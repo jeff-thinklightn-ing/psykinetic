@@ -29,8 +29,8 @@ extends Control
 ## and the log line's, cue sound's slot for an ordinary gain.
 const TRACKS := {
 	"explore": {"label": "Wayfaring", "color": "#9cc8e0", "cue": "ui.reward_found"},
-	"regard": {"label": "Regard", "color": "#ffd27a", "cue": "ui.reward_gain"},
-	"bond": {"label": "Bond", "color": "#eaa0a0", "cue": "ui.reward_gain"},
+	"regard": {"label": "Regard", "color": "#ffd27a", "cue": "ui.reward_regard"},
+	"bond": {"label": "Bond", "color": "#eaa0a0", "cue": "ui.reward_bond"},
 	# A companion's needs (companions' six; Jeff picked Shelter): the need cue, one a frame.
 	"leisure": {"label": "Ease", "color": "#a8c870", "cue": "ui.reward_need"},
 	"adventure": {"label": "Venture", "color": "#d8a070", "cue": "ui.reward_need"},
@@ -38,11 +38,11 @@ const TRACKS := {
 	"faith": {"label": "Faith", "color": "#e8d8a0", "cue": "ui.reward_need"},
 	"safety": {"label": "Shelter", "color": "#90b8a8", "cue": "ui.reward_need"},
 	"company": {"label": "Company", "color": "#e0b0c8", "cue": "ui.reward_need"},
-	"practice": {"label": "Practice", "color": "#c4d0d8", "cue": "ui.reward_gain"},
-	"deed": {"label": "Deeds", "color": "#f0b860", "cue": "ui.reward_gain"},
+	"practice": {"label": "Practice", "color": "#c4d0d8", "cue": "ui.reward_practice"},
+	"deed": {"label": "Deeds", "color": "#f0b860", "cue": "ui.reward_deed"},
 	"catch": {"label": "Catch", "color": "#7cc8c0", "cue": "ui.reward_catch"},
 	"gold": {"label": "", "color": "#c79a55", "cue": "ui.reward_coin"},
-	"item": {"label": "", "color": "#f4efe6", "cue": "ui.reward_gain"},
+	"item": {"label": "", "color": "#f4efe6", "cue": "ui.reward_item"},
 }
 ## A track not in TRACKS.
 const OTHER := {"label": "", "color": "#c79a55", "cue": "ui.reward_gain"}
@@ -53,6 +53,9 @@ const THINGS := {"a fight won": "Fight Won"}
 const STEP_CUE := "ui.reward_step"
 const WANT_CUE := "ui.reward_want"
 const FALLBACK_CUE := "ui.reward_gain"
+## An explore gain with no place and no bar (the hill cat spotted lying up, 814):
+## sound's one soft high note, under the found cue (804 amended (17)).
+const SPOTTED_CUE := "ui.reward_spotted"
 ## A companion's need met (sound's soft note, under the gain's): one a frame
 ## however many needs one deed meets, and only on a frame no other cue was
 ## asked for (sound: her bond's gain, or a step, is the bigger news, and two
@@ -284,6 +287,8 @@ func add(data: Dictionary) -> bool:
 			slot = STEP_CUE
 		elif track == "deed" and big:
 			slot = WANT_CUE
+		elif track == "explore" and not big and not data.get("bar") is Dictionary:
+			slot = SPOTTED_CUE
 		# In a fight only a step sounds; the rest of the burst is the float.
 		if not in_fight or not step.is_empty():
 			_cue(slot, merged, now)

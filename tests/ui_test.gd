@@ -2670,7 +2670,7 @@ func _test_gains() -> void:
 	_check(gains.lines.size() == 1 and gains.lines[0]["text"] == "Umbrage (Regard +2)" and gains.floats.size() == 1
 		and gains.float_text(gains.floats[0]) == "Umbrage (Regard +2)" and gains.lines[0]["words"] == "gave ore the town was short of",
 		"two gains within a second are one float and one log line, rolled up (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
-	_check(gains.cues.size() == 1 and gains.cues[0][0] == "ui.reward_gain", "one cue for the burst (%s)" % [gains.cues])
+	_check(gains.cues.size() == 1 and gains.cues[0][0] == "ui.reward_regard", "one cue for the burst, regard's own (%s)" % [gains.cues])
 	_check(not gains.add({"track": "regard", "amount": 0, "of": "Umbrage"}) and not gains.add({"track": "regard", "amount": -2, "of": "Umbrage"})
 		and not gains.add({"amount": 3}) and gains.lines.size() == 1, "nothing for a loss, a nought or no track")
 	for i in 5:
@@ -2746,7 +2746,30 @@ func _test_gains() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	slots = gains.cues.map(func(c: Array) -> String: return c[0])
-	_check(slots == ["ui.reward_gain"], "a need and her bond in one frame: the bond's cue alone (%s)" % [slots])
+	_check(slots == ["ui.reward_bond"], "a need and her bond in one frame: the bond's cue alone (%s)" % [slots])
+	# 804 amended (17): each track its own cue; sound's slot exists and plays (its own takes, else a fallback).
+	for track: String in ["deed", "regard", "bond", "practice", "item"]:
+		clear.call()
+		gains.add({"track": track, "amount": 1, "of": "x"})
+		slots = gains.cues.map(func(c: Array) -> String: return c[0])
+		_check(slots == [str(Gains.TRACKS[track]["cue"])] and slots[0] == "ui.reward_" + track, "%s sounds its own cue (%s)" % [track, slots])
+	clear.call()
+	gains.add({"track": "explore", "amount": 1, "of": "a hill cat", "words": "spotted a hill cat"})
+	slots = gains.cues.map(func(c: Array) -> String: return c[0])
+	_check(slots == [Gains.SPOTTED_CUE], "a hill cat spotted (no place, no bar): the spotted cue (%s)" % [slots])
+	clear.call()
+	gains.add({"track": "explore", "amount": 1, "of": "Old Tower", "bar": {"have": 1, "need": 5}})
+	gains.add({"track": "explore", "amount": 1, "of": "Hollowfell", "big": true, "banner": "Hollowfell"})
+	slots = gains.cues.map(func(c: Array) -> String: return c[0])
+	_check(slots == ["ui.reward_found"], "a place found or explored keeps the found cue (%s)" % [slots])
+	var unplayed: Array[String] = []
+	var cue_slots: Array[String] = [Gains.SPOTTED_CUE]
+	for each: String in Gains.TRACKS:
+		cue_slots.append(str(Gains.TRACKS[each]["cue"]))
+	for each: String in cue_slots:
+		if not SoundKit.has(each) or SoundKit.played_from(each, false).is_empty():
+			unplayed.append(each)
+	_check(unplayed.is_empty(), "every track's cue, and spotted, is a slot sound has and something plays (%s)" % [unplayed])
 	clear.call()
 	gains.has_cue = func(slot: String) -> bool: return slot == Gains.FALLBACK_CUE
 	gains.add({"track": "catch", "amount": 1})

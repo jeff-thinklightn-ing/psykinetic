@@ -43923,6 +43923,18 @@ made; a mono source's cut is unchanged, and takes already cut stay as they are (
 at a time for three cycles on a drawn body at its work, its stroke at each blow and none between;
 the Chop clip without the work silent (gated on the takes on disk, SoundKit.files). CHANGELOG
 bullet in voice's words. Client only; protocol unchanged, no new class_name.
+804 amended (17), ui's side (release's label; the coordinator's approval, package "reward cues", on; straight behind sound's): Gains.TRACKS points each track at its own slot: deed ui.reward_deed, regard ui.reward_regard, bond ui.reward_bond, practice ui.reward_practice, item ui.reward_item (gold, catch, the places and the six needs unchanged), and an explore gain with no place and no bar (the hill cat spotted lying up, 814: Main._on_cat_spotted sends neither "big" nor "bar"; a place found carries a banner, a place explored its bar) sounds ui.reward_spotted (Gains.SPOTTED_CUE). Sound's slots.json carries the fallbacks (each to the cue its track had), so Gains keeps no table of its own and a tree without the takes still plays the old cue (Gains._play falls to FALLBACK_CUE only for a slot sound lacks altogether). A step (STEP_CUE), a big deed (WANT_CUE), the need cue's one-a-frame rule and the fight's silence are unchanged. ui_test _test_gains: each of the five tracks sounds its own slot, a hill cat the spotted one, a place found or explored the found one, and every TRACKS cue and spotted is a slot SoundKit has and plays (SoundKit.played_from(slot, false)). The package's one bullet is voice's, here. Client only, protocol unchanged, no new class_name.
+
+804 amended (10) (ui; the coordinator's ruling on playtest's bear_deed tour, where "Practice, swordplay"
+floated 11 times in 13 s mid-fight; combat: the "arts" message comes on every change to a peak, so each
+blow can send one; release's label): in a fight (Gains.fighting, the client's own test), an art's
+practice rises are held (Gains.held), with no float, line or cue. They float and log as one gain
+("+11 Practice, swordplay", voice's form) once the fight is over, or once none has come for
+Gains.HOLD_SECONDS (10). A whole step floats at once, even in a fight, with what was held: a rise that
+crosses a tenth of the bar (Main._practice_gained marks it "whole"). The sim and the practice bar are
+unchanged. ui_test _test_gains (rises held, then one float; a whole step at once; the 10 s fallback;
+the fight's end; Main's tenth). No bullet (804's line says what a gain shows). Client only, protocol
+unchanged, no new class_name.
 
 ## 805. The core loop's first slice: Wren wants to go fishing
 
