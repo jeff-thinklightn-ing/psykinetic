@@ -1988,9 +1988,16 @@ func _test_throw_and_charge() -> void:
 		World.step()
 	_check(World.axe_state(boss)["where"] == "ground", "it lies at the line's end (%s)" % World.axe_state(boss)["cell"])
 	_check(World.try_axe_charge(boss), "he charges")
+	var busy := 0
+	var told := 0
 	for i in 20:
 		World.step()
+		if World.boss_busy(boss):  # Its told line down till the charge is over (810 amended (2)).
+			busy += 1
+			told += 1 if not World.telegraphs().is_empty() else 0
 	_check(World.axe_state(boss)["where"] == "hand" and not World.is_disarmed(boss), "he reached it: the axe in his hands again")
+	_check(busy > int(World.moves["charge"]["roar"]) and told == busy and World.telegraphs().is_empty(),
+			"his told line down every tick of the roar and the rush (%d of %d), gone once he has it" % [told, busy])
 
 
 ## His thrown axe bound to him while it lies (603 amended; Jeff: "player

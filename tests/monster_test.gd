@@ -1829,6 +1829,7 @@ func _test_ambush() -> void:
 	_test_heavy_cycle()
 	_test_sneak_pack()
 	_test_aim_struck_cell()
+	_test_tell_through_rush()
 	_test_boar_king()
 	_test_boar_king_close()
 	_test_boar_king_lair()
@@ -6702,6 +6703,54 @@ func _test_old_wolf() -> void:
 ## bear's charge and the old grey's spring at a body off its cell's middle
 ## (its free centre in the next cell) are told through that cell, not held
 ## back (the boar king's hold run found the line to the tile missing it).
+## A told charge's line stays down until the rush it warns of has stopped
+## (810 amended (2); the coordinator's rule, from playtest's king hold run):
+## it ended as the rush began, so a rush's far cells were struck unmarked.
+func _test_tell_through_rush() -> void:
+	print("%s== a told rush's line stays down until the rush stops: the great bear's charge, the old grey's spring (810 amended (2)) ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for kind: String in ["B", "G"]:
+		var rows: Array[String] = ["#".repeat(20)]
+		for y in 9:
+			rows.append("#" + ".".repeat(18) + "#")
+		rows.append("#".repeat(20))
+		var at := Vector2i(9, 5) if kind == "B" else Vector2i(8, 5)
+		rows[5] = rows[5].substr(0, 5) + kind + rows[5].substr(6)
+		rows[at.y] = rows[at.y].substr(0, at.x) + "P" + rows[at.y].substr(at.x + 1)
+		var e := _build(rows)
+		var beast: Monster = e[kind][0]
+		var player: GridEntity = e["P"][0]
+		player.protected = false
+		player.max_hp = 100
+		player.hp = 100
+		beast.sight_range = 12
+		beast.target = player
+		if kind == "B":
+			beast.set("_roared_fight", true)
+			beast.set("_next_charge", 0)
+		else:
+			beast.set("_next_howl", World.tick + 100000)
+			beast.set("_next_spring", 0)
+		beast.call("_special_tick")
+		var id := int((beast.get("_move") as Dictionary).get("telegraph", 0))
+		var rush_ticks := 0
+		var live := 0
+		var over := false
+		for i in 60:
+			World.step()
+			if World.rushing(beast):
+				rush_ticks += 1
+				live += 1 if World.telegraphs().has(id) else 0
+			elif rush_ticks > 0:
+				over = true
+				break
+		_check(id != 0 and rush_ticks > 0 and live == rush_ticks and over and not World.telegraphs().has(id),
+			"the %s's told line live at every tick of its rush (%d of %d), ended once it stopped" % ["great bear" if kind == "B" else "old grey", live, rush_ticks])
+	DayNight.reset()
+	Monster.idling = true
+
+
 func _test_aim_struck_cell() -> void:
 	print("%s== the great bear's charge and the old grey's spring at a body off its cell's middle: told through where it is struck (810 amended) ==" % char(10))
 	Monster.idling = false

@@ -23,6 +23,7 @@ notes (decision 324).
 - Town houses look lived in: each has a doorstep at its door, a worn plank or a stone slab, and an iron lantern beside it that burns at night while someone inside is awake, as the shop's and the temple's do now; stone houses have shutters too, and smoke rises from a house's chimney, or a hut's fire, whenever the house is lit; and a house on raised ground is lit warm inside when its windows are, where before only its windows glowed (489 amended (4)).
 - In town, a pig's neck bends whole now when it puts its head down to feed or falls, where before it split open (319 amended (4)).
 - On Windows the game runs smoothly on some laptops where it crawled at a few frames a second, as it now draws with Vulkan, or with Direct3D 12 where there's no Vulkan (833).
+- The red line marked for a charge stays on the ground now until the run is over, for the great bear's charge, the old grey's lunge and the draugr's run for his thrown axe, where before it vanished as the run began and its far end struck you unmarked (810 amended (2)).
 
 ## v0.1.209
 

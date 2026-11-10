@@ -465,10 +465,11 @@ func _tend_move() -> bool:
 			World.end_telegraph(id, true)
 			_log_move(move, "landed on %d" % hit.size() if not hit.is_empty() else "dodged")
 		"charge":
-			World.end_telegraph(id, true)
+			# Its told line stays down until the rush stops (810 amended (2)): ended in _on_rush_ended.
 			if World.rush(self, _move["toward"], int(charge["cells"]), {"blow": {"impulse": float(charge["impulse"])}}):
-				_move = {"move": "rush"}
+				_move = {"move": "rush", "telegraph": id}
 				return true
+			World.end_telegraph(id, false)
 			_log_move(move, "no room")
 	_move = {}
 	return true
@@ -486,6 +487,7 @@ func _on_died(entity: GridEntity, cause: StringName) -> void:
 func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: Dictionary) -> void:
 	if entity != self or _move.get("move", "") != "rush":
 		return
+	var told := int(_move.get("telegraph", 0))
 	_move = {}
 	var hit := 0
 	for each: Variant in result.get("struck", []):
@@ -493,6 +495,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 		if met is GridEntity and is_instance_valid(met) and met != self and (met as GridEntity).spawned:
 			World.damage(met, int(charge["damage"]), self, &"attack")
 			hit += 1
+	World.end_telegraph(told, true)  # Landed, as ever; its told line down till now (810 amended (2)).
 	if hit > 0:
 		_blow_tick = World.tick
 		_log_move("charge", "landed on %d (%s)" % [hit, reason])

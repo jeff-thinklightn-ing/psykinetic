@@ -226,12 +226,14 @@ func _tend_move() -> bool:
 			_move = {}
 			_pack_rush()
 		"lunge":
-			World.end_telegraph(int(_move["telegraph"]), true)
+			# Its told line stays down until the rush stops (810 amended (2)): ended in _on_rush_ended.
+			var told := int(_move["telegraph"])
 			var toward: Vector2 = _move["toward"]
 			_move = {}
 			if World.rush(self, toward, int(spring["cells"]), {"blow": {"impulse": 0.0}}):
-				_move = {"move": "rush"}
+				_move = {"move": "rush", "telegraph": told}
 				return true
+			World.end_telegraph(told, false)
 			_log_move("lunge", "no room")
 			_begin_pant()
 		"pant":
@@ -273,6 +275,7 @@ func _begin_pant() -> void:
 func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: Dictionary) -> void:
 	if entity != self or _move.get("move", "") != "rush":
 		return
+	var told := int(_move.get("telegraph", 0))
 	_move = {}
 	var bitten: GridEntity = null
 	for each: Variant in result.get("struck", []):
@@ -291,6 +294,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 		_log_move("lunge", "bit (%s)%s" % [reason, ", dragged" if drag != Vector2.ZERO else ""])
 	else:
 		_log_move("lunge", "dodged (%s)" % reason)
+	World.end_telegraph(told, true)  # Landed, as ever; its told line down till now (810 amended (2)).
 	_begin_pant()
 
 

@@ -6003,8 +6003,7 @@ func _tend_charge(by: GridEntity, job: Dictionary) -> void:
 		return
 	if tick < int(job["lands"]):
 		return
-	if _telegraphs.has(int(job["telegraph"])):
-		end_telegraph(int(job["telegraph"]), true)
+	job["ran"] = true  # Its told line stays down till the charge is over (810 amended (2)): _charge_over ends it, landed.
 	var to: Vector2i = job["to"]
 	if axe_state(by)["where"] != "ground":
 		_charge_over(by, job, "gone")
@@ -6040,7 +6039,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Variant = null, _re
 func _charge_over(by: GridEntity, job: Dictionary, reason: String) -> void:
 	_boss_moves.erase(by)
 	if _telegraphs.has(int(job["telegraph"])):
-		end_telegraph(int(job["telegraph"]), false)
+		end_telegraph(int(job["telegraph"]), bool(job.get("ran", false)))
 	if reason == "arrived" and by.tile == job["to"] and axe_state(by)["where"] == "ground":
 		_take_axe(by)
 		return
