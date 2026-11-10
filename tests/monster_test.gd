@@ -1833,6 +1833,7 @@ func _test_ambush() -> void:
 	_test_tell_through_rush()
 	_test_boar_king()
 	_test_boar_king_close()
+	_test_boar_king_far_chase()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -7350,6 +7351,80 @@ func _test_boar_king_close() -> void:
 	_check(king._wallow_far and World.distance(king.tile, player.tile) >= BoarKing.WALLOW_CLEAR and nearest >= 2
 			and king.target == null,
 		"a foe by his den: he goes the far way, %d off them, never back through their reach (nearest %d), and stands alone" % [World.distance(king.tile, player.tile), nearest])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## Broken off the far way and followed (the coordinator, for his unshelve):
+## a plain walker at a player's pace who follows him step for step from his
+## first step away corners him, and a fight is his again, inside 150 ticks;
+## striking him too, it ends him inside 150. In the open: his roam of his den
+## lies clear of every wall, and none is beside him when cornered.
+func _test_boar_king_far_chase() -> void:
+	print("%s== the boar king broken off the far way, followed: cornered and ended inside 15 s, no wall ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var arena: Array[String] = ["#".repeat(46)]
+	for y in 25:
+		arena.append("#" + ".".repeat(44) + "#")
+	arena.append("#".repeat(46))
+	var den := Vector2i(23, 13)
+	for strikes: bool in [false, true]:
+		var rows := arena.duplicate()
+		rows[13] = rows[13].substr(0, 24) + "K" + rows[13].substr(25)
+		rows[13] = rows[13].substr(0, 22) + "P" + rows[13].substr(23)
+		var e := _build(rows)
+		var king: BoarKing = e["K"][0]
+		var player: GridEntity = e["P"][0]
+		player.protected = false
+		player.max_hp = 100
+		player.hp = 100
+		king.den = den
+		king.sight_range = 12
+		king.hp = int(float(king.max_hp) * float(king.charge["wallow_below"])) - 1
+		king.target = player
+		king.note_struck(player)
+		var reach := king.wander_radius * 2 + 2
+		var open := den.x - reach >= 2 and den.x + reach <= 43 and den.y - reach >= 2 and den.y + reach <= 24
+		var from_tile := king.tile
+		var first_away := -1
+		var cornered := -1
+		var died := -1
+		var walled := false
+		var far := false
+		var steps := 0
+		var last_tile := king.tile
+		var next_strike := 0
+		_damage_log.clear()
+		for i in 400:
+			if strikes and World.distance(player.tile, king.tile) <= 1 and World.tick >= next_strike:
+				World.face(player, king.tile - player.tile)
+				if World.try_attack(player, king):
+					next_strike = World.tick + World.attack_ticks_of(player)
+			elif World.distance(player.tile, king.tile) > 1:
+				World.try_move(player, Senses.way_toward(player.tile, king.tile))
+			World.step()
+			far = far or king._wallow_far
+			if not king.spawned or king.hp <= 0:
+				died = World.tick
+				break
+			if king.tile != last_tile:
+				steps += 1
+				last_tile = king.tile
+				if first_away < 0 and king.tile != from_tile:
+					first_away = World.tick
+			if first_away >= 0 and cornered < 0 and king._wallow_far and (king.target != null or str(king._move.get("move", "")) != ""):
+				cornered = World.tick
+				for way: Vector2i in World.DIRECTIONS:
+					walled = walled or not World.is_walkable(king.tile + way)
+				if not strikes:
+					break
+		if not strikes:
+			_check(far and open and first_away >= 0 and cornered >= 0 and cornered - first_away <= 150 and not walled,
+				"followed by a walker, the far way, he is cornered and fights in %d ticks from his first step away (%d steps; roam clear of walls %s, a wall beside him %s)" % [cornered - first_away if cornered >= 0 else -1, steps, open, walled])
+		else:
+			_check(far and first_away >= 0 and died >= 0 and died - first_away <= 150,
+				"followed and struck, the far way, he falls %d ticks after his first step away (%d steps)" % [died - first_away if died >= 0 else -1, steps])
 	DayNight.reset()
 	Monster.idling = true
 
