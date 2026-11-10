@@ -7768,6 +7768,10 @@ const FISH_CAST_TICKS := 15
 ## FISH_WAIT_MOST ticks, a seeded roll per cast (the whole cast 15-30 s).
 const FISH_WAIT_LEAST := 120
 const FISH_WAIT_MOST := 270
+## While fish feed (805 amended (10), Weather.fish_feeding) the wait's top
+## comes down toward FISH_WAIT_KEEN: a bite sooner at dawn, at dusk and in
+## rain, never later than FISH_WAIT_MOST; FISH_WAIT_LEAST stays.
+const FISH_WAIT_KEEN := 160
 ## The bite: the float dips, the splash and its cue; at its end the catch
 ## lands or slips the hook. The strike hook (try_strike) cuts it short.
 const FISH_BITE_TICKS := 12
@@ -7929,6 +7933,12 @@ func _angler_id(entity: GridEntity) -> String:
 	return ""
 
 
+## The longest wait for a bite while fish feed [param feeding] (0..1,
+## Weather.fish_feeding): FISH_WAIT_MOST at 0, FISH_WAIT_KEEN at 1.
+static func fish_wait_most(feeding: float) -> int:
+	return roundi(lerpf(FISH_WAIT_MOST, FISH_WAIT_KEEN, clampf(feeding, 0.0, 1.0)))
+
+
 ## Why [param by] could not cast now (try_fish's checks, in its order), ""
 ## if it could: "no_rod", "busy", "no_water", "no_fish" (water that fishes
 ## nothing, pond_at's ""), "fished_out" (its pond's stock is 0 today).
@@ -7969,7 +7979,7 @@ func try_fish(by: GridEntity) -> bool:
 	var pond := pond_at(at, by.tile)
 	var roll := RandomNumberGenerator.new()
 	roll.seed = hash("%s:%d:%s" % [by.name, tick, at])
-	var bite := tick + FISH_CAST_TICKS + roll.randi_range(FISH_WAIT_LEAST, FISH_WAIT_MOST)
+	var bite := tick + FISH_CAST_TICKS + roll.randi_range(FISH_WAIT_LEAST, fish_wait_most(Weather.fish_feeding(fields.region, DayNight.now())))
 	_fishing[by] = {"pond": pond, "at": at, "tile": by.tile, "from": tick, "exerted": by.last_exertion_tick(),
 		"bite": bite, "ends": bite + FISH_BITE_TICKS, "rod": rod_hand(by), "roll": roll.randf()}
 	by.fishing = {"state": "cast", "at": at}

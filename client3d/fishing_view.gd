@@ -9,6 +9,12 @@ extends Node
 ## ticks at it (sfx.fish_wait, held from the plop to the bite or the pull;
 ## 805 amended (9)). Client only: it reads what is replicated each frame.
 ## A sound slot sound has no takes for yet is skipped quietly (SoundKit.has).
+## Fish rising (805 amended (10), "fish rise"): on each body of water that
+## fishes (World.fish_waters_of the room's terrain) a ring spreads now and
+## then where a fish rises, more often the keener they feed
+## (Weather.fish_feeding: dawn, dusk, rain), the same measure that brings
+## the bite sooner, so the water says when to cast. Wider and slower than a
+## bite's ring, never near a float, a fleck of spray when they feed hard.
 
 ## Seconds the cast's flight takes (World.FISH_CAST_TICKS at its tick rate).
 const CAST_SECONDS := 1.5
@@ -26,6 +32,26 @@ const TIP_OUT := 1.2
 ## Seconds a landed or missed float takes to come back to the tip.
 const PULL_SECONDS := 0.4
 
+## Seconds between rises on a body: RISE_SLOW while fish hardly feed,
+## RISE_FAST at their keenest (each gap drawn half to half again of it).
+const RISE_SLOW := 9.0
+const RISE_FAST := 1.5
+## A rise's ring: its widest radius (m) and its seconds.
+const RISE_WIDEST := 0.9
+const RISE_SECONDS := 1.2
+## A rise ring's whiteness at its start, fading to nothing as it spreads.
+const RISE_ALPHA := 0.6
+## In the dark a ring and its fleck dim to RISE_DARK of that (they are drawn
+## unlit, and would glow), full again from daylight 0.5.
+const RISE_DARK := 0.35
+## No rise within this many metres of a float (it would read as a bite),
+## nor farther than RISE_NEAR from the camera (unseen).
+const RISE_CLEAR := 2.0
+const RISE_NEAR := 45.0
+## Feeding above this throws a fleck of spray as the ring starts.
+const RISE_SPLASH := 0.6
+const SPLASH_SECONDS := 0.3
+
 ## The view (Client3D): its puppets and water surface are read.
 var view: Node = null
 ## The angler's name -> {float, line, state, since, ring}.
@@ -34,6 +60,19 @@ var casts: Dictionary[String, Dictionary] = {}
 var seen: Array[Array] = []
 
 var _clock := 0.0
+## Fishing water read from the view's terrain: body key -> its cells.
+var bodies: Dictionary[String, Array] = {}
+var _read_from: Variant = null
+## Body key -> when it next rises (_clock).
+var _next_rise: Dictionary[String, float] = {}
+## Rises showing: {ring, splash, since, at, splashing}; spent ones kept for
+## the next.
+var rises: Array[Dictionary] = []
+## Each rise begun, for tests: [body, cell, feeding].
+var rose: Array[Array] = []
+## For tests: feeding taken as this (0..1) instead of the clock's.
+var feeding_override := -1.0
+var _roll := RandomNumberGenerator.new()
 
 
 func _process(delta: float) -> void:
@@ -50,6 +89,134 @@ func _process(delta: float) -> void:
 	for key: String in casts.keys():
 		if not live.has(key):
 			_drop(key)
+	step_rises(view.get("_terrain") if view.get("_terrain") is Dictionary else {})
+
+
+## How keenly fish feed now, here (Weather.fish_feeding for the live zone's
+## region, or the tests' override).
+func feeding() -> float:
+	if feeding_override >= 0.0:
+		return feeding_override
+	return Weather.fish_feeding(World.fields.region, DayNight.now())
+
+
+## The gap between rises on a body at [param keen] feeding (its middle).
+static func rise_gap(keen: float) -> float:
+	return lerpf(RISE_SLOW, RISE_FAST, clampf(keen, 0.0, 1.0))
+
+
+## The fishing water of [param terrain] read as bodies (once per terrain).
+func read_waters(terrain: Dictionary) -> void:
+	if is_same(terrain, _read_from):
+		return
+	_read_from = terrain
+	bodies.clear()
+	_next_rise.clear()
+	var waters := World.fish_waters_of(terrain)
+	for cell: Vector2i in waters:
+		var key: String = waters[cell]
+		if not bodies.has(key):
+			bodies[key] = []
+		bodies[key].append(cell)
+
+
+## The rises on [param terrain]'s fishing water, now (_clock): each body
+## rises when due, then the next is drawn; the showing rings spread and fade.
+func step_rises(terrain: Dictionary) -> void:
+	read_waters(terrain)
+	var keen := feeding()
+	var dim := lerpf(RISE_DARK, 1.0, smoothstep(DayNight.NIGHT, 0.5, DayNight.daylight(DayNight.now())))
+	for key: String in bodies:
+		if not _next_rise.has(key):
+			_next_rise[key] = _clock + rise_gap(keen) * _roll.randf()
+		elif _clock >= _next_rise[key]:
+			_next_rise[key] = _clock + rise_gap(keen) * _roll.randf_range(0.5, 1.5)
+			var cells: Array = bodies[key]
+			_rise(key, cells[_roll.randi() % cells.size()], keen)
+	for rise: Dictionary in rises:
+		var ring: MeshInstance3D = rise["ring"]
+		if not ring.visible:
+			continue
+		var since := _clock - float(rise["since"])
+		var grown := since / RISE_SECONDS
+		ring.visible = grown < 1.0
+		ring.scale = Vector3.ONE * lerpf(0.15, RISE_WIDEST, sqrt(clampf(grown, 0.0, 1.0)))
+		(ring.material_override as StandardMaterial3D).albedo_color.a = RISE_ALPHA * dim * (1.0 - grown)
+		var splash: MeshInstance3D = rise["splash"]
+		var flick := since / SPLASH_SECONDS
+		splash.visible = bool(rise["splashing"]) and flick < 1.0
+		if splash.visible:
+			splash.position = rise["at"] + Vector3(0, sin(flick * PI) * 0.12, 0)
+			splash.scale = Vector3.ONE * (1.0 - flick)
+			(splash.material_override as StandardMaterial3D).albedo_color.a = dim
+
+
+## A fish rises at [param cell] of [param key]'s water, unless a float is
+## near or the camera far.
+func _rise(key: String, cell: Vector2i, keen: float) -> void:
+	for cast: Dictionary in casts.values():
+		var bobber: Node3D = cast["float"]
+		if Vector2(bobber.position.x, bobber.position.z).distance_to(Vector2(cell)) < RISE_CLEAR:
+			return
+	var at := Vector3(cell.x, _surface(cell), cell.y)
+	var camera := view.get_viewport().get_camera_3d() if view.is_inside_tree() else null
+	if camera != null and Vector2(camera.global_position.x, camera.global_position.z).distance_to(
+			Vector2(view.to_global(at).x, view.to_global(at).z)) > RISE_NEAR:
+		return
+	var rise: Dictionary = {}
+	for spent: Dictionary in rises:
+		if not (spent["ring"] as MeshInstance3D).visible:
+			rise = spent
+			break
+	if rise.is_empty():
+		rise = {"ring": _ring_mesh(), "splash": _splash_mesh()}
+		rises.append(rise)
+	rise["since"] = _clock
+	rise["at"] = at
+	rise["splashing"] = keen > RISE_SPLASH
+	var ring: MeshInstance3D = rise["ring"]
+	ring.position = at + Vector3(0, 0.01, 0)
+	ring.scale = Vector3.ONE * 0.15
+	ring.visible = true
+	rose.append([key, cell, keen])
+
+
+## A ring as a bite's (a thin torus, pale and fading), under the view.
+func _ring_mesh() -> MeshInstance3D:
+	var ring := MeshInstance3D.new()
+	var disc := TorusMesh.new()
+	disc.inner_radius = 0.8  # A band a fifth of its radius: read from the low camera.
+	disc.outer_radius = 1.0
+	ring.mesh = disc
+	var foam := StandardMaterial3D.new()
+	foam.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	foam.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	foam.albedo_color = Color(1, 1, 1, RISE_ALPHA)
+	ring.material_override = foam
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.visible = false
+	view.add_child(ring)
+	return ring
+
+
+## A rise's fleck of spray, under the view.
+func _splash_mesh() -> MeshInstance3D:
+	var splash := MeshInstance3D.new()
+	var drop := SphereMesh.new()
+	drop.radius = 0.05
+	drop.height = 0.1
+	drop.radial_segments = 6
+	drop.rings = 3
+	splash.mesh = drop
+	var white := StandardMaterial3D.new()
+	white.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	white.albedo_color = Color(0.92, 0.96, 1.0)
+	white.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	splash.material_override = white
+	splash.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	splash.visible = false
+	view.add_child(splash)
+	return splash
 
 
 ## [param entity]'s cast drawn (made the first time), by its state.
@@ -189,3 +356,9 @@ func _drop(key: String) -> void:
 func _exit_tree() -> void:
 	for key: String in casts.keys():
 		_drop(key)
+	for rise: Dictionary in rises:
+		for part: String in ["ring", "splash"]:
+			var node: Node = rise[part]
+			if is_instance_valid(node):
+				node.queue_free()
+	rises.clear()

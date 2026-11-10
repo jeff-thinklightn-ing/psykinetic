@@ -285,6 +285,34 @@ static func rain_between(region: String, from: float, to: float) -> float:
 	return total / DayNight.day_steps
 
 
+## How keenly fish feed (805 amended (10), "fish rise"): about sunrise and
+## sunset, by the sun's height so it follows the season's day (full with
+## the sun on the horizon, gone FEED_SPREAD degrees above or below it), over
+## a floor of FEED_NIGHT at night and FEED_DAY by day.
+const FEED_SPREAD := 12.0
+const FEED_NIGHT := 0.1
+const FEED_DAY := 0.15
+## Rain on the water adds up to FEED_RAIN: from a drizzle (full by rain
+## 0.3, so a "rain" spell's 0.7 counts whole), gone again in a storm's
+## downpour (from 0.8, none by 0.95).
+const FEED_RAIN := 0.4
+
+
+## How keenly fish feed in [param region] at world step [param steps], 0..1
+## (805 amended (10)): highest about sunrise and sunset, low at midday and
+## at night, raised by light or steady rain, not by a storm. The same on the
+## server (World.try_fish's wait, sooner as it rises) and the client (the
+## rise rings drawn on fishing water, FishingView), from the clock, the
+## season and the weather alone: nothing on the wire.
+static func fish_feeding(region: String, steps: float) -> float:
+	var sun := DayNight.elevation(steps)
+	var keen := lerpf(FEED_NIGHT, FEED_DAY, smoothstep(-FEED_SPREAD, FEED_SPREAD, sun))
+	keen = maxf(keen, 1.0 - smoothstep(0.0, FEED_SPREAD, absf(sun)))
+	var rain := float(at(region, steps)["rain"])
+	keen += FEED_RAIN * smoothstep(0.05, 0.3, rain) * (1.0 - smoothstep(0.8, 0.95, rain))
+	return clampf(keen, 0.0, 1.0)
+
+
 ## Server, on the world tick: every storm since the last check (at most
 ## CATCH_UP days back) breaks each standing roof of each level in
 ## [param areas] (WorldMap.areas: "roofs", "region") with the level's

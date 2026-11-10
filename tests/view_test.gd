@@ -171,6 +171,7 @@ func _ready() -> void:
 		_test_bow_back()  # Reads a draw's pose on the wall clock: right after the pick's swing, as fitted.
 		_test_sheathed()
 		await _test_fishing_pose()  # Lets frames run: the rod's tip is read off the pose.
+		_test_fish_rise()
 		await _test_axe_edge_leads()
 		_test_guard_arms()
 		await _test_goblins_differ()
@@ -8926,6 +8927,62 @@ func _test_fishing_pose() -> void:
 	_check(not puppet.has_meta("fish_state") and not rig.base_clip().begins_with("Fish"), "reeled in: the next cast casts again, and it stands (%s)" % rig.base_clip())
 	player.slots = was
 	_rig._process(0.0)
+
+
+## Fish rising (805 amended (10), "fish rise"): rings only on water that
+## fishes, more often the keener the fish feed, none by a float.
+func _test_fish_rise() -> void:
+	print("
+== fish rising: rings on fishing water, oftener as they feed (805 amended (10)) ==")
+	var fv: Node = _rig.fishing_view
+	var player := _player()
+	var base: Vector2i = player.tile + Vector2i(3, 3) if player != null else Vector2i(10, 10)
+	var water: Array[Vector2i] = []
+	for y in 4:
+		for x in 4:
+			water.append(base + Vector2i(x, y))
+	var puddle: Array[Vector2i] = [base + Vector2i(8, 0), base + Vector2i(9, 0)]  # Too small to fish.
+	var terrain := {"water": water + puddle}
+	fv.rose.clear()
+	var count_at := func(keen: float, seconds: float) -> int:
+		fv.feeding_override = keen
+		fv.rose.clear()
+		fv._next_rise.clear()
+		var t := 0.0
+		while t < seconds:
+			fv._clock += 0.1
+			t += 0.1
+			fv.step_rises(terrain)
+		return fv.rose.size()
+	var slow: int = count_at.call(0.0, 120.0)
+	var on_water := true
+	for entry: Array in fv.rose:
+		on_water = on_water and water.has(entry[1])
+	var fast: int = count_at.call(1.0, 120.0)
+	for entry: Array in fv.rose:
+		on_water = on_water and water.has(entry[1])
+	_check(fv.bodies.size() == 1, "one body fishes (the 16-cell pool), not the 2-cell puddle (%s)" % fv.bodies.keys())
+	_check(on_water and slow > 0 and fast > slow * 3, "rings only on the pool, %d in two minutes hardly feeding, %d at their keenest" % [slow, fast])
+	var showing := 0
+	for rise: Dictionary in fv.rises:
+		showing += 1 if (rise["ring"] as MeshInstance3D).visible else 0
+	_check(fv.rises.size() <= 4 and showing >= 1, "the rings reused, %d made for %d rises" % [fv.rises.size(), fast])
+	# A float on the pool: no rise within RISE_CLEAR of it.
+	if player != null:
+		player.fishing = {"state": "wait", "at": base + Vector2i(1, 1)}
+		fv._process(0.0)
+		count_at.call(1.0, 60.0)
+		var clear := true
+		for entry: Array in fv.rose:
+			clear = clear and Vector2(entry[1]).distance_to(Vector2(base + Vector2i(1, 1))) >= fv.RISE_CLEAR
+		_check(clear and fv.rose.size() > 0, "none within %.0f m of a float (%d elsewhere)" % [fv.RISE_CLEAR, fv.rose.size()])
+		player.fishing = {}
+		fv._process(0.0)
+	fv.feeding_override = -1.0
+	fv.read_waters(_rig._terrain)
+	for rise: Dictionary in fv.rises:
+		(rise["ring"] as MeshInstance3D).visible = false
+		(rise["splash"] as MeshInstance3D).visible = false
 
 
 func _test_bandit_look() -> void:

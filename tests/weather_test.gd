@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_night_town()
 	_test_mine_light()
 	_test_skylights()
+	_test_fish_feeding()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -616,3 +617,81 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## Fish feeding (805 amended (10), "fish rise"): keenest about dawn and dusk,
+## low at midday and night, raised by rain but not a storm; the wait for a
+## bite only ever comes sooner, and at feeding 0 it is exactly 805's.
+func _test_fish_feeding() -> void:
+	print("
+== fish feeding: dawn, dusk and rain bring the bite sooner (805 amended (10)) ==")
+	Weather.use({"default": {"weights": {"clear": 1}}, "wet": {"weights": {"rain": 1}}, "wild": {"weights": {"storm": 1}}})
+	var at_hour := func(hour: float) -> float:
+		return fposmod((hour / 24.0 - DayNight.phase) * DayNight.day_steps, float(DayNight.day_steps)) + DayNight.anchor
+	# Sunrise and sunset today: where the sun crosses the horizon.
+	var rise := -1.0
+	var sets := -1.0
+	for i in 24 * 60:
+		var a := DayNight.elevation(at_hour.call(i / 60.0))
+		var b := DayNight.elevation(at_hour.call((i + 1) / 60.0))
+		if a < 0.0 and b >= 0.0:
+			rise = i / 60.0
+		elif a >= 0.0 and b < 0.0:
+			sets = i / 60.0
+	var keen := {}
+	for hour: float in [rise, sets, 12.0, 0.0, 3.0, 23.0]:
+		keen[hour] = Weather.fish_feeding("default", at_hour.call(hour))
+	_check(is_equal_approx(DayNight.hour(at_hour.call(6.5)), 6.5), "the clock read back at the hour asked (%.2f)" % DayNight.hour(at_hour.call(6.5)))
+	_check(rise > 3.0 and sets > rise and keen[rise] > 0.95 and keen[sets] > 0.95,
+			"keenest at sunrise %.2f h and sunset %.2f h (%.2f, %.2f)" % [rise, sets, keen[rise], keen[sets]])
+	# The year's longest and shortest days (whole days on, so the hours line
+	# up): the peak sits at their sunrise and sunset, which move with the season.
+	var days := maxi(roundi(Season.year_steps() / DayNight.day_steps), 1)
+	var longest := 0
+	var shortest := 0
+	for d in days:
+		var tilt := Season.declination(at_hour.call(12.0) + d * DayNight.day_steps)
+		if tilt > Season.declination(at_hour.call(12.0) + longest * DayNight.day_steps):
+			longest = d
+		if tilt < Season.declination(at_hour.call(12.0) + shortest * DayNight.day_steps):
+			shortest = d
+	var edges := {}
+	for d: int in [longest, shortest]:
+		var on := float(d * DayNight.day_steps)
+		var up := -1.0
+		var down := -1.0
+		for i in 24 * 60:
+			var a := DayNight.elevation(at_hour.call(i / 60.0) + on)
+			var b := DayNight.elevation(at_hour.call((i + 1) / 60.0) + on)
+			if a < 0.0 and b >= 0.0:
+				up = i / 60.0
+			elif a >= 0.0 and b < 0.0:
+				down = i / 60.0
+		edges[d] = [up, down, Weather.fish_feeding("default", at_hour.call(up) + on), Weather.fish_feeding("default", at_hour.call(down) + on)]
+	var summer: Array = edges[longest]
+	var winter: Array = edges[shortest]
+	_check(winter[0] - summer[0] > 0.5 and summer[2] > 0.95 and summer[3] > 0.95 and winter[2] > 0.95 and winter[3] > 0.95,
+			"the peak follows the sun through the year: the longest day's sunrise %.2f h and sunset %.2f h (%.2f, %.2f), the shortest's %.2f and %.2f (%.2f, %.2f)"
+			% [summer[0], summer[1], summer[2], summer[3], winter[0], winter[1], winter[2], winter[3]])
+	_check(keen[12.0] < 0.3 and keen[3.0] < 0.3 and keen[0.0] < 0.3, "low at midday and at night (%.2f, %.2f, %.2f)" % [keen[12.0], keen[3.0], keen[0.0]])
+	var all_in := true
+	for i in 96:
+		for region: String in ["default", "wet", "wild"]:
+			var k := Weather.fish_feeding(region, at_hour.call(i * 0.25))
+			all_in = all_in and k >= 0.0 and k <= 1.0
+	_check(all_in, "always 0..1, every quarter hour, dry, wet and stormy")
+	var noon := at_hour.call(12.0) as float
+	var dry := Weather.fish_feeding("default", noon)
+	var wet := Weather.fish_feeding("wet", noon)
+	var wild := Weather.fish_feeding("wild", noon)
+	_check(float(Weather.at("wet", noon)["rain"]) > 0.3, "the wet region rains at noon (%.2f; not snow)" % float(Weather.at("wet", noon)["rain"]))
+	_check(wet > dry + 0.3 and absf(wild - dry) < 0.01, "rain raises it (%.2f from %.2f), a storm's downpour doesn't (%.2f)" % [wet, dry, wild])
+	_check(World.fish_wait_most(0.0) == World.FISH_WAIT_MOST and World.FISH_WAIT_MOST == 270 and World.FISH_WAIT_LEAST == 120,
+			"at feeding 0 the wait is 805's, 120 to 270 ticks: nothing worse for anyone")
+	var never_later := true
+	for i in 21:
+		var most := World.fish_wait_most(i / 20.0)
+		never_later = never_later and most <= World.FISH_WAIT_MOST and most >= World.FISH_WAIT_LEAST
+	_check(never_later and World.fish_wait_most(1.0) == World.FISH_WAIT_KEEN and World.FISH_WAIT_KEEN < World.FISH_WAIT_MOST,
+			"keener, sooner: at most %d at full feeding, never past 270 nor under 120" % World.fish_wait_most(1.0))
+	Weather.reload()

@@ -43496,6 +43496,32 @@ told). Tests: sound_kit_test (a pond's shore across from the listener and on its
 stream's curve is no pond; the three positional); view_test _test_fishing_pose (the lap held while
 it waits where the takes are, stopped at the miss). Client only; protocol unchanged, no new
 class_name. CHANGELOG bullet in voice's words.
+805 amended (10) (2026-11-09, release's label; the coordinator's approval, environment's design, economy's
+agreement as the pond stock's owner; package "fish rise", landing on): fish rise, and dawn, dusk and rain bring
+the bite sooner, shown on the water. Weather.fish_feeding(region, steps), 0..1, is a pure static of the clock and
+the weather, so server and client compute the same with nothing on the wire: about sunrise and sunset by the
+sun's height (DayNight.elevation), so it follows the season's day, full with the sun on the horizon and gone
+FEED_SPREAD 12 degrees above or below it (about an hour and a half either side), over a floor of FEED_NIGHT 0.1
+at night and FEED_DAY 0.15 by day (fixed hours put the dusk peak in the dark in winter); rain adds
+up to FEED_RAIN 0.4, full from a drizzle by rain 0.3 (a "rain" spell's 0.7 counts whole), gone in a storm's
+downpour (from 0.8, none by 0.95); clamped to 0..1. Server: World.try_fish's wait for the bite is
+randi_range(FISH_WAIT_LEAST 120, World.fish_wait_most(feeding)), which lerps FISH_WAIT_MOST 270 down to
+FISH_WAIT_KEEN 160, so at feeding 0 the wait is exactly 805's and it never gets longer; the catch chance (0.6) and
+the stock (8, refill 2) are economy's and unchanged, the stock not sent to clients. Client: FishingView draws rise
+rings on each body that fishes (World.fish_waters_of the room's terrain, the bodies the server casts into), one
+per body every RISE_SLOW 9 s at feeding 0 down to RISE_FAST 1.5 s at full (each gap drawn from half to half again),
+at a random cell of the body; a rise's ring is wider and slower than a bite's (RISE_WIDEST 0.9 m over RISE_SECONDS
+1.2 s, against 0.6 m over 0.7 s) and a broader band, a fifth of its radius, starting at RISE_ALPHA 0.6, so the low camera
+reads it; with a fleck of spray at its start above RISE_SPLASH 0.6; both drawn unlit, so in the dark they
+dim to RISE_DARK 0.35, full again from daylight 0.5; none within RISE_CLEAR
+2 m of a float (it would read as a bite) nor farther than RISE_NEAR 45 m from the camera; rings and flecks reused.
+No words on screen: the water says when to cast. Not in this: rain rings on the water (environment's next look
+item); Wren noticing the rise (companions and voice, offered the function's name once this is on main).
+weather_test _test_fish_feeding (keenest at the day's sunrise and sunset, and on the year's longest and shortest days at theirs; low at
+midday and night; always 0..1, rain raises it and
+a storm doesn't, the wait 120 to 270 at feeding 0 and never past it, 160 at full); view_test _test_fish_rise (rings
+only on a body that fishes, not a 2-cell puddle; over three times as many at full feeding as at none; reused rings;
+none by a float). Server and client, protocol unchanged, no new class_name; the bullet is voice's.
 
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
