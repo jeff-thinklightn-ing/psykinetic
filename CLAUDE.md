@@ -18,12 +18,14 @@ which worktree owns each step, and the design rules not to break without asking 
   routes between trees), questions for Jeff and his "waiting on you" list, the weekly
   summary, and this file.
 - **release**: landing and shipping. The landing lock (it may freeze `main`, settle who
-  lands next, and clear a stale lock), decision numbers, `PROTOCOL_REVISION` numbers and
+  lands next, and clear a stale lock), `PROTOCOL_REVISION` numbers and
   release versions, cutting the batched releases, deploying the server, the box's health
-  and rollbacks, `CHANGELOG.md`, and `THIRD_PARTY.md`. Ask it for a number before you
-  commit; tell it when you land (commit, protocol change, new `class_name`).
-- A design question goes to the coordinator first; once approved, get its decision number
-  from release.
+  and rollbacks, `CHANGELOG.md`, and `THIRD_PARTY.md`. Ask it for a revision number before
+  you commit; tell it when you land (commit, protocol change, new `class_name`). Decision
+  numbers come from a script since 834 (Landing work, below); release settles a clash or a
+  mis-issued label there.
+- A design question goes to the coordinator first; once approved, take its decision number
+  from the script (`sh tools/decision_number.sh new <tree> "<what>"`).
 - New player-facing lines (dialogue, windows, signs, barks) go to the `voice` worktree session
   for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`.
 - The interface is two trees (Jeff, 2026-11-09): `ui` owns what a window does (behaviour and
@@ -87,8 +89,14 @@ place, and a text and loot don't go in before a quest is in."
   `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it, and (539 amended (4), 0fc2e053) on any non-bullet line under `## Unreleased`: one line per bullet, never wrapped. On a CHANGELOG-only rebase conflict, run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
-  running, ask the release session for the number before
-  committing, so two trees don't take the same one.
+  running, take the number from the script before committing, so two trees don't take the
+  same one (834, open since 2026-11-10; never a guessed number): `sh tools/decision_number.sh
+  new <tree> "<what>"` for a new decision, `amend <tree> <decision> "<what>"` for the next
+  `amended (k)`, `status` for what is out, `drop <tree> <number-or-label> "<why>"` to give one
+  back. A follow-up that lands on its own takes the next amended (k) from the script; a
+  paragraph added to work not yet landed stays under its hand-out and takes nothing; a tree
+  landing its side of a decision the coordinator named uses that decision's number and takes
+  nothing.
 - After a pull or rebase that brings in a new `class_name`, run
   `godot --headless --path . --import` before testing: each worktree has its own `.godot`
   class cache, and without it scripts naming the new class fail to compile. Name any new
