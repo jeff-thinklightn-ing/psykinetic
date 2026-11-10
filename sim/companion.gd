@@ -144,6 +144,9 @@ const APEX_BERTH := 6
 const APEX_WARN_AGAIN_TICKS := 3000
 ## How far round her she looks for her berth, broken off (780 amended (21)).
 const BERTH_SEARCH := 12
+## Her own steps to a berth cell, weighed against her player's reach (780
+## amended (25)): half a cell of their reach for each step of her way.
+const BERTH_WAY_WEIGHT := 0.5
 ## Ticks an apex she broke from still counts as fighting on after it last
 ## went for her or her player (780 amended (21)): its pause between rushes,
 ## the king's wallow (playtest's king9: 88 ticks off and back), is its fight.
@@ -1037,6 +1040,8 @@ var _apex_seen: Dictionary[int, int] = {}
 ## Broken off (780 amended (21)): apex instance id -> the tick it last went
 ## for her or her player (broke_from).
 var _fights_on: Dictionary[int, int] = {}
+## The first step of her way to berth_cell's cell (780 amended (25)).
+var berth_next := NONE
 ## Broken off from an apex fight (she or her player low): till both are over
 ## HP_THRESHOLDS[0] again, an apex is her foe only while it goes for her.
 var _apex_broke := false
@@ -7855,48 +7860,103 @@ func _way_out() -> Dictionary[Vector2i, bool]:
 
 
 ## Where she stands broken off while [param beasts] fight on (780 amended
-## (21); the coordinator's order): never on her player's way out (_way_out),
-## a link's cell or fire; then, of the free cells within BERTH_SEARCH that
-## are APEX_BERTH or more from each beast and its escort, the nearest her
-## player within FOLLOW_START of them (she follows if the fight moves); else
-## the nearest her player at any reach; else, nothing so clear, the one
-## farthest from them. Her own cell is kept while it is as good. NONE if
-## there is none.
+## (21) and (25); the coordinator's order). Only a cell she can reach by a
+## way that never goes inside APEX_BERTH of a beast or its escort (from a
+## cell inside it, only ever farther out): with one between her and her
+## player, she keeps to her side. Of those, never her player's way out
+## (_way_out), a link's cell or fire, and APEX_BERTH or more from each: the
+## best within FOLLOW_START of her player (she follows if the fight moves),
+## else the best at any reach, keyed on their reach plus BERTH_WAY_WEIGHT of
+## her steps there. None: she stays, unless her own cell is inside it, then a
+## step straight away (the neighbour farthest from them). Her own cell is
+## kept while it is as good. The first step of the way is berth_next.
 func berth_cell(beasts: Array[GridEntity]) -> Vector2i:
-	var threats: Array[GridEntity] = beasts.duplicate()
+	var threats: Array[Vector2i] = []
+	for beast in beasts:
+		threats.append(beast.tile)
 	for entity in World.entities():
 		if entity is Animal and beasts.has((entity as Animal).escort_lead) and entity.spawned and entity.hp > 0 and entity.zone == zone:
-			threats.append(entity)
+			threats.append(entity.tile)
 	var blocked := _way_out()
-	var keeper_at: Vector2i = keeper.tile if _alive(keeper) else tile
-	var tiers: Array[Vector2i] = [NONE, NONE, NONE]  # Near her player, clear at any reach, farthest.
-	var keys: Array[float] = [INF, INF, INF]
-	for cell in _cells_within(BERTH_SEARCH):
-		if cell != tile and (not World.is_walkable(cell) or not World.is_free(cell)):
-			continue
-		if World.is_fire(cell) or World.is_link_cell(cell) or blocked.has(cell):
-			continue
-		var clear := 1 << 20
-		for each in threats:
-			clear = mini(clear, World.distance(cell, each.tile))
-		var to_keeper := World.distance(cell, keeper_at)
-		# Her own cell wins a tie: no stepping back and forth between two as good.
-		var key := float(to_keeper) - (0.5 if cell == tile else 0.0)
-		if clear >= APEX_BERTH:
-			if to_keeper <= FOLLOW_START and key < keys[0]:
-				tiers[0] = cell
-				keys[0] = key
-			if key < keys[1]:
-				tiers[1] = cell
-				keys[1] = key
-		var far_key := -float(clear) * 100.0 + key
-		if far_key < keys[2]:
-			tiers[2] = cell
-			keys[2] = far_key
-	for cell in tiers:
-		if cell != NONE:
-			return cell
-	return NONE
+	var from := tile
+	var passable := func(cell: Vector2i) -> bool:
+		return cell == from or World.is_walkable(cell) and World.is_free(cell) and not World.is_fire(cell)
+	var standable := func(cell: Vector2i) -> bool:
+		return not World.is_fire(cell) and not World.is_link_cell(cell) and not blocked.has(cell)
+	var way := berth_way(tile, keeper.tile if _alive(keeper) else tile, threats, passable, standable)
+	berth_next = way[1]
+	return way[0]
+
+
+## berth_cell's search (780 amended (25)), from [param from] with her player
+## at [param keeper_at] and the beasts at [param threats]: [goal, first step].
+## [param passable] says a cell can be walked through, [param standable] that
+## it may be stood on (not fire, a link, her player's way out). A breadth-first
+## walk within BERTH_SEARCH of her that never steps inside APEX_BERTH of a
+## threat, or, inside it, only ever farther out.
+static func berth_way(from: Vector2i, keeper_at: Vector2i, threats: Array[Vector2i], passable: Callable, standable: Callable) -> Array[Vector2i]:
+	var came: Dictionary[Vector2i, Vector2i] = {from: from}
+	var steps: Dictionary[Vector2i, int] = {from: 0}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	var near := NONE
+	var near_key := INF
+	var any := NONE
+	var any_key := INF
+	while head < queue.size():
+		var at := queue[head]
+		head += 1
+		var at_clear := _clear_of(at, threats)
+		if at_clear >= APEX_BERTH and bool(standable.call(at)):
+			var to_keeper := World.distance(at, keeper_at)
+			# Her own cell wins a tie: no stepping back and forth between two as good.
+			var key := float(to_keeper) + BERTH_WAY_WEIGHT * steps[at] - (0.5 if at == from else 0.0)
+			if to_keeper <= FOLLOW_START and key < near_key:
+				near = at
+				near_key = key
+			if key < any_key:
+				any = at
+				any_key = key
+		for dir: Vector2i in World.DIRECTIONS:
+			var next := at + dir
+			if came.has(next) or World.distance(next, from) > BERTH_SEARCH or not bool(passable.call(next)):
+				continue
+			var next_clear := _clear_of(next, threats)
+			if next_clear < APEX_BERTH and next_clear <= at_clear:
+				continue  # Never inside its berth, but on the way out of it.
+			came[next] = at
+			steps[next] = steps[at] + 1
+			queue.append(next)
+	var goal := near if near != NONE else any
+	if goal == NONE:
+		# Nothing clear she can reach by such a way: she stays, unless her own
+		# cell is inside it; then a step straight away.
+		goal = from
+		var own := _clear_of(from, threats)
+		if own < APEX_BERTH:
+			var away_key := -INF
+			for dir: Vector2i in World.DIRECTIONS:
+				var next := from + dir
+				if not bool(passable.call(next)) or not bool(standable.call(next)):
+					continue
+				var next_clear := _clear_of(next, threats)
+				var key := next_clear * 10.0 - World.distance(next, keeper_at)
+				if next_clear > own and key > away_key:
+					goal = next
+					away_key = key
+		return [goal, goal]
+	var first := goal
+	while came[first] != from:
+		first = came[first]
+	return [goal, first]
+
+
+## The nearest of [param threats] to [param cell], in cells (1 << 20 for none).
+static func _clear_of(cell: Vector2i, threats: Array[Vector2i]) -> int:
+	var clear := 1 << 20
+	for each in threats:
+		clear = mini(clear, World.distance(cell, each))
+	return clear
 
 
 ## AVOID: broken off from an apex that fights on, to her berth (berth_cell),
@@ -7906,8 +7966,12 @@ func berth_cell(beasts: Array[GridEntity]) -> Vector2i:
 func _avoid_step() -> void:
 	var broke := broke_from()
 	if not broke.is_empty():
+		if World.tick < next_move_tick:
+			return  # Not her step yet: the way is found when she can take it.
 		var cell := berth_cell(broke)
-		if cell != NONE and cell != tile and _step_toward(cell, false):
+		# A step at a time along the way berth_cell found (780 amended (25)),
+		# not Heel's shortest, which may cut past the beast.
+		if cell != NONE and cell != tile and _step_toward(berth_next, false):
 			return
 		var at_her := _adjacent_hostile()
 		if cell != tile and at_her != null and World.in_reach(self, at_her):

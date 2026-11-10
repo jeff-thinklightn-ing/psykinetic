@@ -41879,6 +41879,28 @@ read by combat's flank guard (780 amended (9), flank_guard_per_player 25). An "[
 line when it changes. monster_test _test_bear_party. Server only, protocol unchanged, no new
 class_name; no bullet (the bear lives in bear_yard only).
 
+780 amended (25): the berth's way (2026-11-10, companions; release's label; the coordinator's
+design, from playtest's brk3_3 on (21)). With the bear between her and her player, (21)'s second
+tier took the clear cell nearest them at any reach, which lay past it, and Heel's way there cut by
+it, so she stood: 4 off it for 2 s (472-492), and 1 off as it walked by at low hp, fleeing her
+player (695-710; enemy-ai: Monster's flee_below, it was not going for her). Now berth_cell is
+Companion.berth_way(from, her player's cell, the threats' cells, passable, standable), a
+breadth-first walk within BERTH_SEARCH of her that never steps inside APEX_BERTH of a beast or its
+escort, or, from a cell inside it, only ever farther out. Of the cells it reaches that she may stand
+on (not fire, a link or her player's way out) and APEX_BERTH clear, the best within FOLLOW_START of
+her player, else the best at any reach, keyed on their reach plus BERTH_WAY_WEIGHT (0.5) of her
+steps there, her own cell kept on a tie: with the beast between them she takes ground on her side
+and waits for the angle. Reaching none, she stays, unless her own cell is inside the berth: then a
+step straight away (the neighbour farthest from them, nearer her player on a tie). (21)'s third
+tier, the farthest cell however reached, is gone. _avoid_step walks the way it found a step at a
+time (berth_next), not Heel's shortest, and looks for it only on a tick she can step.
+companion_test _test_break_off_holds: brk3_3's three cases in an open yard, walked a step at a
+time: the bear between them (out of its berth on her side in 2 steps), it walking past her with her
+player behind (every step farther out, nearest 6 after her steps), her player knocked 10 cells
+past it (she sets off at once, round it, never inside, to 1 off them); boxed in inside, one step
+straight away; nowhere to stand, she stays; (21)'s apex holds and room cell unchanged. Server only,
+protocol unchanged, no new class_name.
+
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'

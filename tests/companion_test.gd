@@ -4964,9 +4964,11 @@ func _test_old_grey_seen() -> void:
 ## walked back into its reach): for the great bear, the old grey and the boar
 ## king, her PULL_BACK holds while it is on her player, she keeps APEX_BERTH
 ## from it and takes no blow; it gone, calm brings her back. And where she
-## stands (berth_cell): near her player when a cell 5 clear is; farther, still
-## clear, when none near is; the farthest when none is clear; never on her
-## player's way out.
+## stands (berth_cell): near her player when a cell 6 clear is; never on her
+## player's way out. Her way there (780 amended (25), berth_way): never inside
+## its berth but out of it, on her side of one between them; after her player
+## knocked far past it, at once and a way round; nothing to reach, a step
+## straight away, or she stays.
 func _test_break_off_holds() -> void:
 	print("\n== broken off, the apex still on her player: no calm GUARD, her berth kept, no blow; gone, GUARD again (780 amended (21)) ==")
 	_kill_monsters()
@@ -5047,45 +5049,62 @@ func _test_break_off_holds() -> void:
 	_check(cell != Vector2i(-99999, -99999) and World.distance(cell, beast.tile) >= Companion.APEX_BERTH
 			and World.distance(cell, owner.tile) <= Companion.FOLLOW_START and not pet._way_out().has(cell),
 			"a clear cell near her player: she takes it, at their side (%s)" % cell)
-	# A corridor: her player beside it, nothing clear near them; farther, still clear, nearest them.
-	_put(beast, Vector2i(8, 4))
-	_put(owner, Vector2i(9, 4))
-	_put(pet, Vector2i(9, 6))
-	cell = pet.berth_cell(beasts)
-	var best_clear := 1 << 20
-	for each in pet._cells_within(Companion.BERTH_SEARCH):
-		if (each == pet.tile or World.is_walkable(each) and World.is_free(each)) and not World.is_fire(each) and not World.is_link_cell(each) \
-				and not pet._way_out().has(each) and World.distance(each, beast.tile) >= Companion.APEX_BERTH:
-			best_clear = mini(best_clear, World.distance(each, owner.tile))
-	_check(cell != Vector2i(-99999, -99999) and World.distance(cell, beast.tile) >= Companion.APEX_BERTH and World.distance(cell, owner.tile) > Companion.FOLLOW_START
-			and World.distance(cell, owner.tile) == best_clear and not pet._way_out().has(cell),
-			"nothing clear near her player: farther, still %d clear, the nearest them (%s, %d off them)" % [Companion.APEX_BERTH, cell, World.distance(cell, owner.tile)])
-	# A small lair: nothing clear in reach (stand-ins over every cell she could take): the farthest from them.
-	var stand_ins: Array[GridEntity] = [beast]
-	var candidates: Array[Vector2i] = []
-	for each in pet._cells_within(Companion.BERTH_SEARCH):
-		if (each == pet.tile or World.is_walkable(each) and World.is_free(each)) and not World.is_fire(each) and not World.is_link_cell(each) \
-				and not pet._way_out().has(each):
-			candidates.append(each)
-	for each in candidates:
-		if stand_ins.all(func(s: GridEntity) -> bool: return World.distance(each, s.tile) >= Companion.APEX_BERTH):
-			var stand := GridEntity.new()
-			stand.tile = each + Vector2i(1, 0)
-			stand_ins.append(stand)
-	cell = pet.berth_cell(stand_ins)
-	var most := -1
-	for each in candidates:
-		var clear := 1 << 20
-		for s in stand_ins:
-			clear = mini(clear, World.distance(each, s.tile))
-		most = maxi(most, clear)
-	var cell_clear := 1 << 20
-	for s in stand_ins:
-		cell_clear = mini(cell_clear, World.distance(cell, s.tile))
-	_check(cell != Vector2i(-99999, -99999) and cell_clear == most and most < Companion.APEX_BERTH and not pet._way_out().has(cell),
-			"nothing %d clear in reach: the farthest cell from them (%s, %d clear of %d stand-ins)" % [Companion.APEX_BERTH, cell, cell_clear, stand_ins.size() - 1])
-	for s in stand_ins.slice(1):
-		s.free()
+	# Her way there (780 amended (25)): playtest's brk3_3 in bear_yard, in an
+	# open yard, a step at a time as she walks it. Never a step inside the
+	# berth, but out of it; she keeps to her side of a beast between them.
+	var yard := func(c: Vector2i) -> bool: return c.x >= 0 and c.y >= 0 and c.x < 60 and c.y < 60
+	var anywhere := func(_c: Vector2i) -> bool: return true
+	var walk := func(start: Vector2i, keeper_cell: Vector2i, threat_cells: Array[Vector2i], most: int) -> Dictionary:
+		var got := {"at": start, "bad": 0, "moved": 0, "lowest": Companion._clear_of(start, threat_cells)}
+		for i in most:
+			var here: Vector2i = got["at"]
+			var way: Array[Vector2i] = Companion.berth_way(here, keeper_cell, threat_cells, yard, anywhere)
+			if way[1] == here:
+				break
+			var was := Companion._clear_of(here, threat_cells)
+			var now := Companion._clear_of(way[1], threat_cells)
+			if now < Companion.APEX_BERTH and now <= was or World.distance(way[1], here) != 1:
+				got["bad"] = int(got["bad"]) + 1
+			got["at"] = way[1]
+			got["moved"] = int(got["moved"]) + 1
+			got["lowest"] = mini(int(got["lowest"]), now)
+		return got
+	# 472-492: her (30, 34) 4 off the bear (26, 36), her player (25, 36) on its far side.
+	var bear_a: Array[Vector2i] = [Vector2i(26, 36)]
+	var went: Dictionary = walk.call(Vector2i(30, 34), Vector2i(25, 36), bear_a, 20)
+	var went_at: Vector2i = went["at"]
+	_check(int(went["bad"]) == 0 and int(went["moved"]) > 0 and Companion._clear_of(went_at, bear_a) >= Companion.APEX_BERTH and went_at.x > 26,
+			"the bear between them: she steps out at once, never inside its berth, and stands %d clear on her side (%s, %d steps)" % [Companion.APEX_BERTH, went_at, went["moved"]])
+	# 695-710: it walks at her past her, her player behind it; two steps of hers to each sample.
+	var her_at := Vector2i(5, 23)
+	var bad_steps := 0
+	var lowest_off := 1 << 20
+	for frame: Array in [[Vector2i(4, 28), Vector2i(3, 29)], [Vector2i(4, 26), Vector2i(3, 28)], [Vector2i(5, 25), Vector2i(4, 27)], [Vector2i(4, 23), Vector2i(4, 26)], [Vector2i(4, 22), Vector2i(4, 24)]]:
+		var bear_b: Array[Vector2i] = [frame[0]]
+		var stepped: Dictionary = walk.call(her_at, frame[1], bear_b, 2)
+		bad_steps += int(stepped["bad"])
+		her_at = stepped["at"]
+		lowest_off = mini(lowest_off, Companion._clear_of(her_at, bear_b))
+	_check(bad_steps == 0 and lowest_off >= Companion.APEX_BERTH - 2,
+			"it walks past her, her player behind it: each step farther out, never back in (nearest %d after her steps; she stood to 1 before)" % lowest_off)
+	# 502-507: her player knocked 10 west, (15, 36), the bear (23, 36) after them, she at (30, 34).
+	var bear_c: Array[Vector2i] = [Vector2i(23, 36)]
+	var after: Dictionary = walk.call(Vector2i(30, 34), Vector2i(15, 36), bear_c, 30)
+	var after_at: Vector2i = after["at"]
+	var first_way: Array[Vector2i] = Companion.berth_way(Vector2i(30, 34), Vector2i(15, 36), bear_c, yard, anywhere)
+	_check(first_way[1] != Vector2i(30, 34) and int(after["bad"]) == 0 and int(after["lowest"]) >= Companion.APEX_BERTH and World.distance(after_at, Vector2i(15, 36)) < 15,
+			"her player knocked far past it: she starts after them at once by a way round it, never inside (%s, %d off them, %d clear at the nearest)" % [after_at, World.distance(after_at, Vector2i(15, 36)), after["lowest"]])
+	# Nothing clear within reach: inside, a step straight away; clear, she stays.
+	var box := func(c: Vector2i) -> bool: return c.x >= 0 and c.y >= 0 and c.x <= 2 and c.y <= 2
+	var bear_d: Array[Vector2i] = [Vector2i(3, 1)]
+	var boxed: Array[Vector2i] = Companion.berth_way(Vector2i(1, 1), Vector2i(1, 1), bear_d, box, anywhere)
+	_check(boxed[0] == boxed[1] and boxed[0].x == 0 and World.distance(boxed[0], Vector2i(1, 1)) == 1,
+			"no way to a clear cell, inside its berth: one step straight away (%s)" % [boxed])
+	var alone := func(c: Vector2i) -> bool: return c == Vector2i(1, 1)
+	var never := func(_c: Vector2i) -> bool: return false
+	var bear_e: Array[Vector2i] = [Vector2i(9, 1)]
+	var stays: Array[Vector2i] = Companion.berth_way(Vector2i(1, 1), Vector2i(1, 1), bear_e, alone, never)
+	_check(stays[0] == Vector2i(1, 1) and stays[1] == Vector2i(1, 1), "no way to a cell she may stand on, outside its berth: she stays (%s)" % [stays])
 	# Her player's way out is never hers: from them to the room's link at (1, 1).
 	_put(owner, Vector2i(10, 3))
 	_check(pet._way_out().has(Vector2i(9, 2)) and pet._way_out().has(Vector2i(1, 1)), "her player's way out runs to the link (%s)" % [pet._way_out().keys()])
