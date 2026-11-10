@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement: knocked back and stunned, you stand still through the stun and walk on from where you are when it ends, even on a slow connection, where before the moves you'd held were all walked at once and you jumped two or three cells a moment after the blow (688 amended (10)).
 - In rain, drops prick the water with small quick rings, a scatter in drizzle and the whole surface in a downpour, fewer on running water, thinning as the shower passes, and a fish's rise still shows among them (309 amended (2)).
 - The old grey throws his head up and howls as he calls his pack in, gathers himself low before his lunge, and stands head down and heaving after it, your opening, where before his howl was only heard and his lunge came with no warning (780 amended (17)).
 - Blows marked in red now land where they're marked: the great bear and the old grey no longer hold back their charge and lunge at times for no reason you could see, and the kobold chief's ambush in Hollowfell and the grave robbers' lunge in the Barrow catch you in the red, where before they sometimes missed you standing in it (810 amended).

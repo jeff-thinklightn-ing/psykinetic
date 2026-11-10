@@ -33220,6 +33220,43 @@ again, with or without a second attack ordered); push_test's chained shoves fade
 halt (FreeNet.Own.held_by_server reading it, no walk-ahead and snap back), and ui narrowing ground
 clicks beside a tall monster. Server only, protocol unchanged, no new class_name.
 
+688 amended (10): a stunned player's free body is still tended (release's label; the
+coordinator's approval; playtest's lagged bear runs, classified, after Jeff's stutter in the
+great bear fight: every correction over a cell shown at once came a few ticks after a swipe's
+push, with 16 moves pending where 150 ms leaves about 5). World.step skips a stunned entity's
+turn, and a player's turn (Player._sim_tick) is where its free body is tended (tend_free_body)
+and its state packed (pack_free). So through the stun after a knock's slide (World._push:
+knockback_stun_ticks past the slide) or any other stun, the moves its client sent were neither
+spent standing nor acknowledged and no state went out; they waited out the stun and were walked
+after it, while the client, held as long by _reel_until (FreeNet.Own.held_by_server), drew none
+of them, and the first state after the stun came seconds of walking away. Now a stunned player
+with a free body is still tended and packed each tick (World.step's act loop, beside the turn
+it skips): free_held counts the stun, so its moves are spent standing and acknowledged as a
+halt's or a slide's are, its state goes out, and its orders wait as before. Moves held through a
+stun no longer walk once it ends; the walk goes on with what is held after it. And the first
+state after a hold the client was told of (Own._was_held) is blended up to HELD_BLEND_MAX: it
+takes up what the view stood through that the server walked once its own hold was over (the
+stun's length counted from the client's own tick when _net_stunned arrives, and the moves'
+lag), about a cell under 150 ms, which BLEND_MAX (0.75) showed at once. Blended only along a
+line the body could be drawn (the coordinator's condition; no blend's line was checked before):
+Own.clear_line, melee's clear line (World._cells_between: no wall, closed door or step up
+between) with no other body in a cell it crosses bar its own companion; across one the hand-back
+is shown at once. The hold's own states and BLEND_MAX's blends are unchanged, unchecked as on
+main; the rest of the line work stays on physics-stutter2. free_net_test _test_hand_back_line:
+1.17 cells clear, blended; across the corner of a wall's end, or through a body, shown at once.
+free_net_test _test_stunned_free_body (one world serving both, the client's calls told only
+what a client is):
+knocked 2 tiles, and stunned with no slide, at 0 and 150 ms, and stunned standing: never moved by
+its own moves while stunned, at most 8 moves pending (25-29 before, one jump of 2.6-3.0 cells
+shown at once), one correction after (0.40 cells at 0 ms, 1.06 at 150 ms) blended, none shown at
+once; stunned standing, no correction at all; the view ends on the server's centre.
+_test_kick_under_lag walks on past the slide's stun. tools/stutter_log_patch.py and
+tools/stutter_classify.py (the coordinator's: every free-movement change judged by the lagged
+pair, classified, main against the branch): the prints a checkout takes for a run, never
+committed, and the corrections sorted by cause. Left for a lagged pair to show it matters: the
+stun's end tick on the wire in place of its length (a protocol change). Server and client,
+protocol unchanged, no new class_name.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

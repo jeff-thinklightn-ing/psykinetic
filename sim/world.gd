@@ -1396,6 +1396,13 @@ func _step_zone() -> void:
 				t += senses_usec - looked
 			# Its turn's time, by what it is (decision 469).
 			t = part("act: monsters" if entity is Monster else "act: companions" if entity is Companion 					else "act: players" if entity is Player else "act: others", t)
+		elif entity is Player and _alive(entity) and is_stunned(entity) and free_body(entity):
+			# Its turn skipped, not its free moves (688 amended (10)): spent
+			# standing and acknowledged as any held body's are (free_held), and
+			# its state sent; skipped, they waited out the stun and were walked
+			# after it, which its client, held as long, never drew.
+			tend_free_body(entity as Player)
+			(entity as Player).pack_free()
 	t = Time.get_ticks_usec()
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).

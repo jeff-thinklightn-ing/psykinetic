@@ -140,6 +140,11 @@ class Own:
 	## downed_until, each as the server sends them. Till then nothing is
 	## replayed on its centre, which is drawn as it comes, blended.
 	var hold_until := -1.0
+	## Whether the last state came while the server held the body (a slide,
+	## a stun, down): the first after the hold takes up the moves the view
+	## stood through that the server walked once its own hold was over
+	## (688 amended (10)), the hold's hand-back, blended as the hold's are.
+	var _was_held := false
 
 	## (FreeNet.quantise; here, where Own's own code reaches it.)
 	static func quantise(intent: Vector2) -> Vector2:
@@ -209,6 +214,8 @@ class Own:
 		if not server.is_empty() and acked != int(server["acked"]) and not seq_after(acked, int(server["acked"])):
 			pending.clear()  # The count started again (a spawn, the switch): what was sent before is gone.
 		var overruled := held_by_server(entity)
+		var released := _was_held and not overruled
+		_was_held = overruled
 		server = state
 		while not pending.is_empty() and not seq_after(int(pending[0]["seq"]), acked):
 			pending.pop_front()
@@ -232,8 +239,15 @@ class Own:
 					print("[latency] free correction %.3f cells at %s, %d pending" % [fresh.length(), base, pending.size()])
 			var off := error + fresh
 			# Overruled, the server's moves are drawn as they come: blended
-			# however far (a slide's first tick goes most of a cell).
-			error = off if off.length() < (HELD_BLEND_MAX if overruled else BLEND_MAX) else Vector2.ZERO
+			# however far (a slide's first tick goes most of a cell). The
+			# hold's hand-back (the first state after it) is blended as far,
+			# but only along a line the body could be drawn: never across a
+			# wall, a closed door or another's body, else shown at once
+			# (688 amended (10)).
+			var blends := off.length() < (HELD_BLEND_MAX if overruled or released else BLEND_MAX)
+			if released:
+				blends = blends and clear_line(entity, base + off, base)
+			error = off if blends else Vector2.ZERO
 
 	## Where to draw the body this frame, in cells.
 	func shown(entity: GridEntity) -> Vector2:
@@ -264,6 +278,22 @@ class Own:
 		# Further off than any hold runs: a tick of a clock since begun again
 		# (a room reset restarts the zone's), not a hold.
 		return World.tick < until and until - World.tick <= HOLD_MAX_TICKS
+
+	## Whether [param entity]'s body may be drawn gliding straight from
+	## [param from] to [param to] (cells): no wall, closed door or step up
+	## between (World._cells_between, melee's clear line) and no other body
+	## in a cell it crosses, bar its own cell's and its own companion's.
+	static func clear_line(entity: GridEntity, from: Vector2, to: Vector2) -> bool:
+		if from.distance_to(to) < 0.05:
+			return true
+		var cells := World._cells_between(from, to)
+		if cells.is_empty():
+			return false
+		for cell: Vector2i in cells:
+			var other := World.get_entity_at(cell)
+			if other != null and other != entity and cell != entity.tile and not World._own_companion_of(other, entity):
+				return false
+		return true
 
 	func _glide(entity: GridEntity, command: Dictionary) -> void:
 		var glided: Array = World.free_glide(entity, base, command["intent"], float(command["ticks"]), held)

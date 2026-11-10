@@ -47,6 +47,8 @@ func _ready() -> void:
 	_test_lag_and_loss()
 	_test_lag_across_fords()
 	_test_kick_under_lag()
+	_test_stunned_free_body()
+	_test_hand_back_line()
 	_test_companion_on_a_client()
 	_test_rebuilt_body()
 	_test_resend()
@@ -242,7 +244,9 @@ func _test_kick_under_lag() -> void:
 	var drawn_was := Vector2.INF
 	var drawn_way := 0
 	var turns := 0
-	var plan: Array[Array] = [[Vector2.RIGHT, 40], [Vector2.RIGHT, 50], [Vector2.ZERO, 80]]
+	# On past the slide's stun (688 amended (10): the moves held down through
+	# a stun are spent standing, so the walk east again comes after it).
+	var plan: Array[Array] = [[Vector2.RIGHT, 40], [Vector2.RIGHT, 140], [Vector2.ZERO, 80]]
 	for leg in plan:
 		for i in int(leg[1]):
 			frame += 1
@@ -281,6 +285,141 @@ func _test_kick_under_lag() -> void:
 	_check(player.free_pos.x > slid_to.x + 0.5, "walked east again after the slide (%s)" % player.free_pos)
 	_check(own.pending.is_empty() and own.shown(player).distance_to(player.free_pos) < 0.02,
 			"the view ends on the server's centre, nothing left to replay (%s, %s)" % [own.shown(player), player.free_pos])
+
+
+## 688 amended (10), the post-knock stall (playtest's bear runs: a jump of
+## 2-3 cells shown at once some ticks after a swipe's push, 16 moves
+## pending): a stunned player's turn is skipped, but not its free body,
+## whose moves are spent standing and acknowledged and whose state goes out
+## each tick of the stun. Walking west, then a knock 2 tiles (World._push:
+## the slide and knockback_stun_ticks) or a stun with no slide (a bash's,
+## World._stun_for), its commands a lag late as --test-lag holds them (0
+## and 150 ms), and a player stunned standing. One world serves both, so the
+## client's calls see only what a client is told: no free_halt_until,
+## stunned_until_tick or free_kick_path, and _reel_until as _net_stunned
+## sets it (its own tick on arrival, plus the stun's length).
+func _test_stunned_free_body() -> void:
+	print("
+== a stunned free body: its moves spent standing, its state sent (688 amended (10)) ==")
+	for case: Array in [["knocked", 0], ["knocked", 9], ["stunned, no slide", 0], ["stunned, no slide", 9], ["stunned standing", 9]]:
+		var how: String = case[0]
+		var up: int = case[1]
+		var player := _build(OPEN, Vector2i(8, 2))
+		player.owner_peer = 4242
+		var pusher := _spawn("res://sim/monster.gd", "Pusher", Vector2i(11, 2)) as Monster
+		pusher.acts = false
+		pusher.sight_range = 0
+		var own := FreeNet.Own.new()
+		var to_server: Array[Array] = []
+		var to_client: Array[Array] = []
+		var told: Array[Array] = []  # [frame, ticks]: _net_stunned, as the client hears it.
+		var pushes: Array[Array] = []  # [frame, tiles]: the body's `pushed`.
+		var client_reel := 0.0
+		var stun_was := 0
+		var struck := -1
+		var most_pending := 0
+		var moved_stunned := 0.0
+		var fixes := 0
+		var at_once := 0
+		var largest := 0.0
+		for frame in range(1, 301):
+			var hidden := [player.free_halt_until, player.stunned_until_tick, player.free_kick_path, player._reel_until]
+			player.free_halt_until = 0
+			player.stunned_until_tick = 0
+			player.free_kick_path = PackedVector2Array()
+			player._reel_until = client_reel
+			while not pushes.is_empty() and int(pushes[0][0]) <= frame:
+				own.pushed(int(pushes.pop_front()[1]))
+			while not told.is_empty() and int(told[0][0]) <= frame:
+				client_reel = World.tick + int(told.pop_front()[1])
+				player._reel_until = client_reel
+			var intent := Vector2.ZERO if how == "stunned standing" or frame > 240 else Vector2(-1, 0)
+			var commands := own.hold(player, intent, FRAME)
+			if not commands.is_empty():
+				to_server.append([frame + up, FreeNet.pack_commands(commands)])
+			while not to_client.is_empty() and int(to_client[0][0]) <= frame:
+				var drawn := own.shown(player)
+				var was := own.base
+				own.confirm(player, FreeNet.unpack_state(to_client.pop_front()[1], World.tick))
+				var fresh := was.distance_to(own.base) if was != Vector2.INF else 0.0
+				if struck >= 0 and fresh > 0.02 and not own.held_by_server(player):
+					fixes += 1
+					largest = maxf(largest, fresh)
+					if drawn.distance_to(own.shown(player)) > 0.25:
+						at_once += 1
+			if struck >= 0:
+				most_pending = maxi(most_pending, own.pending.size())
+			player.free_halt_until = hidden[0]
+			player.stunned_until_tick = hidden[1]
+			player.free_kick_path = hidden[2]
+			player._reel_until = hidden[3]
+			while not to_server.is_empty() and int(to_server[0][0]) <= frame:
+				player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+				World.take_free(player, FreeNet.unpack_commands(to_server.pop_front()[1]))
+			if frame == 60:
+				struck = World.tick
+				if how == "knocked":
+					var from := player.free_pos
+					World._push(pusher, player, Vector2(-1, 0), 1.61)
+					var path := player.free_kick_path
+					pushes.append([frame, roundi(from.distance_to(path[path.size() - 1])) if not path.is_empty() else 0])
+				else:
+					World._stun_for(player, 11)
+			if player.stunned_until_tick != stun_was:
+				stun_was = player.stunned_until_tick
+				if stun_was > World.tick:
+					told.append([frame + 1, stun_was - World.tick])
+			if frame % 6 == 0:
+				var before := player.free_pos
+				var sliding := not player.free_kick_path.is_empty()
+				var stunned := World.is_stunned(player)
+				World.step()
+				player.pack_free()
+				to_client.append([frame, player.free_state.duplicate()])
+				if stunned and World.is_stunned(player) and not sliding and player.free_kick_path.is_empty():
+					moved_stunned = maxf(moved_stunned, before.distance_to(player.free_pos))
+		var lag := "%d ms" % roundi(up * FRAME * 1000.0)
+		print("  measured: %s, %s: stunned to tick %d (struck %d); the most pending after %d; %d corrections after, the largest %.2f cells, %d shown at once" % [
+				how, lag, stun_was, struck, most_pending, fixes, largest, at_once])
+		_check(stun_was > struck + 5, "%s, %s: stunned (to %d, struck at %d)" % [how, lag, stun_was, struck])
+		_check(moved_stunned < 0.001, "%s, %s: never moved by its own moves while stunned, only by the slide (%.3f cells)" % [how, lag, moved_stunned])
+		_check(most_pending < 16, "%s, %s: its moves acknowledged through the stun (at most %d pending)" % [how, lag, most_pending])
+		_check(at_once == 0, "%s, %s: nothing shown at once after it (%d)" % [how, lag, at_once])
+		if how == "stunned standing":
+			_check(fixes == 0, "stunned standing: no correction at all when it ends (%d)" % fixes)
+		_check(own.shown(player).distance_to(player.free_pos) < 0.02 and own.pending.is_empty(),
+				"%s, %s: the view ends on the server's centre (%s, %s)" % [how, lag, own.shown(player), player.free_pos])
+
+
+## The hold's hand-back (688 amended (10), the coordinator's condition): the
+## first state after a stun or a push is blended up to HELD_BLEND_MAX only
+## along a line the body could be drawn; across a wall's corner, or through
+## another's body, it is shown at once. A knock that ends beside the corner
+## of WALLED's wall (its east end, between (5, 1) and (5, 2)), the
+## correction across it, against the same correction clear of it.
+func _test_hand_back_line() -> void:
+	print("
+== the hold's hand-back blended only along a clear line (688 amended (10)) ==")
+	for case: Array in [["clear", Vector2(6.0, 1.4), false], ["across the wall's corner", Vector2(5.0, 1.4), false], ["through a body", Vector2(6.0, 1.4), true]]:
+		var how: String = case[0]
+		var held_at: Vector2 = case[1]
+		var handed := held_at + Vector2(1.0, 0.6)  # 1.17 cells: over BLEND_MAX, under HELD_BLEND_MAX.
+		var player := _build(WALLED, Vector2i(0, 3))
+		if case[2]:
+			var other := _spawn("res://sim/monster.gd", "Other", Vector2i(6, 2)) as Monster
+			other.acts = false
+		var own := FreeNet.Own.new()
+		player._reel_until = World.tick + 10  # Stunned, as the client was told.
+		own.confirm(player, FreeNet.unpack_state(FreeNet.pack_state(held_at, 0, 0.0, World.tick, Vector2i(held_at.round())), World.tick))
+		player._reel_until = 0.0  # The stun over: the next state is the hand-back.
+		own.confirm(player, FreeNet.unpack_state(FreeNet.pack_state(handed, 0, 0.0, World.tick, Vector2i(handed.round())), World.tick))
+		var drawn := own.shown(player)
+		if how == "clear":
+			_check(drawn.distance_to(held_at) < 0.02, "%s: the hand-back blended from where it was drawn (%s)" % [how, drawn])
+		else:
+			_check(drawn.distance_to(handed) < 0.02, "%s: the hand-back shown at once, never drawn through (%s)" % [how, drawn])
+		var _sent := own.hold(player, Vector2.ZERO, 0.2)  # Past BLEND_SECONDS: the blend run out.
+		_check(own.shown(player).distance_to(handed) < 0.02, "%s: the view ends on the server's centre (%s)" % [how, own.shown(player)])
 
 
 ## Jeff's freeze after a room reset (689 amended (4)): the rebuilt body's
