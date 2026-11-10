@@ -90,6 +90,7 @@ func _ready() -> void:
 	_test_bandit_rows()
 	_test_chiefs()
 	_test_lone_guard()
+	_test_named_struck_fights()
 	_test_ambush_choice()
 	_test_band_robbers()
 	_test_old_wolf()
@@ -2217,6 +2218,80 @@ func _test_given_strength() -> void:
 	World.spawn(rolled2, Vector2i(12, 1))
 	_check(rolled2.max_hp == roundi(built_hp * 0.9), "its stored strength kept at the next spawn (%d)" % rolled2.max_hp)
 	NamedEnemy.reset_for_test()  # The test row gone; the file's read again.
+
+
+## A named foe a player has struck fights that player (806 amended (12), the
+## coordinator's ruling on combat's Brand the Ox: "a named foe who has been
+## struck by a player fights that player, alone or not; a temper roll may
+## shape how he fights, never whether"). Brand rolled cautious holds back
+## from her till she strikes him; struck, he comes in and strikes back, and
+## keeps at her when she steps off. An unnamed one of his roll still holds
+## back as before (806 amended (9)).
+func _test_named_struck_fights() -> void:
+	print("%s== a named foe struck by a player fights her: his temper shapes how, never whether ==" % char(10))
+	var rows: Array[String] = ["#".repeat(20)]
+	for y in 9:
+		rows.append("#" + ".".repeat(18) + "#")
+	rows.append("#".repeat(20))
+	for named: String in ["brand", ""]:
+		_build(rows)
+		var spec := Level._spec_for("monster_robber_brute", Level.MONSTER_TYPES)
+		spec["name"] = "Brute"
+		spec["tile"] = Vector2i(6, 5)
+		if named != "":
+			spec["named"] = named
+		Level.arm(spec)
+		var brute := EntityFactory.build(spec) as Monster
+		_room.add_child(brute)
+		World.spawn(brute, Vector2i(6, 5))
+		brute.boldness = 0.05  # Rolled cautious: he holds back alone.
+		brute.temper = Monster.Temper.CAUTIOUS
+		brute.sight_range = 9
+		var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(9, 5))
+		player.max_hp = 1000
+		player.hp = 1000
+		player.protected = false
+		_damage_log.clear()
+		var by_him := func() -> int:
+			var n := 0
+			for d: Dictionary in _damage_log:
+				if d["entity"] == player and d["source"] == brute:
+					n += 1
+			return n
+		for i in 60:
+			World.step()
+			player.hp = 1000
+		var before: int = by_him.call()
+		# She walks in and strikes him.
+		var struck := false
+		for i in 40:
+			if World.distance(player.tile, brute.tile) > 1:
+				World.try_move(player, Senses.way_toward(player.tile, brute.tile))
+			elif not struck:
+				World.face(player, brute.tile - player.tile)
+				struck = World.try_attack(player, brute)
+			World.step()
+			player.hp = 1000
+			if struck:
+				break
+		# Then she steps back off him, 3 off, and stands.
+		for i in 6:
+			World.try_move(player, Senses.way_toward(brute.tile, player.tile))
+			World.step()
+		_damage_log.clear()
+		for i in 120:
+			World.step()
+			player.hp = 1000
+		var after: int = by_him.call()
+		print("  %s (boldness %.2f, cautious): %d blows on her before she struck, struck %s, %d in the 12 s after" % [
+			"Brand" if named != "" else "an unnamed one", brute.boldness, before, struck, after])
+		if named != "":
+			_check(before == 0 and struck and after >= 2,
+				"Brand, rolled cautious, holds back till she strikes him; struck, he comes at her though she steps off (%d blows in 12 s)" % after)
+		else:
+			_check(struck and after == 0, "an unnamed one of his roll still holds back, struck or not (%d)" % after)
 
 
 ## A lone guard's standoff (806 amended (8); companions' barrow find: a timid

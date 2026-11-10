@@ -534,6 +534,10 @@ static var truce_broken: Dictionary[String, int] = {}
 ## them. Unanswered that long, it lets them be as before.
 var struck_by: GridEntity = null
 var struck_tick := -100000
+## The players who have struck it (instance ids), for a named one's hold-back
+## (806 amended (12)): a named foe a player has struck fights that player,
+## alone or not; its temper shapes how, never whether.
+var _struck_by_players: Dictionary[int, bool] = {}
 const ANSWER_TICKS := 40
 const ANSWER_REACH := 2
 ## Its kind's "never_lies" (573 amended (4); Jeff: the draugr "should not lie
@@ -1266,7 +1270,8 @@ func _sim_tick() -> void:
 		return
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
-	if pack_id == "" and not _pressing and (boldness < HOLD_BACK_BELOW and temper != Temper.BOLD or _dreads_target()) \
+	if pack_id == "" and not _pressing \
+			and (boldness < HOLD_BACK_BELOW and temper != Temper.BOLD and not _struck_named(target) or _dreads_target()) \
 			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
 			and not _band_holds() and (not band_fights or _mate_near()):
 		_standing_off()
@@ -2837,6 +2842,15 @@ func _wear_bundle() -> void:
 	World.items.set_condition(World.slot_uid(self, hand), draw.randi_range(WORN_BUNDLE.x, WORN_BUNDLE.y))
 
 
+## Whether it is a named foe [param by] (a player) has struck (806 amended
+## (12), the coordinator's ruling: "a named foe who has been struck by a
+## player fights that player, alone or not; a temper roll may shape how he
+## fights, never whether"): its roll's holding back is gone for them. Dread
+## (_dreads_target, 420's bane) still holds it back.
+func _struck_named(by: GridEntity) -> bool:
+	return named_id != "" and is_instance_valid(by) and _struck_by_players.has(by.get_instance_id())
+
+
 ## Whether its target holds a dread thing and it minds (not bold; an
 ## animal never: a wolf is cautious by its row, but knows no names).
 func _dreads_target() -> bool:
@@ -3417,6 +3431,8 @@ func note_struck(by: GridEntity) -> void:
 		return
 	struck_by = by
 	struck_tick = World.tick
+	if by is Player:
+		_struck_by_players[by.get_instance_id()] = true
 	_given_up.erase(by.get_instance_id())
 	_rouse()
 	if (by is Player or by is Companion) and in_truce():

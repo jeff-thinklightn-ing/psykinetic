@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A named foe you've struck turns and fights you now, however wary his temper, so Brand the Ox and the robbers named beside him no longer stand idle under your blows, where before a cautious one could hang back and let you hit him (806 amended (12)).
 - Townsfolk at work can be heard now: a woodcutter's axe bites into the wood at each chop, and a carpenter at a build rasps the saw on each push and pull and knocks with the hammer at each blow (804 amended (18)).
 
 - Towns: a sick townsperson in bed tells you what ails them and what would help, a walk to the healer's or a remedy, or that they're on the mend, where before they said only "Not now."; and whoever keeps the town's chronicle will read it to you wherever you find them at work, or at home and awake, where before only at their desk (491 amended, 501 amended (2)).
