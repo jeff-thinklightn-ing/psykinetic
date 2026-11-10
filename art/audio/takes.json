@@ -3507,6 +3507,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"ui.reward_bond": [
+			{
+				"file": "ui.reward_bond.ogg",
+				"from": "freesound",
+				"original": "freesound 416577: Tanpura Short drone pluck C sharp.wav (from 2 s for 1.6 s)",
+				"sha256": "72d28ff02dc84de61b81c0e34d8cb2e717181d0e1fc40cee8dc31fbd6c774929",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/416577/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_bond.2.ogg",
+				"from": "freesound",
+				"original": "freesound 416751: Tanpura Short E flat.wav (from 0.4 s for 1.6 s)",
+				"sha256": "1fb564400b8974c962f8b228a0eb15bf162f018f0783b1829fedb36e7bc2c1c1",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/416751/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_bond.3.ogg",
+				"from": "freesound",
+				"original": "freesound 416753: Tanpura Short 02 E flat.wav (from 0.2 s for 1.6 s)",
+				"sha256": "288094a633865b0846e6ed4683ffcda90ba9b7f2da1e0b4e3eea26dde657d932",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/416753/",
+				"license": "CC0 1.0"
+			}
+		],
 		"ui.reward_catch": [
 			{
 				"file": "ui.reward_catch.ogg",
@@ -3562,6 +3591,35 @@
 				"sha256": "4127a1167ac28d2589dae6cee8e172c9c96863dd7ac864f4700f484323e72387",
 				"by": "NickMorris",
 				"url": "https://freesound.org/people/NickMorris/sounds/184743/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_deed": [
+			{
+				"file": "ui.reward_deed.ogg",
+				"from": "freesound",
+				"original": "freesound 345629: Frame drum_oneshot_RAW_11.wav (from 0 s for 0.7 s)",
+				"sha256": "d152728f2a09959446fb5db7418a19dfc2d1d3dea2b5c3fdb4d22b34dc932ba7",
+				"by": "cabled_mess",
+				"url": "https://freesound.org/people/cabled_mess/sounds/345629/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_deed.2.ogg",
+				"from": "freesound",
+				"original": "freesound 345634: Frame drum_oneshot_RAW_14.wav (from 0 s for 0.7 s)",
+				"sha256": "34d88620ca6b56c9bdf70ae1fb80947f657abcd530f7047583ed408011f8c5c9",
+				"by": "cabled_mess",
+				"url": "https://freesound.org/people/cabled_mess/sounds/345634/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_deed.3.ogg",
+				"from": "freesound",
+				"original": "freesound 345625: Frame drum_oneshot_RAW_05.wav (from 0 s for 0.6 s)",
+				"sha256": "c578cc2871975999557859d54af29a6009e74fe9ba1eda46db396bd2efdf14a9",
+				"by": "cabled_mess",
+				"url": "https://freesound.org/people/cabled_mess/sounds/345625/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -3623,6 +3681,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"ui.reward_item": [
+			{
+				"file": "ui.reward_item.ogg",
+				"from": "freesound",
+				"original": "freesound 315838: Leather Bag Drop (from 0 s for 0.6 s)",
+				"sha256": "d2126608f87444ea0ab8fa04e796eea071752c1b883803874d5981e59f40521e",
+				"by": "gneube",
+				"url": "https://freesound.org/people/gneube/sounds/315838/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "ui.reward_item.2.ogg",
+				"from": "freesound",
+				"original": "freesound 427016: 0015 Bag Drop.wav (from 0 s for 0.6 s)",
+				"sha256": "bbb0fcbf5781ca0aca2af1987cd5915ac9dc229d1b9b0b045131504f17279700",
+				"by": "swelltoe77",
+				"url": "https://freesound.org/people/swelltoe77/sounds/427016/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "ui.reward_item.3.ogg",
+				"from": "freesound",
+				"original": "freesound 426990: 0006 Bag Drop.wav (from 0 s for 0.6 s)",
+				"sha256": "168d64f7ec39b36fb88d1fb5092d223a4eee83984888922a8a394bc787a664b1",
+				"by": "swelltoe77",
+				"url": "https://freesound.org/people/swelltoe77/sounds/426990/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"ui.reward_need": [
 			{
 				"file": "ui.reward_need.ogg",
@@ -3649,6 +3736,93 @@
 				"sha256": "3b79ac5a4f728e2008afd1f623309500b70d8040ec17368bb9f2cff7f8601387",
 				"by": "PanPiper5",
 				"url": "https://freesound.org/people/PanPiper5/sounds/659909/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_practice": [
+			{
+				"file": "ui.reward_practice.ogg",
+				"from": "freesound",
+				"original": "freesound 784563: Zob Stick B - quick shake 01 (from 0 s for 0.6 s)",
+				"sha256": "16577172872cd10680a6a500cccc48b5778ce44c8aef99e1c848d467e703dbe1",
+				"by": "nlux",
+				"url": "https://freesound.org/people/nlux/sounds/784563/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "ui.reward_practice.2.ogg",
+				"from": "freesound",
+				"original": "freesound 784564: Zob Stick B - quick shake 02 (from 0 s for 0.6 s)",
+				"sha256": "a0d380b54aebc9f44ca8cf08bc62b657b8741ce9e541a35aaf4fc09f99073ea8",
+				"by": "nlux",
+				"url": "https://freesound.org/people/nlux/sounds/784564/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "ui.reward_practice.3.ogg",
+				"from": "freesound",
+				"original": "freesound 784527: Zob Stick A - quick shake 02 (from 0 s for 0.7 s)",
+				"sha256": "729201477eb888b3b08346d6b991b3adadfc27fefba2ef766f93aba8acc48cd2",
+				"by": "nlux",
+				"url": "https://freesound.org/people/nlux/sounds/784527/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"ui.reward_regard": [
+			{
+				"file": "ui.reward_regard.ogg",
+				"from": "freesound",
+				"original": "freesound 148763: piano_string_hit_short 1 (the pluck, then itself a major third up) (from 0 s for 1.1 s)",
+				"sha256": "6ccbf8b93fc7dd74bb31c14c2fd808395321bb907098ceabc6a49de20fe93539",
+				"by": "Daphne_in_Wonderland",
+				"url": "https://freesound.org/people/Daphne_in_Wonderland/sounds/148763/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_regard.2.ogg",
+				"from": "freesound",
+				"original": "freesound 148767: piano_string_hit_short 4 (the pluck, then itself a fourth up) (from 0 s for 1.1 s)",
+				"sha256": "57d68ca8963bb0c03c66322317c603a13892b2ffbeea39ce7f9777f3de44eebd",
+				"by": "Daphne_in_Wonderland",
+				"url": "https://freesound.org/people/Daphne_in_Wonderland/sounds/148767/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_regard.3.ogg",
+				"from": "freesound",
+				"original": "freesound 148763: piano_string_hit_short 1 (the pluck, then itself a fifth up) (from 0 s for 1.1 s)",
+				"sha256": "78afba81e80d182d32c1ad693e9108eaee55632df4606b07a6469daefd1f9df6",
+				"by": "Daphne_in_Wonderland",
+				"url": "https://freesound.org/people/Daphne_in_Wonderland/sounds/148763/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_spotted": [
+			{
+				"file": "ui.reward_spotted.ogg",
+				"from": "freesound",
+				"original": "freesound 347896: Celtic Harp -A5.wav (from 0 s for 0.8 s)",
+				"sha256": "392f2d516f325b54abe9287420ea1df580997f4b77ea49bfedbfe9b2f7534c87",
+				"by": "tarane468",
+				"url": "https://freesound.org/people/tarane468/sounds/347896/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_spotted.2.ogg",
+				"from": "freesound",
+				"original": "freesound 347899: Celtic Harp -F# 5.wav (from 0 s for 0.8 s)",
+				"sha256": "baa04989d6d032a0749d89dc6b25cb7fb50753957f81182ef73975de26f01d35",
+				"by": "tarane468",
+				"url": "https://freesound.org/people/tarane468/sounds/347899/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_spotted.3.ogg",
+				"from": "freesound",
+				"original": "freesound 347902: Celtic Harp -D5.wav (from 0 s for 0.8 s)",
+				"sha256": "1114b9431704e66eef739ac905a16123265cd3f2c7cf6ee6ec93e97d804a212a",
+				"by": "tarane468",
+				"url": "https://freesound.org/people/tarane468/sounds/347902/",
 				"license": "CC0 1.0"
 			}
 		],

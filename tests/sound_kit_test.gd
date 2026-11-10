@@ -793,12 +793,23 @@ func _test_ui_sounds() -> void:
 	# 804, sound's side: ui's reward cues, each on the UI bus, everywhere,
 	# under ui.notify (heard a dozen times running), three takes of its own.
 	var rewards: Array[String] = []
-	for kind: String in ["gain", "step", "want", "coin", "catch", "found", "need"]:
+	for kind: String in ["gain", "step", "want", "coin", "catch", "found", "need", "deed", "regard", "bond", "practice", "item", "spotted"]:
 		var slot := "ui.reward_" + kind
 		if SoundKit.bus(slot) != "ui" or SoundKit.positional(slot) or SoundKit.volume_db(slot) >= SoundKit.volume_db("ui.notify") \
 				or SoundKit.takes(slot).size() < 3:
 			rewards.append(slot)
 	_check(rewards.is_empty(), "each reward cue on the UI bus, not placed, under ui.notify, three takes (%s)" % [rewards])
+	# 804 amended (17): a track's own cue, never silent: each falls back to the
+	# cue the track had (gain; spotted, found's), and a sighting is smaller than a find.
+	var falls := {"deed": "gain", "regard": "gain", "bond": "gain", "practice": "gain", "item": "gain", "spotted": "found"}
+	var off: Array[String] = []
+	for kind: String in falls:
+		var slot := "ui.reward_" + kind
+		var back := "ui.reward_" + str(falls[kind])
+		if str(SoundKit.spec(slot).get("fallback", "")) != back or SoundKit.played_from(slot, false) != slot or SoundKit.played_from(back, false) != back:
+			off.append(slot)
+	_check(off.is_empty() and SoundKit.volume_db("ui.reward_spotted") < SoundKit.volume_db("ui.reward_found"),
+			"each track's own cue plays its takes, else its old cue's; spotted under found (%s)" % [off])
 	# 805 amended (4): items' fishing cues, placed at the float, heard near,
 	# never by monsters, two takes or more.
 	var fishing: Array[String] = []

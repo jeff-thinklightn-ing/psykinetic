@@ -43764,6 +43764,31 @@ progress and walls. economy_test _test_build_credit. Server only, protocol uncha
 
 804 amended (16) (2026-11-09, release's label; voice's words): a faded gain leaves the screen (Jeff on v0.1.208: some deed texts stay faintly on the screen, gone only at a zone change). Gains draws its floats and its banner on one canvas, asking for a redraw only while one shows; on the frame the last one ran out nothing asked, and the canvas kept its last drawing, the text a few percent visible, until something else redrew it. No tween or label was left behind. Gains._process now asks once more after the last goes (it counts what it drew, Gains.drawn), so the canvas is drawn empty. ui_test: a deed's float and banner run past their end, drawn while live and nothing drawn after. Client only; protocol unchanged; no new class_name.
 
+804 amended (17) (2026-11-10, release's label; the coordinator's approval, package "reward cues", on):
+each track its own cue. Five tracks shared ui.reward_gain's harp pluck and a sighting shared
+ui.reward_found's motif, so a regard rise, a bond, practice, an item and a deed sounded alike, and a
+hill cat spotted as a place found. Six ui slots (the UI bus, not placed, under ui.notify, in the
+cues' family of harp, wood and skin), each with a "fallback" to the cue its track had, so a tree
+without the takes, or a slot without them, plays that cue rather than nothing (SoundKit.played_from):
+ui.reward_deed (a frame drum's low firm strike, -14 dB), ui.reward_regard (a warm piano-string pluck
+and the same raised a third, a fourth or a fifth 0.17 s after, -12 dB), ui.reward_bond (a soft held
+tanpura note, -12 dB), ui.reward_practice (a short stick-rattle roll, -10 dB: bright, so measured
+quieter), ui.reward_item (a leather bag set down, -11 dB), all falling back to ui.reward_gain; and
+ui.reward_spotted (one soft high Celtic-harp note, A5, F#5 or D5, -15 dB, its loudest 100 ms about
+6 dB under found's), falling back to ui.reward_found. Measured at their slots' volumes: each 100 ms
+loudest between -24.5 and -31 dB, beside the old cues' -24 to -32 and a close fight hit's -7 to -12;
+apart from each other and the old seven in length, attack, brightness and pitch (the drum's centroid
+about 125-225 Hz, the plucks' 800-900, the tanpura's 1.3-1.8 kHz with a half-second swell, the
+rattle's 7 kHz, the bag's 0.2-0.3 s thud, the harp note's 590-880 Hz fundamental against gain's 310);
+the reel, named in order, C:/dev/review/sound/reward_cues/reward_cues_reel.ogg (.txt), for Jeff's
+ear. 18 Freesound takes: CC0 (cabled_mess 345629, 345634, 345625; Daphne_in_Wonderland 148763,
+148767; luckylittleraven 416577, 416751, 416753; tarane468 347896, 347899, 347902) and CC BY 4.0
+(nlux 784563, 784564, 784527; gneube 315838; swelltoe77 427016, 426990, their makers' pages live
+2026-11-09); THIRD_PARTY regenerated. sound_kit_test: the six with the seven (UI bus, not placed,
+under ui.notify, three takes), each playing its own takes and falling back to its track's old cue,
+spotted under found. ui's side points Gains.TRACKS at them (below). Client only; protocol
+unchanged, no new class_name. No bullet here: the package's one, in voice's words, rides ui's side.
+
 ## 805. The core loop's first slice: Wren wants to go fishing
 
 Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out
