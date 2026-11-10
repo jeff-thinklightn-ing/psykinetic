@@ -831,6 +831,88 @@ if saved_kinds is not None:
 elif os.path.exists(gate._path("kinds.json")):
     os.remove(gate._path("kinds.json"))
 
+print("== release moves one queued entry to the front (394 amended (25)) ==")
+gate._memory = lambda: (40.0, 40.0)
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.05
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+saved_kinds = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=2.0, commit_gb=1.0, lean_first=False),
+    "bench": dict(gate.KINDS["bench"], ram_gb=2.0, commit_gb=1.0)})
+def clear_gate():
+    for each in gate._entries("queue") + gate._entries("running"):
+        folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
+        os.remove(gate._path(folder, each["file"]))
+def queued(tree, kind, waiter=True):
+    name = "%019d-%s-%d.json" % (time.time_ns(), tree, os.getpid())
+    entry = {"tree": tree, "kind": kind, "pid": None, "queued": time.time()}
+    if waiter:
+        entry.update(waiter=os.getpid(), waiter_since=gate.started_at(os.getpid()))
+    gate._write(gate._path("queue", name), entry)
+    time.sleep(0.01)
+    return name
+def queue_of():
+    return ["%s %s" % (each["tree"], each["kind"]) for each in gate._entries("queue")]
+clear_gate()
+queued("art", "suite")
+queued("ui", "bench")
+late = queued("fix", "suite")
+check(gate.main(["front", "fix", "suite", "--by", "perf", "--why", "mine"]) == 2 and queue_of()[-1] == "fix suite",
+    "front by another tree: refused, nothing moved (%s)" % queue_of())
+check(gate.main(["front", "fix", "suite", "--by", "release"]) == 2, "front with no --why: refused")
+check(gate.main(["front", "nobody", "suite", "--by", "release", "--why", "x"]) == 3, "front of an entry not queued: refused")
+check(gate.main(["front", "fix", "suite", "--by", "release", "--why", "view_test's back step fails every landing"]) == 0
+    and queue_of() == ["fix suite", "art suite", "ui bench"], "release fronts it: first among the waiters (%s)" % queue_of())
+check(os.path.exists(gate._path("queue", late)), "its ticket keeps its name: its waiter still finds it")
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tfront\tfix\tsuite\tby release, why: view_test's back step fails every landing; jumped: art suite, ui bench" in text,
+    "the log has who fronted it, why, and whom it jumped")
+check("\trefused\tfix\tsuite\tfront by perf" in text, "and the refused front")
+queued("other", "suite")
+check(gate.main(["front", "other", "suite", "--by", "release", "--why", "y"]) == 3 and queue_of()[-1] == "other suite",
+    "a second front while the first still waits: refused")
+out = io.StringIO()
+with contextlib.redirect_stdout(out):
+    gate.summary(datetime.date.today().isoformat())
+check("fix suite front: by release, why: view_test's back step" in out.getvalue(), "the day's summary lists the front")
+clear_gate()
+queued("art", "suite")
+queued("ghost", "suite", waiter=False)
+check(gate.main(["front", "ghost", "suite", "--by", "release", "--why", "z"]) == 3 and queue_of()[0] == "art suite",
+    "an entry with no live waiter: refused, nothing moved")
+# The coordinator's case: a suite running and a bench queued ahead. The fronted suite never starts
+# beside the running one nor slips the suite/bench exclusion, and the bench it passed still runs.
+clear_gate()
+owed_job("main", "suite", 2.0)
+bench = threading.Thread(target=lambda: gate.take("ui", "bench", os.getpid()), daemon=True)
+bench.start()
+until(lambda: queue_of() == ["ui bench"])
+landing = threading.Thread(target=lambda: gate.take("fix", "suite", os.getpid()), daemon=True)
+landing.start()
+until(lambda: queue_of() == ["ui bench", "fix suite"])
+check(gate.main(["front", "fix", "suite", "--by", "release", "--why", "every landing pays for it"]) == 0
+    and queue_of() == ["fix suite", "ui bench"], "fronted past the bench (%s)" % queue_of())
+time.sleep(1.0)
+check(trees("running") == ["main"], "a suite running: the fronted suite waits for it (suite at most 1), the bench too (%s)" % trees("running"))
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+check(until(lambda: trees("running") == ["fix"]), "the running suite done: the fronted one starts (%s)" % trees("running"))
+time.sleep(0.5)
+check(trees("running") == ["fix"] and queue_of() == ["ui bench"], "the bench never beside it (%s, %s)" % (trees("running"), queue_of()))
+landing.join(5)
+gate.release("fix", "suite")
+check(until(lambda: trees("running") == ["ui"]), "the suite released: the bench it passed runs (%s)" % trees("running"))
+bench.join(5)
+gate.release("ui", "bench")
+clear_gate()
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved_kinds is not None:
+    gate._write(gate._path("kinds.json"), saved_kinds)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

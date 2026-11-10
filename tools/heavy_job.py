@@ -108,7 +108,10 @@ tune it), heavy_jobs.log a line an event (`summary`).
                                                    model server): measured as the take's (394 amended (20))
   heavy_job.py release <tree> <kind>               give back what take held
   heavy_job.py holds <tree> <kind>                 exit 0 if <tree> holds a <kind> (run or take)
-  heavy_job.py status                              running, queued, free memory
+  heavy_job.py front <tree> <kind> --by release --why "<reason>"
+                                                   release alone: that queued entry first among the
+                                                   waiters, never past what runs (394 amended (25))
+  heavy_job.py status                             running, queued, free memory
   heavy_job.py kinds                               the kinds and their estimates
   heavy_job.py summary [YYYY-MM-DD]                what waited or was stopped that day (today)
   heavy_job.py note <tree> launch <detail...>      log a test scene that died at launch (decision 530),
@@ -1039,7 +1042,19 @@ def _entries(folder):
             _write(_path(folder, name), entry)
         entry["file"] = name
         out.append(entry)
+    if folder == "queue":
+        out.sort(key=_order)  # A fronted entry's "order" puts it first (394 amended (25)).
     return out
+
+
+def _order(entry):
+    """A queue entry's place: its "order" when release has fronted it, else
+    when it queued (its ticket's leading nanoseconds)."""
+    order = entry.get("order")
+    if order is not None:
+        return order
+    head = entry["file"].split("-")[0]
+    return int(head) if head.isdigit() else 0
 
 
 def log(event, tree, kind, detail=""):
@@ -1546,7 +1561,8 @@ def status():
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)%s%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
             ", first for %.0f s" % (time.time() - entry["head_since"]) if entry.get("head_since") else "",
-            ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""))
+            ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
+            + (", fronted by %s: %s" % (entry["fronted"]["by"], entry["fronted"]["why"]) if entry.get("fronted") else ""))
     if not running and not queue:
         print("no heavy jobs")
     return 0
@@ -1597,7 +1613,59 @@ def summary(day):
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late")
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late", "front")
+## Who may move a queued entry to the front (394 amended (25)): release, for a
+## change every queued landing is paying for (a failing check on main, a broken
+## tool) or on Jeff's word. Names are an honour system, as the land lock's are.
+FRONT_BY = "release"
+
+
+def front(tree, kind, by, why):
+    """[tree]'s queued [kind] made first among the waiters, by release, for
+    [why] (394 amended (25)). Only its place in the queue changes: the ticket
+    keeps its name (a renamed one reads to its own waiter as dropped, and it
+    would exit 3), and running jobs are never touched, so it still waits for
+    room, a kind's cap and what it excludes. Refused: not release; no reason;
+    not queued; its waiter dead; another fronted entry still waiting."""
+    if by != FRONT_BY:
+        print("heavy_job: front is release's alone (394 amended (25)); %s: tell the coordinator why instead" % (by or "no --by"),
+            file=sys.stderr)
+        log("refused", tree, kind, "front by %s" % (by or "nobody"))
+        return 2
+    if not why.strip():
+        print("heavy_job: front needs --why \"<reason>\" (394 amended (25))", file=sys.stderr)
+        return 2
+    with StateLock():
+        queue = _entries("queue")
+        mine = [each for each in queue if each["tree"] == tree and each["kind"] == kind]
+        if not mine:
+            print("heavy_job: %s %s is not queued; nothing moved" % (tree, kind), file=sys.stderr)
+            return 3
+        target = mine[0]
+        waiter = target.get("waiter")
+        if not waiter or not alive(waiter, target.get("waiter_since")):
+            print("heavy_job: %s %s: its waiter (pid %s) is gone; nothing moved" % (tree, kind, waiter), file=sys.stderr)
+            return 3
+        earlier = [each for each in queue if each.get("fronted") and each["file"] != target["file"]]
+        if earlier:
+            print("heavy_job: %s %s, fronted before, still waits: one front at a time; nothing moved" % (
+                earlier[0]["tree"], earlier[0]["kind"]), file=sys.stderr)
+            return 3
+        place = queue.index(target)
+        if place == 0:
+            print("heavy_job: %s %s is first already" % (tree, kind))
+            return 0
+        jumped = ", ".join("%s %s" % (each["tree"], each["kind"]) for each in queue[:place])
+        entry = _read(_path("queue", target["file"]))
+        if entry is None:
+            print("heavy_job: %s %s left the queue as it was moved; nothing moved" % (tree, kind), file=sys.stderr)
+            return 3
+        entry["order"] = _order(queue[0]) - 1
+        entry["fronted"] = {"by": by, "why": why, "at": time.time()}
+        _write(_path("queue", target["file"]), entry)
+        log("front", tree, kind, "by %s, why: %s; jumped: %s" % (by, why, jumped))
+    print("heavy_job: %s %s moved to the front of the queue, past %s; it still waits for room and what runs" % (tree, kind, jumped))
+    return 0
 ## What a script outside the gate may log with `note` (decision 530: a test
 ## scene that died at launch, before any of its own code ran).
 NOTE_EVENTS = ("launch",)
@@ -1618,7 +1686,7 @@ def main(args):
         print(__doc__)
         return 0
     command = args[0]
-    if command in ("run", "take", "attach", "release", "holds") and (len(args) < 3 or args[2] not in kinds()
+    if command in ("run", "take", "attach", "release", "holds", "front") and (len(args) < 3 or args[2] not in kinds()
             or kinds()[args[2]].get("variant_of")):
         print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)
         return 2
@@ -1654,6 +1722,10 @@ def main(args):
         return release(args[1], args[2])
     if command == "holds":
         return 0 if holds(args[1], args[2]) else 1
+    if command == "front":
+        def option(name):
+            return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else ""
+        return front(args[1], args[2], option("--by"), option("--why"))
     if command == "status":
         return status()
     if command == "kinds":
@@ -1665,7 +1737,7 @@ def main(args):
             print("heavy_job: note <tree> <event> <detail...>, an event of: %s" % ", ".join(NOTE_EVENTS), file=sys.stderr)
             return 2
         return note(args[1], args[2], " ".join(args[3:]))
-    print("heavy_job: no command %s (run, take, attach, release, status, kinds, summary, note)" % command, file=sys.stderr)
+    print("heavy_job: no command %s (run, take, attach, release, front, status, kinds, summary, note)" % command, file=sys.stderr)
     return 2
 
 

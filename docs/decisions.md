@@ -46730,6 +46730,30 @@ a bench): neither scene nor suite, whose estimates every tree waits on. heavy_jo
 kind before it queues (MANY_GODOT_TESTS names the tests; add one there when another starts several Godots).
 heavy_job_test: net_test under scene refused, net one at a time. Tools only; protocol unchanged; no class_name; no bullet.
 
+394 amended (25) (perf, 2026-11-10; the coordinator's approved design, release's label): release can move
+one queued entry to the front. Twice in a day a fix every landing was paying for (the night's, then the
+morning's back-step mend for view_test) had to ride a take ten places back, because the queue could not be
+reordered. `heavy_job front <tree> <kind> --by release --why "<reason>"` makes that tree's queued entry first
+among the waiters.
+- Only its place changes. The entry gets an "order" just below the first waiter's, and the queue is sorted by
+  it (else by its ticket's time, as before), in one write under the state lock. The ticket file keeps its name:
+  a renamed one reads to its own waiter as dropped, and the waiter exits 3. Running jobs are never touched, so
+  the fronted job still waits for room, its kind's cap and the kinds it excludes, and starts on its waiter's
+  next look once it may. No new take, no nesting and no new wait, so none of 394's stall shapes: waiters
+  already re-read the queue at every look, and the rules for going past a row are unchanged.
+- Refused: --by anything but release (FRONT_BY; the refusal names the rule and is logged; names are an honour
+  system, as the land lock's are), no --why, an entry not queued, an entry whose waiter is gone (one that
+  could never start would hold the head), and a second front while an earlier fronted entry still waits.
+- The log's "front" line names who fronted it, why, and the entries it jumped; the daily summary lists it,
+  and status marks a fronted entry with its reason.
+- Its use, for CLAUDE.md (the coordinator's words): release calls it for a change every queued landing is
+  paying for (a failing check on main, a broken tool) or on Jeff's word, never for a tree's convenience; a
+  tree doesn't ask release for it, it tells the coordinator why.
+heavy_job_test: refusals (another tree, no reason, not queued, no live waiter, a second front); fronted
+first with its ticket's name kept; the log and the summary. With a suite running and a bench queued ahead,
+a fronted suite waits for the running one, starts when it ends, never beside the bench, and the bench it
+passed runs once it is released. Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
