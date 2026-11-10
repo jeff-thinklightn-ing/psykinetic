@@ -19948,7 +19948,8 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		if cause == &"attack" and instance_from_id(id) is GridEntity:
 			flinch = (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - AnimRig.now_msec()) / 1000.0
 		if flinch > 0.0:
-			get_tree().create_timer(flinch).timeout.connect(_flinch.bind(puppet))
+			var ids_flinch := puppet.get_instance_id()
+			get_tree().create_timer(flinch).timeout.connect(func() -> void: _flinch(instance_from_id(ids_flinch) as Node3D))
 		else:
 			_flinch(puppet)
 	if puppet != null and cause == &"shot":
@@ -19964,9 +19965,12 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		var seam := instance_from_id(id) as Seam
 		if landed > 0.0:
 			_play_later("sfx.pick_strike", puppet.position + Vector3.UP * 0.8, landed)
+			var ids_dust := [puppet.get_instance_id(), seam.get_instance_id() if seam != null else 0]
 			get_tree().create_timer(landed).timeout.connect(func() -> void:
-				if is_instance_valid(puppet) and is_instance_valid(seam):
-					_seam_dust(puppet, seam))
+				var fired_by := instance_from_id(ids_dust[0]) as Node3D
+				var fired_seam := instance_from_id(ids_dust[1]) as Seam
+				if is_instance_valid(fired_by) and is_instance_valid(fired_seam):
+					_seam_dust(fired_by, fired_seam))
 		else:
 			sfx.play("sfx.pick_strike", puppet.position + Vector3.UP * 0.8)
 			_seam_dust(puppet, seam)
@@ -19977,9 +19981,12 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		var wait := (int(blow[1]) - AnimRig.now_msec()) / 1000.0
 		if wait > 0.0:
 			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait)
+			var ids_hurt := [struck.get_instance_id() if struck != null else 0, puppet.get_instance_id()]
 			get_tree().create_timer(wait).timeout.connect(func() -> void:
-				if is_instance_valid(struck) and is_instance_valid(puppet) and is_instance_valid(sfx) and sfx.is_inside_tree():
-					_pain(struck, puppet))
+				var fired_body := instance_from_id(ids_hurt[0]) as GridEntity
+				var fired_puppet := instance_from_id(ids_hurt[1]) as Node3D
+				if is_instance_valid(fired_body) and is_instance_valid(fired_puppet) and is_instance_valid(sfx) and sfx.is_inside_tree():
+					_pain(fired_body, fired_puppet))
 		else:
 			sfx.play(str(blow[0]), puppet.position + Vector3.UP * 0.8)
 			_pain(struck, puppet)
@@ -20005,8 +20012,9 @@ func _on_pushed(tiles: int, id: int) -> void:
 	if entity != null and tiles > 0:
 		# Shoved into water: a splash as it lands there.
 		get_tree().create_timer(SLIDE_SECONDS).timeout.connect(func() -> void:
-			if is_instance_valid(entity) and is_instance_valid(sfx) and sfx.is_inside_tree() and World.is_water(entity.tile):
-				sfx.play("sfx.splash", _tile_position(entity.tile)))
+			var fired_slid := instance_from_id(id) as GridEntity
+			if is_instance_valid(fired_slid) and is_instance_valid(sfx) and sfx.is_inside_tree() and World.is_water(fired_slid.tile):
+				sfx.play("sfx.splash", _tile_position(fired_slid.tile)))
 	if puppet == null or entity == null or tiles <= 0 or not puppet.has_meta("rig"):
 		return
 	if puppet.has_meta("knock"):
@@ -23506,10 +23514,13 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0, 
 	if hold > STRIKE_HOLD_LEAST:
 		# Till then its gait goes on (_animate): not busy. A blow given up meanwhile (_on_winding's
 		# 0 ticks) or another begun stops it (its token).
+		var ids_held := [puppet.get_instance_id(), rig.get_instance_id()]
 		get_tree().create_timer(hold).timeout.connect(func() -> void:
-			if is_instance_valid(puppet) and is_instance_valid(rig) and int(puppet.get_meta("strike_token", 0)) == token:
-				var late := rig.strike(clip, contact, lands_in - hold, recover)
-				puppet.set_meta("busy_until", Time.get_ticks_msec() + int(late * 1000.0)))
+			var fired_body := instance_from_id(ids_held[0]) as Node3D
+			var fired_rig := instance_from_id(ids_held[1]) as AnimRig
+			if is_instance_valid(fired_body) and is_instance_valid(fired_rig) and int(fired_body.get_meta("strike_token", 0)) == token:
+				var late := fired_rig.strike(clip, contact, lands_in - hold, recover)
+				fired_body.set_meta("busy_until", Time.get_ticks_msec() + int(late * 1000.0)))
 		return true
 	var seconds := rig.strike(clip, contact, lands_in, recover)
 	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
@@ -23819,9 +23830,12 @@ func _on_guarded(broken: bool, id: int) -> void:
 		# Sparks off the shield as the drawn blow meets it (340 amended, animation's side).
 		var wait := (int(_struck_with(holder)[1]) - AnimRig.now_msec()) / 1000.0
 		if wait > 0.0:
+			var ids_spark := [puppet.get_instance_id(), holder.get_instance_id() if holder != null else 0]
 			get_tree().create_timer(wait).timeout.connect(func() -> void:
-				if is_instance_valid(puppet) and puppet.is_inside_tree() and is_instance_valid(holder):
-					_spark(puppet, holder))
+				var fired_puppet := instance_from_id(ids_spark[0]) as Node3D
+				var fired_holder := instance_from_id(ids_spark[1]) as GridEntity
+				if is_instance_valid(fired_puppet) and fired_puppet.is_inside_tree() and is_instance_valid(fired_holder):
+					_spark(fired_puppet, fired_holder))
 		else:
 			_spark(puppet, holder)
 
@@ -23840,9 +23854,11 @@ func _play_block(slot: String, puppet: Node3D, lands: int, gain_db: float) -> vo
 		if is_instance_valid(puppet):
 			sfx.play(slot, puppet.position + Vector3.UP * 0.9, 1.0, gain)
 		return
+	var ids_block := puppet.get_instance_id()
 	get_tree().create_timer(wait).timeout.connect(func() -> void:
-		if is_instance_valid(puppet) and puppet.is_inside_tree():
-			sfx.play(slot, puppet.position + Vector3.UP * 0.9, 1.0, gain))
+		var fired_puppet := instance_from_id(ids_block) as Node3D
+		if is_instance_valid(fired_puppet) and fired_puppet.is_inside_tree():
+			sfx.play(slot, fired_puppet.position + Vector3.UP * 0.9, 1.0, gain))
 
 
 ## The side of a body facing [param facing] that a blow from [param from] meets (a grid direction
@@ -23902,9 +23918,12 @@ func _on_bashed(direction: Vector2i, by: NodePath, id: int) -> void:
 					maxf(rig.length(CLIP_SHIELD_BASH) - SHIELD_BASH_CONTACT, 0.1))
 			swinger.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
 	if lands > 0.0:
+		var ids_bash := [puppet.get_instance_id(), target.get_instance_id() if target != null else 0]
 		get_tree().create_timer(lands).timeout.connect(func() -> void:
-			if is_instance_valid(puppet) and puppet.is_inside_tree() and is_instance_valid(target):
-				_bash_taken(puppet, target, direction, from))
+			var fired_puppet := instance_from_id(ids_bash[0]) as Node3D
+			var fired_target := instance_from_id(ids_bash[1]) as GridEntity
+			if is_instance_valid(fired_puppet) and fired_puppet.is_inside_tree() and is_instance_valid(fired_target):
+				_bash_taken(fired_puppet, fired_target, direction, from))
 	else:
 		_bash_taken(puppet, target, direction, from)
 
@@ -23945,10 +23964,12 @@ func _on_stunned(ticks: int, cause: StringName, id: int) -> void:
 	var swung: Array = _swings.get(id, [])
 	var wait := (int(swung[2]) - AnimRig.now_msec()) / 1000.0 if not swung.is_empty() else 0.0
 	if wait > 0.0:
+		var ids_recoil := puppet.get_instance_id()
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
-			if is_instance_valid(puppet) and puppet.is_inside_tree():
-				_recoil(puppet)
-				_recoil_heard(puppet, cause))
+			var fired_puppet := instance_from_id(ids_recoil) as Node3D
+			if is_instance_valid(fired_puppet) and fired_puppet.is_inside_tree():
+				_recoil(fired_puppet)
+				_recoil_heard(fired_puppet, cause))
 	else:
 		_recoil(puppet)
 		_recoil_heard(puppet, cause)
@@ -24231,9 +24252,11 @@ func _volley_ring(cell: Vector2i, radius: float, seconds: float) -> void:
 	ring.name = "VolleyRing"
 	ring.position = Vector3(cell.x, base + ON_FLOOR * 2.0, cell.y)
 	add_child(ring, true)
+	var ids_ring := ring.get_instance_id()
 	get_tree().create_timer(seconds + VOLLEY_RING_AFTER).timeout.connect(func() -> void:
-		if is_instance_valid(ring):
-			ring.queue_free())
+		var fired_ring := instance_from_id(ids_ring) as Node
+		if is_instance_valid(fired_ring):
+			fired_ring.queue_free())
 
 
 ## One of the volley's arrows (677 amended (2)): it rains down steeply

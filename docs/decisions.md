@@ -46319,3 +46319,26 @@ hungry; trade debt at most 198 on day 20, 0 by day 25 (5 days after the selling 
 baseline's peak was 101, cleared on day 18); workers owed 0 on day 29 (baseline 10); town gold 427
 against 336. The town ends richer because it takes fewer hides for the seller's 60 gold a day.
 The coordinator accepted it: the bar is the town not going short. Still off; no bullet.
+
+## 836. A timer or tween callback captures instance ids, never nodes
+
+Perf, on the coordinator's approval and combat's nod; release's number. The rule, for all client code:
+a callback that runs later (a SceneTreeTimer's timeout, a tween_callback, a call_deferred lambda)
+captures the instance ids of the nodes and entities it needs, and looks them up with instance_from_id
+when it fires, doing nothing for one that is gone. It never captures the node itself.
+
+Why: Godot reports "Lambda capture at index N was freed. Passed "null" instead." the moment a lambda is
+called after an object it captured was freed, before its body runs, so an is_instance_valid guard inside
+it comes too late. A SceneTreeTimer outlives every node. That line, in a test's log, is an engine error
+land.sh fails, and it failed landings at random (perf's and builder's, 11-09) in view_test: a blow's pain
+waits on a timer for the drawn blade to land (the blow-wait case, from 338 amended (4)), and when the
+struck body died and was freed inside that wait, the timer's lambda fired on it. A player's log showed the
+same line whenever a foe died inside a blow's wait; nothing they saw changed.
+
+Done in client3d.gd, ten callbacks, what each does and its timing unchanged: the flinch (it was bound to
+the puppet), the seam's dust, a blow's pain, a pushed body's splash, a held strike let go, sparks off a
+shield, a block's sound, a shield bash taken, a recoil, and a volley's ring cleared.
+
+view_test _test_blow_wait_outlives_body forces it every run: a swing planted beside a body so its blow
+waits 300 ms, the body struck, then despawned inside the wait, then the wait run out. Before the fix it
+printed the error each time; after, none. Client only; protocol unchanged; no class_name; no bullet.

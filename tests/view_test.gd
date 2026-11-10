@@ -177,6 +177,7 @@ func _ready() -> void:
 		_test_allies()
 		_test_barrow_dead()
 		_test_person_monster()
+		await _test_blow_wait_outlives_body()
 		_test_bandit_look()
 		_test_shadows_in_view()
 		_test_no_2d_under_3d()
@@ -8816,6 +8817,34 @@ func _test_person_monster() -> void:
 	_check(plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
 			"without the words, drawn as before")
 	World.despawn(plain)
+	_rig._process(0.0)
+
+
+## A blow's pain waits for the drawn blade to land (a timer); the body it
+## struck dies and is freed inside that wait (836). Its callback holds ids,
+## not nodes: before 836 it printed "Lambda capture at index 0 was freed"
+## every time, which land.sh fails as an engine error, so that is the check.
+func _test_blow_wait_outlives_body() -> void:
+	print("
+== a blow's wait outlives the body it struck: nothing freed is called (836) ==")
+	var swinger := _spawn_imp(Vector2i(9, 6))
+	var struck := _spawn_imp(Vector2i(10, 6))
+	_rig._process(0.0)
+	var now := AnimRig.now_msec()
+	_rig._swings[swinger.get_instance_id()] = [now, "", now + 300]
+	var lands := int(_rig._struck_with(struck)[1])
+	_check(lands > now, "a swing beside it lands later (%d ms on)" % (lands - now))
+	var puppet: Node3D = _rig._puppets.get(struck.get_instance_id())
+	World.damage(struck, 1, null, &"attack")
+	World.despawn(struck)
+	_rig._process(0.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(not is_instance_valid(struck), "the struck body is freed inside the wait (its puppet may still be falling: %s)" % is_instance_valid(puppet))
+	await get_tree().create_timer(0.5).timeout
+	_check(true, "the wait has passed (an engine error above would fail the landing)")
+	_rig._swings.erase(swinger.get_instance_id())
+	World.despawn(swinger)
 	_rig._process(0.0)
 
 
