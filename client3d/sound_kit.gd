@@ -330,6 +330,21 @@ static func crash(cause: StringName, creature: String) -> String:
 	return slot if cause == &"crash" and creature != "" and has(slot) else ""
 
 
+## A steadied body's set by its kind (843, sound's side): the apexes' and the
+## draugr's own, the named chiefs' (by their base kinds) one humanoid stamp.
+const STEADY_SLOTS := {"great_bear": "sfx.great_bear_steady", "old_wolf": "sfx.wolf_steady",
+		"boar_king": "sfx.boar_king_steady", "draugr": "sfx.draugr_steady",
+		"robber_brute": "sfx.chief_steady", "brute": "sfx.chief_steady", "sneak": "sfx.chief_steady"}
+## A blow landing on a steadied body (843): a dull heavy thud in place of the hit.
+const HIT_STEADIED := "sfx.hit_steadied"
+
+
+## The slot a body of [param kind] makes as it steadies itself coming out of
+## a stagger (843; combat calls it only for a steadied body): "" for none.
+static func steady_slot(kind: String) -> String:
+	return str(STEADY_SLOTS.get(kind, ""))
+
+
 ## A swing's slot: a two-handed weapon's heavier whoosh.
 static func swing(id: String) -> String:
 	return "sfx.swing_heavy" if id != "" and int(Items.def(id).get("hands", 1)) >= 2 and not Items.verb_of(id).is_empty() 			and str(Items.verb_of(id).get("kind", "")) != "ranged" else "sfx.swing"

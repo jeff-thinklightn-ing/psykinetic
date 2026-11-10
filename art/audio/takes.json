@@ -1233,6 +1233,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.boar_king_steady": [
+			{
+				"file": "sfx.boar_king_steady.ogg",
+				"from": "freesound",
+				"original": "freesound 233165: Pig - Snort 6 - 96kHz.wav (from 0.18 s for 0.6 s) at 0.8 speed",
+				"sha256": "1ab08f6a6a41dbd305008194fc2f9f4ec708455db3601ccd5cc6915ada2d0f1c",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233165/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_steady.2.ogg",
+				"from": "freesound",
+				"original": "freesound 233147: Pig - Snort 1 - 96kHz.wav (from 0.35 s for 0.3 s) at 0.8 speed",
+				"sha256": "90047d7a4c6adf4662b29a42ca4737d77774e1b620097b0272cabd59a0b7ea89",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233147/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_steady.3.ogg",
+				"from": "freesound",
+				"original": "freesound 233163: Pig - Snort 4 - 96kHz.wav (from 0 s for 0.4 s) at 0.8 speed",
+				"sha256": "70a84a764a9f4fdb6992aada62a21ae47b6285af257e177d04b12a80732cc299",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233163/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.boar_root": [
 			{
 				"file": "sfx.boar_root.ogg",
@@ -1445,6 +1474,35 @@
 				"sha256": "1202b5e734475772bbe36027a37f2e8520b5fec93d394864adc577cce27bf81c",
 				"by": "The_Frisbee_of_Peace",
 				"url": "https://freesound.org/people/The_Frisbee_of_Peace/sounds/573653/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.chief_steady": [
+			{
+				"file": "sfx.chief_steady.ogg",
+				"from": "freesound",
+				"original": "freesound 46520: stomp1.WAV (from 0 s for 0.45 s)",
+				"sha256": "355c6e8da0bd47e6c49fd20789d3f3c2388f76cd02ff1cd0d76e83b0de9a2ff0",
+				"by": "stomachache",
+				"url": "https://freesound.org/people/stomachache/sounds/46520/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.chief_steady.2.ogg",
+				"from": "freesound",
+				"original": "freesound 46521: stomp2.WAV (from 0 s for 0.45 s)",
+				"sha256": "882d0719bdd3629b967d6ab062576508f953d46ac8fc292b3b890aba3f99772d",
+				"by": "stomachache",
+				"url": "https://freesound.org/people/stomachache/sounds/46521/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.chief_steady.3.ogg",
+				"from": "freesound",
+				"original": "freesound 46522: stomp3.WAV (from 0 s for 0.45 s)",
+				"sha256": "7c9cb63c409da09dbf9f314d7d3bf9898f6869809fc17bcfc0de2cc35abe6868",
+				"by": "stomachache",
+				"url": "https://freesound.org/people/stomachache/sounds/46522/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -1674,6 +1732,35 @@
 				"sha256": "b606561365f38dafa068b7ee1b415bcc633b8458fa535eb0eac7aeaea9fd7a33",
 				"by": "LordForklift",
 				"url": "https://freesound.org/people/LordForklift/sounds/448395/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.draugr_steady": [
+			{
+				"file": "sfx.draugr_steady.ogg",
+				"from": "freesound",
+				"original": "freesound 384885: Knight Left Footstep on Gravel 4 (With Chainmail) (from 0 s for 0.5 s)",
+				"sha256": "76656624abf42303a1f006bb60abfd82db17cea0df6366d98601c9e6055576e2",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384885/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.draugr_steady.2.ogg",
+				"from": "freesound",
+				"original": "freesound 384888: Knight Right Footstep on Gravel 4 (With Chainmail) (from 0 s for 0.5 s)",
+				"sha256": "21772e637a66b6bf7532e752ab11354f383ca64532708e15c29880a849616420",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384888/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.draugr_steady.3.ogg",
+				"from": "freesound",
+				"original": "freesound 384888: Knight Right Footstep on Gravel 4 (With Chainmail) (from 0 s for 0.5 s) at 0.85 speed",
+				"sha256": "6710dfe1826c1a9444a0e98e31870a0822d130b818c7966ea528e48893399dc6",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384888/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -2414,6 +2501,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.great_bear_steady": [
+			{
+				"file": "sfx.great_bear_steady.ogg",
+				"from": "freesound",
+				"original": "freesound 77633: growl2.wav (from 0 s for 1 s) at 0.8 speed",
+				"sha256": "e8f177af6ac9722063c707049ce83048bada48d2799d59ff5c54594bf599fab0",
+				"by": "lendrick",
+				"url": "https://freesound.org/people/lendrick/sounds/77633/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_steady.2.ogg",
+				"from": "freesound",
+				"original": "freesound 77637: growl6.wav (from 0 s for 1.1 s) at 0.8 speed",
+				"sha256": "ae0c456444360fa9f9edc9820e7a4e20fcc1bb95822fd7dd0c6511b304a8d0f5",
+				"by": "lendrick",
+				"url": "https://freesound.org/people/lendrick/sounds/77637/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_steady.3.ogg",
+				"from": "freesound",
+				"original": "freesound 77637: growl6.wav (from 0 s for 1.1 s) at 0.7 speed",
+				"sha256": "bbe58197709e01b750c41c66e6a193b124157c27bc615b8ee71d8667e9705990",
+				"by": "lendrick",
+				"url": "https://freesound.org/people/lendrick/sounds/77637/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.hammer_wood": [
 			{
 				"file": "sfx.hammer_wood.ogg",
@@ -2668,6 +2784,35 @@
 				"by": "damnsatinist",
 				"url": "https://freesound.org/people/damnsatinist/sounds/493914/",
 				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.hit_steadied": [
+			{
+				"file": "sfx.hit_steadied.ogg",
+				"from": "freesound",
+				"original": "freesound 185536: sandbag punch_single4.wav (from 0.12 s for 0.6 s)",
+				"sha256": "08dcc2b056247039229e6975a9eca746faeea7d53dff27b8e81034a114b7db6c",
+				"by": "martian",
+				"url": "https://freesound.org/people/martian/sounds/185536/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hit_steadied.2.ogg",
+				"from": "freesound",
+				"original": "freesound 185537: sandbag punch_single3.wav (from 0.12 s for 0.6 s)",
+				"sha256": "106ca34f806afab66e231f3ba5011a7358ae137d21a8dfca1636bbe52fa1742d",
+				"by": "martian",
+				"url": "https://freesound.org/people/martian/sounds/185537/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hit_steadied.3.ogg",
+				"from": "freesound",
+				"original": "freesound 185536: sandbag punch_single4.wav (from 0.12 s for 0.6 s) at 0.85 speed",
+				"sha256": "94534599ce0bfba7c60461bc8e840810b716e9cbecb39af95d52b924cfcae62c",
+				"by": "martian",
+				"url": "https://freesound.org/people/martian/sounds/185536/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.hit_stone": [
@@ -3524,6 +3669,26 @@
 				"by": "GB01",
 				"url": "https://freesound.org/people/GB01/sounds/152815/",
 				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.wolf_steady": [
+			{
+				"file": "sfx.wolf_steady.ogg",
+				"from": "freesound",
+				"original": "freesound 342204: Beast Snarling (from 0.3 s for 0.7 s) at 0.9 speed",
+				"sha256": "ea35dd33ba18279e12a8997f5707f12dd73300bb7b8490c810783f606ec506d4",
+				"by": "Christopherderp",
+				"url": "https://freesound.org/people/Christopherderp/sounds/342204/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_steady.2.ogg",
+				"from": "freesound",
+				"original": "freesound 342204: Beast Snarling (from 1.35 s for 0.65 s) at 0.9 speed",
+				"sha256": "aa21c6ec1b866e52f91c435e5ffe19e83bc9da706e5fe0a124a27e238dd910eb",
+				"by": "Christopherderp",
+				"url": "https://freesound.org/people/Christopherderp/sounds/342204/",
+				"license": "CC0 1.0"
 			}
 		],
 		"ui.chat_ping": [

@@ -47715,3 +47715,26 @@ SENSE_RULES_NOT_YET a rule, each with what it waits on) and its generations 1-4 
 only; protocol unchanged; no new class_name. Sheets: C:/dev/review/dungeon/838_castle_halls_g{1,2,3}.png.
 The box lays the new hold at its next regeneration (every 3 game days). One CHANGELOG bullet in voice's
 words.
+## 843. Steadied: a boss out of a stagger isn't staggered again till his told move
+
+843, sound's side (2026-11-10, release's number; combat's piece, package "steadied", landing in
+combat's take, on with it): a steadied body is heard setting himself, and a
+blow that doesn't rock him lands dull. Six slots, sfx bus, positional, each with a "fallback" to an
+existing cue so a tree without the takes plays that rather than nothing (SoundKit.played_from). The
+set, by the body's kind (SoundKit.STEADY_SLOTS, SoundKit.steady_slot(kind), "" for none; combat
+calls it only for a steadied body): sfx.great_bear_steady (a short low growl, slowed to 0.7-0.8,
+range 14, -4 dB, falling back to sfx.great_bear_growl), sfx.wolf_steady (the old grey's short
+snarl, 0.9, -4 dB, to sfx.wolf_growl), sfx.boar_king_steady (a deep snort, 0.8, -2 dB, to
+sfx.boar_king_snort), sfx.draugr_steady (a mailed foot stamped down, -2 dB, to
+sfx.thrown_land_heavy), and sfx.chief_steady for the named chiefs by their base kinds
+(robber_brute, brute, sneak: Brand, Grull, Skeech; a heavy stamp, -4 dB, to sfx.thrown_land_heavy).
+The unrocked blow: sfx.hit_steadied (SoundKit.HIT_STEADIED; a sandbag's dull heavy thud, its weight
+about 96 Hz, range 16, 0 dB, played in place of the hit, falling back to sfx.boar_king_crash).
+Measured at their volumes (each slot's loudest 100 ms): the sets -16 to -20.5 dB, beside the
+bodies' own growls and snorts (-12 to -20); the thud -15, a few dB under a close blunt hit's -12
+and a blade's -8, and far duller. 17 CC0 Freesound takes: martian 185536 (twice, once slowed),
+185537; lendrick 77633, 77637 (twice); Christopherderp 342204 (two snarls); JarredGibb 233165,
+233147, 233163; Ali_6868 384885, 384888 (twice); stomachache 46520, 46521, 46522; THIRD_PARTY
+regenerated. sound_kit_test _test_steadied: each kind's set (a plain wolf and a deer none), each
+slot placed on the sfx bus playing something, and with no takes of its own its stand-in. Client
+only; protocol unchanged, no new class_name. No bullet here: the package's rides combat's side.

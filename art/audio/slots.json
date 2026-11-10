@@ -1205,6 +1205,66 @@
 			"volume_db": 0.0,
 			"uses": "the boar king charging into a tree, rock or wall: a heavy dull body thud as he stuns himself (780 amended (16); Client3D on GridEntity.stunned with cause crash, SoundKit.stun_sound)"
 		},
+		"sfx.great_bear_steady": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -4.0,
+			"fallback": "sfx.great_bear_growl",
+			"uses": "the great bear steadying himself out of a stagger: a short low growl as he sets (843; combat's, SoundKit.steady_slot)"
+		},
+		"sfx.wolf_steady": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -4.0,
+			"fallback": "sfx.wolf_growl",
+			"uses": "the old grey steadying himself out of a stagger: a short snarl as he sets (843; combat's, SoundKit.steady_slot)"
+		},
+		"sfx.boar_king_steady": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -2.0,
+			"fallback": "sfx.boar_king_snort",
+			"uses": "the boar king steadying himself out of a stagger: a deep snort as he sets (843; combat's, SoundKit.steady_slot)"
+		},
+		"sfx.draugr_steady": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -2.0,
+			"fallback": "sfx.thrown_land_heavy",
+			"uses": "the draugr steadying himself out of a stagger: an armoured stamp, mail ringing (843; combat's, SoundKit.steady_slot)"
+		},
+		"sfx.chief_steady": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -4.0,
+			"fallback": "sfx.thrown_land_heavy",
+			"uses": "a named chief (Brand, Grull, Skeech) steadying himself out of a stagger: a heavy stamp (843; combat's, SoundKit.steady_slot)"
+		},
+		"sfx.hit_steadied": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 16,
+			"volume_db": 0.0,
+			"fallback": "sfx.boar_king_crash",
+			"uses": "a blow landing on a steadied body: a dull heavy thud in place of the hit, that it didn't rock him (843; combat's, SoundKit.HIT_STEADIED)"
+		},
 		"sfx.footstep_hooves_heavy": {
 			"category": "movement",
 			"type": "oneshot",

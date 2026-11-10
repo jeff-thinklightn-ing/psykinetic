@@ -17,6 +17,7 @@ func _ready() -> void:
 	_test_sources()
 	_test_noises_are_the_sims()
 	_test_fallbacks()
+	_test_steadied()
 	_test_placeholder()
 	_test_takes()
 	_test_ambience_weights()
@@ -349,6 +350,27 @@ func _test_fallbacks() -> void:
 	_check(SoundKit.played_from("sfx.block_shield") == "" and SoundKit.files("sfx.block_shield").is_empty(), "a block: nothing yet, the placeholder")
 	SoundKit.reload()
 
+
+## 843, sound's side: a steadied body's set by its kind, the named chiefs' by
+## their base kinds, and the dull thud of a blow that doesn't rock him; each
+## plays its own takes, else the stand-in it falls back to, never nothing.
+func _test_steadied() -> void:
+	print("\n== steadied: each body's set, the chiefs' one stamp, the unrocked thud (843) ==")
+	var want := {"great_bear": "sfx.great_bear_steady", "old_wolf": "sfx.wolf_steady", "boar_king": "sfx.boar_king_steady",
+			"draugr": "sfx.draugr_steady", "robber_brute": "sfx.chief_steady", "brute": "sfx.chief_steady", "sneak": "sfx.chief_steady",
+			"wolf": "", "deer": "", "": ""}
+	for kind: String in want:
+		_check(SoundKit.steady_slot(kind) == want[kind], "%s steadied: %s" % [kind if kind != "" else "(none)", want[kind] if want[kind] != "" else "none"])
+	var stand_ins := {"sfx.great_bear_steady": "sfx.great_bear_growl", "sfx.wolf_steady": "sfx.wolf_growl",
+			"sfx.boar_king_steady": "sfx.boar_king_snort", "sfx.draugr_steady": "sfx.thrown_land_heavy",
+			"sfx.chief_steady": "sfx.thrown_land_heavy", SoundKit.HIT_STEADIED: "sfx.boar_king_crash"}
+	for slot: String in stand_ins:
+		_check(SoundKit.has(slot) and SoundKit.positional(slot) and SoundKit.bus(slot) == "sfx" and SoundKit.played_from(slot, false) != "",
+				"%s: placed, sfx bus, plays something (%s)" % [slot, SoundKit.played_from(slot, false)])
+	_without_takes(stand_ins.keys())
+	for slot: String in stand_ins:
+		_check(SoundKit.played_from(slot, false) == stand_ins[slot], "%s with no takes of its own: %s meanwhile" % [slot, stand_ins[slot]])
+	SoundKit.reload()
 
 func _test_takes() -> void:
 	print("
