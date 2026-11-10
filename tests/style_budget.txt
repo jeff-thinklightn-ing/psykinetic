@@ -1,0 +1,36 @@
+# Theme overrides, loose colours and fonts each file of the game's code may hold (decision 840,
+# tests/style_test). One line per file: path overrides colours fonts. A file with no line may
+# hold none. A line only falls: style_test fails a file over its line (a new colour, font or size
+# goes through ui-design's theme) and a file under it (lower the line in the same commit).
+main.gd 1 18 0
+render/admin_panel.gd 5 0 0
+render/arrival_card.gd 6 3 0
+render/barter_panel.gd 24 0 0
+render/boss_bar.gd 3 2 0
+render/card_page.gd 5 3 0
+render/character_preview.gd 0 2 0
+render/character_sheet.gd 1 1 0
+render/click_ripple.gd 0 1 0
+render/compass.gd 2 0 0
+render/connect_screen.gd 5 0 0
+render/deal_panel.gd 5 0 0
+render/down_screen.gd 2 0 0
+render/fade.gd 0 2 0
+render/find_panel.gd 6 2 0
+render/gains.gd 0 1 0
+render/game_menu.gd 1 0 0
+render/hint_panel.gd 2 0 0
+render/item_tip.gd 7 0 0
+render/main_menu.gd 1 0 0
+render/minimap.gd 1 5 0
+render/note_sheet.gd 2 0 0
+render/options_panel.gd 15 0 0
+render/pack_panel.gd 19 4 0
+render/quest_panel.gd 5 1 0
+render/shop_panel.gd 4 0 0
+render/speech_bubbles.gd 5 0 0
+render/talk_panel.gd 5 0 0
+render/town_sheet.gd 28 3 0
+render/tuning_panel.gd 11 0 0
+render/world_map_panel.gd 0 1 0
+sim/grid_entity.gd 4 0 0
