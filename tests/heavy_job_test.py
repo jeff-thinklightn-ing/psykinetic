@@ -913,6 +913,45 @@ if saved_kinds is not None:
 elif os.path.exists(gate._path("kinds.json")):
     os.remove(gate._path("kinds.json"))
 
+print("== status says why each row waits, and what each running job is owed (394 amended (26)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+gate.total_ram_gb = lambda: None
+saved_kinds = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=18.0, commit_gb=1.0, lean_first=False),
+    "scene": dict(gate.KINDS["scene"], ram_gb=1.3, commit_gb=1.0)})
+clear_gate()
+owed_job("builder", "suite", 18.0)  # Owed all 18 GB: 26 free, 8 to give.
+queued("items", "scene")
+queued("npc", "scene")
+queued("import", "godot_import")
+def status_lines(free):
+    gate._memory = lambda: (free, free)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        gate.status()
+    return out.getvalue().splitlines()
+lines = status_lines(26.0)
+check(lines[0].endswith("; owed to running jobs: RAM 18.0 GB, commit 18.0 GB"), "the first line ends with what is owed: %s" % lines[0])
+check(lines[1].startswith("running builder suite, ") and lines[1].endswith("; owed 18.0 GB"), "a running job's line ends with its owed: %s" % lines[1])
+check(lines[2].startswith("queued items scene, ") and "; waits: " in lines[2] and "wanted" in lines[2],
+    "the head waits on memory, saying so: %s" % lines[2])
+check(lines[3].startswith("queued npc scene, ") and "; waits: behind the head, items scene, which waits on: " in lines[3],
+    "the scene behind it: behind that head: %s" % lines[3])
+check(lines[4].startswith("queued import godot_import, ") and "; waits: behind the head" in lines[4],
+    "and the import behind a head waiting on memory (first come for memory): %s" % lines[4])
+lines = status_lines(40.0)
+check(lines[2].endswith("; may start at its next look"), "with room, the head may start: %s" % lines[2])
+reasons = gate.queue_reasons(gate._entries("queue"), gate._entries("running"), 26.0, 26.0, None)
+check(len(reasons) == 3 and reasons[0].startswith("waits: "), "queue_reasons, read only: %s" % reasons)
+check([each["tree"] for each in gate._entries("queue")] == ["items", "npc", "import"], "status moved nothing")
+clear_gate()
+gate._memory, gate.total_ram_gb = real_memory, real_total_ram
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved_kinds is not None:
+    gate._write(gate._path("kinds.json"), saved_kinds)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

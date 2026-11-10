@@ -1532,15 +1532,53 @@ def holds(tree, kind):
         return any(entry["tree"] == tree and entry["kind"] == kind for entry in _entries("running"))
 
 
+def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
+    """Each queued entry's reason, as its waiter's next look would judge it
+    (wait_turn's passes and decide, read only): "may start at its next look",
+    or "waits: " and what holds it; one behind a head names that head and
+    what the head waits on (394 amended (26))."""
+    table = kinds()
+    now = time.time() if now is None else now
+    out = []
+    for place, entry in enumerate(queue):
+        # A kind the table lacks (a kinds.json older than the entry): judged as a suite, the heaviest.
+        default = dict(table.get(entry["kind"]) or KINDS.get(entry["kind"]) or table["suite"])
+        row = queued_row(table, entry, default)
+        ahead = [dict(queued_row(table, each, default), tree=each["tree"]) for each in queue[:place]]
+        head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now, backfill_length(row))
+        ok, why = decide(row, running, head, free_ram, free_gpu if row["gpu"] else None, free_commit)
+        if ok:
+            out.append("may start at its next look" + (" (past %s by backfill)" % ", ".join(
+                "%s %s" % (each["tree"], each["kind"]) for each in past) if past else ""))
+        elif not head and queue:
+            first = queue[0]
+            first_row = queued_row(table, first, default)
+            _, first_why = decide(first_row, running, True, free_ram, free_gpu if first_row["gpu"] else None, free_commit)
+            out.append("waits: behind the head, %s %s, which waits on: %s%s" % (first["tree"], first["kind"],
+                first_why or "its next look", "; " + past_why if past_why else ""))
+        else:
+            out.append("waits: %s" % why)
+    return out
+
+
 def status():
+    """Running and queued jobs and free memory. Since 394 amended (26) each
+    line ends with what explains a wait: what each running job is still
+    owed of its estimate, and each queued row's reason, the gate's own
+    decide/passes answer for it at this moment (what its waiter sees). The
+    state is read under the lock as before and judged after letting it go:
+    status never writes it, so it can't stall a waiter. Earlier text of each
+    line is unchanged (scripts read it); the reason comes after "; "."""
     with StateLock():
         running = _entries("running")
         queue = _entries("queue")
     free_gpu, used_gpu = gpu_gb()
     free_ram, free_commit = _memory()
-    print("free RAM %.1f GB (margin %.0f GB), commit %s, GPU %s" % (free_ram, MARGIN_GB,
+    print("free RAM %.1f GB (margin %.0f GB), commit %s, GPU %s; owed to running jobs: RAM %.1f GB, commit %.1f GB" % (
+        free_ram, MARGIN_GB,
         "%.1f GB free (margin %.0f GB)" % (free_commit, COMMIT_MARGIN_GB) if free_commit is not None else "unknown",
-        "%.1f GB free" % free_gpu if free_gpu is not None else "unknown"))
+        "%.1f GB free" % free_gpu if free_gpu is not None else "unknown",
+        reserved_gb(running), reserved_commit_gb(running)))
     for entry in running:
         held = time.time() - entry["started"]
         limit, share = entry.get("limit_s"), entry.get("cpu_share")
@@ -1557,12 +1595,14 @@ def status():
             entry.get("using_gb", 0.0), entry["ram_gb"], ("" if entry.get("watched") else " (taken)")
             + (" (lean)" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
             + (" (went past %s, due by %s)" % (backfill["past"], time.strftime("%H:%M", time.localtime(backfill["due"])))
-                if backfill else ""), flag))
+                if backfill else ""), flag) + "; owed %.1f GB" % reserved_gb([entry]))
+    reasons = queue_reasons(queue, running, free_ram, free_commit, free_gpu)
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)%s%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
             ", first for %.0f s" % (time.time() - entry["head_since"]) if entry.get("head_since") else "",
             ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
-            + (", fronted by %s: %s" % (entry["fronted"]["by"], entry["fronted"]["why"]) if entry.get("fronted") else ""))
+            + (", fronted by %s: %s" % (entry["fronted"]["by"], entry["fronted"]["why"]) if entry.get("fronted") else "")
+            + "; " + reasons[place - 1])
     if not running and not queue:
         print("no heavy jobs")
     return 0

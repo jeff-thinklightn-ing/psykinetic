@@ -46830,6 +46830,24 @@ first with its ticket's name kept; the log and the summary. With a suite running
 a fronted suite waits for the running one, starts when it ends, never beside the bench, and the bench it
 passed runs once it is released. Tools only; protocol unchanged; no class_name; no bullet.
 
+394 amended (26) (perf, 2026-11-10; release's label, the coordinator's approval of the output): `heavy_job
+status` says why each queued row waits. Release asked why 13 scenes sat queued with a scene slot free: builder's
+full suite had taken an 18.1 GB estimate and used 4.1, so 14 GB was owed to it, and a scene's 1.3 + 8 didn't fit
+in what was left. Status gave no reason per row.
+- The first line ends with what the running jobs are owed of their estimates (RAM and commit), and each running
+  line with its own: "; owed 14.0 GB".
+- Each queued line ends with its reason: "; may start at its next look" (with what it would go past by
+  backfill), "; waits: " and decide's answer (memory with the free, owed and wanted figures, the count, a
+  kind's cap, a kind it excludes), or, behind a head, "; waits: behind the head, <tree> <kind>, which waits on:"
+  that head's answer. These are wait_turn's own passes and decide, read only (queue_reasons), so status and
+  the waiters can't disagree.
+- The state is read under the state lock exactly as before and judged after it is let go; status never writes
+  it, so a status call can't stall a waiter. Each line's earlier text is unchanged, and the reason comes after
+  "; ", so release's and watch's reads still match; summary is untouched.
+heavy_job_test: owed on the first line and on a running job's; a head waiting on memory says so with the
+figures; a scene and an import behind it name that head; with room the head may start; status moves nothing.
+Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
