@@ -76,6 +76,7 @@ func _ready() -> void:
 	_test_camp_chest()
 	_test_band()
 	_test_crypt_ways()
+	_test_arrival_rule()
 	_test_deep_crypt()
 	_test_barrow_quest()
 	_test_decor()
@@ -4913,6 +4914,81 @@ func _test_crypt_ways() -> void:
 			if not at is Vector2i or not map.walkable(at):
 				wrong.append("g%d: %s at %s" % [generation, spawn, at])
 	_check(wrong.is_empty() and template["warnings"].is_empty(), "the barrow's three arrivals in their anchors and on floor in the template and generations 1-3 (%s %s)" % [wrong, template["warnings"]])
+
+
+func _test_arrival_rule() -> void:
+	print("
+== layout sense: no arrival inside a fight (832) ==")
+	var spawn := Vector2i(20, 20)
+	var at := func(entities: Array) -> Array:
+		return LAYOUT_SENSE.arrival_faults({"spawn_points": {"from_test": spawn}, "entities": entities})
+	var guard := {"tile": Vector2i(29, 20), "home": Vector2i(29, 20), "kind": "brute", "idle": {"mode": "guard"}}
+	var guard_far := {"tile": Vector2i(30, 20), "home": Vector2i(30, 20), "kind": "brute", "idle": {"mode": "guard"}}
+	var wanderer := {"tile": Vector2i(32, 24), "home": Vector2i(32, 24), "kind": "robber"}
+	var wanderer_far := {"tile": Vector2i(33, 20), "home": Vector2i(33, 20), "kind": "robber"}
+	var draugr := {"tile": Vector2i(21, 20), "home": Vector2i(21, 20), "kind": "draugr"}
+	var patrol := {"tile": Vector2i(40, 20), "home": Vector2i(40, 20), "kind": "sneak", "idle": {"mode": "patrol", "route": [Vector2i(40, 20), Vector2i(25, 20)]}}
+	_check(at.call([guard]).size() == 1 and at.call([guard_far]).is_empty(), "a standing foe 9 cells off is a fault, 10 off is not (%s)" % [at.call([guard])])
+	_check(at.call([wanderer]).size() == 1 and at.call([wanderer_far]).is_empty(), "a wanderer 12 off is a fault (its reach 3 more), 13 off is not")
+	_check(at.call([draugr]).is_empty(), "the seated draugr beside an arrival is no fight")
+	_check(at.call([patrol]).size() == 1, "a patrol's waypoint 5 off is a fault though its post is 20 off")
+	_check(LAYOUT_SENSE.RULES.has("arrival"), "arrival is one of layout sense's rules")
+	var holding: Array[String] = []
+	var as_held: bool = Regen.layout_options({"held": ["door", "arrival"]}).get("arrival") == true and Regen.layout_options({"held": ["door"]}).get("arrival") == false
+	for level_name: String in Regen.marked_levels():
+		var block := Regen.config_of(level_name)
+		as_held = as_held and Regen.layout_options(block).get("arrival") == ("arrival" in (block.get("held", []) as Array))
+		if "arrival" in (block.get("held", []) as Array):
+			holding.append(level_name)
+	_check(as_held, "checked in generation only where a block holds it (806 amended (11): off till 832's switch-on holds it in both barrow depths; held now: %s)" % [holding])
+	# A block holding it: the crypt lays its monsters clear of the arrivals
+	# (the barrow, from_breach left out: main's unused one sits in the camp
+	# till 832 moves it), and a try with an arrival fault is never laid (an
+	# arrival put in the camp, by its robbers).
+	var prepared := Regen.prepare("barrow")
+	if not "arrival" in (prepared["config"]["held"] as Array):
+		(prepared["config"]["held"] as Array).append("arrival")
+	var kept: Dictionary = prepared["made"]["config"]["spawn_points"].duplicate()
+	kept["in_camp"] = [10, 45]
+	prepared["made"]["config"]["spawn_points"].erase("from_breach")
+	prepared["config"]["arrivals"].erase("from_breach")
+	var clear := true
+	for generation in [1, 2, 3]:
+		var made := Regen.generate_prepared(prepared, generation)
+		clear = clear and not made.is_empty() and Regen.layout_faults(made, prepared["config"]).all(func(f: Dictionary) -> bool: return f["rule"] != "arrival")
+	_check(clear, "a barrow held to it: generations 1-3 laid with every arrival clear, the crypt laying its robbers clear")
+	prepared["made"]["config"]["spawn_points"] = kept
+	_check(Regen.generate_prepared(prepared, 1).is_empty(), "and with an arrival no try can clear (one in the robbers' camp), none is laid: the last laid copy stands")
+	# The rule's scope (the coordinator): every level a player can reach, laid
+	# by hand or a template, its arrivals clear: each start, and each spawn
+	# point some link names (main's barrow from_breach, named by none till
+	# 832, is not one); the test levels exempt, castle maps' to mend.
+	var named := {}
+	var folders := DirAccess.get_directories_at(Level.DIR)
+	for folder: String in folders:
+		var config := Level.template_config(folder)
+		for link: Variant in config.get("links", []):
+			if link is Dictionary:
+				named["%s/%s" % [link.get("to_map", ""), link.get("to_spawn", "")]] = true
+	var faulted: Array = []
+	var read := 0
+	for folder: String in folders:
+		if folder in LAYOUT_SENSE.ARRIVAL_EXEMPT or LAYOUT_SENSE.ARRIVAL_NOT_YET.has(folder) or not FileAccess.file_exists(Level.DIR + folder + "/layout.png") or not FileAccess.file_exists(Level.DIR + folder + "/level.json"):
+			continue
+		read += 1
+		var made := Level.template(folder)
+		var laid := Level.parse(made["layout"], made.get("height"), made["config"], made.get("relief"))
+		var reached := {}
+		for spawn_name: Variant in laid.get("spawn_points", {}):
+			if named.has("%s/%s" % [folder, spawn_name]):
+				reached[spawn_name] = laid["spawn_points"][spawn_name]
+		laid["spawn_points"] = reached
+		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(laid):
+			faulted.append("%s: %s" % [folder, fault["what"]])
+	_check(read >= 15 and faulted.is_empty(), "every level a player reaches (%d read; sample and test_room exempt, castle maps' to mend) has its arrivals clear (%s)" % [read, faulted])
+	var castle := Level.template("castle")
+	_check(not LAYOUT_SENSE.arrival_faults(Level.parse(castle["layout"], castle.get("height"), castle["config"], castle.get("relief"))).is_empty(),
+		"castle's arrivals still want mending (drop it from ARRIVAL_NOT_YET once maps has)")
 
 
 ## 832 (the crypt's ways in): the deep laid by the crypt generator, its

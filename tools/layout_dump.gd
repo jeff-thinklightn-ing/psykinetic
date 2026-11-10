@@ -6,6 +6,10 @@ extends Node
 ##   godot --headless --path <repo> --scene res://tools/layout_dump.tscn -- --out=<dir> [--levels=barrow,castle_halls] [--generations=1,2,3]
 ##   godot ... --scene res://tools/layout_dump.tscn -- --out=<an earlier dump> --check   (its faults checked again)
 ## Without --levels, every level marked "regenerate". Writes nothing but --out.
+##   godot ... --scene res://tools/layout_dump.tscn -- --arrivals
+## (832): every level under levels/, laid by hand or generated (its
+## template), read for layout_sense's arrival rule alone, one line each
+## "ARRIVAL <level>: <fault>"; a report, never a failure. Writes nothing.
 
 
 func _ready() -> void:
@@ -15,6 +19,10 @@ func _ready() -> void:
 			args[arg.substr(2, arg.find("=") - 2)] = arg.substr(arg.find("=") + 1)
 		elif arg.begins_with("--"):
 			args[arg.substr(2)] = true
+	if args.has("arrivals"):
+		_report_arrivals()
+		get_tree().quit(0)
+		return
 	var out := str(args.get("out", ""))
 	if out.is_empty():
 		push_error("layout_dump: --out=<dir> is needed")
@@ -58,6 +66,24 @@ func _ready() -> void:
 			_write_faults(stem, Regen.layout_faults(made, Regen.config_of(level_name)))
 			print("layout_dump: %s (%d tries, %d ms)" % [stem, made["tries"], Time.get_ticks_msec() - began])
 	get_tree().quit(0)
+
+
+## --arrivals (832): each level's arrival faults printed, then how many.
+func _report_arrivals() -> void:
+	var sense := preload("res://sim/layout_sense.gd")
+	var count := 0
+	var levels := 0
+	for folder: String in DirAccess.get_directories_at(Level.DIR):
+		if not FileAccess.file_exists(Level.DIR + folder + "/level.json") or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		levels += 1
+		var made := Level.template(folder)
+		var level := Level.parse(made["layout"], made.get("height"), made["config"], made.get("relief"))
+		var note := " (exempt: a test level)" if folder in sense.ARRIVAL_EXEMPT else (" (not yet: %s)" % sense.ARRIVAL_NOT_YET[folder] if sense.ARRIVAL_NOT_YET.has(folder) else "")
+		for fault: Dictionary in sense.arrival_faults(level):
+			print("ARRIVAL %s: %s at %s%s" % [folder, fault["what"], fault["cell"], note])
+			count += 1
+	print("ARRIVAL %d faults over %d levels" % [count, levels])
 
 
 func _write_faults(stem: String, found: Array) -> void:

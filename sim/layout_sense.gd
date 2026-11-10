@@ -40,12 +40,29 @@ extends RefCounted
 ##             STAND_IN_REACH steps of one, so a lone player can solve it;
 ##             what its door opens on holds a chest that gives; and every
 ##             secret has two clues or more.
+##   arrival   (832, the coordinator: no arrival puts a player inside a
+##             fight) no spawn point or start within ARRIVAL_CLEAR cells (beyond any
+##             kind's alerted sight, 7 and 2) of a hostile monster's reach:
+##             its cell, plus WANDER_RADIUS for one that wanders or
+##             patrols about home, or each waypoint of its route. The
+##             seated draugr, the fallen knight and prey (CALM_KINDS) are
+##             no fight. Checked only when [param options] "arrival" is
+##             true (806 amended (11): a level whose block holds the rule).
 ## options: "ways" (the level's way width, cells), "heart" (Vector2i: the
 ## spine's far end; else the regenerate block's farthest anchor, else the
 ## farthest floor), "anchors" (the regenerate block's), "config" (level.json,
 ## for its niches and decor rows when [param level] lacks them).
 
-const RULES: Array[String] = ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop"]
+const RULES: Array[String] = ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"]
+## The arrival rule's reach (832): beyond every kind's sight (7 cells, and
+## up to 2 more alerted), in cells (the larger of x and y apart, as sight).
+const ARRIVAL_CLEAR := 10
+const CALM_KINDS: Array[String] = ["draugr", "astral_knight", "rabbit", "deer", "stag"]
+## The rule's scope (the coordinator): every level a player can reach,
+## generated or laid by hand, but these test levels; and (ARRIVAL_NOT_YET)
+## the hand-laid ones still to mend, each named with who mends it.
+const ARRIVAL_EXEMPT: Array[String] = ["sample", "test_room"]
+const ARRIVAL_NOT_YET := {"castle": "maps, after the cut: from_foothills, from_halls, from_test_room, start 1 by imps and a sneak"}
 ## The co-op rule's reaches (crypt landing 2): a stand-in within STAND_IN_REACH
 ## steps of a plate; plates PLATES_APART apart; a plate within PLATE_REACH
 ## steps of its door.
@@ -86,6 +103,10 @@ static func check(level: Dictionary, rooms: Array = [], options: Dictionary = {}
 	_spine(lay, options, faults)
 	_chests(level, lay, options, faults)
 	_coop(level, lay, faults)
+	# 832 (806 amended (11)): only where the level holds the arrival rule
+	# (Regen.layout_options' "arrival"), so no other level's faults change.
+	if options.get("arrival", false):
+		faults.append_array(arrival_faults(level))
 	return faults
 
 
@@ -94,6 +115,89 @@ static func check_chests(level: Dictionary, options: Dictionary = {}) -> Array:
 	var faults: Array = []
 	_chests(level, _lay(level, [], options), options, faults)
 	return faults
+
+
+## The arrival rule alone (832): one fault for each arrival of
+## [param level] (Level.parse's: each spawn point, where a link's way in
+## lands, and each start, "start 1" on) within ARRIVAL_CLEAR of a hostile's
+## reach, naming the nearest; its cell the arrival's. Read over any level,
+## laid by hand or generated, indoors or out.
+static func arrival_faults(level: Dictionary) -> Array:
+	var faults: Array = []
+	var spawns: Dictionary = (level.get("spawn_points", {}) as Dictionary).duplicate()
+	var starts: Array = level.get("starts", [])
+	for index in starts.size():
+		spawns["start %d" % (index + 1)] = starts[index]
+	var reaches: Array = []
+	for spec: Dictionary in level.get("entities", []):
+		var at: Variant = spec.get("tile")
+		var kind := str(spec.get("kind", ""))
+		if not at is Vector2i or not (spec.has("home") or spec.has("named")) or kind in CALM_KINDS:
+			continue
+		for reach: Array in _reach_of(spec, kind, at):
+			reaches.append([reach[0], reach[1], kind])
+	for spawn_name: String in _sorted_names(spawns):
+		var spawn: Variant = spawns[spawn_name]
+		if not spawn is Vector2i:
+			continue
+		var worst: Array = []
+		for reach: Array in reaches:
+			var apart := maxi(absi(spawn.x - reach[0].x), absi(spawn.y - reach[0].y))
+			var short := ARRIVAL_CLEAR + int(reach[1]) - apart
+			if short > 0 and (worst.is_empty() or short > int(worst[0])):
+				worst = [short, apart, reach[2], ARRIVAL_CLEAR + int(reach[1])]
+		if not worst.is_empty():
+			faults.append({"rule": "arrival", "cell": spawn,
+				"what": "the arrival %s is %d cells from where %s %s roams (%d wanted)" % [spawn_name, worst[1],
+					"an" if str(worst[2]).left(1) in "aeiou" else "a", worst[2], worst[3]]})
+	return faults
+
+
+static func _sorted_names(spawns: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for key: Variant in spawns:
+		out.append(str(key))
+	out.sort()
+	return out
+
+
+## Where a monster [param spec] of [param kind] at [param at] may stand
+## idling: [[cell, cells more]], its own cell with WANDER_RADIUS more when it
+## wanders or patrols about home, each waypoint of a route, a gathering's
+## point with its radius.
+static func _reach_of(spec: Dictionary, kind: String, at: Vector2i) -> Array:
+	var idle: Variant = spec.get("idle", {})
+	var mode := str((idle as Dictionary).get("mode", "")) if idle is Dictionary else str(idle)
+	if mode.is_empty():
+		var row: Variant = Monster.kinds().get(kind, {})
+		var given: Variant = (row as Dictionary).get("idle", "none") if row is Dictionary else "none"
+		# The kind's row holds its idle as Monster.Idle, a number.
+		if given is int:
+			given = Monster.IDLE_MODES.find_key(given)
+		mode = str((given as Dictionary).get("mode", "none")) if given is Dictionary else str(given)
+	var out: Array = [[at, 0]]
+	if idle is Dictionary and (idle as Dictionary).get("route") is Array and not ((idle as Dictionary)["route"] as Array).is_empty():
+		for point: Vector2i in (idle as Dictionary)["route"]:
+			out.append([point, 0])
+	elif mode == "wander" or mode == "patrol":
+		out = [[at, Monster.WANDER_RADIUS]]
+	elif mode == "gather":
+		var point: Variant = (idle as Dictionary).get("point") if idle is Dictionary else null
+		out = [[point if point is Vector2i else at, int((idle as Dictionary).get("radius", Monster.GATHER_RADIUS)) if idle is Dictionary else Monster.GATHER_RADIUS]]
+	return out
+
+
+## 832 (806 amended (11)): whether a [param kind] laid at [param cell],
+## idle as its kind is, keeps the arrival rule for every cell of
+## [param arrivals] (a generator laying its monsters clear of them).
+static func clear_of_arrivals(cell: Vector2i, kind: String, arrivals: Array) -> bool:
+	if arrivals.is_empty() or kind in CALM_KINDS:
+		return true
+	for reach: Array in _reach_of({}, kind, cell):
+		for arrival: Vector2i in arrivals:
+			if maxi(absi(arrival.x - reach[0].x), absi(arrival.y - reach[0].y)) < ARRIVAL_CLEAR + int(reach[1]):
+				return false
+	return true
 
 
 ## How many faults of each rule, every rule named (0 when clean).

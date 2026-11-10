@@ -248,6 +248,14 @@ static func prepare(level_name: String) -> Dictionary:
 	# The first hall's niches (608): the template's list goes to the
 	# generator, which re-rolls them and moves the hidden door.
 	config["niches"] = made["config"].get("niches", [])
+	# The arrivals (832): the template's spawn points and starts, for a
+	# generator that lays its monsters clear of them when the block holds
+	# that rule.
+	var arrivals: Dictionary = (made["config"].get("spawn_points", {}) as Dictionary).duplicate(true)
+	var starts: Array = made["config"].get("starts", [])
+	for index in starts.size():
+		arrivals["start %d" % (index + 1)] = starts[index]
+	config["arrivals"] = arrivals
 	# The worker's own copies: Level keeps the template's dictionaries, which
 	# the main thread goes on reading (the images are only read, by both).
 	return {"level_name": level_name, "made": {"layout": layout, "height": made["height"], "config": made["config"].duplicate(true)},
@@ -330,6 +338,11 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		# the fewest held, then the fewest preferred. Only "held" fails a test.
 		var prefer: Array = config.get("prefer", [])
 		var found := layout_faults(result, config)
+		# 806 amended (11): a try with an arrival fault is never laid, not
+		# even as the best (the crypt lays clear of arrivals, so none should
+		# come; with none clear, the level's last laid copy stands).
+		if "arrival" in held and found.any(func(fault: Dictionary) -> bool: return fault["rule"] == "arrival"):
+			continue
 		result["faults"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in held).size()
 		result["preferred"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in prefer).size()
 		if result["faults"] == 0 and result["preferred"] == 0:
@@ -340,7 +353,8 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		if int(best["faults"]) > 0:
 			print("[regen] %s: the best of %d tries keeps %d layout faults (806)" % [level_name, HELD_TRIES, best["faults"]])
 		return best
-	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
+	push_warning("[regen] %s: no map of %d tries joined every anchor (or kept its arrivals clear); the last one stands" % [level_name,
+		HELD_TRIES if not held.is_empty() else TRIES])
 	return {}
 
 
@@ -361,13 +375,15 @@ static func layout_faults(made: Dictionary, config: Dictionary) -> Array:
 ## 806: the checker's options for a "regenerate" block [param config]: its
 ## "ways" (default 3) and "pillars" (0), a dungeon, and the anchors the
 ## spine's heart is sought in: the block's "heart" anchor when it names one
-## (the crypt's: the robbers' camp), else every anchor (the farthest).
+## (the crypt's: the robbers' camp), else every anchor (the farthest);
+## "arrival" when the block holds that rule (806 amended (11)).
 static func layout_options(config: Dictionary) -> Dictionary:
 	var anchors: Array = config.get("anchors", [])
 	var heart := str(config.get("heart", ""))
 	if not heart.is_empty():
 		anchors = anchors.filter(func(anchor: Variant) -> bool: return anchor is Dictionary and str(anchor.get("name", "")) == heart)
-	return {"ways": int(config.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(config.get("pillars", 0))}
+	return {"ways": int(config.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(config.get("pillars", 0)),
+		"arrival": "arrival" in (config.get("held", []) as Array)}
 
 
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt

@@ -58,6 +58,7 @@ extends RefCounted
 
 const Tools := preload("res://sim/level_gen/gen_tools.gd")
 const Labyrinth := preload("res://sim/level_gen/labyrinth.gd")
+const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const FLOOR := "stone"
 ## The processional's width unless the block says ("ways", an odd number).
@@ -111,6 +112,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var plan := {"rooms": [], "ways": {}, "decor": [], "entities": [], "buildings": [], "niches": [], "carvings": [],
 		"laid_rooms": [], "processional": [], "ends": [], "plates": [], "secrets": [], "plate_cells": {},
 		"gap": DEEP_GAP if config.get("deep") is Dictionary else ROOM_GAP}
+	plan["arrivals"] = _arrivals(config, seed)
 	var nodes := Labyrinth._anchor_nodes(template, given, {})
 	if nodes.is_empty():
 		return map
@@ -214,6 +216,24 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 ## lays them: Regen moves the link by it.
 static func niche_plan(config: Dictionary, seed: int) -> Dictionary:
 	return Labyrinth.niche_plan(config, seed)
+
+
+## 832 (806 amended (11)): the cells players arrive on, when the block
+## holds the arrival rule (else none): the template's spawn points and
+## starts (Regen's "arrivals"), from_below where this seed's hidden niche
+## moves it.
+static func _arrivals(config: Dictionary, seed: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if not "arrival" in (config.get("held", []) as Array) or not config.get("arrivals") is Dictionary:
+		return out
+	var moved: Dictionary = niche_plan(config, seed)
+	for spawn_name: String in config["arrivals"]:
+		var at: Variant = Level._tile(config["arrivals"][spawn_name])
+		if spawn_name == "from_below" and moved.has("before"):
+			at = moved["before"]
+		if at is Vector2i:
+			out.append(at)
+	return out
 
 
 ## What the generation lays besides cells and edges, for Regen to add to
@@ -1126,7 +1146,8 @@ static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary
 ## "near" anchor, "apart" as the block says; none in the chapel of rest,
 ## and (823, dungeon's side: foes last longer, the same lone robber tomb
 ## after tomb) none in a room at all: the band out on the ways by its camp,
-## a tomb holding a robber only where its chest is.
+## a tomb holding a robber only where its chest is. Each laid clear of the
+## arrivals (832, plan "arrivals": layout_sense's arrival rule kept).
 static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: RandomNumberGenerator, plan: Dictionary) -> void:
 	var counts: Variant = config.get("monsters", {})
 	if not counts is Dictionary or (counts as Dictionary).is_empty():
@@ -1147,7 +1168,7 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 			continue
 		var spots: Array[Vector2i] = []
 		for cell in Tools.sorted_cells(room["cells"]):
-			if Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell):
+			if Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell) and LAYOUT_SENSE.clear_of_arrivals(cell, guard, plan["arrivals"]):
 				spots.append(cell)
 		spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, room["chest"]) < Tools.distance(b, room["chest"]))
 		left[guard] = int(left[guard]) - Labyrinth._lay(map, anchors, "monster_" + guard, 1, spots)
@@ -1165,7 +1186,11 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 		kinds.erase(guard)
 		kinds.append(guard)
 	for kind: String in kinds:
-		var spots: Array[Vector2i] = floor.duplicate()
+		# Clear of every arrival (832, when the block holds that rule).
+		var spots: Array[Vector2i] = []
+		for cell in floor:
+			if LAYOUT_SENSE.clear_of_arrivals(cell, kind, plan["arrivals"]):
+				spots.append(cell)
 		var anchor_name := str(near.get(kind, near.get("_all", "")))
 		for anchor: Dictionary in anchors:
 			if not anchor_name.is_empty() and str(anchor.get("name", "")) == anchor_name:
@@ -1213,7 +1238,7 @@ static func _packs_by_chests(map: LevelMap, anchors: Array, config: Dictionary, 
 				spots = ways.duplicate()
 			var at := Vector2i(-1, -1)
 			for cell in spots:
-				if free.call(cell):
+				if free.call(cell) and LAYOUT_SENSE.clear_of_arrivals(cell, lead, plan["arrivals"]):
 					at = cell
 					break
 			if at.x < 0:
@@ -1224,7 +1249,7 @@ static func _packs_by_chests(map: LevelMap, anchors: Array, config: Dictionary, 
 			for dy in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
 				for dx in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
 					var cell := at + Vector2i(dx, dy)
-					if free.call(cell) and _walk_within(map, at, cell, Labyrinth.PACK_REACH * 2):
+					if free.call(cell) and _walk_within(map, at, cell, Labyrinth.PACK_REACH * 2) and LAYOUT_SENSE.clear_of_arrivals(cell, of, plan["arrivals"]):
 						close.append(cell)
 			var members: Array[Vector2i] = [at]
 			for cell in Labyrinth._nearest_first(at, close):
