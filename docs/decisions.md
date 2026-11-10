@@ -46806,3 +46806,47 @@ Wren's, 769), so nothing clashes with hollowfell.lost or hollowfell.held. reside
 _test_pointers. Server only; protocol unchanged (WorldNews.tell's message is 805's); no new class_name.
 Package: none, it lands on by itself (it mends a live gap). One CHANGELOG bullet in voice's words.
 831, ui's side: the barter window marks a trusted player's prices (the coordinator's approval; package "trusted prices": economy's prices, ui's mark, voice's word; economy switches it on). BarterPanel puts voice's one word, "Trusted" (TRUSTED_WORDS), in a brass Caption label after the title in the head row, with no hover and no caption (Jeff dislikes glosses), shown while the "barter" data carries "trusted": true (BarterPanel.trusted_shown for tests); the title takes the row's width and the word sits at its end. The older "shop" window (ShopPanel, "Shop") is not marked in this landing, though its message carries the same flag: raised with economy. ui_test: "Trusted" after the title, none when the key is left out. Lands off: nothing sends "trusted" until economy's switch-on. No bullet (economy's switch-on carries voice's). Client only, protocol 55 is economy's, no new class_name.
+## 841. Builder mode's decor tool
+
+Builder's, on the coordinator's approval of builder's catch-up list (item c); release's number; lore's
+lines for the two wall pieces. Builder mode had no way to write level.json's "decor" (647, 658), so a
+request for a barrel by a wall or candles in a chapel couldn't be met. The decor tool lays one piece:
+{at, kind, side, variant, remove}, written as a "decor" entry [x, y, dx, dy, kind, variant].
+
+The kinds a request lays by hand (BuilderSession.DECOR_WORDS, each said in the prompt in words): barrel,
+sack, broken_cart, campfire_cold and bones (bulky), bedroll, scattered_bones and candles (low),
+wall_hearth (a fireplace two cells wide, against an inside wall: indoors any wall, outdoors only a
+building's wall inside its rect), rune_strip (lore: dark elven runes, only in the tower over the mine,
+which the orcs built to dark elven designs) and carving (lore: old marks cut in stone by the ancients, the
+dwarves or the town's first miners, only at the standing stones and milestones, in the dwarven castle and
+its halls, and in Hollowfell; never in the barrow, whose tomb names are drafts with Jeff, and never on a
+town or farm building). Kept out, refused in words (DECOR_KEPT_OUT): fence (the fence tool lays one),
+crate and cart (place lays real ones), captive_post (it comes with its captive's camp) and inn_sign (it
+comes with its tavern). Every other Level.DECOR_KINDS kind is a generator's or a set's (the mine's
+pieces, the crypt's, the lair's, moss and webs) and is refused as not laid by hand.
+
+The check is Level.decor_from itself: the new entry is read against the working copy's parsed terrain
+(Level.parse's floor, edges and niches), and any warning it gives is the refusal, so builder mode never
+writes a piece the level would leave out. A wall piece needs side (the wall it stands against); a faced
+piece may give one (the way its front faces); a piece that faces no way is refused one. A second of a
+kind on the same cell and step is refused, as decor_from would. A refusal says what, where and why in plain words
+("a rune_strip does not fit at (30, 20): there is no wall on the east side of (30, 20)"; "(25, 25) is
+water, not floor"): it is the only teaching the tool does, and the model passes it on.
+
+Decor is drawn only, never solid, and that stays so: players walk through it. But a player walking with
+a companion wouldn't walk through a barrel, so the bulky pieces (BULKY_DECOR) count as in the way for
+narrow_ways (600 amended), on the preview's street checks as well as the tool's: one that would leave a
+way one cell wide is refused, naming the cells, and the prompt says to set bulky pieces against a wall or
+in a corner. A bulky piece never goes on a cell where a thing, marker or link stands. The request's
+situation lists the decor in and round the area ("Decor here: barrel at (20, 10) (east)"), so a request
+can take one away (remove, of a kind or all on the cell).
+
+builder_test _test_decor: each hand-laid kind laid and read back by Level.parse; a barrel closing a
+two-cell lane refused, naming the way; candles there laid; a rune strip with no wall refused by
+decor_from; a wall_hearth on a wall in the open refused, indoors laid; fence and a generator's kind
+refused in words; remove; a sack laid one cell off a barrel along a wall refused, the gap between them
+named. The prompt and tools grow by about 2,310 characters (about 580 tokens a request at 4 a token;
+53,420 by _test_kind_lines' count), most of it the eleven kinds' words. The prompt and tools stay static, one cached prefix, and rare detail is
+taught in the tools' answers (the coordinator's ruling): builder_test's PREFIX_CEILING_TOKENS (20,000, at 4
+characters a token) fails the test past it, and only the coordinator moves it. No bullet (builder mode is Jeff's tool). Server and builder only; protocol
+unchanged; no new class_name.

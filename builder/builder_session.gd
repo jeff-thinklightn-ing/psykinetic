@@ -87,6 +87,34 @@ const MAX_WATCH := 32
 ## vendor town's seller at its first stall place in key order, so a new one
 ## could move Rolf, and no stall seller is designed. Rolf's spot is economy's.
 const STALL_SAYS := "a stall's seller isn't designed yet, so no stall place can be marked"
+## The decor kinds (Level.DECOR_KINDS) a request lays by hand (841; the
+## coordinator's list), each said in the prompt: what it is, and whether it
+## is bulky (in the way) or low. rune_strip and carving are lore's lines.
+const DECOR_WORDS := {
+	"barrel": "a barrel, bulky",
+	"sack": "a sack of goods or plunder, bulky",
+	"broken_cart": "a broken cart left by a road, bulky",
+	"campfire_cold": "a cold campfire, its stones and ash, bulky",
+	"bones": "a heap of skulls and long bones (an ossuary's), bulky",
+	"bedroll": "a bedroll on the ground (a camp's, a trader's), low",
+	"scattered_bones": "a few bones scattered (set dressing, never a find), low",
+	"candles": "a cluster of candles on the floor (a chapel's), low",
+	"wall_hearth": "a fireplace against an inside wall, two cells wide, from its cell east or south along the wall: indoors on any wall, outdoors only on a building's wall inside it",
+	"rune_strip": "dark elven runes on a wall, only in the tower over the mine (the orcs built it to dark elven designs)",
+	"carving": "old marks cut in a stone wall by the ancients, the dwarves or the town's first miners: only at the standing stones and milestones, in the dwarven castle and its halls, and in Hollowfell; never in the barrow, never on a town or farm building",
+}
+## Decor that counts as in the way for one-cell ways (narrow_ways, 841):
+## drawn only, never solid in the game, but a player walking with a
+## companion would not walk through a barrel.
+const BULKY_DECOR: Array[String] = ["barrel", "sack", "broken_cart", "campfire_cold", "bones"]
+## Decor kinds a request may not lay by hand, why in words (841).
+const DECOR_KEPT_OUT := {
+	"fence": "a fence is laid with the fence tool",
+	"crate": "place lays a real crate (one a player can push)",
+	"cart": "place lays a real cart",
+	"captive_post": "a captive's post comes with its captive's camp, not by hand",
+	"inn_sign": "an inn's sign comes with its tavern, not by hand",
+}
 ## Who keeps a forest camp (maps' fill_forest).
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## The quarter turns that face a kind building (south as made) to a side.
@@ -409,6 +437,8 @@ static func tools(config := {}) -> Array:
 			tool["input_schema"]["properties"]["use"]["enum"] = building_uses() + [""]
 		elif tool["name"] == "link":
 			tool["input_schema"]["properties"]["cue"]["enum"] = Level.CUES + [""]
+		elif tool["name"] == "decor":
+			tool["input_schema"]["properties"]["kind"]["enum"] = DECOR_WORDS.keys()
 	return out
 
 
@@ -477,12 +507,14 @@ Levels join at their edges: walking off one edge arrives on the neighbour's oppo
 
 Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). A refuge (where a sought newcomer is found) says where it is (mark_place's where); a trader may have his bed and the side he faces, a perch its watch (the cells a hill cat pounces onto from it, 6 cells or more from any road). A name or shown name you write is a draft: it goes to voice when its level is put up to land, never straight into a released level. Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
 
+%s
+
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), decor_line(), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -509,6 +541,13 @@ func _situation() -> String:
 			places.append("%s (%s at %s, radius %d, held by %s)" % [key, place["kind"], place["cell"], place["radius"], place["holder"]])
 	if not places.is_empty():
 		text += "\n\nPlaces here: " + ", ".join(places) + "."
+	var decor := PackedStringArray()
+	for entry: Variant in doc.config.get("decor", []) if doc.config.get("decor") is Array else []:
+		if entry is Array and (entry as Array).size() == 6 and area.grow(MARGIN).has_point(Vector2i(int(entry[0]), int(entry[1]))):
+			var step := Vector2i(int(entry[2]), int(entry[3]))
+			decor.append("%s at %s%s" % [entry[4], Vector2i(int(entry[0]), int(entry[1])), " (%s)" % side_name(step) if step != Vector2i.ZERO else ""])
+	if not decor.is_empty():
+		text += "\n\nDecor here: " + ", ".join(decor) + "."
 	if not relief().is_empty():
 		text += "\n\nThis level's ground is shaped in metres: the Heights block is in half metres."
 	var coded := PackedStringArray()
@@ -783,6 +822,14 @@ const TOOLS := [
 			"radius": {"type": "number", "description": "cells its light reaches, 1 to 4 (2 if not given)"},
 			"remove": {"type": "boolean"}},
 			"required": ["at"]}},
+	{"name": "decor", "description": "Sets a piece of decor on a floor cell (the system prompt says each kind): drawn only, never solid, never opened, so players walk through it. A wall piece stands in its cell with its back to the wall on side; a faced piece's front faces side. remove takes away the decor on the cell (of kind, if given).",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"kind": {"type": "string", "enum": []},
+			"side": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "a wall piece: the side of its cell its wall is on (needed); a faced piece: the way its front faces (optional)"},
+			"variant": {"type": "integer", "minimum": 1, "description": "the piece's variant (1 if not given)"},
+			"remove": {"type": "boolean"}},
+			"required": ["at"]}},
 	{"name": "town_wall", "description": "Walls a town in: a wall on the edges just outside a rectangle of cells, gates (doors) in it, recorded as that town's wall (a town walled again gets the new one). Leaves the cells as they are.",
 		"input_schema": {"type": "object", "properties": {
 			"town": {"type": "string", "description": "the key of the town's stockpile place in this level"},
@@ -974,6 +1021,8 @@ func _run_tool(tool: String, input: Variant) -> Dictionary:
 			return _link(given)
 		"skylight":
 			return _skylight(given)
+		"decor":
+			return _decor(given)
 		"set_building":
 			return _set_building(given)
 		"town_wall":
@@ -2351,8 +2400,10 @@ const NARROW_SHOWN := 8
 ## no one walks (void, water, rock, a solid building's). No way is one cell
 ## wide where a player walks with a companion (600 amended; the coordinator's
 ## rule from Jeff's play test of the crypt, 2026-10-22).
-func narrow_ways() -> Array[Vector2i]:
-	var solid: Dictionary = walk_ground().get("solid", {})
+func narrow_ways(extra := {}) -> Array[Vector2i]:
+	var solid: Dictionary = (walk_ground().get("solid", {}) as Dictionary).duplicate()
+	solid.merge(bulky_cells())
+	solid.merge(extra)
 	var open := func(cell: Vector2i) -> bool:
 		return Rect2i(Vector2i.ZERO, working.map.size).has_point(cell) and working.map.walkable(cell) and not solid.has(cell)
 	var shut := func(cell: Vector2i, step: Vector2i) -> bool:
@@ -2365,6 +2416,111 @@ func narrow_ways() -> Array[Vector2i]:
 					or (shut.call(cell, Vector2i.UP) and shut.call(cell, Vector2i.DOWN))):
 				out.append(cell)
 	return out
+
+
+## The cells of the working copy's bulky decor (BULKY_DECOR, 841), as
+## narrow_ways counts them: in the way, though drawn only.
+func bulky_cells() -> Dictionary:
+	var out := {}
+	for entry: Variant in working.config.get("decor", []) if working.config.get("decor") is Array else []:
+		if entry is Array and (entry as Array).size() == 6 and str(entry[4]) in BULKY_DECOR:
+			out[Vector2i(int(entry[0]), int(entry[1]))] = true
+	return out
+
+
+## The prompt's paragraph on decor (841): the kinds a request lays, each in words.
+static func decor_line() -> String:
+	var kinds := PackedStringArray()
+	for kind: String in DECOR_WORDS:
+		kinds.append("%s (%s)" % [kind, DECOR_WORDS[kind]])
+	return "decor sets a piece on a floor cell, drawn only: no piece is solid or opened, and players walk through it. The pieces: %s. A bulky piece is in the way all the same: set it against a wall or in a corner, out of the way; the tool refuses one that would leave a way one cell wide. A wall piece stands in its cell with its back to the wall on its side." % "; ".join(kinds)
+
+
+## The decor tool (841): a piece of a DECOR_WORDS kind laid on a floor cell
+## as level.json "decor" [x, y, dx, dy, kind, variant] (647, 658), checked
+## by Level.decor_from itself (its warning the refusal), a bulky piece
+## refused where it would leave a way one cell wide; or the decor on a cell
+## taken away.
+func _decor(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("decor needs at: [x, y]")
+	if not area.has_point(at):
+		return _no("%s is outside the area" % [at])
+	var kind := str(given.get("kind", "")).strip_edges()
+	var listed: Array = (working.config["decor"] as Array).duplicate(true) if working.config.get("decor") is Array else []
+	if bool(given.get("remove", false)):
+		var kept := listed.filter(func(entry: Variant) -> bool:
+			return not (entry is Array and (entry as Array).size() == 6 and Vector2i(int(entry[0]), int(entry[1])) == at and (kind.is_empty() or str(entry[4]) == kind)))
+		if kept.size() == listed.size():
+			return _no("no %s at %s" % [kind if not kind.is_empty() else "decor", at])
+		working.apply_changes({"config": {"decor": kept}})
+		return {"ok": true, "text": "took away %d piece%s of decor at %s" % [listed.size() - kept.size(), "" if listed.size() - kept.size() == 1 else "s", at]}
+	if DECOR_KEPT_OUT.has(kind):
+		return _no("%s is not laid with decor: %s" % [kind, DECOR_KEPT_OUT[kind]])
+	if Level.DECOR_KINDS.has(kind) and not DECOR_WORDS.has(kind):
+		return _no("%s is laid by its level's own maker, not by hand: decor lays %s" % [kind, ", ".join(DECOR_WORDS.keys())])
+	if not DECOR_WORDS.has(kind):
+		return _no("kind is one of %s" % ", ".join(DECOR_WORDS.keys()))
+	var spec: Dictionary = Level.DECOR_KINDS[kind]
+	var side := str(given.get("side", ""))
+	if not side.is_empty() and not SIDES.has(side):
+		return _no("side is one of %s" % ", ".join(SIDES.keys()))
+	var step := Vector2i.ZERO
+	if str(spec["sits"]) == "wall":
+		if side.is_empty():
+			return _no("a %s stands against a wall: give side, the side of %s its wall is on" % [kind, at])
+		step = SIDES[side]
+	elif not side.is_empty():
+		if not bool(spec.get("faced", false)):
+			return _no("a %s faces no way: leave side out" % kind)
+		step = SIDES[side]
+	if kind == "wall_hearth":
+		var outside := _hearth_outside(at, step)
+		if not outside.is_empty():
+			return _no(outside)
+	var variant := int(given.get("variant", 1))
+	var entry := [at.x, at.y, step.x, step.y, kind, variant]
+	for other: Variant in listed:
+		if other is Array and (other as Array).size() == 6 and str(other[4]) == kind and Vector2i(int(other[0]), int(other[1])) == at and Vector2i(int(other[2]), int(other[3])) == step:
+			return _no("a %s is at %s already" % [kind, at])
+	var warnings: Array[String] = []
+	Level.decor_from({"decor": [entry]}, working.parsed()["terrain"], warnings)
+	if not warnings.is_empty():
+		# decor_from's warning, said in plain words: what, where and why.
+		var why := "it fits nothing there"
+		if "on no floor" in warnings[0]:
+			why = "%s is %s, not floor" % [at, working.map.cell(at)]
+		elif str(spec["sits"]) == "wall" and int(spec.get("wide", 1)) > 1:
+			why = "it needs a wall on the %s side of %s and of the cell beside it, %s" % [side, at, at + Vector2i(absi(step.y), absi(step.x))]
+		elif str(spec["sits"]) == "wall":
+			why = "there is no wall on the %s side of %s" % [side, at]
+		return _no("a %s does not fit at %s: %s" % [kind, at, why])
+	if kind in BULKY_DECOR:
+		if not working.entry_of(at).is_empty() or not working.link_of(at).is_empty():
+			return _no("something stands on %s already" % [at])
+		var before := narrow_ways()
+		var shut := narrow_ways({at: true}).filter(func(cell: Vector2i) -> bool: return cell not in before)
+		if not shut.is_empty():
+			return _no("a %s at %s would leave a way one cell wide at %s: players walk with companions; set it against a wall or in a corner, out of the way"
+				% [kind, at, ", ".join(shut.slice(0, NARROW_SHOWN).map(func(cell: Vector2i) -> String: return str(cell)))])
+	working.apply_changes({"config": {"decor": listed + [entry]}})
+	return {"ok": true, "text": "laid a %s at %s%s" % [kind, at,
+		(" against its %s wall" if str(spec["sits"]) == "wall" else ", facing %s") % side if not side.is_empty() else ""]}
+
+
+## Why a wall_hearth at [param at] against its [param step] wall is not on an
+## inside wall (841): outdoors, both its cells in a building's rect; indoors
+## any wall will do. "" if it is.
+func _hearth_outside(at: Vector2i, step: Vector2i) -> String:
+	if Level.zone_of(working.config) != "outdoors":
+		return ""
+	var along := Vector2i(absi(step.y), absi(step.x))
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var rect: Variant = Level.building_rect(entry) if entry is Dictionary else null
+		if rect is Rect2i and (rect as Rect2i).has_point(at) and (rect as Rect2i).has_point(at + along):
+			return ""
+	return "a wall_hearth stands against an inside wall: outdoors, only on a building's wall, inside it"
 
 
 ## A side's word: (0, 1) "south".

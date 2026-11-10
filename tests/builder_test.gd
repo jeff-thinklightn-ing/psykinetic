@@ -6,6 +6,12 @@ extends Node
 ## Run it with tests/run.ps1 or tests/run.sh. Prints PASS/FAIL per assertion
 ## and quits with exit code 1 if any assertion failed, 0 otherwise.
 
+## The soft ceiling on what every builder request sends before the
+## conversation (the system prompt and the tools, one cached prefix), in
+## tokens at 4 characters a token (841; the coordinator's, 2026-11-10). Only
+## the coordinator moves it: when it trips, take the coordinator the prompt's
+## paragraphs with how often a request has needed each, not a trim by age.
+const PREFIX_CEILING_TOKENS := 20000
 var _failures := 0
 
 
@@ -42,6 +48,7 @@ func _ready() -> void:
 	_test_workings()
 	_test_kind_lines()
 	_test_place_cells()
+	_test_decor()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -272,7 +279,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "town_wall", "roof", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "decor", "town_wall", "roof", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -1067,6 +1074,7 @@ func _test_kind_lines() -> void:
 	var prompt := BuilderSession.system_prompt()
 	var tools := JSON.stringify(BuilderSession.tools())
 	print("  (the prompt %d characters, the tools %d: about %d tokens a request together, at 4 a token)" % [prompt.length(), tools.length(), (prompt.length() + tools.length()) / 4])
+	_check((prompt.length() + tools.length()) / 4 <= PREFIX_CEILING_TOKENS, "the prompt and tools stay under the coordinator's ceiling of %d tokens (%d)" % [PREFIX_CEILING_TOKENS, (prompt.length() + tools.length()) / 4])
 	var apex := ["great_bear", "old_wolf", "boar_king"]
 	_check(apex.all(func(kind: String) -> bool: return BuilderSession.is_apex(kind)), "the great bear, the old grey and the boar king are apex")
 	var offered: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "place")[0]["input_schema"]["properties"]["thing"]["enum"]
@@ -1194,6 +1202,79 @@ func _test_place_cells() -> void:
 	_check(not remark.get("ok", true) and not shift.get("ok", true) and "economy's" in str(shift.get("text")) and not carry.get("ok", true) and "weapon_stall" in str(carry.get("text"))
 		and places["weapon_stall"] == {"at": [25, 9], "kind": "stall", "holder": "town", "radius": 1},
 		"the weapon_stall place: marked again, moved, carried with its stall: each refused, it stays (%s; %s; %s)" % [remark, shift, carry])
+
+
+## The decor tool (841): each hand-laid kind laid and read back by
+## Level.parse; a bulky piece closing a two-cell way refused; a wall_hearth
+## outdoors off a building refused, indoors laid; a kept-out kind and a
+## generator's refused in words; remove; the prompt's words.
+func _test_decor() -> void:
+	print("
+== 841: the decor tool, its kinds laid and read back ==")
+	var offered: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "decor")[0]["input_schema"]["properties"]["kind"]["enum"]
+	_check(offered == BuilderSession.DECOR_WORDS.keys() and offered.all(func(kind: String) -> bool: return Level.DECOR_KINDS.has(kind))
+		and not "fence" in offered and not "crate" in offered and not "inn_sign" in offered and not "captive_post" in offered and not "mine_arch" in offered,
+		"decor offers the hand-laid kinds, all Level's, none kept out (%s)" % [offered])
+	var prompt := BuilderSession.system_prompt()
+	_check("decor sets a piece on a floor cell, drawn only" in prompt and "dark elven runes on a wall, only in the tower over the mine" in prompt
+		and "never in the barrow" in prompt and "set it against a wall or in a corner" in prompt, "the prompt says each kind, lore's lines, and where bulky pieces go")
+	var doc := _doc()
+	# A lane two cells wide (x 11 and 12, y 5 to 9), and a long wall in the open (east of x 20).
+	for y in range(5, 10):
+		doc.map.set_edge(Terrain.edge_key(Vector2i(10, y), Vector2i.RIGHT), "wall")
+		doc.map.set_edge(Terrain.edge_key(Vector2i(12, y), Vector2i.RIGHT), "wall")
+	for y in range(10, 20):
+		doc.map.set_edge(Terrain.edge_key(Vector2i(20, y), Vector2i.RIGHT), "wall")
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	_check(session.narrow_ways().is_empty(), "the lane is two cells wide to start")
+	var laid := {
+		"barrel": [[20, 10], "east"], "sack": [[20, 11], ""], "broken_cart": [[4, 20], "south"], "campfire_cold": [[8, 20], ""], "bones": [[20, 14], ""],
+		"bedroll": [[12, 20], "west"], "scattered_bones": [[14, 20], ""], "candles": [[16, 20], ""], "rune_strip": [[20, 16], "east"], "carving": [[20, 18], "east"]}
+	for kind: String in laid:
+		var given := {"at": laid[kind][0], "kind": kind}
+		if not str(laid[kind][1]).is_empty():
+			given["side"] = laid[kind][1]
+		var out := session.run_tool("decor", given)
+		_check(out.get("ok", false), "decor: a %s at %s (%s)" % [kind, laid[kind][0], out])
+	var level := Level.parse(session.working.map.to_image(), null, session.working.config)
+	var read: Array = level["terrain"]["decor"]
+	_check(laid.keys().all(func(kind: String) -> bool: return read.any(func(piece: Dictionary) -> bool: return piece["kind"] == kind and piece["cell"] == Vector2i(laid[kind][0][0], laid[kind][0][1]))),
+		"Level reads every piece back (%d of %d; %s)" % [read.size(), laid.size(), level["warnings"].filter(func(warning: String) -> bool: return "decor" in warning)])
+	_check(read.any(func(piece: Dictionary) -> bool: return piece["kind"] == "barrel" and piece["out"] == Vector2i(1, 0)), "the barrel faces east, [1, 0]")
+	var gap := session.run_tool("decor", {"at": [20, 8], "kind": "sack"})
+	_check(not gap.get("ok", true) and "one cell wide at (20, 9)" in str(gap.get("text")), "a sack a cell off the barrel along the wall: refused, the gap between them named (%s)" % gap)
+	# Refusals.
+	var lane := session.run_tool("decor", {"at": [11, 7], "kind": "barrel"})
+	_check(not lane.get("ok", true) and "one cell wide at (12, 7)" in str(lane.get("text")) and "against a wall or in a corner" in str(lane.get("text")),
+		"a barrel in the two-cell lane: refused, naming the way it leaves (%s)" % lane)
+	_check(session.run_tool("decor", {"at": [11, 7], "kind": "candles"}).get("ok", false) and session.narrow_ways().is_empty(), "candles there: laid, low, the lane still two cells")
+	var no_wall := session.run_tool("decor", {"at": [30, 20], "kind": "rune_strip", "side": "east"})
+	_check(not no_wall.get("ok", true) and "there is no wall on the east side of (30, 20)" in str(no_wall.get("text")), "a rune strip with no wall: refused by Level.decor_from, in plain words (%s)" % no_wall)
+	session.working.map.set_cell(Vector2i(25, 25), "water")
+	var wet := session.run_tool("decor", {"at": [25, 25], "kind": "candles"})
+	_check(not wet.get("ok", true) and "(25, 25) is water, not floor" in str(wet.get("text")), "candles on water: refused, saying so (%s)" % wet)
+	_check(not session.run_tool("decor", {"at": [20, 16], "kind": "carving"}).get("ok", true), "a wall piece with no side: refused")
+	_check(not session.run_tool("decor", {"at": [16, 22], "kind": "candles", "side": "north"}).get("ok", true), "candles given a side: refused")
+	var hearth := session.run_tool("decor", {"at": [20, 10], "kind": "wall_hearth", "side": "east"})
+	_check(not hearth.get("ok", true) and "inside wall" in str(hearth.get("text")), "a wall_hearth on a wall in the open: refused (%s)" % hearth)
+	var fence := session.run_tool("decor", {"at": [25, 20], "kind": "fence"})
+	_check(not fence.get("ok", true) and "the fence tool" in str(fence.get("text")), "a fence: refused in words (%s)" % fence)
+	var arch := session.run_tool("decor", {"at": [25, 20], "kind": "mine_arch"})
+	_check(not arch.get("ok", true) and "not by hand" in str(arch.get("text")), "a generator's kind: refused in words (%s)" % arch)
+	_check(not session.run_tool("decor", {"at": [20, 10], "kind": "barrel", "side": "east"}).get("ok", true), "a second barrel on the same cell: refused")
+	var gone := session.run_tool("decor", {"at": [20, 11], "remove": true})
+	_check(gone.get("ok", false) and not (session.working.config["decor"] as Array).any(func(entry: Array) -> bool: return entry[0] == 20 and entry[1] == 11),
+		"remove: the sack taken away (%s)" % gone)
+	# Indoors, a wall_hearth on any wall.
+	var indoors := _doc()
+	indoors.config["outdoor"] = false
+	for x in range(5, 10):
+		indoors.map.set_edge(Terrain.edge_key(Vector2i(x, 5), Vector2i.UP), "wall")
+	var inside := BuilderSession.new(indoors, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var fire := inside.run_tool("decor", {"at": [6, 5], "kind": "wall_hearth", "side": "north"})
+	var hall := Level.parse(inside.working.map.to_image(), null, inside.working.config)
+	_check(fire.get("ok", false) and (hall["terrain"]["decor"] as Array).any(func(piece: Dictionary) -> bool: return piece["kind"] == "wall_hearth"),
+		"indoors: a wall_hearth on the north wall, read back (%s)" % fire)
 
 
 ## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,
