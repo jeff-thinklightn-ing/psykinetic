@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_umbrage_kinds()
 	_test_workings()
 	_test_kind_lines()
+	_test_place_cells()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -1113,6 +1114,86 @@ func _test_workings() -> void:
 	var warnings: Array[String] = []
 	var read := Level.places_from({"places": {"hollowfell": BuilderSession._place_moved(real, Vector2i(1, 1))}}, warnings)
 	_check(warnings.is_empty() and read.has("hollowfell"), "the hills' own entry, moved, reads back (%s)" % [warnings])
+
+
+## mark_place's own cells (792 amended (2)): a refuge's where (needed), a
+## shown name, a trader's bed and facing, a perch's watch (named near a road),
+## each on its own kind only; move carries them and a lair's den; marking a
+## place again keeps the fields builder mode doesn't write.
+func _test_place_cells() -> void:
+	print("
+== 792 amended (2): a refuge's where, a trader's bed and facing, a perch's watch ==")
+	var props: Dictionary = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "mark_place")[0]["input_schema"]["properties"]
+	_check(props["where"]["enum"] == Level.REFUGE_WHERE.duplicate() and props.has("shown") and props.has("bed") and props.has("watch")
+		and not props.has("den") and not props.has("truce") and not props.has("lore_id"), "mark_place offers where, shown, bed, facing and watch, never den, truce or lore_id")
+	_check("draft until voice has seen it" in str(props["name"]["description"]) and "draft" in str(props["shown"]["description"]), "name and shown are said to be drafts for voice")
+	var doc := _doc()
+	doc.config["roads"] = [{"points": [[0, 25, 2], [39, 25, 2]], "kind": "stone"}]
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	# A refuge: its where needed, one of Level.REFUGE_WHERE.
+	var bare := session.run_tool("mark_place", {"key": "shieling", "kind": "refuge", "at": [8, 8], "holder": "nobody", "name": "a shieling high on the hill"})
+	_check(not bare.get("ok", true) and "needs where" in str(bare.get("text")) and not session.working.config.get("places", {}).has("shieling"), "a refuge with no where: refused (%s)" % bare)
+	_check(not session.run_tool("mark_place", {"key": "shieling", "kind": "refuge", "at": [8, 8], "holder": "nobody", "where": "moon"}).get("ok", true), "a where not of REFUGE_WHERE: refused")
+	_check(not session.run_tool("mark_place", {"key": "farm", "kind": "farm", "at": [8, 8], "holder": "town", "where": "hills"}).get("ok", true), "a where on a farm: refused")
+	var refuge := session.run_tool("mark_place", {"key": "shieling", "kind": "refuge", "at": [8, 8], "holder": "nobody",
+		"name": "a shieling high on the hill", "shown": "the shieling", "where": "hills"})
+	var places: Dictionary = session.working.config.get("places", {})
+	_check(refuge.get("ok", false) and places["shieling"].get("where") == "hills" and places["shieling"].get("shown") == "the shieling"
+		and "draft until voice" in str(refuge.get("text")), "a refuge in the hills, its shown name, the answer saying its name is a draft (%s)" % refuge)
+	var warnings: Array[String] = []
+	var read := Level.places_from({"places": places}, warnings)
+	_check(warnings.is_empty() and read["shieling"].get("where") == "hills" and read["shieling"].get("shown") == "the shieling", "Level reads its where and shown (%s)" % [warnings])
+	# A trader: his bed within the radius, the side he faces as a step.
+	var trader := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [19, 10], "facing": "north"})
+	places = session.working.config.get("places", {})
+	_check(trader.get("ok", false) and places["camp_trader"].get("bed") == [19, 10] and places["camp_trader"].get("facing") == [0, -1], "a trader's bed and facing north, written [0, -1] (%s)" % [places.get("camp_trader", trader)])
+	var far_bed := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [24, 10]})
+	_check(not far_bed.get("ok", true) and "beyond the place's radius" in str(far_bed.get("text")), "a bed beyond his radius: refused (%s)" % far_bed)
+	_check(not session.run_tool("mark_place", {"key": "camp2", "kind": "camp", "at": [20, 12], "holder": "nobody", "bed": [20, 13]}).get("ok", true), "a bed on a camp: refused")
+	_check(not session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "holder": "nobody", "facing": "up"}).get("ok", true), "a facing not a side: refused")
+	# A perch: its watch within the radius, the cells near the road named.
+	var watch := [[30, 18], [31, 18], [30, 22]]
+	var perch := session.run_tool("mark_place", {"key": "cat_rocks", "kind": "perch", "at": [30, 20], "radius": 4, "holder": "nobody", "watch": watch})
+	places = session.working.config.get("places", {})
+	_check(perch.get("ok", false) and places["cat_rocks"].get("watch") == watch, "a perch's watch cells kept (%s)" % [places.get("cat_rocks", perch)])
+	_check("(30, 22)" in str(perch.get("text")) and not "(30, 18)" in str(perch.get("text")) and "from a road" in str(perch.get("text")),
+		"the answer names the watch cell under 6 from the road, not the far ones (%s)" % perch)
+	_check(not session.run_tool("mark_place", {"key": "cat_far", "kind": "perch", "at": [30, 10], "radius": 2, "holder": "nobody", "watch": [[30, 14]]}).get("ok", true), "a watch cell beyond the radius: refused")
+	_check(not session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "holder": "nobody", "watch": [[20, 11]]}).get("ok", true), "a watch on a trader: refused")
+	# Move carries the bed, the watch and a lair's den; marking again keeps the den and lore_id.
+	places = (session.working.config["places"] as Dictionary).duplicate(true)
+	places["lair"] = {"at": [10, 20], "kind": "lair", "radius": 3, "holder": "nobody", "den": [11, 20], "lore_id": "some_lair"}
+	session.working.apply_changes({"config": {"places": places}})
+	session.run_tool("move", {"place": "camp_trader", "by": [2, 0]})
+	session.run_tool("move", {"place": "cat_rocks", "by": [-1, 0]})
+	session.run_tool("move", {"place": "lair", "by": [0, -2]})
+	places = session.working.config.get("places", {})
+	_check(places["camp_trader"].get("bed") == [21, 10] and places["camp_trader"].get("facing") == [0, -1], "move: the trader's bed goes with him, his facing kept (%s)" % [places["camp_trader"]])
+	_check(places["cat_rocks"].get("watch") == [[29, 18], [30, 18], [29, 22]], "move: the perch's watch goes with it (%s)" % [places["cat_rocks"]])
+	_check(places["lair"].get("den") == [11, 18], "move: the lair's den goes with it (%s)" % [places["lair"]])
+	var again := session.run_tool("mark_place", {"key": "lair", "kind": "lair", "at": [10, 18], "radius": 4, "holder": "nobody"})
+	places = session.working.config.get("places", {})
+	_check(again.get("ok", false) and places["lair"].get("den") == [11, 18] and places["lair"].get("lore_id") == "some_lair" and places["lair"].get("radius") == 4
+		and "kept its den, lore_id" in str(again.get("text")), "marked again: its den and lore_id kept, said (%s)" % again)
+	_check("A refuge (where a sought newcomer is found) says where it is" in BuilderSession.system_prompt(), "the prompt says a refuge's where, a trader's bed and a perch's watch")
+	# No stall place: none marked, Umbrage's weapon_stall neither changed nor moved, alone or with its stall.
+	var kinds: Array = props["kind"]["enum"]
+	_check(not "stall" in kinds and "trader" in kinds, "mark_place offers no stall kind")
+	var stall := session.run_tool("mark_place", {"key": "a_stall", "kind": "stall", "at": [25, 10], "holder": "town"})
+	_check(not stall.get("ok", true) and "a stall's seller isn't designed yet, so no stall place can be marked" in str(stall.get("text"))
+		and not session.working.config["places"].has("a_stall"), "a stall place: refused in words, nothing marked (%s)" % stall)
+	places = (session.working.config["places"] as Dictionary).duplicate(true)
+	places["weapon_stall"] = {"at": [25, 9], "kind": "stall", "holder": "town", "radius": 1}
+	var buildings: Array = (session.working.config.get("buildings", []) as Array).duplicate(true)
+	buildings.append({"slot": "building.market_stall", "at": [25, 10], "facing": [0, 1]})
+	session.working.apply_changes({"config": {"places": places, "buildings": buildings}})
+	var remark := session.run_tool("mark_place", {"key": "weapon_stall", "kind": "other", "at": [27, 9], "holder": "town"})
+	var shift := session.run_tool("move", {"place": "weapon_stall", "by": [2, 0]})
+	var carry := session.run_tool("move", {"at": [25, 10], "by": [0, 3]})
+	places = session.working.config.get("places", {})
+	_check(not remark.get("ok", true) and not shift.get("ok", true) and "economy's" in str(shift.get("text")) and not carry.get("ok", true) and "weapon_stall" in str(carry.get("text"))
+		and places["weapon_stall"] == {"at": [25, 9], "kind": "stall", "holder": "town", "radius": 1},
+		"the weapon_stall place: marked again, moved, carried with its stall: each refused, it stays (%s; %s; %s)" % [remark, shift, carry])
 
 
 ## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,

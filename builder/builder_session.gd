@@ -71,6 +71,22 @@ const MARGIN := 3
 ## A place's shape cells (792; buildings' 774): [x, y] each, seats a list.
 const SHAPE_CELLS: Array[String] = ["brazier", "lamp", "hearth", "seats"]
 const MAX_SEATS := 16
+## A place's cells move carries with it (792 amended (2)): the shape cells,
+## a trader's bed, a lair's den (move only: mark_place never writes one) and
+## a perch's watch; seats and watch are lists.
+const MOVED_CELLS: Array[String] = ["brazier", "lamp", "hearth", "seats", "bed", "den", "watch"]
+const LIST_CELLS: Array[String] = ["seats", "watch"]
+## A place's fields mark_place doesn't write, kept when it marks one again
+## (792 amended (2)): another tree's, set in level.json.
+const KEPT_FIELDS: Array[String] = ["den", "truce", "opens", "fire_ring", "explore", "lore_id"]
+## How far a perch's watch lies from any road (make_hills' PERCH_OFF_SAFE, 814).
+const WATCH_OFF_ROAD := 6
+const MAX_WATCH := 32
+## Why builder mode marks, changes or moves no "stall" place (792 amended (2),
+## the coordinator's ruling on economy's answer): Main._vendor_spot stands a
+## vendor town's seller at its first stall place in key order, so a new one
+## could move Rolf, and no stall seller is designed. Rolf's spot is economy's.
+const STALL_SAYS := "a stall's seller isn't designed yet, so no stall place can be marked"
 ## Who keeps a forest camp (maps' fill_forest).
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## The quarter turns that face a kind building (south as made) to a side.
@@ -385,8 +401,9 @@ static func tools(config := {}) -> Array:
 			tool["input_schema"]["properties"]["thing"]["enum"] = things(config).keys()
 			tool["input_schema"]["properties"]["loot"]["enum"] = Items.loot_tables().keys()
 		elif tool["name"] == "mark_place":
-			tool["input_schema"]["properties"]["kind"]["enum"] = Level.PLACE_KINDS.duplicate()
+			tool["input_schema"]["properties"]["kind"]["enum"] = Level.PLACE_KINDS.filter(func(kind: String) -> bool: return kind != "stall")
 			tool["input_schema"]["properties"]["holder"]["enum"] = Factions.read().names() + [Factions.NOBODY]
+			tool["input_schema"]["properties"]["where"]["enum"] = Level.REFUGE_WHERE.duplicate()
 		elif tool["name"] == "building":
 			tool["input_schema"]["properties"]["kind"]["enum"] = Level.kinds().keys()
 			tool["input_schema"]["properties"]["use"]["enum"] = building_uses() + [""]
@@ -458,7 +475,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
+Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). A refuge (where a sought newcomer is found) says where it is (mark_place's where); a trader may have his bed and the side he faces, a perch its watch (the cells a hill cat pounces onto from it, 6 cells or more from any road). A name or shown name you write is a draft: it goes to voice when its level is put up to land, never straight into a released level. Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
@@ -703,7 +720,12 @@ const TOOLS := [
 			"at": _CELL,
 			"radius": {"type": "integer", "minimum": 1, "maximum": 32},
 			"holder": {"type": "string", "enum": [], "description": "a faction (levels/factions.json) or nobody"},
-			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\""},
+			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\": a draft until voice has seen it (it goes to voice when its level is put up to land, never straight into a released level)"},
+			"shown": {"type": "string", "description": "optional, the name a player reaching it is shown where its name is a where-phrase (\"the shieling\" for \"a shieling high on the hill\"); a draft as its name is"},
+			"where": {"type": "string", "enum": [], "description": "a refuge only, and needed there: where it is, the word the towns say it by"},
+			"bed": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "a trader only, optional, [x, y] within its radius: where he sleeps (his bedroll)"},
+			"facing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "a trader only, optional: the side he faces (his fire's)"},
+			"watch": {"type": "array", "items": _CELL, "description": "a perch only: the cells within its radius a hill cat pounces onto from it (low grass, kept 6 cells or more from any road)"},
 			"rect": {"type": "object", "description": "optional, the ground it covers (a post's 3 x 3, a tavern's room, a fire's ring): top-left x, y, width, height, in the area",
 				"properties": _RECT["properties"], "required": _RECT["required"]},
 			"brazier": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "optional, [x, y]: a post's fire basket, in its rect (lit at night)"},
@@ -1027,6 +1049,8 @@ func _mark_place(given: Dictionary) -> Dictionary:
 		return _no("%s is outside the area" % [at])
 	if working.map.cell(at) in ["void", "water"]:
 		return _no("%s is %s: a place stands on ground" % [at, working.map.cell(at)])
+	if kind == "stall":
+		return _no(STALL_SAYS)
 	if kind not in Level.PLACE_KINDS:
 		return _no("kind is one of %s" % ", ".join(Level.PLACE_KINDS))
 	if not Factions.read().has(holder):
@@ -1035,6 +1059,8 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	if shape is String:
 		return _no(shape)
 	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true) if working.config.get("places") is Dictionary else {}
+	if places.get(key) is Dictionary and str(places[key].get("kind", "")) == "stall":
+		return _no("%s is a stall place, where its town's seller stands: %s, and builder mode changes none" % [key, STALL_SAYS])
 	var place := {"at": [at.x, at.y], "kind": kind, "radius": clampi(int(given.get("radius", Level.PLACE_RADIUS)), 1, 32), "holder": holder}
 	place.merge(shape)
 	if given.has("mix"):
@@ -1042,8 +1068,22 @@ func _mark_place(given: Dictionary) -> Dictionary:
 		if kind != "camp" or str(given["mix"]) not in CAMP_MIXES:
 			return _no("mix is for a camp only: %s" % ", ".join(CAMP_MIXES))
 		place["mix"] = str(given["mix"])
+	# A refuge says where it is (613 amended; Level.places_from warns on one without).
+	var where := str(given.get("where", "")).strip_edges()
+	if kind == "refuge" and where not in Level.REFUGE_WHERE:
+		return _no("a refuge needs where: one of %s" % ", ".join(Level.REFUGE_WHERE))
+	if kind != "refuge" and not where.is_empty():
+		return _no("where is for a refuge only")
+	if kind == "refuge":
+		place["where"] = where
 	if given.has("name"):
 		place["name"] = str(given["name"])
+	if not str(given.get("shown", "")).strip_edges().is_empty():
+		place["shown"] = str(given["shown"]).strip_edges()
+	var own: Variant = _own_cells(given, kind, at, int(place["radius"]))
+	if own is String:
+		return _no(own)
+	place.merge(own)
 	var town := str(given.get("town", "")).strip_edges()
 	if not town.is_empty():
 		# The town that works this site (maps' 517, decision 520): a stockpile place here.
@@ -1071,11 +1111,81 @@ func _mark_place(given: Dictionary) -> Dictionary:
 		if not holds.is_empty():
 			place["holds"] = holds
 	var again := places.has(key)
+	var kept: Array[String] = []
+	if again and places[key] is Dictionary:
+		for field: String in KEPT_FIELDS:
+			if (places[key] as Dictionary).has(field):
+				place[field] = places[key][field]
+				kept.append(field)
 	places[key] = place
 	working.apply_changes({"config": {"places": places}})
-	return {"ok": true, "text": "%s the place %s: a %s at %s, radius %d, held by %s%s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder,
+	var text := "%s the place %s: a %s at %s, radius %d, held by %s%s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder,
 		", holding %d captives" % (place["holds"] as Array).size() if place.has("holds") else ""] \
-		+ (", worked by the town of %s" % town if place.has("town") else "")}
+		+ (", worked by the town of %s" % town if place.has("town") else "")
+	if not kept.is_empty():
+		text += "; kept its %s" % ", ".join(kept)
+	if place.has("name") or place.has("shown"):
+		text += "; its name is a draft until voice has seen it"
+	var by_road := _watch_by_road(place.get("watch", []))
+	if not by_road.is_empty():
+		text += "; the watch cells %s lie less than %d cells from a road: a hill cat's watch keeps off the ways folk walk" % [", ".join(by_road.map(func(cell: Vector2i) -> String: return str(cell))), WATCH_OFF_ROAD]
+	return {"ok": true, "text": text}
+
+
+## A trader's bed and facing and a perch's watch from [param given] (792
+## amended (2); Level.PLACE_SHAPES: bed a cell, facing a step, watch cells),
+## each on its own kind only, the cells in the area, on ground and within
+## [param radius] of [param at]; else what is wrong.
+func _own_cells(given: Dictionary, kind: String, at: Vector2i, radius: int) -> Variant:
+	var out := {}
+	for field: String in ["bed", "facing", "watch"]:
+		if not given.has(field):
+			continue
+		var owner := "perch" if field == "watch" else "trader"
+		if kind != owner:
+			return "%s is for a %s only" % [field, owner]
+		if field == "facing":
+			if not SIDES.has(str(given["facing"])):
+				return "facing is one of %s" % ", ".join(SIDES.keys())
+			var step: Vector2i = SIDES[str(given["facing"])]
+			out["facing"] = [step.x, step.y]
+			continue
+		if field == "watch" and (not given["watch"] is Array or (given["watch"] as Array).size() > MAX_WATCH):
+			return "watch is a list of up to %d cells" % MAX_WATCH
+		var cells: Array = []
+		for value: Variant in (given[field] if field == "watch" else [given[field]]):
+			var cell: Variant = Level._tile(value)
+			if cell == null:
+				return "%s is [x, y]" % ("each watch cell" if field == "watch" else field)
+			if not area.has_point(cell):
+				return "the %s %s is outside the area" % [field, cell]
+			if working.map.cell(cell) in ["void", "water"]:
+				return "the %s %s is %s: it lies on ground" % [field, cell, working.map.cell(cell)]
+			if (cell - at).length_squared() > radius * radius:
+				return "the %s %s is beyond the place's radius %d of %s" % [field, cell, radius, at]
+			cells.append([cell.x, cell.y])
+		out[field] = cells if field == "watch" else cells[0]
+	return out
+
+
+## Of [param watch] (a perch's [x, y] cells), those less than WATCH_OFF_ROAD
+## from a road's cell (level.json's "roads", decision 559).
+func _watch_by_road(watch: Variant) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if not watch is Array or (watch as Array).is_empty():
+		return out
+	var roads: Dictionary = {}
+	for road: Dictionary in Curves.parse(working.config, "roads", [] as Array[String]):
+		roads.merge(Curves.cells(road["curve"], false))
+	for value: Variant in watch:
+		var cell: Variant = Level._tile(value)
+		if cell == null:
+			continue
+		for road_cell: Variant in roads:
+			if road_cell is Vector2i and maxi(absi(road_cell.x - cell.x), absi(road_cell.y - cell.y)) < WATCH_OFF_ROAD:
+				out.append(cell)
+				break
+	return out
 
 
 ## A place's shape fields from [param given] (792; buildings' 774 reads them,
@@ -1116,7 +1226,8 @@ func _shape_of(given: Dictionary) -> Variant:
 
 
 ## [param place] (a level.json "places" entry) moved [param by]: its cell,
-## rect and shape cells together (792).
+## rect and shape cells together (792), and a trader's bed, a lair's den and
+## a perch's watch (792 amended (2)).
 static func _place_moved(place: Dictionary, by: Vector2i) -> Dictionary:
 	var out := place.duplicate(true)
 	var at: Variant = Level._tile(place.get("at"))
@@ -1124,15 +1235,15 @@ static func _place_moved(place: Dictionary, by: Vector2i) -> Dictionary:
 		out["at"] = [at.x + by.x, at.y + by.y]
 	if place.get("rect") is Array and (place["rect"] as Array).size() == 4:
 		out["rect"] = [int(place["rect"][0]) + by.x, int(place["rect"][1]) + by.y, int(place["rect"][2]), int(place["rect"][3])]
-	for field: String in SHAPE_CELLS:
-		var cells: Array = place[field] if field == "seats" and place.get(field) is Array else [place.get(field)]
+	for field: String in MOVED_CELLS:
+		var cells: Array = place[field] if field in LIST_CELLS and place.get(field) is Array else [place.get(field)]
 		var moved: Array = []
 		for value: Variant in cells:
 			var cell: Variant = Level._tile(value)
 			if cell != null:
 				moved.append([cell.x + by.x, cell.y + by.y])
 		if place.has(field) and not moved.is_empty():
-			out[field] = moved if field == "seats" else moved[0]
+			out[field] = moved if field in LIST_CELLS else moved[0]
 	return out
 
 
@@ -1305,6 +1416,8 @@ func _cant_take(cell: Vector2i, own: Array = []) -> String:
 
 func _move_place(key: String, delta: Vector2i) -> Dictionary:
 	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true)
+	if str(places[key].get("kind", "")) == "stall":
+		return _no("%s is a stall place, where its town's seller stands: moving it is economy's, not builder mode's" % key)
 	var moved := _place_moved(places[key], delta)
 	var at: Vector2i = Level._tile(moved["at"])
 	if not area.has_point(at) or working.map.cell(at) in ["void", "water"]:
@@ -1405,6 +1518,8 @@ func _move_building(named: Dictionary, delta: Vector2i) -> Dictionary:
 	for key: String in places:
 		var place_at: Variant = Level._tile(places[key].get("at")) if places[key] is Dictionary else null
 		if place_at != null and rect.grow(1).has_point(place_at):
+			if str(places[key].get("kind", "")) == "stall":
+				return _no("moving it would carry the stall place %s, where its town's seller stands: moving that is economy's, not builder mode's" % key)
 			places[key] = _place_moved(places[key], delta)
 			carried.append(key)
 	var config := {"buildings": buildings}
