@@ -2147,6 +2147,33 @@
 			"volume_db": -4.0,
 			"uses": "a pick (or any blow) striking an ore seam (769 amended (4)); Client3D._on_struck, a Seam struck"
 		},
+		"sfx.chop_wood": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -10.0,
+			"uses": "an axe biting into wood, a body at the \"chop\" work (804 amended (18)); Client3D._stroke_sounds, at the blow of the Chop clip"
+		},
+		"sfx.saw_stroke": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 8,
+			"volume_db": -14.0,
+			"uses": "one stroke of a hand saw through wood, a body at the \"saw\" work (804 amended (18)); Client3D._stroke_sounds, its push and its pull in the Saw clip"
+		},
+		"sfx.hammer_wood": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -12.0,
+			"uses": "a carpenter's hammer on wood, a body at the \"hammer\" work (804 amended (18)); Client3D._stroke_sounds, at the blow of the Hammer clip"
+		},
 		"sfx.ore_sack": {
 			"category": "world",
 			"type": "oneshot",

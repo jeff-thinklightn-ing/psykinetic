@@ -97,6 +97,10 @@ if ($Start -ge 0) { $ffmpegArgs += @('-ss', "$Start") }
 $ffmpegArgs += @('-i', $Source)
 # The output's length: slowed (-Rate), the cut lasts longer.
 if ($Length -gt 0) { $ffmpegArgs += @('-t', "$($Length / $Rate)") }
+$positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positional -eq $false)
+# The take's channels, folded in float as the encoder folds them: an s16
+# stereo source folded in s16 read 3 dB under it (804 amended (18)).
+$fold = "aformat=sample_fmts=flt:channel_layouts=$(if ($positional) { 'mono' } else { 'stereo' })"
 # A gain to peak at -PeakDb: the cut's loudest sample measured first.
 $gain = ''
 if ($PeakDb -lt 0) {
@@ -110,12 +114,14 @@ if ($PeakDb -lt 0) {
 	$ErrorActionPreference = 'Continue'
 	# astats, not volumedetect: volumedetect reads at 16 bits, so a float
 	# source over full scale measured 0 dB and its take kept the overshoot.
-	$report = (& ffmpeg @measure -af "${window}astats=measure_perchannel=none" -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
+	# Measured as the take is made, folded to its channels by the same filter
+	# (804 amended (18)): measured on the source's own channels and folded after
+	# by -ac, a stereo source's take asked for -4 dBFS came out over full scale.
+	$report = (& ffmpeg @measure -af "${window}$fold,astats=measure_perchannel=none" -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
 	$ErrorActionPreference = 'Stop'
 	if ($report -notmatch 'Peak level dB: (-?[\d.]+)') { Fail "couldn't measure $Source's peak" }
 	$gain = ",volume=$($PeakDb - [double]$Matches[1])dB"
 }
-$positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positional -eq $false)
 # Positional: mono (the 3D player places it). Flat: stereo, whatever the source
 # (quad and ambisonic beds folded down).
 $ffmpegArgs += @('-ac', $(if ($positional) { '1' } else { '2' }))
@@ -126,7 +132,7 @@ if ($spec.type -eq 'oneshot') {
 		if ($Length -le 0) { Fail '-FadeOut needs -Length' }
 		$fade = "afade=t=out:st=$([math]::Max(0.0, $Length - $FadeOut)):d=$FadeOut,"
 	}
-	$ffmpegArgs += @('-af', "$fade$slow$trim,areverse,$trim,areverse$gain")
+	$ffmpegArgs += @('-af', "$fold,$fade$slow$trim,areverse,$trim,areverse$gain")
 } else {
 	# A loop or a bed loops without a seam: its last LoopFade seconds fade out
 	# over its first fading in, and it ends where that overlap began.
@@ -135,7 +141,7 @@ if ($spec.type -eq 'oneshot') {
 	}
 	$fade = [math]::Min($LoopFade, $whole / 4)
 	$body = $whole - $fade
-	$ffmpegArgs += @('-filter_complex', ("[0:a]asplit=3[a][b][c];" +
+	$ffmpegArgs += @('-filter_complex', ("[0:a]$fold,asplit=3[a][b][c];" +
 		"[a]atrim=0:$fade,asetpts=PTS-STARTPTS,afade=t=in:d=$fade[head];" +
 		"[b]atrim=${fade}:$body,asetpts=PTS-STARTPTS[mid];" +
 		"[c]atrim=${body}:$whole,asetpts=PTS-STARTPTS,afade=t=out:d=$fade[tail];" +

@@ -68,6 +68,7 @@ func _ready() -> void:
 		await _test_sounds_follow_events()
 		await _test_bow_sounds()
 		await _test_armour_footfalls()
+		_test_work_strokes()
 		_test_wade_drip()
 		_test_bridge_ends()
 		_test_far_cry()
@@ -1347,6 +1348,63 @@ func _test_wade_drip() -> void:
 	if not had_ford:
 		World._fords.erase(ford)
 	_rig.sfx.hear_everything = hear_was
+
+
+## 804 amended (18): a work's strokes heard at its blows. Each work clip run
+## through three cycles a frame (1/60 s) at a time on a drawn body set to its
+## work: its stroke sound exactly at each blow of Client3D.WORK_STROKES, at the
+## hands' height, none between; the work's clip without the work, none.
+func _test_work_strokes() -> void:
+	print("
+== a work's strokes at its blows: the axe biting, the saw's push and pull, the hammer's face (804 amended (18)) ==")
+	_check(Client3D.stroke_slot(null, "chop") == "sfx.chop_wood" and Client3D.stroke_slot(null, "saw") == "sfx.saw_stroke"
+			and Client3D.stroke_slot(null, "hammer") == "sfx.hammer_wood" and Client3D.stroke_slot(null, "hoe") == ""
+			and Client3D.STROKE_SLOTS.values().all(func(slot: String) -> bool: return SoundKit.has(slot)),
+			"each work's stroke its slot; a work with none (the hoe) silent")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
+	if puppet == null or not puppet.has_meta("rig"):
+		_check(true, "no drawn player: skipped")
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var work_was: String = str(puppet.get_meta("work", ""))
+	for word: String in Client3D.STROKE_SLOTS:
+		var slot: String = Client3D.STROKE_SLOTS[word]
+		var clip := str(Client3D.ACTIVITIES[word]["clip"])
+		var length := rig.length(clip)
+		if SoundKit.files(slot).is_empty() or length <= 0.0:
+			_check(true, "%s: its takes are not synced here, or no %s clip: skipped" % [word, clip])
+			continue
+		puppet.set_meta("work", word)
+		if puppet.has_meta("stroke_at"):
+			puppet.remove_meta("stroke_at")
+		var heard_at: Array[float] = []
+		var right := true
+		for frame in int(length * 3.0 * 60.0):
+			rig.base_at(clip, frame / 60.0)
+			rig.tree.advance(0.0)
+			var before := _rig.sfx.played.size()
+			_rig._stroke_sounds(player, puppet, rig)
+			for entry: Array in _rig.sfx.played.slice(before):
+				heard_at.append(fposmod(frame / 60.0, length) / length)
+				right = right and entry[0] == slot
+		var blows: Array = Client3D.WORK_STROKES[clip]
+		var on_blows := heard_at.all(func(share: float) -> bool: return blows.any(func(blow: float) -> bool:
+				return fposmod(share - blow, 1.0) < 1.5 / 60.0 / length))
+		print("  %s (%s, %.2f s): %d strokes in 3 cycles, at %s of the clip" % [word, clip, length, heard_at.size(), heard_at.map(func(share: float) -> String: return "%.3f" % share)])
+		# The first cycle's blow at its very start (the saw's push at 0) passes
+		# before any frame was seen, so one fewer then.
+		var want := blows.size() * 3 - (1 if blows.has(0.0) else 0)
+		_check(right and on_blows and heard_at.size() == want, "%s: %s at each of its %d blows a cycle, none between (%d of %d)" % [word, slot, blows.size(), heard_at.size(), want])
+	# The clip playing without its work (another body's clip, a test pose): none.
+	puppet.set_meta("work", "")
+	var quiet_before := _rig.sfx.played.size()
+	for frame in 120:
+		rig.base_at("Chop", frame / 60.0)
+		rig.tree.advance(0.0)
+		_rig._stroke_sounds(player, puppet, rig)
+	_check(_rig.sfx.played.size() == quiet_before and not puppet.has_meta("stroke_at"), "the Chop clip with no work: silent")
+	puppet.set_meta("work", work_was)
 
 
 ## 676 1b (Jeff on the first mixes: "the walking ones are approximately

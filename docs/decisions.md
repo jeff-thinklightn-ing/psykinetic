@@ -43789,6 +43789,32 @@ under ui.notify, three takes), each playing its own takes and falling back to it
 spotted under found. ui's side points Gains.TRACKS at them (below). Client only; protocol
 unchanged, no new class_name. No bullet here: the package's one, in voice's words, rides ui's side.
 
+804 amended (18) (2026-11-10, release's label; the coordinator's approval, on): a work's strokes
+heard. Townsfolk chopping, sawing and hammering (566 amended's ACTIVITIES "chop", "saw", "hammer")
+worked in silence. Three world slots (sfx bus, positional, at the body's hands, STROKE_UP 1 m over
+its feet): sfx.chop_wood (an axe biting a log, range 10, -10 dB), sfx.saw_stroke (one stroke of a
+hand saw, range 8, -14 dB), sfx.hammer_wood (a carpenter's hammer on timber, range 10, -12 dB; the
+carpenter's, the coordinator's approval: a smith's anvil is the smithy's package).
+Client3D._stroke_sounds, beside _footfall_sounds for every drawn humanoid, plays a work's stroke as
+its clip passes a blow (WORK_STROKES, shares of the clip from tools/humanoid_clips.py's keys: the
+axe in at 0.62 s of Chop's 1.6, the saw's push and pull at each half of Saw's 0.8, the hammer's
+face at 0.22 of Hammer's 0.7), by footfall_between as the footfalls, while the body's work
+(its "work" meta) has that clip on its base layer; anything else, nothing. Client3D.stroke_slot
+(entity, word) names the slot, so the smithy can give a smith's hammer the anvil without another
+word. Measured at their volumes (each slot's loudest 100 ms): the axe -22 dB, the saw -28, the
+hammer -29.5, among the footsteps' -27 to -33 and well under a close blade hit's -8; quiet enough
+to repeat (a saw stroke every 0.4 s). 11 CC0 Freesound takes: kyles 452554, hadescolossus 703420
+(two strokes) for the axe; Pagey1969 566040 (three strokes), LiezelDippenaar 707527 for the saw;
+L.i.Z.e.L.l.E_+ 707864 (two blows), sgrowe 342542, blukotek 337816 for the hammer; THIRD_PARTY
+regenerated. tools/sound_take.ps1 measured a take's peak on the source's own channels and folded
+them to mono after (-ac), and an s16 stereo source folded in s16 read 3 dB under the float fold the
+encoder makes: a take asked for -4 dBFS from two near-alike channels came out over full scale. Now
+the cut is folded once, in float, in the filter (aformat), both where it is measured and where it is
+made; a mono source's cut is unchanged, and takes already cut stay as they are (only new cuts). view_test _test_work_strokes: each work clip run a frame
+at a time for three cycles on a drawn body at its work, its stroke at each blow and none between;
+the Chop clip without the work silent (gated on the takes on disk, SoundKit.files). CHANGELOG
+bullet in voice's words. Client only; protocol unchanged, no new class_name.
+
 ## 805. The core loop's first slice: Wren wants to go fishing
 
 Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out
