@@ -44899,6 +44899,15 @@ forbids a 4 x 6 one, so the coordinator picked a 5 x 6 kind "smithy" at x 214..2
 whenever the town has its smith (the coordinator: a banked fire), with the lamp and windows on the
 houses' awake rule. level_test _test_smithy_inside and view_test _test_smithy_inside. Level data,
 Level, the tool and the client; protocol unchanged, no new class_name.
+811 amended (6) (art-kit; release's label; the coordinator's Hollowfell iron list, item 2; buildings' smithy,
+811 amended (2), off): the smithy's sign, prop.smithy_sign. prop.inn_sign's frame, height and hand
+(buildings: hung as the Mughouse's is, on the smithy's south front beside its door, the 2.75 m arm under a
+stone storey's eaves): the wrought bracket and scrolled strut from a wall plate, the arm's tip curled down
+where the inn's lantern hangs, and the board on two rings painted on both faces with an anvil and a hammer
+over it, nothing else (no words or marks: the coordinator). By hand, palette only, 360 tris,
+C:/dev/review/mughouse/make_mughouse.py; the look at C:/dev/review/mughouse/smithy_sign_big.png. Off:
+nothing places it till buildings' 811 amended (2) switches the smithy on. Art only, protocol unchanged, no
+new class_name, no bullet.
 
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
