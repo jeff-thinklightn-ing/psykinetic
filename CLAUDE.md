@@ -69,7 +69,7 @@ place, and a text and loot don't go in before a quest is in."
   which gates itself. If the lock is held, keep working and try again in a
   few minutes; never push while another tree holds it. Don't hold it for anything else
   (record clips and run benches before taking it): a landing takes under 20 minutes (a
-  lean one about 16), and a land lock older than 25 is stale and may be taken over (667). If taking it fails, stop: a
+  lean one about 16), and a land lock is stale, and may be taken over, 25 minutes after its take or its last beat (667; since 667 amended land.sh beats it each minute while its tests run, so a live landing never goes stale and none is cut short to stay under 25). If taking it fails, stop: a
   script must never push after a failed take.
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
