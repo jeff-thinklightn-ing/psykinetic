@@ -42,6 +42,9 @@ func _ready() -> void:
 	_test_flank()
 	_test_downed_fire()
 	_test_flank_party()
+	_test_steadied()
+	_test_steadied_axes()
+	_test_steadied_chief()
 	_test_fight_won()
 	_test_tell_truth()
 	_test_hurt_line()
@@ -1568,6 +1571,264 @@ func _test_flank() -> void:
 	_check(not World.is_stunned(foe) and int(heard["n"]) == 2, "its tell over (landed): nothing")
 	World.end_telegraph(landed, false)
 	World.flanked.disconnect(on_flank)
+
+
+## Steadied (843): a boss or apex out of a stagger can't be staggered again
+## till a told move of his resolves or steady_ticks pass with none under
+## way; harm as ever, a knockdown the push alone; a flank still staggers
+## (its guard keeps it to one), his own crash still stuns; ordinary foes
+## never steady. Each change told to the views as a quiet cry.
+func _test_steadied() -> void:
+	print("\n== steadied: a boss out of a stagger isn't staggered again till his told move (843) ==")
+	var e := _build(["#########", "#.......#", "#..PmP..#", "#.......#", "#########"])
+	var back: Player = e["P"][0]  # (3,2), behind: the foe faces east.
+	var front: Player = e["P"][1]
+	var foe: Monster = e["m"][0]
+	foe.facing = Vector2i(1, 0)
+	back.free_pos = Vector2(3.0, 2.0)
+	front.free_pos = Vector2(5.0, 2.0)
+	var cries: Array[StringName] = []
+	var on_cry := func(kind: StringName) -> void:
+		cries.append(kind)
+	foe.cried.connect(on_cry)
+	var shape := {"kind": "cone", "origin": [foe.tile.x, foe.tile.y], "facing": [1, 0], "length": 2.0, "half_angle": 60.0}
+	_check(World.steady_ticks == 30, "combat.json: steady_ticks 30")
+
+	World._stun_for(foe, 5)
+	World.tick += 5
+	World._tend_steady()
+	_check(not World.steadies(foe) and not World.is_steadied(foe) and cries.is_empty(), "an ordinary foe out of a stagger: no steady")
+	World._stun_for(foe, 5)
+	_check(World.is_stunned(foe), "and staggered again at once")
+	foe.stunned_until_tick = 0
+	World._steady_after.clear()
+
+	foe.boss = true
+	World._stun_for(foe, 5)
+	World._tend_steady()
+	_check(World.steadies(foe) and not World.is_steadied(foe), "a boss mid-stagger: not steadied yet")
+	World.tick += 5
+	World._tend_steady()
+	_check(World.is_steadied(foe) and cries == [&"steady"], "out of it: steadied, cried \"steady\" (%s)" % [cries])
+	var t0 := World.tick
+	World._stun_for(foe, 10)
+	_check(not World.is_stunned(foe), "steadied: a stagger does nothing")
+	var hp := foe.hp
+	_give(back, "giant_axe")
+	back.next_attack_tick = 0
+	back.next_move_tick = 0
+	_check(World.try_wind_up(back, foe), "a giant axe wound up at him")
+	World.tick = int(back.wind_up["lands"])
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(foe.hp < hp and not World.is_stunned(foe) and not World.is_down(foe), "its blow: harm (%d), no stagger, no knockdown" % (hp - foe.hp))
+	_clear(back)
+	_blow(foe, front)
+	_check(World.is_steadied(foe), "his own plain blow (a bite) doesn't end it")
+	World.tick = t0 + 29
+	World._tend_steady()
+	_check(World.is_steadied(foe), "29 ticks on: still steadied")
+	World.tick = t0 + 30
+	World._tend_steady()
+	_check(not World.is_steadied(foe) and cries == [&"steady", &"steady_over"], "30 with no told move: over, cried \"steady_over\" (%s)" % [cries])
+	World._stun_for(foe, 5)
+	_check(World.is_stunned(foe), "then staggered as ever")
+
+	World.tick += 5
+	World._tend_steady()
+	World.tick += 10
+	var told := World.telegraph(foe, "swipe", shape, 40)
+	World.tick += 25
+	World._tend_steady()
+	_check(World.is_steadied(foe), "a told move begun inside the 30: steadied till it resolves (35 ticks on)")
+	World.end_telegraph(told, true)
+	_check(not World.is_steadied(foe) and cries.back() == &"steady_over", "it lands: over")
+
+	World._stun_for(foe, 5)
+	World.tick += 5
+	World._tend_steady()
+	told = World.telegraph(foe, "swipe", shape, 10)
+	World.tick += 3
+	World.end_telegraph(told, false)
+	_check(not World.is_steadied(foe), "a told move given up ends it too, before the 30")
+
+	World._stun_for(foe, 5)
+	World.tick += 5
+	World._tend_steady()
+	World._stun_for(foe, 8, &"crash")
+	_check(World.is_stunned(foe) and World.is_steadied(foe), "his own crash stuns him steadied")
+	World.tick += 8
+	World._tend_steady()
+	_check(World.is_steadied(foe) and cries.count(&"steady") == cries.count(&"steady_over") + 1, "out of it, steadied afresh, no second cry (%s)" % [cries])
+
+	var marked := World.telegraph(foe, "swipe", shape, 10, true)
+	_blow(back, foe)
+	_check(World.is_stunned(foe) and foe.stunned_until_tick == World.tick + World.flank_stagger, "steadied, flanked mid-tell: staggered as ever")
+	World.end_telegraph(marked, false)
+	_check(not World.is_steadied(foe), "the move it broke ends the steady")
+	World.tick += World.flank_stagger
+	World._tend_steady()
+	_check(World.is_steadied(foe), "out of the flank's stagger: steadied afresh")
+	marked = World.telegraph(foe, "slam", shape, 10, true)
+	_blow(back, foe)
+	_check(not World.is_stunned(foe), "a second flank inside the guard: nothing")
+	World.end_telegraph(marked, false)
+
+	World._stun_for(foe, 5)
+	World.tick += 5
+	World._tend_steady()
+	World._axes[foe] = {"cell": Vector2i(6, 1), "uid": 0}
+	foe.next_move_tick = 0
+	_check(World.try_axe_charge(foe) and not World.is_steadied(foe), "his charge to his axe ends it as it begins (the draugr's, dungeon's)")
+	World.end_telegraph(int(World._boss_moves[foe]["telegraph"]), false)
+	World._boss_moves.erase(foe)
+	World._axes.erase(foe)
+	_check(cries.count(&"steady") == cries.count(&"steady_over"), "every \"steady\" told its \"steady_over\" (%d)" % cries.count(&"steady"))
+	foe.cried.disconnect(on_cry)
+
+	var ears := _build(["#######", "#.....#", "#.mm..#", "#.....#", "#######"])
+	var loud: Monster = ears["m"][0]
+	var listener: Monster = ears["m"][1]
+	listener.senses.heard.clear()
+	loud.boss = true
+	World._stun_for(loud, 2)
+	World.tick += 2
+	World._tend_steady()
+	_check(World.is_steadied(loud) and listener.senses.heard.is_empty(), "the cry is quiet: a foe beside him hears nothing")
+
+
+## Two giant axes on the great bear (843): free 0 before (stagger after
+## stagger, his told moves broken); now at most one stagger between his
+## told moves, a flank aside, and he gets them in.
+func _test_steadied_axes() -> void:
+	print("\n== steadied: two giant axes on the great bear, one stagger between his moves (843) ==")
+	World.reset()
+	World.load_combat_rules(FileAccess.get_file_as_string(World.COMBAT_RULES))
+	if _room != null:
+		_room.free()
+	_room = Node2D.new()
+	add_child(_room)
+	var rows: Array[String] = ["################", "#..............#", "#..............#", "#..............#",
+			"#..............#", "#..............#", "#..............#", "#..............#", "################"]
+	World.load_terrain(Terrain.parse(Terrain.expand(rows)))
+	var players: Array[GridEntity] = []
+	for at: Vector2i in [Vector2i(4, 3), Vector2i(4, 5)]:
+		var player := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "P%d" % at.y, "tile": at})
+		_room.add_child(player)
+		World.spawn(player, at)
+		player.max_hp = 99999
+		player.hp = 99999
+		_give(player, "giant_axe")
+		players.append(player)
+	var row: Dictionary = Monster.kinds()["great_bear"]
+	var bear := EntityFactory.build({"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear", "name": "Bear",
+			"tile": Vector2i(8, 4), "props": (row["body"] as Dictionary).duplicate()})
+	_room.add_child(bear)
+	World.spawn(bear, Vector2i(8, 4))
+	bear.max_hp = 99999
+	bear.hp = 99999
+	bear.sight_range = 14
+	var counts := {"told": 0, "staggers": 0, "flanks": 0, "most": 0, "steadied": 0}
+	var on_told := func(id: int, _data: Dictionary) -> void:
+		if World._telegraphs.has(id) and World._telegraphs[id]["source"] == bear:
+			counts["most"] = maxi(int(counts["most"]), int(counts["staggers"]) - int(counts["flanks"]))
+			counts["told"] = int(counts["told"]) + 1
+			counts["staggers"] = 0
+			counts["flanks"] = 0
+	var on_flank := func(target: GridEntity, _source: GridEntity, _id: int) -> void:
+		if target == bear:
+			counts["flanks"] = int(counts["flanks"]) + 1
+	World.telegraph_started.connect(on_told)
+	World.flanked.connect(on_flank)
+	var struck_back := 0
+	var hp := {}
+	for player in players:
+		hp[player] = player.hp
+	for t in 600:
+		for player in players:
+			if player.action_order == GridEntity.Order.NONE and player.wind_up.is_empty():
+				World.command_attack(player, bear)
+		var was := World.is_stunned(bear)
+		World.step()
+		if World.is_stunned(bear) and not was:
+			counts["staggers"] = int(counts["staggers"]) + 1
+		if World.is_steadied(bear):
+			counts["steadied"] = int(counts["steadied"]) + 1
+		for player in players:
+			if player.hp < int(hp[player]):
+				struck_back += 1
+			hp[player] = player.hp
+	counts["most"] = maxi(int(counts["most"]), int(counts["staggers"]) - int(counts["flanks"]))
+	World.telegraph_started.disconnect(on_told)
+	World.flanked.disconnect(on_flank)
+	print("  measured: 60 s, told moves %d, his blows landed %d, steadied %d ticks, most staggers between told moves %d" % [
+			counts["told"], struck_back, counts["steadied"], counts["most"]])
+	_check(int(counts["most"]) <= 1, "at most one stagger between his told moves, a flank aside (%d)" % counts["most"])
+	_check(int(counts["told"]) >= 6 and struck_back >= 6, "he gets his told moves in (%d) and strikes back (%d)" % [counts["told"], struck_back])
+
+
+## A chief with no told moves under a giant axe (843): his steady ends on
+## the 30-tick timer, not a told move. Live for 60 s: each stagger after the
+## first starts no sooner than steady_ticks after the one before ended
+## (unless a told move of his resolved between), and his plain blows land.
+func _test_steadied_chief() -> void:
+	print("\n== steadied: a giant axe on the orc chief, his steady on the timer (843) ==")
+	World.reset()
+	World.load_combat_rules(FileAccess.get_file_as_string(World.COMBAT_RULES))
+	if _room != null:
+		_room.free()
+	_room = Node2D.new()
+	add_child(_room)
+	var rows: Array[String] = ["################", "#..............#", "#..............#", "#..............#",
+			"#..............#", "#..............#", "#..............#", "#..............#", "################"]
+	World.load_terrain(Terrain.parse(Terrain.expand(rows)))
+	var player := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Axe", "tile": Vector2i(4, 4)})
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 4))
+	player.max_hp = 99999
+	player.hp = 99999
+	_give(player, "giant_axe")
+	var row: Dictionary = Monster.kinds()["brute"]
+	var chief := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "brute", "named": "grull",
+			"name": "Chief", "tile": Vector2i(8, 4), "props": (row["body"] as Dictionary).duplicate()})
+	_room.add_child(chief)
+	World.spawn(chief, Vector2i(8, 4))
+	var wields: Dictionary = row.get("wields", {})
+	if not wields.is_empty():
+		World.set_slots(chief, Items.tidy(["", "", "", "", str(wields.values()[0]), ""], Items.CARRIED))
+	chief.max_hp = 99999
+	chief.hp = 99999
+	chief.sight_range = 14
+	_check(World.steadies(chief) and (chief as Monster).boss, "the orc chief is a boss: he steadies")
+	var told := {"ended": -1, "n": 0}
+	var on_ended := func(id: int, _landed: bool) -> void:
+		told["ended"] = World.tick  # Any told move's end; his own are the only ones here.
+		told["n"] = int(told["n"]) + 1
+	World.telegraph_ended.connect(on_ended)
+	var staggers := 0
+	var too_soon: Array[String] = []
+	var last_end := -1
+	var hp := player.hp
+	var struck_back := 0
+	for t in 600:
+		if player.action_order == GridEntity.Order.NONE and player.wind_up.is_empty():
+			World.command_attack(player, chief)
+		var was := World.is_stunned(chief)
+		World.step()
+		var now := World.is_stunned(chief)
+		if now and not was:
+			staggers += 1
+			if last_end >= 0 and World.tick - last_end < World.steady_ticks and int(told["ended"]) < last_end:
+				too_soon.append("%d after %d" % [World.tick - last_end, last_end])
+		elif was and not now:
+			last_end = World.tick
+		if player.hp < hp:
+			struck_back += 1
+		hp = player.hp
+	World.telegraph_ended.disconnect(on_ended)
+	print("  measured: 60 s, staggers %d, his blows landed %d, told moves ended %d" % [staggers, struck_back, told["n"]])
+	_check(staggers >= 2 and too_soon.is_empty(), "staggered again only 30 ticks after the last ended, with no told move between (%d staggers; too soon: %s)" % [staggers, too_soon])
+	_check(struck_back >= 6, "his plain blows land between (%d)" % struck_back)
 
 
 ## A downed body's window runs out once (544 amended; playtest's A/B run): a

@@ -20285,6 +20285,8 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
 		var blow := _struck_with(struck)
+		if _heard_steadied(struck):
+			blow[0] = SoundKit.HIT_STEADIED  # 843: a blow that doesn't rock him lands dull.
 		var wait := (int(blow[1]) - AnimRig.now_msec()) / 1000.0
 		if wait > 0.0:
 			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait)
@@ -20614,6 +20616,17 @@ func _mourn_local() -> void:
 	_mourning = true
 	if music != null:
 		music.sting("death")
+
+
+## Who was heard steadied (843: cried "steady", till "steady_over", or
+## STEADY_HEARD_MS if that is lost), by instance id: the msec it lapses.
+const STEADY_HEARD_MS := 6000
+var _steadied := {}
+
+
+## Whether [param struck] was heard steadied and isn't over it (843).
+func _heard_steadied(struck: GridEntity) -> bool:
+	return struck != null and int(_steadied.get(struck.get_instance_id(), 0)) > AnimRig.now_msec()
 
 
 ## What a blow on [param struck] sounds like and when, [slot, msec]: the
@@ -24797,6 +24810,18 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.pant(int((pant as Dictionary).get("ticks", 20) if pant is Dictionary else 20) * World.TICK_DT)
 		elif cry == &"call":
 			view.snarl()
+	if cry == &"steady" or cry == &"steady_over":
+		# Steadied (843): a boss or apex out of a stagger heard setting
+		# himself by his kind (SoundKit.steady_slot), the blows on him dull
+		# till it is over (_heard_steadied); never a cry slot of its own.
+		if cry == &"steady_over" or not (monster.boss or Monster.is_apex(creature)):
+			_steadied.erase(id)
+			return
+		_steadied[id] = AnimRig.now_msec() + STEADY_HEARD_MS
+		var set_slot := SoundKit.steady_slot(creature)
+		if set_slot != "":
+			sfx.play(set_slot, puppet.position + Vector3.UP * 0.8)
+		return
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))

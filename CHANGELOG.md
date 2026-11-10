@@ -27,6 +27,7 @@ notes (decision 324).
 - A big blow that knocks you into your companion, or her into you, hurts each of you once now, where before it could bounce between you and hurt you both two or three times over, sometimes felling her at a stroke (688 amended (11)).
 - When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).
 - Your companion, once she pulls back from the great bear or the old grey, stays well clear of it and its pack while it still fights you, never in your way if you run, and comes back to your side once it falls or you get away, where before she soon walked back into its reach and was bitten (780 amended (21)).
+- The great bear and the old grey shake off being knocked reeling now: you see and hear them set themselves, and until their next marked blow your hits still hurt and push them, landing with a dull thud, but they rock without reeling, hold their wind-up and keep their feet, so no axe holds them off for long; a blow from behind as one winds up still staggers it once, as before (843).
 ## v0.1.210
 
 - What goes over the network changes, so v0.1.209 and older can't join the server: update through the launcher first.

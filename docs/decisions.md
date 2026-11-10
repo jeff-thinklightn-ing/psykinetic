@@ -47717,6 +47717,60 @@ The box lays the new hold at its next regeneration (every 3 game days). One CHAN
 words.
 ## 843. Steadied: a boss out of a stagger isn't staggered again till his told move
 
+Release's number; the coordinator's approval, with enemy-ai's (the apexes, the chiefs), dungeon's (the
+draugr), sound's and animation's agreement. Playtest's draugr log: a careless giant-axe bot held him
+staggered until he was beaten in 14 s, without his landing a blow. Combat's measure (a player striking a
+live boss the moment each blow was ready, 300 ticks): a giant axe (cycle 15, stagger 16) left every boss
+free 0 ticks, the great bear 2 told moves to the sword's 11 (6 broken); a battle axe (free 4) nearly as
+bad on the great bear; the war hammer (before its one-cell cap, 305 amended) held the old grey. Each
+boss's shortest wind-up is 8 to 12 ticks, so any stagger longer than the weapon's cycle less that kept
+him from ever striking.
+
+The rule (something the boss has, so heavy weapons stay what they are on everyone else): a Monster.boss
+(the draugr; the named chiefs Brand, the orc chief and the kobold chief, by named_enemies.json's boss) or
+an apex (the great bear, the old grey, the boar king) coming out of a stagger, his own tree crash among
+them, is steadied (World._tend_steady, each tick of his zone, before anyone acts). While steadied a blow's
+harm and push are as ever, but World._stun_for staggers him no more, so no wind-up of his is broken by
+it, and World.knock_down leaves him standing: the blow's push alone. The steady ends when a told move of
+his resolves (a telegraph of his begun since: landed, missed, or broken; World.end_telegraph), the
+draugr's charge to his thrown axe as World.try_axe_charge begins it (dungeon's), or else steady_ticks (30, 3 s,
+levels/combat.json) after it began, put off while a told move he began inside them is still under way.
+His plain blows (a bite, a chief's swing) never end it, so a boss with no told moves (Brand, the orc
+chief) is steadied the 30; the kobold chief's ambush is his told move (enemy-ai's), the draugr's walk
+back and spent step run out on the 30. The flank (780) is exempt: a blow from behind on a flank-marked
+tell staggers him steadied or not (World._stun_for's through_steady); the move it breaks ends the steady,
+and its flank_guard (50 ticks, more with a party) keeps it to one, so a second flank inside the guard does
+nothing; out of the flank's stagger a fresh steady starts. His own crash (the boar king's) stuns him
+steadied, for the same reason. Skids, winded and the old grey's pant are no stagger and give no steady.
+Ordinary foes and the risen dead never steady: a heavy weapon still holds them, as it should. Server
+only state (World._steady, _steady_after; World.is_steadied, World.steadies), not saved.
+
+What the views are told: his cry "steady" as it starts and always "steady_over" as it ends (Monster._cry
+at radius 0: World.noise returns at once, so nothing hears it and no fight's din is noted). The client keeps who was
+heard steadied (Client3D._steadied, lapsing STEADY_HEARD_MS, 6 s, if a "steady_over" is lost): a blow on
+him plays SoundKit.HIT_STEADIED in place of the hit, and "steady" plays his kind's set
+(SoundKit.steady_slot, only for a boss or apex) in place of any cry slot; animation's set and brace come
+from the same cries. Why a cry and not a field: a replicated field would be a protocol change, and a
+cry at radius 0 never reaches World.noise, so no monster or companion hears it; anything that should
+react to a steadied boss (a companion's advice, a foe's tactic) reads World.is_steadied on the server,
+never the cry. No companion line. Package "steadied": combat's rule and hooks, sound's slots and
+takes, animation's beat, landed in one take, on.
+
+Protocol unchanged (release's ruling, as dungeon's seal_lift): a cry is a cried word on an existing RPC.
+An older client's _on_cried still sets the puppet's "cried_at", so its idle sounds keep quiet
+IDLE_QUIET_MS after each steady cry, and finds no slot for "steady": harmless. combat_test _test_steadied
+(an ordinary foe never steadies; the boss steadied only out of the stagger; a stagger and a giant axe's
+knockdown do nothing, its harm lands; a bite doesn't end it; 29 ticks still, 30 over; a told move begun
+inside the 30 holds it till it lands; one given up ends it early; his crash stuns him and he steadies
+afresh with no second cry; a flank staggers him steadied, the move it broke ends it, a second inside the
+guard does nothing; the axe charge ends it; every "steady" told its "steady_over"; the cry is heard by no
+foe beside him) and _test_steadied_axes (two giant axes on the live great bear for 60 s: at most one
+stagger between his told moves, a flank aside; measured 30 told moves and 26 of his blows landed,
+steadied 31 ticks in all), and _test_steadied_chief (a giant axe on the orc chief, who has no told
+moves, 60 s: his steady on the timer, 7 staggers each at least the 30 after the last ended, 17 of his
+blows landed). No new
+class_name.
+
 843, sound's side (2026-11-10, release's number; combat's piece, package "steadied", landing in
 combat's take, on with it): a steadied body is heard setting himself, and a
 blow that doesn't rock him lands dull. Six slots, sfx bus, positional, each with a "fallback" to an

@@ -181,6 +181,7 @@ func _ready() -> void:
 		_test_allies()
 		_test_barrow_dead()
 		_test_person_monster()
+		_test_steadied_heard()
 		await _test_blow_wait_outlives_body()
 		_test_bandit_look()
 		_test_shadows_in_view()
@@ -8941,6 +8942,35 @@ func _test_person_monster() -> void:
 	_check(plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
 			"without the words, drawn as before")
 	World.despawn(plain)
+	_rig._process(0.0)
+
+
+## Steadied heard (843): a boss's "steady" plays his kind's set
+## (SoundKit.steady_slot) and never a cry slot of its own; a blow on him the
+## dull thud (SoundKit.HIT_STEADIED) in place of the hit, till "steady_over";
+## an ordinary foe crying it (no server sends one) changes nothing.
+func _test_steadied_heard() -> void:
+	print("\n== steadied: his set heard by his kind, a blow on him dull till it's over (843) ==")
+	var chief := _spawn_imp(Vector2i(9, 6), "robber_brute")
+	_rig._process(0.0)
+	var id := chief.get_instance_id()
+	var plain := _heard(func() -> void: _rig._on_cried(&"steady", id))
+	_check(not _rig._heard_steadied(chief) and plain.is_empty(), "an ordinary foe's \"steady\": nothing (%s)" % [plain])
+	chief.boss = true
+	var set_heard := _heard(func() -> void: _rig._on_cried(&"steady", id))
+	_check(_rig._heard_steadied(chief) and set_heard == [SoundKit.steady_slot("robber_brute")],
+			"a boss's: steadied, his kind's set (%s)" % [set_heard])
+	var dull := _heard(func() -> void: World.damage(chief, 1, null, &"attack"); _rig._process(0.0))
+	_check(SoundKit.HIT_STEADIED in dull and not "sfx.hit_flesh" in dull and not "sfx.hit_blunt_armor" in dull,
+			"a blow on him steadied: the dull thud, not the hit (%s)" % [dull])
+	var over := _heard(func() -> void: _rig._on_cried(&"steady_over", id))
+	_check(not _rig._heard_steadied(chief) and over.is_empty(), "\"steady_over\": heard steadied no more, quietly (%s)" % [over])
+	var again := _heard(func() -> void: World.damage(chief, 1, null, &"attack"); _rig._process(0.0))
+	_check(not SoundKit.HIT_STEADIED in again and not again.is_empty(), "then the hit as ever (%s)" % [again])
+	_rig._on_cried(&"steady", id)
+	_rig._steadied[id] = AnimRig.now_msec() - 1
+	_check(not _rig._heard_steadied(chief), "a lost \"steady_over\": it lapses (STEADY_HEARD_MS %d)" % Client3D.STEADY_HEARD_MS)
+	World.despawn(chief)
 	_rig._process(0.0)
 
 

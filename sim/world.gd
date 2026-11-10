@@ -421,6 +421,16 @@ var winded_regen_delay := 20
 ## two players can't chain it into never acting (the coordinator).
 var flank_stagger := 4
 var flank_guard := 50
+## Steadied (843): a boss or apex coming out of a stagger isn't staggered
+## again until a told move of his resolves (landed, missed or broken), or
+## steady_ticks pass with none under way (one begun inside them seen
+## through), so no weapon's stagger can hold him for the fight. A flank
+## still staggers him (its own guard keeps it to one); his own crash still
+## stuns him. Server only: the views hear it as his cries "steady" and
+## "steady_over".
+var steady_ticks := 30
+var _steady: Dictionary = {}  # Monster -> {"from": tick, "until": tick}.
+var _steady_after: Dictionary = {}  # Monster -> true: staggered, steadied as it ends.
 ## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
@@ -1377,6 +1387,7 @@ func _step_zone() -> void:
 	_tend_rushes()  # Each rush's next cell when due (decision 604).
 	_tend_rolls()  # Each rolling cart's next cell when due (decision 794).
 	_tend_free_kicks()  # Pushed free bodies' slides shown, stunned or not (688 amended (2)).
+	_tend_steady()  # Out of a stagger, steadied; steadied no more (843).
 	t = part("tiers, roster", t)
 	for entity in _actors:
 		# Not its turn by the tier it has, and that tier not due to be
@@ -1939,6 +1950,8 @@ func reset() -> void:
 	_fights.clear()  # Decision 740: its din goes with it.
 	_hurt_folds.clear()  # 544 amended (2): no room's fire told in the next.
 	_fight_foes.clear()
+	_steady.clear()  # 843.
+	_steady_after.clear()
 	_fight_beaten.clear()
 	_fight_own.clear()
 	_fight_ended.clear()
@@ -5362,7 +5375,8 @@ func load_combat_rules(text: String) -> void:
 					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
 			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
-				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack", "flank_stagger", "flank_guard"]:
+				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack", "flank_stagger", "flank_guard",
+				"steady_ticks"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(key, int(given) if get(key) is int else float(given))
@@ -5449,7 +5463,7 @@ func _try_flank(source: GridEntity, target: GridEntity) -> bool:
 	var found := flankable(target)  # Alive, marked, unlanded, past its guard.
 	if found == 0 or not is_instance_valid(source) or not is_behind(source, target):
 		return false
-	_stun_for(target, flank_stagger)
+	_stun_for(target, flank_stagger, &"", true)  # Steadied or not (843): its guard keeps it to one.
 	_flank_guard_until[target] = tick + flank_guard_for(target)
 	_log("flank: %s staggers %s, its %s lost" % [source.name, target.name, _telegraphs[found]["data"]["kind"]])
 	flanked.emit(target, source, found)
@@ -5479,9 +5493,14 @@ func end_telegraph(id: int, landed: bool) -> void:
 	if not _telegraphs.has(id):
 		return
 	var zone_name := str(_telegraphs[id]["data"]["zone"])
+	var source: Variant = _telegraphs[id]["source"]
+	var from := int(_telegraphs[id]["data"]["from_tick"])
+	var kind := str(_telegraphs[id]["data"]["kind"])
 	_telegraphs.erase(id)
 	telegraph_ended.emit(id, landed)
 	telegraph_ended_in.emit(zone_name, id, landed)
+	if is_instance_valid(source) and _steady.has(source) and from >= int(_steady[source]["from"]):
+		_steady_end(source, "his %s %s" % [kind, "landed" if landed else "given up"])  # 843.
 
 
 ## The cells telegraph [param id] shows, as sent (decision 602); none
@@ -5643,6 +5662,7 @@ func try_axe_charge(by: GridEntity) -> bool:
 	if axe.is_empty() or bool(axe.get("disarmed", false)) or not _boss_can_begin(by, true):
 		return false
 	var cell: Vector2i = axe["cell"]
+	_steady_end(by, "his charge to his axe")  # 843 (dungeon's): the charge itself ends it.
 	if cell == by.tile:
 		_take_axe(by)
 		return true
@@ -8289,6 +8309,8 @@ func _freed(entity: GridEntity) -> void:
 func _forget_jobs(entity: GridEntity) -> void:
 	_boss_moves.erase(entity)
 	_flank_guard_until.erase(entity)
+	_steady.erase(entity)
+	_steady_after.erase(entity)
 	_axes.erase(entity)
 	for id: int in _telegraphs.keys():
 		if _telegraphs[id]["source"] == entity:
@@ -10630,14 +10652,80 @@ func _stun(entity: GridEntity, remaining_force: float) -> void:
 	_stun_for(entity, stun_ticks_base + roundi(remaining_force * stun_ticks_per_force))
 
 
-## Stuns [param entity] for [param ticks] from now, if that is longer.
-func _stun_for(entity: GridEntity, ticks: int, cause: StringName = &"") -> void:
+## Stuns [param entity] for [param ticks] from now, if that is longer. A
+## steadied body (843) isn't, unless [param through_steady] (a flank) or it
+## is his own crash; a boss or apex staggered is steadied as it ends.
+func _stun_for(entity: GridEntity, ticks: int, cause: StringName = &"", through_steady := false) -> void:
 	if not _alive(entity) or not entity.is_creature() or is_sheltered(entity):
 		return
+	if _steady.has(entity) and not through_steady and cause != &"crash":
+		return  # Steadied (843): the blow's harm and push as ever, no stagger.
 	if cause == &"" and entity.stun_cause_tick == tick:
 		cause = entity.stun_cause  # The same blow's stun drawn out (a bash's slide): its cause kept.
 	if tick + ticks > entity.stunned_until_tick:
 		entity._world_stunned(tick + ticks, ticks, cause)  # Its cause told with it (379 amended).
+		if steadies(entity):
+			_steady_after[entity] = true
+
+
+## Whether [param entity] steadies coming out of a stagger (843): a boss
+## (Monster.boss: the draugr, the named chiefs) or an apex. Ordinary foes
+## and the risen dead never do.
+func steadies(entity: GridEntity) -> bool:
+	return entity is Monster and ((entity as Monster).boss or Monster.is_apex(kind_of(entity)))
+
+
+## Whether [param entity] is steadied now (843). Server only: false off
+## authority.
+func is_steadied(entity: GridEntity) -> bool:
+	return _steady.has(entity)
+
+
+## Steadied (843), each tick in this zone: a boss or apex out of its
+## stagger (no longer stunned, not lying) is steadied; one steadied
+## steady_ticks with no told move of his begun since under way is steadied
+## no more. A told move resolving ends it sooner (end_telegraph).
+func _tend_steady() -> void:
+	if _steady_after.is_empty() and _steady.is_empty():
+		return
+	for entity: Variant in _steady_after.keys():
+		if not _alive(entity):
+			_steady_after.erase(entity)
+		elif entity.zone == zone.name and not is_stunned(entity) and not is_down(entity):
+			_steady_after.erase(entity)
+			_steady_begin(entity)
+	for entity: Variant in _steady.keys():
+		if not _alive(entity):
+			_steady.erase(entity)
+		elif entity.zone == zone.name and tick >= int(_steady[entity]["until"]) \
+				and _told_since(entity, int(_steady[entity]["from"])) == 0:
+			_steady_end(entity, "its time out")
+
+
+func _steady_begin(entity: GridEntity) -> void:
+	var fresh := not _steady.has(entity)
+	_steady[entity] = {"from": tick, "until": tick + steady_ticks}
+	if fresh:
+		(entity as Monster)._cry(&"steady", 0)  # Quiet (radius 0): told to the views, heard by no one.
+	_log("steady: %s sets himself" % entity.name)
+
+
+func _steady_end(entity: GridEntity, why: String) -> void:
+	if not _steady.has(entity):
+		return
+	_steady.erase(entity)
+	if _alive(entity):
+		(entity as Monster)._cry(&"steady_over", 0)
+	_log("steady: %s's over, %s" % [entity.name, why])
+
+
+## A telegraph of [param entity]'s begun at or after [param from] and not
+## yet over: its id, 0 for none.
+func _told_since(entity: GridEntity, from: int) -> int:
+	for id: int in _telegraphs:
+		if _telegraphs[id]["source"] == entity and int(_telegraphs[id]["data"]["from_tick"]) >= from:
+			return id
+	return 0
 
 
 ## [param against] is what it hit: &"stone", &"wood", &"body", or &"" (it
@@ -12577,6 +12665,9 @@ func is_down(entity: GridEntity) -> bool:
 func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
 	if not Net.is_authority() or ticks <= 0 or is_sheltered(target):
 		return  # (Arriving, decision 661: not knocked down.)
+	if _steady.has(target):
+		_log("steadied: %s not knocked down by %s" % [target.name, source.name if is_instance_valid(source) else "?"])
+		return  # 843: the blow's push alone.
 	if target is Monster and (target as Monster).never_lies:
 		# Never on the floor (573 amended (4), the draugr; approved by the
 		# coordinator, combat's file): a stagger, the stun alone. No
