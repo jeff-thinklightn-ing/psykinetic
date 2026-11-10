@@ -539,7 +539,7 @@ func _spawn(script: String, entity_name: String, at: Vector2i) -> GridEntity:
 ## World.request_free) and, by its default, falls on slow acks; Net.steady_throttle holds it at
 ## its top. A real ENet pair on loopback: one end not serviced for STALL_MS, as a slow server
 ## tick (or a slow client frame) stalls it, while the other sends reliably, so its acks come
-## back late. Unconfigured, the waiting end's throttle falls (the stall is real); held, it reads
+## back late. Unconfigured, the waiting end's throttle may fall (printed only); held, it reads
 ## the top on both ends after a stall of either end, and again on a link connected anew (Net
 ## makes the call on every connect).
 const THROTTLE_STALL_MS := 900
@@ -553,12 +553,15 @@ func _test_throttle_steady() -> void:
 	if pair.is_empty():
 		_check(false, "an ENet pair on port %d" % port)
 		return
+	# The unconfigured control, printed, not checked: ENet puts a link's throttle back at its top
+	# on any ack while its last round trip is within its variance (enet_peer_throttle's first
+	# branch), and on loopback, with round trips of 0-1 ms, a loaded machine's jitter makes it so
+	# (sound's lean take beside a full machine read 32 of 32 after a stall, 11-10). The held checks
+	# below are the fix's, the readback of deceleration 0 among them.
 	_enet_stall(pair, true)
-	var fell := _throttle(pair[2])
-	_check(fell < THROTTLE_TOP, "unconfigured, a stalled server's late acks lower the client's throttle (%d of %d)" % [fell, THROTTLE_TOP])
+	print("  (unconfigured, a stalled server's late acks: the client's throttle %d of %d)" % [_throttle(pair[2]), THROTTLE_TOP])
 	_enet_stall(pair, false)
-	fell = _throttle(pair[3])
-	_check(fell < THROTTLE_TOP, "unconfigured, a stalled client's late acks lower the server's throttle (%d of %d)" % [fell, THROTTLE_TOP])
+	print("  (unconfigured, a stalled client's late acks: the server's throttle %d of %d)" % [_throttle(pair[3]), THROTTLE_TOP])
 	_enet_close(pair)
 	pair = _enet_pair(port, true)
 	if pair.is_empty():
