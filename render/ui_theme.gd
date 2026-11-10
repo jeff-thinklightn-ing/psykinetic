@@ -3,7 +3,8 @@ extends RefCounted
 ## The shared look of every screen (docs/ui_style.md): the project theme,
 ## render/ui_theme.tres, which every Control inherits. Panels use its
 ## types and named variations (Title, Heading, Caption, Small, Name,
-## Outlined, Inset, HandSlot, Deep) and set no fonts, sizes or colours of
+## Outlined, Inset, HandSlot, Deep; a talk window's offers: OfferList,
+## OfferRow, Price, PriceShort) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
 ## bubbles) reads the theme's named colours, fonts, sizes and constants
 ## from here, so the .tres is the one source of truth.
