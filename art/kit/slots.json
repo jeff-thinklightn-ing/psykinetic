@@ -2939,6 +2939,7 @@
 			"category": "props",
 			"type": "mesh",
 			"kind": "cell",
+			"footprint": [1, 1],
 			"size": [0.7, 0.8, 0.4],
 			"budget": 400,
 			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.anvil/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh squeezed to 0.7 x 0.8 x 0.4 with its stump, iron and wood from the concept, 351 tris"},

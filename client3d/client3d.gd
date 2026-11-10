@@ -377,6 +377,8 @@ const PLATE_CLICK_SOUND := "sfx.plate_click"
 ## the forge lit from the shutter's door (its "fire" part shown;
 ## environment's light and sparks on its "hearth", _show_forge).
 const FORGE_SHUTTER_SLOT := "wall.stone.forge_shutter"
+## Umbrage's smithy forge (811 amended (2)), lit as the cold forge once woken.
+const SMITHY_FORGE_SLOT := "building.smithy_forge"
 const FORGE_PIECES := {"bellows": ["building.forge_bellows", "treadle", "sfx.bellows_wheeze"],
 	"lever": ["building.forge_lever", "handle", "sfx.lever_clank"]}
 const LEVER_DOWN := deg_to_rad(150.0)
@@ -8783,6 +8785,12 @@ func _add_buildings() -> void:
 			_buildings[index]["quarters"] = BuildingComposer.quarters(node)
 		_show_state(_buildings[index])
 		_add_smoke(_buildings[index])
+		# Umbrage's smithy forge (811 amended (2)) burning: its "fire" part
+		# shown and the forge's light and sparks at its "hearth", as the cold
+		# forge's once woken (_light_forge); cold and dark while the town has
+		# no smith comes with its package's switch-on.
+		if slot == SMITHY_FORGE_SLOT:
+			_light_forge(rect.position, true, false)
 		if ArtKit.spec(slot).get("stand") is Array:
 			for cell in Level.rect_cells(rect):
 				_stand_at[cell] = stand_offset(slot, rect, node.rotation.y, cell)

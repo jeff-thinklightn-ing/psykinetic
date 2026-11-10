@@ -44850,6 +44850,41 @@ says. Players saved on the old cells stand on floor in the same room (one saved 
 arrival, on the new stair down, takes nothing till they step). Level data, Level and the tool;
 protocol unchanged, no new class_name.
 
+811 amended (2): Umbrage's smithy inside, the Mughouse's way (package "iron from Hollowfell", lands
+off; the coordinator's approved smithy design, 11-06, and its rulings 11-09/11-10; release's label;
+art-kit's smithy pieces b22d9014c and fcb945008; lore's smithy; voice's names; npc's cells and ask).
+levels/interiors/umbrage_smithy.json lays umbrage_smithy, one stone floor 10 x 9, Umbrage's
+("wilds/store"), its place "the smithy", lore's smithy. Its forge hall (0,0) 6 x 9 has the front
+door in its south wall at (2,8),(3,8) (arriving on (2,8)), building.smithy_forge on (1,0)-(2,0)
+with its back to the north wall, prop.anvil on (2,2), building.quench_trough on (4,0),
+building.grindstone on (0,4), building.smith_bench on (4,4)-(5,4), all solid and doorless, and
+prop.tool_wall hung on the west wall at (0,1). The place "smithy" (a new Level.PLACE_KINDS kind) is
+at (3,2), where the smith works, beside the anvil. The stores (6,0) 4 x 4 hold the ore, charcoal
+and iron bars, flat decor. The smith's room (6,4) 4 x 5, the keeper's, has his bed on (9,5), its
+head to the east wall. Its rooms are named Forge, Stores and Smith's room. tools/make_interior.py
+gains the uses "forge" and "stores": a forge room's "forge", "anvil", "trough", "grindstone" and
+"bench" (FORGE_PIECES), "tool_wall" (laid as variant 2, his tools gone, TOOLS_GONE) and "smith",
+the place's cell, with "trade" "smith" and "face" the anvil; a stores room's "heaps" (HEAPS). It
+refuses a piece off the room, on another, on a door or the smith's cell, the smith off the floor
+or not beside the anvil, and a tool wall on no wall. Level.places_from carries a place's "trade"
+(a word) and "face" (a cell, else warned and left out) as it carries lore_id (npc's ask: a floor's
+workplace found by its trade, not its key). Level.BUILDINGS, SOLID and DOORLESS take the forge
+pieces, prop.anvil among them as a 1 x 1 solid piece (its slot given "footprint" [1, 1],
+art-kit's word); Level.DECOR_KINDS takes tool_wall (a wall
+piece, front +z, two variants), heap_ore, heap_charcoal and stack_iron_bars. umbrage_smithy is
+SHELVED (820) to the wilds at (215,200), outside the smithy's door, till the package's switch-on:
+no link reaches it and the world never opens it. Client3D: building.smithy_forge burns,
+its "fire" part shown and the forge's light and sparks at its "hearth" (_light_forge, the cold
+forge's once woken). Cold and dark while the town has no smith comes with the switch-on (economy's
+Main.town_has_trade), as do the shell and its sign. The shell needs a kind, and Jeff's MIN_ROOM
+forbids a 4 x 6 one, so the coordinator picked a 5 x 6 kind "smithy" at x 214..218, y 194..199
+(the column at x 218 widened east, clear; maps has nothing there), its two-cell door
+(216,199)-(217,199), and art-kit's prop.smithy_sign (811 amended (6)) on the south edge of
+(215,199), beside the door. The switch-on also brings Relaid.SHELLS and the chimney's smoke
+whenever the town has its smith (the coordinator: a banked fire), with the lamp and windows on the
+houses' awake rule. level_test _test_smithy_inside and view_test _test_smithy_inside. Level data,
+Level, the tool and the client; protocol unchanged, no new class_name.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

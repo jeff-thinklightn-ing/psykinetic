@@ -1,0 +1,219 @@
+{
+	"name": "The smithy",
+	"outdoor": false,
+	"town": "wilds/store",
+	"building": "umbrage_smithy",
+	"storeys": [
+		"umbrage_smithy"
+	],
+	"ambient": 0.3,
+	"walls": "stone",
+	"floors": "stone",
+	"starts": [
+		[
+			2,
+			8
+		]
+	],
+	"spawn_points": {
+		"from_wilds": [
+			2,
+			8
+		]
+	},
+	"links": [
+		{
+			"at": [
+				2,
+				9
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_smithy"
+		},
+		{
+			"at": [
+				3,
+				9
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_smithy"
+		}
+	],
+	"buildings": [
+		{
+			"slot": "building.smithy_forge",
+			"at": [
+				1,
+				0
+			]
+		},
+		{
+			"slot": "prop.anvil",
+			"at": [
+				2,
+				2
+			]
+		},
+		{
+			"slot": "building.quench_trough",
+			"at": [
+				4,
+				0
+			]
+		},
+		{
+			"slot": "building.grindstone",
+			"at": [
+				0,
+				4
+			]
+		},
+		{
+			"slot": "building.smith_bench",
+			"at": [
+				4,
+				4
+			]
+		}
+	],
+	"decor": [
+		[
+			0,
+			1,
+			-1,
+			0,
+			"tool_wall",
+			2
+		],
+		[
+			9,
+			0,
+			0,
+			1,
+			"heap_ore",
+			1
+		],
+		[
+			9,
+			2,
+			0,
+			1,
+			"heap_charcoal",
+			1
+		],
+		[
+			8,
+			0,
+			0,
+			1,
+			"stack_iron_bars",
+			1
+		]
+	],
+	"places": {
+		"smithy": {
+			"at": [
+				3,
+				2
+			],
+			"kind": "smithy",
+			"radius": 1,
+			"name": "the smithy",
+			"rect": [
+				0,
+				0,
+				6,
+				9
+			],
+			"trade": "smith",
+			"face": [
+				2,
+				2
+			],
+			"lore_id": "smithy"
+		}
+	},
+	"beds": [
+		[
+			9,
+			5,
+			1,
+			0
+		]
+	],
+	"rooms": {
+		"forge": {
+			"id": "forge",
+			"use": "forge",
+			"rect": [
+				0,
+				0,
+				6,
+				9
+			],
+			"doors": [],
+			"name": "Forge"
+		},
+		"stores": {
+			"id": "stores",
+			"use": "stores",
+			"rect": [
+				6,
+				0,
+				4,
+				4
+			],
+			"doors": [
+				{
+					"to": "forge",
+					"cells": [
+						[
+							6,
+							1
+						],
+						[
+							6,
+							2
+						]
+					],
+					"side": "west"
+				}
+			],
+			"name": "Stores"
+		},
+		"keeper": {
+			"id": "keeper",
+			"use": "keeper",
+			"rect": [
+				6,
+				4,
+				4,
+				5
+			],
+			"doors": [
+				{
+					"to": "forge",
+					"cells": [
+						[
+							6,
+							5
+						],
+						[
+							6,
+							6
+						]
+					],
+					"side": "west"
+				}
+			],
+			"beds": [
+				[
+					9,
+					5
+				]
+			],
+			"name": "Smith's room"
+		}
+	},
+	"passages": {}
+}

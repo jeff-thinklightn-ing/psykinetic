@@ -1,0 +1,29 @@
+{
+	"building": "umbrage_smithy",
+	"town": "wilds/store",
+	"place_name": "the smithy",
+	"lore_id": "smithy",
+	"walls": "stone",
+	"floors_set": "stone",
+	"front": {"floor": "umbrage_smithy", "cells": [[2, 8], [3, 8]], "to_map": "wilds", "to_spawn": "from_smithy", "spawn": "from_wilds"},
+	"floors": [
+		{
+			"level": "umbrage_smithy",
+			"name": "The smithy",
+			"size": [10, 9],
+			"ambient": 0.3,
+			"rooms": [
+				{"id": "forge", "use": "forge", "name": "Forge", "rect": [0, 0, 6, 9],
+					"forge": [1, 0], "anvil": [2, 2], "trough": [4, 0], "grindstone": [0, 4], "bench": [4, 4],
+					"tool_wall": [0, 1], "smith": [3, 2]},
+				{"id": "stores", "use": "stores", "name": "Stores", "rect": [6, 0, 4, 4],
+					"doors": [{"to": "forge", "cells": [[6, 1], [6, 2]], "side": "west"}],
+					"heaps": [[9, 0], [9, 2], [8, 0]]},
+				{"id": "keeper", "use": "keeper", "name": "Smith's room", "rect": [6, 4, 4, 5],
+					"doors": [{"to": "forge", "cells": [[6, 5], [6, 6]], "side": "west"}],
+					"beds": [[9, 5]]}
+			],
+			"stairs": []
+		}
+	]
+}

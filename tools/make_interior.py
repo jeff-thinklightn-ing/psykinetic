@@ -29,6 +29,17 @@ rooms and its stairs:
   With "candles" true (811 amended (4)), lit candles stand on each table's
   middle and the counter's (level.json "lit_candles", Level.lit_candles_from),
   each with a warm light of its own.
+  A forge room (811 amended (2), Umbrage's smithy; art-kit's pieces) holds
+  its "forge" (the west cell of a building.smithy_forge two across, its
+  back to the north wall), its "anvil" (a prop.anvil, a cell, solid), its
+  "trough" (a building.quench_trough), its "grindstone", its "bench" (the
+  west cell of a building.smith_bench two across) and its "tool_wall" (a
+  wall cell the smith's tools hang on, beside the west wall: variant 2, his
+  tools gone, till the town has its smith), and "smith", the cell the smith
+  works at, facing the anvil: the place "smithy", its "trade" "smith" and
+  its "face" the anvil (npc's), named as the spec's place_name. A stores
+  room's "heaps" are its ore, charcoal and iron bars in turn, lying on the
+  floor (decor). No piece on another, on a door's cell or the smith's.
   Never a chest: chests are for dungeons only (Jeff, 2026-11-04). A
   player's storage at home is its own container piece (a strongbox,
   wardrobe or vault), and the locker is opened through a person.
@@ -56,7 +67,7 @@ import sys
 from PIL import Image
 
 SPECS = os.path.join("levels", "interiors")
-USES = ["common", "kitchen", "cellar", "room", "keeper", "attic", "hall", "stair"]
+USES = ["common", "kitchen", "cellar", "room", "keeper", "attic", "hall", "stair", "forge", "stores"]
 COLOURS = {
     "void": (0, 0, 0),
     "stone": (0x9A, 0x9A, 0x9A),
@@ -67,7 +78,7 @@ COLOURS = {
     "link": (0xFF, 0x00, 0xFF),
 }
 SIDES = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}
-HOLDING = ["beds", "holds", "hearth", "counter", "taps", "tables"]
+HOLDING = ["beds", "holds", "hearth", "counter", "taps", "tables", "forge", "heaps"]
 # The stores a room's "holds" are drawn as, in turn (art-kit's prop.<kind>).
 STORES = ["crate", "barrel", "sack"]
 # The common room's pieces (Level.BUILDINGS' sizes, all solid, facing
@@ -88,6 +99,19 @@ CANDLE_LIGHT_OVER_COUNTER = 1.4
 # keeps its grain (environment, from the stills): their light's energy, reach
 # and falloff; the counter's are Client3D's own (CANDLE_ENERGY, _RANGE, _FALLOFF).
 TABLE_CANDLE_LIGHT = {"energy": 0.9, "reach": 4.5, "falloff": 1.0}
+# A forge room's pieces (811 amended (2), Level.BUILDINGS' sizes, all solid,
+# facing south, their backs to the north): key -> (slot, across, deep).
+FORGE_PIECES = {
+    "forge": ("building.smithy_forge", 2, 1),
+    "anvil": ("prop.anvil", 1, 1),
+    "trough": ("building.quench_trough", 1, 1),
+    "grindstone": ("building.grindstone", 1, 1),
+    "bench": ("building.smith_bench", 2, 1),
+}
+# A stores room's "heaps", in turn (Level.DECOR_KINDS, flat).
+HEAPS = ["heap_ore", "heap_charcoal", "stack_iron_bars"]
+# The smith's tool wall while the town has no smith (art-kit's variant 2).
+TOOLS_GONE = 2
 # Godot imports a level's layout as an Image (Level._image), never a texture.
 IMPORT = '[remap]\n\nimporter="image"\ntype="Image"\n'
 
@@ -185,6 +209,42 @@ def furniture_faults(room):
     return faults
 
 
+def forge_faults(room):
+    """A forge room's pieces laid wrong: off the room, on another piece,
+    a door's cell or the smith's; the smith off the floor that is left, or
+    not beside the anvil; the tool wall on no wall."""
+    faults = []
+    x0, y0, w, h = room["rect"]
+    inside = lambda c: x0 <= c[0] < x0 + w and y0 <= c[1] < y0 + h
+    doors = {tuple(c) for d in room.get("doors", []) for c in d["cells"]}
+    smith = tuple(room["smith"]) if room.get("smith") else None
+    if smith is None or not room.get("anvil"):
+        return ["a forge room with no \"smith\" or no \"anvil\""]
+    taken = {}
+    for key, kind in FORGE_PIECES.items():
+        if not room.get(key):
+            continue
+        for cell in piece_cells(kind, room[key]):
+            if not inside(cell):
+                faults.append("the %s at %s runs off the room at %s" % (key, room[key], cell))
+            elif cell in taken:
+                faults.append("the %s at %s is on the %s at %s" % (key, room[key], taken[cell], cell))
+            elif cell in doors or cell == smith:
+                faults.append("the %s at %s is on a door or the smith at %s" % (key, room[key], cell))
+            taken[cell] = key
+    if not inside(smith) or smith in taken:
+        faults.append("the smith's cell %s is off the floor" % (smith,))
+    anvil = tuple(room["anvil"])
+    if abs(smith[0] - anvil[0]) + abs(smith[1] - anvil[1]) != 1:
+        faults.append("the smith at %s is not beside the anvil at %s" % (smith, anvil))
+    if room.get("tool_wall"):
+        try:
+            bed_way(room["rect"], room["tool_wall"])
+        except SpecError:
+            faults.append("the tool wall at %s is on no wall" % (room["tool_wall"],))
+    return faults
+
+
 def spawn_name(from_level, index):
     return "from_%s_%d" % (from_level, index)
 
@@ -264,6 +324,8 @@ def check(spec):
                     faults.append("%s/%s: %s" % (level, room["id"], e))
             if room["use"] == "common":
                 faults += ["%s/%s: %s" % (level, room["id"], f) for f in furniture_faults(room)]
+            if room["use"] == "forge":
+                faults += ["%s/%s: %s" % (level, room["id"], f) for f in forge_faults(room)]
             holds = any(room.get(key) for key in HOLDING) or any(o.startswith("floor:") for o in opens)
             if len(opens) <= 1 and not holds and room["use"] not in ("common",):
                 faults.append("%s/%s: a dead end holding nothing" % (level, room["id"]))
@@ -383,6 +445,21 @@ def lay(spec, floor):
                     places["tavern"]["lore_id"] = spec["lore_id"]
                 if room.get("hearth"):
                     places["tavern"]["hearth"] = list(room["hearth"])
+        if room["use"] == "forge":
+            # The smithy's forge room (811 amended (2)): its solid pieces, the
+            # tool wall hung beside its wall, and the place the smith works at.
+            for key, (slot, _across, _deep) in FORGE_PIECES.items():
+                if room.get(key):
+                    buildings.append({"slot": slot, "at": list(room[key])})
+            if room.get("tool_wall"):
+                way = bed_way(room["rect"], room["tool_wall"])
+                decor.append([room["tool_wall"][0], room["tool_wall"][1], way[0], way[1], "tool_wall", TOOLS_GONE])
+            places["smithy"] = {"at": list(room["smith"]), "kind": "smithy", "radius": 1, "name": spec.get("place_name", "the smithy"),
+                                "rect": room["rect"], "trade": "smith", "face": list(room["anvil"])}
+            if spec.get("lore_id"):
+                places["smithy"]["lore_id"] = spec["lore_id"]
+        for index, cell in enumerate(room.get("heaps", [])):
+            decor.append([cell[0], cell[1], 0, 1, HEAPS[index % len(HEAPS)], 1])
         for index, cell in enumerate(room.get("holds", [])):
             # Plain decor (Level.DECOR_KINDS, flat): never a Pushable crate.
             decor.append([cell[0], cell[1], 0, 1, STORES[index % len(STORES)], 1])

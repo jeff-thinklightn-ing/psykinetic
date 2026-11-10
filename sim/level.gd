@@ -66,6 +66,7 @@ const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vecto
 ## package's landing takes it out of here and lays its land again.
 const SHELVED: Dictionary[String, Array] = {
 	"boar_lair": ["forest", Vector2i(124, 175)],  # The boar king's (780 amended (12)).
+	"umbrage_smithy": ["wilds", Vector2i(215, 200)],  # Umbrage's smithy inside (811 amended (2)), till its package's switch-on.
 }
 ## Levels made again on a new grid (decision 756: layout A's step 3, the
 ## hills rebuilt bigger), each with the decision that remade it: a server's
@@ -128,7 +129,7 @@ const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
 	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire",
-	"trader", "captive", "lair", "perch", "other"]
+	"trader", "captive", "lair", "perch", "smithy", "other"]
 ## A place's own cells and rect, kept on Level's place dict when given and
 ## well-formed (771/772/774, buildings' side; environment's 782 lights read
 ## "brazier" and "lamp"): key -> "cell" (a Vector2i), "rect" (a Rect2i) or
@@ -175,6 +176,7 @@ const BUILDINGS := {
 	"building.fold": Vector2i(6, 6),
 	"building.grave": Vector2i(1, 2),
 	"building.great_tree": Vector2i(3, 3),
+	"building.grindstone": Vector2i(1, 1),  # Umbrage's smithy (811 amended (2), art-kit's): the grindstone.
 	"building.hall_chair": Vector2i(1, 1),
 	"building.hatch_sealed": Vector2i(1, 1),
 	"building.healers_hut": Vector2i(3, 3),
@@ -185,6 +187,7 @@ const BUILDINGS := {
 	"building.market_stall": Vector2i(2, 1),
 	"building.milestone": Vector2i(1, 1),
 	"building.mound": Vector2i(12, 12),
+	"building.quench_trough": Vector2i(1, 1),  # Umbrage's smithy (811 amended (2)): the quench trough.
 	"building.robbers_dig": Vector2i(2, 2),
 	"building.round_table": Vector2i(3, 3),
 	"building.rubble_heap": Vector2i(1, 1),
@@ -192,6 +195,8 @@ const BUILDINGS := {
 	"building.set_cold_forge": Vector2i(2, 1),  # castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
 	"building.set_windlass": Vector2i(2, 1),  # Hollowfell's windlass over an old shaft (790 amended (3); art-kit 4bc722a8).
 	"building.shed": Vector2i(2, 3),
+	"building.smith_bench": Vector2i(2, 1),  # Umbrage's smithy (811 amended (2)): the smith's bench, its back to the wall.
+	"building.smithy_forge": Vector2i(2, 1),  # Umbrage's smithy (811 amended (2)): the forge, its back to the wall.
 	"building.standing_stone": Vector2i(1, 1),
 	"building.tap_rack": Vector2i(2, 1),  # The Mughouse's (811 amended): its tap rack.
 	"building.tavern_table": Vector2i(2, 2),  # The Mughouse's (811 amended): its tables.
@@ -204,6 +209,7 @@ const BUILDINGS := {
 	"building.weapon_rack": Vector2i(2, 1),
 	"building.well": Vector2i(1, 1),
 	"building.woodpile": Vector2i(1, 1),
+	"prop.anvil": Vector2i(1, 1),  # Umbrage's smithy (811 amended (2)): the anvil on its block, the smith beside it.
 	"tree.clawed": Vector2i(1, 1),
 	"tree.great_oak": Vector2i(4, 4),
 }
@@ -307,17 +313,21 @@ const SOLID: Array[String] = [
 	"building.fallen_column",
 	"building.grave",
 	"building.great_tree",
+	"building.grindstone",
 	"building.hunters_blind",
 	"building.lean_to",
 	"building.market_stall",
 	"building.milestone",
 	"building.mound",
+	"building.quench_trough",
 	"building.robbers_dig",
 	"building.round_table",
 	"building.rubble_heap",
 	"building.sarcophagus",
 	"building.set_cold_forge",
 	"building.set_windlass",
+	"building.smith_bench",
+	"building.smithy_forge",
 	"building.standing_stone",
 	"building.tap_rack",
 	"building.tavern_table",
@@ -326,6 +336,7 @@ const SOLID: Array[String] = [
 	"building.waystone",
 	"building.weapon_rack",
 	"building.woodpile",
+	"prop.anvil",
 	"tree.clawed",
 	"tree.great_oak",
 ]
@@ -339,7 +350,8 @@ const SOLID: Array[String] = [
 ## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
 ## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
 ## taverner behind the counter; 806 amended (3): the crypt's sarcophagi and the
-## robbers' dig into a tomb's floor; 806 (c): castle_halls' cold forge): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
+## robbers' dig into a tomb's floor; 806 (c): castle_halls' cold forge; 811 amended (2): Umbrage's
+## smithy's forge, anvil, quench trough, grindstone and bench): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
 ## the boar's lair's mouth, a tree scored by its tusks, tree.clawed; 778 amended: the hills'
 ## great oak, art-kit's tree.great_oak, its trunk and roots).
 ## One entry a line, sorted, each with its comma (816: a new kind is its own line).
@@ -355,16 +367,20 @@ const DOORLESS: Array[String] = [
 	"building.fallen_column",
 	"building.grave",
 	"building.great_tree",
+	"building.grindstone",
 	"building.hunters_blind",
 	"building.lean_to",
 	"building.market_stall",
 	"building.milestone",
+	"building.quench_trough",
 	"building.robbers_dig",
 	"building.round_table",
 	"building.rubble_heap",
 	"building.sarcophagus",
 	"building.set_cold_forge",
 	"building.set_windlass",
+	"building.smith_bench",
+	"building.smithy_forge",
 	"building.standing_stone",
 	"building.tap_rack",
 	"building.tavern_table",
@@ -373,6 +389,7 @@ const DOORLESS: Array[String] = [
 	"building.waystone",
 	"building.weapon_rack",
 	"building.woodpile",
+	"prop.anvil",
 	"tree.clawed",
 	"tree.great_oak",
 ]
@@ -1610,6 +1627,17 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 		# The lore entry it is (811 amended: the Mughouse, lore's last_light), carried for its readers.
 		if not str(entry.get("lore_id", "")).is_empty():
 			out[str(key)]["lore_id"] = str(entry["lore_id"])
+		# A workplace's trade and the cell its worker faces (811 amended (2),
+		# npc's ask: the smithy's "smith" at the anvil), so a floor's workplace
+		# is found by its trade, not its key.
+		if not str(entry.get("trade", "")).strip_edges().is_empty():
+			out[str(key)]["trade"] = str(entry["trade"]).strip_edges()
+		if entry.has("face"):
+			var face: Variant = _tile(entry["face"])
+			if face == null:
+				warnings.append("the place %s faces %s: not a cell, left out" % [key, entry["face"]])
+			else:
+				out[str(key)]["face"] = face
 		# The name a reached place's gain shows (804, maps' side; voice's), where its name is a where-phrase (613's).
 		out[str(key)]["shown"] = str(entry["shown"]).strip_edges() if entry.get("shown") is String and not str(entry["shown"]).strip_edges().is_empty() else out[str(key)]["name"]
 		# A rock shelter's way out (798 amended (4)): a step along x or y, else warned and left out.
@@ -2486,6 +2514,14 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# sign out of the street front's wall, +x out.
 	"wall_hearth": {"sits": "wall", "variants": 1, "front": "z", "wide": 2},
 	"inn_sign": {"sits": "edge", "variants": 1},
+	# Umbrage's smithy (811 amended (2), art-kit's pieces): the smith's tool
+	# wall hung on the forge hall's wall, its front +z out of it (variant 1
+	# while he is home, 2 the gaps while the town has none); the stores'
+	# heaps of ore and charcoal and stacked iron bars, lying on the floor.
+	"tool_wall": {"sits": "wall", "variants": 2, "front": "z"},
+	"heap_ore": {"sits": "flat", "variants": 1, "faced": true},
+	"heap_charcoal": {"sits": "flat", "variants": 1, "faced": true},
+	"stack_iron_bars": {"sits": "flat", "variants": 1, "faced": true},
 	# The boar's lair (780 amended (12); art-kit's lair commit): a wallow, wet
 	# or drying; boars' rooted-up ground; the trodden run through the thorns;
 	# a few bones scattered (a heap is the crypt's "bones"; set dressing, never a find).

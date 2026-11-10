@@ -3109,6 +3109,7 @@ func _test_relaid() -> void:
 	_test_caches(wilds, hills)
 	_test_carved(hills)
 	_test_tavern_zone(wilds)
+	_test_smithy_inside()
 	_test_storey_stairs()
 	_test_shelled(wilds)
 	_test_perches(hills)
@@ -3962,6 +3963,69 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	var roofed := (wilds["buildings"] as Array).any(func(building: Dictionary) -> bool: return (building["rect"] as Rect2i).has_point(Vector2i(201, 202)))
 	_check(grates.size() == 1 and grates[0]["cell"] == Vector2i(201, 202) and int(grates[0]["variant"]) == 1 and not roofed and lit.size() == 1,
 		"the chapel yard's grate at (201, 202) in the open, over the first hall's skylight (%s, %s)" % [grates, lit])
+
+
+## Umbrage's smithy inside (811 amended (2), the smithy's package, off): one
+## stone floor, Umbrage's, held back (SHELVED) till its switch-on; its forge
+## hall's forge, anvil, quench trough, grindstone and bench where laid,
+## solid; the smith's place by the anvil with npc's trade and face, lore's
+## smithy; his tools gone from the wall; the stores' heaps; his bed in his
+## room, its head to the east wall; every floor cell reached from the door, which leads out a wall;
+## a place's bad "face" warned and left out.
+func _test_smithy_inside() -> void:
+	print("
+== Umbrage's smithy inside (811 amended (2)): held back, furnished, the smith's place and bed ==")
+	var level := Level.load_level("umbrage_smithy")
+	_check(not level.is_empty() and (level["warnings"] as Array).is_empty() and level["town"] == "wilds/store"
+		and level["storeys"] == ["umbrage_smithy"] and not level["terrain"]["outdoor"],
+		"umbrage_smithy parses clean, indoors, Umbrage's, one storey (%s)" % [level.get("warnings")])
+	_check_shelved("umbrage_smithy", "wilds", Vector2i(215, 200))
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var pieces := {}
+	for building: Dictionary in level["buildings"]:
+		pieces[building["rect"]] = building["slot"]
+	var want := {Rect2i(1, 0, 2, 1): "building.smithy_forge", Rect2i(2, 2, 1, 1): "prop.anvil", Rect2i(4, 0, 1, 1): "building.quench_trough",
+		Rect2i(0, 4, 1, 1): "building.grindstone", Rect2i(4, 4, 2, 1): "building.smith_bench"}
+	var solid := want.keys().all(func(rect: Rect2i) -> bool:
+		return Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not floor.has(cell)))
+	_check(pieces == want and solid, "the forge hall's forge, anvil, trough, grindstone and bench where laid, solid (%s)" % [pieces])
+	var smithy: Dictionary = level["places"].get("smithy", {})
+	_check(smithy.get("cell") == Vector2i(3, 2) and smithy.get("kind") == "smithy" and smithy.get("trade") == "smith"
+		and smithy.get("face") == Vector2i(2, 2) and smithy.get("lore_id") == "smithy" and smithy.get("name") == "the smithy"
+		and floor.has(Vector2i(3, 2)) and Lore.entries().has("smithy"),
+		"the smith's place by the anvil, facing it, his trade smith, lore's smithy (%s)" % [smithy])
+	var decor: Array = (level["terrain"]["decor"] as Array).map(func(piece: Dictionary) -> String:
+		return "%s %d" % [piece["kind"], int(piece.get("variant", 1))])
+	_check(decor == ["tool_wall 2", "heap_ore 1", "heap_charcoal 1", "stack_iron_bars 1"],
+		"his tools gone from the wall (variant 2) and the stores' ore, charcoal and bars, drawn only (%s)" % [decor])
+	var beds: Array = Level.storeys_of("umbrage_smithy")["beds"]
+	_check(beds.size() == 1 and beds[0]["cells"] == [Vector2i(9, 5), Vector2i(8, 5)] and beds[0]["head"] == Vector2i(1, 0),
+		"the smith's bed in his room at (9, 5), its head to the east wall (%s)" % [beds])
+	var rooms: Dictionary = Level.template_config("umbrage_smithy").get("rooms", {})
+	var named: Array = rooms.values().map(func(room: Dictionary) -> String: return str(room.get("name", "")))
+	named.sort()
+	_check(named == ["Forge", "Smith's room", "Stores"], "its rooms named in voice's words (%s)" % [named])
+	var edges: Dictionary = level["terrain"]["edges"]
+	var from: Vector2i = level["spawn_points"]["from_wilds"]
+	var seen := {from: true}
+	var todo: Array[Vector2i] = [from]
+	while not todo.is_empty():
+		var cell: Vector2i = todo.pop_back()
+		for way: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			var next := cell + way
+			if floor.has(next) and not seen.has(next) and int(edges.get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN)) != Terrain.Edge.WALL:
+				seen[next] = true
+				todo.append(next)
+	var outs: Array = (level["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
+	_check(seen.size() == floor.size() and from == Vector2i(2, 8) and outs.size() == 2 and outs.all(func(link: Dictionary) -> bool:
+		return int(edges.get(Terrain.edge_key(link["tile"], Vector2i(0, -1)), Terrain.Edge.OPEN)) == Terrain.Edge.DOOR),
+		"every floor cell reached from just inside its door (%d of %d), its way out through the door in its south wall" % [seen.size(), floor.size()])
+	var warnings: Array[String] = []
+	var places := Level.places_from({"places": {"a": {"at": [1, 1], "face": "north"}, "b": {"at": [2, 2]}}}, warnings)
+	_check(not places["a"].has("face") and not places["b"].has("face") and not places["b"].has("trade") and warnings.size() == 1,
+		"a place's bad face warned and left out, none where unsaid (%s)" % [warnings])
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended

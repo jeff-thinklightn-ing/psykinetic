@@ -2794,6 +2794,7 @@ func _test_kinds() -> void:
 	_test_home_label()
 	_test_inside_is_his()
 	_test_tavern_inside()
+	_test_smithy_inside()
 
 
 ## Umbrage's tavern, re-laid (774; the coordinator: "a player who walks into
@@ -2801,6 +2802,29 @@ func _test_kinds() -> void:
 ## its east door a cell at a time, the view tells it inside, the bounds
 ## ui's camera frames within the inn's footprint and round the player, and
 ## the inn's own roof eased off; out again, not inside.
+## Umbrage's smithy inside (811 amended (2), off): its forge burning, its
+## "fire" part shown and the forge's light at its hearth, as the cold forge's
+## once woken; its pieces drawn; the smith's tools gone from the west wall.
+func _test_smithy_inside() -> void:
+	print("
+== Umbrage's smithy inside (811 amended (2)): the forge burning, its pieces drawn ==")
+	var level := Level.load_level("umbrage_smithy")
+	_rig.rebuild(level["terrain"], level["spawn_points"]["from_wilds"])
+	var forges: Array = _rig._buildings.filter(func(building: Dictionary) -> bool: return building.get("rect") == Rect2i(1, 0, 2, 1))
+	var forge: Node3D = forges[0]["node"] if forges.size() == 1 else null
+	var fire: Node = forge.find_child("ForgeFire", true, false) if forge != null else null
+	var light := fire.get_node_or_null("Light") as OmniLight3D if fire != null else null
+	var part := forge.find_child("fire", true, false) as Node3D if forge != null else null
+	_check(light != null and light in _rig._forge_lights and light.light_color == Client3D.FORGE_COLOUR and part != null and part.visible,
+		"the smithy's forge burning: its fire shown, the forge's light at its hearth (%s)" % [fire])
+	var drawn: Array = _rig._buildings.map(func(building: Dictionary) -> Rect2i: return building["rect"])
+	_check([Rect2i(2, 2, 1, 1), Rect2i(4, 0, 1, 1), Rect2i(0, 4, 1, 1), Rect2i(4, 4, 2, 1)].all(func(rect: Rect2i) -> bool: return rect in drawn),
+		"its anvil, trough, grindstone and bench drawn (%s)" % [drawn])
+	var tools := _rig._room.get_node_or_null("Decor_0_1_tool_wall_-1_0") as Node3D
+	_check(tools != null and is_equal_approx(tools.position.x, -0.5) and is_equal_approx(tools.rotation.y, PI * 0.5),
+		"the smith's tool wall hung on the west wall (%s)" % [tools.position if tools != null else null])
+
+
 func _test_tavern_inside() -> void:
 	print("\n== the wilds' tavern, walked into through its door: inside, its own bounds and roof (774) ==")
 	var wilds := Level.load_level("wilds")
