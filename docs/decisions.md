@@ -12404,6 +12404,19 @@ PICK_SIDE does for the pick), 0.85-0.94 through its blow, no weapon swinging it 
 keeps its outward blade (the coordinator). Re-extracted into goblin.res. view_test _test_axe_edge_leads (each
 heavy axe's +x along its head's travel through the sweep, scrubbed). Client and tools only, protocol
 unchanged, no new class_name.
+
+451 amended (4) (art-kit; release's label; the coordinator's ask, 2026-11-10): the carried lantern's own
+mesh, gear.lantern, for the hip lantern every player and companion carries, which Client3D._hanging_lantern
+draws today as two boxes made in code (a 9 x 13 x 9 cm iron box and a wider glowing band, a flat white
+scrap at the hip by day). By hand, palette only, 164 tris: a small iron lantern hung by its ring, a peaked
+square cap overhanging a little (a lantern's peak from the play camera, not a cube), a top plate, four
+posts and a base, all dark iron round the panes, which are the 2nd material, "pane": dull warm horn by
+day, its emission what pc-character turns up while the light is on (each body its own copy). Origin the
+ring's top, hanging down -y to -0.13, 0.094 across. The slot only: pc-character's swap draws it (with
+belt_r's frame and the light rule the coordinator settled), so nothing changes in game until then.
+C:/dev/review/lantern/build.sh; the look at C:/dev/review/lantern/gear_lantern.png (the coordinator's go,
+pc-character's OK). Art only, protocol unchanged, no new class_name, no bullet (it comes with the swap).
+
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 
 Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:
