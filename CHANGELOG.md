@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- While your float waits on the water, you hear it lap and tick faintly until a fish bites or you pull in, and an empty float lifts out with a small drip when you miss; and still water laps quietly at the shore of the pond and the pools, heard from the bank nearest you as you walk round it (805 amended (9)).
 - Towns: Rolf at the stall sells a pick for 5 gold, for digging ore (479 amended).
 - You can move again the moment after you strike, and one click away from a foe sets you moving and calls off the blow you'd clicked, where before you stood until your weapon was ready and it took several clicks to get clear of a swipe (688 amended (8)).
 - Your companion warns you of the old grey when she sees him, and of his jaws and his pack when you send her at him or she pulls back from him, where before she said nothing at the sight of him and spoke of a bear's paws in a fight with him (780 amended (19)).

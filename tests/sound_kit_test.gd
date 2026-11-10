@@ -540,6 +540,18 @@ func _test_ambience_weights() -> void:
 	_check(past.at == 2 and is_equal_approx(past.t, 1.0) and is_equal_approx(past.distance, 4.0), "past its end: its end (%s)" % past)
 	_check(Ambience.nearest_on([Vector2i(3, 3)], Vector2(3, 7)).distance == 4.0 and Ambience.nearest_on([], Vector2.ZERO).is_empty(), "one cell; none")
 	_check(SoundKit.positional("amb.stream") and SoundKit.reach("amb.stream") >= 12, "a stream heard from %d cells" % SoundKit.reach("amb.stream"))
+	# A pond heard from the nearest point of its shore, round the ring (805 amended (9)).
+	var pond := {"closed": true, "curve": {"points": PackedVector2Array([Vector2(0, 0), Vector2(6, 0), Vector2(6, 4), Vector2(0, 4)])}}
+	var bank := Ambience.pond_shore(pond, Vector2(3, -2))
+	var round_back := Ambience.pond_shore(pond, Vector2(-3, 2))
+	_check(not bank.is_empty() and (bank.at as Vector2).is_equal_approx(Vector2(3, 0)) and is_equal_approx(bank.distance, 2.0)
+			and (round_back.at as Vector2).is_equal_approx(Vector2(0, 2)) and is_equal_approx(round_back.distance, 3.0),
+			"a pond: the shore across from you, and on its closing side (%s; %s)" % [bank, round_back])
+	_check(Ambience.pond_shore({"closed": false, "curve": pond.curve}, Vector2(3, -2)).is_empty() and Ambience.pond_shore({}, Vector2.ZERO).is_empty(),
+			"a stream's or a river's curve is no pond")
+	_check(SoundKit.positional("amb.pond") and SoundKit.reach("amb.pond") >= 8, "a pond heard from %d cells" % SoundKit.reach("amb.pond"))
+	for slot: String in ["sfx.fish_wait", "sfx.fish_missed"]:
+		_check(SoundKit.positional(slot) and SoundKit.reach(slot) > 0, "%s heard at the float, from %d cells" % [slot, SoundKit.reach(slot)])
 	# A stream's fall (decision 557): louder the further it drops.
 	_check(is_equal_approx(Ambience.fall_db(Client3D.FALL_LEAST), Ambience.FALL_DB.x) and is_equal_approx(Ambience.fall_db(3.0), Ambience.FALL_DB.y)
 			and Ambience.fall_db(0.46) > Ambience.FALL_DB.x and Ambience.fall_db(0.46) < Ambience.FALL_DB.y,

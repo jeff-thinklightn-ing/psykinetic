@@ -5,7 +5,9 @@ extends Node
 ## line from the rod's tip to it. The cast flies the float out in an arc
 ## (sfx.fish_cast, the whip) and lands (sfx.fish_plop); it sits bobbing while it waits; at the bite it dips and a
 ## ring spreads (sfx.fish_bite); landed, it is pulled in (sfx.fish_landed),
-## missed, it lifts out. Client only: it reads what is replicated each frame.
+## missed, it lifts out (sfx.fish_missed). While it waits, the water laps and
+## ticks at it (sfx.fish_wait, held from the plop to the bite or the pull;
+## 805 amended (9)). Client only: it reads what is replicated each frame.
 ## A sound slot sound has no takes for yet is skipped quietly (SoundKit.has).
 
 ## Seconds the cast's flight takes (World.FISH_CAST_TICKS at its tick rate).
@@ -75,6 +77,9 @@ func show_cast(key: String, entity: GridEntity) -> void:
 			spot = water.lerp(tip, clampf(since / PULL_SECONDS, 0.0, 1.0))
 	var bobber: Node3D = cast["float"]
 	bobber.position = spot
+	var lap: Variant = cast.get("lap")
+	if lap != null and is_instance_valid(lap):
+		view.sfx.steer(lap, spot)
 	_line(cast["line"], tip, spot)
 	var ring: MeshInstance3D = cast["ring"]
 	ring.visible = state == "bite" and since < RING_SECONDS
@@ -90,9 +95,15 @@ func _begin(key: String, cast: Dictionary, state: String, cell: Vector2i) -> voi
 	cast["state"] = state
 	cast["since"] = _clock
 	seen.append([key, state])
-	var slot: String = {"cast": "sfx.fish_cast", "wait": "sfx.fish_plop", "bite": "sfx.fish_bite", "landed": "sfx.fish_landed"}.get(state, "")
+	var slot: String = {"cast": "sfx.fish_cast", "wait": "sfx.fish_plop", "bite": "sfx.fish_bite", "landed": "sfx.fish_landed",
+		"missed": "sfx.fish_missed"}.get(state, "")
+	var water := Vector3(cell.x, _surface(cell), cell.y)
 	if not slot.is_empty() and SoundKit.has(slot) and view.get("sfx") != null:
-		view.sfx.play(slot, Vector3(cell.x, _surface(cell), cell.y))
+		view.sfx.play(slot, water)
+	# The line in water: its lap held only while it waits.
+	_quiet(cast)
+	if state == "wait" and view.get("sfx") != null:
+		cast["lap"] = view.sfx.hold("sfx.fish_wait", water)
 
 
 ## A float, its line and its ring, under the view.
@@ -157,8 +168,17 @@ func _surface(cell: Vector2i) -> float:
 	return view._water_surface(Vector2(cell))
 
 
+## [param cast]'s held lap, if any, stopped.
+func _quiet(cast: Dictionary) -> void:
+	var lap: Variant = cast.get("lap")
+	if lap != null and is_instance_valid(lap):
+		lap.queue_free()
+	cast["lap"] = null
+
+
 ## [param key]'s float, line and ring gone.
 func _drop(key: String) -> void:
+	_quiet(casts[key])
 	for part: String in ["float", "line", "ring"]:
 		var node: Node = casts[key][part]
 		if is_instance_valid(node):

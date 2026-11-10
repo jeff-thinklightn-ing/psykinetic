@@ -43480,6 +43480,23 @@ stream, a bridged one and a ford do not; the wilds' pond, pools and reach, nothi
 the pond's every cell its place's stock); items_test and companion_test's fishing set their one test
 cell as a body. Server only, protocol unchanged, no new class_name.
 
+805 amended (9) (2026-11-09, release's label; the coordinator's ask, the three small gaps left in
+the shipped slice): fishing sounds. The line in water: while a float waits (FishingView "wait"),
+sfx.fish_wait (sfx bus, a loop, range 6, -16 dB: a faint lap and tick) is held at it (Sfx.hold,
+steered to the bobbing float each frame), from the plop to the bite or the pull, and stopped at any
+other state or when the cast is dropped (FishingView._quiet). A miss: the float lifting out,
+sfx.fish_missed (range 8, -10 dB: a small drip and slap), beside the landed's flop. A pond's own bed:
+amb.pond (ambience bus, a loop, range 14, -12 dB: still water lapping at a shore), one per pond (a
+closed water of the terrain's "waters", 559) within its reach, held at the point of its shore nearest
+the listener (Ambience.pond_shore, the closed curve being its shore as in Client3D._curve_near) and
+sliding round it as they walk the bank, as amb.stream follows a stream. Six CC0 Freesound takes:
+amb.pond 524688 (salilnair) and 318064 (ceich93); sfx.fish_wait two quieter stretches of the same
+two; sfx.fish_missed 842164 and 842162 (AardsReal). Items' FishingView._begin holds the hooks (items
+told). Tests: sound_kit_test (a pond's shore across from the listener and on its closing side; a
+stream's curve is no pond; the three positional); view_test _test_fishing_pose (the lap held while
+it waits where the takes are, stopped at the miss). Client only; protocol unchanged, no new
+class_name. CHANGELOG bullet in voice's words.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

@@ -406,6 +406,26 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"amb.pond": [
+			{
+				"file": "amb.pond.ogg",
+				"from": "freesound",
+				"original": "freesound 524688: Water-lap-against-rocks-lake.wav (from 0 s for 28 s)",
+				"sha256": "c877725d6179315b8b74bb93d0007490f832a11ce3d4a98b8c6222b9b2412d7a",
+				"by": "salilnair",
+				"url": "https://freesound.org/people/salilnair/sounds/524688/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.pond.2.ogg",
+				"from": "freesound",
+				"original": "freesound 318064: Water_Lapping_River.wav (from 2 s for 28 s)",
+				"sha256": "d01f24122030f1672c9b9eddc67494c925c5c425b9818ab6b0a7afc45dde2112",
+				"by": "ceich93",
+				"url": "https://freesound.org/people/ceich93/sounds/318064/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.rain": [
 			{
 				"file": "amb.rain.ogg",
@@ -1706,6 +1726,26 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.fish_missed": [
+			{
+				"file": "sfx.fish_missed.ogg",
+				"from": "freesound",
+				"original": "freesound 842164: Water Drip Free (from 0.15 s for 0.6 s)",
+				"sha256": "e2e2925cf6a41aad013eddb3097f13e46a73feaaed788889786f88d73e82baea",
+				"by": "AardsReal",
+				"url": "https://freesound.org/people/AardsReal/sounds/842164/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_missed.2.ogg",
+				"from": "freesound",
+				"original": "freesound 842162: Multi Drip Free (from 0.12 s for 0.8 s)",
+				"sha256": "4fddc3f1e082c0e9c28dffd8c7cb7e7416f7e9c50223aed954c9d9050abc0cc7",
+				"by": "AardsReal",
+				"url": "https://freesound.org/people/AardsReal/sounds/842162/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.fish_plop": [
 			{
 				"file": "sfx.fish_plop.ogg",
@@ -1723,6 +1763,26 @@
 				"sha256": "38d09134bd9532edb3aa73a3074af7d22687ad5aa3c8f0a7b90d1af3bd1691fa",
 				"by": "giddster",
 				"url": "https://freesound.org/people/giddster/sounds/386429/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.fish_wait": [
+			{
+				"file": "sfx.fish_wait.ogg",
+				"from": "freesound",
+				"original": "freesound 524688: Water-lap-against-rocks-lake.wav (from 30 s for 10 s)",
+				"sha256": "79f99bb65f57fc7d94f86a2f035ed0ac9c7aa7bb9419ba01f2a1624f1c3df1d0",
+				"by": "salilnair",
+				"url": "https://freesound.org/people/salilnair/sounds/524688/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_wait.2.ogg",
+				"from": "freesound",
+				"original": "freesound 318064: Water_Lapping_River.wav (from 34 s for 10 s)",
+				"sha256": "eac574dfcf001b9283076de119ac994e499c3f243a205e13f878af8d2dd4910d",
+				"by": "ceich93",
+				"url": "https://freesound.org/people/ceich93/sounds/318064/",
 				"license": "CC0 1.0"
 			}
 		],

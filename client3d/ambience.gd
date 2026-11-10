@@ -128,6 +128,10 @@ var _draft: AudioStreamPlayer3D
 ## the listener is within its reach; and the streams they were made for.
 var _streams := {}
 var _stream_paths: Array = []
+## Pond (its index in the terrain's "waters", a closed one) -> its held
+## still-water lap (amb.pond, 805 amended (9)), as streams'.
+var _ponds := {}
+var _pond_waters: Array = []
 ## Fall (its index in Client3D.stream_falls) -> its held loop, as streams'.
 var _falls := {}
 var _fall_list: Array = []
@@ -194,6 +198,7 @@ func _weigh() -> void:
 	_place_draft(cell)
 	_place_point("amb.forge_roar", lit_forges(view._terrain.get("plates", []), _door_open), cell)
 	_place_streams(cell)
+	_place_ponds(cell)
 	_place_falls(cell)
 	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
 	for slot: String in rates:
@@ -408,6 +413,55 @@ func _place_streams(cell: Vector2i) -> void:
 				continue
 			_streams[i] = player
 		view.sfx.steer(player, at, 1.0, duck_db)
+
+
+## Each pond (a closed water of the terrain's "waters", 559) within its reach
+## of [param cell] held at the point of its shore nearest the listener
+## (pond_shore), sliding round it as they walk the bank (805 amended (9)).
+func _place_ponds(cell: Vector2i) -> void:
+	var waters: Array = view._terrain.get("waters", [])
+	if not is_same(waters, _pond_waters):
+		for player: Variant in _ponds.values():
+			if is_instance_valid(player):
+				player.queue_free()
+		_ponds.clear()
+		_pond_waters = waters
+	var reach := float(SoundKit.reach("amb.pond"))
+	for i in waters.size():
+		var player: Variant = _ponds.get(i)
+		if player != null and not is_instance_valid(player):
+			player = null
+		var near := pond_shore(waters[i], Vector2(cell))
+		if near.is_empty() or float(near.distance) > reach + 2.0:
+			if player != null:
+				player.queue_free()
+			_ponds.erase(i)
+			continue
+		var on: Vector2 = near.at
+		var at := Vector3(on.x, view._tile_position(Vector2i(on.round())).y, on.y)
+		if player == null:
+			player = view.sfx.hold("amb.pond", at)
+			if player == null:
+				continue
+			_ponds[i] = player
+		view.sfx.steer(player, at, 1.0, duck_db)
+
+
+## The point of [param water]'s shore nearest [param to] (cells), and how far:
+## {at: Vector2, distance}; {} for a water that isn't a pond (not closed, or
+## under three points). The closed curve is its shore (Client3D._curve_near).
+static func pond_shore(water: Dictionary, to: Vector2) -> Dictionary:
+	if not bool(water.get("closed", false)):
+		return {}
+	var points: PackedVector2Array = (water.get("curve", {}) as Dictionary).get("points", PackedVector2Array())
+	if points.size() < 3:
+		return {}
+	var ring: Array = Array(points)
+	ring.append(points[0])
+	var near := nearest_on(ring, to)
+	var a: Vector2 = ring[near.at]
+	var b: Vector2 = ring[mini(int(near.at) + 1, ring.size() - 1)]
+	return {"at": a.lerp(b, float(near.t)), "distance": float(near.distance)}
 
 
 ## Each stream's fall within its reach of [param cell] held, at the fall

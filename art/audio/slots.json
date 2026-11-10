@@ -689,6 +689,24 @@
 			"volume_db": -6.0,
 			"uses": "a fish pulled out of the water: a wet flop (805; items' FishingView, right after the bite)"
 		},
+		"sfx.fish_missed": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 8,
+			"volume_db": -10.0,
+			"uses": "a missed bite: the empty float lifting out of the water, a small drip and slap (805 amended (9); items' FishingView)"
+		},
+		"sfx.fish_wait": {
+			"category": "items",
+			"type": "loop",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -16.0,
+			"uses": "the line in water: a faint lap and tick at the float while it waits for a bite (805 amended (9); items' FishingView, held from the plop till the bite or the pull)"
+		},
 		"sfx.grass_rustle": {
 			"category": "movement",
 			"type": "oneshot",
@@ -2129,6 +2147,15 @@
 			"range": 16,
 			"volume_db": -8.0,
 			"uses": "running water: a stream heard from the nearest point of its course, before it is seen; Ambience, one per stream at the point of its course nearest the listener"
+		},
+		"amb.pond": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 14,
+			"volume_db": -12.0,
+			"uses": "still water: a pond's quiet lap at its edge (805 amended (9)); Ambience, one per pond at the point of its shore nearest the listener"
 		},
 		"amb.falls": {
 			"category": "ambience",

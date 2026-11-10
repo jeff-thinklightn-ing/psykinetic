@@ -8902,6 +8902,22 @@ func _test_fishing_pose() -> void:
 	var up := float(tip.y - puppet.global_position.y) if tip is Vector3 else 0.0
 	_check(tip is Vector3 and up > 1.5 and up < 2.5 and reach.length() > 0.9 and reach.length() < 2.2,
 			"waiting: the tip out and up, %.2f m up, %.2f m out (%s; the model's front %s)" % [up, reach.length(), rig.base_clip(), ahead])
+	# The line in water heard while it waits, and only then (805 amended (9)).
+	var key := String(player.name)
+	var cast: Dictionary = _rig.fishing_view.casts.get(key, {})
+	var lap: Variant = cast.get("lap")
+	var held := lap != null and is_instance_valid(lap) and str(lap.get_meta("slot", "")) == "sfx.fish_wait"
+	_check(held == SoundKit.has("sfx.fish_wait"), "waiting: the float's lap held at it (%s; takes here: %s)" % [held, SoundKit.has("sfx.fish_wait")])
+	player.fishing = {"state": "missed", "at": player.tile + Vector2i(0, 2)}
+	for i in 2:
+		await get_tree().process_frame
+	cast = _rig.fishing_view.casts.get(key, {})
+	_check(cast.get("lap") == null and (lap == null or not is_instance_valid(lap) or lap.is_queued_for_deletion()),
+			"missed: the lap stopped as the float lifts out")
+	player.fishing = {"state": "wait", "at": player.tile + Vector2i(0, 2)}  # Back as it was: the miss's clip not left playing.
+	puppet.set_meta("busy_until", 0)
+	_rig._process(0.0)
+	puppet.set_meta("busy_until", 0)
 	player.fishing = {}
 	_rig._process(0.0)
 	_check(not puppet.has_meta("fish_state") and not rig.base_clip().begins_with("Fish"), "reeled in: the next cast casts again, and it stands (%s)" % rig.base_clip())
