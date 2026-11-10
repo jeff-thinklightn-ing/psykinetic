@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).
+- Your companion, once she pulls back from the great bear or the old grey, stays well clear of it and its pack while it still fights you, never in your way if you run, and comes back to your side once it falls or you get away, where before she soon walked back into its reach and was bitten (780 amended (21)).
 ## v0.1.210
 
 - What goes over the network changes, so v0.1.209 and older can't join the server: update through the launcher first.

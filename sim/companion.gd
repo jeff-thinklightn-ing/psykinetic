@@ -142,6 +142,12 @@ const MINE_FULL_LINE := "My pack's full of ore. I can't carry more."
 ## Voice's words, three to a pool.
 const APEX_BERTH := 6
 const APEX_WARN_AGAIN_TICKS := 3000
+## How far round her she looks for her berth, broken off (780 amended (21)).
+const BERTH_SEARCH := 12
+## Ticks an apex she broke from still counts as fighting on after it last
+## went for her or her player (780 amended (21)): its pause between rushes,
+## the king's wallow (playtest's king9: 88 ticks off and back), is its fight.
+const FIGHTS_ON_TICKS := 150
 const APEX_SEEN: Array[String] = ["A great bear. Let's give it room.", "That's a great bear. We leave it be.", "Big one. Keep wide of it."]
 ## A hill cat lying up (814, companions' side; voice's words): what she says
 ## pointing it out to her player, once they are within CAT_POINT_RANGE and
@@ -1028,6 +1034,9 @@ var _keeper_still_since := 0
 ## Apexes she has seen: instance id -> the tick she last saw it (780 amended
 ## (5)); a warning is said when one is new or long unseen.
 var _apex_seen: Dictionary[int, int] = {}
+## Broken off (780 amended (21)): apex instance id -> the tick it last went
+## for her or her player (broke_from).
+var _fights_on: Dictionary[int, int] = {}
 ## Broken off from an apex fight (she or her player low): till both are over
 ## HP_THRESHOLDS[0] again, an apex is her foe only while it goes for her.
 var _apex_broke := false
@@ -3588,6 +3597,9 @@ func _calm() -> void:
 		return
 	if not standing_instruction().is_empty() or not order.is_empty():
 		return
+	if not broke_from().is_empty():
+		_fight_seen_tick = World.tick
+		return  # Broken off from an apex that fights on (780 amended (21)): no calm while it does.
 	if World.tick - _fight_seen_tick < hold_ticks("calm_ticks"):
 		return  # Calm a moment first (706): a lull in a fight is no calm.
 	if stance != Stance.GUARD:
@@ -7756,6 +7768,13 @@ func _apex_after_choose() -> void:
 			and _calm_apex(tile, APEX_BERTH - 1) != null:
 		current_intent = Intent.AVOID
 		intent_target = null
+	elif current_intent in [Intent.FOLLOW, Intent.IDLE, Intent.MINE, Intent.RETREAT, Intent.ATTACK] and stance != Stance.HOLD \
+			and order.is_empty() and not broke_from().is_empty():
+		# Broken off and it fights on (780 amended (21)): she keeps her berth
+		# from it and its escort, at her player's side as near as that lets her,
+		# never on their way out; RETREAT counts it no foe and walked her back.
+		current_intent = Intent.AVOID
+		intent_target = null
 
 
 ## A creature lying up to spring (814, enemy-ai's cat.lying(), spotted_by
@@ -7782,9 +7801,118 @@ static func _hp_over(entity: GridEntity, fraction: float) -> bool:
 	return entity.max_hp <= 0 or float(entity.hp) / entity.max_hp >= fraction
 
 
-## AVOID: a step out of a calm apex's berth, to the cell within 2 farthest
-## from it, nearer her player on a tie.
+## The apexes she broke off from that fight on (780 amended (21)): each in
+## her zone and up, engaged with her or her player, or with an escort of its
+## own on either of them; wherever she stands (the coordinator: keyed on the
+## fight, not her eyes). Empty when she has not broken off.
+func broke_from() -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	if not _apex_broke:
+		_fights_on.clear()
+		return out
+	for entity in World.entities():
+		if not apex(entity) or not entity.spawned or entity.zone != zone or entity.hp <= 0:
+			continue
+		var id := entity.get_instance_id()
+		if _apex_with(entity, self) or _alive(keeper) and _apex_with(entity, keeper) or _escort_on_us(entity):
+			_fights_on[id] = World.tick
+		# A pause in its fight is still its fight (the king's wallow between
+		# rushes, playtest's king9: about 9 s off and back).
+		if World.tick - int(_fights_on.get(id, -FIGHTS_ON_TICKS - 1)) <= FIGHTS_ON_TICKS:
+			out.append(entity)
+	return out
+
+
+## Whether an escort of [param lead] (Animal.escort_lead: the old grey's
+## pack, the king's sounder) goes for her or her player.
+func _escort_on_us(lead: GridEntity) -> bool:
+	for entity in World.entities():
+		if entity is Animal and (entity as Animal).escort_lead == lead and entity.spawned and entity.hp > 0:
+			var aim: GridEntity = (entity as Monster).target
+			if aim != null and (aim == self or aim == keeper):
+				return true
+	return false
+
+
+## The cells of her player's way out (780 amended (21)): from them, a step
+## at a time, to the nearest of this zone's link cells, those included;
+## none with no link. She never stands on one while broken off.
+func _way_out() -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	if not _alive(keeper):
+		return out
+	var exit := NONE
+	for at: Vector2i in World.fields.link_cells:
+		if exit == NONE or World.distance(keeper.tile, at) < World.distance(keeper.tile, exit):
+			exit = at
+	if exit == NONE:
+		return out
+	var at := keeper.tile
+	while at != exit:
+		at += Vector2i(signi(exit.x - at.x), signi(exit.y - at.y))
+		out[at] = true
+	return out
+
+
+## Where she stands broken off while [param beasts] fight on (780 amended
+## (21); the coordinator's order): never on her player's way out (_way_out),
+## a link's cell or fire; then, of the free cells within BERTH_SEARCH that
+## are APEX_BERTH or more from each beast and its escort, the nearest her
+## player within FOLLOW_START of them (she follows if the fight moves); else
+## the nearest her player at any reach; else, nothing so clear, the one
+## farthest from them. Her own cell is kept while it is as good. NONE if
+## there is none.
+func berth_cell(beasts: Array[GridEntity]) -> Vector2i:
+	var threats: Array[GridEntity] = beasts.duplicate()
+	for entity in World.entities():
+		if entity is Animal and beasts.has((entity as Animal).escort_lead) and entity.spawned and entity.hp > 0 and entity.zone == zone:
+			threats.append(entity)
+	var blocked := _way_out()
+	var keeper_at: Vector2i = keeper.tile if _alive(keeper) else tile
+	var tiers: Array[Vector2i] = [NONE, NONE, NONE]  # Near her player, clear at any reach, farthest.
+	var keys: Array[float] = [INF, INF, INF]
+	for cell in _cells_within(BERTH_SEARCH):
+		if cell != tile and (not World.is_walkable(cell) or not World.is_free(cell)):
+			continue
+		if World.is_fire(cell) or World.is_link_cell(cell) or blocked.has(cell):
+			continue
+		var clear := 1 << 20
+		for each in threats:
+			clear = mini(clear, World.distance(cell, each.tile))
+		var to_keeper := World.distance(cell, keeper_at)
+		# Her own cell wins a tie: no stepping back and forth between two as good.
+		var key := float(to_keeper) - (0.5 if cell == tile else 0.0)
+		if clear >= APEX_BERTH:
+			if to_keeper <= FOLLOW_START and key < keys[0]:
+				tiers[0] = cell
+				keys[0] = key
+			if key < keys[1]:
+				tiers[1] = cell
+				keys[1] = key
+		var far_key := -float(clear) * 100.0 + key
+		if far_key < keys[2]:
+			tiers[2] = cell
+			keys[2] = far_key
+	for cell in tiers:
+		if cell != NONE:
+			return cell
+	return NONE
+
+
+## AVOID: broken off from an apex that fights on, to her berth (berth_cell),
+## fighting only an escort at her when she cannot step; else a step out of a
+## calm apex's berth, to the cell within 2 farthest from it, nearer her
+## player on a tie.
 func _avoid_step() -> void:
+	var broke := broke_from()
+	if not broke.is_empty():
+		var cell := berth_cell(broke)
+		if cell != NONE and cell != tile and _step_toward(cell, false):
+			return
+		var at_her := _adjacent_hostile()
+		if cell != tile and at_her != null and World.in_reach(self, at_her):
+			World.try_attack(self, at_her)
+		return
 	var bear := _calm_apex(tile, APEX_BERTH - 1)
 	if bear == null:
 		current_intent = Intent.FOLLOW

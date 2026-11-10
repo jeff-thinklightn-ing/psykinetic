@@ -138,6 +138,7 @@ func _ready() -> void:
 	_test_brought_back_ends_wait()
 	_test_old_grey_seen()
 	_test_great_bear()
+	_test_break_off_holds()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -4956,6 +4957,155 @@ func _test_old_grey_seen() -> void:
 	World.despawn(grey)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
+
+
+## Broken off from an apex that fights on (780 amended (21); king7's Rhea,
+## and the bear on main, calm set her GUARD 28 ticks after her break and she
+## walked back into its reach): for the great bear, the old grey and the boar
+## king, her PULL_BACK holds while it is on her player, she keeps APEX_BERTH
+## from it and takes no blow; it gone, calm brings her back. And where she
+## stands (berth_cell): near her player when a cell 5 clear is; farther, still
+## clear, when none near is; the farthest when none is clear; never on her
+## player's way out.
+func _test_break_off_holds() -> void:
+	print("\n== broken off, the apex still on her player: no calm GUARD, her berth kept, no blow; gone, GUARD again (780 amended (21)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var pet_hp_was := pet.hp
+	var stance_was := pet.stance
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	var crates := {}  # The room's things, put back after: a bear on her player shoves them about.
+	for entity in World.get_entities():
+		if entity.spawned and entity != owner and entity != pet and not entity is Monster:
+			crates[entity] = entity.tile
+	DayNight.set_hour(12.0)
+	for spec: Dictionary in [{"script": "res://sim/great_bear.gd", "kind": "great_bear"},
+			{"script": "res://sim/old_wolf.gd", "kind": "old_wolf"}, {"script": "res://sim/boar_king.gd", "kind": "boar_king"}]:
+		_kill_monsters()
+		_put(owner, Vector2i(10, 3))
+		_put(pet, Vector2i(4, 3))
+		var beast := _main._spawn({"script": spec["script"], "shape": "capsule", "kind": spec["kind"],
+			"name": "TestBroke%s%d" % [spec["kind"], World.tick], "tile": Vector2i(11, 3)}) as Monster
+		_kill_monsters_but(beast)
+		if beast.get("asleep") == true:
+			beast.set("asleep", false)
+		pet.hp = int(pet.max_hp * 0.25)
+		pet._apex_broke = true
+		pet._serial += 1
+		pet._set_stance(Companion.Stance.PULL_BACK, pet._serial, "scripted")
+		var flips := 0
+		var blows := 0
+		var hp_now := pet.hp
+		var nearest := 1 << 20
+		var on_her := 0
+		for i in 80:
+			beast.target = owner
+			owner.hp = owner.max_hp
+			var was := pet.stance
+			World.step()
+			if pet.stance == Companion.Stance.GUARD and was != Companion.Stance.GUARD:
+				flips += 1
+			if pet.hp < hp_now:
+				blows += 1
+			hp_now = pet.hp
+			if beast.target == pet:
+				on_her += 1
+			if i >= 10:
+				nearest = mini(nearest, World.distance(pet.tile, beast.tile))
+		_check(flips == 0 and pet.stance == Companion.Stance.PULL_BACK and not pet.broke_from().is_empty(),
+				"%s on her player: her PULL_BACK holds, no calm GUARD (%d flips; on her %d of 80)" % [spec["kind"], flips, on_her])
+		# Her berth as round a calm one: within APEX_BERTH - 1 she steps out, so
+		# one closing on her player may come a cell inside it for a step.
+		_check(blows == 0 and nearest >= Companion.APEX_BERTH - 1,
+				"%s: she keeps her berth, never nearer than %d, and takes no blow (nearest %d, blows %d, at %s)" % [spec["kind"], Companion.APEX_BERTH - 1, nearest, blows, pet.tile])
+		World.despawn(beast)
+		beast.queue_free()
+		for i in Companion.hold_ticks("calm_ticks") + 10:
+			World.step()
+		_check(pet.broke_from().is_empty() and pet.stance == Companion.Stance.GUARD,
+				"%s gone: calm brings her back to GUARD (%s)" % [spec["kind"], pet.stance_name()])
+	# Where she stands, by the coordinator's order.
+	_kill_monsters()
+	var beast := _main._spawn({"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear",
+		"name": "TestBerth%d" % World.tick, "tile": Vector2i(11, 8)}) as Monster
+	_kill_monsters_but(beast)
+	pet._apex_broke = true
+	_put(owner, Vector2i(5, 3))
+	_put(pet, Vector2i(6, 3))
+	var beasts: Array[GridEntity] = [beast]
+	# A pause in its fight (the king's wallow) is still its fight; long off, it is over.
+	beast.target = null
+	pet._fights_on[beast.get_instance_id()] = World.tick - 100
+	var paused := pet.broke_from().has(beast)
+	pet._fights_on[beast.get_instance_id()] = World.tick - Companion.FIGHTS_ON_TICKS - 1
+	_check(paused and not pet.broke_from().has(beast), "off it 100 ticks between rushes, still its fight; %d off, over" % (Companion.FIGHTS_ON_TICKS + 1))
+	var cell := pet.berth_cell(beasts)
+	_check(cell != Vector2i(-99999, -99999) and World.distance(cell, beast.tile) >= Companion.APEX_BERTH
+			and World.distance(cell, owner.tile) <= Companion.FOLLOW_START and not pet._way_out().has(cell),
+			"a clear cell near her player: she takes it, at their side (%s)" % cell)
+	# A corridor: her player beside it, nothing clear near them; farther, still clear, nearest them.
+	_put(beast, Vector2i(8, 4))
+	_put(owner, Vector2i(9, 4))
+	_put(pet, Vector2i(9, 6))
+	cell = pet.berth_cell(beasts)
+	var best_clear := 1 << 20
+	for each in pet._cells_within(Companion.BERTH_SEARCH):
+		if (each == pet.tile or World.is_walkable(each) and World.is_free(each)) and not World.is_fire(each) and not World.is_link_cell(each) \
+				and not pet._way_out().has(each) and World.distance(each, beast.tile) >= Companion.APEX_BERTH:
+			best_clear = mini(best_clear, World.distance(each, owner.tile))
+	_check(cell != Vector2i(-99999, -99999) and World.distance(cell, beast.tile) >= Companion.APEX_BERTH and World.distance(cell, owner.tile) > Companion.FOLLOW_START
+			and World.distance(cell, owner.tile) == best_clear and not pet._way_out().has(cell),
+			"nothing clear near her player: farther, still %d clear, the nearest them (%s, %d off them)" % [Companion.APEX_BERTH, cell, World.distance(cell, owner.tile)])
+	# A small lair: nothing clear in reach (stand-ins over every cell she could take): the farthest from them.
+	var stand_ins: Array[GridEntity] = [beast]
+	var candidates: Array[Vector2i] = []
+	for each in pet._cells_within(Companion.BERTH_SEARCH):
+		if (each == pet.tile or World.is_walkable(each) and World.is_free(each)) and not World.is_fire(each) and not World.is_link_cell(each) \
+				and not pet._way_out().has(each):
+			candidates.append(each)
+	for each in candidates:
+		if stand_ins.all(func(s: GridEntity) -> bool: return World.distance(each, s.tile) >= Companion.APEX_BERTH):
+			var stand := GridEntity.new()
+			stand.tile = each + Vector2i(1, 0)
+			stand_ins.append(stand)
+	cell = pet.berth_cell(stand_ins)
+	var most := -1
+	for each in candidates:
+		var clear := 1 << 20
+		for s in stand_ins:
+			clear = mini(clear, World.distance(each, s.tile))
+		most = maxi(most, clear)
+	var cell_clear := 1 << 20
+	for s in stand_ins:
+		cell_clear = mini(cell_clear, World.distance(cell, s.tile))
+	_check(cell != Vector2i(-99999, -99999) and cell_clear == most and most < Companion.APEX_BERTH and not pet._way_out().has(cell),
+			"nothing %d clear in reach: the farthest cell from them (%s, %d clear of %d stand-ins)" % [Companion.APEX_BERTH, cell, cell_clear, stand_ins.size() - 1])
+	for s in stand_ins.slice(1):
+		s.free()
+	# Her player's way out is never hers: from them to the room's link at (1, 1).
+	_put(owner, Vector2i(10, 3))
+	_check(pet._way_out().has(Vector2i(9, 2)) and pet._way_out().has(Vector2i(1, 1)), "her player's way out runs to the link (%s)" % [pet._way_out().keys()])
+	World.despawn(beast)
+	beast.queue_free()
+	pet._apex_broke = false
+	pet.hp = pet_hp_was
+	pet.stance = stance_was
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	owner.hp = owner.max_hp
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	for entity: GridEntity in crates:
+		if is_instance_valid(entity):
+			_put(entity, crates[entity])
+	_settle(pet)
 
 
 func _test_great_bear() -> void:

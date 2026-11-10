@@ -41759,6 +41759,33 @@ king's pools go in his package at his unshelve. companion_test _test_old_grey_se
 line and no bear's; his ordered and break pools; none of his lines names a bear, a paw or an "it".
 Server only, protocol unchanged, no new class_name.
 
+780 amended (21): the break-off holds while the apex fights on, and her berth is kept (2026-11-10,
+companions; release's label; the coordinator's approval with two changes; a live fault). Broken off
+from an apex (_apex_broke: she or her player low), she counted it hostile only while it went for her
+(_apex_engaged), so with it on her player in_fight() was false and _calm set her GUARD after
+calm_ticks: GUARD walked her back to her player's side, inside its reach. Playtest's careless
+king7 run took Rhea from 20 to 1 that way (bites after each calm reset: PULL_BACK and GUARD four
+times); enemy-ai's king9 runs flipped her four times while he lived; companion_test on main showed
+the great bear the same (GUARD 28 ticks after the break, the bear never on her). (a) While an apex
+she broke from fights on (broke_from: in her zone and up, engaged with her or her player, or an
+escort of its own, Animal.escort_lead, going for either; wherever she stands, keyed on the fight,
+not her eyes, the coordinator), _calm does not lift her PULL_BACK; it lifts as before once both are
+whole, or once it is down, gone or off them FIGHTS_ON_TICKS (150): a pause between rushes is its
+fight (the king's wallow, king9: 88 ticks off and back). (b) Meanwhile she keeps her berth from it
+and its escort: FOLLOW, IDLE, MINE, RETREAT (which counted it no foe and walked her back) and
+ATTACK become AVOID, and _avoid_step goes to berth_cell, in the coordinator's order: never a cell
+on her player's way out (_way_out: from them, a step at a time, to the nearest of the zone's link
+cells), a link's cell or fire; then, of the free cells within BERTH_SEARCH (12), those APEX_BERTH
+or more from each beast, the nearest her player within FOLLOW_START (so she follows if the fight
+moves); else the nearest her player at any reach; else, none so clear, the farthest from them; her
+own cell kept on a tie. She never leaves the zone on her own, and fights only an escort at her when
+she cannot step. Her stance asks, her dodge of a told blow (663) and reviving her downed player are
+as they were; no new line of hers. companion_test _test_break_off_holds: for the great bear, the
+old grey and the boar king, broken off at a quarter, it kept on her player: no calm GUARD, never
+nearer than APEX_BERTH - 1 (she steps out within it, as round a calm one), no blow; gone, calm
+brings her back; a pause of 100 ticks still its fight, 151 over; near, farther and farthest cells;
+her player's way out to the room's link. Server only, protocol unchanged, no new class_name.
+
 780 amended (8): the bear tuned for one to three (enemy-ai, 2026-11-04; combat's draft from
 playtest's bear_yard runs, the coordinator's ruling; release's label). Playtest's players fell to
 an untold plain blow (attack_damage 5 a second), not to the moves: a player is a free body, kept on
