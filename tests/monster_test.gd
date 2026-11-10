@@ -1833,6 +1833,7 @@ func _test_ambush() -> void:
 	_test_tell_through_rush()
 	_test_boar_king()
 	_test_boar_king_close()
+	_test_boar_king_aim()
 	_test_boar_king_lair()
 	_test_bold_comes_in()
 	_test_given_strength()
@@ -6978,7 +6979,16 @@ func _test_boar_king() -> void:
 	_check(sounder.all(func(b: Animal) -> bool: return b._burst_until < 0), "a dodged charge: none of his sounder sent in")
 	king._move = {"move": "rush", "toward": Vector2(1, 0)}
 	World.rush_ended.emit(king, "body", king.tile, {"struck": [{"body": player}]})
-	_check(sounder.filter(func(b: Animal) -> bool: return b._burst_until > World.tick).size() == 1, "a charge that hits: the one sent in behind it")
+	_damage_log.clear()
+	var hushed := true
+	for i in int(king.charge["quiet"]) - 1:
+		World.step()
+		hushed = hushed and not _damage_log.any(func(d: Dictionary) -> bool: return sounder.has(d["source"]))
+	var early := sounder.filter(func(b: Animal) -> bool: return b._burst_until > World.tick).size()
+	for i in 3:
+		World.step()
+	_check(hushed and early == 0 and sounder.filter(func(b: Animal) -> bool: return b._burst_until > World.tick).size() == 1,
+		"a charge that hits: no boar strikes for %d ticks (the charge is the hit), then the one sent in (%d early)" % [int(king.charge["quiet"]), early])
 	# Never into a downing: no charge at a third, and one of them at such a foe.
 	king._move = {}
 	player.hp = 50
@@ -6995,6 +7005,58 @@ func _test_boar_king() -> void:
 	player.hp = 2
 	king._gore(player, Vector2(1, 0))
 	_check(player.hp == 1, "his charge's blow never takes a player below 1 hp (%d)" % player.hp)
+	DayNight.reset()
+	Monster.idling = true
+
+
+## His aim at a body off its cell's middle (playtest's hold run, the
+## coordinator's forcing of its cause): mid back-off at the run's two clear
+## spots, the bot's free centre set off its tile's middle; each offset
+## charges, none paws again.
+func _test_boar_king_aim() -> void:
+	print("%s== the boar king's aim at a body off its cell's middle: clear, he charges ==" % char(10))
+	var pawed: Array[String] = []
+	var charged := 0
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var arena: Array[String] = ["#".repeat(30)]
+	for y in 14:
+		arena.append("#" + ".".repeat(28) + "#")
+	arena.append("#".repeat(30))
+	var put := func(rows: Array[String], at: Vector2i, symbol: String) -> void:
+		rows[at.y] = rows[at.y].substr(0, at.x) + symbol + rows[at.y].substr(at.x + 1)
+	var offs: Array[Vector2] = [Vector2.ZERO, Vector2(0.6, 0.0), Vector2(-0.6, 0.0), Vector2(0.0, 0.6), Vector2(0.0, -0.6),
+		Vector2(0.6, 0.6), Vector2(-0.6, -0.6), Vector2(0.6, -0.6), Vector2(-0.6, 0.6), Vector2(0.45, 0.0), Vector2(0.0, 0.45)]
+	for spot: Array in [[Vector2i(9, 11), Vector2i(12, 8)], [Vector2i(9, 4), Vector2i(12, 7)]]:
+		for off: Vector2 in offs:
+			var rows := arena.duplicate()
+			put.call(rows, spot[0], "K")
+			put.call(rows, spot[1], "P")
+			var e := _build(rows)
+			var king: BoarKing = e["K"][0]
+			var player: GridEntity = e["P"][0]
+			player.protected = false
+			player.max_hp = 100
+			player.hp = 100
+			king.sight_range = 12
+			king.target = player
+			king._next_charge = 0
+			player.free_pos = Vector2(spot[1]) + off
+			var sc := World.struck_cell(player)
+			king._move = {"move": "back", "telegraph": 0, "lands": World.tick + 14, "from": World.tick}
+			var result := "none"
+			for i in 10:
+				World.step()
+				var mv := str(king._move.get("move", ""))
+				if mv == "charge" or mv == "paw":
+					result = mv
+					break
+			if result == "charge":
+				charged += 1
+			else:
+				pawed.append("%s %s" % [spot[0], off])
+			print("  PROBE-AIM %s->%s off %s struck %s tile %s after %s: %s (king at %s)" % [spot[0], spot[1], off, sc, player.tile, World.struck_cell(player), result, king.tile])
+	_check(pawed.is_empty(), "clear at both spots, every offset of the body: a told charge (%d), no paw again %s" % [charged, pawed])
 	DayNight.reset()
 	Monster.idling = true
 
@@ -7086,6 +7148,166 @@ func _test_boar_king_close() -> void:
 	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 3 and bites.size() >= 2 and gap >= 28
 			and bites.all(func(d: Dictionary) -> bool: return int(d["amount"]) <= 3),
 		"his bite slow and light: %d in 15 s, the shortest gap %d ticks, %s hp" % [bites.size(), gap, bites.map(func(d: Dictionary) -> int: return int(d["amount"]))])
+	# His charge's hit: "damage" in all, its knock-aside's impact part of it.
+	player.hp = 100
+	king.hp = king.max_hp
+	_damage_log.clear()
+	king._gore(player, Vector2(1, 0))
+	for i in 4:
+		World.step()
+	var gored := 100 - player.hp
+	_check(gored == int(king.charge["damage"]),
+		"his charge's hit, knock-aside and all, is %d hp, not more (%d)" % [int(king.charge["damage"]), gored])
+	# Low, in his lair: he breaks off to his wallow, never fleeing; struck on
+	# the way, he bites back at the one beside him, but neither chases nor
+	# charges.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(20, 5), "K")
+	put.call(rows, Vector2i(21, 5), "P")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.den = Vector2i(4, 5)
+	king.sight_range = 12
+	king.hp = int(float(king.max_hp) * float(king.charge["wallow_below"])) - 1
+	king.target = player
+	king.note_struck(player)
+	_damage_log.clear()
+	var fled := false
+	var charged := false
+	var from_den := World.distance(king.tile, king.den)
+	for i in 12:
+		World.step()
+		fled = fled or king.alert == Monster.Alert.FLEEING
+		charged = charged or str(king._move.get("move", "")) in ["paw", "back", "charge", "rush"]
+	var bit := _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == king and d["entity"] == player)
+	for i in 80:
+		World.step()
+		fled = fled or king.alert == Monster.Alert.FLEEING
+		charged = charged or str(king._move.get("move", "")) in ["paw", "back", "charge", "rush"]
+	_check(not fled and not charged and king.target == null and World.distance(king.tile, king.den) <= from_den - 8,
+		"under his wallow line he breaks off home, never fleeing nor charging (%d to %d from his den)" % [from_den, World.distance(king.tile, king.den)])
+	_check(bit and World.distance(player.tile, Vector2i(21, 5)) == 0,
+		"struck on his way, he bites back at the one beside him, not chasing them (bit %s)" % bit)
+	# Aimed where a blow strikes: a free body off its cell's middle (its
+	# centre in the next cell) still gets the charge (playtest's hold run).
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(10, 4), "K")
+	put.call(rows, Vector2i(14, 4), "P")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	king.target = player
+	player.free_pos = Vector2(14.0, 4.6)
+	var off_cell := World.struck_cell(player)
+	var aimed := king._try_charge(World.distance(king.tile, off_cell) + int(king.charge["past"]), true)
+	_check(off_cell != player.tile and aimed and off_cell in king.told_line,
+		"a body off its cell's middle (struck at %s, its tile %s): his charge told through where it is struck" % [off_cell, player.tile])
+	World.end_telegraph(int(king._move.get("telegraph", 0)), false)
+	# A rock behind him: he backs off aside and still charges a held foe.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(14, 5), "K")
+	put.call(rows, Vector2i(15, 5), "P")
+	for at: Vector2i in [Vector2i(13, 4), Vector2i(13, 5), Vector2i(13, 6), Vector2i(12, 5)]:
+		put.call(rows, at, "#")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	king.target = player
+	var start := World.tick
+	var told := -1
+	var paws := 0
+	for i in 60:
+		World.step()
+		if str(king._move.get("move", "")) == "paw" and int(king._move["from"]) == World.tick - 1:
+			paws += 1
+		if str(king._move.get("move", "")) == "charge":
+			told = World.tick
+			break
+	_check(told >= 0 and told - start <= 30 and paws <= 1,
+		"a rock behind him, a foe held at his side: one paw, a charge told (%d ticks, %d paws)" % [told - start, paws])
+	# His move windows are his: no boar of his sounder strikes while he paws,
+	# backs off, tells, runs, skids or lies stunned, nor "quiet" after a hit;
+	# held still, a told charge at least once in 100 ticks.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(14, 5), "K")
+	put.call(rows, Vector2i(15, 5), "P")
+	for at: Vector2i in [Vector2i(17, 3), Vector2i(17, 7), Vector2i(13, 8)]:
+		put.call(rows, at, "o")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	var boars: Array = e["o"]
+	for boar: Animal in boars:
+		boar.escort_lead = king
+		boar.escort_follow = 4
+	player.protected = false
+	player.max_hp = 200
+	player.hp = 200
+	king.sight_range = 12
+	king.target = player
+	_damage_log.clear()
+	var in_window := 0
+	var tells: Array[int] = []
+	var boar_hp := 0
+	var all_hp := 0
+	var was := ""
+	for i in 300:
+		var windowed := king.in_move_window() or World.tick < king._quiet_until
+		World.step()
+		player.hp = maxi(player.hp, 150)
+		var move := str(king._move.get("move", ""))
+		if move == "charge" and was != "charge":
+			tells.append(World.tick)
+		was = move
+		for d: Dictionary in _damage_log:
+			if int(d["tick"]) != World.tick or d["entity"] != player:
+				continue
+			all_hp += int(d["amount"])
+			if boars.has(d["source"]):
+				boar_hp += int(d["amount"])
+				if windowed:
+					in_window += 1
+	var gaps_ok := tells.size() >= 3
+	for k in range(1, tells.size()):
+		gaps_ok = gaps_ok and tells[k] - tells[k - 1] <= 100
+	_check(in_window == 0, "no boar of his sounder strikes in his move windows or the quiet after a hit (%d)" % in_window)
+	_check(gaps_ok and (all_hp == 0 or float(boar_hp) / float(all_hp) < 0.4),
+		"held still, a told charge at least each 100 ticks (%s), his boars under 40%% of the harm (%d of %d)" % [tells, boar_hp, all_hp])
+	# A foe by his den: going home is no retreat; away and alone, the far
+	# way, never through their reach.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(8, 5), "K")
+	put.call(rows, Vector2i(7, 6), "P")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.den = Vector2i(6, 5)
+	king.sight_range = 12
+	king.hp = int(float(king.max_hp) * float(king.charge["wallow_below"])) - 1
+	king.target = player
+	var nearest := 99
+	for i in 80:
+		World.step()
+		if i >= 3:
+			nearest = mini(nearest, World.distance(king.tile, player.tile))
+	_check(king._wallow_far and World.distance(king.tile, player.tile) >= BoarKing.WALLOW_CLEAR and nearest >= 2
+			and king.target == null,
+		"a foe by his den: he goes the far way, %d off them, never back through their reach (nearest %d), and stands alone" % [World.distance(king.tile, player.tile), nearest])
 	DayNight.reset()
 	Monster.idling = true
 

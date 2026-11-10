@@ -130,7 +130,7 @@
 		"moves": {
 			"charge": {"windup": 12, "cells": 7, "past": 2, "from": 3, "damage": 6, "impulse": 140.0, "every": 60,
 				"skid": 15, "stun": 25, "not_below": 0.33, "join_tiles": 8,
-				"paw": 6, "back": 20, "back_step": 5.0, "short": 2}
+				"paw": 6, "back": 14, "back_step": 5.0, "short": 2, "quiet": 20, "wallow_below": 0.15}
 		}
 	},
 	"hill_cat": {

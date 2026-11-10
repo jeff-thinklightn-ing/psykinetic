@@ -483,7 +483,16 @@ func _ring(foe: GridEntity) -> void:
 	if World.tick >= next_move_tick and not World.is_stunned(self):
 		move_ticks = _pace
 		var d := World.distance(tile, foe.tile)
-		if d < SOUNDER_RING.x:
+		var lead := escort_lead as BoarKing if escort_lead is BoarKing else null
+		if lead != null and lead.charging_now() and tile in lead.told_line:
+			# On his told line: off it, his lane clear (the coordinator).
+			for way in World.DIRECTIONS:
+				var cell := tile + way
+				if not cell in lead.told_line and World.is_walkable(cell) and World.is_free(cell) \
+						and World.distance(cell, foe.tile) >= SOUNDER_RING.x - 1:
+					World.try_move(self, way)
+					break
+		elif d < SOUNDER_RING.x:
 			var best := Vector2i.ZERO
 			var best_d := d
 			for way in World.DIRECTIONS:
