@@ -46288,3 +46288,25 @@ trusts gets a better price there, and nobody gets a worse one.
   side") follows, then economy's switch-on with voice's bullet.
 
 Server and client; protocol 55; no new class_name.
+
+The trusted 10% only on goods the town never sells back (the coordinator's ruling (b), before the
+switch-on): with the clamp alone, a 30-day trusted-seller soak (tools/town_soak --days=30
+--players=1 --sell=60 --sell-until=20 --trusted) matched 826's baseline to the gold. A hide banked
+stayed 6 and a bear claw at the tanner's 3, because a thin-margin good's trusted sell sat under its
+trusted buy, which is floored at the plain pay-back plus 1. Hand-ins and trophies are most of what
+players sell, so that would have made "trusted" feel like nothing. Now Economy.never_sold_back(id)
+holds for a raw banked or a trophy given in that is not made (Production shelves it), not a
+luxury (caravans shelve it), and whose yield no made or imported thing also yields (a cloth bolt's
+cloth). On those (trusted_sell with shelved false: bank_price, trophy_outcome, and the counter's
+offer for a thing with a yield, which is banked, not shelved) a trusted player gets the whole
+10%, at least 1 more. Everything else keeps the clamp. A trophy sold at the counter goes onto the
+shelf as gear: while one of it sits there, the trusted hand-in stays under its trusted shelf price,
+and _paid_back floors that price above the trusted hand-in. economy_test's walk found that loop
+(a bear claw shelved at 3 against the tanner's trusted 4). It now mints and shelves one of every
+thing a shelf can hold (made, a luxury, or gear with no yield), on an empty store and at comfort,
+and checks that no road back (counter, tanner, store) pays a trusted player what it cost. The soak
+again: a hide 7, a claw 4; every sale paid in full (1248 town, 300 camp, none short), nobody
+hungry; trade debt at most 198 on day 20, 0 by day 25 (5 days after the selling stopped; the
+baseline's peak was 101, cleared on day 18); workers owed 0 on day 29 (baseline 10); town gold 427
+against 336. The town ends richer because it takes fewer hides for the seller's 60 gold a day.
+The coordinator accepted it: the bar is the town not going short. Still off; no bullet.

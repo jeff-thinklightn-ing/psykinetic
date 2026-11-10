@@ -219,7 +219,7 @@ func _test_trusted_prices() -> void:
 		var trusted := economy.offers(TOWN, ids, "pt")
 		for id: String in ids:
 			var buy_plain := economy.price(TOWN, id, Economy.SELL, cat)
-			var buy_trusted := economy._trusted_buy_of(TOWN, id, buy_plain, cat)
+			var buy_trusted := economy._trusted_buy_of(TOWN, id, buy_plain, cat, "pt")
 			if buy_trusted > buy_plain:
 				bad.append("%s buy %d -> %d" % [id, buy_plain, buy_trusted])
 			if plain.has(id):
@@ -227,20 +227,64 @@ func _test_trusted_prices() -> void:
 					bad.append("%s sells for less trusted (%d < %d)" % [id, trusted[id], plain[id]])
 				if int(trusted[id]) > int(plain[id]):
 					better += 1
-				if int(trusted[id]) >= buy_trusted and (int(trusted[id]) > int(plain[id]) or buy_trusted < buy_plain):
+				if int(trusted[id]) >= buy_trusted and (int(trusted[id]) > int(plain[id]) or buy_trusted < buy_plain) and _on_a_shelf(economy, id, cat):
 					bad.append("%s round trip: sell %d, buy %d" % [id, trusted[id], buy_trusted])
 			if buy_trusted < buy_plain and buy_trusted <= economy._paid_back(TOWN, id, cat):
 				bad.append("%s bought trusted at %d, sold back plain for %d" % [id, buy_trusted, economy._paid_back(TOWN, id, cat)])
-			var trophy := int(economy.trophy_outcome(TOWN, "pt", id)["gold"])
-			if trophy > economy.trophy_price(id) and trophy >= buy_trusted:
-				bad.append("%s trophy round trip: %d, buy %d" % [id, trophy, buy_trusted])
 		for what: String in Stockpile.RESOURCES:
 			var each := economy.bank_price(TOWN, "pt", what, 1)
-			if each > economy.bank_price(TOWN, "p1", what, 1) and each >= economy._trusted_buy_of(TOWN, what, economy.price(TOWN, what, Economy.SELL, cat), cat):
+			if each > economy.bank_price(TOWN, "p1", what, 1) and not economy.never_sold_back(what, cat) and each >= economy._trusted_buy_of(TOWN, what, economy.price(TOWN, what, Economy.SELL, cat), cat, "pt"):
 				bad.append("%s banked round trip: %d" % [what, each])
 			if economy.bank_price(TOWN, "pt", what, 3) < economy.bank_price(TOWN, "p1", what, 3):
 				bad.append("%s banked for less trusted" % what)
 	_check(bad.is_empty() and better > 10, "every priced item, empty and at comfort: trusted never worse, %d sell better, no round trip (%s)" % [better, bad.slice(0, 6)])
+	# Ruling (b): the whole 10% on what the town never sells back (a raw
+	# banked, a trophy given in); every thing that can be on a shelf (made,
+	# a luxury, or gear sold at the counter) still bought dearer than all a
+	# trusted player gets back for it, by any road, empty and at comfort.
+	var loops: Array = []
+	var stock2 := Stockpile.new({}, clock, book)
+	stock2.deposit(TOWN, "gold", 500, "test")
+	var work2 := Production.new({}, stock2, null, clock, rules, func() -> Dictionary: return cat)
+	var e2 := Economy.new({}, stock2, work2, clock, rules, func() -> Dictionary: return cat)
+	e2.trusted_of = economy.trusted_of
+	for round in 2:
+		if round == 1:
+			for what: String in Stockpile.RESOURCES:
+				stock2.deposit(TOWN, what, maxi(work2.comfort(TOWN, what) - stock2.count(TOWN, what), 0), "test")
+		for id: String in ids:
+			if not _on_a_shelf(e2, id, cat):
+				continue
+			var unit := book.mint(id, "made", "test")
+			stock2.stock_shop(TOWN, unit, "test", "")
+			var buy := e2.shop_price(TOWN, unit, "", "pt", cat)
+			var asked := e2.item_price(TOWN, unit, cat)
+			var back := {"counter": int(e2.offers(TOWN, [id], "pt").get(id, 0)), "tanner": int(e2.trophy_outcome(TOWN, "pt", id)["gold"]) if not e2.trophy_trade(id).is_empty() else 0}
+			var banked := 0
+			for what: String in (cat[id].get("yield", {}) as Dictionary):
+				banked += e2.bank_price(TOWN, "pt", what, int(cat[id]["yield"][what]))
+			back["store"] = banked
+			for road: String in back:
+				if int(back[road]) >= buy and int(back[road]) > 0:
+					var was := int(e2.offers(TOWN, [id], "p1").get(id, 0)) if road == "counter" else (e2.trophy_price(id) if road == "tanner" else 0)
+					if road == "store":
+						for what: String in (cat[id].get("yield", {}) as Dictionary):
+							was += e2.bank_price(TOWN, "p1", what, int(cat[id]["yield"][what]))
+					if int(back[road]) > was or buy < asked:
+						loops.append("%s: buy %d, %s %d" % [id, buy, road, back[road]])
+			stock2.take_from_shop(TOWN, unit, "test")
+	_check(loops.is_empty(), "everything a shelf can hold, empty and at comfort: no road back pays a trusted player what it cost (%s)" % [loops.slice(0, 6)])
+	var hide_plain := e2.bank_price(TOWN, "p1", "hide", 1)
+	var claw_plain := e2.trophy_price("bear_claw")
+	_check(e2.never_sold_back("hide", cat) and e2.bank_price(TOWN, "pt", "hide", 1) == maxi(hide_plain + 1, ceili(hide_plain * 1.1)),
+		"a hide banked: the whole 10%% to pt (%d, plain %d)" % [e2.bank_price(TOWN, "pt", "hide", 1), hide_plain])
+	_check(e2.never_sold_back("bear_claw", cat) and int(e2.trophy_outcome(TOWN, "pt", "bear_claw")["gold"]) == maxi(claw_plain + 1, ceili(claw_plain * 1.1)),
+		"a bear claw at the tanner's: the whole 10%% to pt (%d, plain %d)" % [e2.trophy_outcome(TOWN, "pt", "bear_claw")["gold"], claw_plain])
+	_check(not e2.never_sold_back("cloth", cat) and not e2.never_sold_back("leather", cat) and not e2.never_sold_back("sword", cat),
+		"cloth (a bolt's yield), leather (made) and a sword (gear): sold back, still clamped")
+	var claw_counter := int(e2.offers(TOWN, ["bear_claw"], "pt").get("bear_claw", 0))
+	_check(claw_counter < e2._trusted_buy_of(TOWN, "bear_claw", e2.price(TOWN, "bear_claw", Economy.SELL, cat), cat, "pt"),
+		"a bear claw sold at the counter goes on the shelf: clamped under its trusted buy (%d)" % claw_counter)
 	var uid := book.mint("sword", "made", "test")
 	stock.stock_shop(TOWN, uid, "test", "")
 	var shelf := economy.item_price(TOWN, uid, cat)
@@ -254,6 +298,15 @@ func _test_trusted_prices() -> void:
 	_check(deal["ok"] and int(deal["price"]) == economy.trusted_buy(shelf), "pt buys it at the trusted price (%s)" % [deal])
 	economy.rules["town_regard"]["trusted_price"]["on"] = false
 	_check(not economy.trusted(TOWN, "pt") and economy.trusted_buy(10) == 9, "switched off: nobody is trusted")
+
+
+## Whether thing [param id] can be on a town's shelf (831 ruling (b)'s
+## test): made (Production), a luxury (caravans), or gear with no yield (a
+## player's counter sale shelves it; a raw is banked).
+func _on_a_shelf(economy: Economy, id: String, cat: Dictionary) -> bool:
+	var made: Variant = cat.get(id, {}).get("made")
+	return (made is Dictionary and not (made as Dictionary).is_empty()) or economy.is_luxury(id, cat) \
+		or (cat.get(id, {}).get("yield", {}) as Dictionary).is_empty()
 
 
 func _test_vendor() -> void:
