@@ -41,8 +41,8 @@ through `run` is watched: if free RAM falls under the margin while it runs
 and it is the newest job running, its own wrapper stops its own child (no
 one else's process: never kill by name, never another session's) and puts
 it back in the queue, MAX_RESTARTS times at most. Each kind's estimate is
-updated from the peak `run` measures (the whole process tree's working
-set), rising at once and falling slowly. A `run` by a tree that already
+updated from the most `run` sees the whole process tree hold at once (394
+amended (27); RAM_MEASURE), rising at once and falling slowly. A `run` by a tree that already
 holds a take of the kind (land.sh under its landing's take), or whose
 take's holder is this run's own ancestor process whatever the tree's name
 (394 amended (11): maps landed from a side worktree, wt-umbrage, under a
@@ -66,8 +66,8 @@ slot 10 h on 2026-10-17 and 7.6 h on 2026-10-18 with landings behind it.
 A soak meant to run for hours says so with --expect; the soak kind's limit
 is its max_minutes (180) whatever its runs took (fixed_limit).
 
-A suite out of reach (memory held outside the gate) for LEAN_AFTER_SECONDS
-runs lean (394 amended (9), (10), (12)): land.sh reads HEAVY_JOB_KIND,
+A suite out of reach (memory held outside the gate) at its turn (394
+amended (27); for LEAN_AFTER_SECONDS, a kind not lean_first) runs lean (394 amended (9), (10), (12)): land.sh reads HEAVY_JOB_KIND,
 suite_lean3, and runs fewer scenes at once and its other parts (net_test,
 state_test, server_boot_test) after the suite, not beside it, net_test's
 groups one after another; under suite_lean3's own estimate, when that one
@@ -230,6 +230,21 @@ MANY_GODOT_TESTS = ("net_test",)
 ## times its RAM estimate, unless its first row names commit_gb (394
 ## amended (20)).
 UNMEASURED_COMMIT_FACTOR = 2.0
+## What a kind's RAM estimate is measured by (394 amended (27)): AT_ONCE, the
+## most its processes held together (each watch's sum, never under the largest
+## one process's own peak), or SUMMED_PEAKS, each process's own peak added up
+## (the measure before): a suite's processes peak at different moments, so
+## the sum ran 2-3 GB over what the suite ever held (11-10: 14.0-20.5 GB summed,
+## 11.8-17.7 at once) and held every landing lean. Both are kept in kinds.json
+## (MEASURE_FIELDS) under the same rule (updated_estimate); ram_gb is the one
+## named here, so setting SUMMED_PEAKS puts every kind back at once. Commit is
+## measured at once already (the job object's own peak, exact).
+AT_ONCE, SUMMED_PEAKS = "at once", "summed peaks"
+RAM_MEASURE = AT_ONCE
+MEASURE_FIELDS = {AT_ONCE: "ram_once_gb", SUMMED_PEAKS: "ram_peaks_gb"}
+## A kind's at-once estimate, first seeded from its last done lines in the log
+## (replayed under updated_estimate), this many at most.
+SEED_RUNS = 20
 GB = 1024.0 ** 3
 
 
@@ -321,6 +336,22 @@ def queued_row(table, entry, default):
         if lean is not None and lean["estimate"] == entry["estimate"]:
             return lean
     return dict(table.get(kind, default), kind=kind)
+
+
+def due_row(table, entry, default, running, free_ram_gb, free_commit_gb=None, row=None, now=None):
+    """The row the queue [entry] runs as at its turn (394 amended (27)): its
+    queued_row ([row] if given), or its lean row while it has not gone lean
+    and goes_lean says it would. A suite chooses lean only when it starts;
+    till then those queued beside it (and its own waiter) judge it by what it
+    would run as: a full suite out of reach would look passable (may_pass)
+    to the suites behind it, which would go lean and start first."""
+    row = queued_row(table, entry, default) if row is None else row
+    kind = entry["kind"]
+    if entry.get("estimate", kind) != kind or not row.get("lean"):
+        return row
+    lean = lean_row(table, kind)
+    waited = (time.time() if now is None else now) - entry.get("queued", time.time() if now is None else now)
+    return lean if goes_lean(row, lean, waited, running, free_ram_gb, free_commit_gb) else row
 
 
 def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
@@ -565,6 +596,72 @@ def updated_estimate(old_gb, peak_gb):
     return round(max(peak_gb, 0.8 * old_gb + 0.2 * peak_gb), 2)
 
 
+def record_ram(saved, at_once_gb, peaks_gb):
+    """[saved] (a kinds.json row) after a run that held [at_once_gb] at once
+    and whose processes' own peaks summed to [peaks_gb] (394 amended (27)):
+    each measure's estimate under updated_estimate, from ram_gb where it has
+    none yet; ram_gb the one RAM_MEASURE names."""
+    for field, measured, last in (("ram_once_gb", at_once_gb, "last_once_gb"), ("ram_peaks_gb", peaks_gb, "last_peak_gb")):
+        if measured > 0.0:
+            saved[field] = updated_estimate(saved.get(field, saved["ram_gb"]), measured)
+            saved[last] = round(measured, 2)
+    saved["ram_gb"] = saved.get(MEASURE_FIELDS[RAM_MEASURE], saved["ram_gb"])
+    return saved
+
+
+def seeded_once(kind, variant_of, lines):
+    """[kind]'s at-once estimate from the log's [lines] (394 amended (27)):
+    its last SEED_RUNS done lines with a working set at once (a variant's: its
+    kind's lean ones), replayed under updated_estimate; None if it has none."""
+    runs = []
+    for line in lines:
+        parts = line.rstrip("\n").split("\t")
+        if len(parts) != 5 or parts[1] != "done" or parts[3] != (variant_of or kind):
+            continue
+        if parts[4].endswith(", lean") != bool(variant_of):
+            continue
+        found = re.search(r"working set at once ([0-9.]+) GB", parts[4])
+        if found:
+            runs.append(float(found.group(1)))
+    estimate = None
+    for each in runs[-SEED_RUNS:]:
+        estimate = each if estimate is None else updated_estimate(estimate, each)
+    return estimate
+
+
+def seed_measures():
+    """Gives each measured kinds.json row its two estimates once (394 amended
+    (27)): ram_peaks_gb its ram_gb (summed peaks till now), ram_once_gb from
+    the log (seeded_once, else ram_gb), and ram_gb the one RAM_MEASURE names.
+    Whether it wrote."""
+    table = _read(_path("kinds.json")) or {}
+    if all("ram_once_gb" in row for row in table.values() if "ram_gb" in row):
+        return False
+    with StateLock():
+        table = _read(_path("kinds.json")) or {}
+        lines = []
+        try:
+            with open(_path("heavy_jobs.log"), encoding="utf-8", errors="replace") as handle:
+                lines = [line for line in handle if "\tdone\t" in line and "working set at once" in line]
+        except OSError:
+            pass
+        wrote = False
+        for name, row in table.items():
+            if "ram_gb" not in row or "ram_once_gb" in row:
+                continue
+            row.setdefault("ram_peaks_gb", row["ram_gb"])
+            once = seeded_once(name, KINDS.get(name, {}).get("variant_of"), lines)
+            row["ram_once_gb"] = round(once, 2) if once is not None else row["ram_gb"]
+            row["ram_gb"] = row[MEASURE_FIELDS[RAM_MEASURE]]
+            wrote = True
+        if wrote:
+            _write(_path("kinds.json"), table)
+            log("measure", "heavy_job", "kinds", "RAM estimates seeded, by %s: %s" % (RAM_MEASURE, ", ".join(
+                "%s %.1f (summed peaks %.1f)" % (name, row["ram_once_gb"], row["ram_peaks_gb"])
+                for name, row in sorted(table.items()) if "ram_once_gb" in row)))
+        return wrote
+
+
 # --- The machine -------------------------------------------------------------
 
 def free_ram_gb():
@@ -695,6 +792,9 @@ def measure_attached(entry, read=process_memory):
         each["peak_commit_gb"] = max(each.get("peak_commit_gb", 0.0), numbers[3])
     peak = max(peak, sum(each.get("peak_gb", 0.0) for each in entry["attached"]))
     peak_commit = max(peak_commit, sum(each.get("peak_commit_gb", 0.0) for each in entry["attached"]))
+    # At once (394 amended (27)): their sum now, never under one's own peak.
+    entry["attached_once_gb"] = round(max(entry.get("attached_once_gb", 0.0), using,
+        max([each.get("peak_gb", 0.0) for each in entry["attached"]] or [0.0])), 3)
     now = (round(using, 3), round(commit, 3), round(peak, 3), round(peak_commit, 3))
     was = (entry.get("using_gb"), entry.get("using_commit_gb"), entry.get("attached_peak_gb"), entry.get("attached_peak_commit_gb"))
     entry["using_gb"], entry["using_commit_gb"], entry["attached_peak_gb"], entry["attached_peak_commit_gb"] = now
@@ -841,15 +941,17 @@ class Job:
 
     def memory(self):
         """The job's live processes' (working set now, commit now, the sum of
-        their own peak working sets), GB. The peaks catch what a watch every
-        WATCH_SECONDS misses (a model's weights read on the CPU a moment
-        before they go to the card)."""
+        their own peak working sets, the largest one process's own peak), GB.
+        The peaks catch what a watch every WATCH_SECONDS misses (a model's
+        weights read on the CPU a moment before they go to the card); the
+        largest one is a floor under the working set at once (394 amended
+        (27)): when it peaked, the job held at least that."""
         if self.handle is None:
-            return 0.0, 0.0, 0.0
+            return 0.0, 0.0, 0.0, 0.0
         kernel = ctypes.windll.kernel32
         Counters = self._Counters
         kernel.OpenProcess.restype = ctypes.c_void_p
-        total, commit, peaks = 0, 0, 0
+        total, commit, peaks, top = 0, 0, 0, 0
         for pid in self._ids():
             process = kernel.OpenProcess(0x1000 | 0x0010, False, pid)  # QUERY_LIMITED | VM_READ
             if not process:
@@ -860,8 +962,9 @@ class Job:
                 total += counters.working_set
                 commit += counters.pagefile
                 peaks += counters.peak_working_set
+                top = max(top, counters.peak_working_set)
             kernel.CloseHandle(ctypes.c_void_p(process))
-        return total / GB, commit / GB, peaks / GB
+        return total / GB, commit / GB, peaks / GB, top / GB
 
     def peak_gb(self):
         """The most memory the job's processes held at once (committed), as
@@ -994,6 +1097,10 @@ def kinds():
         row["excludes"] = sorted(set(first.get("excludes", [])) | set(saved.get(name, {}).get("excludes", [])))
         if not row["excludes"]:
             del row["excludes"]
+        # The measure's own estimate (394 amended (27)), over a ram_gb an older
+        # heavy_job.py wrote from summed peaks.
+        if MEASURE_FIELDS[RAM_MEASURE] in row:
+            row["ram_gb"] = row[MEASURE_FIELDS[RAM_MEASURE]]
         table[name] = _split(row, first["ram_gb"])
     for name, row in saved.items():
         table.setdefault(name, _split(dict(row), 0.0))
@@ -1118,23 +1225,21 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 fresh = dict(table[kind], kind=kind) if estimate == kind else lean_row(table, kind)
                 if fresh is not None:
                     row = fresh
-            ahead = [dict(queued_row(table, each, row), tree=each["tree"]) for each in queue[:place - 1]]
+            free_ram, free_commit = _memory()
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
-            # waiting for a suite.
-            free_ram, free_commit = _memory()
-            if estimate == kind and goes_lean(row, lean_row(kinds(), kind) if row.get("lean") else None,
-                    time.time() - queued, running, free_ram, free_commit):
-                row = lean_row(kinds(), kind)
-                estimate = row["estimate"]
-                entry = _read(_path("queue", ticket))
-                if entry is not None:
-                    entry["estimate"] = estimate
-                    _write(_path("queue", ticket), entry)
-                log("lean", tree, kind, "out of reach %.0f s at %.1f GB free: runs as %s, %.1f GB" % (
-                    time.time() - queued, free_ram, estimate, row["ram_gb"]))
-                print("heavy_job: %s %s out of reach (memory held outside the gate): runs lean, as %s (%.1f + %.0f GB)" % (
-                    tree, kind, estimate, row["ram_gb"], MARGIN_GB), file=sys.stderr)
+            # waiting for a suite. Each judged as it would run at its turn
+            # (due_row, 394 amended (27)).
+            ahead = [dict(due_row(table, each, row, running, free_ram, free_commit), tree=each["tree"])
+                for each in queue[:place - 1]]
+            # Lean is chosen when it would start, not at its first look (394
+            # amended (27)): till then a suite out of reach is judged as its lean
+            # row and stays full, so room at its turn starts it full. Chosen at
+            # entry, the 10:36 suites (11-10) went lean at 23-25 GB free with a
+            # suite running and stayed lean for the two hours to their turns.
+            full = row
+            if estimate == kind:
+                row = due_row(table, {"kind": kind, "queued": queued}, row, running, free_ram, free_commit, row)
             now = time.time()
             if place == 1 and head_since is None:
                 head_since = now
@@ -1145,6 +1250,16 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
             head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
+            if ok and row is not full:
+                estimate = row["estimate"]
+                entry = _read(_path("queue", ticket))
+                if entry is not None:
+                    entry["estimate"] = estimate
+                    _write(_path("queue", ticket), entry)
+                log("lean", tree, kind, "out of reach %.0f s at %.1f GB free: runs as %s, %.1f GB; at its turn, full %.1f + %.0f GB%s" % (
+                    time.time() - queued, free_ram, estimate, row["ram_gb"], full["ram_gb"], MARGIN_GB, measures(full)))
+                print("heavy_job: %s %s out of reach (memory held outside the gate): runs lean, as %s (%.1f + %.0f GB)" % (
+                    tree, kind, estimate, row["ram_gb"], MARGIN_GB), file=sys.stderr)
             stuck = blockers(row, running)
             if place == 1 and stuck and all(each.get("backfill") for each in stuck):
                 held_by_backfill = held_by_backfill or now
@@ -1152,7 +1267,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 held_by_backfill = None
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
-                behind = [queued_row(table, each, row) for each in queue[place:]]
+                behind = [due_row(table, each, row, running, free_ram, free_commit) for each in queue[place:]]
                 if place < len(queue) and may_step_aside(dict(row, kind=kind), behind):
                     # Steps to the back itself: waiters started from an older
                     # heavy_job.py (a tree not yet rebased) don't know the
@@ -1329,9 +1444,9 @@ def run(tree, kind, command, expect_minutes=None):
         samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
             time.sleep(WATCH_SECONDS)
-            using, committed, peaks = job.memory()
+            using, committed, peaks, top = job.memory()
             peak = max(peak, using, peaks)
-            at_once = max(at_once, using)
+            at_once = max(at_once, using, top)
             if os.name == "nt" and committed >= listed_gb + PEAK_LIST_STEP_GB and time.time() - listed_at >= PEAK_LIST_SECONDS:
                 listed, listed_gb, listed_at = job.listing(), committed, time.time()
             commit_peak = max(commit_peak, committed, job.peak_gb())
@@ -1405,10 +1520,9 @@ def run(tree, kind, command, expect_minutes=None):
                 table = _read(_path("kinds.json")) or {}
                 saved = dict(kinds()[estimate])
                 if peak > 0.0:
-                    saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
+                    record_ram(saved, at_once, peak)
                     if saved["gpu"] and gpu_peak > 0.0:
                         saved["gpu_gb"] = updated_estimate(saved["gpu_gb"], gpu_peak)
-                    saved["last_peak_gb"] = round(peak, 2)
                 if commit_peak > 0.0:
                     saved["commit_gb"] = updated_estimate(commit_of(saved), commit_peak)
                     saved["last_commit_gb"] = round(commit_peak, 2)
@@ -1495,8 +1609,7 @@ def record_attached(kind, entry):
     table = _read(_path("kinds.json")) or {}
     saved = dict(kinds()[kind])
     if peak > 0.0:
-        saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
-        saved["last_peak_gb"] = round(peak, 2)
+        record_ram(saved, entry.get("attached_once_gb", peak), peak)
     if peak_commit > 0.0:
         saved["commit_gb"] = updated_estimate(commit_of(saved), peak_commit)
         saved["last_commit_gb"] = round(peak_commit, 2)
@@ -1543,8 +1656,9 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
     for place, entry in enumerate(queue):
         # A kind the table lacks (a kinds.json older than the entry): judged as a suite, the heaviest.
         default = dict(table.get(entry["kind"]) or KINDS.get(entry["kind"]) or table["suite"])
-        row = queued_row(table, entry, default)
-        ahead = [dict(queued_row(table, each, default), tree=each["tree"]) for each in queue[:place]]
+        row = due_row(table, entry, default, running, free_ram, free_commit, now=now)
+        ahead = [dict(due_row(table, each, default, running, free_ram, free_commit, now=now), tree=each["tree"])
+            for each in queue[:place]]
         head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now, backfill_length(row))
         ok, why = decide(row, running, head, free_ram, free_gpu if row["gpu"] else None, free_commit)
         if ok:
@@ -1552,7 +1666,7 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
                 "%s %s" % (each["tree"], each["kind"]) for each in past) if past else ""))
         elif not head and queue:
             first = queue[0]
-            first_row = queued_row(table, first, default)
+            first_row = due_row(table, first, default, running, free_ram, free_commit, now=now)
             _, first_why = decide(first_row, running, True, free_ram, free_gpu if first_row["gpu"] else None, free_commit)
             out.append("waits: behind the head, %s %s, which waits on: %s%s" % (first["tree"], first["kind"],
                 first_why or "its next look", "; " + past_why if past_why else ""))
@@ -1614,8 +1728,19 @@ def show_kinds():
             ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
             ", at most %d at once" % row["max_running"] if row.get("max_running") is not None else "",
             ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else "",
-            " (commit %.1f)" % row["last_commit_gb"] if "last_commit_gb" in row else ""))
+            " (commit %.1f)" % row["last_commit_gb"] if "last_commit_gb" in row else "",
+            measures(row)))
     return 0
+
+
+def measures(row):
+    """[row]'s two RAM estimates, for a while (394 amended (27)), the deciding
+    one first: "; RAM by at once 17.7, summed peaks 20.5" ("" if none yet)."""
+    if "ram_once_gb" not in row and "ram_peaks_gb" not in row:
+        return ""
+    other = SUMMED_PEAKS if RAM_MEASURE == AT_ONCE else AT_ONCE
+    return "; RAM by %s %.1f, %s %.1f" % (RAM_MEASURE, row.get(MEASURE_FIELDS[RAM_MEASURE], row["ram_gb"]),
+        other, row.get(MEASURE_FIELDS[other], row["ram_gb"]))
 
 
 def summary(day):
@@ -1726,6 +1851,9 @@ def main(args):
         print(__doc__)
         return 0
     command = args[0]
+    # Not status or kinds: they never write the state (394 amended (26)).
+    if command in ("run", "take", "attach", "release"):
+        seed_measures()
     if command in ("run", "take", "attach", "release", "holds", "front") and (len(args) < 3 or args[2] not in kinds()
             or kinds()[args[2]].get("variant_of")):
         print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)

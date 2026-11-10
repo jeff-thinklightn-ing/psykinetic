@@ -46848,6 +46848,48 @@ heavy_job_test: owed on the first line and on a running job's; a head waiting on
 figures; a scene and an import behind it name that head; with room the head may start; status moves nothing.
 Tools only; protocol unchanged; no class_name; no bullet.
 
+394 amended (27) (perf, 2026-11-10; release's label, the coordinator's approved design): the gate's RAM
+estimates are measured as the working set at once, and a suite chooses lean at its turn, not when it queues.
+The coordinator asked whether scenes should give way to queued landings. They shouldn't: out_of_reach already
+counts every running gated job's memory as given back, so scenes never made a suite lean, and the three waits a
+suite had on the running count came to 6.8 minutes in the day. What landings paid was the lean runs themselves,
+about 21 minutes against a full suite's 14. From 10:22 every suite went lean, judged at 20.5 + 8 GB, an estimate
+that was the sum of each process's own peak. A suite's processes peak at different moments, so the sum ran 2-3
+GB over anything the suite held: today's full suites were 14.0-20.5 GB summed and 11.8-17.7 at once.
+- Every kind's RAM estimate now comes from the most its processes held together: each watch's sum, never under
+  the largest single process's own peak (a process that peaked between two watches is still counted, since the
+  job held at least that much then). It follows the same rule as before (updated_estimate: up at once, down a
+  fifth). Commit is unchanged: it was already measured at once, from the job object's own exact peak. A take's
+  attached processes are measured the same way (attached_once_gb).
+- kinds.json keeps both estimates for a while, ram_once_gb and ram_peaks_gb, each under that rule. ram_gb is the
+  one RAM_MEASURE names, and kinds() reads it from there over a ram_gb an older heavy_job.py wrote. Setting
+  RAM_MEASURE = SUMMED_PEAKS puts every kind back at once (the revert rule: one suite stopped for memory in the
+  first day and it goes back). `kinds` shows both figures ("; RAM by at once 17.7, summed peaks 20.5"), as does
+  each lean line, and the done line already had both.
+- The first run, take, attach or release seeds each measured row once (seed_measures, under the state lock,
+  logged as "measure"; status and kinds never write):
+  ram_peaks_gb is its ram_gb, and ram_once_gb is its last 20 done lines' working set at once replayed under
+  the rule (a lean variant uses its kind's lean runs), or else its ram_gb. From today's log: suite 17.7 (was
+  20.5), suite_lean3 6.1, scene 1.6, bench 1.6.
+- A suite stays full while it waits and chooses lean only when it would otherwise start: due_row judges it,
+  for its own waiter, for those queued beside it, and for status, as what it would run as at its turn. It goes
+  lean only when decide would start it and the full suite is out of reach, so (23)'s point holds: no waiting
+  first. Room at its turn starts it full. A full suite out of reach is judged as its lean row by those behind
+  it, so none of them can go past it, lean, and start first. Chosen at entry, the 10:36 suites went lean at
+  23-25 GB free while another suite ran, and stayed lean for the two hours to their turns. The lean line now
+  adds "; at its turn, full X + 8 GB" with both figures.
+Replay of today's 22 lean calls: on the at-once estimate alone (16.2 GB at 05:43, 17.7 from 10:36), 9 would
+have run full, judged on free RAM alone, which is a lower bound since what running jobs give back only adds room.
+Of the 5 lean starts, the free figure logged nearest each start (24.9-26.4 GB; start lines carry none) puts 3
+over 17.7 + 8, so with the choice at its turn those 3 would have run full. A take queued before this keeps the
+choice its own heavy_job.py made; no tree withdraws and requeues to pick it up. heavy_job_test: both measures
+under the rule, ram_gb from the named one over an older write, the switch back, the seed from log lines (lean
+and released lines left out) written once and logged, a process's own peak between two watches counted; due_row
+lean, full and gone lean; one behind a full suite out of reach doesn't pass it; queued while a suite runs it
+stays full and status says it waits on the count; room at its turn starts full; no room at its turn goes lean
+with no wait, and its lean line is written once with the full figure. Tools only; protocol unchanged; no
+class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

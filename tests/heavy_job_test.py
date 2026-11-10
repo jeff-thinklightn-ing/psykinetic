@@ -952,6 +952,124 @@ if saved_kinds is not None:
 elif os.path.exists(gate._path("kinds.json")):
     os.remove(gate._path("kinds.json"))
 
+print("== estimates by the working set at once (394 amended (27)) ==")
+saved_kinds = gate._read(gate._path("kinds.json"))
+row = {"ram_gb": 20.5, "ram_once_gb": 15.0, "ram_peaks_gb": 20.5}
+gate.record_ram(row, 17.7, 20.0)
+check(row["ram_once_gb"] == 17.7 and row["ram_peaks_gb"] == 20.4 and row["ram_gb"] == 17.7
+    and row["last_once_gb"] == 17.7 and row["last_peak_gb"] == 20.0,
+    "a run: each measure under the same rule (up at once, down a fifth), ram_gb at once: %s" % row)
+gate.record_ram(row, 12.0, 14.0)
+check(row["ram_once_gb"] == 16.56 and row["ram_gb"] == 16.56, "down a fifth toward the run: %s" % row)
+fresh = gate.record_ram({"ram_gb": 6.5}, 4.0, 5.0)
+check(fresh["ram_once_gb"] == 6.0 and fresh["ram_peaks_gb"] == 6.2 and fresh["ram_gb"] == 6.0,
+    "a row with neither yet starts both from ram_gb: %s" % fresh)
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=20.4, ram_once_gb=16.56, ram_peaks_gb=20.4)})
+check(gate.kinds()["suite"]["ram_gb"] == 16.56, "kinds: ram_gb is the at-once estimate")
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=21.0, ram_once_gb=16.56, ram_peaks_gb=20.4)})
+check(gate.kinds()["suite"]["ram_gb"] == 16.56, "over a ram_gb an older heavy_job.py wrote from summed peaks")
+check(gate.measures(gate.kinds()["suite"]) == "; RAM by at once 16.6, summed peaks 20.4", "both figures shown: %s" % gate.measures(gate.kinds()["suite"]))
+gate.RAM_MEASURE = gate.SUMMED_PEAKS
+check(gate.kinds()["suite"]["ram_gb"] == 20.4 and gate.measures(gate.kinds()["suite"]).startswith("; RAM by summed peaks 20.4"),
+    "RAM_MEASURE back to summed peaks: every kind back at once")
+gate.RAM_MEASURE = gate.AT_ONCE
+lines = ["2026-11-10T0%d:00:00\tdone\tt\tsuite\texit 0, 800 s, peak 17.0 GB, commit 14.0 GB, working set at once %.1f GB\n" % (i, v)
+    for i, v in enumerate((14.0, 16.0, 13.0))]
+lines.append("2026-11-10T05:00:00\tdone\tt\tsuite\texit 0, 1250 s, peak 7.0 GB, commit 5.6 GB, working set at once 5.8 GB, lean\n")
+lines.append("2026-11-10T06:00:00\tdone\tt\tsuite\treleased after 900 s\n")
+check(gate.seeded_once("suite", None, lines) == round(max(13.0, 0.8 * 16.0 + 0.2 * 13.0), 2),
+    "seeded from the log: its full runs replayed, the lean one and a release left out: %s" % gate.seeded_once("suite", None, lines))
+check(gate.seeded_once("suite_lean3", "suite", lines) == 5.8, "a variant from its kind's lean runs")
+check(gate.seeded_once("bench", None, lines) is None, "a kind with no runs in the log: none")
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=20.5), "bench": dict(gate.KINDS["bench"], ram_gb=3.0)})
+check(gate.seed_measures(), "seed_measures writes once")
+seeded = gate._read(gate._path("kinds.json"))
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+want = gate.seeded_once("suite", None, text.splitlines(True))
+check(seeded["suite"]["ram_peaks_gb"] == 20.5 and seeded["suite"]["ram_once_gb"] == (round(want, 2) if want is not None else 20.5)
+    and seeded["suite"]["ram_gb"] == seeded["suite"]["ram_once_gb"], "the suite: summed peaks kept, at once seeded: %s" % seeded["suite"])
+want = gate.seeded_once("bench", None, text.splitlines(True))
+check(seeded["bench"]["ram_peaks_gb"] == 3.0 and seeded["bench"]["ram_once_gb"] == (round(want, 2) if want is not None else 3.0),
+    "the bench the same: %s" % seeded["bench"])
+check("\tmeasure\theavy_job\tkinds\tRAM estimates seeded, by at once: " in text, "the log says so, both figures")
+check(not gate.seed_measures(), "and never again")
+if os.name == "nt":
+    # One process's own peak, between two watches: 300 MB held a moment, then let go.
+    code = gate.run("blip", "bench", [sys.executable, "-c", "x = bytearray(300 * 1024 * 1024); x[::4096] = b'1' * len(x[::4096]); "
+        "del x; import time; time.sleep(3)"])
+    with open(gate._path("heavy_jobs.log")) as log:
+        done = [line for line in log if "\tdone\tblip\tbench\t" in line]
+    once = float(done[0].split("working set at once ")[1].split(" GB")[0]) if done else 0.0
+    check(code == 0 and once >= 0.28, "the working set at once never under one process's own peak: %s" % (done[0].strip() if done else "none"))
+    check(gate.kinds()["bench"].get("last_once_gb", 0.0) >= 0.28, "and it is the bench's at-once measure")
+
+print("== a suite goes lean at its turn, not its first look (394 amended (27)) ==")
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.1
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 8.0
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=14.6, commit_gb=1.0),
+    "suite_lean3": dict(gate.KINDS["suite_lean3"], ram_gb=8.0, commit_gb=1.0)})
+clear_gate()
+table = gate.kinds()
+low = (18.3, 30.0)  # 14.6 + 8 out of reach, 8 + 8 in
+gate._memory = lambda: low
+first = {"kind": "suite", "queued": time.time() - 1}
+check(gate.due_row(table, first, table["suite"], [], *low)["ram_gb"] == 8.0, "out of reach, it runs as its lean row at its turn")
+check(gate.due_row(table, first, table["suite"], [], 40.0, 40.0)["ram_gb"] == 14.6, "with room, full")
+check(gate.due_row(table, dict(first, estimate="suite_lean3"), table["suite"], [], 40.0, 40.0)["ram_gb"] == 8.0, "gone lean, lean")
+check(not gate.may_pass(gate.lean_row(table, "suite"), [gate.due_row(table, first, table["suite"], [], *low)], [], *low),
+    "a suite behind a full one out of reach does not go past it, lean, to start first")
+gate._memory = lambda: (40.0, 40.0)
+check(gate.take("holder", "suite", os.getpid()) == 0, "a suite held")
+gate._memory = lambda: low
+turn = threading.Thread(target=lambda: gate.take("turn", "suite", os.getpid()), daemon=True)
+turn.start()
+wait_for(lambda: queue_of() == ["turn suite"])
+time.sleep(1.0)
+entry = gate._entries("queue")[0] if gate._entries("queue") else {}
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check(entry.get("estimate", "suite") == "suite" and "\tlean\tturn\tsuite\t" not in text,
+    "out of reach while a suite runs: still full, no lean chosen (%s)" % entry)
+reasons = gate.queue_reasons(gate._entries("queue"), gate._entries("running"), low[0], low[1], None)
+check(reasons and "at most 1 at once" in reasons[0], "status: it waits on the suite running, not on memory: %s" % reasons)
+gate._memory = lambda: (40.0, 40.0)
+gate.release("holder", "suite")
+wait_for(lambda: any(each["tree"] == "turn" for each in gate._entries("running")))
+held = [each for each in gate._entries("running") if each["tree"] == "turn"]
+check(held and held[0]["estimate"] == "suite" and held[0]["ram_gb"] == 14.6, "room at its turn: it starts full (%s)" % held)
+turn.join(5)
+gate.release("turn", "suite")
+gate._memory = lambda: low
+check(gate.take("holder", "suite", os.getpid()) == 0 and gate._entries("running")[0]["estimate"] == "suite_lean3",
+    "no room at its turn, nothing ahead: lean at once")
+turn2 = threading.Thread(target=lambda: gate.take("turn2", "suite", os.getpid()), daemon=True)
+turn2.start()
+wait_for(lambda: queue_of() == ["turn2 suite"])
+time.sleep(1.0)
+entry = gate._entries("queue")[0] if gate._entries("queue") else {}
+check(entry.get("estimate", "suite") == "suite", "queued behind it, still full")
+waited_from = time.time()
+gate.release("holder", "suite")
+wait_for(lambda: any(each["tree"] == "turn2" for each in gate._entries("running")))
+held = [each for each in gate._entries("running") if each["tree"] == "turn2"]
+check(held and held[0]["estimate"] == "suite_lean3" and time.time() - waited_from < 5.0,
+    "no room at its turn: lean at once, no wait first (%s)" % held)
+with open(gate._path("heavy_jobs.log")) as log:
+    lean_lines = [line for line in log if "\tlean\tturn2\tsuite\t" in line]
+check(len(lean_lines) == 1 and "at its turn, full 14.6 + 8 GB" in lean_lines[0], "the lean line, once, with the full figure: %s" % (
+    lean_lines[0].strip() if lean_lines else "none"))
+turn2.join(5)
+gate.release("turn2", "suite")
+clear_gate()
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved_kinds is not None:
+    gate._write(gate._path("kinds.json"), saved_kinds)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
