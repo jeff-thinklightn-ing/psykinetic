@@ -304,6 +304,8 @@ func _ready() -> void:
 			_steady_reel()
 		"hillcat":
 			_hillcat()
+		"oldgrey":
+			_oldgrey()
 		"draugr", "draugr_walkback":
 			_draugr()
 		_:
@@ -932,6 +934,75 @@ func _hillcat() -> void:
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	max_seconds = maxf(max_seconds, 60.0)
 	_script = [["say", 10, "A hill cat lies up."], ["cat_fight", 0, ""], ["wait", 20, ""]]
+
+
+## The old grey's lunge as a made leap (780 amended (24), animation's side; the coordinator's two
+## reels): open ground, the play camera, the old grey alone (no pack: he lunges at a foe 2-3 off
+## every SPRING "every" ticks). The player walks up to 3 off him along grid x (his told line 3
+## cells straight, 2 on a slant) and holds, stepping back to it through his pant after each bite
+## (on the side nearer the field's middle), he kept in his place meanwhile, so each spring is from
+## 3 off: --which=side (the default) the camera turned 45 degrees (yaw -45, so grid x runs across
+## its look), the crouch, the leap and the pant seen side-on; --which=play the play camera as it
+## rests (yaw 0), the leap coming slantwise down the screen as play shows it. The player's hp kept
+## full by the reel. Till it ends.
+func _oldgrey() -> void:
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 22:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	_grey_side = not "--which=play" in OS.get_cmdline_user_args()
+	var at := Vector2i(16, 11)
+	var markers := {at + _grey_way * 7: "start", at: "monster_old_wolf"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9, "legend": {"monster_old_wolf": "#9a9a92"},
+		"entities": [{"at": [at.x, at.y], "facing": [_grey_way.x, _grey_way.y]}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	max_seconds = maxf(max_seconds, 45.0)
+	_script = [["say", 10, "The old grey, alone."], ["grey_fight", 0, ""]]
+
+
+var _grey_way := Vector2i(1, 0)
+var _grey_side := true
+var _grey_turned := false
+
+
+## One tick of the old grey's reel: the player 3 off him along _grey_way, held while his lunge
+## (its crouch, the leap, the pant) runs; true once he is gone.
+func _grey_step() -> bool:
+	var grey := _monster
+	if not is_instance_valid(grey) or not grey.spawned:
+		return true
+	_player.hp = _player.max_hp
+	var view: Client3D = _main._client3d
+	if not _grey_turned and view != null:
+		_grey_turned = true
+		_main.pack_panel.shown = false  # The pack would cover him.
+		view._zoom_to = view.ZOOM_MIN  # Close in, so his crouch and leap read.
+		if _grey_side:  # Held, as a turn the player made rests (Client3D's own, not saved).
+			view.yaw = -45.0
+			view._yaw_step = -45.0
+			view._hand_yaw = -45.0
+	var move := str(grey.get("_move").get("move", "")) if grey.get("_move") is Dictionary else ""
+	match move:
+		"lunge":
+			_caption.text = "He crouches, head down: the lunge told."
+		"rush":
+			_caption.text = "The leap."
+		_:
+			# 3 off him along the line, on whichever side is nearer the field's middle (a bite's drag
+			# toward the edge is walked back from), so every lunge runs across the camera's look.
+			var hold := grey.tile + _grey_way * 3
+			var other := grey.tile - _grey_way * 3
+			if not World.is_walkable(hold) or (World.is_walkable(other)
+					and Vector2(other).distance_to(Vector2(20, 11)) < Vector2(hold).distance_to(Vector2(20, 11))):
+				hold = other
+			if World.is_walkable(hold):
+				_walk(hold)
+			# Staging: he keeps his place (alone, he would dart back in and spring from 2 off), so
+			# each spring is from 3 off, its rush the told line's whole length.
+			grey.next_move_tick = maxi(grey.next_move_tick, World.tick + 2)
+			_caption.text = "He stands panting: the opening." if move == "pant" else "Three off him, along his line."
+	World.face(_player, Senses.way_toward(_player.tile, grey.tile))
+	return false
 
 
 ## One tick of the hill cat's reel; true once it is over (each part runs out after its limit).
@@ -2232,6 +2303,9 @@ func _on_tick(tick: int) -> void:
 		"cat_fight":
 			if not _cat_step(tick):
 				return
+		"grey_fight":
+			if not _grey_step():
+				return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -2379,7 +2453,7 @@ func _log(tick: int) -> void:
 			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
 			", ".join(them)])
 		return
-	if scenario in ["melee_audit", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
+	if scenario in ["melee_audit", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat", "oldgrey"]:
 		var side := func(entity: GridEntity) -> String:
 			return "%s at %s hp %d/%d st %d/%d%s%s%s%s" % [entity.name, entity.tile, entity.hp, entity.max_hp, entity.stamina,
 				entity.max_stamina, " stunned" if World.is_stunned(entity) else "", " down" if World.is_down(entity) else "",

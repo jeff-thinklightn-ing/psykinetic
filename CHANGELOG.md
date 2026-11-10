@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The old grey leaps when he lunges now: he sinks onto his haunches, head down and ears laid back, then leaps off his hind legs with his forelegs reaching and lands panting, where before he squashed flat and slid at you (780 amended (24)).
 - The big map names where each way out goes, "to the Foothills" or "to the Barrow", and a way to a place with no name shows just its mark (589 amended (2)).
 - A charge that only passes close beside you leaves you walking on where you were, so stepping just clear of it is enough, where before it put you back a cell across your way though it never touched you (688 amended (14)).
 - When a fight starts, your companion's card, the town sheet, the maps and any note you're reading close so you can see the fight; open one again whenever you like, though a blow you take closes it again, where before they stayed open over the middle of the screen (846).

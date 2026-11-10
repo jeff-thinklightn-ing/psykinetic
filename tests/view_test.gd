@@ -197,6 +197,7 @@ func _ready() -> void:
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
 		await _test_hill_cat_clips()
+		await _test_old_wolf_leap()
 		await _test_apex_sweep()
 		await _test_creature_down()
 		await _test_creature_tells()
@@ -12278,9 +12279,11 @@ func _test_apex_sweep() -> void:
 	# drawn), what it draws sitting, and its heavy wind-up's clip.
 	var apexes := {
 		"great_bear": {"tells": {"swipe": "swipe", "slam": "slam", "charge": "charge_tell"}, "cries": {"roar": "roar"},
-			"sit": "sleep", "heavy": "attack"},
-		"old_wolf": {"tells": {"lunge": ""}, "cries": {"howl": "howl"}, "sit": "lie", "heavy": "attack"},
-		"boar_king": {"tells": {"charge": "charge_tell"}, "cries": {"skid": "skid"}, "sit": "graze", "heavy": "hook"},
+			"sit": "sleep", "heavy": "attack", "lead": "attack"},
+		"old_wolf": {"tells": {"lunge": "lunge_tell"}, "cries": {"howl": "howl"}, "sit": "lie", "heavy": "attack",
+			"lead": "bite_lead"},
+		"boar_king": {"tells": {"charge": "charge_tell"}, "cries": {"skid": "skid"}, "sit": "graze", "heavy": "hook",
+			"lead": "attack"},
 	}
 	var player := _player()
 	for kind: String in apexes:
@@ -12315,6 +12318,7 @@ func _test_apex_sweep() -> void:
 			view._pant_until = 0
 			view._dazed_until = 0
 			view._then = ""
+			view._tell_then_at = 0
 			beast.alert = Monster.Alert.IDLE
 			beast.pose = Monster.Pose.STAND
 			beast.winded = false
@@ -12364,7 +12368,7 @@ func _test_apex_sweep() -> void:
 		expect.call("heavy wind-up", rig.playing(), str(want["heavy"]))
 		fresh.call()
 		view.wind(0.3, true)
-		expect.call("lead", rig.playing(), "attack")
+		expect.call("lead", rig.playing(), str(want["lead"]))
 		for move: String in want["tells"]:
 			fresh.call()
 			var clip := str(want["tells"][move])
@@ -12396,6 +12400,83 @@ func _test_apex_sweep() -> void:
 		World.despawn(beast)
 		_rig._process(0.0)
 		await _frames(1)
+
+
+## The old grey's lunge drawn as a made leap (780 amended (24), animation's side; the coordinator,
+## after v0.1.210's "a squash and spring, not a made leap"): his lunge's telegraph plays his
+## lunge_tell, its contact on the landing (his SPRING windup, 0.8 s), its crouch held on after; at
+## the landing (drawn here without a body, so not waiting on its slide) his leap plays once out of
+## the crouch; called off, no leap; a landing seen late (drawn otherwise then) no stale leap.
+func _test_old_wolf_leap() -> void:
+	print("\n== the old grey's lunge: the crouch told, the leap at its landing ==")
+	var body := Node3D.new()
+	var pose := Node3D.new()
+	body.add_child(pose)
+	_rig.add_child(body)
+	var art := ArtKit.instance("creature.old_wolf")
+	pose.add_child(art)
+	var view := CreatureView.new("creature.old_wolf", art, pose)
+	body.add_child(view)
+	var rig := view.rig
+	var has_all := rig != null and ["lunge_tell", "leap"].all(func(clip: String) -> bool: return view.clips.has(clip))
+	_check(has_all, "his art holds lunge_tell and leap (%s)" % [view.clips.keys()])
+	if not has_all:
+		body.queue_free()
+		return
+	var crouch_to := rig.length(view.clips["lunge_tell"]) * float(view._contact.get("lunge_tell", 0.0))
+	_check(absf(crouch_to - 0.8) < 0.05 and rig.length(view.clips["lunge_tell"]) > 1.1 and rig.length(view.clips["leap"]) > 0.4
+			and rig.length(view.clips["leap"]) < 0.8,
+			"the crouch 0.8 s to the spring (OldWolf's SPRING windup, 8 ticks), held on after, the leap under 0.8 s (%.2f of %.2f, %.2f)"
+			% [crouch_to, rig.length(view.clips["lunge_tell"]), rig.length(view.clips["leap"])])
+	view.frame(body, null)
+	var told := view.tell("lunge", 0.8, 21)
+	var landing := view._tell_until
+	_check(told and rig.playing() == view.clips["lunge_tell"] and view._tell_then == "leap" and view._tell_then_at == landing
+			and absf(rig._contact_msec - landing) <= 40 and rig._strike_msec > landing + 200,
+			"his lunge's telegraph plays lunge_tell, its spring on the landing, the crouch held on after, the leap to follow (%s)" % rig.playing())
+	view.frame(body, null)
+	_check(rig.playing() == view.clips["lunge_tell"], "before its landing, still crouched (%s)" % rig.playing())
+	view._tell_then_at = AnimRig.now_msec()  # Its landing come (the clock's, not waited for).
+	# Landed, but his rush's slide not begun (a tick or more after): the crouch held; the leap
+	# starts with the slide (GridEntity.stepping), so he never stands up before he goes.
+	var near := _player()
+	var grey := _spawn_imp(near.tile + Vector2i(0, 2) if near != null else Vector2i(9, 6))  # His body.
+	grey.stepping = false
+	view.frame(body, grey)
+	var held: bool = rig.playing() == view.clips["lunge_tell"] and view._tell_then_at > 0
+	grey.stepping = true
+	view.frame(body, grey)
+	grey.stepping = false
+	_check(held and rig.base_clip() == view.clips["leap"] and not rig.striking() and view._busy_until > AnimRig.now_msec()
+			and view._tell_then_at == 0,
+			"landed, his crouch held till his rush slides, then he leaps, once, the crouch over (%s, %s)"
+			% [held, rig.base_clip()])
+	World.despawn(grey)
+	view.tell_over(21, true)
+	view._busy_until = 0
+	view.frame(body, null)
+	view.tell("lunge", 0.8, 22)
+	view.tell_over(22, false)
+	_check(view._tell_then_at == 0 and not rig.striking(), "called off (stunned in his crouch): no leap to follow")
+	view.frame(body, null)
+	view.tell("lunge", 0.8, 23)
+	view._tell_then_at = AnimRig.now_msec() - CreatureView.TELL_THEN_LATE_MS - 100
+	view.frame(body, null)
+	_check(rig.base_clip() != view.clips["leap"] and view._tell_then_at == 0,
+			"a landing seen late (he was drawn otherwise as it came): no stale leap (%s)" % rig.base_clip())
+	# His bite told ahead (enemy-ai's 780 amended (23), a lead of 6 ticks): his own bite_lead, head
+	# down and back, held, its snap (the contact) landing with the blow; not the generic coil.
+	view._busy_until = 0
+	rig.cancel_strike()
+	view.wind(0.6, true)
+	var length := rig.length(view.clips["bite_lead"])
+	var contact := length * float(view._contact.get("bite_lead", 0.0))
+	_check(view.clips.has("bite_lead") and rig.playing() == view.clips["bite_lead"] and absf(rig.speed() - contact / 0.6) < 0.02
+			and absf(contact - 0.65) < 0.05 and not (view._coil != null and view._coil.is_running()),
+			"his bite told ahead: his bite_lead, its snap at 0.6 s with the blow, no generic coil (%s x%.2f, snap %.2f s of %.2f)"
+			% [rig.playing(), rig.speed(), contact, length])
+	body.queue_free()
+	await _frames(1)
 
 
 func _test_hill_cat_clips() -> void:

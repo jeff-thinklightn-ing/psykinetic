@@ -86,9 +86,16 @@ const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze",
 ## A move's tell (780 amended (6): an apex beast's World.telegraph, its "kind" the move): the
 ## slot clip it plays, its contact landing on the telegraph's lands tick; a move not named here
 ## plays the clip of its own name (swipe, slam). Only a slot listing the clip has one.
-const TELL_CLIPS := {"charge": "charge_tell", "pounce": "crouch_tell"}
+const TELL_CLIPS := {"charge": "charge_tell", "pounce": "crouch_tell", "lunge": "lunge_tell"}
 ## Tells whose clip is all wind-up (the slot gives no contact): their end is the move's start.
 const TELL_ENDS_AT_LANDING: Array[String] = ["charge_tell", "crouch_tell"]
+## A tell's clip followed by a slot clip played once (780 amended (24)'s leap: the old grey's lunge
+## springs from its crouch, the sim telling the view nothing more till his pant): from its landing,
+## as the body's slide begins (GridEntity.stepping: his rush, a tick or more after; the tell's clip
+## holds its crouch past its contact till then), unless the tell was called off (tell_over not
+## landed), or no slide came within TELL_THEN_LATE_MS (no room: he pants where he is).
+const TELL_THEN := {"lunge_tell": "leap"}
+const TELL_THEN_LATE_MS := 400
 ## Monster.Pose.DOWN (enemy-ai's 764: a deer hurt past its sprint, lying a while, to be
 ## finished): drawn lying on its belly, alive (creature_life.gd, over its idle), lain down over
 ## DOWN_SECONDS, got up over UP_SECONDS; first seen down it lies at once; dying it unfolds over
@@ -126,6 +133,9 @@ var _steady: Tween
 var _rest_yaw := 0.0
 ## A slot clip played once when the one playing ends (the hill cat's recover after its leap).
 var _then := ""
+## A slot clip played once at the tell's landing (TELL_THEN), and when (msec; 0 for none).
+var _tell_then := ""
+var _tell_then_at := 0
 ## Plain blows struck: a slot with a bite alternates its swipe (attack) and bite.
 var _blows := 0
 var _bolt_until := 0
@@ -268,6 +278,17 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		else:
 			_loop("walk", ArtKit.feel("creature_view.teeter_pace", TEETER_PACE))
 		return
+	var late := _tell_then_at > 0 and now - _tell_then_at > TELL_THEN_LATE_MS
+	if _tell_then_at > 0 and now >= _tell_then_at and (late or monster == null or monster.stepping):
+		# The tell landed and the body goes: the move it told plays (the old grey's leap) out of the
+		# crouch, with the slide; none when no slide came in time, or it was drawn otherwise then.
+		var then := _tell_then
+		_tell_then = ""
+		_tell_then_at = 0
+		if not late:
+			_busy_until = 0
+			rig.cancel_strike()
+			_once(then)
 	_dazed = clips.has("dazed") and (now < _dazed_until if monster == null
 			else monster.stun_cause == &"crash" and World.tick + World.tick_alpha < monster._reel_until)
 	if now < _busy_until:
@@ -403,8 +424,12 @@ func unwind() -> void:
 ## A blow wound up over [param seconds] (GridEntity.winding: a brute's HEAVY
 ## tactic, a heavy weapon's wind-up, a plain blow's lead): the attack struck so that its
 ## contact, the blow, lands as the sim's does. A [param lead] (a plain blow told ahead, 338
-## amended (4)) also coils the body over it (coil).
+## amended (4)) also coils the body over it (coil); a slot with a bite_lead (the old grey's, 780
+## amended (24): head let down and back, held, then the snap) strikes that instead, its snap the blow.
 func wind(seconds: float, lead := false) -> void:
+	if lead and clips.has("bite_lead"):
+		_strike(maxf(seconds, 0.05), "bite_lead")
+		return
 	# A heavy wind-up (not a lead) plays the slot's hook where it has one: the boar king's tusks.
 	# A plain one swipes and bites in turn for a slot with a bite (the hill cat's), as swing does.
 	_strike(maxf(seconds, 0.05), "hook" if not lead and clips.has("hook") else _blow())
@@ -459,8 +484,9 @@ func tell(move: String, lands_in: float, id: int) -> bool:
 	if rig == null or _dead:
 		return false
 	if not clips.has(clip):
-		# No clip of its own (the old grey's lunge): the body gathers over the tell and springs as it
-		# lands (coil, a lead's draw-back), never slid into untold (the coordinator).
+		# No clip of its own (the old grey's lunge before his lunge_tell): the body gathers over the
+		# tell and springs as it lands (coil, a lead's draw-back), never slid into untold (the
+		# coordinator).
 		if _pose == null or _down:
 			return false
 		coil(maxf(lands_in, 0.05))
@@ -470,6 +496,8 @@ func tell(move: String, lands_in: float, id: int) -> bool:
 	_strike(maxf(lands_in, 0.05), clip)
 	_tell_id = id
 	_tell_until = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+	_tell_then = str(TELL_THEN.get(clip, ""))
+	_tell_then_at = _tell_until if clips.has(_tell_then) else 0
 	return true
 
 
@@ -481,6 +509,7 @@ func tell_over(id: int, landed: bool) -> void:
 	_tell_id = 0
 	if not landed:
 		_tell_until = 0
+		_tell_then_at = 0
 		unwind()
 
 
