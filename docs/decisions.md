@@ -46678,6 +46678,25 @@ about 20 minutes), but only after waiting LEAN_AFTER_SECONDS (5 minutes) for a f
 heavy_job_test: lean at once, still full when it fits, not when the lean one doesn't fit either, and the
 suite's row is lean_first over a kinds.json written before it. Tools only; protocol unchanged; no
 class_name; no bullet.
+394 amended (24) (perf, 2026-11-09; the coordinator's approval, release's label): a waiting job
+re-reads its kind's estimate at every look, its lean variant's once it has gone lean, never the one read when it
+queued. At 22:28 one physics run under `scene` (a many-Godot network test, 11.7 GB at once) raised the scene
+estimate to 13.6 GB, and the scenes queued in the next minutes kept that figure while it fell to 4.4: each wanted
+13.6 + 8 GB beside a full suite owed 19.7 of 36 free, and the scenes behind, judging them by the fresh figure as
+able to start, never went past. Ten scenes and an import waited behind seven suites with a scene slot free. Passing
+is unchanged: a job that can start goes past rows waiting on their own kind or out of reach, first-come within a kind,
+and a wait on memory the running jobs will give back still holds those behind it, so a suite is never delayed.
+On load: a landing gets back the up-to-two scenes beside its suite (below normal) that 394 amended (17)
+always allowed and the stale estimates had left unused; land.sh and what runs inside it are unchanged. Release
+watches net_test's late-join flake against scenes beside a suite; if it rises, the answer is a longer wait in
+the test, not fewer scenes.
+heavy_job_test: a waiter queued under a 20 GB estimate starts, without requeueing, once it falls to 2; a scene
+behind a suite waiting on such memory stays behind it.
+A test that starts several Godots, run alone, takes a kind of its own, net (13.6 GB, one at a time, never beside
+a bench): neither scene nor suite, whose estimates every tree waits on. heavy_job refuses net_test under any other
+kind before it queues (MANY_GODOT_TESTS names the tests; add one there when another starts several Godots).
+heavy_job_test: net_test under scene refused, net one at a time. Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

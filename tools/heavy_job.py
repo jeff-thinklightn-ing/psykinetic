@@ -213,7 +213,16 @@ KINDS = {
     # normal priority so the landing's scenes and net_test come first.
     "scene": {"ram_gb": 1.5, "gpu_gb": 0.0, "gpu": False, "max_running": 2, "excludes": ["bench"], "max_minutes": 30,
         "below_normal": True},
+    # A test that starts several Godots, run alone (394 amended (24)): net_test
+    # (its servers and four clients, 11.7 GB at once). Its own estimate: as a
+    # scene it tripled the scene estimate every tree waits on, as a suite it
+    # would pull the full suite's down and take the landings' one slot.
+    "net": {"ram_gb": 13.6, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 30,
+        "below_normal": True},
 }
+## A many-Godot test, by its command (394 amended (24)): a run of one under
+## another kind is refused, named, before it queues.
+MANY_GODOT_TESTS = ("net_test",)
 ## A kind never measured (no kinds.json row) is judged on commit at this
 ## times its RAM estimate, unless its first row names commit_gb (394
 ## amended (20)).
@@ -1085,6 +1094,15 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 raise SystemExit(3)
             place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
             table = kinds()
+            # Its own estimate as kinds.json has it now (394 amended (24)), its
+            # lean variant's once it has gone lean: not the one read when it
+            # queued. A scene queued the second one heavy scene raised the
+            # kind's estimate to 13.6 GB judged itself by that while the
+            # estimate fell to 4.4, and held nine scenes behind it (11-09).
+            if kind in table:
+                fresh = dict(table[kind], kind=kind) if estimate == kind else lean_row(table, kind)
+                if fresh is not None:
+                    row = fresh
             ahead = [dict(queued_row(table, each, row), tree=each["tree"]) for each in queue[:place - 1]]
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
@@ -1266,6 +1284,11 @@ def run(tree, kind, command, expect_minutes=None):
             tree, kind, outer["tree"], outer["kind"]), file=sys.stderr)
         log("nested", tree, kind, "inside %s %s" % (outer["tree"], outer["kind"]))
         return shell_code(subprocess.call(command))
+    many = next((name for name in MANY_GODOT_TESTS if any(name in str(part) for part in command)), None)
+    if many is not None and kind != "net":
+        print("heavy_job: %s starts several Godots: run it as net, not %s (394 amended (24))" % (many, kind), file=sys.stderr)
+        log("refused", tree, kind, "%s is a net run" % many)
+        return 2
     restarts = 0
     while True:
         adopted, estimate = _adopt_take(tree, kind)

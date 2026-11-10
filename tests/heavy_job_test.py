@@ -769,6 +769,68 @@ check("\tattach\tart\tgodot_export\tpid " in text and "attached peak " in text, 
 if os.path.exists(gate._path("kinds.json")):  # Not there when the attach failed: the FAILs above say why.
     os.remove(gate._path("kinds.json"))
 
+print("== a waiter re-reads its estimate at every look (394 amended (24)) ==")
+import threading
+real_memory, real_total_ram, real_poll = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
+real_margins = gate.MARGIN_GB, gate.COMMIT_MARGIN_GB
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0  # The real ones: this part is about room (earlier parts set none).
+gate._memory = lambda: (40.0, 40.0)
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.05
+for each in gate._entries("queue") + gate._entries("running"):
+    folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
+    os.remove(gate._path(folder, each["file"]))
+def owed_job(tree, kind, ram):
+    # Running, owed all of [ram] (nothing used yet): 40 GB free, 15 owed, 25 to give.
+    gate._write(gate._path("running", "%s-%s-%d.json" % (tree, kind, os.getpid())), {"tree": tree, "kind": kind,
+        "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()), "queued": time.time(), "started": time.time(),
+        "ram_gb": ram, "commit_gb": ram, "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": True})
+def until(condition, seconds=30.0):
+    end = time.time() + seconds
+    while not condition() and time.time() < end:
+        time.sleep(0.05)
+    return condition()
+def trees(folder):
+    return [each["tree"] for each in gate._entries(folder)]
+saved_kinds = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=20.0, commit_gb=1.0)})
+owed_job("held", "godot_import", 15.0)
+waiter = threading.Thread(target=lambda: gate.take("late", "scene", os.getpid()), daemon=True)
+waiter.start()
+until(lambda: trees("queue") == ["late"])
+time.sleep(0.5)
+check(trees("queue") == ["late"], "queued under a 20 GB estimate, 25 GB to give: it waits (%s)" % trees("queue"))
+gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=2.0, commit_gb=1.0)})
+check(until(lambda: "late" in trees("running")), "the estimate falls to 2 GB: the same waiter starts, not requeued (%s)" % trees("running"))
+waiter.join(5)
+gate.release("late", "scene")
+# A suite first in the queue waits on memory the running job will give back (25 + 8 wanted, 25 to give):
+# the scene behind it, in reach, never goes past it.
+gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=2.0, commit_gb=1.0),
+    "suite": dict(gate.KINDS["suite"], ram_gb=25.0, commit_gb=1.0, lean_first=False)})
+gate._write(gate._path("queue", "%019d-first-%d.json" % (time.time_ns(), os.getpid())), {"tree": "first", "kind": "suite",
+    "pid": None, "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+behind = threading.Thread(target=lambda: gate.take("behind", "scene", os.getpid()), daemon=True)
+behind.start()
+until(lambda: trees("queue") == ["first", "behind"])
+time.sleep(1.0)
+check(trees("queue") == ["first", "behind"] and "behind" not in trees("running"),
+    "a scene behind a suite waiting on memory stays behind it: the suite is never delayed (%s)" % trees("queue"))
+for each in gate._entries("queue") + gate._entries("running"):
+    folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
+    os.remove(gate._path(folder, each["file"]))
+behind.join(5)
+check(gate.run("phys", "scene", ["bash", "tests/net_test.sh"]) == 2 and not trees("queue"),
+    "net_test under scene: refused before it queues (run it as net)")
+check("net" in gate.kinds() and gate.kinds()["net"]["max_running"] == 1 and "bench" in gate.kinds()["net"]["excludes"],
+    "net, a kind of its own: one at a time, never beside a bench")
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved_kinds is not None:
+    gate._write(gate._path("kinds.json"), saved_kinds)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

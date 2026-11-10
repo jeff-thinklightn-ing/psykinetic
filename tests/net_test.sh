@@ -109,7 +109,8 @@ finish() {
 WAIT_LIMIT="${NET_TEST_WAIT:-120}"
 wait_for() {
 	waited=0
-	until [ "$(grep -cE "$2" "$LOGS/$1.log" 2>/dev/null || true)" -ge "${3:-1}" ]; do
+	# A log not made yet counts 0 (grep -c prints nothing for a missing file).
+	until n="$(grep -cE "$2" "$LOGS/$1.log" 2>/dev/null)"; [ "${n:-0}" -ge "${3:-1}" ]; do
 		waited=$((waited + 1))
 		if [ "$waited" -gt $((WAIT_LIMIT * 4)) ]; then
 			echo "  (gave up waiting for /$2/ in $1.log)"
