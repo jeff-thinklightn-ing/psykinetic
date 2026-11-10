@@ -19579,15 +19579,17 @@ func _camp_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
 
 
 ## Where the starter stall's keeper of [param place_id] stands (736): within
-## its radius of the cell of a "stall" place of his town (buildings' "weapon_stall",
-## behind the counter), the first by id; none, the store's 5x5 at [param store].
+## its radius of the cell of the "stall" place economy.json vendor.stall names
+## in his town's area (buildings' "weapon_stall", behind the counter), and no
+## other stall place (another one laid, keyed before it, never takes him);
+## none, or not a stall of his town, the store's 5x5 at [param store].
 func _vendor_spot(place_id: String, store: Vector2i) -> Rect2i:
 	var town := World.holdings.place(place_id)
-	for id: String in World.holdings.places_in(str(town.get("area", ""))):
-		var stall := World.holdings.place(id)
-		if str(stall.get("kind", "")) == "stall" and str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
-			var radius := maxi(int(stall.get("radius", 1)), 0)
-			return Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	var key := str(World.economy.rules.get("vendor", {}).get("stall", "")) if World.economy != null else ""
+	var stall := World.holdings.place("%s/%s" % [town.get("area", ""), key]) if not key.is_empty() else {}
+	if str(stall.get("kind", "")) == "stall" and str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
+		var radius := maxi(int(stall.get("radius", 1)), 0)
+		return Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
 	return Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
 
 

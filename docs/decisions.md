@@ -37916,6 +37916,21 @@ with the purse following the price down. economy agreed (no soak counts
 gold_changed). Server and client: the "shop" message is unchanged, protocol
 unchanged (b16a7a9da620), no new class_name.
 
+736 amended (4) (release's label; the coordinator's approval, from builder's
+piece tool): Rolf stands at his named stall, never the first one found.
+Main._vendor_spot took the first "stall" place of his town's area in sorted
+id order, so any second stall place, laid by hand or by a tool and keyed
+before "weapon_stall" (a "stall_2"), would have moved him to it without a
+word. economy.json vendor gains "stall": "weapon_stall", and _vendor_spot
+takes only "<area>/<that key>", and only when it is a stall place held for
+his town; else, as before, the store's 5x5. Builder's tool lays a
+market_stall as dressing only, with no stall place (nothing reads the kind
+but this: no resident takes up a stall, and merchants sell at the store's
+counter), and a stall seller is a design for another day. resident_test
+_test_vendor: a decoy stall keyed before his named one doesn't take him, and
+on its own leaves him by the store. Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 735, sound's side: the draugr laughs as he attacks on a refusal (voice.draugr_laugh)
 
 Jeff: the draugr "laughs as he attacks you" when you refuse him. The coordinator approved a
