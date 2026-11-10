@@ -633,9 +633,12 @@ static func _rumour_offer(worker_id: String, who: Dictionary, given: Dictionary)
 		Hearsay._lower_first(str(entry.get("text", "")))], {"heard": str(entry.get("id", ""))}, "")
 
 
-## The scholar's chronicle (decision 491): at home (their desk, by the
-## routine, 404) a scholar offers to read it; nothing elsewhere, nothing
-## from anyone else.
+## The scholar's chronicle (decision 491): at work or at home (by the
+## routine, 404) a scholar offers to read it, the chronicle with him
+## (PAGE_AT; at home alone, since 772 home is his sleep spell's, so it was
+## all but never offered); nothing elsewhere, nothing from anyone else.
+## Asleep, nobody is offered anything (Main._greeted).
+const PAGE_AT: Array[String] = ["work", "home"]
 static func _page_offer(worker_id: String, who: Dictionary, town: String, given: Dictionary) -> Dictionary:
 	if str(who.get("type", "")) != SCHOLAR or town.is_empty():
 		return {}
@@ -644,11 +647,11 @@ static func _page_offer(worker_id: String, who: Dictionary, town: String, given:
 	var hour := DayNight.hour(at)
 	if is_nan(hour) or is_inf(hour):
 		return {}
-	if Townsfolk.whereabouts(_trade_of(who), hour, Season.name_at(at), SCHOLAR, worker_id, Townsfolk.day_of(at)) != "home":
+	if not Townsfolk.whereabouts(_trade_of(who), hour, Season.name_at(at), SCHOLAR, worker_id, Townsfolk.day_of(at)) in PAGE_AT:
 		return {}
 	var name := str(who.get("name", worker_id))
 	return _offer(worker_id, PAGE, "chronicle", "Read the chronicle",
-		"%s keeps the town's chronicle here at %s desk, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ)
+		"%s keeps the town's chronicle, with %s copy always to hand, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ)  # Voice's words (491 amended).
 
 
 ## "her", "his" or "their" for [param their_card]'s pronoun.

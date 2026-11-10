@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
+	_test_sick_word()  # 501 amended (2): last, as it moves the day on.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -2225,6 +2226,98 @@ func _test_sick_body() -> void:
 	World.production.set_away("rs-folk07", true)
 	if not hut.is_empty():
 		World.production.set_away("medicine_man:" + hut, true)
+	Townsfolk.use_rules({})
+	_sync()
+
+
+## A sick townsman clicked in bed says what ails him and what would help
+## (501 amended (2)), where he said "Not now.": the town's one smith, a
+## healer's hut in the zone: the walk asked, standing (the HUD's say-yes),
+## a yes and he follows; seen to, the mend's line, and up by morning; in his
+## sleep spell, asleep; no hut, a remedy asked.
+func _test_sick_word() -> void:
+	print("
+== a sick townsman in bed tells you what ails him and what would help (501 amended (2)) ==")
+	var rules := Townsfolk.rules().duplicate(true)
+	rules["sick"] = {"chance": 0.000000001, "winter": 1, "hungry": 1, "old": 1, "days": 5, "death_old": 0.0, "visit_hours": 2, "kinds": ["a cough"]}
+	Townsfolk.use_rules(rules)
+	var steps_was := World.steps  # The day moved on below, put back after: the later tests' hails run by the day.
+	var due_was: Dictionary = Townsfolk._sick_due.duplicate()
+	var says: Dictionary = rules.get("sick_says", {})
+	_check(says.get("hut", []).size() == 3 and says.get("remedy", []).size() == 3 and says.get("treated", []).size() == 3 and str(says.get("walk_title", "")).contains("{name}"),
+		"townsfolk.json sick_says: voice's three pools and the walk's title")
+	var hut: String = _main._healers_hut_of(STORE)
+	var player := _player()
+	if World.production.worker("rs-bram").is_empty():
+		World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith")
+	World.production.set_away("rs-bram", false)
+	_check(World.production.worker("rs-bram").get("trades", []) == ["smith"], "(Bram the smith, the only one about: the rest are away)")
+	Townsfolk._set_sickness(World.production, "rs-bram", {"since": Townsfolk.day_of(World.steps), "kind": "a cough", "treated": -1, "cured_by": ""})
+	DayNight.set_hour(11.0)
+	_sync()
+	var bram := _body("rs-bram")
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	if bram == null or player == null or hut.is_empty():
+		_check(false, "(Bram's body, the player and the test town's hut: %s %s %s)" % [bram, player, hut])
+	else:
+		_check(bram.doing == Resident.Doing.BED and not bram.sleeping(), "at eleven Bram lies sick in bed, awake")
+		_put(player, _main._nearest_free(bram.tile + Vector2i(1, 0)))
+		var pid: String = player.player_id
+		_main._greet_at.clear()
+		_main._standing.erase(pid)
+		_main._greeted(player, bram)
+		var hut_lines: Array = says["hut"].map(func(l: String) -> String: return l.replace("{kind}", "a cough"))
+		_check(spoken.size() == 1 and spoken[0] in hut_lines and not "Not now." in spoken, "clicked: his cough and the walk to the healer's asked, not \"Not now.\" (%s)" % [spoken])
+		var standing: Dictionary = _main._standing_for(pid, "rs-bram")
+		_check(str(standing.get("title", "")) == "Walk Bram to the healer's", "the walk stands as his offer, by his name, for the say-yes: %s" % [standing.get("title", "")])
+		_check(not _main._offer_said(bram, player, "yes"), "a yes takes no offer of the list (the walk is 501's word)")
+		_main._ask_resident(bram, _main._display_name(player), "yes", player)
+		_check(bram.escort_of == pid, "and the yes, as any word, sets him following at heel")
+		_main._resident_asks.clear()
+		_main._resident_out.clear()
+		_check(_main._standing_for(pid, "rs-bram").is_empty(), "the walk taken, nothing stands")
+		bram.escort_of = ""
+		Townsfolk.treat(World.production, "rs-bram", "Oren", "the medicine man", pid)
+		_sync()
+		spoken.clear()
+		_main._greet_at.clear()
+		_main._greeted(player, bram)
+		_check(spoken.size() == 1 and spoken[0] in says["treated"] and _main._standing_for(pid, "rs-bram").is_empty(), "seen to: the mend's line next click, nothing asked (%s)" % [spoken])
+		var spell := Townsfolk.sleep_spell("rs-bram")
+		DayNight.set_hour(fposmod(spell.x + 0.2, 24.0))
+		_sync()
+		spoken.clear()
+		_main._greet_at.clear()
+		_main._greeted(player, bram)
+		_check(spoken.is_empty(), "in his sleep spell, abed: no word, he is told asleep (%s)" % [spoken])
+		DayNight.set_hour(11.0)
+		World.steps += DayNight.day_steps
+		Townsfolk.sicken(World.production)
+		_sync()
+		_check(not Townsfolk.is_sick(World.production, "rs-bram") and _body("rs-bram") != null and _body("rs-bram").doing != Resident.Doing.BED,
+			"by the next morning he is up and about")
+		# No hut in the zone: a remedy asked.
+		Townsfolk._set_sickness(World.production, "rs-bram", {"since": Townsfolk.day_of(World.steps), "kind": "the shakes", "treated": -1, "cured_by": ""})
+		var kept: Dictionary = World.holdings._places.get(hut, {})
+		World.holdings._places.erase(hut)
+		_sync()
+		spoken.clear()
+		_main._greet_at.clear()
+		_main._standing.erase(pid)
+		_main._greeted(player, _body("rs-bram"))
+		var remedy_lines: Array = says["remedy"].map(func(l: String) -> String: return l.replace("{kind}", "the shakes"))
+		_check(spoken.size() == 1 and spoken[0] in remedy_lines and _main._standing_for(pid, "rs-bram").is_empty(), "no healer's hut: a remedy in his hands asked, nothing standing (%s)" % [spoken])
+		World.holdings._places[hut] = kept
+		Townsfolk._set_sickness(World.production, "rs-bram", {})
+	Net.message_received.disconnect(heard)
+	World.production.set_away("rs-bram", true)
+	World.steps = steps_was
+	Townsfolk._sick_due = due_was
+	DayNight.set_hour(11.0)
 	Townsfolk.use_rules({})
 	_sync()
 

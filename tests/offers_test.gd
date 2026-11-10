@@ -490,6 +490,27 @@ func _test_chronicle() -> void:
 	_check(Standing.words(Townsfolk.card_of(_work, "o-odo"), "p1") != "" and Townsfolk.card_of(_work, "o-odo").get("standing", {}).has("p1"), "they have met")
 	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "well"}, {"from": 12, "to": 24, "at": "well"}]}, "gossip": {"every": 0}})
 	_check(_offers("o-odo").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "at the well, no chronicle: it is at the desk")
+	# His real rolled week (residents.json's days: his trade's work, the scholar's temple hour, the temple day, the
+	# night picks, his sleep spell): on offer for hours a day while he is up, at work or home, never elsewhere
+	# (772's sleep spells left home his abed hours alone, the offer all but gone).
+	var real: Variant = JSON.parse_string(FileAccess.get_file_as_string(Townsfolk.DAYS_FILE))
+	Townsfolk.use_days(real if real is Dictionary else {})
+	var quarters := 0
+	var stray := 0
+	for day in 7:
+		for quarter in 96:
+			_now = day * DayNight.day_steps + quarter * DayNight.day_steps / 96
+			var hour := DayNight.hour(_now)
+			var where := Townsfolk.whereabouts("smith", hour, Season.name_at(_now), "scholar", "o-odo", Townsfolk.day_of(_now))
+			var offered := _offers("o-odo").any(func(o: Dictionary) -> bool: return o["kind"] == Offers.PAGE)
+			if offered and not Townsfolk.asleep_at("o-odo", hour):
+				quarters += 1
+			if offered and not where in Offers.PAGE_AT:
+				stray += 1
+	_check(quarters / 4.0 / 7.0 >= 8.0, "his real week: the chronicle on offer %.1f hours a day while he is up (at least 8)" % [quarters / 4.0 / 7.0])
+	_check(stray == 0, "never offered away from work and home (%d quarters)" % stray)
+	Townsfolk.use_days({"default": {"stints": [{"from": 0, "to": 12, "at": "home"}, {"from": 12, "to": 24, "at": "home"}]}, "gossip": {"every": 0}})
+	_now = 0
 	Offers.ctx = _ctx
 
 

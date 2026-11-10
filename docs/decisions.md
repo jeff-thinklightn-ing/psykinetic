@@ -14672,6 +14672,8 @@ Rejected: a model writing the chronicle (invention); a new message kind
 for a page (ui's work and a protocol bump for a dozen talk-log lines); a
 chronicle file on the box; the chronicle as an item to carry.
 
+491 amended (release's label; the coordinator's ruling on npc's resident sweep): the chronicle is offered wherever the scholar is met at work or at home awake (Offers.PAGE_AT), with the chronicle to hand. Since 772 a home stint is "home" only inside the sleep spell (its quarter-hour lead aside), the rest of the night a night pick, and asleep nobody is offered anything (Main._greeted), so the offer at home alone was all but gone (about 15 game minutes a night) for every scholar. Its text is voice's: "%s keeps the town's chronicle, with %s copy always to hand, and will read it to you." offers_test walks his real rolled week (residents.json's days: his trade's work, the scholar's temple hour, the temple day, the night picks, his sleep spell) and wants at least 8 hours a day on offer while he is up, never away from work and home, so a change to the days cannot empty it again unseen. Server only; protocol unchanged; no new class_name.
+
 ## 492. The scoundrel: short measures and a bad loan
 
 The hidden types' side-doings (393; the thief 393/461, the scholar and
@@ -15480,6 +15482,8 @@ are unchanged, and it has no catalog value: economy's value_of prices it
 from its wool and work (economy: 4 gold of wool into 3 cloth is the
 weaver's margin, the reason to bring sheep in). It is measured, so a scoundrel weaver's short measure (493) applies. Wool is a
 store resource from economy's c3130ddc. Protocol unchanged.
+
+501 amended (2) (release's label; the coordinator's ruling on npc's resident sweep; voice's words): a sick townsman clicked in bed and awake says what ails him and what would help, where he said only "Not now." and nothing told the player why (the town window counts the sick; the hover's ailment shows only with hints on; kin's plea is a founding roll). Main._sick_word, by townsfolk.json "sick_says", the line by the id and the day, {kind} the sickness: seen to, "treated" (up by morning); with a healer's hut in his zone (Main._healers_hut_of, as the walk's own test in _ask_resident), "hut", the walk asked, and it stands as an offer titled walk_title ("Walk {name} to the healer's") through Main._speak_offer, so the HUD shows its say-yes and Y says yes; no offer of the list matches it, so the yes, as any word, reaches _ask_resident and starts the walk (501's), which lets the standing go; else "remedy", a remedy put in his hands (443's hand-over) asked. In his sleep spell he is told asleep (751's line): the sick lie abed without the sleep activity, so _sick_word reads Resident.asleep_now. A companion resting in town speaks for herself, as before. Not a clickable row: townsfolk's offers are taken by a typed word (the coordinator sends ui that gap); a click never starts the walk (the coordinator: the player chooses). resident_test _test_sick_word: the town's smith with the hut, the line and the standing walk, a yes and he follows, the mend's line next click, asleep in his spell, up the next morning; with no hut, the remedy's line. Server only; protocol unchanged (the standing rides the offers message's "standing" as since 536); no new class_name.
 
 ## 501 amended, items' side: herbs, and the remedy's recipe
 

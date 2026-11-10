@@ -12070,6 +12070,8 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 		elif Townsfolk.is_sick(World.production, body.worker_id) and int(Townsfolk.sickness_of(World.production, body.worker_id).get("treated", -1)) < 0 \
 				and not _healers_hut_of(body.town).is_empty():
 			body.start_escort(player_id, speaker)  # Sick: a word, and they let you walk them to the healer (decision 501).
+			if str(_standing.get(player_id, {}).get("worker", "")) == body.worker_id:
+				_standing.erase(player_id)  # Their walk asked (501 amended (2)) taken: nothing stands.
 	body.asked_by = player_id
 	body.asked_by_name = speaker
 	if not player_id.is_empty() and World.production != null:
@@ -18436,6 +18438,34 @@ func _hails_tick() -> void:
 				return
 
 
+## What [param body], sick in bed and awake, says to a click (501 amended
+## (2); townsfolk.json "sick_says", voice's words, by the id and the day;
+## {kind} the sickness): seen to, the "treated" line; with a healer's hut in
+## their zone, the walk asked ("hut"), and its offer's "title" (SICK_WALK,
+## {name} theirs); else a remedy handed over ("remedy"). In their sleep
+## spell {"asleep": true}: the sick lie abed without the sleep activity, so
+## Main._greeted tells them asleep, as anyone (751). {} for anyone else: a
+## companion resting in town speaks for herself.
+const SICK_WALK := "sick_walk"
+func _sick_word(body: Resident) -> Dictionary:
+	if body == null or not is_instance_valid(body) or not body.card.is_empty() or body.doing != Resident.Doing.BED 			or World.production == null or not Townsfolk.is_sick(World.production, body.worker_id) or body.sleeping():
+		return {}
+	if Resident.asleep_now(body.worker_id):
+		return {"asleep": true}
+	var says: Dictionary = Townsfolk.rules().get("sick_says", {})
+	var sickness := Townsfolk.sickness_of(World.production, body.worker_id)
+	var walk := int(sickness.get("treated", -1)) < 0 and not _healers_hut_of(body.town).is_empty()
+	var pool := "treated" if int(sickness.get("treated", -1)) >= 0 else ("hut" if walk else "remedy")
+	var lines: Array = says.get(pool, [])
+	if lines.is_empty():
+		return {}
+	var day := Townsfolk.day_of(World.production.now())
+	var out := {"line": str(lines[absi(hash(body.worker_id + ":" + str(day))) % lines.size()]).replace("{kind}", str(sickness.get("kind", "a fever")))}
+	if walk:
+		out["title"] = str(says.get("walk_title", "")).replace("{name}", body.person)
+	return out
+
+
 ## Whether [param body] is one to hail or greet at all: spawned, out and
 ## about (not strayed, escorting, hiding, in bed), a townsperson (not a
 ## companion resting in town, who speaks for herself).
@@ -19022,6 +19052,19 @@ func _greeted(player: Player, body: Resident) -> void:
 	for serial: Variant in _resident_out:
 		if int(_resident_out[serial].get("body", 0)) == body.get_instance_id():
 			busy = true
+	var sick := _sick_word(body) if not busy else {}
+	if not sick.is_empty():
+		# In bed and awake, they say what ails them and what would help (501 amended (2)); the walk asked stands
+		# as an offer (the HUD's say-yes), and a word to them starts it (501's, _ask_resident).
+		_greet_at[key] = now_msec
+		if sick.has("asleep"):
+			_asleep_told(player, body)  # In their sleep spell, abed: asleep, as anyone (751).
+		elif sick.has("title"):
+			_speak_offer(body, body.worker_id, body.person, player, {"id": Offers.SEP.join([body.worker_id, Offers.PLEA, SICK_WALK]),
+				"kind": Offers.PLEA, "title": sick["title"], "words": sick["line"]})
+		else:
+			_resident_says(body, sick["line"], "", player)
+		return
 	if not _hail_able(body) or busy:
 		var refuse := str(rules.get("refuse", "Not now."))
 		if not refuse.is_empty() and body.card.is_empty():  # A companion resting in town speaks for herself.
