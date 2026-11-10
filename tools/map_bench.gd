@@ -30,9 +30,18 @@ extends Node
 ## --yaw=D turns it to D degrees; a shot leaves out the hints.
 ## --stand-in=1 draws the border's pine stands with PineStands' stand-in
 ## while their slot has no art (shots, to tune the packing).
-## --low=1 turns the low camera on (decision 623) and --scatter-reach=N sets
-## its scatter's reach (decision 653); the frames start with the scatter
-## round the view built.
+## --low=1 turns the low camera on (decision 623) and --low=0 the ortho view
+## (the low camera is the default with a settings file, 623 amended; without
+## --low the camera is as that file says); --scatter-reach=N sets its
+## scatter's reach (decision 653); the frames start with the scatter round
+## the view built.
+## Before the frames (828 amended (2)): a "BENCH ran:" line read back from the
+## scene, not the flags (host or client, level, camera and zoom, weather,
+## window, how much of the frame is water), and the run fails (exit 4) naming
+## any of them that differs from what a flag asked, or (exit 3) if the game
+## never left the connect screen (a client with no server: pass --host).
+## The player's pack, open on a fresh player's first join, is kept shut: the
+## frames are the view.
 ## --season=NAME starts the year in that season (Season.NAMES).
 ## --hour=H starts the clock at that hour (0..24: 12 noon).
 ## --weather-at=KIND@S turns every region's weather to KIND S seconds into
@@ -73,6 +82,7 @@ var shot := ""
 var shot_zoom := 0.0
 var shot_yaw := NAN
 var low := false
+var low_given := false
 var scatter_reach := 0.0
 ## --weather-at: the kind, and when in the frames ("" once done).
 var weather_at := ""
@@ -119,14 +129,16 @@ func _ready() -> void:
 			"off": off.assign(pair[1].split(","))
 			"stand-in": PineStands.stand_in = pair[1] != "0"
 			"season": Net.start_season = pair[1].to_lower() if Season.NAMES.has(pair[1].to_lower()) else ""
-			"low": low = pair[1] != "0"
+			"low":
+				low = pair[1] != "0"
+				low_given = true
 			"scatter-reach": scatter_reach = pair[1].to_float()
 			"hour": Net.start_hour = fposmod(pair[1].to_float(), 24.0)
 			"weather-at":
 				weather_at = pair[1].get_slice("@", 0).to_lower()
 				weather_at_s = pair[1].get_slice("@", 1).to_float()
-	if low:
-		Net.set_camera_low(true, false)
+	if low_given:
+		Net.set_camera_low(low, false)  # Both ways: --low=0 was a no-op while the low camera was the default (11-10).
 	var windowed := DisplayServer.get_name() != "headless"
 	print("BENCH size=%d cells (%d floor), monsters/room=%d, cells/monster=%s, players=%d, %s" % [size, size * size,
 		monsters, "every spot" if cells_per_monster <= 0.0 else str(cells_per_monster), players,
@@ -319,16 +331,17 @@ func _ready() -> void:
 		Performance.get_monitor(Performance.OBJECT_COUNT),
 		(OS.get_static_memory_usage() - memory_before) / 1048576.0])
 
-	if windowed:
-		await _frames()
+	if windowed and not await _frames():
+		return  # Its exit code already set: nothing timed.
 	print("BENCH done")
 	get_tree().quit()
 
 
 ## Frames for [member seconds] with the world ticking as in play, vsync
 ## off: the average and worst frame, draw calls and video memory, and the
-## renderer's share of a frame.
-func _frames() -> void:
+## renderer's share of a frame. False, the exit code set, when the game
+## never left the connect screen or ran other than its flags asked.
+func _frames() -> bool:
 	World.set_process(true)
 	var viewport := get_viewport().get_viewport_rid()
 	RenderingServer.viewport_set_measure_render_time(viewport, true)
@@ -336,6 +349,13 @@ func _frames() -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	for i in 30:
 		await get_tree().process_frame
+	# A client with no server (no mode named, a fresh settings file): the
+	# connect screen over the view, and nothing of the game to time (11-10).
+	var connect_screen: Variant = _main.get("connect_screen")
+	if Net.mode == Net.Mode.CLIENT and not Net.online or connect_screen != null and connect_screen.visible:
+		print("BENCH never left the connect screen (a client with no server: pass --host); nothing timed")
+		get_tree().quit(3)
+		return false
 	var view: Node = _main._client3d
 	if view != null and off.has("shadows"):
 		for light: OmniLight3D in view._shadow_lights:
@@ -389,6 +409,13 @@ func _frames() -> void:
 			pass
 		print("BENCH scatter round the view (reach %.0f): built in %.1f ms; %s" % [view._scatter_reach(),
 			(Time.get_ticks_usec() - built) / 1000.0, _scatter_drawn(view)])
+	_shut_pack()
+	await get_tree().process_frame
+	var differs := _ran(view, host)
+	if differs != "":
+		print("BENCH ran other than its flags asked: %s; nothing timed" % differs)
+		get_tree().quit(4)
+		return false
 	var home := host.tile if host != null else Vector2i.ZERO
 	var stepped := 0
 	var turn_total := 0
@@ -420,6 +447,7 @@ func _frames() -> void:
 		spikes.append(Vector2((now - last) / 1000.0, (now - started) / 1000000.0))
 		last = now
 		frames += 1
+		_shut_pack()
 		if view != null and spin != 0.0:
 			var turn_started := Time.get_ticks_usec()
 			view._set_yaw(view.yaw + spin * delta)
@@ -513,6 +541,71 @@ func _frames() -> void:
 	if turns > 0:
 		print("BENCH turning %.0f degrees a second: the turn itself avg %.2f ms, worst %.2f ms a frame (%d frames)" % [
 			spin, turn_total / 1000.0 / turns, turn_worst / 1000.0, turns])
+	return true
+
+
+## The player's pack shut (a fresh player's first join opens it, over a
+## third of the frame); looked at each frame, as the join may come late.
+func _shut_pack() -> void:
+	var pack: Variant = _main.get("pack_panel")
+	if pack != null and pack.shown:
+		pack.shown = false
+		print("BENCH the pack shut (opened by the first join)")
+
+
+## The "BENCH ran:" line, read back from the scene after setup (828 amended
+## (2)), and what in it differs from what a flag asked ("" for nothing): a
+## still's or a number's label can be checked from its log.
+func _ran(view: Node, host: Player) -> String:
+	var mode := str(Net.Mode.find_key(Net.mode)).to_lower()
+	var level := str(_main.get("map_name"))
+	var camera := "none"
+	var zoom := 0.0
+	if view != null:
+		camera = "low" if view._low else "high (ortho)"
+		zoom = view.zoom
+	var weather := str(Weather.at(World.fields.region, World.steps).get("kind", "clear")) if World.outdoor else "indoors"
+	var window := DisplayServer.window_get_size()
+	print("BENCH ran: %s%s, level %s, camera %s, zoom %.2f, weather %s, window %dx%d, water about %.0f%% of the frame (unoccluded)" % [
+		mode, " online" if Net.online else " offline", level, camera, zoom, weather, window.x, window.y, _water_share(view, host)])
+	var differs: Array[String] = []
+	if OS.get_cmdline_user_args().has("--host") and (Net.mode != Net.Mode.HOST or not Net.online):
+		differs.append("%s%s, asked --host" % [mode, "" if Net.online else " offline"])
+	var asked_level := NAME if map == "" else map
+	if level != asked_level:
+		differs.append("level %s, asked %s" % [level, asked_level])
+	if low_given and view != null and view._low != low:
+		differs.append("camera %s, asked --low=%d%s" % [camera, int(low), "" if World.outdoor else " (indoors: no low camera)"])
+	if shot_zoom > 0.0 and view != null and absf(view.zoom - shot_zoom) > 0.01:
+		differs.append("zoom %.2f, asked %.2f" % [view.zoom, shot_zoom])
+	if Net.start_weather != "" and weather != Net.start_weather:
+		differs.append("weather %s, asked %s" % [weather, Net.start_weather])
+	return "; ".join(differs)
+
+
+## How much of the frame looks onto water cells (World.is_water), percent:
+## rays on a 48 x 27 grid met with the ground's plane at the host's height,
+## nothing in front counted (the reeds round a pond hide some of it).
+func _water_share(view: Node, host: Player) -> float:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return 0.0
+	var ground := 0.0
+	if view != null and host != null and view._puppets.has(host.get_instance_id()):
+		ground = (view._puppets[host.get_instance_id()] as Node3D).global_position.y
+	var size := get_viewport().get_visible_rect().size
+	var hits := 0
+	for gy in 27:
+		for gx in 48:
+			var at := Vector2((gx + 0.5) / 48.0 * size.x, (gy + 0.5) / 27.0 * size.y)
+			var from := camera.project_ray_origin(at)
+			var way := camera.project_ray_normal(at)
+			if way.y > -0.0001:
+				continue
+			var hit := from + way * ((ground - from.y) / way.y)
+			if World.is_water(Vector2i(roundi(hit.x), roundi(hit.z))):
+				hits += 1
+	return 100.0 * hits / (48.0 * 27.0)
 
 
 ## players - 1 more players, each at the free tile nearest a point of a grid

@@ -46618,6 +46618,39 @@ or atlas (asus-atlas, C: only, ssh into PowerShell, so each command is passed to
 PowerShell line); --repeat N runs the game N times on the same user data (a player's next session, its
 caches warm). Tools only; protocol unchanged; no class_name.
 
+828 amended (2) (perf, 2026-11-10; the coordinator's ruling, release's label): a laptop run says what
+it ran, and a run that wasn't what was asked fails. Two labels in one day didn't match their runs. A
+game started with no mode reads a fresh settings file, joins 127.0.0.1 as a client, finds no server and
+waits behind the connect screen: nine of perf's rain and glass benches timed that screen, and
+pc-character's satchel shot found no bodies. And map_bench's --low=0 never turned the low camera off,
+the default whenever a settings file exists (623 amended), so every "high camera" still and number of
+the day was the low one.
+- remote_shot.sh adds --host after the game's "--" when no mode is named there (--host, --client,
+  --server, --practice, --menu), and prints that it did. After the run, a godot.log that shows a client
+  joining and no host listening, with --client not asked, fails the run as void.
+- remote_shot.sh refuses before the laptop is touched: --headless, --path, --position, --resolution,
+  --fullscreen and --maximized (the runner sets the window and the path), and a res://tests/ scene (the
+  suite runs those headless). A locked laptop, or one at its logon screen (LogonUI running), is refused
+  at once, where its run used to wait out the whole timeout behind the lock. The exit trap deletes the
+  run's scheduled task too: a stopped run used to leave psyk_shot_<name> behind. schtasks's warning that
+  /ST is past is hidden.
+- map_bench's --low sets the camera both ways (--low=0 the ortho view); with no --low it is as the
+  settings file says. After 30 frames, a client with no server, or the connect screen up, exits 3 ("never
+  left the connect screen"), with nothing timed. Before the frames it prints "BENCH ran:", read back from
+  the scene rather than the flags: host or client and online, the level, the camera (low, or high
+  (ortho)) and its zoom, the weather's kind (Weather.at), the window's size, and how much of the frame
+  looks onto water (rays on a 48 by 27 grid met with the ground's plane at the host's height and
+  World.is_water, nothing in front counted). Anything that differs from what --host, --map, --low, --zoom
+  or --weather asked exits 4, naming each difference, with nothing timed. The player's pack, opened by a
+  fresh player's first join over a third of the frame, is kept shut through the frames.
+- Checked on the Lenovo from a scratch commit, four runs. No mode: --host added, hosted, "camera low,
+  zoom 1.00, weather storm, window 1600x900, water about 3%" at Reed Pond. --low=0: "camera high (ortho)",
+  water about 21%. --low=1 on the indoor dungeon: exit 4, "camera high (ortho), asked --low=1 (indoors: no
+  low camera)". --client: exit 3, "never left the connect screen".
+- Not changed: swap_bench and the trees' shot scenes are git-ignored and their own. They host when given
+  --host, which remote_shot now adds, and remote_shot's client check covers their runs too.
+Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 833. Windows renders with Vulkan, D3D12 as the fallback
 
 The coordinator's approval, on perf's laptop benches; release's number. project.godot's

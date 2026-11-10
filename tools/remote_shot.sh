@@ -27,6 +27,9 @@
 # In the godot args, {out} is the run's output folder on the laptop. One run
 # at a time (a lock on the laptop). Nothing is passed but the bundle, the
 # --with files and the args: no agent, no forwarding, no token.
+# No mode after the game's "--" gets --host (828 amended (2)): with none, a
+# fresh settings file waits as a client behind the connect screen. A locked
+# laptop is refused at once, and so are window and path flags and test scenes.
 set -u
 RUNNER=lenovo
 REPEAT=1
@@ -104,17 +107,43 @@ rsh() {
 rps() { rsh "powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Root $ROOT -Runs $RUNS $*"; }
 
 # The game's args: {out} filled in, and the host bound to 127.0.0.1 after the game's "--".
+# The runner sets the window, the path and the audio itself, and a test scene runs headless in
+# the suite, never on a laptop (828 amended (2)): refused before the laptop is touched.
 ARGS=()
 dashed=0
+moded=0
 for arg in "$@"; do
-	[ "$arg" = "--" ] && dashed=1
+	if [ "$arg" = "--" ] && [ $dashed -eq 0 ]; then
+		dashed=1
+	elif [ $dashed -eq 0 ]; then
+		case "$arg" in
+			--headless|--path|--path=*|--position|--position=*|--resolution|--resolution=*|--fullscreen|--maximized)
+				echo "$arg: refused (the runner sets the window and the path; a laptop run is windowed)"; exit 2 ;;
+			res://tests/*|tests/*)
+				echo "$arg: refused (a test scene runs headless in the suite, not on a laptop)"; exit 2 ;;
+		esac
+	else
+		# A mode named after the game's "--" (Net._parse_args); --menu wants the menu on purpose.
+		case "$arg" in --host|--client|--server|--practice|--menu) moded=1 ;; esac
+	fi
 	ARGS+=("${arg//\{out\}/$OUT_FWD}")
 done
 [ $dashed -eq 1 ] || ARGS+=("--")
+# No mode named: a fresh settings file joins 127.0.0.1 as a client, finds no server and waits
+# behind the connect screen, so a bench times that screen and a shot finds no player (11-10).
+if [ $moded -eq 0 ]; then
+	ARGS+=("--host")
+	echo "remote_shot: no mode named (--host, --client, --server, --practice or --menu): added --host"
+fi
 ARGS+=("--bind=127.0.0.1")
 printf '%s\n' "${ARGS[@]}" >"$TMP/args.txt"
 
 rsh "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
+# Locked (or at its logon screen): the task would never show a window, and the run would wait
+# out its whole timeout for nothing (atlas, 11-10). Refused at once.
+if rsh "tasklist /nh /fi \"imagename eq LogonUI.exe\" | find /i \"LogonUI.exe\"" >/dev/null 2>&1; then
+	echo "the laptop is locked (LogonUI runs): nothing run; ask Jeff to unlock it"; exit 1
+fi
 "${SCP[@]}" tools/remote_shot_run.ps1 "$HOST:$(fwd "$helper")" || exit 1
 rps -Mode lock -Dir "$NAME" -StaleMin $((TIMEOUT + 25)) || { echo "the laptop runner is busy"; exit 1; }
 release() { rps -Mode unlock >/dev/null 2>&1; }
@@ -151,11 +180,13 @@ rps -Mode import -TimeoutMin 20 || { echo "import failed"; exit 1; }
 # 2. The run, in the logged-on session.
 # (cmd: the parentheses keep the mkdir out of the if's body.)
 rsh "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run folder"; exit 1; }
-# The run folder (its out and its APPDATA) goes however this ends (828).
-trap 'rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
-"${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
+# The run folder (its out and its APPDATA) and its task go however this ends (828; the task
+# since 828 amended (2): a stopped run left psyk_shot_<name> on the laptop).
 task="psyk_shot_$NAME"
-rsh "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Root $ROOT -Runs $RUNS -Mode run -Dir $DIR -TimeoutMin $TIMEOUT -Repeat $REPEAT\" >nul && schtasks /run /tn $task >nul" \
+trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
+"${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
+# (2>nul: schtasks warns that /ST 00:00 is past; the task is run at once by /run.)
+rsh "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Root $ROOT -Runs $RUNS -Mode run -Dir $DIR -TimeoutMin $TIMEOUT -Repeat $REPEAT\" >nul 2>nul && schtasks /run /tn $task >nul" \
 	|| { echo "no task (is anyone logged on?)"; exit 1; }
 done=""
 for _ in $(seq 1 $(((TIMEOUT + 3) * 6))); do
@@ -173,4 +204,11 @@ mkdir -p "$REVIEW"
 rsh "rmdir /s /q $DIR" >/dev/null 2>&1
 rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
 ls "$REVIEW"
+# A game that joined as a client and never hosted, unless --client was asked: no level of its own,
+# the connect screen over whatever it drew; its numbers and stills are void (828 amended (2)).
+if ! printf '%s\n' "${ARGS[@]}" | grep -qx -- "--client"; then
+	if grep -q "client connecting to" "$REVIEW/godot.log" 2>/dev/null && ! grep -q "host listening" "$REVIEW/godot.log" 2>/dev/null; then
+		echo "remote_shot: the game ran as a client and never hosted: its numbers and stills are void"; exit 1
+	fi
+fi
 case "$done" in "exit 0") exit 0 ;; *) exit 1 ;; esac
