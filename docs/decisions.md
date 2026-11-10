@@ -7415,7 +7415,11 @@ his charge to his axe a told rush (rush's opts "told", carried in the lunge's st
 takes its share of the collision's impact through told_guard along the charge's line, the
 charger his whole, _push and its chain untouched (688 amended (11) holds; physics' read); one
 whose shield takes all of it has no impact (no impact stagger, no wear) and the rush's struck
-counts what it took. Enemy-ai converts the great beasts' sites to told_hit in its own change
+counts what it took. The hurl and the charge push before the guard is read, and a push of a cell
+or more staggers its body, so told_guard takes [stunned_until], the holder's stagger as it stood
+before the move's own push (hurl's result carries it, read before its launch; the charge reads it
+before _push): a move's own stagger never keeps its shield from meeting it (dungeon's site tests
+in draugr_fight_test found both sites letting the whole harm through). Enemy-ai converts the great beasts' sites to told_hit in its own change
 behind this one (the bear's charge, swipe and slam, the grey's lunge, the king's gore, the cat's
 pounce, and Skeech's ambush, which skips the guard today), landing back to back with this in one cut (the coordinator: one rule, never true of one
 foe alone). Only a told move that skips a raised guard today comes to told_guard (the

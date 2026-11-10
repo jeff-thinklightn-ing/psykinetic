@@ -6107,7 +6107,9 @@ func _hurl_lands(by: GridEntity, slot: int, shape: Dictionary) -> void:
 	var result: Dictionary = call("hurl", by, slot, Telegraph.facing_of(shape), int(float(move["length"])), float(move["speed"]))
 	var hit: Variant = result.get("hit")
 	if hit is GridEntity and _alive(hit) and can_target(by, hit):
-		var harm := told_guard(hit, by, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), Vector2(Telegraph.facing_of(shape)))  # 340 amended (3).
+		# 340 amended (3): the guard as it stood before hurl's launch staggered it.
+		var harm := told_guard(hit, by, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), Vector2(Telegraph.facing_of(shape)),
+				int(result.get("stunned_until", -1)))
 		if harm > 0:
 			damage(hit, harm, by, &"attack")
 	var landed: Variant = result.get("landed")
@@ -7452,8 +7454,13 @@ func parry_cap(target: GridEntity) -> int:
 ## facing so a shield turned onto the line meets him whatever cell he
 ## arrives in; Vector2.ZERO (a ring, a spin) reads his body (off_facing).
 ## A sword's parry and a lowered shield meet no told move.
-func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO) -> int:
-	if harm <= 0 or body.raised != "block" or is_sheltered(body) or not holds_in_hands(body) or is_stunned(body):
+## [param stunned_until]: the holder's stunned_until_tick as it stood before
+## this move's own push or launch, for a site that pushes first (the hurl,
+## the told charge): the stagger the move itself gives never keeps its own
+## shield from meeting it (dungeon's site tests). -1 reads it now.
+func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO, stunned_until := -1) -> int:
+	var stunned := tick < (body.stunned_until_tick if stunned_until < 0 else stunned_until)
+	if harm <= 0 or body.raised != "block" or is_sheltered(body) or not holds_in_hands(body) or stunned:
 		return harm
 	if tick < body.bash_moment_until or body.facing == Vector2i.ZERO or not is_instance_valid(by) or by == body:
 		return harm
@@ -10836,6 +10843,7 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 		var lost := 0.5 * m1 * u * u - 0.5 * m1 * maxf(kept, 0.0) * maxf(kept, 0.0) - 0.5 * m2 * given * given
 		var impact := roundi(impact_per_energy * maxf(lost, 0.0) * 0.5)
 		var speed := given + float(blow.get("impulse", 0.0)) / maxf(m2, 0.001)
+		var stunned_until := body.stunned_until_tick  # Before the push staggers it (340 amended (3)).
 		var pushed := _push(entity, body, line, speed, false, int(blow.get("stagger", -1)))
 		var went := 0
 		for each: Dictionary in pushed:
@@ -10843,7 +10851,7 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 				went = each["cells"]
 		# A told charge (340 amended (3)): the one met takes it on a raised shield facing the line;
 		# all of it taken there, it has no impact (no stagger, no wear) and struck counts what it took.
-		var taken := told_guard(body, entity, impact, line) if impact > 0 and bool(state.get("told", false)) else impact
+		var taken := told_guard(body, entity, impact, line, stunned_until) if impact > 0 and bool(state.get("told", false)) else impact
 		if impact > 0:
 			if taken > 0:
 				_impact(body, taken, entity, &"body")
@@ -11004,6 +11012,7 @@ func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float, 
 	if hit != null:
 		items.note(uid, "thrown", "at %s by %s" % [_label_of(hit), _label_of(by)], zone.name, hit.tile)
 		out["hit"] = hit
+		out["stunned_until"] = hit.stunned_until_tick  # Before the launch (340 amended (3): the told guard reads it).
 		var weight := Items.weight_of(id)
 		out["hit_result"] = launch(by, hit, line, weight * speed)
 		if _alive(hit) and not out["hit_result"].get("moved", false):
