@@ -373,6 +373,12 @@ var _drawn_shown := -INF
 ## The facing as shown, an angle in grid space, turning toward the wanted
 ## one at TURN_RATE.
 var _shown_angle := NAN
+## A body drawn backing off (CreatureView sets it for a slot with a back_off: the boar king's;
+## 780 amended (16), his back-off, animation's side): a step run squarely against its facing
+## (BACK_STEP_DOT, a cosine) keeps the facing shown through the slide, its face on its foe, where
+## any other step turns the body to its way.
+var faces_back_steps := false
+const BACK_STEP_DOT := -0.5
 ## 655: the tile the step before the one shown came from, when that step
 ## was drawn bending into this one (so this one starts on the bend), else
 ## UNKNOWN_TILE; and the tile this one bends toward at its end, settled as its
@@ -701,6 +707,9 @@ func _process(delta: float) -> void:
 			_note_push_shown(knocked, to, t)
 			if stepping:
 				wanted = bent[1] if not bent.is_empty() else Vector2(to - _from_tile)
+				var backed := faces_back_steps and facing != Vector2i.ZERO
+				if backed and Vector2(facing).normalized().dot(wanted.normalized()) < BACK_STEP_DOT:
+					wanted = Vector2(facing)  # Backing off, its face kept on its foe.
 			elif aim != Vector2.ZERO:
 				wanted = aim
 	_turn_toward(wanted, delta)

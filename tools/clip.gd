@@ -296,7 +296,7 @@ func _ready() -> void:
 			_melee_audit()
 		"drawbacks":
 			_drawbacks()
-		"boarking":
+		"boarking", "boarback", "boarcircle":
 			_boarking()
 		"hillcat":
 			_hillcat()
@@ -315,7 +315,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "hillcat"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -354,7 +354,7 @@ func _ready() -> void:
 	layer.add_child(_caption)
 	if _main._client3d != null:
 		_main._client3d._zoom_to = _main._client3d.ZOOM_MAX
-	if scenario in ["drawbacks", "boarking", "hillcat"]:
+	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _monster is Animal:
 			(_monster as Animal).raid = "drawbacks"  # A beast closes and bites, as a raider does.
@@ -838,6 +838,32 @@ func _boarking() -> void:
 	_script = [["say", 10, "The boar king."], ["boar_fight", 0, ""], ["wait", 30, ""]]
 
 
+## His back-off up close (780 amended (16), his back-off, animation's side; the coordinator's two
+## reels): the player walks in under his charge's "from", 2 off (a start there is moved off by the
+## spawn's safe distance), then "boarback" holds there, and "boarcircle" keeps 2 off, going round
+## him a cell at a time, where a face held on a foe could look like a moonwalk. Till the clip ends.
+func _boar_close(king: Monster) -> bool:
+	var ring: Array[Vector2i] = [Vector2i(2, 0), Vector2i(2, 2), Vector2i(0, 2), Vector2i(-2, 2), Vector2i(-2, 0),
+		Vector2i(-2, -2), Vector2i(0, -2), Vector2i(2, -2)]
+	if scenario == "boarback":
+		_caption.text = "Close: he snorts, paws, backs off facing me, then comes."
+		if _aside == Vector2i(-1, -1) or World.distance(_player.tile, king.tile) > 4:
+			_aside = king.tile + Vector2i(2, 0)
+		_walk(_aside)
+		return false
+	_caption.text = "Circling him as he backs off."
+	var rel := Vector2(_player.tile - king.tile)
+	var at := 0
+	for i in ring.size():
+		if absf(angle_difference(rel.angle(), Vector2(ring[i]).angle())) < absf(angle_difference(rel.angle(), Vector2(ring[at]).angle())):
+			at = i
+	var next := king.tile + ring[(at + 1) % ring.size()]
+	if World.distance(_player.tile, king.tile) > 3:
+		next = king.tile + ring[at]
+	_walk(next)
+	return false
+
+
 ## The hill cat's reel (814 amended, the coordinator's staging): open ground, the near low camera;
 ## the cat lying up, spotted (its snarl), then a walker it has not seen (the reel keeps it unseen):
 ## its crouch, leap and recover, then its swipes and bites.
@@ -903,6 +929,8 @@ func _boar_step(tick: int) -> bool:
 	if not is_instance_valid(king):
 		return true
 	king.sight_range = 12
+	if scenario in ["boarback", "boarcircle"]:
+		return _boar_close(king)
 	var move := str(king.get("_move").get("move", "")) if king.get("_move") is Dictionary else ""
 	if _fight_until >= 0 and tick > _fight_until:
 		print("[clip] boarking: part %d ran out at tick %d" % [_part, tick])
@@ -2273,7 +2301,7 @@ func _log(tick: int) -> void:
 			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
 			", ".join(them)])
 		return
-	if scenario in ["melee_audit", "drawbacks", "boarking", "hillcat"]:
+	if scenario in ["melee_audit", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		var side := func(entity: GridEntity) -> String:
 			return "%s at %s hp %d/%d st %d/%d%s%s%s%s" % [entity.name, entity.tile, entity.hp, entity.max_hp, entity.stamina,
 				entity.max_stamina, " stunned" if World.is_stunned(entity) else "", " down" if World.is_down(entity) else "",

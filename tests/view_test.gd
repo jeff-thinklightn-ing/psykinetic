@@ -12284,8 +12284,111 @@ func _test_boar_king_clips() -> void:
 		seen.append(drawn.rig.base_clip() if drawn.rig != null else "")
 	_check(king.stun_cause == &"crash" and seen.all(func(clip: String) -> bool: return clip == drawn.clips.get("dazed", "-")),
 			"his crash's stun, drawn: dazed through it (%s)" % [seen])
+	# Backing off to charge (enemy-ai's back-off): walking away from where he faces, drawn backing
+	# (back_off), not walking off; walking where he faces, his walk. Cried snort: the paw, 0.6 s.
+	king.stun_cause = &""
+	king._reel_until = 0.0
+	king._shown_angle = 0.0  # Facing +x.
+	var backed := _drawn_walk(drawn, puppet, king, Vector3(0.1, 0.0, 0.0))
+	var walked := _drawn_walk(drawn, puppet, king, Vector3(-0.1, 0.0, 0.0))
+	_check(drawn.clips.has("back_off") and backed == drawn.clips["back_off"] and walked == drawn.clips["walk"],
+			"backing away facing his foe, drawn backing off; walking on, his walk (%s, %s)" % [backed, walked])
+	drawn._busy_until = 0
+	drawn.rig.cancel_strike()
+	_rig._on_cried(&"snort", king.get_instance_id())
+	_check(drawn.clips.has("paw") and drawn.rig.playing() == drawn.clips["paw"]
+			and absf(drawn.rig.length(drawn.clips["paw"]) - 0.6) < 0.06,
+			"cried snort: he paws in place, 0.6 s (his 6 ticks) (%s)" % drawn.rig.playing())
+	# A real back step (the boarback reel showed the slide turning him to walk off): his face set
+	# on his foe across the step (BoarKing._tend_back_off's _world_set_facing after World.try_move);
+	# through the slide his shown facing stays on them and he is drawn backing, never walking. The
+	# edges (the coordinator's): a step at a slant to his facing turns him to it as before; his
+	# back-off ended mid-slide (his facing put on his step) turns him to it then, eased, no snap.
+	var back := await _back_step(king, drawn, true, false)
+	_check(back["stepped"] and king.faces_back_steps and back["kept"] > 0.9 and back["clips"].has(drawn.clips.get("back_off", "-"))
+			and not back["clips"].has(drawn.clips.get("walk", "-")) and not back["clips"].has(drawn.clips.get("run", "-")),
+			"a real back step: his face kept on his foe through the slide (the least %.2f), drawn %s"
+			% [back["kept"], back["clips"].keys()])
+	var slant := await _back_step(king, drawn, false, false)
+	_check(slant["stepped"] and slant["to_step"] > 0.7,
+			"a step at a slant to his facing: turned to his step within the slide, as before (%.2f toward it, the most %.2f rad a frame)"
+			% [slant["to_step"], slant["jump"]])
+	var ended := await _back_step(king, drawn, true, true)
+	_check(ended["stepped"] and ended["kept"] > 0.9 and ended["to_step"] > 0.5,
+			"his back-off ended mid-slide: turned to his step then, within the slide, not at its end (%.2f toward it, the most %.2f rad a frame)"
+			% [ended["to_step"], ended["jump"]])
 	World.despawn(king)
 	await _frames(1)
+
+
+## The boar king [param king] stepped a cell by World.try_move, drawn by [param view] through its
+## slide (780 amended (16), his back-off, animation's side): [param backing], his facing put
+## against the step after it (as BoarKing._tend_back_off does), else at a slant (a right angle) to
+## it; [param end_mid], his facing put on his step halfway through the slide (his back-off over).
+## Gives "stepped", "kept" (the least shown facing along the facing he held, while held),
+## "to_step" (the most his shown facing came round along the step while the slide ran,
+## GridEntity.stepping),
+## "jump" (the most the shown facing turned in one frame, rad: TURN_RATE's ease, for the print) and
+## "clips" (the base clips drawn).
+func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool) -> Dictionary:
+	var out := {"stepped": false, "kept": 1.0, "to_step": -1.0, "jump": 0.0, "clips": {}}
+	king.stunned_until_tick = 0
+	king.next_move_tick = 0
+	king.move_ticks = 5.0
+	view._busy_until = 0
+	view._charge_until = 0
+	view.rig.cancel_strike()
+	var stepped := Vector2i.ZERO
+	var held := Vector2i.ZERO
+	for way: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, 0)]:
+		held = -way if backing else Vector2i(way.y, -way.x)
+		king._world_set_facing(held)
+		king.turn_shown_from(Vector2(held).angle())
+		view._last_at = Vector3.INF  # No step left over from before: the slide's own.
+		view._speed = 0.0
+		_rig._process(0.0)  # Its view drawn once, so it knows it backs (faces_back_steps).
+		if World.try_move(king, way):
+			stepped = way
+			break
+	if stepped == Vector2i.ZERO:
+		return out
+	out["stepped"] = true
+	king._world_set_facing(held)
+	var last := king.shown_facing().angle()
+	var began := Time.get_ticks_msec()
+	var ended := false
+	while Time.get_ticks_msec() - began < 450:  # The slide's 5 ticks, before his own mind moves him again.
+		await get_tree().process_frame
+		# The drawing clock run as _run_clock does (World doesn't tick here): the slide moves.
+		World.tick_alpha += get_process_delta_time() * World.TICK_RATE
+		while World.tick_alpha >= 1.0:
+			World.tick += 1
+			World.tick_alpha -= 1.0
+		if end_mid and not ended and Time.get_ticks_msec() - began >= 200:
+			ended = true
+			king._world_set_facing(stepped)
+		_rig._process(0.0)
+		var shown := king.shown_facing()
+		if not ended:
+			out["kept"] = minf(out["kept"], shown.dot(Vector2(held).normalized()))
+		out["jump"] = maxf(out["jump"], absf(angle_difference(last, shown.angle())))
+		last = shown.angle()
+		if king.stepping:  # Within the slide only: after it he turns to his facing as every body does.
+			out["to_step"] = maxf(out["to_step"], shown.dot(Vector2(stepped).normalized()))
+		out["clips"][view.rig.base_clip()] = true
+	return out
+
+
+## What [param view] draws for [param monster] moved a step from [param puppet]'s place plus
+## [param from] to it, at a walk (about 2 cells a second).
+func _drawn_walk(view: CreatureView, puppet: Node3D, monster: Monster, from: Vector3) -> String:
+	view._busy_until = 0
+	view._charge_until = 0
+	view._speed = 2.0
+	view._last_at = puppet.position + from
+	view._last_ms = AnimRig.now_msec() - 50
+	view.frame(puppet, monster)
+	return view.rig.base_clip()
 
 
 ## An apex beast's tells (780 amended (6)): a telegraph's move plays the slot clip of its name

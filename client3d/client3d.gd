@@ -24632,6 +24632,8 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.roar()
 		elif cry == &"skid":
 			view.skid()
+		elif cry == &"snort":
+			view.paw()
 		elif cry == &"pounce":
 			view.pounce()
 		elif cry == &"howl":

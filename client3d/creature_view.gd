@@ -54,6 +54,8 @@ const PANT_PACE := 0.55
 const PANT_DIP := 0.16
 const PANT_EASE := 0.3
 const BLEND := 0.2
+## How squarely against its facing a walk runs to be drawn backing off (a cosine).
+const BACKING_DOT := 0.5
 ## Where a blow lands in its clip when the slot's clip names no "contact":
 ## this far through it.
 const CONTACT := ArtKit.CLIP_CONTACT
@@ -63,7 +65,7 @@ const FALLBACKS := {"graze": "idle", "feed": "graze", "trot": "walk", "charge": 
 	"howl": "idle", "sit": "idle", "lie": "idle"}
 ## The slot clips that loop; the rest (attack, hit, death) play once.
 const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze", "feed", "alert", "howl", "sit", "lie",
-	"sleep", "winded", "dazed"]
+	"sleep", "winded", "dazed", "back_off"]
 ## A move's tell (780 amended (6): an apex beast's World.telegraph, its "kind" the move): the
 ## slot clip it plays, its contact landing on the telegraph's lands tick; a move not named here
 ## plays the clip of its own name (swipe, slam). Only a slot listing the clip has one.
@@ -116,6 +118,8 @@ var _head_up := false
 var _last_at := Vector3.INF
 var _last_ms := 0
 var _speed := 0.0
+## Its last drawn step's way on the ground (x, z), for a back-off (_backing).
+var _way := Vector2.ZERO
 var _down := false
 var _down_ms := 0  # When it went down (or got up): the fall's, the rise's start.
 var _framed := false  # Drawn once: a body first seen down lies at once.
@@ -223,6 +227,8 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 	if _last_at != Vector3.INF and seconds > 0.0:
 		var step := Vector2(puppet.position.x - _last_at.x, puppet.position.z - _last_at.z)
 		_speed = lerpf(_speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
+		if step.length() > 0.0001:
+			_way = step.normalized()
 	_last_at = puppet.position
 	_last_ms = now
 	if _lying(monster, now):
@@ -265,6 +271,8 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		if now < _charge_until:
 			clip = "charge" if clips.has("charge") else "run"
 			scale = maxf(scale, ArtKit.feel("creature_view.charge_speed", CHARGE_SPEED))
+		elif not running and _backing(monster):
+			clip = "back_off"  # Backing away facing its foe (the boar king's, before a charge).
 	elif monster != null and monster.pose == Monster.Pose.SIT:
 		# Asleep, for a beast whose slot has a sleep (the great bear at its den); else grazing.
 		# Lying up, for one whose slot has a lie (the hill cat on its perch).
@@ -275,6 +283,16 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		clip = "alert"
 	_set_head_up(clip in HEAD_UP_FOR and not clips.has(clip))
 	_loop(clip, scale)
+
+
+## Whether [param monster] walks away from where it faces (enemy-ai's boar king backing off to
+## charge, World.face on his foe each step), for a slot with a back_off.
+func _backing(monster: Monster) -> bool:
+	if monster == null or not clips.has("back_off"):
+		return false
+	monster.faces_back_steps = true  # Its slide keeps the face on its foe (GridEntity).
+	var facing := Vector2(monster.shown_facing())
+	return facing != Vector2.ZERO and _way.dot(facing.normalized()) < -BACKING_DOT
 
 
 ## Whether [param monster] is drawn down (Pose DOWN) or still getting up this frame: on its
@@ -448,6 +466,14 @@ func pant(seconds: float) -> void:
 	tween.tween_property(_pose, "rotation:x", dip, PANT_EASE).set_ease(Tween.EASE_OUT)
 	tween.tween_interval(maxf(seconds - PANT_EASE * 2.0, 0.0))
 	tween.tween_property(_pose, "rotation:x", 0.0, PANT_EASE).set_ease(Tween.EASE_IN_OUT)
+
+
+## The paw before a back-off (cried "snort"; the boar king's, enemy-ai's "paw" ticks): its
+## slot's paw once, in place; none without one.
+func paw() -> void:
+	if rig == null or _dead or not clips.has("paw"):
+		return
+	_once("paw")
 
 
 ## A charge (cried "charge"): a faster run for a while, lunging as it goes

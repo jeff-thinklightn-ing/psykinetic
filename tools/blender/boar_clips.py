@@ -65,9 +65,11 @@ def sample(action, frame: float) -> dict:
 	return out
 
 
-def key_clip(arm, name: str, keys: list, base=None, base_frames=0) -> None:
+def key_clip(arm, name: str, keys: list, base=None, base_frames=0, reverse=False, legs=1.0) -> None:
 	"""Keys [param name]: keys are (seconds, {bone: (rot_deg, move)}) over the stock pose
-	(Idle's first frame, or [param base] sampled at the same frame, wrapped at base_frames)."""
+	(Idle's first frame, or [param base] sampled at the same frame, wrapped at base_frames; with
+	[param reverse], at base_frames less it: the base run backwards; the legs' swing from it scaled by
+	[param legs] toward Idle's, a shorter stride)."""
 	old = bpy.data.actions.get(name)
 	if old is not None:
 		bpy.data.actions.remove(old)
@@ -80,7 +82,16 @@ def key_clip(arm, name: str, keys: list, base=None, base_frames=0) -> None:
 	idle = sample(bpy.data.actions["Idle"], 0.0)
 	for seconds, pose in keys:
 		frame = round(seconds * FPS)
-		stock = sample(base, frame % base_frames) if base is not None else idle
+		if base is None:
+			stock = idle
+		else:
+			stock = sample(base, (base_frames - frame) % base_frames if reverse else frame % base_frames)
+			if legs != 1.0:
+				for leg, value in stock.items():
+					if "Leg" in leg:
+						rest = idle.get(leg, [Quaternion(), Vector()])  # Idle keys only some legs.
+						value[0] = rest[0].slerp(value[0], legs)
+						value[1] = rest[1].lerp(value[1], legs)
 		for bone in arm.pose.bones:
 			if bone.name.endswith("_end"):
 				continue
@@ -201,6 +212,39 @@ def hook() -> list:
 	]
 
 
+# The back-off's stance (the coordinator: snout near knee height, the tusks forward at his foe,
+# held the whole loop), the paw ending on it.
+BACK_STANCE = pose(head(50, 16), All=((0, 0, 0), (0, 0, -drop_for(8))))
+
+
+def back_off() -> list:
+	# Over the stock Walk (24 frames, 1 s) run backwards: backing away from his foe, still facing
+	# them (enemy-ai's back-off before a charge, ~2 cells a second for up to 2 s), head low and the
+	# haunches a little gathered, so it reads as squaring up, not fleeing; the stride shortened to
+	# wary steps (legs 0.55: the walk's far hind fling read as a run). Loops at any frame; cut short
+	# after one step, the view blends it out.
+	keys = []
+	for frame in range(0, 25, 3):
+		keys.append((frame / FPS, BACK_STANCE))
+	return keys
+
+
+def paw() -> list:
+	# 0.6 s on the cry "snort" (he stands its 6 ticks, enemy-ai's "paw": 6): head down, the right
+	# fore scraped back once in a big stroke, and a snort's toss, ending near his stance so the
+	# back-off picks up from it.
+	# The hoof lifted to about the elbow and scraped well back, the toss big (the coordinator: read
+	# from the iso camera at distance).
+	low = head(46, 12)
+	return [
+		(0.0, {}),
+		(0.14, pose(gather(10), low, FrontLeg__R=((-78, 0, 0), (0, 0, 0)))),
+		(0.3, pose(gather(10), low, FrontLeg__R=((60, 0, 0), (0, 0, 0)))),
+		(0.44, pose(gather(10), head(8, -20))),  # The snort: a big toss up.
+		(0.6, BACK_STANCE),
+	]
+
+
 def main() -> None:
 	args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 	arm = bpy.data.objects[ARM]
@@ -213,6 +257,8 @@ def main() -> None:
 	key_clip(arm, "Skid", skid())
 	key_clip(arm, "Dazed", dazed())
 	key_clip(arm, "Hook", hook())
+	key_clip(arm, "Back_Off", back_off(), base=bpy.data.actions["Walk"], base_frames=24, reverse=True, legs=0.55)
+	key_clip(arm, "Paw", paw())
 	arm.animation_data.action = was
 	if "--save" in args:
 		bpy.ops.wm.save_mainfile()
