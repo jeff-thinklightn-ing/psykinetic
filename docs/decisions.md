@@ -46677,6 +46677,40 @@ CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new 
 
 ## 827. Wilds basics: farm and barrow
 
+827, maps' side, the main text (2026-11-09; maps' design C:/dev/review/farmstead_barrow/design.md, the
+coordinator's approval; release's number; package "wilds basics: farm and barrow", Jeff's 11-06 list: "the
+ruined farm not looking like a farm, and the barrow almost next to a house"). It moves on from 550 (the barrow's
+mound, then laid at (165, 180) beside the town's house at (170, 193)), 567 (the wilds' marks, which put it
+there) and 599, maps' side (the old farmstead's cache in its south hut, two bare stone squares that read as
+nothing). The barrow: building.mound at (155, 160), its door and the link to the barrow at (160, 160),
+"from_barrow" (160, 159) outside it (the barrow level and its own from_wilds link unchanged); about 32 cells
+from the nearest building, on open grass north-west of town, "a little outside Held" as the lore has it; a
+dirt track (roads 10) to the north road, the barrow post at the junction. The ground is levelled under it
+(relief cone: the pad its mean, the slope out at most 0.2 m a cell, water cells untouched). Nothing
+points at its old place: no sign or waystone named it; the map name follows the link; a player saved on the
+old link (170, 180) or spawn (170, 179) stands on open grass, since the mouth is gone; lore checks the
+directions (lore's 3294da7ec, beside this). The farm, laid at the same place keys and cells (economy's
+sought.farmer and items' farmstead_cache at (119, 139) unchanged): a roofless cottage (kind cottage, small,
+"ruined") at (118, 137) over the cache, its gaps its own: a level entry's own "doors" or "open" now stand
+instead of its size's (Level._kind_edges), so the ruin has no doorway, only the door's gap and a fallen
+corner; building.rubble_heap at (119, 152); two fenced plots west of
+the road beside the cottage (112..119 x 143..147, 106..113 x 154..158), bare dirt under terrain's
+"furrows" along x (no tall grass, which reads as grain), their fences decor "fence" rows with gaps; the
+well dry (its water cell dirt), art-kit's prop.well_dry laid on it as decor "well_dry", drawn only and never
+solid, like the cart (nothing a resident treats as a well); a broken cart, rotten hay and a scarecrow still
+leaning on its pole in the first field by its south fence (114, 146), against the grass between the plots (Level.DECOR_KINDS "hay_rotten" and
+"scarecrow_leaning", art-kit's props; the fallen scarecrow first laid there was lost under the furrows, so
+nothing lays "scarecrow_fallen", its row kept for the prop); the old prefab's walls and lanterns gone. The ruined barn west of the
+stream (72, 137) is laid in ruin too (kind barn, "ruined"), but it is its own place, ruined_barn, the
+carpenter's shelter (economy's sought.carpenter), not the farm's (the coordinator), and the bullet leaves it
+out. No
+worked fields, no crop: a farm gone to ruin, set dressing only; the farmer bringing it back is a later
+package (economy's). level_test _test_farm_and_barrow (the mound out past the town on its link, the post by
+its track; the ruins over the cache and the barn; their own gaps; the fields bare under the furrows; the
+well dry, its ring on it, the leaning scarecrow in the first field); view_test's built water puts its well's water back in memory; world_map_test and the tours
+(playtest's barrow and cut) follow the link to (160, 160). Level data and one sim/level.gd reading (an
+entry's doors/open) plus four DECOR_KINDS rows; protocol unchanged; no new class_name; the bullet.
+
 827, art-kit's side: the pieces for the old farmstead and the ruined barn, by hand, palette only, landed off
 (nothing places them until terrain's "ruined" building draws them and maps lays the farm).
 wall.stone.low_ruin (edge, wall.stone's frame, 3 variants) is a low broken fieldstone wall, dry-laid, 0.35 to

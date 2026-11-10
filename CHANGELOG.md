@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the wilds, the barrow stands alone now on open grass north-west of town, at the end of its own track off the north road, with a lit post where the track leaves the road, where before it sat beside a house; and the old farmstead west of the crossroads looks like a farm gone to ruin, a roofless cottage among tumbled walls, fallow fields behind broken fences, the tumbled ring of a dry well, a broken cart and a scarecrow leaning hard on its pole, where before it was two bare stone squares (827).
 - Towns: once a town marks you Trusted, most things in its shop cost you a tenth less, its store pays a tenth more for the raw goods you hand in, and its tanner for the trophies you give, at least a gold more each, and the dearer gear you sell at its counter fetches a little more too (831).
 - Towns: the town sheet shows a picture for wood, stone and ore now, a few split logs, a few rough-cut stones and a small heap of rust-brown ore, where before they had none (768 amended (2)).
 - The old grey gives you time to get clear of him now: there's a pause before each bite, long enough to step out of it, and he bites far less often; and step off the line of his lunge and he misses you, where before he snapped about once a second with hardly a warning and his lunge could still bite you at the end of its run (780 amended (23)).
