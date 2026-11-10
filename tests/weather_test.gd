@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_mine_light()
 	_test_skylights()
 	_test_fish_feeding()
+	_test_rain_rings()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -695,3 +696,49 @@ func _test_fish_feeding() -> void:
 	_check(never_later and World.fish_wait_most(1.0) == World.FISH_WAIT_KEEN and World.FISH_WAIT_KEEN < World.FISH_WAIT_MOST,
 			"keener, sooner: at most %d at full feeding, never past 270 nor under 120" % World.fish_wait_most(1.0))
 	Weather.reload()
+
+
+# Rain on water (309 amended (2)): the share of the water's drop cells that
+# ring, from the drawn rain. A dry day rings none, exactly; a downpour every
+# cell; it rises with the rain, so a shower's end thins the rings as the drawn
+# rain eases down rather than stopping them at once; indoors none.
+func _test_rain_rings() -> void:
+	_check(WeatherView.ring_share(0.0) == 0.0 and WeatherView.ring_share(WeatherView.RINGS_FROM) == 0.0,
+			"no rain, no rings: the share at rain 0 is exactly 0")
+	_check(WeatherView.ring_share(1.0) == 1.0, "a downpour rings every cell")
+	var rising := true
+	for i in range(1, 21):
+		rising = rising and WeatherView.ring_share(i / 20.0) >= WeatherView.ring_share((i - 1) / 20.0)
+	var steady := WeatherView.ring_share(Weather.KINDS["rain"]["rain"])
+	_check(rising and steady > 0.3 and steady < 1.0, "more rain, more rings (steady rain %.2f)" % steady)
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	var place := func() -> void: view.place(Vector3(100.0, 0.0, 100.0), 0.1, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
+	for i in 30:
+		view.ease_toward(Weather.KINDS["storm"], 0.1)
+	place.call()
+	var storm := view.rings
+	var follows := storm == WeatherView.ring_share(view.weather["rain"])
+	var after: Array[float] = []
+	for i in 6:
+		view.ease_toward(Weather.KINDS["clear"], 0.1)
+		place.call()
+		after.append(view.rings)
+	_check(storm > 0.9 and follows,
+			"in a storm the water rings nearly everywhere (%.2f)" % storm)
+	_check(after[0] < storm and after[0] > 0.0 and after[5] < after[0],
+			"as the shower ends the rings thin out with the eased rain (%.2f, %.2f), not all at once" % [after[0], after[5]])
+	for i in 60:
+		view.ease_toward(Weather.KINDS["clear"], 0.1)
+	place.call()
+	_check(view.rings == 0.0, "cleared, none")
+	view.ease_toward(Weather.KINDS["storm"], 1.0)
+	view.set_outdoor(false)
+	place.call()
+	_check(view.rings == 0.0, "indoors none")
+	view.free()
+	var code := FileAccess.get_file_as_string("res://client3d/water.gdshader")
+	_check(code.contains("global uniform float rain_rings") and not code.contains("sin("),
+			"the water reads the rain_rings global, its drops hashed without sin")
+	_check(ProjectSettings.has_setting("shader_globals/rain_rings"), "and project.godot declares it")

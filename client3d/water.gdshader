@@ -62,6 +62,62 @@ const float FOAM = 0.1;
 const float FLOW_SPEED = 0.6;
 const float FLOW_CYCLE = 1.6;
 
+// Rain on water (309 amended (2)): the share of drop cells that ring now (WeatherView.ring_share
+// of the drawn rain; 0 indoors and on a dry day).
+global uniform float rain_rings;
+// The drops: two offset grids of DROP_CELL m cells, each ringing once a
+// DROP_LIFE s at a place and phase of its own, if its pick for that turn is
+// under the share; a ring DROP_WIDEST m across at most, a band DROP_BAND of a
+// cell wide, sloping the surface (DROP_SLOPE) and paled (DROP_SHEEN). Less
+// than half as wide, quicker and fainter than a fish's rise (FishingView, 0.9 m over
+// 1.2 s, a white band), so a rise still reads among them. Gone past
+// DROP_NEAR..DROP_FAR m from the camera along the ground, and where a cell spans too few
+// pixels to draw a ring (the high camera, the far surface) rather than shimmer.
+const float DROP_CELL = 0.8;
+const float DROP_LIFE = 0.5;
+const float DROP_WIDEST = 0.4;
+const float DROP_BAND = 0.08;
+const float DROP_SLOPE = 1.0;
+const float DROP_SHEEN = 0.45;
+const float DROP_NEAR = 30.0;
+const float DROP_FAR = 45.0;
+
+// Two numbers 0..1 from [p], without a sin hash (it bands on weak GPUs).
+vec2 drop_hash(vec2 p) {
+	vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+	q += dot(q, q.yzx + 33.33);
+	return fract((q.xx + q.yz) * q.zy);
+}
+
+// The drops' rings at [at] (world plane, m) at time [time]: their slope (xy)
+// and sheen (z), for [share] of the cells ringing.
+vec3 drops(vec2 at, float time, float share) {
+	vec3 out_ = vec3(0.0);
+	for (int layer = 0; layer < 2; layer++) {
+		vec2 p = at / DROP_CELL + float(layer) * vec2(0.5, 0.37);
+		vec2 cell = floor(p);
+		vec2 own = drop_hash(cell + float(layer) * 17.3);
+		float turn = time / DROP_LIFE + own.x * 9.0;
+		vec2 pick = drop_hash(cell + floor(turn) * vec2(1.7, 3.1));
+		if (pick.x >= share) {
+			continue;
+		}
+		float age = fract(turn);
+		// Kept inside its cell: the centre 0.3..0.7 across, the ring at most
+		// DROP_WIDEST / 2 out (a quarter of a cell).
+		vec2 centre = cell + 0.3 + 0.4 * vec2(pick.y, fract(pick.x * 13.7 + own.y));
+		vec2 off = p - centre;
+		float d = length(off);
+		float r = age * DROP_WIDEST * 0.5 / DROP_CELL;
+		float x = (d - r) / DROP_BAND;
+		float wave = exp(-x * x);
+		float fade = (1.0 - age) * (1.0 - age);
+		out_.xy += (d > 0.0001 ? off / d : vec2(0.0)) * (-x * wave) * fade * DROP_SLOPE;
+		out_.z += wave * fade;
+	}
+	return out_;
+}
+
 // The surface at [at] at time [t]: the ripples' slope (xy), and a churn
 // (z) that the foam breaks up by.
 vec3 surface(vec2 at, float t) {
@@ -81,6 +137,8 @@ void vertex() {
 
 void fragment() {
 	vec2 at = world.xz + plane_origin.xz;  // On the plane, as mask_origin (822).
+	// How many drop cells a pixel spans, taken before any branch (309 amended (2)).
+	float spans = length(fwidth(at)) / DROP_CELL;
 	// The shore: the field's half, read a little aside; about a cell from
 	// dry to wet, so a half less it is about how far into the water.
 	vec2 aside = vec2(noise(at * 0.9) - 0.5, noise(at * 0.9 + 17.0) - 0.5) * 2.0 * SHORE_WARP;
@@ -152,6 +210,19 @@ void fragment() {
 	// Ripples: the noise's slope, two layers drifting apart.
 	// A curtain keeps its own facing (down the stream), rippled a little.
 	if (curtain < 0.5) {
+		// Rain on water (309 amended (2)): the drops' rings over the ripples,
+		// half as strong on a stream (running water breaks them up).
+		if (rain_rings > 0.0) {
+			// Measured along the ground, as the rises' RISE_NEAR is (the ortho
+			// camera stands CAMERA_DISTANCE 40 m up its slant).
+			float near = 1.0 - smoothstep(DROP_NEAR, DROP_FAR, length(world.xz - CAMERA_POSITION_WORLD.xz));
+			near *= 1.0 - smoothstep(0.15, 0.35, spans);
+			if (near > 0.0) {
+				vec3 rings = drops(at, TIME, rain_rings) * near * (ribbon ? 0.5 : 1.0);
+				slope += rings.xy;
+				ALBEDO = mix(ALBEDO, foam, min(rings.z, 1.0) * DROP_SHEEN);
+			}
+		}
 		NORMAL = normalize((VIEW_MATRIX * vec4(normalize(vec3(-slope.x * 1.5, 1.0, -slope.y * 1.5)), 0.0)).xyz);
 	} else {
 		NORMAL = normalize(NORMAL + (VIEW_MATRIX * vec4(slope.x * 0.6, 0.0, slope.y * 0.6, 0.0)).xyz);

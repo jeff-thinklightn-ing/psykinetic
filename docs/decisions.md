@@ -6337,6 +6337,42 @@ shader reads the depth texture and has no sin hash. Stills before and after
 (the wilds and the hills, near and far): C:/dev/review/fog_soft. Client
 only, protocol unchanged, no new class_name.
 
+309 amended (2): rain on water (package "rain on water", landing on;
+environment's design, the coordinator's approval, release's label). In rain
+every water's surface pricks with small quick rings where drops land: a
+scatter in drizzle, the whole surface in a downpour. Drawn in water.gdshader,
+no nodes: two offset grids of DROP_CELL 0.8 m cells, each ringing once a
+DROP_LIFE 0.5 s at a place and phase of its own (a sin-free hash, as the fog's)
+when its pick for that turn is under the share; a ring at most DROP_WIDEST
+0.4 m across, sloping the surface's normals (DROP_SLOPE) with a touch of
+sheen. Kept apart from a fish's rise (805 amended (10): 0.9 m over 1.2 s, a
+white band) by size, life and brightness, so a rise still reads among them.
+The share is the `rain_rings` shader global (project.godot's shader_globals),
+WeatherView.ring_share of the drawn, eased rain (none at or below RINGS_FROM
+0.05, so a dry day shows none, every cell at RINGS_FULL 1.0), set in
+WeatherView.place and 0 indoors (set_outdoor): it follows the ease, so the
+rings thin out as a shower ends. Snow takes its share out of the rain, so
+falling snow rings less and less. A stream's ribbon at half strength (running
+water breaks them up), a fall's curtain none. Gone from DROP_NEAR 30 to
+DROP_FAR 45 m from the camera (the rises' RISE_NEAR), and where a drop cell spans too few pixels for
+a ring (the high camera, the far surface), so they never shimmer.
+Cost, on the weak machine (the coordinator's bar, half a millisecond; perf's
+Lenovo run, map_bench, the wilds, a storm over Reed Pond at noon filling the
+low camera, 60 s, a fresh user:// each run, after/before/after against main):
+GPU median 6.74 and 6.82 ms against 6.81, frame median 8.68 and 8.76 against
+8.74, CPU 1.45 and 1.46 against 1.46: none measurable, the laptop's warming
+larger. Each run, and a first start here with an empty shader cache, reached
+the world: no crash compiling the new shader on a first launch.
+weather_test _test_rain_rings: the share exactly 0 at rain 0 and at RINGS_FROM,
+1 in a downpour, rising with the rain; the view's share in a storm, thinning
+as the rain eases away, 0 once clear and indoors; the shader reads the
+global with no sin hash, and project.godot declares it. Stills (Reed Pond, noon,
+dry, drizzle, steady and storm, a storm at night and from the high camera):
+C:/dev/review/rain_on_water; from the high camera the rings read at once and
+the rise is the one bold ring; from the low camera, 30 m off, a storm greys and
+dapples the water (the coordinator: no more, so nothing fights the rise).
+Client only, protocol unchanged, no new class_name.
+
 ## 327. A glimpse of the level past a way out
 
 Jeff: "maybe the castle gets a little area where you can see it just beyond

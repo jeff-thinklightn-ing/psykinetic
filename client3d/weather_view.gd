@@ -41,6 +41,11 @@ const DRIP_BOX := Vector3(24.0, 4.0, 24.0)
 const DRIP_HEIGHT := 4.5
 const DRIP_SPEED := 8.0
 const DRIP_COLOUR := Color(0.78, 0.84, 0.9, 0.5)
+## Rain on water (309 amended (2)): the share of the water's drop
+## cells (water.gdshader) that ring, from the drawn rain, through the
+## `rain_rings` global: none below RINGS_FROM, every cell at RINGS_FULL.
+const RINGS_FROM := 0.05
+const RINGS_FULL := 1.0
 ## The visual layer the rain is on, so the roof heightfield leaves it out.
 const RAIN_LAYER := 1 << 19
 ## The fog's layers over the ground: their heights, and how much fog their
@@ -186,6 +191,9 @@ var outdoor := false
 ## The canopy's cover round the view (0..1) and its drips now (set_canopy).
 var canopy := 0.0
 var drip := 0.0
+## The share of the water's drop cells ringing, as last set on the
+## `rain_rings` global (309 amended (2)).
+var rings := 0.0
 ## How far fog and clouds have drifted (m, world xz).
 var _drift := Vector2.ZERO
 var _rain: GPUParticles3D
@@ -235,6 +243,15 @@ func set_outdoor(value: bool) -> void:
 		weather = {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 		RenderingServer.global_shader_parameter_set("wind", Vector4.ZERO)
 		RenderingServer.global_shader_parameter_set("season", Vector4(1.0, 0.0, 0.0, 0.0))
+		rings = 0.0
+		RenderingServer.global_shader_parameter_set("rain_rings", rings)
+
+
+## The share of the water's drop cells that ring at drawn rain [param rain]
+## (0..1): exactly 0 on a dry day, so none ever shows, 1 in a downpour. It
+## follows the eased rain, so the rings thin out as a shower ends.
+static func ring_share(rain: float) -> float:
+	return 0.0 if rain <= RINGS_FROM else smoothstep(RINGS_FROM, RINGS_FULL, rain)
 
 
 ## The view the weather is drawn for (623, environment's side): the low
@@ -322,6 +339,8 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	var way := Vector2(way3.x, way3.z).normalized()
 	var wind: float = weather["wind"]
 	RenderingServer.global_shader_parameter_set("wind", Vector4(way.x, way.y, wind, 0.0))
+	rings = ring_share(weather["rain"])
+	RenderingServer.global_shader_parameter_set("rain_rings", rings)
 	_drift += way * (CALM_DRIFT + CLOUD_DRIFT * wind) * delta
 	# Under the low camera the rain's and snow's box runs from the camera out
 	# along the view (its z), the roofs' heightfield over it; in ortho, over
