@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_inventory_panel()
 	_test_barter()
 	await _test_window_clicks()
+	await _test_window_body_clicks()
 	_test_sweep_key()
 	_test_crouch_key()
 	_test_practice_bars()
@@ -166,6 +167,22 @@ func _test_escape() -> void:
 	await get_tree().process_frame
 	print("== Esc: what is open closes first, then the pause ==")
 	_check(_main.game_menu == null, "no game menu before the first Esc")
+	# 845: the controls list and the pack close on Esc too, the pack (the Dock) last, before the menu.
+	var settings_was: String = Net._settings_override
+	var hints_was: bool = Net.hints
+	var pack_was: bool = _main.pack_panel.shown
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("ui_test.cfg")
+	Net.hints = true
+	_main.hint_panel.visible = true
+	_main.pack_panel.shown = true
+	_main.escape()
+	_check(not _main.hint_panel.visible and not Net.hints and _main.pack_panel.shown and _main.game_menu == null,
+		"Esc closes the controls list first (it covers the world), the pack stays")
+	_main.escape()
+	_check(not _main.pack_panel.shown and _main.game_menu == null, "Esc closes the pack, not the game menu")
+	Net.hints = hints_was
+	_main.hint_panel.visible = hints_was
+	Net._settings_override = settings_was
 	_main.escape()
 	_check(_main.game_menu != null and _main.game_menu.visible, "Esc with nothing open: the game menu")
 	await get_tree().process_frame
@@ -186,6 +203,7 @@ func _test_escape() -> void:
 	_main.escape()
 	_main.escape()
 	_check(not _main.options_panel.visible and not _main.game_menu.visible, "and two Escs close both")
+	_main.pack_panel.shown = pack_was  # The later tests look at the pack.
 
 
 func _test_options_choices() -> void:
@@ -2385,6 +2403,48 @@ func _test_window_clicks() -> void:
 	_check(picked == 1, "the store's good was picked by the click (%d)" % picked)
 	_check(reached.values().all(func(n: int) -> bool: return n == 0),
 		"a press on a square in the pack, the sheet, the store and the town window never reaches the world (%s; -1: no square)" % [reached])
+
+
+## A press in the body of a window (its centre, not a square) stays in the window: 845, from
+## playtest's tour (6 of 7 windows let it through to the world, a walk). The probe is Main.world_clicks.
+func _test_window_body_clicks() -> void:
+	print("
+== a click in a window's body stays in the window, never a walk (845) ==")
+	var pack: PackPanel = _main.pack_panel
+	if pack == null or _main._local_player() == null:
+		print("  (no windows or no player in this scene: its checks skipped)")
+		return
+	var reached: Dictionary = {}
+	var cases := [
+		["pack", func() -> void: pack.shown = true, func() -> Control: return pack,
+			func() -> void: pack.shown = false],
+		["character sheet", func() -> void: pack.shown = true, func() -> Control: return pack.sheet,
+			func() -> void: pack.shown = false],
+		["card", func() -> void: _main.card_page.visible = true, func() -> Control: return _main.card_page,
+			func() -> void: _main.card_page.visible = false],
+		["town", func() -> void: _main.open_town(""), func() -> Control: return _main.town_panel,
+			func() -> void: _main.town_panel.visible = false],
+		["world map", func() -> void: _main.open_world_map(), func() -> Control: return _main.world_map_panel,
+			func() -> void: _main.world_map_panel.close()],
+		["options", func() -> void: _main.options_panel.visible = true, func() -> Control: return _main.options_panel,
+			func() -> void: _main.options_panel.visible = false],
+		["hints", func() -> void: _main.hint_panel.visible = true, func() -> Control: return _main.hint_panel,
+			func() -> void: _main.hint_panel.visible = false],
+	]
+	for each: Array in cases:
+		(each[1] as Callable).call()
+		for i in 3:
+			await get_tree().process_frame
+		var control: Control = (each[2] as Callable).call()
+		if control == null or not control.is_visible_in_tree() or control.size == Vector2.ZERO:
+			reached[each[0]] = -1
+		else:
+			reached[each[0]] = await _click_through(control)
+		(each[3] as Callable).call()
+		await get_tree().process_frame
+	print("  window body clicks that reached the world: %s (-1: not shown here)" % [reached])
+	_check(reached.values().all(func(n: int) -> bool: return n <= 0),
+		"a press in the middle of a window never reaches the world (%s)" % [reached])
 
 
 func _test_character_sheet(pack: PackPanel) -> void:

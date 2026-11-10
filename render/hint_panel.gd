@@ -13,7 +13,7 @@ var _lines: Array[String] = []
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP  # 845: a click on the list stays on the list, never a walk.
 	position = Vector2(UiTheme.constant("margin"), 110)
 	_list = HBoxContainer.new()
 	_list.add_theme_constant_override("separation", UiTheme.constant("section"))

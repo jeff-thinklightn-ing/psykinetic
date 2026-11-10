@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Esc closes the controls list and then your pack, one at a time, before it opens the menu, and a click on the controls list stays on it, where before Esc opened the menu over both and a click on the list walked you to the ground beneath it (845).
 - Gains each have a sound of their own now: a low drum strike for a deed, two warm plucks, the second higher, for a town's regard, a soft held note for your companion's bond, a quick wooden rattle for practice, a leather bag set down for goods handed in or picked up, and one soft high harp note for a creature spotted, where before most shared one harp pluck (804 amended (17)).
 - In the hills, a waystone carved "Mine" stands where the road ends, at the foot of the spur where the shieling's track turns north, and a dirt track from it climbs north-west to Hollowfell's mine mouth, where before no path led there and nothing pointed the way (790 amended (5)).
 - The dwarven halls under the castle are easier to find your way through now, each time they're laid anew: a main way runs from the stair down to the cold forge, every room opens straight off a way, and torches burn along the passages every few steps, where before a room could lie at the end of a long way round, or a passage wrap round a room (838).

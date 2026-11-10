@@ -21156,8 +21156,12 @@ func escape() -> void:
 		game_menu.open(false)
 	elif options_panel != null and options_panel.visible:
 		toggle_options()
+	elif hint_panel != null and hint_panel.visible:
+		toggle_hints()  # 845: the controls list, hidden as its own key hides it.
 	elif pack_panel != null and pack_panel.other != null:
 		close_other()
+	elif pack_panel != null and pack_panel.shown:
+		pack_panel.shown = false  # 845: the pack last of all (the Dock), before the game menu.
 	elif main_menu == null or not main_menu.visible:
 		if game_menu == null:
 			game_menu = GameMenu.new()
