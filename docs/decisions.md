@@ -46457,3 +46457,18 @@ shield, a block's sound, a shield bash taken, a recoil, and a volley's ring clea
 view_test _test_blow_wait_outlives_body forces it every run: a swing planted beside a body so its blow
 waits 300 ms, the body struck, then despawned inside the wait, then the wait run out. Before the fix it
 printed the error each time; after, none. Client only; protocol unchanged; no class_name; no bullet.
+
+## 837. A resident tells of the place their town is short from
+
+Release's number; the coordinator's iron-slice ruling (835), economy's routing. A town short of ore
+had nothing pointing a player at where ore is found. residents.json "pointers" maps a good to the place
+it is found, with voice's lines (lore's check): ore to "hills/hollowfell", the old iron workings, a
+town's own lines under "towns" (only Umbrage, wilds/store, says "our first folk" or "fed us", since
+hollowfell.dug is its story; every other town the third variant alone). When a player greets a
+townsperson (Main._greeted, after the sought rumour), Main._ore_hint looks for a good the town is short
+of (town_sheet "needs") whose place the player does not know yet: the resident says one of its lines
+(one a day by the id) and WorldNews.tell (805) makes the place known, on their map from then on, so it
+is never said to them again. No town digs at Hollowfell (economy: ore comes out in a player's hands, or
+Wren's, 769), so nothing clashes with hollowfell.lost or hollowfell.held. resident_test
+_test_pointers. Server only; protocol unchanged (WorldNews.tell's message is 805's); no new class_name.
+Package: none, it lands on by itself (it mends a live gap). One CHANGELOG bullet in voice's words.

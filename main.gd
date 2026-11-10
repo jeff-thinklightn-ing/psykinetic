@@ -19035,6 +19035,7 @@ func _greeted(player: Player, body: Resident) -> void:
 	var rumour := _rumour_for(body.town, player.player_id, day)
 	if not rumour.is_empty():
 		_resident_says(body, rumour, "", player)  # The town's word of its sought, once a day (decision 643).
+	_ore_hint(body, player)
 	if body.trade == str(World.production.rules.get("herder", {}).get("trade", "herder")):
 		var shelter := _shelter_words(str(World.production.worker(body.worker_id).get("town", "")))
 		if not shelter.is_empty():
@@ -19042,6 +19043,39 @@ func _greeted(player: Player, body: Resident) -> void:
 		if _balance_words(body, player):
 			return  # The balance quest's talk (761, npc's side (2)).
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
+
+
+## Where a town short of a good sends a player (the coordinator's iron-slice
+## ruling, economy's routing): a greeted townsperson of a town whose
+## town_sheet "needs" has residents.json "pointers"' good says its line (its
+## town's own under "towns", else "lines"; one a day by the id, voice's
+## words) to one who does not know its place yet,
+## and the place is told them (WorldNews.tell: on their map from now on, so
+## never said to them again). Ore to Hollowfell, the old iron workings.
+func _ore_hint(body: Resident, player: Player) -> void:
+	if _world_news == null or World.towns == null or body.town.is_empty() or not World.towns._towns.has(body.town):
+		return
+	var record: PlayerRecord = _records.get(player.player_id)
+	var pointers: Variant = Townsfolk.days().get("pointers", {})
+	if record == null or not pointers is Dictionary:
+		return
+	var needs: Array = []
+	for good: String in pointers:
+		var pointer: Variant = pointers[good]
+		if good.begins_with("_") or not pointer is Dictionary:
+			continue
+		var place := str(pointer.get("place", ""))
+		var lines: Variant = (pointer.get("towns", {}) as Dictionary).get(body.town, pointer.get("lines", []))  # A town's own (lore's: whose first folk dug it).
+		if place.is_empty() or record.known_places.has(place) or World.holdings.place(place).is_empty() or not lines is Array or (lines as Array).is_empty():
+			continue
+		if needs.is_empty():
+			needs = town_sheet(body.town).get("needs", [])
+		if not needs.any(func(n: Dictionary) -> bool: return str(n.get("id", "")) == good):
+			continue
+		var day := Townsfolk.day_of(World.production.now())
+		_resident_says(body, str(lines[absi(hash(body.worker_id + ":" + str(day))) % (lines as Array).size()]), "", player, false)
+		_world_news.tell(player.player_id, place)
+		return
 
 
 ## [param line] said by [param body] to [param player] without the mind

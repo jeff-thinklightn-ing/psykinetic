@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
 	_test_sought_body()
+	_test_pointers()  # 837.
 	_test_sought_band()
 	_test_what_is_true()
 	_test_rejoin_moved()
@@ -1845,6 +1846,76 @@ func _test_strayed_body() -> void:
 	World.production.set_away("rs-folk02", true)
 	World.production.set_away("rs-folk03", true)
 	Townsfolk.use_rules({})
+	_sync()
+
+
+## Decision 837: a town short of a good points a player to the place it is
+## found (residents.json "pointers"; ore to Hollowfell): a greeted
+## townsperson says the line to one who does not know the place, which is
+## told them (WorldNews.tell), once; not said where the town is not short;
+## a town's own lines over the common one.
+func _test_pointers() -> void:
+	print("\n== 837: a town short of a good points a player to its place, once ==")
+	var real: Dictionary = (Townsfolk.days().get("pointers", {}) as Dictionary).get("ore", {})
+	_check(real.get("place") == "hills/hollowfell" and (real.get("lines", []) as Array).size() == 1
+		and ((real.get("towns", {}) as Dictionary).get("wilds/store", []) as Array).size() == 3,
+		"ore points to Hollowfell: Umbrage's own three lines, one for any other town")
+	var player := _player()
+	var record: PlayerRecord = _main._records.get(player.player_id) if player != null else null
+	var needs: Array = _main.town_sheet(STORE).get("needs", [])
+	_check(record != null and not needs.is_empty(), "(a player's record, and the test town short of something)")
+	if record == null or needs.is_empty():
+		return
+	World.production.add_worker("rs-point", "Ada", ["cook"], STORE, "settled")
+	(World.towns._town(STORE)["residents"] as Array).append("rs-point")  # One of the town's, as Towns seats one.
+	DayNight.set_hour(10.0)
+	_sync()
+	var body := _body("rs-point")
+	if body == null:
+		for entity: GridEntity in World.townsfolk():
+			if entity is Resident and (entity as Resident).town == STORE and (entity as Resident).card.is_empty():
+				body = entity as Resident
+				break
+	_check(body != null, "(a townsperson to greet)")
+	if body == null:
+		(World.towns._town(STORE)["residents"] as Array).erase("rs-point")
+		World.production.remove_worker("rs-point")
+		return
+	var told: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	var pointers: Dictionary = Townsfolk.days()["pointers"]
+	var kept := pointers.duplicate(true)
+	pointers.clear()
+	var good := str(needs[0]["id"])
+	pointers[good] = {"place": NICHE, "lines": ["Try the niche."]}
+	var knew := record.known_places.has(NICHE)
+	record.known_places.erase(NICHE)
+	_main._ore_hint(body, player)
+	_check(told == ["Try the niche."] and record.known_places.has(NICHE), "short of %s: the line said, and the place known to them (%s)" % [good, told])
+	told.clear()
+	_main._ore_hint(body, player)
+	_check(told.is_empty(), "known now: not said again")
+	record.known_places.erase(NICHE)
+	pointers[good]["towns"] = {STORE: ["Our own niche."]}
+	_main._ore_hint(body, player)
+	_check(told == ["Our own niche."], "the town's own line over the common one (%s)" % [told])
+	told.clear()
+	record.known_places.erase(NICHE)
+	pointers.clear()
+	pointers["nothing_short"] = {"place": NICHE, "lines": ["Try the niche."]}
+	_main._ore_hint(body, player)
+	_check(told.is_empty() and not record.known_places.has(NICHE), "a good the town is not short of: nothing said, nothing told")
+	pointers.clear()
+	pointers.merge(kept)
+	if knew and not record.known_places.has(NICHE):
+		record.known_places.append(NICHE)
+		record.known_places.sort()
+	Net.message_received.disconnect(heard)
+	(World.towns._town(STORE)["residents"] as Array).erase("rs-point")
+	World.production.remove_worker("rs-point")
 	_sync()
 
 
@@ -4138,6 +4209,9 @@ func _test_greet() -> void:
 	_main._hail_heard.clear()
 	_main._hail_greetings.clear()
 	_main._resident_asks.clear()
+	var hint_record: PlayerRecord = _main._records.get(player.player_id)
+	if hint_record != null and not hint_record.known_places.has("hills/hollowfell"):
+		hint_record.known_places.append("hills/hollowfell")  # Hollowfell known: the town's ore hint (837) not said here.
 	_put(player, _main._nearest_free(mara.tile + Vector2i(5, 0)))
 	_main._greeted(player, mara)
 	_check(spoken.is_empty() and mara.addressing.is_empty(), "out of talking reach: nothing")
