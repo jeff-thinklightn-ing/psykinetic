@@ -46076,3 +46076,20 @@ This entry (dungeon's side) lands off: nothing a player meets changes until maps
 - Measured: twelve generations laid with the switch-on keys, no fault of any layout rule (door, purpose, wrap, dead_end, spine, loop, chest, coop) in any; the old caverns had 10 to 16 each (spine 2-6, loop 6-9, chest 1-3, dead_end 1-2).
 
 Tests: level_test _test_crypt_ways (the arrivals in their anchors and on floor, template and generations 1-3) and _test_deep_crypt (generations 1-6 of barrow_deep with DEEP_SWITCH unless it carries "deep": one ossuary, tomb chambers only, the wing named or none, three whole packs, the draugr, both links, no torches out of the anchors, no layout fault, no warning); labyrinth_test and regen_test pass. Level data, generator and tests; protocol unchanged; no new class_name; no bullet (the package's goes with the switch-on, in voice's words with Jeff's names). Package: the crypt's ways in, landing off.
+
+394 amended (23) (perf, 2026-11-09; the coordinator's approval, release's label): the suite runs lean
+at once when the full suite is out of reach. Nine landings queued for 97 minutes after the v0.1.209
+unfreeze. The full suite's estimate (19.8 GB, from items' real 17.3 GB full run on 11-07, 476 s) plus
+the 8 GB margin needs about 28 GB free, which the machine hasn't had since the sessions' own processes
+grew (claude, node and Chrome held about 18 GB). Every suite since then had run as suite_lean3 (6.8 GB,
+about 20 minutes), but only after waiting LEAN_AFTER_SECONDS (5 minutes) for a full slot that never came.
+- A kind marked "lean_first" (the suite) goes lean without that wait: as soon as the full run is out of
+  reach and the lean one is in it. When the full suite fits, it still runs full (about 8 minutes).
+- The estimate isn't capped or reset: the 17.3 GB peak was a real full run, and an estimate set back
+  to the lean one's would start a full suite where it can't fit. The 8 GB margin is unchanged (Jeff's rule
+  from 10-17).
+- What held the queue that afternoon was the lean suite itself out of reach (11.3 GB free with nothing
+  heavy running, 14.8 wanted). This doesn't change that; only freeing memory or the margin does.
+heavy_job_test: lean at once, still full when it fits, not when the lean one doesn't fit either, and the
+suite's row is lean_first over a kinds.json written before it. Tools only; protocol unchanged; no
+class_name; no bullet.

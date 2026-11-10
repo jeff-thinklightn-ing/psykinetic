@@ -420,7 +420,7 @@ check(adopted and float(adopted[0].split("peak ")[1].split(" GB")[0]) >= 0.15, "
     adopted[0].strip() if adopted else "no line"))
 
 print("== a suite out of reach runs lean (394 amended (9), (10)) ==")
-full = dict(gate.KINDS["suite"], kind="suite", ram_gb=14.6, commit_gb=12.2)
+full = dict(gate.KINDS["suite"], kind="suite", ram_gb=14.6, commit_gb=12.2, lean_first=False)
 table = {"suite": full, "suite_lean3": dict(gate.KINDS["suite_lean3"], ram_gb=8.0, runs_s=[600.0])}
 lean = gate.lean_row(table, "suite")
 check(lean["kind"] == "suite" and lean["estimate"] == "suite_lean3" and lean["ram_gb"] == 8.0 and "lean" not in lean
@@ -437,6 +437,12 @@ check(not gate.goes_lean(full, lean, after, [dict(running(14.6, 10.0), kind="sui
     "nor while a suite running will give its memory back (a wait on the gate, not outside it)")
 check(not gate.goes_lean(full, lean, after, [], 12.0, 20.2), "nor when the lean one is out of reach too")
 check(not gate.goes_lean(full, None, after, [], 18.3, 20.2), "nor with no lean variant")
+first = dict(full, lean_first=True)
+check(gate.goes_lean(first, lean, 0, [], 18.3, 20.2), "lean_first (394 amended (23)): lean at once when the full one is out of reach")
+check(not gate.goes_lean(first, lean, 0, [], 30.0, 30.0), "lean_first: still full when the full one is in reach")
+check(not gate.goes_lean(first, lean, 0, [], 12.0, 20.2), "lean_first: nor when the lean one is out of reach too")
+check(gate.KINDS["suite"].get("lean_first") is True and gate.kinds()["suite"].get("lean_first") is True,
+    "the suite is lean_first, over a kinds.json row written before it")
 # Companions' lean take, judged by those behind it at the full suite's
 # estimate, looked out of reach: sound's suite and then economy's went past
 # it as each running suite ended (release, 2026-10-25; 394 amended (15)).

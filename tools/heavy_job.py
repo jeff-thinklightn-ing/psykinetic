@@ -147,7 +147,10 @@ HELD_ENV = "HEAVY_JOB_HELD"
 ## Set by `run` for its command: the kind whose estimate it runs under
 ## (suite_lean3 for a lean suite, 394 amended (9), (10), (12)).
 KIND_ENV = "HEAVY_JOB_KIND"
-## A job out of reach this long runs as its kind's lean variant, if any.
+## A job out of reach this long runs as its kind's lean variant, if any;
+## at once for a kind marked "lean_first" (394 amended (23): the suite, whose
+## full run hasn't fitted beside the sessions' own memory since 11-07, so each
+## landing waited these five minutes for nothing).
 LEAN_AFTER_SECONDS = 5 * 60
 ## A run's processes are listed (memory, command line) when its commit
 ## passes the last listing's by this much, at most this often (394 amended
@@ -190,7 +193,7 @@ KINDS = {
     # its server (394 amended (20)).
     "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True, "commit_gb": 20.0},
     "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90,
-        "lean": "suite_lean3"},  # tests/land.sh: 6.3 GB measured
+        "lean": "suite_lean3", "lean_first": True},  # tests/land.sh: 6.3 GB measured
     # A suite run lean (394 amended (9), (10), (12)): its estimate and runs only;
     # it runs as a suite (lean_row), never as a kind of its own.
     "suite_lean3": {"ram_gb": 8.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
@@ -311,8 +314,11 @@ def queued_row(table, entry, default):
 def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
     """Whether a job of [row] waiting [waited_s] runs as [lean] (its lean
     variant, or None): out of reach that long, and the lean one in reach.
-    A wait on the queue, or on its own kind, never makes it lean."""
-    return (lean is not None and waited_s >= LEAN_AFTER_SECONDS
+    A wait on the queue, or on its own kind, never makes it lean. A kind
+    marked "lean_first" waits no time first (394 amended (23)): it still runs
+    full whenever the full run is in reach."""
+    after = 0 if row.get("lean_first") else LEAN_AFTER_SECONDS
+    return (lean is not None and waited_s >= after
         and out_of_reach(row, running, free_ram_gb, free_commit_gb)
         and not out_of_reach(lean, running, free_ram_gb, free_commit_gb))
 
