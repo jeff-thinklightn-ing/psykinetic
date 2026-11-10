@@ -53,6 +53,23 @@ const COIL_SETTLE := 0.25
 const PANT_PACE := 0.55
 const PANT_DIP := 0.16
 const PANT_EASE := 0.3
+## Steadied (843, animation's side: a boss out of a stagger, cried "steady" till "steady_over"): the
+## set beat, planted and shaken off over STEADY_SECONDS, sunk STEADY_SINK of its height and rolled
+## STEADY_SHAKE (radians) side to side about its length and twisted STEADY_TWIST about the upright
+## (what reads from the game's camera, above); then braced, a share STEADY_HOLD of the
+## sink kept and the head STEADY_DIP low, till "steady_over" or STEADY_CAP seconds (a lost cry). A
+## blow on it meanwhile rocks it back ROCK (radians, ROCK_BACK of its length) and it holds.
+const STEADY_SECONDS := 0.4
+const STEADY_SINK := 0.1
+const STEADY_SHAKE := 0.2
+const STEADY_TWIST := 0.22
+const STEADY_HOLD := 0.4
+const STEADY_DIP := 0.08
+const STEADY_CAP := 6.0
+const STEADY_SETTLE := 0.25
+const ROCK := 0.12
+const ROCK_BACK := 0.06
+const ROCK_SECONDS := 0.24
 const BLEND := 0.2
 ## How squarely against its facing a walk runs to be drawn backing off (a cosine).
 const BACKING_DOT := 0.5
@@ -102,6 +119,11 @@ var _tell_until := 0
 var _charge_until := 0
 ## Panting till (msec, the rigs' clock): the old grey's opening after a lunge.
 var _pant_until := 0
+## Steadied till (msec, the rigs' clock; 0: not), and its tween (843).
+var _steady_until := 0
+var _steady: Tween
+## The pose's own yaw (Client3D turns the art's front to +X): a twist is about it.
+var _rest_yaw := 0.0
 ## A slot clip played once when the one playing ends (the hill cat's recover after its leap).
 var _then := ""
 ## Plain blows struck: a slot with a bite alternates its swipe (attack) and bite.
@@ -133,6 +155,7 @@ func _init(creature_slot: String, art: Node3D, pose: Node3D) -> void:
 	name = "CreatureView"
 	slot = creature_slot
 	_pose = pose
+	_rest_yaw = pose.rotation.y if pose != null else 0.0
 	var players := art.find_children("*", "AnimationPlayer", true, false)
 	if players.is_empty():
 		return
@@ -231,6 +254,8 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 			_way = step.normalized()
 	_last_at = puppet.position
 	_last_ms = now
+	if _steady_until > 0 and (now >= _steady_until or _down):
+		steady_over()  # Its "steady_over" lost (STEADY_CAP), or knocked down after all.
 	if _lying(monster, now):
 		return
 	if monster != null and monster.teeter != Vector2i.ZERO:
@@ -556,12 +581,15 @@ func bolt() -> void:
 
 
 ## A blow taken: its hit clip, else a flinch (tipped and pushed back); none lying down (it
-## would half stand).
+## would half stand). Steadied (843), no hit: it rocks back and holds.
 func hit() -> void:
 	if _dead or _down or (_life != null and _life.weight > 0.0):
 		return
 	if _dazed or AnimRig.now_msec() < _dazed_until:
 		return  # Dazed wins over a blow for its whole stun (the coordinator): its opening stays shown.
+	if steadied():
+		_rock()
+		return
 	if clips.has("hit"):
 		# Not under a blow (it would play unseen, then show held as the blow
 		# fades), nor over one played once.
@@ -578,10 +606,75 @@ func hit() -> void:
 	tween.parallel().tween_property(_pose, "position:x", 0.0, FLINCH_SECONDS * 0.7)
 
 
+## Steadied (cried "steady", 843): out of a stagger a boss plants and shakes it off (the set beat,
+## STEADY_SECONDS), then stands braced, a blow rocking it without a hit, till steady_over.
+func steady() -> void:
+	if rig == null or _dead or _down or _pose == null:
+		return
+	_steady_until = AnimRig.now_msec() + int(ArtKit.feel("creature_view.steady_cap", STEADY_CAP) * 1000.0)
+	var sink := ArtKit.size(slot).y * ArtKit.feel("creature_view.steady_sink", STEADY_SINK)
+	var shake := ArtKit.feel("creature_view.steady_shake", STEADY_SHAKE)
+	var twist := ArtKit.feel("creature_view.steady_twist", STEADY_TWIST)
+	var dip := (-HEAD_UP if _head_up else 0.0) + ArtKit.feel("creature_view.steady_dip", STEADY_DIP)
+	var beat := ArtKit.feel("creature_view.steady_seconds", STEADY_SECONDS)
+	if _steady != null and _steady.is_valid():
+		_steady.kill()
+	_steady = create_tween().set_parallel(true)
+	# Planted: down into its legs, the head low, the first roll of the shake with it.
+	_steady.tween_property(_pose, "position:y", -sink, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_steady.tween_property(_pose, "rotation:x", dip, beat * 0.25).set_ease(Tween.EASE_OUT)
+	_steady.tween_property(_pose, "rotation:z", shake, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_steady.tween_property(_pose, "rotation:y", _rest_yaw + twist, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_steady.chain().tween_property(_pose, "rotation:z", -shake, beat * 0.25).set_trans(Tween.TRANS_SINE)
+	_steady.parallel().tween_property(_pose, "rotation:y", _rest_yaw - twist, beat * 0.25).set_trans(Tween.TRANS_SINE)
+	_steady.chain().tween_property(_pose, "rotation:z", shake * 0.4, beat * 0.2).set_trans(Tween.TRANS_SINE)
+	_steady.parallel().tween_property(_pose, "rotation:y", _rest_yaw + twist * 0.4, beat * 0.2).set_trans(Tween.TRANS_SINE)
+	_steady.chain().tween_property(_pose, "rotation:z", 0.0, beat * 0.3).set_ease(Tween.EASE_OUT)
+	_steady.parallel().tween_property(_pose, "rotation:y", _rest_yaw, beat * 0.3).set_ease(Tween.EASE_OUT)
+	# Braced: part way up again, held so.
+	_steady.parallel().tween_property(_pose, "position:y", -sink * STEADY_HOLD, beat * 0.3).set_ease(Tween.EASE_IN_OUT)
+
+
+## Whether it stands steadied now (843).
+func steadied() -> bool:
+	return _steady_until > AnimRig.now_msec()
+
+
+## Steadied no more (cried "steady_over", or STEADY_CAP, a knockdown, its death): up from the
+## brace.
+func steady_over() -> void:
+	if _steady_until == 0:
+		return
+	_steady_until = 0
+	if _steady != null and _steady.is_valid():
+		_steady.kill()
+	if _pose == null or _dead:
+		return
+	_steady = create_tween().set_parallel(true)
+	_steady.tween_property(_pose, "position:y", 0.0, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	_steady.tween_property(_pose, "rotation:x", -HEAD_UP if _head_up else 0.0, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	_steady.tween_property(_pose, "rotation:z", 0.0, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	_steady.tween_property(_pose, "rotation:y", _rest_yaw, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+
+
+## A blow on it steadied: rocked back, the head tossed up, and back into its brace at once.
+func _rock() -> void:
+	if _pose == null:
+		return
+	var braced := (-HEAD_UP if _head_up else 0.0) + ArtKit.feel("creature_view.steady_dip", STEADY_DIP)
+	var back := ArtKit.size(slot).z * ArtKit.feel("creature_view.rock_back", ROCK_BACK)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(_pose, "rotation:x", braced - ArtKit.feel("creature_view.rock", ROCK), ROCK_SECONDS * 0.25).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_pose, "position:x", -back, ROCK_SECONDS * 0.25).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_property(_pose, "rotation:x", braced, ROCK_SECONDS * 0.75).set_ease(Tween.EASE_IN_OUT)
+	tween.parallel().tween_property(_pose, "position:x", 0.0, ROCK_SECONDS * 0.75).set_ease(Tween.EASE_IN_OUT)
+
+
 ## Dead: its death clip once, held on its last frame; the seconds it takes
 ## (0 with none, and the puppet falls over as a body without art does).
 func die() -> float:
 	_then = ""
+	steady_over()
 	if rig == null or resolve("death") == "":
 		return 0.0
 	if _life != null and _life.weight > 0.0:

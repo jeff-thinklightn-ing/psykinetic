@@ -198,6 +198,8 @@ var _foe := "brute"
 var _part := 0
 var _shown: Array = []
 var _landed: Array[int] = []
+## The tick a steady reel's body began its turn (-1: none under way).
+var _turn_from := -1
 ## Where the player steps out of his throw's line (-1, -1 till it shows).
 var _aside := Vector2i(-1, -1)
 
@@ -298,6 +300,8 @@ func _ready() -> void:
 			_drawbacks()
 		"boarking", "boarback", "boarcircle":
 			_boarking()
+		"steady":
+			_steady_reel()
 		"hillcat":
 			_hillcat()
 		"draugr", "draugr_walkback":
@@ -318,6 +322,14 @@ func _ready() -> void:
 	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
+	if scenario == "steady":
+		# Still and unhurt: they stand to be shown.
+		_player.max_hp = 1000000
+		_player.hp = _player.max_hp
+		for entity in World.monsters():
+			entity.acts = false
+		World._roster_current = false  # Its actors are listed once: they are taken off them.
+		_main.pack_panel.shown = false
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
 		# The imp only stands there to be struck: it neither dies nor moves.
 		_monster.max_hp = 1000000
@@ -353,7 +365,7 @@ func _ready() -> void:
 	_caption.add_theme_constant_override("outline_size", 8)
 	layer.add_child(_caption)
 	if _main._client3d != null:
-		_main._client3d._zoom_to = _main._client3d.ZOOM_MAX
+		_main._client3d._zoom_to = _main._client3d.ZOOM_MIN if scenario == "steady" else _main._client3d.ZOOM_MAX
 	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _monster is Animal:
@@ -381,7 +393,11 @@ func _process(delta: float) -> void:
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
 	if at != null and monster != null and not scenario in ["camera_turn", "gains", "sheet", "target", "landmark"]:  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
-		view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
+		if scenario == "steady":
+			# The body in its turn in the middle (843's reel), however far it stands.
+			view.pan = view.pan.lerp(monster.position - at.position, 1.0 - exp(-4.0 * delta))
+		else:
+			view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
 
 
 ## Registers the scenario's room: [param rows] of cells, a start, one
@@ -867,6 +883,40 @@ func _boar_close(king: Monster) -> bool:
 ## The hill cat's reel (814 amended, the coordinator's staging): open ground, the near low camera;
 ## the cat lying up, spotted (its snarl), then a walker it has not seen (the reel keeps it unseen):
 ## its crouch, leap and recover, then its swipes and bites.
+## Steadied (843, animation's side): the bosses that take it round the player, still, each in turn
+## told "steady" (as the server cries it), struck twice braced, then "steady_over"; the camera on
+## each. The view's side only: no sim stagger.
+const STEADY_KINDS := {"great_bear": Vector2i(2, 3), "old_wolf": Vector2i(6, 2), "boar_king": Vector2i(10, 3),
+	"draugr": Vector2i(11, 7), "robber_brute": Vector2i(10, 11), "brute": Vector2i(6, 12), "sneak": Vector2i(2, 11)}
+## Each one's tick in its turn: told "steady" (the camera there first), the blows, steady_over, the
+## turn's end.
+const STEADY_TOLD := 10
+const STEADY_BLOWS: Array[int] = [20, 28]
+const STEADY_OVER_AT := 38
+const STEADY_TURN := 48
+
+
+func _steady_reel() -> void:
+	var rows: Array[String] = ["##############"]
+	for y in 13:
+		rows.append("#............#")
+	rows.append("##############")
+	var markers := {Vector2i(6, 7): "start"}
+	var config := {"name": "Clip", "ambient": 0.9, "entities": [], "legend": {}}
+	for kind: String in STEADY_KINDS:
+		var at: Vector2i = STEADY_KINDS[kind]
+		markers[at] = "monster_" + kind
+		var toward := Vector2i(signi(6 - at.x), signi(7 - at.y))
+		config["entities"].append({"at": [at.x, at.y], "facing": [toward.x, toward.y], "idle": {"mode": "guard"}})
+		if not kind in ["brute", "sneak"]:
+			config["legend"]["monster_" + kind] = "#%02x%02x48" % [0x40 + at.x * 8, 0x40 + at.y * 8]  # A colour of its own.
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [["wait", 20, ""]]
+	for kind: String in STEADY_KINDS:
+		_script.append(["steady", kind, kind.replace("_", " ") + ": steadied, struck twice, steady_over"])
+	_script.append(["wait", 20, ""])
+
+
 func _hillcat() -> void:
 	var rows: Array[String] = ["#".repeat(40)]
 	for y in 22:
@@ -2132,6 +2182,30 @@ func _on_tick(tick: int) -> void:
 						World.order_attack(_player, foe)
 				return
 			_fight_until = -1
+		"steady":
+			# One body's turn (_steady_reel): told "steady" as the server cries it, struck, let up.
+			var body: Monster = null
+			for entity in World.monsters():
+				if str(entity.spawn_spec.get("kind", "")) == step[1]:
+					body = entity
+			if body == null:
+				push_warning("clip: no %s" % step[1])
+			else:
+				_monster = body  # The camera on it.
+				var turn := tick - _turn_from if _turn_from >= 0 else 0
+				if _turn_from < 0:
+					_turn_from = tick
+				var view: Node = _main._client3d
+				var puppet: Node3D = view._puppets.get(body.get_instance_id())
+				if turn == STEADY_TOLD:
+					view._on_cried(&"steady", body.get_instance_id())
+				elif turn in STEADY_BLOWS and puppet != null:
+					view._flinch(puppet)
+				elif turn == STEADY_OVER_AT:
+					view._on_cried(&"steady_over", body.get_instance_id())
+				if turn < STEADY_TURN:
+					return
+			_turn_from = -1
 		"bout":
 			# As "brawl", through the player's own attack order (a left click
 			# on the foe), but over when either side is down.

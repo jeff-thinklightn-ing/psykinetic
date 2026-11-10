@@ -200,6 +200,7 @@ func _ready() -> void:
 		await _test_apex_sweep()
 		await _test_creature_down()
 		await _test_creature_tells()
+		await _test_steadied()
 		_test_piles()
 		_test_heard_as_monsters_hear()
 		_test_ambience_runs()
@@ -13621,6 +13622,116 @@ func _test_shield_seen() -> void:
 	_rig._swings.erase(player.get_instance_id())
 	World.despawn(imp)
 	_rig._process(0.0)
+
+
+## Steadied (843, animation's side): a boss out of a stagger, cried "steady", plants and shakes it
+## off, then stands braced; a blow on it rocks it with no hit clip; "steady_over" (or its cap) lets
+## it up. A creature (the boar king, CreatureView) and a person (a robber for the chiefs, Client3D).
+func _test_steadied() -> void:
+	print("
+== steadied (843): out of a stagger it plants and shakes it off, a blow rocks it without a hit, braced till steady_over ==")
+	var king := _spawn_imp(Vector2i(9, 4), "boar_king")
+	var robber := _spawn_imp(Vector2i(9, 6), "robber")
+	await _frames(2)
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets.get(king.get_instance_id()) if king != null else null
+	var view := puppet.get_meta("creature_view", null) as CreatureView if puppet != null else null
+	var person: Node3D = _rig._puppets.get(robber.get_instance_id()) if robber != null else null
+	if view == null or view.rig == null or person == null or not person.has_meta("rig") or not person.has_node("Body/Model"):
+		_check(false, "a boar king by its CreatureView and a robber by its rig (%s, %s)" % [view, person])
+		for each: GridEntity in [king, robber]:
+			if each != null:
+				World.despawn(each)
+		return
+	var pose := view._pose
+	_rig._on_cried(&"steady", king.get_instance_id())
+	var lowest := 0.0
+	var rolled := 0.0
+	var twisted := 0.0
+	# Waits on the state, not the wall clock (a loaded suite reads a tween late): the beat's 0.4 s
+	# watched, then on till braced, 3 s at most.
+	var braced := func() -> bool:
+		return pose.position.y < -0.005 and absf(pose.rotation.z) < 0.01 and absf(pose.rotation.y - view._rest_yaw) < 0.01
+	var started := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < 600 or (not braced.call() and Time.get_ticks_msec() - started < 3000):
+		await get_tree().process_frame
+		lowest = minf(lowest, pose.position.y)
+		rolled = maxf(rolled, absf(pose.rotation.z))
+		twisted = maxf(twisted, absf(pose.rotation.y - view._rest_yaw))
+	_check(view.steadied() and lowest < -0.02 and rolled > 0.05 and twisted > 0.05 and pose.position.y < -0.005
+			and absf(pose.rotation.z) < 0.01 and absf(pose.rotation.y - view._rest_yaw) < 0.01,
+			"the boar king steadied: planted (sunk %.3f m), shaken (rolled %.2f, twisted %.2f rad), then braced (%.3f m)"
+			% [lowest, rolled, twisted, pose.position.y])
+	var hit_clip := str(view.clips.get("hit", "-"))
+	_rig._flinch(puppet)
+	var rocked := 0.0
+	started = Time.get_ticks_msec()
+	while rocked >= -0.01 and Time.get_ticks_msec() - started < 1000:
+		await get_tree().process_frame
+		rocked = minf(rocked, pose.position.x)
+	_check(rocked < -0.01 and view.rig.playing() != hit_clip and view.steadied(),
+			"a blow on him steadied: rocked back %.3f m, no hit clip (%s), still steadied" % [rocked, view.rig.playing()])
+	_rig._on_cried(&"steady_over", king.get_instance_id())
+	started = Time.get_ticks_msec()
+	var risen := func() -> bool:
+		return absf(pose.position.y) < 0.005 and absf(pose.rotation.x) < 0.01
+	while (not risen.call() or Time.get_ticks_msec() - started < 400) and Time.get_ticks_msec() - started < 3000:
+		await get_tree().process_frame
+	_check(not view.steadied() and absf(pose.position.y) < 0.005 and absf(pose.rotation.x) < 0.01,
+			"steady_over: up from the brace (%.3f m, %.3f rad)" % [pose.position.y, pose.rotation.x])
+	view.steady()
+	view._steady_until = AnimRig.now_msec() - 1
+	view.frame(puppet, king)
+	_check(view._steady_until == 0, "a lost steady_over: let up at its cap")
+	# A person (the chiefs' way): its Model dipped, its Body rolled, its clips playing on.
+	var body := person.get_node("Body") as Node3D
+	var model := body.get_node("Model") as Node3D
+	var rig := person.get_meta("rig") as AnimRig
+	var rest_y := model.position.y
+	_rig._on_cried(&"steady", robber.get_instance_id())
+	var faces := model.rotation.y
+	var dipped := rest_y
+	var rolled_by := 0.0
+	var twisted_by := 0.0
+	var lifted := 0.0
+	var held := func() -> bool:
+		var turned_back := absf(angle_difference(faces, model.rotation.y)) < 0.01
+		return model.position.y < rest_y - 0.02 and absf(body.rotation.x) < 0.01 and absf(body.rotation.z) < 0.01 and turned_back
+	started = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - started < 600 or (not held.call() and Time.get_ticks_msec() - started < 3000):
+		await get_tree().process_frame
+		dipped = minf(dipped, model.position.y)
+		rolled_by = maxf(rolled_by, absf(body.rotation.x))
+		twisted_by = maxf(twisted_by, absf(angle_difference(faces, model.rotation.y)))
+		lifted = maxf(lifted, body.rotation.z)
+	_check(_rig._held_steady(person) and dipped < rest_y - 0.1 and rolled_by > 0.2 and twisted_by > 0.15 and lifted > 0.05
+			and model.position.y < rest_y - 0.02 and absf(body.rotation.x) < 0.01 and absf(body.rotation.z) < 0.01
+			and absf(angle_difference(faces, model.rotation.y)) < 0.01,
+			"a person steadied: dipped %.3f m, shoulders rolled %.2f, twisted %.2f, head up %.2f rad, then braced (%.3f m below its rest)"
+			% [rest_y - dipped, rolled_by, twisted_by, lifted, rest_y - model.position.y])
+	var stood := body.position
+	_rig._flinch(person)
+	var pushed := 0.0
+	started = Time.get_ticks_msec()
+	while pushed <= 0.02 and Time.get_ticks_msec() - started < 1000:
+		await get_tree().process_frame
+		pushed = maxf(pushed, Vector2(body.position.x - stood.x, body.position.z - stood.z).length())
+	_check(pushed > 0.02 and not rig.playing() in _rig.HIT_CLIPS,
+			"a blow on a person steadied: rocked %.3f m, no hit clip (%s)" % [pushed, rig.playing()])
+	_rig._on_cried(&"steady_over", robber.get_instance_id())
+	started = Time.get_ticks_msec()
+	var stood_up := func() -> bool:
+		return absf(model.position.y - rest_y) < 0.005 and absf(body.rotation.x) < 0.01
+	while (not stood_up.call() or Time.get_ticks_msec() - started < 400) and Time.get_ticks_msec() - started < 3000:
+		await get_tree().process_frame
+	_check(not _rig._held_steady(person) and absf(model.position.y - rest_y) < 0.005 and absf(body.rotation.x) < 0.01,
+			"steady_over: the person up from the brace (%.3f m off its rest)" % (model.position.y - rest_y))
+	person.set_meta("busy_until", 0)
+	_rig._flinch(person)
+	_check(rig.playing() in _rig.HIT_CLIPS, "steadied no more, a blow plays its hit again (%s)" % rig.playing())
+	World.despawn(king)
+	World.despawn(robber)
+	await _frames(2)
 
 
 func _spawn_imp(tile: Vector2i, kind := "") -> Monster:

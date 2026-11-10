@@ -1997,6 +1997,24 @@ const SPARK_REACH := 0.35
 const SPARK_CHEST := 1.1
 const BASH_JOLT := 0.08
 const BASH_JOLT_SECONDS := 0.18
+## A person steadied (843, animation's side: the chiefs out of a stagger, cried "steady" till
+## "steady_over"; a creature's is CreatureView.steady): the set beat over STEADY_SECONDS, hunched
+## STEADY_HUNCH (radians) into a dip of STEADY_DIP (metres), the shoulders rolled STEADY_ROLL and the
+## body twisted STEADY_TWIST about the upright side to side (what reads from above: combat's look at
+## the first reel), then the chest and head brought up STEADY_LIFT; then held STEADY_HOLD of the dip
+## till "steady_over" or STEADY_CAP seconds; a blow on it rocks it back STEADY_ROCK (metres) and home
+## with no hit clip.
+const STEADY_DIP := 0.2
+const STEADY_ROLL := 0.35
+const STEADY_TWIST := 0.3
+const STEADY_HUNCH := 0.15
+const STEADY_LIFT := 0.12
+const STEADY_SECONDS := 0.4
+const STEADY_HOLD := 0.35
+const STEADY_CAP := 6.0
+const STEADY_SETTLE := 0.25
+const STEADY_ROCK := 0.1
+const STEADY_ROCK_SECONDS := 0.22
 static var _spark_mesh: ArrayMesh
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
@@ -20310,6 +20328,9 @@ func _flinch(puppet: Node3D) -> void:
 	# longer fall to ground they just freeze in place").
 	if not is_instance_valid(puppet) or not puppet.is_inside_tree() or puppet.has_meta("corpse"):
 		return
+	if _held_steady(puppet):
+		_steady_rock(puppet)  # Steadied (843): no hit clip, rocked and held.
+		return
 	_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).hit()
@@ -23180,7 +23201,8 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 		return
 	if not puppet.has_meta("faces"):
 		puppet.set_meta("faces", model.rotation.y)
-	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0)
+	# Plus a steadied person's twist (843: Client3D._steady's, eased by its tween).
+	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0) + float(puppet.get_meta("steady_twist", 0.0))
 	if not is_equal_approx(model.rotation.y, want):
 		model.rotation.y = want
 
@@ -24209,12 +24231,114 @@ func _hit_from(puppet: Node3D, entity: GridEntity, from: Vector2) -> bool:
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).hit()
 		return true
+	if _held_steady(puppet):
+		_steady_rock(puppet)  # Steadied (843): no hit clip, rocked and held.
+		return true
 	var hits: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("hits", {})
 	var names: Array[String] = []
 	for clip: String in hits.get(hit_side(Vector2(entity.facing), from), []):
 		if puppet.has_meta("rig") and (puppet.get_meta("rig") as AnimRig).has(clip):
 			names.append(clip)
 	return _play_once(puppet, _pick_clip(puppet, names if not names.is_empty() else HIT_CLIPS))
+
+
+## A person steadied (cried "steady", 843): out of a stagger a chief plants and shakes it off (its
+## Model dipped, _lay keeping Body's place; Body's shoulders rolled about its front, +X; the clips
+## play on), then holds braced till _steady_over, a blow rocking it with no hit clip
+## (_steady_rock). Its STEADY_CAP if the "steady_over" is lost.
+func _steady(puppet: Node3D) -> void:
+	if puppet.has_meta("corpse") or not puppet.has_meta("rig") or not puppet.has_node("Body/Model"):
+		return
+	var body := puppet.get_node("Body") as Node3D
+	var model := body.get_node("Model") as Node3D
+	var rest_y := float(puppet.get_meta("steady_rest_y", model.position.y))
+	var token := int(puppet.get_meta("steady_token", 0)) + 1
+	var cap := ArtKit.feel("client3d.steady_cap", STEADY_CAP)
+	puppet.set_meta("steady_rest_y", rest_y)
+	puppet.set_meta("steady_token", token)
+	puppet.set_meta("steady_until", AnimRig.now_msec() + int(cap * 1000.0))
+	var dip := ArtKit.feel("client3d.steady_dip", STEADY_DIP)
+	var roll := ArtKit.feel("client3d.steady_roll", STEADY_ROLL)
+	var twist := ArtKit.feel("client3d.steady_twist", STEADY_TWIST)
+	var hunch := ArtKit.feel("client3d.steady_hunch", STEADY_HUNCH)
+	var lift := ArtKit.feel("client3d.steady_lift", STEADY_LIFT)
+	var beat := ArtKit.feel("client3d.steady_seconds", STEADY_SECONDS)
+	var tween := body.create_tween().set_parallel(true)
+	puppet.set_meta("steady_tween", tween)
+	# The twist through _lay (which sets Model's yaw each frame): its "steady_twist", the puppet found
+	# by its id (836).
+	var id_twist := puppet.get_instance_id()
+	var twisted := func(angle: float) -> void:
+		var fired_puppet := instance_from_id(id_twist) as Node3D
+		if is_instance_valid(fired_puppet):
+			fired_puppet.set_meta("steady_twist", angle)
+	# Planted: hunched into the dip, the first roll and twist with it.
+	tween.tween_property(model, "position:y", rest_y - dip, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(body, "rotation:z", -hunch, beat * 0.25).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "rotation:x", roll, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	tween.tween_method(twisted, 0.0, twist, beat * 0.25).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	tween.chain().tween_property(body, "rotation:x", -roll, beat * 0.25).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_method(twisted, twist, -twist, beat * 0.25).set_trans(Tween.TRANS_SINE)
+	# Shaken off: the last of the shake as it comes up, chest and head raised.
+	tween.chain().tween_property(body, "rotation:x", roll * 0.4, beat * 0.2).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_method(twisted, -twist, twist * 0.4, beat * 0.2).set_trans(Tween.TRANS_SINE)
+	tween.parallel().tween_property(body, "rotation:z", lift, beat * 0.2).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_property(body, "rotation:x", 0.0, beat * 0.3).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_method(twisted, twist * 0.4, 0.0, beat * 0.3).set_ease(Tween.EASE_OUT)
+	tween.parallel().tween_property(body, "rotation:z", 0.0, beat * 0.3).set_ease(Tween.EASE_IN_OUT)
+	# Braced: part way up again, held so.
+	tween.parallel().tween_property(model, "position:y", rest_y - dip * STEADY_HOLD, beat * 0.3).set_ease(Tween.EASE_IN_OUT)
+	# Its cap (by ids, 836): a lost "steady_over" leaves it braced no longer than this.
+	var ids_steady := [puppet.get_instance_id(), token]
+	get_tree().create_timer(cap).timeout.connect(func() -> void:
+		var fired_puppet := instance_from_id(ids_steady[0]) as Node3D
+		if is_instance_valid(fired_puppet) and int(fired_puppet.get_meta("steady_token", 0)) == ids_steady[1]:
+			_steady_over(fired_puppet))
+
+
+## Whether [param puppet], a person, stands steadied now (843; a creature's: CreatureView.steadied).
+func _held_steady(puppet: Node3D) -> bool:
+	return not puppet.has_meta("creature_view") and int(puppet.get_meta("steady_until", 0)) > AnimRig.now_msec()
+
+
+## A person steadied no more (cried "steady_over", or its cap): up from the brace.
+func _steady_over(puppet: Node3D) -> void:
+	if not puppet.has_meta("steady_until"):
+		return
+	puppet.remove_meta("steady_until")
+	puppet.set_meta("steady_token", int(puppet.get_meta("steady_token", 0)) + 1)
+	var old: Variant = puppet.get_meta("steady_tween", null)
+	if old is Tween and (old as Tween).is_valid():
+		(old as Tween).kill()
+	puppet.remove_meta("steady_tween")
+	var rest_y := float(puppet.get_meta("steady_rest_y", 0.0))
+	puppet.remove_meta("steady_rest_y")
+	if not puppet.has_node("Body/Model"):
+		return
+	var body := puppet.get_node("Body") as Node3D
+	var model := body.get_node("Model") as Node3D
+	puppet.remove_meta("steady_twist")
+	if puppet.has_meta("corpse"):
+		model.position.y = rest_y  # Killed braced: its fall is its own, the brace just gone.
+		body.rotation.x = 0.0
+		body.rotation.z = 0.0
+		return
+	var tween := body.create_tween().set_parallel(true)
+	tween.tween_property(model, "position:y", rest_y, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(body, "rotation:x", 0.0, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(body, "rotation:z", 0.0, STEADY_SETTLE).set_ease(Tween.EASE_IN_OUT)
+
+
+## A blow on a steadied person: rocked back (its Body off its front) and home, no hit clip.
+func _steady_rock(puppet: Node3D) -> void:
+	if not puppet.has_node("Body"):
+		return
+	var body := puppet.get_node("Body") as Node3D
+	var rest := body.position  # Where _lay keeps it (as _bash_taken's jolt).
+	var back := -body.transform.basis.x.normalized() * ArtKit.feel("client3d.steady_rock", STEADY_ROCK)
+	var tween := body.create_tween()
+	tween.tween_property(body, "position", rest + back, STEADY_ROCK_SECONDS * 0.3).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "position", rest, STEADY_ROCK_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
 
 
 ## Shield-bashed (379 amended, animation's side): the basher (at [param by]) drives its shield in,
@@ -24810,6 +24934,14 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.pant(int((pant as Dictionary).get("ticks", 20) if pant is Dictionary else 20) * World.TICK_DT)
 		elif cry == &"call":
 			view.snarl()
+		elif cry == &"steady":
+			view.steady()
+		elif cry == &"steady_over":
+			view.steady_over()
+	elif cry == &"steady":
+		_steady(puppet)
+	elif cry == &"steady_over":
+		_steady_over(puppet)
 	if cry == &"steady" or cry == &"steady_over":
 		# Steadied (843): a boss or apex out of a stagger heard setting
 		# himself by his kind (SoundKit.steady_slot), the blows on him dull

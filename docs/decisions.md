@@ -47792,3 +47792,27 @@ and a blade's -8, and far duller. 17 CC0 Freesound takes: martian 185536 (twice,
 regenerated. sound_kit_test _test_steadied: each kind's set (a plain wolf and a deer none), each
 slot placed on the sfx bus playing something, and with no takes of its own its stand-in. Client
 only; protocol unchanged, no new class_name. No bullet here: the package's rides combat's side.
+843, animation's side: steadied seen (2026-11-10; release's label under combat's 843; combat's ask
+and its look at the reels, the coordinator's approval; one take with combat's and sound's sides). A
+boss steadied out of a stagger takes a blow without a reel, and a second axe blow that seems to do
+nothing reads as a bug, so the player is shown it: on the cry "steady" (Monster._cry, quiet, through
+Client3D._on_cried) the body plants and shakes it off, a 0.4 s set beat drawn in code since no slot
+has a clip for it (a creature's Pose sunk STEADY_SINK of its height and rolled STEADY_SHAKE side to
+side about its length, CreatureView.steady; a person's, Client3D._steady, for the chiefs, bigger
+since only the creatures read in the first reel (combat's look): hunched STEADY_HUNCH into a dip of
+STEADY_DIP (0.2 m), the shoulders rolled STEADY_ROLL (0.35) and the body twisted STEADY_TWIST about
+the upright through _lay's yaw, then chest and head brought up STEADY_LIFT), then stands braced
+(part of the sink kept, a creature's head a little low) until the server's "steady_over", which it
+always sends since the view cannot work out the end (a told move resolving, else 30 ticks), or
+STEADY_CAP (6 s) should that cry be lost; a death or a knockdown lets it up too. A blow on it
+meanwhile plays no hit clip: it rocks back and holds (CreatureView._rock, Client3D._steady_rock);
+its push still slides it. The great bear, the old grey, the boar king and the draugr (CreatureView)
+and Brand the Ox, the orc chief and Skeech the kobold chief (Client3D's people) all take it; each
+creature slot gains a "steady" clip entry whose fallback is the tween, so a made clip replaces it
+with no code. No new replicated value: two cry words. view_test _test_steadied (the boar king and a
+robber standing in for the chiefs: planted, shaken, braced; a blow rocks with no hit clip;
+steady_over and the cap let it up; a blow after plays its hit). Client3D._held_steady (whether a
+person is braced) beside combat's _steadied (who is heard steadied, for the dull hit): the view's
+beat and the sound's are kept apart, each cry handled by both. tools/clip.gd: the "steady" reel
+scenario (each steadied kind in turn, told, struck twice, steady_over). Package "steadied", on, in
+combat's take. Client only, protocol unchanged, no new class_name.
