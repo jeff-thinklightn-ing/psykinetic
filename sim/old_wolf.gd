@@ -44,6 +44,24 @@ var pant := PANT.duplicate()
 ## The den (his home where laid), his lair's door to walk to, and whether
 ## he is out in his land (Apex's, as the bear's).
 var den := NO_TILE
+## The den rule (780 amended (26), the boar king's, shared: Apex.to_den):
+## under DEN_BELOW of its hp in its lair it never flees but walks to its den,
+## within DEN_RULE "near" of it fighting on; at bay where it stands once struck
+## "at_bay_after" times on the way; one told bite back for each blow on it
+## that lands on the way, never more owed ("bite_per_blow", _den_bite);
+## past its own escort in its way, and at bay where it stands once a foe
+## bars its way home ("barred"). Its walk's state (Apex.to_den's).
+const DEN_BELOW := 0.15
+const DEN_RULE := {"near": 3, "far": false, "log": "den", "at_bay_after": 0, "bite_per_blow": true, "barred": true}
+var _wallow_from: GridEntity = null
+var _wallow_far := false
+var _wallow_hits := 0
+var _wallow_seen := -1
+var _wallow_owed := false
+var _wallow_owed_seen := -1
+var _wallow_tick := -1  # When it turned for home (its pack covers it from then).
+var _wallow_barred := -1  # Since when a foe bars its way home ("barred"); at bay, its last look.
+var _wallow_at_bay := false  # Barred from its den: cornered where it stands.
 var apex_goal := NO_TILE
 var apex_out := false
 ## The move under way: {move, telegraph, lands, shape, toward, from}; a
@@ -58,6 +76,7 @@ func _ready() -> void:
 	super()
 	_hook()
 	den = home if home != NO_TILE else tile
+	_no_flee()
 	var moves: Variant = Monster.kinds().get(_kind(), {}).get("moves", {})
 	if moves is Dictionary:
 		for move: String in ["howl", "spring", "pant"]:
@@ -82,6 +101,8 @@ func _sim_tick() -> void:
 	if den == NO_TILE:
 		den = tile
 	if _tend_move():
+		return
+	if Apex.to_den(self, DEN_BELOW, den, struck_by, DEN_RULE):
 		return
 	if apex_goal != NO_TILE:
 		target = null
@@ -108,6 +129,22 @@ func _settle_bold() -> void:
 	_bold = true
 	temper = Temper.BOLD
 	wander_radius = maxi(_roam, 4)
+	_no_flee()
+
+
+## It never flees (780 amended (26)): under DEN_BELOW in its lair it goes to
+## its den instead (Apex.to_den), as the boar king does.
+func _no_flee() -> void:
+	for t: int in flee_below:
+		flee_below[t] = 0.0
+	dread_flee_below = 0.0
+
+
+## His bite back on the walk to his den (Apex.to_den's "bite_per_blow"):
+## his fight's led bite at [param by], its lead_ticks told (780 amended (23),
+## (26)). True if begun.
+func _den_bite(by: GridEntity) -> bool:
+	return World.try_wind_up(self, by, lead_ticks)
 
 
 ## His pack about him: living wolves of his herd within PACK_TILES (his
@@ -303,6 +340,13 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 ## blow on it strikes, World.struck_cell): the run-up bite's reach.
 func _on_told(body: GridEntity, told: int) -> bool:
 	return World.struck_cell(body) in World.told_cells(told)
+
+
+## Whether he is fighting [param entity] (companions read it,
+## Companion._apex_with): his target, or the one he broke off from on his
+## walk to his den (780 amended (26)), whom he still fights.
+func engaged_with(entity: GridEntity) -> bool:
+	return is_instance_valid(entity) and (target == entity or _wallow_from == entity)
 
 
 ## The way from [param bitten] toward his pack's middle; none with no pack.

@@ -1839,6 +1839,11 @@ func _test_ambush() -> void:
 	_test_old_wolf_lunge_line()
 	_test_old_wolf_rates()
 	_test_told_runs_stop()
+	_test_den_bite_per_blow()
+	_test_den_pack_covers()
+	_test_den_pack_stays()
+	_test_den_walk_past_own()
+	_test_den_walk_barred()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -8395,3 +8400,412 @@ func _test_old_wolf_lair() -> void:
 	Monster.idling = idling_was
 	World.spawn_spec = Callable()
 	DayNight.reset()
+
+
+## His own never bar his walk home (780 amended (26), the coordinator's
+## ruling on the pack-held run, where his two filled the two-wide way north
+## of his lair's door and he stood 90 s on its spawn cell): in his real lair,
+## laid on his live name, his pack in front of him and she beside him
+## (where Apex lays them, the lair's spawn cell), he changes places with
+## each in his way (World.swap_places) and reaches his den; each he passes
+## ends on his old cell, never on hers.
+func _test_den_walk_past_own() -> void:
+	print("%s== the old grey's walk home: past his own pack, never through her ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var level := Level.load_level("grey_den")
+	var places := Apex._places_of("old_wolf", Monster.kinds()["old_wolf"]["lair"])
+	var den: Vector2i = places["den"]
+	_build(["#####", "#...#", "#####"] as Array[String])
+	World.load_terrain(level["terrain"])
+	var start := Vector2i(4, 20)  # The lair's spawn cell (from_foothills), by its link.
+	var grey := _live_grey(start)
+	grey.den = den
+	var pack: Array[Monster] = []
+	for cell: Vector2i in [Vector2i(4, 19), Vector2i(5, 19)]:  # The two-wide way north, both cells.
+		var ws := Level._spec_for("monster_wolf", Level.MONSTER_TYPES)
+		ws["name"] = ("Apex_old_wolf_escort_%d" % (World.steps * 10 + pack.size())).validate_node_name()
+		ws["tile"] = cell
+		ws["home"] = cell
+		var w := EntityFactory.build(ws) as Monster
+		_room.add_child(w)
+		World.spawn(w, cell)
+		(w as Animal).escort_lead = grey
+		pack.append(w)
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": Vector2i(5, 20)})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(5, 20))
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var held := int(floor(0.14 * grey.max_hp))
+	grey.hp = held
+	grey.target = player
+	var moves: Array[Dictionary] = []
+	var on_move := func(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
+		moves.append({"entity": entity, "from": from, "to": to, "tick": World.tick})
+	World.entity_moved.connect(on_move)
+	var reached := -1
+	for i in 600:
+		World.step()
+		player.hp = 1000
+		if grey.hp > 0 and grey.hp < held:
+			grey.hp = held
+		if grey._wallow_from != null and World.distance(grey.tile, den) <= int(OldWolf.DEN_RULE["near"]):
+			reached = i
+			break
+	World.entity_moved.disconnect(on_move)
+	var swaps := 0
+	var astray := 0
+	for m: Dictionary in moves:
+		if m["entity"] != grey:
+			continue
+		for n: Dictionary in moves:
+			if n["tick"] == m["tick"] and n["entity"] in pack and n["from"] == m["to"]:
+				swaps += 1
+				if n["to"] != m["from"] or n["to"] == player.tile:
+					astray += 1
+	print("  from %s to his den %s: reached %s; %d swaps with his own, %d of them astray" % [
+		start, den, "at %.1f s" % (reached / 10.0) if reached >= 0 else "never (60 s)", swaps, astray])
+	_check(reached >= 0 and swaps >= 1 and astray == 0,
+		"his own in his way: he changes places with them and reaches his den (%d swaps, each on his old cell, none on hers: %d astray)" % [swaps, astray])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## A foe barring his walk home corners him (780 amended (26), the
+## coordinator's ruling: barred from his den is cornered, the same rule as
+## at it): she and another fill a two-wide way between him and his den; he
+## does not wait there for ever but turns at bay where he stands, his whole
+## set, within a second or two; once they are gone his way is open and he
+## goes on home.
+func _test_den_walk_barred() -> void:
+	print("%s== the old grey's walk home: barred by foes, at bay where he stands ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(20), "#" + ".".repeat(18) + "#", "#" + ".".repeat(18) + "#", "#".repeat(20)]
+	_build(rows)
+	var grey := _live_grey(Vector2i(14, 1))
+	grey.den = Vector2i(2, 1)
+	var foes: Array[Player] = []
+	for cell: Vector2i in [Vector2i(12, 1), Vector2i(12, 2)]:
+		var p := EntityFactory.build(SPECS["P"].merged({"name": "P%d" % (foes.size() + 1), "tile": cell})) as Player
+		_room.add_child(p)
+		World.spawn(p, cell)
+		p.protected = false
+		p.max_hp = 1000
+		p.hp = 1000
+		foes.append(p)
+	var held := int(floor(0.14 * grey.max_hp))
+	grey.hp = held
+	grey.target = foes[0]
+	var at_bay := -1
+	for i in 60:
+		World.step()
+		for p in foes:
+			p.hp = 1000
+		if grey.hp > 0 and grey.hp < held:
+			grey.hp = held
+		if grey._wallow_at_bay:
+			at_bay = i
+			break
+	var fighting := false
+	for i in 20 if at_bay >= 0 else 0:
+		World.step()
+		for p in foes:
+			p.hp = 1000
+		if grey.hp > 0 and grey.hp < held:
+			grey.hp = held
+		fighting = fighting or grey.target != null
+	for p in foes:
+		World.despawn(p)
+	var home := -1
+	for i in 300:
+		World.step()
+		if grey.hp > 0 and grey.hp < held:
+			grey.hp = held
+		if World.distance(grey.tile, grey.den) <= int(OldWolf.DEN_RULE["near"]):
+			home = i
+			break
+	print("  barred by two in a two-wide way: at bay %s, fighting %s; they gone, home %s" % [
+		"at %.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never (6 s)", fighting, "at %.1f s" % (home / 10.0) if home >= 0 else "never (30 s)"])
+	_check(at_bay >= 0 and at_bay <= 20 and fighting, "barred from his den by foes he turns at bay where he stands, fighting (%s)" % ("%.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never"))
+	_check(home >= 0, "his way open again, he goes on home (%s)" % ("%.1f s" % (home / 10.0) if home >= 0 else "never"))
+	DayNight.reset()
+	Monster.idling = true
+
+
+## His pack already on her when he turns for home stays on her (780 amended
+## (26), the coordinator's check): his turn neither calls them off nor resets
+## their foe, through his walk and at his den, though nobody strikes him on
+## the way.
+func _test_den_pack_stays() -> void:
+	print("%s== the old grey's walk home: a pack already on her stays on her ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 11:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	rows[6] = rows[6].substr(0, 21) + "P" + rows[6].substr(22)
+	var e := _build(rows)
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var grey := _live_grey(Vector2i(20, 6))
+	grey.den = Vector2i(3, 6)
+	var pack: Array[Monster] = []
+	for i in 2:
+		var cell := Vector2i(19, 5 + i * 2)
+		var ws := Level._spec_for("monster_wolf", Level.MONSTER_TYPES)
+		ws["name"] = ("Apex_old_wolf_escort_%d" % (World.steps * 10 + i)).validate_node_name()
+		ws["tile"] = cell
+		ws["home"] = cell
+		var w := EntityFactory.build(ws) as Monster
+		_room.add_child(w)
+		World.spawn(w, cell)
+		(w as Animal).escort_lead = grey
+		w.target = player
+		pack.append(w)
+	grey.target = player
+	for i in 10:  # The fight on: he and his pack on her.
+		World.step()
+		player.hp = 1000
+		for w in pack:
+			if w.target == null:
+				w.target = player
+	grey.hp = int(floor(0.14 * grey.max_hp))
+	var walk_ticks := 0
+	var off_her := 0
+	var den_ticks := 0
+	var off_at_den := 0
+	for i in 400:
+		World.step()
+		player.hp = 1000
+		if grey.hp > 0 and grey.hp < int(floor(0.14 * grey.max_hp)):
+			grey.hp = int(floor(0.14 * grey.max_hp))
+		var home := World.distance(grey.tile, grey.den) <= int(OldWolf.DEN_RULE["near"])
+		if grey._wallow_from == null and not home:
+			continue
+		for w in pack:
+			if not home:
+				walk_ticks += 1
+				if w.target != player:
+					off_her += 1
+			else:
+				den_ticks += 1
+				if w.target != player:
+					off_at_den += 1
+		if home and den_ticks >= 20:
+			break
+	print("  his walk: %d pack ticks, %d off her; at his den: %d pack ticks, %d off her" % [walk_ticks, off_her, den_ticks, off_at_den])
+	_check(walk_ticks > 0 and off_her == 0 and den_ticks > 0 and off_at_den == 0,
+		"his pack on her when he turns stays on her, on his walk and at his den (%d and %d ticks off her)" % [off_her, off_at_den])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## His pack covers his walk home (780 amended (26), the coordinator's ruling
+## on the pack-held run, where his two stood by 1798 walk ticks while she
+## struck him 127 times): turned for his den under 15%, fighting nobody, his
+## escorts take whoever struck him since he turned as their foe; before any
+## blow they are on nobody new. So a player who drives him under 15% with his
+## pack alive faces the pack, and a companion broken off from him keeps her
+## berth (Companion._escort_on_us reads their target).
+func _test_den_pack_covers() -> void:
+	print("%s== the old grey's walk home: his pack covers it, on whoever strikes him ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 11:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	rows[6] = rows[6].substr(0, 21) + "P" + rows[6].substr(22)
+	var e := _build(rows)
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	player.slots[Items.RIGHT_HAND] = "sword"
+	var grey := _live_grey(Vector2i(20, 6))
+	grey.den = Vector2i(3, 6)
+	var pack: Array[Monster] = []
+	for i in 2:
+		var cell := Vector2i(19, 5 + i * 2)
+		var ws := Level._spec_for("monster_wolf", Level.MONSTER_TYPES)
+		ws["name"] = ("Apex_old_wolf_escort_%d" % (World.steps * 10 + i)).validate_node_name()
+		ws["tile"] = cell
+		ws["home"] = cell
+		var w := EntityFactory.build(ws) as Monster
+		_room.add_child(w)
+		World.spawn(w, cell)
+		(w as Animal).escort_lead = grey
+		pack.append(w)
+	grey.hp = int(floor(0.14 * grey.max_hp))
+	grey.target = player
+	grey._pace = 8.0  # Slowed, so she keeps up and her blow lands: the rule here is his pack's, not his speed.
+	var turned := false
+	for i in 20:
+		World.step()
+		player.hp = 1000
+		if grey._wallow_from != null:
+			turned = true
+			break
+	var on_her_before := 0
+	for w in pack:
+		if w.target == player:
+			on_her_before += 1
+	var struck := false
+	for i in 30:
+		if World.distance(player.tile, grey.tile) > 1:
+			var path := World.find_path(player.tile, grey.tile, true, null, 2000, false, {}, false)
+			if not path.is_empty():
+				World.try_move(player, path[0] - player.tile)
+		elif World.tick >= player.next_attack_tick:
+			World.face(player, grey.tile - player.tile)
+			World.try_attack(player, grey)
+		_damage_log.clear()
+		World.step()
+		player.hp = 1000
+		for d: Dictionary in _damage_log:
+			struck = struck or d["entity"] == grey and d["source"] == player  # Her blow landed, not only begun.
+		if grey.hp > 0 and grey.hp < int(floor(0.14 * grey.max_hp)):
+			grey.hp = int(floor(0.14 * grey.max_hp))
+		if struck:
+			break
+	for i in 5:
+		World.step()
+		player.hp = 1000
+	var on_her_after := 0
+	for w in pack:
+		if is_instance_valid(w) and w.target == player:
+			on_her_after += 1
+	print("  turned for home %s, his pack on her %d of 2 before her blow; struck %s, %d of 2 after; still walking %s" % [
+		turned, on_her_before, struck, on_her_after, grey._wallow_from != null])
+	_check(turned and on_her_before == 0 and struck and on_her_after == 2,
+		"his walk home: struck since he turned, both of his pack take her (%d of 2; %d before her blow)" % [on_her_after, on_her_before])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## The den walk's bite back (780 amended (26), the coordinator's ruling on
+## the bear's walk: 3 blows landed on him, 7 bites back, untold): one bite
+## owed for each blow of hers that lands on the walk, never more than one,
+## each his own told move (the bear's swipe, the grey's led bite), so she can
+## step out of it. On his real level, laid on his live name (his roll
+## asserted), at 14% of his hp and held there so the whole walk is seen, she
+## chases and strikes him whenever beside him: careless (never minds a tell),
+## his bites back are no more than her blows that landed, each told the tick
+## before it struck; answering (steps out of each tell), none lands on her,
+## her blows still landing.
+func _test_den_bite_per_blow() -> void:
+	print("%s== the den walk: one told bite back for each blow that lands ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rolls := {"old_wolf": [31, 0.75, 5], "great_bear": [8, 0.83, 6]}
+	for kind: String in ["old_wolf", "great_bear"]:
+		for mode: String in ["careless", "answering"]:
+			var level := Level.load_level({"old_wolf": "grey_den", "great_bear": "bear_cave"}[kind])
+			var places := Apex._places_of(kind, Monster.kinds()[kind]["lair"])
+			var den: Vector2i = places["den"]
+			var door: Vector2i = places["lair_door"]
+			_build(["#####", "#...#", "#####"] as Array[String])
+			World.load_terrain(level["terrain"])
+			# He stands at the far side of his lair from his den: the walkable
+			# cell nearest its door at least 8 off his den.
+			var start := door
+			var best := 999
+			for y in range(0, 64):
+				for x in range(0, 64):
+					var c := Vector2i(x, y)
+					if World.is_walkable(c) and World.is_free(c) and World.distance(c, den) >= 8 and World.distance(c, door) < best:
+						best = World.distance(c, door)
+						start = c
+			var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+			spec["name"] = ("Apex_" + kind).validate_node_name()  # As Apex._lay names him: his name seeds his roll.
+			spec["tile"] = start
+			spec["home"] = den
+			Level.arm(spec)
+			var boss := EntityFactory.build(spec) as Monster
+			_room.add_child(boss)
+			World.spawn(boss, start)
+			if mode == "careless":
+				var roll: Array = rolls[kind]
+				_check(World.attack_ticks_of(boss) == int(roll[0]) and absf(boss.boldness - float(roll[1])) < 0.005 and boss.reaction_ticks == int(roll[2]),
+					"%s: his roll as the server lays him: attack_ticks %d, boldness %.2f, reaction %d (%d, %.3f, %d)" % [
+					boss.name, roll[0], roll[1], roll[2], World.attack_ticks_of(boss), boss.boldness, boss.reaction_ticks])
+			var at := Apex._free_near(start)
+			var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": at})) as Player
+			_room.add_child(player)
+			World.spawn(player, at)
+			player.protected = false
+			player.max_hp = 1000
+			player.hp = 1000
+			player.slots[Items.RIGHT_HAND] = "sword"
+			var held := int(floor(0.14 * boss.max_hp))
+			boss.hp = held
+			boss.target = player
+			if boss is OldWolf:
+				boss._pace = 8.0  # The grey outwalks her (home in 6.3 s, no blow landed): slowed so she keeps beside him; the rule here is his bite, not his speed.
+			_damage_log.clear()
+			var next_strike := 0
+			var started := false
+			var walked := 0
+			var blows := 0
+			var bites := 0
+			var untold := 0
+			for i in 900:
+				var line: Array[Vector2i] = []
+				for id: int in World._telegraphs:
+					if World._telegraphs[id]["source"] == boss:
+						line.append_array(World.told_cells(id))
+				var winding := World.winding(boss)
+				var told := not line.is_empty() or not winding.is_empty()
+				if mode == "answering" and not line.is_empty() and World.struck_cell(player) in line:
+					_step_clear(player, boss, line)
+				elif mode == "answering" and not winding.is_empty() and winding["target"] == player:
+					var way := Senses.way_toward(boss.tile, player.tile)
+					if not World.try_move(player, way):
+						_step_clear(player, boss, [World.struck_cell(player)] as Array[Vector2i])
+				elif World.distance(player.tile, boss.tile) <= 1:
+					if World.tick >= next_strike:
+						World.face(player, boss.tile - player.tile)
+						if World.try_attack(player, boss):
+							next_strike = World.tick + World.attack_ticks_of(player)
+				elif World.tick >= player.next_move_tick and (mode == "careless" or not told):
+					var path := World.find_path(player.tile, boss.tile, true, null, 6000, false, {}, false)
+					if not path.is_empty():
+						World.try_move(player, path[0] - player.tile)
+				var n0 := _damage_log.size()
+				# On his walk: broken off, not yet at his den (within its "near")
+				# nor barred from it (at bay): cornered, he fights his whole set.
+				var on_walk: bool = boss.get("_wallow_from") != null and World.distance(boss.tile, den) > int((OldWolf.DEN_RULE if boss is OldWolf else GreatBear.DEN_RULE)["near"]) 						and not bool(boss.get("_wallow_at_bay"))
+				World.step()
+				if on_walk:
+					started = true
+					walked += 1
+				elif started:
+					break  # At his den: cornered, he fights; the walk is over.
+				for k in range(n0, _damage_log.size()):
+					var d: Dictionary = _damage_log[k]
+					if not on_walk:
+						continue
+					if d["entity"] == boss and d["source"] == player:
+						blows += 1
+					elif d["entity"] == player and d["source"] == boss:
+						bites += 1
+						if not told:
+							untold += 1
+				if boss.hp > 0 and boss.hp < held:
+					boss.hp = held  # Held: the whole walk seen.
+				player.hp = maxi(player.hp, 900)
+			print("  %s, %s: walked %.1f s, her blows on him %d, his bites back %d (%d untold)" % [kind, mode, walked / 10.0, blows, bites, untold])
+			if mode == "careless":
+				_check(started and blows >= 2 and bites >= 1 and bites <= blows and untold == 0,
+					"%s's walk, careless: %d bites back for %d blows that landed, every one told (%d untold)" % [kind, bites, blows, untold])
+			else:
+				_check(started and blows >= 1 and bites == 0,
+					"%s's walk, answering: each told bite stepped out of, none lands (%d), her blows landing (%d)" % [kind, bites, blows])
+	DayNight.reset()
+	Monster.idling = true

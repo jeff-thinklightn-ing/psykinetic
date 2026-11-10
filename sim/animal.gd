@@ -429,17 +429,33 @@ func _sees_prey() -> GridEntity:
 
 
 ## An escort's foe (780 amended (15)): its lead's, a player or companion
-## near; one that struck it lately; else nobody (no prey of its own).
+## near; one that struck it lately; else nobody (no prey of its own). Its
+## lead on its walk to its den (Apex.to_den, 780 amended (26)), fighting
+## nobody: the pack covers its retreat, on whoever struck it since it turned
+## for home, else on whoever it was on.
 func _escort_target() -> GridEntity:
 	if is_instance_valid(escort_lead) and escort_lead.spawned:
 		var foe := escort_lead.target
 		if foe != null and is_instance_valid(foe) and foe.spawned and foe.hp > 0 and not foe is Animal 				and World.distance(tile, foe.tile) <= PACK_TILES * 2:
 			return foe
+		var turned: Variant = escort_lead.get("_wallow_tick")
+		if escort_lead.get("_wallow_from") != null and turned != null:
+			var striker := escort_lead.struck_by
+			if escort_lead.struck_tick > int(turned) and _covers(striker):
+				return striker
+			if _covers(target):
+				return target
 	if World.tick - hurt_tick < CHARGE_TICKS:
 		var struck := _struck_by()
 		if struck != null and is_instance_valid(struck) and struck.spawned and not struck is Animal:
 			return struck
 	return null
+
+
+## Whether [param foe] is one an escort fights covering its lead's walk home
+## (_escort_target): a player or companion, up, within PACK_TILES * 2.
+func _covers(foe: GridEntity) -> bool:
+	return foe != null and is_instance_valid(foe) and foe.spawned and foe.hp > 0 and not foe is Animal 			and World.distance(tile, foe.tile) <= PACK_TILES * 2
 
 
 ## A boar of an apex's escort (780 amended (16), the boar king's sounder):
@@ -510,14 +526,15 @@ func _ring(foe: GridEntity) -> void:
 
 
 ## An escort with nobody to fight, its lead fighting nobody, farther off
-## than escort_follow: after its lead at its pace. True while it does.
+## than escort_follow: after its lead at its pace. True while it does. One
+## covering its lead's walk home (_escort_target) fights instead.
 func _escort_step() -> bool:
 	if escort_lead == null:
 		return false
 	if not is_instance_valid(escort_lead) or not escort_lead.spawned:
 		escort_lead = null
 		return false
-	if target != null or escort_lead.target != null or alert == Alert.FLEEING:
+	if target != null or escort_lead.target != null or alert == Alert.FLEEING or _escort_target() != null:
 		return false
 	if World.distance(tile, escort_lead.tile) <= escort_follow:
 		return false

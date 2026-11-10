@@ -85,6 +85,24 @@ var charge := CHARGE.duplicate()
 
 ## The den: where it spawned (its home).
 var den := NO_TILE
+## The den rule (780 amended (26), the boar king's, shared: Apex.to_den):
+## under DEN_BELOW of its hp in its lair it never flees but walks to its den,
+## within DEN_RULE "near" of it fighting on; at bay where it stands once struck
+## "at_bay_after" times on the way; one told bite back for each blow on it
+## that lands on the way, never more owed ("bite_per_blow", _den_bite);
+## past its own escort in its way, and at bay where it stands once a foe
+## bars its way home ("barred"). Its walk's state (Apex.to_den's).
+const DEN_BELOW := 0.15
+const DEN_RULE := {"near": 3, "far": false, "log": "den", "at_bay_after": 0, "bite_per_blow": true, "barred": true}
+var _wallow_from: GridEntity = null
+var _wallow_far := false
+var _wallow_hits := 0
+var _wallow_seen := -1
+var _wallow_owed := false
+var _wallow_owed_seen := -1
+var _wallow_tick := -1  # When it turned for home (its pack covers it from then).
+var _wallow_barred := -1  # Since when a foe bars its way home ("barred"); at bay, its last look.
+var _wallow_at_bay := false  # Barred from its den: cornered where it stands.
 ## Its lair's door it walks to, going in or out with a player watching
 ## (Apex, 780 amended (13)); NO_TILE when not.
 var apex_goal := NO_TILE
@@ -130,6 +148,7 @@ func _ready() -> void:
 	super()
 	_hook()  # Before its first tick: one laid and killed at once still falls (Apex).
 	den = home if home != NO_TILE else tile
+	_no_flee()
 	_base_hp = max_hp
 	var given_party: Variant = Monster.kinds().get(_kind(), {}).get("party", {})
 	if given_party is Dictionary:
@@ -157,6 +176,8 @@ func _sim_tick() -> void:
 		print("[apex] %s recovers (winded %d ticks) at %s (%d/%d)" % [_kind(), World.tick - _winded_at, tile, hp, max_hp])
 		_winded_at = -1
 	if _tend_move():
+		return
+	if Apex.to_den(self, DEN_BELOW, den, struck_by, DEN_RULE):
 		return
 	if apex_goal != NO_TILE or apex_out and target == null 			and (_blow_tick < 0 or World.tick - _blow_tick > CALM_TICKS) and World.distance(tile, home) > wander_radius * 2 + 2:
 		_walk_to(apex_goal if apex_goal != NO_TILE else home)
@@ -314,6 +335,27 @@ func _settle_bold() -> void:
 	_bold = true
 	temper = Temper.BOLD
 	wander_radius = DEN_RADIUS if _is_night() else maxi(_roam, 6)
+	_no_flee()
+
+
+## It never flees (780 amended (26)): under DEN_BELOW in its lair it goes to
+## its den instead (Apex.to_den), as the boar king does.
+func _no_flee() -> void:
+	for t: int in flee_below:
+		flee_below[t] = 0.0
+	dread_flee_below = 0.0
+
+
+## Its bite back on the walk to its den (Apex.to_den's "bite_per_blow"):
+## its swipe at [param by], told as in its fight (780 amended (26); every
+## blow is told, 780 amended (8)). True if begun.
+func _den_bite(by: GridEntity) -> bool:
+	World.face(self, Senses.way_toward(tile, by.tile))
+	_begin("swipe", Telegraph.cone(tile, Vector2(facing), float(swipe["length"]), float(swipe["half_angle"])), int(swipe["windup"]))
+	if _move.is_empty():
+		return false
+	_next_swipe = World.tick + int(swipe["every"])
+	return true
 
 
 ## A player or companion on its ground, or one that struck it, unless given
@@ -365,11 +407,12 @@ func note_struck(by: GridEntity) -> void:
 ## Whether it is fighting [param entity] (decision 780 amended (4), for
 ## companions: she fights it only when it is engaged with her or her player):
 ## its target is [param entity], or [param entity] struck it within CALM_TICKS.
-## A foe it broke off from is no longer engaged till they strike again.
+## A foe it broke off from is no longer engaged till they strike again. On
+## its walk to its den (780 amended (26)) the one it broke off from still is.
 func engaged_with(entity: GridEntity) -> bool:
 	if not is_instance_valid(entity):
 		return false
-	if target == entity:
+	if target == entity or _wallow_from == entity:
 		return true
 	var at: int = _struck_at.get(entity.get_instance_id(), -1)
 	return at >= 0 and World.tick - at <= CALM_TICKS

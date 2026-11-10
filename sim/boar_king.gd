@@ -171,47 +171,7 @@ func _settle_bold() -> void:
 ## if they are beside him, never chasing nor charging. At his wallow,
 ## cornered, he fights as ever. True while it holds him.
 func _to_wallow() -> bool:
-	if apex_out or hp <= 0 or float(hp) >= float(charge["wallow_below"]) * float(max_hp):
-		_wallow_from = null
-		_wallow_far = false
-		return false
-	if target != null and _wallow_from == null:
-		# Where to: his den, unless the foe stands by it (within 3), when
-		# going home is no retreat: away and alone instead, the far way.
-		_wallow_from = target
-		_wallow_far = World.distance(target.tile, den) <= 3
-		_log_move("wallow", "breaks off" + (", the far way (a foe by his den)" if _wallow_far else ""))
-	var foe := _wallow_from if _wallow_from != null and is_instance_valid(_wallow_from) and _wallow_from.spawned \
-			and _wallow_from.hp > 0 else null
-	if not _wallow_far and World.distance(tile, den) <= 1:
-		return false  # At his wallow: cornered, he fights.
-	if _wallow_far and foe != null and World.distance(tile, foe.tile) <= 1 and _away_from(foe, true) == Vector2i.ZERO:
-		return false  # The far way, and no step away: cornered, he fights.
-	target = null
-	_foe = null
-	_drop_windup()
-	if World.is_stunned(self):
-		return true
-	var by := _bit_by
-	if by != null and is_instance_valid(by) and by.spawned and by.hp > 0 and World.distance(tile, by.tile) <= 1 \
-			and World.tick >= next_attack_tick:
-		_world_set_facing(Senses.way_toward(tile, by.tile))
-		if World.try_attack(self, by):
-			next_attack_tick = World.tick + World.attack_ticks_of(self)
-			_log_move("wallow", "bites back")
-			return true
-	if World.tick >= next_move_tick:
-		move_ticks = _pace
-		if _wallow_far:
-			# Each step away from them, within his roam of his den, never nearer
-			# (never through their reach); WALLOW_CLEAR off, he stands, alone.
-			if foe != null and World.distance(tile, foe.tile) < WALLOW_CLEAR:
-				var way := _away_from(foe, true)
-				if way != Vector2i.ZERO:
-					World.try_move(self, way)
-		elif not _idle_step(den, GreatBear.WALK_SEARCH_TILES):
-			next_move_tick = World.tick + 5
-	return true
+	return Apex.to_den(self, float(charge["wallow_below"]), den, _bit_by, {"near": 1, "far": true, "clear": WALLOW_CLEAR, "log": "wallow"})
 
 
 ## His sounder: the living boars following him (Apex's escort).

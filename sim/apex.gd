@@ -41,6 +41,10 @@ const LAIR_HEAL_STEPS := 300
 const ROAM_STEPS := 1200
 ## Cells round its roaming ground it wanders.
 const ROAM_RADIUS := 6
+## Barred from its den by a foe this long on its walk home (Apex.to_den's
+## "barred", 780 amended (26)), it turns at bay where it stands; at bay, its
+## way home looked at again this often.
+const BARRED_TICKS := 10
 
 ## Kind -> its living body (not saved).
 static var _bodies: Dictionary = {}
@@ -566,3 +570,196 @@ static func died(body: GridEntity) -> void:
 		rec["hp"] = -1
 		_set_state(kind, "dead", "killed")
 		return
+
+
+## The den rule (780 amended (16), the boar king's wallow; 780 amended (26):
+## shared with the great bear and the old grey). Under [param below] of its
+## hp in its lair (out, Apex's beaten back takes it home first) it never
+## flees: no new fight, it walks to [param den], biting back at
+## [param biter] when beside it, never chasing nor charging; at its den
+## (within opts "near"), cornered, it fights as ever, its whole set. A foe by
+## its den (within 3) when it breaks off: with opts "far" (the king) it goes
+## away and alone instead, the far way, opts "clear" off them; without, it
+## fights on where it stands. With opts "at_bay_after" over 0, struck that
+## often on the walk it turns at bay where it stands. With opts
+## "bite_per_blow" (the bear and the grey, 780 amended (26)) it bites back
+## once for each blow on it that lands on the walk, never more than one
+## owed, with its own told move (the body's _den_bite: the bear's swipe, the
+## grey's led bite); without (the king's, till his switch-on) at its cadence,
+## untold. With opts "barred" (the bear and the grey) its own (_own) never
+## bar its way home: it changes places with one in its way (_past_own); a
+## foe who bars it (_barred) BARRED_TICKS on end corners it, at bay where it
+## stands with its whole set, till its way home is open again. Its state rides the body's own _wallow_from and _wallow_far (and
+## _wallow_hits, _wallow_seen with "at_bay_after"; _wallow_owed,
+## _wallow_owed_seen with "bite_per_blow"); opts "log" names its log lines.
+## True while it holds the body.
+static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity, opts: Dictionary = {}) -> bool:
+	var at_bay_after := int(opts.get("at_bay_after", 0))
+	if bool(body.get("apex_out")) or body.hp <= 0 or float(body.hp) >= below * float(body.max_hp):
+		body.set("_wallow_from", null)
+		body.set("_wallow_far", false)
+		if at_bay_after > 0:
+			body.set("_wallow_hits", 0)
+		if bool(opts.get("barred", false)):
+			body.set("_wallow_barred", -1)
+			body.set("_wallow_at_bay", false)
+		return false
+	var near := int(opts.get("near", 1))
+	var far_way := bool(opts.get("far", false))
+	var log_as := str(opts.get("log", "wallow"))
+	var stored: Variant = body.get("_wallow_from")
+	if body.target != null and stored == null:
+		if not far_way and (World.distance(body.tile, den) <= near or World.distance(body.target.tile, den) <= 3):
+			return false  # By its den already, or a foe there: it fights on, cornered.
+		# Where to: its den, unless the foe stands by it (within 3), when
+		# going home is no retreat: away and alone instead, the far way.
+		stored = body.target
+		body.set("_wallow_from", stored)
+		body.set("_wallow_far", far_way and World.distance(body.target.tile, den) <= 3)
+		if at_bay_after > 0:
+			body.set("_wallow_hits", 0)
+			body.set("_wallow_seen", body.struck_tick)
+		body.set("_wallow_tick", World.tick)  # Its pack's (Animal._escort_target); none on the king's.
+		if bool(opts.get("barred", false)):
+			body.set("_wallow_barred", -1)
+			body.set("_wallow_at_bay", false)
+		if bool(opts.get("bite_per_blow", false)):
+			body.set("_wallow_owed", false)  # Blows on the walk owe bites, not the one before it.
+			body.set("_wallow_owed_seen", body.struck_tick)
+		body.call("_log_move", log_as, "breaks off" + (", the far way (a foe by his den)" if bool(body.get("_wallow_far")) else ""))
+	var far := bool(body.get("_wallow_far"))
+	var foe: GridEntity = null
+	if is_instance_valid(stored) and (stored as GridEntity).spawned and (stored as GridEntity).hp > 0:
+		foe = stored as GridEntity
+	if not far and World.distance(body.tile, den) <= near:
+		return false  # At its den: cornered, it fights.
+	if bool(opts.get("barred", false)) and bool(body.get("_wallow_at_bay")):
+		# Barred from its den, cornered: at bay where it stands, its whole
+		# set, till its way home is open again (looked at every BARRED_TICKS).
+		if World.tick < int(body.get("_wallow_barred")) + BARRED_TICKS or _barred(body, den):
+			if World.tick >= int(body.get("_wallow_barred")) + BARRED_TICKS:
+				body.set("_wallow_barred", World.tick)
+			return false
+		body.set("_wallow_at_bay", false)
+		body.set("_wallow_barred", -1)
+		body.call("_log_move", log_as, "goes on home, its way open")
+	if far and foe != null and World.distance(body.tile, foe.tile) <= 1 and body.call("_away_from", foe, true) == Vector2i.ZERO:
+		return false  # The far way, and no step away: cornered, it fights.
+	if at_bay_after > 0 and stored != null:
+		if body.struck_tick > int(body.get("_wallow_seen")):
+			body.set("_wallow_seen", body.struck_tick)
+			body.set("_wallow_hits", int(body.get("_wallow_hits")) + 1)
+			if int(body.get("_wallow_hits")) == at_bay_after:
+				body.call("_log_move", log_as, "turns at bay, struck %d times on the way" % at_bay_after)
+		if int(body.get("_wallow_hits")) >= at_bay_after:
+			return false  # Pressed on the way: at bay where it stands.
+	var per_blow := bool(opts.get("bite_per_blow", false))
+	if per_blow and not World.winding(body).is_empty():
+		return true  # Its told bite under way: it stands through its lead.
+	body.target = null
+	body._foe = null
+	body._drop_windup()
+	if World.is_stunned(body):
+		return true
+	var by := biter
+	if per_blow:
+		# One bite owed for each blow on it that lands (780 amended (26)),
+		# never more than one: its own told move, begun as in its fight
+		# (_den_bite), that she can step out of; begun, it is paid, landed
+		# or not.
+		if body.struck_tick > int(body.get("_wallow_owed_seen")):
+			body.set("_wallow_owed_seen", body.struck_tick)
+			body.set("_wallow_owed", true)
+		if bool(body.get("_wallow_owed")) and by != null and is_instance_valid(by) and by.spawned and by.hp > 0 \
+				and World.distance(body.tile, by.tile) <= 1 and World.tick >= body.next_attack_tick \
+				and bool(body.call("_den_bite", by)):
+			body.set("_wallow_owed", false)
+			body.call("_log_move", log_as, "bites back, told")
+			return true
+	elif by != null and is_instance_valid(by) and by.spawned and by.hp > 0 and World.distance(body.tile, by.tile) <= 1 \
+			and World.tick >= body.next_attack_tick:
+		body._world_set_facing(Senses.way_toward(body.tile, by.tile))
+		var was := by.hp
+		if World.try_attack(body, by):
+			body.next_attack_tick = World.tick + World.attack_ticks_of(body)
+			body.call("_log_move", log_as, "bites back")
+			if by.hp < was:
+				# Untold (the king's wallow, till his switch-on): the tours'
+				# tripwire line, as GreatBear._blow's.
+				print("[apex] %s blow %s %d at %s (%d/%d)" % [body.call("_kind"), World.kind_of(by), was - by.hp, body.tile, body.hp, body.max_hp])
+			return true
+	if World.tick >= body.next_move_tick:
+		body.move_ticks = body._pace
+		if far:
+			# Each step away from them, within its roam of its den, never nearer
+			# (never through their reach); "clear" off, it stands, alone.
+			if foe != null and World.distance(body.tile, foe.tile) < int(opts.get("clear", 6)):
+				var way: Vector2i = body.call("_away_from", foe, true)
+				if way != Vector2i.ZERO:
+					World.try_move(body, way)
+		elif body._idle_step(den, GreatBear.WALK_SEARCH_TILES):
+			if bool(opts.get("barred", false)):
+				body.set("_wallow_barred", -1)
+		elif not (bool(opts.get("barred", false)) and _past_own(body, den)):
+			body.next_move_tick = World.tick + 5
+			if bool(opts.get("barred", false)) and _barred(body, den):
+				# Barred by a foe (in a two-wide way, she or her companion):
+				# BARRED_TICKS of it and it is cornered (780 amended (26)).
+				if int(body.get("_wallow_barred")) < 0:
+					body.set("_wallow_barred", World.tick)
+				elif World.tick - int(body.get("_wallow_barred")) >= BARRED_TICKS:
+					body.set("_wallow_at_bay", true)
+					body.set("_wallow_barred", World.tick)
+					body.call("_log_move", log_as, "turns at bay, its way home barred")
+	return true
+
+
+## Its next cell on its way to [param den] with its own planned through
+## (_own: they are no bar to it, 780 amended (26)); every other body blocks,
+## as in any monster's way. Monster.NO_TILE when it has none: barred.
+static func _next_home(body: Animal, den: Vector2i) -> Vector2i:
+	var lifted: Dictionary[Vector2i, GridEntity] = {}
+	for each: GridEntity in _own(body):
+		if World._occupancy.get(each.tile) == each:
+			lifted[each.tile] = each
+			World._occupancy.erase(each.tile)
+	var way := World.find_path(body.tile, den, true, null, GreatBear.WALK_SEARCH_TILES, false, {}, body.opens_doors_now())
+	for cell: Vector2i in lifted:
+		World._occupancy[cell] = lifted[cell]  # Put back at once: only this search plans through them.
+	return way[0] if not way.is_empty() and World.distance(body.tile, way[0]) == 1 else Monster.NO_TILE
+
+
+## Its own about it, that never bar its way home: its escort (Animal.
+## escort_lead) and, the grey's, his pack (OldWolf.pack).
+static func _own(body: Animal) -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	if body.has_method("pack"):
+		for each: Monster in body.call("pack"):
+			out.append(each)
+	for each in World.monsters():
+		if each is Animal and (each as Animal).escort_lead == body and each.spawned and each.hp > 0 and not each in out:
+			out.append(each)
+	return out
+
+
+## On its walk home its own in its way (780 amended (26), the coordinator's
+## ruling: an apex is never blocked by his escorts): they change places
+## (World.swap_places, its rules: beside it, never across a wall, a closed
+## door or a corner), at its pace; the one it passes ends on its old cell,
+## never anywhere else. True if it went.
+static func _past_own(body: Animal, den: Vector2i) -> bool:
+	var next := _next_home(body, den)
+	if next == Monster.NO_TILE:
+		return false
+	var there: Variant = World._occupancy.get(next)
+	if there == null:
+		return World.try_move(body, next - body.tile)  # Its way round them is open: that way.
+	if not (there is GridEntity and there in _own(body)):
+		return false
+	return World.swap_places(body, there as GridEntity, body._pace)
+
+
+## Whether its way home is barred: no way past every body but its own (a
+## player or her companion in a two-wide way, another beast), or none at all.
+static func _barred(body: Animal, den: Vector2i) -> bool:
+	return _next_home(body, den) == Monster.NO_TILE
