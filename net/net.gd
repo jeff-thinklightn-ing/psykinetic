@@ -1617,6 +1617,34 @@ func rtt_ms() -> float:
 	return server.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME)
 
 
+## ENet's packet throttle, held at its top (847, the walking jump): ENet sends an unreliable
+## packet with the throttle's chance in PACKET_THROTTLE_SCALE and drops the rest, and by its
+## default it lowers the throttle on any ack slower than its last measure allows. One slow tick
+## at a join (a zone waking) left some clients' throttle at 0 for seconds: every move they sent
+## (World.request_free, unreliable) was dropped, and the next one through put them back cells.
+## Our traffic is too small to congest anything, so the throttle never falls (deceleration 0)
+## and is back at its top on the next ack (acceleration the whole scale); the interval stays
+## ENet's own.
+const THROTTLE_INTERVAL_MS := 5000
+const THROTTLE_ACCELERATION := ENetPacketPeer.PACKET_THROTTLE_SCALE
+const THROTTLE_DECELERATION := 0
+
+
+## [param link]'s throttle held at its top (847): ENet's throttle_configure(interval,
+## acceleration, deceleration), which also tells the far end, so either side's call covers both
+## directions; both make the call (a client of an older build is covered by the server's).
+static func steady_throttle(link: ENetPacketPeer) -> void:
+	if link != null:
+		link.throttle_configure(THROTTLE_INTERVAL_MS, THROTTLE_ACCELERATION, THROTTLE_DECELERATION)
+
+
+## The ENet link to [param peer] (1: the server, from a client), or null when the
+## multiplayer peer is not ENet's or has no such peer.
+func _enet_link(peer: int) -> ENetPacketPeer:
+	var enet := multiplayer.multiplayer_peer as ENetMultiplayerPeer
+	return enet.get_peer(peer) if enet != null else null
+
+
 ## The same in sim ticks, capped so a bad reading cannot stall reconciliation.
 func rtt_ticks() -> float:
 	# --test-lag stands in for a longer way to the server, so it counts.
@@ -1813,6 +1841,7 @@ static func reserved_id(id: String, run_mode: int) -> bool:
 
 
 func _on_peer_connected(peer: int) -> void:
+	steady_throttle(_enet_link(peer))  # 847.
 	if token_locked(_peer_address(peer), Time.get_ticks_msec()):
 		_reject(peer, "too many wrong tokens: try again later", "locked out", false)  # 701: no address in the log.
 	elif _authenticated.size() >= max_players:
@@ -2178,6 +2207,7 @@ func reconnect_settled(limit := ATTEMPT_SECONDS) -> bool:
 
 func _on_connected_to_server() -> void:
 	print("[net] connected as peer %d" % multiplayer.get_unique_id())
+	steady_throttle(_enet_link(1))  # 847: here on every connect, a reconnect's too.
 	authenticate.rpc_id(1, {
 		"token": token, "version": claimed_version(), "player_id": player_id, "name": player_name,
 		"body": String(player_body), "look": player_look, "protocol": _test_protocol if _test_protocol != "" else protocol()})

@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_companion_on_a_client()
 	_test_rebuilt_body()
 	_test_resend()
+	_test_throttle_steady()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -531,6 +532,136 @@ func _spawn(script: String, entity_name: String, at: Vector2i) -> GridEntity:
 	_room.add_child(entity)
 	World.spawn(entity, at)
 	return entity
+
+
+## 847, the walking jump: ENet's packet throttle drops unreliable sends (the moves,
+## World.request_free) and, by its default, falls on slow acks; Net.steady_throttle holds it at
+## its top. A real ENet pair on loopback: one end not serviced for STALL_MS, as a slow server
+## tick (or a slow client frame) stalls it, while the other sends reliably, so its acks come
+## back late. Unconfigured, the waiting end's throttle falls (the stall is real); held, it reads
+## the top on both ends after a stall of either end, and again on a link connected anew (Net
+## makes the call on every connect).
+const THROTTLE_STALL_MS := 900
+const THROTTLE_TOP := ENetPacketPeer.PACKET_THROTTLE_SCALE
+
+
+func _test_throttle_steady() -> void:
+	print("\n== 847: ENet's throttle held at its top through a stall ==")
+	var port: int = preload("res://tests/test_ports.gd").of(17930)
+	var pair := _enet_pair(port, false)
+	if pair.is_empty():
+		_check(false, "an ENet pair on port %d" % port)
+		return
+	_enet_stall(pair, true)
+	var fell := _throttle(pair[2])
+	_check(fell < THROTTLE_TOP, "unconfigured, a stalled server's late acks lower the client's throttle (%d of %d)" % [fell, THROTTLE_TOP])
+	_enet_stall(pair, false)
+	fell = _throttle(pair[3])
+	_check(fell < THROTTLE_TOP, "unconfigured, a stalled client's late acks lower the server's throttle (%d of %d)" % [fell, THROTTLE_TOP])
+	_enet_close(pair)
+	pair = _enet_pair(port, true)
+	if pair.is_empty():
+		_check(false, "a held ENet pair on port %d" % port)
+		return
+	var client: ENetPacketPeer = pair[2]
+	var far: ENetPacketPeer = pair[3]
+	_check(client.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE_DECELERATION) == 0
+			and client.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE_ACCELERATION) == THROTTLE_TOP
+			and far.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE_DECELERATION) == 0,
+			"held: deceleration 0 and acceleration %d read back on both ends (throttle_configure's order)" % THROTTLE_TOP)
+	_check(_throttle(client) == THROTTLE_TOP and _throttle(far) == THROTTLE_TOP, "held: both at the top once connected")
+	_enet_stall(pair, true)
+	_check(_throttle(client) == THROTTLE_TOP and _throttle(far) == THROTTLE_TOP,
+			"held: the server stalled, both still at the top (client %d, server %d)" % [_throttle(client), _throttle(far)])
+	_enet_stall(pair, false)
+	_check(_throttle(client) == THROTTLE_TOP and _throttle(far) == THROTTLE_TOP,
+			"held: the client stalled, both still at the top (client %d, server %d)" % [_throttle(client), _throttle(far)])
+	# A reconnect, as Net.reconnect makes one: the old link dropped, a new client host
+	# connected to the same server, held again by the connect's call.
+	client.peer_disconnect_now()
+	(pair[1] as ENetConnection).destroy()
+	var fresh := ENetConnection.new()
+	var again := _enet_connect([pair[0], fresh], port, true) if fresh.create_host(2, 1) == OK else []
+	if again.is_empty():
+		_check(false, "connected anew on port %d" % port)  # (_enet_connect closed both hosts.)
+		return
+	_enet_stall(again, true)
+	_check(_throttle(again[2]) == THROTTLE_TOP and _throttle(again[3]) == THROTTLE_TOP,
+			"held: connected anew and the server stalled, both at the top (client %d, server %d)" % [_throttle(again[2]), _throttle(again[3])])
+	_enet_close(again)
+
+
+## [server host, client host, client's link, server's link], connected (each held by
+## Net.steady_throttle as Net's handlers do when [param held]), or [] when it never connects.
+func _enet_pair(port: int, held: bool) -> Array:
+	var server := ENetConnection.new()
+	if server.create_host_bound("127.0.0.1", port, 4, 1) != OK:
+		return []
+	var client := ENetConnection.new()
+	if client.create_host(2, 1) != OK:
+		server.destroy()
+		return []
+	return _enet_connect([server, client], port, held)
+
+
+## The pair's client host connected (again) to its server host.
+func _enet_connect(pair: Array, port: int, held: bool) -> Array:
+	var server: ENetConnection = pair[0]
+	var client: ENetConnection = pair[1]
+	var link := client.connect_to_host("127.0.0.1", port, 1)
+	var far: ENetPacketPeer = null
+	var until := Time.get_ticks_msec() + 3000
+	while Time.get_ticks_msec() < until and (far == null or link.get_state() != ENetPacketPeer.STATE_CONNECTED):
+		var event := server.service(5)
+		if event[0] == ENetConnection.EVENT_CONNECT:
+			far = event[1]
+		client.service(5)
+	if far == null or link.get_state() != ENetPacketPeer.STATE_CONNECTED:
+		server.destroy()
+		client.destroy()
+		return []
+	if held:
+		Net.steady_throttle(link)
+		Net.steady_throttle(far)
+	_enet_pump([server, client], [link, far], 300)  # The configure commands across, acked.
+	return [server, client, link, far]
+
+
+## One end not serviced for THROTTLE_STALL_MS (the server's when [param server_stalls], else the
+## client's) while the other sends reliably, then both serviced a while.
+func _enet_stall(pair: Array, server_stalls: bool) -> void:
+	var waiting: ENetConnection = pair[1] if server_stalls else pair[0]
+	var sender: ENetPacketPeer = pair[2] if server_stalls else pair[3]
+	_enet_pump([waiting], [sender], THROTTLE_STALL_MS)
+	_enet_pump([pair[0], pair[1]], [pair[2], pair[3]], 500)
+
+
+## [param hosts] serviced for [param ms], each of [param senders] sending a small reliable
+## packet every 30 ms.
+func _enet_pump(hosts: Array, senders: Array, ms: int) -> void:
+	var until := Time.get_ticks_msec() + ms
+	var next := 0
+	while Time.get_ticks_msec() < until:
+		if Time.get_ticks_msec() >= next:
+			next = Time.get_ticks_msec() + 30
+			for sender: ENetPacketPeer in senders:
+				sender.send(0, PackedByteArray([1, 2, 3, 4, 5]), ENetPacketPeer.FLAG_RELIABLE)
+		for host: ENetConnection in hosts:
+			var event := host.service(0)
+			while event[0] != ENetConnection.EVENT_NONE and event[0] != ENetConnection.EVENT_ERROR:
+				event = host.service(0)
+		OS.delay_msec(2)
+
+
+func _throttle(link: ENetPacketPeer) -> int:
+	return roundi(link.get_statistic(ENetPacketPeer.PEER_PACKET_THROTTLE))
+
+
+func _enet_close(pair: Array) -> void:
+	if pair.is_empty():
+		return
+	(pair[1] as ENetConnection).destroy()
+	(pair[0] as ENetConnection).destroy()
 
 
 func _check(ok: bool, what: String) -> void:

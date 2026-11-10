@@ -47003,3 +47003,50 @@ gap refused, naming the link beyond it, and undone; a row of barrels across it, 
 second refused; a lean-to over the only path to the link refused, naming it; with a second gap, the same
 lean-to laid (a detour); removing a barrel and a piece never refused; the hills' flood timed. No bullet
 (builder mode is Jeff's tool). Server and builder only; protocol unchanged; no new class_name.
+
+## 847. ENet's packet throttle never falls on either end (the walking jump)
+
+Release's number; the coordinator's approval (fix A; fix B, a seq gap never acknowledged, is
+approved in shape and comes later with its own revision). Playtest's lagged bear duels showed a
+player walking along early in a session put back 2.6–4.3 cells at once, a few seconds after a join.
+Playtest's wire set (main 02bb4af9a with never-committed prints of each move packet sent and taken,
+with ENet's own figures; 14 runs at --test-lag=0.15, 6 at none): the client kept making its moves on
+time, but ENet put out almost none of them, its packet throttle at 0, rtt 15 ms, loss 0; the server
+took 2 packets in 20 ticks and 49 seqs never came. The next one through acknowledged them all (take_free
+takes any newer seq; the ack is the highest done), so the client dropped them and drew the body where
+the server had it. The throttle at the first send decided every run: started at 32, it stayed and no
+run snapped (12); started at 20–24 it fell to 0 by ticks 31–50 and every run snapped (7, one of them at
+lag 0, so a player on the box meets it); it came back to 32 at ticks 53–57, ENet's 5 s epoch. The join's
+first tick is slow in every run, clean or not (the zone waking, 305–423 ms; sent to perf).
+
+ENet sends an unreliable packet with the throttle's chance in PACKET_THROTTLE_SCALE (32) and drops the
+rest (its source: "When the throttle has a value of 0, all unreliable packets are dropped by ENet"), and
+on each ack it lowers the throttle when the round trip is over the last epoch's plus twice its variance
+(enet_peer_throttle: "peer -> packetThrottle -= peer -> packetThrottleDeceleration;"); within the first
+epoch the last round trip is ENet's default, so a slow ack at the join lowers it. World.request_free is
+unreliable_ordered, and our ENetMultiplayerPeer kept ENet's defaults (interval 5000 ms, acceleration 2,
+deceleration 2).
+
+Now Net.steady_throttle(link) calls ENetPacketPeer.throttle_configure(THROTTLE_INTERVAL_MS 5000,
+THROTTLE_ACCELERATION 32, THROTTLE_DECELERATION 0): the throttle never falls, and is back at its top on
+the next ack. The order is 4.7.2's own: its class reference (--doctool) gives throttle_configure(interval:
+int, acceleration: int, deceleration: int), ENet's enet_peer_throttle_configure(peer, interval,
+acceleration, deceleration) the same ("deceleration: rate at which to decrease the throttle probability as
+mean RTT increases"), and the test reads PEER_PACKET_THROTTLE_DECELERATION back as 0 and _ACCELERATION as
+32. A client makes the call on its server link in Net._on_connected_to_server (every connect, a
+reconnect's too); the server on each client's link in Net._on_peer_connected. ENet also sends the
+configure to the far end, so either call covers both ways, and the server's covers a client of an older
+build. Our traffic (5-byte commands at 30 a second, small states) is far too small to congest a link, so
+the throttle bought nothing; at 0 it also shrank ENet's window for reliable data.
+
+free_net_test _test_throttle_steady, a real ENet pair on loopback with one end left unserviced 900 ms (as
+a slow tick stalls it) while the other sends reliably: unconfigured, the waiting end's throttle falls (0
+and 14 of 32: the stall is real); held, both ends read 32 once connected, after the server stalls, after
+the client stalls, and on a new client host connected after the old link dropped (Net.reconnect's way).
+Playtest's wire set on the branch (59d9a4d33, the same prints; 13 runs at lag 0.15, 6 at none): the
+throttle read 32 at every send and every take in all 19, on both ends; seqs sent and taken were equal in
+every run (617 to 1225 a run), none lost; no at-once correction under state 100 in any. The 8 at-once
+corrections later (states 238-544, the bear 0.2-2.2 cells off) came in the fight's pushes and knocks:
+the blow halt's, not this.
+Server and client; the wire is unchanged (protocol unchanged); no new
+class_name. One CHANGELOG bullet in voice's words.
