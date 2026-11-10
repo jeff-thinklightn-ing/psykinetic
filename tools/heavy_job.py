@@ -354,6 +354,25 @@ def due_row(table, entry, default, running, free_ram_gb, free_commit_gb=None, ro
     return lean if goes_lean(row, lean, waited, running, free_ram_gb, free_commit_gb) else row
 
 
+def judged_row(table, entry, default, running, free_ram_gb, free_commit_gb=None, now=None):
+    """The queue [entry] as those behind it judge it: its due_row, with its
+    tree and, if its waiter gave one, its --expect as "expect_s" (394
+    amended (28))."""
+    row = dict(due_row(table, entry, default, running, free_ram_gb, free_commit_gb, now=now), tree=entry["tree"])
+    if entry.get("expect_s") is not None:
+        row["expect_s"] = entry["expect_s"]
+    return row
+
+
+def holder_name(queue, place):
+    """How a wait names the queue row at [place] that holds it: "the head,
+    <tree> <kind>" for the first, else "<tree> <kind> (<n>th in the queue)"."""
+    entry = queue[place]
+    if place == 0:
+        return "the head, %s %s" % (entry["tree"], entry["kind"])
+    return "%s %s (%s in the queue)" % (entry["tree"], entry["kind"], _ordinal(place + 1))
+
+
 def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
     """Whether a job of [row] waiting [waited_s] runs as [lean] (its lean
     variant, or None): out of reach that long, and the lean one in reach.
@@ -416,6 +435,14 @@ def passes(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=Non
     are ahead of [job] too, so [job] still meets each: a head waiting on
     memory or the count holds it, its own kind holds it, one it conflicts
     with only by backfill."""
+    return passes_held(job, ahead, running, free_ram_gb, free_commit_gb, table, now, length_s)[:3]
+
+
+def passes_held(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=None, now=None, length_s=None):
+    """passes's answer and, when [job] may not start, the index in [ahead]
+    of the row that holds it (394 amended (28)): (ok, past, why, holder),
+    holder None when it may. Each row ahead is judged by its own length
+    (backfill_length: its waiter's --expect, from its queue entry)."""
     held = []
     for other in ahead:
         held.append(kind_blocked(other, running) or not _passes(
@@ -425,21 +452,29 @@ def passes(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=Non
 
 def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s):
     """passes over [ahead], [held] saying for each whether it waits on kind,
-    its own or by those before it."""
+    its own or by those before it.
+
+    One of [job]'s own kind ahead holds it only while that one waits on its
+    kind (kind_blocked: its cap reached, or one it excludes running; 394
+    amended (28)). Held otherwise, it waits on a row before it, which [job]
+    meets too, or on its own length at a backfill: then a shorter job of
+    the same kind may go first. Playtest's tour (--expect 25, 1500 s) could
+    never go past terrain's bench while suites ran back to back, and every
+    scene behind it waited 84 minutes (11-10)."""
     past = []
-    for other, waits in zip(ahead, held):
+    for place, (other, waits) in enumerate(zip(ahead, held)):
         if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
             continue
         if not waits:
-            return False, [], ""
-        if other.get("kind") == job.get("kind"):
-            return False, [], ""
+            return False, [], "", place
+        if other.get("kind") == job.get("kind") and kind_blocked(other, running):
+            return False, [], "", place
         if conflicts(job, other):
             ok, due, why = may_backfill(other, running, table, now, length_s)
             if not ok:
-                return False, [], why
+                return False, [], why, place
             past.append(dict(other, due=due))
-    return True, past, ""
+    return True, past, "", None
 
 
 def conflicts(job, other):
@@ -456,9 +491,14 @@ def median_s(runs):
 def backfill_length(row, expect_minutes=None):
     """How long a job of [row] is counted on to run when it goes past
     another (backfill): its --expect, else its kind's longest recorded run
-    times BACKFILL_MARGIN; None (never goes past) with neither."""
+    times BACKFILL_MARGIN; None (never goes past) with neither. A row
+    judged from a queue entry carries that waiter's --expect as "expect_s"
+    (394 amended (28)): without it, those behind judged a 25-minute tour by
+    its kind's 3.6-minute runs."""
     if expect_minutes is not None:
         return expect_minutes * 60.0
+    if row.get("expect_s") is not None:
+        return float(row["expect_s"])
     runs = row.get("runs_s", [])
     return max(runs) * BACKFILL_MARGIN if runs else None
 
@@ -1191,8 +1231,11 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
     with StateLock():
         # "waiter": this wrapper, which waits for the turn; a take's pid (its
         # holder) may be none, and a queue file whose waiter died is dropped.
-        _write(_path("queue", ticket), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
-            "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued})
+        # "expect_s": its --expect, for those behind it to judge its length
+        # by (backfill_length, 394 amended (28)).
+        _write(_path("queue", ticket), dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
+            "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued},
+            **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {})))
     said = 0.0
     long_logged = False
     # Since when only backfilled jobs have kept this one out (394 amended
@@ -1230,8 +1273,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite. Each judged as it would run at its turn
             # (due_row, 394 amended (27)).
-            ahead = [dict(due_row(table, each, row, running, free_ram, free_commit), tree=each["tree"])
-                for each in queue[:place - 1]]
+            ahead = [judged_row(table, each, row, running, free_ram, free_commit) for each in queue[:place - 1]]
             # Lean is chosen when it would start, not at its first look (394
             # amended (27)): till then a suite out of reach is judged as its lean
             # row and stays full, so room at its turn starts it full. Chosen at
@@ -1247,7 +1289,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 if entry is not None:
                     entry["head_since"] = head_since
                     _write(_path("queue", ticket), entry)
-            head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now,
+            head, past, past_why, holder = passes_held(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             if ok and row is not full:
@@ -1281,12 +1323,13 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                     if aside is not None:
                         ticket = aside
                         log("aside", tree, kind, "out of reach; to the back of %d" % len(queue))
-            if not head and queue and queue[0]["file"] != ticket:
-                first = queue[0]
-                first_row = dict(kinds().get(first["kind"], row), kind=first["kind"])
-                first_gpu = gpu_gb()[0] if first_row["gpu"] else None
-                _, first_why = decide(first_row, running, True, free_ram, first_gpu, free_commit)
-                why = "the head, %s %s, waits on: %s" % (first["tree"], first["kind"], first_why or "its next look")
+            if not head and holder is not None:
+                # The row that holds it (394 amended (28)), not always the
+                # head: playtest's tour, 8th, held the scenes behind it while
+                # each said it waited on the head, a suite.
+                other = ahead[holder]
+                _, other_why = decide(other, running, True, free_ram, gpu_gb()[0] if other["gpu"] else None, free_commit)
+                why = "%s, waits on: %s" % (holder_name(queue, holder), other_why or "its next look")
                 if past_why:
                     why += "; %s" % past_why
             if ok:
@@ -1649,27 +1692,27 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
     """Each queued entry's reason, as its waiter's next look would judge it
     (wait_turn's passes and decide, read only): "may start at its next look",
     or "waits: " and what holds it; one behind a head names that head and
-    what the head waits on (394 amended (26))."""
+    what the head waits on (394 amended (26)). Since 394 amended (28) it
+    names the row that holds it, the head or one further on ("behind <tree>
+    <kind> (<n>th in the queue)"), and judges each by its waiter's --expect."""
     table = kinds()
     now = time.time() if now is None else now
     out = []
     for place, entry in enumerate(queue):
         # A kind the table lacks (a kinds.json older than the entry): judged as a suite, the heaviest.
         default = dict(table.get(entry["kind"]) or KINDS.get(entry["kind"]) or table["suite"])
-        row = due_row(table, entry, default, running, free_ram, free_commit, now=now)
-        ahead = [dict(due_row(table, each, default, running, free_ram, free_commit, now=now), tree=each["tree"])
-            for each in queue[:place]]
-        head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now, backfill_length(row))
+        row = judged_row(table, entry, default, running, free_ram, free_commit, now=now)
+        ahead = [judged_row(table, each, default, running, free_ram, free_commit, now=now) for each in queue[:place]]
+        head, past, past_why, holder = passes_held(row, ahead, running, free_ram, free_commit, table, now, backfill_length(row))
         ok, why = decide(row, running, head, free_ram, free_gpu if row["gpu"] else None, free_commit)
         if ok:
             out.append("may start at its next look" + (" (past %s by backfill)" % ", ".join(
                 "%s %s" % (each["tree"], each["kind"]) for each in past) if past else ""))
-        elif not head and queue:
-            first = queue[0]
-            first_row = due_row(table, first, default, running, free_ram, free_commit, now=now)
-            _, first_why = decide(first_row, running, True, free_ram, free_gpu if first_row["gpu"] else None, free_commit)
-            out.append("waits: behind the head, %s %s, which waits on: %s%s" % (first["tree"], first["kind"],
-                first_why or "its next look", "; " + past_why if past_why else ""))
+        elif not head and holder is not None:
+            other = ahead[holder]
+            _, other_why = decide(other, running, True, free_ram, free_gpu if other["gpu"] else None, free_commit)
+            out.append("waits: behind %s, which waits on: %s%s" % (holder_name(queue, holder),
+                other_why or "its next look", "; " + past_why if past_why else ""))
         else:
             out.append("waits: %s" % why)
     return out

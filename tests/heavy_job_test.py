@@ -282,8 +282,10 @@ ok, past, _ = gate.passes(scene_row, [bench_queued, soak_queued], [suite_at(now 
 check(ok and [each["kind"] for each in past] == ["bench"], "a scene goes past a soak the queue holds, the bench by backfill")
 check(gate.may_pass(import_queued, [bench_queued, soak_queued], [suite_at(now - 100)], 60.0),
     "an import goes past both, without the clock")
-check(not gate.passes(scene_row, [bench_queued, soak_queued, dict(scene_row, tree="items")], [suite_at(now - 100)], 60.0,
+check(not gate.passes(scene_row, [bench_queued, soak_queued, dict(runs["scene"], kind="scene", tree="items")], [suite_at(now - 100)], 60.0,
     None, runs, now, scene_long)[0], "a scene still waits behind a scene that may start")
+check(gate.passes(scene_row, [bench_queued, soak_queued, dict(scene_row, tree="items", expect_s=900.0)], [suite_at(now - 100)], 60.0,
+    None, runs, now, scene_long)[0], "but goes past one held only by its own length at the bench (394 amended (28))")
 ok, _, _ = gate.passes(dict(soak_row, tree="b"), [bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, 600.0)
 check(not ok, "a second soak still waits behind the first")
 check(not gate.passes(scene_row, [soak_queued], [], 60.0, None, runs, now, scene_long)[0],
@@ -946,6 +948,82 @@ check(len(reasons) == 3 and reasons[0].startswith("waits: "), "queue_reasons, re
 check([each["tree"] for each in gate._entries("queue")] == ["items", "npc", "import"], "status moved nothing")
 clear_gate()
 gate._memory, gate.total_ram_gb = real_memory, real_total_ram
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved_kinds is not None:
+    gate._write(gate._path("kinds.json"), saved_kinds)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+
+print("== a long --expect scene behind a bench holds no shorter scene (394 amended (28)) ==")
+# 11-10: playtest's tour (--expect 25) behind terrain's bench while suites ran
+# back to back: it could never go past the bench, and those behind judged it by
+# the scene kind's runs, saw it free to go, and waited behind it 84 minutes.
+check(gate.backfill_length(dict(gate.KINDS["scene"], runs_s=[100.0], expect_s=1500.0)) == 1500.0,
+    "a row from a queue entry counts on its waiter's --expect")
+check(gate.backfill_length(dict(gate.KINDS["scene"], runs_s=[100.0], expect_s=1500.0), expect_minutes=2) == 120.0,
+    "its own waiter's --expect first")
+now = 10000.0
+short_row = dict(gate.KINDS["scene"], kind="scene")
+suite_on = dict(running(6, 6), kind="suite", started=now - 30)
+long_runs = {"suite": dict(gate.KINDS["suite"], runs_s=[800.0]), "scene": dict(gate.KINDS["scene"], runs_s=[100.0]),
+    "bench": dict(gate.KINDS["bench"], runs_s=[300.0])}
+bench_ahead = dict(gate.KINDS["bench"], kind="bench", tree="terrain")
+tour = dict(short_row, tree="playtest", expect_s=1500.0)
+ok, _, why, holder = gate.passes_held(tour, [bench_ahead], [suite_on], 60.0, None, long_runs, now, gate.backfill_length(tour))
+check(not ok and holder == 0 and "needs 1500 s" in why, "the tour may not go past the bench: %s" % why)
+ok, past, _, holder = gate.passes_held(short_row, [bench_ahead, tour], [suite_on], 60.0, None, long_runs, now, 125.0)
+check(ok and holder is None and [each["kind"] for each in past] == ["bench"],
+    "a short scene behind it goes past both, the bench by backfill")
+two_scenes = [suite_on, dict(running(1, 1), kind="scene", started=now), dict(running(1, 1), kind="scene", started=now)]
+ok, _, _, holder = gate.passes_held(short_row, [bench_ahead, tour], two_scenes, 60.0, None, long_runs, now, 125.0)
+check(not ok and holder == 1, "with two scenes running the tour waits on its kind: it holds the scene behind it")
+check(not gate.passes(short_row, [dict(short_row, tree="a")], [dict(running(1, 1), kind="scene")] * 2, 60.0, None,
+    long_runs, now, 125.0)[0], "a scene waiting on the cap holds the same kind, as before")
+# The same through the waiters: a suite running, a bench queued, the tour, three short scenes.
+gate._memory = lambda: (40.0, 40.0)
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.05
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+saved_kinds = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=6.0, commit_gb=1.0, lean_first=False, runs_s=[800.0]),
+    "scene": dict(gate.KINDS["scene"], ram_gb=1.0, commit_gb=1.0, runs_s=[100.0]),
+    "bench": dict(gate.KINDS["bench"], ram_gb=2.0, commit_gb=1.0, runs_s=[300.0])})
+clear_gate()
+gate._write(gate._path("running", "physics-suite-%d.json" % os.getpid()), {"tree": "physics", "kind": "suite",
+    "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()), "queued": time.time() - 60, "started": time.time() - 30,
+    "ram_gb": 6.0, "commit_gb": 1.0, "gpu": False, "using_gb": 6.0, "using_commit_gb": 1.0, "watched": True})
+queued("terrain", "bench")
+long_waiter = threading.Thread(target=lambda: gate.wait_turn("playtest", "scene", os.getpid(), False, 25), daemon=True)
+long_waiter.start()
+until(lambda: queue_of() == ["terrain bench", "playtest scene"])
+entry = [each for each in gate._entries("queue") if each["tree"] == "playtest"]
+check(entry and entry[0].get("expect_s") == 1500.0, "the tour's queue entry carries its --expect (%s)" % entry)
+shorts = []
+for name in ("ea1", "ea2", "ea3"):
+    shorts.append(threading.Thread(target=lambda name=name: gate.take(name, "scene", os.getpid()), daemon=True))
+    shorts[-1].start()
+    until(lambda name=name: name in trees("queue") + trees("running"))
+check(until(lambda: sorted(trees("running")) == ["ea1", "ea2", "physics"]),
+    "beside the suite, the first two short scenes run past the bench and the tour (%s)" % trees("running"))
+time.sleep(0.5)
+check(queue_of() == ["terrain bench", "playtest scene", "ea3 scene"], "the tour and the third wait (%s)" % queue_of())
+lines = status_lines(40.0)
+tour_line = [each for each in lines if each.startswith("queued playtest scene")]
+check(tour_line and "; waits: behind the head, terrain bench, which waits on: " in tour_line[0]
+    and "; going past it needs 1500 s" in tour_line[0], "status names the bench as what holds the tour, and why: %s" % tour_line)
+third = [each for each in lines if each.startswith("queued ea3 scene")]
+check(third and "; waits: behind playtest scene (2nd in the queue), which waits on: " in third[0],
+    "the third waits on the tour (three jobs running, two of them scenes): %s" % third)
+gate.release("ea1", "scene")
+check(until(lambda: "ea3" in trees("running")), "a scene done: the third starts, the tour still waits (%s)" % trees("running"))
+check(queue_of() == ["terrain bench", "playtest scene"], "(%s)" % queue_of())
+gate.release("ea2", "scene")
+gate.release("ea3", "scene")
+clear_gate()  # The tour's waiter finds its place dropped and ends.
+long_waiter.join(5)
+for each in shorts:
+    each.join(5)
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)

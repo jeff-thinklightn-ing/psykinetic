@@ -47029,6 +47029,37 @@ with no wait, and its lean line is written once with the full figure. Tools only
 class_name; no bullet. Landed, `heavy_job kinds` failed on the both-figures column (its format string one
 %s short; nothing the gate decides read it); fixed after, with a check that runs kinds and reads the suite's line.
 
+394 amended (28) (perf, 2026-11-10; label from tools/decision_number.sh, the coordinator's approval): a waiter's
+--expect is written to its queue entry, a job is held by one of its own kind ahead only while that one waits on
+its kind, and a wait names the row that holds it. Playtest queued its tour as a scene with --expect 25 (1500 s)
+behind terrain's bench. A scene may go past a bench only by backfill, ending before the bench's blocker (the
+suite running) does, and with suites back to back none ever had 25 minutes left, so the tour could never start.
+Its --expect lived only in its own waiter: every other waiter, and status, judged its row by the scene kind's
+recorded runs (171.7 s × 1.25), saw it free to go and held behind it, first come, and a scene never went past
+a scene. Seven scenes (enemy-ai's den-rule run among them) waited about 84 minutes behind a row that could not
+start, while each said, and status showed, that it waited on the head, a suite. Not from (26) or (27): the
+length was never shared since backfill (18), and (26)'s status named queue[0] whatever held the row. No suite
+was held. The coordinator had terrain withdraw its bench (to requeue when the landings drain) and the scenes ran.
+- The queue entry carries "expect_s" when its waiter has --expect. backfill_length reads it from a row judged
+  from the queue (judged_row: its due_row, its tree, its expect_s), so those behind and status count on the
+  length the waiter itself counts on. A waiter started from an older heavy_job.py writes none and is judged by
+  its kind's runs as before.
+- _passes: one of [job]'s own kind ahead holds it only while kind_blocked (its cap reached, or one it excludes
+  running). Held otherwise, it waits on a row before it, which [job] meets too, or on its own length at a
+  backfill, and the backfill reasons other than length depend only on the blockers and the table, which are
+  the same for both. So the only job that now goes first is a shorter one of the same kind.
+- passes_held returns the index of the row that holds the job; wait_turn's message, its "waiting" log line and
+  status name that row: "behind the head, <tree> <kind>" as before when it is the first, else "behind <tree>
+  <kind> (<n>th in the queue)", with that row's own decide answer and the backfill reason after.
+heavy_job_test: backfill_length from expect_s and the waiter's own first; the tour can't pass the bench, a short
+scene behind it passes both (the bench by backfill); with two scenes running the tour holds the scene behind it,
+and a scene at the cap holds its kind as before; through real waiters, a suite running, a bench queued, the tour
+(wait_turn with --expect 25, its entry carrying 1500 s) and three short scenes: two run, the tour and the third
+wait, status names the head bench for the tour with "going past it needs 1500 s" and the tour for the third; a
+scene done, the third starts and the tour still waits. The earlier check "a scene still waits behind a scene that
+may start" now gives that scene its runs, and a new one passes a scene held only by its own length. Tools only;
+protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
