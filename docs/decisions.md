@@ -41450,6 +41450,17 @@ flank step as for the bear; pools of the old grey's and the boar king's in voice
 lore, follow. companion_test _test_old_grey_seen: an OldWolf in her sight, no asleep on him, seen,
 no bear line, no error. Server only, protocol unchanged, no new class_name.
 
+780 amended (19): the old grey's own lines (2026-11-09, companions; release's label, the
+coordinator's approval; voice's words, kept to lore: his pack follows him, his jaws). Her lines of
+an apex come from Companion.apex_lines(entity, key), key "seen", "asleep", "ordered" or "break":
+its kind's own in APEX_KIND_LINES first ("old_wolf": seen, ordered, break; no "asleep", as he never
+sleeps), else the bear's pools for a GreatBear; another apex gets the general APEX_ORDERED and
+APEX_BREAK, and nothing when seen, as (18) ruled. So she warns of the old grey in his own words,
+and set on him or breaking off from him she speaks of his jaws and pack, not "its paws". The boar
+king's pools go in his package at his unshelve. companion_test _test_old_grey_seen: seen, his own
+line and no bear's; his ordered and break pools; none of his lines names a bear, a paw or an "it".
+Server only, protocol unchanged, no new class_name.
+
 780 amended (8): the bear tuned for one to three (enemy-ai, 2026-11-04; combat's draft from
 playtest's bear_yard runs, the coordinator's ruling; release's label). Playtest's players fell to
 an untold plain blow (attack_damage 5 a second), not to the moves: a player is a free body, kept on

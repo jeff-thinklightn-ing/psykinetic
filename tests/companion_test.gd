@@ -4769,7 +4769,7 @@ func _walk_own(owner: Player, cell: Vector2i, most_ticks: int) -> bool:
 
 
 func _test_old_grey_seen() -> void:
-	print("\n== an apex with no \"asleep\" (the old grey): seen, no error, and no bear line of him (780 amended (18)) ==")
+	print("\n== an apex with no \"asleep\" (the old grey): seen, no error, his own line and no bear's (780 amended (18), (19)) ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -4790,6 +4790,17 @@ func _test_old_grey_seen() -> void:
 	for line: String in Companion.APEX_SEEN + Companion.APEX_ASLEEP:
 		said += pet._said.count(line)
 	_check(pet._apex_seen.has(grey.get_instance_id()) and said == 0, "sighted, she sees him and says no bear's line of him (%d said: %s)" % [said, pet._said.slice(-2)])
+	var own: Dictionary = Companion.APEX_KIND_LINES["old_wolf"]
+	_check(not pet._said.is_empty() and own["seen"].has(pet._said[-1]), "she warns of him in his own words, 780 amended (19) (%s)" % [pet._said.slice(-1)])
+	_check(Companion.apex_lines(grey, "ordered") == own["ordered"] and Companion.apex_lines(grey, "break") == own["break"]
+			and not own.has("asleep") and Companion.apex_lines(grey, "asleep").is_empty(),
+			"set on him or breaking off, his own lines; he never sleeps, so none for that")
+	var bad := []
+	for key: String in own:
+		for line: String in own[key]:
+			if line.to_lower().contains("bear") or line.to_lower().contains(" its ") or line.to_lower().contains("paw"):
+				bad.append(line)
+	_check(bad.is_empty(), "none of his lines name a bear, a paw or an it (%s)" % [bad])
 	World.despawn(grey)
 	_put(owner, owner_was)
 	_put(pet, pet_was)

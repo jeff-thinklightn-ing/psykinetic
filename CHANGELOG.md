@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion warns you of the old grey when she sees him, and of his jaws and his pack when you send her at him or she pulls back from him, where before she said nothing at the sight of him and spoke of a bear's paws in a fight with him (780 amended (19)).
 - Your companion speaks of other players only from what she can see: ask after one out of sight and she says she doesn't know, where before she might guess where they were or say they were safe; she calls them by name, and she keeps her own wishes to herself while others are talking near her (803 amended (9)).
 - Town houses look lived in: each has a doorstep at its door, a worn plank or a stone slab, and an iron lantern beside it that burns at night while someone inside is awake, as the shop's and the temple's do now; stone houses have shutters too, and smoke rises from a house's chimney, or a hut's fire, whenever the house is lit; and a house on raised ground is lit warm inside when its windows are, where before only its windows glowed (489 amended (4)).
 - In town, a pig's neck bends whole now when it puts its head down to feed or falls, where before it split open (319 amended (4)).

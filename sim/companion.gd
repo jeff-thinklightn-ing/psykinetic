@@ -151,6 +151,16 @@ const CAT_POINT_RANGE := 6
 const APEX_ASLEEP: Array[String] = ["It's asleep. Let's go round, quiet.", "Bear's sleeping. Don't wake it.", "Quiet now. Let it sleep."]
 const APEX_ORDERED: Array[String] = ["If you say so. Mind its paws.", "On your word, then. Stay off its front.", "Your call. Don't stand where it can reach."]
 const APEX_BREAK: Array[String] = ["Back. We can't take it like this.", "Pull back, now. Not like this.", "Leave it. We're done if we stay."]
+## An apex's own pools by kind (voice's words, kept to lore): "seen", "asleep",
+## "ordered", "break" (780 amended (19)). The old grey never sleeps, so he
+## has no "asleep".
+const APEX_KIND_LINES := {
+	"old_wolf": {
+		"seen": ["The old grey. His pack won't be far.", "That's the old grey. Where he goes, the rest follow.", "The old grey, and his pack with him. Keep wide."],
+		"ordered": ["If you say so. Mind his jaws.", "On your word, then. Watch for his pack.", "Your call. Keep his teeth off you."],
+		"break": ["Back. We can't take him like this.", "Pull back, now. Not with his pack on us.", "Leave him. We're done if we stay."],
+	},
+}
 const ORDER_PLAY := "\\b(knucklebones|play (a game|dice|bones|a round)|(a|another) game of (bones|dice)|throw the bones)\\b"
 ## Her player's answer when she has asked them to keep watch (decision 621).
 ## Her ask to keep watch (621 amended (2)): told in her last turn, where a
@@ -1390,7 +1400,8 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		if _quarry != null and apex(_quarry) and not was_engaged:
 			# Her player's word sends her at an apex (780 amended (5), order wins): wary, she goes.
 			_apex_broke = false
-			_say(APEX_ORDERED[World.tick % APEX_ORDERED.size()], true)
+			var ordered := apex_lines(_quarry, "ordered")
+			_say(ordered[World.tick % ordered.size()], true)
 	if phrase == 0 and _sleeping.has("asked_at") and _answered_watch(text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
@@ -7529,6 +7540,20 @@ static func apex(entity: Variant) -> bool:
 	return Monster.is_apex(str((entity as Monster).spawn_spec.get("kind", ""))) or entity is GreatBear
 
 
+## Her pool for apex [param entity] and [param key] ("seen", "asleep",
+## "ordered", "break"): its kind's own (APEX_KIND_LINES), else the bear's for
+## a GreatBear. Another apex gets the general "ordered" and "break" lines, and
+## nothing when seen, since APEX_SEEN and APEX_ASLEEP name a bear (780 amended (18), (19)).
+static func apex_lines(entity: Variant, key: String) -> Array:
+	var kind := str((entity as Monster).spawn_spec.get("kind", "")) if is_instance_valid(entity) and entity is Monster else ""
+	var own: Dictionary = APEX_KIND_LINES.get(kind, {})
+	if own.has(key):
+		return own[key]
+	if is_instance_valid(entity) and entity is GreatBear or key == "ordered" or key == "break":
+		return {"seen": APEX_SEEN, "asleep": APEX_ASLEEP, "ordered": APEX_ORDERED, "break": APEX_BREAK}[key]
+	return []
+
+
 ## Whether apex [param entity] is in a fight with her or her player (going
 ## for one, or struck by one lately: GreatBear.engaged_with), or her player
 ## set her on it ("Get them!"). Broken off, only one going for her.
@@ -7580,8 +7605,8 @@ func _apex_after_choose() -> void:
 		_apex_seen[id] = World.tick
 		if World.tick - last > APEX_WARN_AGAIN_TICKS and not _apex_engaged(entity):
 			var asleep_now: bool = entity.get("asleep") == true
-			var pool := APEX_ASLEEP if asleep_now else APEX_SEEN
-			if entity is GreatBear:  # Her lines are a bear's; another apex's are to come (780 amended (18)).
+			var pool := apex_lines(entity, "asleep" if asleep_now else "seen")
+			if not pool.is_empty():
 				_say(pool[World.tick % pool.size()], true)
 			_narrate("You see %s%s: too strong to take on lightly. Keep clear of it unless %s takes it on." % [
 				refer(entity), ", asleep" if asleep_now else "", keeper_name()])
@@ -7594,7 +7619,8 @@ func _apex_after_choose() -> void:
 	if fighting != null and not _apex_broke and (not _hp_over(self, _retreat_below()) or _alive(keeper) and not _hp_over(keeper, REFLEX_BELOW)):
 		_apex_broke = true
 		_quarry = null
-		_say(APEX_BREAK[World.tick % APEX_BREAK.size()], true)
+		var broke := apex_lines(fighting, "break")
+		_say(broke[World.tick % broke.size()], true)
 		_narrate("You break off from %s and call %s back." % [refer(fighting), keeper_name()])
 		current_intent = Intent.RETREAT
 		intent_target = null
