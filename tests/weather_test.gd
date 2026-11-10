@@ -742,3 +742,43 @@ func _test_rain_rings() -> void:
 	_check(code.contains("global uniform float rain_rings") and not code.contains("sin("),
 			"the water reads the rain_rings global, its drops hashed without sin")
 	_check(ProjectSettings.has_setting("shader_globals/rain_rings"), "and project.godot declares it")
+	_check((load("res://client3d/water.gdshader") as Shader).get_shader_uniform_list().size() > 0,
+			"and it compiles (a bad shader lists no uniforms)")
+	_check_drops_kept(code)
+
+
+# 309 amended (3)'s seam guard: a drop ring drawn from the furthest-out centre
+# its size allows (water.gdshader's keep in from the edge) is spent, its band and
+# its slope under REACH_SPENT, at its cell's edge, for the smallest, the largest
+# and sizes between; the drops' ring math as drops() draws it, with the
+# shader's own constants.
+const REACH_SPENT := 0.02
+
+func _check_drops_kept(code: String) -> void:
+	var c := {}
+	for name in ["DROP_CELL", "DROP_WIDEST", "DROP_BAND", "DROP_SMALLEST", "DROP_FAINTEST",
+			"DROP_KEEP_FROM", "DROP_KEEP_PER", "DROP_RATE_LO", "DROP_RATE_HI"]:
+		var found := RegEx.create_from_string("const float " + name + " = ([0-9.]+);").search(code)
+		c[name] = found.get_string(1).to_float() if found else -1.0
+	var worst := 0.0
+	var keeps: Array[float] = []
+	for step in 5:
+		var pick := step / 4.0
+		var size: float = lerpf(c["DROP_SMALLEST"], 1.0, pick)
+		var strength: float = lerpf(c["DROP_FAINTEST"], 1.0, pick)
+		var keep: float = c["DROP_KEEP_FROM"] + c["DROP_KEEP_PER"] * size
+		keeps.append(keep)
+		for edge in 20:
+			# from the edge outward into the next cell, where nothing draws it
+			var d := keep + edge * 0.01
+			for a in 101:
+				var age := a / 100.0
+				var r: float = age * size * c["DROP_WIDEST"] * 0.5 / c["DROP_CELL"]
+				var x: float = (d - r) / c["DROP_BAND"]
+				var wave := exp(-x * x)
+				worst = maxf(worst, maxf(wave, absf(x) * wave) * (1.0 - age) * (1.0 - age) * strength)
+	_check(c.values().min() > 0.0 and worst < REACH_SPENT and keeps[4] < 0.5,
+			"a drop ring from its furthest-out centre is spent at its cell's edge (%.3f, the centres %.2f..%.2f in for the smallest, %.2f..%.2f for the largest)"
+			% [worst, keeps[0], 1.0 - keeps[0], keeps[4], 1.0 - keeps[4]])
+	_check(c["DROP_SMALLEST"] < 1.0 and c["DROP_RATE_LO"] < 1.0 and c["DROP_RATE_HI"] > 1.0,
+			"the drops ring at rates and sizes of their own, so none fall in rows")

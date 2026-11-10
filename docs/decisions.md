@@ -6386,13 +6386,16 @@ falling snow rings less and less. A stream's ribbon at half strength (running
 water breaks them up), a fall's curtain none. Gone from DROP_NEAR 30 to
 DROP_FAR 45 m from the camera (the rises' RISE_NEAR), and where a drop cell spans too few pixels for
 a ring (the high camera, the far surface), so they never shimmer.
-Cost, on the weak machine (the coordinator's bar, half a millisecond; perf's
-Lenovo run, map_bench, the wilds, a storm over Reed Pond at noon filling the
-low camera, 60 s, a fresh user:// each run, after/before/after against main):
-GPU median 6.74 and 6.82 ms against 6.81, frame median 8.68 and 8.76 against
-8.74, CPU 1.45 and 1.46 against 1.46: none measurable, the laptop's warming
-larger. Each run, and a first start here with an empty shader cache, reached
-the world: no crash compiling the new shader on a first launch.
+Cost, on the weak machine (the coordinator's bar, half a millisecond): the
+Lenovo timings given at landing (GPU 6.74 and 6.82 ms against 6.81) are VOID
+(perf, 11-10): with a fresh user:// and no --host, map_bench's game sat as a
+client at the connect screen, no water in frame, so they measured nothing of
+the rings. Measured again (perf, 11-10, --host, a storm over Reed Pond from
+the low camera at its default zoom, 3500a270c against its parent,
+alternated): GPU median 8.67
+and 8.72 ms against 8.66 and 8.70, about 0.02 ms, well under the bar. A first
+start with an empty shader cache, here and on the Lenovo (with --host),
+reached the world: no crash compiling the new shader on a first launch.
 weather_test _test_rain_rings: the share exactly 0 at rain 0 and at RINGS_FROM,
 1 in a downpour, rising with the rain; the view's share in a storm, thinning
 as the rain eases away, 0 once clear and indoors; the shader reads the
@@ -6402,6 +6405,38 @@ C:/dev/review/rain_on_water; from the high camera the rings read at once and
 the rise is the one bold ring; from the low camera, 30 m off, a storm greys and
 dapples the water (the coordinator: no more, so nothing fights the rise).
 Client only, protocol unchanged, no new class_name.
+
+309 amended (3): the rain rings uneven, so no rows read from above (a tuning
+of the package "rain on water", landing on; the coordinator's note on the
+stills and its approval, release's label). From the high camera a storm's
+rings sat as a lattice: every cell rang once a DROP_LIFE, each ring grew to
+DROP_WIDEST, each centre in the middle 0.3..0.7 of its cell. Now each cell
+rings at a rate of its own, DROP_RATE_LO 0.7 to DROP_RATE_HI 1.3 times that,
+from the hash it already had, so neighbours drift out of step; each ring
+grows to a size of its own, DROP_SMALLEST 0.6 to 1 of DROP_WIDEST, now
+0.5 m, from one more hash a turn, a small one fainter (DROP_FAINTEST 0.8 to
+1): 0.3 to 0.5 m across, 0.4 on the mean as (2)'s every ring was (a first
+cut, 0.5 to 1 of 0.4 m and down to 0.6 as bright, all but lost the rings
+from the play camera on the Lenovo, the small ones under a few pixels); and
+its centre sits DROP_KEEP_FROM 0.1 + DROP_KEEP_PER 0.235 times its size of a
+cell in from each edge, 0.24..0.76 for the smallest and 0.33..0.67 for the
+largest. That keep is the seam guard: a ring is drawn only in its own cell,
+and its band and slope reach past its widest (about 0.33 of a cell from the
+centre for the largest, more than its radius gives), so a centre nearer the
+edge would cut the largest rings faintly at the cell's edge. The share, its ease, the fades
+by distance and by pixel span, a stream's half and a curtain's none
+unchanged; one more hash a grid on water only. weather_test: the shader
+compiles (it lists its uniforms), and a ring from its furthest-out centre
+is spent (band and slope 0.016, under 0.02) at its cell's edge for the smallest,
+the largest and sizes between, with the shader's own constants. Cost on the
+Lenovo (perf, --host, a storm over Reed Pond, alternated, GPU median against
+main): about 0.02 ms at the low camera close in (zoom 0.4, 6.63/6.62 ms
+against 6.58/6.62) and from the high camera (4.50/4.50 against 4.48/4.48),
+no more than (2)'s own (0.02 ms at the low camera's default zoom, 0.05 close
+in, 0.03 from above). Stills: C:/dev/review/rain_on_water/spacing, threeup_high
+and threeup_low (shipped, a first cut, this): from above the rows clearly
+fewer though not gone, at the low camera the water dappling as (2)'s did. No bullet (voice's (2)
+bullet still says it). Client only, protocol unchanged, no new class_name.
 
 ## 327. A glimpse of the level past a way out
 

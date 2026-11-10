@@ -68,14 +68,27 @@ global uniform float rain_rings;
 // The drops: two offset grids of DROP_CELL m cells, each ringing once a
 // DROP_LIFE s at a place and phase of its own, if its pick for that turn is
 // under the share; a ring DROP_WIDEST m across at most, a band DROP_BAND of a
-// cell wide, sloping the surface (DROP_SLOPE) and paled (DROP_SHEEN). Less
-// than half as wide, quicker and fainter than a fish's rise (FishingView, 0.9 m over
+// cell wide, sloping the surface (DROP_SLOPE) and paled (DROP_SHEEN). At most
+// half as wide, quicker and fainter than a fish's rise (FishingView, 0.9 m over
 // 1.2 s, a white band), so a rise still reads among them. Gone past
 // DROP_NEAR..DROP_FAR m from the camera along the ground, and where a cell spans too few
 // pixels to draw a ring (the high camera, the far surface) rather than shimmer.
+// Uneven, so no rows read from above (309 amended (3)): each cell rings at a
+// rate of its own, DROP_RATE_LO..DROP_RATE_HI times one a DROP_LIFE, so
+// neighbours drift out of step; each ring grows to its own size, DROP_SMALLEST..1
+// of DROP_WIDEST, a small one fainter (DROP_FAINTEST..1); and its centre sits
+// DROP_KEEP_FROM + DROP_KEEP_PER * its size of a cell in from every edge, the
+// reach of its band and slope (weather_test checks it against them), so no
+// ring is cut at its cell's edge.
 const float DROP_CELL = 0.8;
 const float DROP_LIFE = 0.5;
-const float DROP_WIDEST = 0.4;
+const float DROP_RATE_LO = 0.7;
+const float DROP_RATE_HI = 1.3;
+const float DROP_WIDEST = 0.5;
+const float DROP_SMALLEST = 0.6;
+const float DROP_FAINTEST = 0.8;
+const float DROP_KEEP_FROM = 0.1;
+const float DROP_KEEP_PER = 0.235;
 const float DROP_BAND = 0.08;
 const float DROP_SLOPE = 1.0;
 const float DROP_SHEEN = 0.45;
@@ -97,21 +110,26 @@ vec3 drops(vec2 at, float time, float share) {
 		vec2 p = at / DROP_CELL + float(layer) * vec2(0.5, 0.37);
 		vec2 cell = floor(p);
 		vec2 own = drop_hash(cell + float(layer) * 17.3);
-		float turn = time / DROP_LIFE + own.x * 9.0;
+		float rate = mix(DROP_RATE_LO, DROP_RATE_HI, own.y);
+		float turn = time * rate / DROP_LIFE + own.x * 9.0;
 		vec2 pick = drop_hash(cell + floor(turn) * vec2(1.7, 3.1));
 		if (pick.x >= share) {
 			continue;
 		}
+		vec2 kind = drop_hash(cell + floor(turn) * vec2(2.9, 5.3) + 41.0);
+		float size = mix(DROP_SMALLEST, 1.0, kind.x);
 		float age = fract(turn);
-		// Kept inside its cell: the centre 0.3..0.7 across, the ring at most
-		// DROP_WIDEST / 2 out (a quarter of a cell).
-		vec2 centre = cell + 0.3 + 0.4 * vec2(pick.y, fract(pick.x * 13.7 + own.y));
+		// Kept inside its cell: the centre [keep] in from every edge, past
+		// the ring's widest (size * DROP_WIDEST / 2, under a third of a
+		// cell) and its band's tail.
+		float keep = DROP_KEEP_FROM + DROP_KEEP_PER * size;
+		vec2 centre = cell + keep + (1.0 - 2.0 * keep) * vec2(pick.y, kind.y);
 		vec2 off = p - centre;
 		float d = length(off);
-		float r = age * DROP_WIDEST * 0.5 / DROP_CELL;
+		float r = age * size * DROP_WIDEST * 0.5 / DROP_CELL;
 		float x = (d - r) / DROP_BAND;
 		float wave = exp(-x * x);
-		float fade = (1.0 - age) * (1.0 - age);
+		float fade = (1.0 - age) * (1.0 - age) * mix(DROP_FAINTEST, 1.0, kind.x);
 		out_.xy += (d > 0.0001 ? off / d : vec2(0.0)) * (-x * wave) * fade * DROP_SLOPE;
 		out_.z += wave * fade;
 	}
