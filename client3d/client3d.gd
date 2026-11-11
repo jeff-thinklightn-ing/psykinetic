@@ -1282,6 +1282,9 @@ const HUMANOID_MOVES := {
 		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
 		# Forehand and backhand, each back to a guard (338 amended, pc-character's side); alternate.
 		"sword": [["Sword_Slash_F", 0.21], ["Sword_Slash_B", 0.21]],
+		# The same with a shield on the left arm (Jeff, 11-07: "the shield is just along for the ride"):
+		# the sword arm's path the plain slash's, the shield worked through it (SHIELDED_STRIKES).
+		"sword_shield": [["Sword_Shield_Slash_F", 0.21], ["Sword_Shield_Slash_B", 0.21]],
 		# Coiled back, hung, swept flat across the front, carried past (the sim's wind-up and recovery).
 		"giant_axe": [["Axe_Sweep", 0.8]],
 		"battle_axe": [["Axe_Sweep", 0.8]],
@@ -24748,7 +24751,7 @@ func _play_once(puppet: Node3D, clip: String) -> bool:
 ## one of ATTACK_CLIPS. False if there is no model.
 func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0, lead := false) -> bool:
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
-	var choices: Array = strikes.get(weapon, strikes.get("", []))
+	var choices: Array = strikes.get(strike_key(swinger, weapon), strikes.get(weapon, strikes.get("", [])))
 	var drawn := drawn_strikes(puppet, swinger, weapon, lead)
 	if not drawn.is_empty():
 		choices = drawn
@@ -24817,6 +24820,20 @@ static func is_lead(swinger: GridEntity, ticks: int) -> bool:
 	# Its kind's row (a client never tempers a monster: its lead_ticks stays the default there).
 	var kind := str(swinger.spawn_spec.get("kind", ""))
 	return ticks <= int(Monster.fight_for(kind).get("lead_ticks", Monster.LEAD_TICKS))
+
+
+## A weapon's strikes with a shield on the left arm, where it has its own (HUMANOID_MOVES): the
+## sword's slashes with the shield worked through them.
+const SHIELDED_STRIKES := {"sword": "sword_shield"}
+
+
+## The HUMANOID_MOVES "strikes" key for [param weapon] in [param swinger]'s right hand: its
+## SHIELDED_STRIKES one with a shield (an item tagged "shield") in its left, else the weapon's own.
+static func strike_key(swinger: GridEntity, weapon: String) -> String:
+	if swinger == null or not SHIELDED_STRIKES.has(weapon) or swinger.slots.size() <= Items.LEFT_HAND:
+		return weapon
+	var left := str(swinger.slots[Items.LEFT_HAND])
+	return str(SHIELDED_STRIKES[weapon]) if not left.is_empty() and "shield" in Items.def(left).get("tags", []) else weapon
 
 
 ## A monster's led blow's strikes gathered first (HUMANOID_MOVES "drawn"; 338 amended (4),

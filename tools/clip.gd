@@ -164,6 +164,11 @@ extends Node
 ##     stunned for good, no town records so none is despawned). --which=fire|well|talk|stall for
 ##     one group; all four in turn without it.
 
+##   shieldcut: the sword-and-shield slashes (Jeff, 11-07: "the shield is just along for the ride";
+##     Client3D's SHIELDED_STRIKES): the player with a sword and a shield cuts at a brute held still
+##     beside him, a dozen seconds. --which=side (the default) the camera on his shield side (from the
+##     north, his left as he faces east), --which=play the play camera as it rests (he faces west, his
+##     left toward it); --plain the old slashes with the same shield on the arm (the reel's "before").
 const NAME := "clip"
 ## The folk scenario's people: [cell, face cell, word, seat slot ("" for none), group].
 const FOLK := [
@@ -363,6 +368,8 @@ func _ready() -> void:
 			_draugr()
 		"folk":
 			_folk_room()
+		"shieldcut":
+			_shieldcut()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -379,8 +386,10 @@ func _ready() -> void:
 	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
-	if scenario == "steady":
+	if scenario in ["steady", "shieldcut"]:
 		# Still and unhurt: they stand to be shown.
+		_monster.max_hp = 1000000 if scenario == "shieldcut" else _monster.max_hp
+		_monster.hp = _monster.max_hp
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 		for entity in World.monsters():
@@ -429,7 +438,7 @@ func _ready() -> void:
 		Net.set_camera_low(false, false)  # The raised camera, whatever the runner's settings keep.
 		if _main._client3d != null:
 			_main._client3d._zoom_to = _main._client3d.ZOOM_MIN
-	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
+	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat", "shieldcut"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _monster is Animal:
 			(_monster as Animal).raid = "drawbacks"  # A beast closes and bites, as a raider does.
@@ -468,6 +477,8 @@ func _process(delta: float) -> void:
 	# wide per hp, a full-screen green line once he is hurt (a reel's artefact, not the game's).
 	if at != null and _player.max_hp >= 1000000 and at.get_node_or_null("HpBar") != null:
 		at.get_node("HpBar").queue_free()
+	if monster != null and _monster.max_hp >= 1000000 and monster.get_node_or_null("HpBar") != null:
+		monster.get_node("HpBar").queue_free()  # The same for a foe held unhurt (shieldcut).
 	if at != null and monster != null and not scenario in ["camera_turn", "gains", "sheet", "target", "landmark"]:  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
 		if scenario == "steady":
@@ -1087,6 +1098,62 @@ func _folk_set_up() -> void:
 	var stall := ArtKit.instance("prop.market_stall")
 	stall.position = view._tile_position(FOLK_STALL) + Vector3(0.5, 0.0, 0.0)  # Its middle between its two cells.
 	view.add_child(stall)
+
+
+func _shieldcut() -> void:
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 22:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	_shield_side = not "--which=play" in OS.get_cmdline_user_args()
+	_shield_plain = "--plain" in OS.get_cmdline_user_args()
+	# Side: he faces east, seen from the north (his left); play: he faces west, his left toward the
+	# play camera (from the south-east), so the brute never stands between.
+	var east := 1 if _shield_side else -1
+	var brute := Vector2i(20 + east, 12)
+	var markers := {Vector2i(20, 12): "start", brute: "monster_brute"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
+		"entities": [{"at": [brute.x, brute.y], "facing": [-east, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	max_seconds = maxf(max_seconds, 24.0)
+	_script = [["item_give", ["sword", Items.RIGHT_HAND], ""], ["item_give", ["shield", Items.LEFT_HAND], ""],
+		["wait", 10, ""], ["shield_cuts", 0, ""], ["wait", 10, ""]]
+
+
+var _shield_side := true
+var _shield_plain := false
+var _shield_from := -1
+const SHIELD_CUT_TICKS := 240
+
+
+## One tick of the shieldcut reel: the player cutting at the brute, the camera set once; true after
+## SHIELD_CUT_TICKS.
+func _shield_step(tick: int) -> bool:
+	var view: Client3D = _main._client3d
+	if _shield_from < 0 and is_instance_valid(_monster) and World.distance(_player.tile, _monster.tile) > 1:
+		_walk(_monster.tile + Vector2i(-1 if _shield_side else 1, 0))  # Up beside him first.
+		return false
+	if _shield_from < 0:
+		_shield_from = tick
+		_main.pack_panel.shown = false
+		if view != null:
+			if _shield_side:  # Yaw 0 looks from the south-east, 45 from the east: 135 from the north.
+				view.yaw = 135.0
+				view._yaw_step = 135.0
+				view._hand_yaw = 135.0
+			var puppet: Node3D = view._puppets.get(_player.get_instance_id())
+			if _shield_plain and puppet != null and puppet.has_meta("moves"):
+				var moves: Dictionary = (puppet.get_meta("moves") as Dictionary).duplicate(true)
+				moves["strikes"]["sword_shield"] = moves["strikes"]["sword"]
+				puppet.set_meta("moves", moves)
+		_caption.text = "Before: the plain slash, the shield along for the ride." if _shield_plain else "Sword and shield: the shield worked through the cut."
+	_player.hp = _player.max_hp
+	_player.stamina = _player.max_stamina
+	if is_instance_valid(_monster):
+		_monster.hp = _monster.max_hp
+		World.face(_player, Senses.way_toward(_player.tile, _monster.tile))
+		World.order_attack(_player, _monster)
+	return tick - _shield_from >= SHIELD_CUT_TICKS
 
 
 func _hillcat() -> void:
@@ -2471,6 +2538,9 @@ func _on_tick(tick: int) -> void:
 				return
 		"grey_fight":
 			if not _grey_step():
+				return
+		"shield_cuts":
+			if not _shield_step(tick):
 				return
 		"folk":
 			if not _folk_step(tick):

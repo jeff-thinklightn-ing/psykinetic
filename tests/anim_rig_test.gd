@@ -25,6 +25,7 @@ func _ready() -> void:
 	await _test_sword_slash()
 	await _test_strike_fade()
 	await _test_sword_clear()
+	await _test_shield_works()
 	await _test_bow_clear()
 	await _test_sky_bow()
 	await _test_bow_back()
@@ -452,8 +453,9 @@ func _test_sword_clear() -> void:
 	print("== the sword clear of its wielder ==")
 	var lib := load(CLIPS) as AnimationLibrary
 	var clips: Array[String] = []
-	for strike: Array in Client3D.HUMANOID_MOVES["strikes"]["sword"]:
-		clips.append(str(strike[0]))
+	for key: String in ["sword", "sword_shield"]:
+		for strike: Array in Client3D.HUMANOID_MOVES["strikes"][key]:
+			clips.append(str(strike[0]))
 	clips.append(Client3D.CLIP_HEAVY)
 	var fails: Array[String] = []
 	var near: Array[String] = []
@@ -493,6 +495,85 @@ func _test_sword_clear() -> void:
 	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears, five builds, %d worn pieces, %s (%d: %s)" % [
 		SWORD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
 	_check(coiled.is_empty(), "neither forearm %.2f m or more into the rest of the body through them (%d: %s)" % [SWORD_ARM_IN, coiled.size(), ", ".join(coiled.slice(0, 16))])
+
+
+## Jeff, 2026-11-07: "sword attacks with a shield in one hand seem like the shield is just along for
+## the ride". The sword-and-shield slashes (Client3D's SHIELDED_STRIKES): the blade never into the
+## shield; the shield's face (the way its front looks) within the lowered guard's arc
+## all through (combat's World.lowered_guard: 45 to 135 degrees round to the left of ahead), out at
+## its front edge at guard and on the forehand's wind-up and back at the flank through the cut, its
+## middle never behind the hips; the sword hand's path the plain slash's; a sword with a shield on the
+## left arm takes these, without one the plain ones.
+const SHIELD_SWORD_CLEAR := 0.03
+func _test_shield_works() -> void:
+	print("== the shield works through the sword's cut ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var made := _sword_body(self, SWORD_BUILDS[0])
+	var model: Node3D = made[0]
+	var rig: AnimRig = made[2]
+	var sockets: Dictionary = (made[3] as Node3D).get_meta("sockets")
+	Client3D._hold(sockets, 1, "shield")
+	await _frames(2)
+	var shield := (sockets["arm_l"] as Node3D).get_node("Held") as Node3D
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var bone := func(name: String) -> Vector3:
+		return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(name)).origin
+	var front := model.global_basis.z.normalized()
+	var left := model.global_basis.x.normalized()
+	var fails: Array[String] = []
+	var faces := {}
+	var least := INF
+	var drift := 0.0
+	for pair: Array in [["Sword_Shield_Slash_F", "Sword_Slash_F"], ["Sword_Shield_Slash_B", "Sword_Slash_B"]]:
+		var length := lib.get_animation(pair[0]).length
+		var t := 0.0
+		while t <= length + 0.001:
+			rig.base_at(pair[1], t)
+			await _frames(2)
+			var plain_hand: Vector3 = bone.call("RightHand")
+			rig.base_at(pair[0], t)
+			await _frames(2)
+			drift = maxf(drift, plain_hand.distance_to(bone.call("RightHand")))
+			var points := _points(shield)
+			var middle := Vector3.ZERO
+			for p in points:
+				middle += p
+			middle /= maxf(points.size(), 1)
+			# Its face: the shield art's +z (art_style), the arm_l socket's +z (the forearm's back).
+			var face := (sockets["arm_l"] as Node3D).global_basis.z
+			var angle := rad_to_deg(atan2(face.dot(left), face.dot(front)))
+			faces["%s %.2f" % [str(pair[0]).trim_prefix("Sword_Shield_Slash_"), t]] = snappedf(angle, 1.0)
+			if angle < 40.0 or angle > 140.0:
+				fails.append("%s %.2f s: faces %.0f deg" % [pair[0], t, angle])
+			if (middle - bone.call("Hips")).dot(front) < -0.1:
+				fails.append("%s %.2f s: behind the hips" % [pair[0], t])
+			var into := false
+			for b in _sword_samples(made[1]):
+				for p in points:
+					least = minf(least, b.distance_to(p))
+					into = into or b.distance_to(p) < SHIELD_SWORD_CLEAR
+			if into:
+				fails.append("%s %.2f s: the blade in the shield" % [pair[0], t])
+			t += 1.0 / SWORD_FPS
+	print("  shield faces (deg left of ahead): %s" % [faces])
+	var at := func(key: String) -> float: return float(faces.get(key, 999.0))
+	var front_edge := absf(at.call("F 0.00") - 45.0) < 20.0 and absf(at.call("F 0.13") - 45.0) < 20.0
+	var flank := [at.call("F 0.33"), at.call("F 0.40"), at.call("B 0.33"), at.call("B 0.40")].all(func(a: float) -> bool: return absf(a - 90.0) < 25.0)
+	_check(fails.is_empty(), "the shield in the lowered guard's arc, never behind the hips, the blade %.2f m clear of it (least %.3f m; %d: %s)"
+			% [SHIELD_SWORD_CLEAR, least, fails.size(), ", ".join(fails.slice(0, 12))])
+	_check(front_edge and flank, "out at the arc's front edge at guard and on the forehand's wind-up, back at the flank through the cut")
+	_check(drift < 0.01, "the sword hand's path the plain slash's (%.4f m apart at most)" % drift)
+	var swinger := GridEntity.new()
+	var plain := Client3D.strike_key(swinger, "sword")
+	var held := PackedStringArray()
+	held.resize(Items.LEFT_HAND + 1)
+	held[Items.LEFT_HAND] = "shield"
+	swinger.slots = held
+	_check(plain == "sword" and Client3D.strike_key(swinger, "sword") == "sword_shield" and Client3D.strike_key(swinger, "dagger") == "dagger",
+			"a sword with a shield on the left arm takes the shield's slashes, without one the plain ones")
+	swinger.free()
+	model.queue_free()
+	(made[3] as Node3D).free()
 
 
 ## A body of [param build] ([name, scene, shape keys]) under [param parent] holding a sword in its

@@ -37444,6 +37444,29 @@ once it dies). The blow's delayed pain cry (_on_struck) already finds the struck
 blow, at rest and mid-wind-up, each end on a death clip. CHANGELOG (voice's words). Client only,
 protocol unchanged, no new class_name.
 
+338 amended (8): the shield worked through the sword's cut (animation; the number from
+decision_number.sh; the coordinator's approval; Jeff, 2026-11-07: "sword attacks with a shield in one
+hand seem like the shield is just along for the ride"). The plain slashes hold the left arm in one
+bend (GUARDING_LEFT) at every key, so a shield on the forearm hung still through them. Two clips of
+their own, Sword_Shield_Slash_F and _B (tools/humanoid_clips.py slash(way, shield=True)), keep the
+plain slash's sword arm, trunk, steps and timing, and key the left arm's own path: at guard and on the
+forehand's wind-up the shield faces 45 degrees round to the left of ahead (SHIELD_FRONT_LEFT, the
+front edge of what a lowered shield guards: combat's World.lowered_guard, the holder's left 45 to 135
+degrees at half strength, ahead only a raised one), pushed out toward the foe as the sword goes back;
+on the backhand's wind-up it is held low and out to the left, under the sword coming over that
+shoulder; through the cut and the follow-through it is drawn back to the left flank (SHIELD_FLANK, 90
+degrees; on the forehand higher and wider, its blade passing low on that side), never behind the body
+nor across to the right; then back to guard. Nothing in a swing lowers it on the server (combat), so
+none is shown. Client3D: HUMANOID_MOVES "sword_shield", SHIELDED_STRIKES {"sword": "sword_shield"},
+and strike_key(swinger, weapon), which _strike uses: a sword with a shield (an item tagged "shield")
+in the left hand takes these, anything else its own. anim_rig_test: _test_sword_clear covers the new
+clips, and _test_shield_works measures the shield's face (the arm_l socket's +z, the shield art's
+front) through both: within 40 to 140 degrees all through (50 to 109 measured), out at the front edge
+at guard and on the wind-up, at the flank through the cut, its middle never behind the hips, the blade
+0.03 m clear of it (0.107 least), the sword hand's path the plain slash's. tools/clip.gd "shieldcut"
+(--which=side|play, --plain for the old slashes with the same shield). CHANGELOG (voice's words).
+Client and art only, protocol unchanged, no new class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

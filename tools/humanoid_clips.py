@@ -158,7 +158,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Pick_Swing": "hand_r", "Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Pick_Swing": "hand_r", "Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Sword_Shield_Slash_F": "hand_r", "Sword_Shield_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -651,8 +651,43 @@ SLASH_KEYS = (0.0, 0.18, 0.27, 0.36, 0.44, 0.7)
 # shoulder it starts from; the cut runs high to low on a diagonal across the front, the trunk
 # unwinding through it, leaning in on a half-step lunge; the follow-through carries it low past the
 # far hip, the trunk turned after it; then back to the guard. Same keys, same 0.7 s.
-def slash(way: float) -> list:
-	"""A slash's keys: [way] 1 forehand (high right to low left), -1 backhand (high left to low right)."""
+# The shield works through the cut (Jeff, 2026-11-07: "sword attacks with a shield in one hand seem
+# like the shield is just along for the ride"; the coordinator's approval): the plain slashes held
+# the left arm in one bend (GUARDING_LEFT) at every key. With a shield on the left forearm (its face
+# out of the forearm's back, the bone's -X, as GUARD has it) its arm keys its own path, the sword arm,
+# trunk, steps and timing the plain slash's: at guard and on the forehand's wind-up the shield faces
+# SHIELD_FRONT_LEFT, 45 degrees round to the left of ahead, the front edge of what a lowered shield
+# guards (combat's World.lowered_guard: the holder's left, 45 to 135 degrees, at half; ahead only a
+# raised one), pushed out toward the foe as the sword goes back; the backhand's wind-up has it low
+# and out to the left, clear under the sword coming over the left shoulder; on the cut and the
+# follow-through it is drawn back to the left flank, facing SHIELD_FLANK (90 degrees, the middle of
+# that arc; the forehand's higher and wider, its blade passing low on that side), never behind the
+# body nor across to the right; then back to guard. Nothing in a swing
+# lowers it on the server (combat), so none is shown.
+SHIELD_FRONT_LEFT = (0.71, -0.71, 0.0)
+SHIELD_FLANK = (1.0, -0.05, 0.0)
+def shield_pose(upper: tuple, fore: tuple, face: tuple) -> list:
+	"""The shield arm: the upper arm along [upper], the forearm along [fore], the shield's face (the
+	forearm's back, its -X) toward [face] (body axes: +X left, -Y ahead, +Z up), made square to it."""
+	y = Vector(fore).normalized()
+	f = Vector(face)
+	f = (f - y * f.dot(y)).normalized()
+	z = (-f).cross(y)
+	return [("upperarm_l", Vector(upper).normalized(), AIM), ("lowerarm_l", (tuple(z), tuple(f)), GRASP)]
+SHIELD_GUARD = shield_pose((0.35, -0.45, -0.82), (-0.35, -0.55, 0.75), SHIELD_FRONT_LEFT)
+SHIELD_OUT = shield_pose((0.45, -0.75, -0.45), (-0.2, -0.55, 0.8), SHIELD_FRONT_LEFT)
+SHIELD_LOW_OUT = shield_pose((0.55, -0.25, -0.8), (0.35, -0.85, 0.15), (0.45, -0.9, 0.0))
+SHIELD_DRAWN = shield_pose((0.55, 0.15, -0.82), (0.22, -0.88, 0.4), SHIELD_FLANK)
+# The forehand's cut runs down to the low left, through where SHIELD_DRAWN sits: its shield drawn
+# back higher and out to the side, off the blade's path.
+SHIELD_DRAWN_HIGH = shield_pose((0.8, 0.15, -0.55), (0.2, -0.75, 0.6), SHIELD_FLANK)
+SWORD_ARM_GUARD = one_hand((0.2, 0.12, -0.22), (-0.25, 0.3, 0.92), (0.0, -1.0, 0.3))
+def slash(way: float, shield: bool = False) -> list:
+	"""A slash's keys: [way] 1 forehand (high right to low left), -1 backhand (high left to low right);
+	[shield]: the left arm working a shield (above), else held in GUARDING_LEFT."""
+	left_guard = SHIELD_GUARD if shield else GUARDING_LEFT
+	left_wind = (SHIELD_OUT if way > 0.0 else SHIELD_LOW_OUT) if shield else GUARDING_LEFT
+	left_drawn = (SHIELD_DRAWN_HIGH if way > 0.0 else SHIELD_DRAWN) if shield else GUARDING_LEFT
 	# Kept clear of the wielder (Jeff on the strip: "check for collisions with the body"; anim_rig_test
 	# _test_sword_clear): the wound-up hand out from the head and ahead of it, the blade upright so the
 	# pommel points down, not across the face; the backhand's elbow forward, so its forearm crosses in
@@ -661,14 +696,14 @@ def slash(way: float) -> list:
 		wind_arm = one_hand((0.2, 0.42, 0.16), (-0.15, 0.45, 0.88), (1.0, -0.3, 0.0))
 	else:  # The backhand winds up over the far (left) shoulder.
 		wind_arm = one_hand((0.46, -0.3, 0.26), (0.3, 0.05, 0.95), (-1.0, -0.3, 0.0), (-0.4, -1.0, -0.6))
-	wind = wind_arm + GUARDING_LEFT + [
+	wind = wind_arm + left_wind + [
 		("spine_01", TURN, -14.0 * way), ("spine_02", TURN, -24.0 * way), ("spine_03", TURN, -10.0 * way),
 		("spine_02", LIFT, 4.0)]
 	if way > 0.0:
 		cut_arm = one_hand((0.56, 0.0, -0.2), (0.5, -0.75, -0.4), (1.0, 0.2, -0.2))
 	else:
 		cut_arm = one_hand((0.62, 0.16, -0.2), (-0.5, -0.75, -0.4), (-1.0, 0.2, -0.2), (-1.0, -0.4, -0.3))
-	cut = cut_arm + GUARDING_LEFT + [
+	cut = cut_arm + left_drawn + [
 		("spine_01", TURN, 6.0 * way), ("spine_02", TURN, 10.0 * way), ("spine_01", LIFT, -10.0)]
 	# The forehand's follow-through well out ahead, its forearm off the belly; the backhand's out to
 	# the right, its elbow out and ahead of the flank.
@@ -676,14 +711,17 @@ def slash(way: float) -> list:
 		follow_arm = one_hand((0.46, -0.36, -0.38), (0.85, 0.1, -0.5), (0.2, 1.0, 0.0))
 	else:
 		follow_arm = one_hand((0.44, 0.56, -0.18), (-0.85, 0.1, -0.5), (-0.2, 1.0, 0.0), (-1.0, -0.4, -0.3))
-	follow = follow_arm + GUARDING_LEFT + [
+	follow = follow_arm + left_drawn + [
 		("spine_01", TURN, 14.0 * way), ("spine_02", TURN, 26.0 * way), ("spine_03", TURN, 10.0 * way),
 		("spine_01", LIFT, -12.0)]
-	poses = (SWORD_GUARD, wind, cut, follow, follow, SWORD_GUARD)
+	guard = SWORD_ARM_GUARD + left_guard
+	poses = (guard, wind, cut, follow, follow, guard)
 	steps = ((0, 0, 0), (0, 0.05, 0), (0, -0.14, -0.04), (0, -0.14, -0.05), (0, -0.12, -0.04), (0, 0, 0))
 	return [(t, P("Sword_Idle", 0.0, pose, move=step)) for t, pose, step in zip(SLASH_KEYS, poses, steps)]
 CLIPS["Sword_Slash_F"] = {"keys": slash(1.0)}
 CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}
+CLIPS["Sword_Shield_Slash_F"] = {"keys": slash(1.0, True)}
+CLIPS["Sword_Shield_Slash_B"] = {"keys": slash(-1.0, True)}
 # Monster draw-backs (338 amended (6); Jeff: "enemies tend to look like they are
 # sliding into you and then no visible swing"): a monster's plain blow is told 3 ticks ahead (its
 # lead) and its strike plays over them, but the jab, the cross and the dagger's stab land 0.17 to
