@@ -24,7 +24,10 @@ docs/decisions.md as origin/main has it (`git show`, before the lock, no
 fetch: every checkout shares one origin/main, and the log covers anything
 newer), the floor release's open wrote, and every number in the log. The next
 amendment of D is one over the highest k of "D amended (k)" anywhere in that
-file (headings and paragraphs; a bare "D amended" is (1)) and in the log. A
+file (headings and paragraphs; a bare "D amended" is (1)), of an "Amended"
+line inside D's entry (each one more than the last unless it names its k:
+"Amended (3)", "Amended a fourth time"), of "D amended a fifth time" and "D's
+eighth amendment", and in the log. A
 decision on neither is refused, so a typo can't start a series. So nothing on
 main, and nothing handed out and not yet landed, is handed out again.
 
@@ -59,6 +62,15 @@ EVENTS = ("seed", "open", "new", "amend", "drop")
 HEADING = re.compile(r"^## (\d+)", re.M)
 LABEL = re.compile(r"\b(\d+) amended(?: \((\d+)\))?")
 AMEND_LABEL = re.compile(r"^(\d+) amended \((\d+)\)$")
+## An amendment inside its decision's entry (the first parser missed these: 49
+## decisions undercounted on 11-10, 539 by four): a line starting "Amended"
+## under "## N", as "Amended (k)", "Amended a fourth time", or bare, "again"
+## or a date (the next).
+INNER = re.compile(r"^Amended\b(?: \((\d+)\)| (?:a|an) (\w+) time)?")
+ORDINALS = {word: n for n, word in enumerate(("first second third fourth fifth sixth seventh eighth ninth tenth eleventh "
+    "twelfth thirteenth fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth twentieth").split(), 1)}
+## "394 amended a fifth time", "394's eighth amendment": anywhere.
+SPELLED = re.compile(r"\b(\d+)(?: amended (?:a|an) (\w+) time|'s (\w+) amendment)")
 
 
 def _path(*parts):
@@ -81,6 +93,26 @@ def parse(text):
             unplaced.append("%d amended (%s)" % (decision, k))
             continue
         amended[decision] = max(amended.get(decision, 0), int(k) if k else 1)
+    for decision, first, second in SPELLED.findall(text):
+        k = ORDINALS.get(first or second)
+        if k:
+            amended[int(decision)] = max(amended.get(int(decision), 0), k)
+    # Inside an entry: each "Amended" line one more than the entry's last,
+    # unless it names its own k. Rounding up on purpose: a skipped label is a
+    # gap, a repeated one two meanings.
+    entry, count = None, 0
+    for line in text.split("\n"):
+        heading = HEADING.match(line)
+        if heading:
+            entry, count = int(heading.group(1)), 0
+            continue
+        inner = INNER.match(line) if entry is not None else None
+        if inner:
+            named = ORDINALS.get(inner.group(2))
+            if inner.group(1) and int(inner.group(1)) <= MOST_AMENDMENTS:
+                named = int(inner.group(1))
+            count = count + 1 if named is None else max(count, named)
+            amended[entry] = max(amended.get(entry, 0), count)
     known = set(int(n) for n in HEADING.findall(text)) | set(amended)
     return highest, amended, known, unplaced
 

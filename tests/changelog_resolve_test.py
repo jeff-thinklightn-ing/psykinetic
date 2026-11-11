@@ -7,6 +7,7 @@ an Unreleased bullet leaves the new wording only; a conflict in another file
 is left alone; CRLF stays CRLF.
   python tests/changelog_resolve_test.py      exit 0 = pass
 """
+import json
 import os
 import shutil
 import subprocess
@@ -150,6 +151,139 @@ try:
     before = read(repo)
     done = subprocess.run([sys.executable, "-B", TOOL], cwd=repo, capture_output=True, text=True)
     check(done.returncode == 1 and read(repo) == before, "left alone, exit 1 (%s)" % done.stderr.strip())
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+print("== the generated pages (539 amended (5)) ==")
+# Items' landing, 16:47 11-10: its rebase under the lock met the generated
+# pages beside CHANGELOG.md. A fake generator per page writes what it read of
+# the merged tree, so the test sees it ran over that tree.
+VOICE = "docs/voice_inventory.md"
+ART, ART_JSON, THIRD = "docs/art_status.md", "art/kit/status.json", "THIRD_PARTY.md"
+FAKE_VOICE = """
+import pathlib
+pathlib.Path("docs/voice_inventory.md").write_text("voice from: " + pathlib.Path("lines.txt").read_text(), newline="")
+"""
+FAKE_ART = """
+import pathlib
+slots = pathlib.Path("slots.txt").read_text()
+pathlib.Path("docs/art_status.md").write_text("art from: " + slots, newline="")
+pathlib.Path("art/kit/status.json").write_text("json from: " + slots, newline="")
+third = pathlib.Path("THIRD_PARTY.md")
+third.write_text(third.read_text().replace("BLOCK old", "BLOCK " + slots.strip()), newline="")
+"""
+FAILING = """
+import sys
+print("SCRIPT ERROR: res://tools/art_status.gd")
+sys.exit(1)
+"""
+PAGES_ALL = sorted(["CHANGELOG.md", VOICE, ART, ART_JSON])
+
+
+def fakes(voice=FAKE_VOICE, art=FAKE_ART):
+    return dict(os.environ, CHANGELOG_RESOLVE_COMMANDS=json.dumps({"voice_inventory": [sys.executable, "-c", voice],
+        "art_status": [sys.executable, "-c", art]}))
+
+
+def pages_case(third_party_conflict=False, branch_bullet=True):
+    """A cut between base and main as cut_case, plus each side's own input
+    (main a line in lines.txt, the branch a slot in slots.txt, merging
+    cleanly) and each side's pages made from its own, so they conflict;
+    THIRD_PARTY.md's slot block (art_status's) in conflict only when
+    [third_party_conflict]; the branch's CHANGELOG bullet unless not
+    [branch_bullet] (then the pages alone conflict)."""
+    repo = scratch()
+    write(repo, "CHANGELOG.md", HEAD + "## Unreleased\n\n- Forge rebuilt.\n\n## v0.1.159\n\n- Older.\n")
+    os.makedirs(os.path.join(repo, "docs"))
+    os.makedirs(os.path.join(repo, "art", "kit"))
+    for name, text in (("lines.txt", "a\n"), ("slots.txt", "s1\n"), (VOICE, "voice from: a\n"), (ART, "art from: s1\n"),
+            (ART_JSON, "json from: s1\n"), (THIRD, "# Third party\n\nBLOCK old\n\nOther.\n")):
+        write(repo, name, text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "base")
+    git(repo, "branch", "branch")
+    write(repo, "CHANGELOG.md", HEAD + "## Unreleased\n\n- Hills lit (549).\n\n## v0.1.160\n\n- Forge rebuilt.\n\n## v0.1.159\n\n- Older.\n")
+    write(repo, "lines.txt", "a\nb\n")
+    write(repo, VOICE, "voice from: a\nb\n")
+    write(repo, ART, "art from: s1\nmain\n")
+    write(repo, ART_JSON, "json from: s1\nmain\n")
+    if third_party_conflict:
+        write(repo, THIRD, "# Third party\n\nBLOCK old\n\nOther, main.\n")
+    git(repo, "commit", "-q", "-am", "cut and main's line")
+    git(repo, "checkout", "-q", "branch")
+    if branch_bullet:
+        write(repo, "CHANGELOG.md", HEAD + "## Unreleased\n\n- A slot (563).\n- Forge rebuilt.\n\n## v0.1.159\n\n- Older.\n")
+    write(repo, "slots.txt", "s1\ns2\n")
+    write(repo, VOICE, "voice from: a\nbranch\n")
+    write(repo, ART, "art from: s1\ns2\n")
+    write(repo, ART_JSON, "json from: s1\ns2\n")
+    if third_party_conflict:
+        write(repo, THIRD, "# Third party\n\nBLOCK old\n\nOther, branch.\n")
+    git(repo, "commit", "-q", "-am", "a slot")
+    return repo
+
+
+def conflicts(repo):
+    return sorted(git(repo, "diff", "--name-only", "--diff-filter=U").stdout.split())
+
+
+def resolve_in(repo, env):
+    return subprocess.run([sys.executable, "-B", TOOL], cwd=repo, capture_output=True, text=True, env=env)
+
+
+repo = pages_case()
+try:
+    stopped = rebase_stops(repo)
+    check(stopped and conflicts(repo) == PAGES_ALL, "the rebase stops on CHANGELOG.md and the three pages (%s)" % conflicts(repo))
+    done = resolve_in(repo, fakes())
+    check(done.returncode == 0, "resolved (%s)" % (done.stdout.strip() or done.stderr.strip()))
+    check(read(repo, VOICE) == "voice from: a\nb\n", "the voice page made again over the merged tree: %r" % read(repo, VOICE))
+    check(read(repo, ART) == "art from: s1\ns2\n" and read(repo, ART_JSON) == "json from: s1\ns2\n",
+        "the art pages made again from the merged slots: %r, %r" % (read(repo, ART), read(repo, ART_JSON)))
+    check("BLOCK s1\ns2" in read(repo, THIRD) and THIRD in git(repo, "diff", "--cached", "--name-only").stdout.split(),
+        "THIRD_PARTY.md's slot block, which art_status writes, staged with them")
+    check("- A slot (563)." in read(repo) and read(repo).count("- Forge rebuilt.") == 1, "CHANGELOG.md resolved as before")
+    unstaged = [line for line in git(repo, "status", "--porcelain", "--untracked-files=no").stdout.splitlines() if line[1] != " "]
+    check(conflicts(repo) == [] and not unstaged, "no conflict left, nothing unstaged (%s)" % unstaged)
+    check(git(repo, "-c", "core.editor=true", "rebase", "--continue", ok=False).returncode == 0
+        and git(repo, "log", "-1", "--format=%s").stdout.strip() == "a slot", "the rebase goes on, the branch's commit on top")
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = pages_case(third_party_conflict=True)
+try:
+    rebase_stops(repo)
+    before = {name: read(repo, name) for name in ("CHANGELOG.md", VOICE, ART, ART_JSON, THIRD)}
+    done = resolve_in(repo, fakes())
+    check(done.returncode == 1 and THIRD in done.stderr, "THIRD_PARTY.md in conflict too: exit 1 (%s)" % done.stderr.strip())
+    check(all(read(repo, name) == text for name, text in before.items()) and THIRD in conflicts(repo) and VOICE in conflicts(repo),
+        "nothing written, every conflict left")
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = pages_case()
+try:
+    rebase_stops(repo)
+    before = {name: read(repo, name) for name in ("CHANGELOG.md", VOICE, ART, ART_JSON, THIRD)}
+    done = resolve_in(repo, fakes(art=FAILING))
+    check(done.returncode == 1 and "art_status" in done.stderr, "a generator failing: exit 1 (%s)" % done.stderr.strip()[:160])
+    after = {name: read(repo, name) for name in before}
+    check(after == before, "the files as they were, conflict markers and all (%s)" % [name for name in before if after[name] != before[name]])
+    check(conflicts(repo) == PAGES_ALL, "and still in conflict (%s)" % conflicts(repo))
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = pages_case(branch_bullet=False)
+try:
+    rebase_stops(repo)
+    pages_only = conflicts(repo)
+    done = resolve_in(repo, fakes())
+    check(pages_only == sorted([VOICE, ART, ART_JSON]) and done.returncode == 0 and conflicts(repo) == []
+        and read(repo, VOICE) == "voice from: a\nb\n",
+        "the pages in conflict without CHANGELOG.md (%s): made again, exit 0 (%s)" % (pages_only, (done.stdout + done.stderr).strip()[:160]))
     git(repo, "rebase", "--abort", ok=False)
 finally:
     shutil.rmtree(repo, ignore_errors=True)

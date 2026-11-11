@@ -58,6 +58,17 @@ check(amended.get(688) == 7 and amended.get(702) == 1 and amended.get(573) == 1,
     "D amended (k); a bare one and one with a date or a sha in brackets are (1): %s" % amended)
 check(not unplaced, "nothing unplaced: %s" % unplaced)
 check(dn.parse("700 amended (2026)\n")[3] == ["700 amended (2026)"], "a bracketed year is no label: unplaced")
+# 11-10: 539's entry holds "Amended (economy's ...)", then (2), (3) and (4),
+# and the script handed out 539 amended (1).
+inner = ("## 539. A check\ntext\nAmended (economy's check, by release): x.\nAmended (2) (release): y.\n"
+    "Amended (4) (release): z.\n## 540. Next\nAmended 2026-10-20: a date, so (1).\nAmended again: (2).\n"
+    "## 541. More\nAmended a third time (release): w.\n"
+    "## 542. Last\n542 amended a fifth time, then 394's eighth amendment.\n")
+amended = dn.parse(inner)[1]
+check(amended.get(539) == 4 and amended.get(540) == 2 and amended.get(541) == 3,
+    "an \"Amended\" line inside its entry counts for it, one more than the last unless it names its k: %s" % amended)
+check(amended.get(542) == 5 and amended.get(394) == 8, "\"D amended a fifth time\" and \"D's eighth amendment\" too: %s" % amended)
+check(dn.parse("## 543. X\nAmended (3): a.\nAmended (2): b.\n")[1].get(543) == 3, "a lower k after a higher keeps the higher")
 
 print("== closed until release opens ==")
 code, out, err = ask("new", "perf", "x")

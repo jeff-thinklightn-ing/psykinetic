@@ -17924,6 +17924,25 @@ whole, not doubled, a reworded continuation replacing the whole bullet;
 changelog_check_test: a wrapped bullet and a stray cut line fail, a wrapped
 released bullet does not.
 
+539 amended (5) (perf, 2026-11-10; release's ask, label from tools/decision_number.sh): the resolver also
+takes the generated pages. Items lost a three-hour turn at 16:47 when its rebase under the lock conflicted in
+docs/voice_inventory.md, docs/art_status.md and art/kit/status.json beside CHANGELOG.md, and once voice's
+inventory check fails landings after v0.1.211 more trees will meet it. tools/changelog_resolve.py now resolves
+a rebase stopped with only CHANGELOG.md and any of those three in conflict (or the pages alone): CHANGELOG.md as
+before; each conflicted page taken from main's side (`git checkout --ours`) and its generator run over the
+merged tree (python -B tools/voice_inventory.py; tools/art_status.gd under $GODOT_PATH, else godot, headless,
+--audio-driver Dummy, its own --log-file, stdin closed, 300 s at most, failed on a nonzero exit or a SCRIPT
+ERROR, Parse Error or ERROR: line); then everything staged, without continuing. art_status also writes
+THIRD_PARTY.md's art slot block: when it changes that file, the file is staged with the pages, since the merged
+tree's block is the right one. Nothing is staged until every generator has worked; on a failure every file gets
+its bytes back (the pages their conflict markers, the index still unmerged), exit 1. Any other file in conflict,
+THIRD_PARTY.md included, is exit 1 with nothing written, as before. changelog_resolve_test, in a scratch repo
+with stand-in generators (CHANGELOG_RESOLVE_COMMANDS, the test's only): CHANGELOG.md and the three pages in
+conflict, each page made again from the merged inputs, THIRD_PARTY.md's block staged, nothing unstaged, the
+rebase continues; THIRD_PARTY.md in conflict too, nothing written; a generator failing, every file as it was and
+still in conflict; the pages alone, resolved. The coordinator puts the rule in CLAUDE.md once this is on main.
+Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc
@@ -47847,3 +47866,9 @@ The second of the coordinator's window rules (2026-11-10, rule 8 of C:/dev/revie
 A fight closes what covers the middle of the screen and nothing else, and the player may always open it again. Main.clear_readings closes the companion's card page (C), the town page, the world map, the zone's big map and a note sheet, and is called from Main._in_fight (the test Gains already asks every frame: a blow taken by the player or their companion, a blow on a monster near, or a hostile near hunting or fighting): once at the first moment a fight is found on (Main._fight_open, the edge), and again for any blow the player themselves takes (Main._blow_on on the local player, a burn or a bleed not being a blow). Nothing is refused: a player who presses C or J mid-fight gets the window and loses it at the next blow taken, so no "fight is over" test exists to stick and lock a key. The Dock (pack and sheet) and a Source (chest, find, store, talk window) sit at the left edge and stay; so do the menus (game menu, Options) and the controls list, which is a setting the player chose (closing it would rewrite hints=). The 720p condition on keeping a Source open (the player and five cells each way uncovered with Dock and Source both up) is the docking landing's fit test; if it cannot be met, a Source closes on a blow taken after all.
 
 ui_test _test_fight_clears_readings: clear_readings closes the card page and the town page, not the pack; a blow taken closes an open card; opened mid-fight it stays open; the next blow closes it again; the first blow of a new fight closes the town page. Client only, protocol unchanged, no new class_name, no package (it mends a live fault). One CHANGELOG bullet in voice's words.
+Fixed 11-10 (release's ruling: no label, a bug fix): the parser counted only "D amended (k)", so amendments
+written inside their entry ("Amended (2)" to "Amended (4)" under ## 539, "Amended a fourth time", "Amended
+again") were missed. 49 decisions were undercounted, and amend gave out "539 amended (1)" (dropped). An
+"Amended" line inside "## N" now counts for N, one more than the entry's last unless it names its k, and "D
+amended a fifth time" and "D's eighth amendment" count anywhere; it rounds up, since a skipped label is a gap
+and a repeated one two meanings. decision_number_test: those shapes, and a lower k after a higher.
