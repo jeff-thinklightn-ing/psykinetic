@@ -42436,6 +42436,24 @@ seven patches, every safe path cell within 60 of something to do, the warmed res
 not once hit or a few cells off), _test_safe_paths (the tracks counted: 703); relief_test (the
 road is the first of four curves); forage_test _test_patches; "forage" is among EditorFields.NOT_OFFERED (laid by the generator). Server and level data; protocol unchanged; no new class_name.
 
+777 amended (2) (the decision-number script's label; the coordinator's ruling on Jeff's core-loop
+report, on his lean A of C:/dev/review/decisions/player-mending.md, no mending by waiting, fires,
+kits and hands; package "a newcomer can mend in town", combat's piece "hearth warms"): a town's
+hearth and its burning fire are warm rests. Combat's read (C:/dev/review/combat/umbrage_feel.md,
+section 4) and playtest's on the v0.1.211 tag: nothing in Umbrage mended a newcomer. The warmed rest
+read only camp buildings' fires and World.lit_hearths (the hill cave's ring alone), so the Mughouse
+hearth and the square's fire warmed nobody, Rolf sold no kit, a remedy cost 6 gold; with none, her
+only rest was to fall and be raised whole. Main._town_warm_cells: the zone's places (the world
+map's area, else an interior floor's level, _zone_level) give a tavern place's "hearth" (Level's
+PLACE_SHAPES cell; the Mughouse's wall hearth (0, 6)) and a place of kind "fire" whose cell burns
+(World.is_fire: the square's pit at (194, 211), a terrain fire; maps' rule, no field and no cell in
+code). _warm_rests counts them beside camps' fires and lit hearths, the same rule: WARM_REACH 2 by
+the larger of x and y (maps' seats round the pit all inside it), WARM_UNHIT_TICKS 5 s unhit, 1 hp a
+second, the "Healing" buff the telling. Any town's, never Umbrage by name. level_test
+_test_town_warm_rests (the Mughouse by its hearth warmed, across the room not, just hit not; the
+wilds' square fire burning and a warm rest, a seat beside it warmed, five off not). Server only;
+protocol unchanged; no new class_name.
+
 ## 783. Falls into shafts: the lip, damage by depth, a deadly fall the shover's kill
 
 Jeff's mine spec ("shafts that npcs can be knocked down"; dungeon's mine_look has a pit three

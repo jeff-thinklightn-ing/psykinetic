@@ -11494,7 +11494,9 @@ func _sync_residents() -> void:
 ## gets physics' 682 heal at WARM_HEAL hp a second, renewed each WARM_TICKS
 ## for a little longer (so it never lapses between), so it ends a moment
 ## after they step away or are hit. A lit hearth warms the same (825,
-## World.lit_hearths: the hill cave's ring, once a player lights it).
+## World.lit_hearths: the hill cave's ring, once a player lights it), and so
+## do a town's (777 amended (2), _town_warm_cells): a tavern's hearth and a
+## fire place that burns.
 const WARM_TICKS := World.TICK_RATE
 const WARM_REACH := 2
 const WARM_UNHIT_TICKS := 5 * World.TICK_RATE
@@ -11509,6 +11511,7 @@ func _warm_rests() -> void:
 		if fire.x >= 0:
 			fires.append(fire)
 	fires.append_array(World.lit_hearths(World.zone.name))
+	fires.append_array(_town_warm_cells(World.zone.name))
 	if fires.is_empty():
 		return
 	for player: Player in _players.values():
@@ -11518,6 +11521,26 @@ func _warm_rests() -> void:
 			continue
 		if fires.any(func(fire: Vector2i) -> bool: return maxi(absi(fire.x - player.tile.x), absi(fire.y - player.tile.y)) <= WARM_REACH):
 			World.add_buff(player, "heal", WARM_HEAL, WARM_TICKS + 2)
+
+
+## [param zone_name]'s town warm rests (777 amended (2), the coordinator's
+## ruling on Jeff's core-loop report: nothing in Umbrage mended a newcomer,
+## so a fall was her only rest): a tavern place's "hearth" (the Mughouse's
+## wall hearth), and a place of kind "fire" whose cell burns (World.is_fire:
+## the square's pit, a terrain fire). Any town's, read from the zone's own
+## places: the world map's area, else an interior floor's level.
+func _town_warm_cells(zone_name: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var area: Dictionary = _world_map.areas.get(zone_name, {}) if _world_map != null else {}
+	var places: Dictionary = area.get("places", {}) if not area.is_empty() else _zone_level(zone_name).get("places", {})
+	for key: String in places:
+		var place: Dictionary = places[key]
+		var kind := str(place.get("kind", ""))
+		if kind == "tavern" and place.get("hearth") is Vector2i:
+			out.append(place["hearth"])
+		elif kind == "fire" and place.get("cell") is Vector2i and World.is_fire(place["cell"]):
+			out.append(place["cell"])
+	return out
 
 
 func _threats_seen() -> void:

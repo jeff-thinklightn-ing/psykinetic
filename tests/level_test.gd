@@ -242,6 +242,7 @@ func _test_every_level() -> void:
 	_test_wilds_on_foot()
 	_test_farm_and_barrow()
 	_test_hearth()
+	_test_town_warm_rests()
 	_test_fill_hills_sights()
 	_test_relaid()
 	print("
@@ -1277,6 +1278,40 @@ func _test_farm_and_barrow() -> void:
 ## E from beside it lights it (the "hearth" command), from farther off not; lit,
 ## it is fire and warms the rest as a camp's fire does (777), till its burn
 ## runs out and it goes cold; the save keeps a burning one.
+## 777 amended (2): a town's hearth and its burning fire warm as a camp's:
+## the Mughouse's hearth, the square's fire in Umbrage; a few cells off, or
+## just hit, nothing.
+func _test_town_warm_rests() -> void:
+	print("\n== 777 amended (2): a town's hearth and its fire are warm rests ==")
+	_check(_main.load_map("umbrage_tavern"), "the Mughouse loads")
+	var player := _player()
+	_check(_main._town_warm_cells(World.zone.name).has(Vector2i(0, 6)), "its hearth (0, 6) a warm rest (%s)" % [_main._town_warm_cells(World.zone.name)])
+	for at: Array in [[Vector2i(2, 6), true, "by the hearth"], [Vector2i(6, 6), false, "across the room"]]:
+		_put(player, at[0])
+		player.buffs = {}
+		player.hurt_tick = World.tick - _main.WARM_UNHIT_TICKS - 1
+		_main._warm_rests()
+		_check((World.buff(player, "heal") == _main.WARM_HEAL) == at[1], "%s at %s, unhurt: %s (%.1f)" % [at[2], at[0], "warmed" if at[1] else "not", World.buff(player, "heal")])
+	_put(player, Vector2i(2, 6))
+	player.buffs = {}
+	player.hurt_tick = World.tick
+	_main._warm_rests()
+	_check(World.buff(player, "heal") == 0.0, "by the hearth, just hit: not warmed")
+	player.buffs = {}
+	_check(_main.load_map("wilds"), "the wilds load")
+	player = _player()
+	var pit := Vector2i(194, 211)
+	_check(World.is_fire(pit) and _main._town_warm_cells(World.zone.name).has(pit), "the square's fire burns at %s, a warm rest" % pit)
+	for at: Array in [[Vector2i(196, 210), true, "on a seat beside it"], [Vector2i(199, 211), false, "five cells off"]]:
+		_put(player, at[0])
+		player.buffs = {}
+		player.hurt_tick = World.tick - _main.WARM_UNHIT_TICKS - 1
+		_main._warm_rests()
+		_check((World.buff(player, "heal") == _main.WARM_HEAL) == at[1], "%s at %s, unhurt: %s (%.1f)" % [at[2], at[0], "warmed" if at[1] else "not", World.buff(player, "heal")])
+	player.buffs = {}
+	_main.load_map("test_room")
+
+
 func _test_hearth() -> void:
 	print("
 == a hearth (825): lit from beside it, fire while it burns, warming the rest, saved ==")
