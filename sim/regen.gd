@@ -147,7 +147,8 @@ static func due(state: Dictionary, config: Dictionary, steps: int) -> bool:
 
 
 ## The saved "regen" section ({area: {generation, at_step, robbers_down
-## if latched, robbers_fallen: the band's ids fallen this generation}}) read back;
+## if latched, robbers_fallen: the band's ids fallen this generation,
+## band_slain: who felled each of them}}) read back;
 ## entries that make no sense are dropped.
 static func states_from(saved: Variant) -> Dictionary:
 	var out := {}
@@ -165,6 +166,15 @@ static func states_from(saved: Variant) -> Dictionary:
 				for key: String in ["solved", "solved_rewarded"]:
 					if entry.get(key) is Array:
 						out[str(area)][key] = (entry[key] as Array).map(func(id: Variant) -> String: return str(id))
+				# 747 amended (8): who felled each of the band this generation
+				# (named id -> player ids), so a restart keeps the kills made
+				# before the taking.
+				if entry.get("band_slain") is Dictionary:
+					var by := {}
+					for named: Variant in entry["band_slain"]:
+						if entry["band_slain"][named] is Array:
+							by[str(named)] = (entry["band_slain"][named] as Array).map(func(id: Variant) -> String: return str(id))
+					out[str(area)]["band_slain"] = by
 	return out
 
 
