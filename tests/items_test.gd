@@ -3536,7 +3536,7 @@ func _test_loot() -> void:
 			and Items.roll_loot("test_never", "x", 0, true).is_empty() and Items.roll_loot("no_such_table", "x", 4, true).is_empty(),
 			"a monster's roll may give nothing; a chest's never does: the first row once (none with no room or no table)")
 	# 330 amended (2): the dungeon caches' gold, sure and seeded, and a trinket sure.
-	var gold_ok := Items.loot_gold("crypt_cache") == [3, 8] and Items.loot_gold("hollowfell_cache") == [5, 15] and Items.loot_gold("supplies").is_empty()
+	var gold_ok := Items.loot_gold("crypt_cache") == [4, 8] and Items.loot_gold("hollowfell_cache") == [5, 15] and Items.loot_gold("supplies").is_empty()
 	for i in 30:
 		var g := Items.roll_gold("castle_cache", "seed%d" % i)
 		gold_ok = gold_ok and g >= 10 and g <= 25 and g == Items.roll_gold("castle_cache", "seed%d" % i)

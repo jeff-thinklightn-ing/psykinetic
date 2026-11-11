@@ -118,7 +118,7 @@
 		]
 	},
 	"gold": {
-		"crypt_cache": [3, 8],
+		"crypt_cache": [4, 8],
 		"deep_cache": [8, 20],
 		"castle_cache": [10, 25],
 		"hollowfell_cache": [5, 15],
