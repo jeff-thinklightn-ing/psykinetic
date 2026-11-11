@@ -558,16 +558,6 @@ def may_backfill(head, running, table, now, length_s):
     return True, due, ""
 
 
-def may_step_aside(job, behind):
-    """Whether [job], out of reach, may step to the back of the queue past
-    [behind] (the rows queued after it): never past a kind that excludes it
-    or that it excludes (394 amended (14)). A suite out of reach for its
-    first LEAN_AFTER_SECONDS stepped behind a bench, which became the head
-    and, excluding suites, held the landing for the whole bench."""
-    return not any(other.get("kind") in job.get("excludes", []) or job.get("kind") in other.get("excludes", [])
-        for other in behind)
-
-
 def short_of_memory(free_ram_gb, free_commit_gb=None):
     """What a running job is short of: "RAM" under MARGIN_GB, "commit" under
     COMMIT_STOP_GB (394 amended (16)), else ""."""
@@ -1323,21 +1313,15 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
             elif stuck or place != 1:
                 held_by_backfill = None
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
+                # It keeps its place (a bug in 394 amended (28), release's
+                # report): jobs that fit go past it (_passes), and it no
+                # longer steps to the back. At 20:37 11-10 a model loaded
+                # outside the gate put every queued suite out of reach; each
+                # in turn found all ahead out of reach, stepped to the back
+                # in the order its waiter looked, and physics and items,
+                # queued first, ended 13th and 14th. The step was for waiters
+                # from a heavy_job.py older than 10-18's rule, none left.
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
-                behind = [due_row(table, each, row, running, free_ram, free_commit) for each in queue[place:]]
-                if place < len(queue) and may_step_aside(dict(row, kind=kind), behind):
-                    # Steps to the back itself: waiters started from an older
-                    # heavy_job.py (a tree not yet rebased) don't know the
-                    # rule above and would hold behind it (107 minutes,
-                    # 2026-10-18). Its turn comes again as the queue drains.
-                    aside = "%019d-%s-%s.json" % (time.time_ns(), tree, pid or os.getpid())
-                    try:
-                        _retried(os.replace, _path("queue", ticket), _path("queue", aside))
-                    except PermissionError:
-                        aside = None  # Still in use: tried again at the next look.
-                    if aside is not None:
-                        ticket = aside
-                        log("aside", tree, kind, "out of reach; to the back of %d" % len(queue))
             if not head and holder is not None:
                 # The row that holds it (394 amended (28)), not always the
                 # head: playtest's tour, 8th, held the scenes behind it while

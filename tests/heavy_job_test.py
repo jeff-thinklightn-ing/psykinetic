@@ -8,6 +8,7 @@ one.
 import contextlib
 import datetime
 import io
+import json
 import os
 import shutil
 import sys
@@ -95,17 +96,6 @@ check(gate.out_of_reach(mesh, [], 32.0) and gate.may_pass(capped, [mesh], [], 32
 check(not gate.out_of_reach(mesh, [dict(running(6, 6), kind="suite")], 32.0) and not gate.may_pass(import_row, [mesh], [dict(running(6, 6), kind="suite")], 32.0),
 	"but not when the running jobs' memory would make room: then first come again")
 check(gate.out_of_reach(mesh, [], 60.0, 20.0), "out of reach on commit too")
-# An out-of-reach suite stepped behind a bench queued after it, the bench
-# became the head and the landing waited for it (release, 2026-10-25).
-out_suite = dict(suite, kind="suite", excludes=["bench"])
-bench_queued = dict(gate.KINDS["bench"], kind="bench")
-soak_queued = dict(gate.KINDS["soak"], kind="soak")
-check(not gate.may_step_aside(out_suite, [dict(import_row), bench_queued]), "an out-of-reach suite never steps behind a bench")
-check(not gate.may_step_aside(dict(bench_queued), [dict(out_suite, excludes=[])]),
-	"nor a bench behind a suite, the exclusion said by the other side only")
-check(not gate.may_step_aside(dict(mesh, kind="soak", excludes=[]), [bench_queued]), "nor a soak behind a bench")
-check(gate.may_step_aside(mesh, [dict(import_row), soak_queued]), "but past kinds it runs beside, as before")
-check(gate.may_step_aside(out_suite, []), "and with none behind, nothing to keep")
 ok, why = gate.decide(suite, [], True, 60.0, None, 5.0)
 check(not ok and why.startswith("commit"), "60 GB RAM free but 5 GB commit: waits, saying commit (%s)" % why)
 check(gate.decide(suite, [], True, 60.0, None, 4.0 + gate.COMMIT_MARGIN_GB)[0], "commit at the estimate plus its margin starts")
@@ -349,15 +339,19 @@ except SystemExit as stop:
     check(stop.code == 4 and not gate._entries("queue"), "a job whose estimate and margin pass the machine's RAM is refused at once (exit 4), never queued")
 gate.total_ram_gb = real_total
 
-print("== a head out of reach steps to the back ==")
-# Waiters from a tree's older heavy_job.py don't go past it themselves.
+print("== a head out of reach keeps its place; jobs that fit go past it (a bug in 394 amended (28)) ==")
+# 20:37 11-10: a model loaded outside the gate put every queued suite out of
+# reach; each stepped to the back in the order its waiter looked, and the
+# two queued first ended last. Now none steps: the blocked keep first-come
+# order, and a job that fits starts past them.
 import threading
 gate.total_ram_gb = lambda: None
 table = gate._read(gate._path("kinds.json")) or {}
-table["trellis_mesh"] = dict(gate.kinds()["trellis_mesh"], ram_gb=1e12)
+saved_table = json.loads(json.dumps(table))
+table["trellis_mesh"] = dict(gate.kinds()["trellis_mesh"], ram_gb=1e12, commit_gb=1e12)
+table["soak"] = dict(gate.kinds()["soak"], ram_gb=0.1, commit_gb=0.1)
 gate._write(gate._path("kinds.json"), table)
 real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
-big = threading.Thread(target=lambda: gate.take("art", "trellis_mesh", os.getpid()), daemon=True)
 def wait_for(condition, seconds=60.0):
     # Polled, not slept: under a loaded landing a fixed wait was overrun
     # (release, art-kit's landing 2026-10-18).
@@ -367,44 +361,28 @@ def wait_for(condition, seconds=60.0):
     return condition()
 def queue_order():
     return [each["tree"] for each in gate._entries("queue")]
-def stepped_aside():
-    with open(gate._path("heavy_jobs.log")) as log:
-        return "\taside\tart\ttrellis_mesh\t" in log.read()
-big.start()
-wait_for(lambda: queue_order() == ["art"])
-# Its queue file held open a moment as it steps aside (a reader, a scanner):
-# Windows refuses the rename, and the waiter tries again rather than ending
-# (it ended once, in ui's landing, 2026-10-24).
-held = open(gate._path("queue", gate._entries("queue")[0]["file"]))
-gate._write(gate._path("queue", "%019d-old-1.json" % time.time_ns()), {"tree": "old", "kind": "suite", "pid": None,
-    "waiter": os.getpid(), "queued": time.time()})
-time.sleep(0.4)
-held.close()
-wait_for(lambda: queue_order() == ["old", "art"] and stepped_aside())
-check(big.is_alive(), "the waiter lived through its file being held open")
-order = queue_order()
-check(order == ["old", "art"], "the job behind goes first in the queue's own order: %s" % order)
+blocked = []
+for name in ("physics", "items", "maps"):
+    blocked.append(threading.Thread(target=lambda name=name: gate.take(name, "trellis_mesh", os.getpid()), daemon=True))
+    blocked[-1].start()
+    wait_for(lambda name=name: name in queue_order())
+fits = threading.Thread(target=lambda: gate.take("small", "soak", os.getpid()), daemon=True)
+fits.start()
+check(wait_for(lambda: any(each["tree"] == "small" for each in gate._entries("running"))),
+    "a job that fits starts past three out of reach: %s" % [each["tree"] for each in gate._entries("running")])
+time.sleep(1.5)
+with open(gate._path("heavy_jobs.log")) as log:
+    asides = [line for line in log if "\taside\t" in line]
+check(queue_order() == ["physics", "items", "maps"] and not asides,
+    "the three out of reach keep first-come order, none stepped aside: %s %s" % (queue_order(), asides))
+gate.release("small", "soak")
 for each in gate._entries("queue"):
     os.remove(gate._path("queue", each["file"]))
-big.join(5)
-# The same head with a bench behind it, the head's kind excluding benches
-# (394 amended (14)): it keeps its place, so the bench never becomes the head.
-table["trellis_mesh"] = dict(table["trellis_mesh"], excludes=["bench"])
-gate._write(gate._path("kinds.json"), table)
-kept = threading.Thread(target=lambda: gate.take("art2", "trellis_mesh", os.getpid()), daemon=True)
-kept.start()
-wait_for(lambda: queue_order() == ["art2"])
-gate._write(gate._path("queue", "%019d-later-1.json" % time.time_ns()), {"tree": "later", "kind": "bench", "pid": None,
-    "waiter": os.getpid(), "queued": time.time()})
-time.sleep(1.0)
-order = queue_order()
-check(order == ["art2", "later"], "an out-of-reach head never steps behind a kind it excludes: %s" % order)
-for each in gate._entries("queue"):
-    os.remove(gate._path("queue", each["file"]))
-kept.join(5)
+for each in blocked + [fits]:
+    each.join(5)
+gate._write(gate._path("kinds.json"), saved_table)
 gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
-check(stepped_aside(), "the log says it stepped aside")
 
 print("== a run inside the tree's own take ==")
 gate.take("lander", "suite", os.getpid())

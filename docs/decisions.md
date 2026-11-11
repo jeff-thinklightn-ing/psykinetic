@@ -47316,6 +47316,14 @@ wait, status names the head bench for the tour with "going past it needs 1500 s"
 scene done, the third starts and the tour still waits. The earlier check "a scene still waits behind a scene that
 may start" now gives that scene its runs, and a new one passes a scene held only by its own length. Tools only;
 protocol unchanged; no class_name; no bullet.
+A bug in it (release's report, release's ruling: no label, a sentence here): at 20:37 11-10 a model loaded
+outside the gate (about 11.8 GB of commit) put every queued suite out of reach even as lean3, and each, finding
+every row ahead out of reach and so taking itself for the head, stepped to the back in the order its waiter
+looked; physics and items, queued first, ended 13th and 14th. An out-of-reach row now keeps its place and jobs
+that fit go past it as before (_passes); the step to the back, kept since 10-18 for waiters from a heavy_job.py
+older than that rule (none left), and may_step_aside are gone. heavy_job_test: three out of reach queued, a job
+that fits starts past them and the three keep first-come order with no aside line (on main's gate they come
+out maps, items, physics).
 
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
