@@ -79,6 +79,7 @@ func _ready() -> void:
 	_test_crypt_ways()
 	_test_arrival_rule()
 	_test_deep_crypt()
+	_test_hall_shortcut()
 	_test_barrow_quest()
 	_test_decor()
 	_test_barrow_level()
@@ -394,8 +395,9 @@ func _test_link_cues() -> void:
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
 			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
-	_check(cue_of.call("wilds", Vector2i(160, 160)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "sealed",
-			"the mound's door is its own cue; the sealed shortcut (in the temple since 715, its back corner since 734 amended (2), the chapel at the centre since 774) its slab")
+	_check(cue_of.call("wilds", Vector2i(160, 160)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "down"
+		and cue_of.call("barrow", Vector2i(30, 8)).get("cue") == "sealed" and cue_of.call("barrow", Vector2i(31, 52)).get("cue") == "up",
+			"the mound's door is its own cue; the chapel stair (the temple's back corner, 832 switched on: open, into the First Hall) a way down; the First Hall's way down to the Ossuary its slab, the camp's breach a way up")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
@@ -1221,7 +1223,7 @@ func _test_farm_and_barrow() -> void:
 		nearest = minf(nearest, middle.distance_to(Vector2((building["rect"] as Rect2i).get_center())))
 		if building.get("ruined", false):
 			ruins[str(building.get("kind", ""))] = building["rect"]
-	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow")
+	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and not l.has("building"))
 	_check(not mound.is_empty() and nearest >= 25.0 and mound["door"] == Vector2i(160, 160) and link.size() == 1 and link[0]["tile"] == Vector2i(160, 160)
 		and wilds["spawn_points"].get("from_barrow") == Vector2i(160, 159)
 		and Vector2(wilds["places"]["post_barrow"]["cell"]).distance_to(Vector2(160, 160)) <= 16.0,
@@ -1892,7 +1894,7 @@ func _test_solid() -> void:
 	Level.unregister("lt_mound")
 	var wilds := Level.load_level("wilds")
 	var mounds: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.mound")
-	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_wilds")
+	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_breach")
 	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(160, 159)
 		and not Vector2i(160, 159) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
 	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it (by Snagfin's stall since 774).
@@ -2334,11 +2336,11 @@ func _test_building_level_link() -> void:
 			"%s: said and left out (%s)" % [bad, said.call(refused)])
 	var wilds := Level.load_level("wilds")
 	var temple: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b.get("kind", "") == "temple")
-	var stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep")
+	var stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_chapel")
 	_check(temple.size() == 1 and stair.size() == 1 and stair[0]["tile"] == Vector2i(199, 199) and stair[0]["building"] == temple[0]["code"]
-		and stair[0]["sealed"] == "draugr" and stair[0]["to_spawn"] == "from_temple" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
+		and stair[0]["sealed"] == "" and stair[0]["to_map"] == "barrow" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
 		and wilds["warnings"].filter(func(w: String) -> bool: return "link" in w).is_empty(),
-		"the wilds' temple carries the sealed stair down in its back corner, (199, 199) (774: it faces west); the old one behind it is gone (%s)" % [stair])
+		"the wilds' temple carries the chapel stair down in its back corner, (199, 199) (774: it faces west; 832 switched on: open, into the First Hall); the old one behind it is gone (%s)" % [stair])
 	# 734 amended (2): Umbrage's temple is the chapel, the temple kind; since
 	# 774 at the square's centre, its doors west down the main road, its
 	# counter and the shortcut's landing inside.
@@ -2346,13 +2348,13 @@ func _test_building_level_link() -> void:
 		var chapel: Dictionary = temple[0]
 		var floor_cells: Array = wilds["terrain"]["floor"]
 		var counter: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool(spec.get("props", {}).get("temple", false)))
-		var landing: Vector2i = Vector2i(wilds["spawn_points"]["from_barrow_shortcut"]) if wilds["spawn_points"].get("from_barrow_shortcut") is Vector2i else Vector2i(-1, -1)
+		var landing: Vector2i = Vector2i(wilds["spawn_points"]["from_crypt"]) if wilds["spawn_points"].get("from_crypt") is Vector2i else Vector2i(-1, -1)
 		var temple_said: Array = wilds["warnings"].filter(func(w: String) -> bool: return "temple" in w)
 		_check(chapel["rect"] == Rect2i(190, 199, 10, 6) and chapel["size"] == "small" and chapel["place"] == "temple" and chapel["use"] == "temple"
 			and chapel["doors"] == [Vector3i(189, 201, Terrain.EAST), Vector3i(189, 202, Terrain.EAST)] and chapel["front"] == Vector2i(189, 201)
 			and wilds["places"].has("temple@189,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
 			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
-			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
+			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the chapel stair's landing, from_crypt, inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
 
 
 ## The kind lists (816): each one entry a line, sorted, so two trees adding
@@ -4414,7 +4416,7 @@ func _test_barrow_level() -> void:
 			and shafts[0]["cell"] == Vector2i(46, 13) and skylights[0]["at"] == Vector2i(46, 13)
 			and deep["terrain"]["decor"].size() == 30 and corner_webs.call(deep) == 4,
 		"the first hall holds two cobwebbed corners, a strip of moss and the light shaft under its skylight, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %s, %d)" % [barrow["terrain"]["decor"].size(), skylights, deep["terrain"]["decor"].size()])
-	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
+	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 5 and int(Regen.config_of("barrow").get("layer", 0)) == 1
 		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
 		and Regen.config_of("barrow_deep")["anchors"][1]["name"] == "lair" and Regen.config_of("barrow_deep").get("monsters") == {"skeleton": 6, "skeleton_guard": 3}
 		and int(Regen.config_of("barrow").get("ways", 0)) == 5 and int(Regen.config_of("barrow_deep").get("ways", 0)) == 5,
@@ -4438,10 +4440,13 @@ func _test_barrow_level() -> void:
 		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
 	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
-	_check(barrow["links"].size() == 2 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
+	_check(barrow["links"].size() == 4 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
+		and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
+		and barrow["links"][2]["tile"] == Vector2i(31, 52) and barrow["links"][2]["to_map"] == "wilds" and barrow["links"][2]["to_spawn"] == "from_barrow"
+		and barrow["links"][3]["tile"] == Vector2i(30, 8) and barrow["links"][3]["to_spawn"] == "from_temple" and barrow["links"][3]["sealed"] == "draugr"
 		and deep["links"].size() == 2 and deep["links"][0]["to_map"] == "barrow" and deep["links"][0]["to_spawn"] == "from_below"
-		and deep["links"][1]["sealed"] == "draugr" and deep["links"][1]["to_spawn"] == "from_barrow_shortcut",
-		"the stairs link the depths both ways, and the temple's sealed shortcut ends behind the draugr's throne in the Ossuary")
+		and deep["links"][1]["sealed"] == "draugr" and deep["links"][1]["to_map"] == "barrow" and deep["links"][1]["to_spawn"] == "from_deep",
+		"the stairs link the depths both ways; 832 switched on: the First Hall's stair up to the chapel, the camp's breach out by the mound, the First Hall's sealed way down, the deep's sealed shortcut up into the First Hall (%s)" % [barrow["links"]])
 	# The rooms named on entering (666, ui's 665 card).
 	var barrow_rooms: Dictionary = Level.template_config("barrow").get("rooms", {})
 	var deep_rooms: Dictionary = Level.template_config("barrow_deep").get("rooms", {})
@@ -4458,14 +4463,17 @@ func _test_barrow_level() -> void:
 		and hidden[0]["out"] == Vector2i(-1, 0) and barrow["terrain"]["edges"][hidden[0]["edge"]] == Terrain.Edge.DOOR and barrow["spawn_points"]["from_below"] == Vector2i(51, 16),
 		"the template's stair down is hidden behind the first hall's south-east niche, a door edge, from_below before it; 14 niches on the hall's walls (%d, %s)" % [niches.size(), hidden])
 	var floor_ok := true
-	for pair: Array in [[barrow, "from_wilds"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_temple"]]:
+	for pair: Array in [[barrow, "from_chapel"], [barrow, "from_deep"], [barrow, "from_breach"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_temple"]]:
 		var level: Dictionary = pair[0]
 		if not level["spawn_points"].has(pair[1]) or not level["terrain"]["floor"].has(level["spawn_points"][pair[1]]):
 			floor_ok = false
 	var wilds := Level.load_level("wilds")
-	var shortcut: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_temple")
-	_check(floor_ok and shortcut.size() == 1 and shortcut[0]["to_map"] == "barrow_deep" and shortcut[0]["sealed"] == "draugr",
-		"every spawn point the stairs and the wilds come in by is floor; the wilds' sealed shortcut leads to the draugr's hall in the Ossuary (666, maps' nod)")
+	var shortcut: Array = barrow["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_temple")
+	var chapel_stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_chapel")
+	_check(floor_ok and shortcut.size() == 1 and shortcut[0]["to_map"] == "barrow_deep" and shortcut[0]["sealed"] == "draugr"
+		and chapel_stair.size() == 1 and chapel_stair[0]["to_map"] == "barrow" and chapel_stair[0]["sealed"] == ""
+		and wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep").is_empty(),
+		"every spawn point the stairs and the wilds come in by is floor; the First Hall's sealed way leads to the draugr's hall in the Ossuary (832 switched on, the coordinator: the quick way down kept), the wilds' temple stair open into the First Hall, none from the wilds into the deep")
 	_check(Level.template_config("barrow_deep").get("stills", []) == ["barrow"] and not Level.template_config("barrow_deep").has("damp")
 		and not Level.template_config("barrow_deep").has("ambient") and not Level.template_config("barrow_deep").has("dead"),
 		"his rest stills the barrow above as well as his own zone; the dark below's damp, light and word on the dead are gone with it (666)")
@@ -4532,12 +4540,20 @@ func _test_barrow_level() -> void:
 	var laid_solid := 0
 	for building: Dictionary in gen_barrow["buildings"]:
 		laid_solid += (building["rect"] as Rect2i).get_area()
-	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == laid_solid and laid_solid > 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8
+	# 832: the deep laid by the crypt (its switch-on) adds its tomb chambers'
+	# sarcophagi, all solid, to the Hall's own 37 (pillars, table, throne).
+	var deep_laid := 0
+	if str(Regen.config_of("barrow_deep").get("generator", "")) == "crypt":
+		var hall_pieces: Array = Level.template_config("barrow_deep").get("buildings", []).map(func(b: Dictionary) -> Vector2i: return Vector2i(int(b["at"][0]), int(b["at"][1])))
+		for building: Dictionary in gen_deep["buildings"]:
+			if not (building["rect"] as Rect2i).position in hall_pieces:
+				deep_laid += (building["rect"] as Rect2i).get_area()
+	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == laid_solid and laid_solid > 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8 + deep_laid
 		and gen_deep["terrain"]["stairs"].size() == 12 and int(gen_deep["terrain"]["heights"].get(Vector2i(49, 75), 0)) == 1 and made_deep["height"] != null
 		and Level.narrow_runs(gen_barrow["terrain"]).is_empty() and Level.narrow_runs(gen_deep["terrain"]).is_empty()
 		and made["config"].get("rooms", {}).size() == 3 and made_deep["config"].get("rooms", {}).has("lair"),
-		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s; solid %d of %d laid; narrow %s)" % [gen_barrow["warnings"], gen_deep["warnings"],
-			gen_barrow["terrain"]["solid"].size(), laid_solid, Level.narrow_runs(gen_barrow["terrain"]).slice(0, 8)])
+		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s; solid %d of %d laid; deep solid %d of %d; narrow %s)" % [gen_barrow["warnings"], gen_deep["warnings"],
+			gen_barrow["terrain"]["solid"].size(), laid_solid, gen_deep["terrain"]["solid"].size(), 37 + deep_laid, Level.narrow_runs(gen_barrow["terrain"]).slice(0, 8)])
 	# The co-op family tomb (crypt landing 2): one plate set, two plates at
 	# least three apart, its door a door edge with the vault's cache chest
 	# behind it and a boulder in the tomb; one loose niche with voice's three
@@ -4595,7 +4611,7 @@ func _test_barrow_level() -> void:
 					first_plate = generation
 			elif goods.has("mail_armour") and first_mail == 0:
 				first_mail = generation
-		if first_mail > 0 and first_plate > 0:
+		if first_mail > 0 and first_plate > 0 and chests_seen >= 6:  # 832: the crypt deep lays three and the Hall's one a generation
 			break
 	var hall_entry: Array = Level.template_config("barrow_deep").get("entities", []).filter(func(e: Dictionary) -> bool: return Vector2i(int(e["at"][0]), int(e["at"][1])) == Sheet.LAIR_CHEST)
 	_check(first_mail > 0 and unmarked == 0 and chests_seen >= 6 and hall_entry.size() == 1 and hall_entry[0].get("loot") == "fallen_grave",
@@ -4805,14 +4821,21 @@ func _test_barrow_exits() -> void:
 	var id: String = _main._peer_ids[Net.local_id]
 	_main.mark_player(id, "draugr")  # The shortcut and the temple's stair open to the blessed.
 	var wilds := Level.load_level("wilds")
-	var temple_stair := Main.building_link_back(wilds, "barrow_deep")
-	# [from level, link cell, to level, where it should land, within].
+	var temple_stair := Main.building_link_back(wilds, "barrow")
+	# [from level, link cell, to level, where it should land, within]. 832
+	# switched on: the First Hall's stair up comes out beside the chapel
+	# stair, the camp's breach at the mound (its named spawn, not the stair),
+	# the First Hall's sealed way down before the throne, the deep's sealed
+	# shortcut up in the First Hall.
 	var ways: Array = [
-		["barrow", Vector2i(40, 1), "wilds", wilds["spawn_points"]["from_barrow"], 1],
+		["barrow", Vector2i(40, 1), "wilds", temple_stair, 1],
+		["barrow", Vector2i(31, 52), "wilds", wilds["spawn_points"]["from_barrow"], 1],
 		["barrow", Vector2i(52, 16), "barrow_deep", Vector2i(49, 2), 1],
+		["barrow", Vector2i(30, 8), "barrow_deep", Vector2i(49, 76), 1],
 		["barrow_deep", Vector2i(49, 1), "barrow", Vector2i(51, 16), 1],
-		["barrow_deep", Vector2i(49, 77), "wilds", temple_stair, 1],
+		["barrow_deep", Vector2i(49, 77), "barrow", Vector2i(31, 8), 1],
 	]
+	var landed := {}
 	for way: Array in ways:
 		_main.load_map("test_room")
 		_main.travel(Net.local_id, way[0], "")
@@ -4828,6 +4851,14 @@ func _test_barrow_exits() -> void:
 		var at: Vector2i = player.tile if player != null else World.NO_CELL
 		_check(linked and _main.map_name == way[2] and player != null and World.distance(at, way[3]) <= way[4],
 			"%s's way out at %s lands in %s within %d of %s (%s, at %s)" % [way[0], way[1], way[2], way[4], way[3], _main.map_name, at])
+		landed[way[1]] = at
+	# 832 switched on (Main.travel): two ways out of the barrow into the wilds;
+	# the breach's named spawn stands at the mound's door, another way back
+	# down, so it holds, where the First Hall's stair follows the temple's.
+	var by_breach: Vector2i = landed.get(Vector2i(31, 52), World.NO_CELL)
+	var by_stair: Vector2i = landed.get(Vector2i(40, 1), World.NO_CELL)
+	_check(World.distance(by_breach, Vector2i(160, 159)) <= 1 and World.distance(by_stair, temple_stair) <= 1 and World.distance(by_breach, by_stair) > 20,
+		"from the barrow by the breach one comes out at the mound (%s), by the First Hall's stair beside the temple's stair (%s): a named spawn beside another way back down holds" % [by_breach, by_stair])
 	# 749 amended: down the temple's shortcut one comes out at from_temple,
 	# before the Hall's throne, his draugr peaceable beside it; spawn safety
 	# counts only monsters that are not peaceable, so a provoked one still
@@ -4989,7 +5020,7 @@ func _test_crypt_ways() -> void:
 	print("
 == the crypt's ways in (832): the barrow's arrivals ==")
 	var template := Level.load_level("barrow")
-	var arrivals := {"from_chapel": "entrance", "from_deep": "entrance", "from_breach": "camp"}
+	var arrivals := {"from_chapel": "entrance", "from_deep": "entrance", "from_breach": "breach"}  # 832: the breach a dig off the camp, out of its sight
 	var wrong: Array[String] = []
 	var anchors: Dictionary = {}
 	for anchor: Dictionary in Regen.config_of("barrow")["anchors"]:
@@ -5007,7 +5038,20 @@ func _test_crypt_ways() -> void:
 			var at: Variant = level["spawn_points"].get(spawn)
 			if not at is Vector2i or not map.walkable(at):
 				wrong.append("g%d: %s at %s" % [generation, spawn, at])
-	_check(wrong.is_empty() and template["warnings"].is_empty(), "the barrow's three arrivals in their anchors and on floor in the template and generations 1-3 (%s %s)" % [wrong, template["warnings"]])
+		# 832 (the coordinator: no arrival puts a player inside a fight).
+		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(level):
+			wrong.append("g%d: %s" % [generation, fault["what"]])
+	_check(wrong.is_empty() and template["warnings"].is_empty(), "the barrow's three arrivals in their anchors and on floor in the template and generations 1-3, each beyond every foe's reach (%s %s)" % [wrong, template["warnings"]])
+	# The breach a dig off the camp's south side, its way out and arrival at
+	# its far end, round its bend from the camp: the camp's every cell beyond
+	# a wandering robber's reach of it (ARRIVAL_CLEAR and WANDER_RADIUS).
+	var breach: Vector2i = template["spawn_points"]["from_breach"]
+	var nearest := 1 << 30
+	for cell in Level.rect_cells(anchors["camp"]):
+		nearest = mini(nearest, maxi(absi(cell.x - breach.x), absi(cell.y - breach.y)))
+	var way_out: Array = template["links"].filter(func(l: Dictionary) -> bool: return l["tile"] == Vector2i(31, 52))
+	_check(nearest >= LAYOUT_SENSE.ARRIVAL_CLEAR + Monster.WANDER_RADIUS and (anchors["breach"] as Rect2i).has_point(Vector2i(31, 52)) and way_out.size() == 1,
+		"the breach comes in at the dig's far end, %d cells from the nearest of the camp (%d wanted), its way out beside it (%s)" % [nearest, LAYOUT_SENSE.ARRIVAL_CLEAR + Monster.WANDER_RADIUS, way_out])
 
 
 func _test_arrival_rule() -> void:
@@ -5085,6 +5129,61 @@ func _test_arrival_rule() -> void:
 		"castle's arrivals still want mending (drop it from ARRIVAL_NOT_YET once maps has)")
 
 
+## 832 (the coordinator's ruling): the quick way down kept. The First Hall's
+## sealed link at (30,8) to barrow_deep / from_temple, sealed "draugr",
+## replaces the wilds temple's stair as the reward for beating him. It reads
+## as a shut way (the slab cue the temple stair had, no words), and a player
+## whose saved record already holds the mark finds it open from the first
+## build it is in. Until maps' switch-on carries it, the test lays it on a
+## copy of the barrow (HALL_SHORTCUT).
+const HALL_SHORTCUT := {"at": [30, 8], "to_map": "barrow_deep", "to_spawn": "from_temple", "sealed": "draugr"}
+func _test_hall_shortcut() -> void:
+	print("
+== the First Hall's sealed way down (832) ==")
+	var level_name := "barrow"
+	var template := Level.template("barrow")
+	var config: Dictionary = (template["config"] as Dictionary).duplicate(true)
+	if not (config["links"] as Array).any(func(l: Dictionary) -> bool: return l["at"] == HALL_SHORTCUT["at"]):
+		var layout: Image = (template["layout"] as Image).duplicate()
+		layout.set_pixel(HALL_SHORTCUT["at"][0] * 2, HALL_SHORTCUT["at"][1] * 2, Color("#ff00ff"))
+		config["links"].append(HALL_SHORTCUT.duplicate(true))
+		level_name = "hall_shortcut_test"
+		Level.register(level_name, layout, template.get("height"), config)
+	var level := Level.parse(Level.template(level_name)["layout"], Level.template(level_name).get("height"), config)
+	var link: Dictionary = {}
+	for each: Dictionary in level["links"]:
+		if each["tile"] == Vector2i(30, 8):
+			link = each
+	var cue: Dictionary = {}
+	for each: Dictionary in level["terrain"]["link_cues"]:
+		if each["tile"] == Vector2i(30, 8):
+			cue = each
+	var deep := Level.load_level("barrow_deep")
+	_check(link.get("to_map") == "barrow_deep" and link.get("to_spawn") == "from_temple" and link.get("sealed") == "draugr"
+			and deep["spawn_points"].has("from_temple") and level["warnings"].is_empty(),
+		"the First Hall's way down at (30,8): to the Ossuary's from_temple, sealed by the draugr (%s, %s)" % [link, level["warnings"]])
+	_check(cue.get("cue") == "sealed" and not cue.has("words") and not cue.has("text"),
+		"it reads as a shut way: the sealed slab, no words (%s)" % [cue])
+	var id: String = _main._peer_ids.get(Net.local_id, "")
+	var record: PlayerRecord = _main._records.get(id)
+	if record == null:
+		_check(false, "a player record to try the way with")
+		return
+	var kept_marks := record.marks.duplicate()
+	var kept_hers: Variant = record.companion.get("marks", []).duplicate()
+	record.companion["marks"] = []
+	record.marks.assign([])
+	_check(not _main.sealed_open(link, Net.local_id), "unmarked, the way stays shut")
+	record.marks.assign(["draugr"])
+	var saved := PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id}))
+	_main._records[id] = saved
+	_check("draugr" in saved.marks and _main.sealed_open(link, Net.local_id),
+		"a player who beat him before the build (the mark in their saved record) finds it open")
+	_main._records[id] = record
+	record.marks.assign(kept_marks)
+	record.companion["marks"] = kept_hers
+
+
 ## 832 (the crypt's ways in): the deep laid by the crypt generator, its
 ## "deep" block (the switch-on's keys, DEEP_SWITCH, until barrow_deep
 ## carries them): generations 1-6 each with an ossuary and tomb chambers
@@ -5092,7 +5191,8 @@ func _test_arrival_rule() -> void:
 ## block's guard packs whole (one shared "pack" each, three of three), the
 ## draugr in the lair, both links kept, no torches out of the anchors, and
 ## no fault of any layout rule, where the old caverns have a dozen.
-const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "cache": "deep_cache", "chests": 3}
+const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "chests": 3,
+	"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"]}
 func _test_deep_crypt() -> void:
 	print("
 == the deep laid as a crypt (832) ==")
@@ -5102,6 +5202,8 @@ func _test_deep_crypt() -> void:
 		config["regenerate"].merge(DEEP_SWITCH, true)
 	Level.register("deep_crypt_test", template["layout"], template.get("height"), config)
 	var block: Dictionary = config["regenerate"]
+	_check(LAYOUT_SENSE.RULES.all(func(rule: String) -> bool: return rule in block.get("held", [])),
+		"the deep holds every layout rule (step 4; %s)" % [block.get("held")])
 	for generation in range(1, 7):
 		var made := Regen.generate("deep_crypt_test", generation)
 		if made.is_empty():
@@ -5451,8 +5553,8 @@ const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 ## the ones still to come and what they wait on; a level there is checked
 ## all the same once its block holds every rule. SENSE_RULES_NOT_YET names
 ## a rule a level holds later, and on what; the level is checked on the rest.
-const SENSE_NOT_YET := {"hollowfell": "the mine's spine and purpose faults, next in step 4", "barrow_deep": "held with 832's switch-on (maps)"}
-const SENSE_RULES_NOT_YET := {"barrow": {"arrival": "held with 832's switch-on (maps)"}}
+const SENSE_NOT_YET := {"hollowfell": "the mine's spine and purpose faults, next in step 4"}
+const SENSE_RULES_NOT_YET := {}
 func _test_sense_everywhere() -> void:
 	print("
 == layout sense in every generated map (step 4) ==")

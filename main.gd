@@ -5240,6 +5240,13 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	if not edge.is_empty():
 		record.tile = WorldMap.arrival(edge["side"], edge["cell"], level["size"])
 	var stair := building_link_back(level, from_name)
+	# 832 switched on: a level can come out two ways from one level (the
+	# barrow's chapel stair and its camp's breach), so a named spawn that
+	# stands at another way back down (the mound's door, not the building's
+	# stair) holds; an old spawn left behind by a moved building still gives
+	# way to the stair.
+	if stair != World.NO_CELL and spawns.has(to_spawn) and _at_other_way_back(level, from_name, Vector2i(spawns[to_spawn])):
+		stair = World.NO_CELL
 	if edge.is_empty() and stair != World.NO_CELL:
 		record.tile = _beside_link(level, stair)  # Up the stair into the building that carries it (714), wherever it now stands.
 	if at != World.NO_CELL:
@@ -5268,6 +5275,16 @@ static func building_link_back(level: Dictionary, from_map: String) -> Vector2i:
 		if str(link.get("to_map", "")) == from_map and not str(link.get("building", "")).is_empty():
 			return link["tile"]
 	return World.NO_CELL
+
+
+## Whether [param cell] stands within one step of a link in [param level]
+## back to [param from_map] that no building carries (832 switched on: the
+## camp's breach comes out at the mound's door, from_barrow beside it).
+static func _at_other_way_back(level: Dictionary, from_map: String, cell: Vector2i) -> bool:
+	for link: Dictionary in level.get("links", []):
+		if str(link.get("to_map", "")) == from_map and str(link.get("building", "")).is_empty() and World.distance(link["tile"], cell) <= 1:
+			return true
+	return false
 
 
 ## A free floor cell beside the link at [param stair] in [param level],

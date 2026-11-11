@@ -51,6 +51,10 @@
 			197,
 			203
 		],
+		"from_crypt": [
+			198,
+			199
+		],
 		"from_held": [
 			130,
 			242
@@ -88,7 +92,7 @@
 				160
 			],
 			"to_map": "barrow",
-			"to_spawn": "from_wilds"
+			"to_spawn": "from_breach"
 		},
 		{
 			"at": [
@@ -350,9 +354,8 @@
 					0,
 					0
 				],
-				"to_map": "barrow_deep",
-				"to_spawn": "from_temple",
-				"sealed": "draugr"
+				"to_map": "barrow",
+				"to_spawn": "from_chapel"
 			}
 		},
 		{

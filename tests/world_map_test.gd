@@ -254,13 +254,15 @@ func _test_plane_layout() -> void:
 	var mound: Dictionary = door_at.call("barrow", "wilds", Vector2i(160, 160), [])
 	_check(not mound.is_empty() and mound["at"] == Vector2i(160, 160) and not mound["hidden"],
 		"the barrow's door: the wilds' mound at (160, 160), on the plane there, in sight (%s)" % [doors.get("barrow")])
-	var below: Dictionary = door_at.call("barrow_deep", "wilds", Vector2i(160, 160), ["barrow"])
-	var stair: Dictionary = {}
-	for door: Dictionary in doors.get("barrow_deep", []):
-		if door["zone"] == "wilds" and (door["via"] as Array).is_empty():
-			stair = door
-	_check(not below.is_empty() and below["hidden"] and not stair.is_empty() and stair["closed"],
-		"the Ossuary: by the barrow from the mound, hidden (the niche), and by the temple's stair, sealed (%s)" % [doors.get("barrow_deep")])
+	# 832 switched on: the barrow's second door is the temple's chapel stair;
+	# the Ossuary is reached through the barrow alone (the First Hall's niche
+	# stair, hidden, and its sealed way down), none straight from the wilds.
+	var chapel: Dictionary = door_at.call("barrow", "wilds", Vector2i(199, 199), [])
+	var through: Array = doors.get("barrow_deep", []).filter(func(door: Dictionary) -> bool: return door["zone"] == "wilds" and door["via"] == ["barrow"])
+	var straight: Array = doors.get("barrow_deep", []).filter(func(door: Dictionary) -> bool: return door["zone"] == "wilds" and (door["via"] as Array).is_empty())
+	_check(not chapel.is_empty() and not chapel["closed"] and not through.is_empty() and straight.is_empty()
+		and through.any(func(door: Dictionary) -> bool: return door["hidden"]) and through.any(func(door: Dictionary) -> bool: return door["closed"]),
+		"the barrow: by the mound and by the temple's chapel stair, open; the Ossuary through the barrow, hidden (the niche) and sealed (the First Hall's way down), none from the wilds (%s %s)" % [doors.get("barrow"), doors.get("barrow_deep")])
 	var halls: Dictionary = door_at.call("castle_halls", "castle", Vector2i(11, 18), [])
 	_check(not halls.is_empty() and halls["at"] == Vector2i(123, -102), "the castle halls' door in the castle, at (123, -102) on the plane (%s)" % [doors.get("castle_halls")])
 	_check(not doors.has("practice") and not zones.has("practice") and not doors.keys().any(func(level_name: String) -> bool: return zones.has(level_name)),

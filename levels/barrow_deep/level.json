@@ -225,8 +225,8 @@
 				49,
 				77
 			],
-			"to_map": "wilds",
-			"to_spawn": "from_barrow_shortcut",
+			"to_map": "barrow",
+			"to_spawn": "from_deep",
 			"sealed": "draugr"
 		}
 	],
@@ -247,7 +247,10 @@
 		}
 	],
 	"regenerate": {
-		"generator": "labyrinth",
+		"generator": "crypt",
+		"heart": "lair",
+		"deep": {"wing": "old_graves"},
+		"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"],
 		"style": "barrow",
 		"layer": 2,
 		"knights": [
@@ -317,7 +320,7 @@
 				"apart": 12
 			}
 		},
-		"chests": 5
+		"chests": 3
 	},
 	"stills": [
 		"barrow"
