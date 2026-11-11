@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A charge that only passes close beside you leaves you walking on where you were, so stepping just clear of it is enough, where before it put you back a cell across your way though it never touched you (688 amended (14)).
 - When a fight starts, your companion's card, the town sheet, the maps and any note you're reading close so you can see the fight; open one again whenever you like, though a blow you take closes it again, where before they stayed open over the middle of the screen (846).
 - Esc closes the controls list and then your pack, one at a time, before it opens the menu, and a click on the controls list stays on it, where before Esc opened the menu over both and a click on the list walked you to the ground beneath it (845).
 - Gains each have a sound of their own now: a low drum strike for a deed, two warm plucks, the second higher, for a town's regard, a soft held note for your companion's bond, a quick wooden rattle for practice, a leather bag set down for goods handed in or picked up, and one soft high harp note for a creature spotted, where before most shared one harp pluck (804 amended (17)).

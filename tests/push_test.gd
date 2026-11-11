@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_stun()
 	_test_toss()
 	_test_beside_own_companion()
+	_test_charge_skim()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -579,6 +580,42 @@ func _test_beside_own_companion() -> void:
 
 
 ## [param player]'s own companion, standing still at [param tile].
+## 688 amended (14): a charge moves only bodies in its told cells. A rush along row 0 passes
+## (3, 0) while a standing free body's centre is in (3, 1), 0.15 from (3, 0)'s square, its circle
+## over that cell's edge: not shoved off the rushing body's cell, nor struck. Its cell taken under
+## his centre still stops it, as a body met.
+func _test_charge_skim() -> void:
+	print("\n== 688 amended (14): a charge brushing a free body's edge neither shoves nor strikes it ==")
+	var e := _build(["m.......", "...P....", "........"])
+	var player: Player = e["P"][0]
+	var by: GridEntity = e["m"][0]
+	player.free_pos = Vector2(3.0, 0.65)
+	var least := player.free_pos.y
+	var most := player.free_pos.y
+	var passed := false
+	World.rush(by, Vector2(1, 0), 6)
+	for i in 14:
+		# Walking slowly east beside its line, as wire3_4's player was: his tend meets the cell.
+		World.free_input(player, Vector2(0.15, 0), World.TICK_DT)
+		World.step()
+		least = minf(least, player.free_pos.y)
+		most = maxf(most, player.free_pos.y)
+		passed = passed or by.tile.x > 3
+	_check(passed and absf(least - 0.65) < 0.001 and absf(most - 0.65) < 0.001 and _hits(player) == 0,
+			"walking beside it, the charge passed (%s) and his centre held at y %.2f-%.2f, unhurt (%d hits)" % [by.tile, least, most, _hits(player)])
+	# Its centre in a told cell: the charge meets him there, as ever.
+	e = _build(["m.......", "...P....", "........"])
+	player = e["P"][0]
+	by = e["m"][0]
+	player.free_pos = Vector2(3.0, 0.45)
+	World._free_claim(player, 2.5)
+	World.rush(by, Vector2(1, 0), 6)
+	for i in 14:
+		World.step()
+	_check(by.tile.x <= 2 or player.free_pos.y > 0.65,
+			"his centre in (3, 0), a told cell: the charge meets him there (it at %s, he at %s)" % [by.tile, player.free_pos])
+
+
 func _companion_of(player: Player, tile: Vector2i) -> Companion:
 	var her := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Rhea", "props": {"max_hp": 20}}) as Companion
 	her.acts = false

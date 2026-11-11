@@ -11324,6 +11324,12 @@ func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vect
 	var keep := FOE_GAP if pass_own and _keeps_apart(entity, other) else FREE_RADIUS
 	if gap.length() >= keep:
 		return p
+	# 688 amended (14): a charge moves only bodies in its told cells. A rushing body's cell does
+	# not push a walking body whose centre is outside it (an edge brush); the cell a rush ends on
+	# is stood off from then, once. Server only: a client's replay, which knows no rush, stands
+	# off it as before, and is corrected back by at most FOE_GAP, under BLEND_MAX.
+	if pass_own and gap.length() > 0.00001 and rushing(other):
+		return p
 	var axis := _free_axis(intent)
 	if effects and entity is Player and is_link_cell(cell) and tick - (entity as Player).free_bumped_tick >= FREE_BUMP_TICKS:
 		(entity as Player).free_bumped_tick = tick

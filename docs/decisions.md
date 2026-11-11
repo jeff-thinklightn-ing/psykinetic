@@ -33533,6 +33533,25 @@ Whether that race should go (the order kept, or the stand begun only once the se
 fired) is combat's question, put to it after 843 and 340 amended (2). Server only and
 behaviour-neutral: every stand as before, protocol unchanged, no new class_name, no bullet.
 
+688 amended (14): a charge brushing a free body's edge doesn't shove it (the decision-number script's
+label; the coordinator's ruling, agreed by combat and enemy-ai: a charge harms and moves only bodies
+in its told cells, and an edge brush on a body outside them neither hits nor shoves). This is the
+keep-off half; enemy-ai's amendment is the told-cells half ("first body met in its told cells").
+What it mends: 3 of wire3's 11 lagged at-once corrections near the bear (wire3_2 s473, wire3_4 s368
+and s466), each the bear's rush passing over his edge with no hit logged. His centre was 0.08 to
+0.18 from the rush's cells and outside them, and his own walk's keep-off (_free_off_cell: FOE_GAP
+off a foe's cell) put him out of each cell as the rushing body took it: 0.94 to 0.96 cells, back
+across his way. World._free_off_cell now lets a walking body (pass_own) stay when the cell's
+occupant is mid-rush (World.rushing) and his centre is outside that cell. A body whose centre is in
+a told cell is still met there by the rush (_lunge_cell, as ever). The cell a rush ends on is stood
+off from then, once, at most FOE_GAP, under BLEND_MAX. A push's slide still meets it body to body.
+It is server only: a rush isn't on the wire, so a client's replay stands off the rushing body as
+before and is corrected back by at most FOE_GAP, blended. No rush goes on the wire unless that
+correction shows in playtest's runs (the coordinator). push_test _test_charge_skim: walking slowly
+beside a rush along the next row, his centre 0.15 off its cells, he holds his line, unhurt (before
+this he was put out to 1.00); his centre in a told cell, the rush meets him there. Server only,
+protocol unchanged, no new class_name.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float
