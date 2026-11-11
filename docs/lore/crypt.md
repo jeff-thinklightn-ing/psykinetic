@@ -525,6 +525,16 @@ generation's sepulcher knight, so [name] is that cycle's knight; "the Hall of Fa
   crypt.camp_key (in the game: Brand carries the chest's key). The draugr asks nothing of the
   robbers now; his own lines are unchanged.
 
+2026-11-10 (747 amended (8), "the fallen knight's quest, mended"): the knight now stands in the
+First Hall, beside the bier at the foot of the temple stair (Jeff: "it makes more sense if the
+knight is at the beginning by the actual altar, not the room labled 'altar'"). Because he speaks
+in that hall, voice changed one phrase of the reveal, "In the First Hall" to "Here in this hall",
+and left every other word as Jeff approved it. The reveal now reads:
+- The reveal: "Then you are strong enough. Here in this hall, the niche that breathes cold air
+  hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen
+  Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let
+  me rest."
+
 ---
 
 ## Log
