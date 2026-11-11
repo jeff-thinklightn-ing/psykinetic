@@ -255,6 +255,7 @@ static func is_name(word: String) -> bool:
 		var small := RegEx.create_from_string("(?:^|(?<=[ (\"]))([a-z][a-z']+)(?=[ ,.;:!?)\"]|$)")
 		var phrase := RegEx.create_from_string("(?<=[a-z,] )([A-Z][a-z']+(?: (?:of the |of |the )?[A-Z][a-z']+)+)")
 		var phrases := {}
+		var whole := RegEx.create_from_string("^[A-Z][a-z']+(?: (?:of the |of |the )?[A-Z][a-z']+)+$")
 		var words := {}
 		var titles := {}
 		var files: Array[String] = []
@@ -291,13 +292,25 @@ static func is_name(word: String) -> bool:
 			if words.has(name.to_lower()):
 				_names.erase(name)
 		_names.merge(titles)
+		var dirs: Array[String] = []
 		for dir: String in DirAccess.get_directories_at("res://levels/"):
-			var path := "res://levels/%s/level.json" % dir
+			dirs.append("res://levels/" + dir)
+			for inner: String in DirAccess.get_directories_at("res://levels/" + dir):
+				dirs.append("res://levels/%s/%s" % [dir, inner])
+		for dir: String in dirs:
+			var path := dir + "/level.json"
 			var level: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
-			var title := str(level.get("name", "")) if level is Dictionary else ""
-			if title.begins_with("The "):
-				title = title.substr(4)
-			if title.contains(" "):
-				phrases[title] = true
+			var pending: Array = [level]
+			while not pending.is_empty():  # Its own name and its rooms' and buildings' ("The First Hall").
+				var value: Variant = pending.pop_back()
+				if value is Array:
+					pending.append_array(value)
+				elif value is Dictionary:
+					pending.append_array((value as Dictionary).values())
+					var title := str(value.get("name", "")) if value.get("name") is String else ""
+					if title.begins_with("The "):
+						title = title.substr(4)
+					if whole.search(title) != null:  # Every word a capital's but "of" and "the" ("Common room" is none).
+						phrases[title] = true
 		_phrases.assign(phrases.keys())
 	return _names.has(word)
