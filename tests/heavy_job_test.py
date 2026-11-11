@@ -824,6 +824,12 @@ for each in gate._entries("queue") + gate._entries("running"):
 behind.join(5)
 check(gate.run("phys", "scene", ["bash", "tests/net_test.sh"]) == 2 and not trees("queue"),
     "net_test under scene: refused before it queues (run it as net)")
+check([gate.many_godot_test(each) for each in (["powershell", "-File", "tests\\net_test.ps1"],
+    ["godot", "--scene", "res://tests/net_test.tscn"], ["sh", "-c", "sh tests/net_test.sh x"])] == ["net_test"] * 3,
+    "net_test named by its file, any path or quoting")
+check(gate.many_godot_test(["godot", "--path", ".", "--scene", "tests/free_net_test.tscn"]) is None
+    and gate.many_godot_test(["godot", "--scene", "tests/net_test_x.tscn"]) is None,
+    "a name it is part of is no match (combat's free_net_test, a single Godot, 11-10)")
 check("net" in gate.kinds() and gate.kinds()["net"]["max_running"] == 1 and "bench" in gate.kinds()["net"]["excludes"],
     "net, a kind of its own: one at a time, never beside a bench")
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll

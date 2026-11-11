@@ -226,6 +226,21 @@ KINDS = {
 ## A many-Godot test, by its command (394 amended (24)): a run of one under
 ## another kind is refused, named, before it queues.
 MANY_GODOT_TESTS = ("net_test",)
+
+
+def many_godot_test(command):
+    """The MANY_GODOT_TESTS name a [command] runs, or None: a file named it
+    (net_test.sh, res://tests/net_test.tscn), never a name it is part of.
+    Matched as a substring, combat's free_net_test.tscn (one Godot, 0.75
+    GB) was refused as a scene and waited 51 minutes as a net run (11-10)."""
+    for part in command:
+        for word in re.split(r"[\\/\s'\"=:]+", str(part)):
+            for name in MANY_GODOT_TESTS:
+                if word == name or word.startswith(name + "."):
+                    return name
+    return None
+
+
 ## A kind never measured (no kinds.json row) is judged on commit at this
 ## times its RAM estimate, unless its first row names commit_gb (394
 ## amended (20)).
@@ -1457,7 +1472,7 @@ def run(tree, kind, command, expect_minutes=None):
             tree, kind, outer["tree"], outer["kind"]), file=sys.stderr)
         log("nested", tree, kind, "inside %s %s" % (outer["tree"], outer["kind"]))
         return shell_code(subprocess.call(command))
-    many = next((name for name in MANY_GODOT_TESTS if any(name in str(part) for part in command)), None)
+    many = many_godot_test(command)
     if many is not None and kind != "net":
         print("heavy_job: %s starts several Godots: run it as net, not %s (394 amended (24))" % (many, kind), file=sys.stderr)
         log("refused", tree, kind, "%s is a net run" % many)

@@ -46943,6 +46943,10 @@ A test that starts several Godots, run alone, takes a kind of its own, net (13.6
 a bench): neither scene nor suite, whose estimates every tree waits on. heavy_job refuses net_test under any other
 kind before it queues (MANY_GODOT_TESTS names the tests; add one there when another starts several Godots).
 heavy_job_test: net_test under scene refused, net one at a time. Tools only; protocol unchanged; no class_name; no bullet.
+Fixed 11-10 (combat's report): the name was matched as a substring of the command, so combat's free_net_test.tscn
+(one Godot, 0.75 GB) was refused as a scene and, run as net, waited 51 minutes on net's 13.6 GB. many_godot_test
+now matches a file named for the test (net_test.sh, net_test.ps1, res://tests/net_test.tscn), never a name it is
+part of; heavy_job_test checks both.
 
 394 amended (25) (perf, 2026-11-10; the coordinator's approved design, release's label): release can move
 one queued entry to the front. Twice in a day a fix every landing was paying for (the night's, then the
