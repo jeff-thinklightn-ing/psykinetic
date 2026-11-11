@@ -48725,6 +48725,14 @@ Resident.GET_UP is 15 ticks for "sit", "sit_talk" and "sit_listen" (1.5 s, so a 
 get-up, 1.45 s, plays out as well as Sitting_Exit), 12 for "tend" as before, and 5 for "lean" (its
 step-off, 0.5 s); the 11 ticks above are these. Animation fits its clips to them; no new word.
 
+853 amended (3) (maps' ask for Umbrage's first spots, 2026-11-11): the starter stall's keeper takes
+a work spot. He has no trade, so a level.json "work" spot of trade "vendor" (Main.VENDOR_TRADE) whose
+"town" is his town's key is his stand (Main._vendor_stands): Main._visitors_wanted gives it him under
+every use his hours choose (work, square, well, inn, temple), so he walks to it and, between, strolls
+his place (_vendor_spot, behind the counter) as 853 keeps everyone moving. With none laid he strolls as
+before. Maps lays Umbrage's at (203, 196) facing (203, 197) through builder's spot tool; no CHANGELOG
+line of npc's (it shows with maps' spots).
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

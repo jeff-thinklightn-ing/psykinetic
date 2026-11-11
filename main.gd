@@ -19928,8 +19928,14 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 	# the store, all day, every day; a plain townsman in an armourer's apron.
 	var vendor: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
 	if place_id in vendor.get("towns", []):
+		var places := _visitor_places(_vendor_spot(place_id, store))
+		var stands := _vendor_stands(area, place)
+		if not stands.is_empty():
+			# Maps' work spot for him (trade "vendor"): whatever his hour, his stand is the spot he
+			# walks to, and he strolls his side of the counter between (853's keep-moving).
+			places["spots"] = {"work": stands, "square": stands, "well": stands, "inn": stands, "temple": stands}
 		out.append({"key": Offers.VENDOR + place_id, "name": str(vendor.get("name", "Rolf")), "trade": "", "player": "",
-			"town": place_id, "look_trade": "smith", "places": _visitor_places(_vendor_spot(place_id, store))})
+			"town": place_id, "look_trade": "smith", "places": places})
 	for entry: Dictionary in World.towns.visitors(place_id):
 		var kind := str(entry.get("kind", ""))
 		var spot: Rect2i = base.get("inn", base["square"])
@@ -20275,6 +20281,17 @@ func _vendor_spot(place_id: String, store: Vector2i) -> Rect2i:
 					return _behind_counter(spot, at, Vector2i(int(each["facing"][0]), int(each["facing"][1])))
 		return spot
 	return Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+
+
+## The starter stall's keeper's own spots in [param area] for the town at [param place] (853 amended (3),
+## maps' ask): level.json "work" spots of trade [constant VENDOR_TRADE] whose "town" is its key.
+func _vendor_stands(area: Dictionary, place: Dictionary) -> Array:
+	var key := str(place.get("key", ""))
+	return area.get("spots", []).filter(func(spot: Dictionary) -> bool: return spot["use"] == "work" and str(spot.get("trade", "")) == VENDOR_TRADE and str(spot.get("town", "")) == key)
+
+
+## A work spot's trade for the starter stall's keeper (he has no trade of his own).
+const VENDOR_TRADE := "vendor"
 
 
 ## The counters a keeper serves over (853): a stall's keeper keeps behind one.

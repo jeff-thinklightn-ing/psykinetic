@@ -5331,6 +5331,19 @@ func _test_vendor() -> void:
 		and Main._behind_counter(about, Vector2i(204, 196), Vector2i(1, 0)) == Rect2i(202, 195, 2, 3)
 		and Main._behind_counter(about, Vector2i(203, 190), Vector2i(0, 1)) == about,
 		"a stall's keeper keeps behind its counter, never round to its front (%s)" % [Main._behind_counter(about, Vector2i(203, 197), Vector2i(0, 1))])
+	# Maps' work spot for him (853 amended (3)): a "work" spot of trade "vendor" in his town is his stand
+	# whatever his hour; another town's, or another trade's, never is.
+	var key := str(town.get("key", ""))
+	var stand := {"use": "work", "cell": store + Vector2i(3, 0), "face": store + Vector2i(3, 1), "pose": "stand", "town": key, "trade": Main.VENDOR_TRADE, "pair": ""}
+	var laid := {"buildings": [], "spots": [stand,
+		{"use": "work", "cell": store + Vector2i(-3, 0), "face": store + Vector2i(-3, 1), "pose": "stand", "town": key + "_other", "trade": Main.VENDOR_TRADE, "pair": ""},
+		{"use": "work", "cell": store + Vector2i(0, 3), "face": store + Vector2i(0, 4), "pose": "stand", "town": key, "trade": "cook", "pair": ""}]}
+	var his: Array = _main._visitors_wanted(laid, STORE, town).filter(func(w: Dictionary) -> bool: return str(w["key"]) == Offers.VENDOR + STORE)
+	var given: Dictionary = his[0]["places"].get("spots", {}) if not his.is_empty() else {}
+	_check(_main._vendor_stands(laid, town) == [stand] and ["work", "square", "well", "inn", "temple"].all(func(u: String) -> bool: return given.get(u, []) == [stand]),
+		"maps' vendor spot is his stand at every hour, no other town's or trade's (%s)" % [given.keys()])
+	var bare: Array = _main._visitors_wanted({"buildings": [], "spots": []}, STORE, town).filter(func(w: Dictionary) -> bool: return str(w["key"]) == Offers.VENDOR + STORE)
+	_check(not bare.is_empty() and not bare[0]["places"].has("spots"), "no vendor spot: he strolls his place as before")
 	if stall_was == null:
 		rule.erase("stall")
 	else:
