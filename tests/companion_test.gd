@@ -150,6 +150,7 @@ func _ready() -> void:
 	_test_heel_leaves_his_line()
 	_test_heel_no_way()
 	_test_heel_free_leader()
+	_test_heel_paced()
 	_test_guide_free()
 	_test_look_asked()
 	_test_reset_free()
@@ -6947,6 +6948,59 @@ func _test_heel_free_leader() -> void:
 	# A turn straight back onto her just-taken step may find her there a
 	# tick or two while her step's time runs: out before he arrives.
 	_check(count["in_way"] <= 4 and count["most"] <= Heel.STOP + 1, "she is out of the cells he is about to cross within a tick or two, and keeps up (%d, %d away at most)" % [count["in_way"], count["most"]])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_heel_paced() -> void:
+	print("
+== on his footsteps her step takes his step's time: no stand-and-go while he walks on (485 amended (2)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var base := pet.move_ticks
+	var his := World.step_ticks(owner, Vector2i(1, 0), owner.tile) / World.ground_drag(owner.tile, Vector2i(1, 0))
+	# East along row 9, her two behind; then west back past where she stood.
+	var stood := 0
+	var walked := 0
+	var near := 0
+	var paced := 0
+	for run: Array in [[Vector2i(4, 9), Vector2i(2, 9), Vector2(1, 0)], [Vector2i(12, 8), Vector2i(12, 9), Vector2(-1, 0)]]:
+		_put(owner, run[0])
+		_put(pet, run[1])
+		pet.heel.catching_up = false
+		for i in 12:
+			World.step()
+		for i in 20:
+			World.free_input(owner, run[2], World.TICK_DT)
+			World.step()
+			if i >= 6:
+				walked += 1
+				if World.tick >= pet.step_until and pet.tile == pet.heel._goal:
+					stood += 1
+				if World.distance(owner.tile, pet.tile) <= Heel.STOP and Heel.walking_on(owner) 						and Companion._inside_of(pet.tile) == Companion._inside_of(owner.tile):
+					near += 1
+					if absf(pet.move_ticks - his) < 0.01:
+						paced += 1
+		for i in 12:
+			World.step()
+	print("  (his step %.2f ticks, her own %.2f; %d of %d ticks near him walking paced, %d of %d stood on her goal)" % [his, base, paced, near, stood, walked])
+	_check(near > 0 and paced > 0 and stood <= 2,
+		"walking on two runs: on his footsteps her step is his (%d of %d ticks near him) and she stands on them no more than 2 ticks (%d)" % [paced, near, stood])
+	# A pace left from a follow she is no longer at (her heel not run last
+	# tick): her own again.
+	pet.move_ticks = his
+	pet.heel.paced_tick = World.tick - 5
+	pet.leaving = true  # (Walking off: no follow this tick.)
+	pet.leaving_to = pet.tile
+	pet._sim_tick()
+	pet.leaving = false
+	pet.leaving_to = Companion.NONE
+	_check(absf(pet.move_ticks - base) < 0.001 and pet.heel.paced_tick == -1, "not following, her own pace again (%.2f)" % pet.move_ticks)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)

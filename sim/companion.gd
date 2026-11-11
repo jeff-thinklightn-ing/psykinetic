@@ -1216,6 +1216,15 @@ func _init() -> void:
 	World.entity_damaged.connect(_on_struck_any)
 	World.loosed.connect(_on_loosed_any)
 	slots = Items.tidy([], SLOTS)
+	heel.paces = true  # Her step paced to her player's while she follows (485 amended (2)).
+	# So a client draws her paced steps at their time (485 amended (2)); put
+	# ahead of "tile" in the config, so a step's move_ticks is in hand when
+	# its tile arrives: after it, each slide was drawn at the step before's
+	# time, and a pace dropping back to her own was squeezed into a dash.
+	var paced := NodePath(".:move_ticks")
+	sync.replication_config.add_property(paced, 0)
+	sync.replication_config.property_set_spawn(paced, true)
+	sync.replication_config.property_set_replication_mode(paced, SceneReplicationConfig.REPLICATION_MODE_ON_CHANGE)
 	replicate("slots")
 	replicate("slot_notes")
 	replicate("slot_counts")
@@ -3360,6 +3369,9 @@ func restore_said(lines: Variant) -> void:
 
 func _sim_tick() -> void:
 	var started := Time.get_ticks_usec()
+	if heel.paced_tick >= 0 and World.tick - heel.paced_tick > 1:
+		heel.unpace(self)  # Not following since last tick: her own pace (485 amended (2)).
+		heel.paced_tick = -1
 	if mind != null:
 		for result: Dictionary in mind.take_results():
 			_take_result(result)

@@ -47,6 +47,20 @@ const ASIDE_SEARCH_TILES := 49
 ## How far the leader gets before she sets off (START; a companion's bond
 ## moves it, decision 555).
 var start := START
+## Her step paced to her leader's (485 amended (2); Jeff, 11-11: "when a
+## companion follows they don't follow smoothly"): on, a step onto the
+## footstep of his next to her takes the time he takes to cross a cell,
+## not her own quicker step's, so she never reaches his footstep early and
+## stands a tick (the skip); any other step (catching up, a step aside) her
+## own pace. What slows her own step
+## (her load, winded, the ground) still does: the pace sets only her
+## move_ticks, never under her own (base_ticks). A body whose move_ticks the
+## client knows (Companion replicates it) sets paces; npc's escorts keep
+## their own.
+var paces := false
+var base_ticks := -1.0
+## The tick follow last set her pace (Companion._sim_tick unpaces once it is stale).
+var paced_tick := -1
 ## She has set off after the leader and not yet closed in.
 var catching_up := false
 var _leader_at := NONE
@@ -100,6 +114,8 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 	var distance := World.distance(body.tile, leader.tile)
 	if distance >= start and not catching_up:
 		catching_up = true
+	if paces:
+		paced_tick = World.tick
 	if leader.tile != _leader_at:
 		if _leader_at != NONE and World.distance(_leader_at, leader.tile) == 1:
 			_trail.push_front(_leader_at)
@@ -122,6 +138,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		if clear.has(body.tile):
 			var aside := _aside(body, leader, clear)
 			if aside != NONE:
+				_pace(body, leader, NONE)
 				step(body, aside, false, leader)
 		return
 	var walking := World.tick - _leader_moved <= WALKING_TICKS
@@ -138,8 +155,10 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 				avoid[at] = true
 	# Beside her walking leader and out of their way she stays put while
 	# they go by (a turn back toward her): no step round to their new back
-	# and straight back again (678, companions' side).
-	if walking and not astray and distance <= CLOSE and not clear.has(body.tile):
+	# and straight back again (678, companions' side). Only while they come
+	# toward or past her (485 amended (2)): one walking away from her she
+	# follows on their footsteps.
+	if walking and not astray and distance <= CLOSE and not clear.has(body.tile) and ahead_of(body.tile - leader.tile, way) >= 0:
 		return
 	# Walking on, she makes for their footsteps, so she goes along the line
 	# they walk (Jeff on v0.1.179: "Pip now does zig zag run behind me");
@@ -172,6 +191,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		return
 	if World.tick < _no_way_until:
 		return  # No way a moment ago: she waits before asking again (685 amended).
+	_pace(body, leader, heel)
 	var went := true
 	if heel != NONE:
 		went = step(body, heel, false, leader, true)
@@ -184,6 +204,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		# amended (2)).
 		_no_way[heel] = World.tick + NO_WAY_KEPT
 		_goal = NONE
+		_pace(body, leader, NONE)
 		if step(body, leader.tile, true, leader, true):
 			return
 	if not went:
@@ -191,6 +212,38 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		if heel != NONE:
 			_no_way[heel] = World.tick + NO_WAY_KEPT  # Next time the next-best heel cell.
 		_goal = NONE
+
+
+## [param body]'s step time for a step toward [param goal] (paces, 485
+## amended (2)): onto a footstep of his (_trail) next to her while [param leader] walks on, the time he takes to cross a cell
+## (World.step_ticks his way, a free body's slant at root two, not the
+## grid's DIAGONAL_TICK_SCALE), as her move_ticks for her step's way
+## (over what her own load, state and ground make of it), never under her
+## base_ticks; else her base_ticks. A cell of his trail a step of hers:
+## by ground speed instead, a slant step of hers onto his straight line
+## lagged (companion_test's following, 4 behind).
+func _pace(body: GridEntity, leader: GridEntity, goal: Vector2i) -> void:
+	if not paces:
+		return
+	if base_ticks < 0.0:
+		base_ticks = body.move_ticks
+	var want := base_ticks
+	var way := goal - body.tile
+	if goal != NONE and _trail.has(goal) and walking_on(leader) and World.distance(body.tile, goal) == 1:
+		var his_way := travel(leader)
+		var his := World.step_ticks(leader, his_way, leader.tile)
+		if World.free_body(leader) and his_way.x != 0 and his_way.y != 0:
+			his = his / World.DIAGONAL_TICK_SCALE * sqrt(2.0)  # A free body's slant crosses a cell in its straight time times root two.
+		var hers := World.step_ticks(body, way, body.tile) / maxf(body.move_ticks, 0.0001)
+		want = maxf(base_ticks, his / maxf(hers, 0.01))
+	if absf(body.move_ticks - want) > 0.001:
+		body.move_ticks = want
+
+
+## [param body] back on her own pace (485 amended (2)): she is not following.
+func unpace(body: GridEntity) -> void:
+	if base_ticks >= 0.0 and absf(body.move_ticks - base_ticks) > 0.001:
+		body.move_ticks = base_ticks
 
 
 ## The nearest of [param leader]'s last cells (their footsteps) a cell back
@@ -322,7 +375,9 @@ static func travel(leader: GridEntity) -> Vector2i:
 		# (688): a shallow slant is the straight it mostly goes.
 		var v := leader.step_velocity.normalized()
 		var lean := 0.38 if World.free_body(leader) else 0.001
-		return Vector2i(signi(v.x) if absf(v.x) > lean else 0, signi(v.y) if absf(v.y) > lean else 0)
+		# signf, not signi: signi truncates a part under one to 0, so a slant or a
+		# free body's way read as no way at all (485 amended (2)).
+		return Vector2i(int(signf(v.x)) if absf(v.x) > lean else 0, int(signf(v.y)) if absf(v.y) > lean else 0)
 	return leader.facing
 
 
@@ -406,6 +461,7 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 			_routes.erase(id)
 			return false
 		_failed.erase(id)
+		path = World.legs_path(body.tile, path, goal, body)  # A few long legs, not a staircase (853 amended (6), npc's; 485 amended (2)).
 		if far >= FAR:
 			route = {"goal": goal}
 		else:

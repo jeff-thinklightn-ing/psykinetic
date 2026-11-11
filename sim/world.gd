@@ -13454,6 +13454,67 @@ func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_ext
 	return pulled
 
 
+## legs_path's farthest point of a path a run is tried to (a cluttered path stays cheap).
+const LEGS_REACH := 24
+
+
+## [param path] (find_path's, from [param from]) walked as a few long legs (853 amended (6), npc's
+## and companions': Jeff's "walking looks like skipping" and "companions don't follow smoothly"; a
+## grid stepper faces each step, and an 8-way path's staircase turned 47% of a resident's steps).
+## From each point, the longest run of the path that two legs can take instead (a diagonal run then a
+## straight one, or a straight run then a diagonal one, whichever is clear: _line_clear for each leg)
+## is replaced by them: the same steps and the same diagonals as that run, never more, a turn only
+## between legs. [param goal] and [param ignore] as _line_clear takes them. Callers: Resident's
+## routes and Heel's; players keep walk_path, monsters find_path.
+func legs_path(from: Vector2i, path: Array[Vector2i], goal: Vector2i, ignore: GridEntity = null) -> Array[Vector2i]:
+	if path.size() < 3:
+		return path
+	var out: Array[Vector2i] = []
+	var anchor := from
+	var way := Vector2i.ZERO  # The last step's: a run that goes on that way is taken first.
+	var i := 0
+	while i < path.size():
+		var best := i
+		var best_legs: Array[Vector2i] = [path[i]]
+		for j in range(i + 1, mini(path.size(), i + LEGS_REACH)):
+			var legs := _two_legs(anchor, path[j], goal, ignore, way)
+			if legs.is_empty():
+				continue
+			if legs.size() <= j - i + 1:
+				best = j
+				best_legs = legs
+		way = best_legs[-1] - (best_legs[-2] if best_legs.size() > 1 else anchor)
+		out.append_array(best_legs)
+		anchor = path[best]
+		i = best + 1
+	return out
+
+
+## The cells of two legs from [param a] to [param b] (b's included, a's not): the diagonal run first,
+## else the straight run first, the first whose legs are clear (_line_clear), the one that sets off
+## [param way] tried first; [] for neither.
+func _two_legs(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity, way := Vector2i.ZERO) -> Array[Vector2i]:
+	var d := b - a
+	var diagonals := mini(absi(d.x), absi(d.y))
+	var corner_diagonal := a + Vector2i(signi(d.x), signi(d.y)) * diagonals
+	var corner_straight := b - Vector2i(signi(d.x), signi(d.y)) * diagonals
+	var corners: Array[Vector2i] = [corner_diagonal, corner_straight]
+	if corner_straight != a and way != Vector2i.ZERO and (corner_straight - a).sign() == way:
+		corners.reverse()  # Straight on the way it was going: no turn where the runs meet.
+	for corner: Vector2i in corners:
+		if corner != a and not _line_clear(a, corner, goal, ignore):
+			continue
+		if corner != b and not _line_clear(corner, b, goal, ignore):
+			continue
+		var cells: Array[Vector2i] = []
+		if corner != a:
+			cells.append_array(line_cells(a, corner))
+		if corner != b:
+			cells.append_array(line_cells(corner, b))
+		return cells
+	return []
+
+
 ## The cells of the straight line from [param a] to [param b] (decision
 ## 678), b's included and a's not: one a step, each a king's move, the
 ## nearest cell to the true line at each of the max(|dx|, |dy|) steps.

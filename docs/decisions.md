@@ -14472,6 +14472,66 @@ class_name Heel.
 Rejected: npc calling Companion's own _follow (her members: keeper, the
 stalking rule); a node per follower (no scene, nothing to draw, a ticked
 RefCounted is enough).
+
+485 amended (2): her follow without the skip (the script's label; the
+coordinator's approval of companions' design; Jeff, 11-11: "walking around
+looks like skipping, and when a companion follows they don't follow
+smoothly"). A probe (a player walking a loop through Umbrage on keys and on
+clicks, lag 0, 600 ticks) found her standing still 36% of his walking
+ticks, with 38 stop-starts a minute while he walked steadily on keys and 60
+on clicks: her own step (move_ticks 2) is quicker than his, so she reached
+his footstep early, stood a tick, and set off again. Four parts:
+(1) Pace: Heel.paces (Companion's on, npc's escorts keep their own pace).
+A step onto one of his footsteps (_trail) next to her while he walks on
+takes the time he takes to cross a cell (World.step_ticks his way; a free
+body's slant at root two, not the grid's DIAGONAL_TICK_SCALE), set as her
+move_ticks for her step's way over what her own load, state and ground make
+of it, never under her own (base_ticks); any other step (catching up, a
+step aside) is her own pace. Companion._sim_tick puts her back on her own
+pace once follow has not run for a tick (Heel.unpace, paced_tick). Her
+wounded pace, load and hurry do what they did.
+(2) No stop at the footstep goal while he walks steadily: the CLOSE
+stay-put beside him (678, companions' side) holds only while he comes
+toward or past her (ahead_of(her offset, his way) >= 0); one walking away
+she follows on his footsteps.
+(3) The straight-run tie-break is npc's World.legs_path (853 amended (6)),
+shared: Heel.step takes its A* path through it, a few long legs, not a
+staircase.
+(4) A bug since 688: Heel.travel took signi() of a normalised float, which
+truncates a part under one to 0, so a free walker's way (and any slant)
+read as no way at all; keep_clear and her cell pick read that too. Now
+int(signf(...)).
+(5) The 2 s stops after a turn-back were a heel cell with no way, and its
+search's cost a server tick of up to a second: that part landed first, on
+its own, as 818 amended (2) (Heel.FOLLOW_SEARCH_TILES, a step toward him
+on no way); here her step toward him is at her own pace (unpaced).
+(6) Her paced steps drawn at their time on a client: Companion's
+move_ticks is put at index 0 of her replication config, ahead of "tile".
+After it (appended by replicate()), a client built each slide from the
+step before's move_ticks, every replicated value being applied in config
+order, so a pace dropping back to her own (3.5 to 2) drew one slide 1.5
+ticks long over a 2-tick step, and 646's arrival pacing and the catch-up
+squeezed the queue into a dash of 12 to 13 cells a second (physics'
+joined-client rows on the first take: 19 frames over 0.15 cells a frame
+against 0). Pacing by ground speed instead of a cell of his trail a step
+of hers was tried and dropped: a slant step of hers onto his straight line
+lagged, 4 behind in companion_test's following.
+After (the same probe, 10 ticks a second, his walk 4 cells a second): keys
+9 stop-starts a minute, standing 20% of his walking ticks; clicks 9, 12%.
+Split by his heading over half a second either side: on a straight stretch
+the only stops are her set-off (START, 555) and the tail of a turn-back;
+at a turn, 0.1 to 0.7 s; at a turn-back, 0.7 to 1.4 s, her standing while
+he walks back past her (678's stay-put) and then 0.6 s until he is her
+START away and a footstep of his is nearer him than she is; the worst
+tick on that route 32 ms (764 before 818 amended (2)). Wire: Companion
+replicates move_ticks (a client draws a paced step at its time), first in
+her config, so PROTOCOL_REVISION shares 56 with 819 (release).
+companion_test _test_heel_paced: she stands at most 2 of his walking ticks
+on a straight walk, steps paced, and is back on her own pace once not
+following. Animation measures it on its laptop probe and physics on its
+client rerun (lag 0 and 150 ms): no standing frames mid-follow while he
+walks steadily, heading swings over 20 degrees in under 10% of windows.
+
 Amended (Jeff: "no birds at night, maybe owls bats"): birds belong to the
 day only. The drips' take with birds (freesound 841641) is dropped, and the
 deep night bed's owl-dense takes (475376, 151241) are replaced by two quiet

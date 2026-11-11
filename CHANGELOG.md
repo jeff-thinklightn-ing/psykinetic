@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion follows in your footsteps at your own pace, walking smoothly behind you, and stops beside you only when you turn back toward her (485 amended (2)).
 - Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856)
 - Towns: hold a pelt, a trophy or a bear claw in your hand at a keeper who buys it, and the keeper tells you it goes in your pack first (856 amended (2))
 - Towns: townsfolk greet you as they know you: a known face with their trade's own words, one you've wronged or who trusts you with words of their own, one who has only heard of you as a stranger, one whose task you're on glad you're seeing to it, and one who can't stop with the reason why (853 amended (5))
