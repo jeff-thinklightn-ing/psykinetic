@@ -62,6 +62,11 @@ const CALM_KINDS: Array[String] = ["draugr", "astral_knight", "rabbit", "deer", 
 ## generated or laid by hand, but these test levels; and (ARRIVAL_NOT_YET)
 ## the hand-laid ones still to mend, each named with who mends it.
 const ARRIVAL_EXEMPT: Array[String] = ["sample", "test_room"]
+## 747 amended (8): the kinds that give a quest, reached from every arrival
+## clear of the hostiles (_giver_faults), and how far clear: GIVER_CLEAR
+## cells (Chebyshev) beyond a hostile's reach at every step of the walk.
+const GIVER_KINDS: Array[String] = ["astral_knight"]
+const GIVER_CLEAR := 10
 const ARRIVAL_NOT_YET := {"castle": "maps, after the cut: from_foothills, from_halls, from_test_room, start 1 by imps and a sneak"}
 ## The co-op rule's reaches (crypt landing 2): a stand-in within STAND_IN_REACH
 ## steps of a plate; plates PLATES_APART apart; a plate within PLATE_REACH
@@ -106,7 +111,7 @@ static func check(level: Dictionary, rooms: Array = [], options: Dictionary = {}
 	# 832 (806 amended (11)): only where the level holds the arrival rule
 	# (Regen.layout_options' "arrival"), so no other level's faults change.
 	if options.get("arrival", false):
-		faults.append_array(arrival_faults(level))
+		faults.append_array(arrival_faults(level, str(options.get("foes_door", ""))))
 	return faults
 
 
@@ -122,7 +127,9 @@ static func check_chests(level: Dictionary, options: Dictionary = {}) -> Array:
 ## lands, and each start, "start 1" on) within ARRIVAL_CLEAR of a hostile's
 ## reach, naming the nearest; its cell the arrival's. Read over any level,
 ## laid by hand or generated, indoors or out.
-static func arrival_faults(level: Dictionary) -> Array:
+## [param foes_door] (747 amended (8)): the one arrival the giver walk is
+## not asked of, the foes' own door (the regenerate block's "foes_door").
+static func arrival_faults(level: Dictionary, foes_door := "") -> Array:
 	var faults: Array = []
 	var spawns: Dictionary = (level.get("spawn_points", {}) as Dictionary).duplicate()
 	var starts: Array = level.get("starts", [])
@@ -136,6 +143,11 @@ static func arrival_faults(level: Dictionary) -> Array:
 			continue
 		for reach: Array in _reach_of(spec, kind, at):
 			reaches.append([reach[0], reach[1], kind])
+	var givers: Array[Vector2i] = []
+	for spec: Dictionary in level.get("entities", []):
+		if str(spec.get("kind", "")) in GIVER_KINDS and spec.get("tile") is Vector2i:
+			givers.append(spec["tile"])
+	var lay := {}
 	for spawn_name: String in _sorted_names(spawns):
 		var spawn: Variant = spawns[spawn_name]
 		if not spawn is Vector2i:
@@ -150,7 +162,68 @@ static func arrival_faults(level: Dictionary) -> Array:
 			faults.append({"rule": "arrival", "cell": spawn,
 				"what": "the arrival %s is %d cells from where %s %s roams (%d wanted)" % [spawn_name, worst[1],
 					"an" if str(worst[2]).left(1) in "aeiou" else "a", worst[2], worst[3]]})
+			continue
+		if not givers.is_empty() and spawn_name != foes_door:
+			if lay.is_empty():
+				lay = _walk_lay(level)
+			faults.append_array(_giver_faults(lay, givers, spawn_name, spawn, reaches))
 	return faults
+
+
+## 747 amended (8) (Jeff: "it makes more sense if the knight is at the
+## beginning by the actual altar"; the coordinator's ruling: the giver is
+## reached from every start and arrival without passing the band): one
+## fault for each quest giver (GIVER_KINDS, at [param givers]) not reached
+## from arrival [param spawn] over [param lay] (_walk_lay) by steps that keep
+## GIVER_CLEAR cells (Chebyshev) beyond every hostile's reach ([param
+## reaches], as the arrival rule reads them).
+static func _giver_faults(lay: Dictionary, givers: Array[Vector2i], spawn_name: String, spawn: Vector2i, reaches: Array) -> Array:
+	var barred := {}
+	for reach: Array in reaches:
+		var reach_cell: Vector2i = reach[0]
+		var span := GIVER_CLEAR + int(reach[1])
+		for y in range(reach_cell.y - span + 1, reach_cell.y + span):
+			for x in range(reach_cell.x - span + 1, reach_cell.x + span):
+				barred[Vector2i(x, y)] = true
+	var seen := {spawn: true}
+	var queue: Array[Vector2i] = [spawn]
+	var i := 0
+	var left := givers.duplicate()
+	while i < queue.size() and not left.is_empty():
+		var cell := queue[i]
+		i += 1
+		left = left.filter(func(giver: Vector2i) -> bool: return maxi(absi(giver.x - cell.x), absi(giver.y - cell.y)) > 1)
+		for way in WAYS:
+			var next := cell + way
+			if not seen.has(next) and not barred.has(next) and _steps(lay, cell, way):
+				seen[next] = true
+				queue.append(next)
+	var faults: Array = []
+	if left.is_empty():
+		return faults
+	var nearest: Array = []
+	for reach: Array in reaches:
+		var apart := maxi(absi(spawn.x - reach[0].x), absi(spawn.y - reach[0].y))
+		if nearest.is_empty() or apart < int(nearest[0]):
+			nearest = [apart, reach[2]]
+	for giver: Vector2i in left:
+		faults.append({"rule": "arrival", "cell": spawn,
+			"what": "from the arrival %s the quest giver at %s is not reached %d cells clear of the hostiles (the nearest %s %d cells off)" % [
+				spawn_name, giver, GIVER_CLEAR, nearest[1] if not nearest.is_empty() else "none", int(nearest[0]) if not nearest.is_empty() else 0]})
+	return faults
+
+
+## The floor, edges and relief of [param level], as _steps reads them (the
+## giver's walk; no rooms or corridors).
+static func _walk_lay(level: Dictionary) -> Dictionary:
+	var terrain: Dictionary = level.get("terrain", {})
+	var floor := {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+	for cell: Vector2i in terrain.get("water", []):
+		floor.erase(cell)
+	return {"floor": floor, "edges": terrain.get("edges", {}), "relief": terrain.get("relief", PackedFloat32Array()),
+		"relief_size": terrain.get("relief_size", Vector2i.ZERO), "stairs": terrain.get("stairs", {})}
 
 
 static func _sorted_names(spawns: Dictionary) -> Array[String]:

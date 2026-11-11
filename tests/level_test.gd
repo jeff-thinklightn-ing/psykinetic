@@ -78,6 +78,7 @@ func _ready() -> void:
 	_test_band()
 	_test_crypt_ways()
 	_test_arrival_rule()
+	_test_giver_rule()
 	_test_deep_crypt()
 	_test_hall_shortcut()
 	_test_barrow_quest()
@@ -5038,8 +5039,9 @@ func _test_crypt_ways() -> void:
 			var at: Variant = level["spawn_points"].get(spawn)
 			if not at is Vector2i or not map.walkable(at):
 				wrong.append("g%d: %s at %s" % [generation, spawn, at])
-		# 832 (the coordinator: no arrival puts a player inside a fight).
-		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(level):
+		# 832 (the coordinator: no arrival puts a player inside a fight); 747
+		# amended (8): the knight reached from each but the robbers' own door.
+		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(level, str(Regen.config_of("barrow").get("foes_door", ""))):
 			wrong.append("g%d: %s" % [generation, fault["what"]])
 	_check(wrong.is_empty() and template["warnings"].is_empty(), "the barrow's three arrivals in their anchors and on floor in the template and generations 1-3, each beyond every foe's reach (%s %s)" % [wrong, template["warnings"]])
 	# The breach a dig off the camp's south side, its way out and arrival at
@@ -5052,6 +5054,56 @@ func _test_crypt_ways() -> void:
 	var way_out: Array = template["links"].filter(func(l: Dictionary) -> bool: return l["tile"] == Vector2i(31, 52))
 	_check(nearest >= LAYOUT_SENSE.ARRIVAL_CLEAR + Monster.WANDER_RADIUS and (anchors["breach"] as Rect2i).has_point(Vector2i(31, 52)) and way_out.size() == 1,
 		"the breach comes in at the dig's far end, %d cells from the nearest of the camp (%d wanted), its way out beside it (%s)" % [nearest, LAYOUT_SENSE.ARRIVAL_CLEAR + Monster.WANDER_RADIUS, way_out])
+
+
+## 747 amended (8) (Jeff: "it makes more sense if the knight is at the
+## beginning by the actual altar"; the coordinator's ruling): the quest
+## giver is reached from every arrival without passing the band, GIVER_CLEAR
+## beyond a hostile's reach; the one arrival not asked, the barrow's
+## breach, the robbers' own door, named in its block alone.
+func _test_giver_rule() -> void:
+	print("
+== layout sense: the quest giver reached clear of the band from every arrival (747 amended (8)) ==")
+	var floor: Array[Vector2i] = []
+	for y in 3:
+		for x in 31:
+			floor.append(Vector2i(x, y))
+	var knight := {"tile": Vector2i(30, 1), "home": Vector2i(30, 1), "kind": "astral_knight"}
+	var guard := {"tile": Vector2i(15, 1), "home": Vector2i(15, 1), "kind": "brute", "idle": {"mode": "guard"}}
+	var hall := func(entities: Array, door := "") -> Array:
+		return LAYOUT_SENSE.arrival_faults({"spawn_points": {"from_test": Vector2i(0, 1)}, "entities": entities, "terrain": {"floor": floor}}, door)
+	_check(hall.call([knight]).is_empty(), "the giver down an empty hall: reached")
+	var barred: Array = hall.call([knight, guard])
+	_check(barred.size() == 1 and str(barred[0]["what"]).contains("from_test") and str(barred[0]["what"]).contains("brute"),
+		"a foe standing on the way between: a fault naming the arrival and the nearest foe (%s)" % [barred])
+	_check(hall.call([knight, guard], "from_test").is_empty(), "the foes' own door is not asked the walk")
+	_check(hall.call([guard]).is_empty(), "no giver, no walk asked")
+	var doors := {}
+	for level_name: String in DirAccess.get_directories_at(Level.DIR):
+		var block: Variant = Level.template_config(level_name).get("regenerate", {})
+		if block is Dictionary and (block as Dictionary).has("foes_door"):
+			doors[level_name] = block["foes_door"]
+	_check(doors == {"barrow": "from_breach"}, "the one arrival exempt anywhere: the barrow's breach, the robbers' own door (%s)" % [doors])
+	var tries: Array[int] = []
+	var faults := {}
+	var at := Vector2i(-1, -1)
+	var facing := Vector2i.ZERO
+	for generation in range(1, 9):
+		var made := Regen.generate("barrow", generation)
+		if made.is_empty():
+			faults[generation] = "not laid"
+			continue
+		tries.append(int(made["tries"]))
+		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var found := LAYOUT_SENSE.arrival_faults(level, "from_breach")
+		if not found.is_empty():
+			faults[generation] = found.map(func(fault: Dictionary) -> String: return str(fault["what"]))
+		for spec: Dictionary in level.get("entities", []):
+			if str(spec.get("kind", "")) == "astral_knight":
+				at = spec["tile"]
+				facing = spec.get("facing", Vector2i.ZERO)
+	_check(faults.is_empty(), "the barrow's generations 1-8: from the temple stair, the start, from_deep and from_below the knight is reached clear, and every arrival clear (tries %s; %s)" % [tries, faults])
+	_check(at == Vector2i(39, 10) and facing == Vector2i(0, -1), "the knight behind the First Hall's bier, facing the stair (%s, %s)" % [at, facing])
 
 
 func _test_arrival_rule() -> void:
@@ -5121,7 +5173,7 @@ func _test_arrival_rule() -> void:
 			if named.has("%s/%s" % [folder, spawn_name]):
 				reached[spawn_name] = laid["spawn_points"][spawn_name]
 		laid["spawn_points"] = reached
-		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(laid):
+		for fault: Dictionary in LAYOUT_SENSE.arrival_faults(laid, str(Regen.config_of(folder).get("foes_door", ""))):
 			faulted.append("%s: %s" % [folder, fault["what"]])
 	_check(read >= 15 and faulted.is_empty(), "every level a player reaches (%d read; sample and test_room exempt, castle maps' to mend) has its arrivals clear (%s)" % [read, faulted])
 	var castle := Level.template("castle")
@@ -5370,9 +5422,11 @@ func _test_monster_names(knight: AstralKnight) -> void:
 
 ## The fallen knight's quest (747; Jeff: "a astral projection of a fallen
 ## knight in the altar room that gives the quest ... stop the grave robbers
-## and ill then give access to the crypt"): he stands in the barrow's Altar
-## Room and is never hurt; his ask, the nine named robbers on the taker's
-## list once each (own and own companion's kills, none before the taking),
+## and ill then give access to the crypt"; 747 amended (8): "at the
+## beginning by the actual altar"): he stands in the First Hall behind its
+## bier and is never hurt; his ask, the nine named robbers on the taker's
+## list once each (own and own companion's kills, this generation's before
+## the taking counted at it),
 ## the turn-in sets the flag and reveals the way; an old record loads as no
 ## quest; the reset clears it.
 func _test_barrow_quest() -> void:
@@ -5380,8 +5434,8 @@ func _test_barrow_quest() -> void:
 == the fallen knight's quest (747): his ask, the nine on the list, the turn-in, the way revealed ==")
 	var barrow := Level.load_level("barrow")
 	var knights := (barrow.get("entities", []) as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "astral_knight")
-	_check(knights.size() == 1 and knights[0]["script"] == "res://sim/astral_knight.gd" and knights[0]["tile"] == Vector2i(38, 32),
-		"the barrow's Altar Room has the fallen knight, below the altar (%s)" % [knights.map(func(k: Dictionary) -> Variant: return k.get("tile"))])
+	_check(knights.size() == 1 and knights[0]["script"] == "res://sim/astral_knight.gd" and knights[0]["tile"] == Vector2i(39, 10),
+		"the barrow's First Hall has the fallen knight, behind its bier (747 amended (8)) (%s)" % [knights.map(func(k: Dictionary) -> Variant: return k.get("tile"))])
 	var player := _player()
 	var id := player.player_id
 	var record: PlayerRecord = _main._records.get(id)
@@ -5414,18 +5468,27 @@ func _test_barrow_quest() -> void:
 		if by != null:
 			robber.note_struck(by)
 		World.damage(robber, 999)
+	# 747 amended (8) (the coordinator; Jeff reached the knight over the band's dead): a band
+	# member felled this generation before the taking counts at it; nobody's kill does not.
+	_main._plain_band_slain.clear()
+	if _main._regen.has("barrow"):
+		(_main._regen["barrow"] as Dictionary).erase("band_slain")
 	slay.call(band[1], player)
-	_check(record.barrow_task.is_empty(), "%s felled before the taking: not counted" % band[1])
+	slay.call(band[1], player)
+	slay.call(band[3], null)
+	_check(record.barrow_task.is_empty() and _main._band_slain_by(id) == [band[1]],
+		"%s felled twice before the taking (risen): kept once for the generation, not yet on a list (%s)" % [band[1], _main._band_slain_by(id)])
 	var took: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
 	var items: Array = player.quest.get("items", [])
 	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
 		and player.quest.get("title") == Main.QUEST_TITLE and player.quest.get("giver") == "the fallen knight" and items.size() == 9
-		and items[0] == {"name": "Brand the Ox", "done": false} and not bool(player.quest.get("ready", true)),
-		"taken: open, \"not yet\"; the tracker's nine, none done (%s)" % [player.quest])
+		and items[0] == {"name": "Brand the Ox", "done": false} and items[1]["done"] == true and items[3]["done"] == false
+		and not bool(player.quest.get("ready", true)) and record.barrow_task.get("slain") == [band[1]],
+		"taken: open, \"not yet\"; the tracker's nine, the one felled before checked, nobody's kill not (%s)" % [player.quest])
 	slay.call(band[1], player)
 	slay.call(band[1], player)
 	_check(record.barrow_task.get("slain") == [band[1]] and (player.quest["items"] as Array)[1]["done"] == true,
-		"%s felled twice (risen): on the list once, checked (%s)" % [band[1], record.barrow_task])
+		"%s felled twice more (risen): on the list once, checked (%s)" % [band[1], record.barrow_task])
 	slay.call(band[2], null)
 	_check(not (band[2] in record.barrow_task.get("slain", [])), "a kill not theirs is not on their list")
 	var old := record.to_dict()
@@ -5453,6 +5516,13 @@ func _test_barrow_quest() -> void:
 		"done, his window still opens: his closing words alone, accept \"none\" (%s)" % [closing])
 	_check(_main.reset_barrow(id).has("the fallen knight's quest") and _main.barrow_quest_of(id) == "ask" and not _main.way_revealed(id, "barrow"),
 		"the reset (quests reset all's reset_barrow): the flag cleared, his ask again")
+	_check(_main._band_slain_by(id).is_empty(), "and the reset forgets whom they felled this generation (747 amended (8))")
+	for named: String in band:
+		slay.call(named, player)
+	var over_the_dead: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
+	_check(over_the_dead["ok"] and _main.barrow_quest_of(id) == "ready" and ids.call() == ["turn_in"] and bool(player.quest.get("ready", false)),
+		"taken over the whole band felled first: straight to ready, the turn-in offered (747 amended (8))")
+	_main.reset_barrow(id)
 	World.despawn(knight)
 	for slot in player.slots.size():
 		if player.slots[slot] == Main.CAMP_KEY:  # Brand's, from the nine.

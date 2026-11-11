@@ -255,6 +255,12 @@ static func prepare(level_name: String) -> Dictionary:
 	var starts: Array = made["config"].get("starts", [])
 	for index in starts.size():
 		arrivals["start %d" % (index + 1)] = starts[index]
+	# The quest givers (747 amended (8)): the monsters are laid clear of
+	# them too, so the walk to one from the way in is clear by shape.
+	if "arrival" in (config.get("held", []) as Array):
+		for spec: Dictionary in Level.parse(layout, made["height"], made["config"]).get("entities", []):
+			if str(spec.get("kind", "")) in LAYOUT_SENSE.GIVER_KINDS and spec.get("tile") is Vector2i:
+				arrivals["giver %s" % spec["tile"]] = [spec["tile"].x, spec["tile"].y]
 	config["arrivals"] = arrivals
 	# The worker's own copies: Level keeps the template's dictionaries, which
 	# the main thread goes on reading (the images are only read, by both).
@@ -376,14 +382,15 @@ static func layout_faults(made: Dictionary, config: Dictionary) -> Array:
 ## "ways" (default 3) and "pillars" (0), a dungeon, and the anchors the
 ## spine's heart is sought in: the block's "heart" anchor when it names one
 ## (the crypt's: the robbers' camp), else every anchor (the farthest);
-## "arrival" when the block holds that rule (806 amended (11)).
+## "arrival" when the block holds that rule (806 amended (11)); its
+## "foes_door" (747 amended (8)), the arrival the giver walk is not asked of.
 static func layout_options(config: Dictionary) -> Dictionary:
 	var anchors: Array = config.get("anchors", [])
 	var heart := str(config.get("heart", ""))
 	if not heart.is_empty():
 		anchors = anchors.filter(func(anchor: Variant) -> bool: return anchor is Dictionary and str(anchor.get("name", "")) == heart)
 	return {"ways": int(config.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(config.get("pillars", 0)),
-		"arrival": "arrival" in (config.get("held", []) as Array)}
+		"arrival": "arrival" in (config.get("held", []) as Array), "foes_door": str(config.get("foes_door", ""))}
 
 
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt
