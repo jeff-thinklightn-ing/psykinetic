@@ -199,13 +199,15 @@ const HESITATE_TICKS := 15
 const DEED_EVERY := 10
 const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play", "look", "plate", "fish"]
 ## Fishing with her player (805 amended (5)): asked, or beside them as they fish.
-const ORDER_FISH := "\\b(let'?s (go )?fish(ing)?|fish with me|(go|come) fish(ing)?|(do|try) (some )?fishing|cast a line|have a fish)\\b"
+## The plain asks too (805 amended (14), Jeff's 11-10 report: "Fish.", "Cast."
+## and "Can you fish?" went unheard): "can you fish", "use your rod", "let's
+## fish", "start fishing", and a bare "fish" or "cast" (ORDER_FISH_BARE).
+const ORDER_FISH := "\\b(let'?s (go )?fish(ing)?|fish with me|(go|come) fish(ing)?|(do|try) (some )?fishing|cast (a|your|the) line|have a fish|(can|could|will|would) you (go )?fish|(use|try) (your|the) rod|start fishing|fish for us)\\b"
+const ORDER_FISH_BARE := "^\\W*(fish|fishing|cast)\\W*$"
 const ORDER_FISH_STOP := "\\b(stop fishing|reel (it )?in|enough fishing|done fishing|put (the|your) rod away)\\b"
-## She reels in when her pond holds this few fish or fewer while her player is
-## casting there: what is left is theirs (the coordinator: her catch never
-## thins it against them). Going to fish she needs only one, as their cast
-## does (Jeff's Reed Pond: she refused water he could fish).
-const FISH_LOW := 2
+## Words of fishing in what her player says that no ask matched: the hint
+## (FISH_ASK_HINT) may answer them.
+const FISH_LIKE := "\\b(fish\\w*|rods?|cast(ing)?|angl\\w*)\\b"
 ## How far from her player she looks for a place to fish, and how close she
 ## stays to them while she fishes beside them.
 const FISH_SEEK := 8
@@ -218,6 +220,32 @@ const FISH_NO_ROD := "No rod of my own, but I'll keep you company."
 const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
 ## A fishing place near, fished out for today (voice's).
 const FISH_FISHED_OUT := "This water's fished out for today. Tomorrow, maybe."
+## Her own start (805 amended (14), the coordinator's numbers): her player
+## still FISH_STILL_S within FISH_STILL_NEAR of her, a bank cell within
+## FISH_NEAR of them, no fight and nothing hostile within FISH_DANGER_NEAR;
+## each start line at most once a game day, silent once all are said
+## (voice's words).
+const FISH_STILL_S := 6
+const FISH_STILL_NEAR := 3
+const FISH_SELF: Array[String] = ["Too good a spot to walk past.", "I'll wet a line while we're here.",
+	"Worth a cast, this.", "Let's see what's down there."]
+## With no rod she sits by the water on her own: rarely, once in
+## FISH_SIT_DAYS game days, else silent (voice's).
+const FISH_SIT := "Nice spot. I'll sit a while."
+const FISH_SIT_DAYS := 3
+## Words of fishing no ask matched, she with a rod or the pond want and a
+## pond she would lead to, they far from water: once a game day, never more
+## (voice's; "go fishing" is an ask ORDER_FISH hears, "lead the way" her lead).
+const FISH_ASK_HINT := "If you want to go fishing, say so and I'll lead the way to the water."
+## A hostile within FISH_DANGER_NEAR of her or her player, or one coming at
+## them: she reels in, says so (at most once in FISH_DANGER_GAP_S), and
+## fishes again once it is gone (voice's).
+const FISH_DANGER_NEAR := 5
+const FISH_DANGER := "Not with that about. I'll keep my eyes on it, not the float."
+const FISH_DANGER_GAP_S := 60
+## Her rod would not come to her hand: no room in her pack for what her
+## right hand holds ("this", never named; voice's).
+const FISH_NO_HAND := "My pack's too full to put this away, so I can't take up my rod."
 ## Once a game day, her player fishing beside her and she with no rod: a
 ## wish for more, never a regret (items' ruling C; voice's words).
 const FISH_WISH := "With a rod of my own we'd catch more."
@@ -743,6 +771,9 @@ var guide_note := ""
 ## fishing place she would lead to; () -> bool, true if she knows one (551
 ## amended (3)).
 var lead_to_fish := Callable()
+## Main's: the fishing place she would lead to, () -> Dictionary ({} for none;
+## "want" set for her want's), asked only (805 amended (14), her hint).
+var fish_lead_place := Callable()
 ## What she went and looked at lately (decision 696): {text, zone, cell,
 ## tick}, newest last, the rules' scouted_most, each kept scout_minutes.
 var scouted: Array[Dictionary] = []
@@ -1499,6 +1530,8 @@ func owner_spoke(text: String, phrase := 0) -> void:
 	if not read.is_empty() and obey(read, text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
+	if phrase == 0 and read.is_empty() and _fish_hint(text):
+		return
 	if PHRASE_STANCES.has(phrase):
 		_serial += 1
 		var wanted: int = PHRASE_STANCES[phrase]
@@ -1579,6 +1612,20 @@ var _fish_said := -100000
 var _fish_spell_spoken := false
 var _fish_wish_day := -1
 var _fish_asked := false
+## Her own start (805 amended (14)): where her player stands and since when;
+## her start lines' days; the cell they stood on when they told her to stop
+## (no start of her own there till they move); a cast broken off for a
+## danger, to take up again ({spot, asked}); her last danger word (tick).
+var _still_tile := World.NO_CELL
+var _still_since := 0
+var _fish_self_days := {}
+var _fish_sit_day := -100
+var _fish_hint_day := -1
+var _fish_declined := World.NO_CELL
+var _fish_resume := {}
+var _fish_danger_said := -100000
+var _fish_was_on := false
+var _fish_cannot_days := {}
 
 
 ## The next clue of the first secret unfound in her player's room (813 amended (2)):
@@ -1626,11 +1673,12 @@ static func _water_by(cell: Vector2i) -> Vector2i:
 
 
 ## A free dry cell within FISH_SEEK of [param near] she could fish from:
-## water within reach, a fishing place's, with a fish left (as their cast
-## needs; [param stocked] false: any fishing place's, fished out or not); the
-## one nearest [param near] but not on it (beside her player), NO_CELL if none;
-## [param nearest_her]: the one nearest her (a walk's bank, 551 amended (3)).
-func fish_spot_near(near: Vector2i, stocked := true, nearest_her := false) -> Vector2i:
+## water within reach, a fishing place's (its stock is never a gate, 805
+## amended (14), economy's: past a party's share the bite thins, it never
+## stops); the one nearest [param near] but not on it (beside her player),
+## NO_CELL if none; [param nearest_her]: the one nearest her (a walk's bank,
+## 551 amended (3)).
+func fish_spot_near(near: Vector2i, nearest_her := false) -> Vector2i:
 	var best := World.NO_CELL
 	var best_key := 1 << 30
 	for dy in range(-FISH_SEEK, FISH_SEEK + 1):
@@ -1640,7 +1688,7 @@ func fish_spot_near(near: Vector2i, stocked := true, nearest_her := false) -> Ve
 				continue
 			var water := _water_by(cell)
 			var pond := World.pond_at(water, cell) if water != World.NO_CELL else ""
-			if pond.is_empty() or stocked and _pond_fish(pond) <= 0:
+			if pond.is_empty():
 				continue
 			var key := World.distance(tile, cell) if nearest_her else World.distance(near, cell) * 100 + World.distance(tile, cell)
 			if key < best_key:
@@ -1655,17 +1703,6 @@ func fish_spot_near(near: Vector2i, stocked := true, nearest_her := false) -> Ve
 static func castable(cell: Vector2i) -> bool:
 	var water := _water_by(cell)
 	return water != World.NO_CELL and not World.is_water(cell) and not World.pond_at(water, cell).is_empty()
-
-
-## Whether [param pond] is a fishing place with fish to spare for her.
-static func _pond_ok(pond: String) -> bool:
-	return not pond.is_empty() and _pond_fish(pond) > FISH_LOW
-
-
-## [param pond]'s fish today (economy's stock), plenty without an economy.
-static func _pond_fish(pond: String) -> int:
-	var economy: Variant = World.economy
-	return int(economy.call("pond_fish", pond)) if economy != null and economy.has_method("pond_fish") else 1 << 20
 
 
 ## Off to [param spot] to fish ([param asked] by her player, else beside them).
@@ -1743,21 +1780,40 @@ func _stop_fishing() -> void:
 
 ## Each tick (805 amended (5)): beside her player as they cast, she casts
 ## too if she has a rod and all is safe, once per cast of theirs (no rod:
-## once a game day she wishes she had one); asked, she keeps casting till
-## told to stop. A hostile in sight, her player gone past FISH_NEAR, or her
-## pond down to FISH_LOW, and she reels in.
+## once a game day she wishes she had one); asked, or of her own (805
+## amended (14): her player still beside a fishing place), she keeps casting
+## till told to stop. Her player gone past FISH_NEAR and she leaves it; a
+## danger (_fish_danger) and she reels in, says so, and takes it up again
+## once it is gone. When her cast is refused she says why (_fish_cannot).
 func _tend_fish() -> void:
 	if not _alive(keeper):
 		if order == "fish":
 			_stop_fishing()
+		_fish_resume = {}
 		return
+	if keeper.tile != _still_tile:
+		_still_tile = keeper.tile
+		_still_since = World.tick
+		_fish_declined = World.NO_CELL
+	if _fish_was_on and order != "fish" and _fish_resume.is_empty():
+		_fish_declined = keeper.tile  # Told off it, or another order: none of her own here till they move.
+	_fish_was_on = order == "fish"
 	var theirs: Dictionary = keeper.fishing
-	var unsafe := in_fight() or _hostile_within(SIGHT_RANGE)
 	if order == "fish":
 		var pond := World.pond_at(_water_by(fish_spot), fish_spot) if fish_spot != World.NO_CELL else ""
 		var rodless := _rod_slot() < 0 and _fish_put.is_empty()
-		var low := not rodless and not _pond_ok(pond) and str(theirs.get("state", "")) in ["cast", "wait", "bite"]
-		if unsafe or World.distance(tile, keeper.tile) > FISH_NEAR or low or pond.is_empty() \
+		if not pond.is_empty() and _fish_danger():
+			_fish_resume = {"spot": fish_spot, "asked": _fish_asked}
+			var casting := not fishing.is_empty() and not fishing.has("over")
+			_stop_fishing()
+			_fish_was_on = false
+			if (casting or tile == fish_spot) and World.tick - _fish_danger_said >= FISH_DANGER_GAP_S * World.TICK_RATE:
+				_fish_danger_said = World.tick
+				_say(FISH_DANGER, true, true)
+			_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "danger", "outcome": "reeled in",
+				"note": "a hostile near or coming: fishing again once it is gone"})
+			return
+		if World.distance(tile, keeper.tile) > FISH_NEAR or pond.is_empty() \
 				or (not _fish_asked and theirs.is_empty() and fishing.is_empty()):
 			_stop_fishing()
 			return
@@ -1767,22 +1823,40 @@ func _tend_fish() -> void:
 			World.face(self, (_water_by(tile) - tile).sign())  # Company at the water, no cast of her own (ruling C).
 			return
 		if not _rod_in_hand():
+			_fish_cannot("no_hand")
 			_stop_fishing()
 			return
 		var water := _water_by(tile)
 		World.face(self, (water - tile).sign())
-		if not World.fish_refusal(self).is_empty() or not World.try_fish(self):
+		var no := World.fish_refusal(self)
+		if not World.try_fish(self):
+			_fish_cannot(no)
 			_stop_fishing()
 		return
-	if not fishing.is_empty() or World.tick % DEED_EVERY != 0 or unsafe or not order.is_empty():
-		if fishing.is_empty() and order.is_empty():
-			_rod_away()
+	if not order.is_empty():
+		_fish_resume = {}
 		return
+	if not fishing.is_empty() or World.tick % DEED_EVERY != 0:
+		return
+	if not _fish_resume.is_empty():
+		var at: Vector2i = _fish_resume["spot"]
+		if guide != null or World.distance(keeper.tile, at) > FISH_NEAR:
+			_fish_resume = {}
+		elif _fish_danger():
+			return
+		else:
+			var again := bool(_fish_resume["asked"])
+			_fish_resume = {}
+			_go_fish(at, again)  # It is gone: she takes it up again (805 amended (14)).
+			_fish_was_on = true
+			return
 	_rod_away()
+	if _fish_self_start():
+		return
 	if str(theirs.get("state", "")) != "cast" or World.distance(tile, keeper.tile) > FISH_NEAR:
 		return
 	var their_cast := int(World._fishing.get(keeper, {}).get("from", -1))
-	if their_cast < 0 or their_cast == _fish_joined:
+	if their_cast < 0 or their_cast == _fish_joined or _fish_danger():
 		return
 	_fish_joined = their_cast
 	if _rod_slot() < 0:
@@ -1794,6 +1868,89 @@ func _tend_fish() -> void:
 	var spot := fish_spot_near(keeper.tile)
 	if spot != World.NO_CELL:
 		_go_fish(spot, false)
+		_fish_was_on = true
+
+
+## A danger to fishing (805 amended (14), the coordinator's numbers): a fight,
+## a hostile within FISH_DANGER_NEAR of her or her player, or one in sight
+## going for either of them.
+func _fish_danger() -> bool:
+	if in_fight() or _hostile_within(FISH_DANGER_NEAR):
+		return true
+	for entity in World.get_entities():
+		var monster := entity as Monster
+		if monster != null and is_instance_valid(monster.target) and (monster.target == self or monster.target == keeper) \
+				and _hostile(monster) and World.distance(tile, monster.tile) <= SIGHT_RANGE:
+			return true
+	return false
+
+
+## Her own start (805 amended (14)): her player still FISH_STILL_S within
+## FISH_STILL_NEAR of her, not on a walk she leads, nor where they told her
+## to stop, nothing near to fear, and a bank cell within FISH_NEAR of them.
+## With a rod she fishes (a FISH_SELF line not said today, else silent); with
+## none she keeps them company at the water (FISH_SIT, rarely). True if she went.
+func _fish_self_start() -> bool:
+	if guide != null or keeper.tile == _fish_declined or not keeper.fishing.is_empty() \
+			or World.tick - _still_since < FISH_STILL_S * World.TICK_RATE \
+			or World.distance(tile, keeper.tile) > FISH_STILL_NEAR:
+		return false
+	var spot := fish_spot_near(keeper.tile)
+	if spot == World.NO_CELL or World.distance(spot, keeper.tile) > FISH_NEAR or _fish_danger():
+		return false
+	_go_fish(spot, true)
+	_fish_was_on = true
+	var day := Townsfolk.day_of(World.steps)
+	var line := ""
+	if _rod_slot() < 0:
+		if day - _fish_sit_day >= FISH_SIT_DAYS:
+			_fish_sit_day = day
+			line = FISH_SIT
+	else:
+		for each: String in FISH_SELF:
+			if int(_fish_self_days.get(each, -1)) != day:
+				_fish_self_days[each] = day
+				line = each
+				break
+	if not line.is_empty():
+		_say(line, true)
+	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "still by the water",
+		"outcome": "fish" if _rod_slot() >= 0 else "company", "note": "of her own: her player stood by a fishing place"})
+	return true
+
+
+## Words of fishing in [param text] no ask matched (805 amended (14)): with a
+## rod of hers or the pond want, a pond she would lead them to
+## (fish_lead_place) and no fishing water near, FISH_ASK_HINT, once a game
+## day; never at the bank, and never more. True if she said it.
+func _fish_hint(text: String) -> bool:
+	var day := Townsfolk.day_of(World.steps)
+	if day == _fish_hint_day or not _alive(keeper) or in_fight() or not fish_lead_place.is_valid() \
+			or RegEx.create_from_string(FISH_LIKE).search(text.to_lower()) == null:
+		return false
+	if fish_spot_near(keeper.tile) != World.NO_CELL:
+		return false
+	var place: Dictionary = fish_lead_place.call()
+	if place.is_empty() or not (_rod_slot() >= 0 or place.has("want")):
+		return false
+	_fish_hint_day = day
+	_say(FISH_ASK_HINT, true)
+	_log({"kind": "voice", "companion": _name_of(self), "trigger": text, "outcome": "hint",
+		"note": "words of fishing no ask matched, far from water: how to ask, once a day"})
+	return true
+
+
+## Why her cast did not start, said (805 amended (14)): no hand for the rod,
+## fished out (until economy's party share lands), no water a cast reaches;
+## busy (stunned, a job), unsaid. Each reason once a game day.
+func _fish_cannot(why: String) -> void:
+	var line: String = {"no_hand": FISH_NO_HAND, "no_rod": FISH_NO_HAND, "fished_out": FISH_FISHED_OUT,
+		"no_water": FISH_NO_WATER, "no_fish": FISH_NO_WATER}.get(why, "")
+	var day := Townsfolk.day_of(World.steps)
+	if not line.is_empty() and int(_fish_cannot_days.get(why, -1)) != day:
+		_fish_cannot_days[why] = day
+		_say(line, true)
+	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "her cast", "outcome": "refused", "note": why})
 
 
 ## A reward of her player's (Main.reward's [param data]) she may react to
@@ -2042,7 +2199,7 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 		return looking
 	if RegEx.create_from_string(ORDER_FISH_STOP).search(said) != null:
 		return {"verb": "fish", "on": false}
-	if found.call(ORDER_FISH):
+	if found.call(ORDER_FISH) or RegEx.create_from_string(ORDER_FISH_BARE).search(said.strip_edges()) != null:
 		return {"verb": "fish", "on": true}
 	if found.call(ORDER_BANDAGE):
 		var own := RegEx.create_from_string("\\b(yourself|your (own )?wounds?|you up|your (cut|bleeding|leg|arm))").search(said) != null
@@ -2271,19 +2428,26 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 		"fish":
 			if not bool(read.get("on", true)):
 				_stop_fishing()
+				_fish_resume = {}
+				if _alive(keeper):
+					_fish_declined = keeper.tile  # None of her own here till they move (805 amended (14)).
 				done = "%s asked you to stop fishing; you reel in and put the rod away." % keeper_name()
 			elif in_fight():
 				done = "%s asked you to fish, but there is fighting near: not now." % keeper_name()
-			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile, false) == World.NO_CELL and bool(lead_to_fish.call()):
+			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile) == World.NO_CELL and bool(lead_to_fish.call()):
 				# No water here, and she knows a pond she would take them to (551
 				# amended (3)): Main's walk, her voice told by its guide_note.
 				_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "lead", "note": "to the water she knows"})
 				return true
 			else:
 				var spot := fish_spot_near(keeper.tile if _alive(keeper) else tile)
-				if spot == World.NO_CELL and fish_spot_near(keeper.tile if _alive(keeper) else tile, false) != World.NO_CELL:
-					_say(FISH_FISHED_OUT, true)
-					done = "%s asked you to fish, but the water here is fished out for today." % keeper_name()
+				if spot != World.NO_CELL and _fish_danger():
+					# Something hostile near (805 amended (14)): she says so, and
+					# goes once it is gone (_tend_fish's _fish_resume).
+					_fish_resume = {"spot": spot, "asked": true}
+					_fish_danger_said = World.tick
+					_say(FISH_DANGER, true, true)
+					done = "%s asked you to fish, but something hostile is near: you keep your eyes on it, and fish once it is gone." % keeper_name()
 				elif spot == World.NO_CELL:
 					_say(FISH_NO_WATER, true)
 					done = "%s asked you to fish, but there is no water with fish in it near." % keeper_name()

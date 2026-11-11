@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion goes fishing with you: with a rod on her, stand by the water together a moment and she casts beside you; a plain "Fish." or "Can you fish?" asks her, and if something hostile comes near she reels in and watches it, then takes up her rod again once it's gone (805 amended (14)).
 - Your companion comes fishing with you even with no rod of her own: ask her and she walks to the water beside you and keeps you company while you cast (805 amended (13)).
 - Visitors to a town no longer say they came "from the road", or that "the road from the road was quiet" (711 amended (1)).
 - Townsfolk keep moving through the day now: every few minutes each walks to another spot of wherever they are, at work, in the square, by the well, at the temple or at home, never all at once, and when they stand they face open ground, not a wall (853).

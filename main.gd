@@ -8642,6 +8642,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	pet.guide_done = _guide_done
 	pet.guide_words = func() -> String: return _roads_words(record, pet)
 	pet.lead_to_fish = _lead_to_fish.bind(pet)
+	pet.fish_lead_place = _fish_lead_place.bind(pet)
 	var walk: Guide = _guides.get(record.player_id)
 	if walk != null:
 		walk.bind(pet, player)
@@ -8747,15 +8748,25 @@ func _note_lead_offer(pet: Companion, text: String) -> void:
 ## (her want's at any step; devoted, the nearest she knows). True if she
 ## knows one (her voice told whether she goes).
 func _lead_to_fish(pet: Companion) -> bool:
-	var record := _record_of(pet)
 	var player := pet.keeper as Player
-	if record == null or player == null or not is_instance_valid(player):
-		return false
-	var to := _fish_place(record, pet) if pet.bond_at_least("devoted") else _want_place(record, pet)
-	if to.is_empty():
+	var to := _fish_lead_place(pet)
+	if to.is_empty() or player == null or not is_instance_valid(player):
 		return false
 	_start_guide(pet, player, to)
 	return true
+
+
+## The fishing place [param pet] would lead her player to (551 amended (3)):
+## her want's (marked "want") at any step, else, devoted, the nearest she
+## knows; {} for none. Her hint reads it too (805 amended (14)).
+func _fish_lead_place(pet: Companion) -> Dictionary:
+	var record := _record_of(pet)
+	if record == null:
+		return {}
+	var to := _want_place(record, pet)
+	if to.is_empty() and pet.bond_at_least("devoted"):
+		to = _fish_place(record, pet)
+	return to
 
 
 ## Her player's map told what she knows the way to (decision 551): the

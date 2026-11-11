@@ -105,6 +105,7 @@ func _ready() -> void:
 	_test_questions_live()
 	_test_companion_verb()
 	_test_fishing()
+	_test_fish_mend()
 	_test_reed_pond_cells()
 	_test_fish_waters()
 	_test_notice()
@@ -2288,15 +2289,10 @@ func _test_fishing() -> void:
 	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("sword", "built"))
 	var spot := pet.fish_spot_near(owner.tile)
 	_check(spot != World.NO_CELL and spot != owner.tile and Companion._water_by(spot) != World.NO_CELL, "a place to fish beside her player (%s)" % [spot])
-	# Jeff's Reed Pond: one fish left is enough, as for his own cast; none, and she says it is fished out.
+	# The pond's stock is never a gate (805 amended (14), economy's party share): empty, still a place to fish.
 	var today: int = World.economy.now() / maxi(DayNight.day_steps, 1)
-	World.economy._ponds[pond] = {"fish": 1, "day": today}
-	_check(World.fish_refusal(owner) != "fished_out" and pet.fish_spot_near(owner.tile) != World.NO_CELL,
-		"one fish left: a place to fish, as for her player's cast (it was refused under FISH_LOW)")
 	World.economy._ponds[pond] = {"fish": 0, "day": today}
-	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
-	_check(pet.order != "fish" and Companion.FISH_FISHED_OUT in pet._said and pet.fish_spot_near(owner.tile) == World.NO_CELL,
-		"fished out: she says so (not \"we'd need a pond\"), and does not go")
+	_check(pet.fish_spot_near(owner.tile) == spot, "no fish left today: still a place to fish beside her player (%s)" % [pet.fish_spot_near(owner.tile)])
 	World.economy._ponds.erase(pond)
 	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
 	_check(pet.order == "fish" and pet.hold_tile == spot, "asked: she goes to the water's edge")
@@ -2336,8 +2332,9 @@ func _test_fishing() -> void:
 	var _imp := _foe_nearby(pet)
 	for i in 3:
 		World.step()
-	_check(pet.order != "fish" and World.rod_hand(pet) < 0 and pet.slots[Items.RIGHT_HAND] == "sword" and Array(pet.slots).find("fishing_rod") in Items.PACK_SLOTS,
-		"a hostile in sight: she reels in, the rod to her pack, her sword back in her right hand (%s)" % [pet.slots])
+	_check(pet.order != "fish" and World.rod_hand(pet) < 0 and pet.slots[Items.RIGHT_HAND] == "sword" and Array(pet.slots).find("fishing_rod") in Items.PACK_SLOTS
+			and pet._said.back() == Companion.FISH_DANGER,
+		"a hostile near: she reels in and says why, the rod to her pack, her sword back in her right hand (%s, %s)" % [pet.slots, pet._said.back()])
 	_kill_monsters()
 	pet.slots[Items.LEFT_HAND] = ""
 	for i in World.FISH_END_TICKS + 2:
@@ -2407,6 +2404,186 @@ func _test_fishing() -> void:
 	World.holdings._since.erase(pond)
 	for slot in held_was.size():
 		pet.slots[slot] = held_was[slot]
+	_settle(pet)
+
+
+## 805 amended (14), Jeff's 11-10 report ("they dont know how, and yes i gave
+## them a pole, and yes its in their hand"): the asks that went unheard, her
+## own start by the water (rod or none), no stock gate, a danger, the hint.
+func _test_fish_mend() -> void:
+	print("\n== fishing that works: the plain asks, her own start, no stock gate, danger, the hint (805 amended (14)) ==")
+	for text: String in ["Fish.", "Cast.", "Can you fish?", "Use your rod.", "Let's fish.", "Go fish.", "Try fishing.", "Go fishing.", "fish!"]:
+		var read := Companion.order_in(text)
+		_check(read.get("verb") == "fish" and read.get("on") == true, "\"%s\": an ask to fish (%s)" % [text, read])
+	for text: String in ["I caught a fish.", "Nice cast.", "Do you like fish?", "Is that a fishing rod?"]:
+		_check(Companion.order_in(text).get("verb", "") != "fish", "\"%s\": not an ask to fish" % text)
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var owner: GridEntity = pet.keeper
+	var water := World.NO_CELL
+	for cell: Vector2i in [owner.tile + Vector2i(2, 0), owner.tile + Vector2i(-2, 0), owner.tile + Vector2i(0, 2), owner.tile + Vector2i(0, -2)]:
+		if World.is_walkable(cell) and not World._occupancy.has(cell):
+			water = cell
+			break
+	_check(water != World.NO_CELL, "a cell for the pond beside her player")
+	if water == World.NO_CELL:
+		return
+	var had_water := World.is_water(water)
+	World._water[water] = true
+	var pond := "%s/mend_pond" % World.zone.name
+	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "mend_pond", "cell": water, "name": "the mend pond",
+		"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+	World._fish_waters.get_or_add(World.zone.name, {})[water] = "pool_mend"
+	World._fish_stock_of.clear()
+	World.holdings._holder[pond] = "nobody"
+	World.holdings._strength[pond] = 1
+	World.holdings._since[pond] = 0
+	var today: int = World.economy.now() / maxi(DayNight.day_steps, 1)
+	var hers_was := pet.slots.duplicate()
+	var his_was := owner.slots.duplicate()
+	var lead_was := pet.fish_lead_place
+	for slot in pet.slots.size():
+		if not pet.slots[slot].is_empty() and Items.def(pet.slots[slot]).get("use") == "fish":
+			pet.slots[slot] = ""
+	pet.slots[Items.RIGHT_HAND] = ""
+	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("fishing_rod", "built"))
+	pet._fish_self_days = {}
+	pet._fish_resume = {}
+	# Her own start, rod in hand: her player still FISH_STILL_S beside the pond.
+	var still_ticks := Companion.FISH_STILL_S * World.TICK_RATE
+	var lines: Array[String] = []
+	for start in Companion.FISH_SELF.size() + 1:
+		pet._still_tile = World.NO_CELL  # As if her player had just stepped here.
+		var said_was: int = pet._said.size()
+		var early := false
+		var cast_at := -1
+		for i in still_ticks + 80:
+			World.step()
+			early = early or i < still_ticks - 1 and pet.order == "fish"
+			if str(pet.fishing.get("state", "")) == "cast":
+				cast_at = i
+				break
+		var new_lines: Array = pet._said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.FISH_SELF)
+		_check(not early and cast_at >= still_ticks - 1 and new_lines.size() <= 1,
+			"start %d: still %d s beside the water, she casts of her own (tick %d), not before (%s)" % [start + 1, Companion.FISH_STILL_S, cast_at, new_lines])
+		lines.append(str(new_lines[0]) if new_lines.size() == 1 else "")
+		pet._carry_out({"verb": "fish", "on": false}, "Stop fishing.")
+		for i in World.FISH_END_TICKS + 2:
+			World.step()
+	_check(lines.slice(0, Companion.FISH_SELF.size()) == Companion.FISH_SELF and lines.back() == "",
+		"each start line once a game day, then she starts in silence (%s)" % [lines])
+	var stopped_at := -1
+	for i in still_ticks + 40:
+		World.step()
+		if pet.order == "fish":
+			stopped_at = i
+			break
+	_check(stopped_at < 0, "told to stop: no start of her own while her player stays put")
+	# His casts, his pond nearly empty and empty: she casts all the same (FISH_LOW is gone).
+	owner.slots[Items.RIGHT_HAND] = ""
+	World.put_item(owner, owner, Items.RIGHT_HAND, World.items.mint("fishing_rod", "built"))
+	for stock: int in [2, 0]:
+		World.economy._ponds[pond] = {"fish": stock, "day": today}
+		World.face(owner, (water - owner.tile).sign())
+		World.try_fish(owner)
+		pet._carry_out({"verb": "fish", "on": true}, "Cast.")
+		var hers := false
+		var said_was: int = pet._said.size()
+		for i in 80:
+			World.step()
+			hers = hers or str(pet.fishing.get("state", "")) == "cast"
+			if owner.fishing.is_empty() and World.fish_refusal(owner).is_empty():
+				World.try_fish(owner)
+		var told: Array = pet._said.slice(said_was)
+		_check(hers or stock == 0 and Companion.FISH_FISHED_OUT in told,
+			"%d fish left, asked: she casts beside them (until economy's party share, at none she says it is fished out) (%s, %s)" % [stock, hers, told])
+		pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
+		if not owner.fishing.is_empty():
+			World.try_fish(owner)
+		for i in World.FISH_END_TICKS + 2:
+			World.step()
+	World.economy._ponds.erase(pond)
+	# A hostile out past FISH_DANGER_NEAR, not coming: she fishes on (the repro's imp in sight).
+	pet._carry_out({"verb": "fish", "on": true}, "Fish.")
+	for i in 60:
+		World.step()
+		if not pet.fishing.is_empty():
+			break
+	var far_imp := _spawn_imp(_free_tile_between(pet, Companion.FISH_DANGER_NEAR + 1, Companion.SIGHT_RANGE))
+	for i in 5:
+		World.step()
+	_check(pet.order == "fish", "an imp %d cells off, not coming: she fishes on (%s)" % [World.distance(pet.tile, far_imp.tile), pet.order])
+	World.damage(far_imp, 999)
+	# One near: she reels in, says why, and takes it up again once it is gone.
+	pet._fish_danger_said = -100000
+	var near_imp := _foe_nearby(pet)
+	for i in 3:
+		World.step()
+	_check(pet.order != "fish" and pet._said.back() == Companion.FISH_DANGER and not pet._fish_resume.is_empty(),
+		"an imp %d cells off: she reels in and says so (%s)" % [World.distance(pet.tile, near_imp.tile), pet._said.back()])
+	World.damage(near_imp, 999)
+	var back_at := -1
+	for i in Companion.DEED_EVERY * 3:
+		World.step()
+		if pet.order == "fish":
+			back_at = i
+			break
+	_check(back_at >= 0, "it gone, she fishes again (tick %d)" % back_at)
+	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	# No rod: of her own she keeps them company at the water, FISH_SIT rarely.
+	for slot in pet.slots.size():
+		if pet.slots[slot] == "fishing_rod":
+			pet.slots[slot] = ""
+	pet._fish_sit_day = -100
+	var sat := 0
+	for start in 2:
+		pet._still_tile = World.NO_CELL
+		var there := false
+		for i in still_ticks + 80:
+			World.step()
+			if pet.order == "fish" and pet.tile == pet.fish_spot:
+				there = true
+				break
+		sat += 1 if there else 0
+		pet._carry_out({"verb": "fish", "on": false}, "Stop fishing.")
+		World.step()
+	_check(sat == 2 and pet._said.count(Companion.FISH_SIT) == 1, "no rod: she goes and sits by the water of her own, and says so once (%d, %d)" % [sat, pet._said.count(Companion.FISH_SIT)])
+	# The hint: words of fishing no ask matched, a want's pond to lead to, far from water; once a day.
+	pet.fish_lead_place = func() -> Dictionary: return {"key": "mend_pond", "want": "pond"}
+	pet._fish_hint_day = -1
+	_check(Companion.order_in("Do you know how to fish?").is_empty() and not pet._fish_hint("Do you know how to fish?"),
+		"at the bank: no hint")
+	if not had_water:
+		World._water.erase(water)
+	(World._fish_waters.get(World.zone.name, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
+	_check(pet._fish_hint("Do you know how to fish?") and pet._said.back() == Companion.FISH_ASK_HINT
+			and "go fishing" in Companion.FISH_ASK_HINT and Companion.order_in("Go fishing.").get("verb") == "fish",
+		"far from water, her want's pond to lead to: how to ask, in words her ask hears (%s)" % pet._said.back())
+	_check(not pet._fish_hint("Know any good fishing spots?"), "a second time that day: never")
+	pet._fish_hint_day = -1
+	_check(not pet._fish_hint("Nice weather."), "no word of fishing: no hint")
+	pet.fish_lead_place = func() -> Dictionary: return {"key": "mend_pond"}
+	_check(not pet._fish_hint("Do you know how to fish?"), "no rod and no want: no hint")
+	pet.fish_lead_place = func() -> Dictionary: return {}
+	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("fishing_rod", "built"))
+	_check(not pet._fish_hint("Do you know how to fish?"), "a rod but no pond she would lead to: no hint")
+	pet.fish_lead_place = lead_was
+	# Put back.
+	pet._stop_fishing()
+	for slot in hers_was.size():
+		pet.slots[slot] = hers_was[slot]
+	for slot in his_was.size():
+		owner.slots[slot] = his_was[slot]
+	World.holdings._places.erase(pond)
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
+	pet._fish_resume = {}
+	pet._fish_declined = World.NO_CELL
 	_settle(pet)
 
 
@@ -3362,7 +3539,7 @@ func _test_want_lead() -> void:
 	_main._on_companion_said("What a fine day it is.", pet)
 	_check(not _main._guide_offers.has(record.player_id), "a line offering nothing: no offer")
 	# Asked to fish with no water near: she takes them to her pond.
-	_check(pet.fish_spot_near(owner.tile, false) == World.NO_CELL, "no fishing water near her player")
+	_check(pet.fish_spot_near(owner.tile) == World.NO_CELL, "no fishing water near her player")
 	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
 	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond and (pet._said.is_empty() or pet._said.back() != Companion.FISH_NO_WATER),
 		"wary, asked to fish with no water near: she takes them to the pond, not \"we'd need a pond\" (%s)" % [pet.guide.goal if pet.guide != null else null])

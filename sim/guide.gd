@@ -395,7 +395,7 @@ func step(routes: WorldRoutes, threat: Callable) -> String:
 		# A fishing place (551 amended (3)): its bank nearest her, once she is
 		# in its area; there when she could cast from where she stands.
 		if not goal.has("banked"):
-			var bank := pet.fish_spot_near(goal["cell"], false, true)
+			var bank := pet.fish_spot_near(goal["cell"], true)
 			goal["banked"] = bank != NONE
 			if bank != NONE:
 				goal["cell"] = bank

@@ -8017,7 +8017,10 @@ func try_fish(by: GridEntity) -> bool:
 		if not _fishing[by].has("over"):
 			_reel_in(by, "lowered")
 		return true
-	if not fish_refusal(by).is_empty():
+	var no := fish_refusal(by)
+	if not no.is_empty():
+		# Counts only (805 amended (14)): the reason and who, never a name, id or cell.
+		print("[fish] refused %s %s" % [no, "companion" if by is Companion else "player"])
 		return false
 	var at := cast_cell(by)
 	var pond := pond_at(at, by.tile)

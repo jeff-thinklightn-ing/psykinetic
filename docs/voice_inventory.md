@@ -8,9 +8,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2771)
+## Lines in the code (2784)
 
-### companions (Pip, Wren, Nix) (627)
+### companions (Pip, Wren, Nix) (640)
 
 | | Line | Where |
 |---|---|---|
@@ -59,11 +59,21 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | \\b(give\|hand\|pass\|return)\\b.*\\b(me\|back)\\b | `sim/companion.gd` ORDER_GIVE_BACK |
 |  | \\b((i\|i'll\|i will\|let me\|we\|we'll)\\s+(\\w+\\s+)?(take\|carry\|hold\|keep\|have\|put)\|carry on\|take (cover\|us\|me\|a (rest\|break\|breather\|look)\|the lead\|them out\|aim)\|hold (on\|the door\|still\|position\|back)\|keep (going\|up\|still\|watch\|an eye))\\b | `sim/companion.gd` ORDER_CARRY_NOT |
 |  | As you say. | `sim/companion.gd` ORDER_ACKS |
-|  | \\b(let'?s (go )?fish(ing)?\|fish with me\|(go\|come) fish(ing)?\|(do\|try) (some )?fishing\|cast a line\|have a fish)\\b | `sim/companion.gd` ORDER_FISH |
+|  | \\b(let'?s (go )?fish(ing)?\|fish with me\|(go\|come) fish(ing)?\|(do\|try) (some )?fishing\|cast (a\|your\|the) line\|have a fish\|(can\|could\|will\|would) you (go )?fish\|(use\|try) (your\|the) rod\|start fishing\|fish for us)\\b | `sim/companion.gd` ORDER_FISH |
+|  | ^\\W*(fish\|fishing\|cast)\\W*$ | `sim/companion.gd` ORDER_FISH_BARE |
 |  | \\b(stop fishing\|reel (it )?in\|enough fishing\|done fishing\|put (the\|your) rod away)\\b | `sim/companion.gd` ORDER_FISH_STOP |
+|  | \\b(fish\\w*\|rods?\|cast(ing)?\|angl\\w*)\\b | `sim/companion.gd` FISH_LIKE |
 |  | No rod of my own, but I'll keep you company. | `sim/companion.gd` FISH_NO_ROD |
 |  | Nothing to fish in here. We'd need a pond. | `sim/companion.gd` FISH_NO_WATER |
 |  | This water's fished out for today. Tomorrow, maybe. | `sim/companion.gd` FISH_FISHED_OUT |
+|  | Too good a spot to walk past. | `sim/companion.gd` FISH_SELF |
+|  | I'll wet a line while we're here. | `sim/companion.gd` FISH_SELF |
+|  | Worth a cast, this. | `sim/companion.gd`  |
+|  | Let's see what's down there. | `sim/companion.gd`  |
+|  | Nice spot. I'll sit a while. | `sim/companion.gd` FISH_SIT |
+|  | If you want to go fishing, say so and I'll lead the way to the water. | `sim/companion.gd` FISH_ASK_HINT |
+|  | Not with that about. I'll keep my eyes on it, not the float. | `sim/companion.gd` FISH_DANGER |
+|  | My pack's too full to put this away, so I can't take up my rod. | `sim/companion.gd` FISH_NO_HAND |
 |  | With a rod of my own we'd catch more. | `sim/companion.gd` FISH_WISH |
 |  | You just landed a fish, fishing beside %s. If you speak now, speak of that, in your own way. | `sim/companion.gd` FISH_CAUGHT |
 |  | \\b(stand\|stay\|wait\|step\|go\|get\|hold\|keep)\\b[^.!?]*\\bplates?\\b | `sim/companion.gd` ORDER_PLATE |
@@ -185,6 +195,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | a quick phrase: its stance at once, standing as the instruction | `sim/companion.gd` owner_spoke() |
 |  | her player's words named another, not her | `sim/companion.gd` owner_spoke() |
 |  | %s just spoke to you. | `sim/companion.gd` owner_spoke() |
+|  | a hostile near or coming: fishing again once it is gone | `sim/companion.gd` _tend_fish() |
+|  | of her own: her player stood by a fishing place | `sim/companion.gd` _fish_self_start() |
+|  | words of fishing no ask matched, far from water: how to ask, once a day | `sim/companion.gd` _fish_hint() |
 |  | You and %s have just grown closer; you are %s %s now. %s | `sim/companion.gd` noticed() |
 |  | Just now %s saw: "%s." | `sim/companion.gd` noticed() |
 |  | %s has just %s. | `sim/companion.gd` noticed() |
@@ -217,7 +230,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You come along with %s, as they asked. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to stop fishing; you reel in and put the rod away. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to fish, but there is fighting near: not now. | `sim/companion.gd` _carry_out() |
-|  | %s asked you to fish, but the water here is fished out for today. | `sim/companion.gd` _carry_out() |
+|  | %s asked you to fish, but something hostile is near: you keep your eyes on it, and fish once it is gone. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to fish, but there is no water with fish in it near. | `sim/companion.gd` _carry_out() |
 |  | You have no rod of your own, so you go to the water's edge to keep %s company while they fish, as asked. | `sim/companion.gd` _carry_out() |
 |  | You go to the water's edge to fish beside %s, as asked. | `sim/companion.gd` _carry_out() |
