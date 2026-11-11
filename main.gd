@@ -3154,7 +3154,12 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 		_free_unblock()
 		return true
 	var yields := other is Player
-	var on_way: bool = path.slice(0, 2).has(there)
+	# 724 amended (6): the route's next two cells, or the first two of the
+	# straight way to its next point: a route pulled to a far point
+	# (_free_pull) has none between, and one standing head-on there was
+	# missed, left to the backstop, which planned both round by one side.
+	var on_way: bool = path.slice(0, 2).has(there) \
+			or World.line_cells(World.free_cell(player, at), path[0]).slice(0, 2).has(there)
 	if not on_way:
 		# Not on the route's next cells (brushed in passing, or left behind by
 		# a step aside, which a frame or two may still see ahead): walked on.

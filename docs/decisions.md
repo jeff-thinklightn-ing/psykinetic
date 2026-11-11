@@ -37114,6 +37114,21 @@ at once (on the spot at most 0.1 s; a side taken with no way on from it would st
 second and come back, its block's count starting again each time it moved) and the walk is given up FREE_GIVE_UP_SECONDS after. Each fails on the old code
 (the run's lines are in the landing message). Client only; protocol unchanged; no new
 class_name.
+
+724 amended (6) (decision_number.sh's label; the coordinator's order, from voice's landing; a fix, no
+package): two players head on along a straight two-cell way each went round by the same side, then
+both stepped aside. Voice's landing on 5605063a2 failed net_test phase 3, "one stepped to its right and
+neither gave up (got 20, want 10)". 689 amended (7)'s pull cut each route to its end, (12, 12) and (5, 12),
+so the other, standing on the row between, was on neither route's next two cells, and (4)'s "on the
+way" never counted him: 724's wait and own-right step never came, both pressed till the backstop (689
+amended (9)) planned each round him by the one open side, row 11, where they met again and each stepped
+its own right. Both arrived, nothing given up (about a second's shuffle), but the backstop line is in
+every phase 3 run since 5605063a2, the passing ones too (one's right was the wall that time). "On the
+way" now also counts the first two cells of the straight line (World.line_cells) from the body's cell to
+the route's next point. A route not pulled is unchanged (its next point is the next cell). controls_test
+_test_free_route_held: a route pulled to (11, 3), another player at (8, 3), from (7.2, 3.0): in the way
+and waited for. Client only; protocol unchanged; no new class_name.
+
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot

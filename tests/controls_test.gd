@@ -1180,6 +1180,17 @@ func _test_free_route_held() -> void:
 			"walking by along the row beside his: not blocked")
 	World.despawn(holder)
 	holder.queue_free()
+	# 724 amended (6) (voice's landing, net_test phase 3: two head-on on a row
+	# both planned round by one side, then both stepped aside): a route pulled
+	# to a far point (_free_pull) has no cell between, and another player on
+	# the straight way there is in the way, waited for to step his own right.
+	holder = _held_body("player", Vector2i(8, 3))
+	_main._free["path"] = [Vector2i(11, 3)]
+	var met: bool = _main._free_blocked(player, Vector2(7.2, 3.0), Vector2(1, 0), _main._free["path"])
+	_check(met and _main._free.get("block_wait", false),
+			"a route pulled to (11, 3), another player head on at (8, 3): in the way, waited for (blocked %s)" % met)
+	World.despawn(holder)
+	holder.queue_free()
 	for kind in ["talker", "foe", "player"]:
 		# The route's own end held (a person stood on the cell clicked).
 		_place_player(Vector2i(3, 3))
