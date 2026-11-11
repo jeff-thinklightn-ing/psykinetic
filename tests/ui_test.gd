@@ -2546,10 +2546,9 @@ func _test_store_face_clicks() -> void:
 	for person: bool in [false, true]:
 		if person:
 			barter.open(_main._local_player(), "Hob")
-			barter.set_person(_main._local_player(), true, false)
-			barter.show_asks(_main._local_player(), [
-				{"id": "hob|commission|a", "kind": "commission", "title": "Take the rescue", "words": "Kin held.", "accept": "take", "cost": 0},
-				{"id": "hob|give|b", "kind": "give", "title": "Give toward the well", "words": "The well waits.", "accept": "give", "cost": 10}], 7)
+			barter.set_person(_main._local_player(), true, true)
+			barter.show_wares(_main._local_player(), "Hob", [
+				{"id": "hob|wares|a", "kind": Offers.WARES, "accept": Offers.WARES, "title": "A knife", "words": "", "cost": 3, "what": {"item": "knife"}}], 7)
 		else:
 			barter.open(null, "Snagfin")
 			barter.show_barter({"shop": "", "town": "Umbrage", "gold": 12,
