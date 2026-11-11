@@ -3730,8 +3730,8 @@ func _test_rout_way_out() -> void:
 			"the barrow's entrance, the link to the wilds, at %s" % entrance)
 	var e := _build(["###"])
 	World.load_terrain(level["terrain"])
-	_check(World.ways_out() == [entrance] and World.is_link_cell(Vector2i(52, 16)),
-			"its ways out %s: the entrance alone, the hidden way down not among them" % [World.ways_out()])
+	_check(World.ways_out() == [entrance, Vector2i(31, 52)] and World.is_link_cell(Vector2i(52, 16)),
+			"its ways out %s: the entrance and the breach (832), the hidden way down not among them" % [World.ways_out()])
 	var path: Array[Vector2i] = []
 	for cell: Vector2i in level["terrain"]["floor"]:  # The deepest way in from the entrance.
 		var way := World.find_path(entrance + Vector2i(0, 1), cell)
