@@ -55,6 +55,8 @@ func _ready() -> void:
 	await _test_layout_on_accept()
 	await _test_arrivals()
 	_test_accept_keeps()
+	_test_json_keep()
+	_test_runner()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1552,3 +1554,116 @@ func _test_accept_keeps() -> void:
 	var written := found.map(func(hit: RegExMatch) -> String: return hit.get_string(1))
 	var missing := written.filter(func(key: String) -> bool: return key not in BuilderSession.CONFIG_KEYS)
 	_check(written.size() >= 5 and missing.is_empty(), "every config key a tool writes is carried on accept (%d writes; missing %s)" % [written.size(), missing])
+
+
+## The lines of [param a] and [param b] that differ, by line number, and
+## the difference in their counts.
+func _lines_apart(a: String, b: String) -> int:
+	var one := a.split("\n")
+	var two := b.split("\n")
+	var apart := absi(one.size() - two.size())
+	for i in mini(one.size(), two.size()):
+		if one[i] != two[i]:
+			apart += 1
+	return apart
+
+
+## [param text] (a level.json) without what 537's building codes add: each
+## building's "code" line, the "building_codes" block, and the commas
+## either brings before it.
+func _without_codes(text: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var in_block := false
+	for line in text.split("\n"):
+		if line.begins_with("\t\"building_codes\": {"):
+			in_block = not line.ends_with("}") and not line.ends_with("},")
+			continue
+		if in_block:
+			in_block = not (line == "\t}" or line == "\t},")
+			continue
+		if line.strip_edges().begins_with("\"code\": "):
+			continue
+		out.append(line.trim_suffix(","))
+	return out
+
+
+func _test_json_keep() -> void:
+	print("\n== level.json written in its own words (851) ==")
+	var keep := MapDoc.JSON_KEEP
+	for level_name: String in ["wilds", "barrow", "barrow_deep", "test_room"]:
+		var text := FileAccess.get_file_as_string(Level.DIR + level_name + "/level.json")
+		var config: Dictionary = JSON.parse_string(text)
+		_check(keep.write(text, config) == text, "%s: no change writes the file byte for byte" % level_name)
+		var named := config.duplicate(true)
+		named["name"] = str(named["name"]) + " (renamed)"
+		var renamed: String = keep.write(text, named)
+		_check(_lines_apart(text, renamed) == 1 and keep.same(JSON.parse_string(renamed), named), "%s: one value changed changes one line" % level_name)
+		# npc's "spots" (a new top-level list) written, read back, kept, and one changed in one line.
+		var spotted := config.duplicate(true)
+		spotted["spots"] = [{"use": "fire", "cell": [3.0, 4.0], "face": [4, 4], "pose": "sit", "town": "store"},
+			{"use": "work", "trade": "cook", "cell": [6, 4], "face": [6, 5], "pose": "stand", "town": "store"}]
+		var with_spots: String = keep.write(text, spotted)
+		_check(keep.same(JSON.parse_string(with_spots), spotted) and keep.write(with_spots, JSON.parse_string(with_spots)) == with_spots
+			and "\"cell\": [3, 4]" in with_spots and not "3.0" in with_spots.substr(with_spots.find("\"spots\"")),
+			"%s: spots written (a cell on one line, whole numbers without .0) and kept as they are" % level_name)
+		var sitting: Dictionary = JSON.parse_string(with_spots)
+		sitting["spots"][1]["pose"] = "lean"
+		_check(_lines_apart(with_spots, keep.write(with_spots, sitting)) == 1, "%s: a spot's pose changed changes one line" % level_name)
+	# Hand-kept short lines stay short when one value in them changes.
+	var short := "{\n\t\"doors\": [{\"cell\": [3, 8], \"to\": \"inn\"}, {\"cell\": [4, 8], \"to\": \"inn\"}],\n\t\"n\": 181\n}\n"
+	var moved: Dictionary = JSON.parse_string(short)
+	moved["doors"][1]["cell"] = [5, 8]
+	moved["doors"].append({"cell": [6, 8], "to": "inn"})
+	_check(keep.write(short, moved) == "{\n\t\"doors\": [{\"cell\": [3, 8], \"to\": \"inn\"}, {\"cell\": [5, 8], \"to\": \"inn\"}, {\"cell\": [6, 8], \"to\": \"inn\"}],\n\t\"n\": 181\n}\n",
+		"a short line kept short with a value moved and a door added (%s)" % keep.write(short, moved).c_escape())
+	# The doc's own save with no edit: the file in its own words, the one change
+	# a save makes of itself (537: each building's code written in) the only lines added.
+	var kept_overlay := Level.overlay_dir
+	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("builder_test_keep/")
+	for level_name: String in ["wilds", "barrow_deep", "test_room"]:
+		var doc := MapDoc.from_level(level_name)
+		var repo := FileAccess.get_file_as_string(Level.DIR + level_name + "/level.json")
+		var coded: Dictionary = JSON.parse_string(repo)
+		Level.fill_codes(coded)
+		var saved := FileAccess.get_file_as_string(doc.folder + "level.json") if doc.save() else ""
+		_check(saved == keep.write(repo, coded) and _without_codes(saved) == _without_codes(repo),
+			"%s: MapDoc saved with no edit: the file in its own words, %d lines more, all building codes" % [level_name, saved.split("\n").size() - repo.split("\n").size()])
+		var images: Array[String] = preload("res://tools/builder_run.gd").changed_files(doc.folder, Level.DIR + level_name + "/")
+		_check(images.all(func(file: String) -> bool: return file == "level.json"), "%s: its images read as the game reads them are unchanged by the save (%s)" % [level_name, images])
+	Level.overlay_dir = kept_overlay
+
+
+func _test_runner() -> void:
+	print("\n== tools/builder_run: builder's tools run headless on a level (851) ==")
+	var runner := preload("res://tools/builder_run.gd")
+	var ports := preload("res://tests/test_ports.gd")
+	var out := ports.scratch_path("builder_run") + "/"
+	var calls := ports.scratch_path("builder_run_calls.json")
+	var overlay_had := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(Level.OVERLAY + "test_room"))
+	var kept_overlay := Level.overlay_dir
+	var write_calls := func(list: Array) -> void:
+		var file := FileAccess.open(calls, FileAccess.WRITE)
+		file.store_string(JSON.stringify(list))
+		file.close()
+	write_calls.call([{"tool": "decor", "input": {"at": [3, 1], "kind": "barrel"}}])
+	var code: int = runner.run(PackedStringArray(["--level=test_room", "--calls=" + calls, "--out=" + out]))
+	var made := FileAccess.get_file_as_string(out + "test_room/level.json")
+	var coded_room: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Level.DIR + "test_room/level.json"))
+	Level.fill_codes(coded_room)
+	var was := MapDoc.JSON_KEEP.write(FileAccess.get_file_as_string(Level.DIR + "test_room/level.json"), coded_room)
+	var laid := runner.changed_files(out + "test_room/", Level.DIR + "test_room/")
+	_check(code == 0 and laid == ["level.json"] and "barrel" in made and _lines_apart(was, made) <= 10,
+		"a barrel laid: level.json alone changed (%s), by a few lines at its end (%d apart: %s)" % [laid, _lines_apart(was, made), made.substr(made.find("\"decor\"")).c_escape()])
+	write_calls.call([{"tool": "paint", "input": {"ground": "dirt", "cells": [[11, 4]]}}])
+	code = runner.run(PackedStringArray(["--level=test_room", "--calls=" + calls, "--out=" + out]))
+	var painted := runner.changed_files(out + "test_room/", Level.DIR + "test_room/")
+	_check(code == 0 and "layout.png" in painted and not "barrel" in FileAccess.get_file_as_string(out + "test_room/level.json")
+		and FileAccess.get_file_as_string(out + "test_room/level.json") == was, "a cell painted: layout.png changed (%s), and the barrel of the run before gone with its folder" % [painted])
+	write_calls.call([{"tool": "decor", "input": {"at": [-3, -3], "kind": "barrel"}}, {"tool": "paint", "input": {"ground": "dirt", "cells": [[11, 4]]}}])
+	code = runner.run(PackedStringArray(["--level=test_room", "--calls=" + calls, "--out=" + out]))
+	_check(code == 2 and not FileAccess.file_exists(out + "test_room/layout.png"), "a refusal stops the run, nothing written")
+	_check(runner.run(PackedStringArray(["--level=test_room", "--calls=" + calls, "--out=" + Level.OVERLAY])) == 1
+		and runner.run(PackedStringArray(["--level=test_room", "--calls=" + calls, "--out=res://levels/"])) == 1
+		and runner.run(PackedStringArray(["--level=no_such_level", "--calls=" + calls, "--out=" + out])) == 1, "the shared overlay, the project and an unknown level refused")
+	_check(Level.overlay_dir == kept_overlay and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(Level.OVERLAY + "test_room")) == overlay_had,
+		"the shared overlay neither read nor written: Level.overlay_dir put back, no test_room there")

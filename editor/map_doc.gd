@@ -17,11 +17,16 @@ extends RefCounted
 signal changed
 
 const UNDO_LIMIT := 200
+## level.json written in its own words where unchanged (decision 851).
+const JSON_KEEP := preload("res://editor/json_keep.gd")
 
 ## Where its files are (res://levels/<map>/; tests use user://).
 var folder := ""
 var map: LevelMap
 var config := {}
+## The level.json text [member config] was read from ("" for none): save
+## writes the file in its words wherever a value is unchanged (851).
+var source_text := ""
 ## Anything unsaved; level.json has changes; height.png was there when
 ## loaded; height.png has changes.
 var dirty := false
@@ -43,9 +48,11 @@ static func open(level_folder: String, new_size := LevelMap.NEW_SIZE) -> MapDoc:
 	doc.folder = level_folder
 	var json_path := level_folder + "level.json"
 	if FileAccess.file_exists(json_path):
-		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(json_path))
+		var text := FileAccess.get_file_as_string(json_path)
+		var parsed: Variant = JSON.parse_string(text)
 		if parsed is Dictionary:
 			doc.config = parsed
+			doc.source_text = text
 	var png := level_folder + "layout.png"
 	var image: Image = null
 	if FileAccess.file_exists(png):
@@ -78,6 +85,8 @@ static func from_level(level_name: String) -> MapDoc:
 	var doc := MapDoc.new()
 	doc.folder = Level.overlay_dir + level_name + "/"
 	doc.config = (made["config"] as Dictionary).duplicate(true)
+	if FileAccess.file_exists(Level.folder_of(level_name) + "level.json"):
+		doc.source_text = FileAccess.get_file_as_string(Level.folder_of(level_name) + "level.json")
 	doc.map = LevelMap.from_image(made["layout"], doc.config)
 	doc.had_heights = made["height"] != null
 	if doc.had_heights:
@@ -121,8 +130,10 @@ func save() -> bool:
 		if json == null:
 			report = "could not save %slevel.json" % folder
 			return false
-		json.store_string(JSON.stringify(config, "\t", false) + "\n")
+		var written := JSON_KEEP.write(source_text, config)
+		json.store_string(written)
 		json.close()
+		source_text = written
 		config_dirty = false
 	if heights_dirty:
 		var heights_png := folder + "height.png"

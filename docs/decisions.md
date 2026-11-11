@@ -48222,3 +48222,50 @@ also words (Rook, Sedge, Wren, Brand) and lore's "Mound-breakers" are a follow-u
 landing: editor_fields NOT_OFFERED "spots" (set in level.json until builder's spot tool), and
 return_test's player stands beside Hob off the hut's own cell (Hob strolls since 853; on the hut's
 cell the hut tied the temple and won by its id; _return_place unchanged).
+
+## 851. Builder's tools run headless on a level, and level.json is written in its own words
+
+The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
+Umbrage's ground headless, as data in levels/wilds, and asked for "a headless run of builder's own
+tools on a level, same refusals, writing level.json for me to diff".
+
+- tools/builder_run.tscn: `--level=<name> --calls=<calls.json> [--area=x,y,w,h] [--out=<dir>]
+  [--go-on] [--into-repo]`. calls.json is a list of {"tool", "input"}, the inputs as
+  BuilderSession.tools() gives them. Each is run by BuilderSession.run_tool with no Claude call and
+  no key, and its answer printed ("TOOL <name> ok|refused: ..."). The first refusal stops the run
+  with nothing written, unless --go-on. Then come the layout news and arrival warnings the change
+  adds, the accept (its refusal stops it too), the save, and the world map's new problems. Each file
+  that differs from levels/<name>/ is named: level.json by its text, the images as the game reads
+  them, each through LevelMap and back. MapDoc writes the pixels between cells black where a
+  hand-laid file may hold a colour (748 of test_room's), so pixel for pixel every save would
+  differ. --into-repo
+  copies only those into levels/<name>/; without it they stay in --out. What lands is the caller's
+  own data change; the runner never commits.
+- --out (default user://builder_run_<checkout>/) is the run's private overlay
+  (Level.overlay_dir for the run, put back after), so every level is read from levels/. The shared
+  user://levels/ overlay is never read or written: an --out that is it or holds it is refused, as
+  is one inside the project. The folder is emptied at each run, but only when it is empty or an
+  earlier run's (marked .builder_run).
+- level.json in its own words (editor/json_keep.gd, MapDoc.JSON_KEEP). Godot's round trip reads
+  every number as a float and opens out every short line. MapDoc.save wrote wilds' 3,322 lines
+  back with 2,877 changed for an edit of one, so builder mode's accept had been doing this to every
+  level it saved. MapDoc keeps the text its config was read from (source_text, from open() and
+  from_level()). Save writes each value unchanged from that text as that text, and writes a changed
+  object or array again with its unchanged members still in their own text. A line the hand kept
+  short stays short, a new array item takes its last old sibling's way, a new list of plain values
+  goes on one line, and a whole number written fresh has no ".0". An unchanged config writes the
+  file back byte for byte. The one change a save makes of itself stays: 537's building codes,
+  written into a level that lacks them (wilds and barrow_deep do), so the first save of those adds
+  a "code" line to each building.
+- npc's "spots" (853) and every other key go through whole: the writer carries any value, and the
+  runner writes only what the tools change.
+
+Tests: builder_test _test_json_keep (wilds, barrow, barrow_deep and test_room: no change gives the
+file byte for byte; one value changed changes one line; spots written, kept, and one spot's pose
+changed in one line; a short line kept short with a value moved and an item added; MapDoc saved
+with no edit adds only building codes and leaves its images, read as the game reads them,
+unchanged). _test_runner (a barrel laid on test_room changes level.json
+alone, by a few lines; a painted cell changes layout.png, the earlier run's barrel gone with its
+folder; a refusal stops the run with nothing written; the shared overlay, the project and an
+unknown level refused; Level.overlay_dir put back and the shared overlay untouched). Tools only:
+nothing player-facing, no package, no bullet; protocol unchanged; no new class_name.
