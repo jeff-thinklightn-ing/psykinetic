@@ -1,5 +1,5 @@
 extends Node
-## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862): UiGlass, UiSlot,
+## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; UiKeyCap 872): UiGlass, UiSlot,
 ## UiPrice, UiTabs, UiLine, UiRow each take their theme types, change them by state,
 ## and report what they show. No port: it opens no network; no scratch files.
 
@@ -15,6 +15,7 @@ func _ready() -> void:
 	_test_line()
 	await _test_row()
 	await _test_quest_card()
+	await _test_key_cap()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -239,3 +240,51 @@ func _test_quest_card() -> void:
 	_check(UiTheme.theme().get_color(&"font_color", &"QuestDone") == UiTheme.color(&"friend"), "and back")
 	remove_child(card)
 	card.queue_free()
+
+
+## The hints' keys (872): a key's cap, a mouse button drawn, a row with its
+## joins, and the strip of six in the HUD's reserved hints rect.
+func _test_key_cap() -> void:
+	var cap := UiKeyCap.new()
+	cap.set_key("E")
+	add_child(cap)
+	await get_tree().process_frame
+	_check(cap.theme_type_variation == &"KeyCap" and not cap.is_mouse(), "a key is a cap")
+	var need := cap.get_combined_minimum_size()
+	_check(need.x >= need.y and need.y >= 52.0, "a cap is at least square and at least 52 units tall (%s)" % need)
+	cap.set_key("LMB")
+	await get_tree().process_frame
+	need = cap.get_combined_minimum_size()
+	_check(cap.theme_type_variation == &"KeyMouse" and cap.is_mouse(), "a mouse button is drawn as a mouse")
+	_check(need.x < need.y, "a mouse is taller than wide (%s)" % need)
+	cap.queue_free()
+	var keys := UiKeyCap.row(["Shift", "+", "LMB"])
+	add_child(keys)
+	_check(keys.get_child_count() == 3 and keys.get_child(0) is UiKeyCap and keys.get_child(1) is Label
+		and (keys.get_child(1) as Label).theme_type_variation == &"KeyJoin" and (keys.get_child(2) as UiKeyCap).is_mouse(),
+		"a row: a cap, the join's words, a mouse")
+	keys.queue_free()
+	var strip := PanelContainer.new()
+	strip.theme_type_variation = &"HintStrip"
+	var rows := VBoxContainer.new()
+	rows.theme_type_variation = &"HintRows"
+	strip.add_child(rows)
+	for line: Array in [[["LMB"], "walk there, or attack; on a friend, talk"], [["RMB"], "off hand; empty-handed, shove"],
+			[["E"], "talk, or open a door"], [["I"], "your pack and gear"], [["Enter"], "say something"], [["M"], "the map"], [["H"], "every key"]]:
+		var item := HBoxContainer.new()
+		item.theme_type_variation = &"HintLine"
+		var at := UiKeyCap.row(line[0])
+		at.custom_minimum_size.x = 140.0
+		item.add_child(at)
+		var words := Label.new()
+		words.theme_type_variation = &"HintFoot" if line[1] == "every key" else &"HintWords"
+		words.text = line[1]
+		item.add_child(words)
+		rows.add_child(item)
+	add_child(strip)
+	await get_tree().process_frame
+	need = strip.get_combined_minimum_size()
+	_check(need.x <= 1160.0 and need.y <= 780.0, "the strip fits the HUD's hints rect (%s <= 1160 x 780)" % need)
+	for type: StringName in [&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup"]:
+		_check(type in UiTheme.SIZED_TYPES, "%s follows the text scale" % type)
+	strip.queue_free()

@@ -8,7 +8,9 @@ extends RefCounted
 ## Subhead, Tab, Well, WellHover, WellPicked, WellNew, WellRefused, PriceChip, TimeChip, ChipPrice,
 ## ChipPriceShort, SquareCount, FootLine, FootLineRefused; a person's asks (UiRow, 860):
 ## Row, RowHover, RowRefused, RowWords, RowLine, and their list Rows; the HUD's quest card (862):
-## QuestCard, QuestColumn, QuestRows, QuestItem, QuestLine, QuestDone, QuestMore, QuestReturn; its containers Stack,
+## QuestCard, QuestColumn, QuestRows, QuestItem, QuestLine, QuestDone, QuestMore, QuestReturn; the hints
+## (UiKeyCap, 872): KeyCap, KeyMouse, KeyText, KeyJoin, KeyRow, HintStrip, HintRows, HintLine, HintWords,
+## HintFoot, HintGroup; its containers Stack,
 ## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
 ## square, square_gap, half_gap) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
@@ -26,7 +28,8 @@ const TYPE := &"Psykinetic"
 ## The theme types whose font sizes the text scale multiplies (decision 453).
 const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel",
 	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused",
-	&"RowWords", &"RowLine", &"QuestLine", &"QuestDone", &"QuestMore", &"QuestReturn"]
+	&"RowWords", &"RowLine", &"QuestLine", &"QuestDone", &"QuestMore", &"QuestReturn",
+	&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup"]
 ## Theme types whose font colour is a meaning colour, so a colour set moves them
 ## with it (a done quest line is the friend green, or blue in "distinct").
 const MEANING_FONTS := {&"QuestDone": &"friend"}

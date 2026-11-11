@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=43 format=3]
+[gd_resource type="Theme" load_steps=46 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -537,6 +537,46 @@ corner_radius_bottom_left = 10
 
 ; The quest card on the HUD (862, the approved mock C:/dev/review/ui-design/hud): the windows' glass, with
 ; a card's smaller margins.
+[sub_resource type="StyleBoxFlat" id="key_cap"]
+content_margin_left = 16.0
+content_margin_top = 7.0
+content_margin_right = 16.0
+content_margin_bottom = 10.0
+bg_color = Color(0.22745098039215686, 0.18823529411764706, 0.1411764705882353, 0.92)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 0.86)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.47)
+shadow_size = 1
+shadow_offset = Vector2(0, 4)
+
+[sub_resource type="StyleBoxEmpty" id="key_mouse"]
+
+[sub_resource type="StyleBoxFlat" id="hint_strip"]
+content_margin_left = 28.0
+content_margin_top = 28.0
+content_margin_right = 28.0
+content_margin_bottom = 20.0
+bg_color = Color(0.3686, 0.3059, 0.2314, 0.7)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.0314, 0.0235, 0.0157, 0.43)
+shadow_size = 18
+shadow_offset = Vector2(4, 14)
+
 [sub_resource type="StyleBoxFlat" id="quest_card"]
 content_margin_left = 28.0
 content_margin_top = 16.0
@@ -787,6 +827,35 @@ TimeChip/base_type = &"PanelContainer"
 TimeChip/styles/panel = SubResource("time_chip")
 WellPicked/base_type = &"PanelContainer"
 WellPicked/styles/panel = SubResource("well_picked")
+KeyCap/base_type = &"PanelContainer"
+KeyCap/styles/panel = SubResource("key_cap")
+KeyMouse/base_type = &"PanelContainer"
+KeyMouse/styles/panel = SubResource("key_mouse")
+KeyText/base_type = &"Label"
+KeyText/colors/font_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+KeyText/font_sizes/font_size = 36
+KeyText/fonts/font = ExtResource("sans_bold")
+KeyJoin/base_type = &"Label"
+KeyJoin/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+KeyJoin/font_sizes/font_size = 36
+KeyRow/base_type = &"HBoxContainer"
+KeyRow/constants/separation = 6
+HintStrip/base_type = &"PanelContainer"
+HintStrip/styles/panel = SubResource("hint_strip")
+HintRows/base_type = &"VBoxContainer"
+HintRows/constants/separation = 20
+HintLine/base_type = &"HBoxContainer"
+HintLine/constants/separation = 18
+HintWords/base_type = &"Label"
+HintWords/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+HintWords/font_sizes/font_size = 42
+HintFoot/base_type = &"Label"
+HintFoot/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+HintFoot/font_sizes/font_size = 42
+HintGroup/base_type = &"Label"
+HintGroup/colors/font_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
+HintGroup/font_sizes/font_size = 46
+HintGroup/fonts/font = SubResource("serif_bold")
 QuestCard/base_type = &"PanelContainer"
 QuestCard/styles/panel = SubResource("quest_card")
 QuestColumn/base_type = &"VBoxContainer"
