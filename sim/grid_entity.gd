@@ -84,6 +84,22 @@ const PIP_REACH := 4.0
 ## How fast the shown facing turns toward where it should point: about
 ## 100 ms to come round (an exponential ease at this rate per second).
 const TURN_RATE := 30.0
+## 655 amended (2) (the coordinator's facing ease, from Jeff's "walking
+## around looks like skipping": Wren's drawn facing turned 18.9 degrees step
+## to step at the median, 54.5 at p90, on 8-way paths of straight and
+## diagonal steps): a body walking by its cells faces the way LOOK_AHEAD cells
+## on along its slides, turning less than WALK_TURN_WIDE at WALK_TURN_RATE
+## (a quarter second's ease), wider at TURN_RATE; between two slides, for
+## GAP_KEEP_TICKS, it keeps the walk's facing unless its own (the server's)
+## turned more than GAP_KEEP_ANGLE from it (stopped to face someone). A
+## tell, a wind-up or a blow faces its line at once (face_told), for
+## SWUNG_FACE_TICKS after a blow.
+const LOOK_AHEAD := 1.5
+const WALK_TURN_RATE := 4.0
+const WALK_TURN_WIDE := PI / 6.0  # 30 degrees: a corner's look ahead outruns it within a step.
+const GAP_KEEP_TICKS := 2.5
+const GAP_KEEP_ANGLE := 0.87  # 50 degrees: more than an 8-way step's 45.
+const SWUNG_FACE_TICKS := 3.0
 ## A corner rounded as the body walks (decision 655): the bend round a
 ## cell's centre reaches this far along the step before it and the step
 ## after (half a step: midpoint to midpoint), and only this far in a
@@ -373,6 +389,12 @@ var _drawn_shown := -INF
 ## The facing as shown, an angle in grid space, turning toward the wanted
 ## one at TURN_RATE.
 var _shown_angle := NAN
+## 655 amended (2): the walk's facing as last drawn and when, on its clock
+## ({way, at}; {} for none), kept over a moment between slides.
+var _walked := {}
+## 655 amended (2): a line it faces at once till a tick ({way, until}; {}
+## for none): face_told.
+var _told := {}
 ## A body drawn backing off (CreatureView sets it for a slot with a back_off: the boar king's;
 ## 780 amended (16), his back-off, animation's side): a step run squarely against its facing
 ## (BACK_STEP_DOT, a cosine) keeps the facing shown through the slide, its face on its foe, where
@@ -531,6 +553,8 @@ func _ready() -> void:
 	damaged.connect(_on_damaged)
 	pushed.connect(_on_pushed)
 	impacted.connect(_on_impacted)
+	winding.connect(_on_winding_face)
+	swung.connect(_on_swung_face)
 	if not Net.is_authority():
 		World.mirror_add(self)
 		_mirroring = true
@@ -608,6 +632,8 @@ func _display_caught_up() -> void:
 
 func _process(delta: float) -> void:
 	var wanted := Vector2(facing)
+	var rate := TURN_RATE
+	var by_cells := false  # Drawn by its cell slides (a grid body), not a free body's centre.
 	if spawned:
 		var free_at := _free_shown()
 		if not free_at.is_empty():
@@ -627,6 +653,7 @@ func _process(delta: float) -> void:
 		else:
 			# Mirrors are drawn slightly in the past, so a tile change is
 			# always known before its slide has to start.
+			by_cells = true
 			var now := World.tick + World.tick_alpha
 			var to := tile
 			if _mirroring:
@@ -700,7 +727,8 @@ func _process(delta: float) -> void:
 			if _mirroring and not _present:
 				t = _settling(to, t)
 			var bent := _bent_step(to, t)  # 655: the corners rounded; [] for a slide drawn straight.
-			position = Iso.grid_to_local(bent[0] if not bent.is_empty() else _from_pos.lerp(Vector2(to), t))
+			var drawn: Vector2 = bent[0] if not bent.is_empty() else _from_pos.lerp(Vector2(to), t)
+			position = Iso.grid_to_local(drawn)
 			var sliding := t < 1.0 and to != _from_tile
 			var knocked := sliding and _on_push_line(_from_tile, to)
 			stepping = sliding and not knocked
@@ -710,9 +738,35 @@ func _process(delta: float) -> void:
 				var backed := faces_back_steps and facing != Vector2i.ZERO
 				if backed and Vector2(facing).normalized().dot(wanted.normalized()) < BACK_STEP_DOT:
 					wanted = Vector2(facing)  # Backing off, its face kept on its foe.
+				else:
+					# 655 amended (2): the way over the next LOOK_AHEAD cells, so a
+					# path of straight and diagonal steps faces its mean heading.
+					var ahead := _look_ahead(drawn, to)
+					if ahead != Vector2.ZERO:
+						wanted = ahead
+					rate = WALK_TURN_RATE
+					_walked = {"way": wanted, "at": now}
+			elif not _walked.is_empty() and now - float(_walked["at"]) <= GAP_KEEP_TICKS and not knocked \
+					and absf(Vector2(facing).angle_to(_walked["way"])) <= GAP_KEEP_ANGLE:
+				# A moment between slides (a stop and go): the walk's facing kept,
+				# unless it was stopped to face something else (its facing, set
+				# by the server, turned from the walk's way).
+				wanted = _walked["way"]
 			elif aim != Vector2.ZERO:
 				wanted = aim
-	_turn_toward(wanted, delta)
+			if not stepping and not wanted.is_equal_approx(_walked.get("way", Vector2.ZERO)):
+				_walked = {}
+	if by_cells and not _told.is_empty():
+		# A tell, a wind-up or a blow: its line faced at once, walking or not.
+		if Time.get_ticks_msec() < int(_told["until"]):
+			wanted = _told["way"]
+			rate = TURN_RATE
+		else:
+			_told = {}
+	if rate != TURN_RATE and is_finite(_shown_angle) and wanted != Vector2.ZERO \
+			and absf(angle_difference(_shown_angle, wanted.angle())) >= WALK_TURN_WIDE:
+		rate = TURN_RATE  # A real turn (a corner, about face): as quick as ever.
+	_turn_toward(wanted, delta, rate)
 	if not draws_2d:
 		return  # Its sprite is not seen: no bob, reel or flash to draw.
 	if _pip != null:
@@ -774,16 +828,61 @@ func _note_pushed(from: Vector2i, to: Vector2i) -> void:
 
 
 ## Eases the shown facing toward [param wanted] (grid units), the short
-## way round, at TURN_RATE.
-func _turn_toward(wanted: Vector2, delta: float) -> void:
+## way round, at [param rate] (TURN_RATE, or WALK_TURN_RATE for a walk's
+## small turns).
+func _turn_toward(wanted: Vector2, delta: float, rate := TURN_RATE) -> void:
 	if wanted == Vector2.ZERO:
 		return
 	var target := wanted.angle()
 	if is_nan(_shown_angle):
 		_shown_angle = target
 		return
-	var step := angle_difference(_shown_angle, target) * (1.0 - exp(-TURN_RATE * delta))
+	var step := angle_difference(_shown_angle, target) * (1.0 - exp(-rate * delta))
 	_shown_angle = wrapf(_shown_angle + step, -PI, PI)
+
+
+## 655 amended (2): the way from [param drawn] (where the body is drawn,
+## in cells) to the point LOOK_AHEAD cells on along its walk: the slide on
+## screen to [param to], then the slides queued after it (a mirror's), as
+## far as they go; ZERO with nowhere ahead.
+func _look_ahead(drawn: Vector2, to: Vector2i) -> Vector2:
+	var points: Array[Vector2] = [Vector2(to)]
+	for slide: Dictionary in _slides:
+		if slide.get("present", false) or slide.has("from_pos"):
+			break  # A push, or a slide set off from elsewhere: not the walk's.
+		points.append(Vector2(slide["to"]))
+	var left := LOOK_AHEAD
+	var point := drawn
+	for next in points:
+		var leg := next - point
+		var length := leg.length()
+		if length >= left:
+			point += leg * (left / length)
+			break
+		left -= length
+		point = next
+	return point - drawn if point.distance_to(drawn) > 0.05 else Vector2.ZERO
+
+
+## 655 amended (2) (the coordinator's guard: combat reads facing): the
+## body faces [param way] at once, walking or not, for [param ticks] of
+## the sim's (counted on the wall's clock, as a view that stands the world
+## still between ticks still lets it go): a blow's wind-up (winding), a blow
+## (swung) and a move's tell (Main._on_telegraph) face their line, never
+## eased nor the walk's look ahead. ZERO, or no ticks, lets it go.
+func face_told(way: Vector2, ticks: float) -> void:
+	if way == Vector2.ZERO or ticks <= 0.0:
+		_told = {}
+		return
+	_told = {"way": way, "until": Time.get_ticks_msec() + roundi(ticks * World.TICK_DT * 1000.0)}
+
+
+func _on_winding_face(direction: Vector2i, ticks: int) -> void:
+	face_told(Vector2(direction), World.display_delay_ticks + ticks + 1.0 if ticks > 0 else 0.0)
+
+
+func _on_swung_face(direction: Vector2i) -> void:
+	face_told(Vector2(direction), World.display_delay_ticks + SWUNG_FACE_TICKS)
 
 
 ## Puts the shown facing at [param angle] (grid space), to turn back from

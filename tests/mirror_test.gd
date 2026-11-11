@@ -30,6 +30,8 @@ func _ready() -> void:
 	_test_the_smooth_meter_names_who_went_back()
 	_test_a_standing_body_starts_without_leaps()
 	_test_a_blow_settles_its_last_step_only()
+	_test_facing_eases_on_a_zigzag()
+	_test_facing_told_and_stopped_for()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -470,6 +472,131 @@ func _run_tick(entity: GridEntity, moves: Array[float], step := Vector2i.ZERO) -
 		var before := entity.position
 		entity._process(0.0)
 		moves.append(before.distance_to(entity.position))
+
+
+## 655 amended (2), the facing ease (the coordinator's bars): on an 8-way
+## path of straight and diagonal steps (Wren's walk: 38% of steps turned,
+## the drawn facing 18.9 degrees step to step at the median, 54.5 at p90),
+## the facing shown while it walks on swings over less than 20 degrees
+## (each step's own way is 45 apart); a 90-degree corner is still faced
+## within 0.3 s of the slide round it.
+func _test_facing_eases_on_a_zigzag() -> void:
+	print("\n== a mirror walking straight and diagonal by turns faces its mean heading; a corner still quickly ==")
+	_open_floor()
+	var wren := _mirror("Zigzag", Vector2i(2, 20), 2)
+	var steps: Array[Vector2i] = []
+	for i in 6:
+		steps.append(Vector2i(1, 0))
+		steps.append(Vector2i(1, 1))
+	var drawn := _face_walk(wren, steps)
+	# The shown facing while it walks on steadily (from its third slide to its
+	# last: the first two set off from standing, the last comes to a stop),
+	# against its mean heading (22.5 degrees, between east and south-east).
+	var slides := 0
+	var last_from := Vector2i(-999, -999)
+	var off: Array[float] = []
+	for sample: Dictionary in drawn:
+		if sample["stepping"] and sample["from"] != last_from:
+			last_from = sample["from"]
+			slides += 1
+		if slides >= 3 and slides < steps.size():
+			off.append(rad_to_deg(angle_difference(deg_to_rad(22.5), sample["angle"])))
+	var swing: float = off.max() - off.min() if not off.is_empty() else INF
+	_check(off.size() > 60 and swing < 20.0,
+			"%d slides; walking on steadily its shown facing swung over %.1f degrees (under 20: a step's own way is 45 apart), %.1f to %.1f off its mean heading" % [slides, swing, off.min() if not off.is_empty() else INF, off.max() if not off.is_empty() else INF])
+	var corner := _mirror("Cornering", Vector2i(2, 30), 2)
+	steps = [Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, 1), Vector2i(0, 1), Vector2i(0, 1)]
+	drawn = _face_walk(corner, steps)
+	var round_at := -1.0
+	var faced_at := -1.0
+	for sample: Dictionary in drawn:
+		if round_at < 0.0 and sample["stepping"] and sample["to"] - sample["from"] == Vector2i(0, 1):
+			round_at = sample["seconds"]
+		if round_at >= 0.0 and faced_at < 0.0 and absf(angle_difference(sample["angle"], PI / 2.0)) < deg_to_rad(15.0):
+			faced_at = sample["seconds"]
+	_check(round_at >= 0.0 and faced_at >= 0.0 and faced_at - round_at <= 0.3,
+			"a corner, four east then four south: faced south (within 15 degrees) %.2f s after the first slide south began (at most 0.3)" % (faced_at - round_at))
+	wren.queue_free()
+	corner.queue_free()
+
+
+## 655 amended (2), the coordinator's guards: a blow wound up mid-walk faces
+## its line at once, never the walk's eased look ahead (combat reads where a
+## foe faces); a body that stops and is turned by the server to what it
+## stopped for (a customer, a counter) faces it at the quick rate, never
+## kept on the walk's way.
+func _test_facing_told_and_stopped_for() -> void:
+	print("\n== a wind-up mid-walk faces its line at once; a stop to face someone, quickly ==")
+	_open_floor()
+	var foe := _mirror("Lunger", Vector2i(2, 40), 2)
+	var steps: Array[Vector2i] = [Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0)]
+	var drawn := _face_walk(foe, steps, 3, Vector2i(0, 1))
+	var told_at := -1.0
+	var faced_at := -1.0
+	var walking := false
+	for sample: Dictionary in drawn:
+		if told_at < 0.0 and sample["told"]:
+			told_at = sample["seconds"]
+		if told_at >= 0.0 and faced_at < 0.0 and absf(angle_difference(sample["angle"], PI / 2.0)) < deg_to_rad(10.0):
+			faced_at = sample["seconds"]
+			walking = sample["stepping"]
+	_check(told_at >= 0.0 and faced_at >= 0.0 and faced_at - told_at <= 0.15 and walking,
+			"wound up south on the fourth step east: faced its line %.2f s after (at most 0.15), still sliding %s" % [faced_at - told_at, walking])
+	var keeper := _mirror("Keeper", Vector2i(2, 44), 2)
+	steps = [Vector2i(1, 0), Vector2i(1, 0), Vector2i(1, 0)]
+	drawn = _face_walk(keeper, steps, -1, Vector2i.ZERO, Vector2i(0, -1))
+	var stood_at := -1.0
+	faced_at = -1.0
+	for sample: Dictionary in drawn:
+		if stood_at < 0.0 and sample["seconds"] > 0.3 and not sample["stepping"]:
+			stood_at = sample["seconds"]
+		if stood_at >= 0.0 and faced_at < 0.0 and absf(angle_difference(sample["angle"], -PI / 2.0)) < deg_to_rad(10.0):
+			faced_at = sample["seconds"]
+	_check(stood_at >= 0.0 and faced_at >= 0.0 and faced_at - stood_at <= 0.15,
+			"walked three east, stopped and turned north by the server: faced north %.2f s after its last slide ended (at most 0.15)" % (faced_at - stood_at))
+	foe.queue_free()
+	keeper.queue_free()
+
+
+## [param entity] fed [param steps] as _walk does, its facing set to each
+## step as the server's would be, drawn ten times a tick with the frames'
+## time: a sample per frame {seconds, stepping, from, to, angle (the shown
+## facing), told}. On step [param wind_on] (if not -1) a wind-up toward
+## [param wind] of 5 ticks; after the last step its facing turned to
+## [param stop_facing] (if not ZERO).
+func _face_walk(entity: GridEntity, steps: Array[Vector2i], wind_on := -1, wind := Vector2i.ZERO, stop_facing := Vector2i.ZERO) -> Array[Dictionary]:
+	var drawn: Array[Dictionary] = []
+	var frame := World.TICK_DT / SAMPLES_PER_TICK
+	var seconds := 0.0
+	for k in steps.size():
+		var step := steps[k]
+		var ticks := ceili(World.step_ticks(entity, step))
+		for i in ticks:
+			_tick += 1
+			World._net_tick(_tick)
+			if i == 0:
+				entity.tile += step
+				entity.facing = step
+				if k == wind_on:
+					entity.winding.emit(wind, 5)
+			if k == steps.size() - 1 and i == ticks - 1 and stop_facing != Vector2i.ZERO:
+				entity.facing = stop_facing
+			for sample in SAMPLES_PER_TICK:
+				World.tick_alpha = float(sample) / SAMPLES_PER_TICK
+				entity._process(frame)
+				seconds += frame
+				drawn.append({"seconds": seconds, "stepping": entity.stepping, "from": entity._from_tile, "to": entity._to_tile,
+						"angle": entity.shown_facing().angle(), "told": not entity._told.is_empty()})
+	for i in ceili(World.display_delay_ticks) + 6:
+		_tick += 1
+		World._net_tick(_tick)
+		for sample in SAMPLES_PER_TICK:
+			World.tick_alpha = float(sample) / SAMPLES_PER_TICK
+			entity._process(frame)
+			seconds += frame
+			drawn.append({"seconds": seconds, "stepping": entity.stepping, "from": entity._from_tile, "to": entity._to_tile,
+					"angle": entity.shown_facing().angle(), "told": not entity._told.is_empty()})
+	return drawn
 
 
 ## [param moves] without the standing still before and after.

@@ -29868,6 +29868,38 @@ _test_bent_walk: a reversal cut exactly 0.25, a diagonal reversal capped
 to it, the capped bend still starting on the straight line at its moment.
 Client only; no wire change; no new class_name.
 
+655 amended (2) (decision_number.sh's label; the coordinator's approval of physics' design, for every
+grid body, with two guards; from Jeff's "walking around looks like skipping, and when a companion
+follows they don't follow smoothly"; a fix, no package): physics' drawn walk at lag 0 had Wren's facing
+turn 18.9 degrees from one grid step to the next at the median and 54.5 at p90, 43 of 90 steps over 20:
+an 8-way path takes straight and diagonal steps by turns (38% of her steps turned), and GridEntity eased
+the shown facing to each step's own way at TURN_RATE (30 a second, about 100 ms round), so she wagged
+45 degrees a step; between two slides (a stop and go) it went to her stored facing and back. Now a body
+drawn by its cell slides (a companion, a resident, a creature; never a free body's centre), while it
+slides, faces the way from where it is drawn to the point LOOK_AHEAD (1.5) cells on along the slide on
+screen and the slides queued after it (GridEntity._look_ahead; a push or a slide set off from elsewhere
+ends the look), so a straight-and-diagonal run faces its mean heading; a turn under WALK_TURN_WIDE (30
+degrees) eases at WALK_TURN_RATE (4, a quarter second's ease), a wider one at TURN_RATE as ever (a
+corner's look ahead swings past 30 within its step, so a corner is still turned quickly; 60 degrees and
+8 left a 24-degree swing on the zigzag, a model of the ease chose these). Between two slides, for GAP_KEEP_TICKS (2.5), it keeps the walk's facing, unless its own facing
+(the server's) has turned more than GAP_KEEP_ANGLE (50 degrees, more than a step's 45) from it: one that
+stopped and was turned to what it stopped for (a keeper to his customer, a worker to his spot) faces it
+at TURN_RATE at once. The coordinator's guard for combat, which reads facing (the lunge a reader must
+step is told by where the foe faces): a tell, a wind-up or a blow faces its line at once, walking or
+not, never eased nor the look ahead (GridEntity.face_told: its own winding for the wind-up's ticks,
+swung for SWUNG_FACE_TICKS (3), and Main._face_tell for a telegraph, its cells' middle, till it lands
+or is over; counted on the wall's clock, as view_test stands World's tick still and a tick-counted face
+held its imp on its blow's line for good). Combat and enemy-ai were told the rule. mirror_test
+_test_facing_eases_on_a_zigzag (six straight and six diagonal steps by turns, a mirror at 2 ticks a
+step: walking on steadily its shown facing swung over 16.0 degrees, under the bar of 20, where the old
+facing swung over 36.3; a corner, four east then four south, faced south 0.21 s after the first slide
+south began, under 0.3, the old 0.09) and _test_facing_told_and_stopped_for (wound up south on the
+fourth step east: its line faced 0.07 s after, still sliding, where the old facing kept the walk's way
+till the slides ended; three east, then turned north by the server: north faced 0.07 s after its last
+slide ended, as before). A gate on the first slide's start alone hid the swing (the 655 bend puts each
+start on the same mid-turn), so the test reads the whole steady walk. Client only; protocol unchanged;
+no new class_name.
+
 ### The war hammer swings one-handed
 
 The coordinator, on the hand pass's cut: the war hammer (hands 1) shared Axe_Overhead, now

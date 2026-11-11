@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions, townsfolk and creatures face the way they're walking and turn smoothly, while anything about to strike, or stopping to face you, still turns to you at once (655 amended (2)).
 - Click to walk and you go round anyone standing in your way at once, or stop beside them if they're on the spot you clicked; another player gets a moment to step aside first (724 amended (4)).
 - Click to walk past the corner of a wall or a ledge and you walk round it all the way to your spot (689 amended (8)).
 - Whatever blocks a click walk, you look for another way round at once, and where there's none, you stop and stand (689 amended (9)).

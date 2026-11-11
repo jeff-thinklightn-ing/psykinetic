@@ -7160,10 +7160,34 @@ func _on_telegraph(data: Dictionary) -> void:
 	var id := int(data.get("id", 0))
 	if data.has("cells"):
 		telegraphs[id] = data
+		_face_tell(data, true)
 		telegraph_started.emit(id, data)
 	elif telegraphs.has(id):
+		_face_tell(telegraphs[id], false)
 		telegraphs.erase(id)
 		telegraph_ended.emit(id, bool(data.get("landed", false)))
+
+
+## 655 amended (2) (the coordinator's guard: the lunge a reader must step is
+## told by where the foe faces): a told move's source faces the middle of
+## its cells at once, never eased nor the walk's look ahead, till it lands;
+## [param on] false lets it go.
+func _face_tell(data: Dictionary, on: bool) -> void:
+	var source := get_node_or_null(NodePath(str(data.get("source", "")))) as GridEntity
+	if source == null:
+		return
+	if not on:
+		source.face_told(Vector2.ZERO, 0.0)
+		return
+	var cells: Array = data.get("cells", [])
+	if cells.is_empty():
+		return
+	var middle := Vector2.ZERO
+	for cell: Array in cells:
+		middle += Vector2(float(cell[0]), float(cell[1]))
+	var way := middle / cells.size() - Vector2(source.tile)
+	if way.length() > 0.01:
+		source.face_told(way, maxf(float(data.get("lands_tick", World.tick)) - World.tick, 0.0) + World.display_delay_ticks + 1.0)
 
 
 ## Server: blood on [param level]'s ground was marked or faded
