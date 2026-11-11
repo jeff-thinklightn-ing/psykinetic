@@ -139,6 +139,7 @@ func _ready() -> void:
 	_test_old_grey_seen()
 	_test_great_bear()
 	_test_break_off_holds()
+	_test_break_off_den_walk()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -5110,6 +5111,112 @@ func _test_break_off_holds() -> void:
 	_check(pet._way_out().has(Vector2i(9, 2)) and pet._way_out().has(Vector2i(1, 1)), "her player's way out runs to the link (%s)" % [pet._way_out().keys()])
 	World.despawn(beast)
 	beast.queue_free()
+	pet._apex_broke = false
+	pet.hp = pet_hp_was
+	pet.stance = stance_was
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	owner.hp = owner.max_hp
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	for entity: GridEntity in crates:
+		if is_instance_valid(entity):
+			_put(entity, crates[entity])
+	_settle(pet)
+
+
+## Broken off, the beast low walks home to its den past her (780 amended
+## (26), enemy-ai's den rule: the great bear and the old grey never flee;
+## under 15% in their lair they walk to their den, at bay there). The walk
+## is its fight going on (engaged_with keeps the one it broke off from), so
+## her PULL_BACK holds all the way and at its den: no GUARD till it is down,
+## out of its reach as it passes, no blow. Down, calm brings her back.
+func _test_break_off_den_walk() -> void:
+	print("\n== broken off, it walks home to its den past her: out of its reach, no GUARD till it is down (780 amended (26)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var pet_hp_was := pet.hp
+	var stance_was := pet.stance
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	var crates := {}
+	for entity in World.get_entities():
+		if entity.spawned and entity != owner and entity != pet and not entity is Monster:
+			crates[entity] = entity.tile
+	DayNight.set_hour(12.0)
+	for spec: Dictionary in [{"script": "res://sim/great_bear.gd", "kind": "great_bear"},
+			{"script": "res://sim/old_wolf.gd", "kind": "old_wolf"}]:
+		_kill_monsters()
+		# Its den in the pocket at the room's west end (rows 8-9, walled above
+		# x 5), her player by it at the east end; she a step inside its berth,
+		# above its way home, the room's north half to keep to.
+		_put(owner, Vector2i(12, 9))
+		_put(pet, Vector2i(6, 6))
+		var beast := _main._spawn({"script": spec["script"], "shape": "capsule", "kind": spec["kind"],
+			"name": "TestDen%s%d" % [spec["kind"], World.tick], "tile": Vector2i(11, 8)}) as Monster
+		_kill_monsters_but(beast)
+		if beast.get("asleep") == true:
+			beast.set("asleep", false)
+		beast.set("den", Vector2i(2, 8))
+		beast.hp = maxi(1, int(beast.max_hp * 0.1))
+		beast.target = owner
+		pet.hp = int(pet.max_hp * 0.25)
+		pet._apex_broke = true
+		pet._serial += 1
+		pet._set_stance(Companion.Stance.PULL_BACK, pet._serial, "scripted")
+		var flips := 0
+		var blows := 0
+		var hp_now := pet.hp
+		var nearest := 1 << 20
+		var inside := 0
+		var held := 0
+		var walked := false
+		var home := -1
+		for i in 400:
+			owner.hp = int(owner.max_hp * 0.45)
+			var was := pet.stance
+			World.step()
+			if beast.get("_wallow_from") == owner:
+				walked = true
+			if pet.stance == Companion.Stance.GUARD and was != Companion.Stance.GUARD:
+				flips += 1
+			if pet.hp < hp_now:
+				blows += 1
+			hp_now = pet.hp
+			var off := World.distance(pet.tile, beast.tile)
+			nearest = mini(nearest, off)
+			if off < Companion.APEX_BERTH:
+				inside += 1
+			if pet.broke_from().has(beast):
+				held += 1
+			if home < 0 and World.distance(beast.tile, Vector2i(2, 8)) <= 3:
+				home = i
+			if home >= 0 and i >= home + 60:
+				break
+		_check(walked and home >= 0, "%s low in its lair: it breaks off and walks home to its den, past her (home in %d ticks, at %s)" % [spec["kind"], home, beast.tile])
+		_check(flips == 0 and pet.stance == Companion.Stance.PULL_BACK and held > 0 and pet.broke_from().has(beast),
+				"%s on its walk and at its den: still its fight, her PULL_BACK holds, no GUARD (%d flips, held %d ticks)" % [spec["kind"], flips, held])
+		# This room is too small to keep APEX_BERTH from one walking through it
+		# (its den in the pocket, the floor 12 by 9): out of its reach on its
+		# way past her, never within its swipe's 2, and no blow; the nearest and
+		# how long under APEX_BERTH printed.
+		_check(blows == 0 and nearest >= 3,
+				"%s walks past her: never within its reach, no blow (nearest %d, %d ticks under %d, blows %d, she at %s)" % [
+				spec["kind"], nearest, inside, Companion.APEX_BERTH, blows, pet.tile])
+		World.damage(beast, 9999)
+		for i in Companion.hold_ticks("calm_ticks") + 10:
+			owner.hp = owner.max_hp
+			World.step()
+		_check(pet.broke_from().is_empty() and pet.stance == Companion.Stance.GUARD,
+				"%s down: calm brings her back to GUARD (%s)" % [spec["kind"], pet.stance_name()])
+		if is_instance_valid(beast) and beast.spawned:
+			World.despawn(beast)
 	pet._apex_broke = false
 	pet.hp = pet_hp_was
 	pet.stance = stance_was
