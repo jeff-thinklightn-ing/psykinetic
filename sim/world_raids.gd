@@ -56,6 +56,13 @@ var routes: WorldRoutes:
 		return _routes
 var _routes: WorldRoutes
 var rules := {}
+
+
+## The routes if something has made them already, else null; never makes
+## them (702 amended (3), perf's ruling: a rout reads the fields only when
+## they are there, as making the routes copies the whole world on the tick).
+func routes_if_made() -> WorldRoutes:
+	return _routes
 ## Id -> {id, faction, from (camp place id), town, strength, carries:
 ## {items, captives}, want (WANT_FOOD or ""), state, raided (the town was
 ## hit), area, cell, walked

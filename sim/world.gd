@@ -908,6 +908,13 @@ var forage: Forage = null
 var clearing: Clearing = null
 ## Raid groups on the world map (decision 328), server only; null on a client.
 var raid_groups: WorldRaids = null
+## () -> WorldRoutes or null: the routes whose distance fields a routed band
+## walks to its own way out (702 amended (3), way_field): Main's, the raid
+## groups' (one set of fields for raids, caravans and guides), once they are
+## made (WorldRaids.routes_if_made: a rout never makes them). Server only;
+## unset or not made (a client, a test that sets none), no field, and a rout
+## searches.
+var way_routes := Callable()
 ## Trade routes and their caravans (decision 504), server only; null on a
 ## client.
 var trade: TradeRoutes = null
@@ -8517,6 +8524,44 @@ func is_link_cell(at: Vector2i) -> bool:
 ## band runs for; none elsewhere.
 func ways_out() -> Array[Vector2i]:
 	return fields.way_out_cells
+
+
+## Of this zone's ways out, a band's own (702 amended (3)): the one by the
+## foes' own door (a crypt's breach), which a routed band runs for alone.
+## None where it has none.
+func band_ways_out() -> Array[Vector2i]:
+	return fields.band_way_cells
+
+
+## The steps to this zone's way out at [param cell] from each of its cells,
+## by cell (y * width + x), -1 where it cannot be walked to (702 amended
+## (3)): way_routes' distance field for it (WorldRoutes.field_to), made off
+## the tick on the routes' pool. Empty until it is in, or with no routes
+## (a regenerated floor drops its routes: WorldRaids.use_map).
+func way_field(cell: Vector2i) -> PackedFloat32Array:
+	var routes: WorldRoutes = way_routes.call() if way_routes.is_valid() else null
+	if routes == null or zone == null:
+		return PackedFloat32Array()
+	return routes.field_to(zone.name, cell)
+
+
+## [param field]'s steps at [param cell] (way_field's), -1 off the floor
+## or where it cannot be walked to.
+func field_at(field: PackedFloat32Array, cell: Vector2i) -> float:
+	var routes: WorldRoutes = way_routes.call() if way_routes.is_valid() else null
+	if routes == null or field.is_empty() or zone == null:
+		return -1.0
+	return routes.at(zone.name, field, cell)
+
+
+## The cells from [param cell] down [param field] (way_field's) to its way
+## out, each one real step nearer, by way_routes (WorldRoutes.down).
+func way_down(field: PackedFloat32Array, cell: Vector2i) -> Array[Vector2i]:
+	var routes: WorldRoutes = way_routes.call() if way_routes.is_valid() else null
+	if routes == null or field.is_empty() or zone == null:
+		var alone: Array[Vector2i] = [cell]
+		return alone
+	return routes.down(zone.name, field, cell)
 
 
 ## Each body but a player that finds itself on a level link's cell (spawned

@@ -4503,6 +4503,10 @@ func _boot() -> void:
 	World.trade = TradeRoutes.new(world_map, World.holdings, World.towns, snapshot.get("trade", {}))
 	World.trade.clock = func() -> int: return World.steps
 	World.trade.get_routes = func() -> WorldRoutes: return World.raid_groups.routes
+	# A routed band walks to its own way out down these routes' distance
+	# fields (702 amended (3)): the same fields, read, never a second set,
+	# and only once something else has made them (a rout never makes them).
+	World.way_routes = func() -> WorldRoutes: return World.raid_groups.routes_if_made() if World.raid_groups != null else null
 	World.trade.is_food = func(kind: String) -> bool:
 		return World.economy.is_food(kind) if World.economy != null and World.economy.has_method("is_food") else kind in ["food", "meat"]
 	# The road's news (decision 504, npc's side): what the wagons bring home, as card facts and the town's memory.

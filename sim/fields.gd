@@ -90,6 +90,9 @@ var link_cells: Dictionary[Vector2i, bool] = {}
 ## decision 702): a dungeon's (one with a depth) alone, none hidden, closed
 ## or sealed.
 var way_out_cells: Array[Vector2i] = []
+## Of those, a band's own (terrain "band_ways_out", 702 amended (3)): the
+## way out by the foes' own door, which a routed band runs for alone.
+var band_way_cells: Array[Vector2i] = []
 ## The wall edges on an open-air building's outline (Level.OPEN_AIR,
 ## decision 452): a fence, which sight crosses (World.edge_blocks_sight).
 var fences: Dictionary[Vector3i, bool] = {}
@@ -179,6 +182,7 @@ func load(terrain: Dictionary) -> void:
 	for cell: Vector2i in terrain.get("links_at", []):
 		link_cells[cell] = true
 	way_out_cells.assign(terrain.get("ways_out", []))
+	band_way_cells.assign(terrain.get("band_ways_out", []))
 	for roof: Dictionary in terrain.get("roofs", []):
 		roofs.append(roof["rect"])
 	# A town's laid plots' buildings too (591 step 2, Clearing.lay_plots).

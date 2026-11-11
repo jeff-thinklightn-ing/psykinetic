@@ -34936,6 +34936,73 @@ to work already. The box's journal showed no logged error or crash since
 v0.1.209 went up, though the release build may not print script errors.
 Server only, protocol unchanged, no new class_name.
 
+702 amended (3) (the decision-number script's label; the coordinator's ruling
+on maps' 832 take, dungeon's finding that _test_rout_way_out fails on it;
+perf's ruling on the walk): with 832 the barrow has two ways out to the
+wilds, the temple stair up into Umbrage's chapel (40, 1) and the breach the
+robbers came in by (31, 52), and nearest-decides would send a routed robber
+up into the temple in town whenever he stood nearer the stair. A routed
+band leaves by its own way out when its level has one, never by the stair.
+Its own: of the level's ways out, those within Level.BAND_DOOR_TILES (3) of
+the regenerate block's "foes_door" arrival (747 amended (8)'s key for the
+foes' own door; the barrow's from_breach at (29, 53), the breach link 2
+off), terrain "band_ways_out", Fields.band_way_cells, World.band_ways_out
+(a filter over the level's few links at load, like ways_out). The links
+carry no tag of their own and need none: the foes' door already names it,
+through any regeneration. Monster._pick_way_out takes those alone for a
+band fighter when there are any (still none past its foe); everyone else,
+and a band in a level without one (832 off, a foes_door with no way out by
+it), keeps today's rule.
+
+The walk there is by a distance field, not a search. On a laid barrow the
+breach is 79 cells from the stair (80 on generation 118), and a rout's
+search (ESCAPE_SEARCH_TILES, 1000) runs out on long winding ways: this was
+true on the box before 832 too, where a routed robber far from the stair
+found no way out and only fled about. A 4000-cell search found it but cost
+4.05 ms for one rout and 21.96 ms for six in one tick, too much for the
+tick (perf). So the field is the one the world routes make anyway: the
+breach is a link, so its exit is a WorldRoutes portal whose distance field
+(steps to it from every cell of the area, walking as World does, -1 where
+none) is made off the tick on the routes' pool. WorldRoutes.field_to(area,
+cell), at and down read it; World.way_routes (Main's: the raid groups'
+routes, one set of fields for raids, caravans, guides and this, read only
+once something else has made them, WorldRaids.routes_if_made: making them
+copies the whole world on the tick, so a rout never does; on the box trade
+and the guides make them early) and
+World.way_field, field_at, way_down hand it to a monster on the server. Not
+in Fields, which every peer runs. _pick_way_out reads the field's steps
+where it stands (-1, no way) and walks its cells down for the not-past-the-
+foe check; _escape_tick steps down it (Monster._field_step: the free
+neighbour nearest the way, so one in the way is stepped round). Until the
+field is in (a regenerated floor drops its routes, WorldRaids.use_map, and
+they are made again), today's 1000-cell search, and a band fighter that
+finds no way holds (below). By the field, on generation 1:
+one rout 0.63 ms and six in one tick 3.38 ms (against 4.05 and 21.96 by the
+4000-cell search), a cornered one's look 0.03 ms; the barrow's fields made
+in 53 ms (WorldRoutes.build_ms, on the pool); today's search from the same
+cell 3.09 ms, finding no way.
+
+Cornered, a band fighter fights on (the coordinator's rule): the last of
+its pack (824) whose band has a way of its own here and no way to it (none,
+or none not past its foe) never takes another way out and never stands
+idle; it keeps fighting (Monster._fights_on_cornered at the last-of-pack
+line, its answer kept NO_WAY_TICKS, 10, so a cornered one does not look
+each tick). _flee's signature is unchanged (Animal overrides it).
+
+monster_test _test_rout_way_out on the barrow laid as generation 1 (the
+authored level is a template of separate anchors: its stair side never
+reaches its camp), with routes over it (the levels its ways lead to stood
+in by copies of its floor, so the wilds' own fields are not made): ways out
+the stair and the breach, the band's the breach alone, its field in; three
+robbers routed 8 to 10 cells in from the stair (the stair the nearer way)
+make for the breach by the field and are gone beside it; with the band's
+way cleared the same robber makes for the stair (the rule off); one routed
+beside the stair makes for the breach; one routed beside the breach is gone
+by it at once ((2)'s typed path, kept). On the authored template, the last
+of a band on the stair side, with no way to its breach, fights on; with the
+rule off it breaks for the stair. Server only, protocol unchanged, no new
+class_name, no bullet (the package's own covers the crypt).
+
 ## 177 amended: every body shader marks the stencil under the target outline
 
 Jeff on v0.1.187: "mousing over or left clicking an enemy causes their whole

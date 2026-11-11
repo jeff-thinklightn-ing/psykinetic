@@ -3718,26 +3718,82 @@ func _test_strike_cells() -> void:
 ## in the barrow run for its entrance, the link up to the wilds (never the
 ## hidden way down to the deep), and leave by it, gone, not dead; a skeleton
 ## (bound) and a robber outdoors flee as ever.
+## Routes over [param source] laid as [param area_name] (WorldMap.build's
+## sources), for a rout's way-out fields (702 amended (3)): each level its
+## ways lead to stands in as a copy of that floor, each way's arrival on its
+## first cell, so the ways are portals without the wilds' own fields (tens
+## of seconds to make). Made here and then, not on a pool.
+func _rout_routes(area_name: String, source: Dictionary) -> WorldRoutes:
+	var names: Array[String] = [area_name]
+	var map := WorldMap.build(names, {area_name: source})
+	var stand_in: Dictionary = map.areas[area_name].duplicate()
+	var first: Vector2i = (stand_in["floor"] as Dictionary).keys()[0]
+	var arrivals := {}
+	for way: Dictionary in map.ways:
+		arrivals[str(way.get("to_spawn", ""))] = first
+	stand_in["spawn_points"] = arrivals
+	for way: Dictionary in map.ways:
+		if not map.areas.has(way["to"]):
+			map.areas[way["to"]] = stand_in
+	return WorldRoutes.new(map, false)
+
+
 func _test_rout_way_out() -> void:
-	print("%s== routed robbers run for the barrow's entrance and are gone by it ==" % char(10))
+	print("%s== routed robbers run for the barrow's breach, their own way in, never the temple stair, and are gone by it ==" % char(10))
 	Monster.idling = false
-	var level := Level.load_level("barrow")
+	# The barrow as the server lays it (it regenerates; the authored level's
+	# stair side does not reach its camp), under a name of its own.
+	var made := Regen.generate("barrow", 1)
+	Level.register("mt_rout_barrow", made["layout"], made.get("height"), made["config"])
+	var level := Level.load_level("mt_rout_barrow")
 	var entrance := Vector2i(40, 1)
 	_check(level["links"].any(func(l: Dictionary) -> bool: return l["tile"] == entrance and l["to_map"] == "wilds"),
 			"the barrow's entrance, the link to the wilds, at %s" % entrance)
-	var e := _build(["###"])
+	var e := _build(["###"], {}, {}, "mt_rout_barrow")
 	World.load_terrain(level["terrain"])
-	_check(World.ways_out() == [entrance] and World.is_link_cell(Vector2i(52, 16)),
-			"its ways out %s: the entrance alone, the hidden way down not among them" % [World.ways_out()])
+	var breach := Vector2i(31, 52)
+	var down: Vector2i = level["links"].filter(func(l: Dictionary) -> bool: return bool(l.get("hidden", false)))[0]["tile"]
+	_check(World.ways_out() == [entrance, breach] and World.is_link_cell(down),
+			"its ways out %s: the stair and the breach, the hidden way down not among them" % [World.ways_out()])
+	_check(World.band_ways_out() == [breach],
+			"the band's own way out (702 amended (3)): the breach by the foes' door, never the stair (%s)" % [World.band_ways_out()])
+	# Walked by the routes' distance fields, as on the server (World.way_routes,
+	# Main's: the raid groups' WorldRoutes; perf's ruling).
+	var started := Time.get_ticks_usec()
+	var routes := _rout_routes("mt_rout_barrow", Level.source("mt_rout_barrow"))
+	World.way_routes = func() -> WorldRoutes: return routes
+	_check(not World.way_field(breach).is_empty(),
+			"the breach's distance field is in (the routes' own: %s, all made in %.1f ms)" % [routes.build_ms, (Time.get_ticks_usec() - started) / 1000.0])
 	var path: Array[Vector2i] = []
+	var reached: Array[Vector2i] = []
 	for cell: Vector2i in level["terrain"]["floor"]:  # The deepest way in from the entrance.
 		var way := World.find_path(entrance + Vector2i(0, 1), cell)
+		if not way.is_empty():
+			reached.append(cell)
 		if way.size() > path.size() and not World.is_link_cell(cell):
 			path = way
 	_check(path.size() >= 13, "a way in from the entrance %d cells deep" % path.size())
+	# Their way to each, from 9 cells in: the stair the nearer. The player
+	# stands clear of both, so neither is past him.
+	var to_stair := World.find_path(path[9], entrance)
+	var to_breach := World.find_path(path[9], breach)
+	_check(not to_breach.is_empty() and to_stair.size() < to_breach.size(),
+			"9 cells in from the stair, it is the nearer way out (%d to the stair, %d to the breach)" % [to_stair.size(), to_breach.size()])
+	var stand := path[11]
+	var clear := -1
+	for cell: Vector2i in reached:
+		if World.is_link_cell(cell) or not World.is_free(cell):
+			continue
+		var near := 1 << 20
+		for way_cell in to_stair + to_breach + path.slice(6, 10):
+			near = mini(near, World.distance(cell, way_cell))
+		if near > clear:
+			clear = near
+			stand = cell
+	_check(clear > Monster.ESCAPE_CLEAR_TILES, "the player stands %d cells clear of both ways, at %s" % [clear, stand])
 	var player := EntityFactory.build(SPECS["P"].merged({"name": "Router"})) as GridEntity
 	_room.add_child(player)
-	World.spawn(player, path[11])
+	World.spawn(player, stand)
 	var gone: Dictionary = {}
 	var left := func(entity: GridEntity) -> void:
 		gone[String(entity.name)] = entity.tile
@@ -3751,26 +3807,63 @@ func _test_rout_way_out() -> void:
 	var bones := EntityFactory.build(SPECS["k"].merged({"name": "Bones", "props": Monster.bodies()["skeleton"]})) as Monster
 	_room.add_child(bones)
 	World.spawn(bones, path[12])
+	# The band's way out on a laid barrow, for perf: one rout, and six in one
+	# tick, by the field; and by today's search (no field in). Printed, not checked.
+	var t0 := Time.get_ticks_usec()
+	robbers[0]._pick_way_out(player.tile)
+	var one_us := Time.get_ticks_usec() - t0
+	t0 = Time.get_ticks_usec()
+	for k in 6:
+		robbers[k % robbers.size()]._pick_way_out(player.tile)
+	var six_us := Time.get_ticks_usec() - t0
+	World.way_routes = Callable()
+	t0 = Time.get_ticks_usec()
+	var searched := robbers[0]._pick_way_out(player.tile)
+	var search_us := Time.get_ticks_usec() - t0
+	World.way_routes = func() -> WorldRoutes: return routes
+	print("  the band's way out on a laid barrow by the field: one rout %.2f ms, six in one tick %.2f ms; with no field in, today's search %.2f ms (way %s)" 			% [one_us / 1000.0, six_us / 1000.0, search_us / 1000.0, searched])
 	for robber in robbers:
 		robber._flee(player.tile)
 	bones._flee(player.tile)
 	var ways := robbers.map(func(r: Monster) -> Vector2i: return r._way_out)
 	var ticks := 0
-	for i in 400:
+	for i in 1200:
 		World.step()
 		ticks += 1
 		if gone.size() >= robbers.size():
 			break
-	_check(ways == [entrance, entrance, entrance] and gone.size() == 3 			and gone.values().all(func(at: Vector2i) -> bool: return World.distance(at, entrance) <= 1),
-			"three robbers routed 8 to 10 cells in, the player deeper: making for %s, gone beside it by tick %d (%s)" % [ways, ticks, gone])
+	_check(ways == [breach, breach, breach] and gone.size() == 3 and gone.values().all(func(at: Vector2i) -> bool: return World.distance(at, breach) <= 1),
+			"three robbers routed 8 to 10 cells in from the stair: making for the breach %s, gone beside it by tick %d (%s)" % [ways, ticks, gone])
 	_check(bones._way_out == Monster.NO_TILE and bones.spawned and not gone.has("Bones"),
 			"a skeleton routed beside them (bound to its barrow): no way out, still there at %s" % bones.tile)
 	World.entity_despawned.disconnect(left)
+	# The rule off (no band way): the same robber makes for the nearer stair, as before 702 amended (3).
+	var kept := World.fields.band_way_cells.duplicate()
+	World.fields.band_way_cells.clear()
+	var old_way := EntityFactory.build(SPECS["x"].merged({"name": "OldWay", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(old_way)
+	World.spawn(old_way, path[9])
+	old_way._flee(player.tile)
+	_check(old_way._way_out == entrance, "with no band way, one routed there makes for the nearer stair (%s)" % [old_way._way_out])
+	World.despawn(old_way)
+	World.fields.band_way_cells.assign(kept)
+	# One routed beside the stair: never up it, the breach still.
+	var at_stair := EntityFactory.build(SPECS["x"].merged({"name": "AtStair", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(at_stair)
+	World.spawn(at_stair, entrance + Vector2i(0, 1))
+	at_stair._flee(player.tile)
+	_check(at_stair._way_out == breach, "a robber routed beside the temple stair: never up it, making for the breach (%s)" % [at_stair._way_out])
+	World.despawn(at_stair)
 	# One routed beside the way out: its path there was a bare [] in a ternary,
 	# untyped, and the assign failed (playtest's barrow tour, a camp robber at its door).
+	var by_breach := breach
+	for d: Vector2i in [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, -1), Vector2i(1, -1)]:
+		if World.is_walkable(breach + d) and World.is_free(breach + d) and not World.is_link_cell(breach + d):
+			by_breach = breach + d
+			break
 	var beside := EntityFactory.build(SPECS["x"].merged({"name": "Beside", "props": Monster.bodies()["robber"]})) as Monster
 	_room.add_child(beside)
-	World.spawn(beside, entrance + Vector2i(0, 1))
+	World.spawn(beside, by_breach)
 	beside._flee(player.tile)
 	var sought_out := beside._way_out
 	var out_by := -1
@@ -3779,10 +3872,62 @@ func _test_rout_way_out() -> void:
 		if not beside.spawned:
 			out_by = i + 1
 			break
-	_check(sought_out == entrance and out_by > 0,
-			"a robber routed beside the entrance: making for it (%s), gone by it at tick %d (at %s)" % [sought_out, out_by, beside.tile])
+	_check(sought_out == breach and out_by > 0,
+			"a robber routed beside the breach: making for it (%s), gone by it at tick %d (at %s)" % [sought_out, out_by, beside.tile])
 	if beside.spawned:
 		World.despawn(beside)
+	# The authored barrow (a template: its stair side never reaches its camp
+	# or breach): the last of a band routed on the stair side has no way to
+	# its door, and fights on, never up the stair (702 amended (3)).
+	var authored := Level.load_level("barrow")
+	World.load_terrain(authored["terrain"])
+	var authored_routes := _rout_routes("mt_rout_barrow", Level.source("barrow"))
+	World.way_routes = func() -> WorldRoutes: return authored_routes
+	var apath: Array[Vector2i] = []
+	for cell: Vector2i in authored["terrain"]["floor"]:
+		var way := World.find_path(entrance + Vector2i(0, 1), cell)
+		if way.size() > apath.size() and not World.is_link_cell(cell):
+			apath = way
+	var cornered_rows := {}
+	for rule_on in [true, false]:
+		var kept_ways := World.fields.band_way_cells.duplicate()
+		if not rule_on:
+			World.fields.band_way_cells.clear()
+		var foe := EntityFactory.build(SPECS["P"].merged({"name": "Corner%s" % rule_on})) as GridEntity
+		_room.add_child(foe)
+		World.spawn(foe, apath[10])
+		foe.protected = false
+		var last := EntityFactory.build(SPECS["x"].merged({"name": "Last%s" % rule_on, "props": Monster.bodies()["robber"]})) as Monster
+		_room.add_child(last)
+		World.spawn(last, apath[6])
+		last.pack_id = "mt_cornered"
+		last.pack_rules = Monster.PACK_DEFAULTS.duplicate(true)
+		last.sight_range = 8
+		last.senses.cone_cos = -1.0
+		var took := -1
+		for i in 60:
+			World.step()
+			if last.alert == Monster.Alert.FIGHTING and last.target == foe:
+				took = i + 1
+				break
+		last._pack_seen = 2  # Its pack was two, fighting; the other is down.
+		if rule_on:
+			var c0 := Time.get_ticks_usec()
+			last._pick_way_out(foe.tile)
+			print("  no way to the breach, by the field: %.2f ms (it took up the fight at tick %d)" % [(Time.get_ticks_usec() - c0) / 1000.0, took])
+		var fled := false
+		for i in 30:
+			World.step()
+			fled = fled or last.alert == Monster.Alert.FLEEING
+		cornered_rows[rule_on] = [fled, last._way_out, last.alert]
+		World.despawn(last)
+		World.despawn(foe)
+		World.fields.band_way_cells.assign(kept_ways)
+	_check(not cornered_rows[true][0] and cornered_rows[true][2] == Monster.Alert.FIGHTING,
+			"the last of a band with no way to its breach: it fights on, never up the stair (%s)" % [cornered_rows[true]])
+	_check(cornered_rows[false][0] and cornered_rows[false][1] == entrance,
+			"with no band way (the rule off), that one breaks for the stair, as before (%s)" % [cornered_rows[false]])
+	World.way_routes = Callable()
 	World.outdoor = true
 	var outside := EntityFactory.build(SPECS["x"].merged({"name": "Outside", "props": Monster.bodies()["robber"]})) as Monster
 	_room.add_child(outside)

@@ -516,6 +516,34 @@ func steps_from(area_name: String, from: Vector2i, targets: Array[Vector2i], fac
 	return _flood(_areas[area_name], from, wanted, PackedFloat32Array(), layer.obstacles.get(area_name, {}))
 
 
+## The distance field of the way out at [param cell] of [param area_name]
+## (its exit portal's: the steps to it from every cell of the area, -1
+## where it cannot be walked to), in [param faction]'s layer. Empty until
+## that area's fields are in, and where no way leaves from [param cell].
+## For a routed band's walk to its own door (702 amended (3)): the fields
+## these routes make anyway, read, never a second copy (perf's ruling).
+func field_to(area_name: String, cell: Vector2i, faction := OPEN) -> PackedFloat32Array:
+	return _field(_layers.get(faction, _layers[OPEN]), _portal_id(area_name, cell))
+
+
+## [param field]'s steps (field_to's, of [param area_name]) at
+## [param cell]; -1 off the area or where it cannot be walked to.
+func at(area_name: String, field: PackedFloat32Array, cell: Vector2i) -> float:
+	if not _areas.has(area_name) or field.size() != _areas[area_name]["size"].x * _areas[area_name]["size"].y:
+		return -1.0
+	return _at(field, area_name, cell)
+
+
+## The cells from [param cell] down [param field] (field_to's, of
+## [param area_name]) to its portal, each one real step nearer; [cell]
+## alone where it cannot walk on.
+func down(area_name: String, field: PackedFloat32Array, cell: Vector2i) -> Array[Vector2i]:
+	if at(area_name, field, cell) < 0.0:
+		var alone: Array[Vector2i] = [cell]
+		return alone
+	return _down(_areas[area_name], field, cell)
+
+
 ## Walking steps from the nearest of [param starts] ({area, cell}) to every
 ## cell of every area it reaches, across the ways (each CROSSING steps),
 ## held ground walked and no way blocked: area name -> PackedFloat32Array

@@ -3273,6 +3273,23 @@ static func _building_links(level: Dictionary, config: Dictionary, warnings: Arr
 	level["terrain"]["ways_out"] = links.filter(func(link: Dictionary) -> bool:
 		return int(config.get("depth", 0)) > 0 and not link["hidden"] and not link["closed"] \
 				and str(link["sealed"]).is_empty()).map(func(link: Dictionary) -> Vector2i: return link["tile"])
+	# Of those, the band's own (702 amended (3), the coordinator's ruling on
+	# 832's breach): the way out within BAND_DOOR_TILES of the regenerate
+	# block's "foes_door" arrival (747 amended (8): the foes' own door), which
+	# a routed band runs for alone, never the temple stair. None without one.
+	var band_ways: Array[Vector2i] = []
+	var door := str((config["regenerate"] as Dictionary).get("foes_door", "")) if config.get("regenerate") is Dictionary else ""
+	var spawns: Dictionary = level.get("spawn_points", {})
+	if not door.is_empty() and spawns.has(door):
+		var arrival: Vector2i = spawns[door]
+		for at: Vector2i in level["terrain"]["ways_out"]:
+			if maxi(absi(at.x - arrival.x), absi(at.y - arrival.y)) <= BAND_DOOR_TILES:
+				band_ways.append(at)
+	level["terrain"]["band_ways_out"] = band_ways
+
+
+## How near the foes' own door a way out must be to be theirs (702 amended (3)).
+const BAND_DOOR_TILES := 3
 
 
 ## The solid buildings in [param level] (SOLID, decision 550) laid into its

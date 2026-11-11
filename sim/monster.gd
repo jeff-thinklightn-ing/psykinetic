@@ -98,6 +98,8 @@ const FLEE_NEAR_TILES := 4
 ## player).
 const ESCAPE_SEARCH_TILES := 1000
 const ESCAPE_CLEAR_TILES := 2
+## How long a cornered band fighter's "no way to its door" holds (702 amended (3)).
+const NO_WAY_TICKS := 10
 ## A call for help (Senses.NOISE_CALL) at most so often; a rout
 ## (Senses.NOISE_ROUT) breaks a cautious one under ROUT_HURT of its hp.
 const CALL_EVERY_TICKS := 100
@@ -605,6 +607,8 @@ var leash := LEASH
 var _flee_from := NO_TILE
 ## The way out it runs for, routed indoors (decision 702), or NO_TILE.
 var _way_out := NO_TILE
+## Until when it has found no way to its band's own door (_fights_on_cornered).
+var _no_way_until := -1
 var _called_tick := -100000
 var _rout_tick := -1
 ## kinds(), read once.
@@ -1192,7 +1196,7 @@ func _sim_tick() -> void:
 			_cry(&"whistle", 0)  # The first of its pack: heard by players, never by monsters (824).
 		var alive := _pack_alive()
 		_pack_seen = maxi(_pack_seen if not took_up else 0, alive)
-		if _pack_seen > 0 and alive == 0:
+		if _pack_seen > 0 and alive == 0 and not _fights_on_cornered(target.tile):
 			_flee(target.tile)  # The last of its pack (824): away, and out of the fight.
 			return
 	if _wary:
@@ -2971,6 +2975,27 @@ func _flee(threat: Vector2i, routs := true) -> void:
 		_cry(&"rout", Senses.NOISE_ROUT)
 
 
+## Whether, about to break from [param threat], it fights on instead
+## (702 amended (3), the coordinator's ruling): a band fighter whose band has
+## a way of its own here (World.band_ways_out, a crypt's breach) and no way
+## to it (_pick_way_out: none, or none not past its foe) never takes another
+## way out (the temple stair) and never stands; cornered, it fights on. The
+## answer is kept NO_WAY_TICKS, so a cornered one does not search each tick.
+func _fights_on_cornered(threat: Vector2i) -> bool:
+	if not band_fights or World.band_ways_out().is_empty() or World.outdoor or bound or not _wary or at_home():
+		return false
+	if World.tick < _no_way_until:
+		return true
+	var was := alert
+	alert = Alert.FLEEING  # Its way picked as one fleeing picks it (opens_doors_now).
+	var way := _pick_way_out(_foe_cell(threat))
+	alert = was
+	if way != NO_TILE:
+		return false
+	_no_way_until = World.tick + NO_WAY_TICKS
+	return true
+
+
 ## Whether its level is its home (702 amended; playtest's Hollowfell tour:
 ## the Blood Rot fled out the mine's mouth and left it empty): its kind is
 ## in the level's "home_kinds". Routed there it never takes a way out; it
@@ -3029,12 +3054,30 @@ func _escape_tick() -> void:
 		return
 	if World.is_stunned(self) or World.tick < next_move_tick:
 		return
-	if _idle_step(_way_out, ESCAPE_SEARCH_TILES):
+	var field := World.way_field(_way_out) if band_fights else PackedFloat32Array()
+	if not field.is_empty() and _field_step(field) or field.is_empty() and _idle_step(_way_out, ESCAPE_SEARCH_TILES):
 		return
 	_way_out = _pick_way_out(_foe_cell(_flee_from))
 	if _way_out == NO_TILE:
 		_alert_until = World.tick + flee_ticks  # No way out: it flees as ever.
 	next_move_tick = World.tick + CHASE_RETRY_TICKS
+
+
+## A step down [param field] (World.way_field's: its band's way out, 702
+## amended (3)): to the free neighbour nearest the way by the field, any
+## nearer than here, so one in the way is stepped round. False when none.
+func _field_step(field: PackedFloat32Array) -> bool:
+	var here := World.field_at(field, tile)
+	var nearer: Array[Array] = []
+	for direction: Vector2i in WorldRoutes.STRAIGHTS + WorldRoutes.DIAGONALS:
+		var there := World.field_at(field, tile + direction)
+		if there >= 0.0 and there < here:
+			nearer.append([there, direction])
+	nearer.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	for each: Array in nearer:
+		if World.try_move(self, each[1]):
+			return true
+	return false
 
 
 ## The cell of the nearest foe it can see, else [param fallback] (a rout
@@ -3052,16 +3095,32 @@ func _foe_cell(fallback: Vector2i) -> Vector2i:
 
 ## The nearest way out by its path (World.ways_out) that does not take it
 ## past [param foe]: no cell of it within ESCAPE_CLEAR_TILES of the foe and
-## nearer it than where it stands. NO_TILE when there is none.
+## nearer it than where it stands. NO_TILE when there is none. A band
+## fighter where its band has a way of its own (World.band_ways_out, a
+## crypt's breach; 702 amended (3)) runs for that alone, never the stair.
 func _pick_way_out(foe: Vector2i) -> Vector2i:
 	var best := NO_TILE
 	var best_size := INF
 	var start := World.distance(tile, foe)
-	for at in World.ways_out():
+	var own := band_fights and not World.band_ways_out().is_empty()
+	var ways := World.band_ways_out() if own else World.ways_out()
+	for at in ways:
 		var path: Array[Vector2i] = []  # Typed: a bare [] in a ternary is untyped and fails the assign.
-		if World.distance(tile, at) > 1:
+		var size := 0.0
+		# The band's own door by its distance field when that is in (702
+		# amended (3), perf's ruling: a laid barrow's breach is 70 to 80
+		# cells from its stair, past any search a rout may run on the tick):
+		# walked down it, cell by cell; -1, no way there.
+		var field := World.way_field(at) if own else PackedFloat32Array()
+		if not field.is_empty():
+			size = World.field_at(field, tile)
+			if size < 0.0:
+				continue
+			path = World.way_down(field, tile)
+		elif World.distance(tile, at) > 1:
 			path = World.find_path(tile, at, false, null, ESCAPE_SEARCH_TILES, false, {}, opens_doors_now())
-		if path.is_empty() and World.distance(tile, at) > 1 or path.size() >= best_size:
+			size = path.size()
+		if path.is_empty() and World.distance(tile, at) > 1 or size >= best_size:
 			continue
 		var past := false
 		for cell in path:
@@ -3071,7 +3130,7 @@ func _pick_way_out(foe: Vector2i) -> Vector2i:
 				break
 		if not past:
 			best = at
-			best_size = path.size()
+			best_size = size
 	return best
 
 
