@@ -2594,7 +2594,8 @@ func look_findings(cell: Vector2i) -> Array[String]:
 		elif entity is Player or entity is Companion or entity is Resident:
 			seen.append(refer(entity))
 		elif entity is Chest:
-			seen.append("a chest")
+			if not Level.undrawn(entity):  # A town's counter drawn as nothing (734 amended (7)) is not there to her.
+				seen.append("a chest")
 		elif entity.pushable:
 			seen.append("a " + object_word(entity))
 	for kind: String in kinds:
@@ -5510,7 +5511,7 @@ func seen_things() -> Array[Dictionary]:
 			found.append(monster)
 		elif entity.pushable:
 			found.append(_thing(object_word(entity), cell, Vector2(cell)))
-		elif entity is Chest:
+		elif entity is Chest and not Level.undrawn(entity):  # (734 amended (7): one drawn as nothing is not there to her.)
 			found.append(_thing("chest", cell, Vector2(cell)))
 	for door: Door in World.get_doors():
 		var sides := Terrain.edge_cells(door.key)
@@ -7494,7 +7495,7 @@ func can_do() -> Array[Dictionary]:
 	# Things go to her own player only (World.reaches), whom she must see.
 	var to_them := _alive(keeper) and World.distance(tile, keeper.tile) <= PERCEPTION_RANGE and senses.sees(keeper)
 	for entity in World.get_entities():
-		if entity is Chest and entity.spawned and World.distance(tile, entity.tile) <= PERCEPTION_RANGE and _sees(entity.tile):
+		if entity is Chest and entity.spawned and not Level.undrawn(entity) and World.distance(tile, entity.tile) <= PERCEPTION_RANGE and _sees(entity.tile):
 			var where := _paces_toward(Vector2(entity.tile))
 			actions.append({"verb": "open_chest", "chest": entity, "at": entity.tile,
 				"words": "open the chest %s and see what is in it" % where})
@@ -7975,6 +7976,8 @@ func _found_in(cells: Array[Vector2i]) -> Array[String]:
 	for entity in World.get_entities():
 		if entity == self or entity == keeper or not entity.spawned or not inside.has(entity.tile):
 			continue
+		if entity is Chest and Level.undrawn(entity):
+			continue  # Drawn as nothing (734 amended (7)).
 		if entity is Chest:
 			var held: Array[String] = []
 			for id: String in (entity as Chest).slots:

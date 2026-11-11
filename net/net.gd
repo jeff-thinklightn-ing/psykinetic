@@ -639,6 +639,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 485 amended (2), the follow mend (companions): Companion replicates move_ticks
 ## (SUBCLASS_REPLICATED), her step paced to her player's while she follows, so a client draws a
 ## paced step at its time; an old client draws her steps at her own quicker pace.
+## 56 also (734 amended (7)): "counter"'s waiting rows may carry "effect": "kept" and "words" (the caption); an old client shows its plain box and "ready".
 const PROTOCOL_REVISION := 56
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

@@ -171,6 +171,23 @@ func _test_reforge() -> void:
 	_check(World.counter_collect(player, counter, uid) == "" and World.slot_uid(player, Items.RIGHT_HAND) == uid,
 		"collected back into the free right hand (438 amended; at %d)" % Array(player.slot_items).find(uid))
 	_check(World.counter_view(player, counter)["waiting"].is_empty(), "nothing waiting now")
+	# 734 amended (7), "no chests in town": a thing taken out of the old chests, held for them
+	# (Relaid.to_temple): its row in voice's words, the mark gone once it is taken, the priest told to say so.
+	var kept := World.items.mint("sword", "stocked", "test", World.zone.name, counter.tile)
+	World.items._book[kept][ItemBook.RETURNED] = ItemBook.FROM_OLD_CHESTS
+	var record := World.towns._town(town)
+	if not record.get("held_for") is Dictionary:
+		record["held_for"] = {}
+	record["held_for"][World.owner_of(player)] = [kept]
+	var rows: Array = World.counter_view(player, counter)["waiting"]
+	_check(rows.size() == 1 and rows[0]["uid"] == kept and rows[0]["effect"] == "kept" and rows[0]["words"] == "Sword, from the old chests",
+		"one from the old chests waits, its row saying so (%s)" % [rows])
+	var told: Array = []
+	var hear := func(by: GridEntity, _at: GridEntity) -> void: told.append(by)
+	World.collected_returned.connect(hear)
+	_check(World.counter_collect(player, counter, kept) == "" and told == [player] and World.items.returned_from(kept).is_empty()
+		and Array(player.slot_items).has(kept), "taken: in their hands, no longer marked, the priest told to say where it came from")
+	World.collected_returned.disconnect(hear)
 
 
 func _beside(cell: Vector2i) -> Vector2i:

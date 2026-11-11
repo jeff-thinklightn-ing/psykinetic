@@ -193,6 +193,7 @@ func _ready() -> void:
 		await _test_doors_swing()
 		await _test_door_states()
 		_test_art_puppets()
+		_test_undrawn_puppet()
 		_test_breakable_hooked_once()
 		await _test_phased_build()
 		await _test_kept_fields()
@@ -12462,6 +12463,39 @@ func _test_door_states() -> void:
 	door.open = kept["open"]
 	await _settle_doors()
 	_check(hinge.visible, "mended: its leaf is back")
+
+
+## A thing drawn as nothing (734 amended (7), "no chests in town": a town's
+## depot, shop counter and locker, reached through their keepers): no body,
+## no pick, and neither a click nor E opens it.
+func _test_undrawn_puppet() -> void:
+	print("
+== a thing drawn as nothing: no body, no pick, never opened by hand (734 amended (7)) ==")
+	var crate: GridEntity = null
+	for entity in World.get_entities():
+		if str(entity.spawn_spec.get("art", "")) == "prop.crate":
+			crate = entity
+			break
+	_check(crate != null, "the test room has a crate to stand in")
+	if crate == null:
+		return
+	var kept: Array[Callable] = []
+	for connection: Dictionary in crate.get_signal_connection_list(&"impacted"):
+		if (connection["callable"] as Callable).get_object() == _rig:
+			kept.append(connection["callable"])
+			crate.disconnect(&"impacted", connection["callable"])
+	var art: Variant = crate.spawn_spec.get("art")
+	crate.spawn_spec["art"] = Level.UNDRAWN_ART
+	var puppet := _rig._make_puppet(crate)
+	_check(Level.undrawn(crate) and Client3D.art_slot_for(crate) == "" and puppet.get_node_or_null("Body") == null
+		and puppet.get_node_or_null("Pick") == null, "drawn as nothing: no body and nothing to pick")
+	_check(not _main.opens_on_click(crate), "a click never opens it: its keeper is the way to it")
+	puppet.free()
+	_disconnect_rig(crate)
+	crate.spawn_spec["art"] = art
+	for callable in kept:
+		crate.impacted.connect(callable)
+	_check(not Level.undrawn(crate), "its own art back")
 
 
 func _test_art_puppets() -> void:

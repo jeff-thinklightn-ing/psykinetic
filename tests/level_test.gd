@@ -1933,13 +1933,11 @@ func _test_solid() -> void:
 	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_breach")
 	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(160, 159)
 		and not Vector2i(160, 159) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
-	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it (by Snagfin's stall since 774).
-	var held := []
-	for spec: Dictionary in wilds["entities"]:
-		if spec["tile"] in [Vector2i(206, 208), Vector2i(206, 207)] and str(spec.get("script", "")).ends_with("chest.gd"):
-			held.append_array(Array(spec.get("props", {}).get("slots", [])))
-	_check(["sword", "spear", "hammer", "shield", "giant_axe", "dagger", "buckler"].all(func(id: String) -> bool: return id in held),
-			"the town chest's two beside it hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler (%s)" % [held])
+	# The testing kit's chests by Snagfin's stall are gone (Jeff, 11-05: "remove chests from town";
+	# 734 amended (7)): a saved world's kit goes to the town's store (_test_removed_to_temple).
+	var kit: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool:
+		return spec["tile"] in [Vector2i(205, 208), Vector2i(206, 208), Vector2i(206, 207)])
+	_check(kit.is_empty(), "no testing kit's chest by the stall now (%s)" % [kit])
 	# 599, maps' side: the old farmstead's cache in the north hut, the hut's kits moved into it.
 	var cache: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return spec["tile"] == Vector2i(119, 139))
 	var props: Dictionary = cache[0].get("props", {}) if cache.size() == 1 else {}
@@ -3117,10 +3115,15 @@ func _test_relaid() -> void:
 	var old_temple := "wilds/temple@217,201"
 	var new_temple: String = plan["places"][old_temple]
 	_check(wilds["places"].has(new_temple.trim_prefix("wilds/")), "the chapel's place is where the mover renames it to (%s)" % new_temple)
+	var gone: Array = []  # Snagfin's three, moved by his stall, then gone from town (734 amended (7)).
+	for removal: Dictionary in Relaid.REMOVED:
+		if removal["level"] == "wilds":
+			gone.append_array((removal["removed"] as Dictionary).keys())
 	for key: String in plan["markers"]:
 		var to: Array = plan["markers"][key]
 		var found := (wilds["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec["tile"] == Vector2i(to[0], to[1]))
-		_check(found.size() == 1, "the marker from %s stands at %s in the level (%d)" % [key, to, found.size()])
+		var removed := "%d,%d" % [to[0], to[1]] in gone
+		_check(found.size() == (0 if removed else 1), "the marker from %s %s %s in the level (%d)" % [key, "is gone from" if removed else "stands at", to, found.size()])
 	# No level entity stands on an old marker cell now (each moved is in the map, so none is laid twice).
 	for key: String in plan["markers"]:
 		var old := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
@@ -3193,6 +3196,8 @@ func _test_relaid() -> void:
 	_test_tavern_zone(wilds)
 	_test_smithy_inside()
 	_test_spots(wilds)  # 853.
+	_test_temple_furnished(wilds)
+	_test_removed_to_temple(wilds)
 	_test_storey_stairs()
 	_test_shelled(wilds)
 	_test_perches(hills)
@@ -4082,6 +4087,112 @@ func _test_spots(wilds: Dictionary) -> void:
 	_check((kept.get("spots", []) as Array).size() == 7 and kept["spots"][0] == config["spots"][0],
 		"a regeneration keeps the spots in its anchors as written (%d)" % (kept.get("spots", []) as Array).size())
 	_check(wilds.get("spots") is Array, "a level's spots reach Level.load_level (the wilds: %d)" % (wilds.get("spots", []) as Array).size())
+
+
+## Umbrage's temple furnished (734 amended (7)): its pews in the nave, clear
+## of every cell its visitors keep off (Main._temple_keep: its doors', its
+## counter's, its respawn's and those about them) and of the way down at
+## (199, 199) and its landing; a candle's light by the stair; and no chest
+## drawn in the town ("no chests in town"): the depot, shop and locker drawn
+## as nothing, the old kit's three gone (_test_removed_to_temple).
+func _test_temple_furnished(wilds: Dictionary) -> void:
+	print("
+== Umbrage's temple furnished (734 amended (7)): its pews, its candles, no chest drawn in town ==")
+	var temple: Dictionary = {}
+	for building: Dictionary in wilds["buildings"]:
+		if str(building.get("kind", "")) == "temple" and building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(Vector2i(199, 199)):
+			temple = building
+	_check(not temple.is_empty() and temple["rect"] == Rect2i(190, 199, 10, 6), "the chapel over x 190..199, y 199..204 (%s)" % [temple.get("rect")])
+	if temple.is_empty():
+		return
+	var near: Array[Vector2i] = [Vector2i(198, 201), Vector2i(189, 201)]  # Its counter, its respawn (the place's cell).
+	for edge: Variant in Level.entrances(temple):
+		if edge is Vector3i:
+			near.append_array(Terrain.edge_cells(edge))
+	var keep := {}
+	for at: Vector2i in near + [Vector2i(199, 199), Vector2i(198, 199)]:  # And the way down, and its landing.
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				keep[at + Vector2i(dx, dy)] = true
+	var pews: Array = (wilds["terrain"]["decor"] as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "bench")
+	var cells: Array = pews.map(func(piece: Dictionary) -> Vector2i: return piece["cell"])
+	cells.sort()
+	_check(cells == [Vector2i(193, 200), Vector2i(193, 203), Vector2i(195, 200), Vector2i(195, 203)]
+		and pews.all(func(piece: Dictionary) -> bool: return piece["out"] == Vector2i(1, 0)),
+		"four pews in the nave, each facing the altar to the east (%s)" % [cells])
+	_check(cells.all(func(cell: Vector2i) -> bool: return (temple["rect"] as Rect2i).has_point(cell) and not keep.has(cell) and cell.y != 201 and cell.y != 202),
+		"each inside, off the cells its visitors keep off, the way down and its landing, and off the aisle")
+	var lit: Array = wilds["terrain"].get("lit_candles", [])
+	_check(lit.any(func(entry: Dictionary) -> bool: return entry["at"] == Vector2(199, 200)),
+		"candles burning on the floor beside the way down (%s)" % [lit])
+	var drawn: Array = []
+	for spec: Dictionary in wilds["entities"]:
+		if str(spec.get("script", "")) == Level.CHEST and not spec.get("props", {}).has("cache") and str(spec.get("art", "")) != Level.UNDRAWN_ART 				and Rect2i(150, 170, 80, 60).has_point(spec["tile"]) and spec.get("props", {}).get("temple", false) != true:
+			drawn.append(spec["tile"])
+	_check(drawn.is_empty(), "no chest drawn in Umbrage: its depot, shop and locker drawn as nothing (%s)" % [drawn])
+	var undrawn: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return str(spec.get("art", "")) == Level.UNDRAWN_ART) 		.map(func(spec: Dictionary) -> Vector2i: return spec["tile"])
+	undrawn.sort()
+	_check(undrawn == [Vector2i(172, 193), Vector2i(190, 196), Vector2i(193, 196)], "the three drawn as nothing (%s)" % [undrawn])
+
+
+## The old kit's three chests by Umbrage's stall removed (734 amended (7),
+## Relaid.REMOVED "to" "temple"), on a world made by hand: one a single
+## player carried, held for them at the temple; the kit's own piece, one two
+## players carried and one the item book never had, on the town's shop (the
+## coordinator: nothing out of every player's reach); none in the store,
+## none held for no one, nothing on the ground, nothing destroyed; a
+## count-only line; the next boot does nothing.
+func _test_removed_to_temple(wilds: Dictionary) -> void:
+	print("\n== The old kit's chests removed, what they held to the temple (734 amended (7)) ==")
+	var chest := func(name: String, key: String, slots: Array, uids: Array) -> Dictionary:
+		var at := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+		return {"script": "res://sim/chest.gd", "shape": "chest", "name": name, "tile": [at.x, at.y], "hp": 1, "stamina": 0,
+			"facing": [0, 1], "props": {}, "spawn": 3, "spawn_key": key, "slots": slots, "items": uids}
+	var stocked := func(id: String, tile: Array, carriers: Array) -> Dictionary:
+		return {"id": id, "made": 1, "at": "", "holder": "", "carriers": carriers,
+			"events": [{"kind": "stocked", "step": 1, "zone": "wilds", "tile": tile, "what": "chest"}]}
+	var row := func(who: String) -> Dictionary:
+		return {"who": who, "name": "", "since": -1, "held": 40, "deeds": {}, "ill": 0.0, "ill_at": 0}
+	var done_before := {"relaid/wilds": 774}
+	for plan: Dictionary in Relaid.REMOVED:
+		if int(plan["decision"]) != 734:
+			done_before[Relaid.done_key_of(plan["level"], plan["decision"])] = int(plan["decision"])
+	var path: String = preload("res://tests/test_ports.gd").scratch("removed_temple_world.json")
+	_check(Snapshot.write(path, {"version": Snapshot.VERSION, "players": [], "remade": done_before,
+		"towns": {"wilds/store": {"buildings": {}}}, "stockpile": {"wilds/store": {"resources": {}, "items": [5]}},
+		"items": {"next": 30, "book": {"5": {"id": "hammer", "made": 0, "at": "stockpile:wilds/store", "holder": "", "carriers": [], "events": []},
+			"21": stocked.call("bow", [205, 208], []), "22": stocked.call("sword", [205, 208], [row.call("player:p1")]),
+			"24": stocked.call("dagger", [206, 208], [row.call("player:p1"), row.call("player:p2")])}},
+		"zones": {"wilds": {"tick": 9, "entities": [chest.call("Chest5", "205,208", ["bow", "sword", "", ""], [21, 22, 0, 0]),
+			chest.call("Chest6", "206,208", ["dagger", "arrows", "", ""], [24, 0, 0, 0]), chest.call("Chest7", "206,207", ["", "", "", ""], [0, 0, 0, 0])],
+			"respawns": [], "ground": [], "records": []}}}), "(the old world written)")
+	var snapshot := Snapshot.load(path)
+	var done: Dictionary = snapshot.get("remade", {})
+	for boot in 2:
+		var lines := Relaid.move(snapshot, done, func(level: String) -> Dictionary: return wilds if level == "wilds" else Level.load_level(level))
+		var ours: Array = lines.filter(func(line: String) -> bool: return line.begins_with("[level] removed in wilds (734)"))
+		if boot == 1:
+			_check(ours.is_empty() and done.get(Relaid.done_key_of("wilds", 734)) == 734, "the next boot does nothing: done under its own key (%s)" % [lines])
+			break
+		_check(ours == ["[level] removed in wilds (734): 3 saved entities removed, 2 holding things, 1 kit things to the shop, 1 players' things held for 1 owners at the temple, 2 of no known owner to the shop, 0 laid on the ground"],
+			"one count-only line, no names, ids or uids (%s)" % [lines])
+		var book: Dictionary = snapshot["items"]["book"]
+		var held: Dictionary = snapshot["towns"]["wilds/store"].get("held_for", {})
+		_check(snapshot["zones"]["wilds"]["entities"].is_empty() and (snapshot["zones"]["wilds"]["ground"] as Array).is_empty(),
+			"the three gone, nothing laid on the ground")
+		var store: Dictionary = snapshot["stockpile"]["wilds/store"]
+		var shelf: Array = (store.get("shop", []) as Array).map(func(uid: Variant) -> int: return int(uid))
+		_check((store["items"] as Array).map(func(uid: Variant) -> int: return int(uid)) == [5], "nothing from the old chests in the town's store")
+		_check(shelf.size() == 3 and shelf[0] == 21 and shelf[1] == 24 and book.has(str(shelf[2])) and book[str(shelf[2])]["id"] == "arrows"
+			and int(snapshot["items"]["next"]) > shelf[2]
+			and shelf.all(func(uid: int) -> bool: return book[str(uid)]["at"] == Stockpile.shop_holder("wilds/store") and not book[str(uid)].has(ItemBook.RETURNED)),
+			"on the town's shop: the kit's own bow, the dagger two carried, the arrows the book never had (given an instance) (%s)" % [shelf])
+		_check(held.get("player:p1") == [22] and book["22"]["at"] == "temple:wilds/store" and book["22"].get(ItemBook.RETURNED) == ItemBook.FROM_OLD_CHESTS,
+			"the sword one player carried, held for them at the temple, marked from the old chests (%s)" % [held])
+		_check(held.keys() == ["player:p1"], "nothing held for no one (%s)" % [held])
+		var stock := Stockpile.new(snapshot["stockpile"], Callable(), ItemBook.from_dict(snapshot["items"]))
+		_check(stock.shop("wilds/store").size() == 3 and stock.items("wilds/store").size() == 1 and stock.items("wilds/store")[0] == 5, "the shop loads as the game loads it (%s)" % [stock.shop("wilds/store")])
+		_check(ItemBook.from_dict(snapshot["items"]).returned_from(22) == ItemBook.FROM_OLD_CHESTS, "the mark kept through the book's load")
 
 
 func _test_smithy_inside() -> void:

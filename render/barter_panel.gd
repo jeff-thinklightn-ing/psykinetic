@@ -1514,7 +1514,10 @@ func _rebuild() -> void:
 	for each: Variant in counter.get("waiting", []):
 		if each is Dictionary:
 			var item := str(each.get("id", ""))
-			_add_box("ready", int(each.get("uid", 0)), item, str(each.get("effect", "")), [], "%s, ready" % Items.name_of(item).capitalize())
+			# Its own words where the server gives them (734 amended (7): one from the old chests), else ready.
+			var words := str(each.get("words", ""))
+			_add_box("ready", int(each.get("uid", 0)), item, str(each.get("effect", "")), [],
+				words if not words.is_empty() else "%s, ready" % Items.name_of(item).capitalize())
 	if _grid.get_child_count() == 0 and not giving:
 		var empty := Label.new()
 		empty.theme_type_variation = &"Caption"

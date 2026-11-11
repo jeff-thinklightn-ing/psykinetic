@@ -487,6 +487,26 @@ func mark_relic(uid: int, knight: String, tier: int) -> void:
 
 ## Whether [param uid] is starter gear (decision 736: bought of a town's
 ## starter vendor; no one buys it back).
+## The mark on a thing held at a temple for its owner because the chests it
+## lay in were taken away (734 amended (7), Relaid.to_temple: "no chests in
+## town"), and the one value it has, the old kit's chests by Umbrage's stall:
+## the priest says where it came from as he hands it back (economy.json "kept").
+const RETURNED := "returned"
+const FROM_OLD_CHESTS := "old_chests"
+
+
+## Where [param uid] was taken from to be held at a temple (RETURNED), "" for
+## a thing held for any other reason, or none.
+func returned_from(uid: int) -> String:
+	return str(_book[uid].get(RETURNED, "")) if _book.has(uid) else ""
+
+
+## [param uid] collected: no longer marked as taken from its chests.
+func clear_returned(uid: int) -> void:
+	if _book.has(uid):
+		_book[uid].erase(RETURNED)
+
+
 func is_starter(uid: int) -> bool:
 	return _book.has(uid) and _book[uid].get("starter", false) == true
 
@@ -679,6 +699,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["charge"] = maxf(float(entry["charge"]), 0.0)  # A charm's (789).
 			if entry.get("starter") == true:
 				items._book[int(key)]["starter"] = true  # Decision 736.
+			if entry.get(RETURNED) is String and not str(entry[RETURNED]).is_empty():
+				items._book[int(key)][RETURNED] = str(entry[RETURNED])  # 734 amended (7).
 			if entry.get("relic") is Dictionary and entry["relic"].get("knight") is String:
 				items._book[int(key)]["relic"] = {"knight": entry["relic"]["knight"], "tier": int(entry["relic"].get("tier", 0))}  # Decision 714.
 			if entry.get("bane") is String and not entry["bane"].is_empty():

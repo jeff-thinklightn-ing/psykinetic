@@ -111,6 +111,10 @@ signal handed_in(place: String, player_id: String, what: String, count: int, raw
 ## A move of things between slots refused for the armour slot's rule
 ## (decision 622): [param why] is said to whoever moved them (Main).
 signal slot_refused(by: GridEntity, why: String)
+## Player [param by] collected at temple counter [param counter] a thing held
+## for them because the chests it lay in were taken away (734 amended (7)):
+## the priest says where it came from (Main, economy.json "kept").
+signal collected_returned(by: GridEntity, counter: GridEntity)
 ## A GroundPile came, changed or went, for the views (any peer).
 signal pile_shown(pile: GroundPile)
 ## Bandaging (try_bandage): [param by] began on [param patient] (state
@@ -4932,6 +4936,12 @@ func counter_view(by: GridEntity, counter: GridEntity, why := "") -> Dictionary:
 				"left": left, "left_seconds": roundi(left * TICK_DT)})
 	if towns != null:
 		for uid in towns.held(town, owner):
+			if not items.returned_from(uid).is_empty():
+				# Taken from the old chests (734 amended (7)): its row says so, in voice's words.
+				var words := str(production.rules.get("kept", {}).get("caption", "%s"))
+				out["waiting"].append({"uid": uid, "id": items.id_of(uid), "effect": "kept",
+					"words": words % Items.name_of(items.id_of(uid)).capitalize() if "%s" in words else words})
+				continue
 			out["waiting"].append({"uid": uid, "id": items.id_of(uid), "effect": "bless" if items.blessed_for(uid) == owner else "reforge"})
 	return out
 
@@ -5054,8 +5064,12 @@ func counter_collect(by: GridEntity, counter: GridEntity, uid: int) -> String:
 	by.slots = slots
 	by.slot_items = uids
 	towns.release_held(town, owner, uid)
+	var returned := not items.returned_from(uid).is_empty()
+	items.clear_returned(uid)
 	_moved_item(uid, counter, by)
 	_log("counter: %s collected %s at %s" % [by.name, items.id_of(uid), town])
+	if returned:
+		collected_returned.emit(by, counter)  # The priest says where it came from (Main).
 	_slots_changed(by)
 	return ""
 

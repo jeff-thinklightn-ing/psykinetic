@@ -470,6 +470,12 @@ const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.5
 const CART := {"script": CARGO, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "art": "prop.cart", "props": {"mass": 60.0, "capacity": 8}}
 ## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
 const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12), "art": "prop.chest"}
+## A level.json entity's "art" for one drawn as nothing at all (734 amended
+## (7), the package "no chests in town"; Jeff, 11-05: "remove chests from
+## town"): a town's depot, shop counter and locker stay as data, reached
+## through their keepers (802 amended (4), 807 amended (2)); the client gives
+## it no body and no pick, and never opens it by a click or E.
+const UNDRAWN_ART := "none"
 ## An ore seam (decision 769); level.json's props may give its
 ## full_sacks, max_hp (the blows a sack takes) and refill_days.
 const SEAM_SPEC := {"script": SEAM_SCRIPT, "shape": "cube", "tint": Color(0.72, 0.45, 0.2), "art": "rock.seam", "label": Seam.LABEL}
@@ -2607,6 +2613,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# runs meeting there); laid run by run, a broken fence its gaps.
 	# Drawn only, never solid, as all decor.
 	"fence": {"sits": "edge", "variants": 1, "posts": "prop.fence_post"},
+	# Umbrage's temple pews (734 amended (7), art-kit's prop.bench, seat
+	# 0.45 m): one to a nave cell, its front the way its sitter faces (the
+	# altar); never solid, so a townsperson sits on its own cell (npc's
+	# "temple" sit spots, maps' side).
+	"bench": {"sits": "flat", "variants": 1, "faced": true},
 }
 
 
@@ -4308,6 +4319,12 @@ static func outline(rect: Rect2i) -> Array[Vector3i]:
 		out.append(Vector3i(rect.position.x - 1, y, Terrain.EAST))
 		out.append(Vector3i(rect.end.x - 1, y, Terrain.EAST))
 	return out
+
+
+## Whether [param entity] is drawn as nothing (its spawn spec's "art"
+## UNDRAWN_ART, 734 amended (7)).
+static func undrawn(entity: Node) -> bool:
+	return entity is GridEntity and str((entity as GridEntity).spawn_spec.get("art", "")) == UNDRAWN_ART
 
 
 static func _spawns(marker: String) -> bool:

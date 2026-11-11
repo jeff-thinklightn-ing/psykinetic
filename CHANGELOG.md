@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage's square has no chests standing in it now, and anything you left in the old chests by the stall waits for you with Aldous at the temple, where pews and candles stand by the stair down (734 amended (7)).
 - The corner map and the big map draw the ground as it looks: green grass, brown paths, grey stone and clear blue water, with the hills gently shaded (873).
 - Names over heads are one readable size at every zoom, on a dark plate like the speech bubbles; where two would meet, the farther one steps up (865).
 - Pictures of your things in the pack and store squares are drawn a little larger, filling more of each square, and the spear is drawn thicker, so its shaft and head show clearly (275 amended (2)).

@@ -21471,12 +21471,18 @@ func _update_mourning(delta: float) -> void:
 	_apply_size()
 
 
+## Whether [param entity] is drawn as nothing (its "art" Level.UNDRAWN_ART,
+## 734 amended (7)): no body, no pick, and a click or E never opens it.
+static func undrawn(entity: GridEntity) -> bool:
+	return Level.undrawn(entity)
+
+
 ## The art slot [param entity] is drawn as (its spawn spec's "art": a crate,
 ## a chest, a boulder, a cart), once that slot has art of its own; "" while
 ## it has none, and the entity is its shape, tinted, as before (decision 264).
 static func art_slot_for(entity: GridEntity) -> String:
 	var slot := str(entity.spawn_spec.get("art", ""))
-	if slot == "" or not ArtKit.has(slot) or ArtKit.filled_by(slot) != "own":
+	if slot == "" or slot == Level.UNDRAWN_ART or not ArtKit.has(slot) or ArtKit.filled_by(slot) != "own":
 		return ""
 	return slot
 
@@ -24738,7 +24744,9 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var collision := CollisionShape3D.new()
 	collision.position.y = height * 0.5
 	area.add_child(collision)
-	if creature != "":
+	if undrawn(entity):
+		pass  # Drawn as nothing (734 amended (7)): no body, and no pick below.
+	elif creature != "":
 		# Its creature slot's rigged art (decision 359): Body turns to its
 		# facing (+X ahead, as the nose), Pose turns the art's front (+Z)
 		# there and is what the view's stand-in tweens tip and push.
@@ -24790,7 +24798,10 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		capsule.radius = MODEL_RADIUS
 		capsule.height = height
 		collision.shape = capsule
-	puppet.add_child(area)
+	if undrawn(entity):
+		area.free()  # Nothing to pick: its keeper is the way to it.
+	else:
+		puppet.add_child(area)
 	if entity.is_creature():
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
 		puppet.add_child(_label("Name", caption, Color.WHITE, height + NAME_LIFT))

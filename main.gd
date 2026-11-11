@@ -1235,6 +1235,7 @@ func _go_online() -> void:
 		World.handed_in.connect(_on_handed_in)  # 804, economy's side: a hand-in thanked.
 		World.depot_pointer = depot_pointer  # 802 amended (3): a store chest refuses players, saying who takes it.
 		World.slot_refused.connect(_on_slot_refused)
+		World.collected_returned.connect(_on_collected_returned)  # 734 amended (7): the priest says where it came from.
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
 			_builder = BuilderHost.new()
@@ -2186,6 +2187,8 @@ func _press_e() -> void:
 	_e_target = _entity_under_mouse()
 	if _e_target == null:
 		_e_target = World.get_entity_at(_mouse_tile())
+	if Level.undrawn(_e_target):
+		_e_target = null  # Drawn as nothing (734 amended (7)): not there to the hand.
 	if _e_target == null:
 		_e_target = remains_at(_mouse_tile())
 	_e_door = _door_under_mouse()
@@ -2204,9 +2207,9 @@ func _release_e() -> void:
 ## you opens or closes.
 func _tap_e(player: Player) -> void:
 	var target := _e_target
-	if is_instance_valid(target) and target.spawned \
+	if is_instance_valid(target) and target.spawned and not Level.undrawn(target) \
 			and (target is Chest or target is Cargo or _is_own_companion(target)):
-		_open_pack(player, target)
+		_open_pack(player, target)  # (734 amended (7): never one drawn as nothing; its keeper is the way.)
 		return
 	if is_instance_valid(target) and target.spawned and (target is Resident or talks_peaceably(target)) \
 			and World.distance(player.tile, talk_cell(target)) <= HEARING_RANGE:
@@ -8459,6 +8462,17 @@ const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: come within two s
 ## they are sent the shop again, and the refusal.
 ## Server: a move refused for the armour slot's rule (decision 622): its
 ## why to the player who moved it (a companion's, to her keeper).
+## Server: [param by] took at temple counter [param counter] a thing held
+## for them since the chests it lay in were taken away (734 amended (7), "no
+## chests in town"): the priest says where it came from (economy.json "kept"
+## "says", voice's words), so nothing seems to have vanished and come back.
+func _on_collected_returned(by: GridEntity, counter: GridEntity) -> void:
+	var line := str(World.production.rules.get("kept", {}).get("says", "")) if World.production != null else ""
+	var priest := _resident_body(_priest_of(World.temple_town(counter)))
+	if by is Player and priest != null and priest.spawned and not line.is_empty():
+		_resident_says(priest, line, "", by as Player, false)
+
+
 func _on_slot_refused(by: GridEntity, why: String) -> void:
 	var peer := by.owner_peer if by is Player else by.keeper_peer
 	if peer != 0:
@@ -22640,7 +22654,7 @@ func _open_pack(player: Player, target: GridEntity) -> void:
 ## rule, through the coordinator): what E opens as a pack, a chest (a
 ## counter, a depot, a cache, a locker's chest) or a cart.
 static func opens_on_click(target: GridEntity) -> bool:
-	return target is Chest or target is Cargo
+	return (target is Chest or target is Cargo) and not Level.undrawn(target)  # 734 amended (7): never one drawn as nothing.
 
 
 ## The free floor cell next to [param at], reachable from it for a hand

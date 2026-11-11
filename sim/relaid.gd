@@ -47,6 +47,15 @@ const REMOVED: Array[Dictionary] = [
 		"27,5": {"to": "ground"},
 		"5,7": {"to": "ground"},
 	}},
+	# No chests in town (734 amended (7); Jeff, 11-05: "remove chests from
+	# town"): the retired kit's three by Umbrage's market stall (807 amended
+	# (5)). What they held goes to the temple of "town" (to_temple): nothing
+	# is laid on the ground, nothing destroyed.
+	{"level": "wilds", "decision": 734, "town": "wilds/store", "removed": {
+		"205,208": {"to": "temple"},
+		"206,208": {"to": "temple"},
+		"206,207": {"to": "temple"},
+	}},
 ]
 
 
@@ -128,7 +137,7 @@ static func _remove(snapshot: Dictionary, done: Dictionary, level_of: Callable, 
 	done[key] = int(plan["decision"])
 	if not snapshot.get("ok", false):
 		return ""
-	var counts := {"removed": 0, "holding": 0, "laid": 0, "kept": 0, "unknown": 0}
+	var counts := {"removed": 0, "holding": 0, "laid": 0, "kept": 0, "unknown": 0, "kit": 0, "held": 0, "nobody": 0, "owners": {}}
 	var zones: Dictionary = snapshot.get("zones", {}) if snapshot.get("zones") is Dictionary else {}
 	if zones.get(level) is Dictionary:
 		var floor := {}
@@ -172,6 +181,10 @@ static func _remove(snapshot: Dictionary, done: Dictionary, level_of: Callable, 
 			match str((plan["removed"][str(spec["spawn_key"])] as Dictionary).get("to", "ground")):
 				"ground":
 					pass
+				"temple":
+					if to_temple(snapshot, str(plan.get("town", "")), level, cell, ids, uids, counts):
+						continue
+					counts["unknown"] += 1  # No such town saved: on the ground, never dropped.
 				_:
 					counts["unknown"] += 1  # A "to" this build does not know: on the ground, never dropped.
 			counts["laid"] += ids.size()
@@ -183,9 +196,109 @@ static func _remove(snapshot: Dictionary, done: Dictionary, level_of: Callable, 
 		_rename_places(snapshot, renames, {"places": 0})
 	var line := "[level] removed in %s (%d): %d saved entities removed, %d holding things, %d things laid on the ground, %d left where they were (no floor near)" % [
 		level, plan["decision"], counts["removed"], counts["holding"], counts["laid"], counts["kept"]]
+	if plan.has("town"):
+		# Counts only (the coordinator: no names, no ids, no uids).
+		line = "[level] removed in %s (%d): %d saved entities removed, %d holding things, %d kit things to the shop, %d players' things held for %d owners at the temple, %d of no known owner to the shop, %d laid on the ground" % [
+			level, plan["decision"], counts["removed"], counts["holding"], counts["kit"], counts["held"], (counts["owners"] as Dictionary).size(),
+			counts["nobody"], counts["laid"]]
 	if counts["unknown"] > 0:
 		line += ", %d with an unknown destination laid on the ground" % counts["unknown"]
 	return line
+
+
+## Things [param ids] (their [param uids] beside them, 0 for one the item
+## book has no instance of) out of a removed chest on [param cell] of
+## [param zone], carried to [param town]'s temple (734 amended (7), the
+## coordinator's rulings: nothing out of every player's reach): one only
+## one player ever carried, held there for them (Towns held_for, decision
+## 434), handed back free by the priest at his counter, marked RETURNED for
+## his words; any other goes on the town's shop at the town's price (its
+## stockpile "shop", Stockpile.shop_holder): a piece of the chest's own lay
+## (minted "stocked" in it, never carried by anyone: _kit_own), and one of
+## no known owner (carried by two or more players, whose book keeps no order
+## of who held it last; by no player; or never in the book, given an
+## instance). False, nothing moved, when [param snapshot] has no such town
+## saved, or no store for it.
+static func to_temple(snapshot: Dictionary, town: String, zone: String, cell: Vector2i, ids: Array, uids: Array, counts: Dictionary) -> bool:
+	var towns: Variant = snapshot.get("towns")
+	if town.is_empty() or not towns is Dictionary or not (towns as Dictionary).get(town) is Dictionary:
+		return false
+	var record: Dictionary = towns[town]
+	if not record.get("held_for") is Dictionary:
+		record["held_for"] = {}
+	var held_for: Dictionary = record["held_for"]
+	if not snapshot.get("items") is Dictionary:
+		snapshot["items"] = {}
+	var items: Dictionary = snapshot["items"]
+	if not items.get("book") is Dictionary:
+		items["book"] = {}
+	var book: Dictionary = items["book"]
+	var stores: Variant = snapshot.get("stockpile")
+	var store: Variant = (stores as Dictionary).get(town) if stores is Dictionary else null
+	if not store is Dictionary:
+		return false
+	if not (store as Dictionary).get("shop") is Array:
+		store["shop"] = []
+	var shelf: Array = store["shop"]
+	for i in ids.size():
+		var uid := int(uids[i]) if i < uids.size() else 0
+		var thing: Variant = book.get(str(uid)) if uid > 0 else null
+		var owner := ""
+		var kit := false
+		if thing is Dictionary:
+			kit = _kit_own(thing, zone, cell)
+			owner = "" if kit else _sole_player(thing)
+		else:
+			# No instance in the book: one made for it, so it can be sold.
+			uid = maxi(int(items.get("next", 1)), 1)
+			while book.has(str(uid)):
+				uid += 1
+			items["next"] = uid + 1
+			thing = {"id": str(ids[i]), "made": 0, "at": "", "holder": "", "carriers": [],
+				"events": [{"kind": "migrated", "step": 0, "zone": zone, "tile": [cell.x, cell.y], "what": "a chest's, unrecorded"}]}
+			book[str(uid)] = thing
+		if owner.is_empty():
+			if not uid in shelf:
+				shelf.append(uid)
+			thing["at"] = Stockpile.shop_holder(town)
+			counts["kit" if kit else "nobody"] += 1
+			continue
+		thing["at"] = "temple:" + town
+		thing[ItemBook.RETURNED] = ItemBook.FROM_OLD_CHESTS
+		if not held_for.get(owner) is Array:
+			held_for[owner] = []
+		held_for[owner].append(uid)
+		counts["held"] += 1
+		counts["owners"][owner] = true
+	return true
+
+
+## Whether book entry [param thing] is provably a piece of the chest's own
+## lay on [param cell] of [param zone] (the coordinator: "its uid in the
+## kit's own lay, never carried by a player"): minted "stocked" there, and
+## carried by nobody since.
+static func _kit_own(thing: Dictionary, zone: String, cell: Vector2i) -> bool:
+	var events: Array = thing.get("events", []) if thing.get("events") is Array else []
+	if not (thing.get("carriers", []) as Array).is_empty() or events.is_empty() or not events[0] is Dictionary:
+		return false
+	var first: Dictionary = events[0]
+	var tile: Variant = first.get("tile")
+	return str(first.get("kind", "")) == "stocked" and str(first.get("zone", "")) == zone and tile is Array \
+		and (tile as Array).size() == 2 and int(tile[0]) == cell.x and int(tile[1]) == cell.y
+
+
+## The one player who ever carried book entry [param thing] (a carrier key,
+## "player:<id>"); "" for none, or more than one (to the shop: the book's
+## carrier rows keep first-carry order and time held, and a take from a
+## chest after the first carry leaves no event, so who held it last is
+## never known).
+static func _sole_player(thing: Dictionary) -> String:
+	var players: Array[String] = []
+	for row: Variant in thing.get("carriers", []):
+		var who := str((row as Dictionary).get("who", "")) if row is Dictionary else ""
+		if who.begins_with("player:") and not who in players:
+			players.append(who)
+	return players[0] if players.size() == 1 else ""
 
 
 ## Things [param ids] (their [param uids] beside them) laid on [param
@@ -369,7 +482,9 @@ static func _onto_floor(level: String, section: Dictionary, floor: Dictionary, c
 
 
 ## Whether [param level] (Level.load_level's) is laid out as [param plan]
-## moves to: each place renamed to and each marker moved to is there.
+## moves to: each place renamed to and each marker moved to is there, but
+## for a marker a later REMOVED entry takes out of that level (734 amended
+## (7): Snagfin's three, moved by its stall, then gone from town).
 static func is_laid(level: Dictionary, plan: Dictionary) -> bool:
 	var places: Dictionary = level.get("places", {})
 	for to: String in plan["places"].values():
@@ -378,8 +493,14 @@ static func is_laid(level: Dictionary, plan: Dictionary) -> bool:
 	var marked := {}
 	for spec: Dictionary in level.get("entities", []):
 		marked[spec.get("tile")] = true
+	var gone := {}
+	for removal: Dictionary in REMOVED:
+		if removal["level"] == str(level.get("name", "")):
+			for key: String in removal["removed"]:
+				gone[Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))] = true
 	for to: Array in plan["markers"].values():
-		if not marked.has(Vector2i(to[0], to[1])):
+		var at := Vector2i(to[0], to[1])
+		if not marked.has(at) and not gone.has(at):
 			return false
 	return true
 

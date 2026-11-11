@@ -1773,6 +1773,11 @@ func _test_counter_panel() -> void:
 	panel.collect_asked.connect(func(uid: int) -> void: collected[0] = uid)
 	panel.click_box("ready", 4)
 	_check(collected[0] == 4, "a click on the ready square collects it: the thing's uid")
+	# 734 amended (7): a waiting thing with its own words (one from the old chests) shows them; one without, "ready".
+	panel.show_counter({"kind": "temple", "why": "", "jobs": [], "working": [],
+		"waiting": [{"uid": 6, "id": "sword", "effect": "kept", "words": "Sword, from the old chests"}, {"uid": 7, "id": "shield", "effect": "bless"}]})
+	_check(panel.box_words("ready", 6) == "Sword, from the old chests" and panel.box_words("ready", 7) == "%s, ready" % Items.name_of("shield").capitalize(),
+		"a waiting thing's own words where given, else ready")
 	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""})
 	_check(panel.boxes_shown().is_empty() and panel.title_shown() == "The smith's counter", "nothing to do: no squares")
 	panel.close()

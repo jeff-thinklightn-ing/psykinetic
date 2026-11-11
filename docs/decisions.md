@@ -38511,6 +38511,61 @@ building's plot, and _scatter_plan gives it only the indoor scatter, as a floor 
 covers the ring; the approach, outside the plot, keeps its grass). view_test _test_turf_house counts
 the whole plot. Client only, protocol unchanged, no new class_name.
 
+734 amended (7): Umbrage's temple furnished, and no chest in town (packages "the temple's inside",
+for 832's way down, and "no chests in town", both on; the coordinator's approval and rulings,
+Umbrage first; the label from tools/decision_number.sh; maps' cells; Jeff, 11-05: "remove chests
+from town", his report, "i dont want items turned into a 'chest' - always a trader/npc", "an empty
+chest is like an anti-reward"). The chapel (levels/wilds, kind temple at (190,199), facing west, its
+nave x 190..199, y 199..204) gains four pews, a new Level.DECOR_KINDS "bench" (art-kit's prop.bench,
+its seat 0.45 m, faced, never solid) at (193,200), (195,200), (193,203) and (195,203), each facing
+east to the altar. They keep off the aisle y 201..202 from the door to the altar, off every cell its
+visitors keep off (Main._temple_keep: its doors', its counter's, its respawn's and those about them)
+and off the way down at (199,199) and its landing (198,199), so the walk from there to the door
+stays open; npc's four "temple" sit spots go on them (maps' side). Candles burn on the floor beside
+the way down at (199,200) (Level lit_candles, 811 amended (4)'s), so it is found by night;
+lit_candles draws its own prop.candles, so the plain decor candles there go. The altar and the
+offering table follow as 734 amended (8) (art-kit's building.temple_altar and prop.offering_table,
+still on their way to main; the coordinator's ruling: "no chests in town" is Jeff's report and waits
+on no model, and (8) must be on main before the 11-12 cut, the pews not out facing a bare wall). A
+town's depot, shop counter and locker stay as data, reached through their keepers (802 amended (4),
+807 amended (2)), and are drawn as nothing: a level.json entity's "art" "none" (Level.UNDRAWN_ART,
+Level.undrawn, by the entity's own spec, never by shape or script) gives it no body and no pick in
+Client3D._make_puppet; Main.opens_on_click, the E tap and its tile fallback never open one; and a
+companion neither sees, lists nor opens one (Companion's senses, a room's things, her chest errands
+and seen_things). In Umbrage those are (190,196) the depot, (193,196) the shop and (172,193) the
+locker; a keeper's own Locker (Main._open_locker_at) is drawn as before. The retired kit's three
+chests by the market stall (807 amended (5); (205,208), (206,208), (206,207)) leave the map (their
+chest markers in levels/wilds/layout.png painted cobble, their level.json entries gone; level_test's
+check of the testing kit's weapons, Jeff's "add some of the melee weapons to the town chest for
+testing", now checks they are gone) (Relaid.is_laid no longer asks 774's re-lay for a marker a later
+REMOVED entry takes out, so a world from before 774 still has them moved, then removed) and are
+removed from the saved world once by Relaid (807's REMOVED, "to" "temple", run-once under
+"relaid/wilds/734"), nothing destroyed and nothing out of every player's reach (Relaid.to_temple;
+the coordinator's ruling, Jeff having stocked the kit to test with): a thing one player carried is
+held for them at the temple (the town record's held_for, by owner), its book entry at
+"temple:wilds/store" and marked returned "old_chests" (ItemBook.RETURNED, FROM_OLD_CHESTS, kept
+through the book's load), handed back free; everything else goes on the town's shop at the town's
+price (the stockpile's "shop", Stockpile.shop_holder), not its store: a piece of the kit's own stock
+no player ever carried (the item book: no carriers, stocked in that zone and tile), and one of no
+known owner, carried by two or more players (the book's carrier rows keep only first-carry order and
+time held, and a take from a chest after the first carry leaves no event, so who held it last is
+never known), by no player, or never in the book (given an instance). Rolf's starter stall (736)
+sells most of the kit's weapons at 1 gold besides. With no town record or store the things go on the
+ground, counted. The journal line carries counts only, no names, ids or uids ("[level] removed in
+wilds (734): N saved entities removed, ... kit things to the shop, ... players' things held for ...
+owners at the temple, ... of no known owner to the shop, ... laid on the ground"). At the temple's
+counter a held thing waits as the blessed do (World.counter_view's waiting rows), its row carrying
+"effect" "kept" and "words" (economy.json "kept": "%s, from the old chests", voice's words), which
+the barter panel shows in place of "%s, ready" (ui's permission, one branch); taking it
+(World.counter_collect) clears the mark and emits World.collected_returned, on which the priest says
+"This was in the old chests by the stall. I kept it for you." (voice's words;
+Main._on_collected_returned). An old client shows its plain box and "ready": protocol 55 unchanged
+(release's ruling, a line above PROTOCOL_REVISION). Rolled back past this and redeployed, a second
+run needs a new key (release's note). level_test _test_temple_furnished and _test_removed_to_temple
+(a world made by hand); view_test _test_undrawn_puppet; blessing_test's kept row; ui_test
+_test_counter_panel. Level data, Level, Relaid, ItemBook, World, Main, Companion, the barter panel
+and Client3D; no new class_name.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

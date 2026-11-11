@@ -53,6 +53,7 @@
 	"commissions": {"rescue": 10, "camp": 20, "fetch": 1, "dispute": 5, "escort": 8, "healing": 6, "watch_night": 10, "watch_wave": 5},
 	"reforge": {"trade": "smith", "fee": 0.5, "least": 1},
 	"bless": {"trade": "priest", "offering": 0.5, "least": 1, "steps": 600},
+	"kept": {"_": "734 amended (7) (no chests in town; voice's words): a thing a player left in the old kit's chests by Umbrage's stall, held for them at the temple once the chests were taken away (Relaid.to_temple): its row's caption at the priest's counter (the thing's name for its %s) and what he says as they take it.", "caption": "%s, from the old chests", "says": "This was in the old chests by the stall. I kept it for you."},
 	"rescue": {"per_camp": 1, "restock_days": 5, "lacking": 3,
 		"trades": {"hunter": 3, "tanner": 3, "fletcher": 3, "farmer": 3, "woodcutter": 3, "smith": 1, "cook": 1, "carpenter": 1},
 		"names": ["Hew", "Bram", "Tilda", "Ada", "Wat", "Joan", "Piers", "Agnes", "Col", "Maud", "Ren", "Sib"]},
