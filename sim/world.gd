@@ -363,6 +363,10 @@ const BLOW_STAND_TICKS := 2
 const LOWERED_ABSORB_SHARE := 0.5
 const LOWERED_ARC := 1
 const GUARD_BROKEN_TICKS := 20
+## The shortest lead (338 amended) that tells a blow (340 amended (4), the
+## coordinator's ruling): 6 ticks, 0.6 s, twice a person's 0.3 s from a tell
+## to its answer. A wound-up blow is told whatever its ticks.
+const TOLD_LEAD_TICKS := 6
 ## A body knocked down (decision 343) is pushed as if it weighed this much
 ## of its mass: lying, it cannot brace.
 const DOWN_MASS_FACTOR := 0.5
@@ -1011,6 +1015,9 @@ class Hit:
 	var bash := 0
 	## A wound-up blow's (decision 392): it breaks any guard it meets.
 	var crushing := false
+	## A told blow's (340 amended (4)): a wound-up one, or one whose lead ran
+	## TOLD_LEAD_TICKS or more; a player's raised shield takes it whole.
+	var told := false
 	## A piercing blow's (a backstab or a reach verb's): worn armour's
 	## deflect_pierce turns some of it (armour, combat's side).
 	var pierce := false
@@ -6023,7 +6030,7 @@ func _tend_disarmed() -> void:
 
 
 ## The spin's sweep (decision 603): every body in its cells struck (a
-## raised shield facing him takes half: told_guard, 340 amended (3)),
+## raised shield facing him takes it whole: told_guard, 340 amended (3), (4)),
 ## pushed outward and knocked down; then its maker spent.
 func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
 	var move: Dictionary = moves["spin"]
@@ -7350,9 +7357,10 @@ func lowered_guard(target: GridEntity, source: GridEntity) -> Dictionary:
 ## GUARD_BROKEN_TICKS. A [param crushing] blow (a wound-up one, decision
 ## 392) breaks it whatever it weighs. A player's guard is the exception
 ## (340 amended (2), _meet_player_guard): never broken by a blow, never a
-## stun for having raised it.
+## stun for having raised it. [param told]: a told blow (Hit.told, a
+## lunge's), which a player's raised shield takes whole (340 amended (4)).
 func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
-		crushing := false) -> Variant:
+		crushing := false, told := false) -> Variant:
 	var verb := guarding(target, source)
 	if verb.is_empty():
 		verb = lowered_guard(target, source)  # 340 amended: its shield's side, at half.
@@ -7363,7 +7371,7 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
 	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
 	if target is Player:
-		return _meet_player_guard(target as Player, source, verb, slot, amount, force, cost, shot, crushing)
+		return _meet_player_guard(target as Player, source, verb, slot, amount, force, cost, shot, crushing, told)
 	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	target._world_note_exertion(tick)
 	var heavy := (weight >= float(verb["breaks_at"]) or crushing) and not shot
@@ -7395,24 +7403,32 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 ## rulings on combat's guard table, Jeff's rule that a choice is a bonus,
 ## never a penalty): what _meet_guard returns. Its weight sets only the
 ## stamina it costs; no blow breaks it and nothing stuns its holder for
-## having raised it. A [param crushing] blow (a wound-up weapon's, 392: the
-## draugr's axe) costs twice. A shield short of the stamina gives out: the
-## blow lands whole, the shield is lowered and can't come up for
+## having raised it. A shield short of the stamina gives out: the blow
+## lands whole, the shield is lowered and can't come up for
 ## GUARD_BROKEN_TICKS. The sword's parry (the right hand's, made without
 ## asking) is never worse than a bare hand: it costs at most parry_cap, and
 ## a blow it can't hold (crushing, of its breaks_at or more, or one it
 ## hasn't the stamina for) it doesn't meet: null, nothing paid.
+## A [param told] blow (340 amended (4), the coordinator's ruling: one rule a
+## player can learn) met on the raised shield is taken whole, so nothing
+## pushes, for at most a light blow's stamina (parry_cap), and never gives it
+## out: short of that stamina, it takes half (LOWERED_ABSORB_SHARE) for what
+## is left and stays up. A lowered shield's side and the parry are as above.
 func _meet_player_guard(target: Player, source: GridEntity, verb: Dictionary, slot: int, amount: int, force: float,
-		cost: int, shot: bool, crushing: bool) -> Variant:
+		cost: int, shot: bool, crushing: bool, told := false) -> Variant:
 	var heavy := crushing and not shot
+	var held := (told or heavy) and slot == Items.LEFT_HAND and target.raised == "block"  # A wound-up blow is told.
 	if slot == Items.RIGHT_HAND:
 		cost = mini(cost, parry_cap(target))
 		if heavy or amount + force >= float(verb["breaks_at"]) or target.max_stamina > 0 and target.stamina < cost:
 			return null  # A parry it can't hold is none, as on a bare hand.
-	elif heavy:
-		cost *= 2  # A wound-up blow taken on a shield: twice the stamina.
+	elif held:
+		cost = mini(cost, parry_cap(target))  # 340 amended (4): a told blow, a light blow's stamina at most.
 	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	target._world_note_exertion(tick)
+	var short := held and target.max_stamina > 0 and target.stamina < cost
+	if short:
+		cost = target.stamina  # 340 amended (4): short, it takes half and stays up.
 	if target.max_stamina > 0 and target.stamina < cost:
 		target.raised = ""
 		target.guard_broken_until = tick + GUARD_BROKEN_TICKS
@@ -7424,7 +7440,10 @@ func _meet_player_guard(target: Player, source: GridEntity, verb: Dictionary, sl
 	if target.max_stamina > 0:
 		target.stamina -= cost
 	var absorb := clampf(float(verb["absorb"]), 0.0, 1.0)
-	_log("guard: %s takes %s's blow (%d, force %.2f) for %d stamina" % [target.name, source.name, amount, force, cost])
+	if held:
+		absorb = LOWERED_ABSORB_SHARE if short else 1.0  # 340 amended (4): whole, or half when short.
+	_log("guard: %s takes %s's %s (%d, force %.2f) for %d stamina%s" % [target.name, source.name,
+			"told blow" if held else "blow", amount, force, cost, ", short: half" if short else ""])
 	target._world_guarded(false)
 	guard_met.emit(target, source, false)
 	if target.raised == "block" and not shot:
@@ -7445,10 +7464,11 @@ func parry_cap(target: GridEntity) -> int:
 ## A told move's harm met by [param body]'s raised shield (340 amended (3),
 ## the coordinator's rule 2, enemy-ai's option (c)): what is left of
 ## [param harm]. A told move is stepped out of; a raised shield facing it
-## takes half its absorb (LOWERED_ABSORB_SHARE) for the stamina a point of
-## harm costs, never breaks and stuns no one, and its maker isn't thrown
-## back. Short of the stamina it gives out, as a plain blow's (the harm
-## whole, the shield lowered for GUARD_BROKEN_TICKS, no stun). Facing:
+## takes it whole (340 amended (4), one rule with a told blow's) for the
+## stamina a point of harm costs, at most a light blow's (parry_cap), never
+## breaks and stuns no one, and its maker isn't thrown back. Short of that
+## stamina it takes half (LOWERED_ABSORB_SHARE) for what is left and stays
+## up: a shield never gives out to a told move. Facing:
 ## [param way] is the told line's direction, the way [param by] comes along
 ## (a charge's, a throw's, a cone's), read as -way against the holder's
 ## facing so a shield turned onto the line meets him whatever cell he
@@ -7471,19 +7491,15 @@ func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO
 	if off > float(verb["arc"]) * PI / 4.0 + 0.01:
 		return harm
 	var steady := float(Items.strength_value(slot_strength(body, Items.LEFT_HAND), "guard_stamina", 1.0))
-	var cost := maxi(1, ceili(float(verb["stamina"]) * harm * steady))
+	var cost := mini(maxi(1, ceili(float(verb["stamina"]) * harm * steady)), parry_cap(body))
 	_mark_fight(by, body)
 	body._world_note_exertion(tick)
-	if body.max_stamina > 0 and body.stamina < cost:
-		body.raised = ""
-		body.guard_broken_until = tick + GUARD_BROKEN_TICKS
-		_log("guard: %s's guard gives out under %s's told move (%d harm; %d stamina for %d)" % [body.name, by.name, harm, body.stamina, cost])
-		body._world_guarded(true)
-		guard_met.emit(body, by, true)
-		return harm
+	var short := body.max_stamina > 0 and body.stamina < cost
+	if short:
+		cost = body.stamina  # 340 amended (4): short, it takes half and stays up.
 	if body.max_stamina > 0:
 		body.stamina -= cost
-	var absorb := clampf(float(verb["absorb"]) * LOWERED_ABSORB_SHARE, 0.0, 1.0)
+	var absorb := LOWERED_ABSORB_SHARE if short else 1.0
 	var left := maxi(0, harm - ceili(harm * absorb - 0.001))
 	_log("guard: %s takes %s's told move on its shield (%d harm, %d left) for %d stamina" % [body.name, by.name, harm, left, cost])
 	body._world_guarded(false)
@@ -7500,6 +7516,8 @@ func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO
 ## unchanged (the guard never shortens the throw) and the launch's impact
 ## comes out of what is left; the rest lands as &"attack". With no impulse
 ## nothing is launched and what is left lands whole. What it took in all.
+## Taken whole on a shield (340 amended (4)) nothing is left, but the throw
+## still throws and a wall's impact, the launch's own, still lands.
 ## Server only.
 ## Which moves come here (the coordinator's ruling on 340 amended (3)): only
 ## a told move that skips a raised guard today (the draugr's spin, throw,
@@ -9148,6 +9166,7 @@ func _tend_wind_ups() -> void:
 				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
+				_hits[i].told = not lead or tick - began >= TOLD_LEAD_TICKS  # 340 amended (4).
 			if logs:
 				_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
 		else:
@@ -10042,7 +10061,7 @@ func _resolve_hits() -> void:
 		if hit.bash > 0:
 			_bash_lands(hit)
 		if not hit.shove:
-			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force, false, hit.crushing)
+			var met: Variant = _meet_guard(hit.target, hit.source, hit.damage, hit.raw_force, false, hit.crushing, hit.told)
 			if met != null:
 				hit.damage = met[0]
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0

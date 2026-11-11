@@ -934,7 +934,7 @@ func _tend_ambush() -> bool:
 			# A raised guard facing it takes a lunge (World._meet_guard, 340)
 			# and, as a shot, is never broken by it (only too little stamina
 			# breaks it): a dagger's thrust, its tell all it has.
-			var met: Variant = World._meet_guard(each, self, amount, 0.0, true)
+			var met: Variant = World._meet_guard(each, self, amount, 0.0, true, false, true)  # Told (340 amended (4)).
 			if met != null:
 				amount = int((met as Array)[0])
 				if each.raised == "block":

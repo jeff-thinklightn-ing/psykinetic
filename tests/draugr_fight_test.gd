@@ -233,7 +233,7 @@ func _test_real_throw() -> void:
 ## 340 amended (3), the draugr's told moves met at their sites (combat's
 ## ask; _test_told_guard covers the spin and told_guard/told_hit as units):
 ## his throw (physics' hurl, the live path) and his charge to his axe, each
-## on a raised shield facing the line: half of it taken for stamina, the
+## on a raised shield facing the line: taken whole for stamina (340 amended (4)), the
 ## throw's launch and the charge's push unchanged, the charger's own share
 ## whole; from the side of the line, the whole of it.
 func _test_told_sites() -> void:
@@ -242,10 +242,10 @@ func _test_told_sites() -> void:
 	var ahead := _told_throw("block", Vector2i(-1, 0))
 	var side := _told_throw("block", Vector2i(0, 1))
 	var harm := int(bare["attack"])
-	var spent := _told_spent(harm)
+	var spent := mini(_told_spent(harm), int(ahead["light"]))
 	_check(harm > 0 and bare["hit"], "his throw, bare: %d harm, the player struck and launched to %s" % [harm, bare["tile"]])
 	_check(int(ahead["attack"]) == _told_left(harm) and int(ahead["stamina"]) == spent and ahead["raised"],
-			"his throw on a shield facing its line: %d of %d left (half its absorb), %d stamina (%d), the shield still up" % [ahead["attack"], harm, ahead["stamina"], spent])
+			"his throw on a shield facing its line: %d of %d left (taken whole, 340 amended (4)), %d stamina (%d), the shield still up" % [ahead["attack"], harm, ahead["stamina"], spent])
 	_check(ahead["tile"] == bare["tile"] and int(ahead["body"]) == int(bare["body"]),
 			"the throw's launch unchanged: to %s as bare (%s), its impact %d as bare (%d)" % [ahead["tile"], bare["tile"], ahead["body"], bare["body"]])
 	_check(int(side["attack"]) == harm and int(side["stamina"]) == 0,
@@ -254,19 +254,21 @@ func _test_told_sites() -> void:
 	var met := _told_charge("block")
 	var impact := int(plain["body"])
 	_check(impact > 0 and plain["over"], "his charge, bare: through the player in its line, %d impact, him %d" % [impact, plain["self"]])
-	_check(int(met["body"]) == _told_left(impact) and int(met["stamina"]) == _told_spent(impact) and met["raised"],
-			"his charge on a shield facing its line: %d of %d left, %d stamina (%d), the shield still up" % [met["body"], impact, met["stamina"], _told_spent(impact)])
+	var charge_spent := mini(_told_spent(impact), int(met["light"]))
+	_check(int(met["body"]) == _told_left(impact) and int(met["stamina"]) == charge_spent and met["raised"],
+			"his charge on a shield facing its line: %d of %d left, %d stamina (%d), the shield still up" % [met["body"], impact, met["stamina"], charge_spent])
 	_check(int(met["self"]) == int(plain["self"]) and met["tile"] == plain["tile"],
 			"the charger takes his whole share (%d, bare %d), the push unchanged (to %s, bare %s)" % [met["self"], plain["self"], met["tile"], plain["tile"]])
 
 
-## What a raised round shield leaves of [param harm] from a told move (told_guard).
-func _told_left(harm: int) -> int:
-	var absorb := clampf(float(Items.verb_of("shield")["absorb"]) * World.LOWERED_ABSORB_SHARE, 0.0, 1.0)
-	return maxi(0, harm - ceili(harm * absorb - 0.001))
+## What a raised round shield leaves of [param harm] from a told move (told_guard):
+## none, with the stamina for it (340 amended (4)).
+func _told_left(_harm: int) -> int:
+	return 0
 
 
-## The stamina a raised round shield spends on [param harm] (told_guard; a plain player's steadiness).
+## The stamina a raised round shield spends on [param harm] (told_guard; a plain player's steadiness),
+## before its cap, a light blow's (World.parry_cap; the tally's "light").
 func _told_spent(harm: int) -> int:
 	return maxi(1, ceili(float(Items.verb_of("shield")["stamina"]) * harm))
 
@@ -328,6 +330,7 @@ func _told_watch(e: Dictionary, stance: String, facing: Vector2i, ticks: int, do
 		return bool(done.call()))
 	World.entity_damaged.disconnect(on)
 	tally["stamina"] = before - player.stamina
+	tally["light"] = World.parry_cap(player)
 	tally["raised"] = player.raised == stance
 	tally["tile"] = player.tile
 	tally["over"] = finished

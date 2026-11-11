@@ -7,7 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- A raised shield facing one of the draugr's marked moves, his spin, his thrown axe or his charge, now takes half its harm for stamina, never breaking or stunning you, though you're still thrown and knocked down; short of stamina, it gives out and the move lands whole; stepping out of the red is still the way clear, where before the shield did nothing against them and his spin broke it every time (340 amended (3)).
+- Shields: a blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing), is taken whole on a raised shield facing it for a little stamina and never breaks your guard; short of stamina, the shield still takes half and stays up, and the draugr's throws still throw you (340 amended (3) and (4))
 ## v0.1.212
 
 - Your companion names things as you'd say them: some roast meat, soft boots, the holy remains, an Encolpion Amulet (294 amended (1)).

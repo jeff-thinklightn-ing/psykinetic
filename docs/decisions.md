@@ -7434,6 +7434,40 @@ told_hit 8 with no launch 4, with a launch into the wall its impact counted in; 
 The shield's tooltip and the CHANGELOG in voice's words. Server and data; protocol unchanged, no
 new class_name.
 
+340 amended (4) (the decision-number script's label; the coordinator's approval of combat's crypt
+design, rule e, game-wide): a told blow met on a raised shield is taken whole for a light blow's
+stamina, and a shield never gives out to one. On combat's Brand table (C:/dev/review/combat/
+brand_table.md) a raised shield never answered Brand: his sledge, a wound-up blow, cost twice its
+weight (about 20 stamina at stamina 100), and with her own blows keeping stamina_regen_delay
+running the shield gave out by his third or fourth, whatever the rule on the stamina (scratch
+variants a to e). One rule a player can learn (the coordinator): a told blow is a wound-up one
+(Hit.crushing, 392) or one whose lead ran World.TOLD_LEAD_TICKS (6, 0.6 s, twice a person's 0.3 s
+from a tell to its answer) or more, marked Hit.told in _tend_wind_ups, and a robber's lunge (told,
+its 6-tick tell; Monster._tend_ambush passes told to _meet_guard). On a player's raised shield
+(raised "block", the left hand) _meet_player_guard takes it whole (absorb 1, so nothing pushes, the
+buckler's 0.75 included) for at most parry_cap, the stamina one light blow of its own costs; short
+of that it takes half (LOWERED_ABSORB_SHARE) for what is left and stays up. The wound-up blow's
+twice (340 amended (2)) is gone with it: a crushing blow is a told one, called direct too. The same
+in told_guard (340 amended (3)): whole for its point cost capped at parry_cap, half when short, never
+given out. Unchanged: plain untold blows (their weight's stamina, short of it the shield gives
+out), a lowered shield's side, the sword's parry (it still never meets a crushing blow; a told lead
+it meets as before), a monster's guard, and a told move's throw: told_hit and the draugr's throw
+and hurl still launch the body as before, and a wall's impact, the launch's own, still lands. The
+Brand table, a player holding her blow while her stamina is under 40 (as one watching the bar
+would), Brand at 85 hp: as built she fell in 17.1 s; on this rule she is never touched (sword
+45.4 s, hammer 98.2 s, dagger 140.2 s, fists leave him at 9 in 180 s); no faster than the same
+weapon answering bare (sword 30.0 s), as the coordinator asked. The Ossuary's dead at lead 6, the
+shield raised: every row won, taking 0 to 9, where as built fists and the hammer fell. The guard
+table (combat's scratch, a player standing facing each boss): the draugr's axe on the buckler 14
+hp/min to 0, the grey's plain bite on the buckler 11 to 0, the stamina left higher on every shield
+row; the moves that skip the guard today (the bear's, the grey's lunge, the king's charge) wait on
+enemy-ai's told_hit sites, as (3) has it. monster_test: no row moved. combat_test
+_test_guard_rework and _test_told_guard, items_test, draugr_fight_test _test_told_sites to the rule
+(taken whole, a light blow's stamina at most, half when short, the shield up); monster_test
+_test_lunge pays a light blow's at most. The round shield's and the buckler's tooltips and the
+CHANGELOG (one bullet for (3) and (4)) in voice's words. Server and data; protocol unchanged, no new
+class_name.
+
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
 Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb
