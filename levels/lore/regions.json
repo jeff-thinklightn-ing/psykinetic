@@ -92,9 +92,9 @@
 			"id": "farmstead",
 			"type": "place",
 			"name": "the old farmstead",
-			"status": "draft",
+			"status": "agreed",
 			"source": "Jeff",
-			"summary": "An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22); not the Blood Rot's doing.",
+			"summary": "An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing.",
 			"place_kind": "farm",
 			"relations": [
 				{
@@ -113,7 +113,109 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "draft"
+					"status": "agreed",
+					"sight": "the old farmstead"
+				}
+			]
+		},
+		{
+			"id": "pond",
+			"type": "place",
+			"name": "the pond",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The wilds' fishing pond, far west of Umbrage by the west road (maps' reed_pond at (33,120), \"the pond\", holder nobody), with the other waters that fish: two pools (110..116 x 57..60 west of the north road; 221..223 x 224..228 east of the woodlot post) and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). No name of its own until Jeff picks one (Reed Pond is asked). Package \"wilds basics: pond\".",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"fishing"
+			],
+			"facts": [
+				{
+					"id": "pond.where",
+					"text": "Far west of town there is a pond: take the road out to the crossroads and keep on west along the west road almost to its end, and the pond lies beside it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed",
+					"sight": "the pond"
+				},
+				{
+					"id": "pond.reeds",
+					"text": "Reeds grow along the pond's edge.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed",
+					"sight": "the reeds"
+				},
+				{
+					"id": "pond.fish",
+					"text": "Fish rise in the pond, and it is nobody's: anyone may fish it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed",
+					"sight": "the fish rising"
+				},
+				{
+					"id": "pond.feeding",
+					"text": "Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "pond.pools",
+					"text": "There are two pools with fish in them too: a small one south-east of town, just east of the woodlot post, and a bigger one west of the north road, a good way north of the crossroads.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "pond.river",
+					"text": "In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
 				}
 			]
 		},
@@ -259,6 +361,19 @@
 						"town_lands"
 					],
 					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "temple.offering",
+					"text": "Whoever the temple brings back makes a gold offering there, and is brought back even with less gold than it asks.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"return"
+					],
 					"source": "Jeff",
 					"status": "agreed"
 				}
