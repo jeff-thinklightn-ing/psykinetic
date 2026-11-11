@@ -48733,6 +48733,18 @@ his place (_vendor_spot, behind the counter) as 853 keeps everyone moving. With 
 before. Maps lays Umbrage's at (203, 196) facing (203, 197) through builder's spot tool; no CHANGELOG
 line of npc's (it shows with maps' spots).
 
+853 amended (4) (lore's audit, the coordinator's approval, 2026-11-11): what was asked opens a
+resident's facts. Each resident knows 102 to 119 agreed facts and four to seven fit the 600-character
+budget, always the same top-weighted ones, so a priest asked about the crypt was handed the pond's road.
+Resident.voice_ask passes the player's line as Resident.asked_topics: each lore entry whose id or name
+it names and each fact tag it names (Resident.TOPIC_SKIP aside), plurals too ("wolves", "crypts").
+system_for, facts_now and world_facts take it as `about`, and world_facts sorts the facts about it
+(Resident._facts_known(about), Lore.known_by's filter) ahead of the rest, keeping the order within
+each (a trusted player's secret, a superstitious resident's rumour, then weight); same budget. It is
+only a reorder: a secret stays untold to a player it does not trust however plainly the line names it
+(resident_test _test_asked_first: the crypt and Pip asked, not trusted and trusted). Hails pass no
+line and are unchanged; companions keep decision 400's way. Server only.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

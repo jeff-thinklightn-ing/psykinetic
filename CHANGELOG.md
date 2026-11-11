@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: townsfolk answer what you ask first, so Aldous asked about the crypt talks of the crypt, and a hunter asked about wolves talks of wolves (853 amended (4))
 - Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10))
 - Townsfolk are a man or a woman as their names say: Aldous asks you to give him the remains, and a few townsfolk look different from this update on, their looks now matching their names (398 amended (1))
 - Towns: Umbrage's store sells at the same price by day and by night, and once the town trusts you, you pay trusted prices there too (586 amended (1))

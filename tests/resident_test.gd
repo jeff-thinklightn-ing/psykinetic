@@ -3664,6 +3664,7 @@ func _test_crypt_secrets() -> void:
 	voice.asked_by = "p-friend"
 	var facts := voice.world_facts()
 	_check(founders in facts and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"), "one he trusts is told, and Main hears which: %s / %s" % [told, facts])
+	_test_asked_first(voice, founders)
 	# A kept secret (615, npc's side; lore's kept_by ["pip"] on pip.paid_silence and crypt.pip_carries): Pip's
 	# body, an acolyte by trade and the runner by his card, speaks by the person knower too; what is kept never
 	# enters his words, even to one he trusts; the stance line stands in its place; Main hears nothing told.
@@ -3708,6 +3709,49 @@ func _test_crypt_secrets() -> void:
 	_main._secret_told("p-other", "old_gods.war")
 	_check(bool(_main._crypt_told.get("p-other", false)), "and the old gods' (lore's old_gods.*), the same secret's deeper why")
 	_main._crypt_told.clear()
+
+
+## What was asked goes first (853 amended (4), lore's audit: every opening the same top-weighted facts):
+## a reorder of what it would say to that player anyway, never a fact more; a secret stays untold to a
+## player it does not trust however plainly the line names it (the coordinator's check).
+func _test_asked_first(voice: Resident, founders: String) -> void:
+	print("
+== asked first: the facts about what the player asked open the words, no fact more ==")
+	var crypt := Resident.asked_topics("What do you know of the crypt? Does Pip go down there?")
+	var wolves := Resident.asked_topics("Seen any wolves about?")
+	_check("crypt" in crypt and "pip" in crypt and wolves.has("wolf") and Resident.asked_topics("Good morning.").is_empty(),
+		"the topics a line names, plurals too (%s, %s)" % [crypt, wolves])
+	# A line as its fact's text: a rumour's "It is said that" off, in small letters.
+	var bare := func(line: String) -> String: return line.trim_prefix("It is said that ").to_lower()
+	var texts := func(facts: Array) -> Array: return facts.map(func(f: Dictionary) -> String: return str(f["text"]).strip_edges().to_lower())
+	var carries := "Pip carries the temple's offering down to the altar in the barrow."
+	var was := voice.asked_by
+	voice.asked_by = "p-stranger"
+	var plain := voice.world_facts()
+	var asked := voice.world_facts(crypt)
+	var about_crypt: Array = texts.call(voice._facts_known(crypt).filter(func(f: Dictionary) -> bool: return not bool(f.get("secret", false))))
+	var everything: Array = texts.call(voice._facts_known())
+	_check(not about_crypt.is_empty() and bare.call(asked[0]) in about_crypt, "a stranger asking of the crypt: a crypt fact opens (%s)" % [asked.slice(0, 2)])
+	_check(not carries in asked and not founders in asked and not carries in plain,
+		"asked of the crypt and Pip, not trusted: no secret, however plainly named (%s)" % [asked])
+	_check(asked.all(func(line: String) -> bool: return line in plain or bare.call(line) in everything),
+		"no fact more than it would say anyway")
+	voice.asked_by = "p-friend"
+	var trusted := voice.world_facts(crypt)
+	_check(founders in trusted and carries in trusted, "asked and trusted: the crypt's secrets told (%s)" % [trusted.slice(0, 3)])
+	voice.asked_by = was
+	# A hunter asked of wolves (lore's survey case): a wolf's fact opens, not the top-weighted ones.
+	var hunter := Resident.new()
+	hunter.worker_id = "hunter-asked"
+	hunter.person = "Agnes"
+	hunter.trade = "hunter"
+	hunter.town = STORE
+	var opening := hunter.world_facts()
+	var wolf_first := hunter.world_facts(wolves)
+	var of_wolves: Array = texts.call(hunter._facts_known(wolves))
+	_check(not of_wolves.is_empty() and bare.call(wolf_first[0]) in of_wolves,
+		"a hunter asked of wolves opens with a wolf's fact (%s; unasked: %s)" % [wolf_first.slice(0, 1), opening.slice(0, 1)])
+	hunter.free()
 
 
 ## The words said and one clause of how (336 amended; Jeff's play on

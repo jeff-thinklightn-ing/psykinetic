@@ -747,17 +747,17 @@ func _face_open() -> void:
 ## The voice ask for [param line], said to it by [param speaker]
 ## (CompanionMind.voice's shape, plain text back).
 func voice_ask(speaker: String, line: String, serial: int) -> Dictionary:
-	var system := system_for(speaker)
+	var system := system_for(speaker, asked_topics(line))
 	var user := "%s says to you: \"%s\"" % [speaker, line]
 	return {"kind": "voice", "serial": serial, "trigger": "%s spoke to %s." % [speaker, person], "speaker": person,
 		"system": system, "user": user, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
 		"spoken_to": true, "asked": true, "heard": line}
 
 
-## The one prompt for who they are (voice_ask's and hail_ask's).
-func system_for(speaker: String) -> String:
+## The one prompt for who they are (voice_ask's and hail_ask's); [param about] what was asked (asked_topics), its facts first.
+func system_for(speaker: String, about := PackedStringArray()) -> String:
 	return VOICE % [person, town_name if not town_name.is_empty() else "a town", " as a " + trade if not trade.is_empty() else "", card_words(),
-		" ".join(facts_now()), speaker, bound_words()]
+		" ".join(facts_now(about)), speaker, bound_words()]
 
 
 # --- Speaking unprompted (decision 554) ------------------------------------------------
@@ -1127,7 +1127,7 @@ func card_words() -> String:
 ## how it last ate and traded (means_words), whether raiders have carried it
 ## off before (Towns.taken_before), what the town is short of, what its shop
 ## has.
-func facts_now() -> Array[String]:
+func facts_now(about := PackedStringArray()) -> Array[String]:
 	var out: Array[String] = []
 	var hour := Companion.time_words(DayNight.hour(DayNight.now()))
 	var sky := ""
@@ -1207,7 +1207,7 @@ func facts_now() -> Array[String]:
 		var hers := Companion.lore_words(person)
 		if not hers.is_empty():
 			out.append(hers)
-	var known := world_facts()
+	var known := world_facts(about)
 	if not known.is_empty():
 		out.append("What you know of the world: %s" % " ".join(known))
 	if binding() in ["townsfolk", "free"] and World.production != null:
@@ -1418,8 +1418,9 @@ const KEPT_LINE := "Some of what you see in your work you keep to yourself, as y
 ## the runner (his card's mark; Pip) the person knower of his own name when
 ## lore lists one, merged by id, a fact kept in either copy kept. Anyone
 ## else speaks by the trade alone, as before.
-func _facts_known() -> Array[Dictionary]:
-	var facts := Lore.known_by(Lore.knower_for(trade), PackedStringArray(), "agreed", hidden_type())
+## With [param about] (asked_topics), only those of its facts about it (Lore.known_by's filter: never more).
+func _facts_known(about := PackedStringArray()) -> Array[Dictionary]:
+	var facts := Lore.known_by(Lore.knower_for(trade), about, "agreed", hidden_type())
 	var own := person.to_lower()
 	if own.is_empty() or own == Lore.knower_for(trade) or not Lore.knowers().has(own) or World.production == null \
 			or not bool(Townsfolk.card_of(World.production, worker_id).get("runner", false)):
@@ -1427,7 +1428,7 @@ func _facts_known() -> Array[Dictionary]:
 	var by_id := {}
 	for fact: Dictionary in facts:
 		by_id[str(fact.get("id", ""))] = fact
-	for fact: Dictionary in Lore.known_by(own, PackedStringArray(), "agreed", hidden_type()):
+	for fact: Dictionary in Lore.known_by(own, about, "agreed", hidden_type()):
 		var id := str(fact.get("id", ""))
 		if by_id.has(id):
 			if bool(fact.get("kept", false)):
@@ -1441,12 +1442,19 @@ func _facts_known() -> Array[Dictionary]:
 ## Lore's agreed facts it knows (Lore.knower_for its trade, by its domain),
 ## a sentence each, weightiest first (a superstitious role's rumours before
 ## the rest: it repeats what is said), within LORE_CHARS; a rumour as what
-## is said. A companion's are in her card and her own voice.
-func world_facts() -> Array[String]:
+## is said. A companion's are in her card and her own voice. Those about
+## [param about] (asked_topics: what the player asked) go first, in the
+## same order among themselves (lore's audit, 853 amended (4)): a reorder
+## of what it would say anyway, never one more fact (a secret stays untold).
+func world_facts(about := PackedStringArray()) -> Array[String]:
 	var out: Array[String] = []
 	if not player_id.is_empty():
 		return out
 	var facts := _facts_known()
+	var asked := {}
+	if not about.is_empty():
+		for fact: Dictionary in _facts_known(about):
+			asked[str(fact.get("id", ""))] = true
 	var kept := false
 	var superstitious := leaning("superstition") >= HIGH
 	# A secret (decision 546, npc's side, part 3) is told past the standing tier: to a player it trusts, and
@@ -1456,6 +1464,8 @@ func world_facts() -> Array[String]:
 		var own := Townsfolk.card_of(World.production, worker_id)
 		trusted = not own.is_empty() and Standing.score(own, asked_by) >= Standing.setting("trusted")
 	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if asked.has(str(a.get("id", ""))) != asked.has(str(b.get("id", ""))):
+			return asked.has(str(a.get("id", "")))  # What was asked about first (853 amended (4)).
 		if trusted and bool(a.get("secret", false)) != bool(b.get("secret", false)):
 			return bool(a.get("secret", false))  # A secret is the rarest thing it can say: first, within the budget.
 		if superstitious and bool(a.get("hearsay", false)) != bool(b.get("hearsay", false)):
@@ -1491,6 +1501,62 @@ func world_facts() -> Array[String]:
 				break
 			length += text.length() + 1
 			out.append(text)
+	return out
+
+
+## What [param line] asks about, as Lore.known_by's topics (853 amended (4), lore's audit): each lore
+## entry whose id or name it names, and each fact tag it names, a plural too ("wolves", "crypts"); none
+## of TOPIC_SKIP. In entry order, then tag order; empty for a line naming none.
+static func asked_topics(line: String) -> PackedStringArray:
+	var out := PackedStringArray()
+	var said := " %s " % Lore._words(line)
+	if said.strip_edges().is_empty():
+		return out
+	for each: Array in _topic_words():
+		if str(each[0]) not in out and (each[1] as Array).any(func(form: String) -> bool: return said.contains(" %s " % form)):
+			out.append(str(each[0]))
+	return out
+
+
+## Tags that mark lore's own bookkeeping or a common word, never a topic asked.
+const TOPIC_SKIP: Array[String] = ["jeff_agreed", "return", "setting"]
+static var _topics: Array = []
+
+
+## [[topic, [its word forms]]]: lore's entries by id and name, then its facts' tags; read once.
+static func _topic_words() -> Array:
+	if not _topics.is_empty():
+		return _topics
+	var tags: Array[String] = []
+	var entries := Lore.entries()
+	for id: String in entries:
+		var entry: Dictionary = entries[id]
+		var names: Array[String] = [Lore._words(id.replace("_", " ")), Lore._words(str(entry.get("name", "")))]
+		var forms: Array = []
+		for each in names:
+			var bare := each.substr(4) if each.begins_with("the ") else each
+			if not bare.is_empty() and bare not in forms:
+				forms.append_array(_plurals(bare))
+		_topics.append([id, forms])
+		for tag: Variant in entry.get("tags", []):
+			if str(tag) not in tags:
+				tags.append(str(tag))
+		for fact: Variant in entry.get("facts", []):
+			if fact is Dictionary:
+				for tag: Variant in fact.get("tags", []):
+					if str(tag) not in tags:
+						tags.append(str(tag))
+	for tag in tags:
+		if tag not in TOPIC_SKIP and not entries.has(tag):
+			_topics.append([tag, _plurals(Lore._words(tag.replace("_", " ")))])
+	return _topics
+
+
+## [param words] and its plurals by its last word: +s, +es, f to ves.
+static func _plurals(words: String) -> Array:
+	var out := [words, words + "s", words + "es"]
+	if words.ends_with("f"):
+		out.append(words.left(-1) + "ves")
 	return out
 
 
