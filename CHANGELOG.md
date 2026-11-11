@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, a robber about to lunge crouches with his dagger drawn back while the red shows, and thrusts as it lands (790 amended (7)).
 - Planted feet hold firm as people walk and jog, and a companion following you keeps one gait through a short pause or a change of pace (869).
 - The Tomb Sledge is held partway up its haft, both hands on the shaft with bare wood behind them, and you bow deep into each blow so its head comes down on the ground in front of you; the axes, picks and war hammer are held a little up their hafts too (451 amended (5))
 - Sword and shield: your shield moves with each swing, pushed out toward your foe as you draw the sword back, kept low and clear on a backhand, and pulled in to your left side through the cut (338 amended (8))

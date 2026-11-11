@@ -1307,6 +1307,12 @@ const HUMANOID_MOVES := {
 		"": [["Punch_Jab_Drawn", 0.33], ["Punch_Cross_Drawn", 0.38]],
 		"dagger": [["Dagger_Stab_Drawn", 0.29]],
 	},
+	# A person's told strike (790 amended (7), animation's side: a robber's lunge): [clip, peak, contact],
+	# drawn back to its gathered pose (peak, seconds in at speed 1), held there through the tell, thrust
+	# as the telegraph lands (AnimRig.strike_held). By what is in the striking hand, as "strikes".
+	"told": {
+		"dagger": ["Dagger_Stab_Drawn", 0.2, 0.29],
+	},
 	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
 	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
@@ -2046,6 +2052,14 @@ const SWING_PITCH_HEAVY := 0.85
 const DEATH_SOUNDS := {"monster": "sfx.goblin_death", "player": "sfx.death_player", "companion": "sfx.death_companion"}
 ## A swing pushes the body this far out toward the blow, and back.
 const LUNGE := 0.3
+## A person's told strike (HUMANOID_MOVES "told"; 790 amended (7)): drawn back to its gather over
+## TOLD_DRAW s, held, thrust over TOLD_THRUST s to land with the telegraph, recovered over
+## TOLD_RECOVER s; the body pushed TOLD_REACH m out along its facing on the thrust (a lunge
+## reaches two cells) and eased back over the recovery.
+const TOLD_DRAW := 0.25
+const TOLD_THRUST := 0.09
+const TOLD_RECOVER := 0.45
+const TOLD_REACH := 0.45
 ## Knocked down: how far the body tips (radians), and how fast.
 const DOWN_TILT := 1.4
 const DOWN_TILT_SPEED := 9.0
@@ -6015,19 +6029,75 @@ func creature_tell(id: int, data: Dictionary) -> void:
 	if source == null:
 		return
 	var puppet: Node3D = _puppets.get(source.get_instance_id())
-	if puppet == null or not puppet.has_meta("creature_view"):
+	if puppet == null:
 		return
 	var lands_in := (int(data.get("lands_tick", World.tick)) - World.tick) * World.TICK_DT
+	if not puppet.has_meta("creature_view"):
+		if str(data.get("kind", "")) == "lunge" and _told_strike(puppet, source as GridEntity, lands_in + STRIKE_LANDS_IN):
+			_tells[id] = puppet
+		return
 	if (puppet.get_meta("creature_view") as CreatureView).tell(str(data.get("kind", "")), lands_in, id):
 		_tells[id] = puppet
+
+
+## A person's told lunge (790 amended (7), animation's side; enemy-ai's ask, the coordinator's
+## approval): its HUMANOID_MOVES "told" strike for what it holds, drawn back, held at the gather
+## through the tell, thrust to land [param lands_in] seconds from now (drawn STRIKE_LANDS_IN behind
+## the sim, as a wound-up blow), the body pushed out along its facing on the thrust and eased back.
+## Its plain blow kept off meanwhile (wound_until). False, nothing played, for a body with no rig or
+## no told strike for its weapon.
+func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float) -> bool:
+	if source == null or not puppet.has_meta("rig"):
+		return false
+	var told: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("told", {})
+	var row: Array = told.get(World.wielded(source), [])
+	var rig := puppet.get_meta("rig") as AnimRig
+	if row.size() < 3 or not rig.has(str(row[0])):
+		return false
+	puppet.set_meta("fidgeting", false)
+	var seconds := rig.strike_held(str(row[0]), float(row[1]), float(row[2]), lands_in, TOLD_DRAW, TOLD_THRUST, TOLD_RECOVER)
+	if seconds <= 0.0:
+		return false
+	var now := Time.get_ticks_msec()
+	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
+	puppet.set_meta("wound_until", now + int(lands_in * 1000.0) + 400)
+	puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)
+	_combat_at[source.get_instance_id()] = now
+	var body := puppet.get_node_or_null("Body") as Node3D
+	if body != null and source.facing != Vector2i.ZERO:
+		var rest := Vector3(0.0, body.position.y, 0.0)
+		var thrust := minf(TOLD_THRUST, lands_in)
+		var tween := create_tween()
+		tween.tween_interval(maxf(lands_in - thrust, 0.0))
+		tween.tween_property(body, "position", rest + Vector3(source.facing.x, 0.0, source.facing.y).normalized() * TOLD_REACH, thrust) \
+				.set_ease(Tween.EASE_OUT)
+		tween.tween_property(body, "position", rest, TOLD_RECOVER).set_ease(Tween.EASE_IN_OUT)
+		puppet.set_meta("told_tween", tween)
+	return true
 
 
 ## Telegraph [param id] over: the tell it began ends (cut short when it did not land).
 func creature_tell_over(id: int, landed: bool) -> void:
 	var puppet: Node3D = _tells.get(id)
 	_tells.erase(id)
-	if puppet != null and is_instance_valid(puppet) and puppet.has_meta("creature_view"):
+	if puppet == null or not is_instance_valid(puppet):
+		return
+	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
+	elif not landed and puppet.has_meta("rig"):
+		# A person's told lunge broken (stunned, knocked off its cell): the thrust never comes.
+		(puppet.get_meta("rig") as AnimRig).cancel_strike()
+		puppet.set_meta("busy_until", 0)
+		puppet.set_meta("wound_until", 0)
+		var tween: Variant = puppet.get_meta("told_tween", null)
+		if tween is Tween and (tween as Tween).is_valid():
+			(tween as Tween).kill()
+		var body := puppet.get_node_or_null("Body") as Node3D
+		if body != null and not is_zero_approx(Vector2(body.position.x, body.position.z).length()):
+			# Broken on the thrust itself: eased home (the pose fades out as cancel_strike fades it).
+			var home := create_tween()
+			home.tween_property(body, "position", Vector3(0.0, body.position.y, 0.0), TOLD_RECOVER * 0.5).set_ease(Tween.EASE_IN_OUT)
+			puppet.set_meta("told_tween", home)
 
 
 func telegraph_land(id: String, landed: bool) -> void:

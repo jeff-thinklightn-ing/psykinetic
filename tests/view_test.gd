@@ -187,6 +187,7 @@ func _ready() -> void:
 		_test_allies()
 		_test_barrow_dead()
 		_test_person_monster()
+		await _test_told_lunge()
 		_test_steadied_heard()
 		await _test_blow_wait_outlives_body()
 		_test_bandit_look()
@@ -9528,6 +9529,91 @@ func _test_person_monster() -> void:
 	_rig._process(0.0)
 
 
+## A robber's told lunge read on his body (790 amended (7), animation's side): the telegraph's
+## "lunge" draws his dagger back to its gather, holds it there through the tell and thrusts as it
+## lands, his body out along his facing on the thrust; his plain blow kept off meanwhile; called
+## off, it stops and his body is back at rest.
+func _test_told_lunge() -> void:
+	print("\n== a robber's told lunge: drawn back, held, thrust as it lands (790 amended (7)) ==")
+	var robber := _spawn_imp(Vector2i(9, 6), "robber")
+	robber.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])  # His kind's, as a level arms him (Level._arm).
+	World.face(robber, Vector2i(1, 0))
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[robber.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+	var told: Array = Client3D.HUMANOID_MOVES["told"].get(World.wielded(robber), [])
+	_check(rig != null and told.size() == 3 and rig.has(str(told[0])),
+			"his told strike for what he holds (%s): %s" % [World.wielded(robber), told])
+	if rig == null or told.size() < 3:
+		World.despawn(robber)
+		return
+	var lands_ticks := 7
+	var lands_in := lands_ticks * World.TICK_DT + Client3D.STRIKE_LANDS_IN
+	var start := AnimRig.now_msec()
+	_rig.creature_tell(21, {"id": 21, "source": str(robber.get_path()), "kind": "lunge", "lands_tick": World.tick + lands_ticks})
+	_check(rig.striking() and rig.playing() == str(told[0]) and _rig._tells.get(21) == puppet
+			and absi(rig.contact_msec - (start + int(lands_in * 1000.0))) <= 20,
+			"the telegraph's lunge: %s, its contact as the drawn tell lands (%d ms, want %d)" % [rig.playing(), rig.contact_msec - start, int(lands_in * 1000.0)])
+	_check(Time.get_ticks_msec() < int(puppet.get_meta("wound_until", 0)), "his plain blow kept off till then (wound_until)")
+	await _until_msec(start + int((Client3D.TOLD_DRAW + 0.12) * 1000.0))
+	var body := puppet.get_node("Body") as Node3D
+	_check(is_zero_approx(rig.speed()) and absf(body.position.x) < 0.01,
+			"drawn back and held at the gather (speed %.2f), not yet out (%.2f m)" % [rig.speed(), body.position.x])
+	var furthest := 0.0
+	var out_at := -1
+	while AnimRig.now_msec() < start + int(lands_in * 1000.0) + 20:
+		await get_tree().process_frame
+		if body.position.x > furthest + 0.001:
+			furthest = body.position.x
+			out_at = AnimRig.now_msec() - start
+	_check(furthest > Client3D.TOLD_REACH * 0.8 and rig.speed() > 0.0,
+			"thrust as it lands: out %.2f m along his facing (furthest at %d ms), the recovery playing (speed %.2f)" % [furthest, out_at, rig.speed()])
+	_rig.creature_tell_over(21, true)
+	await _until_msec(AnimRig.now_msec() + int((Client3D.TOLD_RECOVER + 0.1) * 1000.0))
+	_check(absf(body.position.x) < 0.02 and not _rig._tells.has(21), "and back at rest after (%.2f m)" % body.position.x)
+	# Called off (stunned mid-tell): the thrust never comes, and he eases out of the gather (no snap).
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var hand := func() -> Vector3:
+		return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("RightHand")).origin
+	_rig.creature_tell(22, {"id": 22, "source": str(robber.get_path()), "kind": "lunge", "lands_tick": World.tick + lands_ticks})
+	await _until_msec(AnimRig.now_msec() + int((Client3D.TOLD_DRAW + 0.05) * 1000.0))
+	var held: Vector3 = hand.call()
+	_rig.creature_tell_over(22, false)
+	var was := held
+	var jump := 0.0
+	var off_at := AnimRig.now_msec()
+	while AnimRig.now_msec() < off_at + int(lands_in * 1000.0):
+		await get_tree().process_frame
+		var now_at: Vector3 = hand.call()
+		jump = maxf(jump, now_at.distance_to(was))
+		was = now_at
+	_check(not rig.striking() and absf(body.position.x) < 0.01 and int(puppet.get_meta("wound_until", 0)) == 0,
+			"called off: stopped where it was, his body at rest (%.2f m), his blows his own again" % body.position.x)
+	_check(was.distance_to(held) > 0.05 and jump < 0.6 * was.distance_to(held),
+			"and eased out of the gather, not snapped: the hand %.2f m back to rest, at most %.2f m a frame" % [was.distance_to(held), jump])
+	# Two robbers told at once: each his own timing (two rigs), one held while the other thrusts.
+	var other := _spawn_imp(Vector2i(9, 9), "robber")
+	other.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
+	World.face(other, Vector2i(1, 0))
+	_rig._process(0.0)
+	var other_rig := (_rig._puppets[other.get_instance_id()] as Node3D).get_meta("rig") as AnimRig
+	var both_from := AnimRig.now_msec()
+	_rig.creature_tell(23, {"id": 23, "source": str(robber.get_path()), "kind": "lunge", "lands_tick": World.tick + 5})
+	_rig.creature_tell(24, {"id": 24, "source": str(other.get_path()), "kind": "lunge", "lands_tick": World.tick + 12})
+	var first_in := 5 * World.TICK_DT + Client3D.STRIKE_LANDS_IN
+	var second_in := 12 * World.TICK_DT + Client3D.STRIKE_LANDS_IN
+	_check(absi(rig.contact_msec - (both_from + int(first_in * 1000.0))) <= 20 and absi(other_rig.contact_msec - (both_from + int(second_in * 1000.0))) <= 20,
+			"two robbers told at once: each lands on his own telegraph (%d and %d ms)" % [rig.contact_msec - both_from, other_rig.contact_msec - both_from])
+	await _until_msec(both_from + int(first_in * 1000.0) + 20)
+	_check(rig.speed() > 0.0 and is_zero_approx(other_rig.speed()),
+			"the first thrust while the second still holds (speeds %.2f, %.2f)" % [rig.speed(), other_rig.speed()])
+	_rig.creature_tell_over(23, true)
+	_rig.creature_tell_over(24, false)
+	World.despawn(other)
+	World.despawn(robber)
+	_rig._process(0.0)
+
+
 ## Steadied heard (843): a boss's "steady" plays his kind's set
 ## (SoundKit.steady_slot) and never a cry slot of its own; a blow on him the
 ## dull thud (SoundKit.HIT_STEADIED) in place of the hit, till "steady_over";
@@ -14228,6 +14314,13 @@ func _colour(bar: MeshInstance3D) -> Color:
 
 func _frames(count: int) -> void:
 	for i in count:
+		await get_tree().process_frame
+
+
+## Frames till the rigs' clock (AnimRig.now_msec) reaches [param msec]: a timer here runs on the
+## engine's scaled time, not the clock a rig's strike is timed by.
+func _until_msec(msec: int) -> void:
+	while AnimRig.now_msec() < msec:
 		await get_tree().process_frame
 
 

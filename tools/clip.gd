@@ -250,6 +250,13 @@ var _fight_until := -1
 ## melee_audit's weapon (an item id, or "fists") and foe (a monster kind).
 var _weapon := "sword"
 var _foe := "brute"
+## drawbacks --beside=<kind>: one of that kind stands by, still (Jeff's goblin beside the foe shown).
+var _beside := ""
+var _beside_at := Vector2i(-1, -1)
+## drawbacks --room=open: a wide floor in place of the small walled one.
+var _drawbacks_room := ""
+## drawbacks --lunge-windup=<ticks>: the foe's told lunge that long (a tell ruled but not yet on the branch).
+var _lunge_windup := 0
 ## draugr's part of the fight (_draugr_step), and the telegraphs seen
 ## ([id, kind]) and landed (ids).
 var _part := 0
@@ -293,6 +300,12 @@ func _ready() -> void:
 				_walk_route.append([Vector2i(int(part[0]), int(part[1])), part[2].to_float() if part.size() > 2 else 0.0])
 		elif pair.size() == 2 and pair[0] == "hour":
 			_walk_hour = pair[1].to_float()
+		elif pair.size() == 2 and pair[0] == "beside":
+			_beside = pair[1]
+		elif pair.size() == 2 and pair[0] == "lunge-windup":
+			_lunge_windup = int(pair[1])
+		elif pair.size() == 2 and pair[0] == "room":
+			_drawbacks_room = pair[1]
 	match scenario:
 		"sneak":
 			_sneak()
@@ -404,7 +417,15 @@ func _ready() -> void:
 	add_child(_main)
 	_player = _main._local_player()
 	for entity in World.monsters():
+		if _beside != "" and scenario == "drawbacks" and entity.tile == _beside_at:
+			entity.acts = false  # The one stood by (--beside): still, unhurt, never the foe shown.
+			entity.max_hp = 1000000
+			entity.hp = entity.max_hp
+			World._roster_current = false  # Its actors are listed once: it is taken off them.
+			continue
 		_monster = entity
+	if scenario == "drawbacks" and _drawbacks_room == "open" and _player.tile != _beside_at - Vector2i(3, 0):
+		World._relocate(_player, _beside_at - Vector2i(3, 0))  # Spawn safety put it 6 cells off in the open room.
 	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
@@ -485,6 +506,8 @@ func _ready() -> void:
 			_main._client3d._zoom_to = _main._client3d.ZOOM_MIN
 	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat", "shieldcut"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
+		if scenario == "drawbacks" and _lunge_windup > 0 and _monster is Monster and not (_monster as Monster).lunge.is_empty():
+			(_monster as Monster).lunge["windup"] = _lunge_windup  # --lunge-windup=<ticks>: a tell not yet on the branch.
 		if scenario == "drawbacks" and _monster is Animal:
 			(_monster as Animal).raid = "drawbacks"  # A beast closes and bites, as a raider does.
 		Net.set_camera_low(true, false)
@@ -514,6 +537,14 @@ func _process(delta: float) -> void:
 			view.yaw = rad_to_deg(lerp_angle(deg_to_rad(view.yaw), deg_to_rad(float(turn[0])), 1.0 - exp(-2.0 * delta)))
 			view.pitch = lerpf(view.pitch, float(turn[1]), 1.0 - exp(-2.0 * delta))
 		return
+	if scenario == "drawbacks" and view != null:
+		# --yaw / --pitch hold the camera there here too (a side-on pass of a foe's blow). Not yet held: the
+		# near low camera turns back to straight-on every second or so (C:/dev/review/lunge10_side, 11-11),
+		# so a side-on pass here is void; the play camera's crop has the foe in profile instead.
+		if not is_nan(_walk_yaw):
+			view.yaw = _walk_yaw
+		if not is_nan(_walk_pitch):
+			view.pitch = _walk_pitch
 	if scenario == "walkreel" and view != null and _player != null:
 		if not is_nan(_walk_yaw):
 			view.yaw = _walk_yaw
@@ -974,10 +1005,25 @@ func _drawbacks() -> void:
 		"#.........#",
 		"###########",
 	]
-	var markers := {Vector2i(3, 2): "start", Vector2i(4, 2): "monster_" + _foe}
-	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9, "entities": [{"at": [4, 2], "temperament": "bold"}]}
+	var at := Vector2i(3, 2)
+	if _drawbacks_room == "open":
+		# --room=open: a wide floor, its edge's trees far off (a side-on camera in the small one sat in them).
+		rows = ["#".repeat(25)]
+		for y in 13:
+			rows.append("#" + ".".repeat(23) + "#")
+		rows.append("#".repeat(25))
+		at = Vector2i(12, 7)
+	_beside_at = at + Vector2i(3, 0)
+	var markers := {at: "start", at + Vector2i(1, 0): "monster_" + _foe}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9, "entities": [{"at": [at.x + 1, at.y], "temperament": "bold"}]}
 	if _foe != "imp":
 		config["legend"] = {"monster_" + _foe: "#6a5f70"}  # A kind with no colour of its own.
+	if _beside != "":
+		# --beside=<kind> (CLAUDE.md: animation shown beside Jeff's goblin): one stands by, still and unhurt.
+		markers[_beside_at] = "monster_" + _beside
+		(config["entities"] as Array).append({"at": [_beside_at.x, _beside_at.y], "facing": [-1, 0]})
+		if _beside != "imp":
+			config["legend"] = (config.get("legend", {}) as Dictionary).merged({"monster_" + _beside: "#5a6a50"})
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	_script = [["say", 10, "A %s's blows." % _foe], ["brawl", 12, ""], ["wait", 230, ""]]
 

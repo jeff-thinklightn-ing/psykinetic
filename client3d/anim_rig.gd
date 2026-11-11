@@ -74,6 +74,8 @@ var _action_speed := 1.0
 ## A strike's speed after its contact, and the msec it changes to it.
 var _recover_speed := 1.0
 var _contact_msec := -1
+## A held strike's (strike_held) speeds before its contact, each [msec, speed] from that msec on.
+var _phases: Array = []
 ## The msec the last strike's blow lands (its contact), kept after: its hit is heard then.
 var contact_msec := -1
 ## The last strike's contact in its clip's own seconds (a test reads the pose there, not by the clock).
@@ -306,7 +308,35 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	contact_at = contact
 	var seconds := contact / before + (length - contact) / _recover_speed
 	_strike_msec = now + int(seconds * 1000.0)
+	_phases = []
 	return seconds
+
+
+## [param clip] struck with its gather held (a told lunge, 790 amended (7), animation's side): played
+## to [param peak] (its gathered pose, seconds into the clip at speed 1) over [param draw] seconds,
+## held there, then on to its [param contact] over [param thrust] seconds so the blow lands
+## [param lands_in] seconds from now, and what follows fitted to [param recover] seconds as strike()
+## fits it. Too short a wind-up for the hold: the draw and the thrust shortened alike, no hold. The
+## seconds it takes.
+func strike_held(clip: String, peak: float, contact: float, lands_in: float, draw: float, thrust: float,
+		recover: float) -> float:
+	if strike(clip, contact, lands_in, recover) <= 0.0:
+		return 0.0
+	var length := player.get_animation(_name(clip)).length
+	contact = clampf(contact, 0.0, length)
+	peak = clampf(peak, 0.0, contact)
+	if draw + thrust > lands_in:
+		var cut := maxf(lands_in, 0.001) / maxf(draw + thrust, 0.001)
+		draw *= cut
+		thrust *= cut
+	var now := now_msec()
+	_set_action_speed(peak / maxf(draw, 0.001))
+	var thrust_from := lands_in - thrust
+	_phases = [[now + int(draw * 1000.0), 0.0], [now + int(thrust_from * 1000.0), (contact - peak) / maxf(thrust, 0.001)]]
+	_contact_msec = now + int(lands_in * 1000.0)
+	contact_msec = _contact_msec
+	_strike_msec = _contact_msec + int((length - contact) / _recover_speed * 1000.0)
+	return lands_in + (length - contact) / _recover_speed
 
 
 func _set_action_speed(speed: float) -> void:
@@ -321,6 +351,7 @@ func cancel_strike() -> void:
 		_apply()
 	_strike_msec = 0
 	_contact_msec = -1
+	_phases = []
 
 
 ## The upper layer plays [param clip] over the body above the hips at
@@ -543,7 +574,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	while not _phases.is_empty() and now_msec() >= int(_phases[0][0]):
+		_set_action_speed(float(_phases.pop_front()[1]))
 	if _contact_msec >= 0 and now_msec() >= _contact_msec:
+		_phases = []
 		_contact_msec = -1
 		_set_action_speed(_recover_speed)
 	_since += delta
