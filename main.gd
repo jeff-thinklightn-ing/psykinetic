@@ -21912,7 +21912,7 @@ func hint_lines() -> Array[String]:
 	lines.append_array(["%s+LMB\tyour weapon's own move (a shield bashes)" % Keys.name_of("signature"), "RMB, shield\tblock toward the cursor while held",
 		"%s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" % Keys.name_of("stand"),
 		"RMB, bow\thold to aim at the sky, let go to lob onto the circle: over walls, knocks down",
-		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
+		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour gear and pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tthe town sheet" % Keys.name_of("town"),
 		"%s\tcrouch" % Keys.name_of("crouch"),

@@ -29,6 +29,8 @@ const CLOAK := Color("2c2a33")
 const BELT := Color("2a2118")
 
 var pack: PackPanel
+## The heading over the figure and its worn squares (787 amended (4), voice's).
+const GEAR_WORDS := "Gear"
 var title: Label
 var figure: Figure
 ## The whole load against the body's mass, under the feet; the load's lines
@@ -252,7 +254,7 @@ static func band_color(share: float) -> Color:
 ## (a filled one shows its thing's tip); the squares are filled by the pack.
 ## [param lines] are PackPanel.load_lines(who): the whole, then the parts.
 func show_for(who: GridEntity, lines: PackedStringArray) -> void:
-	title.text = name_of(who)
+	title.text = GEAR_WORDS  # 787 amended (4): what you wear is headed Gear (voice), the carried squares Pack.
 	var capacity := World.load_capacity(who) if who != null else 1.0
 	var whole := (who.load_arms + who.load_body) / maxf(capacity, 0.001) if who != null else 0.0
 	var words := "\n".join(lines)

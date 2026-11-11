@@ -284,7 +284,8 @@ class SlotBox:
 		panel.drop(data["slots_of"], int(data["slot"]), owner_entity(), index, int(data.get("count", 0)))
 
 
-## "Jeff's Pack"; a chest is "Chest".
+## A companion's row, "Wren's gear and pack" (787 amended (4): it shows her worn slots and her carried ones
+## under this one title; the player's own are headed Gear and Pack); a chest is "Chest".
 static func title_of(entity: GridEntity) -> String:
 	if entity is Locker:
 		return "Your chest"  # Decision 722: the same 48 at every town's locker.
@@ -293,7 +294,7 @@ static func title_of(entity: GridEntity) -> String:
 	if entity is Cargo:
 		return "Cart" if entity.capacity > Chest.SLOTS else "Crate"
 	var who := entity.label if not entity.label.is_empty() else String(entity.name)
-	return "%s's Pack" % who
+	return "%s's gear and pack" % who
 
 
 func _ready() -> void:

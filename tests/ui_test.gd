@@ -580,7 +580,7 @@ func _test_sim_reads() -> void:
 		pet.bond_step = "sullen"
 		pet.bond_why = "you left her to fall alone"
 		_main.pack_panel.open(pet)
-		_check(_main.pack_panel.title_shown(false) == "%s's Pack" % her and _main.pack_panel.mood_shown() == ", sullen"
+		_check(_main.pack_panel.title_shown(false) == "%s's gear and pack" % her and _main.pack_panel.mood_shown() == ", sullen"
 			and _main.pack_panel.mood_hover() == "you left her to fall alone", "her pack's title carries her step, the reason on hover")
 		pet.bond_step = "fond"
 		_main.pack_panel._refresh()

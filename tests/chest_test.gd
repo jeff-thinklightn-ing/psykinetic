@@ -86,7 +86,7 @@ func _test_there_and_back() -> void:
 	_main._open_pack(host, chest)
 	_check(panel.other == chest, "and a third opens it again")
 	_check(panel.other == chest and panel.shown_in(false, 0) == "Bandages", "a right click opens it: the kit in its first slot")
-	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "Pack" and panel.sheet.title.text == Net.player_name,
+	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "Pack" and panel.sheet.title.text == "Gear",
 			"titled Chest, and Pack below it; %s on the sheet beside (787)" % Net.player_name)
 	_main.sounds.clear()
 	panel.drop(chest, 0, host, 0)
@@ -316,7 +316,7 @@ func _test_companion_pack() -> void:
 	var panel: PackPanel = _main.pack_panel
 	await get_tree().process_frame
 	_check("sfx.pack_open %s" % pet.name in _main.sounds, "with a sack's rustle (%s)" % [_main.sounds])
-	_check(panel.other == pet and panel.title_shown(false) == "%s's Pack" % pet.name, "a right click on her opens %s's Pack" % pet.name)
+	_check(panel.other == pet and panel.title_shown(false) == "%s's gear and pack" % pet.name, "a right click on her opens %s's gear and pack" % pet.name)
 	var held := Array(host.slots).find(KIT)
 	panel.drop(host, held, pet, 0)
 	_check(Array(pet.slots) == _pad([KIT, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]) and Array(record.companion["slots"]) == _pad([KIT, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]),

@@ -43802,6 +43802,18 @@ scales with the stretch, the coordinator accepted that). Open for the window rul
 covers about a third of the screen with the pack's lower half empty, so whether it shrinks to
 its rows. A CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new class_name.
 
+787 amended (4): the inventory window's headings (2026-11-10; Jeff, by way of the coordinator: "pack
+equipment/gear should not be titled "pack" for everything"; the label from decision_number.sh; voice's
+words). "Pack" had titled gear and carried things alike in the labels. Now: the heading over the figure
+and its worn squares is "Gear" (CharacterSheet.GEAR_WORDS, was the player's name), the carried squares'
+heading stays "Pack"; a companion's open row, which shows her worn slots and her carried ones under one
+title, is "Wren's gear and pack" (PackPanel.title_of, was "Wren's Pack"; her two headings of their own
+wait for the pack-and-sheet redo's layout); the I key's line in the controls list is "your gear and pack"
+and the Options' Controls row "Your gear and pack" (Keys.WORDS "pack"). Left as they were, being about
+carried things only: the chest tooltip, "no room in your pack", E's "your companion's pack", G's "hand,
+else pack". ui_test and chest_test's title checks. A CHANGELOG bullet (voice's words, no "where before":
+it answers Jeff's own words). Client only, protocol unchanged, no new class_name.
+
 ## 774. Umbrage laid out again round its chapel (plan B), and Relaid
 
 Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator approved the stills
