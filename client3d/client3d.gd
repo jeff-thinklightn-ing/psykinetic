@@ -1797,6 +1797,8 @@ const LABEL_SIZE := 0.004
 ## the rest wait till they are near, so a town's names don't crowd a
 ## fight.
 const NAME_TILES := 8.0
+## A Name label's height over the body's: names_on_hud's plates sit on the head under it.
+const NAME_LIFT := 0.35
 const LABEL_FONT_SIZE := 64
 ## A boss's nameplate (752, ui's side): brass, a skull this many world units
 ## square over its name.
@@ -2590,6 +2592,20 @@ var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
 ## Main's speech bubbles, for last words.
 var bubbles: SpeechBubbles
+## Main: the names over heads are drawn on the HUD (UiNamePlates, 865), so each
+## puppet's Name label (and a boss's skull) keeps its words, tint and showing but
+## draws nothing (render layers 0); Main's plates read them (name_plates).
+var names_on_hud := false:
+	set(value):
+		names_on_hud = value
+		for puppet: Node3D in _puppets.values():
+			_hide_name_layers(puppet)
+## Whether name_plates gives the local player's own name (865). Today's game shows it;
+## dropping it is Jeff's call (the coordinator's lean, on the cut's checklist).
+var own_name_on_hud := true
+## name_plates' reused rows, by the puppet's id, and the list it returns.
+var _plate_rows: Dictionary[int, Dictionary] = {}
+var _plates: Array[Dictionary] = []
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
 ## Main: the bodies (node paths) who take something in the player's pack,
@@ -4348,6 +4364,54 @@ func ridge_pitch(at: Vector3) -> float:
 		need = maxf(need, rad_to_deg(atan2(ground + RIDGE_CLEAR - aim, d)))
 		d += 0.5
 	return clampf(need, 0.0, RIDGE_PITCH_MAX)
+
+
+## The names over heads to draw on the HUD this frame (UiNamePlates.source): each
+## shown Name label (its words, tint and showing as _sync_name, _sync_ailments and
+## _sync_named leave them) of a puppet in view (the local player's own only while
+## own_name_on_hud), as {key, text, tint, plain, at: its head's screen point, depth, boss}. Rows and
+## the list are reused, so nothing is made a frame.
+func name_plates() -> Array[Dictionary]:
+	_plates.clear()
+	if _camera == null:
+		return _plates
+	var own := _local_player()
+	var own_id := own.get_instance_id() if own != null and not own_name_on_hud else 0
+	var forward := -_camera.global_transform.basis.z
+	for id: int in _puppets:
+		if id == own_id:
+			continue
+		var puppet: Node3D = _puppets[id]
+		if not puppet.visible or not puppet.is_inside_tree():
+			continue
+		var label := puppet.get_node_or_null("Name") as Label3D
+		if label == null or not label.visible or label.text.is_empty():
+			continue
+		var head := label.global_position - Vector3.UP * NAME_LIFT
+		if _camera.is_position_behind(head):
+			continue
+		if not _plate_rows.has(id):
+			_plate_rows[id] = {"key": id}
+		var row: Dictionary = _plate_rows[id]
+		row["text"] = label.text
+		row["tint"] = label.modulate
+		row["plain"] = label.modulate == Color.WHITE
+		row["at"] = _camera.unproject_position(head)
+		row["depth"] = (head - _camera.global_position).dot(forward)
+		row["boss"] = label.get_node_or_null("BossMark") != null
+		_plates.append(row)
+	return _plates
+
+
+## [param puppet]'s Name label and its skull drawn or not as names_on_hud says.
+func _hide_name_layers(puppet: Node3D) -> void:
+	var label := puppet.get_node_or_null("Name") as Label3D
+	if label == null:
+		return
+	label.layers = 0 if names_on_hud else 1
+	var mark := label.get_node_or_null("BossMark") as Sprite3D
+	if mark != null:
+		mark.layers = 0 if names_on_hud else 1
 
 
 func _local_player() -> Player:
@@ -20237,6 +20301,7 @@ func _drop_remains(id: int) -> void:
 func _entity_went(id: int) -> void:
 	var puppet: Node3D = _puppets[id]
 	_puppets.erase(id)
+	_plate_rows.erase(id)
 	_drop_remains(id)
 	_stop_creak(puppet)
 	if puppet == _outlined:
@@ -21075,6 +21140,7 @@ func _sync_named(monster: Monster, puppet: Node3D) -> void:
 		mark.no_depth_test = true
 		mark.modulate = BOSS_NAME
 		mark.render_priority = label.render_priority
+		mark.layers = 0 if names_on_hud else 1
 		mark.position.y = BOSS_MARK * 1.3  # Clear of the caption under it (the coordinator, on the still).
 		label.add_child(mark)
 	elif not boss and mark != null:
@@ -24727,7 +24793,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	puppet.add_child(area)
 	if entity.is_creature():
 		var caption: String = entity.label if not entity.label.is_empty() else entity.name
-		puppet.add_child(_label("Name", caption, Color.WHITE, height + 0.35))
+		puppet.add_child(_label("Name", caption, Color.WHITE, height + NAME_LIFT))
+		_hide_name_layers(puppet)
 		puppet.set_meta("caption", caption)
 		puppet.set_meta("bubble_height", height + BUBBLE_OVER_HEAD)
 		# The nose: which way it faces, turned each frame (see _sync_puppets).

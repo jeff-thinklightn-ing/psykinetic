@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - The corner map and the big map draw the ground as it looks: green grass, brown paths, grey stone and clear blue water, with the hills gently shaded (873).
+- Names over heads are one readable size at every zoom, on a dark plate like the speech bubbles; where two would meet, the farther one steps up (865).
 - Pictures of your things in the pack and store squares are drawn a little larger, filling more of each square, and the spear is drawn thicker, so its shaft and head show clearly (275 amended (2)).
 - Along the edge of the woods, by the east road and the pond, the treetops nearest the camera fade away, so you see their trunks and the ground beneath (326 amended (2)).
 - The castle and the dark tower on the horizon keep their place as you move, however many zones you've crossed into (650).

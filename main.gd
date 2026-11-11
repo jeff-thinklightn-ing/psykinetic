@@ -446,6 +446,8 @@ var _test_door_sent := false
 var talk: TalkPanel
 ## Speech bubbles over the speakers, in either view.
 var bubbles: SpeechBubbles
+## Names over heads, on the HUD under the bubbles (865), read from the 3D view.
+var name_plates: UiNamePlates
 ## 2D: a bubble's tail this many world px over an entity (above its name).
 const BUBBLE_OVER_2D := 40.0
 ## A gain's float over the player starts this many px over their speech
@@ -2337,6 +2339,7 @@ func _show_3d() -> void:
 	_shown_zone = map_name  # 822 step 4: the zone the live room is.
 	_shown_level = level
 	_client3d.bubbles = bubbles
+	_show_name_plates()
 	_show_towns()
 	if Tuning.allowed():
 		Tuning.register_source("camera", _camera_value, _set_camera_value, camera_fields)  # 673.
@@ -15076,6 +15079,17 @@ static func _point_direction(entity: GridEntity, args: Dictionary) -> Vector2i:
 	if not point.is_finite():
 		return Vector2i.ZERO
 	return grid_direction(point - World.shot_origin(entity))  # A free body's own centre (688).
+
+
+## The names over heads drawn on the HUD from the 3D view's (UiNamePlates,
+## 865): made once, under the bubbles, and pointed at the view each time one is made.
+func _show_name_plates() -> void:
+	if name_plates == null:
+		name_plates = UiNamePlates.new()
+		$HUD.add_child(name_plates)
+		$HUD.move_child(name_plates, 0)
+	_client3d.names_on_hud = true
+	name_plates.source = _client3d.name_plates
 
 
 ## The talk panel (Tab) and the chat box (Enter), on the HUD.

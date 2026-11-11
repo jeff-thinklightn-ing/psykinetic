@@ -1,5 +1,6 @@
 extends Node
 ## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; UiKeyCap 872): UiGlass, UiSlot,
+## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; the name plates 865): UiGlass, UiSlot,
 ## UiPrice, UiTabs, UiLine, UiRow each take their theme types, change them by state,
 ## and report what they show. No port: it opens no network; no scratch files.
 
@@ -16,6 +17,7 @@ func _ready() -> void:
 	await _test_row()
 	await _test_quest_card()
 	await _test_key_cap()
+	_test_name_plates()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -288,3 +290,44 @@ func _test_key_cap() -> void:
 	for type: StringName in [&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup"]:
 		_check(type in UiTheme.SIZED_TYPES, "%s follows the text scale" % type)
 	strip.queue_free()
+## Names over heads (865): one size at every depth, the nearer placed first, a
+## plate that meets it stepped up one plate, a third that still meets faded; the
+## 3D labels kept for their words but drawn on no layer while the HUD has them.
+func _test_name_plates() -> void:
+	var plates := UiNamePlates.new()
+	add_child(plates)
+	var font := plates.get_theme_font(&"font", &"NameText")
+	var size := plates.get_theme_font_size(&"font_size", &"NameText")
+	var plate := plates.get_theme_stylebox(&"panel", &"NamePlate")
+	_check(size >= 42 and plate is StyleBoxFlat, "a name is at least 42 units (21 px at 1080) on its plate (%d)" % size)
+	var near := {"key": 1, "text": "Agnes", "at": Vector2(1000, 600), "depth": 8.0, "plain": true}
+	var far := {"key": 2, "text": "Hale", "at": Vector2(1010, 604), "depth": 9.0, "plain": true}
+	var apart := {"key": 3, "text": "Rolf", "at": Vector2(2000, 600), "depth": 20.0, "plain": true}
+	var placed := plates.place([far, apart, near], font, size, plate)
+	_check(placed.size() == 3 and placed[0]["entry"] == near, "the nearest is placed first")
+	var a: Rect2 = placed[0]["rect"]
+	var b: Rect2 = placed[1]["rect"]
+	var c: Rect2 = placed[2]["rect"]
+	_check(is_equal_approx(a.end.y, 600.0 - UiNamePlates.LIFT) and is_equal_approx(a.get_center().x, 1000.0), "its foot just over the head, centred on it")
+	_check(not a.intersects(b) and b.end.y <= a.position.y and placed[1]["alpha"] == 1.0, "the farther one that would meet it steps up a plate")
+	_check(is_equal_approx(c.size.y, a.size.y) and placed[2]["alpha"] == 1.0, "one apart: the same size, untouched, at any depth")
+	var third := {"key": 4, "text": "Bram", "at": Vector2(1005, 602), "depth": 10.0, "plain": true}
+	placed = plates.place([near, far, third], font, size, plate)
+	_check(placed[2]["alpha"] == UiNamePlates.SHADED, "a third that still meets is faded")
+	remove_child(plates)
+	plates.free()
+	var client := Client3D.new()  # Never in the tree: the layers alone.
+	var puppet := Node3D.new()
+	var label := Label3D.new()
+	label.name = "Name"
+	puppet.add_child(label)
+	var mark := Sprite3D.new()
+	mark.name = "BossMark"
+	label.add_child(mark)
+	client._puppets[7] = puppet
+	client.names_on_hud = true
+	_check(label.layers == 0 and mark.layers == 0, "with the names on the HUD, the 3D name and skull draw nothing")
+	client.names_on_hud = false
+	_check(label.layers == 1 and mark.layers == 1, "and draw again without")
+	puppet.free()
+	client.free()
