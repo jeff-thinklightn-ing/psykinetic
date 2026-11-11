@@ -1,5 +1,5 @@
 {
-	"name": "The Barrow",
+	"name": "The Crypt of the Fallen",
 	"outdoor": false,
 	"depth": 1,
 	"walls": "stone",
@@ -259,7 +259,7 @@
 				38,
 				30
 			],
-			"name": "Altar",
+			"name": "Offering stone",
 			"props": {
 				"role": "offering",
 				"slots": [
@@ -435,7 +435,7 @@
 			]
 		},
 		"altar": {
-			"name": "The Altar Room",
+			"name": "The Low Hall",
 			"rect": [
 				30,
 				24,

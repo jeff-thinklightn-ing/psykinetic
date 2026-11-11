@@ -4431,8 +4431,8 @@ func _test_barrow_level() -> void:
 	print("\n== levels/barrow, barrow_deep (decisions 542, 580, 666): the barrow in two depths, the Hall off the Ossuary; a test run never writes them ==")
 	var barrow := Level.load_level("barrow")
 	var deep := Level.load_level("barrow_deep")
-	_check(barrow["display_name"] == "The Barrow" and barrow["size"] == Vector2i(80, 60) and barrow["warnings"].is_empty(),
-		"The Barrow, 80 x 60 (580), parses with no warning (%s)" % [barrow["warnings"]])
+	_check(barrow["display_name"] == "The Crypt of the Fallen" and barrow["size"] == Vector2i(80, 60) and barrow["warnings"].is_empty(),
+		"The Crypt of the Fallen, 80 x 60 (580), parses with no warning (%s)" % [barrow["warnings"]])
 	_check(deep["display_name"] == "The Ossuary" and deep["size"] == Vector2i(100, 80) and deep["warnings"].is_empty()
 		and not Level.exists("barrow_lair") and not Level.overlaid("barrow_lair") and Level.RETIRED.get("barrow_lair") == ["barrow_deep", Vector2i(49, 2)],
 		"the Ossuary, 100 x 80, parses with no warning; the dark below is retired, its players bound for the Ossuary's stair foot (666; %s)" % [deep["warnings"]])
@@ -4464,11 +4464,11 @@ func _test_barrow_level() -> void:
 			grave_marked[spec["name"]] = marked
 			if kind == "skeleton_guard" and marked:
 				guards_marked += 1
-	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1
+	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("offering stone", 0) == 1 and kinds.get("runner's pack", 0) == 1
 		and kinds.get("robbers' chest", 0) == 1 and kinds.get("astral_knight", 0) == 1
 		and barrow["places"].has("niche") and barrow["entities"].size() == 6 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
 		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
-	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
+	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 4 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
 		and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
