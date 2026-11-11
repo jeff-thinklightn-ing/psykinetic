@@ -222,7 +222,12 @@ class Own:
 		var was := base
 		base = state["pos"]
 		held = state["held"]
-		way = Vector2.ZERO
+		# 689 amended (10): with nothing left to replay and the way still
+		# held, the last glide's way stands till the next close; dropped, the
+		# body was drawn standing between (going() all but nothing): its legs
+		# and facing flicked each tick (151 toggles a minute walking at lag 0).
+		var kept := way if not overruled and pending.is_empty() and open_intent != Vector2.ZERO else Vector2.ZERO
+		way = kept
 		for i in (0 if overruled else pending.size()):
 			var command: Dictionary = pending[i]
 			if i == 0 and int(command["seq"]) == (acked + 1) & 0xFFFF and float(state["used"]) > 0.0:

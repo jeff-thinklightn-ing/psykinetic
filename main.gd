@@ -3150,6 +3150,11 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 	var there := Vector2i(_free_stands(other).round())
 	var goal: Vector2i = path[-1]
 	if there == goal:
+		var again := _free_beside_again(player, at, other, goal)
+		if not again.is_empty():
+			_free["path"] = again
+			_free_unblock()
+			return true
 		print("[free] %s's walk ends at %s beside %s on its end %s (tick %d)" % [player.name, at, other.name, goal, now])
 		_free["path"] = []
 		_free_unblock()
@@ -3189,6 +3194,33 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 			return true
 	_free["block_wait"] = true  # No way round: it stands till he goes.
 	return true
+
+
+## A route to another cell beside what the walk is for, or empty: a chest
+## clicked to open (_pack_wanted) or a person walked to for talk
+## (_talk_wanted), whose cell beside it, [param goal], [param other] has
+## stepped onto since the click. Another free cell beside it in a hand's
+## reach (_beside, nearest where the body stands) and a way there; with
+## none, or the one in the way being what the walk is for, or one picked
+## again already this click, empty, and the walk ends beside the one on it.
+func _free_beside_again(player: Player, at: Vector2, other: GridEntity, goal: Vector2i) -> Array:
+	var target: GridEntity = _pack_wanted if is_instance_valid(_pack_wanted) else (_talk_wanted if is_instance_valid(_talk_wanted) else null)
+	if target == null or other == target or _free.get("repicked", false):
+		return []
+	var of: Vector2i = target.tile if target == _pack_wanted else talk_cell(target)
+	if World.distance(goal, of) != 1:
+		return []  # The click's end was no cell beside it.
+	_free["repicked"] = true
+	var from := World.free_cell(player, at)
+	var cell := _beside(of, from)
+	var route: Array = []
+	if cell != NONE and cell != goal and cell != from:
+		for step: Vector2i in World.walk_path(from, cell, player):
+			route.append(step)
+	if route.is_empty() or route.back() != cell:
+		return []
+	print("[free] %s picks %s beside %s, %s on %s (tick %d)" % [player.name, cell, target.name, other.name, goal, World.tick])
+	return route
 
 
 ## 724 amended (4): what _free_blocked counts of a block, let go.
@@ -3445,6 +3477,7 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
 	_free.erase("replanned")  # 689 amended (9): a click's one plan again from where it stands.
+	_free.erase("repicked")  # Its one other cell beside a chest or a person (_free_beside_again).
 	var path: Array = []
 	var own := _free_own(player)
 	# From the cell the body is shown on (ahead of the server's claim), so

@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_allowance()
 	_test_bank()
 	_test_own_view()
+	_test_own_way_kept()
 	_test_lag_and_loss()
 	_test_lag_across_fords()
 	_test_kick_under_lag()
@@ -162,6 +163,34 @@ func _test_own_view() -> void:
 	player.pack_free()
 	_check(own.pending.is_empty() and own.shown(player).distance_to(Vector2(8, 4)) < 0.01,
 			"placed again: what was sent before is dropped, the view on its new cell (%s)" % own.shown(player))
+
+
+## 689 amended (10) (the coordinator's order after the stall landing, from
+## physics' drawn walk: stepping toggled 151 times a minute walking steadily
+## at lag 0): a server state that has applied every command leaves nothing
+## to replay; the view kept no way, so between it and the next command's
+## close going() was all but nothing and the body was drawn standing, its
+## legs and its facing (to its aim) flicking each tick. Held on, it keeps
+## the last glide's way; let go, it has none.
+func _test_own_way_kept() -> void:
+	print("\n== the own body's way through a server state with nothing left to replay ==")
+	var player := _build(OPEN, Vector2i(1, 2))
+	player.owner_peer = Net.local_id
+	var own := FreeNet.Own.new()
+	player.free_view = own
+	_frames(player, own, Vector2.RIGHT, 12)  # Under way: two commands closed and applied.
+	var standing := 0
+	var emptied := 0
+	for i in 90:
+		_frames(player, own, Vector2.RIGHT, 1)
+		if own.going().length() <= 0.05:
+			standing += 1
+		if own.pending.is_empty():
+			emptied += 1
+	_check(emptied > 0 and standing == 0,
+			"held east 1.5 s, every command applied at %d frames: drawn going on every frame (standing on %d)" % [emptied, standing])
+	_frames(player, own, Vector2.ZERO, 30)
+	_check(own.going() == Vector2.ZERO, "let go: no way, drawn standing (%s)" % own.going())
 
 
 func _test_lag_and_loss() -> void:

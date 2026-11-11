@@ -35674,6 +35674,18 @@ to see it. controls_test _test_free_no_headway: a route made by hand straight ac
 pressed at most 0.6 s; a route to (3, 10), no floor, ends standing within a second. Client only; protocol
 unchanged; no new class_name.
 
+689 amended (10) (decision_number.sh's label; the coordinator's order after the stall landing, from
+Jeff's "walking around looks like skipping"; a fix, no package): physics' drawn walk at lag 0 toggled
+the own body's stepping 151 times a minute walking steadily. FreeNet.Own.confirm set its way to nothing
+before replaying the commands the server had not applied; with every one applied (a host, or a client
+whose state came after its last close) nothing was replayed, and until the next close (SEND_SECONDS)
+going() was the held way scaled to almost nothing, so GridEntity drew the body standing: legs to idle,
+facing to its aim, each tick. Now, not held by the server, with nothing left to replay and a way still
+held, confirm keeps the last glide's way; let go, or held by the server, it has none, as before.
+free_net_test _test_own_way_kept: held east 1.5 s on a host, every command applied at 30 frames,
+going() over the stepping line (0.05) on every frame (the old code: standing on 30 of 90); let go, no
+way. Client only; protocol unchanged; no new class_name.
+
 ## 703: removing the player's grid path
 
 Free walk has been the default since 693; a player's body is to walk only
@@ -37273,6 +37285,22 @@ at once (on the spot at most 0.1 s; a side taken with no way on from it would st
 second and come back, its block's count starting again each time it moved) and the walk is given up FREE_GIVE_UP_SECONDS after. Each fails on the old code
 (the run's lines are in the landing message). Client only; protocol unchanged; no new
 class_name.
+
+724 amended (5) (decision_number.sh's label; the coordinator's order after the stall landing; a fix,
+no package): a chest clicked from afar walks to the free cell beside it nearest the player
+(Main._beside) and opens on arrival; a person clicked for talk, likewise to a cell beside them. When
+someone steps onto that cell on the way, (4) ended the walk beside him, a step short, and a chest out
+of a hand's reach never opened. Now _free_blocked, finding the route's end held while a chest is wanted
+(_pack_wanted) or a person (_talk_wanted) and the end a cell beside it, first asks
+Main._free_beside_again: another free cell beside it in a hand's reach (_beside from where the body
+stands, the held one no longer free) and a walk there; it ends beside the one in the way only when
+there is none, when the one in the way is what the walk is for, or after one such pick this click
+(the "repicked" mark, cleared by a new click), so two who keep stepping onto its cells never lead it
+round and round. controls_test _test_free_beside_again: a chest at (10, 3) clicked from (3, 3), a
+talker stood on the route's end at once: walked on to another cell beside the chest, the chest in reach,
+stood at most 0.3 s, on the spot at most 0.1 s (with the pick off, the walk ends at (8, 3), the chest
+out of reach); with every free side held, the walk ends beside the one on the end. Client only;
+protocol unchanged; no new class_name.
 
 724 amended (6) (decision_number.sh's label; the coordinator's order, from voice's landing; a fix, no
 package): two players head on along a straight two-cell way each went round by the same side, then

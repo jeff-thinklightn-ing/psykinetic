@@ -7,6 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- Click to walk and you go round anyone standing in your way at once, or stop beside them if they're on the spot you clicked; another player gets a moment to step aside first (724 amended (4)).
+- Click to walk past the corner of a wall or a ledge and you walk round it all the way to your spot (689 amended (8)).
+- Whatever blocks a click walk, you look for another way round at once, and where there's none, you stop and stand (689 amended (9)).
+- Click a chest or a person from afar, and if someone steps into the spot beside it as you go, you walk to another spot beside it and still reach it (724 amended (5)).
+- Your character walks smoothly the whole way, legs and facing steady, however long you keep walking (689 amended (10)).
 - Umbrage's map, and the name shown for where you stand, now read "the temple" and "the healer's hut" at those two places (832 amended (1))
 - Your companion follows in your footsteps at your own pace, walking smoothly behind you, and stops beside you only when you turn back toward her (485 amended (2)).
 - Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856)
@@ -23,9 +28,6 @@ notes (decision 324).
 - When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))
 - Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3))
 - Ask your companion to fish with something hostile near and she tells you why not yet, even straight after a fight, then takes up her rod once it's gone (805 amended (15))
-- Click to walk and you go round anyone standing in your way at once, or stop beside them if they're on the spot you clicked; another player gets a moment to step aside first (724 amended (4))
-- Click to walk past the corner of a wall or a ledge and you walk round it all the way to your spot (689 amended (8))
-- Whatever blocks a click walk, you look for another way round at once, and where there's none, you stop and stand (689 amended (9))
 - The old grey's bite lands harder, so his lunge is worth reading: step off the line he marks and you hold your own, and step out of his bite as well and he never touches you (780 amended (33))
 
 - Your shield and your sword's parry never break or leave you stunned now: a raised shield holds any blow for stamina, a heavier one costing more and a wound-up heavy swing twice, and when you run short it gives out, letting that blow through and staying down a moment; your sword's ready parry turns light blows and lets heavier ones by; and the sword and the buckler catch a blow from a foe standing a little off your line, where before a heavy bite broke your guard and left you stunned, worse than holding nothing (340 amended (2)).

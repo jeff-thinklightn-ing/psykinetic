@@ -56,6 +56,7 @@ func _ready() -> void:
 	_test_free_route_passage()
 	_test_free_head_on_pulled()
 	_test_free_no_headway()
+	_test_free_beside_again()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1333,6 +1334,59 @@ func _test_free_head_on_pulled() -> void:
 		World.despawn(holder)
 		holder.queue_free()
 	_check(stepped == 1, "head on in the passage: %d of the two stepped aside (want 1)" % stepped)
+	_stop_walk()
+	Net.controls = saved
+
+
+## 724 amended (5), a chest clicked from afar (the coordinator's order
+## after the stall landing): one steps onto the cell beside it the walk was
+## making for; the walk goes on to another free cell beside it, where the
+## chest is in reach, never ending a step short beside the one on its cell.
+## With the chest's every side held, it ends beside the one in the way.
+func _test_free_beside_again() -> void:
+	print("\n== a chest clicked from afar, its cell beside it taken on the way: another cell beside it ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(9, 3)) <= 10:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(3, 3))
+	_free_start(player)
+	var occupant := World.get_entity_at(Vector2i(10, 3))
+	if occupant != null:
+		World.despawn(occupant)
+	var chest := _main._spawn({"script": "res://sim/chest.gd", "name": "BesideChest", "tile": Vector2i(10, 3)}) as Chest
+	_main._open_pack(player, chest)
+	var planned: Array = (_main._free["path"] as Array).duplicate()
+	var end: Vector2i = planned.back() if not planned.is_empty() else Main.NONE
+	var holder := _held_body("talker", end)
+	var walk := _held_walk(player, 480)
+	_check(_main._pack_wanted == chest and not _walking() and player.tile != end and World.reaches(player, chest)
+			and walk["stall"] <= 0.3 and walk["jog"] <= 0.1,
+			"a talker on %s, the route's end beside the chest at (10, 3): walked on to %s (%s), the chest in reach %s, stood %.1f s (at most 0.3), on the spot %.1f s" % [end, player.tile, player.free_pos, World.reaches(player, chest), walk["stall"], walk["jog"]])
+	World.despawn(holder)
+	holder.queue_free()
+	# Every free side of it held but the one walked for: ends beside him.
+	_place_player(Vector2i(3, 3))
+	_free_start(player)
+	_main._open_pack(player, chest)
+	planned = (_main._free["path"] as Array).duplicate()
+	end = planned.back() if not planned.is_empty() else Main.NONE
+	var others: Array = []
+	for direction in World.DIRECTIONS:
+		var cell: Vector2i = chest.tile + direction
+		if cell != end and World.is_free(cell):
+			others.append(_held_body("talker", cell))
+	holder = _held_body("talker", end)
+	walk = _held_walk(player, 480)
+	_check(not _walking() and World.distance(player.tile, end) == 1 and walk["stall"] <= 0.3 and walk["jog"] <= 0.1,
+			"the chest's every side held (%d): the walk ends beside the one on %s at %s, stood %.1f s, on the spot %.1f s" % [others.size() + 1, end, player.free_pos, walk["stall"], walk["jog"]])
+	for body: GridEntity in others + [holder]:
+		World.despawn(body)
+		body.queue_free()
+	World.despawn(chest)
+	chest.queue_free()
+	_main._pack_wanted = null
 	_stop_walk()
 	Net.controls = saved
 
