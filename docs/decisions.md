@@ -52764,3 +52764,28 @@ in its switch-on commit. Made by C:/dev/review/knight_remains/make_knight_remain
 C:/dev/review/knight_remains (kr4_near.png, kr4_close.png), passed by the coordinator. Lands off:
 placed by nothing until dungeon's switch-on; a game still at the nearest zoom beside the goblin
 before that. Client only (art); protocol unchanged; no new class_name; no bullet.
+## 868. A tavern's hearth burning: its flame and light at the fireplace, from the tavern place's hearth
+
+The coordinator's go, 11-11, package "a newcomer can mend in town", on: the Mughouse's hearth
+is a warm rest (777 amended (2), combat's: Main._town_warm_cells reads the tavern place's
+"hearth" cell, burning always, no state), so it is seen burning, always. Main.night_places
+gives a third list, each tavern-kind place's "hearth" cell (_place_cell; a tavern naming none
+has none), and Main._show_night_places hands it on as set_night_places's third argument. For
+each, Client3D._add_hearth_fire finds the wall hearth decor drawn on that cell
+(Decor_x_y_wall_hearth_*, prop.wall_hearth) and, under the night places so a redraw makes it
+once, at the piece's own transform: a flame (Flames.light, Flames.SIZES 0.55) at the slot's
+"flame" socket over its logs (Flames.socket_of; WALL_HEARTH_FLAME [0, 0.17, 0.58] until
+art-kit's take 871 names it there, the same place; its old "fire" socket stood 8 cm behind the
+firebox's back face, art-gen's near look), and the hut hearth's warm light HEARTH_LIGHT_UP over
+it (HEARTH_ENERGY 1.5 over HEARTH_RANGE 5 m, shadowless, flickered with the fires). No piece,
+nothing. One fire (art-kit and the coordinator): the map's two fire cells under the fireplace,
+(0, 6) and (0, 7), walled off from the room behind it, drew their own floor fire, flames and
+2.5 m lights, a glow at the wall's foot and a flame tip in the firebox mouth
+(C:\dev\review\mug_hearth_now\h-main.png); a fire cell on or beside a hearth's cell is no
+longer drawn (its Fire_x_y quad and its light, now named FireLight_x_y, hidden); the cells
+stay, for all that reads them. Client3D.hearth_cells() gives the cells this zone burns (empty
+where none), sound's one list for hearing it (amb.campfire). weather_test: no hearth with no
+tavern naming one, a tavern's at its "hearth" cell. view_test _test_tavern_inside: the
+Mughouse's flame at the socket on its fireplace, its light shadowless, flickering, the fire
+cells under it not drawn; a zone with none burns none. Client only; protocol unchanged (the
+hearth cell is level data), no new class_name.

@@ -3231,6 +3231,30 @@ func _test_tavern_inside() -> void:
 	_check(hearth != null and is_equal_approx(hearth.position.x, -0.5) and is_equal_approx(hearth.position.z, 6.5)
 			and is_equal_approx(hearth.rotation.y, PI * 0.5),
 			"the Mughouse's fireplace against its west wall, over its two fire cells (%s)" % [hearth.position if hearth != null else null])
+	# Its hearth burning always (868, "a newcomer can mend in town"): one
+	# fire, the flame at the piece's "flame" socket over its logs and the warm
+	# light over it, the map's two fire cells under it not drawn; none once
+	# the tavern names no hearth.
+	var night := Main.night_places(ground["places"])
+	_rig.set_night_places(night[0], night[1], night[2])
+	var fire := _rig._room.find_child("HearthFire_0_6", true, false) as Node3D
+	var fire_light := fire.get_node_or_null("Light") as OmniLight3D if fire != null else null
+	var fire_flame := fire.find_child("Flame", true, false) as Node3D if fire != null else null
+	var flame_at: Variant = Flames.socket_of(Client3D.WALL_HEARTH_SLOT)
+	var want_at: Vector3 = flame_at if flame_at != null else Client3D.WALL_HEARTH_FLAME
+	var cells_drawn := 0
+	for name: String in ["Fire_0_6", "Fire_0_7", "FireLight_0_6", "FireLight_0_7"]:
+		var hearth_drawn := _rig._room.get_node_or_null(name) as Node3D
+		if hearth_drawn != null and hearth_drawn.visible:
+			cells_drawn += 1
+	_check(night[2] == [Vector2i(0, 6)] and _rig.hearth_cells() == [Vector2i(0, 6)] and fire != null and hearth != null
+			and fire.transform.is_equal_approx(hearth.transform) and fire_flame != null and fire_flame.position.is_equal_approx(want_at)
+			and fire_light != null and not fire_light.shadow_enabled and is_equal_approx(fire_light.omni_range, Client3D.HEARTH_RANGE)
+			and _rig._fire_lights.any(func(each: Array) -> bool: return each[0] == fire_light) and cells_drawn == 0,
+			"the Mughouse's hearth burning: its flame at %s on the fireplace, its warm light shadowless over %.1f m, flickering, the fire cells under it not drawn (%d drawn) (868)" % [want_at, Client3D.HEARTH_RANGE, cells_drawn])
+	_rig.set_night_places([], [], [])
+	_check(_rig._room.find_child("HearthFire_0_6", true, false) == null and _rig.hearth_cells().is_empty(),
+			"a zone naming no hearth burns none, and hears none (868)")
 	# Its common room's candles (811 amended (4), environment's numbers):
 	# five, on its four tables and its bar, each lit over its top, warm,
 	# shadowless, at its reach, flickering with the fires.

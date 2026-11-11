@@ -687,6 +687,10 @@ func _test_night_town() -> void:
 			"the store's lantern post beside its cell (no \"lamp\" given)")
 	places["store"]["lamp"] = [7, 8]
 	_check((Main.night_places(places)[1] as Array)[0][1] == Vector2(7, 8), "or at its \"lamp\" cell")
+	_check((Main.night_places(places)[2] as Array).is_empty(), "no hearth burns where no tavern names one (868)")
+	places["tavern"] = {"kind": "tavern", "cell": Vector2i(9, 2), "hearth": [0, 6]}
+	places["bare_tavern"] = {"kind": "tavern", "cell": Vector2i(1, 1)}
+	_check(Main.night_places(places)[2] == [Vector2i(0, 6)], "a tavern's hearth at its \"hearth\" cell, always burning; a tavern naming none has none (868)")
 	var carriers := {}
 	var made: Array[Node3D] = []
 	for i in 6:

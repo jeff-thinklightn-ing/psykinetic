@@ -2963,6 +2963,8 @@ var _night := false
 var _door_lamps: Dictionary[Vector2i, Node3D] = {}
 var _night_posts: Array = []
 var _night_stores: Array = []
+## The tavern hearths' cells (868), burning always.
+var _night_hearths: Array = []
 var _night_places: Node3D
 var _carriers: Dictionary = {}
 var _carried_lights: Array[OmniLight3D] = []
@@ -9091,6 +9093,11 @@ const HEARTH_FLAME_UP := 0.15
 const HEARTH_ENERGY := 1.5
 const HEARTH_RANGE := 5.0
 const HEARTH_LIGHT_UP := 0.7
+## A tavern's wall hearth (868): its slot, and where its flame burns in the
+## slot's own units, over its logs (art-gen's look), until the slot names
+## a "flame" socket.
+const WALL_HEARTH_SLOT := "prop.wall_hearth"
+const WALL_HEARTH_FLAME := Vector3(0.0, 0.17, 0.58)
 ## Each piece: [slot, where in the shelter's frame past its face (y over
 ## the ground there), turn (radians), size].
 const SHELTER_DRESS := [
@@ -19435,6 +19442,7 @@ func _add_fire(cell: Vector2i) -> void:
 		var flame := Flames.light(quad, Vector3(off.x * 0.6, 0.0, off.y * 0.6), size, hash(Vector3i(cell.x, cell.y, n)))
 		flame.name = "Flame%d" % n
 	var light := OmniLight3D.new()
+	light.name = "FireLight_%d_%d" % [cell.x, cell.y]
 	light.light_color = FIRE
 	light.light_energy = 1.5
 	light.omni_range = 2.5
@@ -19618,12 +19626,23 @@ func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
 ## posts] the watch posts' brazier cells (771, buildings' "post" places),
 ## [param stores] [its place's cell, where its lantern post stands (cells)]
 ## for a store with no building round it (one a building covers, at its
-## cell or its post's, is left out: its counter's door lantern). Drawn
-## again whole on each call and after a rebuild (Main._on_room_built).
-func set_night_places(posts: Array, stores: Array) -> void:
+## cell or its post's, is left out: its counter's door lantern); [param
+## hearths] each tavern's hearth cell (868: its fire, _add_hearth_fire).
+## Drawn again whole on each call and after a rebuild (Main._on_room_built).
+func set_night_places(posts: Array, stores: Array, hearths: Array = []) -> void:
 	_night_posts = posts
 	_night_stores = stores
+	_night_hearths = hearths
 	_draw_night_places()
+
+
+## The tavern hearths' cells this zone burns (868), as set_night_places
+## was last given them: empty in a zone with none. Sound hears them.
+func hearth_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in _night_hearths:
+		out.append(cell)
+	return out
 
 
 func _draw_night_places() -> void:
@@ -19631,17 +19650,57 @@ func _draw_night_places() -> void:
 		_night_places.free()
 	_night_places = null
 	_fire_lights = _fire_lights.filter(func(each: Array) -> bool: return is_instance_valid(each[0]))
-	if _room == null or (_night_posts.is_empty() and _night_stores.is_empty()):
+	if _room == null or (_night_posts.is_empty() and _night_stores.is_empty() and _night_hearths.is_empty()):
 		return
 	_night_places = Node3D.new()
 	_night_places.name = "NightPlaces"
 	_room.add_child(_night_places)
 	for cell: Vector2i in _night_posts:
 		_add_brazier(cell)
+	for cell: Vector2i in _night_hearths:
+		_add_hearth_fire(cell)
 	for store: Array in _night_stores:
 		var at: Vector2 = store[1]
 		if not _building_at.has(store[0]) and not _building_at.has(Vector2i(roundi(at.x), roundi(at.y))):
 			_add_store_lamp(at)
+
+
+## A tavern's hearth burning (868, "a newcomer can mend in town"): at the
+## wall hearth drawn on [param cell] (its decor, WALL_HEARTH_SLOT), a flame
+## at its slot's "flame" socket, over the logs (WALL_HEARTH_FLAME till
+## art-kit names one: its "fire" stands behind the firebox's back), and the
+## hut hearth's warm light over it (HEARTH_ENERGY over HEARTH_RANGE,
+## shadowless, distance-faded, flickered as fire is, full indoors); under
+## the night places, so a redraw makes it once. Nothing without the piece.
+func _add_hearth_fire(cell: Vector2i) -> void:
+	var piece: Node3D = null
+	for child in _room.get_children():
+		if child is Node3D and str(child.name).begins_with("Decor_%d_%d_wall_hearth_" % [cell.x, cell.y]):
+			piece = child
+			break
+	if piece == null:
+		return
+	# One fire (art-kit, 11-11): the fire cells the hearth stands on or
+	# beside (the map's, behind its wall) are not drawn, their flames and
+	# light; the cells stay, for all that reads them.
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			for name: String in ["Fire_%d_%d", "FireLight_%d_%d"]:
+				var drawn := _room.get_node_or_null(name % [cell.x + dx, cell.y + dy]) as Node3D
+				if drawn != null:
+					drawn.visible = false
+	var named: Variant = Flames.socket_of(WALL_HEARTH_SLOT)
+	var socket: Vector3 = named if named != null else WALL_HEARTH_FLAME
+	var fire := Node3D.new()
+	fire.name = "HearthFire_%d_%d" % [cell.x, cell.y]
+	fire.transform = piece.transform
+	_night_places.add_child(fire)
+	Flames.light(fire, socket, Flames.size_of(WALL_HEARTH_SLOT), hash(cell))
+	var light := _night_light(FIRE_POOL, HEARTH_ENERGY, HEARTH_RANGE)
+	light.name = "Light"
+	light.position = socket + Vector3(0.0, HEARTH_LIGHT_UP, 0.0)
+	fire.add_child(light)
+	_fire_lights.append([light, HEARTH_ENERGY, _roll(cell, 155) * TAU, Flames.FIRE_FLICKER])
 
 
 ## A watch post's brazier (782; 771): art-kit's POST_BRAZIER, its fire at

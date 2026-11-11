@@ -4587,15 +4587,18 @@ func _show_folds() -> void:
 		_client3d.set_folds(fold_view())
 
 
-## This level's night places as the view lights them (782): [posts, stores].
+## This level's night places as the view lights them (782): [posts, stores,
+## hearths].
 ## Posts: each "post" place's (771, buildings') brazier cell ("brazier", else
 ## its rect's middle, else its cell). Stores: [the "store" place's cell,
 ## where its lantern stands (Vector2, cells): its "lamp" cell, else beside
 ## its cell (NIGHT_STORE_ASIDE)]; the view leaves out one a building covers
-## (that store's counter hangs its door lantern instead).
+## (that store's counter hangs its door lantern instead). Hearths (868): each
+## tavern place's "hearth" cell, its fire burning always.
 static func night_places(places: Dictionary) -> Array:
 	var posts: Array = []
 	var stores: Array = []
+	var hearths: Array = []
 	for key: String in places:
 		var place: Dictionary = places[key]
 		if str(place.get("kind", "")) == "post":
@@ -4603,7 +4606,11 @@ static func night_places(places: Dictionary) -> Array:
 		elif key == "store":
 			var cell := _place_cell(place, "")
 			stores.append([cell, Vector2(_place_cell(place, "lamp")) if place.has("lamp") else Vector2(cell) + NIGHT_STORE_ASIDE])
-	return [posts, stores]
+		# A tavern's hearth (868): its "hearth" cell, burning always, as
+		# combat's warm rest reads it (Main._town_warm_cells); none unless said.
+		if str(place.get("kind", "")) == "tavern" and place.get("hearth") != null:
+			hearths.append(_place_cell(place, "hearth"))
+	return [posts, stores, hearths]
 
 
 ## [param place]'s cell named [param field] ([x, y] or a Vector2i), else
@@ -4635,7 +4642,7 @@ func _show_night_places() -> void:
 	if _client3d != null:
 		var night := night_places(level.get("places", {}))
 		_client3d.fire_places = fire_places(level.get("places", {}))
-		_client3d.set_night_places(night[0], night[1])
+		_client3d.set_night_places(night[0], night[1], night[2])
 
 
 ## Draws the terrain afresh in both views (a map loaded live). A

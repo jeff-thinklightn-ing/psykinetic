@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Mughouse's fireplace burns day and night now, one fire on its logs with its warm light over the common room, where before only a glow showed at the wall's foot (868).
 - The temple's tall pointed windows stand inside its walls, their tops under the eaves, where they ran up through the roof (489 amended (7)).
 - In the crypt, while you fight the draugr, the way behind his throne and the crypt's way down to his hall stay shut until the fight is done (540 amended (1) and (2)).
 - Grass on the lawns grows in clumps of thin blades with a few straw tips (871 amended (1)).
