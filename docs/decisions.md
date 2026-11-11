@@ -48720,6 +48720,11 @@ Mound-breakers", lore's). 832's "Crypt of the Fallen" and "Low Hall" come in by 
 once they land. resident_test _test_lower_first holds the keep-list as a test. No CHANGELOG bullet
 when it ships in 853's cut (voice: the lowering and its mend arrive together); else voice's line.
 
+853 amended (2) (animation's clips, 2026-11-11): a seat's get-up waits longer and a lean has one.
+Resident.GET_UP is 15 ticks for "sit", "sit_talk" and "sit_listen" (1.5 s, so a ground sit's
+get-up, 1.45 s, plays out as well as Sitting_Exit), 12 for "tend" as before, and 5 for "lean" (its
+step-off, 0.5 s); the 11 ticks above are these. Animation fits its clips to them; no new word.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

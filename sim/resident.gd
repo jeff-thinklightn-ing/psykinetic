@@ -53,7 +53,7 @@ static var keep_moving := true
 ## The ticks a body stands on its cell after a word of these ends, before its first step: the client's
 ## get-up (animation's, 2026-11-10: Sitting_Exit 1.03 s for the seat words, Counter_Exit 1.17 s for tend);
 ## stepped off sooner, the client cuts it short.
-const GET_UP := {"sit": 11, "sit_talk": 11, "sit_listen": 11, "tend": 12}
+const GET_UP := {"sit": 15, "sit_talk": 15, "sit_listen": 15, "tend": 12, "lean": 5}  # A ground sit's get-up 1.45 s, a lean's step-off 0.5 s (animation's, 853 amended (2)).
 const FAR_TILES := 30
 const FAR_EVERY := 20
 ## A step blocked so many times, and it looks for a new way.
