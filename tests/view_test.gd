@@ -6977,6 +6977,23 @@ func _test_roads() -> void:
 			if _rig._grounds.get(cell, -1) >= 0 and _rig._grounds[cell] < _rig._ground_floor_end and _rig._ground_kinds.get(cell, "") != _rig._road_kind_round(cell, kinds):
 				by_cell.append(cell)
 		_check(not _rig._road_cells.is_empty() and by_cell.is_empty(), "%s: a road's cells drawn as the ground round them (%d cells; not: %s)" % [name, _rig._road_cells.size(), by_cell.slice(0, 3)])
+		if name == "wilds":
+			# 563 amended (1): Umbrage's roads start inside its cobbled square;
+			# their cells there are drawn as cobble, and the shader lays a dirt
+			# road only off stone, so the road stops at the cobble's edge.
+			var cobbled := []
+			for cell: Vector2i in _rig._road_cells:
+				if _rig._ground_kinds.get(cell, "") == "stone" and _rig.road_at(Vector2(cell)) > 0.5:
+					cobbled.append(cell)
+			# The cells with only road round them (where Umbrage's roads meet its
+			# square) are cobble too, not grass.
+			for cell: Vector2i in [Vector2i(189, 192), Vector2i(200, 192), Vector2i(189, 211), Vector2i(200, 211)]:
+				if not _rig._road_cells.has(cell) or _rig._ground_kinds.get(cell, "") != "stone":
+					cobbled.clear()
+			var code := (load("res://client3d/ground.gdshaderinc") as ShaderInclude).code
+			_check(not cobbled.is_empty() and code.contains("float off_stone = 1.0 - smoothstep(0.3, 0.7, weights.b);")
+					and code.contains("smoothstep(0.42, 0.58, road.r + worn) * off_stone"),
+					"wilds: a dirt road's cells in the square drawn as cobble, those with only road round them too (%d, e.g. %s), its dirt never laid over stone" % [cobbled.size(), cobbled.slice(0, 3)])
 		var on_road := []
 		for chunk: Vector2i in _rig._scatter_chunks:
 			for kind: String in _rig._scatter_plan(chunk):

@@ -360,10 +360,13 @@ void fragment() {
 	weights /= max(weights.r + weights.g + weights.b + weights.a, 0.0001);
 	// A road over the kinds (563, terrain's side): its own kind where its
 	// curve's field is over a half, the edge worn by a noise at two scales,
-	// never the cells.
+	// never the cells. A dirt road is never laid over stone (563 amended
+	// (1)): where a road runs into a cobbled square it stops at the
+	// cobble's own ragged edge, not as dirt lying on the stones.
 	vec2 road = texture(roads, (at - kinds_origin + 0.5) / kinds_size).rg;
 	float worn = (noise(at * 2.1 + 70.0) - 0.5) * 0.3 + (noise(at * 6.0 + 71.0) - 0.5) * 0.12;
-	weights = mix(weights, vec4(0.0, 1.0, 0.0, 0.0), smoothstep(0.42, 0.58, road.r + worn));
+	float off_stone = 1.0 - smoothstep(0.3, 0.7, weights.b);
+	weights = mix(weights, vec4(0.0, 1.0, 0.0, 0.0), smoothstep(0.42, 0.58, road.r + worn) * off_stone);
 	weights = mix(weights, vec4(0.0, 0.0, 1.0, 0.0), smoothstep(0.42, 0.58, road.g + worn));
 
 	// Each kind's look, worked out only where it shows.

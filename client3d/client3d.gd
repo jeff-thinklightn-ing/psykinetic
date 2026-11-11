@@ -15061,17 +15061,22 @@ func _road_near(point: Vector2, kept: Dictionary = _road_kept) -> Vector3:
 ## The kind a road's [param cell] is drawn as under the road (563,
 ## terrain's side): the one most cells round it have that are no road's
 ## (grass with none), so the road's own kind is drawn from its curve alone,
-## not as its cells.
+## not as its cells. A cell with only road round it (where roads cross on a
+## square) looks a ring further out (563 amended (1): such a cell inside
+## Umbrage's cobble was drawn as grass, a dirt island on the stones).
 func _road_kind_round(cell: Vector2i, kinds: Dictionary) -> String:
 	var counts: Dictionary[String, int] = {}
-	for y in range(-1, 2):
-		for x in range(-1, 2):
-			var near := cell + Vector2i(x, y)
-			if near == cell or _road_cells.has(near) or not kinds.has(near):
-				continue
-			var kind := str(kinds[near])
-			if GROUND_CHANNELS.has(kind):
-				counts[kind] = counts.get(kind, 0) + 1
+	for reach in [1, 2]:
+		for y in range(-reach, reach + 1):
+			for x in range(-reach, reach + 1):
+				var near := cell + Vector2i(x, y)
+				if near == cell or _road_cells.has(near) or not kinds.has(near):
+					continue
+				var kind := str(kinds[near])
+				if GROUND_CHANNELS.has(kind):
+					counts[kind] = counts.get(kind, 0) + 1
+		if not counts.is_empty():
+			break
 	var best := "grass"
 	for kind: String in counts:
 		if counts[kind] > counts.get(best, 0):

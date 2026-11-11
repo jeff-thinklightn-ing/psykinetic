@@ -22110,6 +22110,20 @@ the wilds, with 568's river and ponds as curves, 4402/4634 ms before,
 1.27 ms) but for one after hills run at 6.9 ms with its 99th at 7.3, the
 same spike. The curve drawing's cost is the rebuild's, not the frame's.
 
+563 amended (1) (the decision script's label; the coordinator's approval of 11-11, the second of
+terrain's three worst things on Umbrage's ground as a town, C:/dev/review/terrain/town_ground): no
+dirt road on cobble. Umbrage's roads start inside its square, (189, 211.03) and the like, and the
+ground drew their dirt over the stones as splats on the cobble. Two parts. In ground.gdshaderinc a
+dirt road's share is scaled by off_stone (1 less smoothstep(0.3, 0.7) of the ground's stone weight),
+so a road meets the cobble at the cobble's own ragged edge and is never laid over stone (a stone
+road is as before). And _road_kind_round, the kind drawn under a road's cell, looks a ring further
+(reach 2) when every cell round it is a road's: the four cells where two roads meet at the square's
+mouths ((189, 192), (200, 192), (189, 211), (200, 211)) had only road round them, fell to grass, and
+showed as dirt islands with a green rim on the stones. view_land_test _test_roads (wilds): the road
+cells in the square, those four among them, drawn as cobble, and the shader's dirt held off stone.
+Stills from three mouths at the nearest zoom, standing: C:/dev/review/terrain/road_ends/. Client
+only, protocol unchanged, no new class_name; not a package piece, lands on.
+
 ## 396 amended. The fallen back on time, and told how long
 
 From Jeff's play (2026-10-22): he died in the castle, was queued for Hob's
