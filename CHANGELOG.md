@@ -7,7 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- Shields: a blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing, the great bear's swipe, slam and charge, the old grey's lunge), is taken whole on a raised shield facing it for a little stamina and never breaks your guard; short of stamina, the shield still takes half and stays up, and a charge or a throw still moves you, wall and all (340 amended (3) and (4))
+- Shields: a weapon's blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing), is taken whole on a raised shield facing it for a little stamina, and short of stamina the shield still takes half and stays up, though the draugr's throws still throw you (340 amended (3) and (4))
 ## v0.1.212
 
 - Your companion names things as you'd say them: some roast meat, soft boots, the holy remains, an Encolpion Amulet (294 amended (1)).

@@ -1016,7 +1016,8 @@ class Hit:
 	## A wound-up blow's (decision 392): it breaks any guard it meets.
 	var crushing := false
 	## A told blow's (340 amended (4)): a wound-up one, or one whose lead ran
-	## TOLD_LEAD_TICKS or more; a player's raised shield takes it whole.
+	## TOLD_LEAD_TICKS or more, never a beast's (strikes_told); a player's
+	## raised shield takes it whole.
 	var told := false
 	## A piercing blow's (a backstab or a reach verb's): worn armour's
 	## deflect_pierce turns some of it (armour, combat's side).
@@ -7461,6 +7462,15 @@ func parry_cap(target: GridEntity) -> int:
 	return maxi(1, swing_cost(target))
 
 
+## Whether [param source]'s blows can be told ones (340 amended (4), the
+## coordinator's pick: weapons only): anyone's but a beast's, a kind on the
+## "wild" side (the wolves, the old grey, the great bear, the boars, the hill
+## cat), whose blows and told moves stay as they were. People and the dead
+## strike with arms, a weapon or none.
+func strikes_told(source: GridEntity) -> bool:
+	return not (source is Monster and str((Monster.kinds().get(kind_of(source), {}) as Dictionary).get("side", "")) == "wild")
+
+
 ## A told move's harm met by [param body]'s raised shield (340 amended (3),
 ## the coordinator's rule 2, enemy-ai's option (c)): what is left of
 ## [param harm]. A told move is stepped out of; a raised shield facing it
@@ -9166,7 +9176,7 @@ func _tend_wind_ups() -> void:
 				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
-				_hits[i].told = not lead or tick - began >= TOLD_LEAD_TICKS  # 340 amended (4).
+				_hits[i].told = strikes_told(entity) and (not lead or tick - began >= TOLD_LEAD_TICKS)  # 340 amended (4).
 			if logs:
 				_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
 		else:

@@ -7422,7 +7422,11 @@ before _push): a move's own stagger never keeps its shield from meeting it (dung
 in draugr_fight_test found both sites letting the whole harm through). Enemy-ai converts the great beasts' sites to told_hit in its own change
 behind this one (the bear's charge, swipe and slam, the grey's lunge, the king's gore, the cat's
 pounce, and Skeech's ambush, which skips the guard today), landing back to back with this in one cut (the coordinator: one rule, never true of one
-foe alone). Only a told move that skips a raised guard today comes to told_guard (the
+foe alone). Weapons only since (4) (the coordinator's pick): enemy-ai's table
+(C:/dev/review/enemy-ai/told_shield_table.md) found the beasts' told moves taken whole made a
+shield held still beside the grey and the king untouchable (nothing landed in 2 min) and gave one
+who reads them nothing, so the beasts' sites stay as on main and their conversions are parked
+(enemy-ai-told-parked); told_guard still meets the draugr's. Only a told move that skips a raised guard today comes to told_guard (the
 coordinator's ruling on enemy-ai's first look): one that already meets it as a plain blow (the
 robber's lunge, World._meet_guard in Monster._tend_ambush) keeps that path whole, full absorb and
 its maker thrown back, so a raised shield never does less than it did; monster_test _test_lunge
@@ -7467,6 +7471,26 @@ _test_guard_rework and _test_told_guard, items_test, draugr_fight_test _test_tol
 _test_lunge pays a light blow's at most. The round shield's and the buckler's tooltips and the
 CHANGELOG (one bullet for (3) and (4)) in voice's words. Server and data; protocol unchanged, no new
 class_name.
+
+Weapons only (the coordinator's pick on enemy-ai's told shield table,
+C:/dev/review/enemy-ai/told_shield_table.md): no beast's blow is told. World.strikes_told is false
+for a kind on the "wild" side (the wolves, the old grey, the great bear, the boars, the hill cat;
+a kind's "herd" defaults to the kind itself, so it can't say), and _tend_wind_ups marks Hit.told
+only when it is true; the grey's bite, led 6, is met on the shield as on main. monster_test
+_test_told_weapons_only (strikes_told by kind; a skeleton's blow led 6 on a raised buckler whole,
+the grey's in part) and _test_shield_wall (Brand alone, sword and shield raised at his tell,
+beaten untouched). The shields' tooltips and the bullet in voice's words.
+
+4b dropped before landing (the coordinator's fallback, set when 4b was allowed as the last
+variant: it lands only if a player raising at the tell against the wilds keeps her times within
+0.5 s). Enemy-ai's thrifty bot under hold:10 (told_shield_table.md, its foot): the grey held (22.2
+s, shield and buckler, as bare); the king missed, 35.0 s against bare's 32.4, her stamina ending on
+8 against 68, her longest quiet 14.0 to 8.6 s, raising for his long charge tell stopping her breath.
+So no breath rule: World.SHIELD_BREATH_GRACE, the _regen_stamina skip and combat_test
+_test_shield_breath are out, the tooltips and the bullet without their breath clause.
+The wall stays a known fault, on the cut's list: a shield held up still, never striking, holds the
+draugr, Brand, a brute, Grull and a boar for ever (the still guard table, 3 min, nothing landed).
+No further variant (the coordinator).
 
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
