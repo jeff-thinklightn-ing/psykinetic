@@ -154,10 +154,61 @@ extends Node
 ##     The coward sees the player and calls; the rest come. Hurt, each breaks
 ##     at its temperament's mark, and its rout breaks the coward and the
 ##     hurt; the bold one fights on.
+##   folk: Umbrage's people at their spots (566 amended (2), animation's side): three sat round a
+##     fire, each on a seat laid under it (the plain sit, sit_talk, sit_listen), two leant on the
+##     well's rim, a pair stood talking and listening, turn about, a keeper at a market stall
+##     (tend: stepped up to it, now and then a ware shown or handed over). The player walks to look at
+##     each group; its folk stand a moment, take their spot's word (the sat ones sit down onto
+##     their seats), hold it, then lose it (they get up). The seats and the well are the client's
+##     only (the sim's cells stay floor), and the folk are held where they stand (their thinking
+##     stunned for good, no town records so none is despawned). --which=fire|well|talk|stall for
+##     one group; all four in turn without it.
 
 const NAME := "clip"
+## The folk scenario's people: [cell, face cell, word, seat slot ("" for none), group].
+const FOLK := [
+	[Vector2i(18, 16), Vector2i(18, 17), "sit", "prop.bench", "fire"],
+	[Vector2i(17, 17), Vector2i(18, 17), "sit_talk", "prop.log_seat", "fire"],
+	[Vector2i(19, 16), Vector2i(18, 17), "sit_listen", "prop.bench", "fire"],
+	[Vector2i(25, 12), Vector2i(25, 13), "lean", "", "well"],
+	[Vector2i(25, 14), Vector2i(25, 13), "lean", "", "well"],
+	[Vector2i(12, 14), Vector2i(13, 14), "talk", "", "talk"],
+	[Vector2i(13, 14), Vector2i(12, 14), "listen", "", "talk"],
+	[Vector2i(26, 20), Vector2i(26, 21), "tend", "", "stall"],
+]
+## The folk room's size in cells (its border wall included): the groups well inside it, so the camera
+## behind them stands on open ground, not in the trees round it.
+const FOLK_ROOM := Vector2i(40, 32)
+const FOLK_FIRE := Vector2i(18, 17)
+const FOLK_WELL := Vector2i(25, 13)
+## The market stall's two cells' left one (its keeper behind it, on the row above; its front +z, south).
+const FOLK_STALL := Vector2i(26, 21)
+## Where the player stands while each group is shown: off to its side, out of the frame (the camera panned
+## onto the group, _process).
+const FOLK_VIEWS := {"fire": Vector2i(12, 20), "well": Vector2i(25, 5), "talk": Vector2i(8, 18), "stall": Vector2i(26, 29)}
+## Each group's camera, [yaw, pitch] in degrees (Client3D's: yaw 0 looks from the south-east, 45 from
+## the east): the leaners at the well's north and south and the keeper behind the stall seen side-on
+## from the east, lower, so the well's roof and the stall's awning hide neither.
+const FOLK_CAMERA := {"fire": [0.0, 50.0], "well": [45.0, 40.0], "talk": [0.0, 50.0], "stall": [45.0, 40.0]}
+const FOLK_CAPTIONS := {"fire": "Round the fire: sat, one talking, one listening.",
+	"well": "At the well, leant on its rim.", "talk": "Two stood talking, turn about.",
+	"stall": "At the stall, a keeper."}
+## Each group's beats, in seconds from the player's arrival: words on, the pair's turn, words off, done
+## (the keeper held longer, for its asides' 6 to 25 s).
+const FOLK_ON_S := 2.0
+const FOLK_TURN_S := 7.0
+const FOLK_OFF_S := 13.0
+const FOLK_DONE_S := 17.0
+const FOLK_LONGER := {"stall": 30.0}
 
 var scenario := "sneak"
+## --which: the folk scenario's one group ("" for all four).
+var _which := ""
+## The folk scenario's bodies, in FOLK's order, and its groups still to show.
+var _folk: Array[Resident] = []
+var _folk_groups: Array[String] = []
+## The tick the player reached the group being shown (-1 while walking there).
+var _folk_from := -1
 var max_seconds := 60.0
 var _elapsed := 0.0
 var _main: Node
@@ -215,6 +266,8 @@ func _ready() -> void:
 			_weapon = pair[1]
 		elif pair.size() == 2 and pair[0] == "foe":
 			_foe = pair[1]
+		elif pair.size() == 2 and pair[0] == "which":
+			_which = pair[1]
 	match scenario:
 		"sneak":
 			_sneak()
@@ -308,6 +361,8 @@ func _ready() -> void:
 			_oldgrey()
 		"draugr", "draugr_walkback":
 			_draugr()
+		"folk":
+			_folk_room()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
@@ -368,6 +423,12 @@ func _ready() -> void:
 	layer.add_child(_caption)
 	if _main._client3d != null:
 		_main._client3d._zoom_to = _main._client3d.ZOOM_MIN if scenario == "steady" else _main._client3d.ZOOM_MAX
+	if scenario == "folk":
+		# The raised camera at its nearest, panned onto the group shown (_process), the player off to its side.
+		_main.pack_panel.shown = false
+		Net.set_camera_low(false, false)  # The raised camera, whatever the runner's settings keep.
+		if _main._client3d != null:
+			_main._client3d._zoom_to = _main._client3d.ZOOM_MIN
 	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _monster is Animal:
@@ -389,6 +450,16 @@ func _process(delta: float) -> void:
 		get_tree().quit(1)
 		return
 	var view: Node = _main._client3d if _main != null else null
+	if scenario == "folk" and view != null and _player != null and not _folk_groups.is_empty():
+		var standing: Node3D = view._puppets.get(_player.get_instance_id())
+		if standing != null:
+			var group := _folk_groups[0]
+			var centre: Vector3 = view._tile_position(_folk_centre(group)) + (Vector3(0.5, 0.0, 0.0) if group == "stall" else Vector3.ZERO)
+			view.pan = view.pan.lerp((centre - standing.position).limit_length(view.PAN_MAX), 1.0 - exp(-2.0 * delta))
+			var turn: Array = FOLK_CAMERA[group]
+			view.yaw = rad_to_deg(lerp_angle(deg_to_rad(view.yaw), deg_to_rad(float(turn[0])), 1.0 - exp(-2.0 * delta)))
+			view.pitch = lerpf(view.pitch, float(turn[1]), 1.0 - exp(-2.0 * delta))
+		return
 	if view == null or _player == null or not is_instance_valid(_monster):
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
@@ -921,6 +992,101 @@ func _steady_reel() -> void:
 	for kind: String in STEADY_KINDS:
 		_script.append(["steady", kind, kind.replace("_", " ") + ": steadied, struck twice, steady_over"])
 	_script.append(["wait", 20, ""])
+
+
+## The folk scenario's ground: open floor, a fire cell (FOLK_FIRE), the player south of it.
+func _folk_room() -> void:
+	var rows: Array[String] = ["#".repeat(FOLK_ROOM.x)]
+	for y in FOLK_ROOM.y - 2:
+		var row := "#" + ".".repeat(FOLK_ROOM.x - 2) + "#"
+		if y + 1 == FOLK_FIRE.y:
+			row = row.substr(0, FOLK_FIRE.x) + "~" + row.substr(FOLK_FIRE.x + 1)
+		rows.append(row)
+	rows.append("#".repeat(FOLK_ROOM.x))
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), {FOLK_VIEWS["fire"]: "start"}, config), null, config)
+	_folk_groups.assign(["fire", "well", "talk", "stall"] if _which.is_empty() else [_which])
+	max_seconds = maxf(max_seconds, 40.0 + FOLK_DONE_S * _folk_groups.size() + float(FOLK_LONGER.get("stall", 0.0)))
+	_script = [["folk", 0, ""], ["wait", 10, ""]]
+
+
+## One tick of the folk scenario; true once every group has been shown.
+func _folk_step(tick: int) -> bool:
+	if _folk.is_empty():
+		_folk_set_up()
+	for i in _folk.size():
+		var body := _folk[i]
+		if is_instance_valid(body):
+			body.stunned_until_tick = 1 << 30  # Held: its own thinking never moves it (World skips a stunned turn).
+			World.face(body, FOLK[i][1] - FOLK[i][0])
+	if _folk_groups.is_empty():
+		return true
+	var group := _folk_groups[0]
+	if _folk_from < 0:
+		_caption.text = ""
+		if _walk(FOLK_VIEWS[group]):
+			World.face(_player, Senses.way_toward(_player.tile, _folk_centre(group)))
+			_folk_from = tick
+		return false
+	var longer := float(FOLK_LONGER.get(group, 0.0))
+	var seconds := float(tick - _folk_from) / World.TICK_RATE
+	var on := seconds >= FOLK_ON_S and seconds < FOLK_OFF_S + longer
+	var turned := seconds >= FOLK_TURN_S
+	_caption.text = FOLK_CAPTIONS[group] if on else ""
+	for i in _folk.size():
+		if FOLK[i][4] != group or not is_instance_valid(_folk[i]):
+			continue
+		var word: String = FOLK[i][2]
+		if turned and word in ["talk", "listen", "sit_talk", "sit_listen"]:
+			word = {"talk": "listen", "listen": "talk", "sit_talk": "sit_listen", "sit_listen": "sit_talk"}[word]
+		var now := word if on else ""
+		if _folk[i].activity != now:
+			_folk[i].activity = now
+			print("[clip] tick %d: %s %s" % [tick, _folk[i].name, now if not now.is_empty() else "(none)"])
+	if seconds >= FOLK_DONE_S + longer:
+		_folk_groups.remove_at(0)
+		_folk_from = -1
+	return false
+
+
+## The middle a group's folk face: the fire, the well, or between the pair.
+func _folk_centre(group: String) -> Vector2i:
+	match group:
+		"fire":
+			return FOLK_FIRE
+		"well":
+			return FOLK_WELL
+		"stall":
+			return FOLK_STALL
+	return FOLK[5][0]  # The talking pair's first.
+
+
+## The folk, their seats and the well: the bodies spawned held, the rest the client's only.
+func _folk_set_up() -> void:
+	World.towns = null  # No town records: Main's resident sync (which despawns a body no town wants) stays out.
+	for i in FOLK.size():
+		var spot: Array = FOLK[i]
+		var body := _main._spawn({"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_folk_%d" % i,
+			"label": "Folk %d" % i, "tile": spot[0]}) as Resident
+		body.stunned_until_tick = 1 << 30
+		World.face(body, spot[1] - spot[0])
+		_folk.append(body)
+	var view: Node3D = _main._client3d
+	if view == null:
+		return
+	var props: Array = [["building.well", FOLK_WELL, Vector2i(0, 1)]]
+	for spot: Array in FOLK:
+		if not str(spot[3]).is_empty():
+			props.append([spot[3], spot[0], spot[1] - spot[0]])
+	for prop: Array in props:
+		var piece := ArtKit.instance(prop[0])
+		var way := Vector2(prop[2])
+		piece.position = view._tile_position(prop[1])
+		piece.rotation.y = atan2(way.x, way.y)  # Its depth (z) along the facing; a seat's long side across it.
+		view.add_child(piece)
+	var stall := ArtKit.instance("prop.market_stall")
+	stall.position = view._tile_position(FOLK_STALL) + Vector3(0.5, 0.0, 0.0)  # Its middle between its two cells.
+	view.add_child(stall)
 
 
 func _hillcat() -> void:
@@ -2306,6 +2472,9 @@ func _on_tick(tick: int) -> void:
 		"grey_fight":
 			if not _grey_step():
 				return
+		"folk":
+			if not _folk_step(tick):
+				return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -2361,6 +2530,11 @@ func _nearest_standing() -> Monster:
 
 
 func _log(tick: int) -> void:
+	if scenario == "folk":
+		if tick % 30 == 0:
+			print("[clip] tick %d: player %s; folk %s" % [tick, _player.tile, _folk.map(func(b: Resident) -> String:
+				return "%s at %s %s" % [b.tile, b.facing, b.activity] if is_instance_valid(b) else "gone")])
+		return
 	if scenario in ["pack", "raid", "wild", "boar"]:
 		var each: Array[String] = []
 		for entity in World.monsters():

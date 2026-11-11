@@ -948,6 +948,53 @@ CLIPS["Herd_Loop"] = {"loop": True, "keys": [
 	(2.0, P("Idle_Loop", 2.0, LEANED + [("Head", TURN, -14.0), ("Head", LIFT, -4.0)])),
 	(4.0, P("Idle_Loop", 0.0, LEANED + [("Head", TURN, 18.0)])),
 ]}
+# Leaning at the well (Umbrage's townsfolk, npc's "lean" spots; the coordinator's Umbrage focus,
+# Jeff: "townspeople frozen"): facing the well from the next cell, the forearms laid across its
+# coping (the town well's top 0.82 m up, its ring's outside 0.3 m before the feet), the wrists
+# LEAN_RIM ahead of the pelvis and LEAN_UP above it, the hands crossed one over the other, the
+# elbows out; the trunk leant in over them, the weight on the left leg, the right knee easy; the
+# head looking slowly about the square.
+LEAN_RIM = 0.46
+LEAN_UP = -0.02
+LEANT_IN = [("upperarm_l", ([("pelvis", (0.07, -LEAN_RIM, LEAN_UP), 1.0)], (1.0, -0.3, -0.2)), REACH),
+	("upperarm_r", ([("pelvis", (-0.06, -LEAN_RIM + 0.02, LEAN_UP + 0.03), 1.0)], (-1.0, -0.3, -0.2)), REACH),
+	("hand_l", Vector((-1.0, -0.25, -0.1)), AIM), ("hand_r", Vector((1.0, -0.25, 0.0)), AIM),
+	("spine_01", LIFT, -18.0), ("spine_02", LIFT, -12.0), ("spine_03", LIFT, -4.0), ("Head", LIFT, 16.0),
+	("thigh_r", LIFT, 14.0), ("calf_r", LIFT, -24.0)]
+CLIPS["Lean_Rail_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, LEANT_IN + [("Head", TURN, 10.0)], move=(0.0, 0.03, 0.0))),
+	(2.2, P("Idle_Loop", 1.1, LEANT_IN + [("Head", TURN, -18.0), ("spine_02", LIFT, -2.0)], move=(0.0, 0.03, 0.0))),
+	(4.4, P("Idle_Loop", 0.0, LEANT_IN + [("Head", TURN, 10.0)], move=(0.0, 0.03, 0.0))),
+]}
+# The keeper at a market stall (566 amended (2), npc's "tend"; art-kit's stall top 0.88 m, its back
+# edge 0.4 m before the keeper's feet): the UAL's counter clips are a bar's (their wrists 1.08 m up,
+# the Mughouse's bar top 1.06), so the stall's are the same clips bent over it, every frame of the
+# stock clip with the trunk let forward from the hips and the head brought back up to look out
+# over the stall, which brings the far (left) hand down onto the top; the near (right) hand, close
+# in by the hip where the bend hardly moves it, let down COUNTER_RIGHT_DOWN from wherever the clip
+# has it (its show and its give kept), so the resting wrists lie at 0.92 m over the 0.88 top and
+# the give's lowest over it at 0.89; the share eased in over the step up (Counter_Enter) and out
+# over the step back (Counter_Exit), as the stock clips come to the counter and leave it.
+COUNTER_BEND = [("spine_01", LIFT, -11.0), ("spine_02", LIFT, -8.0), ("spine_03", LIFT, -3.0),
+	("neck_01", LIFT, 9.0), ("Head", LIFT, 8.0)]
+COUNTER_RIGHT_DOWN = 0.13
+def bent_over(base: str, length: float, ease: str = "") -> list:
+	"""[base] (a UAL counter clip, [length] seconds) a key a frame with COUNTER_BEND; its share 1
+	throughout, or eased "in" from 0 or "out" to 0 over the clip."""
+	frames = round(length * FPS)
+	keys = []
+	for f in range(frames + 1):
+		t = min(f / FPS, length)
+		share = 1.0 if ease == "" else (t / length if ease == "in" else 1.0 - t / length)
+		share = share * share * (3.0 - 2.0 * share)
+		right = ("upperarm_r", ([("hand_r", (0.0, 0.0, -COUNTER_RIGHT_DOWN * share), 1.0)], (-1.0, -0.3, -0.2)), REACH)
+		keys.append((t, P(base, t, [(bone, axis, degrees * share) for bone, axis, degrees in COUNTER_BEND] + [right])))
+	return keys
+CLIPS["Counter_Low_Idle_Loop"] = {"loop": True, "keys": bent_over("Counter_Idle_Loop", 2.6667)}
+CLIPS["Counter_Low_Show"] = {"keys": bent_over("Counter_Show", 4.6667)}
+CLIPS["Counter_Low_Give"] = {"keys": bent_over("Counter_Give", 4.3667)}
+CLIPS["Counter_Low_Enter"] = {"keys": bent_over("Counter_Enter", 1.1667, "in")}
+CLIPS["Counter_Low_Exit"] = {"keys": bent_over("Counter_Exit", 1.1667, "out")}
 # Carrying game: a doe across the shoulders (art-kit's carry.game on the "shoulder" socket), both
 # hands up before the upper chest holding its feet, the head a little forward under it (the upper
 # layer, so it walks).

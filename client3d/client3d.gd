@@ -1427,6 +1427,15 @@ const CLIP_SIT_DOWN := "GroundSit_Enter"
 const CLIP_SLEEP_UP := "Sleep_Up"
 const CLIP_SITTING := "GroundSit_Idle"
 const CLIP_SIT_UP := "GroundSit_Exit"
+## Sat on a seat (an ACTIVITIES "seat": npc's "sit" spots, Umbrage's townsfolk on a bench, a fire's
+## log, the Mughouse's): the UAL's chair sit, its seat 0.46 m up (maps lays 0.45 m seats), sat down
+## onto once (SEAT_DOWN), the work's clip looped, got up from when the work ends (SEAT_UP). Its hips
+## come down SEAT_TOWARD behind its feet, so the body is drawn that far ahead of its cell (_lay),
+## eased in over SEAT_EASE as it sits and out again after it stands, its hips over the seat there.
+const SEAT_DOWN := "Sitting_Enter"
+const SEAT_UP := "Sitting_Exit"
+const SEAT_TOWARD := 0.245
+const SEAT_EASE := 0.5
 const FIDGET_SECONDS_MIN := 6.0
 const FIDGET_SECONDS_MAX := 25.0
 const FIDGET_CALM_SECONDS := 4.0
@@ -22878,6 +22887,27 @@ const ACTIVITIES := {
 	"hoe": {"upper": "Hoe", "right": "tool.hoe", "grip": 0.75},
 	"herd": {"clip": "Herd", "right": "tool.crook"},
 	"shear": {"clip": "Fixing_Kneeling", "right": "tool.shears"},
+	# Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus,
+	# Jeff: "townspeople frozen"): sat on a seat (SEAT_DOWN; each body one of the sit's idles,
+	# _work_clip), sat talking or listening (npc's pair taking turns), leant on the well's rim
+	# (humanoid_clips' Lean_Rail_Loop), and stood talking or listening. A sit lasts 2 to 4
+	# minutes and a stand 45 to 120 seconds (npc's), many times the 1.7 to 4.2 s loops: now and
+	# then (_work_aside) the sat take another of the sitting idles once through, the sat talker or
+	# listener pauses in one, and the stood shift their weight or look about.
+	"sit": {"clips": ["Sitting_Idle", "Sitting_Idle02", "Sitting_Idle03"], "seat": true,
+		"asides": ["Sitting_Idle", "Sitting_Idle02", "Sitting_Idle03"]},
+	"sit_talk": {"clip": "Sitting_Talking", "seat": true, "asides": ["Sitting_Idle02", "Sitting_Idle03"]},
+	"sit_listen": {"clip": "Sitting_Nodding", "seat": true, "asides": ["Sitting_Idle", "Sitting_Idle02"]},
+	"lean": {"clip": "Lean_Rail"},
+	"talk": {"clip": "Idle_Talking", "asides": ["Fidget_Shift", "Fidget_Shoulders"]},
+	"listen": {"clip": "Idle", "asides": ["Fidget_Shift", "Fidget_LookBack", "Idle_LookAround"]},
+	# A keeper at a market stall (npc's "tend": merchant, keeper; the spot on the stall's back cell,
+	# facing it): stepped up to it (_work_enter), its hands on the stall's 0.88 m top, now and then
+	# showing a ware or handing one over (_work_aside), stepped back from it as the work ends; the
+	# UAL's counter clips bent over to a stall's height (humanoid_clips' Counter_Low_*: the stock
+	# ones are a bar's, 1.06 m, for the Mughouse's taverner when its counter is laid).
+	"tend": {"clip": "Counter_Low_Idle", "enter": "Counter_Low_Enter", "exit": "Counter_Low_Exit",
+		"asides": ["Counter_Low_Show", "Counter_Low_Give"]},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
@@ -23321,6 +23351,10 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 	if work.has("toward") and float(puppet.get_meta("speed", 0.0)) <= WALKING:
 		# Leant in to its work (the bandage kneel), only while it is still: walking, as it stands.
 		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * float(work["toward"]) * float(puppet.get_meta("model_scale", 1.0))
+	var seated := _seated_share(puppet, Time.get_ticks_msec())
+	if seated > 0.0:
+		# Sat (or sitting down, or got up): its hips over the seat under its cell (SEAT_TOWARD).
+		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * SEAT_TOWARD * seated * float(puppet.get_meta("model_scale", 1.0))
 	if lying:
 		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
 		offset = -ahead * (SLEEP_MIDDLE if work.has("down") else LIE_MIDDLE) * float(puppet.get_meta("model_scale", 1.0))
@@ -23613,7 +23647,12 @@ func _animate(puppet: Node3D) -> void:
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	var crouched: bool = puppet.get_meta("crouched", false) and rig.has(CLIP_CROUCH)
-	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm or work.has("clip") or crouched):
+	var aside := str(puppet.get_meta("aside_of", ""))
+	if aside != "" and (aside != str(puppet.get_meta("work", "")) or speed > WALKING or not calm):
+		puppet.set_meta("aside_of", "")  # A work's aside (its show, its give) goes with the work.
+		puppet.set_meta("fidgeting", false)
+		puppet.set_meta("busy_until", 0)
+	elif aside == "" and puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm or _work_clip(puppet, work) != "" or crouched):
 		# A fidget (or sitting down, or getting up) is no reason to stand
 		# still, nor to put off a work begun (a bandage's kneel, items' (3)):
 		# it goes.
@@ -23621,6 +23660,11 @@ func _animate(puppet: Node3D) -> void:
 		puppet.set_meta("busy_until", 0)
 	if speed > WALKING and puppet.get_meta("seated", false):
 		puppet.set_meta("seated", false)
+		puppet.set_meta("busy_until", 0)
+	if speed > WALKING and now < int(puppet.get_meta("unseat_until", 0)):
+		# Walked off while getting up from a seat or stepping back from a counter (_seat, _work_enter):
+		# it goes, before the busy wait below would slide it along in the pose.
+		puppet.set_meta("unseat_until", now)
 		puppet.set_meta("busy_until", 0)
 	# A strike while it steps ("blows you can see", 2): the legs walk its gait under the blow,
 	# faded in and out over LEGS_FADE, so a step taken in a strike is not slid in its pose.
@@ -23652,6 +23696,10 @@ func _animate(puppet: Node3D) -> void:
 			return
 	if _lying_down(puppet, rig, work, speed, now, tempo):
 		return
+	if _seat(puppet, rig, work, speed, now, tempo):
+		return
+	if _work_enter(puppet, rig, work, speed, now, tempo):
+		return
 	if crouched:
 		# Crouched (784 amended (2)): it creeps when it moves, at the creep's stride, else crouches.
 		if speed > WALKING and rig.has(CLIP_CREEP):
@@ -23674,9 +23722,12 @@ func _animate(puppet: Node3D) -> void:
 			return
 	elif puppet.has_meta("fish_state"):
 		puppet.remove_meta("fish_state")  # Reeled in: the next cast is cast again.
-	if speed <= WALKING and work.has("clip") and rig.has(str(work["clip"])):
-		# At its work (566): the work's clip, looped.
-		rig.loop(str(work["clip"]), tempo)
+	var at_work := _work_clip(puppet, work)
+	if speed <= WALKING and at_work != "" and rig.has(at_work):
+		# At its work (566): the work's clip, looped; now and then one of its asides (a keeper's show).
+		if _work_aside(puppet, rig, work, now, tempo):
+			return
+		rig.loop(at_work, tempo)
 		return
 	if now < int(puppet.get_meta("shuffle_until", 0)) and rig.has(CLIP_WALK):
 		# Turning where it stands (_standing_turn): its feet shuffle round.
@@ -23712,6 +23763,104 @@ func _gait(puppet: Node3D, rig: AnimRig, speed: float) -> void:
 	var gaits := paced(puppet.get_meta("gaits", GAITS))
 	var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 	rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+
+
+## [param work]'s clip for [param puppet]: its "clip", else one of its "clips" by the body
+## (each the same every time it is seen, its neighbour likely another); "" for none.
+static func _work_clip(puppet: Node3D, work: Dictionary) -> String:
+	if work.has("clip"):
+		return str(work["clip"])
+	var clips: Array = work.get("clips", [])
+	if clips.is_empty():
+		return ""
+	return str(clips[absi(int(puppet.get_meta("entity_id", 0))) % clips.size()])
+
+
+## A work on a seat (its "seat": npc's "sit" spots) is sat down to once (SEAT_DOWN), its clip
+## looped after; ended, its body gets up (SEAT_UP), cut short if it walks off first. A body first
+## seen at it is already sat. True while one of them plays this frame.
+func _seat(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, now: int, tempo: float) -> bool:
+	if not puppet.has_meta("sat"):
+		puppet.set_meta("sat", work.has("seat"))
+		puppet.set_meta("seat_at", now - int(SEAT_EASE * 1000.0) if work.has("seat") else 0)
+		return false
+	var sat: bool = puppet.get_meta("sat")
+	if work.has("seat") and not sat and speed <= WALKING and rig.has(SEAT_DOWN):
+		puppet.set_meta("sat", true)
+		puppet.set_meta("seat_at", now)
+		puppet.set_meta("busy_until", now + int(rig.once(SEAT_DOWN, tempo) * 1000.0))
+		return true
+	if sat and not work.has("seat"):
+		puppet.set_meta("sat", false)
+		if rig.has(SEAT_UP) and speed <= WALKING:
+			var until := now + int(rig.once(SEAT_UP, tempo) * 1000.0)
+			puppet.set_meta("busy_until", until)
+			puppet.set_meta("unseat_until", until)
+			return true
+		puppet.set_meta("unseat_until", now)
+	if speed > WALKING and now < int(puppet.get_meta("unseat_until", 0)):
+		puppet.set_meta("unseat_until", now)  # Walked off while getting up: it goes.
+		puppet.set_meta("busy_until", 0)
+	return false
+
+
+## A work stepped up to (its "enter": a keeper at its counter) plays that once as it begins, once
+## stood, and its "exit" once as it ends, cut short if it walks off (_animate's "unseat_until"). A
+## body first seen at it is already there. True while one of them plays this frame.
+func _work_enter(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, now: int, tempo: float) -> bool:
+	var word := str(puppet.get_meta("work", ""))
+	if not puppet.has_meta("entered"):
+		puppet.set_meta("entered", word if work.has("enter") else "")
+		return false
+	var entered := str(puppet.get_meta("entered"))
+	if entered == word:
+		return false
+	if not entered.is_empty():
+		puppet.set_meta("entered", "")
+		var exit := str(ACTIVITIES.get(entered, {}).get("exit", ""))
+		if exit != "" and rig.has(exit) and speed <= WALKING:
+			var until := now + int(rig.once(exit, tempo) * 1000.0)
+			puppet.set_meta("busy_until", until)
+			puppet.set_meta("unseat_until", until)
+			return true
+	if work.has("enter") and speed <= WALKING and rig.has(str(work["enter"])):
+		puppet.set_meta("entered", word)
+		puppet.set_meta("busy_until", now + int(rig.once(str(work["enter"]), tempo) * 1000.0))
+		return true
+	return false
+
+
+## At a work with "asides" (a keeper's show and give, a sitter's other idles), one of them now and
+## then, every FIDGET_SECONDS_MIN to MAX by its fidget_rng, never the one before nor the body's own
+## clip at the work; true as one starts.
+func _work_aside(puppet: Node3D, rig: AnimRig, work: Dictionary, now: int, tempo: float) -> bool:
+	var asides: Array = work.get("asides", [])
+	if asides.is_empty() or not puppet.has_meta("rng"):
+		return false
+	var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng"))
+	if not puppet.has_meta("aside_at"):
+		puppet.set_meta("aside_at", now + int(rng.randf_range(2.0, FIDGET_SECONDS_MAX) * 1000.0))
+	if now < int(puppet.get_meta("aside_at")):
+		return false
+	puppet.set_meta("aside_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
+	var choices: Array = asides.filter(func(clip: String) -> bool:
+		return rig.has(clip) and clip != _work_clip(puppet, work) and (asides.size() == 1 or clip != str(puppet.get_meta("aside_clip", ""))))
+	if choices.is_empty():
+		return false
+	var clip: String = choices[rng.randi_range(0, choices.size() - 1)]
+	puppet.set_meta("aside_clip", clip)
+	_play_fidget(puppet, rig, clip, now, tempo)
+	puppet.set_meta("aside_of", str(puppet.get_meta("work", "")))
+	return true
+
+
+## How far [param puppet] is drawn toward its seat's place (0 to 1): eased in over SEAT_EASE as
+## it sits (_seat's "seat_at"), held while sat and while it gets up, eased out after.
+static func _seated_share(puppet: Node3D, now: int) -> float:
+	if bool(puppet.get_meta("sat", false)):
+		return clampf((now - int(puppet.get_meta("seat_at", 0))) / (SEAT_EASE * 1000.0), 0.0, 1.0)
+	var since := now - int(puppet.get_meta("unseat_until", -(1 << 40)))
+	return clampf(1.0 - since / (SEAT_EASE * 1000.0), 0.0, 1.0)
 
 
 ## A work lain down to (its "down", 751: a sleeper) is lain down to once, its

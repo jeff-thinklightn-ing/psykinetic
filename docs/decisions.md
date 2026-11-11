@@ -29877,6 +29877,58 @@ view_test _test_visible_work: each word its clip (or upper clip) and pieces. ani
 among the tool clips once tool.hoe is in (nothing inside the body, five builds; the left hand on
 the haft by its butt; the blade's lowest above 0.15 m). Client only, protocol unchanged, no new
 class_name.
+## 566 amended (2), animation's side: townsfolk at their spots
+
+Jeff, 2026-11-10: "townspeople frozen staring at the wall all day". npc reproduced it (all 13 of
+Umbrage's residents in the stand for hours a day) and gives each place spots (npc's spots contract:
+level.json "spots", a use, a cell, a face and a pose), setting Resident.activity on arrival; this is
+the body each word draws (the coordinator's Umbrage focus; npc's order: sit, lean, then the works;
+the coordinator approved from the folk reel's stills, 2026-11-11).
+Client3D.ACTIVITIES gains "sit" (the UAL's chair sit: one of Sitting_Idle, Sitting_Idle02 and
+Sitting_Idle03 per body, by its id, _work_clip's "clips"), "sit_talk" (Sitting_Talking),
+"sit_listen" (Sitting_Nodding), "lean" (Lean_Rail, below), "talk" (Idle_Talking) and "listen" (the
+idle); a pair's turns are npc's, swapped by the sim, one word one clip. A work with "seat" is sat
+down onto once (Client3D._seat: SEAT_DOWN, Sitting_Enter), its clip looped, and got up from when
+the word ends (SEAT_UP, Sitting_Exit), cut short if it walks off first (checked in _animate ahead
+of the busy wait, which would otherwise slide it along in the pose; npc's 853 holds a body on its
+cell for the get-up's 11 ticks, 12 after "tend", Resident.GET_UP, so the cut is only a fallback);
+a body first seen sat is already down, and a talk and listen turn keeps it sat. The sit's seat is 0.46 m up (every sit
+spot's seat is 0.45 m: prop.bench, the temple's pews, prop.log_seat raised to match) with its hips
+SEAT_TOWARD (0.245 m) behind its feet, so _lay draws the body that far toward its face cell,
+eased in over SEAT_EASE (0.5 s) as it sits and out after it stands (_seated_share), its hips over
+the seat on its cell. tools/humanoid_clips.py's Lean_Rail_Loop (4.4 s): facing the well from the
+next cell, the forearms across the coping (the town well's top 0.82 m up, its ring 0.3 m before
+the feet), the hands crossed, the elbows out, the trunk leant in, the weight on the left leg, the
+head looking slowly about. "tend" (npc's slice 2: a merchant or keeper at a market stall, its spot
+the stall's back cell facing it): a work's "enter" is played once as it begins and its "exit" as it
+ends (Client3D._work_enter, cut short walking off as the sit's get-up is), here Counter_Low_Enter
+and Counter_Low_Exit, its clip Counter_Low_Idle between. The UAL's counter clips are a bar's (their
+wrists 1.08 m up; the Mughouse's bar top is 1.06), so humanoid_clips' bent_over() makes the
+stall's (art-kit's top 0.88 m, its back edge 0.4 m before the keeper's feet): every frame of the
+stock clip with the trunk let forward (COUNTER_BEND) and the near hand, close by the hip where the
+bend hardly moves it, let down COUNTER_RIGHT_DOWN (0.13 m) from wherever the clip has it, so its
+wrists rest at 0.92 m and its give's lowest over the top is 0.89; eased in and out over the step
+up and back. The stock ones wait for the Mughouse's taverner (a "tend_bar" drawn 0.2 m in, once
+its counter is laid and the draw eases rather than jumps). A work's "asides" (Client3D._work_aside)
+are played once now and then, every FIDGET_SECONDS_MIN to MAX by the body's fidget_rng, never the
+one before nor its own clip, and go when the word changes or it walks: the keeper's show and give
+(Counter_Low_Show, Counter_Low_Give); and, because npc holds a sit 2 to 4 minutes and a stand 45
+to 120 seconds against loops of 1.7 to 4.2 s (the coordinator's ask), the sitter's other sitting
+idles, a pause in a sitting idle for the sat talker and listener, and Fidget_Shift, Fidget_Shoulders,
+Fidget_LookBack or Idle_LookAround for the stood pair, so no fourth sitting clip is needed. The
+stock clips (Sitting_*) and the stall's (from build/ual/counter.glb) are taken into goblin.res by
+tools/extract_clips.gd. tools/clip.gd's "folk" scenario (--which=fire|well|talk|stall) shows each
+group taking and losing its words in a test room, the raised camera panned and turned onto each
+(the seats, the well and the stall the client's only, the folk held by a stun, no town records so
+Main despawns none); the reel C:/dev/review/folk5. view_test _test_townsfolk_spots: each word's
+clips in the library, the sit's flow (sat down onto, first seen sat, turns kept sat, got up, cut
+short walking off), the drawn place, each body one of the idles, the sit's hips at a seat's height
+that far behind its feet, the lean's wrists on the coping before it, the keeper's step up (first
+seen there, already there) and back, its asides never twice running, the long sit's asides never
+its own idle and seated (the stood pair's standing), and the keeper's wrists on the stall's top. A
+word the sim doesn't set draws nothing new. Client and art only, protocol unchanged, no new
+class_name.
+
 ## 543 amended, ui's side. The held walk pauses while the server holds three steps
 
 Found in 655 amended's clip pair (2026-10-24): the player's own body slid 3

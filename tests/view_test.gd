@@ -162,6 +162,7 @@ func _ready() -> void:
 		_test_visible_work()
 		_test_head_socket()
 		_test_sleeper()
+		_test_townsfolk_spots()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
 		await _test_shield_seen()
@@ -10899,6 +10900,176 @@ func _test_sleeper() -> void:
 	_check(is_zero_approx(model.rotation.y) and body.position == Vector3.ZERO, "stood: as it stands (%s)" % body.position)
 	puppet.free()
 	_test_sleeper_posture()
+
+
+## Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus, Jeff:
+## "townspeople frozen"): each spot's word has its clips; "sit" sits down onto the seat once
+## (SEAT_DOWN), each body one of the sit's idles, already sat when first seen, the talk and listen
+## turns kept sat, and gets up (SEAT_UP) when the word ends, cut short if it walks off; the body
+## eased SEAT_TOWARD ahead of its cell and back; the sit's hips at a seat's height that far
+## behind its feet, and the lean's forearms on the well's coping before it.
+func _test_townsfolk_spots() -> void:
+	print("
+== townsfolk at their spots: sat on a seat, leant on the well, talking and listening ==")
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var missing: Array[String] = []
+	for word: String in ["sit", "sit_talk", "sit_listen", "lean", "talk", "listen", "tend"]:
+		var spot: Dictionary = Client3D.ACTIVITIES.get(word, {})
+		var clips: Array = spot.get("clips", [spot.get("clip", "")]) + spot.get("asides", [])
+		for key: String in ["enter", "exit"]:
+			if spot.has(key):
+				clips.append(spot[key])
+		for clip: String in clips:
+			if not lib.has_animation(clip):
+				missing.append("%s: %s" % [word, clip])
+	for clip: String in [Client3D.SEAT_DOWN, Client3D.SEAT_UP]:
+		if not lib.has_animation(clip):
+			missing.append(clip)
+	_check(missing.is_empty(), "each spot's word has its clips (missing: %s)" % [missing])
+	_check(["sit", "sit_talk", "sit_listen"].all(func(w: String) -> bool: return bool(Client3D.ACTIVITIES[w].get("seat", false)))
+			and ["lean", "talk", "listen"].all(func(w: String) -> bool: return not Client3D.ACTIVITIES[w].has("seat")),
+			"sat words on a seat, the lean and the stood talk not")
+	var puppet := Node3D.new()
+	var body := Node3D.new()
+	body.name = "Body"
+	puppet.add_child(body)
+	var model := (load(Client3D.HUMAN["scene"]) as PackedScene).instantiate() as Node3D
+	model.name = "Model"
+	body.add_child(model)
+	add_child(puppet)
+	puppet.set_meta("faces", 0.0)
+	puppet.set_meta("entity_id", 7)
+	var rig := AnimRig.make(model, lib, 0.0, true, null)
+	rig.loop("Idle", 0.0)
+	var sit: Dictionary = Client3D.ACTIVITIES["sit"]
+	var now := Time.get_ticks_msec()
+	var first := _rig._seat(puppet, rig, sit, 0.0, now, 1.0)
+	_check(not first and bool(puppet.get_meta("sat")) and is_equal_approx(Client3D._seated_share(puppet, now), 1.0),
+			"first seen sat: already down, its hips over the seat")
+	puppet.set_meta("sat", false)
+	var down := _rig._seat(puppet, rig, sit, 0.0, now, 1.0)
+	var ease_ms := int(Client3D.SEAT_EASE * 1000.0)
+	_check(down and rig.base_clip() == Client3D.SEAT_DOWN and is_zero_approx(Client3D._seated_share(puppet, now))
+			and is_equal_approx(Client3D._seated_share(puppet, now + ease_ms), 1.0),
+			"come to its seat: sits down onto it, drawn toward it over the ease (%s)" % rig.base_clip())
+	puppet.set_meta("work", "sit")
+	puppet.set_meta("seat_at", Time.get_ticks_msec() - ease_ms - 50)
+	_rig._lay(puppet, body, 0.0)
+	_check(body.position.distance_to(Vector3(Client3D.SEAT_TOWARD, 0.0, 0.0)) < 0.001,
+			"sat: drawn %.3f ahead of its cell, its hips over the seat (%s)" % [Client3D.SEAT_TOWARD, body.position])
+	var idles := {}
+	for id in 3:
+		puppet.set_meta("entity_id", id)
+		idles[Client3D._work_clip(puppet, sit)] = true
+	puppet.set_meta("entity_id", 7)
+	_check(idles.size() == 3 and idles.keys().all(func(c: String) -> bool: return c in sit["clips"]),
+			"each body one of the sit's idles, neighbours apart (%s)" % [idles.keys()])
+	var turned := not _rig._seat(puppet, rig, Client3D.ACTIVITIES["sit_talk"], 0.0, now, 1.0) \
+			and not _rig._seat(puppet, rig, Client3D.ACTIVITIES["sit_listen"], 0.0, now, 1.0) and bool(puppet.get_meta("sat"))
+	_check(turned, "talking and listening in turn on the seat: still sat, not sat down again")
+	var up := _rig._seat(puppet, rig, {}, 0.0, now, 1.0)
+	var until := int(puppet.get_meta("unseat_until", 0))
+	_check(up and rig.base_clip() == Client3D.SEAT_UP and until > now and is_equal_approx(Client3D._seated_share(puppet, now), 1.0)
+			and is_zero_approx(Client3D._seated_share(puppet, until + ease_ms)),
+			"its word ended: gets up, held over the seat till it stands, then eased back (%s)" % rig.base_clip())
+	puppet.set_meta("sat", true)
+	_rig._seat(puppet, rig, {}, 0.0, now, 1.0)
+	_rig._seat(puppet, rig, {}, 2.0, now + 100, 1.0)
+	_check(int(puppet.get_meta("unseat_until")) == now + 100 and int(puppet.get_meta("busy_until")) == 0,
+			"walked off while getting up: the getting up goes")
+	# Where the clips put it: the sit's hips at a seat's height behind its feet; the lean's wrists on
+	# the coping (the town well's 0.82 m) before it. Measured against the idle's hips (the UAL's
+	# 0.88 m), as the body is scaled.
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var at := func(clip: String, seconds: float, bone: String) -> Vector3:
+		rig.base_at(clip, seconds)
+		rig.tree.advance(0.0)
+		return skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone)).origin
+	var front := skeleton.global_basis.z.normalized()
+	var hips: Vector3 = at.call("Idle", 0.0, "Hips")
+	var feet: Vector3 = (at.call("Idle", 0.0, "LeftFoot") + at.call("Idle", 0.0, "RightFoot")) / 2.0
+	var sized := hips.y / 0.877
+	var sat_hips: Vector3 = at.call("Sitting_Idle", 0.5, "Hips")
+	var back := (feet - sat_hips).dot(front) / sized
+	_check(absf(sat_hips.y / sized - 0.54) < 0.04 and absf(back - Client3D.SEAT_TOWARD) < 0.06,
+			"sat: its hips %.2f up (a 0.45 m seat's), %.2f behind its feet (SEAT_TOWARD %.3f)" % [sat_hips.y / sized, back, Client3D.SEAT_TOWARD])
+	var lean_low := 9.0
+	var lean_high := -9.0
+	var reach_least := 9.0
+	var reach_most := -9.0
+	for k in 12:
+		for hand: String in ["LeftHand", "RightHand"]:
+			var wrist: Vector3 = at.call("Lean_Rail", k * lib.get_animation("Lean_Rail").length / 12.0, hand)
+			lean_low = minf(lean_low, wrist.y / sized)
+			lean_high = maxf(lean_high, wrist.y / sized)
+			var ahead := (wrist - feet).dot(front) / sized
+			reach_least = minf(reach_least, ahead)
+			reach_most = maxf(reach_most, ahead)
+	_check(lean_low > 0.82 and lean_high < 0.95 and reach_least > 0.3 and reach_most < 0.6,
+			"leant on the well: its wrists %.2f to %.2f up (the coping 0.82), %.2f to %.2f before its feet (the ring's edge 0.3)"
+			% [lean_low, lean_high, reach_least, reach_most])
+	# The keeper at its counter (tend): stepped up to as the work begins (first seen there, already
+	# there), now and then an aside, never the same twice running, stepped back from as it ends.
+	var tend: Dictionary = Client3D.ACTIVITIES["tend"]
+	now = Time.get_ticks_msec()
+	puppet.set_meta("sat", false)
+	puppet.set_meta("work", "tend")
+	puppet.remove_meta("entered")
+	var seen := not _rig._work_enter(puppet, rig, tend, 0.0, now, 1.0) and str(puppet.get_meta("entered")) == "tend"
+	puppet.set_meta("entered", "")
+	var stepped: bool = _rig._work_enter(puppet, rig, tend, 0.0, now, 1.0) and rig.base_clip() == str(tend["enter"])
+	var held := not _rig._work_enter(puppet, rig, tend, 0.0, now, 1.0)
+	_check(seen and stepped and held, "the keeper: first seen at its counter already there, else steps up to it once (%s)" % rig.base_clip())
+	puppet.set_meta("rng", RandomNumberGenerator.new())
+	puppet.set_meta("aside_at", now - 1)
+	var first_aside := _rig._work_aside(puppet, rig, tend, now, 1.0)
+	var shown := rig.base_clip()
+	puppet.set_meta("aside_at", now - 1)
+	var second_aside := _rig._work_aside(puppet, rig, tend, now, 1.0)
+	_check(first_aside and second_aside and shown in tend["asides"] and rig.base_clip() in tend["asides"] and rig.base_clip() != shown
+			and str(puppet.get_meta("aside_of")) == "tend" and int(puppet.get_meta("aside_at")) > now,
+			"now and then shows or hands over a ware, never the same twice running (%s, %s)" % [shown, rig.base_clip()])
+	# A long sit (npc's 2 to 4 minutes) or stand: now and then a sitter takes another of the sitting
+	# idles once through, never its own; the sat talker and listener pause in one; the stood shift or
+	# look about, never a sitting clip.
+	puppet.set_meta("work", "sit")
+	puppet.remove_meta("aside_clip")
+	var own := Client3D._work_clip(puppet, Client3D.ACTIVITIES["sit"])
+	var taken := {}
+	for k in 8:
+		puppet.set_meta("aside_at", now - 1)
+		if _rig._work_aside(puppet, rig, Client3D.ACTIVITIES["sit"], now, 1.0):
+			taken[rig.base_clip()] = true
+	var seated_ok := ["sit", "sit_talk", "sit_listen"].all(func(w: String) -> bool:
+		return (Client3D.ACTIVITIES[w].get("asides", []) as Array).all(func(c: String) -> bool: return c.begins_with("Sitting_")))
+	var stood_ok := ["talk", "listen"].all(func(w: String) -> bool:
+		var asides: Array = Client3D.ACTIVITIES[w].get("asides", [])
+		return not asides.is_empty() and asides.all(func(c: String) -> bool: return not c.begins_with("Sitting_")))
+	_check(taken.size() == 2 and not taken.has(own) and seated_ok and stood_ok,
+			"a long sit: the other sitting idles now and then, never its own (%s; took %s); sat asides seated, stood ones standing"
+			% [own, taken.keys()])
+	puppet.set_meta("work", "")
+	var stepped_back := _rig._work_enter(puppet, rig, {}, 0.0, now, 1.0)
+	_check(stepped_back and rig.base_clip() == tend["exit"] and int(puppet.get_meta("unseat_until")) > now,
+			"its word ended: steps back from the counter (%s)" % rig.base_clip())
+	# Where its hands rest: the market stall's top 0.88 m, its keeper's edge behind the counter.
+	var low := 9.0
+	var high := -9.0
+	var near := 9.0
+	var far := -9.0
+	var idle_length := lib.get_animation(str(tend["clip"])).length
+	for k in 12:
+		for hand: String in ["LeftHand", "RightHand"]:
+			var wrist: Vector3 = at.call(str(tend["clip"]), k * idle_length / 12.0, hand)
+			low = minf(low, wrist.y / sized)
+			high = maxf(high, wrist.y / sized)
+			var ahead := (wrist - feet).dot(front) / sized
+			near = minf(near, ahead)
+			far = maxf(far, ahead)
+	_check(low > 0.89 and high < 0.95 and near > 0.4 and far < 1.5,
+			"the keeper's hands on the stall's top: its wrists %.2f to %.2f up (the top 0.88), %.2f to %.2f before its feet (the top from 0.4 to 1.5)"
+			% [low, high, near, far])
+	puppet.free()
 
 
 ## 751 amended (5): a stooped person's posture is off while it lies (it lifted the curl's
