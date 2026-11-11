@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=42 format=3]
+[gd_resource type="Theme" load_steps=43 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -535,6 +535,27 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+; The quest card on the HUD (862, the approved mock C:/dev/review/ui-design/hud): the windows' glass, with
+; a card's smaller margins.
+[sub_resource type="StyleBoxFlat" id="quest_card"]
+content_margin_left = 28.0
+content_margin_top = 16.0
+content_margin_right = 28.0
+content_margin_bottom = 18.0
+bg_color = Color(0.3686, 0.3059, 0.2314, 0.7)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.0314, 0.0235, 0.0157, 0.43)
+shadow_size = 18
+shadow_offset = Vector2(4, 14)
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -766,3 +787,25 @@ TimeChip/base_type = &"PanelContainer"
 TimeChip/styles/panel = SubResource("time_chip")
 WellPicked/base_type = &"PanelContainer"
 WellPicked/styles/panel = SubResource("well_picked")
+QuestCard/base_type = &"PanelContainer"
+QuestCard/styles/panel = SubResource("quest_card")
+QuestColumn/base_type = &"VBoxContainer"
+QuestColumn/constants/separation = 2
+QuestRows/base_type = &"VBoxContainer"
+QuestRows/constants/separation = 0
+QuestItem/base_type = &"HBoxContainer"
+QuestItem/constants/separation = 16
+QuestLine/base_type = &"Label"
+QuestLine/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+QuestLine/font_sizes/font_size = 40
+QuestDone/base_type = &"Label"
+QuestDone/colors/font_color = Color(0.5607843137254902, 0.6588235294117647, 0.3411764705882353, 1)
+QuestDone/font_sizes/font_size = 40
+QuestMore/base_type = &"Label"
+QuestMore/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+QuestMore/font_sizes/font_size = 40
+QuestReturn/base_type = &"Label"
+QuestReturn/colors/font_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+QuestReturn/font_sizes/font_size = 40
+QuestReturn/fonts/font = ExtResource("sans_bold")
+Psykinetic/constants/mark = 28

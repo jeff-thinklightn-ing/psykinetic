@@ -1,5 +1,5 @@
 extends Node
-## The shared parts of the approved look (decision 854; UiRow 860): UiGlass, UiSlot,
+## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862): UiGlass, UiSlot,
 ## UiPrice, UiTabs, UiLine, UiRow each take their theme types, change them by state,
 ## and report what they show. No port: it opens no network; no scratch files.
 
@@ -14,6 +14,7 @@ func _ready() -> void:
 	_test_tabs()
 	_test_line()
 	await _test_row()
+	await _test_quest_card()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -190,3 +191,51 @@ func _test_row() -> void:
 	row._gui_input(click)
 	_check(got == [row] and not row.is_inside_tree(), "a click is reported, even one that takes the row away")
 	await get_tree().process_frame
+
+
+## The quest card's types (862): built as quest_panel builds it, at the mock's cap of
+## four rows (a title, three lines, the return line), it fits the reserved rect, 600 x 316
+## canvas units (C:/dev/review/ui-design/hud); a done line follows the colour set.
+func _test_quest_card() -> void:
+	var card := PanelContainer.new()
+	card.theme_type_variation = &"QuestCard"
+	var column := VBoxContainer.new()
+	column.theme_type_variation = &"QuestColumn"
+	card.add_child(column)
+	var title := Label.new()
+	title.theme_type_variation = &"Heading"
+	title.text = "Clear the crypt"
+	column.add_child(title)
+	var rows := VBoxContainer.new()
+	rows.theme_type_variation = &"QuestRows"
+	column.add_child(rows)
+	for line: Array in [["Brand the Ox", &"QuestDone"], ["Robbers 5/5", &"QuestDone"], ["The fallen knight", &"QuestDone"]]:
+		var item := HBoxContainer.new()
+		item.theme_type_variation = &"QuestItem"
+		var mark := Control.new()
+		mark.custom_minimum_size = Vector2.ONE * UiTheme.constant(&"mark")
+		item.add_child(mark)
+		var label := Label.new()
+		label.theme_type_variation = line[1]
+		label.text = line[0]
+		item.add_child(label)
+		rows.add_child(item)
+	var back := Label.new()
+	back.theme_type_variation = &"QuestReturn"
+	back.text = "Return to the fallen knight."
+	column.add_child(back)
+	add_child(card)
+	await get_tree().process_frame
+	var need := card.get_combined_minimum_size()
+	_check(need.y <= 316.0, "the card at its cap fits its rect's height (%s <= 316)" % need.y)
+	_check(need.x <= 600.0, "and its width (%s <= 600)" % need.x)
+	_check(UiTheme.constant(&"mark") == 28, "a line's mark is 28 units")
+	var done_label: Label = rows.get_child(0).get_child(1)
+	_check(done_label.get_theme_color(&"font_color") == UiTheme.color(&"friend"), "a done line is the friend colour")
+	UiTheme.apply_colours("distinct")
+	_check(UiTheme.theme().get_color(&"font_color", &"QuestDone") == Color(Color.html(UiTheme.COLOUR_SETS["distinct"]["friend"]), 1.0),
+		"a done line follows the distinct colour set")
+	UiTheme.apply_colours("normal")
+	_check(UiTheme.theme().get_color(&"font_color", &"QuestDone") == UiTheme.color(&"friend"), "and back")
+	remove_child(card)
+	card.queue_free()

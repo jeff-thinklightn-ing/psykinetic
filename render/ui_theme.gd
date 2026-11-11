@@ -7,7 +7,8 @@ extends RefCounted
 ## OfferRow, Price, PriceShort; the store window, Jeff's approved mock: Glass,
 ## Subhead, Tab, Well, WellHover, WellPicked, WellNew, WellRefused, PriceChip, TimeChip, ChipPrice,
 ## ChipPriceShort, SquareCount, FootLine, FootLineRefused; a person's asks (UiRow, 860):
-## Row, RowHover, RowRefused, RowWords, RowLine, and their list Rows; its containers Stack,
+## Row, RowHover, RowRefused, RowWords, RowLine, and their list Rows; the HUD's quest card (862):
+## QuestCard, QuestColumn, QuestRows, QuestItem, QuestLine, QuestDone, QuestMore, QuestReturn; its containers Stack,
 ## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
 ## square, square_gap, half_gap) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
@@ -18,14 +19,17 @@ extends RefCounted
 ## brass, brass_bright, rust, alarm, party, aloud, friend, water, outline.
 ## Fonts: serif, serif_bold, sans, sans_bold. Sizes: title, heading, hud,
 ## body, caption, small, speech. Constants: unit, pad, row, section, slot,
-## slot_gap, radius, margin, outline, square, square_gap, half_gap.
+## slot_gap, radius, margin, outline, square, square_gap, half_gap, mark (a quest line's drawn tick or dot).
 
 const PATH := "res://render/ui_theme.tres"
 const TYPE := &"Psykinetic"
 ## The theme types whose font sizes the text scale multiplies (decision 453).
 const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel",
 	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused",
-	&"RowWords", &"RowLine"]
+	&"RowWords", &"RowLine", &"QuestLine", &"QuestDone", &"QuestMore", &"QuestReturn"]
+## Theme types whose font colour is a meaning colour, so a colour set moves them
+## with it (a done quest line is the friend green, or blue in "distinct").
+const MEANING_FONTS := {&"QuestDone": &"friend"}
 ## The meaning colours and their sets: "normal" is the palette's (docs/ui_style.md);
 ## "distinct" keeps brass and rust, and moves the rest apart for red-green
 ## colour blindness (friend blue, party pale cyan, alarm magenta: each a
@@ -140,6 +144,8 @@ static func apply_colours(name: String) -> void:
 	for key: String in set:
 		var was := found.get_color(key, TYPE) if found.has_color(key, TYPE) else Color.WHITE
 		found.set_color(key, TYPE, Color(Color.html(set[key]), was.a))
+	for type: StringName in MEANING_FONTS:
+		found.set_color(&"font_color", type, found.get_color(MEANING_FONTS[type], TYPE))
 
 
 ## A type's stylebox, for a control that draws one by hand: style("panel", "Inset").
