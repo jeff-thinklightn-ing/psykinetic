@@ -79,10 +79,10 @@
 		{
 			"id": "crypt",
 			"type": "place",
-			"name": "the Barrow of the Fallen",
+			"name": "the Crypt of the Fallen",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The Barrow of the Fallen, an ancient burial mound a little outside town: the wealthy town's newer dead on its top floor, a named band of grave robbers within, breaking walls and tombs with the Tomb Sledge to reach the holy relics; joined by a hidden way to the temple's own underground, the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714).",
+			"summary": "The Crypt of the Fallen, dug beneath the temple in Umbrage: the wealthy town's newer dead in its upper crypt, a named band of grave robbers within, who broke in from the wilds and break walls and tombs with the Tomb Sledge to reach the holy relics; below it by a hidden way the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714; the crypt below the temple, Jeff 2026-11-04 and 2026-11-10).",
 			"relations": [],
 			"tags": [
 				"history"
@@ -115,7 +115,7 @@
 				},
 				{
 					"id": "crypt.wealthy",
-					"text": "Only the wealthy are laid in the barrow; the poor lie in paupers' graves outside.",
+					"text": "Only the wealthy are laid in the crypt; the poor lie in paupers' graves outside.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -127,7 +127,7 @@
 				},
 				{
 					"id": "crypt.top_floor",
-					"text": "The barrow's top floor holds the town's newer dead.",
+					"text": "The crypt's top floor holds the town's newer dead.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -139,7 +139,7 @@
 				},
 				{
 					"id": "crypt.ossuary",
-					"text": "Beneath the temple lies the Ossuary, where the ancient dead were moved, joined to the barrow by a hidden way.",
+					"text": "Below the crypt's top floor lies the Ossuary, where the ancient dead were moved, joined to it by a hidden way.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -151,7 +151,7 @@
 				},
 				{
 					"id": "crypt.third_layer",
-					"text": "The barrow's third layer, where the oldest dead lie, is damp and dark, too moist for any lamp to burn.",
+					"text": "The crypt's third layer, where the oldest dead lie, is damp and dark, too moist for any lamp to burn.",
 					"known": "rumour",
 					"where": [
 						"town_lands"
@@ -163,7 +163,7 @@
 				},
 				{
 					"id": "crypt.robbers",
-					"text": "Grave robbers plunder the barrow, and the dead below do not know them from anyone else who comes down.",
+					"text": "Grave robbers plunder the crypt, and the dead below do not know them from anyone else who comes down.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -277,7 +277,7 @@
 				},
 				{
 					"id": "crypt.pip_carries",
-					"text": "Pip carries the temple's offering down to the altar in the barrow.",
+					"text": "Pip carries the temple's offering down to the altar in the crypt.",
 					"known": "secret",
 					"where": [],
 					"knowers": [
@@ -306,7 +306,7 @@
 				},
 				{
 					"id": "crypt.mound",
-					"text": "The barrow is an ancient burial mound.",
+					"text": "The crypt is dug beneath the temple in Umbrage.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -319,7 +319,19 @@
 				},
 				{
 					"id": "crypt.temple_underground",
-					"text": "The temple has its own underground, joined to the barrow, and keeps it wherever the temple stands.",
+					"text": "The temple has its own underground, the crypt, and keeps it wherever the temple stands.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.robbers_breach",
+					"text": "The temple's door down is locked and watched, so the Mound-breakers broke into the crypt from the wilds.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -331,7 +343,7 @@
 				},
 				{
 					"id": "crypt.robbers_dig",
-					"text": "The Mound-breakers, the grave robbers in the barrow, have been looking for a way to break through to the holy relics, to sell them on the black market.",
+					"text": "The Mound-breakers, the grave robbers in the crypt, have been looking for a way to break through to the holy relics, to sell them on the black market.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -343,7 +355,7 @@
 				},
 				{
 					"id": "crypt.tomb_sledge",
-					"text": "The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the barrow are its work.",
+					"text": "The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the crypt are its work.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -356,7 +368,7 @@
 				},
 				{
 					"id": "crypt.robbers_chest",
-					"text": "The Mound-breakers stash their take in a chest at their camp in the barrow.",
+					"text": "The Mound-breakers stash their take in a chest at their camp in the crypt.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -381,7 +393,7 @@
 				},
 				{
 					"id": "crypt.knight_spirit",
-					"text": "The spirit of a fallen holy knight of Theus keeps watch in the barrow's First Hall, beside the bier at the foot of the temple stair; his bones lie beneath the temple, held by the draugr.",
+					"text": "The spirit of a fallen holy knight of Theus keeps watch in the crypt's First Hall; his bones lie beneath the temple, held by the draugr.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -410,7 +422,7 @@
 				},
 				{
 					"id": "crypt.draugr_angry",
-					"text": "The draugr is angry because the robbers in the barrow dig for the holy relics.",
+					"text": "The draugr is angry because the robbers in the crypt dig for the holy relics.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -462,7 +474,7 @@
 				},
 				{
 					"id": "crypt.dead_rise",
-					"text": "On nights the robbers have dug, or when the temple's alms fall short, the barrow's dead come up out of the dark.",
+					"text": "On nights the robbers have dug, or when the temple's alms fall short, the crypt's dead come up out of the dark.",
 					"known": "rumour",
 					"where": [
 						"town_lands"
