@@ -272,6 +272,14 @@ func _ready() -> void:
 			_weapon = pair[1]
 		elif pair.size() == 2 and pair[0] == "foe":
 			_foe = pair[1]
+		elif pair.size() == 2 and pair[0] == "cam":
+			_walk_cam = pair[1]
+		elif pair.size() == 2 and pair[0] == "jog":
+			_walk_jog = pair[1]
+		elif pair.size() == 2 and pair[0] == "yaw":
+			_walk_yaw = pair[1].to_float()
+		elif pair.size() == 2 and pair[0] == "pitch":
+			_walk_pitch = pair[1].to_float()
 		elif pair.size() == 2 and pair[0] == "which":
 			_which = pair[1]
 	match scenario:
@@ -371,12 +379,14 @@ func _ready() -> void:
 			_folk_room()
 		"shieldcut":
 			_shieldcut()
+		"walkreel":
+			_walkreel()
 		_:
 			push_error("unknown scenario %s" % scenario)
 			get_tree().quit(1)
 			return
 	Net.port = preload("res://tests/test_ports.gd").of(17960)
-	Net.companions = false
+	Net.companions = scenario == "walkreel" and "--wren" in OS.get_cmdline_user_args()  # walkreel --wren: she follows.
 	Net.state_path = ""
 	Net.map_name = NAME
 	_main = preload("res://main.tscn").instantiate()
@@ -397,6 +407,20 @@ func _ready() -> void:
 			entity.acts = false
 		World._roster_current = false  # Its actors are listed once: they are taken off them.
 		_main.pack_panel.shown = false
+	if scenario == "walkreel":
+		# Jeff, 11-11: "walking around looks like skipping". The player walked straight, stopped, turned
+		# and walked on; each frame its body logged ([gait] lines) for the gait's numbers.
+		_player.max_hp = 1000000
+		_player.hp = _player.max_hp
+		for entity in World.monsters():
+			entity.acts = false
+		World._roster_current = false
+		_main.pack_panel.shown = false
+		if _main._client3d == null and DisplayServer.get_name() == "headless":
+			_main._show_3d()  # Measured headless: the view built as a window would (view_test does the same).
+		Net.set_camera_low(true, false)  # The play camera (623).
+		if _main._client3d != null:
+			_main._client3d._zoom_to = _main._client3d.LOW_ZOOM_MIN if _walk_cam == "near" else 1.0
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
 		# The imp only stands there to be struck: it neither dies nor moves.
 		_monster.max_hp = 1000000
@@ -469,6 +493,19 @@ func _process(delta: float) -> void:
 			var turn: Array = FOLK_CAMERA[group]
 			view.yaw = rad_to_deg(lerp_angle(deg_to_rad(view.yaw), deg_to_rad(float(turn[0])), 1.0 - exp(-2.0 * delta)))
 			view.pitch = lerpf(view.pitch, float(turn[1]), 1.0 - exp(-2.0 * delta))
+		return
+	if scenario == "walkreel" and view != null and _player != null:
+		if not is_nan(_walk_yaw):
+			view.yaw = _walk_yaw
+		if not is_nan(_walk_pitch):
+			view.pitch = _walk_pitch
+		if _walk_cam == "near":
+			view._zoom_to = view.LOW_ZOOM_MIN  # Held: the camera's own settings would ease it back.
+		_walk_log(view, _player, "gait")
+		for id: int in view._puppets:
+			var other := instance_from_id(id)
+			if other is Companion:
+				_walk_log(view, other as GridEntity, "wren")
 		return
 	if view == null or _player == null or not is_instance_valid(_monster):
 		return
@@ -1099,6 +1136,72 @@ func _folk_set_up() -> void:
 	var stall := ArtKit.instance("prop.market_stall")
 	stall.position = view._tile_position(FOLK_STALL) + Vector3(0.5, 0.0, 0.0)  # Its middle between its two cells.
 	view.add_child(stall)
+
+
+## walkreel's camera: "play" (the low camera at its usual zoom) or "near" (at its nearest).
+var _walk_cam := "play"
+## walkreel --jog=<clip>:<pace>: that clip in place of each person's jog, at its pace (a
+## trial of another jog before it goes into the gaits).
+var _walk_jog := ""
+## The cell walkreel last clicked (NO_CELL: none yet for this walk).
+var _walk_clicked := NO_CELL
+const NO_CELL := Vector2i(-9999, -9999)
+## walkreel --yaw=<deg> --pitch=<deg>: the camera held there (side-on, for the legs), else the game's.
+var _walk_yaw := NAN
+var _walk_pitch := NAN
+
+
+func _walkreel() -> void:
+	var rows: Array[String] = []
+	for y in 30:  # Open floor well past the walk on its south: a side-on camera (--yaw=-45) sees over it.
+		rows.append(".".repeat(40))
+	var markers := {Vector2i(4, 7): "start", Vector2i(38, 1): "monster_imp"}
+	var config := {"name": "Clip", "outdoor": true,
+		"entities": [{"at": [38, 1], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["wait", 15, "Standing."],
+		["walk", Vector2i(24, 7), "Walking straight."],
+		["wait", 12, "Stopped."],
+		["walk", Vector2i(24, 2), "Turned, walking on."],
+		["wait", 3, ""],
+		["walk", Vector2i(14, 12), "Back on a slant."],
+		["wait", 15, "Stopped."],
+	]
+
+
+## One [gait] line a frame: game seconds, the drawn body's x and z, its gait speed (tiles a second,
+## Client3D's "speed"), the base clip, its rate and place in it, the hips' height and both toes'
+## (x, y, z), all in metres in the world; then the tick and the entity's own drawn place (cells).
+func _walk_log(view: Node, entity: GridEntity, tag: String) -> void:
+	var puppet: Node3D = view._puppets.get(entity.get_instance_id())
+	if puppet == null:
+		return
+	if _walk_jog != "" and not puppet.has_meta("walk_jog"):
+		puppet.set_meta("walk_jog", true)
+		var swap := _walk_jog.split(":")
+		var gaits: Array = (puppet.get_meta("gaits", Client3D.GAITS) as Array).duplicate(true)
+		if gaits.size() == 3:  # A person's: walk, jog, sprint.
+			gaits[1][0] = swap[0]
+			gaits[1][1] = swap[1].to_float() if swap.size() > 1 else gaits[1][1]
+		puppet.set_meta("gaits", gaits)
+	var rig := puppet.get_meta("rig") as AnimRig
+	var skeleton: Skeleton3D = null
+	for found: Node in puppet.find_children("*", "Skeleton3D", true, false):
+		skeleton = found
+		break
+	if rig == null or skeleton == null:
+		return
+	var bone := func(name: String) -> Vector3:
+		var i := skeleton.find_bone(name)
+		return skeleton.global_transform * skeleton.get_bone_global_pose(i).origin if i >= 0 else Vector3.ZERO
+	var hips: Vector3 = bone.call("Hips")
+	var l: Vector3 = bone.call("LeftToes")
+	var r: Vector3 = bone.call("RightToes")
+	var sim := Iso.local_to_grid(entity.position)  # The entity's own drawn place (cells), under the puppet's.
+	print("[%s] %.4f %.4f %.4f %.3f %s %.3f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f %d %.4f %.4f" % [tag, _elapsed,
+			puppet.global_position.x, puppet.global_position.z, float(puppet.get_meta("speed", 0.0)), rig.base_clip(),
+			rig.speed(), rig.base_position(), hips.y, l.x, l.y, l.z, r.x, r.y, r.z, World.tick, sim.x, sim.y])
 
 
 func _shieldcut() -> void:
@@ -2573,6 +2676,16 @@ func _on_tick(tick: int) -> void:
 
 ## A step toward [param to] when the player may move; true once there.
 func _walk(to: Vector2i) -> bool:
+	if scenario == "walkreel":
+		# As a player walks (physics, 11-11: World.free_input queued on the server past FreeNet.Own
+		# drew a per-tick surge no player sees): one click on the cell, Main's own route and drive.
+		if _player.tile == to and _player.free_pos.distance_to(Vector2(to)) < 0.08:
+			_walk_clicked = NO_CELL
+			return true
+		if _walk_clicked != to:
+			_walk_clicked = to
+			_main._move_click(_player, to, false)
+		return false
 	if _player.tile == to:
 		return true
 	if World.tick >= _player.next_move_tick:

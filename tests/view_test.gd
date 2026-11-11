@@ -167,6 +167,7 @@ func _ready() -> void:
 		_test_townsfolk_spots()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
+		_test_gait_holds()
 		await _test_shield_seen()
 		await _test_reel_clock()
 		await _test_barrow_deaths()
@@ -12173,14 +12174,22 @@ func _test_goblin() -> void:
 		_check(forward.dot(wanted) > 0.9, "it faces %s: its toes point %s" % [direction, forward])
 	var own_pace: float = puppet.get_meta("pace")
 	puppet.set_meta("pace", 1.0)  # The gaits at GAITS' own paces; its own pace below.
+	# Each speed held past GAIT_DWELL (869: a change between gaits waits till it has been wanted that
+	# long), on the rigs' clock set by hand: read once, the clock on past the dwell, read again.
+	AnimRig._clock_movie = 1
+	AnimRig._clock_frame = Engine.get_process_frames()
+	AnimRig._clock_msec = Time.get_ticks_msec()
+	var held := func(speed: float, metres: float, ms: int) -> void:
+		for read in 2:
+			puppet.set_meta("speed", speed)
+			puppet.set_meta("gait_speed", speed)
+			puppet.set_meta("last_at", puppet.position - Vector3(metres, 0.0, 0.0))
+			puppet.set_meta("last_ms", AnimRig._clock_msec - ms)
+			_rig._animate(puppet)
+			AnimRig._clock_msec += int(Client3D.GAIT_DWELL * 1000.0) + 50
 	for pace: Array in [[0.7, Client3D.CLIP_WALK], [1.4, Client3D.CLIP_WALK], [2.5, Client3D.CLIP_JOG], [1.2, Client3D.CLIP_JOG],
 			[0.9, Client3D.CLIP_WALK], [5.5, Client3D.CLIP_SPRINT], [4.0, Client3D.CLIP_SPRINT], [3.5, Client3D.CLIP_JOG]]:
-		puppet.set_meta("speed", float(pace[0]))
-		# A second's walk, so the moment between this and _animate's own
-		# clock (a few ms on a busy machine) is a tenth of a percent of it.
-		puppet.set_meta("last_at", puppet.position - Vector3(float(pace[0]), 0.0, 0.0))
-		puppet.set_meta("last_ms", Time.get_ticks_msec() - 1000)
-		_rig._animate(puppet)
+		held.call(float(pace[0]), float(pace[0]), 1000)  # A second's walk.
 		var own := 0.0
 		for gait: Array in Client3D.GAITS:
 			if gait[0] == animator.playing():
@@ -12188,12 +12197,11 @@ func _test_goblin() -> void:
 		_check(animator.playing() == pace[1] and absf(animator.speed() * own - float(pace[0])) < 0.05,
 				"moving %.1f tiles a second: %s, its feet at that pace (x%.2f)" % [pace[0], animator.playing(), animator.speed()])
 	puppet.set_meta("pace", own_pace)
-	puppet.set_meta("speed", 0.7)
-	puppet.set_meta("last_at", puppet.position - Vector3(0.07, 0.0, 0.0))
-	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
-	_rig._animate(puppet)
+	held.call(0.7, 0.07, 100)
 	_check(animator.playing() == Client3D.CLIP_WALK and absf(animator.speed() * Client3D.GAITS[0][1] * own_pace - 0.7) < 0.05,
 			"at its own pace (x%.2f of the clip's, its legs longer or shorter): x%.2f" % [own_pace, animator.speed()])
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
 	var blows := {}
 	for i in 4:
 		imp.swung.emit(Vector2i(1, 0))
@@ -14543,6 +14551,95 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 ## "Blows you can see" (combat's package; enemy-ai's slide diagnosis, Jeff: "enemies tend to look
 ## like they are sliding into you and then no visible swing"): a body struck while it moves walks
 ## its gait under the blow; a struck body flinches as the drawn blow lands, not at its news.
+## 869 (Jeff, 11-11: "walking around looks like skipping"; Wren's clip changed 72 times a minute as
+## she stopped and went on): the gait pick holds through a gap. Driven frame by frame (60 a second) on
+## the rigs' clock, the player's body moved at set speeds: a start from standing walks at once and is
+## jogging within 0.5 s; a 0.25 s pause mid-jog keeps the jog, no clip change through it; speeds
+## alternating across the walk's and the sprint's changes every 0.25 s change gait at most once each;
+## a real stop stands, not before STOP_HOLD and by 0.4 s; a burst from a walk jogs within 0.1 s.
+func _test_gait_holds() -> void:
+	print("\n== 869: the gait holds through a pause, never flaps, stops and bursts at once ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to walk")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var kept := {}
+	for key: String in ["busy_until", "speed", "gait_speed", "last_at", "last_ms", "still_since", "gait_want", "gait_want_at"]:
+		kept[key] = puppet.get_meta(key) if puppet.has_meta(key) else null
+	var was_at := puppet.position
+	var pace: float = puppet.get_meta("pace", 1.0)
+	var gaits := (Client3D.paced(puppet.get_meta("gaits", Client3D.GAITS)) as Array).map(func(gait: Array) -> String: return str(gait[0]))
+	AnimRig._clock_movie = 1
+	AnimRig._clock_frame = Engine.get_process_frames()
+	AnimRig._clock_msec = Time.get_ticks_msec()
+	puppet.set_meta("busy_until", 0)
+	for key: String in ["speed", "gait_speed", "still_since", "gait_want"]:
+		puppet.remove_meta(key)
+	puppet.set_meta("last_at", puppet.position)
+	puppet.set_meta("last_ms", AnimRig._clock_msec)
+	rig.loop(Client3D.CLIP_IDLE, 1.0)
+	# [speed m/s at pace 1, seconds] in order; each frame's clip.
+	var drive := func(legs: Array) -> Array:
+		var seen := []
+		for leg: Array in legs:
+			for i in int(roundf(float(leg[1]) * 60.0)):
+				AnimRig._clock_frame = Engine.get_process_frames()
+				AnimRig._clock_msec += 16
+				puppet.position += Vector3(float(leg[0]) * pace * 0.016, 0.0, 0.0)
+				_rig._animate(puppet)
+				seen.append(rig.base_clip())
+		return seen
+	var changes := func(seen: Array) -> int:
+		var n := 0
+		for i in range(1, seen.size()):
+			n += 1 if seen[i] != seen[i - 1] else 0
+		return n
+	var started: Array = drive.call([[4.0, 0.6]])
+	var first: String = started[0]
+	_check(first in gaits and started[30] == gaits[1], "a start from standing goes at once (%s on its first frame) and jogs within 0.5 s (%s)" % [first, started[30]])
+	drive.call([[4.0, 1.0]])
+	var paused: Array = drive.call([[0.0, 0.25], [4.0, 1.0]])
+	_check(changes.call(paused) == 0 and paused[0] == gaits[1], "a 0.25 s pause mid-jog keeps the jog (%d changes, %s)" % [changes.call(paused), paused[0]])
+	var low := []
+	var high := []
+	for i in 6:
+		low.append_array([[1.2, 0.25], [2.6, 0.25]])
+		high.append_array([[4.0, 0.25], [6.2, 0.25]])
+	var flap_low: Array = drive.call(low)
+	drive.call([[4.5, 1.0]])
+	var flap_high: Array = drive.call(high)
+	_check(changes.call(flap_low) <= 1 and changes.call(flap_high) <= 1,
+			"speeds alternating across a change every 0.25 s: at most one change each (walk and jog %d, jog and sprint %d)" % [changes.call(flap_low), changes.call(flap_high)])
+	# A host's own body at a fractional pace (companions' heel, 2.5 ticks a cell): its drawn place stands a
+	# frame or two at a cell's centre, then makes up the ground in one frame (12 m/s for it).
+	drive.call([[4.0, 1.0]])
+	var hitched := []
+	for i in 6:
+		hitched.append_array(drive.call([[4.0, 0.4], [0.0, 2.0 / 60.0], [12.0, 1.0 / 60.0]]))
+	_check(hitched.all(func(clip: String) -> bool: return clip == gaits[1]),
+			"a jog that stalls two frames and makes the ground up in one keeps the jog, six times over (%s)" % [hitched.filter(func(clip: String) -> bool: return clip != gaits[1])])
+	drive.call([[4.0, 1.0]])
+	var stop: Array = drive.call([[0.0, 0.6]])
+	var stood := stop.find(Client3D.CLIP_IDLE)
+	_check(stood >= int(Client3D.STOP_HOLD * 60.0) - 1 and stood <= 24, "a real stop stands after STOP_HOLD, by 0.4 s (frame %d)" % stood)
+	drive.call([[1.0, 1.5]])
+	var walked := rig.base_clip()
+	var burst: Array = drive.call([[4.0, 0.1]])
+	_check(walked == gaits[0] and burst[-1] == gaits[1], "a burst from a walk (%s) jogs within 0.1 s (%s)" % [walked, burst[-1]])
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
+	puppet.position = was_at
+	for key: String in kept:
+		if kept[key] == null:
+			puppet.remove_meta(key)
+		else:
+			puppet.set_meta(key, kept[key])
+	rig.loop(Client3D.CLIP_IDLE, 1.0)
+
+
 func _test_blows_seen() -> void:
 	print("\n== blows you can see: the legs walk under a strike, the flinch at the contact ==")
 	var player := _player()

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Planted feet hold firm as people walk and jog, and a companion following you keeps one gait through a short pause or a change of pace (869).
 - The Tomb Sledge is held partway up its haft, both hands on the shaft with bare wood behind them, and you bow deep into each blow so its head comes down on the ground in front of you; the axes, picks and war hammer are held a little up their hafts too (451 amended (5))
 - Sword and shield: your shield moves with each swing, pushed out toward your foe as you draw the sword back, kept low and clear on a backhand, and pulled in to your left side through the cut (338 amended (8))
 - Shields: a weapon's blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing), is taken whole on a raised shield facing it for a little stamina, and short of stamina the shield still takes half and stays up, though the draugr's throws still throw you (340 amended (3) and (4))

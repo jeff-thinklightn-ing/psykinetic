@@ -1418,14 +1418,17 @@ const GHOST_MATERIAL := "ghost"
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
 ## its mass over MODEL_MASS, within MODEL_SCALE_MIN/MAX, give or take
-## MODEL_SCALE_SPREAD; its pace (GAITS', as its legs are longer or shorter,
-## give or take PACE_SPREAD) and its idle tempo (TEMPO_SPREAD) its own; and
-## loops start where they will, so a crowd does not move as one.
+## MODEL_SCALE_SPREAD; its pace (GAITS', as its legs are longer or shorter)
+## and its idle tempo (TEMPO_SPREAD) its own; and loops start where they
+## will, so a crowd does not move as one. PACE_SPREAD is 0 (869): a
+## pace off its body's by 8% slid every foot by as much (0.22 m/s at a
+## player's jog, the same through the stance); its draw stays, so each body's
+## other draws are as they were.
 const MODEL_MASS := 40.0
 const MODEL_SCALE_MIN := 0.8
 const MODEL_SCALE_MAX := 1.4
 const MODEL_SCALE_SPREAD := 0.05
-const PACE_SPREAD := 0.08
+const PACE_SPREAD := 0.0
 const TEMPO_SPREAD := 0.10
 ## A blow, a flinch, a death: one of these, never the same blow or flinch
 ## twice running.
@@ -1573,6 +1576,24 @@ const GAITS: Array[Array] = [[CLIP_WALK, 0.5], [CLIP_JOG, 3.5], [CLIP_SPRINT, 5.
 ## Gaits change past the geometric mean of their paces, this much beyond it
 ## either way, so a pace near a change does not flicker between them.
 const GAIT_HYSTERESIS := 1.15
+## The gait held through a gap (869; Jeff, 11-11: "walking around looks like skipping", physics'
+## numbers: Wren's clip changed 72 times a minute, 92 clips under half a second, as she stopped and
+## went on following). A body in a gait that reads standing keeps its gait STOP_HOLD (s), its rate
+## easing down with its smoothed speed, and stands only once still that long: a pause shorter is no
+## stop. A change between gaits waits till the new one has been wanted GAIT_DWELL (s) on end; a start
+## from standing takes its gait at once, as does a burst past the next gait's change by GAIT_BURST
+## (only upward: slowing always waits). The gait and its rate follow the speed smoothed over
+## GAIT_SMOOTH (s), so its steps keep their length through a cell's small surges; standing and
+## starting go by the quick read (speed) as before. Only between gaits and standing: a blow, a seat,
+## a work or any clip but a gait cuts in at once.
+const STOP_HOLD := 0.3
+const GAIT_DWELL := 0.4
+const GAIT_BURST := 1.4
+## A burst is a burst once its frames have run past the change GAIT_BURST_HOLD (s) on end: a drawn
+## body that stood a frame or two and then made up the ground in one (a host's own body at a pace of
+## a fractional tick a cell) read 6 to 9 m/s for that frame, and its quick read flipped it to a sprint.
+const GAIT_BURST_HOLD := 0.05
+const GAIT_SMOOTH := 0.25
 ## People (players, companions, residents): humanoid bodies (decision 243), a
 ## man's and a woman's (the entity's "body", decision 388), made by
 ## tools/body_gen.py (decision 419) on the animation library's own skeleton,
@@ -24267,14 +24288,28 @@ func _animate(puppet: Node3D) -> void:
 	var rig := puppet.get_meta("rig") as AnimRig
 	var now := Time.get_ticks_msec()
 	var last: Vector3 = puppet.get_meta("last_at", puppet.position)
-	var seconds := (now - int(puppet.get_meta("last_ms", now))) / 1000.0
+	# The body's speed on the rigs' clock (AnimRig.now_msec: the wall in play, a reel's frames under the
+	# movie maker), as its clips are timed: on the wall a reel, drawn slower than real time, read every
+	# gait slower than it went and played it so (Jeff's walk, 11-11).
+	var clock := AnimRig.now_msec()
+	var seconds := (clock - int(puppet.get_meta("last_ms", clock))) / 1000.0
 	puppet.set_meta("last_at", puppet.position)
-	puppet.set_meta("last_ms", now)
+	puppet.set_meta("last_ms", clock)
 	var speed: float = puppet.get_meta("speed", 0.0)
 	var step := Vector2(puppet.position.x - last.x, puppet.position.z - last.z)
+	var smooth: float = puppet.get_meta("gait_speed", speed)
 	if seconds > 0.0:
 		speed = lerpf(speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
+		smooth = lerpf(smooth, step.length() / seconds, clampf(seconds / ArtKit.feel("client3d.gait_smooth", GAIT_SMOOTH), 0.0, 1.0))
+		puppet.set_meta("step_speed", step.length() / seconds)  # This frame's own, for a burst (869).
 	puppet.set_meta("speed", speed)
+	puppet.set_meta("gait_speed", smooth)
+	# Its stillness (869's hold) timed from the frame it stopped moving, not from the quick read's
+	# fall under WALKING a quarter second later: held from there, it stands STOP_HOLD after it stopped.
+	if seconds > 0.0 and step.length() / seconds > WALKING:
+		puppet.remove_meta("still_since")
+	elif seconds > 0.0 and not puppet.has_meta("still_since"):
+		puppet.set_meta("still_since", clock)
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
 	if puppet.get_meta("teetering", false) and rig.has(CLIP_TEETER) and entity != null and not _sliding(puppet, entity):
 		# On a rim (783 amended): arms wheeling, once its push's slide has shown; the knock it
@@ -24316,7 +24351,7 @@ func _animate(puppet: Node3D) -> void:
 	if rig.legs_amount() != legs_to:
 		rig.legs_walk(move_toward(rig.legs_amount(), legs_to, seconds / ArtKit.feel("client3d.legs_fade", LEGS_FADE)))
 	if stepping and now < int(puppet.get_meta("busy_until", 0)):
-		_gait(puppet, rig, speed)
+		_gait(puppet, rig, speed, smooth)
 		return
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
@@ -24358,7 +24393,7 @@ func _animate(puppet: Node3D) -> void:
 				* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
 	if speed > WALKING:
-		_gait(puppet, rig, speed)
+		_gait(puppet, rig, speed, smooth)
 		return
 	if entity != null and not entity.fishing.is_empty():
 		if _fishing_pose(puppet, rig, entity, now):
@@ -24388,6 +24423,9 @@ func _animate(puppet: Node3D) -> void:
 		# no gestures: it stands, 662).
 		rig.loop(CLIP_TALKING, tempo)
 		return
+	if _gait_held(puppet, rig):
+		_gait(puppet, rig, speed, smooth)  # A pause, not yet a stop (869): its gait on, slowing.
+		return
 	var idle := _idle_clip(puppet)
 	var both_hands := puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active  # Ready with a two-hander: no fidgets.
 	if idle == CLIP_IDLE and calm and not both_hands and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
@@ -24400,12 +24438,59 @@ func _animate(puppet: Node3D) -> void:
 	rig.loop(idle, tempo)
 
 
-## Its gait for [param speed] (m/s), looped at the stride's rate.
-func _gait(puppet: Node3D, rig: AnimRig, speed: float) -> void:
+## Its gait for [param speed] (m/s, the quick read), looped at the stride's rate: chosen and paced by
+## [param smooth] (the speed smoothed over GAIT_SMOOTH; [param speed] when not given), a change
+## between gaits only once wanted GAIT_DWELL on end or a burst up past GAIT_BURST (869).
+func _gait(puppet: Node3D, rig: AnimRig, speed: float, smooth := -1.0) -> void:
 	var pace: float = puppet.get_meta("pace", 1.0)
 	var gaits := paced(puppet.get_meta("gaits", GAITS))
-	var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
-	rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+	var at := -1
+	for i in gaits.size():
+		if gaits[i][0] == rig.base_clip():
+			at = i
+	var by := speed if smooth < 0.0 else smooth
+	if at < 0:
+		# A start from standing (or from another clip): its gait at once, by the quicker of the two.
+		by = maxf(speed, by)
+		puppet.set_meta("gait_speed", by)
+	var index := gait_for(rig.base_clip(), by / pace, gaits)
+	# A burst goes by the quick read: past the next change up by GAIT_BURST, its gait at once, before the
+	# smoothed read has crossed the change (a walk broken into a run jogs in a tenth of a second).
+	var burst := false
+	if at >= 0 and at + 1 < gaits.size():
+		var up := sqrt(float(gaits[at][1]) * float(gaits[at + 1][1])) * ArtKit.feel("client3d.gait_burst", GAIT_BURST)
+		var clock := AnimRig.now_msec()
+		if float(puppet.get_meta("step_speed", speed)) / pace <= up:
+			puppet.remove_meta("burst_since")
+		elif not puppet.has_meta("burst_since"):
+			puppet.set_meta("burst_since", clock)
+		if speed / pace > up and clock - int(puppet.get_meta("burst_since", clock)) >= int(GAIT_BURST_HOLD * 1000.0):
+			burst = true
+			index = maxi(index, gait_for(rig.base_clip(), speed / pace, gaits))
+	if at >= 0 and index != at:
+		var clock := AnimRig.now_msec()
+		burst = burst and index > at
+		if int(puppet.get_meta("gait_want", -1)) != index:
+			puppet.set_meta("gait_want", index)
+			puppet.set_meta("gait_want_at", clock)
+		if not burst and clock - int(puppet.get_meta("gait_want_at", clock)) < int(ArtKit.feel("client3d.gait_dwell", GAIT_DWELL) * 1000.0):
+			index = at  # Not wanted long enough yet.
+		else:
+			puppet.remove_meta("gait_want")
+	else:
+		puppet.remove_meta("gait_want")
+	var gait: Array = gaits[index]
+	rig.loop(gait[0], clampf(by / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+
+
+## Whether [param puppet], in a gait and reading standing, holds it yet (869: still under STOP_HOLD,
+## a pause rather than a stop); its stillness timed on the rigs' clock from its first frame.
+func _gait_held(puppet: Node3D, rig: AnimRig) -> bool:
+	var gaits := paced(puppet.get_meta("gaits", GAITS))
+	if not gaits.any(func(gait: Array) -> bool: return gait[0] == rig.base_clip()):
+		return false
+	var clock := AnimRig.now_msec()
+	return clock - int(puppet.get_meta("still_since", clock)) < int(ArtKit.feel("client3d.stop_hold", STOP_HOLD) * 1000.0)
 
 
 ## [param work]'s clip for [param puppet]: its "clip", else one of its "clips" by the body

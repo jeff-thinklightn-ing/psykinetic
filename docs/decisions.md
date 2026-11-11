@@ -50345,3 +50345,41 @@ The look builder's answer panel needs (the coordinator's approval of ui-design's
 - For the store window's mend (ui, Store A as built, 11-12, C:/dev/review/ui-design/storeA_built/): QuietScroll, a ScrollContainer type with an empty panel (the dark sunken box round the goods was the ScrollContainer's inset; its bar stays the theme's VScrollBar, as the pack's), and UiSlot places its chips again when its face is resized, not only the square (in a grid in a scroll the face is sized after the square, so the chips stood where a zero-sized face put them: on the squares' top edges, one loose over the pack).
 - The codes builder floats over the world (Client3D.show_building_codes, Label3D) stay as they are for now (builder's lean: a later row).
 Tests: parts_test (_test_answer: a line's codes drawn as chips with the hair space and its words kept; a quiet scroll draws no box; a square in a grid in a scroll has its price chip bottom right once laid out; the chip's colours; a code's split; a close a 72-unit target with no words that presses; the new label types on the text scale; the fault block's broad left edge). style_test (no loose colour, no override in the parts). Client only, protocol unchanged; new class_names UiCodeChip, UiClose.
+## 869. The gait pick holds through gaps: a stop held, a change dwelt on, the rate on a smoothed speed
+
+Jeff, 2026-11-11: "walking around looks like skipping, and when a companion follows they don't follow
+smoothly". Physics' drawn-place log (its draw.txt, Wren following the player) replayed through the
+view's pick: Wren's clip changed about 76 times a minute, many of them clips under half a second, as
+she stopped a beat and went on, and as her speed crossed a gait's change and back within a cell. Each
+change is a blend into a new loop at a new rate: read on screen as a hop.
+
+Client3D._animate keeps two reads of a body's speed: the quick one (speed, as before: 12 a second)
+says it stands or starts; a slow one (gait_speed, smoothed over GAIT_SMOOTH, 0.25 s) chooses the
+gait and its rate, so its steps keep their length through a cell's small surges. Three holds, all
+timed on AnimRig.now_msec() (the rigs' clock: a reel's slowed frames read the speed they show):
+- A body in a gait that reads standing keeps its gait STOP_HOLD (0.3 s) from the frame it stopped
+  moving (still_since), its rate easing down with the slow read; a pause shorter is no stop.
+- A change between gaits waits till the new one has been wanted GAIT_DWELL (0.4 s) on end
+  (gait_want, gait_want_at). Slowing always waits; a burst upward, its quick read past the next change by
+  GAIT_BURST (1.4 times), goes at once.
+- A start from standing (or from any other clip) takes its gait at once, by the quicker read.
+Only between gaits and standing: a blow, a seat, a work, a fishing pose or any clip but a gait cuts
+in at once, as before. Feel keys client3d.stop_hold, gait_dwell, gait_burst, gait_smooth.
+
+Replayed on the same log: Wren 76 to 23 changes a minute, none under half a second between gaits;
+the player 28 to 19. view_test _test_gait_holds drives the player's body frame by frame on a
+hand-set clock (a start, a 0.25 s pause, speeds alternating across each change, a stop, a burst);
+the pace test now holds each speed past the dwell. Client only, protocol unchanged, no new
+class_name.
+
+PACE_SPREAD (162's own pace) is 0: a pace off its body's by up to 8% slid every planted foot by as
+much, the same through the stance (0.22 m/s at a player's jog in a host game walked by clicks, on the
+Lenovo; tools/walk_probe.sh and gait_read.py, which land here too, with clip.gd's walkreel scenario).
+Size and idle tempo still differ, and its draw stays, so each body's other draws are as they were.
+
+A burst counts only once this frame's own speed (step_speed) has run past the change by GAIT_BURST
+for GAIT_BURST_HOLD (0.05 s) on end. From companions' heel reel: a host's own companion at 2.5 ticks a
+cell stood a frame or two at a cell's centre, then made up the ground in one frame (6 to 9 m/s for
+it), and that frame alone flipped her to the sprint, which GAIT_HYSTERESIS's band then kept at her
+4 tiles a second, played at 0.7 times. view_test _test_gait_holds: a jog that stalls two frames and
+makes the ground up in one keeps the jog, six times over.
