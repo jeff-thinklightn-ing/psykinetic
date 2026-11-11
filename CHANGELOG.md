@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion comes fishing with you even with no rod of her own: ask her and she walks to the water beside you and keeps you company while you cast (805 amended (13)).
 - Visitors to a town no longer say they came "from the road", or that "the road from the road was quiet" (711 amended (1)).
 - Townsfolk keep moving through the day now: every few minutes each walks to another spot of wherever they are, at work, in the square, by the well, at the temple or at home, never all at once, and when they stand they face open ground, not a wall (853).
 - Deer, rabbits and wild boar graze well clear of a town now, beyond its outermost houses, and keep farther off as the town grows (740 amended (1)).

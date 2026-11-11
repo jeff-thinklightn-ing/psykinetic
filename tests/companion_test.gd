@@ -2239,7 +2239,8 @@ func _test_fishing() -> void:
 		if not pet.slots[slot].is_empty() and Items.def(pet.slots[slot]).get("use") == "fish":
 			pet.slots[slot] = ""
 	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
-	_check(pet.order != "fish" and Companion.FISH_NO_ROD in pet._said, "no rod: she says so, and does not go")
+	_check(pet.order != "fish" and Companion.FISH_NO_WATER in pet._said and not Companion.FISH_NO_ROD in pet._said,
+		"no rod and no water near: she says there is nothing to fish in, not that she has no rod")
 	# A pond two cells from her player, a rod in her pack.
 	var water := World.NO_CELL
 	for cell: Vector2i in [owner.tile + Vector2i(2, 0), owner.tile + Vector2i(-2, 0), owner.tile + Vector2i(0, 2), owner.tile + Vector2i(0, -2)]:
@@ -2257,6 +2258,22 @@ func _test_fishing() -> void:
 	World.holdings._holder[pond] = "nobody"
 	World.holdings._strength[pond] = 1
 	World.holdings._since[pond] = 0
+	# No rod of her own (items' ruling C, Jeff's: her rod a bonus, never a
+	# condition): she comes, and keeps them company at the water.
+	var company_spot := pet.fish_spot_near(owner.tile)
+	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
+	_check(pet.order == "fish" and Companion.FISH_NO_ROD in pet._said and pet.hold_tile == company_spot and company_spot != World.NO_CELL,
+		"no rod: she says she'll keep them company, and goes to the water's edge (%s)" % [company_spot])
+	for i in 60:
+		World.step()
+		if pet.tile == company_spot:
+			break
+	for i in 20:
+		World.step()
+	_check(pet.order == "fish" and pet.tile == company_spot and pet.fishing.is_empty() and World.rod_hand(pet) < 0,
+		"there, with no cast of her own: she stays by them at the water (%s, %s)" % [pet.tile, pet.fishing])
+	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
+	_check(pet.order != "fish" and pet.fish_spot == World.NO_CELL, "told to stop: she leaves the water")
 	var rod := World.items.mint("fishing_rod", "built")
 	var pack := -1
 	for slot: int in Items.PACK_SLOTS:
@@ -3347,7 +3364,7 @@ func _test_want_lead() -> void:
 	# Asked to fish with no water near: she takes them to her pond.
 	_check(pet.fish_spot_near(owner.tile, false) == World.NO_CELL, "no fishing water near her player")
 	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
-	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond and not Companion.FISH_NO_WATER in pet._said,
+	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond and (pet._said.is_empty() or pet._said.back() != Companion.FISH_NO_WATER),
 		"wary, asked to fish with no water near: she takes them to the pond, not \"we'd need a pond\" (%s)" % [pet.guide.goal if pet.guide != null else null])
 	# (Its water fishable only now: before, no bank within FISH_SEEK of her player.)
 	World._fish_waters.get_or_add(here, {})[water] = "pool_lead"

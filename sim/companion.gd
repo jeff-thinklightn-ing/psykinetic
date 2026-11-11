@@ -210,13 +210,17 @@ const FISH_LOW := 2
 ## stays to them while she fishes beside them.
 const FISH_SEEK := 8
 const FISH_NEAR := 5
-## Her words when she cannot fish (voice's): no rod; no fish in the water here.
-const FISH_NO_ROD := "I've no rod to fish with."
+## Asked to fish with no rod of her own, she comes all the same and keeps
+## them company at the water (items' ruling C, Jeff's: her own rod is a bonus,
+## never a condition; voice's words).
+const FISH_NO_ROD := "No rod of my own, but I'll keep you company."
+## Her words when she cannot fish (voice's): no fish in the water here.
 const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
 ## A fishing place near, fished out for today (voice's).
 const FISH_FISHED_OUT := "This water's fished out for today. Tomorrow, maybe."
-## Once a game day, her player fishing beside her and she with no rod (the coordinator's hint toward the give).
-const FISH_WISH := "I'd join you, if I had a rod."
+## Once a game day, her player fishing beside her and she with no rod: a
+## wish for more, never a regret (items' ruling C; voice's words).
+const FISH_WISH := "With a rod of my own we'd catch more."
 ## Her own cast's end, told her voice at once (805 amended (5)).
 const FISH_CAUGHT := "You just landed a fish, fishing beside %s. If you speak now, speak of that, in your own way."
 ## Her catches spoken of (805 amended (5), the coordinator after playtest's pair 7:
@@ -1751,12 +1755,16 @@ func _tend_fish() -> void:
 	var unsafe := in_fight() or _hostile_within(SIGHT_RANGE)
 	if order == "fish":
 		var pond := World.pond_at(_water_by(fish_spot), fish_spot) if fish_spot != World.NO_CELL else ""
-		var low := not _pond_ok(pond) and str(theirs.get("state", "")) in ["cast", "wait", "bite"]
+		var rodless := _rod_slot() < 0 and _fish_put.is_empty()
+		var low := not rodless and not _pond_ok(pond) and str(theirs.get("state", "")) in ["cast", "wait", "bite"]
 		if unsafe or World.distance(tile, keeper.tile) > FISH_NEAR or low or pond.is_empty() \
 				or (not _fish_asked and theirs.is_empty() and fishing.is_empty()):
 			_stop_fishing()
 			return
 		if tile != fish_spot or not fishing.is_empty():
+			return
+		if rodless:
+			World.face(self, (_water_by(tile) - tile).sign())  # Company at the water, no cast of her own (ruling C).
 			return
 		if not _rod_in_hand():
 			_stop_fishing()
@@ -2271,9 +2279,6 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				# amended (3)): Main's walk, her voice told by its guide_note.
 				_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "lead", "note": "to the water she knows"})
 				return true
-			elif _rod_slot() < 0:
-				_say(FISH_NO_ROD, true)
-				done = "%s asked you to fish, but you have no rod." % keeper_name()
 			else:
 				var spot := fish_spot_near(keeper.tile if _alive(keeper) else tile)
 				if spot == World.NO_CELL and fish_spot_near(keeper.tile if _alive(keeper) else tile, false) != World.NO_CELL:
@@ -2282,6 +2287,11 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				elif spot == World.NO_CELL:
 					_say(FISH_NO_WATER, true)
 					done = "%s asked you to fish, but there is no water with fish in it near." % keeper_name()
+				elif _rod_slot() < 0:
+					# No rod of her own (ruling C): she comes, and keeps them company.
+					_say(FISH_NO_ROD, true)
+					_go_fish(spot, true)
+					done = "You have no rod of your own, so you go to the water's edge to keep %s company while they fish, as asked." % keeper_name()
 				else:
 					_go_fish(spot, true)
 					done = "You go to the water's edge to fish beside %s, as asked." % keeper_name()

@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2768)
+## Lines in the code (2771)
 
 ### companions (Pip, Wren, Nix) (627)
 
@@ -61,10 +61,10 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | As you say. | `sim/companion.gd` ORDER_ACKS |
 |  | \\b(let'?s (go )?fish(ing)?\|fish with me\|(go\|come) fish(ing)?\|(do\|try) (some )?fishing\|cast a line\|have a fish)\\b | `sim/companion.gd` ORDER_FISH |
 |  | \\b(stop fishing\|reel (it )?in\|enough fishing\|done fishing\|put (the\|your) rod away)\\b | `sim/companion.gd` ORDER_FISH_STOP |
-|  | I've no rod to fish with. | `sim/companion.gd` FISH_NO_ROD |
+|  | No rod of my own, but I'll keep you company. | `sim/companion.gd` FISH_NO_ROD |
 |  | Nothing to fish in here. We'd need a pond. | `sim/companion.gd` FISH_NO_WATER |
 |  | This water's fished out for today. Tomorrow, maybe. | `sim/companion.gd` FISH_FISHED_OUT |
-|  | I'd join you, if I had a rod. | `sim/companion.gd` FISH_WISH |
+|  | With a rod of my own we'd catch more. | `sim/companion.gd` FISH_WISH |
 |  | You just landed a fish, fishing beside %s. If you speak now, speak of that, in your own way. | `sim/companion.gd` FISH_CAUGHT |
 |  | \\b(stand\|stay\|wait\|step\|go\|get\|hold\|keep)\\b[^.!?]*\\bplates?\\b | `sim/companion.gd` ORDER_PLATE |
 |  | \\b(anything (odd\|strange\|unusual\|hidden\|here)\|what do you (see\|make of\|think of) (this\|it\|here)\|what do you see\|see anything\|notice anything\|any ideas\|a clue\|hint\|any help\|help me find\|look around\|what'?s this)\\b | `sim/companion.gd` HINT_ASK |
@@ -217,9 +217,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You come along with %s, as they asked. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to stop fishing; you reel in and put the rod away. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to fish, but there is fighting near: not now. | `sim/companion.gd` _carry_out() |
-|  | %s asked you to fish, but you have no rod. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to fish, but the water here is fished out for today. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to fish, but there is no water with fish in it near. | `sim/companion.gd` _carry_out() |
+|  | You have no rod of your own, so you go to the water's edge to keep %s company while they fish, as asked. | `sim/companion.gd` _carry_out() |
 |  | You go to the water's edge to fish beside %s, as asked. | `sim/companion.gd` _carry_out() |
 |  | %s asked you to stand on a plate, but you see no free one here; say so. | `sim/companion.gd` _carry_out() |
 |  | %s told you: "%s" | `sim/companion.gd` _carry_out() |
@@ -2750,7 +2750,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the session's Claude budget is spent | `sim/lawspeaker.gd` tick() |
 |  | no rulings in the answer | `sim/lawspeaker.gd` tick() |
 
-### town talk (32)
+### town talk (35)
 
 | | Line | Where |
 |---|---|---|
@@ -2772,6 +2772,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | [a-z,] ([A-Z][a-z']+) | `sim/hearsay.gd` is_name() |
 |  | ^[A-Z][a-z']+$ | `sim/hearsay.gd` is_name() |
 |  | ^([A-Z][a-z']+) the [A-Z] | `sim/hearsay.gd` is_name() |
+|  | (?:^\|(?<=[ ("]))([a-z][a-z']+)(?=[ ,.;:!?)"]\|$) | `sim/hearsay.gd` is_name() |
+|  | (?<=[a-z,] )([A-Z][a-z']+(?: (?:of the \|of \|the )?[A-Z][a-z']+)+) | `sim/hearsay.gd` is_name() |
+|  | ^[A-Z][a-z']+(?: (?:of the \|of \|the )?[A-Z][a-z']+)+$ | `sim/hearsay.gd` is_name() |
 |  | (?i)\\b(king\|queen\|prince\|princess\|lord\|lady\|duke\|baron\|knight\\w*\|emperor\|empire\|kingdom\|realm\|crown\|throne\|god\|gods\|goddess\|temple of\|priest of\|prophe\\w+\|war\|army\|armies\|legion\\w*\|dwarf\|dwarves\|elf\|elves\|orc\\w*\|goblin\\w*\|kobold\\w*\|dragon\\w*\|demon\\w*\|the land\|mountain\\w*\|river\\w*\|forest\\w*\|sea\|ocean\|capital\|city\|cities)\\b | `sim/town_memory.gd` WORLD_WORDS |
 |  | The town remembers that %s. | `sim/town_memory.gd` remembered() |
 |  | (?i)\\bold\\b | `sim/town_memory.gd` person_of() |
@@ -2868,7 +2871,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (865)
+## Lines in the data (866)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3193,7 +3196,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (124)
+### levels/residents.json (125)
 
 | | Line | Key |
 |---|---|---|
@@ -3238,6 +3241,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Store's open. What do you need? | `keeper.greet[0]` |
 |  | Back again. What'll it be? | `keeper.greet_again[0]` |
 |  | Here's your locker, as you left it. | `keeper.locker[0]` |
+|  | No room to set it down here. Give me a bit of space and ask again. | `keeper.nowhere[0]` |
 |  | I'll take that back. Can't pay for it, mind. | `keeper.back[0]` |
 |  | Back on the pile, then. No coin for it, mind. | `keeper.back[1]` |
 |  | Right, that's back with me. Nothing to pay on it. | `keeper.back[2]` |

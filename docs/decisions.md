@@ -44374,6 +44374,21 @@ _test_fish_rise asked for a ring showing at the moment its two-minute run stoppe
 1.2 s against a gap of 0.75 to 2.25 s at full feeding, so the last step could fall between two rises ("2 made for
 73 rises", none showing). It now takes the most rings showing at once over the run. Test only, no bullet.
 
+805 amended (13): no rod of her own, she comes all the same (the script's label; items' ruling C for its
+package "fishing that works", the coordinator's approval; Jeff's rule: her own rod is a bonus, never a
+condition). Both blind runs on v0.1.210 asked a rodless Wren "let's go fishing" and got "I've no rod to fish
+with." every time. Now, asked to fish with no rod of hers (Companion's fish order): a fishing place's bank
+within FISH_SEEK of her player, she says FISH_NO_ROD, now "No rod of my own, but I'll keep you company."
+(voice's), and goes to it (_go_fish, asked) and stands there facing the water while they cast, with no cast of
+her own (Companion._tend_fish: rodless, never reeled in for the pond's stock, which she does not thin); told to
+stop, a hostile, a fight, or her player past FISH_NEAR, and she leaves it, as with a rod. With no water near she
+leads to the pond as 551 amended (3) has it, rod or none; fished out or none, she says so as before. Unasked,
+beside her player casting with no rod, her once-a-day FISH_WISH is a wish for more, not a regret: "With a rod of
+my own we'd catch more." (voice's). His catch with her near is the "fished" deed, as before; with a rod she
+casts as before. companion_test _test_fishing: no rod and no water, she says there is nothing to fish in; no
+rod by a pond, she says she'll keep them company, goes to the water's edge and stays there with no cast; told
+to stop, she leaves. docs/voice_inventory.md regenerated. Server only, protocol unchanged, no new class_name.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's
