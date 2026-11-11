@@ -147,7 +147,10 @@ const WALKED: Array[String] = ["stone", "grass", "dirt", "tall_grass"]
 ## How near a link its arrival point (from_<level>) is to go with it, in cells.
 const ARRIVAL_NEAR := 4.0
 ## level.json keys a proposal may change as a whole (beyond entries and links).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams"]
+## The level.json keys a proposal carries to the level on accept: every key
+## a tool writes (841 amended (1): decor and skylights were left out, so accept
+## dropped them; builder_test reads the tools for a key missing here).
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams", "decor", "skylights"]
 ## Dungeon's layout rules (806), checked on accept: see layout_news.
 const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 

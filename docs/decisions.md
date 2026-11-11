@@ -47445,6 +47445,8 @@ taught in the tools' answers (the coordinator's ruling): builder_test's PREFIX_C
 characters a token) fails the test past it, and only the coordinator moves it. No bullet (builder mode is Jeff's tool). Server and builder only; protocol
 unchanged; no new class_name.
 
+841 amended (1): accept keeps decor and skylights (2026-11-10, the script's label; found by builder while laying the fallow-field tool). BuilderSession.proposal carries to the level only the config keys in CONFIG_KEYS, and "decor" (841's decor tool) and "skylights" (792's skylight tool) were never listed: each tool wrote the working copy, its answer and the preview's text said it was done, and accept laid the rest of the proposal and silently dropped them. Both now listed. builder_test _test_accept_keeps: a barrel and a skylight each accepted reach the level, and a guard reads builder_session.gd for every config key a tool writes ("config": {"key"), failing on any CONFIG_KEYS misses, so a new tool's key can't be lost so again. Nothing already accepted is changed: what was dropped never reached a level. Server and builder only, protocol unchanged, no new class_name.
+
 ## 842. Builder mode's piece tool
 
 Builder's, on the coordinator's approval of builder's catch-up list (item d); release's number. The

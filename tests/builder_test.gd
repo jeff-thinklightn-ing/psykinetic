@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	await _test_arrivals()
+	_test_accept_keeps()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1530,3 +1531,24 @@ func _test_arrivals() -> void:
 	_check(BuilderSession.holds_arrival({"regenerate": {"held": ["arrival"]}}) and not BuilderSession.holds_arrival({"regenerate": {}})
 		and not BuilderSession.holds_arrival({"outdoor": true}), "a regenerating level holding the rule: its layout's, not a warning")
 	_check("keeps %d cells clear of where a hostile monster stands or roams" % BuilderSession.LAYOUT_SENSE.ARRIVAL_CLEAR in BuilderSession.system_prompt(), "the prompt says the rule, at ARRIVAL_CLEAR")
+
+
+func _test_accept_keeps() -> void:
+	print("\n== 841 amended (1): accept keeps every config key a tool writes ==")
+	# Each tool's config writes reach the level on accept: decor and skylights were left out of the proposal.
+	var field := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var laid := field.run_tool("decor", {"at": [10, 10], "kind": "barrel"})
+	_check(laid.get("ok", false) and field.proposal().get("config", {}).has("decor"), "decor laid: the proposal carries it (%s)" % [field.proposal().get("config", {}).keys()])
+	_check(field.accept() and (field.doc.config.get("decor", []) as Array).size() == 1, "accepted: the barrel is in the level (%s)" % [field.doc.config.get("decor")])
+	var cave := _doc()
+	cave.config.erase("outdoor")
+	cave.config["zone"] = "cave"
+	var under := BuilderSession.new(cave, Rect2i(0, 0, 40, 30), "test_cave", StubClaude.new([]))
+	var gap := under.run_tool("skylight", {"at": [12, 12], "radius": 2})
+	_check(gap.get("ok", false) and under.accept() and (under.doc.config.get("skylights", []) as Array).size() == 1, "a skylight accepted: it is in the level (%s; %s)" % [gap, under.doc.config.get("skylights")])
+	# Every key a tool writes to the working copy's config is one the proposal carries.
+	var source := FileAccess.get_file_as_string("res://builder/builder_session.gd")
+	var found := RegEx.create_from_string("\"config\": \\{\"([a-z_]+)\"").search_all(source)
+	var written := found.map(func(hit: RegExMatch) -> String: return hit.get_string(1))
+	var missing := written.filter(func(key: String) -> bool: return key not in BuilderSession.CONFIG_KEYS)
+	_check(written.size() >= 5 and missing.is_empty(), "every config key a tool writes is carried on accept (%d writes; missing %s)" % [written.size(), missing])
