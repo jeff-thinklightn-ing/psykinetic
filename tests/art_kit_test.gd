@@ -641,6 +641,22 @@ func _test_changed_told() -> void:
 	_check(not icons._cache.has(ItemIcons._key(ids[0])) and icons._cache.has(ItemIcons._key(other)),
 			"%s's art changed: %s's icon is drawn again, %s's kept" % [slot, ids[0], other])
 	icons.free()
+	# A slot's "icon" (275 amended (1)): the fishing rod is pictured by its picture-only
+	# piece, every slot without one by itself, and a change to either forgets the rod's.
+	if Items.exists("fishing_rod") and ArtKit.has("item.fishing_rod.icon"):
+		_check(ItemIcons._slot("fishing_rod") == "item.fishing_rod.icon" and ItemIcons._art("fishing_rod") == "item.fishing_rod"
+				and ItemIcons._slot("item.wool") == "item.wool",
+				"the rod pictured by item.fishing_rod.icon (%s), the wool by itself (%s)" % [ItemIcons._slot("fishing_rod"), ItemIcons._slot("item.wool")])
+		var pictured := ItemIcons.new()
+		pictured._cache[ItemIcons._key("fishing_rod")] = ImageTexture.new()
+		pictured._art_changed("item.fishing_rod")
+		var gone := not pictured._cache.has(ItemIcons._key("fishing_rod"))
+		pictured._cache[ItemIcons._key("fishing_rod")] = ImageTexture.new()
+		pictured._art_changed("item.fishing_rod.icon")
+		_check(gone and not pictured._cache.has(ItemIcons._key("fishing_rod")), "the rod's picture drawn again when its held art or its picture changes")
+		pictured.free()
+	else:
+		_check(false, "the fishing rod and its picture item.fishing_rod.icon are in the kit")
 	# Every icon gets a dark rim (ItemIcons.outlined): a 2 x 2 white square on clear
 	# keeps its white, the pixel beside it is the rim's dark at full alpha, the next
 	# out the soft rim, and the corner stays clear.

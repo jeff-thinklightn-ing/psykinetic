@@ -196,7 +196,7 @@ func _art_changed(slot: String) -> void:
 		return
 	forget(slot)  # Drawn by its slot's name (768).
 	for id: String in Items.ids():
-		if _slot(id) == slot:
+		if _slot(id) == slot or _art(id) == slot:
 			forget(id)
 
 
@@ -232,6 +232,20 @@ func _draw(id: String) -> void:
 
 
 static func _slot(id: String) -> String:
+	var art := _art(id)
+	# A slot may name a picture-only piece to draw in its place (275 amended (1)):
+	# a thing too long and thin to read at a store square's size (the fishing
+	# rod) is pictured by a piece made for it, the held mesh left as it is.
+	if ArtKit.has(art):
+		var picture := str(ArtKit.spec(art).get("icon", ""))
+		if not picture.is_empty() and ArtKit.has(picture):
+			return picture
+	return art
+
+
+## The art slot [param id] is drawn with in the world: its own name, or its
+## item's "art".
+static func _art(id: String) -> String:
 	return id if is_slot(id) else str(Items.def(id).get("art", ""))
 
 

@@ -5347,6 +5347,22 @@ whether placeholders are on; `forget(id)` (or `forget()`) draws again,
 for when art-kit says an item's art changed (a signal of theirs, asked
 for). Client only: nothing is sent, and the protocol is unchanged.
 
+275 amended (1) (art-kit; label by tools/decision_number.sh; ui-design's store window finding, from Jeff's
+11-05 "difficult to see the items because of the small image on brown backgrounds"): a slot may name a
+picture-only piece, "icon", that ItemIcons draws in its place. ItemIcons._slot(id) gives the art slot's
+"icon" when it names a slot in the kit, else the slot as before; _art(id) keeps the slot drawn in the world,
+and _art_changed forgets the picture when either changes. First user: the fishing rod. Its held mesh is 1.8 m
+by 3 cm, under 2 px wide at a store square's 88 px and the spear's twin; thickening it would make a club in
+the hand, and the line and float are FishingView's, off its "tip" socket. item.fishing_rod.icon, a cell
+nobody places: the rod shortened to 0.85 m and sturdier, its line wound pale round the butt, a red-over-white
+float on a short line off the tip, built on the icon's diagonal in the plane facing ItemIcons' camera (the
+tip up and right, as the spear lies), so pose() leaves it standing and the float hangs straight down
+(C:/dev/review/fishing/make_fishing.py rod_icon, 288 tris; strips at 59, 88 and 128 px beside the spear and
+wool, C:/dev/review/rod_icon/rod_icon_strip.png; ui-design's go). item.fishing_rod's override carries
+"icon". ItemIcons' framing (long pieces scaled across, a lighter rim) is ui-design's, after this. art_kit_test
+checks the rod's picture and the forgetting. Client only, protocol unchanged, no new class_name; a bullet in
+voice's words.
+
 ## 301. The town's store in builder mode: a prefab, a chest's use, and a check
 
 Economy's pieces get into real levels through builder mode, not by hand
