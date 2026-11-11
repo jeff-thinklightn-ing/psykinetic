@@ -37127,7 +37127,13 @@ every phase 3 run since 5605063a2, the passing ones too (one's right was the wal
 way" now also counts the first two cells of the straight line (World.line_cells) from the body's cell to
 the route's next point. A route not pulled is unchanged (its next point is the next cell). controls_test
 _test_free_route_held: a route pulled to (11, 3), another player at (8, 3), from (7.2, 3.0): in the way
-and waited for. Client only; protocol unchanged; no new class_name.
+and waited for. _test_free_head_on_pulled (the coordinator's ask for a case timing can't pass by luck): the
+test room's two-cell passage, each route pulled straight down column 20, the other player held on (20, 24),
+each side walked 1.5 s in turn (each client decides alone from where the other stands): going south (its
+right the x 19 wall) it stands, going north (its right x 21) it steps across; one sidestep of the two. On
+5605063a2: "2 of the two stepped aside (want 1)", the south one planned round by x 21 at the backstop.
+Companions' landing failed phase 3 a third way, the same cause: both planned round to row 11, both rights
+shut there, both given up ("got 02"). Client only; protocol unchanged; no new class_name.
 
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 

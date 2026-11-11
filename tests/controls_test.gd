@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_free_pull_beside_a_talker()
 	_test_free_route_held()
 	_test_free_route_passage()
+	_test_free_head_on_pulled()
 	_test_free_no_headway()
 
 	print("")
@@ -1266,6 +1267,58 @@ func _test_free_route_passage() -> void:
 	holder.queue_free()
 	World.despawn(second)
 	second.queue_free()
+	_stop_walk()
+	Net.controls = saved
+
+
+## 724 amended (6) (voice's landing, net_test phase 3): two players head on
+## in the two-cell passage (x 20 and 21), each on a route pulled straight to
+## the far end of column 20 (_free_pull), the other standing on it between.
+## Each client decides alone from where the other stands, so each side is
+## walked here in turn against the other held: going south (its right, x 19,
+## the wall) the body stands and waits; going north (its right, x 21, open) it
+## steps across. One sidestep in all. On 5605063a2 neither counted the other
+## in the way (no cell between on a pulled route) and the backstop planned
+## both round by x 21: two.
+func _test_free_head_on_pulled() -> void:
+	print("\n== two players head on, routes pulled straight: one steps its own right, the other waits ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(20, 25)) <= 12:
+			World.despawn(entity)
+	var stepped := 0
+	for side: Array in [[Vector2i(20, 21), Vector2i(20, 29), "south"], [Vector2i(20, 27), Vector2i(20, 20), "north"]]:
+		var player := _place_player(side[0])
+		_free_start(player)
+		_main._free_route(player, side[1])
+		_main._free["path"] = [side[1]]  # Pulled straight to its end, as _free_pull leaves it.
+		var holder := _held_body("player", Vector2i(20, 24))
+		var widest := 0.0
+		for i in 90:  # 1.5 s
+			if i % 6 == 0:
+				# The passage holds only the two (his companion, brought back
+				# beside him, stood on (21, 25) and shut the right: a first run).
+				for cell_y in range(19, 31):
+					for cell_x: int in [20, 21]:
+						var occupant := World.get_entity_at(Vector2i(cell_x, cell_y))
+						if occupant != null and occupant != player and occupant != holder:
+							World.despawn(occupant)
+			player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+			_main._free_drive(1.0 / 60.0)
+			if i % 6 == 5:
+				World.step()
+			widest = maxf(widest, player.free_pos.x - 20.0)
+		var across := widest > 0.4
+		if across:
+			stepped += 1
+		var want_across: bool = side[2] == "north"
+		_check(across == want_across,
+				"going %s from %s on a route pulled to %s, the other on (20, 24): %s (furthest off column 20: %.2f; at %s)" % [side[2], side[0], side[1],
+				"stepped across to x 21" if across else "stood, its right the wall", widest, player.free_pos])
+		World.despawn(holder)
+		holder.queue_free()
+	_check(stepped == 1, "head on in the passage: %d of the two stepped aside (want 1)" % stepped)
 	_stop_walk()
 	Net.controls = saved
 
