@@ -677,9 +677,10 @@ var _fire: Dictionary[Vector2i, bool] = {}
 ## Decision 740 (Jeff: "animals should keep distance from noise and fire ...
 ## deer should hear the towns noise radius and not cluster around the
 ## town"): the din wildlife keeps out of, each source's radius in cells (a
-## town's its base and per resident, at most town_most; F7's "din.*").
-## Fights are heard for fight_seconds.
-var din_rules := {"town_base": 8.0, "town_per_resident": 0.5, "town_most": 20.0, "fire": 6.0, "fight": 10.0,
+## town's its farthest standing building and town_margin past it, at least
+## town_base, 740 amended (1); F7's "din.*"). Fights are heard for
+## fight_seconds.
+var din_rules := {"town_base": 8.0, "town_margin": 10.0, "fire": 6.0, "fight": 10.0,
 	"fight_seconds": 30.0, "player": 4.0}
 var _fights: Array[Array] = []  # [zone name, cell, tick]
 ## Who is fighting whom (804, combat's side), server only: each player's foes
@@ -12104,8 +12105,9 @@ func out_of_din(cell: Vector2i, din: Dictionary, predator := false) -> Vector2i:
 
 
 ## The zone's din sources, made again once a second: each town (a
-## stockpile place, its residents), each fire cell (one source to the cells
-## within 3 of it), each fight heard lately, each player.
+## stockpile place, out to its standing buildings: _town_reach), each fire
+## cell (one source to the cells within 3 of it), each fight heard lately,
+## each player.
 func _din_sources() -> void:
 	if zone == null:
 		return
@@ -12121,8 +12123,8 @@ func _din_sources() -> void:
 			var place := holdings.place(id)
 			if str(place.get("kind", "")) != "stockpile":
 				continue
-			var people := towns.residents(id).size() if towns != null else 0
-			var radius := minf(float(din_rules["town_base"]) + people * float(din_rules["town_per_resident"]), float(din_rules["town_most"]))
+			var reach := _town_reach(id, place["cell"])
+			var radius := maxf(float(din_rules["town_base"]), reach + float(din_rules["town_margin"])) if reach >= 0.0 else float(din_rules["town_base"])
 			_din.append({"from": place["cell"], "radius": radius, "kind": "town"})
 	var fires: Array[Vector2i] = []
 	for cell: Vector2i in _fire:
@@ -12138,6 +12140,29 @@ func _din_sources() -> void:
 	for entity in sought():
 		if entity is Player and entity.spawned:
 			_din.append({"from": entity.tile, "radius": float(din_rules["player"]), "kind": "player"})
+
+
+## How far town [param town_id]'s standing buildings in the open zone reach
+## from [param from] (740 amended (1); Jeff's "not cluster around the
+## town": Umbrage's houses stood to 24 cells while its din was 16): the
+## farthest cell of any of its town buildings (Fields.town_buildings, the
+## level's and its grown plots) that is not only planned and not gone, by
+## Towns (a client's by the "town" message). -1 with none. Made with the
+## din, so a building that rises counts from then on.
+func _town_reach(town_id: String, from: Vector2i) -> float:
+	var told: Dictionary = towns.buildings_of(town_id) if towns != null else towns_seen.get(town_id, {})
+	var reach := -1.0
+	for building: Dictionary in fields.town_buildings:
+		if str(building.get("town_id", "")) != town_id:
+			continue
+		var state := str(told.get(building.get("use", ""), {}).get("state", Towns.STANDING))
+		if state == Towns.PLANNED or state == "gone":
+			continue
+		var rect: Rect2i = building["rect"]
+		for corner: Vector2i in [rect.position, rect.position + Vector2i(rect.size.x - 1, 0),
+				rect.position + Vector2i(0, rect.size.y - 1), rect.end - Vector2i.ONE]:
+			reach = maxf(reach, Vector2(corner - from).length())
+	return reach
 
 
 ## F7's din radii (673's panel; decision 740).

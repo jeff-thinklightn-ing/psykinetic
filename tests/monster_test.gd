@@ -4014,6 +4014,57 @@ func _test_din() -> void:
 	_check(World.din_at(Vector2i(26, 10)).get("kind") == "fire" and World.din_at(Vector2i(26, 10), true).get("kind") == "fire",
 			"a fire's din, heeded by prey and wolf alike")
 	World._fire.erase(Vector2i(28, 10))
+	# 740 amended (1): a town's din reaches its farthest standing building and town_margin past it.
+	var town_id := "mt_din/square"
+	var inn := {"rect": Rect2i(10, 5, 3, 3), "use": "inn", "town_id": town_id}
+	World.fields.town_buildings.append(inn)
+	var reach := Vector2(Vector2i(12, 7) - town_at).length()
+	World._din_tick = -1000000
+	var grown := World.din_at(town_at)
+	_check(is_equal_approx(float(grown.get("radius", -1.0)), reach + float(World.din_rules["town_margin"]))
+			and World.din_at(town_at + Vector2i(15, 0)).get("kind") == "town",
+			"a town's din reaches its farthest standing building, %.1f off, and %.0f past it (%s)" % [reach, World.din_rules["town_margin"], grown])
+	World.towns_seen[town_id] = {"inn": {"state": Towns.PLANNED}}
+	World._din_tick = -1000000
+	var planned := float(World.din_at(town_at).get("radius", -1.0))
+	World.towns_seen[town_id] = {"inn": {"state": Towns.STANDING}}
+	World._din_tick = -1000000
+	var risen := float(World.din_at(town_at).get("radius", -1.0))
+	_check(is_equal_approx(planned, float(World.din_rules["town_base"])) and is_equal_approx(risen, reach + float(World.din_rules["town_margin"])),
+			"only planned, it counts for nothing (%.1f); risen, the din grows with it (%.1f)" % [planned, risen])
+	# A grazing herd's home never in a town's or fire's din; a hunter's rules its own.
+	var herd_rules := {"species": {"deer": {"size": [1, 1], "mix": {"deer": 1}}, "wolf": {"size": [1, 1], "mix": {"wolf": 1}, "prey": ["deer"]}}}
+	var herd_areas := {"mt_din": {"floor": {}, "outdoor": true, "herds": {}, "peopled": [], "safe_paths": {}, "fords": {}}}
+	var herds := Herds.new({}, herd_areas, herd_rules)
+	var made_at: Array[Vector2i] = []
+	herds.spawn = func(spec: Dictionary) -> Variant:
+		made_at.append(spec["tile"])
+		return true
+	herds.free_near = func(cell: Vector2i, _reach: int) -> Vector2i: return cell
+	var inside := town_at + Vector2i(3, 0)  # East of the store, where the room has floor past the din.
+	var far := town_at + Vector2i(22, 0)
+	_check(not herds.may_home("mt_din", "deer", inside) and herds.may_home("mt_din", "wolf", inside) and herds.may_home("mt_din", "deer", far),
+			"a deer herd may not home in the town's din; a wolf's rules are its own; past the din it may")
+	var group := herds._add_group("mt_din", "deer", inside, 1.0)
+	herds._make_body(group)
+	var home_off := Vector2(group["home"] - town_at).length()
+	_check(home_off > risen and not made_at.is_empty() and Vector2(made_at[0] - town_at).length() > risen,
+			"a herd whose home is in the din moves out with its first body (home %.1f off, body %s)" % [home_off, made_at])
+	# A building risen on a herd's home: the din grows over it, and the herd moves out.
+	World.fields.town_buildings.erase(inn)
+	World._din_tick = -1000000
+	var edge := town_at + Vector2i(11, 0)
+	var under := herds._add_group("mt_din", "deer", edge, 1.0)
+	var free_before := herds.may_home("mt_din", "deer", edge)
+	World.fields.town_buildings.append(inn)
+	World._din_tick = -1000000
+	made_at.clear()
+	herds._make_body(under)
+	var under_off := Vector2(under["home"] - town_at).length()
+	_check(free_before and under_off > risen and not made_at.is_empty() and Vector2(made_at[0] - town_at).length() > risen,
+			"a building rising by a herd's home (%.1f off, past the base din) puts it in the din: the herd moves out (%.1f off)" % [Vector2(edge - town_at).length(), under_off])
+	World.fields.town_buildings.erase(inn)
+	World.towns_seen.erase(town_id)
 	World.holdings = was_holdings
 	World.towns = was_towns
 	World._din_tick = -1000000

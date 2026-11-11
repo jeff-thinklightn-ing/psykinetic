@@ -38243,6 +38243,35 @@ doe grazing in it walks out and grazes past its edge, never fleeing; a
 player's din keeps prey off but not a wolf, who heeds a town's; a fight's
 din, gone after fight_seconds; a fire's, heeded by both. Server only,
 protocol unchanged, no new class_name.
+
+740 amended (1) (the decision-number script's label; the coordinator's
+approval, its margin of 10, Umbrage first): a town's din reaches its
+farthest standing building and town_margin 10 cells past it, at least
+town_base 8 (World._town_reach: the farthest corner of any of its
+Fields.town_buildings, by Towns' state not only planned and not gone, made
+with the din once a second, so a building that rises counts from then on).
+Before, it was town_base plus 0.5 a resident, at most 20: Umbrage's was 16
+while its inn and forge stood to 27.8 and 25.3 cells from the store, and a
+deer herd whose home roamed in grazed in a ring at the din's edge, among
+the outer houses. F7's din fields: town_margin in, town_per_resident and
+town_most gone. A grazing herd's home is never in a town's or a fire's din
+(Herds.may_home, by Herds._in_din, World.din_at as a predator heeds it:
+no fight's, no player's; read for the open zone only), and one found there
+(roamed in, or a building risen on it) moves out with its herd's next body
+(Herds._make_body, World.out_of_din). A hunter's herd (its rule names
+"prey": the wolves) is untouched. Measured on the real wilds with
+Umbrage's ten seated folk and one player in the square, a sim day sampled
+each hour: its din 37.8 (the inn's far corner 27.8 + 10); a fresh world
+0 of 288 deer samples in the din before, 0 of 144 after (the nearest herd
+45 and 50 cells off); a herd home put 10 cells from the store 4 of 144
+inside before (median 17 to 18 cells), after moved to 40 with 0 inside
+(37.9 to 44.4, median 40.4); a home at 4 cells 5 of 144 before, after 0
+(37.9 to 45.2, median 40.6). The din is a circle about the store, so its
+open north side keeps herds as far as the inn's side does. monster_test
+_test_din: a standing inn's reach, a planned one counting nothing, a herd
+home refused in the din, one there moved out with its first body, a
+building rising moving a herd. Server only, protocol unchanged, no new
+class_name. One CHANGELOG bullet in voice's words.
 ## 623, terrain's side: the horizon under the low camera
 
 Jeff on the low camera: "the hills are readable the landmarks visible.

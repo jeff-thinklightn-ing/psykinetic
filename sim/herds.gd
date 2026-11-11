@@ -197,12 +197,16 @@ func barred(area: String, species: String) -> bool:
 ## (397 amended): not barred there, at least its rule's keep_off cells
 ## (Chebyshev) from every place and link pad of the area, and (763,
 ## economy's side: Jeff's safe paths) at least its path_keep_off cells from
-## every cell of the area's roads and dirt tracks (its "safe_paths").
+## every cell of the area's roads and dirt tracks (its "safe_paths"). A
+## grazing herd's never in a town's or a fire's din (740 amended (1)):
+## _in_din.
 func may_home(area: String, species: String, cell: Vector2i) -> bool:
 	if barred(area, species):
 		return false
 	if areas.get(area, {}).get("fords", {}).has(cell):
 		return false  # A ford is walked through, never lived on (maps' 776).
+	if _in_din(area, species, cell):
+		return false
 	var keep_off := int(_species(species).get("keep_off", 0))
 	if keep_off > 0:
 		for at: Vector2i in areas.get(area, {}).get("peopled", []):
@@ -217,6 +221,20 @@ func may_home(area: String, species: String, cell: Vector2i) -> bool:
 				if paths.has(cell + Vector2i(dx, dy)):
 					return false
 	return true
+
+
+## Whether [param cell] of [param area] is in a town's or a fire's din
+## (World.din_at's, as a predator heeds it: no fight's, no player's) for a
+## grazing [param species] (740 amended (1): a home there kept its herd in a
+## ring at the town's edge, among Umbrage's outer houses). A hunter's
+## (its rule names "prey") never: wolves keep their own rules. Read for the
+## open zone only, the one whose din World makes; an area elsewhere is
+## weighed when it opens (_make_body moves a home found in it).
+func _in_din(area: String, species: String, cell: Vector2i) -> bool:
+	if _species(species).has("prey") or World.zone == null or World.zone.name != area:
+		return false
+	var din := World.din_at(cell, true)
+	return not din.is_empty() and str(din.get("kind", "")) in ["town", "fire"]
 
 
 ## [param area]'s groups of a species it no longer keeps (barred) dropped,
@@ -778,6 +796,12 @@ static func _bodies_in(area: String) -> Variant:
 ## One of [param each]'s kept animals made a body near its home: false
 ## (nothing made) if there is no room there.
 func _make_body(each: Dictionary) -> bool:
+	if _in_din(str(each["area"]), str(each["species"]), each["home"]):
+		# Its herd's home in a town's or fire's din (740 amended (1): a home
+		# roamed there, or a building risen on it): the herd moves out first.
+		var moved := World.out_of_din(each["home"], World.din_at(each["home"], true), true)
+		if moved != World.NO_CELL:
+			each["home"] = moved
 	var home: Vector2i = each["home"]
 	var tile: Vector2i = free_near.call(home, 4) if free_near.is_valid() else home
 	if tile == World.NO_CELL:
