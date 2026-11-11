@@ -268,7 +268,7 @@ func _tend_move() -> bool:
 			var toward: Vector2 = _move["toward"]
 			_move = {}
 			if World.rush(self, toward, int(spring["cells"]), {"blow": {"impulse": 0.0}, "within": World.told_cells(told)}):  # Never past its told end (780 amended (27)).
-				_move = {"move": "rush", "telegraph": told}
+				_move = {"move": "rush", "telegraph": told, "toward": toward}
 				return true
 			World.end_telegraph(told, false)
 			_log_move("lunge", "no room")
@@ -313,19 +313,25 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 	if entity != self or _move.get("move", "") != "rush":
 		return
 	var told := int(_move.get("telegraph", 0))
+	var toward: Vector2 = _move.get("toward", Vector2(facing))
 	_move = {}
 	var bitten: GridEntity = null
+	var stunned_until := -1
 	for each: Variant in result.get("struck", []):
 		var met: Variant = each.get("body") if each is Dictionary else null
 		if met is GridEntity and is_instance_valid(met) and met != self and (met as GridEntity).spawned \
 				and not (met is Monster and _same_pack(met as Monster)):
 			bitten = met
+			stunned_until = int(each.get("stunned_until", -1))
 			break
 	if bitten == null and is_instance_valid(target) and target.spawned and World.distance(tile, target.tile) <= 1 \
 			and _on_told(target, told):
 		bitten = target  # Run up to them on his line: the bite at its end. Stepped off it, they're clear (780 amended (23)).
 	if bitten != null:
-		World.damage(bitten, int(spring["damage"]), self, &"attack")
+		# Told (340 amended (4)): a raised shield facing his line takes the bite; his drag unchanged.
+		var harm := World.told_guard(bitten, self, int(spring["damage"]), toward, stunned_until)
+		if harm > 0:
+			World.damage(bitten, harm, self, &"attack")
 		var drag := _drag_way(bitten)
 		if drag != Vector2.ZERO and is_instance_valid(bitten) and bitten.spawned and bitten.hp > 0:
 			World.launch(self, bitten, drag, float(spring["drag"]))

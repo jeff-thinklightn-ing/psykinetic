@@ -10604,9 +10604,10 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 			state["reason"] = "body"
 			state["stopped_by"] = body.name
 			if not blow.is_empty():
+				var before := body.stunned_until_tick  # Before its blow staggers it: the site's told_guard reads this (340 amended (4)).
 				var landed := apply_blow(entity, body, {"impulse": float(blow.get("impulse", 0.0)),
 						"direction": line, "stagger": int(blow.get("stagger", -1))})
-				state["struck"].append({"body": body, "cells": landed["distance"], "impact": landed["impact_damage"]})
+				state["struck"].append({"body": body, "cells": landed["distance"], "impact": landed["impact_damage"], "stunned_until": before})
 			return
 		var u: float = float(state["u"]) / drag  # Its speed in this cell.
 		var m1 := pushed_mass(entity)

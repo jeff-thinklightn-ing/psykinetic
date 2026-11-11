@@ -494,13 +494,13 @@ func _tend_move() -> bool:
 	match move:
 		"swipe":
 			var swept := _bodies(cells)
-			var struck := _hit_cells(cells, int(swipe["damage"]))
+			var struck := _hit_cells(cells, int(swipe["damage"]), _move["toward"])
 			World.sweep(self, _move["toward"], float(swipe["half_angle"]) * 2.0, int(ceil(float(swipe["length"]))), {"impulse": float(swipe["impulse"]), "only": swept})  # A body spared is not pushed (810).
 			World.end_telegraph(id, true)
 			_log_move(move, "landed on %d" % struck if struck > 0 else "dodged")
 		"slam":
 			var hit := _bodies(cells)
-			_hit_cells(cells, int(slam["damage"]))
+			_hit_cells(cells, int(slam["damage"]), Vector2.ZERO)  # A ring: read by its body.
 			World.sweep(self, _move["toward"], 360.0, 1, {"impulse": float(slam["impulse"]), "only": hit})  # A body spared is not pushed (810).
 			for each in hit:
 				if is_instance_valid(each) and each.spawned:
@@ -511,7 +511,7 @@ func _tend_move() -> bool:
 			# Its told line stays down until the rush stops (810 amended (2)): ended in _on_rush_ended.
 			if World.rush(self, _move["toward"], int(charge["cells"]), {"blow": {"impulse": float(charge["impulse"])},
 					"within": World.told_cells(id)}):  # Never past its told end (780 amended (27)).
-				_move = {"move": "rush", "telegraph": id}
+				_move = {"move": "rush", "telegraph": id, "toward": _move["toward"]}
 				return true
 			World.end_telegraph(id, false)
 			_log_move(move, "no room")
@@ -532,12 +532,16 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 	if entity != self or _move.get("move", "") != "rush":
 		return
 	var told := int(_move.get("telegraph", 0))
+	var toward: Vector2 = _move.get("toward", Vector2(facing))
 	_move = {}
 	var hit := 0
 	for each: Variant in result.get("struck", []):
 		var met: Variant = each.get("body") if each is Dictionary else null
 		if met is GridEntity and is_instance_valid(met) and met != self and (met as GridEntity).spawned:
-			World.damage(met, int(charge["damage"]), self, &"attack")
+			# Told (340 amended (4)): a raised shield facing its line takes it; its blow's throw unchanged.
+			var harm := World.told_guard(met, self, int(charge["damage"]), toward, int(each.get("stunned_until", -1)))
+			if harm > 0:
+				World.damage(met, harm, self, &"attack")
 			hit += 1
 	World.end_telegraph(told, true)  # Landed, as ever; its told line down till now (810 amended (2)).
 	if hit > 0:
@@ -560,12 +564,16 @@ func _bodies(cells: Array[Vector2i]) -> Array[GridEntity]:
 	return out
 
 
-## [param damage] to each body on [param cells]; how many.
-func _hit_cells(cells: Array[Vector2i], damage: int) -> int:
+## [param damage] to each body on [param cells]; how many. Told (340
+## amended (4)): a raised shield facing [param way] (its told line; ZERO, a
+## ring, reads its body) takes it (World.told_guard); its push unchanged.
+func _hit_cells(cells: Array[Vector2i], damage: int, way: Vector2) -> int:
 	var hit := _bodies(cells)
 	for each in hit:
 		_join(each)
-		World.damage(each, damage, self, &"attack")
+		var harm := World.told_guard(each, self, damage, way)
+		if harm > 0:
+			World.damage(each, harm, self, &"attack")
 	if not hit.is_empty():
 		_blow_tick = World.tick
 	return hit.size()

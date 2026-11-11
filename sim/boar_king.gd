@@ -438,7 +438,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 			continue
 		if met is Animal and (met as Animal).escort_lead == self:
 			continue  # His own sounder: shouldered past.
-		_gore(met as GridEntity, toward)
+		_gore(met as GridEntity, toward, int(each.get("stunned_until", -1)))
 		hit += 1
 	if hit > 0:
 		_log_move("charge", "landed on %d (%s)" % [hit, reason])
@@ -457,8 +457,11 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 
 
 ## [param body] met by his run: its damage, never below 1 hp for a player or
-## companion, and knocked aside off the line.
-func _gore(body: GridEntity, toward: Vector2) -> void:
+## companion, and knocked aside off the line. Told (340 amended (4)): a
+## raised shield facing his line takes the damage (World.told_guard, read
+## with [param stunned_until] before his blow and his knock); the knock and
+## its impact unchanged.
+func _gore(body: GridEntity, toward: Vector2, stunned_until := -1) -> void:
 	var damage := int(charge["damage"])
 	if not body is Monster:
 		damage = mini(damage, body.hp - 1)
@@ -467,6 +470,7 @@ func _gore(body: GridEntity, toward: Vector2) -> void:
 	# on top (playtest's run: 6 and 2 of impact, 8).
 	var knock := body is Monster or body.max_hp <= 0 \
 			or float(body.hp - damage) >= float(charge["not_below"]) * float(body.max_hp)
+	damage = World.told_guard(body, self, damage, toward, stunned_until)
 	if knock:
 		var aside := Vector2(-toward.y, toward.x)
 		var cell := body.tile + Vector2i(roundi(aside.x), roundi(aside.y))
