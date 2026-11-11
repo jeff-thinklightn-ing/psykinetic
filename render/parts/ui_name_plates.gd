@@ -6,6 +6,11 @@ extends Control
 ## zoom and depth, its foot just over the head. Nearer names are placed first; a
 ## plate that would meet a placed one steps up one plate, and one that still
 ## meets fades to SHADED. A boss's name carries its skull, left of the words.
+## On the screen's edge (865, the coordinator's note on animation's Umbrage
+## film, 11-11): a head off the screen, or nearer the lens than NEAR, has no
+## plate; a plate whose head is on the screen but whose words would cross its
+## edge is held inside it, EDGE in; and a step up that would leave the top
+## fades in place instead. A name is never clipped and never grows.
 ## The view says what to draw: [member source] returns this frame's names, each
 ## {key, text, tint, plain, at (the head's screen point), depth, boss}; which
 ## names show, their words and tints stay the view's (Client3D.name_plates).
@@ -17,6 +22,11 @@ const SHADED := 0.4
 ## Between the head and the plate's foot, and between two stacked plates.
 const LIFT := 10.0
 const GAP := 6.0
+## A head nearer the camera than this (in metres along its view) has no plate:
+## its body fills that part of the view and the plate would cover it.
+const NEAR := 1.5
+## A plate held inside the screen stays this far from its edge.
+const EDGE := 8.0
 
 ## Returns this frame's names (Client3D.name_plates).
 var source: Callable
@@ -49,7 +59,7 @@ func _draw() -> void:
 	var size := get_theme_font_size(&"font_size", &"NameText")
 	var plate := get_theme_stylebox(&"panel", &"NamePlate")
 	var colour := get_theme_color(&"font_color", &"NameText")
-	for one: Dictionary in place(source.call(), font, size, plate):
+	for one: Dictionary in place(source.call(), font, size, plate, get_rect()):
 		var rect: Rect2 = one["rect"]
 		var alpha: float = one["alpha"]
 		var entry: Dictionary = one["entry"]
@@ -71,14 +81,20 @@ func _draw() -> void:
 ## [param entries] laid out: each its plate's rect and alpha, nearer first, the
 ## rest stepped up one plate or faded where they would meet a placed one.
 ## Sorts [param entries] in place; the result is this part's own array, reused.
-func place(entries: Array, font: Font, size: int, plate: StyleBox) -> Array[Dictionary]:
+## With [param screen], heads off it or nearer than NEAR get no plate and each
+## plate is held EDGE inside it.
+func place(entries: Array, font: Font, size: int, plate: StyleBox, screen := Rect2()) -> Array[Dictionary]:
 	if _measured_at != size:
 		_widths.clear()
 		_measured_at = size
 	entries.sort_custom(_nearer)
 	_placed.clear()
 	var height := font.get_height(size) + plate.get_margin(SIDE_TOP) + plate.get_margin(SIDE_BOTTOM)
+	var held := screen.has_area()
+	var inside := screen.grow(-EDGE)
 	for entry: Dictionary in entries:
+		if held and (float(entry["depth"]) < NEAR or not screen.has_point(entry["at"])):
+			continue
 		var text := str(entry["text"])
 		if not _widths.has(text):
 			_widths[text] = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
@@ -87,12 +103,17 @@ func place(entries: Array, font: Font, size: int, plate: StyleBox) -> Array[Dict
 			width += size + plate.get_margin(SIDE_LEFT) * 0.5
 		var at: Vector2 = entry["at"]
 		var rect := Rect2(at.x - width / 2.0, at.y - LIFT - height, width, height)
+		if held:
+			rect.position = rect.position.clamp(inside.position, (inside.end - rect.size).max(inside.position))
 		var alpha := 1.0
 		var hit: Variant = _meets(rect)
 		if hit != null:
-			rect.position.y = (hit as Rect2).position.y - height - GAP
-			if _meets(rect) != null:
+			var up := rect
+			up.position.y = (hit as Rect2).position.y - height - GAP
+			if (held and up.position.y < inside.position.y) or _meets(up) != null:
 				alpha = SHADED
+			else:
+				rect = up
 		if _pool.size() <= _placed.size():
 			_pool.append({})
 		var one: Dictionary = _pool[_placed.size()]

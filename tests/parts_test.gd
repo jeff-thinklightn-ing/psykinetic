@@ -314,6 +314,21 @@ func _test_name_plates() -> void:
 	var third := {"key": 4, "text": "Bram", "at": Vector2(1005, 602), "depth": 10.0, "plain": true}
 	placed = plates.place([near, far, third], font, size, plate)
 	_check(placed[2]["alpha"] == UiNamePlates.SHADED, "a third that still meets is faded")
+	# The screen's edge (865, animation's Umbrage film: names between the lens
+	# and the player grew and were clipped by the frame).
+	var screen := Rect2(0, 0, 3840, 2160)
+	var off_top := {"key": 5, "text": "Hazel", "at": Vector2(1500, -40), "depth": 3.0, "plain": true}
+	var at_lens := {"key": 6, "text": "Maud", "at": Vector2(2500, 900), "depth": 0.8, "plain": true}
+	var high := {"key": 7, "text": "Agnes", "at": Vector2(3830, 30), "depth": 2.5, "plain": true}
+	var under := {"key": 8, "text": "Isolde", "at": Vector2(3800, 40), "depth": 4.0, "plain": true}
+	placed = plates.place([off_top, at_lens, high, under], font, size, plate, screen)
+	_check(placed.size() == 2 and placed[0]["entry"] == high and placed[1]["entry"] == under,
+		"a head off the screen, or nearer the lens than NEAR, has no plate (%d placed)" % placed.size())
+	var held: Rect2 = placed[0]["rect"]
+	var inside := screen.grow(-UiNamePlates.EDGE)
+	_check(inside.encloses(held) and is_equal_approx(held.size.y, a.size.y), "a head on the screen's edge keeps its plate whole, held inside it, the same size (%s)" % held)
+	var faded: Rect2 = placed[1]["rect"]
+	_check(inside.encloses(faded) and placed[1]["alpha"] == UiNamePlates.SHADED, "and one that can't step up past the top fades in place, still inside (%s)" % faded)
 	remove_child(plates)
 	plates.free()
 	var client := Client3D.new()  # Never in the tree: the layers alone.
