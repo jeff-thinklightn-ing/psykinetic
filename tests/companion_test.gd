@@ -136,6 +136,7 @@ func _ready() -> void:
 	_test_follow_without_backsteps()
 	_test_follow_a_creep()
 	_test_one_cell_door()
+	_test_doorway_bound()
 	_test_mind_log_no_names()
 	_test_mines_a_seam()
 	_test_mines_only_at_a_seam()
@@ -5459,6 +5460,67 @@ func _test_one_cell_door() -> void:
 	for i in 60:
 		World.step()
 	_check(not World.walk_path(owner.tile, Vector2i(5, 0), owner).is_empty(), "and has a route out, she at %s" % [pet.tile])
+	World.unregister_door(door)
+	door.free()
+	World._set_terrain(_main._terrain)
+	for entity: GridEntity in moved:
+		World._relocate(entity, moved[entity])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+func _test_doorway_bound() -> void:
+	print("
+== her player in a doorway, his heel cell sealed inside: a bounded search, then a step toward him (818 amended (2)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	# A wide field (rows 0..39, 60 across: 2400 cells, past the bound), a
+	# one-cell entry (5, 40), the door between it and the hut (5, 41); the
+	# hut's floor rows 41..44. He stands in the door's inside cell facing
+	# out, so his heel cell is inside behind him and her only way to it is
+	# through him (animation's realmap run: 1020 ms a tick at Umbrage's door).
+	var floor_cells: Array[Vector2i] = [Vector2i(5, 40)]
+	for y in 40:
+		for x in 60:
+			floor_cells.append(Vector2i(x, y))
+	for y in range(41, 45):
+		for x in range(2, 9):
+			floor_cells.append(Vector2i(x, y))
+	var door_key := Terrain.edge_key(Vector2i(5, 40), Vector2i(0, 1))
+	var moved := {}
+	for entity in World.get_entities():
+		if entity != owner and entity != pet and entity.spawned and floor_cells.has(entity.tile):
+			moved[entity] = entity.tile
+			World._relocate(entity, Vector2i(80 + moved.size(), 80))
+	World._set_terrain({"floor": floor_cells, "fire": [], "edges": {door_key: Terrain.Edge.DOOR}, "torches": []})
+	var door: Door = load("res://sim/door.gd").new()
+	door.key = door_key
+	World.register_door(door)
+	door.open = true
+	_put(owner, Vector2i(5, 41))
+	World.face(owner, Vector2i(0, -1))
+	_put(pet, Vector2i(5, 36))
+	var sealed := Heel.cell(pet, owner, {}, Vector2i(0, -1))
+	_check(sealed.y > 41 and World.find_path(pet.tile, sealed, false, null, 0, false, {}, true, World.PATH_FIRE_AVOID).is_empty(),
+			"his heel cell is in the hut behind him, with no way to it past him (%s)" % [sealed])
+	pet.heel.catching_up = true
+	var worst := 0
+	var nearer := -1
+	var was := World.distance(pet.tile, owner.tile)
+	for i in 30:
+		var from := World.path_closed
+		World.step()
+		worst = maxi(worst, World.path_closed - from)
+		if nearer < 0 and World.distance(pet.tile, owner.tile) < was:
+			nearer = i
+	print("  (worst tick's searches closed %d cells; the bound %d; nearer him on tick %d)" % [worst, Heel.FOLLOW_SEARCH_TILES, nearer])
+	_check(worst <= Heel.FOLLOW_SEARCH_TILES + 100, "no tick's search closes more than the bound and a short way to him (%d, bound %d)" % [worst, Heel.FOLLOW_SEARCH_TILES])
+	_check(nearer >= 0 and nearer <= 5, "she steps toward him at once, no pause for no way (tick %d)" % nearer)
 	World.unregister_door(door)
 	door.free()
 	World._set_terrain(_main._terrain)

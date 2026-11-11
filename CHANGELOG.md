@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Stop in a doorway with your companion following and she comes straight to you, with no pause in the game (818 amended (2)).
 - A companion you've just met carries a bandaging kit and bandages your wounds when things are quiet, once you're down a fifth of your health, and tells you the first time that she's seeing to it (681 amended (1))
 - When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))
 - Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3))

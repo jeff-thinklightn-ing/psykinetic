@@ -612,6 +612,9 @@ var _grid_steps := PackedByteArray()
 ## or closed in search number _search (the search it holds the number of),
 ## and its cost, the cell it came from and the order it was opened in, so
 ## nothing is emptied between searches.
+## The cells find_path has closed, every search summed (a test counts what
+## one search looked at; never read by the sim).
+var path_closed := 0
 var _search := 0
 var _search_opened := PackedInt32Array()
 var _search_closed := PackedInt32Array()
@@ -13125,6 +13128,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				path.append(Vector2i(origin.x + at % width, origin.y + at / width))
 				at = _search_from[at]
 			path.reverse()
+			path_closed += closed_count
 			return path
 		_search_closed[at] = stamp
 		closed_count += 1
@@ -13197,6 +13201,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			path.append(Vector2i(origin.x + at % width, origin.y + at / width))
 			at = _search_from[at]
 		path.reverse()
+	path_closed += closed_count
 	return path
 
 

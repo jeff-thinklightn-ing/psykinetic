@@ -46978,6 +46978,23 @@ finds; every other cell beside a wall, 133, 132 and 136 walks, the farthest 212 
 missed, about 10 s with the next) and _test_walled_off (a goal
 ringed by bodies: no way either way, both times printed). Server only, protocol unchanged, no new
 class_name.
+
+818 amended (2): her follow's search for a near goal is bounded tighter, then a step toward him
+(the script's label; the coordinator's ask on animation's realmap run on main: one server tick of
+1020 ms on a laptop as Isolde followed her player through Umbrage's door at (180,196); companions'
+probe on this PC, 660 to 760 ms, several a minute on that route). Heel.cell picks a heel cell
+without asking whether it can be reached (485, 678): with him in a door's inside cell facing out,
+his heel cell is in the house behind him and her only way in is his cell, so Heel.step's search
+closed STEP_SEARCH_TILES of the town before giving up, every player's tick stalled, then she
+paused NO_WAY_TICKS (685 amended). Now follow asks step with near: a goal nearer than FAR (12) is
+searched to Heel.FOLLOW_SEARCH_TILES (1000; a way round a house closes a few hundred), a FAR one
+in full as before. A heel cell with no way, her farther than CLOSE, is passed over (NO_WAY_KEPT,
+as before) and she steps toward him that tick (step to his cell, a goal she may stand by), and
+waits only if that fails too. World.path_closed sums the cells find_path closes, for tests; the sim
+never reads it. companion_test _test_doorway_bound: a 2400-cell field, a one-cell door, him in its
+inside cell facing out, her four cells out: his heel cell is behind him with no way to it; over
+30 ticks no tick's searches close more than the bound and a short way to him, and she comes nearer
+him within 5 ticks. Server only, protocol unchanged, no new class_name.
 ## 819. The pack's twelve: a third row of four
 
 Jeff, after a night's play on v0.1.206 (tonight's cache finds went to the

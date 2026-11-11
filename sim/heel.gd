@@ -77,6 +77,14 @@ const NO_ROUTE_TICKS := 20
 ## winding wilds and hills need up to 24000 for their longest (over 120 cells
 ## apart), Umbrage, the forest and the foothills 8000, the castle 2000.
 const STEP_SEARCH_TILES := 24000
+## The cells follow's search closes at most for a goal nearer than FAR
+## (step's near; 818 amended (2)): her heel cell is a few cells off, and
+## one walled off from her (a cell in the house her player stands in the
+## door of) was searched to STEP_SEARCH_TILES before giving up, 660 to 760
+## ms a tick on a desktop and 1020 on a laptop, every player's tick stalled.
+## A way round a house closes a few hundred; past this she steps toward
+## him instead, and a goal FAR off is searched in full.
+const FOLLOW_SEARCH_TILES := 1000
 ## Kept routes by body (instance id): {goal, at, path (the cells still to
 ## walk)}; failed searches: {from, goal, until}.
 static var _routes := {}
@@ -166,10 +174,18 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 		return  # No way a moment ago: she waits before asking again (685 amended).
 	var went := true
 	if heel != NONE:
-		went = step(body, heel, false, leader)
+		went = step(body, heel, false, leader, true)
 	elif distance > CLOSE:
 		# None free: as close as she can get; one that cannot get closer waits.
-		went = step(body, leader.tile, true, leader)
+		went = step(body, leader.tile, true, leader, true)
+	if not went and heel != NONE and distance > CLOSE:
+		# No way to that cell (one in the house he stands in the door of):
+		# passed over, and this tick a step toward him, not a pause (818
+		# amended (2)).
+		_no_way[heel] = World.tick + NO_WAY_KEPT
+		_goal = NONE
+		if step(body, leader.tile, true, leader, true):
+			return
 	if not went:
 		_no_way_until = World.tick + NO_WAY_TICKS
 		if heel != NONE:
@@ -362,8 +378,9 @@ static func cell(body: GridEntity, leader: GridEntity, clear := {}, way := NONE)
 ## or more and its goal may be stood on, else find_path's. A step into a
 ## cell [param leader] is walking into (keep_clear) waits instead: she
 ## stops short rather than bump (678, companions' side). False if there is
-## no way there.
-static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leader: GridEntity = null) -> bool:
+## no way there. [param near]: follow's own goals, a way to one nearer
+## than FAR searched only to FOLLOW_SEARCH_TILES (818 amended (2)).
+static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leader: GridEntity = null, near := false) -> bool:
 	if World.tick < body.next_move_tick:
 		return true
 	var id := body.get_instance_id()
@@ -382,7 +399,8 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 		path.assign(route["path"])
 	else:
 		searches += 1
-		path = World.find_path(body.tile, goal, occupied_goal_ok, null, STEP_SEARCH_TILES, false, {}, true, World.PATH_FIRE_AVOID)  # Off fire (707); bounded (818 amended).
+		var bound := FOLLOW_SEARCH_TILES if near and far < FAR else STEP_SEARCH_TILES
+		path = World.find_path(body.tile, goal, occupied_goal_ok, null, bound, false, {}, true, World.PATH_FIRE_AVOID)  # Off fire (707); bounded (818 amended, and its (2)).
 		if path.is_empty():
 			_failed[id] = {"from": body.tile, "goal": goal, "until": World.tick + NO_ROUTE_TICKS}
 			_routes.erase(id)
