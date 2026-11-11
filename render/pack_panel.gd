@@ -285,16 +285,37 @@ class SlotBox:
 
 
 ## A companion's row, "Wren's gear and pack" (787 amended (4): it shows her worn slots and her carried ones
-## under this one title; the player's own are headed Gear and Pack); a chest is "Chest".
+## under this one title; the player's own are headed Gear and Pack); a chest is "Chest", or its own name where
+## it has one (787 amended (5), title_name).
 static func title_of(entity: GridEntity) -> String:
 	if entity is Locker:
 		return "Your chest"  # Decision 722: the same 48 at every town's locker.
 	if entity is Chest:
-		return "Chest"
+		var named := title_name(String(entity.name))
+		return named if not named.is_empty() else "Chest"
 	if entity is Cargo:
 		return "Cart" if entity.capacity > Chest.SLOTS else "Crate"
 	var who := entity.label if not entity.label.is_empty() else String(entity.name)
 	return "%s's gear and pack" % who
+
+
+## A chest's own name as its window's title: [param name] stripped, when it begins with a capital
+## and holds only letters, spaces, apostrophes and hyphens ("Runner's pack", "Offering stone");
+## "" for any other (a working name such as "Chest1" or "KitChest2", a lowercase tag, an id), which
+## the window then titles "Chest". A name voice has not read stays out of a title (voice's page
+## mirrors this rule in tools/voice_inventory.py and names tests/chest_test.gd's _test_chest_titles).
+static func title_name(name: String) -> String:
+	var trimmed := name.strip_edges()
+	if trimmed.is_empty():
+		return ""
+	var first := trimmed.substr(0, 1)
+	if first.to_upper() != first or first.to_lower() == first:
+		return ""
+	for i in range(1, trimmed.length()):
+		var letter := trimmed.substr(i, 1)
+		if letter.to_upper() == letter.to_lower() and letter not in [" ", "'", "’", "-"]:
+			return ""
+	return trimmed
 
 
 func _ready() -> void:

@@ -34,6 +34,7 @@ func _ready() -> void:
 		World.step()
 
 	_test_the_chest()
+	_test_chest_titles()
 	await _test_there_and_back()
 	_test_refused()
 	_test_two_players()
@@ -381,3 +382,39 @@ func _pad(slots: Array) -> Array:
 	while out.size() < Player.SLOTS:
 		out.append("")
 	return out
+
+
+## A chest with a name of its own is titled with it (the coordinator's mend; voice's rule): the same
+## examples voice's page mirrors in tools/voice_inventory.py, and every level chest whose name passes
+## holds a chest prop, so voice's reading of "a chest is an entry with one of these props" cannot miss one.
+func _test_chest_titles() -> void:
+	print("
+== a chest's own name is its window's title ==")
+	var passes := ["Runner's pack", "Robbers' chest", "Offering stone", "Offering stone "]
+	var fails := ["KitChest1", "Chest1", " altar", "Robbers_chest", "", "chest", "Door 2"]
+	_check(passes.all(func(name: String) -> bool: return PackPanel.title_name(name) == name.strip_edges()),
+		"names that read as names pass whole (%s)" % [passes.map(func(name: String) -> String: return PackPanel.title_name(name))])
+	_check(fails.all(func(name: String) -> bool: return PackPanel.title_name(name).is_empty()),
+		"working names, ids and lowercase tags do not (%s)" % [fails.map(func(name: String) -> String: return PackPanel.title_name(name))])
+	var chest := Chest.new()
+	chest.name = "Offering stone"
+	var plain := Chest.new()
+	plain.name = "Chest3"
+	var locker := Locker.new()
+	_check(PackPanel.title_of(chest) == "Offering stone" and PackPanel.title_of(plain) == "Chest" and PackPanel.title_of(locker) == "Your chest",
+		"a named chest shows its name, a default one reads Chest, the locker stays Your chest")
+	chest.free()
+	plain.free()
+	locker.free()
+	var props := ["slots", "cache", "role", "temple", "shop", "depot", "locker"]
+	var named := 0
+	var missed: Array[String] = []
+	for level_name: String in Level.names():
+		var level := Level.load_level(level_name)
+		for spec: Variant in level.get("entities", []):
+			if spec is Dictionary and str(spec.get("script", "")) == Level.CHEST and not PackPanel.title_name(str(spec.get("name", ""))).is_empty():
+				named += 1
+				var held: Dictionary = spec.get("props", {})
+				if not props.any(func(key: String) -> bool: return held.has(key)):
+					missed.append("%s in %s" % [spec.get("name", ""), level_name])
+	_check(named >= 3 and missed.is_empty(), "%d named chests across the levels, each holding a chest prop (missed: %s)" % [named, missed])

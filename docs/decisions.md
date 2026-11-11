@@ -43994,6 +43994,19 @@ line names her, an order is read with her name taken out, and the console finds 
 "bond"), by her label or her node's name alike (Companion.names_of, named_by, answers_to), so a
 player who types the name shown always reaches her; what she is logged and spoken of as stays her
 label. resident_test reads its claims ask and its speaker by her label.
+787 amended (5) (ui, 2026-11-11; the coordinator's mend; voice's rule and bullet): a chest with a name of its own is
+titled with it. PackPanel.title_of titled every Chest "Chest", so a named chest's name (the Runner's pack, the
+Robbers' chest, the barrow's Offering stone) never reached the screen. A chest's name is its entity name (the level
+entry's "name"; unnamed ones are "Chest1", "Chest2" by count). PackPanel.title_name(name) is the rule: stripped, it
+begins with a capital and holds only letters, spaces, apostrophes and hyphens; anything else ("KitChest1", "Chest1",
+"altar", "Robbers_chest") reads "Chest", so a working name or an id never reaches a title unworded. The Locker ("Your
+chest") and Cargo ("Cart", "Crate") stay as they were. Voice's inventory mirrors the rule and warns on a passing name it
+has not read (748 amended (9)); the coordinator ruled that no level may call the barrow's chest an "Altar" (its own
+ruling, not Jeff's: his page knight-and-altar.md is unanswered), and maps' 832 renamed it before this landed.
+tests/chest_test.gd _test_chest_titles: the agreed examples both ways, a named chest and a default one, and every
+level chest whose name passes holds one of slots, cache, role, temple, shop, depot or locker. Client only; protocol
+unchanged; no new class_name.
+
 ## 788. Worn slots: head, neck, back, feet, two rings, the charm
 
 Jeff (11-03, via the coordinator): "I meant to add the other item slots like the hat, the boots,
