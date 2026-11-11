@@ -46,7 +46,7 @@ const KIND_WORDS := {
 	"robber_brute": "the biggest Mound-breaker, who swings the Tomb Sledge and smashes walls; in the robbers' camp in the barrow",
 	"bandit": "an outlaw from the forest's camps who robs travellers on its paths; on forest paths and in camps",
 	"bandit_brute": "a bigger, heavier outlaw of the forest's camps; on forest paths and in camps",
-	"astral_knight": "the spirit of a fallen holy knight of Theus, keeping watch; in the barrow's Altar Room",
+	"astral_knight": "the spirit of a fallen holy knight of Theus, keeping watch; in the barrow's First Hall, behind its bier",
 	"draugr": "the barrow's undead master, keeper of the Hall of Fallen Souls, bargains for gold, fights those who refuse; beneath the barrow's temple",
 	"wolf": "a wolf, a wild animal: hunts in the wilds, worse at night",
 	"hill_cat": "a great cat, a wild animal: lies up in the rocks and drops on what passes; in the hill rocks",
