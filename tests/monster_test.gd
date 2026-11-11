@@ -3,6 +3,7 @@ extends Node
 ## in its own manner (Monster._temper), a pack round its target rather than
 ## in a queue (Monster._pick_slot). Steps World by hand.
 
+const Walk := preload("res://tests/walk.gd")
 const SPECS := {
 	"P": {"script": "res://sim/player.gd", "shape": "capsule", "props": {"max_hp": 999}},
 	"m": {"script": "res://sim/monster.gd", "shape": "capsule"},
@@ -1826,6 +1827,8 @@ func _test_ambush() -> void:
 	World.spawn(player, Vector2i(3, 2))
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 	_test_lunge()
+	_test_told_weapons_only()
+	_test_shield_wall()
 	_test_plain_lead()
 	_test_stop_to_strike()
 	_test_heavy_cycle()
@@ -1859,6 +1862,170 @@ func _telegraph_cells(kind: String) -> Array[Vector2i]:
 			for c: Array in data["cells"]:
 				out.append(Vector2i(c[0], c[1]))
 	return out
+
+
+## 340 amended (4), weapons only (the coordinator's pick): a blow led
+## TOLD_LEAD_TICKS or more is a told one, taken whole on a raised shield,
+## but never a beast's (World.strikes_told): the wolves, the old grey, the
+## bear and the boars keep their blows as on main.
+func _test_told_weapons_only() -> void:
+	print("\n== 340 amended (4): told blows are weapons' only ==")
+	var kinds := {"w": false, "G": false, "B": false, "K": false, "x": true, "k": true, "g": true, "u": true}
+	for key: String in kinds:
+		var e := _build(["#########", "#.P%s....#" % key, "#########"])
+		var foe: Monster = e[key][0]
+		_check(World.strikes_told(foe) == kinds[key], "%s: its blows %s be told" % [foe.name, "can" if kinds[key] else "can't"])
+	var someone := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player9"}))
+	_check(World.strikes_told(someone), "a player's can")
+	someone.free()
+	# The same blow, led 6, on a raised buckler: a skeleton's whole, the grey's in part.
+	var took := {}
+	for run: String in ["k", "G", "k bare", "G bare"]:
+		var key := run.left(1)
+		var e := _build(["#########", "#.P%s....#" % key, "#########"])
+		var foe: Monster = e[key][0]
+		var player: Player = e["P"][0]
+		World.face(player, Vector2i(1, 0))
+		if not run.ends_with("bare"):
+			player.slots[Items.LEFT_HAND] = "buckler"
+			World.try_stance(player, "block")
+		_bold(foe)
+		foe.idle = Monster.Idle.NONE
+		foe.target = player
+		foe.lead_ticks = World.TOLD_LEAD_TICKS
+		foe.attack_damage = 8
+		foe.next_attack_tick = 0
+		foe.next_move_tick = 0
+		var hp := player.hp
+		_check(World.try_wind_up(foe, player, World.TOLD_LEAD_TICKS), "%s draws back on the player (%s)" % [foe.name, run])
+		for i in World.TOLD_LEAD_TICKS + 2:
+			World.step()
+		took[run] = hp - player.hp
+	_check(int(took["k bare"]) == 8 and int(took["G bare"]) == 8, "both land bare (%d, %d)" % [took["k bare"], took["G bare"]])
+	_check(int(took["k"]) == 0, "a skeleton's blow led 6 on a raised buckler: taken whole (%d through)" % took["k"])
+	_check(int(took["G"]) > 0, "the grey's bite led 6 on it: in part, as on main (%d through)" % took["G"])
+
+
+## 340 amended (4), option 4b (the coordinator's bars): a raised shield held
+## still, never striking, loses to the draugr, Brand and a brute inside
+## 3 min (it stops breathing after 1 s up, and runs dry); raised only at the
+## tell, Brand alone is beaten untouched.
+func _test_shield_wall() -> void:
+	print("\n== 340 amended (4): a still raised shield loses; raised at the tell it wins ==")
+	for row: Array in [["draugr", ""], ["robber_brute", "brand"], ["brute", ""]]:
+		for shield: String in ["shield", "buckler"]:
+			seed(2000)
+			var pair := _shield_fight(row[0], row[1], "", shield, true)
+			var foe: Monster = pair[0]
+			var player: Player = pair[1]
+			var fell := -1
+			for t in 1800:
+				var way := Senses.way_toward(player.tile, foe.tile)
+				if way != Vector2i.ZERO:
+					World.face(player, way)
+				if player.raised != "block":
+					World.try_stance(player, "block")
+				World.step()
+				if 99999 - player.hp >= 20:
+					fell = t
+					break
+			_check(fell >= 0, "%s on a still raised %s: 20 hp lost inside 3 min (%s)" % [
+					row[1] if row[1] != "" else row[0], shield, "%.1f s" % (fell / 10.0) if fell >= 0 else "never"])
+	seed(2000)
+	var pair := _shield_fight("robber_brute", "brand", "sword", "shield", false)
+	var brand: Monster = pair[0]
+	var player: Player = pair[1]
+	var won := -1
+	for t in 3000:
+		_tell_bot(player, brand)
+		World.step()
+		if not World._alive(brand) or brand.hp <= 0:
+			won = t
+			break
+		if player.hp < 99999:
+			break
+	_check(won >= 0 and player.hp == 99999, "Brand alone, sword and shield raised at his tell: beaten untouched (%s, %d hp lost)" % [
+			"%.1f s" % (won / 10.0) if won >= 0 else "not beaten", 99999 - player.hp])
+
+
+## A room 14 by 7: the player at (4,4), hp past counting, [param weapon]
+## (if any) in her right hand and [param shield] in her left; a [param kind]
+## (named [param named]) at (8,4), armed as a level arms it, after her
+## (struck once first, [param provoke], so a lurker takes her up).
+func _shield_fight(kind: String, named: String, weapon: String, shield: String, provoke: bool) -> Array:
+	var rows: Array[String] = ["################"]
+	for y in 7:
+		rows.append("#...P..........#" if y == 3 else "#..............#")
+	rows.append("################")
+	var e := _build(rows)
+	var player: Player = e["P"][0]
+	player.max_hp = 99999
+	player.hp = 99999
+	if weapon != "":
+		World.put_item(player, player, Player.RIGHT_HAND, World.items.mint(weapon, "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint(shield, "built"))
+	var row: Dictionary = Monster.kinds()[kind]
+	var at := Vector2i(8, 4)
+	var spec := {"script": "res://sim/draugr.gd" if kind == "draugr" else "res://sim/monster.gd", "shape": "capsule", "kind": kind,
+			"name": "Foe", "tile": at, "props": (row["body"] as Dictionary).duplicate()}
+	if named != "":
+		spec["named"] = named
+	Level.arm(spec)  # Its kind's "wields", as a level arms it.
+	var foe := EntityFactory.build(spec) as Monster
+	_room.add_child(foe)
+	World.spawn(foe, at)
+	foe.acts = true
+	foe.sight_range = 14
+	if foe.has_method("start_pact"):
+		player.player_id = "shield_test"
+		foe.call("start_pact", player, "easy")
+		if not foe.holds_cell:
+			World.hold_cell(foe, at)
+	for i in 3:
+		World.step()
+	if provoke:
+		World.damage(foe, 1, player, &"attack")
+	foe.target = player
+	return [foe, player]
+
+
+## A player who raises her shield at [param foe]'s tell (its blow drawn back
+## at her 0.3 s, or its told cells under her) and lowers it after; between,
+## if she has 40 stamina, she closes and strikes (combat's Brand table's
+## thrifty answering bot).
+func _tell_bot(player: Player, foe: Monster) -> void:
+	var red := {}
+	for id: int in World._telegraphs:
+		if World._telegraphs[id]["source"] == foe:
+			for c: Variant in World._telegraphs[id]["data"]["cells"]:
+				red[c if c is Vector2i else Vector2i(int(c[0]), int(c[1]))] = true
+	var drawn: bool = not foe.wind_up.is_empty() and foe.wind_up.get("target") == player and World.distance(player.tile, foe.tile) <= 3 \
+			and World.tick - int(foe.wind_up.get("began", World.tick)) >= 3
+	if drawn or red.has(player.tile):
+		var way := Senses.way_toward(player.tile, foe.tile)
+		if way != Vector2i.ZERO:
+			World.face(player, way)
+		if player.raised != "block":
+			player.action_order = GridEntity.Order.NONE
+			World.try_stance(player, "block")
+		return
+	if player.raised != "":
+		World.try_stance(player, "")
+	if player.stamina < 40:
+		player.action_order = GridEntity.Order.NONE
+		return
+	if player.wind_up.is_empty() and not World.in_reach(player, foe, false):
+		var best := Vector2i(-1, -1)
+		var near := 999
+		for way: Vector2i in World.DIRECTIONS:
+			var c: Vector2i = foe.tile + way
+			if World.is_walkable(c) and not (World._occupancy.has(c) and World._occupancy[c] != player) and World.distance(player.tile, c) < near:
+				near = World.distance(player.tile, c)
+				best = c
+		if best != Vector2i(-1, -1):
+			Walk.toward(player, best)
+	if player.action_order == GridEntity.Order.NONE and player.wind_up.is_empty():
+		World.command_attack(player, foe)
 
 
 ## A robber and a player in a row: the robber at (2,2) facing east, the

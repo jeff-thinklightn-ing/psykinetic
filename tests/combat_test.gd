@@ -72,6 +72,7 @@ func _ready() -> void:
 	_test_weapon_memory()
 	_test_guard_rework()
 	_test_told_guard()
+	_test_shield_breath()
 	_test_arts_marks()
 	_test_lob_aim_on_client()
 	_test_armour()
@@ -772,6 +773,42 @@ func _test_guard_rework() -> void:
 ## never gives out (short, half); a lowered shield or a sword meets none;
 ## told_hit meets the guard on the whole harm and takes a launch's impact
 ## out of what is left; the draugr's spin met on a shield still throws.
+## 340 amended (4), option 4b: a player's shield held up past
+## World.SHIELD_BREATH_GRACE (1 s) straight gets no stamina back until it is
+## lowered; a shorter raise breathes as ever, and each raise has its grace.
+func _test_shield_breath() -> void:
+	print("\n== a raised shield's breath: up over 1 s straight, none comes back (340 amended (4), 4b) ==")
+	var e := _build(["#######", "#.Pm..#", "#######"])
+	var holder: Player = e["P"][0]
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	holder.facing = Vector2i(1, 0)
+	var start := World.tick
+	var breathe := func(ticks: int) -> void:
+		for i in ticks:
+			World.tick += 1
+			World._regen_stamina()
+	holder.stamina = 10
+	holder.winded = false
+	holder._world_note_exertion(World.tick - 100)
+	World.try_stance(holder, "block")
+	var at := holder.stamina
+	breathe.call(8)
+	_check(holder.raised == "block" and holder.stamina > at, "raised 0.8 s: it breathes (%d to %d)" % [at, holder.stamina])
+	breathe.call(4)
+	at = holder.stamina
+	breathe.call(50)
+	_check(holder.stamina == at, "held up past 1.2 s: nothing back over 5 s (%d to %d)" % [at, holder.stamina])
+	World.try_stance(holder, "")
+	breathe.call(50)
+	_check(holder.stamina > at, "lowered: over 5 s it comes back (%d to %d)" % [at, holder.stamina])
+	holder.stamina = 10
+	World.try_stance(holder, "block")
+	breathe.call(8)
+	_check(holder.stamina > 10, "raised again: its grace anew (10 to %d)" % holder.stamina)
+	World.try_stance(holder, "")
+	World.tick = start
+
+
 func _test_told_guard() -> void:
 	print("\n== told moves: a raised shield facing the line takes it whole, never breaks, no stun (340 amended (3), (4)) ==")
 	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
