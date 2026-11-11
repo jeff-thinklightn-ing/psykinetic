@@ -214,15 +214,22 @@ static func refusal(card: Dictionary, player_id: String, road: Array[Dictionary]
 
 
 ## The places and areas she can lead to, from her roads: a named place she
-## has seen (Holdings' [param holdings]) and an area of [param world_map]
-## she has stood in, with a start to arrive at. Each {key, kind, name,
-## area, cell}; places first, then areas, each by name.
+## has seen (Holdings' [param holdings]), or one of her home area's (551
+## amended (3), the coordinator: "she lives there"), and an area of
+## [param world_map] she has stood in, with a start to arrive at. Each {key,
+## kind, name, area, cell}; places first, then areas, each by name.
 static func destinations(card: Dictionary, holdings: Holdings, world_map: WorldMap) -> Array[Dictionary]:
 	var roads := roads_of(card)
 	var places: Array[Dictionary] = []
 	var areas: Array[Dictionary] = []
 	if holdings != null:
-		for id: Variant in roads["places"]:
+		var ids: Array = (roads["places"] as Array).duplicate()
+		var home: Variant = card.get("home")
+		if home is Dictionary and not str(home.get("zone", "")).is_empty():
+			for id: String in holdings.places_in(str(home["zone"])):
+				if id not in ids:
+					ids.append(id)
+		for id: Variant in ids:
 			var place := holdings.place(str(id))
 			if not place.is_empty() and not str(place["name"]).is_empty():
 				places.append({"key": place["id"], "kind": "place", "name": str(place["name"]), "area": place["area"], "cell": place["cell"]})
@@ -277,6 +284,14 @@ static func _plain(text: String) -> String:
 ## the place) to take a stopped walk up again.
 const ASK := "(?i)\\b(take|lead|guide|show|bring|walk)\\s+(me|us)\\b.*\\b(to|towards?)\\b|\\b(lead|show)\\s+(me\\s+|us\\s+)?the\\s+way\\b|\\bwhich\\s+way\\s+to\\b|\\b(you\\s+lead|take\\s+the\\s+lead|lead\\s+(us|me|on\\s+to))\\b"
 const RESUME := "(?i)^\\W*(lead on|go on|lead the way|carry on|keep going|onwards?)\\W*$"
+## Her player's yes to her own offer to lead (551 amended (3)), taken up
+## within OFFER_S of her saying it.
+const AGREES := "(?i)^\\W*(yes|yeah|yep|yup|aye|sure|ok|okay|alright|all right|please|lead on|lead the way|go on|let'?s go|let'?s|take me|show me|why not|sounds good|of course|i'?d like that|i'?d love that|that would be (nice|good|great|lovely))\\b"
+const OFFER_S := 90.0
+## Her voice's word on anywhere she does not know the way to (551 amended
+## (k), the coordinator: in her own words, never "never offer").
+const UNKNOWN_WAY := "Anywhere else, you do not know the way; if it comes up, say so in your own words."
+const NO_WAY_YET := "You do not know the way to any place yet; if it comes up, say so in your own words."
 
 
 ## Whether [param text] asks her to lead somewhere.
@@ -376,7 +391,21 @@ func step(routes: WorldRoutes, threat: Callable) -> String:
 		if entity is Monster and entity.spawned and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
 				and threat.call(entity) and (pet.senses == null or pet.senses.sees(entity, -1, false)):
 			return "danger"
-	if pet.zone == goal["area"] and World.distance(pet.tile, goal["cell"]) <= int(setting("arrive", 3.0)):
+	if goal.get("bank", false) and pet.zone == goal["area"]:
+		# A fishing place (551 amended (3)): its bank nearest her, once she is
+		# in its area; there when she could cast from where she stands.
+		if not goal.has("banked"):
+			var bank := pet.fish_spot_near(goal["cell"], false, true)
+			goal["banked"] = bank != NONE
+			if bank != NONE:
+				goal["cell"] = bank
+				_leg = {}
+				_cells.clear()
+		var there := Companion.castable(pet.tile) if bool(goal["banked"]) \
+			else World.distance(pet.tile, goal["cell"]) <= int(setting("arrive", 3.0))
+		if there:
+			return "arrived"
+	elif pet.zone == goal["area"] and World.distance(pet.tile, goal["cell"]) <= int(setting("arrive", 3.0)):
 		return "arrived"
 	if _leg.is_empty():
 		if pet.zone == goal["area"] and (routes == null or not routes.is_ready(WorldRoutes.OPEN)):

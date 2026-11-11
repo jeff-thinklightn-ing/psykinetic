@@ -120,6 +120,7 @@ func _ready() -> void:
 	await _test_guide()
 	_test_guide_refuses()
 	_bond_as(0, kept_bond)
+	_test_want_lead()
 	_test_loyalty()
 	_test_leaving()
 	_test_out_of_reach()
@@ -3250,6 +3251,147 @@ func _test_guide() -> void:
 	_main.travel(Net.local_id, here, "", {}, came_from)
 	World.enter_named(here)
 	_settle(_companion())
+
+
+## 551 amended (3), the coordinator after Jeff's "wren says she'll lead to the
+## pond": she takes her player to the place of her own want at any bond step,
+## knows her home area's places, and their yes to her offer sets her off; the
+## walk ends where she could cast. Elsewhere she says she does not know the way.
+func _test_want_lead() -> void:
+	print("
+== she takes her player to the pond she wants to fish at, at any bond step; their yes sets her off (551 amended (3)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var here := String(World.zone.name)
+	var kept_home: Variant = record.companion.get("home")
+	var kept_want: Variant = record.companion.get("want")
+	var kept_roads: Variant = record.companion.get("roads")
+	var kept_bond: Variant = _bond_as(0)
+	record.companion.erase("roads")
+	_main._guides.clear()
+	_main._guide_offers.clear()
+	_main._guide_refused.clear()
+	pet.guide = null
+	# Her home area with no named place: she knows the way nowhere.
+	record.companion["home"] = {"place": "", "zone": "nowhere_area", "trade": ""}
+	_check(_main._roads_words(record, pet) == Guide.NO_WAY_YET, "knowing no place, her voice is told she does not know the way (%s)" % _main._roads_words(record, pet))
+	# A pond some way off in her home area (this one): she knows it, living here.
+	var water := _far_cell(owner.tile, 9, 14)
+	_check(water != Vector2i(-1, -1), "a cell 9-14 from her player for the pond (%s)" % water)
+	if water == Vector2i(-1, -1):
+		return
+	var had_water := World.is_water(water)
+	World._water[water] = true
+	var pond := "%s/lead_pond" % here
+	World.holdings._places[pond] = {"id": pond, "area": here, "key": "lead_pond", "cell": water, "name": "the lead pond",
+		"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+	World.holdings._holder[pond] = "nobody"
+	World.holdings._strength[pond] = 1
+	World.holdings._since[pond] = 0
+	record.companion["home"] = {"place": "", "zone": here, "trade": ""}
+	_check(Guide.destinations(record.companion, World.holdings, _main._world_map).any(func(each: Dictionary) -> bool: return each["key"] == pond),
+		"her home area's place: she knows the way there without having seen it with them")
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	var no_want := func() -> void: record.companion.erase("want")
+	var want := func() -> void: record.companion["want"] = {"key": "pond", "need": "leisure", "since": day}
+	var reset := func() -> void:
+		if pet.guide != null:
+			pet.guide.stop("moved")
+		pet.guide = null
+		owner.led_by = ""
+		owner.led_to = ""
+		_main._guides.clear()
+		_main._guide_offers.clear()
+		pet.guide_note = ""
+	# Not devoted, no want of it: she follows; a place she does not know: she says so.
+	_bond_as(0)
+	no_want.call()
+	_main._guide_said(owner, pet, "Take me to the lead pond")
+	_check(pet.guide == null and "follow them" in pet.guide_note, "fond, wanting nothing of it: she follows, as before (%s)" % pet.guide_note)
+	reset.call()
+	_main._guide_said(owner, pet, "Take me to Nowhere Fen")
+	_check(pet.guide == null and "do not know the way" in pet.guide_note, "a place she does not know: she does not know the way (%s)" % pet.guide_note)
+	reset.call()
+	_check(Guide.UNKNOWN_WAY in _main._roads_words(record, pet) and not "Except to" in _main._roads_words(record, pet),
+		"her voice: anywhere else, she says she does not know the way (%s)" % _main._roads_words(record, pet))
+	# Her want open, at each bond step: her offer, their yes, and she sets off for its bank.
+	want.call()
+	for score: int in [-3, 0, 6]:
+		_bond_as(score)
+		var step := pet.bond_step
+		var words: String = _main._roads_words(record, pet)
+		_check(("the lead pond" in words) and (("Except to the lead pond" in words) != (step == "devoted")),
+			"%s: her voice is told she can take them to the pond she wants (%s)" % [step, words])
+		_main._on_companion_said("I'd love to take you to the lead pond, if you'd like to fish there.", pet)
+		_check(str((_main._guide_offers.get(record.player_id, {}).get("to", {}) as Dictionary).get("key", "")) == pond, "%s: her offer kept" % step)
+		_main._guide_said(owner, pet, "Yes, let's.")
+		_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond and pet.guide.goal.get("bank") == true
+			and "wanted to go fishing" in pet.guide_note, "%s: their yes, and she leads them to the pond (%s)" % [step, pet.guide_note])
+		reset.call()
+		_main._guide_said(owner, pet, "Take me to the lead pond")
+		_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond, "%s: asked to take them there, she does" % step)
+		reset.call()
+	_bond_as(-3)
+	# An offer naming no place: her want's; a yes long after, nothing.
+	_main._on_companion_said("Shall I show you the way?", pet)
+	_check(str((_main._guide_offers.get(record.player_id, {}).get("to", {}) as Dictionary).get("key", "")) == pond, "an offer naming no place: her want's pond")
+	_main._guide_offers[record.player_id]["tick"] = World.tick - roundi(Guide.OFFER_S * World.TICK_RATE) - 1
+	_main._guide_said(owner, pet, "Yes")
+	_check(pet.guide == null, "a yes long after her offer: nothing")
+	reset.call()
+	_main._on_companion_said("What a fine day it is.", pet)
+	_check(not _main._guide_offers.has(record.player_id), "a line offering nothing: no offer")
+	# Asked to fish with no water near: she takes them to her pond.
+	_check(pet.fish_spot_near(owner.tile, false) == World.NO_CELL, "no fishing water near her player")
+	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
+	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond and not Companion.FISH_NO_WATER in pet._said,
+		"wary, asked to fish with no water near: she takes them to the pond, not \"we'd need a pond\" (%s)" % [pet.guide.goal if pet.guide != null else null])
+	# (Its water fishable only now: before, no bank within FISH_SEEK of her player.)
+	World._fish_waters.get_or_add(here, {})[water] = "pool_lead"
+	World._fish_stock_of.clear()
+	# The walk: she stops where she could cast, and says why she brought them.
+	var sent_routes: Array[Array] = []
+	var send_was: Callable = _main._world_news.send
+	_main._world_news.send = func(peer: int, data: Dictionary) -> void:
+		if data.has("guide_route") and peer == _player().owner_peer:
+			sent_routes.append(data["guide_route"]["path"])
+		send_was.call(peer, data)
+	var log_was: int = _main.party_log._lines.size()
+	for i in 900:
+		if pet.guide == null:
+			break
+		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
+			_kill_monsters()
+		if not sent_routes.is_empty() and not (sent_routes.back() as Array).is_empty() and is_instance_valid(_player()):
+			Walk.toward(_player(), _route_next(_player(), sent_routes.back()))
+		World.step()
+	_main._world_news.send = send_was
+	var brought := false
+	for line: Variant in _main.party_log._lines.slice(maxi(log_was - 5, 0)):
+		brought = brought or "has brought" in str(line) and "the lead pond" in str(line)
+	_check(pet.guide == null and Companion.castable(pet.tile) and World.distance(pet.tile, water) <= World.FISH_REACH and brought,
+		"there: on the pond's bank, within a cast of its water, and she says she has brought them (%s, water %s, %s)" % [pet.tile, water, brought])
+	reset.call()
+	# Put back.
+	if not had_water:
+		World._water.erase(water)
+	(World._fish_waters.get(here, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
+	World.holdings._places.erase(pond)
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
+	for key: String in ["home", "want", "roads"]:
+		var was: Variant = {"home": kept_home, "want": kept_want, "roads": kept_roads}[key]
+		if was == null:
+			record.companion.erase(key)
+		else:
+			record.companion[key] = was
+	_bond_as(0, kept_bond)
+	_settle(pet)
 
 
 func _test_guide_refuses() -> void:

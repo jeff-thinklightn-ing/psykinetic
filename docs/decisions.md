@@ -19544,6 +19544,63 @@ tests/companion_test _test_guide covers:
 - the map's message, and the map's command;
 - across test_room's link to sample, and the same walk going on there.
 
+551 amended (3): she takes her player to the place of her own want, at any
+bond step (the script's label; the coordinator's ruling on items' ask, from
+Jeff's 11-07 "wren says she'll lead to the pond"). Her pond want ("to go
+fishing with {player}", 803 amended (4), ready since 805 amended (5)) and her
+roads line had her offer the lead, but only a devoted companion led (621), and
+one who had not seen the pond with them did not know it: she promised and did
+nothing. The coordinator: not a filter that takes her words away ("one more
+restriction"), but her words made true; the promise is the one the loop needs.
+
+- What she knows (Guide.destinations): her roads as before, and her home
+  area's named places (record.companion.home.zone, Holdings.places_in): she
+  lives there.
+- Main._want_place: her open want's place she leads to at any step; for the
+  pond want, the fishing place she knows nearest her (Main._fish_place, her
+  own area first), marked "bank" and "want". Main._leads_to: devoted,
+  anywhere she knows; else only that place. Main._start_guide's gate reads
+  it (the danger refusal, phase 2, as before); any fishing place's walk is
+  marked "bank".
+- Her offer and their yes: a line of hers offering a lead (Companion.
+  LEAD_OFFER: I'll / let me / shall I / want me to ... take, lead, bring or
+  walk you; show you the way; follow me; come with me) is kept as an offer
+  (Main._note_lead_offer, on _on_companion_said), to the place it names when
+  she would lead there, else her want's. Their words within Guide.OFFER_S
+  (90 s) that agree (Guide.AGREES: yes, sure, please, let's, take me, ...)
+  and do not ask for somewhere else set her off. "Take me to the pond" does,
+  as any ask does.
+- Asked to fish with no fishing water within FISH_SEEK (Companion's fish
+  order), she takes them to that place (Companion.lead_to_fish, Main's
+  _lead_to_fish: devoted, the nearest she knows; else her want's) in place of
+  "Nothing to fish in here. We'd need a pond."
+- The walk's end (Guide.step): a "bank" goal, once she is in its area, is the
+  free dry cell by its water nearest her (Companion.fish_spot_near's
+  nearest_her), and she is there when she could cast from where she stands
+  (Companion.castable: a fishing place's water within World.FISH_REACH; items'
+  World.fish_refusal is to take it over once any water fishes). Elsewhere as
+  before. Her arrival words say why: "where you wanted to go fishing with
+  them"; her set-off note too.
+- Her voice (Main._roads_words): below devoted, "Except to <the pond>: you
+  would like to go fishing with them there, and you can take them there
+  yourself"; devoted, that she could offer to; then Guide.UNKNOWN_WAY,
+  "Anywhere else, you do not know the way; if it comes up, say so in your own
+  words."; knowing no place, Guide.NO_WAY_YET. No sentence filter; no
+  "never offer".
+
+Pond only: the temple want takes the same once playtest has seen the pond
+lead work blind in a released game (the coordinator). Her rod: items makes
+the player's rod count for her; her refusals for want of one are companions'
+to change on items' design. companion_test _test_want_lead: knowing nowhere,
+the line; a home-area pond known unseen; fond with no want, she follows; a
+place unknown, she does not know the way; her want open at wary, fond and
+devoted: her voice's line, her offer kept, their yes and she sets off for its
+bank, "take me to" too; an offer naming no place, her want's; a yes past
+OFFER_S, nothing; "let's go fishing" with no water near, she leads; the walk
+ends on the bank within a cast of the water, and she says she has brought
+them. Part of items' package "fishing that works", on by nature. Server only,
+protocol unchanged, no new class_name.
+
 ## 551, npc's side. The road's news to companions
 
 Companions' guide (551: a companion weighs the roads her player walks by

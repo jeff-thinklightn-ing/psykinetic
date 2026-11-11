@@ -8640,6 +8640,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	pet.guide_routes = func() -> WorldRoutes: return World.raid_groups.routes if World.raid_groups != null else null
 	pet.guide_done = _guide_done
 	pet.guide_words = func() -> String: return _roads_words(record, pet)
+	pet.lead_to_fish = _lead_to_fish.bind(pet)
 	var walk: Guide = _guides.get(record.player_id)
 	if walk != null:
 		walk.bind(pet, player)
@@ -8659,7 +8660,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 func _roads_words(record: PlayerRecord, pet: Companion) -> String:
 	var known := Guide.destinations(record.companion, World.holdings, _world_map)
 	if known.is_empty():
-		return ""
+		return Guide.NO_WAY_YET
 	var here := func(each: Dictionary) -> int:
 		return World.distance(each["cell"], pet.tile) if each["area"] == pet.zone else 100000
 	known.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return here.call(a) < here.call(b))
@@ -8669,8 +8670,91 @@ func _roads_words(record: PlayerRecord, pet: Companion) -> String:
 	# Devoted, she offers; below it she follows; sullen, she leads nowhere
 	# (decisions 555, 621).
 	var offer: String = (Companion.loyalty().get("guide_words", {}) as Dictionary).get(pet.bond_step, "")
-	var can := ", and can lead them there" if pet.bond_at_least("devoted") else ""
-	return ("You know the way to %s, having been there with %s%s. %s" % [", ".join(names), record.name, can, offer]).strip_edges()
+	var devoted := pet.bond_at_least("devoted")
+	var can := ", and can lead them there" if devoted else ""
+	var words := "You know the way to %s%s. %s" % [", ".join(names), can, offer]
+	# The place of her own want (551 amended (3), the coordinator): she takes
+	# them there at any step; it is where she wants to go.
+	var wanted := _want_place(record, pet)
+	if not wanted.is_empty():
+		words += (" You would like to go fishing with them at %s, and could offer to take them there." if devoted
+			else " Except to %s: you would like to go fishing with them there, and you can take them there yourself.") % wanted["name"]
+	return (words + " " + Guide.UNKNOWN_WAY).strip_edges()
+
+
+## Of what she knows the way to (Guide.destinations), the fishing place
+## nearest her (in her own area first), with "bank" set: the walk ends on
+## its bank; {} if she knows none (551 amended (3)).
+func _fish_place(record: PlayerRecord, pet: Companion) -> Dictionary:
+	if record == null or World.holdings == null:
+		return {}
+	var best := {}
+	for each: Dictionary in Guide.destinations(record.companion, World.holdings, _world_map):
+		if each["kind"] != "place" or str(World.holdings.place(str(each["key"])).get("kind", "")) != "fishing":
+			continue
+		var here: bool = each["area"] == pet.zone
+		if best.is_empty() or here and (best["area"] != pet.zone or World.distance(pet.tile, each["cell"]) < World.distance(pet.tile, best["cell"])):
+			best = each
+	if best.is_empty():
+		return {}
+	best = best.duplicate()
+	best["bank"] = true
+	return best
+
+
+## The place of her open want she can take her player to at any bond step
+## (551 amended (3), the coordinator: "it is her wish, she is taking you
+## where she wants to go"): for the pond want, _fish_place, marked "want";
+## {} for none.
+func _want_place(record: PlayerRecord, pet: Companion) -> Dictionary:
+	var want: Variant = record.companion.get("want") if record != null else null
+	if not want is Dictionary or str(want.get("key", "")) != "pond":
+		return {}
+	var place := _fish_place(record, pet)
+	if not place.is_empty():
+		place["want"] = "pond"
+	return place
+
+
+## Whether [param pet] would lead her player to [param to] at her bond
+## step: devoted, anywhere she knows; else only her want's place.
+func _leads_to(record: PlayerRecord, pet: Companion, to: Dictionary) -> bool:
+	if pet.bond_at_least("devoted"):
+		return true
+	var wanted := _want_place(record, pet)
+	return not wanted.is_empty() and wanted["key"] == to.get("key")
+
+
+## Her own line offering to lead (Companion.LEAD_OFFER) is kept as an offer
+## her player's yes takes up within Guide.OFFER_S (551 amended (3)): the
+## place it names, when she would lead there; naming none, her want's place.
+func _note_lead_offer(pet: Companion, text: String) -> void:
+	var record: PlayerRecord = _records.get(pet.keeper_id)
+	if record == null or RegEx.create_from_string(Companion.LEAD_OFFER).search(text) == null:
+		return
+	var to := Guide.named_in(text, Guide.destinations(record.companion, World.holdings, _world_map))
+	if to.is_empty():
+		to = _want_place(record, pet)
+	elif not _leads_to(record, pet, to):
+		return
+	if not to.is_empty():
+		_guide_offers[pet.keeper_id] = {"day": Townsfolk.day_of(World.steps), "to": to, "tick": World.tick}
+
+
+## Her player asked her to fish with no water near (Companion's fish order,
+## 551 amended (3)): she takes them to the fishing place she would lead to
+## (her want's at any step; devoted, the nearest she knows). True if she
+## knows one (her voice told whether she goes).
+func _lead_to_fish(pet: Companion) -> bool:
+	var record := _record_of(pet)
+	var player := pet.keeper as Player
+	if record == null or player == null or not is_instance_valid(player):
+		return false
+	var to := _fish_place(record, pet) if pet.bond_at_least("devoted") else _want_place(record, pet)
+	if to.is_empty():
+		return false
+	_start_guide(pet, player, to)
+	return true
 
 
 ## Her player's map told what she knows the way to (decision 551): the
@@ -8711,6 +8795,12 @@ func _guide_said(player: Player, pet: Companion, line: String) -> bool:
 	if record == null:
 		return false
 	var walk: Guide = _guides.get(record.player_id)
+	# Yes to her own offer to lead (551 amended (3)): she sets off.
+	var offered: Dictionary = _guide_offers.get(record.player_id, {})
+	if offered.has("tick") and World.tick - int(offered["tick"]) <= roundi(Guide.OFFER_S * World.TICK_RATE) \
+			and not Guide.asks(line) and RegEx.create_from_string(Guide.AGREES).search(line) != null:
+		_start_guide(pet, player, offered["to"])
+		return true
 	if Guide.asks_resume(line):
 		# As far as she offered (551 phase 2), else the stopped walk.
 		var offer: Dictionary = _guide_offers.get(record.player_id, {})
@@ -8751,7 +8841,17 @@ func _nearest_known(pet: Companion, known: Array[Dictionary]) -> Dictionary:
 ## destination), her voice told so once; unless the road there is not safe
 ## (551 phase 2), or she refused it earlier today: her voice told why.
 func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
-	if not pet.bond_at_least("devoted"):
+	# Her want's place, or a fishing place: the walk ends on its bank.
+	var record := _record_of(pet)
+	var wanted := _want_place(record, pet)
+	if not wanted.is_empty() and wanted["key"] == to.get("key"):
+		to = wanted
+	elif not to.has("bank") and World.holdings != null and to.get("kind") == "place" \
+			and str(World.holdings.place(str(to.get("key", ""))).get("kind", "")) == "fishing":
+		to = to.duplicate()
+		to["bank"] = true
+	var leads := _leads_to(record, pet, to) if record != null else pet.bond_at_least("devoted")
+	if not leads:
 		# Only devoted, she takes the lead (decision 621, Jeff's); sullen
 		# or colder, she is unhappy with them (555).
 		var why := "you will not lead them anywhere now: you are unhappy with them" if not pet.bond_at_least("wary") \
@@ -8784,7 +8884,8 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	pet.guide = walk
 	player.led_by = Companion._name_of(pet)
 	player.led_to = str(to.get("key", ""))
-	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again." % [_display_name(player), to["name"]]
+	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again.%s" % [
+		_display_name(player), to["name"], " It is where you wanted to go fishing with them." if to.get("want") == "pond" else ""]
 	party_log.add("%s leads the way to %s." % [Companion._name_of(pet), to["name"]])
 	print("[guide] %s leads %s to %s (%s)" % [Companion._name_of(pet), _display_name(player), to["name"], to["key"]])
 
@@ -8846,7 +8947,8 @@ func _guide_done(pet: Companion, why: String) -> void:
 		party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), who, walk.goal["name"]])
 		pet.guide = null
 		_guides.erase(pet.keeper_id)
-		pet._ask_voice("You have led %s to %s, as they asked." % [who, walk.goal["name"]])
+		pet._ask_voice("You have led %s to %s, %s." % [who, walk.goal["name"],
+			"where you wanted to go fishing with them" if walk.goal.get("want") == "pond" else "as they asked"])
 	elif why != "moved" and why != "lost":
 		party_log.add("%s stops leading the way: %s." % [Companion._name_of(pet), words])
 		pet._ask_voice("You stopped leading %s to %s: %s." % [who, walk.goal["name"], words])
@@ -15219,6 +15321,7 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 			other.overheard(Companion._name_of(pet), text, false)
 	party_log.add("%s said: \"%s\"" % [Companion._name_of(pet), text])
 	_heard_near(pet, Companion._name_of(pet), text)
+	_note_lead_offer(pet, text)  # Her offer to lead, for her player's yes (551 amended (3)).
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
 		record.companion["said"] = pet.said_lines()

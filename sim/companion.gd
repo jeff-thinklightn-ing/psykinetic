@@ -350,6 +350,9 @@ const LOOK_AROUND := 2
 ## (_errand_verbs) is said only when it names exactly one thing she could
 ## do now, which she then does; any other promise is roleplay and stays.
 const PROMISE := "(?i)\\b(i'?ll|i will|let me|i'?m going to|i can|on it)\\b"
+## Her own line offering to lead her player somewhere (551 amended (3)):
+## Main keeps it as an offer their yes takes up.
+const LEAD_OFFER := "(?i)\\b(i'?ll|i will|let me|i can|i could|i'?d (love|like|be glad|be happy) to|shall i|should i|want me to|i'?m going to|happy to|glad to)\\b[^.!?]*\\b((lead|guide|take|bring|walk)\\s+(you|us)\\b|show\\s+(you|us)\\s+the\\s+way|lead\\s+the\\s+way)|\\b(follow me|come with me)\\b"
 const COMPASS_WORD := "\\b(north-east|north-west|south-east|south-west|north|south|east|west)\\b"
 ## She notes where she has seen things every so many ticks (_remember_sights).
 const MEMORY_EVERY := 10
@@ -732,6 +735,10 @@ var guide_routes := Callable()
 var guide_done := Callable()
 var guide_words := Callable()
 var guide_note := ""
+## Main's: asked to fish with no water near, she takes her player to the
+## fishing place she would lead to; () -> bool, true if she knows one (551
+## amended (3)).
+var lead_to_fish := Callable()
 ## What she went and looked at lately (decision 696): {text, zone, cell,
 ## tick}, newest last, the rules' scouted_most, each kept scout_minutes.
 var scouted: Array[Dictionary] = []
@@ -1617,8 +1624,9 @@ static func _water_by(cell: Vector2i) -> Vector2i:
 ## A free dry cell within FISH_SEEK of [param near] she could fish from:
 ## water within reach, a fishing place's, with a fish left (as their cast
 ## needs; [param stocked] false: any fishing place's, fished out or not); the
-## one nearest [param near] but not on it (beside her player), NO_CELL if none.
-func fish_spot_near(near: Vector2i, stocked := true) -> Vector2i:
+## one nearest [param near] but not on it (beside her player), NO_CELL if none;
+## [param nearest_her]: the one nearest her (a walk's bank, 551 amended (3)).
+func fish_spot_near(near: Vector2i, stocked := true, nearest_her := false) -> Vector2i:
 	var best := World.NO_CELL
 	var best_key := 1 << 30
 	for dy in range(-FISH_SEEK, FISH_SEEK + 1):
@@ -1630,11 +1638,19 @@ func fish_spot_near(near: Vector2i, stocked := true) -> Vector2i:
 			var pond := World.pond_at(water, cell) if water != World.NO_CELL else ""
 			if pond.is_empty() or stocked and _pond_fish(pond) <= 0:
 				continue
-			var key := World.distance(near, cell) * 100 + World.distance(tile, cell)
+			var key := World.distance(tile, cell) if nearest_her else World.distance(near, cell) * 100 + World.distance(tile, cell)
 			if key < best_key:
 				best_key = key
 				best = cell
 	return best
+
+
+## Whether a cast from [param cell] reaches a fishing place's water (551
+## amended (3): where a walk to a pond ends; items' World.fish_refusal is to
+## take this over once any water can be fished).
+static func castable(cell: Vector2i) -> bool:
+	var water := _water_by(cell)
+	return water != World.NO_CELL and not World.is_water(cell) and not World.pond_at(water, cell).is_empty()
 
 
 ## Whether [param pond] is a fishing place with fish to spare for her.
@@ -2250,6 +2266,11 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				done = "%s asked you to stop fishing; you reel in and put the rod away." % keeper_name()
 			elif in_fight():
 				done = "%s asked you to fish, but there is fighting near: not now." % keeper_name()
+			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile, false) == World.NO_CELL and bool(lead_to_fish.call()):
+				# No water here, and she knows a pond she would take them to (551
+				# amended (3)): Main's walk, her voice told by its guide_note.
+				_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "lead", "note": "to the water she knows"})
+				return true
 			elif _rod_slot() < 0:
 				_say(FISH_NO_ROD, true)
 				done = "%s asked you to fish, but you have no rod." % keeper_name()
