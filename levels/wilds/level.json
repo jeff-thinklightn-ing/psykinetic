@@ -198,6 +198,7 @@
 				198,
 				201
 			],
+			"art": "prop.offering_table",
 			"facing": [
 				0.0,
 				1.0
@@ -314,6 +315,17 @@
 				"to_map": "barrow",
 				"to_spawn": "from_chapel"
 			}
+		},
+		{
+			"slot": "building.temple_altar",
+			"at": [
+				199,
+				201
+			],
+			"facing": [
+				-1,
+				0
+			]
 		},
 		{
 			"slot": "building.turf_house",
@@ -3059,7 +3071,9 @@
 		]
 	],
 	"lit_candles": [
-		{"at": [199, 200], "top": 0.0, "up": 0.4, "energy": 0.9, "reach": 4.0, "falloff": 1.0}
+		{"at": [199, 200], "top": 0.0, "up": 0.4, "energy": 0.9, "reach": 4.0, "falloff": 1.0},
+		{"at": [199.15, 201.0], "top": 1.006, "up": 0.35, "energy": 0.7, "reach": 3.5, "falloff": 1.0},
+		{"at": [199.15, 202.0], "top": 1.006, "up": 0.35, "energy": 0.7, "reach": 3.5, "falloff": 1.0}
 	],
 	"ledges": [
 		{

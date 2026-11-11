@@ -38566,6 +38566,27 @@ run needs a new key (release's note). level_test _test_temple_furnished and _tes
 _test_counter_panel. Level data, Level, Relaid, ItemBook, World, Main, Companion, the barter panel
 and Client3D; no new class_name.
 
+734 amended (8): Umbrage's temple's altar and offering table (the label from
+tools/decision_number.sh; package "the temple furnished", on, with (7); art-kit's
+building.temple_altar and prop.offering_table; the coordinator's ruling that it be on main before
+the 11-12 cut). The altar (Level.BUILDINGS "building.temple_altar", 2 x 1, solid and doorless) is
+the first furnishing that stands inside another building: Level.STANDS_INSIDE names a slot and the
+kinds it may stand in (the altar, "temple"), and Level.buildings_from lets it onto the floor of a
+building of that kind listed before it, wholly inside, clear of any other building or furnishing,
+where every other building stands clear of the rest (said and left out otherwise: "is not all on the
+floor inside a temple"). It stands at (199, 201..202) facing west, its back to the chapel's east
+wall and its cloth to the pews, beside the counter at (198, 201), the walk from the door to the
+counter's front and to the way down's landing (198, 199) open; no holy sign (the coordinator: a sign
+of Theus waits on Jeff). Two lit candles burn on its top (Level lit_candles, top 1.006 m, art-kit's
+figure for the cloth; energy 0.7, reach 3.5, against today's night, retuned with the town's lamps in
+"Umbrage at night"). The temple's counter, a Chest with props "temple", is drawn as art-kit's
+prop.offering_table (its level.json "art"), so nothing in the chapel looks like a chest. level_test
+_test_temple_furnished: an altar inside a temple stands, one on another's cell and one outside any
+temple left out and said; the altar's rect, facing, solid and doorless; its two candles; the
+counter's art; and in the loaded wilds, nobody on the altar, the counter's front, the landing and
+the candles' cell reached from just inside the door. Level data, Level.STANDS_INSIDE and three Level
+rows; protocol unchanged, no new class_name.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

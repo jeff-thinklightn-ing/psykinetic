@@ -204,6 +204,7 @@ const BUILDINGS := {
 	"building.tap_rack": Vector2i(2, 1),  # The Mughouse's (811 amended): its tap rack.
 	"building.tavern_table": Vector2i(2, 2),  # The Mughouse's (811 amended): its tables.
 	"building.temple": Vector2i(4, 6),
+	"building.temple_altar": Vector2i(2, 1),  # Umbrage's chapel (734 amended (8)): its altar, its back to the east wall.
 	"building.throne": Vector2i(1, 1),
 	"building.tower_ruin": Vector2i(3, 3),
 	"building.turf_house": Vector2i(7, 5),
@@ -233,6 +234,12 @@ const ART_WALLED: Array[String] = ["building.turf_house"]
 ## tripod) and its bed, two cells along x; its shelf hangs on the wall and
 ## takes none.
 const FURNISHED := {"building.turf_house": [Vector2i(2, 0), Vector2i(-2, -1), Vector2i(-1, -1)]}
+## A furnishing that stands inside a building of a kind listed (734 amended
+## (8): Umbrage's chapel's altar): slot -> the kinds; all its cells on that
+## building's floor, listed after it, clear of any other building or
+## furnishing. Elsewhere, and anywhere for any other slot, a building stands
+## clear of the others.
+const STANDS_INSIDE := {"building.temple_altar": ["temple"]}
 ## The turf house's bed among them (FURNISHED's second and third, its head
 ## the first of the two: art-kit's socket turned head -x).
 const FURNISHED_BED := {"building.turf_house": [1, 2]}
@@ -334,6 +341,7 @@ const SOLID: Array[String] = [
 	"building.standing_stone",
 	"building.tap_rack",
 	"building.tavern_table",
+	"building.temple_altar",
 	"building.tower_ruin",
 	"building.wayside_shrine",
 	"building.waystone",
@@ -387,6 +395,7 @@ const DOORLESS: Array[String] = [
 	"building.standing_stone",
 	"building.tap_rack",
 	"building.tavern_table",
+	"building.temple_altar",
 	"building.tower_ruin",
 	"building.wayside_shrine",
 	"building.waystone",
@@ -2238,9 +2247,9 @@ static func region_of(config: Dictionary, warnings: Array[String] = []) -> Strin
 ## facing: [dx, dy], the side its front is on}], as {slot, cell, facing
 ## (Vector2i), rect (the footprint, Rect2i), use and town (its link to
 ## the town's records, "" if none: _link)}. A building stands only on
-## floor (water, for ON_WATER's) of one height, clear of the others: one
-## that does not, or of a slot there is not, is left out and said in
-## [param warnings]; one whose outline has open edges stands, said (a shed
+## floor (water, for ON_WATER's) of one height, clear of the others (a
+## STANDS_INSIDE one wholly inside one of its kinds instead): one that does
+## not, or of a slot there is not, is left out and said in [param warnings]; one whose outline has open edges stands, said (a shed
 ## may be open; a well has no walls; an OPEN_AIR one's gate is a gap).
 static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -2257,6 +2266,8 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 	for cell: Vector2i in terrain.get("water", []):
 		wet[cell] = true
 	var taken: Dictionary[Vector2i, bool] = {}
+	# The cells a kind building stands on, by its kind, for STANDS_INSIDE.
+	var kind_at: Dictionary[Vector2i, String] = {}
 	var linked := {}
 	for entry: Variant in listed:
 		index += 1
@@ -2276,14 +2287,20 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		var under := wet if on_water else ground
 		# A BANKED one stands on its whole plot, its bank's ring too (718).
 		var stands_on := rect_cells(rect) if BANKED.has(what) else cells
-		var bad := stands_on.filter(func(cell: Vector2i) -> bool: return not under.has(cell) or taken.has(cell))
+		var within: Array = STANDS_INSIDE.get(what, [])
+		var bad := stands_on.filter(func(cell: Vector2i) -> bool:
+			return not under.has(cell) or (str(kind_at.get(cell, "")) not in within if not within.is_empty() else taken.has(cell)))
 		if bad.is_empty():
 			bad = _uneven(terrain, stands_on)
 		if not bad.is_empty():
-			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [what, rect.position, "water" if on_water else "clear floor", bad[0]])
+			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [what, rect.position,
+				"water" if on_water else "the floor inside a %s" % " or ".join(within) if not within.is_empty() else "clear floor", bad[0]])
 			continue
 		for cell in stands_on:
 			taken[cell] = true
+			kind_at.erase(cell)
+			if entry.has("kind"):
+				kind_at[cell] = str(entry["kind"])
 		if on_water:
 			# Its water is the well's, not a pool (805 amended (11), animation's
 			# clip: a perch from Umbrage's well): World.fish_waters_of skips it.

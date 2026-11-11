@@ -4094,7 +4094,11 @@ func _test_spots(wilds: Dictionary) -> void:
 ## counter's, its respawn's and those about them) and of the way down at
 ## (199, 199) and its landing; a candle's light by the stair; and no chest
 ## drawn in the town ("no chests in town"): the depot, shop and locker drawn
-## as nothing, the old kit's three gone (_test_removed_to_temple).
+## as nothing, the old kit's three gone (_test_removed_to_temple). 734
+## amended (8): its altar against the east wall at (199, 201..202), facing
+## the nave, solid, two candles burning on its top; the counter drawn as the
+## offering table; and from just inside the door, walked in the loaded
+## wilds, the counter's front, the way down and its landing still reached.
 func _test_temple_furnished(wilds: Dictionary) -> void:
 	print("
 == Umbrage's temple furnished (734 amended (7)): its pews, its candles, no chest drawn in town ==")
@@ -4133,6 +4137,45 @@ func _test_temple_furnished(wilds: Dictionary) -> void:
 	var undrawn: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return str(spec.get("art", "")) == Level.UNDRAWN_ART) 		.map(func(spec: Dictionary) -> Vector2i: return spec["tile"])
 	undrawn.sort()
 	_check(undrawn == [Vector2i(172, 193), Vector2i(190, 196), Vector2i(193, 196)], "the three drawn as nothing (%s)" % [undrawn])
+	var altars: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return str(building.get("slot", "")) == "building.temple_altar")
+	_check(altars.size() == 1 and altars[0]["rect"] == Rect2i(199, 201, 1, 2) and altars[0]["facing"] == Vector2i(-1, 0)
+		and "building.temple_altar" in Level.SOLID and "building.temple_altar" in Level.DOORLESS,
+		"the altar against the east wall at (199, 201..202), facing the nave, solid, doorless (%s)" % [altars])
+	var on_altar: Array = lit.filter(func(entry: Dictionary) -> bool:
+		return is_equal_approx(float(entry["top"]), 1.006) and Rect2(198.5, 200.5, 2, 3).has_point(Vector2(entry["at"]) + Vector2(0.5, 0.5)))
+	_check(on_altar.size() == 2,
+		"two candles burning on the altar's top, 1.006 m up (%s)" % [lit])
+	var counter: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return spec["tile"] == Vector2i(198, 201))
+	_check(counter.size() == 1 and counter[0].get("art") == "prop.offering_table" and counter[0].get("props", {}).get("temple", false) == true,
+		"the temple's counter drawn as the offering table (%s)" % [counter])
+	# Level.STANDS_INSIDE: an altar stands only inside a temple, clear of another furnishing.
+	var floor_cells: Array[Vector2i] = []
+	for y in 12:
+		for x in 16:
+			floor_cells.append(Vector2i(x, y))
+	var said: Array[String] = []
+	var laid := Level.buildings_from({"buildings": [{"kind": "temple", "size": "small", "at": [0, 0], "facing": [0, 1]},
+		{"slot": "building.temple_altar", "at": [2, 1], "facing": [0, 1]}, {"slot": "building.temple_altar", "at": [3, 1], "facing": [0, 1]},
+		{"slot": "building.temple_altar", "at": [10, 1], "facing": [0, 1]}]},
+		{"floor": floor_cells, "water": [], "edges": {}, "heights": {}}, said)
+	var stood: Array = laid.filter(func(building: Dictionary) -> bool: return building["slot"] == "building.temple_altar").map(func(building: Dictionary) -> Vector2i: return building["cell"])
+	_check(stood == [Vector2i(2, 1)] and said.filter(func(line: String) -> bool: return "the floor inside a temple" in line).size() == 2,
+		"an altar stands inside a temple; one on another's cell and one outside any temple are left out, said (%s, %s)" % [stood, said])
+	_check(_main.load_map("wilds"), "(the wilds loaded, to walk the chapel)")
+	_check(not World.is_walkable(Vector2i(199, 201)) and not World.is_walkable(Vector2i(199, 202)), "nobody walks onto the altar")
+	var reached := {Vector2i(191, 201): true}
+	var queue: Array[Vector2i] = [Vector2i(191, 201)]
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_back()
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := at + step
+			if reached.has(next) or not (temple["rect"] as Rect2i).has_point(next) or not World.is_walkable(next) or World.edge_blocks(at, step, true):
+				continue
+			reached[next] = true
+			queue.append(next)
+	_check(reached.has(Vector2i(197, 201)) and reached.has(Vector2i(198, 199)) and reached.has(Vector2i(198, 200)),
+		"from inside the door: the counter's front, the way down's landing and the candles' cell beside it reached (%d cells)" % reached.size())
+	_main.load_map("test_room")
 
 
 ## The old kit's three chests by Umbrage's stall removed (734 amended (7),
