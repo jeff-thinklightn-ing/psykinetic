@@ -38228,6 +38228,21 @@ _test_vendor: a decoy stall keyed before his named one doesn't take him, and
 on its own leaves him by the store. Server only, protocol unchanged, no new
 class_name, no bullet.
 
+736 amended (5) (the script's label; the coordinator's ruling on Jeff's core-loop report,
+combat's ask): nothing in Umbrage mended a newcomer, so Rolf's stall sells the bandaging
+kit, at 5 gold (its value in items.json). One line in vendor.wares, {"item":
+"bandaging_kit", "count": 1, "price": 5}, minted and marked starter like every ware: the
+gold goes from the buyer's purse into nothing, and no shop, maker, fence or trader buys it
+back, so it can't be minted and sold on. The kit is gear and is never used up
+(World.try_bandage), so the price is for a tool: one kit mends 10 hp a bandaging, out of a
+fight, as often as its holder likes. The stall never runs out, so how many he stocks
+doesn't arise. Pedlars and camp traders already sell kits, at 6 (value x 1.15) and 9 under
+a toll. Rolf's is the cheapest, which suits a newcomer's first kit, and the travellers keep
+their margin (the coordinator's one-price design names it). It does not touch the healer's
+trade: his care is a full mend in his hut, paid ahead. economy_test _test_vendor: the kit
+for 5 gold, none of it the treasury's. A piece of the package "a newcomer can mend in
+town", on. Server only, protocol unchanged, no new class_name.
+
 ## 735, sound's side: the draugr laughs as he attacks on a refusal (voice.draugr_laugh)
 
 Jeff: the draugr "laughs as he attacks you" when you refuse him. The coordinator approved a
