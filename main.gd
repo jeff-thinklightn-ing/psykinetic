@@ -8812,6 +8812,9 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.facts_changed.connect(_on_facts_changed.bind(pet, record))
 	pet.restore_said(record.companion.get("said", []))
 	World.set_slots(pet, record.companion.get("slots", []), record.companion.get("items", []))
+	if is_new:
+		_give_starting_kit(pet)
+	pet.told_tending = record.companion.get("told_tending", false) == true
 	pet.party_log = party_log
 	pet.home = record.companion.get("home", {})
 	# The draugr's blessing (decision 544): she brings her downed player back.
@@ -14370,8 +14373,27 @@ func _remember_companion(id: String) -> void:
 	record.companion["tile_zone"] = pet.zone  # (Her tile is in this zone; elsewhere she comes beside her player.)
 	record.companion["alive"] = true
 	record.companion["said"] = pet.said_lines()
+	record.companion["told_tending"] = pet.told_tending
 	record.companion["slots"] = Array(pet.slots)
 	record.companion["items"] = Array(World.slot_uids(pet))
+
+
+## What a newly met companion brings (681 amended (1)).
+const STARTING_KIT := "bandaging_kit"
+
+
+## A newly met companion's bandaging kit (681 amended (1); the
+## coordinator's lean A of player-mending.md, after playtest's newcomer sat
+## at 15 of 20 for 80 s in the crypt and died): one in her first free pack
+## slot, so she can tend her player from the first fight. A new record
+## only; an older companion is given none.
+func _give_starting_kit(pet: Companion) -> void:
+	var slot := World.free_pack_slot(pet)
+	if slot < 0 or World.bandage_kit(pet) >= 0:
+		return
+	var uid := World.items.mint(STARTING_KIT, "brought", Companion._name_of(pet), pet.zone, pet.tile)
+	if not World.put_item(pet, pet, slot, uid):
+		World.items.end(uid, "lost", "no room", pet.zone, pet.tile)
 
 
 ## "say" {text}: chat, typed or a quick phrase (_player_said).
@@ -15659,6 +15681,7 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
 		record.companion["said"] = pet.said_lines()
+		record.companion["told_tending"] = pet.told_tending
 	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": Companion._name_of(pet), "text": text})
 
 

@@ -403,10 +403,15 @@ const SEARCH_NEAR := 2
 const SEARCH_WANDER := 3
 const ERRAND_TICKS := 200
 ## Wounds seen to unasked (decision 681): looked at every TEND_EVERY ticks;
-## her player (then she) tended below TEND_BELOW of their hp, or bleeding;
-## after one that came to nothing, none again for TEND_BACKOFF ticks.
+## her player (then she) tended at TEND_BELOW of their hp or under, or
+## bleeding (681 amended (1): 0.8, was under 0.75); after one that came to
+## nothing, none again for TEND_BACKOFF ticks.
 const TEND_EVERY := 10
-const TEND_BELOW := 0.75
+const TEND_BELOW := 0.8
+## Said the first time she bandages her player unasked, once a companion
+## (681 amended (1), voice's words): so her player knows she can, and the
+## kit is hers.
+const TEND_FIRST := "Hold still. I've bandages, and that wants seeing to."
 const TEND_BACKOFF := 100
 ## Under this share of her hp she drinks a remedy she carries (681, the
 ## remedy: items' 682 "heal" buff).
@@ -1043,6 +1048,8 @@ var _tend_after := 0
 ## Off, she tends no wound and drinks no remedy unasked (decision 681): the
 ## older companion_test sections, which hurt bodies she would tend.
 static var tends_unasked := true
+## Whether she has said TEND_FIRST (681 amended (1)); kept in her record.
+var told_tending := false
 ## Main's (decision 621): whether a cell of her zone is on a road, and in a
 ## town; unset, never.
 var on_road := Callable()
@@ -4214,6 +4221,9 @@ func _tend_unasked() -> void:
 			_start_errand({"verb": "bandage", "patient": patient, "at": patient.tile, "unasked": true,
 				"words": "tend your own wounds" if own else "tend your player's wounds"}, _serial)
 			_narrate("Unasked, you set about bandaging %s." % ("your own wounds" if own else "%s's wounds" % keeper_name()))
+			if not own and not told_tending:
+				told_tending = true  # Before _say, so Main's record of what she said keeps it.
+				told_tending = _say(TEND_FIRST, true)
 			return
 
 
@@ -4248,11 +4258,12 @@ static func is_remedy(id: String) -> bool:
 
 
 ## Whether [param patient] wants bandaging (decision 681): hurt, not
-## already mending, and under TEND_BELOW of their hp or bleeding.
+## already mending, and at TEND_BELOW of their hp or under (681 amended
+## (1)), or bleeding.
 func _wants_tending(patient: GridEntity) -> bool:
 	if not _alive(patient) or patient.hp <= 0 or patient.hp >= patient.max_hp or patient.mending != 0:
 		return false
-	return float(patient.hp) < TEND_BELOW * patient.max_hp or patient.ailments.has("bleed")
+	return float(patient.hp) <= TEND_BELOW * patient.max_hp + 0.0001 or patient.ailments.has("bleed")
 
 
 ## A hostile within COMBAT_RANGE of her or her player.

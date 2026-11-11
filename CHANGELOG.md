@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A companion you've just met carries a bandaging kit and bandages your wounds when things are quiet, once you're down a fifth of your health, and tells you the first time that she's seeing to it (681 amended (1))
 - When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))
 - Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3))
 - Ask your companion to fish with something hostile near and she tells you why not yet, even straight after a fight, then takes up her rod once it's gone (805 amended (15))

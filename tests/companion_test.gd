@@ -509,6 +509,8 @@ func _test_old_record_gets_a_companion() -> void:
 	_check(pet != null and pet.keeper == _player(), "a companion was created for it and follows")
 	_check(record != null and record.companion.get("name") is String and record.companion.get("alive") == true,
 			"and is now in the record (%s)" % [record.companion.get("name") if record else ""])
+	_check(pet != null and World.bandage_kit(pet) >= 0 and World.items.id_of(World.slot_uid(pet, World.bandage_kit(pet))) == "bandaging_kit",
+			"a newly met companion brings a bandaging kit (681 amended (1); her slots %s)" % [pet.slots if pet else []])
 
 	# A companion that died stays dead: the owner coming back does not bring it back.
 	World.damage(pet, 999)
@@ -547,10 +549,13 @@ func _test_old_record_gets_a_companion() -> void:
 	if _companion() != null:
 		World.despawn(_companion())  # (Since 694 amended (2) she is off the world already.)
 	record.companion["alive"] = true
+	record.companion["slots"] = []  # An older companion with an empty pack (681 amended (1)).
+	record.companion["items"] = []
 	_main._companions.clear()
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	pet = _companion()
 	_check(pet != null and World.distance(pet.tile, _player().tile) == 1, "a companion saved next to an imp comes back beside its owner instead (at %s)" % [pet.tile if pet else Vector2i(-1, -1)])
+	_check(pet != null and World.bandage_kit(pet) < 0, "an older companion coming back is given no kit (681 amended (1); her slots %s)" % [pet.slots if pet else []])
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
 
@@ -1102,6 +1107,7 @@ func _test_errands() -> void:
 	# Fetching from the chest and handing over: to her own player.
 	var kit: String = chest.slots[0]
 	_check(kit == "bandaging_kit", "(the chest holds a bandaging kit)")
+	var her_kits := pet.slots.count(kit)  # Her own, brought (681 amended (1)).
 	for i in 21:
 		World.step()
 	offered = pet.can_do()
@@ -1116,8 +1122,8 @@ func _test_errands() -> void:
 	mind.voice_answer = {"say": "There you go.", "stance": ""}
 	_step_until(func() -> bool: return pet.errand.is_empty(), 60)
 	told = mind.triggers("voice")
-	_check(chest.slots.find(kit) == -1 and owner.slots.find(kit) != -1 and pet.slots.find(kit) == -1,
-		"it is in her player's slots now, not the chest's or hers (%s)" % [owner.slots])
+	_check(chest.slots.find(kit) == -1 and owner.slots.find(kit) != -1 and pet.slots.count(kit) == her_kits,
+		"it is in her player's slots now, not the chest's, and hers is still hers alone (%s)" % [owner.slots])
 	_check(told.size() == 1 and told[0] == "You brought Player the bandaging kit from the chest.", "and she tells it: %s" % [told])
 	_check(World.items.history(owner.slot_items[owner.slots.find(kit)]).size() > 0, "the kit's history follows it")
 	# (A ring to give: her own bandaging kit she keeps off her offers, 681.)
@@ -7029,6 +7035,7 @@ func _test_tends_unasked() -> void:
 	var spoken: Array[String] = []
 	var on_said := func(line: String) -> void: spoken.append(line)
 	pet.said.connect(on_said)
+	pet.told_tending = false
 	_put(owner, Vector2i(9, 7))
 	_put(pet, Vector2i(10, 9))
 	var slots_were := pet.slots.duplicate()
@@ -7062,9 +7069,52 @@ func _test_tends_unasked() -> void:
 	_check(owner.mending == 2 and pet.mending != 0, "then her own wounds (player %d, she %d)" % [owner.mending, pet.mending])
 	var lines := says.values().map(func(line: Variant) -> String: return str(line))
 	_check(not spoken.any(func(line: String) -> bool: return line in lines), "and nothing said of it (%s)" % [spoken])
+	_check(spoken.count(Companion.TEND_FIRST) == 1 and pet.told_tending and _main._records.get(pet.keeper_id).companion.get("told_tending") == true,
+		"but the first time she tends her player, she says so, once, and her record keeps it (681 amended (1); %s)" % [spoken])
 	pet.said.disconnect(on_said)
 	World.set_slots(pet, slots_were)
 	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	owner.hp = owner.max_hp
+	owner.mending = 0
+	pet.hp = hp_was
+	pet.mending = 0
+	# 681 amended (1): at TEND_BELOW (0.8) of their hp or under; a second
+	# tend of her player says nothing more.
+	var at := int(floor(Companion.TEND_BELOW * owner.max_hp + 0.0001))
+	var shares: Array[String] = []
+	for hp: int in [at - 1, at, at + 1]:
+		owner.hp = hp
+		shares.append("%d/%d %s" % [hp, owner.max_hp, pet._wants_tending(owner)])
+	owner.hp = at - 1
+	var low_ok := pet._wants_tending(owner)
+	owner.hp = at
+	var at_ok := pet._wants_tending(owner)
+	owner.hp = at + 1
+	_check(low_ok and at_ok and not pet._wants_tending(owner), "she tends at %d of %d and under, not at %d (%s)" % [at, owner.max_hp, at + 1, shares])
+	pet.said.connect(on_said)
+	spoken.clear()
+	World.set_slots(pet, ["bandaging_kit"])
+	_put(owner, Vector2i(9, 7))
+	_put(pet, Vector2i(10, 9))
+	owner.hp = at
+	owner.mending = 0
+	calm.call()
+	pet._tend_after = 0
+	_step_until(func() -> bool: return owner.mending != 0, Companion.TEND_EVERY * 4 + 40)
+	_check(owner.mending != 0 and not spoken.has(Companion.TEND_FIRST),
+		"at %d of %d her player is bandaged, and her first-tend line is not said again (%s)" % [at, owner.max_hp, spoken])
+	var imp2 := _spawn_imp(_free_tile_between(pet, 3, 4))
+	imp2.acts = false
+	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	owner.hp = at
+	owner.mending = 0
+	pet._tend_after = 0
+	for i in Companion.TEND_EVERY * 3:
+		World.step()
+	_check(pet.errand.is_empty() and owner.mending == 0, "at %d of %d with a monster near: not in a fight" % [at, owner.max_hp])
+	World.despawn(imp2)
+	pet.said.disconnect(on_said)
+	World.set_slots(pet, slots_were)
 	owner.hp = owner.max_hp
 	owner.mending = 0
 	pet.hp = hp_was
@@ -7945,8 +7995,9 @@ func _test_how_she_speaks() -> void:
 	var pet := _companion()
 	var prompt := pet.voice_prompt("test")
 	_check(not RegEx.create_from_string("\\d+ paces?").search(prompt), "no number of paces anywhere in her voice's prompt")
-	_check("You carry a lantern" not in prompt and "You carry a lantern, and in your pack nothing." in pet.voice_prompt("", "Player just said to you: \"What are you carrying?\""),
-			"what she carries is in her prompt only when asked about it")
+	var asked_prompt := pet.voice_prompt("", "Player just said to you: \"What are you carrying?\"")
+	_check("You carry a lantern" not in prompt and "You carry a lantern, and in your pack a bandaging kit." in asked_prompt,
+			"what she carries is in her prompt only when asked about it (her own kit, 681 amended (1))")
 	pet._sky_asked = true  # Asked about the sky: told it in full (unasked, briefly: _test_sky_unasked).
 	_check("outdoors" not in pet.voice_situation() and "# wall," in pet.perception_grid(), "under stone she is told nothing of the sky")
 	World.outdoor = true

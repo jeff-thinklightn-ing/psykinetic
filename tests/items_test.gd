@@ -226,7 +226,11 @@ func _test_given() -> void:
 	_check(World.try_transfer(host, host, 0, pet, 1), "the host gives the kit to %s" % pet.name)
 	var events: Array = World.items.history(uid)["events"]
 	_check(events[-1]["kind"] == "given" and pet.name in str(events[-1]["what"]), "given, to her (%s)" % [events[-1]])
-	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "her player's record has its instance")
+	# Her own kit, brought (681 amended (1)), and the one given.
+	var held := Array(record.companion.get("items", []))
+	var brought := held.filter(func(each: Variant) -> bool: return int(each) != 0 and int(each) != uid)
+	_check(held.size() > 1 and held[1] == uid and brought.size() == 1 and World.items.id_of(int(brought[0])) == "bandaging_kit",
+		"her player's record has its instance, beside the kit she brought (%s)" % [held])
 	World.steps += 20
 	_check(World.try_transfer(pet, pet, 1, host, 3), "she hands it back herself")
 	_check(World.items.held_by(uid, World.holder_key(pet)) == 20 and host.slot_items[3] == uid, "she held it 20 steps; the host has it")

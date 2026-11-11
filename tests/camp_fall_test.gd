@@ -20,6 +20,7 @@ var _camp := ""
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17858)
+	Companion.tends_unasked = false  # Her own kit (681 amended (1)): her bandaging moved the room's fight and the player's deaths; none of this tests tending.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	_test_truce()

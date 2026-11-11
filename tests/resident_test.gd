@@ -27,6 +27,7 @@ func _ready() -> void:
 	Resident.keep_moving = false  # The cases from before 853 read bodies that keep their cell; _test_keep_moving turns it on.
 	Net.port = preload("res://tests/test_ports.gd").of(17796)
 	Net.companions = true
+	Companion.tends_unasked = false  # Her own kit (681 amended (1)): bandaging herself walked her off where the plea's player stood; none of this tests tending.
 	Net.state_path = preload("res://tests/test_ports.gd").scratch("resident_test_world.json")
 	if FileAccess.file_exists(Net.state_path):
 		DirAccess.remove_absolute(Net.state_path)

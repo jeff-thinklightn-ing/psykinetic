@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Only in the party log (35)
+## Only in the party log (36)
 
 Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
 client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
@@ -44,6 +44,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | In %s, %s. | `main.gd` _offers_context() |
 | %s is free%s. | `main.gd` companion_freed() |
 | and waits in | `main.gd` companion_freed() |
+| %s said: "%s" | `main.gd` _on_companion_said() |
 | %s's %s is %s now. | `main.gd` _narrate_named() |
 | %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
 | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
@@ -54,9 +55,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2797)
+## Lines in the code (2802)
 
-### companions (Pip, Wren, Nix) (652)
+### companions (Pip, Wren, Nix) (653)
 
 | | Line | Where |
 |---|---|---|
@@ -143,6 +144,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | a door opening or shutting | `sim/companion.gd`  |
 |  | something striking a door | `sim/companion.gd`  |
 |  | a door breaking | `sim/companion.gd`  |
+|  | Hold still. I've bandages, and that wants seeing to. | `sim/companion.gd` TEND_FIRST |
 |  | (?i)\\b(i'?ll\|i will\|let me\|i'?m going to\|i can\|on it)\\b | `sim/companion.gd` PROMISE |
 |  | (?i)\\b(i'?ll\|i will\|let me\|i can\|i could\|i'?d (love\|like\|be glad\|be happy) to\|shall i\|should i\|want me to\|i'?m going to\|happy to\|glad to)\\b[^.!?]*\\b((lead\|guide\|take\|bring\|walk)\\s+(you\|us)\\b\|show\\s+(you\|us)\\s+the\\s+way\|lead\\s+the\\s+way)\|\\b(follow me\|come with me)\\b | `sim/companion.gd` LEAD_OFFER |
 |  | \\b(north-east\|north-west\|south-east\|south-west\|north\|south\|east\|west)\\b | `sim/companion.gd` COMPASS_WORD |
@@ -2041,7 +2043,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (712)
+### server and windows (716)
 
 | | Line | Where |
 |---|---|---|
@@ -2071,6 +2073,10 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s pick up %s | `main.gd` _process() |
 |  | Wares, if you have coin. | `main.gd` _greet_sample() |
 |  | wait a moment before saying more | `main.gd` _say_to_person() |
+|  | walkable %s, held %s, step shut %s | `main.gd` _free_no_headway() |
+|  | %s walkable %s held %s line %s | `main.gd` _free_round() |
+|  | %s no way on from it | `main.gd` _free_round() |
+|  | no plan from %s | `main.gd` _free_round() |
 |  | %s@%d,%d | `main.gd` _move_items() |
 |  | usage: reload <zone> \| reload all (zones: %s) | `main.gd` _reload_command() |
 |  | no open zone's level changed on disk (%d open) | `main.gd` _reload_command() |
@@ -2341,7 +2347,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s bumped into %s. | `main.gd` _on_bumped() |
 |  | %s bumped into %s. | `main.gd` _make_way() |
 |  | %s %s%s: "%s" | `main.gd` _player_said() |
-|  | %s said: "%s" | `main.gd` _on_companion_said() |
+| U | %s said: "%s" | `main.gd` _on_companion_said() |
 |  | A newer game, v%s, is out: start the game again with launch.bat to update. | `main.gd` _on_message() |
 |  | They are too far away. | `main.gd` give_gold() |
 |  | You can give gold only to a fellow traveller or to the one who goes with you. | `main.gd` give_gold() |

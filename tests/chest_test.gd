@@ -299,7 +299,13 @@ func _test_companion_pack() -> void:
 	var record: PlayerRecord = _main._records[Net.player_id]
 	_main._join_companion(record, host)
 	var pet: Companion = _main._companions.get(Net.player_id)
-	_check(pet != null and Array(pet.slots) == ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "she has a pack of 4, two hands and the armour slot, empty")
+	var own: Array = Array(pet.slots) if pet != null else []
+	var own_kit := own.find(Main.STARTING_KIT)
+	if own_kit >= 0:
+		own[own_kit] = ""
+	_check(pet != null and own_kit >= 0 and own == ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], "she has a pack of 4, two hands and the armour slot, empty but for the bandaging kit a newly met companion brings (681 amended (1)): %s" % [Array(pet.slots) if pet else "none"])
+	World.set_slots(pet, [])  # Her own kit put by: the drop below is the kit this test follows.
+	_main._remember_companion(Net.player_id)
 	_check(World.reaches(host, pet), "her player, %d away, reaches it" % World.distance(host.tile, pet.tile))
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
