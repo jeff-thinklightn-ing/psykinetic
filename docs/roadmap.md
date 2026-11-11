@@ -3,6 +3,26 @@
 Last updated: 2026-10-14. Owner: Jeff. Every session reads this before starting work.
 The player-facing version (for Dire) lives in a separate doc; this one is for building.
 
+## Focus: one area at a time, Umbrage first (Jeff, 2026-11-10)
+
+Jeff: "another feeling i have is the work is being spread thin across all the different zones, and I
+want to refocus effort umbrage itself feeling good -- rolf fix and town people fix is going to go a
+long away, but I think we need to move through areas together and not have work spread around - its
+harder to test that way too". And the same evening: "every time i get on to test something the same
+things i report haven't changed"; "i also mentioned the core gameplay loop bring the most important
+thing to fix and i can't even tell if that is being addressed."
+
+- **Every tree works on Umbrage until Jeff says it feels good**, then all move to the next area
+  together (the coordinator names it with him). Umbrage is the town, its people, its keepers and
+  their windows, the Mughouse, the temple and the crypt under it, the ground round the town, Wren in
+  town, and loop 1 (her fishing wish, which starts there). Work for another area parks, apart from
+  what was already queued to land on 11-10 and real breakage.
+- **A report of Jeff's is a tree's first work**, kept in C:\dev\review\your_reports.md (the
+  coordinator edits it), reproduced on the released build as a player who was told nothing, and
+  closed only when playtest has seen it fixed in the released game. A release note never calls a
+  report of his fixed on a test alone.
+- **Each cut's checklist opens with his reports and the area in focus**, so he tests one place.
+
 ## Goal right now (Jeff, 2026-11-04: "the game doesn't seem fun yet")
 
 **The core.** Jeff: "some of the 'core' of the game is that you are tending to the companions needs
