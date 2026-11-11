@@ -147,6 +147,11 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	var streets: Array = result.get("street_warnings", [])
 	if not streets.is_empty():
 		reply["summary"] += "\nStreets: " + "; ".join(streets)
+	# Who comes to the spots the proposal lays or changes (859), before Enter.
+	if str(session.working.config.get("spots")) != str(session.doc.config.get("spots")):
+		var users := session.spot_preview()
+		if not users.is_empty():
+			reply["summary"] += "\nSpots, who comes: " + "; ".join(users)
 	var arrivals: Array = result.get("arrival_warnings", [])
 	if not arrivals.is_empty():
 		reply["summary"] += "\nArrivals (a player coming in there lands inside a fight): " + "; ".join(arrivals)

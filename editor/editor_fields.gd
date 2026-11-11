@@ -108,7 +108,7 @@ const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "ro
 	"town", "storeys", "beds", "lit_candles",
 	# A fallow field's furrows (827, terrain's side: written by hand, like decor).
 	"furrows",
-	# Where townsfolk stand and sit (853: maps lays them by hand; builder's spot tool to come).
+	# The town's spots (853, npc's): laid with builder mode's spot tool (859), not here.
 	"spots"]
 const FACINGS := {"north": [0, -1], "east": [1, 0], "south": [0, 1], "west": [-1, 0]}
 

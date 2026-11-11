@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_accept_keeps()
 	_test_json_keep()
 	_test_runner()
+	_test_spots()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -285,7 +286,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "decor", "piece", "town_wall", "roof", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "decor", "spot", "piece", "town_wall", "roof", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -1667,3 +1668,88 @@ func _test_runner() -> void:
 		and runner.run(PackedStringArray(["--level=no_such_level", "--calls=" + calls, "--out=" + out])) == 1, "the shared overlay, the project and an unknown level refused")
 	_check(Level.overlay_dir == kept_overlay and DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(Level.OVERLAY + "test_room")) == overlay_had,
 		"the shared overlay neither read nor written: Level.overlay_dir put back, no test_room there")
+
+
+func _test_spots() -> void:
+	print("\n== the spot tool: where townsfolk stand, sit and lean (859, npc's 853) ==")
+	# Umbrage's square fire (wilds' square_fire, its seats) and the weapon stall's counter.
+	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	var steps := wilds.working.undo_steps.size()
+	var seat := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"})
+	var seat_text := str(seat.get("text"))
+	_check(seat.get("ok", false) and wilds.working.config.get("spots") == [{"use": "fire", "cell": [192, 210], "face": [193, 211], "pose": "sit", "town": "store"}]
+		and wilds.working.undo_steps.size() == steps + 1 and not "Warning" in seat_text,
+		"a sit spot on the fire's seat: npc's shape, the store its town by default, one undo step, no seat warning (%s)" % seat_text)
+	if not Client3D.ACTIVITIES.has("sit"):
+		_check("sit draws as stand until its clip lands" in seat_text, "it says the sit draws as a stand until animation's clip lands")
+	var turned := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 209], "pose": "sit"})
+	_check(turned.get("ok", false) and "changed it to" in str(turned.get("text")) and (wilds.working.config["spots"] as Array).size() == 1
+		and wilds.working.config["spots"][0]["face"] == [193, 209], "laid again on its cell: the spot turned, still one (%s)" % turned.get("text"))
+	var refusals := {
+		"its face is not one of the eight cells about it": {"at": [192, 212], "use": "fire", "face": [195, 215]},
+		"its use \"dance\" is none of": {"at": [192, 212], "use": "dance", "face": [193, 212]},
+		"a work spot names no trade": {"at": [192, 212], "use": "work", "face": [193, 212]},
+		"trade is for a work spot": {"at": [192, 212], "use": "fire", "face": [193, 212], "trade": "cook"},
+		"pair is for a talk spot": {"at": [192, 212], "use": "fire", "face": [193, 212], "pair": "a"},
+	}
+	for words: String in refusals:
+		var out := wilds.run_tool("spot", refusals[words])
+		_check(not out.get("ok", true) and words in str(out.get("text")), "refused: %s (%s)" % [words, out.get("text")])
+	var fire := wilds.run_tool("spot", {"at": [194, 211], "use": "fire", "face": [194, 210]})
+	_check(not fire.get("ok", true), "on the fire itself: refused (%s)" % fire.get("text"))
+	# The keeper behind his counter; who comes (residents.json's settled people, read without a world).
+	var keeper := wilds.run_tool("spot", {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]})
+	var keeper_text := str(keeper.get("text"))
+	_check(keeper.get("ok", false) and "work (merchant) in store (1 spot)" in keeper_text and "Snagfin" in keeper_text,
+		"a merchant's spot behind the counter: laid, and who comes read (%s)" % keeper_text)
+	if World.towns == null:
+		_check("residents.json's settled people only" in keeper_text, "with no world, said: the settled people only")
+	var gone := wilds.run_tool("spot", {"at": [192, 210], "remove": true})
+	_check(gone.get("ok", false) and "took away the fire spot at (192, 210)" in str(gone.get("text")) and (wilds.working.config["spots"] as Array).size() == 1, "removed (%s)" % gone.get("text"))
+	wilds.working.undo()
+	_check((wilds.working.config["spots"] as Array).size() == 2, "undone: the fire spot back")
+	var preview := wilds.spot_preview()
+	_check(preview.size() == 2 and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind (%s)" % [preview])
+	var shown := BuilderSession.spot_words(wilds.working.config)
+	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (192, 210) facing (193, 209)" in shown,
+		"accepted: both spots in the level, said in the situation (%s)" % shown)
+	# A field with no town, then with one: the seat warning, a doorway, a way closed, ground not reached.
+	var field := _doc()
+	field.config["starts"] = [[2, 2]]
+	var session := BuilderSession.new(field, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var townless := session.run_tool("spot", {"at": [10, 10], "use": "square", "face": [11, 10]})
+	_check(not townless.get("ok", true) and "no town's store" in str(townless.get("text")), "no town on the level: refused (%s)" % townless.get("text"))
+	session.working.config["places"] = {"store": {"at": [20, 15], "kind": "stockpile", "holder": "town"}, "far_store": {"at": [38, 28], "kind": "stockpile", "holder": "town"}}
+	var bare := session.run_tool("spot", {"at": [10, 10], "use": "square", "face": [11, 10], "pose": "sit"})
+	_check(bare.get("ok", false) and "Warning: nothing at (10, 10) is sat on" in str(bare.get("text")) and session.working.config["spots"][0]["town"] == "store",
+		"a sit spot on bare grass: laid with a warning; the nearest store its town (%s)" % bare.get("text"))
+	session.working.map.set_edge(Terrain.edge_key(Vector2i(14, 10), Vector2i.RIGHT), "door")
+	var doorway := session.run_tool("spot", {"at": [14, 10], "use": "square", "face": [13, 10]})
+	_check(not doorway.get("ok", true) and "in a doorway" in str(doorway.get("text")), "in a doorway: refused (%s)" % doorway.get("text"))
+	session.run_tool("paint", {"ground": "rock", "rects": [{"x": 25, "y": 0, "w": 1, "h": 10}, {"x": 25, "y": 11, "w": 1, "h": 19}]})
+	var plug := session.run_tool("spot", {"at": [25, 10], "use": "square", "face": [24, 10]})
+	_check(not plug.get("ok", true) and "would close the only way through: it cuts off" in str(plug.get("text")), "the one gap in a wall: refused, what it cuts off named (%s)" % str(plug.get("text")).left(160))
+	# Walled in by hand (the paint tool's own 844 check undoes an edit that cuts ground off).
+	for x in range(30, 35):
+		session.working.map.set_cell(Vector2i(x, 20), "rock")
+		session.working.map.set_cell(Vector2i(x, 24), "rock")
+	for y in range(21, 24):
+		session.working.map.set_cell(Vector2i(30, y), "rock")
+		session.working.map.set_cell(Vector2i(34, y), "rock")
+	session._reached = {}
+	var shut := session.run_tool("spot", {"at": [32, 22], "use": "square", "face": [32, 21]})
+	_check(not shut.get("ok", true) and "not reached" in str(shut.get("text")), "ground walled in, reached from nowhere: refused (%s)" % shut.get("text"))
+	# Rolf's rule: a stall's square wider than its counter, the keeper's spot behind it only.
+	session.working.config["places"]["stall"] = {"at": [10, 20], "kind": "stall", "holder": "town", "town": "store", "radius": 2}
+	session.working.config["buildings"] = [{"slot": "building.market_stall", "at": [10, 21], "facing": [0, 1]}]
+	session._reached = {}
+	var front := session.run_tool("spot", {"at": [12, 22], "use": "work", "trade": "merchant", "face": [11, 22]})
+	_check(not front.get("ok", true) and "customers' side of the counter at (10, 21)" in str(front.get("text")), "a merchant's spot out front of his counter: refused (%s)" % front.get("text"))
+	var behind := session.run_tool("spot", {"at": [12, 19], "use": "work", "trade": "merchant", "face": [11, 19]})
+	_check(behind.get("ok", false), "behind it: laid (%s)" % behind.get("text"))
+	var cook := session.run_tool("spot", {"at": [12, 22], "use": "work", "trade": "cook", "face": [11, 22]})
+	_check(cook.get("ok", false), "a cook's spot there, no keeper: laid (%s)" % cook.get("text"))
+	# The prompt says it, and the tool is offered with npc's uses and poses.
+	var offered: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "spot")
+	_check(not offered.is_empty() and offered[0]["input_schema"]["properties"]["use"]["enum"] == Level.SPOT_USES and "spot lays where one townsperson stands" in BuilderSession.system_prompt(),
+		"the tool offered (npc's uses and poses) and the prompt says it")

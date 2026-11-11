@@ -92,6 +92,10 @@ static func _run_in(level_name: String, calls: Array, args: Dictionary, out: Str
 		print("LAYOUT %s" % news)
 	for news in session.arrival_news(arrivals_before):
 		print("ARRIVAL %s (%s)" % [news, BuilderSession.ARRIVAL_SAYS])
+	# Who comes to the spots the change lays (859).
+	if str(session.working.config.get("spots")) != str(doc.config.get("spots")):
+		for users in session.spot_preview():
+			print("SPOTS %s" % users)
 	if not session.accept():
 		print("builder_run: not accepted: %s; nothing written" % (session.refused if not session.refused.is_empty() else "no change"))
 		return 2

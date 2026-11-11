@@ -150,7 +150,7 @@ const ARRIVAL_NEAR := 4.0
 ## The level.json keys a proposal carries to the level on accept: every key
 ## a tool writes (841 amended (1): decor and skylights were left out, so accept
 ## dropped them; builder_test reads the tools for a key missing here).
-const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams", "decor", "skylights"]
+const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams", "decor", "skylights", "spots"]
 ## Dungeon's layout rules (806), checked on accept: see layout_news.
 const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 
@@ -478,6 +478,9 @@ static func tools(config := {}) -> Array:
 			tool["input_schema"]["properties"]["cue"]["enum"] = Level.CUES + [""]
 		elif tool["name"] == "decor":
 			tool["input_schema"]["properties"]["kind"]["enum"] = DECOR_WORDS.keys()
+		elif tool["name"] == "spot":
+			tool["input_schema"]["properties"]["use"]["enum"] = Level.SPOT_USES.duplicate()
+			tool["input_schema"]["properties"]["pose"]["enum"] = Level.SPOT_POSES.duplicate()
 		elif tool["name"] == "piece":
 			tool["input_schema"]["properties"]["kind"]["enum"] = PIECE_WORDS.keys()
 			tool["input_schema"]["properties"]["arrow"]["enum"] = Level.CARVED_ARROWS.duplicate()
@@ -558,7 +561,7 @@ Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has o
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), decor_line(), piece_line(), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), decor_line() + "\n\n" + spot_line(), piece_line(), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -592,6 +595,9 @@ func _situation() -> String:
 			decor.append("%s at %s%s" % [entry[4], Vector2i(int(entry[0]), int(entry[1])), " (%s)" % side_name(step) if step != Vector2i.ZERO else ""])
 	if not decor.is_empty():
 		text += "\n\nDecor here: " + ", ".join(decor) + "."
+	var spots := spot_words(doc.config)
+	if not spots.is_empty():
+		text += "\n\nSpots here: " + spots + "."
 	if not relief().is_empty():
 		text += "\n\nThis level's ground is shaped in metres: the Heights block is in half metres."
 	var coded := PackedStringArray()
@@ -874,6 +880,17 @@ const TOOLS := [
 			"variant": {"type": "integer", "minimum": 1, "description": "the piece's variant (1 if not given)"},
 			"remove": {"type": "boolean"}},
 			"required": ["at"]}},
+	{"name": "spot", "description": "Lays a spot where one townsperson stands, sits or leans (the system prompt says how): its use, the cell its body faces, its pose; a work spot names its trade, a talk spot its pair. A spot on a cell that has one changes it. remove takes away the spot on the cell.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"use": {"type": "string", "enum": []},
+			"face": _CELL,
+			"pose": {"type": "string", "enum": [], "description": "stand when not given"},
+			"trade": {"type": "string", "description": "a work spot's trade (cook, smith, ...)"},
+			"pair": {"type": "string", "description": "a talk spot's pair: the two spots of a pair share it and face each other"},
+			"town": {"type": "string", "description": "the town's place key (its store's); the town whose ground holds the cell when not given"},
+			"remove": {"type": "boolean"}},
+			"required": ["at"]}},
 	{"name": "piece", "description": "Lays a standing piece with no walls or roof (the system prompt says each kind) with its top-left at a cell and its front to a side: solid, no one walks its cells. remove takes away the piece standing on a cell.",
 		"input_schema": {"type": "object", "properties": {
 			"at": _CELL,
@@ -1097,6 +1114,8 @@ func _run_tool(tool: String, input: Variant) -> Dictionary:
 			return _skylight(given)
 		"decor":
 			return _decor(given)
+		"spot":
+			return _spot(given)
 		"piece":
 			return _piece(given)
 		"set_building":
@@ -2585,6 +2604,332 @@ func _decor(given: Dictionary) -> Dictionary:
 		(" against its %s wall" if str(spec["sits"]) == "wall" else ", facing %s") % side if not side.is_empty() else ""]}
 
 
+# --- Spots (859) ---------------------------------------------------------------
+
+## The prompt's paragraph on spots (859, npc's 853 contract).
+static func spot_line() -> String:
+	return ("spot lays where one townsperson stands, sits or leans while doing something: level.json's spots, read by the town's people. "
+		+ "Its use is what they are doing there: work (a trade's spot: its trade named), square, fire, well, inn, temple, talk (two spots of one pair, facing each other); "
+		+ "fire and talk spots are taken in the square's hours. Face is the cell the body faces (the fire, the well, the pot, its partner), one of the eight about it. "
+		+ "Pose is stand, sit (over a seat laid there) or lean (a rim, a fence, a wall). A spot is on walkable ground the town reaches, never in a doorway, before a door, "
+		+ "on a fire, or where a body standing would close the only way through. Lay more spots than people, so no two want one.")
+
+
+## [param config]'s spots in a line each ("fire sit at (3, 4) facing (4, 4)"), or "".
+static func spot_words(config: Dictionary) -> String:
+	var words := PackedStringArray()
+	for spot: Dictionary in Level.spots_from(config, [] as Array[String]):
+		words.append("%s%s %s at %s facing %s%s" % [spot["use"], " (%s)" % spot["trade"] if not str(spot["trade"]).is_empty() else "",
+			spot["pose"], spot["cell"], spot["face"], " (pair %s)" % spot["pair"] if not str(spot["pair"]).is_empty() else ""])
+	return ", ".join(words)
+
+
+## The spot tool (859): a level.json "spots" entry in npc's shape (853),
+## checked by Level.spots_from itself (its warning on this cell the
+## refusal), and by what the contract keeps that the reader cannot see: not
+## on a fire, a doorway, the cell before a door or a way off the level; a
+## sit spot over a seat; reached from where players come in; and no body
+## standing there closing the only way through (the coordinator). One on a
+## cell with a spot changes it; remove takes it away.
+func _spot(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("spot needs at: [x, y]")
+	if not area.has_point(at):
+		return _no("%s is outside the area" % [at])
+	var listed: Array = (working.config["spots"] as Array).duplicate(true) if working.config.get("spots") is Array else []
+	var on_cell := func(entry: Variant) -> bool: return entry is Dictionary and Level._tile(entry.get("cell")) == at
+	var rest := listed.filter(func(entry: Variant) -> bool: return not on_cell.call(entry))
+	var was: Array = listed.filter(on_cell)
+	if bool(given.get("remove", false)):
+		if was.is_empty():
+			return _no("no spot at %s" % [at])
+		working.apply_changes({"config": {"spots": rest}})
+		return {"ok": true, "text": "took away the %s spot at %s" % [was[0].get("use", ""), at]}
+	var use := str(given.get("use", "")).strip_edges()
+	var pose := str(given.get("pose", "stand")).strip_edges()
+	var trade := str(given.get("trade", "")).strip_edges()
+	var pair := str(given.get("pair", "")).strip_edges()
+	if not trade.is_empty() and use != "work":
+		return _no("trade is for a work spot: this one's use is %s" % use)
+	if not pair.is_empty() and use != "talk":
+		return _no("pair is for a talk spot: this one's use is %s" % use)
+	var town := str(given.get("town", "")).strip_edges()
+	if town.is_empty():
+		town = nearest_town(at)
+		if town.is_empty():
+			return _no("a spot belongs to a town, and this level has no town's store (a stockpile place): name its town")
+	var face: Variant = Level._tile(given.get("face"))
+	var entry := {"use": use, "cell": [at.x, at.y], "face": [face.x, face.y] if face is Vector2i else given.get("face"), "pose": pose, "town": town}
+	if use == "work":
+		entry["trade"] = trade
+	if use == "talk" and not pair.is_empty():
+		entry["pair"] = pair
+	# npc's reader: its warning on this spot is the refusal, in its words.
+	var floor := {}
+	for cell: Vector2i in working.parsed()["terrain"]["floor"]:
+		floor[cell] = true
+	var warnings: Array[String] = []
+	Level.spots_from({"spots": rest + [entry]}, warnings, floor)
+	var mine := "the spot at %s " % [at]
+	for warning: String in warnings:
+		if warning.begins_with(mine):
+			return _no(warning.trim_suffix("; left out"))
+	var kept_clear := _spot_clear(at)
+	if not kept_clear.is_empty():
+		return _no("a spot is not %s: %s is %s" % [kept_clear[0], at, kept_clear[1]])
+	var unseated := pose == "sit" and not seat_at(at)
+	if not reached().has(at):
+		return _no("%s is not reached from where players and townsfolk come in" % [at])
+	# A body standing there: the ground reached with every spot's cell solid, before and after.
+	var held := {}
+	for other: Variant in rest:
+		if other is Dictionary and Level._tile(other.get("cell")) != null:
+			held[Level._tile(other.get("cell"))] = true
+	var before := reached_round(held)
+	held[at] = true
+	var after := reached_round(held)
+	var cut: Array[Vector2i] = []
+	for cell: Vector2i in before:
+		if cell != at and not after.has(cell):
+			cut.append(cell)
+	if not cut.is_empty():
+		cut.sort()
+		return _no("a body standing at %s would close the only way through: it cuts off %d cell%s (%s)" % [at, cut.size(), "" if cut.size() == 1 else "s",
+			", ".join(cut.slice(0, NARROW_SHOWN).map(func(cell: Vector2i) -> String: return str(cell))) + (" and more" if cut.size() > NARROW_SHOWN else "")])
+	var front := keeper_front(entry)
+	if not front.is_empty():
+		return _no(front)
+	working.apply_changes({"config": {"spots": rest + [entry]}})
+	var said := "%s a %s spot at %s, %s facing %s%s" % ["changed it to" if not was.is_empty() else "laid", use if use != "work" else "work (%s)" % trade, at, pose,
+		face, ", pair %s" % pair if not pair.is_empty() else ""]
+	if unseated:
+		said += ". Warning: nothing at %s is sat on (%s), so the body sits on the ground" % [at, SEAT_SAYS]
+	var users := spot_users(town, use, trade)
+	if not users.is_empty():
+		said += ". " + users
+	return {"ok": true, "text": said}
+
+
+## Why a spot may not be at [param at], as [what it is not, what is there],
+## or []: a fire, a way off the level, an entry, a doorway (a door edge on
+## one of its sides) or the cell in front of a building's door.
+func _spot_clear(at: Vector2i) -> Array:
+	if working.map.cell(at) == "fire":
+		return ["on a fire", "a fire"]
+	if not working.link_of(at).is_empty():
+		return ["on a way off the level", "one"]
+	if not working.entry_of(at).is_empty():
+		return ["on an entry", "one"]
+	for side in HeightTools.FOUR:
+		if working.map.edge(Terrain.edge_key(at, side)) == "door":
+			return ["in a doorway", "beside the door on its %s side" % side_name(side)]
+	for other: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var their: Variant = Level.building_rect(other)
+		if not their is Rect2i:
+			continue
+		var facing := Level.building_facing(other)
+		var door := solid_door(other) if str(other.get("slot", "")) in Level.SOLID else Level.front_cell(their, facing) - facing
+		if door != Level.NO_DOOR and at in [door, door + facing]:
+			return ["in a doorway or before a door", "the door of the %s or the cell before it" % building_name(other)]
+	return []
+
+
+## What a sit spot sits on (859, npc's reading): what the warning names.
+const SEAT_SAYS := "a seat of a place (a tavern's, a fire's) or a chair or bench laid there"
+## Building slots a body sits on (npc: the barrow's hall chair, the smith's bench).
+const SEAT_SLOTS: Array[String] = ["building.hall_chair", "building.smith_bench"]
+## The trades that keep a stall or counter (npc's contract: they "tend").
+const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper"]
+
+
+## Whether a body sits on something at [param at] (859, npc's reading: the
+## code knows no seat cell of its own): a place's "seats" cell (a tavern's,
+## a fire's), or a cell of a SEAT_SLOTS building.
+func seat_at(at: Vector2i) -> bool:
+	var places: Variant = working.config.get("places", {})
+	for key: Variant in places if places is Dictionary else {}:
+		var place: Variant = places[key]
+		for seat: Variant in place.get("seats", []) if place is Dictionary and place.get("seats") is Array else []:
+			if Level._tile(seat) == at:
+				return true
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		if entry is Dictionary and str(entry.get("slot", "")) in SEAT_SLOTS:
+			var rect: Variant = Level.building_rect(entry)
+			if rect is Rect2i and (rect as Rect2i).has_point(at):
+				return true
+	return false
+
+
+## The key of the town a spot at [param at] belongs to by default (859,
+## npc): the level's store (a place of kind stockpile), the nearest of
+## several by its cell; "" for none.
+func nearest_town(at: Vector2i) -> String:
+	var best := ""
+	var best_far := 0
+	var places: Variant = working.config.get("places", {})
+	for key: Variant in places if places is Dictionary else {}:
+		var place: Variant = places[key]
+		var cell: Variant = Level._tile(place.get("at")) if place is Dictionary and str(place.get("kind", "")) == "stockpile" else null
+		if cell is Vector2i:
+			var far := (cell as Vector2i).distance_squared_to(at)
+			if best.is_empty() or far < best_far:
+				best = str(key)
+				best_far = far
+	return best
+
+
+## Why a keeper's work spot [param entry] stands on its stall's customers'
+## side (859, Rolf's rule, npc's reading: Main._behind_counter over the stall
+## place's square and its counter), or "". The keeper only ever strolls
+## behind his counter, so a spot out front would never be used.
+func keeper_front(entry: Dictionary) -> String:
+	if str(entry.get("use", "")) != "work" or str(entry.get("trade", "")) not in KEEPER_TRADES:
+		return ""
+	var at := Vector2i(int(entry["cell"][0]), int(entry["cell"][1]))
+	var places: Variant = working.config.get("places", {})
+	for key: Variant in places if places is Dictionary else {}:
+		var place: Variant = places[key]
+		var cell: Variant = Level._tile(place.get("at")) if place is Dictionary and str(place.get("kind", "")) == "stall" else null
+		if not cell is Vector2i:
+			continue
+		var radius := int(place.get("radius", Level.PLACE_RADIUS))
+		var square := Rect2i(cell - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+		if not square.has_point(at):
+			continue
+		for building: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+			if not building is Dictionary or str(building.get("slot", "")) not in Main.COUNTERS:
+				continue
+			var counter: Variant = Level._tile(building.get("at"))
+			if not counter is Vector2i or absi(counter.x - cell.x) > 1 or absi(counter.y - cell.y) > 1:
+				continue
+			if not Main._behind_counter(square, counter, Level.building_facing(building)).has_point(at):
+				return "a %s's work spot at %s is on the customers' side of the counter at %s: he only ever stands behind it" % [entry["trade"], at, counter]
+	return ""
+
+
+## Which world the who-uses-it reading reads ("" for the one running here).
+var spot_world := ""
+
+
+## Who uses the spots of [param town]'s [param use] (and [param trade], a
+## work spot's) over one day (859, npc's rule): each resident whose
+## Townsfolk.whereabouts word at each hour is the use ("square" for square,
+## fire and talk alike; "work" with the trade among theirs), against the
+## spots there are. "" when no spot of that kind is laid.
+func spot_users(town: String, use: String, trade := "") -> String:
+	var spots := Level.spots_from(working.config, [] as Array[String]).filter(func(spot: Dictionary) -> bool:
+		return spot["town"] == town and _spot_group(spot["use"]) == _spot_group(use) and (use != "work" or spot["trade"] == trade))
+	if spots.is_empty():
+		return ""
+	var group := _spot_group(use)
+	var named := "work (%s)" % trade if use == "work" else ("square, fire and talk" if group == "square" else use)
+	var poses := PackedStringArray()
+	for spot: Dictionary in spots:
+		var pose: String = spot["pose"]
+		if pose != "stand" and not Client3D.ACTIVITIES.has(pose) and not poses.has(pose + " draws as stand until its clip lands"):
+			poses.append(pose + " draws as stand until its clip lands")
+	var head := "%s in %s (%d spot%s%s)" % [named, town, spots.size(), "" if spots.size() == 1 else "s", "; " + ", ".join(poses) if not poses.is_empty() else ""]
+	var residents := _spot_residents(town)
+	if residents.is_empty():
+		return head + ": no residents read%s" % (" (%s)" % spot_world if not spot_world.is_empty() else "")
+	var hours := {}
+	var wants: Array[int] = []
+	wants.resize(24)
+	for resident: Dictionary in residents:
+		var mine: Array[int] = []
+		for hour in 24:
+			var word := Townsfolk.whereabouts(str(resident["trade"]), float(hour), "", str(resident["type"]), str(resident["id"]))
+			var comes: bool = word == "work" and trade in resident["trades"] if use == "work" else (word == "square" if group == "square" else word == use)
+			if comes:
+				mine.append(hour)
+				wants[hour] += 1
+		if not mine.is_empty():
+			hours[str(resident["name"])] = mine
+	var where := " (%s)" % (spot_world if not spot_world.is_empty() else "this world, now")
+	if hours.is_empty():
+		return head + ": nobody comes all day" + where
+	var who := PackedStringArray()
+	for name: String in hours:
+		who.append("%s %s" % [name, _spans(hours[name])])
+	var over: Array[int] = []
+	var most := 0
+	for hour in 24:
+		most = maxi(most, mini(wants[hour], spots.size()))
+		if wants[hour] > spots.size():
+			over.append(hour)
+	var said := "%s: %s; at most %d at once of %d" % [head, ", ".join(who), most, spots.size()]
+	if not over.is_empty():
+		var peak := 0
+		for hour in over:
+			peak = maxi(peak, wants[hour])
+		said += "; too few at %s (%d want them): the rest stand anywhere in the place's rect" % [_spans(over), peak]
+	return said + where
+
+
+## A spot use's group (859): square, fire and talk are all the square's hours.
+static func _spot_group(use: String) -> String:
+	return "square" if use in ["square", "fire", "talk"] else use
+
+
+## Hours [param hours] (sorted) as spans: "8-12, 18-21" (each span's end the hour after its last).
+static func _spans(hours: Array[int]) -> String:
+	var out := PackedStringArray()
+	var i := 0
+	while i < hours.size():
+		var j := i
+		while j + 1 < hours.size() and hours[j + 1] == hours[j] + 1:
+			j += 1
+		out.append("%d-%d" % [hours[i], hours[j] + 1])
+		i = j + 1
+	return ", ".join(out)
+
+
+## [param town]'s residents as the who-uses-it reading needs them: [{id,
+## name, trade, trades, type}]. From the world running here when it holds
+## the town (World.towns, its workers' trades; spot_world says which; the
+## coordinator: in-process only, said to the builder-mode player who asked
+## and never logged, its townsfolk only, never a companion); with
+## none (the headless runner), residents.json's settled people of the town
+## alone (npc: economy's workers are rolled as a world runs), and
+## spot_world says so.
+func _spot_residents(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var whole := "%s/%s" % [map_name, town]
+	if World.towns != null and World.production != null and not World.towns.residents(whole).is_empty():
+		for id: String in World.towns.residents(whole):
+			var worker := World.production.worker(id)
+			# Townsfolk only (the coordinator): a companion left in town is a player's.
+			if id.begins_with("companion:") or worker.is_empty() or worker.has("owner"):
+				continue
+			var trades: Array = worker.get("trades", [])
+			out.append({"id": id, "name": str(worker.get("name", id)), "trade": str(trades[0]) if not trades.is_empty() else "",
+				"trades": trades, "type": str(worker.get("type", ""))})
+		return out
+	var settled := Townsfolk.settled()
+	for id: String in settled:
+		var card: Dictionary = settled[id]
+		if str(card.get("town", "")) == whole:
+			out.append({"id": id, "name": str(card.get("name", id)), "trade": str(card.get("trade", "")), "trades": [str(card.get("trade", ""))],
+				"type": str(card.get("type", ""))})
+	if spot_world.is_empty() and not out.is_empty():
+		spot_world = "residents.json's settled people only: economy's workers are rolled as a world runs, not read here"
+	return out
+
+
+## Every laid spot kind's reading (859), a line each: the proposal's summary and the runner's.
+func spot_preview() -> Array[String]:
+	var out: Array[String] = []
+	var seen := {}
+	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
+		var key := "%s|%s|%s" % [spot["town"], _spot_group(spot["use"]), spot["trade"] if spot["use"] == "work" else ""]
+		if seen.has(key):
+			continue
+		seen[key] = true
+		out.append(spot_users(spot["town"], spot["use"], spot["trade"]))
+	return out
+
+
 ## Why a wall_hearth at [param at] against its [param step] wall is not on an
 ## inside wall (841): outdoors, both its cells in a building's rect; indoors
 ## any wall will do. "" if it is.
@@ -2777,7 +3122,17 @@ func _kept_clear(rect: Rect2i) -> String:
 func reached() -> Dictionary:
 	if not _reached.is_empty():
 		return _reached
+	_reached = reached_round({})
+	return _reached
+
+
+## reached() with the cells of [param extra] solid too (859: a body standing on a spot).
+func reached_round(extra: Dictionary) -> Dictionary:
 	var ground := flood_ground()
+	if not extra.is_empty():
+		var solid: Dictionary = (ground.get("solid", {}) as Dictionary).duplicate()
+		solid.merge(extra)
+		ground["solid"] = solid
 	var map := working.map
 	var seen: Dictionary = {}
 	var queue: Array[Vector2i] = []
@@ -2794,7 +3149,6 @@ func reached() -> Dictionary:
 			if not seen.has(next) and HeightTools.steps(map, at, next, ground):
 				seen[next] = true
 				queue.append(next)
-	_reached = seen
 	return seen
 
 var _reached: Dictionary = {}

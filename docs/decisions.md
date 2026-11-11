@@ -48313,3 +48313,61 @@ alone, by a few lines; a painted cell changes layout.png, the earlier run's barr
 folder; a refusal stops the run with nothing written; the shared overlay, the project and an
 unknown level refused; Level.overlay_dir put back and the shared overlay untouched). Tools only:
 nothing player-facing, no package, no bullet; protocol unchanged; no new class_name.
+
+
+## 859. Builder's spot tool: where townsfolk stand, sit and lean, and who comes
+
+The coordinator's approval, for Umbrage (one area at a time), on npc's 853 contract: level.json's
+top-level "spots", [{use, cell, face, pose, town, trade, pair}], read by Level.spots_from. Maps lays
+Umbrage's spots and needs to see who actually goes to each one ("who actually goes there" is what
+npc got wrong for ten days, the coordinator).
+
+- The tool: `spot {at, use, face, pose, trade, pair, town, remove}` writes one entry in npc's shape.
+  town defaults to the level's store (a stockpile place, the nearest of several; npc), and is written
+  as the place's key ("store"), the way Main._resident_places reads it. pose defaults to stand. A
+  spot laid on a cell that already has one changes it. remove takes it away, and one undo restores
+  it. "spots" is in CONFIG_KEYS, so accept carries it (841am1's guard test checks every key a tool
+  writes).
+- Its rules: npc's reader, not a copy. The tool runs Level.spots_from over the working copy with its
+  floor, and a warning naming the new spot's cell is the refusal, in npc's words (use, pose, town,
+  work with no trade, a face not one of the eight, not floor, one spot a cell). Builder refuses what
+  the reader can't see: a fire cell; a way off the level or an entry; a doorway (a door edge on a
+  side) or a building's door and the cell before it; a cell the 844 reach doesn't reach; trade on a
+  spot that isn't work, or pair on one that isn't talk. Also a body that would close the only way
+  through (the coordinator: "a resident parked in a doorway-wide lane is the frozen-town report
+  coming back another way"): the reach is run with every other spot's cell solid, then again with
+  this one solid too, and the count and cells that would be cut off are named. And Rolf's rule
+  (npc's reading): a keeper's (merchant, taverner, keeper) work spot inside a stall place's square
+  must be behind its counter, per Main._behind_counter over that square and the Main.COUNTERS slot
+  within one cell of the stall. On the customers' side the keeper would never use it.
+- A sit spot with nothing to sit on is laid with a warning, not refused (npc: the code knows no seat
+  cell of its own). A seat is a place's "seats" cell (a tavern's, a fire's) or a cell of a
+  building.hall_chair or building.smith_bench.
+- Who comes (spot_users, spot_preview): for each kind of spot in a town (square, fire and talk
+  together, as they share the square's hours; each other use; work by trade), each hour of one day at
+  default season and mood, the residents whose Townsfolk.whereabouts word is its use (work also by
+  trade), against the spots laid. The answer gives each resident's hours, how many at most at once of
+  how many, too few spots at an hour ("the rest stand anywhere in the place's rect"), and nobody all
+  day. A pose with no clip yet (Client3D.ACTIVITIES has no "sit" or "lean") is said to draw as a
+  stand until its clip lands. It shows in each tool answer, the proposal summary before Enter ("Spots,
+  who comes: ...", when the proposal changes the spots), and the runner's SPOTS lines.
+- Whose residents (the coordinator's rule): in game, the server's own World.towns and its workers,
+  read in-process and labelled "this world, now". Townsfolk only, never a companion ("companion:" ids,
+  owned records), said only to the builder-mode player who asked, and never logged. Headless (851's
+  runner, no world) it reads residents.json's settled people of the town ("<area>/<key>") and says
+  "residents.json's settled people only: economy's workers are rolled as a world runs, not read
+  here". No world is booted to guess.
+- editor_fields keeps "spots" in NOT_OFFERED, so the level editor doesn't edit them; its comment now
+  says they are laid with this tool (npc's line).
+
+Tests: builder_test _test_spots (Umbrage's square fire and weapon stall in wilds: a sit spot on a fire
+seat laid in npc's shape with its town by default and no warning, said to draw as a stand; laid again
+it turns; refused for a bad face, an unknown use, work without a trade, trade or pair on the wrong
+use, the fire itself; a merchant behind the counter laid with
+who comes read; removed and undone; the preview a line a kind; accepted into the level and said in
+the situation. On a test field: no store refused; a bare sit warned, the nearest store its town; a
+doorway, the one gap in a wall (what it cuts off named) and walled-in ground refused; a merchant's
+spot out front of a stall's counter refused, behind it laid, a cook's out front laid; the tool offered
+with npc's uses and the prompt saying it). Tools only: nothing player-facing, no package, no bullet;
+protocol unchanged; no new class_name. Step 2 (the ghost in game: a marker for each spot, facing and
+pose) is an amendment of this, when built.
