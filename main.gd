@@ -19781,8 +19781,32 @@ func _vendor_spot(place_id: String, store: Vector2i) -> Rect2i:
 	var stall := World.holdings.place("%s/%s" % [town.get("area", ""), key]) if not key.is_empty() else {}
 	if str(stall.get("kind", "")) == "stall" and str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
 		var radius := maxi(int(stall.get("radius", 1)), 0)
-		return Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+		var spot := Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+		# His side of the counter only (853, the coordinator's rule): he strolls, never round to the front.
+		var buildings: Array = _world_map.areas.get(str(town.get("area", "")), {}).get("buildings", []) if _world_map != null else []
+		for each: Variant in buildings:
+			if each is Dictionary and str(each.get("slot", "")) in COUNTERS and each.get("at") is Array and each.get("facing") is Array:
+				var at := Vector2i(int(each["at"][0]), int(each["at"][1]))
+				if World.distance(at, Vector2i(stall["cell"])) <= 1:
+					return _behind_counter(spot, at, Vector2i(int(each["facing"][0]), int(each["facing"][1])))
+		return spot
 	return Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+
+
+## The counters a keeper serves over (853): a stall's keeper keeps behind one.
+const COUNTERS: Array[String] = ["building.market_stall"]
+
+
+## The part of [param spot] behind a counter at [param at] facing [param facing] (its customers' side):
+## the cells back of its line, where its keeper stands; [param spot] whole when none is.
+static func _behind_counter(spot: Rect2i, at: Vector2i, facing: Vector2i) -> Rect2i:
+	var kept := Rect2i()
+	for y in range(spot.position.y, spot.end.y):
+		for x in range(spot.position.x, spot.end.x):
+			var cell := Vector2i(x, y)
+			if (cell.x - at.x) * facing.x + (cell.y - at.y) * facing.y < 0:
+				kept = Rect2i(cell, Vector2i.ONE) if kept.size == Vector2i.ZERO else kept.merge(Rect2i(cell, Vector2i.ONE))
+	return kept if kept.size != Vector2i.ZERO else spot
 
 
 ## Every place of a routine at [param spot]: a visitor keeps to it all day.

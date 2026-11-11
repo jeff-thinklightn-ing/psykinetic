@@ -48129,6 +48129,11 @@ the richer day):
   _test_keep_moving with it on.
 - A trade with no building standing works its own patch of the square (Main._open_work: a 3 x 3 about
   a cell of the square's inner ring its trade's hash chooses), till maps lays its work spots.
+- A keeper with a counter strolls only on his side of it (the coordinator's rule, 2026-11-11): never
+  round to its front, nor onto the cell a player trades from. Main._vendor_spot cuts the starter
+  stall's keeper's 3 x 3 to the cells behind a counter (Main.COUNTERS: building.market_stall) beside
+  his stall place, by its facing (Main._behind_counter): Rolf's (203, 195)..(204, 196), behind the
+  stall at (203, 197) facing south.
 
 The spots (the contract; maps lays them, builder edits them, animation and sound draw and sound
 them). A level.json's top-level "spots", an array; not "places", which are holdings. Each entry

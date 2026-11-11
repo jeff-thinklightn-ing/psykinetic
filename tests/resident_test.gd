@@ -5280,6 +5280,12 @@ func _test_vendor() -> void:
 	_check(spot == Rect2i(stall_cell - Vector2i.ONE, Vector2i(3, 3)), "his named stall: behind its counter, not the one keyed first (%s)" % [spot])
 	_check(decoy_only == Rect2i(store - Vector2i(2, 2), Vector2i(5, 5)), "another stall alone never takes him: by the store (%s)" % [decoy_only])
 	_check(_main._vendor_spot(STORE, store) == Rect2i(store - Vector2i(2, 2), Vector2i(5, 5)), "no stall: by the store")
+	# His side of the counter (853): Umbrage's, the stall (203, 197) facing south, him at (203, 196).
+	var about := Rect2i(202, 195, 3, 3)
+	_check(Main._behind_counter(about, Vector2i(203, 197), Vector2i(0, 1)) == Rect2i(202, 195, 3, 2)
+		and Main._behind_counter(about, Vector2i(204, 196), Vector2i(1, 0)) == Rect2i(202, 195, 2, 3)
+		and Main._behind_counter(about, Vector2i(203, 190), Vector2i(0, 1)) == about,
+		"a stall's keeper keeps behind its counter, never round to its front (%s)" % [Main._behind_counter(about, Vector2i(203, 197), Vector2i(0, 1))])
 	if stall_was == null:
 		rule.erase("stall")
 	else:
