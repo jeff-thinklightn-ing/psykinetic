@@ -40218,6 +40218,23 @@ own landing straight after v0.1.211's unfreeze makes it fail, regenerating the p
 commit.
 Tools and tests only, protocol unchanged, no new class_name.
 
+748 amended (7), voice's side (2026-11-11, the coordinator's ask, the script's label): lines heard
+only by the party log are flagged. sim/party_log.gd is the server's own list. Her mind reads its
+tail (companion.gd's context) and tools/town_soak.gd reads it, but no message kind carries it to a
+client. So a line whose only delivery is party_log.add is never seen by a player: playtest found
+four crypt lines like that, and voice's sweep (C:/dev/review/voice/unheard_lines.md) found 34 in
+v0.1.210 across seven trees. voice_inventory.py now marks such a literal **U** and lists them under
+"Only in the party log (n)" at the top of docs/voice_inventory.md. A literal counts when it is in a
+party_log.add call (its continuation lines, a CONST it names, or a variable set up to LOG_NEAR, 6,
+lines above), with no call that reaches a player (Net.broadcast_to / message_to, _say, _say_plain,
+_ask_voice, _narrate, a _tell_ call, guide_note, _thank_aloud, and dungeon's Main.say_to and say_to_pair) within LOG_NEAR lines of it in the
+same function. Records by design are LOG_EXEMPT (file, function) or LOG_EXEMPT_TEXT, each with its
+why: speech that goes out beside it, combat the client shows, her comings and goings that her
+_ask_voice says, and the like. `--check` prints the count as a warning and never fails on it, so
+each tree sees its own lines leave the list as it gives them a delivery. It doesn't catch a line
+that Main builds from another file's text, such as an offer's result line. Tools only, protocol
+unchanged, no new class_name.
+
 ## 757. The Dwarven Halls' chests: dwarven_hoard
 
 castle_halls' three chests (its template's "chests": 3, decision 649's note: "the chests' loot the

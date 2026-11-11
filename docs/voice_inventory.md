@@ -8,6 +8,52 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
+## Only in the party log (35)
+
+Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
+client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
+reaches the player (a "party" or "speech" message, `_say_plain`, her `_ask_voice`), or a
+record by design goes in the tool's LOG_EXEMPT with why. Marked **U** below too.
+A line Main builds from another file's text (an offer's result line) isn't caught here.
+
+| Line | Where |
+|---|---|
+| %s throws the bones: %d to %s's %d. | `sim/companion.gd` _play_on() |
+| %s won't touch grave goods | `sim/companion.gd` turns_down() |
+| %s won't carry that for %s | `sim/companion.gd` turns_down() |
+| The stair down is barred from below. | `main.gd` SEALED_LINES |
+| The way on is closed. | `main.gd` _take_link() |
+| The way is sealed. | `main.gd` _take_link() |
+| %s leaves you %s. | `main.gd` _return_gear() |
+| The draugr yields. %s %s. | `main.gd` barrow_won() |
+| %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
+| Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
+| The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
+| %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
+| Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
+| The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
+| The hall's door opens. | `main.gd` _hold_hall_door() |
+| The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
+| Only the dead lie here. | `main.gd` _on_niche_pressed() |
+| The slab swings aside from behind. | `main.gd` _reveal_from_below() |
+| %s is mortally wounded. | `main.gd` _on_downed() |
+| %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
+| %s brought %s back (%d charges left). | `main.gd` _on_channel() |
+| Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
+| %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
+| In %s, %s. | `main.gd` _offers_context() |
+| %s is free%s. | `main.gd` companion_freed() |
+| and waits in | `main.gd` companion_freed() |
+| %s's %s is %s now. | `main.gd` _narrate_named() |
+| %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
+| %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
+| %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
+| %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
+| %s keeps %s from %s. | `main.gd` _narrate_kept() |
+| %s is back with %s. | `main.gd` _narrate_kept() |
+| %s's camp%s falls. | `main.gd` _check_camps() |
+| %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
+
 ## Lines in the code (2785)
 
 ### companions (Pip, Wren, Nix) (640)
@@ -270,7 +316,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You are badly hurt (%d of %d), and the fight is over for now. You'd like to rest before the next one: | `sim/companion.gd` _watch_deeds() |
 |  | tell %s so in your own words, plainly. | `sim/companion.gd` _watch_deeds() |
 |  | Your game of knucklebones is broken off. | `sim/companion.gd` _play_on() |
-|  | %s throws the bones: %d to %s's %d. | `sim/companion.gd` _play_on() |
+| U | %s throws the bones: %d to %s's %d. | `sim/companion.gd` _play_on() |
 |  | %d to %d | `sim/companion.gd` _play_on() |
 |  | You just played knucklebones by the fire with %s, and you %s, %s. Say how you take it, as yourself. | `sim/companion.gd` _play_on() |
 |  | %s would rather go on: you do not sleep now. | `sim/companion.gd` _answered_watch() |
@@ -540,8 +586,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | (dead\|down\|fallen\|not moving)\|fell\|died\|dropped)\\s*([.!;,]\|$) | `sim/companion.gd` event_report() |
 |  | You leap clear of %s. | `sim/companion.gd` _act() |
 |  | you are badly hurt | `sim/companion.gd` _choose() |
-|  | %s won't touch grave goods | `sim/companion.gd` turns_down() |
-|  | %s won't carry that for %s | `sim/companion.gd` turns_down() |
+| U | %s won't touch grave goods | `sim/companion.gd` turns_down() |
+| U | %s won't carry that for %s | `sim/companion.gd` turns_down() |
 |  | %s's line of fire | `sim/companion.gd` _read_telegraphs() |
 |  | Your pack is full of ore: you stop mining. | `sim/companion.gd` _mine_pick() |
 |  | ; talk: answered %d of %d (said %d, did %d), unanswered %d | `sim/companion.gd` talk_report() |
@@ -2039,9 +2085,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s %s %s; marks: %s | `main.gd` _mark_command() |
 |  | %s stays in %s, working as its %s. Come back and %s will travel with you again. | `main.gd` travel() |
 |  | %s went to %s. | `main.gd` travel() |
-| L | The stair down is barred from below. | `main.gd` SEALED_LINES |
-|  | The way on is closed. | `main.gd` _take_link() |
-|  | The way is sealed. | `main.gd` _take_link() |
+| L U | The stair down is barred from below. | `main.gd` SEALED_LINES |
+| U | The way on is closed. | `main.gd` _take_link() |
+| U | The way is sealed. | `main.gd` _take_link() |
 |  | usage: weather [%s\|auto\|reload] [<minutes>] [<region>\|all] | `main.gd` _weather_command() |
 |  | no climate for region %s (regions: %s) | `main.gd` _weather_command() |
 |  | %s (%s): %s | `main.gd` _weather_command() |
@@ -2139,7 +2185,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s goes home to %s; you part as friends. | `main.gd` _begin_leaving() |
 |  | You are leaving %s for good, and going home to %s: they %s. | `main.gd` _begin_leaving() |
 |  | %s leaves you, and goes home to %s. | `main.gd` _begin_leaving() |
-|  | %s leaves you %s. | `main.gd` _return_gear() |
+| U | %s leaves you %s. | `main.gd` _return_gear() |
 |  | %s is glad to travel with %s again. | `main.gd` _recruit_said() |
 |  | %s came to your town and asked you to travel with them again, and you were glad to. | `main.gd` _recruit_said() |
 |  | asked you back | `main.gd` _recruit_said() |
@@ -2155,12 +2201,12 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | (another of her name lives in every town: someone else now, not to be asked back) | `main.gd` _hand_companion_over() |
 | L | You left %s because they %s. | `main.gd` _favour_words() |
 |  | are spoken well of in your town | `main.gd` _favour_tick() |
-|  | The draugr yields. %s %s. | `main.gd` barrow_won() |
+| U | The draugr yields. %s %s. | `main.gd` barrow_won() |
 |  | is blessed and takes up the %s, uncharged | `main.gd` barrow_won() |
 |  | stands over him again | `main.gd` barrow_won() |
-|  | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
-| L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
-|  | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
+| U | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
+| L U | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
+| U | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | L | the draugr's blessing | `main.gd` reset_barrow() |
 |  | the deal won | `main.gd` reset_barrow() |
 | L | the fallen knight's quest | `main.gd` reset_barrow() |
@@ -2169,12 +2215,12 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Clear the crypt | `main.gd` QUEST_TITLE |
 | L | the fallen knight | `main.gd` QUEST_GIVER |
 | L | Brand the Ox | `main.gd` _give_camp_key() |
-|  | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
-|  | Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
-|  | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
-|  | The hall's door opens. | `main.gd` _hold_hall_door() |
-|  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
-|  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
+| U | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
+| U | Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
+| U | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
+| U | The hall's door opens. | `main.gd` _hold_hall_door() |
+| U | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
+| U | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draft coming from one of the niches. | `main.gd` _tell_draft() |
 |  | The fresh mortar crumbles under your hands, and the niche comes open. | `main.gd` LOOSE_NICHE_LINE |
 |  | a sealed tomb opened | `main.gd` TOMB_OPENED |
@@ -2193,9 +2239,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | drove %s back with you | `main.gd` _bond_apex_beaten() |
 |  | %s@%s:%d,%d#%d | `main.gd` _secret_key() |
 |  | Nothing more here. | `main.gd` _search_secret() |
-|  | The slab swings aside from behind. | `main.gd` _reveal_from_below() |
-|  | %s is mortally wounded. | `main.gd` _on_downed() |
-|  | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
+| U | The slab swings aside from behind. | `main.gd` _reveal_from_below() |
+| U | %s is mortally wounded. | `main.gd` _on_downed() |
+| U | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 |  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd` _on_downed() |
 |  | You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
@@ -2204,10 +2250,10 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Not while they're fighting near. | `main.gd` _start_channel() |
 |  | %s kneels beside %s. | `main.gd` _on_channel() |
 |  | %s's return of %s is broken. | `main.gd` _on_channel() |
-|  | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
+| U | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
 |  | %s was carried off by raiders. | `main.gd` _on_entity_taken() |
 |  | Raiders beat %s down and carried them off. | `main.gd` _on_entity_taken() |
-|  | Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
+| U | Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
 |  | %s was beaten down and carried off by raiders in %s. | `main.gd` _companion_taken_in_town() |
 |  | Raiders carried %s off from %s. | `main.gd` _companion_taken_in_town() |
 |  | %s said: "%s" | `main.gd` _all_clear() |
@@ -2220,9 +2266,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s the %s is found %s and is being led here. | `main.gd` _sought_words() |
 |  | Away %s. Back when I can. | `main.gd` _sought_notes() |
 |  | %s the %s has gone off, %s they say. | `main.gd` _rumour_for() |
-|  | %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
+| U | %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
 |  | [reads the chronicle: %d lines] | `main.gd` _read_page() |
-|  | In %s, %s. | `main.gd` _offers_context() |
+| U | In %s, %s. | `main.gd` _offers_context() |
 |  | a gift from %s | `main.gd` _on_handed() |
 |  | a gift from %s | `main.gd` _favour_given() |
 |  | brought you %s | `main.gd` _favour_given() |
@@ -2244,8 +2290,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | carried you out of the raiders' camp | `main.gd` companion_freed() |
 |  | %s was freed from the raiders%s. | `main.gd` companion_freed() |
 |  | and brought to | `main.gd` companion_freed() |
-|  | %s is free%s. | `main.gd` companion_freed() |
-|  | and waits in | `main.gd` companion_freed() |
+| U | %s is free%s. | `main.gd` companion_freed() |
+| U | and waits in | `main.gd` companion_freed() |
 |  | %s stays in the town and works as its %s. | `main.gd` _stay_in_town() |
 |  | %s goes back to the town to rest. | `main.gd` _rest_in_town() |
 |  | (off: the key was refused) | `main.gd` _mind_claude() |
@@ -2318,7 +2364,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 | L | the fallen knight | `main.gd` KNIGHT_UNNAMED |
 |  | %s shoved %s | `main.gd` _narrate_push() |
 |  | %s's charge breaks on %s's spear. | `main.gd` _narrate_brace() |
-|  | %s's %s is %s now. | `main.gd` _narrate_named() |
+| U | %s's %s is %s now. | `main.gd` _narrate_named() |
 |  | %s is named for %s now, after long use. | `main.gd` _card_named() |
 |  | %s kept %s from her. | `main.gd` _card_kept() |
 |  | kept %s from you | `main.gd` _card_kept() |
@@ -2339,12 +2385,12 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | holds a grudge against %s | `main.gd` _card_grew() |
 |  | has had its vengeance on %s | `main.gd` _card_grew() |
 |  | %s fell, and was brought back at %s%s. | `main.gd` return_fact() |
-|  | %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
-|  | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
-|  | %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
-|  | %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
-|  | %s keeps %s from %s. | `main.gd` _narrate_kept() |
-|  | %s is back with %s. | `main.gd` _narrate_kept() |
+| U | %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
+| U | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
+| U | %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
+| U | %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
+| U | %s keeps %s from %s. | `main.gd` _narrate_kept() |
+| U | %s is back with %s. | `main.gd` _narrate_kept() |
 |  | %s takes up %s and puts down %s. | `main.gd` _narrate_swap() |
 |  | Your arms give out. | `main.gd` _tell_arms_gave() |
 |  | %s knocks %s down. | `main.gd` _narrate_down() |
@@ -2357,13 +2403,13 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s bled for %d. | `main.gd` _narrate_damage() |
 |  | %s shot %s for %d. | `main.gd` _narrate_damage() |
 |  | %s hit %s for %d. | `main.gd` _narrate_damage() |
-|  | %s's camp%s falls. | `main.gd` _check_camps() |
+| U | %s's camp%s falls. | `main.gd` _check_camps() |
 |  | cleared %s with you | `main.gd` _bond_cleared() |
 |  | freed this whole place of its camps with you | `main.gd` _bond_cleared() |
 |  | won a fight beside you | `main.gd` _bond_won() |
 |  | spoke harshly to you | `main.gd` _bond_felt() |
 |  | said sorry for their harsh words | `main.gd` _bond_felt() |
-|  | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
+| U | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 |  | played knucklebones with you | `main.gd` _bond_played() |
 |  | left you to fall alone | `main.gd` _bond_left_down() |
 |  | let you bleed out | `main.gd` _bond_fell() |

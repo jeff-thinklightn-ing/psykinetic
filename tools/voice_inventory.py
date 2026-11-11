@@ -16,7 +16,10 @@ the regenerated page). It reads only the tree, and of it only the files git
 knows (committed or staged; `git ls-files`): the scanned code, levels/ and
 docs/lore/. Its output is the same on every checkout: sorted, LF line ends,
 no date, no path outside the tree. land.sh warns until v0.1.211's unfreeze,
-then fails (the coordinator's warn-first day, 748 amended (6)).
+then fails (the coordinator's warn-first day, 748 amended (6)). Lines whose only
+delivery is party_log.add (the server's own list, never sent to a client) are
+listed first as "Only in the party log" and marked U; --check warns their
+count and never fails on it (748 amended (7)).
 
 Heuristics, not a parser: a GDScript literal counts when it has three or more
 words and a lowercase letter, and the line isn't a log/print/assert/comment.
@@ -153,10 +156,107 @@ def gd_files():
             yield f
 
 
+# Only in the party log (748 amended (7)): sim/party_log.gd is the server's
+# own list, read by her mind and never sent to a client, so a line whose only
+# delivery is party_log.add is never seen by a player (the coordinator's
+# sweep, 2026-11-11: C:/dev/review/voice/unheard_lines.md). A party_log.add
+# counts as delivered when a call that does reach a player sits within
+# LOG_NEAR lines of it in the same function.
+LOG_ADD = re.compile(r"\bparty_log\.add\(")
+DELIVERY = re.compile(
+    r"\bNet\.(broadcast|broadcast_to|message|message_to)\(|\b_say(_plain|_to_person)?\(|\b_ask_voice\(|"
+    r"\b_narrate\(|\b_tell_\w*\(|\bguide_note\s*=|\b_thank_aloud\(|\bsay_to(_pair)?\("
+)
+LOG_NEAR = 6
+# Functions whose party_log lines are records by design: her mind's context
+# for an event the player gets another way (a caller tells it, the client
+# shows it, or the player has left). (file, function) -> why.
+LOG_EXEMPT = {
+    ("main.gd", "_stay_in_town"): "told by its caller (travel's 'stays in %s, working as its %s') or the player has left",
+    ("main.gd", "_rest_in_town"): "the player has left",
+    ("main.gd", "_join_companion"): "she is there; _tell_whereabouts and _tell_sickness tell it",
+    ("main.gd", "_resident_recruit_said"): "her _ask_voice says it as she joins",
+    ("main.gd", "_recruit_said"): "her _ask_voice says it as she joins",
+    ("main.gd", "_begin_leaving"): "her _ask_voice says it",
+    ("main.gd", "_favour_given"): "a record: the gift was the player's own act",
+    ("main.gd", "_guard_raised"): "the guard's own 'raised' line (_guard_told)",
+    ("main.gd", "_narrate_push"): "the client shows the push",
+    ("main.gd", "_narrate_brace"): "the client shows the brace",
+    ("main.gd", "_narrate_swap"): "a record of the player's own act",
+    ("main.gd", "_narrate_down"): "the client shows it",
+    ("main.gd", "_narrate_bash"): "the client shows it",
+    ("main.gd", "_narrate_guard"): "the client shows it",
+    ("main.gd", "_narrate_damage"): "the client shows the hit and its number",
+    ("main.gd", "_on_bumped"): "a record",
+    ("main.gd", "_make_way"): "a record",
+    ("main.gd", "_start_guide"): "guide_note: she says it",
+    ("main.gd", "_on_command"): "builder, not players",
+    ("main.gd", "travel"): "a record: the player travelled",
+    ("main.gd", "_item_command"): "the pickup is told beside it",
+    ("main.gd", "_on_entity_died"): "her last words go out in the 'death' message",
+}
+# Single records inside a function whose other lines aren't (the text as the page shows it).
+LOG_EXEMPT_TEXT = {
+    "%s kneels beside %s.": "the client shows the kneel and its ring",
+    "%s's return of %s is broken.": "the client shows the ring end",
+}
+
+
+def _func_spans(lines):
+    """Each line's enclosing function: (name, first index, last index) or None."""
+    out = [None] * len(lines)
+    starts = [(i, FUNC.match(l).group(1)) for i, l in enumerate(lines) if FUNC.match(l)]
+    for n, (s, name) in enumerate(starts):
+        e = starts[n + 1][0] - 1 if n + 1 < len(starts) else len(lines) - 1
+        for i in range(s, e + 1):
+            out[i] = (name, s, e)
+    return out
+
+
+def log_only(rel, lines):
+    """The lines (1-based) holding a literal delivered only by party_log.add,
+    and the constants such a call names: ({line}, {CONST})."""
+    spans = _func_spans(lines)
+    flagged, consts = set(), set()
+    for i, raw in enumerate(lines):
+        code = code_part(raw)
+        if not LOG_ADD.search(code) or spans[i] is None:
+            continue
+        name, s, e = spans[i]
+        if (rel, name) in LOG_EXEMPT:
+            continue
+        near = range(max(s, i - LOG_NEAR), min(e, i + LOG_NEAR) + 1)
+        if any(DELIVERY.search(code_part(lines[k])) for k in near if k != i):
+            continue
+        # The call itself, over its continuation lines.
+        args, k, depth = code[LOG_ADD.search(code).end():], i, 1
+        call_lines = [i]
+        while True:
+            depth += args.count("(") - args.count(")")
+            if depth <= 0 or k + 1 > e or len(call_lines) > 4:
+                break
+            k += 1
+            call_lines.append(k)
+            args = code_part(lines[k])
+        joined = " ".join(code_part(lines[j]) for j in call_lines)[LOG_ADD.search(code).end():]
+        flagged.update(j + 1 for j in call_lines)
+        consts.update(re.findall(r"\b([A-Z][A-Z_0-9]{2,})\b", joined))
+        # A variable it logs, set a few lines above (var line := "...").
+        for var in set(re.findall(r"\b([a-z_]\w*)\b", STRING.sub("", joined))):
+            for j in range(max(s, i - LOG_NEAR), i):
+                if re.match(r"\s*(var\s+)?%s\s*(:?=|:\s*\w+\s*=)" % re.escape(var), lines[j]):
+                    flagged.add(j + 1)
+    return flagged, consts
+
+
+UNHEARD = []  # (rel, line, where, text), filled by scan_gd
+
+
 def scan_gd(rel):
     rows = []
     with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
         lines = f.read().splitlines()
+    unheard_lines, unheard_consts = log_only(rel, lines)
     ctx = ""
     for i, raw in enumerate(lines, 1):
         m = FUNC.match(raw)
@@ -174,6 +274,8 @@ def scan_gd(rel):
             text = norm(lit)
             if wordy(text, 3):
                 rows.append((rel, i, where, text))
+                if (i in unheard_lines or (c and c.group(1) in unheard_consts)) and text not in LOG_EXEMPT_TEXT:
+                    UNHEARD.append((rel, i, where, text))
     return rows
 
 
@@ -221,10 +323,26 @@ def build():
         "",
     ]
     by_speaker = {}
+    del UNHEARD[:]
     for rel in gd_files():
         for row in scan_gd(rel):
             spk = SPEAKER_BY_FILE.get(rel, "server and windows" if rel == "main.gd" else "other (" + rel.split("/")[0] + ")")
             by_speaker.setdefault(spk, []).append(row)
+    unheard = {(rel, i, text) for rel, i, _, text in UNHEARD}
+    out.append("## Only in the party log (%d)" % len(UNHEARD))
+    out.append("")
+    out.append("Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no")
+    out.append("client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that")
+    out.append("reaches the player (a \"party\" or \"speech\" message, `_say_plain`, her `_ask_voice`), or a")
+    out.append("record by design goes in the tool's LOG_EXEMPT with why. Marked **U** below too.")
+    out.append("A line Main builds from another file's text (an offer's result line) isn't caught here.")
+    out.append("")
+    if UNHEARD:
+        out.append("| Line | Where |")
+        out.append("|---|---|")
+        for rel, i, where, text in UNHEARD:
+            out.append("| %s | `%s` %s |" % (md_cell(text), rel, where))
+        out.append("")
     gd_total = sum(len(v) for v in by_speaker.values())
     out.append("## Lines in the code (%d)" % gd_total)
     out.append("")
@@ -235,7 +353,7 @@ def build():
         out.append("| | Line | Where |")
         out.append("|---|---|---|")
         for rel, i, where, text in rows:
-            mark = "L" if quoted(text, lore) else ""
+            mark = " ".join(m for m, on in (("L", quoted(text, lore)), ("U", (rel, i, text) in unheard)) if on)
             out.append("| %s | %s | `%s` %s |" % (mark, md_cell(text), rel, where))
         out.append("")
     data_rows = []
@@ -276,6 +394,10 @@ def main():
                 ok = f.read() == text
         except OSError:
             ok = False
+        if UNHEARD:
+            # A warning, never a failure (748 amended (7)): the count falls as trees give their lines a delivery.
+            print("voice_inventory: %d line(s) only in the party log, never shown to a player: see \"Only in the party log\""
+                  " in docs/voice_inventory.md (a warning, 748 amended (7))" % len(UNHEARD))
         if ok:
             print("voice_inventory: up to date")
         else:
