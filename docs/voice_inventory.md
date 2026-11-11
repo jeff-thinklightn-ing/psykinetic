@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2784)
+## Lines in the code (2785)
 
 ### companions (Pip, Wren, Nix) (640)
 
@@ -709,7 +709,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Take %s till first light; the town pays at dawn. | `sim/offers.gd` _watch_offer() |
 |  | the next building | `sim/offers.gd` _build_words() |
 |  | Give %s the remains of %s | `sim/offers.gd` _relic_offers() |
-|  | %s's remains, brought up from the barrow, for the altar. | `sim/offers.gd` _relic_offers() |
+|  | %s's remains, brought up from the crypt, for the altar. | `sim/offers.gd` _relic_offers() |
 |  | %s, %d gold | `sim/offers.gd` _vendor_offers() |
 |  | %s for %d gold, for the road. Mind, no one will buy it back off you. | `sim/offers.gd` _vendor_offers() |
 |  | %s, %d gold | `sim/offers.gd` _camp_offers() |
@@ -719,11 +719,11 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s, %d gold | `sim/offers.gd` _shop_offer() |
 |  | I have %s at the counter for %d gold. | `sim/offers.gd` _shop_offer() |
 |  | Take the offering down | `sim/offers.gd` _crypt_offers() |
-|  | Carry the temple's offering, %d gold, down to the altar in the barrow and lay it there. Tell no one. | `sim/offers.gd` _crypt_offers() |
+|  | Carry the temple's offering, %d gold, down to the offering stone in the crypt and lay it there. Tell no one. | `sim/offers.gd` _crypt_offers() |
 |  | Find the runner | `sim/offers.gd` _crypt_offers() |
 |  | %s went down with the offering and has not come back. Find what became of him. | `sim/offers.gd` _crypt_offers() |
-|  | %s carried the temple's offering down and laid it at the altar. | `sim/offers.gd` crypt_done() |
-|  | %s laid the offering at the altar, as promised to %s. | `sim/offers.gd` crypt_done() |
+|  | %s carried the temple's offering down and laid it on the stone below. | `sim/offers.gd` crypt_done() |
+|  | %s laid the offering on the stone below, as promised to %s. | `sim/offers.gd` crypt_done() |
 |  | carried the offering down | `sim/offers.gd` crypt_done() |
 |  | %s found %s's pack in the robbers' camp under the mound: he fell to them on his way. | `sim/offers.gd` crypt_done() |
 |  | %s found %s's pack in the robbers' camp, and told %s. | `sim/offers.gd` crypt_done() |
@@ -774,7 +774,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the temple's offering, to carry down | `sim/offers.gd` accept() |
 |  | %s promised %s: %s | `sim/offers.gd` accept() |
 |  | %s takes %s's commission: %s. | `sim/offers.gd` accept() |
-|  | %s takes the temple's offering, %d gold, to carry down to the altar. | `sim/offers.gd` accept() |
+|  | %s takes the temple's offering, %d gold, to carry down to the stone in the crypt. | `sim/offers.gd` accept() |
 |  | %s paid %d gold of %s's debt to the town. | `sim/offers.gd` accept() |
 |  | cleared their debt to the town | `sim/offers.gd` accept() |
 |  | paid %d gold of their debt | `sim/offers.gd` accept() |
@@ -795,7 +795,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | to bring %d %s to the store | `sim/offers.gd` _promise() |
 |  | to walk %s home | `sim/offers.gd` _promise() |
 |  | to lay the quarrel with %s before the lawspeaker | `sim/offers.gd` _promise() |
-|  | to carry the temple's offering, %d gold, down to the altar | `sim/offers.gd` _promise() |
+|  | to carry the temple's offering, %d gold, down to the stone in the crypt | `sim/offers.gd` _promise() |
 |  | to find what became of %s | `sim/offers.gd` _promise() |
 |  | gave them %s | `sim/offers.gd` gift() |
 |  | %s gave %s %s. | `sim/offers.gd` gift() |
@@ -1235,7 +1235,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (598)
+### other (sim) (599)
 
 | | Line | Where |
 |---|---|---|
@@ -1474,6 +1474,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand. | `sim/items.gd` art_slots() |
 |  | maps, after the cut: from_foothills, from_halls, from_test_room, start 1 by imps and a sneak | `sim/layout_sense.gd` ARRIVAL_NOT_YET |
 |  | the arrival %s is %d cells from where %s %s roams (%d wanted) | `sim/layout_sense.gd` arrival_faults() |
+|  | from the arrival %s the quest giver at %s is not reached %d cells clear of the hostiles (the nearest %s %d cells off) | `sim/layout_sense.gd` _giver_faults() |
 |  | a room with no use | `sim/layout_sense.gd` _purpose() |
 |  | an empty room%s | `sim/layout_sense.gd` _purpose() |
 |  | a corridor runs along %d of this room's sides | `sim/layout_sense.gd` _wraps() |
@@ -1945,7 +1946,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You were last paid %d gold by %s for %s%s. | `sim/resident.gd` _trade_words() |
 |  | You last paid %s %d gold for %s%s. | `sim/resident.gd` _trade_words() |
 |  | The knight whose sepulcher lies open below now is %s. | `sim/resident.gd` relic_line() |
-|  | Holy knights of the temple lie in the old barrow under the town, and the Mound-breakers, the grave robbers there, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
+|  | Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
 |  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
 |  | one who has no amulet is given one. | `sim/resident.gd` relic_line() |
 |  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd` KEPT_LINE |
@@ -2162,10 +2163,10 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | L | the draugr's blessing | `main.gd` reset_barrow() |
 |  | the deal won | `main.gd` reset_barrow() |
-|  | the fallen knight's quest | `main.gd` reset_barrow() |
+| L | the fallen knight's quest | `main.gd` reset_barrow() |
 |  | the totem's charges | `main.gd` reset_barrow() |
 |  | the draft felt | `main.gd` reset_barrow() |
-|  | Clear the barrow | `main.gd` QUEST_TITLE |
+|  | Clear the crypt | `main.gd` QUEST_TITLE |
 | L | the fallen knight | `main.gd` QUEST_GIVER |
 | L | Brand the Ox | `main.gd` _give_camp_key() |
 |  | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
@@ -2387,7 +2388,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You carry no blessing from below yet. Keep %s safe until you have stood before what waits there, then bring the remains to me. | `main.gd` _relic_returned() |
 |  | laid on the altar | `main.gd` _relic_returned() |
 |  | brought home the remains of %s | `main.gd` _relic_returned() |
-|  | %s brought the remains of %s up from the barrow, and you laid them on the altar. | `main.gd` _relic_returned() |
+|  | %s brought the remains of %s up from the crypt, and you laid them on the altar. | `main.gd` _relic_returned() |
 |  | %s is home at last. Bless you. | `main.gd` _relic_returned() |
 |  | The blessing is on your amulet: it holds %d now. | `main.gd` _relic_returned() |
 |  | hails and greetings | `main.gd` quests_forget() |
@@ -2396,8 +2397,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | memories of %d named enem%s | `main.gd` quests_forget() |
 |  | %s has not been seen since morning. | `main.gd` _alms_runs_tick() |
 |  | lost below with %d gold | `main.gd` _alms_runs_tick() |
-|  | %s was lost below the barrow, saw the draugr bargain for gold, and lived. | `main.gd` _runner_found() |
-|  | %s came up from the barrow, found by %s, and would not say what he saw. | `main.gd` _runner_found() |
+|  | %s was lost in the crypt, saw the draugr bargain for gold, and lived. | `main.gd` _runner_found() |
+|  | %s came up from the crypt, found by %s, and would not say what he saw. | `main.gd` _runner_found() |
 |  | %s finds %s in a niche in the wall, shaking; he makes his way up. | `main.gd` _runner_found() |
 |  | You find %s in a niche in the wall, shaking. He will not say what he saw, and makes his way up. | `main.gd` _runner_found() |
 |  | found by %s | `main.gd` _runner_found() |
@@ -2732,7 +2733,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 | L | Some of the Mound-breakers still dig. Put them all down, then come back to me. | `sim/astral_knight.gd` NOT_YET |
 |  | The robbers are put down | `sim/astral_knight.gd` TURN_IN_TITLE |
 | L | The Mound-breakers are put down. | `sim/astral_knight.gd` TURN_IN_WORDS |
-| L | Then you are strong enough. In the First Hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |
+| L | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |
 | L | The way below is open to you. My remains wait in the Hall of Fallen Souls. | `sim/astral_knight.gd` DONE |
 |  | %s takes up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | %s has proven their strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
@@ -2884,7 +2885,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (866)
+## Lines in the data (869)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3548,7 +3549,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |---|---|---|
 |  | The people the players fight for; what is found on the road comes home to the town. | `entries[0].summary` |
 |  | The town is named Umbrage. | `entries[0].facts[0].text` |
-|  | Umbrage is cursed because of the grave robbers, and because its economy runs off the barrow's gold. | `entries[0].facts[2].text` |
+|  | Umbrage is cursed because of the grave robbers, and because its economy runs off the crypt's gold. | `entries[0].facts[2].text` |
 |  | The town lies in the Blood Rot's region, at a distance from their mine. | `entries[0].facts[3].text` |
 |  | The town and the whole region live under constant threat from Blood Rot raiders. | `entries[0].facts[4].text` |
 |  | Everything brought home goes into the town's shared stockpile. | `entries[0].facts[5].text` |
@@ -3590,7 +3591,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | L | The goblins grew stronger from the rot. | `entries[4].facts[15].text` |
 |  | Outlaws in the forest's camps who rob the living on its paths, apart from the Mound-breakers in the crypt (enemy-ai's 793 faction, approved by the coordinator). Their name is with Jeff (lean: the Tollmen). | `entries[5].summary` |
 
-### levels/lore/history.json (41)
+### levels/lore/history.json (44)
 
 | | Line | Key |
 |---|---|---|
@@ -3601,15 +3602,15 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | the ambush that took the smith | `entries[1].name` |
 |  | The smith's expedition below the castle was ambushed and he was captured (docs/lore/castle.md). | `entries[1].summary` |
 | L | The smith's expedition was ambushed below the castle, and the smith was captured. | `entries[1].facts[0].text` |
-| L | the Barrow of the Fallen | `entries[2].name` |
-|  | The Barrow of the Fallen, an ancient burial mound a little outside town: the wealthy town's newer dead on its top floor, a named band of grave robbers within, breaking walls and tombs with the Tomb Sledge to reach the holy relics; joined by a hidden way to the temple's own underground, the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714). | `entries[2].summary` |
+|  | the Crypt of the Fallen | `entries[2].name` |
+|  | The Crypt of the Fallen, dug beneath the temple in Umbrage: the wealthy town's newer dead in its upper crypt, a named band of grave robbers within, who broke in through an old mound outside town and break walls and tombs with the Tomb Sledge to reach the holy relics; below it by a hidden way the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714; the crypt below the temple, Jeff 2026-11-04 and 2026-11-10). | `entries[2].summary` |
 | L | The crypt is a place to keep away from. | `entries[2].facts[0].text` |
 |  | The town's first folk moved the old dead down to make room for their own, the oldest as far down as they dared go. | `entries[2].facts[1].text` |
-| L | Only the wealthy are laid in the barrow; the poor lie in paupers' graves outside. | `entries[2].facts[2].text` |
-| L | The barrow's top floor holds the town's newer dead. | `entries[2].facts[3].text` |
-|  | Beneath the temple lies the Ossuary, where the ancient dead were moved, joined to the barrow by a hidden way. | `entries[2].facts[4].text` |
-|  | The barrow's third layer, where the oldest dead lie, is damp and dark, too moist for any lamp to burn. | `entries[2].facts[5].text` |
-|  | Grave robbers plunder the barrow, and the dead below do not know them from anyone else who comes down. | `entries[2].facts[6].text` |
+|  | Only the wealthy are laid in the crypt; the poor lie in paupers' graves outside. | `entries[2].facts[2].text` |
+|  | The crypt's top floor holds the town's newer dead. | `entries[2].facts[3].text` |
+|  | Below the crypt's top floor lies the Ossuary, where the ancient dead were moved, joined to it by a hidden way. | `entries[2].facts[4].text` |
+|  | The crypt's third layer, where the oldest dead lie, is damp and dark, too moist for any lamp to burn. | `entries[2].facts[5].text` |
+|  | Grave robbers plunder the crypt, and the dead below do not know them from anyone else who comes down. | `entries[2].facts[6].text` |
 |  | The dead below are angry at being disturbed, and the draugr's magic moves them. | `entries[2].facts[7].text` |
 |  | The draugr keeps the Hall of Fallen Souls, beneath the temple. | `entries[2].facts[8].text` |
 | L | the Hall of Fallen Souls | `entries[2].facts[8].sight` |
@@ -3619,22 +3620,25 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Whoever refuses the draugr's bargain must fight him for it. | `entries[2].facts[12].text` |
 | L | The door of the Hall of Fallen Souls closes behind whoever enters, and opens again for gold returned or for his defeat. | `entries[2].facts[13].text` |
 |  | The Encolpion Amulet encases blessed ashes that protect the wearer, and gives its holder another chance to fight. | `entries[2].facts[14].text` |
-|  | Pip carries the temple's offering down to the altar in the barrow. | `entries[2].facts[15].text` |
-|  | The Barrow of the Fallen lies a little outside town, under a grass-covered mound with a stone-framed door. | `entries[2].facts[16].text` |
-| L | The barrow is an ancient burial mound. | `entries[2].facts[17].text` |
-|  | The temple has its own underground, joined to the barrow, and keeps it wherever the temple stands. | `entries[2].facts[18].text` |
-|  | The Mound-breakers, the grave robbers in the barrow, have been looking for a way to break through to the holy relics, to sell them on the black market. | `entries[2].facts[19].text` |
-|  | The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the barrow are its work. | `entries[2].facts[20].text` |
-|  | The Mound-breakers stash their take in a chest at their camp in the barrow. | `entries[2].facts[21].text` |
+|  | Pip carries the temple's offering down into the crypt and lays it on the offering stone in the Low Hall. | `entries[2].facts[15].text` |
+|  | The crypt is dug beneath the temple in Umbrage. | `entries[2].facts[16].text` |
+|  | The temple has its own underground, the crypt, and keeps it wherever the temple stands. | `entries[2].facts[17].text` |
+|  | The temple's door down is locked and watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt. | `entries[2].facts[18].text` |
+|  | The Mound-breakers, the grave robbers in the crypt, have been looking for a way to break through to the holy relics, to sell them on the black market. | `entries[2].facts[19].text` |
+|  | The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the crypt are its work. | `entries[2].facts[20].text` |
+|  | The Mound-breakers stash their take in a chest at their camp in the crypt. | `entries[2].facts[21].text` |
 |  | Brand the Ox, the biggest of the Mound-breakers, carries the key to their chest. | `entries[2].facts[22].text` |
-|  | The spirit of a fallen holy knight of Theus keeps watch in the barrow's Altar Room; his bones lie beneath the temple, held by the draugr. | `entries[2].facts[23].text` |
+|  | The spirit of a fallen holy knight of Theus keeps watch in the crypt's First Hall, beside the bier at the foot of the temple stair; his bones lie beneath the temple, held by the draugr. | `entries[2].facts[23].text` |
 |  | The secret way down to the Ossuary is found only once the Mound-breakers have been put down. | `entries[2].facts[24].text` |
-|  | The draugr is angry because the robbers in the barrow dig for the holy relics. | `entries[2].facts[25].text` |
+|  | The draugr is angry because the robbers in the crypt dig for the holy relics. | `entries[2].facts[25].text` |
 |  | Aldous cannot reach the holy knights' relics beneath the temple, because the draugr has taken up residence there. | `entries[2].facts[26].text` |
 |  | A holy knight's remains, returned to Aldous, charge the Encolpion Amulet. | `entries[2].facts[27].text` |
-| L | Warriors' spears are planted around the outside of the mound, standing up like spikes. | `entries[2].facts[28].text` |
-|  | the spears round the mound | `entries[2].facts[28].sight` |
-|  | On nights the robbers have dug, or when the temple's alms fall short, the barrow's dead come up out of the dark. | `entries[2].facts[29].text` |
+|  | On nights the robbers have dug, or when the temple's alms fall short, the crypt's dead come up out of the dark. | `entries[2].facts[28].text` |
+|  | the old burial mound | `entries[3].name` |
+|  | An old burial mound a little outside town, north-west of Umbrage: grass over it, a stone-framed door, warriors' spears planted round it. No name of its own. The Mound-breakers forced its door and dug from it through to the crypt under the temple (Jeff 2026-10-27: "the barrows is an ancient burial mound ... its connected to the barrows"; art-kit's building.mound, maps' (155,160); 832; crypt-names.md pick 4 A). | `entries[3].summary` |
+|  | An old burial mound lies a little outside town, grass-covered, with a stone-framed door. | `entries[3].facts[0].text` |
+| L | Warriors' spears are planted around the outside of the mound, standing up like spikes. | `entries[3].facts[1].text` |
+|  | the spears round the mound | `entries[3].facts[1].sight` |
 
 ### levels/lore/knowers.json (9)
 
@@ -3803,7 +3807,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations. | `entries[16].facts[0].text` |
 |  | Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left. | `entries[16].facts[1].text` |
 |  | Since Hollowfell was lost, whatever is strongest in the hills holds it. | `entries[16].facts[2].text` |
-|  | When Hollowfell was lost, the town turned to the barrow's gold, and that is part of why Umbrage is cursed. | `entries[16].facts[3].text` |
+|  | When Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed. | `entries[16].facts[3].text` |
 |  | A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house. | `entries[17].summary` |
 |  | The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau. | `entries[17].facts[0].text` |
 |  | The watchtower on the plateau was broken when the Old Tower was taken. | `entries[17].facts[1].text` |
@@ -3850,8 +3854,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The one god of the homeland, whom the temple and the town follow (Jeff, 2026-10-22; docs/lore/crypt.md). | `entries[1].summary` |
 | L | The temple and the town follow Theus, the god of their homeland. | `entries[1].facts[0].text` |
 | L | The faith of Theus holds to one god alone. | `entries[1].facts[1].text` |
-|  | The tribe's many old gods; Psyke, their god of war, gives the barrow's draugr his power and sends the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers, who follow Theus (Jeff, 2026-10-22; docs/lore/crypt.md). | `entries[2].summary` |
+|  | The tribe's many old gods; Psyke, their god of war, gives the crypt's draugr his power and sends the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers, who follow Theus (Jeff, 2026-10-22; docs/lore/crypt.md). | `entries[2].summary` |
 | L | The old gods are a tribe's many forgotten gods; Psyke, their god of war, empowers the draugr, blesses through him, and raises the fallen to send them back to battle. | `entries[2].facts[0].text` |
-| L | Robbers who pilfer the barrow anger the old gods; gold offerings appease them, because they return what was stolen. | `entries[2].facts[1].text` |
+|  | Robbers who pilfer the crypt anger the old gods; gold offerings appease them, because they return what was stolen. | `entries[2].facts[1].text` |
 | L | The temple's goers do not know their gifts go to the old gods. | `entries[2].facts[2].text` |
 

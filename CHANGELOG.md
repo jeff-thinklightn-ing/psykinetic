@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.211
+
 - The Crypt of the Fallen under the temple is open now: the temple's back stair goes down into the First Hall, where the fallen knight stands behind the burial table, the first you meet on the way down, with his quest against the robbers (any you've killed already count toward it), and you come back up inside the temple beside the stair; the old burial mound's door in the wilds opens on the far end of the robbers' dig, a long tunnel west into the Robbers' Camp, with its own way back out to the mound; the Ossuary below is where the old dead lie, tomb chambers round the ossuary and a dark wing of old graves, each chest guarded by a pack, and its sealed shortcut comes up into the First Hall; and once you've beaten the draugr, a sealed slab in the First Hall takes you straight down to the Hall of Fallen Souls (832, 747 amended (8)).
 - Your companion goes fishing with you: with a rod on her, stand by the water together a moment and she casts beside you; a plain "Fish." or "Can you fish?" asks her, and if something hostile comes near she reels in and watches it, then takes up her rod again once it's gone (805 amended (14)).
 - Your companion comes fishing with you even with no rod of her own: ask her and she walks to the water beside you and keeps you company while you cast (805 amended (13)).
@@ -32,7 +34,6 @@ notes (decision 324).
 - A swing you click while walking always comes through now, a sword's quick blow or a heavy weapon's wind-up alike, where before it was often lost just as it should land, its stamina spent for nothing, most of all as you walked away (392 amended (6)).
 - A named foe you've struck turns and fights you now, however wary his temper, so Brand the Ox and the robbers named beside him no longer stand idle under your blows, where before a cautious one could hang back and let you hit him (806 amended (12)).
 - Townsfolk at work can be heard now: a woodcutter's axe bites into the wood at each chop, and a carpenter at a build rasps the saw on each push and pull and knocks with the hammer at each blow (804 amended (18)).
-
 - Towns: a sick townsperson in bed tells you what ails them and what would help, a walk to the healer's or a remedy, or that they're on the mend, where before they said only "Not now."; and whoever keeps the town's chronicle will read it to you wherever you find them at work, or at home and awake, where before only at their desk (491 amended, 501 amended (2)).
 - In the wilds, the barrow stands alone now on open grass north-west of town, at the end of its own track off the north road, with a lit post where the track leaves the road, where before it sat beside a house; and the old farmstead west of the crossroads looks like a farm gone to ruin, a roofless cottage among tumbled walls, fallow fields behind broken fences, the tumbled ring of a dry well, a broken cart and a scarecrow leaning hard on its pole, where before it was two bare stone squares (827).
 - Towns: once a town marks you Trusted, most things in its shop cost you a tenth less, its store pays a tenth more for the raw goods you hand in, and its tanner for the trophies you give, at least a gold more each, and the dearer gear you sell at its counter fetches a little more too (831).
@@ -43,6 +44,7 @@ notes (decision 324).
 - When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).
 - Your companion, once she pulls back from the great bear or the old grey, stays well clear of it and its pack while it still fights you, never in your way if you run, and comes back to your side once it falls or you get away, where before she soon walked back into its reach and was bitten (780 amended (21)).
 - The great bear and the old grey shake off being knocked reeling now: you see and hear them set themselves, and until their next marked blow your hits still hurt and push them, landing with a dull thud, but they rock without reeling, hold their wind-up and keep their feet, so no axe holds them off for long; a blow from behind as one winds up still staggers it once, as before (843).
+
 ## v0.1.210
 
 - What goes over the network changes, so v0.1.209 and older can't join the server: update through the launcher first.
