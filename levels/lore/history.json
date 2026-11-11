@@ -319,7 +319,7 @@
 				},
 				{
 					"id": "crypt.robbers_breach",
-					"text": "The temple's door down is locked and watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt.",
+					"text": "The temple's stair down is watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt.",
 					"known": "rumour",
 					"true": true,
 					"where": [
