@@ -78,6 +78,13 @@ that the walk looks like skipping and the people look like "bad claymation place
   state_test; decision 278; since 450 it also exports the server pack and boots it with one
   client joining, about 60 s beside the suite), commit, and land it per change with `git push origin HEAD:main`. If the push is refused, `main`
   moved: rebase, retest, push again. A branch never collects unlanded work.
+- Before you queue a landing, run on your own take the tests that use what your diff changes,
+  plus any that failed your last landing (a solo scene through the gate is minutes; a failed
+  landing costs every tree behind you a suite). Grep the tests for a constant, name or count you
+  changed: of the four takes that failed their landing for a real fault on 11-10 and 11-11, two
+  had not run the failing test (a slot count raised from 22 to 27 with two tests hard-coding 22),
+  one met a broken main and one a true clash with another tree's new check
+  (`C:/dev/review/perf/flakes.md`).
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `sh tools/heavy_job.sh take <tree> suite`
   (waits if the machine is short, holding no lock yet), then
