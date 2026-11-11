@@ -24,6 +24,7 @@ notes (decision 324).
 - Towns: Rolf sells a bandaging kit at his stall for 5 gold, and a kit isn't used up, so one keeps mending you between fights (736 amended (5))
 
 - Towns: stand close by a town's hearth or fire, unhit for a few seconds, and it heals you as a camp's fire does, with the Healing mark showing; in Umbrage, the hearth in the Last Light Mughouse's common room and the fire on the square (777 amended (2))
+- With the low camera, when a house or the temple comes between you and the view, the camera moves in to stand outside it and rises with you, so you see the whole of yourself (864).
 
 ## v0.1.211
 

@@ -48645,3 +48645,54 @@ spot out front of a stall's counter refused, behind it laid, a cook's out front 
 with npc's uses and the prompt saying it). Tools only: nothing player-facing, no package, no bullet;
 protocol unchanged; no new class_name. Step 2 (the ghost in game: a marker for each spot, facing and
 pose) is an amendment of this, when built.
+
+## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
+
+The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it
+(C:\dev\review\terrain\umbrage_edges\x_camera_in_house_178_229.png), a known leak in two cuts'
+checklists. A player at (178, 229) on the south-west road with the low camera turned to 135 had
+its eye 19 m back, inside the inn (kind inn at (170, 205)): planks filled the screen, the
+player a rim through them. Nothing caught it. Outdoors (801) no wall or roof fades for the line
+to the player; CameraTurn found no yaw within TURN_MOST that cleared them, so it stayed and the
+rim showed (623 amended (5)); and the lens's hide (_close_pieces, 623 amended (2)) takes only
+trees and tall pieces within NEAR_CLOSE of the eye, while the inn's far wall stood between the
+eye and the player anyway. Now the eye comes in. Each frame (Client3D._follow) the line from
+the player's chest (BOX_PULL_CHEST, 1.2 m over the camera's aim) out to the eye at its full
+distance is asked against every roofed building's box (Client3D._eye_box: its pieces' and
+roof's meshes, made on first need; none for a piece with no roof, so a stall, a well or a stone
+never pulls it); where it first enters one grown by BOX_PULL_MARGIN (0.5 m;
+Client3D.segment_enters, a box the chest is in not asked, so a player inside a house is not
+pulled; terrain's walk found an eye 0.2 m off a forge's eave at (207, 200) yaw 45, the line
+grazing it, so the grown box is asked, and against the box itself, short by the margin, when
+the player stands within the margin of its wall), the eye's share of its distance
+(Client3D._box_pull, in _camera_distance under the low camera only) is eased to that point, the
+margin short of the box, never nearer than BOX_PULL_LEAST (3 m; the coordinator, after clips of
+LOW_ZOOM_MIN's floor leaving the eye inside the temple's wall, a screen of stone: the pull
+alone may come nearer than the zoom's own nearest). Nearer than that, the eye stays in the box
+and the rim shows as before (a building that close fills the view whichever way; CameraTurn
+still searches). It comes in at BOX_PULL_IN_RATE (10 a second, the coordinator: an eye inside a
+wall for a second reads as a glitch) and goes back out only once the line has been clear
+BOX_PULL_HOLD (1 s), at BOX_PULL_OUT_RATE (1.2 a second), so a walk past a house does not pump
+the view (the coordinator's condition). The pitch is not touched: the eye moves along its own
+line. Aimed at the feet as before, a 3 m eye cut the player's head off the top of the screen
+(the coordinator, from the clips), so under BOX_PULL_RISE_FROM (8 m) the aim rises from the
+feet, to BOX_PULL_AIM_LIFT (1 m) over them at BOX_PULL_LEAST (Client3D.box_rise, in
+_place_camera; the eye rises with it, the tilt kept), and the WASD lean and the aim lead ease
+out by the same share (a 3-cell lean at 3 m put the player off the screen's side): at LOW_FOV
+50 a 3 m eye then holds the whole figure, feet to BOX_PULL_HEAD (1.9 m), about 7 degrees in
+from the top and 10 from the bottom, from LOW_PITCH_NEAR to a ridge's 30 degrees, so the floor
+stays 3 m. Nothing fades for it (Jeff, 11-06: "landmarks shouldn't go transparent"), and
+terrain's 12 m dithered near cut was not taken (it would dissolve every house within 12 m of
+the lens all the time, the eye standing 19 m back, and wanted a dither in every building
+material). The ortho camera is unchanged. The roof and chimney before the lens at (182, 183)
+yaw 315 (x_roof_before_camera_182_183.png) are left: the player is clear there. view_land_test
+_test_eye_kept_out: a segment's entry into a box; at (178, 229) yaw 135 the eye that stood in
+the inn brought in to stand outside every building, no nearer than BOX_PULL_LEAST; at every
+pull from the full distance down to BOX_PULL_LEAST, at the nearest zoom and the full, the
+player's feet and head projected inside the screen, 5 % in from each edge; at (207, 200) yaw 45
+at the nearest zoom the eye at least the margin off the forge's box, its eave in it; open
+ground where at four yaws the eye does not move at all; and a walk past the inn to its far
+corner (178, 202) at 5 cells a second, the eye's distance printed each half second, in and back
+out once at most (on to the temple, its own pull in is a second building, not pumping), the
+figure framed in every frame. Client only; protocol unchanged, no new class_name. Combat and
+physics measure with the low camera: told before it landed.

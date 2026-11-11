@@ -44,6 +44,8 @@ func _ready() -> void:
 
 	if _land():
 		_test_horizon()
+		_test_eye_kept_out()
+		_test_doors_fade_inside()
 		_test_sky()
 		_test_far_landmarks()
 		_test_arc_on_ground()
@@ -7400,6 +7402,291 @@ func _test_sky() -> void:
 	_rig._weather_view.weather = weather_was.duplicate()
 	_rig._sky_step = -1
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The low camera's eye kept out of buildings (decision 864): a segment's
+## entry into a box; in Umbrage at (178, 229), yaw 135, the eye that stood in
+## the inn brought in along its line to stand outside every building, no
+## nearer than BOX_PULL_LEAST; on open ground it does not move at
+## all; and a walk past the inn at a player's pace (5 cells a second), the
+## eye's distance printed each half second, coming in and going out once.
+func _test_eye_kept_out() -> void:
+	print("\n== the low camera's eye kept out of buildings (864) ==")
+	var box := AABB(Vector3.ZERO, Vector3(2.0, 2.0, 2.0))
+	_check(is_equal_approx(Client3D.segment_enters(Vector3(-1.0, 1.0, 1.0), Vector3(4.0, 0.0, 0.0), box), 0.25)
+			and Client3D.segment_enters(Vector3(-1.0, 3.0, 1.0), Vector3(4.0, 0.0, 0.0), box) == -1.0
+			and Client3D.segment_enters(Vector3(-2.0, 1.0, 1.0), Vector3(1.0, 0.0, 0.0), box) == -1.0,
+			"a segment enters a box a quarter along; over it, or short of it, it does not")
+	var low_was := Net.camera_low
+	var yaw_was := _rig.yaw
+	Net.set_camera_low(true, false)
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], Vector2i(178, 229))
+	_rig.zoom = 1.0
+	_rig._zoom_to = 1.0
+	_rig.pan = Vector3.ZERO
+	_rig._ridge_pitch = 0.0
+	var ground := func(cell: Vector2) -> Vector3: return Vector3(cell.x, _rig._ground_height(cell), cell.y)
+	var in_building := func(eye: Vector3) -> String:
+		for building: Dictionary in _rig._buildings:
+			var each: AABB = _rig._eye_box(building)
+			if each.size != Vector3.ZERO and each.has_point(eye):
+				return str(building.get("kind", building.get("slot", "?")))
+		return ""
+	# Stood at (178, 229), turned to 135: the eye at its full distance is in the inn.
+	_rig._set_yaw(135.0)
+	_rig.pitch = _rig.normal_pitch()
+	_rig._camera_target = ground.call(Vector2(178, 229))
+	_rig._box_pull = 1.0
+	_rig._box_hold = 0.0
+	_rig._place_camera()
+	var was_in: String = in_building.call(_rig._camera.position)
+	var want := _rig.eye_clear_share()
+	for i in 180:
+		_rig._ease_box_pull(_rig.eye_clear_share(), 1.0 / 60.0)
+	_rig._place_camera()
+	var now_in: String = in_building.call(_rig._camera.position)
+	var full := Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * _rig._size_factor()
+	var distance := _rig._camera.position.distance_to(_rig._camera_target)
+	# The figure in frame: feet and head projected inside the screen, 5 % in from each edge.
+	var framed := func(feet: Vector3) -> bool:
+		var screen := _rig._camera.get_viewport().get_visible_rect().size
+		var inner := Rect2(screen * 0.05, screen * 0.9)
+		for body_at: Vector3 in [feet, feet + Vector3.UP * Client3D.BOX_PULL_HEAD]:
+			if _rig._camera.is_position_behind(_rig.to_global(body_at)) or not inner.has_point(_rig._camera.unproject_position(_rig.to_global(body_at))):
+				return false
+		return true
+	var pull_was: float = _rig._box_pull
+	var zoom_was: float = _rig.zoom
+	var unframed: Array[String] = []
+	for each_zoom: float in [Client3D.LOW_ZOOM_MIN, 1.0]:
+		_rig.zoom = each_zoom
+		_rig.pitch = _rig.normal_pitch()
+		var whole := Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * _rig._size_factor()
+		for step in 21:
+			_rig._box_pull = lerpf(Client3D.BOX_PULL_LEAST / whole, 1.0, step / 20.0)
+			_rig._place_camera()
+			if not framed.call(_rig._camera_target):
+				unframed.append("%.1f m at zoom %.1f" % [_rig._camera_distance(), each_zoom])
+	_rig.zoom = zoom_was
+	_rig.pitch = _rig.normal_pitch()
+	_rig._box_pull = pull_was
+	_rig._place_camera()
+	_check(unframed.is_empty(), "at every pull from the full distance down to %.0f m, nearest zoom and full, the player's feet and head stand inside the screen with a margin, the aim risen %.1f m at the nearest (864; cut at %s)" % [Client3D.BOX_PULL_LEAST, Client3D.BOX_PULL_AIM_LIFT, unframed])
+	_check(was_in != "" and want < 1.0 and now_in == "" and distance >= Client3D.BOX_PULL_LEAST - 0.01 and distance < full,
+			"at (178, 229) yaw 135 the eye stood in the %s; brought in to %.1f m of %.1f (share %.2f), outside every building" % [was_in, distance, full, want])
+	# Terrain's walk at the nearest zoom (the coordinator, 11-11): at (207, 200)
+	# yaw 45 the eye stood inside a house's eave, the box being the house's
+	# meshes and its roof's, overhang and all; at (203, 216) yaw 135 a stall's
+	# awning filled the frame, a stall having no roof and so no box. Each
+	# piece within 2 m of the eye printed.
+	var near_eye := func(eye: Vector3) -> String:
+		var names: Array[String] = []
+		for building: Dictionary in _rig._buildings:
+			var node: Node3D = building.get("node")
+			if node == null:
+				continue
+			var box_all: AABB = _rig.global_transform.affine_inverse() * _rig._bounds(node)
+			var roof: Node3D = building.get("roof")
+			if roof != null and not node.is_ancestor_of(roof):
+				box_all = box_all.merge(_rig.global_transform.affine_inverse() * _rig._bounds(roof))
+			if eye.clamp(box_all.position, box_all.end).distance_to(eye) <= 2.0:
+				names.append("%s %s (box %s, roof %s, fades %s, stands %s, %.1f m off)" % [building.get("use", ""), building["rect"],
+						_rig._eye_box(building).size != Vector3.ZERO, roof != null, building.get("fades", false), building.get("stands", false), eye.clamp(box_all.position, box_all.end).distance_to(eye)])
+		return ", ".join(names) if not names.is_empty() else "none"
+	var spot_out: Dictionary = {}
+	for spot: Array in [[Vector2(207, 200), 45.0, "eave"], [Vector2(203, 216), 135.0, "stall"]]:
+		_rig.zoom = Client3D.LOW_ZOOM_MIN
+		_rig._zoom_to = Client3D.LOW_ZOOM_MIN
+		_rig._set_yaw(spot[1])
+		_rig.pitch = _rig.normal_pitch()
+		_rig._camera_target = ground.call(spot[0])
+		_rig._box_pull = 1.0
+		_rig._box_hold = 0.0
+		_rig._place_camera()
+		var was_box: String = in_building.call(_rig._camera.position)
+		var near_before: String = near_eye.call(_rig._camera.position)
+		for i in 180:
+			_rig._ease_box_pull(_rig.eye_clear_share(), 1.0 / 60.0)
+		_rig._place_camera()
+		var now_box: String = in_building.call(_rig._camera.position)
+		var off_box := INF
+		for building: Dictionary in _rig._buildings:
+			var each_box: AABB = _rig._eye_box(building)
+			if each_box.size != Vector3.ZERO:
+				off_box = minf(off_box, _rig._camera.position.clamp(each_box.position, each_box.end).distance_to(_rig._camera.position))
+		spot_out[spot[2]] = now_box if now_box != "" or off_box >= Client3D.BOX_PULL_MARGIN - 0.05 else "%.2f m off a box" % off_box
+		print("  %s at %s yaw %.0f, nearest zoom: eye %.1f m (share %.2f), in a box before: %s, after: %s; within 2 m before: %s; after: %s" % [spot[2], spot[0],
+				spot[1], _rig._camera.position.distance_to(_rig._camera_target), _rig._box_pull, was_box if was_box != "" else "no", now_box if now_box != "" else "no",
+				near_before, near_eye.call(_rig._camera.position)])
+	_rig.zoom = zoom_was
+	_rig._zoom_to = zoom_was
+	_rig.pitch = _rig.normal_pitch()
+	_check(spot_out["eave"] == "", "at (207, 200) yaw 45, nearest zoom, the eye stands outside the forge's box, its roof's overhang in it, and at least the margin off it (864; %s)" % spot_out["eave"])
+	# Open ground: the cell nearest (214, 244) with no building within 26 cells; at any yaw the eye never moves.
+	var open := Vector2i(-1, -1)
+	var best := INF
+	for y in range(224, 265):
+		for x in range(194, 235):
+			var cell := Vector2i(x, y)
+			var clear := true
+			for building: Dictionary in _rig._buildings:
+				if Vector2((building["rect"] as Rect2i).get_center()).distance_to(Vector2(cell)) < 26.0:
+					clear = false
+					break
+			if clear and Vector2(cell).distance_to(Vector2(214, 244)) < best:
+				best = Vector2(cell).distance_to(Vector2(214, 244))
+				open = cell
+	var moved := 0
+	for turn: float in [0.0, 90.0, 180.0, 270.0]:
+		_rig._set_yaw(turn)
+		_rig._camera_target = ground.call(Vector2(open))
+		_rig._box_pull = 1.0
+		_rig._place_camera()
+		var before := _rig._camera.position
+		for i in 60:
+			_rig._ease_box_pull(_rig.eye_clear_share(), 1.0 / 60.0)
+		_rig._place_camera()
+		if _rig._box_pull != 1.0 or _rig._camera.position != before:
+			moved += 1
+	_check(open != Vector2i(-1, -1) and moved == 0, "on open ground at %s the eye does not move at all, four yaws (%d moved)" % [open, moved])
+	# A walk past the inn along the south-west road, yaw 135, at 5 cells a second: the eye's distance each half second.
+	_rig._set_yaw(135.0)
+	_rig._box_pull = 1.0
+	_rig._box_hold = 0.0
+	var floor := {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor[cell] = true
+	var nearest := func(to: Vector2i) -> Vector2i:
+		for r in 6:
+			for dy in range(-r, r + 1):
+				for dx in range(-r, r + 1):
+					if floor.has(to + Vector2i(dx, dy)):
+						return to + Vector2i(dx, dy)
+		return to
+	var start: Vector2i = nearest.call(Vector2i(178, 236))
+	# To the inn's far corner, not on to the temple: a second building's own
+	# pull in is not the eye pumping past this one (864's BOX_PULL_LEAST).
+	var goal: Vector2i = nearest.call(Vector2i(178, 202))
+	var came := {start: start}
+	var queue: Array[Vector2i] = [start]
+	var head := 0
+	while head < queue.size() and not came.has(goal):
+		var c: Vector2i = queue[head]
+		head += 1
+		for d: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1)]:
+			if floor.has(c + d) and not came.has(c + d):
+				came[c + d] = c
+				queue.append(c + d)
+	var walk: Array[Vector2] = []
+	if came.has(goal):
+		var back := goal
+		while back != start:
+			walk.push_front(Vector2(back))
+			back = came[back]
+		walk.push_front(Vector2(start))
+	print("  walk from %s to %s, %d cells" % [start, goal, walk.size()])
+	var step := 1.0 / 60.0
+	var seconds := 0.0
+	var along := 0.0
+	var last_row := -1.0
+	var rows: Array[float] = []
+	var inside_frames := 0
+	var cut_frames := 0
+	while walk.size() > 1 and along < walk.size() - 1:
+		var k := floori(along)
+		var at: Vector2 = walk[k].lerp(walk[mini(k + 1, walk.size() - 1)], along - k)
+		_rig._camera_target = ground.call(at)
+		_rig._ease_box_pull(_rig.eye_clear_share(), step)
+		_rig._place_camera()
+		if not framed.call(_rig._camera_target):
+			cut_frames += 1
+		var where: String = in_building.call(_rig._camera.position)
+		if where != "":
+			inside_frames += 1
+		if seconds - last_row >= 0.5 - 0.0001:
+			last_row = seconds
+			var gap := _rig._camera.position.distance_to(_rig._camera_target)
+			rows.append(gap)
+			print("  walk %.1f s at (%.1f, %.1f): eye %.1f m (share %.2f)%s" % [seconds, at.x, at.y, gap, _rig._box_pull, (" in " + where) if where != "" else ""])
+		seconds += step
+		along += 5.0 * step
+	# Pumping: the distance turning from falling to rising, or back, by over half a metre a row.
+	var turns := 0
+	var going := 0
+	for i in range(1, rows.size()):
+		var change := rows[i] - rows[i - 1]
+		if absf(change) < 0.5:
+			continue
+		var sign_now := 1 if change > 0.0 else -1
+		if going != 0 and sign_now != going:
+			turns += 1
+		going = sign_now
+	_check(cut_frames == 0, "on the walk the player's feet and head (%.1f m) stay inside the screen with a margin at every pull (%d frames cut) (864)" % [Client3D.BOX_PULL_HEAD, cut_frames])
+	_check(rows.size() >= 10 and turns <= 1,
+			"a walk past the inn: the eye comes in and goes back out once at most (%d turns in %d rows, %d frames still inside a box)" % [turns, rows.size(), inside_frames])
+	_rig._box_pull = 1.0
+	_rig._set_yaw(yaw_was)
+	Net.set_camera_low(low_was, false)
+	_rig._apply_camera_mode()
+
+
+## A doorway's leaves fade with the near wall (864, maps' still inside the
+## temple, x_inside_temple_shows_doors.png): inside Umbrage's temple at
+## (194, 201), the camera to the west, the near side faded takes the west
+## doors' frame and both leaves; from outside, before the doors, neither.
+func _test_doors_fade_inside() -> void:
+	print("\n== a doorway's leaves fade with the near wall (864) ==")
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], Vector2i(194, 201))
+	var west := Vector3(-1.0, 0.6, 0.0).normalized()
+	var inside := _rig.to_global(Vector3(194.0, _rig._ground_height(Vector2(194, 201)) + 1.0, 201.0))
+	var outside := _rig.to_global(Vector3(186.0, _rig._ground_height(Vector2(186, 201)) + 1.0, 201.0))
+	var leaves: Array[Node3D] = []
+	var frames: Array[Node3D] = []
+	for key: Vector3i in _rig._doorways:
+		if key.z != Terrain.EAST or key.x != 189 or key.y < 199 or key.y > 204:
+			continue
+		var door: Node3D = _rig._doorways[key].get_node(^"Door")
+		if not frames.has(door.get_node(^"Body")):
+			frames.append(door.get_node(^"Body"))
+		for leaf in door.get_children():
+			if str(leaf.name).begins_with("leaf") and not leaves.has(leaf):
+				leaves.append(leaf)
+	var faded_in := _rig._inside_walls([inside] as Array[Vector3], west)
+	_check(leaves.size() == 2 and frames.size() == 1 and leaves.all(func(leaf: Node3D) -> bool: return faded_in.has(leaf)) and faded_in.has(frames[0]),
+			"inside the temple, the camera west: the west doors' frame and both leaves fade with the near side (%d leaves, %d frames)" % [leaves.size(), frames.size()])
+	# From the street, nobody inside: at every yaw the closed doors stay as built.
+	var ghosted := 0
+	for turn in 8:
+		var toward := Vector3(1.0, 0.0, 1.0).normalized().rotated(Vector3.UP, deg_to_rad(turn * 45.0))
+		toward = (toward + Vector3(0.0, 0.6, 0.0)).normalized()
+		var faded_out := _rig._inside_walls([outside] as Array[Vector3], toward)
+		if leaves.any(func(leaf: Node3D) -> bool: return faded_out.has(leaf)):
+			ghosted += 1
+	_check(leaves.size() == 2 and ghosted == 0, "from the street, nobody inside, the closed doors stay solid at all eight yaws (%d ghosted)" % ghosted)
+	# An open leaf fades and comes back with its run as a shut one does.
+	if leaves.size() == 2:
+		var leaf: Node3D = leaves[0]
+		leaf.rotation.y = PI * 0.5
+		var open_in := _rig._inside_walls([inside] as Array[Vector3], west).has(leaf)
+		# The leaf itself may be the mesh (art-kit's leaves are), as _set_near reads it.
+		var meshes: Array = _rig._descendants(leaf).filter(func(node: Node) -> bool: return node is MeshInstance3D and (node as MeshInstance3D).mesh != null)
+		var before: Array = meshes.map(func(mesh: MeshInstance3D) -> Array: return [mesh.material_override, mesh.get_surface_override_material(0)])
+		_rig._set_near(leaf, true)
+		var faded := false
+		for k in meshes.size():
+			var mesh: MeshInstance3D = meshes[k]
+			if mesh.material_override != before[k][0] or mesh.get_surface_override_material(0) != before[k][1]:
+				faded = true
+		_rig._set_near(leaf, false)
+		var back := true
+		for k in meshes.size():
+			var mesh: MeshInstance3D = meshes[k]
+			if mesh.material_override != before[k][0] or mesh.get_surface_override_material(0) != before[k][1]:
+				back = false
+		leaf.rotation.y = 0.0
+		_check(open_in and meshes.size() > 0 and faded and back, "an open leaf is in the near side too, fades and comes back as built (%d meshes)" % meshes.size())
 
 
 func _test_horizon() -> void:

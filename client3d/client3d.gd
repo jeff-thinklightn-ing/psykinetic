@@ -480,6 +480,31 @@ const NEAR_ALPHA := 0.3
 ## see-through fades them on to NEAR_CLOSE_ALPHA in its shader.
 const NEAR_CLOSE := 4.0
 const NEAR_CLOSE_ALPHA := 0.1
+## The low camera's eye kept out of buildings (decision 864): where the line
+## from the player's chest (BOX_PULL_CHEST over their aim) out to the eye
+## enters a roofed building's box, the eye comes in along it to
+## BOX_PULL_MARGIN short of the box, never nearer than BOX_PULL_LEAST
+## (3 m, nearer than the zoom's own nearest: the coordinator after the
+## clips, a wall filling the screen being what this is for); in at
+## BOX_PULL_IN_RATE, and back out only after the line has
+## been clear BOX_PULL_HOLD seconds, at BOX_PULL_OUT_RATE, so a walk past a
+## house does not pump the view. Nothing fades for it (Jeff, 11-06).
+const BOX_PULL_CHEST := 1.2
+const BOX_PULL_MARGIN := 0.5
+const BOX_PULL_IN_RATE := 10.0
+const BOX_PULL_OUT_RATE := 1.2
+const BOX_PULL_HOLD := 1.0
+const BOX_PULL_LEAST := 3.0
+## Under BOX_PULL_RISE_FROM metres the low camera's aim rises from the
+## feet, to BOX_PULL_AIM_LIFT over them at BOX_PULL_LEAST, and the lean
+## and aim lead ease out with it, so the whole figure, feet to head
+## (BOX_PULL_HEAD) with room above, stays in frame (box_rise): aimed at
+## the feet, a 3 m eye cut the head off. The tilt is kept, so the eye
+## stays on its own line; at LOW_FOV it holds the figure from LOW_PITCH_NEAR
+## to the ridge's.
+const BOX_PULL_RISE_FROM := 8.0
+const BOX_PULL_AIM_LIFT := 1.0
+const BOX_PULL_HEAD := 1.9
 ## A near piece's mesh keeps its own material override under this meta
 ## while it is see-through.
 const OPAQUE_META := &"opaque_material"
@@ -2095,6 +2120,11 @@ var _zoom_to := 1.0
 ## none): a factor on the view's size over the wheel's zoom.
 var _reach_pull := 1.0
 var _reach_pull_to := 1.0
+## The share of the low camera's distance its eye stands at (decision 864):
+## 1.0 clear of every building; less while one would hold it; and the
+## seconds left before it may ease back out.
+var _box_pull := 1.0
+var _box_hold := 0.0
 ## The click scheme's pan: how far the view is off the player (ground
 ## units), what it was when this drag began, and whether it is easing home.
 var pan := Vector3.ZERO
@@ -3803,9 +3833,9 @@ static func low_pitch_at(at: float) -> float:
 
 ## The camera's distance from its target: CAMERA_DISTANCE; under the low
 ## camera, LOW_DISTANCE_SHARE of it scaled as the ortho size is (the wheel,
-## a peek, the mourning pull-back).
+## a peek, the mourning pull-back), and kept out of buildings (_box_pull).
 func _camera_distance() -> float:
-	return CAMERA_DISTANCE * LOW_DISTANCE_SHARE * _size_factor() if _low else CAMERA_DISTANCE
+	return CAMERA_DISTANCE * LOW_DISTANCE_SHARE * _size_factor() * _box_pull if _low else CAMERA_DISTANCE
 
 
 ## The low camera on or off as Net.camera_low and the map say (decision
@@ -3908,10 +3938,111 @@ func screen_direction(offset: Vector2) -> Vector2:
 	return (to - from).normalized() if from.distance_to(to) > 0.001 else Vector2.UP
 
 
+## The share of the low camera's distance at which its eye stands clear of
+## every roofed building (decision 864): the line from the player's chest
+## out to the eye at its full distance, the first box it enters or
+## passes within BOX_PULL_MARGIN of, that far short of it; 1.0 when it
+## comes near none or under the ortho
+## camera. A box the chest is in (a house they stand in) is not asked.
+## Never nearer than BOX_PULL_LEAST: a box nearer than that keeps the
+## eye in it, and the rim shows through as today (623 amended (5)).
+func eye_clear_share() -> float:
+	if not _low or _buildings.is_empty() or _camera == null:
+		return 1.0
+	var chest := _camera_target + Vector3.UP * BOX_PULL_CHEST
+	var full := _camera_offset() / maxf(_box_pull, 0.001)
+	var length := full.length()
+	if length < 0.001:
+		return 1.0
+	var nearest := INF
+	for building: Dictionary in _buildings:
+		var box := _eye_box(building)
+		if box.size == Vector3.ZERO or box.has_point(chest):
+			continue
+		# Grown by the margin, so a line grazing an eave is asked too (terrain's
+		# walk: the eye 0.2 m off a forge's eave); a player within the margin
+		# of a wall is asked against the box itself, short by the margin.
+		var grown := box.grow(BOX_PULL_MARGIN)
+		var hugging := grown.has_point(chest)
+		var enters := segment_enters(chest, full, box if hugging else grown)
+		if enters < 0.0 or enters >= 1.0:
+			continue
+		nearest = minf(nearest, enters * length - (BOX_PULL_MARGIN if hugging else 0.0))
+	if nearest == INF:
+		return 1.0
+	var least := minf(BOX_PULL_LEAST / length, 1.0)
+	return clampf(nearest / length, least, 1.0)
+
+
+## How far the low camera's aim has risen (decision 864): 0 at
+## BOX_PULL_RISE_FROM metres and beyond, 1 at BOX_PULL_LEAST; 0 under the
+## ortho camera.
+func box_rise() -> float:
+	if not _low:
+		return 0.0
+	return clampf((BOX_PULL_RISE_FROM - _camera_distance()) / (BOX_PULL_RISE_FROM - BOX_PULL_LEAST), 0.0, 1.0)
+
+
+## A roofed building's box in this node's space (its pieces' and its
+## roof's meshes), made on first need; none for a piece with no roof.
+func _eye_box(building: Dictionary) -> AABB:
+	if building.has("eye_box"):
+		return building["eye_box"]
+	var box := AABB()
+	var roof: Node3D = building.get("roof")
+	var node: Node3D = building.get("node")
+	if roof != null and node != null and is_inside_tree():
+		var whole := _bounds(node)
+		if not node.is_ancestor_of(roof):
+			whole = whole.merge(_bounds(roof))
+		box = global_transform.affine_inverse() * whole
+	building["eye_box"] = box
+	return box
+
+
+## Where the segment from [param from] along [param along] first enters
+## [param box], as a share of [param along] (0..1); -1.0 if it does not.
+static func segment_enters(from: Vector3, along: Vector3, box: AABB) -> float:
+	var near := 0.0
+	var far := 1.0
+	for axis in 3:
+		var low := box.position[axis]
+		var high := box.end[axis]
+		if absf(along[axis]) < 0.000001:
+			if from[axis] < low or from[axis] > high:
+				return -1.0
+			continue
+		var a := (low - from[axis]) / along[axis]
+		var b := (high - from[axis]) / along[axis]
+		near = maxf(near, minf(a, b))
+		far = minf(far, maxf(a, b))
+		if near > far:
+			return -1.0
+	return near
+
+
+## The eye's share eased toward [param want] over [param delta] seconds
+## (decision 864): in at once at BOX_PULL_IN_RATE, out only after
+## BOX_PULL_HOLD seconds clear, at BOX_PULL_OUT_RATE.
+func _ease_box_pull(want: float, delta: float) -> void:
+	if want < _box_pull - 0.0005:
+		_box_hold = BOX_PULL_HOLD
+		_box_pull = lerpf(_box_pull, want, 1.0 - exp(-BOX_PULL_IN_RATE * delta))
+	elif want > _box_pull + 0.0005:
+		_box_hold = maxf(_box_hold - delta, 0.0)
+		if _box_hold <= 0.0:
+			_box_pull = lerpf(_box_pull, want, 1.0 - exp(-BOX_PULL_OUT_RATE * delta))
+	else:
+		_box_pull = want
+	if absf(_box_pull - want) < 0.0005:
+		_box_pull = want
+
+
 func _place_camera() -> void:
 	_aim_hillshade()
-	_camera.position = _camera_target + _camera_offset()
-	_camera.look_at(_camera_target, Vector3.UP)
+	var aim := _camera_target + Vector3.UP * BOX_PULL_AIM_LIFT * box_rise()
+	_camera.position = aim + _camera_offset()
+	_camera.look_at(aim, Vector3.UP)
 	if _low and _ground_look != null:
 		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x + _plane_at.x, _camera_target.z + _plane_at.z))
 	if _low and _far_root != null:
@@ -3940,8 +4071,9 @@ func _follow(delta: float) -> void:
 	_aim_lead = _aim_lead.lerp(_aim_lead_to, 1.0 - exp(-zoom_rate * delta))
 	if _aim_lead_to == Vector3.ZERO and _aim_lead.length() < 0.001:
 		_aim_lead = Vector3.ZERO
-	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead, aim_lead_cells) + pan
+	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead, aim_lead_cells) * (1.0 - box_rise()) + pan
 	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
+	_ease_box_pull(eye_clear_share(), delta)
 	_place_camera()
 	_update_sight(puppet.position, delta)
 
@@ -19305,6 +19437,12 @@ func _wall_runs() -> Dictionary[Vector3i, Array]:
 			var piece: Node3D = _walls[key] if _walls.has(key) else _doorways[key].get_node(DOOR_FRAME)
 			if not pieces.has(piece):
 				pieces.append(piece)
+			# Its leaves with its frame (864): shut, they are the near wall too,
+			# and the player inside was hidden behind them while the rest faded.
+			if not _walls.has(key):
+				for leaf in _doorways[key].get_node(^"Door").get_children():
+					if leaf is Node3D and str(leaf.name).begins_with("leaf") and not pieces.has(leaf):
+						pieces.append(leaf)
 		for vertex in vertices:
 			if _posts.has(vertex) and not pieces.has(_posts[vertex]):
 				pieces.append(_posts[vertex])

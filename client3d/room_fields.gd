@@ -66,7 +66,7 @@ const ROOM: Array[StringName] = [
 	&"_land",
 	&"_relief", &"_relief_size", &"_relief_given", &"_wet", &"_ground_top", &"_ground_look",
 	&"_hillshade_yaw", &"_ground_bottom", &"_corners", &"_ramp_heights", &"_dais_stairs",
-	&"_ridge_pitch", &"_sight_cut", &"_sight_hidden", &"_sight_key", &"_water_mask", &"_shore_mask",
+	&"_ridge_pitch", &"_box_pull", &"_box_hold", &"_sight_cut", &"_sight_hidden", &"_sight_key", &"_water_mask", &"_shore_mask",
 	&"_depth_image", &"_depth_mask", &"_shore_image", &"_shore_heights", &"_stream_cells",
 	&"_curve_waters", &"_curve_cells", &"_curve_near_sample", &"_curve_near_also", &"_curve_kept",
 	&"_road_kept", &"_edge_kept", &"_road_curves", &"_road_cells", &"_road_near_sample",
