@@ -451,7 +451,7 @@
 			"facts": [
 				{
 					"id": "merchant.dear",
-					"text": "The merchant sells his goods dearer than the town's store does.",
+					"text": "The merchant sells dearer than the town's store does.",
 					"known": "lived",
 					"knowers": [
 						"merchant"
@@ -481,7 +481,7 @@
 				},
 				{
 					"id": "merchant.night",
-					"text": "By night, at his counter, the merchant buys stolen goods and grave goods, at half what the town would give.",
+					"text": "By night the merchant buys stolen goods and grave goods across the counter, at half what the town would give.",
 					"known": "secret",
 					"knowers": [
 						"merchant"
@@ -542,7 +542,7 @@
 				},
 				{
 					"id": "cook.well",
-					"text": "When the well runs dry the cook works at half pace, and before the first harvest is in he will not cook from the larder kept for the town's people.",
+					"text": "When the well runs dry the cook works at half pace, and before the first harvest is in, nothing is cooked from the larder kept for the town's people.",
 					"known": "lived",
 					"knowers": [
 						"cook"
@@ -604,7 +604,7 @@
 				},
 				{
 					"id": "carpenter.mending",
-					"text": "The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher he mends arrows.",
+					"text": "The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher the carpenter also mends arrows.",
 					"known": "lived",
 					"knowers": [
 						"carpenter"
@@ -651,7 +651,7 @@
 				},
 				{
 					"id": "farmer.winter",
-					"text": "In winter the farmer digs roots, and his crop goes to the town's store, paid from the treasury.",
+					"text": "In winter the farmer digs roots, and the farm's crop goes to the town's store, paid from the treasury.",
 					"known": "lived",
 					"knowers": [
 						"farmer"
@@ -713,7 +713,7 @@
 				},
 				{
 					"id": "hunter.sells",
-					"text": "The hunter sells his meat and hides to the store, and the antlers and tusks are kept there.",
+					"text": "The hunter sells meat and hides to the store, and the antlers and tusks are kept there.",
 					"known": "lived",
 					"knowers": [
 						"hunter"
@@ -728,7 +728,7 @@
 				},
 				{
 					"id": "hunter.strays",
-					"text": "Sometimes the hunter strays too far out, and whoever walks him home is paid for it.",
+					"text": "Sometimes the hunter strays too far out, and whoever walks the hunter home is paid for it.",
 					"known": "lived",
 					"knowers": [
 						"hunter"
@@ -790,7 +790,7 @@
 				},
 				{
 					"id": "tanner.goes",
-					"text": "The tanner's leather goes to the store, and his bucklers and armour to the shop.",
+					"text": "The tanner's leather goes to the store, and the tanner's bucklers and armour to the shop.",
 					"known": "lived",
 					"knowers": [
 						"tanner"
@@ -822,7 +822,7 @@
 			"facts": [
 				{
 					"id": "woodcutter.lot",
-					"text": "The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives him deadwood.",
+					"text": "The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives deadwood.",
 					"known": "lived",
 					"knowers": [
 						"woodcutter"
@@ -837,7 +837,7 @@
 				},
 				{
 					"id": "woodcutter.sells",
-					"text": "The woodcutter sells his wood to the store, and wood that others bring in goes to the carpenter.",
+					"text": "The woodcutter sells wood to the store, and wood that others bring in goes to the carpenter.",
 					"known": "lived",
 					"knowers": [
 						"woodcutter"
