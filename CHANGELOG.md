@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Barrow under the temple is open now: the temple's back stair goes down into the First Hall, where the fallen knight stands behind the burial table, the first you meet on the way down, with his quest against the robbers (any you've killed already count toward it), and you come back up inside the temple beside the stair; the barrow mound's door in the wilds opens on the far end of the robbers' dig, a long tunnel west into the Robbers' Camp, with its own way back out to the mound; the Ossuary below is where the old dead lie, tomb chambers round the ossuary and a dark wing of old graves, each chest guarded by a pack, and its sealed shortcut comes up into the First Hall; and once you've beaten the draugr, a sealed slab in the First Hall takes you straight down to the Hall of Fallen Souls (832, 747 amended (8)).
 - Your companion goes fishing with you: with a rod on her, stand by the water together a moment and she casts beside you; a plain "Fish." or "Can you fish?" asks her, and if something hostile comes near she reels in and watches it, then takes up her rod again once it's gone (805 amended (14)).
 - Your companion comes fishing with you even with no rod of her own: ask her and she walks to the water beside you and keeps you company while you cast (805 amended (13)).
 - Visitors to a town no longer say they came "from the road", or that "the road from the road was quiet" (711 amended (1)).

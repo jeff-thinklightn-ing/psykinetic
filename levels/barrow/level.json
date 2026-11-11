@@ -31,12 +31,8 @@
 			8
 		],
 		"from_breach": [
-			10,
-			44
-		],
-		"from_wilds": [
-			40,
-			2
+			29,
+			53
 		],
 		"from_below": [
 			51,
@@ -50,7 +46,7 @@
 				1
 			],
 			"to_map": "wilds",
-			"to_spawn": "from_barrow"
+			"to_spawn": "from_crypt"
 		},
 		{
 			"at": [
@@ -60,6 +56,23 @@
 			"to_map": "barrow_deep",
 			"to_spawn": "from_above",
 			"hidden": true
+		},
+		{
+			"at": [
+				31,
+				52
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_barrow"
+		},
+		{
+			"at": [
+				30,
+				8
+			],
+			"to_map": "barrow_deep",
+			"to_spawn": "from_temple",
+			"sealed": "draugr"
 		}
 	],
 	"niches": [
@@ -289,7 +302,8 @@
 			"spine",
 			"loop",
 			"chest",
-			"coop"
+			"coop",
+			"arrival"
 		],
 		"every_days": 3,
 		"anchors": [
@@ -328,6 +342,15 @@
 					8
 				],
 				"name": "camp"
+			},
+			{
+				"rect": [
+					9,
+					50,
+					24,
+					5
+				],
+				"name": "breach"
 			}
 		],
 		"entrance": "entrance",

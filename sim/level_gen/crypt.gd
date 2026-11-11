@@ -1090,8 +1090,12 @@ static func _loose_niche(map: LevelMap, room: Dictionary, config: Dictionary, rn
 ## chest marker and its entry {at, props: {cache}} (the block's "cache"
 ## table, rolled per player and generation, 808). Whether it was laid.
 static func _chest(map: LevelMap, room: Dictionary, kept: Dictionary, config: Dictionary, plan: Dictionary) -> bool:
+	# The deep's chests (832) are the old dead's grave goods, not a cache:
+	# no "cache" prop, so each rolls the level's own chest table (the
+	# Ossuary's ossuary_grave, mail among it, 622) and carries its grave mark.
 	var cache := str(config.get("cache", ""))
-	if cache.is_empty():
+	var old_dead: bool = config.get("deep") is Dictionary
+	if cache.is_empty() and not old_dead:
 		return false
 	var deep: int = room["deep"]
 	var wide: int = room["wide"]
@@ -1101,7 +1105,7 @@ static func _chest(map: LevelMap, room: Dictionary, kept: Dictionary, config: Di
 			continue
 		map.set_cell(cell, "chest")
 		kept[cell] = true
-		plan["entities"].append({"at": [cell.x, cell.y], "props": {"cache": cache}})
+		plan["entities"].append({"at": [cell.x, cell.y]} if old_dead else {"at": [cell.x, cell.y], "props": {"cache": cache}})
 		room["chest"] = cell
 		room["things"] = int(room.get("things", 0)) + 1
 		return true
