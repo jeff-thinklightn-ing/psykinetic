@@ -5982,7 +5982,7 @@ func _take_link(entity: GridEntity, to: Vector2i) -> void:
 			# Sealed (decision 540): open to the marked alone, said once a stand.
 			if _told_closed.get(entity.owner_peer) != to:
 				_told_closed[entity.owner_peer] = to
-				party_log.add(str(SEALED_LINES.get(str(link["to_map"]), "The way is sealed.")))
+				say_to([entity.owner_peer], str(SEALED_LINES.get(str(link["to_map"]), "The way is sealed.")))
 			return
 		if link["tile"] == to:
 			_told_closed.erase(entity.owner_peer)
@@ -10536,12 +10536,33 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		blessed += 1
 		var line := "The draugr yields. %s %s." % [record.name,
 			("is blessed and takes up the %s, uncharged" % Items.name_of(World.TOTEM)) if minted else ("is blessed" if first else "stands over him again")]
-		party_log.add(line)
+		say_to(World.peers_in(player.zone), line)
 		if tier >= 0 and not knight.is_empty():
 			World.into_pack(player, World.mint_relic(knight, tier, player))
-			party_log.add(SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name)
+			say_to(World.peers_in(player.zone), SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name)
 		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
+
+
+## Server: says [param line] to the players of [param peers] and keeps it in
+## the party log (133 amended (1)). PartyLog.add alone reaches no screen: it
+## is the server's list the companions' minds read (voice's sweep of
+## 2026-11-11 found 34 lines said only there). This sends it as well on the
+## party route, a "party" message from "Server" (Net.broadcast_to), as the
+## niche's draft line always went.
+## Whom to pass:
+## - the doer alone, for what only they did or were refused (a wrong niche
+##   pressed, a sealed way tried): [code][player.owner_peer][/code];
+## - everyone in the zone who sees it, for what happens there (a door shuts,
+##   a slab swings aside, a boss's key or relic taken, a deal struck):
+##   [code]World.peers_in(zone_name)[/code];
+## - the party across zones, only for what concerns them wherever they are:
+##   their peers, gathered by the caller.
+## Line words go through voice; a line naming the doer reads in the third
+## person to everyone, the doer too.
+func say_to(peers: Array[int], line: String) -> void:
+	party_log.add(line)
+	Net.broadcast_to(peers, "party", {"from": "Server", "text": line})
 
 
 ## The knight's sepulcher's plaque (714, lore's line, Jeff passed), said
@@ -10972,9 +10993,9 @@ func _give_camp_key(player_id: String, at: Vector2i) -> void:
 		return
 	var uid := World.items.mint(CAMP_KEY, "looted", "Brand the Ox", World.zone.name, at)
 	if World.into_pack(player, uid) >= 0:
-		party_log.add("%s takes the key from Brand's belt." % _display_name(player))
+		say_to(World.peers_in(player.zone), "%s takes the key from Brand's belt." % _display_name(player))
 	else:
-		party_log.add("Brand's key falls at %s's feet." % _display_name(player))
+		say_to(World.peers_in(player.zone), "Brand's key falls at %s's feet." % _display_name(player))
 
 
 ## [param record]'s player, if in the game, given the quest they are on
@@ -11089,7 +11110,7 @@ func _hold_hall_door(zone_name: String, held: bool) -> void:
 		World.hold_door(door, held, HALL_LOCK)
 	World.enter(was)
 	if not doors.is_empty():
-		party_log.add("The hall's door shuts behind you." if held else "The hall's door opens.")
+		say_to(World.peers_in(zone_name), "The hall's door shuts behind you." if held else "The hall's door opens.")
 	if not held:
 		_apply_hall_seal(zone_name)  # The challenge over, the dead's seal holds again by its own rule (666).
 
@@ -11168,12 +11189,12 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 		_told_niche.erase(peer)
 		door.open = true  # Its lock kept (747): shut again, it gives only to those it is revealed to.
 		World.halt(entity, World.tick + NICHE_FOUND_HOLD)
-		party_log.add("The slab swings aside: a stair goes down into the dark.")
+		say_to(World.peers_in(World.zone.name), "The slab swings aside: a stair goes down into the dark.")
 		print("[level] %s found the hidden door at %s in %s" % [_display_name(entity), Terrain.edge_cells(key)[0], World.zone.name])
 		return
 	if _told_niche.get(peer) != key:
 		_told_niche[peer] = key
-		party_log.add("Only the dead lie here.")
+		say_to([peer], "Only the dead lie here.")
 
 
 ## The first hall of regenerating level [param zone_name] (608 amended: where
@@ -11554,7 +11575,7 @@ func _reveal_from_below(zone_name: String) -> void:
 		if door.zone == zone_name and door.lock == HIDDEN_LOCK and not door.open:
 			World.hold_door(door, false, HIDDEN_LOCK)
 			door.open = true
-			party_log.add("The slab swings aside from behind.")
+			say_to(World.peers_in(zone_name), "The slab swings aside from behind.")
 
 
 ## [param player] come into the zone (joined, or travelled in): a draugr
@@ -19458,7 +19479,7 @@ func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, go
 	if not str(result.get("say", "")).is_empty():
 		_say_plain(monster, name, str(result["say"]))
 	if not str(result.get("line", "")).is_empty():
-		party_log.add(str(result["line"]))
+		say_to(World.peers_in(player.zone), str(result["line"]))
 	if bool(result.get("ok", false)):
 		_standing.erase(player_id)
 	_send_monster_offers(monster, player_id, player.owner_peer)

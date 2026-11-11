@@ -19,6 +19,9 @@ const LEDGE_BOUND := 0.45
 var _failures := 0
 var _main: Node
 var _pushes: Array[Dictionary] = []
+## Every "party" line this peer's screen was sent (133 amended (1): a line
+## said to a player must reach it, not the party log alone).
+var _heard: Array[String] = []
 
 
 func _ready() -> void:
@@ -29,6 +32,9 @@ func _ready() -> void:
 	add_child(_main)
 	World.entity_pushed.connect(func(entity: GridEntity, _by: GridEntity, _direction: Vector2i, tiles: int, impact: int, stopped_by: String) -> void:
 		_pushes.append({"entity": entity, "tiles": tiles, "impact": impact, "stopped_by": stopped_by}))
+	Net.message_received.connect(func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			_heard.append(str(data.get("text", ""))))
 	_register_maps()
 	_check(_player() == null or World.free_body(_player()), "a player is a free body: every player's walk below is one (6b, 703)")
 
@@ -2848,7 +2854,8 @@ func _test_sealed_link() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check(_main.map_name == "test_link_s" and _player() == player, "Player walking onto the sealed link stays (%s)" % _main.map_name)
-	_check(_main.party_log.last(1) == ["The way is sealed."], "told the way is sealed (%s)" % [_main.party_log.last(1)])
+	_check(_main.party_log.last(1) == ["The way is sealed."] and _heard.slice(-1) == ["The way is sealed."],
+		"told the way is sealed, on their screen (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
 	_check(_main.admin_command("mark Player -draugr") == "Player lacks draugr already", "the console takes no mark off that is not there")
 	var answer: String = _main.admin_command("mark Player draugr")
 	_check(answer == "Player marked draugr; marks: draugr" and record.marks == ["draugr"], "the console marks the player (%s)" % answer)
@@ -2919,8 +2926,9 @@ func _test_temple_stair() -> void:
 	_hold_free(walker, Vector2(0, -1), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(_main.map_name == "lt_temple_shut" and _main.party_log.last(1) == ["The stair down is barred from below."],
-		"unblessed at the stair down: it stays shut, barred from below (%s)" % [_main.party_log.last(1)])
+	_check(_main.map_name == "lt_temple_shut" and _main.party_log.last(1) == ["The stair down is barred from below."]
+		and _heard.slice(-1) == ["The stair down is barred from below."],
+		"unblessed at the stair down: it stays shut, barred from below, told on their screen (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
 	_main.load_map("test_room")
 	Level.unregister("lt_temple_shut")
 
@@ -2961,6 +2969,7 @@ func _test_barrow_won() -> void:
 	_check(_main.party_log.last(2) == ["The draugr yields. %s is blessed and takes up the %s, uncharged." % [record.name, Items.name_of(World.TOTEM)],
 			Main.SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name],
 		"the win and the plaque said (%s)" % [_main.party_log.last(2)])
+	_check(_heard.slice(-2) == _main.party_log.last(2), "and both reach the winner's screen as party lines (%s)" % [_heard.slice(-2)])
 	_check(_main.charge_from_relic(player, 1) == 10 and player.charges == 10 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,
 		"the relic on the altar: the deal's 10 charges, 10 of 50; the zone's sum is 10, another zone's 0")
 	_main.barrow_won([id], "easy")
@@ -3041,12 +3050,14 @@ func _test_hall_door() -> void:
 	_put(player, Vector2i(5, 3))
 	_main._hold_hall_door("lt_hall", true)
 	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
-		and _main.party_log.last(1) == ["The hall's door shuts behind you."], "held: shut, locked with a key nobody holds, stone, and said (%s)" % [_main.party_log.last(1)])
+		and _main.party_log.last(1) == ["The hall's door shuts behind you."] and _heard.slice(-1) == ["The hall's door shuts behind you."],
+		"held: shut, locked with a key nobody holds, stone, and said to those in the zone (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
 	_hold_free(player, Vector2(0, 1), 8)
 	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "no walk goes through it: stopped at its face (%s)" % player.free_pos)
 	_check(not World.try_toggle_door(player, key) and not door.open, "and E rattles it")
 	_main._hold_hall_door("lt_hall", false)
-	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."], "let go: the lock lifted, still shut till opened, and said")
+	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."] and _heard.slice(-1) == ["The hall's door opens."],
+		"let go: the lock lifted, still shut till opened, and said to them (%s)" % [_heard.slice(-1)])
 	await get_tree().process_frame
 	_check(World.try_toggle_door(player, key) and door.open, "E opens it now")
 	# The dead's seal (666): held while they stand, entry only, under a challenge's lock.
@@ -4548,14 +4559,14 @@ func _test_hidden_niche() -> void:
 	_put(player, Vector2i(2, 1))
 	_hold_free(player, Vector2(0, -1), 6)
 	var line := "Only the dead lie here."
-	_check(player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line],
-		"pressing into a plain niche is stopped and says the line (%s)" % [_main.party_log.last(1)])
+	_check(player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line] and heard.count(line) == 1,
+		"pressing into a plain niche is stopped and says the line, to the player's screen (%s)" % [heard])
 	var told: Array = _main.party_log.last(3)
 	_hold_free(player, Vector2(0, -1), 6)
 	_check(_main.party_log.last(3) == told, "pressing on at it says nothing more")
 	_put(player, Vector2i(4, 1))
 	_hold_free(player, Vector2(0, -1), 6)
-	_check(_main.party_log.last(2) == [line, line], "another niche says it again")
+	_check(_main.party_log.last(2) == [line, line] and heard.count(line) == 2, "another niche says it again (%s)" % [heard])
 	_put(player, Vector2i(6, 1))
 	_check(not World.may_open(player, door) and not World.try_toggle_door(player, key) and not door.open, "no walk opens the hidden niche's door and E rattles it")
 	for i in 10:
@@ -4563,8 +4574,8 @@ func _test_hidden_niche() -> void:
 		if door.open:
 			break
 	_check(player.tile == Vector2i(6, 1) and door.open and door.lock == "hidden_niche"
-		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
-		"pressing into the hidden niche finds it: the door open, its lock kept (747: shut, it gives only to those it is revealed to), and said (%s)" % [_main.party_log.last(1)])
+		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."] and heard.has("The slab swings aside: a stair goes down into the dark."),
+		"pressing into the hidden niche finds it, said on the finder's screen too: the door open, its lock kept (747: shut, it gives only to those it is revealed to), and said (%s)" % [_main.party_log.last(1)])
 	_check(World.hidden_niche()["open"], "the marker says open")
 	# 608 amended (2): the finder stands while the slab gives way, pressing
 	# on or not; the stair behind is not taken through the shut slab.
@@ -4619,8 +4630,9 @@ func _test_hidden_niche() -> void:
 	World.enter(was)
 	_check(not door.open and door.lock == "hidden_niche", "locked again")
 	_main.travel(Net.local_id, "lt_niche", "from_below")
-	_check(door.open and door.lock.is_empty() and _player().tile == Vector2i(6, 1) and _main.party_log.last(2)[0] == "The slab swings aside from behind.",
-		"come up from below, the slab is pushed open from behind and said; the player stands before it (%s)" % [_main.party_log.last(2)])
+	_check(door.open and door.lock.is_empty() and _player().tile == Vector2i(6, 1) and _main.party_log.last(2)[0] == "The slab swings aside from behind."
+		and _heard.has("The slab swings aside from behind."),
+		"come up from below, the slab is pushed open from behind and said, on their screen too; the player stands before it (%s)" % [_main.party_log.last(2)])
 	# 672 amended, dungeon's side: the world's barrow is every player's,
 	# laid again by the console's zone reset, the slab shut and locked.
 	_main.admin_command("zone reset lt_niche")
@@ -5601,7 +5613,8 @@ func _test_camp_chest() -> void:
 	brand.note_struck(player)
 	World.damage(brand, 9999)
 	var keys := func() -> int: return Array(player.slots).count(Main.CAMP_KEY)
-	_check(keys.call() == 1, "Brand felled by them: his key in their pack (%s)" % [player.slots])
+	_check(keys.call() == 1 and _heard.slice(-1) == ["%s takes the key from Brand's belt." % _main._display_name(player)],
+		"Brand felled by them: his key in their pack, and said on their screen (%s %s)" % [player.slots, _heard.slice(-1)])
 	var first: bool = _main.search(player, chest)
 	var after_first := World.gold_of(id)
 	_check(first and after_first == gold_was + 25 and keys.call() == 0 and "robbers_camp" in record.caches,
@@ -5714,7 +5727,10 @@ func _test_barrow_quest() -> void:
 	var saved_slain: Variant = JSON.parse_string(JSON.stringify({"barrow": {"generation": 2, "at_step": 5, "band_slain": {band[1]: [id]}}}))
 	_check(Regen.states_from(saved_slain)["barrow"].get("band_slain") == {band[1]: [id]},
 		"whom they felled is saved and read back with the generation: a restart keeps it (747 amended (8))")
-	var took: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
+	_main._monster_accepts(knight, player, {"id": "quest:%d:ask" % knight.id}, 0)
+	var took := {"ok": _main.barrow_quest_of(id) == "open"}
+	_check(_heard.slice(-1) == ["%s takes up the fallen knight's task." % player.name],
+		"the deal's line (the knight's taking) reaches the screens there, not the party log alone (%s)" % [_heard.slice(-1)])
 	var items: Array = player.quest.get("items", [])
 	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
 		and player.quest.get("title") == Main.QUEST_TITLE and player.quest.get("giver") == "the fallen knight" and items.size() == 9

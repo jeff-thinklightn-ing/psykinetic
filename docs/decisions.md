@@ -1146,6 +1146,29 @@ log. What players need to say across zones is party chat, `/p`, marked and
 coloured apart, and kept from the companions: it is the players talking,
 not anything said in her world.
 
+133 amended (1), 2026-11-11: what the server tells a player reaches a screen.
+The party log is each zone's list kept on the server for the companions'
+minds; nothing sends it anywhere. Lines written as things a player is told
+had gone there alone: playtest's crypt walk pressed thirteen wrong niches and
+found the hidden one with no word back, and voice's sweep found 34 such lines
+in six trees, all live in v0.1.210. Main.say_to(peers, line) keeps the line
+in the party log and sends it on the party route the niche's draft line
+always used: a "party" message from "Server" (Net.broadcast_to), no new
+message kind, no protocol change. Its doc comment says whom to pass: the doer
+alone for what only they did or were refused; everyone in the zone
+(World.peers_in) for what happens there in sight; the party across zones only
+for what concerns them anywhere. Every tree's told line goes through it from
+now on, and voice's inventory counts a say_to call as a delivery. Dungeon's
+ten lines go through it here: a sealed way (SEALED_LINES, "The way is
+sealed.") to the one who tried it; the hall's door shutting and opening, the
+slab found and pushed from behind, Brand's key taken or dropped, the
+draugr's yield and the sepulcher plaque, and a talking monster's deal line
+(the fallen knight's taking and proving, the draugr at rest) to the zone;
+"Only the dead lie here." to the presser. level_test keeps every "party"
+line its peer is sent (_heard) and asserts each of these arrived, not only
+that the server composed it. The other trees' lines follow on their own
+landings, on this helper.
+
 ## 134. Companions overhear; the server says what it knows of whom a line is for
 
 With two players together, every word was her own player's to her, so
