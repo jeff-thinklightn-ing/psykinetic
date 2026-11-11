@@ -54,9 +54,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2785)
+## Lines in the code (2797)
 
-### companions (Pip, Wren, Nix) (640)
+### companions (Pip, Wren, Nix) (652)
 
 | | Line | Where |
 |---|---|---|
@@ -105,6 +105,12 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | \\b(give\|hand\|pass\|return)\\b.*\\b(me\|back)\\b | `sim/companion.gd` ORDER_GIVE_BACK |
 |  | \\b((i\|i'll\|i will\|let me\|we\|we'll)\\s+(\\w+\\s+)?(take\|carry\|hold\|keep\|have\|put)\|carry on\|take (cover\|us\|me\|a (rest\|break\|breather\|look)\|the lead\|them out\|aim)\|hold (on\|the door\|still\|position\|back)\|keep (going\|up\|still\|watch\|an eye))\\b | `sim/companion.gd` ORDER_CARRY_NOT |
 |  | As you say. | `sim/companion.gd` ORDER_ACKS |
+|  | That took it out of me. Can we rest a moment? | `sim/companion.gd` REST_ASK |
+|  | I'm hurt. Sit a while with me? | `sim/companion.gd` REST_ASK |
+|  | I've had a beating. Could we stop a bit? | `sim/companion.gd`  |
+|  | Right behind you. | `sim/companion.gd` BREAK_LEFT |
+|  | I can't hold this alone. Coming. | `sim/companion.gd` BREAK_LEFT |
+|  | Too much for me here. I'm with you. | `sim/companion.gd` BREAK_LEFT |
 |  | \\b(let'?s (go )?fish(ing)?\|fish with me\|(go\|come) fish(ing)?\|(do\|try) (some )?fishing\|cast (a\|your\|the) line\|have a fish\|(can\|could\|will\|would) you (go )?fish\|(use\|try) (your\|the) rod\|start fishing\|fish for us)\\b | `sim/companion.gd` ORDER_FISH |
 |  | ^\\W*(fish\|fishing\|cast)\\W*$ | `sim/companion.gd` ORDER_FISH_BARE |
 |  | \\b(stop fishing\|reel (it )?in\|enough fishing\|done fishing\|put (the\|your) rod away)\\b | `sim/companion.gd` ORDER_FISH_STOP |
@@ -244,6 +250,12 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | a hostile near or coming: fishing again once it is gone | `sim/companion.gd` _tend_fish() |
 |  | of her own: her player stood by a fishing place | `sim/companion.gd` _fish_self_start() |
 |  | words of fishing no ask matched, far from water: how to ask, once a day | `sim/companion.gd` _fish_hint() |
+|  | beside her player again, or nothing going for her: the usual rules again | `sim/companion.gd` _left_to_it() |
+|  | %s has gone on and left you to it, and you are losing: you break off and go after them. | `sim/companion.gd` _left_to_it() |
+|  | under half, her player gone past %d from what is at her | `sim/companion.gd` _left_to_it() |
+|  | %s stays by you, so you sit down to rest and get your breath back. | `sim/companion.gd` _tend_rest_ask() |
+|  | her ask to rest, taken by his staying | `sim/companion.gd` _tend_rest_ask() |
+|  | once a hurt spell; his yes or his staying by her takes it | `sim/companion.gd` _tend_rest_ask() |
 |  | You and %s have just grown closer; you are %s %s now. %s | `sim/companion.gd` noticed() |
 |  | Just now %s saw: "%s." | `sim/companion.gd` noticed() |
 |  | %s has just %s. | `sim/companion.gd` noticed() |

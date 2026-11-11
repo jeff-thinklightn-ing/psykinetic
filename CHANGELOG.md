@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))
+- Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3))
+- Ask your companion to fish with something hostile near and she tells you why not yet, even straight after a fight, then takes up her rod once it's gone (805 amended (15))
 - Click to walk and you go round anyone standing in your way at once, or stop beside them if they're on the spot you clicked; another player gets a moment to step aside first (724 amended (4))
 - Click to walk past the corner of a wall or a ledge and you walk round it all the way to your spot (689 amended (8))
 - Whatever blocks a click walk, you look for another way round at once, and where there's none, you stop and stand (689 amended (9))

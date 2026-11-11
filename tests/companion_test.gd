@@ -18,6 +18,7 @@ func _ready() -> void:
 	# they need beside them, and a wandering imp would join in.
 	Monster.idling = false
 	Companion.hold_tongue = false  # Her voice in a fight, for the sections that test it; _test_quiet has it on (decision 675).
+	Companion.ask_rest = false  # Her rest ask (616 amended (3)) only where _test_left_and_rest tests it.
 	Companion.tends_unasked = false  # The older sections hurt bodies she would tend; _test_tends_unasked and _test_drinks_a_remedy have it on (decision 681).
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
@@ -106,6 +107,7 @@ func _ready() -> void:
 	_test_companion_verb()
 	_test_fishing()
 	_test_fish_mend()
+	_test_left_and_rest()
 	_test_reed_pond_cells()
 	_test_fish_waters()
 	_test_notice()
@@ -2190,6 +2192,175 @@ func _test_fish_waters() -> void:
 ## she'll lead to the pond"; its place now radius 6, it was 3 and missed 7 of 16 water cells):
 ## every cell of its water, and every dry cell within FISH_REACH of it that she
 ## or her player could fish from, is its fishing place's (pond_at's covers).
+## 780 amended (32) and 616 amended (3), the coordinator's rulings on
+## enemy-ai's pond runs (her player walked off; she fought on alone to 2, 4
+## and 5 of 20, and walked into town at a quarter): left to a losing fight,
+## she breaks off and goes to him; hurt after a fight, she asks to rest.
+func _test_left_and_rest() -> void:
+	print("\n== left to it: she breaks off and goes to him (780 amended (32)); hurt after, she asks to rest (616 amended (3)) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	pet.said.connect(_record_said)
+	Companion.ask_rest = false  # The break-off first, alone.
+	var owner: GridEntity = pet.keeper
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var hp_was := owner.hp
+	var hurt := int(pet.max_hp * 0.45)
+	# Her at (3, 8), the imp beside her at (2, 8), clear of the fire at (6..8, 5).
+	var cases := [
+		{"name": "her player 8 cells off", "at": Vector2i(10, 8), "breaks": true},
+		{"name": "her player 3 cells off", "at": Vector2i(5, 8), "breaks": false},
+		{"name": "8 off, told to wait", "at": Vector2i(10, 8), "breaks": false, "wait": true},
+		{"name": "8 off, loosing at it", "at": Vector2i(10, 8), "breaks": false, "loose": true},
+		{"name": "8 off, his bow drawn", "at": Vector2i(10, 8), "breaks": false, "draw": true},
+	]
+	for each: Dictionary in cases:
+		_kill_monsters()
+		_settle(pet)
+		pet._left_broke = false
+		pet._keeper_fought = -100000
+		_put(owner, _main._nearest_free(each["at"]))
+		_put(pet, _main._nearest_free(Vector2i(3, 8)))
+		if bool(each.get("wait", false)):
+			pet._carry_out({"verb": "wait"}, "Wait here.")
+		var imp := _spawn_imp(_main._nearest_free(pet.tile + Vector2i(-1, 0)))
+		imp.max_hp = 60
+		imp.hp = 60
+		pet.hp = hurt
+		var said_was: int = _heard_said.size()
+		var broke := false
+		var with_him := -1
+		for i in 80:
+			if bool(each.get("loose", false)) and i % 10 == 0:
+				World.loosed.emit(owner, 0.0, 1)
+			if bool(each.get("draw", false)):
+				owner.raised = "draw"
+			World.step()
+			broke = broke or pet._left_broke
+			if broke and with_him < 0 and World.distance(pet.tile, owner.tile) <= Companion.LEFT_DONE:
+				with_him = i
+		owner.raised = ""
+		var lines: Array = _heard_said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.BREAK_LEFT)
+		if bool(each["breaks"]):
+			_check(broke and lines.size() == 1 and with_him >= 0 and imp.hp == 60 and not pet._left_broke,
+				"%s, her at %d of %d: she breaks off, says so once, and is with him by tick %d, no blow on the way (%s, imp %d; her %s, him %s, imp %s)" % [
+					each["name"], hurt, pet.max_hp, with_him, lines, imp.hp, pet.tile, owner.tile, imp.tile])
+		else:
+			_check(not broke and lines.is_empty(), "%s: she does not break off (%s)" % [each["name"], lines])
+		if bool(each.get("wait", false)):
+			pet._carry_out({"verb": "follow"}, "Come on.")
+		World.damage(imp, 999)
+	_kill_monsters()
+	_put(owner, _main._nearest_free(Vector2i(3, 8)))
+	_put(pet, _main._nearest_free(Vector2i(2, 8)))
+	_settle(pet)
+	# The rest ask: hurt, the fight over REST_ASK_AFTER_S, once a hurt spell.
+	var after := Companion.REST_ASK_AFTER_S * World.TICK_RATE
+	var still := Companion.REST_ASK_STILL_S * World.TICK_RATE
+	Companion.ask_rest = true
+	var busy_was: Callable = pet.keeper_busy
+	pet.keeper_busy = func() -> bool: return false
+	var ask := func() -> int:
+		pet._calm_since = World.tick
+		var said_was: int = _heard_said.size()
+		for i in after + 5:
+			World.step()
+			if _heard_said.size() > said_was and str(pet._said.back()) in Companion.REST_ASK:
+				return i
+		return -1
+	pet.hp = hurt
+	pet._rest_asked = false
+	var at: int = ask.call()
+	_check(at >= after - 1 and pet._rest_offer_at >= 0, "hurt, %d s after the fight: she asks to rest (tick %d, %s)" % [Companion.REST_ASK_AFTER_S, at, pet._said.back()])
+	pet.owner_spoke("Yes.")
+	var hp_then: int = pet.hp
+	for i in Companion.REST_HEAL_TICKS * 3 + 2:
+		World.step()
+	_check(pet.order == "rest" and pet.hp >= hp_then + 2, "\"Yes.\": she rests and mends (%s, %d to %d)" % [pet.order, hp_then, pet.hp])
+	# Getting up for a fight keeps the spell's ask said.
+	var near := _spawn_imp(_main._nearest_free(Vector2i(2, 4)))
+	for i in 3:
+		World.step()
+	_check(pet.order != "rest", "a fight near: she gets up (%s)" % pet.order)
+	World.damage(near, 999)
+	var said_was: int = _heard_said.size()
+	pet._calm_since = World.tick
+	for i in after + 20:
+		World.step()
+	_check(_heard_said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.REST_ASK).is_empty(),
+		"after it, still hurt the same spell: no second ask")
+	# Whole again, then hurt: a new spell; he stays by her and she sits, unsaid.
+	pet.order = ""
+	pet.hp = pet.max_hp
+	World.step()
+	pet.hp = hurt
+	at = ask.call()
+	said_was = _heard_said.size()
+	var sat_at := -1
+	for i in still + 10:
+		World.step()
+		if pet.order == "rest":
+			sat_at = i
+			break
+	_check(at >= 0 and sat_at >= still - 2 and _heard_said.size() == said_was,
+		"a new spell asked (tick %d), he stays by her %d s: she sits to rest, saying nothing more (tick %d)" % [at, Companion.REST_ASK_STILL_S, sat_at])
+	# Busy with someone else: no sit of her own.
+	pet.order = ""
+	pet.hp = pet.max_hp
+	World.step()
+	pet.hp = hurt
+	pet.keeper_busy = func() -> bool: return true
+	at = ask.call()
+	var sat := false
+	for i in still + 10:
+		World.step()
+		sat = sat or pet.order == "rest"
+	_check(at >= 0 and not sat, "he is busy with someone else: she asks, but does not sit of her own")
+	pet.keeper_busy = func() -> bool: return false
+	# He walks on: the offer lapses, no second word.
+	pet._rest_offer_at = -1
+	pet.hp = pet.max_hp
+	World.step()
+	pet.hp = hurt
+	at = ask.call()
+	var far := World.NO_CELL
+	for y in range(1, 10):
+		for x in range(1, 13):
+			var cell := Vector2i(x, y)
+			if World.distance(cell, pet.tile) > Companion.REST_LEAVE + 1 and World.is_free(cell) and not (y == 5 and x >= 5 and x <= 9):
+				far = cell
+	_check(far != World.NO_CELL, "a cell past REST_LEAVE in the room")
+	_put(owner, far)
+	said_was = _heard_said.size()
+	for i in still + 10:
+		World.step()
+	_check(at >= 0 and pet._rest_offer_at < 0 and pet.order != "rest" and _heard_said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.REST_ASK).is_empty(),
+		"he walks on: the ask lapses, she does not sit or ask again (%s)" % pet.order)
+	# Put back.
+	Companion.ask_rest = false
+	pet.said.disconnect(_record_said)
+	pet.keeper_busy = busy_was
+	pet.order = ""
+	pet._rest_offer_at = -1
+	pet._rest_asked = false
+	owner.hp = hp_was
+	_kill_monsters()
+	_put(owner, owner_was)
+	_put(pet, pet_was if World.is_free(pet_was) else _main._nearest_free(owner_was + Vector2i(1, 0)))
+	_settle(pet)
+
+
+## Her lines as she says them (Companion.said), for checks counting what she
+## said: her _said keeps only the last SAID_REMEMBERED.
+var _heard_said: Array[String] = []
+
+
+func _record_said(text: String) -> void:
+	_heard_said.append(text)
+
+
 func _test_reed_pond_cells() -> void:
 	print("
 == the Reed Pond: all its water and bank are its fishing place's (Jeff's live bug) ==")
@@ -2420,6 +2591,7 @@ func _test_fish_mend() -> void:
 	_kill_monsters()
 	var pet := _companion()
 	_settle(pet)
+	pet.said.connect(_record_said)
 	var owner: GridEntity = pet.keeper
 	var water := World.NO_CELL
 	for cell: Vector2i in [owner.tile + Vector2i(2, 0), owner.tile + Vector2i(-2, 0), owner.tile + Vector2i(0, 2), owner.tile + Vector2i(0, -2)]:
@@ -2455,7 +2627,7 @@ func _test_fish_mend() -> void:
 	var lines: Array[String] = []
 	for start in Companion.FISH_SELF.size() + 1:
 		pet._still_tile = World.NO_CELL  # As if her player had just stepped here.
-		var said_was: int = pet._said.size()
+		var said_was: int = _heard_said.size()
 		var early := false
 		var cast_at := -1
 		for i in still_ticks + 80:
@@ -2464,7 +2636,7 @@ func _test_fish_mend() -> void:
 			if str(pet.fishing.get("state", "")) == "cast":
 				cast_at = i
 				break
-		var new_lines: Array = pet._said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.FISH_SELF)
+		var new_lines: Array = _heard_said.slice(said_was).filter(func(line: String) -> bool: return line in Companion.FISH_SELF)
 		_check(not early and cast_at >= still_ticks - 1 and new_lines.size() <= 1,
 			"start %d: still %d s beside the water, she casts of her own (tick %d), not before (%s)" % [start + 1, Companion.FISH_STILL_S, cast_at, new_lines])
 		lines.append(str(new_lines[0]) if new_lines.size() == 1 else "")
@@ -2473,6 +2645,35 @@ func _test_fish_mend() -> void:
 			World.step()
 	_check(lines.slice(0, Companion.FISH_SELF.size()) == Companion.FISH_SELF and lines.back() == "",
 		"each start line once a game day, then she starts in silence (%s)" % [lines])
+	# 805 amended (15): in the hush after a fight (675) her start's line is
+	# dropped; it is not counted, so a later start can say it.
+	pet._fish_self_days = {}
+	pet._still_tile = World.NO_CELL
+	Companion.hold_tongue = true
+	pet._fight_tick = World.tick + 100000
+	var hushed_at := -1
+	for i in still_ticks + 80:
+		World.step()
+		if str(pet.fishing.get("state", "")) == "cast":
+			hushed_at = i
+			break
+	_check(hushed_at >= 0 and pet._fish_self_days.is_empty(),
+		"a start in the hush after a fight: she casts, and her line is not counted as said (%s)" % [pet._fish_self_days])
+	pet._fight_tick = World.tick - 1000
+	pet._carry_out({"verb": "fish", "on": false}, "Stop fishing.")
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	pet._fight_tick = World.tick + 100000
+	pet._fish_cannot_days = {}
+	pet._fish_cannot("no_water")
+	var cannot_hushed := not pet._fish_cannot_days.has("no_water")
+	pet._fight_tick = World.tick - 1000
+	var cannot_was: int = _heard_said.size()
+	pet._fish_cannot("no_water")
+	_check(cannot_hushed and pet._fish_cannot_days.has("no_water") and _heard_said.size() == cannot_was + 1 and pet._said.back() == Companion.FISH_NO_WATER,
+		"why she can't cast, in the hush: not counted; said once it is over")
+	pet._fish_cannot_days = {}
+	Companion.hold_tongue = false
 	var stopped_at := -1
 	for i in still_ticks + 40:
 		World.step()
@@ -2489,13 +2690,13 @@ func _test_fish_mend() -> void:
 		World.try_fish(owner)
 		pet._carry_out({"verb": "fish", "on": true}, "Cast.")
 		var hers := false
-		var said_was: int = pet._said.size()
+		var said_was: int = _heard_said.size()
 		for i in 80:
 			World.step()
 			hers = hers or str(pet.fishing.get("state", "")) == "cast"
 			if owner.fishing.is_empty() and World.fish_refusal(owner).is_empty():
 				World.try_fish(owner)
-		var told: Array = pet._said.slice(said_was)
+		var told: Array = _heard_said.slice(said_was)
 		_check(hers or stock == 0 and Companion.FISH_FISHED_OUT in told,
 			"%d fish left, asked: she casts beside them (until economy's party share, at none she says it is fished out) (%s, %s)" % [stock, hers, told])
 		pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
@@ -2533,6 +2734,26 @@ func _test_fish_mend() -> void:
 	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
 	for i in World.FISH_END_TICKS + 2:
 		World.step()
+	# 805 amended (15): asked with one 3 or 4 cells off (in a fight), she says
+	# so and fishes once it is gone, as with one at five.
+	pet._fish_danger_said = -100000
+	pet._fish_resume = {}
+	var fight_imp := _foe_nearby(pet)
+	World.step()
+	pet._carry_out({"verb": "fish", "on": true}, "Fish.")
+	_check(pet.in_fight() and pet._said.back() == Companion.FISH_DANGER and not pet._fish_resume.is_empty(),
+		"asked to fish, an imp %d cells off: she says so (%s)" % [World.distance(pet.tile, fight_imp.tile), pet._said.back()])
+	World.damage(fight_imp, 999)
+	var asked_back := -1
+	for i in Companion.DEED_EVERY * 3:
+		World.step()
+		if pet.order == "fish":
+			asked_back = i
+			break
+	_check(asked_back >= 0, "it gone, she fishes as asked (tick %d)" % asked_back)
+	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
 	# No rod: of her own she keeps them company at the water, FISH_SIT rarely.
 	for slot in pet.slots.size():
 		if pet.slots[slot] == "fishing_rod":
@@ -2560,6 +2781,12 @@ func _test_fish_mend() -> void:
 		World._water.erase(water)
 	(World._fish_waters.get(World.zone.name, {}) as Dictionary).erase(water)
 	World._fish_stock_of.clear()
+	Companion.hold_tongue = true
+	pet._fight_tick = World.tick + 100000
+	_check(not pet._fish_hint("Do you know how to fish?") and pet._fish_hint_day == -1,
+		"the hint in the hush after a fight: not said, not counted (805 amended (15))")
+	pet._fight_tick = World.tick - 1000
+	Companion.hold_tongue = false
 	_check(pet._fish_hint("Do you know how to fish?") and pet._said.back() == Companion.FISH_ASK_HINT
 			and "go fishing" in Companion.FISH_ASK_HINT and Companion.order_in("Go fishing.").get("verb") == "fish",
 		"far from water, her want's pond to lead to: how to ask, in words her ask hears (%s)" % pet._said.back())
@@ -2584,6 +2811,7 @@ func _test_fish_mend() -> void:
 	World.holdings._since.erase(pond)
 	pet._fish_resume = {}
 	pet._fish_declined = World.NO_CELL
+	pet.said.disconnect(_record_said)
 	_settle(pet)
 
 

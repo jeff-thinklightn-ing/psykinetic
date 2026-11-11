@@ -8860,6 +8860,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	pet.guide_words = func() -> String: return _roads_words(record, pet)
 	pet.lead_to_fish = _lead_to_fish.bind(pet)
 	pet.fish_lead_place = _fish_lead_place.bind(pet)
+	pet.keeper_busy = _keeper_busy.bind(pet)
 	var walk: Guide = _guides.get(record.player_id)
 	if walk != null:
 		walk.bind(pet, player)
@@ -8984,6 +8985,25 @@ func _fish_lead_place(pet: Companion) -> Dictionary:
 	if to.is_empty() and pet.bond_at_least("devoted"):
 		to = _fish_place(record, pet)
 	return to
+
+
+## Whether [param pet]'s player is busy with someone else (616 amended (3),
+## for her rest ask's silent sit): an offer a resident spoke to them stands
+## (_standing, within Companion.REST_BUSY_S), or they are within
+## Companion.REST_BUSY_NEAR of a resident, a counter or a shop chest. The
+## server has no record of an open window (npc, 11-11: the panels are the
+## client's), so this is the nearest it knows.
+func _keeper_busy(pet: Companion) -> bool:
+	var player := pet.keeper as Player
+	if player == null or not is_instance_valid(player):
+		return false
+	var standing: Dictionary = _standing.get(player.player_id, {})
+	if not standing.is_empty() and World.steps - int(standing.get("at", 0)) <= Companion.REST_BUSY_S * World.TICK_RATE:
+		return true
+	for entity: GridEntity in World.get_entities():
+		if entity.zone == player.zone and World.distance(entity.tile, player.tile) <= Companion.REST_BUSY_NEAR 				and (entity is Resident or entity is Chest and ((entity as Chest).shop or not World.counter_kind(entity).is_empty())):
+			return true
+	return false
 
 
 ## Her player's map told what she knows the way to (decision 551): the

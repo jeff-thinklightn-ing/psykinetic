@@ -70,6 +70,10 @@ const QUIET_AFTER := 30
 ## Off only for companion_test's older sections, which ask her voice in a
 ## fight to test what it is told; _test_quiet has it on.
 static var hold_tongue := true
+## Off only for companion_test's older sections, whose players stand by a
+## hurt companion for long checks of other things; _test_left_and_rest has
+## it on (616 amended (3)).
+static var ask_rest := true
 const SIGHT_RANGE := 7
 ## GUARD fights a hostile this close to her or her player.
 const GUARD_RANGE := 3
@@ -192,6 +196,43 @@ const ORDER_ACKS: Array[String] = ["On it.", "All right.", "As you say.", "Right
 ## when whole, when a fight starts, or her player goes past REST_LEAVE.
 const REST_HEAL_TICKS := 20
 const REST_LEAVE := 8
+## Hurt after a fight, she asks to rest (616 amended (3), the coordinator's
+## ruling on enemy-ai's pond runs: she walked into town at a quarter and
+## nothing told him resting would mend her): under REST_ASK_BELOW of her hp,
+## nothing hostile in SIGHT_RANGE for REST_ASK_AFTER_S, no order, errand,
+## walk or line, her player up within REST_LEAVE. Once a hurt spell (till
+## she is back over REST_ASK_BELOW). An offer: his yes within Guide.OFFER_S
+## (Guide.AGREES) and she rests; he still within REST_ASK_NEAR of her
+## REST_ASK_STILL_S, not busy with someone else (keeper_busy), and she sits
+## to rest unsaid; other words, an order, or he past REST_LEAVE and it lapses.
+## Voice's words; none says what resting does.
+const REST_ASK_BELOW := 0.5
+const REST_ASK_AFTER_S := 5
+const REST_ASK_NEAR := 3
+const REST_ASK_STILL_S := 6
+const REST_ASK: Array[String] = ["That took it out of me. Can we rest a moment?", "I'm hurt. Sit a while with me?",
+	"I've had a beating. Could we stop a bit?"]
+## Main._keeper_busy's reach: an offer a resident spoke to her player this
+## recently (in World.steps), or one of them this near.
+const REST_BUSY_S := 30
+const REST_BUSY_NEAR := 2
+## Left to it (780 amended (32), the coordinator's ruling on enemy-ai's pond
+## runs: her player walked off from a boar or two wolves and she fought on
+## alone to 2, 4 and 5 of 20): in a fight, under LEFT_BELOW of her hp, her
+## player more than LEFT_REACH from every hostile going for her, none going
+## for him, and none of it his from range (no blow, loose, draw or attack of
+## his at a hostile within LEFT_FOUGHT_TICKS), nor his word to wait (HOLD):
+## she breaks off. From an apex that is 780 amended (21)'s berth
+## (_apex_broke); from anything else she goes to him, striking no blow on the
+## way (cornered LEFT_STUCK_TICKS with one at her, she fights it), till
+## within LEFT_DONE of him or with no hostile in her sight. BREAK_LEFT, voice's,
+## said as she goes.
+const LEFT_BELOW := 0.5
+const LEFT_REACH := 6
+const LEFT_FOUGHT_TICKS := 50
+const LEFT_DONE := 3
+const LEFT_STUCK_TICKS := 10
+const BREAK_LEFT: Array[String] = ["Right behind you.", "I can't hold this alone. Coming.", "Too much for me here. I'm with you."]
 ## Wary or colder, how long she hesitates over a plain order (decision 621),
 ## and the orders she hesitates over.
 const HESITATE_TICKS := 15
@@ -774,6 +815,9 @@ var lead_to_fish := Callable()
 ## Main's: the fishing place she would lead to, () -> Dictionary ({} for none;
 ## "want" set for her want's), asked only (805 amended (14), her hint).
 var fish_lead_place := Callable()
+## Main's: whether her player is busy with someone else, () -> bool (616
+## amended (3)): her rest ask's silent sit waits while they are.
+var keeper_busy := Callable()
 ## What she went and looked at lately (decision 696): {text, zone, cell,
 ## tick}, newest last, the rules' scouted_most, each kept scout_minutes.
 var scouted: Array[Dictionary] = []
@@ -1129,6 +1173,8 @@ const SLOTS := Items.CARRIED
 
 func _init() -> void:
 	super()
+	World.entity_damaged.connect(_on_struck_any)
+	World.loosed.connect(_on_loosed_any)
 	slots = Items.tidy([], SLOTS)
 	replicate("slots")
 	replicate("slot_notes")
@@ -1527,6 +1573,12 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
 	var read := order_in(text, keeper.slots if _alive(keeper) else ([] as Array[String]), slots) if phrase == 0 else {}
+	if _rest_offer_at >= 0:
+		# Her ask to rest answered (616 amended (3)): a yes takes it; any
+		# other words, his own order among them, let it lapse.
+		if phrase == 0 and read.is_empty() and RegEx.create_from_string(Guide.AGREES).search(text) != null:
+			read = {"verb": "rest"}
+		_rest_offer_at = -1
 	if not read.is_empty() and obey(read, text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
@@ -1626,6 +1678,20 @@ var _fish_resume := {}
 var _fish_danger_said := -100000
 var _fish_was_on := false
 var _fish_cannot_days := {}
+## Her rest ask (616 amended (3)): asked this hurt spell; the tick of the
+## standing offer (-1 none); the tick a hostile was last in her sight; her
+## player's cell and since when, for his staying by her.
+var _rest_asked := false
+var _rest_offer_at := -1
+var _calm_since := 0
+var _rest_still_tile := World.NO_CELL
+var _rest_still_since := 0
+## Left to it (780 amended (32)): broken off to go to her player; the tick he
+## last fought from anywhere; her cell and since when, for a cornered stop.
+var _left_broke := false
+var _keeper_fought := -100000
+var _left_still_tile := World.NO_CELL
+var _left_still_since := 0
 
 
 ## The next clue of the first secret unfound in her player's room (813 amended (2)):
@@ -1861,9 +1927,8 @@ func _tend_fish() -> void:
 	_fish_joined = their_cast
 	if _rod_slot() < 0:
 		var day := Townsfolk.day_of(World.steps)
-		if day != _fish_wish_day:
-			_fish_wish_day = day
-			_say(FISH_WISH, true)
+		if day != _fish_wish_day and _say(FISH_WISH, true):
+			_fish_wish_day = day  # Counted only once said (805 amended (15)): the hush drops a line.
 		return
 	var spot := fish_spot_near(keeper.tile)
 	if spot != World.NO_CELL:
@@ -1904,16 +1969,19 @@ func _fish_self_start() -> bool:
 	var line := ""
 	if _rod_slot() < 0:
 		if day - _fish_sit_day >= FISH_SIT_DAYS:
-			_fish_sit_day = day
 			line = FISH_SIT
 	else:
 		for each: String in FISH_SELF:
 			if int(_fish_self_days.get(each, -1)) != day:
-				_fish_self_days[each] = day
 				line = each
 				break
-	if not line.is_empty():
-		_say(line, true)
+	if not line.is_empty() and _say(line, true):
+		# Counted only once said (805 amended (15)): within the hush after a
+		# fight the line is dropped, and kept for her next start.
+		if line == FISH_SIT:
+			_fish_sit_day = day
+		else:
+			_fish_self_days[line] = day
 	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "still by the water",
 		"outcome": "fish" if _rod_slot() >= 0 else "company", "note": "of her own: her player stood by a fishing place"})
 	return true
@@ -1933,11 +2001,142 @@ func _fish_hint(text: String) -> bool:
 	var place: Dictionary = fish_lead_place.call()
 	if place.is_empty() or not (_rod_slot() >= 0 or place.has("want")):
 		return false
+	if not _say(FISH_ASK_HINT, true):
+		return false  # Dropped by the hush (805 amended (15)): not counted.
 	_fish_hint_day = day
-	_say(FISH_ASK_HINT, true)
 	_log({"kind": "voice", "companion": _name_of(self), "trigger": text, "outcome": "hint",
 		"note": "words of fishing no ask matched, far from water: how to ask, once a day"})
 	return true
+
+
+## Hostiles going for her: next to her, or a monster in sight set on her.
+func _going_for_her() -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	for entity in World.get_entities():
+		if not _hostile(entity) or entity.zone != zone:
+			continue
+		var d := World.distance(tile, entity.tile)
+		if d == 1 or d <= SIGHT_RANGE and (entity as Monster).target == self:
+			out.append(entity)
+	return out
+
+
+## Whether a hostile is within [param reach] of her (not of her player).
+func _hostile_near_her(reach: int) -> bool:
+	for entity in World.get_entities():
+		if _hostile(entity) and entity.zone == zone and World.distance(tile, entity.tile) <= reach:
+			return true
+	return false
+
+
+## A blow anywhere (World.entity_damaged): her player's on a monster is his
+## part in a fight (780 amended (32)).
+func _on_struck_any(entity: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
+	if source != null and source == keeper and entity is Monster:
+		_keeper_fought = World.tick
+
+
+## A shot anywhere (World.loosed): her player's, hit or miss, is his part.
+func _on_loosed_any(by: GridEntity, _angle: float, _step: int) -> void:
+	if by != null and by == keeper:
+		_keeper_fought = World.tick
+
+
+## Whether she is broken off to go to her player, left to a losing fight
+## (780 amended (32)); breaks off when the rule says so, saying BREAK_LEFT.
+## From an apex the break is its berth's (_apex_broke), and false here.
+func _left_to_it() -> bool:
+	if _alive(keeper) and (keeper.raised == "draw" or is_instance_valid(keeper.action_target) and _hostile(keeper.action_target)):
+		_keeper_fought = World.tick  # Drawing, or set on one: his fight too.
+	if not _left_broke and (max_hp <= 0 or float(hp) / max_hp >= LEFT_BELOW):
+		return false  # The common case, before any look round.
+	var on_her := _going_for_her()
+	if _left_broke:
+		# Kept till she is with him: one that let her go turns her back to it
+		# no more than one still at her heels does.
+		if not _alive(keeper) or World.is_downed(keeper) or World.distance(tile, keeper.tile) <= LEFT_DONE or not _hostile_near_her(SIGHT_RANGE):
+			_left_broke = false
+			_log({"kind": "stance", "companion": _name_of(self), "mind": "hands", "trigger": "left to it", "outcome": "rejoined",
+				"note": "beside her player again, or nothing going for her: the usual rules again"})
+			return false
+		return true
+	if on_her.is_empty() or not _alive(keeper) or World.is_downed(keeper) or stance == Stance.HOLD or not order.is_empty() \
+			or guide != null and guide.going() or max_hp <= 0 or float(hp) / max_hp >= LEFT_BELOW \
+			or World.tick - _keeper_fought <= LEFT_FOUGHT_TICKS:
+		return false
+	var an_apex: GridEntity = null
+	for foe in on_her:
+		if (foe as Monster).target == keeper or World.distance(keeper.tile, foe.tile) <= LEFT_REACH:
+			return false
+		if apex(foe):
+			an_apex = foe
+	_say(BREAK_LEFT[absi(hash(_name_of(self) + str(World.tick))) % BREAK_LEFT.size()], true, true)
+	_narrate("%s has gone on and left you to it, and you are losing: you break off and go after them." % keeper_name())
+	_log({"kind": "stance", "companion": _name_of(self), "mind": "hands", "trigger": "left to it", "outcome": "broke off",
+		"note": "under half, her player gone past %d from what is at her" % LEFT_REACH})
+	if an_apex != null:
+		_apex_broke = true  # Its berth (780 amended (21)), as when she or her player is low.
+		_quarry = null
+		return false
+	_left_broke = true
+	_quarry = null
+	_left_still_tile = tile
+	_left_still_since = World.tick
+	return true
+
+
+## Broken off (780 amended (32)): to her player at heel, no blow on the way;
+## cornered a while with [param foe] next to her, she fights it.
+func _go_to_keeper(foe: GridEntity) -> void:
+	if tile != _left_still_tile:
+		_left_still_tile = tile
+		_left_still_since = World.tick
+	if foe != null and World.tick - _left_still_since >= LEFT_STUCK_TICKS:
+		_fight_or(foe, Intent.FOLLOW)
+		return
+	current_intent = Intent.FOLLOW
+	intent_target = null
+
+
+## Each tick (616 amended (3)): hurt after a fight, her ask to rest, once a
+## hurt spell; the offer it leaves, taken by his staying by her.
+func _tend_rest_ask() -> void:
+	if _hostile_within(SIGHT_RANGE):
+		_calm_since = World.tick
+	if _alive(keeper) and keeper.tile != _rest_still_tile:
+		_rest_still_tile = keeper.tile
+		_rest_still_since = World.tick
+	if not ask_rest or max_hp <= 0 or float(hp) / max_hp >= REST_ASK_BELOW:
+		_rest_asked = false
+		_rest_offer_at = -1
+		return
+	if _rest_offer_at >= 0:
+		if not order.is_empty() or not _alive(keeper) or World.is_downed(keeper) or World.distance(tile, keeper.tile) > REST_LEAVE \
+				or World.tick - _rest_offer_at > int(Guide.OFFER_S * World.TICK_RATE) or _calm_since > _rest_offer_at:
+			_rest_offer_at = -1
+			return
+		if World.distance(tile, keeper.tile) <= REST_ASK_NEAR \
+				and World.tick - maxi(_rest_still_since, _rest_offer_at) >= REST_ASK_STILL_S * World.TICK_RATE \
+				and not (keeper_busy.is_valid() and bool(keeper_busy.call())):
+			# He stays by her: she sits to rest, unsaid.
+			_rest_offer_at = -1
+			order = "rest"
+			_rest_heal_at = World.tick + REST_HEAL_TICKS
+			_serial += 1
+			_set_stance(Stance.HOLD, _serial, "order")
+			_narrate("%s stays by you, so you sit down to rest and get your breath back." % keeper_name())
+			_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "he stayed by her", "outcome": "rest",
+				"note": "her ask to rest, taken by his staying"})
+		return
+	if _rest_asked or not order.is_empty() or not errand.is_empty() or guide != null and guide.going() or asleep \
+			or not fishing.is_empty() or _left_broke or not _alive(keeper) or World.is_downed(keeper) \
+			or World.distance(tile, keeper.tile) > REST_LEAVE or World.tick - _calm_since < REST_ASK_AFTER_S * World.TICK_RATE:
+		return
+	if _say(REST_ASK[absi(hash(_name_of(self) + str(World.tick))) % REST_ASK.size()], true):
+		_rest_asked = true  # Counted only once said: the hush drops a line.
+		_rest_offer_at = World.tick
+		_log({"kind": "voice", "companion": _name_of(self), "trigger": "hurt after a fight", "outcome": "asked to rest",
+			"note": "once a hurt spell; his yes or his staying by her takes it"})
 
 
 ## Why her cast did not start, said (805 amended (14)): no hand for the rod,
@@ -1947,9 +2146,8 @@ func _fish_cannot(why: String) -> void:
 	var line: String = {"no_hand": FISH_NO_HAND, "no_rod": FISH_NO_HAND, "fished_out": FISH_FISHED_OUT,
 		"no_water": FISH_NO_WATER, "no_fish": FISH_NO_WATER}.get(why, "")
 	var day := Townsfolk.day_of(World.steps)
-	if not line.is_empty() and int(_fish_cannot_days.get(why, -1)) != day:
-		_fish_cannot_days[why] = day
-		_say(line, true)
+	if not line.is_empty() and int(_fish_cannot_days.get(why, -1)) != day and _say(line, true):
+		_fish_cannot_days[why] = day  # Counted only once said (805 amended (15)).
 	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "her cast", "outcome": "refused", "note": why})
 
 
@@ -2432,7 +2630,9 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				if _alive(keeper):
 					_fish_declined = keeper.tile  # None of her own here till they move (805 amended (14)).
 				done = "%s asked you to stop fishing; you reel in and put the rod away." % keeper_name()
-			elif in_fight():
+			elif in_fight() and fish_spot_near(keeper.tile if _alive(keeper) else tile) == World.NO_CELL:
+				# Fighting and no water here: not now. With water near, the danger
+				# branch below says so and goes once it is over (805 amended (15)).
 				done = "%s asked you to fish, but there is fighting near: not now." % keeper_name()
 			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile) == World.NO_CELL and bool(lead_to_fish.call()):
 				# No water here, and she knows a pond she would take them to (551
@@ -2833,6 +3033,7 @@ func _keep_order() -> void:
 			_say(ORDER_ACKS[absi(hash(_name_of(self))) % ORDER_ACKS.size()], true)
 	_play_on()
 	_keep_watch()
+	_tend_rest_ask()
 	if order != "rest":
 		return
 	var why := ""
@@ -6224,6 +6425,8 @@ func _act() -> void:
 	elif _stands_over():
 		# Devoted (decision 555): she stands over her downed player, low or not.
 		_fight_or(foe, Intent.HOLD)
+	elif _left_to_it():
+		_go_to_keeper(foe)  # Left to a losing fight (780 amended (32)).
 	else:
 		_choose(foe, low)
 	_apex_after_choose()
