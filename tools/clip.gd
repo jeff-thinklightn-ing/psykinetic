@@ -419,6 +419,18 @@ func _ready() -> void:
 	Net.map_name = _walk_map if scenario == "walkreel" and not _walk_map.is_empty() else NAME
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
+	# One game view, one sun, one environment in the town's world before a frame is saved (the
+	# coordinator, 11-11: scratch shot scenes that added a second view doubled the light). Headless
+	# there's no view and no frames: the counts are logged only.
+	var guard := preload("res://tools/shot_guard.gd")
+	var counts: Dictionary = guard.count(_main._client3d if _main._client3d != null else _main)
+	for line: String in counts["lines"]:
+		print("CLIP view " + line)
+	print("CLIP " + guard.summary(counts))
+	if DisplayServer.get_name() != "headless" and not guard.ok(counts):
+		push_error("clip: not one rig, sun and environment in the town's world: no frames")
+		get_tree().quit(3)
+		return
 	_player = _main._local_player()
 	for entity in World.monsters():
 		if _beside != "" and scenario == "drawbacks" and entity.tile == _beside_at:

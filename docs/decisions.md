@@ -13049,7 +13049,18 @@ has its own copy of the pane (_own_pane); the town's, always lit, share one (_to
 frame (_shade_town_panes). The light itself still sits over the head (451). LANTERN_BY_BAG (819 amended
 (2)) moves the same LanternBody, so the satchel's move is unchanged. view_test _test_hip_lantern (the slot
 at the belt, hung and upright in belt_r's frame, the rule's cases, covered and lit in the rig, the
-companion's own pane, the town's shared one where the boxes stood). Stills C:/dev/review/pc-character/lantern/.
+companion's own pane, the town's shared one where the boxes stood). Stills C:/dev/review/pc-character/lantern/
+(raw4, sheet4: the accepted run; the first three drew under two views and are void, below). The light on the
+ground, measured on the player alone (the companion 12 m off) under today's night: the play camera's grey
+round the feet, lit over covered, +8 to +11 (of about 30, near +30%) within 2 m, +6.5 at 3 m, none from 5 m;
+at dusk +8 to +13 of about 80 within 2 m. With environment's 858 night look (a brighter street) the pair is
+shot again; under about +20% within 2 m the lantern's energy is tuned in that look (the coordinator's word).
+The shot scenes that host main.tscn had added a second Client3D over the one a windowed main builds
+(_show_3d), doubling the sun, lamps and environment (environment's finding, 2026-11-11): tools/shot_guard.gd
+(no class_name; count, ok, summary) counts the rigs that run and the suns and environments drawing in the
+town's world (the glimpses, the neighbour view and the own-world SubViewports of the item icons and the
+character preview set apart; 858's body fill not a sun), and tools/clip.gd logs it before any frame and,
+windowed, quits without frames unless each is one.
 CHANGELOG bullet in voice's words. Client only, protocol unchanged, no new class_name.
 
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
