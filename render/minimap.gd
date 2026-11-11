@@ -29,13 +29,21 @@ const LABEL_SIZE := 16
 const TITLE_SIZE := 20
 const BIG_FRACTION := 0.72
 const ZOOMS: Array[float] = [1.0, 2.0, 4.0]
-const PALETTE := "res://art/kit/palette.png"
-const SWATCH := 16
-## Swatches of art/kit/palette.png by ground kind (as the 3D view's ground).
-const GROUND_SWATCHES := {"grass": Vector2i(4, 3), "dirt": Vector2i(3, 4), "stone": Vector2i(1, 3), "sand": Vector2i(3, 1)}
-## Its frame, water, marks and labels take the shared theme's colours and
-## serif (UiTheme, docs/ui_style.md); the ground keeps the palette's swatches.
-static var WATER: Color = UiTheme.color("water")
+## The ground's colour by kind (decision 873): the theme's map_ colours, each
+## kind as terrain's ground shader draws it from above (grass green, dirt
+## brown, stone grey, sand pale; a wood its crowns' dark green). Any other
+## kind is stone. Indoors (level.json "outdoor" not true) stone is the floors'
+## stone, map_floor, as the 3D draws a room's floor.
+const GROUND_KINDS: Array[String] = ["grass", "dirt", "stone", "sand", "forest"]
+## How far the zone's highest ground is lightened and its lowest darkened
+## (873): shading by the zone's own range, gentle, so the paths and the water
+## stay the strongest marks; a zone of one height is drawn flat.
+const RELIEF := 0.08
+## Its frame, water, marks, labels and ground take the shared theme's colours
+## and serif (UiTheme, docs/ui_style.md).
+## The maps' water (873): a clear light blue, 2.2:1 on grass, so water is
+## the strongest mark on the ground (the theme's water was 1.06:1 on map_grass).
+static var WATER: Color = UiTheme.color("map_water")
 const WALL := Color(0.16, 0.14, 0.12)
 static var DOOR: Color = UiTheme.color("brass")
 static var FRAME: Color = UiTheme.color("backing")
@@ -91,9 +99,6 @@ var draw_usec := 0
 var _marks: Array = []
 var _marks_hash := 0
 
-static var _palette: Image
-
-
 ## The world map's button under the corner map (Jeff: "it should be its own
 ## page if anything or a small button under the map"): pressed, world_asked.
 signal world_asked
@@ -141,18 +146,9 @@ func _process(_delta: float) -> void:
 
 
 ## What [param kind] of ground looks like: its palette swatch's middle.
-static func ground_colour(kind: String) -> Color:
-	if _palette == null:
-		var loaded: Texture2D = load(PALETTE)
-		_palette = loaded.get_image() if loaded != null else Image.create(1, 1, false, Image.FORMAT_RGBA8)
-		if _palette.is_compressed():
-			_palette.decompress()
-	var swatch: Vector2i = GROUND_SWATCHES.get(kind, GROUND_SWATCHES["grass" if kind == "forest" else "stone"])
-	var at := swatch * SWATCH + Vector2i(SWATCH / 2, SWATCH / 2)
-	if at.x >= _palette.get_width() or at.y >= _palette.get_height():
-		return Color(0.4, 0.45, 0.35)
-	var colour := _palette.get_pixelv(at)
-	return colour.darkened(0.3) if kind == "forest" else colour
+static func ground_colour(kind: String, indoors := false) -> Color:
+	var known := kind if kind in GROUND_KINDS else "stone"
+	return UiTheme.color(&"map_floor" if indoors and known == "stone" else StringName("map_" + known))
 
 
 ## The map drawn again from [param level] (Level.load_level's, as Main holds
@@ -182,14 +178,25 @@ static func made_for(level: Dictionary) -> Dictionary:
 	var kinds: Dictionary = terrain.get("kinds", {})
 	var heights: Dictionary = terrain.get("heights", {})
 	var by_kind := {}
-	for cell: Vector2i in terrain.get("floor", []):
+	var indoors := not bool(Level.template_config(str(level.get("name", ""))).get("outdoor", false))
+	var floor: Array = terrain.get("floor", [])
+	# The zone's own range of heights: its lowest ground darkened and its
+	# highest lightened by RELIEF, the middle as the kind's colour (873).
+	var low := 0
+	var high := 0
+	for i in floor.size():
+		var height := int(heights.get(floor[i], 0))
+		low = height if i == 0 else mini(low, height)
+		high = height if i == 0 else maxi(high, height)
+	var span := float(high - low)
+	for cell: Vector2i in floor:
 		var kind := str(kinds.get(cell, "stone"))
 		if not by_kind.has(kind):
-			by_kind[kind] = ground_colour(kind)
+			by_kind[kind] = ground_colour(kind, indoors)
 		var colour: Color = by_kind[kind]
-		var height := int(heights.get(cell, 0))
-		if height != 0:
-			colour = colour.lightened(0.05 * height) if height > 0 else colour.darkened(0.06 * -height)
+		if span > 0.0:
+			var lift := (float(int(heights.get(cell, 0)) - low) / span - 0.5) * 2.0 * RELIEF
+			colour = colour.lightened(lift) if lift > 0.0 else colour.darkened(-lift)
 		image.set_pixelv(cell, colour)
 	for cell: Vector2i in terrain.get("water", []):
 		if Rect2i(Vector2i.ZERO, size).has_point(cell):

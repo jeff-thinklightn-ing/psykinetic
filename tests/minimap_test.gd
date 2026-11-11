@@ -37,12 +37,15 @@ func _test_picture() -> void:
 	add_child(map)
 	map.rebuild(level)
 	var kinds: Dictionary = level["terrain"]["kinds"]
-	var plain := Minimap.ground_colour(str(kinds.get(Vector2i(2, 0), "stone")))
+	var plain := Minimap.ground_colour(str(kinds.get(Vector2i(2, 0), "stone")), true)
 	_check(map.image.get_size() == Vector2i(3, 3), "one pixel a cell (%s)" % map.image.get_size())
-	_check(map.image.get_pixel(2, 0).is_equal_approx(plain), "open ground is its kind's palette swatch, the zone's border left to the frame (%s)" % plain)
+	var open_cell := map.image.get_pixel(2, 0)
+	_check(open_cell.v >= plain.darkened(Minimap.RELIEF).v - 0.01 and open_cell.v <= plain.lightened(Minimap.RELIEF).v + 0.01
+		and absf(open_cell.h - plain.h) < 0.02 and open_cell.a == 1.0,
+		"open ground is its kind's map colour, shaded at most RELIEF by height (indoors, stone is the floors' stone), the zone's border left to the frame (%s, %s)" % [plain, open_cell])
 	_check(map.image.get_pixel(0, 0).v < plain.v and map.image.get_pixel(1, 0).v < plain.v,
 		"a wall darkens the cells either side of it")
-	_check(map.image.get_pixel(2, 1).is_equal_approx(Minimap.WATER), "water is water's blue")
+	_check(map.image.get_pixel(2, 1).is_equal_approx(Minimap.WATER) and Minimap.WATER == UiTheme.color(&"map_water"), "water is the maps' water blue (873)")
 	_check(map.image.get_pixel(2, 2).a == 0.0, "where there is no floor nothing is drawn")
 	_check(map.title == "The Little Room", "the big map's title is the zone's name (%s)" % map.title)
 	_check(map.starts.has(Vector2i(0, 1)), "it marks the start cells (%s)" % [map.starts])
@@ -66,6 +69,28 @@ func _test_picture() -> void:
 	_check(map.image.get_size() == Vector2i(wilds["size"]) and map.places.any(func(place: Dictionary) -> bool: return place["kind"] == "stockpile")
 		and map.ways_out.any(func(way: Dictionary) -> bool: return way["label"] == "the Foothills"),
 		"the wilds: the town's store and the way north (to the foothills since 745) are on it")
+	# The ground as the eye sees it (873): grass green, dirt brown, stone grey,
+	# from the theme; shading by the zone's own range, so no wash.
+	var grass := Minimap.ground_colour("grass")
+	var dirt := Minimap.ground_colour("dirt")
+	_check(grass.g > grass.r and grass.g > grass.b and dirt.r > dirt.g and dirt.g > dirt.b,
+		"grass is drawn green and dirt brown (873; they were swapped: %s, %s)" % [grass, dirt])
+	_check(Minimap.ground_colour("stone") == UiTheme.color(&"map_stone") and Minimap.ground_colour("stone", true) == UiTheme.color(&"map_floor")
+		and Minimap.ground_colour("mud") == UiTheme.color(&"map_stone") and Minimap.ground_colour("forest") == UiTheme.color(&"map_forest"),
+		"each kind's colour is the theme's map_ colour; any other kind is stone, indoors the floors' stone")
+	var w_terrain: Dictionary = wilds["terrain"]
+	var w_kinds: Dictionary = w_terrain["kinds"]
+	var washed := 0
+	var shown := 0
+	for cell: Vector2i in w_terrain["floor"]:
+		var kind := str(w_kinds.get(cell, "stone"))
+		var base := Minimap.ground_colour(kind)
+		var drawn := map.image.get_pixelv(cell)
+		if not drawn.is_equal_approx(Minimap.WATER):
+			shown += 1
+			if drawn.v > base.lightened(Minimap.RELIEF).v + 0.01:
+				washed += 1
+	_check(shown > 0 and washed == 0, "no ground in the wilds is lit past its kind's colour by more than RELIEF (873; %d of %d)" % [washed, shown])
 	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["to"] == "foothills")
 	_check(castle_ways.size() == 1 and castle_ways[0]["cue"] == "arch" and castle_ways[0]["facing"] == Vector2i(0, -1),
 		"the wilds' north link (the castle's till 745, the foothills' since) is an arch facing north on the big map (589; %s)" % [castle_ways])
