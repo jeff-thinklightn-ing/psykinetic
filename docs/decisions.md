@@ -42271,6 +42271,16 @@ there; another click replaces it, and a zone change or the deadline drops it. ch
 (_test_click_from_afar: walked once the state comes, the wish kept; too late, dropped). No bullet
 (release). Client only, protocol unchanged, no new class_name.
 
+779 amended (3): a right click on your own companion opens her pack again (2026-11-10; playtest's run: a right
+click on her did not open it, so there was nothing to drag a rod onto; the coordinator: "a gesture that worked for a
+month and silently stopped"; the label from decision_number.sh). Decision 779 moved chests and carts to the left click
+(Main.opens_on_click; a left click on a companion talks) and left the right click, which had opened a chest or her
+pack since 2026-10-09 (c08f2688d), to the camera and the off hand: nothing opened her pack but E (the hint
+"LMB  talk   E  her pack"), and _open_pack's comment went on saying a right click. Now, in _unhandled_input, a right
+press on your own companion, with no shield or bow up (World.off_hand empty: those still raise), calls _open_pack as E
+does; a second one closes it. chest_test: the right press and release through the real handler open her pack beside
+yours. Client only, protocol unchanged, no new class_name.
+
 ## 776. The hills' rivers are streams, waded anywhere
 
 Jeff, 2026-11-02 (through the coordinator): "imo the river is more like a stream and should be

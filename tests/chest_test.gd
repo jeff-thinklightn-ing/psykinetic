@@ -320,6 +320,22 @@ func _test_companion_pack() -> void:
 	await get_tree().process_frame
 	_check("sfx.pack_open %s" % pet.name in _main.sounds, "with a sack's rustle (%s)" % [_main.sounds])
 	_check(panel.other == pet and panel.title_shown(false) == "%s's gear and pack" % pet.name, "a right click on her opens %s's gear and pack" % pet.name)
+	# 779 amended (3): the right click itself, through the real handler, opens her pack (the cell under the cursor is hers).
+	_main.close_other()
+	await get_tree().process_frame
+	_check(panel.other == null, "her pack shut before the click")
+	_main._pick_grid = Vector2(pet.tile)
+	var right := InputEventMouseButton.new()
+	right.button_index = MOUSE_BUTTON_RIGHT
+	right.pressed = true
+	_main._unhandled_input(right)
+	right.pressed = false
+	_main._unhandled_input(right)
+	await get_tree().process_frame
+	_check(panel.other == pet, "a right click on her, press and release through the real handler, opens her pack beside yours")
+	_main.close_other()
+	_main._open_pack(host, pet)
+	await get_tree().process_frame
 	var held := Array(host.slots).find(KIT)
 	panel.drop(host, held, pet, 0)
 	_check(Array(pet.slots) == _pad([KIT, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]) and Array(record.companion["slots"]) == _pad([KIT, "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""]),

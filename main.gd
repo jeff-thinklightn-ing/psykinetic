@@ -1628,6 +1628,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				_click_with_bow(player)
 		return
+	# 779 amended (3): a right click on your own companion opens her pack, as it did from 2026-10-09 until
+	# 779 moved chests to the left click (a left click on her talks) and left the right one with the camera and
+	# the off hand: with a shield or a bow up it is theirs, else it opens her pack (E does too).
+	if click.button_index == MOUSE_BUTTON_RIGHT and target != null and _is_own_companion(target) and World.off_hand(player).is_empty() and not (barter_panel != null and barter_panel.owns_pack()):  # The store window stands in for the pack while it is open.
+		_open_pack(player, target)
+		return
 	if click.button_index == MOUSE_BUTTON_RIGHT and _raise_off_hand(player):
 		return
 	# Ctrl: the held weapon's signature move; Shift: a swing where you
@@ -15700,7 +15706,7 @@ func context_hint_for(thing: Node) -> String:
 	if thing is Door:
 		return "%s  open or close" % Keys.name_of("open")
 	if thing is Companion:
-		return "LMB  talk   E  her pack" if _is_own_companion(thing) else "LMB  talk"
+		return "LMB  talk   E or RMB  her gear and pack" if _is_own_companion(thing) else "LMB  talk"
 	if thing is Resident:
 		# Decision 454: Shift+LMB attacks, said in the controls list. 515 amended: in bed, their ailment (npc's Resident.ailing).
 		var ailing := str((thing as Resident).ailing)
@@ -22698,7 +22704,7 @@ func toggle_pack() -> void:
 		barter_panel.close()  # The pack and a talk window take the same place: opening one closes the other.
 
 
-## A right click on a chest, or on the player's own companion: open it
+## E on a chest or on the player's own companion, a left click on a chest (779), a right click on the companion (779 amended (3)): open it
 ## within reach (World.reaches); from afar, walk to the nearest free cell
 ## beside it, and open on arrival (_update_pack). On the one already open,
 ## it closes.

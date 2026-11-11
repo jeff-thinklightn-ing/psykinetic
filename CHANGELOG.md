@@ -61,6 +61,7 @@ notes (decision 324).
 - Towns: Rolf's stall, pedlars and each town's store and shops now trade in one store window, the keeper's goods on the left and your pack on the right, square for square, each with its price and your gold at the head of your pack: one click buys or sells, the line at the foot says what happened or why not, coins are counted onto the counter as you buy and drop into your purse as you sell, goods you leave go down on a shelf with a sound of their own, and a thing the keeper won't take says so, and who will where the town knows; Donate and Locker sit beside Store as tabs where the keeper has them, and the window stands in for your pack and sheet until you close it (I swaps back to them); the healer's, the temple's and the forge's counters, and townsfolk you talk to, keep their own windows for now (852, 395 amended (1)).
 - Towns: buy with a full pack and you keep your gold, and the store window tells you "Your pack is full." (852).
 - The Barrow's quest card shows only while you're in the Barrow or the halls below it, and steps aside whenever a window opens over it (747 amended (7)).
+- Right-click your companion to open her gear and pack, as E does (779 amended (3)).
 - The inventory window heads what you wear "Gear" and what you carry "Pack", and your companion's is titled for both, her gear and pack (787 amended (4)).
 
 ## v0.1.211
