@@ -7592,7 +7592,15 @@ within 0%; with the delay at 0, 3.91 and a frame 411% off, the stand and the jum
 stepping in at 1004 with its lunge landing at 1010 is drawn within 0.25 cell of its tile by
 then (0.00 off; the guard, as it was with no delay); a plain blow the tick it steps in waits
 0.30 s (its 2-tick step and the tick behind; 0.00 with the delay at 0, the swing begun with
-the body a cell short); a teleport mid-step is drawn on its tile at once (0.000 off). The
+the body a cell short); a teleport mid-step is drawn on its tile at once (0.000 off). That
+0.30 s (the coordinator asked why, the delay being a tick) is arriving_in's whole wait: the
+step's own 0.2 s slide, which a host never waited for before (arriving_in was 0 for any body
+not a mirror, so a host swung while the body still slid; a joined client already waited it,
+"blows you can see" (c)), and the 0.1 s the delay adds. It is not how late a swing is drawn:
+Client3D._strike clamps its hold to lands_in less the strike's fastest lead, so the drawn
+contact never moves past when the blow lands and a longer wait only cuts the wind-up short.
+The harm number and the hit sound come on the sim's hit, as before, not on the drawn swing.
+A body that has stood a tick or more waits nothing; one that just stopped, at most a tick. The
 test's bodies are placed as World.spawn places them (_world_place) under Net.mode HOST, so
 none is a mirror. push_test, view_test and combat_test pass with it. A dedicated server
 draws nothing; a picked body (Main's pick by drawn place) is a tick behind as drawn. Client
