@@ -55,6 +55,8 @@ func _ready() -> void:
 	await _test_resident_asks()
 	await _test_window_clicks()
 	await _test_window_body_clicks()
+	await _test_store_face_clicks()
+	await _test_amulet_equips()
 	await _test_fight_clears_readings()
 	_test_sweep_key()
 	_test_crouch_key()
@@ -2526,6 +2528,140 @@ func _test_window_clicks() -> void:
 	_check(picked == 1, "the store's good was picked by the click (%d)" % picked)
 	_check(reached.values().all(func(n: int) -> bool: return n == 0),
 		"a press on a square in the pack, the sheet, the store and the town window never reaches the world (%s; -1: no square)" % [reached])
+
+
+## A press anywhere on a store's or a townsperson's window, squares, gaps, prices, headings and
+## buttons alike, stays in the window (Jeff, 11-05: "clicking on npc shops items clicks through the
+## menu and moves position"; 765 amended fixed the squares, this scans the whole face). The
+## probe is Main.world_clicks; a leak names the control under the press.
+func _test_store_face_clicks() -> void:
+	print("
+== a press anywhere on a store's window stays in it (Jeff 11-05) ==")
+	var barter: BarterPanel = _main.barter_panel
+	if barter == null or _main._local_player() == null:
+		print("  (no window or no player in this scene: its checks skipped)")
+		return
+	var leaks: Array[String] = []
+	var scanned := 0
+	for person: bool in [false, true]:
+		if person:
+			barter.open(_main._local_player(), "Hob")
+			barter.set_person(_main._local_player(), true, false)
+			barter.show_asks(_main._local_player(), [
+				{"id": "hob|commission|a", "kind": "commission", "title": "Take the rescue", "words": "Kin held.", "accept": "take", "cost": 0},
+				{"id": "hob|give|b", "kind": "give", "title": "Give toward the well", "words": "The well waits.", "accept": "give", "cost": 10}], 7)
+		else:
+			barter.open(null, "Snagfin")
+			barter.show_barter({"shop": "", "town": "Umbrage", "gold": 12,
+				"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
+				"buys": {"hide": {"gold": 20, "up_to": 1}}, "fenced": {},
+				"pack": [{"slot": 0, "uid": 201, "id": "hide"}], "why": ""})
+		for i in 3:
+			await get_tree().process_frame
+		var panels: Array[Control] = []
+		if barter._box.is_visible_in_tree():
+			panels.append(barter._box)
+		var rect: Rect2 = barter._box.get_global_rect()
+		print("  %s window: rect %s, %d panels" % ["person" if person else "store", rect, panels.size()])
+		for ix in 9:
+			for iy in 9:
+				var at := rect.position + rect.size * Vector2(0.06 + 0.88 * ix / 8.0, 0.06 + 0.88 * iy / 8.0)
+				if not panels.any(func(p: Control) -> bool: return p.get_global_rect().has_point(at)):
+					continue
+				scanned += 1
+				var before: int = _main.world_clicks
+				var motion := InputEventMouseMotion.new()
+				motion.position = at
+				motion.global_position = at
+				get_viewport().push_input(motion, true)
+				await get_tree().process_frame
+				var under := get_viewport().gui_get_hovered_control()
+				for pressed: bool in [true, false]:
+					var click := InputEventMouseButton.new()
+					click.button_index = MOUSE_BUTTON_LEFT
+					click.pressed = pressed
+					click.position = at
+					click.global_position = at
+					get_viewport().push_input(click, true)
+					await get_tree().process_frame
+				if _main.world_clicks > before:
+					leaks.append("%s at %s under %s" % ["person" if person else "store", at, under.name if under != null else "nothing"])
+		barter.close()
+		await get_tree().process_frame
+	print("  %d presses on the window's face, %d reached the world" % [scanned, leaks.size()])
+	for leak in leaks.slice(0, 12):
+		print("    leak: " + leak)
+	_check(scanned > 20 and leaks.is_empty(), "no press on a store's or a person's window reaches the world (%d scanned, %d leaked)" % [scanned, leaks.size()])
+
+
+## The Encolpion Amulet wears at the neck (Jeff, 11-07: "encolpion amulet is not equipable"): a
+## double-click on it in the pack, and a drag onto the neck square.
+func _test_amulet_equips() -> void:
+	print("
+== the Encolpion Amulet goes on at the neck (Jeff 11-07) ==")
+	var me: Player = _main._local_player()
+	if me == null or not Net.is_authority():
+		print("  (no player or not the host: its checks skipped)")
+		return
+	var had_slots := me.slots.duplicate()
+	var had_uids := World.slot_uids(me)
+	var empty: Array = []
+	empty.resize(Items.CARRIED)
+	empty.fill("")
+	World.set_slots(me, empty)
+	# The amulet a player really holds: minted bound to them, as Aldous gives it (714).
+	var uid := World.mint_bound(World.TOTEM, World.holder_key(me), me, me.zone, me.tile)
+	World.put_item(me, me, 0, uid)
+	var why := World.try_equip(me, me, 0)
+	_check(why == "" and me.slots[Items.NECK] == "encolpion_amulet" and me.slots[0] == "",
+			"a double-click on the amulet in the pack puts it on at the neck (refused: \"%s\")" % why)
+	why = World.try_equip(me, me, Items.NECK)
+	_check(why == "" and me.slots[Items.NECK] == "" and me.slots[0] == "encolpion_amulet",
+			"a double-click on the worn amulet takes it off, back into the pack (refused: \"%s\")" % why)
+	var moved := World.try_transfer(me, me, 0, me, Items.NECK, 0)
+	_check(me.slots[Items.NECK] == "encolpion_amulet",
+			"dragged from the pack onto the neck square, it goes on (%s; neck holds \"%s\")" % [str(moved), me.slots[Items.NECK]])
+	# The real press: a double-click on its square in the pack, through the viewport.
+	World.try_equip(me, me, Items.NECK)
+	var pack: PackPanel = _main.pack_panel
+	var pack_was: bool = pack.shown
+	pack.shown = true
+	for i in 3:
+		await get_tree().process_frame
+	var square := _square(pack.get_child(0), PackPanel.SlotBox)
+	if square != null:
+		var at := square.get_global_transform_with_canvas() * (square.size / 2.0)
+		var motion := InputEventMouseMotion.new()
+		motion.position = at
+		motion.global_position = at
+		get_viewport().push_input(motion, true)
+		await get_tree().process_frame
+		for pressed: bool in [true, false, true, false]:
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = pressed
+			click.double_click = pressed and not square.get_meta("first", true)
+			click.position = at
+			click.global_position = at
+			if pressed:
+				square.set_meta("first", false)
+			get_viewport().push_input(click, true)
+			await get_tree().process_frame
+		_check(me.slots[Items.NECK] == "encolpion_amulet",
+				"a real double-click on the amulet's square in the pack puts it on (neck holds \"%s\")" % me.slots[Items.NECK])
+	else:
+		_check(false, "the amulet's square was found in the pack")
+	pack.shown = pack_was
+	World.try_equip(me, me, Items.NECK)
+	# With the pack full ("pack space is a premium"): it still goes on, into the empty neck square.
+	World.try_equip(me, me, Items.NECK)
+	for slot: int in Items.pack_slots_of(me.slots):
+		if slot != 0 and me.slots[slot].is_empty():
+			World.put_item(me, me, slot, World.items.mint("hide", "built"))
+	why = World.try_equip(me, me, 0)
+	_check(why == "" and me.slots[Items.NECK] == "encolpion_amulet",
+			"with every other pack square full, the bound amulet still goes on at the neck (refused: \"%s\")" % why)
+	World.set_slots(me, had_slots, had_uids)
 
 
 ## A press in the body of a window (its centre, not a square) stays in the window: 845, from
