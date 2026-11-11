@@ -41753,6 +41753,24 @@ once per zone per process: on the box the first resident sync in each zone after
 (a stand-in outdoor Zone under a tavern floor's name: never loaded, no taverner). Server only, protocol
 unchanged, no new class_name, no bullet.
 
+772 amended (4) (the empty Mughouse: Jeff's ledger, loop 1, from economy's fish_home tour on v0.1.210,
+"nobody was in the Mughouse at 10:00"; npc's probe and economy's kept log, the coordinator's approval):
+the taverner was there, seated at step 300 and wanted by the floor from then on; the tour looked in the
+tick the zone loaded, and the floor's sync ran on its own every RESIDENT_SYNC_TICKS (30) zone ticks, so
+a player walking in saw the room empty for up to 3 s, then Margery at her counter. Main.travel now runs
+Main._arrival_sync for an interior zone (not World.zone.outdoor) after World is in it and before
+_show_zone_to, when no other player is in it already (perf's: only the first in pays; theirs keeps it
+placed): the floor's folk are in the first state the player is shown. Its cost is said with no
+names ("[residents] arrival sync in <zone>: N bodies, X ms"; 1.28 ms for the Mughouse in resident_test,
+perf told). And at boot Main._seat_keepers runs Towns._appoint for each town as its first turn would, so
+a fresh world's laid inn has its keeper from step 0; one already seated is left as it is (a second
+seating seats none). Her day is unchanged: home 06:00-09:00, the counter 09:00-20:00, and her night pick
+the counter (772's), abed only in her own short spell; her rows come only from her body, so none are
+offered where she is not. resident_test (the taverner end to end): her work behind the bar, none of the
+customers' side; seated again at boot, still one; walked in at 10:00, Margery on the floor in the tick
+they land and at her counter; her first words to a stranger fill every name. Server only, protocol
+unchanged, no new class_name.
+
 ## 779. A left click opens what E opens
 
 A left click on a counter did nothing in the store tour: counters and depots are Chests, and a
@@ -44096,6 +44114,17 @@ ui_test: Sell (1 item) and the Sell tab on a row that pays; give_word Donate on 
 protocol unchanged, no new class_name.
 
 802 amended (9) (release's label; the coordinator: a trophy whose whole price is owed said Donate): give_word says Sell where a row pays gold now or owes it, gold or "owed" over 0. Economy's rows carry "owed" when the town's treasury is at its floor (the tanner's trophies, the stall's keeper's), the price banked as owed and none paid now; that row read Donate, as if nothing came back. Its line was already "Owes you N gold" (give_lines), so no new words. ui_test: a row with gold 0 and owed 5 reads Sell, its line "Owes you 5 gold" and no "Pays 0 gold". CHANGELOG (voice's). Package: none (a bug fix). Client only, protocol unchanged, no new class_name.
+
+802 amended (10) (the coordinator's ruling on the empty Mughouse; voice's words): the store chest's
+refusal says where its taker works. Main.depot_pointer adds Main._taker_where to a line that names the
+taker by its trade ("Fish goes to the taverner, at the Last Light Mughouse."; "That goes to the
+Mughouse." names its place and is left): the work building's "name" ("at <name>"), else the level it
+opens into ("at the Last Light Mughouse"), else economy.json receives.pointers "where" by its use
+("in the kitchen shed", "at the forge", "at the temple", "at the inn"); none standing laid, the line
+plain. With no cook the fish goes to the taverner already (receives' order); "Nobody here takes that."
+stays when no one takes it. resident_test: the where for the taverner, the cook and a trade with no
+building, and a fish refused at Umbrage's chest. Server and levels data, protocol unchanged, no new
+class_name.
 
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 

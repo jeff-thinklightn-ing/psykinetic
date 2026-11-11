@@ -1045,6 +1045,37 @@ func _test_taverner_end_to_end() -> void:
 		_check(wanted.has(margery) and wanted[margery]["town"] == wilds and (places.get("work", Rect2i()) as Rect2i).has_point(tavern.get("counter", Vector2i(-9, -9))),
 			"on the Mughouse's floor: the seated taverner wanted, about the counter (%s)" % [places.get("work", "")])
 		_check(places.get("home") == Rect2i(12, 6, 6, 4), "the keeper's room the taverner's home there")
+		_check(not (places.get("work", Rect2i()) as Rect2i).has_point(Vector2i(9, 4)) and (places.get("work", Rect2i()) as Rect2i).end.y <= 4,
+			"her counter's work behind the bar, none of the customers' side (%s)" % [places.get("work", "")])
+		# Seated at boot as well (the empty Mughouse): a second seating seats no second keeper.
+		_main._seat_keepers()
+		_main._seat_keepers()
+		var keepers := World.towns.residents(wilds).filter(func(who: String) -> bool: return _main.TAVERNER in World.production.worker(who).get("trades", []))
+		_check(keepers == [margery], "seated again at boot: still one taverner (%s)" % [keepers])
+		# The store chest's pointer says where the taker works (the coordinator's ruling, voice's words).
+		var phrases: Dictionary = World.economy.rules.get("receives", {}).get("pointers", {}).get("where", {})
+		_check(_main._taker_where(wilds, _main.TAVERNER, phrases) == "at the Last Light Mughouse" and _main._taker_where(wilds, "cook", phrases) == "in the kitchen shed"
+			and _main._taker_where(wilds, "fletcher", phrases) == "", "where a taker works: %s, %s, none for a trade with no building" % [_main._taker_where(wilds, _main.TAVERNER, phrases), _main._taker_where(wilds, "cook", phrases)])
+		var fish_line: String = _main.depot_pointer(wilds, "fish")
+		_check(fish_line.ends_with(", at the Last Light Mughouse.") or fish_line.ends_with(", in the kitchen shed."), "a fish refused at the chest: who and where (%s)" % fish_line)
+		# A player walking in sees her at once: the floor's folk made in the tick they land, before the
+		# first state they are shown (economy's tour on v0.1.210 looked on arrival and saw the room empty).
+		DayNight.set_hour(10.0)
+		var from_zone := World.zone.name
+		_main.travel(Net.local_id, "umbrage_tavern", "from_wilds")
+		var floor_bodies: Array = World.townsfolk().map(func(body: GridEntity) -> String: return (body as Resident).worker_id)
+		_check(World.zone.name == "umbrage_tavern" and margery in floor_bodies, "walked into the Mughouse at 10:00: Margery there in the tick they land (%s)" % [floor_bodies])
+		var seen: Resident = null
+		for body: GridEntity in World.townsfolk():
+			if (body as Resident).worker_id == margery:
+				seen = body
+		_check(seen != null and (places.get("work", Rect2i()) as Rect2i).has_point(seen.tile), "at her counter (%s)" % [seen.tile if seen != null else ""])
+		var greet_rules: Dictionary = Townsfolk.rules().get("greet", {})
+		var words: Array[String] = []
+		for seed in 8:
+			words.append(Resident.greet_word(_main.TAVERNER, "stranger", greet_rules, seed))
+		_check(words.all(func(word: String) -> bool: return not word.is_empty() and not word.contains("%s")), "her first words to a stranger fill every name (%s)" % [words])
+		_main.travel(Net.local_id, from_zone)
 		var none := {}
 		_main._tavern_folk(none, TOWN)
 		_check(none.is_empty(), "a town's own zone is no tavern floor: no taverner wanted by it")

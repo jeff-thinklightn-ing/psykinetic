@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10))
 - Townsfolk are a man or a woman as their names say: Aldous asks you to give him the remains, and a few townsfolk look different from this update on, their looks now matching their names (398 amended (1))
 - Towns: Umbrage's store sells at the same price by day and by night, and once the town trusts you, you pay trusted prices there too (586 amended (1))
 - Badly hurt with no bandaging kit between you, your companion names the nearest warm rest and offers to lead you there, and near Umbrage's store, with no rest to name, she tells you who sells kits (616 amended (4)).

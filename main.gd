@@ -4878,6 +4878,7 @@ func _boot() -> void:
 		World.production.work_done.connect(_on_counter_work_done)
 	_seat_healers()
 	_seat_gatherers()
+	_seat_keepers()
 	_test_temple_day()
 	if Net.test_hp and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 		push_error("[test] --test-hp without --run-marker: ignored (786: a test-only flag, never the box's)")
@@ -5461,6 +5462,8 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	record.zone = to_map
 	if not record.companion.is_empty() and not record.companion.has("resident"):
 		record.companion["tile"] = null  # Beside their player.
+	if not World.zone.outdoor and not World.peers_in(to_map).any(func(other: int) -> bool: return other != peer):
+		_arrival_sync(to_map)  # Before the first state they are shown: no empty room, then folk appearing. The first in only (perf's).
 	_show_zone_to(peer, to_map, leaving)
 	_join_player(peer, id, record.name)
 	_shelter_arrival(peer, id)
@@ -11612,6 +11615,15 @@ func _companion_taken_in_town(body: Resident, by: String) -> void:
 			Net.broadcast_to([peer], "party", {"from": "Server", "text": "Raiders carried %s off from %s." % [pet_name, town]})
 
 
+## An interior zone's folk made the moment a player arrives (the empty Mughouse: the floor's sync ran
+## every RESIDENT_SYNC_TICKS of its own ticks, so a player walking in saw the room empty for up to
+## 3 s, then Margery at her counter). World is in the zone; its cost said, with no names.
+func _arrival_sync(zone_name: String) -> void:
+	var t := Time.get_ticks_usec()
+	_sync_residents()
+	print("[residents] arrival sync in %s: %d bodies, %.2f ms" % [zone_name, World.townsfolk().size(), (Time.get_ticks_usec() - t) / 1000.0])
+
+
 ## Server: the zone World is in has a body for each resident of its towns
 ## (Towns.residents, not away), then for each companion resting or working
 ## in one away from her player (her record's "resident", not held, her
@@ -17064,8 +17076,34 @@ func depot_pointer(town: String, id: String) -> String:
 	var trades: Array = World.production.worker(worker).get("trades", [])
 	for trade: String in words.get(raw, {}):
 		if trade in trades:
-			return str(words[raw][trade])
+			var line := str(words[raw][trade])
+			# Only a line naming the taker by trade gains where ("That goes to the Mughouse." names its place).
+			var where := _taker_where(town, trade, words.get("where", {})) if line.contains(trade.replace("_", " ")) else ""
+			return line if where.is_empty() else "%s, %s." % [line.trim_suffix("."), where]
 	return nobody
+
+
+## Where [param trade]'s taker in [param town] works, in voice's words (the coordinator's ruling: the
+## pointer says where, from the place itself): its work building's "name" ("at <name>"), else the
+## level it opens into ("at the Last Light Mughouse"), else [param phrases] by its use ("in the
+## kitchen shed"); "" for none standing laid, the line said plain.
+func _taker_where(town: String, trade: String, phrases: Dictionary) -> String:
+	var place := World.holdings.place(town) if World.holdings != null else {}
+	var kind := "inn" if trade == TAVERNER else (World.towns.kind_for(trade) if World.towns != null else "")
+	if place.is_empty() or kind.is_empty() or _world_map == null:
+		return ""
+	for building: Variant in _world_map.areas.get(str(place.get("area", "")), {}).get("buildings", []):
+		if not building is Dictionary or str(building.get("town", "")) != str(place.get("key", "")) or str(building.get("use", "")) != kind:
+			continue
+		if building.get("name") is String and not str(building["name"]).is_empty():
+			return "at " + str(building["name"])
+		var inside := str(building.get("inside", ""))
+		if not inside.is_empty() and Level.exists(inside):
+			var named := str(Level.load_level(inside).get("display_name", ""))
+			if not named.is_empty():
+				return "at " + (("the" + named.substr(3)) if named.begins_with("The ") else named)
+		return str(phrases.get(kind, ""))
+	return ""
 
 
 ## A building kind in words ("healers_hut" -> "healers hut").
@@ -20846,6 +20884,18 @@ func _place_captive(camp_id: String, holder: String, hold: Dictionary, index: in
 ## Every town's gatherers (767): each store place the town holds seats its
 ## woodcutter and hunter once (Towns.seat_gatherers); a place held by
 ## another faction now waits for a later boot. Name-free boot lines.
+## At boot (the empty Mughouse, the coordinator's approval): each town's building keepers and officials
+## seated as its first turn would (Towns._appoint: the inn's taverner once the inn stands), so a fresh
+## world's Mughouse has Margery from step 0, not the first turn; one already seated is left as it is.
+func _seat_keepers() -> void:
+	if World.towns == null or World.production == null:
+		return
+	var towns: Array = World.towns._towns.keys().filter(World.towns.is_town)
+	towns.sort()
+	for town: String in towns:
+		World.towns._appoint(town)
+
+
 func _seat_gatherers() -> void:
 	if World.holdings == null or World.towns == null:
 		return
