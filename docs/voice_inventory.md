@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2743)
+## Lines in the code (2747)
 
 ### companions (Pip, Wren, Nix) (626)
 
@@ -724,7 +724,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | What %s said | `sim/offers.gd` _rumour_offer() |
 |  | %s told me%s that %s. | `sim/offers.gd` _rumour_offer() |
 |  | Read the chronicle | `sim/offers.gd` _page_offer() |
-|  | %s keeps the town's chronicle here at %s desk, and will read it to you. | `sim/offers.gd` _page_offer() |
+|  | %s keeps the town's chronicle, with %s copy always to hand, and will read it to you. | `sim/offers.gd` _page_offer() |
 |  | %s the %s | `sim/offers.gd` chronicle_of() |
 |  | Bring the medicine man | `sim/offers.gd` _plea_offer() |
 |  | My %s %s lies sick with %s; the medicine man is out at his hut. Fetch him to %s. | `sim/offers.gd` _plea_offer() |
@@ -1221,7 +1221,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (583)
+### other (sim) (587)
 
 | | Line | Where |
 |---|---|---|
@@ -1451,6 +1451,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground | `sim/items.gd` art_slots() |
 |  | gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there | `sim/items.gd` art_slots() |
 |  | Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand. | `sim/items.gd` art_slots() |
+|  | maps, after the cut: from_foothills, from_halls, from_test_room, start 1 by imps and a sneak | `sim/layout_sense.gd` ARRIVAL_NOT_YET |
+|  | the arrival %s is %d cells from where %s %s roams (%d wanted) | `sim/layout_sense.gd` arrival_faults() |
 |  | a room with no use | `sim/layout_sense.gd` _purpose() |
 |  | an empty room%s | `sim/layout_sense.gd` _purpose() |
 |  | a corridor runs along %d of this room's sides | `sim/layout_sense.gd` _wraps() |
@@ -1726,6 +1728,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | nothing to hand over | `sim/world.gd` counter_order() |
 |  | that is not done here | `sim/world.gd` counter_order() |
 |  | a %s can't become that | `sim/world.gd` counter_order() |
+|  | the town lacks | `sim/world.gd` counter_order() |
+|  | the town lacks %d ore | `sim/world.gd` counter_order() |
 |  | there is no smith at the forge now | `sim/world.gd` counter_order() |
 |  | a reforge at %s | `sim/world.gd` counter_order() |
 |  | a fee for a reforge | `sim/world.gd` counter_order() |
@@ -2843,7 +2847,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (792)
+## Lines in the data (803)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3297,12 +3301,22 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (111)
+### levels/townsfolk.json (121)
 
 | | Line | Key |
 |---|---|---|
 |  | %s sleeps and does not stir. | `asleep[2]` |
 |  | {name} is asleep. {other} at the store will see to you. | `asleep_store[0]` |
+|  | The healer's seen to me. I'll be up by morning. | `sick_says.treated[0]` |
+|  | I've had my dose. Morning, I'll be on my feet. | `sick_says.treated[1]` |
+|  | On the mend now. Let me sleep it off. | `sick_says.treated[2]` |
+|  | I've {kind} on me. Would you walk me to the healer's? | `sick_says.hut[0]` |
+|  | It's {kind}, and a bad one. Help me to the healer's hut? | `sick_says.hut[1]` |
+|  | Down with {kind}. Walk me to the healer's, would you? | `sick_says.hut[2]` |
+|  | I've {kind} on me. Got a remedy? Give it here. | `sick_says.remedy[0]` |
+|  | Down with {kind}. Put a remedy in my hand and I'll mend. | `sick_says.remedy[1]` |
+|  | It's {kind}. A remedy in my hand would set me right. | `sick_says.remedy[2]` |
+|  | Walk {name} to the healer's | `sick_says.walk_title` |
 |  | You there. The wolves are at my sheep. | `balance.hail[0]` |
 |  | Wolves on the hill again, and my sheep with them. | `balance.hail[1]` |
 |  | Mind yourself up there; the wolves are at my fold. | `balance.hail[2]` |
@@ -3530,7 +3544,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | L | The goblins grew stronger from the rot. | `entries[4].facts[15].text` |
 |  | Outlaws in the forest's camps who rob the living on its paths, apart from the Mound-breakers in the crypt (enemy-ai's 793 faction, approved by the coordinator). Their name is with Jeff (lean: the Tollmen). | `entries[5].summary` |
 
-### levels/lore/history.json (40)
+### levels/lore/history.json (41)
 
 | | Line | Key |
 |---|---|---|
@@ -3573,6 +3587,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Aldous cannot reach the holy knights' relics beneath the temple, because the draugr has taken up residence there. | `entries[2].facts[26].text` |
 |  | A holy knight's remains, returned to Aldous, charge the Encolpion Amulet. | `entries[2].facts[27].text` |
 | L | Warriors' spears are planted around the outside of the mound, standing up like spikes. | `entries[2].facts[28].text` |
+|  | the spears round the mound | `entries[2].facts[28].sight` |
 |  | On nights the robbers have dug, or when the temple's alms fall short, the barrow's dead come up out of the dark. | `entries[2].facts[29].text` |
 
 ### levels/lore/knowers.json (1)

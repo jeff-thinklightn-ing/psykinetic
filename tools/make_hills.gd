@@ -170,6 +170,10 @@ const FORD_FREE := 4
 const TRACK_WIDTH := 1.4
 const TRACKS := [{"to": "herders_hut", "from": Vector2i(20, 112)}, {"to": "hill_cave", "from": Vector2i(50, 111)},
 	{"to": "hill_shieling", "from": ROAD_END}]
+## Hollowfell's track (the iron package's pointer, the coordinator's pick): from the
+## road's end at the spur's foot to the mine's mouth, its waystone (SIGHTS
+## waystone_hollowfell) where it leaves the road.
+const MINE_TRACK := {"to": "hollowfell", "from": ROAD_END}
 const CAMPS: Array[Dictionary] = [
 	{"key": "bridge_camp", "name": "the camp by the bridge", "at": Vector2i(88, 116), "facing": Vector2i(0, -1)},
 	{"key": "spur_camp", "name": "the camp under the spur", "at": Vector2i(177, 95), "facing": Vector2i(-1, 0)}]
@@ -284,6 +288,9 @@ const SIGHTS: Array[Dictionary] = [
 	{"key": "hunters_blind", "slot": "building.hunters_blind", "at": Vector2i(52, 156), "facing": Vector2i(1, 0)},
 	{"key": "waystone_hut", "slot": "building.waystone", "at": Vector2i(20, 110), "facing": ROADWARD, "variant": 3, "carved": "Hut", "arrow": "left"},
 	{"key": "waystone_cave", "slot": "building.waystone", "at": Vector2i(51, 114), "facing": ROADWARD, "variant": 3, "carved": "Cave", "arrow": "right"},
+	# In the fork at the road's end (MINE_TRACK): Hollowfell's track to the reader's left, the shieling's to the right;
+	# "Mine" (voice's word: "Hollowfell" cut to the panel's width read as a scrawl).
+	{"key": "waystone_hollowfell", "slot": "building.waystone", "at": Vector2i(174, 84), "facing": ROADWARD, "variant": 3, "carved": "Mine", "arrow": "left"},
 	{"key": "dead_traveller", "decor": "fallen_guard", "at": Vector2i(45, 69), "facing": Vector2i(1, 0)},
 	{"key": "cairn", "slot": "building.cairn", "at": Vector2i(114, 81), "facing": Vector2i(0, 1),
 		"cache": {"table": "cairn_cache", "place": "the cairn", "art": "prop.cache_stones"}},
@@ -476,6 +483,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_tracks()
 	_camps()
 	_hollowfell()
+	_mine_track()
 	_lairs()
 	_patches()
 	_wade(laid["falls"])
@@ -995,25 +1003,41 @@ func _tracks() -> void:
 		if map.walkable(cell) and map.cell(cell) != "water":
 			road_cells.append(cell)
 	for track: Dictionary in TRACKS:
-		if not _laid(track["to"]):
-			continue
-		var place: Dictionary = config["places"][track["to"]]
-		var to := Vector2i(int(place["at"][0]), int(place["at"][1]))
-		var from: Vector2i = road_cells[0]
-		for cell in road_cells:
-			if Vector2(cell - track["from"]).length() < Vector2(from - track["from"]).length():
-				from = cell
-		var laid := Relief.road(map, from, [], to, TRACK_WIDTH)
-		if laid.is_empty():
-			_missed.append("no track to %s" % track["to"])
-			push_error("[hills] no track to %s" % track["to"])
-			continue
-		for cell: Vector2i in laid["cells"]:
-			if map.cell(cell) in ["grass", "dirt"]:
-				map.set_cell(cell, "dirt")
-			_track_cells[cell] = true
-		config["roads"].append({"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"})
-		print("[hills] a track to %s from %s: %d cells" % [track["to"], from, laid["cells"].size()])
+		if _laid(track["to"]):
+			_track(track, road_cells)
+
+
+## One side track (777): from the road cell nearest its "from" to its place's
+## cell, laid as _tracks says.
+func _track(track: Dictionary, road_cells: Array[Vector2i]) -> void:
+	var place: Dictionary = config["places"][track["to"]]
+	var to := Vector2i(int(place["at"][0]), int(place["at"][1]))
+	var from: Vector2i = road_cells[0]
+	for cell in road_cells:
+		if Vector2(cell - track["from"]).length() < Vector2(from - track["from"]).length():
+			from = cell
+	var laid := Relief.road(map, from, [], to, TRACK_WIDTH)
+	if laid.is_empty():
+		_missed.append("no track to %s" % track["to"])
+		push_error("[hills] no track to %s" % track["to"])
+		return
+	for cell: Vector2i in laid["cells"]:
+		if map.cell(cell) in ["grass", "dirt"]:
+			map.set_cell(cell, "dirt")
+		_track_cells[cell] = true
+	config["roads"].append({"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"})
+	print("[hills] a track to %s from %s: %d cells" % [track["to"], from, laid["cells"].size()])
+
+
+## Hollowfell's track (MINE_TRACK), laid once its place is (after _hollowfell,
+## which comes after the other tracks).
+func _mine_track() -> void:
+	var road_cells: Array[Vector2i] = []
+	for cell: Vector2i in _road_cells:
+		if map.walkable(cell) and map.cell(cell) != "water":
+			road_cells.append(cell)
+	if not road_cells.is_empty() and config["places"].has(MINE_TRACK["to"]):
+		_track(MINE_TRACK, road_cells)
 
 
 ## The rest camps' pads, levelled by Relief.lay (keep_flat).

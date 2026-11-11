@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the hills, a waystone carved "Mine" stands where the road ends, at the foot of the spur where the shieling's track turns north, and a dirt track from it climbs north-west to Hollowfell's mine mouth, where before no path led there and nothing pointed the way (790 amended (5)).
 - The dwarven halls under the castle are easier to find your way through now, each time they're laid anew: a main way runs from the stair down to the cold forge, every room opens straight off a way, and torches burn along the passages every few steps, where before a room could lie at the end of a long way round, or a passage wrap round a room (838).
 - When your companion wants to go fishing with you, she takes you to the pond herself, however new your bond: say yes when she offers, or ask her to go fishing, and she leads the way along the roads, waits if you fall behind and stops on the bank (551 amended (3)).
 - The great bear and the old grey make a last stand now: hurt near to death in their lairs, they fall back to their dens instead of running, biting back once for each blow you land on the way, each bite shown before it comes so you can step out of it, and turn at bay there, or where they meet you if you block the way, to fight with all they have, while the old grey's pack goes for whoever strikes him as he falls back, where before both broke and ran and you had to chase them down (780 amended (26)).

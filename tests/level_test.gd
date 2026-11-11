@@ -1015,12 +1015,12 @@ func _test_fill_hills_sights() -> void:
 		var slot := str(building.get("slot", ""))
 		counts[slot] = int(counts.get(slot, 0)) + 1
 	var want := {"building.tower_ruin": 1, "tree.great_oak": 1, "building.standing_stone": 1, "building.milestone": 2,
-		"building.wayside_shrine": 1, "building.woodpile": 1, "building.hunters_blind": 1, "building.waystone": 2,
+		"building.wayside_shrine": 1, "building.woodpile": 1, "building.hunters_blind": 1, "building.waystone": 3,
 		"building.cairn": 1, "building.grave": 1, "building.lean_to": 1}
 	if not preload("res://tools/make_hills.gd").SHELTER_BUILT:
 		want["building.waystone"] = 1  # W4 waits on the hill cave's shelter (820's rule).
 	var short := want.keys().filter(func(slot: String) -> bool: return int(counts.get(slot, 0)) != int(want[slot]))
-	_check(short.is_empty(), "the sights stand: a watchtower, an oak, a stone, two milestones, a shrine, a stack, a blind, two waystones, a cairn, a grave, a lean-to (off: %s)" % [short])
+	_check(short.is_empty(), "the sights stand: a watchtower, an oak, a stone, two milestones, a shrine, a stack, a blind, three waystones, a cairn, a grave, a lean-to (off: %s)" % [short])
 	# Hollowfell's mine mouth (798 amended (3), maps' side): its link's "mine" cue, the bank's rock
 	# behind it (no floor), and terrain's raised bank round it.
 	var MakeHills := preload("res://tools/make_hills.gd")
@@ -1038,6 +1038,34 @@ func _test_fill_hills_sights() -> void:
 		return Relief.at(mine_relief, mine_size, Vector2i(row[0], row[1])) < float(row[2]) - 0.05)
 	_check(mine_link.size() == 1 and str(mine_link[0].get("cue", "")) == "mine" and mine_floor.is_empty() and low.is_empty(),
 		"Hollowfell's mouth: the link's mine cue, its bank's rock no floor (%s), every bank cell at least terrain's height (%s)" % [mine_floor, low.slice(0, 3)])
+	# Hollowfell's track and waystone (the iron package's pointer): a dirt track from the road's
+	# end to the mouth's place, two cells across all the way (a 2 x 2 of floor round every cell
+	# on its line), and the carved stone in the fork, the shieling's track east of it.
+	var mouth_at: Array = hills_json["places"]["hollowfell"]["at"]
+	var mine_track: Array = (hills_json["roads"] as Array).filter(func(r: Dictionary) -> bool:
+		var points: Array = r["points"]
+		return Vector2(points[0][0], points[0][1]).distance_to(Vector2(MakeHills.ROAD_END)) < 1.5 			and Vector2(points[-1][0], points[-1][1]).distance_to(Vector2(mouth_at[0], mouth_at[1])) < 1.5)
+	var pinched: Array = []
+	if mine_track.size() == 1:
+		var points: Array = mine_track[0]["points"]
+		for i in range(points.size() - 1):
+			var a := Vector2(points[i][0], points[i][1])
+			var b := Vector2(points[i + 1][0], points[i + 1][1])
+			for step in range(int(a.distance_to(b) * 4.0) + 1):
+				var cell := Vector2i(a.lerp(b, step / maxf(1.0, a.distance_to(b) * 4.0)).floor())
+				var wide := false
+				for corner: Vector2i in [Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]:
+					var all_floor := true
+					for d: Vector2i in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]:
+						all_floor = all_floor and (cell + corner + d) in level["terrain"]["floor"]
+					wide = wide or all_floor
+				if not wide and not cell in pinched:
+					pinched.append(cell)
+	var fork_stone: Array = (hills_json["buildings"] as Array).filter(func(b: Dictionary) -> bool: return b.get("carved", "") == "Mine")
+	var stone_at := Vector2i(fork_stone[0]["at"][0], fork_stone[0]["at"][1]) if fork_stone.size() == 1 else Vector2i(-1, -1)
+	_check(mine_track.size() == 1 and pinched.is_empty() and Vector2(stone_at).distance_to(Vector2(MakeHills.ROAD_END)) < 6.0
+			and stone_at.x < MakeHills.ROAD_END.x and stone_at.y < MakeHills.ROAD_END.y,
+		"Hollowfell's track from the road's end to its mouth, two across all the way (pinched at %s), its stone in the fork at %s" % [pinched.slice(0, 4), stone_at])
 	# The hill cave (798 amended (4), maps' side): the refuge opens east to a shelter, the
 	# cells under the overhang floor and the rest of its hill rock, terrain's bank raised round
 	# it; no rest place (its fire ring is cold, 798 amended (4), maps' side).
@@ -3646,12 +3674,13 @@ func _test_perches(hills: Dictionary) -> void:
 
 ## The hills' carved stones (800, maps' side): the two milestones read
 ## "Umbrage" and "Shieling" on milestone variant 2, the two waystones "Hut"
-## (arrow left) and "Cave" (arrow right) on waystone variant 3; no other
-## stone in the hills is carved.
+## (arrow left) and "Cave" (arrow right) on waystone variant 3, and the fork's
+## "Mine" (arrow left, MINE_TRACK); no other stone in the hills is carved.
 func _test_carved(hills: Dictionary) -> void:
 	print("== The hills' carved stones (800) ==")
 	var want := {"Umbrage": ["building.milestone", 2, ""], "Shieling": ["building.milestone", 2, ""],
-		"Hut": ["building.waystone", 3, "left"], "Cave": ["building.waystone", 3, "right"]}
+		"Hut": ["building.waystone", 3, "left"], "Cave": ["building.waystone", 3, "right"],
+		"Mine": ["building.waystone", 3, "left"]}
 	if not preload("res://tools/make_hills.gd").SHELTER_BUILT:
 		want.erase("Cave")  # W4 waits on the hill cave's shelter (820's rule).
 	var carved := {}
