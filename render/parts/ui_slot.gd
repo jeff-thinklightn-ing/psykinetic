@@ -167,8 +167,11 @@ func _show_state(name: String) -> void:
 func _gui_input(event: InputEvent) -> void:
 	var click := event as InputEventMouseButton
 	if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-		pressed.emit(self)
+		# Accepted before it is reported: a click that rebuilds the squares
+		# frees this one, and accept_event out of the tree is an error (854
+		# amended (1); v0.1.202's click).
 		accept_event()
+		pressed.emit(self)
 
 
 ## The chips and the mark at their corners (the face is the square inside its margin).

@@ -84,6 +84,14 @@ func _test_slot() -> void:
 	click.pressed = true
 	slot._gui_input(click)
 	_check(got == [slot], "a click is reported")
+	# A click that frees the square (a rebuild) raises no error: it is accepted first.
+	var gone := UiSlot.new()
+	add_child(gone)
+	gone.pressed.connect(func(which: UiSlot) -> void:
+		remove_child(which)
+		which.queue_free())
+	gone._gui_input(click)
+	_check(not gone.is_inside_tree(), "a click that takes the square away")
 	slot.queue_free()
 
 
@@ -120,10 +128,13 @@ func _test_tabs() -> void:
 func _test_line() -> void:
 	var line := UiLine.new()
 	add_child(line)
+	line.size = Vector2(1600.0, 0.0)  # A window's width: autowrapped, a line a word at none.
 	line.say("Bought a spear for 1 gold.")
 	_check(line.theme_type_variation == &"FootLine" and not line.refused, "what was done, in bone")
 	line.refuse("You need 2 more gold.")
 	_check(line.theme_type_variation == &"FootLineRefused" and line.refused and line.text == "You need 2 more gold.", "a refusal, in rust")
+	var said := line.get_combined_minimum_size().y
 	line.clear()
 	_check(line.text == "" and not line.refused, "cleared")
+	_check(said > 0.0 and is_equal_approx(line.get_combined_minimum_size().y, said), "and still a line high (%s, %s)" % [said, line.get_combined_minimum_size().y])
 	line.queue_free()
