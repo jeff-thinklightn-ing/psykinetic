@@ -769,14 +769,14 @@ func _test_crypt_commissions() -> void:
 	_check("Take the offering down" in titles.call("p1") and not "Find the runner" in titles.call("p1"), "gold at the altar: the offering to one told the secret, no runner lost: %s" % [titles.call("p1")])
 	_check(not "Take the offering down" in titles.call("p2"), "nothing to one not told")
 	var offer: Dictionary = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")[0]
-	_check(str(offer["words"]) == "Carry the temple's offering, 12 gold, down to the altar in the barrow and lay it there. Tell no one." and str(offer["kind"]) == Offers.COMMISSION, "its words: %s" % offer["words"])
+	_check(str(offer["words"]) == "Carry the temple's offering, 12 gold, down to the offering stone in the crypt and lay it there. Tell no one." and str(offer["kind"]) == Offers.COMMISSION, "its words: %s" % offer["words"])
 	var taken := Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
-	_check(bool(taken["ok"]) and given == [["p1", 12]] and pot[0] == 0 and str(taken["line"]) == "Jeff takes the temple's offering, 12 gold, to carry down to the altar.", "taken: the altar's gold into the purse: %s" % taken["line"])
+	_check(bool(taken["ok"]) and given == [["p1", 12]] and pot[0] == 0 and str(taken["line"]) == "Jeff takes the temple's offering, 12 gold, to carry down to the stone in the crypt.", "taken: the altar's gold into the purse: %s" % taken["line"])
 	var standing: Array = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")
 	_check(standing.size() == 1 and bool(standing[0].get("open", false)), "it stands as an open ask, not offered again: %s" % [standing.map(func(o: Dictionary) -> bool: return bool(o.get("open", false)))])
-	_check(str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff promised Aldous: to carry the temple's offering, 12 gold, down to the altar", "the promise on his card: %s" % Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"])
+	_check(str(Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"]) == "Jeff promised Aldous: to carry the temple's offering, 12 gold, down to the stone in the crypt", "the promise on his card: %s" % Townsfolk.card_of(_work, "o-aldous")["facts"].back()["text"])
 	_check(not Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and not Offers.crypt_done(TOWN, "p2", Offers.OFFERING, _ctx), "nothing met for another ask or another player")
-	_check(Offers.crypt_done(TOWN, "p1", Offers.OFFERING, _ctx) and downs == [12] and _done.size() == 1 and str(_done[0][2]) == "Jeff laid the offering at the altar, as promised to Aldous." and int(_done[0][3]) == 0,
+	_check(Offers.crypt_done(TOWN, "p1", Offers.OFFERING, _ctx) and downs == [12] and _done.size() == 1 and str(_done[0][2]) == "Jeff laid the offering on the stone below, as promised to Aldous." and int(_done[0][3]) == 0,
 		"laid at the altar: the gold goes down, the ask is met, no pay: %s" % [_done])
 	_check(Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1") == Standing.setting("offering") and Townsfolk.card_of(_work, "o-aldous").get("asks", []).is_empty(), "Aldous thinks the more of them: %d" % Standing.score(Townsfolk.card_of(_work, "o-aldous"), "p1"))
 	# The runner lost: the second commission; the pack found.

@@ -10242,7 +10242,7 @@ func reset_barrow(id: String) -> Array[String]:
 ## hidden way below is revealed to them for good (way_revealed; Jeff:
 ## "completion is a flag for each player").
 const QUEST_DONE := "barrow_quest"
-const QUEST_TITLE := "Clear the barrow"
+const QUEST_TITLE := "Clear the crypt"
 const QUEST_GIVER := "the fallen knight"
 
 
@@ -19943,7 +19943,7 @@ func _relic_returned(player: Player, body: Resident, uid: int) -> bool:
 	var held := World.totem_charges(World.totem_of(player.player_id))
 	var who := Offers.name_of(Offers.ctx, player.player_id)
 	Offers._regard(World.production, body.worker_id, player.player_id, Standing.setting("relic"), "brought home the remains of %s" % knight)
-	Townsfolk.learn(World.production, body.worker_id, "%s brought the remains of %s up from the barrow, and you laid them on the altar." % [who, knight])
+	Townsfolk.learn(World.production, body.worker_id, "%s brought the remains of %s up from the crypt, and you laid them on the altar." % [who, knight])
 	var thanks := "%s is home at last. Bless you." % knight
 	var charge := "The blessing is on your amulet: it holds %d now." % held
 	_say_plain(body, body.person, thanks + " " + charge)
@@ -20312,10 +20312,10 @@ func _runner_found(town: String, run: Dictionary, rule: Dictionary) -> void:
 	var name := str(World.production.worker(who).get("name", rule.get("name", "Pip")))
 	World.economy.altar_down(town, int(run.get("gold", 0)))
 	_runner_home(town, run)
-	Townsfolk.learn(World.production, who, "%s was lost below the barrow, saw the draugr bargain for gold, and lived." % name)
+	Townsfolk.learn(World.production, who, "%s was lost in the crypt, saw the draugr bargain for gold, and lived." % name)
 	var priest := _priest_of(town)
 	if not priest.is_empty():
-		Townsfolk.learn(World.production, priest, "%s came up from the barrow, found by %s, and would not say what he saw." % [name, _display_name(finder)])
+		Townsfolk.learn(World.production, priest, "%s came up from the crypt, found by %s, and would not say what he saw." % [name, _display_name(finder)])
 	party_log.add("%s finds %s in a niche in the wall, shaking; he makes his way up." % [_display_name(finder), name])
 	Net.broadcast_to([finder.owner_peer], "party", {"from": name, "text": "You find %s in a niche in the wall, shaking. He will not say what he saw, and makes his way up." % name})
 	MindLog.record({"kind": "runner", "companion": name, "mind": "resident", "say": "found by %s" % _display_name(finder), "outcome": "found"})

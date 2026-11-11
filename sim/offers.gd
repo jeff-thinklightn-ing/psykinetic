@@ -381,7 +381,7 @@ static func _relic_offers(worker_id: String, who: Dictionary, card: Dictionary, 
 			continue
 		var knight := str(relic.get("knight", "the knight"))
 		out.append(_offer(worker_id, RELIC, str(uid), "Give %s the remains of %s" % [_them(card), knight],
-			"%s's remains, brought up from the barrow, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC))
+			"%s's remains, brought up from the crypt, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC))
 	return out
 
 
@@ -495,7 +495,7 @@ static func _crypt_offers(worker_id: String, who: Dictionary, town: String, play
 	var gold := int(asks.get("offering", 0))
 	if gold > 0 and not has.call(OFFERING):
 		out.append(_offer(worker_id, COMMISSION, OFFERING + ":" + town, "Take the offering down",
-			"Carry the temple's offering, %d gold, down to the altar in the barrow and lay it there. Tell no one." % gold,
+			"Carry the temple's offering, %d gold, down to the offering stone in the crypt and lay it there. Tell no one." % gold,
 			{"sub": OFFERING, "gold": gold, "town": town}, TAKE))
 	var runner := str(asks.get("runner", ""))
 	if not runner.is_empty() and not has.call(RUNNER):
@@ -522,8 +522,8 @@ static func crypt_done(town: String, player_id: String, sub: String, given: Dict
 		if sub == OFFERING:
 			var gold := int(ask.get("what", {}).get("gold", 0))
 			_call(given, "altar_down", [town, gold])
-			_close(pair[0], ask, "%s carried the temple's offering down and laid it at the altar." % by,
-				"%s laid the offering at the altar, as promised to %s." % [by, name], "", 1, given, OFFERING, "carried the offering down")
+			_close(pair[0], ask, "%s carried the temple's offering down and laid it on the stone below." % by,
+				"%s laid the offering on the stone below, as promised to %s." % [by, name], "", 1, given, OFFERING, "carried the offering down")
 		else:
 			var runner := str(ask.get("what", {}).get("name", "Pip"))
 			_close(pair[0], ask, "%s found %s's pack in the robbers' camp under the mound: he fell to them on his way." % [by, runner],
@@ -1044,7 +1044,7 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 			Townsfolk.learn(production, worker_id, "%s promised %s: %s" % [player_name, name, _promise(ask)])
 			out["line"] = "%s takes %s's commission: %s." % [player_name, name, _promise(ask)]
 			if ask["sub"] == OFFERING:
-				out["line"] = "%s takes the temple's offering, %d gold, to carry down to the altar." % [player_name, int(ask["what"]["gold"])]
+				out["line"] = "%s takes the temple's offering, %d gold, to carry down to the stone in the crypt." % [player_name, int(ask["what"]["gold"])]
 			out["ok"] = true
 		LEND:
 			var owed := maxi(int(offer["what"].get("loan", 0)), 1)
@@ -1112,7 +1112,7 @@ static func _promise(ask: Dictionary) -> String:
 		"quarrel":
 			return "to lay the quarrel with %s before the lawspeaker" % what.get("name", "")
 		OFFERING:
-			return "to carry the temple's offering, %d gold, down to the altar" % int(what.get("gold", 0))
+			return "to carry the temple's offering, %d gold, down to the stone in the crypt" % int(what.get("gold", 0))
 		RUNNER:
 			return "to find what became of %s" % what.get("name", "Pip")
 	return str(ask.get("title", "")).to_lower()
