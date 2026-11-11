@@ -5186,6 +5186,7 @@ func _test_vendor() -> void:
 	_test_vendor_buttons(player, rolf, rule)
 	_test_keeper(player, rolf)
 	_test_keeper_buttons(player, rolf)
+	_test_keeper_locker_reach(player, rolf)
 	Net.message_received.disconnect(heard)
 	rule["towns"] = towns_was
 	_sync()
@@ -5226,6 +5227,40 @@ func _test_keeper_buttons(player: Player, rolf: Resident) -> void:
 	if locker != null and is_instance_valid(locker):
 		World.despawn(locker)
 	record.kit_given = false
+
+
+## 807 amended (6): the locker a keeper opens stands where the player can reach it, from every side of the stall
+## (playtest, v0.1.210: it stood on the player's own cell beside him, and the client shut it the frame it opened).
+## The check is the client's own: World.reaches(player, locker), what _update_pack asks each frame.
+func _test_keeper_locker_reach(player: Player, rolf: Resident) -> void:
+	print("
+== a keeper's locker stands where the player can reach it, from every side (807 amended (6)) ==")
+	var record: PlayerRecord = _main._records.get(player.player_id)
+	if record == null:
+		_check(false, "(a record for the player)")
+		return
+	if rolf.doing == Resident.Doing.HIDE:
+		rolf.doing = Resident.Doing.WORK
+	var sides := 0
+	var bad: Array[String] = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx == 0 and dy == 0:
+				continue
+			var beside := rolf.tile + Vector2i(dx, dy)
+			if not World.is_walkable(beside) or (World.get_entity_at(beside) != null and World.get_entity_at(beside) != player):
+				continue
+			_put(player, beside)
+			var locker: Locker = _main.keeper_locker(player, rolf)
+			sides += 1
+			var ok: bool = locker != null and locker.tile != player.tile and World.reaches(player, locker) and World.distance(locker.tile, rolf.tile) <= 1
+			print("  keeper locker: player at %s, keeper %s, locker %s, reaches %s" % [beside, rolf.tile, locker.tile if locker != null else null, World.reaches(player, locker) if locker != null else false])
+			if not ok:
+				bad.append("%s -> %s" % [beside, locker.tile if locker != null else null])
+	_check(sides >= 2 and bad.is_empty(), "the locker is off the player's cell and within their reach from every free side (%d sides; bad: %s)" % [sides, bad])
+	var kept: Locker = World.locker_of(player.player_id)
+	if kept != null and is_instance_valid(kept):
+		World.despawn(kept)
 
 
 ## Rolf, the keeper of all hours (807 amended (2)): his own greeting; a

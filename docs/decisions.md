@@ -44759,6 +44759,19 @@ straight after (807 amended (5), ui's side). resident_test _test_keeper. Protoco
 "53 (807 amended (5))" line under 53 records the field gone. No new class_name. Package: 807 amended (5),
 npc's side then ui's side, nothing switched off.
 
+807 amended (6): Rolf's locker stands where you can reach it (2026-11-10; playtest's blind run of v0.1.210, the
+coordinator: "Open locker at Rolf's closes the store ... and no locker ever shows beside the pack"; the label from
+decision_number.sh; voice's words). Since v0.1.206 (807 amended (2), fa65277f8) Main.keeper_locker stood the locker on
+`keeper.tile + (player.tile - keeper.tile).clampi(-1, 1)`: the cell beside him toward you, which is YOUR OWN cell when you
+stand beside him (the usual way: you click him and walk up). The client opened the row (_watch_locker), then _update_pack
+asked World.reaches(player, locker), which for a chest is can_melee(player.tile, locker.tile) and false for the same
+cell, and shut it the same frame. Now Main._locker_cell picks a free walkable cell next to him that is not the player's,
+that the player can melee-reach and that holds no one else (their own locker already there counts as free), the one toward
+them first, then the others nearest them; with none he says his new line (residents.json keeper "nowhere", voice's: "No
+room to set it down here. Give me a bit of space and ask again."), never silence. resident_test
+_test_keeper_locker_reach: the player on each free side of the stall, the locker not on their cell and reachable, the
+cells logged; it fails on main for the sides the old cell fell on. Server only; protocol unchanged, no new class_name.
+
 ## 799. The forest camps' traders
 
 The coordinator's approved design (2026-11-04), on maps' forest phase C (793, maps' side,

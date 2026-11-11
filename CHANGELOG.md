@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: ask Rolf to open your locker and he sets it down beside him, where you can reach it, and it stays open (807 amended (6)).
 - Umbrage's townsfolk talk about their own work first now: the taverner of the Mughouse's counter and its beds, the carpenter of what he builds and mends, the farmer of his year, the hunter, the tanner, the woodcutter, the merchant, the priest and the medicine man each of his own trade, then of the town itself; before, every one of them opened on the same handful of things. They can also tell you of the pond far west of town where the fish rise, and of the old farmstead standing abandoned in the wilds.
 - The old grey leaps when he lunges now: he sinks onto his haunches, head down and ears laid back, then leaps off his hind legs with his forelegs reaching and lands panting, where before he squashed flat and slid at you (780 amended (24)).
 - The big map names where each way out goes, "to the Foothills" or "to the Barrow", and a way to a place with no name shows just its mark (589 amended (2)).

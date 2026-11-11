@@ -22144,11 +22144,38 @@ func open_locker(player: Player, prop: Chest) -> Locker:
 func keeper_locker(player: Player, keeper: Resident) -> Locker:
 	if not Net.is_authority() or not _keeper_serves(player, keeper):
 		return null
-	var toward := keeper.tile + (player.tile - keeper.tile).clampi(-1, 1)
-	var locker := _open_locker_at(player, keeper.zone, toward)
+	var cell := _locker_cell(player, keeper)
+	if cell == NONE:
+		_keeper_says(keeper, "nowhere", player)  # No free cell beside him that they can reach: said, not silent (807 amended (6)).
+		return null
+	var locker := _open_locker_at(player, keeper.zone, cell)
 	if locker != null:
 		_keeper_says(keeper, "locker", player)
 	return locker
+
+
+## The cell for [param player]'s locker beside [param keeper] (807 amended (6); playtest, v0.1.210: "Open locker"
+## shut the store and nothing showed): a free walkable cell next to him that is not the player's own and that the
+## player can reach (World.can_melee, as the pack's open row asks each frame), the one toward them first, then the
+## others nearest them. It stood on `keeper.tile + the step toward the player`, which is the player's own cell when they
+## stand beside him, and the client shut the row the frame it opened. NONE for no such cell.
+func _locker_cell(player: Player, keeper: Resident) -> Vector2i:
+	var mine := World.locker_of(player.player_id)
+	var toward := keeper.tile + (player.tile - keeper.tile).clampi(-1, 1)
+	var around: Array[Vector2i] = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx != 0 or dy != 0:
+				around.append(keeper.tile + Vector2i(dx, dy))
+	around.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		if (a == toward) != (b == toward):
+			return a == toward
+		return World.distance(a, player.tile) < World.distance(b, player.tile))
+	for cell: Vector2i in around:
+		var there := World.get_entity_at(cell)
+		if cell != player.tile and World.is_walkable(cell) and (there == null or there == mine) and World.can_melee(player.tile, cell):
+			return cell
+	return NONE
 
 
 ## Whether [param keeper] serves [param player] now (807 amended (2)): the
