@@ -1569,6 +1569,17 @@ func _lines_apart(a: String, b: String) -> int:
 	return apart
 
 
+## Removes [param path] (an absolute folder) and all in it, if there.
+func _remove_folder(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	for sub in DirAccess.get_directories_at(path):
+		_remove_folder(path.path_join(sub))
+	for file in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path.path_join(file))
+	DirAccess.remove_absolute(path)
+
+
 ## [param text] (a level.json) without what 537's building codes add: each
 ## building's "code" line, the "building_codes" block, and the commas
 ## either brings before it.
@@ -1621,6 +1632,10 @@ func _test_json_keep() -> void:
 	# a save makes of itself (537: each building's code written in) the only lines added.
 	var kept_overlay := Level.overlay_dir
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("builder_test_keep/")
+	# A save left here by the last run is an overlay MapDoc would load in
+	# place of the repo's file, so a change to a level.json since then read as
+	# the save's own: start from none.
+	_remove_folder(ProjectSettings.globalize_path(Level.overlay_dir))
 	for level_name: String in ["wilds", "barrow_deep", "test_room"]:
 		var doc := MapDoc.from_level(level_name)
 		var repo := FileAccess.get_file_as_string(Level.DIR + level_name + "/level.json")
