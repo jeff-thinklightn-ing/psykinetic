@@ -13031,6 +13031,26 @@ nor 0.06 m into it (measured -0.034 to -0.012), the left hand at most 0.102 m of
 "shieldcut" takes --weapon=X (that weapon alone). Reels C:/dev/review/sledge_after_side and
 sledge_before_side. CHANGELOG (voice's words). Package none (a mend of what is in). Client and art only,
 protocol unchanged, no new class_name.
+451 amended (4), pc-character's side (the coordinator's ruling and its light rule, 2026-11-10; its word
+that every lantern the boxes drew is swapped): Client3D._hanging_lantern draws gear.lantern in place of
+its two code boxes, wherever they hung: at every player's and companion's belt_r, on a walker carrying
+one at night (782), under a store's own post (782) and a door lamp's stand-in where prop.door_lamp is
+missing. It hangs in the room the boxes filled: at the belt its ring's top LANTERN_RING (3.5 cm) under
+belt_r and down LANTERN_TALL (13 cm), turned with belt_r's flipped frame so it stands upright; a hung one
+upright with its ring's top LANTERN_RING + LANTERN_TALL over its anchor, as the boxes stood. The panes
+(the slot's material "pane") glow by the coordinator's rule, pane_energy: lit (the body's "Lantern" light
+shown: L uncovers a player's, a companion's is always lit, a dead body's is dropped) times the light's
+energy over LANTERN_ENERGY (_size_lantern's 1.2; a damp level's dimmer) times PANE_BRIGHT, times the
+place's dark the way the aura's motes read it (789 amended): full under a roof, and in the open falling
+through dusk with day_share (DayNight.light from DayNight.NIGHT to full day, now one function the motes
+use too), to PANE_FLOOR (a fifth) of bright by day, so a lit lantern still shows its light at noon and
+never goes white. Covered, the panes are the art's own dull horn. Each player's and companion's lantern
+has its own copy of the pane (_own_pane); the town's, always lit, share one (_town_pane), shaded once a
+frame (_shade_town_panes). The light itself still sits over the head (451). LANTERN_BY_BAG (819 amended
+(2)) moves the same LanternBody, so the satchel's move is unchanged. view_test _test_hip_lantern (the slot
+at the belt, hung and upright in belt_r's frame, the rule's cases, covered and lit in the rig, the
+companion's own pane, the town's shared one where the boxes stood). Stills C:/dev/review/pc-character/lantern/.
+CHANGELOG bullet in voice's words. Client only, protocol unchanged, no new class_name.
 
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 

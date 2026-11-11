@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
 - In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
 - The Ossuary's dead lie in three rooms, well apart (870).
 - At the robbers' camp, a Robbers' bundle beside the two bedrolls holds two bandaging kits (870).

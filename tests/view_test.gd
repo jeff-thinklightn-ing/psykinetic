@@ -80,6 +80,7 @@ func _ready() -> void:
 		_test_idle_voices()
 		await _test_monster_death()
 		_test_aura()
+		_test_hip_lantern()
 		await _test_forge()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1616,6 +1617,90 @@ func _death_after_despawn() -> void:
 ## A charm's aura (789): a cool, steady light over its wearer after
 ## sunset, the followed player's own always among the real lights; none
 ## with no aura.
+## The lantern hung (451 amended (4), pc-character's side): art-kit's gear.lantern at the belt where
+## the boxes were, its panes lit as the coordinator's rule says, each body its own; the town's share one.
+func _test_hip_lantern() -> void:
+	print("
+== the hip lantern: art-kit's gear.lantern under belt_r, its panes lit by the light and the dark ==")
+	var player := _player()
+	var pet := _companion()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var belt := (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r") as Node3D
+	var lamp := belt.get_node_or_null("LanternBody") as Node3D if belt != null else null
+	var art := lamp.get_node_or_null("Art") as Node3D if lamp != null else null
+	_check(art != null and str(art.get_meta(&"slot", "")) == Client3D.LANTERN_SLOT and lamp.find_children("*", "MeshInstance3D", true, false).size() == 1,
+			"art-kit's gear.lantern hangs at the belt, no code boxes (%s)" % [art])
+	if art == null:
+		return
+	# Hung by its ring in belt_r's frame (its +y the body's down, 451): the ring's top under the socket,
+	# the rest below it, where the boxes were; upright, its cap toward the belt.
+	var mesh := lamp.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D
+	var box := (belt.global_transform.affine_inverse() * mesh.global_transform) * mesh.get_aabb()
+	_check(absf(box.position.y - Client3D.LANTERN_RING) < 0.004 and absf(box.end.y - Client3D.LANTERN_RING - Client3D.LANTERN_TALL) < 0.004,
+			"hung by its ring %.3f under the belt, down to %.3f (the boxes' room, belt_r's frame)" % [box.position.y, box.end.y])
+	var up := (belt.global_basis.inverse() * art.global_basis).y.normalized()
+	_check(up.dot(Vector3.DOWN) > 0.99 and puppet.global_basis.y.normalized().dot(art.global_basis.y.normalized()) > 0.9,
+			"upright, its cap up whatever belt_r's turn (%.2f)" % up.dot(Vector3.DOWN))
+	# The rule: lit x dark x the light's energy, a floor while lit, covered dull.
+	var bright := Client3D.PANE_BRIGHT
+	_check(Client3D.pane_energy(0.0, 0.0, true) == 0.0 and Client3D.pane_energy(0.0, 0.0, false) == 0.0, "covered: no glow, night or a hall")
+	_check(is_equal_approx(Client3D.pane_energy(Client3D.LANTERN_ENERGY, 0.0, true), bright)
+			and is_equal_approx(Client3D.pane_energy(Client3D.LANTERN_ENERGY, 1.0, false), bright),
+			"lit at night, or under a roof by day: bright (%.2f)" % bright)
+	var noon := Client3D.pane_energy(Client3D.LANTERN_ENERGY, 1.0, true)
+	var dusk := Client3D.pane_energy(Client3D.LANTERN_ENERGY, 0.5, true)
+	_check(is_equal_approx(noon, bright * Client3D.PANE_FLOOR) and dusk > noon and dusk < bright,
+			"by day in the open the floor, %.2f (a fifth); through dusk between (%.2f)" % [noon, dusk])
+	_check(Client3D.pane_energy(Client3D.LANTERN_ENERGY * Client3D.DAMP_LANTERN, 0.0, true) < bright, "a damp level's dimmer light, dimmer panes")
+	_check(is_equal_approx(Client3D.day_share(DayNight.NIGHT), 0.0) and is_equal_approx(Client3D.day_share(1.0), 1.0), "the dark the aura's motes read (day_share)")
+	# In the rig: covered and lit, its own pane; Wren's another.
+	var light := puppet.get_node_or_null("Lantern") as OmniLight3D
+	var was_day := DayNight.light
+	var was_out := _rig._outdoor
+	var was_lit := player.emit_light
+	DayNight.light = DayNight.NIGHT
+	_rig._outdoor = true
+	player.emit_light = 0.0
+	light.visible = false
+	_rig._glow_lantern(puppet)
+	var pane := mesh.get_surface_override_material(Client3D._lantern_pane(lamp)[1]) as StandardMaterial3D
+	var dull: Array = pane.get_meta(&"dull") if pane != null else [Color.BLACK, 0.0]
+	_check(pane != null and pane.emission == dull[0] and is_equal_approx(pane.emission_energy_multiplier, dull[1]),
+			"covered (L) at night: the art's own dull horn")
+	light.visible = true
+	_rig._glow_lantern(puppet)
+	_check(pane != null and pane.emission == Client3D.PANE_GLOW and is_equal_approx(pane.emission_energy_multiplier, Client3D.pane_energy(light.light_energy, 0.0, true)),
+			"lit at night: the panes glow at %.2f" % (pane.emission_energy_multiplier if pane != null else 0.0))
+	DayNight.light = 1.0
+	_rig._glow_lantern(puppet)
+	_check(pane != null and is_equal_approx(pane.emission_energy_multiplier, Client3D.pane_energy(light.light_energy, 1.0, true)), "lit by day: the floor, still lit")
+	if pet != null:
+		var hers: Node3D = _rig._puppets[pet.get_instance_id()]
+		_rig._glow_lantern(hers)
+		var her_belt := (hers.get_meta("sockets", {}) as Dictionary).get("belt_r") as Node3D
+		var her_lamp := her_belt.get_node_or_null("LanternBody") as Node3D if her_belt != null else null
+		var her_pane := Client3D._own_pane(her_lamp) if her_lamp != null else null
+		_check(her_pane != null and her_pane != pane and her_pane.emission == Client3D.PANE_GLOW, "Wren's lantern lit, her own pane")
+	DayNight.light = was_day
+	_rig._outdoor = was_out
+	player.emit_light = was_lit
+	light.visible = was_lit > 0.0
+	# The town's: hung upright over their anchor where the boxes were, one pane shared and lit.
+	var a := Client3D._hanging_lantern()
+	var b := Client3D._hanging_lantern()
+	var a_pane := Client3D._lantern_pane(a)
+	var b_pane := Client3D._lantern_pane(b)
+	var a_mesh := a_pane[0] as MeshInstance3D
+	var a_box: AABB = (a.get_node("Art") as Node3D).transform * a_mesh.get_aabb()
+	_check(a_mesh.get_surface_override_material(a_pane[1]) == Client3D._town_pane and (b_pane[0] as MeshInstance3D).get_surface_override_material(b_pane[1]) == Client3D._town_pane,
+			"the town's lanterns share one lit pane")
+	_check(absf(a_box.end.y - (Client3D.LANTERN_RING + Client3D.LANTERN_TALL)) < 0.004 and absf(a_box.position.y - Client3D.LANTERN_RING) < 0.004,
+			"a hung one upright where the boxes stood (%.3f .. %.3f)" % [a_box.position.y, a_box.end.y])
+	a.free()
+	b.free()
+
+
 func _test_aura() -> void:
 	print("\n== a charm's aura: a cool light round the wearer at night, always the player's own ==")
 	var player := _player()

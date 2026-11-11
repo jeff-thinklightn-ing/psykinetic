@@ -824,6 +824,21 @@ const DAMP_COLD := Color(0.42, 0.5, 0.58)
 const DAMP_FOG := Color(0.025, 0.03, 0.04)
 const DAMP_FOG_DENSITY := 0.02
 const DAMP_LANTERN := 0.75
+## A carried lantern's light energy on a dry level (_size_lantern).
+const LANTERN_ENERGY := 1.2
+## The lantern hung (451 amended (4), pc-character's side): art-kit's gear.lantern in the room the
+## two code boxes filled, its ring's top LANTERN_RING under its socket (belt_r's, its frame turned)
+## or LANTERN_RING + LANTERN_TALL over a hung one's anchor (a post's arm, a hand's CARRIED_HANG).
+const LANTERN_SLOT := "gear.lantern"
+const LANTERN_RING := 0.035
+const LANTERN_TALL := 0.13
+## Its panes (the slot's material PANE_NAME) glow PANE_GLOW: lit, at PANE_BRIGHT in the dark at
+## LANTERN_ENERGY, down to PANE_FLOOR of that by day in the open (the coordinator's rule, pane_energy);
+## unlit (covered), the art's own dull horn.
+const PANE_NAME := "pane"
+const PANE_GLOW := Color(1.0, 0.55, 0.2)
+const PANE_BRIGHT := 2.0
+const PANE_FLOOR := 0.2
 ## A light casts shadows only while its reach overlaps the ground the camera
 ## shows, give or take this (cells); checked when the view moves a cell or
 ## changes size, and every SHADOW_RECHECK seconds for lights that move.
@@ -3469,6 +3484,7 @@ func _process(delta: float) -> void:
 	_update_mourning(delta)
 	_flicker_fires(delta)
 	_light_carriers(delta)
+	_shade_town_panes()
 	_light_wall_lamps(delta)
 	_light_houses(delta)
 	_light_skylights(delta)
@@ -3638,7 +3654,7 @@ func _apply_sky() -> void:
 func _size_lantern(light: OmniLight3D) -> void:
 	var damp := bool(_terrain.get("damp", false))
 	light.omni_range = PLAYER_LIGHT_RANGE * Fields.carried_reach(damp) / float(Fields.CARRIED_REACH)
-	light.light_energy = 1.2 * (DAMP_LANTERN if damp else 1.0)
+	light.light_energy = LANTERN_ENERGY * (DAMP_LANTERN if damp else 1.0)
 
 
 ## The cells' brightness for the soft scatter (580, terrain's side): an L8
@@ -19158,8 +19174,14 @@ func _sync_aura_motes(entity: GridEntity, puppet: Node3D) -> void:
 	if not motes.visible:
 		motes.visible = true
 		motes.emitting = true
-	var day := clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0)
-	_aura_mote_material.albedo_color = Color(AURA_COLOUR * aura_mote_glow(day, _outdoor), 1.0)
+	_aura_mote_material.albedo_color = Color(AURA_COLOUR * aura_mote_glow(day_share(DayNight.light), _outdoor), 1.0)
+
+
+## How far into the day the open is (789 amended; the motes', and the lanterns' panes', 451 amended
+## (4)): 0 at night (DayNight.NIGHT and under) .. 1 in full day, through dusk and dawn as
+## DayNight.light ([param light]) goes.
+static func day_share(light: float) -> float:
+	return clampf(inverse_lerp(DayNight.NIGHT, 1.0, light), 0.0, 1.0)
 
 
 ## The specks round a wearer (789 amended), as a skylight's motes are made
@@ -20427,10 +20449,11 @@ func _sync_puppets() -> void:
 			if entity is Companion:
 				puppet.set_meta("guide_wait", (entity as Companion).guide_wait)
 		_sync_bow(entity, puppet)
-		if entity is Player:
+		if entity is Player or entity is Companion:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
-			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
+			if entity is Player and lantern != null and lantern.visible != (entity.emit_light > 0.0):
 				lantern.visible = entity.emit_light > 0.0  # Covered (L).
+			_glow_lantern(puppet)
 		elif entity is Monster:
 			_sync_named(entity as Monster, puppet)
 			_sync_alert(entity as Monster, puppet)
@@ -22152,34 +22175,111 @@ func _sync_worn(entity: GridEntity, puppet: Node3D) -> void:
 	look.wear(model, id)
 
 
-## A carried lantern as it hangs at the belt: a small dark frame round a
-## warm glow, below the socket.
-static var _lantern_parts: Array = []
-static func _hanging_lantern() -> Node3D:
-	if _lantern_parts.is_empty():
-		var frame := BoxMesh.new()
-		frame.size = Vector3(0.09, 0.13, 0.09)
-		var iron := StandardMaterial3D.new()
-		iron.albedo_color = Color(0.16, 0.14, 0.12)
-		iron.roughness = 0.8
-		var glow := BoxMesh.new()
-		glow.size = Vector3(0.1, 0.08, 0.1)
-		var flame := StandardMaterial3D.new()
-		flame.albedo_color = PLAYER_LIGHT
-		flame.emission_enabled = true
-		flame.emission = PLAYER_LIGHT
-		flame.emission_energy_multiplier = 1.5
-		_lantern_parts = [frame, iron, glow, flame]
+## A lantern as it hangs (451; art-kit's gear.lantern since 451 amended (4)), a "LanternBody" whose
+## "Art" hangs by its ring: [param at_belt], under belt_r (its frame turned over, so the lantern is
+## turned with it), its ring's top LANTERN_RING under the socket; else upright, the ring's top
+## LANTERN_RING + LANTERN_TALL over the node (a post's lantern, a walker's), where the boxes stood.
+## Hung ones (the town's: a store's post, a walker's, a door's stand-in) are always lit and share
+## one pane, _town_pane, shaded by _shade_town_panes; a belt's gets its own (_own_pane).
+static var _town_pane: StandardMaterial3D = null
+static func _hanging_lantern(at_belt := false) -> Node3D:
 	var lantern := Node3D.new()
 	lantern.name = "LanternBody"
-	for i in 2:
-		var piece := MeshInstance3D.new()
-		piece.mesh = _lantern_parts[i * 2]
-		piece.material_override = _lantern_parts[i * 2 + 1]
-		piece.position = Vector3(0.0, 0.1, 0.0)
-		piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if i == 1 else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		lantern.add_child(piece)
+	var art := ArtKit.instance(LANTERN_SLOT)
+	art.name = "Art"
+	if at_belt:
+		art.transform = Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(0.0, LANTERN_RING, 0.0))
+	else:
+		art.position = Vector3(0.0, LANTERN_RING + LANTERN_TALL, 0.0)
+	lantern.add_child(art)
+	if not at_belt:
+		var pane := _lantern_pane(lantern)
+		if not pane.is_empty():
+			if _town_pane == null:
+				_town_pane = _pane_copy(pane)
+				shade_pane(_town_pane, pane_energy(LANTERN_ENERGY, 0.0, false))
+			(pane[0] as MeshInstance3D).set_surface_override_material(pane[1], _town_pane)
 	return lantern
+
+
+## [param lantern]'s panes: [its MeshInstance3D, the surface drawn in PANE_NAME], or [] (art
+## without one: a grey box).
+static func _lantern_pane(lantern: Node3D) -> Array:
+	for mesh: MeshInstance3D in lantern.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh == null:
+			continue
+		for i in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(i)
+			if own != null and own.resource_name == PANE_NAME:
+				return [mesh, i]
+	return []
+
+
+## A copy of the art's pane material to shade, its own dull horn kept in metas.
+static func _pane_copy(pane: Array) -> StandardMaterial3D:
+	var copy := ((pane[0] as MeshInstance3D).mesh.surface_get_material(pane[1]) as StandardMaterial3D).duplicate() as StandardMaterial3D
+	copy.set_meta(&"dull", [copy.emission, copy.emission_energy_multiplier])
+	return copy
+
+
+## A belt lantern's own pane (each body its own, 451 amended (4)), made on first asking.
+static func _own_pane(lantern: Node3D) -> StandardMaterial3D:
+	var pane := _lantern_pane(lantern)
+	if pane.is_empty():
+		return null
+	var mesh := pane[0] as MeshInstance3D
+	var own := mesh.get_surface_override_material(pane[1]) as StandardMaterial3D
+	if own == null:
+		own = _pane_copy(pane)
+		mesh.set_surface_override_material(pane[1], own)
+	return own
+
+
+## How bright a lantern's panes glow (the coordinator's rule, 451 amended (4)): its light's
+## [param energy] (0: unlit, covered) over LANTERN_ENERGY, times PANE_BRIGHT, times the place's dark
+## (the aura's: under a roof, [param outdoor] false, full; in the open, as the night comes, through
+## [param day], day_share's), never under PANE_FLOOR of it while lit so a lit one shows by day; 0
+## unlit (the art's dull horn).
+static func pane_energy(energy: float, day: float, outdoor: bool) -> float:
+	if energy <= 0.0:
+		return 0.0
+	var dark := 1.0 - clampf(day, 0.0, 1.0) if outdoor else 1.0
+	return PANE_BRIGHT * energy / LANTERN_ENERGY * lerpf(PANE_FLOOR, 1.0, dark)
+
+
+## Sets [param pane] glowing at [param energy] (pane_energy's), or back to its dull horn at 0.
+static func shade_pane(pane: StandardMaterial3D, energy: float) -> void:
+	if is_equal_approx(float(pane.get_meta(&"glow", -1.0)), energy):
+		return
+	pane.set_meta(&"glow", energy)
+	if energy <= 0.0:
+		var dull: Array = pane.get_meta(&"dull")
+		pane.emission = dull[0]
+		pane.emission_energy_multiplier = dull[1]
+	else:
+		pane.emission = PANE_GLOW
+		pane.emission_energy_multiplier = energy
+
+
+## A player's or companion's belt lantern lit as its light is (451 amended (4)): the "Lantern"
+## light shown and at its energy (L covers a player's; a dropped one, a dead body's, is gone).
+func _glow_lantern(puppet: Node3D) -> void:
+	var belt := (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r") as Node3D
+	var lamp := belt.get_node_or_null("LanternBody") as Node3D if belt != null else null
+	if lamp == null:
+		return
+	var pane := _own_pane(lamp)
+	if pane == null:
+		return
+	var light := puppet.get_node_or_null("Lantern") as OmniLight3D
+	var energy := light.light_energy if light != null and light.visible else 0.0
+	shade_pane(pane, pane_energy(energy, day_share(DayNight.light), _outdoor))
+
+
+## The town's lanterns' shared pane, always lit, shaded by the place's dark (451 amended (4)).
+func _shade_town_panes() -> void:
+	if _town_pane != null:
+		shade_pane(_town_pane, pane_energy(LANTERN_ENERGY, day_share(DayNight.light), _outdoor))
 
 
 ## The arrows' kinds as their nocked arrow's and their quiver's variants
@@ -25392,7 +25492,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# The lantern itself hangs at the belt (decision 451), the light above.
 		var belt: Node3D = (puppet.get_meta("sockets", {}) as Dictionary).get("belt_r")
 		if belt != null:
-			belt.add_child(_hanging_lantern())
+			belt.add_child(_hanging_lantern(true))
 	add_child(puppet)
 	return puppet
 
