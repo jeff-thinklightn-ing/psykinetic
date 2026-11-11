@@ -1776,6 +1776,36 @@
 			"volume_db": -14.0,
 			"uses": "gold: a small coin drop (804; ui's Gains)"
 		},
+		"ui.trade_buy": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -10.0,
+			"fallback": "ui.reward_coin",
+			"cut": "trade",
+			"uses": "a buy at the store window: coins counted out onto a wooden counter (395 amended (1); ui's Store tab, its foot line's Bought)"
+		},
+		"ui.trade_sell": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -10.0,
+			"fallback": "ui.reward_coin",
+			"cut": "trade",
+			"uses": "a sale at the store window, or a hand-back that returns gold: coins dropped into a purse (395 amended (1); ui's Store tab, Sold)"
+		},
+		"ui.trade_give": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"fallback": "ui.reward_item",
+			"cut": "trade",
+			"uses": "goods left for the town or handed back with no gold, and the locker's moves (6 dB softer): a thing set down on a wooden shelf (395 amended (1); ui's Store, Donate and Locker tabs)"
+		},
 		"ui.reward_catch": {
 			"category": "ui",
 			"type": "oneshot",

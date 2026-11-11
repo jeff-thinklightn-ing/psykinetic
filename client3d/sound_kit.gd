@@ -109,6 +109,13 @@ static func positional(slot: String) -> bool:
 	return bool(spec(slot).get("positional", true))
 
 
+## The cut group [param slot] plays in ("" none; 395 amended (1)): played flat,
+## it fades the group's last sound still playing (Sfx.CUT_SECONDS), so cues
+## clicked fast (the store's buys) are one each, never stacked louder.
+static func cut(slot: String) -> String:
+	return str(spec(slot).get("cut", ""))
+
+
 ## The noise [param slot] names (a key of NOISES), or "" when monsters do
 ## not hear it.
 static func noise(slot: String) -> String:

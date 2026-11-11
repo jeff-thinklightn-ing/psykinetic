@@ -861,7 +861,47 @@ func _test_ui_sounds() -> void:
 	_check(forge_cues.is_empty() and str(SoundKit.spec("sfx.bellows_wheeze").get("fallback", "")) == "sfx.plate_click"
 			and str(SoundKit.spec("sfx.lever_clank").get("fallback", "")) == "sfx.plate_click" and SoundKit.reach("sfx.forge_whoomph") > SoundKit.reach("sfx.lever_clank"),
 			"the forge's bellows, lever, catching and roar placed, unheard by monsters, three takes each; the pieces a plate's click without (%s)" % [forge_cues])
-	for node: Node in [button, slider, panel, ui, sfx]:
+	# 395 amended (1): the store's trades heard (ui's Store tab plays them from its
+	# foot line): each on the UI bus, flat, under ui.notify, in the "trade" cut
+	# group, falling back to the coin or the bag so none is silent, two takes or more.
+	var trades := {"buy": "ui.reward_coin", "sell": "ui.reward_coin", "give": "ui.reward_item"}
+	var trade_off: Array[String] = []
+	for kind: String in trades:
+		var slot := "ui.trade_" + kind
+		if SoundKit.bus(slot) != "ui" or SoundKit.positional(slot) or SoundKit.volume_db(slot) >= SoundKit.volume_db("ui.notify") \
+				or SoundKit.cut(slot) != "trade" or str(SoundKit.spec(slot).get("fallback", "")) != trades[kind] \
+				or SoundKit.played_from(slot, false) != slot or SoundKit.takes(slot).size() < 2:
+			trade_off.append(slot)
+	_check(trade_off.is_empty() and SoundKit.cut("ui.click") == "" and SoundKit.cut("ui.reward_coin") == "",
+			"each trade cue on the UI bus, flat, under ui.notify, cut as one group, else the coin's or the bag's; a click never cut (%s)" % [trade_off])
+	# Five buys clicked at once: one heard, the four before it faded and freed;
+	# a click among them is no trade and plays on.
+	var cut_sfx := Sfx.new()
+	add_child(cut_sfx)
+	for i in 3:
+		cut_sfx.play_flat("ui.trade_buy")
+	cut_sfx.play_flat("ui.click")
+	cut_sfx.play_flat("ui.trade_sell")
+	cut_sfx.play_flat("ui.trade_give", 1.0, -6.0)
+	var by_slot := func(slot: String) -> Array:
+		return cut_sfx.get_children().filter(func(node: Node) -> bool: return node is AudioStreamPlayer and str(node.get_meta("slot", "")) == slot)
+	var trading := func() -> Array:
+		return cut_sfx.get_children().filter(func(node: Node) -> bool: return node is AudioStreamPlayer and str(node.get_meta("slot", "")).begins_with("ui.trade_"))
+	var fading: Array = trading.call().filter(func(node: Node) -> bool: return node.has_meta(&"cut"))
+	var left: Array = trading.call().filter(func(node: Node) -> bool: return not node.has_meta(&"cut"))
+	_check(trading.call().size() == 5 and fading.size() == 4 and left.size() == 1 and str(left[0].get_meta("slot")) == "ui.trade_give",
+			"five trade cues at once: the last plays, the four before it fade (%d fading, %d left)" % [fading.size(), left.size()])
+	_check((by_slot.call("ui.click") as Array).size() == 1 and not (by_slot.call("ui.click")[0] as Node).has_meta(&"cut"), "a click among them plays on")
+	# Frames, not a timer: a frame that loaded the takes is long, and a timer
+	# fires before that frame's tweens step.
+	var faded_at := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - faded_at < 1000 and trading.call().any(func(node: Node) -> bool: return node.has_meta(&"cut")):
+		await get_tree().process_frame
+	_check(trading.call().size() <= 1 and trading.call().all(func(node: Node) -> bool: return not node.has_meta(&"cut")),
+			"the faded ones are gone soon after (%d left, %d ms)" % [trading.call().size(), Time.get_ticks_msec() - faded_at])
+	cut_sfx.play_flat("ui.trade_buy")
+	_check(trading.call().filter(func(node: Node) -> bool: return not node.has_meta(&"cut")).size() == 1, "one trade cue after another, never two at full")
+	for node: Node in [button, slider, panel, ui, sfx, cut_sfx]:
 		node.queue_free()
 	await get_tree().process_frame
 

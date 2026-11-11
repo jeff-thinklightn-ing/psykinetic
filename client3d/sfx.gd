@@ -70,6 +70,10 @@ var played: Array[Array] = []
 var unheard: Array[String] = []
 ## dB the DUCKED buses sit below their volumes (0 or less; set_duck).
 static var duck_db := 0.0
+## Cut group (SoundKit.cut) -> its last flat player (395 amended (1)).
+var _cut_last := {}
+## How fast a cut group's last sound fades under the next (s).
+const CUT_SECONDS := 0.04
 
 
 func _ready() -> void:
@@ -277,10 +281,27 @@ func play_flat(slot: String, pitch := 1.0, volume_db := 0.0) -> void:
 	player.pitch_scale = pitch * randf_range(1.0 - PITCH_JITTER, 1.0 + PITCH_JITTER)
 	_mark(player, slot, pitch)
 	player.volume_db = _volume(slot, volume_db)
+	_cut(SoundKit.cut(slot), player)
 	add_child(player)
 	player.finished.connect(player.queue_free)
 	player.play()
 	played.append([slot, stream.resource_path, player.bus])
+
+
+## [param player] the last of cut group [param group]: the one before it,
+## still playing, fades out over CUT_SECONDS and is freed (its tween is its
+## own, so one that ends first takes the tween with it).
+func _cut(group: String, player: AudioStreamPlayer) -> void:
+	if group.is_empty():
+		return
+	var was: Variant = _cut_last.get(group)  # Untyped: it may have been freed.
+	if is_instance_valid(was) and (was as AudioStreamPlayer).playing and not (was as Node).has_meta(&"cut"):
+		var last := was as AudioStreamPlayer
+		last.set_meta(&"cut", true)
+		var fade := last.create_tween()
+		fade.tween_property(last, "volume_db", -60.0, CUT_SECONDS)
+		fade.tween_callback(last.queue_free)
+	_cut_last[group] = player
 
 
 static func _bus_of(slot: String) -> String:

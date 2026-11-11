@@ -4154,6 +4154,84 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"ui.trade_buy": [
+			{
+				"file": "ui.trade_buy.ogg",
+				"from": "freesound",
+				"original": "freesound 561359: Coin Payment (from 0.33 s for 0.6 s)",
+				"sha256": "3174ccdf1442e905e453d10c8d60404525b2c90477c178013cc2a56be6697557",
+				"by": "moogleoftheages",
+				"url": "https://freesound.org/people/moogleoftheages/sounds/561359/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.trade_buy.2.ogg",
+				"from": "freesound",
+				"original": "freesound 561359: Coin Payment (from 1.55 s for 0.6 s)",
+				"sha256": "28e234e40a199849d95dac3416758d5ddc39c34aae4bdf62bc15fe7e84e6d286",
+				"by": "moogleoftheages",
+				"url": "https://freesound.org/people/moogleoftheages/sounds/561359/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.trade_buy.3.ogg",
+				"from": "freesound",
+				"original": "freesound 187144: coins from hand to table.wav (from 3.4 s for 0.6 s)",
+				"sha256": "852e07569f53e84ace3077421186da5c3485036ba5d23b5f716fb0b77c90f1ce",
+				"by": "jankisjes",
+				"url": "https://freesound.org/people/jankisjes/sounds/187144/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.trade_give": [
+			{
+				"file": "ui.trade_give.ogg",
+				"from": "freesound",
+				"original": "freesound 323725: thunk.wav (from 0 s for 0.39 s)",
+				"sha256": "6935f174c87c039a55178324d3e1b8b9c2dd0e03366b3300abb099985d4d0754",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/323725/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.trade_give.2.ogg",
+				"from": "freesound",
+				"original": "freesound 188431: Epic Object Placing.flac (from 0 s for 0.6 s)",
+				"sha256": "8839c45e8f3ce86fd25a2819e3f075a10e6c0b77449710a294112958dc5648e7",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/188431/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.trade_give.3.ogg",
+				"from": "freesound",
+				"original": "freesound 525170: Wood Impact 7 {Soft} (from 0 s for 0.6 s)",
+				"sha256": "35160b285b61fe76b9cae03bf5cd1cd8d3288342b8d125c6ff72b5bd0f2ee0e2",
+				"by": "Sophia_C",
+				"url": "https://freesound.org/people/Sophia_C/sounds/525170/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"ui.trade_sell": [
+			{
+				"file": "ui.trade_sell.ogg",
+				"from": "freesound",
+				"original": "freesound 485773: Heavy Money Bag - 2 (from 0.4 s for 0.8 s)",
+				"sha256": "594896beb9c353c721242918f7a7f2ce4a69fe83539ce42b2fa3e6f4c29d3a5d",
+				"by": "SpaceJoe",
+				"url": "https://freesound.org/people/SpaceJoe/sounds/485773/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.trade_sell.2.ogg",
+				"from": "freesound",
+				"original": "freesound 485774: Heavy Money Bag - 3 (from 0.25 s for 0.7 s)",
+				"sha256": "0de8524b0f7ff810641f3534cddc17ffa843505792bb3922b8940c8409a7a649",
+				"by": "SpaceJoe",
+				"url": "https://freesound.org/people/SpaceJoe/sounds/485774/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.death_female": [
 			{
 				"file": "voice.death_female.ogg",

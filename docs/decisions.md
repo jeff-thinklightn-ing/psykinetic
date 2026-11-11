@@ -9803,6 +9803,31 @@ sound_kit_test's `_test_ui_sounds` checks a button made after the hook, the hove
 slider, a watched panel, the UI bus, and the quiet start. The clip scenario is `sound_ui`.
 Client only; no protocol change.
 
+395 amended (1) (2026-11-10, decision_number.sh's label; the coordinator's approval, on its
+Umbrage focus; package Umbrage's store, on, heard once ui's Store tab plays it): the store's
+trades heard. A trade made no sound but the button's click. ui's Store tab, redone so one click
+is one buy or one sale with a foot line saying what happened, plays a cue as that line is
+written: "Bought ..." ui.trade_buy (coins counted out onto a wooden counter), "Sold ..." and a
+hand-back that returns gold ui.trade_sell (coins dropped into a purse), "Left ... on the
+shelves" and a hand-back with no gold ui.trade_give (goods set down on a wooden shelf), the
+locker's moves ui.trade_give 6 dB softer; a refusal stays ui.error. The cues are ui's to call
+(UiSounds.play), not inferred here from the purse. Each is a ui slot, flat, on the UI bus,
+falling back to the cue gold or goods already had (ui.reward_coin, ui.reward_item), so none is
+silent in a tree without the takes. A player may click five things in two seconds: each is
+heard, never stacked louder. A slot may name a cut group (slots.json "cut", SoundKit.cut);
+Sfx.play_flat fades the group's last sound still playing over CUT_SECONDS (0.04 s, on a tween
+of that player's own, so one that ends first takes the tween with it) and frees it. The three
+trade cues are the "trade" group; no other slot has one. Measured at their volumes (each take's
+loudest 100 ms, both channels): buy -33, sell -33.5, give -32 dB, each slot's takes within
+0.3 dB of each other, over the coin cue's loudest (-35) and well under a click (-21). They are
+apart in brightness (spectral centroid: the counted coins 2.4 to 4.2 kHz, the purse 1.2 to
+1.5 kHz, the set-down 0.2 to 0.55 kHz) and length (0.26 to 0.71 s). 8 Freesound takes (CC0:
+moogleoftheages 561359, jankisjes 187144, SpaceJoe 485773 and 485774, Reitanna 323725,
+qubodup 188431; CC BY 4.0: Sophia_C 525170, page live); THIRD_PARTY regenerated.
+sound_kit_test (each trade cue's shape and fallback; five at once, one heard and four faded,
+then freed; a click among them not cut). No bullet: ui's Store tab carries the package's.
+Client only; protocol unchanged, no new class_name.
+
 ## 402. door.single's opening 0.8 x 2.4 m, its own plank door
 
 Jeff on v0.1.149: "walking and scale seems good, but now the doors are way
