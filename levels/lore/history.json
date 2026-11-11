@@ -82,7 +82,7 @@
 			"name": "the Crypt of the Fallen",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The Crypt of the Fallen, dug beneath the temple in Umbrage: the wealthy town's newer dead in its upper crypt, a named band of grave robbers within, who broke in from the wilds and break walls and tombs with the Tomb Sledge to reach the holy relics; below it by a hidden way the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714; the crypt below the temple, Jeff 2026-11-04 and 2026-11-10).",
+			"summary": "The Crypt of the Fallen, dug beneath the temple in Umbrage: the wealthy town's newer dead in its upper crypt, a named band of grave robbers within, who broke in through an old mound outside town and break walls and tombs with the Tomb Sledge to reach the holy relics; below it by a hidden way the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714; the crypt below the temple, Jeff 2026-11-04 and 2026-11-10).",
 			"relations": [],
 			"tags": [
 				"history"
@@ -293,18 +293,6 @@
 					"status": "agreed"
 				},
 				{
-					"id": "crypt.outside_town",
-					"text": "The Barrow of the Fallen lies a little outside town, under a grass-covered mound with a stone-framed door.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"source": "Jeff",
-					"status": "agreed",
-					"tags": [],
-					"sight": "the barrow mound"
-				},
-				{
 					"id": "crypt.mound",
 					"text": "The crypt is dug beneath the temple in Umbrage.",
 					"known": "common",
@@ -331,7 +319,7 @@
 				},
 				{
 					"id": "crypt.robbers_breach",
-					"text": "The temple's door down is locked and watched, so the Mound-breakers broke into the crypt from the wilds.",
+					"text": "The temple's door down is locked and watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt.",
 					"known": "rumour",
 					"true": true,
 					"where": [
@@ -461,18 +449,6 @@
 					"status": "agreed"
 				},
 				{
-					"id": "crypt.spears",
-					"text": "Warriors' spears are planted around the outside of the mound, standing up like spikes.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"source": "Jeff",
-					"status": "agreed",
-					"tags": [],
-					"sight": "the spears round the mound"
-				},
-				{
 					"id": "crypt.dead_rise",
 					"text": "On nights the robbers have dug, or when the temple's alms fall short, the crypt's dead come up out of the dark.",
 					"known": "rumour",
@@ -483,6 +459,44 @@
 					"source": "Jeff",
 					"status": "agreed",
 					"true": true
+				}
+			]
+		},
+		{
+			"id": "old_mound",
+			"type": "place",
+			"name": "the old burial mound",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "An old burial mound a little outside town, north-west of Umbrage: grass over it, a stone-framed door, warriors' spears planted round it. No name of its own. The Mound-breakers forced its door and dug from it through to the crypt under the temple (Jeff 2026-10-27: \"the barrows is an ancient burial mound ... its connected to the barrows\"; art-kit's building.mound, maps' (155,160); 832; crypt-names.md pick 4 A).",
+			"relations": [],
+			"tags": [
+				"barrow"
+			],
+			"facts": [
+				{
+					"id": "old_mound.outside_town",
+					"text": "An old burial mound lies a little outside town, grass-covered, with a stone-framed door.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed",
+					"tags": [],
+					"sight": "the barrow mound"
+				},
+				{
+					"id": "old_mound.spears",
+					"text": "Warriors' spears are planted around the outside of the mound, standing up like spikes.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"source": "Jeff",
+					"status": "agreed",
+					"tags": [],
+					"sight": "the spears round the mound"
 				}
 			]
 		}
