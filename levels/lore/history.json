@@ -381,7 +381,7 @@
 				},
 				{
 					"id": "crypt.knight_spirit",
-					"text": "The spirit of a fallen holy knight of Theus keeps watch in the barrow's Altar Room; his bones lie beneath the temple, held by the draugr.",
+					"text": "The spirit of a fallen holy knight of Theus keeps watch in the barrow's First Hall, beside the bier at the foot of the temple stair; his bones lie beneath the temple, held by the draugr.",
 					"known": "rumour",
 					"true": true,
 					"where": [
