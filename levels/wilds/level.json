@@ -901,6 +901,16 @@
 				173,
 				231
 			]
+		},
+		"crypt_stair": {
+			"at": [
+				199,
+				199
+			],
+			"kind": "other",
+			"radius": 1,
+			"worth": 0,
+			"name": "the crypt stair"
 		}
 	},
 	"rooms": {

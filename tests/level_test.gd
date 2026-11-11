@@ -2391,6 +2391,13 @@ func _test_building_level_link() -> void:
 			and wilds["places"].has("temple@189,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
 			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
 			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the chapel stair's landing, from_crypt, inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
+		# The stair's own place (npc's crypt pointer key "wilds/crypt_stair"):
+		# on the stair, a cell wide, no one's, worth nothing, no found-place reward.
+		var stair_place: Dictionary = wilds["places"].get("crypt_stair", {})
+		_check(stair_place.get("cell") == Vector2i(199, 199) and stair_place.get("kind") == "other" and stair_place.get("radius") == 1
+			and stair_place.get("worth") == 0 and stair_place.get("holder") == "nobody" and stair_place.get("name") == "the crypt stair"
+			and not bool(stair_place.get("explore", true)) and (chapel["rect"] as Rect2i).has_point(Vector2i(199, 199)),
+			"the crypt stair is a place of its own on the stair, inside the temple: other, a cell wide, nobody's, worth 0, no found-place reward (%s)" % [stair_place])
 
 
 ## The kind lists (816): each one entry a line, sorted, so two trees adding
