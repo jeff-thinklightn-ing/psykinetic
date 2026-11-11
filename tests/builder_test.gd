@@ -1762,6 +1762,8 @@ func _test_spots() -> void:
 	_check(not front.get("ok", true) and "customers' side of the counter at (10, 21)" in str(front.get("text")), "a merchant's spot out front of his counter: refused (%s)" % front.get("text"))
 	var behind := session.run_tool("spot", {"at": [12, 19], "use": "work", "trade": "merchant", "face": [11, 19]})
 	_check(behind.get("ok", false), "behind it: laid (%s)" % behind.get("text"))
+	var vendor := session.run_tool("spot", {"at": [12, 22], "use": "work", "trade": "vendor", "face": [11, 22]})
+	_check(not vendor.get("ok", true) and "customers' side" in str(vendor.get("text")), "Rolf's \"vendor\" spot out front: refused as any keeper's (%s)" % vendor.get("text"))
 	var cook := session.run_tool("spot", {"at": [12, 22], "use": "work", "trade": "cook", "face": [11, 22]})
 	_check(cook.get("ok", false), "a cook's spot there, no keeper: laid (%s)" % cook.get("text"))
 	# The prompt says it, and the tool is offered with npc's uses and poses.

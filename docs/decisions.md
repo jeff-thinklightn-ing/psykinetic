@@ -48337,7 +48337,8 @@ npc got wrong for ten days, the coordinator).
   through (the coordinator: "a resident parked in a doorway-wide lane is the frozen-town report
   coming back another way"): the reach is run with every other spot's cell solid, then again with
   this one solid too, and the count and cells that would be cut off are named. And Rolf's rule
-  (npc's reading): a keeper's (merchant, taverner, keeper) work spot inside a stall place's square
+  (npc's reading): a keeper's (merchant, taverner, keeper, and Rolf's "vendor", Main.VENDOR_TRADE)
+  work spot inside a stall place's square
   must be behind its counter, per Main._behind_counter over that square and the Main.COUNTERS slot
   within one cell of the stall. On the customers' side the keeper would never use it.
 - A sit spot with nothing to sit on is laid with a warning, not refused (npc: the code knows no seat

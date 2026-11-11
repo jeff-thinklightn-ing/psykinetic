@@ -2739,8 +2739,10 @@ func _spot_clear(at: Vector2i) -> Array:
 const SEAT_SAYS := "a seat of a place (a tavern's, a fire's) or a chair or bench laid there"
 ## Building slots a body sits on (npc: the barrow's hall chair, the smith's bench).
 const SEAT_SLOTS: Array[String] = ["building.hall_chair", "building.smith_bench"]
-## The trades that keep a stall or counter (npc's contract: they "tend").
-const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper"]
+## The trades that keep a stall or counter (npc's contract: they "tend"),
+## and the starter stall's keeper, Rolf, whose work spot names "vendor"
+## (Main.VENDOR_TRADE, npc's 853 amended (3); no Production trade).
+const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper", "vendor"]
 
 
 ## Whether a body sits on something at [param at] (859, npc's reading: the
