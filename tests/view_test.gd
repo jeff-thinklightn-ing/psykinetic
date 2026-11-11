@@ -7958,6 +7958,25 @@ func _test_far_landmarks() -> void:
 		placed = placed and is_equal_approx(float(geometry.get_instance_shader_parameter("true_distance")), distance)
 		placed = placed and geometry.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and geometry.material_override == _rig._far_material
 	_check(placed, "each on its true line from the camera, no further than FAR_DRAW and scaled by as much, shrunk to keep its top in frame (top edge %.1f degrees); no shadows" % top_edge)
+	# 650 amended (3): each stands on its hill, FAR_FOOT_SINK deep under its
+	# foot and wider than the piece, hazed by the piece's own distance.
+	var feet: Array[String] = []
+	for mark: Dictionary in _rig._far_marks:
+		var node: Node3D = mark["node"]
+		var foot := node.get_node_or_null("FarFoot") as MeshInstance3D
+		var body: GeometryInstance3D = mark["meshes"][0]
+		var piece_box: AABB = body.get_aabb()
+		var foot_box: AABB = foot.get_aabb() if foot != null else AABB()
+		if (foot != null and (mark["meshes"] as Array).has(foot) and foot.material_override == _rig._far_material
+				and foot.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				and Color(foot.get_instance_shader_parameter("body")).is_equal_approx(Client3D.FAR_FOOT_BODY)
+				and is_equal_approx(float(foot.get_instance_shader_parameter("true_distance")), float(body.get_instance_shader_parameter("true_distance")))
+				and is_equal_approx(foot_box.position.y, -Client3D.FAR_FOOT_SINK) and absf(foot_box.end.y) < 0.01
+				and foot_box.size.x > piece_box.size.x and foot_box.size.z > piece_box.size.z
+				and float(mark["height"]) > 0.0 and is_equal_approx(float(mark["height"]), piece_box.end.y)):
+			feet.append(String(node.name))
+	_check(feet.size() == _rig._far_marks.size() and feet.size() > 0,
+			"each far landmark on its hill, %.0f m deep under its foot, wider than it, in the far material, hazed by its own distance, its height still the piece's (%s)" % [Client3D.FAR_FOOT_SINK, feet])
 	# More sky on screen: nearer true size, with no code change.
 	var fov_was: float = _rig._camera.fov
 	var tower: Dictionary = {}

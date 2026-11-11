@@ -692,6 +692,19 @@ const FAR_SHRINK_MOST := 0.05
 ## Its body's light at night, of the day's (the haze carries the night's dark).
 const FAR_NIGHT_LIGHT := 0.18
 const FAR_SHADER := preload("res://client3d/far.gdshader")
+## A far landmark's foot (650 amended (3)): its foot stands at its zone's
+## height, so the castle (11.8 m over the wilds) hung over Umbrage's land
+## with sky under it. Each stands on a low hill: a FAR_FOOT_SIDES-sided cone
+## cut flat at its foot, FAR_FOOT_SINK deep, spreading FAR_FOOT_FLARE metres
+## out for each metre down from the piece's own footprint, in the far
+## material in FAR_FOOT_BODY, hazed by its true distance as the piece is.
+## FAR_FOOT_BODY is the far land's own pale green as it reads at the
+## castle's 140 m from Umbrage's north edge (the land there 140,163,126; a
+## darker green stood out as a plinth).
+const FAR_FOOT_SINK := 15.0
+const FAR_FOOT_FLARE := 1.5
+const FAR_FOOT_SIDES := 12
+const FAR_FOOT_BODY := Color("91a880")
 const FAR_STAND_INS := {
 	"far.castle": {"body": Color("6e6b64"), "blocks": [
 		["box", Vector3(0, 0, 19), Vector3(40, 9, 2)],
@@ -11192,8 +11205,28 @@ func _add_far_landmarks() -> void:
 				geometry.set_instance_shader_parameter("body", FAR_STAND_INS.get(slot, FAR_STAND_INS["far.tower"])["body"])
 				meshes.append(geometry)
 		var top := 0.0
+		var reach := 0.0
 		for geometry: GeometryInstance3D in meshes:
 			top = maxf(top, geometry.get_aabb().end.y)
+			# Its footprint about the foot, in the landmark's own space.
+			var to_node := Transform3D.IDENTITY
+			var up: Node = geometry
+			while up != null and up != node:
+				to_node = (up as Node3D).transform * to_node
+				up = up.get_parent()
+			var bounds := to_node * geometry.get_aabb()
+			for corner in 8:
+				var point := bounds.get_endpoint(corner)
+				reach = maxf(reach, Vector2(point.x, point.z).length())
+		# The hill it stands on (650 amended (3)), hazed with it.
+		var foot := MeshInstance3D.new()
+		foot.name = "FarFoot"
+		foot.mesh = far_foot(reach)
+		foot.material_override = _far_material
+		foot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		foot.set_instance_shader_parameter("body", FAR_FOOT_BODY)
+		node.add_child(foot)
+		meshes.append(foot)
 		_far_marks.append({"node": node, "meshes": meshes, "at": mark["at"], "height": top})
 	if _camera != null:
 		_place_far_landmarks()
@@ -11247,6 +11280,44 @@ static func far_shrink(eye: Vector3, at: Vector3, height: float, most: float) ->
 
 ## [param slot]'s stand-in (FAR_STAND_INS; a tower's for a slot it lacks):
 ## its blocks in one mesh, front +z, bottom at 0.
+## The hill under a far landmark whose footprint reaches [param reach]
+## metres from its foot (650 amended (3)): flat on top at the foot (y 0),
+## its sides spreading FAR_FOOT_FLARE out for each metre down to
+## FAR_FOOT_SINK below it; flat-faced, every face toward the outside.
+static func far_foot(reach: float) -> ArrayMesh:
+	var top := maxf(reach, 1.0)
+	var bottom := top + FAR_FOOT_SINK * FAR_FOOT_FLARE
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var face := func(a: Vector3, b: Vector3, c: Vector3, outward: Vector3) -> void:
+		# Godot's front winds clockwise: (c - a) x (b - a) faces out.
+		var normal := (c - a).cross(b - a)
+		if normal.dot(outward) < 0.0:
+			var swap := b
+			b = c
+			c = swap
+			normal = -normal
+		tool.set_normal(normal.normalized())
+		for point: Vector3 in [a, b, c]:
+			tool.add_vertex(point)
+	for side in FAR_FOOT_SIDES:
+		var turn_a := TAU * side / FAR_FOOT_SIDES
+		var turn_b := TAU * (side + 1) / FAR_FOOT_SIDES
+		var dir_a := Vector3(cos(turn_a), 0.0, sin(turn_a))
+		var dir_b := Vector3(cos(turn_b), 0.0, sin(turn_b))
+		var top_a := dir_a * top
+		var top_b := dir_b * top
+		var low_a := dir_a * bottom + Vector3.DOWN * FAR_FOOT_SINK
+		var low_b := dir_b * bottom + Vector3.DOWN * FAR_FOOT_SINK
+		var out := (dir_a + dir_b).normalized() * FAR_FOOT_SINK + Vector3.UP * (bottom - top)
+		face.call(top_a, top_b, low_b, out)
+		face.call(top_a, low_b, low_a, out)
+		# The flat top, a hair under the foot: seen in a courtyard, never
+		# fighting the piece's own floor.
+		face.call(Vector3.DOWN * 0.05, top_a + Vector3.DOWN * 0.05, top_b + Vector3.DOWN * 0.05, Vector3.UP)
+	return tool.commit()
+
+
 static func far_stand_in(slot: String) -> ArrayMesh:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)

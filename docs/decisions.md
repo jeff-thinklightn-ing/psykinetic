@@ -39409,6 +39409,20 @@ _old_rooms (_room_built comes again), and _add_far_landmarks frees a live set
 and clears the list first; view_test _test_phased_build builds the wilds over
 frames under the low camera and checks the marks placed under the new room,
 one set, none freed, the skirt made.
+650 amended (3) (the decision script's label; one of terrain's three worst things from its walk of
+Umbrage's edges, 11-11): a hill under each far landmark. A landmark's foot stands at its own
+zone's height, so from Umbrage's north edge (150,10 and 200,12) the castle, about 140 m off and
+11.8 m over the wilds, showed a strip of sky under its walls. Each landmark now stands on
+"FarFoot", a FAR_FOOT_SIDES (12) sided cone cut flat a hair under its foot (Client3D.far_foot),
+its top as wide as the piece's own footprint and its sides spreading FAR_FOOT_FLARE (1.5) m out
+for each metre down to FAR_FOOT_SINK (15) m below; in the far material, placed, scaled and
+hazed with the piece, no shadows, kept out of the piece's height for the shrink. FAR_FOOT_BODY
+(#91a880) is the far land's pale green as it reads there: a darker green (#5d7742) stood out as a
+plinth. From the square and the hills the land's far line already meets both pieces' feet, and
+the hill stays behind it, so those stills are unchanged. Under the low camera only, as the
+landmarks are. view_test _test_far_landmarks checks each mark's hill: in its meshes, the far
+material, no shadows, its body colour, the piece's own distance, 15 m deep, wider than the piece,
+the mark's height still the piece's. Stills C:/dev/review/terrain/far_feet/.
 Client only, protocol unchanged, no new class_name.
 
 ## 746. A curve by a cell twice: each pass searched
