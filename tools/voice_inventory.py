@@ -7,7 +7,7 @@ docs/voice_inventory.md: each line with who says it (by file, a best guess),
 where it lives, and whether lore's pages quote it (a line quoted in docs/lore/
 is usually one Jeff passed; docs/voice.md names the ones he wrote himself).
 
-Run: python -B tools/voice_inventory.py [--check]
+Run: python -B tools/voice_inventory.py [--check | --land <tree> [--lock <dir>]]
 --check exits 1 if docs/voice_inventory.md is out of date, naming this tool;
 tests/land.sh and land.ps1 run it before the gate, so a tree that adds or
 changes a player's line regenerates the page at its own landing (the
@@ -15,8 +15,10 @@ coordinator's, 2026-11-10: combat's hand edit, d1e21aedb, conflicted with
 the regenerated page). It reads only the tree, and of it only the files git
 knows (committed or staged; `git ls-files`): the scanned code, levels/ and
 docs/lore/. Its output is the same on every checkout: sorted, LF line ends,
-no date, no path outside the tree. land.sh warns until v0.1.211's unfreeze,
-then fails (the coordinator's warn-first day, 748 amended (6)). Lines whose only
+no date, no path outside the tree. land.sh runs it as --land <tree> (748
+amended (8)): a landing under the land lock commits a stale page itself, as a
+commit of its own; anywhere else a stale page is a warning, and a generator
+that fails stops the landing (see land()). Lines whose only
 delivery is party_log.add (the server's own list, never sent to a client) are
 listed first as "Only in the party log" and marked U; --check warns their
 count and never fails on it (748 amended (7)).
@@ -385,7 +387,120 @@ def build():
     return "\n".join(out) + "\n"
 
 
+LAND_LOCK = "/c/dev/land.lock"
+PAGE = "docs/voice_inventory.md"
+FOLD_MESSAGE = "voice_inventory: page regenerated at landing (748 amended (8))"
+
+
+def _native(path):
+    """A Git-bash path (/c/dev/x) as Windows Python opens it (C:/dev/x)."""
+    drive = re.match(r"^/([A-Za-z])/(.*)$", path)
+    if os.name == "nt" and drive:
+        return "%s:/%s" % (drive.group(1).upper(), drive.group(2))
+    return path
+
+
+def _git(*args):
+    return subprocess.run(["git", "-C", ROOT] + list(args), capture_output=True, text=True)
+
+
+def _arg(flag, default=""):
+    if flag in sys.argv and sys.argv.index(flag) + 1 < len(sys.argv):
+        return sys.argv[sys.argv.index(flag) + 1]
+    return default
+
+
+def _trees():
+    """The trees' own folder names (tests/port_offsets.txt: each has a line)."""
+    try:
+        with open(os.path.join(ROOT, "tests", "port_offsets.txt"), encoding="utf-8") as f:
+            return {line.split()[0] for line in f if line.strip() and not line.startswith("#")}
+    except OSError:
+        return set()
+
+
+def holds_lock(tree, owner):
+    """Whether the land lock's [param owner] is this checkout, whose folder
+    (or PSYKINETIC_TREE) is [param tree] (release's ask): the same name;
+    psykinetic-<owner> (release's psykinetic-release takes it as "release");
+    a side worktree <owner>-<anything> (items-cast for items) whose folder is
+    not a tree's own (ui-design is no side of ui); or the tree the gated run
+    this was started under was given (HEAVY_JOB_HELD, <tree>-<kind>-<pid>.json)."""
+    if not tree or not owner:
+        return False
+    if owner == tree or tree == "psykinetic-" + owner:
+        return True
+    if tree.startswith(owner + "-") and tree not in _trees():
+        return True
+    held = re.match(r"^(.+)-[^-]+-\d+\.json$", os.environ.get("HEAVY_JOB_HELD", ""))
+    return bool(held) and held.group(1) == owner
+
+
+def land():
+    """--land <tree> [--lock <dir>] (748 amended (8)): tests/land.sh and land.ps1
+    run it before the gate. Exit 0: the page is up to date, or it was stale and
+    is now regenerated as a commit of its own, touching only the page, which
+    goes out with the landing (one line names it). That happens only when
+    <tree> holds the land lock (its owner file, matched by holds_lock; the lock is
+    $PSYKINETIC_LAND_LOCK, else /c/dev/land.lock), no tracked file has an
+    uncommitted change, and HEAD is ahead of origin/main: a landing's own
+    retest after its rebase. Exit 3: stale, but not folded (no lock, a dirty
+    tree, nothing ahead): one VOICE INVENTORY STALE line, a warning. Exit 2: the
+    generator or git failed, and the landing stops (land.sh treats any exit but
+    0 and 3 so, a crash's traceback included)."""
+    tree = _arg("--land")
+    lock = _native(_arg("--lock", os.environ.get("PSYKINETIC_LAND_LOCK", LAND_LOCK)))
+    try:
+        text = build()
+    except Exception as error:  # noqa: BLE001 - any failure stops the landing, named.
+        print("voice_inventory: the generator failed (%s: %s); run python -B tools/voice_inventory.py --check to see it"
+              % (type(error).__name__, error))
+        return 2
+    if UNHEARD:
+        print("voice_inventory: %d line(s) only in the party log, never shown to a player: see \"Only in the party log\""
+              " in docs/voice_inventory.md (a warning, 748 amended (7))" % len(UNHEARD))
+    try:
+        with open(OUT, encoding="utf-8") as f:
+            if f.read() == text:
+                return 0
+    except OSError:
+        pass
+    owner = ""
+    try:
+        with open(os.path.join(lock, "owner"), encoding="utf-8") as f:
+            owner = f.read().strip()
+    except OSError:
+        pass
+    dirty = _git("status", "--porcelain", "--untracked-files=no")
+    ahead = _git("rev-list", "--count", "origin/main..HEAD")
+    why = ""
+    if not holds_lock(tree, owner):
+        why = "this tree doesn't hold the land lock"
+    elif dirty.returncode != 0 or dirty.stdout.strip():
+        why = "a tracked file has uncommitted changes"
+    elif ahead.returncode != 0 or int(ahead.stdout.strip() or "0") < 1:
+        why = "HEAD is not ahead of origin/main"
+    if why:
+        print("VOICE INVENTORY STALE (a warning; not committed here: %s): run python -B tools/voice_inventory.py and"
+              " commit docs/voice_inventory.md, or land under the land lock, which commits it (748 amended (8))" % why)
+        return 3
+    with open(OUT, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    done = _git("commit", "-q", "-m", FOLD_MESSAGE, "--", PAGE)
+    if done.returncode != 0:
+        _git("checkout", "--", PAGE)
+        print("voice_inventory: committing the regenerated page failed (%s); run python -B tools/voice_inventory.py"
+              " --check to see it" % (done.stderr.strip() or done.stdout.strip()))
+        return 2
+    sha = _git("rev-parse", "--short", "HEAD").stdout.strip()
+    print("VOICE INVENTORY: regenerated and committed on its own as %s, going out with this landing (748 amended (8))"
+          % sha)
+    return 0
+
+
 def main():
+    if "--land" in sys.argv:
+        sys.exit(land())
     text = build()
     if "--check" in sys.argv:
         # Read as text, so a checkout with CRLF line ends compares the same.

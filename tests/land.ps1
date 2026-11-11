@@ -30,14 +30,19 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		exit 1
 	}
 	# docs/voice_inventory.md is generated: a changed player's line means
-	# re-running its tool, never a hand edit (748 amended (6)). A warning, said
-	# again before the result line, until v0.1.211's unfreeze; then it fails here.
-	$inventoryStale = ''
-	& python -B (Join-Path $root 'tools\voice_inventory.py') --check
-	if ($LASTEXITCODE -ne 0) {
-		$inventoryStale = 'VOICE INVENTORY STALE (a warning now; this fails landings from v0.1.211): run python -B tools/voice_inventory.py and commit docs/voice_inventory.md with your change'
-		Write-Output $inventoryStale
+	# re-running its tool, never a hand edit (748 amended (6)). Under this
+	# tree's land lock, clean and ahead of origin/main, a stale page is
+	# regenerated as a commit of its own that goes out with the landing, its sha
+	# named; elsewhere a stale page is a warning, said again before the result
+	# line; a generator that fails stops the landing here (748 amended (8)).
+	$inventoryOut = @(& python -B (Join-Path $root 'tools\voice_inventory.py') --land $tree --lock 'C:\dev\land.lock' 2>&1 | ForEach-Object { "$_" })
+	$inventoryCode = $LASTEXITCODE
+	$inventoryOut | Write-Output
+	if ($inventoryCode -ne 0 -and $inventoryCode -ne 3) {
+		Write-Output "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventoryCode; run python -B tools/voice_inventory.py --check to see it)"
+		exit 1
 	}
+	$inventoryStale = (@($inventoryOut | Where-Object { $_ -like 'VOICE INVENTORY*' }) -join "`n")
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
@@ -100,6 +105,9 @@ Write-Output "$(if ($changelogOk) { 'PASS' } else { 'FAIL' })  changelog_check_t
 $resolveTest = & python -B (Join-Path $root 'tests\changelog_resolve_test.py') 2>&1
 $resolveOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($resolveOk) { 'PASS' } else { 'FAIL' })  changelog_resolve_test"
+$inventoryTest = & python -B (Join-Path $root 'tests\voice_inventory_test.py') 2>&1
+$inventoryOk = $LASTEXITCODE -eq 0
+Write-Output "$(if ($inventoryOk) { 'PASS' } else { 'FAIL' })  voice_inventory_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 if ($lean) {
 	# Lean (394 amended (19)): state_test and server_boot_test (a Godot or two
@@ -132,6 +140,10 @@ if (-not $gateOk) {
 if (-not $changelogOk) {
 	$failed += 'changelog_check_test'
 	$changelogTest | Write-Output
+}
+if (-not $inventoryOk) {
+	$failed += 'voice_inventory_test'
+	$inventoryTest | Write-Output
 }
 if (-not $resolveOk) {
 	$failed += 'changelog_resolve_test'
@@ -171,7 +183,7 @@ Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue
 $seconds = [int]((Get-Date) - $started).TotalSeconds
 Write-Output ''
 if ($failed.Count -eq 0) {
-	$line = "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; ${seconds}s)"
+	$line = "LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test, voice_inventory_test; ${seconds}s)"
 } else {
 	$line = "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"
 }

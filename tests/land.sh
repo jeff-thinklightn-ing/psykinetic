@@ -27,11 +27,19 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# the shared user:// logs folder (decision 664).
 	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, silence or off-screen, decision 664 and its amendments: fix it as above)"; exit 1; }
 	# docs/voice_inventory.md is generated: a changed player's line means
-	# re-running its tool, never a hand edit (748 amended (6)). A warning, said
-	# again before the result line, until v0.1.211's unfreeze; then it fails here.
-	inventory_stale=""
-	python -B tools/voice_inventory.py --check || inventory_stale="VOICE INVENTORY STALE (a warning now; this fails landings from v0.1.211): run python -B tools/voice_inventory.py and commit docs/voice_inventory.md with your change"
-	[ -n "$inventory_stale" ] && echo "$inventory_stale"
+	# re-running its tool, never a hand edit (748 amended (6)). Under this
+	# tree's land lock, clean and ahead of origin/main, a stale page is
+	# regenerated as a commit of its own that goes out with the landing, its sha
+	# named; elsewhere a stale page is a warning, said again before the result
+	# line; a generator that fails stops the landing here (748 amended (8)).
+	inventory_out="$(python -B tools/voice_inventory.py --land "$tree" 2>&1)"
+	inventory_code=$?
+	[ -n "$inventory_out" ] && echo "$inventory_out"
+	case "$inventory_code" in
+		0|3) ;;
+		*) echo "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventory_code; run python -B tools/voice_inventory.py --check to see it)"; exit 1 ;;
+	esac
+	inventory_stale="$(printf '%s\n' "$inventory_out" | grep '^VOICE INVENTORY' || true)"
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
@@ -93,6 +101,7 @@ part heavy_job_test python -B tests/heavy_job_test.py
 part decision_number_test python -B tests/decision_number_test.py
 part changelog_check_test python -B tests/changelog_check_test.py
 part changelog_resolve_test python -B tests/changelog_resolve_test.py
+part voice_inventory_test python -B tests/voice_inventory_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 if [ -n "$lean" ]; then
@@ -119,7 +128,7 @@ wait
 
 code=0
 failed=""
-for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test suite net_test state_test server_boot_test; do
+for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test voice_inventory_test suite net_test state_test server_boot_test; do
 	# A part killed before it wrote its status (no file, or empty) fails: an
 	# empty status passed the test once, and economy's landing pushed over a
 	# suite killed mid-run (2026-10-23). Only a status of exactly 0 passes.
@@ -151,7 +160,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test, voice_inventory_test; $(( $(date +%s) - started ))s)"
 else
 	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi

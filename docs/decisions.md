@@ -40343,7 +40343,8 @@ v0.1.211's unfreeze, each after a long wait at the gate): a stale page prints "V
 STALE (a warning now; this fails landings from v0.1.211): run python -B tools/voice_inventory.py
 ..." where the check runs and again just above the result line, and the landing goes on. Voice's
 own landing straight after v0.1.211's unfreeze makes it fail, regenerating the page in the same
-commit.
+commit. (It never failed: 748 amended (8), below, on release's terms, has a landing commit the page
+itself instead, and keeps the warning everywhere else.)
 Tools and tests only, protocol unchanged, no new class_name.
 
 748 amended (7), voice's side (2026-11-11, the coordinator's ask, the script's label): lines heard
@@ -40362,6 +40363,38 @@ _ask_voice says, and the like. `--check` prints the count as a warning and never
 each tree sees its own lines leave the list as it gives them a delivery. It doesn't catch a line
 that Main builds from another file's text, such as an offer's result line. Tools only, protocol
 unchanged, no new class_name.
+
+748 amended (8), voice's side (2026-11-11, release's terms, the script's label): a landing commits a
+stale page itself; it doesn't fail on it. Failing a stale page would have cost a landing its slot
+at the gate for a page nobody edits by hand, and about ten trees were queued behind v0.1.211's
+unfreeze. So tests/land.sh and land.ps1 now run `python -B tools/voice_inventory.py --land <tree>`
+where `--check` ran, before the gate. A page up to date is exit 0. A stale page is regenerated and
+committed as a commit of its own ("voice_inventory: page regenerated at landing (748 amended
+(8))", touching only docs/voice_inventory.md, never an amend), and one line, "VOICE INVENTORY:
+regenerated and committed on its own as <sha> ...", names it, said again above the result line.
+That commit goes out with the push, but only when all three hold: this tree holds the land lock
+(its owner file; $PSYKINETIC_LAND_LOCK, else /c/dev/land.lock, and land.ps1's C:\dev\land.lock;
+release's ask: land.sh's name is the folder's, so the owner matches the same name,
+psykinetic-<owner> (psykinetic-release takes it as "release"), a side worktree <owner>-<anything>
+(items-cast, builder-wtfield) whose folder isn't a tree's own in tests/port_offsets.txt (so
+ui-design is never taken for a side of ui), or the tree a gated run was given, from
+HEAVY_JOB_HELD's <tree>-<kind>-<pid>.json),
+no tracked file has an uncommitted change (untracked ones, such as a landing's own log in build/,
+don't count, since the scan reads only tracked files), and HEAD is ahead of origin/main. That is a
+landing's own retest after its rebase. Anything else (no lock, another tree's lock, a dirty tree,
+nothing ahead: a plain test run) is exit 3: one "VOICE INVENTORY STALE (a warning; not committed
+here: <why>) ..." line where it runs and again above the result line, and the run goes on. Any
+other exit, a generator that fails (exit 2, its error named) or the tool's own traceback, stops the
+landing at once: "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed ...;
+run python -B tools/voice_inventory.py --check to see it)". On a failed commit the page is put back.
+A landing script that pushes a sha it noted before land.sh ran leaves the new commit behind, and the
+page stays stale on main until the next landing commits it. tests/voice_inventory_test.py, a land.sh
+and land.ps1 part, checks this in a scratch repo holding a copy of the tool: a fold under the lock
+(one commit, only the page, its sha named, --check clean after it), the four warnings with nothing
+committed, an up-to-date page, and a generator that fails (an unreadable script). To push without
+land.sh's fold (a page-only fix by hand): `python -B tools/voice_inventory.py && git add
+docs/voice_inventory.md && git commit -m "voice_inventory regenerated"`. Tools and tests only, no
+CHANGELOG bullet, protocol unchanged, no new class_name.
 
 ## 757. The Dwarven Halls' chests: dwarven_hoard
 
