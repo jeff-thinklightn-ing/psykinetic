@@ -10945,6 +10945,27 @@ func _sync_quest(record: PlayerRecord) -> void:
 		player.quest = quest
 
 
+## The controls of the windows that may reach the quest card (747 amended (7),
+## ui's side): it keeps clear of every one that is open. The big map counts
+## while the corner map is opened out.
+func _quest_windows() -> Array:
+	var out: Array = [pack_panel, shop_panel, barter_panel, find_panel, deal_panel, note_sheet, card_page, town_panel,
+			world_map_panel, game_menu, options_panel, hint_panel, tuning_panel, admin_panel, main_menu, _bar]
+	if minimap != null and minimap.big:
+		out.append(minimap)
+	return out
+
+
+## The zone the local player stands in, for the quest card's place (747
+## amended (6)): "" until the player is here and their zone is the one loaded,
+## so the first frames after a zone change or a login know no zone.
+func _quest_zone() -> String:
+	var own := _local_player()
+	if own == null or own.zone != str(World.zone.name):
+		return ""
+	return own.zone
+
+
 ## [param record]'s player, if in the game, told its charges and the most it
 ## may hold (Player.charges and charge_room, replicated; decision 573).
 func _sync_charges(record: PlayerRecord) -> void:
@@ -15119,6 +15140,8 @@ func _build_talk() -> void:
 	quest_panel.quest_of = func() -> Dictionary:
 		var own := _local_player()
 		return own.quest if own != null else {}
+	quest_panel.windows_of = _quest_windows
+	quest_panel.zone_of = _quest_zone
 	$HUD.add_child(quest_panel)
 	minimap = Minimap.new()
 	minimap.name = "Minimap"

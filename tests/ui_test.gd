@@ -880,7 +880,109 @@ func _test_quest_tracker() -> void:
 	own.quest = {}
 	await get_tree().process_frame
 	_check(not panel.visible, "the quest over: the tracker hides")
+	await _test_quest_card_place_and_windows(panel, own)
 	own.quest = was
+
+
+## The quest card's place and the windows over it (747 amended (7), ui's side;
+## Jeff, v0.1.210: "the quest overlay for barrows stayed with me after logging
+## out, going to bear cave" and "that quest window overlaps the inventory
+## window"). The place: only in the quest's "zones", never in an unknown one,
+## anywhere with no key. The windows: never drawn over or under an open one,
+## back RETURN_SECONDS after the last has gone.
+func _test_quest_card_place_and_windows(panel: QuestPanel, own: Player) -> void:
+	var items := [{"name": "Robber", "done": false}]
+	own.quest = {"title": "Clear the barrow", "giver": "the fallen knight", "items": items, "ready": false, "zones": ["barrow", "barrow_deep"]}
+	var zone_was := panel.zone_of
+	var windows_was := panel.windows_of
+	var here := ["bear_cave"]
+	panel.zone_of = func() -> String: return here[0]
+	panel.windows_of = func() -> Array: return []
+	panel._clear = QuestPanel.RETURN_SECONDS  # The pack, open over the card's place till now, has been let go for good.
+	await get_tree().process_frame
+	_check(not panel.visible, "the barrow's quest in the bear's cave: no card")
+	here[0] = ""
+	panel.show_quest(own.quest)
+	panel.step(0.0)
+	_check(not panel.visible, "a zone not known yet (a login, the first frames after a zone change): no card, not even for a frame")
+	here[0] = "barrow_deep"
+	panel.step(0.0)
+	_check(panel.visible, "in the barrow's depths: the card")
+	here[0] = "barrow"
+	panel.step(0.0)
+	_check(panel.visible, "in the barrow: the card")
+	here[0] = "town"
+	panel.step(0.0)
+	_check(not panel.visible, "back in town with the quest still held: no card")
+	var keyless: Dictionary = own.quest.duplicate()
+	keyless.erase("zones")
+	own.quest = keyless
+	panel.step(0.0)
+	_check(panel.visible, "a quest with no zones (an older server, a quest with no place): the card anywhere, as before")
+	_check(_main._quest_zone() == "" or _main._quest_zone() == str(World.zone.name), "Main's zone for the card is the loaded zone's or none")
+	# The windows, with a stand-in control and then the real ones.
+	here[0] = "barrow"
+	own.quest = {"title": "Clear the barrow", "giver": "the fallen knight", "items": items, "ready": false, "zones": ["barrow"]}
+	panel.step(0.0)
+	var window := Control.new()
+	window.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_main.get_node("HUD").add_child(window)
+	panel.windows_of = func() -> Array: return [window]
+	var card := Rect2(panel.position, panel.size)
+	window.position = card.position + Vector2(-300.0, 0.0)
+	window.size = Vector2(300.0 - QuestPanel.OVERLAP_MARGIN / 2.0, card.size.y)
+	panel.step(0.0)
+	_check(not panel.visible, "a window ending a few pixels off the card still hides it (the margin)")
+	window.size = Vector2(300.0 - QuestPanel.OVERLAP_MARGIN * 2.0, card.size.y)
+	panel.step(QuestPanel.RETURN_SECONDS * 2.0)
+	_check(panel.visible, "a window well clear of the card: shown")
+	window.size = Vector2(400.0, card.size.y)
+	panel.step(0.0)
+	_check(not panel.visible, "a window over the card: hidden")
+	window.visible = false
+	panel.step(QuestPanel.RETURN_SECONDS * 0.4)
+	_check(not panel.visible, "the window closed: the card waits (no flicker while one is dragged across it)")
+	panel.step(QuestPanel.RETURN_SECONDS * 0.4)
+	_check(not panel.visible, "...still waiting")
+	panel.step(QuestPanel.RETURN_SECONDS * 0.4)
+	_check(panel.visible, "...and returns once the window has been gone for the wait")
+	window.visible = true
+	panel.step(0.0)
+	_check(not panel.visible, "the window opened again: hidden at once")
+	window.queue_free()
+	# The real windows: the invariant, at the screen's own height and a taller one.
+	panel.windows_of = windows_was
+	var open_was: bool = _main.pack_panel.shown
+	var win := get_window()
+	var scale_was := [win.content_scale_mode, win.content_scale_aspect, win.content_scale_size]
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	for height: int in [1080, 1440]:
+		# The headless window cannot be resized: the content size sets the lines the HUD is laid out on.
+		win.content_scale_size = Vector2i(int(round(height * 16.0 / 9.0)), height)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		_check(int(panel.get_viewport_rect().size.y) == height, "the HUD laid out on %d lines (%s)" % [height, panel.get_viewport_rect().size])
+		for shown in [false, true]:
+			_main.pack_panel.shown = shown
+			await get_tree().process_frame
+			panel.step(QuestPanel.RETURN_SECONDS * 2.0)
+			var card_now := Rect2(panel.position, panel.size).grow(QuestPanel.OVERLAP_MARGIN)
+			var clash := false
+			for control: Variant in _main._quest_windows():
+				var c := control as Control
+				if c != null and is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().intersects(card_now):
+					clash = true
+			_check(not (clash and panel.visible), "at %d lines with the pack %s: the card is never drawn over or under an open window (%s)" % [height, "open" if shown else "shut", card_now])
+			if shown and clash:
+				_check(not panel.visible, "at %d lines the pack window reaches the card's place: the card is hidden" % height)
+			_main.pack_panel.shown = false
+	win.content_scale_mode = scale_was[0]
+	win.content_scale_aspect = scale_was[1]
+	win.content_scale_size = scale_was[2]
+	_main.pack_panel.shown = open_was
+	panel.zone_of = zone_was
+	panel.windows_of = windows_was
 
 
 ## A talking monster's deals as buttons (629, ui's side).

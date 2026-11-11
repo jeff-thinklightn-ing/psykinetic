@@ -39703,6 +39703,27 @@ green checks, a 'return to the fallen knight' line when ready".
 
 Tests: ui_test _test_quest_tracker, _test_deal_window. Client only; reads what rev 43 replicates, no protocol change of
 its own; new class_name QuestPanel.
+
+747 amended (7), ui's side (2026-11-10; Jeff on v0.1.210: "the quest overlay for barrows stayed with me
+after logging out, going to bear cave, etc. in addition that quest window overlaps the inventory
+window"; the coordinator's ruling; the label from decision_number.sh, dungeon's zones key being (6)).
+The card was drawn whenever Player.quest was non-empty, in every zone and after every login, and at
+the HUD's right whatever window was open. Now (1) it keeps clear of the open windows: Main
+passes QuestPanel.windows_of (Main._quest_windows: the pack and sheet, store, barter, find, deal, note
+sheet, card page, town page, world map, menus, options, controls list, admin and tuning panels, and the
+corner map while it is opened out), and a window whose rect, OVERLAP_MARGIN (12 px) wider, meets the
+card's hides it; it returns RETURN_SECONDS (0.5 s) after the last has gone, so a window animating or
+dragged across it does not flicker it. (2) It is drawn only in the quest's own place: dungeon's "zones" in
+Player.quest (the barrow, its depths and the knight's zone, 747 amended (6)), against QuestPanel.zone_of
+(Main._quest_zone: the local player's zone only while it is the zone loaded, else "", so the first
+frames after a login or a zone change draw nothing). A quest with no "zones" (an older server) is drawn
+anywhere, as before. The quest is still held and saved; walking back into the place, or being ready
+beside the giver, brings the card back. No reminder strip elsewhere unless Jeff asks. The builder's
+labels sit centred at the top and do not reach the card, so they are not in the list. ui_test
+_test_quest_card_place_and_windows: each place case, the margin, the return wait, and the real windows at
+1080 and 1440 lines (the content size sets the lines in the headless window): the pack window reaches the
+card's place at both and hides it. Client only; protocol unchanged; no new class_name.
+
 ## 623 amended (2): the low camera nearer, and flatter as it nears
 
 Jeff on the low camera (by way of the coordinator, 2026-10-30): "for camera i actually want to
