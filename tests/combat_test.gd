@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_lob()
 	_test_free_blows()
 	_test_click_away()
+	_test_wind_up_kept()
 	_test_hammer_shove()
 	_test_free_chase()
 	_test_body_reach()
@@ -908,6 +909,69 @@ func _test_click_away() -> void:
 		_check(host.free_pos.distance_to(stepped) > 0.5 and not pinned_again, "%s: and it keeps walking away, no blow pinning it again" % ["another attack ordered" if queued else "after one blow"])
 		_check(struck_at >= 0 and waited <= World.BLOW_STAND_TICKS + 1,
 				"%s: a click away moves the body within the short pin (%d ticks, the bar %d)" % ["another attack ordered" if queued else "after one blow", waited, World.BLOW_STAND_TICKS + 1])
+
+
+## A wind-up clicked with a walk key held is never given up by that walk (the coordinator's
+## ruling on combat's finding): its plant holds through its landing tick, so it is struck
+## before any step of his own. Measured over starting points spread evenly across his cell
+## (10 by 10), a sword's lead walking past the foe and walking away, a giant axe's heavy
+## pressed on at him, its walk 20 degrees off the way to him each tick (within
+## WIND_UP_KEEP_ANGLE, so the walk keeps it; off it, 392 amended gives it up as ever): how
+## many of the wind-ups begun were given up.
+func _test_wind_up_kept() -> void:
+	print("
+== a wind-up clicked walking: his own walk never gives it up ==")
+	for row: Array in [["sword", Vector2.UP, "walking past"], ["sword", Vector2.LEFT, "walking away"], ["giant_axe", Vector2.ZERO, "pressing on at him"]]:
+		var tally := {"began": 0, "given up": 0, "landed": 0, "struck the air": 0}
+		for ix in 10:
+			for iy in 10:
+				var offset := Vector2(-0.45 + 0.1 * ix, -0.45 + 0.1 * iy)
+				var end := _wind_up_kept_run(row[0], row[1], offset)
+				if end == "":
+					continue
+				tally["began"] += 1
+				tally[end] += 1
+		print("  measured: %s, %s: of %d wind-ups begun, %d given up, %d landed, %d struck the air" % [row[0], row[2], tally["began"],
+				tally["given up"], tally["landed"], tally["struck the air"]])
+		_check(tally["began"] >= 50 and tally["given up"] == 0, "%s %s: none of %d given up by his own walk (%d)" % [row[0], row[2], tally["began"], tally["given up"]])
+
+
+## One of _test_wind_up_kept's: [param weapon] in hand, from his cell's centre plus
+## [param offset], the walk key [param way] held (ZERO: pressed on at him, 20 degrees off
+## the way to him each tick) and the attack clicked the first tick: how
+## his wind-up ended ("given up", "landed", "struck the air"), "" if none began.
+func _wind_up_kept_run(weapon: String, way: Vector2, offset: Vector2) -> String:
+	var e := _build(["#########", "#.......#", "#.......#", "#....m..#", "#...P...#", "#.......#", "#########"])
+	var host: GridEntity = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	if way != Vector2.UP:
+		World._relocate(host, foe.tile - Vector2i(1, 0))
+	host.free_pos = Vector2(host.tile) + offset
+	foe.acts = false
+	foe.max_hp = 999
+	foe.hp = 999
+	_give(host, weapon)
+	host.next_attack_tick = 0
+	host.wind_up = {}
+	var hp0 := foe.hp
+	var began := false
+	for i in 30:
+		var walk := way
+		if walk == Vector2.ZERO:
+			walk = (World.body_centre(foe) - World.body_centre(host)).normalized().rotated(deg_to_rad(-20.0))
+		World.free_input(host, walk, World.TICK_DT)
+		if i == 0:
+			World.command_attack(host, foe)
+		World.step()
+		if not began:
+			if host.wind_up.is_empty():
+				return ""
+			began = true
+		elif host.wind_up.is_empty():
+			if foe.hp < hp0:
+				return "landed"
+			return "struck the air" if host.next_attack_tick > World.tick else "given up"
+	return "given up"
 
 
 ## Jeff on v0.1.208: the war hammer's knockback too high; the

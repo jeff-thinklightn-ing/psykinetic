@@ -8647,7 +8647,11 @@ func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	# ticks come out of the weapon's own cycle, hit to hit attack_ticks_of.
 	var lead := not heavy
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile, "began": tick, "lead": lead}
-	_halt_for_blow(by, tick + ticks)
+	# Planted through its landing tick (392 amended (6)): a free body's own walk is taken before its
+	# wind-ups are struck in a tick (_step_zone), so a plant ending as it lands let a step that
+	# tick carry it off its cell and give a paid blow up. Its strike, whiff or recover stands
+	# on from there as ever, so the stand (blow_stand) is unchanged.
+	_halt_for_blow(by, tick + ticks + 1)
 	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
 	_winders[by] = true
 	by._world_set_facing(direction)
