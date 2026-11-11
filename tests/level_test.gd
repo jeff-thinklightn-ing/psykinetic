@@ -5721,6 +5721,9 @@ func _test_barrow_quest() -> void:
 		and items[0] == {"name": "Brand the Ox", "done": false} and items[1]["done"] == true and items[3]["done"] == false
 		and not bool(player.quest.get("ready", true)) and record.barrow_task.get("slain") == [band[1]],
 		"taken: open, \"not yet\"; the tracker's nine, the one felled before checked, nobody's kill not (%s)" % [player.quest])
+	# 747 amended (6): the card shows only in the quest's own place, named from the level data.
+	_check(player.quest.get("zones") == ["barrow", "barrow_deep"] and _main.quest_zones() == ["barrow", "barrow_deep"],
+		"its card's places: the band's barrow and its depths, the knight among them (%s)" % [player.quest.get("zones")])
 	slay.call(band[1], player)
 	slay.call(band[1], player)
 	_check(record.barrow_task.get("slain") == [band[1]] and (player.quest["items"] as Array)[1]["done"] == true,

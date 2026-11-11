@@ -40002,6 +40002,20 @@ _test_barrow_quest (felled before the taking, twice, counted once; nobody's kill
 forgets it; taken over the dead band, ready). Server and level data; protocol unchanged (a
 v0.1.210 client is sent the new layout and the knight at his new cell like any generation); no
 new class_name. On the box it shows at the barrow's next regeneration after the deploy.
+747 amended (6), dungeon's side (2026-11-10; Jeff, playing v0.1.210: "the quest overlay for
+barrows stayed with me after logging out, going to bear cave, etc."; the coordinator's ruling,
+the script's label): the card shows only in the quest's own place, and the quest stays held and
+saved as before. Main._sync_quest adds "zones" to Player.quest: Main.quest_zones(), read once
+from the level data, sorted. It holds the band's zone (economy's robbers.barrow), every indoor
+level a link of it leads to (its depths, the hidden way included; the wilds is outdoor), and
+every level whose legend places the knight (QUEST_KNIGHT_MARKER, "monster_astral_knight"):
+today ["barrow", "barrow_deep"]. ui's side draws the card only while the local player's zone is
+in it. Without the key (an old server) it draws everywhere, and an old client ignores the key
+and draws everywhere as before, so no new revision (release; the comment above
+PROTOCOL_REVISION). The code shows no stuck card after a turn-in: the mark and the cleared
+task are set in one call, _sync_quest runs at every join, and reset_barrow clears both.
+level_test _test_barrow_quest: the taken quest's zones. Server only; protocol unchanged; no new
+class_name.
 
 ## 742 amended: the camp chest locked, Brand's key, once per player
 

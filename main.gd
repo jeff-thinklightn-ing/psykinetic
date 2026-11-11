@@ -10990,7 +10990,8 @@ func _sync_quest(record: PlayerRecord) -> void:
 		var items: Array = []
 		for id: String in _quest_band():
 			items.append({"name": str(NamedEnemy.def(id).get("name", id.capitalize())), "done": id in slain})
-		quest = {"title": QUEST_TITLE, "giver": QUEST_GIVER, "items": items, "ready": _quest_left(record).is_empty()}
+		quest = {"title": QUEST_TITLE, "giver": QUEST_GIVER, "items": items, "ready": _quest_left(record).is_empty(),
+			"zones": quest_zones()}
 	if player.quest != quest:
 		player.quest = quest
 
@@ -11014,6 +11015,37 @@ func _quest_zone() -> String:
 	if own == null or own.zone != str(World.zone.name):
 		return ""
 	return own.zone
+
+
+## The levels the fallen knight's quest card shows in (747 amended (6); the
+## coordinator's ruling on Jeff's play of v0.1.210: "the quest overlay for
+## barrows stayed with me after logging out, going to bear cave, etc."),
+## from the level data: the band's zone (economy's robbers.barrow), every
+## indoor level a link of it leads to (its depths), and every level whose
+## legend places the knight. Sorted; read once.
+func quest_zones() -> Array:
+	if not _quest_zones.is_empty():
+		return _quest_zones
+	var found: Array[String] = []
+	var band_zone := str(World.economy.rules.get("robbers", {}).get("barrow", "")) if World.economy != null else ""
+	if not band_zone.is_empty() and Level.exists(band_zone):
+		found.append(band_zone)
+		for link: Variant in Level.template_config(band_zone).get("links", []):
+			var to := str((link as Dictionary).get("to_map", "")) if link is Dictionary else ""
+			if not to.is_empty() and to not in found and Level.exists(to) and not bool(Level.template_config(to).get("outdoor", false)):
+				found.append(to)
+	for level_name: String in Level.names():
+		var legend: Variant = Level.template_config(level_name).get("legend", {})
+		if legend is Dictionary and (legend as Dictionary).has(QUEST_KNIGHT_MARKER) and level_name not in found:
+			found.append(level_name)
+	found.sort()
+	_quest_zones = found
+	return _quest_zones
+
+
+## The legend marker that places the fallen knight (quest_zones).
+const QUEST_KNIGHT_MARKER := "monster_astral_knight"
+var _quest_zones: Array = []
 
 
 ## [param record]'s player, if in the game, told its charges and the most it
