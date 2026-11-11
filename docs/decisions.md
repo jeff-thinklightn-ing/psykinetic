@@ -48986,3 +48986,28 @@ corner (178, 202) at 5 cells a second, the eye's distance printed each half seco
 out once at most (on to the temple, its own pull in is a second building, not pumping), the
 figure framed in every frame. Client only; protocol unchanged, no new class_name. Combat and
 physics measure with the low camera: told before it landed.
+## 857. Pack first: only wielded things go to a free hand
+
+Context: World.free_slot_for put anything picked up, looted, bought, cooked, caught or handed over into a free
+hand first, then the pack. A new player has empty hands, so his first pelt, fish or herb landed in his right fist,
+and neither Rolf's window nor ui's new store (which draws the carried squares only) had a square for it: the first
+thing he tried to sell was the one thing the store could not see. Playtest's Rhea held her fish in her left hand
+the same way. The coordinator's rule, for ui's store A.
+
+Decision: Items.wielded(id) is a thing held to be used: a row with a "verb" (weapons, shields, the bow, the
+pick, the trophy weapons), one tagged weapon or shield, or the rod (use "fish"); a plain "tool" tag (the bandaging
+kit, an axe head) is not. World.free_slot_for: a wielded thing to a free hand that can hold it first (the right,
+then the left), else the pack, so a bought sword or the rod arrives ready; anything else to the first free pack
+square, a hand only when the pack is full. World.room_for looks for a stack to join in the same order (a fish
+joins the pack's fish before a hand's). The same for a companion's pickups, by the same calls. A catch
+(World._stow_catch, from _land_catch): its angler's own room first, so a landed fish goes to the pack, never
+into the hand the rod left; a companion with no room hands it to her keeper (alive, in her zone): onto his stack
+of fish in the pack, else a free pack square, never his hands, by his own put (she need not stand beside him); else
+at her feet. World.fish_landed_to says where ("self", "keeper", "ground"; "" for a miss), set before
+fishing_changed's "caught", for companions' line (hers, voice's) when she hands it over or neither has room.
+
+Consequences: items_test _test_pack_first (the wielded rule, empty hands take a pelt and a fish to the pack, a
+sword and the rod to the right hand, a stack joined in the pack, a full pack's pelt to a hand, a player's catch
+to his pack with his free hand left free, a full companion's catch into her keeper's pack, neither with room: at
+her feet with his empty hand left empty). Server only; protocol unchanged; no new class_name; no bullet (a
+pelt no longer in the fist is how it should always have been; voice may want one).

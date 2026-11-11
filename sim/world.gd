@@ -6462,26 +6462,34 @@ func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 ## stack it joins (decision 619; the hands, then the pack), else
 ## free_slot_for's; -1 for none.
 func room_for(entity: GridEntity, uid: int) -> int:
-	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + pack_slots(entity) if has_hands(entity) else range(entity.slots.size())
+	var hands: Array = [Items.RIGHT_HAND, Items.LEFT_HAND]
+	var order: Array = range(entity.slots.size())
+	if has_hands(entity):
+		order = hands + pack_slots(entity) if Items.wielded(items.id_of(uid)) else pack_slots(entity) + hands
 	for slot: int in order:
 		if slot < entity.slots.size() and stacks_onto(slot_uid(entity, slot), uid):
 			return slot
 	return free_slot_for(entity, items.id_of(uid))
 
 
-## The slot [param entity] would take [param id] into: a free hand that
-## can hold it (the right first; a two-handed thing both hands free), else
-## the first free pack slot; -1 for none.
+## The slot [param entity] would take [param id] into, pack first (the
+## coordinator's rule for the store, 857): a wielded thing (Items.wielded:
+## a weapon, a shield, the rod) to a free hand that can hold it (the right
+## first; a two-handed thing both hands free), else the first free pack
+## slot; anything else (a pelt, a fish, herbs, a kit) to the first free pack
+## slot, a hand only when the pack is full; -1 for none.
 func free_slot_for(entity: GridEntity, id: String) -> int:
 	if has_hands(entity):
+		var packed := free_pack_slot(entity)
+		if packed >= 0 and not Items.wielded(id):
+			return packed
 		for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
 			if entity.slots[hand].is_empty():
 				var trial := entity.slots.duplicate()
 				trial[hand] = id
 				if hands_allow(entity, trial):
 					return hand
-	if has_hands(entity):
-		return free_pack_slot(entity)
+		return packed
 	for slot in entity.slots.size():
 		if entity.slots[slot].is_empty():
 			return slot
@@ -7973,6 +7981,10 @@ var _fishing: Dictionary[GridEntity, Dictionary] = {}
 var _cooking: Dictionary[GridEntity, Dictionary] = {}
 ## Why the last cast or cooking broke off: "moved", "hurt", "lowered", "gone".
 var fish_broke_why := ""
+## Where the last catch went, set before fishing_changed's "caught" (857):
+## "self" (its angler's slots), "keeper" (a companion's, into her keeper's
+## pack: she had no room), "ground" (at its angler's feet); "" for a miss.
+var fish_landed_to := ""
 
 
 ## The hand holding a rod (a thing whose catalog use is "fish"), -1 if none.
@@ -8315,12 +8327,35 @@ func _land_catch(by: GridEntity) -> void:
 	var uid := 0
 	if caught:
 		uid = items.mint("fish", "caught", _label_of(by), zone.name, job["at"])
-		var slot := room_for(by, uid)
-		if slot < 0 or not put_item(by, by, slot, uid):
-			put_on_ground(uid, by.tile)
+		fish_landed_to = _stow_catch(by, uid)
+	else:
+		fish_landed_to = ""
 	by.fishing = {"state": "landed" if caught else "missed", "at": job["at"]}
 	_log("fish: %s %s at %s" % [by.name, "lands a fish" if caught else "loses the bite", job["pond"]])
 	fishing_changed.emit(by, &"caught" if caught else &"missed", uid)
+
+
+## [param uid], a catch, into [param by]'s own room (room_for: its pack
+## first), else a companion's into her keeper's pack (alive, in her zone:
+## onto his stack of it, else a free pack square, never a hand; 857, the
+## coordinator's room rule), else at its feet. Where it went (fish_landed_to).
+func _stow_catch(by: GridEntity, uid: int) -> String:
+	var slot := room_for(by, uid)
+	if slot >= 0 and put_item(by, by, slot, uid):
+		return "self"
+	var keeper: Variant = by.get("keeper") if by is Companion else null
+	if keeper is GridEntity and _alive(keeper) and (keeper as GridEntity).zone == by.zone and has_hands(keeper):
+		var into := -1
+		for packed: int in pack_slots(keeper):
+			if packed < keeper.slots.size() and stacks_onto(slot_uid(keeper, packed), uid):
+				into = packed
+				break
+		if into < 0:
+			into = free_pack_slot(keeper)
+		if into >= 0 and put_item(keeper, keeper, into, uid):  # His own hands: she need not stand beside him.
+			return "keeper"
+	put_on_ground(uid, by.tile)
+	return "ground"
 
 
 ## Each tick: casts fly, wait, bite and land, or break off; cooking cooks.

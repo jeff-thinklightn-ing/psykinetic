@@ -331,6 +331,18 @@ static func worn_kinds() -> Array[String]:
 	return out
 
 
+## Whether [param id] is a thing held to be used (the pack-first rule):
+## a row with a "verb" (a weapon, a shield, the bow, the pick), one tagged
+## weapon or shield, or the rod (use "fish"). A plain "tool" tag (the
+## bandaging kit, an axe head) is not: it is used from the pack.
+static func wielded(id: String) -> bool:
+	if id.is_empty():
+		return false
+	var row := def(id)
+	var tags: Array = row.get("tags", [])
+	return not (row.get("verb", {}) as Dictionary).is_empty() or "weapon" in tags or "shield" in tags or str(row.get("use", "")) == "fish"
+
+
 ## The kind of slot [param id] is worn in (788): "body" for armour (622),
 ## its worn field's slot, else "" (not worn).
 static func worn_kind(id: String) -> String:

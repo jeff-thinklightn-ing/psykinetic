@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_rebuild()
 	_test_charm()  # Before fishing: its steps would shift the timed checks.
 	_test_fishing()  # Last: its casts' ticks, and it clears the host (805 amended (3)).
+	_test_pack_first()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -393,10 +394,12 @@ func _test_ground() -> void:
 	_check(World.items.at_of(wood) == "%s@%d,%d" % [World.zone.name, cell.x, cell.y] and World.items.history(wood)["holder"] == "",
 			"the wood knows where it lies, carried by nobody")
 	var host_mass := host.mass
-	_check(World.try_pick_up(host, cell) and host.slot_items[Player.RIGHT_HAND] == wood, "picked up again: into the right hand")
+	var into := World.free_pack_slot(host)
+	_check(World.try_pick_up(host, cell) and into >= 0 and host.slot_items[into] == wood and host.slots[Player.RIGHT_HAND].is_empty(),
+		"picked up again: into the pack, not the fist (857)")
 	_check(not World.zone.piles.has(cell) and World.ground_at(cell).is_empty(), "and the ground is bare")
 	_check(host.mass > host_mass, "it weighs again")
-	World.try_drop(host, Player.RIGHT_HAND)
+	World.try_drop(host, into)
 	var kits: Array[int] = []
 	for i in 4:
 		var uid := World.items.mint("knife", "built")  # Things that don't stack (decision 619).
@@ -435,8 +438,9 @@ func _test_throw() -> void:
 	_check(is_instance_valid(pile) and pile.thrown_from == from, "its pile says where it was thrown from")
 	_check(not World.try_throw(host, 1, target), "nothing is thrown from the pack")
 	World._relocate(host, target)
-	World.try_pick_up(host, target)
-	World.try_transfer(host, host, Player.RIGHT_HAND, host, 1)
+	World.try_pick_up(host, target)  # Into the pack (857): back to its square 1.
+	if World.slot_of_unit(host, kit) != 1:
+		World.try_transfer(host, host, World.slot_of_unit(host, kit), host, 1)
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
 	var beside := _open_line(host, 1)
@@ -4356,6 +4360,95 @@ func _give(entity: GridEntity, id: String, slot: int) -> int:
 	var uid := World.items.mint(id, "built")
 	World.put_item(entity, entity, slot, uid)
 	return uid
+
+
+## 857, pack first (the coordinator's rule for the store): a thing picked
+## up, bought or caught goes to the pack unless it is wielded (a weapon, a
+## shield, the rod), which goes to a free hand first; a hand only when the
+## pack is full. A companion's catch with no room of hers goes to her
+## keeper's pack (never his hands), else her feet (World.fish_landed_to).
+func _test_pack_first() -> void:
+	print("
+== pack first (857): only wielded things to a free hand; a companion's catch to her keeper's pack ==")
+	var host := _player(Net.local_id)
+	_clear(host)
+	_check(Items.wielded("sword") and Items.wielded("shield") and Items.wielded("bow") and Items.wielded("pick") and Items.wielded("fishing_rod")
+			and not Items.wielded("fish") and not Items.wielded("bear_pelt") and not Items.wielded("herbs") and not Items.wielded("bandaging_kit")
+			and not Items.wielded("axe_head") and not Items.wielded(""), "wielded: weapons, shields, the bow, the pick, the rod; not a fish, a pelt, herbs, a kit, an axe head")
+	var first_pack := World.free_pack_slot(host)
+	_check(World.free_slot_for(host, "bear_pelt") == first_pack and World.free_slot_for(host, "fish") == first_pack,
+		"empty hands: a pelt and a fish go to the pack's first square (%d), not the fist" % first_pack)
+	_check(World.free_slot_for(host, "sword") == Items.RIGHT_HAND and World.free_slot_for(host, "fishing_rod") == Items.RIGHT_HAND,
+		"a sword and the rod to the right hand, ready")
+	var fish := _give(host, "fish", World.free_slot_for(host, "fish"))
+	_check(World.slot_of_unit(host, fish) == first_pack and host.slots[Items.RIGHT_HAND].is_empty(), "the fish in the pack, the hands empty")
+	var second := World.items.mint("fish", "caught")
+	_check(World.room_for(host, second) == first_pack, "another joins its stack in the pack")
+	World.items.end(second, "gone")
+	# The pack full: a hand after all.
+	for slot: int in World.pack_slots(host):
+		if host.slots[slot].is_empty():
+			_give(host, "dagger", slot)
+	_check(World.free_pack_slot(host) < 0 and World.free_slot_for(host, "bear_pelt") == Items.RIGHT_HAND, "the pack full: a pelt to a hand")
+	_clear(host)
+	# The catch: a landed fish to the pack, never into the hand the rod left.
+	_give(host, "fishing_rod", Items.RIGHT_HAND)
+	var catch := World.items.mint("fish", "caught")
+	_check(World._stow_catch(host, catch) == "self" and World.slot_of_unit(host, catch) == first_pack and host.slots[Items.LEFT_HAND].is_empty(),
+		"a player's catch: his pack, the free hand left free")
+	_clear(host)
+	# Full everywhere: the catch at his feet, and he is told so (805 amended (11): never silent).
+	var filler := World.free_slot_for(host, "dagger")
+	while filler >= 0:
+		_give(host, "dagger", filler)
+		filler = World.free_slot_for(host, "dagger")
+	var told: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	var dropped := World.items.mint("fish", "caught")
+	var stowed := World._stow_catch(host, dropped)
+	_main._on_fishing_changed(host, &"caught", dropped)
+	Net.message_received.disconnect(hear)
+	_check(stowed == "ground" and told == ["Your pack is full: a perch is left at your feet."], "a full pack: the catch at his feet, and told so on his screen (%s, %s)" % [stowed, told])
+	for each: Vector2i in World.zone.ground.keys():
+		var at := Array(World.ground_uids(each)).find(dropped)
+		if at >= 0:
+			World.items.end(World.take_from_ground(each, at), "gone")
+	_clear(host)
+	var pet: Companion = _main._companions.get(Net.player_id)
+	if pet == null or not pet.spawned:
+		_check(false, "a companion to stow for")
+		return
+	World._relocate(pet, _free_near(host, 1))
+	var had := pet.slots.duplicate()
+	var had_uids := World.slot_uids(pet)
+	World.set_slots(pet, Items.tidy([], pet.slots.size()), [])
+	var free := World.free_slot_for(pet, "dagger")
+	while free >= 0:
+		_give(pet, "dagger", free)
+		free = World.free_slot_for(pet, "dagger")
+	var hers := World.items.mint("fish", "caught")
+	_check(World._stow_catch(pet, hers) == "keeper" and World.slot_of_unit(host, hers) == first_pack,
+		"her slots full: her catch into her keeper's pack (%s)" % World.slot_of_unit(host, hers))
+	World.items.end(World.take_item(host, host, World.slot_of_unit(host, hers)), "gone")  # So the next can't join its stack.
+	for slot: int in World.pack_slots(host):
+		if host.slots[slot].is_empty():
+			_give(host, "dagger", slot)
+	var lost := World.items.mint("fish", "caught")
+	var went := World._stow_catch(pet, lost)
+	_check(went == "ground" and host.slots[Items.RIGHT_HAND].is_empty() and host.slots[Items.LEFT_HAND].is_empty()
+			and World.items.history(lost)["holder"] == "" and World.items.at_of(lost).begins_with(World.zone.name + "@"),
+		"neither has room: at her feet, never into his empty hand (%s, at %s, his hands %s %s)" % [went, World.items.at_of(lost),
+			host.slots[Items.RIGHT_HAND], host.slots[Items.LEFT_HAND]])
+	for each: Vector2i in World.zone.ground.keys():
+		var at := Array(World.ground_uids(each)).find(lost)
+		if at >= 0:
+			World.items.end(World.take_from_ground(each, at), "gone")
+	_clear(pet)
+	World.set_slots(pet, had, had_uids)
+	_clear(host)
 
 
 ## A cell [param cells] away from [param entity] in a straight line with

@@ -1022,6 +1022,9 @@ func _test_person_takes(host: Player) -> void:
 	World.economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
 	_main._hand_item(me, "sword", "test")
 	_main._hand_item(me, "dagger", "test", true)
+	for hand: int in [Items.RIGHT_HAND, Items.LEFT_HAND]:  # Keepers take from the pack only (856 amended (2)); under 857's pack first the sword and dagger start in hands.
+		if host.slots[hand] in ["sword", "dagger"] and World.free_pack_slot(host) >= 0:
+			World.try_transfer(host, host, hand, host, World.free_pack_slot(host))
 	var takes: Array = _main.person_takes(host, carp)
 	var wood: Array = takes.filter(func(row: Dictionary) -> bool: return row["what"] == "wood_bundle")
 	var had := World.stockpile.count(STORE, "wood")
