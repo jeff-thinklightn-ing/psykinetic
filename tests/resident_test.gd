@@ -4011,6 +4011,12 @@ func _test_lower_first() -> void:
 	_check(also.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "I and places' names kept: %s" % [also.map(func(line: String) -> String: return Hearsay._lower_first(line))])
 	_check(Hearsay._lower_first("Old Marta lives by the east field") == "old Marta lives by the east field" and Hearsay._lower_first("Hall doors creak.") == "hall doors creak.",
 		"a common word lowered when no name opens with it (%s)" % Hearsay._lower_first("Old Marta lives by the east field"))
+	# The coordinator's rule after voice's keep-list (2026-11-11): people's names, the names lists' and
+	# lore's, and titles' names are names whatever the prose writes small; a hyphened name whole.
+	var people := ["Rook keeps watch.", "Sedge took the coin.", "Crake ran.", "Fenn fell.", "Wren laughs.", "Theus rules.",
+		"Brand holds the key.", "Mound-breakers dig by night.", "Old Tam mends bones.", "Brother Cuth prays."]
+	_check(people.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "people's names kept: %s" % [people.map(func(line: String) -> String: return Hearsay._lower_first(line))])
+	_check(Hearsay._lower_first("Mound of earth.") == "mound of earth.", "a word of a hyphened name lowered alone (%s)" % Hearsay._lower_first("Mound of earth."))
 
 
 func _test_keep_moving() -> void:

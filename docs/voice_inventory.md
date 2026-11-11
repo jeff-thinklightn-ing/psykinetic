@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2807)
+## Lines in the code (2808)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -2833,7 +2833,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | the session's Claude budget is spent | `sim/lawspeaker.gd` tick() |
 |  | no rulings in the answer | `sim/lawspeaker.gd` tick() |
 
-### town talk (35)
+### town talk (36)
 
 | | Line | Where |
 |---|---|---|
@@ -2851,8 +2851,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | What %s knows to be true: %s What %s has heard before: %s %s just said: "%s" | `sim/hearsay.gd` claims_ask() |
 |  | - nothing of the world beyond the town | `sim/hearsay.gd` claims_ask() |
 |  | %s heard %s | `sim/hearsay.gd` claims_ask() |
-|  | ^[A-Za-z]+ | `sim/hearsay.gd` _lower_first() |
-|  | [a-z,] ([A-Z][a-z']+) | `sim/hearsay.gd` is_name() |
+|  | ^[A-Za-z]+(?:-[a-z]+)* | `sim/hearsay.gd` _lower_first() |
+|  | [a-z,] ([A-Z][a-z']+(?:-[a-z]+)*) | `sim/hearsay.gd` is_name() |
+|  | [A-Z][a-z']+ | `sim/hearsay.gd` is_name() |
 |  | ^[A-Z][a-z']+$ | `sim/hearsay.gd` is_name() |
 |  | ^([A-Z][a-z']+) the [A-Z] | `sim/hearsay.gd` is_name() |
 |  | (?:^\|(?<=[ ("]))([a-z][a-z']+)(?=[ ,.;:!?)"]\|$) | `sim/hearsay.gd` is_name() |

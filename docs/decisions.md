@@ -48663,6 +48663,16 @@ landing: editor_fields NOT_OFFERED "spots" (set in level.json until builder's sp
 return_test's player stands beside Hob off the hut's own cell (Hob strolls since 853; on the hut's
 cell the hut tied the temple and won by its id; _return_place unchanged).
 
+853 amended (1) (the coordinator's rule after voice's keep-list and lore's notes, 2026-11-11): a
+person's name is a name whatever else the texts write in small letters. Hearsay.is_name always
+counts a value of one capitalized word (the names lists: the robbers Rook, Sedge, Crake and Fenn,
+the townsfolk's and companions' names, Wren, Theus), the name of a lore entry of type "person", and
+a title's name ("Brand the Ox"); a names list's name of several words ("Old Tam", "Brother Cuth")
+keeps its capitals opening a line (Hearsay._phrases); a hyphened name is read whole ("the
+Mound-breakers", lore's). 832's "Crypt of the Fallen" and "Low Hall" come in by the level-name rule
+once they land. resident_test _test_lower_first holds the keep-list as a test. No CHANGELOG bullet
+when it ships in 853's cut (voice: the lowering and its mend arrive together); else voice's line.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

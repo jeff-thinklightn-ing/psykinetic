@@ -219,7 +219,7 @@ static func _key(text: String) -> String:
 static func _lower_first(text: String) -> String:
 	if text.length() <= 1 or text.substr(1, 1) != text.substr(1, 1).to_lower():
 		return text
-	var first := RegEx.create_from_string("^[A-Za-z]+").search(text)
+	var first := RegEx.create_from_string("^[A-Za-z]+(?:-[a-z]+)*").search(text)  # "Mound-breakers" whole.
 	if first != null and (first.get_string() == "I" or is_name(first.get_string())):
 		return text
 	for phrase: String in _phrases:
@@ -232,10 +232,13 @@ static func _is_letter(code: int) -> bool:
 	return (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or code == 39
 
 
-## The names the game's own texts use (NAME_FILES): a word they write capitalized mid-sentence (after
-## a small letter or a comma) and a names list's single word, unless they also write it in small
-## letters in prose ("Old Marta" is old Marta: "old" is a word; an id like "hollowfell" is not prose), and
-## the name of a title ("Brand the Ox"); read once.
+## The names the game's own texts use (NAME_FILES), read once. Always a name: a value that is one
+## capitalized word (a names list's, "Rook", "Wren"), a person's name in lore (an entry of type
+## "person": "Wren", "Pip"), and the name of a title ("Brand the Ox"), whatever else the texts write
+## in small letters (the coordinator's rule, 2026-11-11, after voice's keep-list). A word they write
+## capitalized mid-sentence (after a small letter or a comma; "Mound-breakers" with its hyphen) is a
+## name unless they also write it in small letters in prose ("Old Marta" is old Marta: "old" is a
+## word; an id like "hollowfell" is not prose).
 const NAME_FILES: Array[String] = ["res://levels/lore/", "res://levels/residents.json", "res://levels/economy.json",
 	"res://levels/townsfolk.json", "res://levels/companion_traits.json", "res://levels/named_enemies.json"]
 static var _names: Dictionary = {}
@@ -249,7 +252,8 @@ static var _names_read := false
 static func is_name(word: String) -> bool:
 	if not _names_read:
 		_names_read = true
-		var mid := RegEx.create_from_string("[a-z,] ([A-Z][a-z']+)")
+		var mid := RegEx.create_from_string("[a-z,] ([A-Z][a-z']+(?:-[a-z]+)*)")
+		var capital := RegEx.create_from_string("[A-Z][a-z']+")
 		var lone := RegEx.create_from_string("^[A-Z][a-z']+$")
 		var titled := RegEx.create_from_string("^([A-Z][a-z']+) the [A-Z]")
 		var small := RegEx.create_from_string("(?:^|(?<=[ (\"]))([a-z][a-z']+)(?=[ ,.;:!?)\"]|$)")
@@ -257,7 +261,7 @@ static func is_name(word: String) -> bool:
 		var phrases := {}
 		var whole := RegEx.create_from_string("^[A-Z][a-z']+(?: (?:of the |of |the )?[A-Z][a-z']+)+$")
 		var words := {}
-		var titles := {}
+		var titles := {}  # Always names: titles', names lists' and lore's people's.
 		var files: Array[String] = []
 		for path: String in NAME_FILES:
 			if path.ends_with("/"):
@@ -273,11 +277,18 @@ static func is_name(word: String) -> bool:
 				var value: Variant = pending.pop_back()
 				if value is Dictionary:
 					pending.append_array((value as Dictionary).values())
+					if value.get("type") == "person" and value.get("name") is String:
+						for found: RegExMatch in capital.search_all(str(value["name"])):
+							titles[found.get_string()] = true
+						if whole.search(str(value["name"])) != null:
+							phrases[str(value["name"])] = true
 				elif value is Array:
 					pending.append_array(value)
 				elif value is String:
 					if lone.search(value) != null:
-						_names[value] = true
+						titles[value] = true
+					elif whole.search(value) != null:
+						phrases[value] = true  # A names list's of several words: "Old Tam", "Brother Cuth".
 					var title := titled.search(value)
 					if title != null:
 						titles[title.get_string(1)] = true
