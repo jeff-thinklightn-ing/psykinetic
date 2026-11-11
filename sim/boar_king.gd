@@ -90,9 +90,8 @@ var told_line: Array[Vector2i] = []
 ## Why his last charge check missed (_try_charge; the log's reason).
 var _miss := ""
 ## His wallow: the foe he broke off from, and whether they stood by his den
-## ("far": away and alone instead, the far side of his roam).
-var _wallow_from: GridEntity = null
-var _wallow_far := false
+## ("far": away and alone instead, the far side of his roam): Monster's
+## _wallow_from and _wallow_far (Apex.to_den's state, 806 amended (14)'s stand).
 ## Cells off a foe he goes to, the far way, before standing (left alone).
 const WALLOW_CLEAR := 6
 

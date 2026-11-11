@@ -9168,12 +9168,13 @@ func _tend_wind_ups() -> void:
 		var direction: Vector2i = entity.wind_up["direction"]
 		var lead: bool = entity.wind_up.get("lead", false)
 		var began: int = entity.wind_up.get("began", tick)
+		var bonus: int = entity.wind_up.get("bonus", 0)  # A told backstab's harm on top (a FLANK monster's, from behind).
 		var logs := _logs_wind_up(entity, entity.wind_up)
 		entity.wind_up = {}
 		_winders.erase(entity)
 		var first := _hits.size()
 		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead) \
-				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true, lead):
+				and _try_hit(entity, aimed as GridEntity, entity.attack_damage + bonus, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
 				_hits[i].told = strikes_told(entity) and (not lead or tick - began >= TOLD_LEAD_TICKS)  # 340 amended (4).

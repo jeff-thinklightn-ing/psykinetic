@@ -668,10 +668,12 @@ static func _den_fighting(body: Monster, entity: GridEntity) -> bool:
 ## stands with its whole set, till its way home is open again. Its state rides the body's own _wallow_from and _wallow_far (and
 ## _wallow_hits, _wallow_seen with "at_bay_after"; _wallow_owed,
 ## _wallow_owed_seen with "bite_per_blow"); opts "log" names its log lines.
+## A boss's stand (806 amended (14), Monster.stands: Brand) keeps the same rule
+## on its own ground, its home for its den, with Monster.STAND_RULE.
 ## True while it holds the body.
-static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity, opts: Dictionary = {}) -> bool:
+static func to_den(body: Monster, below: float, den: Vector2i, biter: GridEntity, opts: Dictionary = {}) -> bool:
 	var at_bay_after := int(opts.get("at_bay_after", 0))
-	if bool(body.get("apex_out")) or body.hp <= 0 or float(body.hp) >= below * float(body.max_hp):
+	if body.get("apex_out") == true or body.hp <= 0 or float(body.hp) >= below * float(body.max_hp):
 		body.set("_wallow_from", null)
 		body.set("_wallow_far", false)
 		if at_bay_after > 0:
@@ -742,7 +744,7 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 	if per_blow and not World.winding(body).is_empty():
 		return true  # Its told bite under way: it stands through its lead.
 	body.target = null
-	body._foe = null
+	body.set("_foe", null)  # An animal's charge (a stand's monster has none).
 	body._drop_windup()
 	if World.is_stunned(body):
 		return true
@@ -805,7 +807,7 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 ## Its next cell on its way to [param den] with its own planned through
 ## (_own: they are no bar to it, 780 amended (26)); every other body blocks,
 ## as in any monster's way. Monster.NO_TILE when it has none: barred.
-static func _next_home(body: Animal, den: Vector2i) -> Vector2i:
+static func _next_home(body: Monster, den: Vector2i) -> Vector2i:
 	var lifted: Dictionary[Vector2i, GridEntity] = {}
 	for each: GridEntity in _own(body):
 		if World._occupancy.get(each.tile) == each:
@@ -819,7 +821,7 @@ static func _next_home(body: Animal, den: Vector2i) -> Vector2i:
 
 ## Its own about it, that never bar its way home: its escort (Animal.
 ## escort_lead) and, the grey's, his pack (OldWolf.pack).
-static func _own(body: Animal) -> Array[GridEntity]:
+static func _own(body: Monster) -> Array[GridEntity]:
 	var out: Array[GridEntity] = []
 	if body.has_method("pack"):
 		for each: Monster in body.call("pack"):
@@ -835,7 +837,7 @@ static func _own(body: Animal) -> Array[GridEntity]:
 ## (World.swap_places, its rules: beside it, never across a wall, a closed
 ## door or a corner), at its pace; the one it passes ends on its old cell,
 ## never anywhere else. True if it went.
-static func _past_own(body: Animal, den: Vector2i) -> bool:
+static func _past_own(body: Monster, den: Vector2i) -> bool:
 	var next := _next_home(body, den)
 	if next == Monster.NO_TILE:
 		return false
@@ -849,5 +851,5 @@ static func _past_own(body: Animal, den: Vector2i) -> bool:
 
 ## Whether its way home is barred: no way past every body but its own (a
 ## player or her companion in a two-wide way, another beast), or none at all.
-static func _barred(body: Animal, den: Vector2i) -> bool:
+static func _barred(body: Monster, den: Vector2i) -> bool:
 	return _next_home(body, den) == Monster.NO_TILE

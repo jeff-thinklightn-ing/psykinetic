@@ -255,6 +255,22 @@ const IDLE_PLAN_RETRY_TICKS := 10
 ## it never holds back, and it circles to a flank only while a mate is beside
 ## its target.
 const CALL_RUN_TICKS := 20
+## The band's rally (806 amended (14), the coordinator's ruling on enemy-ai's
+## crypt band probe: robbers stood idle 5 to 12 cells from a mate being cut
+## down). A band fighter idle or wary, looked at every RALLY_EVERY ticks,
+## whose mate is fighting within RALLY_WALK walking cells (a path's length,
+## a wall the way round it, never through), asks to come; the fighting mate
+## sends those who asked one at a time, nearest first, RALLY_GAP apart (the
+## first RALLY_GAP after the first ask), never while RALLY_MOST of its band
+## already fight its foe or are on their way to it (sent and still coming:
+## the enemy-ai probe's crypt rows had five to seven on a pair when the
+## ones coming were not counted). One posted farther keeps its post.
+const RALLY_EVERY := 10
+const RALLY_WALK := 10
+const RALLY_GAP := 20
+const RALLY_MOST := 4
+## Off, no band rallies (a test's or a probe's measure of the rule).
+static var rallies := true
 ## Sneak packs (824): a pack's members (props "pack", laid by dungeon, on a
 ## kind whose row has a "pack" block) share a target within PACK_WAKE_REACH
 ## of each other; the row's "pack" block over PACK_DEFAULTS: how much a cell
@@ -505,6 +521,23 @@ var _ambush_armed := true
 ## 806 amended (9): its row's "band_fights"; whether it has run to call its
 ## band this fight (once: then it fights on), and whom it comes back to.
 var band_fights := false
+## The band's hold-off (its row's "holds_off"; 806 amended (14), the coordinator's ruling on
+## enemy-ai's crypt rows, 2026-11-11): one who would join a fight by himself
+## while the party already has its share of his band on it (_hold_share)
+## holds HOLD_NEAR to HOLD_FAR cells off, in sight and facing them, shifting
+## his cell every HOLD_SHIFT_TICKS, and takes a place the moment one opens.
+## A boss who stands never holds; if one comes in over the share, the newest
+## fighter steps back. One the party strikes, or closes on and swings at,
+## fights (her choice). A holder strikes nobody from his hold.
+var holds_off := false
+## Holding off now (_holds_now), and when it last took up its place at its
+## party's fight (the newest steps back), and which party that was.
+var _holding := false
+var _joined_tick := -1
+var _joined_party := 0
+var _hold_shift_at := 0
+## Ticks running a place has stood open at its party (HOLD_OPEN_TICKS).
+var _hold_open := 0
 ## Its pack (824): props "pack" where its kind's row has a "pack" block, else
 ## "" (fights as ever: barrow_deep's grave guards are laid with the prop and
 ## no block); the block's rules (PACK_DEFAULTS); the most of its pack it has
@@ -667,6 +700,42 @@ var named_noted := {}
 ## its kind's "boss": Brand, the draugr). Both replicated.
 var given_name := ""
 var boss := false
+## A boss's stand (806 amended (14), the coordinator's ruling on enemy-ai's crypt
+## band probe: Brand left his fight at an eighth and stood alive in a
+## corner a minute later): a named row's "stand", it never flees; under
+## STAND_BELOW of its hp it falls back to its own ground (_stand_at, its
+## home) if it has left it and fights there to the end, by the den rule the
+## great bear and the old grey keep (Apex.to_den, STAND_RULE).
+var stands := false
+var _stand_at := NO_TILE
+const STAND_BELOW := 0.15
+const STAND_RULE := {"near": 2, "barred": true, "log": "stand"}
+## The den rule's state (Apex.to_den; 780 amended (16), (26)): the foe it
+## broke off from and whether it went the far way; struck on its walk
+## (at_bay_after); a bite owed (bite_per_blow); when it turned for home (its
+## pack covers it from then); since when a foe bars its way home, and
+## whether it is at bay, barred.
+var _wallow_from: GridEntity = null
+var _wallow_far := false
+var _wallow_hits := 0
+var _wallow_seen := -1
+var _wallow_owed := false
+var _wallow_owed_seen := -1
+var _wallow_tick := -1
+var _wallow_barred := -1
+var _wallow_at_bay := false
+## The rally (RALLY_WALK): those of its band who asked to come to its fight
+## (instance id -> [the mate, its walk]), when it may send the next, and
+## when it next looks for a mate's fight itself.
+var _rally_asked: Dictionary[int, Array] = {}
+var _rally_look_at := 0
+## The rally's pace by fight (a foe's party, _rally_party: him and his
+## companion one fight): when the next of the band may be sent to it.
+static var _rally_fight_next: Dictionary[int, int] = {}
+## The fight (_rally_party) it was sent to, while it is on its way (HUNTING):
+## counted toward RALLY_MOST there. 0 when it was sent to none.
+var _rally_for := 0
+var _wallow_bay_hard := false  # At bay for a refused step its way read open for (780 amended (30)).
 var _pick_look_tick := -100000
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
@@ -767,6 +836,7 @@ func _ready() -> void:
 		fearless = bool(row.get("fearless", false))
 		never_lies = bool(row.get("never_lies", false))
 		band_fights = bool(row.get("band_fights", false))
+		holds_off = bool(row.get("holds_off", false))
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
 		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
@@ -809,6 +879,9 @@ func _take_named_ways() -> void:
 	lurks = bool(row.get("lurks", false))
 	if lurks:
 		idle = Idle.GUARD
+	stands = bool(row.get("stand", false))
+	if stands:
+		_stand_fast()
 	var moves: Variant = row.get("moves")
 	if moves is Dictionary and (moves as Dictionary).get("ambush") is Dictionary:
 		ambush = AMBUSH.duplicate()
@@ -1135,6 +1208,11 @@ func _sim_tick() -> void:
 	if not noticing:
 		_unnoticing()
 		return
+	if stands:
+		if _stand_at == NO_TILE:
+			_stand_at = home if home != NO_TILE else tile
+		if Apex.to_den(self, STAND_BELOW, _stand_at, struck_by, STAND_RULE):
+			return  # Low and off its ground: back to it (806 amended (14)'s stand).
 	if alert == Alert.FLEEING:
 		_flee_tick()
 		return
@@ -1172,17 +1250,23 @@ func _sim_tick() -> void:
 		World.named_note(self, "met", seen)  # Decision 716: npc's memory of it.
 	target = seen
 	if target == null:
+		_holding = false
+		_hold_open = 0
 		_drop_windup()
 		if not raised.is_empty():
 			World.try_stance(self, "")  # Nobody to shoot or guard against.
 		if _pick_up(false):
 			return
+		if band_fights or stands:
+			_rally_look()
 		_alert_tick()
 		return
 	var took_up := alert != Alert.FIGHTING
 	if alert == Alert.IDLE:
 		_post = tile
 	alert = Alert.FIGHTING
+	if (band_fights or stands) and not _rally_asked.is_empty():
+		_rally_send()
 	_quarry = target
 	if target.tile != _quarry_at:
 		_quarry_from = _quarry_at
@@ -1203,6 +1287,9 @@ func _sim_tick() -> void:
 	if took_up:
 		_pressing = false
 		_standoff_mark = []
+	if holds_off and _holds_now():
+		_hold_off()
+		return  # The party has its share of the band on it: he holds off, his turn next.
 	if _tend_ambush():
 		return  # Its told strike from behind, or the opening after (790 amended (4)).
 	if not World.winding(self).is_empty():
@@ -1539,8 +1626,12 @@ func _strike() -> void:
 			if not behind and begin_lunge(target):
 				return  # From in front or side-on, told (790 amended (4)).
 			if behind:
-				# Unseen from behind: at once (no settle: it was never seen coming).
-				if World.try_attack(self, target, attack_damage + backstab_damage):
+				# From behind, told too (the coordinator's approval of combat's
+				# crypt design): the same wind-up as its front blow (lead_ticks),
+				# its backstab's harm on top as it lands (World._tend_wind_ups'
+				# "bonus"). Before, at once and untold.
+				if _stood_settle() and World.try_wind_up(self, target, lead_ticks):
+					wind_up["bonus"] = backstab_damage
 					_recover_after_blow()
 					if pack_id != "":
 						_dart_out()  # A pack's: in, and out again (824).
@@ -2698,7 +2789,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
-			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "boss": bool(row.get("boss", false)),
+			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "holds_off": bool(row.get("holds_off", false)), "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"pack": (row["pack"] as Dictionary).duplicate(true) if row.get("pack") is Dictionary else null,  # 824.
@@ -3892,6 +3983,207 @@ static func turned(direction: Vector2i, steps: int) -> Vector2i:
 
 ## A wound-up blow given up before it was struck: the views told to stop
 ## (GridEntity.winding with 0 ticks; decision 392).
+## Its band's fight near it (RALLY_WALK): idle or wary, every RALLY_EVERY
+## ticks, it asks the nearest mate fighting within its walk to be sent for.
+func _rally_look() -> void:
+	if not rallies or World.tick < _rally_look_at or alert == Alert.FLEEING or alert == Alert.HUNTING or in_truce() or lurking():
+		return
+	_rally_look_at = World.tick + RALLY_EVERY
+	_rally_for = 0
+	var nearest: Monster = null
+	for each in World.monsters():
+		var mate := each as Monster
+		if mate == null or mate == self or not mate._rallies() or not mate.spawned or mate.hp <= 0 or mate.alert != Alert.FIGHTING \
+				or not is_instance_valid(mate.target) or World.distance(tile, mate.tile) > RALLY_WALK or not _same_side(mate):
+			continue
+		if nearest == null or World.distance(tile, mate.tile) < World.distance(tile, nearest.tile):
+			nearest = mate
+	if nearest == null or nearest._rally_asked.has(get_instance_id()):
+		return
+	var way := World.find_path(tile, nearest.tile, true, self, RALLY_WALK * 8)
+	if way.is_empty() or way.size() > RALLY_WALK:
+		return
+	var fight := _rally_party(nearest.target)
+	if int(_rally_fight_next.get(fight, -1)) < World.tick:
+		_rally_fight_next[fight] = World.tick + RALLY_GAP
+	nearest._rally_asked[get_instance_id()] = [self, way.size()]
+
+
+## One of the rally's (RALLY_WALK): a band fighter, or a boss of theirs
+## who makes a stand (Brand among his robbers, the coordinator's ruling).
+func _rallies() -> bool:
+	return band_fights or stands
+
+
+## A fight's key for the rally: a companion's fight is her player's.
+static func _rally_party(foe: GridEntity) -> int:
+	if foe is Companion and is_instance_valid((foe as Companion).keeper):
+		return (foe as Companion).keeper.get_instance_id()
+	return foe.get_instance_id() if is_instance_valid(foe) else 0
+
+
+## Fighting, it sends for the next of its band who asked (_rally_look):
+## nearest first, RALLY_GAP apart, never while RALLY_MOST fight its foe.
+func _rally_send() -> void:
+	var fight := _rally_party(target)
+	if World.tick < int(_rally_fight_next.get(fight, -1)):
+		return
+	var fighting := 0
+	for each in World.monsters():
+		var mate := each as Monster
+		if mate == null or not mate._rallies() or not mate.spawned or mate.hp <= 0:
+			continue
+		if mate.alert == Alert.FIGHTING and is_instance_valid(mate.target) and _rally_party(mate.target) == fight or mate.alert == Alert.HUNTING and mate._rally_for == fight:
+			fighting += 1  # At it, or sent and on the way.
+	if fighting >= RALLY_MOST:
+		return
+	var pick := -1
+	var walk := 1 << 30
+	for id: int in _rally_asked.keys():
+		var asked: Monster = _rally_asked[id][0] as Monster if is_instance_valid(_rally_asked[id][0]) else null
+		if asked == null or not asked.spawned or asked.hp <= 0 or asked.target != null or asked.alert == Alert.FIGHTING:
+			_rally_asked.erase(id)
+			continue
+		if int(_rally_asked[id][1]) < walk:
+			walk = int(_rally_asked[id][1])
+			pick = id
+	if pick < 0:
+		return
+	var sent: Monster = _rally_asked[pick][0]
+	_rally_asked.erase(pick)
+	_rally_fight_next[fight] = World.tick + RALLY_GAP
+	sent._follow(target.tile, Alert.HUNTING, HUNT_TICKS)
+	sent._rally_for = fight
+	print("[band] %s comes to %s's fight (%d cells)" % [sent.name, name, walk])
+
+
+## The band's share of a party (the coordinator's ruling): at least
+## HOLD_SHARE_LEAST, and HOLD_SHARE_PER_BODY a body of it.
+const HOLD_SHARE_LEAST := 4
+const HOLD_SHARE_PER_BODY := 2
+const HOLD_NEAR := 3
+const HOLD_FAR := 4
+const HOLD_SHIFT_TICKS := 30
+## How long a place must stand open before a holder takes it: a mate who
+## loses sight of her for a tick is no place open.
+const HOLD_OPEN_TICKS := 2
+
+
+## [param foe]'s party (_rally_party's): its player and the companions he
+## keeps who are up, or the foe alone.
+static func _party_bodies(foe: GridEntity) -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	if not is_instance_valid(foe):
+		return out
+	var keeper: GridEntity = (foe as Companion).keeper if foe is Companion and is_instance_valid((foe as Companion).keeper) else foe
+	if keeper.spawned:
+		out.append(keeper)
+	for entity in World.sought():
+		if entity is Companion and (entity as Companion).keeper == keeper and entity.spawned and entity.hp > 0:
+			out.append(entity)
+	if out.is_empty():
+		out.append(foe)
+	return out
+
+
+## How many of its band a party of [param bodies] may have on it at once.
+static func _hold_share(bodies: int) -> int:
+	return maxi(HOLD_SHARE_LEAST, HOLD_SHARE_PER_BODY * bodies)
+
+
+## Whether it holds off its target's party now (holds_off): the share on it
+## already, and it the newest there (a standing boss never); one of the
+## party struck it, or is in reach and facing it, and it fights.
+func _holds_now() -> bool:
+	if stands or not is_instance_valid(target):
+		_holding = false
+		return false
+	var party := _rally_party(target)
+	var bodies := _party_bodies(target)
+	if is_instance_valid(struck_by) and World.tick - struck_tick <= ANSWER_TICKS and _rally_party(struck_by) == party:
+		_holding = false
+		return false  # She struck it: hers to fight.
+	for body in bodies:
+		if World.in_reach(body, self) and body.facing == Senses.way_toward(body.tile, tile):
+			_holding = false
+			return false  # She closed on it, facing it: it fights.
+	if _joined_party != party:
+		_joined_party = party
+		_joined_tick = World.tick
+	var at: Array[Monster] = []
+	for each in World.monsters():
+		var mate := each as Monster
+		if mate == null or mate == self or not mate._rallies() or not mate.spawned or mate.hp <= 0 or mate._holding:
+			continue
+		if mate.alert != Alert.FIGHTING:
+			continue
+		if is_instance_valid(mate.target) and _rally_party(mate.target) == party or mate.target == null and mate._joined_party == party:
+			at.append(mate)  # At her, or lost sight of her this tick and still at her fight.
+	var share := _hold_share(bodies.size())
+	if _holding:
+		_hold_open = _hold_open + 1 if at.size() < share else 0
+		if _hold_open >= HOLD_OPEN_TICKS:
+			_holding = false  # A place open (a fall, a flight): in.
+			_hold_open = 0
+			_joined_tick = World.tick
+		return _holding
+	if at.size() < share:
+		return false
+	# Over the share with it: the newest steps back (a standing boss never).
+	for mate in at:
+		if not mate.stands and (mate._joined_tick > _joined_tick or mate._joined_tick == _joined_tick and mate.id > id):
+			return false  # Another is newer: he steps back, not it.
+	_holding = true
+	_drop_windup()
+	slot = NO_TILE
+	return true
+
+
+## Holding off (_holds_now): HOLD_NEAR to HOLD_FAR cells from its target, in
+## sight of it and facing it; a cell along every HOLD_SHIFT_TICKS.
+func _hold_off() -> void:
+	if World.is_stunned(self) or World.tick < next_move_tick:
+		World.face(self, Senses.way_toward(tile, target.tile))
+		return
+	var d := World.distance(tile, target.tile)
+	var sees := World.has_line_of_sight(tile, target.tile)
+	if d < HOLD_NEAR:
+		_step_back()
+	elif d > HOLD_FAR or not sees:
+		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
+		if not path.is_empty() and World.distance(path[0], target.tile) >= HOLD_NEAR:
+			World.try_move(self, path[0] - tile)
+	elif World.tick >= _hold_shift_at:
+		_hold_shift_at = World.tick + HOLD_SHIFT_TICKS
+		var start := (id + World.tick / HOLD_SHIFT_TICKS) % World.DIRECTIONS.size()
+		for k in World.DIRECTIONS.size():
+			var way: Vector2i = World.DIRECTIONS[(start + k) % World.DIRECTIONS.size()]
+			var to := tile + way
+			var dt := World.distance(to, target.tile)
+			if dt < HOLD_NEAR or dt > HOLD_FAR or not World.is_free(to) or not World.has_line_of_sight(to, target.tile):
+				continue
+			if World.try_move(self, way):
+				break
+	World.face(self, Senses.way_toward(tile, target.tile))
+
+
+## A stand's (stands): it never flees, nor breaks at a rout or a dread.
+func _stand_fast() -> void:
+	for t: int in flee_below:
+		flee_below[t] = 0.0
+	dread_flee_below = 0.0
+
+
+## Its kind, as its row names it (the den rule's log lines).
+func _kind() -> String:
+	return str(spawn_spec.get("kind", ""))
+
+
+## A line of its den-rule walk (Apex.to_den's "log"): a stand's, its name's.
+func _log_move(move: String, how: String) -> void:
+	print("[%s] %s %s at %s -> %s (%d/%d)" % [move, given_name if not given_name.is_empty() else _kind(), move, tile, how, hp, max_hp])
+
+
 func _drop_windup() -> void:
 	if not _windup.is_empty():
 		_world_winding(_windup["direction"], 0)

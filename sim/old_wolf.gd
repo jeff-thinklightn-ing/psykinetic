@@ -53,16 +53,6 @@ var den := NO_TILE
 ## bars its way home ("barred"). Its walk's state (Apex.to_den's).
 const DEN_BELOW := 0.15
 const DEN_RULE := {"near": 3, "far": false, "log": "den", "at_bay_after": 0, "bite_per_blow": true, "barred": true}
-var _wallow_from: GridEntity = null
-var _wallow_far := false
-var _wallow_hits := 0
-var _wallow_seen := -1
-var _wallow_owed := false
-var _wallow_owed_seen := -1
-var _wallow_tick := -1  # When it turned for home (its pack covers it from then).
-var _wallow_barred := -1  # Since when a foe bars its way home ("barred"); at bay, its last look.
-var _wallow_at_bay := false  # Barred from its den: cornered where it stands.
-var _wallow_bay_hard := false  # At bay for a refused step its way read open for (780 amended (30)).
 ## Who of the players and companions struck it (instance ids), for its foe on
 ## the den rule (Apex.den_foe, 780 amended (29)); cleared once it is whole again.
 var _den_struck: Dictionary[int, bool] = {}

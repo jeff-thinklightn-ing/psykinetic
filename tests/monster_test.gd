@@ -1848,6 +1848,9 @@ func _test_ambush() -> void:
 	_test_den_walk_past_own()
 	_test_den_walk_barred()
 	_test_den_homeward()
+	_test_boss_stand()
+	_test_band_rally()
+	_test_band_hold_off()
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_boar_king_aim()
@@ -2027,7 +2030,7 @@ func _lunge_room() -> Array:
 
 
 ## 338 amended (4), "blows you can see": a monster's plain blow draws back
-## its kind's lead_ticks (3), told as a winding, before it lands; it stands
+## its kind's lead_ticks (a skeleton's 6), told as a winding, before it lands; it stands
 ## through it, and strikes as often as before (the lead comes out of its
 ## cycle). A step out of reach in the lead spares; lead_ticks 0, at once.
 func _test_plain_lead() -> void:
@@ -2037,7 +2040,7 @@ func _test_plain_lead() -> void:
 	var e := _build(rows)
 	var skeleton: Monster = e["k"][0]
 	var player: Player = e["P"][0]
-	_check(skeleton.lead_ticks == 3, "a skeleton's lead is the fight block's 3 (%d)" % skeleton.lead_ticks)
+	_check(skeleton.lead_ticks == 6, "a skeleton's lead is its row's 6 (the crypt take, combat's design; the fight block's 3 before) (%d)" % skeleton.lead_ticks)
 	_bold(skeleton)
 	skeleton.idle = Monster.Idle.NONE  # A crypt skeleton's homeward idle fights only what is in its way.
 	skeleton.target = player
@@ -2057,8 +2060,8 @@ func _test_plain_lead() -> void:
 	_check(began.size() >= 2 and struck.size() >= 2, "it led and struck more than once (began %s, struck %s)" % [began, struck])
 	var led := true
 	for k in mini(began.size(), struck.size()):
-		led = led and struck[k] - began[k] >= 3 and struck[k] - began[k] <= 4
-	_check(led, "each blow lands 3 ticks after it draws back (began %s, struck %s)" % [began, struck])
+		led = led and struck[k] - began[k] >= skeleton.lead_ticks and struck[k] - began[k] <= skeleton.lead_ticks + 1
+	_check(led, "each blow lands its lead (%d ticks) after it draws back (began %s, struck %s)" % [skeleton.lead_ticks, began, struck])
 	_check(skeleton.tile == at, "it stood its ground through them (%s)" % skeleton.tile)
 	var cycle := World.attack_ticks_of(skeleton)
 	_check(struck.size() >= 2 and struck[1] - struck[0] <= cycle + skeleton.cooldown_spread + 1,
@@ -8997,6 +9000,188 @@ func _test_den_walk_refused() -> void:
 ## breaks off; his den once he turns for home, on his walk and at his den
 ## alike; nothing again once he is whole enough to fight on (back over
 ## DEN_BELOW), or on the boar king's far way (no den to keep).
+func _test_boss_stand() -> void:
+	print("
+== a boss's stand: Brand low and off his ground goes back to it and fights there, never fleeing ==")
+	Monster.idling = false
+	var rows: Array[String] = ["######################", "#....................#", "#.x..................#", "#....................#",
+		"#.................P..#", "######################"]
+	for stand in [true, false]:
+		var e := _build(rows, {"x": {"named": "brand", "kind": "robber_brute", "props": Level.MONSTER_TYPES["robber_brute"].duplicate()}})
+		var brand: Monster = e["x"][0]
+		var player: GridEntity = e["P"][0]
+		var ground := brand.tile
+		if stand:
+			_check(brand.stands, "Brand's row stands")
+		else:
+			brand.stands = false
+			brand.flee_below = {Monster.Temper.BOLD: 0.15, Monster.Temper.CAUTIOUS: 0.35, Monster.Temper.COWARDLY: 0.6}
+			brand.dread_flee_below = Monster.DREAD_FLEE_BELOW
+		brand.sight_range = 12
+		brand.senses.cone_cos = -1.0
+		World.step()  # His ground taken where he stands.
+		World._relocate(brand, player.tile + Vector2i(-2, 0))
+		brand.free_pos = Vector2(brand.tile)
+		for i in 10:
+			World.step()
+		brand.hp = maxi(2, roundi(brand.max_hp * 0.1) + 1)
+		World.damage(brand, 1, player)  # Struck low: where a robber's flight is weighed.
+		var fled := false
+		var home_at := -1
+		for i in 200:
+			World.step()
+			fled = fled or brand.alert == Monster.Alert.FLEEING
+			if home_at < 0 and World.distance(brand.tile, ground) <= 2:
+				home_at = i
+		if stand:
+			_check(not fled and home_at >= 0, "low, he never flees and is back on his ground (%s, %s from it; fled %s)" % [brand.tile, World.distance(brand.tile, ground), fled])
+			World._relocate(player, brand.tile + Vector2i(1, 0))
+			player.free_pos = Vector2(player.tile)
+			var hurt := player.hp
+			for i in 80:
+				World.step()
+			_check(brand.alert == Monster.Alert.FIGHTING and player.hp < hurt and World.distance(brand.tile, ground) <= 2,
+				"come at there, he fights on his ground (%s, the player %d of %d)" % [Monster.Alert.keys()[brand.alert], player.hp, hurt])
+		else:
+			_check(fled, "the stand off: low, he flees as any robber (%s)" % [brand.tile])
+	Monster.idling = true
+
+
+func _test_band_rally() -> void:
+	print("
+== the band's rally: a mate within a walk of ten comes to the fight, one at a time; one behind a wall keeps his post ==")
+	Monster.idling = false
+	var rows: Array[String] = ["##################", "#................#", "#.P.x.....x.x....#", "#................#",
+		"##############...#", "#...x............#", "##################"]
+	for rally in [true, false]:
+		Monster.rallies = rally
+		var e := _build(rows)
+		var band: Array = e["x"]
+		var fighter: Monster = band[0]
+		var near: Monster = band[1]
+		var next: Monster = band[2]
+		var walled: Monster = band[3]
+		for robber: Monster in band:
+			robber.temper = Monster.Temper.BOLD
+		fighter.sight_range = 8
+		fighter.senses.cone_cos = -1.0
+		var came := {}
+		for i in 120:
+			World.step()
+			for robber: Monster in [near, next, walled]:
+				if not came.has(robber) and robber.alert != Monster.Alert.IDLE:
+					came[robber] = i
+		var walk_walled := World.find_path(walled.tile, fighter.tile, true, walled, 400).size()
+		if rally:
+			_check(came.has(near) and came.has(next) and int(came[next]) - int(came[near]) >= Monster.RALLY_GAP,
+				"the two within a walk come, the nearer first, %d ticks apart (%s, %s)" % [int(came.get(next, -1)) - int(came.get(near, -1)), came.get(near, -1), came.get(next, -1)])
+			_check(not came.has(walled) and walk_walled > Monster.RALLY_WALK and World.distance(walled.tile, fighter.tile) <= 3,
+				"one three cells off behind a wall, %d by the way round, keeps his post" % walk_walled)
+		else:
+			_check(came.is_empty(), "the rally off: none comes (%s)" % [came.keys().map(func(r: Monster) -> String: return r.name)])
+	Monster.rallies = true
+	# Six within a walk, posted out of sight of her: the rally sends them till
+	# RALLY_MOST are at her or on their way, never more (the probe's crypt
+	# rows had five to seven on a pair while the ones coming went uncounted).
+	var crowd: Array[String] = ["##################", "#.......x.x......#", "#.P.x............#", "#................#",
+		"#.....x.x.x.x....#", "##################"]
+	var c := _build(crowd)
+	var her: GridEntity = c["P"][0]
+	her.protected = false
+	her.max_hp = 100000
+	her.hp = 100000
+	var gang: Array = c["x"]
+	for robber: Monster in gang:
+		robber.temper = Monster.Temper.BOLD
+		robber.sight_range = 2
+	gang[0].sight_range = 8
+	gang[0].senses.cone_cos = -1.0
+	var most := 0
+	var most_counted := 0
+	for i in 400:
+		World.step()
+		her.hp = 100000
+		var at_her := gang.filter(func(r: Monster) -> bool: return r.spawned and r.alert == Monster.Alert.FIGHTING and r.target == her).size()
+		var counted := gang.filter(func(r: Monster) -> bool: return r.spawned and (r.alert == Monster.Alert.FIGHTING and r.target == her 				or r.alert == Monster.Alert.HUNTING and r._rally_for != 0)).size()
+		most = maxi(most, at_her)
+		most_counted = maxi(most_counted, counted)
+	_check(most == Monster.RALLY_MOST and most_counted <= Monster.RALLY_MOST,
+		"seven of a band, six within a walk: at most %d at her at once (%d, %d with those on their way)" % [Monster.RALLY_MOST, most, most_counted])
+	Monster.idling = true
+
+
+## The band's hold-off (the coordinator's ruling on enemy-ai's crypt rows):
+## six in sight of a solo player, never more than her share (4) in reach of
+## her over a minute; a fifth in within 1.5 s of a fall; one she strikes from
+## his hold fights her.
+func _test_band_hold_off() -> void:
+	print("%s== the band's hold-off: six robbers in sight of one player, never more than four on her; the next in when one falls ==" % char(10))
+	Monster.idling = false
+	var rows: Array[String] = ["##############", "#............#", "#.x...x...x..#", "#............#", "#............#",
+		"#.....P......#", "#............#", "#............#", "#.x...x...x..#", "#............#", "##############"]
+	var e := _build(rows)
+	var her: GridEntity = e["P"][0]
+	her.protected = false
+	her.max_hp = 100000
+	her.hp = 100000
+	var band: Array = e["x"]
+	for robber: Monster in band:
+		robber.temper = Monster.Temper.BOLD
+		robber.sight_range = 8
+		robber.senses.cone_cos = -1.0
+		robber.max_hp = 100000  # None falls but the one this test fells.
+		robber.hp = 100000
+	_check(band.size() == 6 and band.all(func(r: Monster) -> bool: return r.holds_off and r.band_fights),
+		"six of the band, each holding off by its row (\"holds_off\")")
+	var most := 0
+	var holders_seen := 0
+	for i in 600:
+		World.step()
+		her.hp = 100000
+		var near_her := band.filter(func(r: Monster) -> bool: return r.spawned and World.in_reach(r, her)).size()
+		most = maxi(most, near_her)
+		holders_seen = maxi(holders_seen, band.filter(func(r: Monster) -> bool: return r.spawned and r._holding).size())
+	var holders := band.filter(func(r: Monster) -> bool: return r.spawned and r._holding)
+	var held_off := true
+	for held: Monster in holders:
+		var d := World.distance(held.tile, her.tile)
+		held_off = held_off and d >= Monster.HOLD_NEAR and d <= Monster.HOLD_FAR + 1 and World.has_line_of_sight(held.tile, her.tile)
+	_check(most <= Monster.HOLD_SHARE_LEAST and holders_seen >= 2 and held_off,
+		"over a minute at most %d in reach of her (%d), %d holding off 3 to 4 cells away in sight (%s)" \
+		% [Monster.HOLD_SHARE_LEAST, most, holders_seen, holders.map(func(r: Monster) -> int: return World.distance(r.tile, her.tile))])
+	# One of those at her falls: a holder takes his place within 1.5 s.
+	var at_her: Array = band.filter(func(r: Monster) -> bool: return r.spawned and not r._holding and r.target == her)
+	var fallen: Monster = at_her[0]
+	World.damage(fallen, 1000000, her)
+	var back := -1
+	for i in 30:
+		World.step()
+		her.hp = 100000
+		var near_her := band.filter(func(r: Monster) -> bool: return r.spawned and World.in_reach(r, her)).size()
+		if near_her >= Monster.HOLD_SHARE_LEAST and back < 0:
+			back = i + 1
+	_check(not fallen.spawned and back > 0 and back <= 15,
+		"one of the four falls: the next is in reach of her %d ticks after (within 15)" % back)
+	# A holder she strikes fights her (her choice), over the share.
+	var holder: Monster = null
+	for i in 200:
+		World.step()
+		her.hp = 100000
+		var now: Array = band.filter(func(r: Monster) -> bool: return r.spawned and r._holding)
+		if not now.is_empty():
+			holder = now[0]
+			break
+	var struck := false
+	if holder != null:
+		World.damage(holder, 1, her)
+		for i in 3:
+			World.step()
+			her.hp = 100000
+		struck = not holder._holding and holder.alert == Monster.Alert.FIGHTING
+	_check(holder != null and struck, "a holder she strikes fights her (holding now: %s)" % [holder._holding if holder != null else null])
+	Monster.idling = true
+
+
 func _test_den_homeward() -> void:
 	print("%s== Apex.homeward: his den while he is on the den rule, else nothing ==" % char(10))
 	Monster.idling = false
