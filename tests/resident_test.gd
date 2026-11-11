@@ -92,6 +92,7 @@ func _ready() -> void:
 	_test_camp_traders()  # 799: the forest camps' traders.
 	_test_relic()  # 714: the knight's remains to Aldous.
 	_test_vendor()  # 736: the starter stall.
+	_test_legs()  # 853 amended (6): routes as a few long legs.
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_keep_moving()  # 853, its moving on (Resident.keep_moving) for itself.
@@ -3712,6 +3713,60 @@ func _test_crypt_secrets() -> void:
 	_main._secret_told("p-other", "old_gods.war")
 	_check(bool(_main._crypt_told.get("p-other", false)), "and the old gods' (lore's old_gods.*), the same secret's deeper why")
 	_main._crypt_told.clear()
+
+
+## A route as a few long legs (853 amended (6), Jeff's "walking looks like skipping": 47% of a day's
+## resident steps turned): World.legs_path keeps find_path's ends, never more steps nor diagonals, each
+## step a king's move, and turns no more often; on open ground, one turn at most.
+func _test_legs() -> void:
+	print("
+== a route as a few long legs, not a staircase (853 amended (6)) ==")
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	var turns := func(from: Vector2i, cells: Array[Vector2i]) -> int:
+		var count := 0
+		var at := from
+		var last := Vector2i.ZERO
+		for cell in cells:
+			var way := cell - at
+			if last != Vector2i.ZERO and way != last:
+				count += 1
+			last = way
+			at = cell
+		return count
+	var diagonals := func(from: Vector2i, cells: Array[Vector2i]) -> int:
+		var count := 0
+		var at := from
+		for cell in cells:
+			if cell.x != at.x and cell.y != at.y:
+				count += 1
+			at = cell
+		return count
+	var kings := func(from: Vector2i, cells: Array[Vector2i]) -> bool:
+		var at := from
+		for cell in cells:
+			if maxi(absi(cell.x - at.x), absi(cell.y - at.y)) != 1 or not World.is_walkable(cell):
+				return false
+			at = cell
+		return true
+	var tried := 0
+	var before := 0
+	var after := 0
+	var steps := 0
+	var held := true
+	for pair: Array in [[Vector2i(-4, -3), Vector2i(4, 1)], [Vector2i(-3, 3), Vector2i(3, -2)], [Vector2i(0, -4), Vector2i(2, 4)], [Vector2i(-4, 0), Vector2i(4, 3)]]:
+		var a: Vector2i = _main._nearest_free(store + pair[0])
+		var b: Vector2i = _main._nearest_free(store + pair[1])
+		var path := World.find_path(a, b, false, null, Resident.RESIDENT_SEARCH_TILES)
+		if path.size() < 3:
+			continue
+		tried += 1
+		var legs := World.legs_path(a, path, b)
+		held = held and legs.size() <= path.size() and legs.back() == b and kings.call(a, legs) and diagonals.call(a, legs) <= diagonals.call(a, path) 			and turns.call(a, legs) <= turns.call(a, path)
+		before += turns.call(a, path)
+		after += turns.call(a, legs)
+		steps += legs.size()
+	_check(tried > 0 and held, "the legs keep the ends, never more steps or diagonals, king's moves, no more turns (%d routes)" % tried)
+	_check(after < before or before == 0, "fewer turns: %d before, %d after, over %d steps" % [before, after, steps])
 
 
 ## What was asked goes first (853 amended (4), lore's audit: every opening the same top-weighted facts):

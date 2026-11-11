@@ -1588,8 +1588,8 @@ func _step() -> void:
 	if tile == _goal or World.tick < next_move_tick or World.tick < _rise_until:
 		return
 	if _route.is_empty():
-		_route = World.find_path(tile, _goal, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
-				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN)
+		_route = World.legs_path(tile, World.find_path(tile, _goal, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
+				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN), _goal, self)  # A few long legs, not a staircase (853 amended (6)).
 		if _route.is_empty() and World.distance(tile, _goal) > 1 and World.is_walkable(_goal) and not World.is_free(_goal):
 			_route = _path_beside(_goal)  # Another stands on it (853: one strolled onto the store's cell and the carrier stood).
 		if _route.is_empty():
@@ -1624,7 +1624,7 @@ func _path_beside(cell: Vector2i) -> Array[Vector2i]:
 		var way := World.find_path(tile, at, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
 				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN)
 		if not way.is_empty():
-			return way
+			return World.legs_path(tile, way, at, self)
 	return []
 
 

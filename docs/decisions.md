@@ -49041,6 +49041,19 @@ lost beyond the walls "lost", awake abed "abed", else greet.refuse. One who has 
 their card ("asks", by this player) is greeted with greet.waiting by the day, over the standing's
 word and the trade's. Nobody is refused who was not before. Server and levels data.
 
+853 amended (6) (npc's look at Umbrage, the coordinator's approval, 2026-11-11; one function with
+companions): a resident walks a few long legs, not a staircase. A headless day in the plaza turned
+47% of 2,899 resident steps (find_path's 8-way staircases), and a grid stepper faces each step, so up
+close the body twisted every other step (physics measured companions' Wren at 17.7 degrees a step,
+the median; the player's free body follows walk_path's pulled line and does not twist). World.legs_path
+(from, path, goal, ignore) redraws a find_path route from each point as the longest run two legs can
+take instead (a diagonal run and a straight run, World._two_legs, the one going on the last step's way
+tried first; each leg World._line_clear), within World.LEGS_REACH points: never more steps or
+diagonals, a turn only between legs. Resident._step's route and _path_beside's take it; companions'
+Heel.step calls it on its route (485 amended (2), theirs). find_path, walk_path and monsters are
+unchanged. resident_test _test_legs: the ends kept, no more steps, diagonals or turns, fewer turns over
+four routes in the town.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
