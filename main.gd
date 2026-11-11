@@ -19393,6 +19393,14 @@ func _on_visitor_left(town: String, id: String) -> void:
 ## The news a visitor to [param town] carries: the newest happening of up
 ## to two other towns ("In Westfold, the wagon came home."), else a word of
 ## the road from where they came (townsfolk.json visitors.road).
+## Whether visitor [param entry] comes from nowhere known (711 amended): Towns writes "the road" when
+## the town has no road's far end yet (a fresh world), and "from %s" made "the road from the road";
+## townsfolk.json's "greetings_unplaced" and "road_unplaced" name no place.
+static func _visitor_unplaced(entry: Dictionary) -> bool:
+	var from := str(entry.get("from", ""))
+	return from.is_empty() or from == "the road"
+
+
 func _visitor_news(town: String, entry: Dictionary) -> Array:
 	var out: Array = []
 	var others: Array = World.towns._towns.keys()
@@ -19407,11 +19415,20 @@ func _visitor_news(town: String, entry: Dictionary) -> Array:
 				newest = said
 		if not newest.is_empty():
 			out.append({"kind": "town", "text": "In %s, %s." % [_town_words(other), Resident._lead(str(newest.get("text", ""))).trim_suffix(".")]})
-	var road: Array = Townsfolk.rules().get("visitors", {}).get("road", [])
+	var road := _visitor_road(entry)
 	if out.is_empty() and not road.is_empty():
-		var line := str(road[absi(hash(str(entry.get("id", "")))) % road.size()])
-		out.append({"kind": "road", "text": line % str(entry.get("from", "the road")) if line.contains("%s") else line})
+		out.append({"kind": "road", "text": road})
 	return out
+
+
+## A word of the road visitor [param entry] came by (townsfolk.json visitors.road, from where they
+## came; road_unplaced when that is nowhere known, _visitor_unplaced); "" for none.
+static func _visitor_road(entry: Dictionary) -> String:
+	var road: Array = Townsfolk.rules().get("visitors", {}).get("road_unplaced" if _visitor_unplaced(entry) else "road", [])
+	if road.is_empty():
+		return ""
+	var line := str(road[absi(hash(str(entry.get("id", "")))) % road.size()])
+	return line % str(entry.get("from", "")) if line.contains("%s") else line
 
 
 ## The visitors of [param place_id] wanted here as bodies (_sync_residents):
@@ -19893,7 +19910,10 @@ func _visitor_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
 			_resident_says(body, str(leaving[absi(hash(body.worker_id)) % leaving.size()]), "", player)
 		return
 	var from := str(entry.get("from", "the road"))
-	var greetings: Array = words.get("greetings", {}).get(str(entry.get("kind", "")), [])
+	var kind := str(entry.get("kind", ""))
+	var greetings: Array = words.get("greetings_unplaced", {}).get(kind, []) if _visitor_unplaced(entry) else []
+	if greetings.is_empty():
+		greetings = words.get("greetings", {}).get(kind, [])  # The vendor's name no place.
 	if not greetings.is_empty():
 		var line := str(greetings[absi(hash(body.worker_id + player.player_id)) % greetings.size()])
 		_resident_says(body, line % from if line.contains("%s") else line, "", player)

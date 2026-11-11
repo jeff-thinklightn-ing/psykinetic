@@ -5902,6 +5902,22 @@ func _test_visitors() -> void:
 	_main._greet_at.clear()
 	_main._greeted(player, odo)
 	_check(spoken.size() == 1, "clicked again: the greeting only, the news told once a visit (%s)" % [spoken])
+	# From nowhere known (711 amended; v0.1.210: "The road from the road was quiet"): lines naming no place.
+	var words: Dictionary = Townsfolk.rules()["visitors"]
+	var nowhere := {"id": "visitor_rs_nowhere", "kind": "traveller", "from": "the road"}
+	var told := Main._visitor_road(nowhere)
+	_check(told in words["road_unplaced"] and not told.contains("road from"), "from nowhere known: the road's news names no place (%s)" % told)
+	_check(Main._visitor_road({"id": "visitor_rs_nowhere", "from": "Saltmarsh"}).contains("from Saltmarsh"), "from a known place: the road from it")
+	var was_from := str(entry["from"])
+	entry["from"] = "the road"
+	spoken.clear()
+	_main._greet_at.clear()
+	_main._greeted(player, odo)
+	_check(spoken.size() == 1 and spoken[0] in words["greetings_unplaced"]["pedlar"], "a pedlar from nowhere known greets naming no place (%s)" % [spoken])
+	entry["from"] = was_from
+	for kind: String in words["greetings_unplaced"]:
+		for line: String in words["greetings_unplaced"][kind] + words["road_unplaced"]:
+			_check(not line.contains("%s"), "no place to fill in %s's \"%s\"" % [kind, line])
 	var offers := Offers.of(odo.worker_id, pid)
 	_check(offers.size() == 1 and str(offers[0]["kind"]) == Offers.WARES and int(offers[0]["cost"]) == _main._visitor_price("spice"),
 		"a pedlar's wares, at economy's price (%s)" % [offers])

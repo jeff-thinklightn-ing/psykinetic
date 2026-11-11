@@ -36326,6 +36326,17 @@ for robber_brute too (enemy-ai's coming kind). resident_test covers each
 step, and townsfolk_test, farm_test and companion_test pass. Server only,
 protocol unchanged (measured), no new class_name.
 
+711 amended (1), npc's side (the script's label; found in economy's walk on v0.1.210, the coordinator's
+routing): visitors from nowhere known name no place. In a fresh world a town has no road's far end yet,
+Main's visitor_from gives none, and Towns writes "the road" for where a visitor came from (economy keeps
+that word); the lines filled it into "from %s": Hale "Just passing through, from the road." then "The
+road from the road was quiet, thank the gods.", Edda "Nothing much stirring on the road from the road."
+Now Main._visitor_unplaced (from "" or "the road") draws townsfolk.json visitors "greetings_unplaced" by
+kind and "road_unplaced" (voice's words; none of the greetings says "road", so the news after one never
+repeats it); a vendor's greetings name no place already. The road's word is Main._visitor_road.
+resident_test _test_visitors: the news and a pedlar's greeting from nowhere known, a known place's road
+still named, no %s in the new lines. Server and levels data, protocol unchanged, no new class_name.
+
 ## 603 amended (7), ui's side: the disc's rim whole
 
 Combat's whole-disc spin (half_angle 180) drew its rim, the curtain, with

@@ -76,7 +76,13 @@
 			"pedlar": ["Fine things from %s, if you've the coin.", "Come and look. All the way from %s."],
 			"pilgrim": ["Peace on you. I've walked from %s to pray here.", "The gods keep you. I came from %s."]
 		},
+		"greetings_unplaced": {
+			"traveller": ["Just passing through. Where's a body get a drink round here?", "Only stopping the night, then on again."],
+			"pedlar": ["Fine things, if you've the coin.", "Carried all this on my back. Have a look."],
+			"pilgrim": ["Peace on you. I've come to pray here.", "The gods keep you. My feet ache, but I'm here to pray."]
+		},
 		"road": ["The road from %s was quiet, thank the gods.", "Nothing much stirring on the road from %s."],
+		"road_unplaced": ["The road was quiet, thank the gods.", "Nothing much stirring out there."],
 		"leaving": ["I'm on my way. Fare you well.", "Off down the road. Gods keep you."]
 	}
 }

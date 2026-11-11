@@ -8,9 +8,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2747)
+## Lines in the code (2768)
 
-### companions (Pip, Wren, Nix) (626)
+### companions (Pip, Wren, Nix) (627)
 
 | | Line | Where |
 |---|---|---|
@@ -82,6 +82,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | something striking a door | `sim/companion.gd`  |
 |  | a door breaking | `sim/companion.gd`  |
 |  | (?i)\\b(i'?ll\|i will\|let me\|i'?m going to\|i can\|on it)\\b | `sim/companion.gd` PROMISE |
+|  | (?i)\\b(i'?ll\|i will\|let me\|i can\|i could\|i'?d (love\|like\|be glad\|be happy) to\|shall i\|should i\|want me to\|i'?m going to\|happy to\|glad to)\\b[^.!?]*\\b((lead\|guide\|take\|bring\|walk)\\s+(you\|us)\\b\|show\\s+(you\|us)\\s+the\\s+way\|lead\\s+the\\s+way)\|\\b(follow me\|come with me)\\b | `sim/companion.gd` LEAD_OFFER |
 |  | \\b(north-east\|north-west\|south-east\|south-west\|north\|south\|east\|west)\\b | `sim/companion.gd` COMPASS_WORD |
 |  | \\b(where\|see\|look\|around\|near\|next\|here\|this\|that\|fire\|flames?\|burn\\w*\|glow\\w*\|warm\|water\|door\|crates?\|box\\w*\|boulders?\|rocks?\|carts?\|chests?\|ledges?\|edge\|drop\|stairs?\|torch\\w*\|light)\\b | `sim/companion.gd` SURROUNDINGS_WORDS |
 |  | fire\|flame\|burn | `sim/companion.gd`  |
@@ -1221,11 +1222,16 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (587)
+### other (sim) (598)
 
 | | Line | Where |
 |---|---|---|
 |  | its hours over | `sim/apex.gd` _fall_back_why() |
+|  | , the far way (a foe by his den) | `sim/apex.gd` to_den() |
+|  | goes on home, its way open | `sim/apex.gd` to_den() |
+|  | turns at bay, struck %d times on the way | `sim/apex.gd` to_den() |
+|  | bites back, told | `sim/apex.gd` to_den() |
+|  | turns at bay, its way home barred | `sim/apex.gd` to_den() |
 |  | eaten by wolves | `sim/balance.gd` eat() |
 |  | put down by someone | `sim/balance.gd` _gone() |
 |  | taken by wolves | `sim/balance.gd` take_sheep() |
@@ -1237,7 +1243,6 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | a breeding pair kept, ewes from town | `sim/balance.gd` _judge() |
 |  | from the farm, the wolves kept off | `sim/balance.gd` _judge() |
 |  | the flock lost to the wolves | `sim/balance.gd` _judge() |
-|  | , the far way (a foe by his den) | `sim/boar_king.gd` _to_wallow() |
 |  | struck at his own cell | `sim/boar_king.gd` _try_charge() |
 |  | struck at %s, its tile %s: off the line's %d cells (%d off) | `sim/boar_king.gd` _why_missed() |
 | L | struck at %s, its tile %s: blocked at %s by the ground | `sim/boar_king.gd` _why_missed() |
@@ -1431,6 +1436,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | it isn't safe ahead | `sim/guide.gd`  |
 |  | (?i)\\b(take\|lead\|guide\|show\|bring\|walk)\\s+(me\|us)\\b.*\\b(to\|towards?)\\b\|\\b(lead\|show)\\s+(me\\s+\|us\\s+)?the\\s+way\\b\|\\bwhich\\s+way\\s+to\\b\|\\b(you\\s+lead\|take\\s+the\\s+lead\|lead\\s+(us\|me\|on\\s+to))\\b | `sim/guide.gd` ASK |
 |  | (?i)^\\W*(lead on\|go on\|lead the way\|carry on\|keep going\|onwards?)\\W*$ | `sim/guide.gd` RESUME |
+|  | (?i)^\\W*(yes\|yeah\|yep\|yup\|aye\|sure\|ok\|okay\|alright\|all right\|please\|lead on\|lead the way\|go on\|let'?s go\|let'?s\|take me\|show me\|why not\|sounds good\|of course\|i'?d like that\|i'?d love that\|that would be (nice\|good\|great\|lovely))\\b | `sim/guide.gd` AGREES |
+|  | Anywhere else, you do not know the way; if it comes up, say so in your own words. | `sim/guide.gd` UNKNOWN_WAY |
+|  | You do not know the way to any place yet; if it comes up, say so in your own words. | `sim/guide.gd` NO_WAY_YET |
 |  | its grudge on %s to %s-bane | `sim/item_book.gd` drop_grudge() |
 |  | from %s by %s | `sim/item_book.gd` keep() |
 |  | %s into %s%s | `sim/item_book.gd` reforge() |
@@ -1756,6 +1764,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the prices have moved | `sim/world.gd` try_barter() |
 |  | no room to carry it | `sim/world.gd` try_barter() |
 |  | %s has no coin for that today. | `sim/world.gd` try_barter() |
+|  | his %s %s | `sim/world.gd` end_telegraph() |
+|  | his charge to his axe | `sim/world.gd` try_axe_charge() |
 |  | the ground at %d,%d | `sim/world.gd` _bank_ground() |
 |  | on the ground by %s | `sim/world.gd` _pick_unit() |
 |  | %s@%d,%d | `sim/world.gd` put_on_ground() |
@@ -1776,10 +1786,12 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | nothing (its speed spent) | `sim/world.gd` _roll_step() |
 |  | , dead: what it carried lies there | `sim/world.gd` _fall_hurt() |
 |  | nothing (the lunge's length) | `sim/world.gd` _lunge_cell() |
+|  | nothing (its told line's end) | `sim/world.gd` _lunge_cell() |
 |  | a braced spear | `sim/world.gd` _lunge_cell() |
 |  | a cell held (%s) | `sim/world.gd` _lunge_cell() |
 |  | nothing (it arrived) | `sim/world.gd` _lunge_cell() |
 |  | at %s by %s | `sim/world.gd` hurl() |
+|  | its time out | `sim/world.gd` _tend_steady() |
 |  | nothing (walked into) | `sim/world.gd` _shift() |
 |  | nothing (force spent) | `sim/world.gd` _free_slide() |
 |  | the rim (teetering) | `sim/world.gd` _free_slide() |
@@ -1957,7 +1969,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (707)
+### server and windows (712)
 
 | | Line | Where |
 |---|---|---|
@@ -2083,7 +2095,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s leaves her work in the town and goes with %s. | `main.gd` _join_companion() |
 |  | %s is sick with %s, and goes with %s all the same. | `main.gd` _join_companion() |
 |  | , and can lead them there | `main.gd` _roads_words() |
-|  | You know the way to %s, having been there with %s%s. %s | `main.gd` _roads_words() |
+|  | You know the way to %s%s. %s | `main.gd` _roads_words() |
+|  | You would like to go fishing with them at %s, and could offer to take them there. | `main.gd` _roads_words() |
+|  | Except to %s: you would like to go fishing with them there, and you can take them there yourself. | `main.gd` _roads_words() |
 |  | (?i)\\b(to\|towards?)\\b | `main.gd` _guide_said() |
 |  | %s asks you to lead them somewhere you have not been with them: you do not know the way there. | `main.gd` _guide_said() |
 |  | %s asks you to lead them to %s, and you are there already. | `main.gd` _guide_said() |
@@ -2094,10 +2108,13 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s asks you again to lead them to %s; you refused earlier today and still will not: it isn't safe: %s. | `main.gd` _start_guide() |
 |  | %s asked you to lead them to %s, but you will not go: it isn't safe: %s.%s Tell them so. | `main.gd` _start_guide() |
 |  | %s won't lead the way to %s: it isn't safe. | `main.gd` _start_guide() |
-|  | %s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again. | `main.gd` _start_guide() |
+|  | %s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again.%s | `main.gd` _start_guide() |
+|  | It is where you wanted to go fishing with them. | `main.gd` _start_guide() |
 |  | %s leads the way to %s. | `main.gd` _start_guide() |
 |  | %s has brought %s to %s. | `main.gd` _guide_done() |
-|  | You have led %s to %s, as they asked. | `main.gd` _guide_done() |
+|  | You have led %s to %s, %s. | `main.gd` _guide_done() |
+|  | where you wanted to go fishing with them | `main.gd` _guide_done() |
+|  | as they asked | `main.gd` _guide_done() |
 |  | %s stops leading the way: %s. | `main.gd` _guide_done() |
 |  | You stopped leading %s to %s: %s. | `main.gd` _guide_done() |
 |  | You would lead them as far as %s, and no further. | `main.gd` _as_far_words() |
@@ -2733,7 +2750,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the session's Claude budget is spent | `sim/lawspeaker.gd` tick() |
 |  | no rulings in the answer | `sim/lawspeaker.gd` tick() |
 
-### town talk (28)
+### town talk (32)
 
 | | Line | Where |
 |---|---|---|
@@ -2751,6 +2768,10 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | What %s knows to be true: %s What %s has heard before: %s %s just said: "%s" | `sim/hearsay.gd` claims_ask() |
 |  | - nothing of the world beyond the town | `sim/hearsay.gd` claims_ask() |
 |  | %s heard %s | `sim/hearsay.gd` claims_ask() |
+|  | ^[A-Za-z]+ | `sim/hearsay.gd` _lower_first() |
+|  | [a-z,] ([A-Z][a-z']+) | `sim/hearsay.gd` is_name() |
+|  | ^[A-Z][a-z']+$ | `sim/hearsay.gd` is_name() |
+|  | ^([A-Z][a-z']+) the [A-Z] | `sim/hearsay.gd` is_name() |
 |  | (?i)\\b(king\|queen\|prince\|princess\|lord\|lady\|duke\|baron\|knight\\w*\|emperor\|empire\|kingdom\|realm\|crown\|throne\|god\|gods\|goddess\|temple of\|priest of\|prophe\\w+\|war\|army\|armies\|legion\\w*\|dwarf\|dwarves\|elf\|elves\|orc\\w*\|goblin\\w*\|kobold\\w*\|dragon\\w*\|demon\\w*\|the land\|mountain\\w*\|river\\w*\|forest\\w*\|sea\|ocean\|capital\|city\|cities)\\b | `sim/town_memory.gd` WORLD_WORDS |
 |  | The town remembers that %s. | `sim/town_memory.gd` remembered() |
 |  | (?i)\\bold\\b | `sim/town_memory.gd` person_of() |
@@ -2847,7 +2868,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (803)
+## Lines in the data (865)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3301,7 +3322,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (121)
+### levels/townsfolk.json (129)
 
 | | Line | Key |
 |---|---|---|
@@ -3422,8 +3443,16 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Come and look. All the way from %s. | `visitors.greetings.pedlar[1]` |
 |  | Peace on you. I've walked from %s to pray here. | `visitors.greetings.pilgrim[0]` |
 |  | The gods keep you. I came from %s. | `visitors.greetings.pilgrim[1]` |
+|  | Just passing through. Where's a body get a drink round here? | `visitors.greetings_unplaced.traveller[0]` |
+|  | Only stopping the night, then on again. | `visitors.greetings_unplaced.traveller[1]` |
+|  | Fine things, if you've the coin. | `visitors.greetings_unplaced.pedlar[0]` |
+|  | Carried all this on my back. Have a look. | `visitors.greetings_unplaced.pedlar[1]` |
+|  | Peace on you. I've come to pray here. | `visitors.greetings_unplaced.pilgrim[0]` |
+|  | The gods keep you. My feet ache, but I'm here to pray. | `visitors.greetings_unplaced.pilgrim[1]` |
 |  | The road from %s was quiet, thank the gods. | `visitors.road[0]` |
 |  | Nothing much stirring on the road from %s. | `visitors.road[1]` |
+|  | The road was quiet, thank the gods. | `visitors.road_unplaced[0]` |
+|  | Nothing much stirring out there. | `visitors.road_unplaced[1]` |
 |  | I'm on my way. Fare you well. | `visitors.leaving[0]` |
 |  | Off down the road. Gods keep you. | `visitors.leaving[1]` |
 
@@ -3590,11 +3619,19 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | the spears round the mound | `entries[2].facts[28].sight` |
 |  | On nights the robbers have dug, or when the temple's alms fall short, the barrow's dead come up out of the dark. | `entries[2].facts[29].text` |
 
-### levels/lore/knowers.json (1)
+### levels/lore/knowers.json (9)
 
 | | Line | Key |
 |---|---|---|
 |  | a scholar in the archive | `knowers[2].name` |
+|  | lore (d), Umbrage's trades | `knowers[13].source` |
+|  | lore (d), Umbrage's trades | `knowers[14].source` |
+|  | lore (d), Umbrage's trades | `knowers[15].source` |
+|  | lore (d), Umbrage's trades | `knowers[16].source` |
+|  | lore (d), Umbrage's trades | `knowers[17].source` |
+|  | lore (d), Umbrage's trades | `knowers[18].source` |
+|  | lore (d), Umbrage's trades | `knowers[19].source` |
+|  | lore (d), Umbrage's trades | `knowers[20].source` |
 
 ### levels/lore/materials.json (8)
 
@@ -3609,14 +3646,20 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The learned have tied the rot to the ore, some by watching and some by the gift. | `entries[1].facts[1].text` |
 |  | Ore from the mine carries the rot into those who work it or carry it long. | `entries[1].facts[2].text` |
 
-### levels/lore/people.json (20)
+### levels/lore/people.json (58)
 
 | | Line | Key |
 |---|---|---|
 |  | The priest who keeps the town's temple and brings the fallen back. | `entries[0].summary` |
 |  | The town's priest brings the fallen back. | `entries[0].facts[0].text` |
+|  | The priest blesses a thing brought to him for an offering of half its worth. | `entries[0].facts[1].text` |
+|  | The priest's keep comes from the temple's alms, and the town pays him nothing while it is a hamlet. | `entries[0].facts[2].text` |
+|  | The priest is at the temple from six till noon and again through the afternoon, and at the square at noon and in the evening. | `entries[0].facts[3].text` |
 |  | The medicine man who lives in the healer's hut in the wilds and brings the fallen back. | `entries[1].summary` |
 |  | The medicine man in the healer's hut brings the fallen back. | `entries[1].facts[0].text` |
+|  | The medicine man gathers herbs near his hut and makes remedies, stamina potions, the bear's-claw charm and the bear's-grease draught, remedies first while anyone is sick. | `entries[1].facts[1].text` |
+|  | The medicine man takes someone into his care for ten gold, or five herbs or five antlers, or for doing his first errand; only those in his care are brought back at his hut. | `entries[1].facts[2].text` |
+|  | The medicine man visits the sick in town, and mends his hut with wood and cloth from the town's store. | `entries[1].facts[3].text` |
 |  | The town's smith, who went below the castle after a rumoured great dwarven forge with hired guards; ambushed and captured, he is held at the forge, forced to work goblin weapons for the Blood Rot's raids (docs/lore/castle.md). | `entries[2].summary` |
 | L | Rumour tells of a great dwarven forge deep below the castle. | `entries[2].facts[0].text` |
 | L | The smith went down after the great dwarven forge, bringing an expedition of hired guards to protect him and carry out what they found. | `entries[2].facts[1].text` |
@@ -3633,8 +3676,40 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | L | Pip knows only enough to do the temple's work; part of his pay is to keep what he sees to himself, with the promise that he will one day become a holy knight of Theus. | `entries[5].facts[3].text` |
 |  | Nix is a woman, a companion who rests in town between trips; the rest of who she is comes from her card, which the companions tree rolls and grows. | `entries[6].summary` |
 |  | Nix is a woman who goes out with the town's people by choice and rests in town between trips. | `entries[6].facts[0].text` |
+|  | The Mughouse's taverner keeps its counter and lives in the tavern (residents.json; economy's beds and rents). | `entries[7].summary` |
+|  | The taverner keeps the Mughouse's counter from nine in the morning till eight at night, and lives in the tavern. | `entries[7].facts[0].text` |
+|  | Half of what the Mughouse is paid for its beds is the taverner's and the rest goes to the town's treasury: two gold for a resident's bed, two to six for a traveller's stay. | `entries[7].facts[1].text` |
+|  | While the town has no cook, the taverner takes in the food, meat and fish brought to the Mughouse. | `entries[7].facts[2].text` |
+|  | The town's merchant, the settled goblin with his counter a little apart, and the only fence (decisions 471, 586). | `entries[8].summary` |
+|  | The merchant sells his goods dearer than the town's store does. | `entries[8].facts[0].text` |
+|  | By day the merchant turns away anything stolen or taken from the dead. | `entries[8].facts[1].text` |
+|  | By night, at his counter, the merchant buys stolen goods and grave goods, at half what the town would give. | `entries[8].facts[2].text` |
+|  | The cook in the town's kitchen (economy's kitchen; residents.json's cook day). | `entries[9].summary` |
+|  | The cook makes travel rations from food, roast meat from meat and roast perch from fish, for the shop's shelf and the town's daily meals. | `entries[9].facts[0].text` |
+|  | The cook is at the well by five, in the kitchen from six till mid-afternoon, then at the square, and at the inn before going home. | `entries[9].facts[1].text` |
+|  | When the well runs dry the cook works at half pace, and before the first harvest is in he will not cook from the larder kept for the town's people. | `entries[9].facts[2].text` |
+|  | The town's carpenter, who raises and mends its buildings (economy's builds and repairs). | `entries[10].summary` |
+|  | The carpenter raises every building in town, repairs what is damaged and mends the roofs a storm breaks. | `entries[10].facts[0].text` |
+|  | A build waits until its materials are in the store, and wood brought to the carpenter goes toward the build in hand. | `entries[10].facts[1].text` |
+|  | The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher he mends arrows. | `entries[10].facts[2].text` |
+|  | The town's farmer, once a field stands (economy's crop). | `entries[11].summary` |
+|  | The farmer sows in spring and harvests in autumn; rain helps the crop, a storm can flatten half of it, and a crop not in by winter rots. | `entries[11].facts[0].text` |
+|  | In winter the farmer digs roots, and his crop goes to the town's store, paid from the treasury. | `entries[11].facts[1].text` |
+|  | The farmer is at the well by five and in the field from six till four, then at the square, and at the inn before going home. | `entries[11].facts[2].text` |
+|  | The town's hunter (economy's hunter, sites). | `entries[12].summary` |
+|  | The hunter hunts deer, boar and rabbit in the wilds near the store, for the town has no hunting ground of its own. | `entries[12].facts[0].text` |
+|  | The hunter sells his meat and hides to the store, and the antlers and tusks are kept there. | `entries[12].facts[1].text` |
+|  | Sometimes the hunter strays too far out, and whoever walks him home is paid for it. | `entries[12].facts[2].text` |
+|  | The town's tanner, once one comes and a tannery stands (economy's tannery). | `entries[13].summary` |
+|  | The tanner makes leather from hides, and bucklers and leather armour from the leather. | `entries[13].facts[0].text` |
+|  | The tanner buys beasts' pelts for tanning, and claws, fangs, antlers and tusks for trimming leather. | `entries[13].facts[1].text` |
+|  | The tanner's leather goes to the store, and his bucklers and armour to the shop. | `entries[13].facts[2].text` |
+|  | The town's woodcutter at the woodlot (economy's woodcutter). | `entries[14].summary` |
+|  | The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives him deadwood. | `entries[14].facts[0].text` |
+|  | The woodcutter sells his wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
+|  | The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening. | `entries[14].facts[2].text` |
 
-### levels/lore/regions.json (84)
+### levels/lore/regions.json (92)
 
 | | Line | Key |
 |---|---|---|
@@ -3646,82 +3721,90 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | L | Umbrage sits in the Woodlands. | `entries[1].facts[0].text` |
 |  | Farmsteads and fields lie near the town. | `entries[1].facts[1].text` |
 |  | Where the players and their companions belong, and where the stockpile is. | `entries[2].summary` |
-|  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22); not the Blood Rot's doing. | `entries[3].summary` |
+|  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. | `entries[3].summary` |
 |  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[0].text` |
-|  | The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended). | `entries[4].summary` |
-|  | Towerside is the land south of Umbrage, round the Old Tower. | `entries[4].facts[0].text` |
-|  | The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22). | `entries[5].summary` |
-|  | The Old Tower, across the river from Umbrage, is a broken-down castle the ancients lived in. | `entries[5].facts[0].text` |
-|  | The Old Tower, the ancients' castle, was conquered in the battle, and its fallen warriors were buried before the people moved on. | `entries[5].facts[1].text` |
-|  | Nothing is known of the ancients' history, or of them since they left. | `entries[5].facts[2].text` |
-|  | No dead lie by the Old Tower: the dead are in the barrows, and the tower is where they lived. | `entries[5].facts[3].text` |
-|  | Snagfin the goblin keeps his counter in the Old Tower. | `entries[5].facts[4].text` |
-|  | The town's temple, kept by a priest, where the fallen are brought back. | `entries[6].summary` |
-|  | The town has a temple, and a priest keeps it. | `entries[6].facts[0].text` |
-|  | A charm blessed at the temple becomes Theus's. | `entries[6].facts[1].text` |
-|  | the Last Light Mughouse | `entries[7].name` |
-|  | Umbrage's tavern on the west of the square, three floors (Jeff named it, 2026-11-05: "Last Light Mughouse"); locals call it the Mughouse. | `entries[7].summary` |
-|  | Umbrage's tavern is the Last Light Mughouse, and locals call it the Mughouse. | `entries[7].facts[0].text` |
-|  | The Mughouse has a hearth in its common room, ale on tap at the counter, and five rooms to hire upstairs under an attic. | `entries[7].facts[1].text` |
-|  | the hearth and the rooms upstairs | `entries[7].facts[1].sight` |
-|  | The Mughouse's sign hangs by its door: a board painted with a burning lantern and no letters, with a small iron lantern at the bracket's tip. | `entries[7].facts[2].text` |
-|  | The Last Light keeps a lamp in the window nearest its door that never goes out, day or night. | `entries[7].facts[3].text` |
-|  | the lamp in the window | `entries[7].facts[3].sight` |
-|  | Umbrage's smithy, cold since its smith went below the castle after the great dwarven forge and was taken. | `entries[8].summary` |
-|  | Umbrage's smithy has stood cold since the smith went below the castle. | `entries[8].facts[0].text` |
-|  | A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back. | `entries[9].summary` |
-|  | Out in the wilds stands a healer's hut, where a medicine man lives. | `entries[9].facts[0].text` |
-|  | The orc stronghold, outside the forest, in a land where the trees have been stripped (Jeff, 2026-10-27; maps' world_plane place "stronghold"). | `entries[10].summary` |
-|  | Cravenhold is the orc stronghold, outside the forest, in a land where the trees have been stripped. | `entries[10].facts[0].text` |
-|  | An ancient, dilapidated castle built by dwarven stone smiths over a known entrance to the shifting labyrinths, to guard it; mostly overrun now (docs/lore/castle.md). | `entries[11].summary` |
-| L | The castle is ancient and dilapidated. | `entries[11].facts[0].text` |
-|  | The castle was built by dwarven stone smiths, plain and utilitarian. | `entries[11].facts[1].text` |
-|  | The dwarves built the castle over the labyrinths, as a cover over a known entrance, to guard it. | `entries[11].facts[2].text` |
-|  | The castle guards a treasure that was rumoured and never found. | `entries[11].facts[3].text` |
-|  | The castle is no longer dwarven; it is mostly overrun. | `entries[11].facts[4].text` |
-|  | The maps of the labyrinths below the castle were lost long ago. | `entries[11].facts[5].text` |
-|  | The labyrinths shift: their ways are never the same twice for long, which is why their treasures were never carried out and why adventurers still come. | `entries[11].facts[6].text` |
-| L | Dwarven artifacts come from the dungeons below the castle. | `entries[11].facts[7].text` |
-|  | Who has overrun the castle: the Blood Rot, their orc or kobold allies, something from below, or several at once. | `entries[11].facts[8].text` |
-|  | An old mine, the heart of the Blood Rot's land, over the fallen star. | `entries[12].summary` |
-|  | The old mine is the heart of the Blood Rot's land, and they live in and around it. | `entries[12].facts[0].text` |
-|  | The deeper into the mine, the stronger the Blood Rot are. | `entries[12].facts[1].text` |
-| L | The mine was dug toward where the star fell. | `entries[12].facts[2].text` |
-|  | the tower over the mine | `entries[13].name` |
-|  | A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures. | `entries[13].summary` |
-| L | A tower stands over the mine. | `entries[13].facts[0].text` |
-|  | that tower over the mine | `entries[13].facts[0].sight` |
-|  | The tower over the mine was built by orcish labour to the designs of dark elven architects, in their majestic style. | `entries[13].facts[1].text` |
-|  | The tower over the mine holds old artifacts and treasures; dark elven artifacts come from it. | `entries[13].facts[2].text` |
-|  | The inside of the tower over the mine shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come. | `entries[13].facts[3].text` |
-| L | Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago. | `entries[14].summary` |
-|  | Deep in the Blood Rot's mine lies a fallen star, the source of the rot. | `entries[14].facts[0].text` |
-| L | Common folk call it a fallen star. | `entries[14].facts[1].text` |
-| L | Those who live near the mine call it the rot-source. | `entries[14].facts[2].text` |
-|  | Those the Blood Rot take are carried down toward the star and are not seen again. | `entries[14].facts[3].text` |
-|  | The town's old iron workings in the hills, dug by the first folk and lost when the deep seams broke into caves below; whatever is strongest in the hills holds it (Jeff, 2026-11-03: "I like the name of Hollowfell", and lore's story). Its level is 790's mine (57e3f9e2). | `entries[15].summary` |
-|  | Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations. | `entries[15].facts[0].text` |
-|  | Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left. | `entries[15].facts[1].text` |
-|  | Since Hollowfell was lost, whatever is strongest in the hills holds it. | `entries[15].facts[2].text` |
-|  | When Hollowfell was lost, the town turned to the barrow's gold, and that is part of why Umbrage is cursed. | `entries[15].facts[3].text` |
-|  | A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house. | `entries[16].summary` |
-|  | The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau. | `entries[16].facts[0].text` |
-|  | The watchtower on the plateau was broken when the Old Tower was taken. | `entries[16].facts[1].text` |
-|  | A cold fire-basin at the top of the watchtower is where the watch lit its warning fire. | `entries[16].facts[2].text` |
-|  | the lone great oak | `entries[17].name` |
-|  | A lone great oak between the hills' rivers (maps' 778, hills (111,159)), older than the town. Jeff picked it for the Druids' hall, a hollow oak massive enough to walk into (2026-11-03); that stays out of the facts until the hall is built. | `entries[17].summary` |
-|  | The lone great oak between the rivers is older than the town, and the hill herders won't let it be felled. | `entries[17].facts[0].text` |
-|  | A herder who loses a beast ties a strip of cloth to the great oak, and they say the beast comes home. | `entries[17].facts[1].text` |
-|  | A standing stone on the hills plateau's east edge (maps' 778, hills (199,70)), older than the ancients. | `entries[18].summary` |
-|  | The standing stone on the plateau is older than the ancients; some say the old tribe raised it for their many gods. | `entries[18].facts[0].text` |
-|  | No one can read the worn carving on the standing stone, and nobody sleeps beside it. | `entries[18].facts[1].text` |
-|  | The road through the hills, west to the wilds and east to the spur and the shieling, and the small stories off it (maps' 778). | `entries[19].summary` |
-|  | The hills road is older than the town: the ancients laid it, and the town's folk have cut new names over the milestones' worn marks. | `entries[19].facts[0].text` |
-|  | A traveller on the hills road was caught by raiders; they took his pack but missed a note in his coat. | `entries[19].facts[1].text` |
-|  | Before the raiders caught him, the traveller hid his goods under a cairn north of the hills road, east of where he lies. | `entries[19].facts[2].text` |
-|  | Some years ago hill folk and Blood Rot raiders fought in the hills, and the broken gear still lies where they fell. | `entries[19].facts[3].text` |
-|  | One of the hill folk who fell in that fight was buried where he fell, the barrow being too far, and someone still brings his grave fresh offerings. | `entries[19].facts[4].text` |
-|  | His kin left the town for the hills after the fight and keeps a lean-to there, and is often out. | `entries[19].facts[5].text` |
+|  | The wilds' fishing pond, far west of Umbrage by the west road (maps' reed_pond at (33,120), "the pond", holder nobody), with the other waters that fish: two pools (110..116 x 57..60 west of the north road; 221..223 x 224..228 east of the woodlot post) and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). No name of its own until Jeff picks one (Reed Pond is asked). Package "wilds basics: pond". | `entries[4].summary` |
+|  | Far west of town there is a pond: take the road out to the crossroads and keep on west along the west road almost to its end, and the pond lies beside it. | `entries[4].facts[0].text` |
+|  | Reeds grow along the pond's edge. | `entries[4].facts[1].text` |
+|  | Fish rise in the pond, and it is nobody's: anyone may fish it. | `entries[4].facts[2].text` |
+|  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[4].facts[3].text` |
+|  | There are two pools with fish in them too: a small one south-east of town, just east of the woodlot post, and a bigger one west of the north road, a good way north of the crossroads. | `entries[4].facts[4].text` |
+|  | In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach. | `entries[4].facts[5].text` |
+|  | The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended). | `entries[5].summary` |
+|  | Towerside is the land south of Umbrage, round the Old Tower. | `entries[5].facts[0].text` |
+|  | The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22). | `entries[6].summary` |
+|  | The Old Tower, across the river from Umbrage, is a broken-down castle the ancients lived in. | `entries[6].facts[0].text` |
+|  | The Old Tower, the ancients' castle, was conquered in the battle, and its fallen warriors were buried before the people moved on. | `entries[6].facts[1].text` |
+|  | Nothing is known of the ancients' history, or of them since they left. | `entries[6].facts[2].text` |
+|  | No dead lie by the Old Tower: the dead are in the barrows, and the tower is where they lived. | `entries[6].facts[3].text` |
+|  | Snagfin the goblin keeps his counter in the Old Tower. | `entries[6].facts[4].text` |
+|  | The town's temple, kept by a priest, where the fallen are brought back. | `entries[7].summary` |
+|  | The town has a temple, and a priest keeps it. | `entries[7].facts[0].text` |
+|  | A charm blessed at the temple becomes Theus's. | `entries[7].facts[1].text` |
+|  | Whoever the temple brings back makes a gold offering there, and is brought back even with less gold than it asks. | `entries[7].facts[2].text` |
+|  | the Last Light Mughouse | `entries[8].name` |
+|  | Umbrage's tavern on the west of the square, three floors (Jeff named it, 2026-11-05: "Last Light Mughouse"); locals call it the Mughouse. | `entries[8].summary` |
+|  | Umbrage's tavern is the Last Light Mughouse, and locals call it the Mughouse. | `entries[8].facts[0].text` |
+|  | The Mughouse has a hearth in its common room, ale on tap at the counter, and five rooms to hire upstairs under an attic. | `entries[8].facts[1].text` |
+|  | the hearth and the rooms upstairs | `entries[8].facts[1].sight` |
+|  | The Mughouse's sign hangs by its door: a board painted with a burning lantern and no letters, with a small iron lantern at the bracket's tip. | `entries[8].facts[2].text` |
+|  | The Last Light keeps a lamp in the window nearest its door that never goes out, day or night. | `entries[8].facts[3].text` |
+|  | the lamp in the window | `entries[8].facts[3].sight` |
+|  | Umbrage's smithy, cold since its smith went below the castle after the great dwarven forge and was taken. | `entries[9].summary` |
+|  | Umbrage's smithy has stood cold since the smith went below the castle. | `entries[9].facts[0].text` |
+|  | A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back. | `entries[10].summary` |
+|  | Out in the wilds stands a healer's hut, where a medicine man lives. | `entries[10].facts[0].text` |
+|  | The orc stronghold, outside the forest, in a land where the trees have been stripped (Jeff, 2026-10-27; maps' world_plane place "stronghold"). | `entries[11].summary` |
+|  | Cravenhold is the orc stronghold, outside the forest, in a land where the trees have been stripped. | `entries[11].facts[0].text` |
+|  | An ancient, dilapidated castle built by dwarven stone smiths over a known entrance to the shifting labyrinths, to guard it; mostly overrun now (docs/lore/castle.md). | `entries[12].summary` |
+| L | The castle is ancient and dilapidated. | `entries[12].facts[0].text` |
+|  | The castle was built by dwarven stone smiths, plain and utilitarian. | `entries[12].facts[1].text` |
+|  | The dwarves built the castle over the labyrinths, as a cover over a known entrance, to guard it. | `entries[12].facts[2].text` |
+|  | The castle guards a treasure that was rumoured and never found. | `entries[12].facts[3].text` |
+|  | The castle is no longer dwarven; it is mostly overrun. | `entries[12].facts[4].text` |
+|  | The maps of the labyrinths below the castle were lost long ago. | `entries[12].facts[5].text` |
+|  | The labyrinths shift: their ways are never the same twice for long, which is why their treasures were never carried out and why adventurers still come. | `entries[12].facts[6].text` |
+| L | Dwarven artifacts come from the dungeons below the castle. | `entries[12].facts[7].text` |
+|  | Who has overrun the castle: the Blood Rot, their orc or kobold allies, something from below, or several at once. | `entries[12].facts[8].text` |
+|  | An old mine, the heart of the Blood Rot's land, over the fallen star. | `entries[13].summary` |
+|  | The old mine is the heart of the Blood Rot's land, and they live in and around it. | `entries[13].facts[0].text` |
+|  | The deeper into the mine, the stronger the Blood Rot are. | `entries[13].facts[1].text` |
+| L | The mine was dug toward where the star fell. | `entries[13].facts[2].text` |
+|  | the tower over the mine | `entries[14].name` |
+|  | A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures. | `entries[14].summary` |
+| L | A tower stands over the mine. | `entries[14].facts[0].text` |
+|  | that tower over the mine | `entries[14].facts[0].sight` |
+|  | The tower over the mine was built by orcish labour to the designs of dark elven architects, in their majestic style. | `entries[14].facts[1].text` |
+|  | The tower over the mine holds old artifacts and treasures; dark elven artifacts come from it. | `entries[14].facts[2].text` |
+|  | The inside of the tower over the mine shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come. | `entries[14].facts[3].text` |
+| L | Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago. | `entries[15].summary` |
+|  | Deep in the Blood Rot's mine lies a fallen star, the source of the rot. | `entries[15].facts[0].text` |
+| L | Common folk call it a fallen star. | `entries[15].facts[1].text` |
+| L | Those who live near the mine call it the rot-source. | `entries[15].facts[2].text` |
+|  | Those the Blood Rot take are carried down toward the star and are not seen again. | `entries[15].facts[3].text` |
+|  | The town's old iron workings in the hills, dug by the first folk and lost when the deep seams broke into caves below; whatever is strongest in the hills holds it (Jeff, 2026-11-03: "I like the name of Hollowfell", and lore's story). Its level is 790's mine (57e3f9e2). | `entries[16].summary` |
+|  | Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations. | `entries[16].facts[0].text` |
+|  | Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left. | `entries[16].facts[1].text` |
+|  | Since Hollowfell was lost, whatever is strongest in the hills holds it. | `entries[16].facts[2].text` |
+|  | When Hollowfell was lost, the town turned to the barrow's gold, and that is part of why Umbrage is cursed. | `entries[16].facts[3].text` |
+|  | A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house. | `entries[17].summary` |
+|  | The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau. | `entries[17].facts[0].text` |
+|  | The watchtower on the plateau was broken when the Old Tower was taken. | `entries[17].facts[1].text` |
+|  | A cold fire-basin at the top of the watchtower is where the watch lit its warning fire. | `entries[17].facts[2].text` |
+|  | the lone great oak | `entries[18].name` |
+|  | A lone great oak between the hills' rivers (maps' 778, hills (111,159)), older than the town. Jeff picked it for the Druids' hall, a hollow oak massive enough to walk into (2026-11-03); that stays out of the facts until the hall is built. | `entries[18].summary` |
+|  | The lone great oak between the rivers is older than the town, and the hill herders won't let it be felled. | `entries[18].facts[0].text` |
+|  | A herder who loses a beast ties a strip of cloth to the great oak, and they say the beast comes home. | `entries[18].facts[1].text` |
+|  | A standing stone on the hills plateau's east edge (maps' 778, hills (199,70)), older than the ancients. | `entries[19].summary` |
+|  | The standing stone on the plateau is older than the ancients; some say the old tribe raised it for their many gods. | `entries[19].facts[0].text` |
+|  | No one can read the worn carving on the standing stone, and nobody sleeps beside it. | `entries[19].facts[1].text` |
+|  | The road through the hills, west to the wilds and east to the spur and the shieling, and the small stories off it (maps' 778). | `entries[20].summary` |
+|  | The hills road is older than the town: the ancients laid it, and the town's folk have cut new names over the milestones' worn marks. | `entries[20].facts[0].text` |
+|  | A traveller on the hills road was caught by raiders; they took his pack but missed a note in his coat. | `entries[20].facts[1].text` |
+|  | Before the raiders caught him, the traveller hid his goods under a cairn north of the hills road, east of where he lies. | `entries[20].facts[2].text` |
+|  | Some years ago hill folk and Blood Rot raiders fought in the hills, and the broken gear still lies where they fell. | `entries[20].facts[3].text` |
+|  | One of the hill folk who fell in that fight was buried where he fell, the barrow being too far, and someone still brings his grave fresh offerings. | `entries[20].facts[4].text` |
+|  | His kin left the town for the hills after the fight and keeps a lean-to there, and is often out. | `entries[20].facts[5].text` |
 
 ### levels/lore/roles.json (1)
 
