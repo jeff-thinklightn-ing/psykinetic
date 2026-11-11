@@ -5,7 +5,7 @@ extends RefCounted
 ## types and named variations (Title, Heading, Caption, Small, Name,
 ## Outlined, Inset, HandSlot, Deep; a talk window's offers: OfferList,
 ## OfferRow, Price, PriceShort; the store window, Jeff's approved mock: Glass,
-## Subhead, Tab, Well, WellHover, WellNew, WellRefused, PriceChip, ChipPrice,
+## Subhead, Tab, Well, WellHover, WellPicked, WellNew, WellRefused, PriceChip, TimeChip, ChipPrice,
 ## ChipPriceShort, SquareCount, FootLine, FootLineRefused; its containers Stack,
 ## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
 ## square, square_gap, half_gap) and set no fonts, sizes or colours of

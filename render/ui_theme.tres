@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=37 format=3]
+[gd_resource type="Theme" load_steps=39 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -450,6 +450,40 @@ corner_radius_top_right = 25
 corner_radius_bottom_right = 25
 corner_radius_bottom_left = 25
 
+; A square picked (a thing chosen for a work at a counter): the brass rim.
+[sub_resource type="StyleBoxFlat" id="well_picked"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.702, 0.651, 0.5412, 1)
+border_width_left = 6
+border_width_top = 6
+border_width_right = 6
+border_width_bottom = 6
+border_color = Color(0.7804, 0.6039, 0.3333, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+; A time on a square (work in hand, "4 min"): the price pill with no coin.
+[sub_resource type="StyleBoxFlat" id="time_chip"]
+content_margin_left = 18.0
+content_margin_top = 2.0
+content_margin_right = 18.0
+content_margin_bottom = 2.0
+bg_color = Color(0.102, 0.0784, 0.0627, 0.84)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 25
+corner_radius_top_right = 25
+corner_radius_bottom_right = 25
+corner_radius_bottom_left = 25
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -663,3 +697,7 @@ Stack/base_type = &"VBoxContainer"
 Stack/constants/separation = 12
 Strip/base_type = &"HBoxContainer"
 Strip/constants/separation = 12
+TimeChip/base_type = &"PanelContainer"
+TimeChip/styles/panel = SubResource("time_chip")
+WellPicked/base_type = &"PanelContainer"
+WellPicked/styles/panel = SubResource("well_picked")
