@@ -25536,6 +25536,21 @@ castle link an arch facing north, a sealed way's words), ui_test
 docs/ui/shots/sim/big_map_cues.jpg after the coordinator's all-clear
 (docs-only). Client only, protocol unchanged, no new class_name.
 
+589 amended (2), ui-design's side: a way out's words name the place, never
+its id (the coordinator's rule, 11-10, for the Crypt's stair and the mound
+door, which read "to barrow"). On the big map an open way, a neighbour's
+side and a door read "to " + the destination level's title as said
+mid-line (`Minimap.title_of`: level.json "name" through
+`Level.template_config`, Main.mid_line's form, "to the Barrow"; read once
+per rebuild, the level.json alone); a level with no title gets its mark
+and no words, never the id. Each way keeps its id under "to". The big
+map's own title no longer falls back to the level id. The sealed rule is
+unchanged ("a sealed way", no destination) and hidden links stay off both
+maps. The world map's area names already show no id (WorldMap sets
+display_name, "" when untitled). tests: minimap_test (the words by title,
+an untitled level's none). Package none (a mend). Client only, protocol
+unchanged, no new class_name.
+
 ## 600. The Old Tower: Snagfin's ruin in Held as one prefab
 
 Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down

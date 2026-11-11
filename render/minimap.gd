@@ -58,9 +58,11 @@ var image: Image
 var cells := Vector2i.ZERO
 var title := ""
 var starts: Array[Vector2i] = []
-## {cell, label, cue, facing}: links at their marker with their built cue
+## {cell, label, to, cue, facing}: links at their marker with their built cue
 ## (Level.CUES) and the way it faces (a grid direction); neighbours at the
-## middle of their side, cue "edge", facing out.
+## middle of their side, cue "edge", facing out. label is the destination's
+## title as said mid-line ("the Barrow"; title_of), "" when it has none, and
+## to its level id (589 amended (2): a label never shows an id).
 var ways_out: Array[Dictionary] = []
 ## {cell, name, kind}: the level's places.
 var places: Array[Dictionary] = []
@@ -163,7 +165,7 @@ func rebuild(level: Dictionary, made := {}) -> void:
 	if made.is_empty():
 		made = made_for(level)
 	cells = made["cells"]
-	title = str(level.get("display_name", "")) if str(level.get("display_name", "")) != "" else str(level.get("name", ""))
+	title = str(level.get("display_name", ""))
 	image = made["image"]
 	texture = ImageTexture.create_from_image(image)
 	_rest_of_rebuild(level)
@@ -225,7 +227,7 @@ func _rest_of_rebuild(level: Dictionary) -> void:
 		if bool(link.get("hidden", false)):
 			continue  # Not given away (608; 589 amended).
 		var built: Dictionary = cues.get(link["tile"], {})
-		ways_out.append({"cell": link["tile"], "label": str(link["to_map"]), "cue": str(built.get("cue", link.get("cue", "none"))),
+		ways_out.append({"cell": link["tile"], "label": title_of(str(link["to_map"])), "to": str(link["to_map"]), "cue": str(built.get("cue", link.get("cue", "none"))),
 			"facing": built.get("facing", Vector2i(0, 1)) if built.get("facing") is Vector2i else Vector2i(0, 1)})
 	var neighbours: Dictionary = level.get("neighbours", {})
 	var outward := {"north": Vector2i(0, -1), "south": Vector2i(0, 1), "west": Vector2i(-1, 0), "east": Vector2i(1, 0)}
@@ -233,7 +235,7 @@ func _rest_of_rebuild(level: Dictionary) -> void:
 		var middle := Vector2i(cells.x / 2, cells.y / 2)
 		var cell: Vector2i = {"north": Vector2i(middle.x, 0), "south": Vector2i(middle.x, cells.y - 1),
 			"west": Vector2i(0, middle.y), "east": Vector2i(cells.x - 1, middle.y)}.get(side, middle)
-		ways_out.append({"cell": cell, "label": str(neighbours[side]), "cue": "edge", "facing": outward.get(side, Vector2i(0, 1))})
+		ways_out.append({"cell": cell, "label": title_of(str(neighbours[side])), "to": str(neighbours[side]), "cue": "edge", "facing": outward.get(side, Vector2i(0, 1))})
 	places.clear()
 	var listed: Dictionary = level.get("places", {})
 	for key: String in listed:
@@ -360,8 +362,9 @@ func _draw() -> void:
 				_draw_cue(p, cue, on_screen(Vector2(way.get("facing", Vector2i(0, 1))), shown), reach)
 			else:
 				draw_circle(p, dot + 1.5, colour)
-			if big:
-				draw_string(font, p + Vector2(reach + 4, 5), label_of(cue, str(way["label"])), HORIZONTAL_ALIGNMENT_LEFT, -1, label_size, colour))
+			var words := label_of(cue, str(way["label"]))
+			if big and not words.is_empty():
+				draw_string(font, p + Vector2(reach + 4, 5), words, HORIZONTAL_ALIGNMENT_LEFT, -1, label_size, colour))
 	for place: Dictionary in places:
 		var at := to_screen(Vector2(place["cell"]), shown)
 		_mark(at, dest, func(p: Vector2) -> void:
@@ -402,10 +405,23 @@ func _mark(at: Vector2, dest: Rect2, draw: Callable) -> void:
 		draw.call(at)
 
 
-## A way out's words on the big map: where it leads, or for a sealed way
-## nothing of that (where it leads is learned by opening it).
-static func label_of(cue: String, to_map: String) -> String:
-	return "a sealed way" if cue == "sealed" else "to " + to_map
+## A way out's words on the big map: where it leads ([param title], title_of's),
+## or for a sealed way nothing of that (where it leads is learned by opening
+## it); none for a place with no title (589 amended (2)).
+static func label_of(cue: String, title: String) -> String:
+	if cue == "sealed":
+		return "a sealed way"
+	return "" if title.is_empty() else "to " + title
+
+
+## Level [param level_name]'s title as said mid-line (level.json "name",
+## Main.mid_line's form: "The Barrow" -> "the Barrow"), "" when it has none;
+## never the id (589 amended (2)).
+static func title_of(level_name: String) -> String:
+	if level_name.is_empty():
+		return ""
+	var name := str(Level.template_config(level_name).get("name", "")).strip_edges()
+	return "the " + name.trim_prefix("The ") if name.begins_with("The ") else name
 
 
 ## The glyph for [param cue] at [param p], [param facing] the way it stands
