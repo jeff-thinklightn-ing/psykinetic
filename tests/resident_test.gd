@@ -5665,6 +5665,47 @@ func _test_relic() -> void:
 	_check(player.slot_items.has(uid), "(the relic in the player's slots)")
 	var offers := Offers.of(priest, pid).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.RELIC)
 	_check(offers.size() == 1 and str(offers[0]["title"]).ends_with("the remains of Sir Ewald"), "the priest offers to take it (%s)" % [offers])
+	# A row naming a resident takes their own pronoun (playtest: "Give her the remains" from Aldous; lore's table).
+	_check(offers.size() == 1 and str(offers[0]["title"]) == "Give him the remains of Sir Ewald", "his own pronoun: %s" % [offers[0]["title"] if not offers.is_empty() else ""])
+	var kept := {"traits": {"name": "Aldous", "pronoun": "she"}, "look": {"beard": "full"}, "card": "She keeps the temple.", "card_by": "model"}
+	_check(ResidentCard.mend_pronoun(kept) and kept["traits"]["pronoun"] == "he" and kept["card"] == "" and not ResidentCard.mend_pronoun(kept),
+		"a card kept from before mended to his name's, its paragraph to be written again, once (%s)" % [kept])
+	# Through a load (the coordinator's conditions): the card mended once, its other parts kept; a second load
+	# mends nothing; a name left to roll kept exactly as saved.
+	var saved: Dictionary = {"workers": {priest: {"name": "Aldous", "trades": ["priest"], "town": STORE, "origin": "appointed",
+		"card": {"traits": {"name": "Aldous", "pronoun": "she", "food": "apples"}, "look": {"beard": "none", "age": "old"}, "facts": ["f"], "card": "She keeps it.", "card_by": "model"}},
+		"rook:" + STORE: {"name": "Rook", "trades": ["fisherman"], "town": STORE, "origin": "settled",
+		"card": {"traits": {"name": "Rook", "pronoun": "she"}, "look": {"beard": "none"}, "card": "She fishes.", "card_by": "model"}}}}
+	var first := Production.new(saved, null, null, Callable(), World.production.rules)
+	var mended_card: Dictionary = first.worker(priest).get("card", {})
+	var again := Production.new(first.to_dict(), null, null, Callable(), World.production.rules)
+	_check(str(mended_card.get("traits", {}).get("pronoun", "")) == "he" and mended_card["traits"]["food"] == "apples" and mended_card["look"]["age"] == "old"
+		and mended_card["facts"] == ["f"] and str(mended_card["card"]) == "" and again.worker(priest).get("card", {}) == mended_card
+		and first.worker("rook:" + STORE).get("card", {}) == saved["workers"]["rook:" + STORE]["card"],
+		"a load mends Aldous's card once, the rest of it kept; a second load mends nothing; Rook's (left to roll) as saved (%s)" % [mended_card])
+	var maud := {"traits": {"name": "Maud", "pronoun": "he"}, "look": {"beard": "full"}}
+	_check(ResidentCard.mend_pronoun(maud) and maud["traits"]["pronoun"] == "she" and maud["look"]["beard"] == "none", "a she loses the beard (%s)" % [maud])
+	var wrong: Array[String] = []
+	var table: Dictionary = ResidentCard.tables().get("pronoun_of", {})
+	for who: String in table:
+		if not who.begins_with("_") and str(ResidentCard.roll("pronoun:" + who, who, "farmer")["traits"]["pronoun"]) != str(table[who]):
+			wrong.append(who)
+	var lists: Array[String] = []
+	var pending: Array = [World.economy.rules if World.economy != null else {}]
+	while not pending.is_empty():
+		var value: Variant = pending.pop_back()
+		if value is Dictionary:
+			for key: Variant in value:
+				if str(key) == "names" and value[key] is Array:
+					for each: Variant in value[key]:
+						lists.append(str(each))
+				elif value[key] is Dictionary or value[key] is Array:
+					pending.append(value[key])
+		elif value is Array:
+			pending.append_array(value)
+	var rolls := ["Alder", "Rowan", "Ash", "Wynn", "Bryn", "Pike", "Rook", "Ren"]
+	var unlisted := lists.filter(func(who: String) -> bool: return not table.has(who) and who not in rolls)
+	_check(wrong.is_empty() and not lists.is_empty() and unlisted.is_empty(), "every name rolls its own pronoun, every names list's name in lore's table or left to roll (wrong %s, not in it %s)" % [wrong, unlisted])
 	var other := World.production.worker_ids(STORE).filter(func(id: String) -> bool: return "priest" not in World.production.worker(id).get("trades", []))
 	_check(other.is_empty() or Offers.of(str(other[0]), pid).all(func(o: Dictionary) -> bool: return str(o["kind"]) != Offers.RELIC), "nobody else does")
 	var score := Standing.score(Townsfolk.card_of(World.production, priest), pid)

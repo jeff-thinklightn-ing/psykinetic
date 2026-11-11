@@ -10560,6 +10560,24 @@ naming birthplaces or a river (lore: nothing stated that Jeff has not);
 kin rolled against residents without cards yet (it would make every card in
 the town at once); the type in the written paragraph (it stays a separate
 standing fact, so the model never dresses it up).
+
+398 amended (1) (playtest, carrying the knight's remains: Aldous's row read "Give her the remains of
+Sir Leofric the Silent"; the coordinator's routing, lore's table): the pronoun was drawn from the
+table's "pronoun" whatever the name economy gave, and the body (look_spec's body, the beard) followed
+it. A name's own pronoun now comes first: resident_traits.json "pronoun_of" (lore's: Aldous, Pip and
+Rolf he and Nix she are Jeff's; the rest lore's reading of the names; Alder, Rowan, Ash, Wynn, Bryn,
+Pike, Rook and Ren left to the roll), read by ResidentCard.pronoun_of; ResidentCard.roll still draws
+(the rest of the card rolls as before) and takes the name's. A card kept from before is mended as
+Production loads it (ResidentCard.mend_pronoun: a she loses a drawn beard, the written paragraph is
+cleared to be written again by the usual lazy path, one card at a time as a body is met, never all at
+load; one line at load, "[cards] N card(s) given their name's own pronoun", no names), touching only
+a card whose name is in the table and whose pronoun differs (name, trade, home, facts, standing and
+gear kept), so on the box some residents' looks change at the deploy (the 11-12 cut, the
+coordinator's ruling; the table beyond Jeff's four is lore's reading, his to change, on that cut's
+checklist; "_pronoun_of" holds the note, the table is plain data for lore to edit). resident_test:
+the relic row reads "Give him", a load mends once and a second load nothing, a name left to roll kept
+as saved, and every economy names list's name in the table or left to roll. Server and levels data,
+protocol unchanged, no new class_name.
 ## 405. The hunt into the town: meat, hides, the roast and the tanner
 
 Herds step 2 (367's herds, 397's wildlife in play), the coordinator's

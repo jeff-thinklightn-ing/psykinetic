@@ -61,9 +61,35 @@ static func roll(worker_id: String, person_name: String, trade: String, origin :
 	var traits := {"name": person_name, "trade": trade}
 	for key: String in KEYS:
 		traits[key] = _pick(table.get(key, []), rng)
+	traits["pronoun"] = pronoun_of(person_name, str(traits["pronoun"]))  # Drawn all the same: the rest rolls as before.
 	var came := _pick(table.get("came", []), rng)
 	var look := _roll_look(table.get("look", {}), rng, str(traits["pronoun"]), worker_id)
 	return {"traits": traits, "came": came_words(origin, by, came), "look": look, "facts": [], "card": "", "card_by": ""}
+
+
+## [param person_name]'s own pronoun (resident_traits.json "pronoun_of", lore's table; playtest saw
+## "Give her the remains" from Aldous), else [param drawn].
+static func pronoun_of(person_name: String, drawn: String) -> String:
+	var table: Variant = tables().get("pronoun_of", {})
+	return str(table.get(person_name, drawn)) if table is Dictionary else drawn
+
+
+## A card kept from before pronoun_of (a resident's on the box) given its name's own pronoun: a "she"
+## loses her beard, and the written paragraph is cleared to be written again. Whether it changed.
+static func mend_pronoun(card: Dictionary) -> bool:
+	var traits: Variant = card.get("traits")
+	if not traits is Dictionary or not traits.has("pronoun"):
+		return false
+	var own := pronoun_of(str(traits.get("name", "")), str(traits["pronoun"]))
+	if own == str(traits["pronoun"]):
+		return false
+	traits["pronoun"] = own
+	if own == "she" and card.get("look") is Dictionary and (card["look"] as Dictionary).has("beard"):
+		card["look"]["beard"] = "none"
+	if card.has("card"):
+		card["card"] = ""
+		card["card_by"] = ""
+	return true
 
 
 ## How they came to the town: a record whose [param origin] is a rescue

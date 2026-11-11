@@ -1915,6 +1915,7 @@ func to_dict() -> Dictionary:
 ## workshop is gone gives its materials back.
 func from_dict(saved: Dictionary) -> void:
 	var workers: Variant = saved.get("workers", {})
+	var mended := 0  # Cards given their name's own pronoun (398 amended (1), npc's side).
 	if workers is Dictionary:
 		for id: String in workers:
 			var entry: Variant = workers[id]
@@ -1952,6 +1953,8 @@ func from_dict(saved: Dictionary) -> void:
 			# npc's card of them, kept as it is.
 			if entry.get("card") is Dictionary:
 				_workers[id]["card"] = entry["card"].duplicate(true)
+				if ResidentCard.mend_pronoun(_workers[id]["card"]):  # The name's own pronoun (npc's side, lore's table).
+					mended += 1
 			# Companions' sentences for the prompt (581 amended, 686; npc's side).
 			for key: String in ["left_why", "left_back"]:
 				if entry.get(key) is String and not entry[key].is_empty():
@@ -1964,6 +1967,8 @@ func from_dict(saved: Dictionary) -> void:
 			if last is Dictionary and not last.is_empty():
 				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),
 					"gold": int(last.get("gold", 0)), "with": str(last.get("with", ""))}
+	if mended > 0:
+		print("[cards] %d card(s) given their name's own pronoun" % mended)  # A count, no names.
 	var workshops: Variant = saved.get("workshops", {})
 	if workshops is Dictionary:
 		for id: String in workshops:
