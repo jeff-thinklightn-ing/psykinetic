@@ -5008,6 +5008,8 @@ func _test_draugr_paid() -> void:
 	var taken := draugr.accept_offer(player, draugr.offers_for("p1")[0], 60)
 	_check(taken["ok"] and draugr.state == Draugr.State.PACT and book.get("p1|mt_paidlair", {}).get("level") == "normal",
 		"60 gold buys the normal pact, and the payer's deal is kept (%s)" % [book])
+	_check(taken["you_line"] == "You give the draugr 60 gold and take up his pact for 10 risings." and str(taken["line"]).ends_with(" gives the draugr 60 gold and takes up his pact for 10 risings."),
+		"its line said of them to the others, its you-form to them (133 amended (2)): %s" % taken["you_line"])
 	_move_to(player, Vector2i(11, 2))
 	World.step()
 	var offers := draugr.offers_for("p1")
@@ -5022,7 +5024,8 @@ func _test_draugr_paid() -> void:
 		"the payer never pays twice: a gold deal is refused, the gold kept")
 	_move_to(player, Vector2i(7, 2))
 	var again := draugr.accept_offer(player, offers[0], 0)
-	_check(again["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == gold_was,
+	_check(again["ok"] and draugr.state == Draugr.State.PACT and draugr.difficulty == "normal" and World.gold_of("p1") == gold_was
+		and again["you_line"] == "You take up the draugr's pact again.",
 		"the fight again, at the level paid for, for no gold (%s)" % again)
 	World.damage(draugr, 9999, player)
 	_check(draugr.state == Draugr.State.AT_REST and draugr.blessed_last == ["p1"] and not book.has("p1|mt_paidlair"),
@@ -5273,7 +5276,7 @@ func _test_draugr() -> void:
 	var drawn := draugr.accept_offer(player, poor[0], 0)
 	World.step()
 	_check(drawn["ok"] and draugr.target == player and draugr._provoked == player and not draugr.peaceable and World.gold_of("p1") == 0
-		and said.back() == Draugr.REFUSED and said.count(Draugr.ANGER) == anger_was,
+		and said.back() == Draugr.REFUSED and said.count(Draugr.ANGER) == anger_was and drawn["you_line"] == "You refuse the draugr. He laughs, and rises to strike.",
 		"refused: \"Then I'll take it from you by force!\", and he fights them, no gold paid, no ANGER after (%s, %s)" % [drawn, said.slice(-2)])
 	draugr._provoked = null
 	draugr.target = null
@@ -5282,7 +5285,8 @@ func _test_draugr() -> void:
 	var gold_was := World.gold_of("p1")
 	var short := draugr.accept_offer(player, draugr.offers_for("p1")[0], 9)
 	World.step()
-	_check(short["ok"] and World.gold_of("p1") == gold_was - 9 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30,
+	_check(short["ok"] and World.gold_of("p1") == gold_was - 9 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30
+		and short["you_line"] == "You give the draugr 9 gold, too little: he attacks.",
 		"9 gold, under the least deal (10): he keeps it and attacks, at his own level")
 	_check(said.count(Draugr.ANGER) == 2, "a new fight: his anger once more (%d)" % said.count(Draugr.ANGER))
 	World.damage(draugr, 999, player)

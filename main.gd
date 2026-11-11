@@ -10536,10 +10536,14 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		blessed += 1
 		var line := "The draugr yields. %s %s." % [record.name,
 			("is blessed and takes up the %s, uncharged" % Items.name_of(World.TOTEM)) if minted else ("is blessed" if first else "stands over him again")]
-		say_to(World.peers_in(player.zone), line)
+		var you_line := "The draugr yields. %s." % [
+			("You are blessed, and take up the %s, uncharged" % Items.name_of(World.TOTEM)) if minted else ("You are blessed" if first else "You stand over him again")]
+		var there := World.peers_in(player.zone)
+		say_to_pair(player.owner_peer, you_line, line, there)
 		if tier >= 0 and not knight.is_empty():
 			World.into_pack(player, World.mint_relic(knight, tier, player))
-			say_to(World.peers_in(player.zone), SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name)
+			say_to(there, SEPULCHER_PLAQUE % knight)  # The carved words alone (voice: read as carved).
+			say_to_pair(player.owner_peer, "You take the holy remains, for the altar.", "%s takes the holy remains, for the altar." % record.name, there)
 		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
 
@@ -10563,6 +10567,23 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 func say_to(peers: Array[int], line: String) -> void:
 	party_log.add(line)
 	Net.broadcast_to(peers, "party", {"from": "Server", "text": line})
+
+
+## Server: a line about one player (133 amended (2); voice: narration speaks
+## to the reader as "you", of others in the third person). [param you_line]
+## to [param actor_peer] (their owner_peer) alone, [param others_line] to the
+## rest of [param peers] (as say_to's: everyone in the zone who sees it, or
+## the party), and the third-person line kept in the party log for the
+## companions' minds. An empty [param others_line] tells the actor alone.
+func say_to_pair(actor_peer: int, you_line: String, others_line: String, peers: Array[int]) -> void:
+	party_log.add(others_line if not others_line.is_empty() else you_line)
+	Net.broadcast_to([actor_peer], "party", {"from": "Server", "text": you_line})
+	var rest: Array[int] = []
+	for peer in peers:
+		if peer != actor_peer:
+			rest.append(peer)
+	if not others_line.is_empty() and not rest.is_empty():
+		Net.broadcast_to(rest, "party", {"from": "Server", "text": others_line})
 
 
 ## The knight's sepulcher's plaque (714, lore's line, Jeff passed), said
@@ -10993,9 +11014,9 @@ func _give_camp_key(player_id: String, at: Vector2i) -> void:
 		return
 	var uid := World.items.mint(CAMP_KEY, "looted", "Brand the Ox", World.zone.name, at)
 	if World.into_pack(player, uid) >= 0:
-		say_to(World.peers_in(player.zone), "%s takes the key from Brand's belt." % _display_name(player))
+		say_to_pair(player.owner_peer, "You take the key from Brand's belt.", "%s takes the key from Brand's belt." % _display_name(player), World.peers_in(player.zone))
 	else:
-		say_to(World.peers_in(player.zone), "Brand's key falls at %s's feet." % _display_name(player))
+		say_to_pair(player.owner_peer, "Brand's key falls at your feet: your pack is full.", "Brand's key falls at %s's feet." % _display_name(player), World.peers_in(player.zone))
 
 
 ## [param record]'s player, if in the game, given the quest they are on
@@ -19478,7 +19499,9 @@ func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, go
 		return
 	if not str(result.get("say", "")).is_empty():
 		_say_plain(monster, name, str(result["say"]))
-	if not str(result.get("line", "")).is_empty():
+	if not str(result.get("you_line", "")).is_empty():
+		say_to_pair(player.owner_peer, str(result["you_line"]), str(result.get("line", "")), World.peers_in(player.zone))
+	elif not str(result.get("line", "")).is_empty():
 		say_to(World.peers_in(player.zone), str(result["line"]))
 	if bool(result.get("ok", false)):
 		_standing.erase(player_id)

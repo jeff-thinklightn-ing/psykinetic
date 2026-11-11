@@ -67,15 +67,18 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 
 
 ## [param player] says yes to [param offer]: the ask taken, or the quest
-## turned in (his reveal said); "not yet" is only his words again.
+## turned in (his reveal said); "not yet" is only his words again. "line"
+## is said of them to the others there, "you_line" to them (133 amended (2)).
 func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 	var offer_id := str(offer.get("id", ""))
 	var at := _quest(player.player_id)
 	if offer_id.ends_with(":ask") and at == "ask" and _quest_step(player.player_id, "take"):
-		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name}
+		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name,
+			"you_line": "You take up the fallen knight's task."}
 	if offer_id.ends_with(":turn_in") and at == "ready" and _quest_step(player.player_id, "turn_in"):
 		said.emit(REVEALED)
-		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % player.name}
+		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % player.name,
+			"you_line": "You have proven your strength to the fallen knight."}
 	if at == "":
 		return {"ok": false, "say": DONE, "line": ""}
 	return {"ok": false, "say": NOT_YET if at == "open" else "", "line": ""}

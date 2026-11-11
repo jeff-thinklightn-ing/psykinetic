@@ -1169,6 +1169,30 @@ line its peer is sent (_heard) and asserts each of these arrived, not only
 that the server composed it. The other trees' lines follow on their own
 landings, on this helper.
 
+133 amended (2), 2026-11-11: a line about one player says "you" to them.
+Narration speaks to the reader as "you" and of others in the third person
+(voice.md section 2), so a told line about a named player reached that
+player in the third person once 133 amended (1) sent it. Main.say_to_pair(
+actor_peer, you_line, others_line, peers) sends the you-form to the actor
+alone and the third-person line to the rest of peers, and keeps the third
+person in the party log for the companions. Voice's words: the draugr's
+yield ("The draugr yields. You are blessed, and take up the Encolpion
+Amulet, uncharged." / "You are blessed." / "You stand over him again.");
+the sepulcher plaque said as a line of its own, to the zone, exactly as Jeff
+passed it, then "You take the holy remains, for the altar."; Brand's key
+("You take the key from Brand's belt." / "Brand's key falls at your feet:
+your pack is full.", the reason in the you-line alone); the fallen knight's
+taking and proving, his accept_offer result carrying "you_line" beside
+"line", which Main._monster_accepts sends as a pair; the draugr's deal
+results likewise ("You refuse the draugr. He laughs, and rises to strike.",
+"You take up the draugr's pact again.", "You give the draugr %d gold, too
+little: he attacks.", "You give the draugr %d gold and take up his pact for
+%d risings."; sim/draugr.gd's accept_offer, enemy-ai's file, its "line"
+unchanged). The barrow tour reads
+the proving by "proven" and "fallen knight". level_test asserts the you-forms
+on the actor's screen, the third person in the log, and that a line about
+another peer reaches this one in the third person only.
+
 ## 134. Companions overhear; the server says what it knows of whom a line is for
 
 With two players together, every word was her own player's to her, so

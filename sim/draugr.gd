@@ -508,7 +508,8 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 
 ## [param player] says yes to his offer with [param gold]: under the least
 ## deal he refuses; else the gold is his, and the pact begins at the deal
-## it buys (the highest step it reaches).
+## it buys (the highest step it reaches). "line" is said of them to the
+## others there, "you_line" to them (133 amended (2), voice's words).
 func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 	var deal := deal_for(gold)
 	if state == State.PACT:
@@ -524,13 +525,15 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		peaceable = false  # The same tick, for the client (648).
 		_angered = true
 		said.emit(REFUSED)
-		return {"ok": true, "say": "", "line": "%s refuses the draugr. He laughs, and rises to strike." % player.name}
+		return {"ok": true, "say": "", "line": "%s refuses the draugr. He laughs, and rises to strike." % player.name,
+			"you_line": "You refuse the draugr. He laughs, and rises to strike."}
 	var paid := _paid(player.player_id)
 	if str(offer.get("id", "")).ends_with(":again"):
 		if paid.is_empty() or not SCALE.has(str(paid.get("level", ""))):
 			return {"ok": false, "say": "", "line": ""}
 		start_pact(player, str(paid["level"]))  # Paid once (548 amended): no gold.
-		return {"ok": true, "say": "", "line": "%s takes up the draugr's pact again." % player.name}
+		return {"ok": true, "say": "", "line": "%s takes up the draugr's pact again." % player.name,
+			"you_line": "You take up the draugr's pact again."}
 	if not paid.is_empty():
 		return {"ok": false, "say": AGAIN_WORDS, "line": ""}  # A gold deal while one is paid: never twice.
 	if gold <= 0:
@@ -543,10 +546,12 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		# kind's own level; beaten, he gives his respect and nothing more.
 		_provoked = player
 		target = player
-		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [player.name, gold]}
+		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [player.name, gold],
+			"you_line": "You give the draugr %d gold, too little: he attacks." % gold}
 	start_pact(player, str(deal["name"]))
 	_deal_paid(player.player_id, str(deal["name"]))  # Paid once: every fight after at this level (548 amended).
-	return {"ok": true, "say": "", "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])]}
+	return {"ok": true, "say": "", "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])],
+		"you_line": "You give the draugr %d gold and take up his pact for %d risings." % [gold, int(deal["charges"])]}
 
 
 ## [param player_id]'s paid deal for his zone (548 amended, npc's

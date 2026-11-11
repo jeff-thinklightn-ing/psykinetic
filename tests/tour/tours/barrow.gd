@@ -679,7 +679,7 @@ func _keep_knight(bot: Node, marked := false) -> void:
 		step = "done"
 	elif not quest.is_empty():
 		step = "ready" if bool(quest.get("ready", false)) else "open"
-	elif not bot.told.filter(func(l: Dictionary) -> bool: return "proven their strength" in str(l["text"])).is_empty() \
+	elif not bot.told.filter(func(l: Dictionary) -> bool: return "proven" in str(l["text"]) and "fallen knight" in str(l["text"])).is_empty() \
 			or not bot.heard.filter(func(l: Dictionary) -> bool: return "breathes cold air" in str(l["text"])).is_empty():
 		step = "done"
 	var file := FileAccess.open(bot.out_dir.path_join("knight_phase1.json"), FileAccess.WRITE)

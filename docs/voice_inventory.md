@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Only in the party log (36)
+## Only in the party log (23)
 
 Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
 client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
@@ -21,21 +21,8 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s throws the bones: %d to %s's %d. | `sim/companion.gd` _play_on() |
 | %s won't touch grave goods | `sim/companion.gd` turns_down() |
 | %s won't carry that for %s | `sim/companion.gd` turns_down() |
-| The stair down is barred from below. | `main.gd` SEALED_LINES |
-| The way on is closed. | `main.gd` _take_link() |
-| The way is sealed. | `main.gd` _take_link() |
 | %s leaves you %s. | `main.gd` _return_gear() |
-| The draugr yields. %s %s. | `main.gd` barrow_won() |
-| %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
-| Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
 | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
-| %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
-| Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
-| The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
-| The hall's door opens. | `main.gd` _hold_hall_door() |
-| The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
-| Only the dead lie here. | `main.gd` _on_niche_pressed() |
-| The slab swings aside from behind. | `main.gd` _reveal_from_below() |
 | %s is mortally wounded. | `main.gd` _on_downed() |
 | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
@@ -55,7 +42,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2832)
+## Lines in the code (2845)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -2066,7 +2053,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (722)
+### server and windows (729)
 
 | | Line | Where |
 |---|---|---|
@@ -2126,9 +2113,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s %s %s; marks: %s | `main.gd` _mark_command() |
 |  | %s stays in %s, working as its %s. Come back and %s will travel with you again. | `main.gd` travel() |
 |  | %s went to %s. | `main.gd` travel() |
-| L U | The stair down is barred from below. | `main.gd` SEALED_LINES |
-| U | The way on is closed. | `main.gd` _take_link() |
-| U | The way is sealed. | `main.gd` _take_link() |
+| L | The stair down is barred from below. | `main.gd` SEALED_LINES |
+|  | The way on is closed. | `main.gd` _take_link() |
+|  | The way is sealed. | `main.gd` _take_link() |
 |  | usage: weather [%s\|auto\|reload] [<minutes>] [<region>\|all] | `main.gd` _weather_command() |
 |  | no climate for region %s (regions: %s) | `main.gd` _weather_command() |
 |  | %s (%s): %s | `main.gd` _weather_command() |
@@ -2247,11 +2234,16 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | (another of her name lives in every town: someone else now, not to be asked back) | `main.gd` _hand_companion_over() |
 | L | You left %s because they %s. | `main.gd` _favour_words() |
 |  | are spoken well of in your town | `main.gd` _favour_tick() |
-| U | The draugr yields. %s %s. | `main.gd` barrow_won() |
+|  | The draugr yields. %s %s. | `main.gd` barrow_won() |
 |  | is blessed and takes up the %s, uncharged | `main.gd` barrow_won() |
 |  | stands over him again | `main.gd` barrow_won() |
-| U | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
-| L U | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
+|  | The draugr yields. %s. | `main.gd` barrow_won() |
+|  | You are blessed, and take up the %s, uncharged | `main.gd` barrow_won() |
+|  | You are blessed | `main.gd` barrow_won() |
+|  | You stand over him again | `main.gd` barrow_won() |
+|  | You take the holy remains, for the altar. | `main.gd` barrow_won() |
+|  | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
+| L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
 | U | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | L | the draugr's blessing | `main.gd` reset_barrow() |
 |  | the deal won | `main.gd` reset_barrow() |
@@ -2261,12 +2253,14 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | Clear the crypt | `main.gd` QUEST_TITLE |
 | L | the fallen knight | `main.gd` QUEST_GIVER |
 | L | Brand the Ox | `main.gd` _give_camp_key() |
-| U | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
-| U | Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
-| U | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
-| U | The hall's door opens. | `main.gd` _hold_hall_door() |
-| U | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
-| U | Only the dead lie here. | `main.gd` _on_niche_pressed() |
+|  | You take the key from Brand's belt. | `main.gd` _give_camp_key() |
+|  | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
+|  | Brand's key falls at your feet: your pack is full. | `main.gd` _give_camp_key() |
+|  | Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
+|  | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
+|  | The hall's door opens. | `main.gd` _hold_hall_door() |
+|  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
+|  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draft coming from one of the niches. | `main.gd` _tell_draft() |
 |  | The fresh mortar crumbles under your hands, and the niche comes open. | `main.gd` LOOSE_NICHE_LINE |
 |  | a sealed tomb opened | `main.gd` TOMB_OPENED |
@@ -2285,7 +2279,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | drove %s back with you | `main.gd` _bond_apex_beaten() |
 |  | %s@%s:%d,%d#%d | `main.gd` _secret_key() |
 |  | Nothing more here. | `main.gd` _search_secret() |
-| U | The slab swings aside from behind. | `main.gd` _reveal_from_below() |
+|  | The slab swings aside from behind. | `main.gd` _reveal_from_below() |
 | U | %s is mortally wounded. | `main.gd` _on_downed() |
 | U | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 |  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd` _on_downed() |
@@ -2793,7 +2787,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | came somewhere new with you | `main.gd` _discovered() |
 |  | %d ms at %s | `main.gd` _report_walk() |
 
-### the draugr (18)
+### the draugr (22)
 
 | | Line | Where |
 |---|---|---|
@@ -2808,15 +2802,19 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | Then I'll take it from you by force! | `sim/draugr.gd` REFUSED |
 |  | I am bound in another's pact. Wait. | `sim/draugr.gd` accept_offer() |
 |  | %s refuses the draugr. He laughs, and rises to strike. | `sim/draugr.gd` accept_offer() |
+|  | You refuse the draugr. He laughs, and rises to strike. | `sim/draugr.gd` accept_offer() |
 |  | %s takes up the draugr's pact again. | `sim/draugr.gd` accept_offer() |
+|  | You take up the draugr's pact again. | `sim/draugr.gd` accept_offer() |
 |  | You have not so much. | `sim/draugr.gd` accept_offer() |
 |  | the draugr's pact | `sim/draugr.gd` accept_offer() |
 |  | %s gives the draugr %d gold, too little: he attacks. | `sim/draugr.gd` accept_offer() |
+|  | You give the draugr %d gold, too little: he attacks. | `sim/draugr.gd` accept_offer() |
 |  | %s gives the draugr %d gold and takes up his pact for %d risings. | `sim/draugr.gd` accept_offer() |
+|  | You give the draugr %d gold and take up his pact for %d risings. | `sim/draugr.gd` accept_offer() |
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
-### the fallen knight (10)
+### the fallen knight (12)
 
 | | Line | Where |
 |---|---|---|
@@ -2829,7 +2827,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | L | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |
 | L | The way below is open to you. My remains wait in the Hall of Fallen Souls. | `sim/astral_knight.gd` DONE |
 |  | %s takes up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
+|  | You take up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | %s has proven their strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
+|  | You have proven your strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
 
 ### the lawspeaker (21)
 

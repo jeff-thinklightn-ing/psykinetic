@@ -2966,16 +2966,25 @@ func _test_barrow_won() -> void:
 		"the amulet is minted into their pack, bound for life, uncharged: the win gives no charges (0 of 50)")
 	_check(not knight.is_empty() and won.size() == relics_before + 1 and World.relic_of(won[-1]) == {"knight": knight, "tier": 1} and World.soulbound(won[-1]),
 		"from the sepulcher, the holy remains of %s at the normal deal's tier, bound to the winner, in their pack (%s)" % [knight, World.relic_of(won[-1]) if not won.is_empty() else {}])
-	_check(_main.party_log.last(2) == ["The draugr yields. %s is blessed and takes up the %s, uncharged." % [record.name, Items.name_of(World.TOTEM)],
-			Main.SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name],
-		"the win and the plaque said (%s)" % [_main.party_log.last(2)])
-	_check(_heard.slice(-2) == _main.party_log.last(2), "and both reach the winner's screen as party lines (%s)" % [_heard.slice(-2)])
+	_check(_main.party_log.last(3) == ["The draugr yields. %s is blessed and takes up the %s, uncharged." % [record.name, Items.name_of(World.TOTEM)],
+			Main.SEPULCHER_PLAQUE % knight, "%s takes the holy remains, for the altar." % record.name],
+		"the win, the plaque as its own line and the taking kept in the party log in the third person (%s)" % [_main.party_log.last(3)])
+	_check(_heard.slice(-3) == ["The draugr yields. You are blessed, and take up the %s, uncharged." % Items.name_of(World.TOTEM),
+			Main.SEPULCHER_PLAQUE % knight, "You take the holy remains, for the altar."],
+		"and on the winner's screen as said to them (133 amended (2)): \"You are blessed\", the plaque's carved words, \"You take\" (%s)" % [_heard.slice(-3)])
+	var others_from := _heard.size()
+	var another := Net.local_id + 1000  # A peer not this one: its you-line goes to it, never here.
+	var both: Array[int] = [Net.local_id, another]
+	_main.say_to_pair(another, "You test the line.", "Someone tests the line.", both)
+	_check(_heard.slice(others_from) == ["Someone tests the line."] and _main.party_log.last(1) == ["Someone tests the line."],
+		"say_to_pair: a line about another player reaches the rest in the third person, never their you-form (%s)" % [_heard.slice(others_from)])
 	_check(_main.charge_from_relic(player, 1) == 10 and player.charges == 10 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,
 		"the relic on the altar: the deal's 10 charges, 10 of 50; the zone's sum is 10, another zone's 0")
 	_main.barrow_won([id], "easy")
 	_check(World.totem_of(id) == uid and World.totem_charges(uid) == 10 and record.barrow["best"] == "normal"
-		and _main.party_log.last(2)[0] == "The draugr yields. %s stands over him again." % record.name and World.relic_of(relics.call()[-1])["tier"] == 0,
-		"won again at an easier deal: the same amulet, no charges, best kept, an easy relic (%s)" % [_main.party_log.last(2)])
+		and _main.party_log.last(3)[0] == "The draugr yields. %s stands over him again." % record.name and World.relic_of(relics.call()[-1])["tier"] == 0
+		and _heard.slice(-3)[0] == "The draugr yields. You stand over him again.",
+		"won again at an easier deal: the same amulet, no charges, best kept, an easy relic (%s %s)" % [_main.party_log.last(3), _heard.slice(-3)])
 	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 15, "its relic adds its 5")
 	World.items.set_charges(uid, 45)
 	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 50, "at the room's edge what fits is taken")
@@ -5613,7 +5622,8 @@ func _test_camp_chest() -> void:
 	brand.note_struck(player)
 	World.damage(brand, 9999)
 	var keys := func() -> int: return Array(player.slots).count(Main.CAMP_KEY)
-	_check(keys.call() == 1 and _heard.slice(-1) == ["%s takes the key from Brand's belt." % _main._display_name(player)],
+	_check(keys.call() == 1 and _heard.slice(-1) == ["You take the key from Brand's belt."]
+		and _main.party_log.last(4).has("%s takes the key from Brand's belt." % _main._display_name(player)),
 		"Brand felled by them: his key in their pack, and said on their screen (%s %s)" % [player.slots, _heard.slice(-1)])
 	var first: bool = _main.search(player, chest)
 	var after_first := World.gold_of(id)
@@ -5729,7 +5739,7 @@ func _test_barrow_quest() -> void:
 		"whom they felled is saved and read back with the generation: a restart keeps it (747 amended (8))")
 	_main._monster_accepts(knight, player, {"id": "quest:%d:ask" % knight.id}, 0)
 	var took := {"ok": _main.barrow_quest_of(id) == "open"}
-	_check(_heard.slice(-1) == ["%s takes up the fallen knight's task." % player.name],
+	_check(_heard.slice(-1) == ["You take up the fallen knight's task."] and _main.party_log.last(1) == ["%s takes up the fallen knight's task." % player.name],
 		"the deal's line (the knight's taking) reaches the screens there, not the party log alone (%s)" % [_heard.slice(-1)])
 	var items: Array = player.quest.get("items", [])
 	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
