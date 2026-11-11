@@ -282,6 +282,17 @@ func _ready() -> void:
 			_walk_pitch = pair[1].to_float()
 		elif pair.size() == 2 and pair[0] == "which":
 			_which = pair[1]
+		elif pair.size() == 2 and pair[0] == "map":
+			_walk_map = pair[1]
+		elif pair.size() == 2 and pair[0] == "start":
+			var xy := pair[1].split(",")
+			_walk_start = Vector2i(int(xy[0]), int(xy[1]))
+		elif pair.size() == 2 and pair[0] == "route":
+			for leg: String in pair[1].split(";", false):
+				var part := leg.split(",")
+				_walk_route.append([Vector2i(int(part[0]), int(part[1])), part[2].to_float() if part.size() > 2 else 0.0])
+		elif pair.size() == 2 and pair[0] == "hour":
+			_walk_hour = pair[1].to_float()
 	match scenario:
 		"sneak":
 			_sneak()
@@ -388,7 +399,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17960)
 	Net.companions = scenario == "walkreel" and "--wren" in OS.get_cmdline_user_args()  # walkreel --wren: she follows.
 	Net.state_path = ""
-	Net.map_name = NAME
+	Net.map_name = _walk_map if scenario == "walkreel" and not _walk_map.is_empty() else NAME
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	_player = _main._local_player()
@@ -410,6 +421,15 @@ func _ready() -> void:
 	if scenario == "walkreel":
 		# Jeff, 11-11: "walking around looks like skipping". The player walked straight, stopped, turned
 		# and walked on; each frame its body logged ([gait] lines) for the gait's numbers.
+		if _walk_start != NO_CELL:
+			# The real map (--map, --start): the host's player (and its companion) put on the route's
+			# first cell as an admin's move puts one (Main.travel), then taken again, new bodies.
+			for peer: int in _main._players:
+				if _main._players[peer] == _player:
+					_main.travel(peer, World.zone.name, "", {}, _walk_start)
+			_player = _main._local_player()
+		if not is_nan(_walk_hour):
+			DayNight.set_hour(_walk_hour)
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 		for entity in World.monsters():
@@ -1149,9 +1169,25 @@ const NO_CELL := Vector2i(-9999, -9999)
 ## walkreel --yaw=<deg> --pitch=<deg>: the camera held there (side-on, for the legs), else the game's.
 var _walk_yaw := NAN
 var _walk_pitch := NAN
+## walkreel on a real map: --map=<level> (wilds: Umbrage), --start=x,y (the player put there, its
+## companion beside), --route="x,y,pause_s;..." (each leg one click, then that pause), --hour=h.
+var _walk_map := ""
+var _walk_start := NO_CELL
+var _walk_route: Array = []
+var _walk_hour := NAN
 
 
 func _walkreel() -> void:
+	if not _walk_map.is_empty():
+		# The real map (the coordinator, 11-11: every walk, follow and townsfolk reel on Umbrage's streets):
+		# --map=wilds --start=x,y --route="x,y,pause_s;..." --hour=h. Each leg one click, then its pause.
+		_script = [["wait", 15, "Standing."]]
+		for leg: Array in _walk_route:
+			_script.append(["walk", leg[0], ""])
+			if float(leg[1]) > 0.0:
+				_script.append(["wait", int(roundf(float(leg[1]) * World.TICK_RATE)), ""])
+		_script.append(["wait", 15, "Stopped."])
+		return
 	var rows: Array[String] = []
 	for y in 30:  # Open floor well past the walk on its south: a side-on camera (--yaw=-45) sees over it.
 		rows.append(".".repeat(40))
