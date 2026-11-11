@@ -8649,6 +8649,19 @@ facing the town's square, footprint 216-219 x 195-200, lanes from its
 door to the square; the healer's hut by the south forest edge, footprint
 151-153 x 233-235 facing north, the far side from the castle link, a path
 from its door to the town's west lane at (196, 213).
+
+373 amended (1) (art-kit; label by tools/decision_number.sh; buildings' temple furnishing, the coordinator's
+Umbrage-first order, 2026-11-10): the temple's inside gets its altar and its counter's own look. building.temple_altar:
+2 x 1 cells, long along x, its back (-z) to the wall; dressed plain pale stone (a plinth course, two courses with
+staggered joints, a top slab overhanging a little) under a plain undyed linen cloth hanging down the front to a
+darker hem; its top at 1.006, where buildings sets two Level lit_candles clusters; solid; no sign, symbol or
+carving (the coordinator: a sign of Theus waits on Jeff's words). prop.offering_table: one cell, a low oak table
+(0.84 x 0.56, 0.8 high) with a shallow bronze offering bowl, which buildings lays as the temple counter entity's
+"art" in place of the chest it was drawn as (Jeff: no chests in town); nothing else about the counter changes.
+By hand, palette only, C:/dev/review/temple/make_temple.py; the look at C:/dev/review/temple/temple_pieces.png.
+Off: nothing places either until buildings' furnishing. Art only, protocol unchanged, no new class_name, no bullet
+(buildings' furnishing carries it).
+
 ## 376. Who is bound to lore facts is a role list in levels/lore/roles.json, keyed by trade
 
 Jeff's rule (2026-10-17): officials (priests, guards, the town's officials) speak
@@ -21131,6 +21144,16 @@ entries (a woodlot place for the store at the forest's edge, radius about
 woodpile within 4 cells of the store off its door path; moved to Held with
 the town if Jeff takes a Held of its own). resident_test _test_visible_work
 stands both props at runtime. Server only, protocol unchanged. Part 2 (after art-kit's slots 65e4b44d): the two slots in Level.BUILDINGS, SOLID and DOORLESS, with release's line under PROTOCOL_REVISION 30 in net.gd's comment (a v0.1.163 client would walk through their cells; 30 keeps it out). Maps' side ce6e6f78: the wilds' woodlot at (194,227), radius 4, the block at (195,226), the pile at (207,201). Part 3, checked on the real wilds with the town soak (three days, a hauler retrained woodcutter on day 2): he chops at (195,225) facing south onto the block and ends each carry at (208,201) facing west onto the pile. Found on the way: a retrained worker's body kept its spawn trade (Main._spawn_resident set it once), so the work tick never saw the new woodcutter; _sync_residents now follows the worker's first trade (Pip the acolyte's body too), the label the spawn's until it stands again. town_soak samples every body's activity every 20 steps and reports it ("SOAK work <kind>: n samples at name tile facing").
+
+566 amended (3) (art-kit; label by tools/decision_number.sh; animation's ask for Umbrage's townsfolk, the
+coordinator's Umbrage-first order, 2026-11-10): two more work pieces, in tool.hoe's and tool.shears' style, for
+animation's clips. tool.broom: a besom for the hauler's sweep, a straight ash haft 1.3 m up +y from its butt (the
+origin), birch twigs bound round its top flaring to a ragged brush past its end; two hands, grip 0.3 and grip_2
+0.85 (animation's numbers). tool.ladle: a cook's carved birch ladle for the stir, about 0.6 m, one hand, its
+origin the handle's butt, +y toward a deep round bowl whose hollow faces +x; grip at the origin, as tool.hoe's.
+By hand, palette only, C:/dev/review/tools/make_work.py (216 and 212 tris); the look at
+C:/dev/review/tools/work_umbrage/broom_ladle.png. Off: unused until animation's ACTIVITIES entries name them.
+Art only, protocol unchanged, no new class_name, no bullet.
 
 ## 566, economy's side: visible work's readers and the "town" message
 
