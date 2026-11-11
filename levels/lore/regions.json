@@ -139,7 +139,7 @@
 			"facts": [
 				{
 					"id": "pond.where",
-					"text": "Far west of town there is a pond: take the road out to the crossroads and keep on west along the west road almost to its end, and the pond lies beside it.",
+					"text": "The pond lies far west of town, near the end of the west road.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -149,8 +149,7 @@
 					],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the pond",
-					"weight": 2
+					"sight": "the pond"
 				},
 				{
 					"id": "pond.reeds",
