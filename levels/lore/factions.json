@@ -41,7 +41,7 @@
 				},
 				{
 					"id": "town.curse_why",
-					"text": "Umbrage is cursed because of the grave robbers, and because its economy runs off the barrow's gold.",
+					"text": "Umbrage is cursed because of the grave robbers, and because its economy runs off the crypt's gold.",
 					"known": "rumour",
 					"true": true,
 					"where": [

@@ -775,7 +775,7 @@
 				},
 				{
 					"id": "hollowfell.barrow_gold",
-					"text": "When Hollowfell was lost, the town turned to the barrow's gold, and that is part of why Umbrage is cursed.",
+					"text": "When Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed.",
 					"known": "rumour",
 					"where": [
 						"town_lands"

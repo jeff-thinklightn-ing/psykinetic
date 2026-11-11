@@ -184,7 +184,7 @@
 			"name": "the old gods",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The tribe's many old gods; Psyke, their god of war, gives the barrow's draugr his power and sends the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers, who follow Theus (Jeff, 2026-10-22; docs/lore/crypt.md).",
+			"summary": "The tribe's many old gods; Psyke, their god of war, gives the crypt's draugr his power and sends the fallen back to battle; angered by the robbers, appeased by gold that returns what was stolen; known to Aldous and the draugr, not to the temple's goers, who follow Theus (Jeff, 2026-10-22; docs/lore/crypt.md).",
 			"relations": [
 				{
 					"to": "crypt",
@@ -213,7 +213,7 @@
 				},
 				{
 					"id": "old_gods.gold",
-					"text": "Robbers who pilfer the barrow anger the old gods; gold offerings appease them, because they return what was stolen.",
+					"text": "Robbers who pilfer the crypt anger the old gods; gold offerings appease them, because they return what was stolen.",
 					"known": "secret",
 					"where": [],
 					"knowers": [
