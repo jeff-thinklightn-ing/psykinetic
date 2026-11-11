@@ -4,7 +4,11 @@ extends RefCounted
 ## render/ui_theme.tres, which every Control inherits. Panels use its
 ## types and named variations (Title, Heading, Caption, Small, Name,
 ## Outlined, Inset, HandSlot, Deep; a talk window's offers: OfferList,
-## OfferRow, Price, PriceShort) and set no fonts, sizes or colours of
+## OfferRow, Price, PriceShort; the store window, Jeff's approved mock: Glass,
+## Subhead, Tab, Well, WellHover, WellNew, WellRefused, PriceChip, ChipPrice,
+## ChipPriceShort, SquareCount, FootLine, FootLineRefused; its containers Stack,
+## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
+## square, square_gap, half_gap) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
 ## bubbles) reads the theme's named colours, fonts, sizes and constants
 ## from here, so the .tres is the one source of truth.
@@ -13,12 +17,13 @@ extends RefCounted
 ## brass, brass_bright, rust, alarm, party, aloud, friend, water, outline.
 ## Fonts: serif, serif_bold, sans, sans_bold. Sizes: title, heading, hud,
 ## body, caption, small, speech. Constants: unit, pad, row, section, slot,
-## slot_gap, radius, margin, outline.
+## slot_gap, radius, margin, outline, square, square_gap, half_gap.
 
 const PATH := "res://render/ui_theme.tres"
 const TYPE := &"Psykinetic"
 ## The theme types whose font sizes the text scale multiplies (decision 453).
-const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel"]
+const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel",
+	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused"]
 ## The meaning colours and their sets: "normal" is the palette's (docs/ui_style.md);
 ## "distinct" keeps brass and rust, and moves the rest apart for red-green
 ## colour blindness (friend blue, party pale cyan, alarm magenta: each a

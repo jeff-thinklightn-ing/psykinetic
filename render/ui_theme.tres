@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=27 format=3]
+[gd_resource type="Theme" load_steps=37 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -294,6 +294,162 @@ corner_radius_top_right = 3
 corner_radius_bottom_right = 3
 corner_radius_bottom_left = 3
 
+; The glass pane (Jeff approved the store window, 11-10: store-rolf-1080.png): the lifted pane #5e4e3b at 0.70 over the world, a lit rim, a soft shadow. The frost behind it is UiGlass's (a part, to come); without it this is the flat tint.
+[sub_resource type="StyleBoxFlat" id="glass"]
+content_margin_left = 40.0
+content_margin_top = 24.0
+content_margin_right = 40.0
+content_margin_bottom = 24.0
+bg_color = Color(0.3686, 0.3059, 0.2314, 0.7)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.0314, 0.0235, 0.0157, 0.43)
+shadow_size = 18
+shadow_offset = Vector2(4, 14)
+
+; A tab at a window's head (Store, Donate, Locker): at rest, a faint plate.
+[sub_resource type="StyleBoxFlat" id="tab"]
+content_margin_left = 28.0
+content_margin_top = 10.0
+content_margin_right = 28.0
+content_margin_bottom = 10.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.04)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.24)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; A tab under the pointer: the flame rim.
+[sub_resource type="StyleBoxFlat" id="tab_hover"]
+content_margin_left = 28.0
+content_margin_top = 10.0
+content_margin_right = 28.0
+content_margin_bottom = 10.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.08)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1.0, 0.8235, 0.4784, 1.0)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; The open tab: a lit plate, the flame rim, heavier along its foot.
+[sub_resource type="StyleBoxFlat" id="tab_on"]
+content_margin_left = 28.0
+content_margin_top = 10.0
+content_margin_right = 28.0
+content_margin_bottom = 10.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.13)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 5
+border_color = Color(1.0, 0.8235, 0.4784, 1.0)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; A square (the store's, its goods and the pack): the light cloth ground #b3a68a, so a dark picture reads on it, a fine dark rim.
+[sub_resource type="StyleBoxFlat" id="well"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.702, 0.651, 0.5412, 1.0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.1176, 0.0863, 0.0549, 0.78)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+; A square under the pointer: lighter cloth, the flame rim.
+[sub_resource type="StyleBoxFlat" id="well_hover"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.7961, 0.749, 0.6471, 1.0)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(1.0, 0.8235, 0.4784, 1.0)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+; A square whose thing just arrived (bought, or moved in): the flame rim on the ground.
+[sub_resource type="StyleBoxFlat" id="well_new"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.702, 0.651, 0.5412, 1.0)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(1.0, 0.8235, 0.4784, 1.0)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+; A square whose click was refused, for about a second: the rust rim.
+[sub_resource type="StyleBoxFlat" id="well_refused"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.702, 0.651, 0.5412, 1.0)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.9098, 0.4745, 0.1804, 1.0)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+; A price on a square's corner: a dark pill, a lit rim; the coin drawn in its left margin.
+[sub_resource type="StyleBoxFlat" id="price_chip"]
+content_margin_left = 48.0
+content_margin_top = 2.0
+content_margin_right = 20.0
+content_margin_bottom = 2.0
+bg_color = Color(0.102, 0.0784, 0.0627, 0.84)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 25
+corner_radius_top_right = 25
+corner_radius_bottom_right = 25
+corner_radius_bottom_left = 25
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -446,3 +602,64 @@ TooltipLabel/font_sizes/font_size = 30
 TooltipPanel/styles/panel = SubResource("tooltip")
 Tip/base_type = &"PanelContainer"
 Tip/styles/panel = SubResource("tooltip")
+ChipPrice/base_type = &"Label"
+ChipPrice/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+ChipPrice/font_sizes/font_size = 40
+ChipPrice/fonts/font = ExtResource("sans_bold")
+ChipPriceShort/base_type = &"Label"
+ChipPriceShort/colors/font_color = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
+ChipPriceShort/font_sizes/font_size = 40
+ChipPriceShort/fonts/font = ExtResource("sans_bold")
+FootLine/base_type = &"Label"
+FootLine/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+FootLine/font_sizes/font_size = 44
+FootLineRefused/base_type = &"Label"
+FootLineRefused/colors/font_color = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
+FootLineRefused/font_sizes/font_size = 44
+Glass/base_type = &"PanelContainer"
+Glass/styles/panel = SubResource("glass")
+PriceChip/base_type = &"PanelContainer"
+PriceChip/styles/panel = SubResource("price_chip")
+SquareCount/base_type = &"Label"
+SquareCount/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+SquareCount/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
+SquareCount/constants/outline_size = 10
+SquareCount/font_sizes/font_size = 40
+SquareCount/fonts/font = ExtResource("sans_bold")
+Subhead/base_type = &"Label"
+Subhead/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Subhead/font_sizes/font_size = 44
+Subhead/fonts/font = ExtResource("sans_bold")
+Tab/base_type = &"Button"
+Tab/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Tab/colors/font_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Tab/colors/font_pressed_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Tab/colors/font_hover_pressed_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Tab/colors/font_focus_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Tab/font_sizes/font_size = 42
+Tab/fonts/font = ExtResource("sans_bold")
+Tab/styles/normal = SubResource("tab")
+Tab/styles/hover = SubResource("tab_hover")
+Tab/styles/pressed = SubResource("tab_on")
+Tab/styles/hover_pressed = SubResource("tab_on")
+Tab/styles/focus = SubResource("focus")
+Well/base_type = &"PanelContainer"
+Well/styles/panel = SubResource("well")
+WellHover/base_type = &"PanelContainer"
+WellHover/styles/panel = SubResource("well_hover")
+WellNew/base_type = &"PanelContainer"
+WellNew/styles/panel = SubResource("well_new")
+WellRefused/base_type = &"PanelContainer"
+WellRefused/styles/panel = SubResource("well_refused")
+Psykinetic/constants/square = 176
+Psykinetic/constants/square_gap = 16
+Psykinetic/constants/half_gap = 88
+Halves/base_type = &"HBoxContainer"
+Halves/constants/separation = 88
+Squares/base_type = &"GridContainer"
+Squares/constants/h_separation = 16
+Squares/constants/v_separation = 16
+Stack/base_type = &"VBoxContainer"
+Stack/constants/separation = 12
+Strip/base_type = &"HBoxContainer"
+Strip/constants/separation = 12
