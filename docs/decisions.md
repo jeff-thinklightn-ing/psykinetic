@@ -48745,6 +48745,24 @@ only a reorder: a secret stays untold to a player it does not trust however plai
 (resident_test _test_asked_first: the crypt and Pip asked, not trusted and trusted). Hails pass no
 line and are unchanged; companions keep decision 400's way. Server only.
 
+853 amended (5) (voice's audit, the coordinator's approval, 2026-11-11; voice's words): a click's
+greeting. (a) Resident.greet_word gave greet.standing's one word before the trade's lines, so anyone
+who knew you said "Back again?" or "Good to see you.": three words in place of thirty lines. Now
+"known" has the trade's line, as a stranger does, and "wronged" and "trusted" one of three lines
+each (levels/townsfolk.json greet.standing, arrays), picked by the day as the trade's are. (b)
+Standing.heard made the entry on gossip alone, so someone never spoken to said "Back again?". An
+entry heard makes is marked "heard_only"; Standing.met_in_person is false for it, and the click's
+word and the hail's greeting cue (Resident's HAIL_GREETINGS) treat such a player as a stranger.
+Standing.met on a heard-only entry meets them (the mark gone, "met" now, the score kept), so their
+first words count as first words. What gossip does to the score is unchanged. A standing saved
+before this has no mark and counts as met (the box's: not a bug). (c) Main._greeted said
+greet.refuse "Not now." while the resident's own reply to the player was queued or out at the mind;
+now they turn to them and say nothing, and the reply comes. One who cannot stop says Main._refuse_word's
+word by why, greet.refuse_by by the day: led home by this player "led_by_you", by another "away",
+lost beyond the walls "lost", awake abed "abed", else greet.refuse. One who has taken an ask on
+their card ("asks", by this player) is greeted with greet.waiting by the day, over the standing's
+word and the trade's. Nobody is refused who was not before. Server and levels data.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

@@ -2955,7 +2955,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (869)
+## Lines in the data (880)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3118,7 +3118,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (32)
+### levels/economy.json (33)
 
 | | Line | Key |
 |---|---|---|
@@ -3131,6 +3131,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | There's %d gold for it. | `camp_traders.say.bought` |
 |  | I've enough of that for now. | `camp_traders.say.enough` |
 |  | I've no use for that. | `camp_traders.say.wont` |
+|  | in the kitchen shed | `receives.pointers.where.kitchen` |
 |  | Ore goes to the smith. | `receives.pointers.ore.smith` |
 |  | Wood goes to the carpenter. | `receives.pointers.wood.carpenter` |
 |  | Wood goes to the fletcher. | `receives.pointers.wood.fletcher` |
@@ -3410,7 +3411,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (129)
+### levels/townsfolk.json (139)
 
 | | Line | Key |
 |---|---|---|
@@ -3494,8 +3495,18 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Nothing made just now. Come back tomorrow. | `empty_shelf.default[0]` |
 |  | I've nothing ready for you yet. | `empty_shelf.default[1]` |
 |  | The shelf's bare. Give me time. | `empty_shelf.default[2]` |
+|  | Not now; I've somewhere to be. | `greet.refuse_by.away[0]` |
+|  | Not now. I need to get back to town. | `greet.refuse_by.lost[0]` |
+|  | Not now. I'm abed. | `greet.refuse_by.abed[1]` |
+|  | Still on it? Good. | `greet.waiting[0]` |
+|  | Glad you're seeing to that. | `greet.waiting[1]` |
+|  | That's in good hands, then. | `greet.waiting[2]` |
 |  | You're in my care; fall where you will, I'll see to you. | `greet.care` |
-|  | Good to see you. | `greet.standing.trusted` |
+|  | What do you want now? | `greet.standing.wronged[1]` |
+|  | Say it and be on your way. | `greet.standing.wronged[2]` |
+|  | Good to see you. | `greet.standing.trusted[0]` |
+|  | There you are. What is it? | `greet.standing.trusted[1]` |
+|  | Ah, it's you. All well? | `greet.standing.trusted[2]` |
 |  | Herbs, if you have any; the town is short of them. | `greet.trades.medicine_man[1]` |
 |  | Sit; let me look at you. | `greet.trades.medicine_man[2]` |
 |  | What is it? The forge won't wait. | `greet.trades.smith[0]` |

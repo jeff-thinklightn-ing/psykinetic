@@ -877,7 +877,7 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 				_sentence(", because " + because.trim_suffix(".")) if not because.is_empty() else "."]})
 	if not sky.is_empty() and str(hails.get("sky", "")) != sky:
 		cues.append({"kind": "sky", "text": _sentence(sky)})
-	var word := Standing.words(card, player_id)
+	var word := Standing.words(card, player_id) if Standing.met_in_person(card, player_id) else "stranger"  # Heard of, not met (853 amended (5)).
 	if greeting_ok and word == "stranger":
 		cues.append({"kind": "greeting", "text": HAIL_KNOWN_OF % [player_name, known_of.trim_suffix(".")] if not known_of.is_empty()
 			else str(HAIL_STRANGER[absi(hash(worker_id)) % HAIL_STRANGER.size()]) % player_name})
@@ -1096,7 +1096,12 @@ func address(target: GridEntity, ticks: int) -> void:
 static func greet_word(trade: String, standing_word: String, rules: Dictionary, seed: int) -> String:
 	var by_standing: Variant = rules.get("standing", {})
 	if by_standing is Dictionary and by_standing.has(standing_word):
-		return str(by_standing[standing_word])
+		# Wronged and trusted: one of their lines by the day (853 amended (5)); known has the trade's, as a stranger.
+		var said: Variant = by_standing[standing_word]
+		if said is Array and not (said as Array).is_empty():
+			return str(said[absi(seed) % (said as Array).size()])
+		if said is String:
+			return said
 	var trades: Variant = rules.get("trades", {})
 	var lines: Variant = trades.get(trade, trades.get("default", [])) if trades is Dictionary else []
 	if not lines is Array or (lines as Array).is_empty():

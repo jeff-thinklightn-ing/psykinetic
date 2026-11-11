@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: townsfolk greet you as they know you: a known face with their trade's own words, one you've wronged or who trusts you with words of their own, one who has only heard of you as a stranger, one whose task you're on glad you're seeing to it, and one who can't stop with the reason why (853 amended (5))
 - Towns: townsfolk answer what you ask first, so Aldous asked about the crypt talks of the crypt, and a hunter asked about wolves talks of wolves (853 amended (4))
 - Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10))
 - Townsfolk are a man or a woman as their names say: Aldous asks you to give him the remains, and a few townsfolk look different from this update on, their looks now matching their names (398 amended (1))

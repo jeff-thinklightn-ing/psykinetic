@@ -39,12 +39,14 @@
 		"smithed": ["Nothing on the rack. Bring me iron and come back tomorrow.", "I've no iron to work, so there's nothing made.", "The forge is cold for want of ore. Bring some and I'll get to it."],
 		"default": ["Nothing made just now. Come back tomorrow.", "I've nothing ready for you yet.", "The shelf's bare. Give me time."]},
 	"greet": {
-		"_note": "A click on a townsperson (decision 560, npc's side; Jeff: they stop, turn and address you). stop_seconds: how long they stand facing the player; again_seconds: one greeting a pair in this long (a click within it only turns them again); refuse: the word when they cannot stop (in bed, hiding, strayed, escorting, an ask of theirs out); standing: the word for one the town knows (Standing.words: wronged, known, trusted; a stranger gets the trade's); trades: a trade's lines, one picked a day (the default's for a trade not listed). The word is said at once without the mind; what they have to tell the player today follows as a hail (554) under its limits.",
+		"_note": "A click on a townsperson (decision 560, npc's side; Jeff: they stop, turn and address you). stop_seconds: how long they stand facing the player; again_seconds: one greeting a pair in this long (a click within it only turns them again); refuse: the word when they cannot stop, refuse_by's by why where it has one (led_by_you: walked home by this player; away: led by another; lost: strayed beyond the walls; abed: awake in bed), one a day; their reply already on its way: no word, they turn to them (853 amended (5)); standing: one of the lines a day for one they have met who is wronged or trusted (known, a stranger and one only heard of get the trade's); waiting: one a day, in place of either, for one who has taken an ask of theirs; trades: a trade's lines, one picked a day (the default's for a trade not listed). The word is said at once without the mind; what they have to tell the player today follows as a hail (554) under its limits.",
 		"stop_seconds": 8,
 		"again_seconds": 10,
 		"refuse": "Not now.",
+		"refuse_by": {"led_by_you": ["Lead on, then.", "Right behind you."], "away": ["Not now; I've somewhere to be."], "lost": ["Not now. I need to get back to town."], "abed": ["Let me rest.", "Not now. I'm abed."]},
+		"waiting": ["Still on it? Good.", "Glad you're seeing to that.", "That's in good hands, then."],
 		"care": "You're in my care; fall where you will, I'll see to you.",
-		"standing": {"wronged": "You again.", "known": "Back again?", "trusted": "Good to see you."},
+		"standing": {"wronged": ["You again.", "What do you want now?", "Say it and be on your way."], "trusted": ["Good to see you.", "There you are. What is it?", "Ah, it's you. All well?"]},
 		"trades": {
 			"medicine_man": ["What ails you?", "Herbs, if you have any; the town is short of them.", "Sit; let me look at you."],
 			"default": ["What is it?", "Aye?", "Yes?"],

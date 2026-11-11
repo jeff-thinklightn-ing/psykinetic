@@ -65,12 +65,29 @@ static func score(card: Dictionary, player_id: String) -> int:
 
 
 ## Their first words with [param player_id] at [param step]: the entry made
-## at 0 (known). Whether it was the first time.
+## at 0 (known). Whether it was the first time: an entry gossip alone made
+## (heard's "heard_only") is met now, its score kept (853 amended (5)).
 static func met(card: Dictionary, player_id: String, step: int) -> bool:
-	if player_id.is_empty() or not entry(card, player_id).is_empty():
+	if player_id.is_empty():
+		return false
+	var it := entry(card, player_id)
+	if bool(it.get("heard_only", false)):
+		var own: Dictionary = card["standing"][player_id]  # entry() hands a copy: the card's own is changed.
+		own.erase("heard_only")
+		own["met"] = step
+		return true
+	if not it.is_empty():
 		return false
 	card.get_or_add("standing", {})[player_id] = {"score": 0, "met": step, "since": step, "why": [], "own": false}
 	return true
+
+
+## Whether they have met [param player_id] themselves, not only heard of them (853 amended (5),
+## voice's audit: gossip alone had a stranger greeted "Back again?"). A standing saved before
+## 853 amended (5) has no mark and counts as met.
+static func met_in_person(card: Dictionary, player_id: String) -> bool:
+	var it := entry(card, player_id)
+	return not it.is_empty() and not bool(it.get("heard_only", false))
 
 
 ## Whether [param step] is the step of their first words.
@@ -122,8 +139,11 @@ static func heard(card: Dictionary, player_id: String, sign: int, why: String, f
 	var it := entry(card, player_id)
 	if bool(it.get("own", false)):
 		return false
+	var fresh := it.is_empty()
 	met(card, player_id, step)
 	it = card["standing"][player_id]
+	if fresh:
+		it["heard_only"] = true  # Known by gossip, not met (853 amended (5)): their first words meet them.
 	var limit := setting("heard_most")
 	var moved := clampi(int(it.get("score", 0)) + signi(sign) * setting("heard"), -limit, limit)
 	if moved == int(it.get("score", 0)):

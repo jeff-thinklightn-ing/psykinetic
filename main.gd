@@ -19668,7 +19668,11 @@ func _greeted(player: Player, body: Resident) -> void:
 	for serial: Variant in _resident_out:
 		if int(_resident_out[serial].get("body", 0)) == body.get_instance_id():
 			busy = true
-	var sick := _sick_word(body) if not busy else {}
+	if busy:
+		# Their reply to what was said is on its way (853 amended (5), voice's audit): they turn to them, no "Not now.".
+		body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
+		return
+	var sick := _sick_word(body)
 	if not sick.is_empty():
 		# In bed and awake, they say what ails them and what would help (501 amended (2)); the walk asked stands
 		# as an offer (the HUD's say-yes), and a word to them starts it (501's, _ask_resident).
@@ -19681,8 +19685,8 @@ func _greeted(player: Player, body: Resident) -> void:
 		else:
 			_resident_says(body, sick["line"], "", player)
 		return
-	if not _hail_able(body) or busy:
-		var refuse := str(rules.get("refuse", "Not now."))
+	if not _hail_able(body):
+		var refuse := _refuse_word(body, player, rules, Townsfolk.day_of(World.production.now()))
 		if not refuse.is_empty() and body.card.is_empty():  # A companion resting in town speaks for herself.
 			_resident_says(body, refuse, "", player)
 		return
@@ -19690,7 +19694,11 @@ func _greeted(player: Player, body: Resident) -> void:
 	var card := Townsfolk.card_of(World.production, body.worker_id)
 	var now := World.production.now()
 	var day := Townsfolk.day_of(now)
-	var word := Resident.greet_word(body.trade, Standing.words(card, player.player_id) if not card.is_empty() else "stranger", rules, hash(body.worker_id + ":" + str(day)))
+	var met := not card.is_empty() and Standing.met_in_person(card, player.player_id)  # Gossip alone is no meeting (853 amended (5)).
+	var word := Resident.greet_word(body.trade, Standing.words(card, player.player_id) if met else "stranger", rules, hash(body.worker_id + ":" + str(day)))
+	var waiting: Array = rules.get("waiting", [])
+	if not waiting.is_empty() and (card.get("asks", []) as Array).any(func(ask: Variant) -> bool: return ask is Dictionary and str(ask.get("by", "")) == player.player_id):
+		word = str(waiting[absi(hash(body.worker_id + ":" + str(day))) % waiting.size()])  # On their ask (853 amended (5)): glad of it, over the standing's word.
 	if body.trade == "medicine_man" and in_care(player.player_id, _care_hut_of(body.worker_id)):
 		word = str(rules.get("care", word))  # One in his care hears it (584 amended, npc's side).
 	_resident_says(body, word, "", player)
@@ -19705,6 +19713,25 @@ func _greeted(player: Player, body: Resident) -> void:
 		if _balance_words(body, player):
 			return  # The balance quest's talk (761, npc's side (2)).
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
+
+
+## The word of [param body] that cannot stop for [param player] (853 amended (5), voice's words, by the
+## day): led home by them, greet.refuse_by "led_by_you"; led by another, "away"; lost beyond the walls,
+## "lost"; awake abed, "abed"; else greet.refuse.
+func _refuse_word(body: Resident, player: Player, rules: Dictionary, day: int) -> String:
+	var reason := ""
+	if not body.escort_of.is_empty():
+		reason = "led_by_you" if body.escort_of == player.player_id else "away"
+	elif body.doing == Resident.Doing.ESCORT:
+		reason = "away"
+	elif body.strayed or body.doing == Resident.Doing.STRAYED:
+		reason = "lost"
+	elif body.doing == Resident.Doing.BED and not body.sleeping():
+		reason = "abed"
+	var lines: Variant = rules.get("refuse_by", {}).get(reason, [])
+	if lines is Array and not (lines as Array).is_empty():
+		return str(lines[absi(hash(body.worker_id + ":" + str(day))) % (lines as Array).size()])
+	return str(rules.get("refuse", "Not now."))
 
 
 ## Where a town short of a good sends a player (the coordinator's iron-slice

@@ -3724,7 +3724,10 @@ func _test_asked_first(voice: Resident, founders: String) -> void:
 	# A line as its fact's text: a rumour's "It is said that" off, in small letters.
 	var bare := func(line: String) -> String: return line.trim_prefix("It is said that ").to_lower()
 	var texts := func(facts: Array) -> Array: return facts.map(func(f: Dictionary) -> String: return str(f["text"]).strip_edges().to_lower())
-	var carries := "Pip carries the temple's offering down to the altar in the barrow."
+	# Lore's own text by its id (lore: 832 rewrote it; a string kept here would pass the not-in checks unseen).
+	var carries_of := Lore.known_by("priest").filter(func(f: Dictionary) -> bool: return str(f["id"]) == "crypt.pip_carries")
+	var carries := str(carries_of[0]["text"]).strip_edges() if not carries_of.is_empty() else ""
+	_check(not carries.is_empty() and not founders.is_empty(), "lore's crypt secrets are there to test (%s)" % carries)
 	var was := voice.asked_by
 	voice.asked_by = "p-stranger"
 	var plain := voice.world_facts()
@@ -3734,8 +3737,12 @@ func _test_asked_first(voice: Resident, founders: String) -> void:
 	_check(not about_crypt.is_empty() and bare.call(asked[0]) in about_crypt, "a stranger asking of the crypt: a crypt fact opens (%s)" % [asked.slice(0, 2)])
 	_check(not carries in asked and not founders in asked and not carries in plain,
 		"asked of the crypt and Pip, not trusted: no secret, however plainly named (%s)" % [asked])
-	_check(asked.all(func(line: String) -> bool: return line in plain or bare.call(line) in everything),
-		"no fact more than it would say anyway")
+	# The town's memory follows the facts in the same budget: shorter facts asked first leave room for a
+	# remembered line the plain words had no room for, and that is no fact more.
+	var memory_log: Variant = Offers._call(Offers.ctx, "memory", [voice.town]) if Offers.ctx.has("memory") and not voice.town.is_empty() else null
+	var remembered: Array = TownMemory.remembered(memory_log) if memory_log is Array else []
+	var more: Array = asked.filter(func(line: String) -> bool: return not (line in plain or bare.call(line) in everything or line in remembered))
+	_check(more.is_empty(), "no fact more than it would say anyway (%s)" % [more])
 	voice.asked_by = "p-friend"
 	var trusted := voice.world_facts(crypt)
 	_check(founders in trusted and carries in trusted, "asked and trusted: the crypt's secrets told (%s)" % [trusted.slice(0, 3)])
@@ -4501,7 +4508,20 @@ func _test_greet() -> void:
 	var cook: Array = rules["trades"]["cook"]
 	_check(Resident.greet_word("cook", "stranger", rules, 3) in cook and Resident.greet_word("cook", "stranger", rules, 4) in cook
 		and Resident.greet_word("cook", "stranger", rules, 3) != Resident.greet_word("cook", "stranger", rules, 4), "a stranger gets one of the cook's lines, by the day")
-	_check(Resident.greet_word("cook", "wronged", rules, 3) == "You again." and Resident.greet_word("cook", "trusted", rules, 3) == "Good to see you.", "one the town knows gets the standing's word")
+	var standing: Dictionary = rules.get("standing", {})
+	_check((standing.get("wronged", []) as Array).size() == 3 and (standing.get("trusted", []) as Array).size() == 3 and not standing.has("known")
+		and Resident.greet_word("cook", "wronged", rules, 3) in standing["wronged"] and Resident.greet_word("cook", "trusted", rules, 3) in standing["trusted"]
+		and Resident.greet_word("cook", "trusted", rules, 3) != Resident.greet_word("cook", "trusted", rules, 4),
+		"wronged and trusted: one of three lines by the day (853 amended (5))")
+	_check(Resident.greet_word("cook", "known", rules, 3) == Resident.greet_word("cook", "stranger", rules, 3), "known: the trade's own line, as a stranger, not \"Back again?\"")
+	# Gossip alone is no meeting (853 amended (5)): heard of, not met in person, till their first words.
+	var gossip := {}
+	Standing.heard(gossip, "p-gossip", 1, "brought the sick home", "Agnes", 5)
+	_check(Standing.entry(gossip, "p-gossip").get("score", 0) == 1 and not Standing.met_in_person(gossip, "p-gossip"), "heard of by gossip: the standing moves, not met")
+	_check(Standing.met(gossip, "p-gossip", 9) and Standing.met_in_person(gossip, "p-gossip") and Standing.score(gossip, "p-gossip") == 1
+		and Standing.first_words(gossip, "p-gossip", 9) and not Standing.met(gossip, "p-gossip", 10), "their first words meet them, the score kept, once")
+	var saved := {"standing": {"p-old": {"score": 0, "met": 1, "since": 1, "why": [], "own": false}}}
+	_check(Standing.met_in_person(saved, "p-old"), "a standing saved before counts as met (no mark)")
 	_check(Resident.greet_word("weaver", "stranger", rules, 1) in rules["trades"]["default"], "a trade not listed: the default's")
 	_check(str(rules.get("care", "")).begins_with("You're in my care") and Resident.greet_word("medicine_man", "stranger", rules, 2) in rules["trades"]["medicine_man"]
 		and not Resident.greet_word("medicine_man", "stranger", rules, 2).begins_with("You're in my care"), "the medicine man's own lines; the care word only for one in his care, by Main (584 amended, npc's side)")
@@ -4556,13 +4576,46 @@ func _test_greet() -> void:
 	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
 	mara.doing = Resident.Doing.BED
 	_main._greeted(player, mara)
-	_check(spoken.size() == 4 and spoken[3] == "Mara: Not now.|" and mara.addressing.is_empty(), "in bed: no stop, the refusal word (%s)" % spoken[3])
+	var refuse_by: Dictionary = rules.get("refuse_by", {})
+	_check(spoken.size() == 4 and spoken[3].get_slice("|", 0).trim_prefix("Mara: ") in refuse_by.get("abed", []) and mara.addressing.is_empty(),
+		"awake in bed: no stop, an abed word (%s)" % spoken[3])
 	mara.doing = Resident.Doing.SQUARE
 	_main._greet_at.clear()
 	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
 	_main._resident_asks.append({"body": mara.get_instance_id(), "ask": {"serial": 0, "trigger": "x", "speaker": "Mara"}, "at": World.tick, "player": "", "peer": -1})
 	_main._greeted(player, mara)
-	_check(spoken.size() == 5 and spoken[4] == "Mara: Not now.|", "an ask of hers waiting: the same")
+	_check(spoken.size() == 4 and mara.addressing == String(player.get_path()), "her reply already on its way: no \"Not now.\", she turns to them (853 amended (5))")
+	_main._resident_asks.clear()
+	mara.addressing = ""  # Her turn to them over, without stepping the world (the later tests' clock as before).
+	mara._address_until = World.tick
+	# Why they cannot stop, voice's words (853 amended (5)).
+	var why := func(escort: String, doing: Resident.Doing, strayed: bool) -> String:
+		var body := Resident.new()
+		body.worker_id = "rs-why"
+		body.escort_of = escort
+		body.doing = doing
+		body.strayed = strayed
+		var word: String = _main._refuse_word(body, player, rules, 3)
+		body.free()
+		return word
+	_check(why.call(pid, Resident.Doing.ESCORT, false) in refuse_by["led_by_you"] and why.call("p-other", Resident.Doing.ESCORT, false) in refuse_by["away"]
+		and why.call("", Resident.Doing.STRAYED, true) in refuse_by["lost"] and why.call("", Resident.Doing.HIDE, false) == str(rules["refuse"]),
+		"led by them, led by another, lost, the rest: each its own word (%s)" % [[why.call(pid, Resident.Doing.ESCORT, false), why.call("", Resident.Doing.STRAYED, true)]])
+	# On her ask (853 amended (5)): glad of it, in place of the trade's and the standing's word.
+	var mara_card := Townsfolk.card_of(World.production, "rs-mara")
+	var asks_was: Variant = mara_card.get("asks")
+	mara_card["asks"] = [{"id": "x", "kind": "errand", "by": pid}]
+	World.production.set_card("rs-mara", mara_card)
+	_main._greet_at.clear()
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_main._greeted(player, mara)
+	_check(spoken.size() == 5 and spoken[4].get_slice("|", 0).trim_prefix("Mara: ") in rules.get("waiting", []), "her ask taken by them: a waiting word (%s)" % [spoken.slice(4)])
+	mara_card = Townsfolk.card_of(World.production, "rs-mara")
+	if asks_was == null:
+		mara_card.erase("asks")
+	else:
+		mara_card["asks"] = asks_was
+	World.production.set_card("rs-mara", mara_card)
 	_main._resident_asks.clear()
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
