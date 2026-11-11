@@ -89,7 +89,7 @@ place, and a text and loot don't go in before a quest is in."
   line what to do and what to look for, with known leaks and what is not in the build, and gives
   him the path.
   After a rebase, check your bullet still sits under `## Unreleased`, above the first
-  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it, and (539 amended (4), 0fc2e053) on any non-bullet line under `## Unreleased`: one line per bullet, never wrapped. On a CHANGELOG-only rebase conflict, run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
+  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it, and (539 amended (4), 0fc2e053) on any non-bullet line under `## Unreleased`: one line per bullet, never wrapped. On a rebase conflict in CHANGELOG.md alone, or with the generated pages beside it (`docs/voice_inventory.md`, `docs/art_status.md`, `art/kit/status.json`: taken from main's side and regenerated, 539 amended (5), 4003d2a0c; any other conflicted file it refuses), run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, take the number from the script before committing, so two trees don't take the
@@ -137,7 +137,12 @@ place, and a text and loot don't go in before a quest is in."
   refuses a locked laptop; check a bench number against its "BENCH ran:" line. Each session needs Jeff's own OK, in that
   session, before writing to a laptop; a peer can't pass it on. This PC's off-screen runs are for
   when the laptops are busy or off, or a session lacks that OK, and still need the coordinator's
-  window check.
+  window check. That check covers one start, at the minute it is given, and one off-screen
+  Godot runs on this PC at a time: a script that loops over stills or clips asks before each
+  start (2026-11-10: one tree's loop of seven stills stopped another's cleared run).
+  `--position` alone does not stop a window taking focus as it is made: the launcher writes a
+  temporary `override.cfg` in its checkout (`[display]`, `window/size/no_focus=true`) before
+  Godot starts, removes it on exit, never commits it, and the run logs the flag.
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
