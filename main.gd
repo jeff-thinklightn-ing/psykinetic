@@ -10219,6 +10219,9 @@ func reset_barrow(id: String) -> Array[String]:
 	if mark_player(id, QUEST_DONE, false) or not record.barrow_task.is_empty():
 		record.barrow_task = {}
 		cleared.append("the fallen knight's quest")
+	for state: Dictionary in _regen.values() + [_plain_band_slain]:
+		for ids: Array in (state.get("band_slain", {}) as Dictionary).values():
+			ids.erase(id)
 	_sync_quest(record)
 	var totem := World.totem_of(id)
 	if totem != 0 and World.totem_charges(totem) > 0:
@@ -10283,7 +10286,9 @@ func barrow_quest_step(player_id: String, step: String) -> bool:
 	if record == null:
 		return false
 	if step == "take" and at == "ask":
-		record.barrow_task = {"taken": true, "slain": []}
+		# 747 amended (8) (the coordinator): the band this player, or their
+		# companion, felled in this generation before the taking counts at it.
+		record.barrow_task = {"taken": true, "slain": _band_slain_by(player_id)}
 	elif step == "turn_in" and at == "ready":
 		mark_player(player_id, QUEST_DONE)
 		record.barrow_task = {}
@@ -10306,6 +10311,7 @@ func _quest_credit(entity: GridEntity, _cause: StringName) -> void:
 	var id := _slayer_id(entity as Monster)
 	if named == CAMP_KEY_FROM:
 		_give_camp_key(id, entity.tile)
+	_note_band_slain(entity.zone, named, id)
 	var record: PlayerRecord = _records.get(id)
 	if record == null or barrow_quest_of(id) == "" or not bool(record.barrow_task.get("taken", false)):
 		return
@@ -10315,6 +10321,34 @@ func _quest_credit(entity: GridEntity, _cause: StringName) -> void:
 	slain.append(named)
 	record.barrow_task["slain"] = slain
 	_sync_quest(record)
+
+
+## 747 amended (8): who felled each of the band this generation, taken or
+## not: the barrow's regen state's "band_slain" (named id -> player ids;
+## saved with it, gone with the generation), a test's level's in
+## _plain_band_slain. Nobody's kill ("") is not kept.
+func _note_band_slain(zone_name: String, named: String, player_id: String) -> void:
+	if player_id.is_empty():
+		return
+	var state: Dictionary = _regen[zone_name] if _regen.has(zone_name) else _plain_band_slain
+	var by: Dictionary = state.get_or_add("band_slain", {})
+	var ids: Array = by.get(named, [])
+	if not player_id in ids:
+		ids.append(player_id)
+	by[named] = ids
+
+
+## The band's ids [param player_id] (or their companion) felled in the
+## band's zone this generation (_note_band_slain), in the band's order.
+func _band_slain_by(player_id: String) -> Array:
+	var zone_name := str(World.economy.rules.get("robbers", {}).get("barrow", "")) if World.economy != null else ""
+	var state: Dictionary = _regen[zone_name] if _regen.has(zone_name) else _plain_band_slain
+	var by: Dictionary = state.get("band_slain", {})
+	return _quest_band().filter(func(id: String) -> bool: return player_id in (by.get(id, []) as Array))
+
+
+## A test's level's band_slain (no regen state).
+var _plain_band_slain := {}
 
 
 ## The player id of who felled [param monster]: the player who struck it
@@ -20163,9 +20197,15 @@ func _crypt_asks_tick() -> void:
 			var sub := str(ask.get("sub", ""))
 			if sub != Offers.OFFERING and sub != Offers.RUNNER:
 				continue
-			var chest := _chest_named(barrow, "Altar" if sub == Offers.OFFERING else str(rule.get("pack", "Runner's pack")))
+			var chest := _chest_named(barrow, OFFERING_ALTAR if sub == Offers.OFFERING else str(rule.get("pack", "Runner's pack")))
 			if chest != null and World.reaches(player, chest):
 				Offers.crypt_done(str(ask.get("town", "")), player.player_id, sub)
+
+
+## The barrow's offering container's name (its levels/barrow/level.json
+## entry at (38, 30); 747 amended (8): Jeff picks its new label, and this
+## and that entry change together).
+const OFFERING_ALTAR := "Altar"
 
 
 ## The chest called [param chest_name] in zone [param zone_name], null for none

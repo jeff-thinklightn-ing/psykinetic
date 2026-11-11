@@ -246,6 +246,16 @@
 	"entities": [
 		{
 			"at": [
+				39,
+				10
+			],
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"at": [
 				38,
 				30
 			],
@@ -355,6 +365,7 @@
 		],
 		"entrance": "entrance",
 		"heart": "camp",
+		"foes_door": "from_breach",
 		"monsters": {
 			"robber": 8,
 			"robber_brute": 1

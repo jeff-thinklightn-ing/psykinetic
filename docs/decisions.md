@@ -39023,6 +39023,48 @@ A "yes" said to it still gets DONE again (accept_offer: done). PROTOCOL_REVISION
 and forces its cut. level_test _test_barrow_quest: after the turn-in his one offer is the
 closing words, accept "none"; a player with no record gets none.
 
+747 amended (8), dungeon's side (2026-11-10; Jeff, playing v0.1.210: "because of the barrow
+layout i had to fight through the robbers to access the knight -- it makes more sense if the
+knight is at the beginning by the actual altar, not the room labled 'altar' - by the time i got
+the quest all of the enemies had been dispatched", and "in fact i had previously ruled that the
+crypt would be below the umbrage temple"; the coordinator's package "the fallen knight's quest,
+mended", one take with maps' 832 switch-on). The beginning is the temple stair (from_chapel)
+into the First Hall, and the actual altar its bier (building.burial_table, 38-40 by 8-9, under
+the light shaft). The knight's marker moves from (38,32) in the lower room to (39,10), behind
+the bier, facing north (level.json "facing" [0, -1]) toward the stair and the start: off the
+walks from the stair to the hall's ways out, off the light shaft's cell. The lower room's two
+skeleton guards stay where they are. The giver walk sits inside the arrival rule
+(layout_sense.arrival_faults, so no new rule name and no held list to change): from every
+arrival, every quest giver (GIVER_KINDS, "astral_knight") is reached by steps that keep
+GIVER_CLEAR (10, Chebyshev) beyond every hostile's reach, as the arrival rule reads reach; the
+fault names the arrival and the nearest foe. Regen.prepare passes the givers' cells to the
+generator with the arrivals, so the crypt lays its monsters clear of the knight too. One arrival
+is not asked the walk: the barrow's block names "foes_door": "from_breach", the robbers' own door
+(806 amended (11)'s arrival clear still holds there), and the test holds that it is the only one
+anywhere. The coordinator ruled that exemption, on a measurement: over 4 generations and 24
+tries, from the stair, the start, from_deep and from_below the knight was reached 10 clear every
+time, and from from_breach never, not even at 0 clear. By the crypt's shape the band patrols the
+processional (five robbers in a column at x15, y25-41, each wandering 3) between the breach's
+end and the hall, and no single robber's removal opened it. A second way out for the breach,
+its anchor ending at x31 so the crypt joins it to the processional (maps' option (a)), was
+measured and dropped: 3 of 4 generations then kept a held fault (a wrap, a dead end; best of 16
+tries), against 0 of 12 without it. So the robbers' door opens into the robbers' camp as 832
+laid it, the arrival clear holding there (the band's nearest 13 cells off), and a player who
+comes in that way has the kills counted. The count: Main._note_band_slain keeps, for the barrow's
+generation, who felled each of the band (the regen state's "band_slain", gone with the
+generation, cleared for a player by reset_barrow); the taking starts the list from it
+(_band_slain_by), so one risen and felled twice counts once, and a taking over the whole band
+dead goes straight to "ready". Whose kill counts is as before (own and own companion's).
+Main.OFFERING_ALTAR names the lower room's offering container for 546's run, so Jeff's new label
+is that constant and the entry's name. The names wait on him: the lower room is still "The Altar
+Room", its container "Altar", a plain chest (prop.chest). level_test _test_giver_rule (a hall
+with and without a foe on the way, the foes' door, no giver; the only exempt arrival; the
+barrow's generations 1-8 with no arrival fault and the knight at (39,10) facing the stair) and
+_test_barrow_quest (felled before the taking, twice, counted once; nobody's kill not; the reset
+forgets it; taken over the dead band, ready). Server and level data; protocol unchanged (a
+v0.1.210 client is sent the new layout and the knight at his new cell like any generation); no
+new class_name. On the box it shows at the barrow's next regeneration after the deploy.
+
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
 Jeff: "and the chest only opens with a key from the boss and only hold gold

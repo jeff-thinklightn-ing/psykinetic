@@ -1,6 +1,6 @@
 class_name AstralKnight
 extends Monster
-## The fallen knight's astral projection in the barrow's Altar Room (747;
+## The fallen knight's astral projection in the barrow's First Hall, by its bier (747;
 ## Jeff: "a astral projection of a fallen knight in the altar room that
 ## gives the quest ... prove your strength and stop the grave robbers and
 ## ill then give access to the crypt"). He stands where he is, talks as the
@@ -21,7 +21,7 @@ const NOT_YET_TITLE := "Not yet"
 const NOT_YET := "Some of the Mound-breakers still dig. Put them all down, then come back to me."
 const TURN_IN_TITLE := "The robbers are put down"
 const TURN_IN_WORDS := "The Mound-breakers are put down."
-const REVEALED := "Then you are strong enough. In the First Hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest."
+const REVEALED := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest."
 const DONE := "The way below is open to you. My remains wait in the Hall of Fallen Souls."
 ## A quest offer's accept that takes nothing (747 amended (5)): his words
 ## alone, ui's window closing on its one button.
