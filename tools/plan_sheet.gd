@@ -133,7 +133,7 @@ const LAIR_DECOR: Array = [
 ## The rooms named on entering (666, ui's 665 card): drafts for lore.
 const BARROW_ROOMS := {
 	"entrance": {"name": "The First Hall", "rect": [27, 1, 26, 16]},
-	"altar": {"name": "The Altar Room", "rect": [30, 24, 18, 14]},
+	"altar": {"name": "The Low Hall", "rect": [30, 24, 18, 14]},
 	"camp": {"name": "The Robbers' Camp", "rect": [6, 42, 10, 8]}}
 const DEEP_ROOMS := {"entrance": {"name": "The Charnel Vault", "rect": [46, 1, 8, 6]},  # 714: lore's name, Jeff passed.
 		"lair": {"name": "The Hall of Fallen Souls", "rect": [34, 56, 32, 22]}}
@@ -359,7 +359,7 @@ static func sample_barrow() -> Dictionary:
 	for torch: Vector2i in BARROW_TORCHES:
 		markers[torch] = "torch"
 	var layout := Level.image_from_rows(_lines(rows), markers, {"legend": BARROW_LEGEND})
-	var config := {"name": "The Barrow", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone",
+	var config := {"name": "The Crypt of the Fallen", "outdoor": false, "depth": 1, "walls": "stone", "floors": "stone",
 		"music": "music.barrow",  # Its own music, Jeff's barrows-moody (668).
 		"grave_goods": true,
 		"buildings": [{"slot": "building.burial_table", "at": [HALL_TABLE.position.x, HALL_TABLE.position.y]}],  # The old king's table (580 step 3).
@@ -370,7 +370,7 @@ static func sample_barrow() -> Dictionary:
 		"niches": barrow_niches(),
 		"decor": BARROW_DECOR,  # Webs in the entry corners, moss at the south wall (647).
 		"places": {"niche": {"at": [BARROW_NICHE.x, BARROW_NICHE.y], "kind": "other", "radius": 1, "name": "a niche in the wall"}},
-		"entities": [{"at": [BARROW_ALTAR.x, BARROW_ALTAR.y], "name": "Altar", "props": {"slots": ["", "", "", ""]}},
+		"entities": [{"at": [BARROW_ALTAR.x, BARROW_ALTAR.y], "name": "Offering stone", "props": {"slots": ["", "", "", ""]}},
 			{"at": [BARROW_PACK.x, BARROW_PACK.y], "name": "Runner's pack", "props": {"grave": false, "slots": ["", "", "", ""]}}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 1, "ways": 5, "every_days": 3, "anchors": BARROW_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [8, 11], "size": [[8, 7], [14, 11]]}, "loops": 0.15,

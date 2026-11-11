@@ -20121,7 +20121,7 @@ func _crypt_asks_tick() -> void:
 ## The barrow's offering container's name (its levels/barrow/level.json
 ## entry at (38, 30); 747 amended (8): Jeff picks its new label, and this
 ## and that entry change together).
-const OFFERING_ALTAR := "Altar"
+const OFFERING_ALTAR := "Offering stone"
 
 
 ## The chest called [param chest_name] in zone [param zone_name], null for none
