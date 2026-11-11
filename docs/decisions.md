@@ -39051,8 +39051,8 @@ measured and dropped: 3 of 4 generations then kept a held fault (a wrap, a dead 
 tries), against 0 of 12 without it. So the robbers' door opens into the robbers' camp as 832
 laid it, the arrival clear holding there (the band's nearest 13 cells off), and a player who
 comes in that way has the kills counted. The count: Main._note_band_slain keeps, for the barrow's
-generation, who felled each of the band (the regen state's "band_slain", gone with the
-generation, cleared for a player by reset_barrow); the taking starts the list from it
+generation, who felled each of the band (the regen state's "band_slain", saved and read back
+by Regen.states_from so a restart keeps it, gone with the generation, cleared for a player by reset_barrow); the taking starts the list from it
 (_band_slain_by), so one risen and felled twice counts once, and a taking over the whole band
 dead goes straight to "ready". Whose kill counts is as before (own and own companion's).
 Main.OFFERING_ALTAR names the lower room's offering container for 546's run, so Jeff's new label

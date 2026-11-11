@@ -5507,6 +5507,9 @@ func _test_barrow_quest() -> void:
 	slay.call(band[3], null)
 	_check(record.barrow_task.is_empty() and _main._band_slain_by(id) == [band[1]],
 		"%s felled twice before the taking (risen): kept once for the generation, not yet on a list (%s)" % [band[1], _main._band_slain_by(id)])
+	var saved_slain: Variant = JSON.parse_string(JSON.stringify({"barrow": {"generation": 2, "at_step": 5, "band_slain": {band[1]: [id]}}}))
+	_check(Regen.states_from(saved_slain)["barrow"].get("band_slain") == {band[1]: [id]},
+		"whom they felled is saved and read back with the generation: a restart keeps it (747 amended (8))")
 	var took: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
 	var items: Array = player.quest.get("items", [])
 	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
