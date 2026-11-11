@@ -124,7 +124,12 @@ func _test_retaken() -> void:
 	var again := Holdings.new(WorldMap.build(names), Factions.read(), JSON.parse_string(JSON.stringify(saved)))
 	_check(again.fallen_camps().size() == 1 and again.fallen_camps()[0]["faction"] == "goblins", "and still after a restart")
 	_check(_main._retake_camps() == 0, "not before rescue.restock_days have passed")
-	World.holdings._since[_camp] = World.holdings.now() - 6 * maxi(DayNight.day_steps, 1)
+	# Main retakes on its own clock too (every WORLD_TICK_STEPS), and each walk below steps the
+	# world: ripe while he walked, it raced this test's own call, and lost it when the corridor
+	# imps downed him on the way (companions' follow mend). So the camp is ripe only while
+	# nobody steps: unripe on every walk, ripened at the spot, and asked at once.
+	var unripe: int = World.holdings._since[_camp]
+	var ripe: int = World.holdings.now() - 6 * maxi(DayNight.day_steps, 1)
 	var player := _player()
 	if player == null or World.is_downed(player):
 		# Beaten down by the imps meanwhile (Mortally Wounded): bled out, and back.
@@ -136,8 +141,11 @@ func _test_retaken() -> void:
 				break
 		player = _player()
 	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
+	World.holdings._since[_camp] = ripe
 	_check(_main._retake_camps() == 0, "nor with a player standing in it")
+	World.holdings._since[_camp] = unripe
 	_walk_to(player, Vector2i(9, 6))
+	World.holdings._since[_camp] = ripe
 	_check(_main._retake_camps() == 1 and World.holdings.holder(_camp) == "goblins" and World.holdings.fallen_camps().is_empty(),
 		"after them, with nobody in it, the goblins take it back")
 	# Clear of the imp's tile (RESPAWN_MIN_DISTANCE) and past the grace of their
