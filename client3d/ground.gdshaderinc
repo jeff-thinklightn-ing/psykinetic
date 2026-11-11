@@ -92,6 +92,16 @@ uniform float sky_floor = 0.0;
 // under the crowns.
 uniform sampler2D canopy : hint_default_black, filter_linear, repeat_disable;
 uniform float sky_floor_roof = 0.0;
+// Umbrage at night (858): the sky's light as the floor had it before the
+// night look's lift (Client3D.floor_brightness; below 0, none: sky_floor is
+// all of it). The floor's colour takes this one, so every light that falls
+// on it (a lantern, a lamp, the moon, the ambient) lights it as before, and
+// the lift, sky_floor's over this, is the sky's own light added on top:
+// night_sky_light, the ambient and the moon on flat ground, as the ambient
+// and a directional light light an albedo. A lamp's pool keeps its strength.
+uniform float sky_floor_base = -1.0;
+uniform float sky_floor_roof_base = -1.0;
+uniform vec3 night_sky_light = vec3(0.0);
 // The floor sets (Client3D._floor_sets, decision 285), a byte a cell like
 // kinds but read cell by cell, so a floor ends at the walls' line: 0 the
 // ground's own look, 1 wood (planks), 2 stone (flagstones), 3 cave (rock),
@@ -454,10 +464,12 @@ void fragment() {
 
 	// Light and heat as the old floor had them, worked out in sRGB.
 	float sky_here = mix(sky_floor, sky_floor_roof, roof);
-	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, sky_here);
+	float base_here = sky_floor_base < 0.0 ? sky_here : mix(sky_floor_base, sky_floor_roof_base, roof);
+	vec3 lit = pow(colour, vec3(1.0 / 2.2)) * max(shade.r, base_here);
 	vec3 warm_srgb = pow(warm, vec3(1.0 / 2.2));
 	ALBEDO = pow(mix(lit, warm_srgb, shade.g), vec3(2.2));
-	EMISSION = pow(warm_srgb * shade.g, vec3(2.2));
+	float lift = max(pow(sky_here, 2.2) - pow(base_here, 2.2), 0.0) * (1.0 - shade.g);
+	EMISSION = pow(warm_srgb * shade.g, vec3(2.2)) + colour * lift * night_sky_light;
 	ROUGHNESS = 1.0;
 	METALLIC = 0.0;
 	SPECULAR = 0.5;

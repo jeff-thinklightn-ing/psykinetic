@@ -876,7 +876,9 @@ const FLOOR_LIGHT_HIGH := 0.7
 ## and moon as well, while walls, grass and bodies took the night's light
 ## alone, so pale stone and tufts read 2 to 5 times the street. Switched on,
 ## the sky's floor light outdoors bottoms at NIGHT_FLOOR_DARKEST (the cells'
-## own light, a torch's pool, and every indoor floor as before); the night
+## own light, a torch's pool, and every indoor floor as before), the lift
+## the sky's light alone (sky_floor_base, _set_night_sky_light: a lantern's
+## or a lamp's pool on the ground keeps its strength); the night
 ## key (SKY_KEYS' first) takes NIGHT_KEY_2's ambient and moon, lower and less
 ## blue; and a faint fill, BODY_FILL_ENERGY at full night from the camera's
 ## side, lights bodies alone (BODY_LAYER, every puppet's drawn parts), so a
@@ -885,12 +887,12 @@ const FLOOR_LIGHT_HIGH := 0.7
 ## for tests and stills.
 const NIGHT_LOOK_2 := false
 static var night_look_2 := NIGHT_LOOK_2
-const NIGHT_FLOOR_DARKEST := 0.5
-const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.18,
+const NIGHT_FLOOR_DARKEST := 0.6
+const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.135,
 		"light": Color(0.7, 0.76, 0.95), "energy": 0.2}
 const BODY_LAYER := 1 << 18
 const BODY_FILL := Color(0.8, 0.83, 0.92)
-const BODY_FILL_ENERGY := 0.1
+const BODY_FILL_ENERGY := 0.26
 ## How far below the camera's line the fill shines (degrees), so a body's
 ## front and top take it.
 const BODY_FILL_DOWN := 20.0
@@ -3509,6 +3511,7 @@ func _apply_sky() -> void:
 		if _ground_shader_material != null:
 			_ground_shader_material.set_shader_parameter("sky_floor", _floor_least)
 			_ground_shader_material.set_shader_parameter("sky_floor_roof", _floor_least)
+			_ground_shader_material.set_shader_parameter("sky_floor_base", -1.0)  # No lift indoors (858).
 		# A damp level (580, terrain's side): darker and colder, a faint
 		# haze in the lanterns' light.
 		if bool(_terrain.get("damp", false)):
@@ -3572,11 +3575,16 @@ static func cliff_sky(level: float) -> float:
 
 ## The sky's light on the outdoor floor, as a brightness (0 indoors); under
 ## a full canopy [param roof] (the same if under 0).
-func _set_sky_floor(level: float, roof := -1.0) -> void:
+func _set_sky_floor(level: float, roof := -1.0, base := -1.0, base_roof := -1.0) -> void:
 	_sky_floor = level
 	if _ground_shader_material != null:
 		_ground_shader_material.set_shader_parameter("sky_floor", level)
 		_ground_shader_material.set_shader_parameter("sky_floor_roof", level if roof < 0.0 else roof)
+		# The floor's light before the night look's lift (858): none given, none (sky_floor is all of it).
+		var under := level if base < 0.0 else base
+		_ground_shader_material.set_shader_parameter("sky_floor_base", under)
+		_ground_shader_material.set_shader_parameter("sky_floor_roof_base", (level if roof < 0.0 else roof) if base < 0.0
+				else (base if base_roof < 0.0 else base_roof))
 	if _cliff_material != null:
 		_cliff_material.set_shader_parameter("sky_floor", cliff_sky(level))
 	for view in _glimpses:
@@ -3671,7 +3679,25 @@ func _update_sky(delta: float) -> void:
 	# too: it takes its light from here, not the ambient, and stayed black.
 	var lift := 1.0 + LOW_DUSK_LIFT * low_dusk(_look_elevation) if _low else 1.0
 	_set_sky_floor(minf(sky_floor_brightness(light) * lift, 1.0) if lit else 0.0,
-			minf(sky_floor_brightness(roof) * lift, 1.0) if lit else 0.0)
+			minf(sky_floor_brightness(roof) * lift, 1.0) if lit else 0.0,
+			minf(sky_floor_brightness(light, false) * lift, 1.0) if lit else 0.0,
+			minf(sky_floor_brightness(roof, false) * lift, 1.0) if lit else 0.0)
+	_set_night_sky_light()
+
+
+## The sky's own light on flat ground (858): the ambient, and the moon (or
+## sun) as it falls on the flat, as the ambient and a directional light
+## light an albedo (colour times energy times the fall; start 7's stills
+## measured a PI more as 2.75 times too bright a lift). The floor
+## shader adds the night look's lift as this light alone, so a lantern's or
+## a lamp's pool keeps its strength (sky_floor_base).
+func _set_night_sky_light() -> void:
+	if _ground_shader_material == null:
+		return
+	var ambient := _environment.ambient_light_color * _environment.ambient_light_energy
+	var falls := maxf(_sun.global_transform.basis.z.y, 0.0) if _sun.visible else 0.0
+	var moon := _sun.light_color * _sun.light_energy * falls
+	_ground_shader_material.set_shader_parameter("night_sky_light", Vector3(ambient.r + moon.r, ambient.g + moon.g, ambient.b + moon.b))
 
 
 ## The sun, the moon, the stars and the clouds on the sky (decision 744),
@@ -3890,8 +3916,8 @@ static func sky_key(i: int) -> Dictionary:
 ## [param light] there (floor_brightness); while night_look_2 it bottoms at
 ## NIGHT_FLOOR_DARKEST, not FLOOR_DARKEST (858). The cells' own light
 ## (_floor_shade) and indoor floors keep floor_brightness.
-static func sky_floor_brightness(light: float) -> float:
-	var darkest := NIGHT_FLOOR_DARKEST if night_look_2 else FLOOR_DARKEST
+static func sky_floor_brightness(light: float, look_2 := night_look_2) -> float:
+	var darkest := NIGHT_FLOOR_DARKEST if look_2 else FLOOR_DARKEST
 	return lerpf(darkest, 1.0, smoothstep(FLOOR_LIGHT_LOW, FLOOR_LIGHT_HIGH, light))
 
 

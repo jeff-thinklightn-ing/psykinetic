@@ -6612,8 +6612,9 @@ func _test_built_water() -> void:
 ## back: indoors, on a damp level and in a cave the ambient and the floor's
 ## light are the same switched on as off, and no body fill; outdoors at
 ## midnight the ambient lower and less blue, the ground's floor light up from
-## FLOOR_DARKEST to NIGHT_FLOOR_DARKEST, the fill on; at noon all as off; a
-## body's drawn parts on BODY_LAYER, its own layer kept.
+## FLOOR_DARKEST to NIGHT_FLOOR_DARKEST, the fill on, the floor's colour
+## keeping its light off (sky_floor_base) under the lift; at noon all as off;
+## a body's drawn parts on BODY_LAYER, its own layer kept.
 func _test_night_look_2() -> void:
 	print("\n== Umbrage at night (858): outdoors only, the ground lit once, a fill on bodies ==")
 	var was := Client3D.night_look_2
@@ -6621,7 +6622,8 @@ func _test_night_look_2() -> void:
 	var weather_was: Dictionary = World.fields.weather.duplicate()
 	var read := func() -> Array:
 		return [_rig._environment.ambient_light_color, _rig._environment.ambient_light_energy,
-				float(_rig._ground_shader_material.get_shader_parameter("sky_floor")), _rig._body_fill.visible]
+				float(_rig._ground_shader_material.get_shader_parameter("sky_floor")), _rig._body_fill.visible,
+				_param_or(_rig._ground_shader_material, "sky_floor_base", -1.0)]
 	var barrow := Level.load_level("barrow")
 	var plain: Dictionary = barrow["terrain"]
 	var damp: Dictionary = plain.duplicate()
@@ -6659,12 +6661,35 @@ func _test_night_look_2() -> void:
 	var bluer := func(c: Color) -> float: return c.b - c.r
 	_check(float(on_night[1]) < float(off_night[1]) and bluer.call(on_night[0]) < bluer.call(off_night[0])
 			and float(on_night[2]) > float(off_night[2]) and bool(on_night[3]) and not bool(off_night[3])
-			and float(on_night[4]) > 0.0 and float(on_night[4]) <= Client3D.BODY_FILL_ENERGY + 0.0001,
+			and float(on_night[5]) > 0.0 and float(on_night[5]) <= Client3D.BODY_FILL_ENERGY + 0.0001,
 			"midnight outdoors switched on: the ambient %.3f (off %.3f), less blue, the floor's light %.2f (off %.2f), the body fill %.2f"
-			% [on_night[1], off_night[1], on_night[2], off_night[2], on_night[4]])
+			% [on_night[1], off_night[1], on_night[2], off_night[2], on_night[5]])
+	# The lift is the sky's alone (858): the floor's colour keeps the light it had off, so a lantern or a
+	# lamp lights it as before, and the sky's light on it is set for the shader to add the rest.
+	var sky_light: Vector3 = _param_or(_rig._ground_shader_material, "night_sky_light", Vector3.ZERO)
+	_check(is_equal_approx(float(on_night[4]), float(off_night[2])) and is_equal_approx(float(off_night[4]), float(off_night[2])),
+			"midnight: the floor's colour keeps its light off (%.2f, off %.2f) under the lift to %.2f"
+			% [on_night[4], off_night[2], on_night[2]])
+	# The sky's light pinned to its sum, so a wrong scale fails here, not in a still (start 7: a PI too
+	# many lit the street 2.75 times over): NIGHT_KEY_2's ambient plus its moon at its fall on the flat.
+	# At midnight on the hills the moon stands lifted to 60 degrees (a fall of 0.866): the row's own numbers.
+	var key: Dictionary = Client3D.NIGHT_KEY_2
+	var want_ambient: Color = key["ambient"] * float(key["ambient_energy"])
+	var want_moon: Color = key["light"] * float(key["energy"])
+	var midnight := Vector3(want_ambient.r + want_moon.r * 0.866, want_ambient.g + want_moon.g * 0.866, want_ambient.b + want_moon.b * 0.866)
+	_check(sky_light.distance_to(midnight) < 0.01, "midnight: the sky's light on the floor %s, the ambient and the moon's fall summed %s" % [sky_light, midnight])
+	at.call(2.0, true)
+	var later: Vector3 = _param_or(_rig._ground_shader_material, "night_sky_light", Vector3.ZERO)
+	var env := _rig._environment
+	var falls := maxf(_rig._sun.global_transform.basis.z.y, 0.0)
+	var summed := Vector3(env.ambient_light_color.r * env.ambient_light_energy + _rig._sun.light_color.r * _rig._sun.light_energy * falls,
+			env.ambient_light_color.g * env.ambient_light_energy + _rig._sun.light_color.g * _rig._sun.light_energy * falls,
+			env.ambient_light_color.b * env.ambient_light_energy + _rig._sun.light_color.b * _rig._sun.light_energy * falls)
+	_check(later.distance_to(summed) < 0.005 and falls > 0.0, "02:00: the sky's light %s, the view's ambient and moon (fall %.3f) summed %s" % [later, falls, summed])
 	var off_noon: Array = at.call(12.0, false)
 	var on_noon: Array = at.call(12.0, true)
-	_check(off_noon.slice(0, 4) == on_noon.slice(0, 4) and not bool(on_noon[3]), "noon outdoors: the same switched on as off, no fill")
+	_check(off_noon.slice(0, 5) == on_noon.slice(0, 5) and not bool(on_noon[3]) and is_equal_approx(float(on_noon[4]), float(on_noon[2])),
+			"noon outdoors: the same switched on as off, no fill, no lift")
 	var parts := 0
 	var layered := 0
 	for puppet: Node3D in _rig._puppets.values():
@@ -6678,6 +6703,13 @@ func _test_night_look_2() -> void:
 	World.fields.weather = weather_was
 	_rig._weather_view.weather = weather_was.duplicate()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## [param material]'s [param name], or the shader's own [param fallback] when never set (a shader
+## material gives null for a uniform nobody set).
+func _param_or(material: ShaderMaterial, name: String, fallback: Variant) -> Variant:
+	var value: Variant = material.get_shader_parameter(name)
+	return fallback if value == null else value
 
 
 ## A damp level's look (580, terrain's side): the barrow with "damp": its
