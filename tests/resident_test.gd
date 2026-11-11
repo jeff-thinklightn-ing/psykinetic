@@ -4159,6 +4159,49 @@ func _test_lower_first() -> void:
 	_check(Hearsay._lower_first("Mound of earth.") == "mound of earth.", "a word of a hyphened name lowered alone (%s)" % Hearsay._lower_first("Mound of earth."))
 
 
+## A stroll's free cell has room (853 amended (7), npc's look: about 2,760 silent body-minutes a day
+## shoulder to shoulder): no other body on or headed to its eight neighbours while the place has such a
+## cell; a crowded cell, not none, when it has not.
+func _test_room(mara: Resident, square: Rect2i) -> void:
+	var beside := func(cell: Vector2i) -> bool:
+		for them: GridEntity in World.entities():
+			if them == mara:
+				continue
+			var theirs: Array[Vector2i] = [them.tile]
+			if them is Resident and (them as Resident)._goal != Resident.NO_CELL:
+				theirs.append((them as Resident)._goal)
+			for each: Vector2i in theirs:
+				if absi(each.x - cell.x) <= 1 and absi(each.y - cell.y) <= 1:
+					return true
+		return false
+	var roomy := 0
+	for x in square.size.x:
+		for y in square.size.y:
+			var cell := square.position + Vector2i(x, y)
+			roomy += 1 if World.is_free(cell) and not World.is_link_cell(cell) and not beside.call(cell) else 0
+	var crowded := 0
+	for i in 24:
+		World.tick += 81
+		mara._pick_goal()
+		crowded += 1 if beside.call(mara._goal) else 0
+		World._relocate(mara, mara._goal)
+	_check(roomy < 3 or crowded == 0, "24 strolls with room in the square: none beside another body (%d beside, %d cells with room)" % [crowded, roomy])
+	# No room: a cell beside another body, not standing still.
+	var other: GridEntity = null
+	var next_to := Resident.NO_CELL
+	for body: GridEntity in World.entities():
+		if body == mara:
+			continue
+		for way: Vector2i in World.DIRECTIONS:
+			if World.is_free(body.tile + way) and not World.is_link_cell(body.tile + way) and body.tile + way != mara.tile:
+				other = body
+				next_to = body.tile + way
+				break
+		if other != null:
+			break
+	_check(other != null and mara._free_cell(Rect2i(next_to, Vector2i.ONE)) == next_to, "no cell with room: the crowded one (%s)" % [next_to])
+
+
 func _test_keep_moving() -> void:
 	print("\n== townsfolk keep moving (853, Jeff's frozen townsfolk): a new cell each time, never back, the stand to the open, spots ==")
 	var mara: Resident = null
@@ -4191,8 +4234,11 @@ func _test_keep_moving() -> void:
 	var distinct := {}
 	for cell: Vector2i in goals:
 		distinct[cell] = true
-	_check(stayed == 0 and back == 0 and distinct.size() >= 12 and goals.all(func(cell: Vector2i) -> bool: return square.has_point(cell)),
+	# At least 8 cells (12 before 853 amended (7): picks keep to open cells with room, 9 of them in this
+	# square with the town's folk standing in it).
+	_check(stayed == 0 and back == 0 and distinct.size() >= 8 and goals.all(func(cell: Vector2i) -> bool: return square.has_point(cell)),
 		"24 picks at Gar's 81 ticks: never the cell it stands on nor the one it left, %d cells of the square (%d stayed, %d back)" % [distinct.size(), stayed, back])
+	_test_room(mara, square)
 	# Every idle doing strolls; not with a task, not abed.
 	mara._goal = mara.tile
 	_check(mara._strolls(), "idle at work, it strolls")

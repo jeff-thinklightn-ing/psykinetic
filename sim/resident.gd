@@ -640,17 +640,27 @@ func _round_stop() -> Dictionary:
 	return stops[index] if index >= 0 and index < stops.size() and stops[index] is Dictionary else {}
 
 
+## The cells with room _free_cell tries a way to before it takes a crowded one (853 amended (7)).
+const ROOM_TRIES := 3
+
+
 ## A free cell of [param area] other than where it stands, from a start a hash of its id, the tick and
 ## its count of picks chooses, and not the cell it just left unless no other is free (the mend: a start
 ## of (id * 31 + tick) % 81 at a stroll every 81 ticks fell on the same cell each time, and Gar stepped
-## between two cells all night); where it stands if none.
+## between two cells all night); where it stands if none. With 853's moving on, a cell with room
+## first (853 amended (7)): open ground (its eight neighbours walkable), none of them another body's
+## cell or another resident's goal, and a way to it (find_path, ROOM_TRIES such cells at most); else
+## any free cell, as before.
 func _free_cell(area: Rect2i, keep: Array = []) -> Vector2i:
 	var count := area.size.x * area.size.y
 	if count <= 0:
 		return tile
 	_picks += 1
 	var start := absi(hash([id, World.tick, _picks])) % count
+	var near := _others_near() if keep_moving else {}
+	var tries := 0
 	var back := NO_CELL
+	var crowded := NO_CELL
 	for i in count:
 		var at := area.position + Vector2i((start + i) % count % area.size.x, (start + i) % count / area.size.x)
 		if at == tile or not World.is_free(at) or keep.has(at) or World.is_link_cell(at):
@@ -658,8 +668,37 @@ func _free_cell(area: Rect2i, keep: Array = []) -> Vector2i:
 		if at == _left:
 			back = at
 			continue
-		return at
+		if not keep_moving:
+			return at
+		if not near.has(at) and tries < ROOM_TRIES and World.DIRECTIONS.all(func(way: Vector2i) -> bool: return World.is_walkable(at + way)):
+			tries += 1
+			if not World.find_path(tile, at, false, null, RESIDENT_SEARCH_TILES, false, {}, true, World.PATH_FIRE_EXTRA,
+					RESIDENT_BODIES_WITHIN).is_empty():
+				return at
+			continue  # Room it has no way to now.
+		if crowded == NO_CELL:
+			crowded = at  # Crowded, or room past ROOM_TRIES unchecked: as before 853 amended (7).
+	if crowded != NO_CELL:
+		return crowded
 	return back if back != NO_CELL else tile
+
+
+## The cells beside another body (853 amended (7), npc's look at Umbrage: strollers' free cells fell
+## shoulder to shoulder, about 2,760 silent body-minutes a day): each cell on or next to another
+## entity's, or next to another resident's goal. A talk pair's cells are spots ("talk"), not picked here.
+func _others_near() -> Dictionary:
+	var near := {}
+	for other: GridEntity in World.entities():
+		if other == self:
+			continue
+		var cells: Array[Vector2i] = [other.tile]
+		if other is Resident and (other as Resident)._goal != NO_CELL and (other as Resident)._goal != other.tile:
+			cells.append((other as Resident)._goal)
+		for cell: Vector2i in cells:
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					near[cell + Vector2i(dx, dy)] = true
+	return near
 
 
 ## The goal [param cell], the cell it stands on noted as left when it is another.

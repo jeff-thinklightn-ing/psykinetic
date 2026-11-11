@@ -49054,6 +49054,18 @@ Heel.step calls it on its route (485 amended (2), theirs). find_path, walk_path 
 unchanged. resident_test _test_legs: the ends kept, no more steps, diagonals or turns, fewer turns over
 four routes in the town.
 
+853 amended (7) (npc's look at Umbrage, the coordinator's approval, 2026-11-11): a stroll's cell has
+room. A headless day in the plaza stood bodies shoulder to shoulder in silence for about 2,760
+body-minutes, each free cell picked with no look at who stood beside it. With keep_moving,
+Resident._free_cell takes a cell with room: open ground (its eight neighbours walkable, so no pocket
+behind a counter that one standing body seals: town_day_test's Ash stood 529 minutes in the inn
+otherwise), none of them another entity's cell or another resident's goal (Resident._others_near),
+and a way to it (find_path, up to Resident.ROOM_TRIES such cells); else any free cell as before, then
+the one it left. A talk pair stands at "talk" spots, which this does not pick. resident_test
+_test_room: 24 strolls in the square, none beside another body; no room, the crowded cell, not
+standing still; _test_keep_moving's 24 picks cover 8 cells or more, not 12 (9 open cells with room in
+its square); town_day_test passes.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
