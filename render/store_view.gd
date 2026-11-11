@@ -1,8 +1,9 @@
 class_name StoreView
-extends PanelContainer
+extends UiGlass
 ## The store window as Jeff approved it (decision 852; the mock is ui-design's,
 ## C:/dev/review/ui-design/store/, Jeff 11-10: "store update is what i
-## imagined -- approve"): one window for every keeper, with the head's tabs
+## imagined -- approve"; the parts are 854's: UiGlass the pane, UiTabs the head's tabs, UiSlot
+## each square with its UiPrice chip, UiLine the foot): one window for every keeper, with the head's tabs
 ## (Store, Donate, Locker), the keeper's goods on the left and the player's
 ## pack on the right in the same squares, the player's gold at the pack's
 ## head, and one line at the foot saying what just happened. It only draws:
@@ -39,9 +40,9 @@ var icon_of: Callable
 
 var _title: Label
 var _trusted: Label
-var _tabs: HBoxContainer
-var _tab_buttons: Dictionary = {}
-var _asleep: Label
+var _tabs: UiTabs
+var _tab_ids: Array[String] = []
+var _asleep: UiLine
 var _goods_head: Label
 var _goods_scroll: ScrollContainer
 var _goods: GridContainer
@@ -50,7 +51,7 @@ var _mine_head: Label
 var _gold: Label
 var _mine: GridContainer
 var _load: CharacterSheet.LoadBar
-var _foot: Label
+var _foot: UiLine
 ## "kind:key" -> msec the rust rim ends / the lit state ends.
 var _refused: Dictionary = {}
 var _new: Dictionary = {}
@@ -58,28 +59,31 @@ var _squares: Dictionary = {}
 var _state: Dictionary = {}
 
 
-## One square: its picture, its count top left, its price chip bottom right.
+## One square (UiSlot): what it stands for in the window (a ware, a good, a thing of yours).
 class Square:
-	extends PanelContainer
+	extends UiSlot
 	var kind := ""
 	var key: Variant
 	var words := ""
 	var view: StoreView
 
+	## The press is taken first: it can rebuild the squares, this one out of the tree (Jeff on
+	## v0.1.202). UiSlot takes it after saying so (reported to ui-design).
 	func _gui_input(event: InputEvent) -> void:
 		var click := event as InputEventMouseButton
 		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-			accept_event()  # First: the press can rebuild the squares, this one out of the tree (Jeff on v0.1.202).
+			accept_event()
 			view.square_pressed.emit(kind, key)
 
 
 func _init() -> void:
+	super()
 	name = "StoreView"
-	theme_type_variation = &"Glass"
 	visible = false
 
 
 func _ready() -> void:
+	super()  # UiGlass: the frost and its group.
 	var column := VBoxContainer.new()
 	column.theme_type_variation = &"Stack"
 	add_child(column)
@@ -94,11 +98,12 @@ func _ready() -> void:
 	_trusted.text = BarterPanel.TRUSTED_WORDS
 	_trusted.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	head.add_child(_trusted)
-	_tabs = HBoxContainer.new()
-	_tabs.theme_type_variation = &"Strip"
+	_tabs = UiTabs.new()
+	_tabs.chosen.connect(func(index: int) -> void:
+		if index >= 0 and index < _tab_ids.size():
+			tab_pressed.emit(_tab_ids[index]))
 	head.add_child(_tabs)
-	_asleep = Label.new()
-	_asleep.theme_type_variation = &"FootLineRefused"
+	_asleep = UiLine.new()
 	column.add_child(_asleep)
 	var halves := HBoxContainer.new()
 	halves.theme_type_variation = &"Halves"
@@ -141,9 +146,7 @@ func _ready() -> void:
 	_load = CharacterSheet.LoadBar.new()
 	_load.custom_minimum_size = Vector2(0, side() * 0.25)
 	right.add_child(_load)
-	_foot = Label.new()
-	_foot.theme_type_variation = &"FootLine"
-	_foot.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_foot = UiLine.new()
 	column.add_child(_foot)
 	if not _state.is_empty():
 		show_state(_state)
@@ -179,14 +182,19 @@ func show_state(state: Dictionary) -> void:
 		return  # Drawn at _ready.
 	_title.text = str(state.get("title", ""))
 	_trusted.visible = bool(state.get("trusted", false))
-	_asleep.text = str(state.get("asleep", ""))
+	_asleep.refuse(str(state.get("asleep", "")))
 	_asleep.visible = not _asleep.text.is_empty()
 	_set_tabs(state.get("tabs", []))
 	_goods_head.text = str(state.get("goods_head", ""))
 	_mine_head.text = str(state.get("mine_head", ""))
 	_gold.text = str(int(state.get("gold", 0)))
-	_foot.text = str(state.get("foot", "")) if not str(state.get("foot", "")).is_empty() else " "  # Always a line high: a buy never moves the window.
-	_foot.theme_type_variation = &"FootLineRefused" if bool(state.get("refused", false)) else &"FootLine"
+	var said := str(state.get("foot", ""))
+	if said.is_empty():
+		_foot.say(" ")  # Always a line high: a buy never moves the window.
+	elif bool(state.get("refused", false)):
+		_foot.refuse(said)
+	else:
+		_foot.say(said)
 	_foot.visible = true
 	_squares.clear()
 	_fill(_goods, state.get("goods", []))
@@ -216,22 +224,16 @@ func set_lines(lines: Array) -> void:
 
 
 func _set_tabs(tabs: Array) -> void:
-	for child: Node in _tabs.get_children():
-		_tabs.remove_child(child)
-		child.queue_free()
-	_tab_buttons.clear()
+	_tab_ids.clear()
+	var names: Array[String] = []
+	var open := 0
 	for tab: Variant in tabs:
 		var each: Dictionary = tab
-		var button := Button.new()
-		button.theme_type_variation = &"Tab"
-		button.toggle_mode = true
-		button.focus_mode = Control.FOCUS_NONE
-		button.text = str(each.get("text", ""))
-		button.set_pressed_no_signal(bool(each.get("open", false)))
-		var id := str(each.get("id", ""))
-		button.pressed.connect(func() -> void: tab_pressed.emit(id))
-		_tabs.add_child(button)
-		_tab_buttons[id] = button
+		if bool(each.get("open", false)):
+			open = names.size()
+		_tab_ids.append(str(each.get("id", "")))
+		names.append(str(each.get("text", "")))
+	_tabs.set_tabs(names, open)
 
 
 func _fill(grid: GridContainer, squares: Array) -> void:
@@ -254,24 +256,13 @@ func _square(spec: Dictionary) -> Square:
 	square.kind = str(spec.get("kind", ""))
 	square.key = spec.get("key")
 	square.words = str(spec.get("words", ""))
-	square.custom_minimum_size = Vector2.ONE * side()
 	square.mouse_entered.connect(func() -> void: square_hovered.emit(square.kind, square.key, square.words, square.get_global_rect()))
 	square.mouse_exited.connect(func() -> void: square_hovered.emit(square.kind, square.key, "", Rect2()))
-	# One overlay fills the square (a container would stack its children): the picture, the count at the top
-	# left from 2, the price chip at the bottom right.
-	var overlay := Control.new()
-	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	square.add_child(overlay)
 	var item := str(spec.get("item", ""))
 	if not item.is_empty():
-		var picture := TextureRect.new()
-		picture.set_anchors_preset(Control.PRESET_FULL_RECT)
-		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		picture.texture = icon_of.call(item) if icon_of.is_valid() else null
-		overlay.add_child(picture)
-		if picture.texture == null:
+		var picture: Texture2D = icon_of.call(item) if icon_of.is_valid() else null
+		square.set_picture(picture)
+		if picture == null:
 			var name := Label.new()  # No picture (headless, not drawn yet): the short name.
 			name.set_anchors_preset(Control.PRESET_FULL_RECT)
 			name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -280,33 +271,15 @@ func _square(spec: Dictionary) -> Square:
 			name.theme_type_variation = &"Small"
 			name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			name.text = Items.short_of(item)
-			overlay.add_child(name)
-	var count := int(spec.get("count", 0))
-	if count > 1:
-		var number := Label.new()
-		number.theme_type_variation = &"SquareCount"
-		number.text = str(count)
-		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		overlay.add_child(number)
+			square.add_child(name)
+	square.set_count(int(spec.get("count", 0)))
 	var price := int(spec.get("price", -1))
 	if price >= 0:
 		var free := price == 0 and str(spec.get("kind", "")) in ["ware", "good"]
-		var chip := PanelContainer.new()
-		chip.theme_type_variation = &"TimeChip" if free else &"PriceChip"
-		chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		chip.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		var row := HBoxContainer.new()
-		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.add_child(row)
-		var number := Label.new()
-		number.theme_type_variation = &"ChipPriceShort" if bool(spec.get("short", false)) else &"ChipPrice"
-		number.text = FREE_WORDS if free else str(price)
-		number.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		row.add_child(number)
-		chip.set_meta("words", "gold %d" % price)
-		overlay.add_child(chip)
+		if free:
+			square.price().set_words(FREE_WORDS)
+		else:
+			square.price().set_gold(price, bool(spec.get("short", false)))
 		square.set_meta("price", price)
 	return square
 
@@ -314,11 +287,11 @@ func _square(spec: Dictionary) -> Square:
 ## [param square]'s look: refused (a rust rim), just changed, or at rest.
 func _restyle(square: Square, id: String, now: int) -> void:
 	if int(_refused.get(id, 0)) > now:
-		square.theme_type_variation = &"WellRefused"
+		square.set_state("refused")
 	elif int(_new.get(id, 0)) > now:
-		square.theme_type_variation = &"WellNew"
+		square.set_state("new")
 	else:
-		square.theme_type_variation = &"Well"
+		square.set_state("rest")
 
 
 ## The square [param kind]:[param key] shows its refused rim for REFUSED_SECONDS.
@@ -364,8 +337,8 @@ func squares_shown(side: String) -> Array[String]:
 ## The tabs shown, as "id" or "id*" for the open one (tests).
 func tabs_shown() -> Array[String]:
 	var out: Array[String] = []
-	for id: String in _tab_buttons:
-		out.append(id + ("*" if (_tab_buttons[id] as Button).button_pressed else ""))
+	for i in _tab_ids.size():
+		out.append(_tab_ids[i] + ("*" if i == _tabs.current else ""))
 	return out
 
 
@@ -374,7 +347,7 @@ func foot_shown() -> String:
 
 
 func foot_is_refused() -> bool:
-	return _foot != null and _foot.theme_type_variation == &"FootLineRefused"
+	return _foot != null and _foot.refused
 
 
 func title_shown() -> String:
