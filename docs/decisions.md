@@ -12812,6 +12812,26 @@ belt_r's frame and the light rule the coordinator settled), so nothing changes i
 C:/dev/review/lantern/build.sh; the look at C:/dev/review/lantern/gear_lantern.png (the coordinator's go,
 pc-character's OK). Art only, protocol unchanged, no new class_name, no bullet (it comes with the swap).
 
+451 amended (5) (art-kit; label by tools/decision_number.sh; the coordinator's routing of Jeff's report, 11-01:
+the Tomb Sledge "shouldn't be held at the very end of the shaft thats not how hammers work"): the long
+hafts' hands moved up, agreed with animation, whose two-hand hold and clips are re-posed to them in the
+same take (the sockets alone pull every head about 0.25 m in, and the sledge's down key would stop short of
+the ground). The slots.json overrides, up +y from each slot's origin, rear hand (grip) / lead hand (grip_2):
+item.tomb_sledge 0.35 / 0.85 (was 0.12 / 0.57), item.battle_axe 0.4 / 0.95 (was 0.12 / 0.57; its origin
+0.09 up the haft), item.giant_axe 0.3 / 0.8 (was 0.12 / 0.57; 0.8, not the 0.85 first agreed, keeps the
+lead hand under its beard, which reaches down to about 0.65 beside the haft), item.pick 0.2 / 0.55 (was the
+sim's 0 / 0.54; animation's PICK_GRIP goes to 0.35 with it), item.rot_hammer 0.2 / 0.6 (was 0 / 0.57), and
+the one-handed war hammer, item.hammer, held 0.15 up (was its origin). A span of bare haft is left behind the
+rear hand and the lead hand a forearm below the head; the sledge's lead hand slides down toward the rear on
+the fall (animation's REACH_SLIDES). The four hand-built hafts' leather wraps move with the hands, so the
+hands close on leather (C:/dev/review/draugr_items/make_items714.py and make_draugr_items.py, which now
+lowers the battle axe its 0.09 itself; C:/dev/review/pick/make_pick.py; C:/dev/review/trinkets/make_trinkets.py,
+the pick-hammer's haft four rings more, 156 tris); each grip_2 empty matches its socket, the giant axe's
+moved in its blend. The two generated meshes (the giant axe, the war hammer) are unchanged. Side views with
+the hands marked at C:/dev/review/grips/hafts.png. The sim's span and reach are unchanged. Lands in
+animation's take, cherry-picked at its bottom. Art only, protocol unchanged, no new class_name, no bullet
+(animation's take carries the hold's).
+
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 
 Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:
