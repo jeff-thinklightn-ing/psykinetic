@@ -1,6 +1,6 @@
 extends Node
-## The shared parts of the approved look (decision 854): UiGlass, UiSlot,
-## UiPrice, UiTabs, UiLine each take their theme types, change them by state,
+## The shared parts of the approved look (decision 854; UiRow 860): UiGlass, UiSlot,
+## UiPrice, UiTabs, UiLine, UiRow each take their theme types, change them by state,
 ## and report what they show. No port: it opens no network; no scratch files.
 
 var _failures := 0
@@ -13,6 +13,7 @@ func _ready() -> void:
 	await _test_refused()
 	_test_tabs()
 	_test_line()
+	await _test_row()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -138,3 +139,42 @@ func _test_line() -> void:
 	_check(line.text == "" and not line.refused, "cleared")
 	_check(said > 0.0 and is_equal_approx(line.get_combined_minimum_size().y, said), "and still a line high (%s, %s)" % [said, line.get_combined_minimum_size().y])
 	line.queue_free()
+
+
+func _test_row() -> void:
+	var row := UiRow.new()
+	add_child(row)
+	row.size.x = 1320.0
+	_check(row.theme_type_variation == &"Row" and row.get_theme_stylebox(&"panel") is StyleBoxFlat, "an ask at rest is a Row")
+	row.set_words("Walk Bram home")
+	_check(row.words() == "Walk Bram home" and row.line() == "" and not row.has_price(), "words alone: no line, no chip")
+	var alone := row.get_combined_minimum_size().y
+	_check(alone >= UiRow.MIN_HEIGHT, "a row is a thing to hit (%s >= %s)" % [alone, UiRow.MIN_HEIGHT])
+	row.set_line("The roof's half on.")
+	_check(row.line() == "The roof's half on." and row.get_combined_minimum_size().y > alone, "the asker's line under the words makes it taller")
+	row.set_line("")
+	_check(row.line() == "" and is_equal_approx(row.get_combined_minimum_size().y, alone), "and none again")
+	row.price().set_gold(6, true)
+	_check(row.has_price() and row.price().shown() == "6" and row.price().short, "the gold, in rust when you can't pay")
+	row.clear_price()
+	_check(not row.has_price(), "no chip")
+	for name: String in UiRow.STATES:
+		row._show_state(name)
+		_check(row.theme_type_variation == UiRow.STATES[name] and row.get_theme_stylebox(&"panel") is StyleBoxFlat,
+			"state %s takes %s" % [name, UiRow.STATES[name]])
+	row._show_state("rest")
+	row.flash_refused()
+	_check(row.state == "refused" and row.theme_type_variation == &"RowRefused", "a refused ask shows the rust rim")
+	row._process(UiRow.REFUSED_SECONDS + 0.01)
+	_check(row.state != "refused", "then it goes back")
+	var got: Array = []
+	row.pressed.connect(func(which: UiRow) -> void:
+		got.append(which)
+		remove_child(which)
+		which.queue_free())
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	row._gui_input(click)
+	_check(got == [row] and not row.is_inside_tree(), "a click is reported, even one that takes the row away")
+	await get_tree().process_frame

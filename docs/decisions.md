@@ -49654,3 +49654,184 @@ Proof, start 9 (2026-11-11 05:01, one view, the player and the camera at each sp
 
 view_test _test_night_look_2 (the switch forced on and put back): indoors, on a damp level and in a cave the ambient and the floor's light are the same switched on as off, with no fill; outdoors at midnight the ambient lower and less blue, the floor's light up, the fill on and no stronger than BODY_FILL_ENERGY; the ground's colour keeping its light off (sky_floor_base) under the lift; the sky's light on the floor pinned to its sum, at midnight to NIGHT_KEY_2's ambient plus its moon at a fall of 0.866 and at 02:00 to the view's own ambient and moon, so a wrong scale fails there and not in a still; at noon all as off, with no lift; every body's drawn part on BODY_LAYER with its own layer kept. Client only, protocol unchanged, no new class_name, no bullet while off (the bullet comes with the switch-on).
 854 amended (1): two fixes from ui's swap of the store window onto the parts. UiSlot accepts a click before it reports it (pressed): a click that rebuilds the squares frees the one clicked, and accept_event on a node out of the tree is an error (v0.1.202's click). UiLine keeps one line's height when empty (its FootLine font at the resolved size, line spacing included, redone on a theme change), so a window never grows or shrinks as its foot line comes and goes; clear() leaves the text empty. Tests: parts_test (a click whose handler frees the square; the line's height kept when cleared). Client only, protocol unchanged, no new class_name, no bullet.
+The script's number; the coordinator's approval of the mend and of the spots contract (2026-11-10,
+night). Jeff, on v0.1.210: "townspeople frozen staring at the wall all day", and why he said it: "the
+mechanism from me playing to them getting fixed seems broken". npc reproduced it locally on the
+v0.1.210 tag, before reasoning from the code: town_soak's Umbrage (its ten folk) for one game day, a
+player in the square, every body read each game minute. All 13 bodies stood on one cell for 1 to 10
+game hours by day (55 awake stays of 5+ minutes; Bea 589, Maud 528, Gar 515, Mags 488 in the kitchen),
+none with a clip but the stand. One faced shut ground: Hob, 457 minutes facing the well's stone. A
+lived-in arm (every building standing, wood, stone and ore spent, the larder full) read the same.
+Three causes, each seen in the samples and a probe of the goal and the wander clock:
+
+1. A body already inside its next place never moved: Resident._pick_goal kept the cell it stood on
+   whenever that cell was in the new place's rect, and a trade with no standing building had work =
+   the square, so work, the square, the inn (none standing outside a shell) and the well's grown rect
+   overlapped or were one 9 x 9. Doing went WORK to INN, WELL to WORK, SQUARE to INN, and the body
+   never stepped.
+2. Only the square's hours re-picked (the stroll), and the pick could repeat: _free_cell started at
+   (id * 31 + tick) % 81 and the stroll came every 80 + (id * 7) % 40 ticks, 81 for Gar, so every pick
+   fell on the same cell and he stepped between two cells all night. No other doing strolled.
+3. At work with no job is standing: no task, no activity, the client's stand idle.
+
+What changes (slice 1 of three; the coordinator's order: people move, then people work for show, then
+the richer day):
+
+- Every entry into a place walks to a cell of it other than the one it stands on (Resident._set_goal
+  notes the cell left). Every idle doing strolls (Resident.STROLLS: work, home awake, the square, the
+  well, the inn, the temple, a lawspeaker's round; not hiding, sick abed, led, lost or visiting the
+  sick; never with a task, abed asleep, addressing a player, or far from every player): its next
+  move STROLL_TICKS (450) plus up to STROLL_SPREAD (750) more on, by a hash of its id and its count of
+  picks, so 12 to 32 game minutes (45 to 120 real seconds; the coordinator's ruling, 2026-11-11: 3 to 6
+  game minutes, 11 to 22 real seconds, would read as restless), staggered so a town does not move as
+  one; a seat (a spot posed "sit") is kept SEAT_TICKS (1125) plus up to SEAT_SPREAD (1125), 30 to 60
+  game minutes.
+- The pick (Resident._free_cell, _free_spot) starts at a hash of its id, the tick and its count of
+  picks, skips the cell it stands on, and takes the cell it just left only when no other is free: no
+  two-cell shuffle. It never picks a level link's cell (a player's way out alone, 571: World.try_move
+  refuses a resident onto it); the first run of the mend had Aldous two game hours one step from the
+  crypt stair (199, 199), trying it. A stroll whose step stays refused (STUCK_TRIES) picks again. A
+  goal another body stands on (the store's cell, a strolling body on it, held resident_test's farmer
+  in her field with the sack) is walked to beside it (Resident._path_beside), and waited for there.
+- Standing idle, it faces the open (Resident._face_open): at a spot its "face"; else, the cell before
+  it shut, the walkable way of the eight nearest its place's middle; never on its way to bed (its
+  head to the bed's is _show_work's: turned from it, it never slept) nor at a task. Sat or leaning, it
+  still looks for raiders (_look). Clicked mid-stroll, it turns to the player as the step ends
+  (World.face is refused while a step runs; address() sets the facing).
+- Getting up (animation's ask): a body whose word was a seat's ("sit", "sit_talk", "sit_listen") stands
+  on its cell Resident.GET_UP's 11 ticks after the word ends before its first step (12 after "tend"), so
+  the client's Sitting_Exit (1.03 s) and Counter_Exit (1.17 s) play out; arriving needs nothing.
+- Resident.keep_moving (static, on): off, a body keeps a cell it stands on in its place and only the
+  square strolls, as before; resident_test runs its cases from before 853 with it off and
+  _test_keep_moving with it on.
+- A trade with no building standing works its own patch of the square (Main._open_work: a 3 x 3 about
+  a cell of the square's inner ring its trade's hash chooses), till maps lays its work spots.
+- A keeper with a counter strolls only on his side of it (the coordinator's rule, 2026-11-11): never
+  round to its front, nor onto the cell a player trades from. Main._vendor_spot cuts the starter
+  stall's keeper's 3 x 3 to the cells behind a counter (Main.COUNTERS: building.market_stall) beside
+  his stall place, by its facing (Main._behind_counter): Rolf's (203, 195)..(204, 196), behind the
+  stall at (203, 197) facing south.
+
+The spots (the contract; maps lays them, builder edits them, animation and sound draw and sound
+them). A level.json's top-level "spots", an array; not "places", which are holdings. Each entry
+{"use", "cell", "face", "pose", "town", "trade", "pair"}:
+- use: what the resident is doing when it takes the spot, one of Level.SPOT_USES: "work" (needs
+  "trade": only that trade takes it), "square", "fire", "well", "inn", "temple", "talk". The square's
+  hours take the square's, the fire's and the talk spots alike.
+- cell: where the body stands or sits, floor; face: the cell it faces (the fire, the well, the pot,
+  the stall, its partner), one of the eight about cell; pose: Level.SPOT_POSES, "stand" (the default),
+  "sit" (a seat laid under it: bench, stool, log, fire seat) or "lean" (the well's rim, a fence);
+  town: the town's place key ("store" for Umbrage); pair: two talk spots sharing one face each other.
+- Level.spots_from(config, warnings, floor) reads them; a spot breaking a rule (use or pose unknown,
+  no town, work with no trade, face not beside it, cell not floor, another spot's cell) is warned as
+  "the spot at (x, y) (use): <why>; left out" and dropped (builder's spot tool refuses with that line).
+  A spot also keeps off door cells, the cell before a door or gate, fire cells and a temple's kept
+  cells (Main's temple_keep), and is reachable from the store: maps' checks in level_test.
+- Level.load_level carries "spots"; WorldMap's area too; Main._resident_places gives each resident
+  places["spots"], its town's by use, a work spot only its trade's. Resident takes a free spot of its
+  doing's use first, else a free cell of the place's rect.
+- Every writer keeps the array: MapDoc.save writes the config whole (builder's json_keep keeps the
+  file's words), LevelMap.moved_config shifts each spot's cell and face (one off the map dropped),
+  Regen.generated_config keeps the spots in its anchors, tools/make_interior.py writes a spec's
+  "spots" through (the Mughouse's go in its interior spec). The prefab clipboard does not carry them.
+- An interior (the Mughouse) carries its own; its residents' use of them comes with slice 3.
+
+What the client sees: no new field. Resident.activity (replicated) carries the word, drawn by
+Client3D.ACTIVITIES (animation's 566 amended (2)); a word not there draws the stand, so the sim may
+set a word before its clip lands and an old client walks and stands as before. Words: slice 1, at a
+spot, "sit" and "lean"; slice 2, work for show at a trade's spot with no job: hammer, saw, chop, hoe
+and herd (existing), stir (cook), tend (merchant, taverner, keeper), sweep (hauler), scrape (tanner),
+pray (priest), fletch (hunter, sat), grind (medicine man), watch (guard); slice 3, a pair turn about:
+"talk" and "listen" standing, "sit_talk" and "sit_listen" sat. Release: no PROTOCOL_REVISION (an old
+client draws no pose for a word it lacks; a later word that a v0.1.210 client would draw wrong, or a
+changed meaning, is asked again); the comment above it says so.
+
+Live in slice 1: the moving and the facing everywhere; "sit" and "lean" only where a spot is laid,
+and none is laid on main yet (maps lays Umbrage's next), their clips animation's. Measured again with
+the same run on this code: every body's longest awake stay on one cell and facing, 06:00 to 22:00, fell
+from 120 to 589 game minutes (Bea 589, Maud 528, Gar 515, Mags 488) to 5 with the first wait (3 to 6
+game minutes), and none faced shut ground (Hob's well stone before); with the ruled wait, at most 32. Tests: town_day_test (new: the wilds town 06:00 to 22:00,
+town_soak's ten folk, a player in the square, every body in sight each game minute; none awake stands
+idle on one cell and facing past 35 game minutes, nor faces shut ground idle past 3);
+resident_test _test_keep_moving (24 picks at Gar's 81 ticks: never the cell stood on nor the one left;
+who strolls and who keeps still; the next stroll 12 to 32 game minutes on, staggered; the stand turned from
+shut ground; a fire seat taken, faced and sat, got up from, its cell kept through the get-up;
+Main._open_work); level_test
+_test_spots (the reader's rules and warnings, moved_config and Regen keeping the array, the wilds
+level carrying it). Server only (Level, WorldMap, Main, Resident, tools/make_interior.py, the editor's
+moved_config); protocol unchanged; no new class_name. Bullet in voice's words; no package (a fix, on).
+
+Riding along (the coordinator's ruling on lore's finding): Hearsay._lower_first lowered the first letter
+of every fact it put after "It is said that" and the like, names too ("It is said that umbrage is
+cursed"; Hollowfell, Brand, Aldous, Snagfin). It keeps a name now (Hearsay.is_name): a word the game's
+texts (Hearsay.NAME_FILES: levels/lore, residents, economy, townsfolk, companion traits, named enemies)
+write capitalized mid-sentence, a names list's single word, or a title's name ("Brand the Ox"), read
+once. resident_test _test_lower_first.
+
+Found in 853's landing (lawspeaker_test: "the town remembers that Old Marta lives by the east field"):
+"Old" counted as a name, since the texts write "the Old Tower". A word the texts also write in small
+letters in prose (a string with a space; an id like "hollowfell" is not prose) is no name ("old",
+"hall", "barrow", "road"); a title's name stays one. The coordinator's rule: "I" ("I'll", "I'm",
+"I've", "I'd") is never lowered, and a place's name of several words that opens a line keeps its
+capitals (Hearsay._phrases: those the texts write mid-sentence, "the Hall of Fallen Souls", "the
+Blood Rot", "the Last Light Mughouse", and the levels' own names without "The", "First Hall").
+The list of words that change went to voice and lore; voice's keep-list of people's names that are
+also words (Rook, Sedge, Wren, Brand) and lore's "Mound-breakers" are a follow-up. Also in the
+landing: editor_fields NOT_OFFERED "spots" (set in level.json until builder's spot tool), and
+return_test's player stands beside Hob off the hut's own cell (Hob strolls since 853; on the hut's
+cell the hut tied the temple and won by its id; _return_place unchanged).
+
+## 851. Builder's tools run headless on a level, and level.json is written in its own words
+
+The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
+Umbrage's ground headless, as data in levels/wilds, and asked for "a headless run of builder's own
+tools on a level, same refusals, writing level.json for me to diff".
+
+- tools/builder_run.tscn: `--level=<name> --calls=<calls.json> [--area=x,y,w,h] [--out=<dir>]
+  [--go-on] [--into-repo]`. calls.json is a list of {"tool", "input"}, the inputs as
+  BuilderSession.tools() gives them. Each is run by BuilderSession.run_tool with no Claude call and
+  no key, and its answer printed ("TOOL <name> ok|refused: ..."). The first refusal stops the run
+  with nothing written, unless --go-on. Then come the layout news and arrival warnings the change
+  adds, the accept (its refusal stops it too), the save, and the world map's new problems. Each file
+  that differs from levels/<name>/ is named: level.json by its text, the images as the game reads
+  them, each through LevelMap and back. MapDoc writes the pixels between cells black where a
+  hand-laid file may hold a colour (748 of test_room's), so pixel for pixel every save would
+  differ. --into-repo
+  copies only those into levels/<name>/; without it they stay in --out. What lands is the caller's
+  own data change; the runner never commits.
+- --out (default user://builder_run_<checkout>/) is the run's private overlay
+  (Level.overlay_dir for the run, put back after), so every level is read from levels/. The shared
+  user://levels/ overlay is never read or written: an --out that is it or holds it is refused, as
+  is one inside the project. The folder is emptied at each run, but only when it is empty or an
+  earlier run's (marked .builder_run).
+- level.json in its own words (editor/json_keep.gd, MapDoc.JSON_KEEP). Godot's round trip reads
+  every number as a float and opens out every short line. MapDoc.save wrote wilds' 3,322 lines
+  back with 2,877 changed for an edit of one, so builder mode's accept had been doing this to every
+  level it saved. MapDoc keeps the text its config was read from (source_text, from open() and
+  from_level()). Save writes each value unchanged from that text as that text, and writes a changed
+  object or array again with its unchanged members still in their own text. A line the hand kept
+  short stays short, a new array item takes its last old sibling's way, a new list of plain values
+  goes on one line, and a whole number written fresh has no ".0". An unchanged config writes the
+  file back byte for byte. The one change a save makes of itself stays: 537's building codes,
+  written into a level that lacks them (wilds and barrow_deep do), so the first save of those adds
+  a "code" line to each building.
+- npc's "spots" (853) and every other key go through whole: the writer carries any value, and the
+  runner writes only what the tools change.
+
+Tests: builder_test _test_json_keep (wilds, barrow, barrow_deep and test_room: no change gives the
+file byte for byte; one value changed changes one line; spots written, kept, and one spot's pose
+changed in one line; a short line kept short with a value moved and an item added; MapDoc saved
+with no edit adds only building codes and leaves its images, read as the game reads them,
+unchanged). _test_runner (a barrel laid on test_room changes level.json
+alone, by a few lines; a painted cell changes layout.png, the earlier run's barrel gone with its
+folder; a refusal stops the run with nothing written; the shared overlay, the project and an
+unknown level refused; Level.overlay_dir put back and the shared overlay untouched). Tools only:
+nothing player-facing, no package, no bullet; protocol unchanged; no new class_name.
+
+## 860. UiRow: a person's ask as a row, in the approved look
+
+The coordinator approved the talk window's mock (11-11, C:/dev/review/ui-design/talk/, from ui's walk-through C:/dev/review/ui/talk_walkthrough.md) in the look and parts Jeff approved on 11-10, and the part it needs. A townsperson's asks were text-height buttons (about 26 px at 1080; the audit's fault 10) with a bare number for their gold.
+- UiRow (render/parts/ui_row.gd, a PanelContainer): the window's width; the ask's words left (RowWords, 44), the asker's own line under them only where they have one (RowLine, 40, dim; voice's rule), and its cost right as the store's chip (UiPrice, with the coin, rust when you can't pay), centred. At least MIN_HEIGHT 112 canvas units tall (56 px at 1080); the text scale on top (RowWords and RowLine are sized types). Its state is its rim: Row at rest, RowHover (the flame rim) under the pointer, RowRefused (rust) for a second after flash_refused, then back. Never greyed. It accepts a click before reporting it (pressed), as UiSlot since 854 amended (1). No colour, font or size override: style_test's count stays.
+- Theme: Row, RowHover, RowRefused (PanelContainer, row styleboxes), RowWords, RowLine (Label), Rows (the list, separation 12).
+- The window, ui's (its rows branch, 536 amended, lands first as it is with UiPrice and a four-row cap, then swaps to UiRow): it takes the pack's place at the bottom right; four rows' own heights, then the next row's top fading in with a down-mark, the rest scroll; the window ends under the last row and its foot; the foot is the typing line (lit on hover, focused on open, 802) or, for a person who answers clicks only, the line alone; what went wrong is said in the foot in rust until the next click or key, so the window never grows for it. Refusal reasons are one line of at most 50 characters (voice, economy).
+Tests: parts_test (the row's words, line, chip, states, the refused flash and its return, a click that frees it). New class_name UiRow; nothing uses it yet; protocol unchanged; no bullet (players see nothing until ui's window uses it).

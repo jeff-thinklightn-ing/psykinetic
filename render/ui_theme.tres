@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=39 format=3]
+[gd_resource type="Theme" load_steps=42 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -484,6 +484,57 @@ corner_radius_top_right = 25
 corner_radius_bottom_right = 25
 corner_radius_bottom_left = 25
 
+; A person's ask (UiRow, 860): a faint plate the window's width, a fine lit rim.
+[sub_resource type="StyleBoxFlat" id="row"]
+content_margin_left = 32.0
+content_margin_top = 14.0
+content_margin_right = 32.0
+content_margin_bottom = 14.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.055)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; An ask under the pointer: the plate lit, the flame rim.
+[sub_resource type="StyleBoxFlat" id="row_hover"]
+content_margin_left = 32.0
+content_margin_top = 14.0
+content_margin_right = 32.0
+content_margin_bottom = 14.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.13)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(1.0, 0.8235, 0.4784, 1.0)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; An ask refused, for a second: the rust rim.
+[sub_resource type="StyleBoxFlat" id="row_refused"]
+content_margin_left = 32.0
+content_margin_top = 14.0
+content_margin_right = 32.0
+content_margin_bottom = 14.0
+bg_color = Color(0.9569, 0.9373, 0.902, 0.055)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.9098, 0.4745, 0.1804, 1.0)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -654,6 +705,20 @@ Glass/base_type = &"PanelContainer"
 Glass/styles/panel = SubResource("glass")
 PriceChip/base_type = &"PanelContainer"
 PriceChip/styles/panel = SubResource("price_chip")
+Row/base_type = &"PanelContainer"
+Row/styles/panel = SubResource("row")
+RowHover/base_type = &"PanelContainer"
+RowHover/styles/panel = SubResource("row_hover")
+RowRefused/base_type = &"PanelContainer"
+RowRefused/styles/panel = SubResource("row_refused")
+RowWords/base_type = &"Label"
+RowWords/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+RowWords/font_sizes/font_size = 44
+RowLine/base_type = &"Label"
+RowLine/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+RowLine/font_sizes/font_size = 40
+Rows/base_type = &"VBoxContainer"
+Rows/constants/separation = 12
 SquareCount/base_type = &"Label"
 SquareCount/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
 SquareCount/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)

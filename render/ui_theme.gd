@@ -6,7 +6,8 @@ extends RefCounted
 ## Outlined, Inset, HandSlot, Deep; a talk window's offers: OfferList,
 ## OfferRow, Price, PriceShort; the store window, Jeff's approved mock: Glass,
 ## Subhead, Tab, Well, WellHover, WellPicked, WellNew, WellRefused, PriceChip, TimeChip, ChipPrice,
-## ChipPriceShort, SquareCount, FootLine, FootLineRefused; its containers Stack,
+## ChipPriceShort, SquareCount, FootLine, FootLineRefused; a person's asks (UiRow, 860):
+## Row, RowHover, RowRefused, RowWords, RowLine, and their list Rows; its containers Stack,
 ## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
 ## square, square_gap, half_gap) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
@@ -23,7 +24,8 @@ const PATH := "res://render/ui_theme.tres"
 const TYPE := &"Psykinetic"
 ## The theme types whose font sizes the text scale multiplies (decision 453).
 const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel",
-	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused"]
+	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused",
+	&"RowWords", &"RowLine"]
 ## The meaning colours and their sets: "normal" is the palette's (docs/ui_style.md);
 ## "distinct" keeps brass and rust, and moves the rest apart for red-green
 ## colour blindness (friend blue, party pale cyan, alarm magenta: each a
