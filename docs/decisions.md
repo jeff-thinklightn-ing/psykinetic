@@ -5363,6 +5363,17 @@ wool, C:/dev/review/rod_icon/rod_icon_strip.png; ui-design's go). item.fishing_r
 checks the rod's picture and the forgetting. Client only, protocol unchanged, no new class_name; a bullet in
 voice's words.
 
+275 amended (2) (ui-design; label by tools/decision_number.sh; the framing 275 amended (1) left to it, from
+the same finding): ItemIcons frames tighter, MARGIN 1.18 to 1.06 (every picture about 11% larger in its
+square), and a long piece (pose's LONG) is thickened across, never along: its width and depth scaled
+toward a THIN_RATIO (7)-th of its length, at most THICK_MOST (2.5) times (thickness(size)), so a spear's
+shaft and head read at 88 and 59 px. Today only the spear qualifies (2.38); the sword, dagger, knife, bow,
+pick, hammer, axe and arrows are stout enough and stay as made, and the rod draws art-kit's picture piece.
+No light rim: on the store's lighter ground (#b3a68a) the dark rim reads. Stills (the Lenovo, before and
+after at 88 and 59 px): C:/dev/review/ui-design/store/icons/icons_landed.png. Pieces still thin at 59 px
+(the pick's haft, the sword) are art-kit's to picture if it judges so. items_test checks thickness. Client
+only, protocol unchanged, no new class_name; a bullet in voice's words.
+
 ## 301. The town's store in builder mode: a prefab, a chest's use, and a check
 
 Economy's pieces get into real levels through builder mode, not by hand

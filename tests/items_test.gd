@@ -3660,6 +3660,10 @@ func _test_icons() -> void:
 	_check(laid != Basis.IDENTITY and turned["size"] <= ItemIcons.frame(long, view)["size"] * 1.05,
 			"a long thing (a bundle of wood) lies across the diagonal, framed as tight (%.2f)" % turned["size"])
 	_check(ItemIcons.pose(Vector3(0.35, 0.45, 0.3)) == Basis.IDENTITY, "a sack stands as it is")
+	_check(is_equal_approx(ItemIcons.thickness(Vector3(0.04, 1.8, 0.04)), ItemIcons.THICK_MOST)
+			and is_equal_approx(ItemIcons.thickness(Vector3(0.1, 1.05, 0.1)), 1.5)
+			and ItemIcons.thickness(Vector3(0.3, 0.9, 0.3)) == 1.0 and ItemIcons.thickness(Vector3(0.35, 0.45, 0.3)) == 1.0,
+			"a long thin thing (a spear) is thickened across toward a seventh of its length, at most %s; a stout one and a sack not" % ItemIcons.THICK_MOST)
 	var icons: ItemIcons = _main.item_icons
 	_check(icons != null and _main.pack_panel.icons == icons, "the pack panel takes its icons from Main's ItemIcons")
 	_check(icons.icon(KIT) == null and not icons.enabled, "headless, no icon is drawn")

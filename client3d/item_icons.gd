@@ -6,7 +6,8 @@ extends Node
 ## from the game's 3/4 angle, SIZE px, a clear background, a dark rim
 ## round it: outlined), one a frame,
 ## kept, and icon_ready(id) says it is there. A long thing (a spear, a bundle
-## of wood) is turned to lie across the icon's diagonal. Headless nothing is
+## of wood) is turned to lie across the icon's diagonal, and thickened across
+## (never along) so its shaft and head read at a store square's size (thickness). Headless nothing is
 ## rendered: icon gives null always, and the panel shows names instead.
 ## Client only; the server never makes one. Ground piles keep their 3D art.
 ## When an item's art changes, forget(id) (or forget() for all) draws it
@@ -19,10 +20,16 @@ const SIZE := 128
 ## game's camera looks on.
 const YAW := PI * 0.25
 const PITCH := -PI / 6.0
-## Room round the thing, a share of its size on screen.
-const MARGIN := 1.18
+## Room round the thing, a share of its size on screen (1.18 till the store
+## square's stills, ui-design 11-10: the picture about 11% larger).
+const MARGIN := 1.06
 ## Taller than this times its width and depth: laid across the diagonal.
 const LONG := 1.6
+## A long thing's cross-section is brought up toward a THIN_RATIO-th of its
+## length, at most THICK_MOST times (a spear's shaft from a hair to a line at
+## 88 px; its length, and anything not long, as made).
+const THIN_RATIO := 7.0
+const THICK_MOST := 2.5
 ## The rim round every icon (the coordinator, for Jeff: "small images on
 ## brown"): a dark line OUTLINE px wide hugging the thing's edge, then a
 ## fainter one out to OUTLINE_SOFT, so iron and wood stand off any square.
@@ -126,6 +133,14 @@ static func pose(size: Vector3) -> Basis:
 	return Basis.IDENTITY
 
 
+## How much a thing of [param size] is thickened across for its icon (its
+## width and depth; never its length): 1 for anything not long (pose).
+static func thickness(size: Vector3) -> float:
+	if size.y <= maxf(size.x, size.z) * LONG:
+		return 1.0
+	return clampf(size.y / (maxf(maxf(size.x, size.z), 0.001) * THIN_RATIO), 1.0, THICK_MOST)
+
+
 func _ready() -> void:
 	if not enabled:
 		return
@@ -210,6 +225,8 @@ func _draw(id: String) -> void:
 	_busy = true
 	var slot := _slot(id)
 	var thing := ArtKit.instance(slot)
+	var across := thickness(ArtKit.size(slot))
+	thing.scale = Vector3(across, 1.0, across) * thing.scale
 	var pivot := Node3D.new()
 	pivot.basis = pose(ArtKit.size(slot))
 	pivot.add_child(thing)

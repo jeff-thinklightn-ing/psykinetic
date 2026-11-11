@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Pictures of your things in the pack and store squares are drawn a little larger, filling more of each square, and the spear is drawn thicker, so its shaft and head show clearly (275 amended (2)).
 - Along the edge of the woods, by the east road and the pond, the treetops nearest the camera fade away, so you see their trunks and the ground beneath (326 amended (2)).
 - The castle and the dark tower on the horizon keep their place as you move, however many zones you've crossed into (650).
 - From Umbrage's north edge, the castle on the horizon stands on a low green hill of its own (650 amended (3)).
