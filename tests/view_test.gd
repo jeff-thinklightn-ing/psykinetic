@@ -107,6 +107,7 @@ func _ready() -> void:
 		_test_seasons()
 		_test_heights()
 		_test_damp_look()
+		_test_night_look_2()
 		_test_dais()
 		_test_dark_set()
 		_test_lair()
@@ -6604,6 +6605,78 @@ func _test_built_water() -> void:
 	var hills := Level.load_level("hills")
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	_check(_rig._built_water.is_empty(), "hills: all its water natural, from its curves (built: %s)" % [_rig._built_water.keys().slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Umbrage at night (858), its switch forced on here (night_look_2) and put
+## back: indoors, on a damp level and in a cave the ambient and the floor's
+## light are the same switched on as off, and no body fill; outdoors at
+## midnight the ambient lower and less blue, the ground's floor light up from
+## FLOOR_DARKEST to NIGHT_FLOOR_DARKEST, the fill on; at noon all as off; a
+## body's drawn parts on BODY_LAYER, its own layer kept.
+func _test_night_look_2() -> void:
+	print("\n== Umbrage at night (858): outdoors only, the ground lit once, a fill on bodies ==")
+	var was := Client3D.night_look_2
+	var hour_was := DayNight.hour(DayNight.now())
+	var weather_was: Dictionary = World.fields.weather.duplicate()
+	var read := func() -> Array:
+		return [_rig._environment.ambient_light_color, _rig._environment.ambient_light_energy,
+				float(_rig._ground_shader_material.get_shader_parameter("sky_floor")), _rig._body_fill.visible]
+	var barrow := Level.load_level("barrow")
+	var plain: Dictionary = barrow["terrain"]
+	var damp: Dictionary = plain.duplicate()
+	damp["damp"] = true
+	var cave: Dictionary = plain.duplicate()
+	cave["zone"] = "cave"
+	cave.erase("ambient")
+	var differ := []
+	for name: String in ["barrow", "damp", "cave"]:
+		var terrain: Dictionary = {"barrow": plain, "damp": damp, "cave": cave}[name]
+		var seen := []
+		for on: bool in [false, true]:
+			Client3D.night_look_2 = on
+			_rig.rebuild(terrain, barrow["centre"])
+			_rig._update_sky(0.0)
+			seen.append(read.call())
+		if seen[0] != seen[1] or bool(seen[1][3]):
+			differ.append("%s %s / %s" % [name, seen[0], seen[1]])
+	_check(differ.is_empty(), "indoors, damp and in a cave the ambient and floor light are the same switched on as off, no fill (%s)" % [differ])
+	var hills := Level.load_level("hills")
+	var at := func(hour: float, on: bool) -> Array:
+		Client3D.night_look_2 = on
+		DayNight.set_hour(hour)
+		World.fields.weather = Weather.KINDS["clear"].duplicate()
+		World.fields.weather["wind_dir"] = Vector2.RIGHT
+		World.fields.weather["snow"] = 0.0
+		_rig._weather_view.weather = World.fields.weather.duplicate()
+		_rig.rebuild(hills["terrain"], hills["centre"])
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+		_rig._update_sky(0.0)  # The fill follows the look the first call set.
+		return read.call() + [_rig._body_fill.light_energy]
+	var off_night: Array = at.call(0.0, false)
+	var on_night: Array = at.call(0.0, true)
+	var bluer := func(c: Color) -> float: return c.b - c.r
+	_check(float(on_night[1]) < float(off_night[1]) and bluer.call(on_night[0]) < bluer.call(off_night[0])
+			and float(on_night[2]) > float(off_night[2]) and bool(on_night[3]) and not bool(off_night[3])
+			and float(on_night[4]) > 0.0 and float(on_night[4]) <= Client3D.BODY_FILL_ENERGY + 0.0001,
+			"midnight outdoors switched on: the ambient %.3f (off %.3f), less blue, the floor's light %.2f (off %.2f), the body fill %.2f"
+			% [on_night[1], off_night[1], on_night[2], off_night[2], on_night[4]])
+	var off_noon: Array = at.call(12.0, false)
+	var on_noon: Array = at.call(12.0, true)
+	_check(off_noon.slice(0, 4) == on_noon.slice(0, 4) and not bool(on_noon[3]), "noon outdoors: the same switched on as off, no fill")
+	var parts := 0
+	var layered := 0
+	for puppet: Node3D in _rig._puppets.values():
+		for node: Node in puppet.find_children("*", "GeometryInstance3D", true, false):
+			parts += 1
+			if (node as VisualInstance3D).layers & Client3D.BODY_LAYER and (node as VisualInstance3D).layers & 1:
+				layered += 1
+	_check(parts > 0 and layered == parts, "every body's drawn part on BODY_LAYER, its own layer kept (%d of %d)" % [layered, parts])
+	Client3D.night_look_2 = was
+	DayNight.set_hour(hour_was)
+	World.fields.weather = weather_was
+	_rig._weather_view.weather = weather_was.duplicate()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

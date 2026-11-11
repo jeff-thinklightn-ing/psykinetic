@@ -869,6 +869,31 @@ const FLOOR_DARKEST := 0.3
 ## edge (decision 304).
 const FLOOR_LIGHT_LOW := 0.2
 const FLOOR_LIGHT_HIGH := 0.7
+## Umbrage at night (decision 858, package "Umbrage at night"; lands off,
+## switched on by environment in the cut that carries buildings' lamps): out
+## of doors at night the ground was darkened twice, its colour scaled to
+## FLOOR_DARKEST by the sky's floor light and then lit by the night's ambient
+## and moon as well, while walls, grass and bodies took the night's light
+## alone, so pale stone and tufts read 2 to 5 times the street. Switched on,
+## the sky's floor light outdoors bottoms at NIGHT_FLOOR_DARKEST (the cells'
+## own light, a torch's pool, and every indoor floor as before); the night
+## key (SKY_KEYS' first) takes NIGHT_KEY_2's ambient and moon, lower and less
+## blue; and a faint fill, BODY_FILL_ENERGY at full night from the camera's
+## side, lights bodies alone (BODY_LAYER, every puppet's drawn parts), so a
+## foe reads at least as well as before on the lighter ground. Indoors and on
+## a damp level nothing changes. The night_look_2 static mirrors the const
+## for tests and stills.
+const NIGHT_LOOK_2 := false
+static var night_look_2 := NIGHT_LOOK_2
+const NIGHT_FLOOR_DARKEST := 0.5
+const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.18,
+		"light": Color(0.7, 0.76, 0.95), "energy": 0.2}
+const BODY_LAYER := 1 << 18
+const BODY_FILL := Color(0.8, 0.83, 0.92)
+const BODY_FILL_ENERGY := 0.1
+## How far below the camera's line the fill shines (degrees), so a body's
+## front and top take it.
+const BODY_FILL_DOWN := 20.0
 const WARM := Color(1.0, 0.5, 0.2)
 const WARM_MOST := 0.45
 const LANTERN := Color(1.0, 0.93, 0.7)
@@ -2755,6 +2780,8 @@ var _hp_bar_shader: Shader
 var _boss_mark: ImageTexture
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
+## The night's fill on bodies (858).
+var _body_fill: DirectionalLight3D
 var _outdoor := false
 ## The low-horizon camera is on now (decision 623): Net.camera_low and
 ## outdoors.
@@ -3377,14 +3404,65 @@ func _build_environment() -> void:
 	RenderingServer.directional_shadow_atlas_set_size(SUN_SHADOW_SIZE, true)
 	add_child(sun)
 	_sun = sun
+	# 858: the night's fill on bodies alone (BODY_LAYER), shadowless; off
+	# till night_look_2 and the night (_place_body_fill).
+	_body_fill = DirectionalLight3D.new()
+	_body_fill.name = "BodyFill"
+	_body_fill.light_color = BODY_FILL
+	_body_fill.light_energy = 0.0
+	_body_fill.light_cull_mask = BODY_LAYER
+	_body_fill.shadow_enabled = false
+	_body_fill.visible = false
+	add_child(_body_fill)
+	var tree := get_tree()
+	if tree != null and not tree.node_added.is_connected(_tag_body):
+		tree.node_added.connect(_tag_body)
 	_weather_view = WeatherView.new()
 	add_child(_weather_view)
+
+
+## A drawn part of a body (858): any VisualInstance3D entering the tree under
+## a puppet (its root carries "entity_id", _make_puppet) also goes on
+## BODY_LAYER, so the night's fill reaches it, gear and clothes put on later
+## too. Its own layer is kept, so every other light and camera sees it as
+## before.
+func _tag_body(node: Node) -> void:
+	if not node is VisualInstance3D or node is Light3D:
+		return
+	var up := node.get_parent()
+	for i in 16:
+		if up == null or up == self:
+			return
+		if up.has_meta("entity_id"):
+			(node as VisualInstance3D).layers |= BODY_LAYER
+			return
+		up = up.get_parent()
+
+
+## The night's fill on bodies (858), outdoors while night_look_2: as strong
+## as the night is deep (BODY_FILL_ENERGY when the day's light is gone), and
+## shining from the camera's side, BODY_FILL_DOWN under its line, so the
+## faces seen take it.
+func _place_body_fill() -> void:
+	var energy := BODY_FILL_ENERGY * (1.0 - _look_daylight) if night_look_2 and _outdoor else 0.0
+	_body_fill.light_energy = energy
+	_body_fill.visible = energy > 0.001
+	if _body_fill.visible and _camera != null:
+		var ahead := -_camera.global_transform.basis.z
+		var level := Vector3(ahead.x, 0.0, ahead.z)
+		if level.length_squared() < 0.0001:
+			level = Vector3(0.0, 0.0, -1.0)
+		level = level.normalized()
+		var down := deg_to_rad(BODY_FILL_DOWN)
+		var way := (level * cos(down) + Vector3.DOWN * sin(down)).normalized()
+		_body_fill.basis = Basis.looking_at(way, Vector3.UP)
 
 
 ## The dark under-stone look, or outdoors the sky on the world clock
 ## (_update_sky): its light, the sun or the moon.
 func _apply_sky() -> void:
 	_outdoor = bool(_terrain.get("outdoor", false))
+	_body_fill.visible = false
 	_sky_step = -1
 	_environment.fog_enabled = false
 	_set_sky_floor(0.0)
@@ -3511,6 +3589,7 @@ func _set_sky_floor(level: float, roof := -1.0) -> void:
 func _update_sky(delta: float) -> void:
 	if not _outdoor or _sky_material == null:
 		return
+	_place_body_fill()
 	var at := DayNight.fraction(DayNight.now())
 	var step := floori(at * SKY_STEPS) % SKY_STEPS
 	var weathered := _weather_view.ease_toward(World.fields.weather, delta)
@@ -3591,8 +3670,8 @@ func _update_sky(delta: float) -> void:
 	# Dusk's lift under the low camera (623 amended (3)) reaches the floor
 	# too: it takes its light from here, not the ambient, and stayed black.
 	var lift := 1.0 + LOW_DUSK_LIFT * low_dusk(_look_elevation) if _low else 1.0
-	_set_sky_floor(minf(floor_brightness(light) * lift, 1.0) if lit else 0.0,
-			minf(floor_brightness(roof) * lift, 1.0) if lit else 0.0)
+	_set_sky_floor(minf(sky_floor_brightness(light) * lift, 1.0) if lit else 0.0,
+			minf(sky_floor_brightness(roof) * lift, 1.0) if lit else 0.0)
 
 
 ## The sun, the moon, the stars and the clouds on the sky (decision 744),
@@ -3785,17 +3864,35 @@ func _ease_canopy(delta: float) -> bool:
 ## SKY_KEYS blended for the sun [param elevation] degrees high.
 static func sky_look(elevation: float) -> Dictionary:
 	if elevation <= SKY_KEYS[0][0]:
-		return SKY_KEYS[0][1]
+		return sky_key(0)
 	for i in range(1, SKY_KEYS.size()):
 		if elevation <= SKY_KEYS[i][0]:
 			var weight: float = inverse_lerp(SKY_KEYS[i - 1][0], SKY_KEYS[i][0], elevation)
-			var low: Dictionary = SKY_KEYS[i - 1][1]
-			var high: Dictionary = SKY_KEYS[i][1]
+			var low: Dictionary = sky_key(i - 1)
+			var high: Dictionary = sky_key(i)
 			var look := {}
 			for key: String in low:
 				look[key] = lerp(low[key], high[key], weight)
 			return look
 	return SKY_KEYS[-1][1]
+
+
+## SKY_KEYS' look [param i]; the night's (the first) with NIGHT_KEY_2's
+## ambient and moon over it while night_look_2 (858).
+static func sky_key(i: int) -> Dictionary:
+	var look: Dictionary = SKY_KEYS[i][1]
+	if i == 0 and night_look_2:
+		look = look.merged(NIGHT_KEY_2, true)
+	return look
+
+
+## The sky's light on the outdoor floor as a brightness, for the sim's
+## [param light] there (floor_brightness); while night_look_2 it bottoms at
+## NIGHT_FLOOR_DARKEST, not FLOOR_DARKEST (858). The cells' own light
+## (_floor_shade) and indoor floors keep floor_brightness.
+static func sky_floor_brightness(light: float) -> float:
+	var darkest := NIGHT_FLOOR_DARKEST if night_look_2 else FLOOR_DARKEST
+	return lerpf(darkest, 1.0, smoothstep(FLOOR_LIGHT_LOW, FLOOR_LIGHT_HIGH, light))
 
 
 ## DayNight's direction [param toward] (x east, y up, z south) in this

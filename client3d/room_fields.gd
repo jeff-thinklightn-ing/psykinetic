@@ -32,7 +32,7 @@ const VIEW: Array[StringName] = [
 	&"_step_pace", &"_step_slot", &"_flattened", &"_arrows", &"_pending_deaths", &"_break_sounds",
 	&"_departed", &"_door_open", &"_door_node", &"_far", &"_local_name", &"_mourning", &"_mourn",
 	&"_down", &"_environment", &"_listener", &"sfx", &"ambience", &"music", &"heartbeat",
-	&"bandaging", &"fishing_view", &"_hp_bar_shader", &"_boss_mark", &"_sun", &"_low", &"_fire_time",
+	&"bandaging", &"fishing_view", &"_hp_bar_shader", &"_boss_mark", &"_sun", &"_body_fill", &"_low", &"_fire_time",
 	&"_night", &"_carriers", &"_carried_lights", &"_carried_by", &"_carried_clock",
 	&"_wall_lamp_clock", &"_skylight_clock", &"_sky_material", &"_sky_horizon", &"_sky_step",
 	&"_look", &"_look_daylight", &"_floor_least", &"_look_elevation", &"_haze", &"_weather_view",
