@@ -39366,6 +39366,16 @@ view_test _test_far_landmarks checks:
 - the castle shifting as the camera moves 40 m;
 - none with the camera high, no far castle from the wilds or inside the
   castle (the tower from both), none under stone.
+A bug mend (pc-character's find, 11-11; no label, this sentence): a build over
+frames calls _apply_camera_mode before its new room is made, so the skirt and
+the landmarks were made under the room on its way out and freed with it, and
+_far_marks kept the dead entries: _place_far_landmarks stopped on a script error
+at each camera placing (about 1.1 ms a frame, build/farcost timing on this PC)
+and the marks after it were never placed. Now neither is made under a room in
+_old_rooms (_room_built comes again), and _add_far_landmarks frees a live set
+and clears the list first; view_test _test_phased_build builds the wilds over
+frames under the low camera and checks the marks placed under the new room,
+one set, none freed, the skirt made.
 Client only, protocol unchanged, no new class_name.
 
 ## 746. A curve by a cell twice: each pass searched

@@ -3883,13 +3883,17 @@ func _apply_camera_mode() -> void:
 		_camera.far = CAMERA_DISTANCE * 3.0
 	if _environment != null:
 		_environment.fog_aerial_perspective = LOW_AERIAL if low else 0.0
-	# The horizon (623, terrain's side): the skirt made on first need.
-	if low and _skirt == null and _room != null and not _forest_distance.is_empty():
+	# The horizon (623, terrain's side): the skirt made on first need. Not
+	# under a room on its way out: a build over frames comes here before
+	# its new room is made, and _room_built comes again (650, pc-character's
+	# find of 11-11: the landmarks were built under the old room and freed).
+	var room_live := _room != null and not _old_rooms.has(_room)
+	if low and _skirt == null and room_live and not _forest_distance.is_empty():
 		_add_skirt()
 	if _skirt != null:
 		_skirt.visible = low
 	# The far landmarks (650, terrain's side), the same way.
-	if low and _far_root == null and _room != null:
+	if low and _far_root == null and room_live:
 		_add_far_landmarks()
 	if _far_root != null:
 		_far_root.visible = low
@@ -10970,6 +10974,11 @@ static func far_landmarks(plane: Dictionary, level: String, drawn: Dictionary, n
 ## when its slot is filled, else its stand-in (far_stand_in), every mesh in
 ## the one far material; no shadows. Placed at once, then as the camera is.
 func _add_far_landmarks() -> void:
+	# Never two sets: a live one goes, and the list with it (dead entries in
+	# it stopped _place_far_landmarks at the first).
+	if is_instance_valid(_far_root):
+		_far_root.queue_free()
+	_far_marks.clear()
 	_far_root = Node3D.new()
 	_far_root.name = "FarLandmarks"
 	_room.add_child(_far_root)

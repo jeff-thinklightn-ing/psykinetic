@@ -12391,6 +12391,29 @@ func _test_phased_build() -> void:
 			"a rebuild mid-build: the first's room gone, told once, the same room (%d nodes)" % drawn.call())
 	_check(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT) == orphans,
 			"no orphan nodes left by the stopped build (%d, %d)" % [Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), orphans])
+	# 650's far landmarks after a build over frames under the low camera
+	# (pc-character's find, 11-11): under the new room, none freed, one set.
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	_rig._apply_camera_mode()
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"], true)
+	await _settled_room()
+	await _frames(2)
+	# Placed as the camera is, here and each frame since: a freed node in
+	# the list errors (land.sh fails a scene on an ERROR line), so the next
+	# such loop fails a landing, not 2,000 times in play.
+	_rig._place_camera()
+	var far_dead := _rig._far_marks.filter(func(mark: Dictionary) -> bool:
+		return (not is_instance_valid(mark["node"]) or not _rig._room.is_ancestor_of(mark["node"]) or not (mark["node"] as Node3D).is_inside_tree()
+			or (mark["node"] as Node3D).scale.x <= 0.0))
+	var far_sets := _rig._room.find_children("FarLandmarks", "", true, false).size()
+	_check(not _rig._far_marks.is_empty() and far_dead.is_empty() and far_sets == 1 and is_instance_valid(_rig._far_root)
+			and _rig._room.is_ancestor_of(_rig._far_root) and is_instance_valid(_rig._skirt) and _rig._room.is_ancestor_of(_rig._skirt),
+			"a build over frames under the low camera (a crossing): the far landmarks placed and the skirt made under the new room, none freed, one set, no error placing them (%d marks, %d dead, %d sets)" % [
+			_rig._far_marks.size(), far_dead.size(), far_sets])
+	Net.set_camera_low(low_was, false)
+	_rig._apply_camera_mode()
 	_rig.room_built.disconnect(count_built)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
