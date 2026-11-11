@@ -3241,6 +3241,109 @@ func _test_wanderers() -> void:
 			gone = true
 			break
 	_check(not boar.drawn and gone and wanderers.ids().is_empty(), "under half its hp it is driven off, runs, and is gone out of sight; the wanderer is over")
+	# 805 amended (12), the pond probe's two faults: one broken by its own
+	# kind's flee rule is driven off though it ran unstruck (it came back for
+	# the cast once its run was over), and once its run is over it marches
+	# back the way it came, as it came in (a walk home in one search failed
+	# on the wilds and it stood in sight).
+	var ran_id := wanderers.come("pond_c", "p1", "boar", cast)
+	var ran: Animal = wanderers.beasts(ran_id)[0] if not wanderers.beasts(ran_id).is_empty() else null
+	if ran != null:
+		ran.hp = ran.max_hp / 2 - 1
+		ran._flee(fisher.tile)
+		World.step()
+		_check(not ran.drawn, "under half and running by its own rule, unstruck: driven off, not after the cast (drawn %s)" % ran.drawn)
+		if ran.spawned:
+			World.despawn(ran)
+	wanderers.clear()
+	var back_id := wanderers.come("pond_d", "p1", "boar", cast)
+	var back: Animal = wanderers.beasts(back_id)[0] if not wanderers.beasts(back_id).is_empty() else null
+	if back != null:
+		var came_in: Vector2i = wanderers._in_play[back_id]["arrival"]
+		World._relocate(back, fisher.tile + Vector2i(4, 0))
+		back.drawn = false
+		back.sight_range = 0  # Her no threat to it: its own way, not a bolt from her.
+		World.step()
+		_check(back.spawned and back.idle == Monster.Idle.MARCH and not back.route.is_empty() and back.route.back() == came_in,
+			"driven off in her sight: it marches back to the cell it came in at %s (idle %s, route end %s)" % [came_in, Monster.Idle.keys()[back.idle],
+				back.route.back() if not back.route.is_empty() else null])
+		var back_gone := false
+		for i in 1500:
+			World.step()
+			if not back.spawned:
+				back_gone = true
+				break
+		_check(back_gone and not wanderers.ids().has(back_id), "and is gone out of sight, the wanderer over (at %s)" % back.tile)
+	wanderers.clear()
+	# 805 amended (12), the coordinator's rulings on the pond probe: a wolf
+	# pair only to an armed bank, else a boar; one bitten twice who never
+	# struck back is let be, and the beast goes the way it came.
+	var bare_id := wanderers.come("pond_e", "p1", "wolf", cast)
+	var bare_kinds: Array = wanderers.beasts(bare_id).map(func(b: Animal) -> String: return str(b.spawn_spec.get("kind", "")))
+	_check(bare_kinds == ["boar"], "a bare fisher: the wolf pair waits, a boar comes (%s)" % [bare_kinds])
+	for each in wanderers.beasts(bare_id):
+		World.despawn(each)
+	wanderers.clear()
+	var held := fisher.slots.duplicate()
+	held[Items.RIGHT_HAND] = "dagger"
+	fisher.slots = held
+	var armed_id := wanderers.come("pond_e", "p1", "wolf", cast)
+	var armed_kinds: Array = wanderers.beasts(armed_id).map(func(b: Animal) -> String: return str(b.spawn_spec.get("kind", "")))
+	_check(armed_kinds == ["wolf", "wolf"], "an armed fisher alone: the pair comes (%s)" % [armed_kinds])
+	for each in wanderers.beasts(armed_id):
+		World.despawn(each)
+	wanderers.clear()
+	var bare_kin := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "BankKin", "props": {"max_hp": 20}}) as Companion
+	_room.add_child(bare_kin)
+	World.spawn(bare_kin, fisher.tile + Vector2i(-2, 0))
+	bare_kin.keeper = fisher
+	var kin_id := wanderers.come("pond_e", "p1", "wolf", cast)
+	var kin_kinds: Array = wanderers.beasts(kin_id).map(func(b: Animal) -> String: return str(b.spawn_spec.get("kind", "")))
+	_check(kin_kinds == ["boar"], "an armed fisher with a bare companion beside him: a boar (%s)" % [kin_kinds])
+	for each in wanderers.beasts(kin_id):
+		World.despawn(each)
+	World.despawn(bare_kin)
+	wanderers.clear()
+	var bitten := {"n": 0}
+	var count_bites := func(target: GridEntity, amount: int, source: GridEntity, _cause: StringName) -> void:
+		if target == fisher and amount > 0 and source is Animal and (source as Animal).wanderer != "":
+			bitten["n"] += 1
+	World.entity_damaged.connect(count_bites)
+	var still_id := wanderers.come("pond_f", "p1", "boar", cast)
+	var still: Animal = wanderers.beasts(still_id)[0] if not wanderers.beasts(still_id).is_empty() else null
+	if still != null:
+		for i in 1500:
+			World.step()
+			if int(bitten["n"]) >= 2:
+				break
+		World.step()
+		_check(int(bitten["n"]) == 2 and not still.drawn, "a fisher who never strikes back: bitten twice, and it breaks off (%d bites, drawn %s)" % [bitten["n"], still.drawn])
+		var still_gone := false
+		for i in 1500:
+			World.step()
+			if not still.spawned:
+				still_gone = true
+				break
+		_check(int(bitten["n"]) == 2 and still_gone and not wanderers.ids().has(still_id),
+			"it never comes back to him that visit, and goes the way it came (%d bites, gone %s)" % [bitten["n"], still_gone])
+	wanderers.clear()
+	bitten["n"] = 0
+	var fought_id := wanderers.come("pond_g", "p1", "boar", cast)
+	var fought: Animal = wanderers.beasts(fought_id)[0] if not wanderers.beasts(fought_id).is_empty() else null
+	if fought != null:
+		var struck := false
+		for i in 2000:
+			World.step()
+			if not struck and World.distance(fought.tile, fisher.tile) <= 1:
+				World.damage(fought, 1, fisher)
+				struck = true
+			if int(bitten["n"]) >= 3:
+				break
+		_check(int(bitten["n"]) >= 3 and fought.drawn, "one who struck it once is no one it lets be: bitten past two (%d bites)" % bitten["n"])
+		if fought.spawned:
+			World.despawn(fought)
+	World.entity_damaged.disconnect(count_bites)
+	wanderers.clear()
 	# Wolves, a pair, that never reach anyone before their time is up.
 	var pair_id := wanderers.come("pond_a", "p1", "wolf", cast)
 	var wolves := wanderers.beasts(pair_id)
@@ -3254,6 +3357,15 @@ func _test_wanderers() -> void:
 	World.step()
 	_check(wanderers.ids().is_empty() and wolves.all(func(w: Animal) -> bool: return not w.spawned),
 			"their time up and nobody in a fight, they turn back and are gone, out of sight")
+	# 805 amended (12): a cast lands in water, never walkable (items' blind tour: none came at any water).
+	var wet := Vector2i(11, 0)
+	var wet_id := wanderers.come("pond_b", "p1", "boar", wet)
+	var wet_boars := wanderers.beasts(wet_id)
+	_check(wet_id != "" and wet_boars.size() == 1 and wet_boars[0].home == Vector2i(11, 1),
+			"cast onto water: a boar still comes, for the dry cell by the cast (%s, home %s)" % [wet_id, wet_boars[0].home if not wet_boars.is_empty() else null])
+	for each in wet_boars:
+		World.despawn(each)
+	wanderers.clear()
 	World.outdoor = false
 	World.spawn_spec = Callable()
 	wanderers.player_of = Callable()

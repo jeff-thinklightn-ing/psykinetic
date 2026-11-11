@@ -45803,6 +45803,49 @@ rod by a pond, she says she'll keep them company, goes to the water's edge and s
 to stop, she leaves. docs/voice_inventory.md regenerated. Server only, protocol unchanged, no new class_name.
 
 805 amended (14): fishing that works (the script's label; the coordinator's ruling on companions' repro of Jeff's 11-10 report, "i keep taking companions to the pond to fish, but they dont know how, and yes i gave them a pole, and yes its in their hand"; items' package "fishing that works"). The repro (a companion with a rod in hand at a full pond) found her silent in four ways: two minutes idle beside her player at the water, she never cast, since only his cast or an ask started her; "Fish.", "Cast." and "Can you fish?" were not asks ORDER_FISH heard; at two fish left she reeled in unsaid (FISH_LOW); an imp in sight at seven cells kept her from casting, unsaid. Now: (1) ORDER_FISH also hears "can you fish", "use your rod", "start fishing", "cast your line", and a bare "fish" or "cast" (ORDER_FISH_BARE). Words of fishing no ask matched (FISH_LIKE) get the hint, FISH_ASK_HINT "If you want to go fishing, say so and I'll lead the way to the water." (voice's; its "go fishing" is an ask she hears). It plays once a game day at most, only far from fishing water, and only when she has a rod or the pond want and a pond she would lead to (Main._fish_lead_place, split from _lead_to_fish, read through Companion.fish_lead_place), so it never promises a lead she would not give and never turns into explaining the game. (2) She starts on her own (_fish_self_start, the coordinator's numbers): her player still FISH_STILL_S 6 s within FISH_STILL_NEAR 3 cells of her, a bank cell within FISH_NEAR of them, no fight and nothing hostile within FISH_DANGER_NEAR 5, not on a walk she leads, and not where they told her to stop until they move (_fish_declined, set by any order that takes hers). With a rod she fishes and keeps casting, as asked, and one of FISH_SELF's four lines plays, each at most once a game day, silent after that. With no rod she keeps them company at the water and says FISH_SIT "Nice spot. I'll sit a while." once in FISH_SIT_DAYS 3 game days. (3) When her cast is refused she says why (_fish_cannot, each reason once a game day): her rod would not come to her hand, FISH_NO_HAND (voice's); fished out, FISH_FISHED_OUT, until economy's party share removes that refusal; no water a cast reaches, FISH_NO_WATER. A busy refusal (stunned, a job) stays unsaid. (4) The pond's stock is never a gate: FISH_LOW, _pond_ok, _pond_fish and fish_spot_near's stocked parameter are gone (economy: past a party's share the bite thins, it never stops; Economy.pond_fish is a read). (5) A danger, _fish_danger: a fight, a hostile within FISH_DANGER_NEAR of her or her player, or one in sight going for either. She reels in with FISH_DANGER "Not with that about. I'll keep my eyes on it, not the float." (voice's), at most once in FISH_DANGER_GAP_S 60, keeps the spot in _fish_resume, and goes back to it once the danger is gone, unless her player has left it, another order came, or a walk began. Asked to fish with a danger near, she says the same and goes once it is gone. A hostile out past five cells and not coming no longer stops her. (6) World.try_fish prints "[fish] refused <reason> player|companion" on each refusal, counts only: no name, id or cell. Her cast goes through try_fish, so hers are counted too. companion_test _test_fish_mend: the unmatched asks by name, and words that are not asks; four own starts with a rod, each line once and the fifth silent, none before 6 s; none after "Stop fishing." while her player stays; asked beside his casts at two fish and at none; an imp past five cells, she fishes on; one at three or four, she reels in, says so, and fishes again once it is dead; no rod, her own start twice and FISH_SIT once; the hint at the bank (none), far from water (said, in words order_in hears), a second time that day (none), no word of fishing, no rod and no want, a rod but no pond to lead to (none). _test_fishing's fished-out check becomes "no fish left: still a place to fish", and its hostile check reads FISH_DANGER. Server only, protocol unchanged, no new class_name.
+805 amended (12) (2026-11-10, the decision-number script's label; items' blind tour of v0.1.210, loop 1, package
+"fishing that works"): the wanderer goes for the dry cell by the cast. None ever came: at every water the server said
+"[wanderer] none comes to wilds/pool_221_224: no cell out of sight with a way to (221, 224)" (the Reed Pond, two pools
+and the river alike). Economy hands Wanderers the cast cell, which is the water's, and Wanderers._arrival_cell keeps
+a cell only if World.find_path finds a way from it to that cell; find_path ends on no unwalkable cell, so every
+candidate failed. monster_test's cast was a floor cell, so the test never saw it. Now Wanderers._dry_by makes the goal:
+the cast cell if walkable, else the walkable cell nearest it within DRY_TILES (8) that the one fishing can walk to
+from where she stands (the nearest DRY_TRIES, 12, tried), so on a river her own bank is taken over a nearer far bank.
+The arrival ring, the march route and the beast's home all use it; any water alike, pond, pool or river (items'
+805 amended (11) fishes them all). monster_test _test_wanderers: a cast onto unwalkable ground brings a boar for the
+dry cell beside it. Server only; protocol unchanged; no new class_name; no bullet (the package's switch-on bullet,
+voice's, covers the wanderer).
+
+Before it went live, the coordinator asked what a day-0 wanderer does to a first-timer's pair, bare (fists, the
+free rod in hand, an empty pack; the first ten minutes send him to the pond before he can buy a sword). Measured on
+the real wilds at the Reed Pond with tools of the probe's own (not in the tree): economy's first kind is always one
+boar (18 hp, a 3 bite each 1.4 s, a cell in 3.5 ticks to a player's 2.5). With his companion, nobody died in nine
+trials; she drove it off with her fists (12 to 15 of her 20 lost), he walking off was never caught. Alone, going in
+he killed it in 2 to 5 s left with 11, walking off he was never touched, but standing and never striking he died
+in all three trials (7 bites). The coordinator's rulings, all inside this amendment:
+- One who never strikes back is let be: a wanderer's beast that has landed UNANSWERED_BITES (2) bites on a body
+  that never struck any beast of that wanderer breaks off it (Wanderers._on_damaged, on World.entity_damaged): no
+  longer drawn, it lets that body be for the visit (Monster._given_up, its _post cleared; Wanderers._step_one turns
+  it from that body should it take it up again) and goes the way it came. A blow from a body on any of its beasts
+  makes it one who fights back, never let be that visit. Each beast counts its own; every kind alike. Re-measured
+  alone: standing still he lives at 14 in all three trials, two bites, it gone 18 to 27 s later and never back;
+  going in and walking off unchanged.
+- A wolf pair only to an armed bank: Wanderers.come turns economy's "wolf" into a "boar" unless the fisher and every
+  companion of theirs within BANK_TILES (12) each hold or carry a weapon (an item tagged "weapon",
+  Wanderers._armed), with a log line. The pair against the bare pair: going in, both wolves dead in 8 to 14 s, she
+  left with 8 of 20; walking off he was never caught, but she stayed and fought and was left with 4 and 2. Economy's
+  roll is unchanged (the first visit a boar, a later one a boar or the pair).
+- Two faults the probe showed. A boar broken by its kind's own flee rule in its charge ran on drawn and came back for
+  the cast once its run was over: Animal now drops drawn under half its hp before its running is stepped. One
+  driven off or given up walked home in one search (Monster._idle_tick's return), which failed from 30 cells on the
+  wilds, and a hurt boar stood 19 cells from him, in sight, till the zone slept: once its run is over it marches
+  back the way it came, as it came in (Wanderers._route from where it stands to its arrival cell, Idle.MARCH),
+  planned again after any later run.
+Her staying to fight while he walks away, and her coming into town hurt with nothing telling him to rest her, are
+companions' (their own decisions). monster_test _test_wanderers: a beast under half running by its own rule,
+unstruck, is not drawn; driven off in sight it marches to its arrival cell and is gone; a bare fisher's wolves are
+a boar, an armed one alone gets the pair, an armed one with a bare companion a boar; one never striking back is
+bitten twice and let be, it gone; one who struck it once is bitten past two. Each fails with its rule off.
 
 805 amended (15): her fishing lines are never lost to the fight hush (the script's label; companions' check of its own 805 amended (13) and (14) for the coordinator, after voice's sweep of lines no client shows). Every fishing line goes out as her speech (Companion._say, Main._on_companion_said, "speech"), but 675's hush (no line while she or her player fights, nor QUIET_AFTER after) lost three: (a) "Fish." with a hostile within COMBAT_RANGE took obey's older in-fight branch, unsaid, and she did not fish once it was gone; that branch now takes only the case of no water near, and the danger branch says FISH_DANGER (through the hush) and keeps _fish_resume. (b) Her own start's line (FISH_SELF, FISH_SIT), FISH_WISH and the hint were counted said for the day before _say; (c) so were _fish_cannot's. Each now counts only when _say says it was said. companion_test _test_fish_mend: asked with an imp at 3 or 4, FISH_DANGER and she fishes once it is dead; a start in the hush, her line not counted; why she can't cast, in the hush not counted, said after; the hint in the hush, not said or counted. Server only, protocol unchanged, no new class_name.
 

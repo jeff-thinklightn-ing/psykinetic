@@ -226,6 +226,12 @@ func _sim_tick() -> void:
 		_startle_until = -1
 	if role == Role.GAME and escort_lead != null and _sounder_tick():
 		return  # A boar of an apex's sounder (780 amended (16)).
+	if role == Role.GAME and drawn and hp * 2 < max_hp:
+		# Driven off (805): it runs, and is gone out of sight. Looked at
+		# before its running (805 amended (12)): a boar broken by its kind's
+		# own flee rule in its charge ran on drawn and came back for the
+		# cast once its run was over.
+		drawn = false
 	# Struck, a boar turns and charges though it was running (an arrow from
 	# afar); prey runs on.
 	if alert == Alert.FLEEING and not (role == Role.GAME and _struck_by() != null):
@@ -245,8 +251,6 @@ func _sim_tick() -> void:
 			_graze_tick()
 		return
 	var from := _struck_by()
-	if role == Role.GAME and drawn and hp * 2 < max_hp:
-		drawn = false  # Driven off (805): it runs, and is gone out of sight.
 	if role == Role.GAME and (from != null or drawn or World.distance(tile, threat.tile) <= CORNERED_TILES and _cornered(threat.tile)):
 		_foe = from if from != null else threat
 		_charge_until = World.tick + CHARGE_TICKS
