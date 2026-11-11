@@ -55,6 +55,22 @@ place, and a text and loot don't go in before a quest is in."
   complete; the coordinator rules on each (switch it off, or hold the cut) before the
   build goes out. Cut checklists list only complete packages.
 
+## No tree is idle (Jeff, 2026-11-11)
+
+"what made me call this out is animation reporting nothing to do", on the morning he reported
+that the walk looks like skipping and the people look like "bad claymation place holders".
+
+- A tree with nothing queued, or waiting on the gate or a freeze, doesn't ask "what next". It
+  looks at its own area in the game as a player meets it (Umbrage first, ordinary play, the
+  nearest zoom) and brings the coordinator its three worst things: one line each, with a still
+  or a number, and what it would do. A report of Jeff's goes first, then queued work, then this.
+- Passing tests and a far-camera still are not "it looks right". Art and animation are shown at
+  the nearest zoom beside Jeff's goblin before they land.
+- Playtest runs a look pass on every released build: close stills of each kind of person and
+  creature, the player walking and a companion following, kept in
+  `C:/dev/review/look/<version>/` and laid beside the last build's. A difference nobody intended
+  is reported the day it appears.
+
 ## Landing work
 
 - Only `main` is released. In a worktree, rebase onto `origin/main` before each change,
