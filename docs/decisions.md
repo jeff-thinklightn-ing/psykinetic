@@ -48192,3 +48192,16 @@ cursed"; Hollowfell, Brand, Aldous, Snagfin). It keeps a name now (Hearsay.is_na
 texts (Hearsay.NAME_FILES: levels/lore, residents, economy, townsfolk, companion traits, named enemies)
 write capitalized mid-sentence, a names list's single word, or a title's name ("Brand the Ox"), read
 once. resident_test _test_lower_first.
+
+Found in 853's landing (lawspeaker_test: "the town remembers that Old Marta lives by the east field"):
+"Old" counted as a name, since the texts write "the Old Tower". A word the texts also write in small
+letters in prose (a string with a space; an id like "hollowfell" is not prose) is no name ("old",
+"hall", "barrow", "road"); a title's name stays one. The coordinator's rule: "I" ("I'll", "I'm",
+"I've", "I'd") is never lowered, and a place's name of several words that opens a line keeps its
+capitals (Hearsay._phrases: those the texts write mid-sentence, "the Hall of Fallen Souls", "the
+Blood Rot", "the Last Light Mughouse", and the levels' own names without "The", "First Hall").
+The list of words that change went to voice and lore; voice's keep-list of people's names that are
+also words (Rook, Sedge, Wren, Brand) and lore's "Mound-breakers" are a follow-up. Also in the
+landing: editor_fields NOT_OFFERED "spots" (set in level.json until builder's spot tool), and
+return_test's player stands beside Hob off the hut's own cell (Hob strolls since 853; on the hut's
+cell the hut tied the temple and won by its id; _return_place unchanged).

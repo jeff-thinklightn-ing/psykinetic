@@ -237,7 +237,14 @@ func _test_main() -> void:
 		healer.worker_id = keeper
 		healer.trade = "medicine_man"
 		World.spawn(healer, hut + Vector2i(2, 0))
-	World._relocate(_player(), healer.tile + Vector2i(1, 0))
+	# Beside him, never on the hut's own cell: Hob strolls (853), and there the hut ties a temple put at the
+	# player's cell and wins by its id (853's landing: Hob stood west of the hut, the player on it).
+	var beside := healer.tile + Vector2i(1, 0)
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if healer.tile + way != hut and World.is_walkable(healer.tile + way) and World.get_entity_at(healer.tile + way) == null:
+			beside = healer.tile + way
+			break
+	World._relocate(_player(), beside)
 	World.add_gold(me, -World.gold_of(me), "test")
 	World.add_gold(me, 4, "test")
 	_check(_main.retain(_player(), {"resident": str(healer.get_path()), "pay": "gold"}) == "" and not _main.in_care(me, id), "4 gold: refused")
@@ -260,7 +267,7 @@ func _test_main() -> void:
 	World.production.add_worker("priest:" + temple, "Aldous", ["priest"], "", "settled")
 	World.production.assign(temple, "priest:" + temple)
 	_check(World.production.manned(temple), "(the temple is manned)")
-	_check(_main._return_place(_player().tile).get("place", "") == temple, "(a manned temple nearer than the hut: others come back there: %s)" % [_main._return_place(_player().tile)])
+	_check(_main._return_place(_player().tile).get("place", "") == temple, "(a manned temple nearer than the hut: others come back there: %s, the player at %s, Hob at %s)" % [_main._return_place(_player().tile), _player().tile, healer.tile])
 	_check(_main._return_place(_player().tile, me).get("place", "") == id, "in his care: his hut first, over the nearer temple")
 	World.production.set_away(keeper, true)
 	_check(_main._return_place(_player().tile, me).get("place", "") == temple, "his hut unmanned: the nearest manned place, the temple, as before")

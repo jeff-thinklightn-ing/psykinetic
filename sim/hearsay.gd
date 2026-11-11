@@ -213,22 +213,35 @@ static func _key(text: String) -> String:
 
 ## [param text] with its first letter lowered to follow "It is said that" and the like, unless its
 ## first word is a name (lore's finding, 2026-11-10: "It is said that umbrage is cursed"; Hollowfell,
-## Brand, Aldous and Snagfin the same): is_name.
+## Brand, Aldous and Snagfin the same): is_name. "I" ("I'll", "I'm", "I've", "I'd") keeps its capital, and
+## so does a place's name of several words that opens it ("Hall of Fallen Souls", "First Hall": _phrases;
+## the coordinator's rule, 2026-11-11).
 static func _lower_first(text: String) -> String:
 	if text.length() <= 1 or text.substr(1, 1) != text.substr(1, 1).to_lower():
 		return text
 	var first := RegEx.create_from_string("^[A-Za-z]+").search(text)
-	if first != null and is_name(first.get_string()):
+	if first != null and (first.get_string() == "I" or is_name(first.get_string())):
 		return text
+	for phrase: String in _phrases:
+		if text.begins_with(phrase) and (text.length() == phrase.length() or not _is_letter(text.unicode_at(phrase.length()))):
+			return text
 	return text.left(1).to_lower() + text.substr(1)
 
 
+static func _is_letter(code: int) -> bool:
+	return (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or code == 39
+
+
 ## The names the game's own texts use (NAME_FILES): a word they write capitalized mid-sentence (after
-## a small letter or a comma), a names list's single word, and the name of a title ("Brand the Ox");
-## read once.
+## a small letter or a comma) and a names list's single word, unless they also write it in small
+## letters in prose ("Old Marta" is old Marta: "old" is a word; an id like "hollowfell" is not prose), and
+## the name of a title ("Brand the Ox"); read once.
 const NAME_FILES: Array[String] = ["res://levels/lore/", "res://levels/residents.json", "res://levels/economy.json",
 	"res://levels/townsfolk.json", "res://levels/companion_traits.json", "res://levels/named_enemies.json"]
 static var _names: Dictionary = {}
+## The names of several words (_lower_first): those NAME_FILES write mid-sentence ("the Hall of Fallen
+## Souls", "the Old Tower") and the levels' own names without their "The" (level.json "name"); filled by is_name.
+static var _phrases: Array[String] = []
 static var _names_read := false
 
 
@@ -239,6 +252,11 @@ static func is_name(word: String) -> bool:
 		var mid := RegEx.create_from_string("[a-z,] ([A-Z][a-z']+)")
 		var lone := RegEx.create_from_string("^[A-Z][a-z']+$")
 		var titled := RegEx.create_from_string("^([A-Z][a-z']+) the [A-Z]")
+		var small := RegEx.create_from_string("(?:^|(?<=[ (\"]))([a-z][a-z']+)(?=[ ,.;:!?)\"]|$)")
+		var phrase := RegEx.create_from_string("(?<=[a-z,] )([A-Z][a-z']+(?: (?:of the |of |the )?[A-Z][a-z']+)+)")
+		var phrases := {}
+		var words := {}
+		var titles := {}
 		var files: Array[String] = []
 		for path: String in NAME_FILES:
 			if path.ends_with("/"):
@@ -261,7 +279,25 @@ static func is_name(word: String) -> bool:
 						_names[value] = true
 					var title := titled.search(value)
 					if title != null:
-						_names[title.get_string(1)] = true
+						titles[title.get_string(1)] = true
 					for found: RegExMatch in mid.search_all(value):
 						_names[found.get_string(1)] = true
+					for found: RegExMatch in phrase.search_all(value):
+						phrases[found.get_string(1)] = true
+					if value.contains(" "):  # Prose, not an id ("hollowfell", "snagfin").
+						for found: RegExMatch in small.search_all(value):
+							words[found.get_string(1)] = true
+		for name: String in _names.keys():
+			if words.has(name.to_lower()):
+				_names.erase(name)
+		_names.merge(titles)
+		for dir: String in DirAccess.get_directories_at("res://levels/"):
+			var path := "res://levels/%s/level.json" % dir
+			var level: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+			var title := str(level.get("name", "")) if level is Dictionary else ""
+			if title.begins_with("The "):
+				title = title.substr(4)
+			if title.contains(" "):
+				phrases[title] = true
+		_phrases.assign(phrases.keys())
 	return _names.has(word)

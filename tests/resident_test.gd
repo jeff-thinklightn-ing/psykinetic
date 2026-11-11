@@ -4003,6 +4003,13 @@ func _test_lower_first() -> void:
 	var kept := ["Umbrage is cursed.", "Hollowfell's mine is deep.", "Brand the Ox carries the key.", "Aldous keeps the temple.", "Snagfin buys what others will not."]
 	_check(kept.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "a name kept: %s" % [kept.map(func(line: String) -> String: return Hearsay._lower_first(line))])
 	_check(Hearsay._lower_first("UMBRAGE") == "UMBRAGE" and Hearsay._lower_first("I") == "I", "shouting and a lone letter left alone")
+	# The coordinator's rule (2026-11-11): "I" never lowered; a place's name of several words keeps its capitals;
+	# a word the texts write small ("old") lowered, unless a name of several words opens with it.
+	var also := ["I'll go.", "I'm here.", "I've seen it.", "I'd say so.", "I saw him.", "Hall of Fallen Souls opens for gold.",
+		"First Hall is dark.", "Old Tower stands.", "Hollowfell is far."]
+	_check(also.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "I and places' names kept: %s" % [also.map(func(line: String) -> String: return Hearsay._lower_first(line))])
+	_check(Hearsay._lower_first("Old Marta lives by the east field") == "old Marta lives by the east field" and Hearsay._lower_first("Hall doors creak.") == "hall doors creak.",
+		"a common word lowered when no name opens with it (%s)" % Hearsay._lower_first("Old Marta lives by the east field"))
 
 
 func _test_keep_moving() -> void:
