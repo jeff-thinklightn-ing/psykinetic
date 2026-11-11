@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_cut_off()
 	_test_chest_rule()
 	await _test_layout_on_accept()
+	await _test_arrivals()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1488,3 +1489,44 @@ func _test_layout_on_accept() -> void:
 		var own := BuilderSession.layout_faults(real.doc)
 		var took := Time.get_ticks_msec() - started
 		_check(real.layout_news(own).is_empty(), "%s untouched: nothing new (its own: %s, checked in %d ms)" % [level_name, BuilderSession.LAYOUT_SENSE.counts(own), took])
+
+
+func _test_arrivals() -> void:
+	print("\n== 806 amended (13): a way in inside a fight warned of, never refused ==")
+	var doc := _doc()
+	doc.config["starts"] = [[2, 2]]
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var own := session.arrival_faults(doc)
+	_check(own.is_empty() and session.arrival_news(own).is_empty(), "the start far from the brute: nothing (%s)" % [own])
+	var placed := session.run_tool("place", {"at": [6, 4], "thing": "brute"})
+	var news := session.arrival_news(own)
+	_check(placed.get("ok", false) and news.size() == 1 and news[0].begins_with("arrival at (2, 2): the arrival start 1 is 4 cells from where a brute roams"),
+		"a brute laid 4 cells from the start: warned, by the start and the nearest (%s; %s)" % [placed, news])
+	_check(session.accept() and session.refused.is_empty() and doc.map.cell(Vector2i(6, 4)) == "monster_brute", "accepted all the same: a warning, never a refusal (%s)" % session.refused)
+	# The level's own is the baseline: once accepted, the same start is no news.
+	var after := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var had := after.arrival_faults(doc)
+	_check(had.size() == 1 and after.arrival_news(had).is_empty(), "the level's own arrival fault: not the edit's (%s)" % [had])
+	# A spawn point a link lands on, in any zone: indoors too.
+	after.working.config["spawn_points"] = {"from_wilds": [34, 6]}
+	_check(after.arrival_news(had).any(func(fault: String) -> bool: return "from_wilds" in fault), "a spawn point by the first brute: warned (%s)" % [after.arrival_news(had)])
+	after.working.config.erase("spawn_points")
+	# Claude is told as it goes, and the preview's summary carries it.
+	var stub := StubClaude.new([
+		[{"name": "place", "input": {"at": [5, 2], "thing": "imp"}}],
+		"An imp.",
+	])
+	var fresh := _doc()
+	fresh.config["starts"] = [[2, 2]]
+	var asked := BuilderSession.new(fresh, Rect2i(0, 0, 40, 30), "test_field", stub)
+	var result: Dictionary = await asked.ask("an imp by the start")
+	var told := str(stub.sent[1]["messages"][2]["content"][0]["content"])
+	_check("Arrivals now (" + BuilderSession.ARRIVAL_SAYS + "): arrival at (2, 2)" in told, "the tool's result tells Claude (%s)" % told)
+	_check((result["arrival_warnings"] as Array).size() == 1 and (result["layout_warnings"] as Array).is_empty(), "the result's arrival_warnings say it, the layout's not (%s)" % [result["arrival_warnings"]])
+	# None on the test levels and those held back, nor where the layout rules hold it (refused there, by layout_news).
+	var exempt := BuilderSession.new(fresh, Rect2i(0, 0, 40, 30), "test_room", StubClaude.new([]))
+	var held_back := BuilderSession.new(fresh, Rect2i(0, 0, 40, 30), "castle", StubClaude.new([]))
+	_check(exempt.arrival_faults(asked.working).is_empty() and held_back.arrival_faults(asked.working).is_empty(), "test_room and castle (ARRIVAL_EXEMPT, ARRIVAL_NOT_YET): none")
+	_check(BuilderSession.holds_arrival({"regenerate": {"held": ["arrival"]}}) and not BuilderSession.holds_arrival({"regenerate": {}})
+		and not BuilderSession.holds_arrival({"outdoor": true}), "a regenerating level holding the rule: its layout's, not a warning")
+	_check("keeps %d cells clear of where a hostile monster stands or roams" % BuilderSession.LAYOUT_SENSE.ARRIVAL_CLEAR in BuilderSession.system_prompt(), "the prompt says the rule, at ARRIVAL_CLEAR")

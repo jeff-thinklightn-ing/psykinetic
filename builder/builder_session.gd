@@ -222,6 +222,9 @@ func ask(text: String) -> Dictionary:
 	# The level's own layout faults (806), and those the proposal adds already said.
 	var layout_before := layout_faults(doc)
 	var layout_said: Array[String] = []
+	# And the arrivals' (806 amended (13)): the level's own the baseline, what the proposal adds said once, a warning.
+	var arrivals_before := arrival_faults(doc)
+	var arrivals_said: Array[String] = []
 	for turn in MAX_TURNS:
 		var response: Dictionary = await client.send(_body())
 		if response.has("error"):
@@ -259,11 +262,18 @@ Heights now: " + "; ".join(ground)
 					if not streets.is_empty():
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
 					# And to the layout rules, which accepting it must not break (806).
-					var layout := layout_news(layout_before)
+					var now := working.parsed()
+					var layout := layout_news(layout_before, now)
 					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
 					layout_said = layout
 					if not unsaid.is_empty():
 						outcome["text"] += "\nLayout now (fix it before you finish: the player can't accept a fault): " + "; ".join(unsaid)
+					# And to the ways in (806 amended (13)): a warning, never a refusal.
+					var arrivals := arrival_news(arrivals_before, now)
+					var unwarned := arrivals.filter(func(fault: String) -> bool: return fault not in arrivals_said)
+					arrivals_said = arrivals
+					if not unwarned.is_empty():
+						outcome["text"] += "\nArrivals now (" + ARRIVAL_SAYS + "): " + "; ".join(unwarned)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -288,7 +298,9 @@ Heights now: " + "; ".join(ground)
 	result["height_warnings"] = height_checks()
 	result["site_warnings"] = site_checks()
 	result["street_warnings"] = street_checks()
-	result["layout_warnings"] = layout_news(layout_before)
+	var parsed_now := working.parsed()
+	result["layout_warnings"] = layout_news(layout_before, parsed_now)
+	result["arrival_warnings"] = arrival_news(arrivals_before, parsed_now)
 	result["cost"] = spent
 	busy = false
 	return result
@@ -526,7 +538,7 @@ The grid shows the area and a margin round it, one character a cell (the margin 
 %s
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
-Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A chest of loot goes only in a dungeon (a level below ground, or one that regenerates) and always holds something: items or a loot table; outside a dungeon a chest is only a town store's depot or a shop counter (use). Indoors and in a dungeon the layout rules hold (a tool's result says any you break as "Layout now"): every room has a use (something in it: a monster, a chest, a sight, a sign, a way on), a chest has a monster near it, no way ends blind for nothing; a change that breaks one can't be accepted. A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
+Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A chest of loot goes only in a dungeon (a level below ground, or one that regenerates) and always holds something: items or a loot table; outside a dungeon a chest is only a town store's depot or a shop counter (use). Indoors and in a dungeon the layout rules hold (a tool's result says any you break as "Layout now"): every room has a use (something in it: a monster, a chest, a sight, a sign, a way on), a chest has a monster near it, no way ends blind for nothing; a change that breaks one can't be accepted. Anywhere, a way in (a spawn point, where a link's way in lands, or a start) keeps 10 cells clear of where a hostile monster stands or roams, so no one arrives inside a fight; the tool's answer warns of one as "Arrivals now". A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
 
 Running water is a stream: the stream tool lays its course, from where it rises to where it goes. Give it a ford or a bridge wherever a path meets it, or the far bank is cut off; a bridge needs level banks of floor at both ends.
 
@@ -3015,8 +3027,8 @@ func proposal() -> Dictionary:
 ## level, or the working copy): every rule in a dungeon or indoors, by the
 ## regenerate block's options when it has one (Regen.layout_options); out
 ## of doors only the chest rule (no interior to judge).
-static func layout_faults(of: MapDoc) -> Array:
-	var level := of.parsed()
+static func layout_faults(of: MapDoc, parsed: Dictionary = {}) -> Array:
+	var level := parsed if not parsed.is_empty() else of.parsed()
 	var config := of.config
 	if Level.zone_of(config) == "outdoors" and not is_dungeon(config):
 		return LAYOUT_SENSE.check_chests(level, {"dungeon": false})
@@ -3030,15 +3042,56 @@ static func layout_faults(of: MapDoc) -> Array:
 ## and cell; layout_faults(doc) when not given). A fault the level already
 ## had stays its own (the barrow's empty rooms, castle_halls'): only what
 ## the edit adds is refused, a fault moved with its chest or room included.
-func layout_news(before: Variant = null) -> Array[String]:
+func layout_news(before: Variant = null, parsed: Dictionary = {}) -> Array[String]:
 	var had := {}
 	for fault: Dictionary in (before if before is Array else layout_faults(doc)):
 		had["%s %s" % [fault["rule"], fault["cell"]]] = true
 	var out: Array[String] = []
-	for fault: Dictionary in layout_faults(working):
+	for fault: Dictionary in layout_faults(working, parsed):
 		if not had.has("%s %s" % [fault["rule"], fault["cell"]]):
 			out.append("%s at %s: %s" % [fault["rule"], fault["cell"], fault["what"]])
 	return out
+
+
+## Dungeon's arrival rule (806 amended (11), layout_sense.arrival_faults)
+## over [param of] (the level, or the working copy), in every zone, laid by
+## hand or generated (806 amended (13)): a spawn point or start within
+## ARRIVAL_CLEAR of where a hostile roams. None on the test levels and those
+## held back (ARRIVAL_EXEMPT, ARRIVAL_NOT_YET), nor where the level's layout
+## rules hold the rule (its regenerate block's "held"): layout_news says it
+## there, and accept refuses it.
+func arrival_faults(of: MapDoc, parsed: Dictionary = {}) -> Array:
+	if map_name in LAYOUT_SENSE.ARRIVAL_EXEMPT or LAYOUT_SENSE.ARRIVAL_NOT_YET.has(map_name) or holds_arrival(of.config):
+		return []
+	return LAYOUT_SENSE.arrival_faults(parsed if not parsed.is_empty() else of.parsed())
+
+
+## Whether [param config]'s layout rules hold the arrival rule (layout_faults' options).
+static func holds_arrival(config: Dictionary) -> bool:
+	if Level.zone_of(config) == "outdoors" and not is_dungeon(config):
+		return false
+	var block: Variant = config.get("regenerate")
+	return block is Dictionary and bool(Regen.layout_options(block).get("arrival", false))
+
+
+## The arrival faults the proposal adds, said ("arrival at <cell>: <what>"):
+## those of the working copy not in [param before] (the level's own, by
+## rule and cell, the baseline: a way in already inside a fight is the
+## level's, not the edit's). A warning only (the coordinator): the player
+## may accept it.
+func arrival_news(before: Array, parsed: Dictionary = {}) -> Array[String]:
+	var had := {}
+	for fault: Dictionary in before:
+		had["%s %s" % [fault["rule"], fault["cell"]]] = true
+	var out: Array[String] = []
+	for fault: Dictionary in arrival_faults(working, parsed):
+		if not had.has("%s %s" % [fault["rule"], fault["cell"]]):
+			out.append("%s at %s: %s" % [fault["rule"], fault["cell"], fault["what"]])
+	return out
+
+
+## What an arrival warning asks (806 amended (13)).
+const ARRIVAL_SAYS := "a warning: a player coming in there lands inside a fight; move the monster, or the way in, further apart"
 
 
 func accept() -> bool:

@@ -147,6 +147,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	var streets: Array = result.get("street_warnings", [])
 	if not streets.is_empty():
 		reply["summary"] += "\nStreets: " + "; ".join(streets)
+	var arrivals: Array = result.get("arrival_warnings", [])
+	if not arrivals.is_empty():
+		reply["summary"] += "\nArrivals (a player coming in there lands inside a fight): " + "; ".join(arrivals)
 	var layout: Array = result.get("layout_warnings", [])
 	if not layout.is_empty():
 		reply["summary"] += "\nLayout (can't be accepted until fixed): " + "; ".join(layout)
