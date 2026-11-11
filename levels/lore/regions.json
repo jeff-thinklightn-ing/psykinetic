@@ -114,7 +114,8 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed",
-					"sight": "the old farmstead"
+					"sight": "the old farmstead",
+					"weight": 2
 				}
 			]
 		},
@@ -148,7 +149,8 @@
 					],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the pond"
+					"sight": "the pond",
+					"weight": 2
 				},
 				{
 					"id": "pond.reeds",
@@ -176,7 +178,8 @@
 					],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the fish rising"
+					"sight": "the fish rising",
+					"weight": 2
 				},
 				{
 					"id": "pond.feeding",
@@ -351,7 +354,8 @@
 						"return"
 					],
 					"status": "agreed",
-					"sight": "the temple"
+					"sight": "the temple",
+					"weight": 2
 				},
 				{
 					"id": "temple.charm_blessed",
@@ -362,7 +366,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "temple.offering",
@@ -375,7 +380,8 @@
 						"return"
 					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				}
 			]
 		},
@@ -405,7 +411,8 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed",
-					"sight": "the Mughouse"
+					"sight": "the Mughouse",
+					"weight": 2
 				},
 				{
 					"id": "last_light.inside",
@@ -417,7 +424,8 @@
 					"tags": [],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the hearth and the rooms upstairs"
+					"sight": "the hearth and the rooms upstairs",
+					"weight": 2
 				},
 				{
 					"id": "last_light.sign",
@@ -429,7 +437,8 @@
 					"tags": [],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the lantern sign"
+					"sight": "the lantern sign",
+					"weight": 2
 				},
 				{
 					"id": "last_light.lamp",
@@ -441,7 +450,8 @@
 					"tags": [],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the lamp in the window"
+					"sight": "the lamp in the window",
+					"weight": 2
 				}
 			]
 		},

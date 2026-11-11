@@ -26,7 +26,8 @@
 					"known": "common",
 					"where": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "town.cursed",
@@ -37,7 +38,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "town.curse_why",
@@ -49,7 +51,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "town.in_region",
@@ -59,7 +62,8 @@
 						"blood_rot_lands"
 					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "town.threat",
@@ -69,7 +73,8 @@
 						"blood_rot_lands"
 					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"weight": 2
 				},
 				{
 					"id": "town.stockpile",

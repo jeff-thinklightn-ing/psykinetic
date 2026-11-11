@@ -14,6 +14,10 @@ const TYPES := ["world", "faction", "people", "region", "place", "material", "cr
 const STATUSES := ["agreed", "draft", "asked"]
 const KNOWN := ["common", "rumour", "secret", "lived"]
 const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "carries", "took", "held_at"]
+## The trades whose own lived facts may weigh 3, and the entries that are
+## Umbrage itself, which may weigh 2 (lore (d), the coordinator's ruling 2026-11-10).
+const WEIGHED_TRADES := ["taverner", "merchant", "cook", "carpenter", "farmer", "hunter", "tanner", "woodcutter", "priest", "medicine_man"]
+const UMBRAGE_ITSELF := ["town", "temple", "last_light", "pond", "farmstead"]
 
 var _failures := 0
 var _entries := {}
@@ -240,8 +244,20 @@ func _test_known_by() -> void:
 	Lore.reload()
 	var ore := Lore.known_by("learned", PackedStringArray(["ore"]), "draft").map(func(fact: Dictionary) -> String: return fact["id"])
 	_check("blighted_ore.carries" in ore and not "the_land.fire" in ore, "on the files, about the ore: the ore's facts, not the fire's %s" % [ore])
-	var weighted: Array = Lore.known_by("learned", PackedStringArray(), "draft").filter(func(fact: Dictionary) -> bool: return fact["weight"] != Lore.DEFAULT_WEIGHT)
-	_check(weighted.is_empty(), "no fact is weighted until Jeff weighs them")
+	# Weights (lore (d), the coordinator's ruling 2026-11-10, Jeff's to re-weigh) put a resident's own
+	# trade and town first, never a belief or a piece of history: 3 only on a trade's lived fact, 2 only
+	# on Umbrage itself, nothing else above DEFAULT_WEIGHT.
+	var wrong: Array = []
+	for id in _entries:
+		for fact: Dictionary in _entries[id]["facts"]:
+			if not fact.has("weight"):
+				continue
+			var weight := float(fact["weight"])
+			var own_trade: bool = fact.get("known") == "lived" and not fact.get("knowers", []).is_empty() \
+					and fact.get("knowers", []).all(func(knower: Variant) -> bool: return knower in WEIGHED_TRADES)
+			if not (weight == 1.0 or (weight == 3.0 and own_trade) or (weight == 2.0 and id in UMBRAGE_ITSELF)):
+				wrong.append(fact.get("id"))
+	_check(wrong.is_empty(), "a weight puts only a trade's own lived facts (3) or Umbrage itself (2) first %s" % [wrong])
 
 
 func _test_names_file() -> void:

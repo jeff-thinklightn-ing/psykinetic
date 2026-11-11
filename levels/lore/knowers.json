@@ -130,6 +130,70 @@
 			"source": "npc (546, part 3)",
 			"where": [],
 			"tags": []
+		},
+		{
+			"id": "taverner",
+			"name": "the Mughouse's taverner",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "merchant",
+			"name": "the merchant",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "cook",
+			"name": "the town's cook",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "carpenter",
+			"name": "the town's carpenter",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "farmer",
+			"name": "the town's farmer",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "hunter",
+			"name": "the town's hunter",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "tanner",
+			"name": "the town's tanner",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
+		},
+		{
+			"id": "woodcutter",
+			"name": "the town's woodcutter",
+			"status": "agreed",
+			"source": "lore (d), Umbrage's trades",
+			"where": ["town_lands", "blood_rot_lands"],
+			"tags": []
 		}
 	]
 }

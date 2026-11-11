@@ -28,6 +28,51 @@
 						"return"
 					],
 					"status": "agreed"
+				},
+				{
+					"id": "priest.blessing",
+					"text": "The priest blesses a thing brought to him for an offering of half its worth.",
+					"known": "lived",
+					"knowers": [
+						"priest"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "priest.keep",
+					"text": "The priest's keep comes from the temple's alms, and the town pays him nothing while it is a hamlet.",
+					"known": "lived",
+					"knowers": [
+						"priest"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "priest.day",
+					"text": "The priest is at the temple from six till noon and again through the afternoon, and at the square at noon and in the evening.",
+					"known": "lived",
+					"knowers": [
+						"priest"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
 				}
 			]
 		},
@@ -58,6 +103,51 @@
 						"return"
 					],
 					"status": "agreed"
+				},
+				{
+					"id": "medicine_man.makes",
+					"text": "The medicine man gathers herbs near his hut and makes remedies, stamina potions, the bear's-claw charm and the bear's-grease draught, remedies first while anyone is sick.",
+					"known": "lived",
+					"knowers": [
+						"medicine_man"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "medicine_man.care",
+					"text": "The medicine man takes someone into his care for ten gold, or five herbs or five antlers, or for doing his first errand; only those in his care are brought back at his hut.",
+					"known": "lived",
+					"knowers": [
+						"medicine_man"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "medicine_man.sick",
+					"text": "The medicine man visits the sick in town, and mends his hut with wood and cloth from the town's store.",
+					"known": "lived",
+					"knowers": [
+						"medicine_man"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
 				}
 			]
 		},
@@ -279,6 +369,501 @@
 						"town_lands"
 					],
 					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "taverner",
+			"type": "person",
+			"name": "the taverner",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The Mughouse's taverner keeps its counter and lives in the tavern (residents.json; economy's beds and rents).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "taverner.counter",
+					"text": "The taverner keeps the Mughouse's counter from nine in the morning till eight at night, and lives in the tavern.",
+					"known": "lived",
+					"knowers": [
+						"taverner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "taverner.beds",
+					"text": "Half of what the Mughouse is paid for its beds is the taverner's and the rest goes to the town's treasury: two gold for a resident's bed, two to six for a traveller's stay.",
+					"known": "lived",
+					"knowers": [
+						"taverner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "taverner.no_cook",
+					"text": "While the town has no cook, the taverner takes in the food, meat and fish brought to the Mughouse.",
+					"known": "lived",
+					"knowers": [
+						"taverner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "merchant",
+			"type": "person",
+			"name": "the merchant",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's merchant, the settled goblin with his counter a little apart, and the only fence (decisions 471, 586).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "merchant.dear",
+					"text": "The merchant sells his goods dearer than the town's store does.",
+					"known": "lived",
+					"knowers": [
+						"merchant"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "merchant.day",
+					"text": "By day the merchant turns away anything stolen or taken from the dead.",
+					"known": "lived",
+					"knowers": [
+						"merchant"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "merchant.night",
+					"text": "By night, at his counter, the merchant buys stolen goods and grave goods, at half what the town would give.",
+					"known": "secret",
+					"knowers": [
+						"merchant"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "cook",
+			"type": "person",
+			"name": "the cook",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The cook in the town's kitchen (economy's kitchen; residents.json's cook day).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "cook.makes",
+					"text": "The cook makes travel rations from food, roast meat from meat and roast perch from fish, for the shop's shelf and the town's daily meals.",
+					"known": "lived",
+					"knowers": [
+						"cook"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "cook.day",
+					"text": "The cook is at the well by five, in the kitchen from six till mid-afternoon, then at the square, and at the inn before going home.",
+					"known": "lived",
+					"knowers": [
+						"cook"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "cook.well",
+					"text": "When the well runs dry the cook works at half pace, and before the first harvest is in he will not cook from the larder kept for the town's people.",
+					"known": "lived",
+					"knowers": [
+						"cook"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "carpenter",
+			"type": "person",
+			"name": "the carpenter",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's carpenter, who raises and mends its buildings (economy's builds and repairs).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "carpenter.builds",
+					"text": "The carpenter raises every building in town, repairs what is damaged and mends the roofs a storm breaks.",
+					"known": "lived",
+					"knowers": [
+						"carpenter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "carpenter.waits",
+					"text": "A build waits until its materials are in the store, and wood brought to the carpenter goes toward the build in hand.",
+					"known": "lived",
+					"knowers": [
+						"carpenter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "carpenter.mending",
+					"text": "The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher he mends arrows.",
+					"known": "lived",
+					"knowers": [
+						"carpenter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "farmer",
+			"type": "person",
+			"name": "the farmer",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's farmer, once a field stands (economy's crop).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "farmer.year",
+					"text": "The farmer sows in spring and harvests in autumn; rain helps the crop, a storm can flatten half of it, and a crop not in by winter rots.",
+					"known": "lived",
+					"knowers": [
+						"farmer"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "farmer.winter",
+					"text": "In winter the farmer digs roots, and his crop goes to the town's store, paid from the treasury.",
+					"known": "lived",
+					"knowers": [
+						"farmer"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "farmer.day",
+					"text": "The farmer is at the well by five and in the field from six till four, then at the square, and at the inn before going home.",
+					"known": "lived",
+					"knowers": [
+						"farmer"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "hunter",
+			"type": "person",
+			"name": "the hunter",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's hunter (economy's hunter, sites).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "hunter.ground",
+					"text": "The hunter hunts deer, boar and rabbit in the wilds near the store, for the town has no hunting ground of its own.",
+					"known": "lived",
+					"knowers": [
+						"hunter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "hunter.sells",
+					"text": "The hunter sells his meat and hides to the store, and the antlers and tusks are kept there.",
+					"known": "lived",
+					"knowers": [
+						"hunter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "hunter.strays",
+					"text": "Sometimes the hunter strays too far out, and whoever walks him home is paid for it.",
+					"known": "lived",
+					"knowers": [
+						"hunter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "tanner",
+			"type": "person",
+			"name": "the tanner",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's tanner, once one comes and a tannery stands (economy's tannery).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "tanner.makes",
+					"text": "The tanner makes leather from hides, and bucklers and leather armour from the leather.",
+					"known": "lived",
+					"knowers": [
+						"tanner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "tanner.buys",
+					"text": "The tanner buys beasts' pelts for tanning, and claws, fangs, antlers and tusks for trimming leather.",
+					"known": "lived",
+					"knowers": [
+						"tanner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "tanner.goes",
+					"text": "The tanner's leather goes to the store, and his bucklers and armour to the shop.",
+					"known": "lived",
+					"knowers": [
+						"tanner"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				}
+			]
+		},
+		{
+			"id": "woodcutter",
+			"type": "person",
+			"name": "the woodcutter",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The town's woodcutter at the woodlot (economy's woodcutter).",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "woodcutter.lot",
+					"text": "The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives him deadwood.",
+					"known": "lived",
+					"knowers": [
+						"woodcutter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "woodcutter.sells",
+					"text": "The woodcutter sells his wood to the store, and wood that others bring in goes to the carpenter.",
+					"known": "lived",
+					"knowers": [
+						"woodcutter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
+				},
+				{
+					"id": "woodcutter.day",
+					"text": "The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening.",
+					"known": "lived",
+					"knowers": [
+						"woodcutter"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
 				}
 			]
 		}
