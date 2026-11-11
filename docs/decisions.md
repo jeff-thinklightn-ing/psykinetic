@@ -24841,6 +24841,15 @@ below; the templates' hidden stair and 14 niches), view_test (the parse).
 Level data both sides read: ships in a full cut; protocol unchanged; no
 new class_name.
 
+608 amended (3), art-kit's side (the coordinator's ruling for the hidden niche's tell; dungeon's label, its
+decor row places the piece): prop.candle_draft, an edge piece in wall.crypt.cracked's frame, standing on the floor at
+the wall's foot beside the crack's rubble (middle (0.457, 0.305), the room toward +x), not solid: three tallow
+candles whose flames lean about 40 degrees out from the wall and whose wax runs down the room side, the air coming out
+of the stone shown, not the niche. The niche has no sill, so the candles stand low. No light of its own: dungeon's
+row may add a dim warm one. By hand, palette and "glow", 318 tris; C:/dev/review/crypt_set/make_crypt_set.py
+candle_draft; the look at C:/dev/review/candle_draft/candle_draft_sheet.png. Off: nothing places it until dungeon's
+side of 608 amended (3) lands. Art only, protocol unchanged, no new class_name, no bullet.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)
@@ -43539,6 +43548,11 @@ second, the "Healing" buff the telling. Any town's, never Umbrage by name. level
 _test_town_warm_rests (the Mughouse by its hearth warmed, across the room not, just hit not; the
 wilds' square fire burning and a warm rest, a seat beside it warmed, five off not). Server only;
 protocol unchanged; no new class_name.
+777 amended (1) (art-kit; label by tools/decision_number.sh; maps' ask, for animation's sit clip, 2026-11-11):
+prop.log_seat (both variants) raised 0.1 on two split chocks laid across under it, so its flat face is at 0.45, where
+the sit clip's seat (0.46) puts a resident; size [1.223, 0.455, 0.555], 142 and 130 tris. The rest camps place it as
+before. C:/dev/review/mine_pieces/make_mine.py (LIFT); the look at C:/dev/review/logseat/log_seat.png. Art only,
+protocol unchanged, no new class_name, no bullet.
 
 ## 783. Falls into shafts: the lip, damage by depth, a deadly fall the shover's kill
 
