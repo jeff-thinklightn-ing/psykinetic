@@ -1041,12 +1041,12 @@ func _test_block() -> void:
 	_check(met == [0, 0.0] and host.raised == "block", "a blow of 3 and more push (3.6): taken too (340 amended (2))")
 	before = host.stamina
 	met = World._meet_guard(host, imp, 3, 0.6, false, true)
-	_check(met == [0, 0.0] and host.raised == "block" and not World.is_stunned(host) and host.stamina == before - 30,
-			"the same, crushing (wound up, 392): held, at twice the stamina (%d)" % (before - host.stamina))
-	host.stamina = 20
-	met = World._meet_guard(host, imp, 3, 0.6, false, true)
-	_check(met == [3, 0.6] and host.raised == "" and not World.is_stunned(host) and host.stamina == 20,
-			"crushing, with 20 stamina for 30: the shield gives out, the blow whole, no stun")
+	_check(met == [0, 0.0] and host.raised == "block" and not World.is_stunned(host) and host.stamina == before - mini(15, World.parry_cap(host)),
+			"the same, crushing (wound up, 392, told): held whole, a light blow's stamina at most (340 amended (4); %d)" % (before - host.stamina))
+	host.stamina = 10
+	met = World._meet_guard(host, imp, 3, 0.6)
+	_check(met == [3, 0.6] and host.raised == "" and not World.is_stunned(host) and host.stamina == 10,
+			"a plain blow, with 10 stamina for 15: the shield gives out, the blow whole, no stun")
 	host.stamina = host.max_stamina
 	_check(not World.try_stance(host, "block"), "and the shield will not come up again at once")
 	host.guard_broken_until = World.tick

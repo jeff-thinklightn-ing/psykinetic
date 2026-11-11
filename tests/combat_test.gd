@@ -687,8 +687,9 @@ func _test_arts_marks() -> void:
 ## 340 amended (2), the coordinator's rulings on the guard table (Jeff's
 ## rule: a choice is a bonus, never a penalty): a player's guard is never
 ## broken by a blow and never stuns its holder; a blow's weight sets only
-## its cost, a crushing one twice; short of the stamina a shield gives out,
-## the blow whole; the sword's parry never worse than a bare hand; a
+## its cost; short of the stamina a shield gives out, the blow whole; a
+## crushing (told) blow on it a light blow's stamina at most, never given
+## out to (340 amended (4)); the sword's parry never worse than a bare hand; a
 ## monster's guard as before (broken by weight or a crushing blow, stunned);
 ## the arc meets any of a striker's body.
 func _test_guard_rework() -> void:
@@ -710,18 +711,18 @@ func _test_guard_rework() -> void:
 			"a blow of 5.5, over the shield's 3.5: held, 4 stamina a point of it paid (%s, %d stamina)" % [met, holder.stamina])
 	_check(World._meet_guard(holder, striker, 3, 0.4, true) == [0, 0.0] and holder.raised == "block", "a shot of 3.4: held")
 	holder.stamina = 100
+	var light := World.parry_cap(holder)
 	met = World._meet_guard(holder, striker, 3, 1.2, false, true)
-	_check(met == [0, 0.0] and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 100 - 34,
-			"a crushing blow (a wound-up one, 392) of 4.2: held, at twice the stamina (%s, %d paid)" % [met, 100 - holder.stamina])
+	_check(met == [0, 0.0] and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 100 - mini(17, light),
+			"a crushing blow (a wound-up one, 392, told) of 4.2: held whole, a light blow's stamina at most (340 amended (4); %s, %d paid, %d at most)" % [
+			met, 100 - holder.stamina, light])
 	_check(World.is_stunned(striker), "and thrown back off the shield as any blow it takes")
 	striker.stunned_until_tick = 0
-	holder.stamina = 20
+	holder.stamina = light - 1
 	met = World._meet_guard(holder, striker, 3, 1.2, false, true)
-	_check(met == [3, 1.2] and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 20
-			and holder.guard_broken_until == World.tick + World.GUARD_BROKEN_TICKS and not World.is_stunned(striker),
-			"20 stamina for 34: it gives out, the blow whole, no stun either side, unraised a while (%s)" % [met])
-	_check(World.try_stance(holder, "block") == false, "and no raising it again for a while")
-	raise.call()
+	_check(met == [1, 0.6] and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 0,
+			"%d stamina for %d: never given out to a told blow, it takes half and stays up (%s)" % [light - 1, light, met])
+	striker.stunned_until_tick = 0
 	holder.stamina = 5
 	met = World._meet_guard(holder, striker, 3, 0.0)
 	_check(met == [3, 0.0] and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 5,
@@ -765,13 +766,14 @@ func _test_guard_rework() -> void:
 	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
 
 
-## 340 amended (3), the coordinator's rule 2: a told move is stepped out of;
-## a raised shield facing its line takes half, for stamina, never breaks
-## and stuns no one; a lowered shield or a sword meets none; told_hit
-## meets the guard on the whole harm and takes a launch's impact out of
-## what is left; the draugr's spin takes half on a shield and still throws.
+## 340 amended (3), the coordinator's rule 2, as 340 amended (4) has it: a
+## told move is stepped out of; a raised shield facing its line takes it
+## whole for a light blow's stamina at most, never breaks, stuns no one and
+## never gives out (short, half); a lowered shield or a sword meets none;
+## told_hit meets the guard on the whole harm and takes a launch's impact
+## out of what is left; the draugr's spin met on a shield still throws.
 func _test_told_guard() -> void:
-	print("\n== told moves: a raised shield facing the line takes half, never breaks, no stun (340 amended (3)) ==")
+	print("\n== told moves: a raised shield facing the line takes it whole, never breaks, no stun (340 amended (3), (4)) ==")
 	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
 	var holder: Player = e["P"][0]
 	var by: GridEntity = e["m"][0]
@@ -779,17 +781,19 @@ func _test_told_guard() -> void:
 	holder.facing = Vector2i(1, 0)
 	World.try_stance(holder, "block")
 	holder.stamina = 100
+	var light := World.parry_cap(holder)
 	var left := World.told_guard(holder, by, 6, Vector2(-1, 0))
-	_check(left == 3 and holder.stamina == 100 - 24 and holder.raised == "block" and not World.is_stunned(holder) and not World.is_stunned(by),
-			"6 along a line from ahead: half taken, 3 left, 24 stamina, the shield up, no stun either side (%d)" % left)
-	_check(World.told_guard(holder, by, 6, Vector2(0, 1)) == 6 and holder.stamina == 76, "from the side of its line: nothing met")
-	_check(World.told_guard(holder, by, 6) == 3, "no line (a ring, a spin): by his body, ahead: met")
-	holder.stamina = 10
+	_check(left == 0 and holder.stamina == 100 - mini(24, light) and holder.raised == "block" and not World.is_stunned(holder) and not World.is_stunned(by),
+			"6 along a line from ahead: taken whole, %d stamina (24 a point, a light blow's %d at most), the shield up, no stun either side (%d)" % [
+			100 - holder.stamina, light, left])
+	var had := holder.stamina
+	_check(World.told_guard(holder, by, 6, Vector2(0, 1)) == 6 and holder.stamina == had, "from the side of its line: nothing met")
+	_check(World.told_guard(holder, by, 6) == 0, "no line (a ring, a spin): by his body, ahead: met")
+	holder.stamina = light - 1
 	left = World.told_guard(holder, by, 6, Vector2(-1, 0))
-	_check(left == 6 and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 10
-			and holder.guard_broken_until == World.tick + World.GUARD_BROKEN_TICKS,
-			"10 stamina for 24: it gives out, the harm whole, no stun, unraised a while")
-	holder.guard_broken_until = 0
+	_check(left == 3 and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 0,
+			"%d stamina for %d: never given out, half taken, 3 left, the shield still up (340 amended (4))" % [light - 1, light])
+	World.try_stance(holder, "")
 	holder.stamina = 100
 	_check(World.told_guard(holder, by, 6, Vector2(-1, 0)) == 6 and holder.stamina == 100, "lowered: no told move met")
 	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
@@ -801,16 +805,17 @@ func _test_told_guard() -> void:
 	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
 	World.try_stance(holder, "block")
 	var hp := holder.hp
+	holder.stamina = 100
 	var took := World.told_hit(by, holder, 8, Vector2.ZERO, 0.0, Vector2(-1, 0))
-	_check(took == 4 and holder.hp == hp - 4, "told_hit, 8 with no launch: 4 taken (%d)" % (hp - holder.hp))
+	_check(took == 0 and holder.hp == hp, "told_hit, 8 with no launch: none taken (%d)" % (hp - holder.hp))
 	holder.max_hp = 500
 	holder.hp = 500
 	hp = holder.hp
 	holder.stamina = 100
 	World.try_stance(holder, "block")
 	took = World.told_hit(by, holder, 8, Vector2(-1, 0), 240.0, Vector2(-1, 0))
-	_check(took == hp - holder.hp and took >= 4 and holder.tile != Vector2i(3, 2),
-			"8 with a launch into the wall: thrown (%s), its impact counted in the 4 left, %d in all" % [holder.tile, took])
+	_check(took == hp - holder.hp and took > 0 and holder.tile != Vector2i(3, 2),
+			"8 with a launch into the wall: the 8 taken whole, still thrown (%s), the wall's impact its own, %d in all" % [holder.tile, took])
 	# The draugr's spin on a shield raised at him.
 	e = _build(["#########", "#..PmP..#", "#########"])
 	var boss: GridEntity = e["m"][0]
@@ -839,8 +844,8 @@ func _test_told_guard() -> void:
 	World.entity_damaged.disconnect(on)
 	var a := int(taken.get(bearer, 0))
 	var b := int(taken.get(bare, 0))
-	_check(b > 0 and a > 0 and a <= ceili(b / 2.0) and World.is_down(bearer) and not World.is_stunned(boss),
-			"the spin: the shield ahead takes half of it (%d against %d bare), still thrown down, no break, he isn't thrown back" % [a, b])
+	_check(b > 0 and a == 0 and World.is_down(bearer) and not World.is_stunned(boss),
+			"the spin: the shield ahead takes it whole (%d against %d bare, 340 amended (4)), still thrown down, no break, he isn't thrown back" % [a, b])
 
 
 func _test_weapon_memory() -> void:

@@ -2173,7 +2173,9 @@ func _test_lunge() -> void:
 	for i in 6:
 		World.tick += 1
 		robber._tend_ambush()
-	_check(player.hp == hp, "the shield took it whole, not told_guard's half (%d of %d)" % [player.hp, hp])
+	_check(player.hp == hp and player.max_stamina - player.stamina <= World.parry_cap(player),
+			"the shield took it whole, a told blow, a light blow's stamina at most (340 amended (4); %d of %d, %d paid)" % [
+			player.hp, hp, player.max_stamina - player.stamina])
 	_check(World.is_stunned(robber) and robber.stun_cause == &"guarded" and robber.stunned_until_tick - World.tick <= World.SHIELD_RECOIL_STUN
 			and player.raised == "block",
 			"340 amended: the robber thrown back off it, &\"guarded\" (%s, %d ticks left)" % [robber.stun_cause, robber.stunned_until_tick - World.tick])
