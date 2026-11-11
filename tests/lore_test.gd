@@ -15,9 +15,10 @@ const STATUSES := ["agreed", "draft", "asked"]
 const KNOWN := ["common", "rumour", "secret", "lived"]
 const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "carries", "took", "held_at"]
 ## The trades whose own lived facts may weigh 3, and the entries that are
-## Umbrage itself, which may weigh 2 (lore (d), the coordinator's ruling 2026-11-10).
+## Umbrage itself, which may weigh 2 (lore (d), the coordinator's ruling 2026-11-10; the crypt
+## under the temple since its pointer, 11-11), never on a secret or a fact tagged history.
 const WEIGHED_TRADES := ["taverner", "merchant", "cook", "carpenter", "farmer", "hunter", "tanner", "woodcutter", "priest", "medicine_man"]
-const UMBRAGE_ITSELF := ["town", "temple", "last_light", "pond", "farmstead"]
+const UMBRAGE_ITSELF := ["town", "temple", "last_light", "pond", "farmstead", "crypt"]
 
 var _failures := 0
 var _entries := {}
@@ -255,7 +256,9 @@ func _test_known_by() -> void:
 			var weight := float(fact["weight"])
 			var own_trade: bool = fact.get("known") == "lived" and not fact.get("knowers", []).is_empty() \
 					and fact.get("knowers", []).all(func(knower: Variant) -> bool: return knower in WEIGHED_TRADES)
-			if not (weight == 1.0 or (weight == 3.0 and own_trade) or (weight == 2.0 and id in UMBRAGE_ITSELF)):
+			var umbrage: bool = id in UMBRAGE_ITSELF and fact.get("known") != "secret" \
+					and not "history" in fact.get("tags", [])
+			if not (weight == 1.0 or (weight == 3.0 and own_trade) or (weight == 2.0 and umbrage)):
 				wrong.append(fact.get("id"))
 	_check(wrong.is_empty(), "a weight puts only a trade's own lived facts (3) or Umbrage itself (2) first %s" % [wrong])
 

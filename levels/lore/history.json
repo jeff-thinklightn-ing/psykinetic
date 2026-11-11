@@ -123,7 +123,8 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed",
-					"sight": "the family tombs"
+					"sight": "the family tombs",
+					"weight": 2
 				},
 				{
 					"id": "crypt.top_floor",
@@ -171,7 +172,8 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed",
-					"sight": "the broken tombs"
+					"sight": "the broken tombs",
+					"weight": 2
 				},
 				{
 					"id": "crypt.angry_dead",
@@ -458,7 +460,8 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed",
-					"true": true
+					"true": true,
+					"weight": 2
 				}
 			]
 		},

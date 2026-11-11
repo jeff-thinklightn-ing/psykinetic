@@ -73,6 +73,21 @@
 					"source": "game",
 					"status": "agreed",
 					"weight": 3
+				},
+				{
+					"id": "priest.crypt",
+					"text": "Beneath the temple lies the town's crypt, where the wealthy are laid in their families' tombs, and the Mound-breakers have broken into it from outside.",
+					"known": "lived",
+					"knowers": [
+						"priest"
+					],
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed",
+					"weight": 3
 				}
 			]
 		},
