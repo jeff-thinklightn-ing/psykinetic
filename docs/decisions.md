@@ -6306,6 +6306,28 @@ Rejected: more real trees out to the view's reach (tens of thousands of
 nodes on a 256-cell map), and fog, which would have hidden the land's own
 far side too.
 
+326 amended (1) (the coordinator's approval, design (A) of 11-10; Jeff's 11-01 report of holes by
+Umbrage's trees, found on v0.1.195 and covered by 753 since v0.1.196, left this): the canopy never
+stands between the low camera and the player. By the edge of the land (Umbrage's woodlot, 3 cells
+from the land's end) the low camera stands out over the canopy, 18.7 cells behind the player and
+7.5 m up at zoom 1, and its faceted sheet rose 5 m in front of the lens, filling the bottom of the
+frame. As a crown by the lens is hidden (NEAR_CLOSE, 623 amended (2)), the canopy is now not drawn
+within Client3D.CANOPY_EYE_CUT (12 m) of the camera, dithered over CANOPY_EYE_CUT_BAND (2 m) inside
+that with the 4x4 Bayer the grown forest's see-through uses: TerrainBorder's material is
+season_eye_cut.gdshader (season.gdshaderinc under EYE_CUT; Client3D.season_material takes the
+shader), its eye_cut set by TerrainBorder.set_eye_cut, CANOPY_EYE_CUT under the low camera and 0
+under the high (Client3D._apply_camera_mode, _phase_border). 12 m, not the 8 m first tried: the
+line from the camera to the player meets the canopy's top (CROWN + CROWN_ROLL + CROWN_PEAK, 4.65 m
+over its land) 7.6 m from the camera at zoom 1 and 9.7 m at ZOOM_MAX, and 8 m left it half drawn
+there. Through the cut the forest's own stands and their floor show (stills at the woodlot and by
+the healer), never the sunk floor; it follows the camera, so it holds at every edge, yaw and zoom
+with no list of places. Cost on the Atlas (map_bench at the woodlot, the canopy before the lens):
++0.2 ms a frame; no build cost. A 60-frame walk along the edge flickers no more at the cut's edge
+than the grass does. Rejected: the canopy held under the camera's lines near the land (a trough in
+it past the last stands, a new look), and hiding whole 16-cell chunks as crowns are hidden (a
+square blanked at a time). view_test _test_horizon: the cut on the canopy's own material only,
+12 m under the low camera, 0 under the high. Stills: C:/dev/review/terrain/canopy_cut/.
+
 ## 309. What weather looks like: drawn round the view, eased to the sim's
 
 The 3D view draws the zone's weather (World.fields.weather, decision 308)

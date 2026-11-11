@@ -7759,12 +7759,42 @@ func _test_horizon() -> void:
 			and sky.get_shader_parameter("sky_horizon_color") == _rig._sky_horizon and sky.get_shader_parameter("ground_bottom_color") == Client3D.FOREST_FLOOR
 			and is_equal_approx(float(sky.get_shader_parameter("ground_curve")), Client3D.LOW_SKY_GROUND_CURVE),
 			"the sky just below the horizon the haze's colour (no forest floor band under the skyline), the rest the forest floor")
+	# The border canopy kept from between the low camera and the player (326
+	# amended): its own material cuts it within CANOPY_EYE_CUT of the camera,
+	# and nothing else in the room draws with that cut.
+	var canopy_cut := func() -> Array:
+		var border: TerrainBorder = _rig._border
+		if border == null:
+			return [-1.0, [], 0]
+		border.finish()
+		var sheet := border.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Canopy_"))
+		var cut := -1.0
+		var off_shader: Array[String] = []
+		for piece: Node in sheet:
+			var look := (piece as MeshInstance3D).material_override as ShaderMaterial
+			if look == null or look.shader != TerrainBorder.EYE_CUT_SHADER:
+				off_shader.append(str(piece.name))
+			else:
+				cut = float(look.get_shader_parameter("eye_cut"))
+		var others := 0
+		for node: Node in _rig._room.find_children("*", "GeometryInstance3D", true, false):
+			if str(node.name).begins_with("Canopy_"):
+				continue
+			var override := (node as GeometryInstance3D).material_override as ShaderMaterial
+			if override != null and override.shader == TerrainBorder.EYE_CUT_SHADER:
+				others += 1
+		return [cut, off_shader, others, sheet.size()]
+	var cut_low: Array = canopy_cut.call()
+	_check(cut_low.size() == 4 and int(cut_low[3]) > 0 and (cut_low[1] as Array).is_empty() and is_equal_approx(float(cut_low[0]), Client3D.CANOPY_EYE_CUT) and int(cut_low[2]) == 0,
+			"the canopy past the wood's edge not drawn within %.0f m of the low camera, on its own material and no other's (%s)" % [Client3D.CANOPY_EYE_CUT, cut_low])
 	Net.set_camera_low(false, false)
 	_rig._apply_camera_mode()
 	_check(skirt != null and not skirt.visible and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 0.0)
 			and sky.get_shader_parameter("ground_horizon_color") == Client3D.FOREST_FLOOR.lightened(0.2)
 			and is_equal_approx(float(sky.get_shader_parameter("ground_curve")), Client3D.SKY_GROUND_CURVE),
 			"the camera high: the skirt hidden, the far meadow off, the sky's ground the forest floor's again")
+	var cut_high: Array = canopy_cut.call()
+	_check(cut_high.size() == 4 and is_equal_approx(float(cut_high[0]), 0.0), "and drawn whole under the high camera (%s)" % [cut_high])
 	Net.set_camera_low(true, false)
 	var barrow := Level.load_level("barrow")
 	_rig.rebuild(barrow["terrain"], barrow["centre"])
@@ -8700,7 +8730,8 @@ func _test_seasons() -> void:
 		for mesh: MeshInstance3D in node.find_children("*", "MeshInstance3D", true, false) + ([node] if node is MeshInstance3D else []):
 			for surface in mesh.mesh.get_surface_count():
 				var drawn := mesh.get_active_material(surface) as ShaderMaterial
-				out.append(null if drawn == null or drawn.shader != Client3D.SEASON_SHADER else drawn.get_shader_parameter("leaf"))
+				# The canopy's own eye cut is the season's shader too (326 amended (1)).
+				out.append(null if drawn == null or not drawn.shader in [Client3D.SEASON_SHADER, TerrainBorder.EYE_CUT_SHADER] else drawn.get_shader_parameter("leaf"))
 		return out
 	var leaves: Array = []
 	var dead: Array = []

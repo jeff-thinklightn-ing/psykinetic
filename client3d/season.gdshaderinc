@@ -44,6 +44,22 @@ varying vec2 world_xz;
 // edge); SEE_THROUGH draws only that, faded toward alpha as a near wall is.
 #include "res://client3d/see_through.gdshaderinc"
 #endif
+#ifdef EYE_CUT
+// The border canopy under the low camera (326 amended): within eye_cut
+// metres of the camera it is not drawn, dithered over eye_cut_band inside
+// that, as a crown by the low camera's lens is hidden (623 amended (2)),
+// so the canopy past a wood's edge never stands between the camera and
+// the player; off at 0 (the high camera).
+uniform float eye_cut = 0.0;
+uniform float eye_cut_band = 2.0;
+varying vec3 cut_world;
+
+float cut_bayer(vec2 p) {
+	ivec2 q = ivec2(mod(p, 4.0));
+	int m[16] = int[](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
+	return (float(m[q.y * 4 + q.x]) + 0.5) / 16.0;
+}
+#endif
 
 float snow_noise(vec2 p) {
 	vec2 i = floor(p);
@@ -66,9 +82,20 @@ void vertex() {
 #ifdef CUTAWAY
 	see_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 #endif
+#ifdef EYE_CUT
+	cut_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+#endif
 }
 
 void fragment() {
+#ifdef EYE_CUT
+	if (eye_cut > 0.0) {
+		float kept = smoothstep(eye_cut - eye_cut_band, eye_cut, distance(cut_world, CAMERA_POSITION_WORLD));
+		if (kept < cut_bayer(FRAGCOORD.xy)) {
+			discard;
+		}
+	}
+#endif
 #ifdef CUTAWAY
 	float see = see_weight(INV_VIEW_MATRIX);
 #ifdef SEE_THROUGH

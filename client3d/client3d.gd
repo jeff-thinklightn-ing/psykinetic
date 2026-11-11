@@ -505,6 +505,17 @@ const BOX_PULL_LEAST := 3.0
 const BOX_PULL_RISE_FROM := 8.0
 const BOX_PULL_AIM_LIFT := 1.0
 const BOX_PULL_HEAD := 1.9
+## The border canopy past a wood's edge (TerrainBorder, 326 amended): under
+## the low camera it is not drawn within this many metres of the camera,
+## dithered over CANOPY_EYE_CUT_BAND inside that (season_eye_cut.gdshader),
+## as a crown by the lens is hidden (NEAR_CLOSE): a player near the edge of
+## the land puts the camera over the canopy, and it stood in front of it.
+## Gone wholly within 10 m: the line from the low camera to the player meets
+## the canopy's top (CROWN + CROWN_ROLL + CROWN_PEAK, 4.65 m over its land)
+## 7.6 m from the camera at zoom 1 and 9.7 m at ZOOM_MAX (8 m left it half
+## drawn on that line, the stills of 11-10).
+const CANOPY_EYE_CUT := 12.0
+const CANOPY_EYE_CUT_BAND := 2.0
 ## A near piece's mesh keeps its own material override under this meta
 ## while it is see-through.
 const OPAQUE_META := &"opaque_material"
@@ -3882,6 +3893,10 @@ func _apply_camera_mode() -> void:
 		_add_far_landmarks()
 	if _far_root != null:
 		_far_root.visible = low
+	# The border canopy kept from between the low camera and the player
+	# (326 amended): its eye cut on under the low camera only.
+	if _border != null:
+		_border.set_eye_cut(CANOPY_EYE_CUT if low else 0.0)
 	if _ground_look != null:
 		_ground_look.set_shader_parameter("far_meadow", 1.0 if low else 0.0)
 		_ground_look.set_shader_parameter("far_from", scatter_reach_low - FAR_MEADOW_FADE * 0.5)
@@ -7012,14 +7027,16 @@ static var _season_materials: Dictionary = {}
 ## season and turned in autumn. Kept and shared by material and leaf
 ## unless not [param shared] (a material made for one build). Its
 ## see-through copy beside it (SEASON_NEAR_META), for the near fade.
-static func season_material(material: Material, leaf: bool, shared := true) -> Material:
+## [param shader]: another season shader for the material itself (the
+## border canopy's eye cut, 326 amended), else season.gdshader.
+static func season_material(material: Material, leaf: bool, shared := true, shader: Shader = null) -> Material:
 	var base := material as BaseMaterial3D
 	if base == null:
 		return material
 	var key := [base.get_instance_id(), leaf]
 	if shared and _season_materials.has(key):
 		return _season_materials[key][0]
-	var made := _season_copy(SEASON_SHADER, base, leaf)
+	var made := _season_copy(shader if shader != null else SEASON_SHADER, base, leaf)
 	var near := _season_copy(SEASON_NEAR_SHADER, base, leaf)
 	near.set_shader_parameter("alpha", NEAR_ALPHA)
 	near.render_priority = NEAR_PRIORITY
@@ -7342,6 +7359,7 @@ func _phase_border() -> void:
 	_border.name = "Border"
 	_room.add_child(_border)
 	_border.build(_wooded, _edge_elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
+	_border.set_eye_cut(CANOPY_EYE_CUT if _low else 0.0)
 
 
 ## The rock mass (769, terrain's side): an indoor level whose level.json

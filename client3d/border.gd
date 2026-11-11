@@ -29,6 +29,9 @@ const CROWN_SIZE := 1.6
 ## Each corner pushed up or down by up to this much more, so the crowns
 ## come to points as the trees' do.
 const CROWN_PEAK := 0.45
+## The canopy's shader: season.gdshader's, not drawn within eye_cut metres of
+## the camera (326 amended; Client3D.CANOPY_EYE_CUT under the low camera).
+const EYE_CUT_SHADER := preload("res://client3d/season_eye_cut.gdshader")
 ## Its colour at REACH, as a share of its colour at START.
 const FAR_SHADE := 0.55
 ## The far floor: this many metres past the land each way, this far below
@@ -48,6 +51,8 @@ var chunks: Dictionary[Vector2i, Array] = {}
 var far_floor: MeshInstance3D
 var _task := -1
 var _material: Material
+## The canopy's eye cut under the low camera, metres (0: off; set_eye_cut).
+var eye_cut := 0.0
 ## Whether the canopy is broadleaf's (dried and turned with the season) or
 ## the stands' (evergreen: snow only).
 var _leaf := true
@@ -94,6 +99,15 @@ func build(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, f
 	else:
 		work.call()
 		_place()
+
+
+## The canopy not drawn within [param metres] of the camera (0: drawn
+## whole), dithered at its edge: the low camera's (326 amended), so a
+## player by the land's edge never has the canopy between them and it.
+func set_eye_cut(metres: float) -> void:
+	eye_cut = metres
+	if _material != null:
+		(_material as ShaderMaterial).set_shader_parameter("eye_cut", metres)
 
 
 ## Waits for the canopy, and adds it.
@@ -218,7 +232,9 @@ func _place() -> void:
 		base.vertex_color_use_as_albedo = true
 		base.vertex_color_is_srgb = true
 		base.roughness = 1.0
-		_material = Client3D.season_material(base, _leaf, false)
+		_material = Client3D.season_material(base, _leaf, false, EYE_CUT_SHADER)
+		(_material as ShaderMaterial).set_shader_parameter("eye_cut_band", Client3D.CANOPY_EYE_CUT_BAND)
+		(_material as ShaderMaterial).set_shader_parameter("eye_cut", eye_cut)
 	for chunk: Vector2i in chunks:
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
