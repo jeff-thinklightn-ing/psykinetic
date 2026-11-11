@@ -2792,9 +2792,22 @@ const FIRE_CLEAR_REACH := 3
 ## of for FREE_BLOCKED_SECONDS (of the sim's ticks) steps to its own right, if that cell is
 ## open, and plans again round the body as a wall; with its right shut it
 ## waits, as the other, coming the other way, has its right open. Past
-## FREE_GIVE_UP_SECONDS blocked, the route is given up.
+## FREE_GIVE_UP_SECONDS blocked, the route is given up. Since 724 amended
+## (4) that wait is for another player only, standing; one who never steps
+## aside (a resident, a monster) on the route's next cells is gone round at
+## once, and the route's own end held ends the walk there (_free_blocked).
 const FREE_BLOCKED_SECONDS := 0.25
 const FREE_GIVE_UP_SECONDS := 2.0
+## How far past its stand-off (World.FOE_GAP, the farther of the server's
+## two) from another's held square a body counts it in its way (724
+## amended (4)), in cells.
+const FREE_AHEAD_REACH := 0.2
+## 689 amended (9): a click route walking that has come no nearer its next
+## point by FREE_HEADWAY (cells) in FREE_NO_HEADWAY_SECONDS (of the sim's
+## ticks) is planned again once from where it stands, else ended standing
+## (_free_no_headway).
+const FREE_NO_HEADWAY_SECONDS := 0.4
+const FREE_HEADWAY := 0.05
 ## Blocked means stood still against another: past this far (cells) from
 ## where the block began, it got on, and the count starts again.
 const FREE_BLOCKED_MOVED := 0.15
@@ -2949,6 +2962,11 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			if _free_press_waits(at, path[0], not own.pending.is_empty()):
 				return Vector2.ZERO
 			if _free_blocked(player, at, way, path):
+				# Ended, or waiting on another (standing, never stepping on the spot), or round him.
+				if (_free["path"] as Array).is_empty() or _free.get("block_wait", false):
+					return Vector2.ZERO
+				return (Vector2(_free["path"][0]) - at).normalized()
+			if _free_no_headway(player, own, at, path):
 				return Vector2.ZERO if (_free["path"] as Array).is_empty() else (Vector2(_free["path"][0]) - at).normalized()
 			# The last cell: slower as it comes, so it stops on the centre.
 			return way.normalized() * (clampf(way.length() * 4.0, 0.2, 1.0) if path.size() == 1 else 1.0)
@@ -2959,6 +2977,55 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			return Vector2.ZERO
 		path.pop_front()
 	return Vector2.ZERO
+
+
+## 689 amended (9), the backstop (the coordinator's, after physics' drawn walk
+## found two causes of a route pressing on the spot where one was assumed:
+## a resident on its next cell, 724 amended (4), and a wall's edge its body
+## clipped, 689 amended (8)): whatever stops it, a click route that is sending
+## its way and has come no nearer [param path]'s next point by FREE_HEADWAY
+## in FREE_NO_HEADWAY_SECONDS is planned again once a click from where it
+## stands (World.walk_path); a plan with no way, or the same next point,
+## ends the walk standing. Not counted: while the server holds the body (a
+## push's slide, a stun, down), or across a frame that sent no way (a wait
+## against a pushable or another player), and a new route or next point
+## starts it again. It says once, with no names, the cell the body made for
+## and what the planner believed of it, so a cause not yet known reports
+## itself. True when [member _free]'s path was changed (or emptied).
+func _free_no_headway(player: Player, own: FreeNet.Own, at: Vector2, path: Array) -> bool:
+	var now := World.tick
+	var next: Vector2i = path[0]
+	var gap := at.distance_to(Vector2(next))
+	var mark: Dictionary = _free.get("headway", {})
+	if own.held_by_server(player) or not is_same(mark.get("route"), path) or mark.get("next") != next \
+			or now - int(mark.get("last", now)) > 1 or gap < float(mark.get("best", INF)) - FREE_HEADWAY:
+		_free["headway"] = {"route": path, "next": next, "best": gap, "since": now, "last": now}
+		return false
+	mark["last"] = now
+	var stood := float(now - int(mark["since"])) / World.TICK_RATE
+	if stood < FREE_NO_HEADWAY_SECONDS:
+		return false
+	_free.erase("headway")
+	var from := World.free_cell(player, at)
+	var line := World.line_cells(from, next)
+	var first: Vector2i = line[0] if not line.is_empty() else next
+	var holder := World.get_entity_at(first)
+	var believed := "walkable %s, held %s, step shut %s" % [World.is_walkable(first),
+			holder != null and holder != player and not World._own_companion_of(holder, player),
+			first != from and World._terrain_blocks_step(from, first - from, true)]
+	var goal: Vector2i = path[-1]
+	var route: Array = []
+	if not _free.get("replanned", false):
+		_free["replanned"] = true
+		for cell: Vector2i in World.walk_path(from, goal, player):
+			route.append(cell)
+	if route.is_empty() or route[0] == next:
+		print("[free] no headway %.1f s at %s making for %s toward %s (the planner: %s): the walk ended" % [stood, at, first, goal, believed])
+		_free["path"] = []
+		return true
+	print("[free] no headway %.1f s at %s making for %s toward %s (the planner: %s): planned again by %s" % [stood, at, first, goal, believed, route[0]])
+	_free["path"] = route
+	return true
 
 
 ## Whether a click route at [param at] waits against a pushable on
@@ -3002,19 +3069,29 @@ static func _free_stands(entity: GridEntity) -> Vector2:
 	return Vector2(entity.tile)
 
 
-## 724: the body (not [param player]) against [param at] ahead along
-## [param heading]: its centre (_free_stands) within two FREE_RADIUS and a
-## little, less than 60 degrees off the way. Never his own companion: his
-## body passes through her (688), so she blocks nothing (playtest's barrow
-## tour: she followed beside the route, each step aside walled her and
-## planned back, and he paced between two cells for 30 to 90 s).
+## 724: the body (not [param player]) in the way at [param at] along
+## [param heading]: one holding a cell (the cell under _free_stands) whose
+## square is within World.FOE_GAP and FREE_AHEAD_REACH of the body, the way
+## to its nearest point less than 60 degrees off the heading. Measured to
+## the square, as the server stands a free body FREE_RADIUS (a foe's
+## FOE_GAP) off any cell another holds (World._free_off_cell), not centre
+## to centre (724 amended (4): two centres within 0.8 never counted a
+## resident, whose square stops the body 0.8 from his centre head-on and
+## farther aslant, so the route pressed on, stepping on the spot, until he
+## moved: 45 s short of a click's end in physics' drawn walk). Never his own
+## companion: his body passes through her (688), so she blocks nothing
+## (playtest's barrow tour: she followed beside the route, each step aside
+## walled her and planned back, and he paced between two cells for 30 to
+## 90 s). Never a pushable: a click route presses it (_free_press_waits).
 func _free_body_ahead(player: Player, at: Vector2, heading: Vector2) -> GridEntity:
 	var best: GridEntity = null
-	var nearest := World.FREE_RADIUS * 2.0 + 0.2
+	var nearest := World.FOE_GAP + FREE_AHEAD_REACH
 	for entity in World.get_entities():
-		if entity == player or not is_instance_valid(entity) or not entity.spawned or World._own_companion_of(entity, player):
+		if entity == player or not is_instance_valid(entity) or not entity.spawned or entity.pushable \
+				or World._own_companion_of(entity, player) or World.get_entity_at(entity.tile) != entity:
 			continue
-		var off := _free_stands(entity) - at
+		var low := Vector2(Vector2i(_free_stands(entity).round())) - Vector2(0.5, 0.5)
+		var off := at.clamp(low, low + Vector2.ONE) - at
 		if off.length() < nearest and off.length() > 0.001 and off.normalized().dot(heading) > 0.5:
 			nearest = off.length()
 			best = entity
@@ -3029,8 +3106,23 @@ func _free_body_ahead(player: Player, at: Vector2, heading: Vector2) -> GridEnti
 ## sides) if that cell is walkable and empty, then goes round the other as
 ## a wall to the route's end; with the right shut it waits for the other
 ## to step aside. Blocked FREE_GIVE_UP_SECONDS, the route is given up.
-## True when [member _free]'s path was changed (or emptied).
+## 724 amended (4) (Jeff: "walking around looks like skipping"; physics'
+## drawn walk stood 45 s short of a resident on a click's end and 90 s
+## against another's square): the route's own end held ends the walk at
+## once, where it stands beside it (a person clicked, or one standing on the
+## cell). One who never steps aside himself (anyone but another player)
+## holding one of the route's next two cells is gone round at once: a step
+## right, else left, else a route planned from here round him as a wall.
+## Another player is waited for FREE_BLOCKED_SECONDS, as two head-on each
+## step their own right; a held square off the route's next two cells
+## (brushed in passing, or one a step aside has left behind) is walked on
+## past, any that truly stops it left to the backstop (_free_no_headway).
+## With no way round it stands (no way
+## sent, so no walk in place) till the other goes or FREE_GIVE_UP_SECONDS.
+## True when [member _free]'s path was changed (or emptied) or it stands
+## waiting ([member _free]'s block_wait).
 func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bool:
+	_free["block_wait"] = false
 	var other := _free_body_ahead(player, at, way.normalized())
 	# Counted in the sim's ticks, not the wall's: a server that stalls (a
 	# test's hold, a long frame) stops the clock with the bodies.
@@ -3038,48 +3130,103 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 	if not is_same(_free.get("blocked_route"), path):
 		# Another route (a new click): its own count, from nothing.
 		_free["blocked_route"] = path
-		_free.erase("blocked_since")
-		_free.erase("blocked_at")
-		_free.erase("sidestepped")
-	if other == null or at.distance_to(_free.get("blocked_at", at)) > FREE_BLOCKED_MOVED:
+		_free_unblock()
+	if other == null or other == _free.get("chase") or at.distance_to(_free.get("blocked_at", at)) > FREE_BLOCKED_MOVED:
 		# Nobody against it, or it got on (a body passing beside, the other
-		# stepping aside): not blocked.
-		_free.erase("blocked_since")
-		_free.erase("blocked_at")
-		_free.erase("sidestepped")
+		# stepping aside), or the foe a chase goes for (it stops in reach,
+		# _free_chase): not blocked.
+		_free_unblock()
 		return false
 	var since: int = _free.get("blocked_since", now)
 	_free["blocked_since"] = since
 	_free["blocked_at"] = _free.get("blocked_at", at)
 	var blocked := float(now - since) / World.TICK_RATE
+	var there := Vector2i(_free_stands(other).round())
+	var goal: Vector2i = path[-1]
+	if there == goal:
+		print("[free] %s's walk ends at %s beside %s on its end %s (tick %d)" % [player.name, at, other.name, goal, now])
+		_free["path"] = []
+		_free_unblock()
+		return true
 	if blocked >= FREE_GIVE_UP_SECONDS:
 		print("[free] %s's route given up at %s: %s at %s in the way %.1f s (tick %d)" % [player.name, at, other.name, _free_stands(other), blocked, now])
 		_free["path"] = []
-		_free.erase("blocked_since")
-		_free.erase("blocked_at")
-		_free.erase("sidestepped")
+		_free_unblock()
 		return true
-	if blocked < FREE_BLOCKED_SECONDS or _free.get("sidestepped", false):
+	var yields := other is Player
+	var on_way: bool = path.slice(0, 2).has(there)
+	if not on_way:
+		# Not on the route's next cells (brushed in passing, or left behind by
+		# a step aside, which a frame or two may still see ahead): walked on.
+		# One that truly stops it is the backstop's (_free_no_headway).
 		return false
-	var heading := way.normalized()
-	var from := World.free_cell(player, at)
-	var side := from + Vector2i(Vector2(-heading.y, heading.x).round())
-	var there := Vector2i(_free_stands(other).round())
-	if side == there or not World.is_walkable(side) or World.get_entity_at(side) != null 			or not World._line_clear(from, side, side, player):
-		return false  # The right is shut: wait; the other's is open.
-	_free["sidestepped"] = true
-	var goal: Vector2i = path[-1]
-	var route: Array = [side]
-	# Round the other as a wall, unless it stands on the route's end (it
-	# will go; walled, there would be no way at all).
-	for cell: Vector2i in World.find_path(side, goal, true, player, 0, false, {} if there == goal else {there: true}):
-		route.append(cell)
-	if route.back() != goal:
-		route.append(goal)  # No way round now: on for the end, blocked again or not.
-	print("[free] %s steps right from %s to %s round %s at %s (tick %d)" % [player.name, from, side, other.name, there, now])
-	_free["path"] = route
-	_free["blocked_route"] = route  # The same block: its clock and its one step aside go on.
+	if blocked < FREE_BLOCKED_SECONDS and yields:
+		_free["block_wait"] = true  # Another player ahead: he steps his own right.
+		return true
+	if not _free.get("sidestepped", false):
+		_free["sidestepped"] = true
+		var route := _free_round(player, at, way.normalized(), other, there, goal, not yields)
+		if not route.is_empty():
+			_free["path"] = route
+			_free["blocked_route"] = route  # The same block: its clock and its one step aside go on.
+			return true
+	_free["block_wait"] = true  # No way round: it stands till he goes.
 	return true
+
+
+## 724 amended (4): what _free_blocked counts of a block, let go.
+func _free_unblock() -> void:
+	_free.erase("blocked_since")
+	_free.erase("blocked_at")
+	_free.erase("sidestepped")
+
+
+## 724: a route from [param at] round [param other] on [param there] to
+## [param goal], or empty: a step to the body's right (with [param any_side],
+## else its left) if that cell is walkable, empty and in line, then on round
+## him as a wall; with [param any_side] and both shut, planned from its own
+## cell round him (724 amended (4)). Past one who never steps aside
+## ([param any_side]) a side is taken only with a way on from it to the end:
+## with none (a two-cell passage, its other cell held too) the body would
+## step across, press the second, step back, and never stand long enough
+## to give up. Past another player the step is taken as ever, on for the end
+## whether or not a way round shows now: he steps his own right too.
+func _free_round(player: Player, at: Vector2, heading: Vector2, other: GridEntity, there: Vector2i, goal: Vector2i, any_side: bool) -> Array:
+	var from := World.free_cell(player, at)
+	var right := Vector2i(Vector2(-heading.y, heading.x).round())
+	var sides: Array[Vector2i] = [right]
+	if any_side:
+		sides.append(-right)
+	var shut: Array[String] = []
+	for step in sides:
+		var side := from + step
+		var holder := World.get_entity_at(side)
+		if side == there or not World.is_walkable(side) or holder != null and holder != player \
+				or not World._line_clear(from, side, side, player):
+			shut.append("%s walkable %s held %s line %s" % [side, World.is_walkable(side), holder != null and holder != player,
+					World._line_clear(from, side, side, player)])
+			continue
+		var route: Array = [side]
+		for cell: Vector2i in World.find_path(side, goal, true, player, 0, false, {there: true}):
+			route.append(cell)
+		if route.back() != goal:
+			if any_side:
+				shut.append("%s no way on from it" % side)
+				continue
+			route.append(goal)  # No way round now: on for the end, blocked again or not.
+		print("[free] %s steps %s from %s to %s round %s at %s (tick %d)" % [player.name, "right" if step == right else "left", from, side, other.name, there, World.tick])
+		return route
+	if any_side:
+		var route: Array = []
+		for cell: Vector2i in World.find_path(from, goal, true, player, 0, false, {there: true}):
+			route.append(cell)
+		if not route.is_empty() and route.back() == goal:
+			print("[free] %s plans round %s at %s from %s (tick %d)" % [player.name, other.name, there, from, World.tick])
+			return route
+		shut.append("no plan from %s" % from)
+	# Said once a block (the caller tries once): what shut each way round.
+	print("[free] %s finds no way round %s at %s from %s, at %s: %s (tick %d)" % [player.name, other.name, there, from, at, "; ".join(shut), World.tick])
+	return []
 
 
 ## The route's string pulled (689 amended (5); Jeff: "mouse move directions is
@@ -3118,18 +3265,28 @@ func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 ## Whether [param player]'s free body could go straight from [param a] to
 ## [param b] (its centre's way, World.FREE_RADIUS round) without its square
 ## reaching a cell that isn't walkable or that another holds (never itself,
-## its own companion, whom it passes through, or whoever holds [param goal]).
+## its own companion, whom it passes through, or whoever holds [param goal]),
+## nor a corner of it stepping across an edge the terrain shuts between two
+## walkable cells (a wall, a ledge; World._terrain_blocks_step, a door
+## opened), as the free collision stops it there (689 amended (8): at 150
+## ms the drawn walk's route, pulled to its end with the cells' line clear,
+## stood 90 s pressed on such an edge at (199.8, 198.75) in the wilds).
 ## Looked at every BODY_SAMPLE of a cell (under the square's width, so no
 ## cell is stepped over), the square's four corners, BODY_SLACK inside its
 ## radius (a body at rest against a wall stands exactly a radius off it).
 static func body_line_clear(a: Vector2, b: Vector2, goal: Vector2i, player: GridEntity) -> bool:
 	var steps := maxi(ceili(a.distance_to(b) / BODY_SAMPLE), 1)
 	var seen := {}
+	var was := {}
 	var r := World.FREE_RADIUS - BODY_SLACK
 	for k in range(0, steps + 1):
 		var point := a.lerp(b, float(k) / steps)
 		for corner: Vector2 in [Vector2(-r, -r), Vector2(r, -r), Vector2(-r, r), Vector2(r, r)]:
 			var cell := Vector2i((point + corner).round())
+			var before: Vector2i = was.get(corner, cell)
+			was[corner] = cell
+			if before != cell and World._terrain_blocks_step(before, cell - before, true):
+				return false
 			if seen.has(cell) or cell == goal:
 				continue
 			seen[cell] = true
@@ -3270,6 +3427,7 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	_free_taken_over(player)
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
+	_free.erase("replanned")  # 689 amended (9): a click's one plan again from where it stands.
 	var path: Array = []
 	var own := _free_own(player)
 	# From the cell the body is shown on (ahead of the server's claim), so

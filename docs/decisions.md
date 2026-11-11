@@ -35485,6 +35485,36 @@ everything). Clicks from there and from the crypt's place, pressed to the wall a
 their way within 3 s, with the mend and without it (the test room never held the crypt's stand
 still). Client only (main.gd); protocol unchanged; no new class_name; CHANGELOG bullet (voice's).
 
+689 amended (8) (2026-11-11, the script's label; with 724 amended (4), the coordinator's go on Jeff's
+"walking around looks like skipping"; a fix, no package): physics' drawn walk at 150 ms (one client on
+the wilds, (208, 205) to (192, 198)) stood 90 s at (199.8, 198.75), a radius off the edge between columns
+199 and 200, its route pulled to its end (192, 198), every cell round it walkable and empty, nobody
+there but itself and its companion. The cells' line from its cell (World._line_clear) went along row
+199, clear; the body's square, half in row 198, crossed an edge the terrain shuts between two walkable
+cells, the free collision stopped it head on, and a route left only its end is never planned again.
+body_line_clear now follows each corner of the square from cell to cell along the way and refuses one
+stepping where World._terrain_blocks_step forbids (a wall, a ledge, a diagonal past a shut corner; a door
+opened, as _line_clear asks). controls_test _test_free_pull_round_a_wall: with the wall south of (3, 12),
+both cells walkable, the way south from (3.75, 12.0), the square's west half across that wall, is not
+clear (fails without the edge check), and down the door's middle from (4.0, 12.0) it is. Client only;
+protocol unchanged; no new class_name.
+
+689 amended (9) (2026-11-11, the script's label; the coordinator's backstop, asked with 724 amended (4)
+and 689 amended (8) because one walk held two causes where one was assumed; a fix, no package): whatever
+stops a click route, it never walks on the spot for good. Main._free_no_headway: a route sending its
+way that has come no nearer its next point by FREE_HEADWAY (0.05 cells) in FREE_NO_HEADWAY_SECONDS
+(0.4, the sim's ticks) is planned again once a click (World.walk_path) from the cell it stands in; a plan
+with no way, or with the same next point, ends the walk standing. Not counted while the server holds the
+body (a push's slide, a stun, down: FreeNet.Own.held_by_server) or across a frame that sent no way (724's
+wait for another player, a pushable's press wait), and a new route or next point starts the count again;
+a new click may plan again once more. It prints one line, with no names: "[free] no headway <s> at
+<where> making for <cell> toward <end> (the planner: walkable, held, step shut): planned again by <cell>
+| the walk ended", so a cause not yet known reports itself in a client's log instead of waiting for Jeff
+to see it. controls_test _test_free_no_headway: a route made by hand straight across the wall south of
+(3, 12) (which no check of the planner's knows is shut) is planned again by the door and reaches (3, 13),
+pressed at most 0.6 s; a route to (3, 10), no floor, ends standing within a second. Client only; protocol
+unchanged; no new class_name.
+
 ## 703: removing the player's grid path
 
 Free walk has been the default since 693; a player's body is to walk only
@@ -37046,6 +37076,44 @@ not as the check after it. Net prints each test player's join up to the count (t
 start) whenever --test-wait-players is set, and net_test prints each phase's for perf. Test only: no
 bullet, protocol unchanged, no new class_name. With it on main, release's one-rerun rule for a late
 join ends.
+
+724 amended (4) (decision_number.sh's label; the coordinator's go, from Jeff's "walking around
+looks like skipping"; a fix, no package): physics' drawn walk (one client on the wilds, companions'
+stops) stood 45 s on the spot short of a click's end someone held, 90 s at 150 ms against another's
+square, 1.5 s at a held cell's corner. The server stands a free body FREE_RADIUS off the square of
+any cell another holds (FOE_GAP off a foe's; World._free_off_cell), so pressed on it the body's centre
+is 0.8 from the holder's head on and farther aslant; Main._free_body_ahead counted a body only with
+centres under 0.8, so against a resident, a monster or a player standing on his cell the step right
+and the give-up never came, and the route pressed on, stepping on the spot, till he moved. Now
+_free_body_ahead measures to the held square (the cell under _free_stands): within FOE_GAP and
+FREE_AHEAD_REACH (0.2), the way to its nearest point within 60 degrees of the heading; never a
+pushable (the click's press, _free_press_waits), his own companion, or one not holding its cell. And
+_free_blocked, to the coordinator's bar of no stand over 0.3 s: the route's own end held ends the walk
+at once where it stands, beside it (a person clicked, or one stood on the cell; talk opens within
+TALK_REACH, so a walk ended short still opens it); a cell among the route's next two held by one who
+never steps aside himself (anyone but a player) is gone round at once (Main._free_round: a step right,
+else left, either only with a way on from it to the end, then on round him as a wall; else a route
+planned from its own cell round him; when none, it says once what shut each way, "[free] ... finds no
+way round"); another
+player is waited for FREE_BLOCKED_SECONDS standing, then the step right, as two head-on each take
+their own (net_test's passage, one step); a held square off the route's next two cells (brushed in passing, or one a
+step aside has left behind, which a frame may still see ahead: past another player, whose step came
+after the wait, the first take stood there till the give-up) is walked on past, so walking beside
+someone never stops, and anything that truly stops it is the backstop's (689 amended (9)). With no way round the
+body stands, no way sent (_free["block_wait"]), so no walk in place, till the other goes or
+FREE_GIVE_UP_SECONDS. The foe a chase goes for is never in its way: the chase stops in reach as it
+did. controls_test _test_free_route_held: the square counted head on (7.2, 3.0) and aslant (8.8, 2.74),
+centres 0.8 and 0.84 off; not a cell short nor walking away; a brush along the next row not blocked; and
+with a talker at peace, a foe and another player each: the clicked cell (8, 3) held, the walk ends beside
+it, stood against it at most 0.3 s; the route's own 4th cell held (planned through it: a first try put
+the holder on a cell the test room's route went round, and it passed without any step aside), gone round
+to the end, stood at most 0.3 s (another player 0.4), never sending a way it did not walk (a walk on the
+spot) over 0.1 s. _test_free_route_passage, the test room's two-cell dead-end passage (x 20 and 21, rows
+20 to 30): a talker on the route's cell is passed on the other cell; with both cells held the body stands
+at once (on the spot at most 0.1 s; a side taken with no way on from it would step across, press the
+second and come back, its block's count starting again each time it moved) and the walk is given up FREE_GIVE_UP_SECONDS after. Each fails on the old code
+(the run's lines are in the landing message). Client only; protocol unchanged; no new
+class_name.
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot

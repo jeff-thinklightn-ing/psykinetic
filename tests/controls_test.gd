@@ -52,6 +52,9 @@ func _ready() -> void:
 	_test_free_route_own_companion()
 	_test_free_pull_round_a_wall()
 	_test_free_pull_beside_a_talker()
+	_test_free_route_held()
+	_test_free_route_passage()
+	_test_free_no_headway()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1082,6 +1085,12 @@ func _test_free_pull_round_a_wall() -> void:
 			break
 	_check(player.tile == Vector2i(3, 13) and door.is_open() and not _walking(),
 			"route %s from (3, 11): the door opened, at (3, 13) by %s" % [planned, cells])
+	# 689 amended (8): the body's square stepping across a wall's edge between two walkable cells.
+	_check(World._terrain_blocks_step(Vector2i(3, 12), Vector2i(0, 1), true) and World.is_walkable(Vector2i(3, 12))
+			and World.is_walkable(Vector2i(3, 13)), "(the wall south of (3, 12), both cells walkable)")
+	_check(not Main.body_line_clear(Vector2(3.75, 12.0), Vector2(3.75, 13.0), Vector2i(4, 13), player)
+			and Main.body_line_clear(Vector2(4.0, 12.0), Vector2(4.0, 13.0), Vector2i(4, 13), player),
+			"a straight way from (3.75, 12.0) south, its square's west half across the wall south of (3, 12): not clear; down the door's middle from (4.0, 12.0): clear")
 	_stop_walk()
 	World._set_door(door, false, player)
 	player.free_view = null
@@ -1139,6 +1148,195 @@ func _test_free_pull_beside_a_talker() -> void:
 	World.despawn(talker)
 	talker.queue_free()
 	Net.controls = saved
+
+
+## 724 amended (4) (Jeff: "walking around looks like skipping"; physics'
+## drawn walk stood 45 s short of a click's end someone held, and 90 s
+## against another's square): the server stands the body off a held
+## cell's square, 0.8 from its centre head on and farther aslant, where the
+## old centre check (under 0.8) never counted him, so the route walked on
+## the spot till he moved. Now, with the holder a talker at peace, a foe
+## (FOE_GAP) and another player: the route's own end held ends the walk
+## beside it at once; a cell on the way held is gone round (another player
+## waited for FREE_BLOCKED_SECONDS, standing), never stood against longer.
+func _test_free_route_held() -> void:
+	print("\n== a click route met by one holding a cell on it: never a walk on the spot ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(7, 3)) <= 10:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(3, 3))
+	var holder := _held_body("talker", Vector2i(8, 3))
+	_check(_main._free_body_ahead(player, Vector2(7.2, 3.0), Vector2(1, 0)) == holder
+			and _main._free_body_ahead(player, Vector2(8.8, 2.74), Vector2(-1, 0)) == holder,
+			"pressed on his square head on (7.2, 3.0) and aslant (8.8, 2.74), centres 0.8 and 0.84 apart: he is in the way")
+	_check(_main._free_body_ahead(player, Vector2(6.0, 3.0), Vector2(1, 0)) == null
+			and _main._free_body_ahead(player, Vector2(7.2, 3.0), Vector2(-1, 0)) == null,
+			"a cell short, or walking away from him: not in the way")
+	# Brushed in passing (his square beside the route, not on it): walked on, no stand.
+	_main._free["path"] = [Vector2i(8, 2), Vector2i(9, 2)]
+	_check(not _main._free_blocked(player, Vector2(7.2, 2.0), Vector2(1, 0), _main._free["path"]),
+			"walking by along the row beside his: not blocked")
+	World.despawn(holder)
+	holder.queue_free()
+	for kind in ["talker", "foe", "player"]:
+		# The route's own end held (a person stood on the cell clicked).
+		_place_player(Vector2i(3, 3))
+		_free_start(player)
+		_main._free_route(player, Vector2i(8, 3))
+		holder = _held_body(kind, Vector2i(8, 3))
+		var walk := _held_walk(player, 240)
+		_check(not _walking() and World.distance(player.tile, Vector2i(8, 3)) == 1 and walk["stall"] <= 0.3,
+				"%s on the cell clicked (8, 3): the walk ends beside it at %s, stood against it %.1f s (at most 0.3)" % [kind, player.free_pos, walk["stall"]])
+		World.despawn(holder)
+		holder.queue_free()
+		# A cell on the way held: gone round, on to the end.
+		_place_player(Vector2i(3, 3))
+		_free_start(player)
+		_main._free_route(player, Vector2i(11, 3))
+		var planned: Array = (_main._free["path"] as Array).duplicate()
+		var on_it: Vector2i = planned[3] if planned.size() > 4 else Main.NONE
+		holder = _held_body(kind, on_it)
+		walk = _held_walk(player, 600, Vector2i(11, 3))
+		var most := Main.FREE_BLOCKED_SECONDS + 0.15 if kind == "player" else 0.3
+		_check(walk["arrived"] and walk["stall"] <= most and walk["jog"] <= 0.1,
+				"%s on %s, the 4th cell of the route %s to (11, 3): gone round, at %s, stood against it %.1f s (at most %.2f), on the spot %.1f s (at most 0.1)" % [kind, on_it, planned, player.free_pos, walk["stall"], most, walk["jog"]])
+		World.despawn(holder)
+		holder.queue_free()
+	_stop_walk()
+	Net.controls = saved
+
+
+## 724 amended (4), the passages (the coordinator's; two-cell passages are
+## the map rule): in the test room's dead-end passage, x 20 and 21 from row
+## 20 down to 30, one who never steps aside on the route's cell is passed on
+## the passage's other cell; with both cells held there is no way round, so
+## the body stands at once (never a walk on the spot, nor stepping across
+## to press the second and back) and the walk is given up at
+## FREE_GIVE_UP_SECONDS.
+func _test_free_route_passage() -> void:
+	print("\n== a holder in a two-cell passage: passed on its other cell; both cells held: stood at once, given up ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(20, 25)) <= 12:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(20, 19))
+	_free_start(player)
+	_main._free_route(player, Vector2i(20, 29))
+	var planned: Array = (_main._free["path"] as Array).duplicate()
+	var on_it := Main.NONE
+	for cell: Vector2i in planned:
+		if cell.y == 24:
+			on_it = cell
+	var holder := _held_body("talker", on_it)
+	var walk := _held_walk(player, 600, Vector2i(20, 29))
+	_check(walk["arrived"] and walk["stall"] <= 0.3 and walk["jog"] <= 0.1,
+			"a talker on %s in the passage, the route %s: passed on its other cell, at %s, stood %.1f s (at most 0.3), on the spot %.1f s" % [on_it, planned, player.free_pos, walk["stall"], walk["jog"]])
+	World.despawn(holder)
+	holder.queue_free()
+	_place_player(Vector2i(20, 19))
+	_free_start(player)
+	_main._free_route(player, Vector2i(20, 29))
+	planned = (_main._free["path"] as Array).duplicate()
+	for cell: Vector2i in planned:
+		if cell.y == 24:
+			on_it = cell
+	var beside := Vector2i(41 - on_it.x, 24)
+	holder = _held_body("talker", on_it)
+	var second := _held_body("talker", beside)
+	walk = _held_walk(player, 480)
+	var given_up := float(walk["ended"]) / World.TICK_RATE
+	_check(not _walking() and walk["jog"] <= 0.1 and walk["ended"] > 0 and given_up <= 1.5 + Main.FREE_GIVE_UP_SECONDS
+			and player.free_pos.y < 23.5,
+			"both cells of the passage held, %s and %s: stood at once at %s (on the spot %.1f s, at most 0.1), the walk given up %.1f s in (the way there and %.1f)" % [on_it, beside, player.free_pos, walk["jog"], given_up, Main.FREE_GIVE_UP_SECONDS])
+	World.despawn(holder)
+	holder.queue_free()
+	World.despawn(second)
+	second.queue_free()
+	_stop_walk()
+	Net.controls = saved
+
+
+## 689 amended (9), the backstop: a route the planner never made, which
+## neither 724's body check nor body_line_clear knows is shut (it says its
+## next step is open), pressed on the spot no longer than
+## FREE_NO_HEADWAY_SECONDS and a tick: planned again from where it stands
+## when there is a way (the wall south of (3, 12), the door beside it), else
+## ended standing (the cell north of (3, 11) is no floor) within a second.
+func _test_free_no_headway() -> void:
+	print("\n== a click route making no headway, whatever stops it: planned again once, else ended standing ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(3, 12))
+	_free_start(player)
+	_main._free.erase("replanned")
+	_main._free["path"] = [Vector2i(3, 13)]  # Straight through the wall south of (3, 12).
+	var walk := _held_walk(player, 600, Vector2i(3, 13))
+	var most := 0.6  # FREE_NO_HEADWAY_SECONDS (0.4) and two ticks; a number, so the old code's run compiles.
+	_check(walk["arrived"] and walk["stall"] <= most,
+			"a route across the wall south of (3, 12): planned again by the door, at (3, 13) (%s), pressed %.1f s (at most %.1f)" % [player.free_pos, walk["stall"], most])
+	player = _place_player(Vector2i(3, 11))
+	_free_start(player)
+	_main._free.erase("replanned")
+	_main._free["path"] = [Vector2i(3, 10)]  # No floor: no plan reaches it.
+	walk = _held_walk(player, 60)
+	_check(not _walking() and player.free_pos.distance_to(Vector2(3, 11)) < 0.5,
+			"a route to (3, 10), no floor: ended within a second, standing at %s (the route %s)" % [player.free_pos, _main._free["path"]])
+	_stop_walk()
+	Net.controls = saved
+
+
+## A body holding [param cell] for _test_free_route_held: a talker at
+## peace, a foe that stands still, or another player.
+func _held_body(kind: String, cell: Vector2i) -> GridEntity:
+	var occupant := World.get_entity_at(cell)
+	if occupant != null:
+		World.despawn(occupant)
+	if kind == "player":
+		return _main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "Cyl", "tile": cell, "peer": 77, "label": "Cyl"})
+	var body := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Holder", "tile": cell}) as Monster
+	body.sight_range = 0
+	body.acts = false
+	if kind == "talker":
+		body.talks = true
+		body.peaceable = true
+	_main.add_child(body)
+	World.spawn(body, cell)
+	return body
+
+
+## The click route walked up to [param frames] frames (to [param cell], if
+## given): {"stall": the longest it stood still with its route still on,
+## in seconds, by the sim's ticks; "jog": the longest it sent a way and
+## did not move (a walk on the spot), likewise; "arrived": on [param cell]'s
+## centre; "ended": the tick its route ended, -1 if it never did}.
+func _held_walk(player: Player, frames: int, cell := Main.NONE) -> Dictionary:
+	var longest := 0
+	var run := 0
+	var jog := 0
+	var jogging := 0
+	var ended := -1
+	var start := World.tick
+	var last := player.free_pos
+	var own: Variant = _main._free_own(player)  # FreeNet.Own (its open way: the walk sent).
+	for i in frames:
+		player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+		_main._free_drive(1.0 / 60.0)
+		if i % 6 == 5:
+			World.step()
+			var still := player.free_pos.distance_to(last) < 0.01
+			run = run + 1 if _walking() and still else 0
+			longest = maxi(longest, run)
+			jogging = jogging + 1 if still and own != null and own.open_intent != Vector2.ZERO else 0
+			jog = maxi(jog, jogging)
+			if ended < 0 and not _walking():
+				ended = World.tick - start
+			last = player.free_pos
+		if cell != Main.NONE and player.tile == cell and player.free_pos.distance_to(Vector2(cell)) < 0.06:
+			return {"stall": float(longest) / World.TICK_RATE, "jog": float(jog) / World.TICK_RATE, "arrived": true, "ended": ended}
+	return {"stall": float(longest) / World.TICK_RATE, "jog": float(jog) / World.TICK_RATE, "arrived": false, "ended": ended}
 
 
 ## A click route with his own companion standing on it (playtest's barrow
