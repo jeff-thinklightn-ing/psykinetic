@@ -43,6 +43,13 @@ if (Test-Path $durations) {
 		if ($fields.Count -eq 2 -and -not $last.ContainsKey($fields[1])) { $last[$fields[1]] = [int]$fields[0] }
 	}
 }
+# A scene's time limit (90 amended (1), as tests/run.sh): $timeout, or twice
+# its last run when that is more, at most $timeoutCap.
+$timeoutCap = 900
+function Get-Limit($scene) {
+	$twice = if ($last.ContainsKey($scene)) { 2 * $last[$scene] } else { 0 }
+	[Math]::Max($timeout, [Math]::Min($twice, $timeoutCap))
+}
 $scenes = @(Get-ChildItem (Join-Path $PSScriptRoot '*_test.tscn') | ForEach-Object { "tests/$($_.Name)" } |
 	Sort-Object @{ Expression = { if ($last.ContainsKey($_)) { $last[$_] } else { 999 } }; Descending = $true })
 
@@ -55,8 +62,11 @@ function Get-Verdict($scene, $process, $killed, $took) {
 	$output = @(Get-Content "$log.out" -ErrorAction SilentlyContinue) + @(Get-Content "$log.err" -ErrorAction SilentlyContinue) | ForEach-Object { "$_" }
 	$why = ''
 	if ($killed) {
-		$why = "did not finish within ${timeout}s (a parse error, or a hang): killed"
+		# Apart from a failed check (90 amended (1)), and noted in the gate's log.
+		$lastTook = if ($last.ContainsKey($scene)) { "$($last[$scene])" } else { 'no' }
+		$why = "timed out under load: did not finish within $(Get-Limit $scene)s (its last run took ${lastTook}s; a parse error or a hang ends here too): killed"
 		$output += "FAIL  $scene $why"
+		$null = & python -B (Join-Path $root 'tools/heavy_job.py') note (Split-Path $root -Leaf) timeout "$(Get-Name $scene) after $(Get-Limit $scene)s (its last run ${lastTook}s)" 2>$null
 	} elseif ($output | Select-String 'SCRIPT ERROR|^ERROR:') {
 		$why = "an engine error: $(($output | Select-String 'SCRIPT ERROR|^ERROR:' | Select-Object -First 1).Line)"
 	} elseif ($process.ExitCode -ne 0) {
@@ -139,7 +149,7 @@ try {
 			$took = [int]((Get-Date) - $entry.Started).TotalSeconds
 			$killed = $false
 			if (-not $entry.Process.HasExited) {
-				if ($took -lt $timeout) { continue }
+				if ($took -lt (Get-Limit $scene)) { continue }
 				Stop-Scene $entry.Process
 				$killed = $true
 			}
@@ -187,7 +197,9 @@ try {
 		$scenes | Where-Object { $retried.ContainsKey($_) } | ForEach-Object { $verdicts[$_] } | Write-Output
 		$code = 0
 	} else {
-		Write-Output "SUITE: FAIL ($($failed.Count) of $($scenes.Count) failed: $(($failed | ForEach-Object { Get-Name $_ }) -join ' '); ${seconds}s$again)"
+		$timedOut = @($failed | Where-Object { $verdicts[$_] -match ': timed out under load:' }).Count
+		$slow = if ($timedOut -gt 0) { "; $timedOut of them timed out under load, not a failed check" } else { '' }
+		Write-Output "SUITE: FAIL ($($failed.Count) of $($scenes.Count) failed: $(($failed | ForEach-Object { Get-Name $_ }) -join ' ')$slow; ${seconds}s$again)"
 		$failed | ForEach-Object { $verdicts[$_] } | Write-Output
 	}
 } finally {

@@ -27,8 +27,13 @@ case "$GODOT" in
 esac
 
 # A scene that has not finished in this many seconds (a parse error leaves
-# Godot running, waiting) is killed and fails the run.
+# Godot running, waiting) is killed and fails the run. Since 90 amended (1)
+# this is the floor: a scene gets twice its own last run (DURATIONS) when
+# that is more, up to TIMEOUT_CAP, so a slow scene on a loaded machine is
+# not killed at 300 s (view_test and view_land_test run 150 to 240 s lean,
+# and were killed in four landings, 11-07).
 TIMEOUT="${TEST_TIMEOUT:-300}"
+TIMEOUT_CAP=900
 
 cd "$(dirname "$0")/.."
 . tests/godot_log.sh  # Its logs in build/logs (decision 664).
@@ -39,6 +44,24 @@ SERIAL=0
 LOGS="$(mktemp -d -t psykinetic-run.XXXXXX)"
 trap 'rm -rf "$LOGS"' EXIT
 DURATIONS=.godot/test_durations.txt
+# Each scene's last time (s), read once (90 amended (1)); the subshells that
+# run the scenes inherit it.
+declare -A LAST_TOOK
+if [ -f "$DURATIONS" ]; then
+	while read -r last_took last_scene; do
+		[ -n "$last_scene" ] && [ -z "${LAST_TOOK[$last_scene]:-}" ] && LAST_TOOK[$last_scene]="$last_took"
+	done <"$DURATIONS"
+fi
+
+# The time limit of [param 1]'s scene: TIMEOUT, or twice its last run when
+# that is more, at most TIMEOUT_CAP (and never under TIMEOUT).
+scene_limit() {
+	last="${LAST_TOOK[$1]:-0}"
+	limit=$(( last * 2 ))
+	[ "$limit" -gt "$TIMEOUT_CAP" ] && limit="$TIMEOUT_CAP"
+	[ "$limit" -lt "$TIMEOUT" ] && limit="$TIMEOUT"
+	echo "$limit"
+}
 
 # Every tests/*_test.tscn, found by name, so a new test scene needs no edit here (a
 # shared list made every tree adding a test conflict with the others). Slowest
@@ -58,7 +81,8 @@ run_scene() {
 	started=$(date +%s)
 	# The marker names this run's process of this scene, for the kill below.
 	marker="psykinetic-run-$$-$name"
-	timeout --kill-after=10 "$TIMEOUT" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
+	limit="$(scene_limit "$scene")"
+	timeout --kill-after=10 "$limit" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 	status=$?
 	retried=""
 	if launch_failed "$status" "$started" "$log"; then
@@ -69,7 +93,7 @@ run_scene() {
 		retried="${retried%%; backtrace:*}"  # The whole one is in the gate's log.
 		sleep 2
 		again=$(date +%s)
-		timeout --kill-after=10 "$TIMEOUT" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)_again")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
+		timeout --kill-after=10 "$limit" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)_again")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
 		status=$?
 		if launch_failed "$status" "$again" "$log"; then
 			again_note="$(launch_note "$name" "$status" "$log")"
@@ -84,8 +108,11 @@ run_scene() {
 	took=$(( $(date +%s) - started ))
 	why=""
 	if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
-		why="did not finish within ${TIMEOUT}s (a parse error, or a hang): killed"
+		# Apart from a failed check (90 amended (1)): a kill for time, noted in
+		# the gate's log too, so the record tells the two apart.
+		why="timed out under load: did not finish within ${limit}s (its last run took ${LAST_TOOK[$scene]:-no}s; a parse error or a hang ends here too): killed"
 		echo "FAIL  $scene $why" >>"$log"
+		python -B tools/heavy_job.py note "$(basename "$(pwd)")" timeout "$name after ${limit}s (its last run ${LAST_TOOK[$scene]:-unknown}s)" >/dev/null 2>&1
 	elif grep -q "SCRIPT ERROR\|^ERROR:" "$log"; then
 		why="an engine error: $(grep -m 1 "SCRIPT ERROR\|^ERROR:" "$log")"
 	elif [ "$status" -ne 0 ]; then
@@ -183,7 +210,10 @@ if [ "$code" -eq 0 ]; then
 	echo "SUITE: PASS ($count scenes, $jobs_at_once at once, $(( $(date +%s) - started ))s$again)"
 	cat "$LOGS"/*.result 2>/dev/null | grep "retried after a launch failure"
 else
-	echo "SUITE: FAIL ($(echo "$failed" | wc -w | tr -d ' ') of $count failed:$failed; $(( $(date +%s) - started ))s$again)"
+	timed_out=$(cat "$LOGS"/*.result 2>/dev/null | grep -c ": timed out under load:")
+	slow=""
+	[ "$timed_out" -gt 0 ] && slow="; $timed_out of them timed out under load, not a failed check"
+	echo "SUITE: FAIL ($(echo "$failed" | wc -w | tr -d ' ') of $count failed:$failed$slow; $(( $(date +%s) - started ))s$again)"
 	for name in $failed; do cat "$LOGS/$name.log.result"; done
 fi
 exit $code

@@ -120,6 +120,7 @@ tune it), heavy_jobs.log a line an event (`summary`).
   heavy_job.py kinds                               the kinds and their estimates
   heavy_job.py summary [YYYY-MM-DD]                what waited or was stopped that day (today)
   heavy_job.py note <tree> launch <detail...>      log a test scene that died at launch (decision 530),
+                                                   or `timeout`, one killed for time (90 amended (1)),
                                                    with free RAM and commit; prints the line's detail
 
 Standard library only (ctypes for Windows), so any Python can run it by path.
@@ -2042,7 +2043,7 @@ def summary(day):
         if event == "launch":
             detail = detail.split("; backtrace:")[0]  # The whole one stays in the log.
         print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in SUMMARY_EVENTS else "waited", detail))
-    counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung", "launch")]
+    counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung", "launch", "timeout")]
     late = [float(re.match(r"waited (\d+)", each[4]).group(1)) for each in lines
         if each[1] == "backfill_late" and re.match(r"waited (\d+)", each[4])]
     counts.append("%d backfill, %d late (%.0f s in all)" % (sum(1 for each in lines if each[1] == "backfill"), len(late), sum(late)))
@@ -2070,7 +2071,7 @@ def summary(day):
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late", "front",
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front",
     "old_gate", "unbeaten", "beat_failed")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
@@ -2126,7 +2127,7 @@ def front(tree, kind, by, why):
     return 0
 ## What a script outside the gate may log with `note` (decision 530: a test
 ## scene that died at launch, before any of its own code ran).
-NOTE_EVENTS = ("launch", "beat_failed")
+NOTE_EVENTS = ("launch", "timeout", "beat_failed")  # timeout: a test scene killed for time (90 amended (1)).
 
 
 def note(tree, event, detail):

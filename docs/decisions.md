@@ -800,6 +800,21 @@ A parse error leaves Godot waiting rather than exiting, which hung the
 test run, and with it ship.ps1. Each scene now gets 300 s (TEST_TIMEOUT
 overrides), after which it is killed and the run fails.
 
+90 amended (1) (2026-11-11, perf; the coordinator's assignment from the
+landing flakes, fronted by release; label from tools/decision_number.sh): a
+scene's limit follows its own last run. view_test and view_land_test run
+150 to 240 s at lean width and were killed at 300 s in four landings on
+11-07 (economy's and three of maps'), the largest single class of failed
+landings that week (C:\dev\review\perf\flakes.md). tests/run.sh and run.ps1
+now give each scene twice its last time from .godot/test_durations.txt when
+that is more than 300 s (TEST_TIMEOUT, still the floor), at most 900 s
+(TIMEOUT_CAP), so a parse error or a hang still ends. A scene killed for
+time is reported apart from a failed check: its line reads "timed out under
+load: did not finish within N s (its last run took M s ...)", the SUITE:
+FAIL line counts such scenes, and each is noted in the gate's log as a
+`timeout` event (heavy_job note; heavy_job summary counts them), so the
+record tells load from a broken check. Tests and tools only.
+
 ## 91. The voice is told what she is doing and what just happened
 
 Lines came out generic ("Stay close." while she was pulling back) because
