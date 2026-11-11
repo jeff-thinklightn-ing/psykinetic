@@ -2818,6 +2818,9 @@ const FREE_PRESS_TOUCH := 0.001
 ## How far along its route a free body looks for a cell in clear line
 ## (_free_pull, 689 amended (5)): a few line checks a frame at most.
 const FREE_PULL_CELLS := 12
+## body_line_clear's sampling along the way and its square's give (cells).
+const BODY_SAMPLE := 0.25
+const BODY_SLACK := 0.02
 ## How often a chase sends its attack order again while out of reach (697).
 const FREE_CHASE_RESEND_MS := 1000
 ## A chase stops this share of its weapon's span off its foe (699 amended).
@@ -3091,17 +3094,51 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 ## door, (15, 27) to (15, 28) to (14, 28), dropped (15, 28) a cell short of
 ## (14, 28), the body pressed the wall between, and each re-click planned
 ## it back: it stepped between (14, 27) and (15, 27) for a minute).
+## Both judge the body's own way too, from where it is (body_line_clear): the
+## cells' line from its cell may be clear while the body, off its cell's
+## centre, would clip a held cell's corner (dungeon's crypt walk: beside the
+## knight, sliding round him, the route pulled to its end, the straight way
+## clipped his square and slid it back into the wall's corner, and nothing
+## planned a route left only its end again: 20 s still; 689 amended (7)).
 func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 	var from := World.free_cell(player, at)
 	for k in range(mini(path.size() - 1, FREE_PULL_CELLS), 0, -1):
-		if World._line_clear(from, path[k], path[k], player) and not segment_burns(at, Vector2(path[k]), World.is_burning):
+		if World._line_clear(from, path[k], path[k], player) and not segment_burns(at, Vector2(path[k]), World.is_burning) \
+				and body_line_clear(at, Vector2(path[k]), path[k], player):
 			for i in k:
 				path.pop_front()
 			return
 	var here := Vector2i(at.round())
 	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])) \
-			and World._line_clear(here, path[1], path[1], player) and not segment_burns(at, Vector2(path[1]), World.is_burning):
+			and World._line_clear(here, path[1], path[1], player) and not segment_burns(at, Vector2(path[1]), World.is_burning) \
+			and body_line_clear(at, Vector2(path[1]), path[1], player):
 		path.pop_front()
+
+
+## Whether [param player]'s free body could go straight from [param a] to
+## [param b] (its centre's way, World.FREE_RADIUS round) without its square
+## reaching a cell that isn't walkable or that another holds (never itself,
+## its own companion, whom it passes through, or whoever holds [param goal]).
+## Looked at every BODY_SAMPLE of a cell (under the square's width, so no
+## cell is stepped over), the square's four corners, BODY_SLACK inside its
+## radius (a body at rest against a wall stands exactly a radius off it).
+static func body_line_clear(a: Vector2, b: Vector2, goal: Vector2i, player: GridEntity) -> bool:
+	var steps := maxi(ceili(a.distance_to(b) / BODY_SAMPLE), 1)
+	var seen := {}
+	var r := World.FREE_RADIUS - BODY_SLACK
+	for k in range(0, steps + 1):
+		var point := a.lerp(b, float(k) / steps)
+		for corner: Vector2 in [Vector2(-r, -r), Vector2(r, -r), Vector2(-r, r), Vector2(r, r)]:
+			var cell := Vector2i((point + corner).round())
+			if seen.has(cell) or cell == goal:
+				continue
+			seen[cell] = true
+			if not World.is_walkable(cell):
+				return false
+			var other := World.get_entity_at(cell)
+			if other != null and other != player and not World._own_companion_of(other, player):
+				return false
+	return true
 
 
 ## Whether a body going straight from [param a] to [param b] would stand,

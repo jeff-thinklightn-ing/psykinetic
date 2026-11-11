@@ -35463,6 +35463,28 @@ unacknowledged command (own.pending empty): a body put back short walks
 on from where the server has it. Client only, protocol unchanged, no new
 class_name.
 
+689 amended (7) (2026-11-11, the script's label; the coordinator's go, from dungeon's crypt walk on
+maps' d83a5a393): a click route is pulled only where the body's own way is clear. In the crypt,
+right after taking the fallen knight's quest at (40, 10) (the knight at (39, 10), the wall north at
+(40, 9) and (39, 9)), a click on the sealed stair (30, 8) stood still 20 s: the route went round him
+by (39, 11), but sliding round him the body's cell line to the end was clear (World._line_clear from
+free_cell, the cells only), so _free_pull cut the route to its end; the straight way from where the
+body was clipped his square, the free collision slid it back into the wall's corner ((40.0, 9.8)),
+and a route left only its end is never planned again. Now both of _free_pull's pulls also need
+Main.body_line_clear: the body's square (FREE_RADIUS less BODY_SLACK 0.02, so a body at rest against a
+wall isn't counted in it) along the straight way from where it is, its four corners every
+BODY_SAMPLE (0.25) of a cell, reaching no cell that isn't walkable or that another holds (never
+itself, its own companion, or the route's end). Dungeon's crypt walk with the mend, the same seed:
+the stair reached in about 5 s, and the tour ran on. In the test room (a talker at peace at (4, 11),
+the wall north of (3, 11)), the old pull, from a body at 81 places round him and clicks on every
+free cell, crossed his square in 3666 of 8748 cases (a report run). An earlier sweep's still clicks
+are not counted: imps came back and fire was near in it. controls_test _test_free_pull_beside_a_talker:
+sliding round him at (3.0, 11.6), cell (3, 12), clicks on (1, 1) and (6, 1) keep the route's head (4, 12),
+where the old pull took it to (6, 11) through his square (it fails with body_line_clear made to pass
+everything). Clicks from there and from the crypt's place, pressed to the wall at (3.0, 10.8), are each on
+their way within 3 s, with the mend and without it (the test room never held the crypt's stand
+still). Client only (main.gd); protocol unchanged; no new class_name; CHANGELOG bullet (voice's).
+
 ## 703: removing the player's grid path
 
 Free walk has been the default since 693; a player's body is to walk only

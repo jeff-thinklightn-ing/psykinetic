@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_free_chase()
 	_test_free_route_own_companion()
 	_test_free_pull_round_a_wall()
+	_test_free_pull_beside_a_talker()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1084,6 +1085,59 @@ func _test_free_pull_round_a_wall() -> void:
 	_stop_walk()
 	World._set_door(door, false, player)
 	player.free_view = null
+	Net.controls = saved
+
+
+## Dungeon's crypt walk (maps' d83a5a393): at (40, 10) beside the knight (39, 10), the wall north,
+## a click on (30, 8) stood still 20 s. The route went round him (39, 11), but sliding round
+## him the body's cell line to the end was clear, the route was pulled to its end, the
+## straight way clipped his square and slid it back into the wall's corner, and a route left
+## only its end was never planned again. The test room's (3, 11), the wall north at (3, 10),
+## a talker who never steps aside at (4, 11): sliding round him at (3.0, 11.6), cell (3, 12),
+## the cells' line to (6, 11) is clear but the body's square crosses his (the old pull took
+## it in 3666 of 8748 spots and clicks round him); the pull stops short of that now, and
+## clicks from there and from the crypt's place, pressed to the wall, walk.
+func _test_free_pull_beside_a_talker() -> void:
+	print("\n== a click beside one who never makes way, a wall the other side: the body's own way judged ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(4, 11)) <= 10:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(3, 11))
+	var talker := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Knight", "tile": Vector2i(4, 11)}) as Monster
+	talker.sight_range = 0
+	talker.talks = true
+	talker.peaceable = true
+	talker.acts = false
+	_main.add_child(talker)
+	_check(World.spawn(talker, Vector2i(4, 11)) and not World.is_walkable(Vector2i(3, 10)),
+			"(a talker at peace at (4, 11), the wall north of (3, 11))")
+	_check(not Main.body_line_clear(Vector2(3.0, 11.45), Vector2(7.0, 8.0), Vector2i(7, 8), player)
+			and Main.body_line_clear(Vector2(4.4, 3.3), Vector2(9.0, 3.0), Vector2i(9, 3), player),
+			"body_line_clear: off its centre, the straight way to (7, 8) clips his square; _test_free_pull's open way is clear")
+	var sliding := Vector2(3.0, 11.6)
+	for goal: Vector2i in [Vector2i(1, 1), Vector2i(6, 1)]:
+		var path: Array = World.walk_path(World.free_cell(player, sliding), goal, player)
+		var first = path[0] if not path.is_empty() else null
+		_main._free_pull(player, path, sliding)
+		_check(first == Vector2i(4, 12) and path[0] == first,
+				"sliding round him at %s, a click on %s: the route not pulled past %s (the straight way on crosses his square; the route %s)" % [sliding, goal, first, path])
+	var pressed := Vector2(3.0, 10.5 + World.FREE_RADIUS)
+	for walk: Array in [[pressed, Vector2i(7, 8)], [pressed, Vector2i(3, 3)], [pressed, Vector2i(6, 11)], [sliding, Vector2i(1, 1)], [sliding, Vector2i(6, 1)]]:
+		var goal: Vector2i = walk[1]
+		_place_player(Vector2i(3, 11))
+		_free_start(player)
+		player.free_pos = walk[0]
+		player.hp = player.max_hp
+		_main._free_route(player, goal)
+		var start := player.free_pos
+		_free_frames(player, 180)
+		_check(player.free_pos.distance_to(start) > 1.0 and World.distance(player.tile, goal) < World.distance(Vector2i(3, 11), goal),
+				"a click on %s from %s: on its way (at %s, the route %s)" % [goal, start, player.free_pos, _main._free["path"]])
+	_stop_walk()
+	World.despawn(talker)
+	talker.queue_free()
 	Net.controls = saved
 
 

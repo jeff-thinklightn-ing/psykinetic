@@ -10,6 +10,7 @@ notes (decision 324).
 
 - Your shield and your sword's parry never break or leave you stunned now: a raised shield holds any blow for stamina, a heavier one costing more and a wound-up heavy swing twice, and when you run short it gives out, letting that blow through and staying down a moment; your sword's ready parry turns light blows and lets heavier ones by; and the sword and the buckler catch a blow from a foe standing a little off your line, where before a heavy bite broke your guard and left you stunned, worse than holding nothing (340 amended (2)).
 - Goblins are solid all over, from chests and belts to legs, collars and ears, and every goblin wears his hood up, Snagfin at home too; people and goblins keep their full shape at a distance (494 amended (3))
+- Click to walk away from someone who never steps aside, such as the fallen knight with a wall at your back, and you walk round them at once (689 amended (7))
 
 - Towns: Rolf sells a bandaging kit at his stall for 5 gold, and a kit isn't used up, so one keeps mending you between fights (736 amended (5))
 
