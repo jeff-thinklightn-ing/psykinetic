@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2811)
+## Lines in the code (2813)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -2051,7 +2051,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (716)
+### server and windows (718)
 
 | | Line | Where |
 |---|---|---|
@@ -2143,14 +2143,16 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | someone was hurt | `main.gd` _tell_bandage_broke() |
 |  | a monster came near | `main.gd` _tell_bandage_broke() |
 |  | Your bandaging broke off: %s. | `main.gd` _tell_bandage_broke() |
-|  | Take the rod in hand to fish. | `main.gd` FISH_REFUSED |
+|  | You've no rod. Rolf at the stall has them. | `main.gd` FISH_REFUSED |
 |  | Your hands are full. | `main.gd` FISH_REFUSED |
 |  | There's no water near enough to cast into. | `main.gd` _tell_bandage_broke() |
-|  | Nothing takes the line here. | `main.gd` _tell_bandage_broke() |
 |  | This water is fished out for today. | `main.gd` _tell_bandage_broke() |
 |  | Your hands are full. | `main.gd` COOK_REFUSED |
 |  | You need a fire beside you to cook. | `main.gd` COOK_REFUSED |
+|  | in the square | `main.gd` FIRE_WHERE |
+|  | %s, done to a turn. | `main.gd` COOKED |
 |  | you were struck | `main.gd` FISH_BROKE |
+|  | There's one %s. | `main.gd` _tell_use_refused() |
 |  | You reel in: %s. | `main.gd` _on_fishing_changed() |
 |  | You reel in. | `main.gd` _on_fishing_changed() |
 |  | It slips the hook and is gone. | `main.gd` _on_fishing_changed() |

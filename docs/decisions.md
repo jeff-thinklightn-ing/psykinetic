@@ -45670,6 +45670,41 @@ C:/dev/review/mughouse/make_mughouse.py; the look at C:/dev/review/mughouse/smit
 nothing places it till buildings' 811 amended (2) switches the smithy on. Art only, protocol unchanged, no
 new class_name, no bullet.
 
+805 amended (11), "fishing that works", A, B, H and F (2) (items; the script's label; the coordinator's package and rulings
+after Jeff on v0.1.210: "fishing still doesn't work even though its in the release notes again", and his core loop
+first; items' blind tour on v0.1.210, tests/tour/tours/fish.gd, and playtest's: the cast was only a right-click on
+the rod's hand square in the pack window, a pool that looked fishable refused, a bite came and went in 1.2 s with
+nothing to answer, and a double click took the rod out of the hand). A, the cast: a left click on a water cell with
+a rod anywhere on you casts there (Main._fish_click, both control schemes, before the bow's and the walk's), by a new
+command "fish" {at} (World.try_fish(by, wanted), cast_cell taking the clicked cell when it is water within
+FISH_REACH); farther, the player walks to the nearest dry cell within reach of it (Main.cast_bank, _cast_wanted, cast
+on arrival by _update_cast). A rod in the pack goes to the right hand by itself (World._rod_to_hand: what that hand
+held to the rod's square by the swap, World.rod_slot) and both go back on the first step off the cell after the cast
+(World._tend_rods) or at once when a blow or a fall breaks it (_reel_in), so a wanderer never meets a player with
+the sword packed. With no rod the click is sent all the same and answered once a minute (Main.NO_ROD_EVERY, an answer
+to a click, not a caption): "You've no rod. Rolf at the stall has them." (voice's; a person, not a price). The pack's
+right-click still casts, now from the pack too, and a double click on a rod in hand leaves it there. B, the water:
+every body of water fishes (World.fish_waters_of: any 8-connected water, a river however narrow or bridged; a ford is
+floor, never water), so "Nothing takes the line here." (no_fish) is gone; World.fish_body_size(pond) gives a body's
+cells (a fishing place's id, or one not known, 0) for economy's thin stock on small water (economy's row,
+FISH_BODY_SMALL 8). H, the bite: FISH_BITE_TICKS 12 to 30 (3 s), its ring spreading again each second and its splash
+heard twice (client3d/fishing_view.gd); any left click while the float is down strikes (the "fish" command at the
+bite, World.try_strike), the cast's roll taken times FISH_STRIKE_ROLL 2/3 (economy's 0.6 becomes 0.9), a bonus: a bite
+left alone lands as it always did. A click on the water while waiting leaves the cast be. F (2), home: a fire cooks
+from World.COOK_REACH 2 cells (was 1), so the square's fire cooks from its seats round the pit (its place's rect is
+those two cells) and the Mughouse's hearth from the benches beside it, where both refused before (maps' finding); a
+fire's reach rather than a place's rect, since the tavern's place is its whole common room. Done is told: "Roast
+perch, done to a turn." (Main.COOKED, voice's; never where it went). No fire near: "You need a fire beside you to
+cook. There's one in the square." (Main.FIRE_WHERE by fire place id, lore's words; only within FIRE_TOLD_WITHIN 24
+cells of it, so never outside Umbrage; elsewhere the first sentence alone). Every line told here goes to its
+player's screen by Net.broadcast_to on the "party" route (the catch by 804's reward message), none by
+party_log.add alone (voice's sweep, the coordinator's check); a catch or a cooked thing his pack had no room for
+lies at his feet and says so (Main._tell_left_at_feet, take_line's words: "Your pack is full: a perch is left
+at your feet."). items_test
+_test_fishing_that_works, companion_test _test_fish_waters (every body; the wilds' every water cell). Protocol changed:
+PROTOCOL_REVISION 56, shared with 819 amended (the satchel; release's: it rides the 11-12 cut with this). No new
+class_name.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

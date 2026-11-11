@@ -31,6 +31,8 @@ notes (decision 324).
 
 - Towns: stand close by a town's hearth or fire, unhit for a few seconds, and it heals you as a camp's fire does, with the Healing mark showing; in Umbrage, the hearth in the Last Light Mughouse's common room and the fire on the square (777 amended (2))
 - With the low camera, when a house or the temple comes between you and the view, the camera moves in to stand outside it and rises with you, so you see the whole of yourself (864).
+- Fishing: with a rod on you, click the water to cast, and if it's out of reach you walk to the bank first; the rod comes to your hand by itself and goes back when you walk on. Every pond, pool and stream has fish now. When the float dips, it keeps ringing and splashing for three seconds: click anywhere in that time to strike, and you land the fish nine times in ten, where a bite you leave alone lands about six (805 amended (11)).
+- Cooking: you can cook a couple of paces from a fire now, from round the square's fire pit or the benches by the Mughouse hearth, and you're told when it's done; with no fire near, you're told you need one, and in Umbrage that there's one in the square (805 amended (11)).
 
 ## v0.1.211
 

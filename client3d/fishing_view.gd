@@ -26,6 +26,10 @@ const BOB_RATE := 0.6
 const DIP := 0.06
 const RING_WIDEST := 0.6
 const RING_SECONDS := 0.7
+## The bite's ring again, every this many seconds while the float is down,
+## and its splash once more this far in (805 amended (11): a bite of 3 s).
+const BITE_RING_EVERY := 1.0
+const BITE_SPLASH_AGAIN := 1.2
 ## The rod's tip from the angler's feet: up, and out ahead.
 const TIP_UP := 1.6
 const TIP_OUT := 1.2
@@ -249,9 +253,17 @@ func show_cast(key: String, entity: GridEntity) -> void:
 		view.sfx.steer(lap, spot)
 	_line(cast["line"], tip, spot)
 	var ring: MeshInstance3D = cast["ring"]
-	ring.visible = state == "bite" and since < RING_SECONDS
+	# 805 amended (11): the bite lasts long enough to answer (World.FISH_BITE_TICKS),
+	# so its ring spreads again every BITE_RING_EVERY while the float is down,
+	# and its splash sounds again once (BITE_SPLASH_AGAIN), so it is seen and heard.
+	var ring_since := fmod(since, BITE_RING_EVERY)
+	ring.visible = state == "bite" and ring_since < RING_SECONDS
+	if state == "bite" and since >= BITE_SPLASH_AGAIN and not cast.get("splashed_again", false):
+		cast["splashed_again"] = true
+		if SoundKit.has("sfx.fish_bite") and view.get("sfx") != null:
+			view.sfx.play("sfx.fish_bite", water)
 	if ring.visible:
-		var grown := since / RING_SECONDS
+		var grown := ring_since / RING_SECONDS
 		ring.position = water + Vector3(0, 0.01, 0)
 		ring.scale = Vector3.ONE * lerpf(0.1, RING_WIDEST, grown)
 		(ring.material_override as StandardMaterial3D).albedo_color.a = 0.6 * (1.0 - grown)
@@ -261,6 +273,7 @@ func show_cast(key: String, entity: GridEntity) -> void:
 func _begin(key: String, cast: Dictionary, state: String, cell: Vector2i) -> void:
 	cast["state"] = state
 	cast["since"] = _clock
+	cast["splashed_again"] = false
 	seen.append([key, state])
 	var slot: String = {"cast": "sfx.fish_cast", "wait": "sfx.fish_plop", "bite": "sfx.fish_bite", "landed": "sfx.fish_landed",
 		"missed": "sfx.fish_missed"}.get(state, "")

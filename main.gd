@@ -1353,6 +1353,7 @@ func _process(delta: float) -> void:
 	if _client3d != null:
 		_client3d.telegraph_tick(World.tick)  # 602, ui's side: the telegraphs' fill.
 	_update_pack()
+	_update_cast()
 	_update_talk()
 	_update_deal()
 	_update_find()
@@ -1593,6 +1594,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)  # A gone draugr's remains: a click talks to him (573 amended (4)).
+	# Fishing (805 amended (11), "fishing that works"): the float down, a left
+	# click strikes; a left click on water with a rod on you casts there.
+	if click.button_index == MOUSE_BUTTON_LEFT and _fish_click(player, tile, on_sprite):
+		return
 	# A bow in hand (583 amended; Jeff: "the point of shift is to stand
 	# firm and start nocking"): Shift (the stand key) held draws and stands
 	# the body firm (drive_stand_draw), a left release while drawn looses
@@ -2749,6 +2754,7 @@ func _apply_azimuth() -> void:
 ## (_free_intent). Nothing before its body's free state is heard (703).
 func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
+	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -3846,6 +3852,7 @@ func _load_level(level_name: String, kept := {}) -> bool:
 	_room_here = ""  # 665, ui's side: a new level, its rooms unvisited.
 	_room_left_at.clear()
 	Companion.know_level(map_name, loaded)
+	_fire_places[map_name] = Level.fires_of(loaded)
 	_terrain = loaded["terrain"]
 	# Its felled cells (591): the server's own, a client's as told.
 	if not kept.is_empty():
@@ -8256,10 +8263,29 @@ func _tell_bandage_broke(by: GridEntity, patient: GridEntity, state: StringName)
 
 
 ## Why a cast or cooking could not begin (805 amended (3); voice's words).
-const FISH_REFUSED := {"no_rod": "Take the rod in hand to fish.", "busy": "Your hands are full.",
-	"no_water": "There's no water near enough to cast into.", "no_fish": "Nothing takes the line here.",
-	"fished_out": "This water is fished out for today."}
+## "no_rod" answers a click on water with no rod on you (805 amended (11)):
+## it names a person, not a price (the coordinator). Every water fishes
+## since 805 amended (11), so "Nothing takes the line here." is gone.
+const FISH_REFUSED := {"no_rod": "You've no rod. Rolf at the stall has them.", "busy": "Your hands are full.",
+	"no_water": "There's no water near enough to cast into.", "fished_out": "This water is fished out for today."}
+## The no-rod answer at most once a minute a player (805 amended (11)): an
+## answer to a click, never a caption; player id -> the tick last told.
+const NO_ROD_EVERY := 600
+var _no_rod_told: Dictionary[String, int] = {}
 const COOK_REFUSED := {"busy": "Your hands are full.", "no_fire": "You need a fire beside you to cook."}
+## The no-fire answer's second sentence (805 amended (11), voice's "There's
+## one %s."): where the nearest fire to sit at is (Level.fires_of, by place
+## id; lore's words), told only within FIRE_TOLD_WITHIN cells of it, so "in
+## the square" never shows outside Umbrage; a fire with no words here, or
+## none near, leaves the first sentence alone.
+const FIRE_WHERE := {"square_fire": "in the square"}
+const FIRE_TOLD_WITHIN := 24
+## Each zone's fires to sit at (Level.fires_of), read as a level loads,
+## else once when first asked.
+var _fire_places: Dictionary[String, Array] = {}
+## The cooked thing told (805 amended (11), voice's), %s its name, its
+## first letter capital; never where it went (the pack, else the ground).
+const COOKED := "%s, done to a turn."
 ## Why a cast or cooking broke off (World.fish_broke_why), the clause after the colon.
 const FISH_BROKE := {"moved": "you moved", "hurt": "you were struck"}
 
@@ -8272,11 +8298,30 @@ func _tell_use_refused(player: Player, slot: int) -> void:
 	var row := Items.def(player.slots[slot])
 	var why := ""
 	if not str(row.get("cooks", "")).is_empty():
-		why = COOK_REFUSED.get(World.cook_refusal(player, slot), "")
+		var refusal := World.cook_refusal(player, slot)
+		why = COOK_REFUSED.get(refusal, "")
+		var where := _fire_where(player.zone, player.tile) if refusal == "no_fire" else ""
+		if not where.is_empty():
+			why += " There's one %s." % where
 	elif row.get("use") == "fish":
 		why = FISH_REFUSED.get(World.fish_refusal(player), "")
 	if not why.is_empty():
 		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": why})
+
+
+## A click on water ([param wanted]) that cast nothing (805 amended (11)):
+## why, told to that player; the no-rod answer once a NO_ROD_EVERY.
+func _tell_fish_refused(player: Player, wanted: Vector2i) -> void:
+	if player.owner_peer == 0:
+		return
+	var why := World.fish_refusal(player, wanted)
+	if why == "no_rod":
+		if World.tick - int(_no_rod_told.get(player.player_id, -NO_ROD_EVERY)) < NO_ROD_EVERY:
+			return
+		_no_rod_told[player.player_id] = World.tick
+	var line := str(FISH_REFUSED.get(why, ""))
+	if not line.is_empty():
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": line})
 
 
 ## A cast's news (World.fishing_changed): broken off or slipped, told to
@@ -8297,12 +8342,44 @@ func _on_fishing_changed(by: GridEntity, state: StringName, uid: int) -> void:
 		if at is Vector2i:
 			gain["at"] = at
 		reward((by as Player).player_id, gain)
+		_tell_left_at_feet(by as Player, uid)
 
 
-## Cooking's news (World.cooking_changed): broken off, told to its player.
-## Done says nothing: the cooked thing in the pack says it.
-func _on_cooking_changed(by: GridEntity, state: StringName, _uid: int) -> void:
-	if state != &"broken" or not by is Player or (by as Player).owner_peer == 0:
+## [param uid], just made for [param player] (a catch, a thing cooked), told
+## when his pack had no room and it lies at his feet (805 amended (11);
+## take_line's words, voice's): never silent.
+func _tell_left_at_feet(player: Player, uid: int) -> void:
+	if uid == 0 or player.owner_peer == 0 or not World.items.has(uid) or not str(World.items.history(uid).get("holder", "")).is_empty():
+		return
+	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": take_line([], 0, [{"id": World.items.id_of(uid), "count": 1}])})
+
+
+## The words for the fire nearest [param cell] in [param zone_name]
+## (FIRE_WHERE), "" if none is within FIRE_TOLD_WITHIN or it has none.
+func _fire_where(zone_name: String, cell: Vector2i) -> String:
+	if not _fire_places.has(zone_name):
+		_fire_places[zone_name] = Level.fires_of(Level.load_level(zone_name)) if Level.exists(zone_name) else []
+	var best := ""
+	var nearest := FIRE_TOLD_WITHIN + 1
+	for place: Dictionary in _fire_places[zone_name]:
+		var away := World.distance(cell, place["cell"])
+		if FIRE_WHERE.has(place["id"]) and away < nearest:
+			best = FIRE_WHERE[place["id"]]
+			nearest = away
+	return best
+
+
+## Cooking's news (World.cooking_changed): broken off, or done (the cooked
+## thing named, 805 amended (11)), told to its player.
+func _on_cooking_changed(by: GridEntity, state: StringName, uid: int) -> void:
+	if not by is Player or (by as Player).owner_peer == 0:
+		return
+	if state == &"done":
+		var made := Items.name_of(World.items.id_of(uid))
+		Net.broadcast_to([(by as Player).owner_peer], "party", {"from": "Server", "text": COOKED % (made.left(1).to_upper() + made.substr(1))})
+		_tell_left_at_feet(by as Player, uid)
+		return
+	if state != &"broken":
 		return
 	var why: String = FISH_BROKE.get(World.fish_broke_why, "")
 	if not why.is_empty():
@@ -14584,6 +14661,15 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var at: Variant = args.get("at")
 		if at is Array and (at as Array).size() == 2:
 			World.light_hearth(entity, Vector2i(int(at[0]), int(at[1])))  # 825: lit or renewed.
+	elif command_name == "fish" and entity is Player:
+		# 805 amended (11): a click on water casts there (a rod in the pack to
+		# hand by itself), strikes at the bite; refused, told why.
+		var at: Variant = args.get("at")
+		var cell := World.NO_CELL
+		if at is Array and (at as Array).size() == 2:
+			cell = Vector2i(int(at[0]), int(at[1]))
+		if not World.try_fish(entity, cell):
+			_tell_fish_refused(entity as Player, cell)
 	elif command_name == "use" and entity is Player:
 		var used := int(args.get("slot", -1))
 		if not World.try_use(entity, used):
@@ -22466,6 +22552,8 @@ func pack_double_click(mine: bool, index: int) -> String:
 		return "transfer"
 	if open is Locker:
 		command = ("deposit" if Items.is_pack(index) else "equip") if mine else "withdraw"
+	elif mine and index in [Items.RIGHT_HAND, Items.LEFT_HAND] and index < player.slots.size() 			and Items.def(player.slots[index]).get("use") == "fish":
+		return ""  # 805 amended (11): a rod in hand stays there (a double click took it out, blind on v0.1.210).
 	elif mine:
 		command = "equip"
 	elif _is_own_companion(open):
@@ -22564,6 +22652,83 @@ func _sound(slot: String, entity: GridEntity) -> void:
 	sounds.append("%s %s" % [slot, entity.name])
 	if _client3d != null and is_instance_valid(entity) and DisplayServer.get_name() != "headless":
 		_client3d.play_at(slot, entity)
+
+
+## Fishing by a click (805 amended (11), "fishing that works"; Jeff: "fishing
+## still doesn't work"): with [param player]'s float down (the bite), any left
+## click strikes; else a left click on a water cell [param tile] (no body
+## under the cursor) with a rod anywhere on it casts there, a "fish" command
+## {at} (the server puts a packed rod in hand); out of reach it is walked to
+## the nearest dry cell within World.FISH_REACH of it first (_cast_wanted,
+## cast on arrival by _update_cast). No rod: the click is sent all the same,
+## for the server's answer (who has rods), and walks as before. True when
+## the click was fishing's and nothing else should take it.
+func _fish_click(player: Player, tile: Vector2i, on_sprite: bool) -> bool:
+	_cast_wanted = NONE
+	if str(player.fishing.get("state", "")) == "bite":
+		World.command(player, "fish", {})
+		return true
+	if on_sprite or tile == NONE or not World.is_water(tile):
+		return false
+	var args := {"at": [tile.x, tile.y]}
+	if World.rod_slot(player) < 0:
+		World.command(player, "fish", args)
+		return false
+	if str(player.fishing.get("state", "")) in ["cast", "wait"]:
+		return true  # Waiting on a bite: a click on the water leaves the cast be.
+	if _in_cast_reach(player.tile, tile):
+		World.command(player, "fish", args)
+		return true
+	var bank := cast_bank(player.tile, tile)
+	if bank == NONE:
+		World.command(player, "fish", args)  # Told why (no water near enough).
+		return true
+	_move_click(player, bank)
+	_cast_wanted = tile
+	return true
+
+
+## The water cell a click asked to cast at, walked to first; NONE if none.
+var _cast_wanted := NONE
+
+
+## Whether [param water] is within World.FISH_REACH of [param from] (the
+## square World.cast_cell searches).
+static func _in_cast_reach(from: Vector2i, water: Vector2i) -> bool:
+	return from != water and absi(water.x - from.x) <= World.FISH_REACH and absi(water.y - from.y) <= World.FISH_REACH
+
+
+## The dry walkable cell within World.FISH_REACH of [param water] nearest
+## [param from] (805 amended (11)): where a click on far water walks to cast.
+## NONE if none.
+static func cast_bank(from: Vector2i, water: Vector2i) -> Vector2i:
+	var best := NONE
+	var best_far := 1 << 30
+	for dy in range(-World.FISH_REACH, World.FISH_REACH + 1):
+		for dx in range(-World.FISH_REACH, World.FISH_REACH + 1):
+			var cell := water + Vector2i(dx, dy)
+			if World.is_water(cell) or not World.is_walkable(cell):
+				continue
+			var far := World.distance(from, cell) * 10 + absi(dx) + absi(dy)
+			if far < best_far:
+				best_far = far
+				best = cell
+	return best
+
+
+## Each frame (805 amended (11)): a far water clicked casts once the local
+## player stands within reach of it, its route walked out; another order (a click elsewhere) has
+## dropped it (_fish_click clears it, _move_click's routes replace it).
+func _update_cast() -> void:
+	if _cast_wanted == NONE:
+		return
+	var player := _local_player()
+	if player == null:
+		_cast_wanted = NONE
+		return
+	if _in_cast_reach(player.tile, _cast_wanted) and (_free.get("path", []) as Array).is_empty():
+		World.command(player, "fish", {"at": [_cast_wanted.x, _cast_wanted.y]})
+		_cast_wanted = NONE
 
 
 ## A right click on [param slot] of the local player's pack: use what is

@@ -733,6 +733,9 @@ var _fords: Dictionary[Vector2i, bool] = {}
 ## Each zone's fishable water (805 amended (8)): zone name -> {water cell ->
 ## its body's key}, fish_waters_of its terrain, set each time it is laid.
 var _fish_waters: Dictionary[String, Dictionary] = {}
+## Each zone's bodies of water by key -> their cells' count (805 amended
+## (11), fish_body_size), set with _fish_waters.
+var _fish_body_cells: Dictionary[String, Dictionary] = {}
 ## A body's stock (pond_at), "<zone>/<key>" -> the fishing place over it or
 ## the body's own id; built as asked, cleared when a zone is laid.
 var _fish_stock_of: Dictionary[String, String] = {}
@@ -1436,6 +1439,7 @@ func _step_zone() -> void:
 	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
 	_tend_fishing()  # Casts and cooking (805 amended (3)).
+	_tend_rods()  # A rod taken up to cast, back after the first step (805 amended (11)).
 	_tend_downed()
 	_tend_teeters()  # Found its feet on a rim (783).
 	_fade_buffs()
@@ -2186,6 +2190,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
 	_fish_waters[zone.name] = fish_waters_of(terrain)
+	_fish_body_cells[zone.name] = fish_body_counts(_fish_waters[zone.name])
 	var hearths := {}
 	for cell: Variant in terrain.get("fire_rings", []):
 		if cell is Vector2i:
@@ -7918,9 +7923,10 @@ func _tend_wounds() -> void:
 
 ## A rod's reach: water within this many cells of the angler (any way round).
 const FISH_REACH := 2
-## The least cells a body of water fishes with (805 amended (8)): a pool
-## (standing water, no stream through it) or a river's wide reach.
-const FISH_BODY_LEAST := 8
+## Every body of water fishes (805 amended (11), "fishing that works"); one
+## of fewer cells than this is small, and economy keeps it a thinner stock
+## (fish_body_size, economy.json ponds.small).
+const FISH_BODY_SMALL := 8
 ## The cast's flight: the float in the air, then on the water.
 const FISH_CAST_TICKS := 15
 ## The wait after the cast lands, before the bite: FISH_WAIT_LEAST to
@@ -7932,14 +7938,25 @@ const FISH_WAIT_MOST := 270
 ## rain, never later than FISH_WAIT_MOST; FISH_WAIT_LEAST stays.
 const FISH_WAIT_KEEN := 160
 ## The bite: the float dips, the splash and its cue; at its end the catch
-## lands or slips the hook. The strike hook (try_strike) cuts it short.
-const FISH_BITE_TICKS := 12
+## lands or slips the hook. Long enough to answer (805 amended (11)): a
+## click while the float is down strikes (try_strike), which cuts it short.
+const FISH_BITE_TICKS := 30
+## A strike at the bite (805 amended (11)): the cast's roll is taken times
+## this, so a catch is likelier than a bite left alone (0.6 becomes 0.9 at
+## economy's catch); never less likely. A bonus: the unanswered bite lands
+## as it always did.
+const FISH_STRIKE_ROLL := 2.0 / 3.0
 ## How long a cast's end ("landed", "missed") stays shown before it clears.
 const FISH_END_TICKS := 8
 ## Without the pond's own stock (economy's pond_catch), a bite's chance.
 const FISH_CATCH := 0.6
 ## Cooking at a fire: this many ticks, broken as a cast is.
 const COOK_TICKS := 100
+## How far from a fire cooking reaches, in cells either way (805 amended
+## (11)): two, so the square's fire cooks from its seats round the pit
+## (its place's rect, two out) and the Mughouse's hearth from the benches
+## beside it; one cell left them all refused.
+const COOK_REACH := 2
 
 ## A cast ([param state] &"cast"), the bite (&"bite"), a fish landed
 ## (&"caught", [param uid] the fish), the bite missed (&"missed") or a cast
@@ -7966,9 +7983,81 @@ func rod_hand(entity: GridEntity) -> int:
 	return -1
 
 
-## The water cell [param entity] would cast into: within FISH_REACH, the one
-## most ahead of its facing, then the nearest; NO_CELL if none.
-func cast_cell(entity: GridEntity) -> Vector2i:
+## The slot holding a rod anywhere on [param entity] (805 amended (11)): a
+## hand's first (rod_hand), else the pack's first; -1 if none.
+func rod_slot(entity: GridEntity) -> int:
+	var hand := rod_hand(entity)
+	if hand >= 0:
+		return hand
+	for slot: int in Items.pack_slots_of(entity.slots):
+		if slot < entity.slots.size() and not entity.slots[slot].is_empty() and Items.def(entity.slots[slot]).get("use") == "fish":
+			return slot
+	return -1
+
+
+## Rods taken from the pack to cast (805 amended (11)): angler -> {rod_slot
+## (where the rod came from and goes back to), held (what the right hand
+## held, gone to rod_slot by the swap), tile (where it was taken up)}.
+var _rod_put: Dictionary[GridEntity, Dictionary] = {}
+
+
+## [param by]'s rod into its right hand from the pack, to cast (805 amended
+## (11)): what that hand held goes to the rod's square by the swap, and both
+## go back on its first step after the cast (_tend_rods) or at a blow. True
+## with a rod in a hand (one already there: nothing moved).
+func _rod_to_hand(by: GridEntity) -> bool:
+	if rod_hand(by) >= 0:
+		return true
+	var from := rod_slot(by)
+	if from < 0:
+		return false
+	var held := by.slots[Items.RIGHT_HAND]
+	if not try_transfer(by, by, from, by, Items.RIGHT_HAND):
+		return false
+	if rod_hand(by) < 0:
+		return false
+	if not _rod_put.has(by):
+		_rod_put[by] = {"rod_slot": from, "held": held, "tile": by.tile}
+	return true
+
+
+## [param by]'s rod back to the square it came from and what its right hand
+## held back in that hand (805 amended (11)), if it was taken up to cast
+## (_rod_to_hand). With no room (a catch filled the square) the rod stays
+## in hand.
+func _rod_back(by: GridEntity) -> void:
+	var put: Dictionary = _rod_put.get(by, {})
+	_rod_put.erase(by)
+	if put.is_empty() or not is_instance_valid(by) or by.slots.size() <= Items.RIGHT_HAND:
+		return
+	var hand := rod_hand(by)
+	if hand != Items.RIGHT_HAND:
+		return  # Put away or moved by hand since: nothing to undo.
+	var back := int(put["rod_slot"])
+	if back >= by.slots.size():
+		return
+	var held := str(put["held"])
+	if by.slots[back].is_empty() or (not held.is_empty() and by.slots[back] == held):
+		try_transfer(by, by, Items.RIGHT_HAND, by, back)  # The swap: the rod back, the weapon to hand.
+
+
+## Each tick (805 amended (11)): a rod taken up to cast goes back once its
+## angler has stepped off the cell it cast from and is not casting.
+func _tend_rods() -> void:
+	for by: GridEntity in _rod_put.keys():
+		if not is_instance_valid(by) or not _alive(by):
+			_rod_put.erase(by)
+		elif not _fishing.has(by) and by.tile != _rod_put[by]["tile"]:
+			_rod_back(by)
+
+
+## The water cell [param entity] would cast into: [param wanted] if it is
+## water within FISH_REACH (a click on it, 805 amended (11)); else within
+## FISH_REACH, the one most ahead of its facing, then the nearest; NO_CELL if none.
+func cast_cell(entity: GridEntity, wanted := NO_CELL) -> Vector2i:
+	if wanted != NO_CELL and wanted != entity.tile and is_water(wanted) \
+			and absi(wanted.x - entity.tile.x) <= FISH_REACH and absi(wanted.y - entity.tile.y) <= FISH_REACH:
+		return wanted
 	var best := NO_CELL
 	var best_score := -INF
 	var ahead := Vector2(entity.facing).normalized() if entity.facing != Vector2i.ZERO else Vector2.ZERO
@@ -7986,8 +8075,8 @@ func cast_cell(entity: GridEntity) -> Vector2i:
 
 
 ## The stock [param cell]'s water fishes from (805 amended (8)), "" if it
-## fishes none (no water, a ford, a body too small, a narrow or bridged
-## stream): a fishing place over any cell of its body (maps' "fishing"
+## fishes none (not water: since 805 amended (11) every water cell is some
+## body's): a fishing place over any cell of its body (maps' "fishing"
 ## place, Holdings' id: its stock and its name), else the body's own id,
 ## "<zone>/pool_<x>_<y>" or "<zone>/river_<x>_<y>" (pond_name). The angler's
 ## cell, [param _from], no longer decides: any bank of a body fishes it.
@@ -8027,13 +8116,13 @@ func pond_name(pond: String) -> String:
 	return "the river" if pond.get_file().begins_with("river_") else "a pool"
 
 
-## [param terrain]'s fishable water (805 amended (8)): water cell -> its
-## body's key. A body is 8-connected "water" (never a ford). One no stream
-## path runs through is a pool, "pool_<x>_<y>", with FISH_BODY_LEAST cells
-## or more; one a stream runs through is the river, "river_<x>_<y>", with
-## FISH_BODY_LEAST cells or more, three wide somewhere (a cell whose 3x3 is
-## all water) and no bridge over or beside it (a bridge's channel is no
-## reach). <x>, <y>: its first cell, least y then least x.
+## [param terrain]'s fishable water (805 amended (8); every body since 805
+## amended (11), Jeff's "fishing still doesn't work": water a player can
+## see fishes): water cell -> its body's key. A body is 8-connected "water"
+## (a ford is never water: it is walked, not fished). One a stream path runs
+## through is the river, "river_<x>_<y>", narrow, bridged or wide; any other
+## a pool, "pool_<x>_<y>", whatever its size. <x>, <y>: its first cell,
+## least y then least x.
 static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
 	var wet: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in terrain.get("water", []):
@@ -8042,9 +8131,6 @@ static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
 	for stream: Dictionary in terrain.get("streams", []):
 		for cell: Vector2i in stream.get("path", []):
 			flowing[cell] = true
-	var bridged: Dictionary[Vector2i, bool] = {}
-	for cell: Vector2i in terrain.get("bridged", []):
-		bridged[cell] = true
 	var out: Dictionary[Vector2i, String] = {}
 	var seen: Dictionary[Vector2i, bool] = {}
 	for start: Vector2i in wet:
@@ -8053,8 +8139,6 @@ static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
 		seen[start] = true
 		var body: Array[Vector2i] = [start]
 		var river := false
-		var wide := false
-		var spanned := false
 		var first := start
 		var i := 0
 		while i < body.size():
@@ -8063,22 +8147,36 @@ static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
 			river = river or flowing.has(cell)
 			if cell.y < first.y or cell.y == first.y and cell.x < first.x:
 				first = cell
-			var all_wet := true
 			for dy in range(-1, 2):
 				for dx in range(-1, 2):
 					var next := cell + Vector2i(dx, dy)
-					spanned = spanned or bridged.has(next)
-					if not wet.has(next):
-						all_wet = false
-					elif not seen.has(next):
+					if wet.has(next) and not seen.has(next):
 						seen[next] = true
 						body.append(next)
-			wide = wide or all_wet
-		if body.size() < FISH_BODY_LEAST or river and (not wide or spanned):
-			continue
 		var key := "%s_%d_%d" % ["river" if river else "pool", first.x, first.y]
 		for cell in body:
 			out[cell] = key
+	return out
+
+
+## How many cells the body of water [param pond] is (805 amended (11), for
+## economy's thin stock on small water): a body's own id
+## ("<zone>/pool_<x>_<y>", "<zone>/river_<x>_<y>") its cell count; a
+## fishing place's id, or one not known, 0 (economy's full row).
+func fish_body_size(pond: String) -> int:
+	var zone_name := pond.get_base_dir()
+	var key := pond.get_file()
+	if holdings != null and holdings.all_places().has(pond):
+		return 0
+	return int(_fish_body_cells.get(zone_name, {}).get(key, 0))
+
+
+## [param waters]' bodies (fish_waters_of's) by key -> how many cells.
+static func fish_body_counts(waters: Dictionary) -> Dictionary[String, int]:
+	var out: Dictionary[String, int] = {}
+	for cell: Vector2i in waters:
+		var key := str(waters[cell])
+		out[key] = out.get(key, 0) + 1
 	return out
 
 
@@ -8099,46 +8197,59 @@ static func fish_wait_most(feeding: float) -> int:
 
 
 ## Why [param by] could not cast now (try_fish's checks, in its order), ""
-## if it could: "no_rod", "busy", "no_water", "no_fish" (water that fishes
-## nothing, pond_at's ""), "fished_out" (its pond's stock is 0 today).
-func fish_refusal(by: GridEntity) -> String:
-	if rod_hand(by) < 0:
+## if it could: "no_rod" (none anywhere on it: since 805 amended (11) a rod
+## in the pack goes to hand by itself), "busy", "no_water" (none within
+## FISH_REACH), "fished_out" (its pond's stock is 0 today). [param wanted]:
+## the water cell clicked, if one was (cast_cell). Every water cell fishes
+## since 805 amended (11), so nothing says "nothing takes the line" any more.
+func fish_refusal(by: GridEntity, wanted := NO_CELL) -> String:
+	if rod_slot(by) < 0:
 		return "no_rod"
 	if _fishing.has(by) or _cooking.has(by) or _bandaging.has(by) or is_stunned(by) or not has_hands(by) or is_downed(by):
 		return "busy"
-	var at := cast_cell(by)
-	if at == NO_CELL:
-		return "no_water"
-	var pond := pond_at(at, by.tile)
+	var at := cast_cell(by, wanted)
+	var pond := pond_at(at, by.tile) if at != NO_CELL else ""
 	if pond.is_empty():
-		return "no_fish"
+		return "no_water"
 	if economy != null and economy.has_method("pond_fish") and int(economy.call("pond_fish", pond)) <= 0:
 		return "fished_out"
 	return ""
 
 
-## [param by] (a player or a companion with a rod in hand) casts into the
-## water within FISH_REACH (cast_cell), at a fishing place (pond_at): the
+## [param by] (a player or a companion with a rod on it) casts into the
+## water within FISH_REACH (cast_cell: [param wanted], the water cell
+## clicked, if it is in reach), any body of water (pond_at): a rod in the
+## pack goes to its right hand first (_rod_to_hand, 805 amended (11)); the
 ## float flies (FISH_CAST_TICKS), sits (a seeded FISH_WAIT_LEAST to
 ## FISH_WAIT_MOST), then bites (FISH_BITE_TICKS), and the catch lands
 ## (economy's pond_catch, else FISH_CATCH) into its pack, or at its feet
 ## with the pack full. Moving, a blow, a hurt or lowering the rod reels in
-## (_tend_fishing); using the rod again while casting reels in. False, and
-## nothing starts, if it cannot (fish_refusal).
-func try_fish(by: GridEntity) -> bool:
+## (_tend_fishing). Asked again while casting: at the bite it strikes
+## (try_strike, 805 amended (11)); otherwise a click on water ([param
+## wanted] given) leaves the cast be, and using the rod (none given) reels
+## in. False, and nothing starts, if it cannot (fish_refusal).
+func try_fish(by: GridEntity, wanted := NO_CELL) -> bool:
 	if not Net.is_authority() or not _can_handle(by):
 		return false
 	if _fishing.has(by):
-		if not _fishing[by].has("over"):
+		if _fishing[by].has("over"):
+			return true
+		if str(by.fishing.get("state", "")) == "bite":
+			return try_strike(by)
+		if wanted == NO_CELL:
 			_reel_in(by, "lowered")
 		return true
-	var no := fish_refusal(by)
+	var no := fish_refusal(by, wanted)
 	if not no.is_empty():
 		# Counts only (805 amended (14)): the reason and who, never a name, id or cell.
 		print("[fish] refused %s %s" % [no, "companion" if by is Companion else "player"])
 		return false
-	var at := cast_cell(by)
+	if not _rod_to_hand(by):
+		return false
+	var at := cast_cell(by, wanted)
 	var pond := pond_at(at, by.tile)
+	if at != by.tile:
+		face(by, (at - by.tile).sign())
 	var roll := RandomNumberGenerator.new()
 	roll.seed = hash("%s:%d:%s" % [by.name, tick, at])
 	var bite := tick + FISH_CAST_TICKS + roll.randi_range(FISH_WAIT_LEAST, fish_wait_most(Weather.fish_feeding(fields.region, DayNight.now())))
@@ -8154,11 +8265,15 @@ func try_fish(by: GridEntity) -> bool:
 	return true
 
 
-## The strike, the hook for a later click at the bite: during the bite the
-## catch is decided now; else nothing. True if it struck.
+## The strike (805 amended (11)): a click while the float is down. During
+## the bite the catch is decided now, the cast's roll taken times
+## FISH_STRIKE_ROLL (likelier than a bite left alone); else nothing. True
+## if it struck.
 func try_strike(by: GridEntity) -> bool:
 	if not Net.is_authority() or not _fishing.has(by) or str(by.fishing.get("state", "")) != "bite":
 		return false
+	_fishing[by]["roll"] = float(_fishing[by]["roll"]) * FISH_STRIKE_ROLL
+	_fishing[by]["struck"] = true
 	_land_catch(by)
 	return true
 
@@ -8171,6 +8286,8 @@ func _reel_in(by: GridEntity, why: String) -> void:
 	fish_broke_why = why
 	_log("fish: %s reels in (%s)" % [by.name if is_instance_valid(by) else "?", why])
 	fishing_changed.emit(by, &"broken", 0)
+	if why == "hurt" or why == "gone":
+		_rod_back(by)  # 805 amended (11): a blow puts the weapon back in hand at once.
 
 
 ## Why a job (a cast, cooking) begun as [param job] is broken now, "" if
@@ -8247,10 +8364,10 @@ func _tend_fishing() -> void:
 			_cook_done(by, job)
 
 
-## Whether a fire burns on [param cell] or a cell beside it.
+## Whether a fire burns on [param cell] or within COOK_REACH of it.
 func _beside_fire(cell: Vector2i) -> bool:
-	for dy in range(-1, 2):
-		for dx in range(-1, 2):
+	for dy in range(-COOK_REACH, COOK_REACH + 1):
+		for dx in range(-COOK_REACH, COOK_REACH + 1):
 			if is_fire(cell + Vector2i(dx, dy)):
 				return true
 	return false

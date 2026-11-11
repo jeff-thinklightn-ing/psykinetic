@@ -632,6 +632,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## row it opens, so "slots" and slot_items are 27 long; an old client reads 22.
 ## One number for the 11-12 cut (release): 56 is shared with items' 805 amended (11) (fishing) and
 ## companions' 485 amended (2) (the follow mend); each adds its own reason here as it lands, no 57.
+## 56 (805 amended (11), "fishing that works"): a new "fish" command {at: [x, y]} casts at a clicked water cell; an old client never sends it.
 const PROTOCOL_REVISION := 56
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

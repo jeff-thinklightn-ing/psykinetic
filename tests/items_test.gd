@@ -4103,8 +4103,6 @@ func _test_fishing() -> void:
 	var near_water := World.cast_cell(host) != World.NO_CELL
 	_check(near_water or World.fish_refusal(host) == "no_water", "the rod in hand, no water near: no cast (%s)" % World.fish_refusal(host))
 	World._water[water] = true
-	_check(World.cast_cell(host) != World.NO_CELL and World.fish_refusal(host) == "no_fish",
-		"water within two, too little to fish (805 amended (8): a body of eight cells or more): nothing takes the line (%s)" % World.fish_refusal(host))
 	var pond := "%s/test_pond" % World.zone.name
 	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "test_pond", "cell": water, "name": "the test pond",
 		"kind": "fishing", "radius": 2, "worth": 1, "start": "nobody", "town": ""}
@@ -4153,16 +4151,43 @@ func _test_fishing() -> void:
 			and _fish_units(host) == fish_before,
 		"a bite missed: it slips the hook, nothing more in the pack")
 	_steps(World.FISH_END_TICKS)
+	_test_fishing_that_works(host, water, caught)
 	World.fishing_changed.disconnect(on_caught)
-	# Cooking at a fire.
+	# Cooking at a fire, away from the room's own (COOK_REACH 2 reaches past the cell beside).
+	for cell: Vector2i in _main._terrain["floor"]:
+		var fire_near := false
+		for dy in range(-World.COOK_REACH - 2, World.COOK_REACH + 3):
+			for dx in range(-World.COOK_REACH - 2, World.COOK_REACH + 3):
+				fire_near = fire_near or World.is_fire(cell + Vector2i(dx, dy))
+		if not fire_near and World.is_free(cell) and not World.is_link_cell(cell) and not World.is_water(cell):
+			World._relocate(host, cell)
+			break
 	var slot := Array(host.slots).find("fish")
 	_check(World.cook_refusal(host, slot) == "no_fire" and not World.try_use(host, slot), "no fire beside: no cooking")
-	var fire := host.tile + Vector2i(1, 0)
+	var fire := host.tile + Vector2i(World.COOK_REACH + 1, 0)
 	World._fire[fire] = true
-	_check(World.try_use(host, slot) and World._cooking.has(host), "a fire beside: the perch cooks")
-	_steps(World.COOK_TICKS)
-	_check(Array(host.slots).has("cooked_fish") and not World._cooking.has(host), "done: a roast perch in the pack (%s)" % [Array(host.slots)])
+	_check(World.cook_refusal(host, slot) == "no_fire", "a fire three cells off: still none beside")
 	World._fire.erase(fire)
+	# 805 amended (11): two cells, the square's seats round its pit and the Mughouse's benches.
+	fire = host.tile + Vector2i(World.COOK_REACH, -World.COOK_REACH)
+	World._fire[fire] = true
+	_check(World.COOK_REACH == 2 and World.try_use(host, slot) and World._cooking.has(host), "a fire two cells off (a seat round the pit): the perch cooks")
+	var told_cook: Array[String] = []
+	var hear_cook := func(kind: String, data: Dictionary) -> void:
+		if kind == "party" and "turn" in str(data.get("text", "")):
+			told_cook.append(str(data["text"]))
+	Net.message_received.connect(hear_cook)
+	_steps(World.COOK_TICKS)
+	Net.message_received.disconnect(hear_cook)
+	_check(Array(host.slots).has("cooked_fish") and not World._cooking.has(host), "done: a roast perch in the pack (%s)" % [Array(host.slots)])
+	_check(told_cook.size() == 1 and told_cook[0] == "Roast perch, done to a turn.", "and told: %s" % [told_cook])
+	World._fire.erase(fire)
+	# The no-fire answer names the square's fire only near it (Umbrage), else the first sentence alone.
+	_main._fire_places["fire_where_test"] = [{"id": "square_fire", "cell": Vector2i(194, 211)}, {"id": "a_camp", "cell": Vector2i(200, 212)}]
+	var near: String = _main._fire_where("fire_where_test", Vector2i(198, 214))
+	var far: String = _main._fire_where("fire_where_test", Vector2i(194 + _main.FIRE_TOLD_WITHIN + 1, 211))
+	_main._fire_places.erase("fire_where_test")
+	_check(near == "in the square" and far == "", "no fire: \"There's one in the square.\" near it, nothing more away from it, a fire with no words passed over (%s, %s)" % [near, far])
 	if not had_water:
 		World._water.erase(water)
 	(World._fish_waters.get(World.zone.name, {}) as Dictionary).erase(water)
@@ -4172,6 +4197,56 @@ func _test_fishing() -> void:
 	World.holdings._strength.erase(pond)
 	World.holdings._since.erase(pond)
 	_clear(host)
+
+
+## 805 amended (11), "fishing that works" (Jeff on v0.1.210: "fishing still doesn't
+## work"): a click on [param water] casts with the rod in the pack (it goes to
+## hand by itself, the weapon to its square, and both back on the first step);
+## a click at the bite strikes, a likelier catch than a bite left alone; a click
+## on the water while waiting leaves the cast be; a blow puts the weapon back at
+## once; no rod anywhere: no_rod. [param caught]: fishing_changed's log.
+func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> void:
+	print("
+== fishing that works (805 amended (11)): a click on water casts, the rod from the pack; the strike ==")
+	_clear(host)
+	_give(host, "sword", Items.RIGHT_HAND)
+	var packed := Items.ALL_PACK_SLOTS[0]
+	_give(host, "fishing_rod", packed)
+	_check(World.rod_hand(host) < 0 and World.rod_slot(host) == packed and World.fish_refusal(host, water) == "",
+		"the rod in the pack, a sword in hand: a click on the water may cast (%s)" % World.fish_refusal(host, water))
+	_check(World.cast_cell(host, water) == water, "the cell clicked is the cell cast at (%s)" % World.cast_cell(host, water))
+	_check(World.try_fish(host, water) and host.fishing.get("state") == "cast" and host.fishing.get("at") == water
+			and host.slots[Items.RIGHT_HAND] == "fishing_rod" and host.slots[packed] == "sword",
+		"cast: the rod to the right hand by itself, the sword to its square (%s)" % [Array(host.slots)])
+	_steps(World.FISH_CAST_TICKS)
+	_check(World.try_fish(host, water) and host.fishing.get("state") == "wait", "a click on the water while waiting: the cast left be (%s)" % host.fishing)
+	World._fishing[host]["roll"] = 0.85  # Left alone, a miss (0.85 > 0.6); struck, 0.85 x 2/3 < 0.6.
+	_steps(int(World._fishing[host]["bite"]) - World.tick)
+	_check(host.fishing.get("state") == "bite" and World.FISH_BITE_TICKS >= 25, "the bite, long enough to answer (%d ticks)" % World.FISH_BITE_TICKS)
+	var fish_before := _fish_units(host)
+	_check(World.try_fish(host) and host.fishing.get("state") == "landed" and _fish_units(host) == fish_before + 1
+			and caught[-1][1] == &"caught", "a click at the bite strikes: a perch a bite left alone would have lost (%s)" % host.fishing)
+	_steps(World.FISH_END_TICKS)
+	_check(host.slots[Items.RIGHT_HAND] == "fishing_rod", "still standing there: the rod stays in hand")
+	var stood := host.tile
+	World._relocate(host, _free_near(host, 1))
+	_steps(1)
+	_check(host.slots[Items.RIGHT_HAND] == "sword" and host.slots[packed] == "fishing_rod",
+		"the first step after: the sword back in hand, the rod back in its square (%s)" % [Array(host.slots)])
+	World._relocate(host, stood)
+	_steps(1)
+	# A blow mid-cast: the weapon back at once.
+	World.try_fish(host, water)
+	_steps(3)
+	host.hurt_tick = World.tick
+	_steps(1)
+	_check(host.fishing.is_empty() and World.fish_broke_why == "hurt" and host.slots[Items.RIGHT_HAND] == "sword",
+		"struck mid-cast: reeled in, the sword back in hand at once (%s, %s)" % [World.fish_broke_why, Array(host.slots)])
+	# Every water fishes: no "nothing takes the line"; no rod anywhere, no_rod.
+	_clear(host)
+	_check(World.fish_refusal(host, water) == "no_rod", "no rod anywhere: no_rod (%s)" % World.fish_refusal(host, water))
+	_give(host, "fishing_rod", Items.RIGHT_HAND)
+	_give(host, "fish", Items.ALL_PACK_SLOTS[0])  # For the cooking after.
 
 
 ## How many perch [param entity] carries.

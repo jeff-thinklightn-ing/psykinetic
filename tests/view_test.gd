@@ -9384,7 +9384,7 @@ func _test_fish_rise() -> void:
 	for y in 4:
 		for x in 4:
 			water.append(base + Vector2i(x, y))
-	var puddle: Array[Vector2i] = [base + Vector2i(8, 0), base + Vector2i(9, 0)]  # Too small to fish.
+	var puddle: Array[Vector2i] = [base + Vector2i(8, 0), base + Vector2i(9, 0)]  # Small water fishes too (805 amended (11)).
 	var terrain := {"water": water + puddle}
 	fv.rose.clear()
 	# The most rings showing at once over a run: its last step may fall
@@ -9409,12 +9409,12 @@ func _test_fish_rise() -> void:
 	var slow: int = count_at.call(0.0, 120.0)
 	var on_water := true
 	for entry: Array in fv.rose:
-		on_water = on_water and water.has(entry[1])
+		on_water = on_water and (terrain["water"] as Array).has(entry[1])
 	var fast: int = count_at.call(1.0, 120.0)
 	for entry: Array in fv.rose:
-		on_water = on_water and water.has(entry[1])
-	_check(fv.bodies.size() == 1, "one body fishes (the 16-cell pool), not the 2-cell puddle (%s)" % fv.bodies.keys())
-	_check(on_water and slow > 0 and fast > slow * 3, "rings only on the pool, %d in two minutes hardly feeding, %d at their keenest" % [slow, fast])
+		on_water = on_water and (terrain["water"] as Array).has(entry[1])
+	_check(fv.bodies.size() == 2, "both bodies fish, the 16-cell pool and the 2-cell puddle (%s)" % [fv.bodies.keys()])
+	_check(on_water and slow > 0 and fast > slow * 3, "rings only on water, %d in two minutes hardly feeding, %d at their keenest" % [slow, fast])
 	_check(fv.rises.size() <= 4 and seen["most"] >= 1, "the rings reused, %d made for %d rises (%d showing at most)" % [fv.rises.size(), fast, seen["most"]])
 	# A float on the pool: no rise within RISE_CLEAR of it.
 	if player != null:
