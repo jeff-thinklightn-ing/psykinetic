@@ -1401,11 +1401,12 @@ func lore_budget() -> int:
 ## what he sees to himself"): the deflection in the speaker's own words and never the fact's text, so no slip of
 ## the model can leak what it holds back.
 ## The priest's standing knowledge (decision 714, npc's side), outside the
-## lore budget like KEPT_LINE: the knights under the barrow and the relic's
-## use; [param knight] the one whose sepulcher stands now, "" for none.
+## lore budget like KEPT_LINE: the knights in the Hall of Fallen Souls beneath
+## the temple (832's switch-on, lore's words) and the relic's use; [param
+## knight] the one whose sepulcher stands now, "" for none.
 static func relic_line(knight: String) -> String:
 	var now := "" if knight.is_empty() or knight == "<null>" else " The knight whose sepulcher lies open below now is %s." % knight
-	return ("Holy knights of the temple lie in the old barrow under the town, and the Mound-breakers, the grave robbers there, dig for their bones to sell.%s"
+	return ("Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s"
 		+ " Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet;"
 		+ " one who has no amulet is given one.") % now
 
