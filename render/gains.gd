@@ -124,6 +124,10 @@ var play: Callable
 var has_cue: Callable
 ## (banner text) -> whether another panel shows it now (the arrival card).
 var shown_elsewhere: Callable
+## () -> whether a trading window is open now (Main: the barter panel). A trade's gain
+## ("trade" on it, economy's 856) then keeps its chip and leaves its words out, as the
+## window's foot line says them once (852).
+var trade_window_open: Callable
 
 ## The live floats: {key, track, of, amount, at, born, color, small}.
 var floats: Array[Dictionary] = []
@@ -231,6 +235,8 @@ func add(data: Dictionary) -> bool:
 		held.erase(of)
 	var at: Variant = Snapshot.vector(data.get("at"))
 	var words := str(data.get("words", ""))
+	if data.has("trade") and trade_window_open.is_valid() and bool(trade_window_open.call()):
+		words = ""  # The window's foot says the trade; the chip stays (852).
 	# Lines worded by the server, not counted here (playtest's reward tour):
 	# things handed in, by their own count ("+10 ore", not the town's name).
 	# No gold owed any more (826: every sale paid in full).

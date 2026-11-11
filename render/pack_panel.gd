@@ -109,6 +109,16 @@ var held_open := false:
 		if is_node_ready():
 			_refresh()
 
+## 852: the store window owns the pack while it is open: the pack and sheet are not
+## drawn (they come back as they were when it closes).
+var suppressed := false:
+	set(value):
+		if value == suppressed:
+			return
+		suppressed = value
+		if is_node_ready():
+			_refresh()
+
 var _other_title: Label
 ## The open row's title and, for a companion, her bond's step beside it
 ## (555, ui's side): ", sullen" dim, nothing at fond; hover: her reason.
@@ -817,7 +827,7 @@ func mood_hover() -> String:
 func _refresh() -> void:
 	if not is_instance_valid(other):
 		other = null
-	visible = (shown or other != null or held_open) and is_instance_valid(player)
+	visible = (shown or other != null or held_open) and is_instance_valid(player) and not suppressed
 	_other_head.visible = other != null
 	_other_title.visible = other != null
 	_other_row.visible = other != null

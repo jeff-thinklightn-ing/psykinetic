@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_crouch_key()
 	_test_practice_bars()
 	await _test_gains()
+	await _test_trade_float()
 	_test_find_window()
 	_test_seam_click()
 	_test_fire_click()
@@ -893,6 +894,8 @@ func _test_quest_tracker() -> void:
 ## anywhere with no key. The windows: never drawn over or under an open one,
 ## back RETURN_SECONDS after the last has gone.
 func _test_quest_card_place_and_windows(panel: QuestPanel, own: Player) -> void:
+	var pack_was: bool = _main.pack_panel.shown
+	_main.pack_panel.shown = false  # An open pack window would cover the card: the cases below are about the place.
 	var items := [{"name": "Robber", "done": false}]
 	own.quest = {"title": "Clear the barrow", "giver": "the fallen knight", "items": items, "ready": false, "zones": ["barrow", "barrow_deep"]}
 	var zone_was := panel.zone_of
@@ -902,6 +905,7 @@ func _test_quest_card_place_and_windows(panel: QuestPanel, own: Player) -> void:
 	panel.windows_of = func() -> Array: return []
 	panel._clear = QuestPanel.RETURN_SECONDS  # The pack, open over the card's place till now, has been let go for good.
 	await get_tree().process_frame
+	panel.step(QuestPanel.RETURN_SECONDS * 2.0)  # No window over it for a while: the return wait is over.
 	_check(not panel.visible, "the barrow's quest in the bear's cave: no card")
 	here[0] = ""
 	panel.show_quest(own.quest)
@@ -985,6 +989,7 @@ func _test_quest_card_place_and_windows(panel: QuestPanel, own: Player) -> void:
 	_main.pack_panel.shown = open_was
 	panel.zone_of = zone_was
 	panel.windows_of = windows_was
+	_main.pack_panel.shown = pack_was
 
 
 ## A talking monster's deals as buttons (629, ui's side).
@@ -1781,7 +1786,8 @@ func _test_counter_panel() -> void:
 	_check(panel.box_words("ready", 6) == "Sword, from the old chests" and panel.box_words("ready", 7) == "%s, ready" % Items.name_of("shield").capitalize(),
 		"a waiting thing's own words where given, else ready")
 	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""})
-	_check(panel.boxes_shown().is_empty() and panel.title_shown() == "The smith's counter", "nothing to do: no squares")
+	_check(panel.boxes_shown().is_empty() and panel.title_shown() == "The shop" and not panel._counter_work(),
+		"a shop counter told with no work (the store's own chest is told as one too; economy's fish_home tour, 852): no squares, and it is not titled \"The smith's counter\" (%s)" % panel.title_shown())
 	panel.close()
 
 
@@ -2218,54 +2224,77 @@ func _test_barter() -> void:
 		"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
 		"buys": {"hide": {"gold": 20, "up_to": 1}, "dagger": {"gold": 6, "up_to": 1}}, "fenced": {203: 3},
 		"pack": [{"slot": 0, "uid": 201, "id": "hide"}, {"slot": 1, "uid": 202, "id": "dagger"}, {"slot": 2, "uid": 204, "id": "hide"},
-			{"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 4, "uid": 205, "id": "food_sack"}], "why": ""}
+			{"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 7, "uid": 205, "id": "food_sack"}], "why": ""}
+	# 852: the approved store window, one click a buy or a sale. The player's pack is set for it.
+	var me: Player = _main._local_player()
+	var had_slots: Array = me.slots.duplicate() if me != null else []
+	var had_uids: Array = World.slot_uids(me) if me != null else []
+	if me != null:
+		var stocked: Array = []
+		stocked.resize(Items.CARRIED)
+		stocked.fill("")
+		stocked[0] = "hide"
+		stocked[1] = "dagger"
+		stocked[2] = "hide"
+		stocked[3] = "dagger"
+		stocked[7] = "food_sack"
+		World.set_slots(me, stocked)
+		pack.player = me
 	panel.open(null, "Snagfin")
 	panel.show_barter(sample)
-	_check(panel.is_open() and panel.title_shown() == "Snagfin" and panel.button_shown() == "Buy" and panel._button.disabled,
-		"opened for the merchant: his name the title, Buy dim with nothing picked (%s)" % panel.title_shown())
+	var view: StoreView = panel._store_view
+	_check(panel.is_open() and panel._layout_store() and view.visible and panel.title_shown() == "Snagfin" and view.tabs_shown() == ["store*"] and pack.suppressed,
+		"opened for the merchant: the store window, his name the title, the Store tab open, the separate pack let go (%s, %s)" % [panel.title_shown(), view.tabs_shown()])
+	_check(view.goods_head_shown() == "Snagfin's goods" and view.gold_shown() == 12, "his goods on the left, your gold at the pack's head (%s, %d)" % [view.goods_head_shown(), view.gold_shown()])
 	_check(panel.trusted_shown() == "", "no \"trusted\" in the barter: no mark")
 	panel.show_barter(sample.merged({"trusted": true}, true))
 	var trusted_on := panel.trusted_shown()
-	var trusted_tip := panel._trusted.tooltip_text
 	panel.show_barter(sample)
-	_check(trusted_on == "Trusted" and trusted_tip.is_empty() and panel.trusted_shown() == "" and panel.title_shown() == "Snagfin",
-		"the town's trusted prices: \"Trusted\" after the title, no hover; gone when the key is left out (%s)" % trusted_on)
+	_check(trusted_on == "Trusted" and panel.trusted_shown() == "" and panel.title_shown() == "Snagfin",
+		"the town's trusted prices: \"Trusted\" after the title; gone when the key is left out (%s)" % trusted_on)
 	_check(panel.boxes_shown() == ["good 101 gold 10", "good 102 gold 1"] and panel.box_words("good", 101) == Items.name_of("sword"),
-		"his goods as squares, each price a chip over it, the name on hover (%s)" % [panel.boxes_shown()])
-	_check(pack.prices == {0: 20, 1: 6, 2: 20, 3: 3, 4: 0} and pack.held_open,
-		"what he pays for each of the player's things, for the pack's chips (0: won't buy, dimmed); the pack held open (%s)" % [pack.prices])
-	panel.toggle_take(101)
-	_check(panel.button_shown() == "Buy (1 item)" and panel.total_shown() == "Total gold 10" and not panel._button.disabled,
-		"a sword picked: Buy (1 item), its Total 10 (%s, %s)" % [panel.button_shown(), panel.total_shown()])
-	panel.toggle_give(201)
-	_check(panel.button_shown() == "Trade (2 items)" and panel.balance_of([201], [101]) == 10 and panel.total_shown() == "Total gold +10" and pack.selected.has(0),
-		"a hide given too: Trade (2 items), the Total signed +10, the hide's box framed (%s, %s)" % [panel.button_shown(), panel.total_shown()])
-	panel.toggle_give(204)
-	_check(not panel.give.has(204) and panel.hover_shown() == "the town has enough of that", "a second hide past up_to stays unpicked and says why")
-	_check(panel.pays_for(203) == 3 and panel.is_fenced(203) and panel.pays_for(205) == 0, "grave goods pay the fenced half; a thing the town won't buy pays nothing")
-	panel.toggle_give(205)
-	_check(not panel.give.has(205) and panel.hover_shown() == "won't buy", "won't buy: unpicked, said")
-	panel.toggle_take(101)
-	_check(panel.button_shown() == "Sell (1 item)" and panel.total_shown() == "Total gold 20", "the sword let go: Sell (1 item), Total 20")
-	panel.toggle_give(201)
-	panel.toggle_take(101)
-	panel.toggle_take(102)
-	_check(panel.button_shown() == "Buy (2 items)" and panel.total_shown() == "Total gold 11" and not panel._button.disabled,
-		"two picked, nothing given: Buy (2 items), Total 11, within the purse (%s)" % panel.button_shown())
-	panel.show_barter({"shop": "", "gold": 5, "goods": sample["goods"], "buys": sample["buys"], "fenced": {}, "pack": sample["pack"], "why": ""})
-	_check(panel._button.disabled and panel.foot_shown() == "You need 6 more gold.", "the purse down to 5: You need 6 more gold., Buy dim")
-	panel.toggle_take(102)
-	panel._confirm()
-	_check(asked.is_empty(), "the sword alone is still more than 5: Buy asks nothing")
+		"his goods as squares, each with its price, the name on hover (%s)" % [panel.boxes_shown()])
+	if me != null:
+		var mine := view.squares_shown("mine")
+		_check(mine.slice(0, 5) == ["mine 0 20", "mine 1 6", "mine 2 20", "mine 3 3", "mine 7 -1"],
+			"what he pays on the player's squares, none on what he won't take (%s)" % [mine.slice(0, 5)])
+	# One click on a good: bought (asked), or the line says why not and nothing is asked.
+	panel._on_store_square("good", 101)
+	panel._pending["at"] = 0  # No pack change in a test: the line needs no wait.
+	_check(asked == [[[], [101], -10]] and not panel.foot_shown().begins_with("You need"), "a click on the sword asks the trade: take it for 10 (%s)" % [asked])
+	panel.show_barter({"shop": "", "gold": 2, "goods": [{"uid": 102, "id": "bandaging_kit", "price": 1}], "buys": sample["buys"], "fenced": {203: 3}, "pack": sample["pack"], "why": ""})
+	_check(panel.foot_shown() == "Bought a sword for 10 gold." and not view.foot_is_refused(), "the sword gone from his shelf and the purse down: the foot line says it (%s)" % panel.foot_shown())
+	panel._on_store_square("good", 101)
+	panel.show_barter(sample.merged({"gold": 5}, true))
+	panel._on_store_square("good", 101)
+	_check(panel.foot_shown() == "You need 5 more gold." and view.foot_is_refused() and refusals.has("You need 5 more gold."), "short of gold: the foot line in rust, the error cue (%s)" % panel.foot_shown())
+	asked.clear()
 	panel.show_barter(sample)
-	panel._confirm()
-	_check(asked == [[[], [101], -10]], "with 12 again, Buy asks the trade: give none, take the sword, -10 (%s)" % [asked])
+	# A sale: the hide for 20; a thing he won't take says so; the town having enough says so.
+	panel._on_store_square("mine", 0)
+	panel._pending["at"] = 0  # No pack change in a test: the line needs no wait.
+	_check(asked == [[[201], [], 20]], "a click on a hide: sold for what he pays (%s)" % [asked])
+	panel.show_barter({"shop": "", "gold": 32, "goods": sample["goods"], "buys": sample["buys"], "fenced": {203: 3}, "pack": [{"slot": 1, "uid": 202, "id": "dagger"}, {"slot": 2, "uid": 204, "id": "hide"}, {"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 7, "uid": 205, "id": "food_sack"}], "why": ""})
+	_check(panel.foot_shown() == "Sold a raw hide for 20 gold.", "the hide gone from the pack, the purse up: the foot line says it (%s)" % panel.foot_shown())
+	asked.clear()
+	panel._on_store_square("mine", 7)
+	_check(asked.is_empty() and panel.foot_shown() == "Snagfin won't take that." and view.foot_is_refused(), "a thing he won't take: the line says so in rust, nothing asked (%s)" % panel.foot_shown())
 	panel.show_barter({"shop": "", "gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "the prices have moved"})
-	_check(panel.why_shown() == "the prices have moved" and refusals == ["the prices have moved"] and panel.take.is_empty(),
-		"a refusal: why shown and said; a sword no longer on the shelf is dropped from the pick")
+	_check(panel.foot_shown() == "the prices have moved" and view.foot_is_refused() and refusals.has("the prices have moved"), "a refusal: its why in the foot line, in rust, and the error cue")
+	panel.show_barter(sample)
+	panel.near = false
+	panel._on_store_square("good", 102)
+	_check(panel.foot_shown() == BarterPanel.STEP_CLOSER and asked.is_empty(), "out of reach: Step closer to trade., nothing asked")
+	panel.near = true
+	panel.set_points({"food_sack": "Food goes to the cook."})
+	panel.show_barter(sample)
+	panel._on_store_square("mine", 7)
+	_check(panel.foot_shown() == "Food goes to the cook.", "a thing he won't take where the server says who does: its words (%s)" % panel.foot_shown())
 	panel.close()
-	_check(not panel.is_open() and pack.selected.is_empty() and pack.prices.is_empty() and not pack.held_open and panel.button_shown() == "Buy",
-		"closed: nothing picked, no frames, no chips, the pack let go (%s %s %s %s %s)" % [panel.is_open(), pack.selected, pack.prices, pack.held_open, panel.button_shown()])
+	_check(not panel.is_open() and not view.visible and not pack.suppressed and not pack.held_open and panel.foot_shown() == "",
+		"closed: the window gone, the pack let go and shown as it was")
+	if me != null:
+		World.set_slots(me, had_slots, had_uids)
 	# 799 amended (2): a camp's trader buys your raws through Sell (npc's "barter": goods [], buys, why).
 	var trader: Resident = load(Main.RESIDENT).new()
 	trader.name = ("Resident_" + Offers.CAMP_TRADER + "toll").validate_node_name()
@@ -2276,14 +2305,12 @@ func _test_barter() -> void:
 	var camp := {"shop": "", "resident": "", "town": "toll", "gold": 12, "goods": [], "fenced": {}, "why": "",
 		"buys": {"hide": {"gold": 4, "up_to": 2}}, "pack": [{"slot": 0, "uid": 301, "id": "hide"}, {"slot": 1, "uid": 302, "id": "dagger"}]}
 	panel.show_barter(camp)
-	panel.toggle_give(301)
-	_check(panel.pays_for(301) == 4 and panel.pays_for(302) == 0 and panel.button_shown() == "Sell (1 item)" and panel.total_shown() == "Total gold 4",
-		"his Sell: a hide he buys at 4, Sell (1 item); a dagger he won't (%s, %s)" % [panel.button_shown(), panel.total_shown()])
+	_check(panel.pays_for(301) == 4 and panel.pays_for(302) == 0, "his Sell: a hide he buys at 4; a dagger he won't")
 	camp["buys"] = {}
 	camp["why"] = "I've no coin left for that."
 	panel.show_barter(camp)
 	_check(panel.why_shown() == "I've no coin left for that." and panel.pays_for(301) == 0,
-		"his purse empty: economy's purse word shown, nothing bought (%s)" % panel.why_shown())
+		"his purse empty: economy's purse word shown in the foot line, nothing bought (%s)" % panel.why_shown())
 	panel.close()
 	# The bar under a greeting resident's bubble: without a bubble it closes at once.
 	var oda: GridEntity = load(Main.RESIDENT).new()
@@ -2502,11 +2529,15 @@ func _test_window_clicks() -> void:
 		"pack": [{"slot": 0, "uid": 201, "id": "hide"}], "why": ""})
 	for i in 3:
 		await get_tree().process_frame
-	var good := _square(barter, BarterPanel.StoreBox)
-	reached["store's good (picked)"] = await _click_through(good) if good != null else -1
-	var picked := barter.take.size()
-	good = _square(barter, BarterPanel.StoreBox)
-	reached["store's good again (let go)"] = await _click_through(good) if good != null else -1
+	var bought: Array = []
+	var catch_trade := func(_shop: GridEntity, _give: Array, take: Array, _balance: int) -> void: bought.append(take)
+	barter.trade_asked.connect(catch_trade)
+	var good := _square(barter, StoreView.Square)  # 852: one click on his good buys it.
+	reached["store's good (bought)"] = await _click_through(good) if good != null else -1
+	var picked := bought.size()
+	good = _square(barter, StoreView.Square)
+	reached["store's good again"] = await _click_through(good) if good != null else -1
+	barter.trade_asked.disconnect(catch_trade)
 	barter.close()
 	var town: TownSheet = _main.town_panel
 	if town != null:
@@ -2525,7 +2556,7 @@ func _test_window_clicks() -> void:
 		_main.town_states = states_was
 	pack.shown = false
 	_check(bare == 1, "the probe: a press on bare ground reaches the world (%d)" % bare)
-	_check(picked == 1, "the store's good was picked by the click (%d)" % picked)
+	_check(picked >= 1, "the store's good was bought by the click (%d)" % picked)
 	_check(reached.values().all(func(n: int) -> bool: return n == 0),
 		"a press on a square in the pack, the sheet, the store and the town window never reaches the world (%s; -1: no square)" % [reached])
 
@@ -2593,6 +2624,52 @@ func _test_store_face_clicks() -> void:
 	_check(scanned > 20 and leaks.is_empty(), "no press on a store's or a person's window reaches the world (%d scanned, %d leaked)" % [scanned, leaks.size()])
 
 
+## A trade's float and the store window's foot (852; the coordinator): the server's "Bought ... for N gold"
+## rides the "reward" route for every trade. The window that made it open: the float's chip stays and its
+## words are left out of the log, as the foot says them once; the window shut: the float's words whole.
+## A free thing reads as the server's float reads, never "for 0 gold".
+func _test_trade_float() -> void:
+	print("
+== a trade's float against the store window's foot (852) ==")
+	var gains: Gains = _main.gains
+	var barter: BarterPanel = _main.barter_panel
+	if gains == null or barter == null:
+		print("  (no gains or window in this scene: its checks skipped)")
+		return
+	var bought := {"track": "item", "amount": 1, "of": "sword", "words": "Bought a sword for 10 gold", "trade": "bought"}
+	gains.lines.clear()
+	gains.floats.clear()
+	gains.waiting.clear()
+	barter.close()
+	_main._on_message("reward", bought.duplicate())
+	var shut: Dictionary = gains.lines.back() if not gains.lines.is_empty() else {}
+	_check(not shut.is_empty() and shut["text"] == "+1 sword" and shut["words"] == "Bought a sword for 10 gold",
+		"window shut: the float's chip and its words whole (%s)" % [shut])
+	gains.lines.clear()
+	gains.floats.clear()
+	gains.waiting.clear()
+	barter.open(null, "Snagfin")
+	barter.show_barter({"shop": "", "town": "Umbrage", "gold": 12, "goods": [{"uid": 101, "id": "sword", "price": 10}],
+		"buys": {}, "fenced": {}, "pack": [], "why": ""})
+	var near_was := barter.near
+	barter.near = true
+	_main._on_message("reward", bought.duplicate())
+	var shown: Dictionary = gains.lines.back() if not gains.lines.is_empty() else {}
+	_check(not shown.is_empty() and shown["text"] == "+1 sword" and str(shown["words"]).is_empty() and not gains.floats.is_empty()
+		and gains.float_text(gains.floats[0]) == "+1 sword",
+		"window open: the chip stays, its words are left out (%s)" % [shown])
+	# The foot says a free first rod as the server's float does (here set by the word that comes with the trade).
+	barter._expect({"kind": "ware", "key": "rod", "cue": "bought", "free": true, "text": ""})
+	_main._on_message("reward", {"track": "item", "amount": 1, "of": "fishing rod", "words": "Got a fishing rod, free", "trade": "bought"})
+	barter._pending["at"] = 0
+	barter._check_answer()
+	_check(barter._foot_text == "Got a fishing rod, free" and not barter._foot_refused and not "0 gold" in barter._foot_text,
+		"a free thing: the foot reads the server's words, never 'for 0 gold' (%s)" % [barter._foot_text])
+	barter.near = near_was
+	barter.close()
+	await get_tree().process_frame
+
+
 ## The Encolpion Amulet wears at the neck (Jeff, 11-07: "encolpion amulet is not equipable"): a
 ## double-click on it in the pack, and a drag onto the neck square.
 func _test_amulet_equips() -> void:
@@ -2627,7 +2704,7 @@ func _test_amulet_equips() -> void:
 	pack.shown = true
 	for i in 3:
 		await get_tree().process_frame
-	var square := _square(pack.get_child(0), PackPanel.SlotBox)
+	var square: Control = pack.box_in(true, 0)
 	if square != null:
 		var at := square.get_global_transform_with_canvas() * (square.size / 2.0)
 		var motion := InputEventMouseMotion.new()
@@ -3604,7 +3681,9 @@ func _test_person_give() -> void:
 	window.open(body, "Bran")
 	window.set_person(body, true, true)
 	window.show_barter({"resident": str(body.get_path()), "gold": 5, "goods": [], "buys": {}, "pack": [], "takes": rows})
-	_check(window.giving and window._give_tab.visible and window._give_tab.button_pressed, "carrying what they take: the window opens on Give, its toggle shown")
+	_check(not window.giving and window._give_tab.visible and not window._give_tab.button_pressed,
+		"carrying what they take: the window opens on the store, never on Donate (Jeff), its toggle shown")
+	window.set_giving(true)
 	var lights: Dictionary = window.pack.prices if window.pack != null else {}
 	_check(window.pack == null or int(lights.get(0, -9)) == 3 and int(lights.get(1, -9)) == -1 and int(lights.get(3, -9)) == 0,
 		"the squares they take lit (a coin where they pay now), the rest dim (%s)" % [lights])
@@ -3638,6 +3717,60 @@ func _test_person_give() -> void:
 	_check(not window.giving and window._grid.visible, "the toggle off: the trade back")
 	window.show_barter({"resident": str(body.get_path()), "gold": 5, "goods": [], "buys": {}, "pack": [], "takes": []})
 	_check(not window.giving and not window._give_tab.visible, "they take nothing carried: no toggle")
+	# 852: a keeper who answers clicks only (Rolf): the store window, Donate a tab in it, one click hands one thing over.
+	window.close()
+	window.open(body, "Rolf")
+	window.set_person(body, false, true)
+	var had_slots: Array = me.slots.duplicate()
+	var had_uids: Array = World.slot_uids(me)
+	var stock: Array = []
+	stock.resize(Items.CARRIED)
+	stock.fill("")
+	stock[0] = "dagger"
+	stock[1] = "bear_pelt"
+	stock[2] = "food_sack"
+	World.set_slots(me, stock)
+	var wares := [{"id": "vendor:store|wares|knife", "kind": Offers.VENDOR_WARES, "accept": Offers.VENDOR_WARES, "title": "A knife", "words": "", "cost": 1, "what": {"item": "knife"}}]
+	window.show_wares(body, "Rolf", wares, 5)
+	window.set_keeper(wares)
+	var takes_rows := [{"uid": 911, "slot": 0, "what": "dagger", "count": 1, "raw": "", "for": {}, "have": 0, "need": 0, "gold": 0, "starter": true},
+		{"uid": 912, "slot": 1, "what": "bear_pelt", "count": 1, "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 3}]
+	window.set_takes(takes_rows)
+	var store_view: StoreView = window._store_view
+	_check(window._layout_store() and store_view.tabs_shown() == ["store*", "donate", "locker"] and not window.giving,
+		"Rolf's window: the store window, tabs Store (open), Donate and Locker (%s)" % [store_view.tabs_shown()])
+	_check(store_view.squares_shown("goods") == ["ware vendor:store|wares|knife 1"], "his wares as squares, the price on each (%s)" % [store_view.squares_shown("goods")])
+	_check(store_view.squares_shown("mine").slice(0, 3) == ["mine 0 -1", "mine 1 3", "mine 2 -1"],
+		"Rolf pays for a trophy: the pelt's square carries its price on the Store tab, the starter dagger (a gift) none (%s)" % [store_view.squares_shown("mine").slice(0, 3)])
+	window._on_store_tab("donate")
+	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and store_view.squares_shown("goods").is_empty(),
+		"the Donate tab: open, his goods away (%s)" % [store_view.tabs_shown()])
+	_check(store_view.squares_shown("mine").slice(0, 3) == ["mine 0 -1", "mine 1 3", "mine 2 -1"], "his takes lit on yours: a price only where he pays (%s)" % [store_view.squares_shown("mine").slice(0, 3)])
+	window._on_store_hover("mine", 1, "Bear Pelt", Rect2(0, 0, 10, 10))
+	_check(store_view.lines_shown() == ["For tanning", "Pays 3 gold"], "the pointer on the pelt: what handing it over does (%s)" % [store_view.lines_shown()])
+	window._on_store_hover("mine", 1, "", Rect2())
+	var gave: Array = []
+	var catch_give := func(to: GridEntity, uids: Array) -> void: gave.append([to, uids])
+	window.give_asked.disconnect(_main._give_to_person)  # The stand-in is no vendor: the real give would answer with offers and close the window.
+	window.give_asked.connect(catch_give)
+	window._on_store_square("mine", 0)
+	window._pending["at"] = 0  # No pack change in a test: the line needs no wait.
+	_check(gave == [[body, [911]]], "one click on the dagger hands it back (%s)" % [gave])
+	window.set_takes([takes_rows[1]])
+	_check(window.foot_shown() == "Handed back the dagger." and not store_view.foot_is_refused(), "the dagger gone from his takes: the foot line says it (%s)" % window.foot_shown())
+	window._on_store_square("mine", 1)
+	_check(gave.size() == 2 and gave[1][1] == [912], "one click on the pelt sells it (%s)" % [gave])
+	window._on_store_square("mine", 2)
+	_check(window.foot_shown() == "Rolf won't take that." and store_view.foot_is_refused(), "a thing he doesn't take: the line says so (%s)" % window.foot_shown())
+	window.give_asked.disconnect(catch_give)
+	window.give_asked.connect(_main._give_to_person)
+	var asked_locker: Array = []
+	var catch_locker := func(who: GridEntity) -> void: asked_locker.append(who)
+	window.locker_asked.connect(catch_locker)
+	window._on_store_tab("locker")
+	window.locker_asked.disconnect(catch_locker)
+	_check(asked_locker == [body] and not window.is_open() and not window.pack.suppressed, "the Locker tab: asks for his locker, the store window out of the way, the pack back")
+	World.set_slots(me, had_slots, had_uids)
 	window.close()
 	World.despawn(body)
 	body.queue_free()

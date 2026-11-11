@@ -640,6 +640,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (SUBCLASS_REPLICATED), her step paced to her player's while she follows, so a client draws a
 ## paced step at its time; an old client draws her steps at her own quicker pace.
 ## 56 also (734 amended (7)): "counter"'s waiting rows may carry "effect": "kept" and "words" (the caption); an old client shows its plain box and "ready".
+## 56 also (852, "the store window"; no new number, release): "offers" to a keeper may carry "points"
+## {item id: words} (where what the keeper won't take goes), and a "takes" row "starter": true; an old
+## client shows neither (no points, a plain row).
 const PROTOCOL_REVISION := 56
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

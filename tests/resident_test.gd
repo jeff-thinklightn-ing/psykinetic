@@ -5950,6 +5950,21 @@ func _test_vendor() -> void:
 	_check(World.economy.gold(pid) == 5 - int(rule.get("price", 1)) and at >= 0 and World.is_starter(World.slot_uid(player, at)),
 		"bought: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
 	_check(spoken.size() == 1, "he says so (%s)" % [spoken])
+	# 852: a full pack refuses before any gold moves (Jeff's store window; playtest: gold taken, the ware at your feet, no word).
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND] + Array(World.pack_slots(player)):
+		if player.slots[slot].is_empty():
+			World.put_item(player, player, slot, World.items.mint("hammer", "built"))
+	World.economy.add_gold(pid, 5, "the test")
+	var gold_full := World.economy.gold(pid)
+	var book_full: int = World.items.size()
+	spoken.clear()
+	if not sword.is_empty():
+		_main._accept_offer(player, str(sword[0]["id"]), 0)
+	_check(World.economy.gold(pid) == gold_full and World.items.size() == book_full and spoken == [Main.FULL_PACK_LINE],
+		"a full pack: his line, the gold unchanged, nothing minted (%s, gold %d, items %d to %d)" % [spoken, World.economy.gold(pid), book_full, World.items.size()])
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND] + Array(World.pack_slots(player)):
+		if player.slots[slot] == "hammer":
+			World.items.place(World._take_out(player, slot), "the test")  # Room again for what follows.
 	_test_vendor_buttons(player, rolf, rule)
 	_test_keeper(player, rolf)
 	_test_keeper_buttons(player, rolf)
@@ -6165,21 +6180,21 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 	_check(not sword.is_empty() and panel.box_words("ware", sword) == Items.name_of("sword"), "the sword's square: its name on hover")
 	if sword.is_empty():
 		return
-	panel.toggle_ware(sword)
-	_check(panel.button_shown() == "Buy (1 item)" and panel._button.disabled and panel.foot_shown() == "You need %d more gold." % price,
-		"picked with no gold: Buy (1 item), dim, the shortfall said (%s; %s)" % [panel.button_shown(), panel.foot_shown()])
+	panel._on_store_square("ware", sword)  # 852: one click, no gold: nothing is asked, the foot line says why in rust.
+	_check(panel.foot_shown() == "You need %d more gold." % price and panel._store_view.foot_is_refused() and World.economy.gold(pid) == 0,
+		"a click with no gold: the shortfall in the foot line, in rust, nothing bought (%s)" % panel.foot_shown())
 	# Playtest on v0.1.195: gold from a quest, the dole or a chest never reached the client, so the buttons stayed grey.
 	_main._give_gold(pid, 3, "a quest's reward (the test)")  # Economy.add_gold, as a quest's reward is paid.
 	World.add_gold(pid, 2, "a coin purse")  # A chest's purse, World's way.
 	_main._update_store()
-	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and not panel._button.disabled and panel.total_shown() == "Total gold %d" % price,
-		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), Buy enables, its Total %s" % [_main.gold, _main.shop_panel.gold_shown(), panel.total_shown()])
+	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and panel.purse == 5,
+		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), the window's %d" % [_main.gold, _main.shop_panel.gold_shown(), panel.purse])
 	var floats: Array[String] = []
 	var floated := func(kind: String, data: Dictionary) -> void:
 		if kind == "reward":
 			floats.append(str(data.get("words", "")))
 	Net.message_received.connect(floated)
-	panel._confirm()  # Main._offer_deal: the "offer" command.
+	panel._on_store_square("ware", sword)  # One click buys: Main._offer_deal, the "offer" command.
 	Net.message_received.disconnect(floated)
 	var at := player.slots.find("sword")
 	_check(World.economy.gold(pid) == 5 - price and _main.gold == 5 - price and at >= 0 and World.is_starter(World.slot_uid(player, at)),

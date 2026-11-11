@@ -103,6 +103,8 @@ signal give_asked(to: GridEntity, uids: Array)
 ## with the kit (807 amended (5): Jeff, "a 'take practice kit' button that
 ## just fills your inventory with junk you can't trade").
 signal locker_asked(keeper: GridEntity)
+## 852: the store window's answer came: "bought", "sold" (a sale, or a hand-over paid in gold) or "left" (a gift, a hand-back), for the cue (Main plays it).
+signal told(what: String)
 
 ## 802: the chat area's height in lines, and how many lines it keeps.
 const CHAT_LINES := 6
@@ -111,8 +113,25 @@ const CHAT_WIDTH := 600
 ## 802: the typing line's longest line (Main.CHAT_MAX_CHARS's).
 const LINE_MOST := 200
 ## Voice's words (802): the button's foot while out of reach for a trade.
-const STEP_CLOSER := "Step closer to trade"
+const STEP_CLOSER := "Step closer to trade."
 const ASLEEP_WORDS := "asleep"
+## The store window's lines (852; voice's, every one ends with a full stop; %s the
+## thing with its article, "a spear", or "the dagger" for your own piece; %d gold).
+const BOUGHT_LINE := "Bought %s for %d gold."
+const SOLD_LINE := "Sold %s for %d gold."
+const HANDED_BACK_LINE := "Handed back %s."
+const LEFT_LINE := "Left %s on the shelves for the town."
+const WONT_TAKE_LINE := "%s won't take that."
+const ENOUGH_LINE := "The town has enough of that."
+const ASLEEP_LINE := "%s is asleep. Come back by day."
+const STORE_TAB := "Store"
+const LOCKER_TAB := "Locker"
+## How long a click waits for the server to answer before the line stops expecting it, msec.
+const ANSWER_MSEC := 3000
+## A keeper's refusal in words (his speech) is read as the answer when the purse has not moved by then, msec.
+const SAID_MSEC := 600
+## The line waits this long for the pack's squares to change with the purse, then is said anyway, msec.
+const PACK_WAIT_MSEC := 500
 ## The mark of the town's trusted prices (voice's word, the regard ladder's; no hover).
 const TRUSTED_WORDS := "Trusted"
 ## Voice's words for Give (802; 802 amended (8), give_word): the toggle and
@@ -170,6 +189,23 @@ var takes: Array = []
 var giving := false
 var gift: Dictionary = {}
 var _give_due := false
+## 852: the approved store window (StoreView), which every goods and wares trade
+## uses (a counter's work and the healer's care keep the old window beside the
+## pack); this controller hands it a state and takes its clicks.
+var _store_view: StoreView
+## The foot line's words and whether it is a refusal (rust); said by say_foot.
+var _foot_text := ""
+var _foot_refused := false
+## The click the server has not answered yet: {kind, key, text, purse, at, uid}.
+var _pending: Dictionary = {}
+## The last words the keeper said (his speech) and when, msec.
+var _said := {"text": "", "at": -1000000}
+## The thing the pointer is on in the store window, "kind:key" ("" none).
+var _store_over := ""
+## When the last click was answered (msec): a trade's words from the server, arriving just after, replace its line.
+var _answered_msec := -1000000
+## Where each thing in the pack that the keeper won't take goes ({item id: words}, the server's depot pointers); the foot line says them.
+var points: Dictionary = {}
 var _box: PanelContainer
 var _title: Label
 ## "Trusted" (economy's trusted prices, voice's word, no hover) after the
@@ -386,6 +422,13 @@ func _ready() -> void:
 	_tip_words = Label.new()
 	_tip.add_child(_tip_words)
 	add_child(_tip)
+	_store_view = StoreView.new()
+	_store_view.icon_of = _icon
+	_store_view.square_pressed.connect(_on_store_square)
+	_store_view.square_hovered.connect(_on_store_hover)
+	_store_view.tab_pressed.connect(_on_store_tab)
+	add_child(_store_view)
+	move_child(_tip, -1)  # The name over a square draws over the window.
 	if pack != null:
 		pack.select_hook = _select_mine
 		pack.hover_hook = _hover_mine
@@ -426,6 +469,7 @@ func show_wares(person: GridEntity, who: String, offers: Array, gold: int) -> vo
 	for id: Variant in wares_pick.keys():
 		if ware_entry(str(id)).is_empty():
 			wares_pick.erase(id)
+	_check_answer()
 	_rebuild()
 
 
@@ -522,8 +566,9 @@ func asks_shown() -> Array[String]:
 func set_keeper(offers: Array) -> void:
 	var keeper := _open and offers.any(func(each: Variant) -> bool:
 		return each is Dictionary and str((each as Dictionary).get("kind", "")) == Offers.VENDOR_WARES)
-	if _locker_button != null:
+	if _locker_button != null and _locker_button.visible != keeper:
 		_locker_button.visible = keeper
+		_rebuild()  # 852: the Locker tab shows with it.
 
 
 ## Whether Rolf's buttons show: [Open locker].
@@ -535,6 +580,7 @@ func keeper_buttons() -> Array[bool]:
 func set_purse(gold: int) -> void:
 	if gold != purse:
 		purse = gold
+		_check_answer()
 		_rebuild()
 
 
@@ -692,6 +738,11 @@ func close() -> void:
 		_asks_box.visible = false
 		_asks_scroll.visible = false
 	_hover_words = ""
+	_foot_text = ""
+	_foot_refused = false
+	_pending = {}
+	_store_over = ""
+	points = {}
 	_hide_tip()
 	_rebuild()
 
@@ -721,6 +772,8 @@ func show_barter(given: Dictionary) -> void:
 	var why := str(data.get("why", ""))
 	if not why.is_empty():
 		refused.emit(why)
+		say_foot(why, true)  # 852: the refusal's own words in the window's foot line.
+		_pending = {}
 	set_takes(given.get("takes", []))
 
 
@@ -738,9 +791,8 @@ func set_takes(rows: Variant) -> void:
 			gift.erase(uid)
 	if takes.is_empty():
 		giving = false
-	elif _give_due and person != null:
-		_open_on_give()
-	_give_due = false
+	_give_due = false  # 852: the window opens on Store, never on Donate (Jeff: "it just says Give").
+	_check_answer()
 	_rebuild()
 
 
@@ -1283,19 +1335,23 @@ func hover_shown() -> String:
 
 
 func why_shown() -> String:
-	return _why.text
+	return _store_view.foot_shown() if _layout_store() and _store_view.foot_is_refused() else _why.text
 
 
 func title_shown() -> String:
-	return _title.text
+	return _store_view.title_shown() if _layout_store() else _title.text
 
 
 ## "Trusted" while shown, "" otherwise (tests).
 func trusted_shown() -> String:
+	if _layout_store():
+		return TRUSTED_WORDS if data.get("trusted") == true else ""
 	return _trusted.text if _trusted.visible else ""
 
 
 func foot_shown() -> String:
+	if _layout_store():
+		return _store_view.foot_shown()
 	return _foot.text if _foot.visible else ""
 
 
@@ -1313,6 +1369,11 @@ func total_shown() -> String:
 ## The squares shown (tests): "<kind> <key> <chips>[ picked]" each.
 func boxes_shown() -> Array[String]:
 	var out: Array[String] = []
+	if _layout_store():
+		for line: String in _store_view.squares_shown("goods"):
+			var parts := line.split(" ")
+			out.append("%s %s gold %s" % [parts[0], parts[1], parts[2]])
+		return out
 	for box: Node in _grid.get_children():
 		if box is StoreBox:
 			var chips := PackedStringArray()
@@ -1325,6 +1386,9 @@ func boxes_shown() -> Array[String]:
 
 ## The name a square's hover shows (tests and the tip).
 func box_words(kind: String, key: Variant) -> String:
+	if _layout_store():
+		var square := _store_view.square_for(kind, key)
+		return square.words if square != null else ""
 	for box: Node in _grid.get_children():
 		if box is StoreBox and box.kind == kind and str(box.key) == str(key):
 			return box.words
@@ -1442,10 +1506,32 @@ func _rebuild() -> void:
 			pack.set_selected([])
 			pack.set_prices({})
 			pack.held_open = false
+			pack.suppressed = false
 		_box.visible = false
 		_total.visible = false
+		if _store_view != null:
+			_store_view.visible = false
 		return
-	_title.text = title_words(merchant, str(counter.get("kind", "")) if not counter.is_empty() else "")
+	if _layout_store():
+		# 852: the approved window; it owns the pack while it is open (the separate pack and
+		# sheet are not drawn, and come back as they were when it closes).
+		if pack != null:
+			pack.set_selected([])
+			pack.set_prices({})
+			pack.held_open = false
+			pack.suppressed = true
+		_box.visible = false
+		_total.visible = false
+		_store_view.visible = true
+		_hide_tip()
+		_store_view.show_state(_store_state())
+		_show_words()
+		return
+	if _store_view != null:
+		_store_view.visible = false
+	if pack != null:
+		pack.suppressed = false
+	_title.text = title_words(merchant, str(counter.get("kind", "")) if _counter_work() else "")
 	_trusted.visible = data.get("trusted") == true
 	_state.text = ASLEEP_WORDS
 	_state.visible = person != null and asleep
@@ -1781,6 +1867,358 @@ func _show_total() -> void:
 	_total.visible = true
 
 
+## 852: whether the approved store window shows now: a trade (not the chat alone), no
+## typing line (a townsperson who hears typed words keeps the old window until the
+## townsperson window is redone), and no counter's work or the healer's care.
+func _layout_store() -> bool:
+	return _open and trades and not talks and not _counter_work() and care().is_empty()
+
+
+## Whether the counter message has any work to show: jobs, work in hand or work ready. A store's own chest is told as a
+## counter of kind "shop" too, with none of them (economy's fish_home tour, v0.1.210: its window was titled "The smith's
+## counter"): that is no counter work, and neither the title nor the layout follows it.
+func _counter_work() -> bool:
+	for key: String in ["jobs", "working", "waiting"]:
+		var rows: Variant = counter.get(key, [])
+		if rows is Array and not (rows as Array).is_empty():
+			return true
+	return false
+
+
+## Whether the store window is open and owns the pack: the separate pack and sheet
+## are not drawn meanwhile (Main closes the window when I is pressed).
+func owns_pack() -> bool:
+	return _layout_store()
+
+
+## A thing as the lines name it (voice): "a spear", "an axe", "the dagger" for your own piece; no article for a plural name.
+static func thing_words(id: String, definite: bool) -> String:
+	var name := Items.name_of(id).to_lower()
+	if definite:
+		return "the " + name
+	if name.ends_with("s") and not name.ends_with("ss"):
+		return name
+	return ("an " if name.substr(0, 1) in ["a", "e", "i", "o", "u"] else "a ") + name
+
+
+## The state the store window draws (StoreView's shape), from what the window knows.
+func _store_state() -> Dictionary:
+	var player: GridEntity = pack.player if pack != null else null
+	var tabs: Array = [{"id": "store", "text": STORE_TAB, "open": not giving}]
+	if not takes.is_empty():
+		tabs.append({"id": "donate", "text": DONATE_WORDS, "open": giving})
+	if _locker_button != null and _locker_button.visible:
+		tabs.append({"id": "locker", "text": LOCKER_TAB, "open": false})
+	var goods: Array = []
+	if not giving:
+		for each: Variant in data.get("goods", []):
+			if each is Dictionary:
+				var price := int(each.get("price", 0))
+				goods.append({"kind": "good", "key": int(each.get("uid", 0)), "item": str(each.get("id", "")),
+					"words": Items.name_of(str(each.get("id", ""))), "price": price, "short": price > purse})
+		for each: Dictionary in wares:
+			var item := ware_item(each)
+			var cost := int(each.get("cost", 0))
+			goods.append({"kind": "ware", "key": str(each.get("id", "")), "item": item, "words": Items.name_of(item),
+				"price": cost, "short": cost > purse})
+	var mine: Array = []
+	if is_instance_valid(player):
+		for slot: int in World.pack_slots(player):
+			if slot >= player.slots.size():
+				continue
+			var item := str(player.slots[slot])
+			var spec := {"kind": "mine", "key": slot, "item": item, "words": Items.name_of(item) if not item.is_empty() else "",
+				"price": -1, "count": World.slot_count(player, slot) if not item.is_empty() else 0}
+			if not item.is_empty():
+				if giving:
+					var row := takes_at(slot)
+					spec["lit"] = not row.is_empty()
+					if not row.is_empty() and int(row.get("gold", 0)) > 0:
+						spec["price"] = int(row["gold"])
+				else:
+					var entry := pack_entry_at(slot)
+					var row := takes_at(slot)
+					if not entry.is_empty() and pays_for(int(entry.get("uid", 0))) > 0:
+						spec["price"] = pays_for(int(entry.get("uid", 0)))
+					elif entry.is_empty() and not row.is_empty() and int(row.get("gold", 0)) > 0:
+						spec["price"] = int(row["gold"])  # A keeper with no stock of his own who pays for a trophy (Rolf, economy): a price on the square.
+			mine.append(spec)
+	var foot := _foot_text
+	var refused := _foot_refused
+	if asleep and person != null:
+		foot = ASLEEP_LINE % merchant
+		refused = true
+	elif not near:
+		foot = STEP_CLOSER
+		refused = true
+	return {"title": title_words(merchant, ""), "trusted": data.get("trusted") == true, "tabs": tabs,
+		"goods_head": ("%s's goods" % merchant if not merchant.is_empty() else "Goods") if not giving else "",
+		"goods": goods, "mine_head": "Your pack", "mine": mine, "gold": purse,
+		"lines": _donate_lines(), "foot": foot, "refused": refused,
+		"load_share": ((player.load_arms + player.load_body) / maxf(World.load_capacity(player), 0.001)) if is_instance_valid(player) else 0.0,
+		"load_words": "
+".join(PackPanel.load_lines(player)) if is_instance_valid(player) else ""}
+
+
+## Donate: what handing over the thing the pointer is on does, voice's lines (one a thing), else none.
+func _donate_lines() -> Array:
+	if not giving or not _store_over.begins_with("mine:"):
+		return []
+	var row := takes_at(int(_store_over.get_slice(":", 1)))
+	return give_lines([row]) if not row.is_empty() else []
+
+
+## What the foot line says for a thing of yours [param id] the keeper won't take: where it goes when the server
+## said ("Pelts and trophies go to the tanner."), else "Rolf won't take that.".
+func _wont_take_words(id: String) -> String:
+	var pointed := str(points.get(id, ""))
+	return pointed if not pointed.is_empty() else WONT_TAKE_LINE % _keeper_name()
+
+
+## Where the keeper's points are read from: Main passes the server's with each offers message.
+func set_points(given: Dictionary) -> void:
+	points = given.duplicate()
+
+
+## The foot line says [param words] ([param refused]: in rust).
+func say_foot(words: String, refused := false) -> void:
+	_foot_text = words
+	_foot_refused = refused
+	if _open:
+		_rebuild()
+
+
+## What [param body], the keeper, just said (Main's speech hook): a refusal in words
+## (his "That's 3 gold, friend.") is the answer to the click when the purse does not move.
+func keeper_said(body: GridEntity, words: String) -> void:
+	if _open and (body == with or body == person):
+		_said = {"text": words, "at": Time.get_ticks_msec()}
+
+
+## A click the server will answer: the line shown once the purse or the squares change.
+func _expect(pending: Dictionary) -> void:
+	pending["purse"] = purse
+	pending["slots"] = Array(pack.player.slots).duplicate() if pack != null and is_instance_valid(pack.player) else []
+	pending["at"] = Time.get_ticks_msec()
+	_pending = pending
+
+
+## Whether the answer to the pending click has come (the purse moved, the thing left its
+## square): its line, and the cue.
+func _check_answer() -> void:
+	if _pending.is_empty():
+		return
+	var uid := int(_pending.get("uid", 0))
+	var money := false
+	var gone := false
+	match str(_pending.get("kind", "")):
+		"ware":
+			money = purse < int(_pending["purse"]) or bool(_pending.get("free", false))
+		"good":
+			money = purse < int(_pending["purse"]) or not goods_have(uid)
+		"mine":
+			money = takes_row(uid).is_empty() if giving else (pack_entry(uid).is_empty() or purse > int(_pending["purse"]))
+	# The line is said with the pack: the purse and the squares come as two messages, so it waits for
+	# both (the thing in the pack, or out of it) and, if the squares never change, for ANSWER_WAIT_MSEC.
+	var changed: bool = pack != null and is_instance_valid(pack.player) and Array(pack.player.slots) != _pending.get("slots", [])
+	gone = changed or Time.get_ticks_msec() - int(_pending.get("at", 0)) >= PACK_WAIT_MSEC
+	if not (money and gone):
+		return
+	var text := str(_pending.get("text", ""))
+	var cue := str(_pending.get("cue", ""))
+	_pending = {}
+	_answered_msec = Time.get_ticks_msec()
+	_foot_text = text
+	_foot_refused = false
+	if not cue.is_empty():
+		told.emit(cue)
+	if _open:
+		_rebuild()
+
+
+## The words of a trade the server told with its gain ("trade": "bought" or "sold" on the
+## "reward" message, economy's 856) while this window is open: the foot says them, once,
+## in place of the line made here (a free thing reads as the server's float reads, never
+## "for 0 gold"). They take the foot if it already shows a trade line, else the click
+## still waiting for its answer.
+func trade_words(words: String, trade: String) -> void:
+	if not _open or words.is_empty():
+		return
+	var kind := str(_pending.get("kind", ""))
+	if not kind.is_empty() and (kind == "mine") == (trade == "sold"):
+		_pending["text"] = words
+		return
+	if Time.get_ticks_msec() - _answered_msec < ANSWER_MSEC:
+		_foot_text = words
+		_foot_refused = false
+		_rebuild()
+
+
+## Each frame: a click not answered in time stops being expected; a keeper's refusal in
+## words, with no change to the purse, is the answer.
+func _expire_pending() -> void:
+	if _pending.is_empty():
+		return
+	_check_answer()  # The squares may have changed since the purse did.
+	if _pending.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	var at := int(_pending.get("at", now))
+	if int(_said["at"]) >= at and now - at >= SAID_MSEC:
+		var key: Variant = _pending.get("key")
+		var kind := str(_pending.get("kind", ""))
+		_pending = {}
+		_refuse(kind, key, str(_said["text"]))
+	elif now - at > ANSWER_MSEC:
+		_pending = {}
+
+
+## A click that cannot go through: the foot line says why in rust, the square shows its
+## rust rim, nothing moves, and the error cue sounds.
+func _refuse(kind: String, key: Variant, words: String) -> void:
+	_pending = {}
+	if _store_view != null:
+		_store_view.flash_refused(kind, key)
+	refused.emit(words)
+	say_foot(words, true)
+
+
+## Out of reach or the keeper asleep: said and refused (true), else false.
+func _stopped(kind: String, key: Variant) -> bool:
+	if asleep and person != null:
+		_refuse(kind, key, ASLEEP_LINE % merchant)
+		return true
+	if not near:
+		_refuse(kind, key, STEP_CLOSER)
+		return true
+	return false
+
+
+## The keeper's name for a refusal line.
+func _keeper_name() -> String:
+	return merchant if not merchant.is_empty() else "They"
+
+
+func _on_store_square(kind: String, key: Variant) -> void:
+	if not _open:
+		return
+	match kind:
+		"ware":
+			_buy_ware(str(key))
+		"good":
+			_buy_good(int(key))
+		"mine":
+			if giving:
+				_donate(int(key))
+			else:
+				_sell(int(key))
+
+
+## One click on a ware: bought at its price, or the line says why not.
+func _buy_ware(id: String) -> void:
+	var entry := ware_entry(id)
+	if entry.is_empty() or _stopped("ware", id):
+		return
+	var cost := int(entry.get("cost", 0))
+	var short := shortfall_words(-cost, purse)
+	if not short.is_empty():
+		_refuse("ware", id, short)
+		return
+	# A free ware (the first rod) never says "for 0 gold": its words are the server's float's (trade_words).
+	_expect({"kind": "ware", "key": id, "cue": "bought", "free": cost <= 0,
+		"text": BOUGHT_LINE % [thing_words(ware_item(entry), false), cost] if cost > 0 else ""})
+	offer_asked.emit(id, cost)
+
+
+## One click on a good of a counter's stock: bought, or the line says why not.
+func _buy_good(uid: int) -> void:
+	var entry := goods_entry(uid)
+	if entry.is_empty() or _stopped("good", uid):
+		return
+	var price := int(entry.get("price", 0))
+	var short := shortfall_words(-price, purse)
+	if not short.is_empty():
+		_refuse("good", uid, short)
+		return
+	_expect({"kind": "good", "key": uid, "uid": uid, "cue": "bought", "free": price <= 0,
+		"text": BOUGHT_LINE % [thing_words(str(entry.get("id", "")), false), price] if price > 0 else ""})
+	trade_asked.emit(with, [], [uid], balance_of([], [uid]))
+
+
+## One click on a thing of yours: sold for what they pay (a unit of a stack), or the line says why not.
+func _sell(slot: int) -> void:
+	var entry := pack_entry_at(slot)
+	if _stopped("mine", slot):
+		return
+	if entry.is_empty():
+		var paid := takes_at(slot)  # A keeper with no stock of his own who pays for a trophy (Rolf): a sale, by his takes row.
+		if not paid.is_empty() and int(paid.get("gold", 0)) > 0:
+			var paid_id := str(paid.get("what", ""))
+			_expect({"kind": "mine", "key": slot, "uid": int(paid.get("uid", 0)), "cue": "sold", "text": SOLD_LINE % [thing_words(paid_id, false), int(paid["gold"])]})
+			give_asked.emit(person if person != null else with, [int(paid.get("uid", 0))])
+			return
+		if pack != null and is_instance_valid(pack.player) and slot < pack.player.slots.size() and not str(pack.player.slots[slot]).is_empty():
+			_refuse("mine", slot, _wont_take_words(str(pack.player.slots[slot])))
+		return
+	var uid := int(entry.get("uid", 0))
+	var id := str(entry.get("id", ""))
+	var pay := pays_for(uid)
+	if pay <= 0:
+		_refuse("mine", slot, _wont_take_words(id))
+		return
+	if up_to(id) < 1:
+		_refuse("mine", slot, ENOUGH_LINE)
+		return
+	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold", "text": SOLD_LINE % [thing_words(id, false), pay]})
+	trade_asked.emit(with, [uid], [], balance_of([uid], []))
+
+
+## One click on a thing of yours on Donate: handed over, or the line says they won't take it.
+func _donate(slot: int) -> void:
+	var row := takes_at(slot)
+	if _stopped("mine", slot):
+		return
+	if row.is_empty():
+		_refuse("mine", slot, _wont_take_words(str(pack.player.slots[slot]) if pack != null and is_instance_valid(pack.player) and slot < pack.player.slots.size() else ""))
+		return
+	var uid := int(row.get("uid", 0))
+	var id := str(row.get("what", ""))
+	var gold := int(row.get("gold", 0))
+	var text := SOLD_LINE % [thing_words(id, false), gold] if gold > 0 \
+			else HANDED_BACK_LINE % thing_words(id, true) if bool(row.get("starter", false)) \
+			else LEFT_LINE % thing_words(id, true)
+	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold" if gold > 0 else "left", "text": text})
+	give_asked.emit(person if person != null else with, [uid])
+
+
+func _on_store_tab(id: String) -> void:
+	match id:
+		"store":
+			set_giving(false)
+		"donate":
+			set_giving(true)
+		"locker":
+			# Landing A: the locker opens beside the pack, the store window out of the way.
+			var keeper := with
+			close()
+			if keeper != null:
+				locker_asked.emit(keeper)
+
+
+func _on_store_hover(kind: String, key: Variant, words: String, rect: Rect2) -> void:
+	if words.is_empty():
+		_store_over = ""
+		_hide_tip()
+	else:
+		_store_over = "%s:%s" % [kind, key]
+		_tip_words.text = words
+		_tip.reset_size()
+		_tip.global_position = Vector2(rect.position.x, rect.position.y - _tip.size.y - 6)
+		_tip.visible = true
+	if giving and _store_view != null:
+		_store_view.set_lines(_donate_lines())
+
+
 func _process(_delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	_place()
@@ -1792,6 +2230,16 @@ func _process(_delta: float) -> void:
 func _place() -> void:
 	if _open and not is_instance_valid(with) and with != null:
 		close()
+	_expire_pending()
+	if _store_view != null and _store_view.visible:
+		# 852: at the screen's bottom right, clear of the player and of the right-hand column.
+		_store_view.reset_size()
+		var screen := get_viewport_rect().size
+		var margin := float(UiTheme.constant("margin"))
+		_store_view.position = Vector2(screen.x - _store_view.size.x - margin, screen.y - _store_view.size.y - margin)
+		_box.visible = false
+		_total.visible = false
+		return
 	var pack_shown := pack != null and pack.visible
 	_box.visible = _open and pack_shown
 	if not _box.visible:

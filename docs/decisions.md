@@ -50029,3 +50029,51 @@ reshuffles by about 150 body-minutes a day at random until maps' work spots are 
 well is a decision of its own. look_day prints the night's and the day's packed as two totals, and
 for a body asleep off its bed (Rolf stood asleep at (180, 207)) its goal, bed, route and the path it
 finds. Server only; protocol unchanged; no new class_name.
+## 852. The store window: one window for every keeper, one click a buy or a sale
+
+Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...
+make all stores use the same layout, i will approve final version", 11-05, 11-07 "it just says Give", 11-10
+"rolfs store UI confusing bordering on non functional") and, on ui-design's mock
+(C:/dev/review/ui-design/store/, store-rolf-1080.png), 11-10: "store update is what i imagined -- approve".
+The coordinator's rulings of that night stand. Package "the store window", on.
+
+What it is. StoreView (render/store_view.gd, a new class_name) draws; BarterPanel stays the controller and
+hands it a state (_store_state) and takes its clicks. One window at the screen's bottom right: the keeper's name
+and tabs Store, Donate and Locker (those the keeper has) at its head, the keeper's goods on the left, the
+player's carried squares on the right in the same squares, a price chip on every square that has one, the
+player's gold at the head of the pack half, and one line at the foot. It opens on Store, never on Donate
+(BarterPanel no longer opens on Give). Every look is the theme's types (Glass, Subhead, Tab, Well and its states,
+PriceChip, ChipPrice, SquareCount, FootLine, TimeChip for a free ware's "Free"); no override, colour, font or
+size of its own.
+
+What a click does. No picks, no Trade, no Total: one click on a thing of his buys it (a ware: the "offer"
+command; a good of a counter's stock: "trade" with that one thing), one click on a thing of yours sells it (a
+unit of a stack; "trade"), and on the Donate tab a click on a thing he takes hands it over ("give"). The foot
+line answers: "Bought %s for %d gold.", "Sold %s for %d gold.", "Handed back %s." (a starter piece, the server's
+takes row says "starter": true), "Left %s on the shelves for the town." (voice's words), said once the server's
+answer is seen (the purse moved, or the thing left its place); a refusal is said at once, in rust, with the
+square's rust rim and the error cue, and nothing moves: "You need N more gold.", "%s won't take that." (or, where
+the server knows who does, the keeper's "points" words: Main._pointers_for reads depot_pointer for each kind in the
+pack he doesn't take, sent with his offers), "The town has enough of that.", "Step closer to trade.", "%s is
+asleep. Come back by day.", the server's own why, and a keeper's refusal in words (Main's speech hook, read when the
+purse hasn't moved). The window's answer plays sound's cues (ui.trade_buy, ui.trade_sell, ui.trade_give; the coin
+and the bag until they are on main).
+
+It owns the pack. While it is open the separate pack and sheet are not drawn (PackPanel.suppressed), and come
+back as they were when it closes; I closes it and opens the pack, one for the other. Clicks never reach the world
+(ui_test's face scan: 162 presses on the window, none walked). The Locker tab closes it and asks for the keeper's
+locker (the pack shows with the chest beside it; the locker's own paged tab is a later landing).
+
+A full pack refuses before any gold moves (Main._has_room_for, World.room_for counting a stack the ware would
+join): Rolf's and a pedlar's sales said nothing and put the ware at the buyer's feet after taking the gold
+(playtest, 11-10). resident_test: gold unchanged, nothing minted, the keeper's "Your pack is full.".
+
+What keeps today's window, said plainly: the healer's care, the temple's and the forge's counters (a counter message
+with jobs, work in hand or work ready; a store chest told as a counter with none of them no longer is one, and no
+longer titles its window "The smith's counter"), and a townsperson you can type to (the typing line): their redo is
+the services' landing and the townsperson window's. Donate here is the same window; the old Give box stays only for
+the talkers. A new PROTOCOL_REVISION is not taken (release): "points" on the offers message and "starter" on a
+takes row are fields an old client ignores (net/net.gd's comment). Tests: ui_test _test_barter (the merchant's
+store, a camp trader's), _test_window_clicks, _test_store_face_clicks, the Donate and Locker checks at Rolf's;
+resident_test _test_vendor_buttons and the full-pack case. Client and server (the full-pack refusal, the pointers,
+the starter flag).

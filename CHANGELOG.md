@@ -58,6 +58,8 @@ notes (decision 324).
 - Towns: a townsperson's window lists what you can do for them or give them as rows to click, each with its price in gold where it has one, and a row you can't afford or are too far away for says why, where before you had to type the word for each (536 amended).
 - You arrive with a clear view now: your pack stays shut until you press I or open a chest, where before it and your character sheet lay open over the middle of the screen when you joined (787 amended (3)).
 - A chest with a name of its own is titled with it when you open it, such as the Runner's pack or the Robbers' chest (787 amended (5))
+- Towns: Rolf's stall, pedlars and each town's store and shops now trade in one store window, the keeper's goods on the left and your pack on the right, square for square, each with its price and your gold at the head of your pack: one click buys or sells, the line at the foot says what happened or why not, coins ring on a buy, a sale or a gift, and a thing the keeper won't take says so, and who will where the town knows; Donate and Locker sit beside Store as tabs where the keeper has them, and the window stands in for your pack and sheet until you close it (I swaps back to them); the healer's, the temple's and the forge's counters, and townsfolk you talk to, keep their own windows for now (852).
+- Towns: buy with a full pack and you keep your gold, and the store window tells you "Your pack is full." (852).
 - The Barrow's quest card shows only while you're in the Barrow or the halls below it, and steps aside whenever a window opens over it (747 amended (7)).
 - The inventory window heads what you wear "Gear" and what you carry "Pack", and your companion's is titled for both, her gear and pack (787 amended (4)).
 

@@ -2063,6 +2063,21 @@ func _trade(with: GridEntity, give: Array, take: Array, gold_balance: int) -> vo
 		World.command(player, "trade", {key: str(with.get_path()), "give": give, "take": take, "gold": gold_balance})
 
 
+## 852: the store window's answer came ("bought", "sold", "left"): its cue. Sound's
+## ui.trade_buy, ui.trade_sell and ui.trade_give once on main; the coin and the bag
+## they fall back to until then (a name not in the kit plays nothing).
+func _on_store_told(what: String) -> void:
+	if ui_sounds == null:
+		return
+	match what:
+		"bought":
+			ui_sounds.play("ui.trade_buy" if SoundKit.has("ui.trade_buy") else "ui.reward_coin")
+		"sold":
+			ui_sounds.play("ui.trade_sell" if SoundKit.has("ui.trade_sell") else "ui.reward_coin")
+		"left":
+			ui_sounds.play("ui.trade_give" if SoundKit.has("ui.trade_give") else "ui.reward_item")
+
+
 ## Economy's barter message (Main.barter_told, 560, economy's side): the
 ## window redrawn, the purse read.
 func _on_barter_told(data: Dictionary) -> void:
@@ -12890,10 +12905,28 @@ func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	if taker != null and not _worker_town(body.worker_id).is_empty():
 		data["takes"] = person_takes(taker, body.worker_id)  # What they'd take of the pack (802 amended (2), the Give tab).
 		_held_take_said(body, taker)  # 856 amended (2): a thing held that he'd take from the pack.
+		data["points"] = _pointers_for(taker, _worker_town(body.worker_id), data["takes"])  # 852: where what they won't take goes.
 	var standing := _standing_for(player_id, body.worker_id)
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
 	Net.message_to(peer, "offers", data)
+
+
+## Server: for each kind of thing in [param player]'s pack that [param takes] (a person's rows) leaves out, the
+## words saying where it goes in [param town] (depot_pointer, voice's and economy's receives): {item id: words}.
+## The store window's foot line says them for a click on a thing the keeper won't take (852).
+func _pointers_for(player: Player, town: String, takes: Array) -> Dictionary:
+	var out := {}
+	if World.economy == null or town.is_empty():
+		return out
+	var taken := {}
+	for row: Variant in takes:
+		taken[str((row as Dictionary).get("what", ""))] = true
+	for slot: int in World.pack_slots(player):
+		var id := str(player.slots[slot]) if slot < player.slots.size() else ""
+		if not id.is_empty() and not taken.has(id) and not out.has(id):
+			out[id] = depot_pointer(town, id)
+	return out
 
 
 ## Server: [param player] accepts offer [param offer_id] (of the resident
@@ -15376,6 +15409,7 @@ func _build_talk() -> void:
 	gains.play = _gain_cue
 	gains.has_cue = SoundKit.has
 	gains.shown_elsewhere = _gain_shown_elsewhere
+	gains.trade_window_open = func() -> bool: return barter_panel != null and barter_panel.is_open()
 	$HUD.add_child(gains)
 	$HUD.move_child(gains, 1)
 	Net.gains_shown_changed.connect(_on_gains_shown)
@@ -15462,6 +15496,7 @@ func _build_talk() -> void:
 	barter_panel.give_asked.connect(_give_to_person)  # 802: Give's button.
 	barter_panel.locker_asked.connect(_keeper_command.bind("locker"))  # 807 amended (3): Rolf's buttons.
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
+	barter_panel.told.connect(_on_store_told)  # 852: the store window's answer, its cue (sound's trade cues).
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
 		connect("barter_told", _on_barter_told)
@@ -15808,6 +15843,7 @@ func _on_offers_message(data: Dictionary) -> void:
 		# store window since 765 (none closes it if it shows theirs).
 		if barter_panel != null:
 			barter_panel.show_wares(who, str(data.get("speaker", "")), data.get("offers", []) if data.get("offers") is Array else [], gold)
+			barter_panel.set_points(data.get("points", {}) if data.get("points") is Dictionary else {})  # 852: where what he won't take goes.
 			if data.has("takes") and barter_panel.is_open() and barter_panel.person == who:
 				barter_panel.set_takes(data["takes"])  # 802 Give: what Rolf takes (gear, a gift).
 			if barter_panel.is_open() and barter_panel.with == who:
@@ -16364,6 +16400,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "reward":
 		if gains != null:
 			gains.add(data)  # 804: a gain, shown.
+		if data.has("trade") and barter_panel != null:
+			barter_panel.trade_words(str(data.get("words", "")), str(data["trade"]))  # 852: the foot says it once.
 		_explored_gained(data)
 		return
 	if kind == "arts":
@@ -16553,6 +16591,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
 		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
 			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.
+		if entity != null and barter_panel != null:
+			barter_panel.keeper_said(entity, str(data.get("text", "")))  # 852: a keeper's refusal is the store window's foot line.
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 			var said := SoundKit.speech(entity, str(data.get("text", "")))
@@ -17639,7 +17679,7 @@ func person_takes(player: Player, worker: String) -> Array:
 			# keeper takes it, from the pack, for nothing (Donate, ui's word for gold 0).
 			if not worker.begins_with(Offers.VENDOR) or not Items.is_pack(slot):
 				continue
-			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0}
+			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "starter": true}
 		elif not yields.is_empty():
 			var raw := str(yields.keys()[0])
 			if raw == "gold" or receiver_for(town, raw) != worker and not (worker == Offers.VENDOR + town and keeper_takes(town, raw)):
@@ -19590,6 +19630,27 @@ func _retain_care(player_id: String, healer_id: String, pay: String) -> Dictiona
 	return {"ok": false, "why": ""}
 
 
+## Voice's refusal for a ware bought with no room to carry it (852): said by the keeper, no gold taken.
+const FULL_PACK_LINE := "Your pack is full."
+
+
+## Server: whether [param player_id]'s player here has room for one [param item_id] (852): a
+## free hand or pack square, or a stack it would join (World.room_for, as _hand_item places it; a
+## starter ware is marked first, as there). True for a player not here (the sale then decides).
+func _has_room_for(player_id: String, item_id: String, starter: bool) -> bool:
+	if World.items == null or player_id.is_empty():
+		return true
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
+			var probe := World.items.mint(item_id, "made", "", World.zone.name, entity.tile)
+			if starter:
+				World.mark_starter(probe)
+			var room := World.room_for(entity, probe) >= 0
+			World.items.end(probe, "probe")  # Nothing minted: the book as it was.
+			return room
+	return true
+
+
 ## Server: a made thing [param item_id] from [param from_name] into
 ## [param player_id]'s free hand or pack, else on the ground at their feet
 ## (the medicine man's brew, 584 amended). False if they are not here.
@@ -21138,6 +21199,9 @@ func _visitor_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
 ## economy takes the gold, the tax and the stock (Towns.visitor_sell); the
 ## thing is minted into their hands; the pedlar says how it went.
 func _visitor_sells(player: Player, body: Resident, item: String) -> void:
+	if not _has_room_for(player.player_id, item, false):
+		_resident_says(body, FULL_PACK_LINE, "", player)  # 852: refused before any gold moves.
+		return
 	var done := World.towns.visitor_sell(body.worker_id.trim_prefix(Offers.VISITOR), player.player_id, item)
 	if bool(done.get("ok", false)):
 		_hand_item(player.player_id, item, body.person)
@@ -21151,6 +21215,9 @@ func _visitor_sells(player: Player, body: Resident, item: String) -> void:
 ## into their hands, each marked starter; the keeper says how it went.
 func _vendor_sells(player: Player, body: Resident, item: String) -> void:
 	if World.economy == null or not World.economy.has_method("vendor_sale"):
+		return
+	if not _has_room_for(player.player_id, item, true):
+		_resident_says(body, FULL_PACK_LINE, "", player)  # 852: refused before any gold moves.
 		return
 	var done: Dictionary = World.economy.vendor_sale(player.player_id, item)
 	if bool(done.get("ok", false)):
@@ -22613,6 +22680,13 @@ func _menu_options() -> void:
 ## chest or a companion's pack open, that closed.
 func toggle_pack() -> void:
 	if pack_panel == null:
+		return
+	if barter_panel != null and barter_panel.owns_pack():
+		# 852: the store window owns the pack: I swaps it for the pack, one for the other, never both.
+		barter_panel.close()
+		pack_panel.shown = true
+		if _local_player() != null:
+			_sound("sfx.pack_open", _local_player())
 		return
 	if pack_panel.other != null:
 		close_other()
