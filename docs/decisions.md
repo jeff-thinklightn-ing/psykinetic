@@ -14861,6 +14861,28 @@ that model (MODELS), marked at home, and a goblin at home goes bare-headed (its 
 down (C:\dev
 eview\people\snagfin.png). His look string carries no trade (an outcast's, npc),
 and a goblin has no apron, so no apron.
+
+494 amended (3) (art-kit; label by tools/decision_number.sh; Jeff's reports, 2026-11-11: "snagfin has some
+see through body parts which is a glitch", "in game the graphic has deteriorated", and "i worked on the goblin for a
+while to get it looking like something i'd be happy with and then that"; the coordinator's rulings): the goblin drawn
+as he made it again. Two scripted steps of 10-18 had undone it, and neither was shown to him. (1) This entry's
+goblin.gdshader replaced the .glb's own material, which is double-sided, with one that culls back faces. His mesh has
+faces wound inward (188 edges: chest, belt, legs, collar, ears) that his material drew, so every goblin has had holes
+since. (2) The first amendment's tools/goblin_hood.py cut the hood off his mesh, left 98 open edges in the head and put
+a dome in it, so a goblin with its hood down (Snagfin at home, about a third of a raid) showed the cut and the dome.
+Now goblin.gdshader and goblin_marking.gdshader draw both sides (render_mode cull_disabled), as his material did; the
+orc and the kobold, which share it, have clean meshes and look the same. Every goblin is hooded (GOBLIN_HOOD_UP 1.0,
+its draw still taken so every other look stays; model_for's at-home hood down is gone) until a bare head made by hand
+has been shown to Jeff before and after. His goblin.blend and goblin.glb are not touched: drawing both sides is the
+mend, not re-winding his faces. The script's cut head and dome stay in the file, unused under the hood, and
+tools/goblin_hood.py is not to be run again. And the five character models (goblin, human_m, human_f, orc, kobold) are
+imported without Godot's generated LODs (meshes/generate_lods=false; perf's word: at 1.5k to 3.3k tris a body they
+save almost nothing and merge a faceted figure's planes); they come back, hand-made or a checked set, before any finer
+body ships. The 24 creatures keep theirs (herds on screen). Proof: C:/dev/review/goblin_hist/goblin_then_now.png and
+findings.md. view_test: a goblin and an orc drawn on both sides where their own models were (a surface drawn in the
+kit's palette aside: palette.tres culls by rule over closed meshes, as the orc's gear is), every character model
+imported whole, a raid of 40 all hooded, Snagfin hooded. Client only, protocol unchanged, no new class_name.
+
 ## 489. BuildingComposer: a kind's look, seeded, off the grid
 
 Step 3 of Jeff's building variety (488 is step 1; art-kit's slots are

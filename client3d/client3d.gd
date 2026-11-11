@@ -1544,8 +1544,12 @@ const GOBLIN_MARKS := ["scarred", "striped", "red-handed"]
 const GOBLIN_UNMARKED := 0.55
 ## Its hood up (GOBLIN_HOOD_UP of the time) or down, bare-headed; its ears
 ## from small to big (goblin.glb's Ears_Small and Ears_Big, tools/goblin_hood.py),
-## a word past GOBLIN_EARS_SAID either way (decision 494 amended).
-const GOBLIN_HOOD_UP := 0.7
+## a word past GOBLIN_EARS_SAID either way (decision 494 amended). Every goblin
+## hooded for now (494 amended (3), Jeff 11-11: "snagfin has some see through body
+## parts"): the bare head goblin_hood.py cut shows its cut and a dome, not Jeff's
+## work; down again only once a bare head made by hand has been shown to him. (The
+## draw is still taken, so every goblin's other looks stay as they were.)
+const GOBLIN_HOOD_UP := 1.0
 ## A painted ally's variation (painted_look; decision 529): a little broader or
 ## slighter, its skin's hue barely turned (an orc stays grey-blue, a kobold
 ## red to purple), its colour and lightness more, marked or not.
@@ -20885,7 +20889,7 @@ static func model_for(entity: GridEntity) -> Dictionary:
 	var kind := str(entity.spawn_spec.get("kind", ""))
 	if entity is Resident and MODELS.has(kind):
 		# A goblin among the townsfolk (decision 471, Snagfin): its kind's body, at home in
-		# town, bare-headed (494's hood down).
+		# town, hooded as every goblin is for now (494 amended (3)).
 		var model: Dictionary = MODELS[kind].duplicate()
 		model["at_home"] = true
 		return model
@@ -20940,9 +20944,6 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	if model.get("goblin", false):
 		# Its own goblin (decision 494): the shared material, its variation as instance parameters.
 		var look := goblin_look(str(puppet.get_meta("entity_name", "")))
-		if model.get("at_home", false) and look["hood"]:
-			look["hood"] = false
-			look["words"] = (str(look["words"]) + " hood=down").strip_edges()
 		puppet.set_meta("goblin_look", look)
 		scene.scale = Vector3(scene.scale.x * float(look["width"]), scene.scale.y, scene.scale.z * float(look["width"]))
 		for mesh: MeshInstance3D in scene.find_children("*", "MeshInstance3D", true, false):

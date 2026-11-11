@@ -4,5 +4,8 @@
 // palette swatch (gear, its amount in .a), and one of three marks (goblin_marks.png's
 // channels: a scar, cheek stripes, a red hand) drawn or none (mark, one-hot).
 shader_type spatial;
+// Both sides drawn, as the goblin's own double-sided .glb material drew him (494 amended (3)): his mesh
+// has faces wound inward (chest, belt, legs, collar, ears) that culling dropped, putting holes in every goblin.
+render_mode cull_disabled;
 
 #include "res://art/models/characters/goblin.gdshaderinc"

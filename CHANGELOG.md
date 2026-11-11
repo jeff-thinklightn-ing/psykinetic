@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Goblins are solid all over, from chests and belts to legs, collars and ears, and every goblin wears his hood up, Snagfin at home too; people and goblins keep their full shape at a distance (494 amended (3))
+
 ## v0.1.211
 
 - The Crypt of the Fallen under the temple is open now: the temple's back stair goes down into the First Hall, where the fallen knight stands behind the burial table, the first you meet on the way down, with his quest against the robbers (any you've killed already count toward it), and you come back up inside the temple beside the stair; the old burial mound's door in the wilds opens on the far end of the robbers' dig, a long tunnel west into the Robbers' Camp, with its own way back out to the mound; the Ossuary below is where the old dead lie, tomb chambers round the ossuary and a dark wing of old graves, each chest guarded by a pack, and its sealed shortcut comes up into the First Hall; and once you've beaten the draugr, a sealed slab in the First Hall takes you straight down to the Hall of Fallen Souls (832, 747 amended (8)).

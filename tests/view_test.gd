@@ -9389,6 +9389,33 @@ func _test_barrow_dead() -> void:
 const REST_FLESH := 0.08
 
 
+
+## The surfaces [param puppet]'s model drew on both sides (its own material double-sided, as a .glb's
+## doubleSided gives) but its drawn material culls (a ShaderMaterial without cull_disabled, a BaseMaterial3D
+## not CULL_DISABLED): "mesh/surface" each. A surface drawn in the kit's palette is left out: palette.tres
+## culls back faces everywhere by rule, and the kit keeps those meshes closed (the orc's gear, surface 0).
+static func _sides_dropped(puppet: Node3D) -> Array[String]:
+	var out: Array[String] = []
+	for m: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
+		if not m.get_parent() is Skeleton3D or m.mesh == null:
+			continue
+		for s in m.mesh.get_surface_count():
+			var own := m.mesh.surface_get_material(s)
+			var drawn: Material = m.material_override if m.material_override != null else m.get_surface_override_material(s)
+			if drawn == null:
+				drawn = own
+			if drawn != null and drawn.resource_path == ArtKit.PALETTE:
+				continue
+			var both := func(mat: Material) -> bool:
+				if mat is BaseMaterial3D:
+					return (mat as BaseMaterial3D).cull_mode == BaseMaterial3D.CULL_DISABLED
+				if mat is ShaderMaterial and (mat as ShaderMaterial).shader != null:
+					return "cull_disabled" in (mat as ShaderMaterial).shader.code
+				return false
+			if both.call(own) and not both.call(drawn):
+				out.append("%s/%d" % [m.name, s])
+	return out
+
 func _test_goblins_differ() -> void:
 	print("\n== no two goblins alike: size by mass, their own pace and tempo, out of step; they look about, and stand tired ==")
 	var imps: Array[Monster] = [_spawn_imp(Vector2i(9, 2), "imp"), _spawn_imp(Vector2i(10, 2), "imp")]
@@ -9419,6 +9446,26 @@ func _test_goblins_differ() -> void:
 	var body_mesh := a.find_children("*", "MeshInstance3D", true, false).filter(func(m: MeshInstance3D) -> bool: return m.get_parent() is Skeleton3D)[0] as MeshInstance3D
 	var skin: Vector3 = body_mesh.get_instance_shader_parameter("skin")
 	_check(shared and skin == la["skin"], "drawn in the one shared material, its look as instance parameters (skin %s)" % skin)
+	# Both sides drawn where its own model drew both (494 amended (3), Jeff 11-11: "snagfin has some see through
+	# body parts"): the goblin's .glb material is double-sided over faces wound inward, so a material drawing
+	# it in their place that culls back faces puts holes in it.
+	var dropped: Array[String] = []
+	for puppet: Node3D in [a, big]:
+		dropped.append_array(_sides_dropped(puppet))
+	_check(dropped.is_empty(), "a goblin and an orc drawn on both sides where their own models were (%s)" % ("none dropped" if dropped.is_empty() else ", ".join(dropped)))
+	# And every triangle its .blend has (494 amended (3), perf's word for bodies of 1.5k to 3.3k tris): no
+	# character scene imported with Godot's generated LODs, which merge a faceted figure's planes when small.
+	var decimated: Array[String] = []
+	var scenes: Array[String] = [str(Client3D.HUMAN["scene"]), str(Client3D.HUMAN_F["scene"])]
+	for kind: String in Client3D.MODELS:
+		var path := str(Client3D.MODELS[kind].get("scene", ""))
+		if path.begins_with("res://art/models/characters/") and path not in scenes:
+			scenes.append(path)
+	for path in scenes:
+		var config := ConfigFile.new()
+		if config.load(path + ".import") != OK or bool(config.get_value("params", "meshes/generate_lods", true)):
+			decimated.append(path.get_file())
+	_check(decimated.is_empty(), "%d character models imported whole, no generated LODs (%s)" % [scenes.size(), "none" if decimated.is_empty() else ", ".join(decimated)])
 	var marked := 0
 	var stocky_or_lean := 0
 	for i in 40:
@@ -9442,8 +9489,9 @@ func _test_goblins_differ() -> void:
 	for i in 40:
 		if not Client3D.goblin_look("Raider%d" % i)["hood"]:
 			bare += 1
-	_check(bare > 4 and bare < 25, "a raid of 40: %d bare-headed" % bare)
-	# A goblin among the townsfolk (decision 471, Snagfin): its kind's body, hood down, never a person's.
+	_check(bare == 0, "a raid of 40: %d bare-headed (every goblin hooded for now, 494 amended (3))" % bare)
+	# A goblin among the townsfolk (decision 471, Snagfin): its kind's body, never a person's; hooded, as
+	# every goblin is for now (494 amended (3): the script's bare head is not Jeff's work).
 	var occupant := World.get_entity_at(Vector2i(12, 2))
 	if occupant != null:
 		World.despawn(occupant)
@@ -9454,8 +9502,8 @@ func _test_goblins_differ() -> void:
 	var his_model := his.get_node_or_null("Body/Model") if his != null else null
 	var hoods: Array = his_model.find_children("Hood", "MeshInstance3D", true, false) if his_model != null else []
 	_check(his_model != null and his_model.scene_file_path == str(Client3D.MODELS["imp"]["scene"]) and hoods.size() == 1
-			and not (hoods[0] as MeshInstance3D).visible and "hood=down" in str(his.get_meta("goblin_look")["words"]),
-			"a goblin resident is the goblin, its hood down (%s)" % [his_model.scene_file_path if his_model != null else "no model"])
+			and (hoods[0] as MeshInstance3D).visible and not "hood=down" in str(his.get_meta("goblin_look")["words"]),
+			"a goblin resident is the goblin, its hood up (%s)" % [his_model.scene_file_path if his_model != null else "no model"])
 	World.despawn(merchant)
 	_rig._process(0.0)
 	var animators: Array[AnimRig] = [a.get_meta("rig"), b.get_meta("rig")]
