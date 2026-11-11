@@ -9,8 +9,8 @@ extends Node
 const TOWN := "wilds/store"
 const HOUR := 2250
 const MINUTE := 37
-## The longest an awake body may stand idle on one cell (game minutes): a stroll comes every 3 to 6.
-const STAY_MINUTES := 15
+## The longest an awake body may stand idle on one cell (game minutes): a stroll comes every 12 to 32.
+const STAY_MINUTES := 35
 ## The longest an idle body may face shut ground (game minutes).
 const SHUT_MINUTES := 3
 const FROM_HOUR := 6

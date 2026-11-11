@@ -35,9 +35,13 @@ const HIDE_TICKS := 600
 const WANDER_TICKS := 80
 ## Idle, whatever it is doing (the frozen-townsfolk mend, Jeff 2026-11-10: "townspeople frozen staring
 ## at the wall all day"), it moves on to another spot of its place this often: STROLL_TICKS plus up to
-## STROLL_SPREAD more, its own by a hash (37.5 ticks a game minute: 3 to 6 game minutes).
-const STROLL_TICKS := 112
-const STROLL_SPREAD := 113
+## STROLL_SPREAD more, its own by a hash (37.5 ticks a game minute: 12 to 32 game minutes, 45 to 120 real
+## seconds; the coordinator, 2026-11-11: a shorter wait reads as restless). A seat: SEAT_TICKS plus up to
+## SEAT_SPREAD (30 to 60 game minutes, settling in).
+const STROLL_TICKS := 450
+const STROLL_SPREAD := 750
+const SEAT_TICKS := 1125
+const SEAT_SPREAD := 1125
 ## The doings it strolls in while idle (no task, not abed): not hiding, sick, led, lost, visiting the sick.
 const STROLLS: Array[Doing] = [Doing.WORK, Doing.HOME, Doing.SQUARE, Doing.WELL, Doing.INN, Doing.TEMPLE, Doing.ROUNDS]
 ## The poses a spot gives (Level.spots_from's "pose"): its activity word while it is there, drawn by
@@ -604,7 +608,7 @@ func _pick_goal() -> void:
 		_spot = spot
 		_set_goal(spot["cell"])
 		if str(spot.get("pose", "")) == "sit":
-			_wander_at += STROLL_TICKS + absi(hash([id, _picks, "sit"])) % STROLL_SPREAD
+			_wander_at = World.tick + SEAT_TICKS + absi(hash([id, _picks, "sit"])) % SEAT_SPREAD
 		return
 	if area.size == Vector2i.ZERO:
 		_goal = tile

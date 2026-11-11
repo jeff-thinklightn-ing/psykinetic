@@ -48106,9 +48106,11 @@ the richer day):
   notes the cell left). Every idle doing strolls (Resident.STROLLS: work, home awake, the square, the
   well, the inn, the temple, a lawspeaker's round; not hiding, sick abed, led, lost or visiting the
   sick; never with a task, abed asleep, addressing a player, or far from every player): its next
-  move STROLL_TICKS (112) plus up to STROLL_SPREAD (113) more on, by a hash of its id and its count of
-  picks, so 3 to 6 game minutes, staggered so a town does not move as one; a seat (a spot posed "sit")
-  is kept twice as long.
+  move STROLL_TICKS (450) plus up to STROLL_SPREAD (750) more on, by a hash of its id and its count of
+  picks, so 12 to 32 game minutes (45 to 120 real seconds; the coordinator's ruling, 2026-11-11: 3 to 6
+  game minutes, 11 to 22 real seconds, would read as restless), staggered so a town does not move as
+  one; a seat (a spot posed "sit") is kept SEAT_TICKS (1125) plus up to SEAT_SPREAD (1125), 30 to 60
+  game minutes.
 - The pick (Resident._free_cell, _free_spot) starts at a hash of its id, the tick and its count of
   picks, skips the cell it stands on, and takes the cell it just left only when no other is free: no
   two-cell shuffle. It never picks a level link's cell (a player's way out alone, 571: World.try_move
@@ -48172,12 +48174,12 @@ changed meaning, is asked again); the comment above it says so.
 Live in slice 1: the moving and the facing everywhere; "sit" and "lean" only where a spot is laid,
 and none is laid on main yet (maps lays Umbrage's next), their clips animation's. Measured again with
 the same run on this code: every body's longest awake stay on one cell and facing, 06:00 to 22:00, fell
-from 120 to 589 game minutes (Bea 589, Maud 528, Gar 515, Mags 488) to 5, one stroll's wait, and none
-faced shut ground (Hob's well stone before). Tests: town_day_test (new: the wilds town 06:00 to 22:00,
+from 120 to 589 game minutes (Bea 589, Maud 528, Gar 515, Mags 488) to 5 with the first wait (3 to 6
+game minutes), and none faced shut ground (Hob's well stone before); with the ruled wait, at most 32. Tests: town_day_test (new: the wilds town 06:00 to 22:00,
 town_soak's ten folk, a player in the square, every body in sight each game minute; none awake stands
-idle on one cell and facing past 15 game minutes, nor faces shut ground idle past 3);
+idle on one cell and facing past 35 game minutes, nor faces shut ground idle past 3);
 resident_test _test_keep_moving (24 picks at Gar's 81 ticks: never the cell stood on nor the one left;
-who strolls and who keeps still; the next stroll 3 to 6 minutes on, staggered; the stand turned from
+who strolls and who keeps still; the next stroll 12 to 32 game minutes on, staggered; the stand turned from
 shut ground; a fire seat taken, faced and sat, got up from, its cell kept through the get-up;
 Main._open_work); level_test
 _test_spots (the reader's rules and warnings, moved_config and Regen keeping the array, the wilds

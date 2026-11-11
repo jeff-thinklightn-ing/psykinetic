@@ -4055,7 +4055,7 @@ func _test_keep_moving() -> void:
 		mara._pick_goal()
 		picks[mara._wander_at - World.tick] = true
 	_check(picks.keys().all(func(wait: int) -> bool: return wait >= Resident.STROLL_TICKS and wait < Resident.STROLL_TICKS + Resident.STROLL_SPREAD)
-		and picks.size() >= 8, "its next stroll 3 to 6 game minutes on, staggered (%d waits of 13)" % picks.size())
+		and picks.size() >= 8, "its next stroll 12 to 32 game minutes on, staggered (%d waits of 13)" % picks.size())
 	# The stand faces the open: a cell with the ground shut before it turns to open ground.
 	var shut := Resident.NO_CELL
 	var way := Vector2i.ZERO
@@ -4088,7 +4088,7 @@ func _test_keep_moving() -> void:
 	mara.doing = Resident.Doing.SQUARE
 	mara._left = Resident.NO_CELL
 	mara._pick_goal()
-	_check(mara._goal == seat and mara._wander_at - World.tick >= 2 * Resident.STROLL_TICKS, "in the square's hours it goes to the fire's seat, and sits longer (%s)" % [mara._goal])
+	_check(mara._goal == seat and mara._wander_at - World.tick >= Resident.SEAT_TICKS, "in the square's hours it goes to the fire's seat, and sits longer (%s)" % [mara._goal])
 	World._relocate(mara, seat)
 	World.tick = maxi(World.tick, mara.next_move_tick)
 	mara._face_open()
