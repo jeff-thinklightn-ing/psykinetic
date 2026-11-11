@@ -100,6 +100,19 @@ const WALK_TURN_WIDE := PI / 6.0  # 30 degrees: a corner's look ahead outruns it
 const GAP_KEEP_TICKS := 2.5
 const GAP_KEEP_ANGLE := 0.87  # 50 degrees: more than an 8-way step's 45.
 const SWUNG_FACE_TICKS := 3.0
+## 350 amended (1) (the coordinator, from animation's host walkreel and
+## companions' trace: Wren at her 2.5-tick pace, every second step due on a
+## half tick, World.try_move taking it on the next whole tick and dating its
+## slide back to the half; a host drew its own bodies at now, so the slide
+## before ended, she stood half a tick, then jumped 0.3 to 0.47 m): a host
+## draws its grid bodies on a clock this far behind now, the largest
+## back-date a fractional pace gives, so the next slide is always in hand.
+## Drawing only: the sim, its telegraphs and blows, and the host's own free
+## body are on now as before. A joined client draws display_delay_ticks
+## (1.5) behind.
+const HOST_DRAW_DELAY_TICKS := 1.0
+## How many slides may wait their turn on a host (a rush a cell a tick).
+const HOST_NEXT_MAX := 8
 ## A corner rounded as the body walks (decision 655): the bend round a
 ## cell's centre reaches this far along the step before it and the step
 ## after (half a step: midpoint to midpoint), and only this far in a
@@ -395,6 +408,10 @@ var _walked := {}
 ## 655 amended (2): a line it faces at once till a tick ({way, until}; {}
 ## for none): face_told.
 var _told := {}
+## 350 amended (1): a host's slides waiting their turn ({from, to, tick,
+## duration}), and where the one drawn ends (UNKNOWN_TILE: at its tile).
+var _host_next: Array[Dictionary] = []
+var _host_to := UNKNOWN_TILE
 ## A body drawn backing off (CreatureView sets it for a slot with a back_off: the boar king's;
 ## 780 amended (16), his back-off, animation's side): a step run squarely against its facing
 ## (BACK_STEP_DOT, a cosine) keeps the facing shown through the slide, its face on its foe, where
@@ -719,6 +736,17 @@ func _process(delta: float) -> void:
 				if not _guess.is_empty() and World.tick + World.tick_alpha > float(_guess["until"]):
 					_take_back_guess()
 				to = _to_tile
+			elif HOST_DRAW_DELAY_TICKS > 0.0 and Net.is_authority():
+				# 350 amended (1): a host draws its bodies HOST_DRAW_DELAY_TICKS
+				# behind now, so a slide dated before the tick it was taken on
+				# (a fractional pace's) is in hand as the one before ends.
+				now -= HOST_DRAW_DELAY_TICKS
+				while not _host_next.is_empty() and now >= _move_tick + _move_duration:
+					var slide: Dictionary = _host_next.pop_front()
+					_start_slide(slide["from"], float(slide["tick"]), float(slide["duration"]))
+					_host_to = slide["to"]
+				if _host_to != UNKNOWN_TILE and (not _host_next.is_empty() or _move_duration > 0.0 and now < _move_tick + _move_duration):
+					to = _host_to
 			# Constant speed along the step, no easing at its ends: steps
 			# that follow one another join up into one steady walk.
 			var t := 1.0
@@ -939,6 +967,8 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	step_until = -100000.0
 	_from_tile = at
 	_move_duration = 0
+	_host_next.clear()  # 350 amended (1): nothing waits to be drawn from its last place.
+	_host_to = UNKNOWN_TILE
 	hp = max_hp
 	stamina = max_stamina
 	stunned_until_tick = 0
@@ -961,7 +991,23 @@ func _world_set_facing(direction: Vector2i) -> void:
 
 
 ## Render hint: the entity just went from [param from] to its current tile.
+## On a host (350 amended (1)) a slide that comes while the one before is
+## still being drawn, on the host's clock HOST_DRAW_DELAY_TICKS behind,
+## waits its turn (_host_next); one of no length (a teleport) is shown at
+## once and drops what waits.
 func _world_slide_from(from: Vector2i, at_tick: float, duration: float) -> void:
+	if duration > 0.0 and HOST_DRAW_DELAY_TICKS > 0.0 and not _mirroring and Net.is_authority() and _free_shown().is_empty() \
+			and (not _host_next.is_empty() or _move_duration > 0.0 and World.tick + World.tick_alpha - HOST_DRAW_DELAY_TICKS < _move_tick + _move_duration):
+		_host_next.append({"from": from, "to": tile, "tick": at_tick, "duration": duration})
+		if _host_next.size() > HOST_NEXT_MAX:
+			_host_next.pop_front()
+		return
+	_host_next.clear()
+	_host_to = tile if duration > 0.0 else UNKNOWN_TILE
+	_start_slide(from, at_tick, duration)
+
+
+func _start_slide(from: Vector2i, at_tick: float, duration: float) -> void:
 	_from_tile = from
 	_from_pos = Vector2(from)
 	_move_tick = at_tick
@@ -1318,14 +1364,20 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	_slides.append({"from": old, "to": tile, "tick": start, "duration": duration})
 
 
-## Mirrors only: seconds till the drawn body reaches the end of its slides
-## (the one on screen and those waiting), on the display clock; 0 when it is
-## drawn standing, and for anything not a mirror. Cosmetic: a blow's wind-up
-## waits for it (Client3D._strike).
+## Seconds till the drawn body reaches the end of its slides (the one on
+## screen and those waiting), on the display clock: a mirror's, or a host's
+## HOST_DRAW_DELAY_TICKS behind (350 amended (1)); 0 when it is drawn
+## standing, and for a free body. Cosmetic: a blow's wind-up waits for it
+## (Client3D._strike).
 func arriving_in() -> float:
-	if not _mirroring:
+	if _mirroring:
+		return maxf(_slides_end() - (World.tick + World.tick_alpha - World.display_delay_ticks), 0.0) * World.TICK_DT
+	if HOST_DRAW_DELAY_TICKS <= 0.0 or not Net.is_authority() or not _free_shown().is_empty():
 		return 0.0
-	return maxf(_slides_end() - (World.tick + World.tick_alpha - World.display_delay_ticks), 0.0) * World.TICK_DT
+	var end := _move_tick + _move_duration
+	for slide: Dictionary in _host_next:
+		end = maxf(end, float(slide["tick"]) + float(slide["duration"]))
+	return maxf(end - (World.tick + World.tick_alpha - HOST_DRAW_DELAY_TICKS), 0.0) * World.TICK_DT
 
 
 ## Mirrors only: the display tick the slide shown and those waiting end at.

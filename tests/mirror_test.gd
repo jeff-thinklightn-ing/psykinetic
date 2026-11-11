@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_a_blow_settles_its_last_step_only()
 	_test_facing_eases_on_a_zigzag()
 	_test_facing_told_and_stopped_for()
+	_test_host_draws_a_tick_behind()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -556,6 +557,102 @@ func _test_facing_told_and_stopped_for() -> void:
 			"walked three east, stopped and turned north by the server: faced north %.2f s after its last slide ended (at most 0.15)" % (faced_at - stood_at))
 	foe.queue_free()
 	keeper.queue_free()
+
+
+## 350 amended (1) (the coordinator's bar and guards): on a host, a body at
+## a fractional pace (2.5 ticks a cell: Wren, a wolf, a boar), each step
+## taken on the whole tick after it falls due and its slide dated back to
+## when it fell due (World.try_move's kept clock), is drawn at an even
+## speed, every frame within 10% of its mean, never held then jumped; one
+## stepping in to lunge is drawn on its cell, within a quarter cell, by the
+## tick the lunge lands, and a plain blow's swing waits for it
+## (arriving_in); one teleported is drawn there at once, nothing of its walk
+## trailing.
+func _test_host_draws_a_tick_behind() -> void:
+	print("\n== a host draws its bodies a tick behind: a 2.5-tick pace walked evenly, a strike's body there, a teleport at once ==")
+	var saved := Net.mode
+	Net.mode = Net.Mode.HOST
+	var tick_was := World.tick
+	World.tick = 1000
+	World.tick_alpha = 0.0
+	var wolf := _host_body("HostWolf", Vector2i(2, 50), 2)
+	var frame := World.TICK_DT / SAMPLES_PER_TICK
+	var due := float(World.tick) + 1.0
+	var speeds: Array[float] = []
+	var last := Iso.local_to_grid(wolf.position)
+	var steps := 0
+	var striker := _host_body("HostRobber", Vector2i(2, 54), 2)
+	var strike_off := INF
+	var lands := -1
+	var arriving := -1.0
+	for k in 300:
+		if World.tick_alpha == 0.0:
+			# The sim's tick: a step falls due every 2.5 ticks; taken on the
+			# first whole tick at or after it, its slide dated when it fell due.
+			if steps < 10 and float(World.tick) >= due:
+				var from := wolf.tile
+				wolf.tile = from + Vector2i(1, 0)
+				wolf._world_slide_from(from, due, 2.5)
+				due += 2.5
+				steps += 1
+			if World.tick == 1004:
+				var from := striker.tile
+				striker.tile = from + Vector2i(1, 0)
+				striker._world_slide_from(from, float(World.tick), 2.0)
+				# A robber's told lunge (monsters.json: windup 6) begun the tick it steps in.
+				lands = World.tick + 6
+				arriving = striker.arriving_in()
+		wolf._process(frame)
+		striker._process(frame)
+		var at := Iso.local_to_grid(wolf.position)
+		if steps >= 3 and steps < 10:  # Walking on steadily (past setting off, before the last).
+			speeds.append(at.distance_to(last) / frame)
+		last = at
+		if World.tick == lands and World.tick_alpha == 0.0:
+			strike_off = Iso.local_to_grid(striker.position).distance_to(Vector2(striker.tile))
+		World.tick_alpha += 1.0 / SAMPLES_PER_TICK
+		if World.tick_alpha >= 1.0 - 0.0001:
+			World.tick_alpha = 0.0
+			World.tick += 1
+	var mean := 0.0
+	for s in speeds:
+		mean += s
+	mean /= maxf(speeds.size(), 1.0)
+	var worst := 0.0
+	for s in speeds:
+		worst = maxf(worst, absf(s - mean) / mean if mean > 0.0 else INF)
+	_check(speeds.size() > 100 and worst <= 0.10,
+			"a 2.5-tick pace on a host, every second step dated half a tick back: drawn %.2f cells a second, each frame within %.0f%% of it (at most 10)" % [mean, worst * 100.0])
+	_check(strike_off <= 0.25, "stepped in and lunging (its 6-tick tell): drawn %.2f cells off its cell as the lunge lands (at most 0.25)" % strike_off)
+	# A plain blow (no tell) the tick it steps in: the view's swing waits for
+	# the body drawn a tick behind (Client3D._strike holds it arriving_in).
+	_check(absf(arriving - (2.0 + GridEntity.HOST_DRAW_DELAY_TICKS) * World.TICK_DT) < 0.02,
+			"a blow the tick it steps in waits %.2f s for its body to be drawn there (its 2-tick step and the host's tick behind)" % arriving)
+	# A teleport mid-walk: drawn there at once.
+	var from := wolf.tile
+	wolf.tile = from + Vector2i(1, 0)
+	wolf._world_slide_from(from, float(World.tick), 2.5)
+	wolf._process(frame)
+	wolf.tile = Vector2i(30, 50)
+	wolf._world_slide_from(Vector2i(30, 50), float(World.tick), 0.0)
+	wolf._process(frame)
+	var off := Iso.local_to_grid(wolf.position).distance_to(Vector2(30, 50))
+	_check(off < 0.01, "teleported mid-step: drawn on its new cell at once (%.3f off), its walk not trailing" % off)
+	wolf.queue_free()
+	striker.queue_free()
+	World.tick = tick_was
+	World.tick_alpha = 0.0
+	Net.mode = saved
+
+
+## A host's own body (Net.mode HOST when built, so no mirror), placed as
+## World.spawn places one (_world_place: spawned, drawn on its tile) without
+## joining the world's grid.
+func _host_body(entity_name: String, tile: Vector2i, move_ticks: int) -> GridEntity:
+	var entity := _mirror(entity_name, tile, move_ticks)
+	entity._world_place(0, tile)
+	entity._process(0.0)
+	return entity
 
 
 ## [param entity] fed [param steps] as _walk does, its facing set to each

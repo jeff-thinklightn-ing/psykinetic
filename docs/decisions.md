@@ -7566,6 +7566,39 @@ frame from others and counts each body. The clock part's gain is not in
 these runs (no server stall happened in them; the baseline's one clean run
 with a stall had 28 of its first 40 logged jumps from it); mirror_test
 covers it. Corrections a minute are unchanged (5 / 16 / 27).
+
+350 amended (1), a host draws its bodies a tick behind (decision_number.sh's label;
+the coordinator's go, a delay rather than a redraw, from animation's host walk reels and
+companions' Wren trace; a fix, no package). On a host Wren, wolves and boars at a 2.5-tick
+pace stood 1 to 2 frames, then jumped 0.3 to 0.47 m, every second step: a step due on a
+half tick is taken by World.try_move on the next whole tick and its slide dated back to the
+half, but a host drew its own bodies at now, so the slide before had ended half a tick
+earlier and the body stood, then the back-dated slide came in already half done. A joined
+client never saw it (its mirrors draw display_delay_ticks, 1.5, behind and queue slides,
+above), but every host reel and every look pass judged on a host did. Now a host draws its
+grid bodies on a clock `HOST_DRAW_DELAY_TICKS` (1.0, the largest back-date a fractional
+pace gives) behind now: GridEntity._world_slide_from keeps a slide that comes while the one
+before is still drawn on that clock in `_host_next` (at most `HOST_NEXT_MAX`, 8), and
+_process takes the next as the one drawn ends, as a mirror's queue does (_start_slide, the
+old body of _world_slide_from). A slide of no length (a teleport, a respawn) and
+_world_place show at once and drop what waits, so nothing trails or smears on appearing,
+dying or teleporting. Drawing only: the sim, its telegraphs, blows and hits stay on now, and
+the host's own free body is drawn as before. arriving_in() now counts a host's waiting
+slides too, so Client3D._strike holds a wind-up till the body is drawn where it strikes
+from, and a lunge's body is in place by its lands tick. mirror_test
+_test_host_draws_a_tick_behind (Net.mode HOST): a wolf at a 2.5-tick pace with back-dated
+slides keeps every frame's speed within 10% of its mean (4.00 cells a second, every frame
+within 0%; with the delay at 0, 3.91 and a frame 411% off, the stand and the jump); a robber
+stepping in at 1004 with its lunge landing at 1010 is drawn within 0.25 cell of its tile by
+then (0.00 off; the guard, as it was with no delay); a plain blow the tick it steps in waits
+0.30 s (its 2-tick step and the tick behind; 0.00 with the delay at 0, the swing begun with
+the body a cell short); a teleport mid-step is drawn on its tile at once (0.000 off). The
+test's bodies are placed as World.spawn places them (_world_place) under Net.mode HOST, so
+none is a mirror. push_test, view_test and combat_test pass with it. A dedicated server
+draws nothing; a picked body (Main's pick by drawn place) is a tick behind as drawn. Client
+only: a host draws a tick later than before, a joined client unchanged; protocol unchanged;
+no new class_name.
+
 ## 351. A door redoes only the light and heat lines that go through it
 
 From the tick re-baseline on today's main (coordinator, after decision
