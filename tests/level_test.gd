@@ -2398,6 +2398,14 @@ func _test_building_level_link() -> void:
 			and stair_place.get("worth") == 0 and stair_place.get("holder") == "nobody" and stair_place.get("name") == "the crypt stair"
 			and not bool(stair_place.get("explore", true)) and (chapel["rect"] as Rect2i).has_point(Vector2i(199, 199)),
 			"the crypt stair is a place of its own on the stair, inside the temple: other, a cell wide, nobody's, worth 0, no found-place reward (%s)" % [stair_place])
+	# The places Umbrage's temple and the healer's turf house make go by lore's
+	# names (ui-design's zone map audit: "Temple", "Healers Hut" were the kinds capitalised).
+	var named := {"temple@189,201": "the temple", "healers_hut@152,232": "the healer's hut"}
+	var names_now := {}
+	for key: String in named:
+		names_now[key] = wilds["places"].get(key, {}).get("name", "")
+	_check(names_now == named and wilds["places"]["temple@189,201"].get("kind") == "temple" and wilds["places"]["healers_hut@152,232"].get("kind") == "healers_hut",
+		"the temple's and the healer's hut's places go by lore's names, on their buildings' front cells (%s)" % [names_now])
 
 
 ## The kind lists (816): each one entry a line, sorted, so two trees adding

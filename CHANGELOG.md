@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage's map, and the name shown for where you stand, now read "the temple" and "the healer's hut" at those two places (832 amended (1))
 - Your companion follows in your footsteps at your own pace, walking smoothly behind you, and stops beside you only when you turn back toward her (485 amended (2)).
 - Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856)
 - Towns: hold a pelt, a trophy or a bear claw in your hand at a keeper who buys it, and the keeper tells you it goes in your pack first (856 amended (2))

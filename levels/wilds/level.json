@@ -911,6 +911,28 @@
 			"radius": 1,
 			"worth": 0,
 			"name": "the crypt stair"
+		},
+		"temple@189,201": {
+			"at": [
+				189,
+				201
+			],
+			"kind": "temple",
+			"radius": 1,
+			"worth": 0,
+			"name": "the temple",
+			"lore_id": "temple"
+		},
+		"healers_hut@152,232": {
+			"at": [
+				152,
+				232
+			],
+			"kind": "healers_hut",
+			"radius": 1,
+			"worth": 0,
+			"name": "the healer's hut",
+			"lore_id": "healers_hut"
 		}
 	},
 	"rooms": {
