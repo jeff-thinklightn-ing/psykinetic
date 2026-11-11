@@ -179,9 +179,9 @@ func _test_barrow() -> void:
 	var kinds := _kinds(level)
 	_check(doors >= 4 and level["terrain"]["torches"].size() >= 8,
 		"layer 1 is all shallow: the town's tombs have doors and the ways their torches (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
-	_check(kinds.get("robber", 0) == 8 and kinds.get("robber_brute", 0) == 1 and kinds.get("chest", 0) == 3 and kinds.get("altar", 0) == 1 and kinds.get("skeleton_guard", 0) == 2
+	_check(kinds.get("robber", 0) == 8 and kinds.get("robber_brute", 0) == 1 and kinds.get("chest", 0) == 3 and kinds.get("offering stone", 0) == 1 and kinds.get("skeleton_guard", 0) == 2
 		and kinds.get("runner's pack", 0) == 1 and kinds.get("skeleton", 0) == 0,
-		"the band laid, eight robbers and Brand (714 (4)), and three chests; the altar, its two guards and the Runner's pack kept; no dead walk (%s)" % [kinds])
+		"the band laid, eight robbers and Brand (714 (4)), and three chests; the offering stone, its two guards and the Runner's pack kept; no dead walk (%s)" % [kinds])
 	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
 		"layer 1's robbers stand on open floor in both generations, floor all round and no wall edge (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
 	# The coordinator (714 (4)): spread over the rooms, so a lone player
@@ -319,8 +319,8 @@ func _test_barrow() -> void:
 			var d := float(depth.call(spec["tile"])) / float(far)
 			dead_by_band[0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)] += 1
 	_check(kinds.get("skeleton", 0) == 6 and kinds.get("skeleton_guard", 0) == 3 and kinds.get("chest", 0) == 6 and kinds.get("draugr", 0) == 1
-		and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
-		"six skeletons and three grave guards (823, dungeon's side), five chests laid and the Hall's own, the draugr kept on his throne; no robbers, no altar (%s)" % [kinds])
+		and kinds.get("robber", 0) == 0 and not kinds.has("offering stone"),
+		"six skeletons and three grave guards (823, dungeon's side), five chests laid and the Hall's own, the draugr kept on his throne; no robbers, no offering stone (%s)" % [kinds])
 	# 823, dungeon's side (foes last longer): each guard leads a pack, two
 	# skeletons within PACK_REACH of it, the guards 12 apart at least.
 	var guards: Array[Vector2i] = []
