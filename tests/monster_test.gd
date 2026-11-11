@@ -7773,6 +7773,11 @@ func _test_old_wolf_lunge_line() -> void:
 ## (20 hp) against his to fall (his max_hp): the careless one loses, the
 ## line-reader comes out about even (she falls no sooner than four fifths
 ## of his time), the answerer wins with half her health left.
+## The old grey's careless bar (780 amended (33)): she falls at least this
+## much before he does, as measured with his bite 5 (0.2 s with a sword).
+const CARELESS_MARGIN := 0.2
+
+
 func _test_old_wolf_rates() -> void:
 	print("%s== the old grey alone on one player: one who reads his lunge and his bite beats him; one careless loses ==" % char(10))
 	Monster.idling = false
@@ -7786,20 +7791,25 @@ func _test_old_wolf_rates() -> void:
 	var her_hp := 20
 	var taken := {}
 	var lost := {}
-	for mode: String in ["still", "careless", "reader", "answers"]:
+	# The sword in every way; the dagger careless too (780 amended (33): it
+	# beat him careless on main, unmeasured, before his bite was 5).
+	for run: Array in [["sword", "still"], ["sword", "careless"], ["sword", "reader"], ["sword", "answers"], ["dagger", "careless"]]:
+		var held: String = run[0]
+		var mode: String = run[1]
+		var key := mode if held == "sword" else held + " " + mode
 		var rows := arena.duplicate()
 		rows[13] = rows[13].substr(0, 24) + "P" + rows[13].substr(25)
 		var e := _build(rows)
 		var grey := _live_grey(Vector2i(18, 13))
 		var player: GridEntity = e["P"][0]
-		if mode == "still":
+		if key == "still":
 			_check(World.attack_ticks_of(grey) == 31 and absf(grey.boldness - 0.75) < 0.005 and grey.reaction_ticks == 5,
 				"his roll as the server lays him (%s): attack_ticks 31 (his row's 30, rolled), boldness 0.75, reaction 5 (%d, %.3f, %d)" % [
 				grey.name, World.attack_ticks_of(grey), grey.boldness, grey.reaction_ticks])
 		player.protected = false
 		player.max_hp = 1000
 		player.hp = 1000
-		player.slots[Items.RIGHT_HAND] = "sword"
+		player.slots[Items.RIGHT_HAND] = held
 		grey.max_hp = 100000
 		grey.hp = 100000
 		grey.sight_range = 12
@@ -7863,17 +7873,22 @@ func _test_old_wolf_rates() -> void:
 				by_him += int(d["amount"])
 			elif d["entity"] == grey:
 				on_him += int(d["amount"])
-		taken[mode] = by_him * per
-		lost[mode] = on_him * per
-		print("  %s (a sword): %.0f hp a minute taken (bites %.1f a minute, %.0f hp; lunges %.0f hp), his %.0f lost (%.1f blows a minute in his pant), %.1f lunges a minute; she falls in %.1f s, he in %s" % [
-			mode, taken[mode], src["bites"] * per, src["bites_hp"] * per, src["lunges_hp"] * per, lost[mode], src["in_pant"] * per, lunges * per,
-			60.0 * her_hp / maxf(taken[mode], 0.01), "%.1f s" % (60.0 * his_hp / lost[mode]) if lost[mode] > 0.0 else "never"])
+		taken[key] = by_him * per
+		lost[key] = on_him * per
+		print("  %s (a %s): %.0f hp a minute taken (bites %.1f a minute, %.0f hp; lunges %.0f hp), his %.0f lost (%.1f blows a minute in his pant), %.1f lunges a minute; she falls in %.1f s, he in %s" % [
+			mode, held, taken[key], src["bites"] * per, src["bites_hp"] * per, src["lunges_hp"] * per, lost[key], src["in_pant"] * per, lunges * per,
+			60.0 * her_hp / maxf(taken[key], 0.01), "%.1f s" % (60.0 * his_hp / lost[key]) if lost[key] > 0.0 else "never"])
 	var falls := func(mode: String) -> float: return 60.0 * her_hp / maxf(float(taken[mode]), 0.01)
 	var beaten := func(mode: String) -> float: return 60.0 * his_hp / float(lost[mode]) if float(lost[mode]) > 0.0 else INF
-	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 4 and int(row["fight"]["lead_ticks"]) == 6,
-		"his bite slow and told: 4 a bite, a 6-tick lead, one each 3 s (the coordinator's ruling)")
-	_check(falls.call("careless") < beaten.call("careless"),
-		"one who misses every 2nd told lunge loses: she falls in %.1f s, he in %.1f s" % [falls.call("careless"), beaten.call("careless")])
+	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 5 and int(row["fight"]["lead_ticks"]) == 6,
+		"his bite slow and told: 5 a bite (780 amended (33)), a 6-tick lead, one each 3 s (the coordinator's rulings)")
+	# The margin as measured on 340 amended (2) (0.2 s with the sword, 0.4 s with
+	# the dagger): she falls first by at least CARELESS_MARGIN. A change that
+	# tips it: bite 6 next (780 amended (33)).
+	for careless: String in ["careless", "dagger careless"]:
+		_check(falls.call(careless) + CARELESS_MARGIN <= beaten.call(careless),
+			"one who misses every 2nd told lunge loses (%s): she falls in %.2f s, he in %.2f s (first by %.1f s at least)" % [
+			"a sword" if careless == "careless" else "a dagger", falls.call(careless), beaten.call(careless), CARELESS_MARGIN])
 	_check(falls.call("reader") >= 0.8 * beaten.call("reader"),
 		"one who reads his lunge's line comes out about even: she falls in %.1f s, he in %.1f s (within a fifth)" % [falls.call("reader"), beaten.call("reader")])
 	_check(float(taken["answers"]) * beaten.call("answers") / 60.0 <= her_hp / 2.0,

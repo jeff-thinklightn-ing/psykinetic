@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The old grey's bite lands harder, so his lunge is worth reading: step off the line he marks and you hold your own, and step out of his bite as well and he never touches you (780 amended (33))
 
 - Your shield and your sword's parry never break or leave you stunned now: a raised shield holds any blow for stamina, a heavier one costing more and a wound-up heavy swing twice, and when you run short it gives out, letting that blow through and staying down a moment; your sword's ready parry turns light blows and lets heavier ones by; and the sword and the buckler catch a blow from a foe standing a little off your line, where before a heavy bite broke your guard and left you stunned, worse than holding nothing (340 amended (2)).
 - When a fight starts, your companion's card, the town sheet, the maps and any note you're reading close so you can see the fight; open one again whenever you like, though a blow you take closes it again, where before they stayed open over the middle of the screen (846).

@@ -104,7 +104,7 @@
 		"lair": {"zone": "grey_den", "land": ["foothills"], "range": 40, "hours": [6, 20], "venture_after_s": 1800,
 			"out_most_s": 2400, "fall_back_hp": 0.3, "fall_back_escort": 1, "rise_s": 1800, "path_margin": 6, "pad_margin": 30},
 		"escort": {"kind": "wolf", "count": [2, 2], "follow": 4},
-		"body": {"mass": 60.0, "max_hp": 40, "move_ticks": 2.9, "attack_damage": 4, "attack_ticks": 30, "sight_range": 8},
+		"body": {"mass": 60.0, "max_hp": 40, "move_ticks": 2.9, "attack_damage": 5, "attack_ticks": 30, "sight_range": 8},
 		"senses": {"cone": 160, "night": 0.6, "hearing": 2.0, "alert_sight": 2, "notice": 1.2},
 		"fight": {"lead_ticks": 6},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,

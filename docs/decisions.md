@@ -42111,6 +42111,24 @@ past it (she sets off at once, round it, never inside, to 1 off them); boxed in 
 straight away; nowhere to stand, she stays; (21)'s apex holds and room cell unchanged. Server only,
 protocol unchanged, no new class_name.
 
+Amended (33), the old grey's bite 5 on 340 amended (2) (the decision-number script's label; the coordinator's ruling
+on enemy-ai's grid, C:\dev\review\enemy-ai\grey_grid_340am2.md). 340 amended (2) lets a sword's parry cost no more
+than World.parry_cap, and with it a careless sword beat him alone: 16.2 s to her fall against 13.4 to his. The
+dagger already did on main (16.2 against 13.6), unmeasured, since _test_old_wolf_rates gave only a sword. Bare,
+dagger, hammer and the giant axe are unchanged by 340 amended (2). Measured on his live body (Apex_old_wolf, his roll
+31 / 0.745 / 5) with every day-one weapon, still, careless, reading and answering: his attack_ticks first, as ruled,
+does not do it. At 26 the careless sword still wins; from 22 his bite comes round before his lunge, he lunges about
+once after his opener, and careless and reader are one row, which undoes (23). Lead 5 moves no row and puts
+animation's bite_lead (a 0.6 s lead, (24)) out of step. So his bite is 5 (body attack_damage), attack_ticks 30 and
+lead 6 as before: careless loses with every weapon (sword 13.2 s against 13.4, dagger 13.2 against 13.6), the sword
+and dagger readers come out even (15.5 / 15.7, 17.1 / 17.5), one answering his bite is never touched (22.2 s with a
+sword). The careless margin is at the line: _test_old_wolf_rates holds it as measured, careless falling first by at
+least CARELESS_MARGIN (0.2 s) with the sword and the dagger. If a later change tips it, bite 6 is the next step
+(careless 11.1 against 13.4), with the sword's reader then at the edge of the test's fifth (12.9 against 15.7).
+Combat's, recorded for later (the coordinator: not now, both trees on Umbrage): bare and hammer readers lose on every
+row, main included (weapon pace), and the giant axe holds him in his pant (never touched, he dead in 11.7 s at half
+a lunge a minute), a lock for 843's follow-up.
+
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'
