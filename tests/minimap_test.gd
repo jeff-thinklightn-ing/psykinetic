@@ -91,6 +91,37 @@ func _test_picture() -> void:
 			if drawn.v > base.lightened(Minimap.RELIEF).v + 0.01:
 				washed += 1
 	_check(shown > 0 and washed == 0, "no ground in the wilds is lit past its kind's colour by more than RELIEF (873; %d of %d)" % [washed, shown])
+	# The stream, the woods and the rocks as the eye sees them (873 amended (1)).
+	var fords: Array = w_terrain.get("fords", [])
+	var ford_water := fords.filter(func(cell: Vector2i) -> bool: return map.image.get_pixelv(cell).is_equal_approx(Minimap.WATER))
+	_check(fords.size() > 20 and ford_water.size() == fords.size(),
+		"the wilds' stream (its fords) is drawn as water, as the 3D runs it (%d of %d)" % [ford_water.size(), fords.size()])
+	var w_floor := {}
+	for cell: Vector2i in w_terrain["floor"]:
+		w_floor[cell] = true
+	for cell: Vector2i in w_terrain["water"]:
+		w_floor[cell] = true
+	var w_rocks := {}
+	for cell: Vector2i in w_terrain.get("rocks", []):
+		w_rocks[cell] = true
+	var w_size: Vector2i = wilds["size"]
+	var empty := 0
+	var woods := 0
+	var wrong := 0
+	for y in w_size.y:
+		for x in w_size.x:
+			var cell := Vector2i(x, y)
+			if w_floor.has(cell):
+				continue
+			var drawn := map.image.get_pixelv(cell)
+			if drawn.a == 0.0:
+				empty += 1
+			elif drawn.is_equal_approx(Minimap.WOODS):
+				woods += 1
+			elif not (w_rocks.has(cell) and drawn.is_equal_approx(UiTheme.color(&"map_stone"))):
+				wrong += 1
+	_check(woods > 0 and empty == 0 and wrong == 0 and Minimap.WOODS == UiTheme.color(&"map_woods"),
+		"outdoors no cell is left empty: the woods are map_woods and a rock is stone, never darkened by its wall (%d woods, %d empty, %d else)" % [woods, empty, wrong])
 	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["to"] == "foothills")
 	_check(castle_ways.size() == 1 and castle_ways[0]["cue"] == "arch" and castle_ways[0]["facing"] == Vector2i(0, -1),
 		"the wilds' north link (the castle's till 745, the foothills' since) is an arch facing north on the big map (589; %s)" % [castle_ways])

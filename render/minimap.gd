@@ -44,6 +44,11 @@ const RELIEF := 0.08
 ## The maps' water (873): a clear light blue, 2.2:1 on grass, so water is
 ## the strongest mark on the ground (the theme's water was 1.06:1 on map_grass).
 static var WATER: Color = UiTheme.color("map_water")
+## Outdoors, a cell with no floor is the woods (the 3D draws trees there) and
+## a rock is a rock (873 amended (1), terrain's colours from above): the woods
+## a dark olive that stands off the meadow, a rock the ground's stone. Indoors
+## no floor is drawn as nothing, the frame showing through.
+static var WOODS: Color = UiTheme.color("map_woods")
 const WALL := Color(0.16, 0.14, 0.12)
 static var DOOR: Color = UiTheme.color("brass")
 static var FRAME: Color = UiTheme.color("backing")
@@ -198,14 +203,25 @@ static func made_for(level: Dictionary) -> Dictionary:
 			var lift := (float(int(heights.get(cell, 0)) - low) / span - 0.5) * 2.0 * RELIEF
 			colour = colour.lightened(lift) if lift > 0.0 else colour.darkened(-lift)
 		image.set_pixelv(cell, colour)
-	for cell: Vector2i in terrain.get("water", []):
-		if Rect2i(Vector2i.ZERO, size).has_point(cell):
+	# A ford (shallow water walked through, decision 505) is drawn as water:
+	# the 3D runs the stream over it, and its kind is only its bed's footing.
+	var inside := Rect2i(Vector2i.ZERO, size)
+	for cell: Vector2i in terrain.get("water", []) + terrain.get("fords", []):
+		if inside.has_point(cell):
 			image.set_pixelv(cell, WATER)
+	if not indoors:
+		var rocks := {}
+		for cell: Vector2i in terrain.get("rocks", []):
+			rocks[cell] = true
+		var stone := ground_colour("stone")
+		for y in size.y:
+			for x in size.x:
+				if image.get_pixel(x, y).a == 0.0:
+					image.set_pixel(x, y, stone if rocks.has(Vector2i(x, y)) else WOODS)
 	# A wall between two cells darkens the floor either side, once, so it shows
 	# at one pixel a cell. The walls Level puts round the zone's border are
 	# the map's own edge, drawn by its frame.
 	var edges: Dictionary = terrain.get("edges", {})
-	var inside := Rect2i(Vector2i.ZERO, size)
 	var walled := {}
 	for key: Vector3i in edges:
 		if int(edges[key]) != Terrain.Edge.WALL:
@@ -215,8 +231,15 @@ static func made_for(level: Dictionary) -> Dictionary:
 		if inside.has_point(cell) and inside.has_point(other):
 			walled[cell] = true
 			walled[other] = true
+	# Only the ground's side darkens: the woods and rocks stand behind it, and
+	# a ford is water, as water is never darkened.
+	var floor_at := {}
+	for cell: Vector2i in floor:
+		floor_at[cell] = true
+	for cell: Vector2i in terrain.get("fords", []):
+		floor_at.erase(cell)
 	for cell: Vector2i in walled:
-		if image.get_pixelv(cell).a > 0.0:
+		if floor_at.has(cell):
 			image.set_pixelv(cell, image.get_pixelv(cell).lerp(WALL, 0.65))
 	return {"level": level, "cells": size, "image": image}
 
