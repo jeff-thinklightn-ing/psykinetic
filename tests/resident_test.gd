@@ -24,6 +24,7 @@ var _main: Node
 
 func _ready() -> void:
 	World.set_process(false)
+	Resident.keep_moving = false  # The cases from before 853 read bodies that keep their cell; _test_keep_moving turns it on.
 	Net.port = preload("res://tests/test_ports.gd").of(17796)
 	Net.companions = true
 	Net.state_path = preload("res://tests/test_ports.gd").scratch("resident_test_world.json")
@@ -92,6 +93,7 @@ func _ready() -> void:
 	_test_vendor()  # 736: the starter stall.
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
+	_test_keep_moving()  # 853, its moving on (Resident.keep_moving) for itself.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
@@ -100,6 +102,7 @@ func _ready() -> void:
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
+	_test_lower_first()  # Lore's finding: a name keeps its capital.
 	_test_sick_word()  # 501 amended (2): last, as it moves the day on.
 
 	Production.type_of = Townsfolk.roll_type
@@ -491,7 +494,8 @@ func _test_bodies_in_town() -> void:
 	_check(World.townsfolk().size() == 1 and not World.sought().has(bram), "one of the townsfolk, not sought (no monster's tier wakes for him)")
 	var hut := Rect2i(9, 5, 3, 3)
 	var square := Rect2i(3, 1, 5, 5)
-	_check(bram.places["home"] == hut and bram.places["work"] == square, "home the hut; no forge, so he works in the square (%s)" % [bram.places])
+	_check(bram.places["home"] == hut and bram.places["work"] == Main._open_work(square, "smith") and square.encloses(bram.places["work"]),
+		"home the hut; no forge, so he works in his own patch of the square (853) (%s)" % [bram.places])
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), 120)
 	_check(bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), "noon: at work (%s, at %s)" % [bram.doing, bram.tile])
 	DayNight.set_hour(_spell_hour(bram.worker_id))  # His own sleep spell (772).
@@ -2310,7 +2314,8 @@ func _test_sick_word() -> void:
 		_main._standing.erase(pid)
 		_main._greeted(player, _body("rs-bram"))
 		var remedy_lines: Array = says["remedy"].map(func(l: String) -> String: return l.replace("{kind}", "the shakes"))
-		_check(spoken.size() == 1 and spoken[0] in remedy_lines and _main._standing_for(pid, "rs-bram").is_empty(), "no healer's hut: a remedy in his hands asked, nothing standing (%s)" % [spoken])
+		_check(spoken.size() == 1 and spoken[0] in remedy_lines and _main._standing_for(pid, "rs-bram").is_empty(), "no healer's hut: a remedy in his hands asked, nothing standing (%s; he at %s %s, the player at %s)" % [spoken,
+			_body("rs-bram").tile if _body("rs-bram") != null else Vector2i.ZERO, Resident.Doing.keys()[_body("rs-bram").doing] if _body("rs-bram") != null else "", player.tile])
 		World.holdings._places[hut] = kept
 		Townsfolk._set_sickness(World.production, "rs-bram", {})
 	Net.message_received.disconnect(heard)
@@ -3990,6 +3995,131 @@ func _test_alms_run() -> void:
 	World.production.set_away(priest, true)
 	_put(player, Vector2i(2, 2))
 
+func _test_lower_first() -> void:
+	print("
+== \"It is said that ...\": a common first word lowered, a name kept (lore's finding, 2026-11-10) ==")
+	_check(Hearsay._lower_first("Raiders can kill.") == "raiders can kill." and Hearsay._lower_first("Whoever falls is carried home.") == "whoever falls is carried home.",
+		"a common word lowered (%s)" % Hearsay._lower_first("Raiders can kill."))
+	var kept := ["Umbrage is cursed.", "Hollowfell's mine is deep.", "Brand the Ox carries the key.", "Aldous keeps the temple.", "Snagfin buys what others will not."]
+	_check(kept.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "a name kept: %s" % [kept.map(func(line: String) -> String: return Hearsay._lower_first(line))])
+	_check(Hearsay._lower_first("UMBRAGE") == "UMBRAGE" and Hearsay._lower_first("I") == "I", "shouting and a lone letter left alone")
+
+
+func _test_keep_moving() -> void:
+	print("\n== townsfolk keep moving (853, Jeff's frozen townsfolk): a new cell each time, never back, the stand to the open, spots ==")
+	var mara: Resident = null
+	for body: GridEntity in World.townsfolk():
+		if (body as Resident).town == STORE and not (body as Resident).worker_id.begins_with(Offers.VISITOR) and (body as Resident).task.is_empty():
+			mara = body
+			break
+	_check(mara != null, "one of the town's people has a body (%s)" % [mara.person if mara != null else ""])
+	if mara == null:
+		return
+	Resident.keep_moving = true
+	var was := {"places": mara.places.duplicate(true), "doing": mara.doing, "tile": mara.tile, "task": mara.task.duplicate(true), "wander": mara._wander_at}
+	var square: Rect2i = mara.places.get("square", Rect2i())
+	mara.task = {}
+	# Gar's case on v0.1.210: a pick every 81 ticks in a 9 x 9 fell on one cell, back and forth.
+	mara.places = {"square": square, "work": square, "home": was["places"].get("home", square)}
+	mara.doing = Resident.Doing.WORK
+	var goals: Array[Vector2i] = []
+	var back := 0
+	var stayed := 0
+	for i in 24:
+		World.tick += 81
+		var before := mara.tile
+		var left := mara._left
+		mara._pick_goal()
+		stayed += 1 if mara._goal == before else 0
+		back += 1 if mara._goal == left else 0
+		goals.append(mara._goal)
+		World._relocate(mara, mara._goal)
+	var distinct := {}
+	for cell: Vector2i in goals:
+		distinct[cell] = true
+	_check(stayed == 0 and back == 0 and distinct.size() >= 12 and goals.all(func(cell: Vector2i) -> bool: return square.has_point(cell)),
+		"24 picks at Gar's 81 ticks: never the cell it stands on nor the one it left, %d cells of the square (%d stayed, %d back)" % [distinct.size(), stayed, back])
+	# Every idle doing strolls; not with a task, not abed.
+	mara._goal = mara.tile
+	_check(mara._strolls(), "idle at work, it strolls")
+	mara.task = {"kind": "chop", "cell": mara.tile}
+	_check(not mara._strolls(), "at a task, it does not")
+	mara.task = {}
+	for doing: Resident.Doing in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.ESCORT, Resident.Doing.VISIT]:
+		mara.doing = doing
+		_check(not mara._strolls(), "hiding, sick abed, led or visiting the sick, it keeps still (%s)" % Resident.Doing.keys()[doing])
+	mara.doing = Resident.Doing.WORK
+	var picks := {}
+	for i in 13:
+		mara._goal = Resident.NO_CELL
+		mara._pick_goal()
+		picks[mara._wander_at - World.tick] = true
+	_check(picks.keys().all(func(wait: int) -> bool: return wait >= Resident.STROLL_TICKS and wait < Resident.STROLL_TICKS + Resident.STROLL_SPREAD)
+		and picks.size() >= 8, "its next stroll 3 to 6 game minutes on, staggered (%d waits of 13)" % picks.size())
+	# The stand faces the open: a cell with the ground shut before it turns to open ground.
+	var shut := Resident.NO_CELL
+	var way := Vector2i.ZERO
+	for y in range(square.position.y - 3, square.end.y + 3):
+		for x in range(square.position.x - 3, square.end.x + 3):
+			var at := Vector2i(x, y)
+			if not World.is_free(at):
+				continue
+			for d: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+				if not World.is_walkable(at + d):
+					shut = at
+					way = d
+					break
+			if shut != Resident.NO_CELL:
+				break
+		if shut != Resident.NO_CELL:
+			break
+	_check(shut != Resident.NO_CELL, "a cell by shut ground near the square")
+	if shut != Resident.NO_CELL:
+		World._relocate(mara, shut)
+		mara._spot = {}
+		mara._world_set_facing(way)
+		World.tick = maxi(World.tick, mara.next_move_tick)
+		mara._face_open()
+		_check(mara.facing != way and World.is_walkable(mara.tile + mara.facing), "facing shut ground, it turns to the open (%s to %s)" % [way, mara.facing])
+	# A laid spot: taken first, faced, its pose its activity; the square's hours take the fire's too.
+	var seat := _town_cell(mara.tile)
+	var facing_cell := seat + Vector2i(0, 1)
+	mara.places["spots"] = {"fire": [{"use": "fire", "cell": seat, "face": facing_cell, "pose": "sit", "town": "store", "trade": "", "pair": ""}]}
+	mara.doing = Resident.Doing.SQUARE
+	mara._left = Resident.NO_CELL
+	mara._pick_goal()
+	_check(mara._goal == seat and mara._wander_at - World.tick >= 2 * Resident.STROLL_TICKS, "in the square's hours it goes to the fire's seat, and sits longer (%s)" % [mara._goal])
+	World._relocate(mara, seat)
+	World.tick = maxi(World.tick, mara.next_move_tick)
+	mara._face_open()
+	mara._show_work()
+	_check(mara.facing == Vector2i(0, 1) and mara.activity == "sit", "there it faces the fire and sits (%s, %s)" % [mara.facing, mara.activity])
+	World.tick += 1
+	mara._pick_goal()
+	mara._show_work()
+	_check(mara._goal != seat and mara.activity == "", "moving on, it gets up (%s)" % [mara.activity])
+	var risen := World.tick
+	while mara.tile == seat and World.tick < risen + 60:
+		World.tick += 1
+		mara._step()
+	_check(World.tick - risen >= Resident.GET_UP["sit"] and mara.tile != seat,
+		"it stands on the seat's cell through its get-up, then steps off (%d ticks)" % (World.tick - risen))
+	# A trade with no building works its own patch of the square, not the whole of it.
+	var big := Rect2i(10, 10, 9, 9)
+	var cook: Rect2i = Main._open_work(big, "cook")
+	_check(cook.size == Vector2i(3, 3) and big.encloses(cook) and Main._open_work(big, "") == big and Main._open_work(Rect2i(0, 0, 3, 3), "cook") == Rect2i(0, 0, 3, 3),
+		"no building: the cook's own 3 x 3 in the square (%s); no trade or a small square, the square" % [cook])
+	mara.places = was["places"]
+	mara.doing = was["doing"]
+	mara.task = was["task"]
+	mara._spot = {}
+	mara._wander_at = was["wander"]
+	World._relocate(mara, was["tile"])
+	mara._goal = mara.tile
+	mara.activity = ""
+	Resident.keep_moving = false
+
+
 func _sync() -> void:
 	_main._sync_residents()
 	World.step()
@@ -4928,7 +5058,12 @@ func _test_field_work() -> void:
 		World.step()
 		if World.distance(mara.tile, store_cell) <= 1:
 			break
-	_check(World.distance(mara.tile, store_cell) <= 1 and mara.activity == "carry_sack", "(she reaches the store with it: %s at %s)" % [mara.activity, mara.tile])
+	var in_way: Array = []
+	for body: GridEntity in World.get_entities():
+		if body != mara and body.spawned and World.distance(body.tile, mara.tile) <= 2:
+			in_way.append("%s %s" % [body.name, body.tile])
+	_check(World.distance(mara.tile, store_cell) <= 1 and mara.activity == "carry_sack", "(she reaches the store with it: %s at %s; goal %s, task %s, route %s, retry %d, stuck %d, %s, store %s, near %s)" % [
+		mara.activity, mara.tile, mara._goal, mara.task.get("cell"), mara._route, mara._retry_at - World.tick, mara._stuck, Resident.Doing.keys()[mara.doing], store_cell, in_way])
 	_check(_main._task_for(mara).is_empty() and str(_main._sacks.get("rs-mara", "")) == "harvested", "set down: nothing more this harvest")
 	town_record["crop"]["stage"] = ""
 	_main._task_for(mara)
@@ -5791,7 +5926,8 @@ func _test_visitors() -> void:
 	_main._greet_at.clear()
 	if odo != null:
 		_main._greeted(player, odo)
-	_check(spoken.size() == 1 and spoken[0] in Townsfolk.rules()["visitors"]["leaving"], "clicked: they're on their way (%s)" % [spoken])
+	_check(spoken.size() == 1 and spoken[0] in Townsfolk.rules()["visitors"]["leaving"], "clicked: they're on their way (%s; at %s, the player at %s, %s)" % [spoken,
+		odo.tile if odo != null else Vector2i.ZERO, player.tile, Resident.Doing.keys()[odo.doing] if odo != null else ""])
 	_main._visitors_leaving["visitor:visitor_rs_1"]["until"] = World.tick - 1
 	_sync()
 	_sync()

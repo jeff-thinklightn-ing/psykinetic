@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk keep moving through the day now: every few minutes each walks to another spot of wherever they are, at work, in the square, by the well, at the temple or at home, never all at once, and when they stand they face open ground, not a wall (853).
 - Deer, rabbits and wild boar graze well clear of a town now, beyond its outermost houses, and keep farther off as the town grows (740 amended (1)).
 - The fishing rod has a picture of its own in your pack and the store, a short sturdy rod with its line wound round the butt and a red-and-white float hanging from the tip (275 amended (1)).
 - Towns: ask Rolf to open your locker and he sets it down beside him, where you can reach it, and it stays open (807 amended (6)).

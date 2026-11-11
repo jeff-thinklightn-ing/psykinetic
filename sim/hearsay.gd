@@ -211,5 +211,57 @@ static func _key(text: String) -> String:
 	return RegEx.create_from_string("[^a-z0-9 ]").sub(text.to_lower(), "", true).strip_edges()
 
 
+## [param text] with its first letter lowered to follow "It is said that" and the like, unless its
+## first word is a name (lore's finding, 2026-11-10: "It is said that umbrage is cursed"; Hollowfell,
+## Brand, Aldous and Snagfin the same): is_name.
 static func _lower_first(text: String) -> String:
-	return text.left(1).to_lower() + text.substr(1) if text.length() > 1 and text.substr(1, 1) == text.substr(1, 1).to_lower() else text
+	if text.length() <= 1 or text.substr(1, 1) != text.substr(1, 1).to_lower():
+		return text
+	var first := RegEx.create_from_string("^[A-Za-z]+").search(text)
+	if first != null and is_name(first.get_string()):
+		return text
+	return text.left(1).to_lower() + text.substr(1)
+
+
+## The names the game's own texts use (NAME_FILES): a word they write capitalized mid-sentence (after
+## a small letter or a comma), a names list's single word, and the name of a title ("Brand the Ox");
+## read once.
+const NAME_FILES: Array[String] = ["res://levels/lore/", "res://levels/residents.json", "res://levels/economy.json",
+	"res://levels/townsfolk.json", "res://levels/companion_traits.json", "res://levels/named_enemies.json"]
+static var _names: Dictionary = {}
+static var _names_read := false
+
+
+## Whether [param word] is a name (_names): "Umbrage" yes, "Raiders" no.
+static func is_name(word: String) -> bool:
+	if not _names_read:
+		_names_read = true
+		var mid := RegEx.create_from_string("[a-z,] ([A-Z][a-z']+)")
+		var lone := RegEx.create_from_string("^[A-Z][a-z']+$")
+		var titled := RegEx.create_from_string("^([A-Z][a-z']+) the [A-Z]")
+		var files: Array[String] = []
+		for path: String in NAME_FILES:
+			if path.ends_with("/"):
+				for file: String in DirAccess.get_files_at(path):
+					if file.ends_with(".json"):
+						files.append(path + file)
+			else:
+				files.append(path)
+		for path: String in files:
+			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+			var pending: Array = [parsed]
+			while not pending.is_empty():
+				var value: Variant = pending.pop_back()
+				if value is Dictionary:
+					pending.append_array((value as Dictionary).values())
+				elif value is Array:
+					pending.append_array(value)
+				elif value is String:
+					if lone.search(value) != null:
+						_names[value] = true
+					var title := titled.search(value)
+					if title != null:
+						_names[title.get_string(1)] = true
+					for found: RegExMatch in mid.search_all(value):
+						_names[found.get_string(1)] = true
+	return _names.has(word)

@@ -3139,6 +3139,7 @@ func _test_relaid() -> void:
 	_test_carved(hills)
 	_test_tavern_zone(wilds)
 	_test_smithy_inside()
+	_test_spots(wilds)  # 853.
 	_test_storey_stairs()
 	_test_shelled(wilds)
 	_test_perches(hills)
@@ -4002,6 +4003,34 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 ## smithy; his tools gone from the wall; the stores' heaps; his bed in his
 ## room, its head to the east wall; every floor cell reached from the door, which leads out a wall;
 ## a place's bad "face" warned and left out.
+func _test_spots(wilds: Dictionary) -> void:
+	print("\n== where people stand and sit (853): level.json spots, read and kept ==")
+	var warnings: Array[String] = []
+	var floor := {Vector2i(5, 5): true, Vector2i(6, 5): true, Vector2i(5, 6): true, Vector2i(7, 7): true}
+	var config := {"spots": [
+		{"use": "fire", "cell": [5, 5], "face": [6, 6], "pose": "sit", "town": "store"},
+		{"use": "work", "trade": "cook", "cell": [6, 5], "face": [6, 4], "town": "store"},
+		{"use": "work", "cell": [5, 6], "face": [5, 7], "town": "store"},
+		{"use": "dance", "cell": [7, 7], "face": [7, 8], "town": "store"},
+		{"use": "well", "cell": [9, 9], "face": [9, 8], "town": "store"},
+		{"use": "square", "cell": [5, 5], "face": [5, 4], "town": "store"},
+		{"use": "square", "cell": [7, 7], "face": [7, 5], "town": "store"},
+		{"use": "talk", "cell": [7, 7], "face": [7, 6], "pose": "sit", "town": "store", "pair": "a"}]}
+	var spots := Level.spots_from(config, warnings, floor)
+	_check(spots.size() == 3 and spots[0] == {"use": "fire", "cell": Vector2i(5, 5), "face": Vector2i(6, 6), "pose": "sit", "town": "store", "trade": "", "pair": ""}
+		and spots[1]["pose"] == "stand" and spots[1]["trade"] == "cook" and spots[2]["use"] == "talk" and spots[2]["pair"] == "a",
+		"a fire seat, the cook's work spot (stood when no pose), a sat talk spot read (%s)" % [spots])
+	_check(warnings.size() == 5 and warnings.all(func(line: String) -> bool: return line.begins_with("the spot at (")),
+		"five left out, each warning naming its cell: no trade, an unknown use, off the floor, a taken cell, a face two off (%s)" % [warnings])
+	var moved := LevelMap.moved_config(config, func(cell: Vector2i) -> Variant: return cell + Vector2i(2, 0) if cell.x < 9 else null)
+	_check((moved["spots"] as Array).size() == 7 and moved["spots"][0]["cell"] == [7, 5] and moved["spots"][0]["face"] == [8, 6],
+		"a shifted map takes its spots with it, cell and face; one off the map is dropped (%d kept)" % (moved["spots"] as Array).size())
+	var kept := Regen.generated_config(config, [{"rect": Rect2i(0, 0, 8, 8)}], 2)
+	_check((kept.get("spots", []) as Array).size() == 7 and kept["spots"][0] == config["spots"][0],
+		"a regeneration keeps the spots in its anchors as written (%d)" % (kept.get("spots", []) as Array).size())
+	_check(wilds.get("spots") is Array, "a level's spots reach Level.load_level (the wilds: %d)" % (wilds.get("spots", []) as Array).size())
+
+
 func _test_smithy_inside() -> void:
 	print("
 == Umbrage's smithy inside (811 amended (2)): held back, furnished, the smith's place and bed ==")

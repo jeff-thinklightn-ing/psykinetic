@@ -307,6 +307,20 @@ static func moved_config(config: Dictionary, move: Callable, turns := 0, dropped
 			else:
 				markets.erase(key)
 				dropped.append("market %s" % key)
+	if out.get("spots") is Array:
+		# Where people stand and sit (Level.spots_from, the frozen-townsfolk mend): a spot's cell and the
+		# cell it faces go with it; one either of whose cells leaves the map is dropped.
+		var spots: Array = []
+		for entry: Variant in out["spots"]:
+			var to: Variant = cell.call(entry.get("cell") if entry is Dictionary else null)
+			var face: Variant = cell.call(entry.get("face") if entry is Dictionary else null)
+			if to != null and face != null:
+				entry["cell"] = to
+				entry["face"] = face
+				spots.append(entry)
+			else:
+				dropped.append("spot %s" % [entry])
+		out["spots"] = spots
 	if out.get("streams") is Array:
 		# A stream's course goes with it, cell by cell; one cut by the edge
 		# keeps the part still on the map (decision 505).

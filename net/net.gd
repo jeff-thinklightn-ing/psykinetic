@@ -626,6 +626,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## gold), after which the server sends "find" again with what is left (rows [] and gold 0
 ## closes it); a chest stocked from a loot table now spawns as a cache (props "cache",
 ## "cache_cell"), so an old client's Take all is its only take there.
+## 55 (853): Resident.activity may be "sit"/"lean" (later slices more words); an old client without the word in ACTIVITIES draws no pose. No new number (release).
 const PROTOCOL_REVISION := 55
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

@@ -13501,8 +13501,17 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		elif standing and building["use"] == "inn" and not _is_shell(building):
 			inn = building["rect"]  # A shell's (811) inn is inside: its stint, visitors and sleepers keep to the square and homes.
 	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
-	var out := {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
+	var out := {"work": work if work.size != Vector2i.ZERO else _open_work(square, trade), "home": home if home.size != Vector2i.ZERO else square,
 		"square": square}
+	# Where the town's people stand and sit (Level.spots_from, the frozen-townsfolk mend): its town's
+	# spots by use, a work spot only its trade's.
+	var spots := {}
+	for spot: Dictionary in area.get("spots", []):
+		if str(spot.get("town", "")) != key or (spot["use"] == "work" and str(spot.get("trade", "")) != trade):
+			continue
+		(spots.get_or_add(spot["use"], []) as Array).append(spot)
+	if not spots.is_empty():
+		out["spots"] = spots
 	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside
 	# (npc's side (2)). A house's or the inn's own bed where buildings lists them (npc's side (4)): the nth
 	# sleeper there its nth bed, one with none left beds down outside.
@@ -13539,6 +13548,25 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	if trade == "priest" and out.has("temple"):
 		out["work"] = out["temple"]
 	return out
+
+
+## A trade's own patch of [param square] while it has no building standing (the frozen-townsfolk
+## mend: its work, the square, the inn and the well were one rect, so a change of doing moved
+## nobody): a 3 x 3 about a cell of the square's inner ring its trade's hash chooses; the square
+## for no trade or a square under 5 x 5.
+static func _open_work(square: Rect2i, trade: String) -> Rect2i:
+	if trade.is_empty() or square.size.x < 5 or square.size.y < 5:
+		return square
+	var inner := square.grow(-1)
+	var ring: Array[Vector2i] = []
+	for x in range(inner.position.x, inner.end.x):
+		ring.append(Vector2i(x, inner.position.y))
+		ring.append(Vector2i(x, inner.end.y - 1))
+	for y in range(inner.position.y + 1, inner.end.y - 1):
+		ring.append(Vector2i(inner.position.x, y))
+		ring.append(Vector2i(inner.end.x - 1, y))
+	var centre := ring[absi(hash(trade)) % ring.size()]
+	return Rect2i(centre - Vector2i.ONE, Vector2i(3, 3)).intersection(square)
 
 
 ## The roofless of [param wanted] bedded down (decision 751, npc's side (2)):

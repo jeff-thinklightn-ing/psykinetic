@@ -704,6 +704,10 @@ static func generated_config(template_config: Dictionary, anchors: Array, genera
 	if config.get("buildings") is Array:
 		config["buildings"] = config["buildings"].filter(func(entry: Variant) -> bool:
 			return entry is Dictionary and inside.call(entry.get("at")))
+	if config.get("spots") is Array:
+		# Where people stand and sit (Level.spots_from): kept in the anchors, with the rest laid there.
+		config["spots"] = config["spots"].filter(func(entry: Variant) -> bool:
+			return entry is Dictionary and inside.call(entry.get("cell")))
 	# The template's moss and webs (647) inside the anchors; a web on a
 	# niche goes too, since the niches are re-rolled (Level.decor_from would
 	# say so otherwise): the roll hangs the generation's own.

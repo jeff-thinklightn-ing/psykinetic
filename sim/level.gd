@@ -146,6 +146,9 @@ const REFUGE_WHERE: Array[String] = ["wilds", "hills", "forest", "woods", "castl
 const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut", "building.turf_house": "healers_hut"}
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
+## A spot's uses and poses (spots_from): what its resident is doing, and how it is there.
+const SPOT_USES: Array[String] = ["work", "square", "fire", "well", "inn", "temple", "talk"]
+const SPOT_POSES: Array[String] = ["stand", "sit", "lean"]
 ## The place kinds out in the lands a player is rewarded for reaching when
 ## they have a name of their own (decision 804, maps' side: Wayfaring): a
 ## refuge, a rest, a working, a fort, a work site in the wild. A place's
@@ -1324,6 +1327,10 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["terrain"]["furrows"] = furrows_from(config, warnings)
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
+	var floor_set := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor_set[cell] = true
+	level["spots"] = spots_from(config, warnings, floor_set)
 	level["forage"] = forage_from(config, warnings)
 	level["became"] = became_from(config, warnings)
 	level["entities"] = entities
@@ -1598,6 +1605,59 @@ static func furrows_from(config: Dictionary, warnings: Array[String]) -> Array[D
 			continue
 		out.append({"rect": Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3])),
 				"along": Vector2i(1, 0) if along == "x" else Vector2i(0, 1)})
+	return out
+
+
+## The spots a level's people stand and sit at (the frozen-townsfolk mend, npc's, 2026-11-10;
+## maps lays them, builder edits them): level.json's top-level "spots", an array of {"use", "cell",
+## "face", "pose", "town", "trade", "pair"}. "use" is what the resident is doing when it takes one
+## (SPOT_USES: "work" needs a "trade"; "fire" and "talk" are taken from the square's hours);
+## "face" the cell it faces, one of the eight about "cell"; "pose" SPOT_POSES ("stand" when none);
+## "town" the town's place key; "pair" a talk spot's partner's shared id. A spot that breaks a rule
+## (its cell off [param floor] when given, another spot's cell, its face not beside it, a use or pose
+## unknown, work with no trade, no town) is warned in [param warnings], naming its cell "(x, y)",
+## and left out. Out: [{use, cell: Vector2i, face: Vector2i, pose, town, trade, pair}].
+static func spots_from(config: Dictionary, warnings: Array[String], floor: Dictionary = {}) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("spots", [])
+	if not listed is Array:
+		warnings.append("\"spots\" in level.json is not an array")
+		return out
+	var taken := {}
+	for entry: Variant in listed:
+		if not entry is Dictionary:
+			warnings.append("a spot in level.json \"spots\" is not an object")
+			continue
+		var cell: Variant = _tile(entry.get("cell"))
+		if not cell is Vector2i:
+			warnings.append("a spot in level.json \"spots\" has no \"cell\" [x, y]")
+			continue
+		var face: Variant = _tile(entry.get("face"))
+		var use := str(entry.get("use", ""))
+		var pose := str(entry.get("pose", "stand"))
+		var town := str(entry.get("town", ""))
+		var trade := str(entry.get("trade", ""))
+		var why := ""
+		if use not in SPOT_USES:
+			why = "its use \"%s\" is none of %s" % [use, SPOT_USES]
+		elif pose not in SPOT_POSES:
+			why = "its pose \"%s\" is none of %s" % [pose, SPOT_POSES]
+		elif town.is_empty():
+			why = "it names no town"
+		elif use == "work" and trade.is_empty():
+			why = "a work spot names no trade"
+		elif not face is Vector2i or face == cell or absi(face.x - cell.x) > 1 or absi(face.y - cell.y) > 1:
+			why = "its face is not one of the eight cells about it"
+		elif not floor.is_empty() and not floor.has(cell):
+			why = "its cell is not floor"
+		elif taken.has(cell):
+			why = "another spot is on its cell"
+		if not why.is_empty():
+			warnings.append("the spot at %s (%s): %s; left out" % [cell, use, why])
+			continue
+		taken[cell] = true
+		out.append({"use": use, "cell": cell, "face": face, "pose": pose, "town": town, "trade": trade,
+			"pair": str(entry.get("pair", ""))})
 	return out
 
 

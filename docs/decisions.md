@@ -48066,3 +48066,111 @@ ui-design, 2026-11-10; the coordinator's approval (the number from tools/decisio
 - The rule the services hold (the coordinator, from the store's): what you pay sits on the keeper's side; a chip on your own square only ever means what you get.
 - Theme: WellPicked (the brass rim) and TimeChip (the pill without a coin) join the store's types (5f7bcb039).
 Tests: parts_test (each part's theme types, states, the refused flash and its return, chips, tabs, the foot line, the frost's setting). New class_names UiGlass, UiSlot, UiPrice, UiTabs, UiLine; nothing uses them yet (ui's windows swap to them); protocol unchanged; no bullet (players see nothing until a window uses them).
+## 853. Townsfolk keep moving: every doing strolls, a pick never repeats, the stand faces the open, and the spots people use
+
+The script's number; the coordinator's approval of the mend and of the spots contract (2026-11-10,
+night). Jeff, on v0.1.210: "townspeople frozen staring at the wall all day", and why he said it: "the
+mechanism from me playing to them getting fixed seems broken". npc reproduced it locally on the
+v0.1.210 tag, before reasoning from the code: town_soak's Umbrage (its ten folk) for one game day, a
+player in the square, every body read each game minute. All 13 bodies stood on one cell for 1 to 10
+game hours by day (55 awake stays of 5+ minutes; Bea 589, Maud 528, Gar 515, Mags 488 in the kitchen),
+none with a clip but the stand. One faced shut ground: Hob, 457 minutes facing the well's stone. A
+lived-in arm (every building standing, wood, stone and ore spent, the larder full) read the same.
+Three causes, each seen in the samples and a probe of the goal and the wander clock:
+
+1. A body already inside its next place never moved: Resident._pick_goal kept the cell it stood on
+   whenever that cell was in the new place's rect, and a trade with no standing building had work =
+   the square, so work, the square, the inn (none standing outside a shell) and the well's grown rect
+   overlapped or were one 9 x 9. Doing went WORK to INN, WELL to WORK, SQUARE to INN, and the body
+   never stepped.
+2. Only the square's hours re-picked (the stroll), and the pick could repeat: _free_cell started at
+   (id * 31 + tick) % 81 and the stroll came every 80 + (id * 7) % 40 ticks, 81 for Gar, so every pick
+   fell on the same cell and he stepped between two cells all night. No other doing strolled.
+3. At work with no job is standing: no task, no activity, the client's stand idle.
+
+What changes (slice 1 of three; the coordinator's order: people move, then people work for show, then
+the richer day):
+
+- Every entry into a place walks to a cell of it other than the one it stands on (Resident._set_goal
+  notes the cell left). Every idle doing strolls (Resident.STROLLS: work, home awake, the square, the
+  well, the inn, the temple, a lawspeaker's round; not hiding, sick abed, led, lost or visiting the
+  sick; never with a task, abed asleep, addressing a player, or far from every player): its next
+  move STROLL_TICKS (112) plus up to STROLL_SPREAD (113) more on, by a hash of its id and its count of
+  picks, so 3 to 6 game minutes, staggered so a town does not move as one; a seat (a spot posed "sit")
+  is kept twice as long.
+- The pick (Resident._free_cell, _free_spot) starts at a hash of its id, the tick and its count of
+  picks, skips the cell it stands on, and takes the cell it just left only when no other is free: no
+  two-cell shuffle. It never picks a level link's cell (a player's way out alone, 571: World.try_move
+  refuses a resident onto it); the first run of the mend had Aldous two game hours one step from the
+  crypt stair (199, 199), trying it. A stroll whose step stays refused (STUCK_TRIES) picks again. A
+  goal another body stands on (the store's cell, a strolling body on it, held resident_test's farmer
+  in her field with the sack) is walked to beside it (Resident._path_beside), and waited for there.
+- Standing idle, it faces the open (Resident._face_open): at a spot its "face"; else, the cell before
+  it shut, the walkable way of the eight nearest its place's middle; never on its way to bed (its
+  head to the bed's is _show_work's: turned from it, it never slept) nor at a task. Sat or leaning, it
+  still looks for raiders (_look). Clicked mid-stroll, it turns to the player as the step ends
+  (World.face is refused while a step runs; address() sets the facing).
+- Getting up (animation's ask): a body whose word was a seat's ("sit", "sit_talk", "sit_listen") stands
+  on its cell Resident.GET_UP's 11 ticks after the word ends before its first step (12 after "tend"), so
+  the client's Sitting_Exit (1.03 s) and Counter_Exit (1.17 s) play out; arriving needs nothing.
+- Resident.keep_moving (static, on): off, a body keeps a cell it stands on in its place and only the
+  square strolls, as before; resident_test runs its cases from before 853 with it off and
+  _test_keep_moving with it on.
+- A trade with no building standing works its own patch of the square (Main._open_work: a 3 x 3 about
+  a cell of the square's inner ring its trade's hash chooses), till maps lays its work spots.
+
+The spots (the contract; maps lays them, builder edits them, animation and sound draw and sound
+them). A level.json's top-level "spots", an array; not "places", which are holdings. Each entry
+{"use", "cell", "face", "pose", "town", "trade", "pair"}:
+- use: what the resident is doing when it takes the spot, one of Level.SPOT_USES: "work" (needs
+  "trade": only that trade takes it), "square", "fire", "well", "inn", "temple", "talk". The square's
+  hours take the square's, the fire's and the talk spots alike.
+- cell: where the body stands or sits, floor; face: the cell it faces (the fire, the well, the pot,
+  the stall, its partner), one of the eight about cell; pose: Level.SPOT_POSES, "stand" (the default),
+  "sit" (a seat laid under it: bench, stool, log, fire seat) or "lean" (the well's rim, a fence);
+  town: the town's place key ("store" for Umbrage); pair: two talk spots sharing one face each other.
+- Level.spots_from(config, warnings, floor) reads them; a spot breaking a rule (use or pose unknown,
+  no town, work with no trade, face not beside it, cell not floor, another spot's cell) is warned as
+  "the spot at (x, y) (use): <why>; left out" and dropped (builder's spot tool refuses with that line).
+  A spot also keeps off door cells, the cell before a door or gate, fire cells and a temple's kept
+  cells (Main's temple_keep), and is reachable from the store: maps' checks in level_test.
+- Level.load_level carries "spots"; WorldMap's area too; Main._resident_places gives each resident
+  places["spots"], its town's by use, a work spot only its trade's. Resident takes a free spot of its
+  doing's use first, else a free cell of the place's rect.
+- Every writer keeps the array: MapDoc.save writes the config whole (builder's json_keep keeps the
+  file's words), LevelMap.moved_config shifts each spot's cell and face (one off the map dropped),
+  Regen.generated_config keeps the spots in its anchors, tools/make_interior.py writes a spec's
+  "spots" through (the Mughouse's go in its interior spec). The prefab clipboard does not carry them.
+- An interior (the Mughouse) carries its own; its residents' use of them comes with slice 3.
+
+What the client sees: no new field. Resident.activity (replicated) carries the word, drawn by
+Client3D.ACTIVITIES (animation's 566 amended (2)); a word not there draws the stand, so the sim may
+set a word before its clip lands and an old client walks and stands as before. Words: slice 1, at a
+spot, "sit" and "lean"; slice 2, work for show at a trade's spot with no job: hammer, saw, chop, hoe
+and herd (existing), stir (cook), tend (merchant, taverner, keeper), sweep (hauler), scrape (tanner),
+pray (priest), fletch (hunter, sat), grind (medicine man), watch (guard); slice 3, a pair turn about:
+"talk" and "listen" standing, "sit_talk" and "sit_listen" sat. Release: no PROTOCOL_REVISION (an old
+client draws no pose for a word it lacks; a later word that a v0.1.210 client would draw wrong, or a
+changed meaning, is asked again); the comment above it says so.
+
+Live in slice 1: the moving and the facing everywhere; "sit" and "lean" only where a spot is laid,
+and none is laid on main yet (maps lays Umbrage's next), their clips animation's. Measured again with
+the same run on this code: every body's longest awake stay on one cell and facing, 06:00 to 22:00, fell
+from 120 to 589 game minutes (Bea 589, Maud 528, Gar 515, Mags 488) to 5, one stroll's wait, and none
+faced shut ground (Hob's well stone before). Tests: town_day_test (new: the wilds town 06:00 to 22:00,
+town_soak's ten folk, a player in the square, every body in sight each game minute; none awake stands
+idle on one cell and facing past 15 game minutes, nor faces shut ground idle past 3);
+resident_test _test_keep_moving (24 picks at Gar's 81 ticks: never the cell stood on nor the one left;
+who strolls and who keeps still; the next stroll 3 to 6 minutes on, staggered; the stand turned from
+shut ground; a fire seat taken, faced and sat, got up from, its cell kept through the get-up;
+Main._open_work); level_test
+_test_spots (the reader's rules and warnings, moved_config and Regen keeping the array, the wilds
+level carrying it). Server only (Level, WorldMap, Main, Resident, tools/make_interior.py, the editor's
+moved_config); protocol unchanged; no new class_name. Bullet in voice's words; no package (a fix, on).
+
+Riding along (the coordinator's ruling on lore's finding): Hearsay._lower_first lowered the first letter
+of every fact it put after "It is said that" and the like, names too ("It is said that umbrage is
+cursed"; Hollowfell, Brand, Aldous, Snagfin). It keeps a name now (Hearsay.is_name): a word the game's
+texts (Hearsay.NAME_FILES: levels/lore, residents, economy, townsfolk, companion traits, named enemies)
+write capitalized mid-sentence, a names list's single word, or a title's name ("Brand the Ox"), read
+once. resident_test _test_lower_first.

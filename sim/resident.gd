@@ -33,6 +33,23 @@ const LOOK_EVERY := 5
 const HIDE_TICKS := 600
 ## In the square it strolls to another cell about this often (ticks).
 const WANDER_TICKS := 80
+## Idle, whatever it is doing (the frozen-townsfolk mend, Jeff 2026-11-10: "townspeople frozen staring
+## at the wall all day"), it moves on to another spot of its place this often: STROLL_TICKS plus up to
+## STROLL_SPREAD more, its own by a hash (37.5 ticks a game minute: 3 to 6 game minutes).
+const STROLL_TICKS := 112
+const STROLL_SPREAD := 113
+## The doings it strolls in while idle (no task, not abed): not hiding, sick, led, lost, visiting the sick.
+const STROLLS: Array[Doing] = [Doing.WORK, Doing.HOME, Doing.SQUARE, Doing.WELL, Doing.INN, Doing.TEMPLE, Doing.ROUNDS]
+## The poses a spot gives (Level.spots_from's "pose"): its activity word while it is there, drawn by
+## Client3D.ACTIVITIES (animation's); "stand" is none.
+const POSES: Array[String] = ["sit", "lean"]
+## 853's moving on (the strolls, and a new cell on every pick): off, a body keeps a cell it stands on in
+## its place and only the square strolls, as before; resident_test's cases from before 853 run with it off.
+static var keep_moving := true
+## The ticks a body stands on its cell after a word of these ends, before its first step: the client's
+## get-up (animation's, 2026-11-10: Sitting_Exit 1.03 s for the seat words, Counter_Exit 1.17 s for tend);
+## stepped off sooner, the client cuts it short.
+const GET_UP := {"sit": 11, "sit_talk": 11, "sit_listen": 11, "tend": 12}
 const FAR_TILES := 30
 const FAR_EVERY := 20
 ## A step blocked so many times, and it looks for a new way.
@@ -137,6 +154,13 @@ var sheltering := false
 ## The trades whose job is the fight (762): they turn out, never hide.
 const FIGHTERS: Array[String] = ["guard"]
 var _wander_at := -1
+## The cell it last walked off (the mend: a stroll never goes back to it next) and its count of picks
+## (the pick's hash changes with each).
+var _left := NO_CELL
+var _picks := 0
+## The spot it is going to or at ({} for a cell of the rect): Level.spots_from's {use, cell, face, pose}.
+var _spot: Dictionary = {}
+var _rise_until := -1  # Getting up (GET_UP): no step before this tick.
 ## When it chooses again after finding no way to its goal; -1 for none (762 amended (3)).
 var _retry_at := -1
 ## Addressing a player who clicked them (decision 560, npc's side): the
@@ -432,6 +456,10 @@ func _sim_tick() -> void:
 		# Addressing a player (560): standing, facing them, while the stop lasts and they stay in reach.
 		var who := get_node_or_null(NodePath(addressing)) as GridEntity
 		if World.tick < _address_until and who != null and who.spawned and World.distance(who.tile, tile) <= ADDRESS_REACH:
+			# Turned to them (853: clicked mid-stroll, World.face is refused till its step is done; it turns then).
+			var way := _toward(who.tile)
+			if way != facing:
+				World.face(self, way)
 			return
 		addressing = ""
 	# A body at a task (566; 521 amended) keeps the near tick and its real route however far the players are:
@@ -439,8 +467,8 @@ func _sim_tick() -> void:
 	var far := _far() and task.is_empty()
 	if far and (World.tick + id) % FAR_EVERY != 0:
 		return
-	if not far and World.tick % LOOK_EVERY == 0 and activity.is_empty():
-		_look()  # Not while at work or asleep (566): the work sets the facing.
+	if not far and World.tick % LOOK_EVERY == 0 and (activity.is_empty() or activity in POSES):
+		_look()  # Not while at work or asleep (566): the work sets the facing. Sat or leaning, it still looks.
 	if not far and trade in FIGHTERS and _fight():
 		return  # A guard at a foe (791): the fight is the tick.
 	if World.tick - hurt_tick <= 1:
@@ -457,8 +485,10 @@ func _sim_tick() -> void:
 	if now != doing or _goal == NO_CELL:
 		doing = now
 		_pick_goal()
-	elif doing == Doing.SQUARE and tile == _goal and World.tick >= _wander_at:
-		_pick_goal()
+	elif keep_moving and not far and tile == _goal and World.tick >= _wander_at and _strolls():
+		_pick_goal()  # Idle, it moves on (the mend): every doing that has nothing to do, not only the square.
+	elif not keep_moving and doing == Doing.SQUARE and tile == _goal and World.tick >= _wander_at:
+		_pick_goal()  # Before 853: the square's stroll alone.
 	elif _retry_at >= 0 and World.tick >= _retry_at:
 		_pick_goal()  # Its way was shut (a body in the door, its cell taken): it tries again (762 amended (3)).
 	_show_work()
@@ -467,6 +497,8 @@ func _sim_tick() -> void:
 			World.walk(self, _goal, FAR_EVERY)
 		return
 	_step()
+	if keep_moving and tile == _goal and (activity in POSES or (activity.is_empty() and _strolls())):
+		_face_open()  # Not on its way to bed (its head to the wall is _show_work's), nor at a task.
 
 
 ## Lost (decision 487): stands where it is, or follows the player who spoke
@@ -564,17 +596,27 @@ func _pick_goal() -> void:
 	if doing == Doing.HOME and sleeps_now():
 		_goal = _bed()
 		return
+	# Staggered by body (the coordinator: thirteen at once must not look like a drill); a seat is kept twice as long.
+	_wander_at = World.tick + STROLL_TICKS + absi(hash([id, _picks])) % STROLL_SPREAD
+	_spot = {}
+	var spot := _free_spot(_spot_use())
+	if not spot.is_empty():
+		_spot = spot
+		_set_goal(spot["cell"])
+		if str(spot.get("pose", "")) == "sit":
+			_wander_at += STROLL_TICKS + absi(hash([id, _picks, "sit"])) % STROLL_SPREAD
+		return
 	if area.size == Vector2i.ZERO:
 		_goal = tile
 		return
 	# In the temple (734 amended (4)): off its doors, its counter and its respawn (Main's "temple_keep").
 	var keep: Array = places.get("temple_keep", []) if area == places.get("temple") else []
-	if area.has_point(tile) and not keep.has(tile) and not (doing == Doing.SQUARE and _goal != NO_CELL):
-		_goal = tile
-	else:
-		_goal = _free_cell(area, keep)
-	if doing == Doing.SQUARE:
-		_wander_at = World.tick + WANDER_TICKS + (id * 7) % 40
+	# Always a cell to walk to in a doing that strolls (the mend): one it stood on already in the place kept
+	# it there for hours (the square, the work, the inn and the well were one rect with no building for its
+	# trade). Hiding, sick abed, led or at a bedside it stays where it is in the place, as before.
+	var stays := (doing not in STROLLS or not keep_moving and not (doing == Doing.SQUARE and _goal != NO_CELL)) \
+		and area.has_point(tile) and not keep.has(tile)
+	_set_goal(tile if stays else _free_cell(area, keep))
 
 
 ## The home the lawspeaker's rounds (decision 459) have him at now: one of
@@ -594,16 +636,108 @@ func _round_stop() -> Dictionary:
 	return stops[index] if index >= 0 and index < stops.size() and stops[index] is Dictionary else {}
 
 
-## A free cell of [param area], from a start its id and the tick choose;
-## where it stands if none.
+## A free cell of [param area] other than where it stands, from a start a hash of its id, the tick and
+## its count of picks chooses, and not the cell it just left unless no other is free (the mend: a start
+## of (id * 31 + tick) % 81 at a stroll every 81 ticks fell on the same cell each time, and Gar stepped
+## between two cells all night); where it stands if none.
 func _free_cell(area: Rect2i, keep: Array = []) -> Vector2i:
 	var count := area.size.x * area.size.y
-	var start := absi(id * 31 + World.tick) % count
+	if count <= 0:
+		return tile
+	_picks += 1
+	var start := absi(hash([id, World.tick, _picks])) % count
+	var back := NO_CELL
 	for i in count:
 		var at := area.position + Vector2i((start + i) % count % area.size.x, (start + i) % count / area.size.x)
-		if at != tile and World.is_free(at) and not keep.has(at):
-			return at
-	return tile
+		if at == tile or not World.is_free(at) or keep.has(at) or World.is_link_cell(at):
+			continue  # A link's cell is a player's way out alone (571): Aldous stood two hours by the crypt stair.
+		if at == _left:
+			back = at
+			continue
+		return at
+	return back if back != NO_CELL else tile
+
+
+## The goal [param cell], the cell it stands on noted as left when it is another.
+func _set_goal(cell: Vector2i) -> void:
+	if cell != tile:
+		_left = tile
+	_goal = cell
+
+
+## Whether it strolls now (the mend): idle in a doing of STROLLS, no task, not abed, not addressing.
+func _strolls() -> bool:
+	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not (doing == Doing.HOME and sleeps_now())
+
+
+## The spots' use its doing takes (Level.spots_from's "use"): the square's hours take the square's,
+## the fire's and the talk's alike; "" for a doing with none.
+func _spot_use() -> String:
+	match doing:
+		Doing.WORK:
+			return "work" if task.is_empty() else ""
+		Doing.SQUARE:
+			return "square"
+		Doing.WELL:
+			return "well"
+		Doing.INN:
+			return "inn"
+		Doing.TEMPLE:
+			return "temple"
+	return ""
+
+
+## A free spot of [param use] from Main's places["spots"] (its town's; a work spot its trade's), not the
+## one it stands on nor the one it just left unless no other is free, by the same changing hash as
+## _free_cell; the square's hours choose among the square's, the fire's and the talk's spots; {} for none.
+func _free_spot(use: String) -> Dictionary:
+	if use.is_empty() or not places.get("spots") is Dictionary:
+		return {}
+	var spots: Dictionary = places["spots"]
+	var pool: Array = []
+	for each: String in (["square", "fire", "talk"] if use == "square" else [use]):
+		pool.append_array(spots.get(each, []))
+	if pool.is_empty():
+		return {}
+	_picks += 1
+	var start := absi(hash([id, World.tick, _picks])) % pool.size()
+	var back := {}
+	for i in pool.size():
+		var spot: Dictionary = pool[(start + i) % pool.size()]
+		var cell: Vector2i = spot["cell"]
+		if cell == tile or not World.is_free(cell) or World.is_link_cell(cell):
+			continue
+		if cell == _left:
+			back = spot
+			continue
+		return spot
+	return back
+
+
+## Standing idle or at a spot, it faces the open (the mend: Hob stood seven hours with his face to the
+## well's stone): at a spot its "face"; else, the cell before it shut, the open way of the eight
+## nearest the middle of its place.
+func _face_open() -> void:
+	if not _spot.is_empty() and tile == _spot.get("cell"):
+		var way := _toward(_spot["face"])
+		if facing != way:
+			World.face(self, way)
+		return
+	if facing != Vector2i.ZERO and World.is_walkable(tile + facing):
+		return
+	var area: Rect2i = places.get(PLACE_OF.get(doing, "square"), places.get("square", Rect2i()))
+	var middle := Vector2(area.get_center()) if area.size != Vector2i.ZERO else Vector2(tile)
+	var best := Vector2i.ZERO
+	var best_d := INF
+	for way: Vector2i in World.DIRECTIONS:
+		if not World.is_walkable(tile + way):
+			continue
+		var d := Vector2(tile + way).distance_squared_to(middle)
+		if d < best_d:
+			best_d = d
+			best = way
+	if best != Vector2i.ZERO and facing != best:
+		World.face(self, best)
 
 
 ## The voice ask for [param line], said to it by [param speaker]
@@ -814,6 +948,13 @@ static func hail_done(production: Production, worker_id: String, player_id: Stri
 ## with the head to the wall; else "". A task's goal is kept when the
 ## routine's pick strayed from it.
 func _show_work() -> void:
+	var was := activity
+	_show_work_now()
+	if GET_UP.has(was) and activity != was:
+		_rise_until = World.tick + int(GET_UP[was])  # Its get-up plays out on its cell (animation's).
+
+
+func _show_work_now() -> void:
 	if doing == Doing.WORK and not task.is_empty():
 		var cell: Vector2i = task.get("cell", NO_CELL)
 		if cell != NO_CELL and _goal != cell:
@@ -840,7 +981,8 @@ func _show_work() -> void:
 		else:
 			activity = ""
 		return
-	activity = ""
+	var pose := str(_spot.get("pose", "")) if not _spot.is_empty() and tile == _spot.get("cell") and facing == _toward(_spot["face"]) else ""
+	activity = pose if pose in POSES else ""
 
 
 ## A new goal, the route begun afresh.
@@ -936,7 +1078,10 @@ func address(target: GridEntity, ticks: int) -> void:
 	_address_until = World.tick + ticks
 	var d := target.tile - tile
 	if d != Vector2i.ZERO:
-		World.face(self, Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y))))
+		var way := Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y)))
+		World.face(self, way)
+		if facing != way and Net.is_authority() and spawned:
+			_world_set_facing(way)  # Clicked mid-stroll (853): World.face waits out a step; a click turns it now.
 
 
 ## The word said at once when clicked, from townsfolk.json "greet": the
@@ -1364,12 +1509,16 @@ static func _listed(parts: Array) -> String:
 ## A step along its route to its goal, a new route when it has none or is
 ## stuck.
 func _step() -> void:
-	if tile == _goal or World.tick < next_move_tick:
+	if tile == _goal or World.tick < next_move_tick or World.tick < _rise_until:
 		return
 	if _route.is_empty():
 		_route = World.find_path(tile, _goal, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
 				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN)
+		if _route.is_empty() and World.distance(tile, _goal) > 1 and World.is_walkable(_goal) and not World.is_free(_goal):
+			_route = _path_beside(_goal)  # Another stands on it (853: one strolled onto the store's cell and the carrier stood).
 		if _route.is_empty():
+			if World.distance(tile, _goal) <= 1 and not World.is_free(_goal):
+				return  # Beside it, the cell taken: it waits there for it.
 			_goal = tile  # No way there now: it waits, and chooses again later (762 amended (3): whatever it is doing).
 			_retry_at = World.tick + PATH_RETRY_TICKS + absi(id) % (PATH_RETRY_SPREAD + 1)
 			return
@@ -1381,8 +1530,26 @@ func _step() -> void:
 	if _stuck >= STUCK_TRIES:
 		_route.clear()
 		_stuck = 0
-		if not World.is_free(_goal):
-			_pick_goal()
+		if not World.is_free(_goal) or keep_moving and _strolls():
+			_pick_goal()  # A stroll that cannot get there goes elsewhere (853).
+
+
+## A route to a free cell beside [param cell], the nearest to it first, then to this body; [] for none.
+func _path_beside(cell: Vector2i) -> Array[Vector2i]:
+	var around: Array[Vector2i] = []
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var at := cell + Vector2i(dx, dy)
+			if at != cell and World.is_free(at) and not World.is_link_cell(at):
+				around.append(at)
+	around.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return World.distance(a, tile) < World.distance(b, tile))
+	for at in around:
+		var way := World.find_path(tile, at, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
+				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN)
+		if not way.is_empty():
+			return way
+	return []
 
 
 # --- Guards who fight (decision 791) -------------------------------------------

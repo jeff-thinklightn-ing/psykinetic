@@ -529,6 +529,10 @@ def lay(spec, floor):
     }
     if lit_candles:
         config["lit_candles"] = lit_candles
+    if spec.get("spots"):
+        # Where its people stand and sit (Level.spots_from, the frozen-townsfolk mend): laid by hand
+        # in the spec, written through as they are; Level checks them.
+        config["spots"] = spec["spots"]
     with open(os.path.join(out, "level.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(config, f, indent="\t")
         f.write("\n")
