@@ -216,7 +216,7 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 	if worker_id.begins_with(VISITOR):
 		return _visitor_offers(worker_id, given)
 	if worker_id.begins_with(VENDOR):
-		return _vendor_offers(worker_id, given)
+		return _vendor_offers(worker_id, given, player_id)
 	if worker_id.begins_with(CAMP_TRADER):
 		return _camp_offers(worker_id, player_id, given)
 	if production == null or worker_id.begins_with(Townsfolk.COMPANION):
@@ -387,8 +387,10 @@ static func _relic_offers(worker_id: String, who: Dictionary, card: Dictionary, 
 
 ## The starter stall's wares (decision 736): one line for each of
 ## economy.json vendor.wares (ctx "vendor": the rule), at vendor.price,
-## never running out; "Arrows, 1 gold".
-static func _vendor_offers(worker_id: String, given: Dictionary) -> Array[Dictionary]:
+## never running out; "Arrows, 1 gold". A ware's price for [param
+## player_id] is ctx "vendor_cost" (Economy.vendor_cost) where given: 0 for
+## the first free one (856), offered in vendor.free_title and free_words.
+static func _vendor_offers(worker_id: String, given: Dictionary, player_id := "") -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var rule: Variant = _call(given, "vendor")
 	if not rule is Dictionary:
@@ -401,7 +403,14 @@ static func _vendor_offers(worker_id: String, given: Dictionary) -> Array[Dictio
 			continue
 		var name := str(catalog.get(item, {}).get("name", item.replace("_", " "))) if catalog is Dictionary else item.replace("_", " ")
 		price = int(line.get("price", rule.get("price", 1)))  # A ware's own price (805: the fishing rod, 3).
+		var cost: Variant = _call(given, "vendor_cost", [player_id, item]) if not player_id.is_empty() else null
+		if cost != null:
+			price = int(cost)  # 856: the first rod free to a player who has never had it.
 		var thing := name if item == "arrows" or name.ends_with("s") else Companion._a(name)
+		if price == 0 and rule.has("free_title"):
+			out.append(_offer(worker_id, VENDOR_WARES, item, str(rule["free_title"]) % _upper_first(thing),
+				str(rule.get("free_words", "")), {"item": item, "price": 0}, VENDOR_WARES, 0))
+			continue
 		out.append(_offer(worker_id, VENDOR_WARES, item, "%s, %d gold" % [_upper_first(thing), price],
 			"%s for %d gold, for the road. Mind, no one will buy it back off you." % [_upper_first(thing), price], {"item": item, "price": price}, VENDOR_WARES, price))
 	return out

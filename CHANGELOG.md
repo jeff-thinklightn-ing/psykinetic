@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856)
+- Towns: hold a pelt, a trophy or a bear claw in your hand at a keeper who buys it, and the keeper tells you it goes in your pack first (856 amended (2))
 - Towns: townsfolk greet you as they know you: a known face with their trade's own words, one you've wronged or who trusts you with words of their own, one who has only heard of you as a stranger, one whose task you're on glad you're seeing to it, and one who can't stop with the reason why (853 amended (5))
 - Towns: townsfolk answer what you ask first, so Aldous asked about the crypt talks of the crypt, and a hunter asked about wolves talks of wolves (853 amended (4))
 - Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10))

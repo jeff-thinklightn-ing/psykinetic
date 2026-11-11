@@ -5253,6 +5253,12 @@ func barter_reach(by: GridEntity, shop: GridEntity) -> bool:
 	return false
 
 
+## What the last try_barter moved (856 amended (1), M3: nothing a keeper does is
+## silent): {sold: [{id, gold}], bought: [{id, gold}]}, a unit a row, at
+## what was paid; Main tells the player. Server only.
+var last_trade: Dictionary = {"sold": [], "bought": []}
+
+
 ## Player [param by], within reach of shop counter [param shop], barters
 ## (decision 560): their things [param give] (uids in their slots) to the
 ## town, [param take] (uids off its shelf) from it, each at the price the
@@ -5265,6 +5271,7 @@ func barter_reach(by: GridEntity, shop: GridEntity) -> bool:
 ## that maker: their own make off their town's shelf, the gives bought from
 ## their purse (Economy.maker_quote) into their store.
 func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, balance: int, maker := "") -> String:
+	last_trade = {"sold": [], "bought": []}
 	if not Net.is_authority():
 		return "not here"
 	var place := shop_place(shop) if maker.is_empty() 			else str(production.worker(maker).get("town", "")) if production != null else ""
@@ -5328,6 +5335,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		if not economy.maker_swap(maker, who, gives.map(func(each: Dictionary) -> String: return str(each["id"])), quote["gives"], take, quote["takes"]):
 			return "%s has no coin for that today." % production.worker(maker).get("name", "they")
 		for i in from_slots.size():
+			last_trade["sold"].append({"id": str(gives[i]["id"]), "gold": int(quote["gives"][i])})
 			_sold(by, by, from_slots[i], int(give[i]), place, who, int(quote["gives"][i]), shop)
 		for i in take.size():
 			var into := to_slots[i]
@@ -5335,11 +5343,13 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 				into = room_for(by, int(take[i]))
 			put_item(by, by, into, int(take[i]))
 			_log("shop: %s bought %s from %s for %d gold" % [by.name, items.id_of(int(take[i])), place, int(quote["takes"][i])])
+			last_trade["bought"].append({"id": items.id_of(int(take[i])), "gold": int(quote["takes"][i])})
 		return ""
 	for i in from_slots.size():
 		var deal := economy.sell(who, place, str(gives[i]["id"]), bool(gives[i]["fenced"]), int(quote["gives"][i]))
 		if deal["ok"]:
 			_sold(by, by, from_slots[i], int(give[i]), place, who, int(deal["paid"]), shop)
+			last_trade["sold"].append({"id": str(gives[i]["id"]), "gold": int(deal["paid"])})
 	for i in take.size():
 		var deal := economy.buy(who, place, int(take[i]), int(quote["takes"][i]))
 		if deal["ok"]:
@@ -5348,6 +5358,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 				into = room_for(by, int(take[i]))  # The stack it was to join was given away whole.
 			put_item(by, by, into, int(take[i]))
 			_log("shop: %s bought %s at %s for %d gold" % [by.name, deal["id"], place, deal["price"]])
+			last_trade["bought"].append({"id": str(deal["id"]), "gold": int(deal["price"])})
 	return ""
 
 

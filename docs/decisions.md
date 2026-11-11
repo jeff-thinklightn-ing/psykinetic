@@ -49011,3 +49011,68 @@ sword and the rod to the right hand, a stack joined in the pack, a full pack's p
 to his pack with his free hand left free, a full companion's catch into her keeper's pack, neither with room: at
 her feet with his empty hand left empty). Server only; protocol unchanged; no new class_name; no bullet (a
 pelt no longer in the fist is how it should always have been; voice may want one).
+## 856. A new player's first money: the first rod free, and Rolf takes fish
+
+The coordinator's go (2026-11-10), from economy's blind runs on v0.1.210: a new player starts with an
+empty pack and 0 gold, every ware at Rolf's stall answers "You need 3 more gold.", nobody in Umbrage
+offers a way to earn, and the rod costs 3, so the first keeper a new player tries is a dead end and
+the pond (loop 1) is shut to him. Pieces of items' package "fishing that works" (M1 and M2 of
+economy's money design); the rules: things come from a person, towns never owe players, bonuses not
+penalties, no gold from nowhere.
+
+- M1, the first rod. economy.json vendor.first_free "fishing_rod": every player gets it from the stall
+  for nothing, once (Economy.vendor_cost 0, first_free_for; who has had it free kept as "first_free"
+  in Economy's save, so a rod bought before 856 does not count: a bonus, never a check of the past). Offers._vendor_offers takes the player and reads ctx
+  "vendor_cost": the free row reads vendor.free_title ("%s, free", the ware's name; voice kept it) and free_words
+  ("First one's on me.", voice's), so an old client, which shows the server's words as they are,
+  reads it right. Economy.vendor_sale at 0 records it and says free_say (voice's). Minted starter
+  (736), so no buyer takes it back. No gold moves.
+- M2, Rolf takes fish. economy.json vendor.takes ["fish"]: the stall's keeper takes those raws at the
+  store's price beside their own takers (receives: the cook, the taverner), so a new player's first
+  keeper takes the catch. Main.keeper_takes; person_takes lets the keeper take them; takers_of and
+  depot_pointer name him for them ("That goes to Rolf at the stall."; the coordinator's rule: a
+  pointer names only someone who is there), while the Give to the cook or taverner still takes
+  them. Paid as any hand-in banked (World.donate: the store's price, trusted 1.1, always in full,
+  826), the fish into the larder, thanked by the hand-in's float. His word on it, vendor.takes_say
+  ("Fresh ones. I'll take those.", voice's), once a visit (KEEPER_TAKES_QUIET, ten minutes).
+
+Tests: economy_test _test_vendor (the first rod free once, his word, saved and loaded, a player with
+no gold still gets it, the next at 3), _test_keeper_takes_fish (off without takes; the stack at the
+store's price; the pointer and takers name him; given, banked, paid, thanked); resident_test
+_test_vendor (the free row's cost and words). Server only; protocol unchanged (release: values in
+existing messages; "fish" already a known item); no new class_name. Package: fishing that works
+(items switches it on).
+
+856 amended (1) (the coordinator's go, M3: nothing a keeper does is silent): the blind run's roast
+perch sold at the store's counter moved the purse with no float or line. World.try_barter records
+what it moved in World.last_trade {sold, bought: [{id, gold}] a unit a row, at what was paid};
+after a trade Main.trade_done groups it by kind ([{id, count, gold}]), the "barter" reply carries
+it as "sold" and "bought" (absent on a plain look), and _trade_told floats it in voice's words, the
+store window's own line without its full stop: a sale a "gold" float ("Sold 2 perch for 2 gold"),
+a purchase an "item" float of what was bought ("Bought a sword for 1 gold"; the gain shown, never a
+"+gold" for gold spent). Main.thing_words counts a thing ("a sword", "2 swords", "2 perch").
+ui's store A reads sold and bought for its foot line. A buy at the stall (Offers.accept, then
+_vendor_sells) floats the same way, never only the keeper's word; a purchase that cost nothing
+floats TRADE_FREE (voice's: "Got a fishing rod, free"), never "for 0 gold". Each trade float
+carries "trade" ("sold" or "bought"), which a hand-in's float never does. The coordinator's ruling:
+the server always sends the words, which an old client, a hand-in and a trade outside the window
+need; once store A lands, the client shows the gain chip and leaves the words out while the window
+that made the trade is open, its foot saying them once (ui's side). Protocol: release's ruling, no
+new number (optional keys an old client ignores; the comments above PROTOCOL_REVISION).
+economy_test _test_barter checks the reply, the floats and the words, and the first rod's free
+words; resident_test _test_vendor_buttons asserts the client's "reward" after a real Buy press.
+
+856 amended (2) (the coordinator's ruling on playtest's batch 2, pelt (a); part of "a first day in
+Umbrage"): a hill cat's pelt given to a player went into a free hand, and Rolf, who buys trophies
+and makers' inputs from the pack only (821, so a held tool is never offered away), showed nothing
+for it and said nothing. Items' World.free_slot_for change (only what is wielded goes to a free
+hand first; a pelt, a fish, a herb to a pack square) removes the case for a new player; the store
+window drawing hands was ruled out (a wielded sword one slip from sold). What is left, a full pack
+with a trophy in the fist (or a wielded trophy picked up bare-handed), gets a word, never silence:
+Main.held_take(player, worker) names a thing held in a hand that the worker buys (bought_by) and
+none of it in the pack, a raw never (raws are taken from a hand already), a starter ware never;
+_send_offers has the taker say economy.json receives.pointers.held (voice's: "I'll take that from
+your pack, not your hand.") when his window opens on one, once a visit (KEEPER_TAKES_QUIET) for
+each player and taker (_held_said_at, not saved). economy_test _test_held_take (held: no row,
+named; in the pack: a row, nothing; a raw hide held never counts). Server only; protocol
+unchanged; no new class_name.

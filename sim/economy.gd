@@ -151,6 +151,9 @@ var _ponds: Dictionary = {}
 var _anglers: Dictionary = {}
 ## Wanderers sent (805): {pond: {player id: {count, day}}}; saved.
 var _wandered: Dictionary = {}
+## The players who have had the stall's first free ware (856): {player id:
+## true}; saved as "first_free".
+var _first_free: Dictionary = {}
 ## The workings' yield (835): {place: {period, quota, mined}}, the sacks
 ## its seams hold this period and how many were dug; saved.
 var _workings: Dictionary = {}
@@ -1821,18 +1824,45 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 ## {ok, say, gold (paid), count (how many one purchase gives)}.
 func vendor_sale(player_id: String, item: String) -> Dictionary:
 	var rule: Dictionary = rules.get("vendor", {})
-	var line: Dictionary = {}
-	for each: Variant in rule.get("wares", []):
-		if each is Dictionary and str(each.get("item", "")) == item:
-			line = each
+	var line := _vendor_line(item)
 	if line.is_empty():
 		return {"ok": false, "say": "I've none of that.", "gold": 0, "count": 0}
-	var cost := maxi(int(line.get("price", rule.get("price", 1))), 0)
+	var cost := vendor_cost(player_id, item)
 	if gold(player_id) < cost:
 		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0, "count": 0}
+	var say := "Yours. Mind, no one will buy it off you."
 	if cost > 0:
 		add_gold(player_id, -cost, "a starter %s" % item)
-	return {"ok": true, "say": "Yours. Mind, no one will buy it off you.", "gold": cost, "count": maxi(int(line.get("count", 1)), 1)}
+	elif first_free_for(player_id, item):
+		_first_free[player_id] = true  # 856: once per player.
+		say = str(rule.get("free_say", say))
+	return {"ok": true, "say": say, "gold": cost, "count": maxi(int(line.get("count", 1)), 1)}
+
+
+## The stall's wares line for [param item] (vendor.wares), {} for none.
+func _vendor_line(item: String) -> Dictionary:
+	for each: Variant in rules.get("vendor", {}).get("wares", []):
+		if each is Dictionary and str(each.get("item", "")) == item:
+			return each
+	return {}
+
+
+## What the stall asks [param player_id] for one [param item] (736; 856):
+## the ware's own price, else vendor.price; 0 for vendor.first_free to a
+## player who has never had it from him (first_free_for).
+func vendor_cost(player_id: String, item: String) -> int:
+	if first_free_for(player_id, item):
+		return 0
+	var rule: Dictionary = rules.get("vendor", {})
+	return maxi(int(_vendor_line(item).get("price", rule.get("price", 1))), 0)
+
+
+## Whether [param item] is the stall's first free ware (856, the
+## coordinator's: a new player's first rod) and [param player_id] has not
+## had it yet.
+func first_free_for(player_id: String, item: String) -> bool:
+	return not player_id.is_empty() and item == str(rules.get("vendor", {}).get("first_free", "")) and not _first_free.has(player_id) \
+		and not _vendor_line(item).is_empty()
 
 
 ## What a pedlar asks for one [param item] (711): its value x merchant.sell,
@@ -3524,7 +3554,7 @@ func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"trade_debt": _trade_debt.duplicate(), "trade_purse": _trade_purse.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
-		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true),
+		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true), "first_free": _first_free.duplicate(true),
 		"workings": _workings.duplicate(true), "wanted": _wanted.duplicate(true), "camp_traders": _camp_traders.duplicate(true)}
 
 
@@ -3566,6 +3596,10 @@ func from_dict(saved: Dictionary) -> void:
 		for id: Variant in owed_what:
 			if owed_what[id] is Array:
 				_owed_what[str(id)] = (owed_what[id] as Array).map(func(what: Variant) -> String: return str(what))
+	var first_free: Variant = saved.get("first_free", {})
+	if first_free is Dictionary:
+		for who: Variant in first_free:
+			_first_free[str(who)] = true
 	for key: String in ["ponds", "wandered", "workings", "wanted"]:
 		var each: Variant = saved.get(key, {})
 		if each is Dictionary:

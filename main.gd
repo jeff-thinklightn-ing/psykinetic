@@ -8433,7 +8433,7 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 ## (decision 562: a maker's barter, [param shop] their body) "shop" is ""
 ## and "resident" their path: their own make, and what they buy from their
 ## purse ("" otherwise).
-func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> void:
+func _send_barter(player: Player, shop: GridEntity, why := "", maker := "", done := {}) -> void:
 	var place := World.shop_place(shop) if maker.is_empty() else str(World.production.worker(maker).get("town", ""))
 	var data := {"shop": str(shop.get_path()) if maker.is_empty() else "", "resident": str(shop.get_path()) if not maker.is_empty() else "",
 		"town": place, "gold": World.gold_of(player.player_id), "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why,
@@ -8462,7 +8462,75 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 		for each: Dictionary in data["pack"]:
 			if data["fence"] == Economy.FENCE_NIGHT and plain.has(each["id"]) and World.items.is_grave(int(each["uid"])):
 				data["fenced"][each["uid"]] = World.economy.fence_price(int(plain[each["id"]]["gold"]))
+	for key: String in ["sold", "bought"]:
+		if not (done.get(key, []) as Array).is_empty():
+			data[key] = done[key]  # 856 amended (1), M3: what the trade just moved, for the window's foot line.
 	Net.message_to(player.owner_peer, "barter", data)
+
+
+## What a trade moved (856 amended (1), M3), from World.last_trade: {sold,
+## bought}, each [{id, count, gold}] by kind in the order first moved,
+## gold the sum paid for them.
+static func trade_done(last: Dictionary) -> Dictionary:
+	var out := {"sold": [], "bought": []}
+	for key: String in out:
+		var rows: Array = out[key]
+		for unit: Variant in last.get(key, []):
+			var row: Dictionary = {}
+			for each: Dictionary in rows:
+				if each["id"] == str(unit.get("id", "")):
+					row = each
+			if row.is_empty():
+				row = {"id": str(unit.get("id", "")), "count": 0, "gold": 0}
+				rows.append(row)
+			row["count"] = int(row["count"]) + 1
+			row["gold"] = int(row["gold"]) + int(unit.get("gold", 0))
+	return out
+
+
+## [param player] told what a trade moved (856 amended (1), M3: nothing a
+## keeper does is silent): a "gold" float for each way it went, in voice's
+## words ("Sold 2 perch for 2 gold", "Bought a sword for 1 gold").
+func _trade_told(player: Player, done: Dictionary) -> void:
+	if player == null:
+		return
+	for key: String in ["sold", "bought"]:
+		var rows: Array = done.get(key, [])
+		if rows.is_empty():
+			continue
+		var gold := 0
+		var count := 0
+		var parts: Array = []
+		for row: Dictionary in rows:
+			gold += int(row["gold"])
+			count += int(row["count"])
+			parts.append(thing_words(str(row["id"]), int(row["count"])))
+		var words := (TRADE_SOLD if key == "sold" else TRADE_BOUGHT) % [_and_words(parts), gold]
+		if key == "bought" and gold == 0:
+			words = TRADE_FREE % _and_words(parts)  # The first free one (856): never "for 0 gold".
+		# "trade": a trade's float, not a hand-in's (Store A leaves its words to its own foot line).
+		if key == "sold":
+			_reward(player.player_id, {"track": "gold", "amount": gold, "words": words, "trade": key})  # "+2 gold".
+		else:
+			# What was bought is the gain shown ("+1 sword"), the gold in the words.
+			_reward(player.player_id, {"track": "item", "amount": count, "of": Items.name_of(str(rows[0]["id"])).to_lower(), "words": words, "trade": key})
+
+
+## Voice's words for a trade's float (856 amended (1), M3), as the store
+## window's own line without its full stop.
+const TRADE_SOLD := "Sold %s for %d gold"
+const TRADE_BOUGHT := "Bought %s for %d gold"
+## A purchase that cost nothing (856: the first rod; voice's): "Got a fishing rod, free".
+const TRADE_FREE := "Got %s, free"
+
+
+## [param count] of item [param id] in words: "a sword", "2 swords",
+## "2 perch" (a name ending in "perch" or "s" stays as it is).
+static func thing_words(id: String, count: int) -> String:
+	var name := Items.name_of(id).to_lower() if not Items.def(id).is_empty() else id.replace("_", " ")
+	if count == 1:
+		return "%s %s" % ["an" if not name.is_empty() and name[0] in "aeiou" else "a", name]
+	return "%d %s" % [count, name if name.ends_with("perch") or name.ends_with("s") else name + "s"]
 
 
 ## Server: maker [param body] with none of his own makes on the shelf says
@@ -12716,6 +12784,7 @@ func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	var taker := _player_of_id(player_id)
 	if taker != null and not _worker_town(body.worker_id).is_empty():
 		data["takes"] = person_takes(taker, body.worker_id)  # What they'd take of the pack (802 amended (2), the Give tab).
+		_held_take_said(body, taker)  # 856 amended (2): a thing held that he'd take from the pack.
 	var standing := _standing_for(player_id, body.worker_id)
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
@@ -12837,6 +12906,7 @@ func _offers_context() -> Dictionary:
 		"visitor_price": _visitor_price,
 		"camp_stock": _camp_stock,  # A forest camp's trader's wares (799).
 		"vendor": func() -> Dictionary: return World.economy.rules.get("vendor", {}) if World.economy != null else {},
+		"vendor_cost": func(player_id: String, item: String) -> int: return World.economy.vendor_cost(player_id, item) if World.economy != null else 1,  # 856.
 		"relics": _relics_held,
 		"barrow_knight": barrow_knight,
 		"lawspeaker": func(town: String) -> Dictionary: return World.towns.lawspeaker(town) if World.towns != null and World.towns.has_method("lawspeaker") else _lawspeaker_records.get(town, {}).duplicate(true),
@@ -14823,11 +14893,15 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 				_threat_told(entity as Player, "The shopkeeper", shut)  # Shut (762).
 				return
 			why = "" if World.barter_reach(entity, shop) else "too far from the counter"
+		var done := {}
 		if command_name == "trade" and why.is_empty():
 			var give: Variant = args.get("give", [])
 			var take: Variant = args.get("take", [])
 			why = World.try_barter(entity, shop, give if give is Array else [], take if take is Array else [], int(args.get("gold", 0)), maker)
-		_send_barter(entity as Player, shop, why, maker)
+			if why.is_empty():
+				done = trade_done(World.last_trade)
+				_trade_told(entity as Player, done)
+		_send_barter(entity as Player, shop, why, maker, done)
 		if command_name == "barter" and not maker.is_empty() and why.is_empty():
 			_empty_shelf_told(entity as Player, shop as Resident)  # 562 amended (6).
 	elif command_name == "counter" and entity is Player:
@@ -16279,6 +16353,8 @@ func give(player: Player, args: Dictionary) -> Array:
 	if _taken_back > 0:
 		_keeper_says(body, "back", player)  # Starter gear handed back (807 amended (5)): no thanks owed, his own word.
 	_taken_back = 0
+	if body.worker_id.begins_with(Offers.VENDOR) and _keeper_took_raw(body.worker_id, _given_ids):
+		_keeper_takes_said(body, player)
 	_send_offers(body, player.player_id, player.owner_peer)
 	if bool(args.get("barter", false)) and not body.worker_id.begins_with(Offers.VENDOR):
 		_send_barter(player, body, "", body.worker_id)  # A maker's window (ui): its pack list fresh for Sell.
@@ -16300,6 +16376,7 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 	_giving_to = worker
 	_giving_name = who
 	_taken_back = 0
+	_given_ids = []
 	for raw: Variant in uids:
 		var uid := int(raw)
 		if not takes.has(uid):
@@ -16316,14 +16393,92 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 			continue
 		var trophy := World.items.id_of(uid) if not bought_by(town, World.items.id_of(uid)).is_empty() else ""  # A trophy or a maker's input (821).
 		for unit: int in units:
+			var id := World.items.id_of(unit)  # Read before banking: a banked raw leaves the book.
 			if World.donate(player, unit, town):
 				given.append(unit)
+				_given_ids.append(id)
 				if not trophy.is_empty():
 					_trophy_sold(town, _id_of_player(player), trophy)
 	_thank_hand_ins()
 	_giving_to = ""
 	_giving_name = ""
 	return given
+
+
+## Whether any of [param ids] (item ids, give_to's _given_ids), just given to
+## the stall's keeper [param worker], was a raw he takes (856, vendor.takes).
+## Ids, not uids: a banked raw has left the item book by then.
+func _keeper_took_raw(worker: String, ids: Array) -> bool:
+	var town := worker.trim_prefix(Offers.VENDOR)
+	for id: Variant in ids:
+		var yields := Items.yield_of(str(id))
+		if not yields.is_empty() and keeper_takes(town, str(yields.keys()[0])):
+			return true
+	return false
+
+
+## The stall's keeper's word on the raws he took (856, vendor.takes_say,
+## voice's: "Fresh ones. I'll take those."), once a visit: not again to the
+## same player within KEEPER_TAKES_QUIET steps.
+func _keeper_takes_said(keeper: Resident, player: Player) -> void:
+	var line := str(World.economy.rules.get("vendor", {}).get("takes_say", ""))
+	var last := int(_keeper_takes_at.get(player.player_id, -KEEPER_TAKES_QUIET))
+	if line.is_empty() or World.tick - last < KEEPER_TAKES_QUIET:
+		return
+	_keeper_takes_at[player.player_id] = World.tick
+	_resident_says(keeper, line, "", player)
+
+
+## The item ids give_to last banked (856, for _keeper_took_raw), read before
+## each was banked; not saved.
+var _given_ids: Array = []
+## A visit, for the keeper's word on what he took (856): ten minutes.
+const KEEPER_TAKES_QUIET := 10 * 60 * World.TICK_RATE
+## When the stall's keeper last said takes_say to each player (856): {player id: tick}; not saved.
+var _keeper_takes_at: Dictionary = {}
+
+
+## A thing [param player] holds in a hand that [param worker] would buy
+## were it in the pack, and none of it in the pack (856 amended (2), the
+## coordinator's: a trophy or a maker's input, bought from the pack only
+## (821), held in a fist with the pack full): its id, "" for none. A raw
+## is taken from a hand already, so it never counts.
+func held_take(player: Player, worker: String) -> String:
+	var town := _worker_town(worker)
+	if town.is_empty() or World.economy == null or World.items == null:
+		return ""
+	var packed := {}
+	for slot in player.slots.size():
+		if Items.is_pack(slot):
+			packed[str(player.slots[slot])] = true
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if slot >= player.slots.size():
+			continue
+		var id := str(player.slots[slot])
+		if id.is_empty() or packed.has(id) or not Items.yield_of(id).is_empty() or World.items.is_starter(World.slot_uid(player, slot)):
+			continue
+		if str(bought_by(town, id).get("worker", "")) == worker:
+			return id
+	return ""
+
+
+## [param body]'s word to [param player] when his window opens on a thing
+## he'd take held in a hand (held_take; 856 amended (2)): receives.pointers
+## held (voice's words), at most once a visit (KEEPER_TAKES_QUIET) for each
+## player and taker, so nothing he'd take is refused in silence.
+func _held_take_said(body: Resident, player: Player) -> void:
+	if World.economy == null or held_take(player, body.worker_id).is_empty():
+		return
+	var line := str(World.economy.rules.get("receives", {}).get("pointers", {}).get("held", ""))
+	var key := "%s|%s" % [player.player_id, body.worker_id]
+	if line.is_empty() or World.tick - int(_held_said_at.get(key, -KEEPER_TAKES_QUIET)) < KEEPER_TAKES_QUIET:
+		return
+	_held_said_at[key] = World.tick
+	_resident_says(body, line, "", player, false)  # Said from _send_offers, whose offers follow: not sent twice.
+
+
+## When each taker last said pointers.held to each player (856 amended (2)): {"player id|worker": tick}; not saved.
+var _held_said_at: Dictionary = {}
 
 
 ## Whom the hand-in being banked is given to (give): a worker key and their
@@ -16887,6 +17042,17 @@ func receiver_for(town: String, raw: String, workers = null) -> String:
 	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
 
 
+## Whether the starter stall's keeper of [param town] takes raw [param raw]
+## at the store's price beside its own takers (856: economy.json
+## vendor.takes, fish; the coordinator's: the first keeper a new player
+## tries takes the catch). The pointer and the pack's tooltip name him.
+func keeper_takes(town: String, raw: String) -> bool:
+	if World.economy == null or raw.is_empty():
+		return false
+	var rule: Dictionary = World.economy.rules.get("vendor", {})
+	return town in rule.get("towns", []) and raw in rule.get("takes", [])
+
+
 ## 802 amended (5), ui's side: the "takers" entry (Main.takers_here) for
 ## item [param id] carried in the pack: its raw's taker (Items.yield_of), or
 ## for gear (no raw, of some worth: a value, or made) the stall's keeper;
@@ -16949,7 +17115,8 @@ func takers_of(town: String) -> Dictionary:
 	var lacking: Dictionary = World.towns.shortfall(town).get("needs", {}) if World.towns != null else {}
 	var bodies := _bodies_by_worker()
 	# Every input of the build below (802 amended (7)): add to it anything takers_of comes to read.
-	var stamp := hash([workers, lacking.keys(), bodies, World.economy.rules.get("vendor", {}).get("towns", []), World.economy.rules.get("receives", {}).size(), _input_seats(workers)])
+	var stamp := hash([workers, lacking.keys(), bodies, World.economy.rules.get("vendor", {}).get("towns", []), World.economy.rules.get("receives", {}).size(), _input_seats(workers),
+		World.economy.rules.get("vendor", {}).get("takes", [])])  # 856: the raws the stall's keeper takes.
 	var known: Dictionary = _takers_built.get(town, {})
 	if int(known.get("stamp", 0)) == stamp and known.has("data"):
 		return known["data"]  # Nothing it reads has changed (802 amended (7)): the last build.
@@ -16960,6 +17127,8 @@ func takers_of(town: String) -> Dictionary:
 		var worker := receiver_for(town, raw, workers)
 		if worker.is_empty():
 			continue
+		if keeper_takes(town, raw):
+			worker = Offers.VENDOR + town  # 856: the stall's keeper, who is always there, is the one named.
 		var entry := _taker_entry(worker, bodies, workers)
 		entry["store"] = not lacking.has(raw)  # As give_outcome: "build" while the queued build lacks it.
 		out["takers"][raw] = entry
@@ -17107,7 +17276,7 @@ func person_takes(player: Player, worker: String) -> Array:
 			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0}
 		elif not yields.is_empty():
 			var raw := str(yields.keys()[0])
-			if raw == "gold" or receiver_for(town, raw) != worker:
+			if raw == "gold" or receiver_for(town, raw) != worker and not (worker == Offers.VENDOR + town and keeper_takes(town, raw)):
 				continue
 			row = give_outcome(town, player_id, raw, int(yields[raw]) * count)
 			row["raw"] = raw
@@ -17155,6 +17324,8 @@ func depot_pointer(town: String, id: String) -> String:
 		raw = "input" if not input_taker(town, id).is_empty() else "trophy"
 	var worker := receiver_for(town, raw) if not raw.is_empty() and raw not in ["trophy", "input"] else trophy_by if raw in ["trophy", "input"] \
 			else (Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else "")
+	if keeper_takes(town, raw):
+		worker = Offers.VENDOR + town  # 856: fish to the stall's keeper, who is always there.
 	if worker.is_empty():
 		return nobody
 	if worker.begins_with(Offers.VENDOR):
@@ -20588,6 +20759,8 @@ func _vendor_sells(player: Player, body: Resident, item: String) -> void:
 	if bool(done.get("ok", false)):
 		for i in maxi(int(done.get("count", 1)), 1):
 			_hand_item(player.player_id, item, body.person, true)
+		# The float as at a counter (856 amended (1), M3): a stall buy is never only his word.
+		_trade_told(player, {"bought": [{"id": item, "count": maxi(int(done.get("count", 1)), 1), "gold": int(done.get("gold", 0))}]})
 	var say := str(done.get("say", ""))
 	if not say.is_empty():
 		_resident_says(body, say, "", player)

@@ -394,8 +394,19 @@ func _test_vendor() -> void:
 	_check(not economy.vendor_sale("p1", "crown")["ok"] and economy.gold("p1") == 2, "not one of its wares: refused")
 	_check(not economy.vendor_sale("p2", "sword")["ok"] and economy.gold("p2") == 0, "no gold: refused")
 	economy.add_gold("p1", 1, "test")
+	# 856: a player's first rod is free, once; offered and sold at 0, then at its 3.
+	_check(economy.vendor_cost("p1", "fishing_rod") == 0 and economy.vendor_cost("p9", "fishing_rod") == 0 and economy.vendor_cost("p1", "sword") == 1
+		and economy.vendor_cost("", "fishing_rod") == 3, "the first rod costs a new player nothing; the sword still 1; no player, its 3")
+	var free := economy.vendor_sale("p1", "fishing_rod")
+	_check(free["ok"] and int(free["gold"]) == 0 and int(free["count"]) == 1 and economy.gold("p1") == 3 and str(free["say"]) == "First one's on me.",
+		"the first rod: free, his word on it (856; %s)" % [free])
+	_check(economy.vendor_cost("p1", "fishing_rod") == 3 and economy.vendor_cost("p9", "fishing_rod") == 0, "once: his next rod 3, another player's first still free")
+	var kept := Economy.new(JSON.parse_string(JSON.stringify(economy.to_dict())), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
+	_check(kept.vendor_cost("p1", "fishing_rod") == 3 and kept.vendor_cost("p9", "fishing_rod") == 0, "saved and loaded: who has had it stays")
 	var rod := economy.vendor_sale("p1", "fishing_rod")
 	_check(rod["ok"] and int(rod["gold"]) == 3 and economy.gold("p1") == 0, "Rolf's fishing rod: 3 gold (805; %s)" % [rod])
+	_check(bool(economy.vendor_sale("p2", "fishing_rod")["ok"]) and economy.vendor_cost("p2", "fishing_rod") == 3 and economy.gold("p2") == 0,
+		"a player with no gold gets his first rod all the same")
 	economy.add_gold("p1", 8, "test")
 	var cloak := economy.vendor_sale("p1", "cloak")
 	_check(cloak["ok"] and int(cloak["gold"]) == 8 and economy.gold("p1") == 0, "Rolf's woollen cloak: 8 gold (788 amended; %s)" % [cloak])
@@ -910,6 +921,18 @@ func _test_barter_in_town(host: Player, counter: Chest) -> void:
 	_check(_main.barter_data.get("why") == "" and World.gold_of(host.player_id) == gold + fenced - asks
 		and World.slot_of_unit(host, kit) >= 0 and ore not in World.slot_uids(host) and kit not in World.stockpile.shop(STORE),
 		"traded: the sack banked, the kit in the pack, %d gold (%s, %d)" % [gold + fenced - asks, Array(host.slots), World.gold_of(host.player_id)])
+	# 856 amended (1), M3: the reply says what moved, and the player is told by floats.
+	var kit_id: String = World.items.id_of(kit)
+	_check(_main.barter_data.get("sold") == [{"id": "ore_sack", "count": 1, "gold": fenced}] and _main.barter_data.get("bought") == [{"id": kit_id, "count": 1, "gold": asks}],
+		"the reply carries sold and bought (%s, %s)" % [_main.barter_data.get("sold"), _main.barter_data.get("bought")])
+	var floats: Array = _main.rewards_given.slice(-2).map(func(each: Dictionary) -> Dictionary: return each["data"])
+	_check(floats.size() == 2 and floats[0]["track"] == "gold" and int(floats[0]["amount"]) == fenced and str(floats[0]["words"]) == "Sold %s for %d gold" % [Main.thing_words("ore_sack", 1), fenced]
+		and floats[1]["track"] == "item" and int(floats[1]["amount"]) == 1 and str(floats[1]["words"]).begins_with("Bought "), "and floated: the gold for the sale, the thing for the purchase (%s)" % [floats])
+	_check(Main.thing_words("fish", 2) == "2 perch" and Main.thing_words("sword", 1) == "a sword" and Main.thing_words("sword", 2) == "2 swords"
+		and Main.trade_done({"sold": [{"id": "fish", "gold": 1}, {"id": "fish", "gold": 1}], "bought": []}) == {"sold": [{"id": "fish", "count": 2, "gold": 2}], "bought": []},
+		"the words: 2 perch, a sword, 2 swords; units counted by kind")
+	World.command(host, "barter", {"shop": str(counter.get_path())})
+	_check(not _main.barter_data.has("sold") and not _main.barter_data.has("bought"), "a plain look carries neither")
 	while DayNight.daylight(World.steps) < DayNight.DARK_LIGHT:
 		World.steps += 600
 	World.command(host, "barter", {"shop": str(counter.get_path())})
@@ -1005,6 +1028,80 @@ func _test_town_sheet(host: Player) -> void:
 	_test_admin_stock(host)
 
 
+## 856 (the coordinator's go): the stall's keeper takes fish at the store's
+## price beside its own takers; the pointer and the takers name him; paid in
+## full, banked in the larder, thanked as a hand-in. Without vendor.takes,
+## as before.
+func _test_keeper_takes_fish(host: Player, me: String) -> void:
+	var rule: Dictionary = World.economy.rules["vendor"]
+	_check(not _main.keeper_takes(STORE, "fish"), "no vendor.takes: the keeper takes no fish")
+	rule["takes"] = ["fish"]
+	for i in 3:
+		_main._hand_item(me, "fish", "test")
+	var rows: Array = _main.person_takes(host, Offers.VENDOR + STORE).filter(func(row: Dictionary) -> bool: return row["what"] == "fish")
+	var pays := World.economy.bank_price(STORE, me, "fish", 1)
+	_check(rows.size() == 1 and int(rows[0]["count"]) == 3 and rows[0]["raw"] == "fish" and int(rows[0]["gold"]) == 3 * pays and pays >= 1,
+		"the keeper takes the perch, the whole stack, at the store's price (%d each; %s)" % [pays, rows])
+	_check(_main.depot_pointer(STORE, "fish") == "That goes to Rolf at the stall.", "the pointer names him (%s)" % _main.depot_pointer(STORE, "fish"))
+	_check(str(_main.takers_of(STORE).get("takers", {}).get("fish", {}).get("trade", "")) == "vendor", "the takers name him for fish (%s)" % [_main.takers_of(STORE).get("takers", {}).get("fish", {})])
+	var gold := World.gold_of(me)
+	var larder := World.stockpile.count(STORE, "fish")
+	var given: Array = _main.give_to(host, Offers.VENDOR + STORE, "Rolf", [int(rows[0]["uid"])] if not rows.is_empty() else [])
+	var thanks: Dictionary = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me and each["data"]["track"] == "item").back()["data"]
+	_check(given.size() == 3 and World.count_of(host, "fish") == 0 and World.gold_of(me) == gold + 3 * pays and World.stockpile.count(STORE, "fish") == larder + 3
+		and str(thanks.get("words", "")).begins_with("Rolf takes") and int(thanks.get("gold", 0)) == 3 * pays,
+		"given to Rolf: banked in the store, paid in full, thanked (%d given; %s)" % [given.size(), thanks])
+	_check(_main._keeper_took_raw(Offers.VENDOR + STORE, _main._given_ids), "the keeper's word follows a fish he took (%s)" % [_main._given_ids])
+	rule.erase("takes")
+	# A stall buy floats as a counter's does (M3); his first rod in the offer's own words, never "for 0 gold".
+	_main._trade_told(host, {"bought": [{"id": "fishing_rod", "count": 1, "gold": 0}]})
+	var free_float: Dictionary = _main.rewards_given.back()["data"]
+	_check(str(free_float.get("words", "")) == "Got a fishing rod, free" and str(free_float.get("track", "")) == "item" and str(free_float.get("trade", "")) == "bought",
+		"the first rod's float: voice's free words, no gold in it, marked a trade (%s)" % [free_float])
+	_test_held_take(host, me)
+
+
+## 856 amended (2) (the coordinator's, playtest's pelt in a fist): a trophy
+## its buyer takes from the pack only, held in a hand with none in the pack,
+## is named by held_take, so his window's word (receives.pointers.held,
+## voice's) says so; in the pack it is a row and nothing is said; a raw held
+## never counts.
+func _test_held_take(host: Player, me: String) -> void:
+	var buyer := str(_main.bought_by(STORE, "hill_cat_pelt").get("worker", ""))
+	_check(not buyer.is_empty(), "someone in town buys the hill cat's pelt (%s)" % buyer)
+	_check(not str(World.economy.rules["receives"]["pointers"].get("held", "")).is_empty(), "the held word is in the rules")
+	var hand := Items.LEFT_HAND
+	if not str(host.slots[hand]).is_empty():
+		_check(false, "the left hand is free for the test (%s)" % host.slots[hand])
+		return
+	_main._hand_item(me, "hill_cat_pelt", "test")
+	var at := Array(host.slots).find("hill_cat_pelt")
+	if at != hand:
+		World._move_units(host, host, at, host, hand, 1)
+	var rows: Array = _main.person_takes(host, buyer).filter(func(row: Dictionary) -> bool: return row["what"] == "hill_cat_pelt")
+	_check(str(host.slots[hand]) == "hill_cat_pelt" and rows.is_empty() and _main.held_take(host, buyer) == "hill_cat_pelt",
+		"held in a hand: no row, and held_take names it (%s)" % [Array(host.slots)])
+	_check(_main.held_take(host, "nobody_here").is_empty(), "nobody else is told of it")
+	var room := -1
+	for slot: int in World.pack_slots(host):
+		if str(host.slots[slot]).is_empty():
+			room = slot
+			break
+	if room >= 0:
+		World._move_units(host, host, hand, host, room, 1)
+		rows = _main.person_takes(host, buyer).filter(func(row: Dictionary) -> bool: return row["what"] == "hill_cat_pelt")
+		_check(rows.size() == 1 and _main.held_take(host, buyer).is_empty(), "in the pack: his row, nothing said (%s)" % [rows])
+	_main._hand_item(me, "hide", "test")
+	var hide_at := Array(host.slots).find("hide")
+	if hide_at >= 0 and str(host.slots[hand]).is_empty():
+		World._move_units(host, host, hide_at, host, hand, 1)
+	_check(_main.held_take(host, buyer).is_empty(), "a raw hide held never counts (taken from a hand already)")
+	for id: String in ["hill_cat_pelt", "hide"]:
+		var slot := Array(host.slots).find(id)
+		if slot >= 0:
+			World.items.end(World.take_item(host, host, slot), "gone")
+
+
 ## The give path's data (804's hand-in to people; ui's Give tab): wood goes
 ## to the town's carpenter alone, with what it does for the town and the gold;
 ## gear to the stall's keeper, never a starter ware; the keeper takes a raw
@@ -1063,6 +1160,7 @@ func _test_person_takes(host: Player) -> void:
 	# The store chest refuses players (802 amended (3)), saying who takes it, in voice's words.
 	_check(_main.depot_pointer(STORE, "wood_bundle") == "Wood goes to the carpenter." and _main.depot_pointer(STORE, "sword") == "That goes to Rolf at the stall.",
 		"the pointers: wood to the carpenter, gear to Rolf (%s, %s)" % [_main.depot_pointer(STORE, "wood_bundle"), _main.depot_pointer(STORE, "sword")])
+	_test_keeper_takes_fish(host, me)
 	# A thing held is never offered as a gift (802 amended (4); playtest's pick in hand).
 	_main._hand_item(me, "sword", "test")
 	var packed: int = Array(host.slots).find("sword")

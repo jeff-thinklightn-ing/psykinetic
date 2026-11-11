@@ -1056,8 +1056,11 @@ func _test_taverner_end_to_end() -> void:
 		var phrases: Dictionary = World.economy.rules.get("receives", {}).get("pointers", {}).get("where", {})
 		_check(_main._taker_where(wilds, _main.TAVERNER, phrases) == "at the Last Light Mughouse" and _main._taker_where(wilds, "cook", phrases) == "in the kitchen shed"
 			and _main._taker_where(wilds, "fletcher", phrases) == "", "where a taker works: %s, %s, none for a trade with no building" % [_main._taker_where(wilds, _main.TAVERNER, phrases), _main._taker_where(wilds, "cook", phrases)])
+		var meat_line: String = _main.depot_pointer(wilds, "meat")
+		_check(meat_line.ends_with(", at the Last Light Mughouse.") or meat_line.ends_with(", in the kitchen shed."), "meat refused at the chest: who and where (%s)" % meat_line)
+		# Fish go to the stall's keeper, who is always there (856, vendor.takes): his line, no where.
 		var fish_line: String = _main.depot_pointer(wilds, "fish")
-		_check(fish_line.ends_with(", at the Last Light Mughouse.") or fish_line.ends_with(", in the kitchen shed."), "a fish refused at the chest: who and where (%s)" % fish_line)
+		_check(fish_line == "That goes to Rolf at the stall.", "a fish refused at the chest: Rolf at the stall (%s)" % fish_line)
 		# A player walking in sees her at once: the floor's folk made in the tick they land, before the
 		# first state they are shown (economy's tour on v0.1.210 looked on arrival and saw the room empty).
 		DayNight.set_hour(10.0)
@@ -5457,11 +5460,14 @@ func _test_vendor() -> void:
 	_check(spoken.size() == 1, "a greeting (%s)" % [spoken])
 	_check(_main._resident_addressed(player, "hello there", null) != rolf, "typed words never reach him")
 	var offers := Offers.of(rolf.worker_id, pid)
-	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3).
+	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3); 856: his first rod 0.
 	for line: Dictionary in rule.get("wares", []):
-		ware_price[str(line["item"])] = int(line.get("price", rule.get("price", 1)))
+		ware_price[str(line["item"])] = World.economy.vendor_cost(pid, str(line["item"]))
 	_check(offers.size() == (rule.get("wares", []) as Array).size() and offers.all(func(o: Dictionary) -> bool: return int(o["cost"]) == int(ware_price.get(str(o["what"].get("item", "")), -1)) and str(o["kind"]) == Offers.VENDOR_WARES),
 		"every ware at its price (%s)" % [offers.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	var first: Array = offers.filter(func(o: Dictionary) -> bool: return str(o["what"].get("item", "")) == str(rule.get("first_free", "")))
+	_check(rule.get("first_free", "") == "" or first.size() == 1 and int(first[0]["cost"]) == 0 and str(first[0]["title"]) == "A fishing rod, free"
+		and str(first[0]["words"]) == "First one's on me.", "856: his first rod offered free, in voice's words (%s)" % [first])
 	var sword := offers.filter(func(o: Dictionary) -> bool: return str(o["what"].get("item", "")) == "sword")
 	World.economy.add_gold(pid, -World.economy.gold(pid), "the test")
 	spoken.clear()
@@ -5670,9 +5676,10 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 		return
 	var pid := Net.player_id
 	var price := int(rule.get("price", 1))
-	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3).
+	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3); 856: his first rod free.
 	for line: Dictionary in rule.get("wares", []):
-		ware_price[str(line["item"])] = int(line.get("price", price))
+		ware_price[str(line["item"])] = World.economy.vendor_cost(pid, str(line["item"])) if World.economy.rules.get("vendor") == rule \
+				else int(line.get("price", price))
 	for slot in player.slots.size():
 		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
 			World.items.place(World._take_out(player, slot), "the test")  # Empty hands again.
@@ -5702,10 +5709,17 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 	_main._update_store()
 	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and not panel._button.disabled and panel.total_shown() == "Total gold %d" % price,
 		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), Buy enables, its Total %s" % [_main.gold, _main.shop_panel.gold_shown(), panel.total_shown()])
+	var floats: Array[String] = []
+	var floated := func(kind: String, data: Dictionary) -> void:
+		if kind == "reward":
+			floats.append(str(data.get("words", "")))
+	Net.message_received.connect(floated)
 	panel._confirm()  # Main._offer_deal: the "offer" command.
+	Net.message_received.disconnect(floated)
 	var at := player.slots.find("sword")
 	_check(World.economy.gold(pid) == 5 - price and _main.gold == 5 - price and at >= 0 and World.is_starter(World.slot_uid(player, at)),
 		"Buy bought it: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
+	_check(floats.has("Bought a sword for %d gold" % price), "and the client is told it: a float of what was bought and for what (856 amended (1), M3; %s)" % [floats])
 	_check(panel.is_open() and panel.with == rolf and panel.wares.size() >= count and panel.wares_pick.is_empty(),
 		"his offers sent again: the window stays open on him, nothing picked")
 	_main._update_store()
