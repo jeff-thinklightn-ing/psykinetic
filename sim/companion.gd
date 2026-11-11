@@ -7849,6 +7849,13 @@ func broke_from() -> Array[GridEntity]:
 	return out
 
 
+## Whether she has broken off from an apex fight (780 amended (21)): she or
+## her player low, till both are over HP_THRESHOLDS[0] again (enemy-ai's 780
+## amended (29) reads it).
+func broken_off() -> bool:
+	return _apex_broke
+
+
 ## Whether an escort of [param lead] (Animal.escort_lead: the old grey's
 ## pack, the king's sounder) goes for her or her player.
 func _escort_on_us(lead: GridEntity) -> bool:

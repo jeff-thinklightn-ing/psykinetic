@@ -103,6 +103,10 @@ var _wallow_owed_seen := -1
 var _wallow_tick := -1  # When it turned for home (its pack covers it from then).
 var _wallow_barred := -1  # Since when a foe bars its way home ("barred"); at bay, its last look.
 var _wallow_at_bay := false  # Barred from its den: cornered where it stands.
+var _wallow_bay_hard := false  # At bay for a refused step its way read open for (780 amended (30)).
+## Who of the players and companions struck it (instance ids), for its foe on
+## the den rule (Apex.den_foe, 780 amended (29)); cleared once it is whole again.
+var _den_struck: Dictionary[int, bool] = {}
 ## Its lair's door it walks to, going in or out with a player watching
 ## (Apex, 780 amended (13)); NO_TILE when not.
 var apex_goal := NO_TILE
@@ -363,6 +367,8 @@ func _den_bite(by: GridEntity) -> bool:
 func _nearest_visible_target() -> GridEntity:
 	var struck := _struck_by()
 	var seen: GridEntity = struck if struck != null and not struck is Animal else super()
+	if Apex.homeward(self) != NO_TILE:
+		return Apex.den_foe(self, seen)  # On the den rule, its order (780 amended (29)): no giving up.
 	if seen == null:
 		return null
 	var id := seen.get_instance_id()
@@ -383,6 +389,11 @@ func _nearest_visible_target() -> GridEntity:
 	return seen
 
 
+## Its set's reach (Apex.den_foe, 780 amended (29)): its charge's line.
+func _set_reach() -> int:
+	return maxi(int(charge["cells"]), ceili(float(swipe["length"])))
+
+
 func _give_up_on(foe: GridEntity, why: String) -> void:
 	_left_be[foe.get_instance_id()] = World.tick + BREAK_OFF_TICKS
 	_struck_at.erase(foe.get_instance_id())
@@ -397,6 +408,8 @@ func note_struck(by: GridEntity) -> void:
 		_struck_at[by.get_instance_id()] = World.tick
 		_join(by)
 	Apex.struck(self, by)  # Its wait to go out starts again (780 amended (13)); by, one of its fighters (780 amended (20)).
+	if by is Player or by is Companion:
+		_den_struck[by.get_instance_id()] = true
 	if asleep:
 		_wake()
 	if not _roared_half and hp * 2 < max_hp:

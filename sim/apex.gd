@@ -587,6 +587,67 @@ static func homeward(body: GridEntity) -> Vector2i:
 	return den if den is Vector2i else Monster.NO_TILE
 
 
+## Its foe on the den rule (780 amended (29), the coordinator's order; while
+## homeward gives its den: walking home, at its den, at bay), in place of
+## [param seen], its usual pick: whoever struck it last, within its set's
+## reach (the body's _set_reach); else [param seen] if it is fighting it,
+## else the nearest who is (a player; a companion not broken off, or one who
+## has struck it: a striker like anyone); a broken-off companion who has not
+## struck it only when nobody else is a foe at all. It ranks foes once its
+## own look has found one, and finds none its look has not.
+static func den_foe(body: Monster, seen: GridEntity) -> GridEntity:
+	if homeward(body) == Monster.NO_TILE:
+		return seen
+	if seen == null:
+		return null  # Its own look finds nobody yet (sight, notice): the order finds nobody either.
+	var last := body.struck_by
+	if _den_able(last) and (last is Player or last is Companion) \
+			and World.distance(body.tile, last.tile) <= int(body.call("_set_reach")) \
+			and _den_knows(body, last, World.distance(body.tile, last.tile)):
+		return last
+	if _den_able(seen) and _den_fighting(body, seen):
+		return seen
+	var best: GridEntity = null
+	var best_d := body.sight_range + 1
+	for entity in World.sought():
+		if entity == seen or not _den_able(entity) or not _den_fighting(body, entity):
+			continue
+		var d := World.distance(body.tile, entity.tile)
+		if d < best_d and _den_knows(body, entity, d):
+			best = entity
+			best_d = d
+	return best if best != null else seen
+
+
+## Whether [param body] knows of [param entity], [param d] off, as its own
+## look does (Monster._nearest_visible_target): touching it, answering its
+## blow just now, or seen (in its cone unless it is its target). The order
+## ranks the foes it knows of; it gives it no eyes behind (a striker
+## following it home, unseen, is not turned on at once).
+static func _den_knows(body: Monster, entity: GridEntity, d: int) -> bool:
+	return d <= 1 or body._answering(entity) or body.senses.sees(entity, d, entity != body.target)
+
+
+## A foe it may take on the den rule: there, up, out of its spawn grace.
+static func _den_able(entity: GridEntity) -> bool:
+	return entity != null and is_instance_valid(entity) and entity.spawned and entity.hp > 0 \
+			and not entity.protected and not World.is_downed(entity)
+
+
+## Whether [param entity] fights [param body] (den_foe): a player; a
+## player's companion not broken off (Companion.broken_off), or one who has
+## struck it (the body's _den_struck), broken off or not.
+static func _den_fighting(body: Monster, entity: GridEntity) -> bool:
+	if entity is Player:
+		return true
+	if not (entity is Companion and (entity as Companion).keeper != null):
+		return false
+	var struck: Variant = body.get("_den_struck")
+	if struck is Dictionary and (struck as Dictionary).has(entity.get_instance_id()):
+		return true
+	return not (entity as Companion).broken_off()
+
+
 ## The den rule (780 amended (16), the boar king's wallow; 780 amended (26):
 ## shared with the great bear and the old grey). Under [param below] of its
 ## hp in its lair (out, Apex's beaten back takes it home first) it never
@@ -618,6 +679,10 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 		if bool(opts.get("barred", false)):
 			body.set("_wallow_barred", -1)
 			body.set("_wallow_at_bay", false)
+			body.set("_wallow_bay_hard", false)
+		var struck: Variant = body.get("_den_struck")
+		if struck is Dictionary and body.hp >= body.max_hp:
+			(struck as Dictionary).clear()  # Whole again: its fight's strikers forgotten (780 amended (29)).
 		return false
 	var near := int(opts.get("near", 1))
 	var far_way := bool(opts.get("far", false))
@@ -638,6 +703,7 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 		if bool(opts.get("barred", false)):
 			body.set("_wallow_barred", -1)
 			body.set("_wallow_at_bay", false)
+			body.set("_wallow_bay_hard", false)
 		if bool(opts.get("bite_per_blow", false)):
 			body.set("_wallow_owed", false)  # Blows on the walk owe bites, not the one before it.
 			body.set("_wallow_owed_seen", body.struck_tick)
@@ -651,11 +717,15 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 	if bool(opts.get("barred", false)) and bool(body.get("_wallow_at_bay")):
 		# Barred from its den, cornered: at bay where it stands, its whole
 		# set, till its way home is open again (looked at every BARRED_TICKS).
-		if World.tick < int(body.get("_wallow_barred")) + BARRED_TICKS or _barred(body, den):
+		# Refused a step its way read open for (780 amended (30)), till it
+		# also has nobody to fight: no flicking between a fight and a wall.
+		if World.tick < int(body.get("_wallow_barred")) + BARRED_TICKS or _barred(body, den) \
+				or bool(body.get("_wallow_bay_hard")) and body.target != null:
 			if World.tick >= int(body.get("_wallow_barred")) + BARRED_TICKS:
 				body.set("_wallow_barred", World.tick)
 			return false
 		body.set("_wallow_at_bay", false)
+		body.set("_wallow_bay_hard", false)
 		body.set("_wallow_barred", -1)
 		body.call("_log_move", log_as, "goes on home, its way open")
 	if far and foe != null and World.distance(body.tile, foe.tile) <= 1 and body.call("_away_from", foe, true) == Vector2i.ZERO:
@@ -717,13 +787,16 @@ static func to_den(body: Animal, below: float, den: Vector2i, biter: GridEntity,
 				body.set("_wallow_barred", -1)
 		elif not (bool(opts.get("barred", false)) and _past_own(body, den)):
 			body.next_move_tick = World.tick + 5
-			if bool(opts.get("barred", false)) and _barred(body, den):
-				# Barred by a foe (in a two-wide way, she or her companion):
-				# BARRED_TICKS of it and it is cornered (780 amended (26)).
+			if bool(opts.get("barred", false)):
+				# Its step home failing (780 amended (26)): barred by a foe (in
+				# a two-wide way, she or her companion), or refused for anything
+				# else (a link's cell, a body's edge; 780 amended (30)):
+				# BARRED_TICKS of it and it is cornered.
 				if int(body.get("_wallow_barred")) < 0:
 					body.set("_wallow_barred", World.tick)
 				elif World.tick - int(body.get("_wallow_barred")) >= BARRED_TICKS:
 					body.set("_wallow_at_bay", true)
+					body.set("_wallow_bay_hard", not _barred(body, den))
 					body.set("_wallow_barred", World.tick)
 					body.call("_log_move", log_as, "turns at bay, its way home barred")
 	return true

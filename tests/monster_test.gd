@@ -1845,6 +1845,8 @@ func _test_ambush() -> void:
 	_test_den_walk_past_own()
 	_test_den_walk_barred()
 	_test_den_homeward()
+	_test_den_foe_order()
+	_test_den_walk_refused()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -8532,6 +8534,124 @@ func _test_den_walk_barred() -> void:
 		"at %.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never (6 s)", fighting, "at %.1f s" % (home / 10.0) if home >= 0 else "never (30 s)"])
 	_check(at_bay >= 0 and at_bay <= 20 and fighting, "barred from his den by foes he turns at bay where he stands, fighting (%s)" % ("%.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never"))
 	_check(home >= 0, "his way open again, he goes on home (%s)" % ("%.1f s" % (home / 10.0) if home >= 0 else "never"))
+	DayNight.reset()
+	Monster.idling = true
+
+
+## His foe on the den rule (780 amended (29), the coordinator's order, from
+## companions' finding: at his den he charged a broken-off companion trapped
+## beside him): at bay or walking home, whoever struck him last within his
+## set's reach first; then anyone fighting him; a broken-off companion who has
+## not struck him only when nobody else is a foe at all; one who strikes him
+## is a striker like anyone. For the grey and the bear, at his den on the den
+## rule, three frames.
+func _test_den_foe_order() -> void:
+	print("%s== on the den rule: his foe by the order, striker first, a broken-off companion last ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for kind: String in ["old_wolf", "great_bear"]:
+		var picks: Array[String] = []
+		for frame: String in ["striker beside her", "nobody else", "she strikes"]:
+			var rows: Array[String] = ["#".repeat(40)]
+			for y in 11:
+				rows.append("#" + ".".repeat(38) + "#")
+			rows.append("#".repeat(40))
+			_build(rows)
+			var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+			spec["name"] = ("Apex_" + kind).validate_node_name()
+			spec["tile"] = Vector2i(10, 6)
+			Level.arm(spec)
+			var boss := EntityFactory.build(spec) as Monster
+			_room.add_child(boss)
+			World.spawn(boss, Vector2i(10, 6))
+			boss.set("den", Vector2i(10, 6))  # At his den: cornered there, on the den rule.
+			# Her player 2 off (within his set's reach), or out of the way.
+			var at := Vector2i(12, 6) if frame != "nobody else" else Vector2i(37, 1)
+			var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": at})) as Player
+			_room.add_child(player)
+			World.spawn(player, at)
+			player.protected = false
+			var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow",
+				"props": {"max_hp": 10}}) as Companion
+			_room.add_child(pet)
+			World.spawn(pet, Vector2i(9, 6))  # Trapped beside him.
+			pet.keeper = player
+			pet.protected = false
+			pet._apex_broke = true  # Broken off (companions' state).
+			boss.hp = int(floor(0.14 * boss.max_hp))
+			boss.set("_wallow_from", player)
+			for i in 10:  # A moment at his den: he has looked about him.
+				World.step()
+				pet.hp = pet.max_hp
+				player.hp = player.max_hp
+				boss.hp = int(floor(0.14 * boss.max_hp))
+			if frame == "striker beside her":
+				boss.note_struck(player)
+			elif frame == "she strikes":
+				boss.note_struck(pet)
+			var pick: GridEntity = boss.call("_nearest_visible_target")
+			picks.append("%s -> %s" % [frame, pick.name if pick != null else "nobody"])
+			match frame:
+				"striker beside her":
+					_check(Apex.homeward(boss) == Vector2i(10, 6) and pick == player,
+						"%s at his den, struck by her player 2 off, a broken-off companion beside him: he takes the striker (%s)" % [kind, pick.name if pick != null else "nobody"])
+				"nobody else":
+					_check(pick == pet, "%s, nobody else a foe at all: he may take the broken-off companion (%s)" % [kind, pick.name if pick != null else "nobody"])
+				"she strikes":
+					_check(pick == pet, "%s, she strikes him: a striker like anyone, broken off or not (%s)" % [kind, pick.name if pick != null else "nobody"])
+		print("  %s: %s" % [kind, ", ".join(picks)])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## A walk home refused for something other than a body in the cell (780
+## amended (30), the coordinator's approval): a monster may not step onto a
+## link's cell (World.try_move), though a way home is planned across it; his
+## two-wide way home is all link cells, empty. A step that fails BARRED_TICKS
+## on end is barred however it fails: he turns at bay where he stands, not
+## waiting there for ever.
+func _test_den_walk_refused() -> void:
+	print("%s== the old grey's walk home: a step refused with no body in the cell, at bay all the same ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(20), "#" + ".".repeat(18) + "#", "#" + ".".repeat(18) + "#", "#".repeat(20)]
+	_build(rows)
+	World.fields.link_cells[Vector2i(10, 1)] = true
+	World.fields.link_cells[Vector2i(10, 2)] = true
+	var grey := _live_grey(Vector2i(14, 1))
+	grey.den = Vector2i(2, 1)
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": Vector2i(17, 1)})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(17, 1))
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var held := int(floor(0.14 * grey.max_hp))
+	grey.hp = held
+	grey.target = player
+	World.step()
+	World.despawn(player)  # Nobody to fight: only the way.
+	var at_bay := -1
+	var empty := true
+	for i in 80:
+		World.step()
+		if grey.hp > 0 and grey.hp < held:
+			grey.hp = held
+		for cell: Vector2i in [Vector2i(10, 1), Vector2i(10, 2)]:
+			empty = empty and not World._occupancy.has(cell)
+		if grey._wallow_at_bay:
+			at_bay = i
+			break
+	var flicks := 0
+	for i in 60 if at_bay >= 0 else 0:
+		World.step()
+		if not grey._wallow_at_bay:
+			flicks += 1
+	print("  refused at %s with nobody in the link cells (%s): at bay %s; then %d of 60 ticks not at bay" % [
+		grey.tile, empty, "at %.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never (8 s)", flicks])
+	_check(empty and at_bay >= 0 and at_bay <= 30, "a step home refused with no body in the cell turns him at bay all the same (%s)" % ("%.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never"))
+	World.fields.link_cells.erase(Vector2i(10, 1))
+	World.fields.link_cells.erase(Vector2i(10, 2))
 	DayNight.reset()
 	Monster.idling = true
 

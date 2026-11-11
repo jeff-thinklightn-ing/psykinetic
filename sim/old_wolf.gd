@@ -62,6 +62,10 @@ var _wallow_owed_seen := -1
 var _wallow_tick := -1  # When it turned for home (its pack covers it from then).
 var _wallow_barred := -1  # Since when a foe bars its way home ("barred"); at bay, its last look.
 var _wallow_at_bay := false  # Barred from its den: cornered where it stands.
+var _wallow_bay_hard := false  # At bay for a refused step its way read open for (780 amended (30)).
+## Who of the players and companions struck it (instance ids), for its foe on
+## the den rule (Apex.den_foe, 780 amended (29)); cleared once it is whole again.
+var _den_struck: Dictionary[int, bool] = {}
 var apex_goal := NO_TILE
 var apex_out := false
 ## The move under way: {move, telegraph, lands, shape, toward, from}; a
@@ -87,6 +91,17 @@ func _ready() -> void:
 					if each.has(key):
 						each[key] = given[key]
 	_next_howl = World.tick + int(howl["every"]) / 2
+
+
+## His set's reach (Apex.den_foe, 780 amended (29)): his lunge's line.
+func _set_reach() -> int:
+	return maxi(int(spring["cells"]), 1)
+
+
+## His foe: Animal's pick, on the den rule by its order (Apex.den_foe, 780
+## amended (29)).
+func _nearest_visible_target() -> GridEntity:
+	return Apex.den_foe(self, super())
 
 
 func _hook() -> void:
@@ -369,6 +384,8 @@ func _same_pack(other: Monster) -> bool:
 func note_struck(by: GridEntity) -> void:
 	super(by)
 	Apex.struck(self, by)  # His wait to go out starts again (780 amended (13)); by, one of its fighters (780 amended (20)).
+	if by is Player or by is Companion:
+		_den_struck[by.get_instance_id()] = true
 	if str(_move.get("move", "")) == "howl":
 		_move = {}
 		_log_move("howl", "broken (struck)")
