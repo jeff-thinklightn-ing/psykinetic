@@ -16230,6 +16230,21 @@ view_test: the stack's foot at the eaves under the seat; smoking at each hour wi
 known (5.9 no, 6 to 21.5 yes, 22 no) and never a lit window without smoke; asleep, not.
 Client only; protocol unchanged, no new class_name.
 
+489 amended (7): the chapel's lancets drawn at their own height (the label from
+tools/decision_number.sh; the coordinator's go, 11-11, as a fix with no package). A laptop
+still of the temple on main (C:\dev\review\temple_lancets\t-main.png, t-high.png) had each
+lancet run up past the eaves, its pointed head standing through the roof slope. _dress_window
+stretches a window piece by its wall's height over Client3D.window_drawn_height(slot), and that
+gave a set with no plain window (the chapel's, 734) one storey, 3.0 m, so art-kit's 4.5 m
+wall.chapel.window_tall on the temple's 4.5 m wall was drawn half again as tall, 6.75 m;
+view_test pinned that 3.0 ("as before", (2) above), so nothing caught it. Now such a piece is
+drawn at its own height (ArtKit.size(slot).y): on the temple's wall, at scale 1, its head under
+the eaves. The wood set's windows (a storey's and the two-storey window_tall) are as they were.
+view_test _test_window_slot: the lancet's drawn height its own; and no window piece stands
+above its wall in any set, each set's window at each height window_slot gives it one (a storey,
+4.5 m, two storeys), stretched as _dress_window does. Client only; protocol unchanged, no new
+class_name.
+
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
 A material's pipelines are compiled the first time it is drawn, so its first

@@ -11138,8 +11138,13 @@ static func window_slot(wall_set: String, height: float) -> String:
 
 
 ## The height [param slot] (a window piece, window_slot's) is drawn at: a
-## set's tall window beside a plain one stands two storeys, any other one.
+## set's tall window beside a plain one stands two storeys; one with no
+## plain window beside it (the chapel's lancets, 734) its own height (489 amended (7):
+## at a storey, the temple's 4.5 m lancet on its 4.5 m wall was drawn half
+## again as tall, its head through the roof); any other one storey.
 static func window_drawn_height(slot: String) -> float:
+	if slot.ends_with(".window_tall") and not ArtKit.has(slot.trim_suffix("_tall")) and ArtKit.has(slot):
+		return maxf(ArtKit.size(slot).y, 0.1)
 	var two := slot.ends_with(".window_tall") and ArtKit.has(slot.trim_suffix("_tall"))
 	return WALL_HEIGHT * (2.0 if two else 1.0)
 

@@ -3346,8 +3346,26 @@ func _test_window_slot() -> void:
 	if had:
 		slots["wall.wood.window_tall"] = saved
 	var lancet := c.window_slot("chapel", 4.5)
-	_check((lancet == "wall.chapel.window_tall") == ArtKit.has("wall.chapel.window_tall") and is_equal_approx(c.window_drawn_height("wall.chapel.window_tall"), h),
-			"the chapel's lancet on its wall whatever its height, drawn as before (%s)" % [lancet])
+	var own := ArtKit.size("wall.chapel.window_tall").y if ArtKit.has("wall.chapel.window_tall") else h
+	_check((lancet == "wall.chapel.window_tall") == ArtKit.has("wall.chapel.window_tall")
+			and is_equal_approx(c.window_drawn_height("wall.chapel.window_tall"), own),
+			"the chapel's lancet on its wall whatever its height, drawn at its own %.2f m (%s; 489 amended (7))" % [own, lancet])
+	# No window's top above its wall (489 amended (7)): each set's window piece, at
+	# each height window_slot gives it one, stretched as _dress_window does.
+	var over: Array[String] = []
+	var asked := 0
+	for slot: String in ArtKit.slots():
+		if not slot.begins_with("wall.") or not slot.get_slice(".", 2).begins_with("window"):
+			continue
+		var wall_set := slot.get_slice(".", 1)
+		for wall_tall: float in [h, 4.5, 2.0 * h]:
+			if c.window_slot(wall_set, wall_tall) != slot:
+				continue
+			asked += 1
+			var top := wall_tall / c.window_drawn_height(slot) * ArtKit.size(slot).y
+			if top > wall_tall + 0.1:
+				over.append("%s on %.1f m: %.2f m" % [slot, wall_tall, top])
+	_check(asked > 0 and over.is_empty(), "no window piece stands above its wall, every set, %d asked (%s)" % [asked, over])
 
 
 ## A building being built (decision 566): its stages by its town record's
