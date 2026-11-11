@@ -23,6 +23,9 @@ const INSET := -8.0
 const FADED := 0.45
 const CORNER := 40.0
 const MARK := 52.0
+## A stock level's bar up the left edge (854 amended (2)): its width and inset.
+const LEVEL_WIDTH := 14.0
+const LEVEL_INSET := 10.0
 
 var state := "rest"
 ## Whether the square lights under the pointer while at rest (a square that
@@ -34,6 +37,9 @@ var _count: Label
 var _price: UiPrice
 var _material: UiPrice
 var _mark: TextureRect
+## A stock level, have and enough (set_level); enough < 0: none shown.
+var level_have := 0
+var level_enough := -1
 var _back_to := "rest"
 var _refused_left := 0.0
 
@@ -131,6 +137,46 @@ func has_mark() -> bool:
 	return _mark.visible
 
 
+## A town's stock on this square (854 amended (2); the town window Jeff's
+## look carries, the coordinator's approval 11-11): a bar up the left edge
+## filled have/enough (never past full), rust when half short or worse, brass
+## while short, green at enough; and the true have/enough on the coinless
+## pill ("14/10" over enough), its numbers rust with the bar, so it reads
+## without colour. A thing the town wants none of (enough 0): the count
+## alone, no bar.
+func set_level(have: int, enough: int) -> void:
+	level_have = have
+	level_enough = maxi(enough, 0)
+	if level_enough == 0:
+		price().set_words(str(have))
+	else:
+		price().set_words("%d/%d" % [have, level_enough], level_short() >= 0.5)
+	queue_redraw()
+
+
+func clear_level() -> void:
+	level_enough = -1
+	clear_price()
+	queue_redraw()
+
+
+## How far short of enough, 0 (at enough or over, or no level) to 1 (none).
+func level_short() -> float:
+	if level_enough <= 0:
+		return 0.0
+	return clampf(1.0 - float(level_have) / float(level_enough), 0.0, 1.0)
+
+
+## The bar's colour: the town sheet's rule (rust, brass, the friend colour).
+func level_colour() -> Color:
+	var short := level_short()
+	if short >= 0.5:
+		return UiTheme.color("rust")
+	if short > 0.0:
+		return UiTheme.color("brass")
+	return UiTheme.color("friend")
+
+
 ## One of STATES' names.
 func set_state(name: String) -> void:
 	if not STATES.has(name):
@@ -187,8 +233,14 @@ func _place() -> void:
 		_material.position = Vector2(INSET, face.y - _material.size.y - INSET)
 
 
-## The mark's disc, and the ready corner, over the panel.
+## The level's bar, the mark's disc, and the ready corner, over the panel.
 func _draw() -> void:
+	if level_enough > 0:
+		var well := Rect2(LEVEL_INSET, LEVEL_INSET + 2.0, LEVEL_WIDTH, size.y - 2.0 * LEVEL_INSET - 4.0)
+		draw_rect(well, UiTheme.color("outline"))
+		var filled := well.size.y * (1.0 - level_short())
+		if filled > 0.0:
+			draw_rect(Rect2(well.position.x, well.end.y - filled, LEVEL_WIDTH, filled), level_colour())
 	if _mark.visible:
 		var face_at := _face.position
 		var centre := face_at + _mark.position + _mark.size / 2.0

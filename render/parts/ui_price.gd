@@ -41,9 +41,10 @@ func set_time(words: String) -> void:
 	_show("time", -1, false, null, words)
 
 
-## Words alone on the pill without a coin (a free ware: voice's word).
-func set_words(words: String) -> void:
-	_show("words", -1, false, null, words)
+## Words alone on the pill without a coin (a free ware: voice's word; a stock
+## level's "3/10", in rust while it is well short: 854 amended (2)).
+func set_words(words: String, is_short := false) -> void:
+	_show("words", -1, is_short, null, words)
 
 
 func shown() -> String:

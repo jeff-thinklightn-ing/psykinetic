@@ -78,6 +78,18 @@ func _test_slot() -> void:
 	_check(slot.has_mark(), "a work's mark")
 	slot.set_mark(null)
 	_check(not slot.has_mark(), "no mark")
+	slot.set_level(3, 10)
+	_check(slot.price().shown() == "3/10" and slot.price().short and slot.level_colour() == UiTheme.color("rust"),
+		"a stock well short: 3/10, the numbers and the bar rust")
+	slot.set_level(9, 12)
+	_check(slot.price().shown() == "9/12" and not slot.price().short and slot.level_colour() == UiTheme.color("brass"), "short: brass, the numbers bone")
+	slot.set_level(228, 20)
+	_check(slot.price().shown() == "228/20" and slot.level_short() == 0.0 and slot.level_colour() == UiTheme.color("friend"),
+		"over enough: the true number, the bar full and no further")
+	slot.set_level(2, 0)
+	_check(slot.price().shown() == "2" and slot.level_enough == 0, "a thing the town wants none of: the count alone, no bar")
+	slot.clear_level()
+	_check(not slot._price.visible and slot.level_enough < 0, "no level")
 	var got: Array = []
 	slot.pressed.connect(func(which: UiSlot) -> void: got.append(which))
 	var click := InputEventMouseButton.new()
