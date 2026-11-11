@@ -792,22 +792,24 @@ CLIPS["Axe_Overhead"] = {"keys": [
 	(0.62, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
 	(1.0, P("Idle_Loop", 0.0, AXE_READY)),
 ]}
-# The pick's strike pose (tuned by build/mining/probe.py against the seam's face): the right wrist
+# The pick's strike pose (tuned by build/mining/probe.py against the seam's face; 0.16 further ahead since
+# 451 amended (5), the hands up the haft): the right wrist
 # (ahead, out, up) of the right shoulder, the haft and the point's ways.
-PICK_AT = (-0.12, -0.05, -0.46)
+PICK_AT = (0.04, -0.05, -0.46)
 PICK_HAFT = (0.64, 0.0, 0.77)
 # The edge chop() is given: a held weapon's striking side (+x) lies along the fingers in the game
 # (Client3D's HELD_EDGE_TURN), the hand bone's +y here, so for the point to lead, ahead and down the
 # swing, the edge given is the haft crossed with it: (1, 0, 0), the left, for a haft in the swing's plane.
 PICK_SIDE = (1.0, 0.0, 0.0)
 # A miner's swing (769 amended (9); Jeff on v0.1.202: "mining animation needs work"): the pick, both
-# hands, the right at its butt and the left PICK_GRIP up the haft (art-kit's grip_2), at a seam's face
+# hands, the right at its grip and the left PICK_GRIP up the haft (art-kit's grip_2; 0.2 and 0.55 up from
+# its butt since 451 amended (5), from the butt and 0.54), at a seam's face
 # in the next cell (0.61 m ahead of the body's middle, 1.6 m tall; view_test measures it in the game).
 # From the ready, lifted two-handed over the right shoulder, the weight up (to 0.24 s); swung down in
 # an arc, the head leading, the hips sinking back and the knees bending into it (to 0.4, the contact
 # on the pick's 4-tick lead), the point driven into the face 1.3 m up, the haft at 50 degrees; a small
 # recoil off the rock (0.48), held a beat, and back to the ready (1.0).
-PICK_GRIP = 0.54
+PICK_GRIP = 0.35
 PICK_READY = chop((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), PICK_SIDE, grip=PICK_GRIP)
 PICK_UP = chop((0.14, 0.04, 0.06), (-0.35, -0.25, 0.9), PICK_SIDE, grip=PICK_GRIP) + [
 	("spine_01", LIFT, 6.0), ("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
@@ -836,14 +838,15 @@ CLIPS["Pick_Swing"] = {"keys": [
 # speed 1): heaved up slowly over the right shoulder, the weight back (0 to 0.45 s); hung there,
 # nearly still, the tell (to 0.6); fallen, gathering speed, most of the way in the last 0.15 s, the
 # trunk folding and the hips driving (to 0.9, the contact), the head into the ground before him; held
-# down there, carried a little on (to 1.3); dragged back up to the guard (1.7). The right hand low on
-# the haft (Client3D holds the sledge 0.12 m up from its butt), the left SLEDGE_GRIP up it, sliding
-# down to meet the right on the fall (Client3D's HandReach follows it, SLEDGE_SLIDE).
+# down there, carried a little on (to 1.3); dragged back up to the guard (1.7). The right hand on
+# the haft at its grip (Client3D holds the sledge there: 0.35 m up from its butt since 451 amended (5),
+# Jeff: "it shouldn't be held at the very end of the shaft"), the left SLEDGE_GRIP up it at grip_2
+# (0.85), sliding down to meet the right on the fall (Client3D's HandReach follows it, REACH_SLIDES).
 def sledge(right: tuple, haft: tuple, grip: float, trunk: list = (), poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
 	return chop(right, haft, (0.0, -1.0, 0.0) if haft[2] > 0.3 else (0.0, 0.0, -1.0), poles, grip=grip) + list(trunk)
 
 
-SLEDGE_GRIP = GREAT_GRIP
+SLEDGE_GRIP = 0.5
 SLEDGE_READY = sledge((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), SLEDGE_GRIP)
 SLEDGE_LIFTING = sledge((0.2, -0.2, -0.12), (0.1, -0.1, 1.0), 0.4, [("spine_02", LIFT, 5.0), ("spine_03", LIFT, 2.0)])
 SLEDGE_UP = sledge((0.08, -0.14, 0.1), (-0.8, 0.3, 0.55), 0.38, [("spine_02", LIFT, 12.0), ("spine_03", LIFT, 6.0),
@@ -852,9 +855,14 @@ SLEDGE_HANG = sledge((0.07, -0.14, 0.12), (-0.85, 0.3, 0.5), 0.38, [("spine_02",
 	("spine_02", TURN, -11.0)])
 SLEDGE_HIGH = sledge((0.16, -0.24, 0.12), (0.15, 0.1, 1.0), 0.32, [("spine_02", LIFT, 6.0)])
 SLEDGE_FALLING = sledge((0.28, -0.3, -0.06), (0.9, 0.0, 0.3), 0.2, [("spine_01", LIFT, -6.0), ("spine_02", LIFT, -4.0)])
-SLEDGE_DOWN = sledge((0.24, -0.32, -0.34), (0.6, -0.05, -0.75), 0.12, [("spine_01", LIFT, -18.0), ("spine_02", LIFT, -12.0),
-	("Head", LIFT, 14.0), ("thigh_l", LIFT, 10.0), ("calf_l", LIFT, -14.0), ("thigh_r", LIFT, 6.0), ("calf_r", LIFT, -10.0)])
+# Held 0.35 m up the haft (451 amended (5)) the head came down 0.23 m nearer the hands: the hands lower
+# and the haft steeper, the trunk bowed and the knees bent further, so the head still meets the ground.
+SLEDGE_DOWN = sledge((0.25, -0.31, -0.39), (0.55, -0.05, -0.82), 0.12, [("spine_01", LIFT, -21.0), ("spine_02", LIFT, -14.0),
+	("Head", LIFT, 16.0), ("thigh_l", LIFT, 13.0), ("calf_l", LIFT, -18.0), ("thigh_r", LIFT, 8.0), ("calf_r", LIFT, -13.0)])
 SLEDGE_RISING = sledge((0.26, -0.26, -0.14), (0.85, -0.2, 0.3), 0.25, [("spine_01", LIFT, -6.0), ("spine_02", LIFT, -4.0)])
+# Halfway back to the guard, solved (blended, the left hand left the haft by 0.12 m at 1.6 s once the hands
+# were held 0.5 apart, 451 amended (5)).
+SLEDGE_RETURN = sledge((0.21, -0.16, -0.29), (0.71, -0.3, 0.48), 0.375, [("spine_01", LIFT, -3.0), ("spine_02", LIFT, -2.0)])
 CLIPS["Sledge_Attack"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, SLEDGE_READY)),
 	(0.2, P("Idle_Loop", 0.0, SLEDGE_LIFTING, move=(0.0, 0.01, 0.0))),
@@ -862,10 +870,13 @@ CLIPS["Sledge_Attack"] = {"keys": [
 	(0.6, P("Idle_Loop", 0.0, SLEDGE_HANG, move=(0.0, 0.045, 0.0))),
 	(0.75, P("Idle_Loop", 0.0, SLEDGE_HIGH, move=(0.0, 0.02, 0.0))),
 	(0.84, P("Idle_Loop", 0.0, SLEDGE_FALLING, move=(0.0, -0.04, -0.03))),
-	(0.9, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.1, -0.11))),
-	(1.05, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.11))),
-	(1.3, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.11))),
+	# Down by 0.88, a breath before the sim's contact at 0.9: baked, a key on 0.9 itself still stood 0.16 m
+	# short of the ground there.
+	(0.88, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.1, -0.14))),
+	(1.05, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.14))),
+	(1.3, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.14))),
 	(1.5, P("Idle_Loop", 0.0, SLEDGE_RISING, move=(0.0, -0.05, -0.03))),
+	(1.6, P("Idle_Loop", 0.0, SLEDGE_RETURN, move=(0.0, -0.025, -0.015))),
 	(1.7, P("Idle_Loop", 0.0, SLEDGE_READY)),
 ]}
 # The heavy axes' sweep (combat's times, the sim's 8-tick wind-up, contact 0.8; giant_axe and battle_axe,

@@ -168,7 +168,8 @@ extends Node
 ##     Client3D's SHIELDED_STRIKES): the player with a sword and a shield cuts at a brute held still
 ##     beside him, a dozen seconds. --which=side (the default) the camera on his shield side (from the
 ##     north, his left as he faces east), --which=play the play camera as it rests (he faces west, his
-##     left toward it); --plain the old slashes with the same shield on the arm (the reel's "before").
+##     left toward it); --plain the old slashes with the same shield on the arm (the reel's "before");
+##     --weapon=X that weapon alone in the right hand, no shield (the sledge's reels).
 const NAME := "clip"
 ## The folk scenario's people: [cell, face cell, word, seat slot ("" for none), group].
 const FOLK := [
@@ -1115,15 +1116,18 @@ func _shieldcut() -> void:
 	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9,
 		"entities": [{"at": [brute.x, brute.y], "facing": [-east, 0], "idle": {"mode": "guard"}}]}
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
-	max_seconds = maxf(max_seconds, 24.0)
-	_script = [["item_give", ["sword", Items.RIGHT_HAND], ""], ["item_give", ["shield", Items.LEFT_HAND], ""],
-		["wait", 10, ""], ["shield_cuts", 0, ""], ["wait", 10, ""]]
+	max_seconds = maxf(max_seconds, 30.0)
+	# --weapon=X: X alone in the right hand, no shield (the sledge's reels, 451 amended (5)).
+	_script = [["item_give", [_weapon, Items.RIGHT_HAND], ""]]
+	if _weapon == "sword":
+		_script.append(["item_give", ["shield", Items.LEFT_HAND], ""])
+	_script.append_array([["wait", 10, ""], ["shield_cuts", 0, ""], ["wait", 10, ""]])
 
 
 var _shield_side := true
 var _shield_plain := false
 var _shield_from := -1
-const SHIELD_CUT_TICKS := 240
+const SHIELD_CUT_TICKS := 300
 
 
 ## One tick of the shieldcut reel: the player cutting at the brute, the camera set once; true after
@@ -1146,13 +1150,21 @@ func _shield_step(tick: int) -> bool:
 				var moves: Dictionary = (puppet.get_meta("moves") as Dictionary).duplicate(true)
 				moves["strikes"]["sword_shield"] = moves["strikes"]["sword"]
 				puppet.set_meta("moves", moves)
-		_caption.text = "Before: the plain slash, the shield along for the ride." if _shield_plain else "Sword and shield: the shield worked through the cut."
+		_caption.text = ("Before: the plain slash, the shield along for the ride." if _shield_plain else "Sword and shield: the shield worked through the cut.") if _weapon == "sword" else ""
 	_player.hp = _player.max_hp
 	_player.stamina = _player.max_stamina
 	if is_instance_valid(_monster):
 		_monster.hp = _monster.max_hp
-		World.face(_player, Senses.way_toward(_player.tile, _monster.tile))
-		World.order_attack(_player, _monster)
+		# A heavy blow knocks him back (the sledge's): followed in; near the wall he is put back at the
+		# middle while the player walks, out of the blows.
+		var east := 1 if _shield_side else -1
+		if World.distance(_player.tile, _monster.tile) > 1:
+			if absi(_monster.tile.x - 20) > 10 and World.winding(_player).is_empty():
+				World._relocate(_monster, Vector2i(20 + east, 12))
+			_walk(_monster.tile - Vector2i(east, 0))
+		else:
+			World.face(_player, Senses.way_toward(_player.tile, _monster.tile))
+			World.order_attack(_player, _monster)
 	return tick - _shield_from >= SHIELD_CUT_TICKS
 
 

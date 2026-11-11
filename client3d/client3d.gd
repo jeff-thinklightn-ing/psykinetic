@@ -21829,12 +21829,12 @@ static func _sync_reach(reach: HandReach, sockets: Dictionary, ids: Array) -> vo
 ## as it falls, and back up after: HandReach's second grip moved down the
 ## piece by [[seconds into the clip, metres], ...] (linear between) while the
 ## strike plays. The Tomb Sledge's (Jeff: "move like it has mass"), as
-## Sledge_Attack authors its left hand (humanoid_clips' SLEDGE_*: GREAT_GRIP
-## up from the right, down to 0.12 at the contact). The heavy axes' sweep likewise (humanoid_clips'
+## Sledge_Attack authors its left hand (humanoid_clips' SLEDGE_*: SLEDGE_GRIP, 0.5,
+## up from the right at grip_2, down to 0.12 at the contact; 451 amended (5)). The heavy axes' sweep likewise (humanoid_clips'
 ## SWEEP_*: down to 0.2 for the coil, 0.1 to 0.12 across the front, back up for the guard).
 const REACH_SLIDES := {"Axe_Sweep": [[0.0, 0.0], [0.4, 0.25], [0.55, 0.25], [0.68, 0.35], [0.8, 0.33], [1.05, 0.3], [1.2, 0.2], [1.3, 0.0]],
-	"Sledge_Attack": [[0.0, 0.0], [0.2, 0.05], [0.45, 0.07], [0.6, 0.07], [0.75, 0.13], [0.84, 0.25],
-	[0.9, 0.33], [1.3, 0.33], [1.5, 0.2], [1.7, 0.0]]}
+	"Sledge_Attack": [[0.0, 0.0], [0.2, 0.1], [0.45, 0.12], [0.6, 0.12], [0.75, 0.18], [0.84, 0.3],
+	[0.88, 0.38], [1.3, 0.38], [1.5, 0.25], [1.7, 0.0]]}
 static func _slide_reach(puppet: Node3D) -> void:
 	if not puppet.has_meta("reach") or not puppet.has_meta("rig"):
 		return

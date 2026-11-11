@@ -12832,6 +12832,28 @@ the hands marked at C:/dev/review/grips/hafts.png. The sim's span and reach are 
 animation's take, cherry-picked at its bottom. Art only, protocol unchanged, no new class_name, no bullet
 (animation's take carries the hold's).
 
+451 amended (5), animation's side: the clips and the two-hand hold re-posed to the moved hands (the same
+label; Jeff, 11-01: the Tomb Sledge "shouldn't be held at the very end of the shaft thats not how hammers
+work, it also needs to move like it has mass"). Client3D already holds a piece at its grip socket
+(_grip_at) and brings the left hand to grip_2 (_sync_reach), so the sockets alone move the hands; the
+clips follow. tools/humanoid_clips.py: SLEDGE_GRIP 0.5 (the sledge's hands 0.5 apart, from GREAT_GRIP's
+0.45); held 0.23 m farther up the haft its head came down that much nearer the hands and stopped 0.09 to
+0.24 m above the ground, so SLEDGE_DOWN has the hands lower and the haft steeper, the trunk bowed and the
+knees bent further and the hips 0.14 m down (from 0.11); the down key at 0.88 s, a breath before the sim's
+contact at 0.9 (baked, a key on 0.9 itself still stood 0.16 m short there), held to 1.3; a solved key on
+the way back to the guard (SLEDGE_RETURN, 1.6 s: blended, the left hand left the haft by 0.12 m there).
+PICK_GRIP 0.35 (the pick's hands, from 0.54), and the strike's right wrist 0.16 m further ahead (PICK_AT -0.12 to 0.04): the hands
+higher up the haft drew the point 0.08 m short of the seam's face (view_test, its contact now read after
+the blends settle: the quick read had passed at -0.03 on a pose caught mid-fade); it meets it now (+0.00 m).
+The heavy axes' clips are unchanged: HandReach brings the left hand onto their grip_2 (0.034 m off, as
+before). Client3D: REACH_SLIDES' Sledge_Attack row slides the lead hand 0.5 less the clip's grip at each key
+(to 0.38 at the contact, from 0.33). view_test _test_two_hands reads the sledge's grips from its spec
+(not 0.12 / 0.57) and asks the head on the ground from the contact to 1.3 s, no more than 0.1 m above it
+nor 0.06 m into it (measured -0.034 to -0.012), the left hand at most 0.102 m off the haft. tools/clip.gd
+"shieldcut" takes --weapon=X (that weapon alone). Reels C:/dev/review/sledge_after_side and
+sledge_before_side. CHANGELOG (voice's words). Package none (a mend of what is in). Client and art only,
+protocol unchanged, no new class_name.
+
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 
 Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:

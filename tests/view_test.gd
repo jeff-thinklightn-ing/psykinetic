@@ -11465,20 +11465,28 @@ func _test_two_hands() -> void:
 				var neck := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Neck")).origin
 				_check(left.global_position.y < neck.y - 0.05, "standing ready: the left hand %.2f m below the neck" % (neck.y - left.global_position.y))
 	# The Tomb Sledge (750, pc-character's side; Jeff: "it shouldn't be held at the very end of the
-	# shaft"): the right hand at its grip, 0.12 m up from the butt, the left on grip_2; struck, the left
-	# hand slides down the haft toward the right as it falls (REACH_SLIDES), and is on it there.
+	# shaft"): the right hand at its grip (0.35 m up from the butt since 451 amended (5)), the left on
+	# grip_2; struck, the left hand slides down the haft toward the right as it falls (REACH_SLIDES),
+	# and is on it there; at the contact and held down after it, the head on the ground before him.
 	slots[Items.RIGHT_HAND] = "tomb_sledge"
 	player.slots = slots
 	_rig._process(0.0)
+	var sledge_sockets: Dictionary = ArtKit.spec("item.tomb_sledge").get("sockets", {})
+	var grip_up := float(sledge_sockets["grip"][1])
+	var grip_2 := float(sledge_sockets["grip_2"][1])
 	var sledge := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
 	var hand := (sockets["hand_r"] as Node3D).global_position
 	var up := (hand - sledge.global_position).dot(sledge.global_basis.y.normalized())
-	_check(absf(up - 0.12) < 0.005 and reach != null and reach.active and is_equal_approx(reach.grip.y, 0.57),
-		"the sledge in hand %.2f m up from its butt, the left hand on its grip_2 at %.2f" % [up, reach.grip.y if reach != null else -1.0])
+	_check(absf(up - grip_up) < 0.005 and reach != null and reach.active and is_equal_approx(reach.grip.y, grip_2),
+		"the sledge in hand %.2f m up from its butt (its grip %.2f), the left hand on its grip_2 at %.2f" % [up, grip_up, reach.grip.y if reach != null else -1.0])
 	if reach != null:
 		rig.strike("Sledge_Attack", 0.9, 0.9, 0.8)
 		var slid := 0.0
 		var worst := 0.0
+		var ground_gap := -INF  # The head's lowest above the ground, its highest from 0.9 to 1.3 s.
+		var ground_dip := INF
+		var heights := {}
+		var worst_at := 0.0
 		# Scrubbed, not waited on (750 amended (3)): the strike held at each time in turn, its slide
 		# and its pose at the same moment. On the wall clock a slow frame under a loaded suite let the
 		# pose run on past the grip read before it (0.139 m off once).
@@ -11497,10 +11505,24 @@ func _test_two_hands() -> void:
 			_rig._process(0.0)
 			var grip := reach.grip
 			await get_tree().process_frame
-			slid = maxf(slid, 0.57 - grip.y)
-			worst = maxf(worst, (sockets["hand_l"] as Node3D).global_position.distance_to(sledge.global_transform * grip))
+			slid = maxf(slid, grip_2 - grip.y)
+			var off := (sockets["hand_l"] as Node3D).global_position.distance_to(sledge.global_transform * grip)
+			if off > worst:
+				worst = off
+				worst_at = step * 0.05
+			if step * 0.05 >= 0.9 - 0.001 and step * 0.05 <= 1.3 + 0.001:
+				var low := INF
+				for mesh: MeshInstance3D in sledge.find_children("*", "MeshInstance3D", true, false):
+					var box := mesh.get_aabb()
+					for corner in 8:
+						low = minf(low, (mesh.global_transform * box.get_endpoint(corner)).y)
+				ground_gap = maxf(ground_gap, low - puppet.global_position.y)
+				ground_dip = minf(ground_dip, low - puppet.global_position.y)
+				heights["%.2f" % (step * 0.05)] = snappedf(low - puppet.global_position.y, 0.001)
 		# 0.09 m off on a quiet run, on its fade in run out: 0.12 leaves a loaded frame room (release).
-		_check(slid > 0.3 and worst < 0.12, "struck: the left hand slid %.2f m down the haft toward the right, never more than %.3f m off it" % [slid, worst])
+		_check(slid > 0.3 and worst < 0.12, "struck: the left hand slid %.2f m down the haft toward the right, never more than %.3f m off it (at %.2f s)" % [slid, worst, worst_at])
+		print("  the sledge's head off the ground: %s" % [heights])
+		_check(ground_gap < 0.1 and ground_dip > -0.06, "struck: the head on the ground from the contact to 1.3 s (its lowest %.3f to %.3f m off the ground)" % [ground_dip, ground_gap])
 		# Ended as a strike ends: its clip run out at speed again (a cancel left at speed 0 never
 		# fades, and the rests after it stood on it).
 		rig._set_action_speed(1.0)
@@ -11510,7 +11532,7 @@ func _test_two_hands() -> void:
 		for i in 4:
 			await get_tree().process_frame
 		_rig._process(0.0)
-		_check(not rig.striking() and is_equal_approx(reach.grip.y, 0.57), "the blow done: back at grip_2 (%.2f)" % reach.grip.y)
+		_check(not rig.striking() and is_equal_approx(reach.grip.y, grip_2), "the blow done: back at grip_2 (%.2f)" % reach.grip.y)
 	slots[Items.RIGHT_HAND] = "giant_axe"
 	player.slots = slots
 	_rig._process(0.0)
@@ -13720,6 +13742,13 @@ func _test_pick_meets_seam() -> void:
 	# ran the wall clock past it (maps' landing, -0.14 m; +0.03 alone).
 	rig._contact_msec = -1  # Its own switch to the recovery's speed would run it on past the seek.
 	rig._set_action_speed(0.0)
+	rig.tree.set("parameters/action_seek/seek_request", rig.contact_at)
+	rig._apply()
+	_rig._process(0.0)
+	# Held there while the blends settle (on the wall clock, as the sledge's slide test waits its fade in
+	# out): read at once the same pose stood 0.03 m nearer the body on one run in four (-0.064, then -0.033),
+	# its rest's and its strike's fades caught at a different share. Then seeked again and read.
+	await get_tree().create_timer(0.3).timeout
 	rig.tree.set("parameters/action_seek/seek_request", rig.contact_at)
 	rig._apply()
 	_rig._process(0.0)
