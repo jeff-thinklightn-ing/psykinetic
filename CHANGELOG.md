@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Along the edge of the woods, by the east road and the pond, the treetops nearest the camera fade away, so you see their trunks and the ground beneath (326 amended (2)).
 - The castle and the dark tower on the horizon keep their place as you move, however many zones you've crossed into (650).
 - At the edge of the land, by Umbrage's woodlot and south of the town, the low camera now shows the woods and the forest floor below you: treetops close to the camera thin away, as a tree right beside it already does, so you can see the ground and yourself there (326 amended (1))
 - When you host a game yourself, your companion and the creatures around you walk evenly (350 amended (2)).

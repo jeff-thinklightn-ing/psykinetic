@@ -6328,6 +6328,39 @@ it past the last stands, a new look), and hiding whole 16-cell chunks as crowns 
 square blanked at a time). view_test _test_horizon: the cut on the canopy's own material only,
 12 m under the low camera, 0 under the high. Stills: C:/dev/review/terrain/canopy_cut/.
 
+326 amended (2) (the coordinator's approval of 11-11, the first of terrain's three worst things from
+its walk of Umbrage's edges, C:/dev/review/terrain/umbrage_edges): the forest's own crowns cut as the
+canopy is. Along the land's edge (the east road at 232,202; the pond at 221,231) the low camera
+stood among the edge woods' Tree_, Sapling_ and near Stand_ crowns, 4.8 to 8.8 m from the lens, and
+they filled the bottom of the frame; the near fade fades one between the camera and the player, and
+623 amended (2) hides one only within NEAR_CLOSE (4 m) of the lens. Now each is drawn, while
+its foot is within CANOPY_EYE_CUT + EYE_CUT_REACH (12 + 6 m) of the low camera, with an eye-cut
+copy of its season material (Client3D.eye_cut_material: season_eye_cut.gdshader, and
+season_near_eye_cut.gdshader for its see-through copy, so a faded tree is cut alike), kept and
+shared by material, the cut set with the canopy's (set_tree_eye_cut: CANOPY_EYE_CUT under the low
+camera). Near only, the coordinator's ruling on the first form, which put every tree in its cut copy
+and cost 1.2 ms a frame on the Atlas, most likely every tree paying for the cut's discard: trees,
+saplings and near stands are registered in EYE_CUT_BUCKET (8 m) buckets as they are made
+(_eye_cut_register), and _update_eye_cut, from _place_camera once the camera has moved EYE_CUT_STEP
+(1 m) and from _apply_camera_mode at once, swaps those within reach into their cut copies and the
+rest back (_set_eye_cut_piece), the near fade's kept materials (OPAQUE_META, OPAQUE_SURFACES_META)
+with them, so a fade puts back the right one; none under the high camera. A piece swaps 18 m out,
+past the cut and its band, so the swap draws the same either side. Through the cut the trunks and
+the forest floor show. The far stands (MultiMeshes, from PineStands.NEAR out) keep their material:
+none stood within the cut at the three spots shot. The three vars are the room's (room_fields.gd).
+Cost on the Atlas (map_bench, yaw 45, 40 s, near only twice with before between): at the east road,
+crowns by the lens, median frame 21.75 and 21.97 ms against 21.77 (GPU 19.67 and 19.86 against
+19.67), +0.1 ms; at the square, none near, 20.36 and 20.44 against 20.34, nothing past the runs'
+spread. Stills, before and after, standing at the east road, the pond and the woodlot (210,234):
+C:/dev/review/terrain/crown_cut/ (sheet_east.png, sheet_pond.png, sheet_woodlot.png); near only
+draws the same as every tree cut where the views drew at the same yaw (mean difference under 0.3 of
+255). Two 120-frame walks panned along the east road and the woodlot's edge
+(walkeast_near.png, walkwood_near.png): no pop, each frame's change within 10% of the walk's
+median, and every frame the same as with every tree cut (at most 0.19 of 255). view_land_test _test_horizon: the forest's pieces in their cut copies cut as the
+canopy; near only, a tree cut by the camera and in season away from it, every piece as its distance
+says, a faded one's see-through copy following and the fade putting back the right one; none cut
+under the high camera. view_test's season and near-fade checks take the eye-cut copies.
+
 ## 309. What weather looks like: drawn round the view, eased to the sim's
 
 The 3D view draws the zone's weather (World.fields.weather, decision 308)

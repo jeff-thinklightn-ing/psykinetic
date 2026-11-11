@@ -516,6 +516,13 @@ const BOX_PULL_HEAD := 1.9
 ## drawn on that line, the stills of 11-10).
 const CANOPY_EYE_CUT := 12.0
 const CANOPY_EYE_CUT_BAND := 2.0
+## The forest's own trees, saplings and near stands under the low camera
+## take the same cut (326 amended (2), the Umbrage edge walk of 11-11): by the
+## land's edge the camera stood out over the edge stands, and their crowns
+## 5 to 9 m from the lens filled the bottom of the frame (_update_eye_cut,
+## near only; set_tree_eye_cut). Their see-through copies are cut alike.
+const EYE_CUT_SHADER := preload("res://client3d/season_eye_cut.gdshader")
+const EYE_CUT_NEAR_SHADER := preload("res://client3d/season_near_eye_cut.gdshader")
 ## A near piece's mesh keeps its own material override under this meta
 ## while it is see-through.
 const OPAQUE_META := &"opaque_material"
@@ -2972,6 +2979,12 @@ var _water_bodies: Array[MeshInstance3D] = []
 ## Each rock face drawn: [the cell above, the direction it faces].
 var _cliff_edges: Array[Array] = []
 var _trees: Dictionary[Vector2i, Node3D] = {}
+## The near-only eye cut (326 amended (2)): the registered pieces by bucket
+## (EYE_CUT_BUCKET), those in their cut copies now, and where the camera
+## was when last looked at (in the room).
+var _eye_cut_buckets: Dictionary[Vector2i, Array] = {}
+var _eye_cut_on: Dictionary[Node3D, bool] = {}
+var _eye_cut_at := Vector3.INF
 ## Past the forest, outdoors: its canopy and far floor (TerrainBorder),
 ## under the room; null indoors or where level.json says "border": "none".
 var _border: TerrainBorder
@@ -3901,6 +3914,9 @@ func _apply_camera_mode() -> void:
 	# (326 amended): its eye cut on under the low camera only.
 	if _border != null:
 		_border.set_eye_cut(CANOPY_EYE_CUT if low else 0.0)
+	# And the forest's trees and near stands by the camera (326 amended (2)).
+	set_tree_eye_cut(CANOPY_EYE_CUT if low else 0.0)
+	_update_eye_cut(true)
 	if _ground_look != null:
 		_ground_look.set_shader_parameter("far_meadow", 1.0 if low else 0.0)
 		_ground_look.set_shader_parameter("far_from", scatter_reach_low - FAR_MEADOW_FADE * 0.5)
@@ -4075,6 +4091,8 @@ func _place_camera() -> void:
 		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x + _plane_at.x, _camera_target.z + _plane_at.z))
 	if _low and _far_root != null:
 		_place_far_landmarks()
+	if _low or not _eye_cut_on.is_empty():
+		_update_eye_cut()
 	if _listener != null:
 		# On the ground under the camera's aim (less any pan: the ears stay
 		# with the player), turned as the camera is, so left and right in
@@ -6400,6 +6418,9 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_shade_all = true
 	_trees.clear()
 	_saplings.clear()
+	_eye_cut_buckets.clear()
+	_eye_cut_on.clear()
+	_eye_cut_at = Vector3.INF
 	_clearing_props.clear()
 	_skirt = null
 	_far_root = null
@@ -7051,6 +7072,155 @@ static func season_material(material: Material, leaf: bool, shared := true, shad
 	return made
 
 
+## The eye-cut copies of season materials (eye_cut_material): the season
+## material's id to [the copy, the season material, its see-through copy's
+## copy if it has one]; a season see-through copy's id to its cut copy; and
+## the cut they are set to now (set_tree_eye_cut). Each copy holds what it
+## was copied from (EYE_CUT_OF_META).
+static var _eye_cut_copies: Dictionary = {}
+static var _eye_cut_near: Dictionary = {}
+static var _eye_cut_now := 0.0
+const EYE_CUT_OF_META := &"eye_cut_of"
+## Near only (326 amended (2)): a tree, sapling or near stand takes its cut
+## copy only while its foot stands within CANOPY_EYE_CUT + EYE_CUT_REACH of
+## the low camera (a crown's spread from its foot, a stand's footprint, and
+## the camera's move between two looks), looked at again each EYE_CUT_STEP
+## the camera moves, through buckets EYE_CUT_BUCKET across. Every tree in
+## its cut copy cost 1.2 ms a frame on the Atlas: its discard, paid by all.
+const EYE_CUT_REACH := 6.0
+const EYE_CUT_STEP := 1.0
+const EYE_CUT_BUCKET := 8.0
+
+
+## [param material] (a season_material) as its eye-cut copy (326 amended (2)):
+## not drawn within eye_cut of the camera, dithered over
+## CANOPY_EYE_CUT_BAND; its see-through copy (SEASON_NEAR_META) cut alike.
+## Kept and shared by material; set to the cut now. Any other material as
+## it is.
+static func eye_cut_material(material: Material) -> Material:
+	var made := material as ShaderMaterial
+	if made == null or made.shader != SEASON_SHADER:
+		return material
+	var key := made.get_instance_id()
+	if _eye_cut_copies.has(key):
+		return _eye_cut_copies[key][0]
+	var cut := made.duplicate() as ShaderMaterial
+	cut.shader = EYE_CUT_SHADER
+	cut.set_meta(EYE_CUT_OF_META, made)
+	var entry: Array = [cut, made]
+	if made.has_meta(SEASON_NEAR_META):
+		var season_near := made.get_meta(SEASON_NEAR_META) as ShaderMaterial
+		var near := season_near.duplicate() as ShaderMaterial
+		near.shader = EYE_CUT_NEAR_SHADER
+		near.set_meta(EYE_CUT_OF_META, season_near)
+		cut.set_meta(SEASON_NEAR_META, near)
+		entry.append(near)
+		_eye_cut_near[season_near.get_instance_id()] = near
+	for each: ShaderMaterial in [cut] + entry.slice(2):
+		each.set_shader_parameter("eye_cut", _eye_cut_now)
+		each.set_shader_parameter("eye_cut_band", CANOPY_EYE_CUT_BAND)
+	_eye_cut_copies[key] = entry
+	return cut
+
+
+## [param material] as its eye-cut copy ([param on]: eye_cut_material; a
+## season see-through copy as its cut one) or as the material it was copied
+## from. Any other material as it is.
+static func eye_cut_swap(material: Material, on: bool) -> Material:
+	if material == null:
+		return null
+	if not on:
+		return material.get_meta(EYE_CUT_OF_META) if material.has_meta(EYE_CUT_OF_META) else material
+	if material.has_meta(EYE_CUT_OF_META):
+		return material
+	var near_key := material.get_instance_id()
+	if _eye_cut_near.has(near_key):
+		return _eye_cut_near[near_key]
+	return eye_cut_material(material)
+
+
+## [param piece]'s meshes in their eye-cut copies ([param on]) or their
+## season materials: the drawn ones, and those the near fade keeps to put
+## back (OPAQUE_META, OPAQUE_SURFACES_META), the kept first, so a faded
+## piece's see-through copy finds its cut one.
+func _set_eye_cut_piece(piece: Node3D, on: bool) -> void:
+	for node in _descendants(piece):
+		var mesh := node as MeshInstance3D
+		if mesh == null or mesh.mesh == null:
+			continue
+		if mesh.has_meta(OPAQUE_META):
+			mesh.set_meta(OPAQUE_META, eye_cut_swap(mesh.get_meta(OPAQUE_META), on))
+		if mesh.material_override != null:
+			mesh.material_override = eye_cut_swap(mesh.material_override, on)
+			continue
+		if mesh.has_meta(OPAQUE_SURFACES_META):
+			var kept: Array[Material] = mesh.get_meta(OPAQUE_SURFACES_META)
+			for surface in kept.size():
+				var base: Material = kept[surface] if kept[surface] != null else mesh.mesh.surface_get_material(surface)
+				kept[surface] = eye_cut_swap(base, on)
+			mesh.set_meta(OPAQUE_SURFACES_META, kept)
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.get_surface_override_material(surface)
+			if own == null:
+				own = mesh.mesh.surface_get_material(surface)
+			if own != null:
+				mesh.set_surface_override_material(surface, eye_cut_swap(own, on))
+
+
+## [param piece] (a tree, a sapling, a near stand, a child of the room)
+## among those the near-only cut looks at.
+func _eye_cut_register(piece: Node3D) -> void:
+	var key := Vector2i(floori(piece.position.x / EYE_CUT_BUCKET), floori(piece.position.z / EYE_CUT_BUCKET))
+	if not _eye_cut_buckets.has(key):
+		_eye_cut_buckets[key] = []
+	_eye_cut_buckets[key].append(piece)
+	_eye_cut_at = Vector3.INF
+
+
+## The near-only cut: under the low camera the registered pieces whose foot
+## is within CANOPY_EYE_CUT + EYE_CUT_REACH of the camera in their cut
+## copies and the rest in their season materials; none under the high one.
+## Looked at again once the camera has moved EYE_CUT_STEP ([param force]:
+## now).
+func _update_eye_cut(force := false) -> void:
+	var want: Dictionary[Node3D, bool] = {}
+	if _low and _camera != null and _room != null and _room.is_inside_tree() and _camera.is_inside_tree():
+		var eye := _camera.global_position - _room.global_position
+		if not force and Vector2(eye.x - _eye_cut_at.x, eye.z - _eye_cut_at.z).length() < EYE_CUT_STEP:
+			return
+		_eye_cut_at = eye
+		var reach := CANOPY_EYE_CUT + EYE_CUT_REACH
+		var low_bucket := Vector2i(floori((eye.x - reach) / EYE_CUT_BUCKET), floori((eye.z - reach) / EYE_CUT_BUCKET))
+		var high_bucket := Vector2i(floori((eye.x + reach) / EYE_CUT_BUCKET), floori((eye.z + reach) / EYE_CUT_BUCKET))
+		for bucket_x in range(low_bucket.x, high_bucket.x + 1):
+			for bucket_z in range(low_bucket.y, high_bucket.y + 1):
+				for piece: Node3D in _eye_cut_buckets.get(Vector2i(bucket_x, bucket_z), []):
+					if is_instance_valid(piece) and Vector2(piece.position.x - eye.x, piece.position.z - eye.z).length() <= reach:
+						want[piece] = true
+	elif _eye_cut_on.is_empty():
+		return
+	else:
+		_eye_cut_at = Vector3.INF
+	for piece: Node3D in _eye_cut_on.keys():
+		if not want.has(piece):
+			if is_instance_valid(piece):
+				_set_eye_cut_piece(piece, false)
+			_eye_cut_on.erase(piece)
+	for piece: Node3D in want:
+		if not _eye_cut_on.has(piece):
+			_set_eye_cut_piece(piece, true)
+			_eye_cut_on[piece] = true
+
+
+## Every eye-cut copy's cut, metres (0: off): CANOPY_EYE_CUT under the low
+## camera (_apply_camera_mode), as the border canopy's.
+static func set_tree_eye_cut(metres: float) -> void:
+	_eye_cut_now = metres
+	for entry: Array in _eye_cut_copies.values():
+		for each: ShaderMaterial in [entry[0]] + entry.slice(2):
+			each.set_shader_parameter("eye_cut", metres)
+
+
 static func _season_copy(shader: Shader, base: BaseMaterial3D, leaf: bool) -> ShaderMaterial:
 	var made := ShaderMaterial.new()
 	made.shader = shader
@@ -7364,6 +7534,7 @@ func _phase_border() -> void:
 	_room.add_child(_border)
 	_border.build(_wooded, _edge_elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
 	_border.set_eye_cut(CANOPY_EYE_CUT if _low else 0.0)
+	set_tree_eye_cut(CANOPY_EYE_CUT if _low else 0.0)
 
 
 ## The rock mass (769, terrain's side): an indoor level whose level.json
@@ -12065,6 +12236,7 @@ func _add_tree(cell: Vector2i, clump := 0.5, kind := "", at := Vector2.INF) -> v
 		tree.position = Vector3(at.x, _ground_height(at), at.y)
 	season_dress(tree, slot != "tree.dead" and slot != "tree.pine")
 	_room.add_child(tree)
+	_eye_cut_register(tree)  # Cut when by the low camera (326 amended (2)).
 	_trees[cell] = tree
 
 
@@ -12149,6 +12321,7 @@ func _add_stands(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i
 			drawn.mesh = PineStands.mesh(variant)
 			piece.add_child(drawn)
 			_room.add_child(piece)
+			_eye_cut_register(piece)  # Cut when by the low camera (326 amended (2)).
 			_trees[corner] = piece
 			continue
 		var key := Vector3i(floori(corner.x / float(PineStands.CHUNK)), floori(corner.y / float(PineStands.CHUNK)), variant)
@@ -12391,6 +12564,7 @@ func _add_sapling(cell: Vector2i, distance: Dictionary[Vector2i, int]) -> void:
 	sapling.position = _tile_position(cell) + Vector3(at.x, 0.0, at.y)
 	season_dress(sapling, true)
 	_room.add_child(sapling)
+	_eye_cut_register(sapling)  # Cut when by the low camera (326 amended (2)).
 	_saplings[cell] = sapling
 
 

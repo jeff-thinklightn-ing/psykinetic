@@ -79,7 +79,7 @@ const ROOM: Array[StringName] = [
 	&"_scatter_jobs", &"_tall", &"_tall_where", &"_tall_flat", &"_mask_origin", &"_mask_size",
 	&"canopy_texture", &"canopy_origin", &"_water_bodies", &"_cliff_edges", &"_trees", &"_border",
 	&"_grown", &"_grown_trunks", &"_glimpse_plans", &"_glimpse_ground", &"_glimpses", &"_wooded",
-	&"_saplings", &"_clearing", &"_clearing_props", &"_grown_back", &"_scatter_nodes", &"_skirt",
+	&"_saplings", &"_eye_cut_buckets", &"_eye_cut_on", &"_eye_cut_at", &"_clearing", &"_clearing_props", &"_grown_back", &"_scatter_nodes", &"_skirt",
 	&"_far_root", &"_far_marks", &"_far_material", &"_kinds_image", &"_kinds_texture", &"_buildings",
 	&"_home_labels", &"_plots_drawn", &"_ruin_edges", &"_building_at", &"_banked_plot", &"_stand_at",
 	&"_roofs_off", &"_enclosed", &"_enclosed_rects", &"_enclosed_dirty", &"_enclosed_changed",

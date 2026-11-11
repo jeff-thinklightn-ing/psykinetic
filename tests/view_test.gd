@@ -7776,17 +7776,105 @@ func _test_horizon() -> void:
 				off_shader.append(str(piece.name))
 			else:
 				cut = float(look.get_shader_parameter("eye_cut"))
+		# Nothing else but the forest's trees, saplings and near stands
+		# (326 amended (2)): each of theirs cut, its see-through copy too, at the
+		# canopy's cut; one of each kind at least on the wilds.
 		var others := 0
-		for node: Node in _rig._room.find_children("*", "GeometryInstance3D", true, false):
+		var kinds := {}
+		var tree_cuts := {}
+		for node: Node in _rig._room.find_children("*", "MeshInstance3D", true, false):
 			if str(node.name).begins_with("Canopy_"):
 				continue
-			var override := (node as GeometryInstance3D).material_override as ShaderMaterial
-			if override != null and override.shader == TerrainBorder.EYE_CUT_SHADER:
-				others += 1
-		return [cut, off_shader, others, sheet.size()]
+			var owner_name := ""
+			var climb: Node = node
+			while climb != null and climb != _rig._room:
+				for kind: String in ["Tree_", "Sapling_", "Stand_"]:
+					if str(climb.name).begins_with(kind):
+						owner_name = kind
+				climb = climb.get_parent()
+			var mesh := node as MeshInstance3D
+			var looks: Array[Material] = [mesh.material_override]
+			if mesh.mesh != null:
+				for surface in mesh.mesh.get_surface_count():
+					looks.append(mesh.get_surface_override_material(surface))
+			for look: Material in looks:
+				var shader_look := look as ShaderMaterial
+				if shader_look == null or shader_look.shader != TerrainBorder.EYE_CUT_SHADER:
+					continue
+				if owner_name == "":
+					others += 1
+					continue
+				kinds[owner_name] = true
+				var near: ShaderMaterial = shader_look.get_meta(Client3D.SEASON_NEAR_META) as ShaderMaterial if shader_look.has_meta(Client3D.SEASON_NEAR_META) else null
+				tree_cuts[float(shader_look.get_shader_parameter("eye_cut"))] = true
+				if near == null or near.shader != Client3D.EYE_CUT_NEAR_SHADER:
+					tree_cuts[-2.0] = true
+				else:
+					tree_cuts[float(near.get_shader_parameter("eye_cut"))] = true
+		return [cut, off_shader, others, sheet.size(), kinds.keys(), tree_cuts.keys()]
 	var cut_low: Array = canopy_cut.call()
-	_check(cut_low.size() == 4 and int(cut_low[3]) > 0 and (cut_low[1] as Array).is_empty() and is_equal_approx(float(cut_low[0]), Client3D.CANOPY_EYE_CUT) and int(cut_low[2]) == 0,
-			"the canopy past the wood's edge not drawn within %.0f m of the low camera, on its own material and no other's (%s)" % [Client3D.CANOPY_EYE_CUT, cut_low])
+	_check(cut_low.size() == 6 and int(cut_low[3]) > 0 and (cut_low[1] as Array).is_empty() and is_equal_approx(float(cut_low[0]), Client3D.CANOPY_EYE_CUT) and int(cut_low[2]) == 0,
+			"the canopy past the wood's edge not drawn within %.0f m of the low camera, on its own material and no other's but the forest's (%s)" % [Client3D.CANOPY_EYE_CUT, cut_low])
+	_check(cut_low.size() == 6 and (cut_low[5] as Array).all(func(metres: float) -> bool: return is_equal_approx(metres, Client3D.CANOPY_EYE_CUT)),
+			"and the forest's pieces in their cut copies cut as the canopy, their see-through copies too (326 amended (2); %s)" % [cut_low.slice(4) if cut_low.size() == 6 else cut_low])
+	# Near only (326 amended (2)): a piece in its cut copy only while its
+	# foot is within CANOPY_EYE_CUT + EYE_CUT_REACH of the camera; the near
+	# fade's kept materials swapped with it, so a fade puts back the right one.
+	var drawn_shader := func(piece: Node3D) -> Shader:
+		for node: Node in piece.find_children("*", "MeshInstance3D", true, false):
+			var mesh := node as MeshInstance3D
+			if mesh.mesh != null:
+				var look := mesh.get_active_material(0) as ShaderMaterial
+				return look.shader if look != null else null
+		return null
+	var eye_cut_wrong := func() -> Array:
+		var reach := Client3D.CANOPY_EYE_CUT + Client3D.EYE_CUT_REACH
+		var eye := _rig._camera.global_position - _rig._room.global_position
+		var on := 0
+		var miscut: Array[String] = []
+		for bucket: Array in _rig._eye_cut_buckets.values():
+			for piece: Node3D in bucket:
+				var near_eye := Vector2(piece.position.x - eye.x, piece.position.z - eye.z).length() <= reach and _rig._low
+				var cut_now := false
+				for node: Node in piece.find_children("*", "MeshInstance3D", true, false):
+					var mesh := node as MeshInstance3D
+					for surface in (mesh.mesh.get_surface_count() if mesh.mesh != null else 0):
+						var look := mesh.get_active_material(surface) as ShaderMaterial
+						cut_now = cut_now or (look != null and look.shader in [Client3D.EYE_CUT_SHADER, Client3D.EYE_CUT_NEAR_SHADER])
+				if near_eye:
+					on += 1
+				if near_eye != cut_now or near_eye != _rig._eye_cut_on.has(piece):
+					miscut.append(str(piece.name))
+		return [on, miscut]
+	var probe: Node3D = null
+	for piece: Node3D in _rig._trees.values():
+		if str(piece.name).begins_with("Tree_") and drawn_shader.call(piece) in [Client3D.SEASON_SHADER, Client3D.EYE_CUT_SHADER]:
+			probe = piece
+			break
+	var steps: Array = []
+	if probe != null:
+		var put_eye := func(offset: Vector3) -> void:
+			_rig._camera.global_position = probe.global_position + offset
+			_rig._update_eye_cut()
+		put_eye.call(Vector3(0.0, 7.5, 0.0))
+		steps.append(eye_cut_wrong.call())
+		steps.append(drawn_shader.call(probe) == Client3D.EYE_CUT_SHADER)
+		_rig._set_near(probe, true)
+		steps.append(drawn_shader.call(probe) == Client3D.EYE_CUT_NEAR_SHADER)
+		put_eye.call(Vector3(Client3D.CANOPY_EYE_CUT + Client3D.EYE_CUT_REACH + 3.0, 7.5, 0.0))
+		steps.append(drawn_shader.call(probe) == Client3D.SEASON_NEAR_SHADER)
+		_rig._set_near(probe, false)
+		steps.append(drawn_shader.call(probe) == Client3D.SEASON_SHADER)
+		steps.append(eye_cut_wrong.call())
+		put_eye.call(Vector3(0.5, 7.5, 0.0))
+		steps.append(drawn_shader.call(probe) == Client3D.EYE_CUT_SHADER)
+		_rig._set_near(probe, true)
+		_rig._set_near(probe, false)
+		steps.append(drawn_shader.call(probe) == Client3D.EYE_CUT_SHADER)
+		_rig._place_camera()
+	_check(probe != null and steps.size() == 8 and int(steps[0][0]) > 0 and (steps[0][1] as Array).is_empty() and steps[1] and steps[2]
+			and steps[3] and steps[4] and (steps[5][1] as Array).is_empty() and steps[6] and steps[7],
+			"near only: a tree in its cut copy by the camera and in season away from it, the rest as their distance says; faded, its see-through copy follows, and the fade puts back the right one (%s)" % [steps])
 	Net.set_camera_low(false, false)
 	_rig._apply_camera_mode()
 	_check(skirt != null and not skirt.visible and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 0.0)
@@ -7794,7 +7882,8 @@ func _test_horizon() -> void:
 			and is_equal_approx(float(sky.get_shader_parameter("ground_curve")), Client3D.SKY_GROUND_CURVE),
 			"the camera high: the skirt hidden, the far meadow off, the sky's ground the forest floor's again")
 	var cut_high: Array = canopy_cut.call()
-	_check(cut_high.size() == 4 and is_equal_approx(float(cut_high[0]), 0.0), "and drawn whole under the high camera (%s)" % [cut_high])
+	_check(cut_high.size() == 6 and is_equal_approx(float(cut_high[0]), 0.0) and (cut_high[4] as Array).is_empty() and _rig._eye_cut_on.is_empty(),
+			"and drawn whole under the high camera, the forest's in their season materials (%s)" % [cut_high])
 	Net.set_camera_low(true, false)
 	var barrow := Level.load_level("barrow")
 	_rig.rebuild(barrow["terrain"], barrow["centre"])
@@ -8673,11 +8762,12 @@ func _test_pine_stands() -> void:
 		_rig._set_near(near[0], true)
 		var drawn := near[0].get_child(0) as MeshInstance3D
 		var faded := drawn.get_surface_override_material(0) as ShaderMaterial
-		_check(faded != null and faded.shader == Client3D.SEASON_NEAR_SHADER and faded.render_priority == Client3D.NEAR_PRIORITY,
+		# Its eye-cut copy's see-through copy since 326 amended (2).
+		_check(faded != null and faded.shader in [Client3D.SEASON_NEAR_SHADER, Client3D.EYE_CUT_NEAR_SHADER] and faded.render_priority == Client3D.NEAR_PRIORITY,
 				"a near stand fades as a tree does (its season's see-through copy)")
 		_rig._set_near(near[0], false)
 		var again := drawn.get_active_material(0) as ShaderMaterial
-		_check(again != null and again.shader == Client3D.SEASON_SHADER and not again.get_shader_parameter("leaf"),
+		_check(again != null and again.shader in [Client3D.SEASON_SHADER, Client3D.EYE_CUT_SHADER] and not again.get_shader_parameter("leaf"),
 				"and solid again after, evergreen: snow on it, never dried or turned")
 	var ringed := 0
 	for index in range(_rig._ground_water_end, _rig._ground_cells.size()):
@@ -8761,7 +8851,7 @@ func _test_seasons() -> void:
 	_rig._set_near(tree, true)
 	var faded := tree.find_children("*", "MeshInstance3D", true, false)[0].get_active_material(0) as ShaderMaterial
 	_rig._set_near(tree, false)
-	_check(faded != null and faded.shader == Client3D.SEASON_NEAR_SHADER and season_of.call(tree) == before,
+	_check(faded != null and faded.shader in [Client3D.SEASON_NEAR_SHADER, Client3D.EYE_CUT_NEAR_SHADER] and season_of.call(tree) == before,
 			"a near tree fades in its season's see-through copy, and is in season again after")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
