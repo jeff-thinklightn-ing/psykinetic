@@ -572,6 +572,21 @@ static func died(body: GridEntity) -> void:
 		return
 
 
+## Where [param body] makes its stand (companions' read, for a berth that
+## never stands on its way home, its den or the cells beside them; 780
+## amended (26)'s follow-up): its den while it is on the den rule (to_den
+## holds it: broken off, _wallow_from set), walking home, at its den or at
+## bay where a foe barred it; Monster.NO_TILE otherwise, and on the boar
+## king's far way (away and alone, no den to keep).
+static func homeward(body: GridEntity) -> Vector2i:
+	if not is_instance_valid(body) or not body.spawned or body.hp <= 0:
+		return Monster.NO_TILE
+	if body.get("_wallow_from") == null or bool(body.get("_wallow_far")):
+		return Monster.NO_TILE
+	var den: Variant = body.get("den")
+	return den if den is Vector2i else Monster.NO_TILE
+
+
 ## The den rule (780 amended (16), the boar king's wallow; 780 amended (26):
 ## shared with the great bear and the old grey). Under [param below] of its
 ## hp in its lair (out, Apex's beaten back takes it home first) it never

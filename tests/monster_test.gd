@@ -1844,6 +1844,7 @@ func _test_ambush() -> void:
 	_test_den_pack_stays()
 	_test_den_walk_past_own()
 	_test_den_walk_barred()
+	_test_den_homeward()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -8531,6 +8532,54 @@ func _test_den_walk_barred() -> void:
 		"at %.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never (6 s)", fighting, "at %.1f s" % (home / 10.0) if home >= 0 else "never (30 s)"])
 	_check(at_bay >= 0 and at_bay <= 20 and fighting, "barred from his den by foes he turns at bay where he stands, fighting (%s)" % ("%.1f s" % (at_bay / 10.0) if at_bay >= 0 else "never"))
 	_check(home >= 0, "his way open again, he goes on home (%s)" % ("%.1f s" % (home / 10.0) if home >= 0 else "never"))
+	DayNight.reset()
+	Monster.idling = true
+
+
+## Where he makes his stand (Apex.homeward, companions' read for a berth off
+## his way home and his den; 780 amended (26)'s follow-up): nothing before he
+## breaks off; his den once he turns for home, on his walk and at his den
+## alike; nothing again once he is whole enough to fight on (back over
+## DEN_BELOW), or on the boar king's far way (no den to keep).
+func _test_den_homeward() -> void:
+	print("%s== Apex.homeward: his den while he is on the den rule, else nothing ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 11:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	rows[6] = rows[6].substr(0, 21) + "P" + rows[6].substr(22)
+	var e := _build(rows)
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var grey := _live_grey(Vector2i(20, 6))
+	grey.den = Vector2i(3, 6)
+	grey.target = player
+	World.step()
+	var before := Apex.homeward(grey)
+	grey.hp = int(floor(0.14 * grey.max_hp))
+	var walking := Monster.NO_TILE
+	var at_den := Monster.NO_TILE
+	for i in 300:
+		World.step()
+		player.hp = 1000
+		if grey._wallow_from != null and walking == Monster.NO_TILE:
+			walking = Apex.homeward(grey)
+		if World.distance(grey.tile, grey.den) <= int(OldWolf.DEN_RULE["near"]):
+			at_den = Apex.homeward(grey)
+			break
+	grey.hp = grey.max_hp
+	World.step()
+	var whole := Apex.homeward(grey)
+	grey._wallow_from = player
+	grey._wallow_far = true
+	var far := Apex.homeward(grey)
+	print("  before %s, walking %s, at his den %s, whole %s, the far way %s (den %s)" % [before, walking, at_den, whole, far, grey.den])
+	_check(before == Monster.NO_TILE and walking == grey.den and at_den == grey.den and whole == Monster.NO_TILE and far == Monster.NO_TILE,
+		"homeward: nothing till he turns, his den walking and at his den, nothing whole again or the far way")
 	DayNight.reset()
 	Monster.idling = true
 
