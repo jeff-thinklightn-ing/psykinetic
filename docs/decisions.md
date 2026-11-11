@@ -24897,6 +24897,29 @@ tests:
 - townsfolk_test: the thief fences through the fence alone.
 
 Server and client (the message's meaning); no new class_name.
+
+586 amended (1) (the script's label; the coordinator's ruling (a), Jeff's to undo; from
+economy's one-price design, C:/dev/review/economy/one_price.md): Snagfin's day markup only at a
+counter of his own. Jeff's words were that Snagfin "sells overpriced goods during the day" and
+"has a little larger place on the outskirts of town". Seating him at the town's own store
+counter was the trees' design, not his word. It made Umbrage's only general store cost 30% more
+by day for everyone, and switched off the trusted discount (831) there by day and by night, so
+it landed on every newcomer's first purchases (likely part of Jeff's "Rolf's store is
+confusing"). Now economy.json fence.day_markup_at says where day_markup applies: "own" (a
+counter of his own: none exists yet, so nowhere today) or "store" (the store counter he
+fronts, as 586 built it). Undoing it is that one line of data. Economy.marks_up(fence) is
+true only by day where it applies; fence_markup, shop_price, sell, barter_quote and Main's
+"shop" and "barter" replies read it in place of "any fence state". So the store's goods sell
+at its own price by day, and a trusted player's prices and "trusted" mark hold at the store
+day and night. His fencing is unchanged: grave and stolen goods at his counter (still the
+store counter nearest his home) by night at half the plain price. The half is always of the
+plain price, never a trusted one (barter_quote and Main's "fenced" read the plain buys), and
+they are refused by day. The window's title stays the merchant who fronts it, "Snagfin".
+Whether Snagfin moves to a place of his own with the store kept by someone else is Jeff's
+question, and nothing of that is built. economy_test: at the store he fronts, by day and night,
+the trusted and plain prices with no markup; a trusted player's grave goods fenced by night at
+half the plain price and refused by day; with "store", the markup back by day, none by night or
+at another counter. Server only, protocol unchanged, no new class_name.
 ## 587, economy's side. Back at once from near death
 
 Jeff's down screen, through the coordinator (companions' design:

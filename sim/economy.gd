@@ -436,11 +436,11 @@ func goods(town: String, fence := "", player_id := "") -> Array[Dictionary]:
 
 
 ## What player [param player_id] pays [param town]'s shop for [param uid]
-## (831): its price, the fence's by day, a trusted player's (trusted_buy)
-## where no fence is.
+## (831): its price, the fence's by day where he marks up (marks_up), a
+## trusted player's (trusted_buy) wherever he doesn't.
 func shop_price(town: String, uid: int, fence := "", player_id := "", cat := {}) -> int:
 	var asked := fence_markup(item_price(town, uid, cat), fence)
-	if not fence.is_empty() or not trusted(town, player_id):
+	if marks_up(fence) or not trusted(town, player_id):
 		return asked
 	return _trusted_buy_of(town, stockpile.book.id_of(uid), asked, cat, player_id)
 
@@ -636,10 +636,20 @@ func fence_price(paid: int) -> int:
 	return Economy.fenced(paid, float(fence_rule().get("factor", 0.5)))
 
 
-## [param asked] marked up at the fence's counter by day ([param fence]
-## "day"), else as asked.
+## [param asked] marked up at the fence's counter by day where he marks
+## up (marks_up), else as asked.
 func fence_markup(asked: int, fence: String) -> int:
-	return ceili(asked * float(fence_rule().get("day_markup", 1.0))) if fence == FENCE_DAY else asked
+	return ceili(asked * float(fence_rule().get("day_markup", 1.0))) if marks_up(fence) else asked
+
+
+## Whether goods at a counter in fence state [param fence] are dear and its
+## trusted prices off (586 amended (1), the coordinator's ruling (a), Jeff's
+## to undo): by day, and only where fence.day_markup_at says. "own": a
+## counter of his own, and he has none yet (his night fencing rides the
+## town's store counter), so never today; "store": the town's store counter
+## he fronts, as 586 built it. Missing: "own".
+func marks_up(fence: String) -> bool:
+	return fence == FENCE_DAY and str(fence_rule().get("day_markup_at", "own")) == "store"
 
 
 ## Why grave goods aren't bought at a counter whose fence state is
@@ -905,7 +915,9 @@ func barter_quote(town: String, player_id: String, gives: Array, takes: Array, f
 	var cat: Dictionary = catalog.call()
 	var out := {"ok": false, "gives": [], "takes": [], "balance": 0, "why": ""}
 	var ids: Array = gives.map(func(give: Dictionary) -> String: return str(give["id"]))
-	var offered := buys(town, ids, player_id if fence.is_empty() else "")
+	var offered := buys(town, ids, "" if marks_up(fence) else player_id)
+	# Grave goods are fenced at half the plain price, never a trusted one (586 amended (1)).
+	var plain := offered if marks_up(fence) or not gives.any(func(give: Dictionary) -> bool: return bool(give.get("fenced", false))) 			else buys(town, ids, "")
 	var counts := {}
 	var paid := 0
 	for give: Dictionary in gives:
@@ -924,7 +936,7 @@ func barter_quote(town: String, player_id: String, gives: Array, takes: Array, f
 			return out
 		var gold_each := int(offered[id]["gold"])
 		if bool(give.get("fenced", false)):
-			gold_each = fence_price(gold_each)
+			gold_each = fence_price(int(plain[id]["gold"]))
 		out["gives"].append(gold_each)
 		paid += gold_each
 	var cost := 0
@@ -982,7 +994,7 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1] if at < 0 else at
 	if is_fenced and at < 0:
 		pays = fence_price(pays)
-	elif at < 0 and fence.is_empty():
+	elif at < 0 and not marks_up(fence):
 		pays = trusted_sell(town, player_id, id, pays, cat, (cat.get(id, {}).get("yield", {}) as Dictionary).is_empty())
 	pay_for_player(town, pays, "bought:%s" % player_id)
 	add_gold(player_id, pays, "sold %s" % id)

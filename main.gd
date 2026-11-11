@@ -8339,8 +8339,8 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 	if not place.is_empty() and World.economy != null:
 		var fence_now := World.fence_state(shop)
 		data["goods"] = World.economy.goods(place, fence_now, player.player_id)
-		data["offers"] = World.economy.offers(place, Array(player.slots), player.player_id if fence_now.is_empty() else "")
-		if fence_now.is_empty() and World.economy.trusted(place, player.player_id):
+		data["offers"] = World.economy.offers(place, Array(player.slots), "" if World.economy.marks_up(fence_now) else player.player_id)
+		if not World.economy.marks_up(fence_now) and World.economy.trusted(place, player.player_id):
 			data["trusted"] = true  # 831: its prices are a trusted player's (ui's mark).
 	Net.message_to(player.owner_peer, "shop", data)
 
@@ -8373,12 +8373,15 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 				"given": {"herbs": int(given.get("herbs", 0)), "antlers": int(given.get("antlers", 0))}}  # 584 amended (2).
 	elif not place.is_empty() and World.economy != null:
 		data["goods"] = World.economy.goods(place, data["fence"], player.player_id)
-		data["buys"] = World.economy.buys(place, Array(player.slots), player.player_id if str(data["fence"]).is_empty() else "")
-		if str(data["fence"]).is_empty() and World.economy.trusted(place, player.player_id):
+		var dear := World.economy.marks_up(str(data["fence"]))  # 586 amended (1): his day markup only where it applies.
+		data["buys"] = World.economy.buys(place, Array(player.slots), "" if dear else player.player_id)
+		if not dear and World.economy.trusted(place, player.player_id):
 			data["trusted"] = true  # 831: its prices are a trusted player's (ui's mark).
+		# Grave goods are fenced at half the plain price, never a trusted one (586 amended (1)).
+		var plain: Dictionary = data["buys"] if dear or data["fence"] != Economy.FENCE_NIGHT else World.economy.buys(place, Array(player.slots), "")
 		for each: Dictionary in data["pack"]:
-			if data["fence"] == Economy.FENCE_NIGHT and data["buys"].has(each["id"]) and World.items.is_grave(int(each["uid"])):
-				data["fenced"][each["uid"]] = World.economy.fence_price(int(data["buys"][each["id"]]["gold"]))
+			if data["fence"] == Economy.FENCE_NIGHT and plain.has(each["id"]) and World.items.is_grave(int(each["uid"])):
+				data["fenced"][each["uid"]] = World.economy.fence_price(int(plain[each["id"]]["gold"]))
 	Net.message_to(player.owner_peer, "barter", data)
 
 

@@ -293,7 +293,27 @@ func _test_trusted_prices() -> void:
 	_check(rows.size() == 1 and int(rows[0]["price"]) == economy.trusted_buy(shelf) and int(rows[0]["price"]) < shelf
 		and int(economy.goods(TOWN, "", "p1")[0]["price"]) == shelf and int(economy.goods(TOWN)[0]["price"]) == shelf,
 		"a sword on the shelf at %d: %d to pt, %d to anyone else" % [shelf, rows[0]["price"], shelf])
-	_check(int(economy.goods(TOWN, Economy.FENCE_DAY, "pt")[0]["price"]) == economy.fence_markup(shelf, Economy.FENCE_DAY), "the fence stays the fence")
+	# 586 amended (1): Snagfin's day markup only at a counter of his own (none yet); the store he fronts keeps its prices.
+	_check(int(economy.goods(TOWN, Economy.FENCE_DAY, "pt")[0]["price"]) == economy.trusted_buy(shelf)
+		and int(economy.goods(TOWN, Economy.FENCE_NIGHT, "pt")[0]["price"]) == economy.trusted_buy(shelf)
+		and int(economy.goods(TOWN, Economy.FENCE_DAY, "p1")[0]["price"]) == shelf and int(economy.goods(TOWN, Economy.FENCE_NIGHT, "p1")[0]["price"]) == shelf,
+		"at the store Snagfin fronts, by day and by night: %d to pt, %d to p1, no day markup (586 amended (1))" % [economy.trusted_buy(shelf), shelf])
+	var pt_offers := economy.offers(TOWN, ids, "pt")
+	var p1_offers := economy.offers(TOWN, ids, "p1")
+	var graved := ""
+	for id: String in ids:
+		if graved.is_empty() and p1_offers.has(id) and int(pt_offers.get(id, 0)) > int(p1_offers[id]):
+			graved = id
+	var night_sale := economy.barter_quote(TOWN, "pt", [{"id": graved, "fenced": true}], [], Economy.FENCE_NIGHT)
+	var plain_gold := int(economy.buys(TOWN, [graved], "").get(graved, {}).get("gold", -1))
+	_check(not graved.is_empty() and night_sale["ok"] and int(night_sale["gives"][0]) == economy.fence_price(plain_gold)
+		and economy.barter_quote(TOWN, "pt", [{"id": graved, "fenced": true}], [], Economy.FENCE_DAY)["why"] == "not by day",
+		"pt's grave-goods %s by night: fenced at half the plain %d (%s), never the trusted price; refused by day, as before" % [graved, plain_gold, night_sale])
+	economy.rules["fence"]["day_markup_at"] = "store"
+	_check(int(economy.goods(TOWN, Economy.FENCE_DAY, "pt")[0]["price"]) == ceili(shelf * 1.3)
+		and int(economy.goods(TOWN, Economy.FENCE_NIGHT, "pt")[0]["price"]) == economy.trusted_buy(shelf),
+		"day_markup_at \"store\" (586 as built, one line of data): by day %d to pt, marked up and no trusted price; by night trusted" % ceili(shelf * 1.3))
+	economy.rules["fence"]["day_markup_at"] = "own"
 	economy.add_gold("pt", 100, "test")
 	var deal := economy.buy("pt", TOWN, uid)
 	_check(deal["ok"] and int(deal["price"]) == economy.trusted_buy(shelf), "pt buys it at the trusted price (%s)" % [deal])
@@ -551,12 +571,17 @@ func _test_barter() -> void:
 	var with_fence: Dictionary = economy.rules.duplicate(true)
 	with_fence["fence"] = Production.read_rules(Economy.PATH)["fence"]
 	economy.rules = with_fence
-	_check(economy.rules["fence"]["by"] == "snagfin" and float(economy.rules["fence"]["factor"]) == 0.5 and float(economy.rules["fence"]["day_markup"]) == 1.3,
-		"the fence's rules are economy.json's: Snagfin, half, 1.3 by day")
+	_check(economy.rules["fence"]["by"] == "snagfin" and float(economy.rules["fence"]["factor"]) == 0.5 and float(economy.rules["fence"]["day_markup"]) == 1.3
+		and economy.rules["fence"]["day_markup_at"] == "own",
+		"the fence's rules are economy.json's: Snagfin, half, 1.3 by day at a counter of his own (586 amended (1))")
 	var other := _shop_sword(economy)
-	_check(economy.goods(TOWN, Economy.FENCE_DAY).filter(func(each: Dictionary) -> bool: return each["uid"] == other)[0]["price"] == ceili(18 * 1.3)
-		and economy.goods(TOWN, Economy.FENCE_NIGHT).filter(func(each: Dictionary) -> bool: return each["uid"] == other)[0]["price"] == 18,
-		"his goods by day: 18 marked up to %d; by night 18" % ceili(18 * 1.3))
+	var priced := func(fence: String) -> int: return int(economy.goods(TOWN, fence).filter(func(each: Dictionary) -> bool: return each["uid"] == other)[0]["price"])
+	_check(priced.call(Economy.FENCE_DAY) == 18 and priced.call(Economy.FENCE_NIGHT) == 18 and not economy.marks_up(Economy.FENCE_DAY),
+		"the store he fronts: 18 by day and by night (586 amended (1): he has no counter of his own yet)")
+	economy.rules["fence"]["day_markup_at"] = "store"
+	_check(priced.call(Economy.FENCE_DAY) == ceili(18 * 1.3) and priced.call(Economy.FENCE_NIGHT) == 18 and priced.call("") == 18,
+		"day_markup_at \"store\": 18 marked up to %d by day; by night 18; any other counter 18" % ceili(18 * 1.3))
+	economy.rules["fence"]["day_markup_at"] = "own"
 	_check(economy.fence_by() == "", "no Snagfin in this town: no fence")
 	economy.production.add_worker("snagfin", "Snagfin", ["merchant"], TOWN, "settled", "merchant")
 	_check(economy.fence_by() == "snagfin", "Snagfin in town: the fence")
