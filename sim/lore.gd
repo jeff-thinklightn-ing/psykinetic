@@ -131,6 +131,7 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 			if knows and (about.is_empty() or _about(fact, entry, about)):
 				out.append({"id": fact.get("id", ""), "text": fact.get("text", ""),
 						"hearsay": known == "rumour", "memory": known == "lived", "secret": known == "secret",
+						"speaks_as_rumour": known == "rumour" and fact.get("speaks_as_rumour", false) == true,  # Its text already says it is hearsay.
 						"kept": known == "secret" and knower in fact.get("kept_by", []),
 						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT)),
 						"sight": str(fact.get("sight", ""))})  # A thing to point at there (lore's, for place talk).

@@ -26,8 +26,7 @@
 					"known": "common",
 					"where": [],
 					"source": "Jeff",
-					"status": "agreed",
-					"weight": 2
+					"status": "agreed"
 				},
 				{
 					"id": "town.cursed",
@@ -71,6 +70,11 @@
 					"known": "common",
 					"where": [
 						"blood_rot_lands"
+					],
+					"tags": [
+						"danger",
+						"dangerous",
+						"safe"
 					],
 					"source": "Jeff",
 					"status": "agreed",

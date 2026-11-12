@@ -190,6 +190,7 @@
 					"text": "Rumour tells of a great dwarven forge deep below the castle.",
 					"known": "rumour",
 					"true": true,
+					"speaks_as_rumour": true,
 					"where": [
 						"town_lands"
 					],
@@ -442,7 +443,10 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"food",
+						"eat"
+					],
 					"source": "game",
 					"status": "agreed",
 					"weight": 3

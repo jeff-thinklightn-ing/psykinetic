@@ -20,6 +20,9 @@ const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "c
 const WEIGHED_TRADES := ["taverner", "merchant", "cook", "carpenter", "farmer", "hunter", "tanner", "woodcutter", "priest", "medicine_man"]
 const UMBRAGE_ITSELF := ["town", "temple", "last_light", "town_pond", "farmstead", "crypt"]
 
+## A rumour's text that already speaks as hearsay, which must carry speaks_as_rumour.
+var SAYS_RUMOUR := RegEx.create_from_string("(?i)^(rumour|rumor|it is said|they say|some say|folk say|people say|word is|the story goes)\\b")
+
 var _failures := 0
 var _entries := {}
 var _knowers := {}
@@ -104,6 +107,12 @@ func _test_facts() -> void:
 			var known: Variant = fact.get("known")
 			if known == "rumour":
 				ok = ok and fact.get("true") is bool
+			# speaks_as_rumour marks a rumour whose text already says it is hearsay ("Rumour tells of..."), so
+			# no "It is said that" goes before it (the coordinator's ruling 11-12); true or absent, never on another.
+			if fact.has("speaks_as_rumour"):
+				ok = ok and known == "rumour" and fact["speaks_as_rumour"] is bool and fact["speaks_as_rumour"]
+			elif known == "rumour" and SAYS_RUMOUR.search(String(fact.get("text", ""))) != null:
+				ok = false  # Worded as hearsay without the flag: the wrapper would say it twice.
 			if known == "secret" or known == "lived":
 				ok = ok and fact.get("knowers") is Array and not fact["knowers"].is_empty()
 			for knower in fact.get("knowers", []):
@@ -199,7 +208,7 @@ func _test_known_by() -> void:
 			{"id": "a.there", "text": "there", "known": "common", "where": ["far"]},
 			{"id": "a.all", "text": "all", "known": "common", "where": []},
 			{"id": "a.old", "text": "old", "known": "common", "where": ["far"], "tags": ["history"]},
-			{"id": "a.said", "text": "said", "known": "rumour", "where": ["near"], "true": false},
+			{"id": "a.said", "text": "said", "known": "rumour", "where": ["near"], "true": false, "speaks_as_rumour": true},
 			{"id": "a.hid", "text": "hid", "known": "secret", "where": [], "knowers": ["sage"]},
 			{"id": "a.kept", "text": "kept", "known": "secret", "where": [], "knowers": ["wren", "folk"], "kept_by": ["wren"]},
 			{"id": "a.mine", "text": "mine", "known": "lived", "where": [], "knowers": ["wren"]},
@@ -229,6 +238,7 @@ func _test_known_by() -> void:
 	var said: Dictionary = Lore.known_by("folk").filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.said")[0]
 	var mine: Dictionary = Lore.known_by("wren").filter(func(fact: Dictionary) -> bool: return fact["id"] == "a.mine")[0]
 	_check(said["hearsay"] and not said.has("true") and mine["memory"] and not said["memory"], "a rumour comes as hearsay, its truth kept back; a lived fact as memory")
+	_check(said["speaks_as_rumour"] and not mine["speaks_as_rumour"], "a rumour worded as hearsay says so (speaks_as_rumour); other facts don't")
 	_check(not "a.draft" in ids.call("folk") and "a.draft" in ids.call("folk", "draft"), "a draft fact counts only when drafts are previewed")
 	_check(not "a.asked" in ids.call("folk", "draft"), "an asked fact never counts")
 	_check(not "b.over" in ids.call("folk"), "an agreed fact in a draft entry does not count")

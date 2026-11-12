@@ -86,6 +86,9 @@ Each file is `{"_about": "...", "entries": [...]}`.
     means everyone).
   - `rumour`: told as hearsay where `where` says. `true` (required) records whether
     it is so, so a false rumour can stand without the lore contradicting itself.
+    `speaks_as_rumour: true` marks one whose text already says it is hearsay ("Rumour
+    tells of..."), so a voice puts no "It is said that" before it (the coordinator's
+    ruling 2026-11-12); lore_test refuses a rumour worded so without it.
   - `secret`: known only to the ids in `knowers`.
   - `lived`: one person's own experience, known only to `knowers`, and spoken of as
     memory.
@@ -109,7 +112,7 @@ companions tree's business.
 
 `Lore` (`sim/lore.gd`) reads the files and applies this (decision 289):
 `Lore.known_by("wren")` gives `[{id, text, hearsay, memory, where, weight}]` for the
-agreed facts she knows. A rumour's `true` is never handed out.
+agreed facts she knows (with `speaks_as_rumour`, `secret`, `kept` and `sight`). A rumour's `true` is never handed out.
 `Lore.known_by("wren", ["ore", "rot"])` keeps the facts on those topics: a
 fact's or its entry's tag, the entry's id, or a whole word or phrase of the text
 or the entry's name (any case, a plural "s" allowed).
@@ -120,7 +123,7 @@ others when a prompt has room for only some). Without one it is
 coordinator's ruling 2026-11-10, Jeff's to re-weigh): 3 a trade's lived facts, 2 Umbrage
 itself (the town, the temple, the Mughouse, the farmstead, the pond by town (since 11-12; the far
 pond west of town is not), and since 11-11 the crypt under the temple, never a secret or a fact
-tagged history), else DEFAULT_WEIGHT. lore_test
+tagged history; but the town's name, which the map shows, is 1 since 11-12), else DEFAULT_WEIGHT. lore_test
 refuses any other weight.
 Fact text is a third-person statement: lore_test refuses I, we or you in a fact or
 a summary. To see what a knower would know:

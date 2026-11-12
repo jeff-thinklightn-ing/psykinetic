@@ -4551,6 +4551,15 @@ How a companion's prompt uses the facts stays the companions tree's business.
 Rejected: each reader filtering the JSON itself (the status gate and the truth
 flag would be repeated, and one day missed).
 
+289 amended (1) (the coordinator's ruling, 2026-11-12, after lore's survey of Umbrage's voices; the label
+from decision_number.sh): a rumour fact may carry `speaks_as_rumour: true` when its text already says it is
+hearsay, and known_by hands every fact `speaks_as_rumour` (false unless a rumour so marked). Jeff's
+smith.forge_rumour, "Rumour tells of a great dwarven forge deep below the castle.", came out of npc's
+wrapper as "It is said that rumour tells of...", in every voice asked about the smith. Jeff's wording stays;
+the wrapper (npc's side) leaves a marked text as it is. lore_test refuses a rumour that opens as hearsay
+("Rumour", "It is said", "They say"...) without the flag. Rejected: npc matching the words itself (a second
+list of hearsay openings to keep in step with the data, and a false match on a plain fact).
+
 ## 280. Prices from value and need; players' own gold; trade at a shop counter, taxed for the town
 
 Economy step 5 (sim/economy.gd, World.economy, saved as "economy").
