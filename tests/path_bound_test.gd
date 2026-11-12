@@ -45,6 +45,7 @@ func _ready() -> void:
 		World.enter_named(map)
 		_test_companion_walks(map)
 	_test_walled_off()
+	_test_link_cells()
 	print("RESULT: %s" % ("PASS" if _failures == 0 else "FAIL (%d)" % _failures))
 	get_tree().quit(0 if _failures == 0 else 1)
 
@@ -281,3 +282,51 @@ func _test_walled_off() -> void:
 	body.free()
 	_check(open.is_empty() and bounded.is_empty(), "%s to %s ringed by bodies: no way either way (unbounded %d ms, bounded %d ms)" % [
 		from, goal, (t1 - t0) / 1000, (t2 - t1) / 1000])
+
+
+## A level link's cell is a step only as the goal (the link fix, after 875): try_move refuses any body
+## but a player onto one (571), so a route across one stalled at it for ever (Rolf asleep on his feet a
+## night at the Mughouse's door). Open ground with a link cell on the straight way: the way goes round it,
+## a resident's legs too, and a way whose goal is the link still ends on it.
+func _test_link_cells() -> void:
+	print("== a link's cell: round it, unless it is the goal ==")
+	_main.load_map("wilds")
+	World.enter_named("wilds")
+	var from := Vector2i.ZERO
+	var found := false
+	for cell in World.floor_cells():
+		var clear := true
+		for dy in range(-3, 4):
+			for dx in range(-1, 14):
+				var at := cell + Vector2i(dx, dy)
+				if not World.is_walkable(at) or World._occupancy.has(at) or World.is_link_cell(at):
+					clear = false
+		if clear:
+			from = cell
+			found = true
+			break
+	_check(found, "open ground for it at %s" % from)
+	var goal := from + Vector2i(12, 0)
+	var straight := World.find_path(from, goal, false, null, Resident.RESIDENT_SEARCH_TILES, false, {}, true,
+			World.PATH_FIRE_EXTRA, Resident.RESIDENT_BODIES_WITHIN)
+	var link := from + Vector2i(6, 0)
+	_check(link in straight, "with no link, the straight way crosses %s (%d steps)" % [link, straight.size()])
+	World.fields.link_cells[link] = true
+	World.fields.link_cells[link + Vector2i(0, 1)] = true
+	var way := World.find_path(from, goal, false, null, Resident.RESIDENT_SEARCH_TILES, false, {}, true,
+			World.PATH_FIRE_EXTRA, Resident.RESIDENT_BODIES_WITHIN)
+	var on_links := way.filter(func(cell: Vector2i) -> bool: return World.is_link_cell(cell))
+	_check(not way.is_empty() and way[-1] == goal and on_links.is_empty(),
+		"a link's cell on its way: round it to the goal (%d steps, on links %s)" % [way.size(), on_links])
+	var legs := World.legs_path(from, way, goal)
+	var legs_on := legs.filter(func(cell: Vector2i) -> bool: return World.is_link_cell(cell))
+	_check(not legs.is_empty() and legs[-1] == goal and legs_on.is_empty(),
+		"a resident's legs keep off it too (%d steps, on links %s)" % [legs.size(), legs_on])
+	_check(not World._line_clear(from, goal, goal, null) and World._line_clear(from, link, link, null),
+		"a straight line across it is not clear; one ending on it is")
+	var to_link := World.find_path(from, link, false, null, Resident.RESIDENT_SEARCH_TILES)
+	var before := to_link.slice(0, maxi(to_link.size() - 1, 0)).filter(func(cell: Vector2i) -> bool: return World.is_link_cell(cell))
+	_check(not to_link.is_empty() and to_link[-1] == link and before.is_empty(),
+		"its goal the link: the way ends on it (%d steps, other links on it %s)" % [to_link.size(), before])
+	World.fields.link_cells.erase(link)
+	World.fields.link_cells.erase(link + Vector2i(0, 1))

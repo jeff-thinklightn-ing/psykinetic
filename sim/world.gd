@@ -13433,6 +13433,11 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 	var heap_keys := PackedInt64Array()
 	var heap_cells := PackedInt32Array()
 	var walled := not walls.is_empty()
+	# A level link's cell is a step for none but as the goal (the link fix, after 875): try_move refuses
+	# any body but a player onto one (571), and a player stepping on one travels, so a route across one
+	# stalled at it for ever (Rolf stood asleep a night at the Mughouse's door re-finding one).
+	var links: Dictionary = fields.link_cells
+	var links_any := not links.is_empty()
 	heap_keys.append(best_left << PATH_ORDER_BITS)
 	heap_cells.append(from_at)
 	var offsets := PackedInt32Array()
@@ -13513,6 +13518,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			if shut and not opens_doors:
 				continue
 			var next := current + direction
+			if links_any and next_at != to_at and links.has(next):
+				continue
 			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore 					and not (ignore != null and _own_companion_of(_occupancy[next], ignore)) 					and (bodies_within <= 0 or maxi(absi(next.x - from.x), absi(next.y - from.y)) <= bodies_within):
 				continue
 			if walled and walls.has(next):
@@ -13668,7 +13675,8 @@ static func line_cells(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 
 ## Whether every step of the line from [param a] to [param b] could be
 ## walked as find_path walks (decision 678): the terrain lets it (walls,
-## corners, heights; doors open), nobody stands in it but [param ignore],
+## corners, heights; doors open), no level link's cell but [param goal] is on it,
+## nobody stands in it but [param ignore],
 ## its own companion (find_path) or whoever holds [param goal], and it is
 ## not on fire.
 func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -> bool:
@@ -13676,6 +13684,8 @@ func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -
 	for next in line_cells(a, b):
 		if _terrain_blocks_step(at, next - at, true):
 			return false
+		if next != goal and fields.link_cells.has(next):
+			return false  # A link's cell is a step only as the goal (the link fix, as find_path).
 		if next != goal and _occupancy.has(next) and _occupancy[next] != ignore 				and not (ignore != null and _own_companion_of(_occupancy[next], ignore)):
 			return false
 		if is_burning(next):

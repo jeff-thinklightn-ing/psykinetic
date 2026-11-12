@@ -50686,3 +50686,20 @@ whole, T10 not taken for T1) and _test_answer_panel (the fault block and its Ent
 three and "7 more", unfolded in place; four shown whole; a chip, not its mark; a coordinate whole; an
 old server's summary). New class_name: BuilderPanel. Tools only (builder mode is Jeff's): no package,
 no bullet.
+## 879. A level link's cell is a step only as the goal
+
+A level link's cell is a player's way out alone (571): World.try_move refuses any other body onto one,
+and a player stepping on one travels. World.find_path planned across them all the same, so a body
+whose best way crossed one (a doorway's two link cells) was refused at that step, dropped its route
+after its tries, found the same route again, and stood there: Rolf asleep on his feet a whole night at
+(180, 207), by the Mughouse's door, a free bedroll 17 steps off (npc's look at Umbrage, 875's probe;
+the coordinator's ruling, 2026-11-12). find_path now never steps onto a link's cell but its goal, and
+World._line_clear (a resident's legs, 853 amended (6), and the player's straight runs, 678) refuses a
+line across one but to its goal. A chase or a walk to a link (a band's ways_out, a player standing in
+a doorway's link) still plans to it; where a link was the only way through, a nearest search comes
+back as far as a walk can get, not a route that stalls. Companions, enemy-ai and physics confirmed
+nothing of theirs relies on a route across one; physics carries the same rule into Main.body_line_clear
+(689 amended) after this lands. path_bound_test _test_link_cells: on open ground with a link cell on
+the straight way, the way and a resident's legs go round it to the goal, a line across it is not clear,
+and a way whose goal is the link ends on it. Server and client (the player's route); protocol
+unchanged; no new class_name.
