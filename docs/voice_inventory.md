@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Only in the party log (23)
+## Only in the party log (16)
 
 Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
 client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
@@ -32,13 +32,6 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s is free%s. | `main.gd` companion_freed() |
 | and waits in | `main.gd` companion_freed() |
 | %s said: "%s" | `main.gd` _on_companion_said() |
-| %s's %s is %s now. | `main.gd` _narrate_named() |
-| %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
-| %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
-| %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
-| %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
-| %s keeps %s from %s. | `main.gd` _narrate_kept() |
-| %s is back with %s. | `main.gd` _narrate_kept() |
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
@@ -55,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2857)
+## Lines in the code (2861)
 
 ### companions (Pip, Wren, Nix) (656)
 
@@ -2067,7 +2060,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (738)
+### server and windows (742)
 
 | | Line | Where |
 |---|---|---|
@@ -2427,7 +2420,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | the fallen knight | `main.gd` KNIGHT_UNNAMED |
 |  | %s shoved %s | `main.gd` _narrate_push() |
 |  | %s's charge breaks on %s's spear. | `main.gd` _narrate_brace() |
-| U | %s's %s is %s now. | `main.gd` _narrate_named() |
+|  | Your %s is %s now. | `main.gd` _narrate_named() |
+|  | %s's %s is %s now. | `main.gd` _narrate_named() |
 |  | %s is named for %s now, after long use. | `main.gd` _card_named() |
 |  | %s kept %s from her. | `main.gd` _card_kept() |
 |  | kept %s from you | `main.gd` _card_kept() |
@@ -2448,12 +2442,15 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | holds a grudge against %s | `main.gd` _card_grew() |
 |  | has had its vengeance on %s | `main.gd` _card_grew() |
 |  | %s fell, and was brought back at %s%s. | `main.gd` return_fact() |
-| U | %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
-| U | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
-| U | %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
-| U | %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
-| U | %s keeps %s from %s. | `main.gd` _narrate_kept() |
-| U | %s is back with %s. | `main.gd` _narrate_kept() |
+|  | %s has felled so many %s it is their bane. | `main.gd` _narrate_grew() |
+|  | %s has seen you hurt by %s often enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
+|  | %s has seen its bearers hurt by %s often enough: it holds a grudge against them. | `main.gd` _narrate_grew() |
+|  | %s has had its vengeance on %s. | `main.gd` _narrate_grew() |
+|  | %s has seen enough use to grow: it counts what it fells now. | `main.gd` _narrate_grew() |
+|  | %s is yours now. | `main.gd` _narrate_kept() |
+|  | %s has %s now. | `main.gd` _narrate_kept() |
+|  | %s is back with you. | `main.gd` _narrate_kept() |
+|  | %s is back with %s. | `main.gd` _narrate_kept() |
 |  | %s takes up %s and puts down %s. | `main.gd` _narrate_swap() |
 |  | Your arms give out. | `main.gd` _tell_arms_gave() |
 |  | %s knocks %s down. | `main.gd` _narrate_down() |
