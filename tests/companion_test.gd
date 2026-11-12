@@ -163,6 +163,7 @@ func _ready() -> void:
 	_test_held_for_bandage()
 	_test_carried_slots()
 	_test_tends_unasked()
+	_test_warm_tell()
 	_test_drinks_a_remedy()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
@@ -7181,6 +7182,145 @@ func _test_tends_unasked() -> void:
 	owner.mending = 0
 	pet.hp = hp_was
 	pet.mending = 0
+	Companion.tends_unasked = false
+	_settle(pet)
+
+
+func _test_warm_tell() -> void:
+	print("\n== hurt, no kit: she names a warm rest and offers to take him; once a spell, one place once a day, quiet by one; the stall once (616 amended (4)) ==")
+	Companion.tends_unasked = true
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	var slots_were := pet.slots.duplicate()
+	var owner_slots := owner.slots.duplicate()
+	var hp_was := pet.hp
+	var calls := [pet.warm_place, pet.warm_offer, pet.kit_seller]
+	World.set_slots(pet, [])
+	World.set_slots(owner, [])
+	pet.told_warm = {}
+	pet.told_kit_seller = false
+	pet._warm_spell = false
+	_put(owner, Vector2i(9, 7))
+	_put(pet, Vector2i(10, 9))
+	var rests: Array[Dictionary] = [
+		{"key": "a/one", "kind": "place", "name": "the camp by the bridge", "area": "a", "cell": Vector2i(1, 1)},
+		{"key": "a/two", "kind": "place", "name": "the square's fire", "area": "a", "cell": Vector2i(2, 2)}]
+	var state := {"near": false, "seller": ""}
+	pet.warm_place = func(said: Array) -> Dictionary:
+		if state["near"]:
+			return {"near": true}
+		for rest: Dictionary in rests:
+			if not str(rest["key"]) in said:
+				return rest
+		return {}
+	var offered: Array[Dictionary] = []
+	pet.warm_offer = func(to: Dictionary) -> void: offered.append(to)
+	pet.kit_seller = func() -> String: return str(state["seller"])
+	var low := int(floor(Companion.WARM_TELL_BELOW * owner.max_hp + 0.0001))
+	var told := func(name: String) -> int:
+		var lines := Companion.WARM_TELL.map(func(line: String) -> String: return line % name)
+		return spoken.filter(func(line: String) -> bool: return line in lines).size()
+	var hurt := func(hp: int) -> void:
+		owner.hp = owner.max_hp  # Mended first: a spell ends over TEND_BELOW.
+		for i in Companion.TEND_EVERY + 1:
+			World.step()
+		owner.hp = hp
+		owner.mending = 0
+		owner.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+		pet.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+		for i in Companion.TEND_EVERY * 3:
+			World.step()
+	hurt.call(low + 1)
+	_check(spoken.is_empty(), "at %d of %d, over %d: nothing said (%s)" % [low + 1, owner.max_hp, low, spoken])
+	hurt.call(low)
+	_check(told.call("the camp by the bridge") == 1 and offered.size() == 1 and offered[0]["key"] == "a/one",
+		"at %d of %d, no kit: she names the nearest rest and offers to take him (%s)" % [low, owner.max_hp, spoken])
+	for i in Companion.TEND_EVERY * 4:
+		World.step()
+	_check(spoken.size() == 1, "and says it once a hurt spell (%s)" % [spoken])
+	hurt.call(low)
+	_check(told.call("the camp by the bridge") == 1 and told.call("the square's fire") == 1 and offered.size() == 2,
+		"mended and hurt again: a new spell, and not the same place twice in a day (%s)" % [spoken])
+	hurt.call(low)
+	_check(spoken.size() == 2, "every rest named today, no stall near: nothing (%s)" % [spoken])
+	state["seller"] = "Rolf"
+	hurt.call(low)
+	_check(spoken.size() == 3 and spoken[2] == Companion.KIT_SELLER % "Rolf" and pet.told_kit_seller,
+		"no rest to name, by a stall that sells kits: she says who sells them (%s)" % [spoken])
+	hurt.call(low)
+	_check(spoken.size() == 3, "and that once ever (%s)" % [spoken])
+	pet.told_warm["day"] = int(pet.told_warm["day"]) - 1
+	hurt.call(low)
+	_check(told.call("the camp by the bridge") == 2, "a new day: the nearest named again (%s)" % [spoken])
+	var picked := {}
+	for at: int in range(0, Companion.TEND_EVERY * 12, Companion.TEND_EVERY):
+		picked[absi(hash(Companion._name_of(pet) + str(at / Companion.TEND_EVERY))) % Companion.WARM_TELL.size()] = true
+	_check(picked.size() == Companion.WARM_TELL.size(), "her three ways of saying it all come up over a dozen tells (%s)" % [picked.keys()])
+	state["near"] = true
+	pet.told_warm = {}
+	hurt.call(low)
+	_check(spoken.size() == 4, "by a rest, or on his way to one: nothing (%s)" % [spoken])
+	state["near"] = false
+	World.set_slots(owner, ["bandaging_kit"])
+	hurt.call(low)
+	_check(spoken.size() == 4, "a kit in his pack: nothing (%s)" % [spoken])
+	World.set_slots(owner, [])
+	World.set_slots(pet, ["bandaging_kit"])
+	pet.told_tending = true
+	pet._tend_after = 0
+	hurt.call(low)
+	_check(spoken.size() == 4 and owner.mending != 0, "a kit in hers: she bandages him, and tells nothing (%s, mending %d)" % [spoken, owner.mending])
+	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	World.set_slots(pet, [])
+	owner.mending = 0
+	var imp := _spawn_imp(_free_tile_between(pet, 3, 4))
+	imp.acts = false
+	hurt.call(low)
+	_check(spoken.size() == 4, "a monster near: not in a fight (%s)" % [spoken])
+	World.despawn(imp)
+	pet.said.disconnect(on_said)
+	pet.warm_place = calls[0]
+	pet.warm_offer = calls[1]
+	pet.kit_seller = calls[2]
+	# Her offer is kept for his yes, and she leads, bond or none (_leads_to).
+	var was: Variant = _bond_as(0)
+	var dest: Vector2i = _main._nearest_free(Vector2i(14, 7))
+	_main._warm_offer({"key": "test/warm", "kind": "place", "name": "the test fire", "area": String(World.zone.name), "cell": dest,
+		"at": dest, "reach": 2}, pet)
+	_main._guide_said(owner, pet, "yes please")
+	_check(not pet.bond_at_least("devoted") and pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == "test/warm",
+		"his yes to it: she leads him there, though not devoted (%s)" % [pet.bond_step])
+	if pet.guide != null:
+		_main._guide_done(pet, "moved")
+	_bond_as(0, was)
+	# Main's warm rests, from the levels.
+	var keys := func(area: String) -> Array:
+		return _main._warm_rest_places(area).map(func(each: Dictionary) -> String: return str(each["key"]))
+	var hills: Array = keys.call("hills")
+	_check("hills/bridge_camp" in hills and "hills/spur_camp" in hills, "the hills: its two roadside camps (%s)" % [hills])
+	var forest: Array = keys.call("forest")
+	_check("forest/north_traders_camp" in forest and "forest/south_traders_camp" in forest
+		and not forest.any(func(key: String) -> bool: return str(World.holdings.place(key).get("start", "")) not in [Factions.NOBODY, ""]),
+		"the forest: the traders' camps, never a band's (%s)" % [forest])
+	var wilds: Array[Dictionary] = _main._warm_rest_places("wilds")
+	var mughouse := wilds.filter(func(each: Dictionary) -> bool: return each["key"] == "umbrage_tavern/tavern")
+	_check(mughouse.size() == 1 and mughouse[0]["name"] == "the Mughouse" and mughouse[0]["at"] != mughouse[0]["cell"],
+		"the wilds: the Mughouse, at its door (%s)" % [wilds.map(func(each: Dictionary) -> String: return "%s at %s" % [each["key"], each["at"]])])
+	_check(_main._kit_seller(pet) == "", "away from Umbrage's store: no stall to tell of")
+	World.set_slots(pet, slots_were)
+	World.set_slots(owner, owner_slots)
+	owner.hp = owner.max_hp
+	owner.mending = 0
+	pet.hp = hp_was
+	pet.mending = 0
+	pet.told_warm = {}
+	pet.told_kit_seller = false
+	pet._warm_spell = false
 	Companion.tends_unasked = false
 	_settle(pet)
 

@@ -55,9 +55,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2802)
+## Lines in the code (2807)
 
-### companions (Pip, Wren, Nix) (653)
+### companions (Pip, Wren, Nix) (658)
 
 | | Line | Where |
 |---|---|---|
@@ -145,6 +145,10 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | something striking a door | `sim/companion.gd`  |
 |  | a door breaking | `sim/companion.gd`  |
 |  | Hold still. I've bandages, and that wants seeing to. | `sim/companion.gd` TEND_FIRST |
+|  | You're hurt. Sit a while at %s and you'll mend. Shall I take you? | `sim/companion.gd`  |
+|  | You're in a bad way. There's warmth at %s; I'll take you there, if you like. | `sim/companion.gd`  |
+|  | That wants rest. Come on, %s isn't far. Follow me? | `sim/companion.gd`  |
+|  | %s sells bandaging kits at the stall by the store. You'd do well to have one. | `sim/companion.gd` KIT_SELLER |
 |  | (?i)\\b(i'?ll\|i will\|let me\|i'?m going to\|i can\|on it)\\b | `sim/companion.gd` PROMISE |
 |  | (?i)\\b(i'?ll\|i will\|let me\|i can\|i could\|i'?d (love\|like\|be glad\|be happy) to\|shall i\|should i\|want me to\|i'?m going to\|happy to\|glad to)\\b[^.!?]*\\b((lead\|guide\|take\|bring\|walk)\\s+(you\|us)\\b\|show\\s+(you\|us)\\s+the\\s+way\|lead\\s+the\\s+way)\|\\b(follow me\|come with me)\\b | `sim/companion.gd` LEAD_OFFER |
 |  | \\b(north-east\|north-west\|south-east\|south-west\|north\|south\|east\|west)\\b | `sim/companion.gd` COMPASS_WORD |
@@ -429,6 +433,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | tend your player's wounds | `sim/companion.gd` _tend_unasked() |
 |  | Unasked, you set about bandaging %s. | `sim/companion.gd` _tend_unasked() |
 |  | your own wounds | `sim/companion.gd` _tend_unasked() |
+|  | %s, him at %d of %d | `sim/companion.gd` _warm_tell() |
 |  | Badly hurt, you drank a healing remedy. | `sim/companion.gd` _drink_if_low() |
 |  | %s near the end of %s strength | `sim/companion.gd` strength_words() |
 |  | %s down to half %s strength | `sim/companion.gd` strength_words() |

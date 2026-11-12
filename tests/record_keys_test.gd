@@ -26,7 +26,7 @@ func _ready() -> void:
 	grown.add_fact("Wren keeps a lantern lit at night.", "event", "p")
 	_companion = {
 		"name": "Wren", "card": "Wren, a woman of the hills.", "hp": 3, "stamina": 4, "tile": [5, 6], "tile_zone": "t", "alive": true,
-		"said": ["Over here."], "told_tending": true, "slots": Array(Items.tidy(["dagger"], Companion.SLOTS)), "items": [7],
+		"said": ["Over here."], "told_tending": true, "told_warm": {"day": 3, "places": ["wilds/square_fire"]}, "told_kit_seller": true, "slots": Array(Items.tidy(["dagger"], Companion.SLOTS)), "items": [7],
 		"traits": {"name": "Wren", "birthplace": "the hill farms", "look": {"build": "lean"}, "leanings": {"intellect": 7, "superstition": 4}, "justice": 8},
 		"how_we_met": "In the square.", "card_by": "model", "facts": grown.facts, "beliefs": grown.beliefs, "talk": ["What was that?"],
 		"resident": {"place": "t/store", "zone": "t", "trade": "smith"}, "taken": {"by": "raid-1", "zone": "z", "at": 5},

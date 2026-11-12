@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Badly hurt with no bandaging kit between you, your companion names the nearest warm rest and offers to lead you there, and near Umbrage's store, with no rest to name, she tells you who sells kits (616 amended (4)).
 - Stop in a doorway with your companion following and she comes straight to you, with no pause in the game (818 amended (2)).
 - A companion you've just met carries a bandaging kit and bandages your wounds when things are quiet, once you're down a fifth of your health, and tells you the first time that she's seeing to it (681 amended (1))
 - When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))

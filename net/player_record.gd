@@ -279,6 +279,10 @@ static func companion_from(pet: Variant) -> Dictionary:
 		out["tile_zone"] = str(pet["tile_zone"])  # The zone her tile is in.
 	if pet.get("told_tending") == true:
 		out["told_tending"] = true  # She has said she tends him (681 amended (1)).
+	if pet.get("told_warm") is Dictionary and not (pet["told_warm"] as Dictionary).is_empty():
+		out["told_warm"] = {"day": int(pet["told_warm"].get("day", -1)), "places": _lines(pet["told_warm"].get("places", []))}  # The rests named today (616 amended (4)).
+	if pet.get("told_kit_seller") == true:
+		out["told_kit_seller"] = true  # She has said where kits are sold (616 amended (4)).
 	var traits: Variant = pet.get("traits")
 	if traits is Dictionary and not traits.is_empty():
 		var kept := {}

@@ -8821,6 +8821,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if is_new:
 		_give_starting_kit(pet)
 	pet.told_tending = record.companion.get("told_tending", false) == true
+	pet.told_warm = (record.companion.get("told_warm", {}) as Dictionary).duplicate(true) if record.companion.get("told_warm") is Dictionary else {}
+	pet.told_kit_seller = record.companion.get("told_kit_seller", false) == true
 	pet.party_log = party_log
 	pet.home = record.companion.get("home", {})
 	# The draugr's blessing (decision 544): she brings her downed player back.
@@ -8869,6 +8871,9 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	pet.guide_words = func() -> String: return _roads_words(record, pet)
 	pet.lead_to_fish = _lead_to_fish.bind(pet)
 	pet.fish_lead_place = _fish_lead_place.bind(pet)
+	pet.warm_place = _warm_place.bind(pet)  # The mend tell (616 amended (4)).
+	pet.warm_offer = _warm_offer.bind(pet)
+	pet.kit_seller = _kit_seller.bind(pet)
 	pet.keeper_busy = _keeper_busy.bind(pet)
 	var walk: Guide = _guides.get(record.player_id)
 	if walk != null:
@@ -8946,10 +8951,11 @@ func _want_place(record: PlayerRecord, pet: Companion) -> Dictionary:
 
 
 ## Whether [param pet] would lead her player to [param to] at her bond
-## step: devoted, anywhere she knows; else only her want's place.
+## step: devoted, anywhere she knows; else only her want's place, or
+## where her own mend tell offered to take him ("mend", 616 amended (4)).
 func _leads_to(record: PlayerRecord, pet: Companion, to: Dictionary) -> bool:
-	if pet.bond_at_least("devoted"):
-		return true
+	if pet.bond_at_least("devoted") or to.get("mend") == true:
+		return true  # Devoted (621), or her own mend tell's offer (616 amended (4)).
 	var wanted := _want_place(record, pet)
 	return not wanted.is_empty() and wanted["key"] == to.get("key")
 
@@ -8981,6 +8987,105 @@ func _lead_to_fish(pet: Companion) -> bool:
 		return false
 	_start_guide(pet, player, to)
 	return true
+
+
+## The mend tell's warm rests of [param zone_name] (616 amended (4)), as
+## places she can lead to: {key, kind "place", name, area, cell, at (where it
+## is in this zone), reach}. A roadside rest ("rest"), a camp nobody holds
+## or ever held (the traders'; never a band's, even cleared), the square's
+## fire while it burns ("fire", World.is_fire), and a tavern (the Mughouse)
+## at its way in from this zone, or anywhere inside its own. Lore's names,
+## never a bare "the" for one of two (a traders' camp).
+func _warm_rest_places(zone_name: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.holdings == null:
+		return out
+	var add := func(id: String, at: Vector2i, reach: int) -> void:
+		var place := World.holdings.place(id)
+		out.append({"key": id, "kind": "place", "name": str(place["name"]), "area": str(place["area"]), "cell": place["cell"],
+			"at": at, "reach": reach})
+	for id: String in World.holdings.places_in(zone_name):
+		var place := World.holdings.place(id)
+		if str(place.get("name", "")).is_empty():
+			continue
+		var reach := maxi(int(place.get("radius", 0)), WARM_REACH)
+		match str(place.get("kind", "")):
+			"rest":
+				add.call(id, place["cell"], reach)
+			"camp":
+				# Nobody's from the start and now (the traders'): a band's, even
+				# cleared, is never named (lore).
+				if str(place.get("start", "")) in [Factions.NOBODY, ""] and World.holdings.holder(id) == Factions.NOBODY:
+					add.call(id, place["cell"], reach)
+			"fire":
+				if World.is_fire(place["cell"]):
+					add.call(id, place["cell"], reach)
+			"tavern":
+				add.call(id, place["cell"], 1 << 20)  # Inside it: by it.
+	if _world_map != null:
+		for way: Dictionary in _world_map.ways:
+			if way.get("kind") != "link" or str(way.get("from", "")) != zone_name:
+				continue
+			for id: String in World.holdings.places_in(str(way.get("to", ""))):
+				var place := World.holdings.place(id)
+				var named := not str(place.get("name", "")).is_empty()
+				if str(place.get("kind", "")) == "tavern" and named and not out.any(func(each: Dictionary) -> bool: return each["key"] == id):
+					add.call(id, way["at"], 1)
+	return out
+
+
+## [param pet]'s player's nearest warm rest (616 amended (4)) not among
+## [param said] (the ones named today): {"near": true} while he stands within
+## one's reach or walks toward one (his step's way within 45 degrees of
+## it), {} for none.
+func _warm_place(said: Array, pet: Companion) -> Dictionary:
+	var player := pet.keeper as Player
+	if player == null or not is_instance_valid(player) or not player.spawned:
+		return {}
+	var best: Dictionary = {}
+	var best_d := 1 << 30
+	var going := player.step_velocity.normalized() if Heel.walking_on(player) else Vector2.ZERO
+	for rest: Dictionary in _warm_rest_places(player.zone):
+		var at: Vector2i = rest["at"]
+		var d := World.distance(player.tile, at)
+		if d <= int(rest["reach"]) or going != Vector2.ZERO and going.dot(Vector2(at - player.tile).normalized()) > 0.707:
+			return {"near": true}
+		if str(rest["key"]) in said or d >= best_d:
+			continue
+		best = rest
+		best_d = d
+	return best
+
+
+## Her mend tell's offer to lead to [param to] (616 amended (4)), for her
+## player's yes within Guide.OFFER_S, as her own LEAD_OFFER line keeps one.
+func _warm_offer(to: Dictionary, pet: Companion) -> void:
+	var dest := to.duplicate()
+	dest.erase("at")
+	dest.erase("reach")
+	dest["mend"] = true  # Her own offer: she leads, bond or none (_leads_to).
+	_guide_offers[pet.keeper_id] = {"day": Townsfolk.day_of(World.steps), "to": dest, "tick": World.tick}
+
+
+## Within this many cells of a store whose stall sells bandaging kits, her
+## player is by it (616 amended (4)).
+const KIT_SELLER_NEAR := 30
+
+## The stall keeper's name (economy's vendor: Rolf) when [param pet]'s player
+## is within KIT_SELLER_NEAR of a store whose stall sells bandaging kits; ""
+## else (616 amended (4)).
+func _kit_seller(pet: Companion) -> String:
+	var player := pet.keeper as Player
+	if player == null or not is_instance_valid(player) or World.economy == null or World.holdings == null:
+		return ""
+	var vendor: Dictionary = World.economy.rules.get("vendor", {})
+	if not (vendor.get("wares", []) as Array).any(func(ware: Dictionary) -> bool: return str(ware.get("item", "")) == Main.STARTING_KIT):
+		return ""
+	for town: Variant in vendor.get("towns", []):
+		var store := World.holdings.place(str(town))
+		if not store.is_empty() and str(store["area"]) == player.zone and World.distance(player.tile, store["cell"]) <= KIT_SELLER_NEAR:
+			return str(vendor.get("name", ""))
+	return ""
 
 
 ## The fishing place [param pet] would lead her player to (551 amended (3)):
@@ -14380,6 +14485,8 @@ func _remember_companion(id: String) -> void:
 	record.companion["alive"] = true
 	record.companion["said"] = pet.said_lines()
 	record.companion["told_tending"] = pet.told_tending
+	record.companion["told_warm"] = pet.told_warm.duplicate(true)
+	record.companion["told_kit_seller"] = pet.told_kit_seller
 	record.companion["slots"] = Array(pet.slots)
 	record.companion["items"] = Array(World.slot_uids(pet))
 
@@ -15688,6 +15795,8 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 	if record != null:
 		record.companion["said"] = pet.said_lines()
 		record.companion["told_tending"] = pet.told_tending
+		record.companion["told_warm"] = pet.told_warm.duplicate(true)
+		record.companion["told_kit_seller"] = pet.told_kit_seller
 	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": Companion._name_of(pet), "text": text})
 
 

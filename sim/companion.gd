@@ -412,6 +412,24 @@ const TEND_BELOW := 0.8
 ## (681 amended (1), voice's words): so her player knows she can, and the
 ## kit is hers.
 const TEND_FIRST := "Hold still. I've bandages, and that wants seeing to."
+## The mend tell (616 amended (4); the coordinator's approval, package "a
+## newcomer can mend in town"): her player at WARM_TELL_BELOW of his hp or
+## under, calm, and no bandaging kit with either of them, she names the
+## nearest warm rest in his zone (Main's warm_place: a roadside rest, a
+## traders' camp, the square's fire while it burns, the Mughouse by its
+## door) and offers to take him there, once a hurt spell (until he is back
+## over TEND_BELOW), never the same place twice in a game day (told_warm,
+## on her record), and not at all while he is by one or walking toward it.
+## Voice's words; the places' names lore's.
+const WARM_TELL_BELOW := 0.6
+const WARM_TELL: Array[String] = [
+	"You're hurt. Sit a while at %s and you'll mend. Shall I take you?",
+	"You're in a bad way. There's warmth at %s; I'll take you there, if you like.",
+	"That wants rest. Come on, %s isn't far. Follow me?"]
+## Once ever (told_kit_seller, on her record), on a spell with no rest to
+## name, by a town whose stall sells kits (Main's kit_seller: the stall
+## keeper's name): voice's words.
+const KIT_SELLER := "%s sells bandaging kits at the stall by the store. You'd do well to have one."
 const TEND_BACKOFF := 100
 ## Under this share of her hp she drinks a remedy she carries (681, the
 ## remedy: items' 682 "heal" buff).
@@ -1050,6 +1068,21 @@ var _tend_after := 0
 static var tends_unasked := true
 ## Whether she has said TEND_FIRST (681 amended (1)); kept in her record.
 var told_tending := false
+## The mend tell's (616 amended (4)): {"day", "places"}, the warm rests she
+## has named today; kept in her record.
+var told_warm := {}
+## Whether she has said KIT_SELLER (616 amended (4)); kept in her record.
+var told_kit_seller := false
+## Main's (616 amended (4)): warm_place.call(said ids) -> the nearest warm
+## rest of her player's zone not in them ({key, name, ...}), {"near": true}
+## while he is by one or walking toward one, {} for none; warm_offer.call(it)
+## keeps her offer to lead there for his yes; kit_seller.call() -> the
+## name of the stall keeper selling kits near him, "" for none.
+var warm_place := Callable()
+var warm_offer := Callable()
+var kit_seller := Callable()
+## Told this hurt spell (616 amended (4)): until he is back over TEND_BELOW.
+var _warm_spell := false
 ## Main's (decision 621): whether a cell of her zone is on a road, and in a
 ## town; unset, never.
 var on_road := Callable()
@@ -3368,6 +3401,7 @@ func _sim_tick() -> void:
 	_calm()
 	t = World.turn_part("orders, deeds", t)
 	_tend_unasked()
+	_warm_tell()
 	_drink_if_low()
 	t = World.turn_part("tending", t)
 	_act()
@@ -4225,6 +4259,52 @@ func _tend_unasked() -> void:
 				told_tending = true  # Before _say, so Main's record of what she said keeps it.
 				told_tending = _say(TEND_FIRST, true)
 			return
+
+
+## The mend tell (616 amended (4), WARM_TELL): hurt to WARM_TELL_BELOW,
+## calm, in sight, nothing asked of her and no kit with either of them, she
+## names the nearest warm rest she has not named today and offers to take
+## him; with none, KIT_SELLER once ever by a stall that sells them. Once a
+## hurt spell; silent while he is by a rest or heading to one.
+func _warm_tell() -> void:
+	if not tends_unasked or World.tick % TEND_EVERY != 0 or not _alive(keeper) or keeper.max_hp <= 0:
+		return
+	if float(keeper.hp) > TEND_BELOW * keeper.max_hp + 0.0001:
+		_warm_spell = false  # Mended: the next hurt is a new spell.
+		return
+	if _warm_spell or float(keeper.hp) > WARM_TELL_BELOW * keeper.max_hp + 0.0001 or not warm_place.is_valid():
+		return
+	if not errand.is_empty() or not order.is_empty() or World.is_downed(keeper) or guide != null and guide.going():
+		return
+	if World.bandage_kit(self) >= 0 or World.bandage_kit(keeper) >= 0 or not World.calm(self) or in_fight():
+		return
+	if keeper.zone != zone or World.distance(tile, keeper.tile) > PERCEPTION_RANGE or not senses.sees(keeper):
+		return
+	var day := Townsfolk.day_of(World.steps)
+	if int(told_warm.get("day", -1)) != day:
+		told_warm = {"day": day, "places": []}
+	var place: Dictionary = warm_place.call(told_warm["places"])
+	if place.has("near"):
+		return  # By a rest, or on his way to one: nothing to tell.
+	if not place.is_empty():
+		# By the tick over TEND_EVERY: hash() of a string is x33 a character, so
+		# mod 3 it is its last; a tick on TEND_EVERY always ends in 0.
+		var line := WARM_TELL[absi(hash(_name_of(self) + str(World.tick / TEND_EVERY))) % WARM_TELL.size()] % str(place["name"])
+		if _say(line, true):
+			_warm_spell = true
+			(told_warm["places"] as Array).append(str(place["key"]))
+			if warm_offer.is_valid():
+				warm_offer.call(place)
+			_log({"kind": "voice", "companion": _name_of(self), "trigger": "hurt, no kit", "outcome": "warm tell",
+				"note": "%s, him at %d of %d" % [place["name"], keeper.hp, keeper.max_hp]})
+		return
+	if told_kit_seller or not kit_seller.is_valid():
+		return
+	var seller := str(kit_seller.call())
+	if not seller.is_empty() and _say(KIT_SELLER % seller, true):
+		_warm_spell = true
+		told_kit_seller = true
+		_log({"kind": "voice", "companion": _name_of(self), "trigger": "hurt, no kit, no rest", "outcome": "kit seller", "note": seller})
 
 
 ## Low (under REMEDY_BELOW of her hp), she drinks a remedy she carries
