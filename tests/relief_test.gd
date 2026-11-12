@@ -822,10 +822,12 @@ func _test_wilds() -> void:
 	ring_middle /= maxi(1, stones.size())
 	_check(floor.has(ring_middle) and reached[ring_middle.y * size.x + ring_middle.x] >= 0.0, "the ring's middle %s is walked to, between the stones" % ring_middle)
 	# The woodlot (566 amended): the store's woodlot place, its chopping block
-	# and the woodpile solid, the cells npc's woodcutter stands on walkable.
+	# and the woodpiles solid, the cells npc's woodcutter stands on walkable.
+	# Two woodpiles: the cook shed's (182,194) and the store's (188,194), maps'
+	# (853, maps' side), where the log is carried home.
 	var woodlot: Dictionary = level["places"].get("woodlot", {})
 	var pieces: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] in ["building.chopping_block", "building.woodpile"])
-	_check(woodlot.get("kind", "") == "woodlot" and woodlot.get("town", "") == "store" and pieces.size() == 2
+	_check(woodlot.get("kind", "") == "woodlot" and woodlot.get("town", "") == "store" and pieces.size() == 3
 		and pieces.all(func(b: Dictionary) -> bool: return solid.has((b["rect"] as Rect2i).position))
 		and [Vector2i(195, 225), Vector2i(196, 226), Vector2i(208, 201)].all(func(cell: Vector2i) -> bool: return floor.has(cell)),
 		"the woodlot for the store, its chopping block and the woodpile solid, their stand cells walkable (566 amended)")
