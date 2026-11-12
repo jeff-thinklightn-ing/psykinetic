@@ -234,6 +234,10 @@ code = gate.main(["run", "perf", "scene", "--", G, "--path", "."])
 check(code == 2, "heavy_job run refuses it before queueing (exit %s)" % code)
 code = gate.main(["run", "perf", "scene", "--visible", "--", sys.executable, "-c", "pass"])
 check(code == 0, "--visible is taken as an option (exit %s)" % code)
+code = gate.main(["run", "perf", "scene", "--expect", "300", "--", sys.executable, "-c", "pass"])
+check(code == 2 and not gate._entries("queue"), "a scene with --expect 300 is refused before it queues: a soak (394 amended (32)) (%s)" % code)
+code = gate.main(["run", "perf", "scene", "--expect", "20", "--", sys.executable, "-c", "pass"])
+check(code == 0, "--expect 20 runs (%s)" % code)
 # 394 amended (31): never queue at the gate holding the land lock.
 check(gate.lock_owned("perf", "perf") and gate.lock_owned("psykinetic-release", "release") and gate.lock_owned("items-cast", "items")
     and not gate.lock_owned("ui-design", "ui") and not gate.lock_owned("maps", "perf") and not gate.lock_owned("perf", ""),

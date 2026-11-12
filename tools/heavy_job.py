@@ -251,8 +251,11 @@ KINDS = {
         "fixed_limit": True, "below_normal": True},
     # A test scene run alone (394 amended (17)): beside a suite, below
     # normal priority so the landing's scenes and net_test come first.
+    # max_expect (394 amended (32)): a scene's --expect is at most 20 minutes;
+    # a longer run is a soak (11-11 19:52-20:50: a "scene" row with a
+    # 300-minute limit, 192 runs chained inside it, held a slot of three).
     "scene": {"ram_gb": 1.5, "gpu_gb": 0.0, "gpu": False, "max_running": 2, "excludes": ["bench"], "max_minutes": 30,
-        "below_normal": True},
+        "below_normal": True, "max_expect": 20},
     # A test that starts several Godots, run alone (394 amended (24)): net_test
     # (its servers and four clients, 11.7 GB at once). Its own estimate: as a
     # scene it tripled the scene estimate every tree waits on, as a suite it
@@ -2196,6 +2199,13 @@ def main(args):
                 return 2
             expect = float(options[1])
         command = args[args.index("--") + 1:]
+        most = kinds()[args[2]].get("max_expect")
+        if expect is not None and most is not None and expect > most:
+            print("heavy_job: a %s runs at most %g minutes (--expect %g): a longer run is a soak, "
+                "heavy_job run %s soak --expect %g -- ... (394 amended (32))" % (args[2], most, expect, args[1], expect),
+                file=sys.stderr)
+            log("refused", args[1], args[2], "--expect %g over its kind's %g" % (expect, most))
+            return 2
         problem = None if visible else unseen_problem(command)
         if problem is not None:
             print("heavy_job: not run: %s (664 amended (2))" % problem, file=sys.stderr)

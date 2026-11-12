@@ -10333,6 +10333,17 @@ is counted, and 37's note of an unrevised entry stays out of the summary. The co
 turns over. An "unbeaten" line, the one that catches a pre-31 drop by what it does, now says whose take
 and since when ("unbeaten: <tree> <kind> held N min, since HH:MM, ..."), so release can act on it without reading
 code (the coordinator's ask). Tools and tests only; protocol unchanged; no class_name; no bullet.
+394 amended (32) (perf, 2026-11-11; the coordinator's evening fault (1); label from
+tools/decision_number.sh): a scene's --expect is at most 20 minutes (its kind's "max_expect"); a
+longer one is refused before it queues, exit 2, naming the soak kind to use instead. On 11-11, from
+19:52 to 20:50, a "scene" row with a 300-minute limit (192 runs chained inside it) held one of the
+three slots beside a soak. The coordinator's fault (2), scenes taking a slot past a count-blocked
+suite at the head, is the gate's rule already: a head waiting on the count holds everyone behind
+it. That hour's head (companions-heel, fronted) was out of reach on memory (lean 6.4 + 8 GB at 12.4
+to 13.2 GB free, counting what the running jobs used), so jobs that fit went past it. Holding them
+would not have started it; memory held outside the gate did.
+tests/heavy_job_test: --expect 300 for a scene is refused unqueued; 20 runs. Tools and tests only;
+protocol unchanged; no class_name; no bullet.
 
 ## 395. UI sounds
 
