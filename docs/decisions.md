@@ -49969,6 +49969,28 @@ the smith at his spot, eight bouts within their spans and lengths his own, a tas
 no word and a body turned away showing nothing, spoken to and the fresh bout after, a hail across the
 square, the keeper serving, and a day of shown work moving no stock or gold.
 
+853 amended (11) (people work: the stall's keeper's day is his work; the coordinator's approval, 2026-11-12;
+the label from decision_number.sh). Rolf's body has trade "" (_visitors_wanted), so his day was the
+default's: the well at dawn, the inn at noon and from 18 to 20, all of it at his stall since every place
+of his is the stall, so at maps' vendor spot he would have stood idle at his own counter for those hours
+(saturn's look at Umbrage: "R INN" at his stall at 12:00), and 853 amended (8)'s show needs WORK. A
+"vendor" day in levels/residents.json, 06 to 18 at work (875's Main.INN_TRADERS_DAY) and home after,
+with the night's pick (772) the inn, so 875 lodges him when the Mughouse has room, else his stall as
+before. Resident.day_key gives the stall's keeper (Offers.VENDOR) that day and anyone else its trade's,
+read in Resident.doing_at, so every reader of a body's doing (its tick, Main's spawn, 875's inn goers
+and town side) agrees; his trade stays "", so his voice, offers and lore are unmoved. His sleep is his
+spell by id and his bed, never his day, so his window (_send_offers: not asleep) opens from him at the
+hours it did: all day, and his night as before. He keeps no temple hour (residents.json temple
+"not_for": the vendor's day; Townsfolk.whereabouts): every place of his is his stall, so a temple
+morning only stood him idle there (saturn: TEMPLE at his stall till 09). His day's edges move by his
+own offset (offset_hours, up to 0.75 h) and the season like everyone's, so his stall's work runs
+about 05:15 to 17:15 or 06:45 to 18:45 by him. In the same row "show" gives the hunter "dress" and the tanner "scrape" (animation's kneeling
+words, 877's row; an unknown word shows nothing until it lands); the taverner keeps "tend", dark while
+no work spot is laid in the Mughouse, until animation's tend_bar (her bar is 1.05 m, the stall's clip
+0.88). Dark until maps lays Umbrage's work spots, the package's switch. resident_test
+_test_vendor_day: his day key and trade, at work through the day and not at night, awake 06-18, tending at
+his spot, a hail and a barter each stopping it at once turned to the buyer.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

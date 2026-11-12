@@ -5871,6 +5871,63 @@ func _test_named_enemy() -> void:
 ## wares are offers, bought through economy and minted into the hands;
 ## typed words never reach one; going on, the body walks to the road's edge
 ## and is gone.
+## 853 amended (11): the stall's keeper's day is his work (people work's last blocker): WORK 06-18 by "vendor"'s day, his
+## trade still ""; at maps' vendor spot he tends in bouts, and a hail or a barter stops it at once, turned to
+## the buyer; his sleep (by id and bed, not his day) is as before, so his window opens when it did.
+func _test_vendor_day(rolf: Resident, stand: Dictionary, given: Dictionary) -> void:
+	print("\n== the stall's keeper's day is his work (853 amended (11)) ==")
+	_check(Resident.day_key("", rolf.worker_id) == Resident.VENDOR_DAY and Resident.day_key("smith", "rs-x") == "smith" and rolf.trade == "",
+		"his day is the vendor's, his trade still \"\" (%s)" % rolf.trade)
+	var by_day := true
+	for h in range(7, 17):
+		by_day = by_day and Resident.doing_at(rolf.trade, h + 0.5, "", "", rolf.worker_id) == Resident.Doing.WORK
+	_check(by_day and Resident.doing_at(rolf.trade, 23.5, "", "", rolf.worker_id) != Resident.Doing.WORK
+		and Resident.doing_at("", 12.5) == Resident.Doing.INN, "at work through the day, noon too; not at night; the default day's noon the inn as before")
+	# No temple hour for him (saturn: his temple morning stood him at his stall as TEMPLE till 09); others keep theirs.
+	Townsfolk.test_temple_day = true
+	var his_temple := Resident.doing_at(rolf.trade, 9.5 + Townsfolk.offset_of(rolf.worker_id), "", "", rolf.worker_id, 0)
+	var smiths_temple := Townsfolk.whereabouts("smith", 9.5 + Townsfolk.offset_of("rs-x"), "", "", "rs-x", 0)
+	Townsfolk.test_temple_day = false
+	_check(his_temple == Resident.Doing.WORK and smiths_temple == "temple", "his temple morning: at work, tending (a smith's still the temple: %s)" % smiths_temple)
+	var awake_by_day := true
+	for h in range(6, 18):
+		awake_by_day = awake_by_day and not Townsfolk.asleep_at(rolf.worker_id, h + 0.5)
+	_check(awake_by_day, "his window's rule (_send_offers: not asleep) reads his sleep spell by id and his bed, never his day: awake 06-18, so open all day; his night as before")
+	# At maps' vendor spot, his day's work: he tends in bouts; a hail and a barter each stop it at once.
+	var was_places := rolf.places.duplicate(true)
+	var was_tile := rolf.tile
+	var places: Dictionary = rolf.places.duplicate(true)
+	places["spots"] = {"work": [stand]}
+	rolf.places = places
+	rolf.task = {}
+	rolf.doing = Resident.Doing.WORK
+	rolf.addressing = ""
+	World._relocate(rolf, stand["cell"])
+	rolf._spot = stand
+	rolf._goal = stand["cell"]
+	rolf._world_set_facing(rolf._toward(stand["face"]))
+	rolf._shown = ""
+	rolf._bout_end = -1
+	rolf._show_work()
+	var tending := rolf.activity
+	var buyer: Player = _player()
+	_main._stop_work_for(rolf, buyer)
+	var hailed := rolf.activity == "" and not rolf.addressing.is_empty()
+	rolf.addressing = ""
+	rolf._world_set_facing(rolf._toward(stand["face"]))
+	rolf._bout_end = -1
+	rolf._show_work()
+	var again := rolf.activity
+	var served: Resident = _main._serve(buyer, rolf, rolf.worker_id)
+	_check(tending == "tend" and hailed and again == "tend" and served == rolf and rolf.activity == ""
+		and rolf._address_until - World.tick == Resident.SERVE_SECONDS * World.TICK_RATE, "at his spot he tends (%s); a hail stops it, and a barter stops it turned to the buyer at once" % tending)
+	rolf.addressing = ""
+	rolf.places = was_places
+	rolf._spot = {}
+	World._relocate(rolf, was_tile)
+	rolf._goal = was_tile
+
+
 func _test_vendor() -> void:
 	print("
 == the starter stall: Rolf by the store, a greeting, the base weapons at 1 gold, minted and marked starter (736, npc's side) ==")
@@ -5928,6 +5985,7 @@ func _test_vendor() -> void:
 		"maps' vendor spot is his stand at every hour, no other town's or trade's (%s)" % [given.keys()])
 	var bare: Array = _main._visitors_wanted({"buildings": [], "spots": []}, STORE, town).filter(func(w: Dictionary) -> bool: return str(w["key"]) == Offers.VENDOR + STORE)
 	_check(not bare.is_empty() and not bare[0]["places"].has("spots"), "no vendor spot: he strolls his place as before")
+	_test_vendor_day(rolf, stand, his[0]["places"] if not his.is_empty() else {})
 	if stall_was == null:
 		rule.erase("stall")
 	else:

@@ -429,7 +429,17 @@ static func label_of(person_name: String, _of_trade: String) -> String:
 ## routine (decision 404, Townsfolk.whereabouts: the season, its hidden
 ## type, its own clock and the temple day by [param worker_id]).
 static func doing_at(of_trade: String, hour: float, season := "", type := "", worker_id := "", day := -1, mood := "") -> Doing:
-	return DOING_AT.get(Townsfolk.whereabouts(of_trade, hour, season, type, worker_id, day, mood), Doing.SQUARE)
+	return DOING_AT.get(Townsfolk.whereabouts(day_key(of_trade, worker_id), hour, season, type, worker_id, day, mood), Doing.SQUARE)
+
+
+## The stall's keeper's day in residents.json (853 amended (11)): his stall is his work.
+const VENDOR_DAY := "vendor"
+
+
+## Whose day [param worker_id] keeps (853 amended (11)): the stall's keeper (Offers.VENDOR) his own, "vendor", while
+## his trade stays "" (his voice, offers and lore unmoved); anyone else its trade's.
+static func day_key(of_trade: String, worker_id: String) -> String:
+	return VENDOR_DAY if worker_id.begins_with(Offers.VENDOR) else of_trade
 
 
 ## What one of [param of_trade] (hidden [param type], [param worker_id]) is

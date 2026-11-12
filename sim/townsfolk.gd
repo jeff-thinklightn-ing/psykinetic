@@ -1951,7 +1951,8 @@ static func whereabouts(trade: String, hour: float, season := "", type := "", wo
 	var temple: Dictionary = table.get("temple", {})
 	var every := int(temple.get("every_days", 0))
 	if day >= 0 and every > 0 and (test_temple_day or (day + absi(hash("temple:" + worker_id))) % every == 0) \
-			and _within(at, float(temple.get("from", 9)), float(temple.get("to", 10))):
+			and _within(at, float(temple.get("from", 9)), float(temple.get("to", 10))) \
+			and not trade in temple.get("not_for", []):  # A day with no temple hour (853 amended (11): the stall's keeper).
 		return "temple"
 	for stint: Variant in table.get("types", {}).get(type, []):
 		if stint is Dictionary and _within(at, float(stint.get("from", 0)), float(stint.get("to", 0))):
