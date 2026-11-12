@@ -48696,6 +48696,28 @@ the day was the low one.
   --host, which remote_shot now adds, and remote_shot's client check covers their runs too.
 Tools only; protocol unchanged; no class_name; no bullet.
 
+828 amended (3) (perf, 2026-11-12; the coordinator's ask after maps' two failed Atlas runs; label from
+tools/decision_number.sh): a runner clone's untracked generated files no longer stop a run. A laptop's
+own import wrote tests/tour/tours/fish_click.gd.uid before items committed it to main (29be1cf77); the
+refresh's checkout then refused ("untracked working tree files would be overwritten"), and every run at
+a later main stopped there. The state check uses --untracked-files=no and never saw it.
+- Before the checkout, remote_shot.sh lists the clone's untracked files (git ls-files --others
+  --exclude-standard) beside what <sha> tracks (tools/remote_shot_clash.sh, clashes). A *.uid or *.import
+  in both is removed, each named in the run's output ("remote_shot: removed ... (a generated file)"):
+  the next import makes it again, and the commit's copy is the one wanted. Any other untracked file the
+  commit tracks refuses the run, naming it, with nothing touched, as a change in the clone does.
+- The one-off: the file deleted by hand on both runners' clones (perf, under Jeff's own OK for each
+  laptop): untracked there, tracked at main, the clones' only untracked file.
+- The usage comment also carries the runner note for a bench's worst frame (perf, 11-12): on the Atlas a
+  stray ~450 ms frame now and then is the laptop's own (5 of 9 wilds runs there, 0 of 5 on the Lenovo;
+  the one caught spent ~420 ms outside everything the engine times, with nothing built). A bench whose
+  worst frame matters runs on the Lenovo; map_bench's new --hitch-ms=N says what a long frame did (its
+  process, physics and render times, world ticks, the time before, in and after the draw, pipelines
+  compiled, nodes and resources made, the scenes added).
+tests/remote_shot_clash_test.sh (a land.sh tool part): generated files the commit tracks removed, any
+other stopped on, untracked files it doesn't track left alone. Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 833. Windows renders with Vulkan, D3D12 as the fallback
 
 The coordinator's approval, on perf's laptop benches; release's number. project.godot's

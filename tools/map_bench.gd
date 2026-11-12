@@ -52,6 +52,12 @@ extends Node
 ## drops and fog's layers drawn, outdoors).
 ## --off=shadows,border,glimpse,minimap leaves those pieces of the view out
 ## of the frames, to see what each costs (with --fade=0, no --weather).
+## --hitch-ms=N names each frame over N ms (the coordinator's 450 ms frame
+## in the wilds, 11-12): its process, physics and render times, the world
+## ticks run in it, the pipelines compiled, nodes and resources made, and the
+## scenes added to the tree in it, most first; at the end, how many came in
+## each half of the frames (a first-time build comes once; a second pass of
+## the same ground in one run, with --walk, shows whether it comes back).
 ## --bench-state=PATH starts the host from that saved world (a copy: the
 ## host writes it back), e.g. tools/town_state's wilds town with its
 ## residents; with the game's --test-herds=N after "--", N sets of herds.
@@ -84,6 +90,7 @@ var shot_yaw := NAN
 var low := false
 var low_given := false
 var scatter_reach := 0.0
+var hitch_ms := 0.0
 ## --weather-at: the kind, and when in the frames ("" once done).
 var weather_at := ""
 var weather_at_s := 0.0
@@ -133,6 +140,7 @@ func _ready() -> void:
 				low = pair[1] != "0"
 				low_given = true
 			"scatter-reach": scatter_reach = pair[1].to_float()
+			"hitch-ms": hitch_ms = maxf(0.0, pair[1].to_float())
 			"hour": Net.start_hour = fposmod(pair[1].to_float(), 24.0)
 			"weather-at":
 				weather_at = pair[1].get_slice("@", 0).to_lower()
@@ -439,9 +447,18 @@ func _frames() -> bool:
 	# Every frame's length with when it came: the median, the 99th, and the
 	# longest, to find what a spike is.
 	var spikes: Array[Vector2] = []
+	var hitches: Array[float] = []
+	if hitch_ms > 0.0:
+		get_tree().node_added.connect(_hitch_added)
+		RenderingServer.frame_pre_draw.connect(_hitch_pre_draw)
+		RenderingServer.frame_post_draw.connect(_hitch_post_draw)
+		_hitch_prev = _hitch_monitors()
+		_hitch_tick = World.tick
 	while Time.get_ticks_usec() - started < seconds * 1000000.0:
 		await get_tree().process_frame
 		var now := Time.get_ticks_usec()
+		if hitch_ms > 0.0 and _hitch_look((now - last) / 1000.0, (now - started) / 1000000.0, viewport):
+			hitches.append((now - started) / 1000000.0)
 		var delta := (now - last) / 1000000.0
 		worst = maxf(worst, (now - last) / 1000.0)
 		spikes.append(Vector2((now - last) / 1000.0, (now - started) / 1000000.0))
@@ -523,6 +540,13 @@ func _frames() -> bool:
 	var listed: Array[String] = []
 	for spike in spikes.slice(0, 8):
 		listed.append("%.1f ms at %.1f s" % [spike.x, spike.y])
+	if hitch_ms > 0.0:
+		get_tree().node_added.disconnect(_hitch_added)
+		RenderingServer.frame_pre_draw.disconnect(_hitch_pre_draw)
+		RenderingServer.frame_post_draw.disconnect(_hitch_post_draw)
+		var first := hitches.filter(func(at: float) -> bool: return at < seconds / 2.0).size()
+		print("BENCH frames over %.0f ms: %d, %d in the first half of the frames, %d in the second (at %s s)" % [hitch_ms,
+			hitches.size(), first, hitches.size() - first, ", ".join(hitches.map(func(at: float) -> String: return "%.1f" % at))])
 	print("BENCH frame time: median %.2f ms, 99th %.2f ms; longest: %s" % [
 		times[times.size() / 2], times[mini(times.size() - 1, times.size() * 99 / 100)], ", ".join(listed)])
 	if view != null:
@@ -701,3 +725,77 @@ func _scatter_drawn(view: Node) -> String:
 				nodes += 1
 				instances += (drawn as MultiMeshInstance3D).multimesh.instance_count
 	return "%d chunks, %d MultiMeshes, %d instances" % [view._scattered.size(), nodes, instances]
+
+
+# --hitch-ms (the coordinator's 450 ms frame, 11-12): what a long frame did.
+var _hitch_prev := {}
+var _hitch_tick := 0
+## Scenes (or, for a node made in code, its class) added to the tree since the
+## last frame, with how many.
+var _hitch_new: Dictionary[String, int] = {}
+## The main loop's frame split by the renderer's own signals: when the last
+## frame's draw began and ended, and when the frame before it began (usec).
+var _hitch_pre := 0
+var _hitch_post := 0
+var _hitch_began := 0
+
+
+func _hitch_pre_draw() -> void:
+	_hitch_pre = Time.get_ticks_usec()
+
+
+func _hitch_post_draw() -> void:
+	_hitch_post = Time.get_ticks_usec()
+
+
+func _hitch_added(node: Node) -> void:
+	var key := node.scene_file_path.get_file() if node.scene_file_path != "" else node.get_class()
+	_hitch_new[key] = _hitch_new.get(key, 0) + 1
+
+
+func _hitch_monitors() -> Dictionary:
+	return {
+		"pipelines": Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_MESH)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS),
+		"nodes": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+		"resources": Performance.get_monitor(Performance.OBJECT_RESOURCE_COUNT),
+		"objects": Performance.get_monitor(Performance.OBJECT_COUNT),
+		"vmem_mb": Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0,
+	}
+
+
+## The frame just ended, [param ms] long at [param at] s: told when over
+## hitch_ms; true then.
+func _hitch_look(ms: float, at: float, viewport: RID) -> bool:
+	var now := _hitch_monitors()
+	var ended := Time.get_ticks_usec()
+	# This frame: began (the last process_frame), its scripts and nodes up to
+	# the draw, the draw, then the swap, the window's events and physics
+	# until this process_frame.
+	var split := "loop: to the draw %.1f ms, the draw %.1f ms, after the draw %.1f ms" % [
+		(_hitch_pre - _hitch_began) / 1000.0, (_hitch_post - _hitch_pre) / 1000.0, (ended - _hitch_post) / 1000.0] 		if _hitch_began > 0 and _hitch_pre >= _hitch_began and _hitch_post >= _hitch_pre else "loop: unsplit"
+	_hitch_began = ended
+	var ticks := World.tick - _hitch_tick
+	_hitch_tick = World.tick
+	var long := ms > hitch_ms
+	if long:
+		var grew: Array[String] = []
+		for key: String in now:
+			grew.append("%s %+.0f" % [key, now[key] - _hitch_prev[key]])
+		var added := _hitch_new.keys()
+		added.sort_custom(func(a: String, b: String) -> bool: return _hitch_new[a] > _hitch_new[b] or _hitch_new[a] == _hitch_new[b] and a < b)
+		var named: Array[String] = []
+		for key: String in added.slice(0, 8):
+			named.append("%s x%d" % [key, _hitch_new[key]])
+		print("BENCH long frame %.1f ms at %.2f s: process %.1f ms, physics %.1f ms, render cpu %.1f gpu %.1f, world ticks %d; %s; %s; added: %s" % [
+			ms, at, Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+			RenderingServer.viewport_get_measured_render_time_cpu(viewport),
+			RenderingServer.viewport_get_measured_render_time_gpu(viewport), ticks, split, ", ".join(grew),
+			", ".join(named) if not named.is_empty() else "nothing"])
+	_hitch_prev = now
+	_hitch_new.clear()
+	return long
