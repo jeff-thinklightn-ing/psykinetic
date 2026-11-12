@@ -86,6 +86,8 @@ const MINUS := "\u2212"
 signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
 ## The server refused: [param why].
 signal refused(why: String)
+## The window's close mark pressed (Main closes it as Esc does).
+signal closed
 ## Healing: the player asks for [param with]'s care, paid by [param pay].
 signal care_asked(with: GridEntity, pay: String)
 ## A ware: its offer id and its cost (Main sends "offer").
@@ -427,6 +429,7 @@ func _ready() -> void:
 	_store_view.square_pressed.connect(_on_store_square)
 	_store_view.square_hovered.connect(_on_store_hover)
 	_store_view.tab_pressed.connect(_on_store_tab)
+	_store_view.close_pressed.connect(func() -> void: closed.emit())  # The close mark: Main closes as Esc does.
 	add_child(_store_view)
 	move_child(_tip, -1)  # The name over a square draws over the window.
 	if pack != null:

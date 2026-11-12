@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_crouch_key()
 	_test_practice_bars()
 	await _test_gains()
+	await _test_store_chips()
 	await _test_trade_float()
 	_test_find_window()
 	_test_seam_click()
@@ -2622,6 +2623,50 @@ func _test_store_face_clicks() -> void:
 	for leak in leaks.slice(0, 12):
 		print("    leak: " + leak)
 	_check(scanned > 20 and leaks.is_empty(), "no press on a store's or a person's window reaches the world (%d scanned, %d leaked)" % [scanned, leaks.size()])
+
+
+## The store's squares as built (Jeff's 11-10 store, the Lenovo stills of Store A: chips straddling each
+## square's top edge, one loose over the pack, no dark box round the goods): once laid out, every price chip and
+## count sits inside its own square, a thing with no picture shows its name at the caption's size, the goods
+## half's scroll has the quiet look, and the load bar has its word and no ticks.
+func _test_store_chips() -> void:
+	print("\n== the store's squares: chips inside their squares, no picture shows a readable name ==")
+	var panel: BarterPanel = _main.barter_panel
+	if panel == null:
+		print("  (no window in this scene: its checks skipped)")
+		return
+	panel.open(null, "Snagfin")
+	panel.show_barter({"shop": "", "town": "Umbrage", "gold": 12, "goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1},
+			{"uid": 103, "id": "knife", "price": 0}], "buys": {"hide": {"gold": 6, "up_to": 3}}, "fenced": {}, "pack": [{"slot": 0, "uid": 201, "id": "hide"}], "why": ""})
+	for i in 4:
+		await get_tree().process_frame
+	var view: StoreView = panel._store_view
+	var outside: Array[String] = []
+	var chips := 0
+	for kind: String in ["good", "mine"]:
+		for key: Variant in [101, 102, 103] if kind == "good" else [0]:
+			var square := view.square_for(kind, key)
+			if square == null:
+				continue
+			var rect := square.get_global_rect().grow(1.0)
+			for node: Node in square.find_children("*", "UiPrice", true, false):
+				chips += 1
+				var chip := (node as Control).get_global_rect()
+				if not (rect.has_point(chip.position) and rect.has_point(chip.end)):
+					outside.append("%s %s chip %s in square %s" % [kind, key, chip, rect])
+	_check(chips >= 3 and outside.is_empty(), "every price chip sits inside its own square (%d chips; outside: %s)" % [chips, outside])
+	var named := view.square_for("good", 102)
+	var label_size := -1
+	if named != null:
+		for node: Node in named.get_children():
+			if node is Label and (node as Label).theme_type_variation == &"Caption":
+				label_size = (node as Label).get_theme_font_size(&"font_size")
+	_check(label_size < 0 or label_size >= UiTheme.size("caption"), "a thing with no picture shows its name at the caption's size, not a smaller one (%d)" % label_size)
+	_check(view._goods_scroll.theme_type_variation == &"QuietScroll" and not view._load.ticks, "the goods half's scroll is the quiet one and the load bar has no ticks")
+	_check(view._close != null and view._close.is_visible_in_tree(), "the close mark is at the head's right end")
+	view._close.pressed.emit()
+	_check(not panel.is_open(), "the close mark closes the window, as Esc does")
+	panel.close()
 
 
 ## A trade's float and the store window's foot (852; the coordinator): the server's "Bought ... for N gold"

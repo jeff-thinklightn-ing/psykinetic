@@ -67,6 +67,8 @@ const SLOT_WORDS := {Items.RIGHT_HAND: "Right hand", Items.LEFT_HAND: "Left hand
 class LoadBar:
 	extends Control
 	var share := 0.0
+	## The band edges drawn under the bar (the sheet's); the store window's bar has none (its mock).
+	var ticks := true
 
 	func _init() -> void:
 		mouse_filter = Control.MOUSE_FILTER_STOP  # For its hover words.
@@ -80,7 +82,7 @@ class LoadBar:
 			draw_rect(Rect2(inner.position, Vector2(inner.size.x * fill, inner.size.y)), CharacterSheet.band_color(share))
 		draw_rect(whole, CharacterSheet.FIGURE_EDGE, false, 2.0)
 		var tick := UiTheme.color("text_dim")
-		for edge: float in [World.load_free, World.load_heavy, World.load_overloaded]:
+		for edge: float in ([World.load_free, World.load_heavy, World.load_overloaded] if ticks else []):
 			var x := inner.position.x + inner.size.x * edge / BAR_TOP
 			draw_line(Vector2(x, whole.end.y + 2), Vector2(x, size.y), tick, 3.0)
 

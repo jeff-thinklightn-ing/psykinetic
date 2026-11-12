@@ -23,6 +23,8 @@ signal square_pressed(kind: String, key: Variant)
 signal square_hovered(kind: String, key: Variant, words: String, rect: Rect2)
 ## A tab pressed: "store", "donate" or "locker".
 signal tab_pressed(id: String)
+## The close at the head's right end pressed (UiClose; Esc does the same).
+signal close_pressed
 
 ## Squares a line, both halves.
 const COLUMNS := 4
@@ -30,6 +32,8 @@ const COLUMNS := 4
 const GOODS_ROWS := 4
 ## How long a refused square shows its rust rim, seconds.
 const REFUSED_SECONDS := 1.0
+## The bar's word (voice's, the mock's): its band reads on hover.
+const LOAD_WORDS := "Load"
 ## A free ware's pill (voice: "Free"), the pill for words without a coin.
 const FREE_WORDS := "Free"
 ## A square that just changed (a thing bought or moved in) shows lit this long.
@@ -40,6 +44,7 @@ var icon_of: Callable
 
 var _title: Label
 var _trusted: Label
+var _close: UiClose
 var _tabs: UiTabs
 var _tab_ids: Array[String] = []
 var _asleep: UiLine
@@ -66,14 +71,6 @@ class Square:
 	var key: Variant
 	var words := ""
 	var view: StoreView
-
-	## The press is taken first: it can rebuild the squares, this one out of the tree (Jeff on
-	## v0.1.202). UiSlot takes it after saying so (reported to ui-design).
-	func _gui_input(event: InputEvent) -> void:
-		var click := event as InputEventMouseButton
-		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-			accept_event()
-			view.square_pressed.emit(kind, key)
 
 
 func _init() -> void:
@@ -103,6 +100,13 @@ func _ready() -> void:
 		if index >= 0 and index < _tab_ids.size():
 			tab_pressed.emit(_tab_ids[index]))
 	head.add_child(_tabs)
+	var gap := Control.new()  # The close at the head's right end.
+	gap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	gap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.add_child(gap)
+	_close = UiClose.new()
+	_close.pressed.connect(func() -> void: close_pressed.emit())
+	head.add_child(_close)
 	_asleep = UiLine.new()
 	column.add_child(_asleep)
 	var halves := HBoxContainer.new()
@@ -116,6 +120,7 @@ func _ready() -> void:
 	left.add_child(_goods_head)
 	_goods_scroll = ScrollContainer.new()
 	_goods_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_goods_scroll.theme_type_variation = &"QuietScroll"  # ui-design's: a ScrollContainer with no panel of its own (the dark box round the goods).
 	left.add_child(_goods_scroll)
 	_goods = _grid_of()
 	_goods_scroll.add_child(_goods)
@@ -143,9 +148,19 @@ func _ready() -> void:
 	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	right.add_child(room)
+	var load_row := HBoxContainer.new()
+	load_row.theme_type_variation = &"Strip"
+	right.add_child(load_row)
+	var load_word := Label.new()
+	load_word.theme_type_variation = &"Caption"
+	load_word.text = LOAD_WORDS
+	load_word.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	load_row.add_child(load_word)
 	_load = CharacterSheet.LoadBar.new()
+	_load.ticks = false
 	_load.custom_minimum_size = Vector2(0, side() * 0.25)
-	right.add_child(_load)
+	_load.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	load_row.add_child(_load)
 	_foot = UiLine.new()
 	column.add_child(_foot)
 	if not _state.is_empty():
@@ -190,7 +205,7 @@ func show_state(state: Dictionary) -> void:
 	_gold.text = str(int(state.get("gold", 0)))
 	var said := str(state.get("foot", ""))
 	if said.is_empty():
-		_foot.say(" ")  # Always a line high: a buy never moves the window.
+		_foot.clear()  # UiLine keeps a line's height, so a buy never moves the window.
 	elif bool(state.get("refused", false)):
 		_foot.refuse(said)
 	else:
@@ -256,6 +271,7 @@ func _square(spec: Dictionary) -> Square:
 	square.kind = str(spec.get("kind", ""))
 	square.key = spec.get("key")
 	square.words = str(spec.get("words", ""))
+	square.pressed.connect(func(_slot: UiSlot) -> void: square_pressed.emit(square.kind, square.key))  # UiSlot accepts the press first (854 amended (1)).
 	square.mouse_entered.connect(func() -> void: square_hovered.emit(square.kind, square.key, square.words, square.get_global_rect()))
 	square.mouse_exited.connect(func() -> void: square_hovered.emit(square.kind, square.key, "", Rect2()))
 	var item := str(spec.get("item", ""))
@@ -268,7 +284,7 @@ func _square(spec: Dictionary) -> Square:
 			name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			name.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 			name.autowrap_mode = TextServer.AUTOWRAP_WORD
-			name.theme_type_variation = &"Small"
+			name.theme_type_variation = &"Caption"  # Readable, until the thing's picture is made.
 			name.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			name.text = Items.short_of(item)
 			square.add_child(name)

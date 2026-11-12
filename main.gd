@@ -15585,6 +15585,7 @@ func _build_talk() -> void:
 	barter_panel.order_asked.connect(_order_at_counter)  # 765: work ordered at a counter.
 	barter_panel.collect_asked.connect(_collect_at_counter)
 	barter_panel.said.connect(_say_to_person)  # 802: the window's typing line.
+	barter_panel.closed.connect(close_other)  # The store window's close mark, as Esc.
 	barter_panel.give_asked.connect(_give_to_person)  # 802: Give's button.
 	barter_panel.locker_asked.connect(_keeper_command.bind("locker"))  # 807 amended (3): Rolf's buttons.
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
