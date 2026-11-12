@@ -372,15 +372,15 @@ func _test_answer() -> void:
 	UiCodeChip.add_line(rich, "The door of [T1] temple at (190,\u00a0199); [F12] forge.")
 	await get_tree().process_frame
 	var said := rich.get_parsed_text()
-	_check(said == "The door of \u00a0T\u200a1\u00a0 temple at (190,\u00a0199); \u00a0F\u200a12\u00a0 forge.",
+	_check(said == "The door of \u00a0T\u00a01\u00a0 temple at (190,\u00a0199); \u00a0F\u00a012\u00a0 forge.",
 		"a line's codes drawn as chips, letter and figure a hair apart, its words kept (%s)" % said.c_escape())
-	# 886 amended (1): the hair space not in the bold (its bold glyph is wider than a space), the chip's
-	# back with no side padding (it covered the words' spaces), and builder's bullet type.
-	var bold := rich.get_theme_font(&"bold_font")
+	# 886 amended (1) and (2): the hair is a no-break space in the regular face at HAIR_SCALE of the line
+	# (the bold's hair space is wider than a space; the hair space U+200A breaks), so it is narrower than
+	# a space; the chip's back has no side padding (it covered the words' spaces); builder's bullet type.
 	var plain := rich.get_theme_font(&"normal_font")
 	var size := rich.get_theme_font_size(&"normal_font_size")
-	_check(plain.get_string_size("\u200a", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x < plain.get_string_size(" ", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		and bold != plain, "the hair space, in the regular face, is narrower than a space")
+	_check(plain.get_string_size("\u00a0", HORIZONTAL_ALIGNMENT_LEFT, -1, roundi(size * UiCodeChip.HAIR_SCALE)).x
+		< plain.get_string_size(" ", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5, "the hair, a small no-break space, is under half a space")
 	_check(rich.get_theme_constant(&"text_highlight_h_padding") == 0, "the chip's back reaches no further than its own edge spaces")
 	var theme := UiTheme.theme()
 	_check(theme.get_type_variation_base(&"LineBullet") == &"Label" and theme.get_color(&"font_color", &"LineBullet") == UiTheme.color("text_dim")
@@ -391,6 +391,40 @@ func _test_answer() -> void:
 	_check(UiCodeChip._split("T1") == PackedStringArray(["T", "1"]) and UiCodeChip._split("WS3") == PackedStringArray(["WS", "3"]),
 		"a code splits into its letters and its figure")
 	rich.queue_free()
+	# 886 amended (2): a chip never breaks at a wrap. A narrow paragraph with a chip after every word, so
+	# some chip falls where a line ends: each chip's letter and figure share a line, and at least one
+	# chip sits at a line's edge (the wrap did reach a chip).
+	var narrow := RichTextLabel.new()
+	narrow.theme_type_variation = &"Lines"
+	narrow.fit_content = true
+	narrow.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	narrow.custom_minimum_size.x = 260.0
+	narrow.size.x = 260.0
+	add_child(narrow)
+	var words := ""
+	for i in 24:
+		words += "%s [%s%d] " % ["ab".repeat(1 + i % 4), "TSHI"[i % 4], 1 + i % 9]
+	UiCodeChip.add_line(narrow, words.strip_edges())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var parsed := narrow.get_parsed_text()
+	var split_chips := 0
+	var at_line_start := 0
+	var chips := 0
+	for at in parsed.length() - 2:
+		if parsed[at] == " " and parsed[at + 1] in "TSHI" and parsed[at + 2] == " ":
+			chips += 1
+			var line := narrow.get_character_line(at + 1)
+			if narrow.get_character_line(at + 3) != line:
+				split_chips += 1
+			# A chip at a line's edge: the wrap falls just before it or just after it (the line breaker keeps
+			# it with the word before, so mostly after: its next word starts the next line).
+			if (at > 0 and narrow.get_character_line(at - 1) != narrow.get_character_line(at)) \
+					or (at + 6 < parsed.length() and narrow.get_character_line(at + 6) != narrow.get_character_line(at + 4)):
+				at_line_start += 1
+	_check(chips == 24 and split_chips == 0 and at_line_start > 0 and narrow.get_line_count() > 4,
+		"a chip at a wrap stays whole: %d chips, %d split, %d at a line's edge, %d lines" % [chips, split_chips, at_line_start, narrow.get_line_count()])
+	narrow.queue_free()
 	var close := UiClose.new()
 	var pressed := [0]
 	close.pressed.connect(func() -> void: pressed[0] += 1)
