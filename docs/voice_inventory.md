@@ -54,7 +54,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Runner's pack | `levels/barrow/level.json` |
 | R | Robbers' chest | `levels/barrow/level.json` |
 
-## Lines in the code (2845)
+## Lines in the code (2846)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -962,7 +962,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s\|rose\|%d | `sim/named_mind.gd` rose_news() |
 |  | %s\|%s\|%d | `sim/named_mind.gd` emote() |
 
-### other (client3d) (73)
+### other (client3d) (74)
 
 | | Line | Where |
 |---|---|---|
@@ -995,6 +995,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | shader_type spatial; | `client3d/client3d.gd` _marking_shader() |
 |  | %s\|%s\|%d | `client3d/client3d.gd` _fields_key() |
 |  | %s/healers_hut@%d,%d | `client3d/client3d.gd` hut_id() |
+|  | %s\|%.3f\|%d\|%.3f | `client3d/client3d.gd` _wall_faces() |
 |  | %s=made %s %d | `client3d/client3d.gd` _world_map_key() |
 |  | %s=%s %s | `client3d/client3d.gd` _world_map_key() |
 |  | %s %s %s %s | `client3d/client3d.gd` _update_fade() |
