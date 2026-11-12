@@ -2979,7 +2979,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | | Line | Key |
 |---|---|---|
 |  | The draugr blesses {her} too. | `draugr.companion_line` |
-|  | {her} went down into the barrow with {player} and laid the draugr to rest. | `draugr.fact` |
+|  | {her} went down into the crypt with {player} and laid the draugr to rest. | `draugr.fact` |
 |  | laid the draugr to rest with you | `draugr.bond_why` |
 |  | downed window and charges (544, 573) | `draugr.gates[1]` |
 |  | The elves teach {her} the rot ward too. | `rot_ward.companion_line` |
