@@ -97,6 +97,7 @@ func _ready() -> void:
 	_test_bond()
 	_test_needs()
 	_test_wants()
+	_test_first_want_told()
 	_test_talk_rate()
 	_test_tomb()
 	_test_break_hold()
@@ -167,6 +168,7 @@ func _ready() -> void:
 	_test_tends_unasked()
 	_test_warm_tell()
 	_test_drinks_a_remedy()
+	_test_lead_to_near_water()  # Loads the wilds and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	await _test_old_record_gets_a_companion()
@@ -1666,7 +1668,7 @@ func _test_needs() -> void:
 
 
 func _test_wants() -> void:
-	print("\n== her wants: one at a time, in rungs, the fire first; met by a deed, a big gain; lapsing unseen (803 amended (4)) ==")
+	print("\n== her wants: one at a time, the pond first, then by what she lacks; told first; met by a deed, a big gain; lapsing unseen (803 amended (4), (11)) ==")
 	var pet := _companion()
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var steps_were := World.steps
@@ -1677,7 +1679,21 @@ func _test_wants() -> void:
 	Standing.met(record.companion, record.player_id, World.steps)
 	var even := {"leisure": 1.0, "adventure": 1.0, "wonder": 1.0, "faith": 1.0, "safety": 1.0, "company": 1.0}
 	var card := {"needs": {"leisure": 0.3, "adventure": 0.3, "wonder": 0.3, "faith": 0.3, "safety": 0.9, "company": 0.3}}
-	_check(Companion.pick_want(card, even).get("key") == "fire", "the fire first, whatever she lacks most (%s)" % [Companion.pick_want(card, even)])
+	var watchful := even.duplicate()
+	watchful["safety"] = 1.25
+	card["needs"]["safety"] = 0.2
+	_check(Companion.pick_want(card, watchful).get("key") == "pond", "her first want ever, the pond, whatever she lacks most (803 amended (11): %s)" % [Companion.pick_want(card, watchful)])
+	card["want_rest"] = 0
+	_check(Companion.pick_want(card, watchful).get("key") == "fire", "a want of hers had and done: by what she lacks, the fire open from the start too (%s)" % [Companion.pick_want(card, watchful)])
+	card["needs"]["safety"] = 0.9
+	_check(Companion.pick_want(card, even).get("key") == "pond", "and the pond open from the start, by leisure (%s)" % [Companion.pick_want(card, even)])
+	card["wants_met"] = {"pond": 0}
+	card["needs"]["safety"] = 0.2
+	_check(Companion.pick_want(card, even).get("key") == "fire", "the pond met first: the fire still opens and can be wanted (%s)" % [Companion.pick_want(card, even)])
+	card.erase("want_rest")
+	_check(Companion.pick_want(card, even).get("key") == "fire", "the pond already met: no first for her, by what she lacks (%s)" % [Companion.pick_want(card, even)])
+	card["want_rest"] = 0
+	card["needs"]["safety"] = 0.9
 	card["wants_met"] = {"fire": 1}
 	card["needs"]["company"] = 0.2
 	_check(Companion.pick_want(card, even).get("key") == "town", "then the town by her most-lacking need, company, before the pond")
@@ -1696,14 +1712,24 @@ func _test_wants() -> void:
 	var day := int(World.steps / maxi(DayNight.day_steps, 1))
 	_main._tend_want(record, day)
 	var want: Dictionary = record.companion.get("want", {})
-	_check(want.get("key") == "fire" and int(want.get("since", -1)) == day and pet.want_words.contains(record.name)
-			and pet.want_words.begins_with("to sit by a fire"), "her first want, the fire, on her record and in her voice (%s)" % pet.want_words)
+	_check(want.get("key") == "pond" and int(want.get("since", -1)) == day and want.get("told") == false and pet.want_words.contains(record.name)
+			and pet.want_words.begins_with("to go fishing with") and not pet.want_told,
+		"her first want, the pond, on her record, not yet told, and in her voice (%s)" % pet.want_words)
+	pet._quiet_last_focus = "want"
 	var focus := pet._quiet_pick_focus()
-	var tries := 0
-	while focus.get("key") != "want" and tries < 20:
-		focus = pet._quiet_pick_focus()
-		tries += 1
-	_check(focus.get("key") == "want" and pet._want_told, "a quiet moment tells it (%s)" % [focus])
+	_check(focus.get("key") == "want" and pet.want_told, "her next quiet moment tells it, first, whatever was last (%s)" % [focus])
+	_main._tend_want(record, day)
+	_check(record.companion["want"].get("told") == true and pet.want_told, "told: kept on her record's want")
+	pet.want_words = ""
+	_main._set_mood(record)
+	_check(pet.want_words.begins_with("to go fishing with") and pet.want_told, "her record read again (a restart): told, never told first again")
+	record.companion["want"].erase("told")
+	pet.want_words = ""
+	_main._set_mood(record)
+	_check(pet.want_told, "a want saved before 803 amended (11), no told on it: counts told (a companion on the box is not told it again)")
+	# The fire wanted (its own words), for what follows.
+	record.companion["want"] = {"key": "fire", "need": "safety", "since": day, "told": true}
+	_main._set_want_words(record)
 	# A lesson already learnt counts met, unwanted: rest in town.
 	_main._bond(record, "leisure", "rested in town with you")
 	_check(record.companion["wants_met"].has("town") and record.companion.has("want"), "rest in town before wanting it: the town counts met, the fire still wanted")
@@ -1739,6 +1765,150 @@ func _test_wants() -> void:
 	_main._set_mood(record)
 	pet.want_words = ""
 	pet.want_glad = ""
+
+
+## 803 amended (11), Jeff's loop 1: a new companion's first quiet moment, a
+## model's mind (a stub recording what it is asked), speaks of the pond.
+func _test_first_want_told() -> void:
+	print("\n== a new companion voices the pond want in her first quiet moment (803 amended (11)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(pet, owner.tile + Vector2i(1, 0))
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var keys := ["want", "wants_met", "want_rest"]
+	for key: String in keys:
+		record.companion.erase(key)
+	pet.want_words = ""
+	pet.want_glad = ""
+	_main._tend_want(record, int(World.steps / maxi(DayNight.day_steps, 1)))
+	var mind := CountingMind.new()
+	mind.kind = "ollama"  # A quiet moment asks a model's mind only.
+	var mind_was: CompanionMind = pet.mind
+	pet.mind = mind
+	mind.voice_answer = {"say": "I'd like to go fishing with you.", "stance": ""}
+	pet._fight_tick = -100000
+	pet._keeper_spoke_tick = -100000
+	pet._quiet_next_tick = -1
+	pet._quiet_backoff = 1
+	pet._quiet_last_focus = ""
+	pet._quiet_ticks.clear()
+	pet._last_speech_tick = -1000
+	World.step()
+	pet._quiet_next_tick = World.tick
+	World.step()
+	var asked: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
+	var told: String = str(asked[0]["messages"].back()["content"]) if asked.size() == 1 else ""
+	_main._remember_companion(Net.player_id)  # Her record kept: "told" with it.
+	_check(asked.size() == 1 and str(asked[0]["trigger"]).ends_with("want")
+			and ("You would like to go fishing with %s" % record.name) in told
+			and pet.want_told and record.companion.get("want", {}).get("told") == true,
+		"her first quiet moment speaks of the pond, told and kept told (%s; %s; told %s)" % [asked.map(func(ask: Dictionary) -> String: return ask["trigger"]),
+			told.right(160), record.companion.get("want", {}).get("told")])
+	pet.mind = mind_was
+	for key: String in keys:
+		record.companion.erase(key)
+	pet.want_words = ""
+
+
+## 803 amended (11), the coordinator's ruling (A): Jeff's "i keep taking
+## companions to the pond to fish" is the pool by Snagfin's shack. A fresh
+## companion asked to fish in Umbrage's square leads to that pool's bank, not
+## west to the reed pond; and from each road into Umbrage, the water she
+## would lead to (its walk printed, for FISH_LEAD_NEAR).
+func _test_lead_to_near_water() -> void:
+	print("\n== asked to fish in Umbrage's square, a fresh companion leads to the pool by Snagfin's shack, not west (803 amended (11)) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var keys := ["want", "wants_met", "want_rest", "roads"]
+	var kept := {}
+	for key: String in keys:
+		kept[key] = record.companion.get(key)
+		record.companion.erase(key)
+	var kept_bond: Variant = _bond_as(0)
+	_main._tend_want(record, int(World.steps / maxi(DayNight.day_steps, 1)))
+	var shack := Vector2i(222, 227)
+	# From the square and each road into Umbrage: the water she would lead to.
+	var froms := {"the square's fire": Vector2i(194, 212), "the north road (west)": Vector2i(186, 188),
+		"the north road (east)": Vector2i(203, 188), "the west road": Vector2i(167, 201), "the south-west road": Vector2i(169, 237),
+		"the square's far corner": Vector2i(178, 222), "Umbrage's north-west corner": Vector2i(166, 186),
+		"Umbrage's south-west corner": Vector2i(166, 239), "Umbrage's north-east corner": Vector2i(234, 186)}
+	var rows: Array[String] = []
+	for name: String in froms:
+		var from: Vector2i = _main._nearest_free(froms[name])
+		_put(owner, from)
+		var to: Dictionary = _main._near_water(record, owner)
+		if to.is_empty():
+			rows.append("%s %s: none within %d" % [name, from, Main.FISH_LEAD_NEAR])
+			continue
+		var bank := pet.fish_spot_near(to["cell"])
+		var walk := World.find_path(from, bank, true, owner, 20000) if bank != World.NO_CELL else []
+		rows.append("%s %s: %s (%s) at %s, %d straight, a walk of %d to its bank %s" % [name, from, to["name"], to["key"], to["cell"],
+			World.distance(from, to["cell"]), walk.size(), bank])
+	print("NEAR_WATER " + "\nNEAR_WATER ".join(rows))
+	_check(rows.all(func(row: String) -> bool: return "pool_221_224" in row),
+		"from every way into Umbrage and its corners, the water she would lead to is the pool by Snagfin's shack (FISH_LEAD_NEAR %d)" % Main.FISH_LEAD_NEAR)
+	# The case: a fresh player in the square asks.
+	var start: Vector2i = _main._nearest_free(froms["the square's fire"])
+	_put(owner, start)
+	_put(pet, _main._nearest_free(start + Vector2i(1, 0)))
+	_main._guides.clear()
+	_main._guide_offers.clear()
+	_main._guide_refused.clear()
+	pet.guide = null
+	pet._said.clear()
+	_check(pet.fish_spot_near(owner.tile) == World.NO_CELL and record.companion.get("want", {}).get("key") == "pond" and pet.bond_step == "fond",
+		"in the square: no water within her reach, the pond her want, fond (%s)" % [record.companion.get("want")])
+	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
+	var goal: Dictionary = pet.guide.goal if pet.guide != null else {}
+	_check(pet.guide != null and pet.guide.going() and goal.get("near_water") == true and str(goal.get("key", "")) != "wilds/reed_pond"
+			and World.distance(goal.get("cell", Vector2i.ZERO), shack) <= 8 and Companion.FISH_NEAR_WATER in pet._said
+			and not Companion.FISH_NO_WATER in pet._said,
+		"asked, she sets off for the water by Snagfin's shack, and says so (%s; %s)" % [goal, pet._said])
+	var sent_routes: Array[Array] = []
+	var send_was: Callable = _main._world_news.send
+	_main._world_news.send = func(peer: int, data: Dictionary) -> void:
+		if data.has("guide_route") and peer == _player().owner_peer:
+			sent_routes.append(data["guide_route"]["path"])
+		send_was.call(peer, data)
+	var west := 0
+	for i in 1500:
+		if pet.guide == null:
+			break
+		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster and World.distance(each.tile, pet.tile) <= 12):
+			_kill_monsters()
+		if not sent_routes.is_empty() and not (sent_routes.back() as Array).is_empty() and is_instance_valid(_player()):
+			Walk.toward(_player(), _route_next(_player(), sent_routes.back()))
+		World.step()
+		west = maxi(west, start.x - pet.tile.x)
+	_main._world_news.send = send_was
+	_check(pet.guide == null and Companion.castable(pet.tile) and World.distance(pet.tile, shack) <= 8 and west <= 3,
+		"there: on that pool's bank, within a cast, never walking west (%s, %d west at most, shack %s)" % [pet.tile, west, shack])
+	if pet.guide != null:
+		pet.guide.stop("moved")
+	pet.guide = null
+	owner.led_by = ""
+	owner.led_to = ""
+	_main._guides.clear()
+	for key: String in keys:
+		if kept[key] == null:
+			record.companion.erase(key)
+		else:
+			record.companion[key] = kept[key]
+	_bond_as(0, kept_bond)
+	_main.load_map(was)
+	_settle(_companion())
 
 
 func _test_talk_rate() -> void:

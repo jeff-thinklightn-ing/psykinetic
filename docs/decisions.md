@@ -45799,6 +45799,56 @@ it was not hers). The
 older test's true repeat twice to "What do you think of this place?" is now said again, not
 "...". (9)'s bullet reworded by voice. Server only, protocol unchanged, no new class_name.
 
+803 amended (11): the pond her first want, a want untold told first (the script's label; the
+coordinator's rulings after playtest's blind loop 1 on v0.1.212 and Jeff's ledger line 12, "she
+says she wants to go fishing", which the ledger promised and no build had). Loop 1 in Jeff's words
+is a companion's need met in the first ten minutes; Rolf's free rod, the click on the water and her
+fishing beside him are in, and her saying so was the piece missing. Three causes, read from the
+code: the pond opened only after one want was met (the fire first for everyone); her pick is her
+weight times (1 - need), so a "steady and watchful" card (playtest's Rhea, safety +0.25) wanted the
+fire first even with the two open; and a quiet moment draws its focus by weight (a want 6 of about
+15), so the want came up about half the time. Now: the pond template is open from the start
+("after" 0) and marked "first"; Companion.pick_want gives the open "first" template while her card
+has no want_rest (no want of hers yet met or lapsed), whatever her weights, and after it, whichever
+lacks most, as built. The fire still opens from the start and is met as before; town, wolves and
+the temple keep their "after" counts (the pond counts toward them). A want not yet told comes first
+in her next quiet moment (Companion._quiet_pick_focus, after a just-woken word and a want just met).
+Companion.want_told (was _want_told) is kept on her record's want as "told" (Main._keep_want_told,
+at each tend and in _remember_companion; PlayerRecord keeps it): a want picked now carries "told"
+false; a want saved before this has none and counts told, so a companion already on the box is not
+told her open want again, a restart never retells one, and one who has had a want gets no "first".
+Her lead when asked to fish comes with the open want (551 amended (3)), so a new companion now
+leads; still a devoted companion's bonus after. Where she leads (the coordinator's ruling (A), after
+the code showed the one named fishing place in the wilds is maps' reed pond, about 160 cells west of
+Umbrage's square, while the water a new player fishes, the pool by Snagfin's shack, has no name):
+asked to fish with no water within FISH_SEEK, she leads to the nearest fishable water within
+Main.FISH_LEAD_NEAR (60) of her player, a walk ending on its bank (Main._near_water: a named
+fishing place's own when the water is one, else a goal with no name, "near_water", which _leads_to
+lets her take); only with none does she lead to a named fishing place she knows, and only then
+"Nothing to fish in here. We'd need a pond." Setting off to water with no name she says
+Companion.FISH_NEAR_WATER, "There's water close by. This way." (voice's; no place, so no lore fact).
+Main._lead_to_fish says what it did ("near", "place", ""). The nearest water is what a person would
+walk to and needs no data per town; when Jeff names that pool, it becomes the nearest named place
+with no change here. 60, not the first guess of 40: from the west and south-west roads into Umbrage
+the pool is 52 to 54 off and Umbrage's farthest corner 56, so 40 left them with nothing near;
+the reed pond is within 60 of no cell of Umbrage. A quiet moment asks a model's mind only
+(quiet_minds): playtest's v0.1.212 run had none, so its silence was no evidence; its blind loop runs
+with the desktop's Ollama as the box does (no scripted want line: the coordinator). The ruling is
+named to Jeff as his to turn back, since every companion's first hour now starts the same way.
+Tests: companion_test _test_wants (a watchful card's first want the pond; the fire by lack once she
+has had one; the pond met first, the fire still wanted; the pond already met, no first; the pond on
+her record untold and told first at her next quiet moment whatever was last; told kept on her record
+and after her record is read again; an old want with no told counts told), _test_first_want_told (a
+new companion, a stub model mind: her first quiet moment asks "quiet moment: want" with "You would
+like to go fishing with" her player, told and kept), _test_lead_to_near_water (the wilds loaded: a
+fresh companion, fond, the pond her want, asked "Let's go fishing." in Umbrage's square sets off for
+the water by Snagfin's shack saying so, not the reed pond, and walks her player to that pool's bank,
+never west; from the square, both north roads, the west and south-west roads and three corners of
+Umbrage the water she would lead to is that pool, each walk printed (NEAR_WATER)); record_keys_test
+(told kept with the want). The tests stand on a host; her lead reaches a joined client as the walk's
+route (695), unchanged, and playtest's loop 1 check stands on a joined client. Server only, protocol
+unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A new companion wants to go fishing with you from the start, and if you ask her to fish where there's no water she leads you to some close by (803 amended (11)).
 - A click walk past a doorway or a way out goes round it; you go through only when you click on it (689 amended (11)).
 - At a keeper's counter the Donate tab lists only what you can hand back for nothing, and everything that pays is sold on the Store tab (852 amended (3)).
 - Selling a stack in one click says how many went: "Sold 3 perch for 3 gold." (852 amended (2)).

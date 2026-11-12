@@ -134,14 +134,14 @@
 		}
 	},
 	"wants": {
-		"_note": "Her wants (803 amended (4), needs phase 2; the coordinator's rungs): one at a time, from her most-lacking need (weight x (1 - need)) among the templates open to her: one opens once she has met 'after' wants (the fire first for everyone; then the town or the pond by her weights; the wolves; the temple). A want is met by a deed in met_by, and any template's deed done before she wanted it counts it met (a lesson already learnt is skipped). Met: met_gain on its need, a big gain, a bond deed, and her own word at her next quiet moment. Unmet after lapse_days it lapses, never told, never a cost; rest_days before the next. 'ready': false until its deed exists (the pond: Wren fishing). words: what she wants; done: what she did. {player} is her player's name. Drafts for Jeff.",
+		"_note": "Her wants (803 amended (4), needs phase 2; the coordinator's rungs): one at a time, from her most-lacking need (weight x (1 - need)) among the templates open to her: one opens once she has met 'after' wants (the fire and the pond from the start; then the town by her weights; the wolves; the temple). Her first want ever is the one marked 'first', the pond, whatever her weights (803 amended (11), the coordinator after Jeff's loop 1: a need she can meet in the first ten minutes); after it, whichever lacks most. A want is met by a deed in met_by, and any template's deed done before she wanted it counts it met (a lesson already learnt is skipped). Met: met_gain on its need, a big gain, a bond deed, and her own word at her next quiet moment. Unmet after lapse_days it lapses, never told, never a cost; rest_days before the next. 'ready': false until its deed exists (the pond: Wren fishing). words: what she wants; done: what she did. {player} is her player's name. Drafts for Jeff.",
 		"lapse_days": 3,
 		"rest_days": 1,
 		"met_gain": 0.3,
 		"templates": [
 			{"key": "fire", "need": "safety", "rung": 1, "after": 0, "met_by": ["fire"], "words": "to sit by a fire with {player} and rest a while", "done": "sat by a fire with {player} and rested"},
 			{"key": "town", "need": "company", "rung": 2, "after": 1, "met_by": ["leisure"], "words": "to spend a while in a town among other folk", "done": "spent a while in a town among other folk"},
-			{"key": "pond", "need": "leisure", "rung": 3, "after": 1, "met_by": ["fished"], "ready": true, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
+			{"key": "pond", "need": "leisure", "rung": 3, "after": 0, "first": true, "met_by": ["fished"], "ready": true, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
 			{"key": "wolves", "need": "adventure", "rung": 4, "after": 2, "met_by": ["fought", "cleared"], "words": "to win a fight with {player} beside you", "done": "won a fight beside {player}"},
 			{"key": "temple", "need": "faith", "rung": 5, "after": 3, "met_by": ["blessed"], "words": "to go to the temple and be blessed", "done": "were blessed at the temple"}
 		]

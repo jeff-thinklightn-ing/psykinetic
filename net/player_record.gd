@@ -351,6 +351,8 @@ static func companion_from(pet: Variant) -> Dictionary:
 	var want: Variant = pet.get("want")
 	if want is Dictionary and not want.is_empty():
 		out["want"] = {"key": str(want.get("key", "")), "need": str(want.get("need", "")), "since": int(want.get("since", 0))}
+		if want.has("told"):
+			out["want"]["told"] = bool(want["told"])  # 803 amended (11); none on an older want: counted told.
 	var wants_met: Variant = pet.get("wants_met")
 	if wants_met is Dictionary:
 		var kept_met := {}

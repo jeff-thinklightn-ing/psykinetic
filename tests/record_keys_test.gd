@@ -35,7 +35,7 @@ func _ready() -> void:
 		"standing": {"p": {"score": -7, "met": 1, "since": 2, "why": ["let you bleed out"], "own": true}},
 		"bond_day": 3, "bond_best": 2, "bond_carry": 0.5, "games": {"hers": 1, "theirs": 2},
 		"needs": {"leisure": 0.6, "faith": 0.3}, "need_weights": {"wonder": 1.3}, "needs_day": 4, "needs_today": {"day": 4, "deeds": ["fire"]},
-		"want": {"key": "town", "need": "company", "since": 4}, "wants_met": {"fire": 3}, "want_rest": 5,
+		"want": {"key": "town", "need": "company", "since": 4, "told": false}, "wants_met": {"fire": 3}, "want_rest": 5,
 		"talk_rate": {"m": 0.9, "base": 1.0, "lo": 0.6, "hi": 2.0},
 		"bond_said": {"day": 1, "hurt": 1, "sorry": 0}, "bond_today": {"day": 1, "deeds": ["gift"]}, "marks": ["draugr"],
 		"sick": {"since": 1, "kind": "a cough", "cured_by": "", "treated": -1}, "was_sick": {"since": 1, "ended": 3, "cured_by": "rest"},

@@ -9238,8 +9238,8 @@ func _want_place(record: PlayerRecord, pet: Companion) -> Dictionary:
 ## step: devoted, anywhere she knows; else only her want's place, or
 ## where her own mend tell offered to take him ("mend", 616 amended (4)).
 func _leads_to(record: PlayerRecord, pet: Companion, to: Dictionary) -> bool:
-	if pet.bond_at_least("devoted") or to.get("mend") == true:
-		return true  # Devoted (621), or her own mend tell's offer (616 amended (4)).
+	if pet.bond_at_least("devoted") or to.get("mend") == true or to.get("near_water") == true:
+		return true  # Devoted (621), her own mend tell's offer (616 amended (4)), or water near asked to fish (803 amended (11), _lead_to_fish's).
 	var wanted := _want_place(record, pet)
 	return not wanted.is_empty() and wanted["key"] == to.get("key")
 
@@ -9261,16 +9261,66 @@ func _note_lead_offer(pet: Companion, text: String) -> void:
 
 
 ## Her player asked her to fish with no water near (Companion's fish order,
-## 551 amended (3)): she takes them to the fishing place she would lead to
-## (her want's at any step; devoted, the nearest she knows). True if she
-## knows one (her voice told whether she goes).
-func _lead_to_fish(pet: Companion) -> bool:
+## 551 amended (3)), and she would lead them (the pond her want, at any
+## step; devoted): the nearest fishable water within FISH_LEAD_NEAR of them
+## (803 amended (11), the coordinator's ruling (A): what a person would walk
+## to, no data per town), else the fishing place she would lead to (her
+## want's; devoted, the nearest she knows). "near" when she sets off to that
+## near water, "place" when she was asked to lead to a place (her voice told
+## whether she goes), "" when she knows nowhere.
+func _lead_to_fish(pet: Companion) -> String:
 	var player := pet.keeper as Player
-	var to := _fish_lead_place(pet)
-	if to.is_empty() or player == null or not is_instance_valid(player):
-		return false
+	var record := _record_of(pet)
+	if player == null or not is_instance_valid(player) or record == null \
+			or not (pet.bond_at_least("devoted") or _wants_pond(record)):
+		return ""
+	var to := _near_water(record, player)
+	if to.is_empty():
+		to = _fish_lead_place(pet)
+	if to.is_empty():
+		return ""
 	_start_guide(pet, player, to)
-	return true
+	return "near" if to.get("near_water", false) and pet.guide != null and pet.guide.going() else "place"
+
+
+## How far from her player she looks for water to lead them to, asked to
+## fish (803 amended (11)): the pool by Snagfin's shack is within it from
+## every cell of Umbrage (its farthest corner, (165, 185), 56 off; the west
+## road's way in 54); the reed pond from none.
+const FISH_LEAD_NEAR := 60
+
+
+## Whether her open want is the pond (803 amended (4)).
+static func _wants_pond(record: PlayerRecord) -> bool:
+	var want: Variant = record.companion.get("want") if record != null else null
+	return want is Dictionary and str(want.get("key", "")) == "pond"
+
+
+## The nearest fishable water to [param player] within FISH_LEAD_NEAR, as a
+## walk's goal ending on its bank (803 amended (11)): a fishing place's own
+## (maps', named) when the water is one, else a water with no name
+## ("near_water"); its "want" when the pond is her want. {} for none.
+func _near_water(record: PlayerRecord, player: Player) -> Dictionary:
+	var best := World.NO_CELL
+	var best_d := 1 << 30
+	for dy in range(-FISH_LEAD_NEAR, FISH_LEAD_NEAR + 1):
+		for dx in range(-FISH_LEAD_NEAR, FISH_LEAD_NEAR + 1):
+			var cell := player.tile + Vector2i(dx, dy)
+			if World.pond_in(player.zone, cell).is_empty():
+				continue
+			var d := World.distance(player.tile, cell)
+			if d < best_d:
+				best_d = d
+				best = cell
+	if best == World.NO_CELL:
+		return {}
+	var pond := World.pond_in(player.zone, best)
+	var named := World.holdings != null and World.holdings.all_places().has(pond)
+	var to := {"key": pond, "kind": "place" if named else "water", "name": World.pond_name(pond), "area": player.zone,
+		"cell": best, "bank": true, "near_water": not named}
+	if _wants_pond(record):
+		to["want"] = "pond"
+	return to
 
 
 ## The mend tell's warm rests of [param zone_name] (616 amended (4)), as
@@ -14285,8 +14335,7 @@ func _set_mood(record: PlayerRecord) -> void:
 		if not record.companion.get("talk_rate") is Dictionary:
 			record.companion["talk_rate"] = Companion.talk_start()
 		pet.talk_rate = record.companion["talk_rate"]  # Shared: her moves are her record's (803 amended (5)).
-		var want: Variant = record.companion.get("want")
-		pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
+		_set_want_words(record)
 	if record.companion.has("resident"):
 		_mood_to_worker(record)
 
@@ -15366,6 +15415,7 @@ func _remember_companion(id: String) -> void:
 	record.companion["told_tending"] = pet.told_tending
 	record.companion["told_warm"] = pet.told_warm.duplicate(true)
 	record.companion["told_kit_seller"] = pet.told_kit_seller
+	_keep_want_told(record, pet)
 	record.companion["slots"] = Array(pet.slots)
 	record.companion["items"] = Array(World.slot_uids(pet))
 
@@ -18636,17 +18686,31 @@ func _tend_want(record: PlayerRecord, day: int) -> void:
 		var picked := Companion.pick_want(card, _need_weights(card))
 		if not picked.is_empty():
 			picked["since"] = day
+			picked["told"] = false  # Not yet told (803 amended (11)); a want saved before it has none and counts told.
 			card["want"] = picked
 	_set_want_words(record)
 
 
-## Her voice's want words from her record (803 amended (4)).
+## Her voice's want words from her record (803 amended (4)), and whether
+## she has told it (803 amended (11)): told at a quiet moment, "told" is kept
+## on her record's want, so a restart never has her tell it first again; a
+## want saved before 803 amended (11) has no "told" and counts told.
 func _set_want_words(record: PlayerRecord) -> void:
 	var pet: Companion = _companions.get(record.player_id)
 	if not is_instance_valid(pet):
 		return
+	_keep_want_told(record, pet)
 	var want: Variant = record.companion.get("want")
 	pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
+	pet.want_told = want is Dictionary and bool(want.get("told", true))
+
+
+## Her open want told at a quiet moment (803 amended (11)): "told" kept on
+## her record's want (each tend, and with her record when it is remembered).
+func _keep_want_told(record: PlayerRecord, pet: Companion) -> void:
+	var want: Variant = record.companion.get("want")
+	if want is Dictionary and pet.want_told and pet.want_words == Companion.want_said(str(want["key"]), "words", record.name):
+		want["told"] = true
 
 
 ## A deed of hers and her player's (803 amended (4)): any template it meets

@@ -259,6 +259,9 @@ const FISH_NEAR := 5
 const FISH_NO_ROD := "No rod of my own, but I'll keep you company."
 ## Her words when she cannot fish (voice's): no fish in the water here.
 const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
+## Asked to fish with no water near, she sets off leading them to water
+## close by with no name (803 amended (11); voice's).
+const FISH_NEAR_WATER := "There's water close by. This way."
 ## A fishing place near, fished out for today (voice's).
 const FISH_FISHED_OUT := "This water's fished out for today. Tomorrow, maybe."
 ## Her own start (805 amended (14), the coordinator's numbers): her player
@@ -782,14 +785,16 @@ var needs: Dictionary = {}
 ## Her open want (803 amended (4)), Main's: what she would like, {player}
 ## filled ("to sit by a fire with Jeff and rest a while"), "" for none; and
 ## the want just met, what she did ("sat by a fire with Jeff and rested"),
-## spoken of at her next quiet moment, then "".
+## spoken of at her next quiet moment, then "". want_told: her open want
+## already told at a quiet moment (Main keeps it on her record's want,
+## 803 amended (11)).
 var want_words := "":
 	set(value):
 		if value != want_words:
-			_want_told = false
+			want_told = false
 		want_words = value
 var want_glad := ""
-var _want_told := false
+var want_told := false
 ## Her talk with her player (803 amended (5)), her record's "talk" itself
 ## (Main's, shared): {m, base, lo, hi}; m times her quiet gap.
 var talk_rate: Dictionary = {}
@@ -1820,6 +1825,15 @@ static func castable(cell: Vector2i) -> bool:
 	return water != World.NO_CELL and not World.is_water(cell) and not World.pond_at(water, cell).is_empty()
 
 
+## Main's lead to water (lead_to_fish): true if she leads or was asked to;
+## setting off to water with no name, she says so (803 amended (11)).
+func _lead_to_fish_now() -> bool:
+	var led := str(lead_to_fish.call())
+	if led == "near":
+		_say(FISH_NEAR_WATER, true)
+	return not led.is_empty()
+
+
 ## Off to [param spot] to fish ([param asked] by her player, else beside them).
 func _go_fish(spot: Vector2i, asked: bool) -> void:
 	fish_spot = spot
@@ -2684,9 +2698,10 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				# Fighting and no water here: not now. With water near, the danger
 				# branch below says so and goes once it is over (805 amended (15)).
 				done = "%s asked you to fish, but there is fighting near: not now." % keeper_name()
-			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile) == World.NO_CELL and bool(lead_to_fish.call()):
-				# No water here, and she knows a pond she would take them to (551
-				# amended (3)): Main's walk, her voice told by its guide_note.
+			elif lead_to_fish.is_valid() and fish_spot_near(keeper.tile if _alive(keeper) else tile) == World.NO_CELL and _lead_to_fish_now():
+				# No water here, and water near or a pond she knows she would take
+				# them to (551 amended (3), 803 amended (11)): Main's walk, her
+				# voice told by its guide_note.
 				_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "lead", "note": "to the water she knows"})
 				return true
 			else:
@@ -3847,16 +3862,23 @@ static func want_template(key: String) -> Dictionary:
 ## The want she picks now from [param card] (her record's companion) and
 ## [param weights], {key, need} or {} for none: of the templates ready, not
 ## yet met and open to her (met at least "after" of them), the one whose need
-## lacks most by her weight, weight x (1 - need); the first on a tie.
+## lacks most by her weight, weight x (1 - need); the first on a tie. Her
+## first want ever (no want_rest on her card: no want of hers has yet been
+## met or lapsed) is the open template marked "first", the pond, whatever her
+## weights (803 amended (11), the coordinator after Jeff's loop 1).
 static func pick_want(card: Dictionary, weights: Dictionary) -> Dictionary:
 	var met: Dictionary = card.get("wants_met", {}) if card.get("wants_met") is Dictionary else {}
 	var needs := needs_of(card)
 	var best := {}
 	var best_lack := -1.0
-	for template: Variant in want_templates():
-		if not template is Dictionary or not template.get("ready", true) or met.has(str(template.get("key", ""))) \
-				or int(template.get("after", 0)) > met.size():
-			continue
+	var open := want_templates().filter(func(template: Variant) -> bool:
+		return template is Dictionary and template.get("ready", true) and not met.has(str(template.get("key", ""))) \
+			and int(template.get("after", 0)) <= met.size())
+	if not card.has("want_rest"):
+		for template: Dictionary in open:
+			if template.get("first", false):
+				return {"key": str(template["key"]), "need": str(template.get("need", ""))}
+	for template: Dictionary in open:
 		var need := str(template.get("need", ""))
 		var lack := float(weights.get(need, 1.0)) * (1.0 - float(needs.get(need, 0.5)))
 		if lack > best_lack:
@@ -3936,8 +3958,11 @@ func _quiet_pick_focus() -> Dictionary:
 		var glad := {"key": "glad", "words": want_glad + "."}
 		want_glad = ""
 		return glad  # A want just met (803 amended (4)): her own word on it, next.
+	if not want_words.is_empty() and not want_told:
+		want_told = true  # Kept on her record's want (Main._syncwant_told): told once, not again after a restart.
+		return {"key": "want", "words": want_words + "."}  # A want not yet told, next (803 amended (11)).
 	if not want_words.is_empty():
-		options.append({"key": "want", "weight": "want_told" if _want_told else "want", "words": want_words + "."})
+		options.append({"key": "want", "weight": "want_told" if want_told else "want", "words": want_words + "."})
 	if options.is_empty():
 		return {}
 	var open := options.filter(func(each: Dictionary) -> bool: return each["key"] != _quiet_last_focus)
@@ -3958,7 +3983,7 @@ func _quiet_pick_focus() -> Dictionary:
 	if chosen["key"] == "place":
 		_zone_new_today = false
 	if chosen["key"] == "want":
-		_want_told = true
+		want_told = true
 	_woke_words = ""  # Her waking is spoken of at the next quiet moment or not at all.
 	return chosen
 
