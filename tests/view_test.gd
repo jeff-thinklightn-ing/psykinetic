@@ -9,6 +9,8 @@ extends Node
 var _failures := 0
 var _main: Node
 var _rig: Client3D
+## The frames _run_until last drew.
+var _until_frames := 0
 
 
 ## Its base port: not 7777 (the editor may be hosting there), nor any other
@@ -12324,11 +12326,16 @@ func _test_goblin() -> void:
 			and absf(absf(angle_difference(yaw, PI)) - eased) <= 0.1 * eased + 0.001,
 			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f (%.2f expected after a %.0f ms frame)"
 			% [yaw, was, PI - eased, float(turn[1]) * 1000.0])
-	await _run_clock(0.3)
+	# Waited on, not timed (350 amended (1): the push's slide is drawn a tick behind and ends 0.3 s
+	# after the push, the moment a 0.3 s wait read at): its slide drawn over, then the doubling over.
+	var arrived := await _run_until(func() -> bool: return _slide_over(imp), 1.0)
+	var doubled := await _run_until(func() -> bool: return animator.playing() == Client3D.CLIP_IMPACT, 1.0)
+	var doubled_frames := _until_frames
 	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.05)
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
-	_check(animator.playing() == Client3D.CLIP_IMPACT,
-			"there, hit nothing, it doubles over all the same, still facing it (%s)" % animator.playing())
+	_check(arrived >= 0.0 and doubled >= 0.0 and _soon(doubled, doubled_frames) and animator.playing() == Client3D.CLIP_IMPACT,
+			"there, hit nothing, it doubles over all the same, still facing it (%s; its slide drawn over, doubled over %.2f s (%d frames) after)"
+			% [animator.playing(), doubled, doubled_frames])
 	await _run_clock(Client3D.KNOCK_MIN_SECONDS + 0.8)
 	_check(not puppet.has_meta("knock") and animator.playing() == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.playing())
 	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), was, 0.05)
@@ -12345,9 +12352,9 @@ func _test_goblin() -> void:
 	# mid-step.
 	var drawn := await _run_until(func() -> bool: return imp.stepping, 0.2 + 2.0 * GridEntity.HOST_DRAW_DELAY_TICKS / World.TICK_RATE)
 	var over := await _run_until(func() -> bool: return not puppet.has_meta("knock"), 1.0)
-	_check(drawn >= 0.0 and over >= 0.0 and over <= 1.0 / World.TICK_RATE,
-			"stepping back: drawn %.2f s after its step (a host draws %.1f tick behind), the knock over %.2f s after that (a tick at most)"
-			% [drawn, GridEntity.HOST_DRAW_DELAY_TICKS, over])
+	_check(drawn >= 0.0 and over >= 0.0 and _soon(over),
+			"stepping back: drawn %.2f s after its step (a host draws %.1f tick behind), the knock over %.2f s (%d frames) after that (a tick, or two frames, at most)"
+			% [drawn, GridEntity.HOST_DRAW_DELAY_TICKS, over, _until_frames])
 	await _run_clock(0.05)
 	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.3)
 	_check(not puppet.has_meta("knock") and Client3D.is_gait(animator.playing()) and absf(angle_difference(yaw, PI)) < 0.3,
@@ -12368,8 +12375,11 @@ func _test_goblin() -> void:
 	imp.impacted.emit(2, &"stone")
 	await _run_clock(0.05)
 	_check(animator.playing() == Client3D.CLIP_BACKPEDAL, "pushed into a wall: it backpedals there first (%s)" % animator.playing())
-	await _run_clock(0.25)
-	_check(animator.playing() == Client3D.CLIP_IMPACT, "and doubles over when it gets there (%s)" % animator.playing())
+	# Waited on, not timed, as above: its slide drawn over (a tick behind), then the doubling over.
+	var hit_wall := await _run_until(func() -> bool: return _slide_over(imp), 1.0)
+	var doubled_at := await _run_until(func() -> bool: return animator.playing() == Client3D.CLIP_IMPACT, 1.0)
+	_check(hit_wall >= 0.0 and doubled_at >= 0.0 and _soon(doubled_at),
+			"and doubles over when it gets there (%s; %.2f s (%d frames) after its slide was drawn over)" % [animator.playing(), doubled_at, _until_frames])
 	await _run_clock(1.0)
 	imp.impacted.emit(1, &"wood")
 	_check(animator.playing() == Client3D.CLIP_IMPACT, "shoved against a door where it stands: doubles over at once")
@@ -12426,11 +12436,14 @@ func _run_clock(seconds: float) -> void:
 
 ## Runs the drawing clock as _run_clock does, a frame at a time, until [param done] says so or
 ## [param cap] seconds have passed: the seconds it took (from the first frame), or -1.0 if it never did.
+## Its frames drawn are left in _until_frames.
 func _run_until(done: Callable, cap: float) -> float:
 	var from := Time.get_ticks_msec()
 	var until := from + int(cap * 1000.0)
+	_until_frames = 0
 	while Time.get_ticks_msec() < until:
 		await get_tree().process_frame
+		_until_frames += 1
 		World.tick_alpha += get_process_delta_time() * World.TICK_RATE
 		while World.tick_alpha >= 1.0:
 			World.tick += 1
@@ -12438,6 +12451,17 @@ func _run_until(done: Callable, cap: float) -> float:
 		if done.call():
 			return (Time.get_ticks_msec() - from) / 1000.0
 	return -1.0
+
+
+## Whether a wait _run_until timed at [param seconds] came soon: within a tick, or within two drawn
+## frames when a starved machine draws slower than that ([param frames], else its last count).
+func _soon(seconds: float, frames := -1) -> bool:
+	return seconds <= 1.0 / World.TICK_RATE or (frames if frames >= 0 else _until_frames) <= 2
+
+
+## Whether [param body]'s push is drawn over: its slide neither waiting nor on screen.
+func _slide_over(body: GridEntity) -> bool:
+	return body.push_shown != GridEntity.PushShown.SLIDING and body.push_shown != GridEntity.PushShown.WAITING
 
 
 ## Waits on a turn's state, not the wall clock (a loaded machine eases a turn late: the tossed roll
