@@ -447,7 +447,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You rest in the town %s %s between trips%s. | `sim/companion.gd` standing_words() |
 |  | , and work there as %s | `sim/companion.gd` standing_words() |
 |  | You know that town well. | `sim/companion.gd` standing_words() |
-|  | It is said that %s | `sim/companion.gd` lore_words() |
+| L | It is said that %s | `sim/companion.gd` lore_words() |
 |  | What you know of the world: %s | `sim/companion.gd` lore_words() |
 |  | \\b%ss?\\b | `sim/companion.gd` lore_topics() |
 |  | %s %s %s%s | `sim/companion.gd` stance_prompt() |
@@ -528,7 +528,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | , where you have not been before today | `sim/companion.gd` place_brief() |
 |  | %s Something that happened here: %s | `sim/companion.gd` place_brief() |
 |  | %s There is %s here; you were told of nothing in it. | `sim/companion.gd` place_brief() |
-|  | It is said that %s | `sim/companion.gd` place_brief() |
+| L | It is said that %s | `sim/companion.gd` place_brief() |
 |  | %s One thing you know of it: %s | `sim/companion.gd` place_brief() |
 |  | fire\|flame\|burn | `sim/companion.gd` _asked_in() |
 |  | water\|pool\|lake\|river | `sim/companion.gd` _asked_in() |
@@ -2032,7 +2032,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
 |  | one who has no amulet is given one. | `sim/resident.gd` relic_line() |
 |  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd` KEPT_LINE |
-|  | It is said that %s | `sim/resident.gd` world_facts() |
+| L | It is said that %s | `sim/resident.gd` world_facts() |
 |  | %s and %s | `sim/resident.gd` _listed() |
 
 ### residents (card) (25)
