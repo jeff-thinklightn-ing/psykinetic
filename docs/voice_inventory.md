@@ -3214,8 +3214,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | the coin's other half | `items[39].name` |
 |  | staggers whoever it hits and shoves them back a step; its blunt blows wear their arrows | `items[52].verb.says` |
 |  | parries a light blow from ahead when ready to strike | `items[53].verb.says` |
-|  | raised (right button), takes blows from ahead and throws the attacker back; lowered, still partly guards your left side; the left button bashes with it | `items[54].verb.says` |
-|  | raised, takes most of a blow from straight ahead and throws the attacker back; lowered, still partly guards your left side; a light bash | `items[55].verb.says` |
+|  | raised (right button), takes blows from ahead and throws the attacker back, and the whole of a weapon's blow marked in red or wound up; lowered, still partly guards your left side; the left button bashes with it | `items[54].verb.says` |
+|  | raised, takes most of a blow from ahead and all of a weapon's blow marked in red or wound up, and throws the attacker back; lowered, still partly guards your left side; a light bash | `items[55].verb.says` |
 |  | the draugr's own: winds up long, then falls through any guard on three in an arc, knocking them down | `items[56].verb.says` |
 |  | winds up through a light blow, then falls through any guard on three in an arc, knocking them down | `items[57].verb.says` |
 |  | the robbers' wall-breaker: slow and very heavy, it drives back whoever it hits | `items[58].verb.says` |
