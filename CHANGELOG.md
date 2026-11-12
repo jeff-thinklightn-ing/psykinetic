@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Barrow's quest card stays out of town and the bear's cave: you see it only in the Barrow and the halls below it (747 amended (6)).
 - In the crypt you're now told what happens around you: a niche that holds only the dead, the slab swinging aside, the hall's door shutting and opening, the stair barred from below, Brand's key taken or fallen at your feet, the draugr yielding, the plaque over the holy remains, and how a deal with the fallen knight or the draugr goes (133 amended (1))
 - In the crypt, a robber about to lunge crouches with his dagger drawn back while the red shows, and thrusts as it lands (790 amended (7)).
 - Planted feet hold firm as people walk and jog, and a companion following you keeps one gait through a short pause or a change of pace (869).

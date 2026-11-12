@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_deep_crypt()
 	_test_hall_shortcut()
 	_test_barrow_quest()
+	_test_quest_card_place()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -5798,6 +5799,42 @@ func _test_barrow_quest() -> void:
 			World.set_slots(player, slots, uids)
 	record.marks.assign(kept["marks"])
 	record.barrow_task = kept["task"]
+	_main._sync_quest(record)
+
+
+## 747 amended (6) with ui's half (747 amended (7)): a taken quest carries
+## its zones to the player and the HUD's own card (Main.quest_panel, ui's
+## QuestPanel, reading the local player as the client does) shows only on
+## the crypt's two floors: travelled to each place as a player is, the card
+## drawn in the barrow and barrow_deep, gone in the bear's cave and the wilds
+## (Umbrage).
+func _test_quest_card_place() -> void:
+	print("
+== the quest card only in its own place (747 amended (6)): the HUD's card, place by place ==")
+	var player := _player()
+	if player == null or _main.quest_panel == null:
+		_check(false, "a player and the HUD's quest card to test with")
+		return
+	var id := player.player_id
+	var record: PlayerRecord = _main._records.get(id)
+	var was := str(World.zone.name)
+	var kept := {"marks": record.marks.duplicate(), "task": record.barrow_task.duplicate(true)}
+	_main.mark_player(id, Main.QUEST_DONE, false)
+	record.barrow_task = {"taken": true, "slain": []}
+	var seen := {}
+	for place: String in ["barrow", "barrow_deep", "bear_cave", "wilds"]:
+		_main.load_map(place)
+		var here := _player()
+		_main._sync_quest(record)
+		_main.quest_panel.step(1.0)
+		_main.quest_panel.step(1.0)
+		seen[place] = [here.zone if here != null else "", (here.quest.get("zones", []) if here != null else []), _main.quest_panel.visible]
+	_check(seen["barrow"][2] and seen["barrow_deep"][2] and not seen["bear_cave"][2] and not seen["wilds"][2]
+		and seen.values().all(func(row: Array) -> bool: return row[1] == ["barrow", "barrow_deep"]),
+		"the card on both crypt floors, gone in the bear's cave and the wilds; the quest's zones reach the player in each (%s)" % [seen])
+	record.marks.assign(kept["marks"])
+	record.barrow_task = kept["task"]
+	_main.load_map(was)
 	_main._sync_quest(record)
 
 
