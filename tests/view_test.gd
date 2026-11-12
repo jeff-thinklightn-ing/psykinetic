@@ -111,6 +111,7 @@ func _ready() -> void:
 		_test_heights()
 		_test_damp_look()
 		_test_night_look_2()
+		_test_dusk_floor()
 		_test_dais()
 		_test_dark_set()
 		_test_lair()
@@ -6879,6 +6880,70 @@ func _test_night_look_2() -> void:
 
 ## [param material]'s [param name], or the shader's own [param fallback] when never set (a shader
 ## material gives null for a uniform nobody set).
+## Decision 882: the sim's light keeps the sky's dusk (TWILIGHT_LOW -12,
+## TWILIGHT_HIGH 10), so the outdoor floor does too, at dusk and as dawn
+## mirrors it; its night only once the twilight has gone. 858's lift
+## rides on it unchanged (the colour keeping the light it had off).
+func _test_dusk_floor() -> void:
+	print("\n== dusk and dawn (882): the ground keeps the sky's light through the twilight ==")
+	var was := Client3D.night_look_2
+	var hour_was := DayNight.hour(DayNight.now())
+	var weather_was: Dictionary = World.fields.weather.duplicate()
+	var low_was := _rig._low
+	_rig._low = false  # The low camera's own dusk lift (623 amended (3)) aside: the floor's light alone.
+	# The hour the sun crosses [param elevation], going down after noon or up before it, by the minute.
+	var crossing := func(elevation: float, evening: bool) -> float:
+		for minute in range(0, 12 * 60):
+			var hour := 12.0 + minute / 60.0 if evening else 12.0 - minute / 60.0
+			if DayNight.elevation_at(hour / 24.0) <= elevation:
+				return hour
+		return -1.0
+	var hills := Level.load_level("hills")
+	var at := func(hour: float, on: bool, kind: String) -> Array:
+		Client3D.night_look_2 = on
+		DayNight.set_hour(hour)
+		World.fields.weather = Weather.KINDS[kind].duplicate()
+		World.fields.weather["wind_dir"] = Vector2.RIGHT
+		World.fields.weather["snow"] = 0.0
+		_rig._weather_view.weather = World.fields.weather.duplicate()
+		_rig.rebuild(hills["terrain"], hills["centre"])
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+		_rig._update_sky(0.0)
+		var material := _rig._ground_shader_material
+		return [float(material.get_shader_parameter("sky_floor")), float(_param_or(material, "sky_floor_base", -1.0)),
+				_rig._look_elevation, DayNight.daylight(DayNight.now())]
+	var sunset: float = crossing.call(0.0, true)
+	var dusk: float = crossing.call(-5.3, true)
+	var dawn: float = crossing.call(-5.3, false)
+	var night: float = crossing.call(-10.5, true)
+	var off_sunset: Array = at.call(sunset, false, "clear")
+	var off_dusk: Array = at.call(dusk, false, "clear")
+	var on_dusk: Array = at.call(dusk, true, "clear")
+	_check(float(off_sunset[0]) > 0.95, "sunset (%.2f h): the floor's light %.2f, still the day's (it was 0.56)" % [sunset, off_sunset[0]])
+	_check(dusk > 12.0 and float(off_dusk[3]) > Animal.NIGHT_LIGHT and float(off_dusk[0]) > 0.45 and float(on_dusk[0]) > 0.7
+			and is_equal_approx(float(on_dusk[1]), float(off_dusk[0])),
+			"dusk (%.2f h, %.1f degrees, light %.2f, not yet dark): the floor's light %.2f (0.30 before 882), %.2f under the night look, its colour keeping %.2f"
+			% [dusk, off_dusk[2], off_dusk[3], off_dusk[0], on_dusk[0], on_dusk[1]])
+	var on_dawn: Array = at.call(dawn, true, "clear")
+	_check(dawn > 0.0 and dawn < 12.0 and absf(float(on_dawn[0]) - float(on_dusk[0])) < 0.03,
+			"dawn (%.2f h, %.1f degrees) as dusk: the floor's light %.2f (dusk %.2f)" % [dawn, on_dawn[2], on_dawn[0], on_dusk[0]])
+	var on_night: Array = at.call(night, true, "clear")
+	var off_night: Array = at.call(night, false, "clear")
+	_check(float(on_night[0]) < Client3D.NIGHT_FLOOR_DARKEST + 0.01 and float(off_night[0]) < Client3D.FLOOR_DARKEST + 0.01
+			and float(on_night[3]) < Animal.NIGHT_LIGHT,
+			"the twilight gone (%.2f h, %.1f degrees, light %.2f, dark): the night's floor %.2f (off %.2f)"
+			% [night, on_night[2], on_night[3], on_night[0], off_night[0]])
+	var storm: Array = at.call(dusk, true, "storm")
+	_check(float(storm[0]) < float(on_dusk[0]), "a storm's dusk keeps the cloud's share (%.2f, clear %.2f)" % [storm[0], on_dusk[0]])
+	Client3D.night_look_2 = was
+	DayNight.set_hour(hour_was)
+	World.fields.weather = weather_was
+	_rig._low = low_was
+	_rig._weather_view.weather = weather_was.duplicate()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _param_or(material: ShaderMaterial, name: String, fallback: Variant) -> Variant:
 	var value: Variant = material.get_shader_parameter(name)
 	return fallback if value == null else value

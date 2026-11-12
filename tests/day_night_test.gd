@@ -17,6 +17,7 @@ func _ready() -> void:
 	DayNight.reset()
 	_test_clock()
 	_test_sun()
+	_test_dark_falls()
 	_test_daylight_in_the_field()
 	_test_zones()
 	_test_zone_light()
@@ -73,6 +74,33 @@ func _test_sun() -> void:
 		last = light
 	_check(grows, "from 4:00 to 9:00 the light only grows")
 	DayNight.reset()
+
+
+## Where the sim's dark falls (decision 882, enemy-ai's check): at the
+## equinox the open sky's light goes under the night's (Animal.NIGHT_LIGHT,
+## DayNight.DARK_LIGHT) with the sun between -6.5° and -5.5°, at dusk and at
+## dawn alike, the end of civil twilight (before 882, at -1°: called dark while
+## it was visibly dusk). Night and seen-or-hidden are one threshold, so a body
+## goes unseen in the open the minute the wolves turn bold.
+func _test_dark_falls() -> void:
+	print("\n== at the equinox dark falls at the end of civil twilight, the sun about 6° down ==")
+	var dusk := -1.0
+	var dawn := -1.0
+	for minute in range(12 * 60, 24 * 60):  # Noon to midnight: the first minute under the night's light.
+		if DayNight.daylight_at(minute / 1440.0, 0.0) < DayNight.DARK_LIGHT:
+			dusk = minute / 1440.0
+			break
+	for minute in range(12 * 60, 0, -1):  # Noon back to midnight: the last minute under it before the day.
+		if DayNight.daylight_at(minute / 1440.0, 0.0) < DayNight.DARK_LIGHT:
+			dawn = minute / 1440.0
+			break
+	var at_dusk := DayNight.elevation_at(dusk, 0.0) if dusk >= 0.0 else NAN
+	var at_dawn := DayNight.elevation_at(dawn, 0.0) if dawn >= 0.0 else NAN
+	_check(at_dusk >= -6.5 and at_dusk <= -5.5 and at_dawn >= -6.5 and at_dawn <= -5.5,
+			"dark falls at %02d:%02d with the sun at %.1f°, and lifts at %02d:%02d at %.1f° (both between -6.5° and -5.5°)" % [
+			int(dusk * 24.0), int(dusk * 1440.0) % 60, at_dusk, int(dawn * 24.0), int(dawn * 1440.0) % 60, at_dawn])
+	_check(is_equal_approx(DayNight.DARK_LIGHT, Senses.DARK) and is_equal_approx(Animal.NIGHT_LIGHT, Senses.DARK),
+			"night and hiding are one threshold: NIGHT_LIGHT %.2f, DARK %.2f" % [Animal.NIGHT_LIGHT, Senses.DARK])
 
 
 func _test_daylight_in_the_field() -> void:

@@ -28,6 +28,7 @@ notes (decision 324).
 - A robber's or a skeleton's ordinary blow winds up where you can see it coming, even a stab from behind, and a raised shield facing it takes the blow whole (806 amended (14)).
 - Rain at night falls as faint grey streaks, shaded by the dark and by lamplight, with the view clear close to the camera (309 amended (5)).
 - A travel ration is a cloth-wrapped bundle tied with twine, a sack of food is a slumped burlap sack, a bag of nails is canvas with nails standing out of it, and a bench is two planks on splayed legs (871).
+- Dusk and dawn light the ground as long as they light the sky, and night begins for beasts and for hiding only once the twilight has gone (882).
 ## v0.1.213
 
 - The Barrow's quest card stays out of town and the bear's cave: you see it only in the Barrow and the halls below it (747 amended (6)).
