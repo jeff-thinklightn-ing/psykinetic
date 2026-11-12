@@ -547,6 +547,26 @@
 				"sha256": "bf68f1751cb11c261c3040dc7ddd83cbc360f6ff4ebd7aafd83cb73f60b2c904"
 			}
 		],
+		"amb.town_night": [
+			{
+				"file": "amb.town_night.ogg",
+				"from": "freesound",
+				"original": "freesound 460502: wind, barn, wood movement at varying distance, creaks, hits, light howl, squeaks.wav (its steady 134 Hz tone notched out) (from 12 s for 255 s)",
+				"sha256": "3ceab984e0aa2809bc54ea5e68858ba3cf4381a9ec2bcdcad086836a6978514f",
+				"by": "be_a_hero_not_a_patriot",
+				"url": "https://freesound.org/people/be_a_hero_not_a_patriot/sounds/460502/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_night.2.ogg",
+				"from": "freesound",
+				"original": "freesound 796198: Wind in the countryside, Leaves and creaking wood. (its 4 dB rise over the length evened out) (from 0 s for 229 s)",
+				"sha256": "2ba835c99b73e4bdb93261736d9e3e85a79dfb94f0a574015b24d80f062fecf8",
+				"by": "fran_marenco",
+				"url": "https://freesound.org/people/fran_marenco/sounds/796198/",
+				"license": "CC0 1.0"
+			}
+		],
 		"music.dungeon_base": [
 			{
 				"file": "music.dungeon_base.ogg",

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage at night has the wind in its timbers and eaves, with the creak of old wood, and the fire on the square crackles as a camp's fire does, heard from well across the square (578 amended (2))
 - Umbrage's temple has its altar, pale stone under a plain linen cloth facing the pews, two candles burning on it, and Aldous takes offerings at a low oak table with a bronze bowl on it (734 amended (8)).
 - Umbrage's square has no chests standing in it now, and anything you left in the old chests by the stall waits for you with Aldous at the temple, where pews and candles stand by the stair down (734 amended (7)).
 - The corner map and the big map draw the ground as it looks: green grass, brown paths, grey stone and clear blue water, with the hills gently shaded (873).

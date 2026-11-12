@@ -360,6 +360,34 @@ func _test_ambience_runs() -> void:
 	_check(crackle == null or not crackle.playing, "a dropped camp: no crackle")
 	_rig._buildings.pop_back()
 	_rig.ambience._weigh()
+	# A fire place's fire (Umbrage's square): heard as a camp's fire from its
+	# cell, never as a torch; a terrain fire on no fire place stays a torch.
+	var hearth := listener + Vector2i(2, 1)
+	var by_road := listener + Vector2i(-2, 0)
+	var places := {"square_fire": {"kind": "fire", "cell": hearth}, "well": {"kind": "other", "cell": by_road},
+		"camp": {"kind": "camp", "cell": listener}}
+	_check(Main.fire_places(places) == ([hearth] as Array[Vector2i]), "the fire places: the fire kind's cells (%s)" % [Main.fire_places(places)])
+	var had_torches: Array[Vector2i] = _rig.torch_cells.duplicate()
+	var had_places: Array[Vector2i] = _rig.fire_places
+	_rig.torch_cells.append_array([hearth, by_road] as Array[Vector2i])
+	_rig.fire_places = [hearth] as Array[Vector2i]
+	_check(_rig.place_fires() == ([hearth] as Array[Vector2i]) and hearth in _rig.campfire_cells()
+			and not hearth in _rig.torch_fires() and by_road in _rig.torch_fires(),
+			"the square's fire among the camp fires, not the torches; the other fire a torch")
+	_rig.ambience._weigh()
+	crackle = _rig.ambience.points.get("amb.campfire")
+	var torch: AudioStreamPlayer3D = _rig.ambience.points.get("amb.torch_fire")
+	_check(SoundKit.files("amb.campfire").is_empty() or crackle != null and crackle.playing
+			and crackle.position.distance_to(_rig._tile_position(hearth) + Vector3.UP) < 0.01,
+			"by the square's fire: a camp's crackle from its cell (%s)" % ("held" if crackle != null else "no takes"))
+	_check(SoundKit.files("amb.torch_fire").is_empty() or torch != null and torch.playing
+			and torch.position.distance_to(_rig._tile_position(hearth) + Vector3.UP) > 0.01,
+			"and the torch's loop from a torch, never the square's fire (%s)" % ("held" if torch != null else "no takes"))
+	_rig.fire_places = [] as Array[Vector2i]
+	_check(not hearth in _rig.campfire_cells() and hearth in _rig.torch_fires(), "no fire place: the same fire a torch again")
+	_rig.torch_cells = had_torches
+	_rig.fire_places = had_places
+	_rig.ambience._weigh()
 	# The hidden door's draft (608 amended): from its edge's middle while
 	# its Door is shut, none once it opens or from out of reach.
 	var draft_takes := not SoundKit.files("amb.draft").is_empty()

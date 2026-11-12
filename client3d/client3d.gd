@@ -2704,13 +2704,37 @@ var fishing_view: FishingView
 ## The cells fire burns on, torches (_add_torch) and fires (_add_fire),
 ## for their crackle (Ambience).
 var torch_cells: Array[Vector2i] = []
+## The cells of the level's fire places (level.json "places" of kind "fire":
+## Umbrage's square fire), from Main with the night places (Main.fire_places).
+var fire_places: Array[Vector2i] = []
+
+
+## The fires burning on a fire place's own cell (fire_places among
+## torch_cells): a hearth folk sit round, heard as a camp's fire, not a torch.
+func place_fires() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in fire_places:
+		if torch_cells.has(cell):
+			out.append(cell)
+	return out
+
+
+## torch_cells less the place fires: the fires heard as torches.
+func torch_fires() -> Array[Vector2i]:
+	var hearths := place_fires()
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in torch_cells:
+		if not hearths.has(cell):
+			out.append(cell)
+	return out
 
 
 ## The cells under the camps' fires drawn (decision 777, sound's side: a
 ## rest camp's and a raid camp's, 649; Level.camp_fire, where
 ## BuildingComposer._camp lays prop.campfire), for their crackle
 ## (Ambience, amb.campfire); a dropped plot's left out. And the fire rings
-## drawn lit (825, "hill cave rest"), while a player's fire burns there.
+## drawn lit (825, "hill cave rest"), while a player's fire burns there,
+## and the place fires (place_fires: the square's).
 func campfire_cells() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for entry: Dictionary in _buildings:
@@ -2721,6 +2745,7 @@ func campfire_cells() -> Array[Vector2i]:
 			out.append(fire)
 	for cell: Vector2i in _hearths_burning():
 		out.append(cell)
+	out.append_array(place_fires())
 	return out
 
 

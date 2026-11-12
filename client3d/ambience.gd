@@ -584,9 +584,10 @@ func _door_open(edge: Variant) -> bool:
 
 
 ## The torch loop at the nearest torch heard from [param cell], and the
-## campfire's at the nearest camp's fire (777, sound's side), else off.
+## campfire's at the nearest camp's fire (777, sound's side) or place fire
+## (the square's: Client3D.place_fires, heard as a camp's, not a torch), else off.
 func _place_torch(cell: Vector2i) -> void:
-	_place_point("amb.torch_fire", view.torch_cells, cell)
+	_place_point("amb.torch_fire", view.torch_fires(), cell)
 	_place_point("amb.campfire", view.campfire_cells(), cell)
 	var held := held_camps(view._terrain.get("camps", []), _camp_people())
 	for slot: String in CAMP_TALK:

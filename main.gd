@@ -4558,9 +4558,21 @@ static func _place_cell(place: Dictionary, field: String) -> Vector2i:
 	return place.get("cell", Vector2i.ZERO)
 
 
+## This level's fire places (level.json "places" of kind "fire": Umbrage's
+## square fire), each by its cell, for the view to hear its fire as a camp's.
+static func fire_places(places: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if str(place.get("kind", "")) == "fire" and place.get("cell") is Vector2i:
+			out.append(place["cell"])
+	return out
+
+
 func _show_night_places() -> void:
 	if _client3d != null:
 		var night := night_places(level.get("places", {}))
+		_client3d.fire_places = fire_places(level.get("places", {}))
 		_client3d.set_night_places(night[0], night[1])
 
 

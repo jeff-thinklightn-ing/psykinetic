@@ -22919,6 +22919,35 @@ slots stay, for a take that passes).
 578's fade by the cold goes with them: it was there for the insects, and
 it would have quieted the owls' bed in winter. Ambience.weights is as it
 was before 578. Client only, protocol unchanged, no new class_name.
+
+578 amended (2) (the script's label; the coordinator's approval, 11-11, of the first of sound's
+three worst from its Umbrage ear walk; no package: the town as it stands, heard): the town's night heard. The walk
+(C:\dev\review\sound\umbrage_ears, the town's east at 23:00) measured a median of -55.6 dB at the
+ear, 15 dB under noon, with 58% of its seconds under -50: amb.town_night had no take since the
+insects went, so the town at night was the forest's owls and the wind. amb.town_night now has two
+CC0 Freesound takes of wind in timber, each levelled to a mean of -33.1 dB (both channels' power; the
+day bed's is -30.9), so the square at night sits about 2 dB under its day bed (by the walk's offset, about -43 at the
+ear; the rerun on main measures it): be_a_hero_not_a_patriot 460502 (a barn's wood moving in the wind, creaks and a light howl;
+its 12-267 s, a steady 134 Hz tone 9 dB over its neighbours notched out) and fran_marenco 796198
+(wind in leaves with creaking wood, 229 s, its 4 dB rise over the length evened out so its seam
+doesn't step). Each runs minutes, and a bed starts somewhere along its take, so no loop comes round a
+player could count. Both pass 578's measure: no second has its sound over 4 kHz within 10 dB of its whole (its median
+25 and 18 dB under; the owls' kept bed, 11% of its seconds by the same run), no voices, no creatures (lore: Umbrage keeps no dogs or fowl). Turned down: eniru
+640219 (a 26.6 s loop inside its 190 s), TSP-Talk 845502 (wind on the microphone, 77% under 150
+Hz), szegvari 557191 (a dark drone, nothing over 3 kHz), klankbeeld 186416 (CC BY; an April
+day's oak creak with bright bursts over 3 kHz, birds by the look of them).
+
+A fire place's fire is heard as a camp's. Umbrage's square fire (level.json "places" square_fire,
+kind "fire", at 194,211) is a terrain fire cell, so it played the wall torch's loop (amb.torch_fire,
+range 4, -10 dB) like any burning cell. Main.fire_places gives the view each fire place's cell with
+the night places (Client3D.fire_places, the view's own); Client3D.place_fires is those among
+torch_cells, campfire_cells counts them with the camps' and the lit rings', and Ambience's torch
+loop plays from torch_fires (torch_cells less them), so the square's fire is amb.campfire (777,
+sound's side: range 8, -8 dB, fuller), never both. A terrain fire on no fire place stays a torch.
+sound_kit_test (the town's night weight, two takes each over 200 s); view_test (the fire places of
+a level's places; by the square's fire its crackle from its cell, the torch never from it, a torch
+again once it is no fire place); both pass with the takes and with them aside. Client only;
+protocol unchanged, no new class_name.
 ## 572 amended. The world's jobs never hold a freed node
 
 The same crash class as 572, in World: its per-tick jobs are kept in

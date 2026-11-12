@@ -428,6 +428,15 @@ func _test_ambience_weights() -> void:
 	_check(is_equal_approx(roofed["amb.forest_day"], Ambience.ROOFED), "under a roof: outdoor beds quieter")
 	var town := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 1.0)
 	_check(is_equal_approx(town["amb.town_day"], 1.0) and town["amb.town_night"] == 0.0, "by a town's buildings by day: its day bed")
+	var town_night := Ambience.weights("outdoors", true, DayNight.NIGHT, 23.0, clear, 1.0)
+	_check(is_equal_approx(town_night["amb.town_night"], 1.0) and town_night["amb.town_day"] == 0.0, "by a town's buildings at 23:00: its night bed")
+	# Its takes (the town's night heard: wind in the eaves and timber) run
+	# minutes each, so no loop comes round that a player could count.
+	var night_lengths: Array[float] = []
+	for path: String in SoundKit.files("amb.town_night"):
+		night_lengths.append(snappedf((load(path) as AudioStream).get_length(), 1.0))
+	_check(night_lengths.is_empty() or night_lengths.size() >= 2 and night_lengths.min() >= 200.0,
+			"the town's night bed: two takes or more, each over 200 s (%s)" % [night_lengths if not night_lengths.is_empty() else "no takes"])
 	var dungeon := Ambience.weights("dungeon", true, 1.0, 12.0, {"kind": "storm", "rain": 1.0, "wind": 1.0}, 0.0)
 	_check(dungeon["amb.dungeon"] == 1.0 and dungeon["amb.rain"] == 0.0 and dungeon["amb.forest_day"] == 0.0, "under stone: the dungeon bed, no weather")
 	_check(dungeon["amb.mine_tunnel"] == 0.0 and dungeon["amb.mine_chamber"] == 0.0, "no mine: no mine bed")
