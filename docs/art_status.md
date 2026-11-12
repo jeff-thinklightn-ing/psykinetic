@@ -312,6 +312,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.heap_ore` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `prop.inn_sign` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `prop.ladder` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.lamp_post` | 1 | art-gen, by hand | own | 2026-11-12 |
+| `prop.lamp_post_low` | 1 | art-gen, by hand | own | 2026-11-12 |
 | `prop.lantern` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.log_seat` | 2 | art-kit, by hand | own | 2026-11-02 |
 | `prop.market_stall` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |

@@ -51686,3 +51686,17 @@ weather_test _test_wet_ground: the wetting and drying times, arriving soaked, dr
 a full canopy, the ground shader's constants and lines, the night's share (0.91 of dry), the tell's
 contrast (at least 0.9 of dry), the duller day's parts (and none of it with wet_ground off), and the
 sim's weather untouched. Client only, protocol unchanged, no new class_name.
+## 892. The street lamp posts: prop.lamp_post and prop.lamp_post_low, art-gen's, for buildings' lamps
+
+The store's lamp (_add_store_lamp) and Snagfin's lamp by his shack door (_add_lantern) stand their lanterns on
+code-drawn posts that read as bare stakes at the nearest zoom (the coordinator's order 2026-11-12, for buildings).
+Two new slots, art-gen's by hand (C:/dev/review/items_artgen/make_lamp_post.py, tall and low; 216 tris each;
+art-kit passed both on C:/dev/review/lamp_post/lamp_post_sheet.png beside the goblin at the nearest zoom): a
+chamfered wooden post with a darker foot and a pyramid cap, an iron collar, an arm and strut toward +x and a hook
+with an open ring. prop.lamp_post is 2.15 m tall, its box [0.43, 2.15, 0.15], its middle [0.14, 0, 0], its
+"hang" socket [0.3, 1.97, 0]; prop.lamp_post_low is 1.15 m, [0.35, 1.15, 0.15], [0.1, 0, 0], "hang" [0.22,
+1.015, 0]. gear.lantern hangs by its ring top (its origin) at "hang", scaled 1.7 as buildings has it, the light at
+the lantern's middle. Neither is solid. Their grey boxes are a 15 cm post and the arm, filling the slot's box (the
+first take's 12 cm post failed art_kit_test against the models' 15 cm foot). Package: the store's and Snagfin's
+lamps. They land off: nothing places them until buildings' code stands them in place of its own posts, which
+switches them on. Client only (art); no new class_name.

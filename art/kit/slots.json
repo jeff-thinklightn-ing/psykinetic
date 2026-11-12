@@ -2816,6 +2816,32 @@
 			"uses": "a level's torch standing free in its cell's middle (terrain's drawn fire; prop.torch is the wall sconce); the flame (terrain's shader and a light) burns at its flame socket",
 			"sockets": {"flame": [0, 1.45, 0]}
 		},
+		"prop.lamp_post": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.43, 2.15, 0.15],
+			"middle": [0.14, 0, 0],
+			"budget": 300,
+			"materials": 1,
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/items_artgen/make_lamp_post.py tall (the coordinator's order 2026-11-12 for buildings: the store's and Snagfin's code-drawn lamp posts read as bare stakes; art-kit passed it on C:/dev/review/lamp_post/lamp_post_sheet.png beside the goblin at the nearest zoom): a chamfered wooden post 12 cm across with a darker foot and a pyramid cap, an iron collar, arm and strut toward +x, and a hook with an open ring; 216 tris"},
+			"uses": "a tall (2.15 m) street lamp post (buildings' code stands it in place of the store (_add_store_lamp)'s code-drawn post; never solid): gear.lantern hangs by its ring top (its origin) at the hang socket, scaled 1.7 by buildings, the light at the lantern's middle; the arm toward +x",
+			"sockets": {"hang": [0.3, 1.97, 0]},
+			"grey": [{"at": [0, 1.075, 0], "size": [0.15, 2.15, 0.15]}, {"at": [0.215, 2.04, 0], "size": [0.28, 0.04, 0.04]}]
+		},
+		"prop.lamp_post_low": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.35, 1.15, 0.15],
+			"middle": [0.1, 0, 0],
+			"budget": 300,
+			"materials": 1,
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/items_artgen/make_lamp_post.py low (the coordinator's order 2026-11-12 for buildings: the store's and Snagfin's code-drawn lamp posts read as bare stakes; art-kit passed it on C:/dev/review/lamp_post/lamp_post_sheet.png beside the goblin at the nearest zoom): a chamfered wooden post 12 cm across with a darker foot and a pyramid cap, an iron collar, arm and strut toward +x, and a hook with an open ring; 216 tris"},
+			"uses": "a low (1.15 m) street lamp post (buildings' code stands it in place of Snagfin's shack door (_add_lantern)'s code-drawn post; never solid): gear.lantern hangs by its ring top (its origin) at the hang socket, scaled 1.7 by buildings, the light at the lantern's middle; the arm toward +x",
+			"sockets": {"hang": [0.22, 1.015, 0]},
+			"grey": [{"at": [0, 0.575, 0], "size": [0.15, 1.15, 0.15]}, {"at": [0.175, 1.09, 0], "size": [0.2, 0.04, 0.04]}]
+		},
 		"prop.lantern": {
 			"category": "props",
 			"type": "mesh",
