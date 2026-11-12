@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_damage_and_restart()
 	_test_world_tick()
 	_test_stalled_build()
+	_test_boot_line()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -222,6 +223,25 @@ func _test_world_tick() -> void:
 	World.production = null
 	World.towns = null
 
+
+## The boot line (the coordinator's ask, 11-12): counts and trades only, never a
+## name or an id; room used of room().
+func _test_boot_line() -> void:
+	print("
+== the town's boot line ==")
+	_fresh()
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_towns.note_rescue(TOWN, "bram", "Bram", "smith")
+	_towns.note_rescue(TOWN, "brom", "Brom", "smith")
+	var line := _towns.boot_line(TOWN)
+	var stage := _towns.stage(TOWN) if not _towns.stage(TOWN).is_empty() else "none"
+	_check(line == "town %s: %s; residents 3 (carpenter 1, smith 2); visitors 0; room 3 of 3" % [TOWN, stage], "residents by trade, room used of room (%s)" % line)
+	_check(not ["Dag", "dag", "Bram", "bram", "Brom", "brom"].any(func(word: String) -> bool: return word in line), "no name or id in it")
+	_check(_towns.boot_lines() == [line], "one line per town (%s)" % [_towns.boot_lines()])
+	_check(_towns.move_in(TOWN, "cass", "Cass", "carpenter", "settled"), "a settled one past the room cap")
+	_check(_towns._told.get(TOWN) == 3, "boot_lines keeps the count it told (%s)" % [_towns._told])
+	_at(0)
+	_check(not _towns._told.has(TOWN), "a changed count is told again at the next tick, once (%s)" % [_towns._told])
 
 func _check(ok: bool, label: String) -> void:
 	if not ok:

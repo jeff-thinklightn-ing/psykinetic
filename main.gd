@@ -4983,6 +4983,10 @@ func _boot() -> void:
 	_seat_healers()
 	_seat_gatherers()
 	_seat_keepers()
+	# Each town once its people are seated, counts only, for the box's journal (Towns.boot_line);
+	# again from the first town tick that changes its count.
+	for line: String in World.towns.boot_lines():
+		print("[towns] " + line)
 	_test_temple_day()
 	if Net.test_hp and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 		push_error("[test] --test-hp without --run-marker: ignored (786: a test-only flag, never the box's)")

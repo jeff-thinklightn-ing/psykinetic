@@ -86,6 +86,8 @@ signal reclaimed(town: String, kind: String, zone: String, cells: Array[Vector2i
 
 var rules := {}
 var production: Production
+## boot_lines' counts, by town, till _retell has told a change once.
+var _told := {}
 ## () -> int: the World's steps.
 var clock := Callable()
 ## (town) -> float 0..1: how threatened [param town] is (maps' camps set
@@ -337,6 +339,49 @@ func room(town: String) -> int:
 	var inn_levels := int(inn.get("level", 0)) if inn.get("state") in [STANDING, BUILDING] else 0
 	return int(per.get("base", 3)) + int(per.get("per_inn", 3)) * inn_levels
 
+
+## [param town] at the server's boot, for the box's journal (the coordinator, 11-12:
+## "a count of its residents", read without the world file): its key, stage, residents
+## by their first trade as counts ("none" for no trade), visitors as a count, and room
+## used of room(). Counts and trades only: never a name, an id or a player. Its words
+## are release's grep: "town <key>: <stage>; residents N (<trade> n, ...); visitors N;
+## room N of N".
+func boot_line(town: String) -> String:
+	var record: Dictionary = _towns.get(town, {})
+	var people: Array = record.get("residents", [])
+	var trades := {}
+	for id: Variant in people:
+		var list: Array = production.worker(str(id)).get("trades", []) if production != null else []
+		var trade := str(list[0]) if not list.is_empty() else "none"
+		trades[trade] = int(trades.get(trade, 0)) + 1
+	var names: Array = trades.keys()
+	names.sort()
+	var counts := PackedStringArray()
+	for trade: String in names:
+		counts.append("%s %d" % [trade, trades[trade]])
+	return "town %s: %s; residents %d (%s); visitors %d; room %d of %d" % [town, stage(town) if not stage(town).is_empty() else "none",
+		people.size(), ", ".join(counts), (record.get("visitors", []) as Array).size(), people.size(), room(town)]
+
+
+## Every town's boot_line, sorted by key: holdings with workers of their own
+## (folds, huts) are not towns and print nothing.
+func boot_lines() -> Array[String]:
+	var out: Array[String] = []
+	for town: String in ids():
+		if is_town(town):
+			out.append(boot_line(town))
+			_told[town] = residents(town).size()
+	return out
+
+
+## boot_line once more for each town whose residents changed since boot_lines
+## (a fresh world's first ticks seat its priest and taverner): printed once a
+## town, so the journal shows the count as it settles.
+func _retell() -> void:
+	for town: String in _told.keys():
+		if residents(town).size() != int(_told[town]):
+			print("[towns] " + boot_line(town))
+			_told.erase(town)
 
 ## The town's log, oldest first: [{step, what}].
 func log_of(town: String) -> Array[Dictionary]:
@@ -596,6 +641,7 @@ func settle_companion(companion_id: String, new_id: String) -> bool:
 ## when crowded, else the lowest building that houses a trade. Nothing if
 ## it can't afford it.
 func tick() -> void:
+	_retell()  # A count changed since boot (or the last tick): told once.
 	_stock_camps()
 	_herders_turn()
 	_huts_turn()
