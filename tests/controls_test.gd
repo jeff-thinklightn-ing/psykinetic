@@ -1192,6 +1192,20 @@ func _test_free_route_held() -> void:
 			"a route pulled to (11, 3), another player head on at (8, 3): in the way, waited for (blocked %s)" % met)
 	World.despawn(holder)
 	holder.queue_free()
+	# 724 amended (7) (voice's landing again, net_test phase 3: Fay's walk from
+	# (11, 2) to (5, 12) past Chest1 (10, 3) stepped right twice and was given
+	# up): one who never steps aside beside a route pulled aslant, on the
+	# straight way's first cell but on none of the route's, is not in its way;
+	# the backstop has any that truly stops it. (6) went round him.
+	_place_player(Vector2i(7, 3))
+	_free_start(player)
+	holder = _held_body("talker", Vector2i(6, 4))
+	_main._free["path"] = [Vector2i(1, 13)]
+	var aslant: bool = _main._free_blocked(player, Vector2(6.8, 3.2), Vector2(1, 13) - Vector2(6.8, 3.2), _main._free["path"])
+	_check(not aslant and _main._free["path"] == [Vector2i(1, 13)],
+			"a route pulled aslant to (1, 13) from (6.8, 3.2), a talker beside it on (6, 4): walked on, the route kept (blocked %s, route %s)" % [aslant, _main._free["path"]])
+	World.despawn(holder)
+	holder.queue_free()
 	for kind in ["talker", "foe", "player"]:
 		# The route's own end held (a person stood on the cell clicked).
 		_place_player(Vector2i(3, 3))

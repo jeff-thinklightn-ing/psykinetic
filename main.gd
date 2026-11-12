@@ -3158,8 +3158,14 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 	# straight way to its next point: a route pulled to a far point
 	# (_free_pull) has none between, and one standing head-on there was
 	# missed, left to the backstop, which planned both round by one side.
+	# 724 amended (7): the straight way's cells only for another player (the
+	# head-on, each waiting his own right): the line's cells round to a chest
+	# or a resident beside a straight way (Chest1 (10, 3) by Fay's walk from
+	# (11, 2) in net_test phase 3), and one who never steps aside is gone
+	# round at once, again and again, then given up. Anyone else is the
+	# route's cells' and the backstop's, as before (6).
 	var on_way: bool = path.slice(0, 2).has(there) \
-			or World.line_cells(World.free_cell(player, at), path[0]).slice(0, 2).has(there)
+			or yields and World.line_cells(World.free_cell(player, at), path[0]).slice(0, 2).has(there)
 	if not on_way:
 		# Not on the route's next cells (brushed in passing, or left behind by
 		# a step aside, which a frame or two may still see ahead): walked on.

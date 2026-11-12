@@ -37139,6 +37139,19 @@ right the x 19 wall) it stands, going north (its right x 21) it steps across; on
 Companions' landing failed phase 3 a third way, the same cause: both planned round to row 11, both rights
 shut there, both given up ("got 02"). Client only; protocol unchanged; no new class_name.
 
+724 amended (7) (decision_number.sh's label; the coordinator's ruling and release's 17:45, from voice's
+landing again; a fix of (6), no package): (6)'s straight way counted anyone, and the line's cells round to a
+cell beside a route pulled aslant. Voice's landing on dc56815fb failed net_test phase 3 before the head-on:
+Fay's walk from (11, 2) to (5, 12), pulled straight, had Chest1 (10, 3) on the line's first cell, so the
+chest was "on the way"; one who never steps aside is gone round at once, and she stepped right twice and
+stood against it till the route was given up ("both reached their ends ... got 01"). "round Chest1" is in
+every phase 3 run since 0594fc180 (two to one a run) and in none of the twelve before. The straight way's
+cells now count only another player, the head-on, each waiting to step his own right; anyone else is the
+route's next two cells' and the backstop's, as before (6). controls_test _test_free_route_held: from
+(6.8, 3.2) on a route pulled aslant to (1, 13), a talker at peace on (6, 4) (the line's first cell, none of
+the route's): not blocked, the route kept (on 0594fc180: blocked, gone round); the head-on checks of (6)
+unchanged. Client only; protocol unchanged; no new class_name.
+
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot
