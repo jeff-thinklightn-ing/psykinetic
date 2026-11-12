@@ -50672,7 +50672,11 @@ marked code as its chip). A part of more than four lines shows three and "N more
 place; the pane grows to the screen's foot, then scrolls. A coordinate or a size is held together by
 no-break spaces. The typing box sits under the answer inside the pane; the foot has the keys as key
 caps (Enter, Esc, Ctrl + Z) and the cost. A server before 885 sends no "parts": its summary string is
-drawn as the words, as before. The status line stands aside while an answer shows. No colour, font or
+drawn as the words, as before. The town's trades come a line each (BuilderSession.trade_lines; the
+first keeps the head "the town's trades in <town>, by economy's rules: "), so a long part folds;
+joined with "; " they are trade_preview's one line, so the summary is unchanged. The bullet is its own
+label (LineBullet) on the first line; the pane refits as the answer's height settles, so a short
+answer leaves no empty glass (ui-design's sheet beside the mock). The status line stands aside while an answer shows. No colour, font or
 size in the script: the types are ui-design's.
 
 The codes floated over the world in builder mode (Client3D.show_building_codes) take the chip in a
