@@ -1039,7 +1039,9 @@ func _show_work_now() -> void:
 			var face: Vector2i = task.get("face", NO_CELL)
 			if face != NO_CELL and face != tile and facing != _toward(face):
 				World.face(self, _toward(face))
-			activity = str(task.get("kind", "")) if face == NO_CELL or face == tile or facing == _toward(face) else ""
+			# A load carried there (walking) stays on the shoulder while it turns (853 amended (12)): it goes
+			# down when the sim's next leg says, not for the turn.
+			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) or face == NO_CELL or face == tile or facing == _toward(face) else ""
 		else:
 			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
 		return

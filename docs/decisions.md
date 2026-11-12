@@ -50035,6 +50035,33 @@ no work spot is laid in the Mughouse, until animation's tend_bar (her bar is 1.0
 _test_vendor_day: his day key and trade, at work through the day and not at night, awake 06-18, tending at
 his spot, a hail and a barter each stopping it at once turned to the buyer.
 
+853 amended (12) (people work: the hauler's sack across the square; the coordinator's approval, 2026-11-12;
+the label from decision_number.sh). A hauler at work walks a sack from the store's side, where the town's
+goods are kept, to behind Rolf's stall, across the square, and back empty-handed: Main._hauler_task, in
+legs (back to the store's end, a stand facing its spot to take the sack up, out with it on his shoulder,
+set down at the far end facing its spot, a rest), between his town's two "hauler" work spots
+(Main._haul_ends: the one nearest the store and the one farthest, at least HAUL_MIN_CELLS (10) apart, or
+no sack: a sack walked four cells and back reads as a toy). maps lays them (Umbrage: (190,195) behind
+the store's depot chest and (204,196) behind the stall, 14 cells of paving); they are the switch, and it
+is dark until they land. The sack (carry_sack, the client's Carry_Shoulder and art-kit's carry.sack)
+shows on the loaded leg only; it stays up while he turns at the far end (Resident._show_work_now keeps a
+walked load through the turn, for every carried load: the log and the game blinked off for the turn
+before) and goes when he stands faced there, never mid-step. A leg past HAUL_LEG_SECONDS (a blocked
+street) sets it down where he stands. He gives way on the street as any walker. A hail or a talk stops
+him with the sack still up and holds his leg (Main._stop_work_for takes a haul's task as shown work).
+It is shown only: it yields nothing and moves no stock or gold, like the show words. Economy's real
+hauls (Economy.deliver: _hauled and the fee) are not read; a sack shown after a real delivery, from
+economy's _hauled, is the next step, so the sack is not the town's stock. In the same row
+the taverner's "show" becomes "tend_bar" (animation's Counter_Bar clips at the Mughouse's bar height,
+1.06 m, in 877's row; "tend" stays the stalls' at 0.88): dark while no work spot is laid in the
+Mughouse, and a word the client lacks stands its idle until 877 lands. resident_test _test_hauler:
+the store's end first, the take-up stand, the sack out, a hail with it up, still up while he turns, set
+down faced, a rest, back empty; one end or two under 10 apart, none; another trade never hauls. Umbrage
+has no hauler yet (economy's to found; package "the hauler": this row, maps' two spots, economy's hauler,
+his barks; on when the last of those lands): tools/look_day --haul-spots lays maps' spots in memory and
+makes one townsperson the hauler for the probe day only, in its scratch world. Server only, protocol
+unchanged, no new class_name.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

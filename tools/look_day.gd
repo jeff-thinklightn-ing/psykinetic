@@ -2,11 +2,14 @@ extends Node
 ## npc's look at Umbrage's folk as a player standing in the plaza meets them (the coordinator's
 ## three-worst rule, 2026-11-11). A fresh local world (economy seats its own folk), the player
 ## in the plaza, a warm-up and one game day; every body read each tick. Local scratch world only.
-##   godot --headless --path . --scene tools/look_day.tscn -- --out=<folder> [--mug-spots] [--temple-spots] [--seed=N]
+##   godot --headless --path . --scene tools/look_day.tscn -- --out=<folder> [--mug-spots] [--temple-spots] [--haul-spots] [--seed=N]
+## --haul-spots lays maps' two hauler spots (853 amended (12), in memory only) and, Umbrage having no hauler
+## yet, makes one townsperson the hauler for the probe day (economy's retrain, in this scratch world only):
+## one of no trade, else the carpenter. His legs are read by hour.
 ## --temple-spots lays maps' four temple pews (875's ruling, in memory only). --seed=N steps N whole
 ## days before the warm-up (the night picks and visitors are drawn by the day) and seeds the global draw.
 ## A body under the temple's roof is counted on its own line, apart from the plaza.
-## --mug-spots lays maps' ten Mughouse spots (875's, in memory only) before the day; after the
+## --mug-spots lays maps' nine Mughouse spots (875's, in memory only) before the day; after the
 ## day the player walks into the Mughouse from 20:00 to 03:00 and its floor is read each minute.
 
 const TOWN := "wilds/store"
@@ -48,13 +51,21 @@ var _inn_by_hour := {}  # hour -> the most the town sends into its shell inn (87
 var _watch := {}  # worker id -> 100 ticks of an off-bed sleeper watched from its dump (what holds its next step)
 const WATCH_TICKS := 100
 var _mug := {}  # hour -> {bodies (most at once), shared, packed, on_spot, minutes}
-## Maps' ten Mughouse spots (875), laid by --mug-spots: [cell, face, pose, use].
+## Maps' two hauler spots (853 amended (12)), laid by --haul-spots: [cell, face] (the store's depot chest, behind
+## Rolf's stall).
+const HAUL_SPOTS := [[Vector2i(190, 195), Vector2i(190, 196)], [Vector2i(204, 196), Vector2i(204, 197)]]
+var _haul_id := ""  # The probe's hauler (853 amended (12)): never printed.
+var _haul_leg := ""
+var _haul_stands: Array = []  # His stands (minutes), apart from the town's.
+var _haul_by_hour := {}  # hour -> {"up": n, "out": n, "down_far": n, "down_short": n, "sack_ticks": n}
+## Maps' nine Mughouse spots (875; the hearth's (2,8) dropped in maps' take, it closed (2,6)-(2,7) off), laid by
+## --mug-spots: [cell, face, pose, use].
 ## Maps' four temple pews (875's ruling): [cell, face].
 const TEMPLE_SPOTS := [[Vector2i(193, 200), Vector2i(194, 200)], [Vector2i(195, 200), Vector2i(196, 200)],
 	[Vector2i(193, 203), Vector2i(194, 203)], [Vector2i(195, 203), Vector2i(196, 203)]]
 const MUG_SPOTS := [[Vector2i(8, 4), Vector2i(8, 3), "stand", "inn"], [Vector2i(10, 4), Vector2i(10, 3), "stand", "inn"],
 	[Vector2i(1, 6), Vector2i(0, 6), "sit", "inn"], [Vector2i(1, 7), Vector2i(0, 7), "sit", "inn"], [Vector2i(1, 5), Vector2i(0, 6), "sit", "inn"],
-	[Vector2i(1, 8), Vector2i(0, 7), "sit", "inn"], [Vector2i(2, 5), Vector2i(1, 6), "sit", "inn"], [Vector2i(2, 8), Vector2i(1, 7), "sit", "inn"],
+	[Vector2i(1, 8), Vector2i(0, 7), "sit", "inn"], [Vector2i(2, 5), Vector2i(1, 6), "sit", "inn"],
 	[Vector2i(7, 10), Vector2i(8, 10), "sit", "talk"], [Vector2i(10, 11), Vector2i(9, 11), "sit", "talk"]]
 
 
@@ -66,12 +77,14 @@ func _go() -> void:
 	var out := ""
 	var mug_spots := false
 	var temple_spots := false
+	var haul_spots := false
 	var days_first := 0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--out="):
 			out = arg.trim_prefix("--out=")
 		mug_spots = mug_spots or arg == "--mug-spots"
 		temple_spots = temple_spots or arg == "--temple-spots"
+		haul_spots = haul_spots or arg == "--haul-spots"
 		if arg.begins_with("--seed="):
 			days_first = maxi(int(arg.trim_prefix("--seed=")), 0)
 	seed(days_first)
@@ -113,6 +126,23 @@ func _go() -> void:
 			spots.append({"use": "temple", "cell": each[0], "face": each[1], "pose": "sit", "town": TOWN.get_slice("/", 1), "trade": "", "pair": ""})
 		wilds["spots"] = spots
 		print("LOOK temple spots laid: %d (the wilds' spots now %d)" % [TEMPLE_SPOTS.size(), spots.size()])
+	if haul_spots:
+		var wilds: Dictionary = _main._world_map.areas.get("wilds", {})
+		var spots: Array = wilds.get("spots", [])
+		for each: Array in HAUL_SPOTS:
+			spots.append({"use": "work", "cell": each[0], "face": each[1], "pose": "stand", "town": TOWN.get_slice("/", 1), "trade": "hauler", "pair": ""})
+		wilds["spots"] = spots
+		var was := ""
+		for pick: String in ["", "carpenter"]:
+			for id: String in World.production.worker_ids(TOWN):
+				var trades: Array = World.production.worker(id).get("trades", [])
+				if _haul_id.is_empty() and (trades.is_empty() if pick.is_empty() else pick in trades):
+					_haul_id = id
+					was = pick if not pick.is_empty() else "no trade"
+		if not _haul_id.is_empty():
+			World.production.retrain(_haul_id, "hauler")
+		print("LOOK haul spots laid: %d; the probe made a townsperson (%s) the hauler for the day, in this scratch world only (Umbrage has none yet)" % [
+			HAUL_SPOTS.size(), was if not was.is_empty() else "none found"])
 	for d in days_first:
 		for s in DAY:
 			World.step()
@@ -166,12 +196,31 @@ func _carry_read(body: Resident) -> void:
 	_carry_at[id] = cell
 
 
+## The probe's hauler (853 amended (12)): each leg begun, by hour; a sack set down at the far end or short of it
+## (a blocked leg); ticks with the sack shown.
+func _haul_read(body: Resident) -> void:
+	var haul: Dictionary = _main._hauls.get(body.worker_id, {})
+	var leg := str(haul.get("leg", ""))
+	var by: Dictionary = _haul_by_hour.get_or_add(_hour(), {"up": 0, "out": 0, "down_far": 0, "down_short": 0, "sack_ticks": 0})
+	if body.activity == "carry_sack":
+		by["sack_ticks"] = int(by["sack_ticks"]) + 1
+	if leg != _haul_leg and leg in ["up", "out", "down"]:
+		if leg == "down":
+			by["down_far" if haul.get("cell") == HAUL_SPOTS[1][0] else "down_short"] = int(by["down_far" if haul.get("cell") == HAUL_SPOTS[1][0] else "down_short"]) + 1
+		else:
+			by[leg] = int(by[leg]) + 1
+	_haul_leg = leg
+
+
 func _tick_read() -> void:
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or not body.spawned:
 			continue
-		_stand_read(body)
+		if body.worker_id == _haul_id:
+			_haul_read(body)  # His short stands at the ends are his legs' set-downs: his own line.
+		else:
+			_stand_read(body)
 		_carry_read(body)
 		var id := body.worker_id
 		var was: Dictionary = _last.get(id, {})
@@ -427,6 +476,9 @@ func _close_if(body: Resident) -> void:
 func _close(id: String, walked_off_doing := -1) -> void:
 	var run: Dictionary = _run.get(id, {})
 	_run.erase(id)
+	if id == _haul_id and not run.is_empty():
+		_haul_stands.append(int(run["minutes"]))  # The probe's hauler's stands at his ends: his own line, not the town's strolls.
+		return
 	if not run.is_empty() and bool(run["idle"]):
 		_stand_runs.append(int(run["minutes"]))
 		if walked_off_doing >= 0 and int(run.get("doing", -1)) == walked_off_doing and bool(run.get("seen_start", true)):
@@ -507,7 +559,17 @@ func _report() -> void:
 	# next pick), not those an hour's stint cut; under 12 game minutes (STROLL_TICKS, playtest's 45 s) is short.
 	_stroll_stands.sort()
 	var short := _stroll_stands.filter(func(m: int) -> bool: return m < 12)
-	print("LOOK carry cell changes by hour (521 amended (2)): %s" % [_carry_flips])
+	print("LOOK carry_log cell changes by hour (the woodcutter's, 521 amended (2); the hauler's legs on their own line): %s" % [_carry_flips])
+	if not _haul_id.is_empty():
+		_haul_stands.sort()
+		print("LOOK hauler's stands (not in the town's lines below): %d, median %.0f min, longest %s" % [_haul_stands.size(), _median(_haul_stands),
+			_haul_stands.slice(maxi(_haul_stands.size() - 5, 0))])
+		var total := {"up": 0, "out": 0, "down_far": 0, "down_short": 0, "sack_ticks": 0}
+		for h: int in _haul_by_hour:
+			for k: String in total:
+				total[k] = int(total[k]) + int(_haul_by_hour[h][k])
+		print("LOOK hauler (the probe's, 853 amended (12)): taken up %d, out %d, set down at the far end %d, short of it %d, sack shown %.0f min; by hour %s" % [
+			total["up"], total["out"], total["down_far"], total["down_short"], float(total["sack_ticks"]) / MINUTE, _haul_by_hour])
 	print("LOOK short stands (under %d ticks) by what ended them: %s" % [SHORT_TICKS, _stand_ends])
 	for line: String in _stand_end_lines:
 		print(line)

@@ -336,6 +336,16 @@ var _sacks: Dictionary = {}
 ## The hoeing's place along the field's rows: worker id -> the index of the
 ## cell worked next (_row_cells).
 var _rows: Dictionary = {}
+## The hauler's sack across the square (853 amended (12)): worker id -> {"leg": back, up, out, down or rest,
+## "until": the tick the leg ends by, "cell" and "face": where the sack goes down}.
+var _hauls: Dictionary = {}
+## The hauler's two ends at least this far apart, or no sack (the coordinator: a sack walked four cells
+## and back all day reads as a toy).
+const HAUL_MIN_CELLS := 10
+## Seconds the hauler stands to set a sack down or take one up, facing the end's spot.
+const HAUL_HANDLE_SECONDS := 3
+## Seconds a walking leg may take; past it the sack goes down where he stands (a blocked street).
+const HAUL_LEG_SECONDS := 180
 ## Talk with no panel (decision 536): the offer standing for each player,
 ## player id -> {worker, id, title, at, zone}: what a resident last spoke to
 ## them, taken by a yes, a name or an amount said back; one per player, not
@@ -19996,7 +20006,7 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 ## stop, from where they stand (853 amended (8), the coordinator: "hailed or spoken to, he stops, faces
 ## the speaker for the talk"); a click addresses it already (_greeted).
 func _stop_work_for(body: Resident, player: GridEntity) -> void:
-	if not body.showing_work() or not body.addressing.is_empty():
+	if not (body.showing_work() or bool(body.task.get("haul", false))) or not body.addressing.is_empty():  # The hauler mid-leg too (853 amended (12)): the sack stays up.
 		return
 	body.address(player, int(float(Townsfolk.rules().get("greet", {}).get("stop_seconds", 8)) * World.TICK_RATE), World.distance(body.tile, player.tile))
 
@@ -20075,10 +20085,87 @@ func _task_for(body: Resident) -> Dictionary:
 		return _farmer_task(body)
 	if body.trade == "shepherd" or body.trade == "herder":
 		return _herd_task(body)
+	if body.trade == str(World.production.rules.get("haul", {}).get("trade", "hauler")) and not _haul_ends(body).is_empty():
+		return _hauler_task(body)
 	var build := _build_of(body)
 	if not build.is_empty():
 		return _build_task(build["building"], float(build["progress"]))
 	return {}
+
+
+## The hauler's work (853 amended (12), people work; shown only): between his town's two "hauler" work
+## spots (_haul_ends: the one by the store, where the town's goods are kept, and the far one behind the
+## stall), in legs: back to the store's end empty-handed, a sack taken up there (a stand facing the
+## spot), out across the square with it on his shoulder (carry_sack, the loaded leg only), set down at
+## the far end facing its spot (it leaves his shoulder once he stands there faced, not mid-step), then a
+## rest (Resident.BOUT_REST: the routine's own stroll) before the next. A talk holds his leg and keeps
+## the sack up. It yields nothing and moves no stock or gold: economy's real hauls (Economy.deliver, its
+## _hauled and the fee) are not read yet; showing a sack after a real delivery is the next step.
+func _hauler_task(body: Resident) -> Dictionary:
+	var ends := _haul_ends(body)
+	if ends.is_empty() or body.doing != Resident.Doing.WORK:
+		_hauls.erase(body.worker_id)
+		return {}
+	var now := World.tick
+	var leg_ticks := HAUL_LEG_SECONDS * World.TICK_RATE
+	var handle_ticks := HAUL_HANDLE_SECONDS * World.TICK_RATE
+	var haul: Dictionary = _hauls.get_or_add(body.worker_id, {"leg": "back", "until": now + leg_ticks})
+	if not body.addressing.is_empty() and not body.task.is_empty():
+		haul["until"] = int(haul["until"]) + WORK_CHECK_TICKS  # Spoken to: his leg waits, the sack up.
+		return body.task
+	var from: Dictionary = ends[0]
+	var to: Dictionary = ends[1]
+	var faced := func(spot: Dictionary) -> bool: return body.tile == spot["cell"] and body.facing == body._toward(spot["face"])
+	match str(haul["leg"]):
+		"back":
+			if faced.call(from):
+				haul.merge({"leg": "up", "until": now + handle_ticks}, true)
+			elif now >= int(haul["until"]):
+				haul.merge({"leg": "rest", "until": now + _haul_rest(body)}, true)
+		"up":
+			if now >= int(haul["until"]):
+				haul.merge({"leg": "out", "until": now + leg_ticks}, true)
+		"out":
+			if faced.call(to):
+				haul.merge({"leg": "down", "until": now + handle_ticks, "cell": to["cell"], "face": to["face"]}, true)
+			elif now >= int(haul["until"]):
+				haul.merge({"leg": "down", "until": now + handle_ticks, "cell": body.tile, "face": Resident.NO_CELL}, true)
+		"down":
+			if now >= int(haul["until"]):
+				haul.merge({"leg": "rest", "until": now + _haul_rest(body)}, true)
+		_:
+			if now >= int(haul["until"]):
+				haul.merge({"leg": "back", "until": now + leg_ticks}, true)
+	match str(haul["leg"]):
+		"back":
+			return {"kind": "", "cell": from["cell"], "face": from["face"], "walking": true, "haul": true}
+		"up":
+			return {"kind": "", "cell": from["cell"], "face": from["face"], "walking": false, "haul": true}
+		"out":
+			return {"kind": "carry_sack", "cell": to["cell"], "face": to["face"], "walking": true, "haul": true}
+		"down":
+			return {"kind": "", "cell": haul["cell"], "face": haul["face"], "walking": false, "haul": true}
+	return {}
+
+
+## The hauler's two ends (853 amended (12)): his town's "hauler" work spots, the one nearest the store and
+## the one farthest from it, at least HAUL_MIN_CELLS apart; [] for fewer or nearer (no sack, as before).
+func _haul_ends(body: Resident) -> Array:
+	var mine: Array = ((body.places.get("spots", {}) as Dictionary).get("work", []) as Array).filter(
+		func(spot: Dictionary) -> bool: return str(spot.get("trade", "")) == body.trade)
+	if mine.size() < 2 or World.holdings == null:
+		return []
+	var store: Vector2i = World.holdings.place(body.town).get("cell", body.tile)
+	mine.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return World.distance(a["cell"], store) < World.distance(b["cell"], store))
+	if World.distance(mine[0]["cell"], mine[-1]["cell"]) < HAUL_MIN_CELLS:
+		return []
+	return [mine[0], mine[-1]]
+
+
+## The hauler's rest between sacks (853 amended (12)): Resident.BOUT_REST's span, its length his own.
+func _haul_rest(body: Resident) -> int:
+	var span := Resident.BOUT_REST
+	return (span.x + absi(hash([body.worker_id, World.tick, "haul"])) % (span.y - span.x + 1)) * World.TICK_RATE
 
 
 ## Steps for [param body] to walk home from [param spot] to [param store]

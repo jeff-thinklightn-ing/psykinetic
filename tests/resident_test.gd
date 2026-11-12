@@ -4470,6 +4470,87 @@ func _test_room(mara: Resident, square: Rect2i) -> void:
 ## trade's word from residents.json "show", in bouts of work and rest; a task first; no word, a body
 ## off its spot or turned from it, nothing; spoken to, hailed or serving at the barter window, it stops
 ## and turns to them; and the shown work moves no stock or gold.
+## 853 amended (12): the hauler's sack across the square, shown only. Mara stands in as the hauler; no world
+## steps (the clock is put back), so the tests after see the town as it was.
+func _test_hauler(mara: Resident) -> void:
+	print("\n== the hauler's sack across the square (853 amended (12)) ==")
+	var store: Vector2i = World.holdings.place(mara.town).get("cell", mara.tile)
+	var near: Vector2i = _main._nearest_free(store)
+	var far := Resident.NO_CELL
+	for y in range(near.y - 24, near.y + 25):
+		for x in range(near.x - 24, near.x + 25):
+			var cell := Vector2i(x, y)
+			if far == Resident.NO_CELL and World.distance(cell, near) >= Main.HAUL_MIN_CELLS and World.is_free(cell) 					and World.distance(cell, store) > World.distance(near, store):
+				far = cell
+	var free_far := far != Resident.NO_CELL
+	if not free_far:
+		far = near + Vector2i(Main.HAUL_MIN_CELLS, 0)  # No free cell that far here: the spot's cell all the same (no world steps).
+	print("  (the ends %s and %s, %s free, in %s)" % [near, far, "far" if free_far else "neither far cell", World.zone.name if World.zone != null else "-"])
+	var was_trade := mara.trade
+	var was_tick := World.tick
+	var was_tile := mara.tile
+	var was_facing := mara.facing
+	var from := {"use": "work", "cell": near, "face": near + Vector2i(0, 1), "pose": "stand", "town": mara.town, "trade": "hauler"}
+	var to := {"use": "work", "cell": far, "face": far + Vector2i(0, 1), "pose": "stand", "town": mara.town, "trade": "hauler"}
+	var places: Dictionary = mara.places.duplicate(true)
+	places["spots"] = {"work": [to, from]}
+	mara.places = places
+	mara.trade = "hauler"
+	mara.doing = Resident.Doing.WORK
+	mara.addressing = ""
+	mara.task = {}
+	_main._hauls.erase(mara.worker_id)
+	_put(mara, near + Vector2i(1, 1) if World.is_free(near + Vector2i(1, 1)) else near + Vector2i(-1, 1))
+	var back: Dictionary = _main._task_for(mara)
+	_check(_main._haul_ends(mara) == [from, to] and back.get("cell") == near and back.get("kind") == "" and back.get("walking") == true,
+		"the store's end first, by its nearness to the store; walked to empty-handed (%s)" % [back])
+	_put(mara, near)
+	mara._world_set_facing(mara._toward(from["face"]))
+	var up: Dictionary = _main._task_for(mara)
+	World.tick += Main.HAUL_HANDLE_SECONDS * World.TICK_RATE
+	var out: Dictionary = _main._task_for(mara)
+	_check(up.get("kind") == "" and up.get("walking") == false and out.get("kind") == "carry_sack" and out.get("cell") == far and out.get("walking") == true,
+		"at the store's end, faced: a stand to take it up, then out with the sack to the far end (%s)" % [out])
+	mara.task = out
+	_put(mara, near + (far - near) / 2)
+	mara._show_work()
+	var carrying := mara.activity
+	_main._stop_work_for(mara, _player())
+	var hailed_up := not mara.addressing.is_empty() and mara.activity == "carry_sack"
+	var held: Dictionary = _main._task_for(mara)
+	mara.addressing = ""
+	_check(carrying == "carry_sack" and hailed_up and held == out, "the sack on his shoulder on the way; a hail stops him with it still up, his leg held")
+	_put(mara, far)
+	mara._world_set_facing(-mara._toward(to["face"]))
+	mara._show_work()
+	var turning := mara.activity
+	mara._world_set_facing(mara._toward(to["face"]))
+	var down: Dictionary = _main._task_for(mara)
+	mara.task = down
+	mara._show_work()
+	_check(turning == "carry_sack" and down.get("kind") == "" and down.get("cell") == far and mara.activity == "",
+		"at the far end still up while he turns; faced, he sets it down there: no sack (%s)" % [mara.activity])
+	World.tick += Main.HAUL_HANDLE_SECONDS * World.TICK_RATE
+	var rest: Dictionary = _main._task_for(mara)
+	World.tick += Resident.BOUT_REST.y * World.TICK_RATE
+	var again: Dictionary = _main._task_for(mara)
+	_check(rest.is_empty() and again.get("cell") == near and again.get("kind") == "", "then a rest (his routine's own), then back to the store's end empty-handed")
+	places["spots"] = {"work": [from]}
+	mara.places = places
+	var one: Dictionary = _main._task_for(mara)
+	places["spots"] = {"work": [from, {"use": "work", "cell": near + Vector2i(4, 0), "face": near, "town": mara.town, "trade": "hauler"}]}
+	mara.places = places
+	var close: Dictionary = _main._task_for(mara)
+	mara.trade = was_trade
+	var other_trade: Dictionary = _main._task_for(mara) if was_trade != "hauler" else {}
+	_check(one.is_empty() and close.is_empty() and not other_trade.get("haul", false), "one end, or two under %d cells apart: no sack, as before; another trade never hauls" % Main.HAUL_MIN_CELLS)
+	_main._hauls.erase(mara.worker_id)
+	World.tick = was_tick
+	mara.task = {}
+	_put(mara, was_tile)
+	mara._world_set_facing(was_facing)
+
+
 func _test_show_work(mara: Resident) -> void:
 	print("
 == people work (853 amended (8)): its trade's word at its work spot, in bouts; a task first; talk stops it ==")
@@ -4679,6 +4760,7 @@ func _test_keep_moving() -> void:
 	_check(cook.size == Vector2i(3, 3) and big.encloses(cook) and Main._open_work(big, "") == big and Main._open_work(Rect2i(0, 0, 3, 3), "cook") == Rect2i(0, 0, 3, 3),
 		"no building: the cook's own 3 x 3 in the square (%s); no trade or a small square, the square" % [cook])
 	_test_show_work(mara)
+	_test_hauler(mara)
 	mara.places = was["places"]
 	mara.doing = was["doing"]
 	mara.task = was["task"]
