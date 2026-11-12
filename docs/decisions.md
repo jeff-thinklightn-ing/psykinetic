@@ -10447,55 +10447,6 @@ taken and beats; with no kind named any landing's take is beaten, never a scene;
 open (a PermissionError in a run today, older than this). Tools and tests only; protocol unchanged;
 no class_name; no bullet.
 
-394 amended (37) (perf, 2026-11-12; release's ask, the coordinator's approval and its pid condition; label from
-tools/decision_number.sh): the guard. Older gate code is still run from checkouts that predate a change, and
-before 31 its stale check dropped a landing take 30 minutes after its start, beaten or not. art-kit's waiter
-queued at 01:29 dropped ui's Store A take (05:22:40) and pc-character's (04:36); perf-hitch's waiter, its worktree
-branched before 31, dropped perf's 90am1 take at 07:47. That check already spared a take whose adopted_by
-process lives (a land.sh run inside it), so:
-- Every take new code grants names its holder there, marked guard: its --pid, else its caller (tools/heavy_job.sh
-  now passes the shell that ran it as --caller, by Windows' id where Git Bash has one: `take` itself ends at once,
-  and a dead adopter shields nothing), else the python's parent; with its start time, against a reused id. Older
-  code then drops a new take only once its holder has died. New code ignores a guard (the beats decide, as
-  since 31). A run that adopts the take replaces the guard, and when the run ends the guard goes back on.
-- Every entry new code writes carries GATE_REVISION (37) and its checkout. `status` names, after its rows (their
-  lines unchanged for scripts), each entry older code wrote ("on older gate code: <tree> <kind> ..., pid N, its
-  checkout unknown (written before 394 amended (37)): ... rebase it": older entries carry no checkout, so the pid
-  and the tree's name are what find it), and each landing take 10 minutes old with no beat and no run
-  adopting it ("unbeaten", with its checkout). Each is logged once (old_gate, unbeaten; heavy_jobs/noted.json
-  remembers a day of them), and the daily summary counts them by tree.
-- tools/bench_lock.sh's beat_gate no longer drops a failed beat in /dev/null: a fault (an exit over 1, or a
-  traceback; exit 1 is "no take to beat") is a beat_failed note in the gate's log with its last line, else a line
-  beside the lock. HEAVY_JOB_BEAT_BREAK makes `beat` fail, for the test.
-This guards against older code's drops only, not its other choices (its order, its counts); and it ends when no
-checkout predates it: once every tree's folders are past this commit, the guard is no rule of the gate's, and a
-later amendment may drop it. tests/heavy_job_test.py:
-- the pre-31 check, kept as a copy, skips a guarded take 31 minutes old while its holder lives, and drops it once
-  the holder dies;
-- new code still drops an unbeaten guarded take at 30 minutes and keeps a beaten one;
-- a run's adoption gives the guard back when it ends;
-- the coordinator's case: a take made by `sh tools/heavy_job.sh take` from a waiting script names that script's
-  shell, which older code's check sees alive, and is dropped once the script has died;
-- status names an older entry and an unbeaten take, each logged once and counted by tree in the summary;
-- release's case: a refused lock try beats a suite_remote take;
-- a failed beat is logged as beat_failed.
-Tools and tests only; protocol unchanged; no class_name; no bullet.
-
-394 amended (38) (perf, 2026-11-12; release's and the coordinator's report; label from tools/decision_number.sh):
-37's status line cried wolf. On landing it named all 38 entries in the gate "on older gate code ... it drops landing
-takes at 30 minutes", perf's own 31-and-later waiters among them: an entry with no GATE_REVISION was taken for
-older code, but 31 put no mark on entries, so one written by code from before 31 (which drops landing takes) and
-one from 31 to 36 (which drops none) are the same on disk, and most were the second. Now `status` names an entry
-only when it carries a lower revision ("on older gate code: ..., gate revision N of M, <checkout>; rebase it"),
-and gives one count of entries with none ("written before 394 amended (37), gate revision unknown: N (a count
-only ...; stop none on it)"), naming no one; only a named one is logged as old_gate, and the daily summary leaves
-out 37's own old_gate notes of unrevised entries. The coordinator asked for a test of three ages, before 31, 31 to
-36, and 37 on, with only the first named; the first two cannot be told apart, so the test seeds an entry with no
-revision (both), one of a lower revision and one of this code: only the lower is named and logged, the unrevised
-is counted, and 37's note of an unrevised entry stays out of the summary. The count falls to nothing as the queue
-turns over. An "unbeaten" line, the one that catches a pre-31 drop by what it does, now says whose take
-and since when ("unbeaten: <tree> <kind> held N min, since HH:MM, ..."), so release can act on it without reading
-code (the coordinator's ask). Tools and tests only; protocol unchanged; no class_name; no bullet.
 394 amended (32) (perf, 2026-11-11; the coordinator's evening fault (1); label from
 tools/decision_number.sh): a scene's --expect is at most 20 minutes (its kind's "max_expect"); a
 longer one is refused before it queues, exit 2, naming the soak kind to use instead. On 11-11, from
@@ -10591,6 +10542,56 @@ local suite out; the oldest goes first; a waiter silent 150 s is skipped; releas
 s, the younger gets in); the freeze past a live waiter; an unfed head keeps the lock 3 minutes, then a fitting
 one passes (logged), and the head never takes it unreserved. Tools and tests only; protocol unchanged; no
 class_name; no bullet.
+
+394 amended (37) (perf, 2026-11-12; release's ask, the coordinator's approval and its pid condition; label from
+tools/decision_number.sh): the guard. Older gate code is still run from checkouts that predate a change, and
+before 31 its stale check dropped a landing take 30 minutes after its start, beaten or not. art-kit's waiter
+queued at 01:29 dropped ui's Store A take (05:22:40) and pc-character's (04:36); perf-hitch's waiter, its worktree
+branched before 31, dropped perf's 90am1 take at 07:47. That check already spared a take whose adopted_by
+process lives (a land.sh run inside it), so:
+- Every take new code grants names its holder there, marked guard: its --pid, else its caller (tools/heavy_job.sh
+  now passes the shell that ran it as --caller, by Windows' id where Git Bash has one: `take` itself ends at once,
+  and a dead adopter shields nothing), else the python's parent; with its start time, against a reused id. Older
+  code then drops a new take only once its holder has died. New code ignores a guard (the beats decide, as
+  since 31). A run that adopts the take replaces the guard, and when the run ends the guard goes back on.
+- Every entry new code writes carries GATE_REVISION (37) and its checkout. `status` names, after its rows (their
+  lines unchanged for scripts), each entry older code wrote ("on older gate code: <tree> <kind> ..., pid N, its
+  checkout unknown (written before 394 amended (37)): ... rebase it": older entries carry no checkout, so the pid
+  and the tree's name are what find it), and each landing take 10 minutes old with no beat and no run
+  adopting it ("unbeaten", with its checkout). Each is logged once (old_gate, unbeaten; heavy_jobs/noted.json
+  remembers a day of them), and the daily summary counts them by tree.
+- tools/bench_lock.sh's beat_gate no longer drops a failed beat in /dev/null: a fault (an exit over 1, or a
+  traceback; exit 1 is "no take to beat") is a beat_failed note in the gate's log with its last line, else a line
+  beside the lock. HEAVY_JOB_BEAT_BREAK makes `beat` fail, for the test.
+This guards against older code's drops only, not its other choices (its order, its counts); and it ends when no
+checkout predates it: once every tree's folders are past this commit, the guard is no rule of the gate's, and a
+later amendment may drop it. tests/heavy_job_test.py:
+- the pre-31 check, kept as a copy, skips a guarded take 31 minutes old while its holder lives, and drops it once
+  the holder dies;
+- new code still drops an unbeaten guarded take at 30 minutes and keeps a beaten one;
+- a run's adoption gives the guard back when it ends;
+- the coordinator's case: a take made by `sh tools/heavy_job.sh take` from a waiting script names that script's
+  shell, which older code's check sees alive, and is dropped once the script has died;
+- status names an older entry and an unbeaten take, each logged once and counted by tree in the summary;
+- release's case: a refused lock try beats a suite_remote take;
+- a failed beat is logged as beat_failed.
+Tools and tests only; protocol unchanged; no class_name; no bullet.
+
+394 amended (38) (perf, 2026-11-12; release's and the coordinator's report; label from tools/decision_number.sh):
+37's status line cried wolf. On landing it named all 38 entries in the gate "on older gate code ... it drops landing
+takes at 30 minutes", perf's own 31-and-later waiters among them: an entry with no GATE_REVISION was taken for
+older code, but 31 put no mark on entries, so one written by code from before 31 (which drops landing takes) and
+one from 31 to 36 (which drops none) are the same on disk, and most were the second. Now `status` names an entry
+only when it carries a lower revision ("on older gate code: ..., gate revision N of M, <checkout>; rebase it"),
+and gives one count of entries with none ("written before 394 amended (37), gate revision unknown: N (a count
+only ...; stop none on it)"), naming no one; only a named one is logged as old_gate, and the daily summary leaves
+out 37's own old_gate notes of unrevised entries. The coordinator asked for a test of three ages, before 31, 31 to
+36, and 37 on, with only the first named; the first two cannot be told apart, so the test seeds an entry with no
+revision (both), one of a lower revision and one of this code: only the lower is named and logged, the unrevised
+is counted, and 37's note of an unrevised entry stays out of the summary. The count falls to nothing as the queue
+turns over. An "unbeaten" line, the one that catches a pre-31 drop by what it does, now says whose take
+and since when ("unbeaten: <tree> <kind> held N min, since HH:MM, ..."), so release can act on it without reading
+code (the coordinator's ask). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 ## 395. UI sounds
 
