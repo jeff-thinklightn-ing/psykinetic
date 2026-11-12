@@ -966,7 +966,15 @@ first = "%019d-front-1.json" % time.time_ns()
 gate._write(gate._path("queue", first), {"tree": "front", "kind": "bench", "pid": None,
     "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
 threading = __import__("threading")
-threading.Timer(5.0, lambda: gate._retried(os.remove, gate._path("queue", first))).start()
+# The head leaves once the scene has ended, not at a fixed time: under load the
+# scene's python took longer to start than a 5 s timer allowed, the head left
+# while the scene still held "behind", and its wait was logged late (terrain's
+# landing, 11-12 10:51; release's report).
+def head_leaves(scene=child):
+    scene.wait()
+    time.sleep(1.0)
+    gate._retried(os.remove, gate._path("queue", first))
+threading.Thread(target=head_leaves).start()
 gate.take("behind", "bench", os.getpid())
 child.wait()
 gate.release("behind", "bench")
