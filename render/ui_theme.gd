@@ -30,7 +30,8 @@ const TYPE := &"Psykinetic"
 const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption", &"Small", &"Display", &"TooltipLabel",
 	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused",
 	&"RowWords", &"RowLine", &"QuestLine", &"QuestDone", &"QuestMore", &"QuestReturn",
-	&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup", &"NameText"]
+	&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup", &"NameText",
+	&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused"]
 ## Theme types whose font colour is a meaning colour, so a colour set moves them
 ## with it (a done quest line is the friend green, or blue in "distinct").
 const MEANING_FONTS := {&"QuestDone": &"friend"}
@@ -128,8 +129,9 @@ static func apply_text_scale(k: float) -> void:
 				_base_sizes[[type, &"font_size"]] = found.get_font_size("font_size", type)
 		for name in found.get_font_size_list(TYPE):
 			_base_sizes[[TYPE, name]] = found.get_font_size(name, TYPE)
-		for name in found.get_font_size_list(&"RichTextLabel"):
-			_base_sizes[[&"RichTextLabel", name]] = found.get_font_size(name, &"RichTextLabel")
+		for rich: StringName in [&"RichTextLabel", &"Lines"]:  # Lines: 886's answer lines.
+			for name in found.get_font_size_list(rich):
+				_base_sizes[[rich, name]] = found.get_font_size(name, rich)
 	text_scale = clampf(k, 0.5, 2.0)
 	found.default_font_size = roundi(_base_default_size * text_scale)
 	for key: Array in _base_sizes:

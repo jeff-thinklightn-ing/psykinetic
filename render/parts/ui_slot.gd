@@ -82,6 +82,10 @@ func _init() -> void:
 		if state == "hover":
 			_show_state("rest"))
 	resized.connect(_place)
+	# The face is sized after the square (in a grid in a scroll, only once laid
+	# out): placed again then, so no chip stays where a zero-sized face put it
+	# (886; Store A as built, 11-12: chips on the squares' top edges).
+	_face.resized.connect(_place)
 	set_process(false)
 
 

@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=47 format=3]
+[gd_resource type="Theme" load_steps=50 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -614,6 +614,35 @@ corner_radius_top_right = 30
 corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 
+; A fault in an answer (886; builder's answer panel, approved 11-12): a faint rust
+; plate, a rust rim, a broad rust edge at the left.
+[sub_resource type="StyleBoxFlat" id="fault"]
+content_margin_left = 36.0
+content_margin_top = 12.0
+content_margin_right = 20.0
+content_margin_bottom = 14.0
+bg_color = Color(0.9098, 0.4745, 0.1804, 0.13)
+border_width_left = 8
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9098, 0.4745, 0.1804, 0.6)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+; A button drawn as its words alone (886: a fold's "6 more").
+[sub_resource type="StyleBoxEmpty" id="flat"]
+content_margin_left = 0.0
+content_margin_top = 4.0
+content_margin_right = 0.0
+content_margin_bottom = 4.0
+
+; A scroll drawn as nothing but its bar (886: QuietScroll, a window's goods half;
+; Store A as built showed the ScrollContainer's inset as a dark sunken box).
+[sub_resource type="StyleBoxEmpty" id="quiet"]
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -910,3 +939,49 @@ NameText/base_type = &"Label"
 NameText/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 1)
 NameText/font_sizes/font_size = 44
 NameText/fonts/font = ExtResource("sans_bold")
+Body/base_type = &"Label"
+Body/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Body/font_sizes/font_size = 42
+Note/base_type = &"Label"
+Note/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+Note/font_sizes/font_size = 40
+FaultBlock/base_type = &"PanelContainer"
+FaultBlock/styles/panel = SubResource("fault")
+FaultHead/base_type = &"Label"
+FaultHead/colors/font_color = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
+FaultHead/font_sizes/font_size = 42
+FaultHead/fonts/font = ExtResource("sans_bold")
+Lines/base_type = &"RichTextLabel"
+Lines/colors/default_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Lines/constants/line_separation = 14
+Lines/constants/text_highlight_h_padding = 10
+Lines/constants/text_highlight_v_padding = 4
+Lines/font_sizes/normal_font_size = 42
+Lines/font_sizes/bold_font_size = 38
+Lines/fonts/normal_font = ExtResource("sans")
+Lines/fonts/bold_font = ExtResource("sans_bold")
+CodeChip/colors/back = Color(0.102, 0.0784, 0.0627, 0.9)
+CodeChip/colors/letter = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
+CodeChip/colors/figure = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+FoldLink/base_type = &"Button"
+FoldLink/colors/font_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+FoldLink/colors/font_hover_color = Color(1.0, 0.9, 0.7, 1)
+FoldLink/colors/font_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+FoldLink/colors/font_focus_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+FoldLink/font_sizes/font_size = 40
+FoldLink/fonts/font = ExtResource("sans_bold")
+FoldLink/styles/normal = SubResource("flat")
+FoldLink/styles/hover = SubResource("flat")
+FoldLink/styles/pressed = SubResource("flat")
+FoldLink/styles/focus = SubResource("flat")
+WordsRefused/base_type = &"Label"
+WordsRefused/colors/font_color = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
+WordsRefused/font_sizes/font_size = 42
+Close/base_type = &"Button"
+Close/colors/icon_normal_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
+Close/colors/icon_hover_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Close/colors/icon_pressed_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+Close/constants/size = 72
+Close/constants/stroke = 5
+QuietScroll/base_type = &"ScrollContainer"
+QuietScroll/styles/panel = SubResource("quiet")

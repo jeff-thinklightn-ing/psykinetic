@@ -1,6 +1,6 @@
 extends Node
 ## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; UiKeyCap 872): UiGlass, UiSlot,
-## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; the name plates 865): UiGlass, UiSlot,
+## The shared parts of the approved look (decision 854; UiRow 860; the quest card's types 862; the name plates 865; the answer panel's 886): UiGlass, UiSlot,
 ## UiPrice, UiTabs, UiLine, UiRow each take their theme types, change them by state,
 ## and report what they show. No port: it opens no network; no scratch files.
 
@@ -18,6 +18,7 @@ func _ready() -> void:
 	await _test_quest_card()
 	await _test_key_cap()
 	_test_name_plates()
+	await _test_answer()
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -357,3 +358,65 @@ func _test_name_plates() -> void:
 	_check(label.layers == 1 and mark.layers == 1, "and draw again without")
 	puppet.free()
 	client.free()
+
+
+## Builder's answer panel's look (886): a building's code inline as a chip, its
+## letter and figure apart; a line's marks all chips and its words kept; the
+## window's close; the panel's types on the text scale.
+func _test_answer() -> void:
+	var rich := RichTextLabel.new()
+	rich.theme_type_variation = &"Lines"
+	rich.fit_content = true
+	rich.custom_minimum_size.x = 1400.0
+	add_child(rich)
+	UiCodeChip.add_line(rich, "The door of [T1] temple at (190,\u00a0199); [F12] forge.")
+	await get_tree().process_frame
+	var said := rich.get_parsed_text()
+	_check(said == "The door of T\u200a1 temple at (190,\u00a0199); F\u200a12 forge.",
+		"a line's codes drawn as chips, letter and figure a hair apart, its words kept (%s)" % said.c_escape())
+	_check(rich.get_theme_color(&"figure", &"CodeChip") != rich.get_theme_color(&"letter", &"CodeChip")
+		and rich.get_theme_color(&"back", &"CodeChip").a > 0.5, "a chip: a dark back, the figure brighter than the letter")
+	_check(UiCodeChip._split("T1") == PackedStringArray(["T", "1"]) and UiCodeChip._split("WS3") == PackedStringArray(["WS", "3"]),
+		"a code splits into its letters and its figure")
+	rich.queue_free()
+	var close := UiClose.new()
+	var pressed := [0]
+	close.pressed.connect(func() -> void: pressed[0] += 1)
+	add_child(close)
+	await get_tree().process_frame
+	_check(close.get_combined_minimum_size().x >= 72.0 and close.theme_type_variation == &"Close", "a close is a 72-unit target (%s)" % close.get_combined_minimum_size())
+	close.pressed.emit()
+	_check(pressed[0] == 1 and close.text.is_empty(), "a close presses, and has no words: its x is drawn")
+	close.queue_free()
+	for type: StringName in [&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused"]:
+		_check(type in UiTheme.SIZED_TYPES, "%s follows the text scale" % type)
+	var quiet := ScrollContainer.new()
+	quiet.theme_type_variation = &"QuietScroll"
+	quiet.custom_minimum_size = Vector2(800.0, 400.0)
+	var grid := GridContainer.new()
+	grid.columns = 4
+	quiet.add_child(grid)
+	var squares: Array[UiSlot] = []
+	for k in 8:
+		var square := UiSlot.new()
+		square.price().set_gold(k + 1)
+		grid.add_child(square)
+		squares.append(square)
+	add_child(quiet)
+	for i in 3:
+		await get_tree().process_frame
+	_check(quiet.get_theme_stylebox(&"panel") is StyleBoxEmpty, "a quiet scroll draws no box of its own (886)")
+	var off := 0
+	for square in squares:
+		var chip := square._price
+		if not chip.visible or chip.position.x + chip.size.x < square._face.size.x * 0.75 or chip.position.y + chip.size.y < square._face.size.y * 0.75:
+			off += 1
+	_check(off == 0, "a square in a grid in a scroll has its price chip bottom right once laid out (%d off)" % off)
+	quiet.queue_free()
+	var block := PanelContainer.new()
+	block.theme_type_variation = &"FaultBlock"
+	add_child(block)
+	await get_tree().process_frame
+	var style := block.get_theme_stylebox(&"panel") as StyleBoxFlat
+	_check(style != null and style.border_width_left > style.border_width_top, "a fault block has its broad left edge")
+	block.queue_free()
