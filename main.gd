@@ -11051,12 +11051,18 @@ func _quest_windows() -> Array:
 
 ## The zone the local player stands in, for the quest card's place (747
 ## amended (6)): "" until the player is here and their zone is the one loaded,
-## so the first frames after a zone change or a login know no zone.
+## so the first frames after a zone change or a login know no zone. The
+## loaded zone is zone_name_here(): on a joined client World.zone carries no
+## name and its bodies none either (World.spawn writes the zone's), so the
+## level loaded names it; a body that does name a zone (the host's) must name
+## that one (747 amended (9): the card was hidden everywhere on a joined
+## client, playtest's walk on b411043ec).
 func _quest_zone() -> String:
 	var own := _local_player()
-	if own == null or own.zone != str(World.zone.name):
+	var here := zone_name_here()
+	if own == null or here.is_empty() or not own.zone.is_empty() and own.zone != here:
 		return ""
-	return own.zone
+	return here
 
 
 ## The levels the fallen knight's quest card shows in (747 amended (6); the

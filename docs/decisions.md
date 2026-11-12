@@ -40064,6 +40064,8 @@ task are set in one call, _sync_quest runs at every join, and reset_barrow clear
 level_test _test_barrow_quest: the taken quest's zones. Server only; protocol unchanged; no new
 class_name.
 
+747 amended (9): a joined client's quest card (2026-11-12, the script's label; playtest's joined walk on b411043ec, C:/dev/psykinetic-trees/playtest/build/rel_b411043ec_qcard_2: the card hidden in the Barrow and the halls below, "in_place false, zone_of """; the coordinator's ruling, v0.1.213 held for it). 747 amended (6)'s Main._quest_zone compared the local player's zone with World.zone.name. On a joined client World.zone carries no name and World.spawn writes that empty name on every body, so the zone was always "" and the card showed nowhere, which is how Jeff plays. It now names the place by zone_name_here() (World.zone's name, else the level loaded, map_name, set as the zone's level loads in _client_zone); a body that names a zone (the host's) must name that one, and no local player or no level still gives "", so the first frames of a zone change know no zone. level_test _test_quest_card_place stands each place as a joined client stands it (World.zone and the body unnamed): the card on both crypt floors, gone in the bear's cave and the wilds (Umbrage). Its host-only check passed while the client's card hid; the client's state is set in place, not joined over the wire (playtest's joined walk is that check). Client only, protocol unchanged, no new class_name; no bullet change (bullet 1 as written becomes true).
+
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
 Jeff: "and the chest only opens with a key from the boss and only hold gold

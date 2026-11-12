@@ -5822,6 +5822,7 @@ func _test_quest_card_place() -> void:
 	_main.mark_player(id, Main.QUEST_DONE, false)
 	record.barrow_task = {"taken": true, "slain": []}
 	var seen := {}
+	var joined := {}
 	for place: String in ["barrow", "barrow_deep", "bear_cave", "wilds"]:
 		_main.load_map(place)
 		var here := _player()
@@ -5829,9 +5830,27 @@ func _test_quest_card_place() -> void:
 		_main.quest_panel.step(1.0)
 		_main.quest_panel.step(1.0)
 		seen[place] = [here.zone if here != null else "", (here.quest.get("zones", []) if here != null else []), _main.quest_panel.visible]
+		# 747 amended (9): as a joined client stands here. Its World.zone has
+		# no name and its bodies none (World.spawn writes the zone's); the
+		# level loaded names the place. The host-only check above passed while
+		# the card hid everywhere on a client (playtest's walk on b411043ec).
+		var zone_name := str(World.zone.name)
+		var body_zone := here.zone if here != null else ""
+		World.zone.name = ""
+		if here != null:
+			here.zone = ""
+		_main.quest_panel.step(1.0)
+		_main.quest_panel.step(1.0)
+		joined[place] = [_main._quest_zone(), _main.quest_panel.visible]
+		World.zone.name = zone_name
+		if here != null:
+			here.zone = body_zone
 	_check(seen["barrow"][2] and seen["barrow_deep"][2] and not seen["bear_cave"][2] and not seen["wilds"][2]
 		and seen.values().all(func(row: Array) -> bool: return row[1] == ["barrow", "barrow_deep"]),
 		"the card on both crypt floors, gone in the bear's cave and the wilds; the quest's zones reach the player in each (%s)" % [seen])
+	_check(joined["barrow"] == ["barrow", true] and joined["barrow_deep"] == ["barrow_deep", true]
+		and joined["bear_cave"] == ["bear_cave", false] and joined["wilds"] == ["wilds", false],
+		"a joined client (its zone unnamed, its body's too): the card on both crypt floors, gone in the bear's cave and the wilds (Umbrage), each place named by the level loaded (%s)" % [joined])
 	record.marks.assign(kept["marks"])
 	record.barrow_task = kept["task"]
 	_main.load_map(was)
