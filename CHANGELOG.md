@@ -19,6 +19,7 @@ notes (decision 324).
 - In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
 - The Ossuary's dead lie in three rooms, well apart (870).
 - At the robbers' camp, a Robbers' bundle beside the two bedrolls holds two bandaging kits (870).
+- In the crypt, the first robber you meet on the way in is always alone (870).
 - People, you among them, stand easy, feet under their hips and knees soft, at rest, at work and at a stall; in the Mughouse the taverner stands behind her bar with her hands on the counter (877).
 
 - Towns: wooden houses, the Mughouse among them, have oak-framed windows cut through their own boards, with a glazing cross and board shutters strapped in iron (881).
