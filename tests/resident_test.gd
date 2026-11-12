@@ -92,6 +92,7 @@ func _ready() -> void:
 	_test_camp_traders()  # 799: the forest camps' traders.
 	_test_relic()  # 714: the knight's remains to Aldous.
 	_test_vendor()  # 736: the starter stall.
+	_test_asked_facts()  # 890: a question answered from the world's data, no steps.
 	_test_legs()  # 853 amended (6): routes as a few long legs.
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
@@ -6014,6 +6015,84 @@ func _test_vendor_day(rolf: Resident, stand: Dictionary, given: Dictionary) -> v
 	rolf._spot = {}
 	World._relocate(rolf, was_tile)
 	rolf._goal = was_tile
+
+
+## 890: a player's question a resident's mind answers from the world's data at the moment of asking. No world
+## steps; the vendor rule and the clock put back.
+func _test_asked_facts() -> void:
+	print("\n== asked facts (890): who sells it, who has work, who you are, what's out there, from the data now ==")
+	var player := _player()
+	var body: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		var each := entity as Resident
+		if each != null and each.spawned and each.town == STORE and not each.worker_id.begins_with(Offers.VENDOR) and not each.worker_id.begins_with(Offers.VISITOR) \
+				and each.player_id.is_empty():
+			body = each
+			break
+	_check(player != null and body != null, "a player and a townsperson to ask")
+	if player == null or body == null:
+		return
+	_check(Main.asked_item(Offers._plain("Where can I get a sword?")) == "sword" and Main.asked_item(Offers._plain("where can i get a zorblax")) == ""
+		and Main.asked_item(Offers._plain("any swords?")) == "sword", "the item a line names, its plural too; an unknown word names none")
+	var unknown: Array = _main._asked_facts(body, player, "Where can I get a zorblax?")
+	_check(unknown.is_empty(), "an unknown word: no goods sentence, no false \"nobody\" (%s)" % [unknown])
+	_check(_main._asked_facts(body, player, "Lovely weather.").is_empty(), "no question of its kinds: nothing added")
+	var rule: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
+	if not rule.is_empty():
+		var towns_was: Array = (rule.get("towns", []) as Array).duplicate()
+		rule["towns"] = [STORE]
+		var said: Array = _main._asked_facts(body, player, "Where can I get a sword?")
+		var hour_was := DayNight.hour(DayNight.now())
+		DayNight.set_hour(2.5)  # His night: he is abed or at the inn, not at his stall.
+		var at_night: Array = _main._asked_facts(body, player, "Where can I get a sword?")
+		DayNight.set_hour(hour_was)
+		rule["towns"] = towns_was
+		var named := said.any(func(s: String) -> bool: return str(rule.get("name", "")) in s and "swords" in s)
+		_check(named and said.size() <= 2, "a sword: the stall's keeper by name, where he keeps shop (%s)" % [said])
+		_check(at_night == said, "at night, where he keeps shop, not where he is (%s)" % [at_night])
+		_check(not str(said).contains(player.name) and not str(said).contains(Net.player_id), "nothing of the player, or any player")
+	var none: Array = _main._asked_facts(body, player, "Who sells a lantern?") if Items.exists("lantern") else []
+	_check(none.is_empty() or none.any(func(s: String) -> bool: return s.begins_with("Nobody here sells") or " sells " in s),
+		"a real item: who sells it, or nobody (%s)" % [none])
+	var me: Array = _main._asked_facts(body, player, "Who are you?")
+	var job: Array = _main._asked_facts(body, player, "What's your job?")
+	var sell: Array = _main._asked_facts(body, player, "Where can I sell my sword?")
+	var around: Array = _main._asked_facts(body, player, "Any fish around here?")
+	_check(job.size() == 1 and str(job[0]).begins_with("You are") and sell.is_empty() and around.is_empty(),
+		"lore's checks: \"your job\" asks who it is; selling asks for a buyer, no seller named; \"around here\" is no wilds question (%s, %s, %s)" % [job, sell, around])
+	_check(me.size() == 1 and body.person in me[0] and me[0].begins_with("You are"), "who are you: its own name and trade (%s)" % [me])
+	var work: Array = _main._asked_facts(body, player, "Is there any work for me?")
+	_check(work.size() >= 1 and not work.any(func(s: String) -> bool: return body.person in s), "any work: who else has an ask, or nobody; never itself (%s)" % [work])
+	var near := Main.asked_far(10, Main.asked_rule())
+	var far := Main.asked_far(9999, Main.asked_rule())
+	_check(near == "a short walk" and far == "far off", "distances in words (%s, %s)" % [near, far])
+	var places: Array[Dictionary] = _main._asked_places(STORE)
+	var kinds_ok := places.all(func(p: Dictionary) -> bool: return str(p["name"]) != str(World.holdings.place(STORE).get("name", "")))
+	var sorted := true
+	for i in range(1, places.size()):
+		sorted = sorted and int(places[i]["d"]) >= int(places[i - 1]["d"])
+	_check(kinds_ok and sorted, "the wilds: the town's named places beyond it, nearest first, not its own (%s)" % [places.map(func(p: Dictionary) -> String: return "%s %s %s" % [p["name"], p["way"], p["far"]])])
+	# Lore's survey of a stranger's first questions (2026-11-12), printed for lore and voice to read: what each adds,
+	# and whether the offers' own lines (Offers.ask_kind: wares, work, news) take it before the mind hears it.
+	var taverner: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).spawned and (entity as Resident).town == STORE and (entity as Resident).trade == "taverner":
+			taverner = entity
+	for asked: Resident in ([body, taverner] if taverner != null else [body]):
+		for line: String in ["Where can I fish?", "What's down in the crypt?", "Where can I get a sword?", "Is there any work?",
+				"Who's in charge here?", "What's out in the wilds?", "Where can I sleep?", "Who are you?", "What's dangerous around here?",
+				"Where can I buy food?", "Tell me about this town.", "Any news?", "Where's the smith?", "What's that temple?", "Is it safe at night?"]:
+			print("  ASKED %s | %s | offers: %s | %s" % [asked.trade if not asked.trade.is_empty() else "townsperson", line,
+				Offers.ask_kind(line) if not Offers.ask_kind(line).is_empty() else "-", _main._asked_facts(asked, player, line)])
+	body.asked_facts = ["Rolf sells swords, at the weapon stall."]
+	var facts := body.facts_now()
+	body.asked_facts = []
+	var at := facts.find("What was just asked, and what is true of it now: Rolf sells swords, at the weapon stall.")
+	var lore := -1
+	for i in facts.size():
+		if facts[i].begins_with("What you know of the world"):
+			lore = i
+	_check(at >= 0 and (lore < 0 or at < lore), "in the mind's facts, ahead of what it knows of the world (at %d, lore at %d)" % [at, lore])
 
 
 func _test_vendor() -> void:

@@ -12990,6 +12990,7 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 				_standing.erase(player_id)  # Their walk asked (501 amended (2)) taken: nothing stands.
 	body.asked_by = player_id
 	body.asked_by_name = speaker
+	body.asked_facts = _asked_facts(body, player, line)  # 890: a question answered from the world's data.
 	if not player_id.is_empty() and World.production != null:
 		# Their first words make the standing entry (decision 443).
 		var card := Townsfolk.card_of(World.production, body.worker_id)
@@ -13004,8 +13005,176 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 			"player": player_id, "peer": player.owner_peer if player != null else -1})
 	body.asked_by = ""
 	body.asked_by_name = ""
+	body.asked_facts = []
 	body.first_words = false
 	Transcript.record(body.person, speaker, line)
+
+
+# --- Asked facts (890) ----------------------------------------------------------------
+
+## residents.json "asked": which questions (word lists by kind) and the fact sentences' frames.
+static func asked_rule() -> Dictionary:
+	var rule: Variant = Townsfolk.days().get("asked", {})
+	return rule if rule is Dictionary else {}
+
+
+## What [param body]'s mind is told of [param line] when it asks one of residents.json "asked"'s questions
+## (890; lore's survey: 9 of 15 first questions found no fact): sentences from the world's data at this
+## moment, never cached: goods (who sells the item named, a window open to [param player], nearest first, at
+## most two; "nobody" only for a real item), work (who has an ask this player can take now), self (its own
+## name and trade), wilds (the town's named places beyond it, by direction and distance). Nothing of another
+## player; every place one the player can find (where a keeper keeps shop, not where he is at this hour).
+func _asked_facts(body: Resident, player: Player, line: String) -> Array[String]:
+	var out: Array[String] = []
+	if body == null or player == null or World.production == null:
+		return out
+	var rule := asked_rule()
+	var said := Offers._plain(line)
+	var frames: Dictionary = rule.get("frames", {})
+	var item := asked_item(said)
+	if not item.is_empty() and _asked_is(said, rule, "goods"):
+		var sellers := _asked_sellers(body.town, item, player)
+		if sellers.is_empty():
+			out.append(str(frames.get("none", "Nobody here sells %s now.")) % _plural(Items.name_of(item)))
+		for each: Dictionary in sellers.slice(0, int(rule.get("sellers_most", 2))):
+			out.append(str(frames.get("seller", "%s sells %s, at %s.")) % [each["name"], _plural(Items.name_of(item)), each["at"]])
+	if _asked_is(said, rule, "work"):
+		var askers := _asked_work(body, player.player_id)
+		if askers.is_empty():
+			out.append(str(frames.get("no_work", "Nobody here has asked for help today.")))
+		for each: Dictionary in askers.slice(0, int(rule.get("askers_most", 2))):
+			out.append(str(frames.get("work", "%s, at %s, is asking for help.")) % [each["name"], each["at"]])
+	if _asked_is(said, rule, "self"):
+		out.append(str(frames.get("self", "You are %s, %s.")) % [body.person, _trade_words(body.trade) if not body.trade.is_empty() else "of the town"])
+	if _asked_is(said, rule, "wilds"):
+		for each: Dictionary in _asked_places(body.town).slice(0, int(rule.get("places_most", 3))):
+			out.append(str(frames.get("place", "%s lies %s of the town, %s.")) % [Offers._upper_first(str(each["name"])), each["way"], each["far"]])
+	return out
+
+
+## Whether [param said] (Offers._plain) asks a question of [param kind] (residents.json "asked" kinds: word lists).
+static func _asked_is(said: String, rule: Dictionary, kind: String) -> bool:
+	for word: Variant in rule.get("kinds", {}).get(kind, []):
+		if Offers._has_word(said, str(word)):
+			return true
+	return false
+
+
+## The item [param said] names (its name, its plural or its id's words; the longest name first, so "battle
+## axe" before "axe"), "" for none: an unknown word names nothing.
+static func asked_item(said: String) -> String:
+	var best := ""
+	var best_len := 0
+	for id: Variant in Items.ids():
+		var name := Items.name_of(str(id)).to_lower()
+		for word: String in [name, _plural(name), str(id).replace("_", " ")]:
+			if word.length() > best_len and Offers._has_word(said, word):
+				best = str(id)
+				best_len = word.length()
+	return best
+
+
+## Who sells [param item] in [param town] through a window open to [param player] now: the stall's keeper
+## (economy's vendor wares), the town's counter (Economy.goods, its keeper the merchant), a maker's own
+## (Economy.maker_goods); each {name, at, cell}, nearest the player first. A wronged keeper's window, and every
+## window while the town is threatened, is shut; where each keeps shop, not where it stands now.
+func _asked_sellers(town: String, item: String, player: Player) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.economy == null or World.towns == null or not World.towns.threatened(town).is_empty():
+		return out
+	var place: Dictionary = World.holdings.place(town) if World.holdings != null else {}
+	var store: Vector2i = place.get("cell", player.tile)
+	var vendor: Dictionary = World.economy.rules.get("vendor", {})
+	if town in vendor.get("towns", []) and (vendor.get("wares", []) as Array).any(func(w: Variant) -> bool: return w is Dictionary and str(w.get("item", "")) == item):
+		var stall: Dictionary = World.holdings.place(str(place.get("area", "")) + "/" + str(vendor.get("stall", ""))) if World.holdings != null else {}
+		out.append({"name": str(vendor.get("name", "")), "at": str(stall.get("name", "the stall by %s" % mid_line(str(place.get("name", "the store"))))),
+			"cell": stall.get("cell", store)})
+	var on_counter := World.economy.goods(town, "", player.player_id).any(func(g: Dictionary) -> bool: return str(g.get("id", "")) == item)
+	for id: String in World.production.worker_ids(town):
+		var who := World.production.worker(id)
+		var trades: Array = who.get("trades", [])
+		if trades.is_empty() or Production.off_work(who):
+			continue
+		var card := Townsfolk.card_of(World.production, id)
+		if not card.is_empty() and Standing.words(card, player.player_id) == "wronged":
+			continue
+		var trade := str(trades[0])
+		var sells := (trade == "merchant" and on_counter) or (str(trade) in Items.TRADES
+			and World.economy.maker_goods(id).any(func(g: Dictionary) -> bool: return str(g.get("id", "")) == item))
+		if sells:
+			var at := _keeps_shop(town, trade, store, str(place.get("name", "the store")))
+			out.append({"name": str(who.get("name", id)), "at": at["at"], "cell": at["cell"]})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return World.distance(player.tile, a["cell"]) < World.distance(player.tile, b["cell"]))
+	return out
+
+
+## Where a worker of [param trade] keeps shop or works in [param town], a place a player can find: its
+## trade's building (Towns.kind_for: the forge, the temple), the merchant the store, else the square.
+func _keeps_shop(town: String, trade: String, store: Vector2i, store_name: String) -> Dictionary:
+	if trade == "merchant":
+		return {"at": mid_line(store_name), "cell": store}
+	var kind := World.towns.kind_for(trade) if World.towns != null else ""
+	var rect := _use_rect(town, kind) if not kind.is_empty() else Rect2i()
+	if rect.size != Vector2i.ZERO:
+		return {"at": "the " + kind.replace("_", " "), "cell": rect.get_center()}
+	return {"at": "the square by " + mid_line(store_name), "cell": store}
+
+
+## Who in [param body]'s town has an ask [param player_id] can take now (Offers.of's fresh rows the window
+## shows as asks: BarterPanel.asks_of), each {name, at}; none while the player has taken on as many as
+## Offers allows (per_player), none already taken or done (Offers.of leaves those out or marks them open).
+func _asked_work(body: Resident, player_id: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if player_id.is_empty() or Offers._open_count(World.production, player_id) >= int(Offers.settings().get("per_player", 3)):
+		return out
+	var place: Dictionary = World.holdings.place(body.town) if World.holdings != null else {}
+	var store: Vector2i = place.get("cell", body.tile)
+	for id: String in World.production.worker_ids(body.town):
+		if id == body.worker_id:
+			continue
+		var who := World.production.worker(id)
+		var card := Townsfolk.card_of(World.production, id)
+		if not card.is_empty() and Standing.words(card, player_id) == "wronged":
+			continue
+		var rows := BarterPanel.asks_of(Offers.of(id, player_id), false).filter(func(row: Dictionary) -> bool:
+			return str(row.get("kind", "")) not in [Offers.SHOP, Offers.VENDOR_WARES, Offers.PLEA])
+		if rows.is_empty():
+			continue
+		var trades: Array = who.get("trades", [])
+		var at := _keeps_shop(body.town, str(trades[0]) if not trades.is_empty() else "", store, str(place.get("name", "the store")))
+		out.append({"name": str(who.get("name", id)), "at": at["at"]})
+	return out
+
+
+## The named places beyond [param town] in its area (holdings: none of a town's own, nor the kinds
+## residents.json "asked" "not_kinds" leaves out: posts, the fire, the stall), nearest first, each {name,
+## way (the compass from the town's store), far (residents.json "asked" "distances": the first whose cells
+## reach it)}.
+func _asked_places(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if World.holdings == null:
+		return out
+	var home: Dictionary = World.holdings.place(town)
+	var area := str(home.get("area", ""))
+	var from: Vector2i = home.get("cell", Vector2i.ZERO)
+	var rule := asked_rule()
+	var not_kinds: Array = rule.get("not_kinds", [])
+	for id: String in World.holdings.places_in(area):
+		var each: Dictionary = World.holdings.place(id)
+		if id == town or not str(each.get("town", "")).is_empty() or str(each.get("kind", "")) in not_kinds or str(each.get("name", "")).is_empty():
+			continue
+		var cell: Vector2i = each.get("cell", from)
+		out.append({"name": str(each["name"]), "way": World.compass(Vector2(cell - from)), "far": asked_far(World.distance(from, cell), rule), "d": World.distance(from, cell)})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["d"]) < int(b["d"]))
+	return out
+
+
+## A distance in cells in words (residents.json "asked" "distances": [[cells, words], ...], the first that reaches).
+static func asked_far(cells: int, rule: Dictionary) -> String:
+	for step: Variant in rule.get("distances", []):
+		if step is Array and (step as Array).size() >= 2 and cells <= int(step[0]):
+			return str(step[1])
+	return "far off"
 
 
 ## Server: [param player_id]'s client (peer [param peer]) is sent what

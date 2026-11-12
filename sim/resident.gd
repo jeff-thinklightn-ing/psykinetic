@@ -111,6 +111,9 @@ var type := ""
 ## offers (decision 435); "" between asks.
 var asked_by := ""
 var asked_by_name := ""
+## What the asking player's question is answered with from the world's data (890; Main._asked_facts):
+## set for the prompt being built, then cleared, as asked_by.
+var asked_facts: Array[String] = []
 ## Whether these are their first words together (decision 443).
 var first_words := false
 ## Where it goes: "work", "home", "square" -> Rect2i of cells (Main's).
@@ -1356,6 +1359,8 @@ func facts_now(about := PackedStringArray()) -> Array[String]:
 		var hers := Companion.lore_words(person)
 		if not hers.is_empty():
 			out.append(hers)
+	if not asked_facts.is_empty():
+		out.append("What was just asked, and what is true of it now: %s" % " ".join(asked_facts))  # 890, ahead of lore.
 	var known := world_facts(about)
 	if not known.is_empty():
 		out.append("What you know of the world: %s" % " ".join(known))

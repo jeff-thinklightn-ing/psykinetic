@@ -51023,3 +51023,34 @@ Swept headless over generations 1-300 (the generator alone): barrow_deep never r
 (5) Riding it, three lines voice worded and lore checked against 714: the niche's tell is "You feel a cool draught coming from one of the niches." (the coordinator's 11-11 ruling, the word's spelling); a blessed hand at zero charges is told "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below." (Main.SPENT_LINE; 573's "The draugr gives more." stopped being true at 714, when the draugr's win gave the uncharged amulet and a relic, and Aldous the charges); both of _start_channel's "Not while they're fighting near." are "Not while there's fighting close by." (the bare "they" points at nothing once the Server label goes); and the draugr's pact bought is "%s pays the draugr %d gold for a pact worth %d risings." with its you-form (a price, and risings given later at the altar; "1 rising" singular). level_test pins the spent line on the screen at zero charges; monster_test the pact's pair.
 
 level_test: _test_crypt_spacing (the band's pairs and posts on generations 1-8, the Ossuary's packs on 1-8, 109 and 118); the barrow's generations 1-8 keep the bundle at (6, 48) with two kits beside two bedrolls; the template's decor and entity counts. Server only; protocol unchanged; no new class_name. The box's crypt changes at its first scheduled regeneration after the deploy that carries this, not before.
+
+## 890. Asked facts: a question answered from the world's data at the moment of asking
+
+Lore's survey of a stranger's first questions (2026-11-12): 9 of 15 matched no lore topic and got the
+stock opening, and four of them need no lore, only the world's own data (the coordinator's approval and
+conditions, 2026-11-12). When a player's line to a townsperson reaches its mind (Main._ask_resident, after
+the offers' own wares, work and news lines had their turn) and asks one of residents.json "asked"'s
+questions, Main._asked_facts builds one to three sentences from the data at that moment, never cached,
+and the mind is told them first (Resident.asked_facts, set for that prompt and cleared as asked_by is;
+Resident.facts_now puts them ahead of what it knows of the world):
+- goods ("where can I get a sword", "who sells", "buy"): the item the line names (Main.asked_item: an
+  item's name, its plural or its id; the longest first). Who sells it through a window open to this
+  player now (Main._asked_sellers): the stall's keeper (economy's vendor wares in his town), the town's
+  counter (Economy.goods, kept by the merchant), a maker's own (Economy.maker_goods); a wronged keeper's
+  window and every window while the town is threatened are shut; nearest the player first, at most two,
+  each named with where it keeps shop (its trade's building, the store, the stall), never where it
+  stands at that hour (Rolf at night: still the stall). None: "Nobody here sells ... now", only for a
+  real item; an unknown word gives no goods sentence at all.
+- work ("any work", "a job", "need help"): who else in the town has an ask this player can take now
+  (Offers.of's rows the window shows as asks, BarterPanel.asks_of: none taken or done), none while the
+  player has as many as Offers allows (per_player); else "Nobody here has asked for help today".
+- self ("who are you", "your name", "your job"): its own name and trade.
+- wilds ("the wilds", "out there", "outside the town"): the town's area's named places beyond it
+  (holdings: none of a town's own, nor residents.json "asked" "not_kinds"), nearest three, by the
+  compass from the town's store (World.compass) and residents.json "distances" in cells.
+Lore checked the word lists against its own (2026-11-12): "sell" left out (selling asks for a buyer, the
+wrong way round), "around here" left out (too broad: "any fish around here", "what's dangerous around
+here"), "your job" and "your trade" asked as self. Nothing of another player is said. Lore checks the word lists, voice the frames ("asked" "frames", in
+residents.json for voice to edit). Server only: what the mind is told; protocol unchanged; no new
+class_name. Not yet: a sword at a camp trader's or a pedlar's (their windows are their own offers);
+zones beyond the area (a joined level's name) in the wilds answer. resident_test _test_asked_facts.
