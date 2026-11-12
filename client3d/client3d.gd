@@ -23899,6 +23899,8 @@ func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 const FISH_CLIPS := {"cast": "Fish_Cast", "wait": "Fish_Hold", "bite": "Fish_Bite", "landed": "Fish_Reel", "missed": "Fish_Miss"}
 const FISH_ONCE: Array[String] = ["cast", "landed", "missed"]
 const FISH_HOLD := "Fish_Hold"
+## The bite cut in this fast (s), so its first tug lands on the bite's first moment.
+const FISH_BITE_FADE := 0.05
 func _fishing_pose(puppet: Node3D, rig: AnimRig, entity: GridEntity, now: int) -> bool:
 	var state := str(entity.fishing.get("state", ""))
 	var was := str(puppet.get_meta("fish_state", ""))
@@ -23909,6 +23911,11 @@ func _fishing_pose(puppet: Node3D, rig: AnimRig, entity: GridEntity, now: int) -
 	if state in FISH_ONCE and state != was:
 		var seconds := rig.once(clip, 1.0, ArtKit.feel("client3d.clip_blend", CLIP_BLEND))
 		puppet.set_meta("busy_until", now + int(seconds * 1000.0))
+		return true
+	if state == "bite" and was != "bite":
+		# The bite's first tug is its first moment (805 amended (18): a viewer names the second the bite
+		# starts, silent), with items' float going under: from the clip's start, cut in quickly.
+		rig.loop(clip, 1.0, FISH_BITE_FADE, true)
 		return true
 	rig.loop(FISH_HOLD if state in FISH_ONCE else clip, 1.0)
 	return true

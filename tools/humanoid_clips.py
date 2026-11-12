@@ -1108,7 +1108,9 @@ for _kind, (_mouth, _pull, _bent) in SHEATH_MOUTHS.items():
 # sagging as the line goes slack).
 FISH_FACE = (0.0, 0.0, 1.0)
 FISH_POLE = (-1.0, 0.4, -0.5)
-FISH_LEFT = [("upperarm_l", LIFT, 22.0), ("lowerarm_l", LIFT, 55.0), ("upperarm_l", TURN, -12.0)]
+# The left hand before the belly, under the rod, by the line (a reach: turned, the arm stood out stiffly
+# from the side, its elbow 10 cm out past the shoulder; the fishing film, 11-11, C:/dev/review/fishing_cast).
+FISH_LEFT = left_arm(0.25, -0.11, -0.34, (0.5, 0.4, -1.0))
 FISH_ROD = (0.0, -0.87, 0.5)
 
 
@@ -1123,7 +1125,6 @@ FISH_BACK = rod((0.04, 0.16, 0.14), (0.0, 0.5, 0.87), [("spine_02", TURN, -16.0)
 FISH_HUNG = rod((0.03, 0.16, 0.15), (0.0, 0.58, 0.82), [("spine_02", TURN, -17.0), ("spine_03", TURN, -7.0), ("spine_02", LIFT, 7.0)])
 FISH_WHIP = rod((0.38, 0.1, 0.06), (0.0, -0.66, 0.75), [("spine_02", TURN, 8.0), ("spine_01", LIFT, -5.0)])
 FISH_THROUGH = rod((0.42, 0.08, -0.2), (0.0, -0.97, 0.22), [("spine_02", TURN, 6.0), ("spine_01", LIFT, -8.0), ("spine_02", LIFT, -4.0)])
-FISH_DIP = rod((0.34, 0.1, -0.36), (0.0, -0.95, 0.3), [("spine_01", LIFT, -5.0), ("Head", LIFT, -6.0)])
 FISH_UP = rod((0.18, 0.1, 0.1), (0.0, -0.2, 0.98), [("spine_01", LIFT, 7.0), ("spine_02", LIFT, 5.0)])
 FISH_LATE = rod((0.24, 0.11, -0.18), (0.0, -0.5, 0.87))
 FISH_SLACK = rod((0.32, 0.12, -0.42), (0.0, -0.99, -0.12), [("spine_02", LIFT, -5.0), ("Head", LIFT, -10.0)] + both("clavicle", LIFT, -4.0, mirror=False))
@@ -1141,13 +1142,31 @@ CLIPS["Fish_Hold_Loop"] = {"loop": True, "keys": [
 	(1.5, P("Idle_Loop", 1.5, FISH_HOLD_SWAY)),
 	(3.0, P("Idle_Loop", 0.0, FISH_HOLD)),
 ]}
-CLIPS["Fish_Bite_Loop"] = {"loop": True, "keys": [
-	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
-	(0.12, P("Idle_Loop", 0.0, FISH_DIP, move=(0.0, -0.02, 0.0))),
-	(0.3, P("Idle_Loop", 0.0, FISH_HOLD)),
-	(0.42, P("Idle_Loop", 0.0, FISH_DIP, move=(0.0, -0.02, 0.0))),
-	(0.6, P("Idle_Loop", 0.0, FISH_HOLD)),
-]}
+# The bite (805 amended (18); the coordinator, 11-11, after the fishing film at Jeff's pond: the float
+# can't be seen at the play camera, so the bite reads on him): the rod tip yanked down at the water in
+# a sharp tug (0.07 s), the arms dragged out and down after it and the trunk pulled over (the feet
+# kept), held to 0.25 s, given back by 0.6 s. Two tugs in the 3 s bite (World's FISH_BITE_TICKS), at 0
+# and 1.2 s, with items' float going under and its second splash (BITE_SPLASH_AGAIN); Client3D starts
+# it from its first frame as the bite comes, so the first tug is the bite's first moment.
+def planted(side: str, move: tuple) -> list:
+	"""The [side] ("l" or "r") foot kept where its base stands it with the pelvis moved by [move]
+	(the knee bending forward over it, the foot flat as the base has it)."""
+	out = 1.0 if side == "l" else -1.0
+	return [("thigh_" + side, ([("foot_" + side, tuple(-m for m in move), 1.0)], (0.2 * out, -1.0, 0.0)), REACH)]
+def fish_tug(share: float) -> list:
+	"""The rod pulled down [share] of the way from the hold toward the water."""
+	lerp = lambda a, b: tuple(x + (y - x) * share for x, y in zip(a, b))
+	return (one_hand(lerp((0.3, 0.12, -0.3), (0.48, 0.08, -0.52)), lerp(FISH_ROD, (0.0, -0.9, -0.42)), FISH_FACE, FISH_POLE)
+		+ left_arm(*lerp((0.25, -0.11, -0.34), (0.4, -0.16, -0.5)), (0.5, 0.4, -1.0))
+		+ [("spine_01", LIFT, -12.0 * share), ("spine_02", LIFT, -6.0 * share), ("Head", LIFT, -8.0 * share)])
+def fish_tugged(at: float) -> list:
+	"""One tug from [at] s: yanked down (0.07 s), held to the bottom (0.25 s), given back (0.6 s)."""
+	keys = []
+	for t, share, move in ((0.07, 0.9, (0.0, -0.035, -0.01)), (0.25, 1.0, (0.0, -0.045, -0.015)), (0.6, 0.15, (0.0, -0.005, 0.0))):
+		keys.append((at + t, P("Idle_Loop", 0.0, fish_tug(share) + planted("l", move) + planted("r", move), move=move)))
+	return keys
+CLIPS["Fish_Bite_Loop"] = {"loop": True, "keys": [(0.0, P("Idle_Loop", 0.0, FISH_HOLD))] + fish_tugged(0.0)
+	+ [(1.2, P("Idle_Loop", 0.0, FISH_HOLD))] + fish_tugged(1.2) + [(3.0, P("Idle_Loop", 0.0, FISH_HOLD))]}
 CLIPS["Fish_Reel"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
 	(0.2, P("Idle_Loop", 0.0, FISH_UP, move=(0.0, 0.05, 0.0))),
@@ -1200,12 +1219,18 @@ class Rig:
 		turns = [t for t in spec["turns"] if t[2] != REACH]
 		for bone, (target, pole), _reach in [t for t in spec["turns"] if t[2] == REACH]:
 			now = self.turned(spec, turns)
-			fore, hand = bone.replace("upperarm", "lowerarm"), bone.replace("upperarm", "hand")
+			leg = bone.startswith("thigh")
+			if leg:  # A leg's reach (planted()): thigh, calf, the ankle to [target], the foot kept as its base has it.
+				fore, hand = bone.replace("thigh", "calf"), bone.replace("thigh", "foot")
+			else:
+				fore, hand = bone.replace("upperarm", "lowerarm"), bone.replace("upperarm", "hand")
 			at = sum(((now[b].translation + Vector(off)) * w for b, off, w in target), Vector())
 			if isinstance(pole, list):  # A point: toward it from the shoulder.
 				pole = sum(((now[b].translation + Vector(off)) * w for b, off, w in pole), Vector()) - now[bone].translation
 			upper, lower = solve(now[bone].translation, now[fore].translation, now[hand].translation, at, Vector(pole))
 			turns = turns + [(bone, upper, AIM), (fore, lower, AIM)]
+			if leg:
+				turns.append((hand, self.posed(spec["base"], spec["at"])[hand].col[1].xyz.copy(), AIM))
 		return self.turned(spec, turns)
 
 	def turned(self, spec: dict, listed: list) -> dict:
