@@ -51090,6 +51090,19 @@ reshuffles by about 150 body-minutes a day at random until maps' work spots are 
 well is a decision of its own. look_day prints the night's and the day's packed as two totals, and
 for a body asleep off its bed (Rolf stood asleep at (180, 207)) its goal, bed, route and the path it
 finds. Server only; protocol unchanged; no new class_name.
+
+875 amended (1) (maps' Mughouse stills on its take with the spots on, 2026-11-12; the label from
+decision_number.sh). A goer whose evening had ended stood idle in the common room's corner instead of
+walking to the floor's door: maps' why-lines at 21:45 had the hunter doing HOME, no spots in his places
+(the floor's walk-out entry, every place the door) and his goal (11, 11), the corner he had picked from
+the common room a moment before the sync handed him the door. A body picks a goal only on a change of
+doing or a stroll, and abed it never strolls, so it stood there till its walk-out hour was over and it
+was let go in the room. Now the sync gives a body its places through Resident.take_places: when the place
+of its doing has moved and its goal is no longer in it, it picks a new one there (a task's goal, its
+rounds, a visit and a walk with someone keep theirs). The town's side gains the same: a goer handed the
+inn's door in the town walks there at once. Resident._bed falls back on its home where its places have no
+bed (the floor's entries have none). resident_test _test_take_places. Server only; protocol unchanged; no
+new class_name.
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...

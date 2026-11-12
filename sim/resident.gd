@@ -736,6 +736,23 @@ func _others_near() -> Dictionary:
 
 
 ## The goal [param cell], the cell it stands on noted as left when it is another.
+## Main's places for it now (each sync, 875 amended (1)): when the place of its doing has moved and its goal
+## is no longer in it, a new goal from the new place. A Mughouse goer whose evening ended was handed the
+## floor's door as its every place but kept the corner of the common room it had just picked, and stood
+## there till it was let go (maps' run, 21:45: the hunter at (11,11), spot_uses []); the goal was only
+## picked again on a change of doing or a stroll, and abed it never strolls. A task's goal, its rounds, a
+## visit and a walk with someone keep theirs.
+func take_places(given: Dictionary) -> void:
+	var key := str(PLACE_OF.get(doing, "square"))
+	var was: Variant = places.get(key)
+	places = given
+	if _goal == NO_CELL or not task.is_empty() or doing in [Doing.ROUNDS, Doing.VISIT, Doing.ESCORT, Doing.STRAYED]:
+		return
+	var now: Variant = places.get(key)
+	if now is Rect2i and now != was and (now as Rect2i).size != Vector2i.ZERO and not (now as Rect2i).has_point(_goal):
+		_pick_goal()
+
+
 func _set_goal(cell: Vector2i) -> void:
 	if cell != tile:
 		_left = tile
@@ -1136,7 +1153,7 @@ func _bed() -> Vector2i:
 	var at: Variant = places.get("bed_at")
 	if at is Dictionary and (at as Dictionary).get("cell") is Vector2i:
 		return at["cell"]
-	return bed_cell(places["bed"], places.get("square", Rect2i()))
+	return bed_cell(places.get("bed", places.get("home", Rect2i())), places.get("square", Rect2i()))  # 875 amended (1): a floor's goer has no bed.
 
 
 ## The way its head points in bed: the bed's own (places["bed_at"]), else

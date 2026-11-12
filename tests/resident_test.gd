@@ -1126,6 +1126,44 @@ func _test_taverner_end_to_end() -> void:
 ## alone, so the town's zone and the floor never both hold one at rest; one just gone in is let go at the
 ## door and comes in at the floor's; one just out comes from the door; the rest keep to the lit fire or
 ## stroll with short stands, never the same cell twice running.
+## 875 amended (1): a body whose place moves away from its goal picks a new one there (the Mughouse goer leaving
+## stood in the common room's corner, handed the door). No world steps.
+func _test_take_places(body: Resident) -> void:
+	print("\n== a goal its place has left is picked again (875 amended (1)) ==")
+	if body == null:
+		_check(true, "(no body: skipped)")
+		return
+	var was_places := body.places.duplicate()
+	var was_doing := body.doing
+	var was_goal: Vector2i = body._goal
+	var was_task := body.task.duplicate()
+	var room := Rect2i(body.tile - Vector2i(4, 4), Vector2i(9, 9))
+	body.task = {}
+	body.doing = Resident.Doing.HOME
+	body.places = {"home": room, "square": room}
+	body._goal = room.end - Vector2i.ONE
+	var door_at := body.tile
+	for way: Vector2i in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2), Vector2i(3, 1), Vector2i(-3, -1)]:
+		if World.is_free(body.tile + way) and not World.is_link_cell(body.tile + way):
+			door_at = body.tile + way
+			break
+	_check(door_at != body.tile, "(a free cell near it for the door)")
+	var door := Rect2i(door_at, Vector2i.ONE)
+	body.take_places({"home": door, "square": door, "inn": door})
+	_check(door.has_point(body._goal), "home moved to the door: the goal goes there (%s)" % [body._goal])
+	body._goal = door.position
+	body.take_places({"home": door, "square": door, "inn": door, "work": room})
+	_check(body._goal == door.position, "its own place unmoved: the goal kept")
+	body.task = {"kind": "", "cell": body.tile + Vector2i(1, 1), "walking": true}
+	body._goal = body.task["cell"]
+	body.take_places({"home": room, "square": room})
+	_check(body._goal == body.tile + Vector2i(1, 1), "at a task: its goal kept")
+	body.task = was_task
+	body.places = was_places
+	body.doing = was_doing
+	body._goal = was_goal
+
+
 func _test_inn_night() -> void:
 	print("\n== Umbrage at night (875): a shell inn's goers inside, as many as its spots; the walk in and out; the overflow strolls ==")
 	# Eight of the town's folk about (the tests before sent most away), the rest away; put back at the end.
@@ -4762,6 +4800,7 @@ func _test_keep_moving() -> void:
 		"no building: the cook's own 3 x 3 in the square (%s); no trade or a small square, the square" % [cook])
 	_test_show_work(mara)
 	_test_hauler(mara)
+	_test_take_places(mara)  # 875 amended (1): no steps.
 	mara.places = was["places"]
 	mara.doing = was["doing"]
 	mara.task = was["task"]
