@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_json_keep()
 	_test_runner()
 	_test_spots()
+	_test_paved_street()
 	_test_named_refusals()
 	_test_trades_preview()
 	_test_cached_checks()
@@ -1937,3 +1938,34 @@ func _test_spot_ghost() -> void:
 	var ghost: Array = BuilderHost.proposal_spots(wilds)
 	_check(asked.get("ok", false) and ghost.size() >= 2 and "(190, 196) holds the store chest; lay the spot beside it" in str(asked.get("summary")),
 		"the stub lays spots and passes on the refused one's reason (%s; %s)" % [asked.get("summary"), ghost])
+
+
+func _test_paved_street() -> void:
+	print("\n== a square's paving is street (564 amended (1), maps' reading of Umbrage) ==")
+	_check("(a road or the paving of a square)" in BuilderSession.system_prompt(), "the prompt says paving counts")
+	var hut := {"slot": "building.hut", "at": [20, 2], "facing": [0, 1], "use": "inn", "town": "store"}
+	var rect: Rect2i = Level.building_rect(hut)
+	var front := Level.front_cell(rect, Level.building_facing(hut))
+	var field := func(paving: Array[Vector2i], outdoors: bool) -> Array[String]:
+		var doc := _doc()
+		doc.config["places"] = {"store": {"at": [12, 22], "kind": "stockpile", "holder": "town"}}
+		doc.config["roads"] = [{"points": [[0, 28, 2], [39, 28, 2]], "kind": "stone"}]
+		doc.config["buildings"] = [hut.duplicate(true)]
+		if not outdoors:
+			doc.config["outdoor"] = false
+		Level.fill_codes(doc.config)
+		for cell in paving:
+			doc.map.set_cell(cell, "stone")
+		return BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([])).street_checks().filter(func(line: String) -> bool: return "does not open onto a street" in line)
+	var square: Array[Vector2i] = []
+	for x in range(front.x - 2, front.x + 3):
+		for y in range(front.y, front.y + 3):
+			square.append(Vector2i(x, y))
+	var on_square: Array[String] = field.call(square, true)
+	_check(on_square.is_empty(), "a door onto a square's paving, no road near: on a street (%s)" % [on_square])
+	var on_grass: Array[String] = field.call([] as Array[Vector2i], true)
+	_check(on_grass.size() == 1 and "(no road or square's paving at or beside %s)" % [front] in on_grass[0], "a door onto grass, no road: still warned (%s)" % [on_grass])
+	var slab: Array[String] = field.call([front] as Array[Vector2i], true)
+	_check(slab.size() == 1, "a doorstep slab alone, joined to no square or road: not a street (%s)" % [slab])
+	var indoors: Array[String] = field.call(square, false)
+	_check(indoors.size() == 1, "the same paving indoors: not a street (%s)" % [indoors])

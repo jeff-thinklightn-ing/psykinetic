@@ -551,7 +551,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). A refuge (where a sought newcomer is found) says where it is (mark_place's where); a trader may have his bed and the side he faces, a perch its watch (the cells a hill cat pounces onto from it, 6 cells or more from any road). A name or shown name you write is a draft: it goes to voice when its level is put up to land, never straight into a released level. Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
+Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). A refuge (where a sought newcomer is found) says where it is (mark_place's where); a trader may have his bed and the side he faces, a perch its watch (the cells a hill cat pounces onto from it, 6 cells or more from any road). A name or shown name you write is a draft: it goes to voice when its level is put up to land, never straight into a released level. Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road or the paving of a square). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
 
 %s
 
@@ -2454,8 +2454,9 @@ static func laid_plots(config: Dictionary) -> Array[Dictionary]:
 ## Each building in the area on a plot that does not face the plot's street, and, in a
 ## level with roads (level.json's "roads", decision 559), each other
 ## building serving a town whose door does not open onto a street: no road
-## cell at its front cell or beside it (decision 564). A solid building's
-## door leads under it, not to a street: left out.
+## cell, nor a square's paving (paved_street, 564 amended (1)), at its front
+## cell or beside it (decision 564). A solid building's door leads under it,
+## not to a street: left out.
 func street_checks() -> Array[String]:
 	var out: Array[String] = []
 	var plots := plots_from(working.config) + laid_plots(working.config)
@@ -2466,6 +2467,7 @@ func street_checks() -> Array[String]:
 	var streets := {}
 	for road: Dictionary in Curves.parse(working.config, "roads", [] as Array[String]):
 		streets.merge(Curves.cells(road["curve"], false))
+	var paved := {}
 	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
 		var rect: Variant = Level.building_rect(entry)
 		if rect == null or str(entry.get("slot", "")) in Level.SOLID or not area.intersects(rect):
@@ -2480,8 +2482,8 @@ func street_checks() -> Array[String]:
 		if streets.is_empty() or str(entry.get("use", "")).is_empty():
 			continue
 		var front := Level.front_cell(rect, facing)
-		if not [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN].any(func(step: Vector2i) -> bool: return streets.has(front + step)):
-			out.append("the door of the %s at %s does not open onto a street (no road at or beside %s)" % [name, rect.position, front])
+		if not [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN].any(func(step: Vector2i) -> bool: return streets.has(front + step) or paved_street(front + step, streets, paved)):
+			out.append("the door of the %s at %s does not open onto a street (no road or square's paving at or beside %s)" % [name, rect.position, front])
 	var narrow := narrow_ways()
 	if not narrow.is_empty():
 		out.append("a way one cell wide at %s%s: players walk with companions, so make it two cells (a doorway is the one cell allowed)"
@@ -2492,6 +2494,51 @@ func street_checks() -> Array[String]:
 
 ## How many one-cell ways street_checks names before "and n more".
 const NARROW_SHOWN := 8
+## A paved patch this many cells or more is a square's paving (564 amended (1)).
+const PAVED_SQUARE := 9
+
+
+## Whether [param cell] is street by its paving (564 amended (1), maps'
+## reading of Umbrage: a door onto the square's cobbles is on the town's main
+## street, and a road draws nothing on cobble since 563 amended (1)): outdoors,
+## the map's "stone", in no building, and joined (four ways, stone to stone,
+## outside buildings) to PAVED_SQUARE cells or more, or to a road cell
+## ([param streets]). A doorstep slab or a stone floor indoors is not one.
+## [param known] keeps each patch's answer for the call.
+func paved_street(cell: Vector2i, streets: Dictionary, known: Dictionary) -> bool:
+	if known.has(cell):
+		return known[cell]
+	if Level.zone_of(working.config) != "outdoors" or working.map.cell(cell) != "stone" or _in_building(cell):
+		return false
+	var patch: Array[Vector2i] = [cell]
+	var seen := {cell: true}
+	var joined := false
+	var i := 0
+	while i < patch.size() and not joined and patch.size() < PAVED_SQUARE:
+		var at := patch[i]
+		i += 1
+		for step in HeightTools.FOUR:
+			var next: Vector2i = at + step
+			if streets.has(next):
+				joined = true
+			if seen.has(next) or working.map.cell(next) != "stone" or _in_building(next):
+				continue
+			seen[next] = true
+			patch.append(next)
+	var paving := joined or patch.size() >= PAVED_SQUARE
+	if paving or i >= patch.size():
+		for each: Vector2i in patch:
+			known[each] = paving
+	return paving
+
+
+## Whether [param cell] is inside a building's rect.
+func _in_building(cell: Vector2i) -> bool:
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var rect: Variant = Level.building_rect(entry)
+		if rect is Rect2i and (rect as Rect2i).has_point(cell):
+			return true
+	return false
 
 
 ## The walkable cells in the area shut in on both sides, across or along:

@@ -21510,6 +21510,18 @@ the protocol is unchanged: EditorFields doesn't offer it, LevelMap's
 moved_config moves a plot and turns its street side with the map. A plot
 holds no claim: a building may still go elsewhere, and is only told.
 
+564 amended (1) (maps' reading of Umbrage, the coordinator's approval, 2026-11-12): a square's paving
+is street. The temple's door opens onto Umbrage's square, its cobbles the town's main street, and was
+warned "does not open onto a street": only road-curve cells counted, the spokes stop at the square's
+edge, and a road draws nothing on cobble since 563 amended (1), so no door onto the square could pass.
+BuilderSession.paved_street: a cell counts as street when it is outdoors, the map's "stone", in no
+building, and joined four ways (stone to stone, outside buildings) to PAVED_SQUARE (9) cells or more,
+or to a road cell. A doorstep slab alone or a stone floor indoors is not one, so a house in a field
+can't pass on a slab (the coordinator). The prompt says "(a road or the paving of a square)"; the
+warning says "no road or square's paving at or beside". builder_test _test_paved_street: a door on a
+square passes, a door onto grass still warns, a lone slab and the same paving indoors don't count.
+Tools only: no package, no bullet; protocol unchanged; no new class_name.
+
 ## 550 amended, maps' side: the mound's ring on grass
 
 art-kit's mound (its dome's foot and kerb ring a cell out from the 5 x 5
