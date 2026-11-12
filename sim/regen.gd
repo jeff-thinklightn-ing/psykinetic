@@ -360,10 +360,13 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		if "arrival" in held and found.any(func(fault: Dictionary) -> bool: return fault["rule"] == "arrival"):
 			continue
 		result["faults"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in held).size()
+		# 806 amended (15): a kept chest fault ranks worse than any other held
+		# fault, so a try with a wrap wins over one with an unguarded chest.
+		result["chests"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] == "chest" and "chest" in held).size()
 		result["preferred"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in prefer).size()
 		if result["faults"] == 0 and result["preferred"] == 0:
 			return result
-		if best.is_empty() or [int(result["faults"]), int(result["preferred"])] < [int(best["faults"]), int(best["preferred"])]:
+		if best.is_empty() or [int(result["chests"]), int(result["faults"]), int(result["preferred"])] < [int(best["chests"]), int(best["faults"]), int(best["preferred"])]:
 			best = result
 	if not best.is_empty():
 		if int(best["faults"]) > 0:

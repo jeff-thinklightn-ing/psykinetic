@@ -733,14 +733,14 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 		elif use == "sealed_vault":
 			# The co-op family tomb (crypt landing 2): its twin plates and
 			# bricked vault first, then what else it holds.
-			if chests > 0 and _coop(map, room, kept, config, plan):
+			if chests > 0 and _guardable(map, room, config, plan) and _coop(map, room, kept, config, plan):
 				chests -= 1
 				_sarcophagi(map, room, kept, plan)
 				_niches_in(map, room, kept, 2, rng, plan)
 				_loose_niche(map, room, config, rng, plan)
 			else:
 				_sarcophagi(map, room, kept, plan)
-				if chests > 0 and _chest(map, room, kept, config, plan):
+				if chests > 0 and _guardable(map, room, config, plan) and _chest(map, room, kept, config, plan):
 					chests -= 1
 	tombs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
 	# The deep's wing heart takes the first.
@@ -751,7 +751,7 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 	for room: Dictionary in tombs:
 		if chests <= 0:
 			break
-		if _chest(map, room, kept, config, plan):
+		if _guardable(map, room, config, plan) and _chest(map, room, kept, config, plan):
 			chests -= 1
 	# A tomb the robbers have been at (its chest theirs to guard, or their
 	# dig in it): its sarcophagi robbed (art-kit's variant 2, the lid off).
@@ -763,6 +763,44 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 				if entry["slot"] == "building.sarcophagus":
 					entry["variant"] = 2
 	_roots(map, kept, plan)
+
+
+## 806 amended (15) (the coordinator's ruling on the saturn sweep: main kept
+## an unguarded cache chest on 3 of 300 barrow generations, each in a room
+## by from_below where no guard may stand): whether [param room] has
+## GUARD_ROOM cells its guard (the block's "guard" kind, else the first
+## monster kind) may stand on: floor with floor all round, off the plates,
+## clear of every arrival (layout_sense's arrival rule, held, never broken
+## for a chest). A chest goes only to such a room; the vault and the tombs
+## by walk skip the rest. A generation with fewer such rooms than "chests"
+## lays fewer chests, never an unguarded one: the Robbers' chest (25 gold,
+## Brand's key) alone covers the draugr's least price, 10, so no layout
+## leaves a careful newcomer short of it.
+static func _guardable(map: LevelMap, room: Dictionary, config: Dictionary, plan: Dictionary) -> bool:
+	var counts: Variant = config.get("monsters", {})
+	if not counts is Dictionary or (counts as Dictionary).is_empty():
+		return true  # No monsters to guard with: the chest rule's own matter.
+	var kinds: Array = (counts as Dictionary).keys()
+	kinds.sort()
+	var guard := str(config.get("guard", kinds[0]))
+	var found := 0
+	for cell: Vector2i in room["cells"]:
+		if map.cell(cell) != FLOOR or plan["plate_cells"].has(cell) or not LAYOUT_SENSE.clear_of_arrivals(cell, guard, plan["arrivals"]):
+			continue
+		var open := true
+		for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1)]:
+			if map.cell(cell + way) != FLOOR:
+				open = false
+				break
+		if open:
+			found += 1
+			if found >= GUARD_ROOM:
+				return true
+	return false
+
+
+## The cells a chest's room needs for its guard (_guardable).
+const GUARD_ROOM := 4
 
 
 ## A cell of [param room] by its frame: [param x] along its door wall, [param y] in from it.

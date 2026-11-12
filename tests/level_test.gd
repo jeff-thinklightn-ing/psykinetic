@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_arrival_rule()
 	_test_giver_rule()
 	_test_deep_crypt()
+	_test_chest_guardable()
 	_test_hall_shortcut()
 	_test_barrow_quest()
 	_test_quest_card_place()
@@ -5500,6 +5501,30 @@ func _test_hall_shortcut() -> void:
 ## no fault of any layout rule, where the old caverns have a dozen.
 const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "chests": 3,
 	"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"]}
+## 806 amended (15): a chest only where its guard can stand. On main the
+## barrow kept an unguarded cache chest on generations 56, 191 and 215 (the
+## saturn sweep, 3 of 300), each in a room by from_below inside the arrival
+## rule's reach; now no chest goes to such a room and a kept chest fault
+## ranks worst, so each lays every chest guarded: three, or fewer where too
+## few rooms can hold a guard (191 lays two; the saturn sweep, 6 of 300 short,
+## main 2).
+func _test_chest_guardable() -> void:
+	print("
+== a chest only where its guard can stand (806 amended (15)) ==")
+	var kept := {}
+	var counted := {}
+	for generation: int in [56, 191, 215, 1, 2]:
+		var made := Regen.generate("barrow", generation)
+		var block := Regen.config_of("barrow")
+		var chests := (made["config"].get("entities", []) as Array).filter(func(spec: Dictionary) -> bool:
+			return str(spec.get("props", {}).get("cache", "")) == str(block.get("cache", "")))
+		var faults := Regen.held_faults(made, block, block.get("held", [])).filter(func(fault: Dictionary) -> bool: return fault["rule"] == "chest")
+		counted[generation] = chests.size()
+		if not faults.is_empty() or chests.is_empty() or chests.size() > int(block.get("chests", 0)):
+			kept[generation] = [chests.size(), faults.map(func(fault: Dictionary) -> String: return str(fault["what"]))]
+	_check(kept.is_empty(), "the barrow's generations 56, 191, 215 (main's unguarded three), 1 and 2: every cache chest guarded, at most the block's three, fewer where too few rooms can hold a guard (%s; laid %s)" % [kept, counted])
+
+
 func _test_deep_crypt() -> void:
 	print("
 == the deep laid as a crypt (832) ==")
