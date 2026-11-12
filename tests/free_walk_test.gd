@@ -91,6 +91,7 @@ func _ready() -> void:
 	_test_free_dodge()
 	_test_free_chase()
 	_test_free_kite()
+	_test_told_blow()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -775,13 +776,67 @@ func _test_free_chase() -> void:
 				"%s: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
 
 
+## A robber's plain blow is told (806 amended (14): lead_ticks 6, 0.6 s):
+## one who keeps moving off it beats it (the kite above), and these are what
+## it still lands on (the coordinator's ruling, 11-12). Begun beside a free
+## body 1 cell off: it strikes her as it lands, lead_ticks after it began, if
+## she stands, or backs straight off along its line but stays within reach by
+## bodies (World.reach_limit and lead_slack), or stops to strike him during it;
+## stepping clear of that reach is missed.
+func _test_told_blow() -> void:
+	print("\n== a robber's told blow: standing in it, backing along it within reach, or striking into it is hit; stepping out is not ==")
+	for case: String in ["stands", "backs", "strikes", "steps out"]:
+		var player := _sturdy(_build(_open(16, 9), Vector2i(7, 4)))
+		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": "robber", "tile": Vector2i(6, 4), "temperament": "bold", "props": Monster.bodies()["robber"]}) as Monster
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(6, 4))
+		foe.acts = false  # Only the blow begun here.
+		foe.target = player
+		var reach := World.reach_limit(foe) + World.lead_slack
+		var began := World.try_wind_up(foe, player, foe.lead_ticks)
+		var lands := int(foe.wind_up.get("lands", -1))
+		var hit := {"at": -1, "apart": -1.0}
+		var hurt := func(entity: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
+			if entity == player and source == foe and int(hit["at"]) < 0:
+				hit["at"] = World.tick
+				hit["apart"] = player.free_pos.distance_to(Vector2(foe.tile))
+		World.entity_damaged.connect(hurt)
+		var struck_back := false
+		for i in foe.lead_ticks + 2:
+			var way := Vector2.ZERO
+			var apart := player.free_pos.distance_to(Vector2(foe.tile))
+			if case == "steps out":
+				way = Vector2(1, 0)
+			elif case == "backs" and apart + 0.45 < reach - 0.05:
+				way = Vector2(1, 0)  # Straight off along his line, a full step a tick while it stays within reach.
+			elif case == "strikes" and i == 2 and not struck_back:
+				struck_back = World.try_attack(player, foe)
+			World.free_input(player, way, World.TICK_DT)
+			World.step()
+		World.entity_damaged.disconnect(hurt)
+		var at := int(hit["at"])
+		var detail := "begun %s, lands %d ticks on; hit at tick %d of it, %.2f apart (reach %.2f)" % [began, foe.lead_ticks, at - (lands - foe.lead_ticks) if at >= 0 else -1, float(hit["apart"]), reach]
+		match case:
+			"stands":
+				_check(began and foe.lead_ticks == 6 and at == lands, "standing in it: struck as it lands, 6 ticks (0.6 s) after it began (%s)" % detail)
+			"backs":
+				_check(at == lands and float(hit["apart"]) > 1.2, "backing straight off along its line, still within its reach: struck as it lands (%s)" % detail)
+			"strikes":
+				_check(struck_back and at == lands, "stopping within reach to strike him in its 6 ticks: her blow lands and so does his, at its tick (%s)" % detail)
+			"steps out":
+				_check(at < 0 and player.hp == player.max_hp, "stepping clear of its reach: missed (%s; %.2f apart at the end)" % [detail, player.free_pos.distance_to(Vector2(foe.tile))])
+
+
 ## Kiting (the audit, 3): a free body walks 0.4 cells a tick any way, a
 ## diagonal no slower; a grid walker's diagonal costs 1.5 its pace, and no
 ## kind is as quick (a sneak's 3.0 the nearest, a player's 2.5). Circling at
 ## 4 cells once drew no blow; now a chaser leads the circle (the coordinator,
 ## lead-the-target: where it will be, at its own pace) and a brute (its
-## wind-up on where he will be) and a robber land blows. Walking straight
-## away still escapes: no speed changed.
+## wind-up on where he will be) lands blows. A robber leads it too and winds
+## up at her again and again, but his plain blow is told (806 amended (14),
+## lead_ticks 6) and so is his lunge: one who keeps moving off the told cell
+## beats them (the coordinator's ruling, 11-12; _test_told_blow is what
+## still lands). Walking straight away still escapes: no speed changed.
 func _test_free_kite() -> void:
 	print("
 == kiting: a chaser leads a free body circling at 4; walking away still escapes ==")
@@ -793,6 +848,11 @@ func _test_free_kite() -> void:
 		foe.sight_range = 20
 		foe.senses.cone_cos = -1.0
 		var near := 99.0
+		var winds := {}  # Each told blow or lunge he began at her, by its tick.
+		var told := func(_id: int, data: Dictionary) -> void:
+			if data.get("source") == str(foe.get_path()):  # A telegraph names its source by path.
+				winds[World.tick] = true
+		World.telegraph_started.connect(told)
 		for i in 400:
 			var off := player.free_pos - Vector2(12, 12)
 			var way := Vector2(-off.y, off.x).normalized() - off.normalized() * (off.length() - 4.0) * 0.3
@@ -800,8 +860,14 @@ func _test_free_kite() -> void:
 			World.step()
 			if i > 50:
 				near = minf(near, player.free_pos.distance_to(Vector2(foe.tile)))
+			if not foe.wind_up.is_empty():
+				winds[int(foe.wind_up.get("began", World.tick))] = true
+		World.telegraph_started.disconnect(told)
 		var struck := player.hp < player.max_hp
-		if kind in ["brute", "robber"]:
+		if kind == "robber":
+			_check(not struck and near <= 1.5 and winds.size() >= 3,
+					"robber (its pace %.1f): leads the circle (nearest %.2f) and winds up at her %d times, told blows and lunges; circling off the told cells reads every one (806 amended (14)): %d hp lost" % [foe._pace, near, winds.size(), player.max_hp - player.hp])
+		elif kind == "brute":
 			_check(struck, "%s (its pace %.1f): leads the circle and lands a blow (%d hp lost; nearest %.2f)" % [kind, foe._pace, player.max_hp - player.hp, near])
 		else:
 			print("  ..  %s (its pace %.1f): %d hp lost; nearest %.2f" % [kind, foe._pace, player.max_hp - player.hp, near])
