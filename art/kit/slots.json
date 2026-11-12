@@ -2911,6 +2911,20 @@
 			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/items_artgen/make_bench.py (the coordinator's order 2026-11-11, art-kit's near-view pass; was art-gen's c1 fit): two 6 cm seat planks with a hair's gap, their top edges chamfered pale so each carries a highlight, an A of splayed legs under each end on a cleat with a crossbar, a stretcher along the middle wedged outside the crossbars, peg heads on the seat; the empty \"seat\" at the front edge for animation; 200 tris"},
 			"uses": "a bench"
 		},
+		"prop.stool": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.38, 0.45, 0.366],
+			"middle": [0, 0, -0.026],
+			"budget": 250,
+			"sockets": {"seat": [0, 0.45, 0]},
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/items_artgen/make_stool.py (the coordinator's order for the Mughouse: its places.tavern.seats were bare cells, so a seated resident sat on nothing; art-kit passed it at the nearest zoom beside the goblin, C:/dev/review/items_artgen/prop.stool_before_after.png): a three-legged tavern stool, an eight-sided 5 cm seat slab with a chamfered edge and a worn top, three splayed tapering legs wedged up through it, two low stretchers, palette row 2; 164 tris"},
+			"uses": "a stool to sit on (maps' Mughouse decor rows, the hearth's seats and places.tavern.seats; never solid): its top at 0.45, the pews' and prop.bench's; \"seat\" the middle of its top, for animation's sit (made for 0.46), from any side",
+			"grey": [
+				{"at": [0, 0.225, -0.026], "size": [0.38, 0.45, 0.366]}
+			]
+		},
 		"prop.bed": {
 			"category": "props",
 			"type": "mesh",
