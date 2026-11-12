@@ -88,6 +88,9 @@ signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
 signal refused(why: String)
 ## The window's close mark pressed (Main closes it as Esc does).
 signal closed
+## The pack changed under the open window and the keeper's rows don't say what he does with the new thing: Main asks
+## him again ("offers" or "barter", silent; 852 amended (4)).
+signal refresh_asked
 ## Healing: the player asks for [param with]'s care, paid by [param pay].
 signal care_asked(with: GridEntity, pay: String)
 ## A ware: its offer id and its cost (Main sends "offer").
@@ -130,6 +133,7 @@ const LEFT_LINE := "Left %s on the shelves for the town."
 ## Donate opened with nothing to give says what he takes back (voice's words, %s the keeper).
 const GIFT_ON_DONATE_LINE := "%s takes that back on the Donate tab."
 const PAYS_ON_STORE_LINE := "%s buys that on the Store tab."
+## (The "he" is Rolf's, the only stall keeper today. For another: the keeper's pronoun is on the resident's card, Townsfolk.card_of(World.production, worker_id)["traits"]["pronoun"] ("she", "he", "they"), as main.gd reads it; this line wants the subject form.)
 const DONATE_NOTHING_LINE := "%s takes back what he sold you; you carry none."
 const WONT_TAKE_LINE := "%s won't take that."
 const ENOUGH_LINE := "The town has enough of that."
@@ -142,6 +146,10 @@ const ANSWER_MSEC := 3000
 const SAID_MSEC := 600
 ## The line waits this long for the pack's squares to change with the purse, then is said anyway, msec.
 const PACK_WAIT_MSEC := 500
+## A pack that changed under the open window is settled this long before the keeper is asked again, msec.
+const REFRESH_MSEC := 600
+## And the keeper is asked again no oftener than this, msec: a player sorting the pack is a few asks, not one a change.
+const REFRESH_GAP_MSEC := 3000
 ## The mark of the town's trusted prices (voice's word, the regard ladder's; no hover).
 const TRUSTED_WORDS := "Trusted"
 ## Voice's words for Give (802; 802 amended (8), give_word): the toggle and
@@ -204,6 +212,10 @@ var _give_due := false
 ## pack); this controller hands it a state and takes its clicks.
 var _store_view: StoreView
 ## The foot line's words and whether it is a refusal (rust); said by say_foot.
+var _slots_seen: Array = []
+var _changed_since := -1
+var _refresh_sig := ""
+var _refreshed_at := -100000
 var _foot_text := ""
 var _foot_refused := false
 ## The click the server has not answered yet: {kind, key, text, purse, at, uid}.
@@ -477,6 +489,7 @@ func show_wares(person: GridEntity, who: String, offers: Array, gold: int) -> vo
 		open(person, who)
 	wares = found
 	purse = gold
+	_note_pack()
 	for id: Variant in wares_pick.keys():
 		if ware_entry(str(id)).is_empty():
 			wares_pick.erase(id)
@@ -792,6 +805,7 @@ func show_barter(given: Dictionary) -> void:
 ## or the stall's offers); a pick no longer taken is dropped; none ends Give;
 ## the first rows after the window opens open it on Give.
 func set_takes(rows: Variant) -> void:
+	_note_pack()
 	takes = []
 	if rows is Array:
 		for row: Variant in rows:
@@ -2107,6 +2121,46 @@ func trade_words(words: String, trade: String) -> void:
 		_rebuild()
 
 
+## What each pack slot held when the keeper last told his rows (his "takes" and "buys" are about those things).
+func _note_pack() -> void:
+	_slots_seen = _pack_ids()
+	_changed_since = -1
+	_refresh_sig = ""
+
+
+func _pack_ids() -> Array:
+	return Array(pack.player.slots).duplicate() if pack != null and is_instance_valid(pack.player) else []
+
+
+## Whether [param slot] holds something other than when the keeper's rows were told: his rows say nothing about it
+## yet, so no "he won't take that" and no price, only a new ask (852 amended (4): a thing arriving while the window
+## is open, a companion's hand-over or a catch, showed "won't take that" until the window was reopened).
+func is_stale(slot: int) -> bool:
+	if not _open or _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
+		return false
+	var now := str(pack.player.slots[slot]) if slot < pack.player.slots.size() else ""
+	var then := str(_slots_seen[slot]) if slot < _slots_seen.size() else ""
+	return now != then
+
+
+## Each frame: when the pack has changed under the open window and nothing waits on an answer, ask the keeper
+## again once the change has settled; his answer (the rows) lays the squares right.
+func _refresh_stale() -> void:
+	if not _open or not _pending.is_empty() or _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
+		return
+	var ids := _pack_ids()
+	if ids == _slots_seen:
+		_changed_since = -1
+		return
+	var now := Time.get_ticks_msec()
+	if _changed_since < 0:
+		_changed_since = now
+	elif now - _changed_since >= REFRESH_MSEC and now - _refreshed_at >= REFRESH_GAP_MSEC and _refresh_sig != str(ids):
+		_refresh_sig = str(ids)
+		_refreshed_at = now
+		refresh_asked.emit()
+
+
 ## Each frame: a click not answered in time stops being expected; a keeper's refusal in
 ## words, with no change to the purse, is the answer.
 func _expire_pending() -> void:
@@ -2203,6 +2257,10 @@ func _sell(slot: int) -> void:
 	var entry := pack_entry_at(slot)
 	if _stopped("mine", slot):
 		return
+	if is_stale(slot):
+		_refreshed_at = Time.get_ticks_msec()
+		refresh_asked.emit()  # The keeper's rows are about what the pack held before: ask again, claim nothing.
+		return
 	if entry.is_empty():
 		var paid := takes_at(slot)  # A keeper with no stock of his own who pays for a trophy (Rolf): a sale, by his takes row.
 		if not paid.is_empty() and int(paid.get("gold", 0)) <= 0:
@@ -2233,6 +2291,10 @@ func _sell(slot: int) -> void:
 func _donate(slot: int) -> void:
 	var row := takes_at(slot)
 	if _stopped("mine", slot):
+		return
+	if is_stale(slot):
+		_refreshed_at = Time.get_ticks_msec()
+		refresh_asked.emit()
 		return
 	if row.is_empty():
 		_refuse("mine", slot, _wont_take_words(str(pack.player.slots[slot]) if pack != null and is_instance_valid(pack.player) and slot < pack.player.slots.size() else ""))
@@ -2281,6 +2343,7 @@ func _on_store_hover(kind: String, key: Variant, words: String, rect: Rect2) -> 
 func _process(_delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	_place()
+	_refresh_stale()
 	UiCost.add("barter", Time.get_ticks_usec() - began)
 
 

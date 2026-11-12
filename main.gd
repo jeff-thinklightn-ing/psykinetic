@@ -2001,6 +2001,26 @@ static func answers_clicks_only(body: GridEntity) -> bool:
 ## player's locker opened beside him; his practice kit's "kit" retired,
 ## 807 amended (5)) asked of the stall keeper [param keeper]; the server
 ## checks he serves them.
+## The open store window's keeper asked for his rows again (BarterPanel.refresh_asked), silently: a trading person's
+## or a counter's "barter", a stall keeper's "offers" (the commands that open their windows, without a word said).
+func _refresh_barter() -> void:
+	var me := _local_player()
+	var body: GridEntity = barter_panel.person if barter_panel.person != null else barter_panel.with
+	if me == null or body == null or not is_instance_valid(body) or not body.is_inside_tree():
+		return
+	if barter_panel.person != null and _barters(body):
+		if str(body.get("trade")) == "merchant":
+			var counter := _shop_counter_near(body)
+			if counter != null:
+				World.command(me, "barter", {"shop": str(counter.get_path())})
+		else:
+			World.command(me, "barter", {"resident": str(body.get_path())})
+	elif barter_panel.person != null:
+		World.command(me, "offers", {"entity": str(body.get_path())})
+	elif barter_panel.with != null and is_instance_valid(barter_panel.with) and barter_panel.with.is_inside_tree():
+		World.command(me, "barter", {"shop": str(barter_panel.with.get_path())})
+
+
 func _keeper_command(keeper: GridEntity, command: String) -> void:
 	var me := _local_player()
 	if me != null and keeper != null and is_instance_valid(keeper) and keeper.is_inside_tree():
@@ -16009,6 +16029,7 @@ func _build_talk() -> void:
 	barter_panel.name = "Barter"
 	barter_panel.pack = pack_panel
 	barter_panel.trade_asked.connect(_trade)
+	barter_panel.refresh_asked.connect(_refresh_barter)  # 852 amended (4): a thing arrived under the open window.
 	barter_panel.care_asked.connect(_retain)
 	barter_panel.offer_asked.connect(_offer_deal)  # 765: a ware picked and bought (Rolf's stall, a pedlar's).
 	barter_panel.order_asked.connect(_order_at_counter)  # 765: work ordered at a counter.

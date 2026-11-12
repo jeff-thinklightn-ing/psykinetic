@@ -3828,6 +3828,60 @@ func _test_person_give() -> void:
 	_check(gave.size() == 2 and gave[1][1] == [912], "one click on the pelt on the Store tab sells it (%s)" % [gave])
 	window._on_store_square("mine", 2)
 	_check(window.foot_shown() == "Rolf won't take that." and store_view.foot_is_refused(), "a thing he doesn't take: the line says so (%s)" % window.foot_shown())
+	# 852 amended (4): a thing arriving in the pack while the window is open (a companion's hand-over, a catch) is not
+	# claimed to be refused: his rows say nothing about it yet, so the click asks him again and says nothing.
+	window.set_takes([takes_rows[1]])
+	window._pending = {}  # No click waits on an answer (the pelt's sale above was never answered in a test).
+	window._foot_text = ""
+	window._foot_refused = false
+	window._rebuild()  # The foot shows what the state says: the old refusal gone.
+	var arrived := stock.duplicate()
+	arrived[3] = "bear_pelt"
+	World.set_slots(me, arrived)
+	var refreshes: Array = []
+	var catch_refresh := func() -> void: refreshes.append(1)
+	window.refresh_asked.connect(catch_refresh)
+	_check(window.is_stale(3) and not window.is_stale(2), "the pelt that arrived: his rows are old for that square only")
+	window._on_store_square("mine", 3)
+	_check(refreshes.size() == 1 and window.foot_shown() == "" and not store_view.foot_is_refused(),
+		"a click on the new thing asks him again and claims nothing (%s | %s)" % [refreshes, window.foot_shown()])
+	# How often it asks (the coordinator's question): once for a pack that changed and settled, never one per change,
+	# no oftener than the gap, and nothing while the window is shut.
+	refreshes.clear()
+	window._refreshed_at = -100000
+	window._changed_since = -1
+	window._refresh_sig = ""
+	for step: int in 3:
+		var moved := stock.duplicate()
+		moved[3 + step] = "bear_pelt"
+		World.set_slots(me, moved)
+		window._refresh_stale()  # Each change starts the settling; none settles within 600 ms of the first.
+	_check(refreshes.is_empty(), "three changes inside the settling: no ask (%s)" % [refreshes])
+	window._changed_since = Time.get_ticks_msec() - 700
+	window._refresh_stale()
+	window._refresh_stale()
+	_check(refreshes.size() == 1, "the pack settled: one ask, and not again for the same pack (%s)" % [refreshes])
+	World.set_slots(me, arrived)
+	window._changed_since = Time.get_ticks_msec() - 700
+	window._refresh_stale()
+	_check(refreshes.size() == 1, "another settled pack inside the gap: no second ask (%s)" % [refreshes])
+	window._refreshed_at = -100000
+	window._refresh_sig = ""
+	window.close()
+	World.set_slots(me, stock)
+	window._changed_since = Time.get_ticks_msec() - 700
+	window._refresh_stale()
+	_check(refreshes.size() == 1, "a shut window asks nothing (%s)" % [refreshes])
+	window.open(body, "Rolf")
+	window.set_person(body, false, true)
+	window.show_wares(body, "Rolf", wares, 5)
+	window.set_keeper(wares)
+	window.set_takes([takes_rows[1]])
+	World.set_slots(me, arrived)
+	window.set_takes([takes_rows[1], {"uid": 913, "slot": 3, "what": "bear_pelt", "count": 1, "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 3}])
+	_check(not window.is_stale(3) and store_view.squares_shown("mine")[3] == "mine 3 3", "his answer lays the square: priced (%s)" % [store_view.squares_shown("mine").slice(0, 4)])
+	window.refresh_asked.disconnect(catch_refresh)
+	World.set_slots(me, stock)
 	window.set_takes([])
 	window._on_store_tab("donate")
 	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and window.foot_shown() == "Rolf takes back what he sold you; you carry none.",
