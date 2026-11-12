@@ -7,7 +7,7 @@
 		"holders": "both",
 		"status": "live",
 		"companion_line": "The draugr blesses {her} too.",
-		"fact": "{her} went down into the barrow with {player} and laid the draugr to rest.",
+		"fact": "{her} went down into the crypt with {player} and laid the draugr to rest.",
 		"bond": "blessed",
 		"bond_why": "laid the draugr to rest with you",
 		"gates": ["sealed", "downed window and charges (544, 573)"]
