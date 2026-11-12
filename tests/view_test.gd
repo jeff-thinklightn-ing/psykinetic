@@ -13521,10 +13521,21 @@ func _test_hill_cat_clips() -> void:
 	view.tell_over(9, true)
 	view.pounce()
 	var leapt := rig.playing()
-	await get_tree().create_timer(rig.length(view.clips["pounce"]) + 0.1).timeout
-	view.frame(body, null)
-	_check(leapt == view.clips["pounce"] and rig.playing() == view.clips["recover"],
-			"its landing cry: the leap, then recover (%s, then %s)" % [leapt, rig.playing()])
+	# Waited on, not timed (perf's loaded suite, 11-12, read Pounce still: a timer's first count takes
+	# the whole frame it was made in, so one long frame fired it before the leap's end): the view drawn
+	# a frame at a time until its clip changes, which must be the recover and come as the leap ends,
+	# within a few frames of it.
+	var length := rig.length(view.clips["pounce"])
+	var from := Time.get_ticks_msec()
+	var took := -1.0
+	while Time.get_ticks_msec() - from < int((length + 1.0) * 1000.0):
+		await get_tree().process_frame
+		view.frame(body, null)
+		if rig.playing() != leapt:
+			took = (Time.get_ticks_msec() - from) / 1000.0
+			break
+	_check(leapt == view.clips["pounce"] and rig.playing() == view.clips["recover"] and took >= length - 0.02 and took <= length + 0.25,
+			"its landing cry: the leap, then recover (%s, then %s, %.2f s into its %.2f s leap)" % [leapt, rig.playing(), took, length])
 	await get_tree().create_timer(rig.length(view.clips["recover"]) + 0.1).timeout
 	view.frame(body, null)
 	rig.cancel_strike()
