@@ -3472,6 +3472,13 @@ func _build_environment() -> void:
 func _tag_body(node: Node) -> void:
 	if not node is VisualInstance3D or node is Light3D:
 		return
+	# A part drawn nowhere on purpose stays so (865 amended (1)): a Name label
+	# and its skull while the names are on the HUD (render layers 0), whose
+	# puppet often enters the tree after them; the body layer drew them again.
+	# A part hidden so and later shown by assigning its layers misses the
+	# fill: one the fill should light ORs BODY_LAYER back, or is tagged again.
+	if (node as VisualInstance3D).layers == 0:
+		return
 	var up := node.get_parent()
 	for i in 16:
 		if up == null or up == self:

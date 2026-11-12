@@ -342,6 +342,17 @@ func _test_name_plates() -> void:
 	client._puppets[7] = puppet
 	client.names_on_hud = true
 	_check(label.layers == 0 and mark.layers == 0, "with the names on the HUD, the 3D name and skull draw nothing")
+	# The night's body layer (858) tags a puppet's parts as they enter the tree,
+	# often after the label was hidden: it leaves a part drawn nowhere as it is
+	# (865 amended (1); the names showed twice over heads on main).
+	puppet.set_meta("entity_id", 7)
+	var body := MeshInstance3D.new()
+	puppet.add_child(body)
+	client._tag_body(label)
+	client._tag_body(mark)
+	client._tag_body(body)
+	_check(label.layers == 0 and mark.layers == 0 and body.layers == 1 | Client3D.BODY_LAYER,
+		"a hidden name and skull stay drawn nowhere when the night's body layer tags the puppet (%d, %d); its body takes the layer (%d)" % [label.layers, mark.layers, body.layers])
 	client.names_on_hud = false
 	_check(label.layers == 1 and mark.layers == 1, "and draw again without")
 	puppet.free()
