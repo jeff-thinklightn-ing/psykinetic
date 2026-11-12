@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2813)
+## Lines in the code (2816)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -1439,8 +1439,8 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | an offering at the temple, %d gold | `sim/economy.gd` visitor_arrives() |
 |  | I've none of that. | `sim/economy.gd` vendor_sale() |
 |  | That's %d gold, friend. | `sim/economy.gd` vendor_sale() |
-|  | a starter %s | `sim/economy.gd` vendor_sale() |
 |  | Yours. Mind, no one will buy it off you. | `sim/economy.gd` vendor_sale() |
+|  | a starter %s | `sim/economy.gd` vendor_sale() |
 |  | That's %d gold, friend. | `sim/economy.gd` visitor_sale() |
 |  | %s from %s the pedlar | `sim/economy.gd` visitor_sale() |
 |  | %s from a pedlar: tax %d | `sim/economy.gd` visitor_sale() |
@@ -2051,7 +2051,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (718)
+### server and windows (721)
 
 | | Line | Where |
 |---|---|---|
@@ -2164,6 +2164,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | You can't bandage %s: you have no bandaging kit. | `main.gd` _on_cooking_changed() |
 |  | You can't bandage %s: give it a breath after that blow. | `main.gd` _on_cooking_changed() |
 |  | You can't bandage %s: a monster is too near. | `main.gd` _on_cooking_changed() |
+|  | Sold %s for %d gold | `main.gd` TRADE_SOLD |
+|  | Bought %s for %d gold | `main.gd` TRADE_BOUGHT |
+|  | Got %s, free | `main.gd` TRADE_FREE |
 |  | %s\|%s\|%d | `main.gd` _empty_shelf_told() |
 |  | he keeps no hut | `main.gd` retain() |
 |  | too far away | `main.gd` retain() |
@@ -2960,7 +2963,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (882)
+## Lines in the data (886)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3123,7 +3126,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (33)
+### levels/economy.json (37)
 
 | | Line | Key |
 |---|---|---|
@@ -3136,6 +3139,9 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | There's %d gold for it. | `camp_traders.say.bought` |
 |  | I've enough of that for now. | `camp_traders.say.enough` |
 |  | I've no use for that. | `camp_traders.say.wont` |
+|  | First one's on me. | `vendor.free_words` |
+|  | First one's on me. | `vendor.free_say` |
+|  | Fresh ones. I'll take those. | `vendor.takes_say` |
 |  | in the kitchen shed | `receives.pointers.where.kitchen` |
 |  | Ore goes to the smith. | `receives.pointers.ore.smith` |
 |  | Wood goes to the carpenter. | `receives.pointers.wood.carpenter` |
@@ -3158,6 +3164,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Sheep go to the herder. | `receives.pointers.sheep.herder` |
 |  | That goes to %s at the stall. | `receives.pointers.keeper` |
 |  | Nobody here takes that. | `receives.pointers.nobody` |
+|  | I'll take that from your pack, not your hand. | `receives.pointers.held` |
 |  | a bed at the inn | `folk.needs.bed.what` |
 |  | work on their tools | `folk.needs.tools.what` |
 
