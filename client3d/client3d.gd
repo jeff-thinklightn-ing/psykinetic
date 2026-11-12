@@ -13415,7 +13415,17 @@ func _ground_input(kinds: Dictionary) -> Dictionary:
 	return {"kinds": kinds, "cells": cells, "floor_size": floor_size, "floor_count": floor_count,
 		"water_end": water_end, "wet": wet, "grounds": _grounds.duplicate(), "ground_kinds": _ground_kinds.duplicate(),
 		"corners": _corners.duplicate(), "curve_kept": _curve_kept.duplicate(), "road_kept": _road_kept.duplicate(),
-		"edge_kept": _edge_kept.duplicate()}
+		"edge_kept": _edge_kept.duplicate(), "curve_near": _curve_near_sample.duplicate(), "curve_open": _curve_open()}
+
+
+## Which of [member _curve_waters] run open (a river's, not a pond's), 1 or
+## 0 by index: the fields' workers read it from their input (_curve_band).
+func _curve_open() -> PackedByteArray:
+	var open := PackedByteArray()
+	open.resize(_curve_waters.size())
+	for w in _curve_waters.size():
+		open[w] = 0 if _curve_waters[w]["closed"] else 1
+	return open
 
 
 ## The ground's fields (660 step 2 A, terrain's side; perf's phased zone
@@ -13507,12 +13517,13 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		var slice_heights: PackedFloat32Array = slice[1]
 		for k in slice_kinds.size():
 			looked.append([slice_kinds[k], slice_heights.slice(k * 4, k * 4 + 4)])
+	var ford_beds: Dictionary[Vector2i, bool] = {}
 	for i in cells.size():
 		var cell: Vector2i = cells[i]
 		var kind: String = looked[i][0]
 		ground_kinds[cell] = kind
 		if i < floor_size and kind == FORD_BED_KIND and _fords.has(cell):
-			_ford_beds[cell] = true
+			ford_beds[cell] = true
 		var corner_heights: PackedFloat32Array = looked[i][1]
 		corners[cell] = corner_heights
 		for c in 4:
@@ -13588,7 +13599,8 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 			for t in values.size():
 				edge_made.set_pixel(points[t * 2], points[t * 2 + 1], Color(values[t], 1.0, 0.0))
 	var g := {"grounds": grounds, "corners": corners, "floor_bytes": floor_bytes, "origin": origin, "size": size,
-		"shore_image": shore_image_made, "floor_end": floor_count, "water_end": water_end, "curve_kept": curve_kept}
+		"shore_image": shore_image_made, "floor_end": floor_count, "water_end": water_end, "curve_kept": curve_kept,
+		"curve_near": input["curve_near"], "curve_open": input["curve_open"]}
 	# The shore's cells drawn finer, SHORE_RES a side (decision 553).
 	var shore_heights := _shore_band(cells, floor_count, water_end, g)
 	return {"cells": cells, "floor_count": floor_count, "water_end": water_end, "across": across, "down": down,
@@ -13596,7 +13608,7 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		"floor_bytes": floor_bytes, "chunks": chunks, "grounds": grounds, "ground_kinds": ground_kinds,
 		"corners": corners, "top": top, "bottom": bottom, "shore_image": shore_image_made, "depth_image": depth_made,
 		"road_image": made[1], "edge_image": edge_made, "shore_heights": shore_heights,
-		"curve_kept": curve_kept, "road_kept": road_kept, "edge_kept": edge_kept}
+		"curve_kept": curve_kept, "road_kept": road_kept, "edge_kept": edge_kept, "ford_beds": ford_beds}
 
 
 ## How many threads _ground_fields' fields run on (_run_fields): 1 each in
@@ -13682,6 +13694,7 @@ func _apply_ground_fields(fields: Dictionary) -> void:
 	var edge: Image = fields["edge_image"]
 	_edge_mask = ImageTexture.create_from_image(edge) if edge != null else null
 	_curve_kept = fields["curve_kept"]
+	_ford_beds.assign(fields["ford_beds"])
 	_road_kept = fields["road_kept"]
 	_edge_kept = fields["edge_kept"]
 	_shore_heights = fields["shore_heights"]
@@ -13999,7 +14012,7 @@ func _shore_band(cells: Array, floor_count: int, water_end: int, g: Dictionary) 
 		var fines: Array[PackedFloat32Array] = []
 		for k in range(from, to):
 			var cell: Vector2i = picked_cells[k]
-			if _curve_band(cell):
+			if _curve_band(cell, g):
 				fines.append(_curve_fine(cell, picked, mine))
 				continue
 			var ends: Array[Vector2] = []
@@ -15402,11 +15415,14 @@ static func _water_depth(wet: Dictionary, origin: Vector2i, size: Vector2i) -> I
 
 
 ## Whether [param cell], picked for the shore's finer cells, is drawn from
-## a river's curve (559, terrain's side): near one, not a pond's.
-func _curve_band(cell: Vector2i) -> bool:
-	if not _curve_near_sample.has(cell):
+## a river's curve (559, terrain's side): near one, not a pond's. Read on the
+## fields' workers from [param g]'s own copies (the input's curve_near and
+## curve_open), never the members a build remakes (the fields race, 11-12).
+func _curve_band(cell: Vector2i, g: Dictionary) -> bool:
+	var near: Dictionary = g["curve_near"]
+	if not near.has(cell):
 		return false
-	return not _curve_waters[_curve_near_sample[cell].x]["closed"]
+	return (g["curve_open"] as PackedByteArray)[(near[cell] as Vector2i).x] == 1
 
 
 ## [param cell]'s finer heights from its river's curve (559, terrain's

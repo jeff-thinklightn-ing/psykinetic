@@ -31397,6 +31397,35 @@ frames, the ground's and edges' waits on their workers, the card's first chunks;
 its 22 phases before 7), which catches a build that never lifts or waits more than a frame a phase. The 7 to 9
 frames stay 660 amended (7)'s bench claim, measured under the bench lock where timings count. Tests only;
 protocol unchanged; no class_name; no bullet.
+660 amended (8): the fields' workers read their own copies (2026-11-12, terrain; the coordinator's
+approval; the label from tools/decision_number.sh; 559's curve read named inside). At 05:53
+pc-character's landing on saturn took signal 11 in view_land_test's first case (_test_horizon's
+synchronous rebuild of the hills, from _ready), on a fields worker in Client3D._curve_band (559,
+terrain's side), which read _curve_near_sample and _curve_waters, members a build remakes. The
+"propagate_notification on /root" ERROR before it was the crash handler's NOTIFICATION_CRASH sent
+from the faulting thread, not a tree call: nothing in the fields' worker bodies touches a node. The
+C++ backtrace stopped at the handler's frame, so the unwinder could not walk the faulting stack. The
+main thread was blocked on the band's group task; whatever wrote or freed those members was another
+thread, or the heap was already bad. Not reproduced (the ledger, all on saturn, all clean: no signal
+11, no probe line, no ERROR): a probe (each writer of what the workers read, _read_curves,
+_read_roads, _read_ledges, _apply_ground_fields, swap_room on both views and a second fields run,
+pushing an error and its stack while that view's fields were under way or off the main thread; kept
+out of main) under a stress tool (two views rebuilt between the hills, the wilds and the foothills,
+over frames and cut short mid-fields, both at once, rooms swapped) four seeds of 300 rounds, one
+under a load of 35 on 24 cores; that first rebuild alone in a fresh process 119 times, and 503 times
+with 24 copies at once for 13 minutes (a load of about 35 on 24 cores, the hills' build 5.8 to 10 s
+against 3.5 s); the landing's own commit (a93ff633b, with the tool) 361 times the same way;
+view_land_test on main, v0.1.211 and the cut's head 10 times. Today's landings, each a
+view_land_test under the suite's load (the one condition that crashed), are the sample from here:
+release sends the log of any signal 11 there. So this is hardening, not a found cause: _ground_input
+hands the fields their own copies, curve_near (of _curve_near_sample) and curve_open (_curve_open: 1
+for each of _curve_waters that runs open, 0 for a pond's), and _curve_band reads those from the
+band's g. And the one member the fields wrote on a worker, _ford_beds (the over-frames task), now
+comes back in the fields ("ford_beds") and _apply_ground_fields writes it on the main thread with
+the rest; so an arrival from kept fields has its fords' beds too, where before it left _ford_beds
+empty and the fords' middles had no bed scatter. view_test _test_kept_fields: a ford's beds the same
+on a kept arrival as on a fresh one. Client only, protocol unchanged, no new class_name; not a
+package piece.
 
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 

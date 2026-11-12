@@ -13151,6 +13151,39 @@ func _test_kept_fields() -> void:
 		terrain["kinds"][cell] = Client3D.GROUND_CHANNELS.keys()[i % Client3D.GROUND_CHANNELS.size()]
 		await arrive.call()
 	_check(_rig._fields_kept.size() == Client3D.FIELDS_KEPT, "no more than %d zones kept (%d)" % [Client3D.FIELDS_KEPT, _rig._fields_kept.size()])
+	# A ford's bed on an arrival from kept fields as on a fresh one (the fields
+	# race hardening, 660 amended): the beds come back in the fields, written on
+	# the main thread; before, a kept arrival left _ford_beds empty.
+	var ford_rows: Array[String] = []
+	for py in 8 * 2 - 1:
+		var line := ""
+		for px in 10 * 2 - 1:
+			line += "." if px % 2 == 0 and py % 2 == 0 else " "
+		ford_rows.append(line)
+	var wading: Dictionary = {Vector2i(0, 0): "start"}
+	for y in 8:
+		for x in 10:
+			if Vector2i(x, y) != Vector2i.ZERO:
+				wading[Vector2i(x, y)] = "ford" if y >= 3 and y <= 5 else "grass"
+	Level.register("vt_ford_kept", Level.image_from_rows(ford_rows, wading), null, {"outdoor": true})
+	var ford := Level.load_level("vt_ford_kept")
+	var arrive_ford := func() -> void:
+		_rig.rebuild(ford["terrain"], ford["centre"], true)
+		var frames := 0
+		while (_rig.building_room or _rig.ground_filling) and frames < 400:
+			await get_tree().process_frame
+			frames += 1
+	_rig._fields_kept.clear()
+	hits = _rig.fields_hits
+	await arrive_ford.call()
+	var fresh_beds: Array = _rig._ford_beds.keys()
+	fresh_beds.sort()
+	await arrive_ford.call()
+	var kept_beds: Array = _rig._ford_beds.keys()
+	kept_beds.sort()
+	_check(_rig.fields_hits == hits + 1 and not fresh_beds.is_empty() and kept_beds == fresh_beds,
+			"a ford's bed the same on an arrival from kept fields (%d hits; %d bed cells fresh, %d kept)" % [
+			_rig.fields_hits - hits, fresh_beds.size(), kept_beds.size()])
 	_rig._fields_kept.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
