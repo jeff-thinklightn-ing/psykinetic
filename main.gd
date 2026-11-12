@@ -8496,6 +8496,7 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "", done
 		"town": place, "gold": World.gold_of(player.player_id), "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why,
 		"fence": World.fence_state(shop) if maker.is_empty() else ""}
 	data["pack"] = _pack_rows(player)  # A stack's every unit (decision 619): the barter gives that many of its uids.
+	_serve(player, shop, maker)  # Its keeper turns to them (853 amended (8)).
 	if not maker.is_empty() and World.economy != null:
 		data["takes"] = person_takes(player, maker)  # 802 amended (2): what the maker would take, for the Give tab.
 		data["goods"] = World.economy.maker_goods(maker)
@@ -19494,6 +19495,7 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 		_hail_at[player.player_id] = now_msec
 		_resident_says(body, credit, "", player, false)
 		print("[%s] %s to %s: credit" % ["greet" if clicked else "hail", body.person, _display_name(player)])
+		_stop_work_for(body, player)
 		return true
 	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok,
 		_known_of(body, player.player_id))
@@ -19510,7 +19512,37 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 		"player": player.player_id, "peer": player.owner_peer})
 	_hail_at[player.player_id] = now_msec
 	print("[%s] %s to %s: %s" % ["greet" if clicked else "hail", body.person, _display_name(player), cue.get("kind", "")])
+	_stop_work_for(body, player)
 	return true
+
+
+## A resident at its shown work who hails [param player] stops it and turns to them for the greeting's
+## stop, from where they stand (853 amended (8), the coordinator: "hailed or spoken to, he stops, faces
+## the speaker for the talk"); a click addresses it already (_greeted).
+func _stop_work_for(body: Resident, player: GridEntity) -> void:
+	if not body.showing_work() or not body.addressing.is_empty():
+		return
+	body.address(player, int(float(Townsfolk.rules().get("greet", {}).get("stop_seconds", 8)) * World.TICK_RATE), World.distance(body.tile, player.tile))
+
+
+## The keeper at [param shop] (a counter) or the maker [param shop] itself, turned to [param player] while
+## they barter (853 amended (8): "a keeper selling doesn't keep tending at a wall while the store window
+## is open"): Resident.SERVE_SECONDS from each barter, ended by the player walking off. A counter's keeper
+## is the nearest body at its shown work within two cells of it; one not at its shown work (the healer
+## strolling) is left as _greeted's stop has it.
+func _serve(player: GridEntity, shop: GridEntity, maker: String) -> Resident:
+	var keeper := shop as Resident if not maker.is_empty() else null
+	if keeper == null:
+		var best := 3
+		for entity in World.townsfolk():
+			var body := entity as Resident
+			if body != null and body.spawned and body.at_shown_work() and World.distance(body.tile, shop.tile) < best:
+				keeper = body
+				best = World.distance(body.tile, shop.tile)
+	if keeper == null or not keeper.spawned or not keeper.at_shown_work():
+		return null
+	keeper.address(player, Resident.SERVE_SECONDS * World.TICK_RATE, World.distance(keeper.tile, player.tile))
+	return keeper
 
 
 # --- Visible work (decision 566, npc's side) ---------------------------------------------

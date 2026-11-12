@@ -4202,6 +4202,111 @@ func _test_room(mara: Resident, square: Rect2i) -> void:
 	_check(other != null and mara._free_cell(Rect2i(next_to, Vector2i.ONE)) == next_to, "no cell with room: the crowded one (%s)" % [next_to])
 
 
+## People work (853 amended (8), slice 2, the coordinator's package): at its work spot with no task, its
+## trade's word from residents.json "show", in bouts of work and rest; a task first; no word, a body
+## off its spot or turned from it, nothing; spoken to, hailed or serving at the barter window, it stops
+## and turns to them; and the shown work moves no stock or gold.
+func _test_show_work(mara: Resident) -> void:
+	print("
+== people work (853 amended (8)): its trade's word at its work spot, in bouts; a task first; talk stops it ==")
+	var cell := _town_cell(mara.tile)
+	var way := Vector2i.ZERO
+	for each: Vector2i in World.DIRECTIONS:
+		if World.is_walkable(cell + each):
+			way = each
+			break
+	var spot := {"use": "work", "cell": cell, "face": cell + way, "pose": "stand", "town": mara.town, "trade": "smith"}
+	var places: Dictionary = mara.places.duplicate(true)
+	places["spots"] = {"work": [spot]}
+	mara.places = places
+	mara.task = {}
+	mara.doing = Resident.Doing.WORK
+	mara.addressing = ""
+	World._relocate(mara, cell)
+	mara._spot = spot
+	mara._goal = cell
+	mara._world_set_facing(way)
+	mara._shown = ""
+	mara._bout_end = -1
+	mara._show_work()
+	_check(Resident.show_word("smith") == "hammer" and Resident.show_word("vendor") == "tend" and Resident.show_word("bard") == "" and Resident.show_word("_") == "",
+		"residents.json's show: the smith hammers, the stall's keeper tends, a trade not there shows nothing")
+	_check(mara.activity == "hammer" and mara.showing_work(), "at its work spot, facing it, no task: the smith's word (%s)" % mara.activity)
+	var works: Array = []
+	var rests: Array = []
+	var words: Array = []
+	for i in 8:
+		(works if mara._bout_on else rests).append(mara._bout_end - World.tick)
+		words.append(mara.activity)
+		World.tick = mara._bout_end
+		mara._show_work()
+	var span := func(lengths: Array, range_s: Vector2i) -> bool:
+		return lengths.all(func(n: int) -> bool: return n >= range_s.x * World.TICK_RATE and n <= range_s.y * World.TICK_RATE)
+	var distinct := {}
+	for n: int in works:
+		distinct[n] = true
+	_check(words == ["hammer", "", "hammer", "", "hammer", "", "hammer", ""] and span.call(works, Resident.BOUT_WORK) and span.call(rests, Resident.BOUT_REST)
+		and distinct.size() >= 2, "in bouts: 20-40 s of work, 5-15 s standing, lengths its own (work %s, rest %s ticks)" % [works, rests])
+	mara._bout_end = -1
+	mara.task = {"kind": "saw", "cell": cell}
+	mara._show_work()
+	_check(mara.activity == "saw", "a task first: its task's word (%s)" % mara.activity)
+	mara.task = {}
+	spot["trade"] = "bard"
+	mara._show_work()
+	_check(mara.activity == "" and not mara.at_shown_work(), "a trade with no word: it stands (%s)" % mara.activity)
+	spot["trade"] = "smith"
+	mara._world_set_facing(-way)
+	mara._show_work()
+	_check(mara.activity == "", "turned from its work: nothing shown (%s)" % mara.activity)
+	mara._world_set_facing(way)
+	# Spoken to: it stops, faces the speaker, and takes up a fresh bout once the talk is over.
+	var other: GridEntity = null
+	for body: GridEntity in World.townsfolk():
+		if body != mara and body.spawned:
+			other = body
+			break
+	_check(other != null, "another body to speak to it")
+	if other == null:
+		return
+	mara._show_work()
+	mara.address(other, 80)
+	_check(mara.activity == "" and not mara.showing_work() and mara.at_shown_work() and not mara.addressing.is_empty(), "spoken to: it stops its work")
+	mara.addressing = ""
+	mara._world_set_facing(way)
+	mara._show_work()
+	_check(mara.activity == "hammer" and mara._bout_end - World.tick >= Resident.BOUT_WORK.x * World.TICK_RATE, "the talk over: a fresh bout of work")
+	# Hailing a player across the square: stopped and turned to them while the greeting's stop lasts.
+	_main._stop_work_for(mara, other)
+	_check(mara.activity == "" and not mara.addressing.is_empty() and mara._address_reach >= World.distance(mara.tile, other.tile),
+		"it hails: it stops and turns to them from where they stand (%d cells)" % World.distance(mara.tile, other.tile))
+	# The stall's keeper serving at the barter window: turned to the buyer, its tend's get-up on its cell.
+	mara.addressing = ""
+	spot["trade"] = "vendor"
+	mara._world_set_facing(way)
+	mara._bout_end = -1
+	mara._show_work()
+	var tending := mara.activity
+	var served: Resident = _main._serve(other, mara, mara.worker_id)
+	_check(tending == "tend" and served == mara and mara.activity == "" and mara._address_until - World.tick == Resident.SERVE_SECONDS * World.TICK_RATE
+		and mara._rise_until - World.tick == Resident.GET_UP["tend"], "serving at the window: the keeper stops tending and turns to the buyer (%s)" % tending)
+	mara.addressing = ""
+	# Shown work is no production (economy: its trades read the worker ledger, never a body): a day of
+	# its own ticks at its work spot moves no stock and no gold.
+	var before: Dictionary = World.production.to_dict()
+	mara._world_set_facing(way)
+	mara._bout_end = -1
+	var shown := 0
+	for i in 600:
+		World.tick += 90
+		mara._show_work()
+		shown += 1 if mara.showing_work() else 0
+	_check(shown > 0 and World.production.to_dict() == before, "a day of shown work: stock and treasury as they were (%d of 600 reads at work)" % shown)
+	mara._shown = ""
+	mara._bout_end = -1
+	mara.addressing = ""
+
+
 func _test_keep_moving() -> void:
 	print("\n== townsfolk keep moving (853, Jeff's frozen townsfolk): a new cell each time, never back, the stand to the open, spots ==")
 	var mara: Resident = null
@@ -4309,6 +4414,7 @@ func _test_keep_moving() -> void:
 	var cook: Rect2i = Main._open_work(big, "cook")
 	_check(cook.size == Vector2i(3, 3) and big.encloses(cook) and Main._open_work(big, "") == big and Main._open_work(Rect2i(0, 0, 3, 3), "cook") == Rect2i(0, 0, 3, 3),
 		"no building: the cook's own 3 x 3 in the square (%s); no trade or a small square, the square" % [cook])
+	_test_show_work(mara)
 	mara.places = was["places"]
 	mara.doing = was["doing"]
 	mara.task = was["task"]

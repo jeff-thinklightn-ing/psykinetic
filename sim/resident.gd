@@ -54,6 +54,14 @@ static var keep_moving := true
 ## get-up (animation's, 2026-11-10: Sitting_Exit 1.03 s for the seat words, Counter_Exit 1.17 s for tend);
 ## stepped off sooner, the client cuts it short.
 const GET_UP := {"sit": 15, "sit_talk": 15, "sit_listen": 15, "tend": 12, "lean": 5}  # A ground sit's get-up 1.45 s, a lean's step-off 0.5 s (animation's, 853 amended (2)).
+## Shown work's bouts (853 amended (8), the coordinator: "a smith hammering without pause for a whole
+## stay reads as a machine"): seconds of the word, then seconds standing, each bout's length from the
+## body's own seed.
+const BOUT_WORK := Vector2i(20, 40)
+const BOUT_REST := Vector2i(5, 15)
+## A keeper serving a player at the barter window (853 amended (8)) stays turned to them this long from
+## each barter, unless they walk off (ADDRESS_REACH).
+const SERVE_SECONDS := 30
 const FAR_TILES := 30
 const FAR_EVERY := 20
 ## A step blocked so many times, and it looks for a new way.
@@ -174,6 +182,12 @@ var _retry_at := -1
 var addressing := ""
 var _address_until := -1
 const ADDRESS_REACH := 2
+var _address_reach := ADDRESS_REACH  # A hail's from farther (853 amended (8)).
+## Shown work (853 amended (8)): the word it shows at its work spot, "" off one; whether this bout is
+## work or rest, and the tick it ends (-1: a fresh bout of work next).
+var _shown := ""
+var _bout_on := false
+var _bout_end := -1
 ## Visible work (decision 566, npc's side): what the body is doing where it
 ## stands, replicated for pc-character's clip with the tool in hand ("chop",
 ## "carry_log", "saw", "hammer", "sleep"; 566 amended, phase 2: "stalk",
@@ -459,7 +473,7 @@ func _sim_tick() -> void:
 	if not addressing.is_empty():
 		# Addressing a player (560): standing, facing them, while the stop lasts and they stay in reach.
 		var who := get_node_or_null(NodePath(addressing)) as GridEntity
-		if World.tick < _address_until and who != null and who.spawned and World.distance(who.tile, tile) <= ADDRESS_REACH:
+		if World.tick < _address_until and who != null and who.spawned and World.distance(who.tile, tile) <= _address_reach:
 			# Turned to them (853: clicked mid-stroll, World.face is refused till its step is done; it turns then).
 			var way := _toward(who.tile)
 			if way != facing:
@@ -1024,8 +1038,51 @@ func _show_work_now() -> void:
 		else:
 			activity = ""
 		return
-	var pose := str(_spot.get("pose", "")) if not _spot.is_empty() and tile == _spot.get("cell") and facing == _toward(_spot["face"]) else ""
+	var on_spot: bool = not _spot.is_empty() and tile == _spot.get("cell") and facing == _toward(_spot["face"])
+	if on_spot and doing == Doing.WORK and task.is_empty() and str(_spot.get("use", "")) == "work":
+		var word := show_word(str(_spot.get("trade", "")))
+		if not word.is_empty():
+			activity = word if _bout(word) else ""  # Shown work (853 amended (8)): its trade's, in bouts.
+			return
+	_shown = ""
+	_bout_end = -1
+	var pose := str(_spot.get("pose", "")) if on_spot else ""
 	activity = pose if pose in POSES else ""
+
+
+## The word a work spot of [param trade] shows (853 amended (8), slice 2): levels/residents.json
+## "show", "" for a trade with none (its clip or prop not in yet).
+static func show_word(trade: String) -> String:
+	var table: Variant = Townsfolk.days().get("show", {})
+	return str(table.get(trade, "")) if table is Dictionary and not trade.is_empty() and trade != "_" else ""
+
+
+## Whether it shows its trade's work now (853 amended (8)): Main stops it for a hail or a sale.
+func showing_work() -> bool:
+	return not _shown.is_empty() and activity == _shown
+
+
+## Whether it is on its work spot showing its work, in a bout or the rest between (853 amended (8)).
+func at_shown_work() -> bool:
+	return not _shown.is_empty()
+
+
+## Whether this tick is in a bout of [param word]'s work (true) or a rest between (false): a fresh
+## stay starts with work; each bout's length is the body's own (BOUT_WORK, BOUT_REST).
+func _bout(word: String) -> bool:
+	if _shown != word or _bout_end < 0:
+		_shown = word
+		_bout_on = true
+		_bout_end = World.tick + _bout_ticks(true)
+	elif World.tick >= _bout_end:
+		_bout_on = not _bout_on
+		_bout_end = World.tick + _bout_ticks(_bout_on)
+	return _bout_on
+
+
+func _bout_ticks(work: bool) -> int:
+	var span := BOUT_WORK if work else BOUT_REST
+	return (span.x + absi(hash([id, _bout_end, work])) % (span.y - span.x + 1)) * World.TICK_RATE
 
 
 ## A new goal, the route begun afresh.
@@ -1115,10 +1172,18 @@ static func head_of(home: Rect2i, bed: Vector2i) -> Vector2i:
 
 # --- Addressed by a click (decision 560, npc's side) -------------------------------------
 
-## Stops and turns to [param target], addressing them for [param ticks].
-func address(target: GridEntity, ticks: int) -> void:
+## Stops and turns to [param target], addressing them for [param ticks] while they stay within
+## [param reach] (ADDRESS_REACH; a hail called across the square, its distance then).
+func address(target: GridEntity, ticks: int, reach := ADDRESS_REACH) -> void:
+	if showing_work():
+		# Spoken to, it stops its work for the talk (853 amended (8)): its get-up on its cell, and a fresh
+		# bout once the talk is over.
+		_rise_until = World.tick + int(GET_UP.get(activity, 0))
+		activity = ""
+		_bout_end = -1
 	addressing = String(target.get_path())
 	_address_until = World.tick + ticks
+	_address_reach = maxi(reach, ADDRESS_REACH)
 	var d := target.tile - tile
 	if d != Vector2i.ZERO:
 		var way := Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y)))

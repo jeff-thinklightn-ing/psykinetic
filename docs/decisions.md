@@ -49066,6 +49066,25 @@ _test_room: 24 strolls in the square, none beside another body; no room, the cro
 standing still; _test_keep_moving's 24 picks cover 8 cells or more, not 12 (9 open cells with room in
 its square); town_day_test passes.
 
+853 amended (8) (slice 2 of the frozen-townsfolk mend, "people work", the coordinator's approval and
+package, 2026-11-11): a resident at work with no task, on a "work" spot of its trade and facing it,
+shows that trade's word (Resident.show_word: levels/residents.json "show", by the spot's trade, so the
+starter stall's keeper's "vendor" tends): tend for the taverner, merchant and stall keeper, hammer,
+saw, hoe and herd. It yields nothing (economy: production, wages and the treasury run on the worker
+ledger and read no body). A word goes into "show" only once Client3D.ACTIVITIES plays it and its prop
+is in, so stir, sweep, scrape, pray, fletch, grind and watch wait on animation and art-kit, per trade.
+In bouts, not a loop: Resident.BOUT_WORK seconds of the word, then BOUT_REST standing, each bout's
+length from the body's seed; 853's strolls between its work spots are the longer break. A task comes
+first. Spoken to (address), it stops: its get-up on its cell, a fresh bout after the talk. Hailing a
+player (Main._stop_work_for), it stops and turns to them for the greeting's stop from where they stand
+(address takes a reach). At the barter window (Main._serve, from _send_barter) the keeper at its shown
+work, the maker itself or the nearest body at shown work within two cells of a counter, turns to the
+buyer for Resident.SERVE_SECONDS from each barter, ended by the buyer walking off. Dark until maps
+lays Umbrage's work spots, the piece that switches it on. resident_test _test_show_work: the words,
+the smith at his spot, eight bouts within their spans and lengths his own, a task first, a trade with
+no word and a body turned away showing nothing, spoken to and the fresh bout after, a hail across the
+square, the keeper serving, and a day of shown work moving no stock or gold.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
