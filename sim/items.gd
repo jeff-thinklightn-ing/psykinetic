@@ -75,7 +75,7 @@ const HANDED := LEFT_HAND + 1
 ## How a worn armour looks (decision 622): the covering the views draw.
 const ARMOUR_LOOKS: Array[String] = ["leather", "mail", "plate", "robes"]
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour", "worn", "cooks"]
+	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour", "worn", "cooks", "plural"]
 ## Ids renamed since a save (decision 714, the Draugr's Totem became the
 ## Encolpion Amulet): a saved old id reads as its new one, its uid, binding
 ## and charges kept (tidy, ItemBook.from_dict).
@@ -248,6 +248,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"use": str(entry.get("use", "")),
 		"opens": str(entry.get("opens", "")),
 		"cooks": str(entry.get("cooks", "")),  # What a raw thing cooks to at a fire (805 amended (3)), "" for none.
+		"plural": str(entry.get("plural", "")),  # The name for more than one where it does not change ("perch"), "" to follow the rule (voice, 11-12).
 		"value": maxi(int(entry.get("value", 0)), 0) if entry.get("value") is float or entry.get("value") is int else 0,
 		"verb": verb_from(id, entry["verb"]) if entry.get("verb") is Dictionary else {},
 		"yield": yields,

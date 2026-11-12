@@ -2277,6 +2277,14 @@ func _test_barter() -> void:
 	_check(asked == [[[201], [], 20]], "a click on a hide: sold for what he pays (%s)" % [asked])
 	panel.show_barter({"shop": "", "gold": 32, "goods": sample["goods"], "buys": sample["buys"], "fenced": {203: 3}, "pack": [{"slot": 1, "uid": 202, "id": "dagger"}, {"slot": 2, "uid": 204, "id": "hide"}, {"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 7, "uid": 205, "id": "food_sack"}], "why": ""})
 	_check(panel.foot_shown() == "Sold a raw hide for 20 gold.", "the hide gone from the pack, the purse up: the foot line says it (%s)" % panel.foot_shown())
+	# Playtest's find (v0.1.212, Rolf's): one click sold three perch for 3 gold and the foot said "a perch".
+	_check(BarterPanel.sale_words("Sold a perch for 3 gold.", "fish", 3, 3) == "Sold 3 perch for 3 gold."
+			and BarterPanel.sale_words("Sold a hide for 20 gold.", "hide", 1, 20) == "Sold a hide for 20 gold."
+			and BarterPanel.sale_words("Sold a hide for 20 gold.", "hide", 2, 0) == "Sold a hide for 20 gold.",
+		"a sale that took a stack says how many went; one thing, or no gold gained, keeps the plain line")
+	_check(Main._listed([{"id": "fish", "count": 3}], 0) == "3 perch" and Main._plural("copper brooch") == "copper brooches"
+			and Main._plural("healing remedy") == "healing remedies" and Main._plural("key") == "keys",
+		"the line's plurals: the catalog's own (perch), ch/sh/x +es, consonant+y ies (%s)" % Main._listed([{"id": "fish", "count": 3}], 0))
 	asked.clear()
 	panel._on_store_square("mine", 7)
 	_check(asked.is_empty() and panel.foot_shown() == "Snagfin won't take that." and view.foot_is_refused(), "a thing he won't take: the line says so in rust, nothing asked (%s)" % panel.foot_shown())

@@ -23434,7 +23434,7 @@ static func _listed(rows: Array, gold: int) -> String:
 		var word := Items.name_of(row["id"])
 		word = word.left(1).to_lower() + word.substr(1)
 		if int(row["count"]) > 1:
-			words.append("%d %s" % [row["count"], _plural(word)])
+			words.append("%d %s" % [row["count"], counted_name(str(row["id"]), word)])
 		else:
 			words.append(("an " if word.left(1) in "aeiou" else "a ") + word)
 	if gold > 0:
@@ -23444,11 +23444,22 @@ static func _listed(rows: Array, gold: int) -> String:
 	return ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1]
 
 
+## The name of [param id] ([param word]: its name as the line has it) for more than one: the catalog's own
+## "plural" where it has one ("perch"), else the rule.
+static func counted_name(id: String, word: String) -> String:
+	var own := str(Items.def(id).get("plural", ""))
+	return own.left(1).to_lower() + own.substr(1) if not own.is_empty() else _plural(word)
+
+
 ## [param word] for more than one, in a line: "2 bandaging kits", "2 bone
-## dice" (a word ending in s, or dice, is kept).
+## dice", "2 brooches", "2 healing remedies" (a word ending in s, or dice, is kept).
 static func _plural(word: String) -> String:
 	if word.ends_with("s") or word.ends_with("dice"):
 		return word
+	if word.ends_with("ch") or word.ends_with("sh") or word.ends_with("x"):
+		return word + "es"
+	if word.length() > 1 and word.ends_with("y") and word[-2] not in "aeiou":
+		return word.left(word.length() - 1) + "ies"
 	if word.ends_with("fe"):
 		return word.left(word.length() - 2) + "ves"
 	return word + "s"

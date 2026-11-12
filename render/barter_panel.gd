@@ -121,6 +121,8 @@ const ASLEEP_WORDS := "asleep"
 ## thing with its article, "a spear", or "the dagger" for your own piece; %d gold).
 const BOUGHT_LINE := "Bought %s for %d gold."
 const SOLD_LINE := "Sold %s for %d gold."
+## A sale that took several of a stack at once: the line counts what went (the stack's price is the one paid).
+const SOLD_MANY_LINE := "Sold %d %s for %d gold."
 const HANDED_BACK_LINE := "Handed back %s."
 const LEFT_LINE := "Left %s on the shelves for the town."
 const WONT_TAKE_LINE := "%s won't take that."
@@ -2002,6 +2004,9 @@ func keeper_said(body: GridEntity, words: String) -> void:
 func _expect(pending: Dictionary) -> void:
 	pending["purse"] = purse
 	pending["slots"] = Array(pack.player.slots).duplicate() if pack != null and is_instance_valid(pack.player) else []
+	if str(pending.get("kind", "")) == "mine" and pack != null and is_instance_valid(pack.player) and typeof(pending.get("key")) == TYPE_INT:
+		pending["held"] = World.slot_count(pack.player, int(pending["key"]))
+		pending["thing"] = str(pack.player.slots[int(pending["key"])]) if int(pending["key"]) < pack.player.slots.size() else ""
 	pending["at"] = Time.get_ticks_msec()
 	_pending = pending
 
@@ -2029,6 +2034,8 @@ func _check_answer() -> void:
 		return
 	var text := str(_pending.get("text", ""))
 	var cue := str(_pending.get("cue", ""))
+	if cue == "sold":
+		text = _counted_sale(text)
 	_pending = {}
 	_answered_msec = Time.get_ticks_msec()
 	_foot_text = text
@@ -2037,6 +2044,26 @@ func _check_answer() -> void:
 		told.emit(cue)
 	if _open:
 		_rebuild()
+
+
+## A sale's line [param text] made to say how many went when more than one did: the units that left the
+## sold square (what the pack held before the click less what it holds now) and the gold the purse gained.
+func _counted_sale(text: String) -> String:
+	var held := int(_pending.get("held", 0))
+	var thing := str(_pending.get("thing", ""))
+	if held < 2 or thing.is_empty() or pack == null or not is_instance_valid(pack.player):
+		return text
+	var slot := int(_pending.get("key", -1))
+	var now := World.slot_count(pack.player, slot) if slot < pack.player.slots.size() and str(pack.player.slots[slot]) == thing else 0
+	var went := held - now
+	return sale_words(text, thing, went, purse - int(_pending.get("purse", purse)))
+
+
+## A sale's [param text], or when [param went] (two or more) of [param thing] left for [param gold]: "Sold 3 perch for 3 gold."
+static func sale_words(text: String, thing: String, went: int, gold: int) -> String:
+	if went < 2 or gold <= 0:
+		return text
+	return SOLD_MANY_LINE % [went, Main.counted_name(thing, Items.name_of(thing).to_lower()), gold]
 
 
 ## The words of a trade the server told with its gain ("trade": "bought" or "sold" on the

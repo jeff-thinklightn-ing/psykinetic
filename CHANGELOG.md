@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Selling a stack in one click says how many went: "Sold 3 perch for 3 gold." (852 amended (2)).
 - Towns: Umbrage's townsfolk gather in the square from morning into the evening, standing in pairs, and at first light a few lean on the well (853, maps' side).
 - The maps show each place's own ragged edge against the frame instead of a square of woods, and the barrow's mound is drawn as you see it from above: a ring of stones, a grassy dome and its dark doorway (884).
 - You're told in chat when your gear is named, grows, becomes a bane, takes a grudge or has its vengeance, and when a named thing of yours goes to someone else or comes back to you (133 amended (1)).
