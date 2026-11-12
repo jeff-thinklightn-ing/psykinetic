@@ -18941,6 +18941,29 @@ the shader's sparks cost nothing more); a prop.flame mesh slot (a flame is
 a shader, art-kit agreed); hanging prop.torch on the nearest wall (a torch
 marker is a free-standing cell; art-kit keeps the sconce for buildings'
 walls); flickering Fields' light or the floor's shade.
+
+523 amended (1): a fire laid in a ring of stones burns inside them (the
+coordinator's approval of 2026-11-12; maps' ring for Umbrage's square fire,
+194,211). A fire cell's two or three flames stood up to 0.3 m off its middle
+along each side and its glowing patch was 1.5 cells wide, so in art-kit's
+prop.campfire_cold (stones 0.30-0.50 m from the middle, logs inside 0.25 m)
+the flames stood over the stones on one side and left the logs bare. Now a
+fire cell whose terrain decor holds a campfire_cold on that cell
+(Client3D.fire_ringed; FIRE_RING_KIND) draws its flames within
+FIRE_RING_REACH 0.18 m of the middle (fire_flame_offset: the same rolls,
+scaled and held to the circle) and its patch FIRE_RING_SPREAD 0.56 cells
+wide, inside the stones' inner edge (about 0.28 m). Its light already stood
+at the middle, and the pool at its cluster's middle (a lone ringed cell's
+own). Fire cells have no sparks (a forge's are its own). A fire with no ring
+is drawn as before, and the sim's fire cell (heat, light, cooking) is
+untouched. The 825 hearths and forges are lit at their set piece's "hearth"
+point by _show_forge, with no roll, so they had no such spread. view_test
+_test_fire_ring: the offsets within the reach and unchanged without a ring;
+a castle fire cell ringed draws its flames inside and the small patch, the
+others as before. Stills at the nearest zoom, day and night, before and
+after (ui-design, Lenovo): C:/dev/review/environment/fire_ring. Client only,
+protocol unchanged, no new class_name.
+
 ## 525. Relief: hills, valleys and ridges as data
 
 Jeff: "dirt having polys is not what i meant by elevation .. i meant hills

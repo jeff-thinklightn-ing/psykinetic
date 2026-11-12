@@ -134,6 +134,7 @@ func _ready() -> void:
 		_test_rocks()
 		_test_niches()
 		_test_fire()
+		_test_fire_ring()
 		_test_cold_lamp()
 		await _test_wall_runs()
 		_test_cave_walls()
@@ -4982,6 +4983,53 @@ func _test_fire() -> void:
 			and _rig._room.find_children("FirePool*", "OmniLight3D", false, false).size() == pools
 			and energies.max() != energies.min() and World.light_at(cell) == before,
 			"each fire's drawn light flickers, a pool over each cluster outdoors (%d); World's light stays as it was (%s)" % [pools, energies])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A fire in a ring of stones (523 amended (1)): a fire cell with a
+## campfire_cold on it has its flames within FIRE_RING_REACH of its middle
+## and the smaller patch; the castle's other fire cells keep theirs.
+func _test_fire_ring() -> void:
+	print("
+== fire ring: a fire laid in stones keeps its flames inside them ==")
+	var far := 0.0
+	var same := true
+	for i in 11:
+		for j in 11:
+			far = maxf(far, Client3D.fire_flame_offset(i / 10.0, j / 10.0, true).length())
+			same = same and Client3D.fire_flame_offset(i / 10.0, j / 10.0, false) == (Vector2(i / 10.0, j / 10.0) - Vector2(0.5, 0.5)) * 0.6
+	_check(far <= Client3D.FIRE_RING_REACH + 0.0001 and far > Client3D.FIRE_RING_REACH * 0.9 and same,
+			"in a ring a flame stands within %.2f m of the middle (%.3f), elsewhere as before" % [Client3D.FIRE_RING_REACH, far])
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = (castle["terrain"] as Dictionary).duplicate(true)
+	var fire: Array = terrain.get("fire", [])
+	_rig.rebuild(terrain, castle["centre"])
+	var ringed := Vector2i(-1, -1)
+	for cell: Vector2i in fire:
+		if _rig._grounds.has(cell):
+			ringed = cell
+			break
+	_check(ringed != Vector2i(-1, -1), "the castle has a drawn fire cell to ring (%s)" % ringed)
+	if ringed == Vector2i(-1, -1):
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var decor: Array = (terrain.get("decor", []) as Array).duplicate()
+	decor.append({"kind": Client3D.FIRE_RING_KIND, "cell": ringed, "out": Vector2i.ZERO})
+	terrain["decor"] = decor
+	_rig.rebuild(terrain, castle["centre"])
+	var patch := _rig._room.get_node_or_null("Fire_%d_%d" % [ringed.x, ringed.y]) as MeshInstance3D
+	var flames: Array[Node] = []
+	if patch != null:
+		flames = patch.find_children("Flame*", "Node3D", false, false)
+	var inside := not flames.is_empty() and flames.all(func(flame: Node) -> bool:
+		var at := (flame as Node3D).position
+		return Vector2(at.x, at.z).length() <= Client3D.FIRE_RING_REACH + 0.0001)
+	var small := patch != null and (patch.mesh as PlaneMesh).size == Vector2(Client3D.FIRE_RING_SPREAD, Client3D.FIRE_RING_SPREAD)
+	var others := fire.all(func(cell: Vector2i) -> bool:
+		var other := _rig._room.get_node_or_null("Fire_%d_%d" % [cell.x, cell.y]) as MeshInstance3D
+		return cell == ringed or other == null or (other.mesh as PlaneMesh).size == Vector2(Client3D.FIRE_SPREAD, Client3D.FIRE_SPREAD))
+	_check(inside and small and others,
+			"the ringed cell's %d flames within %.2f m and its patch %.2f wide; the other fire cells as before" % [flames.size(), Client3D.FIRE_RING_REACH, Client3D.FIRE_RING_SPREAD])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

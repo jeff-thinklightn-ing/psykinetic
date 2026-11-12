@@ -880,6 +880,16 @@ const FIRE_SPREAD := 1.5
 ## A fire cell's flames (decision 523): how many, and their heights (m).
 const FIRE_FLAMES := Vector2i(2, 3)
 const FIRE_FLAME_SIZES := Vector2(0.45, 0.75)
+## A fire laid in a ring of stones (523 amended (1)): a fire cell whose
+## decor holds FIRE_RING_KIND (art-kit's prop.campfire_cold, its stones'
+## inner edge about 0.28 m from the middle, maps) has its flames within
+## FIRE_RING_REACH m of the middle and its glowing patch FIRE_RING_SPREAD
+## cells wide, inside the stones; elsewhere a flame stands up to 0.3 m off
+## along each side and the patch is FIRE_SPREAD, so in a ring the flames
+## stood over the stones and left the logs bare.
+const FIRE_RING_KIND := "campfire_cold"
+const FIRE_RING_REACH := 0.18
+const FIRE_RING_SPREAD := 0.56
 ## A torch marker's art (art-kit's standing torch; the stone post until it
 ## has art).
 const TORCH_POST := "prop.torch_post"
@@ -19856,22 +19866,51 @@ func _add_post(vertex: Vector2i) -> void:
 
 
 ## Fire on the ground: a ragged glowing patch (fire.gdshader) wider than
-## its cell, so cells of fire side by side run together; one mesh for all.
+## its cell, so cells of fire side by side run together; one mesh for all,
+## and one smaller for a fire in a ring (FIRE_RING_SPREAD).
 static var _fire_mesh: PlaneMesh
+static var _fire_ring_mesh: PlaneMesh
+
+
+## The glowing patch's mesh, [param spread] cells wide.
+static func _fire_patch(spread: float) -> PlaneMesh:
+	var mesh := PlaneMesh.new()
+	mesh.size = Vector2(spread, spread)
+	var material := ShaderMaterial.new()
+	material.shader = FIRE_SHADER
+	material.set_shader_parameter("fire", FIRE)
+	mesh.material = material
+	return mesh
+
+
+## Whether the fire at [param cell] burns in a ring of stones: terrain
+## [param decor] holds a FIRE_RING_KIND on that cell (523 amended (1)).
+static func fire_ringed(decor: Array, cell: Vector2i) -> bool:
+	for entry: Variant in decor:
+		if entry is Dictionary and str(entry.get("kind", "")) == FIRE_RING_KIND and entry.get("cell") == cell:
+			return true
+	return false
+
+
+## Where a fire cell's flame stands off its middle (m, in the patch's
+## turned frame) from its two rolls (0..1): up to 0.3 along each side, or
+## in a ring (523 amended (1)) within FIRE_RING_REACH of the middle.
+static func fire_flame_offset(roll_x: float, roll_z: float, ringed: bool) -> Vector2:
+	var off := Vector2(roll_x, roll_z) - Vector2(0.5, 0.5)
+	if not ringed:
+		return off * 0.6
+	return (off * FIRE_RING_REACH * 2.0).limit_length(FIRE_RING_REACH)
 
 
 func _add_fire(cell: Vector2i) -> void:
 	torch_cells.append(cell)
+	var ringed := fire_ringed(_terrain.get("decor", []), cell)
 	if _fire_mesh == null:
-		_fire_mesh = PlaneMesh.new()
-		_fire_mesh.size = Vector2(FIRE_SPREAD, FIRE_SPREAD)
-		var material := ShaderMaterial.new()
-		material.shader = FIRE_SHADER
-		material.set_shader_parameter("fire", FIRE)
-		_fire_mesh.material = material
+		_fire_mesh = _fire_patch(FIRE_SPREAD)
+		_fire_ring_mesh = _fire_patch(FIRE_RING_SPREAD)
 	var quad := MeshInstance3D.new()
 	quad.name = "Fire_%d_%d" % [cell.x, cell.y]
-	quad.mesh = _fire_mesh
+	quad.mesh = _fire_ring_mesh if ringed else _fire_mesh
 	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	quad.position = _tile_position(cell) + Vector3(0.0, ON_FLOOR, 0.0)
 	quad.rotation.y = _roll(cell, 6) * TAU
@@ -19879,9 +19918,9 @@ func _add_fire(cell: Vector2i) -> void:
 	# Its flames (decision 523), at places in the cell by the cell.
 	var flames := FIRE_FLAMES.x + floori(_roll(cell, 143) * (FIRE_FLAMES.y - FIRE_FLAMES.x + 1))
 	for n in flames:
-		var off := Vector2(_roll(cell, 144 + n * 3), _roll(cell, 145 + n * 3)) - Vector2(0.5, 0.5)
+		var off := fire_flame_offset(_roll(cell, 144 + n * 3), _roll(cell, 145 + n * 3), ringed)
 		var size := lerpf(FIRE_FLAME_SIZES.x, FIRE_FLAME_SIZES.y, _roll(cell, 146 + n * 3))
-		var flame := Flames.light(quad, Vector3(off.x * 0.6, 0.0, off.y * 0.6), size, hash(Vector3i(cell.x, cell.y, n)))
+		var flame := Flames.light(quad, Vector3(off.x, 0.0, off.y), size, hash(Vector3i(cell.x, cell.y, n)))
 		flame.name = "Flame%d" % n
 	var light := OmniLight3D.new()
 	light.name = "FireLight_%d_%d" % [cell.x, cell.y]
