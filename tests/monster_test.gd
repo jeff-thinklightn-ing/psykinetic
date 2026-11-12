@@ -9239,6 +9239,48 @@ func _test_band_rally() -> void:
 	_check(most == Monster.RALLY_MOST and most_counted <= Monster.RALLY_MOST,
 		"seven of a band, six within a walk: at most %d at her at once (%d, %d with those on their way)" % [Monster.RALLY_MOST, most, most_counted])
 	Monster.idling = true
+	_test_rally_knows()
+
+
+## The rally answers only a fight one knows of (806 amended (17), the
+## coordinator's ruling 11-12): seen within RALLY_SEE (a wall or a shut door
+## stops sight), or heard within RALLY_HEAR through anything; and walked to
+## within RALLY_WALK, doors opened. 806 amended (14)'s own fault stays mended:
+## one in plain sight of a lone mate being fought comes.
+func _test_rally_knows() -> void:
+	print("%s== the rally answers a fight one sees or hears: in plain sight at 9, round a wall at 7 not, a shut door at 5 heard, at 7 not ==" % char(10))
+	Monster.idling = false
+	# [what, rows, door edge or none, whether the mate comes]
+	var cases: Array = [
+		["in plain sight 9 off (806 amended (14)'s fault)", ["###############", "#.............#", "#..Px........x#", "#.............#", "###############"], null, true],
+		["round a wall's end, 7 off, out of sight, a walk of 10", ["##############", "#............#", "#..Px........#", "###########.##", "#............#", "#..........x.#", "##############"], null, false],
+		["through a shut door 5 off: heard", ["##############", "#......#.....#", "#..Px....x...#", "#......#.....#", "##############"], Vector2i(13, 4), true],
+		["through a shut door 7 off: not seen, not heard", ["##############", "#......#.....#", "#..Px......x.#", "#......#.....#", "##############"], Vector2i(13, 4), false],
+	]
+	for case: Array in cases:
+		var edges := {} if case[2] == null else {case[2]: "+"}
+		var rows: Array[String] = []
+		rows.assign(case[1])
+		var e := _build(rows, {}, edges)
+		var fighter: Monster = e["x"][0]
+		var mate: Monster = e["x"][1]
+		for robber: Monster in e["x"]:
+			robber.temper = Monster.Temper.BOLD
+		fighter.sight_range = 8
+		fighter.senses.cone_cos = -1.0
+		var doors := _room.get_children().filter(func(n: Node) -> bool: return n is Door)
+		var shut := doors.all(func(d: Door) -> bool: return not d.is_open())
+		var knows := Monster.knows_of_fight(mate.tile, fighter.tile)
+		var walk := World.find_path(mate.tile, fighter.tile, true, mate, 400, false, {}, mate.opens_doors).size()
+		var came := -1
+		for i in 150:
+			World.step()
+			if came < 0 and mate.alert != Monster.Alert.IDLE:
+				came = i
+		_check((came >= 0) == bool(case[3]) and knows == bool(case[3]) and walk <= Monster.RALLY_WALK and shut,
+				"%s: %s (knows %s; %d apart; walk %d; doors shut %s)" % [case[0], "comes at %.1f s" % (came / 10.0) if came >= 0 else "keeps his post",
+				knows, World.distance(mate.tile, fighter.tile), walk, shut])
+	Monster.idling = true
 
 
 ## The band's hold-off (the coordinator's ruling on enemy-ai's crypt rows):

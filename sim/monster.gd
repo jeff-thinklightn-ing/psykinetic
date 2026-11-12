@@ -267,6 +267,13 @@ const CALL_RUN_TICKS := 20
 ## ones coming were not counted). One posted farther keeps its post.
 const RALLY_EVERY := 10
 const RALLY_WALK := 10
+## And it must know of the fight (806 amended (17)): in its sight line within
+## RALLY_SEE, or within RALLY_HEAR through walls (World.distance), as one hears
+## a fight through a wall. dungeon's first_alone reads these two and
+## RALLY_WALK (870): the first post nobody sees or hears is alone where the
+## player meets him, not wherever the fight is dragged.
+const RALLY_SEE := 9
+const RALLY_HEAR := 6
 const RALLY_GAP := 20
 const RALLY_MOST := 4
 ## Off, no band rallies (a test's or a probe's measure of the rule).
@@ -4002,17 +4009,31 @@ func _rally_look() -> void:
 		if mate == null or mate == self or not mate._rallies() or not mate.spawned or mate.hp <= 0 or mate.alert != Alert.FIGHTING \
 				or not is_instance_valid(mate.target) or World.distance(tile, mate.tile) > RALLY_WALK or not _same_side(mate):
 			continue
+		if not knows_of_fight(tile, mate.tile):
+			continue
 		if nearest == null or World.distance(tile, mate.tile) < World.distance(tile, nearest.tile):
 			nearest = mate
 	if nearest == null or nearest._rally_asked.has(get_instance_id()):
 		return
-	var way := World.find_path(tile, nearest.tile, true, self, RALLY_WALK * 8)
+	# The walk may open doors, as it would to answer (806 amended (17)): hearing
+	# decides whether it knows; a door it can't open (opens_doors) stops it.
+	var way := World.find_path(tile, nearest.tile, true, self, RALLY_WALK * 8, false, {}, opens_doors)
 	if way.is_empty() or way.size() > RALLY_WALK:
 		return
 	var fight := _rally_party(nearest.target)
 	if int(_rally_fight_next.get(fight, -1)) < World.tick:
 		_rally_fight_next[fight] = World.tick + RALLY_GAP
 	nearest._rally_asked[get_instance_id()] = [self, way.size()]
+
+
+## Whether one at [param from] would know of a fight at [param at] (806
+## amended (17)): it sees it, in its line of sight (a wall or a shut door
+## stops it) within RALLY_SEE, or hears it within RALLY_HEAR through
+## anything (World.distance). Static, so a layout check (870's first_alone)
+## can ask the same question on a laid level.
+static func knows_of_fight(from: Vector2i, at: Vector2i) -> bool:
+	var apart := World.distance(from, at)
+	return apart <= RALLY_HEAR or apart <= RALLY_SEE and World.has_line_of_sight(from, at)
 
 
 ## One of the rally's (RALLY_WALK): a band fighter, or a boss of theirs
