@@ -1311,7 +1311,9 @@ const HUMANOID_MOVES := {
 	# drawn back to its gathered pose (peak, seconds in at speed 1), held there through the tell, thrust
 	# as the telegraph lands (AnimRig.strike_held). By what is in the striking hand, as "strikes".
 	"told": {
-		"dagger": ["Dagger_Stab_Drawn", 0.2, 0.29],
+		# Its contact the stab's full stretch (0.33 s, the hand 1 m on from the gather; 790 amended (9):
+		# at 0.29 the hand was still coming, and its stretch came after the drawn landing).
+		"dagger": ["Dagger_Stab_Drawn", 0.2, 0.33],
 	},
 	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
@@ -2063,11 +2065,18 @@ const LUNGE := 0.3
 ## A person's told strike (HUMANOID_MOVES "told"; 790 amended (7)): drawn back to its gather over
 ## TOLD_DRAW s, held, thrust over TOLD_THRUST s to land with the telegraph, recovered over
 ## TOLD_RECOVER s; the body pushed TOLD_REACH m out along its facing on the thrust (a lunge
-## reaches two cells) and eased back over the recovery.
-const TOLD_DRAW := 0.25
-const TOLD_THRUST := 0.09
+## reaches two cells), stopped TOLD_GAP m short of a body standing in its way, and eased back over
+## the recovery. 790 amended (9) (the coordinator, from the v0.1.213 reel): the crouch in by 0.12 s
+## of the tell, the spring 0.15 s and 0.6 m, so both read from the play camera.
+const TOLD_DRAW := 0.12
+const TOLD_THRUST := 0.15
 const TOLD_RECOVER := 0.45
-const TOLD_REACH := 0.45
+const TOLD_REACH := 0.6
+const TOLD_GAP := 0.7
+## 790 amended (9): a blow taken while a told strike gathers rocks the body (STEADY_ROCK) and leaves
+## the strike to land, as the sim lands it; a rock with less than this before the thrust is left out
+## (the thrust moves the body then).
+const TOLD_ROCK_MIN := 0.06
 ## Knocked down: how far the body tips (radians), and how fast.
 const DOWN_TILT := 1.4
 const DOWN_TILT_SPEED := 9.0
@@ -6162,13 +6171,41 @@ func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float) -> bool:
 	if body != null and source.facing != Vector2i.ZERO:
 		var rest := Vector3(0.0, body.position.y, 0.0)
 		var thrust := minf(TOLD_THRUST, lands_in)
+		puppet.set_meta("told_thrust_at", now + int(maxf(lands_in - thrust, 0.0) * 1000.0))
 		var tween := create_tween()
 		tween.tween_interval(maxf(lands_in - thrust, 0.0))
-		tween.tween_property(body, "position", rest + Vector3(source.facing.x, 0.0, source.facing.y).normalized() * TOLD_REACH, thrust) \
+		tween.tween_property(body, "position", rest + Vector3(source.facing.x, 0.0, source.facing.y).normalized() * _told_reach(source), thrust) \
 				.set_ease(Tween.EASE_OUT)
 		tween.tween_property(body, "position", rest, TOLD_RECOVER).set_ease(Tween.EASE_IN_OUT)
 		puppet.set_meta("told_tween", tween)
 	return true
+
+
+## How far [param source]'s told thrust carries its body (790 amended (9)): TOLD_REACH, or short of
+## the first body in its way along its facing, TOLD_GAP m off it (not through the one it strikes).
+func _told_reach(source: GridEntity) -> float:
+	for cells in 2:
+		if World.get_entity_at(source.tile + source.facing * (cells + 1)) != null:
+			return clampf(float(cells + 1) - TOLD_GAP, 0.0, TOLD_REACH)
+	return TOLD_REACH
+
+
+## Whether [param puppet] (a person) is gathering a told strike: drawn back or held, its thrust's
+## contact still to come (790 amended (9)).
+func _told_gathering(puppet: Node3D) -> bool:
+	if puppet.has_meta("creature_view") or not puppet.has_meta("rig") or not puppet.has_meta("told_tween"):
+		return false
+	var tween: Variant = puppet.get_meta("told_tween")
+	var rig := puppet.get_meta("rig") as AnimRig
+	return tween is Tween and (tween as Tween).is_valid() and rig.striking() and rig.contact_msec > AnimRig.now_msec()
+
+
+## A blow taken while [param puppet] gathers a told strike (790 amended (9)): the body rocked back,
+## home before the thrust begins; its gather and thrust kept, as the sim lands the strike.
+func _told_rock(puppet: Node3D) -> void:
+	var left := (int(puppet.get_meta("told_thrust_at", 0)) - AnimRig.now_msec()) / 1000.0
+	if left >= TOLD_ROCK_MIN:
+		_steady_rock(puppet, minf(STEADY_ROCK_SECONDS, left))
 
 
 ## Telegraph [param id] over: the tell it began ends (cut short when it did not land).
@@ -21214,6 +21251,9 @@ func _flinch(puppet: Node3D) -> void:
 	if _held_steady(puppet):
 		_steady_rock(puppet)  # Steadied (843): no hit clip, rocked and held.
 		return
+	if _told_gathering(puppet):
+		_told_rock(puppet)  # Struck as it gathers a told strike (790 amended (9)): the strike kept.
+		return
 	_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).hit()
@@ -25502,6 +25542,9 @@ func _hit_from(puppet: Node3D, entity: GridEntity, from: Vector2) -> bool:
 	if _held_steady(puppet):
 		_steady_rock(puppet)  # Steadied (843): no hit clip, rocked and held.
 		return true
+	if _told_gathering(puppet):
+		_told_rock(puppet)  # Struck as it gathers a told strike (790 amended (9)): the strike kept.
+		return true
 	var hits: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("hits", {})
 	var names: Array[String] = []
 	for clip: String in hits.get(hit_side(Vector2(entity.facing), from), []):
@@ -25598,15 +25641,15 @@ func _steady_over(puppet: Node3D) -> void:
 
 
 ## A blow on a steadied person: rocked back (its Body off its front) and home, no hit clip.
-func _steady_rock(puppet: Node3D) -> void:
+func _steady_rock(puppet: Node3D, seconds := STEADY_ROCK_SECONDS) -> void:
 	if not puppet.has_node("Body"):
 		return
 	var body := puppet.get_node("Body") as Node3D
 	var rest := body.position  # Where _lay keeps it (as _bash_taken's jolt).
 	var back := -body.transform.basis.x.normalized() * ArtKit.feel("client3d.steady_rock", STEADY_ROCK)
 	var tween := body.create_tween()
-	tween.tween_property(body, "position", rest + back, STEADY_ROCK_SECONDS * 0.3).set_ease(Tween.EASE_OUT)
-	tween.tween_property(body, "position", rest, STEADY_ROCK_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(body, "position", rest + back, seconds * 0.3).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "position", rest, seconds * 0.7).set_ease(Tween.EASE_IN_OUT)
 
 
 ## Shield-bashed (379 amended, animation's side): the basher (at [param by]) drives its shield in,

@@ -1025,7 +1025,8 @@ func _drawbacks() -> void:
 	if _beside != "":
 		# --beside=<kind> (CLAUDE.md: animation shown beside Jeff's goblin): one stands by, still and unhurt.
 		markers[_beside_at] = "monster_" + _beside
-		(config["entities"] as Array).append({"at": [_beside_at.x, _beside_at.y], "facing": [-1, 0]})
+		# Facing the camera, which looks west here (the coordinator, 11-12: from behind it read as a rock).
+		(config["entities"] as Array).append({"at": [_beside_at.x, _beside_at.y], "facing": [1, 0]})
 		if _beside != "imp":
 			config["legend"] = (config.get("legend", {}) as Dictionary).merged({"monster_" + _beside: "#5a6a50"})
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)

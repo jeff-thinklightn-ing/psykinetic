@@ -78,6 +78,10 @@ var _action_speed := 1.0
 ## A strike's speed after its contact, and the msec it changes to it.
 var _recover_speed := 1.0
 var _contact_msec := -1
+## Where a held strike's clip is put at its contact (its contact, seconds into the clip), or -1: a
+## held strike's phases each put the clip where it should be, so a long frame never carries it
+## past its gather (790 amended (9): one long frame in the draw held him with the dagger out).
+var _contact_seek := -1.0
 ## A held strike's (strike_held) speeds before its contact, each [msec, speed] from that msec on.
 var _phases: Array = []
 ## The msec the last strike's blow lands (its contact), kept after: its hit is heard then.
@@ -320,6 +324,7 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	var seconds := contact / before + (length - contact) / _recover_speed
 	_strike_msec = now + int(seconds * 1000.0)
 	_phases = []
+	_contact_seek = -1.0
 	return seconds
 
 
@@ -343,7 +348,8 @@ func strike_held(clip: String, peak: float, contact: float, lands_in: float, dra
 	var now := now_msec()
 	_set_action_speed(peak / maxf(draw, 0.001))
 	var thrust_from := lands_in - thrust
-	_phases = [[now + int(draw * 1000.0), 0.0], [now + int(thrust_from * 1000.0), (contact - peak) / maxf(thrust, 0.001)]]
+	_phases = [[now + int(draw * 1000.0), 0.0, peak], [now + int(thrust_from * 1000.0), (contact - peak) / maxf(thrust, 0.001), peak]]
+	_contact_seek = contact
 	_contact_msec = now + int(lands_in * 1000.0)
 	contact_msec = _contact_msec
 	_strike_msec = _contact_msec + int((length - contact) / _recover_speed * 1000.0)
@@ -362,6 +368,7 @@ func cancel_strike() -> void:
 		_apply()
 	_strike_msec = 0
 	_contact_msec = -1
+	_contact_seek = -1.0
 	_phases = []
 
 
@@ -586,11 +593,17 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	while not _phases.is_empty() and now_msec() >= int(_phases[0][0]):
-		_set_action_speed(float(_phases.pop_front()[1]))
+		var phase: Array = _phases.pop_front()
+		_set_action_speed(float(phase[1]))
+		if phase.size() > 2:
+			tree.set("parameters/action_seek/seek_request", float(phase[2]))
 	if _contact_msec >= 0 and now_msec() >= _contact_msec:
 		_phases = []
 		_contact_msec = -1
 		_set_action_speed(_recover_speed)
+		if _contact_seek >= 0.0:
+			tree.set("parameters/action_seek/seek_request", _contact_seek)
+		_contact_seek = -1.0
 	_since += delta
 	_frames += 1
 	if every <= 1 or _frames % every == 0:

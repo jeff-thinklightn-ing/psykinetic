@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
 - The Ossuary's dead lie in three rooms, well apart (870).
 - At the robbers' camp, a Robbers' bundle beside the two bedrolls holds two bandaging kits (870).
 - People, you among them, stand easy, feet under their hips and knees soft, at rest, at work and at a stall; in the Mughouse the taverner stands behind her bar with her hands on the counter (877).

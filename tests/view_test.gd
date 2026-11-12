@@ -9620,18 +9620,66 @@ func _test_told_lunge() -> void:
 	var body := puppet.get_node("Body") as Node3D
 	_check(is_zero_approx(rig.speed()) and absf(body.position.x) < 0.01,
 			"drawn back and held at the gather (speed %.2f), not yet out (%.2f m)" % [rig.speed(), body.position.x])
+	# Struck as he gathers (790 amended (9)): rocked back and home before the thrust, the told strike
+	# kept (the sim lands it whether or not he was hit); no hit clip over it.
+	_rig._flinch(puppet)
+	var kept := rig.striking() and rig.playing() == str(told[0])
+	var rock_from := AnimRig.now_msec()
+	var rocked := 0.0
+	while AnimRig.now_msec() < rock_from + int((Client3D.STEADY_ROCK_SECONDS + 0.06) * 1000.0):
+		await get_tree().process_frame
+		rocked = maxf(rocked, Vector2(body.position.x, body.position.z).length())
+	_check(kept and rocked > 0.03 and Vector2(body.position.x, body.position.z).length() < 0.01
+			and rig.striking() and rig.playing() == str(told[0]) and AnimRig.now_msec() < int(puppet.get_meta("told_thrust_at", 0)),
+			"struck as he gathers: the told strike kept (%s), the body rocked %.2f m and home (%.2f m) before the thrust"
+			% [rig.playing(), rocked, Vector2(body.position.x, body.position.z).length()])
 	var furthest := 0.0
 	var out_at := -1
+	# The dagger hand against his hips along his body's own fore-and-aft axis (the skeleton's Z, whatever
+	# way the body is turned yet), at the gather and at its furthest out about the drawn landing
+	# (790 amended (9): the stab drives the hand out, not just the body in). The gather is drawn back
+	# behind the hips, so its sign names his back; the stab's full stretch is the other way.
+	var arm_skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var ahead := func() -> float:
+		var at := arm_skeleton.get_bone_global_pose(arm_skeleton.find_bone("RightHand")).origin
+		var hips := arm_skeleton.get_bone_global_pose(arm_skeleton.find_bone("Hips")).origin
+		return at.z - hips.z
+	var gathered: float = ahead.call()
+	var landed_ahead := -9.0
 	while AnimRig.now_msec() < start + int(lands_in * 1000.0) + 20:
 		await get_tree().process_frame
 		if body.position.x > furthest + 0.001:
 			furthest = body.position.x
 			out_at = AnimRig.now_msec() - start
+		landed_ahead = maxf(landed_ahead, -signf(gathered) * float(ahead.call()))
 	_check(furthest > Client3D.TOLD_REACH * 0.8 and rig.speed() > 0.0,
 			"thrust as it lands: out %.2f m along his facing (furthest at %d ms), the recovery playing (speed %.2f)" % [furthest, out_at, rig.speed()])
+	# The pose is read as last drawn, so the stretch is followed a little past the contact (Blender
+	# measures the clip 0.42 m behind the hips at the gather, 0.44 m ahead at its 0.33 s contact).
+	while AnimRig.now_msec() < rig.contact_msec + 120:
+		await get_tree().process_frame
+		landed_ahead = maxf(landed_ahead, -signf(gathered) * float(ahead.call()))
+	_check(absf(gathered) > 0.2 and landed_ahead > 0.3,
+			"the dagger hand driven out as it lands: %.2f m ahead of his hips at its furthest (%.2f m behind at the gather)" % [landed_ahead, absf(gathered)])
 	_rig.creature_tell_over(21, true)
 	await _until_msec(AnimRig.now_msec() + int((Client3D.TOLD_RECOVER + 0.1) * 1000.0))
 	_check(absf(body.position.x) < 0.02 and not _rig._tells.has(21), "and back at rest after (%.2f m)" % body.position.x)
+	# A body in his way a cell off (790 amended (9)): the thrust stops TOLD_GAP short of it, not
+	# through the one he strikes.
+	var in_way := _spawn_imp(robber.tile + Vector2i(1, 0))
+	_rig._process(0.0)
+	var way_from := AnimRig.now_msec()
+	_rig.creature_tell(23, {"id": 23, "source": str(robber.get_path()), "kind": "lunge", "lands_tick": World.tick + lands_ticks})
+	var short := 0.0
+	while AnimRig.now_msec() < way_from + int(lands_in * 1000.0) + 40:
+		await get_tree().process_frame
+		short = maxf(short, body.position.x)
+	_check(absf(short - (1.0 - Client3D.TOLD_GAP)) < 0.03,
+			"a body in his way a cell off: out %.2f m, %.2f m short of its cell" % [short, 1.0 - short])
+	_rig.creature_tell_over(23, true)
+	await _until_msec(AnimRig.now_msec() + int((Client3D.TOLD_RECOVER + 0.1) * 1000.0))
+	World.despawn(in_way)
+	_rig._process(0.0)
 	# Called off (stunned mid-tell): the thrust never comes, and he eases out of the gather (no snap).
 	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 	var hand := func() -> Vector3:

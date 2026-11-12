@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_feel_moved()
 	_test_feel_source()
 	await _test_strike()
+	await _test_strike_held_long_frame()
 	await _test_legs_walk()
 	await _test_one_strike_clip()
 	await _test_spear_jab()
@@ -220,6 +221,24 @@ func _test_strike() -> void:
 	rig.strike("Punch_Jab", -1.0, length * AnimRig.CONTACT_DEFAULT, 1.0)
 	await _frames(2)
 	_check(is_equal_approx(rig.speed(), 1.0), "no contact named: halfway through the clip (x%.2f)" % rig.speed())
+	rig.get_parent().queue_free()
+
+
+## A held strike through a long frame (790 amended (9)): a frame longer than the draw carried the
+## clip on past its gather into the blow, so the told robber held his crouch with the dagger already
+## out and "thrust" back into his recovery. Each phase now puts the clip where it should be: one
+## long frame over the draw leaves it held at the gather.
+func _test_strike_held_long_frame() -> void:
+	print("== a held strike through a long frame ==")
+	var rig := _goblin()
+	rig.loop("Idle")
+	await _frames(3)
+	rig.strike_held("Punch_Jab", 0.1, 0.17, 0.8, 0.1, 0.15, 0.6)
+	OS.delay_msec(350)  # One frame far past the 0.1 s draw, as on a starved machine.
+	await _frames(2)
+	_check(rig.striking() and is_zero_approx(rig.speed()) and absf(rig.position() - 0.1) < 0.01,
+			"held at its gather (0.10 s in) after a frame past the draw, not carried on (%.3f s in, x%.2f)" % [rig.position(), rig.speed()])
+	rig.cancel_strike()
 	rig.get_parent().queue_free()
 
 
