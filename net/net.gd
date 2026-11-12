@@ -645,6 +645,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## client shows neither (no points, a plain row).
 ## 747 amended (6): Player.quest may carry "zones" [level names], the places its card shows in; an old client ignores it (draws everywhere), a new client draws everywhere without it. No new number (release).
 ## 859 amended (2): No new number (release): an absent "spots" draws no ghost (builder's proposal message; an old client ignores it).
+## 885: optional "parts" on builder proposals, no new number (release): without it a client draws the "summary" string, which the server still sends whole.
 const PROTOCOL_REVISION := 56
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

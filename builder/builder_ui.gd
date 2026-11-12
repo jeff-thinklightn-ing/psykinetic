@@ -2,8 +2,9 @@ class_name BuilderUI
 extends Node
 ## Builder mode on a client (BuilderHost on the server does the asking): B
 ## turns it on and off. On, a left drag picks an area (outlined on the
-## ground) and a box opens for the request ("a pond here"); the server's
-## proposal shows over the area as a ghost, with Claude's words. Then Enter
+## ground) and the builder's window opens for the request ("a pond here";
+## BuilderPanel, decision 885); the server's proposal shows over the area as a
+## ghost, its answer in the window. Then Enter
 ## (the box empty) accepts it, a request in the box is a follow-up
 ## ("bigger"), Esc discards it; Ctrl+Z takes back the last change to this
 ## level. Left clicks pick areas while it is on: walking waits.
@@ -15,6 +16,8 @@ var area := Rect2i()
 ## "idle" (no area), "asking" (the box open), "working", "proposal".
 var state := "idle"
 var _drag_from := Vector2i(-1, -1)
+## The window (decision 885): the answer, the box, the keys and the cost.
+var panel: BuilderPanel
 var _box: LineEdit
 var _status: Label
 ## The cursor's cell and the player's, while on (decision 537).
@@ -51,23 +54,17 @@ func _ready() -> void:
 	_coords.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_coords.visible = false
 	main.get_node("HUD").add_child(_coords)
-	_box = LineEdit.new()
-	_box.name = "BuilderBox"
-	_box.max_length = BuilderHost.MAX_TEXT
-	_box.visible = false
-	_box.anchor_left = 0.5
-	_box.anchor_right = 0.5
-	_box.offset_left = -800
-	_box.offset_right = 800
-	_box.offset_top = 270
-	_box.offset_bottom = 350
+	panel = BuilderPanel.new()
+	panel.visible = false
+	panel.closed.connect(escape)
+	_box = panel.box
 	_box.text_submitted.connect(_submitted)
 	_box.gui_input.connect(func(event: InputEvent) -> void:
 		var key := event as InputEventKey
 		if key != null and key.pressed and key.keycode == KEY_ESCAPE:
 			escape()
 			main.get_viewport().set_input_as_handled())
-	main.get_node("HUD").add_child(_box)
+	main.get_node("HUD").add_child(panel)
 
 
 func _process(_delta: float) -> void:
@@ -165,7 +162,7 @@ static func building_line(building: Dictionary, states := {}) -> String:
 
 
 func is_typing() -> bool:
-	return _box != null and _box.visible and _box.has_focus()
+	return _box != null and panel.visible and _box.has_focus()
 
 
 ## Main's input, first: true if builder mode took it.
@@ -237,11 +234,11 @@ func escape() -> void:
 	if state == "proposal":
 		_send({"op": "discard"})
 		_proposal = {}
+		state = "asking"
 		_show_area()
 		_open_box()
 		_say("Discarded. Ask again, or drag out another area.")
-	elif _box.visible:
-		_box.visible = false
+	elif panel.visible:
 		_reset()
 		_say("Builder mode: drag out an area.   B leaves.")
 	else:
@@ -252,7 +249,7 @@ func _reset() -> void:
 	state = "idle"
 	area = Rect2i()
 	_proposal = {}
-	_box.visible = false
+	panel.visible = false
 	_box.text = ""
 	if main._client3d != null:
 		main._client3d.clear_builder()
@@ -279,8 +276,9 @@ func _open_box() -> void:
 	if area.size == Vector2i.ZERO:
 		return
 	state = "asking" if state != "proposal" else state
-	_box.placeholder_text = "what goes in these %d x %d cells? (Enter asks, Esc cancels)" % [area.size.x, area.size.y]
-	_box.visible = true
+	if state != "proposal":
+		panel.asking(area, "what goes in these %d x %d cells?" % [area.size.x, area.size.y])
+	panel.visible = true
 	_box.grab_focus()
 
 
@@ -294,6 +292,7 @@ func _submitted(text: String) -> void:
 	_send({"op": "ask", "area": [area.position.x, area.position.y, area.size.x, area.size.y], "text": asked})
 	state = "working"
 	_say("Asking: %s ..." % asked)
+	panel.working("Asking: %s ..." % asked)
 
 
 func _send(args: Dictionary) -> void:
@@ -317,12 +316,13 @@ func on_message(data: Dictionary) -> void:
 				area = Rect2i(int(given[0]), int(given[1]), int(given[2]), int(given[3]))
 			_show_area()
 			var made: Dictionary = data.get("new_area", {})
-			var beyond := "" if made.is_empty() else "\nA new level, %s (%d x %d), beyond the %s edge (outlined in orange)." % [
+			var beyond := "" if made.is_empty() else "A new level, %s (%d x %d), beyond the %s edge (outlined in orange)." % [
 				made.get("name", ""), int(made.get("size", [0, 0])[0]), int(made.get("size", [0, 0])[1]), made.get("side", "")]
-			_say("%s%s\n($%.3f; this area $%.3f)   Enter accepts, a request in the box changes it, Esc discards." % [
-				data.get("summary", ""), beyond, float(data.get("cost", 0.0)), float(data.get("total", 0.0))])
-			_box.placeholder_text = "Enter accepts; or say what to change (\"bigger\", \"move it north\")"
-			_box.visible = true
+			# The answer is the panel's (885); the status line stands aside.
+			_status.visible = false
+			panel.show_answer(data, beyond)
+			print("[builder] proposal ($%.3f): %s" % [float(data.get("cost", 0.0)), str(data.get("summary", "")).get_slice("\n", 0)])
+			panel.visible = true
 			_box.grab_focus()
 			if _test_accept:
 				_test_accept = false
@@ -339,6 +339,8 @@ func on_message(data: Dictionary) -> void:
 		"error":
 			state = "proposal" if not _proposal.is_empty() else ("asking" if area.size != Vector2i.ZERO else "idle")
 			_say("Builder: %s" % data.get("error", "something went wrong"))
+			if panel.visible and _proposal.is_empty():
+				panel.working("Builder: %s" % data.get("error", "something went wrong"))
 
 
 ## --test-builder: "x,y,w,h:request" asked as if dragged out and typed.

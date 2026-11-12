@@ -16,7 +16,8 @@ extends Node
 ## Commands from a client (World.command "builder"): {op: "ask", area:
 ## [x, y, w, h], text}, {op: "accept"}, {op: "discard"}, {op: "undo"}.
 ## Answers to that client (message "builder"): {state: "working" |
-## "proposal" (summary, cost, total, area, cells: [[x, y, meaning]...],
+## "proposal" (summary, parts (885: [{head, lines, fault}...], the
+## summary for the answer panel; an old client reads summary alone), cost, total, area, cells: [[x, y, meaning]...],
 ## edges: [[x, y, side, kind]...], new_area: {name, side, size, footprint:
 ## [x, y, w, h] beyond the edge} when one is proposed) | "error" (error) | "accepted" |
 ## "discarded" | "undone" | "nothing"}.
@@ -134,33 +135,100 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		_reply(peer, {"state": "error", "error": result["error"]})
 		return
 	var reply := proposal_message(session)
-	reply["summary"] = str(result["summary"]) + ("" if result["ok"] else "\n(" + str(result["error"]) + ")")
-	var warnings: Array = result.get("warnings", [])
-	if not warnings.is_empty():
-		reply["summary"] += "\nThe town's store: " + "; ".join(warnings)
-	var ground: Array = result.get("height_warnings", [])
-	if not ground.is_empty():
-		reply["summary"] += "\nHeights: " + "; ".join(ground)
-	var sites: Array = result.get("site_warnings", [])
-	if not sites.is_empty():
-		reply["summary"] += "\nWork sites: " + "; ".join(sites)
-	var streets: Array = result.get("street_warnings", [])
-	if not streets.is_empty():
-		reply["summary"] += "\nStreets: " + "; ".join(streets)
-	# Who comes to the spots the proposal lays or changes (859), before Enter.
-	if str(session.working.config.get("spots")) != str(session.doc.config.get("spots")):
-		var users := session.spot_preview()
-		if not users.is_empty():
-			reply["summary"] += "\nSpots, who comes: " + "; ".join(users)
-	var arrivals: Array = result.get("arrival_warnings", [])
-	if not arrivals.is_empty():
-		reply["summary"] += "\nArrivals (a player coming in there lands inside a fight): " + "; ".join(arrivals)
-	var layout: Array = result.get("layout_warnings", [])
-	if not layout.is_empty():
-		reply["summary"] += "\nLayout (can't be accepted until fixed): " + "; ".join(layout)
+	var parts := answer_parts(session, result)
+	reply["summary"] = summary_of(parts)
+	reply["parts"] = panel_parts(parts, building_codes_of(session))
 	reply["cost"] = result["cost"]
 	reply["total"] = session.usage["cost"]
 	_reply(peer, reply)
+
+
+## The answer's parts' heads (885). A layout fault keeps the proposal from
+## being accepted; the rest are told.
+const STORE_HEAD := "The town's store"
+const HEIGHTS_HEAD := "Heights"
+const SITES_HEAD := "Work sites"
+const STREETS_HEAD := "Streets"
+const SPOTS_HEAD := "Spots, who comes"
+const ARRIVALS_HEAD := "Arrivals (a player coming in there lands inside a fight)"
+const LAYOUT_HEAD := "Layout (can't be accepted until fixed)"
+## The panel's order after Claude's words and the fault (ui-design's mock, 885).
+const PANEL_ORDER: Array[String] = [STORE_HEAD, STREETS_HEAD, SITES_HEAD, SPOTS_HEAD, HEIGHTS_HEAD, ARRIVALS_HEAD]
+
+
+## An answer as parts (885), in the summary's order: Claude's words first
+## (head "", one line: the words, and the error when it stopped short), then
+## each check's lines under its head, {head, lines, fault}; a check with
+## nothing to say has no part.
+static func answer_parts(session: BuilderSession, result: Dictionary) -> Array:
+	var parts: Array = [{"head": "", "lines": [str(result["summary"]) + ("" if result["ok"] else "\n(" + str(result["error"]) + ")")], "fault": false}]
+	var add := func(head: String, lines: Array, fault := false) -> void:
+		if not lines.is_empty():
+			parts.append({"head": head, "lines": lines.map(func(line: Variant) -> String: return str(line)), "fault": fault})
+	add.call(STORE_HEAD, result.get("warnings", []))
+	add.call(HEIGHTS_HEAD, result.get("height_warnings", []))
+	add.call(SITES_HEAD, result.get("site_warnings", []))
+	add.call(STREETS_HEAD, result.get("street_warnings", []))
+	# Who comes to the spots the proposal lays or changes (859), before Enter.
+	if str(session.working.config.get("spots")) != str(session.doc.config.get("spots")):
+		add.call(SPOTS_HEAD, session.spot_preview())
+	add.call(ARRIVALS_HEAD, result.get("arrival_warnings", []))
+	add.call(LAYOUT_HEAD, result.get("layout_warnings", []), true)
+	return parts
+
+
+## The proposal's "summary" (one string, as before 885, whole for an old
+## client: release's condition): the words, then a line a part,
+## "Head: line; line".
+static func summary_of(parts: Array) -> String:
+	var out := str(parts[0]["lines"][0]) if not parts.is_empty() else ""
+	for part: Dictionary in parts.slice(1):
+		out += "\n%s: %s" % [part["head"], "; ".join(PackedStringArray(part["lines"]))]
+	return out
+
+
+## The codes of the buildings the session's level has, before and after.
+static func building_codes_of(session: BuilderSession) -> Array[String]:
+	var codes: Array[String] = []
+	for config: Dictionary in [session.doc.config, session.working.config]:
+		for entry: Variant in config.get("buildings", []):
+			var code := str(entry.get("code", "")) if entry is Dictionary else ""
+			if not code.is_empty() and code not in codes:
+				codes.append(code)
+	return codes
+
+
+## The proposal's "parts" for the panel (885; ui-design's mock): Claude's
+## words, then the layout fault, then the rest in PANEL_ORDER. A line a fault
+## already says is not said again under its own head (the coordinator's note
+## on the mock). Each of [param codes] standing alone in a part's line is
+## marked "[T1]", so the panel draws it as a chip (UiCodeChip) and T1 never
+## reads "Ti"; Claude's words are left as they are said.
+static func panel_parts(parts: Array, codes: Array[String]) -> Array:
+	if parts.is_empty():
+		return []
+	var faults: Array = []
+	for part: Dictionary in parts:
+		if part["fault"]:
+			faults.append_array(part["lines"])
+	var ordered: Array = [parts[0]]
+	ordered.append_array(parts.filter(func(part: Dictionary) -> bool: return part["fault"]))
+	for head in PANEL_ORDER:
+		for part: Dictionary in parts:
+			if part["head"] == head and not part["fault"]:
+				var lines: Array = (part["lines"] as Array).filter(func(line: String) -> bool: return line not in faults)
+				if not lines.is_empty():
+					ordered.append({"head": head, "lines": lines, "fault": false})
+	var marks: RegEx = null
+	if not codes.is_empty():
+		marks = RegEx.create_from_string("(?<![\\w\\[])(" + "|".join(codes) + ")(?![\\w\\]])")
+	var out: Array = []
+	for part: Dictionary in ordered:
+		var lines: Array = part["lines"]
+		if marks != null and not str(part["head"]).is_empty():
+			lines = lines.map(func(line: String) -> String: return marks.sub(line, "[$1]", true))
+		out.append({"head": part["head"], "lines": lines, "fault": part["fault"]})
+	return out
 
 
 ## [param session]'s proposal as the "builder" message's fields.

@@ -50642,3 +50642,39 @@ carries or lays them moves; each slot's source is "art-gen, by hand" with its sc
 
 item.shield, item.wood_bundle and item.cloth_bolt, passed with these, come after items' icon check;
 prop.stool lands with maps' places.tavern.seats rows (the coordinator's rule).
+
+## 885. Builder's answer panel: the summary as parts, in a window of the approved look
+
+The coordinator's approval of ui-design's mock (2026-11-12, C:/dev/review/ui-design/builder/
+answer-proposal-1080.png and answer-refused-1080.png), after ui-design's still of the ghost showed the
+answer as outlined words on the world with the typing box laid over them, one run-on line per part,
+and a building's code "T1" reading "Ti". The look's parts and theme types are 886 (ui-design's).
+
+The server: BuilderHost.answer_parts gives an answer as parts, Claude's words first (head "") and
+then each check's lines under its head ({head, lines, fault}); summary_of joins them into the
+"summary" string exactly as before, which the server still sends whole for an old client (release's
+condition). panel_parts orders them for the panel: the words, the layout fault (the only part that
+keeps a proposal from being accepted), then the store, streets, work sites, spots, heights and
+arrivals; a line the fault already says is not said again under its own head (the coordinator's note
+on the mock); each of the level's building codes standing alone in a part's line is marked "[T1]"
+(Claude's words are left as said). The "builder" proposal message carries it as "parts".
+
+The client: BuilderPanel, a UiGlass at the left under the status line, clear of the area being built.
+The head says "Builder", the area's corner and size, and the close (UiClose: Esc's discard). Claude's
+words wrap as a paragraph. A fault sits in its own block (FaultBlock), and the foot's Enter then reads
+"can't accept yet" in the refused words. Each other part has its head (Subhead) and a bullet line a
+thing (a RichTextLabel of Lines, so a line wraps under its own words; UiCodeChip.add_line draws each
+marked code as its chip). A part of more than four lines shows three and "N more", which unfolds in
+place; the pane grows to the screen's foot, then scrolls. A coordinate or a size is held together by
+no-break spaces. The typing box sits under the answer inside the pane; the foot has the keys as key
+caps (Enter, Esc, Ctrl + Z) and the cost. A server before 885 sends no "parts": its summary string is
+drawn as the words, as before. The status line stands aside while an answer shows. No colour, font or
+size in the script: the types are ui-design's.
+
+The codes floated over the world in builder mode (Client3D.show_building_codes) take the chip in a
+later row. Protocol: no new number (release): "parts" is optional, noted above PROTOCOL_REVISION.
+builder_test _test_answer_parts (the summary unchanged; the order; the repeat dropped; codes marked
+whole, T10 not taken for T1) and _test_answer_panel (the fault block and its Enter; ten lines folded to
+three and "7 more", unfolded in place; four shown whole; a chip, not its mark; a coordinate whole; an
+old server's summary). New class_name: BuilderPanel. Tools only (builder mode is Jeff's): no package,
+no bullet.

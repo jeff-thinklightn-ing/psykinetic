@@ -63,6 +63,8 @@ func _ready() -> void:
 	_test_trades_preview()
 	_test_cached_checks()
 	await _test_spot_ghost()
+	_test_answer_parts()
+	await _test_answer_panel()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1969,3 +1971,81 @@ func _test_paved_street() -> void:
 	_check(slab.size() == 1, "a doorstep slab alone, joined to no square or road: not a street (%s)" % [slab])
 	var indoors: Array[String] = field.call(square, false)
 	_check(indoors.size() == 1, "the same paving indoors: not a street (%s)" % [indoors])
+
+
+func _test_answer_parts() -> void:
+	print("
+== the answer as parts for the panel (885), the summary whole for an old client ==")
+	var parts: Array = [
+		{"head": "", "lines": ["I laid a fire spot by T1's wall."], "fault": false},
+		{"head": BuilderHost.STORE_HEAD, "lines": ["(190, 196) holds the store chest"], "fault": false},
+		{"head": BuilderHost.STREETS_HEAD, "lines": ["the door of the T1 temple at (190, 199) does not open onto a street", "the door of the F12 forge is fine"], "fault": false},
+		{"head": BuilderHost.SPOTS_HEAD, "lines": ["Smith at F1 forge: works about 7-12", "T10 is not T1"], "fault": false},
+		{"head": BuilderHost.LAYOUT_HEAD, "lines": ["the door of the T1 temple at (190, 199) does not open onto a street"], "fault": true}]
+	var summary := BuilderHost.summary_of(parts)
+	_check(summary == "I laid a fire spot by T1's wall.
+The town's store: (190, 196) holds the store chest
+Streets: the door of the T1 temple at (190, 199) does not open onto a street; the door of the F12 forge is fine
+Spots, who comes: Smith at F1 forge: works about 7-12; T10 is not T1
+Layout (can't be accepted until fixed): the door of the T1 temple at (190, 199) does not open onto a street",
+		"the summary is today's string: the words, then \"Head: line; line\" a part (%s)" % summary)
+	var panel: Array = BuilderHost.panel_parts(parts, ["T1", "F1", "F12", "T10"] as Array[String])
+	var heads: Array = panel.map(func(part: Dictionary) -> String: return part["head"])
+	_check(heads == ["", BuilderHost.LAYOUT_HEAD, BuilderHost.STORE_HEAD, BuilderHost.STREETS_HEAD, BuilderHost.SPOTS_HEAD], "the words, the fault, then the mock's order (%s)" % [heads])
+	_check(panel[1]["fault"] and panel[1]["lines"] == ["the door of the [T1] temple at (190, 199) does not open onto a street"], "the fault's line, its code marked (%s)" % [panel[1]])
+	_check(panel[3]["lines"] == ["the door of the [F12] forge is fine"], "a line the fault says is not said again under Streets (%s)" % [panel[3]["lines"]])
+	_check(panel[4]["lines"] == ["Smith at [F1] forge: works about 7-12", "[T10] is not [T1]"], "each code marked whole, T10 not taken for T1 (%s)" % [panel[4]["lines"]])
+	_check(panel[0]["lines"] == ["I laid a fire spot by T1's wall."], "Claude's words are left as said (%s)" % [panel[0]["lines"]])
+	var plain: Array = BuilderHost.panel_parts(parts.slice(0, 2), [] as Array[String])
+	_check(plain.size() == 2 and plain[1]["lines"] == ["(190, 196) holds the store chest"], "no codes in the level: nothing marked")
+	var field := _doc()
+	field.config["buildings"] = [{"slot": "building.hut", "at": [4, 4], "facing": [0, 1], "use": "inn", "town": "store"}]
+	Level.fill_codes(field.config)
+	var codes := BuilderHost.building_codes_of(BuilderSession.new(field, Rect2i(0, 0, 20, 20), "test_field", StubClaude.new([])))
+	_check(codes.size() == 1 and codes[0] == "H1", "the level's building codes (%s)" % [codes])
+	_check(BuilderPanel.keep_whole("at (190, 199), 14 x 10 wide") == "at (190,\u00a0199), 14\u00a0x\u00a010 wide", "a coordinate and a size held together by no-break spaces")
+
+
+func _test_answer_panel() -> void:
+	print("
+== the answer panel (885): fault block, the Enter it stops, folds, chips; an old server's summary ==")
+	var panel := BuilderPanel.new()
+	var holder := Control.new()
+	holder.size = Vector2(3840, 2160)
+	add_child(holder)
+	holder.add_child(panel)
+	var lines: Array = []
+	for i in 10:
+		lines.append("Spot %d: [T1] temple at (%d, 199)" % [i, 180 + i])
+	panel.show_answer({"area": [186, 199, 14, 10], "cost": 0.016, "total": 0.016, "summary": "unused", "parts": [
+		{"head": "", "lines": ["I laid a fire spot.
+The temple's door opens on the square."], "fault": false},
+		{"head": BuilderHost.LAYOUT_HEAD, "lines": ["the door of the [T1] temple at (190, 199) does not open onto a street"], "fault": true},
+		{"head": BuilderHost.SPOTS_HEAD, "lines": lines, "fault": false},
+		{"head": BuilderHost.SITES_HEAD, "lines": ["[F1] forge (215, 199): the smith", "[S1] stall", "one", "four"], "fault": false}]})
+	await get_tree().process_frame
+	var answer := panel.find_child("Answer", true, false)
+	var words := answer.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Words"))
+	_check(words.size() == 2, "Claude's words, a paragraph a line (%d)" % words.size())
+	_check(answer.get_child(2).name.begins_with("Fault") and not panel.acceptable and panel.enter_words() == "can't accept yet",
+		"the fault comes first after the words, in its block, and Enter says it can't accept (%s)" % panel.enter_words())
+	_check((panel.find_child("Area", true, false) as Label).text == "(186, 199)  14 x 10", "the head says the area")
+	var spots: Node = answer.get_child(3)
+	var shown := spots.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line") and (node as Control).visible).size()
+	var more := spots.find_child("More", false, false) as Button
+	_check(shown == BuilderPanel.FOLD_SHOWN and more != null and more.text == "▶ 7 more", "ten lines fold to three and \"7 more\" (%d shown, %s)" % [shown, more.text if more != null else "no fold"])
+	more.pressed.emit()
+	await get_tree().process_frame
+	shown = spots.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line") and (node as Control).visible).size()
+	_check(shown == 10 and not is_instance_valid(more), "\"7 more\" unfolds them in place (%d shown)" % shown)
+	var sites: Node = answer.get_child(4)
+	_check(sites.find_child("More", false, false) == null and sites.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line")).size() == 4, "four lines show whole, no fold")
+	var text := (spots.get_child(1).find_child("Text", true, false) as RichTextLabel).get_parsed_text()
+	_check(("T" + UiCodeChip.HAIR + "1") in text and "[T1]" not in text and "(180,\u00a0199)" in text, "a code drawn as its chip, not its mark; the coordinate held whole (%s)" % text)
+	panel.show_answer({"area": [186, 199, 14, 10], "cost": 0.01, "total": 0.02, "summary": "Done.
+Streets: the door of the T1 temple"})
+	await get_tree().process_frame
+	words = answer.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Words"))
+	_check(words.size() == 2 and panel.acceptable and panel.enter_words() == "accept", "an old server's summary: its lines as the words, Enter accepts")
+	_check((panel.find_child("Cost", true, false) as Label).text == "$0.010   this area $0.020", "the cost at the foot")
+	holder.queue_free()
