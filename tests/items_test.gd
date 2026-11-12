@@ -3120,6 +3120,11 @@ func _test_bane() -> void:
 	strike.call(wolf3)
 	var back := ItemBook.from_dict(World.items.to_dict())
 	_check(back.bane_of(dagger) == "imp" and back.hurt_of(dagger) == {"wolf": 30}, "the bane and the hurt saved and read back")
+	# The getters hand out copies (perf's save-cache audit): only the book's own calls change it.
+	World.items.hurt_of(dagger)["wolf"] = 99
+	World.items.felled_of(dagger).clear()
+	_check(World.items.hurt_of(dagger) == {"wolf": 30} and not World.items.felled_of(dagger).is_empty(),
+			"what hurt_of and felled_of hand out is a copy: writing it leaves the book as it was")
 	World.item_grew.disconnect(growing)
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	Items.reset()
@@ -3229,6 +3234,8 @@ func _test_names() -> void:
 	book.set_name(uid, {"form": "holder_possessive", "holder": "Bo", "made_step": 0, "text": "Bo's dagger"}, "")
 	_check(book.name_of(uid)["text"] == "Ash's dagger" and book.strength_of(uid) == "quiet" and book.name_due(uid, 0, 0).is_empty(),
 			"one name for life: a second is refused")
+	book.name_of(uid)["text"] = "Bo's dagger"
+	_check(book.name_of(uid)["text"] == "Ash's dagger", "what name_of hands out is a copy: writing it leaves the name as it was")
 	for i in ItemBook.MAX_EVENTS + 2:
 		book.note(uid, "seen", str(i))
 	var kinds: Array = book.history(uid)["events"].map(func(e: Dictionary) -> String: return e["kind"])

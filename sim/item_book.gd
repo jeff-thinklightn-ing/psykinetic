@@ -200,9 +200,9 @@ func fell(uid: int, kind: String) -> void:
 
 
 ## What [param uid] has felled, by kind ({kind: count}; decision 415); {}
-## for none.
+## for none. A copy: the book changes only through its own calls.
 func felled_of(uid: int) -> Dictionary:
-	return _book[uid].get("felled", {}) if _book.has(uid) else {}
+	return (_book[uid].get("felled", {}) as Dictionary).duplicate(true) if _book.has(uid) else {}
 
 
 ## Whether [param uid] has character and grows (decision 472, on 415 and
@@ -243,9 +243,9 @@ func set_bane(uid: int, kind: String, zone := "", tile := Vector2i(-1, -1)) -> v
 	note(uid, "bane", kind, zone, tile)
 
 
-## [param uid]'s grudge (decision 417): {kind, paid}; {} for none.
+## [param uid]'s grudge (decision 417): {kind, paid}; {} for none. A copy.
 func grudge_of(uid: int) -> Dictionary:
-	return _book[uid].get("grudge", {}) if _book.has(uid) else {}
+	return (_book[uid].get("grudge", {}) as Dictionary).duplicate(true) if _book.has(uid) else {}
 
 
 ## [param uid] takes a grudge against [param kind] (its holders were hurt
@@ -269,9 +269,9 @@ func hurt(uid: int, kind: String, amount: int) -> void:
 
 
 ## The harm done to [param uid]'s holders by kind ({kind: hp}; decision
-## 473); {} for none.
+## 473); {} for none. A copy.
 func hurt_of(uid: int) -> Dictionary:
-	return _book[uid].get("hurt", {}) if _book.has(uid) else {}
+	return (_book[uid].get("hurt", {}) as Dictionary).duplicate(true) if _book.has(uid) else {}
 
 
 ## [param uid]'s grudge gives way to the bane it has become (decision 473:
@@ -282,29 +282,29 @@ func drop_grudge(uid: int, zone := "", tile := Vector2i(-1, -1)) -> void:
 	if grudge.is_empty():
 		return
 	_book[uid].erase("grudge")
-	hurt_of(uid).erase(str(grudge["kind"]))
+	(_book[uid].get("hurt", {}) as Dictionary).erase(str(grudge["kind"]))
 	note(uid, "gave way", "its grudge on %s to %s-bane" % [grudge["kind"], bane_of(uid)], zone, tile)
 
 
 ## One of [param uid]'s grudge's kind felled with it; [param paid] of them
 ## and the grudge lifts ("avenged"). True when it lifted.
 func pay_grudge(uid: int, paid: int, zone := "", tile := Vector2i(-1, -1)) -> bool:
-	var grudge := grudge_of(uid)
-	if grudge.is_empty():
+	if grudge_of(uid).is_empty():
 		return false
+	var grudge: Dictionary = _book[uid]["grudge"]
 	grudge["paid"] = int(grudge["paid"]) + 1
 	if int(grudge["paid"]) < paid:
 		return false
 	_book[uid].erase("grudge")
-	hurt_of(uid).erase(str(grudge["kind"]))  # Paid: its hurt starts over (decision 473).
+	(_book[uid].get("hurt", {}) as Dictionary).erase(str(grudge["kind"]))  # Paid: its hurt starts over (decision 473).
 	note(uid, "avenged", str(grudge["kind"]), zone, tile)
 	return true
 
 
 ## [param uid]'s name ({form, holder, who (its namer's carrier key),
-## made_step, text}); {} for none.
+## made_step, text}); {} for none. A copy.
 func name_of(uid: int) -> Dictionary:
-	return _book[uid].get("name", {}) if _book.has(uid) else {}
+	return (_book[uid].get("name", {}) as Dictionary).duplicate(true) if _book.has(uid) else {}
 
 
 ## [param uid]'s strength (a key of Items.naming()'s strengths); "" for none.
