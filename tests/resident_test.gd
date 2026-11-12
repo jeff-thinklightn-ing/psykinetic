@@ -5478,6 +5478,25 @@ func _test_visible_work() -> void:
 	for i in Main.WORK_CHECK_TICKS + Resident.FAR_EVERY + 2:
 		World.step()
 	_check(mara.activity == "carry_log", "shown on the way home (%s at %s)" % [mara.activity, mara.tile])
+	# 521 amended (2): with no woodpile, the cell her carry names stays hers while she stands on it (it flipped:
+	# the nearest free cell, asked afresh, skipped her own). No world steps: the clock and the bodies stay as they were.
+	var carry_from := mara.tile
+	var carry_task := mara.task
+	var held: Vector2i = _main._nearest_free(store["cell"])
+	mara.task = {"kind": "carry_log", "cell": held, "face": Resident.NO_CELL, "walking": true}
+	_put(mara, held)
+	var carry_cells := {}
+	for i in 30:
+		mara.task = _main._task_for(mara)
+		carry_cells[mara.task.get("cell")] = true
+	_check(carry_cells.size() == 1 and carry_cells.has(held), "no woodpile: the cell she carries to is kept over 30 checks while she stands on it (%s, cells %s)" % [held, carry_cells.keys()])
+	var player_from: Vector2i = _player().tile
+	_put(mara, carry_from)
+	_put(_player(), held)
+	var other: Vector2i = _main._task_for(mara).get("cell", held)
+	_check(other != held, "her cell taken while she is off it: another (%s)" % [other])
+	_put(_player(), player_from)
+	mara.task = carry_task
 	# The work props (566 amended): a chopping block in the woodlot and a woodpile by the store, stood as doorless solid buildings.
 	var block: Vector2i = _main._nearest_free(centre + Vector2i(-1, 2))
 	var pile: Vector2i = _main._nearest_free(store["cell"] + Vector2i(3, 0))

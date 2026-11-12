@@ -150,12 +150,29 @@ func _hour() -> int:
 	return int(DayNight.hour(DayNight.now()))
 
 
+## A carrier's cell (521 amended (2)): each change of the cell its carry_log names while it carries, by hour.
+var _carry_at := {}  # worker id -> the carry's cell last tick
+var _carry_flips := {}  # hour -> changes
+
+
+func _carry_read(body: Resident) -> void:
+	var id := body.worker_id
+	if str(body.task.get("kind", "")) != "carry_log":
+		_carry_at.erase(id)
+		return
+	var cell: Variant = body.task.get("cell")
+	if _carry_at.has(id) and _carry_at[id] != cell:
+		_carry_flips[_hour()] = int(_carry_flips.get(_hour(), 0)) + 1
+	_carry_at[id] = cell
+
+
 func _tick_read() -> void:
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or not body.spawned:
 			continue
 		_stand_read(body)
+		_carry_read(body)
 		var id := body.worker_id
 		var was: Dictionary = _last.get(id, {})
 		if was.is_empty():
@@ -490,6 +507,7 @@ func _report() -> void:
 	# next pick), not those an hour's stint cut; under 12 game minutes (STROLL_TICKS, playtest's 45 s) is short.
 	_stroll_stands.sort()
 	var short := _stroll_stands.filter(func(m: int) -> bool: return m < 12)
+	print("LOOK carry cell changes by hour (521 amended (2)): %s" % [_carry_flips])
 	print("LOOK short stands (under %d ticks) by what ended them: %s" % [SHORT_TICKS, _stand_ends])
 	for line: String in _stand_end_lines:
 		print(line)

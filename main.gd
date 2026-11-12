@@ -20060,7 +20060,8 @@ func _task_for(body: Resident) -> Dictionary:
 		if from < 0 or back_at < 0 or now < back_at - _walk_home(body, spot["cell"], store_cell):
 			return {"kind": "chop", "cell": spot["cell"], "face": spot["face"], "walking": false}
 		var pile := _pile_spot(body.town, store_cell)
-		return {"kind": "carry_log", "cell": pile.get("cell", _nearest_free(store_cell)), "face": pile.get("face", Resident.NO_CELL), "walking": true}
+		var cell: Vector2i = pile["cell"] if pile.has("cell") else _carry_cell(body, store_cell)
+		return {"kind": "carry_log", "cell": cell, "face": pile.get("face", Resident.NO_CELL), "walking": true}
 	# The trades by their names in economy.json (hunter.trade, buildings' field and pasture trades, herder.trade).
 	if body.trade == "hunter":
 		return _hunter_task(body)
@@ -20296,6 +20297,18 @@ func _site_spot(site: Dictionary, town: String) -> Dictionary:
 ## Where [param town]'s carried logs land: beside the woodpile standing
 ## within WOODPILE_REACH of [param store_cell] (566 amended), facing it;
 ## {} with none (the store's cell then). Kept by town.
+## Where [param body] takes its log with no woodpile by the store (521 amended (2)): the store's nearest free
+## cell, but the cell its carry already names stays while it stands there or no one else does. Asked
+## afresh each check, the nearest free cell skipped the one the carrier stood on, and he stepped back and
+## forth between two cells till his yield landed (npc's look at Umbrage: 21 flips at 15:00).
+func _carry_cell(body: Resident, store_cell: Vector2i) -> Vector2i:
+	if str(body.task.get("kind", "")) == "carry_log" and body.task.get("cell") is Vector2i:
+		var held: Vector2i = body.task["cell"]
+		if held == body.tile or World.is_free(held):
+			return held
+	return _nearest_free(store_cell)
+
+
 func _pile_spot(town: String, store_cell: Vector2i) -> Dictionary:
 	var key := "pile:" + town
 	if not _site_spots.has(key):

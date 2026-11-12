@@ -17778,6 +17778,17 @@ the front-cell geometry. The has_method guards on economy's trip,
 build_progress and set_awake are gone (all on main). resident_test: the turn by the
 walk home against a stand-in trip. Server only, protocol unchanged.
 
+521 amended (2) (a carrier keeps the cell he holds; the coordinator's approval, 2026-11-12; the label from
+decision_number.sh). npc's look at Umbrage found the woodcutter on the return half stepping between two
+cells by the store every 10 ticks till his yield landed (21 flips at 15:00 on seed 0): with no woodpile
+by the store, his carry's cell was the store's nearest free cell asked afresh at each work check, and
+the cell he stood on is not free, so each check named the one beside it. Main._carry_cell: the cell his
+carry already names stays while he stands on it or no one else does; else the nearest free cell as
+before. A woodpile (_pile_spot) comes first, as before. resident_test: no woodpile, the cell kept over
+30 checks while he stands on it; his cell taken while he is off it, another. tools/look_day prints the
+carry's cell changes by hour. A pile spot at Umbrage's store
+is wanted of maps anyway. Server only, protocol unchanged, no new class_name.
+
 ## 513, terrain's side: rocks and slopes drawn
 
 513 left terrain the slope's ramp and the rocks from art-kit's slots.
