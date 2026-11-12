@@ -1624,8 +1624,8 @@ gate._write = noting_write
 gate.take("marker", "scene", os.getpid())
 gate._write = real_write
 gate.release("marker", "scene")
-check(written and written[0].get("lock_rule") == gate.LOCK_RULE and written[0].get("gate") == gate.GATE_REVISION == 38,
-    "a waiter's queue entry carries lock_rule and gate 38 (%s)" % (written[:1],))
+check(written and written[0].get("lock_rule") == gate.LOCK_RULE and written[0].get("gate") == gate.GATE_REVISION >= 38,
+    "a waiter's queue entry carries lock_rule and its gate revision, 38 or later (%s)" % (written[:1],))
 table41 = gate.kinds()
 def entry41(tree, kind, marked, n):
     return dict({"file": "%019d-%s-1.json" % (n, tree), "tree": tree, "kind": kind, "queued": 1000.0 + n},
@@ -1732,6 +1732,57 @@ if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
     gate._retried(os.remove, gate._path("kinds.json"))
+
+print("== a bench behind a convoy holds no scene it could not use (394 amended (40)) ==")
+# 2026-11-12: builder's bench 13th, about 12 remote landings ahead of it, and a
+# 7-minute scene told "going past it needs 407 s, the suite_remote is due in
+# 352 s": the bench's start was some 90 minutes off, and a dozen scenes waited.
+now = 50000.0
+convoy_runs = {"suite_remote": dict(gate.KINDS["suite_remote"], runs_s=[480.0]), "scene": dict(gate.KINDS["scene"], runs_s=[300.0]),
+    "bench": dict(gate.KINDS["bench"], runs_s=[600.0]), "soak": dict(gate.KINDS["soak"], runs_s=[3000.0])}
+remote_on = dict(running(1, 1), kind="suite_remote", started=now - 128)
+# Three more landings' takes wait on the land lock (394 amended (36)), so the rows queued wait on their kind.
+lock_waits = [dict(running(0, 0), kind="suite_remote", started=now - 60, lock_wait=True) for _ in range(3)]
+landing = lambda n: dict(gate.KINDS["suite_remote"], kind="suite_remote", tree="t%d" % n)
+convoy = [landing(n) for n in range(12)]
+bench_13th = dict(gate.KINDS["bench"], kind="bench", tree="builder")
+seven = dict(gate.KINDS["scene"], kind="scene", tree="playtest")
+ok, past, why, holder = gate.passes_held(seven, convoy + [bench_13th], [remote_on] + lock_waits, 60.0, None, convoy_runs, now, 420.0)
+check(ok and [each["kind"] for each in past] == ["bench"], "a 7-minute scene goes past the bench 13th (%s)" % why)
+check(past and past[0]["due"] == now - 128 + 480.0 + 15 * 480.0,
+    "the bench's start counted after the running landing and the fifteen after it: %s" % (past and past[0]["due"] - now))
+ok, _, why, holder = gate.passes_held(seven, [bench_13th], [remote_on], 60.0, None, convoy_runs, now, 420.0)
+check(not ok and holder == 0 and "due in 352 s" in why, "a bench at the true head still holds it, as before (%s)" % why)
+ok, _, _, _ = gate.passes_held(seven, [bench_13th], [remote_on], 60.0, None, convoy_runs, now, 300.0)
+check(ok, "and lets past one that ends before the landing does")
+ok, _, why, _ = gate.passes_held(dict(seven, expect_s=8000.0), convoy + [bench_13th], [remote_on] + lock_waits, 60.0, None, convoy_runs, now, 8000.0)
+check(not ok and "the bench may start in 7552 s (the suite_remote running, then 15 suite_remote ahead of it)" in why,
+    "a scene longer than the convoy (8000 s) still waits, told why: %s" % why)
+# Past its median, the running landing's end is unknown: still at least now, and the fifteen after it.
+late = dict(remote_on, started=now - 900)
+ok, past, why, _ = gate.passes_held(seven, convoy + [bench_13th], [late] + lock_waits, 60.0, None, convoy_runs, now, 420.0)
+check(ok and past[0]["due"] == now + 15 * 480.0, "a landing past its median counts from now (%s)" % why)
+ok, _, why, _ = gate.passes_held(seven, [bench_13th], [late], 60.0, None, convoy_runs, now, 420.0)
+check(not ok and "past its usual length" in why, "with nothing queued ahead, nobody goes past it, as before (%s)" % why)
+# A lower bound: a kind allowed two adds its longest, kinds beside each other count the longest,
+# a row with no runs, one out of reach and one the head may go past count nothing.
+scenes = [dict(gate.KINDS["scene"], kind="scene", tree="s%d" % n, runs_s=[300.0]) for n in range(3)]
+at, _, counted = gate.head_due(bench_13th, scenes, None, [], convoy_runs, now)
+check(at == now + 300.0 and counted == {"scene": 3}, "three scenes ahead: the longest, 300 s (%s, %s)" % (at and at - now, counted))
+soak_ahead = dict(gate.KINDS["soak"], kind="soak", tree="economy")
+at, _, counted = gate.head_due(bench_13th, convoy[:2] + [soak_ahead], None, [remote_on], convoy_runs, now)
+check(at == now + 3000.0, "two landings and a soak, which run beside each other: the longer (%s)" % (at and at - now))
+at, _, counted = gate.head_due(bench_13th, convoy[:2], None, [remote_on], {"bench": convoy_runs["bench"]}, now)
+check(at is None and counted == {}, "rows with no runs recorded count nothing (%s)" % ((at, counted),))
+huge = dict(landing(99), ram_gb=1e12)
+at, _, counted = gate.head_due(bench_13th, [huge], None, [], convoy_runs, now, 60.0, None)
+check(at is None and counted == {}, "a row out of reach counts nothing")
+at, _, counted = gate.head_due(bench_13th, [landing(0)], [(now + 5000.0, "", {"suite_remote": 9})], [], convoy_runs, now)
+check(at is None and counted == {}, "a row the head may go past (its own start 5000 s off, the bench 750 s) counts nothing")
+print("== the bench's status line (394 amended (40)) ==")
+line = gate.bench_wait(bench_13th, convoy, [remote_on] + lock_waits, convoy_runs, now, 60.0, None)
+check(line == "; after 15 landings ahead, about 126 min", "a bench behind the convoy: %r" % line)
+check(gate.bench_wait(bench_13th, [], [remote_on], convoy_runs, now, 60.0, None) == "", "none ahead: nothing said")
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))

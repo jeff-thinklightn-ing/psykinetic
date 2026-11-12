@@ -10684,6 +10684,32 @@ among them, 36 minutes and more, with 27 GB free. Status run from the other side
   eight held ones pass the 21 queued suites; with only the suite running and each light job
   ending, all 30 light rows start in queue order while the suites keep theirs; main's code on
   the same copy holds them behind the head suite. Tools and tests only; protocol unchanged.
+394 amended (40) (perf, 2026-11-12; the coordinator's ask and approval; label from tools/decision_number.sh): a
+head's due time counts the rows ahead of it. builder's bench sat 13th behind about 12 remote landings, each of which
+runs before it by queue order and excludes it, so its start was some 90 minutes off; the backfill test counted only
+the jobs running ("going past it needs 407 s, the suite_remote is due in 352 s", or with the soak's runs not
+recorded, nobody past at all), and a dozen scenes waited an hour and more behind a bench they could not have
+delayed (playtest's v0.1.213 run among them). terrain's bench did the same on 11-10. Now (head_due):
+- A head's earliest start is its running blockers' ends, then the rows queued ahead of it that it conflicts with
+  and the landing takes waiting on the land lock (36), each at its kind's median run: rows of a kind capped at one
+  running add up from the end of that kind's running job, a kind allowed more adds its longest, kinds that may run
+  beside each other count the longest. A row the head itself may go past (started as early as it could, it ends
+  before that row starts), one out of reach, and one with no runs recorded count nothing: a lower bound, so an
+  error only makes going past it stricter.
+- A running blocker with no runs recorded, or past its median, has no known end: with rows queued ahead of the
+  head it counts from now; with none, nobody goes past it, as before.
+- A bench at the true head (nothing queued ahead it waits on) holds the scenes behind it as before, so scenes
+  never starve a bench; landings queued before a bench go first, as queue order says.
+- A refused backfill says how far off the head is: "the bench may start in N s (the suite_remote running, then
+  12 suite_remote ahead of it)". A queued bench's status line ends "; after N landings ahead, about M min", so
+  its tree sees a bench behind a convoy and may pull it. No refusal of benches by queue depth: a landing queued
+  after a bench would still hold it.
+Replayed over a stripped copy of the live queue (11-12 ~14:00, 33 rows): unchanged, but for nothing (the count of
+three running holds it); with builder's bench seeded 13th, three lock waits and a running scene dropped, the first
+scene behind the bench may start by backfill, where the old code held all eleven. tests/heavy_job_test.py: the
+convoy case, a true-head bench still holding, a blocker past its median, the lower bound's cases, the status line.
+It changes how a waiter judges the rows ahead of it and lands after 41, so by 41's rule it raises GATE_REVISION to 39.
+Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 394 amended (42): heavy_job_test removes the gate's files through _retried (the coordinator's ask and release's report,
 2026-11-12; label from tools/decision_number.sh). art-kit-lamps' landing failed at 18:31 on heavy_job_test alone: the

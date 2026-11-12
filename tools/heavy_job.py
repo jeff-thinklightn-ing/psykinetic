@@ -190,7 +190,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 38
+GATE_REVISION = 39  # 40: a head's due time counts the rows ahead of it.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -607,13 +607,15 @@ def passes_held(job, ahead, running, free_ram_gb=None, free_commit_gb=None, tabl
     holder None when it may. Each row ahead is judged by its own length
     (backfill_length: its waiter's --expect, from its queue entry)."""
     held = []
+    dues = ahead_dues(ahead, running, table, now, free_ram_gb, free_commit_gb)
     for other in ahead:
         held.append(kind_blocked(other, running) or not _passes(
-            other, ahead[:len(held)], held, running, free_ram_gb, free_commit_gb, table, now, backfill_length(other))[0])
-    return _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s)
+            other, ahead[:len(held)], held, running, free_ram_gb, free_commit_gb, table, now, backfill_length(other),
+            dues)[0])
+    return _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s, dues)
 
 
-def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s):
+def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s, dues=None):
     """passes over [ahead], [held] saying for each whether it waits on kind,
     its own or by those before it.
 
@@ -633,7 +635,7 @@ def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, 
         if other.get("kind") == job.get("kind") and kind_blocked(other, running):
             return False, [], "", place
         if conflicts(job, other):
-            ok, due, why = may_backfill(other, running, table, now, length_s)
+            ok, due, why = may_backfill(other, running, table, now, length_s, dues[place] if dues else None)
             if not ok:
                 return False, [], why, place
             past.append(dict(other, due=due))
@@ -680,33 +682,144 @@ def blockers(job, running):
     return found
 
 
-def may_backfill(head, running, table, now, length_s):
+def ahead_dues(ahead, running, table, now, free_ram_gb=None, free_commit_gb=None):
+    """head_due of each row in [ahead], each against the rows before it."""
+    dues = []
+    for place, row in enumerate(ahead):
+        dues.append(head_due(row, ahead[:place], dues, running, table, now, free_ram_gb, free_commit_gb))
+    return dues
+
+
+def runs_of(table, row):
+    """[row]'s recorded runs: its estimate's in [table] (a lean suite's
+    own), else those it carries."""
+    return (table or {}).get(row.get("estimate", row.get("kind")), {}).get("runs_s") or row.get("runs_s") or []
+
+
+def head_due(head, before, dues, running, table, now, free_ram_gb=None, free_commit_gb=None):
+    """When [head] could start at the earliest, as those going past it count
+    it (394 amended (40)): (due, why, counted). due: its blockers' ends (each
+    running one's start plus its estimate's median), and after them the rows
+    queued in [before] that it conflicts with, which run first by queue order,
+    each at its kind's median: rows of a kind capped at one running add up,
+    from the end of that kind's running job; a kind allowed more adds its
+    longest. A row the head itself may go past ([dues], each row's own
+    head_due, against the head's length), one out of reach, and one with no
+    runs recorded count nothing, and kinds that may run beside each other
+    count the longest: a lower bound, so an error only makes going past it
+    stricter. due None: nobody goes past, [why] says why ("" when nothing
+    holds the head by kind or queue). counted: the rows counted, by kind.
+
+    Before, only the running blockers counted. builder's bench sat 13th
+    behind about 12 remote landings, its start some 90 minutes off, while a
+    7-minute scene was told "going past it needs 407 s, the suite_remote is
+    due in 352 s": a dozen scenes waited an hour and more for nothing
+    (2026-11-12); terrain's bench did the same on 11-10."""
+    if table is None or now is None:
+        return None, "", {}
+    ends = []
+    unknown = ""
+    sums = {}
+    counted = {}
+    for each in blockers(head, running):
+        if each.get("lock_wait"):
+            # A landing's take waiting on the land lock (394 amended (36)): it runs
+            # after the one holding it, as a row queued ahead does.
+            runs = runs_of(table, each)
+            if runs:
+                kind = each.get("kind")
+                sums[kind] = sums.get(kind, 0.0) + median_s(runs)
+                counted[kind] = counted.get(kind, 0) + 1
+            continue
+        runs = table.get(each.get("estimate", each.get("kind")), {}).get("runs_s", [])
+        if not runs or each.get("started") is None:
+            unknown = unknown or "going past it needs the %s's runs recorded" % each.get("kind")
+            continue
+        end = each["started"] + median_s(runs)
+        if end <= now:
+            unknown = unknown or "the %s running is past its usual length, its end unknown" % each.get("kind")
+            continue
+        ends.append(end)
+    head_length = backfill_length(head)
+    if head_length is None and runs_of(table, head):
+        head_length = max(runs_of(table, head)) * BACKFILL_MARGIN
+    # The head's earliest start from what runs alone: it may go past a row
+    # queued ahead only when it would end, started then, before that row starts.
+    base = _due_after(ends, sums, running, table, now)
+    for place, row in enumerate(before):
+        if not conflicts(head, row):
+            continue
+        if free_ram_gb is not None and out_of_reach(row, running, free_ram_gb, free_commit_gb):
+            continue
+        runs = runs_of(table, row)
+        if not runs:
+            continue
+        row_due = dues[place][0] if dues is not None and place < len(dues) else None
+        if row_due is not None and head_length is not None and (base or now) + head_length <= row_due:
+            continue  # The head may go past it.
+        kind = row.get("kind")
+        if row.get("max_running") == 1:
+            sums[kind] = sums.get(kind, 0.0) + median_s(runs)
+        else:
+            sums[kind] = max(sums.get(kind, 0.0), median_s(runs))
+        counted[kind] = counted.get(kind, 0) + 1
+    if not sums:
+        if unknown:
+            return None, unknown, {}
+        if not ends:
+            return None, "", {}
+        return max(ends), "", {}
+    return _due_after(ends, sums, running, table, now), "", counted
+
+
+def _due_after(ends, sums, running, table, now):
+    """head_due's sum: the latest of [ends] and, for each kind in [sums], the
+    end of that kind's running job (else now) plus its sum; None with
+    neither."""
+    if not ends and not sums:
+        return None
+    due = max(ends) if ends else now
+    for kind, total in sums.items():
+        start = now
+        for each in running:
+            if each.get("kind") != kind or each.get("started") is None or each.get("lock_wait"):
+                continue
+            runs = table.get(each.get("estimate", kind), {}).get("runs_s", [])
+            if runs:
+                start = max(start, each["started"] + median_s(runs))
+        due = max(due, start + total)
+    return due
+
+
+def counted_text(counted):
+    """head_due's counted rows as words: "3 suite_remote and 1 soak"."""
+    return " and ".join("%d %s" % (counted[kind], kind) for kind in sorted(counted))
+
+
+def may_backfill(head, running, table, now, length_s, due=None):
     """Whether a job [length_s] long may start ahead of [head], which it
-    conflicts with (394 amended (18)): [head] waits on kind alone and its
-    blockers should end (each one's start plus its estimate's median run,
-    from [table]) after the job would. A blocker with no runs recorded or
-    past its median has no known end: nobody goes past. (ok, due, why):
-    due, when the blockers should all have ended."""
+    conflicts with (394 amended (18)): [head] waits on kind or the queue, and
+    could not start (head_due, [due] when its caller has it: 394 amended
+    (40)) before the job would end. A blocker with no runs recorded or past
+    its median has no known end: nobody goes past, unless rows queued ahead
+    of the head put its start further off. (ok, due, why): due, when the
+    head could start."""
     if table is None or now is None:
         return False, None, ""
     if length_s is None:
         return False, None, "going past it needs runs of this kind recorded"
-    ends = []
-    for each in blockers(head, running):
-        runs = table.get(each.get("estimate", each.get("kind")), {}).get("runs_s", [])
-        if not runs or each.get("started") is None:
-            return False, None, "going past it needs the %s's runs recorded" % each.get("kind")
-        end = each["started"] + median_s(runs)
-        if end <= now:
-            return False, None, "the %s running is past its usual length, its end unknown" % each.get("kind")
-        ends.append(end)
-    if not ends:
-        return False, None, ""
-    due = max(ends)
-    if now + length_s > due:
-        return False, None, "going past it needs %.0f s, the %s is due in %.0f s" % (
-            length_s, "/".join(sorted(set(each.get("kind") for each in blockers(head, running)))), due - now)
-    return True, due, ""
+    if due is None:
+        due = head_due(head, [], [], running, table, now)
+    at, why, counted = due
+    if at is None:
+        return False, None, why
+    if now + length_s > at:
+        kinds = "/".join(sorted(set(each.get("kind") for each in blockers(head, running)))) or "queue"
+        if counted:
+            return False, None, "going past it needs %.0f s, the %s may start in %.0f s (the %s running, then %s ahead of it)" % (
+                length_s, head.get("kind"), at - now, kinds, counted_text(counted))
+        return False, None, "going past it needs %.0f s, the %s is due in %.0f s" % (length_s, kinds, at - now)
+    return True, at, ""
 
 
 def short_of_memory(free_ram_gb, free_commit_gb=None):
@@ -2301,7 +2414,21 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
                 other_why or "its next look", "; " + past_why if past_why else ""))
         else:
             out.append("waits: %s" % at_least(table, row, why))
+        if not ok and row.get("kind") == "bench":
+            out[-1] += bench_wait(row, ahead, running, table, now, free_ram, free_commit)
     return out
+
+
+def bench_wait(row, ahead, running, table, now, free_ram, free_commit):
+    """A queued bench's wait on the landings ahead of it, for its status line
+    (394 amended (40)): "; after N landings ahead, about M min", so its tree
+    sees a bench behind a convoy and may pull it; "" with none ahead."""
+    dues = ahead_dues(ahead, running, table, now, free_ram, free_commit)
+    at, _, counted = head_due(row, ahead, dues, running, table, now, free_ram, free_commit)
+    landings = sum(count for kind, count in counted.items() if landing_kind(kind))
+    if not landings or at is None:
+        return ""
+    return "; after %d landing%s ahead, about %.0f min" % (landings, "" if landings == 1 else "s", (at - now) / 60.0)
 
 
 def status():
