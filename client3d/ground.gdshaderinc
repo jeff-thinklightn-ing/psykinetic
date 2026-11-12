@@ -132,6 +132,11 @@ varying vec3 world;
 // dries toward straw out of season and turns in autumn; snow lies where the
 // ground faces up (slopes and steps stay bare), never on a building's floor.
 global uniform vec4 season;
+// Wet ground (889): how wet the open ground is (WeatherView.wet, 0 while
+// Client3D.wet_ground is off or indoors), and the look's daylight
+// (710 amended (1)).
+global uniform float ground_wet;
+global uniform float look_day;
 // Where the live zone lies on the world plane (decision 822, Client3D sets it):
 // added to a world position, the place on the plane, so a pattern read there
 // runs on across two zones drawn side by side and is the same after a swap.
@@ -320,6 +325,32 @@ const float KIND_WOBBLE = 0.35;
 const float KIND_EDGE = 0.25;
 const float GRASS_WEAR = 0.7;
 
+// Wet ground (889): stone, dirt and sand darkened by WET_DARK at full wet,
+// grass by WET_GRASS, by night WET_NIGHT of that (858's lifted night floor
+// stays: wet cobbles no darker than 0.9 of dry); the hard ground's
+// roughness toward WET_ROUGH, a soft sheen of the sky. Dry under floors,
+// fading to dry over WET_EDGE of a cell beside one (a porch, a doorway),
+// and less under a forest's roof.
+const float WET_DARK = 0.3;
+const float WET_GRASS = 0.1;
+const float WET_NIGHT = 0.3;
+const float WET_ROUGH = 0.55;
+const float WET_EDGE = 0.35;
+
+bool floor_at(ivec2 cell) {
+	return texelFetch(floors, clamp(cell, ivec2(0), ivec2(kinds_size) - 1), 0).r > 0.5 / 255.0;
+}
+
+// 1 in the open, falling to 0 at the edge of a floor's cell beside it.
+float dry_edge(vec2 in_kinds, ivec2 cell) {
+	vec2 f = fract(in_kinds);
+	ivec2 side = ivec2(f.x < 0.5 ? -1 : 1, f.y < 0.5 ? -1 : 1);
+	vec2 off = min(f, 1.0 - f);
+	float x = floor_at(cell + ivec2(side.x, 0)) ? smoothstep(0.0, WET_EDGE, off.x) : 1.0;
+	float y = floor_at(cell + ivec2(0, side.y)) ? smoothstep(0.0, WET_EDGE, off.y) : 1.0;
+	return min(x, y);
+}
+
 // The grass and the dirt lifted toward the capsule days' greens (decision
 // 532, Jeff: "tone 8 approved, good improvement"): the grass turned
 // GRASS_HUE degrees toward green and its saturation and value raised, the
@@ -420,6 +451,7 @@ void fragment() {
 
 	ivec2 cell = ivec2(floor(at - kinds_origin + 0.5));
 	int floor_set = int(round(texelFetch(floors, clamp(cell, ivec2(0), ivec2(kinds_size) - 1), 0).r * 255.0));
+	bool open_cell = floor_set == 0;
 	if (floor_set >= 8) {
 		floor_set -= 8;
 		float rot = noise(at * 1.6 + 31.0) * 0.7 + noise(at * 5.0 + 7.0) * 0.3;
@@ -453,6 +485,13 @@ void fragment() {
 	if (floor_set == 0) {
 		forest = max(forest, smoothstep(0.45, 0.75, roof + (noise(at * 1.3 + 70.0) - 0.5) * 0.3) * weights.r);
 	}
+	float wet_rough = 0.0;
+	if (ground_wet > 0.0 && open_cell) {
+		float wet_here = ground_wet * (1.0 - 0.7 * roof) * dry_edge(at - kinds_origin + 0.5, cell);
+		float hard = clamp(weights.g + weights.b + weights.a, 0.0, 1.0);
+		colour *= 1.0 - wet_here * mix(WET_GRASS, WET_DARK, hard) * mix(WET_NIGHT, 1.0, look_day);
+		wet_rough = wet_here * hard * (1.0 - forest);
+	}
 	vec3 under_trees = needles_own ? textureGrad(needles_tex, at / needles_tile, dx / needles_tile, dy / needles_tile).rgb * needles_shade
 			: forest_floor * (0.8 + 0.4 * fbm(at * 0.4 + 50.0));
 	colour = mix(colour, under_trees, forest);
@@ -470,7 +509,7 @@ void fragment() {
 	ALBEDO = pow(mix(lit, warm_srgb, shade.g), vec3(2.2));
 	float lift = max(pow(sky_here, 2.2) - pow(base_here, 2.2), 0.0) * (1.0 - shade.g);
 	EMISSION = pow(warm_srgb * shade.g, vec3(2.2)) + colour * lift * night_sky_light;
-	ROUGHNESS = 1.0;
+	ROUGHNESS = mix(1.0, WET_ROUGH, wet_rough);
 	METALLIC = 0.0;
 	SPECULAR = 0.5;
 }

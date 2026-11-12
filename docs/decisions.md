@@ -51471,3 +51471,48 @@ and lifted; the lock's checkout. Tools and tests only; protocol unchanged; no cl
 **Not.** Not behind 858's switch: the server reads the same curve (Senses, the animals, the economy), so a client-only switch would split the game's dark from what it shows. No wire change (each side works the light out from the clock), but an old client would draw night about 27 game minutes before the server's dark, so PROTOCOL_REVISION goes up (release's number). NIGHT_LIGHT alone moved to -6 (option 2) would sit on smoothstep's flat foot (0.202) and split hiding from the wolves; a night clock by the sun (option 3) also splits them.
 
 **Tests.** view_test `_test_dusk_floor`: at sunset the floor still the day's; at -5.3 the sim not yet dark, the floor over 0.45 (0.30 before), over 0.7 under the night look with its colour keeping the light it had off; dawn at -5.3 the same; at -10.5 dark and the night's floor; a storm's dusk keeps the cloud's share. day_night_test (enemy-ai's): at the equinox the dark falls with the sun between -6.5 and -5.5.
+## 889. Wet ground: a duller day under rain and the open ground wet, drawn on the client (environment)
+
+The coordinator's three-worst item 1 of 2026-11-12, approved from the design
+(C:/dev/review/environment/wet_ground/WET_DESIGN.md) and its CPU mock: rain by day read as sun with
+streaks over it (the square at noon: frame 114 against 128 clear, the cobbles dry, the grass keeping
+0.88 of its saturation). Its own package, "wet ground", switched on by environment when its stills
+pass (clear noon, rain noon, rain 22:30, a fight's red tell in rain, the minute after rain as it
+dries); it lands off (Client3D.WET_GROUND false, the static wet_ground mirroring it for tests and
+stills).
+
+- The day under rain (weathered_look, only with wet_ground): the ambient's energy takes
+  CLOUD_AMBIENT 0.2 of the cloud, by the look's daylight (none by night, so 858's night floor
+  stays); the sun's colour greys by CLOUD_GREY_WET 0.5 of the cloud (was 0.25); rain takes RAIN_SUN
+  0.15 more of the sun's energy, its shadows fading with it. Overcast without rain gets only the
+  cloud's parts. The bar for the stills: at steady rain at noon the frame 0.80 to 0.85 of clear and
+  the grass's saturation 0.70 to 0.75 of clear, from the light alone (the grass's wet share is
+  small).
+- Wet ground: WeatherView.wet, 0..1, eases toward the rain falling through (rain x (1 - canopy))
+  in about WET_IN 40 s and dries over DRY_OUT 300 s after (DRY_SLOW 1.5 times slower by night and
+  in the cold: two to three game hours at most); arriving outdoors in rain it starts at the rain's
+  own (a player never lands on dry stones in a downpour), after rain at 0 (the client can't know
+  when it rained, and nothing is sent to close that). Told to the ground shader as the global
+  ground_wet (0 indoors and while wet_ground is off). There stone, dirt and sand darken by WET_DARK
+  0.3 at full wet and grass by WET_GRASS 0.1, by night (look_day, 710 amended (1)) WET_NIGHT 0.3
+  of that, so wet cobbles at night keep 0.91 of dry and 858's lifted floor stays; the hard
+  ground's roughness falls toward WET_ROUGH 0.55, a soft sheen of the sky's light (no reflection
+  pass). Less under a forest's roof (as the snow is). Floors stay dry, and an open cell beside a
+  floor's cell (a roofed porch, a doorway) dries toward that edge over WET_EDGE 0.35 of a cell, so
+  no hard line. The ground under an open stall's awning is ground, not a floor: it wets with the
+  rest (rain blows in; a dry square under each awning would read as a stamp).
+- A fight's red tell stays readable: darker ground under the same red only widens the gap
+  (worst case 1.01 of dry's colour contrast over grey, dark and dirt ground, by day and night, at
+  the faint and full strengths).
+- Drawn only: nothing sent, nothing written to the sim. Weather.at, World.fields.weather, Fields'
+  light (CLOUD_DIM), Senses, economy's wells and farms, the residents' and companions' words,
+  storms and sound's polling read what they read before. Sound may read WeatherView.wet for
+  footsteps on wet stone later; nothing here does.
+- Cost: one global float a frame, and in the ground's fragment, only while wet, two neighbour
+  reads of the floors and three mixes. Perf's Lenovo before and after (clear and rain at 10 s) goes
+  with the stills.
+
+weather_test _test_wet_ground: the wetting and drying times, arriving soaked, dry indoors and under
+a full canopy, the ground shader's constants and lines, the night's share (0.91 of dry), the tell's
+contrast (at least 0.9 of dry), the duller day's parts (and none of it with wet_ground off), and the
+sim's weather untouched. Client only, protocol unchanged, no new class_name.

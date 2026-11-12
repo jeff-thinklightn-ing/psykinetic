@@ -18,6 +18,12 @@ extends Node3D
 ## How fast the drawn weather follows the sim's (per second): the sim's
 ## already changes gradually; this only smooths its ticks.
 const EASE := 2.0
+## Wet ground (889): the rain wets the open ground in about WET_IN s (to
+## 95%) and it dries over DRY_OUT s after, DRY_SLOW times slower at night
+## and in the cold.
+const WET_IN := 40.0
+const DRY_OUT := 300.0
+const DRY_SLOW := 1.5
 ## The rain: drops at most, the box they fall in round the view (x, z
 ## across, y high), their fall (m/s) and how far the wind slants it.
 const RAIN_DROPS := 2400
@@ -217,6 +223,14 @@ var drip := 0.0
 ## The share of the water's drop cells ringing, as last set on the
 ## `rain_rings` global (309 amended (2)).
 var rings := 0.0
+## How wet the open ground is (889), 0..1: it eases toward the rain falling
+## through (rain x (1 - canopy)) in about WET_IN s and dries over DRY_OUT s
+## after (slower by night and in the cold), drawn only (never sent, never
+## the sim's); told to the ground shader as the `ground_wet` global while
+## Client3D.wet_ground. Arriving in rain it starts soaked (_soak).
+var wet := 0.0
+var _soak := false
+var _season := {}
 ## How far fog and clouds have drifted (m, world xz).
 var _drift := Vector2.ZERO
 var _rain: GPUParticles3D
@@ -267,14 +281,29 @@ func set_outdoor(value: bool) -> void:
 		_drips.emitting = false
 		_roofs.visible = false
 		_roofs_linger = 0.0
+	_soak = value
 	if not value:
 		canopy = 0.0
 		drip = 0.0
+		wet = 0.0
+		RenderingServer.global_shader_parameter_set("ground_wet", 0.0)
 		weather = {"cloud": 0.0, "rain": 0.0, "snow": 0.0, "fog": 0.0, "wind": 0.0, "wind_dir": Vector2.RIGHT}
 		RenderingServer.global_shader_parameter_set("wind", Vector4.ZERO)
 		RenderingServer.global_shader_parameter_set("season", Vector4(1.0, 0.0, 0.0, 0.0))
 		rings = 0.0
 		RenderingServer.global_shader_parameter_set("rain_rings", rings)
+
+
+## The ground's wetness (889) after [param delta] s from [param now]
+## toward [param falling] (the rain reaching it): up in about WET_IN s, down
+## over DRY_OUT s, DRY_SLOW times slower at night ([param daylight] under a
+## half) and in the [param cold].
+static func wet_after(now: float, falling: float, delta: float, daylight: float, cold: bool) -> float:
+	falling = clampf(falling, 0.0, 1.0)
+	if falling >= now:
+		return lerpf(now, falling, 1.0 - exp(-delta * 3.0 / WET_IN))
+	var out := DRY_OUT * (DRY_SLOW if daylight < 0.5 else 1.0) * (DRY_SLOW if cold else 1.0)
+	return maxf(falling, now - delta / out)
 
 
 ## The share of the water's drop cells that ring at drawn rain [param rain]
@@ -327,6 +356,7 @@ static func fog_eye_fade(clearance: float) -> float:
 ## The season's land for terrain and scatter (Season.at's green, turn and
 ## snow), outdoors only.
 func set_season(season: Dictionary) -> void:
+	_season = season
 	if outdoor:
 		RenderingServer.global_shader_parameter_set("season",
 				Vector4(season.get("green", 1.0), season.get("turn", 0.0), season.get("snow", 0.0), 0.0))
@@ -345,6 +375,10 @@ func ease_toward(target: Dictionary, delta: float) -> bool:
 	if not outdoor:
 		return false
 	var changed := false
+	if _soak:
+		# Arriving (889): the ground as wet as the rain falling now, at once.
+		wet = clampf(float(target.get("rain", 0.0)) * (1.0 - canopy), 0.0, 1.0)
+		_soak = false
 	var weight := 1.0 - exp(-EASE * delta)
 	for key: String in ["cloud", "rain", "snow", "fog", "wind"]:
 		var to := float(target.get(key, 0.0))
@@ -371,6 +405,8 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	RenderingServer.global_shader_parameter_set("wind", Vector4(way.x, way.y, wind, 0.0))
 	rings = ring_share(weather["rain"])
 	RenderingServer.global_shader_parameter_set("rain_rings", rings)
+	wet = wet_after(wet, weather["rain"] * (1.0 - canopy), delta, daylight, float(_season.get("snow", 0.0)) > 0.0 or float(_season.get("green", 1.0)) < 0.5)
+	RenderingServer.global_shader_parameter_set("ground_wet", wet if Client3D.wet_ground else 0.0)
 	_drift += way * (CALM_DRIFT + CLOUD_DRIFT * wind) * delta
 	# Under the low camera the rain's and snow's box runs from the camera out
 	# along the view (its z), the roofs' heightfield over it; in ortho, over

@@ -55,6 +55,10 @@ rendering_device/fallback_to_d3d12=true
 
 [shader_globals]
 
+ground_wet={
+"type": "float",
+"value": 0.0
+}
 look_day={
 "type": "float",
 "value": 1.0

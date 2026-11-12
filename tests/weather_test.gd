@@ -27,6 +27,7 @@ func _ready() -> void:
 	_test_in_the_field()
 	_test_climates_file()
 	_test_view()
+	_test_wet_ground()
 	_test_low_view()
 	_test_between()
 	_test_roofs()
@@ -206,6 +207,109 @@ func _test_view() -> void:
 	var a := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(35.9, 0.0))
 	var b := WeatherView.cloud_middle(Vector2(10.0, 0.0), Vector2(36.1, 0.0))
 	_check(absf(a.x - b.x) < 0.5, "the drift wrapping a period moves it smoothly (%.2f to %.2f)" % [a.x, b.x])
+
+
+## Wet ground (889): the drawn day under rain duller, the open ground
+## wetting and drying on the client alone; by night the wet cobbles no
+## darker than 0.9 of dry, and a fight's red tell as readable on them.
+func _test_wet_ground() -> void:
+	print("
+== wet ground ==")
+	var was := Client3D.wet_ground
+	# Wetting and drying.
+	var wet := 0.0
+	var t := 0.0
+	while wet < 0.95 * 0.7 and t < 200.0:
+		wet = WeatherView.wet_after(wet, 0.7, 0.5, 1.0, false)
+		t += 0.5
+	_check(absf(t - WeatherView.WET_IN) <= 1.0, "the rain wets the open ground in about %.0f s (%.0f)" % [WeatherView.WET_IN, t])
+	var dry_by := func(daylight: float, cold: bool) -> float:
+		var w := 1.0
+		var s := 0.0
+		while w > 0.0 and s < 3000.0:
+			w = WeatherView.wet_after(w, 0.0, 1.0, daylight, cold)
+			s += 1.0
+		return s
+	var by_day: float = dry_by.call(1.0, false)
+	var by_night: float = dry_by.call(0.0, false)
+	var cold_night: float = dry_by.call(0.0, true)
+	_check(absf(by_day - WeatherView.DRY_OUT) <= 1.0 and by_night > by_day * 1.4 and cold_night > by_night * 1.4
+			and cold_night / 60.0 / 3.75 <= 3.1,
+			"and dries over %.0f s by day, %.0f by night, %.0f on a cold night (%.1f game hours at most)" % [by_day, by_night, cold_night, cold_night / 60.0 / 3.75])
+	# Arriving in rain: soaked at once; under a full canopy dry; indoors 0.
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	view.ease_toward(Weather.KINDS["rain"], 0.016)
+	var arrived := view.wet
+	view.set_outdoor(false)
+	var indoors := view.wet
+	view.set_outdoor(true)
+	view.set_canopy(1.0, 1.0)
+	view.ease_toward(Weather.KINDS["rain"], 0.016)
+	var under := view.wet
+	view.set_outdoor(false)
+	view.free()
+	_check(is_equal_approx(arrived, Weather.KINDS["rain"]["rain"]) and indoors == 0.0 and under == 0.0,
+			"arriving in rain the ground is as wet as the rain (%.2f) at once; indoors and under a full canopy dry" % arrived)
+	# The ground shader: its constants, and the night's share.
+	var code := (load("res://client3d/ground.gdshaderinc") as ShaderInclude).code
+	var const_of := func(name: String) -> float:
+		var re := RegEx.create_from_string("const float %s = ([0-9.]+);" % name)
+		var m := re.search(code)
+		return float(m.get_string(1)) if m != null else -1.0
+	var dark: float = const_of.call("WET_DARK")
+	var grass: float = const_of.call("WET_GRASS")
+	var night: float = const_of.call("WET_NIGHT")
+	_check(code.contains("global uniform float ground_wet") and code.contains("mix(WET_GRASS, WET_DARK, hard) * mix(WET_NIGHT, 1.0, look_day)")
+			and code.contains("dry_edge(") and code.contains("ROUGHNESS = mix(1.0, WET_ROUGH, wet_rough)") and dark > 0.0 and grass > 0.0 and grass < dark,
+			"the ground shader darkens wet stone and dirt by %.2f, grass by %.2f, dry under floors and fading at their edge" % [dark, grass])
+	_check(1.0 - dark * night >= 0.9, "by night wet cobbles keep %.2f of dry (858's floor stays)" % (1.0 - dark * night))
+	# A fight's tell on wet ground as readable as on dry.
+	var red := Color("#f0402a")
+	var worst := 99.0
+	for ground: Color in [Color(0.39, 0.39, 0.39), Color(0.24, 0.24, 0.24), Color(0.12, 0.12, 0.12), Color(0.45, 0.33, 0.2), Color(0.22, 0.16, 0.1)]:
+		for day: float in [1.0, 0.0]:
+			var wet_colour := ground.srgb_to_linear() * (1.0 - dark * lerpf(night, 1.0, day))
+			for alpha: float in [Client3D.TELEGRAPH_NIGHT.x, Client3D.TELEGRAPH_DAY.y]:
+				var dry_tell := _delta_e(ground.srgb_to_linear().lerp(red.srgb_to_linear(), alpha), ground.srgb_to_linear())
+				var wet_tell := _delta_e(wet_colour.lerp(red.srgb_to_linear(), alpha), wet_colour)
+				worst = minf(worst, wet_tell / dry_tell)
+	_check(worst >= 0.9, "a fight's red tell on wet stone and dirt keeps %.2f of its contrast on dry at least" % worst)
+	# The day under rain (only with wet_ground).
+	var noon := Client3D.sky_look(60.0)
+	var rain: Dictionary = Weather.KINDS["rain"]
+	Client3D.wet_ground = false
+	var before := Client3D.weathered_look(noon, rain)
+	Client3D.wet_ground = true
+	var after := Client3D.weathered_look(noon, rain)
+	var dusk := Client3D.weathered_look(noon, rain, 0.0)
+	var overcast := Client3D.weathered_look(noon, Weather.KINDS["overcast"])
+	Client3D.wet_ground = was
+	_check(is_equal_approx(after["ambient_energy"], noon["ambient_energy"] * (1.0 - Client3D.CLOUD_AMBIENT * rain["cloud"]))
+			and is_equal_approx(dusk["ambient_energy"], noon["ambient_energy"])
+			and is_equal_approx(after["energy"], before["energy"] * (1.0 - Client3D.RAIN_SUN * rain["rain"]))
+			and (after["light"] as Color).s < (before["light"] as Color).s
+			and is_equal_approx(overcast["energy"], noon["energy"] * (1.0 - Client3D.CLOUD_SUN * Weather.KINDS["overcast"]["cloud"])),
+			"under rain the day duller: ambient %.2f of clear by day (as ever by night), sun %.2f of before, its colour greyer; overcast only the cloud's" % [after["ambient_energy"] / noon["ambient_energy"], after["energy"] / before["energy"]])
+	_check(not World.fields.weather.has("wet") and Client3D.WET_GROUND == false,
+			"drawn only (never the sim's weather), and off until its stills pass")
+
+
+## CIE76 colour difference of two linear colours.
+func _delta_e(a: Color, b: Color) -> float:
+	return _lab(a).distance_to(_lab(b))
+
+
+func _lab(c: Color) -> Vector3:
+	var x := (0.4124 * c.r + 0.3576 * c.g + 0.1805 * c.b) / 0.9505
+	var y := 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+	var z := (0.0193 * c.r + 0.1192 * c.g + 0.9505 * c.b) / 1.089
+	var f := func(v: float) -> float: return pow(v, 1.0 / 3.0) if v > 0.008856 else 7.787 * v + 16.0 / 116.0
+	var fx: float = f.call(x)
+	var fy: float = f.call(y)
+	var fz: float = f.call(z)
+	return Vector3(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
 
 
 ## The low camera (623, environment's side): the haze scaled so the aim

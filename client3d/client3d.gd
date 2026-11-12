@@ -902,6 +902,18 @@ const FLOOR_LIGHT_HIGH := 0.7
 ## for tests and stills.
 const NIGHT_LOOK_2 := false
 static var night_look_2 := NIGHT_LOOK_2
+## Wet ground (889, its own package "wet ground", off until its stills pass):
+## under rain the day duller and flatter (weathered_look: the ambient takes
+## CLOUD_AMBIENT of the cloud by day, the sun's colour greys by
+## CLOUD_GREY_WET of it, rain takes RAIN_SUN more of the sun), and the open
+## ground wet (WeatherView.wet, the ground shader's `ground_wet`). Drawn
+## only: nothing sent, nothing in the sim. The static mirrors the const for
+## tests and stills.
+const WET_GROUND := false
+static var wet_ground := WET_GROUND
+const CLOUD_AMBIENT := 0.2
+const CLOUD_GREY_WET := 0.5
+const RAIN_SUN := 0.15
 const NIGHT_FLOOR_DARKEST := 0.6
 const NIGHT_KEY_2 := {"ambient": Color(0.5, 0.55, 0.72), "ambient_energy": 0.135,
 		"light": Color(0.7, 0.76, 0.95), "energy": 0.2}
@@ -3753,7 +3765,7 @@ func _update_sky(delta: float) -> void:
 		_sun.shadow_opacity = SHADOW_STRENGTH * smoothstep(0.0, SHADOW_FADE, absf(elevation - MOON_BELOW))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
 	var canopy_cut := lerpf(CANOPY_AMBIENT, LOW_DUSK_CANOPY, low_dusk(_look_elevation)) if _low else CANOPY_AMBIENT
-	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
+	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather, _look_daylight),
 			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE, canopy_cut)
 	_look["weather_fog"] = look["fog"]
 	_sky_horizon = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
@@ -3954,7 +3966,12 @@ static func seasoned_look(look: Dictionary, season: Dictionary) -> Dictionary:
 ## [param look] (sky_look's) under [param weather] (Weather.at's amounts):
 ## cloud greys the sky and takes the sun's light (its shadows fade with
 ## it), fog thickens the haze and lies along the ground, rain darkens.
-static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
+##
+## Under wet_ground (889) the day is duller and flatter as well: the
+## ambient's energy takes CLOUD_AMBIENT of the cloud, by [param day] (the
+## look's daylight; so the night's floor stays 858's), the sun's colour
+## greys by CLOUD_GREY_WET of it, and rain takes RAIN_SUN more of the sun.
+static func weathered_look(look: Dictionary, weather: Dictionary, day := 1.0) -> Dictionary:
 	var cloud := float(weather.get("cloud", 0.0))
 	var fog := float(weather.get("fog", 0.0))
 	var rain := float(weather.get("rain", 0.0))
@@ -3965,8 +3982,11 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 	out["top"] = grey.call(look["top"], 0.75 * cloud)
 	out["horizon"] = grey.call(look["horizon"], 0.6 * cloud)
 	out["ambient"] = grey.call(look["ambient"], 0.25 * cloud)
-	out["light"] = grey.call(look["light"], 0.25 * cloud)
+	out["light"] = grey.call(look["light"], (CLOUD_GREY_WET if wet_ground else 0.25) * cloud)
 	out["energy"] = float(look["energy"]) * (1.0 - CLOUD_SUN * cloud)
+	if wet_ground:
+		out["energy"] = float(out["energy"]) * (1.0 - RAIN_SUN * rain)
+		out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 - CLOUD_AMBIENT * cloud * clampf(day, 0.0, 1.0))
 	out["fog"] = grey.call(look["fog"], maxf(0.6 * cloud, 0.8 * fog))
 	out["fog_weather"] = FOG_DENSITY * fog + RAIN_FOG_DENSITY * rain
 	out["fog_density"] = float(look["fog_density"]) + float(out["fog_weather"])
