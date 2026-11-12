@@ -10230,6 +10230,22 @@ later amendment may drop it. tests/heavy_job_test.py:
 - a failed beat is logged as beat_failed.
 Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (38) (perf, 2026-11-12; release's and the coordinator's report; label from tools/decision_number.sh):
+37's status line cried wolf. On landing it named all 38 entries in the gate "on older gate code ... it drops landing
+takes at 30 minutes", perf's own 31-and-later waiters among them: an entry with no GATE_REVISION was taken for
+older code, but 31 put no mark on entries, so one written by code from before 31 (which drops landing takes) and
+one from 31 to 36 (which drops none) are the same on disk, and most were the second. Now `status` names an entry
+only when it carries a lower revision ("on older gate code: ..., gate revision N of M, <checkout>; rebase it"),
+and gives one count of entries with none ("written before 394 amended (37), gate revision unknown: N (a count
+only ...; stop none on it)"), naming no one; only a named one is logged as old_gate, and the daily summary leaves
+out 37's own old_gate notes of unrevised entries. The coordinator asked for a test of three ages, before 31, 31 to
+36, and 37 on, with only the first named; the first two cannot be told apart, so the test seeds an entry with no
+revision (both), one of a lower revision and one of this code: only the lower is named and logged, the unrevised
+is counted, and 37's note of an unrevised entry stays out of the summary. The count falls to nothing as the queue
+turns over. An "unbeaten" line, the one that catches a pre-31 drop by what it does, now says whose take
+and since when ("unbeaten: <tree> <kind> held N min, since HH:MM, ..."), so release can act on it without reading
+code (the coordinator's ask). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

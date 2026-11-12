@@ -1243,9 +1243,18 @@ def _entries(folder):
 
 
 def older_code(entry):
-    """Whether [entry] was written by gate code older than this (394
-    amended (37)): none or a lower GATE_REVISION."""
-    return entry.get("gate", 0) < GATE_REVISION
+    """Whether [entry] was written by gate code known to be older than this:
+    a lower GATE_REVISION. An entry with none was written before 394 amended
+    (37), by code from before 31 (which drops landing takes at 30 minutes) or
+    from 31 to 36 (which does not): the same on disk, so it is not named
+    (394 amended (38)); unrevised() counts them."""
+    return "gate" in entry and entry["gate"] < GATE_REVISION
+
+
+def unrevised(entry):
+    """Whether [entry] carries no GATE_REVISION: written before 394 amended
+    (37), its code's age unknown (394 amended (38))."""
+    return "gate" not in entry
 
 
 def unbeaten(entry, now=None):
@@ -1269,11 +1278,12 @@ def _note_odd(folder, entries):
     odd = []
     for entry in entries:
         if older_code(entry):
-            odd.append(("old_gate", entry, "%s, pid %s, %s; rebase it (394 amended (37))" % (
-                folder, entry.get("waiter") if folder == "queue" else entry.get("pid"), _where(entry))))
+            odd.append(("old_gate", entry, "%s, pid %s, gate revision %s, %s; rebase it (394 amended (38))" % (
+                folder, entry.get("waiter") if folder == "queue" else entry.get("pid"), entry["gate"], _where(entry))))
         if folder == "running" and unbeaten(entry):
-            odd.append(("unbeaten", entry, "held %.0f min with no beat from its land lock tries, pid %s, %s" % (
-                (time.time() - entry.get("started", 0.0)) / 60, entry.get("pid"), _where(entry))))
+            odd.append(("unbeaten", entry, "held %.0f min, since %s, with no beat from its land lock tries, pid %s, %s" % (
+                (time.time() - entry.get("started", 0.0)) / 60, time.strftime("%H:%M", time.localtime(entry.get("started", 0.0))),
+                entry.get("pid"), _where(entry))))
     if not odd:
         return
     noted = _read(_path(NOTED_FILE)) or {}
@@ -1994,13 +2004,19 @@ def status():
     for folder, entries in (("running", running), ("queued", queue)):
         for entry in entries:
             if older_code(entry):
-                print("on older gate code: %s %s (%s), pid %s, %s: it drops landing takes at 30 minutes; rebase it" % (
+                print("on older gate code: %s %s (%s), pid %s, gate revision %s of %s, %s; rebase it" % (
                     entry["tree"], entry["kind"], folder, entry.get("waiter") if folder == "queued" else entry.get("pid"),
-                    _where(entry)))
+                    entry["gate"], GATE_REVISION, _where(entry)))
+    # 394 amended (38): no revision says nothing of the code's age, so a count, no names.
+    unknown = sum(1 for entry in running + queue if unrevised(entry))
+    if unknown:
+        print("written before 394 amended (37), gate revision unknown: %d (a count only: most are 31 to 36 code,"
+            " which drops nothing; stop none on it)" % unknown)
     for entry in running:
         if unbeaten(entry):
-            print("unbeaten: %s %s held %.0f min, no beat from its land lock tries (pid %s, %s)" % (
-                entry["tree"], entry["kind"], (time.time() - entry["started"]) / 60, entry.get("pid"), _where(entry)))
+            print("unbeaten: %s %s held %.0f min, since %s, no beat from its land lock tries (pid %s, %s)" % (
+                entry["tree"], entry["kind"], (time.time() - entry["started"]) / 60,
+                time.strftime("%H:%M", time.localtime(entry["started"])), entry.get("pid"), _where(entry)))
     if not running and not queue:
         print("no heavy jobs")
     return 0
@@ -2034,6 +2050,8 @@ def summary(day):
             for line in handle:
                 parts = line.rstrip("\n").split("\t")
                 if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in SUMMARY_EVENTS or "waited" in parts[4]):
+                    if parts[1] == "old_gate" and "gate revision" not in parts[4]:
+                        continue  # 37's own notes of an unrevised entry: its age unknown (394 amended (38)).
                     lines.append(parts)
     except OSError:
         pass

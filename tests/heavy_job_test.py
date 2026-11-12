@@ -10,6 +10,7 @@ import datetime
 import io
 import json
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -410,33 +411,51 @@ gate.release("adopt", "suite_remote")
 holder.kill()
 holder.wait()
 
-# Older code's entries, and an unbeaten landing take: named, logged once each.
-gate._write(gate._path("queue", "0000000000000000001-oldie-1.json"), {"tree": "oldie", "kind": "scene", "pid": None,
-    "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+# Older code's entries, and an unbeaten landing take (394 amended (38), the
+# coordinator's three ages): one with no revision stands for both pre-31 and
+# 31-36 code (the same on disk) and is counted, never named; one with a lower
+# revision is named and logged once; one from this code is neither.
+def seeded(name, tree, **more):
+    gate._write(gate._path("queue", name), dict({"tree": tree, "kind": "scene", "pid": None, "waiter": os.getpid(),
+        "waiter_since": gate.started_at(os.getpid()), "queued": time.time()}, **more))
+seeded("0000000000000000001-oldie-1.json", "oldie")
+seeded("0000000000000000002-lower-1.json", "lower", gate=gate.GATE_REVISION - 1, checkout="C:/dev/psykinetic-trees/lower")
+seeded("0000000000000000003-current-1.json", "current", gate=gate.GATE_REVISION, checkout=gate.CHECKOUT)
 gate._write(gate._path("running", "stuck-suite_remote-1.json"), gate.guard({"tree": "stuck", "kind": "suite_remote", "pid": None,
     "queued": time.time() - 700, "started": time.time() - 700, "ram_gb": 1.7, "gpu": False, "watched": False,
     "gate": gate.GATE_REVISION, "checkout": "C:/dev/psykinetic-trees/stuck"}, os.getpid(), gate.started_at(os.getpid())))
+with open(gate._path("heavy_jobs.log"), "a") as handle:  # 37's own note of an unrevised entry, as it wrote them.
+    handle.write("%s\told_gate\tearly\tscene\tqueue, pid 1, its checkout unknown (written before 394 amended (37)); rebase it\n"
+        % time.strftime("%Y-%m-%dT%H:%M:%S"))
 said = io.StringIO()
 with contextlib.redirect_stdout(said):
     gate.status()
     gate.status()
 said = said.getvalue()
-check("on older gate code: oldie scene (queued), pid %d, its checkout unknown" % os.getpid() in said,
-    "status names an entry older code wrote: %s" % [line for line in said.splitlines() if "older" in line][:1])
-check("unbeaten: stuck suite_remote held 12 min" in said and "C:/dev/psykinetic-trees/stuck" in said,
-    "status names a landing take 10 minutes unbeaten, with its checkout")
+named = [line for line in said.splitlines() if line.startswith("on older gate code:")]
+check(len(named) == 2 and all("lower scene (queued), pid %d, gate revision %d of %d, C:/dev/psykinetic-trees/lower"
+    % (os.getpid(), gate.GATE_REVISION - 1, gate.GATE_REVISION) in line for line in named),
+    "status names only the entry of a known lower revision, with its checkout (%s)" % named[:1])
+check(not any("oldie" in line or "current" in line for line in named), "nor one with no revision, nor one of this code")
+check("written before 394 amended (37), gate revision unknown: 1 (a count only" in said,
+    "an unrevised entry is counted, with no claim of harm")
+since = time.strftime("%H:%M", time.localtime(gate._read(gate._path("running", "stuck-suite_remote-1.json"))["started"]))
+check(("unbeaten: stuck suite_remote held 12 min, since %s, no beat" % since) in said and "C:/dev/psykinetic-trees/stuck" in said,
+    "status names a landing take 10 minutes unbeaten: whose, since when, and its checkout (the coordinator's ask)")
 with open(gate._path("heavy_jobs.log")) as handle:
     logged = handle.read()
-check(logged.count("\told_gate\toldie\t") == 1 and logged.count("\tunbeaten\tstuck\t") == 1,
-    "each logged once, however often looked at")
+check(logged.count("\told_gate\tlower\t") == 1 and logged.count("\tunbeaten\tstuck\t") == 1
+    and "\told_gate\toldie\t" not in logged and "\told_gate\tcurrent\t" not in logged,
+    "the lower one and the unbeaten take each logged once; the unrevised and the current not at all")
 said = io.StringIO()
 with contextlib.redirect_stdout(said):
     gate.summary(datetime.date.today().isoformat())
-by_tree = {line.split(" by tree: ")[0].split(": ")[-1]: line.split(" by tree: ")[1].split(", ")
-    for line in said.getvalue().splitlines() if " by tree: " in line}
-check("oldie 1" in by_tree.get("old_gate", []) and "stuck 1" in by_tree.get("unbeaten", []),
-    "the daily summary counts them by tree: %s" % by_tree)
-os.remove(gate._path("queue", "0000000000000000001-oldie-1.json"))
+by_tree = dict(re.findall(r": (old_gate|unbeaten) by tree: (.*)", said.getvalue()))
+check("lower 1" in by_tree.get("old_gate", "") and "early" not in by_tree.get("old_gate", "")
+    and "stuck 1" in by_tree.get("unbeaten", ""),
+    "the summary counts them by tree, leaving out 37's notes of unrevised entries (%s)" % by_tree)
+for name in ("0000000000000000001-oldie-1.json", "0000000000000000002-lower-1.json", "0000000000000000003-current-1.json"):
+    os.remove(gate._path("queue", name))
 os.remove(gate._path("running", "stuck-suite_remote-1.json"))
 
 if shell is not None:
