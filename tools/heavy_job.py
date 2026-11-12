@@ -200,7 +200,14 @@ KINDS = {
     # A suite run lean (394 amended (9), (10), (12)): its estimate and runs only;
     # it runs as a suite (lean_row), never as a kind of its own.
     "suite_lean3": {"ram_gb": 8.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak", "scene"], "max_minutes": 90},
+    # A landing whose Godot tests run on saturn (tools/remote_tests.sh; Jeff,
+    # 2026-11-11): only the exported server's boot and the tool tests run on
+    # this PC, so it asks for their room, not a suite's. A kind of its own, so
+    # the suite's estimate never learns from a run that held no suite; land.sh
+    # picks it when saturn answers, and a landing takes it by the name
+    # `tools/remote_tests.sh kind` prints.
+    "suite_remote": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 60},
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "suite_remote", "soak", "scene"], "max_minutes": 90},
     # Not counted under MAX_RUNNING, one at a time (394 amended (22)): six
     # imports waited on the count beside a suite and two scenes, 2026-11-04.
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90,

@@ -78,6 +78,12 @@ ok, why = gate.decide(dict(capped, excludes=["bench"]), [dict(running(2, 2), kin
 check(not ok and "never beside" in why, "and a suite while a bench runs (%s)" % why)
 check(gate.decide(bench_row, [dict(running(2, 2), kind="godot_import")], True, 60.0, None)[0], "a bench beside an import")
 check("suite" in gate.KINDS["bench"]["excludes"] and "bench" in gate.KINDS["suite"]["excludes"], "the kinds say so both ways")
+# A landing whose Godot tests run on saturn (suite_remote): a kind of its own, sized for the parts left here.
+remote_row = dict(gate.KINDS["suite_remote"], kind="suite_remote")
+check("suite_remote" in gate.KINDS["bench"]["excludes"] and "bench" in remote_row["excludes"], "a bench and a saturn landing's local parts never together, both ways")
+check(gate.out_of_reach(dict(gate.KINDS["suite_lean3"]), [], 12.5) and not gate.out_of_reach(remote_row, [], 12.5),
+    "12.5 GB free: a lean suite is out of reach, a saturn landing's local parts are not")
+check("variant_of" not in remote_row and "lean" not in remote_row, "and the suite's estimate never learns from it")
 
 print("== going past those that wait on their own kind ==")
 import_row = dict(suite, kind="godot_import")

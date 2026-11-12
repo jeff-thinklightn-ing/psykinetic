@@ -40,7 +40,19 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 		*) echo "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventory_code; run python -B tools/voice_inventory.py --check to see it)"; exit 1 ;;
 	esac
 	inventory_stale="$(printf '%s\n' "$inventory_out" | grep '^VOICE INVENTORY' || true)"
-	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
+	# The Godot parts on saturn when it answers (Jeff, 2026-11-11: "go ahead
+	# and move landings' test runs to saturn"; tools/remote_tests.sh): the
+	# gate is then asked for suite_remote, the room of the parts that stay
+	# here. A take this tree already holds decides it (a landing takes the
+	# kind `tools/remote_tests.sh kind` prints, before the land lock);
+	# LAND_LOCAL=1 keeps everything here (the cut's suite on main does).
+	kind=suite
+	if python tools/heavy_job.py holds "$tree" suite_remote >/dev/null 2>&1; then
+		kind=suite_remote
+	elif ! python tools/heavy_job.py holds "$tree" suite >/dev/null 2>&1; then
+		kind="$(bash tools/remote_tests.sh kind)"
+	fi
+	echo "landing tests: through the heavy-job gate as $tree $kind (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
 	# result line written is a fail, whatever the exit (a killed run).
@@ -51,7 +63,7 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	parent=$$
 	( while kill -0 "$parent" 2>/dev/null; do sh tools/land_lock.sh beat "$tree"; sleep 60; done ) &
 	beater=$!
-	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
+	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" "$kind" -- bash tests/land.sh
 	code=$?
 	kill "$beater" 2>/dev/null
 	line="$(cat "$result" 2>/dev/null)"
@@ -82,7 +94,16 @@ suite_lean*)
 	;;
 esac
 started=$(date +%s)
-if [ -n "$lean" ]; then
+# Under the gate's suite_remote (chosen above when saturn answered): the
+# suite, state_test and net_test run on saturn on this checkout's HEAD, the
+# small Windows parts here. The gate gave this run only those parts' room,
+# so a remote fail, or saturn lost since, fails the landing: there is no
+# local second try.
+remote=""
+[ "${HEAVY_JOB_KIND:-}" = "suite_remote" ] && remote=1
+if [ -n "$remote" ]; then
+	echo "landing tests: the suite, state_test and net_test on saturn (tools/remote_tests.sh); server_boot_test and the tool tests here"
+elif [ -n "$lean" ]; then
 	echo "landing tests: the suite ($suite_jobs at once, lean) with state_test and server_boot_test beside it, then net_test"
 else
 	echo "landing tests: the suite ($suite_jobs at once), net_test, state_test and server_boot_test together"
@@ -104,7 +125,18 @@ part changelog_resolve_test python -B tests/changelog_resolve_test.py
 part voice_inventory_test python -B tests/voice_inventory_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
-if [ -n "$lean" ]; then
+if [ -n "$remote" ]; then
+	part server_boot_test bash tests/server_boot_test.sh &
+	part remote_prepare bash tools/remote_tests.sh prepare
+	prepared=""
+	read -r prepared _ <"$LOGS/remote_prepare.status"
+	if [ "$prepared" = "0" ]; then
+		part state_test bash tools/remote_tests.sh part state_test &
+		sleep 0.3
+		part suite bash tools/remote_tests.sh part suite
+		part net_test bash tools/remote_tests.sh part net_test &
+	fi
+elif [ -n "$lean" ]; then
 	# Lean (394 amended (19)): state_test and server_boot_test, a Godot or two
 	# each, beside the suite; net_test, many at once, after it, its groups one
 	# after another (394 amended (12)). state_test, boots one after another,
@@ -125,10 +157,11 @@ else
 	part server_boot_test bash tests/server_boot_test.sh &
 fi
 wait
+[ -n "$remote" ] && bash tools/remote_tests.sh finish
 
 code=0
 failed=""
-for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test voice_inventory_test suite net_test state_test server_boot_test; do
+for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test voice_inventory_test ${remote:+remote_prepare} suite net_test state_test server_boot_test; do
 	# A part killed before it wrote its status (no file, or empty) fails: an
 	# empty status passed the test once, and economy's landing pushed over a
 	# suite killed mid-run (2026-10-23). Only a status of exactly 0 passes.
@@ -160,7 +193,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test, voice_inventory_test; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: PASS (suite, net_test, state_test${remote:+ on saturn}, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test, voice_inventory_test; $(( $(date +%s) - started ))s)"
 else
 	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi
