@@ -3001,7 +3001,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (902)
+## Lines in the data (908)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3334,7 +3334,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (134)
+### levels/residents.json (140)
 
 | | Line | Key |
 |---|---|---|
@@ -3383,6 +3383,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | I'll take that back. Can't pay for it, mind. | `keeper.back[0]` |
 |  | Back on the pile, then. No coin for it, mind. | `keeper.back[1]` |
 |  | Right, that's back with me. Nothing to pay on it. | `keeper.back[2]` |
+|  | The town pays at first light. | `watch.line` |
 |  | Take %s till first light; the town pays at dawn. | `watch.words` |
 |  | Take %s. Keep the brazier lit and your eyes on the dark. | `watch.sign_on[0]` |
 |  | Yours is %s, till first light. Don't leave it. | `watch.sign_on[1]` |
@@ -3456,13 +3457,18 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Far yet? My hands know a hammer better than a road. | `sought.smith.walk` |
 |  | I am the smith you sent for. I came the long way: taken below the castle, and brought back. | `sought.smith.arrival` |
 |  | %s the smith went down after the great dwarven forge with hired guards, and was taken below the castle, and has not come back. | `sought.smith.town` |
+|  | Every coin goes into it. | `offers.give_line` |
 |  | Pay ahead for his care | `offers.care.pay_title` |
+|  | Fall where you will, you'll wake in my care. | `offers.care.pay_line` |
 |  | Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care. | `offers.care.pay` |
+|  | Bring me herbs and you're in my care. | `offers.care.herbs_line` |
 |  | Bring me %d handfuls of herbs and I'll count you in my care, and there is more you could do for me after. | `offers.care.herbs` |
 |  | Walk the sick to him | `offers.care.sick_title` |
+|  | I can't be everywhere. Bring me the sick. | `offers.care.sick_line` |
 |  | There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door. | `offers.care.sick` |
 |  | %s walked %s to %s, who saw to them. | `offers.care.sick_done` |
 |  | Bring the makings of a brew | `offers.care.brew_title` |
+|  | Herbs and antlers, and the potion's yours. | `offers.care.brew_line` |
 |  | Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours. | `offers.care.brew` |
 |  | %s brews what %s brought and hands them the potion. | `offers.care.brew_done` |
 |  | %s is in %s's care now: fall where they will, he will see to them. | `offers.care.kept` |
