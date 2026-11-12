@@ -1238,7 +1238,17 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 			if not anchor_name.is_empty() and str(anchor.get("name", "")) == anchor_name:
 				var rect: Rect2i = anchor["rect"]
 				spots = Labyrinth._nearest_first(rect.position + rect.size / 2, spots)
-		Labyrinth._lay(map, anchors, "monster_" + kind, int(left[kind]), spots, int(apart.get(kind, 0)))
+		# The band's posts out of each other's join reach (the gen-3 pile-on;
+		# enemy-ai's measure: a robber at his post joins from 9 cells in clear
+		# sight, 6 through a wall or door): "apart" {kind: [clear, walled]},
+		# kept from every kind sent to the same anchor, laid before it.
+		var gap: Variant = apart.get(kind, 0)
+		var with: Array = []
+		if gap is Array:
+			for other: String in kinds.slice(0, kinds.find(kind)):
+				if str(near.get(other, near.get("_all", ""))) == anchor_name:
+					with.append("monster_" + other)
+		Labyrinth._lay(map, anchors, "monster_" + kind, int(left[kind]), spots, int(gap[0]) if gap is Array else int(gap), int(gap[1]) if gap is Array else -1, with)
 
 
 ## The block's "packs" (823; 832 lays them in the crypt): each lead kind's
@@ -1253,12 +1263,22 @@ static func _packs_by_chests(map: LevelMap, anchors: Array, config: Dictionary, 
 		return
 	var chest_rooms: Array = plan["rooms"].filter(func(room: Dictionary) -> bool: return room.has("chest"))
 	chest_rooms.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
+	# Never under a laid piece (a sarcophagus's second cell is floor on the
+	# map: playtest's barrow_deep generation 1 laid a pack's member there,
+	# and World.spawn could not place it).
+	var under := {}
+	for entry: Dictionary in plan["buildings"]:
+		var rect: Variant = Level.building_rect(entry)
+		if rect is Rect2i:
+			for cell in Level.rect_cells(rect):
+				under[cell] = true
 	var free := func(cell: Vector2i) -> bool:
-		return Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell)
+		return Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell) and not under.has(cell)
 	var ways: Array[Vector2i] = []
 	for cell: Vector2i in Tools.sorted_cells(plan["ways"]):
 		if free.call(cell):
 			ways.append(cell)
+	var taken: Array[Vector2i] = []
 	var leads: Array = packs.keys()
 	leads.sort()
 	for lead: String in leads:
@@ -1268,39 +1288,88 @@ static func _packs_by_chests(map: LevelMap, anchors: Array, config: Dictionary, 
 		var count := int(left.get(lead, 0))
 		if of == lead:
 			count /= size
+		# Packs out of each other's reach (the crypt bar, O1 (870); the
+		# coordinator: "the pack rooms chosen out of each other's reach"): a
+		# pack's "apart" [clear, walled] (Labyrinth._too_near) keeps its dead
+		# that far from every pack laid before it: the next chest room,
+		# farthest walked first, that keeps it, else the one farthest from
+		# them (every chest still guarded; layout_sense's "packs" rule, which
+		# the block prefers, has Regen take a try that keeps it).
+		var gap: Variant = pack.get("apart", 0)
+		var clear := int(gap[0]) if gap is Array else 0
+		var walled := int(gap[1]) if gap is Array else -1
 		for n in count:
-			var spots: Array[Vector2i] = []
-			if not chest_rooms.is_empty():
-				var room: Dictionary = chest_rooms.pop_front()
-				for cell in Tools.sorted_cells(room["cells"]):
-					if free.call(cell):
-						spots.append(cell)
-				spots = Labyrinth._nearest_first(room["chest"], spots)
-			else:
-				spots = ways.duplicate()
-			var at := Vector2i(-1, -1)
-			for cell in spots:
-				if free.call(cell) and LAYOUT_SENSE.clear_of_arrivals(cell, lead, plan["arrivals"]):
-					at = cell
+			var pick := {}
+			var first := {}
+			for i in (range(chest_rooms.size()) if not chest_rooms.is_empty() else [-1]):
+				var spots: Array[Vector2i] = []
+				if i >= 0:
+					for cell in Tools.sorted_cells(chest_rooms[i]["cells"]):
+						if free.call(cell):
+							spots.append(cell)
+					spots = Labyrinth._nearest_first(chest_rooms[i]["chest"], spots)
+				else:
+					spots = ways.duplicate()
+				var members := _pack_cells(map, plan, free, spots, lead, of, mini(size, 1 + int(left.get(of, 0))))
+				if members.is_empty():
+					continue
+				var kept := clear <= 0 or not taken.any(func(other: Vector2i) -> bool:
+					return members.any(func(cell: Vector2i) -> bool: return Labyrinth._too_near(map, cell, other, clear, walled)))
+				if kept:
+					pick = {"room": i, "members": members}
 					break
-			if at.x < 0:
+				var gap_to := _nearest_of(members, taken)
+				if first.is_empty() or gap_to > int(first["gap"]):
+					first = {"room": i, "members": members, "gap": gap_to}
+			if pick.is_empty():
+				pick = first
+			if pick.is_empty():
 				break
-			map.set_cell(at, "monster_" + lead)
+			if int(pick["room"]) >= 0:
+				chest_rooms.remove_at(int(pick["room"]))
+			var members: Array[Vector2i] = pick["members"]
+			map.set_cell(members[0], "monster_" + lead)
 			left[lead] = int(left.get(lead, 0)) - 1
-			var close: Array[Vector2i] = []
-			for dy in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
-				for dx in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
-					var cell := at + Vector2i(dx, dy)
-					if free.call(cell) and _walk_within(map, at, cell, Labyrinth.PACK_REACH * 2) and LAYOUT_SENSE.clear_of_arrivals(cell, of, plan["arrivals"]):
-						close.append(cell)
-			var members: Array[Vector2i] = [at]
-			for cell in Labyrinth._nearest_first(at, close):
-				if members.size() >= size or int(left.get(of, 0)) <= 0:
-					break
+			for cell in members.slice(1):
 				map.set_cell(cell, "monster_" + of)
 				left[of] = int(left[of]) - 1
-				members.append(cell)
+			taken.append_array(members)
 			plan["entities"].append_array(Labyrinth.pack_rows(members))
+
+
+## The nearest (Chebyshev) any of [param cells] comes to any of [param others]; 1 << 20 with none.
+static func _nearest_of(cells: Array[Vector2i], others: Array[Vector2i]) -> int:
+	var best := 1 << 20
+	for a in cells:
+		for b in others:
+			best = mini(best, maxi(absi(a.x - b.x), absi(a.y - b.y)))
+	return best
+
+
+## A pack's cells on [param spots] (in their order), not yet laid: its lead
+## on the first free one clear of the arrivals, then up to [param size] - 1
+## followers of kind [param of] nearest it within Labyrinth.PACK_REACH,
+## walked to (twice that); empty when no spot takes the lead.
+static func _pack_cells(map: LevelMap, plan: Dictionary, free: Callable, spots: Array[Vector2i], lead: String, of: String, size: int) -> Array[Vector2i]:
+	var at := Vector2i(-1, -1)
+	for cell in spots:
+		if free.call(cell) and LAYOUT_SENSE.clear_of_arrivals(cell, lead, plan["arrivals"]):
+			at = cell
+			break
+	if at.x < 0:
+		return []
+	var close: Array[Vector2i] = []
+	for dy in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+		for dx in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+			var cell := at + Vector2i(dx, dy)
+			if cell != at and free.call(cell) and _walk_within(map, at, cell, Labyrinth.PACK_REACH * 2) and LAYOUT_SENSE.clear_of_arrivals(cell, of, plan["arrivals"]):
+				close.append(cell)
+	var members: Array[Vector2i] = [at]
+	for cell in Labyrinth._nearest_first(at, close):
+		if members.size() >= size:
+			break
+		members.append(cell)
+	return members
 
 
 ## Whether [param to] is walked to from [param from] within [param most]

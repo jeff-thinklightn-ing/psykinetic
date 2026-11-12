@@ -250,6 +250,7 @@
 		"generator": "crypt",
 		"heart": "lair",
 		"deep": {"wing": "old_graves"},
+		"prefer": ["packs"],
 		"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"],
 		"style": "barrow",
 		"layer": 2,
@@ -317,7 +318,7 @@
 			"skeleton_guard": {
 				"of": "skeleton",
 				"size": 3,
-				"apart": 12
+				"apart": [11, 11]
 			}
 		},
 		"chests": 3

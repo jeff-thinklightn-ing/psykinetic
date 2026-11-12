@@ -364,6 +364,7 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		# fault, so a try with a wrap wins over one with an unguarded chest.
 		result["chests"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] == "chest" and "chest" in held).size()
 		result["preferred"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in prefer).size()
+		result["nearest"] = found.filter(func(fault: Dictionary) -> bool: return fault.has("near")).map(func(fault: Dictionary) -> int: return int(fault["near"]))
 		if result["faults"] == 0 and result["preferred"] == 0:
 			return result
 		if best.is_empty() or [int(result["chests"]), int(result["faults"]), int(result["preferred"])] < [int(best["chests"]), int(best["faults"]), int(best["preferred"])]:
@@ -371,6 +372,10 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 	if not best.is_empty():
 		if int(best["faults"]) > 0:
 			print("[regen] %s: the best of %d tries keeps %d layout faults (806)" % [level_name, HELD_TRIES, best["faults"]])
+		elif int(best["preferred"]) > 0:
+			# 870: a preferred rule given up on (the Ossuary's packs nearer than
+			# their "apart"): the nearest they came, numbers only.
+			print("[regen] %s: the best of %d tries keeps %d preferred faults (870), nearest %s" % [level_name, HELD_TRIES, best["preferred"], best.get("nearest", "")])
 		return best
 	push_warning("[regen] %s: no map of %d tries joined every anchor (or kept its arrivals clear); the last one stands" % [level_name,
 		HELD_TRIES if not held.is_empty() else TRIES])
@@ -403,7 +408,32 @@ static func layout_options(config: Dictionary) -> Dictionary:
 	if not heart.is_empty():
 		anchors = anchors.filter(func(anchor: Variant) -> bool: return anchor is Dictionary and str(anchor.get("name", "")) == heart)
 	return {"ways": int(config.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(config.get("pillars", 0)),
-		"arrival": "arrival" in (config.get("held", []) as Array), "foes_door": str(config.get("foes_door", ""))}
+		"arrival": "arrival" in (config.get("held", []) as Array), "foes_door": str(config.get("foes_door", "")),
+		"packs_apart": packs_apart(config), "first_alone": first_alone(config),
+		"band": (config.get("band", {}) as Dictionary).keys().filter(func(kind: Variant) -> bool: return not str(kind).begins_with("_")) if config.get("band") is Dictionary else []}
+
+
+## The first-alone rule's reach (870): the band's own rally, [seen, heard]
+## (Monster.RALLY_SEE, RALLY_HEAR, 806 amended (17): a mate answers a fight
+## he sees or hears), when the block holds or prefers "first"; else [] (the
+## rule off). Read from the AI's constants, never a copy in level.json, so
+## the layout's promise and the rally stay one measure.
+static func first_alone(config: Dictionary) -> Array:
+	var rules: Array = (config.get("held", []) as Array) + (config.get("prefer", []) as Array)
+	return [Monster.RALLY_SEE, Monster.RALLY_HEAR] if "first" in rules else []
+
+
+## The packs rule's reach (870): the largest clear "apart" of the block's
+## "packs" given as [clear, walled], when the block prefers "packs"; else 0.
+static func packs_apart(config: Dictionary) -> int:
+	if "packs" not in (config.get("prefer", []) as Array) or not config.get("packs") is Dictionary:
+		return 0
+	var most := 0
+	for lead: String in config["packs"]:
+		var gap: Variant = (config["packs"][lead] as Dictionary).get("apart", 0)
+		if gap is Array:
+			most = maxi(most, int(gap[0]))
+	return most
 
 
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt

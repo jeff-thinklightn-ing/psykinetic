@@ -11259,7 +11259,7 @@ func _tell_draft(player: Player, to: Vector2i) -> void:
 	if _draft_told.get(key, -1) == generation:
 		return
 	_draft_told[key] = generation
-	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You feel a cool draft coming from one of the niches."})
+	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You feel a cool draught coming from one of the niches."})
 
 
 ## Whether the hidden way in [param zone_name] is revealed to [param
@@ -11781,6 +11781,12 @@ func _all_fallen_tick() -> void:
 				World.damage(player, player.hp, null, &"bled")
 
 
+## The zero-charge line (870, riding it; the coordinator's ruling: 573's
+## "The draugr gives more." stopped being true at 714, when the charges came
+## to be Aldous's for a holy knight's remains; voice's words, lore's check).
+const SPENT_LINE := "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below."
+
+
 ## Server: [param by] begins to bring back the downed [param body] (held E
 ## on it, or her REVIVE): [param by] blessed, with a charge left on its
 ## player's count (573: no half to carry). False if it cannot.
@@ -11789,7 +11795,7 @@ func _start_channel(by: GridEntity, body: GridEntity) -> bool:
 		# A downed guard (791): anyone may help them up, no blessing or charge, when it is calm.
 		if not World.calm(by) or not World.calm(body):
 			if by is Player:
-				Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while they're fighting near."})
+				Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while there's fighting close by."})
 			return false
 		return World.try_channel(by, body, roundi(float(_field_rules().get("channel_s", 4)) * World.TICK_RATE))
 	if not World.is_downed(body) or not _blessed(by) or not _blessed(body):
@@ -11797,12 +11803,12 @@ func _start_channel(by: GridEntity, body: GridEntity) -> bool:
 	var record := _blessing_record(by)
 	if _uses_left(record) <= 0:
 		if by is Player:
-			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "You hold no charge. The draugr gives more."})
+			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": SPENT_LINE})
 		return false
 	if not World.calm(by) or not World.calm(body):
 		# When it is safe (Mortally Wounded): nothing hostile near either, no blow just now.
 		if by is Player:
-			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while they're fighting near."})
+			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while there's fighting close by."})
 		return false
 	return World.try_channel(by, body, roundi(float(_field_rules().get("channel_s", 4)) * World.TICK_RATE))
 

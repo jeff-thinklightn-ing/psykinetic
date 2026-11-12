@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_giver_rule()
 	_test_deep_crypt()
 	_test_chest_guardable()
+	_test_crypt_spacing()
 	_test_hall_shortcut()
 	_test_barrow_quest()
 	_test_quest_card_place()
@@ -3027,6 +3028,17 @@ func _test_barrow_won() -> void:
 	record.barrow = {"best": "easy", "containers": []}
 	_check(_main.charge_from_relic(player, 2) == 15 and _main.charge_from_relic(player, 2) == 10 and World.totem_charges(World.totem_of(id)) == 25,
 		"blessed at the easy deal (room 25): a hard relic's 15, then 10 of the next, full at 25 (%d)" % World.totem_charges(World.totem_of(id)))
+	# 870, riding it: a blessed hand at zero is told the true way to more,
+	# Aldous's for a holy knight's remains (714), not the draugr's.
+	_main.mark_player(id, Main.BLESSED)  # reset_barrow above took the blessing off; the reset below takes it again.
+	World.items.set_charges(World.totem_of(id), 0)
+	_main._sync_charges(record)
+	World.lay_downed(player, 300)
+	_heard.clear()
+	_check(not _main._start_channel(player, player) and _heard.slice(-1) == [Main.SPENT_LINE]
+		and Main.SPENT_LINE == "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below.",
+		"at zero charges: no return, and the spent amulet's line on their screen (%s)" % [_heard.slice(-1)])
+	World.raise_downed(player, player.max_hp)
 	_main.reset_barrow(id)
 	# 714 (1): the generation's knight, lore's fourteen, drawn by its seed.
 	var knights: Array = Regen.config_of("barrow_deep").get("knights", [])
@@ -4430,11 +4442,11 @@ func _test_robbers_latch() -> void:
 		"one come back after does not undo it, and a save keeps it")
 	_main._draft_told.erase("%s@lt_niche" % player.player_id)  # _test_hidden_niche's, told already this generation.
 	_main._tell_draft(player, Vector2i(3, 3))
-	_check(not heard.has("You feel a cool draft coming from one of the niches.") and not _main.way_revealed(player.player_id, "lt_niche"),
+	_check(not heard.has("You feel a cool draught coming from one of the niches.") and not _main.way_revealed(player.player_id, "lt_niche"),
 		"cleared, but the way is not revealed to them (747: the fallen knight's quest not done): no draft (%s)" % [heard])
 	_main.mark_player(player.player_id, Main.QUEST_DONE)
 	_main._tell_draft(player, Vector2i(3, 3))
-	_check(heard.has("You feel a cool draft coming from one of the niches."), "his quest done: now the draft is felt (%s)" % [heard])
+	_check(heard.has("You feel a cool draught coming from one of the niches."), "his quest done: now the draft is felt (%s)" % [heard])
 	_put(player, Vector2i(6, 1))
 	for i in 10:
 		_hold_free(player, Vector2(0, -1), 1)
@@ -4557,7 +4569,7 @@ func _test_hidden_niche() -> void:
 		if kind == "party":
 			heard.append(str(data.get("text", "")))
 	Net.message_received.connect(hear)
-	var draft := "You feel a cool draft coming from one of the niches."
+	var draft := "You feel a cool draught coming from one of the niches."
 	_check(_main.hall_rect("lt_niche") == Rect2i(0, 0, 8, 6) and _main.hall_rect("test_room") == Rect2i(),
 		"the hall is the entrance anchor's rect, none for a level that does not regenerate (%s)" % [_main.hall_rect("lt_niche")])
 	_check(World.hidden_niche() == {"cell": Vector2i(6, 1), "edge": key, "open": false},
@@ -4669,7 +4681,9 @@ func _test_barrow_level() -> void:
 	# 806 amended (3): and the light shaft under the temple yard's grate, its skylight.
 	var shafts: Array = barrow["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "light_shaft")
 	var skylights: Array = barrow["terrain"]["skylights"]
-	_check(barrow["terrain"]["decor"].size() == 4 and corner_webs.call(barrow) == 2 and shafts.size() == 1 and skylights.size() == 1
+	# And the band's bedding in its camp (870; the coordinator's ruling, combat's ask: the kits lie by it).
+	var bedding: Array = barrow["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "bedroll")
+	_check(barrow["terrain"]["decor"].size() == 6 and bedding.size() == 2 and corner_webs.call(barrow) == 2 and shafts.size() == 1 and skylights.size() == 1
 			and shafts[0]["cell"] == Vector2i(46, 13) and skylights[0]["at"] == Vector2i(46, 13)
 			and deep["terrain"]["decor"].size() == 30 and corner_webs.call(deep) == 4,
 		"the first hall holds two cobwebbed corners, a strip of moss and the light shaft under its skylight, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %s, %d)" % [barrow["terrain"]["decor"].size(), skylights, deep["terrain"]["decor"].size()])
@@ -4693,9 +4707,9 @@ func _test_barrow_level() -> void:
 				guards_marked += 1
 	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("offering stone", 0) == 1 and kinds.get("runner's pack", 0) == 1
 		and kinds.get("robbers' chest", 0) == 1 and kinds.get("astral_knight", 0) == 1
-		and barrow["places"].has("niche") and barrow["entities"].size() == 6 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
-		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
-	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
+		and kinds.get("robbers' bundle", 0) == 1 and barrow["places"].has("niche") and barrow["entities"].size() == 7 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
+		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742), the Robbers' bundle by their bedding (870) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
+	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and not grave_marked.get("Robbers' bundle", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 4 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
 		and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
@@ -5342,6 +5356,7 @@ func _test_giver_rule() -> void:
 	_check(doors == {"barrow": "from_breach"}, "the one arrival exempt anywhere: the barrow's breach, the robbers' own door (%s)" % [doors])
 	var tries: Array[int] = []
 	var faults := {}
+	var unbundled := {}
 	var at := Vector2i(-1, -1)
 	var facing := Vector2i.ZERO
 	for generation in range(1, 9):
@@ -5354,10 +5369,16 @@ func _test_giver_rule() -> void:
 		var found := LAYOUT_SENSE.arrival_faults(level, "from_breach")
 		if not found.is_empty():
 			faults[generation] = found.map(func(fault: Dictionary) -> String: return str(fault["what"]))
+		# The two kits by the band's bedding (870, combat's ask), kept by every generation.
+		var bundles: Array = level.get("entities", []).filter(func(spec: Dictionary) -> bool: return str(spec.get("name", "")) == "Robbers' bundle")
+		var beds: Array = (level["terrain"].get("decor", []) as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "bedroll")
+		if bundles.size() != 1 or bundles[0]["tile"] != Vector2i(6, 48) or Array(bundles[0]["props"].get("slots", [])).count("bandaging_kit") != 2 or beds.size() != 2:
+			unbundled[generation] = [bundles.map(func(spec: Dictionary) -> String: return "%s %s" % [spec["tile"], spec["props"].get("slots")]), beds.size()]
 		for spec: Dictionary in level.get("entities", []):
 			if str(spec.get("kind", "")) == "astral_knight":
 				at = spec["tile"]
 				facing = spec.get("facing", Vector2i.ZERO)
+	_check(unbundled.is_empty(), "the barrow's generations 1-8: the Robbers' bundle at (6, 48) holding two bandaging kits, by the band's two bedrolls (%s)" % [unbundled])
 	_check(faults.is_empty(), "the barrow's generations 1-8: from the temple stair, the start, from_deep and from_below the knight is reached clear, and every arrival clear (tries %s; %s)" % [tries, faults])
 	_check(at == Vector2i(39, 10) and facing == Vector2i(0, -1), "the knight behind the First Hall's bier, facing the stair (%s, %s)" % [at, facing])
 
@@ -5490,6 +5511,85 @@ func _test_hall_shortcut() -> void:
 	_main._records[id] = record
 	record.marks.assign(kept_marks)
 	record.companion["marks"] = kept_hers
+
+
+## The crypt bar (crypt_bar.md section 5; the coordinator's picks P1 and O1):
+## the band's posts kept out of each other's join reach (barrow "apart"
+## robber [10, 7], Labyrinth.in_sight; main's 4 had 10-19 pairs inside the
+## reach on generations 1-8, up to 6 at one post), and the Ossuary's packs
+## kept 11 apart wall or no wall, so no two of its rooms wake together (on
+## main, two packs within 10 on g1-5, 7 and 118). The first robber a player
+## meets from the chapel stair stands alone (the held "first" rule; playtest's
+## walk on v0.1.211: four came within 6 s of the first).
+func _test_crypt_spacing() -> void:
+	print("
+== the crypt bar: band posts out of join reach, the Ossuary's packs apart ==")
+	var pairs := {}
+	var most := 0
+	var unalone := {}
+	var known := {}
+	var was := str(World.zone.name)
+	for generation in range(1, 9):
+		var made := Regen.generate("barrow", generation)
+		var map := LevelMap.from_image(made["layout"], made["config"])
+		var posts: Array[Vector2i] = []
+		for cell: Vector2i in map.cells:
+			if map.cells[cell] in ["monster_robber", "monster_robber_brute"]:
+				posts.append(cell)
+		var count := 0
+		for a in posts:
+			var near := 0
+			for b in posts:
+				if a != b and LABYRINTH._too_near(map, a, b, 10, 7):
+					near += 1
+					count += 1
+			most = maxi(most, near)
+		pairs[generation] = count / 2
+		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var walks := LAYOUT_SENSE.band_walks(level, ["robber", "robber_brute"], Regen.first_alone(made["config"].get("regenerate", {})), "from_breach")
+		var met: Array = walks.get("from_chapel", [])
+		if met.is_empty() or not (met[0]["callers"] as Array).is_empty():
+			unalone[generation] = met[0] if not met.is_empty() else "no post met"
+		# 870 with 806 amended (17): the band's own measure on the laid level
+		# (Monster.knows_of_fight: heard within RALLY_HEAR, seen within
+		# RALLY_SEE in World's line of sight). No mate knows of the first
+		# post's fight, so the rally never answers it; if the grid's in_sight
+		# and World's sight ever part, this says so.
+		World.load_terrain(level["terrain"])
+		var mates := {}
+		for arrival: String in walks:
+			for post: Dictionary in walks[arrival]:
+				mates[post["at"]] = true
+		if not met.is_empty():
+			var first: Vector2i = met[0]["at"]
+			var knowing: Array = mates.keys().filter(func(cell: Vector2i) -> bool: return cell != first and Monster.knows_of_fight(cell, first))
+			if not knowing.is_empty():
+				known[generation] = [first, knowing]
+	_check(pairs.values().all(func(n: int) -> bool: return n <= 8) and most <= 4,
+		"the barrow's generations 1-8: at most 8 band pairs inside the join reach and 4 at one post (pairs %s, most %d; main's 4 apart had 10-19 and 6)" % [pairs, most])
+	_main.load_map(was)
+	_check(Regen.first_alone({"held": ["first"]}) == [Monster.RALLY_SEE, Monster.RALLY_HEAR] and Regen.first_alone({}).is_empty(),
+		"the first-alone rule reads the band's rally, seen and heard, from the AI's own constants (806 amended (17)): %s" % [Regen.first_alone({"held": ["first"]})])
+	_check(unalone.is_empty(), "the barrow's generations 1-8: the first robber met from the chapel stair has no other post within the rally's reach, %d in sight, %d through a wall (870, first-alone; %s)" % [Monster.RALLY_SEE, Monster.RALLY_HEAR, unalone])
+	_check(known.is_empty(), "the barrow's generations 1-8, laid: no mate of the band knows of the first post's fight by the rally's own measure (Monster.knows_of_fight), so none answers it (%s)" % [known])
+	var near_packs := {}
+	for generation: int in [1, 2, 3, 4, 5, 6, 7, 8, 109, 118]:
+		var made := Regen.generate("barrow_deep", generation)
+		var packs := {}
+		for spec: Dictionary in made["config"].get("entities", []):
+			var id := str(spec.get("props", {}).get("pack", ""))
+			if not id.is_empty():
+				(packs.get_or_add(id, []) as Array).append(Vector2i(spec["at"][0], spec["at"][1]))
+		var ids := packs.keys()
+		for i in ids.size():
+			for j in range(i + 1, ids.size()):
+				for a: Vector2i in packs[ids[i]]:
+					for b: Vector2i in packs[ids[j]]:
+						if maxi(absi(a.x - b.x), absi(a.y - b.y)) <= 10:
+							near_packs[generation] = [a, b]
+		if ids.size() != 3:
+			near_packs[generation] = "%d packs" % ids.size()
+	_check(near_packs.is_empty(), "the Ossuary's generations 1-8, 109 and 118: three packs, no two within 10 cells (%s)" % [near_packs])
 
 
 ## 832 (the crypt's ways in): the deep laid by the crypt generator, its
@@ -6359,7 +6459,7 @@ func _test_layout_sense() -> void:
 			# The rules its "regenerate" block holds it to ("held", 806 amended
 			# (a)); the rest are reported, not failed.
 			for rule: String in block.get("held", []):
-				_check(by_rule[rule] == 0, "%s generation %d: no %s faults (%s)" % [level_name, generation, rule,
+				_check(int(by_rule.get(rule, 0)) == 0, "%s generation %d: no %s faults (%s)" % [level_name, generation, rule,
 						found.filter(func(f: Dictionary) -> bool: return f["rule"] == rule).slice(0, 6)])
 		print("  REPORT  %s, two generations: %s" % [level_name, totals])
 

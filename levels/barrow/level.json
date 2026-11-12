@@ -221,6 +221,22 @@
 			0,
 			"light_shaft",
 			1
+		],
+		[
+			7,
+			46,
+			0,
+			-1,
+			"bedroll",
+			1
+		],
+		[
+			9,
+			46,
+			0,
+			-1,
+			"bedroll",
+			1
 		]
 	],
 	"skylights": [
@@ -297,6 +313,23 @@
 				"cache": "robbers_camp",
 				"cache_place": "the robbers' chest"
 			}
+		},
+		{
+			"at": [
+				6,
+				48
+			],
+			"name": "Robbers' bundle",
+			"props": {
+				"role": "camp",
+				"grave": false,
+				"slots": [
+					"bandaging_kit",
+					"bandaging_kit",
+					"",
+					""
+				]
+			}
 		}
 	],
 	"regenerate": {
@@ -313,7 +346,8 @@
 			"loop",
 			"chest",
 			"coop",
-			"arrival"
+			"arrival",
+			"first"
 		],
 		"every_days": 3,
 		"anchors": [
@@ -421,7 +455,7 @@
 			]
 		},
 		"apart": {
-			"robber": 4
+			"robber": [10, 7]
 		}
 	},
 	"rooms": {

@@ -550,8 +550,11 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 			"you_line": "You give the draugr %d gold, too little: he attacks." % gold}
 	start_pact(player, str(deal["name"]))
 	_deal_paid(player.player_id, str(deal["name"]))  # Paid once: every fight after at this level (548 amended).
-	return {"ok": true, "say": "", "line": "%s gives the draugr %d gold and takes up his pact for %d risings." % [player.name, gold, int(deal["charges"])],
-		"you_line": "You give the draugr %d gold and take up his pact for %d risings." % [gold, int(deal["charges"])]}
+	# 870, riding it (voice: a price paid, the risings the pact's worth, given
+	# later at the altar; 714): "pays", "a pact worth".
+	var worth := "%d rising%s" % [int(deal["charges"]), "" if int(deal["charges"]) == 1 else "s"]
+	return {"ok": true, "say": "", "line": "%s pays the draugr %d gold for a pact worth %s." % [player.name, gold, worth],
+		"you_line": "You pay the draugr %d gold for a pact worth %s." % [gold, worth]}
 
 
 ## [param player_id]'s paid deal for his zone (548 amended, npc's

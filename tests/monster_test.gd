@@ -5125,7 +5125,7 @@ func _test_draugr_paid() -> void:
 	var taken := draugr.accept_offer(player, draugr.offers_for("p1")[0], 60)
 	_check(taken["ok"] and draugr.state == Draugr.State.PACT and book.get("p1|mt_paidlair", {}).get("level") == "normal",
 		"60 gold buys the normal pact, and the payer's deal is kept (%s)" % [book])
-	_check(taken["you_line"] == "You give the draugr 60 gold and take up his pact for 10 risings." and str(taken["line"]).ends_with(" gives the draugr 60 gold and takes up his pact for 10 risings."),
+	_check(taken["you_line"] == "You pay the draugr 60 gold for a pact worth 10 risings." and str(taken["line"]).ends_with(" pays the draugr 60 gold for a pact worth 10 risings."),
 		"its line said of them to the others, its you-form to them (133 amended (2)): %s" % taken["you_line"])
 	_move_to(player, Vector2i(11, 2))
 	World.step()

@@ -32,8 +32,9 @@ extends RefCounted
 ##             loot table rolled into it, or items laid in it), stands only
 ##             in a dungeon ([param options] "dungeon"), and has a monster in
 ##             its room or within GUARD_REACH steps. A chest with a role of its
-##             own (props "role": an offering altar, a commission's drop) is
-##             not loot and is left out; a depot, shop, locker or temple too;
+##             own (props "role": an offering altar, a commission's drop, the
+##             band's own kit by its bedrolls, "camp", 870) is not loot and is
+##             left out; a depot, shop, locker or temple too;
 ##   coop      (crypt landing 2, the co-op family tomb) each plate set has two
 ##             plates or more, PLATES_APART apart, each walked to from its
 ##             door's room side; a stand-in (a boulder or crate) within
@@ -48,6 +49,11 @@ extends RefCounted
 ##             seated draugr, the fallen knight and prey (CALM_KINDS) are
 ##             no fight. Checked only when [param options] "arrival" is
 ##             true (806 amended (11): a level whose block holds the rule).
+##   first     (870) from each arrival but the foes' door, the band post
+##             nearest by walk has no other band post within its call reach
+##             ([clear, walled]: the band's rally, Regen.first_alone):
+##             first_faults. Checked only when [param options] "first_alone"
+##             is given.
 ## options: "ways" (the level's way width, cells), "heart" (Vector2i: the
 ## spine's far end; else the regenerate block's farthest anchor, else the
 ## farthest floor), "anchors" (the regenerate block's), "config" (level.json,
@@ -112,7 +118,153 @@ static func check(level: Dictionary, rooms: Array = [], options: Dictionary = {}
 	# (Regen.layout_options' "arrival"), so no other level's faults change.
 	if options.get("arrival", false):
 		faults.append_array(arrival_faults(level, str(options.get("foes_door", ""))))
+	if int(options.get("packs_apart", 0)) > 0:
+		faults.append_array(pack_faults(level, int(options["packs_apart"])))
+	if (options.get("first_alone", []) as Array).size() == 2:
+		faults.append_array(first_faults(level, options.get("band", []), options["first_alone"], str(options.get("foes_door", ""))))
 	return faults
+
+
+## The packs rule (870, the crypt bar's O1): each two packs (entities sharing
+## props "pack", Labyrinth.pack_rows) whose nearest members lie closer than
+## [param apart] cells (Chebyshev, wall or no wall), one fault each, saying
+## how near. A block lists it in "prefer": Regen takes a try that keeps it,
+## else the try with the fewest.
+static func pack_faults(level: Dictionary, apart: int) -> Array:
+	var packs := {}
+	for spec: Dictionary in level.get("entities", []):
+		var id := str(spec.get("props", {}).get("pack", ""))
+		if not id.is_empty() and spec.get("tile") is Vector2i:
+			(packs.get_or_add(id, []) as Array).append(spec["tile"])
+	var ids: Array = packs.keys()
+	ids.sort()
+	var faults: Array = []
+	for i in ids.size():
+		for j in range(i + 1, ids.size()):
+			var best := 1 << 20
+			var at := Vector2i.ZERO
+			for a: Vector2i in packs[ids[i]]:
+				for b: Vector2i in packs[ids[j]]:
+					var d := maxi(absi(a.x - b.x), absi(a.y - b.y))
+					if d < best:
+						best = d
+						at = a
+			if best < apart:
+				faults.append({"rule": "packs", "cell": at, "near": best, "what": "two packs %d apart (%s, %s), %d wanted" % [best, ids[i], ids[j], apart]})
+	return faults
+
+
+## The first-alone rule (870, the coordinator's ruling on playtest's crypt
+## walk: with fists, four robbers came within 6 s of the first): from each
+## arrival but [param foes_door], the post of a [param kinds] monster (the
+## block's "band") nearest by walk has no other such post within its call
+## reach, [param reach] [clear, walled]: Chebyshev up to reach[0] in clear
+## sight, up to reach[1] through a wall or door (enemy-ai's join reach: the
+## call, 6, and a wander, 3, in sight; the call alone through stone). One
+## fault per arrival whose first post has a caller, naming them.
+static func first_faults(level: Dictionary, kinds: Array, reach: Array, foes_door := "") -> Array:
+	var faults: Array = []
+	var walks := band_walks(level, kinds, reach, foes_door)
+	for arrival: String in walks:
+		var posts: Array = walks[arrival]
+		if posts.is_empty() or (posts[0]["callers"] as Array).is_empty():
+			continue
+		faults.append({"rule": "first", "cell": posts[0]["at"], "near": (posts[0]["callers"] as Array).size(),
+			"what": "the first post from %s (%s, %d steps) calls %d more: %s" % [arrival, posts[0]["at"], posts[0]["walked"],
+				(posts[0]["callers"] as Array).size(), posts[0]["callers"]]})
+	return faults
+
+
+## Each arrival but [param foes_door] of [param level] (its spawn points and
+## starts): the [param kinds] posts it walks to, nearest first, each
+## {at, walked, callers}: the other posts within [param reach] of it (as
+## first_faults reads it). A post no walk reaches is left out.
+static func band_walks(level: Dictionary, kinds: Array, reach: Array, foes_door := "") -> Dictionary:
+	var posts: Array[Vector2i] = []
+	for spec: Dictionary in level.get("entities", []):
+		if str(spec.get("kind", "")) in kinds and spec.get("tile") is Vector2i:
+			posts.append(spec["tile"])
+	var spawns: Dictionary = (level.get("spawn_points", {}) as Dictionary).duplicate()
+	var starts: Array = level.get("starts", [])
+	for index in starts.size():
+		spawns["start %d" % (index + 1)] = starts[index]
+	var out := {}
+	if posts.is_empty():
+		return out
+	var lay := _walk_lay(level)
+	var callers := {}
+	for post in posts:
+		var near: Array[Vector2i] = []
+		for other in posts:
+			var apart := maxi(absi(post.x - other.x), absi(post.y - other.y))
+			if other != post and (apart <= int(reach[1]) or apart <= int(reach[0]) and in_sight(lay, post, other)):
+				near.append(other)
+		callers[post] = near
+	for spawn_name: String in _sorted_names(spawns):
+		var spawn: Variant = spawns[spawn_name]
+		if spawn is Array and (spawn as Array).size() >= 2:
+			spawn = Vector2i(int(spawn[0]), int(spawn[1]))
+		if spawn_name == foes_door or not spawn is Vector2i:
+			continue
+		var walked := _walked_from(lay, spawn)
+		var met: Array = []
+		for post in posts:
+			if walked.has(post):
+				met.append({"at": post, "walked": int(walked[post]), "callers": callers[post]})
+		met.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walked"]) < int(b["walked"]))
+		out[spawn_name] = met
+	return out
+
+
+## Steps from [param start] to each floor cell over [param lay] (_walk_lay).
+static func _walked_from(lay: Dictionary, start: Vector2i) -> Dictionary:
+	var walked := {start: 0}
+	var queue: Array[Vector2i] = [start]
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		for way in WAYS:
+			var next := cell + way
+			if not walked.has(next) and _steps(lay, cell, way):
+				walked[next] = int(walked[cell]) + 1
+				queue.append(next)
+	return walked
+
+
+## World._line_of_sight's Bresenham walk over [param lay] (_walk_lay): a
+## wall or door edge crossed stops it (a diagonal step needs one of its two
+## routes open), as does a cell off the floor between.
+static func in_sight(lay: Dictionary, from: Vector2i, to: Vector2i) -> bool:
+	var d: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = d.x - d.y
+	var at := from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -d.y:
+			err -= d.y
+			step.x = s.x
+		if e2 < d.x:
+			err += d.x
+			step.y = s.y
+		if step.x == 0 or step.y == 0:
+			if _sight_shut(lay, at, step):
+				return false
+		else:
+			var vx := Vector2i(step.x, 0)
+			var vy := Vector2i(0, step.y)
+			if (_sight_shut(lay, at, vx) or _sight_shut(lay, at + vx, vy)) and (_sight_shut(lay, at, vy) or _sight_shut(lay, at + vy, vx)):
+				return false
+		at += step
+		if at != to and not lay["floor"].has(at):
+			return false
+	return true
+
+
+static func _sight_shut(lay: Dictionary, from: Vector2i, way: Vector2i) -> bool:
+	return int(lay["edges"].get(Terrain.edge_key(from, way), Terrain.Edge.OPEN)) != Terrain.Edge.OPEN
 
 
 ## Only the chest rule (a level with no interior to judge: the wilds, a town).

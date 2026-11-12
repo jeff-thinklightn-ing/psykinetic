@@ -1646,13 +1646,18 @@ static func _open_floor(map: LevelMap, cell: Vector2i) -> bool:
 ## side (4), the coordinator: the band spread over the rooms), no marker
 ## within that many cells (Chebyshev) of another of its kind while any
 ## spot further off is left; then the nearer ones, as before.
-static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], apart := 0) -> int:
+## With [param walled] >= 0 (the block's "apart": {kind: [clear, walled]};
+## the gen-3 pile-on, enemy-ai's join reach), [param apart] holds only in
+## clear sight (Labyrinth.in_sight) and [param walled] through a wall or a
+## door; [param with] are other markers kept apart the same (the band's
+## other kinds). Spots that keep it go first, then the nearer ones.
+static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], apart := 0, walled := -1, with: Array = []) -> int:
 	if count <= 0 or not map.colours.has(marker):
 		return 0
 	var laid := 0
 	var placed: Array[Vector2i] = []
 	for cell: Vector2i in map.cells:
-		if map.cells[cell] == marker:
+		if map.cells[cell] == marker or with.has(map.cells[cell]):
 			placed.append(cell)
 	for gap in ([apart, 0] if apart > 0 else [0]):
 		for cell in spots:
@@ -1660,12 +1665,59 @@ static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spot
 				return laid
 			if map.cell(cell) != FLOOR or _beside_anchor(anchors, cell):
 				continue
-			if gap > 0 and placed.any(func(other: Vector2i) -> bool: return maxi(absi(other.x - cell.x), absi(other.y - cell.y)) < gap):
+			if gap > 0 and placed.any(func(other: Vector2i) -> bool: return _too_near(map, cell, other, gap, walled)):
 				continue
 			map.set_cell(cell, marker)
 			placed.append(cell)
 			laid += 1
 	return laid
+
+
+## Whether [param a] and [param b] lie closer than [param gap] cells
+## (Chebyshev), or than [param walled] when sight between them is broken
+## (walled >= 0; in_sight).
+static func _too_near(map: LevelMap, a: Vector2i, b: Vector2i, gap: int, walled: int) -> bool:
+	var d := maxi(absi(a.x - b.x), absi(a.y - b.y))
+	if d >= gap:
+		return false
+	return walled < 0 or d < walled or in_sight(map, a, b)
+
+
+## Whether [param from] sees [param to] on [param map] as World's sight
+## walks it (Bresenham; a wall or door edge crossed stops it, a diagonal
+## step needing one of its two routes open; a cell between that is not
+## walkable stops it), doors taken as shut: the layout's own measure of
+## enemy-ai's join reach.
+static func in_sight(map: LevelMap, from: Vector2i, to: Vector2i) -> bool:
+	var d: Vector2i = (to - from).abs()
+	var s := Vector2i(1 if from.x < to.x else -1, 1 if from.y < to.y else -1)
+	var err: int = d.x - d.y
+	var at := from
+	while at != to:
+		var e2: int = 2 * err
+		var step := Vector2i.ZERO
+		if e2 > -d.y:
+			err -= d.y
+			step.x = s.x
+		if e2 < d.x:
+			err += d.x
+			step.y = s.y
+		if step.x == 0 or step.y == 0:
+			if _shut(map, at, step):
+				return false
+		else:
+			var via_x := Vector2i(step.x, 0)
+			var via_y := Vector2i(0, step.y)
+			if (_shut(map, at, via_x) or _shut(map, at + via_x, via_y)) and (_shut(map, at, via_y) or _shut(map, at + via_y, via_x)):
+				return false
+		at += step
+		if at != to and not map.walkable(at):
+			return false
+	return true
+
+
+static func _shut(map: LevelMap, from: Vector2i, way: Vector2i) -> bool:
+	return map.edge(Terrain.edge_key(from, way)) != "clear" or not map.walkable(from + way)
 
 
 ## The dead spread over the depth bands (decision 631): [param count]

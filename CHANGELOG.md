@@ -6,6 +6,9 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The Ossuary's dead lie in three rooms, well apart (870).
+- At the robbers' camp, a Robbers' bundle beside the two bedrolls holds two bandaging kits (870).
 - People, you among them, stand easy, feet under their hips and knees soft, at rest, at work and at a stall; in the Mughouse the taverner stands behind her bar with her hands on the counter (877).
 
 - Towns: wooden houses, the Mughouse among them, have oak-framed windows cut through their own boards, with a glazing cross and board shutters strapped in iron (881).

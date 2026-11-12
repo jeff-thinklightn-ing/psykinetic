@@ -597,7 +597,7 @@ their twins.
   the niches'") all read the one marker, the level's hidden niche
   (`World.hidden_niche()`: `{cell, edge, open}`, `{}` in a zone with none;
   the hall `Main.hall_rect(zone_name)`, the "entrance" anchor's rect): the
-  line "You feel a cool draft coming from one of the niches." to a player
+  line "You feel a cool draught coming from one of the niches." to a player
   alone the first time they step into the hall each generation while the
   door is shut (dungeon's; a restart says it again, as the door is found
   again), art-kit's footprints before it (terrain places them), a dust

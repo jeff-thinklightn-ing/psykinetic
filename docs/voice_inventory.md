@@ -42,7 +42,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Chest titles (3)
+## Chest titles (4)
 
 A chest's own name is its window's title when `PackPanel.title_name` passes it (a capital, then
 only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads "Chest".
@@ -53,8 +53,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Offering stone | `levels/barrow/level.json` |
 | R | Runner's pack | `levels/barrow/level.json` |
 | R | Robbers' chest | `levels/barrow/level.json` |
+| R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2844)
+## Lines in the code (2847)
 
 ### companions (Pip, Wren, Nix) (656)
 
@@ -1311,7 +1312,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 
-### other (sim) (604)
+### other (sim) (606)
 
 | | Line | Where |
 |---|---|---|
@@ -1549,6 +1550,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there | `sim/items.gd` art_slots() |
 |  | Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand. | `sim/items.gd` art_slots() |
 |  | maps, after the cut: from_foothills, from_halls, from_test_room, start 1 by imps and a sneak | `sim/layout_sense.gd` ARRIVAL_NOT_YET |
+|  | two packs %d apart (%s, %s), %d wanted | `sim/layout_sense.gd` pack_faults() |
+|  | the first post from %s (%s, %d steps) calls %d more: %s | `sim/layout_sense.gd` first_faults() |
 |  | the arrival %s is %d cells from where %s %s roams (%d wanted) | `sim/layout_sense.gd` arrival_faults() |
 |  | from the arrival %s the quest giver at %s is not reached %d cells clear of the hostiles (the nearest %s %d cells off) | `sim/layout_sense.gd` _giver_faults() |
 |  | a room with no use | `sim/layout_sense.gd` _purpose() |
@@ -2271,7 +2274,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | The hall's door opens. | `main.gd` _hold_hall_door() |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
 |  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
-|  | You feel a cool draft coming from one of the niches. | `main.gd` _tell_draft() |
+|  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |
 |  | The fresh mortar crumbles under your hands, and the niche comes open. | `main.gd` LOOSE_NICHE_LINE |
 |  | a sealed tomb opened | `main.gd` TOMB_OPENED |
 |  | opened a sealed tomb | `main.gd` TOMB_OPENED_WORDS |
@@ -2295,9 +2298,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd` _on_downed() |
 |  | You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
-|  | Not while they're fighting near. | `main.gd` _start_channel() |
-|  | You hold no charge. The draugr gives more. | `main.gd` _start_channel() |
-|  | Not while they're fighting near. | `main.gd` _start_channel() |
+|  | Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below. | `main.gd` SPENT_LINE |
+|  | Not while there's fighting close by. | `main.gd` _start_channel() |
+|  | Not while there's fighting close by. | `main.gd` _start_channel() |
 |  | %s kneels beside %s. | `main.gd` _on_channel() |
 |  | %s's return of %s is broken. | `main.gd` _on_channel() |
 | U | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
@@ -2797,7 +2800,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | came somewhere new with you | `main.gd` _discovered() |
 |  | %d ms at %s | `main.gd` _report_walk() |
 
-### the draugr (22)
+### the draugr (23)
 
 | | Line | Where |
 |---|---|---|
@@ -2819,8 +2822,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the draugr's pact | `sim/draugr.gd` accept_offer() |
 |  | %s gives the draugr %d gold, too little: he attacks. | `sim/draugr.gd` accept_offer() |
 |  | You give the draugr %d gold, too little: he attacks. | `sim/draugr.gd` accept_offer() |
-|  | %s gives the draugr %d gold and takes up his pact for %d risings. | `sim/draugr.gd` accept_offer() |
-|  | You give the draugr %d gold and take up his pact for %d risings. | `sim/draugr.gd` accept_offer() |
+|  | %d rising%s | `sim/draugr.gd` accept_offer() |
+|  | %s pays the draugr %d gold for a pact worth %s. | `sim/draugr.gd` accept_offer() |
+|  | You pay the draugr %d gold for a pact worth %s. | `sim/draugr.gd` accept_offer() |
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
