@@ -205,6 +205,7 @@ func _fresh_working() -> void:
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
 	_reached = {}
+	_parses.clear()
 
 
 ## Asks for [param text] (the first request, or a follow-up), running
@@ -223,10 +224,10 @@ func ask(text: String) -> Dictionary:
 	var spent := 0.0
 	var result := {"ok": false, "summary": "", "cost": 0.0, "error": ""}
 	# The level's own layout faults (806), and those the proposal adds already said.
-	var layout_before := layout_faults(doc)
+	var layout_before := doc_layout_faults()
 	var layout_said: Array[String] = []
 	# And the arrivals' (806 amended (13)): the level's own the baseline, what the proposal adds said once, a warning.
-	var arrivals_before := arrival_faults(doc)
+	var arrivals_before := doc_arrival_faults()
 	var arrivals_said: Array[String] = []
 	for turn in MAX_TURNS:
 		var response: Dictionary = await client.send(_body())
@@ -265,7 +266,7 @@ Heights now: " + "; ".join(ground)
 					if not streets.is_empty():
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
 					# And to the layout rules, which accepting it must not break (806).
-					var now := working.parsed()
+					var now := parsed_of(working)
 					var layout := layout_news(layout_before, now)
 					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
 					layout_said = layout
@@ -301,7 +302,7 @@ Heights now: " + "; ".join(ground)
 	result["height_warnings"] = height_checks()
 	result["site_warnings"] = site_checks()
 	result["street_warnings"] = street_checks()
-	var parsed_now := working.parsed()
+	var parsed_now := parsed_of(working)
 	result["layout_warnings"] = layout_news(layout_before, parsed_now)
 	result["arrival_warnings"] = arrival_news(arrivals_before, parsed_now)
 	result["cost"] = spent
@@ -957,7 +958,8 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 			_reached = before
 			return _no("that would cut off %s from the level's starts and arrivals: leave a way through (a longer way round is fine)" % cut_off_words(lost))
 	# A building it made gets its code now, for the next tool and the answer (decision 537).
-	Level.fill_codes(working.config)
+	if Level.fill_codes(working.config):
+		working.revision += 1
 	return out
 
 
@@ -2088,9 +2090,9 @@ func _roof(given: Dictionary) -> Dictionary:
 		if not str(given.get(key, "")).is_empty():
 			entry[key] = str(given[key])
 	roofs.append(entry)
-	var before: Array = working.parsed()["warnings"]
+	var before: Array = parsed_of(working)["warnings"]
 	working.apply_changes({"config": {"roofs": roofs}})
-	var parsed := working.parsed()
+	var parsed := parsed_of(working)
 	var new := (parsed["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
 	# Asked of Level whether it kept the roof, not read from the new warnings:
 	# a roof it replaced, over the same rect and already left out, had the same words.
@@ -2172,10 +2174,10 @@ func _stream(given: Dictionary) -> Dictionary:
 	var config := {"streams": streams}
 	if bridges > 0:
 		config["buildings"] = buildings
-	var before: Array = working.parsed()["warnings"]
+	var before: Array = parsed_of(working)["warnings"]
 	var laid := _lay({"cells": cells, "config": config}, "a stream, %d wide, %d cells from %s to %s%s%s" % [width, middle.size(), middle[0], middle[-1],
 		", %d fords" % fords if fords > 0 else "", ", %d bridges" % bridges if bridges > 0 else ""])
-	var new := (working.parsed()["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
+	var new := (parsed_of(working)["warnings"] as Array).filter(func(warning: String) -> bool: return warning not in before)
 	var left_out := new.filter(func(warning: String) -> bool: return warning.begins_with("stream %d:" % index) or warning.begins_with("stream %d " % index))
 	if not left_out.is_empty():
 		working.undo()
@@ -2582,7 +2584,7 @@ func _decor(given: Dictionary) -> Dictionary:
 		if other is Array and (other as Array).size() == 6 and str(other[4]) == kind and Vector2i(int(other[0]), int(other[1])) == at and Vector2i(int(other[2]), int(other[3])) == step:
 			return _no("a %s is at %s already" % [kind, at])
 	var warnings: Array[String] = []
-	Level.decor_from({"decor": [entry]}, working.parsed()["terrain"], warnings)
+	Level.decor_from({"decor": [entry]}, parsed_of(working)["terrain"], warnings)
 	if not warnings.is_empty():
 		# decor_from's warning, said in plain words: what, where and why.
 		var why := "it fits nothing there"
@@ -2671,7 +2673,7 @@ func _spot(given: Dictionary) -> Dictionary:
 		entry["pair"] = pair
 	# npc's reader: its warning on this spot is the refusal, in its words.
 	var floor := {}
-	for cell: Vector2i in working.parsed()["terrain"]["floor"]:
+	for cell: Vector2i in parsed_of(working)["terrain"]["floor"]:
 		floor[cell] = true
 	var warnings: Array[String] = []
 	Level.spots_from({"spots": rest + [entry]}, warnings, floor)
@@ -2690,7 +2692,7 @@ func _spot(given: Dictionary) -> Dictionary:
 	for other: Variant in rest:
 		if other is Dictionary and Level._tile(other.get("cell")) != null:
 			held[Level._tile(other.get("cell"))] = true
-	var before := reached_round(held)
+	var before := _held_reach(held)
 	held[at] = true
 	var after := reached_round(held)
 	var cut: Array[Vector2i] = []
@@ -2705,6 +2707,8 @@ func _spot(given: Dictionary) -> Dictionary:
 	if not front.is_empty():
 		return _no(front)
 	working.apply_changes({"config": {"spots": rest + [entry]}})
+	# What every spot held reaches now: the next spot's before (867).
+	_held = {"doc": working, "revision": working.revision, "cells": _cells_key(held), "reach": after}
 	var said := "%s a %s spot at %s, %s facing %s%s" % ["changed it to" if not was.is_empty() else "laid", use if use != "work" else "work (%s)" % trade, at, pose,
 		face, ", pair %s" % pair if not pair.is_empty() else ""]
 	if unseated:
@@ -3060,6 +3064,63 @@ func trade_preview(town: String) -> String:
 	return "the town's trades in %s, by economy's rules: %s" % [town, "; ".join(said)]
 
 
+# --- What is read once a change (867) ---------------------------------------------
+
+## Parses kept per doc and revision: instance id -> {revision, parsed}.
+var _parses := {}
+## The level's own faults, kept by the doc's revision: kind -> {revision, faults}.
+var _baselines := {}
+## The ground reached with every spot's cell held (the spot tool's before).
+var _held := {}
+
+
+## [param of] parsed (MapDoc.parsed), kept while its revision stands (867):
+## the tool calls of an ask read one parse a change, not one a check. Never
+## for accept's refusal, which parses fresh. Read only: a caller that wrote
+## into it would change what the next one reads.
+func parsed_of(of: MapDoc) -> Dictionary:
+	var kept: Variant = _parses.get(of.get_instance_id())
+	if kept is Dictionary and int(kept["revision"]) == of.revision:
+		return kept["parsed"]
+	var parsed := of.parsed()
+	_parses[of.get_instance_id()] = {"revision": of.revision, "parsed": parsed}
+	return parsed
+
+
+## The level's own layout faults (layout_faults(doc)), kept by its revision:
+## the doc changes only on accept or a host's undo, both through MapDoc (867).
+func doc_layout_faults() -> Array:
+	return _baseline("layout", func() -> Array: return layout_faults(doc, parsed_of(doc)))
+
+
+## The level's own arrival faults (arrival_faults(doc)), kept as doc_layout_faults is.
+func doc_arrival_faults() -> Array:
+	return _baseline("arrival", func() -> Array: return arrival_faults(doc, parsed_of(doc)))
+
+
+func _baseline(kind: String, read: Callable) -> Array:
+	var kept: Variant = _baselines.get(kind)
+	if kept is Dictionary and int(kept["revision"]) == doc.revision and is_same(kept["doc"], doc):
+		return kept["faults"]
+	var faults: Array = read.call()
+	_baselines[kind] = {"doc": doc, "revision": doc.revision, "faults": faults}
+	return faults
+
+
+## The ground reached with [param held]'s cells solid: the last spot's after
+## when nothing has changed since, else flooded (867).
+func _held_reach(held: Dictionary) -> Dictionary:
+	if not _held.is_empty() and is_same(_held["doc"], working) and int(_held["revision"]) == working.revision and _held["cells"] == _cells_key(held):
+		return _held["reach"]
+	return reached_round(held)
+
+
+static func _cells_key(cells: Dictionary) -> String:
+	var listed: Array = cells.keys()
+	listed.sort()
+	return str(listed)
+
+
 ## Why a wall_hearth at [param at] against its [param step] wall is not on an
 ## inside wall (841): outdoors, both its cells in a building's rect; indoors
 ## any wall will do. "" if it is.
@@ -3212,7 +3273,7 @@ func _piece(given: Dictionary) -> Dictionary:
 ## building's door or the cell before it.
 func _kept_clear(rect: Rect2i) -> String:
 	var near := rect.grow(1)
-	var level := working.parsed()
+	var level := parsed_of(working)
 	for start: Vector2i in level.get("starts", []):
 		if near.has_point(start):
 			return "on or beside the start at %s" % [start]
@@ -3587,7 +3648,8 @@ func accept() -> bool:
 	refused = ""
 	# 806 amended (7): the proposal may not add a layout fault (an empty
 	# room, a chest that gives nothing or stands unguarded, ...).
-	var news := layout_news()
+	# The working copy parsed fresh, never from the cache (867: a stale one could let a fault through).
+	var news := layout_news(doc_layout_faults())
 	if not news.is_empty():
 		refused = "the change breaks the layout rules: " + "; ".join(news)
 		return false

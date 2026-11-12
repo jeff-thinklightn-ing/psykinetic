@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_spots()
 	_test_named_refusals()
 	_test_trades_preview()
+	_test_cached_checks()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -785,11 +786,14 @@ func _test_visible_work() -> void:
 	var sites := session.site_checks()
 	_check(sites.size() == 1 and "the woodlot woods at (10, 10) has no walkable cell beside the forest within its radius 3" in sites[0], "a woodlot in open grass: no tree to fell (%s)" % [sites])
 	session.working.map.set_cell(Vector2i(13, 11), "void")
+	session.working.revision += 1
 	_check(session.site_checks().is_empty(), "a tree 3 cells off, its neighbour inside the radius: somewhere to stand")
 	session.working.map.set_cell(Vector2i(13, 11), "grass")
 	session.working.map.set_cell(Vector2i(14, 12), "void")
+	session.working.revision += 1
 	_check(session.site_checks().size() == 1, "a tree whose neighbours are all past the radius: not")
 	session.working.config["outdoor"] = false
+	session.working.revision += 1
 	_check(session.stand_problem(Level.places_from(session.working.config, [] as Array[String])["woods"]).begins_with("the woodlot woods is not outdoors"), "a woodlot indoors: no trees")
 	# Builds in hand with no building marked for them.
 	doc = _doc()
@@ -1017,6 +1021,7 @@ func _test_new_kinds() -> void:
 	var sky := session.run_tool("skylight", {"at": [6, 6]})
 	_check(not sky.get("ok", true) and "outdoors" in str(sky.get("text")), "a skylight outdoors: refused (%s)" % sky)
 	session.working.config.erase("outdoor")
+	session.working.revision += 1
 	_check(not session.run_tool("skylight", {"at": [6, 6], "radius": 6}).get("ok", true), "a skylight's radius past 4: refused")
 	sky = session.run_tool("skylight", {"at": [6, 6], "radius": 3})
 	var warnings: Array[String] = []
@@ -1260,6 +1265,7 @@ func _test_decor() -> void:
 	var no_wall := session.run_tool("decor", {"at": [30, 20], "kind": "rune_strip", "side": "east"})
 	_check(not no_wall.get("ok", true) and "there is no wall on the east side of (30, 20)" in str(no_wall.get("text")), "a rune strip with no wall: refused by Level.decor_from, in plain words (%s)" % no_wall)
 	session.working.map.set_cell(Vector2i(25, 25), "water")
+	session.working.revision += 1
 	var wet := session.run_tool("decor", {"at": [25, 25], "kind": "candles"})
 	_check(not wet.get("ok", true) and "(25, 25) is water, not floor" in str(wet.get("text")), "candles on water: refused, saying so (%s)" % wet)
 	_check(not session.run_tool("decor", {"at": [20, 16], "kind": "carving"}).get("ok", true), "a wall piece with no side: refused")
@@ -1347,6 +1353,7 @@ func _test_piece() -> void:
 	for y in range(14, 19):
 		session.working.map.set_edge(Terrain.edge_key(Vector2i(16, y), Vector2i.RIGHT), "wall")
 		session.working.map.set_edge(Terrain.edge_key(Vector2i(18, y), Vector2i.RIGHT), "wall")
+	session.working.revision += 1
 	WorldMap.settings_path = "res://levels/world_map.json"
 	var lane := session.run_tool("piece", {"at": [17, 16], "kind": "milestone", "carved": "Umbrage"})
 	WorldMap.settings_path = was
@@ -1388,6 +1395,7 @@ func _test_cut_off() -> void:
 	# A second gap lower down: the same lean-to leaves a longer way round, and passes.
 	session.working.map.set_edge(Terrain.edge_key(Vector2i(20, 20), Vector2i.RIGHT), "clear")
 	session.working.map.set_edge(Terrain.edge_key(Vector2i(20, 21), Vector2i.RIGHT), "clear")
+	session.working.revision += 1
 	session._reached = {}
 	var detour := session.run_tool("piece", {"at": [21, 10], "kind": "lean_to"})
 	_check(detour.get("ok", false) and session.reached().has(Vector2i(35, 25)), "with a way round by y 20: the lean-to laid (%s)" % detour)
@@ -1415,6 +1423,7 @@ func _test_chest_rule() -> void:
 	_check(session.run_tool("place", {"at": [11, 10], "thing": "chest", "use": "shop"}).get("ok", false), "a shop counter's chest outdoors: placed")
 	_check(session.run_tool("place", {"at": [12, 10], "thing": "chest", "use": "depot"}).get("ok", false), "a depot's chest outdoors: placed")
 	session.working.config["depth"] = 1
+	session.working.revision += 1
 	var empty := session.run_tool("place", {"at": [13, 10], "thing": "chest"})
 	_check(not empty.get("ok", true) and "hold something" in str(empty.get("text")), "an empty chest in a dungeon: refused (%s)" % empty)
 	_check(session.run_tool("place", {"at": [13, 10], "thing": "chest", "loot": "supplies"}).get("ok", false), "a chest with a loot table in a dungeon: placed")
@@ -1422,6 +1431,7 @@ func _test_chest_rule() -> void:
 	session.working.config.erase("depth")
 	session.working.config["regenerate"] = {}
 	session.working.config["loot"] = {"chest": "supplies"}
+	session.working.revision += 1
 	_check(session.run_tool("place", {"at": [15, 10], "thing": "chest"}).get("ok", false), "a regenerated level's chest with the level's chest loot: placed")
 	_check(BuilderSession.is_dungeon({"depth": 2}) and not BuilderSession.is_dungeon({"outdoor": true}), "a dungeon: below ground or regenerated")
 	_check("only in a dungeon" in BuilderSession.system_prompt(), "the prompt says the rule")
@@ -1515,8 +1525,10 @@ func _test_arrivals() -> void:
 	_check(had.size() == 1 and after.arrival_news(had).is_empty(), "the level's own arrival fault: not the edit's (%s)" % [had])
 	# A spawn point a link lands on, in any zone: indoors too.
 	after.working.config["spawn_points"] = {"from_wilds": [34, 6]}
+	after.working.revision += 1
 	_check(after.arrival_news(had).any(func(fault: String) -> bool: return "from_wilds" in fault), "a spawn point by the first brute: warned (%s)" % [after.arrival_news(had)])
 	after.working.config.erase("spawn_points")
+	after.working.revision += 1
 	# Claude is told as it goes, and the preview's summary carries it.
 	var stub := StubClaude.new([
 		[{"name": "place", "input": {"at": [5, 2], "thing": "imp"}}],
@@ -1737,10 +1749,12 @@ func _test_spots() -> void:
 	var townless := session.run_tool("spot", {"at": [10, 10], "use": "square", "face": [11, 10]})
 	_check(not townless.get("ok", true) and "no town's store" in str(townless.get("text")), "no town on the level: refused (%s)" % townless.get("text"))
 	session.working.config["places"] = {"store": {"at": [20, 15], "kind": "stockpile", "holder": "town"}, "far_store": {"at": [38, 28], "kind": "stockpile", "holder": "town"}}
+	session.working.revision += 1
 	var bare := session.run_tool("spot", {"at": [10, 10], "use": "square", "face": [11, 10], "pose": "sit"})
 	_check(bare.get("ok", false) and "Warning: nothing at (10, 10) is sat on" in str(bare.get("text")) and session.working.config["spots"][0]["town"] == "store",
 		"a sit spot on bare grass: laid with a warning; the nearest store its town (%s)" % bare.get("text"))
 	session.working.map.set_edge(Terrain.edge_key(Vector2i(14, 10), Vector2i.RIGHT), "door")
+	session.working.revision += 1
 	var doorway := session.run_tool("spot", {"at": [14, 10], "use": "square", "face": [13, 10]})
 	_check(not doorway.get("ok", true) and "in a doorway" in str(doorway.get("text")), "in a doorway: refused (%s)" % doorway.get("text"))
 	session.run_tool("paint", {"ground": "rock", "rects": [{"x": 25, "y": 0, "w": 1, "h": 10}, {"x": 25, "y": 11, "w": 1, "h": 19}]})
@@ -1753,12 +1767,14 @@ func _test_spots() -> void:
 	for y in range(21, 24):
 		session.working.map.set_cell(Vector2i(30, y), "rock")
 		session.working.map.set_cell(Vector2i(34, y), "rock")
+	session.working.revision += 1
 	session._reached = {}
 	var shut := session.run_tool("spot", {"at": [32, 22], "use": "square", "face": [32, 21]})
 	_check(not shut.get("ok", true) and "not reached" in str(shut.get("text")), "ground walled in, reached from nowhere: refused (%s)" % shut.get("text"))
 	# Rolf's rule: a stall's square wider than its counter, the keeper's spot behind it only.
 	session.working.config["places"]["stall"] = {"at": [10, 20], "kind": "stall", "holder": "town", "town": "store", "radius": 2}
 	session.working.config["buildings"] = [{"slot": "building.market_stall", "at": [10, 21], "facing": [0, 1]}]
+	session.working.revision += 1
 	session._reached = {}
 	var front := session.run_tool("spot", {"at": [12, 22], "use": "work", "trade": "merchant", "face": [11, 22]})
 	_check(not front.get("ok", true) and "customers' side of the counter at (10, 21)" in str(front.get("text")), "a merchant's spot out front of his counter: refused (%s)" % front.get("text"))
@@ -1827,3 +1843,63 @@ func _test_trades_preview() -> void:
 	_check(lines.size() == 2 and lines[1].begins_with("the town's trades in store"), "the proposal's reading ends with the trades line (%s)" % [lines])
 	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("none (no building with a use, no work site)" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
+
+
+## A parse's whole reading, as one string's hash: what a cached and a fresh one must share.
+func _parse_print(parsed: Dictionary) -> int:
+	return hash(str(parsed))
+
+
+func _test_cached_checks() -> void:
+	print("\n== what builder reads once a change, kept by revision (867) ==")
+	# The outdoor chest check: the same faults without the room layout it never read (dungeon's OK).
+	var sense := BuilderSession.LAYOUT_SENSE
+	for level_name: String in ["wilds", "barrow"]:
+		var level := MapDoc.from_level(level_name).parsed()
+		for options: Dictionary in [{"dungeon": false}, {"dungeon": true}]:
+			var old: Array = []
+			sense._chests(level, sense._lay(level, [], options), options, old)
+			_check(str(sense.check_chests(level, options)) == str(old), "%s, dungeon %s: check_chests' faults as before (%d)" % [level_name, options["dungeon"], old.size()])
+	var session := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(176, 186, 40, 32), "wilds", StubClaude.new([]))
+	var first := session.parsed_of(session.working)
+	_check(is_same(session.parsed_of(session.working), first), "read twice with no change: one parse")
+	var agree := func(when: String) -> void:
+		var fresh := session.working.parsed()
+		var kept := session.parsed_of(session.working)
+		_check(_parse_print(kept) == _parse_print(fresh)
+			and str(BuilderSession.layout_faults(session.working, kept)) == str(BuilderSession.layout_faults(session.working))
+			and str(session.arrival_faults(session.working, kept)) == str(session.arrival_faults(session.working))
+			and _parse_print(kept) == _parse_print(fresh), "%s: the kept parse and its faults agree with fresh ones, and reading them wrote nothing into it" % when)
+	session.run_tool("paint", {"ground": "dirt", "cells": [[186, 200]]})
+	_check(not is_same(session.parsed_of(session.working), first), "a tool's change: parsed again")
+	agree.call("after a paint")
+	# A plain chest outdoors, put in by hand (the place tool refuses one): a layout fault of the edit's own.
+	var chest_from := session.working.revision
+	session.working.apply_changes({"cells": {Vector2i(200, 205): "chest"}, "covers": [Vector2i(200, 205)]})
+	_check(session.working.revision > chest_from and session.working.map.cell(Vector2i(200, 205)) == "chest", "a chest put in by hand: the revision on")
+	agree.call("after a chest placed")
+	session.working.undo()
+	agree.call("after an undo")
+	session.working.redo()
+	agree.call("after a redo")
+	var revision := session.working.revision
+	session.run_tool("look", {})
+	_check(session.working.revision == revision, "a look changes nothing: the revision stands")
+	# The level's own faults, kept by its revision; accept never trusts a kept parse.
+	var baseline := session.doc_layout_faults()
+	_check(is_same(session.doc_layout_faults(), baseline) and str(baseline) == str(BuilderSession.layout_faults(session.doc)), "the level's own faults: kept, and as read fresh")
+	var poisoned := session.working.parsed()
+	poisoned["entities"] = []
+	session._parses[session.working.get_instance_id()] = {"revision": session.working.revision, "parsed": poisoned}
+	var news := session.layout_news(baseline)
+	_check(not session.accept() and "the change breaks the layout rules" in session.refused and not news.is_empty(),
+		"a kept parse made wrong (the chest left out of it): accept parses fresh and still refuses the chest (%s)" % session.refused)
+	session.working.undo()
+	session._parses.clear()
+	_check(session.accept() and session.doc.revision > 0 and not is_same(session.doc_layout_faults(), baseline), "accepted with the chest undone: the doc's revision on, its faults read again")
+	# The spot tool's before is the last spot's after, when nothing changed between.
+	session.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"})
+	var kept_reach: Dictionary = session._held.get("reach", {})
+	var held := {Vector2i(192, 210): true}
+	_check(not kept_reach.is_empty() and is_same(session._held_reach(held), kept_reach) and kept_reach.size() == session.reached_round(held).size(),
+		"the reach with the spots held: kept from the last spot, the same as flooded fresh")

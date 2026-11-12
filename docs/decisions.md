@@ -49597,3 +49597,35 @@ there; no remote or credential is added there; sudo there is Jeff's. Each remote
 whole session there when this PC's side is gone; prepare stops what an earlier run left in that tree's
 checkout. A bundle leaves out every ref saturn has (its heads and each tree's refs/land tip). Not yet: a
 failed scene's kept logs stay on saturn (the part's output comes back). Tools and tests only; protocol unchanged; no new class_name.
+## 867. Builder mode reads a level once a change: parses and the level's own faults kept by revision
+
+Builder mode on Umbrage (wilds, 256 by 256) was slow for the town trees to use: the probe of 11-11
+had a tool call's checks at seconds each (the level's layout faults 3.4 s, its arrival faults 0.8 s,
+a spot 1.7 s, accept's layout news 8 s), most of it parsing the same working copy again for each
+check and laying the whole level's rooms for a chest check that, outdoors, never reads them. The
+coordinator's approval, with its two asks: say whether any of it changes what an accept can refuse,
+and a test that the cached and fresh answers agree after an undo and a redo.
+
+- MapDoc keeps a revision: every change made through it (apply_changes, undo, redo, the single-value
+  setters) bumps it. An edit straight to its map or config does not; whoever makes one bumps it
+  (BuilderSession after Level.fill_codes; builder_test after its hand edits).
+- BuilderSession.parsed_of(doc) keeps one parse per doc and revision, read only: an ask's tool calls
+  (roofs, streams, decor, spots, the kept-clear checks, each tool's layout and arrival checks) read
+  one parse a change, not one a check. doc_layout_faults() and doc_arrival_faults() keep the level's
+  own faults by the doc's revision (it changes only on accept or a host's undo).
+- The spot tool's reach with every other spot held is the last spot's after when nothing changed
+  between (kept by doc, revision and the held cells).
+- LayoutSense.check_chests lays no rooms outside a dungeon (dungeon's OK): each chest there is said
+  outside a dungeon and passed over before any guard is looked for. A dungeon-only read moved above
+  that continue needs the lay again; the comment says so.
+
+What an accept can refuse does not change: accept parses the working copy fresh, never from the
+cache, against the level's own faults (the baseline, kept by the doc's revision, which only accept
+and undo move). A stale cache can cost a tool call a wrong word, never let a bad edit through.
+builder_test's _test_cached_checks: check_chests' faults as before on wilds and the barrow, dungeon
+or not; one parse while nothing changes; the kept parse and its faults equal fresh ones after a
+paint, a chest put in, an undo and a redo; a look leaves the revision; the level's faults kept and as
+read fresh; a kept parse made wrong (the chest left out) and accept still refuses the chest; accepted,
+the doc's revision on and its faults read again; the spot reach kept and equal to one flooded fresh.
+Timings under the bench lock follow. Tools only: nothing player-facing, no package, no bullet;
+protocol unchanged; no new class_name.

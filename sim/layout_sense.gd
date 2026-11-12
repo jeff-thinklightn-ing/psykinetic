@@ -118,7 +118,12 @@ static func check(level: Dictionary, rooms: Array = [], options: Dictionary = {}
 ## Only the chest rule (a level with no interior to judge: the wilds, a town).
 static func check_chests(level: Dictionary, options: Dictionary = {}) -> Array:
 	var faults: Array = []
-	_chests(level, _lay(level, [], options), options, faults)
+	# Out of a dungeon _chests reads no lay: each chest is said outside a
+	# dungeon and passed over before any guard is looked for, so the whole
+	# level's rooms are not laid for it (867, dungeon's OK). A dungeon-only
+	# read moved above that continue needs the lay here again.
+	var lay: Dictionary = _lay(level, [], options) if options.get("dungeon", false) else {"things": []}
+	_chests(level, lay, options, faults)
 	return faults
 
 

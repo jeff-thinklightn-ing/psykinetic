@@ -27,6 +27,10 @@ var config := {}
 ## The level.json text [member config] was read from ("" for none): save
 ## writes the file in its words wherever a value is unchanged (851).
 var source_text := ""
+## Bumped by every change made through it (decision 867): what a cached
+## parse of it is good for. An edit straight to map or config does not
+## bump it; whoever makes one bumps it (BuilderSession after fill_codes).
+var revision := 0
 ## Anything unsaved; level.json has changes; height.png was there when
 ## loaded; height.png has changes.
 var dirty := false
@@ -167,6 +171,12 @@ func parsed() -> Dictionary:
 	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, map.to_relief_image())
 
 
+## A change made: the revision on, and said (867).
+func _bump() -> void:
+	revision += 1
+	changed.emit()
+
+
 # --- Undo ----------------------------------------------------------------------------
 
 ## [param step] (what to put back) as the newest undo step; redo is cleared.
@@ -183,7 +193,7 @@ func undo() -> bool:
 	if undo_steps.is_empty():
 		return false
 	redo_steps.append(_swap(undo_steps.pop_back()))
-	changed.emit()
+	_bump()
 	return true
 
 
@@ -191,7 +201,7 @@ func redo() -> bool:
 	if redo_steps.is_empty():
 		return false
 	undo_steps.append(_swap(redo_steps.pop_back()))
-	changed.emit()
+	_bump()
 	return true
 
 
@@ -299,12 +309,13 @@ func apply_changes(changes: Dictionary) -> bool:
 		return false
 	dirty = true
 	push(step)
-	changed.emit()
+	_bump()
 	return true
 
 
 ## Sets level.json's [param key] to [param value] (null takes it out).
 func set_config(key: String, value: Variant) -> void:
+	revision += 1
 	if value == null:
 		config.erase(key)
 	else:
@@ -319,6 +330,7 @@ func set_config(key: String, value: Variant) -> void:
 ## Sets cell [param at]'s height (0 for none); returns what it was. A
 ## change means height.png is written on save.
 func set_height(at: Vector2i, level: int) -> int:
+	revision += 1
 	var old: int = map.heights.get(at, 0)
 	if level <= 0:
 		map.heights.erase(at)
@@ -333,6 +345,7 @@ func set_height(at: Vector2i, level: int) -> int:
 ## Sets cell [param at]'s elevation (decision 525) to [param metres];
 ## returns what it was. A change means relief.png is written on save.
 func set_relief(at: Vector2i, metres: float) -> float:
+	revision += 1
 	if not map.has_relief():
 		_start_relief()
 	var old := map.set_relief(at, metres)
@@ -366,6 +379,7 @@ func entry_of(at: Vector2i) -> Dictionary:
 ## Puts [param entry] as the entry for [param at]: replaced where it is in
 ## the list, added at the end, or ({} or only "at") taken out.
 func put_entry(at: Vector2i, entry: Dictionary) -> void:
+	revision += 1
 	var empty := entry.keys().all(func(key: Variant) -> bool: return str(key) == "at")
 	_put_listed("entities", at, {} if empty else entry)
 
@@ -377,6 +391,7 @@ func link_of(at: Vector2i) -> Dictionary:
 
 ## Puts [param link] as the link on [param at] ({} takes it out).
 func put_link(at: Vector2i, link: Dictionary) -> void:
+	revision += 1
 	_put_listed("links", at, link)
 
 
@@ -432,7 +447,7 @@ func resize(left: int, top: int, right: int, bottom: int) -> String:
 	if lost > 0 or not dropped.is_empty():
 		lost_text = "dropped %d cells%s" % [lost, (", " + ", ".join(dropped)) if not dropped.is_empty() else ""]
 	report = "resized to %d x %d cells%s" % [map.size.x, map.size.y, "; " + lost_text if not lost_text.is_empty() else ""]
-	changed.emit()
+	_bump()
 	return lost_text
 
 
