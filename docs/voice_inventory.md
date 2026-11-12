@@ -3022,9 +3022,9 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |---|---|---|
 |  | This way. Stay close. | `guide.set_off.steady and watchful[0]` |
 |  | This way. Keep up. | `guide.set_off.quick and wary[0]` |
-|  | Come on, it's this way! | `guide.set_off.warm and talkative[0]` |
+|  | Come on, it's this way. | `guide.set_off.warm and talkative[0]` |
 |  | This way. Watch your step. | `guide.set_off.careful and thoughtful[0]` |
-|  | This way, come on! | `guide.set_off.restless and curious[0]` |
+|  | This way, come on. | `guide.set_off.restless and curious[0]` |
 |  | Not here. Not with them this close. | `bandage_says.not_safe` |
 |  | Give it a breath. We're still bleeding from that. | `bandage_says.hurt_now` |
 |  | I've nothing to bandage with. | `bandage_says.no_kit` |
