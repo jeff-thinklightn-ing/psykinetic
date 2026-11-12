@@ -211,6 +211,16 @@ static func _key(text: String) -> String:
 	return RegEx.create_from_string("[^a-z0-9 ]").sub(text.to_lower(), "", true).strip_edges()
 
 
+## A lore fact's words as a voice is handed them: a rumour (fact "hearsay") as "It is said that ...", unless
+## it already speaks as one (fact "speaks_as_rumour", lore's flag: "Rumour tells of...", "They say...";
+## 289 amended (1), npc's side: the smith's came out "It is said that rumour tells of..."); a fact as it is.
+static func said_of(fact: Dictionary) -> String:
+	var text := str(fact.get("text", "")).strip_edges()
+	if bool(fact.get("hearsay", false)) and not bool(fact.get("speaks_as_rumour", false)):
+		return "It is said that %s" % _lower_first(text)
+	return text
+
+
 ## [param text] with its first letter lowered to follow "It is said that" and the like, unless its
 ## first word is a name (lore's finding, 2026-11-10: "It is said that umbrage is cursed"; Hollowfell,
 ## Brand, Aldous and Snagfin the same): is_name. "I" ("I'll", "I'm", "I've", "I'd") keeps its capital, and

@@ -4718,9 +4718,7 @@ static func lore_words(who: String, about := PackedStringArray()) -> String:
 	var said: Array[String] = []
 	var length := 0
 	for fact in facts:
-		var text := str(fact["text"]).strip_edges()
-		if bool(fact.get("hearsay", false)):
-			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
+		var text := Hearsay.said_of(fact)  # A rumour as one, once (289 amended (1), npc's side).
 		if length + text.length() > LORE_CHARS:
 			continue
 		length += text.length() + 1
@@ -5462,9 +5460,7 @@ func place_brief(zone_name: String, new_today := false) -> Dictionary:
 			var x_sees := not str(x.get("sight", "")).is_empty()
 			var y_sees := not str(y.get("sight", "")).is_empty()
 			return x_sees and not y_sees or x_sees == y_sees and float(x["weight"]) > float(y["weight"]))
-		var text := str(facts[0]["text"]).strip_edges()
-		if bool(facts[0].get("hearsay", false)):
-			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
+		var text := Hearsay.said_of(facts[0])  # A rumour as one, once (289 amended (1), npc's side).
 		var seen := str(facts[0].get("sight", ""))
 		return {"text": "%s One thing you know of it: %s" % [head, text], "real": true, "kind": "lore", "sight": seen,
 			"ask": PLACE_ASK_SIGHT["lore"] % seen if not seen.is_empty() else PLACE_ASK["lore"]}

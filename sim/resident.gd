@@ -1637,9 +1637,7 @@ func world_facts(about := PackedStringArray()) -> Array[String]:
 			continue
 		if bool(fact.get("secret", false)) and not trusted:
 			continue
-		var text := str(fact["text"]).strip_edges()
-		if bool(fact.get("hearsay", false)):
-			text = "It is said that %s" % Hearsay._lower_first(text)
+		var text := Hearsay.said_of(fact)
 		if length + text.length() > lore_budget():
 			break
 		length += text.length() + 1

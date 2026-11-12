@@ -4560,6 +4560,15 @@ the wrapper (npc's side) leaves a marked text as it is. lore_test refuses a rumo
 ("Rumour", "It is said", "They say"...) without the flag. Rejected: npc matching the words itself (a second
 list of hearsay openings to keep in step with the data, and a false match on a plain fact).
 
+289 amended (1), npc's side (the coordinator's hearsay ruling, 2026-11-12; lore's flag, the label lore's).
+A rumour whose text already speaks as one (fact "speaks_as_rumour": smith.forge_rumour, "Rumour tells of
+a great dwarven forge deep below the castle.") is not wrapped again: it came out "It is said that rumour
+tells of...". Hearsay.said_of(fact) is the one wrap, at the three places that made it: Resident.world_facts
+and the companion's Companion.lore_words and her place's one fact (those two now lower the first word by
+Hearsay._lower_first as the residents' do, so a name opening a rumour keeps its capital there too); it
+reads the key known_by hands every fact (lore's fdd415823). resident_test: the flagged rumour
+kept as it is, an unflagged one wrapped, a fact bare. Server only, protocol unchanged, no new class_name.
+
 ## 280. Prices from value and need; players' own gold; trade at a shop counter, taxed for the town
 
 Economy step 5 (sim/economy.gd, World.economy, saved as "economy").

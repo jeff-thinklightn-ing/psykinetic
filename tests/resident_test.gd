@@ -4415,6 +4415,12 @@ func _test_lower_first() -> void:
 		"Brand holds the key.", "Mound-breakers dig by night.", "Old Tam mends bones.", "Brother Cuth prays."]
 	_check(people.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "people's names kept: %s" % [people.map(func(line: String) -> String: return Hearsay._lower_first(line))])
 	_check(Hearsay._lower_first("Mound of earth.") == "mound of earth.", "a word of a hyphened name lowered alone (%s)" % Hearsay._lower_first("Mound of earth."))
+	# 289 amended (1), npc's side: a rumour that already speaks as one is not wrapped again.
+	var forge := {"text": "Rumour tells of a great dwarven forge deep below the castle.", "hearsay": true, "speaks_as_rumour": true}
+	var plain := {"text": "Raiders can kill.", "hearsay": true}
+	var fact := {"text": "The town has a temple.  "}
+	_check(Hearsay.said_of(forge) == forge["text"] and Hearsay.said_of(plain) == "It is said that raiders can kill."
+		and Hearsay.said_of(fact) == "The town has a temple.", "a rumour that speaks as one kept as it is (%s); one that doesn't, \"It is said that\"; a fact bare" % Hearsay.said_of(forge))
 
 
 ## A stroll's free cell has room (853 amended (7), npc's look: about 2,760 silent body-minutes a day
