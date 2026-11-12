@@ -50874,3 +50874,75 @@ boards on a backing with ledges and straps, hinged where they were. Other sets' 
 palette walls until each is rebuilt the same way. view_test _test_window_wall_faces (the faces'
 material, place, turn and stretch, the other surfaces untouched, and every drawn one so). Client
 only; protocol unchanged; no new class_name.
+## 877. The people's stance: feet under the hips
+
+(decision_number.sh's 877; Jeff, 2026-11-11, the people look like "bad claymation place holders";
+the coordinator's go, ahead of the work clips.) The UAL's standing clips (Idle, Idle_Talking,
+Idle_LookAround, Idle_Tired, and every clip built on them, our fidgets among them) stand with the
+feet a full pace apart: 0.36 m across and 0.39 m fore and aft, the right toe turned 44 degrees out.
+It is every standing resident's, companion's and the player's pose every second in town, and it
+reads as a lunge held. Chosen: a people's copy of each stood clip with the feet reached under the
+hips, played only by a body whose model says "people_stance" (Client3D.HUMAN and HUMAN_F); the
+goblin, Snagfin (a resident drawn as his kind) and every monster keep the UAL's.
+
+- tools/humanoid_clips.py: people_feet(share, moved) reaches each leg (the builder's leg reach,
+  805 amended (18)) from the UAL's stance to hip width (0.22 m across) and 0.12 m fore and aft,
+  the pelvis over their middle; PEOPLE_LIFT raises the hips 0.03 m so the shorter reach bends the
+  knees 17 to 21 degrees (the UAL's 22 to 27; without it 35, crouched); PEOPLE_TOE turns the
+  left toe out to 8 degrees and the right in to 15 (a leg reach's third item turns its foot about
+  the vertical). people_stood keys a standing loop every 0.25 s with them; people_copy lays them
+  over a built clip's keys, under each key's own hip move. The shift (Fidget_Shift) is keyed every
+  0.1 s with its right-leg turns left to the reach, since its hips go 3.5 cm aside. Clips:
+  People_Idle, People_Idle_Talking, People_Idle_LookAround, People_Idle_Tired and
+  People_Fidget_Shift, _LookBack, _Shoulders, _Sleeve, _ArmsCrossed.
+- AnimRig.stood_as (Client3D.PEOPLE_PREFIX, set on a rig whose model says "people_stance"): a
+  clip asked for is played as its "People_" copy wherever the library has one, and playing(),
+  base_clip() and upper_clip() name it plain, so every caller (the idle, talk, fidgets, works,
+  seats, a work's enter and exit) and every table (FIDGETS, ARMED_FIDGETS, WORK_STROKES) keeps
+  the plain names; as_played(clip) says which clip is played. A copy added to goblin.res is
+  played by people from then on, with nothing else to change.
+- The clips a person plays from the idle and back, matched so none slides a foot as it blends:
+  people_over(keys, left, right, lift) gives each foot a stance ("idle", the clip's "own", or
+  "counter": hip width at the stall) or windows from one to another, the foot carried with a
+  PEOPLE_STEP_LIFT (0.06 m) arc, a step, never a slide: on its own while the clip has it planted,
+  or over the clip's own step. A foot wholly at its own stance keeps the clip's leg (a seat, a
+  kneel: the knee where the UAL puts it). The hips take PEOPLE_LIFT only while both feet stand the
+  idle stance. Works: Chop, Saw, Hammer, Hoe and Lean_Rail take the feet with no lift (their hands
+  meet the log, the ground, the well's coping: nothing above the pelvis moves); Herd, Carry_Game,
+  Carry_Shoulder and the Fish_ clips with it. The keeper: Counter_Low_Idle, _Show and _Give at the
+  counter stance; stepping up (Counter_Low_Enter) the clip's right foot steps and the left is
+  carried after it, stepping back the left first. Sitting_Enter and _Exit, GroundSit_Enter and
+  _Exit: the right foot over the clip's own step, the left carried to (from) where it sits.
+  Fixing_Kneeling: the left foot, planted before the knee, kept at the people's; the knelt right
+  leg the clip's own between its step down and up. The feet now drift less through the works than
+  the UAL's stance let them (the chop's 9 cm over its loop to 3.8, the cast's 17 to 5.3); the
+  ground sit's own slides (its feet drawn in while sat) are the UAL's.
+- anim_rig_test _test_people_feet: People_Idle's feet within 0.30 m across and 0.20 m fore and aft;
+  every "People_" clip that begins or ends at rest has both feet within 3 cm of People_Idle's there;
+  through each, at 1/30 s, five builds, a foot on the ground moves no more than 0.02 m a step (the
+  ground sit's excepted). view_test: the player's body stands People_Idle or a fidget's copy (its
+  rig's as_played); an orc's and a kobold's their own clips.
+- The sit's loops (the coordinator's, from the fire's pair): Sitting_Idle03 raises the right arm over
+  the head for 2.3 s of its 4.2, so a body given it as its loop held an arm in the air more than
+  half the time. Client3D.ACTIVITIES "sit" loops Sitting_Idle or Sitting_Idle02; Idle03 is an aside
+  only, once through now and then. view_test: no seated word loops it, and "sit" keeps it as an aside.
+- Behind a bar (the coordinator's go, from Rolf's pair): "tend" plays Counter_Low_* for a stall's
+  0.88 m top, so at the Mughouse's bar (building.bar_counter, about 1.06 m) the taverner's hands
+  worked under the board. Client3D.ACTIVITIES "tend_bar" plays the UAL's own counter clips, built
+  as Counter_Bar_Idle_Loop, _Show, _Give, _Enter and _Exit (wrists 1.08 to 1.10 m), each with a
+  People_ copy at the counter stance (the enter's and exit's feet carried as Counter_Low's are).
+  npc maps the taverner's "show" word to it. "dress" (the hunter) and "scrape" (the tanner), the
+  interim the coordinator approved until their own clips: Fixing_Kneeling with no tool. Its loop
+  stands up every 5.2 s; a kneel's enter, loop and exit is later work. view_test's spot words list
+  them; anim_rig_test's start and end lists take the bar's clips that begin or end at the counter.
+  Stood up from the board (the coordinator, from the Mughouse stills: she read folded over it, the
+  crown of her head from the south): bar_upright lifts the chest (BAR_UPRIGHT: spine_01 and _02 8
+  degrees, spine_03 4) and reaches each hand back to where the base clip has it (a reach target
+  "bone@base": that bone's head in the base clip as it comes, before any turn), eased in over the
+  enter and out over the exit. Her head 0.15 m higher (1.54 m) and 0.25 m further back over her
+  hips, her face seen from the south, her fingertips on the 1.06 m top (C:/dev/review/mughouse_tend2).
+
+Reel: tools/clip.gd folk --which=stand (the player, a woman and the goblin at rest, nearest zoom),
+C:/dev/review/idle1 (before 4d17d4e34, after 81099a9e7); a work and a seat, --which=stall and fire
+(before 4d17d4e34, after d7f7ac502). Client and art only; protocol unchanged; no new class_name.
+

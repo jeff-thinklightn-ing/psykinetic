@@ -43,6 +43,7 @@ func _ready() -> void:
 	await _test_upper()
 	await _test_upper_timed()
 	await _test_no_upper()
+	await _test_people_feet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2020,3 +2021,78 @@ func _test_no_upper() -> void:
 	_check(not (rig.tree.tree_root as AnimationNodeBlendTree).has_node("upper") and rig.playing() == "Idle",
 		"made without it: no such node, and upper() does nothing")
 	rig.get_parent().queue_free()
+
+
+## 877: the people's stance. People_Idle stands the feet under the hips (within 0.30 m across and
+## 0.20 m fore and aft; the UAL's 0.36 and 0.39). Every "People_" clip that begins or ends where a
+## person stands at rest has both feet within PEOPLE_FEET_NEAR of People_Idle's there (none slides a
+## foot as it blends in or out); through each, a foot on the ground (within 1 cm of its height at rest)
+## moves no more than PEOPLE_SLIDE in a 1/30 s, five builds. The ground sit's own slides (the UAL's,
+## its feet drawn in while sat) are not ours to judge.
+const PEOPLE_FEET_NEAR := 0.03
+const PEOPLE_SLIDE := 0.02
+const PEOPLE_START_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Exit",
+	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Exit", "Sitting_Exit", "GroundSit_Exit"]
+const PEOPLE_END_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Enter",
+	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Enter", "Sitting_Enter", "GroundSit_Enter"]
+func _test_people_feet() -> void:
+	print("== the people's stance: feet under the hips, met and kept by every people's clip ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var off: Array[String] = []
+	var spans: Array[String] = []
+	var clips: Array[String] = []
+	for clip: String in lib.get_animation_list():
+		if clip.begins_with(Client3D.PEOPLE_PREFIX):
+			clips.append(clip)
+	# Every build's feet at People_Idle and at each clip's ends; the slide, frame by frame, on the
+	# first build only (the clips are one rig's, and a sweep of every clip at 30 frames a second on
+	# five builds ran anim_rig_test past its time limit on a loaded landing, 11-12).
+	for build: Array in SWORD_BUILDS:
+		var sweep := build == SWORD_BUILDS[0]
+		var made := _sword_body(self, build)
+		var model: Node3D = made[0]
+		var rig: AnimRig = made[2]
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		if skeleton.find_bone("LeftFoot") < 0 or skeleton.find_bone("RightFoot") < 0:
+			off.append("%s has no LeftFoot or RightFoot bone" % build[0])
+			model.queue_free()
+			(made[3] as Node3D).free()
+			continue
+		var feet := func() -> Array:
+			return ["LeftFoot", "RightFoot"].map(func(bone: String) -> Vector3:
+				return model.global_transform.affine_inverse() * skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone)).origin)
+		rig.base_at(Client3D.PEOPLE_PREFIX + Client3D.CLIP_IDLE, 0.0)
+		await _frames(2)
+		var stance: Array = feet.call()
+		var gap: Vector3 = stance[0] - stance[1]
+		spans.append("%s %.2f across, %.2f ahead" % [build[0], absf(gap.x), absf(gap.z)])
+		if absf(gap.x) > 0.30 or absf(gap.z) > 0.20:
+			off.append("%s People_Idle's feet %.2f m across, %.2f fore and aft" % [build[0], absf(gap.x), absf(gap.z)])
+		for clip in clips:
+			var plain := clip.trim_prefix(Client3D.PEOPLE_PREFIX)
+			var length := lib.get_animation(clip).length
+			var was: Array = []
+			var last := floori((length + 0.001) * 30.0)
+			for k in range(last + 1):
+				if not sweep and k != 0 and k != last:
+					continue
+				var t := k / 30.0
+				rig.base_at(clip, minf(t, length))
+				await _frames(2)
+				var now: Array = feet.call()
+				var end := t == 0.0 and not plain in PEOPLE_START_ELSEWHERE or t + 1.0 / 30.0 > length + 0.001 and not plain in PEOPLE_END_ELSEWHERE
+				for side in 2:
+					var flat := Vector2(now[side].x - stance[side].x, now[side].z - stance[side].z).length()
+					if end and (flat > PEOPLE_FEET_NEAR or absf(float(now[side].y) - float(stance[side].y)) > PEOPLE_FEET_NEAR):
+						off.append("%s %s %.2f s: the %s foot %.3f m from People_Idle's" % [build[0], clip, t, ["left", "right"][side], flat])
+					if sweep and not was.is_empty() and not plain.begins_with("GroundSit") and float(now[side].y) < float(stance[side].y) + 0.01 							and float(was[side].y) < float(stance[side].y) + 0.01:
+						var slid := Vector2(now[side].x - was[side].x, now[side].z - was[side].z).length()
+						if slid > PEOPLE_SLIDE:
+							off.append("%s %s %.2f s: the %s foot slid %.3f m on the ground" % [build[0], clip, t, ["left", "right"][side], slid])
+				was = now
+		model.queue_free()
+		(made[3] as Node3D).free()
+	print("  People_Idle's feet: %s; %d people's clips" % [", ".join(spans), clips.size()])
+	_check(lib.has_animation(Client3D.PEOPLE_PREFIX + Client3D.CLIP_IDLE) and off.is_empty(),
+			"the people's clips meet People_Idle's feet where they begin or end at rest (within %.2f m) and slide none on the ground (%.2f m a 1/30 s), feet under the hips, five builds (the slide on one) (%d: %s)" % [
+			PEOPLE_FEET_NEAR, PEOPLE_SLIDE, off.size(), ", ".join(off.slice(0, 12))])

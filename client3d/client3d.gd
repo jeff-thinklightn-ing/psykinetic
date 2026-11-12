@@ -1521,6 +1521,14 @@ const CLIP_HEAVY_CONTACT := 0.45
 ## slash itself seen, not only its reset).
 const WOUND_STRIKES := ["sword", "tomb_sledge", "giant_axe", "battle_axe"]
 const CLIP_IDLE := "Idle"
+## The people's stance (877; Jeff, 2026-11-11: "bad claymation place holders"): a body whose model
+## says "people_stance" (HUMAN, HUMAN_F: the player, companions, townsfolk) has its rig play each
+## clip as its copy so prefixed where the library has one (AnimRig.stood_as): the stood clips
+## (Idle, its talk, look-round and tiredness, the fidgets) and those a person plays from them and
+## back, built with the feet under the hips (tools/humanoid_clips.py's people_feet: hip width,
+## 0.12 m between them, the knees soft) where the UAL's stand a full pace apart. The goblin,
+## Snagfin and every monster keep the UAL's.
+const PEOPLE_PREFIX := "People_"
 const CLIP_WALK := "Walk"
 ## Wading (775; Jeff: the hills' streams fordable): water over WADE_DEPTH at the feet plays
 ## the high-stepping Wade (humanoid_clips.py), WADE_PACE metres a second at speed 1 (feel's
@@ -1615,7 +1623,7 @@ const GAIT_SMOOTH := 0.25
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true}
 ## The human bodies' gaits (decision 399 amended twice): the pack's jog and
 ## sprint take 2.6 m and 4 m steps, too long for a player's 4 tiles a second
 ## (Jeff on v0.1.149); Jog_Short and Sprint_Short narrow their swing
@@ -1688,7 +1696,7 @@ const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_F_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true}
 ## Moving faster than this (tiles a second) walks. 0.4 let a slow approach
 ## (a monster easing into its last cell before a blow) slide standing
 ## ("blows you can see", 2iii).
@@ -21830,6 +21838,8 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		puppet.set_meta("idle", str(model["idle"]))
 	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, ArtKit.feel("client3d.clip_blend", CLIP_BLEND), true,
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
+	if model.get("people_stance", false):
+		rig.stood_as = PEOPLE_PREFIX
 	rig.loop(_idle_clip(puppet))
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
@@ -23608,8 +23618,10 @@ const ACTIVITIES := {
 	# (humanoid_clips' Lean_Rail_Loop), and stood talking or listening. A sit lasts 2 to 4
 	# minutes and a stand 45 to 120 seconds (npc's), many times the 1.7 to 4.2 s loops: now and
 	# then (_work_aside) the sat take another of the sitting idles once through, the sat talker or
-	# listener pauses in one, and the stood shift their weight or look about.
-	"sit": {"clips": ["Sitting_Idle", "Sitting_Idle02", "Sitting_Idle03"], "seat": true,
+	# listener pauses in one, and the stood shift their weight or look about. Sitting_Idle03 raises
+	# the right arm over the head for 2.3 s of its 4.2 (877, the coordinator's): an aside only, never
+	# a body's loop, or a sitter holds an arm in the air more than half the time.
+	"sit": {"clips": ["Sitting_Idle", "Sitting_Idle02"], "seat": true,
 		"asides": ["Sitting_Idle", "Sitting_Idle02", "Sitting_Idle03"]},
 	"sit_talk": {"clip": "Sitting_Talking", "seat": true, "asides": ["Sitting_Idle02", "Sitting_Idle03"]},
 	"sit_listen": {"clip": "Sitting_Nodding", "seat": true, "asides": ["Sitting_Idle", "Sitting_Idle02"]},
@@ -23623,6 +23635,16 @@ const ACTIVITIES := {
 	# ones are a bar's, 1.06 m, for the Mughouse's taverner when its counter is laid).
 	"tend": {"clip": "Counter_Low_Idle", "enter": "Counter_Low_Enter", "exit": "Counter_Low_Exit",
 		"asides": ["Counter_Low_Show", "Counter_Low_Give"]},
+	# A keeper at a bar (877, the coordinator's "tend_bar": npc's taverner at the Mughouse's counter,
+	# its top 1.06 m): the UAL's counter clips as they come (humanoid_clips' Counter_Bar_*, wrists
+	# 1.08 m), stepped up to, shown and handed over from, stepped back from, as at the stall.
+	"tend_bar": {"clip": "Counter_Bar_Idle", "enter": "Counter_Bar_Enter", "exit": "Counter_Bar_Exit",
+		"asides": ["Counter_Bar_Show", "Counter_Bar_Give"]},
+	# Knelt at a task on the ground (877, the coordinator's interim, npc's "show"): the hunter dressing
+	# game, the tanner scraping a hide; no tool in the hand until items and art-kit make a knife and a
+	# scraper.
+	"dress": {"clip": "Fixing_Kneeling"},
+	"scrape": {"clip": "Fixing_Kneeling"},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"

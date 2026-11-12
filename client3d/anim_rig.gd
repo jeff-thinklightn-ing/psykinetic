@@ -52,6 +52,10 @@ var player: AnimationPlayer
 var tree: AnimationTree
 ## Seconds a change of clip crossfades over (and a strike fades in and out).
 var blend := 0.15
+## A prefix (decision 877: Client3D.PEOPLE_PREFIX on a people's body): a clip asked for is played
+## as its copy so named where the library has one (People_Idle for Idle), and named plain by
+## playing(), base_clip() and upper_clip(), so callers and their tables keep the plain names.
+var stood_as := ""
 ## The tree is posed every this many frames (its level of detail: the caller
 ## sets it by how near and how seen the body is), with the time since.
 var every := 1
@@ -202,11 +206,18 @@ func has(clip: String) -> bool:
 	return player.has_animation(_name(clip))
 
 
-## [param clip] as the player knows it.
+## [param clip] as the player knows it: its [member stood_as] copy where the library has one.
 func _name(clip: String) -> String:
-	if player.has_animation(clip) or not clip.contains("/"):
-		return clip
-	return clip.get_slice("/", 1)
+	if not player.has_animation(clip) and clip.contains("/"):
+		clip = clip.get_slice("/", 1)
+	if stood_as != "" and player.has_animation(stood_as + clip):
+		return stood_as + clip
+	return clip
+
+
+## The clip played for [param clip]: itself, or its [member stood_as] copy.
+func as_played(clip: String) -> String:
+	return _name(clip)
 
 
 ## The base layer plays [param clip] at [param speed] (of the clip's own):
@@ -438,7 +449,7 @@ func base_at(clip: String, seconds: float) -> void:
 
 ## The upper layer's clip ("" for none) and its speed.
 func upper_clip() -> String:
-	return _upper_clip
+	return _upper_clip.trim_prefix(stood_as) if stood_as != "" else _upper_clip
 
 
 func upper_speed() -> float:
@@ -526,12 +537,12 @@ func striking() -> bool:
 
 ## The clip on top: a strike's while it plays, else the base layer's.
 func playing() -> String:
-	return _action_clip if striking() else _base_clip[_slot]
+	return (_action_clip if striking() else _base_clip[_slot]).trim_prefix(stood_as) if stood_as != "" else (_action_clip if striking() else _base_clip[_slot])
 
 
 ## The base layer's clip, whatever plays over it.
 func base_clip() -> String:
-	return _base_clip[_slot]
+	return _base_clip[_slot].trim_prefix(stood_as) if stood_as != "" else _base_clip[_slot]
 
 
 ## The speed of the clip on top (below 0 backwards).

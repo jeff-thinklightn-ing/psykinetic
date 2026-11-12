@@ -19,7 +19,8 @@
 #     head) comes to [target], the elbow bent toward [pole] (a direction, or a point given as a
 #     target is: the elbow then as near it as the arm lets it be); [target] is
 #     [(bone, offset, weight), ...], the weighted sum of those bones' heads (as the pose stands
-#     without its reaches; reaches are met in order, each seeing the ones before) plus offsets.
+#     without its reaches; reaches are met in order, each seeing the ones before) plus offsets;
+#     a bone named "bone@base" is that bone's head in the base clip as it comes, before any turn.
 #   ("hand_x", (length, side), GRASP): the hand turned so a held piece's length (the hand's own +Z;
 #     Client3D's socket) lies along [length], its side (the hand's -X) toward [side].
 # A strike's contact (the moment it lands, seconds) is measured, not guessed: the moment its
@@ -1191,6 +1192,116 @@ CLIPS["Fish_Hold_Loop"] = {"loop": True, "keys": [
 	(1.5, P("Idle_Loop", 1.5, FISH_HOLD_SWAY)),
 	(3.0, P("Idle_Loop", 0.0, FISH_HOLD)),
 ]}
+# The people's stance (877; Jeff, 2026-11-11: the people look like "bad claymation place holders"):
+# the UAL's standing clips keep the feet a full pace apart (the left 0.21 m ahead of the pelvis and
+# 0.20 out, the right 0.18 behind and 0.16 out), which on a townsman at rest reads as a lunge held.
+# PEOPLE_FEET reaches each foot from there to under the hips: hip width (0.11 out each side) and
+# 0.12 m between them fore and aft, the pelvis over their middle; the knees bend to take the
+# shorter reach (soft), the feet turned as the clip has them. Offsets in the armature's own axes
+# (+x the left side, -y ahead), from where the UAL's stance puts each foot.
+PEOPLE_FOOT_L = (-0.085, 0.157, 0.0)
+PEOPLE_FOOT_R = (0.052, -0.117, 0.0)
+PEOPLE_LIFT = 0.03  # The hips raised so much over the nearer feet: the knees soft, not crouched.
+PEOPLE_TOE = (14.0, 29.0)  # The left toe turned out from the UAL's 6 degrees in, the right in from its 44 out.
+def people_feet(share: float = 1.0, moved: tuple = (0.0, 0.0, 0.0)) -> list:
+	"""Both feet reached [share] of the way from the UAL's stance to the people's (the hips raised
+	PEOPLE_LIFT * share: give the same share to the key's move, people_move), kept where they stand
+	under a key's own further move of the hips, [moved]."""
+	off = lambda foot: tuple(v * share - m for v, m in zip((foot[0], foot[1], foot[2] - PEOPLE_LIFT), moved))
+	return [("thigh_l", ([("foot_l", off(PEOPLE_FOOT_L), 1.0)], (0.2, -1.0, 0.0), PEOPLE_TOE[0] * share), REACH),
+		("thigh_r", ([("foot_r", off(PEOPLE_FOOT_R), 1.0)], (-0.2, -1.0, 0.0), PEOPLE_TOE[1] * share), REACH)]
+def people_move(share: float = 1.0) -> tuple:
+	return (0.0, 0.0, PEOPLE_LIFT * share)
+def people_stood(base: str, length: float, step: float = 0.25) -> dict:
+	"""A standing UAL loop [base] with the people's feet, keyed every [step] s so they stay put."""
+	n = max(2, round(length / step))
+	return {"loop": True, "keys": [(length * k / n, P(base, length * k / n, people_feet(), move=people_move())) for k in range(n + 1)]}
+CLIPS["People_Idle_Loop"] = people_stood("Idle_Loop", 2.5)
+def people_copy(name: str) -> dict:
+	"""CLIPS[name] with the people's feet at every key (its own turns kept, the hips raised as the
+	idle's): a clip a person plays from People_Idle and back to it."""
+	spec = dict(CLIPS[name])
+	spec["keys"] = [(t, dict(p, turns=list(p["turns"]) + people_feet(1.0, tuple(p["move"])), move=Vector(p["move"]) + Vector(people_move())))
+		for t, p in CLIPS[name]["keys"]]
+	return spec
+# A person's fidgets, talk and tiredness (HUMAN_FIDGETS, "talk", CLIP_TIRED's people): the same,
+# stood as People_Idle stands. The orc's, the kobold's and the dead's keep the UAL's stance.
+for _name in ("Fidget_LookBack", "Fidget_Shoulders", "Fidget_Sleeve", "Fidget_ArmsCrossed"):
+	CLIPS["People_" + _name] = people_copy(_name)
+# The shift's hips go 3.5 cm aside: keyed every 0.1 s on the way over and back, so the planted feet
+# stay put between keys (a key at each end only let the left one drift 3.5 cm).
+def smooth(x: float) -> float:
+	return x * x * (3.0 - 2.0 * x)
+def people_shift(share: float) -> list:
+	# Its right-leg turns left out: they would move where the reach aims from; the lowered hips bend the knee.
+	return [(bone, axis, degrees * share) for bone, axis, degrees in SHIFT if not bone.endswith("_r") or bone.startswith("spine")]
+_SHIFT_AT = [(0.1 * k, k / 7.0) for k in range(8)] + [(2.2 + 0.1 * k, 1.0 - k / 8.0) for k in range(1, 9)]
+CLIPS["People_Fidget_Shift"] = {"keys": [(t, P("Idle_Loop", t if t < 2.5 else (0.0 if t > 2.95 else t - 2.5), people_shift(smooth(w)) + people_feet(1.0, (-0.035 * smooth(w), 0.0, -0.01 * smooth(w))),
+	move=Vector((-0.035 * smooth(w), 0.0, -0.01 * smooth(w))) + Vector(people_move()))) for t, w in _SHIFT_AT]}
+CLIPS["People_Idle_LookAround_Loop"] = people_stood("Idle_LookAround_Loop", 4.6)
+CLIPS["People_Idle_Talking_Loop"] = people_stood("Idle_Talking_Loop", 2.93)
+CLIPS["People_Idle_Tired_Loop"] = people_stood("Idle_Tired_Loop", 2.3)
+
+# The clips a person plays from People_Idle and back (877), stood as it stands. Each foot is in a
+# stance: "idle" (PEOPLE_FOOT_*: the people's, from the UAL's idle stance), "own" (where the clip
+# puts it) or "counter" (COUNTER_FOOT_*: hip width at a counter, from the UAL's counter stance), and
+# goes from one to another over a window of the clip, carried with a lift (PEOPLE_STEP_LIFT, a step,
+# not a slide), on its own while the clip has it planted or over the clip's own step. The hips are raised
+# PEOPLE_LIFT only so far as both feet stand the people's idle stance (never in a kneel or a seat,
+# where it would lift a knee or the seat off), and a work whose hands touch something takes no lift
+# at all (lift 0: nothing above the pelvis moves, its hands where they were).
+PEOPLE_STEP_LIFT = 0.06
+COUNTER_FOOT_L = (-0.085, -0.008, 0.0)  # The UAL's counter stance (feet level, 0.36 m across) to hip width.
+COUNTER_FOOT_R = (0.053, 0.013, 0.0)
+PEOPLE_STANCES = {"idle": (PEOPLE_FOOT_L, PEOPLE_FOOT_R, PEOPLE_TOE), "own": ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), (0.0, 0.0)),
+	"counter": (COUNTER_FOOT_L, COUNTER_FOOT_R, (0.0, 0.0))}
+def _people_foot(plan: list, t: float) -> tuple:
+	"""A foot's [plan] ([stance] alone, or [(t0, t1, from, to, lifted), ...]) at [t]: (stance weights
+	{name: w}, the lift off the ground)."""
+	if isinstance(plan, str):
+		return {plan: 1.0}, 0.0
+	at = {plan[0][2]: 1.0}
+	for t0, t1, a, b, lifted in plan:
+		if t < t0:
+			break
+		u = 1.0 if t >= t1 else smooth((t - t0) / (t1 - t0))
+		at = {a: 1.0 - u}
+		at[b] = at.get(b, 0.0) + u
+		if t < t1 and lifted:
+			return at, PEOPLE_STEP_LIFT * math.sin(math.pi * u)
+	return at, 0.0
+def people_over(keys: list, left="idle", right="idle", lift: float = PEOPLE_LIFT) -> list:
+	"""[keys] ([(t, P)]) with the people's legs: each foot by its plan (_people_foot), the hips
+	raised [lift] while both stand the idle stance."""
+	out = []
+	for t, p in keys:
+		legs = []
+		weights = []
+		for side, plan in ((0, left), (1, right)):
+			at, up = _people_foot(plan, t)
+			off = Vector()
+			toe = 0.0
+			for name, w in at.items():
+				off += Vector(PEOPLE_STANCES[name][side]) * w
+				toe += PEOPLE_STANCES[name][2][side] * w
+			weights.append(at.get("idle", 0.0))
+			legs.append((off, toe, up))
+		hips = Vector(p["move"]) + Vector((0.0, 0.0, lift * min(weights)))
+		turns = list(p["turns"])
+		for (off, toe, up), thigh, foot, pole in ((legs[0], "thigh_l", "foot_l", (0.2, -1.0, 0.0)), (legs[1], "thigh_r", "foot_r", (-0.2, -1.0, 0.0))):
+			if off.length < 1e-6 and up == 0.0 and abs(toe) < 1e-6 and hips == Vector(p["move"]):
+				continue  # Wholly the clip's own (sat, knelt): its leg as it has it, the knee where it puts it.
+			turns = [x for x in turns if not (x[2] == REACH and x[0] == thigh)]
+			turns.append((thigh, ([(foot, tuple(off + Vector((0.0, 0.0, up)) - hips), 1.0)], pole, toe), REACH))
+		out.append((t, dict(p, turns=turns, move=hips)))
+	return out
+def ual_keys(base: str, length: float) -> list:
+	"""A UAL clip keyed every frame, as it is."""
+	frames = round(length * FPS)
+	return [(min(f / FPS, length), P(base, min(f / FPS, length))) for f in range(frames + 1)]
+
+
+
 # The bite (805 amended (18); the coordinator, 11-11, after the fishing film at Jeff's pond: the float
 # can't be seen at the play camera, so the bite reads on him): the rod tip yanked down at the water in
 # a sharp tug (0.07 s), the arms dragged out and down after it and the trunk pulled over (the feet
@@ -1245,6 +1356,67 @@ def depth(bone) -> int:
 	return 0 if bone.parent is None else 1 + depth(bone.parent)
 
 
+# The works, stood as people stand. Those whose hands meet a thing (the axe and the log, the saw,
+# the hammer, the hoe's blade on the ground, forearms on the well's coping) lift nothing.
+for _name, _lift in (("Chop_Loop", 0.0), ("Saw_Loop", 0.0), ("Hammer_Loop", 0.0), ("Hoe_Loop", 0.0), ("Lean_Rail_Loop", 0.0),
+		("Herd_Loop", PEOPLE_LIFT), ("Carry_Game_Loop", PEOPLE_LIFT), ("Carry_Shoulder_Loop", PEOPLE_LIFT),
+		("Fish_Hold_Loop", PEOPLE_LIFT), ("Fish_Bite_Loop", PEOPLE_LIFT), ("Fish_Cast", PEOPLE_LIFT), ("Fish_Reel", PEOPLE_LIFT),
+		("Fish_Miss", PEOPLE_LIFT)):
+	CLIPS["People_" + _name] = dict(CLIPS[_name], keys=people_over(CLIPS[_name]["keys"], lift=_lift))
+# The keeper at the stall: hip width at the counter; stepping up, the clip's right foot steps
+# (0.1 to 0.65 s) and the left is carried after it; stepping back, the left first, then the right.
+for _name in ("Counter_Low_Idle_Loop", "Counter_Low_Show", "Counter_Low_Give"):
+	CLIPS["People_" + _name] = dict(CLIPS[_name], keys=people_over(CLIPS[_name]["keys"], "counter", "counter", 0.0))
+CLIPS["People_Counter_Low_Enter"] = {"keys": people_over(CLIPS["Counter_Low_Enter"]["keys"],
+	[(0.65, 1.05, "idle", "counter", True)], [(0.1, 0.65, "idle", "counter", True)])}
+CLIPS["People_Counter_Low_Exit"] = {"keys": people_over(CLIPS["Counter_Low_Exit"]["keys"],
+	[(0.1, 0.5, "counter", "idle", True)], [(0.55, 1.1, "counter", "idle", True)])}
+# The keeper at a bar (877, the coordinator's "tend_bar": the Mughouse's bar top 1.06 m): the UAL's
+# counter clips (their wrists 1.08 m up) under Counter_Bar_* names, a key a frame, the chest lifted
+# out of their lean (BAR_UPRIGHT; the coordinator, from the Mughouse's still: from the customers'
+# side the stock lean showed the top of a head, slumped over the bar) with each wrist reached back
+# to where the stock clip has it ("@base"), so the hands stay on the top, its show and give kept;
+# the lift eased in over the step up and out over the step back. The people's copies stood and
+# stepped as at the stall.
+BAR_UPRIGHT = [("spine_01", LIFT, 8.0), ("spine_02", LIFT, 8.0), ("spine_03", LIFT, 4.0)]
+def bar_upright(base: str, length: float, ease: str = "") -> list:
+	"""[base] (a UAL counter clip, [length] seconds) a key a frame with BAR_UPRIGHT, the wrists
+	kept at the stock clip's; its share 1 throughout, or eased "in" from 0 or "out" to 0."""
+	frames = round(length * FPS)
+	keys = []
+	for f in range(frames + 1):
+		t = min(f / FPS, length)
+		share = 1.0 if ease == "" else (t / length if ease == "in" else 1.0 - t / length)
+		share = share * share * (3.0 - 2.0 * share)
+		kept = [("upperarm_l", ([("hand_l@base", (0.0, 0.0, 0.0), 1.0)], (1.0, -0.3, -0.2)), REACH),
+			("upperarm_r", ([("hand_r@base", (0.0, 0.0, 0.0), 1.0)], (-1.0, -0.3, -0.2)), REACH)]
+		keys.append((t, P(base, t, [(bone, axis, degrees * share) for bone, axis, degrees in BAR_UPRIGHT] + kept)))
+	return keys
+for _name, _base, _length, _ease in (("Counter_Bar_Idle_Loop", "Counter_Idle_Loop", 2.6667, ""), ("Counter_Bar_Show", "Counter_Show", 4.6667, ""),
+		("Counter_Bar_Give", "Counter_Give", 4.3667, ""), ("Counter_Bar_Enter", "Counter_Enter", 1.1667, "in"),
+		("Counter_Bar_Exit", "Counter_Exit", 1.1667, "out")):
+	CLIPS[_name] = {"loop": _name.endswith("_Loop"), "keys": bar_upright(_base, _length, _ease)}
+for _name in ("Counter_Bar_Idle_Loop", "Counter_Bar_Show", "Counter_Bar_Give"):
+	CLIPS["People_" + _name] = dict(CLIPS[_name], keys=people_over(CLIPS[_name]["keys"], "counter", "counter", 0.0))
+CLIPS["People_Counter_Bar_Enter"] = {"keys": people_over(CLIPS["Counter_Bar_Enter"]["keys"],
+	[(0.65, 1.05, "idle", "counter", True)], [(0.1, 0.65, "idle", "counter", True)])}
+CLIPS["People_Counter_Bar_Exit"] = {"keys": people_over(CLIPS["Counter_Bar_Exit"]["keys"],
+	[(0.1, 0.5, "counter", "idle", True)], [(0.55, 1.1, "counter", "idle", True)])}
+# Down and up: sat on a seat (the right foot steps with the clip's own, the left carried to the
+# seat's), sat on the ground, a kneel (the left foot, planted before the knee, kept at the people's;
+# the knelt right leg the clip's own).
+CLIPS["People_Sitting_Enter"] = {"keys": people_over(ual_keys("Sitting_Enter", 1.3),
+	[(0.5, 0.85, "idle", "own", True)], [(0.05, 0.5, "idle", "own", True)])}
+CLIPS["People_Sitting_Exit"] = {"keys": people_over(ual_keys("Sitting_Exit", 1.0333),
+	[(0.0, 0.35, "own", "idle", True)], [(0.75, 1.0333, "own", "idle", True)])}
+CLIPS["People_GroundSit_Enter"] = {"keys": people_over(ual_keys("GroundSit_Enter", 2.5),
+	[(0.8, 1.2, "idle", "own", True)], [(0.1, 0.75, "idle", "own", True)])}
+CLIPS["People_GroundSit_Exit"] = {"keys": people_over(ual_keys("GroundSit_Exit", 2.1667),
+	[(1.2, 1.5, "own", "idle", True)], [(1.55, 1.9, "own", "idle", True)])}
+CLIPS["People_Fixing_Kneeling"] = {"keys": people_over(ual_keys("Fixing_Kneeling", 5.2),
+	"idle", [(0.1, 0.6, "idle", "own", True), (4.45, 5.0, "own", "idle", True)])}
+
+
 class Rig:
 	def __init__(self, arm):
 		self.arm = arm
@@ -1266,20 +1438,28 @@ class Rig:
 		"""[spec]'s matrices: its base's, each bone turned about its own head after its parents'
 		turns carried it, the pelvis moved; its reaches met in order."""
 		turns = [t for t in spec["turns"] if t[2] != REACH]
-		for bone, (target, pole), _reach in [t for t in spec["turns"] if t[2] == REACH]:
+		for bone, reach, _reach in [t for t in spec["turns"] if t[2] == REACH]:
+			target, pole = reach[0], reach[1]
 			now = self.turned(spec, turns)
 			leg = bone.startswith("thigh")
 			if leg:  # A leg's reach (planted()): thigh, calf, the ankle to [target], the foot kept as its base has it.
 				fore, hand = bone.replace("thigh", "calf"), bone.replace("thigh", "foot")
 			else:
 				fore, hand = bone.replace("upperarm", "lowerarm"), bone.replace("upperarm", "hand")
-			at = sum(((now[b].translation + Vector(off)) * w for b, off, w in target), Vector())
+			# "bone@base": that bone's head as the base clip has it at [at], before any turn (a wrist kept
+			# where the stock clip puts it while the trunk above it moves: the bar's upright keeper).
+			stock = self.posed(spec["base"], spec["at"]) if any(b.endswith("@base") for b, _o, _w in target) else None
+			at = sum((((stock[b[:-5]] if b.endswith("@base") else now[b]).translation + Vector(off)) * w
+				for b, off, w in target), Vector())
 			if isinstance(pole, list):  # A point: toward it from the shoulder.
 				pole = sum(((now[b].translation + Vector(off)) * w for b, off, w in pole), Vector()) - now[bone].translation
 			upper, lower = solve(now[bone].translation, now[fore].translation, now[hand].translation, at, Vector(pole))
 			turns = turns + [(bone, upper, AIM), (fore, lower, AIM)]
-			if leg:
-				turns.append((hand, self.posed(spec["base"], spec["at"])[hand].col[1].xyz.copy(), AIM))
+			if leg:  # A third item turns the foot that many degrees about the vertical (toward its outside at +).
+				toe = self.posed(spec["base"], spec["at"])[hand].col[1].xyz.copy()
+				if len(reach) > 2:
+					toe.rotate(Quaternion((0.0, 0.0, 1.0), math.radians(reach[2])))
+				turns.append((hand, toe, AIM))
 		return self.turned(spec, turns)
 
 	def turned(self, spec: dict, listed: list) -> dict:

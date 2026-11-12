@@ -181,6 +181,9 @@ const FOLK := [
 	[Vector2i(12, 14), Vector2i(13, 14), "talk", "", "talk"],
 	[Vector2i(13, 14), Vector2i(12, 14), "listen", "", "talk"],
 	[Vector2i(26, 20), Vector2i(26, 21), "tend", "", "stall"],
+	# Stood at rest (877's before and after): the player at FOLK_VIEWS' "stand", a woman, Jeff's goblin.
+	[Vector2i(31, 8), Vector2i(31, 9), "", "", "stand", {"look": "body=female"}],
+	[Vector2i(32, 8), Vector2i(32, 9), "", "", "stand", {"kind": "imp"}],
 ]
 ## The folk room's size in cells (its border wall included): the groups well inside it, so the camera
 ## behind them stands on open ground, not in the trees round it.
@@ -191,14 +194,15 @@ const FOLK_WELL := Vector2i(25, 13)
 const FOLK_STALL := Vector2i(26, 21)
 ## Where the player stands while each group is shown: off to its side, out of the frame (the camera panned
 ## onto the group, _process).
-const FOLK_VIEWS := {"fire": Vector2i(12, 20), "well": Vector2i(25, 5), "talk": Vector2i(8, 18), "stall": Vector2i(26, 29)}
+const FOLK_VIEWS := {"fire": Vector2i(12, 20), "well": Vector2i(25, 5), "talk": Vector2i(8, 18), "stall": Vector2i(26, 29),
+	"stand": Vector2i(30, 8)}
 ## Each group's camera, [yaw, pitch] in degrees (Client3D's: yaw 0 looks from the south-east, 45 from
 ## the east): the leaners at the well's north and south and the keeper behind the stall seen side-on
 ## from the east, lower, so the well's roof and the stall's awning hide neither.
-const FOLK_CAMERA := {"fire": [0.0, 50.0], "well": [45.0, 40.0], "talk": [0.0, 50.0], "stall": [45.0, 40.0]}
+const FOLK_CAMERA := {"fire": [0.0, 50.0], "well": [45.0, 40.0], "talk": [0.0, 50.0], "stall": [45.0, 40.0], "stand": [0.0, 30.0]}
 const FOLK_CAPTIONS := {"fire": "Round the fire: sat, one talking, one listening.",
 	"well": "At the well, leant on its rim.", "talk": "Two stood talking, turn about.",
-	"stall": "At the stall, a keeper."}
+	"stall": "At the stall, a keeper.", "stand": ""}
 ## Each group's beats, in seconds from the player's arrival: words on, the pair's turn, words off, done
 ## (the keeper held longer, for its asides' 6 to 25 s).
 const FOLK_ON_S := 2.0
@@ -1140,7 +1144,7 @@ func _folk_step(tick: int) -> bool:
 	if _folk_from < 0:
 		_caption.text = ""
 		if _walk(FOLK_VIEWS[group]):
-			World.face(_player, Senses.way_toward(_player.tile, _folk_centre(group)))
+			World.face(_player, Vector2i(0, 1) if group == "stand" else Senses.way_toward(_player.tile, _folk_centre(group)))
 			_folk_from = tick
 		return false
 	var longer := float(FOLK_LONGER.get(group, 0.0))
@@ -1173,6 +1177,8 @@ func _folk_centre(group: String) -> Vector2i:
 			return FOLK_WELL
 		"stall":
 			return FOLK_STALL
+		"stand":
+			return FOLK_VIEWS["stand"] + Vector2i(1, 0)  # The woman's, between the player and the goblin.
 	return FOLK[5][0]  # The talking pair's first.
 
 
@@ -1181,8 +1187,10 @@ func _folk_set_up() -> void:
 	World.towns = null  # No town records: Main's resident sync (which despawns a body no town wants) stays out.
 	for i in FOLK.size():
 		var spot: Array = FOLK[i]
-		var body := _main._spawn({"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_folk_%d" % i,
-			"label": "Folk %d" % i, "tile": spot[0]}) as Resident
+		var spec := {"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_folk_%d" % i,
+			"label": "Folk %d" % i, "tile": spot[0]}
+		spec.merge(spot[5] if spot.size() > 5 else {})
+		var body := _main._spawn(spec) as Resident
 		body.stunned_until_tick = 1 << 30
 		World.face(body, spot[1] - spot[0])
 		_folk.append(body)

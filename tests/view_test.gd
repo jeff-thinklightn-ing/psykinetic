@@ -9965,8 +9965,9 @@ func _test_allies() -> void:
 		var rig := puppet.get_meta("rig") as AnimRig
 		var sockets: Dictionary = puppet.get_meta("sockets", {})
 		var model_fidgets: Dictionary = Client3D.MODELS[str(entity.spawn_spec["kind"])]["fidgets"]
-		_check((rig.playing() == Client3D.CLIP_IDLE or model_fidgets.has(rig.playing())) and sockets.has("hand_r") and sockets.has("hand_l"),
-				"its clips play on it (%s) and it has hands to hold things" % rig.playing())
+		_check((rig.playing() == Client3D.CLIP_IDLE or model_fidgets.has(rig.playing())) and rig.as_played(rig.playing()) == rig.playing()
+				and sockets.has("hand_r") and sockets.has("hand_l"),
+				"its clips play on it, in its people's own stance, not the people's (877) (%s), and it has hands to hold things" % rig.playing())
 	var heights := []
 	for puppet: Node3D in [_rig._puppets[orcs[0].get_instance_id()], _rig._puppets[kobold.get_instance_id()]]:
 		var top := 0.0
@@ -10890,8 +10891,9 @@ func _test_humans() -> void:
 		var animator := puppet.get_meta("rig") as AnimRig
 		# Standing, now and then fidgeting (decision 171: the first fidget comes at a moment of
 		# this run's, as early as 2 s in).
-		_check(animator.playing() == Client3D.CLIP_IDLE or Client3D.HUMAN_FIDGETS.has(animator.playing()),
-				"standing: Idle, or a fidget (%s)" % animator.playing())
+		_check((animator.playing() == Client3D.CLIP_IDLE or Client3D.HUMAN_FIDGETS.has(animator.playing()))
+				and animator.as_played(animator.playing()) == Client3D.PEOPLE_PREFIX + animator.playing(),
+				"standing: Idle, or a fidget, played as the people's (877) (%s as %s)" % [animator.playing(), animator.as_played(animator.playing())])
 		var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 		var y := func(bone: String) -> float:
 			return (skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(bone)).origin).y
@@ -11375,7 +11377,7 @@ func _test_townsfolk_spots() -> void:
 == townsfolk at their spots: sat on a seat, leant on the well, talking and listening ==")
 	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
 	var missing: Array[String] = []
-	for word: String in ["sit", "sit_talk", "sit_listen", "lean", "talk", "listen", "tend"]:
+	for word: String in ["sit", "sit_talk", "sit_listen", "lean", "talk", "listen", "tend", "tend_bar", "dress", "scrape"]:
 		var spot: Dictionary = Client3D.ACTIVITIES.get(word, {})
 		var clips: Array = spot.get("clips", [spot.get("clip", "")]) + spot.get("asides", [])
 		for key: String in ["enter", "exit"]:
@@ -11420,12 +11422,18 @@ func _test_townsfolk_spots() -> void:
 	_check(body.position.distance_to(Vector3(Client3D.SEAT_TOWARD, 0.0, 0.0)) < 0.001,
 			"sat: drawn %.3f ahead of its cell, its hips over the seat (%s)" % [Client3D.SEAT_TOWARD, body.position])
 	var idles := {}
-	for id in 3:
+	for id in (sit["clips"] as Array).size():
 		puppet.set_meta("entity_id", id)
 		idles[Client3D._work_clip(puppet, sit)] = true
 	puppet.set_meta("entity_id", 7)
-	_check(idles.size() == 3 and idles.keys().all(func(c: String) -> bool: return c in sit["clips"]),
+	_check(idles.size() == (sit["clips"] as Array).size() and idles.keys().all(func(c: String) -> bool: return c in sit["clips"]),
 			"each body one of the sit's idles, neighbours apart (%s)" % [idles.keys()])
+	# 877 (the coordinator's): Sitting_Idle03's arm over the head is an aside, never a body's loop.
+	var arm_up := ["sit", "sit_talk", "sit_listen"].filter(func(w: String) -> bool:
+		var work: Dictionary = Client3D.ACTIVITIES[w]
+		return "Sitting_Idle03" in work.get("clips", [work.get("clip", "")]))
+	_check(arm_up.is_empty() and "Sitting_Idle03" in sit["asides"],
+			"the arm-up sitting idle (Sitting_Idle03) only ever an aside, never a sitter's loop (%s)" % [arm_up])
 	var turned := not _rig._seat(puppet, rig, Client3D.ACTIVITIES["sit_talk"], 0.0, now, 1.0) \
 			and not _rig._seat(puppet, rig, Client3D.ACTIVITIES["sit_listen"], 0.0, now, 1.0) and bool(puppet.get_meta("sat"))
 	_check(turned, "talking and listening in turn on the seat: still sat, not sat down again")

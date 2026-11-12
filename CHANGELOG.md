@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- People, you among them, stand easy, feet under their hips and knees soft, at rest, at work and at a stall; in the Mughouse the taverner stands behind her bar with her hands on the counter (877).
 
 - Towns: wooden houses, the Mughouse among them, have oak-framed windows cut through their own boards, with a glazing cross and board shutters strapped in iron (881).
 - In the crypt, a Mound-breaker comes to his mates' fight only when he can see or hear it, so one you meet alone in a side room stays alone where you meet him (806 amended (17)).
