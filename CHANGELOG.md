@@ -7,13 +7,17 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.213
+
 - The Barrow's quest card stays out of town and the bear's cave: you see it only in the Barrow and the halls below it (747 amended (6)).
-- In the crypt you're now told what happens around you: a niche that holds only the dead, the slab swinging aside, the hall's door shutting and opening, the stair barred from below, Brand's key taken or fallen at your feet, the draugr yielding, the plaque over the holy remains, and how a deal with the fallen knight or the draugr goes (133 amended (1))
+- In the crypt you're now told what happens around you: a niche that holds only the dead, the slab swinging aside, the hall's door shutting and opening, the stair barred from below, Brand's key taken or fallen at your feet, the draugr yielding, the plaque over the holy remains, and how a deal with the fallen knight or the draugr goes (133 amended (1)).
 - In the crypt, a robber about to lunge crouches with his dagger drawn back while the red shows, and thrusts as it lands (790 amended (7)).
-- Planted feet hold firm as people walk and jog, and a companion following you keeps one gait through a short pause or a change of pace (869).
-- The Tomb Sledge is held partway up its haft, both hands on the shaft with bare wood behind them, and you bow deep into each blow so its head comes down on the ground in front of you; the axes, picks and war hammer are held a little up their hafts too (451 amended (5))
-- Sword and shield: your shield moves with each swing, pushed out toward your foe as you draw the sword back, kept low and clear on a backhand, and pulled in to your left side through the cut (338 amended (8))
-- Shields: a weapon's blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing), is taken whole on a raised shield facing it for a little stamina, and short of stamina the shield still takes half and stays up, though the draugr's throws still throw you (340 amended (3) and (4))
+- Planted feet hold firm as people jog (869).
+- The Tomb Sledge is held partway up its haft, both hands on the shaft with bare wood behind them, and you bow deep into each blow so its head comes down on the ground in front of you; the axes, picks and war hammer are held a little up their hafts too (451 amended (5)).
+- Sword and shield: your shield moves with each swing, pushed out toward your foe as you draw the sword back, kept low and clear on a backhand, and pulled in to your left side through the cut (338 amended (8)).
+- Shields: a weapon's blow you can see coming, marked in red or wound up (Brand's sledge, the draugr's axe, a robber's or a skeleton's slow swing), is taken whole on a raised shield facing it for a little stamina, and short of stamina the shield still takes half and stays up, though the draugr's throws still throw you (340 amended (3) and (4)).
+- Towns: the fire on Umbrage's square crackles like a campfire, by day and by night (578 amended (2)).
+- The store window's prices and counts sit inside their squares, the goods lie on the window with no dark box behind them, a good without its picture yet shows its name, and the load bar is labelled (852 amended (1)).
 ## v0.1.212
 
 - Your companion names things as you'd say them: some roast meat, soft boots, the holy remains, an Encolpion Amulet (294 amended (1)).
