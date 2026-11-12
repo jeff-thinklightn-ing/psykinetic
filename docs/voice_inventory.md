@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2831)
+## Lines in the code (2832)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -1109,7 +1109,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (198)
+### other (render) (199)
 
 | | Line | Where |
 |---|---|---|
@@ -1311,6 +1311,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | The known world | `render/world_map_panel.gd` _draw() |
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
+|  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 
 ### other (sim) (604)
 
