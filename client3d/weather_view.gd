@@ -397,6 +397,63 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	_clouds.global_position = Vector3(middle.x, target.y + 12.0, middle.y)
 
 
+## The drops' one shader (DROP_SHADER), shared by the rain and its warm-up,
+## so the pipelines the warm-up compiles are the ones the rain draws with.
+static var _drop_shader: Shader
+
+
+static func drop_shader() -> Shader:
+	if _drop_shader == null:
+		_drop_shader = Shader.new()
+		_drop_shader.code = DROP_SHADER
+	return _drop_shader
+
+
+## The rain's process material, made one way for the rain and its warm-up:
+## a ParticleProcessMaterial's process shader comes from the features it
+## uses (a box, no spread or gravity, hiding on contact with the Roofs),
+## so the warm-up's compiles the rain's. Each rain gets its own (its
+## direction and box are set as the wind and view change).
+static func rain_process() -> ParticleProcessMaterial:
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = RAIN_BOX * 0.5
+	process.direction = Vector3.DOWN
+	process.spread = 0.0
+	process.initial_velocity_min = RAIN_SPEED
+	process.initial_velocity_max = RAIN_SPEED * 1.15
+	process.gravity = Vector3.ZERO
+	process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	return process
+
+
+## The rain's warm-up (decision 495; perf's 11-12 split, scratch): a few
+## drops made as the rain is (its process material and drop shader, aligned
+## to their fall, on RAIN_LAYER, not local), emitting, so its process and
+## draw pipelines are made while a room is built, not when rain first falls.
+## Client3D.warm_ups draws it under the ground.
+static func warm() -> Node3D:
+	var drops := GPUParticles3D.new()
+	drops.amount = 8
+	drops.lifetime = 1.0
+	drops.preprocess = 1.0
+	drops.local_coords = false
+	drops.layers = RAIN_LAYER
+	drops.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	drops.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY
+	drops.visibility_aabb = AABB(Vector3(-RAIN_BOX.x, -RAIN_HEIGHT - 6.0, -RAIN_BOX.z), Vector3(RAIN_BOX.x * 2.0, RAIN_HEIGHT + 8.0, RAIN_BOX.z * 2.0))
+	drops.process_material = rain_process()
+	var streak := QuadMesh.new()
+	streak.size = Vector2(0.025, 0.55)
+	var material := ShaderMaterial.new()
+	material.shader = drop_shader()
+	material.set_shader_parameter("colour", RAIN_COLOUR)
+	streak.material = material
+	drops.draw_pass_1 = streak
+	drops.emitting = true
+	return drops
+
+
 func _build_rain() -> void:
 	_rain = GPUParticles3D.new()
 	_rain.name = "Rain"
@@ -408,22 +465,12 @@ func _build_rain() -> void:
 	_rain.layers = RAIN_LAYER
 	_rain.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_rain.transform_align = GPUParticles3D.TRANSFORM_ALIGN_Z_BILLBOARD_Y_TO_VELOCITY
-	_rain_process = ParticleProcessMaterial.new()
-	_rain_process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	_rain_process.emission_box_extents = RAIN_BOX * 0.5
-	_rain_process.direction = Vector3.DOWN
-	_rain_process.spread = 0.0
-	_rain_process.initial_velocity_min = RAIN_SPEED
-	_rain_process.initial_velocity_max = RAIN_SPEED * 1.15
-	_rain_process.gravity = Vector3.ZERO
-	_rain_process.collision_mode = ParticleProcessMaterial.COLLISION_HIDE_ON_CONTACT
+	_rain_process = rain_process()
 	_rain.process_material = _rain_process
 	var streak := QuadMesh.new()
 	streak.size = Vector2(0.025, 0.55)
 	var material := ShaderMaterial.new()
-	var shader := Shader.new()
-	shader.code = DROP_SHADER
-	material.shader = shader
+	material.shader = drop_shader()
 	material.set_shader_parameter("colour", RAIN_COLOUR)
 	streak.material = material
 	_rain.draw_pass_1 = streak

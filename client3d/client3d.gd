@@ -10545,7 +10545,8 @@ static func _warm_art() -> void:
 ## cast below the ground). Godot (Forward+ on d3d12, 4.4 and on) also
 ## compiles pipelines in the background with its ubershaders, and keeps a
 ## shader cache in user data: check those before adding a warm-up.
-static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin"), Callable(Client3D, "warm_painted")]
+static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin"), Callable(Client3D, "warm_painted"),
+		Callable(WeatherView, "warm")]
 static var _warmed_ups: Dictionary[String, bool] = {}
 const WARM_FRAMES := 2
 const WARM_DEPTH := 6.0
