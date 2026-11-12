@@ -7,9 +7,15 @@ shader_type spatial;
 render_mode blend_mix, cull_disabled, shadows_disabled, depth_draw_never;
 
 global uniform vec4 wind;
+// The look's daylight (Client3D._look_daylight; 1 by day, 0 at night).
+global uniform float look_day;
 instance uniform float seed = 0.0;
 // How much it hides at most.
 const float MOST = 0.55;
+// The share of its colour it keeps at night (710 amended (1);
+// Flames.CHIMNEY_SMOKE_NIGHT): at full colour, lit by the lights under it,
+// it glowed over the night's sky.
+const float NIGHT = 0.2;
 
 float hash(vec2 p) {
 	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
@@ -43,7 +49,7 @@ void fragment() {
 	float body = 1.0 - smoothstep(half_width * 0.4, half_width, abs(at.x - 0.5 + (wisp - 0.5) * 0.25 * at.y));
 	float fade = smoothstep(0.0, 0.12, at.y) * (1.0 - smoothstep(0.35, 0.95, at.y));
 	float edges = smoothstep(0.0, 0.12, at.x) * smoothstep(1.0, 0.88, at.x);
-	ALBEDO = vec3(0.62, 0.6, 0.57);  // A pale warm grey, lit.
+	ALBEDO = vec3(0.62, 0.6, 0.57) * mix(NIGHT, 1.0, look_day);  // A pale warm grey, lit; dim at night.
 	NORMAL = vec3(0.0, 0.0, 1.0);  // Toward the camera: lit as the light falls on the view.
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

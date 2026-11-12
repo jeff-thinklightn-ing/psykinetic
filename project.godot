@@ -55,6 +55,10 @@ rendering_device/fallback_to_d3d12=true
 
 [shader_globals]
 
+look_day={
+"type": "float",
+"value": 1.0
+}
 sight_cut={
 "type": "float",
 "value": 0.0

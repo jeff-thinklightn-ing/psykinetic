@@ -24,6 +24,13 @@ const DAY_SHARE := 0.3
 const REACH := 1.6
 ## A chimney's smoke (chimney_smoke): its height and width (m).
 const CHIMNEY_SMOKE := Vector2(2.4, 4.0)
+## The share of its pale colour a chimney's smoke keeps at night (710
+## amended (1)), its colour falling with the look's daylight (the shader
+## global look_day, Client3D._look_daylight): lit by the hearth's and the
+## windows' lights below it, at full colour it glowed over the night's sky
+## (108 of 255 against a sky of 46 at 20:00, the Atlas stills, 11-12).
+## Mirrors NIGHT in chimney_smoke.gdshader.
+const CHIMNEY_SMOKE_NIGHT := 0.2
 
 static var _mesh: ArrayMesh
 static var _flame_material: ShaderMaterial
