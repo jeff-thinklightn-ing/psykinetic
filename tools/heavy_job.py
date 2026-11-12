@@ -2305,7 +2305,7 @@ def front(tree, kind, by, why):
     return 0
 ## What a script outside the gate may log with `note` (decision 530: a test
 ## scene that died at launch, before any of its own code ran).
-NOTE_EVENTS = ("launch", "timeout", "beat_failed")  # timeout: a test scene killed for time (90 amended (1)).
+NOTE_EVENTS = ("launch", "timeout", "beat_failed", "push_guard")  # timeout: a test scene killed for time (90 amended (1)); push_guard: the pre-push hook passed a push on an error of its own (decision 883).
 
 
 def note(tree, event, detail):

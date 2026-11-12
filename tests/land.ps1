@@ -14,6 +14,9 @@ $root = Split-Path $PSScriptRoot -Parent
 # adopted by its process (394 amended (11)).
 $tree = if ($env:PSYKINETIC_TREE) { $env:PSYKINETIC_TREE } else { Split-Path $root -Leaf }
 $gate = Join-Path $root 'tools\heavy_job.py'
+# The commit this run tests (decision 883, as tests/land.sh): a PASS stamps it only if
+# HEAD is still here at the end; tools/hooks/pre-push wants the stamp for a push to main.
+if (-not $env:LAND_HEAD) { $env:LAND_HEAD = (& git -C $root rev-parse HEAD 2>$null) }
 if (-not $env:HEAVY_JOB_INSIDE) {
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
@@ -190,6 +193,22 @@ if ($failed.Count -eq 0) {
 	$line = "LANDING TESTS: FAIL ($($failed -join ', '); ${seconds}s)"
 }
 Write-Output $line
+if ($failed.Count -eq 0) {
+	# The PASS stamp (tools/land_stamp.sh's land_stamp_write, the same file).
+	$head = (& git -C $root rev-parse HEAD 2>$null)
+	if ($head -and $head -eq $env:LAND_HEAD) {
+		$common = (& git -C $root rev-parse --path-format=absolute --git-common-dir 2>$null)
+		$dir = Join-Path $common 'land_pass'
+		New-Item -ItemType Directory -Force $dir | Out-Null
+		Get-ChildItem $dir -File -ErrorAction SilentlyContinue | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-2) } | Remove-Item -Force -ErrorAction SilentlyContinue
+		$text = "tree=$tree`ntime=$((Get-Date).ToString('s'))`nline=$line`n"
+		[IO.File]::WriteAllText((Join-Path $dir "$head.tmp"), $text)
+		Move-Item -Force (Join-Path $dir "$head.tmp") (Join-Path $dir $head)
+		Write-Output "push stamp: $head may be pushed to main (tools/hooks/pre-push)"
+	} else {
+		Write-Output "push stamp: none: HEAD moved during the run ($($env:LAND_HEAD) to $head); run land.ps1 on the commit you push"
+	}
+}
 if ($env:LAND_RESULT) { Set-Content -Path $env:LAND_RESULT -Value $line -Encoding utf8 }
 if ($failed.Count -eq 0) { exit 0 }
 exit 1

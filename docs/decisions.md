@@ -51205,3 +51205,39 @@ The zone-map mock's notes 5 and 6 (C:/dev/review/ui-design/zone/, the coordinato
 - The reveal rule: the map hides no ground today (every cell is drawn; only a link with "hidden" is held back, 608/589 amended), so the mark shows exactly as the ground under it does, and a hidden way out gets no doorway as it gets no mark. A landmark whose package is off or that isn't in the released world: the mound has been in the released Wilds since 10-20 (e50ffadc4); Forage.LANDMARKS holds nothing else.
 Tests: minimap_test (inside the edge the woods are map_woods and a rock stone; the torn edge is framed: the empty cells all join the border, none inside, no border cell drawn; the Wilds have one landmark; the mound's ring is map_kerb, its dome grass lit toward its crown, its doorway map_doorway at the barrow's way out, which is not hidden). style_test (no new loose colour). Client only, protocol unchanged, no new class_name.
 852 amended (2) (ui, 2026-11-12; playtest's find on v0.1.212, joined, at Rolf's, passed on by the coordinator and economy): one click on a stack of three perch sold all three for 3 gold and the foot said "Sold a perch for 3 gold.". The foot's sentence is the panel's own (BarterPanel's SOLD_LINE, made at the click and said when the pack and the purse have changed), so it is made to say what happened: after the answer it counts the units that left the sold square (the count the square held at the click less what it holds now, World.slot_count) and the gold the purse gained, and says "Sold 3 perch for 3 gold." (BarterPanel.sale_words, SOLD_MANY_LINE; one thing, or no gain, keeps the plain line; voice's words). The count's plural is the game's own count words: Main._listed names a stack through Main.counted_name, which reads the catalog's new "plural" field first (Items, items.json: "perch" and "roast perch", names that do not change) and else the rule, which Main._plural now has: ch, sh, x take es ("brooches"), a consonant before y is ies ("remedies"), as before s is kept and fe is ves. Buying is one good a click, so it has no stack to count. ui_test pins sale_words and the plurals ("3 perch", "brooches", "remedies"); client only; protocol unchanged; no new class_name; the test stands on the host, the stack's count on a joined client being slot_counts, to be seen by playtest's joined store run.
+
+## 883. The push guard: a PASS stamp and a pre-push hook on main
+
+(perf, 2026-11-12; the coordinator's ask after physics' 03:09 landing, approved by the coordinator with five
+conditions and by release, with Jeff's own OK before the hook is installed: C:\dev\review\decisions\push-guard.md.)
+An untested commit reached main at 03:09: physics' landing script pushed on exit 0 after its land.sh was
+stopped by PID. A bash stopped by its Windows PID reads as exit 0 to its bash parent (taskkill, taskkill /F
+and Stop-Process alike; perf's probe on throwaway processes), and TerminateProcess runs no trap, so no exit
+code a landing script reads can tell a pass from a stop. The tools now hold the rule instead of 25 scripts.
+- The stamp (tools/land_stamp.sh, land_stamp_write). tests/land.sh notes HEAD as it starts (LAND_HEAD); at
+  its very end, every part passed and HEAD unchanged, it writes <git common dir>/land_pass/<sha> (tree, time,
+  the PASS line, saturn's too). HEAD moved during the run writes none and says so. tests/land.ps1 writes the
+  same file; LAND_LOCAL=1 takes the same path. Stamps over two days old are pruned.
+- The hook (tools/hooks/pre-push, run by git before every push from any worktree of the clone). Only a push
+  to refs/heads/main is looked at. When its commits change anything but Markdown at the top and files under
+  docs/ (a cut, CHANGELOG.md only, release's THIRD_PARTY.md and the coordinator's docs stay stampless), the
+  pushed commit needs a stamp, or the push is refused: "no PASS stamp for <sha>. Run tests/land.sh on this
+  commit". A revert is a change like any other: no bypass. On any error of its own it lets the push
+  through, loudly, with a push_guard line in the gate's log (heavy_job note), so a broken guard is seen the
+  same day. A rebase after a PASS changes the sha: the retest the landing rule asks for.
+- Jeff's pick B is built and off: OWNER_MARKER in the hook (empty) would let a commit whose message carries
+  it through without a stamp.
+- The install. tests/land.sh puts origin/main's copy of the hook (never a branch's) into the shared hooks
+  folder when origin/main's tools/hooks/install says "on", and refreshes it each run. It ships "off": the
+  coordinator turns it on once Jeff has answered. Release alone lifts it: a file hooks/pre-push.lifted, then
+  the hook deleted, and land.sh never puts it back. Nobody pushes to main with --no-verify.
+- The name. tools/bench_lock.sh's take records the checkout it was taken from (the lock's "checkout"). A
+  tests/land.sh with no PSYKINETIC_TREE, in the checkout that took the land lock under another name, runs
+  under the lock's name: physics' second take, queued under its own lock, can't happen.
+- Until the hook is on, the coordinator's three rules stand: push only on this run's "LANDING TESTS: PASS",
+  run land.sh under the take's name, stop a pushing script's parent first.
+tests/push_guard_test.sh (a land.sh tool part), in a scratch clone and bare remote: no stamp refused with
+the remedy; a saturn PASS stamped for HEAD's sha and pushed; HEAD moved writes none; a cut, docs/ and top
+Markdown pushed stampless, Markdown elsewhere not; another branch never looked at; a revert refused; the
+marker off and on; an error passes loudly with the gate's line; the install off, on, from origin/main only,
+and lifted; the lock's checkout. Tools and tests only; protocol unchanged; no class_name; no bullet.

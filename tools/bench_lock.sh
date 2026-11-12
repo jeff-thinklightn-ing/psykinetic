@@ -76,6 +76,9 @@ case "${1:-status}" in
 		fi
 		now=$(date +%s)
 		echo "$tree" >"$LOCK/owner"; echo "$what" >"$LOCK/what"; echo "$now" >"$LOCK/taken"; echo "$now" >"$LOCK/since"
+		# The checkout it was taken from (decision 883): tests/land.sh run there under
+		# another name lands under the lock's (physics' second take under the lock, 11-12).
+		git rev-parse --show-toplevel >"$LOCK/checkout" 2>/dev/null
 		log "taken by $tree ($what)"
 		beat_gate "$tree"
 		echo "$LABEL: taken by $tree ($what)"

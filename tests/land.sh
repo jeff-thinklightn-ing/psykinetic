@@ -19,7 +19,23 @@ cd "$(dirname "$0")/.."
 # landing's take under another name (a side worktree's) is still adopted by
 # its process, not its name (394 amended (11)).
 tree="${PSYKINETIC_TREE:-$(basename "$(pwd)")}"
+# The land lock taken from this checkout under another name (decision 883): this
+# run is that landing's, under the lock's name, never a second take queued
+# under its lock (physics, 11-12 03:09).
+land_lock_dir="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}"
+if [ -z "${PSYKINETIC_TREE:-}" ] && [ -f "$land_lock_dir/checkout" ] 	&& [ "$(cat "$land_lock_dir/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
+	lock_tree="$(cat "$land_lock_dir/owner" 2>/dev/null)"
+	if [ -n "$lock_tree" ] && [ "$lock_tree" != "$tree" ]; then
+		echo "landing tests: the land lock was taken here by $lock_tree: run as $lock_tree, not $tree"
+		tree="$lock_tree"
+	fi
+fi
+. tools/land_stamp.sh
+# The commit this run tests: a PASS stamps it only if HEAD is still here at the end.
+export LAND_HEAD="${LAND_HEAD:-$(git rev-parse HEAD 2>/dev/null)}"
 if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
+	# The push guard's hook, when origin/main switches it on (tools/hooks/install).
+	land_hook_install
 	# The CHANGELOG first, no Godot, before any wait at the gate (decision
 	# 539): released sections as tagged, no bullet both unreleased and released.
 	python -B tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
@@ -136,6 +152,7 @@ part changelog_check_test python -B tests/changelog_check_test.py
 part changelog_resolve_test python -B tests/changelog_resolve_test.py
 part voice_inventory_test python -B tests/voice_inventory_test.py
 part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
+part push_guard_test bash tests/push_guard_test.sh
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 if [ -n "$remote" ]; then
@@ -211,5 +228,6 @@ else
 	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi
 echo "$line"
+[ "$code" -eq 0 ] && land_stamp_write "$LAND_HEAD" "$tree" "$line"
 [ -z "${LAND_RESULT:-}" ] || echo "$line" > "$LAND_RESULT"
 exit $code

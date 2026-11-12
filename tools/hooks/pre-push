@@ -1,0 +1,57 @@
+#!/bin/sh
+# The push guard (installed by tests/land.sh from origin/main; release alone
+# lifts it: a file pre-push.lifted beside it, then delete this one; nobody pushes
+# to main with --no-verify). A push to refs/heads/main whose commits change
+# anything but Markdown at the top and docs/ needs the PASS stamp tests/land.sh
+# wrote for the pushed commit (tools/land_stamp.sh). It refuses only on a stamp
+# clearly missing; on any error of its own it lets the push through and says so
+# loudly, in the gate's log too, so a broken guard is seen the same day.
+# Other branches are never looked at.
+
+# Jeff's own pushes exempt by a marker in the pushed commit's message, only if
+# he chooses it (C:\dev\review\decisions\push-guard.md, B). Empty: off.
+OWNER_MARKER=""
+
+zero=0000000000000000000000000000000000000000
+
+loud() {
+	echo "push guard: $1; the push goes through unguarded" >&2
+	python -B tools/heavy_job.py note "${PSYKINETIC_TREE:-$(basename "$(pwd)")}" push_guard "$1" >/dev/null 2>&1 \
+		|| echo "push guard: (and the gate's log could not be written)" >&2
+}
+
+# Whether every path from stdin is exempt: Markdown at the top, or under docs/.
+all_exempt() {
+	while IFS= read -r path; do
+		[ -n "$path" ] || continue
+		case "$path" in
+			docs/*) ;;
+			*/*) return 1 ;;
+			*.md) ;;
+			*) return 1 ;;
+		esac
+	done
+	return 0
+}
+
+[ -n "${PUSH_GUARD_BREAK:-}" ] && { loud "broken on purpose (PUSH_GUARD_BREAK, a test)"; exit 0; }
+common="$(cd "$(git rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null && pwd)" || { loud "no git folder"; exit 0; }
+refused=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+	[ "$remote_ref" = "refs/heads/main" ] || continue
+	[ "$local_sha" = "$zero" ] && continue  # A delete: not a landing.
+	[ "$remote_sha" = "$zero" ] && { loud "main is new on the remote: nothing to compare against"; continue; }
+	# main's tip not here: main moved since the fetch, and the remote refuses the
+	# push itself (not a fast-forward); nothing for the guard to say.
+	git cat-file -e "$remote_sha^{commit}" 2>/dev/null || continue
+	files="$(git diff --name-only "$remote_sha" "$local_sha" 2>/dev/null)" || { loud "could not list what $local_sha changes"; continue; }
+	printf '%s\n' "$files" | all_exempt && continue
+	[ -f "$common/land_pass/$local_sha" ] && continue
+	if [ -n "$OWNER_MARKER" ] && git log -1 --format=%B "$local_sha" 2>/dev/null | grep -qF "$OWNER_MARKER"; then
+		echo "push guard: $local_sha carries the owner's marker: pushed without a stamp" >&2
+		continue
+	fi
+	echo "push guard: refused: no PASS stamp for $local_sha. Run tests/land.sh on this commit (it writes the stamp at its end, when every part passes and HEAD hasn't moved), then push it." >&2
+	refused=1
+done
+exit $refused

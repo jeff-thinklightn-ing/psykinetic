@@ -1,0 +1,4 @@
+off
+# "on" lets tests/land.sh install tools/hooks/pre-push (from origin/main's copy)
+# into the shared hooks folder. Off until Jeff answers
+# C:\dev\review\decisions\push-guard.md (the coordinator flips it).
