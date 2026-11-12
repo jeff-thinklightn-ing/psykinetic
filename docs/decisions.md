@@ -6593,6 +6593,32 @@ and threeup_low (shipped, a first cut, this): from above the rows clearly
 fewer though not gone, at the low camera the water dappling as (2)'s did. No bullet (voice's (2)
 bullet still says it). Client only, protocol unchanged, no new class_name.
 
+309 amended (5): rain at night drawn as rain, not as white rods (the
+coordinator's three-worst item 2 of 2026-11-11, and its pick of 2026-11-12).
+At night every drop showed its own pale colour at full strength (the drop
+material was unshaded), so the drops near the low camera read as white rods
+a finger wide (stills C:/dev/review/envrain). Now the rain's and the drips'
+drops share one shader (DROP_SHADER), lit and without specular: by day
+their own colour as before (emission alone); as the day goes (Client3D's
+_look_daylight, told each frame as "day"), lit by the scene instead (the
+ambient, the moon, a lamp or a lantern, from behind too), keeping
+DROP_NIGHT_GLOW 0.4 of their own colour as emission (colour times
+max(day, 0.4)). The nearest thin out from DROP_NEAR_TO 5 m to nothing at
+DROP_NEAR_FROM 1.5 m from the eye. Lit by the night alone (no glow), the rain
+all but vanished; 0.25 and 0.4 were shot side by side and 0.4 chosen.
+Proof, the Lenovo at 1920x1080, wilds, 22.5, the low camera (ui-design;
+C:/dev/review/envrain/ingame, README and the three-way sheets): bright
+pixels in the bottom third (over its median + 80) at zoom 1.0, main 1,142,
+0.4 497, dry 294; the longest near streak at zoom 0.4, main 82 px, 0.4 34 px
+(the same with no drop lit at all: the scene's, not a drop's); over the
+square's dark ground at zoom 1.0, plain grey lines. The count bar (1.5 times
+dry) was set to catch rods; with the rod bar met, the count gives way: the
+extra bright pixels are the mid-distance rain wanted. Cost (perf, Lenovo):
+the rain's median frame as main's (13.78-13.85 ms against 13.69-13.85), and
+its first frames the start-up frame main's rain shows too. weather_test
+_test_rain_at_night: the shader's day, near fade and night glow, and the
+drops told the day. Client only, protocol unchanged, no new class_name.
+
 ## 327. A glimpse of the level past a way out
 
 Jeff: "maybe the castle gets a little area where you can see it just beyond

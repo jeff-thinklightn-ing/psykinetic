@@ -41,6 +41,14 @@ const DRIP_BOX := Vector3(24.0, 4.0, 24.0)
 const DRIP_HEIGHT := 4.5
 const DRIP_SPEED := 8.0
 const DRIP_COLOUR := Color(0.78, 0.84, 0.9, 0.5)
+## A drop this near the eye (m) is not drawn; from DROP_NEAR_TO on, whole.
+const DROP_NEAR_FROM := 1.5
+const DROP_NEAR_TO := 5.0
+## The least of a drop's own light at night (a share of its colour): lit by
+## the night's ambient and moon alone, a streak was as dark as the ground
+## behind it and the rain all but vanished (the Lenovo stills, 11-12); with
+## this it reads as faint grey lines, far under the white rods it was.
+const DROP_NIGHT_GLOW := 0.4
 ## Rain on water (309 amended (2)): the share of the water's drop
 ## cells (water.gdshader) that ring, from the drawn rain, through the
 ## `rain_rings` global: none below RINGS_FROM, every cell at RINGS_FULL.
@@ -160,15 +168,30 @@ void fragment() {
 }
 """
 
+## Rain's and drips' drops (309 amended (5)): by day their own colour, as
+## before (emission alone, nothing lit); as the day goes, lit by the scene
+## instead (the ambient, the moon, a lamp or a lantern, from behind too),
+## so at night a drop shows where a light catches it and not as a pale
+## pole, keeping DROP_NIGHT_GLOW of its own light. The nearest thin out from DROP_NEAR_TO to nothing at DROP_NEAR_FROM
+## metres from the eye: a drop a step off filled a finger's width.
 const DROP_SHADER := """
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabled;
+render_mode blend_mix, depth_draw_never, cull_disabled, shadows_disabled, specular_disabled;
 
 uniform vec4 colour : source_color = vec4(0.75, 0.8, 0.88, 0.35);
+// The day's share of the light (Client3D._look_daylight): 1 its own colour, 0 lit.
+uniform float day = 1.0;
+uniform float near_from = 1.5;
+uniform float near_to = 5.0;
+// The least of its own light at night (WeatherView.DROP_NIGHT_GLOW).
+uniform float night_glow = 0.4;
 
 void fragment() {
-	ALBEDO = colour.rgb;
-	ALPHA = colour.a * (1.0 - abs(UV.x * 2.0 - 1.0));
+	ALBEDO = colour.rgb * (1.0 - day);
+	BACKLIGHT = colour.rgb * (1.0 - day);
+	EMISSION = colour.rgb * max(day, night_glow);
+	ROUGHNESS = 1.0;
+	ALPHA = colour.a * (1.0 - abs(UV.x * 2.0 - 1.0)) * smoothstep(near_from, near_to, -VERTEX.z);
 }
 """
 
@@ -201,6 +224,8 @@ var _rain_process: ParticleProcessMaterial
 var _snow: GPUParticles3D
 var _snow_process: ParticleProcessMaterial
 var _drips: GPUParticles3D
+## The rain's and the drips' drop materials (DROP_SHADER), told the day's share each frame.
+var _drop_materials: Array[ShaderMaterial] = []
 var _roofs: GPUParticlesCollisionHeightField3D
 var _fog: Array[MeshInstance3D] = []
 var _fog_material: Array[ShaderMaterial] = []
@@ -358,6 +383,8 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	_rain.amount_ratio = clampf(through, 0.0, 1.0)
 	_rain.global_transform = Transform3D(frame, over + Vector3(0.0, RAIN_HEIGHT, 0.0))
 	_rain_process.direction = frame.inverse() * Vector3(way.x * RAIN_SLANT * wind, -1.0, way.y * RAIN_SLANT * wind).normalized()
+	for material in _drop_materials:
+		material.set_shader_parameter("day", daylight)
 	# Snow: slow flakes, carried by the wind.
 	var snow: float = weather["snow"]
 	snow *= lerpf(1.0, CANOPY_SNOW, canopy)
@@ -425,6 +452,7 @@ func _build_rain() -> void:
 	shader.code = DROP_SHADER
 	material.shader = shader
 	material.set_shader_parameter("colour", RAIN_COLOUR)
+	_drop_material(material)
 	streak.material = material
 	_rain.draw_pass_1 = streak
 	_rain.emitting = false
@@ -511,10 +539,19 @@ func _build_drips() -> void:
 	shader.code = DROP_SHADER
 	material.shader = shader
 	material.set_shader_parameter("colour", DRIP_COLOUR)
+	_drop_material(material)
 	drop.material = material
 	_drips.draw_pass_1 = drop
 	_drips.emitting = false
 	add_child(_drips)
+
+
+## [param material] a drop's (DROP_SHADER): its near fade set, kept to be told the day.
+func _drop_material(material: ShaderMaterial) -> void:
+	material.set_shader_parameter("near_from", DROP_NEAR_FROM)
+	material.set_shader_parameter("near_to", DROP_NEAR_TO)
+	material.set_shader_parameter("night_glow", DROP_NIGHT_GLOW)
+	_drop_materials.append(material)
 
 
 func _build_fog() -> void:
