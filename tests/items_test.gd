@@ -4221,6 +4221,35 @@ func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> v
 	var wet_wells: Array = wells.filter(func(b: Dictionary) -> bool: return (wilds["terrain"]["water"] as Array).has(b["cell"]))
 	_check(not wells.is_empty() and wet_wells.size() == wells.size() and wells.all(func(b: Dictionary) -> bool: return not wild_waters.has(b["cell"])),
 		"the wilds as laid: every well (%s) stands on water and none of it fishes" % [wells.map(func(b: Dictionary) -> Vector2i: return b["cell"])])
+	# Jeff's pond by Umbrage (his own build, the crescent round Snagfin's shack,
+	# where he takes companions to fish): one body, every cell of it fishes, and
+	# every dry cell touching it (the bank all round, the dock's end with it)
+	# casts into it.
+	var jeffs: Array[Vector2i] = []
+	for cell: Vector2i in wilds["terrain"]["water"]:
+		if cell.x >= 219 and cell.x <= 225 and cell.y >= 222 and cell.y <= 230:
+			jeffs.append(cell)
+	var bodies := {}
+	for cell in jeffs:
+		bodies[str(wild_waters.get(cell, ""))] = true
+	_check(jeffs.size() >= 8 and bodies.size() == 1 and not bodies.has(""),
+		"Jeff's pond by Umbrage: %d cells, one fishing body (%s)" % [jeffs.size(), bodies.keys()])
+	var floor_cells: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor_cells[cell] = true
+	for cell: Vector2i in wilds["terrain"].get("solid", []):
+		floor_cells.erase(cell)
+	var banks: Array[Vector2i] = []
+	var short: Array[Vector2i] = []
+	for water_cell in jeffs:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var bank := water_cell + Vector2i(dx, dy)
+				if floor_cells.has(bank) and not jeffs.has(bank) and not banks.has(bank):
+					banks.append(bank)
+					if not jeffs.any(func(w: Vector2i) -> bool: return wild_waters.has(w) and maxi(absi(w.x - bank.x), absi(w.y - bank.y)) <= World.FISH_REACH):
+						short.append(bank)
+	_check(banks.size() >= 8 and short.is_empty(), "from every one of its %d bank cells a cast reaches it (short: %s)" % [banks.size(), short])
 	_clear(host)
 	_give(host, "sword", Items.RIGHT_HAND)
 	var packed := Items.ALL_PACK_SLOTS[0]
