@@ -1436,7 +1436,7 @@
 			"size": [0.3, 0.25, 0.3],
 			"budget": 100,
 			"materials": 1,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/scatter.tuft/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 100 mesh, one mesh, 97 tris"},
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/items_artgen/make_tuft.py: a grass tuft of 24 tapered blades from a spread root (11 arching in three faces, 13 short in two, five laid low round the foot), two straw tips, palette 4:1/4:2/4:3 (the old tuft's swatches) and 3:1; 94 tris; replaces art-gen's TRELLIS c4 (10-18), whose broad rosettes read as lettuce heads at the low camera's nearest zoom; side-on silhouette 71% of the old's; the coordinator's ruling 2026-11-12; art-kit passed it on C:/dev/review/tuft/tuft_sheet.png"},
 			"uses": "grass tufts terrain scatters over grass and dirt (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 8, "sink": 0.02, "footprint_r": 0.15, "blocks": false}
 		},

@@ -51729,6 +51729,16 @@ beside), so main keeps its fitted sword and shield and the hand pair comes back 
 the shield's fit on the back is found. The dagger, drawn from the same hip beside the buckler,
 passed the same check. Client only; no new class_name.
 
+871 amended (1), the grass, in its own commit so it can be reverted alone (the coordinator,
+2026-11-12: the commonest thing on screen and the only swap nobody has seen in the game's own
+light): scatter.tuft (art-gen, C:/dev/review/items_artgen/make_tuft.py, 94 tris; the coordinator's
+ruling 2026-11-12, art-gen's third worst: the fitted tuft's broad rosettes read as lettuce heads at
+the low camera's nearest zoom): 24 tapered blades from a spread root, five laid low round the foot,
+two straw tips, on the old tuft's swatches; side-on silhouette 71% of the old's; terrain's density
+unchanged. Lands on, every lawn's tufts at once; an in-game still of the square's edge and the
+pond's meadow from main's tip comes before the 11-13 cut, and if the lawn reads sparse or wrong this
+commit is reverted and nothing else of 871 amended (1) is touched.
+
 ## 869. The gait pick holds through gaps: a stop held, a change dwelt on, the rate on a smoothed speed
 
 ## 885. Builder's answer panel: the summary as parts, in a window of the approved look
