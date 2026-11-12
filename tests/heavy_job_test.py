@@ -558,6 +558,18 @@ if shell is not None:
     check(code == 1 and len(failed_beats) == 1 and "HEAVY_JOB_BEAT_BREAK" in failed_beats[0],
         "a failed beat is logged as beat_failed with its error (%s, %s)" % (code, failed_beats[:1]))
     shutil.rmtree(lock, ignore_errors=True)
+    # With the lock's order on (394 amended (36)) a try runs lock_turn, which beats first: a
+    # beat that fails costs the landing nothing; the free lock is still its.
+    shutil.rmtree(lock + ".waiters", ignore_errors=True)
+    lock_env["HEAVY_JOB_BEAT_BREAK"] = "1"
+    code, said = try_lock("a landing")
+    del lock_env["HEAVY_JOB_BEAT_BREAK"]
+    owner = open(os.path.join(lock, "owner")).read().strip() if os.path.isdir(lock) else ""
+    with open(gate._path("heavy_jobs.log")) as handle:
+        failed_beats = [line for line in handle if "	beat_failed	probe	" in line]
+    check(code == 0 and owner == "probe" and len(failed_beats) >= 2,
+        "a free lock still goes to a try whose beat fails, the fault logged (%s, %s, %s)" % (code, owner, said.strip()[-120:]))
+    shutil.rmtree(lock, ignore_errors=True)
     os.remove(gate._path("running", "probe-suite_remote-1.json"))
     try:
         os.remove(lock + ".log")
@@ -1516,6 +1528,9 @@ check(len(held) == 1 and held[0]["kind"] == "suite_remote" and held[0]["asked"] 
 check(gate.holds("swapper", "suite") and gate.holds("swapper", "suite_remote"),
     "it holds suite (a script's holds line unchanged) and suite_remote (land.sh's first check)")
 check("\tstart\tswapper\tsuite_remote\tasked suite, saturn answers" in swap_log(), "the start line says it was swapped")
+check(held[0].get("gate") == gate.GATE_REVISION and held[0].get("checkout") == gate.CHECKOUT
+    and held[0].get("guard") and held[0].get("adopted_by") == os.getpid(),
+    "a swapped take carries the gate's revision, its checkout and its guard, as any take (394 amended (37) with (33))")
 # tests/land.ps1 runs a suite here inside it: the take is taken back as a suite.
 name, estimate = gate._adopt_take("swapper", "suite")
 held = gate._entries("running")

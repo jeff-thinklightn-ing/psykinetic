@@ -1597,7 +1597,11 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 name = "%s-%s-%s.json" % (tree, "suite_remote", pid or os.getpid())
                 entry = {"tree": tree, "kind": "suite_remote", "asked": kind, "pid": pid, "pid_since": started_at(pid),
                     "queued": queued, "started": time.time(), "ram_gb": swapped["ram_gb"], "commit_gb": commit_of(swapped),
-                    "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": watched, "estimate": "suite_remote"}
+                    "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": watched, "estimate": "suite_remote",
+                    "gate": GATE_REVISION, "checkout": CHECKOUT}
+                if not watched:
+                    # 394 amended (37): a swapped take is guarded as any other.
+                    guard(entry, *guard_holder(pid, caller))
                 if past:
                     entry["backfill"] = {"past": ", ".join("%s %s" % (each["tree"], each["kind"]) for each in past),
                         "due": min(each["due"] for each in past)}
@@ -1979,7 +1983,12 @@ def lock_turn(tree, lock, free):
     of its landing take or of its first try; last, now) and its take beaten
     (beat). With [free] (the lock free or stale), 0 when it may take the lock
     by lock_order, else 1 with why on stdout."""
-    beat(tree)
+    try:
+        beat(tree)
+    except Exception as error:  # noqa: BLE001
+        # A fault in the beat never costs the landing its turn (394 amended (37), with (36)):
+        # told in the gate's log, as beat_gate tells one, and the try goes on.
+        log("beat_failed", tree, "-", "lock_turn's beat: %s: %s" % (type(error).__name__, error))
     folder = lock + ".waiters"
     os.makedirs(folder, exist_ok=True)
     now = time.time()

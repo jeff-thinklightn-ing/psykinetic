@@ -10593,6 +10593,22 @@ turns over. An "unbeaten" line, the one that catches a pre-31 drop by what it do
 and since when ("unbeaten: <tree> <kind> held N min, since HH:MM, ..."), so release can act on it without reading
 code (the coordinator's ask). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (39) (perf, 2026-11-12; label from tools/decision_number.sh): 37 met 33 and 36. 32 to 36 were built
+before 37 and landed after it, stacked (release's order); the rebase took them clean but for two seams, found
+reading the merged code:
+- 33's swap wrote its own running entry (asked suite, granted suite_remote) and so none of 37's fields: a swapped
+  take had no guard, so older gate code could drop it at 30 minutes, and status counted it "revision unknown".
+  It now carries GATE_REVISION, its checkout and its guard as every take does.
+- 36's lock_turn, which every land lock try runs with the order on, beats first; a fault there now crashed the try,
+  so a broken beat kept a landing from a free lock it was owed (before 36 a failed beat cost nothing, and 37
+  logged it). lock_turn now logs it (beat_failed, "lock_turn's beat: ...") and the try goes on.
+heavy_job_test: a swapped take carries the revision, checkout and guard; with HEAVY_JOB_BEAT_BREAK a try at a free
+lock still takes it and the fault is logged (this check fails on the code before the fix). Run over a copy of
+the live gate state (the coordinator's ask after 37): status names nobody, only the count line; the one change it
+shows is 36's own, scenes held behind a suite_remote head held by the count alone until up to three saturn takes
+are granted to wait on the lock, uncounted, after which scenes pass again. Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
