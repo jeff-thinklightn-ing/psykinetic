@@ -4173,6 +4173,7 @@ func _test_band() -> void:
 	var sledge := World.slot_uid(brand, Items.RIGHT_HAND)
 	_check(str(brand.spawn_spec.get("label")) == "Brand the Ox" and brand.tactic == Monster.Tactic.HEAVY and World.wielded(brand) == "tomb_sledge"
 			and World.holder_key(brand) == "named:brand", "Brand the Ox, a heavy, the Tomb Sledge in his hands (%s)" % World.wielded(brand))
+	_check(brand.max_hp == 34, "806 amended (18): Brand at x1.0 hp, his kind's 34 (%d)" % brand.max_hp)
 	var crake := _band_one("crake", "robber", Vector2i(8, 2))
 	_check(str(crake.spawn_spec.get("label")) == "Crake" and World.wielded(crake) == "dagger", "Crake, a plain robber with his dagger")
 	_check(brand.given_name == "Brand the Ox" and brand.boss and crake.given_name == "Crake" and not crake.boss
@@ -9288,8 +9289,10 @@ func _test_rally_knows() -> void:
 ## her over a minute; a fifth in within 1.5 s of a fall; one she strikes from
 ## his hold fights her.
 func _test_band_hold_off() -> void:
-	print("%s== the band's hold-off: six robbers in sight of one player, never more than four on her; the next in when one falls ==" % char(10))
+	print("%s== the band's hold-off: six robbers in sight of one player, never more than three on her; the next in when one falls ==" % char(10))
 	Monster.idling = false
+	_check(Monster._hold_share(1) == 3 and Monster._hold_share(2) == 3 and Monster._hold_share(3) == 4,
+		"806 amended (18): the share is 3 on one body and on two, 4 on three (%d, %d, %d)" % [Monster._hold_share(1), Monster._hold_share(2), Monster._hold_share(3)])
 	var rows: Array[String] = ["##############", "#............#", "#.x...x...x..#", "#............#", "#............#",
 		"#.....P......#", "#............#", "#............#", "#.x...x...x..#", "#............#", "##############"]
 	var e := _build(rows)

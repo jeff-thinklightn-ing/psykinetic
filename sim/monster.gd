@@ -4085,9 +4085,11 @@ func _rally_send() -> void:
 
 
 ## The band's share of a party (the coordinator's ruling): at least
-## HOLD_SHARE_LEAST, and HOLD_SHARE_PER_BODY a body of it.
-const HOLD_SHARE_LEAST := 4
-const HOLD_SHARE_PER_BODY := 2
+## HOLD_SHARE_LEAST, and one more than its bodies (806 amended (18): RUN3 on
+## gen 118 measured 3 on one body and on two, against 4 and 4 before; three
+## or more bodies were not measured).
+const HOLD_SHARE_LEAST := 3
+const HOLD_SHARE_OVER_BODIES := 1
 const HOLD_NEAR := 3
 const HOLD_FAR := 4
 const HOLD_SHIFT_TICKS := 30
@@ -4115,7 +4117,7 @@ static func _party_bodies(foe: GridEntity) -> Array[GridEntity]:
 
 ## How many of its band a party of [param bodies] may have on it at once.
 static func _hold_share(bodies: int) -> int:
-	return maxi(HOLD_SHARE_LEAST, HOLD_SHARE_PER_BODY * bodies)
+	return maxi(HOLD_SHARE_LEAST, bodies + HOLD_SHARE_OVER_BODIES)
 
 
 ## Whether it holds off its target's party now (holds_off): the share on it

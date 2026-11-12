@@ -16,7 +16,7 @@ notes (decision 324).
 - In the crypt, a Mound-breaker comes to his mates' fight only when he can see or hear it, so one you meet alone in a side room stays alone where you meet him (806 amended (17)).
 - In the crypt, a robber across a wall's corner from you steps round to where he can strike (806 amended (16)).
 - A foe beside you at a stair or doorway fights you from another side of you (571 amended (1)).
-- In the crypt, the Mound-breakers step in one after another, a fresh one every two seconds, and while four are on you the rest wait in sight a few steps off until one falls or you go for them; Brand the Ox stands his ground to the end and makes a longer fight of it (806 amended (14)).
+- In the crypt, the Mound-breakers step in one after another, a fresh one every two seconds, and while three are on you the rest wait in sight a few steps off until one falls or you go for them; Brand the Ox stands his ground to the end and makes a longer fight of it (806 amended (14)).
 - A robber's or a skeleton's ordinary blow winds up where you can see it coming, even a stab from behind, and a raised shield facing it takes the blow whole (806 amended (14)).
 - Rain at night falls as faint grey streaks, shaded by the dark and by lamplight, with the view clear close to the camera (309 amended (5)).
 - A travel ration is a cloth-wrapped bundle tied with twine, a sack of food is a slumped burlap sack, a bag of nails is canvas with nails standing out of it, and a bench is two planks on splayed legs (871).
