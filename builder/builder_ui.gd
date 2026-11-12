@@ -27,6 +27,8 @@ var _coords_me := Vector2i(-2, -2)
 var _proposal := {}
 ## --test-builder with a request starting "+": accept the proposal when it comes.
 var _test_accept := false
+## --test-builder with a request starting "*": the answer shown with every fold open (a shot's).
+var _test_unfold := false
 
 
 func _ready() -> void:
@@ -321,6 +323,8 @@ func on_message(data: Dictionary) -> void:
 			# The answer is the panel's (885); the status line stands aside.
 			_status.visible = false
 			panel.show_answer(data, beyond)
+			if _test_unfold:
+				panel.unfold_all()
 			print("[builder] proposal ($%.3f): %s" % [float(data.get("cost", 0.0)), str(data.get("summary", "")).get_slice("\n", 0)])
 			panel.visible = true
 			_box.grab_focus()
@@ -343,7 +347,8 @@ func on_message(data: Dictionary) -> void:
 				panel.working("Builder: %s" % data.get("error", "something went wrong"))
 
 
-## --test-builder: "x,y,w,h:request" asked as if dragged out and typed.
+## --test-builder: "x,y,w,h:request" asked as if dragged out and typed; a
+## request starting "+" accepted when it comes, "*" shown unfolded.
 func test_ask(spec: String) -> void:
 	var parts := spec.split(":", true, 1)
 	var numbers := parts[0].split(",")
@@ -351,10 +356,13 @@ func test_ask(spec: String) -> void:
 		push_warning("[builder] --test-builder=%s: x,y,w,h:request" % spec)
 		return
 	active = true
-	_test_accept = parts[1].begins_with("+")
+	var request := parts[1]
+	_test_unfold = request.begins_with("*")
+	request = request.trim_prefix("*")
+	_test_accept = request.begins_with("+")
 	_set_area(Rect2i(numbers[0].to_int(), numbers[1].to_int(), numbers[2].to_int(), numbers[3].to_int()))
 	_open_box()
-	_submitted(parts[1].trim_prefix("+"))
+	_submitted(request.trim_prefix("+"))
 
 
 func _say(text: String) -> void:

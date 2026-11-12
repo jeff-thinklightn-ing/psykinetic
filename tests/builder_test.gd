@@ -2064,10 +2064,10 @@ The temple's door opens on the square."], "fault": false},
 	var shown := spots.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line") and (node as Control).visible).size()
 	var more := spots.find_child("More", false, false) as Button
 	_check(shown == BuilderPanel.FOLD_SHOWN and more != null and more.text == "▶ 7 more", "ten lines fold to three and \"7 more\" (%d shown, %s)" % [shown, more.text if more != null else "no fold"])
-	more.pressed.emit()
+	panel.unfold_all()
 	await get_tree().process_frame
 	shown = spots.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line") and (node as Control).visible).size()
-	_check(shown == 10 and not is_instance_valid(more), "\"7 more\" unfolds them in place (%d shown)" % shown)
+	_check(shown == 10 and not is_instance_valid(more), "\"7 more\" unfolds them in place, as unfold_all presses it (a shot's \"*\", 859 amended (3)) (%d shown)" % shown)
 	var sites: Node = answer.get_child(4)
 	_check(sites.find_child("More", false, false) == null and sites.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line")).size() == 4, "four lines show whole, no fold")
 	var text := (spots.get_child(1).find_child("Text", true, false) as RichTextLabel).get_parsed_text()

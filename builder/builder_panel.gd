@@ -265,6 +265,13 @@ func _part(head: String, lines: Array) -> Control:
 	return column
 
 
+## Every folded part opened, as its "N more" pressed (859 amended (3): a
+## shot's still can't press it; --test-builder's "*" request).
+func unfold_all() -> void:
+	for more: Node in find_children("More", "Button", true, false):
+		(more as Button).pressed.emit()
+
+
 ## One bullet line: the dot, and the line wrapping under its own words, its
 ## codes as chips.
 func _bullet(text: String) -> Control:
