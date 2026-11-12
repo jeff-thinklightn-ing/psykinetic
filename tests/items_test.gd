@@ -4212,6 +4212,15 @@ func _test_fishing() -> void:
 func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> void:
 	print("
 == fishing that works (805 amended (11)): a click on water casts, the rod from the pack; the strike ==")
+	# A well's water is no body's (animation's clip: a perch from Umbrage's well).
+	var laid := World.fish_waters_of({"water": [Vector2i(5, 5), Vector2i(9, 9)], "covered_water": [Vector2i(9, 9)]})
+	_check(laid.has(Vector2i(5, 5)) and not laid.has(Vector2i(9, 9)), "water under a building on it fishes not (%s)" % [laid])
+	var wilds: Dictionary = Level.load_level("wilds")
+	var wells: Array = (wilds["buildings"] as Array).filter(func(b: Dictionary) -> bool: return str(b.get("slot", "")) == "building.well")
+	var wild_waters := World.fish_waters_of(wilds["terrain"])
+	var wet_wells: Array = wells.filter(func(b: Dictionary) -> bool: return (wilds["terrain"]["water"] as Array).has(b["cell"]))
+	_check(not wells.is_empty() and wet_wells.size() == wells.size() and wells.all(func(b: Dictionary) -> bool: return not wild_waters.has(b["cell"])),
+		"the wilds as laid: every well (%s) stands on water and none of it fishes" % [wells.map(func(b: Dictionary) -> Vector2i: return b["cell"])])
 	_clear(host)
 	_give(host, "sword", Items.RIGHT_HAND)
 	var packed := Items.ALL_PACK_SLOTS[0]

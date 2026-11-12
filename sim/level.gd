@@ -2277,6 +2277,12 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 			continue
 		for cell in stands_on:
 			taken[cell] = true
+		if on_water:
+			# Its water is the well's, not a pool (805 amended (11), animation's
+			# clip: a perch from Umbrage's well): World.fish_waters_of skips it.
+			var covered: Array = terrain.get("covered_water", [])
+			covered.append_array(stands_on)
+			terrain["covered_water"] = covered
 		var open: Array[Vector3i] = []
 		# A kind's own open edges (its "open": a forge's front) are meant so.
 		var meant: Array[Vector3i] = []

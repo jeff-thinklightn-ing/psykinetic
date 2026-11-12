@@ -1772,7 +1772,7 @@ static func _water_by(cell: Vector2i) -> Vector2i:
 	for dy in range(-World.FISH_REACH, World.FISH_REACH + 1):
 		for dx in range(-World.FISH_REACH, World.FISH_REACH + 1):
 			var at := cell + Vector2i(dx, dy)
-			if World.is_water(at) and dx * dx + dy * dy < near:
+			if World.fishes(at) and dx * dx + dy * dy < near:  # Not a well (805 amended (11)).
 				near = dx * dx + dy * dy
 				best = at
 	return best

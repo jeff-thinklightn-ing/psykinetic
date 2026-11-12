@@ -22668,8 +22668,8 @@ func _fish_click(player: Player, tile: Vector2i, on_sprite: bool) -> bool:
 	if str(player.fishing.get("state", "")) == "bite":
 		World.command(player, "fish", {})
 		return true
-	if on_sprite or tile == NONE or not World.is_water(tile):
-		return false
+	if on_sprite or tile == NONE or not World.fishes(tile):
+		return false  # A well's water is a well, clicked as one.
 	var args := {"at": [tile.x, tile.y]}
 	if World.rod_slot(player) < 0:
 		World.command(player, "fish", args)

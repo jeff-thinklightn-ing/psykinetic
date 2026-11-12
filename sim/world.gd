@@ -8073,7 +8073,7 @@ func _tend_rods() -> void:
 ## water within FISH_REACH (a click on it, 805 amended (11)); else within
 ## FISH_REACH, the one most ahead of its facing, then the nearest; NO_CELL if none.
 func cast_cell(entity: GridEntity, wanted := NO_CELL) -> Vector2i:
-	if wanted != NO_CELL and wanted != entity.tile and is_water(wanted) \
+	if wanted != NO_CELL and wanted != entity.tile and fishes(wanted) \
 			and absi(wanted.x - entity.tile.x) <= FISH_REACH and absi(wanted.y - entity.tile.y) <= FISH_REACH:
 		return wanted
 	var best := NO_CELL
@@ -8082,7 +8082,7 @@ func cast_cell(entity: GridEntity, wanted := NO_CELL) -> Vector2i:
 	for dy in range(-FISH_REACH, FISH_REACH + 1):
 		for dx in range(-FISH_REACH, FISH_REACH + 1):
 			var cell := entity.tile + Vector2i(dx, dy)
-			if (dx == 0 and dy == 0) or not is_water(cell):
+			if (dx == 0 and dy == 0) or not fishes(cell):
 				continue
 			var way := Vector2(dx, dy)
 			var score := ahead.dot(way.normalized()) * 2.0 - way.length() * 0.5
@@ -8100,6 +8100,13 @@ func cast_cell(entity: GridEntity, wanted := NO_CELL) -> Vector2i:
 ## cell, [param _from], no longer decides: any bank of a body fishes it.
 func pond_at(cell: Vector2i, _from := NO_CELL) -> String:
 	return pond_in(zone.name, cell)
+
+
+## Whether [param cell] is water that fishes (805 amended (11)): some body's,
+## so not a well's (fish_waters_of). A click on it casts; is_water is what
+## stops walkers.
+func fishes(cell: Vector2i) -> bool:
+	return (_fish_waters.get(zone.name, {}) as Dictionary).has(cell)
 
 
 ## pond_at in zone [param zone_name] (laid once at least).
@@ -8140,11 +8147,16 @@ func pond_name(pond: String) -> String:
 ## (a ford is never water: it is walked, not fished). One a stream path runs
 ## through is the river, "river_<x>_<y>", narrow, bridged or wide; any other
 ## a pool, "pool_<x>_<y>", whatever its size. <x>, <y>: its first cell,
-## least y then least x.
+## least y then least x. Water under a building standing on it (a well,
+## Level.ON_WATER; terrain "covered_water") is no body's: it doesn't fish.
 static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
+	var covered: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("covered_water", []):
+		covered[cell] = true
 	var wet: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in terrain.get("water", []):
-		wet[cell] = true
+		if not covered.has(cell):
+			wet[cell] = true
 	var flowing: Dictionary[Vector2i, bool] = {}
 	for stream: Dictionary in terrain.get("streams", []):
 		for cell: Vector2i in stream.get("path", []):
