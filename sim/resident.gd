@@ -796,16 +796,24 @@ func _free_spot(use: String) -> Dictionary:
 	_picks += 1
 	var start := absi(hash([id, World.tick, _picks])) % pool.size()
 	var back := {}
+	var here := {}
 	for i in pool.size():
 		var spot: Dictionary = pool[(start + i) % pool.size()]
 		var cell: Vector2i = spot["cell"]
-		if cell == tile or not World.is_free(cell) or World.is_link_cell(cell):
+		if cell == tile:
+			if use == "work":
+				here = spot  # 853 amended (13): the work spot it stands on, kept when no other is free.
+			continue
+		if not World.is_free(cell) or World.is_link_cell(cell):
 			continue
 		if cell == _left:
 			back = spot
 			continue
 		return spot
-	return back
+	# None other free: at work it stays on its own (Rolf stepped off his stall's only spot each stroll, a minute or
+	# two each, to a free cell of his work rect: maps' day run); a seat on the square or a well's stand is still
+	# left for a stroll (the mend: folk move on). Else back to the one it left.
+	return here if not here.is_empty() else back
 
 
 ## Standing idle or at a spot, it faces the open (the mend: Hob stood seven hours with his face to the

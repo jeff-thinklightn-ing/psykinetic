@@ -4616,6 +4616,12 @@ func _test_show_work(mara: Resident) -> void:
 	_check(Resident.show_word("smith") == "hammer" and Resident.show_word("vendor") == "tend" and Resident.show_word("bard") == "" and Resident.show_word("_") == "",
 		"residents.json's show: the smith hammers, the stall's keeper tends, a trade not there shows nothing")
 	_check(mara.activity == "hammer" and mara.showing_work(), "at its work spot, facing it, no task: the smith's word (%s)" % mara.activity)
+	# 853 amended (13): a stroll on its sole spot keeps it (Rolf stepped off his stall's each stroll).
+	var left_was: Vector2i = mara._left
+	mara._left = Resident.NO_CELL
+	var kept: Dictionary = mara._free_spot("work")
+	mara._left = left_was
+	_check(kept == spot, "a stroll on its only spot: it keeps it, not a free cell beside (%s)" % [kept.get("cell", "none")])
 	var works: Array = []
 	var rests: Array = []
 	var words: Array = []
@@ -4639,6 +4645,14 @@ func _test_show_work(mara: Resident) -> void:
 	spot["trade"] = "bard"
 	mara._show_work()
 	_check(mara.activity == "" and not mara.at_shown_work(), "a trade with no word: it stands (%s)" % mara.activity)
+	# The hunter's spot (853 amended (11); maps' day run read him idle on a take without 877's clip): "dress" in a bout.
+	spot["trade"] = "hunter"
+	mara._shown = ""
+	mara._bout_end = -1
+	mara._show_work()
+	_check(mara.activity == "dress" and mara.showing_work(), "at a hunter's spot: \"dress\" in a work bout (%s)" % mara.activity)
+	mara._shown = ""
+	mara._bout_end = -1
 	spot["trade"] = "smith"
 	mara._world_set_facing(-way)
 	mara._show_work()

@@ -50428,6 +50428,21 @@ his barks; on when the last of those lands): tools/look_day --haul-spots lays ma
 makes one townsperson the hauler for the probe day only, in its scratch world. Server only, protocol
 unchanged, no new class_name.
 
+853 amended (13) (maps' people-work day run on the Lenovo, C:/dev/review/maps_work_day2/, and the
+coordinator's ruling; the label from decision_number.sh). Rolf stood off his stall's only spot for a
+minute and a half, Idle one cell from it at (202, 195) with "spot=none", then came back. A body at work
+strolls after STROLL_TICKS and its spread (45 to 120 s), and Resident._free_spot skipped the cell it stood
+on; with one work spot none was left, so the goal fell to a free cell of the work rect, and the next
+stroll gave the spot back: on and off, every one-spot worker (the smith too). Now the work spot it
+stands on is kept as the fallback when no other is free (before the one it just left), so a sole work
+spot is held through every stroll, and a body with several still moves among them. Only "work": a seat
+on the square, the fire or a well's stand is still left on a stroll, as the mend has folk move on there
+(resident_test's fire seat: "moving on, it gets up"); the inn's seats keep their own in 875 amended (2). The same day run had the hunter
+idle on his spot: the show word reads the spot's trade ("hunter": "dress", 853 amended (11)), and the
+run's take lacked animation's 877 (90f2f97be), whose client plays "dress"; nothing of npc's changes for
+him. resident_test: a stroll on a sole spot keeps it; a hunter's spot shows "dress" in a bout. Server
+only; protocol unchanged; no new class_name; package "people work".
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
