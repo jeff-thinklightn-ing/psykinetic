@@ -86,11 +86,22 @@ that the walk looks like skipping and the people look like "bad claymation place
   one met a broken main and one a true clash with another tree's new check
   (`C:/dev/review/perf/flakes.md`).
 - Take the landing lock for your final retest and push, so nobody lands between them, with
-  the resource gate taken first (decision 394): `sh tools/heavy_job.sh take <tree> suite`
+  the resource gate taken first (decision 394): `kind=$(bash tools/remote_tests.sh kind)`,
+  `sh tools/heavy_job.sh take <tree> $kind`
   (waits if the machine is short, holding no lock yet), then
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, import, `bash
   tests/land.sh` (it sees your take and doesn't queue again), push,
-  `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> suite`.
+  `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> $kind`.
+  Since 878 (Jeff, 2026-11-11: "go ahead and move landings' test runs to saturn") a landing's
+  Godot tests (the suite, state_test, net_test) run on saturn through `tools/remote_tests.sh`,
+  in about 8 minutes, with server_boot_test and the tool tests here: `kind` prints
+  `suite_remote` when saturn answers and your work is committed, else `suite`, which runs
+  everything here as before. Saturn tests the commit, so commit before you take. A lost
+  connection fails the landing: run it again, never push on it. `LAND_LOCAL=1` keeps
+  everything here (the cut's suite on main does); `land.ps1` has no saturn path. This is the
+  only thing of a tree's that runs on saturn: a solo scene, a probe or a bench there is asked
+  of the coordinator, and beyond a landing's own run no session writes to saturn without
+  Jeff's own OK in that session.
   Never wait on the gate while holding the land lock. The suite take covers that landing's
   import; elsewhere run an import as `sh tools/heavy_job.sh run <tree> godot_import --
   "$GODOT_PATH" --headless --path . --import`, and a plain test run just calls land.sh,
