@@ -3739,6 +3739,8 @@ func _update_sky(delta: float) -> void:
 		_look = sky_look(elevation).duplicate()
 		_look_elevation = elevation
 		_look_daylight = smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
+		# Chimney smoke's colour falls with it (710 amended (1)).
+		RenderingServer.global_shader_parameter_set("look_day", _look_daylight)
 		# The moon by night, opposite the sun; either casts from its
 		# height lifted (shadow_elevation), from where it stands round.
 		var toward := DayNight.sun_at(fraction)

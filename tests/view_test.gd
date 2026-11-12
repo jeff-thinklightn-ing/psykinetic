@@ -2925,6 +2925,7 @@ func _test_kinds() -> void:
 	_test_decline()
 	_test_inside()
 	_test_chimney_smoke()
+	_test_smoke_at_night()
 	_test_turf_house()
 	_test_beds_drawn()
 	_test_chapel()
@@ -3686,6 +3687,43 @@ func _test_chimney_smoke() -> void:
 	var chimneys := _rig._buildings.filter(func(b: Dictionary) -> bool: return (b["node"] as Node3D).find_child("Chimney", true, false) != null)
 	_check(not chimneys.is_empty() and chimneys.all(func(b: Dictionary) -> bool: return b.get("smoke") != null),
 			"every composed chimney has its smoke (%d of %d houses)" % [chimneys.size(), _rig._buildings.size()])
+
+
+## Chimney smoke at night (710 amended (1)): the look's daylight is told to
+## the shaders (look_day), 1 at noon and 0 deep in the night; the smoke's
+## colour falls to CHIMNEY_SMOKE_NIGHT of its pale grey, so at night its
+## colour is under the sky's at 20:00 (a sun 8 degrees down): the Atlas
+## stills had it glowing at 108 over a sky of 46.
+func _test_smoke_at_night() -> void:
+	print("
+== chimney smoke at night: it takes the night's light ==")
+	var hour_was := DayNight.hour(DayNight.now())
+	var hills := Level.load_level("hills")
+	var day_at := func(hour: float) -> float:
+		DayNight.set_hour(hour)
+		_rig.rebuild(hills["terrain"], hills["centre"])
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+		return _rig._look_daylight
+	var noon: float = day_at.call(12.0)
+	var midnight: float = day_at.call(0.0)
+	var code := (load("res://client3d/chimney_smoke.gdshader") as Shader).code
+	# The global itself can't be read back headless (the dummy renderer):
+	# where the look's daylight is worked out, it is told.
+	var source := (load("res://client3d/client3d.gd") as GDScript).source_code
+	var told := (source.contains('RenderingServer.global_shader_parameter_set("look_day", _look_daylight)')
+			and ProjectSettings.has_setting("shader_globals/look_day")
+			and code.contains("global uniform float look_day") and code.contains("mix(NIGHT, 1.0, look_day)")
+			and code.contains("const float NIGHT = %s;" % str(Flames.CHIMNEY_SMOKE_NIGHT)))
+	var pale := Color(0.62, 0.6, 0.57)
+	var night_colour := pale * Flames.CHIMNEY_SMOKE_NIGHT
+	var sky: Color = Client3D.sky_look(-8.0)["top"]
+	_check(noon > 0.95 and midnight < 0.05 and told,
+			"the look's daylight told to the shaders: %.2f at noon, %.2f at midnight; the smoke's colour falls with it to %.2f of its own" % [noon, midnight, Flames.CHIMNEY_SMOKE_NIGHT])
+	_check(night_colour.get_luminance() < sky.get_luminance(),
+			"at night the smoke's colour (%.3f) is under the sky's at 20:00 (%.3f)" % [night_colour.get_luminance(), sky.get_luminance()])
+	DayNight.set_hour(hour_was)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## The healer's turf house (718): a 7 x 5 plot (Level.BANKED), its inside

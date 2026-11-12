@@ -37568,6 +37568,22 @@ town). Server and client both change, so the server needs a redeploy with
 the next cut. Protocol unchanged (the same "town" "awake" field), no new
 class_name.
 
+710 amended (1): chimney smoke takes the night's light (environment's,
+the coordinator's three-worst item of 2026-11-12; buildings read it). The
+smoke's pale grey (chimney_smoke.gdshader, lit) glowed at night: lit by the
+hearth's and windows' lights under it, it peaked at 108 of 255 over a sky
+of 46 and cobbles of 13 at 20:00 (the Atlas stills,
+C:/dev/review/environment/umbrage_dusk/atlas/dusk_20.0_882.png), the
+brightest thing in the frame after the lit windows. Now its colour falls
+with the look's daylight to Flames.CHIMNEY_SMOKE_NIGHT 0.2 of itself
+(NIGHT in the shader): Client3D tells the shaders the look's daylight as a
+new global, look_day (project.godot's shader_globals; 1 by day), when it
+works it out. By day nothing changes. From the still's own numbers its
+peak falls to about 38, under the sky. view_test _test_smoke_at_night:
+look_day 1 at noon and 0 at midnight, the shader reading it, and the
+smoke's night colour (luminance 0.12) under the sky's at a sun 8 degrees
+down (0.13). Client only, protocol unchanged, no new class_name.
+
 ## 714, art-kit's side: the sledge's broken walls and smashed tombs
 
 Dungeon's Amendment 1 to 714. Jeff: "there might be broken walls and tombs that was done with the sledge
