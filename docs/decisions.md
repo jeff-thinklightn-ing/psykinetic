@@ -51026,6 +51026,21 @@ corner (178, 202) at 5 cells a second, the eye's distance printed each half seco
 out once at most (on to the temple, its own pull in is a second building, not pumping), the
 figure framed in every frame. Client only; protocol unchanged, no new class_name. Combat and
 physics measure with the low camera: told before it landed.
+
+864 amended (1): a doorway's leaves faded with their run are drawn through (the coordinator's
+ask, from art-kit's 863 door at the Mughouse; label from tools/decision_number.sh). 864 put a
+doorway's leaves into its run's pieces, so _inside_walls named them and they counted as faded,
+but _update_fade draws only the pieces of its occluder entries and the leaves are no entry's
+(what hides a player is asked of the frame): no leaf was ever drawn through, and a shut door
+between the low camera and a player inside hid him. On main the old fitted door.double's gaps
+let him show by accident; 863's hand-made planks hide him outright. Now, after the entries, any
+piece faded with no entry of its own is drawn through as it starts to count and put back as
+built when it stops (is_instance_valid kept, as a broken door's leaf goes). view_test's 864
+check set a leaf near by hand and so never met this; it now stands the player's puppet on
+each side of the doorway at all eight yaws through _update_fade, for the temple's door.double
+and a door.single, shut and with a leaf open: each faded leaf draws the shared see-through
+copy on every mesh, and once the player has gone and FADE_HOLD passed, every leaf is as built.
+Client only; protocol unchanged, no new class_name.
 ## 857. Pack first: only wielded things go to a free hand
 
 Context: World.free_slot_for put anything picked up, looted, bought, cooked, caught or handed over into a free

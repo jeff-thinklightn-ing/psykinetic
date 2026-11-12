@@ -20294,6 +20294,16 @@ func _update_fade(force := false) -> void:
 			_set_near(piece, fade)
 		if entry[2] and (close.has(piece) != _faded_close.has(piece) or force):
 			_set_close(piece, close.has(piece))
+	# A doorway's leaves fade with their run (864) but are no entry of their
+	# own (what hides a player is asked of the frame): drawn by whether they
+	# are faded now, as an entry's piece is (864 amended (1); a shut door
+	# hid the player inside while it counted as faded).
+	for piece: Node3D in now:
+		if is_instance_valid(piece) and not _occluder_of.has(piece) and (force or not _faded.has(piece)):
+			_set_near(piece, true)
+	for piece: Node3D in _faded:
+		if is_instance_valid(piece) and not _occluder_of.has(piece) and not now.has(piece):
+			_set_near(piece, false)
 	_faded = now
 	_faded_close = close
 	# A roof off draws nothing but its shadow, so the inside stays shaded.

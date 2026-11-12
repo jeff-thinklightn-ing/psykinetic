@@ -8266,6 +8266,73 @@ func _test_doors_fade_inside() -> void:
 				back = false
 		leaf.rotation.y = 0.0
 		_check(open_in and meshes.size() > 0 and faded and back, "an open leaf is in the near side too, fades and comes back as built (%d meshes)" % meshes.size())
+	# Drawn so by the fade itself (864 amended (1)): the leaves counted as
+	# faded but no entry's piece, so _update_fade never drew them through,
+	# and a shut door hid the player inside. A door.double (the temple's
+	# west doors) and a door.single, each shut and open.
+	_leaves_drawn_through(leaves, "the temple's door.double")
+	var single: Array[Node3D] = []
+	for key: Vector3i in _rig._doorways:
+		var door: Node3D = _rig._doorways[key].get_node(^"Door")
+		if door.has_node(^"leaf") and _rig._door_hinges.has(key):
+			single = [door.get_node(^"leaf") as Node3D]
+			break
+	_check(not single.is_empty(), "the room has a door.single to fade")
+	_leaves_drawn_through(single, "a door.single")
+
+
+## [param leaves] (one doorway's), shut and then one open: the player stood
+## on either side of the doorway at every yaw till they fade with the near
+## side; each faded leaf drawn through (the shared see-through copy on each
+## mesh), and back as built once the player has gone and FADE_HOLD passed.
+func _leaves_drawn_through(leaves: Array[Node3D], what: String) -> void:
+	if leaves.is_empty():
+		return
+	var puppet: Node3D = _rig._puppets.get(_player().get_instance_id()) if _player() != null else null
+	_check(puppet != null, "%s: a player's puppet to stand by it" % what)
+	if puppet == null:
+		return
+	var was := puppet.global_position
+	var yaw_was: float = _rig.yaw
+	var door: Node3D = leaves[0].get_parent()
+	var middle := door.global_position
+	for open in 2:
+		leaves[0].rotation.y = PI * 0.5 if open == 1 else 0.0
+		var seen := false
+		var drawn := true
+		for side in [Vector3(1.2, 0.0, 0.0), Vector3(-1.2, 0.0, 0.0), Vector3(0.0, 0.0, 1.2), Vector3(0.0, 0.0, -1.2)]:
+			if seen:
+				break
+			puppet.global_position = middle + door.global_transform.basis * side
+			for turn in 8:
+				_rig._set_yaw(turn * 45.0)
+				_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+				_rig._update_fade()
+				var faded := leaves.filter(func(leaf: Node3D) -> bool: return _rig._faded.has(leaf))
+				if faded.is_empty():
+					continue
+				seen = true
+				drawn = faded.all(func(leaf: Node3D) -> bool: return _through(leaf))
+				break
+		# Gone: far off, the hold over, every leaf as built.
+		puppet.global_position = middle + Vector3(0.0, 0.0, 30.0)
+		_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+		_rig._update_fade()
+		var back := leaves.all(func(leaf: Node3D) -> bool: return not _through(leaf) and not _rig._faded.has(leaf))
+		_check(seen and drawn and back, "%s %s: faded with the near side it is drawn through, and back as built after (seen %s, drawn %s, back %s)" % [what, "open" if open == 1 else "shut", seen, drawn, back])
+	leaves[0].rotation.y = 0.0
+	puppet.global_position = was
+	_rig._set_yaw(yaw_was)
+	_rig._fade_clock += Client3D.FADE_HOLD + 0.1
+	_rig._update_fade(true)
+
+
+## Whether every mesh of [param piece] draws in a see-through copy.
+func _through(piece: Node3D) -> bool:
+	var meshes: Array = _rig._descendants(piece).filter(func(node: Node) -> bool: return node is MeshInstance3D and (node as MeshInstance3D).mesh != null)
+	return not meshes.is_empty() and meshes.all(func(mesh: MeshInstance3D) -> bool:
+		var drawn: Material = mesh.material_override if mesh.material_override != null else mesh.get_surface_override_material(0)
+		return drawn != null and _rig._see_through.values().has(drawn))
 
 
 func _test_horizon() -> void:
