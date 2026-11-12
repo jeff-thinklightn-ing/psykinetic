@@ -126,7 +126,8 @@ const AMBUSH := {"windup": 8, "damage": 5, "recover": 8, "cue_reach": 8}
 ## A kind's told lunge (790 amended (4), combat's; its kind row's "moves"
 ## "lunge" over these): its blow from in front or side-on told as a line
 ## "reach" cells long before it lands, "damage" on whoever is still on it,
-## standing open "recover" ticks after a miss. The crypt robbers'.
+## standing open "recover" ticks after it, landed or missed (790 amended
+## (6)), crying &"overreach". The crypt robbers' (their row: windup 10, recover 9).
 const LUNGE := {"windup": 6, "damage": 3, "reach": 2, "recover": 8}
 ## Its manner, from its name: a step this much quicker or slower, a cooldown
 ## this many ticks either way, up to REACTION_TICKS_MAX to act on a new
@@ -999,7 +1000,8 @@ func begin_lunge(on: GridEntity) -> bool:
 	return true
 
 
-## Whether its ambush holds it: wound up, or standing open after a miss.
+## Whether its ambush holds it: wound up, or standing open after a miss
+## (after any lunge, 790 amended (6)).
 func ambushing() -> bool:
 	return not _ambush.is_empty() or World.tick < _ambush_open_until
 
@@ -1007,7 +1009,9 @@ func ambushing() -> bool:
 ## The ambush under way, each fighting tick: true while it holds it. It
 ## lands when due on whoever is still on the told cell (World.tell_struck,
 ## 810): "damage", cause &"ambush". On nobody it stands open "recover"
-## ticks. A stun, a down or a knock off its cell since it began breaks it.
+## ticks; a lunge stands open after it lands too, overreached, and cries
+## &"overreach" (790 amended (6)). A stun, a down or a knock off its cell
+## since it began breaks it.
 func _tend_ambush() -> bool:
 	if _ambush.is_empty():
 		return World.tick < _ambush_open_until
@@ -1042,8 +1046,11 @@ func _tend_ambush() -> bool:
 		if amount > 0:
 			World.damage(each, amount, self, move)
 	next_attack_tick = maxi(next_attack_tick, World.tick + attack_ticks)
-	if hit.is_empty():
-		_ambush_open_until = World.tick + int(numbers["recover"])  # Stepped out of it: the opening.
+	if hit.is_empty() or move == &"lunge":
+		# Stepped out of it, or any lunge, landed or missed (790 amended (6)): the opening.
+		_ambush_open_until = World.tick + int(numbers["recover"])
+	if move == &"lunge":
+		_cry(&"overreach", 0)  # To whoever sees it (its drawn pose); no noise, so it wakes nobody.
 	print("[%s] %s at %s -> %s" % [move, name, aim, "struck %d" % hit.size() if not hit.is_empty() else "missed"])
 	return true
 
@@ -1313,7 +1320,8 @@ func _sim_tick() -> void:
 	if took_up:
 		_pressing = false
 		_standoff_mark = []
-	if holds_off and _holds_now():
+	if holds_off and World.tick >= _ambush_open_until and _holds_now():
+		# Never sent off mid-opening: he stands where he overreached (790 amended (6)).
 		_hold_off()
 		return  # The party has its share of the band on it: he holds off, his turn next.
 	if _tend_ambush():

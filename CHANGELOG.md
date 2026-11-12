@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, a robber's lunge shows its red line for a full second, and after every lunge, landed or not, he stands a moment crying out, open to your blow (790 amended (6)).
 - A battle axe or giant axe swing reaches a foe who steps half a cell back while you wind it up, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 343 amended (2)).
 - Rolf's sword fells a robber in the barrow in five to seven blows, swung at the same pace for the same stamina (887).
 - The old grey's lunge, marked by a red line before it lands, hits harder than his bite: step out of the red (780 amended (34)).

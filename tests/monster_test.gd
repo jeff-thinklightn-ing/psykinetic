@@ -2264,22 +2264,35 @@ func _test_lunge() -> void:
 	var pair := _lunge_room()
 	var robber: Monster = pair[0]
 	var player: Player = pair[1]
-	_check(int(robber.lunge.get("windup", 0)) == 6 and int(robber.lunge.get("damage", 0)) == 3 and int(robber.lunge.get("reach", 0)) == 2,
-		"the robber has its row's lunge (%s)" % [robber.lunge])
+	_check(int(robber.lunge.get("windup", 0)) == 10 and int(robber.lunge.get("damage", 0)) == 3 and int(robber.lunge.get("reach", 0)) == 2
+			and int(robber.lunge.get("recover", 0)) == 9,
+		"the robber has its row's lunge, told 10, open 9 (790 amended (6); %s)" % [robber.lunge])
+	var cries: Array[StringName] = []
+	robber.cried.connect(func(kind: StringName) -> void: cries.append(kind))
 	var hp := player.hp
 	_check(robber.begin_lunge(player) and robber.ambushing(), "begun on the player in front")
 	var told := _telegraph_cells("lunge")
 	_check(Vector2i(3, 2) in told and Vector2i(4, 2) in told and not Vector2i(2, 2) in told,
 		"its line told, two cells, not its own (%s)" % [told])
 	_check(not robber.begin_lunge(player) and not robber.begin_ambush(player), "never two at once")
-	for i in 5:
+	for i in int(robber.lunge["windup"]) - 1:
 		World.tick += 1
 		robber._tend_ambush()
-	_check(player.hp == hp and robber.ambushing(), "held through its windup (%d)" % player.hp)
+	_check(player.hp == hp and robber.ambushing() and cries.is_empty(), "held through its windup (%d)" % player.hp)
 	World.tick += 1
 	robber._tend_ambush()
 	_check(player.hp == hp - 3 and _telegraph_cells("lunge").is_empty(), "stayed: struck for 3, the tell gone (%d of %d)" % [player.hp, hp])
-	_check(World.tick >= robber._ambush_open_until and World.tick < robber.next_attack_tick, "struck home: no opening, its next blow later")
+	_check(robber._ambush_open_until == World.tick + 9 and robber.ambushing() and World.tick < robber.next_attack_tick,
+		"struck home: overreached, he stands open 9 ticks as after a miss (790 amended (6))")
+	_check(cries.size() == 1 and cries[0] == &"overreach", "and cries overreach as it opens (%s)" % [cries])
+	var planted := robber.tile
+	var held := true
+	for i in 8:
+		World.tick += 1
+		held = held and robber._tend_ambush() and robber.tile == planted
+	_check(held, "planted where he struck through all 9")
+	World.tick += 1
+	_check(not robber.ambushing(), "the opening past: it fights on")
 	# A step back along the line is still struck.
 	pair = _lunge_room()
 	robber = pair[0]
@@ -2287,7 +2300,7 @@ func _test_lunge() -> void:
 	hp = player.hp
 	_check(robber.begin_lunge(player), "begun again")
 	_move_to(player, Vector2i(4, 2))
-	for i in 6:
+	for i in int(robber.lunge["windup"]):
 		World.tick += 1
 		robber._tend_ambush()
 	_check(player.hp == hp - 3, "a step back along it: still struck (%d of %d)" % [player.hp, hp])
@@ -2298,10 +2311,11 @@ func _test_lunge() -> void:
 	hp = player.hp
 	_check(robber.begin_lunge(player), "begun a third time")
 	_move_to(player, Vector2i(3, 3))
-	for i in 6:
+	for i in int(robber.lunge["windup"]):
 		World.tick += 1
 		robber._tend_ambush()
 	_check(player.hp == hp and robber.ambushing(), "a step aside: missed, and it stands open (%d)" % player.hp)
+	_check(robber._ambush_open_until == World.tick + 9, "open its recover, 9, as after a landed one")
 	World.tick += int(robber.lunge["recover"])
 	_check(not robber.ambushing(), "the opening past: it fights on")
 	# Its blow from in front is told; from behind, its poke as before.
@@ -2327,7 +2341,7 @@ func _test_lunge() -> void:
 	player.stamina = player.max_stamina
 	hp = player.hp
 	_check(robber.begin_lunge(player), "begun on a raised shield")
-	for i in 6:
+	for i in int(robber.lunge["windup"]):
 		World.tick += 1
 		robber._tend_ambush()
 	_check(player.hp == hp and player.max_stamina - player.stamina <= World.parry_cap(player),

@@ -2512,6 +2512,62 @@ func _test_tell_truth() -> void:
 		var struck: Array = bear.call("_bodies", cells)
 		_check((host in struck) == bool(each[3]), "%s (cell %s, centre %s, ends %s)" % [each[4], host.tile, host.free_pos, World.free_projected(host)])
 		World.free_drop(host)
+	# A robber's told lunge (790 amended (6), tell 8): aimed at her drawn body (struck_cell), it strikes
+	# whoever's drawn body is on the cells it drew, at the tick it said, not by her held tile.
+	var lunges: Array = [
+		# [her tile, her centre at the tell, her centre when it lands, struck?, label]
+		[Vector2i(6, 7), Vector2(6.0, 7.0), Vector2(6.0, 7.0), true, "a lunge: standing on its line, struck"],
+		[Vector2i(6, 7), Vector2(6.0, 7.0), Vector2(6.0, 7.6), false, "a lunge: her tile on the line, her drawn body stepped clear, spared"],
+		[Vector2i(6, 7), Vector2(6.0, 7.0), Vector2(6.0, 7.4), true, "a lunge: her drawn body still half on it, struck"],
+		[Vector2i(6, 8), Vector2(6.0, 7.4), Vector2(6.0, 7.4), true, "a lunge: her tile off the line, her drawn body on it, struck"],
+		[Vector2i(6, 8), Vector2(6.0, 7.6), Vector2(6.0, 7.3), false, "a lunge: drawn where she stood at the tell; onto a cell it never drew, spared"],
+	]
+	for each: Array in lunges:
+		_lunge_truth(each[0], each[1], each[2], each[3], each[4])
+
+
+## One robber's lunge at a player whose drawn centre is moved without her tile (the lag).
+func _lunge_truth(her_tile: Vector2i, centre_tell: Vector2, centre_land: Vector2, want: bool, label: String) -> void:
+	var rows: Array[String] = []
+	for y in 15:
+		rows.append("#".repeat(22) if y == 0 or y == 14 else "#" + ".".repeat(20) + "#")
+	rows[her_tile.y] = rows[her_tile.y].substr(0, her_tile.x) + "P" + rows[her_tile.y].substr(her_tile.x + 1)
+	var e := _build(rows)
+	var host: Player = e["P"][0]
+	host.max_hp = 999
+	host.hp = 999
+	var row: Dictionary = Monster.kinds()["robber"]
+	var spec := {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "Robber1", "tile": Vector2i(8, 7), "props": (row["body"] as Dictionary).duplicate()}
+	Level.arm(spec)
+	var robber: Monster = EntityFactory.build(spec)
+	_room.add_child(robber)
+	World.spawn(robber, Vector2i(8, 7))
+	robber.acts = true
+	robber.target = host
+	host.free_pos = centre_tell
+	var began := robber.begin_lunge(host)
+	var drawn: Array[Vector2i] = []
+	var lands := -1
+	for id: int in World._telegraphs:
+		if World._telegraphs[id]["source"] == robber:
+			lands = int(World._telegraphs[id]["data"]["lands_tick"])
+			for cell: Array in World._telegraphs[id]["data"]["cells"]:
+				if Vector2i(int(cell[0]), int(cell[1])) != robber.tile:
+					drawn.append(Vector2i(int(cell[0]), int(cell[1])))
+	var cells: Array = (robber.get("_ambush") as Dictionary).get("cells", [])
+	var hp := host.hp
+	var at := -1
+	for t in 12:
+		host.free_pos = centre_land if t >= 1 else centre_tell
+		World.step()
+		if host.hp < hp and at < 0:
+			at = World.tick
+	var same := cells.size() == drawn.size()
+	for cell: Vector2i in cells:
+		same = same and cell in drawn
+	_check(began and same and lands == int(robber.lunge["windup"]) and (host.hp < hp) == want and (at == lands or not want),
+		"%s (drew %s, struck on %s; told for tick %d, struck at %d)" % [label, drawn, cells, lands, at])
+	World.free_drop(host)
 
 
 func _test_hurt_line() -> void:
