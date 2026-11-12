@@ -59,8 +59,11 @@ def run(repo, *args, held=""):
     env.pop("HEAVY_JOB_HELD", None)
     if held:
         env["HEAVY_JOB_HELD"] = held
+    # The tool's output holds titles with curly apostrophes: both ends UTF-8, whatever the
+    # console's code page or a landing's environment (cp1252 here read "Runner’s" as mojibake).
+    env["PYTHONIOENCODING"] = "utf-8"
     return subprocess.run([sys.executable, "-B", os.path.join(repo, "tools", "voice_inventory.py")] + list(args),
-                          capture_output=True, text=True, cwd=repo, env=env)
+                          capture_output=True, encoding="utf-8", errors="replace", cwd=repo, env=env)
 
 
 def scratch(stale=True):
