@@ -50563,3 +50563,29 @@ it), and that frame alone flipped her to the sprint, which GAIT_HYSTERESIS's ban
 4 tiles a second, played at 0.7 times. view_test _test_gait_holds: a jog that stalls two frames and
 makes the ground up in one keeps the jog, six times over.
 852 amended (1) (ui, 2026-11-12; the coordinator's order after ui-design's Lenovo stills of Store A as built beside the approved mock, C:\dev\review\ui-design\storeA_built\): the window as built was not the mock. Chips straddled each square's top edge and one floated loose over the pack: a UiSlot places its chips and count against its face's size, which a square in a grid in a scroll only has after the container lays it out, and nothing placed them again (UiSlot places again when its face is resized, ui-design's 886; the Square's own copy went). The goods sat in a dark box with black gutters, a black block under the last row and a bar: the ScrollContainer's own panel (the goods half is the theme's QuietScroll variation, ui-design's, a ScrollContainer with no panel). A thing with no picture yet (the buckler, rod, cloak, pick and bandages were not drawn within the clip's three seconds) showed its name in the tiny Small type: it is the Caption type now, until its picture is made (icons arrive and redraw the window, as the pack's do). The load bar has its word, "Load" (the mock's), and no ticks (LoadBar.ticks, the sheet keeps them). ui-design's 854 amended (1) fixes are on main, so the two stop-gaps in StoreView go: the Square's own press handler (UiSlot accepts the press first) and the foot's blank line (UiLine keeps a line's height). The window has its close mark at the head's right end (ui-design's UiClose, 886): pressing it closes the window as Esc does (BarterPanel.closed, Main.close_other). ui_test _test_store_chips pins the chips inside their squares and the rest. Client only; protocol unchanged; no new class_name.
+## 871. Art-gen's goods and bench by hand, the Mughouse hearth's fire and flame socket, the temple's candle stand
+
+The coordinator's order, 2026-11-11, from art-gen's survey of its own worst pieces up close: art-gen
+rebuilt them by hand in art-kit's manner (factory settings, one "palette" material, every face on one
+swatch, flat shading, faces wound outward since palette.tres culls back faces), and art-kit passed
+each at the nearest zoom beside the goblin before it came into the kit (C:/dev/review/items_artgen,
+its README and before/after sheets). Same slots, sizes, origins and sockets, so nothing that holds,
+carries or lays them moves; each slot's source is "art-gen, by hand" with its script named.
+
+- item.ration (476 tris), item.food_sack (286), item.nails (382): a cloth-wrapped ration, a slumped
+  burlap sack and a small canvas bag of nails, in place of art-gen's crumpled fits (a keg, a pot).
+- prop.bench (200): two chamfered planks on splayed A legs with a wedged stretcher. It gains a "seat"
+  socket at its front edge ([0, 0.45, 0.2]) for animation; nothing reads it yet.
+- prop.wall_hearth gains the object "fire_set" (152 tris, 774 in all of 800): an ember bed, andirons
+  and three logs on the hearthstone in front of the firebox, no flame in the mesh. Its firebox is
+  only 3 to 7 cm deep, so the old "fire" socket ([0, 0, 0.3]) sits inside the masonry; a "flame"
+  socket at [0, 0.17, 0.58] over the logs is where flames.gd stands the flame (Flames.socket_of,
+  at_socket), at Flames.SIZES 0.55, buildings' 868 (the Mughouse's hearth burning always, package
+  "a newcomer can mend in town"). "fire" stays; no code reads it.
+- prop.candle_stand, a new slot (412 tris, budget 500, cell kind, never solid): a standing iron
+  candlestick with one church candle, its "flame" socket at the wick ([0.002, 1.185, 0]), Flames.SIZES
+  about 0.12. Nothing places it until buildings swaps it in for the floor prop.candles beside the
+  temple's way down.
+
+item.shield, item.wood_bundle and item.cloth_bolt, passed with these, come after items' icon check;
+prop.stool lands with maps' places.tavern.seats rows (the coordinator's rule).
