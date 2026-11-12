@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- In your pack, the bundle of wood is seven tied logs with pale cut ends, and the bolt of cloth a cream roll (871 amended (1)).
+- The dagger has a broad steel blade, an iron guard and a leather grip, and you can see it in a grave robber's hand (871 amended (1)).
+- Towns: the carts on Umbrage's square are plank hand carts on two spoked wheels (871 amended (1)).
 - Wooden walls are overlapping planks, each its own shade, and wooden floors, the Mughouse's among them, are boards of different lengths laid one way.
 - Umbrage's house roofs are wooden shakes laid in courses, its two market stalls have boarded counters under striped awnings, the shed by the square has a plank roof, and a damaged roof shows its rafters through the tear (863).
 - Double doors are straight oak planks with black iron straps and ring pulls, a lit campfire or hearth is five logs leant together over glowing embers, and the log pile where carried logs go stands in a rack, so a half-full pile shows as half full (863).

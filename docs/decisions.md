@@ -51697,6 +51697,37 @@ prop.stool lands with maps' places.tavern.seats rows (the coordinator's rule).
 886 amended (1) (ui-design, 2026-11-12; label by decision_number.sh). Builder's 885 panel, shot on the Lenovo beside the mock (C:/dev/review/ui-design/builder/built/sheet-1080.png), showed "the[T 1]temple": the chip pressed against its words and its letter and figure a full space apart. Two causes, both in the chip: the Lines highlight's side padding (10 units) reached past the words' own spaces (about 7) and covered them; and the sans bold's hair space (U+200A) is 0.29 em, wider than its own space (0.15), where the regular face's is 0.05. So the Lines highlight has no side padding; the chip's back holds a no-break space inside each end as its margin; and the hair space is set in the regular face between the bold letter and the bold figure. The chip's parsed text gains the two edge spaces (" T 1 "). Also for builder's bullets: LineBullet (a Label: the sans, dim, the Lines' size, on the text scale), the "•" builder now sets apart at a wrapped line's top. parts_test (_test_answer: the parsed text; the hair space narrower than a space; no side padding; LineBullet). Client only, protocol unchanged, no new class_name, no bullet (885 unreleased).
 
 886 amended (2) (ui-design, 2026-11-12; label by decision_number.sh). The chip never breaks at a wrap. Builder's 859 amended (3) panel unfolded (C:/dev/review/ui-design/builder/built/sheet4-1080.png) showed no chip at a line's end, but the hair space between letter and figure (U+200A) is a breaking space, so a wrap could leave "T" at one line's end and "1" on the next; the narrow no-break space (U+202F) is not in Alegreya Sans. The hair is now a no-break space set at HAIR_SCALE (0.3) of the line's size, about 0.05 em. parts_test (_test_answer: the parsed text with the no-break hair; the hair under half a space; a narrow paragraph with a chip after every word wraps with each chip whole and at least one chip at a line's edge). Client only, protocol unchanged, no new class_name, no bullet.
+871 amended (1) (the script's label; art-kit's yes to art-gen's goods and the coordinator's orders
+of 2026-11-12; each passed at the nearest zoom beside the goblin, and items' icon read at 64 and 32
+px on the Lenovo, C:/dev/review/icons-after, 2026-11-12, for the bundle and bolt). Four of the
+fitted candidates replaced by hand in the same slots, origins and sockets (the boxes as before but
+the cart's, 0.1 lower), so nothing that holds, wears, shows or lays them moves. item.wood_bundle
+(art-gen, make_goods.py, 380 tris): seven logs on end, round and split by turns, two cords; its cut
+ends pale with a thin ring and the logs 3 mm fuller after items' 32 px read, so they hold as a
+cluster in the icon's diagonal pose; grip_2 at 0.54 as before. item.cloth_bolt (art-gen,
+make_goods.py, 366 tris): a cream roll with stepped ring ends to a dark core, a loose flap and two
+ties. prop.cart (art-gen, make_cart.py, 544 tris; the coordinator's order 2026-11-12 from art-gen's
+three worst in Umbrage, the square's three Cargo carts, one slot): a plank hand cart drawn empty,
+since players load and empty it (its load kept aside in prop.cart_load.blend), two spoked wheels at
+x +-0.4 at the middle of its length, the handles toward -z as before; its slot height 0.5 (was 0.6,
+the fit's scale; no code reads it), the grey's bed lowered to match. item.dagger (art-kit,
+C:/dev/review/tools/make_hide.py dagger, 126 tris; animation's ask through the coordinator
+2026-11-12: the robber's fitted dagger was dark brown blade and all, lost against his trousers at
+play zoom, C:/dev/review/robber_dagger/dagger_sheet.png): an iron pommel and cross guard, a leather
+grip, a broad blade in the kit's steel with its two edges bevelled bright, the swatches of the hand
+tools' blades (one steel across the kit, the coordinator's check); the same box, grip at the origin.
+Lands on: the three items change in the pack's icons, in hand and on the ground, and the square's
+carts change where they stand. The renders were Cycles on the CPU beside the goblin; none of the
+four has yet been seen in the game. The pack icons were checked in ItemIcons' pose on the CPU (the
+dagger's in C:/dev/review/rolf_sword/sword_dagger_icons.png; items passed); items' read of the
+game's own icons follows its first cleared window. art-kit's hand-made item.shield and item.sword
+were in this amendment's first take and are out of it, together: the shield worn on the back failed
+anim_rig_test's back check (the woman jogging, the top of its rim's lip inside her; 0.09 m off the
+back socket did no better), and the hand sword drawn beside main's fitted shield passes three points
+through it at 0.40 of the Draw on the four men (it cleared the hand shield, which it was fitted
+beside), so main keeps its fitted sword and shield and the hand pair comes back as its own row once
+the shield's fit on the back is found. The dagger, drawn from the same hip beside the buckler,
+passed the same check. Client only; no new class_name.
 
 ## 869. The gait pick holds through gaps: a stop held, a change dwelt on, the rate on a smoothed speed
 
