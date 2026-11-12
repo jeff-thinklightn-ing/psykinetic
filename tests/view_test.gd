@@ -12338,7 +12338,17 @@ func _test_goblin() -> void:
 	_check(animator.playing() == Client3D.CLIP_BACKPEDAL, "pushed back again: it backpedals")
 	await _run_clock(0.15)
 	_step_imp(imp, Vector2i(-1, 0))
-	await _run_clock(0.1)
+	# A host draws its bodies GridEntity.HOST_DRAW_DELAY_TICKS behind (350 amended (1)): the step back,
+	# queued behind the push's slide, is drawn from 0.3 s after the push, the moment this check once
+	# read at (0.1 s after the step); whether that frame had begun it was the machine's (npc's landing,
+	# 11-12). Waited on, not timed: the step drawn, the knock over within a tick of it, then read
+	# mid-step.
+	var drawn := await _run_until(func() -> bool: return imp.stepping, 0.2 + 2.0 * GridEntity.HOST_DRAW_DELAY_TICKS / World.TICK_RATE)
+	var over := await _run_until(func() -> bool: return not puppet.has_meta("knock"), 1.0)
+	_check(drawn >= 0.0 and over >= 0.0 and over <= 1.0 / World.TICK_RATE,
+			"stepping back: drawn %.2f s after its step (a host draws %.1f tick behind), the knock over %.2f s after that (a tick at most)"
+			% [drawn, GridEntity.HOST_DRAW_DELAY_TICKS, over])
+	await _run_clock(0.05)
 	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.3)
 	_check(not puppet.has_meta("knock") and Client3D.is_gait(animator.playing()) and absf(angle_difference(yaw, PI)) < 0.3,
 			"walking straight back: the knock is over and it walks back facing the way it goes, not backpedals (%s, yaw %.2f)" % [animator.playing(), yaw])
@@ -12412,6 +12422,22 @@ func _run_clock(seconds: float) -> void:
 		while World.tick_alpha >= 1.0:
 			World.tick += 1
 			World.tick_alpha -= 1.0
+
+
+## Runs the drawing clock as _run_clock does, a frame at a time, until [param done] says so or
+## [param cap] seconds have passed: the seconds it took (from the first frame), or -1.0 if it never did.
+func _run_until(done: Callable, cap: float) -> float:
+	var from := Time.get_ticks_msec()
+	var until := from + int(cap * 1000.0)
+	while Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		World.tick_alpha += get_process_delta_time() * World.TICK_RATE
+		while World.tick_alpha >= 1.0:
+			World.tick += 1
+			World.tick_alpha -= 1.0
+		if done.call():
+			return (Time.get_ticks_msec() - from) / 1000.0
+	return -1.0
 
 
 ## Waits on a turn's state, not the wall clock (a loaded machine eases a turn late: the tossed roll
