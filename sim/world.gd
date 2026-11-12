@@ -186,6 +186,10 @@ signal link_bumped(entity: GridEntity, at: Vector2i)
 ## A step into a burial niche's edge (niche_edges) refused by it: a press
 ## on the niche (608: the hidden door is found so; Main says what gives).
 signal niche_pressed(entity: GridEntity, key: Vector3i)
+## A step refused by a shut door [param entity] may not open (locked, no
+## key): a press on it (the Umbrage crypt follow-up: the Hall's door, held
+## by the dead, says why to a player walking into it; Main says what).
+signal door_pressed(entity: GridEntity, door: Door)
 ## An attack or a swing at air: [param direction] is where it went.
 signal entity_swung(entity: GridEntity, direction: Vector2i)
 
@@ -8924,6 +8928,8 @@ func _step_refused(entity: GridEntity, direction: Vector2i) -> void:
 	if entity is Player and is_link_cell(entity.tile + direction) \
 			and not _terrain_blocks_step(entity.tile, direction, true) and (shut == null or may_open(entity, shut)):
 		link_bumped.emit(entity, entity.tile + direction)
+	if shut != null and not may_open(entity, shut):
+		door_pressed.emit(entity, shut)
 	# A step into a burial niche's edge that stops it presses on the
 	# niche (608): the hidden door's slab gives to a press, nothing else.
 	if (direction.x == 0 or direction.y == 0) and niche_edges.has(Terrain.edge_key(entity.tile, direction)) \

@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2875)
+## Lines in the code (2880)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -2073,7 +2073,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (743)
+### server and windows (747)
 
 | | Line | Where |
 |---|---|---|
@@ -2234,6 +2234,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s stops leading the way to %s: it isn't safe. | `main.gd` _guide_check() |
 |  | You stopped leading %s to %s: it isn't safe: %s.%s | `main.gd` _guide_check() |
 |  | The dead bar the way. | `main.gd` DEAD_LINE |
+|  | Beyond this door waits one who wants back the gold stolen from this place. | `main.gd` HALL_AHEAD_LINE |
 |  | %s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask. | `main.gd` _begin_leaving() |
 |  | %s goes home to %s; you part as friends. | `main.gd` _begin_leaving() |
 |  | You are leaving %s for good, and going home to %s: they %s. | `main.gd` _begin_leaving() |
@@ -2263,6 +2264,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You stand over him again | `main.gd` barrow_won() |
 |  | You take the holy remains, for the altar. | `main.gd` barrow_won() |
 |  | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
+|  | There is no blessing on them, whatever passed down there. | `main.gd` RELIC_UNBLESSED |
+|  | You take the holy remains, for the altar. | `main.gd` remains_unpaid() |
+|  | %s takes the holy remains, for the altar. | `main.gd` remains_unpaid() |
 | L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
 | U | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | L | the draugr's blessing | `main.gd` reset_barrow() |
@@ -2821,7 +2825,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | came somewhere new with you | `main.gd` _discovered() |
 |  | %d ms at %s | `main.gd` _report_walk() |
 
-### the draugr (23)
+### the draugr (24)
 
 | | Line | Where |
 |---|---|---|
@@ -2833,6 +2837,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Face the draugr | `sim/draugr.gd` TITLE |
 |  | Face the draugr again | `sim/draugr.gd` AGAIN_TITLE |
 |  | Your gold is paid. Come, then. | `sim/draugr.gd` AGAIN_WORDS |
+|  | You carry too little: bring more, or stay and face me. | `sim/draugr.gd` POOR_WORDS |
 |  | Then I'll take it from you by force! | `sim/draugr.gd` REFUSED |
 |  | I am bound in another's pact. Wait. | `sim/draugr.gd` accept_offer() |
 |  | %s refuses the draugr. He laughs, and rises to strike. | `sim/draugr.gd` accept_offer() |

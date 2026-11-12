@@ -6746,6 +6746,33 @@ func _test_relic() -> void:
 	_check(not _main._relic_returned(player, aldous, uid) and player.slot_items.has(uid) and spoken.size() == 1 and spoken[0].contains("holds all"),
 		"a full amulet: given back, kept for later (%s)" % [spoken])
 	World.consume(player, uid, "the test")
+	# 714 amended (3): remains won unpaid carry no tier, laid always (here never blessed), no charge.
+	var charges_before := World.totem_charges(World.totem_of(pid))
+	if record != null:
+		record.barrow = {}
+	var unpaid := World.mint_relic("Sir Ewald", _main.RELIC_UNPAID, player)
+	var unpaid_slot := World.room_for(player, unpaid)
+	if unpaid_slot >= 0:
+		World.put_item(player, player, unpaid_slot, unpaid)
+	score = Standing.score(Townsfolk.card_of(World.production, priest), pid)
+	spoken.clear()
+	_check(_main._relic_returned(player, aldous, unpaid) and not player.slot_items.has(unpaid) and World.totem_charges(World.totem_of(pid)) == charges_before
+		and spoken.size() == 1 and spoken[0].contains("Sir Ewald is home at last") and spoken[0].contains(_main.RELIC_UNBLESSED) and not spoken[0].contains("it holds")
+		and Standing.score(Townsfolk.card_of(World.production, priest), pid) == score + Standing.setting("relic"),
+		"remains won unpaid (714 amended (3)): laid though never blessed, no charge, his thanks and the unblessed sentence, his regard rises (%s)" % [spoken])
+	if record != null and not deals.is_empty():
+		record.barrow = {"best": str(deals[0].get("name", "")), "containers": []}
+		World.totem_add(World.totem_of(pid), 1000, Economy.barrow_capacity(record.barrow, _main._field_rules()))  # Blessed, and full.
+	charges_before = World.totem_charges(World.totem_of(pid))
+	unpaid = World.mint_relic("Sir Ewald", _main.RELIC_UNPAID, player)
+	unpaid_slot = World.room_for(player, unpaid)
+	if unpaid_slot >= 0:
+		World.put_item(player, player, unpaid_slot, unpaid)
+	score = Standing.score(Townsfolk.card_of(World.production, priest), pid)
+	spoken.clear()
+	_check(_main._relic_returned(player, aldous, unpaid) and not player.slot_items.has(unpaid) and World.totem_charges(World.totem_of(pid)) == charges_before
+		and spoken.size() == 1 and spoken[0].contains(_main.RELIC_UNBLESSED) and Standing.score(Townsfolk.card_of(World.production, priest), pid) == mini(score + Standing.setting("relic"), Standing.setting("most")),
+		"and with a full amulet: laid, not given back, charges unchanged, the unblessed sentence, regard given up to its most (%s)" % [spoken])
 	if record != null:
 		record.barrow = barrow_was
 	uid = mint.call()

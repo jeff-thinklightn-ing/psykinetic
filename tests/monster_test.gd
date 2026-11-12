@@ -5282,6 +5282,8 @@ func _test_draugr() -> void:
 	draugr.said.connect(func(text: String) -> void: said.append(text))
 	var doors: Array = []
 	draugr.hall_door.connect(func(open: bool) -> void: doors.append(open))
+	var unpaid_by: Array = []
+	draugr.beaten_unpaid.connect(func(ids: Array) -> void: unpaid_by.append(ids))
 	var offers := draugr.offers_for("p1")
 	_check(draugr.talks and offers.size() == 2 and offers[0]["kind"] == "deal" and offers[0]["cost"] == 10
 		and offers[0]["what"]["most"] == 100 and offers[0]["what"]["steps"] == [10, 50, 100] and offers[1]["id"] == "deal:%d:refuse" % draugr.id,
@@ -5339,6 +5341,7 @@ func _test_draugr() -> void:
 	World.damage(draugr, 999, player)
 	_check(draugr.spawned and draugr.hp == draugr.max_hp and draugr.max_hp == 30 and draugr.blessed_last == ["p1"],
 		"beaten, he yields, never dies: the players in his lair are blessed (%s)" % [draugr.blessed_last])
+	_check(unpaid_by.is_empty(), "a pact won: beaten_unpaid never said (714 amended (3); %s)" % [unpaid_by])
 	_check(said.back() == Draugr.WON and doors.back() == true and not draugr.hall_shut, "\"%s\", and his Hall opens" % said.back())
 	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.rest_steps()
 		and draugr.spawn_spec["props"].get("rests_until") == draugr.rests_until and not World.is_down(draugr),
@@ -5388,9 +5391,9 @@ func _test_draugr() -> void:
 	World.add_gold("p1", -held_gold, "test")
 	var poor := draugr.offers_for("p1")
 	_check(poor.size() == 2 and poor[0]["id"] == "deal:%d:refuse" % draugr.id and int(poor[0]["cost"]) == 0 and (poor[0]["what"]["steps"] as Array).is_empty()
-		and poor[0]["title"] == "Refuse" and poor[0]["words"] == Draugr.WORDS and int(poor[1]["cost"]) == 10 and DealPanel.no_deal(poor) == poor[0]
-		and DealPanel.first_deal(poor) == poor[1],
-		"no gold: his first deal is the free refusal (what an older panel shows), the panel's Refuse, his own demand its words (735 amended), his gold deal after (%s)" % [poor.map(func(o: Dictionary) -> String: return str(o["id"]))])
+		and poor[0]["title"] == "Refuse" and poor[0]["words"] == "%s %s" % [Draugr.WORDS, Draugr.POOR_WORDS] and int(poor[1]["cost"]) == 10 and DealPanel.no_deal(poor) == poor[0]
+		and DealPanel.first_deal(poor) == poor[1] and poor[1]["words"] == Draugr.WORDS,
+		"no gold: his first deal is the free refusal (what an older panel shows), the panel's Refuse, his demand then the short purse its words (608 amended (3)), his gold deal after with his demand (%s)" % [poor.map(func(o: Dictionary) -> String: return str(o["id"]))])
 	var anger_was := said.count(Draugr.ANGER)
 	var drawn := draugr.accept_offer(player, poor[0], 0)
 	World.step()
@@ -5412,6 +5415,7 @@ func _test_draugr() -> void:
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT
 		and doors.back() == true and skeleton.laid,
 		"beaten unpaid, his \"death\": his respect, no blessing, laid to rest with the dead stilled, his Hall open")
+	_check(unpaid_by == [["p1"]], "and beaten_unpaid names the lair's living, for the knight's remains (714 amended (3); %s)" % [unpaid_by])
 	var words_were := said.size()
 	var rest_was := draugr.rests_until
 	World.damage(draugr, 999, player)

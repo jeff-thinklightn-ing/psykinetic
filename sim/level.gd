@@ -2568,6 +2568,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"carving": {"sits": "wall", "variants": 1, "slot": "prop.rune_strip"},
 	"ossuary_stack": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.set_ossuary_stack"},
 	"candles": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.candles"},
+	# 608 amended (3) (the Umbrage crypt follow-up): the hidden niche's tell,
+	# candles at the cracked wall's foot, their flames bent out by the draft
+	# (art-kit's piece in web_niche's frame); "on": "hidden", the one niche
+	# kind it sits on, and only there.
+	"candle_draft": {"sits": "niche", "variants": 1, "slot": "prop.candle_draft", "on": "hidden"},
 	"collapse_roots": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.collapse_roots"},
 	"light_shaft": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.set_light_shaft"},
 	# castle_halls' relief hall (806 (c), art-kit's c7539ec7): a dwarven band at
@@ -2857,7 +2862,8 @@ static func lit_candles_from(config: Dictionary, warnings: Array[String]) -> Arr
 ## its width, or its "slots", by its variant). One that is no floor, whose step fits not its
 ## kind, whose strip lies on no wall, whose corner lacks a wall, or whose
 ## web hangs on no open niche of kind "a" or "c" (never the hidden door's,
-## nor a sealed one: variant 2) is said in [param warnings] and left out,
+## nor a sealed one: variant 2), or whose "on": "hidden" piece is on no
+## hidden niche, is said in [param warnings] and left out,
 ## as is a second of a kind on the same cell and step.
 static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -2870,9 +2876,12 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 		floor[cell] = true
 	var edges: Dictionary = terrain.get("edges", {})
 	var open_niches := {}
+	var hidden_niches := {}
 	for niche: Dictionary in terrain.get("niches", []):
 		if niche["kind"] in ["a", "c"] and int(niche["variant"]) == 1:
 			open_niches[niche["edge"]] = true
+		elif niche["kind"] == "hidden":
+			hidden_niches[niche["edge"]] = true
 	var walled := func(cell: Vector2i, way: Vector2i) -> bool:
 		return int(edges.get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN)) == Terrain.Edge.WALL
 	var taken := {}
@@ -2909,7 +2918,7 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 				fits = absi(way.x) == 1 and absi(way.y) == 1 and walled.call(cell, Vector2i(way.x, 0)) and walled.call(cell, Vector2i(0, way.y))
 			"niche":
 				piece["edge"] = Terrain.edge_key(cell, way) if side else Vector3i.ZERO
-				fits = side and open_niches.has(piece["edge"])
+				fits = side and (hidden_niches if DECOR_KINDS[kind].get("on") == "hidden" else open_niches).has(piece["edge"])
 			"span":
 				var widths: Array = DECOR_KINDS[kind]["widths"]
 				var width := 1

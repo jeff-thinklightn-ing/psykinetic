@@ -603,7 +603,8 @@ const WEB_NICHE := 0.25
 ## "web_niche" across WEB_NICHE of [param generated]'s open niches of kind
 ## "a" or "c" (variant 1; never the hidden one, never a sealed slab),
 ## inside the anchors too, since the first hall's niches are re-rolled each
-## generation. Variants by the roll. Written into the generated level.json
+## generation. Variants by the roll. The block's "hidden_tell" (608
+## amended (3)) on the hidden niche. Written into the generated level.json
 ## as "decor" after the template's own.
 static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generated: Dictionary, seed: int, damp: bool) -> Array:
 	var rng := RandomNumberGenerator.new()
@@ -659,6 +660,14 @@ static func decor_of(map: LevelMap, anchors: Array, config: Dictionary, generate
 		if kept.has(cell) or rng.randf() >= WEB_NICHE:
 			continue
 		out.append([cell.x, cell.y, int(niche[2]), int(niche[3]), "web_niche", rng.randi_range(1, int(Level.DECOR_KINDS["web_niche"]["variants"]))])
+	# 608 amended (3): the block's "hidden_tell", a decor kind sat on the
+	# hidden niche ("on": "hidden"), laid at it every generation; after the
+	# rolls, so the rest of the decor stays as it was.
+	var tell := str(config.get("hidden_tell", ""))
+	if Level.DECOR_KINDS.has(tell) and Level.DECOR_KINDS[tell].get("on") == "hidden":
+		for niche: Variant in generated.get("niches", []):
+			if niche is Array and (niche as Array).size() == 6 and str(niche[4]) == "hidden":
+				out.append([int(niche[0]), int(niche[1]), int(niche[2]), int(niche[3]), tell, 1])
 	return out
 
 

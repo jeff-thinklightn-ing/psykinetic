@@ -3004,6 +3004,18 @@ func _test_barrow_won() -> void:
 	_check(_main.migrate_totem(record) == uid and World.totem_charges(uid) == 69 and not record.barrow.has("tokens"),
 		"a count from before moves onto the totem on join (%d)" % World.totem_charges(uid))
 	_check(_main.barrow_won(["nobody"], "easy") == 0, "no record: nobody blessed")
+	# 714 amended (3): beaten unpaid, the knight's remains all the same: no tier, nothing else, the plaque said.
+	var marks_were: Array = record.marks.duplicate()
+	var charges_were := World.totem_charges(uid)
+	var best_was: Dictionary = record.barrow.duplicate(true)
+	var unpaid_of := func() -> int:
+		return relics.call().filter(func(each: int) -> bool: return int(World.relic_of(each).get("tier", 0)) == Main.RELIC_UNPAID).size()
+	var unpaid_before: int = unpaid_of.call()
+	_check(_main.remains_unpaid([id, "nobody"]) == 1 and unpaid_of.call() == unpaid_before + 1 and World.totem_charges(uid) == charges_were
+		and record.marks == marks_were and record.barrow == best_was
+		and _main.party_log.last(2) == [Main.SEPULCHER_PLAQUE % knight, "%s takes the holy remains, for the altar." % record.name]
+		and _heard.slice(-2) == [Main.SEPULCHER_PLAQUE % knight, "You take the holy remains, for the altar."],
+		"beaten unpaid: the holy remains of %s at no tier, the plaque and the taking said as a winner's are; no charge, no mark, best unchanged; nobody without a record (%s %s)" % [knight, _main.party_log.last(2), _heard.slice(-2)])
 	# 714, dungeon's side (1): a relic laid on the altar charges the amulet
 	# with its tier's deal, up to the room; the spill said.
 	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 74 and player.charges == 74,
@@ -3072,24 +3084,63 @@ func _test_hall_door() -> void:
 	_check(door != null and not door.open and door.lock.is_empty() and _main._hall_doors("lt_hall").size() == 1 and _main._hall_doors("lt_hall")[0] == door,
 		"the hall's one door, on its lair anchor's north wall, is found (%s)" % [door])
 	_put(player, Vector2i(5, 3))
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	_main._told_dead.clear()
 	_main._hold_hall_door("lt_hall", true)
 	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
 		and _main.party_log.last(1) == ["The hall's door shuts behind you."] and _heard.slice(-1) == ["The hall's door shuts behind you."],
 		"held: shut, locked with a key nobody holds, stone, and said to those in the zone (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
 	_hold_free(player, Vector2(0, 1), 8)
 	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "no walk goes through it: stopped at its face (%s)" % player.free_pos)
+	_check(not heard.has(_main.DEAD_LINE), "a challenge's held door says nothing of the dead to a walk into it (%s)" % [heard])
 	_check(not World.try_toggle_door(player, key) and not door.open, "and E rattles it")
 	_main._hold_hall_door("lt_hall", false)
 	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."] and _heard.slice(-1) == ["The hall's door opens."],
 		"let go: the lock lifted, still shut till opened, and said to them (%s)" % [_heard.slice(-1)])
 	await get_tree().process_frame
 	_check(World.try_toggle_door(player, key) and door.open, "E opens it now")
+	# 608 amended (3): the warning ahead of his Hall, once a visit, while he sits waiting.
+	var draugr := _main._spawn({"script": "res://sim/draugr.gd", "shape": "capsule", "name": "LtHallDraugr",
+		"tile": Vector2i(5, 7), "props": Level.MONSTER_TYPES["draugr"].duplicate()}) as Draugr
+	draugr.acts = false
+	heard.clear()
+	_main._told_hall.clear()
+	_put(player, Vector2i(5, 2))
+	_check(heard.is_empty(), "a step short of the Hall's door: nothing said (%s)" % [heard])
+	_put(player, Vector2i(5, 3))
+	_check(heard == [_main.HALL_AHEAD_LINE], "at the open Hall door, the draugr seated within: told what waits (%s)" % [heard])
+	_put(player, Vector2i(5, 2))
+	_put(player, Vector2i(5, 3))
+	_check(heard.count(_main.HALL_AHEAD_LINE) == 1, "once a visit: back at the door, not again (%s)" % [heard])
+	_main._told_hall[player.owner_peer] = "lt_elsewhere"
+	_put(player, Vector2i(5, 2))
+	_put(player, Vector2i(5, 3))
+	_check(heard.count(_main.HALL_AHEAD_LINE) == 2, "a visit after one elsewhere: told again (%s)" % [heard])
+	for state: Draugr.State in [Draugr.State.PACT, Draugr.State.AT_REST]:
+		draugr.state = state
+		_main._told_hall.clear()
+		_put(player, Vector2i(5, 2))
+		_put(player, Vector2i(5, 3))
+	_check(heard.count(_main.HALL_AHEAD_LINE) == 2, "in a pact or at rest he asks nothing: nothing said (%s)" % [heard])
+	World.despawn(draugr)
+	_main._told_hall.clear()
 	# The dead's seal (666): held while they stand, entry only, under a challenge's lock.
 	_main._seal_hall("lt_hall", true)
 	_check(not door.open and door.lock == _main.DEAD_LOCK and door.body_material == GridEntity.BodyMaterial.STONE and not World.try_toggle_door(player, key),
 		"the Ossuary's dead standing: the hall's door sealed with a key nobody holds, E rattles it (%s)" % door.lock)
+	heard.clear()
 	_hold_free(player, Vector2(0, 1), 8)
 	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "and stops a walk at its face (%s)" % player.free_pos)
+	_check(heard.count(_main.DEAD_LINE) == 1, "walking into it tells them \"%s\" once, not every step (%s)" % [_main.DEAD_LINE, heard])
+	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
+	_hold_free(player, Vector2(0, 1), 2)
+	_check(heard.count(_main.DEAD_LINE) == 2, "and again once %.0f s have passed while they keep at it (%s)" % [_main.DEAD_TOLD_S, heard])
+	Net.message_received.disconnect(hear)
+	_main._told_dead.clear()
 	_main._seal_hall("lt_hall", false)
 	_check(door.lock.is_empty(), "every one of them down: the seal lifted")
 	await get_tree().process_frame
@@ -5358,6 +5409,8 @@ func _test_giver_rule() -> void:
 	var tries: Array[int] = []
 	var faults := {}
 	var unbundled := {}
+	var hidden_at := {}
+	var untold := {}
 	var at := Vector2i(-1, -1)
 	var facing := Vector2i.ZERO
 	for generation in range(1, 9):
@@ -5366,7 +5419,11 @@ func _test_giver_rule() -> void:
 			faults[generation] = "not laid"
 			continue
 		tries.append(int(made["tries"]))
+		hidden_at[generation] = _hidden_niche_of(made["config"])
 		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var tells: Array = (level["terrain"].get("decor", []) as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "candle_draft")
+		if tells.size() != 1 or tells[0]["cell"] != hidden_at[generation]:
+			untold[generation] = tells.map(func(piece: Dictionary) -> Vector2i: return piece["cell"])
 		var found := LAYOUT_SENSE.arrival_faults(level, "from_breach")
 		if not found.is_empty():
 			faults[generation] = found.map(func(fault: Dictionary) -> String: return str(fault["what"]))
@@ -5382,6 +5439,22 @@ func _test_giver_rule() -> void:
 	_check(unbundled.is_empty(), "the barrow's generations 1-8: the Robbers' bundle at (6, 48) holding two bandaging kits, by the band's two bedrolls (%s)" % [unbundled])
 	_check(faults.is_empty(), "the barrow's generations 1-8: from the temple stair, the start, from_deep and from_below the knight is reached clear, and every arrival clear (tries %s; %s)" % [tries, faults])
 	_check(at == Vector2i(39, 10) and facing == Vector2i(0, -1), "the knight behind the First Hall's bier, facing the stair (%s, %s)" % [at, facing])
+	# 608 amended (3) (the coordinator: "a secret off the main way, never a
+	# far corner"): the hidden niche only on the First Hall's west wall,
+	# within 4 cells of its way out (27, 9)-(27, 10), on these generations and
+	# later ones; still moving between them.
+	for generation: int in [118, 119, 120, 121]:
+		var made := Regen.generate("barrow", generation)
+		hidden_at[generation] = _hidden_niche_of(made.get("config", {}))
+	var astray := hidden_at.keys().filter(func(generation: int) -> bool:
+		var cell: Vector2i = hidden_at[generation]
+		return cell.x != 28 or mini(absi(cell.y - 9), absi(cell.y - 10)) > 4)
+	var places := {}
+	for generation: int in hidden_at:
+		places[hidden_at[generation]] = true
+	_check(astray.is_empty() and places.size() >= 2,
+		"the hidden niche on the west wall within 4 of the hall's way out, on generations 1-8 and 118-121, moving among them (%s)" % [hidden_at])
+	_check(untold.is_empty(), "its tell (the block's hidden_tell, art-kit's candles bent by the draught) laid at the hidden niche and nowhere else, each of generations 1-8, kept by the parse (608 amended (3)) (%s)" % [untold])
 
 
 func _test_arrival_rule() -> void:
@@ -5663,14 +5736,23 @@ func _test_deep_crypt() -> void:
 		var links: Array = level["links"].map(func(link: Dictionary) -> Vector2i: return link["tile"])
 		var torches := 0
 		var map := LevelMap.from_image(made["layout"], laid_config)
+		# The coordinator's condition on lit_way: the spine only; no torch in a
+		# room (the Old Graves' among them); _torches lays none off the way.
+		var in_rooms := {}
+		for laid: Dictionary in laid_config.get("laid_rooms", []):
+			for pair: Variant in laid.get("cells", []):
+				in_rooms[Vector2i(int(pair[0]), int(pair[1]))] = true
+		var stray: Array[Vector2i] = []
 		for cell: Vector2i in map.cells:
-			if map.cells[cell] == "torch" and not Level.in_anchors(block["anchors"], cell):
+			if map.cells[cell] == "torch" and not Level.in_anchors(Regen.config_of("deep_crypt_test")["anchors"], cell):
 				torches += 1
+				if in_rooms.has(cell):
+					stray.append(cell)
 		var faults: Array = LAYOUT_SENSE.check(level, laid_config.get("laid_rooms", []), Regen.layout_options(block))
 		_check(rooms_ok and wing_ok and packs_ok and int(kinds.get("draugr", 0)) == 1 and Vector2i(49, 1) in links and Vector2i(49, 77) in links
-				and torches == 0 and faults.is_empty() and level["warnings"].is_empty(),
-				"deep crypt generation %d: uses %s, the wing %d rooms, packs %s, the draugr, both links, %d torches, faults %s %s"
-				% [generation, uses, wing.size(), packs.values(), torches, LAYOUT_SENSE.counts(faults), level["warnings"]])
+				and torches >= 4 and stray.is_empty() and faults.is_empty() and level["warnings"].is_empty(),
+				"deep crypt generation %d: uses %s, the wing %d rooms, packs %s, the draugr, both links, %d torches along its way (lit_way, the Umbrage crypt follow-up), none in a room %s, faults %s %s"
+				% [generation, uses, wing.size(), packs.values(), torches, stray, LAYOUT_SENSE.counts(faults), level["warnings"]])
 
 
 ## 714, dungeon's side (4): the barrow's robbers are enemy-ai's named band
@@ -6656,3 +6738,12 @@ func _test_throne_way_held() -> void:
 	Net.message_received.disconnect(hear)
 	record.marks.assign(kept_marks)
 	_main.load_map("test_room")
+
+
+## The hall cell before the hidden niche in a generated config's "niches"
+## (608), or (-1, -1).
+func _hidden_niche_of(config: Dictionary) -> Vector2i:
+	for niche: Variant in config.get("niches", []):
+		if niche is Array and str(niche[4]) == "hidden":
+			return Vector2i(int(niche[0]), int(niche[1]))
+	return Vector2i(-1, -1)

@@ -25368,6 +25368,39 @@ row may add a dim warm one. By hand, palette and "glow", 318 tris; C:/dev/review
 candle_draft; the look at C:/dev/review/candle_draft/candle_draft_sheet.png. Off: nothing places it until dungeon's
 side of 608 amended (3) lands. Art only, protocol unchanged, no new class_name, no bullet.
 
+608 amended (3), dungeon's side: the hidden niche off the main way, its tell, and what the crypt says on the
+way to the Hall (the coordinator's ruling on playtest's crypt walk, "a secret off the main way, never a far
+corner"; voice's lines).
+- Where: the regenerate block's "hidden_near" {at: [[x, y], ...], within: n}; Labyrinth.hidden_allowed keeps the
+  niches whose hall cell lies within n cells (the larger of the two ways) of one of the cells at, and niche_plan
+  picks the hidden one among those only (every niche when none is that near, so a block without it is as before).
+  The barrow's: the First Hall's way out, (27, 9) and (27, 10), within 4, so the niche moves along the west wall
+  generation to generation and is never a far corner.
+- Its tell: the block's "hidden_tell", a decor kind of "sits": "niche" with "on": "hidden" (Level.DECOR_KINDS;
+  decor_from lays such a kind on a hidden niche's edge only, never on an open or sealed one). Regen.decor_of lays
+  it at the hidden niche every generation, after the rolls, so the rest of the decor stays as it was. The
+  barrow's is candle_draft, art-kit's prop.candle_draft, drawn in the niche edge's frame as web_niche is (the
+  wall.crypt.cracked frame art-kit built it in); not solid; it stays when the slab is found.
+- The Hall's door held by the dead (666, DEAD_LOCK): World.door_pressed (a step refused by a shut door the walker
+  may not open) tells that player DEAD_LINE, "The dead bar the way.", as E at it does, at most every DEAD_TOLD_S
+  (10 s) while they keep walking into it; a challenge's held door and every other door say nothing.
+- Ahead of the Hall: a player on either cell of an open Hall door (lock lifted), outside the lair, while the
+  draugr sits waiting (SEATED), is told HALL_AHEAD_LINE, "Beyond this door waits one who wants back the gold
+  stolen from this place.", once a visit (_told_hall, forgotten by a move in another zone); in a pact or at rest
+  he asks nothing.
+- A purse under his least deal: the free refusal's words are his demand and then POOR_WORDS, "You carry too
+  little: bring more, or stay and face me." (Jeff's demand first for every purse; "stay and face me" points at
+  Refuse without explaining it). His gold deal keeps his demand alone.
+- The deep's way lit (maps' crypt stills: a 40-cell way unlit read black): barrow_deep's "deep" block takes
+  "lit_way": true, and Crypt lays torches along the processional as the barrow's are laid, a spot a side door's
+  line takes sliding along the wall to the nearest free one (TORCH_SLIDES), and none in a room (the coordinator's
+  condition: the way only; the rooms keep their own candles).
+level_test (the niche on the west wall within 4 of the way out on generations 1-8 and 118-121, moving among them;
+the tell at it and nowhere else on 1-8; the dead's line once, then again after 10 s, and never for a challenge's
+door; the line ahead once a visit, again after another zone, never in a pact or at rest; the deep's torches along
+its way, none in a room), monster_test (the short purse's words). Level data and server lines; protocol
+unchanged; no new class_name.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)
@@ -39207,6 +39240,31 @@ panel. With room the order is as before (relic_of, consume, charge), and
 the old "takes no more" line is gone. resident_test _test_relic: unblessed
 and full each keep the relic with their line; blessed is charged and said.
 Server only; protocol unchanged.
+
+714 amended (3): a refusal won gives the knight's remains (the script's label; the coordinator's ruling on
+playtest's Refuse run, by Jeff's rule that a choice earns a bonus and never a penalty). The tie of the remains to
+the paid deal was this side's own: the relic came "at the deal's tier", and an unpaid win has no deal, so it had
+none. Jeff's words set no purse condition on the remains: 10-22, "for < 20 gold, he attacks and if you kill him
+the door opens and he says '...warrior, you have my respect.' if you turn in the right amounts of gold you get
+resurrection tokens"; 10-27, "there you defeat draugr and get the amulet. the amulet gets charged by aldous when
+you return to him with the relic". So the tokens are for the gold, and the remains are for the win.
+- `Draugr.beaten_unpaid(player_ids)` (enemy-ai's OK): said after RESPECT in the unpaid branch of `_yield`, naming
+  the living players in his lair. `_lair_players()` gathers them for both branches; blessed_last stays the pact's
+  blessed.
+- `Main.remains_unpaid(player_ids)`: each one in the game takes this generation's knight's relic at `RELIC_UNPAID`
+  (-1) into their pack, the plaque and the taking said as barrow_won says a winner's (the carved words alone, then
+  "You take the holy remains" to them and the third person to the rest). No blessing, no amulet, no charge, no
+  axe: those stay the paid pact's. His yield line stays Jeff's RESPECT.
+- `Main._relic_returned` (npc's OK): reads the tier once (default 0, so an older relic stays a paid tier 0). The
+  room check applies only to tier 0 and up, so a no-tier relic is always laid: consumed, his thanks, the regard
+  ("relic") and the town's memory as before. charge_from_relic gives nothing below tier 0, and in place of the
+  charge sentence he says `RELIC_UNBLESSED`, "There is no blessing on them, whatever passed down there." (voice's,
+  past lore). Aldous doesn't know of the pact (Jeff's crypt.md: "Aldous does not know"), so only the draugr tells
+  where the blessing comes from. The journal line says "no tier, no charge".
+- Items: no change. ItemBook keeps the tier as given and a save restores -1.
+resident_test (a no-tier relic laid unblessed, and with a full amulet: no charge, the sentence, the regard),
+level_test (remains_unpaid), monster_test (beaten_unpaid on an unpaid win with the lair's ids, never on a pact
+win). Server only, protocol unchanged, no new class_name.
 ## 714, enemy-ai's side: the barrow's band, the Tomb Sledge, the draugr's anger
 
 The mound-breakers, every barrow robber a named one (716): nine rows in

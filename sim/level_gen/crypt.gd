@@ -80,6 +80,9 @@ const DEEP_GAP := 2
 const RIM := 2
 ## A pair of torches every so many cells along the processional.
 const TORCH_EVERY := 8
+## The deep's lit way: how far along its run a torch spot may slide off a
+## door's line, nearest first.
+const TORCH_SLIDES: Array[int] = [0, 1, -1, 2, -2, 3, -3]
 ## How many bend points the processional may take.
 const BENDS := 2
 ## A gallery this long or more may branch, each side by this chance.
@@ -190,7 +193,12 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 		_deep_uses(plan, str(config["deep"].get("wing", "")))
 	_furnish(map, anchors, config, rng, plan)
 	if not config.get("deep") is Dictionary:
-		_torches(map, anchors, brush, plan)  # The deep stays dark, as it was.
+		_torches(map, anchors, brush, plan)
+	elif bool(config["deep"].get("lit_way", false)):
+		# The Umbrage crypt follow-up (the coordinator; maps' crypt stills: an
+		# unlit way of 40 cells reads black): the deep's way lit as the
+		# processional above is, its rooms left to their own candles.
+		_torches(map, anchors, brush, plan, false)
 	_monsters(map, anchors, config, rng, plan)
 	_guard_rows(map, plan, nodes[entrance]["centre"])
 	_laid_rooms(given, plan)
@@ -1154,23 +1162,31 @@ static func _chest(map: LevelMap, room: Dictionary, kept: Dictionary, config: Di
 
 ## Torches: a pair along the processional's walls every TORCH_EVERY cells,
 ## one inside each room by its door (none in the vault, the ossuary dark
-## too), never in a door's line.
-static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary) -> void:
+## too) unless [param rooms] is false (the deep's lit way), never in a
+## door's line.
+static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary, rooms := true) -> void:
 	var kept := Labyrinth.door_line(map)
 	var path: Array = plan["processional"]
 	for run: Dictionary in _runs(path):
 		var cells: Array = run["cells"]
 		for i in range(TORCH_EVERY / 2, cells.size(), TORCH_EVERY):
 			for side: Vector2i in [run["across"], -(run["across"] as Vector2i)]:
-				var at: Vector2i = cells[i]
-				for step in brush + 2:
-					if not map.walkable(at + side):
+				# The deep's lit way (rooms false): a spot a side door's line
+				# takes slides along the wall to the nearest free one, so a way
+				# lined with doors is still lit; the barrow's stay where they were.
+				for slide: int in ([0] if rooms else TORCH_SLIDES):
+					if i + slide < 0 or i + slide >= cells.size():
+						continue
+					var at: Vector2i = cells[i + slide]
+					for step in brush + 2:
+						if not map.walkable(at + side):
+							break
+						at += side
+					if map.cell(at) == FLOOR and not kept.has(at) and not Labyrinth._beside_anchor(anchors, at) and not map.walkable(at + side):
+						map.set_cell(at, "torch")
+						kept[at] = true
 						break
-					at += side
-				if map.cell(at) == FLOOR and not kept.has(at) and not Labyrinth._beside_anchor(anchors, at) and not map.walkable(at + side):
-					map.set_cell(at, "torch")
-					kept[at] = true
-	for room: Dictionary in plan["rooms"]:
+	for room: Dictionary in plan["rooms"] if rooms else []:
 		if room["use"] == "sealed_vault" or room["use"] == "ossuary":
 			continue
 		var spot: Variant = Labyrinth._by_wall_near(map, room["cells"], room["doors"][0], kept)

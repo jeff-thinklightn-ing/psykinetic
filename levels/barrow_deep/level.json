@@ -249,7 +249,7 @@
 	"regenerate": {
 		"generator": "crypt",
 		"heart": "lair",
-		"deep": {"wing": "old_graves"},
+		"deep": {"wing": "old_graves", "lit_way": true},
 		"prefer": ["packs"],
 		"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"],
 		"style": "barrow",

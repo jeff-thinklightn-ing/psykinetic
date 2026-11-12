@@ -129,6 +129,13 @@ const REFUSE_TITLE := "Refuse"
 ## name as his speech, and the free refusal comes first for a thin purse;
 ## a line describing the button read as if he said it.
 const REFUSE_WORDS := WORDS
+## His words for a purse under his least deal (608 amended (3), voice's; the
+## coordinator's ruling on playtest's crypt walk): the window's first offer,
+## the free refusal, says his demand (Jeff's, first for every purse: it tells
+## a short player why gold matters) and then these, two sentences in all.
+## "Bring more" is true (his rest ends, he is asked again); "stay and face
+## me" points at Refuse without explaining it; "gold" is the demand's word.
+const POOR_WORDS := "You carry too little: bring more, or stay and face me."
 ## His words on being refused (Jeff's own).
 const REFUSED := "Then I'll take it from you by force!"
 
@@ -202,6 +209,14 @@ signal said(text: String)
 ## (hp left, not laid at rest, not his risen), false once every one is down;
 ## said at his first tick and on each change. Main holds the Hall's door.
 signal ossuary_sealed(sealed: bool)
+## Beaten unpaid (714 amended (3); the coordinator's reading of Jeff's words,
+## 10-22 "if you turn in the right amounts of gold you get resurrection
+## tokens" and 10-27 "there you defeat draugr and get the amulet ... charged
+## by aldous when you return to him with the relic"): the tokens are for the
+## gold, the remains have no purse condition. The living players in his lair
+## when he yields unpaid, after RESPECT; Main gives each the knight's remains,
+## with no blessing and no charge.
+signal beaten_unpaid(player_ids: Array)
 
 const OSSUARY_KINDS: Array[String] = ["skeleton", "skeleton_guard"]
 ## What ossuary_sealed last said: -1 nothing yet, else 0 or 1.
@@ -497,6 +512,7 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 	var steps: Array = deals().map(func(each: Dictionary) -> int: return int(each["gold"]))
 	var poor := World.gold_of(player_id) < int(steps[0])
 	if poor:
+		refuse["words"] = "%s %s" % [REFUSE_WORDS, POOR_WORDS]  # His demand, then the short purse (608 amended (3)).
 		out.append(refuse)  # Too little for the least deal: the refusal first, the deal the panel shows.
 	out.append({"id": "deal:%d" % id, "kind": "deal", "title": TITLE, "words": WORDS,
 		"what": {"offering": steps[0], "least": steps[0], "most": steps[-1], "steps": steps},
@@ -796,10 +812,7 @@ func _yield() -> void:
 	_drop_moves()
 	_recall_axe()
 	if state == State.PACT:
-		var ids: Array = []
-		for entity in World.sought():
-			if entity is Player and _in_lair(entity) and entity.hp > 0:
-				ids.append((entity as Player).player_id)
+		var ids := _lair_players()
 		blessed_last = ids
 		for each_id: String in ids:
 			if not _paid(each_id).is_empty():
@@ -820,6 +833,8 @@ func _yield() -> void:
 		# nobody, gives his respect and is laid to rest.
 		print("[draugr] %s: respect (unpaid, beaten)" % (zone if zone != "" else World.zone.name))
 		said.emit(RESPECT)
+		# The knight's remains all the same (714 amended (3)): Main gives them, no blessing with them.
+		beaten_unpaid.emit(_lair_players())  # blessed_last stays the pact's blessed.
 	if rests_until <= World.steps:
 		rests_until = World.steps + rest_steps()
 		_keep_prop("rests_until", rests_until)
@@ -1078,6 +1093,17 @@ func _party() -> Array[GridEntity]:
 		if entity is Companion and (entity as Companion).keeper == player and not World.is_downed(entity):
 			out.append(entity)
 	return out
+
+
+## The player ids standing living in his lair as he yields: the pact's
+## blessed, or those who beat him unpaid (714 amended (3), one loop so the two
+## never drift apart; enemy-ai's ask).
+func _lair_players() -> Array:
+	var ids: Array = []
+	for entity in World.sought():
+		if entity is Player and _in_lair(entity) and entity.hp > 0:
+			ids.append((entity as Player).player_id)
+	return ids
 
 
 func _in_lair(entity: GridEntity) -> bool:

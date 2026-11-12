@@ -352,7 +352,8 @@ static func niche_plan(config: Dictionary, seed: int) -> Dictionary:
 				"a" if rng.randf() < 0.5 else "c", 2 if rng.randf() < NICHE_SLAB else 1])
 	if niches.is_empty():
 		return {}
-	var pick := rng.randi_range(0, niches.size() - 1)
+	var allowed := hidden_allowed(config, niches)
+	var pick: int = allowed[rng.randi_range(0, allowed.size() - 1)]
 	niches[pick][4] = "hidden"
 	niches[pick][5] = 1
 	var before := Vector2i(niches[pick][0], niches[pick][1])
@@ -364,6 +365,32 @@ static func niche_plan(config: Dictionary, seed: int) -> Dictionary:
 		plan["was_alcove"] = was_before + was_step
 		plan["was_edge"] = Terrain.edge_key(was_before, was_step)
 	return plan
+
+
+## The niches (indices into [param niches], niche_plan's rows) the hidden
+## door may be picked from: with the block's "hidden_near" {at: [[x, y],
+## ...], within: n} (the Umbrage crypt follow-up, the coordinator: "a
+## secret off the main way, never a far corner"), those whose hall cell
+## lies within n cells (either way, the larger) of one of the cells at (the hall's way out the
+## quest takes), else every niche; every niche too when none is that near.
+static func hidden_allowed(config: Dictionary, niches: Array) -> Array[int]:
+	var every: Array[int] = []
+	for index in niches.size():
+		every.append(index)
+	var near: Variant = config.get("hidden_near")
+	if not near is Dictionary or not (near as Dictionary).get("at") is Array:
+		return every
+	var within := int(near.get("within", 0))
+	var cells: Array[Vector2i] = []
+	for at: Variant in near["at"]:
+		if at is Array and (at as Array).size() == 2:
+			cells.append(Vector2i(int(at[0]), int(at[1])))
+	var out: Array[int] = []
+	for index in niches.size():
+		var cell := Vector2i(int(niches[index][0]), int(niches[index][1]))
+		if cells.any(func(at: Vector2i) -> bool: return maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= within):
+			out.append(index)
+	return out if not out.is_empty() else every
 
 
 ## The hidden door moved on [param map] as [param plan] (niche_plan) says:

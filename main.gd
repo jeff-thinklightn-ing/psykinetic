@@ -429,6 +429,12 @@ var _told_closed: Dictionary[int, Vector2i] = {}
 ## Peer -> the burial niche's edge it last pressed on (608), so pressing
 ## on at it says "Only the dead lie here." once.
 var _told_niche: Dictionary[int, Vector3i] = {}
+## Peer -> World.tick when "The dead bar the way." was last said to them
+## for a walk into the held Hall door (_on_door_pressed).
+var _told_dead: Dictionary[int, int] = {}
+## Peer -> the zone it was told HALL_AHEAD_LINE in (_tell_hall_ahead): once
+## a visit; a move in any other zone forgets it.
+var _told_hall: Dictionary[int, String] = {}
 ## "<player id>@<zone>" -> the generation the draft line was said to them in
 ## (608 amended, _tell_draft): once a generation; a restart says it again.
 var _draft_told: Dictionary[String, int] = {}
@@ -1258,6 +1264,7 @@ func _go_online() -> void:
 		World.entity_moved.connect(_on_entity_moved)
 		World.link_bumped.connect(_on_link_bumped)
 		World.niche_pressed.connect(_on_niche_pressed)  # The hidden door (608).
+		World.door_pressed.connect(_on_door_pressed)  # The Hall's door held by the dead (666).
 		World.walked_off.connect(_on_walked_off)
 		var drawn := map_name
 		_boot()
@@ -5967,6 +5974,7 @@ func _on_entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 	if not entity is Player:
 		return
 	_tell_draft(entity, to)
+	_tell_hall_ahead(entity, to)
 	_take_link(entity, to)
 
 
@@ -9825,6 +9833,14 @@ const HALL_SEAL_EVERY := 10
 const DEAD_LOCK := "ossuary_dead"
 ## Said to one who tries the sealed hall door (666; a draft for lore).
 const DEAD_LINE := "The dead bar the way."
+## How often (seconds) a player walking into the held Hall door is told
+## DEAD_LINE again, while they keep at it.
+const DEAD_TOLD_S := 10.0
+## Said once a visit to a player who comes to the Hall's door, open to them,
+## before stepping through, while the draugr sits waiting (608 amended (3),
+## voice's narration; the coordinator's ruling on playtest's crypt walk): what
+## he will ask, before the door can shut, naming nobody.
+const HALL_AHEAD_LINE := "Beyond this door waits one who wants back the gold stolen from this place."
 ## The device's two halves (items' kinds, 544's items' side): minted no more
 ## since 573 (the charges are a count on the record); those held are keepsakes.
 
@@ -10621,6 +10637,43 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 	return blessed
 
 
+## A relic's tier for remains won unpaid (714 amended (3)): no deal, so no
+## charge on the altar (charge_from_relic gives nothing below tier 0).
+const RELIC_UNPAID := -1
+## Aldous's sentence in place of the charge line for remains won unpaid
+## (714 amended (3); voice's, past lore): he sees no blessing on them and does
+## not know why. The pact is the draugr's secret (Jeff's crypt.md: "Aldous
+## does not know"), so where the blessing comes from is told by the draugr
+## alone ("...you have honored the pact"), never by Aldous.
+const RELIC_UNBLESSED := "There is no blessing on them, whatever passed down there."
+
+
+## Server: the draugr beaten unpaid (714 amended (3); the coordinator's
+## ruling on playtest's Refuse run, by Jeff's rule that a choice earns a
+## bonus and never a penalty): each of [param player_ids] in the game takes
+## this generation's knight's remains (barrow_knight) as barrow_won gives a
+## winner's, minted at RELIC_UNPAID, into their pack, the plaque said. No
+## blessing, no amulet, no charge, no axe: those stay the paid pact's. His
+## yield line is his own RESPECT, said before. How many took remains.
+func remains_unpaid(player_ids: Array) -> int:
+	var knight := barrow_knight()
+	if knight.is_empty():
+		return 0
+	var given := 0
+	for each: Variant in player_ids:
+		var id := str(each)
+		var record: PlayerRecord = _records.get(id)
+		var player: Player = _players.get(_peer_of(id))
+		if record == null or not is_instance_valid(player) or not player.spawned:
+			continue
+		World.into_pack(player, World.mint_relic(knight, RELIC_UNPAID, player))
+		var there := World.peers_in(player.zone)
+		say_to(there, SEPULCHER_PLAQUE % knight)  # The carved words alone, as barrow_won says them.
+		say_to_pair(player.owner_peer, "You take the holy remains, for the altar.", "%s takes the holy remains, for the altar." % record.name, there)
+		given += 1
+	return given
+
+
 ## Server: says [param line] to the players of [param peers] and keeps it in
 ## the party log (133 amended (1)). PartyLog.add alone reaches no screen: it
 ## is the server's list the companions' minds read (voice's sweep of
@@ -11346,6 +11399,51 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 	if _told_niche.get(peer) != key:
 		_told_niche[peer] = key
 		say_to([peer], "Only the dead lie here.")
+
+
+## Server: [param entity] (a player) stepped to [param to]: on the outer cell
+## of its zone's Hall door, the door not held (no challenge on, the dead
+## down) and the draugr seated there waiting, it is told HALL_AHEAD_LINE,
+## once a visit (_told_hall, forgotten by a move in another zone).
+func _tell_hall_ahead(entity: GridEntity, to: Vector2i) -> void:
+	if not Net.is_authority():
+		return
+	var peer: int = entity.owner_peer
+	var zone_name: String = World.zone.name
+	if _told_hall.has(peer):
+		if _told_hall[peer] == zone_name:
+			return
+		_told_hall.erase(peer)
+	var rect := hall_lair_rect(zone_name)
+	if not rect.has_area() or rect.has_point(to):
+		return
+	var at_door := false
+	for door in _hall_doors(zone_name):
+		var cells := Terrain.edge_cells(door.key)
+		if door.lock == "" and (cells[0] == to or cells[1] == to):
+			at_door = true
+	if not at_door:
+		return
+	for each in World.entities():
+		if each is Draugr and each.spawned and not (each as Draugr).gone and (each as Draugr).state == Draugr.State.SEATED:
+			_told_hall[peer] = zone_name
+			say_to([peer], HALL_AHEAD_LINE)
+			return
+
+
+## Server: [param entity] walked into a shut door it may not open
+## (World.door_pressed; the Umbrage crypt follow-up). The Hall's door held
+## by the Ossuary's dead (666, DEAD_LOCK) tells that player DEAD_LINE, as E
+## at it does, at most every DEAD_TOLD_S while they keep walking into it;
+## any other door says nothing here.
+func _on_door_pressed(entity: GridEntity, door: Door) -> void:
+	if not Net.is_authority() or not entity is Player or door.open or door.lock != DEAD_LOCK:
+		return
+	var peer: int = entity.owner_peer
+	if _told_dead.has(peer) and World.tick - _told_dead[peer] < roundi(DEAD_TOLD_S * World.TICK_RATE):
+		return
+	_told_dead[peer] = World.tick
+	say_to([peer], DEAD_LINE)
 
 
 ## The first hall of regenerating level [param zone_name] (608 amended: where
@@ -19943,6 +20041,9 @@ func _hook_talker(monster: GridEntity) -> void:
 		monster.connect("offer_spoken", func(player_id: String, offer: Dictionary) -> void: _on_offer_spoken(monster, player_id, offer))
 	if monster.has_signal("offer_withdrawn"):
 		monster.connect("offer_withdrawn", func(player_id: String) -> void: _on_offer_withdrawn(monster, player_id))
+	if monster.has_signal("beaten_unpaid"):
+		# The draugr's (714 amended (3)): beaten unpaid, the knight's remains all the same.
+		monster.connect("beaten_unpaid", func(player_ids: Array) -> void: remains_unpaid(player_ids))
 	if monster.has_signal("hall_door"):
 		# The draugr's (573 amended): false shuts his hall's door, true opens it.
 		monster.connect("hall_door", func(open: bool) -> void: _hold_hall_door(monster.zone, not open))
@@ -21678,25 +21779,27 @@ func _relic_returned(player: Player, body: Resident, uid: int) -> bool:
 	if relic.is_empty():
 		return false
 	var knight := str(relic.get("knight", "the knight"))
+	var tier := int(relic.get("tier", 0))
 	# Room first (714 amended, npc's side; dungeon's note): a full amulet, or one never blessed (a quest
-	# reset clears the barrow's best), would take nothing, so he gives the relic back with why.
+	# reset clears the barrow's best), would take nothing, so he gives the relic back with why. Remains
+	# won unpaid (714 amended (3)) carry no charge: always laid, never given back.
 	var record: PlayerRecord = _records.get(player.player_id)
 	var capacity := Economy.barrow_capacity(record.barrow, _field_rules()) if record != null else 0
-	if capacity - World.totem_charges(World.totem_of(player.player_id)) <= 0:
+	if tier >= 0 and capacity - World.totem_charges(World.totem_of(player.player_id)) <= 0:
 		_say_plain(body, body.person, ("Your amulet holds all the blessing it can. Keep %s safe, and bring the remains to me when it has room." % knight) if capacity > 0
 			else ("You carry no blessing from below yet. Keep %s safe until you have stood before what waits there, then bring the remains to me." % knight))
 		return false
 	if not World.consume(player, uid, "laid on the altar"):
 		return false
-	var added := charge_from_relic(player, int(relic.get("tier", 0)))
+	var added := charge_from_relic(player, tier)
 	var held := World.totem_charges(World.totem_of(player.player_id))
 	var who := Offers.name_of(Offers.ctx, player.player_id)
 	Offers._regard(World.production, body.worker_id, player.player_id, Standing.setting("relic"), "brought home the remains of %s" % knight)
 	Townsfolk.learn(World.production, body.worker_id, "%s brought the remains of %s up from the crypt, and you laid them on the altar." % [who, knight])
 	var thanks := "%s is home at last. Bless you." % knight
-	var charge := "The blessing is on your amulet: it holds %d now." % held
+	var charge := ("The blessing is on your amulet: it holds %d now." % held) if tier >= 0 else RELIC_UNBLESSED
 	_say_plain(body, body.person, thanks + " " + charge)
-	print("[relic] the remains of %s laid on the altar in %s, %d charge(s) added" % [knight, body.town, added])
+	print("[relic] the remains of %s laid on the altar in %s, %s" % [knight, body.town, ("%d charge(s) added" % added) if tier >= 0 else "no tier, no charge"])
 	return true
 
 
