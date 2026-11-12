@@ -9355,6 +9355,28 @@ func _test_fishing_pose() -> void:
 	# checkout without them holds none (Sfx.hold's null).
 	var lapping := not SoundKit.files("sfx.fish_wait").is_empty()
 	_check(held == lapping, "waiting: the float's lap held at it (%s; takes here: %s)" % [held, lapping])
+	# The bite read without sound (animation's take 2): a big red-capped float,
+	# a slack line that goes taut at the bite, two tugs at the splashes.
+	var fv: Node = _rig.fishing_view
+	var bobber: Node3D = cast.get("float")
+	var cap: MeshInstance3D = bobber.get_child(0) as MeshInstance3D if bobber != null and bobber.get_child_count() == 1 else null
+	_check(cap != null and (cap.material_override as StandardMaterial3D).albedo_color.is_equal_approx(fv.FLOAT_RED)
+			and (cap.mesh as SphereMesh).is_hemisphere and is_equal_approx(((bobber as MeshInstance3D).mesh as SphereMesh).radius, fv.FLOAT_RADIUS),
+		"the float: %.2f m, its upper half red (%s)" % [fv.FLOAT_RADIUS, bobber.get_children() if bobber != null else "none"])
+	var line_points := func() -> PackedVector3Array:
+		var mesh := (cast["line"] as MeshInstance3D).mesh as ImmediateMesh
+		return mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] if mesh.get_surface_count() > 0 else PackedVector3Array()
+	var slack: PackedVector3Array = line_points.call()
+	var middle := slack[slack.size() / 2] if slack.size() > 2 else Vector3.ZERO
+	var straight := slack[0].lerp(slack[-1], 0.5) if slack.size() > 2 else Vector3.ZERO
+	_check(slack.size() > 2 and middle.y < straight.y - 0.2, "waiting: the line hangs slack (%d points, %.2f m low at its middle)" % [slack.size(), straight.y - middle.y])
+	player.fishing = {"state": "bite", "at": player.tile + Vector2i(0, 2)}
+	for i in 2:
+		await get_tree().process_frame
+	_check((line_points.call() as PackedVector3Array).size() == 2, "the bite: the line drawn straight and taut")
+	_check(is_equal_approx(fv.tug(0.0), 0.0) and is_equal_approx(fv.tug(fv.TUG_DOWN), 1.0) and is_equal_approx(fv.tug(0.9), 0.0)
+			and is_equal_approx(fv.tug(1.2 + fv.TUG_DOWN), 1.0) and fv.BITE_TUGS.size() == 2 and fv.BITE_TUGS[0] == 0.0 and fv.BITE_TUGS[1] == fv.BITE_SPLASH_AGAIN,
+		"the bite: tugged right under twice, at its start and at the second splash")
 	player.fishing = {"state": "missed", "at": player.tile + Vector2i(0, 2)}
 	for i in 2:
 		await get_tree().process_frame

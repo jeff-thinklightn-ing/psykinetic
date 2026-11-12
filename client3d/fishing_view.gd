@@ -26,6 +26,27 @@ const BOB_RATE := 0.6
 const DIP := 0.06
 const RING_WIDEST := 0.6
 const RING_SECONDS := 0.7
+## The bite read without sound (the coordinator after animation's take 2 at
+## Jeff's pond: a 3.5 cm float was four pixels behind the reeds and nothing on
+## screen changed at the bite). The float, stylized: FLOAT_RADIUS (m), its
+## upper half a red cap. At the bite it is tugged right under twice, at
+## BITE_TUGS seconds (the splashes), TUG_DOWN seconds down and TUG_BACK back,
+## UNDER metres deep; between, it rides DIP low. Its ring spreads to
+## BITE_RING_WIDEST. The line hangs slack while it waits, sagging SAG of its
+## length at the middle (SAG_LEAST to SAG_MOST metres), and is drawn straight
+## and taut through the bite: the change that reads at any zoom.
+const FLOAT_RADIUS := 0.12
+const FLOAT_WHITE := Color("eee6d2")
+const FLOAT_RED := Color("d42a1a")
+const BITE_TUGS: Array[float] = [0.0, 1.2]
+const TUG_DOWN := 0.25
+const TUG_BACK := 0.35
+const UNDER := 0.35
+const BITE_RING_WIDEST := 1.1
+const SAG := 0.3
+const SAG_LEAST := 0.35
+const SAG_MOST := 1.4
+const SAG_STEPS := 10
 ## The bite's ring again, every this many seconds while the float is down,
 ## and its splash once more this far in (805 amended (11): a bite of 3 s).
 const BITE_RING_EVERY := 1.0
@@ -243,7 +264,7 @@ func show_cast(key: String, entity: GridEntity) -> void:
 			var t := clampf(since / CAST_SECONDS, 0.0, 1.0)
 			spot = tip.lerp(water, t) + Vector3(0, sin(t * PI) * 1.2, 0)
 		"bite":
-			spot = water + Vector3(0, -DIP * (0.6 + 0.4 * sin(since * 30.0)), 0)
+			spot = water + Vector3(0, -DIP - (UNDER - DIP) * tug(since), 0)
 		"landed", "missed":
 			spot = water.lerp(tip, clampf(since / PULL_SECONDS, 0.0, 1.0))
 	var bobber: Node3D = cast["float"]
@@ -251,7 +272,7 @@ func show_cast(key: String, entity: GridEntity) -> void:
 	var lap: Variant = cast.get("lap")
 	if lap != null and is_instance_valid(lap):
 		view.sfx.steer(lap, spot)
-	_line(cast["line"], tip, spot)
+	_line(cast["line"], tip, spot, sag_of(tip, spot) if state == "wait" else 0.0)
 	var ring: MeshInstance3D = cast["ring"]
 	# 805 amended (11): the bite lasts long enough to answer (World.FISH_BITE_TICKS),
 	# so its ring spreads again every BITE_RING_EVERY while the float is down,
@@ -265,7 +286,7 @@ func show_cast(key: String, entity: GridEntity) -> void:
 	if ring.visible:
 		var grown := ring_since / RING_SECONDS
 		ring.position = water + Vector3(0, 0.01, 0)
-		ring.scale = Vector3.ONE * lerpf(0.1, RING_WIDEST, grown)
+		ring.scale = Vector3.ONE * lerpf(0.1, BITE_RING_WIDEST, grown)
 		(ring.material_override as StandardMaterial3D).albedo_color.a = 0.6 * (1.0 - grown)
 
 
@@ -290,12 +311,22 @@ func _begin(key: String, cast: Dictionary, state: String, cell: Vector2i) -> voi
 func _make() -> Dictionary:
 	var bobber := MeshInstance3D.new()
 	var ball := SphereMesh.new()
-	ball.radius = 0.035
-	ball.height = 0.12
+	ball.radius = FLOAT_RADIUS
+	ball.height = FLOAT_RADIUS * 2.0
 	bobber.mesh = ball
 	var paint := StandardMaterial3D.new()
-	paint.albedo_color = Color("e8e0c8")  # A quill's pale shaft.
+	paint.albedo_color = FLOAT_WHITE
 	bobber.material_override = paint
+	var cap := MeshInstance3D.new()  # Its upper half red, a hair proud of the white.
+	var dome := SphereMesh.new()
+	dome.radius = FLOAT_RADIUS * 1.02
+	dome.height = FLOAT_RADIUS * 1.02
+	dome.is_hemisphere = true
+	cap.mesh = dome
+	var red := StandardMaterial3D.new()
+	red.albedo_color = FLOAT_RED
+	cap.material_override = red
+	bobber.add_child(cap)
 	view.add_child(bobber)
 	var line := MeshInstance3D.new()
 	line.mesh = ImmediateMesh.new()
@@ -320,13 +351,40 @@ func _make() -> Dictionary:
 	return {"float": bobber, "line": line, "ring": ring, "state": "", "since": _clock}
 
 
-## The line drawn from [param from] to [param to].
-func _line(line: MeshInstance3D, from: Vector3, to: Vector3) -> void:
+## How deep in the bite [param since] (seconds into it) the float is tugged,
+## 0 to 1: 1 at the bottom of each of BITE_TUGS (TUG_DOWN down, TUG_BACK
+## back), 0 between.
+static func tug(since: float) -> float:
+	var most := 0.0
+	for at: float in BITE_TUGS:
+		var t := since - at
+		if t < 0.0:
+			continue
+		if t < TUG_DOWN:
+			most = maxf(most, t / TUG_DOWN)
+		elif t < TUG_DOWN + TUG_BACK:
+			most = maxf(most, 1.0 - (t - TUG_DOWN) / TUG_BACK)
+	return most
+
+
+## How far a waiting line from [param from] to [param to] sags at its middle.
+static func sag_of(from: Vector3, to: Vector3) -> float:
+	return clampf(from.distance_to(to) * SAG, SAG_LEAST, SAG_MOST)
+
+
+## The line drawn from [param from] to [param to], hanging [param sag]
+## metres low at its middle (a parabola; 0: straight and taut), never below
+## [param to]'s height short of it.
+func _line(line: MeshInstance3D, from: Vector3, to: Vector3, sag := 0.0) -> void:
 	var mesh: ImmediateMesh = line.mesh
 	mesh.clear_surfaces()
-	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-	mesh.surface_add_vertex(from)
-	mesh.surface_add_vertex(to)
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	var steps := SAG_STEPS if sag > 0.0 else 1
+	for i in steps + 1:
+		var t := float(i) / steps
+		var point := from.lerp(to, t)
+		point.y = maxf(point.y - sag * 4.0 * t * (1.0 - t), to.y)
+		mesh.surface_add_vertex(point)
 	mesh.surface_end()
 
 

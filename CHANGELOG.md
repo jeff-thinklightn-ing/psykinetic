@@ -37,6 +37,7 @@ notes (decision 324).
 - With the low camera, when a house or the temple comes between you and the view, the camera moves in to stand outside it and rises with you, so you see the whole of yourself (864).
 - Fishing: with a rod on you, click the water to cast, and if it's out of reach you walk to the bank first; the rod comes to your hand by itself and goes back when you walk on. Every pond, pool and stream has fish now. When the float dips, it keeps ringing and splashing for three seconds: click anywhere in that time to strike, and you land the fish nine times in ten, where a bite you leave alone lands about six (805 amended (11)).
 - Cooking: you can cook a couple of paces from a fire now, from round the square's fire pit or the benches by the Mughouse hearth, and you're told when it's done; with no fire near, you're told you need one, and in Umbrage that there's one in the square (805 amended (11)).
+- Fishing: a big red-topped float; the line hangs slack while you wait, snaps tight when a fish bites, and the float is pulled right under twice (805 amended (17)).
 
 ## v0.1.211
 
