@@ -54,9 +54,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Runner's pack | `levels/barrow/level.json` |
 | R | Robbers' chest | `levels/barrow/level.json` |
 
-## Lines in the code (2846)
+## Lines in the code (2844)
 
-### companions (Pip, Wren, Nix) (658)
+### companions (Pip, Wren, Nix) (656)
 
 | | Line | Where |
 |---|---|---|
@@ -447,7 +447,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You rest in the town %s %s between trips%s. | `sim/companion.gd` standing_words() |
 |  | , and work there as %s | `sim/companion.gd` standing_words() |
 |  | You know that town well. | `sim/companion.gd` standing_words() |
-| L | It is said that %s | `sim/companion.gd` lore_words() |
 |  | What you know of the world: %s | `sim/companion.gd` lore_words() |
 |  | \\b%ss?\\b | `sim/companion.gd` lore_topics() |
 |  | %s %s %s%s | `sim/companion.gd` stance_prompt() |
@@ -528,7 +527,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | , where you have not been before today | `sim/companion.gd` place_brief() |
 |  | %s Something that happened here: %s | `sim/companion.gd` place_brief() |
 |  | %s There is %s here; you were told of nothing in it. | `sim/companion.gd` place_brief() |
-| L | It is said that %s | `sim/companion.gd` place_brief() |
 |  | %s One thing you know of it: %s | `sim/companion.gd` place_brief() |
 |  | fire\|flame\|burn | `sim/companion.gd` _asked_in() |
 |  | water\|pool\|lake\|river | `sim/companion.gd` _asked_in() |
@@ -1922,7 +1920,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: no floor to %s by it | `sim/world_routes.gd` _add_way() |
 |  | %s %d %d | `sim/world_routes.gd` _portal() |
 
-### residents (109)
+### residents (108)
 
 | | Line | Where |
 |---|---|---|
@@ -2033,7 +2031,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
 |  | one who has no amulet is given one. | `sim/resident.gd` relic_line() |
 |  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd` KEPT_LINE |
-| L | It is said that %s | `sim/resident.gd` world_facts() |
 |  | %s and %s | `sim/resident.gd` _listed() |
 
 ### residents (card) (25)
@@ -2870,7 +2867,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the session's Claude budget is spent | `sim/lawspeaker.gd` tick() |
 |  | no rulings in the answer | `sim/lawspeaker.gd` tick() |
 
-### town talk (36)
+### town talk (37)
 
 | | Line | Where |
 |---|---|---|
@@ -2888,6 +2885,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | What %s knows to be true: %s What %s has heard before: %s %s just said: "%s" | `sim/hearsay.gd` claims_ask() |
 |  | - nothing of the world beyond the town | `sim/hearsay.gd` claims_ask() |
 |  | %s heard %s | `sim/hearsay.gd` claims_ask() |
+| L | It is said that %s | `sim/hearsay.gd` said_of() |
 |  | ^[A-Za-z]+(?:-[a-z]+)* | `sim/hearsay.gd` _lower_first() |
 |  | [a-z,] ([A-Z][a-z']+(?:-[a-z]+)*) | `sim/hearsay.gd` is_name() |
 |  | [A-Z][a-z']+ | `sim/hearsay.gd` is_name() |
