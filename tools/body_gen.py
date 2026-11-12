@@ -1635,7 +1635,30 @@ CLOAK_EASED_OVER = ("Worn_Strap", "Worn_Strap_Over")
 ## hidden under one), moves out along that frame's +z till it is CLOAK_OVER_BAG past the bag's front,
 ## less and less over BAG_FEATHER past its sides, top and bottom; on the bag's side only (never
 ## mirrored as the strap's ease is), so the cloak is fuller over the bag and nowhere else.
-BAG_HALF_WIDE, BAG_TOP, BAG_BOTTOM, BAG_FRONT = 0.113, 0.024, -0.19, 0.094
+BAG_HALF_WIDE, BAG_TOP, BAG_BOTTOM = 0.113, 0.024, -0.19
+## The bag's front by height (819 amended (4)): art-kit's worn.satchel v2 tilts its foot 5 degrees out
+## from the thigh, so its front leaves 0.094 (the draft's flat front) for 0.107 at the flap's tongue and
+## buckle. Pairs of (height, outermost z across the bag at it, buckle included), art-kit's table, read
+## from the top down as the most any height above has reached: a cloak falling over the bag hangs
+## from its fullest point and never tucks back under the rounded foot. Linear between them, held past
+## the ends; never under the draft's 0.094, so the cloak is as before at the bag's top.
+BAG_FRONT_MIN = 0.094
+BAG_FRONT_BY_HEIGHT = ((0.024, 0.089), (0.0, 0.093), (-0.04, 0.097), (-0.08, 0.100), (-0.12, 0.106),
+	(-0.15, 0.107), (-0.185, 0.095))
+
+
+def _bag_front(y: float) -> float:
+	pts = []
+	reach = BAG_FRONT_MIN
+	for h, z in BAG_FRONT_BY_HEIGHT:
+		reach = max(reach, z)
+		pts.append((h, reach))
+	if y >= pts[0][0]:
+		return pts[0][1]
+	for (h0, z0), (h1, z1) in zip(pts, pts[1:]):
+		if y >= h1:
+			return z0 + (z1 - z0) * (h0 - y) / (h0 - h1)
+	return pts[-1][1]
 BAG_FEATHER = 0.10
 ## Past the bag's bounds still eased in full (the cloak's faces are flat between its vertices: round
 ## the bag's front corner, where the cloak turns toward the side, the face beyond cut the corner).
@@ -1675,7 +1698,7 @@ def _ease_over_bag(J: dict, p: Part) -> None:
 				if bz <= 0.0:
 					continue
 				w = fade(abs(d.dot(x)) - BAG_HALF_WIDE - BAG_PAD) * fade(max(BAG_BOTTOM - BAG_PAD - d.z, d.z - BAG_TOP - BAG_PAD))
-				need = (BAG_FRONT + CLOAK_OVER_BAG - bz) * w
+				need = (_bag_front(d.z) + CLOAK_OVER_BAG - bz) * w
 				if need > move.length:
 					move = z * need
 			p.rings[k][i] = v + move

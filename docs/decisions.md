@@ -49140,6 +49140,27 @@ cloak and shield, leather and bow with quiver, cloak and bow; a swing and a chop
 cloak and mail rows again after the move, with the lantern's zoom). Client and art only; protocol
 unchanged; no new class_name.
 
+819 amended (4) (the strapped cloak over worn.satchel v2, pc-character's side; the script's label;
+the coordinator's approval over art-kit's alternative, a bigger corner with no tilt). A region probe
+of art-kit's first worn.satchel on the bag socket (build/satchel/lantern/probe.gd --regions, the man
+and the woman at rest, idle and eight moments each of the walk, jog and sprint; a bag point counts as
+in when it lies more than 4 mm under its nearest trunk or right-leg vertex) found its back clear and
+its front tab and front-bottom corner in the right thigh: the tab 2.4 cm (the man standing), the
+corner 2.8 cm (the woman standing), in about half the poses. Art-kit's v2 (819 amended (3)) makes the
+front tab a wedge standing off the body, rounds the back's front-bottom corner (9 cm), and tilts the
+whole bag's foot 5 degrees out about the strap line, so its front reaches z 0.107 in the bag frame
+where the draft's flat front stood at 0.094. The strapped cloak's ease over the bag (_ease_over_bag)
+now follows the bag's front by height, _bag_front(y): art-kit's table of the outermost z at each
+height, buckle included (BAG_FRONT_BY_HEIGHT), read from the top down as the most any height above
+has reached (a cloak hangs from the bag's fullest point and doesn't tuck under its rounded foot),
+linear between, never under the draft's 0.094 (BAG_FRONT_MIN), plus CLOAK_OVER_BAG as before. A
+straight line from 0.094 to 0.107 would have sat 4 mm inside the buckle. Against v2's 688 vertices,
+on the four strap fits and every body key, no vertex is through the cloak, the least room +4.6 mm
+(the woman, plate fit), where before the mend several touched it (build/cloak bagcloak2.py). human_m
+and human_f built again: of their 28 parts only Worn_Cloak_Strapped moved, the other 27 the same to
+the vertex on the base and all 13 keys (cmp_parts.py; an unchanged-code rebuild reproduces all 28).
+Art only, package "satchel", off; protocol unchanged; no new class_name.
+
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 
 Jeff approved T1+P1+T4+P2 from perf's seamless-zones page (C:/dev/review/umbrage_hill/seamless_zones.md).
