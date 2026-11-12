@@ -2415,7 +2415,10 @@ func _show_3d() -> void:
 	_shown_level = level
 	_client3d.bubbles = bubbles
 	_show_name_plates()
-	_show_towns()
+	# The first room is whole (setup builds it at once, with no room_built):
+	# what every rebuilt room gets, by the same handler (782 amended (2);
+	# sound's finding: no folds, night places or fire places till a rebuild).
+	_on_room_built()
 	if Tuning.allowed():
 		Tuning.register_source("camera", _camera_value, _set_camera_value, camera_fields)  # 673.
 		Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)  # 673 step 2.
