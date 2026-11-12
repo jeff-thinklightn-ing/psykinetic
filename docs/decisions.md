@@ -50643,6 +50643,10 @@ carries or lays them moves; each slot's source is "art-gen, by hand" with its sc
 item.shield, item.wood_bundle and item.cloth_bolt, passed with these, come after items' icon check;
 prop.stool lands with maps' places.tavern.seats rows (the coordinator's rule).
 
+886 amended (1) (ui-design, 2026-11-12; label by decision_number.sh). Builder's 885 panel, shot on the Lenovo beside the mock (C:/dev/review/ui-design/builder/built/sheet-1080.png), showed "the[T 1]temple": the chip pressed against its words and its letter and figure a full space apart. Two causes, both in the chip: the Lines highlight's side padding (10 units) reached past the words' own spaces (about 7) and covered them; and the sans bold's hair space (U+200A) is 0.29 em, wider than its own space (0.15), where the regular face's is 0.05. So the Lines highlight has no side padding; the chip's back holds a no-break space inside each end as its margin; and the hair space is set in the regular face between the bold letter and the bold figure. The chip's parsed text gains the two edge spaces (" T 1 "). Also for builder's bullets: LineBullet (a Label: the sans, dim, the Lines' size, on the text scale), the "•" builder now sets apart at a wrapped line's top. parts_test (_test_answer: the parsed text; the hair space narrower than a space; no side padding; LineBullet). Client only, protocol unchanged, no new class_name, no bullet (885 unreleased).
+
+## 869. The gait pick holds through gaps: a stop held, a change dwelt on, the rate on a smoothed speed
+
 ## 885. Builder's answer panel: the summary as parts, in a window of the approved look
 
 The coordinator's approval of ui-design's mock (2026-11-12, C:/dev/review/ui-design/builder/

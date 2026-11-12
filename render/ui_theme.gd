@@ -31,7 +31,7 @@ const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption"
 	&"Subhead", &"Tab", &"ChipPrice", &"ChipPriceShort", &"SquareCount", &"FootLine", &"FootLineRefused",
 	&"RowWords", &"RowLine", &"QuestLine", &"QuestDone", &"QuestMore", &"QuestReturn",
 	&"KeyText", &"KeyJoin", &"HintWords", &"HintFoot", &"HintGroup", &"NameText",
-	&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused"]
+	&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused", &"LineBullet"]
 ## Theme types whose font colour is a meaning colour, so a colour set moves them
 ## with it (a done quest line is the friend green, or blue in "distinct").
 const MEANING_FONTS := {&"QuestDone": &"friend"}

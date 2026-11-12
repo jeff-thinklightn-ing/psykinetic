@@ -372,8 +372,20 @@ func _test_answer() -> void:
 	UiCodeChip.add_line(rich, "The door of [T1] temple at (190,\u00a0199); [F12] forge.")
 	await get_tree().process_frame
 	var said := rich.get_parsed_text()
-	_check(said == "The door of T\u200a1 temple at (190,\u00a0199); F\u200a12 forge.",
+	_check(said == "The door of \u00a0T\u200a1\u00a0 temple at (190,\u00a0199); \u00a0F\u200a12\u00a0 forge.",
 		"a line's codes drawn as chips, letter and figure a hair apart, its words kept (%s)" % said.c_escape())
+	# 886 amended (1): the hair space not in the bold (its bold glyph is wider than a space), the chip's
+	# back with no side padding (it covered the words' spaces), and builder's bullet type.
+	var bold := rich.get_theme_font(&"bold_font")
+	var plain := rich.get_theme_font(&"normal_font")
+	var size := rich.get_theme_font_size(&"normal_font_size")
+	_check(plain.get_string_size("\u200a", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x < plain.get_string_size(" ", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		and bold != plain, "the hair space, in the regular face, is narrower than a space")
+	_check(rich.get_theme_constant(&"text_highlight_h_padding") == 0, "the chip's back reaches no further than its own edge spaces")
+	var theme := UiTheme.theme()
+	_check(theme.get_type_variation_base(&"LineBullet") == &"Label" and theme.get_color(&"font_color", &"LineBullet") == UiTheme.color("text_dim")
+		and theme.get_font_size(&"font_size", &"LineBullet") == theme.get_font_size(&"normal_font_size", &"Lines"),
+		"LineBullet: a Label, dim, the Lines' size")
 	_check(rich.get_theme_color(&"figure", &"CodeChip") != rich.get_theme_color(&"letter", &"CodeChip")
 		and rich.get_theme_color(&"back", &"CodeChip").a > 0.5, "a chip: a dark back, the figure brighter than the letter")
 	_check(UiCodeChip._split("T1") == PackedStringArray(["T", "1"]) and UiCodeChip._split("WS3") == PackedStringArray(["WS", "3"]),
