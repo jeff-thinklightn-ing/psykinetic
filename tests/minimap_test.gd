@@ -105,23 +105,74 @@ func _test_picture() -> void:
 	for cell: Vector2i in w_terrain.get("rocks", []):
 		w_rocks[cell] = true
 	var w_size: Vector2i = wilds["size"]
+	# The landmarks' footprints (884), drawn as their own mark, not woods.
+	var marked := {}
+	var mounds: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return str(b.get("slot", "")) in Forage.LANDMARKS)
+	for building: Dictionary in mounds:
+		var rect: Rect2i = Level.building_rect(building)
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				marked[Vector2i(x, y)] = true
 	var empty := 0
+	var stray := 0
 	var woods := 0
 	var wrong := 0
+	var border_open := 0
+	var border_drawn := 0
 	for y in w_size.y:
 		for x in w_size.x:
 			var cell := Vector2i(x, y)
-			if w_floor.has(cell):
+			if w_floor.has(cell) or marked.has(cell):
 				continue
 			var drawn := map.image.get_pixelv(cell)
+			var on_border := x == 0 or y == 0 or x == w_size.x - 1 or y == w_size.y - 1
 			if drawn.a == 0.0:
 				empty += 1
 			elif drawn.is_equal_approx(Minimap.WOODS):
 				woods += 1
 			elif not (w_rocks.has(cell) and drawn.is_equal_approx(UiTheme.color(&"map_stone"))):
 				wrong += 1
-	_check(woods > 0 and empty == 0 and wrong == 0 and Minimap.WOODS == UiTheme.color(&"map_woods"),
-		"outdoors no cell is left empty: the woods are map_woods and a rock is stone, never darkened by its wall (%d woods, %d empty, %d else)" % [woods, empty, wrong])
+			if on_border:
+				if drawn.a == 0.0:
+					border_open += 1
+				else:
+					border_drawn += 1
+	# Every empty cell is joined to the border through empty cells (the band
+	# beyond the torn edge); none is a hole inside the zone.
+	var beyond := Minimap._beyond_edge(map.image, w_size)
+	for y in w_size.y:
+		for x in w_size.x:
+			if map.image.get_pixel(x, y).a == 0.0 and not beyond.has(Vector2i(x, y)):
+				stray += 1
+	_check(woods > 0 and wrong == 0 and Minimap.WOODS == UiTheme.color(&"map_woods"),
+		"inside the edge the woods are map_woods and a rock is stone, never darkened by its wall (%d woods, %d else)" % [woods, wrong])
+	_check(empty > 0 and stray == 0 and border_open > 0 and border_drawn == 0,
+		"the torn edge is framed (884): the no-floor band joined to the border is left to the frame (%d empty, %d of them inside, %d border cells drawn)" % [empty, stray, border_drawn])
+	# The barrow's mound (884): a ring of kerb stones, a grass dome, its doorway
+	# where the barrow's way (not hidden) meets its north edge.
+	_check(Forage.LANDMARKS == ["building.mound"] and mounds.size() == 1, "the wilds have one landmark, the barrow's mound (%d)" % mounds.size())
+	if mounds.size() == 1:
+		var rect: Rect2i = Level.building_rect(mounds[0])
+		var kerb := UiTheme.color(&"map_kerb")
+		var ring_ok := true
+		var dome_ok := true
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				var cell := Vector2i(x, y)
+				var drawn := map.image.get_pixelv(cell)
+				if cell == Vector2i(160, 160):
+					continue
+				if x == rect.position.x or y == rect.position.y or x == rect.end.x - 1 or y == rect.end.y - 1:
+					ring_ok = ring_ok and drawn.is_equal_approx(kerb)
+				else:
+					dome_ok = dome_ok and absf(drawn.h - grass.h) < 0.02 and drawn.v >= grass.v - 0.001 and not drawn.is_equal_approx(Minimap.WOODS)
+		var crown := map.image.get_pixelv(rect.get_center())
+		var foot := map.image.get_pixelv(rect.position + Vector2i(1, 1))
+		_check(rect == Rect2i(155, 160, 12, 12) and ring_ok and dome_ok and crown.v > foot.v,
+			"the mound is drawn as it looks from above: a ring of map_kerb, a grass dome lit toward its crown (%s, ring %s, dome %s)" % [rect, ring_ok, dome_ok])
+		_check(map.image.get_pixel(160, 160).is_equal_approx(UiTheme.color(&"map_doorway"))
+			and wilds["links"].any(func(link: Dictionary) -> bool: return link["tile"] == Vector2i(160, 160) and not bool(link.get("hidden", false))),
+			"its doorway is dark where the barrow's way out, which the map shows, meets its edge")
 	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["to"] == "foothills")
 	_check(castle_ways.size() == 1 and castle_ways[0]["cue"] == "arch" and castle_ways[0]["facing"] == Vector2i(0, -1),
 		"the wilds' north link (the castle's till 745, the foothills' since) is an arch facing north on the big map (589; %s)" % [castle_ways])

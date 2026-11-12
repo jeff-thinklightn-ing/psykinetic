@@ -214,10 +214,15 @@ static func made_for(level: Dictionary) -> Dictionary:
 		for cell: Vector2i in terrain.get("rocks", []):
 			rocks[cell] = true
 		var stone := ground_colour("stone")
+		# The zone's torn edge stays framed (884): no-floor cells joined to the
+		# map's border are left empty, the frame showing through; only the woods
+		# and rocks inside the edge are drawn.
+		var beyond := _beyond_edge(image, size)
 		for y in size.y:
 			for x in size.x:
-				if image.get_pixel(x, y).a == 0.0:
+				if image.get_pixel(x, y).a == 0.0 and not beyond.has(Vector2i(x, y)):
 					image.set_pixel(x, y, stone if rocks.has(Vector2i(x, y)) else WOODS)
+		_draw_landmarks(image, level)
 	# A wall between two cells darkens the floor either side, once, so it shows
 	# at one pixel a cell. The walls Level puts round the zone's border are
 	# the map's own edge, drawn by its frame.
@@ -242,6 +247,62 @@ static func made_for(level: Dictionary) -> Dictionary:
 		if floor_at.has(cell):
 			image.set_pixelv(cell, image.get_pixelv(cell).lerp(WALL, 0.65))
 	return {"level": level, "cells": size, "image": image}
+
+
+## The empty cells of [param image] joined to its border through empty
+## cells, four ways (884): the band outside the zone's torn edge, which the
+## frame draws. cell -> true.
+static func _beyond_edge(image: Image, size: Vector2i) -> Dictionary:
+	var beyond := {}
+	var todo: Array[Vector2i] = []
+	for x in size.x:
+		todo.append(Vector2i(x, 0))
+		todo.append(Vector2i(x, size.y - 1))
+	for y in size.y:
+		todo.append(Vector2i(0, y))
+		todo.append(Vector2i(size.x - 1, y))
+	var inside := Rect2i(Vector2i.ZERO, size)
+	while not todo.is_empty():
+		var cell: Vector2i = todo.pop_back()
+		if beyond.has(cell) or not inside.has_point(cell) or image.get_pixelv(cell).a != 0.0:
+			continue
+		beyond[cell] = true
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			todo.append(cell + step)
+	return beyond
+
+
+## A landmark a player steers by (884; Forage.LANDMARKS: today the barrow's
+## mound) drawn as it looks from above, on its footprint (Level.building_rect,
+## the data the game uses): a ring of kerb stones, a grass dome inside, lit
+## toward its crown, and a dark doorway where a way out the map shows meets its
+## edge. The map hides nothing of the ground, so the mark shows as the ground
+## under it does; a hidden way (608) gets no doorway, as it gets no mark.
+static func _draw_landmarks(image: Image, level: Dictionary) -> void:
+	var inside := Rect2i(Vector2i.ZERO, image.get_size())
+	var kerb := UiTheme.color(&"map_kerb")
+	var doorway := UiTheme.color(&"map_doorway")
+	var grass := ground_colour("grass")
+	for building: Variant in level.get("buildings", []):
+		if not building is Dictionary or not str(building.get("slot", "")) in Forage.LANDMARKS:
+			continue
+		var found: Variant = Level.building_rect(building)
+		if not found is Rect2i:
+			continue
+		var rect: Rect2i = found
+		var crown := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) / 2.0
+		var reach := maxf(minf(rect.size.x, rect.size.y) / 2.0, 1.0)
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				var cell := Vector2i(x, y)
+				if not inside.has_point(cell):
+					continue
+				var ring := x == rect.position.x or y == rect.position.y or x == rect.end.x - 1 or y == rect.end.y - 1
+				var lift := clampf(1.0 - Vector2(cell).distance_to(crown) / reach, 0.0, 1.0) * RELIEF * 2.0
+				image.set_pixelv(cell, kerb if ring else grass.lightened(lift))
+		for link: Dictionary in level.get("links", []):
+			if not bool(link.get("hidden", false)) and link.get("tile") is Vector2i and rect.has_point(link["tile"]) and inside.has_point(link["tile"]):
+				image.set_pixelv(link["tile"], doorway)
 
 
 ## The rest of rebuild: the starts, the ways out and the places.

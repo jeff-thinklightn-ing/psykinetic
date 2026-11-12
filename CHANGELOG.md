@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The maps show each place's own ragged edge against the frame instead of a square of woods, and the barrow's mound is drawn as you see it from above: a ring of stones, a grassy dome and its dark doorway (884).
 - You're told in chat when your gear is named, grows, becomes a bane, takes a grudge or has its vengeance, and when a named thing of yours goes to someone else or comes back to you (133 amended (1)).
 - The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
 - In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).

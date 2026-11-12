@@ -19,7 +19,7 @@ extends RefCounted
 ##
 ## Colours (type Psykinetic): backing, backing_deep, slot, edge, text, text_dim,
 ## brass, brass_bright, rust, alarm, party, aloud, friend, water, outline; the maps' ground
-## (873, terrain's colours from above): map_grass, map_dirt, map_stone, map_sand, map_forest, map_floor, map_water; map_woods (873 amended (1)).
+## (873, terrain's colours from above): map_grass, map_dirt, map_stone, map_sand, map_forest, map_floor, map_water; map_woods (873 amended (1)); map_kerb, map_doorway (884: a landmark's ring of stones and its dark way in).
 ## Fonts: serif, serif_bold, sans, sans_bold. Sizes: title, heading, hud,
 ## body, caption, small, speech. Constants: unit, pad, row, section, slot,
 ## slot_gap, radius, margin, outline, square, square_gap, half_gap, mark (a quest line's drawn tick or dot).
