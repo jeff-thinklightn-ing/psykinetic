@@ -58,6 +58,8 @@ func _ready() -> void:
 	_test_json_keep()
 	_test_runner()
 	_test_spots()
+	_test_named_refusals()
+	_test_trades_preview()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1724,7 +1726,7 @@ func _test_spots() -> void:
 	wilds.working.undo()
 	_check((wilds.working.config["spots"] as Array).size() == 2, "undone: the fire spot back")
 	var preview := wilds.spot_preview()
-	_check(preview.size() == 2 and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind (%s)" % [preview])
+	_check(preview.size() == 3 and preview[2].begins_with("the town's trades in store") and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind (%s)" % [preview])
 	var shown := BuilderSession.spot_words(wilds.working.config)
 	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (192, 210) facing (193, 209)" in shown,
 		"accepted: both spots in the level, said in the situation (%s)" % shown)
@@ -1770,3 +1772,58 @@ func _test_spots() -> void:
 	var offered: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "spot")
 	_check(not offered.is_empty() and offered[0]["input_schema"]["properties"]["use"]["enum"] == Level.SPOT_USES and "spot lays where one townsperson stands" in BuilderSession.system_prompt(),
 		"the tool offered (npc's uses and poses) and the prompt says it")
+
+
+func _test_named_refusals() -> void:
+	print("\n== what stands there, named (voice's words) ==")
+	# Umbrage's store and temple: each chest by what it is.
+	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	var named := {
+		Vector2i(190, 196): "the store chest", Vector2i(193, 196): "the shop counter", Vector2i(198, 201): "the temple's chest",
+	}
+	for at: Vector2i in named:
+		var out := wilds.run_tool("spot", {"at": [at.x, at.y], "use": "square", "face": [at.x, at.y + 1]})
+		var said := "%s holds %s; lay the spot beside it" % [at, named[at]]
+		_check(not out.get("ok", true) and str(out.get("text")) == said, "a spot on %s: refused, \"%s\" (%s)" % [named[at], said, out.get("text")])
+	# A field: a way off, a monster and a crate, each by name, to the spot tool and to a move.
+	var field := _doc()
+	field.config["starts"] = [[2, 2]]
+	field.config["places"] = {"store": {"at": [20, 15], "kind": "stockpile", "holder": "town"}}
+	var session := BuilderSession.new(field, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	session.working.apply_changes({"cells": {Vector2i(6, 6): "monster_robber", Vector2i(7, 7): "crate"}, "covers": [Vector2i(6, 6), Vector2i(7, 7)]})
+	session.working.put_link(Vector2i(5, 5), {"at": [5, 5], "to_map": "wilds", "to_spawn": "from_test_field"})
+	var robber := "a " + str(Monster.kinds().get("robber", {}).get("label", "robber")).to_lower()
+	var cases := {
+		Vector2i(5, 5): "(5, 5) is the way to wilds; lay the spot beside it",
+		Vector2i(6, 6): "(6, 6) holds %s; lay the spot beside it" % robber,
+		Vector2i(7, 7): "(7, 7) holds a crate; lay the spot beside it",
+	}
+	for at: Vector2i in cases:
+		var out := session.run_tool("spot", {"at": [at.x, at.y], "use": "square", "face": [at.x + 1, at.y]})
+		_check(not out.get("ok", true) and str(out.get("text")) == cases[at], "a spot there: \"%s\" (%s)" % [cases[at], out.get("text")])
+	_check(session._cant_take(Vector2i(7, 7)) == "(7, 7) holds a crate already" and session._cant_take(Vector2i(5, 5)) == "(5, 5) is the way to wilds already"
+		and session._cant_take(Vector2i(7, 7), [Vector2i(7, 7)]).is_empty(),
+		"moved onto them: what is there, named (%s; %s)" % [session._cant_take(Vector2i(7, 7)), session._cant_take(Vector2i(5, 5))])
+
+
+func _test_trades_preview() -> void:
+	print("\n== the town's trades, by economy's rules, against the work spots (859 amended (1)) ==")
+	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	var before := wilds.trade_preview("store")
+	for words: String in ["the town's trades in store, by economy's rules: ", "smith at the forge, works about ", "cook at the kitchen",
+			"taverner at the inn (if economy seats one)", "priest at the temple (if economy seats one)", "woodcutter at the woodlot woodlot",
+			"vendor at the stall weapon_stall"]:
+		_check(words in before, "Umbrage's trades: \"%s\" (%s)" % [words, before])
+	_check(not "spots laid, no building" in before and "no work spot yet" in before, "no work spot laid yet: said, and no mismatch the other way")
+	var named := false
+	for name: String in ["Margery", "Dunstan", "Aldous", "Brother Cuth", "Ned", "Old Tam"]:
+		named = named or name in before
+	_check(not named, "no name of economy's lists read into it")
+	var keeper := wilds.run_tool("spot", {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]})
+	var keeper_text := str(keeper.get("text"))
+	_check(keeper.get("ok", false) and "the town's trades in store" in keeper_text and "merchant: spots laid, no building" in keeper_text,
+		"a merchant's spot, nothing in town calling for one: said both ways (%s)" % keeper_text)
+	var lines := wilds.spot_preview()
+	_check(lines.size() == 2 and lines[1].begins_with("the town's trades in store"), "the proposal's reading ends with the trades line (%s)" % [lines])
+	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	_check("none (no building with a use, no work site)" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")

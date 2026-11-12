@@ -1551,10 +1551,12 @@ func _ground_near(cell: Vector2i) -> String:
 func _cant_take(cell: Vector2i, own: Array = []) -> String:
 	if not area.has_point(cell):
 		return "%s is outside the area" % [cell]
+	if cell not in own and holds_thing(cell):
+		return "%s holds %s already" % [cell, held_words(cell)]
 	if working.map.cell(cell) not in WALKED and cell not in own:
 		return "%s is %s: it goes on ground" % [cell, working.map.cell(cell)]
-	if cell not in own and (not working.entry_of(cell).is_empty() or not working.link_of(cell).is_empty()):
-		return "something stands on %s already" % [cell]
+	if cell not in own and not working.link_of(cell).is_empty():
+		return "%s is %s already" % [cell, way_words(working.link_of(cell))]
 	return ""
 
 
@@ -2592,8 +2594,10 @@ func _decor(given: Dictionary) -> Dictionary:
 			why = "there is no wall on the %s side of %s" % [side, at]
 		return _no("a %s does not fit at %s: %s" % [kind, at, why])
 	if kind in BULKY_DECOR:
-		if not working.entry_of(at).is_empty() or not working.link_of(at).is_empty():
-			return _no("something stands on %s already" % [at])
+		if not working.link_of(at).is_empty():
+			return _no("%s is %s already" % [at, way_words(working.link_of(at))])
+		if holds_thing(at):
+			return _no("%s holds %s already" % [at, held_words(at)])
 		var before := narrow_ways()
 		var shut := narrow_ways({at: true}).filter(func(cell: Vector2i) -> bool: return cell not in before)
 		if not shut.is_empty():
@@ -2677,7 +2681,7 @@ func _spot(given: Dictionary) -> Dictionary:
 			return _no(warning.trim_suffix("; left out"))
 	var kept_clear := _spot_clear(at)
 	if not kept_clear.is_empty():
-		return _no("a spot is not %s: %s is %s" % [kept_clear[0], at, kept_clear[1]])
+		return _no(kept_clear)
 	var unseated := pose == "sit" and not seat_at(at)
 	if not reached().has(at):
 		return _no("%s is not reached from where players and townsfolk come in" % [at])
@@ -2708,22 +2712,26 @@ func _spot(given: Dictionary) -> Dictionary:
 	var users := spot_users(town, use, trade)
 	if not users.is_empty():
 		said += ". " + users
+	if use == "work":
+		said += ". " + trade_preview(town)
 	return {"ok": true, "text": said}
 
 
-## Why a spot may not be at [param at], as [what it is not, what is there],
-## or []: a fire, a way off the level, an entry, a doorway (a door edge on
-## one of its sides) or the cell in front of a building's door.
-func _spot_clear(at: Vector2i) -> Array:
+## Why a spot may not be at [param at], said whole, or "": a fire, a way off
+## the level, a thing (by name, voice's words), a doorway (a door edge on one
+## of its sides) or the cell in front of a building's door.
+func _spot_clear(at: Vector2i) -> String:
+	var kept := func(what: String, is_what: String) -> String: return "a spot is not %s: %s is %s" % [what, at, is_what]
 	if working.map.cell(at) == "fire":
-		return ["on a fire", "a fire"]
+		return kept.call("on a fire", "a fire")
+	# voice's words: what is there by name, and where to lay it instead.
 	if not working.link_of(at).is_empty():
-		return ["on a way off the level", "one"]
-	if not working.entry_of(at).is_empty():
-		return ["on an entry", "one"]
+		return "%s is %s; lay the spot beside it" % [at, way_words(working.link_of(at))]
+	if holds_thing(at):
+		return "%s holds %s; lay the spot beside it" % [at, held_words(at)]
 	for side in HeightTools.FOUR:
 		if working.map.edge(Terrain.edge_key(at, side)) == "door":
-			return ["in a doorway", "beside the door on its %s side" % side_name(side)]
+			return kept.call("in a doorway", "beside the door on its %s side" % side_name(side))
 	for other: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
 		var their: Variant = Level.building_rect(other)
 		if not their is Rect2i:
@@ -2731,8 +2739,52 @@ func _spot_clear(at: Vector2i) -> Array:
 		var facing := Level.building_facing(other)
 		var door := solid_door(other) if str(other.get("slot", "")) in Level.SOLID else Level.front_cell(their, facing) - facing
 		if door != Level.NO_DOOR and at in [door, door + facing]:
-			return ["in a doorway or before a door", "the door of the %s or the cell before it" % building_name(other)]
-	return []
+			return kept.call("in a doorway or before a door", "the door of the %s or the cell before it" % building_name(other))
+	return ""
+
+
+## What stands on [param at], named for a refusal (voice's words): its own
+## name first, then what it is: the store chest (a depot), the shop counter,
+## a locker, the temple's chest, a chest, a crate, a barrel; a monster by its
+## kind ("a robber").
+func held_words(at: Vector2i) -> String:
+	var entry := working.entry_of(at)
+	if not str(entry.get("name", "")).is_empty():
+		return str(entry["name"])
+	var props: Dictionary = entry.get("props", {}) if entry.get("props") is Dictionary else {}
+	var cell := working.map.cell(at)
+	if cell == "chest":
+		for use: String in HELD_CHESTS:
+			if props.get(use, false):
+				return HELD_CHESTS[use]
+		return "a chest"
+	if cell.begins_with("monster_"):
+		var kind := cell.trim_prefix("monster_")
+		var label := str(Monster.kinds().get(kind, {}).get("label", kind.replace("_", " "))).to_lower()
+		return _a(label)
+	if not str(props.get("cache", "")).is_empty():
+		return "a cache"
+	return _a(cell.replace("_", " "))
+
+
+## Whether a thing stands on [param at]: an entry there, a thing place() puts
+## down, or a monster.
+func holds_thing(at: Vector2i) -> bool:
+	var cell := working.map.cell(at)
+	return not working.entry_of(at).is_empty() or cell in THINGS.values() or cell.begins_with("monster_")
+
+
+## A chest by its use, as held_words says it (voice).
+const HELD_CHESTS := {"depot": "the store chest", "shop": "the shop counter", "locker": "a locker", "temple": "the temple's chest"}
+
+
+## A way off the level, for a refusal: "the way to <level>" (voice).
+static func way_words(link: Dictionary) -> String:
+	return "the way to %s" % str(link.get("to_map", "another level"))
+
+
+static func _a(word: String) -> String:
+	return ("an " if not word.is_empty() and word[0] in "aeiou" else "a ") + word
 
 
 ## What a sit spot sits on (859, npc's reading): what the warning names.
@@ -2742,7 +2794,7 @@ const SEAT_SLOTS: Array[String] = ["building.hall_chair", "building.smith_bench"
 ## The trades that keep a stall or counter (npc's contract: they "tend"),
 ## and the starter stall's keeper, Rolf, whose work spot names "vendor"
 ## (Main.VENDOR_TRADE, npc's 853 amended (3); no Production trade).
-const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper", "vendor"]
+const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper", Main.VENDOR_TRADE]
 
 
 ## Whether a body sits on something at [param at] (859, npc's reading: the
@@ -2929,7 +2981,83 @@ func spot_preview() -> Array[String]:
 			continue
 		seen[key] = true
 		out.append(spot_users(spot["town"], spot["use"], spot["trade"]))
+	var towns: Array[String] = []
+	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
+		if spot["town"] not in towns:
+			towns.append(spot["town"])
+	for town in towns:
+		out.append(trade_preview(town))
 	return out
+
+
+## The trades [param town]'s buildings and work sites call for, by economy's
+## rules (859 amended (1), npc's readings), against the work spots laid: each
+## building of the town with a use, its trade from economy.json's buildings
+## (a keeper's, as the inn's taverner, seated once it stands), a temple's or
+## healer's hut's from return.places, a work site's (a woodlot's woodcutter)
+## from sites, a stall's keeper (Main.VENDOR_TRADE); the hours on the day's
+## table alone (no resident's clock: "about"); a trade economy seats "if
+## economy seats one" (npc). No name is read. A trade with work spots laid and
+## nothing in the town that calls for it is said too (the coordinator).
+func trade_preview(town: String) -> String:
+	var economy := Production.read_rules(Economy.PATH)
+	var rows: Dictionary = economy.get("buildings", {})
+	var seats: Dictionary = economy.get("return", {}).get("places", {})
+	var sites: Dictionary = economy.get("sites", {}).get("trades", {})
+	var needs := {}  # trade -> {where: PackedStringArray, seat: bool, outside: bool}
+	var need := func(trade: String, where: String, seat: bool, outside := false) -> void:
+		if trade.is_empty():
+			return
+		var row: Dictionary = needs.get(trade, {"where": PackedStringArray(), "seat": false, "outside": false})
+		if not row["where"].has(where):
+			row["where"].append(where)
+		row["seat"] = row["seat"] or seat
+		row["outside"] = row["outside"] or outside
+		needs[trade] = row
+	for building: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		if not building is Dictionary or str(building.get("town", "")) != town:
+			continue
+		var use := str(building.get("use", ""))
+		var row: Dictionary = rows.get(use, {}) if rows.get(use) is Dictionary else {}
+		need.call(str(row.get("trade", "")), "the " + use, false)
+		var keeper: Variant = row.get("keeper")
+		if keeper is Dictionary:
+			need.call(str(keeper.get("trade", "")), "the " + use, true)
+		var kind := str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), building.get("kind", "")))
+		if seats.get(kind) is Dictionary:
+			need.call(str(seats[kind].get("trade", "")), "the " + kind.replace("_", " "), true, bool(seats[kind].get("outside", false)))
+	var places: Dictionary = working.config.get("places", {}) if working.config.get("places") is Dictionary else {}
+	for key: String in places:
+		var place: Variant = places[key]
+		if not place is Dictionary or str(place.get("town", "")) != town:
+			continue
+		var kind := str(place.get("kind", ""))
+		for trade: String in sites:
+			if str(sites[trade]) == kind:
+				need.call(trade, "the %s %s" % [kind.replace("_", " "), key], false)
+		if kind == "stall":
+			need.call(Main.VENDOR_TRADE, "the stall " + key, false)
+	var laid := {}
+	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
+		if spot["town"] == town and spot["use"] == "work":
+			laid[spot["trade"]] = int(laid.get(spot["trade"], 0)) + 1
+	var said := PackedStringArray()
+	for trade: String in needs:
+		var row: Dictionary = needs[trade]
+		var hours: Array[int] = []
+		for hour in 24:
+			if Townsfolk.whereabouts(trade, float(hour)) == "work":
+				hours.append(hour)
+		var count := int(laid.get(trade, 0))
+		said.append("%s at %s%s%s, works about %s: %s" % [trade, ", ".join(row["where"]), " (if economy seats one)" if row["seat"] else "",
+			", outside the town" if row["outside"] else "", _spans(hours) if not hours.is_empty() else "no hours on the day's table",
+			"no work spot yet" if count == 0 else "%d work spot%s" % [count, "" if count == 1 else "s"]])
+	for trade: String in laid:
+		if not needs.has(trade):
+			said.append("%s: spots laid, no building" % trade)
+	if said.is_empty():
+		return "the town's trades in %s, by economy's rules: none (no building with a use, no work site)" % town
+	return "the town's trades in %s, by economy's rules: %s" % [town, "; ".join(said)]
 
 
 ## Why a wall_hearth at [param at] against its [param step] wall is not on an

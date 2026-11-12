@@ -49399,6 +49399,24 @@ with npc's uses and the prompt saying it). Tools only: nothing player-facing, no
 protocol unchanged; no new class_name. Step 2 (the ghost in game: a marker for each spot, facing and
 pose) is an amendment of this, when built.
 
+859 amended (1) (the coordinator's approval, with npc's readings): the town's trades beside who
+comes. Who comes reads residents who exist; a town being laid out has buildings before anyone works
+them, so maps could not see which work spots a building calls for. BuilderSession.trade_preview(town)
+lists each trade the town's buildings and work sites call for by economy's rules (levels/economy.json):
+a building's use row's trade, a keeper's (the inn's taverner), a temple's or healer's hut's from
+return.places (outside the town when it says so), a work site's from sites.trades (a woodlot's
+woodcutter), a stall's keeper (Main.VENDOR_TRADE). A trade economy seats is said "if economy seats
+one" (npc's words). Its hours are the day's table alone (Townsfolk.whereabouts with no type or
+worker, offset 0), said "about". Each is set against the work spots laid for it ("no work spot yet",
+or how many), and a trade with spots laid and nothing in the town calling for it is said ("spots
+laid, no building", the coordinator), so a mismatch shows both ways. No name of economy's lists is
+read; no count of residents. It ends spot_preview (a line a town with spots: the proposal's summary,
+the runner's SPOTS lines) and follows a work spot's answer. builder_test _test_trades_preview
+(Umbrage's smith, cook, taverner and priest seated if economy seats one, woodcutter, vendor; no work
+spot yet; no names; a merchant's spot said both ways; the preview's last line; a field with nothing,
+said so). Tools only: nothing player-facing, no package, no bullet; protocol unchanged; no new
+class_name.
+
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 
 The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it
