@@ -43,6 +43,7 @@ var _cost: Label
 ## Whether the shown answer can be accepted (no layout fault).
 var acceptable := true
 static var _whole: RegEx
+var _fit_queued := false
 
 
 func _init() -> void:
@@ -81,6 +82,10 @@ func _init() -> void:
 	_body.theme_type_variation = &"Stack"
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.add_child(_body)
+	# A RichTextLabel knows its height only once it has its width: fit again
+	# whenever the answer's height settles, so the pane hugs it (885, the
+	# sheet: no glass standing empty under a short answer).
+	_body.minimum_size_changed.connect(_queue_fit)
 	box = LineEdit.new()
 	box.name = "BuilderBox"
 	box.max_length = BuilderHost.MAX_TEXT
@@ -266,8 +271,11 @@ func _bullet(text: String) -> Control:
 	var row := HBoxContainer.new()
 	row.name = "Line"
 	var dot := Label.new()
-	dot.theme_type_variation = &"Body"
+	dot.name = "Bullet"
+	dot.theme_type_variation = &"LineBullet"
 	dot.text = "•"
+	# On the first line, the wrapped lines hanging level with the words.
+	dot.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	row.add_child(dot)
 	var rich := RichTextLabel.new()
 	rich.name = "Text"
@@ -283,7 +291,14 @@ func _bullet(text: String) -> Control:
 
 
 ## The pane grows with its answer down to the screen's foot, then scrolls.
+func _queue_fit() -> void:
+	if not _fit_queued:
+		_fit_queued = true
+		_fit.call_deferred()
+
+
 func _fit() -> void:
+	_fit_queued = false
 	if _scroll == null or not is_inside_tree():
 		return
 	var holder := get_parent_control()

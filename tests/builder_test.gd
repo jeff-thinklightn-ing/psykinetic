@@ -1742,7 +1742,7 @@ func _test_spots() -> void:
 	wilds.working.undo()
 	_check((wilds.working.config["spots"] as Array).size() == 2, "undone: the fire spot back")
 	var preview := wilds.spot_preview()
-	_check(preview.size() == 3 and preview[2].begins_with("the town's trades in store") and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind (%s)" % [preview])
+	_check(preview.size() == 2 + wilds.trade_lines("store").size() and preview[2].begins_with("the town's trades in store") and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind, then the trades a line each (%s)" % [preview])
 	var shown := BuilderSession.spot_words(wilds.working.config)
 	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (192, 210) facing (193, 209)" in shown,
 		"accepted: both spots in the level, said in the situation (%s)" % shown)
@@ -1844,7 +1844,10 @@ func _test_trades_preview() -> void:
 	_check(keeper.get("ok", false) and "the town's trades in store" in keeper_text and "merchant: spots laid, no building" in keeper_text,
 		"a merchant's spot, nothing in town calling for one: said both ways (%s)" % keeper_text)
 	var lines := wilds.spot_preview()
-	_check(lines.size() == 2 and lines[1].begins_with("the town's trades in store"), "the proposal's reading ends with the trades line (%s)" % [lines])
+	var trades := wilds.trade_lines("store")
+	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines[1].begins_with("the town's trades in store, by economy's rules: ")
+		and not "; " in lines[2] and "; ".join(PackedStringArray(lines.slice(1))) == wilds.trade_preview("store"),
+		"the proposal's reading ends with the trades, a trade a line (885), joined the trades line as before (%s)" % [lines])
 	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("none (no building with a use, no work site)" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
 
@@ -2048,4 +2051,10 @@ Streets: the door of the T1 temple"})
 	words = answer.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Words"))
 	_check(words.size() == 2 and panel.acceptable and panel.enter_words() == "accept", "an old server's summary: its lines as the words, Enter accepts")
 	_check((panel.find_child("Cost", true, false) as Label).text == "$0.010   this area $0.020", "the cost at the foot")
+	for i in 4:
+		await get_tree().process_frame
+	var scroll := answer.get_parent() as Control
+	var box_gap := panel.box.get_global_rect().position.y - scroll.get_global_rect().end.y
+	_check(scroll.size.y <= answer.get_combined_minimum_size().y + 1.0 and box_gap < 60.0 and panel.size.y < holder.size.y - BuilderPanel.TOP - BuilderPanel.FOOT_ROOM - 200.0,
+		"a short answer: the pane hugs it, the box straight after it (answer %.0f, shown %.0f, gap %.0f, pane %.0f)" % [answer.get_combined_minimum_size().y, scroll.size.y, box_gap, panel.size.y])
 	holder.queue_free()

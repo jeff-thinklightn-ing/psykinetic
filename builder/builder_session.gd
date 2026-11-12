@@ -3036,8 +3036,10 @@ func spot_preview() -> Array[String]:
 	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
 		if spot["town"] not in towns:
 			towns.append(spot["town"])
+	# A trade a line (885: the answer panel's bullets); joined with "; " they
+	# read as trade_preview's one line, so the summary string is as before.
 	for town in towns:
-		out.append(trade_preview(town))
+		out.append_array(trade_lines(town))
 	return out
 
 
@@ -3051,6 +3053,12 @@ func spot_preview() -> Array[String]:
 ## economy seats one" (npc). No name is read. A trade with work spots laid and
 ## nothing in the town that calls for it is said too (the coordinator).
 func trade_preview(town: String) -> String:
+	return "; ".join(trade_lines(town))
+
+
+## trade_preview a trade a line (885), the first headed "the town's trades
+## in <town>, by economy's rules: ".
+func trade_lines(town: String) -> PackedStringArray:
 	var economy := Production.read_rules(Economy.PATH)
 	var rows: Dictionary = economy.get("buildings", {})
 	var seats: Dictionary = economy.get("return", {}).get("places", {})
@@ -3107,8 +3115,9 @@ func trade_preview(town: String) -> String:
 		if not needs.has(trade):
 			said.append("%s: spots laid, no building" % trade)
 	if said.is_empty():
-		return "the town's trades in %s, by economy's rules: none (no building with a use, no work site)" % town
-	return "the town's trades in %s, by economy's rules: %s" % [town, "; ".join(said)]
+		said.append("none (no building with a use, no work site)")
+	said[0] = "the town's trades in %s, by economy's rules: %s" % [town, said[0]]
+	return said
 
 
 # --- What is read once a change (867) ---------------------------------------------
