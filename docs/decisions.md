@@ -10529,7 +10529,8 @@ changes a line.
 tests/heavy_job_test, the probe stubbed: with 12.5 GB free and saturn answering, a take of suite is
 granted as suite_remote, holds both kinds, is released by `release <tree> suite`, and a local run inside
 takes it back. A probe that hangs (1 s limit) or errs leaves a suite. LAND_LOCAL=1 never asks, and a
-scene is never swapped. Tools and tests only; protocol unchanged; no class_name; no bullet.
+scene is never swapped. The test never asks saturn: its probe is stubbed for the whole file (a
+run of it in a checkout with 878 asked the real remote_tests.sh kind and swapped every take). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 394 amended (34) (perf, 2026-11-12; the coordinator's ask after 878; label from tools/decision_number.sh):
 a memory wait's line names the lean run. A full suite out of reach whose lean run is out of reach too

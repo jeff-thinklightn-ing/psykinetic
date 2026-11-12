@@ -21,6 +21,10 @@ STATE = tempfile.mkdtemp(prefix="heavy_job_test_")
 os.environ["HEAVY_JOBS_DIR"] = STATE
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 import heavy_job as gate  # noqa: E402
+# Never ask saturn from a test (394 amended (33)): a take of suite asks the
+# checkout's own tools/remote_tests.sh kind, which reaches saturn. Stubbed
+# here as "saturn does not answer"; the swap's own checks set their own.
+gate.PROBE_COMMAND = [sys.executable, "-c", "print('suite')"]
 
 real_boot_time = gate.boot_time
 gate.boot_time = lambda: 0.0  # Entries made up as hours old stay after this machine's boot.
