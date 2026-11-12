@@ -10242,6 +10242,169 @@ tests/heavy_job_test: an import starts beside a suite and two scenes, not beside
 uncounted import; one import is not counted against a scene, two are; an export still counts.
 Tools only.
 
+394 amended (23) (perf, 2026-11-09; the coordinator's approval, release's label): the suite runs lean
+at once when the full suite is out of reach. Nine landings queued for 97 minutes after the v0.1.209
+unfreeze. The full suite's estimate (19.8 GB, from items' real 17.3 GB full run on 11-07, 476 s) plus
+the 8 GB margin needs about 28 GB free, which the machine hasn't had since the sessions' own processes
+grew (claude, node and Chrome held about 18 GB). Every suite since then had run as suite_lean3 (6.8 GB,
+about 20 minutes), but only after waiting LEAN_AFTER_SECONDS (5 minutes) for a full slot that never came.
+- A kind marked "lean_first" (the suite) goes lean without that wait: as soon as the full run is out of
+  reach and the lean one is in it. When the full suite fits, it still runs full (about 8 minutes).
+- The estimate isn't capped or reset: the 17.3 GB peak was a real full run, and an estimate set back
+  to the lean one's would start a full suite where it can't fit. The 8 GB margin is unchanged (Jeff's rule
+  from 10-17).
+- What held the queue that afternoon was the lean suite itself out of reach (11.3 GB free with nothing
+  heavy running, 14.8 wanted). This doesn't change that; only freeing memory or the margin does.
+heavy_job_test: lean at once, still full when it fits, not when the lean one doesn't fit either, and the
+suite's row is lean_first over a kinds.json written before it. Tools only; protocol unchanged; no
+class_name; no bullet.
+394 amended (24) (perf, 2026-11-09; the coordinator's approval, release's label): a waiting job
+re-reads its kind's estimate at every look, its lean variant's once it has gone lean, never the one read when it
+queued. At 22:28 one physics run under `scene` (a many-Godot network test, 11.7 GB at once) raised the scene
+estimate to 13.6 GB, and the scenes queued in the next minutes kept that figure while it fell to 4.4: each wanted
+13.6 + 8 GB beside a full suite owed 19.7 of 36 free, and the scenes behind, judging them by the fresh figure as
+able to start, never went past. Ten scenes and an import waited behind seven suites with a scene slot free. Passing
+is unchanged: a job that can start goes past rows waiting on their own kind or out of reach, first-come within a kind,
+and a wait on memory the running jobs will give back still holds those behind it, so a suite is never delayed.
+On load: a landing gets back the up-to-two scenes beside its suite (below normal) that 394 amended (17)
+always allowed and the stale estimates had left unused; land.sh and what runs inside it are unchanged. Release
+watches net_test's late-join flake against scenes beside a suite; if it rises, the answer is a longer wait in
+the test, not fewer scenes.
+heavy_job_test: a waiter queued under a 20 GB estimate starts, without requeueing, once it falls to 2; a scene
+behind a suite waiting on such memory stays behind it.
+A test that starts several Godots, run alone, takes a kind of its own, net (13.6 GB, one at a time, never beside
+a bench): neither scene nor suite, whose estimates every tree waits on. heavy_job refuses net_test under any other
+kind before it queues (MANY_GODOT_TESTS names the tests; add one there when another starts several Godots).
+heavy_job_test: net_test under scene refused, net one at a time. Tools only; protocol unchanged; no class_name; no bullet.
+Fixed 11-10 (combat's report): the name was matched as a substring of the command, so combat's free_net_test.tscn
+(one Godot, 0.75 GB) was refused as a scene and, run as net, waited 51 minutes on net's 13.6 GB. many_godot_test
+now matches a file named for the test (net_test.sh, net_test.ps1, res://tests/net_test.tscn), never a name it is
+part of; heavy_job_test checks both.
+
+394 amended (25) (perf, 2026-11-10; the coordinator's approved design, release's label): release can move
+one queued entry to the front. Twice in a day a fix every landing was paying for (the night's, then the
+morning's back-step mend for view_test) had to ride a take ten places back, because the queue could not be
+reordered. `heavy_job front <tree> <kind> --by release --why "<reason>"` makes that tree's queued entry first
+among the waiters.
+- Only its place changes. The entry gets an "order" just below the first waiter's, and the queue is sorted by
+  it (else by its ticket's time, as before), in one write under the state lock. The ticket file keeps its name:
+  a renamed one reads to its own waiter as dropped, and the waiter exits 3. Running jobs are never touched, so
+  the fronted job still waits for room, its kind's cap and the kinds it excludes, and starts on its waiter's
+  next look once it may. No new take, no nesting and no new wait, so none of 394's stall shapes: waiters
+  already re-read the queue at every look, and the rules for going past a row are unchanged.
+- Refused: --by anything but release (FRONT_BY; the refusal names the rule and is logged; names are an honour
+  system, as the land lock's are), no --why, an entry not queued, an entry whose waiter is gone (one that
+  could never start would hold the head), and a second front while an earlier fronted entry still waits.
+- The log's "front" line names who fronted it, why, and the entries it jumped; the daily summary lists it,
+  and status marks a fronted entry with its reason.
+- Its use, for CLAUDE.md (the coordinator's words): release calls it for a change every queued landing is
+  paying for (a failing check on main, a broken tool) or on Jeff's word, never for a tree's convenience; a
+  tree doesn't ask release for it, it tells the coordinator why.
+heavy_job_test: refusals (another tree, no reason, not queued, no live waiter, a second front); fronted
+first with its ticket's name kept; the log and the summary. With a suite running and a bench queued ahead,
+a fronted suite waits for the running one, starts when it ends, never beside the bench, and the bench it
+passed runs once it is released. Tools only; protocol unchanged; no class_name; no bullet.
+
+394 amended (26) (perf, 2026-11-10; release's label, the coordinator's approval of the output): `heavy_job
+status` says why each queued row waits. Release asked why 13 scenes sat queued with a scene slot free: builder's
+full suite had taken an 18.1 GB estimate and used 4.1, so 14 GB was owed to it, and a scene's 1.3 + 8 didn't fit
+in what was left. Status gave no reason per row.
+- The first line ends with what the running jobs are owed of their estimates (RAM and commit), and each running
+  line with its own: "; owed 14.0 GB".
+- Each queued line ends with its reason: "; may start at its next look" (with what it would go past by
+  backfill), "; waits: " and decide's answer (memory with the free, owed and wanted figures, the count, a
+  kind's cap, a kind it excludes), or, behind a head, "; waits: behind the head, <tree> <kind>, which waits on:"
+  that head's answer. These are wait_turn's own passes and decide, read only (queue_reasons), so status and
+  the waiters can't disagree.
+- The state is read under the state lock exactly as before and judged after it is let go; status never writes
+  it, so a status call can't stall a waiter. Each line's earlier text is unchanged, and the reason comes after
+  "; ", so release's and watch's reads still match; summary is untouched.
+heavy_job_test: owed on the first line and on a running job's; a head waiting on memory says so with the
+figures; a scene and an import behind it name that head; with room the head may start; status moves nothing.
+Tools only; protocol unchanged; no class_name; no bullet.
+
+394 amended (27) (perf, 2026-11-10; release's label, the coordinator's approved design): the gate's RAM
+estimates are measured as the working set at once, and a suite chooses lean at its turn, not when it queues.
+The coordinator asked whether scenes should give way to queued landings. They shouldn't: out_of_reach already
+counts every running gated job's memory as given back, so scenes never made a suite lean, and the three waits a
+suite had on the running count came to 6.8 minutes in the day. What landings paid was the lean runs themselves,
+about 21 minutes against a full suite's 14. From 10:22 every suite went lean, judged at 20.5 + 8 GB, an estimate
+that was the sum of each process's own peak. A suite's processes peak at different moments, so the sum ran 2-3
+GB over anything the suite held: today's full suites were 14.0-20.5 GB summed and 11.8-17.7 at once.
+- Every kind's RAM estimate now comes from the most its processes held together: each watch's sum, never under
+  the largest single process's own peak (a process that peaked between two watches is still counted, since the
+  job held at least that much then). It follows the same rule as before (updated_estimate: up at once, down a
+  fifth). Commit is unchanged: it was already measured at once, from the job object's own exact peak. A take's
+  attached processes are measured the same way (attached_once_gb).
+- kinds.json keeps both estimates for a while, ram_once_gb and ram_peaks_gb, each under that rule. ram_gb is the
+  one RAM_MEASURE names, and kinds() reads it from there over a ram_gb an older heavy_job.py wrote. Setting
+  RAM_MEASURE = SUMMED_PEAKS puts every kind back at once (the revert rule: one suite stopped for memory in the
+  first day and it goes back). `kinds` shows both figures ("; RAM by at once 17.7, summed peaks 20.5"), as does
+  each lean line, and the done line already had both.
+- The first run, take, attach or release seeds each measured row once (seed_measures, under the state lock,
+  logged as "measure"; status and kinds never write):
+  ram_peaks_gb is its ram_gb, and ram_once_gb is its last 20 done lines' working set at once replayed under
+  the rule (a lean variant uses its kind's lean runs), or else its ram_gb. From today's log: suite 17.7 (was
+  20.5), suite_lean3 6.1, scene 1.6, bench 1.6.
+- A suite stays full while it waits and chooses lean only when it would otherwise start: due_row judges it,
+  for its own waiter, for those queued beside it, and for status, as what it would run as at its turn. It goes
+  lean only when decide would start it and the full suite is out of reach, so (23)'s point holds: no waiting
+  first. Room at its turn starts it full. A full suite out of reach is judged as its lean row by those behind
+  it, so none of them can go past it, lean, and start first. Chosen at entry, the 10:36 suites went lean at
+  23-25 GB free while another suite ran, and stayed lean for the two hours to their turns. The lean line now
+  adds "; at its turn, full X + 8 GB" with both figures.
+Replay of today's 22 lean calls: on the at-once estimate alone (16.2 GB at 05:43, 17.7 from 10:36), 9 would
+have run full, judged on free RAM alone, which is a lower bound since what running jobs give back only adds room.
+Of the 5 lean starts, the free figure logged nearest each start (24.9-26.4 GB; start lines carry none) puts 3
+over 17.7 + 8, so with the choice at its turn those 3 would have run full. A take queued before this keeps the
+choice its own heavy_job.py made; no tree withdraws and requeues to pick it up. heavy_job_test: both measures
+under the rule, ram_gb from the named one over an older write, the switch back, the seed from log lines (lean
+and released lines left out) written once and logged, a process's own peak between two watches counted; due_row
+lean, full and gone lean; one behind a full suite out of reach doesn't pass it; queued while a suite runs it
+stays full and status says it waits on the count; room at its turn starts full; no room at its turn goes lean
+with no wait, and its lean line is written once with the full figure. Tools only; protocol unchanged; no
+class_name; no bullet. Landed, `heavy_job kinds` failed on the both-figures column (its format string one
+%s short; nothing the gate decides read it); fixed after, with a check that runs kinds and reads the suite's line.
+
+394 amended (28) (perf, 2026-11-10; label from tools/decision_number.sh, the coordinator's approval): a waiter's
+--expect is written to its queue entry, a job is held by one of its own kind ahead only while that one waits on
+its kind, and a wait names the row that holds it. Playtest queued its tour as a scene with --expect 25 (1500 s)
+behind terrain's bench. A scene may go past a bench only by backfill, ending before the bench's blocker (the
+suite running) does, and with suites back to back none ever had 25 minutes left, so the tour could never start.
+Its --expect lived only in its own waiter: every other waiter, and status, judged its row by the scene kind's
+recorded runs (171.7 s × 1.25), saw it free to go and held behind it, first come, and a scene never went past
+a scene. Seven scenes (enemy-ai's den-rule run among them) waited about 84 minutes behind a row that could not
+start, while each said, and status showed, that it waited on the head, a suite. Not from (26) or (27): the
+length was never shared since backfill (18), and (26)'s status named queue[0] whatever held the row. No suite
+was held. The coordinator had terrain withdraw its bench (to requeue when the landings drain) and the scenes ran.
+- The queue entry carries "expect_s" when its waiter has --expect. backfill_length reads it from a row judged
+  from the queue (judged_row: its due_row, its tree, its expect_s), so those behind and status count on the
+  length the waiter itself counts on. A waiter started from an older heavy_job.py writes none and is judged by
+  its kind's runs as before.
+- _passes: one of [job]'s own kind ahead holds it only while kind_blocked (its cap reached, or one it excludes
+  running). Held otherwise, it waits on a row before it, which [job] meets too, or on its own length at a
+  backfill, and the backfill reasons other than length depend only on the blockers and the table, which are
+  the same for both. So the only job that now goes first is a shorter one of the same kind.
+- passes_held returns the index of the row that holds the job; wait_turn's message, its "waiting" log line and
+  status name that row: "behind the head, <tree> <kind>" as before when it is the first, else "behind <tree>
+  <kind> (<n>th in the queue)", with that row's own decide answer and the backfill reason after.
+heavy_job_test: backfill_length from expect_s and the waiter's own first; the tour can't pass the bench, a short
+scene behind it passes both (the bench by backfill); with two scenes running the tour holds the scene behind it,
+and a scene at the cap holds its kind as before; through real waiters, a suite running, a bench queued, the tour
+(wait_turn with --expect 25, its entry carrying 1500 s) and three short scenes: two run, the tour and the third
+wait, status names the head bench for the tour with "going past it needs 1500 s" and the tour for the third; a
+scene done, the third starts and the tour still waits. The earlier check "a scene still waits behind a scene that
+may start" now gives that scene its runs, and a new one passes a scene held only by its own length. Tools only;
+protocol unchanged; no class_name; no bullet.
+A bug in it (release's report, release's ruling: no label, a sentence here): at 20:37 11-10 a model loaded
+outside the gate (about 11.8 GB of commit) put every queued suite out of reach even as lean3, and each, finding
+every row ahead out of reach and so taking itself for the head, stepped to the back in the order its waiter
+looked; physics and items, queued first, ended 13th and 14th. An out-of-reach row now keeps its place and jobs
+that fit go past it as before (_passes); the step to the back, kept since 10-18 for waiters from a heavy_job.py
+older than that rule (none left), and may_step_aside are gone. heavy_job_test: three out of reach queued, a job
+that fits starts past them and the three keep first-come order with no aside line (on main's gate they come
+out maps, items, physics).
+
 394 amended (31) (perf, 2026-11-11; release's two cases and its freeze rule, the coordinator's word to
 land it on its own ahead of (30); label from tools/decision_number.sh): a gate take held while its tree
 waits on the land lock no longer goes stale, never through a freeze, and land.sh never queues at the
@@ -49148,169 +49311,6 @@ Tests: level_test _test_crypt_ways (the arrivals in their anchors and on floor, 
 832, switched on (maps, 2026-11-10; the coordinator's package "the crypt's ways in", landing ON in one take with dungeon's 747 amended (8), "the fallen knight's quest, mended"; Jeff: "the crypt would be below the umbrage temple", and after v0.1.210 "it makes more sense if the knight is at the beginning by the actual altar"). (1) The links. The wilds' temple (Umbrage's chapel, 10 x 6 at (190,199) facing west) carries the chapel stair: its level_link at its back north-east corner (199,199) goes to barrow/from_chapel (40,2), open, where it went to barrow_deep/from_temple sealed by the draugr; no "cue", so the client draws the default "down". The First Hall's way up (40,1) comes out at the wilds' from_crypt (198,199), inside the temple beside the stair. The barrow mound's door (160,160) goes to barrow/from_breach (29,53), the far end of the robbers' dig off the camp (806 amended (11)), whose link (31,52) leads back out to wilds/from_barrow (160,159) by the door. The First Hall's sealed slab (30,8) goes to barrow_deep/from_temple (the quick way down kept for those who have beaten the draugr), and the deep's sealed shortcut (49,77) comes up at barrow/from_deep (31,8), in the First Hall, not the town. No wilds link leads into barrow_deep. from_barrow_shortcut (197,203) is kept, named by no link, so a barrow_deep laid before this take still comes out by the temple. (2) The travel rule: a level reached two ways from one other (the chapel stair and the breach both come up into the wilds) lets a named spawn beside another way back hold (Main._at_other_way_back: within a step of a link back that no building carries), so coming out by the breach lands at the mound, not up the temple's stair; an old spawn left behind by a moved building still gives way to the stair (714). (3) barrow_deep takes the switch-on keys (DEEP_SWITCH): generator crypt, heart lair, deep wing old_graves, chests 3, and every layout rule held, "arrival" with them; its chests roll the Ossuary's grave goods (its "chest": ossuary_grave, 622's mail kept), no cache (deep_cache dropped). The barrow holds "arrival" too, and 747 amended (8)'s giver walk inside it, the breach its "foes_door". level_test's SENSE_NOT_YET (barrow_deep) and SENSE_RULES_NOT_YET (the barrow's arrival) entries go, both depths now held to every rule. (4) The state between the deploy and the laying: the box keeps laid copies (the overlay) of both depths, so the shipped templates reach players at each depth's next generation (Regen re-lays from the repo template every 3 world days) or when release or Jeff lays them sooner (release's note). Meanwhile the temple stair and the mound door work (a barrow laid on v0.1.210 already has from_chapel and from_breach) and the old deep's shortcut still comes out at the temple; the barrow's new exits (the breach's way out, the First Hall's slab) are missing, not wrong, so leaving goes out by the mound only; nothing leads to a wrong place; words for the deep's tomb chambers mismatch until the deep is laid. (5) The names, on Jeff's leans (the coordinator's ruling, 11-10 night, recorded on C:/dev/review/decisions/crypt-names.md and knight-and-altar.md as built and his to change), each one line of data: the level's "name" is "The Crypt of the Fallen" (crypt-names pick 2) and its "rooms" The First Hall, The Low Hall (knight-and-altar pick 2; the room key stays "altar") and The Robbers' Camp in levels/barrow/level.json (tools/plan_sheet.gd with them); nothing in the crypt is called an altar (pick 1 A, one altar, the temple's), so the offering chest's entity name is "Offering stone", with Main.OFFERING_ALTAR's value (its code name kept); the mound is pick 4 A, an old burial mound with no name, its post still "the barrow post"; the deep's wing id old_graves is never shown. Lore's crypt words ride the take (lore-crypt's run). Tests: level_test _test_crypt_ways and _test_deep_crypt with the switch-on (the links, the deep's keys and chests, the arrivals clear), _test_sense_everywhere over both depths, the travel rule's own check. CHANGELOG (voice's words). Level data and one Main rule; protocol unchanged; no new class_name.
 
 832 amended (1) (maps, 2026-11-11; label from tools/decision_number.sh; the coordinator's package "the crypt under the temple, its pointer", with lore's facts and npc's hook; lands ON, before npc's hook): the wilds' level.json gains the place "crypt_stair" on the chapel stair (199,199), inside the temple, so npc's pointer has a key to send a player by ("wilds/crypt_stair") and a cell to name. Kind "other", radius 1, worth 0, nobody's (no holder), name "the crypt stair" (voice's words). Other isn't an explore kind, so reaching it gives no found-place reward; npc keeps its own once-a-player mark, not known_places. Like any named place it shows on the big minimap and in the where-line when standing on the stair, both pointing at a stair that is in. level_test checks the place and that it sits inside the chapel. No bullet of its own: the package's bullet (voice's) comes with npc's hook. Riding the same take (ui-design's zone map audit, the coordinator's ruling): the places Umbrage's temple and the healer's turf house make (Level.building_places, decision 372) were named by their kind capitalised, "Temple" and "Healers Hut", on the map and in the where-line. level.json now lists both under their generated keys, temple@189,201 and healers_hut@152,232, with lore's names "the temple" and "the healer's hut" and lore_id; building_places leaves a key level.json already has as it is. Moving either building in the editor would leave its listed place behind, so a move takes its entry too. level_test checks the names; one bullet (voice's words). Level data; protocol unchanged; no new class_name.
-
-394 amended (23) (perf, 2026-11-09; the coordinator's approval, release's label): the suite runs lean
-at once when the full suite is out of reach. Nine landings queued for 97 minutes after the v0.1.209
-unfreeze. The full suite's estimate (19.8 GB, from items' real 17.3 GB full run on 11-07, 476 s) plus
-the 8 GB margin needs about 28 GB free, which the machine hasn't had since the sessions' own processes
-grew (claude, node and Chrome held about 18 GB). Every suite since then had run as suite_lean3 (6.8 GB,
-about 20 minutes), but only after waiting LEAN_AFTER_SECONDS (5 minutes) for a full slot that never came.
-- A kind marked "lean_first" (the suite) goes lean without that wait: as soon as the full run is out of
-  reach and the lean one is in it. When the full suite fits, it still runs full (about 8 minutes).
-- The estimate isn't capped or reset: the 17.3 GB peak was a real full run, and an estimate set back
-  to the lean one's would start a full suite where it can't fit. The 8 GB margin is unchanged (Jeff's rule
-  from 10-17).
-- What held the queue that afternoon was the lean suite itself out of reach (11.3 GB free with nothing
-  heavy running, 14.8 wanted). This doesn't change that; only freeing memory or the margin does.
-heavy_job_test: lean at once, still full when it fits, not when the lean one doesn't fit either, and the
-suite's row is lean_first over a kinds.json written before it. Tools only; protocol unchanged; no
-class_name; no bullet.
-394 amended (24) (perf, 2026-11-09; the coordinator's approval, release's label): a waiting job
-re-reads its kind's estimate at every look, its lean variant's once it has gone lean, never the one read when it
-queued. At 22:28 one physics run under `scene` (a many-Godot network test, 11.7 GB at once) raised the scene
-estimate to 13.6 GB, and the scenes queued in the next minutes kept that figure while it fell to 4.4: each wanted
-13.6 + 8 GB beside a full suite owed 19.7 of 36 free, and the scenes behind, judging them by the fresh figure as
-able to start, never went past. Ten scenes and an import waited behind seven suites with a scene slot free. Passing
-is unchanged: a job that can start goes past rows waiting on their own kind or out of reach, first-come within a kind,
-and a wait on memory the running jobs will give back still holds those behind it, so a suite is never delayed.
-On load: a landing gets back the up-to-two scenes beside its suite (below normal) that 394 amended (17)
-always allowed and the stale estimates had left unused; land.sh and what runs inside it are unchanged. Release
-watches net_test's late-join flake against scenes beside a suite; if it rises, the answer is a longer wait in
-the test, not fewer scenes.
-heavy_job_test: a waiter queued under a 20 GB estimate starts, without requeueing, once it falls to 2; a scene
-behind a suite waiting on such memory stays behind it.
-A test that starts several Godots, run alone, takes a kind of its own, net (13.6 GB, one at a time, never beside
-a bench): neither scene nor suite, whose estimates every tree waits on. heavy_job refuses net_test under any other
-kind before it queues (MANY_GODOT_TESTS names the tests; add one there when another starts several Godots).
-heavy_job_test: net_test under scene refused, net one at a time. Tools only; protocol unchanged; no class_name; no bullet.
-Fixed 11-10 (combat's report): the name was matched as a substring of the command, so combat's free_net_test.tscn
-(one Godot, 0.75 GB) was refused as a scene and, run as net, waited 51 minutes on net's 13.6 GB. many_godot_test
-now matches a file named for the test (net_test.sh, net_test.ps1, res://tests/net_test.tscn), never a name it is
-part of; heavy_job_test checks both.
-
-394 amended (25) (perf, 2026-11-10; the coordinator's approved design, release's label): release can move
-one queued entry to the front. Twice in a day a fix every landing was paying for (the night's, then the
-morning's back-step mend for view_test) had to ride a take ten places back, because the queue could not be
-reordered. `heavy_job front <tree> <kind> --by release --why "<reason>"` makes that tree's queued entry first
-among the waiters.
-- Only its place changes. The entry gets an "order" just below the first waiter's, and the queue is sorted by
-  it (else by its ticket's time, as before), in one write under the state lock. The ticket file keeps its name:
-  a renamed one reads to its own waiter as dropped, and the waiter exits 3. Running jobs are never touched, so
-  the fronted job still waits for room, its kind's cap and the kinds it excludes, and starts on its waiter's
-  next look once it may. No new take, no nesting and no new wait, so none of 394's stall shapes: waiters
-  already re-read the queue at every look, and the rules for going past a row are unchanged.
-- Refused: --by anything but release (FRONT_BY; the refusal names the rule and is logged; names are an honour
-  system, as the land lock's are), no --why, an entry not queued, an entry whose waiter is gone (one that
-  could never start would hold the head), and a second front while an earlier fronted entry still waits.
-- The log's "front" line names who fronted it, why, and the entries it jumped; the daily summary lists it,
-  and status marks a fronted entry with its reason.
-- Its use, for CLAUDE.md (the coordinator's words): release calls it for a change every queued landing is
-  paying for (a failing check on main, a broken tool) or on Jeff's word, never for a tree's convenience; a
-  tree doesn't ask release for it, it tells the coordinator why.
-heavy_job_test: refusals (another tree, no reason, not queued, no live waiter, a second front); fronted
-first with its ticket's name kept; the log and the summary. With a suite running and a bench queued ahead,
-a fronted suite waits for the running one, starts when it ends, never beside the bench, and the bench it
-passed runs once it is released. Tools only; protocol unchanged; no class_name; no bullet.
-
-394 amended (26) (perf, 2026-11-10; release's label, the coordinator's approval of the output): `heavy_job
-status` says why each queued row waits. Release asked why 13 scenes sat queued with a scene slot free: builder's
-full suite had taken an 18.1 GB estimate and used 4.1, so 14 GB was owed to it, and a scene's 1.3 + 8 didn't fit
-in what was left. Status gave no reason per row.
-- The first line ends with what the running jobs are owed of their estimates (RAM and commit), and each running
-  line with its own: "; owed 14.0 GB".
-- Each queued line ends with its reason: "; may start at its next look" (with what it would go past by
-  backfill), "; waits: " and decide's answer (memory with the free, owed and wanted figures, the count, a
-  kind's cap, a kind it excludes), or, behind a head, "; waits: behind the head, <tree> <kind>, which waits on:"
-  that head's answer. These are wait_turn's own passes and decide, read only (queue_reasons), so status and
-  the waiters can't disagree.
-- The state is read under the state lock exactly as before and judged after it is let go; status never writes
-  it, so a status call can't stall a waiter. Each line's earlier text is unchanged, and the reason comes after
-  "; ", so release's and watch's reads still match; summary is untouched.
-heavy_job_test: owed on the first line and on a running job's; a head waiting on memory says so with the
-figures; a scene and an import behind it name that head; with room the head may start; status moves nothing.
-Tools only; protocol unchanged; no class_name; no bullet.
-
-394 amended (27) (perf, 2026-11-10; release's label, the coordinator's approved design): the gate's RAM
-estimates are measured as the working set at once, and a suite chooses lean at its turn, not when it queues.
-The coordinator asked whether scenes should give way to queued landings. They shouldn't: out_of_reach already
-counts every running gated job's memory as given back, so scenes never made a suite lean, and the three waits a
-suite had on the running count came to 6.8 minutes in the day. What landings paid was the lean runs themselves,
-about 21 minutes against a full suite's 14. From 10:22 every suite went lean, judged at 20.5 + 8 GB, an estimate
-that was the sum of each process's own peak. A suite's processes peak at different moments, so the sum ran 2-3
-GB over anything the suite held: today's full suites were 14.0-20.5 GB summed and 11.8-17.7 at once.
-- Every kind's RAM estimate now comes from the most its processes held together: each watch's sum, never under
-  the largest single process's own peak (a process that peaked between two watches is still counted, since the
-  job held at least that much then). It follows the same rule as before (updated_estimate: up at once, down a
-  fifth). Commit is unchanged: it was already measured at once, from the job object's own exact peak. A take's
-  attached processes are measured the same way (attached_once_gb).
-- kinds.json keeps both estimates for a while, ram_once_gb and ram_peaks_gb, each under that rule. ram_gb is the
-  one RAM_MEASURE names, and kinds() reads it from there over a ram_gb an older heavy_job.py wrote. Setting
-  RAM_MEASURE = SUMMED_PEAKS puts every kind back at once (the revert rule: one suite stopped for memory in the
-  first day and it goes back). `kinds` shows both figures ("; RAM by at once 17.7, summed peaks 20.5"), as does
-  each lean line, and the done line already had both.
-- The first run, take, attach or release seeds each measured row once (seed_measures, under the state lock,
-  logged as "measure"; status and kinds never write):
-  ram_peaks_gb is its ram_gb, and ram_once_gb is its last 20 done lines' working set at once replayed under
-  the rule (a lean variant uses its kind's lean runs), or else its ram_gb. From today's log: suite 17.7 (was
-  20.5), suite_lean3 6.1, scene 1.6, bench 1.6.
-- A suite stays full while it waits and chooses lean only when it would otherwise start: due_row judges it,
-  for its own waiter, for those queued beside it, and for status, as what it would run as at its turn. It goes
-  lean only when decide would start it and the full suite is out of reach, so (23)'s point holds: no waiting
-  first. Room at its turn starts it full. A full suite out of reach is judged as its lean row by those behind
-  it, so none of them can go past it, lean, and start first. Chosen at entry, the 10:36 suites went lean at
-  23-25 GB free while another suite ran, and stayed lean for the two hours to their turns. The lean line now
-  adds "; at its turn, full X + 8 GB" with both figures.
-Replay of today's 22 lean calls: on the at-once estimate alone (16.2 GB at 05:43, 17.7 from 10:36), 9 would
-have run full, judged on free RAM alone, which is a lower bound since what running jobs give back only adds room.
-Of the 5 lean starts, the free figure logged nearest each start (24.9-26.4 GB; start lines carry none) puts 3
-over 17.7 + 8, so with the choice at its turn those 3 would have run full. A take queued before this keeps the
-choice its own heavy_job.py made; no tree withdraws and requeues to pick it up. heavy_job_test: both measures
-under the rule, ram_gb from the named one over an older write, the switch back, the seed from log lines (lean
-and released lines left out) written once and logged, a process's own peak between two watches counted; due_row
-lean, full and gone lean; one behind a full suite out of reach doesn't pass it; queued while a suite runs it
-stays full and status says it waits on the count; room at its turn starts full; no room at its turn goes lean
-with no wait, and its lean line is written once with the full figure. Tools only; protocol unchanged; no
-class_name; no bullet. Landed, `heavy_job kinds` failed on the both-figures column (its format string one
-%s short; nothing the gate decides read it); fixed after, with a check that runs kinds and reads the suite's line.
-
-394 amended (28) (perf, 2026-11-10; label from tools/decision_number.sh, the coordinator's approval): a waiter's
---expect is written to its queue entry, a job is held by one of its own kind ahead only while that one waits on
-its kind, and a wait names the row that holds it. Playtest queued its tour as a scene with --expect 25 (1500 s)
-behind terrain's bench. A scene may go past a bench only by backfill, ending before the bench's blocker (the
-suite running) does, and with suites back to back none ever had 25 minutes left, so the tour could never start.
-Its --expect lived only in its own waiter: every other waiter, and status, judged its row by the scene kind's
-recorded runs (171.7 s × 1.25), saw it free to go and held behind it, first come, and a scene never went past
-a scene. Seven scenes (enemy-ai's den-rule run among them) waited about 84 minutes behind a row that could not
-start, while each said, and status showed, that it waited on the head, a suite. Not from (26) or (27): the
-length was never shared since backfill (18), and (26)'s status named queue[0] whatever held the row. No suite
-was held. The coordinator had terrain withdraw its bench (to requeue when the landings drain) and the scenes ran.
-- The queue entry carries "expect_s" when its waiter has --expect. backfill_length reads it from a row judged
-  from the queue (judged_row: its due_row, its tree, its expect_s), so those behind and status count on the
-  length the waiter itself counts on. A waiter started from an older heavy_job.py writes none and is judged by
-  its kind's runs as before.
-- _passes: one of [job]'s own kind ahead holds it only while kind_blocked (its cap reached, or one it excludes
-  running). Held otherwise, it waits on a row before it, which [job] meets too, or on its own length at a
-  backfill, and the backfill reasons other than length depend only on the blockers and the table, which are
-  the same for both. So the only job that now goes first is a shorter one of the same kind.
-- passes_held returns the index of the row that holds the job; wait_turn's message, its "waiting" log line and
-  status name that row: "behind the head, <tree> <kind>" as before when it is the first, else "behind <tree>
-  <kind> (<n>th in the queue)", with that row's own decide answer and the backfill reason after.
-heavy_job_test: backfill_length from expect_s and the waiter's own first; the tour can't pass the bench, a short
-scene behind it passes both (the bench by backfill); with two scenes running the tour holds the scene behind it,
-and a scene at the cap holds its kind as before; through real waiters, a suite running, a bench queued, the tour
-(wait_turn with --expect 25, its entry carrying 1500 s) and three short scenes: two run, the tour and the third
-wait, status names the head bench for the tour with "going past it needs 1500 s" and the tour for the third; a
-scene done, the third starts and the tour still waits. The earlier check "a scene still waits behind a scene that
-may start" now gives that scene its runs, and a new one passes a scene held only by its own length. Tools only;
-protocol unchanged; no class_name; no bullet.
-A bug in it (release's report, release's ruling: no label, a sentence here): at 20:37 11-10 a model loaded
-outside the gate (about 11.8 GB of commit) put every queued suite out of reach even as lean3, and each, finding
-every row ahead out of reach and so taking itself for the head, stepped to the back in the order its waiter
-looked; physics and items, queued first, ended 13th and 14th. An out-of-reach row now keeps its place and jobs
-that fit go past it as before (_passes); the step to the back, kept since 10-18 for waiters from a heavy_job.py
-older than that rule (none left), and may_step_aside are gone. heavy_job_test: three out of reach queued, a job
-that fits starts past them and the three keep first-come order with no aside line (on main's gate they come
-out maps, items, physics).
 
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
