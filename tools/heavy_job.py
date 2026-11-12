@@ -331,14 +331,22 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     in GB (free_gpu_gb or free_commit_gb None: not known)."""
     if not head:
         return False, "behind others in the queue"
-    if counted(running) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(running) < UNCOUNTED_MOST):
-        return False, "%d heavy jobs running" % counted(running)
+    # Takes waiting on the land lock (394 amended (36)) run nothing yet: not counted.
+    going = [each for each in running if not each.get("lock_wait")]
+    if counted(going) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(going) < UNCOUNTED_MOST):
+        return False, "%d heavy jobs running" % counted(going)
     for each in running:
         if each.get("kind") in job.get("excludes", []):
             return False, "a %s running (never beside a %s)" % (each.get("kind"), job.get("kind"))
-    cap = job.get("max_running")
-    if cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap:
-        return False, "%d %s running, at most %d at once" % (cap, job.get("kind"), cap)
+    if job.get("kind") in LOCK_WAIT_KINDS:
+        waiting = sum(1 for each in running if each.get("lock_wait"))
+        if waiting >= LOCK_WAIT_MOST:
+            return False, "%d %s takes already wait on the land lock, at most %d (394 amended (36))" % (
+                waiting, job.get("kind"), LOCK_WAIT_MOST)
+    else:
+        cap = job.get("max_running")
+        if cap is not None and sum(1 for each in going if each.get("kind") == job.get("kind")) >= cap:
+            return False, "%d %s running, at most %d at once" % (cap, job.get("kind"), cap)
     if job["gpu"] and sum(1 for each in running if each["gpu"]) >= MAX_GPU_RUNNING:
         return False, "a GPU job is running"
     room = free_ram_gb - reserved_gb(running)
@@ -351,6 +359,61 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
+
+
+# 394 amended (36): a saturn landing's take waits on the land lock "held, waiting":
+# the landing flow takes the gate first, and with suite_remote's max_running
+# of 1 a take waiting on the lock held every other saturn row out (perf-saturn,
+# 16 minutes at 04:36 on 11-12, with Store A and the satchel behind it).
+# Waiting takes run nothing: they count neither against MAX_RUNNING nor the
+# kind's max_running (one remote run at a time is the land lock's, whose holder
+# alone runs land.sh); at most LOCK_WAIT_MOST wait at once, and only the oldest
+# waiting one owes its estimate (as_owed): it takes the lock next among them.
+# A take stops waiting when land.sh adopts it (_adopt_take).
+LOCK_WAIT_KINDS = ("suite_remote",)
+LOCK_WAIT_MOST = 3
+# The land lock's order (394 amended (36)): among landings trying for a free lock, the
+# one whose gate take started first (a front moves that start) goes first; a
+# waiter counts while its last try is under LOCK_LIVE_SECONDS old (150 s: two
+# missed tries of a script polling each 60 s; 90 s once every script polls at
+# 30 s). A first waiter whose reservation doesn't fit keeps the lock free for
+# itself UNFED_PASS_SECONDS (3 minutes, release's), then a waiter that fits
+# may pass it ("passed" in the gate's log); it still goes first once it fits.
+LOCK_LIVE_SECONDS = 150
+UNFED_PASS_SECONDS = 180
+
+
+def as_owed(running):
+    """[running] as the gate judges it (394 amended (36)): each take waiting on the land
+    lock but the oldest owes nothing (a copy with no estimate), the oldest
+    its whole estimate, as before."""
+    waiting = sorted((each for each in running if each.get("lock_wait")), key=lambda each: each.get("started", 0.0))
+    head = waiting[0] if waiting else None
+    return [dict(each, ram_gb=0.0, commit_gb=0.0) if each.get("lock_wait") and each is not head else each
+        for each in running]
+
+
+def lock_order(waiters, me, now, fits):
+    """Whether the landing [me] may take a free land lock now (394 amended (36)), from
+    [waiters] ({tree: {"since", "last", "unfed_since"?}}, [me]'s own among
+    them) and whether its reservation [fits]: (go, why, passed), passed the
+    names of fed-up heads it goes past. Never go unfed."""
+    live = sorted(((record["since"], tree) for tree, record in waiters.items()
+        if tree == me or now - record.get("last", 0.0) <= LOCK_LIVE_SECONDS))
+    order = [tree for _, tree in live]
+    ahead = order[:order.index(me)] if me in order else order
+    if not fits:
+        return False, "no room yet for its reservation: the lock kept for it", []
+    starved = []
+    for tree in ahead:
+        unfed = waiters[tree].get("unfed_since")
+        if unfed is not None and now - unfed >= UNFED_PASS_SECONDS:
+            starved.append(tree)
+            continue
+        return False, "free, but %s is ahead of you (its gate take started %s, last tried %.0f s ago)%s" % (
+            tree, time.strftime("%H:%M:%S", time.localtime(waiters[tree]["since"])), now - waiters[tree].get("last", now),
+            "; it has waited %.0f s for room" % (now - unfed) if unfed is not None else ""), []
+    return True, "", starved
 
 
 def uncounted(running):
@@ -459,8 +522,11 @@ def kind_blocked(job, running):
     as many of its kind as its max_running."""
     if any(each.get("kind") in job.get("excludes", []) for each in running):
         return True
+    if job.get("kind") in LOCK_WAIT_KINDS:
+        return sum(1 for each in running if each.get("lock_wait")) >= LOCK_WAIT_MOST
     cap = job.get("max_running")
-    return cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")) >= cap
+    return cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")
+        and not each.get("lock_wait")) >= cap
 
 
 def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
@@ -576,8 +642,11 @@ def blockers(job, running):
     """The running jobs that keep [job] out by kind: those it excludes or
     that exclude it, and its own kind's once at its cap."""
     found = [each for each in running if conflicts(job, each)]
+    if job.get("kind") in LOCK_WAIT_KINDS:
+        waiting = [each for each in running if each.get("lock_wait")]
+        return found + (waiting if len(waiting) >= LOCK_WAIT_MOST else [])
     cap = job.get("max_running")
-    same = [each for each in running if each.get("kind") == job.get("kind")]
+    same = [each for each in running if each.get("kind") == job.get("kind") and not each.get("lock_wait")]
     if cap is not None and len(same) >= cap:
         found += same
     return found
@@ -1428,7 +1497,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     while True:
         with StateLock():
             queue = _entries("queue")
-            running = _entries("running")
+            running = as_owed(_entries("running"))
             free_gpu, _ = gpu_gb() if row["gpu"] else (None, None)
             if not any(each["file"] == ticket for each in queue):
                 # Dropped as stale: its pid is no live Windows process (Git
@@ -1623,6 +1692,7 @@ def _adopt_take(tree, kind):
             entry["adopted_by"] = os.getpid()
             entry["adopted_since"] = started_at(os.getpid())
             entry.pop("guard", None)
+            entry.pop("lock_wait", None)  # 394 amended (36): its landing runs now.
             _write(_path("running", name), entry)
             return name, entry.get("estimate", kind)
     return None, None
@@ -1883,8 +1953,87 @@ def take(tree, kind, pid, caller=None):
     if stray_refused(tree, kind):
         return 2
     _, estimate = wait_turn(tree, kind, pid, False, caller=caller)
+    if estimate in LOCK_WAIT_KINDS:
+        _mark_lock_wait(tree, kind, pid)
     print("heavy_job: %s %s taken%s" % (tree, kind, " (on saturn, as suite_remote)" if estimate == "suite_remote" and kind != estimate
         else " (lean, as %s)" % estimate if estimate != kind else ""))
+    return 0
+
+
+def _mark_lock_wait(tree, kind, pid):
+    """The take just granted to [tree] waits on the land lock (394 amended (36)) until
+    land.sh adopts it."""
+    with StateLock():
+        for entry in _entries("running"):
+            if entry["tree"] != tree or kind not in (entry["kind"], entry.get("asked")) or entry.get("watched") \
+                    or entry.get("adopted_by") or (pid is not None and entry.get("pid") != pid):
+                continue
+            name = entry.pop("file")
+            entry["lock_wait"] = True
+            _write(_path("running", name), entry)
+
+
+def lock_turn(tree, lock, free):
+    """A land lock try by [tree] (394 amended (36); tools/bench_lock.sh, the land lock's
+    take): recorded beside [lock] (<lock>.waiters/<tree>.json: since, the start
+    of its landing take or of its first try; last, now) and its take beaten
+    (beat). With [free] (the lock free or stale), 0 when it may take the lock
+    by lock_order, else 1 with why on stdout."""
+    beat(tree)
+    folder = lock + ".waiters"
+    os.makedirs(folder, exist_ok=True)
+    now = time.time()
+    with StateLock():
+        running = _entries("running")
+    takes = [each for each in running if not each.get("watched") and landing_kind(each["kind"])]
+    own, mine = tree_folders(), set(ancestors(os.getpid())) if takes else set()
+    ranked = sorted((rank, place) for place, rank in enumerate(beat_rank(each, tree, own, mine) for each in takes)
+        if rank is not None)
+    entry = takes[ranked[0][1]] if ranked else None
+    waiters = {}
+    for name in os.listdir(folder):
+        if not name.endswith(".json"):
+            continue
+        record = _read(os.path.join(folder, name))
+        if record is None:
+            continue
+        if now - record.get("last", 0.0) > 4 * LOCK_LIVE_SECONDS:
+            try:
+                os.remove(os.path.join(folder, name))
+            except OSError:
+                pass
+            continue
+        waiters[name[:-len(".json")]] = record
+    mine_record = dict(waiters.get(tree, {}))
+    mine_record["since"] = entry["started"] if entry is not None else mine_record.get("since", now)
+    mine_record["last"] = now
+    fits, short = True, 0.0
+    if entry is not None and entry.get("lock_wait"):
+        free_ram, free_commit = _memory()
+        others = [each for each in as_owed([each for each in running if each["file"] != entry["file"]])]
+        room = free_ram - reserved_gb(others)
+        short = entry["ram_gb"] + MARGIN_GB - room
+        fits = short <= 0 and (free_commit is None
+            or free_commit - reserved_commit_gb(others) >= commit_of(entry) + COMMIT_MARGIN_GB)
+    if fits:
+        mine_record.pop("unfed_since", None)
+    elif free:
+        mine_record.setdefault("unfed_since", now)
+    waiters[tree] = mine_record
+    _write(os.path.join(folder, tree + ".json"), mine_record)
+    if not free:
+        return 0
+    go, why, passed = lock_order(waiters, tree, now, fits)
+    if not go:
+        if not fits:
+            why = "no room yet: %.1f GB short of %s's %.1f GB reservation; the lock kept for you (394 amended (36))" % (
+                max(short, 0.0), entry["kind"], entry["ram_gb"])
+        print("land lock: " + why)
+        return 1
+    for each in passed:
+        log("passed", tree, entry["kind"] if entry is not None else "-",
+            "took the free land lock past %s, which had no room for %.0f s (394 amended (36))" % (
+                each, now - waiters[each]["unfed_since"]))
     return 0
 
 
@@ -2127,7 +2276,7 @@ def status():
     status never writes it, so it can't stall a waiter. Earlier text of each
     line is unchanged (scripts read it); the reason comes after "; "."""
     with StateLock():
-        running = _entries("running")
+        running = as_owed(_entries("running"))
         queue = _entries("queue")
     free_gpu, used_gpu = gpu_gb()
     free_ram, free_commit = _memory()
@@ -2152,7 +2301,13 @@ def status():
             entry.get("using_gb", 0.0), entry["ram_gb"], ("" if entry.get("watched") else " (taken)")
             + (" (lean)" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
             + (" (went past %s, due by %s)" % (backfill["past"], time.strftime("%H:%M", time.localtime(backfill["due"])))
-                if backfill else ""), flag) + "; owed %.1f GB" % reserved_gb([entry]))
+                if backfill else ""), flag) + "; owed %.1f GB" % reserved_gb([entry])
+            + ("; waiting on the land lock (394 amended (36))" if entry.get("lock_wait") else ""))
+    waiting = sorted((each for each in running if each.get("lock_wait")), key=lambda each: each["started"])
+    if waiting:
+        print("waiting on the land lock: %d of %d %s takes, in order: %s" % (len(waiting), LOCK_WAIT_MOST,
+            "/".join(LOCK_WAIT_KINDS), ", ".join("%s (%s)" % (each["tree"], time.strftime("%H:%M:%S", time.localtime(each["started"])))
+            for each in waiting)))
     reasons = queue_reasons(queue, running, free_ram, free_commit, free_gpu)
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)%s%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
@@ -2326,6 +2481,11 @@ def main(args):
     # Not status or kinds: they never write the state (394 amended (26)).
     if command in ("run", "take", "attach", "release"):
         seed_measures()
+    if command == "lock_turn":
+        if len(args) < 3:
+            print("heavy_job: lock_turn <tree> <land lock folder> [--free]", file=sys.stderr)
+            return 2
+        return lock_turn(args[1], args[2], "--free" in args[3:])
     if command == "beat" and len(args) == 2:
         return beat(args[1])  # Any landing kind's take (394 amended (31)).
     if command in ("run", "take", "attach", "release", "holds", "beat", "front") and (len(args) < 3 or args[2] not in kinds()

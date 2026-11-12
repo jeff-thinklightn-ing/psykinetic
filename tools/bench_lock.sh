@@ -46,22 +46,38 @@ who() {
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOCK.log" 2>/dev/null || true; }
 beat_gate() {
 	[ -n "${PSYKINETIC_LOCK_BEATS_GATE:-}" ] || return 0
-	# 0 beaten, 1 no take to beat (a docs push); anything else a fault, told
-	# (394 amended (37)): in the gate's log, else beside the lock.
-	said="$(python -B "$(dirname "$0")/heavy_job.py" beat "$1" 2>&1)"; code=$?
+	# 0 beaten, 1 no take to beat (a docs push) or not this try's turn; anything
+	# else a fault, told (394 amended (37)): in the gate's log, else beside the lock.
+	if [ -n "${PSYKINETIC_LOCK_ORDERED:-}" ]; then
+		# The land lock's order (394 amended (36)): the try recorded beside the lock, the take beaten.
+		said="$(python -B "$(dirname "$0")/heavy_job.py" lock_turn "$1" "$LOCK" 2>&1)"; code=$?
+	else
+		said="$(python -B "$(dirname "$0")/heavy_job.py" beat "$1" 2>&1)"; code=$?
+	fi
 	if [ "$code" -gt 1 ] || printf '%s' "$said" | grep -q "Traceback"; then
 		said="$(printf '%s' "$said" | tail -1)"
-		python -B "$(dirname "$0")/heavy_job.py" note "$1" beat_failed "exit $code: $said" >/dev/null 2>&1 \
-			|| log "beat_failed by $1: exit $code: $said"
+		python -B "$(dirname "$0")/heavy_job.py" note "$1" beat_failed "exit $code: $said" >/dev/null 2>&1 || log "beat_failed by $1: exit $code: $said"
 	fi
 	return 0
+}
+# A free (or stale) land lock goes to the first live landing in the order
+# (394 amended (36); heavy_job.py lock_turn says why not, exit 1); only release's freeze,
+# "main frozen" in its what, takes it past them.
+turn_ok() {
+	[ -n "${PSYKINETIC_LOCK_ORDERED:-}" ] || return 0
+	printf '%s' "$2" | grep -qi "main frozen" && return 0
+	python -B "$(dirname "$0")/heavy_job.py" lock_turn "$1" "$LOCK" --free
 }
 
 case "${1:-status}" in
 	take)
 		tree="${2:?tree name}"; what="${3:-bench}"
+		if [ ! -d "$LOCK" ] && ! turn_ok "$tree" "$what"; then
+			exit 1
+		fi
 		if ! mkdir "$LOCK" 2>/dev/null; then
 			if [ "$(age)" -gt "$STALE_SECONDS" ]; then
+				turn_ok "$tree" "$what" || exit 1
 				echo "$LABEL: taking over a stale lock from $(who)"
 				log "takeover by $tree from $(who)"
 				rm -rf "$LOCK"; mkdir "$LOCK" || exit 1
@@ -79,8 +95,9 @@ case "${1:-status}" in
 		# The checkout it was taken from (decision 883): tests/land.sh run there under
 		# another name lands under the lock's (physics' second take under the lock, 11-12).
 		git rev-parse --show-toplevel >"$LOCK/checkout" 2>/dev/null
+		rm -f "$LOCK.waiters/$tree.json"  # 394 amended (36): in, no longer waiting.
 		log "taken by $tree ($what)"
-		beat_gate "$tree"
+		PSYKINETIC_LOCK_ORDERED= beat_gate "$tree"  # A plain beat: no longer a waiter.
 		echo "$LABEL: taken by $tree ($what)"
 		;;
 	release)

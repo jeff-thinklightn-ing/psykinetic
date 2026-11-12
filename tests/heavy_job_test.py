@@ -360,6 +360,56 @@ else:
     check(code == 0 and "beat" in takes().get("probe", {}), "free: taken, and beaten (%s)" % code)
     shutil.rmtree(lock, ignore_errors=True)
     os.remove(gate._path("running", "probe-suite-1.json"))
+
+    print("== the land lock's order (394 amended (36)) ==")
+    waiters_dir = lock + ".waiters"
+    def try_as(tree, what="a landing"):
+        done = subprocess.run([shell, "tools/land_lock.sh", "take", tree, what], cwd=repo, env=lock_env,
+            capture_output=True, text=True, timeout=60)
+        shutil.rmtree(lock, ignore_errors=True)
+        return done.returncode, done.stdout + done.stderr
+    def waiter(tree, since, last, unfed=None):
+        os.makedirs(waiters_dir, exist_ok=True)
+        record = {"since": since, "last": last}
+        if unfed is not None:
+            record["unfed_since"] = unfed
+        gate._write(os.path.join(waiters_dir, tree + ".json"), record)
+    now = time.time()
+    gate._write(gate._path("running", "probe-suite-1.json"), dict(probe, started=now - 60))
+    waiter("older", now - 600, now - 10)
+    code, said = try_as("probe")
+    check(code == 1 and "older is ahead of you" in said, "a free lock, an older live waiter: exit 1, naming it (%s, %s)" % (code, said.strip()))
+    check(os.path.exists(os.path.join(waiters_dir, "probe.json")), "the refused try is recorded beside the lock")
+    waiter("older", now - 600, now - 160)
+    code, said = try_as("probe")
+    check(code == 0, "the older waiter silent for 160 s: the younger gets in (release's test) (%s, %s)" % (code, said.strip()))
+    check(not os.path.exists(os.path.join(waiters_dir, "probe.json")), "in: its waiting record gone")
+    waiter("older", now - 600, time.time())
+    code, said = try_as("probe", "main frozen for v0.1.212")
+    check(code == 0, "release's freeze takes a free lock past a live waiter (%s)" % code)
+    os.remove(os.path.join(waiters_dir, "older.json"))
+    # A saturn take first in line whose reservation doesn't fit.
+    gate._write(gate._path("running", "probe-suite-1.json"), dict(probe, kind="suite_remote", started=now - 900,
+        ram_gb=9999.0, lock_wait=True))
+    code, said = try_as("probe")
+    check(code == 1 and "no room yet" in said, "the first saturn waiter with no room: exit 1, the lock kept (%s, %s)" % (code, said.strip()))
+    record = gate._read(os.path.join(waiters_dir, "probe.json")) or {}
+    check("unfed_since" in record, "and its wait for room is recorded")
+    check(not os.path.isdir(lock), "nobody took the lock unreserved")
+    code, said = try_as("younger")
+    check(code == 1 and "probe is ahead of you" in said and "waited" in said,
+        "a younger one inside the 3 minutes: refused, told the head waits for room (%s, %s)" % (code, said.strip()))
+    record["unfed_since"] = time.time() - 200
+    record["last"] = time.time()
+    gate._write(os.path.join(waiters_dir, "probe.json"), record)
+    code, said = try_as("younger")
+    check(code == 0, "after 3 minutes without room, a younger one that fits passes it (%s, %s)" % (code, said.strip()))
+    with open(gate._path("heavy_jobs.log")) as handle:
+        check("\tpassed\tyounger\t" in handle.read(), "the pass is in the gate's log")
+    code, said = try_as("probe")
+    check(code == 1 and "no room yet" in said, "the head still gets no lock unreserved")
+    os.remove(gate._path("running", "probe-suite-1.json"))
+    shutil.rmtree(waiters_dir, ignore_errors=True)
     try:
         os.remove(lock + ".log")
     except OSError:
@@ -1507,6 +1557,42 @@ held = gate._entries("running")
 check(len(held) == 1 and held[0]["kind"] == "scene" and not os.path.exists(asked), "a scene is never swapped nor asked about")
 gate.release("scener", "scene")
 (gate._memory, gate.total_ram_gb, gate.MARGIN_GB, gate.COMMIT_MARGIN_GB, gate.PROBE_COMMAND, gate.PROBE_SECONDS) = saved_swap
+
+print("== saturn takes waiting on the land lock (394 amended (36)) ==")
+def wait_entry(tree, started, **more):
+    return dict({"tree": tree, "kind": "suite_remote", "ram_gb": 1.7, "gpu": False, "started": started, "lock_wait": True}, **more)
+remote = dict(gate.KINDS["suite_remote"], kind="suite_remote", ram_gb=1.7)
+three = [wait_entry("a", 100.0), wait_entry("b", 200.0), wait_entry("c", 300.0)]
+owed = gate.as_owed(three)
+check([each["ram_gb"] for each in owed] == [1.7, 0.0, 0.0], "only the oldest waiting take owes its estimate: %s" % [each["ram_gb"] for each in owed])
+ok, why = gate.decide(remote, three[:2], True, 40.0, None)
+check(ok, "a third saturn take may wait beside two (%s)" % why)
+ok, why = gate.decide(remote, three, True, 40.0, None)
+check(not ok and "wait on the land lock" in why, "a fourth queues at the gate: %s" % why)
+attached = dict(wait_entry("d", 50.0), lock_wait=False)
+ok, why = gate.decide(remote, [attached], True, 40.0, None)
+check(ok, "a saturn take may wait while another landing's remote parts run (%s)" % why)
+suite_row = dict(gate.KINDS["suite"], kind="suite", ram_gb=6.0)
+ok, why = gate.decide(suite_row, gate.as_owed(three), True, 40.0, None)
+check(ok, "waiting saturn takes count against no running total: a local suite starts (%s)" % why)
+check(gate.blockers(remote, three) == three and gate.blockers(remote, three[:2]) == [], "the waiting cap is what blocks a saturn take")
+now = 10000.0
+order = {"old": {"since": 100.0, "last": now - 5}, "mid": {"since": 200.0, "last": now - 5}, "me": {"since": 300.0, "last": now}}
+go, why, _ = gate.lock_order(order, "me", now, True)
+check(not go and "old is ahead" in why, "the oldest take goes first: %s" % why)
+go, _, _ = gate.lock_order(order, "old", now, True)
+check(go, "the oldest itself goes")
+order["old"]["last"] = now - 151
+go, why, _ = gate.lock_order(order, "me", now, True)
+check(not go and "mid is ahead" in why, "a waiter silent past 150 s is skipped, the next one is ahead: %s" % why)
+order["mid"]["unfed_since"] = now - 179
+go, why, _ = gate.lock_order(order, "me", now, True)
+check(not go and "waited 179 s for room" in why, "a head short of room keeps the lock 3 minutes: %s" % why)
+order["mid"]["unfed_since"] = now - 181
+go, why, passed = gate.lock_order(order, "me", now, True)
+check(go and passed == ["mid"], "after 3 minutes a waiter that fits passes it: %s %s" % (go, passed))
+go, why, _ = gate.lock_order(order, "me", now, False)
+check(not go and "no room" in why, "no try goes unreserved, first or not")
 
 print("== a landing's take clears or refuses untracked files main tracks (394 amended (35)) ==")
 import subprocess  # noqa: E402

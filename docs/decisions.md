@@ -10559,6 +10559,37 @@ refused ("untracked working tree files would be overwritten"), after hours in th
   rebase then goes through, a real file refused with exit 2 and nothing queued, a bench never looks. Tools
   and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (36) (perf, 2026-11-12; release's report and design choice, the coordinator's two conditions,
+release's three changes; label from tools/decision_number.sh): saturn landings wait on the land lock without
+holding saturn, and the land lock goes in order. perf-saturn held its suite_remote take 16 minutes at 04:36
+waiting on the lock, as the landing flow (gate, then lock) has every landing do; suite_remote's max_running
+of 1 kept Store A and the satchel from even taking theirs. And with several landings polling, a free lock
+went to whoever tried first after a release: pc-character's satchel lost that race three times that night.
+- A granted take of suite_remote (or a suite take swapped to it) is "held, waiting on the land lock"
+  (lock_wait) until land.sh adopts it. Waiting takes count against neither MAX_RUNNING nor max_running (only
+  the lock's holder runs land.sh, so one remote run at a time is the lock's); at most LOCK_WAIT_MOST (3) wait,
+  a fourth queues at the gate. Only the oldest waiting take owes its estimate (as_owed; 1.7 GB learned): the
+  rest run nothing and owe nothing, so waiting costs one reservation however many wait, not one each (at the
+  leak's 0.38 GB an hour, three each would stop local landings about 13 hours sooner in a reboot's life).
+- The land lock's order (land_lock.sh, through bench_lock.sh's PSYKINETIC_LOCK_ORDERED and heavy_job.py
+  lock_turn). Each try records itself beside the lock (<lock>.waiters/<tree>.json: since, the start of its
+  landing take, which a front moves, or of its first try if it holds none; last, now) and beats its take. A
+  free or stale lock goes to the live waiter with the earliest since; a later one's try answers exit 1, "free,
+  but <tree> is ahead of you", so loops keep polling as before. A waiter is live while its last try is under
+  150 s old (two missed tries at 60 s; 90 s once every script polls at 30 s); a dead or hung one is skipped
+  after that. Only release's freeze ("main frozen" in its what) takes a free lock past the waiters, and
+  waiters still get exit 3 under it. A take with no landing take (a docs push) joins the order by its first try.
+- A first waiter whose reservation doesn't fit when the lock is free answers exit 1, "no room yet: n GB
+  short", and the lock stays free for it for UNFED_PASS_SECONDS (3 minutes, release's); then a waiter that
+  fits may pass it, a "passed" line in the gate's log, and it still takes the next free lock it fits. A local
+  suite take always fits (its reservation was granted at the gate). No try takes the lock unreserved.
+- `status` says which takes wait on the land lock and their order ("waiting on the land lock: k of 3").
+tests/heavy_job_test.py: only the oldest waiter owes; a fourth saturn take queues; waiting takes don't hold a
+local suite out; the oldest goes first; a waiter silent 150 s is skipped; release's case (the older silent 160
+s, the younger gets in); the freeze past a live waiter; an unfed head keeps the lock 3 minutes, then a fitting
+one passes (logged), and the head never takes it unreserved. Tools and tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
