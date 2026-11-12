@@ -1806,12 +1806,12 @@ func _test_named_refusals() -> void:
 	field.config["starts"] = [[2, 2]]
 	field.config["places"] = {"store": {"at": [20, 15], "kind": "stockpile", "holder": "town"}}
 	var session := BuilderSession.new(field, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
-	session.working.apply_changes({"cells": {Vector2i(6, 6): "monster_robber", Vector2i(7, 7): "crate"}, "covers": [Vector2i(6, 6), Vector2i(7, 7)]})
+	session.working.apply_changes({"cells": {Vector2i(6, 6): "monster_imp", Vector2i(7, 7): "crate"}, "covers": [Vector2i(6, 6), Vector2i(7, 7)]})
 	session.working.put_link(Vector2i(5, 5), {"at": [5, 5], "to_map": "wilds", "to_spawn": "from_test_field"})
-	var robber := "a " + str(Monster.kinds().get("robber", {}).get("label", "robber")).to_lower()
+	var imp := BuilderSession._a(str(Monster.kinds().get("imp", {}).get("label", "imp")).to_lower())
 	var cases := {
 		Vector2i(5, 5): "(5, 5) is the way to wilds; lay the spot beside it",
-		Vector2i(6, 6): "(6, 6) holds %s; lay the spot beside it" % robber,
+		Vector2i(6, 6): "(6, 6) holds %s; lay the spot beside it" % imp,
 		Vector2i(7, 7): "(7, 7) holds a crate; lay the spot beside it",
 	}
 	for at: Vector2i in cases:
