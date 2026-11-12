@@ -56,7 +56,7 @@ speech that means:
   |---|---|
   | kill, defeat (of people) | put down [Jeff], fall, lay to rest |
   | respawn, resurrect | brought back, wake, rise, walk again (the down screen's "Bleed Out (Respawn)" is Jeff's [Jeff] and stays) |
-  | dungeon, level | the barrow, below, the halls, the stone places |
+  | dungeon, level | the crypt, the mound, below, the halls, the stone places (the draugr alone says "my barrow") |
   | boss | by name or kind: the draugr, Brand the Ox |
   | quest, mission | a task, a job, what was asked |
   | loot (as a verb) | take, carry off, plunder |
@@ -129,7 +129,7 @@ the draugr; a different knight each cycle.
 Who (lore): keeps the temple of Theus, takes alms; keeps the secret of where the gold goes.
 
 - Sentences: short, kindly, a blessing in them; says less than he knows (he keeps a secret,
-  so he never explains the barrow).
+  so he never explains the crypt).
 - Uses: peace, blessing, the altar, the remains, bless you, home.
 - Never: the old gods or Psyke by name to a stranger (a secret, lore), money words beyond
   "gold" and "alms".
