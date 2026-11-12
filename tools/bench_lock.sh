@@ -9,6 +9,12 @@
 # The lock is the folder C:/dev/bench.lock (mkdir is atomic); one quiet for 30 minutes
 # (PSYKINETIC_LOCK_STALE seconds) since its take or its holder's last beat is stale and may
 # be taken over.
+# As the land lock (tools/land_lock.sh sets these, 394 amended (31)):
+# PSYKINETIC_LOCK_FROZEN_EXIT, the exit of a take refused by a lock whose "what"
+# says "main frozen" (release's freeze), which is never beaten; and
+# PSYKINETIC_LOCK_BEATS_GATE, each other take, refused or not, beats the
+# caller's gate take of its landing kind (suite, suite_*; heavy_job beat), so it
+# never goes stale here.
 set -u
 LOCK="${PSYKINETIC_BENCH_LOCK:-/c/dev/bench.lock}"
 STALE_SECONDS="${PSYKINETIC_LOCK_STALE:-1800}"
@@ -38,6 +44,10 @@ who() {
 # Every take, takeover and release, with the time, beside the lock (<lock>.log), so two
 # landings that overlapped can be traced afterwards. Refusals are not logged (loops retry).
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOCK.log" 2>/dev/null || true; }
+beat_gate() {
+	[ -n "${PSYKINETIC_LOCK_BEATS_GATE:-}" ] || return 0
+	python -B "$(dirname "$0")/heavy_job.py" beat "$1" >/dev/null 2>&1 || true
+}
 
 case "${1:-status}" in
 	take)
@@ -47,7 +57,11 @@ case "${1:-status}" in
 				echo "$LABEL: taking over a stale lock from $(who)"
 				log "takeover by $tree from $(who)"
 				rm -rf "$LOCK"; mkdir "$LOCK" || exit 1
+			elif [ -n "${PSYKINETIC_LOCK_FROZEN_EXIT:-}" ] && grep -qi "main frozen" "$LOCK/what" 2>/dev/null; then
+				echo "$LABEL: main frozen by $(who): release your suite take and requeue"
+				exit "$PSYKINETIC_LOCK_FROZEN_EXIT"
 			else
+				beat_gate "$tree"
 				echo "$LABEL: held by $(who); wait and retry"
 				exit 1
 			fi
@@ -55,6 +69,7 @@ case "${1:-status}" in
 		now=$(date +%s)
 		echo "$tree" >"$LOCK/owner"; echo "$what" >"$LOCK/what"; echo "$now" >"$LOCK/taken"; echo "$now" >"$LOCK/since"
 		log "taken by $tree ($what)"
+		beat_gate "$tree"
 		echo "$LABEL: taken by $tree ($what)"
 		;;
 	release)

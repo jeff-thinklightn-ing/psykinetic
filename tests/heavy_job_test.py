@@ -233,6 +233,126 @@ code = gate.main(["run", "perf", "scene", "--", G, "--path", "."])
 check(code == 2, "heavy_job run refuses it before queueing (exit %s)" % code)
 code = gate.main(["run", "perf", "scene", "--visible", "--", sys.executable, "-c", "pass"])
 check(code == 0, "--visible is taken as an option (exit %s)" % code)
+# 394 amended (31): never queue at the gate holding the land lock.
+check(gate.lock_owned("perf", "perf") and gate.lock_owned("psykinetic-release", "release") and gate.lock_owned("items-cast", "items")
+    and not gate.lock_owned("ui-design", "ui") and not gate.lock_owned("maps", "perf") and not gate.lock_owned("perf", ""),
+    "the lock's owner matched by holds_lock's rules")
+held_lock = os.path.join(STATE, "held.lock")
+os.makedirs(held_lock, exist_ok=True)
+real_memory_nq = gate._memory
+gate._memory = lambda: (60.0, 60.0)
+for owner, tree, want in (("perf", "perf", gate.NO_QUEUE_CODE), ("release", "psykinetic-release", gate.NO_QUEUE_CODE),
+        ("maps", "perf", 0)):
+    with open(os.path.join(held_lock, "owner"), "w") as handle:
+        handle.write(owner + "\n")
+    code = gate.main(["run", tree, "scene", "--no-queue-under-lock", held_lock, "--", sys.executable, "-c", "pass"])
+    check(code == want and not gate._entries("queue"),
+        "%s's run, the lock %s's: exit %s, never queued (%s)" % (tree, owner, want, code))
+gate.take("perf", "scene", os.getpid())
+with open(os.path.join(held_lock, "owner"), "w") as handle:
+    handle.write("perf\n")
+code = gate.main(["run", "perf", "scene", "--no-queue-under-lock", held_lock, "--", sys.executable, "-c", "pass"])
+check(code == 0, "holding the lock inside its own take: it runs in the take (%s)" % code)
+gate.release("perf", "scene")
+check(gate.main(["run", "perf", "scene", "--no-queue-under-lock", os.path.join(STATE, "no.lock"), "--", sys.executable, "-c", "pass"]) == 0,
+    "no lock held: it runs as before")
+gate._memory = real_memory_nq
+shutil.rmtree(held_lock, ignore_errors=True)
+
+print("== a take beaten while its tree waits on the land lock (394 amended (31)) ==")
+import subprocess  # noqa: E402
+
+
+def old_take(tree, pid=None, beat=None):
+    entry = {"tree": tree, "kind": "suite", "pid": pid, "queued": time.time() - 7200,
+        "started": time.time() - gate.TAKE_STALE_SECONDS - 60, "ram_gb": 6.0, "gpu": False, "watched": False}
+    if pid:
+        entry["pid_since"] = gate.started_at(pid)
+    if beat is not None:
+        entry["beat"] = beat
+    gate._write(gate._path("running", "%s-suite-1.json" % tree), entry)
+
+
+def takes():
+    return {each["tree"]: each for each in gate._entries("running")}
+
+
+with gate.StateLock():
+    old_take("waiting", beat=time.time() - 60)
+    check("waiting" in takes(), "a take past TAKE_STALE_SECONDS, beaten a minute ago, is kept")
+    old_take("waiting")
+    check("waiting" not in takes(), "unbeaten, it is dropped as before")
+def young_take(tree, pid=None):
+    entry = {"tree": tree, "kind": "suite", "pid": pid, "queued": time.time(), "started": time.time() - 60,
+        "ram_gb": 6.0, "gpu": False, "watched": False}
+    if pid:
+        entry["pid_since"] = gate.started_at(pid)
+    gate._write(gate._path("running", "%s-suite-1.json" % tree), entry)
+
+
+for tree in ("psykinetic-release", "items-cast", "ui-design"):
+    young_take(tree)
+check(gate.beat("release", "suite") == 0 and "beat" in takes()["psykinetic-release"],
+    "release's lock beats psykinetic-release's take (holds_lock's rules, 748 amended (8))")
+check(gate.beat("items", "suite") == 0 and "beat" in takes()["items-cast"], "items' lock beats its side worktree's take")
+check(gate.beat("ui", "suite") == 1 and "beat" not in takes()["ui-design"],
+    "ui's lock never beats ui-design's, a tree of its own (it beat: %s)" % [t for t, e in takes().items() if "beat" in e])
+young_take("renamed", os.getpid())
+check(gate.beat("release", "suite") == 0 and "beat" in takes()["renamed"],
+    "a take whose holder is this process's ancestor comes before psykinetic-<owner>")
+check(gate.beat("nobody", "suite") == 0, "and is found whatever its name")
+for tree in list(takes()):
+    os.remove(gate._path("running", "%s-suite-1.json" % tree))
+check(gate.beat("release", "suite") == 1, "no take held: exit 1")
+gate._write(gate._path("running", "maps-suite_remote-1.json"), {"tree": "maps", "kind": "suite_remote", "pid": None,
+    "queued": time.time(), "started": time.time() - 60, "ram_gb": 2.0, "gpu": False, "watched": False})
+gate._write(gate._path("running", "maps-scene-1.json"), {"tree": "maps", "kind": "scene", "pid": None,
+    "queued": time.time(), "started": time.time() - 60, "ram_gb": 1.0, "gpu": False, "watched": False})
+check(gate.main(["beat", "maps"]) == 0 and "beat" in gate._read(gate._path("running", "maps-suite_remote-1.json"))
+    and "beat" not in gate._read(gate._path("running", "maps-scene-1.json")),
+    "with no kind named, any landing's take is beaten (a remote landing's suite_remote), never a scene")
+os.remove(gate._path("running", "maps-suite_remote-1.json"))
+os.remove(gate._path("running", "maps-scene-1.json"))
+
+# tools/land_lock.sh itself: a frozen lock is never beaten, and says so with exit 3.
+shell = shutil.which("sh") or next((p for p in (r"C:\Program Files\Git\bin\sh.exe", r"C:\Program Files\Git\usr\bin\sh.exe")
+    if os.path.exists(p)), None)
+if shell is None:
+    print("  SKIP  land_lock.sh's beat: no sh here")
+else:
+    repo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    lock = os.path.join(STATE, "land.lock")
+    lock_env = dict(os.environ, PSYKINETIC_LAND_LOCK=lock.replace("\\", "/"), HEAVY_JOBS_DIR=STATE)
+    def try_lock(what):
+        done = subprocess.run([shell, "tools/land_lock.sh", "take", "probe", what], cwd=repo, env=lock_env,
+            capture_output=True, text=True, timeout=60)
+        return done.returncode, done.stdout + done.stderr
+    def hold_lock(owner, what):
+        shutil.rmtree(lock, ignore_errors=True)
+        os.makedirs(lock)
+        for name, value in (("owner", owner), ("what", what), ("taken", str(int(time.time()))), ("since", str(int(time.time())))):
+            with open(os.path.join(lock, name), "w") as handle:
+                handle.write(value + "\n")
+    probe = {"tree": "probe", "kind": "suite", "pid": None, "queued": time.time(), "started": time.time() - 600,
+        "ram_gb": 6.0, "gpu": False, "watched": False}
+    gate._write(gate._path("running", "probe-suite-1.json"), probe)
+    hold_lock("release", "main frozen for v0.1.212")
+    code, said = try_lock("a landing")
+    check(code == 3 and "main frozen" in said and "requeue" in said and "beat" not in takes().get("probe", {}),
+        "a take tried against a frozen lock: exit 3, told to requeue, its gate take not beaten (%s, %s)" % (code, said.strip()))
+    hold_lock("builder", "859: builder spot tool")
+    code, said = try_lock("a landing")
+    check(code == 1 and "beat" in takes().get("probe", {}), "held by a landing: exit 1, and its gate take beaten (%s)" % code)
+    shutil.rmtree(lock, ignore_errors=True)
+    gate._write(gate._path("running", "probe-suite-1.json"), probe)
+    code, said = try_lock("a landing")
+    check(code == 0 and "beat" in takes().get("probe", {}), "free: taken, and beaten (%s)" % code)
+    shutil.rmtree(lock, ignore_errors=True)
+    os.remove(gate._path("running", "probe-suite-1.json"))
+    try:
+        os.remove(lock + ".log")
+    except OSError:
+        pass
 
 print("== going past a bench that waits on a suite (backfill, 394 amended (18)) ==")
 runs = {"suite": dict(table["suite"], runs_s=[450.0, 500.0, 460.0]), "suite_lean3": dict(table["suite_lean3"], runs_s=[1000.0]),
@@ -385,7 +505,7 @@ check(queue_order() == ["physics", "items", "maps"] and not asides,
     "the three out of reach keep first-come order, none stepped aside: %s %s" % (queue_order(), asides))
 gate.release("small", "soak")
 for each in gate._entries("queue"):
-    os.remove(gate._path("queue", each["file"]))
+    gate._retried(os.remove, gate._path("queue", each["file"]))  # A waiter may hold it open a moment (Windows).
 for each in blocked + [fits]:
     each.join(5)
 gate._write(gate._path("kinds.json"), saved_table)
@@ -651,7 +771,7 @@ real_total, gate.total_ram_gb = gate.total_ram_gb, lambda: None
 gate._write(gate._path("kinds.json"), backfill_runs)
 for folder in ("queue", "running"):
     for each in gate._entries(folder):
-        os.remove(gate._path(folder, each["file"]))
+        gate._retried(os.remove, gate._path(folder, each["file"]))
 # A suite's take running 100 s, a bench queued behind it by a live waiter.
 gate._write(gate._path("running", "land-suite-%d.json" % os.getpid()), {"tree": "land", "kind": "suite", "pid": os.getpid(),
     "pid_since": gate.started_at(os.getpid()), "started": time.time() - 100, "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
@@ -665,7 +785,7 @@ with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tbackfill\tui\tscene\tpast environment bench, waiting on suite due in " in text, "the log says so")
 for each in gate._entries("queue"):
-    os.remove(gate._path("queue", each["file"]))
+    gate._retried(os.remove, gate._path("queue", each["file"]))  # A waiter may hold it open a moment (Windows).
 os.remove(gate._path("running", "land-suite-%d.json" % os.getpid()))
 # A backfilled scene still running when the suite has gone: the bench's wait
 # from then is logged as late.
@@ -836,7 +956,7 @@ gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb
 def clear_gate():
     for each in gate._entries("queue") + gate._entries("running"):
         folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
-        os.remove(gate._path(folder, each["file"]))
+        gate._retried(os.remove, gate._path(folder, each["file"]))
 def queued(tree, kind, waiter=True):
     name = "%019d-%s-%d.json" % (time.time_ns(), tree, os.getpid())
     entry = {"tree": tree, "kind": kind, "pid": None, "queued": time.time()}

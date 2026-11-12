@@ -97,17 +97,22 @@ them elsewhere, as the test does): running/ and queue/ hold a file a job,
 kinds.json the estimates and caps (edit a kind's max_running there to
 tune it), heavy_jobs.log a line an event (`summary`).
 
-  heavy_job.py run <tree> <kind> [--expect MIN] [--visible] -- <command...>
+  heavy_job.py run <tree> <kind> [--expect MIN] [--visible] [--no-queue-under-lock DIR] -- <command...>
                                                    wait, run, release; the command's exit code (5: stopped,
                                                    over its limit or hung; a long soak passes --expect MIN);
                                                    a windowed Godot in <command> runs off-screen and silent
-                                                   unless --visible (664 amended (2))
+                                                   unless --visible (664 amended (2)); with the land lock
+                                                   at DIR held by <tree> (lock_owned), it runs only inside
+                                                   a take, else exits 6 unqueued (394 amended (31))
   heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap);
                                                    N a Windows process id (Git Bash: $(cat /proc/$$/winpid))
   heavy_job.py attach <tree> <kind> --pid N        a process started under <tree>'s take of <kind> (a
                                                    model server): measured as the take's (394 amended (20))
   heavy_job.py release <tree> <kind>               give back what take held
   heavy_job.py holds <tree> <kind>                 exit 0 if <tree> holds a <kind> (run or take)
+  heavy_job.py beat <owner> [<kind>]               the land lock's <owner>'s take of <kind> (any
+                                                   landing's: suite, suite_*) alive now: TAKE_STALE_SECONDS
+                                                   count from here (exit 1: none held; 394 amended (31))
   heavy_job.py front <tree> <kind> --by release --why "<reason>"
                                                    release alone: that queued entry first among the
                                                    waiters, never past what runs (394 amended (25))
@@ -169,6 +174,10 @@ MAX_RESTARTS = 2
 ## A take running this long is forgotten, even while the shell that took it
 ## lives on (a session's shell, a loop that never released): a landing takes
 ## under 10 minutes, and a land lock is stale at 15.
+## Since 394 amended (31) it counts from the take's last beat when later
+## (`beat`; tools/land_lock.sh take beats its tree's suite take each try, so a
+## take held while its tree waits on the land lock is never dropped: perf's
+## 360 amended (1) and combat's 340 amended (2) lost theirs so, 11-11).
 TAKE_STALE_SECONDS = 30 * 60
 ## A wait this long goes in the log (and so in `summary`) with its reason.
 LONG_WAIT_SECONDS = 5 * 60
@@ -1196,7 +1205,8 @@ def _entries(folder):
         if folder == "queue" and entry.get("waiter"):
             stale = stale or not alive(entry["waiter"], entry.get("waiter_since"))
         if folder == "running" and not entry.get("watched") and not alive(entry.get("adopted_by"), entry.get("adopted_since")):
-            stale = stale or time.time() - entry.get("started", entry["queued"]) > TAKE_STALE_SECONDS
+            held_since = max(entry.get("started", entry["queued"]), entry.get("beat", 0.0))
+            stale = stale or time.time() - held_since > TAKE_STALE_SECONDS
         if stale:
             os.remove(_path(folder, name))
             log("stale", entry["tree"], entry["kind"], "%s dropped" % folder)
@@ -1457,7 +1467,36 @@ def unseen_problem(command):
     return None
 
 
-def run(tree, kind, command, expect_minutes=None):
+## The exit code of a run that would have queued while its tree holds the
+## land lock (--no-queue-under-lock, 394 amended (31)).
+NO_QUEUE_CODE = 6
+
+
+def lock_owned(tree, owner):
+    """Whether the land lock's [owner] is the checkout [tree] by voice's
+    holds_lock rules (748 amended (8)), as beat_rank reads them: the same
+    name, psykinetic-<owner>, or a side worktree <owner>-<anything> that is
+    no tree's own folder."""
+    if not tree or not owner:
+        return False
+    return (owner == tree or tree == "psykinetic-" + owner
+        or (tree.startswith(owner + "-") and tree not in tree_folders()))
+
+
+def lock_owner(folder):
+    """The land lock [folder]'s owner, or "" (not held); a Git Bash path
+    (/c/dev/land.lock) read as Windows'."""
+    drive = re.match(r"^/([a-zA-Z])/(.*)$", folder)
+    if drive and os.name == "nt":
+        folder = "%s:/%s" % (drive.group(1).upper(), drive.group(2))
+    try:
+        with open(os.path.join(folder, "owner"), encoding="utf-8") as handle:
+            return handle.read().strip()
+    except OSError:
+        return ""
+
+
+def run(tree, kind, command, expect_minutes=None, no_queue=False):
     # A gated run inside another (frame_budget.ps1 under a bench script run
     # through the gate) would queue behind its own parent forever: the outer
     # run already holds the room and measures every process under it.
@@ -1478,6 +1517,15 @@ def run(tree, kind, command, expect_minutes=None):
         if adopted is not None:
             name = adopted
             print("heavy_job: %s %s inside this tree's take, measured as a run" % (tree, kind), file=sys.stderr)
+        elif no_queue:
+            # 394 amended (31): land.sh holding the land lock with no take to adopt
+            # queued at the gate with main locked (perf 09:45-10:12, animation
+            # 11:04-11:22, 11-11: their takes dropped while they waited on the lock).
+            print("heavy_job: %s %s: this tree holds the land lock and has no take of %s to run in: not queued "
+                "(never queue at the gate holding the lock: release the lock, take the gate, then the lock again)"
+                % (tree, kind, kind), file=sys.stderr)
+            log("refused", tree, kind, "holding the land lock with no take to adopt")
+            return NO_QUEUE_CODE
         else:
             name, estimate = wait_turn(tree, kind, os.getpid(), True, expect_minutes)
         started = time.time()
@@ -1688,6 +1736,61 @@ def release(tree, kind):
                 return 0
     print("heavy_job: %s holds no %s" % (tree, kind), file=sys.stderr)
     return 1
+
+
+def tree_folders():
+    """The trees' own folder names, tests/port_offsets.txt's (each has a line)."""
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tests", "port_offsets.txt"),
+                encoding="utf-8") as handle:
+            return {line.split()[0] for line in handle if line.strip() and not line.startswith("#")}
+    except OSError:
+        return set()
+
+
+def beat_rank(entry, owner, own, mine):
+    """How near a take [entry] is to the land lock's [owner] (394 amended
+    (31), voice's holds_lock rules of 748 amended (8)): 0 its tree is the
+    owner; 1 its holder is an ancestor of this process ([mine], ids); 2
+    psykinetic-<owner> (release's checkout takes the lock as "release"); 3
+    a side worktree <owner>-<anything> that is no tree's own folder ([own]:
+    ui-design is no side of ui); None, not the owner's."""
+    tree = entry["tree"]
+    if tree == owner:
+        return 0
+    if entry.get("pid") and int(entry["pid"]) in mine:
+        return 1
+    if tree == "psykinetic-" + owner:
+        return 2
+    if tree.startswith(owner + "-") and tree not in own:
+        return 3
+    return None
+
+
+def landing_kind(kind):
+    """Whether [kind] is a landing's (suite, or a suite_* kind of its own such
+    as a remote landing's): the takes land_lock.sh beats."""
+    return kind == "suite" or kind.startswith("suite_")
+
+
+def beat(owner, kind=None):
+    """The take of [kind] (None: any landing_kind) held by the land lock's
+    [owner] (beat_rank: the nearest) marked alive now (394 amended (31)):
+    its TAKE_STALE_SECONDS count from here. 0 if one was found, else 1. A
+    run is watched and never goes stale so; nothing to beat."""
+    with StateLock():
+        takes = [each for each in _entries("running") if not each.get("watched")
+            and (each["kind"] == kind if kind else landing_kind(each["kind"]))]
+        own, mine = tree_folders(), set(ancestors(os.getpid())) if takes else set()
+        ranked = sorted((rank, place) for place, rank in enumerate(beat_rank(each, owner, own, mine) for each in takes)
+            if rank is not None)
+        if not ranked:
+            return 1
+        entry = takes[ranked[0][1]]
+        name = entry.pop("file")
+        entry["beat"] = time.time()
+        _write(_path("running", name), entry)
+        return 0
 
 
 def holds(tree, kind):
@@ -1917,7 +2020,9 @@ def main(args):
     # Not status or kinds: they never write the state (394 amended (26)).
     if command in ("run", "take", "attach", "release"):
         seed_measures()
-    if command in ("run", "take", "attach", "release", "holds", "front") and (len(args) < 3 or args[2] not in kinds()
+    if command == "beat" and len(args) == 2:
+        return beat(args[1])  # Any landing kind's take (394 amended (31)).
+    if command in ("run", "take", "attach", "release", "holds", "beat", "front") and (len(args) < 3 or args[2] not in kinds()
             or kinds()[args[2]].get("variant_of")):
         print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)
         return 2
@@ -1930,9 +2035,18 @@ def main(args):
         visible = "--visible" in options
         if visible:
             options.remove("--visible")
+        no_queue = False
+        if "--no-queue-under-lock" in options:
+            at = options.index("--no-queue-under-lock")
+            if at + 1 >= len(options):
+                print("heavy_job: --no-queue-under-lock <land lock folder>", file=sys.stderr)
+                return 2
+            no_queue = lock_owned(args[1], lock_owner(options[at + 1]))
+            del options[at:at + 2]
         if options:
             if options[0] != "--expect" or len(options) != 2:
-                print("heavy_job: run <tree> <kind> [--expect MIN] [--visible] -- <command...>", file=sys.stderr)
+                print("heavy_job: run <tree> <kind> [--expect MIN] [--visible] [--no-queue-under-lock DIR] -- <command...>",
+                    file=sys.stderr)
                 return 2
             expect = float(options[1])
         command = args[args.index("--") + 1:]
@@ -1940,7 +2054,7 @@ def main(args):
         if problem is not None:
             print("heavy_job: not run: %s (664 amended (2))" % problem, file=sys.stderr)
             return 2
-        return run(args[1], args[2], command, expect)
+        return run(args[1], args[2], command, expect, no_queue)
     if command == "take":
         pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
         return take(args[1], args[2], pid)
@@ -1951,6 +2065,8 @@ def main(args):
         return attach(args[1], args[2], int(args[args.index("--pid") + 1]))
     if command == "release":
         return release(args[1], args[2])
+    if command == "beat":
+        return beat(args[1], args[2])
     if command == "holds":
         return 0 if holds(args[1], args[2]) else 1
     if command == "front":

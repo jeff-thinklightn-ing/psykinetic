@@ -69,11 +69,15 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	parent=$$
 	( while kill -0 "$parent" 2>/dev/null; do sh tools/land_lock.sh beat "$tree"; sleep 60; done ) &
 	beater=$!
-	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" "$kind" -- bash tests/land.sh
+	# Holding the land lock, never queue at the gate (394 amended (31)): with no
+	# take of this tree's to run in (dropped while it waited, or never taken), the
+	# run refuses at once (exit 6) instead of queueing with main locked.
+	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" "$kind" 		--no-queue-under-lock "${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}" -- bash tests/land.sh
 	code=$?
 	kill "$beater" 2>/dev/null
 	line="$(cat "$result" 2>/dev/null)"
 	rm -f "$result"
+	[ -z "$line" ] && [ "$code" -eq 6 ] && line="LANDING TESTS: FAIL (lost the gate take while holding the land lock: release the lock, take the gate, then the lock again; 394 amended (31))"
 	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
 	echo
 	[ -n "$inventory_stale" ] && echo "$inventory_stale"

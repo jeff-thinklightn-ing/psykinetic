@@ -9900,6 +9900,48 @@ tests/heavy_job_test: an import starts beside a suite and two scenes, not beside
 uncounted import; one import is not counted against a scene, two are; an export still counts.
 Tools only.
 
+394 amended (31) (perf, 2026-11-11; release's two cases and its freeze rule, the coordinator's word to
+land it on its own ahead of (30); label from tools/decision_number.sh): a gate take held while its tree
+waits on the land lock no longer goes stale, never through a freeze, and land.sh never queues at the
+gate holding the lock.
+- Combat's 340 amended (2) take (09:33) was dropped as stale at 10:03 while it waited on the land lock,
+  as perf's 360 amended (1) was, which then held the lock 27 minutes queued at the gate. That is the
+  landing flow as written (gate, then lock): any lock wait past TAKE_STALE_SECONDS (30 minutes) lost
+  the take, and with the queue this deep, two fronted report landings paid for it.
+- `heavy_job beat <owner> <kind>` marks a take alive; TAKE_STALE_SECONDS count from its last beat when
+  that is later than its start. It finds the take of the land lock's owner by voice's holds_lock rules
+  (748 amended (8)), nearest first: the same name; a take whose holder is an ancestor of the beating
+  process, whatever its name; psykinetic-<owner> (release's checkout takes the lock as "release"); a
+  side worktree <owner>-<anything> that is no tree's own folder (tests/port_offsets.txt: ui-design is
+  no side of ui).
+- tools/land_lock.sh take beats the caller's suite take on each try, refused or not (bench_lock.sh,
+  PSYKINETIC_LOCK_BEATS_GATE), so a tree retrying the lock as the flow says keeps its gate take however
+  long the wait. A take nobody beats still goes in 30 minutes.
+- Never through a freeze (release): a lock whose "what" says "main frozen" refuses a take with exit 3
+  (PSYKINETIC_LOCK_FROZEN_EXIT), "main frozen by <who>: release your suite take and requeue", and
+  never beats. A tree that kept its take through this morning's freeze held a suite slot for nothing
+  (voice; perf's 360 amended (1) for 186 minutes); now it gives the take back, waits out the freeze
+  and queues again. Exit 1 (held by a landing) is unchanged.
+- `heavy_job beat <owner>` with no kind beats the owner's take of any landing kind (suite, or a
+  suite_* kind of its own, as a remote landing's), never a scene; land_lock.sh uses that form.
+- Never queue at the gate holding the land lock (the coordinator's ask; release's part (b), first
+  written into 394 amended (30), landed here first): `heavy_job run --no-queue-under-lock <dir>`
+  reads the lock's owner and, when it is this tree by the same name rules (lock_owned), runs only
+  inside a take, else exits 6 (NO_QUEUE_CODE) unqueued, logged "refused". tests/land.sh and
+  land.ps1 pass it, and fail with "lost the gate take while holding the land lock: release the lock,
+  take the gate, then the lock again". Animation's take, dropped at 09:03 through the freeze, got
+  the lock at 11:04 and land.sh queued 13th holding it, until 11:22: the line stood still. A cut
+  holding the freeze lock takes its suite (heavy_job take, fronted) before land.sh, as its flow says;
+  land.sh no longer queues for it. land.ps1 takes the lock's folder from PSYKINETIC_LAND_LOCK, as
+  land_lock.sh does.
+tests/heavy_job_test: a take past TAKE_STALE_SECONDS beaten a minute ago is kept, unbeaten dropped;
+release's lock beats psykinetic-release's take, items' its side worktree's, ui's never ui-design's,
+and an ancestor's take comes first whatever its name; land_lock.sh against a frozen lock exits 3,
+says to requeue and beats nothing, against a landing's lock exits 1 and beats, and a free lock is
+taken and beats; with no kind named any landing's take is beaten, never a scene; lock_owned's rules; a run under a lock this tree holds exits 6 unqueued with no take, runs inside its own take, and runs as before under another tree's lock or none. Its queue cleanups retry a delete Windows refuses while a waiter holds the file
+open (a PermissionError in a run today, older than this). Tools and tests only; protocol unchanged;
+no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

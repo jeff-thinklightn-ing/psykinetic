@@ -53,7 +53,7 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 	# While the tests run, a land lock this tree holds is beaten each minute (667
 	# amended, as tests/land.sh does): its "since" moves to now. The job ends
 	# with this script, or by itself once this process is gone.
-	$lock = 'C:\dev\land.lock'
+	$lock = if ($env:PSYKINETIC_LAND_LOCK) { $env:PSYKINETIC_LAND_LOCK } else { 'C:\dev\land.lock' }  # As tools/land_lock.sh.
 	$beater = Start-Job -ArgumentList $lock, $tree, $PID -ScriptBlock {
 		param($lock, $tree, $parent)
 		while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
@@ -66,7 +66,8 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		}
 	}
 	try {
-		& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+		# Holding the land lock, never queue at the gate (394 amended (31), as tests/land.sh).
+		& python $gate run $tree suite --no-queue-under-lock $lock -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
 		$code = $LASTEXITCODE
 	} finally {
 		Stop-Job $beater -ErrorAction SilentlyContinue
@@ -76,6 +77,7 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 	}
 	$line = (Get-Content $result -ErrorAction SilentlyContinue | Select-Object -First 1)
 	Remove-Item $result -ErrorAction SilentlyContinue
+	if (-not $line -and $code -eq 6) { $line = "LANDING TESTS: FAIL (lost the gate take while holding the land lock: release the lock, take the gate, then the lock again; 394 amended (31))" }
 	if (-not $line) { $line = "LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)" }
 	Write-Output ''
 	if ($inventoryStale) { Write-Output $inventoryStale }
