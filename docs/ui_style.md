@@ -32,13 +32,15 @@ Licence 1.1; `art/fonts/`, recorded in THIRD_PARTY.md):
 
 | Face | Use |
 |------|-----|
-| **Alegreya** (serif) | titles, headings, names (people, places, named things), speech bubbles, the map's labels: what the world says |
-| **Alegreya Sans** | everything else: body text, control labels, hints, the HUD line, chat, numbers |
+| **Alegreya** (serif) | titles and display text, at 54 units and up: what the world says |
+| **Alegreya Sans** | everything else, and every name under 54 units: body text, control labels, hints, the HUD line, chat and its speakers, numbers |
 
 Why: a calligraphic serif reads at small sizes, suits the game's tone (grim, fated, loyal)
 without looking like a scroll, and its angular strokes sit with the faceted art; its
 matched sans keeps the controls plain. Bold for a name that must be found (the compass's N,
 a speaker), never for whole sentences. No italics, no small caps, no third face.
+
+The serif only at 54 canvas units and up (18 px in a 720 window, 27 px at 1080; 854 amended (3)): below that its thin strokes fall under a pixel and smear (the talk box's names at 38, 11-12), where the monoline sans holds. Smaller text is the sans whatever it names, a name in brass bold sans (TalkName, the talk box). The heading role and the other smaller serif places below still draw the serif: they move to the sans one at a time, each beside a still.
 
 Type scale, in canvas units:
 
