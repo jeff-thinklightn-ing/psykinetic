@@ -98,7 +98,17 @@ class Responder:
 		return count
 
 
+## Whether [param ip] is this machine's own (127.0.0.0/8, ::1).
+static func is_loopback(ip: String) -> bool:
+	return ip.begins_with("127.") or ip == "::1" or ip == "::ffff:127.0.0.1"
+
+
 ## The client's side: one question, answered within ANSWER_SEC or not.
+## 431 amended (2): its socket is connected to where it asks, so it takes an
+## answer from that address and port alone (and poll() compares the source
+## too); asking this machine, it is bound to the loopback first, so no
+## socket on every address exists for it (perf's socket probe found one on
+## each hosted laptop run, the host asking its own status).
 class Query:
 	extends RefCounted
 	var address := ""
@@ -106,6 +116,7 @@ class Query:
 	var _udp := PacketPeerUDP.new()
 	var _deadline := 0
 	var _result := {}
+	var _ip := ""
 
 	## Asks the server at [param with_address] whose status port is
 	## [param status_port].
@@ -117,7 +128,10 @@ class Query:
 		if ip.is_empty():
 			_result = {"ok": false, "why": "no such server: %s" % with_address}
 			return
-		if _udp.set_dest_address(ip, status_port) != OK or _udp.put_packet(ServerStatus.request()) != OK:
+		_ip = ip
+		# A question to this machine binds its socket to the loopback first (431 amended (2)).
+		var bound := not ServerStatus.is_loopback(ip) or _udp.bind(0, "::1" if ip == "::1" else "127.0.0.1") == OK
+		if not bound or _udp.connect_to_host(ip, status_port) != OK or _udp.put_packet(ServerStatus.request()) != OK:
 			_result = {"ok": false, "why": "could not ask %s" % with_address}
 
 	## The answer once there is one ({ok: true, version, protocol, players,
@@ -126,7 +140,10 @@ class Query:
 		if not _result.is_empty():
 			return _result
 		while _udp.get_available_packet_count() > 0:
-			var answer: Variant = ServerStatus._parse(_udp.get_packet())
+			var packet := _udp.get_packet()
+			if _udp.get_packet_ip().trim_prefix("::ffff:") != _ip.trim_prefix("::ffff:") or _udp.get_packet_port() != port:
+				continue  # Not from where it asked: not read.
+			var answer: Variant = ServerStatus._parse(packet)
 			if answer is Dictionary and int((answer as Dictionary).get("status", 0)) == VERSION:
 				_result = {"ok": true, "version": str(answer.get("version", "")), "protocol": str(answer.get("protocol", "")),
 					"players": int(answer.get("players", 0)), "accepting": bool(answer.get("accepting", false))}

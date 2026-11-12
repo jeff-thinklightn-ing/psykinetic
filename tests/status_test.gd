@@ -6,7 +6,9 @@ extends Node
 ## else; the same address asking again within a second gets nothing (the
 ## rate limit), so that query reads "no answer" after 2 s; nobody listening
 ## reads "no answer" too; Net.query_status says so through status_received,
-## with compatible worked out. Run it with tests/run.ps1 or tests/run.sh.
+## with compatible worked out. 431 amended (2): an answer from another port
+## than the one asked is not read; a question to this machine holds no socket
+## past the loopback. Run it with tests/run.ps1 or tests/run.sh.
 
 const BASE_PORT := 17850
 
@@ -18,6 +20,8 @@ func _ready() -> void:
 	_test_packets()
 	await _test_exchange()
 	await _test_net()
+	await _test_only_from_asked()
+	_test_loopback_socket()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -88,6 +92,72 @@ func _test_net() -> void:
 	var result: Dictionary = heard[0][2] if not heard.is_empty() else {}
 	_check(heard.size() == 1 and heard[0][0] == "127.0.0.1" and heard[0][1] == port and result.get("ok") == true
 		and result.get("compatible") == true, "status_received once, for the address and game port asked, compatible (%s)" % [heard])
+
+
+func _test_only_from_asked() -> void:
+	print("== an answer only from where it asked (431 amended (2)) ==")
+	var port: int = preload("res://tests/test_ports.gd").of(BASE_PORT + 8)
+	var server := ServerStatus.Responder.new()
+	server.info = _info
+	server.listen(port)
+	var query := ServerStatus.Query.new()
+	query.send("127.0.0.1", port)
+	# A stranger (another port on this machine) sends a well-formed answer first.
+	var stranger := PacketPeerUDP.new()
+	stranger.bind(0, "127.0.0.1")
+	stranger.set_dest_address("127.0.0.1", query._udp.get_local_port())
+	var forged := ServerStatus.reply(ServerStatus.request(), {"version": "9.9.9", "protocol": "forged", "players": 99, "accepting": false})
+	_check(not forged.is_empty() and stranger.put_packet(forged) == OK, "a stranger sends a well-formed answer to the query's port")
+	for i in 5:
+		await get_tree().process_frame
+	_check(query.poll().is_empty(), "the query has not read it")
+	var result := await _answer(query, server)
+	_check(result.get("ok") == true and result.get("protocol") == "abc123",
+		"the server's own answer is the one read (%s)" % [result])
+	stranger.close()
+	server.close()
+
+
+## The local addresses of this process's UDP sockets, or null when the
+## platform's tool cannot be asked (Windows: Get-NetUDPEndpoint; Linux: ss).
+func _udp_sockets() -> Variant:
+	var out: Array = []
+	var pid := OS.get_process_id()
+	var code := 0
+	if OS.get_name() == "Windows":
+		code = OS.execute("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+			"Get-NetUDPEndpoint -OwningProcess %d -ErrorAction SilentlyContinue | ForEach-Object { $_.LocalAddress + ' ' + $_.LocalPort }" % pid], out)
+		if code != 0 or out.is_empty():
+			return null
+		return (out[0] as String).strip_edges().split("\n", false)
+	code = OS.execute("ss", ["-uanpH"], out)
+	if code != 0 or out.is_empty():
+		return null
+	var mine: Array[String] = []
+	for line in (out[0] as String).split("\n", false):
+		if line.contains("pid=%d," % pid):
+			var words := line.split(" ", false)
+			if words.size() > 3:
+				var local := words[3]
+				var at := local.rfind(":")
+				mine.append("%s %s" % [local.substr(0, at).trim_prefix("[").trim_suffix("]"), local.substr(at + 1)])
+	return mine
+
+
+func _test_loopback_socket() -> void:
+	print("== a question to this machine holds no socket past the loopback (431 amended (2)) ==")
+	var query := ServerStatus.Query.new()
+	query.send("127.0.0.1", preload("res://tests/test_ports.gd").of(BASE_PORT + 10))
+	var local := query._udp.get_local_port()
+	var sockets: Variant = _udp_sockets()
+	if sockets == null:
+		print("  SKIP  this platform's socket list could not be read")
+		return
+	var found := ""
+	for line: String in sockets:
+		if line.strip_edges().ends_with(" %d" % local):
+			found = line.strip_edges()
+	_check(found.begins_with("127.0.0.1 "), "the query's socket (port %d) is on 127.0.0.1: %s" % [local, found if found != "" else "not found in %s" % [sockets]])
 
 
 ## [param query]'s answer, with [param server] (if any) answering meanwhile.

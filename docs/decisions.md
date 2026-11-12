@@ -12429,6 +12429,25 @@ build, from the next release, and the installed unit with the flag. On
 2026-10-21 the unit in /etc/systemd/system still lacked it, until Jeff's
 `sudo cp` and daemon-reload (above). Server only; protocol unchanged.
 
+431 amended (2) (perf, 2026-11-12; the coordinator's ask; label from tools/decision_number.sh): the status question
+holds no socket past the loopback, a host does not ask itself, and an answer is read only from where it was asked.
+A socket probe of a hosting game (for the laptops' joined runs, 828 amended (4)) found a UDP socket on 0.0.0.0 for
+about 2 s after start, beside the game's own on 127.0.0.1: ServerStatus.Query's PacketPeerUDP, never bound, so the
+OS bound it to every address when it sent; Main._ask_server_status asked Net.address (127.0.0.1) from _play() and
+_show_menu() in every mode, the host and the server asking themselves. Now: (a) a Query to a loopback address
+(ServerStatus.is_loopback: 127.*, ::1, ::ffff:127.0.0.1) binds its socket to 127.0.0.1 (::1 for ::1) before it
+sends; (b) Main asks nothing when this process is the authority and the address is its own (loopback or
+localhost); a plain is_authority() test would hide a player's menu status line, since Net's mode defaults to HOST
+before one is given; (c) poll() reads a packet only from the address and port it asked (an IPv4-mapped address
+matching its plain form), any other dropped unread. The probe on this build (C:/dev/psykinetic-trees/perf-status,
+each mode stopped by PID): server and host each one socket, the game's on ::ffff:127.0.0.1; a client its status
+question on 127.0.0.1 and its ENet connection on ::: (all addresses; ENetMultiplayerPeer.create_client takes no bind
+address, so that one is unchanged here and is for 828 amended (4)'s joined-run check to rule on); offline none.
+tests/status_test: a stranger's well-formed answer from another local port is not read and the server's own is; a
+question to 127.0.0.1 holds its socket on 127.0.0.1 (Get-NetUDPEndpoint on Windows, ss on Linux; SKIP where
+neither answers). --print-protocol 8414d6cf60f4 before and after (the hash counts RPC signatures, replicated lists
+and message kinds, none touched). Client and server; protocol unchanged; no class_name; no bullet.
+
 ## 406. Credits in the options: who made the sounds, from the takes list
 
 The options panel ends with a Credits section. It names who made what the game

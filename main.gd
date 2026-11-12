@@ -1081,6 +1081,10 @@ func _show_menu() -> void:
 func _ask_server_status() -> void:
 	if not Net.has_method("query_status") or Net.address.is_empty():
 		return
+	# 431 amended (2): a host or server does not ask its own status (it knows
+	# it, and the question held a socket open on every address for 2 s).
+	if Net.is_authority() and (ServerStatus.is_loopback(Net.address) or Net.address == "localhost"):
+		return
 	if not Net.is_connected("status_received", _on_server_status):
 		Net.connect("status_received", _on_server_status)
 	Net.call("query_status", Net.address, Net.port)
