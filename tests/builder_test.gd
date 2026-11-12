@@ -1745,10 +1745,21 @@ func _test_spots() -> void:
 	wilds.working.undo()
 	_check((wilds.working.config["spots"] as Array).size() == 2, "undone: the fire spot back")
 	var preview := wilds.spot_preview()
-	_check(preview.size() == 2 + wilds.trade_lines("store").size() and preview[2].begins_with("the town's trades in store") and "square, fire and talk in store (1 spot" in preview[0], "the proposal's reading: one line a kind, then the trades a line each (%s)" % [preview])
+	var jargon := preview.filter(func(line: String) -> bool: return "this world" in line or "at most" in line or "square, fire and talk" in line)
+	_check(preview.size() == 2 + wilds.trade_lines("store").size() and preview[0].begins_with("Fire spot (192, 210), sit facing (193, 209)")
+		and preview[1].begins_with("Work spot (merchant) (204, 196), stand facing (204, 197): ") and "Snagfin" in preview[1] and "one at a time" in preview[1]
+		and preview.slice(2) == Array(wilds.trade_lines("store")) and jargon.is_empty(),
+		"the proposal's reading (859 amended (3)): a line a laid spot, its cell, pose and who comes, then the trades a line each; none of the old words (%s)" % [preview])
+	_check(BuilderSession.shortfall([0, 0, 2, 2, 1] as Array[int], 1) == "; short at 2-4: 2 want it" and BuilderSession.shortfall([3, 1, 3] as Array[int], 2) == "; short at 0-1 and 2-3: 3 want its 2 spots"
+		and BuilderSession.shortfall([1, 1] as Array[int], 1).is_empty(), "the hours a spot is short: voice's words (%s; %s)" % [BuilderSession.shortfall([0, 0, 2, 2, 1] as Array[int], 1), BuilderSession.shortfall([3, 1, 3] as Array[int], 2)])
 	var shown := BuilderSession.spot_words(wilds.working.config)
 	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (192, 210) facing (193, 209)" in shown,
 		"accepted: both spots in the level, said in the situation (%s)" % shown)
+	var after := BuilderSession.new(wilds.doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	after.run_tool("spot", {"at": [192, 210], "remove": true})
+	var taken := after.spot_preview()
+	_check(not taken.is_empty() and taken[0] == "Fire spot (192, 210) taken up" and not taken.any(func(line: String) -> bool: return "(204, 196)" in line),
+		"a spot taken up: said so; the spot kept is not said again (%s)" % [taken])
 	# A field with no town, then with one: the seat warning, a doorway, a way closed, ground not reached.
 	var field := _doc()
 	field.config["starts"] = [[2, 2]]
@@ -1836,26 +1847,33 @@ func _test_trades_preview() -> void:
 	wilds_doc.config.erase("spots")
 	var wilds := BuilderSession.new(wilds_doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
 	var before := wilds.trade_preview("store")
-	for words: String in ["the town's trades in store, by economy's rules: ", "smith at the forge, works about ", "cook at the kitchen",
-			"taverner at the inn (if economy seats one)", "priest at the temple (if economy seats one)", "woodcutter at the woodlot woodlot",
-			"vendor at the stall weapon_stall"]:
-		_check(words in before, "Umbrage's trades: \"%s\" (%s)" % [words, before])
-	_check(not "spots laid, no building" in before and "no work spot yet" in before, "no work spot laid yet: said, and no mismatch the other way")
+	var code_of := func(use: String) -> String:
+		for building: Variant in wilds.working.config.get("buildings", []):
+			if building is Dictionary and str(building.get("use", "")) == use and str(building.get("town", "")) == "store":
+				return str(building.get("code", ""))
+		return ""
+	var forge: String = code_of.call("forge")
+	for words: String in ["the town's trades in store, by economy's rules: ", "Smith at %s forge: works about " % forge, "Cook at %s kitchen: " % code_of.call("kitchen"),
+			"Priest at %s temple (if the town takes one on)" % code_of.call("temple"), "Woodcutter at the woodlot: ", "Vendor at the stall: "]:
+		_check(words in before, "Umbrage's trades (859 amended (3)): \"%s\" (%s)" % [words, before])
+	_check(not forge.is_empty() and not "woodlot woodlot" in before and not "weapon_stall" in before and not "the forge" in before,
+		"a building by its code and kind (%s), a place by its kind alone, never a key" % forge)
+	_check(not "but no trade here uses them" in before and "no work spot yet" in before, "no work spot laid yet: said, and no mismatch the other way")
 	var named := false
 	for name: String in ["Margery", "Dunstan", "Aldous", "Brother Cuth", "Ned", "Old Tam"]:
 		named = named or name in before
 	_check(not named, "no name of economy's lists read into it")
 	var keeper := wilds.run_tool("spot", {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]})
 	var keeper_text := str(keeper.get("text"))
-	_check(keeper.get("ok", false) and "the town's trades in store" in keeper_text and "merchant: spots laid, no building" in keeper_text,
+	_check(keeper.get("ok", false) and "the town's trades in store" in keeper_text and "Merchant work spots laid, but no trade here uses them" in keeper_text,
 		"a merchant's spot, nothing in town calling for one: said both ways (%s)" % keeper_text)
 	var lines := wilds.spot_preview()
 	var trades := wilds.trade_lines("store")
-	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines[1].begins_with("the town's trades in store, by economy's rules: ")
-		and not "; " in lines[2] and "; ".join(PackedStringArray(lines.slice(1))) == wilds.trade_preview("store"),
-		"the proposal's reading ends with the trades, a trade a line (885), joined the trades line as before (%s)" % [lines])
+	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines.slice(1) == Array(trades) and not "by economy's rules" in lines[1]
+		and wilds.trade_preview("store") == "the town's trades in store, by economy's rules: " + "; ".join(trades),
+		"the proposal's reading ends with the trades, a trade a line (885), no head on the first; Claude's tool text joins them under it (%s)" % [lines])
 	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
-	_check("none (no building with a use, no work site)" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
+	_check("No trades yet: no building with a use, no work site" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
 
 
 ## A parse's whole reading, as one string's hash: what a cached and a fresh one must share.

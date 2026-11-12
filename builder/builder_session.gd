@@ -2935,22 +2935,11 @@ func spot_users(town: String, use: String, trade := "") -> String:
 		if pose != "stand" and not Client3D.ACTIVITIES.has(pose) and not poses.has(pose + " draws as stand until its clip lands"):
 			poses.append(pose + " draws as stand until its clip lands")
 	var head := "%s in %s (%d spot%s%s)" % [named, town, spots.size(), "" if spots.size() == 1 else "s", "; " + ", ".join(poses) if not poses.is_empty() else ""]
-	var residents := _spot_residents(town)
-	if residents.is_empty():
+	var read := _spot_wants(town, use, trade)
+	if not read["read"]:
 		return head + ": no residents read%s" % (" (%s)" % spot_world if not spot_world.is_empty() else "")
-	var hours := {}
-	var wants: Array[int] = []
-	wants.resize(24)
-	for resident: Dictionary in residents:
-		var mine: Array[int] = []
-		for hour in 24:
-			var word := Townsfolk.whereabouts(str(resident["trade"]), float(hour), "", str(resident["type"]), str(resident["id"]))
-			var comes: bool = word == "work" and trade in resident["trades"] if use == "work" else (word == "square" if group == "square" else word == use)
-			if comes:
-				mine.append(hour)
-				wants[hour] += 1
-		if not mine.is_empty():
-			hours[str(resident["name"])] = mine
+	var hours: Dictionary = read["hours"]
+	var wants: Array[int] = read["wants"]
 	var where := " (%s)" % (spot_world if not spot_world.is_empty() else "this world, now")
 	if hours.is_empty():
 		return head + ": nobody comes all day" + where
@@ -2977,8 +2966,9 @@ static func _spot_group(use: String) -> String:
 	return "square" if use in ["square", "fire", "talk"] else use
 
 
-## Hours [param hours] (sorted) as spans: "8-12, 18-21" (each span's end the hour after its last).
-static func _spans(hours: Array[int]) -> String:
+## Hours [param hours] (sorted) as spans: "8-12, 18-21" (each span's end the
+## hour after its last), joined by [param joiner] (the panel's lines: " and ").
+static func _spans(hours: Array[int], joiner := ", ") -> String:
 	var out := PackedStringArray()
 	var i := 0
 	while i < hours.size():
@@ -2987,7 +2977,81 @@ static func _spans(hours: Array[int]) -> String:
 			j += 1
 		out.append("%d-%d" % [hours[i], hours[j] + 1])
 		i = j + 1
-	return ", ".join(out)
+	return joiner.join(out)
+
+
+## A spot's use as the panel names it (859 amended (3)): "Fire spot", "Work spot (smith)".
+const SPOT_NAMES := {"fire": "Fire spot", "square": "Square spot", "talk": "Talk spot", "well": "Well spot", "inn": "Inn spot", "temple": "Temple spot"}
+
+
+## One laid or changed spot's line for the answer panel (859 amended (3),
+## the coordinator's ruling on builder's worst two; the mock's words): its
+## cell and pose, who comes when (any of [param town]'s residents whose hour
+## is the spot's group, as spot_users reads), "one at a time", and the hours
+## more want the group than its spots seat. No "(this world, now)": a reading
+## from residents.json alone (the headless runner) says so in a few words.
+func spot_reading(spot: Dictionary) -> String:
+	var use: String = spot["use"]
+	var cell: Vector2i = spot["cell"]
+	var face: Vector2i = spot["face"]
+	var named: String = "Work spot (%s)" % spot["trade"] if use == "work" else SPOT_NAMES.get(use, use.capitalize() + " spot")
+	var said := "%s (%d, %d), %s facing (%d, %d)" % [named, cell.x, cell.y, spot["pose"], face.x, face.y]
+	if spot["pose"] != "stand" and not Client3D.ACTIVITIES.has(spot["pose"]):
+		said += ", drawn standing until its clip lands"
+	var read := _spot_wants(spot["town"], use, spot["trade"])
+	if not read["read"]:
+		return said + ": nobody lives here yet"
+	var hours: Dictionary = read["hours"]
+	if hours.is_empty():
+		return said + ": nobody comes all day"
+	var who := PackedStringArray()
+	for name: String in hours:
+		who.append("%s %s" % [name, _spans(hours[name], " and ")])
+	said += ": %s; one at a time%s" % [", ".join(who), shortfall(read["wants"], read["spots"])]
+	if read["settled"]:
+		said += " (settled folk only)"
+	return said
+
+
+## The hours more want a spot group than its [param seats] spots seat, from
+## [param wants] (how many at each hour), voice's words: "; short at 20-22: 2
+## want it", "3 want its 2 spots" for a group of two; "" when it seats them.
+static func shortfall(wants: Array[int], seats: int) -> String:
+	var over: Array[int] = []
+	var peak := 0
+	for hour in wants.size():
+		if wants[hour] > seats:
+			over.append(hour)
+			peak = maxi(peak, wants[hour])
+	if over.is_empty():
+		return ""
+	return "; short at %s: %d want %s" % [_spans(over, " and "), peak, "it" if seats == 1 else "its %d spots" % seats]
+
+
+## Who of [param town]'s residents wants a spot of [param use]'s group (and
+## [param trade], a work spot's) at each hour (859, npc's rule; shared by
+## spot_users and spot_reading): {read: any resident read, settled: read from
+## residents.json alone, spots: how many such spots are laid, hours: name ->
+## [hour], wants: [24] how many at each hour}.
+func _spot_wants(town: String, use: String, trade: String) -> Dictionary:
+	var group := _spot_group(use)
+	var spots := Level.spots_from(working.config, [] as Array[String]).filter(func(spot: Dictionary) -> bool:
+		return spot["town"] == town and _spot_group(spot["use"]) == group and (use != "work" or spot["trade"] == trade))
+	var residents := _spot_residents(town)
+	var hours := {}
+	var wants: Array[int] = []
+	wants.resize(24)
+	for resident: Dictionary in residents:
+		var mine: Array[int] = []
+		for hour in 24:
+			var word := Townsfolk.whereabouts(str(resident["trade"]), float(hour), "", str(resident["type"]), str(resident["id"]))
+			var comes: bool = word == "work" and trade in resident["trades"] if use == "work" else (word == "square" if group == "square" else word == use)
+			if comes:
+				mine.append(hour)
+				wants[hour] += 1
+		if not mine.is_empty():
+			hours[str(resident["name"])] = mine
+	return {"read": not residents.is_empty(), "settled": spot_world.begins_with("residents.json"), "spots": spots.size(), "hours": hours, "wants": wants}
 
 
 ## [param town]'s residents as the who-uses-it reading needs them: [{id,
@@ -3022,22 +3086,30 @@ func _spot_residents(town: String) -> Array[Dictionary]:
 	return out
 
 
-## Every laid spot kind's reading (859), a line each: the proposal's summary and the runner's.
+## Who comes to the spots this change lays (859; a line a laid or changed
+## spot since 859 amended (3), spot_reading, and a line a spot taken up), then
+## the trades of their towns a line each: the proposal's "Spots, who comes"
+## part and the runner's.
 func spot_preview() -> Array[String]:
 	var out: Array[String] = []
-	var seen := {}
-	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
-		var key := "%s|%s|%s" % [spot["town"], _spot_group(spot["use"]), spot["trade"] if spot["use"] == "work" else ""]
-		if seen.has(key):
-			continue
-		seen[key] = true
-		out.append(spot_users(spot["town"], spot["use"], spot["trade"]))
+	var had := {}
+	for spot: Dictionary in Level.spots_from(doc.config, [] as Array[String]):
+		had[spot["cell"]] = spot
 	var towns: Array[String] = []
+	var now := {}
 	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
-		if spot["town"] not in towns:
-			towns.append(spot["town"])
-	# A trade a line (885: the answer panel's bullets); joined with "; " they
-	# read as trade_preview's one line, so the summary string is as before.
+		now[spot["cell"]] = true
+		if str(had.get(spot["cell"])) != str(spot):
+			out.append(spot_reading(spot))
+			if spot["town"] not in towns:
+				towns.append(spot["town"])
+	for cell: Vector2i in had:
+		if not now.has(cell):
+			var gone: Dictionary = had[cell]
+			out.append("%s (%d, %d) taken up" % ["Work spot (%s)" % gone["trade"] if gone["use"] == "work" else SPOT_NAMES.get(gone["use"], str(gone["use"]).capitalize() + " spot"), cell.x, cell.y])
+			if gone["town"] not in towns:
+				towns.append(gone["town"])
+	# A trade a line (885: the answer panel's bullets).
 	for town in towns:
 		out.append_array(trade_lines(town))
 	return out
@@ -3049,15 +3121,17 @@ func spot_preview() -> Array[String]:
 ## (a keeper's, as the inn's taverner, seated once it stands), a temple's or
 ## healer's hut's from return.places, a work site's (a woodlot's woodcutter)
 ## from sites, a stall's keeper (Main.VENDOR_TRADE); the hours on the day's
-## table alone (no resident's clock: "about"); a trade economy seats "if
-## economy seats one" (npc). No name is read. A trade with work spots laid and
+## table alone (no resident's clock: "about"); a trade economy seats "(if
+## the town takes one on)" (npc's condition, voice's words). No name is read. A trade with work spots laid and
 ## nothing in the town that calls for it is said too (the coordinator).
 func trade_preview(town: String) -> String:
-	return "; ".join(trade_lines(town))
+	return "the town's trades in %s, by economy's rules: %s" % [town, "; ".join(trade_lines(town))]
 
 
-## trade_preview a trade a line (885), the first headed "the town's trades
-## in <town>, by economy's rules: ".
+## trade_preview a trade a line (885), as the answer panel says them (859
+## amended (3)): "Smith at F1 forge: works about 7-12 and 13-18; no work spot
+## yet", a building by its code and kind (885 draws the code's chip), a place
+## by its kind alone, never a level's key.
 func trade_lines(town: String) -> PackedStringArray:
 	var economy := Production.read_rules(Economy.PATH)
 	var rows: Dictionary = economy.get("buildings", {})
@@ -3077,14 +3151,16 @@ func trade_lines(town: String) -> PackedStringArray:
 		if not building is Dictionary or str(building.get("town", "")) != town:
 			continue
 		var use := str(building.get("use", ""))
+		var code := str(building.get("code", ""))
+		var called := func(what: String) -> String: return ("%s %s" % [code, what]) if not code.is_empty() else "the " + what
 		var row: Dictionary = rows.get(use, {}) if rows.get(use) is Dictionary else {}
-		need.call(str(row.get("trade", "")), "the " + use, false)
+		need.call(str(row.get("trade", "")), called.call(use), false)
 		var keeper: Variant = row.get("keeper")
 		if keeper is Dictionary:
-			need.call(str(keeper.get("trade", "")), "the " + use, true)
+			need.call(str(keeper.get("trade", "")), called.call(use), true)
 		var kind := str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), building.get("kind", "")))
 		if seats.get(kind) is Dictionary:
-			need.call(str(seats[kind].get("trade", "")), "the " + kind.replace("_", " "), true, bool(seats[kind].get("outside", false)))
+			need.call(str(seats[kind].get("trade", "")), called.call(kind.replace("_", " ")), true, bool(seats[kind].get("outside", false)))
 	var places: Dictionary = working.config.get("places", {}) if working.config.get("places") is Dictionary else {}
 	for key: String in places:
 		var place: Variant = places[key]
@@ -3093,9 +3169,9 @@ func trade_lines(town: String) -> PackedStringArray:
 		var kind := str(place.get("kind", ""))
 		for trade: String in sites:
 			if str(sites[trade]) == kind:
-				need.call(trade, "the %s %s" % [kind.replace("_", " "), key], false)
+				need.call(trade, "the " + kind.replace("_", " "), false)
 		if kind == "stall":
-			need.call(Main.VENDOR_TRADE, "the stall " + key, false)
+			need.call(Main.VENDOR_TRADE, "the stall", false)
 	var laid := {}
 	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
 		if spot["town"] == town and spot["use"] == "work":
@@ -3108,15 +3184,14 @@ func trade_lines(town: String) -> PackedStringArray:
 			if Townsfolk.whereabouts(trade, float(hour)) == "work":
 				hours.append(hour)
 		var count := int(laid.get(trade, 0))
-		said.append("%s at %s%s%s, works about %s: %s" % [trade, ", ".join(row["where"]), " (if economy seats one)" if row["seat"] else "",
-			", outside the town" if row["outside"] else "", _spans(hours) if not hours.is_empty() else "no hours on the day's table",
-			"no work spot yet" if count == 0 else "%d work spot%s" % [count, "" if count == 1 else "s"]])
+		said.append("%s at %s%s%s: %s; %s" % [trade.capitalize(), ", ".join(row["where"]), " (if the town takes one on)" if row["seat"] else "",
+			", outside the town" if row["outside"] else "", "works about " + _spans(hours, " and ") if not hours.is_empty() else "no working hours set",
+			"no work spot yet" if count == 0 else ("one work spot" if count == 1 else "%d work spots" % count)])
 	for trade: String in laid:
 		if not needs.has(trade):
-			said.append("%s: spots laid, no building" % trade)
+			said.append("%s work spots laid, but no trade here uses them" % trade.capitalize())
 	if said.is_empty():
-		said.append("none (no building with a use, no work site)")
-	said[0] = "the town's trades in %s, by economy's rules: %s" % [town, said[0]]
+		said.append("No trades yet: no building with a use, no work site")
 	return said
 
 

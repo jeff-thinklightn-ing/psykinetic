@@ -50723,6 +50723,28 @@ refusal); view_test (a mark each, turned to its face, the gone one
 fainter with its cross). Tools only: nothing a player outside builder mode sees, no package, no
 bullet; no new class_name.
 
+859 amended (3) (the coordinator's yes to builder's two worst in builder mode, 2026-11-12; the label
+from decision_number.sh): who comes to a spot, said a spot at a time, and the trades by code and kind.
+The answer panel's (885) "Spots, who comes" part said each spot group once, in a reader's words of the
+check ("square, fire and talk in store (2 spots): Maud 12-13, ...; at most 1 at once of 2 (this
+world, now)"), so it could not say which spot a line meant or when it fell short; and the trades named
+places by their keys ("the stall weapon_stall", "the woodlot woodlot") and buildings with no code, so
+885 drew no chip. Now BuilderSession.spot_preview says a line a spot laid or changed against the level
+as it was (spot_reading: its use, cell, pose and face; who of the town comes when, the group's people
+as before; "one at a time"; the hours more want the group than its spots seat, shortfall: "short at
+20-22: 2 want it", "3 want its 2 spots" for two; "(settled folk only)" when read from residents.json
+without a world) and a line a spot taken up, then the trades of those spots' towns a line each;
+trade_lines names a building by its code and kind ("Smith at F1 forge: works about 7-12 and 13-18; no
+work spot yet") and a place by its kind alone, with no head; trade_preview (the spot tool's answer to
+Claude) puts "the town's trades in <town>, by economy's rules: " before them, as before.
+spot_users (the spot tool's answer to Claude) reads the same people (_spot_wants) and keeps its words.
+The runner's SPOTS lines are the panel's. Voice worded the lines ("one at a time", "short at", "nobody
+lives here yet", "but no trade here uses them", "no working hours set", a seated trade "(if the town takes one on)"); ui-design's sheet of the built panel
+beside the mock again before it lands (the panel's content changes). builder_test _test_spots (the
+lines laid, a spot taken up said, none of the old words; the hours too few) and _test_trades_preview
+(codes, no keys, the head on Claude's line alone). Server only, protocol unchanged, no new class_name,
+no bullet (builder mode is Jeff's tool).
+
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 
 The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it
