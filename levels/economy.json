@@ -147,6 +147,8 @@
 		"places": {"hollowfell": {"zone": "hollowfell", "from": "from_hills", "towns": ["wilds/store"]}}},
 	"ponds": {"_": "Decision 805 (the core loop's first slice, fishing): each fishing place's fish, fish to start and the most it holds, refill a game day; a cast's catch chance while it has any (items' try_use fish calls Economy.pond_catch). wanderer: a player fishing at a pond for after steps (a pick in the range; 10 a second) gets one beast, first on their first visit, then one of then, at most once a pond every cooldown game days; a visit with no cast for visit_ends steps is over. Economy sends wanderer_due, enemy-ai spawns it.",
 		"fish": 8, "refill": 2, "catch": 0.6,
+		"at": {"_": "805 amended (16) (the coordinator's ruling; Jeff 10-29: no enforced scarcity in pre-alpha): a water of its own, by pond_at's id, with its own fish and refill; any other water the ones above. Jeff's crescent by Snagfin's shack, where he takes a companion to fish: 40, full again each game day (about twenty minutes of steady catching for two).",
+			"wilds/pool_221_224": {"fish": 40, "refill": 40}},
 		"wanderer": {"after": [900, 1500], "visit_ends": 1800, "cooldown": 1, "first": "boar", "then": ["boar", "wolf"]}},
 	"rent": 1,
 	"rent_every": 54000,

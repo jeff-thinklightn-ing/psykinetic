@@ -508,6 +508,14 @@ func _test_ponds() -> void:
 	economy.pond_catch(POND, "p1", 0.1)
 	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
 	_check(again.pond_fish(POND) == 7, "saved and loaded: 7 fish")
+	# Jeff's crescent by Umbrage (805 amended (16)): 40, and 40 back a day; every other water 8 and 2.
+	const CRESCENT := "wilds/pool_221_224"
+	_check(economy.pond_fish(CRESCENT) == 40, "the crescent by Umbrage holds 40 fish (%d)" % economy.pond_fish(CRESCENT))
+	for i in 40:
+		economy.pond_catch(CRESCENT, "p1", 0.1)
+	_check(economy.pond_fish(CRESCENT) == 0 and economy.pond_fish("wilds/reed_pond") == 8, "40 caught there: it is empty, another water still holds 8")
+	_now += DayNight.day_steps
+	_check(economy.pond_fish(CRESCENT) == 40 and economy.pond_fish(POND) == 8, "a game day on: the crescent full at 40 again, the other back to its 8 (%d)" % economy.pond_fish(CRESCENT))
 
 	var sent: Array = []
 	economy.wanderer_due.connect(func(pond: String, player_id: String, kind: String, at: Vector2i) -> void: sent.append([pond, player_id, kind, at]))

@@ -3196,9 +3196,13 @@ func pond_rule() -> Dictionary:
 
 
 ## Pond [param pond]'s fish now: ponds.fish to start, refilled ponds.refill
-## a game day up to ponds.fish.
+## a game day up to ponds.fish; a water of its own in ponds.at (805 amended
+## (16): Jeff's crescent by Umbrage) has its own fish and refill.
 func pond_fish(pond: String) -> int:
 	var rule := pond_rule()
+	var own: Variant = rule.get("at", {}).get(pond, {})
+	if own is Dictionary and not (own as Dictionary).is_empty():
+		rule = rule.merged(own, true)
 	var most := int(rule.get("fish", 8))
 	var day := now() / maxi(DayNight.day_steps, 1)
 	if not _ponds.has(pond):
