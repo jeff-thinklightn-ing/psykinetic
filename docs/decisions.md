@@ -49144,3 +49144,43 @@ your pack, not your hand.") when his window opens on one, once a visit (KEEPER_T
 each player and taker (_held_said_at, not saved). economy_test _test_held_take (held: no row,
 named; in the pack: a row, nothing; a raw hide held never counts). Server only; protocol
 unchanged; no new class_name.
+
+## 878. Landings' Godot tests on saturn
+
+Jeff, 2026-11-11, at 21:07: "go ahead and move landings' test runs to saturn". This PC had run short
+of memory for a suite (about 11 GB held by the kernel; a lean suite waits for 14.4 GB free), and the
+line stalled for hours on one suite at a time. saturn (Ubuntu, 24 cores, 30 GB, on the tailnet) runs
+the whole suite in about five minutes. The coordinator's design and draft; release's review, trial and
+landing.
+
+tools/remote_tests.sh sends the checkout's HEAD to saturn as a git bundle (only what saturn lacks), checks
+it out at ~/land/<tree> (a worktree of ~/psykinetic, which has no remote and no credentials), checks
+the sha and a clean tree, imports twice, and runs the suite, state_test and net_test there with
+timeout and </dev/null, one landing at a time (a slot, ~/land/.busy, stale after 40 minutes). A part
+passes only on its own "REMOTE <part>: PASS sha=<HEAD>" line with exit 0: a lost connection, another
+sha's line or no line is a fail. The land lock, the rebase, server_boot_test, the python tool tests
+and the push stay on this PC.
+
+The gate has a kind of its own, suite_remote (3 GB seed, one at a time, never beside a bench), so the
+suite's learned estimate never learns from a run that held no suite. It is "remote": this PC's CPU says
+nothing of whether saturn's side is hung, so the hung check skips it and its limit is fixed at 60
+minutes, over the sum of the saturn side's own timeouts (the slot 10 minutes, each import 5, the suite
+20 with state_test 15 beside it, net_test 10). heavy_job holds counts a take held by the asking
+process's own ancestor whatever tree it is named for (as a run adopts one, 394 amended (11)), so a
+landing that took suite under another name is never sent to queue again while it holds the land lock;
+land.sh prints which take it found. land.sh's outer part runs as
+suite_remote when this tree holds a suite_remote take, as suite when it holds a suite take (local, as
+before; every waiter queued before this landed), else as `tools/remote_tests.sh kind` says
+(suite_remote when saturn answers and LAND_LOCAL is unset). Under suite_remote, a remote failure
+fails the landing: there is never a quiet local second try. A landing script that wants saturn takes
+`$(bash tools/remote_tests.sh kind)` in place of suite before the land lock. The cut's suite on main
+runs with LAND_LOCAL=1, so nothing is released without a full Windows pass: with this, the only
+Godot run on Windows in a saturn landing is server_boot_test, so that cut suite is what guards
+Windows-only paths and stays a hard step of every cut. A Windows fail after a saturn pass is a platform
+difference, reported to the coordinator and noted in C:/dev/review/perf/flakes.md.
+
+Only this script writes to saturn, and only under ~/land and ~/psykinetic; nothing from the box goes
+there; no remote or credential is added there; sudo there is Jeff's. Each remote part watches its own connection and ends its
+whole session there when this PC's side is gone; prepare stops what an earlier run left in that tree's
+checkout. A bundle leaves out every ref saturn has (its heads and each tree's refs/land tip). Not yet: a
+failed scene's kept logs stay on saturn (the part's output comes back). Tools and tests only; protocol unchanged; no new class_name.
