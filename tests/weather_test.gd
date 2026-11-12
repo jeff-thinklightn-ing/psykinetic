@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_fish_feeding()
 	_test_rain_rings()
 	_test_rain_at_night()
+	_test_roofs_drawn()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -822,3 +823,33 @@ func _check_drops_kept(code: String) -> void:
 			% [worst, keeps[0], 1.0 - keeps[0], keeps[4], 1.0 - keeps[4]])
 	_check(c["DROP_SMALLEST"] < 1.0 and c["DROP_RATE_LO"] < 1.0 and c["DROP_RATE_HI"] > 1.0,
 			"the drops ring at rates and sizes of their own, so none fall in rows")
+
+
+## 309 amended (6): the roofs' heightfield is drawn only while rain or snow
+## falls and while the last drops still fall; dry, indoors or after, not.
+func _test_roofs_drawn() -> void:
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	var place := func(delta: float) -> void: view.place(Vector3(100.0, 0.0, 100.0), delta, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
+	for i in 60:
+		view.ease_toward(Weather.KINDS["clear"], 0.1)
+	place.call(0.1)
+	_check(not view._roofs.visible, "clear weather: the roofs' heightfield is not drawn")
+	for i in 30:
+		view.ease_toward(Weather.KINDS["storm"], 0.1)
+	place.call(0.1)
+	_check(view._rain.emitting and view._roofs.visible, "rain falling: the roofs are drawn")
+	for i in 60:
+		view.ease_toward(Weather.KINDS["clear"], 0.1)
+	place.call(0.1)
+	var falling := view._roofs.visible
+	var linger := maxf(view._rain.lifetime, view._snow.lifetime)
+	place.call(linger + 0.5)
+	_check(not view._rain.emitting and falling and not view._roofs.visible,
+			"stopped: drawn while the last drops fall (%.1f s), then not" % linger)
+	view.ease_toward(Weather.KINDS["storm"], 1.0)
+	place.call(0.1)
+	view.set_outdoor(false)
+	_check(not view._roofs.visible, "indoors: not drawn")
+	view.free()

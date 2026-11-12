@@ -227,6 +227,9 @@ var _drips: GPUParticles3D
 ## The rain's and the drips' drop materials (DROP_SHADER), told the day's share each frame.
 var _drop_materials: Array[ShaderMaterial] = []
 var _roofs: GPUParticlesCollisionHeightField3D
+## How much longer (s) the roofs stay drawn after the rain and snow stop:
+## the drops already falling still meet them (309 amended (6)).
+var _roofs_linger := 0.0
 var _fog: Array[MeshInstance3D] = []
 var _fog_material: Array[ShaderMaterial] = []
 var _clouds: Decal
@@ -262,6 +265,8 @@ func set_outdoor(value: bool) -> void:
 		_rain.emitting = false
 		_snow.emitting = false
 		_drips.emitting = false
+		_roofs.visible = false
+		_roofs_linger = 0.0
 	if not value:
 		canopy = 0.0
 		drip = 0.0
@@ -395,6 +400,7 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	# Drips: big slow drops from under the crowns, straight down.
 	_drips.emitting = drip > 0.02
 	_drips.amount_ratio = drip
+	_show_roofs(delta)
 	_drips.global_position = target + Vector3(0.0, DRIP_HEIGHT, 0.0)
 	# Fog: layers centred on the view (under the low camera, ahead of the
 	# aim), their noise drifting.
@@ -466,7 +472,20 @@ func _build_rain() -> void:
 	_roofs.update_mode = GPUParticlesCollisionHeightField3D.UPDATE_MODE_WHEN_MOVED
 	_roofs.follow_camera_enabled = true
 	_roofs.heightfield_mask = 0xFFFFF & ~RAIN_LAYER
+	_roofs.visible = false
 	add_child(_roofs)
+
+
+## The roofs' heightfield drawn only while rain or snow falls, and for the
+## falling drops' and flakes' lifetime after (309 amended (6)): drawn, it
+## cost about 1.15 ms a frame (8.7%, the Lenovo at night, perf 11-12) even
+## with nothing falling. The drips don't collide, so they don't need it.
+func _show_roofs(delta: float) -> void:
+	if _rain.emitting or _snow.emitting:
+		_roofs_linger = maxf(_rain.lifetime, _snow.lifetime)
+	else:
+		_roofs_linger = maxf(_roofs_linger - delta, 0.0)
+	_roofs.visible = _roofs_linger > 0.0
 
 
 func _build_snow() -> void:

@@ -6619,6 +6619,28 @@ its first frames the start-up frame main's rain shows too. weather_test
 _test_rain_at_night: the shader's day, near fade and night glow, and the
 drops told the day. Client only, protocol unchanged, no new class_name.
 
+309 amended (6): the roofs' heightfield drawn only while rain or snow falls
+(the coordinator's ruling of 2026-11-12, on perf's Lenovo runs). The rain's
+and snow's GPUParticlesCollisionHeightField3D ("Roofs") was in the tree all
+the time, and drawn, it cost about 1.15 ms a frame with nothing falling
+(clear, night 22.5, wilds, low camera: median 13.17-13.21 ms with it,
+12.02-12.09 without, draw calls unchanged at 1893; 1.2 ms with rain, runs
+C:/dev/review/perf_split_* and perf_splitclear_*). Now WeatherView hides it
+(visible false) unless rain or snow is emitting, and keeps it for the
+longer of the rain's and snow's lifetime after they stop, so the drops and
+flakes already falling still stop on the roofs; hidden indoors. The drips
+don't collide, so they don't need it. The low camera's RESOLUTION_512 is
+kept: a smaller one only if drawn-while-raining is still dear. weather_test
+_test_roofs_drawn: not drawn clear, drawn in a storm, drawn while the last
+drops fall and not after, not indoors. Proof, perf's before/after on the
+Lenovo (map_bench wilds, 22.5, low camera, 25 s, three runs each;
+C:/dev/review/perf_roofs_*): clear, median 13.18-13.25 ms before,
+12.25-12.30 after (75.5-75.9 fps to 80.1-81.3), 0.9 ms back as without the
+node; with rain at 10 s, 14.12-14.14 against 14.03-14.06, the same, drawn
+once it rains; the rain's first frame the same (two pipelines both). No
+bullet (nothing a player sees). Client only, protocol unchanged, no new
+class_name.
+
 ## 327. A glimpse of the level past a way out
 
 Jeff: "maybe the castle gets a little area where you can see it just beyond
