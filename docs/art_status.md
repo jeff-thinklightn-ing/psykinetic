@@ -60,12 +60,12 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.grindstone` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `building.hall_chair` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.hatch_sealed` | 1 | art-kit, by hand | own | 2026-10-24 |
-| `building.house` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `building.house` | 1 | art-kit, by hand (roof, roof_damaged); art-gen c5, fitted (trim, state_damaged) | own | 2026-11-11 |
 | `building.hunters_blind` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `building.hut` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `building.lean_to` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `building.link_arch` | 3 | art-kit, by hand | own | 2026-10-22 |
-| `building.market_stall` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
+| `building.market_stall` | 1 | art-kit, by hand | own | 2026-11-11 |
 | `building.milestone` | 2 | art-kit, by hand | own | 2026-11-03 |
 | `building.mound` | 1 | Jeff, by hand (on art-kit's scripted mound) | own | 2026-10-22 |
 | `building.quench_trough` | 1 | art-kit, by hand | own | 2026-11-06 |
@@ -75,7 +75,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.sarcophagus` | 2 | art-kit, by hand | own | 2026-11-05 |
 | `building.set_cold_forge` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `building.set_windlass` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `building.shed` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `building.shed` | 1 | art-kit, by hand (roof, roof_damaged); art-gen c11, fitted (trim, state_damaged) | own | 2026-11-11 |
 | `building.smith_bench` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `building.smithy_forge` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `building.stair_down` | 3 | art-kit, by hand | own | 2026-10-22 |
@@ -120,7 +120,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `creature.wolf` | 1 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Wolf, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-17 |
 | `dais.edge` | 1 | art-kit, by hand | own | 2026-10-22 |
 | `dais.steps` | 1 | art-kit, by hand | own | 2026-10-22 |
-| `door.double` | 4 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `door.double` | 4 | art-kit, by hand (variants 1 and 2); art-kit, by hand (3, 4) | own | 2026-11-11 |
 | `door.gate` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `door.portcullis` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `door.single` | 2 | art-kit | own | 2026-10-17 |
@@ -131,7 +131,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `floor.chapel` | 1 | art-gen, procedural (no model) | own | 2026-10-29 |
 | `floor.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `floor.thicket` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `floor.wood` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
+| `floor.wood` | 1 | art-gen, procedural (no model) | own | 2026-11-12 |
 | `frame.cruck` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `frame.sill` | 1 | art-kit, by hand | own | 2026-10-21 |
 | `fx.arrow` | 3 | art-kit | own | 2026-10-17 |
@@ -249,7 +249,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `material.wall.dark` | 1 | art-kit, by hand | own | 2026-10-24 |
 | `material.wall.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `material.wall.thicket` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `material.wall.wood` | 1 | art-gen | own | 2026-10-18 |
+| `material.wall.wood` | 1 | art-gen, procedural (no model) | own | 2026-11-12 |
 | `mine.arch_3` | 1 | art-kit, by hand | own | 2026-11-02 |
 | `mine.arch_4` | 1 | art-kit, by hand | own | 2026-11-02 |
 | `mine.arch_5` | 1 | art-kit, by hand | own | 2026-11-02 |
@@ -282,7 +282,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.cache_pack` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `prop.cache_stones` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `prop.cage` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.campfire` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.campfire` | 1 | art-kit, by hand | own | 2026-11-11 |
 | `prop.campfire_cold` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `prop.candle_draft` | 1 | art-kit, by hand | own | 2026-11-11 |
 | `prop.candle_stand` | 1 | art-gen, by hand | own | 2026-11-11 |

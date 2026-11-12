@@ -370,7 +370,7 @@
 		"material.wall.wood": {
 			"category": "materials",
 			"type": "texture",
-			"source": {"by": "art-gen", "tool": "Qwen-Image-2512, art-gen's seamless.py", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/material.wall.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c5 made seamless by art-gen"},
+			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow (art-gen's board_tile.py)", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/art-gen_textures/handoff (board_tile.py wall): lapped horizontal boards through the tile edge, a lit lower lip, a 4 px lap shadow; every other course in two pieces, shaded per piece (no course bands), one plainly dark and one lightest piece per tile; mean matched to the Qwen c5 tile it replaces (it read as stacked brick at the near view); passed by art-kit, approved by the coordinator after ui-design's in-game stills (C:/dev/review/ui-design/wood); N:/assets/candidates/material.wall.wood/procedural/material.wall.wood_lapped_p3.png"},
 			"tile_m": 2.0,
 			"pixels": 512,
 			"uses": "the planks of swept wall.wood runs (wall.wood.profile): u is metres along the run, v metres up"
@@ -820,7 +820,7 @@
 		"floor.wood": {
 			"category": "floors",
 			"type": "texture",
-			"source": {"by": "art-gen, re-graded by art-kit", "tool": "Qwen-Image-2512, art-gen's seamless.py, numpy", "license": "own", "date": "2026-10-19", "notes": "N:/assets/candidates/floor.wood/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2 (the _top concept) made seamless by art-gen (min-error cut; the cross-board rows break where the seam passes); re-graded (Jeff, 2026-10-19: \"tone 8 approved, good improvement\"; the coordinator's (2), the castle's grade on the other tiles): per channel in linear light toward row 2's wood, the capsule days' wood floor at the castle's lit level, never darker than before, a soft shoulder; mean #8a7858 (hue 38, sat 0.36, value 0.54) to #96744f (hue 31, sat 0.47, value 0.59)"},
+			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow (art-gen's board_tile.py)", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/art-gen_textures/handoff (board_tile.py floor, extra joint): boards one way, full-tile lengths with staggered end joints (two or three per board), 3 px dark seams with a lit edge, one board in eight plainly darker, a few soft splits and knots; mean matched to the re-grade Jeff approved 2026-10-19 (\"tone 8 approved\"); replaces the Qwen c2 tile after art-gen's near-view audit (it read as a parquet of crossed strips); passed by art-kit, approved by the coordinator after ui-design's in-game stills (C:/dev/review/ui-design/wood); N:/assets/candidates/floor.wood/procedural/floor.wood_boards_p2x.png"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on the floor of a home place (floor set \"wood\"): planks"
@@ -1627,7 +1627,7 @@
 			"footprint": [2, 1],
 			"size": [2, 2.4, 1.2],
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-29", "notes": "prop.market_stall's mesh as a building (its own blend copied; N:/assets/candidates/prop.market_stall/notes.md, the note's c7): its awning in banner red and cloth, counter and posts on row 2"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/market_stall/make_stall.py from art-gen's fitted stall (prop.market_stall's c7 as a building, 2026-10-29), rebuilt by hand for the coordinator's three-worst order (a creased lumpy counter and a torn crumpled awning up close, beside the goblin): the same box and the counter's top at 0.88; a boarded counter 1.8 x 1 (three front boards with dark joints, each tilted a little, a middle stile, boarded ends, a kick rail, a two-plank top with a lip), four square posts (back 2.34, front 2.06) and rails, an awning of eight flat-panelled stripes in banner red and undyed linen with a 4 cm sag and a scalloped valance front and sides; its back edge inside the box (y 0.585) over Rolf's cell; 678 tris; look C:/dev/review/market_stall/ba.png"},
 			"uses": "736's stall, economy's 1g starter weapon vendor (coordinator-approved; buildings' ask): 2 x 1 cells, long side along x, the counter at the front (+z), the awning over it, 0.1 over the cell's depth front and back; buildings places it in Umbrage's square, a solid building like building.weapon_rack",
 			"grey": [
 				{"at": [0, 0.5, 0.3], "size": [2, 1, 0.6]},
@@ -1799,7 +1799,7 @@
 			"footprint": [4, 6],
 			"size": [4.6, 4.5, 6.6],
 			"budget": 4000, "sockets": {"chimney_seat": [0.45, 4.21, -2.6]},
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.house/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c5's roof, budget 3000 -> 4000: its shingles are separate pieces, so it decimates only to about 1700, and the damaged roof is a second copy): fitted to the 4.6 x 1.5 x 6.6 roof box, pivot at the eaves, shingles on row 2's browns in blocks, gable boards; roof_damaged: the roof with a hole torn in the +x slope, the rafters under it running down the slope (one snapped), battens across, loose pieces of the cover on them (Jeff: beams one way, never spokes); trim the eave boards; state_damaged rubble and planks at the walls' feet; 2026-10-27 (the coordinator, review/buildings/forge_smoke_10.png: a gap by the ridge at a gable end, the walls showing through): the shingle pieces didn't all meet; 29 faces wound inward turned out (46 in roof_damaged), a closed underlay under the cover in its own swatch (roof_damaged: only its whole -x slope) and a ridge cap of two boards (C:/dev/review/buildings/roof_fix.py, roof_under.py); art-kit, 2026-11-06 (buildings' pass for Jeff's \"no windows, no light inside\", the coordinator's order): the empty chimney_seat, where chimney.stone's foot sits on the +x slope 0.45 off the ridge, 0.7 in from the -z gable, on the roof (as slot_chimney seats it); the stack's smoke at chimney.stone's own smoke socket"},
+			"source": {"by": "art-kit, by hand (roof, roof_damaged); art-gen c5, fitted (trim, state_damaged)", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/house_roof/make_house_roof.py: roof and roof_damaged rebuilt by hand for the coordinator's three-worst order (art-gen's c5 roof, crumpled triangle soup up close); the same pivot at the eaves, profile (x +-2.3, the ridge 1.5 up, gables 3.3 out) and chimney_seat; wooden shakes, eight courses a slope, each its own slab, its butt 5-8 cm proud and its top twisted a little, one weathered brown (2,3) with darker butts (2,4) (the first pass's grey-brown read as stone slabs under a sun); under them a deck (fascia, soffit), a two-board ridge cap, barge boards, a wall plate along each long wall's top, gables boarded at y +-3 with battens, all in the roof part so they fade and go off with it; roof_damaged: a hole about 3 x 1.8 m torn in the +x slope, four rafters (the second snapped and sagging), battens (one gone, one short), three loose shakes (Jeff: beams one way, never spokes); trim and state_damaged as fitted from c5 (N:/assets/candidates/building.house/notes.md); 1768 and 1804 tris; look C:/dev/review/house_roof/ba.png"},
 			"uses": "a house, 4 x 6 cells, its ridge along z: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height. chimney_seat is where the stack meets the roof, on its slope: chimney.stone's origin goes at its x and z with y at the eaves (3.0), its lower part down inside the roof, its top over the ridge (never the origin on the seat itself, which stands it 1.2 m too tall)",
 			"grey": "none",
 			"wall_set": "wood",
@@ -1999,9 +1999,9 @@
 			"type": "mesh",
 			"kind": "cell",
 			"footprint": [2, 3],
-			"size": [2.6, 4, 3.6],
+			"size": [2.8, 4, 3.6],
 			"budget": 3000,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/building.shed/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c11's plank roof): decimated to 1211 and stretched to the 2.6 x 1.0 x 3.6 roof box, pivot at the eaves, planks down the slope on row 2 in bands, gable boards; roof_damaged: the roof with a hole torn in the +x slope, the rafters under it running down the slope (one snapped), battens across, loose pieces of the cover on them (Jeff: beams one way, never spokes); trim the eave boards; state_damaged rubble and planks at the walls' feet"},
+			"source": {"by": "art-kit, by hand (roof, roof_damaged); art-gen c11, fitted (trim, state_damaged)", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/shed_roof/make_shed_roof.py (building.house's roof made the same way): roof and roof_damaged rebuilt by hand for the coordinator's three-worst order (art-gen's c11 roof, warped blotchy planks up close); the same pivot at the eaves and profile (x +-1.3, the ridge 1.0 up, gables 1.8 out); planks down the slope board on board, under-boards 0.26 apart (2,3) with a narrower board over each joint (2,2), each its own slab, its foot a little long or short and twisted a little; a deck, a two-board ridge cap, barge boards, wall plates and gables boarded at y +-1.5, in the roof part; roof_damaged: planks broken ragged round a hole about 1.1 x 0.9 in the +x slope, three gone, three rafters (one snapped), battens, two loose planks; trim and state_damaged as fitted from c11 (N:/assets/candidates/building.shed/notes.md); 872 and 1040 tris; look C:/dev/review/shed_roof/ba.png"},
 			"uses": "a shed, 2 x 3 cells: its roof and trim, never walls or a floor: its walls are the map's wall edges in its wall_set, drawn by terrain's runs and faded per edge (buildings hides the roof and the near wall while you are inside), and its floor is terrain's ground in its floor_set (a \"floor\" part only for a raised floor). Damaged (its state): roof_damaged shows in place of roof, the same pivot, and state_damaged's rubble at the walls' feet, within the footprint's outer 0.5 m so the inside stays walkable. Origin the footprint's middle; the roof's pivot at the eaves, 3 m, the wall height",
 			"grey": "none",
 			"wall_set": "wood",
@@ -2009,7 +2009,7 @@
 			"states": ["damaged"],
 			"parts": [
 				{"name": "roof", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
-					{"at": [0, 0.2, 0], "size": [2.6, 0.4, 3.6]},
+					{"at": [0, 0.2, 0], "size": [2.8, 0.4, 3.6]},
 					{"at": [0, 0.6, 0], "size": [1.56, 0.4, 3.6]},
 					{"at": [0, 0.9, 0], "size": [0.65, 0.2, 3.6]}
 				]},
@@ -2018,9 +2018,9 @@
 					{"at": [1, 2.95, 0], "size": [0.15, 0.1, 3.6]}
 				]},
 				{"name": "roof_damaged", "motion": "fixed", "pivot": [0, 3, 0], "grey": [
-					{"at": [0, 0.2, -0.9], "size": [2.6, 0.4, 1.8]},
+					{"at": [0, 0.2, -0.9], "size": [2.8, 0.4, 1.8]},
 					{"at": [0, 0.6, -0.9], "size": [1.56, 0.4, 1.8]},
-					{"at": [0, 0.1, 1.08], "size": [2.6, 0.2, 1.44]}
+					{"at": [0, 0.1, 1.08], "size": [2.8, 0.2, 1.44]}
 				]},
 				{"name": "state_damaged", "motion": "fixed", "pivot": [0, 0, 0], "grey": [
 					{"at": [-0.75, 0.2, 0], "size": [0.5, 0.4, 1.2]},
@@ -2232,13 +2232,13 @@
 			"type": "mesh",
 			"kind": "cell",
 			"footprint": [1, 1],
-			"size": [1.348, 1.074, 0.482],
+			"size": [1.348, 1.074, 0.56],
 			"variants": 3,
 			"budget": 1200,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/site/make_bwoodpile.py from prop.woodpile.blend: its bearers and one of its stacks per variant (1 low, two courses, 452 tris; 2 half, four, 792; 3 full, six, 1120), since the building path hides state_* nodes; four rough stakes driven at its ends' corners, leant in on the stack, their tops sawn on a slant, the same in every variant so each fills the slot's box"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/site/make_bwoodpile.py from prop.woodpile.blend: its bearers and one of its stacks per variant (1 low, two courses, 452 tris; 2 half, four, 792; 3 full, six, 1120), since the building path hides state_* nodes; four rough stakes driven at its ends' corners, leant in on the stack, their tops sawn on a slant, the same in every variant so each fills the slot's box; art-kit, 2026-11-11 (863, the coordinator's queue from art-kit's near survey, \"thin logs between two tall stakes\"): C:/dev/review/woodpile/make_bwoodpile2.py, the stakes made a rack's ends, posts thicker (r 0.046) and six-sided and each end's pair tied by a crossbar 9 cm under their tops, so a half or low stack reads as a rack partly filled; the same height, so every variant keeps the slot's box; 496 / 836 / 1164 tris"},
 			"uses": "a log pile where the carried logs land (566 amended, npc's), 1 x 1 cell, a doorless solid building turned by a free yaw, its long side along x a little over the cell: variant 1 low, 2 half, 3 full (maps stands 2 for now); prop.woodpile stays the build site's, its fills as states",
 			"grey": [
-				{"at": [0, 0.537, 0], "size": [1.348, 1.074, 0.482]}
+				{"at": [0, 0.537, 0], "size": [1.348, 1.074, 0.56]}
 			]
 		},
 		"building.sarcophagus": {"category": "buildings", "type": "mesh", "kind": "cell", "footprint": [1, 2], "size": [0.93, 0.8, 1.93], "tolerance": 0.2, "variants": 2, "budget": 800, "source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-05", "notes": "C:/dev/review/crypt_set/make_crypt_set.py sarcophagus.1, .2 (dungeon's crypt under the wilds chapel): a chest of dressed grey stone on a plinth, a carved border and panels down its long sides, a ring cut in each end; 1 sealed under a heavy lid with a sword in relief down it (456 tris); 2 robbed: the lid's head third broken off and gone, the rest shoved aside and cracked, the dark inside open with a skull and long bones, broken stone on the floor (670 tris, 1.11 wide, off true by 0.1)"}, "uses": "a sarcophagus in the crypt (dungeon's crypt rework; 806's set_sarcophagus draws variant 2), 1 x 2 cells, long along z, a doorless solid building", "grey": [{"at": [0, 0.4, 0], "size": [0.93, 0.8, 1.93]}]},
@@ -2595,7 +2595,7 @@
 			"budget": 3600,
 			"variants": 4,
 			"uses": "a double door over two cell edges (2 m along z): the frame, two leaves hinged at its ends, swinging apart; open and closed are the leaves' swing; its opening 1.8 x 2.4 m, as door.single's 0.8 x 2.4 (decision 402); variant 3 the barrow's tall double door (dungeon's generator: the crypt's wide doors, picked by crypt style; the coordinator: about 2.6 m; Jeff: \"doors are still kind of small and narrow\"): its opening 1.8 x 2.6 under a 0.4 lintel, its leaves 2.6 high (size [0.13, 2.6, 0.9]), hinged as the others; variant 4 the chapel's door (the temple's chapel set, Jeff's pick c2; C:/dev/review/building_kits/chapel_parts.md): its opening 1.8 wide under a pointed arch springing at 2.0, its point at 2.6, the leaves' tops cut to the arch",
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/door.double/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; c1, budget 900 -> 3600): its 3600 mesh fitted to 0.5 x 3 x 2; leaf_a cut out hinged at z -0.9 and mirrored for leaf_b; colours projected from the concept onto wood and iron swatches; 3408 tris; variant 2 the dark set's (659 amended, art-kit's side): this mesh with its faces moved to the palette's row 8 (blue-black, the pale inlay on its irons), C:/dev/review/tower/doors; variant 3 by hand (art-kit, 2026-10-27, C:/dev/review/crypt_walls/make_crypt_double.py, sheet door_double_3_sheet.png): jambs of crypt stone blocks on a dark core, the lintel carved both faces (a dark band of pale runes, a skull), five dark oak planks per leaf on a black core, three studded iron bands, hinge knuckles, ring pulls both faces; 2436 tris; variant 4 by hand (art-kit, 2026-10-29, C:/dev/review/building_kits/make_chapel_double.py, sheet door_double_4_sheet.png): pale dressed stone jambs with darker quoins, voussoirs round a four-centred pointed arch with a keystone, a hood moulding with label stops, six warm oak planks per leaf cut to the arch, long iron strap hinges with turned ends, ring pulls both faces"},
+			"source": {"by": "art-kit, by hand (variants 1 and 2); art-kit, by hand (3, 4)", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "variant 1 (the town's) and variant 2 (the dark set's, 659 amended) by hand (art-kit, 2026-11-11, 863: the coordinator's order from art-gen's three-worst survey, c1's warped planks, spiky lumps for straps and blob knockers up close, edge-on a twisted post): C:/dev/review/town_double/make_town_double.py <town|dark>, sheets ba.png, ba_dark.png, sun_compare.png: squared oak jambs chamfered to the opening, a lintel beam chamfered under and a boarded panel above it to 3.0 (WALL_HEIGHT), five upright planks per leaf on a dark core, every other one proud, the planks stopping short of the meeting edge for a dark seam, three wide flat iron straps per face in the darkest iron (the coordinator: heavier, to read at the usual camera), studded, hinge knuckles, ring pulls both faces; leaf_a and leaf_b hinged at slot z -0.9 and +0.9 as before; 1504 tris each (was 3408); the dark set the same in row 8 with pale inlay irons; variant 3 by hand (art-kit, 2026-10-27, C:/dev/review/crypt_walls/make_crypt_double.py, sheet door_double_3_sheet.png): jambs of crypt stone blocks on a dark core, the lintel carved both faces (a dark band of pale runes, a skull), five dark oak planks per leaf on a black core, three studded iron bands, hinge knuckles, ring pulls both faces; 2436 tris; variant 4 by hand (art-kit, 2026-10-29, C:/dev/review/building_kits/make_chapel_double.py, sheet door_double_4_sheet.png): pale dressed stone jambs with darker quoins, voussoirs round a four-centred pointed arch with a keystone, a hood moulding with label stops, six warm oak planks per leaf cut to the arch, long iron strap hinges with turned ends, ring pulls both faces"},
 			"states": ["locked", "barred", "broken"],
 			"grey": [
 				{"at": [0, 1.5, -0.95], "size": [0.5, 3, 0.1]},
@@ -2860,7 +2860,7 @@
 			"size": [1, 0.4, 1],
 			"budget": 400,
 			"materials": 2,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.campfire/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 400 mesh scaled to the 1 m box, its ring of stones grey, logs and embers from the concept, 371 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-11", "notes": "C:/dev/review/campfire/make_campfire.py (863: the coordinator's order from art-gen's three-worst; c1 was a crumpled ring with a solid flame cone), on make_hills.py's helpers: prop.campfire_cold's own ash bed and nine stones taken from its mesh where they lie, so 825's cold-to-lit swap keeps one hearth; five logs leant together in a cone, their tops crossing over the middle at 0.39, bark below with a cut end and burnt black over the upper half; embers glowing on the ash (row 7); no flame in the mesh, flames.gd draws it at the flame socket, kept at 0.2 (the coordinator: flames licking up through the logs); 394 tris; sheets ba.png, ba_high.png, sun_compare.png"},
 			"uses": "a ring of stones and logs; the fire burns at its flame socket",
 			"sockets": {"flame": [0, 0.2, 0]}
 		},

@@ -52260,3 +52260,50 @@ miss; a wall between, a body between, her own push 1.6 further: miss; a monster'
 unchanged; no new class_name.
 
 884 amended (1), ui-design, 2026-11-12 (the coordinator's (1) on 884's stills: the mound read as a square yard). The landmark is drawn round: Minimap.in_round, a cell whose middle is within the footprint's half-width of its middle, so each side's middle cells are in; Minimap.on_ring, a cell in the round with any of its eight neighbours outside it, so the kerb ring is closed on the diagonals, never a stair of single cells; the footprint's corners outside the round are the meadow's grass. The dome's light inside is as before, and the doorway (the barrow's way at (160,160), its north side's middle) sits on the ring. minimap_test: the corners grass, the ring map_kerb and touching each side's middle, the dome inside. Client only, protocol unchanged, no new class_name; 884's bullet stands ("a ring of stones").
+## 863. Umbrage's art-gen buildings rebuilt by hand: the house roof, the market stall, the shed roof; the double door, the lit campfire, the woodpile's rack
+
+The coordinator's three-worst order (Jeff, 11-11: every tree judges its own area up close, beside his goblin, and
+brings its three worst). Art-kit's survey of Umbrage at the low camera's nearest zoom (8 m, 12 degrees) and the usual
+camera's (ortho 6 m, pitch 50), beside the goblin (C:/dev/review/umbrage_near/three_worst.png): the three worst
+pieces a player meets there were all art-gen candidates applied on 10-18 and 10-29 ("go ahead and apply the
+candidates and ill veto in game"), crumpled up close next to the goblin's planes. Each is now made by hand in
+Blender, palette only, from a script kept with its look sheet. The box, origin, pivots, part names and sockets are
+as they were, so nothing laid moves, and each was approved by the coordinator from a before/after sheet at both
+cameras. Being art-gen's, not Jeff's hand work, none needed his sheet first; they go in the cut's look sheet.
+
+- building.house's roof and roof_damaged (C:/dev/review/house_roof/make_house_roof.py): wooden shakes in courses,
+  each its own slab, the courses read by their butts' edges and facets, not by paint. One weathered brown: a
+  grey-brown read as stone slabs under a sun from the high camera, so it went a step warmer. Under them a deck,
+  a ridge cap, barge boards, wall plates and boarded gables, all in the roof part, so they fade and go off with
+  it when a player walks in. chimney.stone still stands at chimney_seat.
+- building.market_stall (C:/dev/review/market_stall/make_stall.py): a boarded counter, its top still at 0.88
+  (animation's counter height), square posts, and a striped awning of flat panels in banner red and linen with a
+  scalloped valance. Its back edge stays inside the box, so it covers Rolf's cell no more than before. Nothing is
+  laid on the counter (economy, buildings), and Rolf stands from the slot's at and facing, not its mesh. A person
+  behind the counter clears the back rail (2.24 m) by half a metre.
+- building.shed's roof and roof_damaged (C:/dev/review/shed_roof/make_shed_roof.py): planks down the slope, board
+  on board, made as the house roof is. The shed at (178,196) has been drawn since the starter town, so it lands
+  on. The cook's fire, table and bedroll stay off with the cook's kitchen package.
+- door.double variants 1 and 2 (C:/dev/review/town_double/make_town_double.py, town and dark): the coordinator's
+  next order, from art-gen's own survey (its c1: warped planks, spiky lumps for straps, blob knockers, and edge-on
+  a twisted post). Squared, chamfered jambs and a lintel with a boarded panel over it to 3.0 (WALL_HEIGHT, where a
+  taller wall's Lintel box starts), five planks a leaf on a dark core, wide flat iron straps with studs, and ring
+  pulls. The coordinator's sun check at the usual camera found the first irons merged into a brown panel, so the
+  straps went wider and to the darkest iron, and the planks stop short of the meeting edge for a dark seam. The
+  frame "double" (Body) and leaf_a and leaf_b hinged at z -0.9 and +0.9 are as they were. 1504 tris each, from 3408.
+  The dark set (659) is the same in row 8. Variants 3 and 4 were made by hand already.
+- prop.campfire (C:/dev/review/campfire/make_campfire.py): its ring is prop.campfire_cold's own (that piece's ash
+  bed and nine stones, taken from its mesh as they lie), so 825's swap of the cold ring for the lit one while a
+  fire_ring burns keeps one hearth and only the fire changes. Five logs lean together in a cone, burnt black toward
+  their crossed tops at 0.39, over embers on the ash. The flame stays flames.gd's, at the socket at 0.2: its foot
+  stands among the logs and the rest rises clear (the coordinator: flames licking up through the logs, and sound's
+  crackle and environment's light stay where they are).
+- building.woodpile (C:/dev/review/woodpile/make_bwoodpile2.py): its four stakes must stay full height in every
+  variant, since they hold each variant's box to the slot's. So they become a rack's ends instead: thicker
+  six-sided posts, each end's pair tied by a crossbar near the top. A half or low pile then reads as a rack partly
+  filled, not thin logs between two tall stakes.
+
+Each damaged roof keeps a torn hole in its +x slope with rafters running down it, one snapped (Jeff: beams one
+way, never spokes). Tris: house 3844 of 4000, stall 678 of 800, shed 2184 of 3000, door.double 1504 of 3600
+(each variant), campfire 394 of 400, woodpile 496 / 836 / 1164 of 1200. Tests: art_kit_test (sizes,
+parts, pivots, budgets). Art only; protocol unchanged; no new class_name.

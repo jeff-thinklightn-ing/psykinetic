@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wooden walls are overlapping planks, each its own shade, and wooden floors, the Mughouse's among them, are boards of different lengths laid one way.
+- Umbrage's house roofs are wooden shakes laid in courses, its two market stalls have boarded counters under striped awnings, the shed by the square has a plank roof, and a damaged roof shows its rafters through the tear (863).
+- Double doors are straight oak planks with black iron straps and ring pulls, a lit campfire or hearth is five logs leant together over glowing embers, and the log pile where carried logs go stands in a rack, so a half-full pile shows as half full (863).
 - In a store, something that lands in your pack while the window is open is priced as soon as it lands (852 amended (4)).
 - Indoors, a door between you and the camera goes see-through with the wall around it (864 amended (1)).
 - A hunter at his work, or anyone binding a wound, kneels down to it, works on their knees and gets up when done (877 amended (1)).

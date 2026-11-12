@@ -245,7 +245,7 @@
 			"type": "mesh",
 			"kind": "cell",
 			"category": "buildings",
-			"size": "2.6 x 4.0 x 3.6",
+			"size": "2.8 x 4.0 x 3.6",
 			"budget": 3000
 		},
 		{
@@ -2681,7 +2681,7 @@
 			"type": "mesh",
 			"kind": "cell",
 			"category": "buildings",
-			"size": "1.35 x 1.07 x 0.48",
+			"size": "1.35 x 1.07 x 0.56",
 			"budget": 1200
 		},
 		{
