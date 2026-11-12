@@ -52528,6 +52528,30 @@ weather_test _test_wet_ground: the wetting and drying times, arriving soaked, dr
 a full canopy, the ground shader's constants and lines, the night's share (0.91 of dry), the tell's
 contrast (at least 0.9 of dry), the duller day's parts (and none of it with wet_ground off), and the
 sim's weather untouched. Client only, protocol unchanged, no new class_name.
+
+## 891. Her shout when her player is flanked
+
+The decision-number script's label; the coordinator's approval, crypt package. Combat's World.is_flanked
+(340 amended (5)) is true when a body carries a shield, raised or not, and two or more monsters fighting
+it stand within their reach where no single facing covers them all by the shield's arc. Companion
+._warn_flanked, after _note_fight in her tick: her player flanked, she says her flank_says line at once,
+no model, through the fight's hush (_say in_fight). She shouts once a fight, and not again for
+FLANK_SHOUT_GAP_S (300 s) after a shout. A fight goes on while her player stays flanked or she fought
+within QUIET_AFTER ticks. Out of the fight and out of sight of her player, she says nothing. Downed,
+neither does she, and the shout is not spent. The marks are kept per player (Companion._flank_shouts,
+keyed by the player's instance id): of two companions with one player, the first to see it shouts and
+the other holds. The line is picked by her temperament from companion_traits.json "flank_says" (voice's
+words), else "default", the same line each time for one companion. It moves nobody. companion_test
+_test_flank_shout: one wolf on a shielded player, no shout; wolves west and east, she shouts at once;
+asked again, none; a new fight within the gap, none; past it, she shouts again.
+
+Riding it, 803 amended (12)'s plain want line (playtest's wanttold found no row for it) is a mind-log
+row: kind "quiet", trigger "quiet moment: want", outcome "plain line", with why (no voice of her own, or
+her voice gave none). It is not a "voice" row, so her voice's counts and quiet backoff are unchanged.
+Companion._log answers the want after recording the voice row, so the plain line's row comes after it.
+companion_test _test_first_want_told checks the row. Server only, protocol unchanged, no new
+class_name. The bullet waits on playtest's joined crypt fight.
+
 ## 892. The street lamp posts: prop.lamp_post and prop.lamp_post_low, art-gen's, for buildings' lamps
 
 The store's lamp (_add_store_lamp) and Snagfin's lamp by his shack door (_add_lantern) stand their lanterns on

@@ -48,9 +48,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2934)
+## Lines in the code (2936)
 
-### companions (Pip, Wren, Nix) (657)
+### companions (Pip, Wren, Nix) (659)
 
 | | Line | Where |
 |---|---|---|
@@ -402,6 +402,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | nothing new in that fight: no one hurt, nothing big or new | `sim/companion.gd` _watch() |
 |  | %s is near death with %s on them: you leave where you were told to %s and go to fight beside them. | `sim/companion.gd` _tend_keeper_falling() |
 |  | the order to %s broken | `sim/companion.gd` _tend_keeper_falling() |
+|  | a mind with no voice of its own | `sim/companion.gd` _quiet_moment() |
 |  | %s %s %s | `sim/companion.gd` focus_text() |
 |  | your own sleep just now: %s You are the one who slept; %s stayed awake. | `sim/companion.gd` _quiet_pick_focus() |
 |  | where you stand | `sim/companion.gd` _quiet_pick_focus() |
@@ -601,6 +602,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | U | %s won't carry that for %s | `sim/companion.gd` turns_down() |
 |  | %s's line of fire | `sim/companion.gd` _read_telegraphs() |
 |  | Your pack is full of ore: you stop mining. | `sim/companion.gd` _mine_pick() |
+|  | her voice gave none (%s) | `sim/companion.gd` _want_answered() |
 |  | ; talk: answered %d of %d (said %d, did %d), unanswered %d | `sim/companion.gd` talk_report() |
 |  | , gap x median %.2f, range %.2f-%.2f | `sim/companion.gd` talk_report() |
 |  | , set less %d more %d | `sim/companion.gd` talk_report() |
@@ -3074,7 +3076,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (924)
+## Lines in the data (936)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3112,7 +3114,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (125)
+### levels/companion_traits.json (137)
 
 | | Line | Key |
 |---|---|---|
@@ -3121,6 +3123,18 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Come on, it's this way. | `guide.set_off.warm and talkative[0]` |
 |  | This way. Watch your step. | `guide.set_off.careful and thoughtful[0]` |
 |  | This way, come on. | `guide.set_off.restless and curious[0]` |
+|  | Get your back to something! | `flank_says.default[0]` |
+|  | They're getting round you! Back up! | `flank_says.default[1]` |
+|  | Behind you! Don't let them get behind you! | `flank_says.default[2]` |
+|  | Back to something, they're all round you! | `flank_says.default[3]` |
+|  | Get your back to something. Don't let them get round you. | `flank_says.steady and watchful[0]` |
+|  | Behind you! Back up, now! | `flank_says.quick and wary[0]` |
+|  | They're all round you! Get your back to something! | `flank_says.warm and talkative[0]` |
+|  | Back up. Keep them all in front of you. | `flank_says.careful and thoughtful[0]` |
+|  | Don't let them get behind you! | `flank_says.restless and curious[0]` |
+|  | Back up. Something behind you. | `flank_says.quiet and patient[0]` |
+|  | Get a wall behind you and fight! | `flank_says.blunt and fearless[0]` |
+|  | Too many friends round you! Back up! | `flank_says.cheerful under pressure[0]` |
 |  | Not here. Not with them this close. | `bandage_says.not_safe` |
 |  | Give it a breath. We're still bleeding from that. | `bandage_says.hurt_now` |
 |  | I've nothing to bandage with. | `bandage_says.no_kit` |

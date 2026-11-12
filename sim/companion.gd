@@ -3446,6 +3446,7 @@ func _sim_tick() -> void:
 		_execute()
 	t = World.turn_part("moving", t)
 	_note_fight()
+	_warn_flanked()
 	World.turn_part("after", t)
 
 
@@ -3826,7 +3827,7 @@ func _quiet_moment() -> void:
 	if not voiced:
 		_quiet_ticks.append(World.tick)
 		_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())
-		_tell_want_plainly()
+		_tell_want_plainly("a mind with no voice of its own")
 		return
 	var focus := _quiet_pick_focus()
 	if focus.is_empty():
@@ -4256,6 +4257,53 @@ func _note_fight() -> void:
 			_pending_voice = {}
 		_fight_tick = World.tick
 		_fight_why = _fight_cause()
+
+
+# --- Her shout when her player is flanked (decision 891) ---------------------
+
+## After a shout, none again for so long (seconds), across fights.
+const FLANK_SHOUT_GAP_S := 300
+## Per player (instance id): [the shout's tick, the last tick of its fight].
+## On the player, not on her: of two companions with one player, the first
+## to see it shouts and the other holds.
+static var _flank_shouts: Dictionary[int, Array] = {}
+
+
+## Her player flanked (World.is_flanked: foes on them from where no one facing
+## of their shield covers them all): she shouts the flank_says line, in the
+## fight or seeing them, once a fight and not again for FLANK_SHOUT_GAP_S.
+## A spoken line through the fight's hush; it moves nobody. Downed, she
+## says nothing and the shout is not spent.
+func _warn_flanked() -> void:
+	var player := keeper
+	if not _alive(player) or World.is_downed(player) or World.is_downed(self):
+		return
+	var key := player.get_instance_id()
+	var flanked: bool = World.is_flanked(player)
+	var mark: Array = _flank_shouts.get(key, [])
+	if not mark.is_empty() and (flanked or World.tick - _fight_tick <= QUIET_AFTER) and World.tick - int(mark[1]) <= QUIET_AFTER:
+		mark[1] = World.tick  # The shout's fight goes on.
+	if not flanked:
+		return
+	if not mark.is_empty() and (World.tick - int(mark[1]) <= QUIET_AFTER or World.tick - int(mark[0]) < FLANK_SHOUT_GAP_S * World.TICK_RATE):
+		return
+	if not fight_roused() and not _sees(player.tile):
+		return  # Out of the fight and out of sight: she knows nothing of it.
+	var line := flank_line()
+	if not line.is_empty() and _say(line, true, true):
+		_flank_shouts[key] = [World.tick, World.tick]
+
+
+## Her flank_says line: her temperament's, else "default"'s, the same one
+## each time for her.
+func flank_line() -> String:
+	var lines: Variant = CompanionCard.tables().get("flank_says", {})
+	if lines is not Dictionary:
+		return ""
+	var pick: Variant = lines.get(str(traits.get("temperament", "")), lines.get("default"))
+	if pick is not Array or (pick as Array).is_empty():
+		return ""
+	return str(pick[absi(hash(_name_of(self))) % (pick as Array).size()])
 
 
 ## Counted in the mind log (decision 675): what she held back, by kind
@@ -7343,24 +7391,29 @@ func _want_answered(outcome: String) -> void:
 	if outcome == "said":
 		want_told = true
 	elif outcome in ["silent", "dropped", "no answer"]:
-		_tell_want_plainly()
+		_tell_want_plainly("her voice gave none (%s)" % outcome)
 
 
-## Her untold want in her plain words; told once said.
-func _tell_want_plainly() -> bool:
+## Her untold want in her plain words; told once said, a "quiet" row in the
+## mind log with [param why] (playtest's wanttold found no row for it): not a
+## "voice" row, so her voice's counts and quiet backoff are untouched.
+func _tell_want_plainly(why: String) -> bool:
 	if want_says.is_empty() or not _say(want_says, true):
 		return false
 	want_told = true
+	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": want", "outcome": "plain line",
+		"say": want_says, "note": why})
 	return true
 
 
 ## [param entry] in the mind log, with her stance and how far her player is
 ## as it is written.
 func _log(entry: Dictionary) -> void:
+	var answered := ""
 	if entry.get("kind") == "voice":
 		_count_voice(entry)
 		if str(entry.get("trigger", "")) == QUIET_TRIGGER + ": want" and entry.has("outcome"):
-			_want_answered(str(entry["outcome"]))
+			answered = str(entry["outcome"])
 		if str(entry.get("trigger", "")).begins_with(QUIET_TRIGGER) and entry.has("outcome") and entry["outcome"] != "not asked":
 			# Let pass ("..."), the next waits longer, up to max_gap_s; said, as before.
 			var widest := maxi(int(float(quiet_rules().get("max_gap_s", 600)) * World.TICK_RATE / float(_quiet_gap_mid())), 1)
@@ -7369,6 +7422,8 @@ func _log(entry: Dictionary) -> void:
 	entry["keeper_distance"] = World.distance(tile, keeper.tile) if _alive(keeper) else -1
 	keeper_name()  # Refreshes keeper_label from a live keeper.
 	MindLog.record(entry, keeper_label)  # Her player's name kept out (781).
+	if not answered.is_empty():
+		_want_answered(answered)  # After its row: a plain line's own row follows it (891).
 
 
 ## Decision 803: a voice entry counted for the journal's "[voice]" line by

@@ -131,6 +131,7 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_freed_game_target()
+	_test_flank_shout()
 	_test_seated_boss()
 	_test_fallen_knight()
 	_test_truce()
@@ -1792,6 +1793,8 @@ func _test_first_want_told() -> void:
 	var none := _first_quiet_moment("ollama", {}, false, false, true)
 	_check(none["asked"] == ["quiet moment: want"] and none["said"] == [plain] and none["told"] and none["kept"] == true,
 		"no answer (her model's ask timed out, as a slow or down model's comes back): her plain line, told (%s)" % _quiet_row(none))
+	_check(silent["logged"] == "quiet plain line" and none["logged"] == "quiet plain line",
+		"her plain line is a row in the mind log (%s; %s)" % [silent["logged"], none["logged"]])
 	var scripted := _first_quiet_moment("counting", {"say": "Never asked.", "stance": ""}, false, true)
 	_check(scripted["asked"].is_empty() and scripted["said"] == [plain] and scripted["told"] and scripted["kept"] == true
 			and scripted["again"].is_empty(),
@@ -1865,6 +1868,8 @@ func _first_quiet_moment(kind: String, answer: Dictionary, fight := false, again
 			World.step()
 		row["again"] = said.duplicate()
 	pet.said.disconnect(heard)
+	var last: Dictionary = MindLog.last.get(Companion._name_of(pet), {})
+	row["logged"] = "%s %s" % [last.get("kind", ""), last.get("outcome", "")]
 	_main._remember_companion(Net.player_id)  # Her record kept: "told" with it.
 	row["told"] = pet.want_told
 	row["kept"] = record.companion.get("want", {}).get("told")
@@ -9197,6 +9202,81 @@ func _test_freed_game_target() -> void:
 	owner.free_pos = Vector2(owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+## 891: her player flanked (combat's World.is_flanked: a shield, two foes on
+## them that no one facing covers), she shouts her flank_says line at once:
+## once a fight, not again within FLANK_SHOUT_GAP_S, nothing when not
+## flanked. Two wolves stand west and east of her player (Monster.noticing
+## off, their targets set by hand; no World.step, which lets her strike one
+## and turn it on her). Her player's left hand, places and the shout marks
+## are put back after.
+func _test_flank_shout() -> void:
+	print("\n== her player flanked: she shouts once a fight (891) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var facing_was := owner.facing
+	var at := Vector2i(7, 2)
+	_put(owner, at)
+	owner.free_pos = Vector2(at)
+	_put(pet, at + Vector2i(0, 1))
+	_settle(pet)
+	_put(owner, at)
+	owner.free_pos = Vector2(at)
+	owner.facing = Vector2i(1, 0)
+	Monster.noticing = false
+	Companion._flank_shouts.clear()
+	var held_was := World.take_item(owner, owner, Player.LEFT_HAND) if not owner.slots[Player.LEFT_HAND].is_empty() else 0
+	World.put_item(owner, owner, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	var west := _spawn_wild("wolf", at + Vector2i(-1, 0))
+	var east := _spawn_wild("wolf", at + Vector2i(1, 0))
+	var line: String = pet.flank_line()
+	var table: Dictionary = CompanionCard.tables().get("flank_says", {})
+	var all_lines: Array = []
+	for key: String in table:
+		if table[key] is Array:
+			all_lines.append_array(table[key])
+	_check(not line.is_empty() and line in all_lines and line == pet.flank_line(), "her flank line is one of flank_says, the same each time (%s)" % line)
+	west.target = owner
+	east.target = null
+	pet._said.clear()
+	pet._warn_flanked()
+	_check(not World.is_flanked(owner) and pet._said.is_empty(), "one wolf on him: not flanked, no shout (%s)" % [pet._said])
+	east.target = owner
+	var placed := west.tile == at + Vector2i(-1, 0) and east.tile == at + Vector2i(1, 0)
+	pet._warn_flanked()
+	_check(placed and World.is_flanked(owner) and pet._said.size() == 1 and pet._said[0] == line,
+		"wolves west and east of his shield: flanked, she shouts at once (placed %s; said %s)" % [placed, pet._said])
+	pet._warn_flanked()
+	_check(World.is_flanked(owner) and pet._said.size() == 1, "the same fight, asked again: no second shout (%s)" % [pet._said])
+	var key := owner.get_instance_id()
+	var gap := Companion.FLANK_SHOUT_GAP_S * World.TICK_RATE
+	Companion._flank_shouts[key] = [World.tick - 60, World.tick - Companion.QUIET_AFTER - 1]
+	pet._fight_tick = World.tick - Companion.QUIET_AFTER - 1
+	pet._warn_flanked()
+	_check(World.is_flanked(owner) and pet._said.size() == 1, "a new fight within FLANK_SHOUT_GAP_S of the last shout: none (%s)" % [pet._said])
+	Companion._flank_shouts[key] = [World.tick - gap - 1, World.tick - Companion.QUIET_AFTER - 1]
+	pet._warn_flanked()
+	_check(World.is_flanked(owner) and pet._said.size() == 2 and pet._said[1] == line, "a new fight past it: she shouts again (flanked %s; %s)" % [World.is_flanked(owner), pet._said])
+	World.despawn(west)
+	World.despawn(east)
+	Monster.noticing = true
+	_kill_monsters()
+	Companion._flank_shouts.clear()
+	var shield := World.take_item(owner, owner, Player.LEFT_HAND)
+	if shield > 0:
+		World.items.end(shield, "gone")
+	if held_was > 0:
+		World.put_item(owner, owner, Player.LEFT_HAND, held_was)
+	owner.facing = facing_was
+	_put(owner, owner_was)
+	owner.free_pos = Vector2(owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+	pet._said.clear()
 
 
 ## A wild animal of [param kind] at [param tile] (a test's prop: with

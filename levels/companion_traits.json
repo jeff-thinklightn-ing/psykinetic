@@ -57,6 +57,18 @@
 		"bond": {"wary": -1, "fond": 0, "close": 1, "devoted": 2},
 		"company": 1
 	},
+	"flank_says": {
+		"_note": "Her shout when her player is flanked (decision 891; voice's words): said once a fight, not again for Companion.FLANK_SHOUT_GAP_S, by her temperament (else \"default\"), the same pick each time for one companion; at once, no model.",
+		"default": ["Get your back to something!", "They're getting round you! Back up!", "Behind you! Don't let them get behind you!", "Back to something, they're all round you!"],
+		"steady and watchful": ["Get your back to something. Don't let them get round you."],
+		"quick and wary": ["Behind you! Back up, now!"],
+		"warm and talkative": ["They're all round you! Get your back to something!"],
+		"careful and thoughtful": ["Back up. Keep them all in front of you."],
+		"restless and curious": ["Don't let them get behind you!"],
+		"quiet and patient": ["Back up. Something behind you."],
+		"blunt and fearless": ["Get a wall behind you and fight!"],
+		"cheerful under pressure": ["Too many friends round you! Back up!"]
+	},
 	"bandage_says": {
 		"_note": "What she says when she won't or can't bandage (decision 625, Jeff: 'Pip seems lazy at bandaging ... just says fine'), at once, no model, by World.bandage_refusal's reason or bandage_broke_why; a key with _self is for her own wound. Drafts for Jeff.",
 		"not_safe": "Not here. Not with them this close.",
