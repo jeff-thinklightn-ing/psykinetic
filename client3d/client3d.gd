@@ -1534,6 +1534,8 @@ const CLIP_SIT_UP := "GroundSit_Exit"
 const SEAT_DOWN := "Sitting_Enter"
 const SEAT_UP := "Sitting_Exit"
 const SEAT_TOWARD := 0.245
+## The kneel at work's get-up (877 amended (1)): its "exit", cut short by a move or a fight.
+const KNEEL_UP := "Kneel_Up"
 const SEAT_EASE := 0.5
 const FIDGET_SECONDS_MIN := 6.0
 const FIDGET_SECONDS_MAX := 25.0
@@ -24409,7 +24411,9 @@ const ACTIVITIES := {
 	# The bandage kneel (Jeff: "a kneeling next to the target animation"): a
 	# player's or a companion's while it tends (GridEntity.tending), turned to
 	# the patient and leant toward it this far (metres), hands at its work.
-	"bandage": {"clip": "Fixing_Kneeling", "toward": 0.3},
+	# Knelt down to it, the knelt work looped, got up after (877 amended (1): Fixing_Kneeling, down, at
+	# work and up in one, plays once, so looped it held its last frame, standing; the same for each kneel).
+	"bandage": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up", "toward": 0.3},
 	# A companion asleep on the night watch (621 amended, Companion.asleep): on
 	# her side, knees drawn up, a slow breath (humanoid_clips' Sleep_Side_Loop),
 	# her front to the fire (_sleeping_yaw).
@@ -24424,7 +24428,7 @@ const ACTIVITIES := {
 	"carry_sack": {"upper": "Carry_Shoulder", "shoulder": "carry.sack"},
 	"hoe": {"upper": "Hoe", "right": "tool.hoe", "grip": 0.75},
 	"herd": {"clip": "Herd", "right": "tool.crook"},
-	"shear": {"clip": "Fixing_Kneeling", "right": "tool.shears"},
+	"shear": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up", "right": "tool.shears"},
 	# Umbrage's townsfolk at their spots (npc's spots contract; the coordinator's Umbrage focus,
 	# Jeff: "townspeople frozen"): sat on a seat (SEAT_DOWN; each body one of the sit's idles,
 	# _work_clip), sat talking or listening (npc's pair taking turns), leant on the well's rim
@@ -24456,8 +24460,8 @@ const ACTIVITIES := {
 	# Knelt at a task on the ground (877, the coordinator's interim, npc's "show"): the hunter dressing
 	# game, the tanner scraping a hide; no tool in the hand until items and art-kit make a knife and a
 	# scraper.
-	"dress": {"clip": "Fixing_Kneeling"},
-	"scrape": {"clip": "Fixing_Kneeling"},
+	"dress": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up"},
+	"scrape": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up"},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
@@ -25383,6 +25387,14 @@ func _animate(puppet: Node3D) -> void:
 		# it goes, before the busy wait below would slide it along in the pose.
 		puppet.set_meta("unseat_until", now)
 		puppet.set_meta("busy_until", 0)
+	if speed > WALKING and now < int(puppet.get_meta("enter_until", 0)):
+		puppet.set_meta("enter_until", 0)  # Moved off while stepping into its work (_work_enter): it goes.
+		puppet.set_meta("busy_until", 0)
+	if (speed > WALKING or not calm) and now < int(puppet.get_meta("rise_until", 0)):
+		# Getting up off its knees (KNEEL_UP) as it moves off or in a fight: up at once, its guard and
+		# its stance ready, not 1.5 s on its knees after a bandage.
+		puppet.set_meta("rise_until", 0)
+		puppet.set_meta("busy_until", 0)
 	# A strike while it steps ("blows you can see", 2): the legs walk its gait under the blow,
 	# faded in and out over LEGS_FADE, so a step taken in a strike is not slid in its pose.
 	var stepping := rig.striking() and speed > WALKING
@@ -25588,11 +25600,20 @@ func _work_enter(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 		if exit != "" and rig.has(exit) and speed <= WALKING:
 			var until := now + int(rig.once(exit, tempo) * 1000.0)
 			puppet.set_meta("busy_until", until)
-			puppet.set_meta("unseat_until", until)
+			if exit == KNEEL_UP:
+				# Got up from its knees where it knelt (877 amended (1)): not drawn over a seat as
+				# "unseat_until" draws one, and cut short by a move or a fight (_animate's "rise_until").
+				puppet.set_meta("rise_until", until)
+			else:
+				puppet.set_meta("unseat_until", until)
 			return true
 	if work.has("enter") and speed <= WALKING and rig.has(str(work["enter"])):
 		puppet.set_meta("entered", word)
-		puppet.set_meta("busy_until", now + int(rig.once(str(work["enter"]), tempo) * 1000.0))
+		# Moved off while still stepping in (a tender shoved mid-kneel, 877 amended (1)): it goes,
+		# as from the exit (_animate's "enter_until"), not slid along in the pose till the clip is done.
+		var until := now + int(rig.once(str(work["enter"]), tempo) * 1000.0)
+		puppet.set_meta("busy_until", until)
+		puppet.set_meta("enter_until", until)
 		return true
 	return false
 

@@ -45,6 +45,8 @@ func _ready() -> void:
 	await _test_upper_timed()
 	await _test_no_upper()
 	await _test_people_feet()
+	_test_work_clips_loop()
+	await _test_kneel_stays()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2051,9 +2053,58 @@ func _test_no_upper() -> void:
 const PEOPLE_FEET_NEAR := 0.03
 const PEOPLE_SLIDE := 0.02
 const PEOPLE_START_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Exit",
-	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Exit", "Sitting_Exit", "GroundSit_Exit"]
+	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Exit", "Sitting_Exit", "GroundSit_Exit",
+	"Kneel_Work", "Kneel_Up"]
 const PEOPLE_END_ELSEWHERE: Array[String] = ["Counter_Low_Idle", "Counter_Low_Show", "Counter_Low_Give", "Counter_Low_Enter",
-	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Enter", "Sitting_Enter", "GroundSit_Enter"]
+	"Counter_Bar_Idle", "Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Enter", "Sitting_Enter", "GroundSit_Enter",
+	"Kneel_Work", "Kneel_Down"]
+## Every work word's clip loops (877 amended (1); maps' stills, 11-12: Fixing_Kneeling, down, at work
+## and up in one, plays once, so a work's loop of it held its last frame: the hunter stood on straight
+## legs), plain and as the people's copy; what it steps in and out with and its asides are there.
+func _test_work_clips_loop() -> void:
+	print("== every work's clip loops ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var off: Array[String] = []
+	for word: String in Client3D.ACTIVITIES:
+		var work: Dictionary = Client3D.ACTIVITIES[word]
+		var looped: Array = (work.get("clips", []) as Array).duplicate()
+		if work.has("clip"):
+			looped.append(work["clip"])
+		for clip: Variant in looped:
+			for name: String in [str(clip), Client3D.PEOPLE_PREFIX + str(clip)]:
+				if lib.has_animation(name) and lib.get_animation(name).loop_mode == Animation.LOOP_NONE:
+					off.append("%s: %s plays once" % [word, name])
+		for key: String in ["enter", "exit"]:
+			if work.has(key) and not lib.has_animation(str(work[key])):
+				off.append("%s: its %s %s is not in the library" % [word, key, work[key]])
+	_check(off.is_empty(), "every work's clip loops, its enter and exit there (%d: %s)" % [off.size(), ", ".join(off.slice(0, 8))])
+
+
+## A person knelt at work stays knelt (877 amended (1)): People_Kneel_Work looped past its length
+## keeps the hips low, and People_Kneel_Down ends there.
+func _test_kneel_stays() -> void:
+	print("== a person knelt at work stays knelt ==")
+	var made := _sword_body(self, SWORD_BUILDS[0])
+	var model: Node3D = made[0]
+	var rig: AnimRig = made[2]
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var hips := func() -> float:
+		return (model.global_transform.affine_inverse() * skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Hips")).origin).y
+	rig.base_at(Client3D.PEOPLE_PREFIX + Client3D.CLIP_IDLE, 0.0)
+	await _frames(2)
+	var stood: float = hips.call()
+	var length := rig.length(Client3D.PEOPLE_PREFIX + "Kneel_Work")
+	rig.loop(Client3D.PEOPLE_PREFIX + "Kneel_Work")
+	await _seconds(0.3)
+	var early: float = hips.call()
+	await _seconds(length + 0.4)
+	var late: float = hips.call()
+	_check(length > 1.0 and early < stood * 0.6 and late < stood * 0.6 and rig.playing() == Client3D.PEOPLE_PREFIX + "Kneel_Work",
+			"knelt at work: the hips %.2f m, and %.2f m past the loop's %.2f s (stood: %.2f m)" % [early, late, length, stood])
+	model.queue_free()
+	(made[3] as Node3D).free()
+
+
 func _test_people_feet() -> void:
 	print("== the people's stance: feet under the hips, met and kept by every people's clip ==")
 	var lib := load(CLIPS) as AnimationLibrary

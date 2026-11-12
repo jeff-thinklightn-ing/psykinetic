@@ -51844,6 +51844,26 @@ Reel: tools/clip.gd folk --which=stand (the player, a woman and the goblin at re
 C:/dev/review/idle1 (before 4d17d4e34, after 81099a9e7); a work and a seat, --which=stall and fire
 (before 4d17d4e34, after d7f7ac502). Client and art only; protocol unchanged; no new class_name.
 
+877 amended (1): the kneel at work as down, a knelt loop and up (the decision-number script's label; the
+coordinator's ask from maps' stills on main, C:/dev/review/maps_work_day3/hunter_strip.png: the hunter at his
+work spot stood on straight legs, leaning, an arm hanging, the same each look). Fixing_Kneeling goes down,
+works and gets up again in its 5.2 s and plays once (its people's copy extracted "once"); a work's
+rig.loop of it played it through and held its last frame, standing. Every word that knelt so ("dress",
+"scrape", "shear", and "bandage", a player's or a companion's tending) now plays its three parts:
+Kneel_Down (to 1.08 s) as its "enter", Kneel_Work looped (1.08 to 3.75 s, its last 0.4 s eased back
+to its start: there the hands meet within 7 mm, only the wrists and fingers turn back) and Kneel_Up as
+its "exit", each with a people's copy keeping People_Fixing_Kneeling's feet (tools/humanoid_clips.py
+ual_slice, kneel_work_keys; goblin.res re-extracted with the six). Fixing_Kneeling stays a fidget, played
+once. anim_rig_test _test_work_clips_loop: every ACTIVITIES clip loops, plain and as its people's copy,
+its enter and exit in the library (it would have named this); _test_kneel_stays: People_Kneel_Work keeps
+the hips under 0.6 of the standing height past its own length; the people's feet lists take the kneel's
+knelt ends. view_test: the shear and the bandage kneel down first, get up after. A work's step-in (its
+"enter", now a kneel's 1.08 s) goes when the body moves off (_animate's "enter_until", as "unseat_until"
+does the exit's): a tender shoved mid-kneel walks, not slid along in the pose. The get-up (KNEEL_UP) keeps
+its own "rise_until", not "unseat_until" (which draws a body over its seat: the kneeler was slid 0.245 m
+forward as it rose), and is cut short by a move or a fight (not calm): a bandager in a fight stands at once, its
+guard and ready stance with it. It is drawing only; the world never held her.
+
 ## 870. The crypt bar, dungeon's side: the band's posts out of each other's reach, the Ossuary's packs apart, two kits in the robbers' camp
 
 The coordinator set a bar for package "the crypt under the temple": a newcomer with a companion and starter gear finishes the knight's quest with at most two falls, resting between rooms. Playtest's unboosted walk on 3bedbeee9 fell four times to the band and was downed by the Ossuary's dead in 8 s. The joint page is C:/dev/review/enemy-ai/crypt_bar.md (enemy-ai leads; section 5 is dungeon's, with the measures). The coordinator picked P1 and O1, and the kits as built.

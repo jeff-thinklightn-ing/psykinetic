@@ -11584,8 +11584,15 @@ func _test_visible_work() -> void:
 		works[word] = [rig.base_clip() if not Client3D.ACTIVITIES[word].has("upper") else rig.upper_clip(), held[0], held[1]]
 	_check(works == {"stalk": ["Crouch_Idle", "", "art:item.bow"], "carry_game": ["Carry_Game", "", ""],
 			"carry_sack": ["Carry_Shoulder", "", ""], "hoe": ["Hoe", "art:tool.hoe", ""], "herd": ["Herd", "art:tool.crook", ""],
-			"shear": ["Fixing_Kneeling", "art:tool.shears", ""]},
+			"shear": ["Kneel_Down", "art:tool.shears", ""]},  # Stepped to its work: knelt down first (877 amended (1)).
 			"stalking with a bow, carrying game and a sack, hoeing, herding, shearing: each its clip and pieces (%s)" % works)
+	# 877 amended (1): knelt down, it works knelt in a loop; then got up, nothing entered, before the sleep.
+	puppet.set_meta("busy_until", 0)
+	show.call("shear")
+	_check(rig.base_clip() == "Kneel_Work", "shearing, knelt down: the knelt work loops (%s)" % rig.base_clip())
+	puppet.set_meta("entered", "")
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("unseat_until", 0)
 	show.call("sleep")
 	var lain_down := rig.base_clip()
 	puppet.set_meta("busy_until", 0)  # The lie-down (751) done.
@@ -11635,20 +11642,29 @@ func _test_visible_work() -> void:
 		var yaw := Client3D._tending_yaw(player, 0.0)
 		_rig._lay(puppet, body, yaw)
 		var leant := body.position.length()
-		_check(rig.base_clip() == "Fixing_Kneeling" and patient.tile != player.tile and is_equal_approx(yaw, toward)
+		# 877 amended (1): it kneels down (its "enter"), then works knelt in a loop, and gets up after.
+		_check(rig.base_clip() == "Kneel_Down" and patient.tile != player.tile and is_equal_approx(yaw, toward)
 				and absf(leant - 0.3 * float(puppet.get_meta("model_scale", 1.0))) < 0.001,
 				"tending a body: kneeling (%s), turned to it, leant in %.2f m" % [rig.base_clip(), leant])
 		puppet.set_meta("speed", 3.0)
 		_rig._animate(puppet)
 		_rig._lay(puppet, body, yaw)
-		_check(rig.base_clip() != "Fixing_Kneeling" and body.position == Vector3.ZERO, "moving (shoved): it walks, not leant (%s)" % rig.base_clip())
+		_check(not rig.base_clip().begins_with("Kneel_") and body.position == Vector3.ZERO, "moving (shoved): it walks, not leant (%s)" % rig.base_clip())
 		puppet.set_meta("speed", 0.0)
 		player.tending = ""
 		_rig._sync_work(player, puppet)
 		_rig._animate(puppet)
 		_rig._lay(puppet, body, yaw)
-		_check(rig.base_clip() != "Fixing_Kneeling" and body.position == Vector3.ZERO and Client3D._tending_yaw(player, 1.0) == 1.0,
-				"done or broken off: standing again, its own facing (%s)" % rig.base_clip())
+		_check(rig.base_clip() in ["Kneel_Up", "Idle"] and body.position == Vector3.ZERO and Client3D._tending_yaw(player, 1.0) == 1.0,
+				"done or broken off: getting up, or standing again, its own facing (%s)" % rig.base_clip())
+		# 877 amended (1): getting up off its knees in a fight, it is up at once (its guard and stance ready).
+		var rising := rig.base_clip()
+		_rig._combat_at[int(puppet.get_meta("entity_id", 0))] = Time.get_ticks_msec()
+		_rig._animate(puppet)
+		_check(rising == "Kneel_Up" and rig.base_clip() != "Kneel_Up" and int(puppet.get_meta("busy_until", 0)) == 0,
+				"getting up (%s) as a fight starts: up at once (%s)" % [rising, rig.base_clip()])
+		puppet.set_meta("busy_until", 0)  # Got up.
+		puppet.set_meta("unseat_until", 0)
 		# A fidget already playing when the tending starts gives way to the kneel at once (items'
 		# (3): the fidget held it off up to 3.4 s, and a short bandage showed no kneel at all).
 		_rig._combat_at.erase(int(puppet.get_meta("entity_id", 0)))  # Calm: a fight drops a fidget anyway.
@@ -11657,13 +11673,19 @@ func _test_visible_work() -> void:
 		player.tending = String(patient.name)
 		_rig._sync_work(player, puppet)
 		_rig._animate(puppet)
-		_check(fidget == "Fidget_Shift" and rig.base_clip() == "Fixing_Kneeling",
+		_check(fidget == "Fidget_Shift" and rig.base_clip() == "Kneel_Down",
 				"a fidget playing (%s) when the tending starts: kneeling at once (%s)" % [fidget, rig.base_clip()])
 		player.tending = ""
 		_rig._sync_work(player, puppet)
 		_rig._animate(puppet)
+		puppet.set_meta("busy_until", 0)  # Got up (877 amended (1)'s Kneel_Up): standing for what follows.
+		puppet.set_meta("unseat_until", 0)
 	_rig._sync_held(player, puppet)
 	puppet.set_meta("work", "")
+	_rig._animate(puppet)
+	# The tending ended mid-kneel-down: its get-up starts only now; stood up for the tests after.
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("rise_until", 0)
 	_rig._animate(puppet)
 
 

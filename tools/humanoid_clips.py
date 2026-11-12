@@ -1415,6 +1415,31 @@ CLIPS["People_GroundSit_Exit"] = {"keys": people_over(ual_keys("GroundSit_Exit",
 	[(1.2, 1.5, "own", "idle", True)], [(1.55, 1.9, "own", "idle", True)])}
 CLIPS["People_Fixing_Kneeling"] = {"keys": people_over(ual_keys("Fixing_Kneeling", 5.2),
 	"idle", [(0.1, 0.6, "idle", "own", True), (4.45, 5.0, "own", "idle", True)])}
+# The kneel at work as a loop (the coordinator, 11-12, from maps' stills on main: the hunter at his
+# work stood on straight legs). Fixing_Kneeling goes down, works and gets up again in its 5.2 s and
+# plays once, so a work word that looped it held its last frame: standing. Now its three parts: down
+# (to KNEEL_FROM), the knelt work looped (KNEEL_FROM to KNEEL_TO, its last KNEEL_EASE eased back to
+# its start: there the hands meet within 7 mm, the wrists and fingers turn back) and up (from
+# KNEEL_TO); a work's "enter" and "exit" play the down and the up. The people's copies keep its
+# feet as People_Fixing_Kneeling has them.
+KNEEL_FROM = 26 / FPS
+KNEEL_TO = 90 / FPS
+KNEEL_EASE = 0.4
+KNEEL_LENGTH = 5.2
+def ual_slice(base: str, start: float, end: float) -> list:
+	"""A UAL clip from [start] to [end] keyed every frame, its time from 0."""
+	return [(f / FPS - start, P(base, min(f / FPS, end))) for f in range(round(start * FPS), round(end * FPS) + 1)]
+def kneel_work_keys() -> list:
+	keys = [(t, p) for t, p in ual_slice("Fixing_Kneeling", KNEEL_FROM, KNEEL_TO) if t <= KNEEL_TO - KNEEL_FROM - KNEEL_EASE + 1e-6]
+	return keys + [(KNEEL_TO - KNEEL_FROM, P("Fixing_Kneeling", KNEEL_FROM))]
+CLIPS["Kneel_Down"] = {"keys": ual_slice("Fixing_Kneeling", 0.0, KNEEL_FROM)}
+CLIPS["Kneel_Work_Loop"] = {"loop": True, "keys": kneel_work_keys()}
+CLIPS["Kneel_Up"] = {"keys": ual_slice("Fixing_Kneeling", KNEEL_TO, KNEEL_LENGTH)}
+CLIPS["People_Kneel_Down"] = {"keys": people_over(ual_slice("Fixing_Kneeling", 0.0, KNEEL_FROM),
+	"idle", [(0.1, 0.6, "idle", "own", True)])}
+CLIPS["People_Kneel_Work_Loop"] = {"loop": True, "keys": people_over(kneel_work_keys(), "idle", "own")}
+CLIPS["People_Kneel_Up"] = {"keys": people_over(ual_slice("Fixing_Kneeling", KNEEL_TO, KNEEL_LENGTH),
+	"idle", [(4.45 - KNEEL_TO, 5.0 - KNEEL_TO, "own", "idle", True)])}
 
 
 class Rig:

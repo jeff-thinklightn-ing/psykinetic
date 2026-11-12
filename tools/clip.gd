@@ -184,7 +184,14 @@ const FOLK := [
 	# Stood at rest (877's before and after): the player at FOLK_VIEWS' "stand", a woman, Jeff's goblin.
 	[Vector2i(31, 8), Vector2i(31, 9), "", "", "stand", {"look": "body=female"}],
 	[Vector2i(32, 8), Vector2i(32, 9), "", "", "stand", {"kind": "imp"}],
+	# Knelt at work (877 amended (1)): the hunter dressing game, Jeff's goblin beside him, and a body laid
+	# on the ground that the player kneels to bandage (GridEntity.tending), at the nearest zoom.
+	[Vector2i(31, 14), Vector2i(31, 15), "dress", "", "kneel"],
+	[Vector2i(33, 14), Vector2i(33, 15), "", "", "kneel", {"kind": "imp"}],
+	[Vector2i(28, 15), Vector2i(29, 15), "sleep_side", "", "kneel"],
 ]
+## The kneel group's body the player bandages (FOLK's index).
+const FOLK_PATIENT := 12
 ## The folk room's size in cells (its border wall included): the groups well inside it, so the camera
 ## behind them stands on open ground, not in the trees round it.
 const FOLK_ROOM := Vector2i(40, 32)
@@ -195,21 +202,21 @@ const FOLK_STALL := Vector2i(26, 21)
 ## Where the player stands while each group is shown: off to its side, out of the frame (the camera panned
 ## onto the group, _process).
 const FOLK_VIEWS := {"fire": Vector2i(12, 20), "well": Vector2i(25, 5), "talk": Vector2i(8, 18), "stall": Vector2i(26, 29),
-	"stand": Vector2i(30, 8)}
+	"stand": Vector2i(30, 8), "kneel": Vector2i(29, 15)}
 ## Each group's camera, [yaw, pitch] in degrees (Client3D's: yaw 0 looks from the south-east, 45 from
 ## the east): the leaners at the well's north and south and the keeper behind the stall seen side-on
 ## from the east, lower, so the well's roof and the stall's awning hide neither.
-const FOLK_CAMERA := {"fire": [0.0, 50.0], "well": [45.0, 40.0], "talk": [0.0, 50.0], "stall": [45.0, 40.0], "stand": [0.0, 30.0]}
+const FOLK_CAMERA := {"fire": [0.0, 50.0], "well": [45.0, 40.0], "talk": [0.0, 50.0], "stall": [45.0, 40.0], "stand": [0.0, 30.0], "kneel": [0.0, 30.0]}
 const FOLK_CAPTIONS := {"fire": "Round the fire: sat, one talking, one listening.",
 	"well": "At the well, leant on its rim.", "talk": "Two stood talking, turn about.",
-	"stall": "At the stall, a keeper.", "stand": ""}
+	"stall": "At the stall, a keeper.", "stand": "", "kneel": ""}
 ## Each group's beats, in seconds from the player's arrival: words on, the pair's turn, words off, done
 ## (the keeper held longer, for its asides' 6 to 25 s).
 const FOLK_ON_S := 2.0
 const FOLK_TURN_S := 7.0
 const FOLK_OFF_S := 13.0
 const FOLK_DONE_S := 17.0
-const FOLK_LONGER := {"stall": 30.0}
+const FOLK_LONGER := {"stall": 30.0, "kneel": 12.0}
 
 var scenario := "sneak"
 ## --which: the folk scenario's one group ("" for all four).
@@ -517,9 +524,10 @@ func _ready() -> void:
 	if scenario == "folk":
 		# The raised camera at its nearest, panned onto the group shown (_process), the player off to its side.
 		_main.pack_panel.shown = false
-		Net.set_camera_low(false, false)  # The raised camera, whatever the runner's settings keep.
+		# --low: the play camera (the low one, 623) instead, at its nearest.
+		Net.set_camera_low("--low" in OS.get_cmdline_user_args(), false)
 		if _main._client3d != null:
-			_main._client3d._zoom_to = _main._client3d.ZOOM_MIN
+			_main._client3d._zoom_to = _main._client3d.LOW_ZOOM_MIN if Net.camera_low else _main._client3d.ZOOM_MIN
 	if scenario in ["drawbacks", "boarking", "boarback", "boarcircle", "hillcat", "shieldcut"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _lunge_windup > 0 and _monster is Monster and not (_monster as Monster).lunge.is_empty():
@@ -551,7 +559,10 @@ func _process(delta: float) -> void:
 			view.pan = view.pan.lerp((centre - standing.position).limit_length(view.PAN_MAX), 1.0 - exp(-2.0 * delta))
 			var turn: Array = FOLK_CAMERA[group]
 			view.yaw = rad_to_deg(lerp_angle(deg_to_rad(view.yaw), deg_to_rad(float(turn[0])), 1.0 - exp(-2.0 * delta)))
-			view.pitch = lerpf(view.pitch, float(turn[1]), 1.0 - exp(-2.0 * delta))
+			if not Net.camera_low:
+				view.pitch = lerpf(view.pitch, float(turn[1]), 1.0 - exp(-2.0 * delta))
+			if group == "kneel" or "--near" in OS.get_cmdline_user_args():  # --near: any group at the nearest zoom.
+				view._zoom_to = view.LOW_ZOOM_MIN if Net.camera_low else view.ZOOM_MIN  # The nearest zoom.
 		return
 	if scenario == "drawbacks" and view != null:
 		# --yaw / --pitch hold the camera there here too (a side-on pass of a foe's blow). Not yet held: the
@@ -1175,6 +1186,11 @@ func _folk_step(tick: int) -> bool:
 		if _folk[i].activity != now:
 			_folk[i].activity = now
 			print("[clip] tick %d: %s %s" % [tick, _folk[i].name, now if not now.is_empty() else "(none)"])
+	if group == "kneel" and is_instance_valid(_folk[FOLK_PATIENT]):
+		var tending := String(_folk[FOLK_PATIENT].name) if on else ""
+		if _player.tending != tending:
+			_player.tending = tending
+			print("[clip] tick %d: the player tending %s" % [tick, tending if not tending.is_empty() else "(none)"])
 	if seconds >= FOLK_DONE_S + longer:
 		_folk_groups.remove_at(0)
 		_folk_from = -1
@@ -1192,6 +1208,8 @@ func _folk_centre(group: String) -> Vector2i:
 			return FOLK_STALL
 		"stand":
 			return FOLK_VIEWS["stand"] + Vector2i(1, 0)  # The woman's, between the player and the goblin.
+		"kneel":
+			return Vector2i(30, 14)  # Between the player at his patient and the hunter.
 	return FOLK[5][0]  # The talking pair's first.
 
 

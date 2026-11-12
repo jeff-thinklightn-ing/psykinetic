@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A hunter at his work, or anyone binding a wound, kneels down to it, works on their knees and gets up when done (877 amended (1)).
 - Things on the ground lie as they would: a bear pelt, fish, hides, cloaks, leather and antlers flat, several dropped on one spot in a heap, and swords and tools on top of the ground (619 amended (2)).
 - Footsteps on grass change from step to step, and footsteps on stone fall at an even loudness, the same as on grass (267 amended (1)).
 - A battle axe or giant axe swing reaches a foe who takes a step back while you wind it up, however you came at him, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 874 amended (1), 343 amended (2)).
