@@ -10578,9 +10578,11 @@ went to whoever tried first after a release: pc-character's satchel lost that ra
   but <tree> is ahead of you", so loops keep polling as before. A waiter is live while its last try is under
   150 s old (two missed tries at 60 s; 90 s once every script polls at 30 s); a dead or hung one is skipped
   after that. Only release's freeze ("main frozen" in its what) takes a free lock past the waiters, and
-  waiters still get exit 3 under it. A take with no landing take (a docs push) joins the order by its first try.
+  waiters still get exit 3 under it. A take with no landing take (a docs push) joins the order by its first try
+  (release's change: the design sent let a take-less lock take a free lock; now a docs push waits its turn).
 - A first waiter whose reservation doesn't fit when the lock is free answers exit 1, "no room yet: n GB
-  short", and the lock stays free for it for UNFED_PASS_SECONDS (3 minutes, release's); then a waiter that
+  short", and the lock stays free for it for UNFED_PASS_SECONDS (3 minutes, release's change from the
+  design's 10: a free lock held idle costs every waiter behind it); then a waiter that
   fits may pass it, a "passed" line in the gate's log, and it still takes the next free lock it fits. A local
   suite take always fits (its reservation was granted at the gate). No try takes the lock unreserved.
 - `status` says which takes wait on the land lock and their order ("waiting on the land lock: k of 3").
