@@ -25,6 +25,8 @@ import heavy_job as gate  # noqa: E402
 # checkout's own tools/remote_tests.sh kind, which reaches saturn. Stubbed
 # here as "saturn does not answer"; the swap's own checks set their own.
 gate.PROBE_COMMAND = [sys.executable, "-c", "print('suite')"]
+# Nor clear this checkout's stray files (394 amended (35)): on for its own checks only.
+gate.STRAY_CHECK = False
 
 real_boot_time = gate.boot_time
 gate.boot_time = lambda: 0.0  # Entries made up as hours old stay after this machine's boot.
@@ -1505,6 +1507,60 @@ held = gate._entries("running")
 check(len(held) == 1 and held[0]["kind"] == "scene" and not os.path.exists(asked), "a scene is never swapped nor asked about")
 gate.release("scener", "scene")
 (gate._memory, gate.total_ram_gb, gate.MARGIN_GB, gate.COMMIT_MARGIN_GB, gate.PROBE_COMMAND, gate.PROBE_SECONDS) = saved_swap
+
+print("== a landing's take clears or refuses untracked files main tracks (394 amended (35)) ==")
+import subprocess  # noqa: E402
+repo = tempfile.mkdtemp(prefix="heavy_job_stray_")
+def git(*args):
+    return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.autocrlf=false"] + list(args),
+        cwd=repo, capture_output=True, text=True)
+def put(path, text="x"):
+    full = os.path.join(repo, path)
+    os.makedirs(os.path.dirname(full), exist_ok=True)
+    with open(full, "w") as handle:
+        handle.write(text)
+git("init", "-q")
+for path in ("a.gd", "keep.txt"):
+    put(path)
+git("add", "-A")
+git("commit", "-q", "-m", "base")
+base = git("rev-parse", "HEAD").stdout.strip()
+for path in ("tours/fish.gd", "tours/fish.gd.uid", "art/a.png.import", "levels/wilds.json"):
+    put(path)
+git("add", "-A")
+git("commit", "-q", "-m", "main")
+git("update-ref", "refs/remotes/origin/main", "HEAD")
+git("checkout", "-q", "--detach", base)
+check(gate.stray_tracked(repo) == ([], []), "nothing untracked: nothing done")
+put("tours/fish.gd.uid")
+put("art/a.png.import")
+put("notes.txt")
+removed, refused = gate.stray_tracked(repo)
+check(removed == ["art/a.png.import", "tours/fish.gd.uid"] and refused == [],
+    "generated files main tracks removed, an untracked file main doesn't track left alone: %s %s" % (removed, refused))
+check(not os.path.exists(os.path.join(repo, "tours", "fish.gd.uid")) and os.path.exists(os.path.join(repo, "notes.txt")),
+    "the .uid is gone, notes.txt kept")
+check(git("rebase", "-q", "origin/main").returncode == 0, "the rebase onto main then goes through")
+git("checkout", "-q", "--detach", base)
+put("tours/fish.gd.uid")
+put("levels/wilds.json")
+gate.STRAY_CHECK = True
+here = os.getcwd()
+os.chdir(repo)
+err = io.StringIO()
+with contextlib.redirect_stderr(err):
+    code = gate.take("stray", "suite", os.getpid())
+os.chdir(here)
+check(code == 2 and "levels/wilds.json" in err.getvalue() and "tours/fish.gd.uid" in err.getvalue(),
+    "a take of suite with a real file main tracks: refused at once, exit 2, names it (%d): %s" % (code, err.getvalue().strip()[-200:]))
+check(not any(os.path.isdir(gate._path(f)) and gate._entries(f) for f in ("queued", "running")), "nothing queued or taken")
+check(os.path.exists(os.path.join(repo, "levels", "wilds.json")), "the real file is left alone")
+os.chdir(repo)
+check(gate.stray_refused("stray", "bench") is False, "a bench's take never looks (not a landing kind)")
+os.chdir(here)
+gate.STRAY_CHECK = False
+check(gate.stray_tracked(STATE) == ([], []), "not a checkout: nothing done")
+shutil.rmtree(repo, ignore_errors=True)
 clear_gate()
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins

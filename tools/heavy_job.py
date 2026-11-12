@@ -1880,6 +1880,8 @@ def take(tree, kind, pid, caller=None):
         print("heavy_job: %s %s inside %s's %s run, which holds it; nothing taken" % (
             tree, kind, outer["tree"], outer["kind"]))
         return 0
+    if stray_refused(tree, kind):
+        return 2
     _, estimate = wait_turn(tree, kind, pid, False, caller=caller)
     print("heavy_job: %s %s taken%s" % (tree, kind, " (on saturn, as suite_remote)" if estimate == "suite_remote" and kind != estimate
         else " (lean, as %s)" % estimate if estimate != kind else ""))
@@ -1976,6 +1978,66 @@ def beat_rank(entry, owner, own, mine):
     if tree.startswith(owner + "-") and tree not in own:
         return 3
     return None
+
+
+# 394 amended (35): a landing's take first clears its checkout of untracked files
+# that origin/main tracks. An import writes a script's .gd.uid or an image's
+# .import before the tree that made it commits it; the landing's rebase onto main
+# then stops ("untracked working tree files would be overwritten") at its turn,
+# after hours queued (buildings' and ui's fronted takes, 11-12 02:18, ended in
+# seconds on tests/tour/tours/fish_click.gd.uid). Off in the gate's own test,
+# which sets it on for its own checks in a scratch repository.
+STRAY_CHECK = True
+STRAY_GENERATED = (".uid", ".import")
+
+
+def stray_tracked(cwd=None):
+    """Untracked files in the checkout at [cwd] that origin/main tracks, as
+    (removed, refused): generated kinds (STRAY_GENERATED) deleted here, the rest
+    left alone. ([], []) when it isn't a checkout or has no origin/main."""
+    def git(*args):
+        done = subprocess.run(["git"] + list(args), cwd=cwd, capture_output=True, timeout=60)
+        return done.stdout.decode("utf-8", "replace").split("\0") if done.returncode == 0 else None
+    try:
+        tracked = git("ls-tree", "-r", "-z", "--name-only", "origin/main")
+        untracked = git("ls-files", "-z", "--others", "--exclude-standard")
+        top = git("rev-parse", "--show-toplevel")
+    except (OSError, subprocess.SubprocessError):
+        return [], []
+    if tracked is None or untracked is None or top is None:
+        return [], []
+    top = top[0].strip()
+    both = sorted(set(path for path in untracked if path) & set(path for path in tracked if path))
+    removed, refused = [], []
+    for path in both:
+        if path.endswith(STRAY_GENERATED):
+            try:
+                os.remove(os.path.join(top, path))
+                removed.append(path)
+            except OSError:
+                refused.append(path)
+        else:
+            refused.append(path)
+    return removed, refused
+
+
+def stray_refused(tree, kind):
+    """For a landing kind: clear the checkout's stray generated files, naming
+    each; True (and the names said) when any other untracked file main tracks
+    stands in the way, so the take is refused before it queues."""
+    if not STRAY_CHECK or not landing_kind(kind):
+        return False
+    removed, refused = stray_tracked()
+    for path in removed:
+        print("heavy_job: removed the untracked %s, which origin/main tracks (a generated file; 394 amended (35))" % path,
+            file=sys.stderr)
+        log("stray", tree, kind, "removed %s" % path)
+    if not refused:
+        return False
+    print("heavy_job: %s %s not queued: untracked files here that origin/main tracks would stop the rebase onto main; "
+        "move or delete them, then queue again (394 amended (35)):\n  %s" % (tree, kind, "\n  ".join(refused)), file=sys.stderr)
+    log("refused", tree, kind, "untracked files main tracks: %s" % ", ".join(refused))
+    return True
 
 
 def landing_kind(kind):

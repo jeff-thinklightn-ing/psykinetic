@@ -10541,6 +10541,24 @@ line, and where a row behind names it. Text only; the judging is unchanged. test
 figure added to a full suite's memory wait; a lean row, a kind with no lean run and a wait on the count
 left as they were. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (35) (perf, 2026-11-12; the coordinator's ask, approved as its own row after the cut; label from
+tools/decision_number.sh): a landing's take first clears its checkout of untracked files that origin/main
+tracks. An import had written tests/tour/tours/fish_click.gd.uid in several checkouts before items committed
+it; buildings' and ui's fronted takes (02:17 and 02:18) then ended in seconds, their rebase onto main
+refused ("untracked working tree files would be overwritten"), after hours in the queue.
+- `take <tree> <kind>` for a landing kind (suite, suite_*), before it queues, lists the checkout's untracked
+  files beside `git ls-tree origin/main` (stray_tracked; no fetch, about 0.3 s). A *.uid or *.import in
+  both is deleted and named ("removed the untracked ..., which origin/main tracks", a `stray` line in the
+  gate's log): the next import makes it again, and main's copy is the one wanted. Any other untracked file
+  main tracks refuses the take at once, exit 2, naming each, with nothing queued and the file left alone
+  (a `refused` line), so the row fails in its own tree, not at its turn. Nothing changes in any landing
+  script. Other kinds, and a take inside a run that holds it, never look.
+- The same fault on the laptops' clones is 828 amended (3).
+- tests/heavy_job_test.py checks it in a scratch repository with its own origin/main (STRAY_CHECK is off
+  for the rest of the file, so the test never touches its own checkout): generated files removed and the
+  rebase then goes through, a real file refused with exit 2 and nothing queued, a bench never looks. Tools
+  and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
