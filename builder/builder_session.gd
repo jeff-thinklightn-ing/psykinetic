@@ -3180,6 +3180,12 @@ func trade_lines(town: String, held: Variant = null) -> PackedStringArray:
 				need.call(trade, "the " + kind.replace("_", " "), false)
 		if kind == "stall":
 			need.call(Main.VENDOR_TRADE, "the stall", false)
+	# The hauler (859 amended (4), package "the hauler"): economy's haul trade
+	# is a town store's own, founded by economy, so seated "(if the town takes
+	# one on)"; his work spots are the store's two ends (npc's 853 amended (12)).
+	var haul := str(economy.get("haul", {}).get("trade", "")) if economy.get("haul") is Dictionary else ""
+	if not haul.is_empty() and places.get(town) is Dictionary:
+		need.call(haul, "the store", true)
 	var laid := {}
 	for spot: Dictionary in Level.spots_from(working.config, [] as Array[String]):
 		if spot["town"] == town and spot["use"] == "work":

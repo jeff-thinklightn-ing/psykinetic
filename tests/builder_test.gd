@@ -1875,7 +1875,18 @@ func _test_trades_preview() -> void:
 	var seated := ", ".join(wilds.trade_lines("store", {"taverner": true}))
 	_check("Taverner at " in seated and not "inn (if the town takes one on)" in seated and "temple (if the town takes one on)" in seated,
 		"a seated trade a resident already holds: no \"(if the town takes one on)\"; one nobody holds keeps it (%s)" % seated)
-	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	# The hauler (859 amended (4)): the store's own, his two work spots counted, never "no trade here uses them".
+	_check("Hauler at the store (if the town takes one on): " in seated and "no work spot yet" in seated.substr(seated.find("Hauler at")),
+		"the hauler, economy's founded trade, a line of the town's store's own (%s)" % seated)
+	var hauled := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	hauled.working.config["spots"] = (hauled.working.config.get("spots", []) as Array) + [
+		{"use": "work", "cell": [188, 197], "face": [189, 197], "pose": "stand", "town": "store", "trade": "hauler"},
+		{"use": "work", "cell": [196, 197], "face": [195, 197], "pose": "stand", "town": "store", "trade": "hauler"}]
+	hauled.working.revision += 1
+	var carried := "; ".join(hauled.trade_lines("store", {"hauler": true}))
+	_check("Hauler at the store: " in carried and "2 work spots" in carried.substr(carried.find("Hauler at")) and not "Hauler work spots laid" in carried,
+		"maps' two hauler spots, a hauler in town: \"2 work spots\", no condition, no mismatch (%s)" % carried)
+	var empty :=BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("No trades yet: no building with a use, no work site" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
 
 

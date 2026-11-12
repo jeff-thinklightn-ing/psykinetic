@@ -50748,6 +50748,17 @@ lines laid, a spot taken up said, none of the old words; the hours too few) and 
 (codes, no keys, the head on Claude's line alone; a seated trade held, no condition). Server only, protocol unchanged, no new class_name,
 no bullet (builder mode is Jeff's tool).
 
+859 amended (4) (the coordinator, 2026-11-12: a piece of package "the hauler", which stays off until this
+is on main; the label from decision_number.sh): the hauler among the town's trades. npc's 853 amended
+(12) gave the hauler two "hauler" work spots at a store's ends, but no building or site in economy.json
+calls for him (economy founds him: its "haul" rule), so 859 amended (3)'s trades lines would have said
+of maps' two spots "Hauler work spots laid, but no trade here uses them". trade_lines now reads
+economy's haul trade as a town store's own: "Hauler at the store (if the town takes one on): works
+about ...; no work spot yet" (2 work spots once laid), the condition dropped once a resident holds the
+trade, as any seated one. builder_test _test_trades_preview (the line; two spots laid and a hauler
+held, "2 work spots", no condition, no mismatch). Server only, protocol unchanged, no new class_name,
+no bullet.
+
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 
 The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it
