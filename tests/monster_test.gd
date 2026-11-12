@@ -1853,6 +1853,7 @@ func _test_ambush() -> void:
 	_test_band_hold_off()
 	_test_den_foe_order()
 	_test_den_walk_refused()
+	_test_link_slots()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -8940,6 +8941,87 @@ func _test_den_foe_order() -> void:
 					_check(pick == pet, "%s, she strikes him: a striker like anyone, broken off or not (%s)" % [kind, pick.name if pick != null else "nobody"])
 		print("  %s: %s" % [kind, ", ".join(picks)])
 	DayNight.reset()
+	Monster.idling = true
+
+
+## A level link's cell beside a player (571 amended (1); 571 refuses it to all but players) is
+## never a monster's fight slot, nor its wander, loop, gather or flee goal.
+## Before, a slot there was picked, refused, and picked again in place, so a
+## player by a stair or doorway could not be reached (the coordinator, 11-12).
+## Beside a stair it fights her from another cell; with the link the only
+## open cell beside her it has no way to her (879: a route crosses a link's
+## cell only as its goal), so it keeps off the link, minds her and strikes
+## nobody, as with any target it has no way to.
+func _test_link_slots() -> void:
+	print("%s== a link's cell beside a player: never its slot; with no other way in, it keeps off it and strikes nobody ==" % char(10))
+	Monster.idling = false
+	# An imp (plain) and a robber (flanks): kinds, so wary, and out of sight
+	# round the wall's end they hunt her (a kindless monster forgets her there;
+	# a skeleton lays itself down at its cell).
+	for symbol: String in ["i", "x"]:
+		# Beside a stair in a wall's gap: the link (5, 3) is the nearest cell beside
+		# her from the west; the others are round the wall's ends.
+		var e := _build(["###########", "#.........#", "#....#....#", "#.........#", "#....#....#", "#.........#", "###########"])
+		World.fields.link_cells[Vector2i(5, 3)] = true
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": Vector2i(6, 3)})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(6, 3))
+		var spec: Dictionary = SPECS[symbol].duplicate(true)
+		if spec.has("kind"):
+			spec["props"] = (Level.MONSTER_TYPES[spec["kind"]] as Dictionary).duplicate()
+		spec.merge({"name": "Foe", "tile": Vector2i(1, 3)}, true)
+		var foe := EntityFactory.build(spec) as Monster
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(1, 3))
+		_bold(foe)
+		var on_link := 0
+		var first := -1
+		for i in 150:
+			World.step()
+			if foe.slot == Vector2i(5, 3):
+				on_link += 1
+			if first < 0 and _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == foe):
+				first = i
+		_check(on_link == 0 and first >= 0 and first <= 100,
+				"%s, beside a stair: never its slot on the link (%d ticks), it strikes her from another cell (first blow at %.1f s, from %s; at the end %s, slot %s, tactic %s)" % [
+				NAMES[symbol], on_link, first / 10.0, foe.tile, Monster.Alert.keys()[foe.alert], foe.slot, Monster.Tactic.keys()[foe.tactic]])
+		World.fields.link_cells.erase(Vector2i(5, 3))
+		# The link (4, 3) the only open cell beside her, at the end of a way.
+		e = _build(["#########", "#.......#", "#.......#", "####.####", "####.####", "#########"])
+		World.fields.link_cells[Vector2i(4, 3)] = true
+		player = EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": Vector2i(4, 4)})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(4, 4))
+		player.max_hp = 1000
+		player.hp = 1000
+		foe = EntityFactory.build(spec.merged({"tile": Vector2i(4, 1)}, true)) as Monster  # In sight of her, down the way.
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(4, 1))
+		_bold(foe)
+		on_link = 0
+		for i in 40:
+			World.step()
+			if foe.slot == Vector2i(4, 3):
+				on_link += 1
+		var held := foe.tile
+		var cells := {}
+		var faced := 0
+		var minded := 0
+		for i in 30:
+			World.step()
+			cells[foe.tile] = true
+			if foe.slot == Vector2i(4, 3):
+				on_link += 1
+			if foe.facing == Vector2i(0, 1):
+				faced += 1
+			if foe.target == player or foe._watched == player.get_instance_id():
+				minded += 1
+		_check(on_link == 0 and not cells.has(Vector2i(4, 3)) and cells.size() == 1 and minded == 30 and player.hp == player.max_hp,
+				"%s, the link the only cell beside her: keeps off it at %s (cells over 30 ticks %s; facing her %d of 30), minding her %d of 30; never its slot on the link (%d ticks); no blow (at the end: %s, tactic %s, facing %s, slot %s, dreads %s, pressing %s, next move %d at tick %d, way in %s)" % [
+				NAMES[symbol], held, cells.keys(), faced, minded, on_link, Monster.Alert.keys()[foe.alert], Monster.Tactic.keys()[foe.tactic],
+				foe.facing, foe.slot, foe._dreads_target(), foe._pressing, foe.next_move_tick, World.tick,
+				World.find_path(foe.tile, player.tile, true, null, 50, false, {}, foe.opens_doors_now())])
+		World.fields.link_cells.erase(Vector2i(4, 3))
 	Monster.idling = true
 
 

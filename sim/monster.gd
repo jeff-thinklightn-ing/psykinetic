@@ -1791,7 +1791,9 @@ func _pick_slot() -> Vector2i:
 		for direction in World.DIRECTIONS:
 			cells.append(target.tile + direction)
 	for at in cells:
-		if claimed.has(at) or not World.is_walkable(at) or not free and not World.can_melee(at, target.tile):
+		# Never a level link's cell (571 amended (1); 571 refuses it to all but players): a slot there was
+		# picked again and again, the step refused, beside a player at a doorway or stair.
+		if claimed.has(at) or not World.is_walkable(at) or World.is_link_cell(at) or not free and not World.can_melee(at, target.tile):
 			continue
 		var occupant := World.get_entity_at(at)
 		if occupant != null and occupant != self:
@@ -3181,7 +3183,7 @@ func _flee_goal() -> Vector2i:
 	for n in range(flee_tiles, 0, -1):
 		for way: Vector2i in [away, Vector2i(away.x, 0), Vector2i(0, away.y)]:
 			var at := tile + way * n
-			if way != Vector2i.ZERO and World.is_walkable(at) and World.is_free(at):
+			if way != Vector2i.ZERO and World.is_walkable(at) and World.is_free(at) and not World.is_link_cell(at):
 				return at
 	return NO_TILE
 
@@ -3735,7 +3737,7 @@ func _wander_goal() -> Vector2i:
 	for i in 12:
 		var at := home + Vector2i(_idle_rng.randi_range(-wander_radius, wander_radius),
 				_idle_rng.randi_range(-wander_radius, wander_radius))
-		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at) or _shuns(at):
+		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at) or World.is_link_cell(at) or _shuns(at):
 			continue
 		if _straight(tile, at, wander_radius * 2 + 2):
 			_idle_path.clear()  # It walks there straight (_idle_step).
@@ -3825,7 +3827,7 @@ func _ensure_route() -> void:
 		for reach in range(PATROL_LOOP_RADIUS, 0, -1):
 			var at := home + way * reach
 			# Straight from home if it can be walked so; a search only if not.
-			if World.is_walkable(at) and not World.is_fire(at) and at not in route \
+			if World.is_walkable(at) and not World.is_fire(at) and not World.is_link_cell(at) and at not in route \
 					and (_straight(home, at, PATROL_LOOP_RADIUS * 2) \
 						or not World.find_path(home, at, true, null, _about_search(PATROL_LOOP_RADIUS), false, {}, opens_doors).is_empty()):
 				route.append(at)
@@ -3863,7 +3865,7 @@ func _gather_place() -> Vector2i:
 		for dx in range(-reach, reach + 1):
 			for dy in range(-reach, reach + 1):
 				var at := gather_point + Vector2i(dx, dy)
-				if World.distance(at, gather_point) != reach or not World.is_walkable(at) or World.is_fire(at):
+				if World.distance(at, gather_point) != reach or not World.is_walkable(at) or World.is_fire(at) or World.is_link_cell(at):
 					continue
 				if at != tile and not World.is_free(at):
 					continue

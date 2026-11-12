@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A foe beside you at a stair or doorway fights you from another side of you (571 amended (1)).
 - In the crypt, the Mound-breakers step in one after another, a fresh one every two seconds, and while four are on you the rest wait in sight a few steps off until one falls or you go for them; Brand the Ox stands his ground to the end and makes a longer fight of it (806 amended (14)).
 - A robber's or a skeleton's ordinary blow winds up where you can see it coming, even a stab from behind, and a raised shield facing it takes the blow whole (806 amended (14)).
 - Rain at night falls as faint grey streaks, shaded by the dark and by lamplight, with the view clear close to the camera (309 amended (5)).

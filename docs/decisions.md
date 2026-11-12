@@ -22411,6 +22411,8 @@ cut (the box runs 28, main 29).
 tests/level_test: a link's cell known as one; a resident does not step onto
 it; one put on it steps off; a player stepping at it while a body stands
 there takes the link; nothing is put down on it.
+571 amended (1): a link's cell is never a fighter's slot or a monster's goal (2026-11-12, the script's label; the coordinator's ruling on enemy-ai's crypt camp probe). 571 refuses any body but a player a step onto a link's cell, yet Monster still chose one: a fight slot beside a player standing by a stair or a doorway (_pick_slot) was picked, its step refused, and picked again each tick, so a player there could not be reached; a wander goal, a patrol loop point, a band's gather place or a flee spot could fall on one too. Now _pick_slot passes link cells over (World.is_link_cell), and so do _wander_goal, _ensure_route's loop points, _gather_place and _flee_goal. A route already crosses a link's cell only as its goal (879), so with the link the only way to her it has no way in: it keeps off the link, minds her and lets her be after its stand-off, as with any target it has no way to. monster_test _test_link_slots: beside a stair in a wall's gap, an imp and a robber never take the link as a slot and strike her from another cell; with the link the only open cell beside her, each keeps off it, minds her 30 ticks of 30 and strikes nobody. Server only, protocol unchanged, no new class_name.
+
 ## 563, terrain's side: roads drawn from their curves
 
 Jeff's rule (see 559, terrain's side): a road is a smooth curve drawn as
