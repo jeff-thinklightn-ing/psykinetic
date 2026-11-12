@@ -1359,8 +1359,12 @@ func _sim_tick() -> void:
 		return  # Bare-handed: the weapon at its feet first.
 	if pack_id == "" and not _pressing \
 			and (boldness < HOLD_BACK_BELOW and temper != Temper.BOLD and not _struck_named(target) or _dreads_target()) \
-			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
-			and not _band_holds() and (not band_fights or _mate_near()):
+			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and World.distance(tile, target.tile) > 1 \
+			and not _target_beset(_others_needed()) and not _band_holds() and (not band_fights or _mate_near()):
+		# Never beside its target (806 amended (16); the crypt camp, gen 3 seed 4): there it is out of
+		# reach only across a wall's corner, and held so, its stand-off ran out, it
+		# watched her, her nearness roused it, and it held again: ten minutes
+		# FIGHTING and never a blow. Beside her it goes round to a cell it strikes from.
 		_standing_off()
 		return  # Waits for the others; a band that outnumbers them goes in together.
 	if not _pressing and _rng.randf() < pause_chance:

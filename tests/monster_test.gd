@@ -1854,6 +1854,7 @@ func _test_ambush() -> void:
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_link_slots()
+	_test_corner_fight()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -9022,6 +9023,54 @@ func _test_link_slots() -> void:
 				foe.facing, foe.slot, foe._dreads_target(), foe._pressing, foe.next_move_tick, World.tick,
 				World.find_path(foe.tile, player.tile, true, null, 50, false, {}, foe.opens_doors_now())])
 		World.fields.link_cells.erase(Vector2i(4, 3))
+	Monster.idling = true
+
+
+## Across a wall's corner (806 amended (16); the crypt camp's probe, gen 3
+## seed 4, the coordinator 11-12): a fighter diagonal to a free body with the
+## corner's wall between is adjacent but can strike nobody (no clear line by
+## bodies). A cautious robber of a band held back there for his mate ten
+## minutes, FIGHTING and never a blow (his stand-off ran out, he watched her,
+## her nearness roused him, he held again). Beside her, he never holds back:
+## he takes a cell he can strike from.
+func _test_corner_fight() -> void:
+	print("%s== across a wall's corner: a fighter beside her never holds back: it takes a cell it can strike from ==" % char(10))
+	Monster.idling = false
+	for symbol: String in ["x", "m"]:
+		# As in the camp: a robber of the row's own temper (not made bold), a
+		# mate of his band four cells off round the wall, out of her sight.
+		var rows: Array[String] = ["##########", "#........#", "#........#", "#.###" + symbol + "...#", "#.###....#", "#.###..." + symbol + "#", "##########"]
+		var e := _build(rows)
+		var foe: Monster = e[symbol][0]
+		foe.sight_range = 12
+		foe.senses.cone_cos = -1.0
+		foe.reaction_ticks = 0
+		foe.pause_chance = 0.0
+		# Cautious and fighting for his band, as Crake was, so he would hold back
+		# for his mate, who keeps his post (nobody besets her).
+		foe.boldness = 0.25
+		foe.temper = Monster.Temper.CAUTIOUS
+		foe.band_fights = true
+		var post: Monster = e[symbol][1]
+		post.acts = false
+		post.band_fights = true
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": Vector2i(4, 2)})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(4, 2))
+		player.max_hp = 1000
+		player.hp = 1000
+		var corner := World.can_melee(foe.tile, player.tile) or World.in_reach(foe, player)
+		var first := -1
+		var cells := {}
+		for i in 100:
+			World.step()
+			cells[foe.tile] = true
+			if first < 0 and _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == foe):
+				first = i
+		var mate: Monster = e[symbol][1]
+		_check(not corner and first >= 0 and first <= 50,
+				"%s (boldness %.2f, temper %s) diagonal across the corner (no strike from there: %s): it moves to strike (first blow at %.1f s; cells %s; its mate %s at %s)" % [
+				NAMES[symbol], foe.boldness, Monster.Temper.keys()[foe.temper], not corner, first / 10.0, cells.keys(), Monster.Alert.keys()[mate.alert], mate.tile])
 	Monster.idling = true
 
 
