@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2820)
+## Lines in the code (2831)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -1109,7 +1109,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (188)
+### other (render) (198)
 
 | | Line | Where |
 |---|---|---|
@@ -1127,7 +1127,14 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | regenerate now %s | `render/admin_panel.gd` _regenerate_this() |
 |  | The temple's counter | `render/barter_panel.gd` COUNTER_TITLES |
 |  | The smith's counter | `render/barter_panel.gd` COUNTER_TITLES |
-|  | Step closer to trade | `render/barter_panel.gd` STEP_CLOSER |
+|  | Step closer to trade. | `render/barter_panel.gd` STEP_CLOSER |
+|  | Bought %s for %d gold. | `render/barter_panel.gd` BOUGHT_LINE |
+|  | Sold %s for %d gold. | `render/barter_panel.gd` SOLD_LINE |
+|  | Handed back %s. | `render/barter_panel.gd` HANDED_BACK_LINE |
+|  | Left %s on the shelves for the town. | `render/barter_panel.gd` LEFT_LINE |
+|  | %s won't take that. | `render/barter_panel.gd` WONT_TAKE_LINE |
+|  | The town has enough of that. | `render/barter_panel.gd` ENOUGH_LINE |
+|  | %s is asleep. Come back by day. | `render/barter_panel.gd` ASLEEP_LINE |
 |  | For %s: %d of %d %s | `render/barter_panel.gd` give_lines() |
 |  | Pays %d gold | `render/barter_panel.gd` give_lines() |
 |  | nothing for sale | `render/barter_panel.gd` empty_words() |
@@ -1139,8 +1146,10 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | You need %d more gold. | `render/barter_panel.gd` shortfall_words() |
 |  | %d of %d to give | `render/barter_panel.gd` stack_words() |
 |  | the town has enough of that | `render/barter_panel.gd` toggle_give() |
+|  | %s %s gold %s | `render/barter_panel.gd` boxes_shown() |
 |  | %s %s %s%s | `render/barter_panel.gd` boxes_shown() |
 |  | %s, in hand | `render/barter_panel.gd` _rebuild() |
+|  | .join(PackPanel.load_lines(player)) if is_instance_valid(player) else | `render/barter_panel.gd` _store_state() |
 |  | I hold %s. | `render/card_page.gd` held_words() |
 |  | I hold %s; %s taught it to me. | `render/card_page.gd` held_words() |
 |  | My purse is empty. | `render/card_page.gd` purse_words() |
@@ -1221,6 +1230,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s %d gold | `render/shop_panel.gd` _rebuild() |
 |  | The town pays: %s (put it in the counter) | `render/shop_panel.gd` _rebuild() |
 |  | The town wants nothing you carry. | `render/shop_panel.gd` _rebuild() |
+|  | %s %s %s | `render/store_view.gd` squares_shown() |
 |  | The town has enough of that. | `render/town_sheet.gd` ENOUGH_WORDS |
 |  | The town has no use for that. | `render/town_sheet.gd` NO_USE_WORDS |
 |  | Donate (%d gold) | `render/town_sheet.gd` action() |
@@ -2055,7 +2065,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (721)
+### server and windows (722)
 
 | | Line | Where |
 |---|---|---|
@@ -2348,7 +2358,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s open your chest | `main.gd` context_hint_for() |
 |  | %s open the shop | `main.gd` context_hint_for() |
 |  | %s open or close | `main.gd` context_hint_for() |
-|  | LMB talk E her pack | `main.gd` context_hint_for() |
+|  | LMB talk E or RMB her gear and pack | `main.gd` context_hint_for() |
 |  | LMB interact in bed with %s | `main.gd` context_hint_for() |
 |  | %s hold draw LMB loose | `main.gd` context_hint_for() |
 |  | LMB talk E hold bandage | `main.gd` context_hint_for() |
@@ -2452,6 +2462,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | ignored your warning and took you there | `main.gd` _bond_warned() |
 |  | %s said: "%s" | `main.gd` _say_plain() |
 |  | You have but %d gold. | `main.gd` _monster_accepts() |
+|  | Your pack is full. | `main.gd` FULL_PACK_LINE |
 |  | %s said: "%s"%s | `main.gd` _resident_says() |
 |  | %s is asleep. | `main.gd` _asleep_told() |
 |  | %s is asleep. | `main.gd` _asleep_told() |
