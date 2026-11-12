@@ -295,9 +295,9 @@ static func _give_offers(worker_id: String, who: Dictionary, town: String, playe
 	var words := "%s waits on %s%d gold; what you give goes to it." % [kind.capitalize() if not kind.begins_with("the ") else "The " + kind.trim_prefix("the "), needs + " and " if not needs.is_empty() else "", gold]
 	var step := int(settings().get("give_most", 10))
 	if gold <= step:
-		out.append(_offer(worker_id, GIVE, "give:all", "Give toward %s" % kind, words, {"gold": gold, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, gold))
+		out.append(_lined(_offer(worker_id, GIVE, "give:all", "Give toward %s" % kind, words, {"gold": gold, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, gold), str(settings().get("give_line", ""))))
 		return out
-	out.append(_offer(worker_id, GIVE, "give:step", "Give toward %s" % kind, words, {"gold": step, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, step))
+	out.append(_lined(_offer(worker_id, GIVE, "give:step", "Give toward %s" % kind, words, {"gold": step, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, step), str(settings().get("give_line", ""))))
 	var purse: Variant = _call(given, "gold_of", [player_id])
 	var rest := mini(gold, int(purse)) if purse is int or purse is float else gold
 	if rest > step:
@@ -316,8 +316,8 @@ static func _watch_offer(worker_id: String, who: Dictionary, player_id: String, 
 		return {}
 	var rule: Dictionary = Townsfolk.days().get("watch", {})
 	var name := str(post.get("name", "the post"))
-	return _offer(worker_id, WATCH, "watch", str(rule.get("title", "Stand a watch")),
-		str(rule.get("words", "Take %s till first light; the town pays at dawn.")) % name, {"post": str(post["id"]), "name": name}, WATCH)
+	return _lined(_offer(worker_id, WATCH, "watch", str(rule.get("title", "Stand a watch")),
+		str(rule.get("words", "Take %s till first light; the town pays at dawn.")) % name, {"post": str(post["id"]), "name": name}, WATCH), str(rule.get("line", "")))
 
 
 ## "the inn" for a build kind ("inn", "healers_hut").
@@ -348,6 +348,19 @@ static func _needs_words(needs: Variant) -> String:
 
 static func _offer(worker_id: String, kind: String, key: String, title: String, words: String, what: Dictionary, accept: String, cost := 0) -> Dictionary:
 	return {"id": SEP.join([worker_id, kind, key]), "kind": kind, "title": title, "words": words, "what": what, "accept": accept, "cost": cost}
+
+
+## [param offer] with its asker's short aside under the row (voice's words,
+## ui's "line": at most LINE_MOST characters; "words" stays the full speech),
+## or as it was when [param line] is empty.
+static func _lined(offer: Dictionary, line: String) -> Dictionary:
+	if not line.is_empty():
+		offer["line"] = line
+	return offer
+
+
+## The longest a row's "line" may be (ui's row; voice's lines keep under it).
+const LINE_MOST := 60
 
 
 static func _as_open(ask: Dictionary) -> Dictionary:
@@ -781,16 +794,16 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 	var card := Townsfolk.card_of(production, worker_id)
 	var retainer := int(rule.get("retainer", 0))
 	if via.is_empty() and retainer > 0:
-		out.append(_offer(worker_id, CARE, "care", str(words.get("pay_title", "Pay ahead for his care")),
+		out.append(_lined(_offer(worker_id, CARE, "care", str(words.get("pay_title", "Pay ahead for his care")),
 			str(words.get("pay", "Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care.")) % retainer,
-			{"gold": retainer, "hut": hut}, CARE, retainer))
+			{"gold": retainer, "hut": hut}, CARE, retainer), str(words.get("pay_line", ""))))
 	var herbs := int(rule.get("herbs", 0))
 	if not _quest_done(via):
 		var had := int(_given(player_id, hut, given).get("herbs", 0))
 		if herbs > 0 and had < herbs and not _has_ask(card, player_id, CARE_HERBS):
-			out.append(_offer(worker_id, PLEA, CARE_HERBS, str(words.get("herbs_title", "Bring him herbs")),
+			out.append(_lined(_offer(worker_id, PLEA, CARE_HERBS, str(words.get("herbs_title", "Bring him herbs")),
 				str(words.get("herbs", "Bring me %d handfuls of herbs and I'll count you in my care, and there is more you could do for me after.")) % (herbs - had),
-				{"sub": CARE_HERBS, "hut": hut, "herbs": herbs}, TAKE))
+				{"sub": CARE_HERBS, "hut": hut, "herbs": herbs}, TAKE), str(words.get("herbs_line", ""))))
 		return out
 	# The chain (his first quest done): the sick while someone is sick, else the brew; each once.
 	for ask: Dictionary in card.get("asks", []).duplicate():
@@ -801,13 +814,13 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 			card = Townsfolk.card_of(production, worker_id)
 	var done: Dictionary = card.get("care_done", {}).get(player_id, {})
 	if int(rule.get("sick", 0)) > 0 and not done.get("sick", false) and not _has_ask(card, player_id, CARE_SICK) and not _sick_in(production, town).is_empty():
-		out.append(_offer(worker_id, PLEA, CARE_SICK, str(words.get("sick_title", "Walk the sick to him")),
+		out.append(_lined(_offer(worker_id, PLEA, CARE_SICK, str(words.get("sick_title", "Walk the sick to him")),
 			str(words.get("sick", "There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door.")),
-			{"sub": CARE_SICK, "hut": hut}, TAKE))
+			{"sub": CARE_SICK, "hut": hut}, TAKE), str(words.get("sick_line", ""))))
 	elif not done.get("brew", false) and not _has_ask(card, player_id, CARE_BREW):
-		out.append(_offer(worker_id, PLEA, CARE_BREW, str(words.get("brew_title", "Bring the makings of a brew")),
+		out.append(_lined(_offer(worker_id, PLEA, CARE_BREW, str(words.get("brew_title", "Bring the makings of a brew")),
 			str(words.get("brew", "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.")) % BREW_HERBS,
-			{"sub": CARE_BREW, "hut": hut, "herbs": BREW_HERBS, "antlers": BREW_ANTLERS}, TAKE))
+			{"sub": CARE_BREW, "hut": hut, "herbs": BREW_HERBS, "antlers": BREW_ANTLERS}, TAKE), str(words.get("brew_line", ""))))
 	return out
 
 

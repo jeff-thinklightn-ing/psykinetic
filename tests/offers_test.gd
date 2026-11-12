@@ -615,9 +615,33 @@ func _test_care() -> void:
 	_ctx["companion_sick"] = func(_id: String) -> Dictionary: return {}
 	_ctx["set_companion_sick"] = func(_id: String, _r: Dictionary) -> void: pass
 	var subs := func(offers: Array[Dictionary]) -> Array: return offers.map(func(o: Dictionary) -> String: return str(o.get("what", {}).get("sub", o.get("kind", ""))))
+	# The rows' lines from the real file (residents.json's offers.care *_line), beside this test's numbers.
+	var real: Variant = JSON.parse_string(FileAccess.get_file_as_string(Offers.FILE))
+	var real_offers: Dictionary = real.get("offers", {}) if real is Dictionary else {}
+	var real_care: Dictionary = real_offers.get("care", {})
+	var with_lines: Dictionary = Offers.settings().duplicate()
+	var line_words := {}
+	for key: String in ["pay_line", "herbs_line", "sick_line", "brew_line"]:
+		line_words[key] = real_care.get(key, "")
+	with_lines["care"] = line_words
+	Offers.use_settings(with_lines)
 	var mine := _offers("o-doc")
 	_check(subs.call(mine).has(Offers.CARE) and subs.call(mine).has(Offers.CARE_HERBS) and mine.filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.CARE)[0]["what"]["gold"] == 10,
 		"not in his care: pay 10 ahead, or bring him 5 herbs (his first quest): %s" % [subs.call(mine)])
+	# Each row's short aside (voice's, ui's "line"): the care words' lines, every one within LINE_MOST.
+	var care_words: Dictionary = Offers.settings().get("care", {})
+	var line_of := func(offers: Array[Dictionary], sub: String) -> String:
+		for o: Dictionary in offers:
+			if str(o.get("what", {}).get("sub", o.get("kind", ""))) == sub:
+				return str(o.get("line", ""))
+		return "(no row)"
+	_check(line_of.call(mine, Offers.CARE) == str(care_words.get("pay_line")) and line_of.call(mine, Offers.CARE_HERBS) == str(care_words.get("herbs_line"))
+		and not str(care_words.get("pay_line", "")).is_empty(), "the care rows' lines: %s / %s" % [line_of.call(mine, Offers.CARE), line_of.call(mine, Offers.CARE_HERBS)])
+	var real_days: Variant = JSON.parse_string(FileAccess.get_file_as_string(Townsfolk.DAYS_FILE))
+	var lines: Array = [real_offers.get("give_line", ""), real_days.get("watch", {}).get("line", "") if real_days is Dictionary else ""]
+	for key: String in ["pay_line", "herbs_line", "sick_line", "brew_line"]:
+		lines.append(real_care.get(key, ""))
+	_check(lines.all(func(line: Variant) -> bool: return not str(line).is_empty() and str(line).length() <= Offers.LINE_MOST), "six lines, none past %d characters: %s" % [Offers.LINE_MOST, lines])
 	# The retainer in person: economy's retain, the way in "gold" (p2).
 	var pay: Dictionary = mine.filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.CARE)[0]
 	var paid := Offers.accept("o-doc", "p2", "Ann", pay["id"], 0, _ctx)
@@ -642,6 +666,7 @@ func _test_care() -> void:
 	mine = _offers("o-doc")
 	var sick: Array = mine.filter(func(o: Dictionary) -> bool: return o.get("what", {}).get("sub", "") == Offers.CARE_SICK)
 	_check(sick.size() == 1 and not subs.call(mine).has(Offers.CARE_BREW), "Tam sick: walk the sick to him, the brew waits: %s" % [subs.call(mine)])
+	_check(not sick.is_empty() and str(sick[0].get("line", "")) == str(care_words.get("sick_line")), "the sick row's line")
 	_check(Offers.accept("o-doc", "p1", "Jeff", sick[0]["id"], 0, _ctx)["ok"] if not sick.is_empty() else false, "taken")
 	_done.clear()
 	Offers.healed(TOWN, "o-tam", "p1", "Jeff", "the healer", _ctx)
@@ -651,6 +676,7 @@ func _test_care() -> void:
 	# The brew: three herbs and a pair of antlers over visits, the potion handed back.
 	mine = _offers("o-doc")
 	var brew: Array = mine.filter(func(o: Dictionary) -> bool: return o.get("what", {}).get("sub", "") == Offers.CARE_BREW)
+	_check(brew.size() == 1 and str(brew[0].get("line", "")) == str(care_words.get("brew_line")), "the brew row's line")
 	_check(brew.size() == 1 and Offers.accept("o-doc", "p1", "Jeff", brew[0]["id"], 0, _ctx)["ok"], "the sick seen to: the brew asked and taken")
 	Offers.gift("p1", "Jeff", "o-doc", "herbs", _ctx)
 	Offers.gift("p1", "Jeff", "o-doc", "antlers", _ctx)
@@ -840,6 +866,7 @@ func _test_asks() -> void:
 	var third := Offers.to_speak("o-ald", "p1", "work", str(second.get("id", "")))
 	_check(str(first.get("id", "")).ends_with("give:step") and str(second.get("id", "")).ends_with("give:rest") and third.get("id") == first.get("id"),
 		"asked for work: the step, asked again the rest, then the step again: %s" % [[first.get("title"), second.get("title"), third.get("title")]])
+	_check(str(first.get("line", "")) == str(Offers.settings().get("give_line")) and not second.has("line"), "giving toward the inn: the step's line; the rest's row none")
 	_check(Offers.to_speak("o-ald", "p1", "wares").is_empty() and Offers.to_speak("o-ald", "p1", "news").is_empty(), "no wares and no news from the official: the mind answers those")
 	_check(str(Offers.named("o-ald", "p1", "The rest, then.").get("id", "")).ends_with("give:rest") and Offers.named("o-ald", "p1", "Yes").is_empty(), "'the rest' names the second line; a yes names nothing (the standing one takes it)")
 	_check(Offers.amount_refusal(first, 30, 60) == "The inn wants but 24 gold more." and Offers.amount_refusal(first, 70, 60) == "You have but 60 gold." and Offers.amount_refusal(first, 20, 60).is_empty(),

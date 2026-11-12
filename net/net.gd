@@ -624,6 +624,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## No new number (856 amended (1), release): "barter" after a trade may carry "sold" and "bought"
 ## [{id, count, gold}], and "reward" for a trade's float may carry "trade" ("bought" or "sold");
 ## an old client ignores both.
+## No new number (release): an offer row may carry "line", its asker's short aside under the row
+## (voice's words, ui's row); an old client ignores it.
 ## 55 also (599 amended (2), "one loot window"; release's, the one number for the wire changes
 ## before v0.1.210, shared with 831): "take_find" may carry "id" (one row of the find, "gold" its
 ## gold), after which the server sends "find" again with what is left (rows [] and gold 0

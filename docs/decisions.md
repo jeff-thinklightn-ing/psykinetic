@@ -19837,6 +19837,18 @@ DealPanel is unchanged; merging it into this window is a later change. ui_test
 _test_resident_asks. A CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new
 class_name.
 
+536 amended, economy's side: the line under a row (under ui's hand-out; no number of its own).
+An ask row may carry "line", its asker's short aside under the row (voice's words, at most
+Offers.LINE_MOST, 60 characters; "words" stays the full speech). Offers._lined puts it on the
+healer's four care rows (residents.json offers.care pay_line, herbs_line, sick_line, brew_line),
+on giving toward a town's building, the whole and the step (offers.give_line; "Give the rest" has
+none), and on the guard captain's watch (watch.line). Vendor, camp, visitor and shop rows carry
+none. Offers._lined and LINE_MOST are word for word npc's (npc-lines), so whichever lands second
+merges clean. The window draws the line in ui's own change; until then nothing shows it, so it
+lands off. offers_test checks each row's line against the data and every one within LINE_MOST.
+No CHANGELOG bullet. Wire: an optional key on an offer row, no new number (release; net.gd's
+note), an old client ignores it. No new class_name.
+
 ## 544, ui's side: downed and brought back, read on the HUD
 
 Companions' 544 replicates downed_until, channel_of (the body's node
