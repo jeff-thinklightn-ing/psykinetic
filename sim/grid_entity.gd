@@ -168,6 +168,9 @@ var wind_up := {}
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.
 var down_until := 0
+## The tick its last knock-down (or stagger) began, -1 for none (World.knock_down's
+## grace, 343 amended (2)). Server only, not replicated.
+var downed_at := -1
 ## Teetering on a rim (World, decision 783): the way the drop lies from its
 ## cell, ZERO standing firm. A creature's replicates, for the views' wobble.
 var teeter := Vector2i.ZERO

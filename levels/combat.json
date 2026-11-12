@@ -8,6 +8,8 @@
 	"winded_blow_scale": 0.5,
 	"melee_reach": 0.9,
 	"lead_slack": 0.5,
+	"windup_slack": 0.5,
+	"down_grace": 40,
 	"winded_regen_delay": 20,
 	"flank_stagger": 4,
 	"flank_guard": 50,

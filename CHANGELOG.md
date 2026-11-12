@@ -7,7 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
-- Rolf's sword fells a plain robber in five blows, swung at the same pace for the same stamina (887).
+- A battle axe or giant axe swing reaches a foe who steps half a cell back while you wind it up, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 343 amended (2)).
+- Rolf's sword fells a robber in the barrow in five to seven blows, swung at the same pace for the same stamina (887).
 - The old grey's lunge, marked by a red line before it lands, hits harder than his bite: step out of the red (780 amended (34)).
 - A great bear, the old grey, a skeleton guard or the draugr fights on, or goes back to its den or its room, when whoever it was after leaves, and so does any pack with it (806 amended (20)).
 - A new companion wants to go fishing with you from the start, and if you ask her to fish where there's no water she leads you to some close by (803 amended (11)).

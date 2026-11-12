@@ -7673,6 +7673,30 @@ takes a resident, a companion or a player beside its target. The aimed
 target stays decision 454's (a plain click never attacks a friend); a
 monster's arc is unchanged and takes everyone. combat_test
 _test_arc_spares_friends. Sim only, protocol unchanged.
+
+343 amended (2): the knock-down grace (the decision-number script's label;
+the coordinator's ruling with 874, from combat's duel rows). A body knocked
+down can't be knocked down again until down_grace (levels/combat.json, 40
+ticks, on the F7 panel) after that knock-down began: World.knock_down reads
+GridEntity.downed_at (the tick the last one began, -1 for none, server
+only, never replicated) and, inside the grace, returns: the blow lands
+with its harm and its push, no down and no stun of the down's. Every body
+and every source alike: a player's axe on a monster, a monster's slam or
+spin on a player, a lob that knocks down. The draugr's never_lies stagger
+takes it too (a stun-lock on a boss is the same lock); dungeon's
+draugr_fight_test settles his fight's length. A fall is exempt (_fall_hurt
+passes fall): a fall always floors. Why: with 874's slack every wound-up
+blow lands, and a knockdown weapon's next blow came before its 15-tick down
+had worn off: on combat's duel the battle axe floored Crake with every
+blow, 128 knock-downs in 16 fights at 3 a hit, and he never answered; the
+giant axe the same. With the grace a knock-down buys one follow-up on him
+lying, about two a fight. For players nothing changes that they meet today:
+the bear's slam (every 50 ticks) and the draugr's spin are slower than the
+grace, and no robber or goblin knocks down. combat_test _test_down_grace (a
+player and a monster: none again at 20 or 39 ticks, again at 40, a fall
+inside the grace still floors; a giant axe's second blow inside it harms,
+no down; the draugr staggered, not again inside it). Server and data,
+protocol unchanged, no new class_name.
 ## 341. A monster with a bow in its hands stands off and shoots
 
 A monster wielding a bow (decision 338's "wields", World.off_hand "draw")
@@ -51934,3 +51958,69 @@ _test_sword_lead's own keys back and aside: kept, struck. Tested hosted, on the 
 a joined client predicts its own walk and never read the stand, and whether it is put back during a
 lead walked off is playtest's joined count on main's tip before the cut. Server and data only;
 protocol unchanged; no new class_name.
+
+## 874. A wound-up blow follows a foe who shifts half a cell (the whiff mend)
+
+The decision-number script's label; the coordinator's ruling (11-11),
+which lands it on the coordinator's lean, Jeff's page telling him (C:/dev/review/decisions/battle-axe.md),
+from combat's duel rows (C:/dev/review/combat/two_hander_options.md, the
+candidate section). Jeff, 11-07: "two hander attacks are so slow its
+impossible to fight with".
+
+What a player met: she clicks a robber, and the attack order walks her in
+and winds the battle axe up (8 ticks) from the first cell in reach, often a
+diagonal. His lunge's planted ticks end, and he steps off before her blow
+lands. World._tend_wind_ups strikes the aimed target
+only if still in reach as it lands, so the blow struck the air. On eight
+starts with click bots at tell 10, a reader who stepped off his red landed
+23 % of her blows with main's axe (wins 5 of 8 in 78 to 86 s), and careless
+fell at 26 to 28 s. A monster's lead blow (338 amended) already lands up to
+lead_slack (0.5) past reach; a player's wind-up had none.
+
+Now a player's or a companion's wound-up blow takes windup_slack
+(levels/combat.json, 0.5, on the F7 panel): begun in reach, it lands on a
+target that has got at most that far past reach as it lands, with nothing
+between (World._wind_up_reaches, _try_hit's reach test for a paid,
+non-lead blow; World._takes_windup_slack). A foe who ends within half a
+cell past reach as the blow lands is struck; further, it strikes the air.
+The slack is past reach, not from where he stood: a monster steps whole
+cells, and the robber's step-off was always one cell (on main 186 of the
+189 blows out of reach as they landed, 0.09 to 0.44 past reach), so no
+rule catches it and spares another one-cell step. What is lost: a cautious
+foe's single step back (412) no longer dodges a wound-up axe; it still
+dodges the Sledge and anything without the slack. Enemy-ai brings the read
+back as a follow-up (a cautious one steps two cells or off the line from
+an axe's wind-up), the coordinator's ruling. Not a monster's (its leads take
+lead_slack; enemy-ai's rows stand). Not a knockback verb's: the Tomb
+Sledge with it drove its foe off with every blow and took nothing for 10
+to 32 s, a keep-away 343 amended (2)'s grace doesn't cover, so it waits on
+its own look. With it every blow lands, and a knockdown weapon would floor
+him every blow: 343 amended (2)'s grace comes with it.
+
+The battle axe's damThe battle axe's damage 1.6 to 2.5 (5 a hit), its down kept at 15; its
+value 20 to 15 (items: under the giant axe's 17). The 11-11 rows that ruled
+it (eight starts, Crake, tell 10: careless 12.1 to 13.3 s taking 9, a reader
+in 6 blows taking 2.6) were on the candidate with enemy-ai's lunge row.
+Measured again on the rebased tip, 11-12, by the coordinator on ubuntu-1
+with enemy-ai's duel harness (zz_duel5, 16 starts, one robber, his hp as the
+row's; C:/dev/review/combat/probe_box/axe874_run/). With main's own lunge
+(tell 6, open 8 after a miss) it does not win: the battle axe 0 of 16
+careless and reader (wind-ups 11.2, landed 4.4; main without 874: 10.0 and
+2.3), the giant axe 10 of 16; fists and sword 16 of 16. With enemy-ai's
+lunge row laid over it (790 amended (6), tell 10, open 9 after every lunge)
+the battle axe wins 16 of 16 careless, strafe and reader in 17.5 s taking
+14.6 (landed 6.0 of 9.2), the giant axe 16 of 16 in 14.4 to 16.9 s taking
+5.8; fists 7.1 s taking 8.5 (a reader 1.6), the sword 5.5 s taking 5.8 (a
+reader 1.4). So the mend is this and the lunge row together: a player
+meets it only once 790 amended (6) is on main. Against two robbers the
+battle axe wins 1 of 16 at most. Still open (the coordinator's, after the
+cut): reading buys the axe nothing (reader equals careless), and it is
+slower and costlier than fists against one robber; a tuning that makes it a
+bonus in one honest way. A bot that walks while it winds (strafe2) never
+lands a heavy, by design (392 amended (6)): a two-hander plants her.
+ndup_slack (a battle axe's
+wind-up on a foe 0.3 and 0.45 past reach as it lands: struck; a whole cell
+past (2.8 apart): the air; a giant axe's struck; the Sledge's not; a monster's takes
+none); monster_test _test_meets_wind_up's cautious case (one cell back
+down a one-row room: the blow follows, once); items_test _test_battle_axe (x2.5) and the value case (15, under the
+giant axe). Server and data, protocol unchanged, no new class_name.

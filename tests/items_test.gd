@@ -1739,8 +1739,8 @@ func _test_battle_axe() -> void:
 == the draugr's battle axe, left at his feet when he yields (decision 603, items' side) ==")
 	var verb := Items.verb_of("battle_axe")
 	_check(Items.def("battle_axe")["hands"] == 2 and is_equal_approx(Items.def("battle_axe")["weight"], 7.0) and verb["kind"] == "knockdown"
-			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 1.6) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
-			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x1.6, x2.2 slower, wound up 8 (%s)" % [verb])
+			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 2.5) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
+			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x2.5 (874), x2.2 slower, wound up 8 (%s)" % [verb])
 	_check(Items.def("battle_axe")["made"].is_empty() and Monster.kinds()["draugr"]["yields"] == [{"item": "battle_axe"}],
 			"nobody makes one; the draugr's row yields it")
 	var host := _player(Net.local_id)
@@ -4054,7 +4054,8 @@ func _test_priced() -> void:
 		if Items.value_of(id) <= 0 and not (made is Dictionary and not made.is_empty()) and not (yields is Dictionary and not yields.is_empty()):
 			unpriced.append(id)
 	_check(unpriced.is_empty(), "case: every sellable row has a value, a made or a yield (unpriced: %s)" % ", ".join(unpriced))
-	_check(Items.value_of("battle_axe") >= 17, "case: the battle axe is worth at least the giant axe's make")
+	_check(Items.value_of("battle_axe") == 15,
+			"case: the battle axe at 15, under the giant axe's make of 17 (items, 874: it kills no quicker than a careless sword)")
 
 
 ## The starter vendor's gear (decision 736, items' side): the wares list,

@@ -69,6 +69,8 @@ func _ready() -> void:
 	_test_free_wind_up_given_up()
 	_test_sledge_recover()
 	_test_sword_lead()
+	_test_windup_slack()
+	_test_down_grace()
 	_test_weapon_memory()
 	_test_guard_rework()
 	_test_told_guard()
@@ -1002,6 +1004,100 @@ func _test_sword_lead() -> void:
 	_check(host.wind_up.is_empty(), "stunned mid-lead: given up")
 
 
+## A wound-up blow's slack (874, the whiff mend): a player's wind-up, begun
+## in reach, lands on a foe who has shifted up to windup_slack past reach as
+## it lands, and strikes the air past that; a monster's plain wind-up and a
+## knockback verb's (the Tomb Sledge) take none.
+func _test_windup_slack() -> void:
+	print("
+== a wound-up blow follows a half-cell shift, misses a whole one; not a monster's, not the Sledge's (874) ==")
+	var e := _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
+	var paths := Tuning.fields().map(func(r: Dictionary) -> String: return str(r["path"]))
+	_check(is_equal_approx(World.windup_slack, 0.5) and World.down_grace == 40 and "combat.windup_slack" in paths and "combat.down_grace" in paths,
+			"windup_slack 0.5 and down_grace 40 from combat.json, on the F7 panel")
+	for each: Array in [["battle_axe", 0.3, true, "a battle axe's, the foe 0.3 past reach as it lands: struck"],
+			["battle_axe", 0.45, true, "0.45 past: struck"],
+			["battle_axe", 1.0, false, "a whole cell past: the air"],
+			["giant_axe", 0.3, true, "a giant axe's, 0.3 past: struck"],
+			["tomb_sledge", 0.3, false, "the Tomb Sledge's (knockback), 0.3 past: the air, no slack"]]:
+		e = _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
+		var host: Player = e["P"][0]
+		var foe: Player = e["P"][1]
+		_give(host, each[0])
+		foe.max_hp = 100
+		foe.hp = 100
+		host.free_pos = Vector2(3.0, 3.0)
+		foe.free_pos = Vector2(4.2, 3.0)
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+		_check(World.try_wind_up(host, foe), "(%s) wound up in reach" % each[0])
+		World.tick = int(host.wind_up["lands"])
+		foe.free_pos = Vector2(3.0 + World.reach_limit(host) + float(each[1]), 3.0)
+		World._tend_wind_ups()
+		World._resolve_hits()
+		_check((foe.hp < 100) == each[2], "%s (%d, %.2f apart, reach %.1f)" % [each[3], foe.hp,
+				World.body_centre(host).distance_to(World.body_centre(foe)), World.reach_limit(host)])
+	var m := _build(["#######", "#.P.m.#", "#######"])
+	_check(World._takes_windup_slack(m["P"][0]) and not World._takes_windup_slack(m["m"][0]),
+			"a player's wind-up takes it, a monster's doesn't (its leads take lead_slack)")
+
+
+## The knock-down grace (343 amended (2)): knocked down, a body can't be
+## again until down_grace ticks after that one began; a blow inside it lands
+## with its harm, no down. A player's and a monster's alike; the draugr's
+## stagger too; a fall never waits on it.
+func _test_down_grace() -> void:
+	print("
+== the knock-down grace: one follow-up, never a lock; players and monsters; the stagger; falls exempt (343 amended (2)) ==")
+	var e := _build(["#########", "#.P...m.#", "#########"])
+	var host: Player = e["P"][0]
+	var foe: Monster = e["m"][0]
+	for body: GridEntity in [foe, host]:
+		var began := World.tick
+		World.knock_down(body, null, 15)
+		_check(World.is_down(body) and body.downed_at == began, "%s knocked down (until %d)" % [body.name, body.down_until])
+		World.tick = began + 20
+		World.knock_down(body, null, 15)
+		_check(not World.is_down(body) and body.down_until == began + 15, "up at 20 ticks, inside the grace: not knocked down again")
+		World.tick = began + 39
+		World.knock_down(body, null, 15)
+		_check(not World.is_down(body), "at 39: still not")
+		World.tick = began + 40
+		World.knock_down(body, null, 15)
+		_check(World.is_down(body) and body.downed_at == began + 40, "at 40: knocked down again")
+		World.tick = began + 50
+		World.knock_down(body, null, 20, true)
+		_check(World.is_down(body) and body.down_until == began + 70, "a fall inside the grace still floors it")
+		World.tick = began + 200
+	# A giant axe's blows on one foe: the first knocks down, the next inside the grace only harms.
+	e = _build(["#########", "#.......#", "#..Pm...#", "#.......#", "#########"])
+	host = e["P"][0]
+	foe = e["m"][0]
+	_give(host, "giant_axe")
+	foe.max_hp = 100
+	foe.hp = 100
+	_wound_blow(host, foe)
+	var first_down := foe.down_until
+	_check(World.is_down(foe), "a giant axe's blow knocks the foe down")
+	World.tick = foe.down_until + 1
+	var hp := foe.hp
+	_wound_blow(host, foe)
+	_check(foe.hp < hp and not World.is_down(foe) and foe.down_until == first_down, "its next, the foe up but inside the grace: harm (%d), no down" % (hp - foe.hp))
+	# The draugr never lies: staggered, and not again inside the grace.
+	e = _build(["#########", "#.P...m.#", "#########"])
+	foe = e["m"][0]
+	foe.never_lies = true
+	var at := World.tick
+	World.knock_down(foe, null, 10)
+	_check(World.is_stunned(foe) and not World.is_down(foe) and foe.downed_at == at, "the draugr staggered, not lying")
+	World.tick = at + 15
+	World.knock_down(foe, null, 10)
+	_check(not World.is_stunned(foe), "inside the grace: not staggered again")
+	World.tick = at + 40
+	World.knock_down(foe, null, 10)
+	_check(World.is_stunned(foe), "at 40: staggered again")
+
+
 ## A free body's attack order is held while its own commands walk it (its
 ## client's chase, ui's half), struck once in reach, given up after
 ## Player.FREE_CHASE_TICKS; never a grid step, which snapped it from centre
@@ -1616,6 +1712,18 @@ func _clear(entity: GridEntity) -> void:
 	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
 		if not entity.slots[slot].is_empty():
 			World.items.end(World.take_item(entity, entity, slot), "gone")
+
+
+## A wound-up blow at a foe beside it (a grid body), from wind-up to landing.
+func _wound_blow(attacker: GridEntity, target: GridEntity) -> void:
+	attacker.next_attack_tick = 0
+	attacker.next_move_tick = 0
+	if not World.try_wind_up(attacker, target):
+		_check(false, "%s wound up at %s" % [attacker.name, target.name])
+		return
+	World.tick = int(attacker.wind_up["lands"])
+	World._tend_wind_ups()
+	World._resolve_hits()
 
 
 ## A blow struck now and resolved.

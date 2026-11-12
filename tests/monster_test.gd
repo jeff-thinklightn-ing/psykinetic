@@ -5998,7 +5998,9 @@ func _test_meets_wind_up() -> void:
 					hits_on_imp += 1
 		match case:
 			"cautious":
-				_check(hits_on_imp == 0 and not reached_when_due, "a cautious one steps out of reach and keeps out: the blow strikes the air")
+				# 874: a wound-up axe follows a foe up to windup_slack past reach; one cell
+				# back down this one-row room is 2.0 apart, under 1.8 + 0.5.
+				_check(hits_on_imp == 1 and not reached_when_due, "a cautious one steps out, the blow follows (874) (%d blows)" % hits_on_imp)
 			"shield":
 				_check(hits_on_imp == 0 and World.winding(player).is_empty() and player.next_bash_tick == 0 and imp.next_bash_tick > 0,
 					"a shield-bearer bashes it: the wind-up given up, no blow")

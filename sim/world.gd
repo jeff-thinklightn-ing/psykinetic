@@ -426,6 +426,18 @@ var melee_reach := 0.9
 ## no sidestep slips a slash, and only a step straight back from its edge
 ## does (2.0 at 0.9 and 0.5).
 var lead_slack := 0.5
+## A wound-up blow's slack (874, the whiff mend): a player's or a
+## companion's wind-up, begun in reach, still lands on a target that has
+## got at most this past reach as it lands, as a lead does (lead_slack), so
+## a foe who shifts half a cell during it is struck, not the air. Not a
+## monster's (theirs is lead_slack), nor a knockback verb's (the Tomb
+## Sledge: its push would keep a foe off for ever; its own look first).
+var windup_slack := 0.5
+## The knock-down grace (343 amended (2)): a body knocked down (or the
+## draugr staggered) can't be again until this many ticks after that one
+## began; a blow inside it lands with its harm and push, no down. So a
+## knock-down buys one follow-up, never a lock. A fall is exempt.
+var down_grace := 40
 var winded_regen_delay := 20
 ## Flanking (780, combat's side): a body struck from behind while it winds a
 ## flank-marked move is staggered this many ticks (its mover gives the move
@@ -5465,8 +5477,8 @@ func load_combat_rules(text: String) -> void:
 					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
 			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
-				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack", "flank_stagger", "flank_guard",
-				"steady_ticks"]:
+				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack", "windup_slack", "down_grace",
+				"flank_stagger", "flank_guard", "steady_ticks"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(key, int(given) if get(key) is int else float(given))
@@ -9213,13 +9225,23 @@ func _tend_wind_ups() -> void:
 
 ## Whether a wound-up blow by [param entity] reaches [param aimed] as it
 ## lands: in reach, or for a [param lead] (338 amended) up to
-## lead_slack past it with nothing between, where a body is free.
+## lead_slack past it with nothing between, where a body is free; for a
+## wind-up that takes windup_slack (_takes_windup_slack, 874), up to that
+## past it with nothing between.
 func _wind_up_reaches(entity: GridEntity, aimed: GridEntity, lead: bool) -> bool:
 	if in_reach(entity, aimed):
 		return true
+	if not lead and _takes_windup_slack(entity):
+		return _body_reach(body_centre(entity), body_centre(aimed), entity, aimed, blow_verb(entity), windup_slack)
 	if not lead or not (free_body(entity) or free_body(aimed)):
 		return false
 	return _body_reach(body_centre(entity), body_centre(aimed), entity, aimed, blow_verb(entity), lead_slack)
+
+
+## Whether [param entity]'s wound-up blow takes windup_slack (874): not a
+## monster's (its leads take lead_slack), not a knockback verb's.
+func _takes_windup_slack(entity: GridEntity) -> bool:
+	return windup_slack > 0.0 and not entity is Monster and str(blow_verb(entity).get("kind", "")) != "knockback"
 
 
 ## The shield in [param entity]'s left hand, if it can bash (decision 379):
@@ -9953,7 +9975,8 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		return false
 	if not can_target(attacker, target) or is_stunned(attacker):
 		return false
-	if tick < attacker.next_attack_tick or not (in_reach(attacker, target, is_shove) or lead and _wind_up_reaches(attacker, target, true)):
+	if tick < attacker.next_attack_tick or not (in_reach(attacker, target, is_shove) or lead and _wind_up_reaches(attacker, target, true)
+			or paid and not lead and not is_shove and _takes_windup_slack(attacker) and _wind_up_reaches(attacker, target, false)):
 		return false
 	# No hitting mid-step: the attacker's tile changes when a step starts, but
 	# on screen it is still crossing over, so the blow would land from afar.
@@ -10788,7 +10811,7 @@ func _fall_hurt(body: GridEntity, levels: int, source: GridEntity) -> int:
 	_impact(body, amount, source, &"stone")
 	var alive := _alive(body)
 	if alive and body.is_creature():
-		knock_down(body, source, fall_down_ticks)
+		knock_down(body, source, fall_down_ticks, true)  # A fall floors her, grace or none (343 amended (2)).
 	_log("fall: %s fell %d levels to %s, %d hp%s" % [body.name if is_instance_valid(body) else "?", levels, at, amount,
 			"" if alive else ", dead: what it carried lies there"])
 	return amount
@@ -13156,13 +13179,18 @@ func is_down(entity: GridEntity) -> bool:
 ## Knocks [param target] down for [param ticks] (a giant axe's blow;
 ## decision 343): it lies (down_until, replicated, for the views), cannot
 ## act (a stun as long), lowers what it raised, and is pushed as if
-## DOWN_MASS_FACTOR of its mass.
-func knock_down(target: GridEntity, source: GridEntity, ticks: int) -> void:
+## DOWN_MASS_FACTOR of its mass. Not again within down_grace ticks of the
+## last knock-down's start (343 amended (2)), but for a [param fall].
+func knock_down(target: GridEntity, source: GridEntity, ticks: int, fall := false) -> void:
 	if not Net.is_authority() or ticks <= 0 or is_sheltered(target):
 		return  # (Arriving, decision 661: not knocked down.)
 	if _steady.has(target):
 		_log("steadied: %s not knocked down by %s" % [target.name, source.name if is_instance_valid(source) else "?"])
 		return  # 843: the blow's push alone.
+	if not fall and target.downed_at >= 0 and tick - target.downed_at < down_grace:
+		_log("grace: %s not knocked down again by %s" % [target.name, source.name if is_instance_valid(source) else "?"])
+		return  # 343 amended (2): the blow's harm and push alone; one follow-up, never a lock.
+	target.downed_at = tick
 	if target is Monster and (target as Monster).never_lies:
 		# Never on the floor (573 amended (4), the draugr; approved by the
 		# coordinator, combat's file): a stagger, the stun alone. No
