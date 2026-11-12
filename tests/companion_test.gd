@@ -2174,9 +2174,9 @@ func _test_fish_waters() -> void:
 	var rivers := kinds.keys().filter(func(key: String) -> bool: return key.begins_with("river_"))
 	var pond_key := str(wilds.get(Vector2i(32, 118), ""))
 	_check(pond_key.begins_with("pool_") and pools.size() >= 3 and rivers.size() >= 1
-			and (terrain.get("water", []) as Array).all(func(cell: Vector2i) -> bool: return wilds.has(cell))
+			and (terrain.get("water", []) as Array).all(func(cell: Vector2i) -> bool: return wilds.has(cell) != (cell in terrain.get("covered_water", [])))
 			and wilds.keys().all(func(cell: Vector2i) -> bool: return not cell in terrain.get("fords", [])),
-		"the wilds: every water cell fishes (805 amended (11)), the pond and its pools (%s), the river (%s); no ford" % [pools, rivers])
+		"the wilds: every water cell fishes but a well's (805 amended (11)), the pond and its pools (%s), the river (%s); no ford" % [pools, rivers])
 	# The pond's stock is its fishing place's, whatever bank it is fished from.
 	_check(World.holdings != null and World.holdings._places.has("wilds/reed_pond"), "the wilds' pond is a fishing place in play")
 	if World.holdings != null and World.holdings._places.has("wilds/reed_pond"):
