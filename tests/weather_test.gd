@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_skylights()
 	_test_fish_feeding()
 	_test_rain_rings()
+	_test_rain_at_night()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -745,6 +746,45 @@ func _test_rain_rings() -> void:
 	_check((load("res://client3d/water.gdshader") as Shader).get_shader_uniform_list().size() > 0,
 			"and it compiles (a bad shader lists no uniforms)")
 	_check_drops_kept(code)
+
+
+# 309 amended (5): the drops' own colour by day (emission, nothing lit, as
+# before), lit by the scene as the day goes, so at night a drop shows where a
+# light catches it, not as a pale pole; the nearest thinned. The day's share
+# reaches both drop materials (rain and drips) each frame.
+func _test_rain_at_night() -> void:
+	var code := WeatherView.DROP_SHADER
+	var head := code.substr(0, code.find(";", code.find("render_mode")))
+	_check(not head.contains("unshaded") and code.contains("EMISSION = colour.rgb * max(day, night_glow)") and WeatherView.DROP_NIGHT_GLOW > 0.0 and WeatherView.DROP_NIGHT_GLOW < 0.5
+			and code.contains("ALBEDO = colour.rgb * (1.0 - day)") and code.contains("BACKLIGHT"),
+			"the drops are lit by the scene as the day goes, keep their own colour by day and DROP_NIGHT_GLOW of it at night (%.2f)" % WeatherView.DROP_NIGHT_GLOW)
+	_check(code.contains("smoothstep(near_from, near_to, -VERTEX.z)")
+			and WeatherView.DROP_NEAR_FROM < WeatherView.DROP_NEAR_TO
+			and WeatherView.DROP_NEAR_TO < Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * Client3D.LOW_ZOOM_MIN,
+			"the nearest drops thin out, and the player stands beyond the fade at the nearest zoom (%.1f m < %.1f m)" % [
+			WeatherView.DROP_NEAR_TO, Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * Client3D.LOW_ZOOM_MIN])
+	var view := WeatherView.new()
+	add_child(view)
+	view.set_outdoor(true)
+	view.ease_toward(Weather.KINDS["rain"], 1.0)
+	var days := []
+	for daylight: float in [1.0, 0.0, 0.4]:
+		view.place(Vector3(100.0, 0.0, 100.0), 0.1, Color.GRAY, daylight, func(way: Vector3) -> Vector3: return way)
+		var each := []
+		for material in view._drop_materials:
+			each.append(float(material.get_shader_parameter("day")))
+			each.append(float(material.get_shader_parameter("near_to")))
+		days.append(each)
+	var near := WeatherView.DROP_NEAR_TO
+	_check(view._drop_materials.size() == 2 and days[0] == [1.0, near, 1.0, near] and days[1] == [0.0, near, 0.0, near]
+			and is_equal_approx(days[2][0], 0.4), "rain's and drips' drops told the day's share each frame (%s)" % [days])
+	view.free()
+	var shader := Shader.new()
+	shader.code = code
+	var names := []
+	for uniform: Dictionary in shader.get_shader_uniform_list():
+		names.append(uniform["name"])
+	_check(names.has("day") and names.has("near_from") and names.has("colour") and names.has("night_glow"), "and the drop shader compiles (%s)" % [names])
 
 
 # 309 amended (3)'s seam guard: a drop ring drawn from the furthest-out centre
