@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
 	_test_tavern_keeper()  # 772 amended (2).
 	_test_taverner_end_to_end()  # 772 amended (2) with economy's 812.
+	_test_inn_night()  # 875: Umbrage at night.
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
@@ -1115,6 +1116,248 @@ func _test_taverner_end_to_end() -> void:
 		record["buildings"].erase("inn")
 	else:
 		record["buildings"]["inn"] = had_inn
+	_sync()
+
+
+## Umbrage at night (875, the coordinator's approval): a town whose inn is a shell sends its inn-goers
+## onto the floor, as many as the floor has "inn" and "talk" spots, decided from the schedule and that cap
+## alone, so the town's zone and the floor never both hold one at rest; one just gone in is let go at the
+## door and comes in at the floor's; one just out comes from the door; the rest keep to the lit fire or
+## stroll with short stands, never the same cell twice running.
+func _test_inn_night() -> void:
+	print("\n== Umbrage at night (875): a shell inn's goers inside, as many as its spots; the walk in and out; the overflow strolls ==")
+	# Eight of the town's folk about (the tests before sent most away), the rest away; put back at the end.
+	var away_before := {}
+	for who: String in World.towns.residents(STORE):
+		away_before[who] = bool(World.production.worker(who).get("away", false))
+		World.production.set_away(who, not who in ["rs-folk00", "rs-folk01", "rs-folk02", "rs-folk03", "rs-folk04", "rs-folk05", "rs-folk06", "rs-folk07"])
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
+	# A shell inn in the test town (15 x 10) whose front cell is open ground by the store: its door.
+	var by_store: Vector2i = _main._nearest_free(World.holdings.place(STORE).get("cell", Vector2i.ZERO) + Vector2i(3, 2))
+	var shell := {"slot": "building.shed", "rect": Rect2i(by_store - Vector2i(1, 3), Vector2i(3, 3)), "facing": Vector2i(0, 1),
+		"town": STORE.get_slice("/", 1), "use": "inn", "inside": "umbrage_tavern"}
+	buildings.append(shell)
+	var level: Dictionary = _main._zone_level("umbrage_tavern")
+	var spots_before: Variant = level.get("spots")
+	var key := STORE.get_slice("/", 1)
+	level["spots"] = []
+	var nobody := 0
+	var shut_out := 0
+	for q in 24:
+		DayNight.set_hour(float(q))
+		nobody += _main._inn_goers(STORE, DayNight.now()).size()
+		for entity: GridEntity in World.townsfolk():
+			var each := {"key": (entity as Resident).worker_id, "places": {}}
+			shut_out += 0 if _main._inn_town_side(each, STORE, [] as Array[String], [] as Array[String]) and not each["places"].has("short_stands") else 1
+	_check(_main._inn_spots(STORE).is_empty() and nobody == 0 and shut_out == 0,
+		"no spots laid on the floor: nobody goes in, at any hour, and nobody is shut out on short stands (%d)" % shut_out)
+	var laid: Array = [
+		{"use": "inn", "cell": Vector2i(1, 6), "face": Vector2i(0, 6), "pose": "sit", "town": key, "trade": "", "pair": ""},
+		{"use": "inn", "cell": Vector2i(8, 4), "face": Vector2i(8, 3), "pose": "stand", "town": key, "trade": "", "pair": ""},
+		{"use": "talk", "cell": Vector2i(7, 10), "face": Vector2i(8, 10), "pose": "sit", "town": key, "trade": "", "pair": "mug_east"},
+		{"use": "inn", "cell": Vector2i(2, 5), "face": Vector2i(1, 6), "pose": "sit", "town": "elsewhere", "trade": "", "pair": ""}]
+	level["spots"] = laid
+	_check(_main._inn_spots(STORE).size() == 3, "the floor's inn and talk spots of this town: 3 (another town's left out)")
+	var door: Vector2i = _main._shell_inn(STORE).get("door", Vector2i(-1, -1))
+	_check(door == Level.front_cell(shell["rect"], shell["facing"]) and door == by_store and World.is_walkable(door), "the shell's door: its front cell, open ground (%s)" % [door])
+	# The day's hours, a quarter at a time: who is inside, and an hour since.
+	var hour_steps := DayNight.day_steps / 24.0
+	var enter_at := -1.0
+	var inside_at := -1.0
+	var leave_at := -1.0
+	var over_cap := 0
+	var ever := {}
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		var now := DayNight.now()
+		var goers: Array[String] = _main._inn_goers(STORE, now)
+		var earlier: Array[String] = _main._inn_goers(STORE, now - hour_steps)
+		over_cap += 1 if goers.size() > 3 else 0
+		for who: String in goers:
+			ever[who] = true
+		# A goer just gone, one not a goer half an hour before either (its body in the town then), off midnight's turn
+		# (set_hour moves within the day: 23:30 is not the night before 00:00).
+		var half_before: Array[String] = _main._inn_goers(STORE, now - hour_steps / 2.0)
+		if enter_at < 0 and q >= 4 and goers.any(func(who: String) -> bool: return not who in earlier and not who in half_before):
+			enter_at = q / 4.0
+		if inside_at < 0 and goers.any(func(who: String) -> bool: return who in earlier):
+			inside_at = q / 4.0
+		if leave_at < 0 and earlier.any(func(who: String) -> bool: return not who in goers):
+			leave_at = q / 4.0
+	_check(over_cap == 0 and not ever.is_empty() and enter_at >= 0 and inside_at >= 0 and leave_at >= 0,
+		"through a day: never more inside than the floor's 3 spots; some go in (%.2f), stay (%.2f) and come out (%.2f); %d of the town in all" % [enter_at, inside_at, leave_at, ever.size()])
+	DayNight.set_hour(inside_at)
+	_check(_main._inn_goers(STORE, DayNight.now()) == _main._inn_goers(STORE, DayNight.now()), "from the schedule alone: the same goers asked twice")
+	# At rest inside: never a body in the town's zone too, and every one wanted on the floor.
+	_main._inn_walked_in.clear()
+	_sync()
+	var goers_now: Array[String] = _main._inn_goers(STORE, DayNight.now())
+	var settled: Array[String] = goers_now.filter(func(who: String) -> bool: return who in _main._inn_goers(STORE, DayNight.now() - hour_steps))
+	var tavern: Dictionary = Level.tavern_of(level).get("wilds/store", {})
+	var floor := {}
+	_main._inn_floor_side(floor, level, STORE, tavern)
+	_check(not settled.is_empty() and settled.all(func(who: String) -> bool: return _body(who) == null and floor.has(who) and not floor[who].has("enter_at")),
+		"inside a while: no body in the town, wanted on the floor at its spots, not entering (%s)" % [settled])
+	_check(goers_now.all(func(who: String) -> bool: return (floor.get(who, {}) as Dictionary).get("places", {}).get("spots", {}).get("inn", []).size() == 3),
+		"the floor's spots theirs, the talk pair's in the inn's hours")
+	# Following one in: a goer whose stint has just begun walks to the door, is let go there, and is the
+	# one coming in at the floor's door.
+	DayNight.set_hour(enter_at - 0.5)
+	_sync()
+	DayNight.set_hour(enter_at)
+	var fresh: Array[String] = _main._inn_goers(STORE, DayNight.now()).filter(func(who: String) -> bool:
+		return not who in _main._inn_goers(STORE, DayNight.now() - hour_steps) and not who in _main._inn_goers(STORE, DayNight.now() - hour_steps / 2.0))
+	_sync()
+	var walker: Resident = null
+	for who: String in fresh:
+		if _body(who) != null:
+			walker = _body(who)
+			break
+	_check(walker != null and walker.places.get("inn") == Rect2i(door, Vector2i.ONE), "just gone to the inn: its body walks to the door (%s)" % [walker.places.get("inn") if walker != null else fresh])
+	if walker != null:
+		var who_walked := walker.worker_id
+		var on_way := {}
+		_main._inn_floor_side(on_way, level, STORE, tavern)
+		_check(not on_way.has(who_walked), "walking to the door in the town: not yet wanted on the floor (one body, never two)")
+		World._relocate(walker, _main._nearest_free(door))
+		_sync()
+		var floor_in := {}
+		_main._inn_floor_side(floor_in, level, STORE, tavern)
+		var floor_door: Vector2i = _main._floor_door(level)
+		_check(_body(who_walked) == null and floor_in.has(who_walked) and floor_in[who_walked].get("enter_at") == floor_door and floor_door != Companion.NONE,
+			"at the door: let go in the town and coming in at the floor's door (%s), never missing, never two in one zone" % [floor_door])
+	# Coming out: one whose stint has just ended comes from the inn's door.
+	_main._inn_walked_in.clear()
+	DayNight.set_hour(leave_at)
+	var out_now: Array[String] = _main._inn_goers(STORE, DayNight.now() - hour_steps).filter(func(who: String) -> bool:
+		return not who in _main._inn_goers(STORE, DayNight.now()))
+	for who: String in out_now:
+		var gone := _body(who)
+		if gone != null:
+			World.despawn(gone)  # It was inside: no body here before it comes out.
+	_sync()
+	var came := _body(out_now[0]) if not out_now.is_empty() else null
+	_check(came != null and World.distance(came.tile, door) <= 2, "just out of the inn: from its door (%s)" % [came.tile if came != null else out_now])
+	# No room inside: the overflow strolls with short stands, never the cell it stands on or the one it left
+	# (853's moving on, as in the game; the tests before keep it off).
+	Resident.keep_moving = true
+	level["spots"] = [laid[0]]
+	var crowd: Resident = null
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		_sync()
+		for body: GridEntity in World.townsfolk():
+			if bool((body as Resident).places.get("short_stands", false)):
+				crowd = body
+				break
+		if crowd != null:
+			break
+	_check(crowd != null, "one inn spot and more going: the rest stroll outside (%s)" % [crowd.person if crowd != null else ""])
+	if crowd != null:
+		crowd.doing = Resident.Doing.INN  # Its doing at the hour it was found (the sim tick sets it on the hour).
+		var stands: Array = []
+		var repeats := 0
+		var seats := 0
+		for i in 10:
+			var was := crowd.tile
+			World.tick += 200
+			crowd._pick_goal()
+			if not crowd._spot.is_empty():
+				seats += 1  # A lit fire's seat: a seat, kept as one.
+			else:
+				stands.append(crowd._wander_at - World.tick)
+				repeats += 1 if crowd._goal == was else 0
+			World._relocate(crowd, crowd._goal)
+		_check(stands.size() >= 5 and stands.all(func(n: int) -> bool: return n >= Resident.SHORT_STAND_TICKS and n < Resident.SHORT_STAND_TICKS + Resident.SHORT_STAND_SPREAD)
+			and repeats == 0 and stands.duplicate().reduce(func(a: Array, n: int) -> Array: return a if n in a else a + [n], []).size() >= 3,
+			"its stands 2 to 5 game minutes, not all one length, never the same cell twice running (%s; %d seats)" % [stands, seats])
+	Resident.keep_moving = false
+	# Visitors who lodge at the inn go in as the town's own do, after them, by id (the coordinator's ruling); a pedlar keeps the
+	# store by day (Main.INN_TRADERS_DAY) and lodges at night.
+	level["spots"] = laid
+	var visitors_before: Array = (World.towns._towns[STORE].get("visitors", []) as Array).duplicate(true)
+	var stay := {"came": World.towns.now() - DayNight.day_steps, "leaves": World.towns.now() + DayNight.day_steps, "from": "Saltmarsh", "news": []}
+	World.towns._towns[STORE]["visitors"] = [stay.merged({"id": "rs_lodger", "kind": "traveller", "name": "Wyn"}),
+		stay.merged({"id": "rs_pedlar", "kind": "pedlar", "name": "Odo", "stock": {}})]
+	var lodger := Offers.VISITOR + "rs_lodger"
+	var pedlar_in := false
+	var order_ok := true
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		var with_folk: Array[String] = _main._inn_goers(STORE, DayNight.now())
+		var by_day: bool = q / 4.0 >= _main.INN_TRADERS_DAY.x and q / 4.0 < _main.INN_TRADERS_DAY.y
+		pedlar_in = pedlar_in or by_day and (Offers.VISITOR + "rs_pedlar") in with_folk
+		var visitor_seen := false
+		for who: String in with_folk:
+			visitor_seen = visitor_seen or who.begins_with(Offers.VISITOR)
+			order_ok = order_ok and (who.begins_with(Offers.VISITOR) or not visitor_seen)
+	for who: String in away_before:
+		World.production.set_away(who, true)  # The town's own away: the lodger's hours alone.
+	var lodged_at := -1.0
+	var pedlar_night := -1.0
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		var goers_v: Array[String] = _main._inn_goers(STORE, DayNight.now())
+		var by_day: bool = q / 4.0 >= _main.INN_TRADERS_DAY.x and q / 4.0 < _main.INN_TRADERS_DAY.y
+		pedlar_in = pedlar_in or by_day and (Offers.VISITOR + "rs_pedlar") in goers_v
+		if pedlar_night < 0 and not by_day and (Offers.VISITOR + "rs_pedlar") in goers_v:
+			pedlar_night = q / 4.0
+		if lodged_at < 0 and lodger in goers_v:
+			lodged_at = q / 4.0
+	_check(lodged_at >= 0 and not pedlar_in and pedlar_night >= 0 and order_ok,
+		"a lodger goes in when its day says (%.2f), after the town's own; a pedlar never by day, at night it lodges (%.2f)" % [lodged_at, pedlar_night])
+	# By day a trader keeps its stand: not one the inn has no room for, so no short stands (nwhy2: Rolf paced his stall at noon).
+	var pedlar_key := Offers.VISITOR + "rs_pedlar"
+	var day_short := false
+	var hour_was := DayNight.hour(DayNight.now())
+	for q in range(int(_main.INN_TRADERS_DAY.x * 4), int(_main.INN_TRADERS_DAY.y * 4)):
+		DayNight.set_hour(q / 4.0)
+		var each := {"key": pedlar_key, "places": {"square": Rect2i(door, Vector2i(3, 3))}}
+		_main._inn_town_side(each, STORE, _main._inn_goers(STORE, DayNight.now()), [] as Array[String])
+		day_short = day_short or bool(each["places"].get("short_stands", false))
+	DayNight.set_hour(hour_was)  # The hour as the day's loops above left it, for what follows.
+	_check(_main._inn_trader(STORE, pedlar_key) and _main._inn_trader(STORE, Offers.VENDOR + STORE) and not _main._inn_trader(STORE, lodger)
+		and not day_short, "a pedlar and the stall's keeper are traders, a lodger not; by day a trader has no short stands")
+	# At night (outside Main.INN_TRADERS_DAY) a lodger is in whenever it is up, whatever 772 picked: a visitor's every place
+	# is its own spot, so a square or temple pick stood it in the open (the coordinator's seed 1).
+	var up_out := 0
+	var up_in := 0
+	for q in 96:
+		var hour := q / 4.0
+		if hour >= _main.INN_TRADERS_DAY.x and hour < _main.INN_TRADERS_DAY.y:
+			continue
+		DayNight.set_hour(hour)
+		var now := DayNight.now()
+		var doing := Resident.doing_at("", hour, Season.name_at(int(now)), "", lodger, Townsfolk.day_of(now), Townsfolk.mood_of(World.production, lodger))
+		if doing == Resident.Doing.HOME:
+			continue
+		if lodger in _main._inn_goers(STORE, now):
+			up_in += 1
+		else:
+			up_out += 1
+	_check(up_in > 0 and up_out == 0, "a lodger up at night is in, whatever its pick (%d quarter-hours in, %d out)" % [up_in, up_out])
+	if lodged_at >= 0:
+		DayNight.set_hour(lodged_at)
+		var floor_v := {}
+		_main._inn_floor_side(floor_v, level, STORE, tavern)
+		_check(floor_v.has(lodger) and str(floor_v[lodger].get("name", "")) == "Wyn" and str(floor_v[lodger].get("trade", "x")) == "",
+			"on the floor: the lodger by its name, no trade (%s)" % [floor_v.get(lodger, {}).get("name", "")])
+	World.towns._towns[STORE]["visitors"] = visitors_before
+	# The town as it was.
+	if spots_before == null:
+		level.erase("spots")
+	else:
+		level["spots"] = spots_before
+	buildings.erase(shell)
+	_main._inn_walked_in.clear()
+	_main._inn_walked_out.clear()
+	for who: String in away_before:
+		World.production.set_away(who, bool(away_before[who]))
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
 	_sync()
 
 

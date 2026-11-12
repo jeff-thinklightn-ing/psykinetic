@@ -49869,3 +49869,76 @@ The coordinator approved the names mock (11-11, C:/dev/review/ui-design/names/),
 - SpeechBubbles keeps its room over the name (NAME_SIZE), as before.
 - On the screen's edge (the coordinator's note on animation's first Umbrage film, 11-11, C:/dev/review/realmap_film1/sheet.png: townsfolk between the lens and the player had names several times the player's, one clipped by the frame): a head off the screen, or nearer the camera than NEAR (1.5 m along its view, where its body fills that part of the view), has no plate. A plate whose head is on the screen is held whole inside it, EDGE (8 units) in. A plate that would step up past the top fades in place instead (as one that still meets after its step does). A name is never clipped and never grows.
 Tests: parts_test (_test_name_plates: the size at least 42 units, nearer placed first, the foot at the head less LIFT, a meeting plate steps up, two apart keep their place, a third that still meets is shaded, heads off the screen or at the lens get no plate, a plate on the edge held inside it, one that cannot step up past the top fades in place, names_on_hud's layers both ways). style_test PASS. New class_name UiNamePlates; client only, protocol unchanged. perf benches it with a town on screen (map_bench, Umbrage) before it lands.
+## 875. Umbrage at night: a shell inn's night-goers go inside, as many as its floor has spots
+
+npc's look at Umbrage (the coordinator's approval, 2026-11-11; package "Umbrage at night"). A
+headless day found five to eight residents standing in the plaza between midnight and six:
+772's night picks send a body whose stint is home to the inn six times in ten, and Umbrage's inn
+is a shell (811) whose floors are the Mughouse interior, so the "inn" place outdoors is the
+square about it. This amends 772 amended (2)'s option B, "nobody else crosses" (the
+coordinator's design ruling of 11-05, not Jeff's word, lifted for this): the taverner still works
+the counter inside, and now the town's inn-goers cross too.
+
+Who is inside is decided by Main._inn_goers(town, at) alone: the town's residents (not away,
+sick, companions or the taverner), then its visitors who lodge at the inn (711's, not a pilgrim,
+who keeps the temple, nor one going on: the coordinator's ruling, as a probe found two of them
+standing the night in the square, a shell inn's "inn" place for them being the square) and the
+stall's keeper (736's Rolf), each in id order; a pedlar and Rolf keep their stands by day
+(Main.INN_TRADERS_DAY, 6 to 18) and lodge only outside it; outside it a lodger is in whenever it
+is up, whatever 772 picked (a visitor's every place is its own spot and Rolf's his stall, so a
+square or temple pick stood them in the open on a seeded probe day),
+whose day (Resident.doing_at on their own clock, the evening's inn stint or 772's night pick; a
+visitor's the default day, as its body has) says the inn at that step, as many as the floor
+(the shell's "inside" level) has "inn" and "talk" spots of the town (a talk spot inside is taken
+in the inn's hours, not the square's). It never reads where a body is, so the town's zone and
+the floor's cannot disagree. With no spots laid nobody goes in and the night is as before: maps'
+ten spots (two counter stands, six seats about the hearth, the mug_east talk pair) are the
+switch, laid together once this is on main and art-gen's stool is in.
+
+The crossing is walked, never a vanishing: a goer whose stint began under INN_WALK_HOURS (1)
+ago and whose body stands in the town walks to the shell's door (Level.front_cell) and is let
+go there (Main._inn_walked_in, once within a cell of it); on the floor the same goer is wanted
+coming in at the floor's door (Main._floor_door, the floor cell beside its link to its own
+town's area), so a player who follows one in finds that one entering, never missing and never
+doubled; while a player in the other zone still sees its body walking to that side's door
+(Main._held_body), neither side takes it, so a body is in one zone only. One whose
+stint ended under an hour ago is made at the town's door, and on the floor one walks to its door
+and is let go (Main._inn_walked_out). A goer the floor has no room for keeps to the lit fire's
+seats, else strolls with short stands (places "short_stands": Resident.SHORT_STAND_TICKS 75
+plus up to SHORT_STAND_SPREAD 115, two to five game minutes; 853 amended (7)'s free cell is never
+the one it stands on or the one it left), never a vigil in the open; a trader keeping its stand by
+day (Main._inn_trader: the stall's keeper or a pedlar, inside INN_TRADERS_DAY) is not shut out and
+keeps its own stands (saturn's look at Umbrage: Rolf paced three cells by his stall at noon). With no
+inn or talk spots on the floor nothing of this runs (Main._inn_town_side): the town's evening is as
+before, until maps lays them (npc's look: unlaid, every inn-goer paced short stands all evening). Bodies on the floor are
+still made only while a player is there (_tavern_folk); nothing wakes the floor for residents
+alone. Level.spots_from's doc says the inn's spots. resident_test _test_inn_night: no spots,
+nobody in at any hour; through a day never more inside than the floor's three; a settled goer
+has no body in the town and is wanted on the floor with its spots; a goer just gone walks to
+the door, is not wanted on the floor while it walks, is let go there and is the one entering at
+the floor's door; one just out comes from
+the town's door; with one spot the rest stroll, their stands two to five minutes, never the same
+cell twice running; a lodger goes in when its day says, after the town's own, by its name and
+no trade on the floor, and a pedlar never. The temple's night bodies (a priest's or a temple
+pick's) sit at maps' four temple pews when they are laid (853's reader takes them as it is);
+a lodger's bedroll by the inn stays for now. tools/look_day --mug-spots and --temple-spots lay
+maps' ten and four in memory; it counts the temple's roof on its own line apart from the plaza,
+the open plaza's most standing at once each hour, and packed by kind, doing and hour; --seed=N
+steps N days first (the night picks and visitors are drawn by the day); after the day it reads
+the Mughouse floor from 20:00 to 03:00 (bodies, cells shared, beside another off a spot, on a
+spot).
+
+Two seeded probe days each way (the coordinator's runs on saturn; the night picks and visitors are
+drawn by the day) found the rest of the night's standing outside the inn's share: a pedlar with
+nowhere at night, Rolf at his stall till two, and 772's square picks with nothing to sit at in the
+square. So 772's default night weights go from 6 inn, 3 square, 1 temple to 8, 1, 1 in
+residents.json, holding while the square has nowhere to sit at night (Umbrage's inn a shell with
+room inside; fire seats and maps' stands to come, when the square takes more again, sitting). The
+weights are the default, not a shell inn's own: whereabouts has no town, and Umbrage is the only
+town whose folk have bodies at night. The bar (the coordinator's): on both seeds the open plaza at
+most two standing at once from 22 to 05, and packed no higher than before from 20 to 05; the day's
+packing is the dawn well's and the work patches' (_open_work's 3 x 3 with no work spot laid), which
+reshuffles by about 150 body-minutes a day at random until maps' work spots are laid, and the dawn
+well is a decision of its own. look_day prints the night's and the day's packed as two totals, and
+for a body asleep off its bed (Rolf stood asleep at (180, 207)) its goal, bed, route and the path it
+finds. Server only; protocol unchanged; no new class_name.

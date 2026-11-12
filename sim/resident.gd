@@ -41,6 +41,11 @@ const WANDER_TICKS := 80
 const STROLL_TICKS := 450
 const STROLL_SPREAD := 750
 const SEAT_TICKS := 1125
+## A night-goer the inn had no room for (875, "Umbrage at night"; Main's places "short_stands"): its stands
+## in the open last SHORT_STAND_TICKS plus up to SHORT_STAND_SPREAD (2 to 5 game minutes), a stroll and
+## not a vigil; never the cell it stands on or the one it left (_free_cell).
+const SHORT_STAND_TICKS := 75
+const SHORT_STAND_SPREAD := 115
 const SEAT_SPREAD := 1125
 ## The doings it strolls in while idle (no task, not abed): not hiding, sick, led, lost, visiting the sick.
 const STROLLS: Array[Doing] = [Doing.WORK, Doing.HOME, Doing.SQUARE, Doing.WELL, Doing.INN, Doing.TEMPLE, Doing.ROUNDS]
@@ -616,6 +621,8 @@ func _pick_goal() -> void:
 		return
 	# Staggered by body (the coordinator: thirteen at once must not look like a drill); a seat is kept twice as long.
 	_wander_at = World.tick + STROLL_TICKS + absi(hash([id, _picks])) % STROLL_SPREAD
+	if bool(places.get("short_stands", false)):
+		_wander_at = World.tick + SHORT_STAND_TICKS + absi(hash([id, _picks, "short"])) % SHORT_STAND_SPREAD  # 875.
 	_spot = {}
 	var spot := _free_spot(_spot_use())
 	if not spot.is_empty():

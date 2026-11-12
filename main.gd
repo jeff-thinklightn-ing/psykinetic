@@ -11891,11 +11891,15 @@ func _sync_residents() -> void:
 					"type": str(World.production.worker(who).get("type", ""))})
 			folk.append_array(_companions_resting(place_id))
 			var homes := _homes(area, place)
+			var inn_now := _inn_goers(place_id, DayNight.now())  # 875: who is in the shell inn now, and an hour since.
+			var inn_before := _inn_goers(place_id, DayNight.now() - _inn_walk_steps())
 			for i in folk.size():
 				if wanted.size() < RESIDENTS_MAX:
 					var each: Dictionary = folk[i]
 					each["town"] = place_id
 					each["places"] = _resident_places(area, place, each["trade"], homes, i)
+					if not str(each["key"]).begins_with("companion:") and not _inn_town_side(each, place_id, inn_now, inn_before):
+						continue  # In the Mughouse (875).
 					var settled := Townsfolk.settled()
 					if settled.has(each["key"]):
 						# A stall, not a house (decision 471): the 3x3 about the marked cell;
@@ -11919,6 +11923,9 @@ func _sync_residents() -> void:
 			# Strangers passing through (711, npc's side): at the inn, the store or the temple by kind.
 			for each: Dictionary in _visitors_wanted(area, place_id, place):
 				if wanted.size() < RESIDENTS_MAX:
+					if (str(each["key"]).begins_with(Offers.VISITOR) or str(each["key"]).begins_with(Offers.VENDOR)) \
+							and not _visitors_leaving.has(str(each["key"])) and not _inn_town_side(each, place_id, inn_now, inn_before):
+						continue  # Lodging in the Mughouse (875).
 					wanted[each["key"]] = each
 		# The healer's hut (decision 404): whoever economy seats there (the
 		# medicine man, a worker whose town is the hut's place id) has a body
@@ -14114,6 +14121,253 @@ func _tavern_folk(wanted: Dictionary, zone_name := "") -> void:
 			continue
 		wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": TAVERNER, "player": "", "town": town,
 			"type": str(worker.get("type", "")), "places": places.duplicate()}
+	_inn_floor_side(wanted, level, town, tavern)  # Its night-goers too (875).
+
+
+# --- Umbrage at night (875): a shell inn's goers inside, as many as its spots ----------------------
+
+## How long after an inn stint begins (or ends) a goer is still walking in (or out), in game hours: the
+## town's side walks them to the inn's door, the floor's side brings them in at its own (875).
+const INN_WALK_HOURS := 1.0
+## The hours a pedlar and the stall's keeper keep their stands (875): they lodge in the shell inn outside them.
+const INN_TRADERS_DAY := Vector2(6.0, 18.0)
+## Goers who reached the inn's door on the town's side this stint (875): no longer wanted there.
+var _inn_walked_in: Dictionary = {}
+## Goers who reached the floor's door on their way out this stint (875): no longer wanted on the floor.
+var _inn_walked_out: Dictionary = {}
+
+
+## [param place_id]'s inn when it is a shell whose floors are an interior (811), with its door on the
+## town's side: {building, inside (the floor's level), door (Level.front_cell)}; {} for none.
+func _shell_inn(place_id: String) -> Dictionary:
+	var place := World.holdings.place(place_id)
+	if place.is_empty() or _world_map == null:
+		return {}
+	var key := str(place.get("key", ""))
+	for building: Dictionary in _world_map.areas.get(str(place.get("area", "")), {}).get("buildings", []):
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == "inn" and _is_shell(building):
+			return {"building": building, "inside": str(building["inside"]),
+				"door": Level.front_cell(building.get("rect", Rect2i()), building.get("facing", Vector2i(0, 1)))}
+	return {}
+
+
+## The shell inn's floor spots for [param place_id]'s night-goers (875): its interior level's "inn" and
+## "talk" spots of the town (a talk spot inside is taken in the inn's hours, not the square's); [] for none.
+func _inn_spots(place_id: String) -> Array:
+	var shell := _shell_inn(place_id)
+	if shell.is_empty():
+		return []
+	var key := str(World.holdings.place(place_id).get("key", ""))
+	return (_zone_level(str(shell["inside"])).get("spots", []) as Array).filter(func(spot: Dictionary) -> bool:
+		return str(spot.get("use", "")) in ["inn", "talk"] and str(spot.get("town", "")) == key)
+
+
+## Who of [param place_id] is in its shell inn at world step [param at] (875, "Umbrage at night"): each
+## whose day says the inn then (Resident.doing_at on its own clock: the evening's stint, or 772's night
+## pick), the town's residents first (not away, sick or its taverner), then its visitors who lodge at the
+## inn (a pilgrim keeps the temple, one going on the road; a pedlar keeps the store by day and lodges at
+## night) and the stall's keeper (736), each in id order, as many as the floor has spots.
+## From the schedule and the cap alone, never from where a body is, so the town's zone and the floor's agree.
+func _inn_goers(place_id: String, at: float) -> Array[String]:
+	var out: Array[String] = []
+	var cap := _inn_spots(place_id).size()
+	if cap <= 0 or World.towns == null or World.production == null:
+		return out
+	var ids: Array[String] = []
+	for who: String in World.towns.residents(place_id):
+		var worker := World.production.worker(who)
+		if who.begins_with("companion:") or worker.is_empty() or bool(worker.get("away", false)) or TAVERNER in worker.get("trades", []) \
+				or Townsfolk.is_sick(World.production, who):
+			continue
+		ids.append(who)
+	ids.sort()
+	var lodgers: Array[String] = []
+	var traders := {}  # A pedlar and the stall's keeper keep their stands by day (INN_TRADERS_DAY): they lodge at night.
+	for entry: Dictionary in World.towns.visitors(place_id):
+		var key := Offers.VISITOR + str(entry.get("id", ""))
+		if str(entry.get("kind", "")) != "pilgrim" and not _visitors_leaving.has(key):
+			lodgers.append(key)
+			if str(entry.get("kind", "")) == "pedlar":
+				traders[key] = true
+	var vendor: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
+	if place_id in vendor.get("towns", []):
+		lodgers.append(Offers.VENDOR + place_id)  # Rolf: his night's inn hours in the Mughouse, not at his stall.
+		traders[Offers.VENDOR + place_id] = true
+	lodgers.sort()
+	ids.append_array(lodgers)
+	var hour := DayNight.hour(at)
+	for who: String in ids:
+		if out.size() >= cap:
+			break
+		if traders.has(who) and hour >= INN_TRADERS_DAY.x and hour < INN_TRADERS_DAY.y:
+			continue
+		var person := _inn_person(place_id, who)
+		var doing := Resident.doing_at(str(person["trade"]), DayNight.hour(at), Season.name_at(int(at)), str(person["type"]), who,
+			Townsfolk.day_of(at), Townsfolk.mood_of(World.production, who))
+		# A lodger's night (outside INN_TRADERS_DAY) is the inn whenever it is up: a visitor's every place is its own spot
+		# and Rolf's his stall, so 772's square or temple pick stood them in the open (the coordinator's seed 1).
+		var lodging_night := (who.begins_with(Offers.VISITOR) or who.begins_with(Offers.VENDOR)) 			and (hour < INN_TRADERS_DAY.x or hour >= INN_TRADERS_DAY.y) and doing != Resident.Doing.HOME
+		if doing == Resident.Doing.INN or lodging_night:
+			out.append(who)
+	return out
+
+
+## Whether [param who] keeps a stand at [param place_id] by day and lodges at night (875, INN_TRADERS_DAY):
+## the stall's keeper (Rolf) or a pedlar among its visitors.
+func _inn_trader(place_id: String, who: String) -> bool:
+	if who.begins_with(Offers.VENDOR):
+		return true
+	if not who.begins_with(Offers.VISITOR) or World.towns == null:
+		return false
+	for entry: Dictionary in World.towns.visitors(place_id):
+		if Offers.VISITOR + str(entry.get("id", "")) == who:
+			return str(entry.get("kind", "")) == "pedlar"
+	return false
+
+
+## {name, trade, type} of [param who], a resident of [param place_id] or one of its visitors (875): a
+## visitor has no trade or type, its body's day the default (as _visitors_wanted spawns it).
+func _inn_person(place_id: String, who: String) -> Dictionary:
+	if who.begins_with(Offers.VENDOR):
+		var vendor: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
+		return {"name": str(vendor.get("name", "Rolf")), "trade": "", "type": "", "look_trade": "smith"}  # His apron, as _visitors_wanted's.
+	if who.begins_with(Offers.VISITOR):
+		var id := who.trim_prefix(Offers.VISITOR)
+		for entry: Dictionary in World.towns.visitors(place_id):
+			if str(entry.get("id", "")) == id:
+				return {"name": str(entry.get("name", "")), "trade": "", "type": ""}
+		return {"name": "", "trade": "", "type": ""}
+	var worker := World.production.worker(who)
+	var trades: Array = worker.get("trades", [])
+	return {"name": str(worker.get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "", "type": str(worker.get("type", ""))}
+
+
+## [param who]'s body in zone [param zone_name] (875): the current zone's, else a held zone's; null for none.
+## A goer walking between the town and its inn's floor has a body in one zone only (never two): the other
+## side waits for it to reach its door.
+func _held_body(zone_name: String, who: String) -> Resident:
+	if World.zone != null and zone_name == World.zone.name:
+		return _resident_body(who)
+	var held: Zone = World.zones.get(zone_name)
+	if held == null:
+		return null
+	for entity: GridEntity in held.entities:
+		if entity is Resident and (entity as Resident).worker_id == who and entity.spawned:
+			return entity
+	return null
+
+
+## The world steps of INN_WALK_HOURS.
+func _inn_walk_steps() -> float:
+	return INN_WALK_HOURS * DayNight.day_steps / 24.0
+
+
+## The town's side of [param place_id]'s shell inn for [param each] (a _sync_residents entry, its places
+## made) (875): false when it is inside and not wanted here; a goer whose stint began within
+## INN_WALK_HOURS and whose body stands here walks to the inn's door and is let go there; one just out
+## comes from the door (enter_at); one the inn has no room for keeps to the lit fire's seats, else
+## strolls with short stands. [param goers] and [param earlier] are _inn_goers now and INN_WALK_HOURS ago.
+func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], earlier: Array[String]) -> bool:
+	var shell := _shell_inn(place_id)
+	if shell.is_empty() or _inn_spots(place_id).is_empty():
+		return true  # No inn here, or none open (no spots on its floor): the town's evening as before 875.
+	var who := str(each["key"])
+	var door: Vector2i = shell["door"]
+	if who in goers:
+		var body := _resident_body(who)
+		if who in earlier or body == null or _inn_walked_in.has(who):
+			return false  # Inside.
+		if World.distance(body.tile, door) <= 1:
+			_inn_walked_in[who] = true
+			return false  # Gone in at the door.
+		var going: Dictionary = each["places"]
+		for use: String in ["inn", "square", "temple", "well", "work"]:
+			going[use] = Rect2i(door, Vector2i.ONE)  # Whatever its doing (a lodger up at night in any), to the door.
+		going.erase("spots")
+		return true
+	_inn_walked_in.erase(who)
+	if who in earlier and not _inn_walked_out.has(who) and _held_body(str(shell["inside"]), who) != null:
+		return false  # Still walking out to the floor's door (a player in there): not here yet.
+	if who in earlier:
+		each["enter_at"] = door  # Out of the inn: from its door, where a body is made.
+	var hour := DayNight.hour(DayNight.now())
+	if hour >= INN_TRADERS_DAY.x and hour < INN_TRADERS_DAY.y and _inn_trader(place_id, who):
+		return true  # Keeping its stand by day, not shut out: its own stands (nwhy2: Rolf paced his stall at noon).
+	var person := _inn_person(place_id, who)
+	if Resident.doing_now(str(person["trade"]), str(person["type"]), who) == Resident.Doing.INN:
+		# No room inside: the lit fire's seats, else a stroll with short stands, never a vigil in the open.
+		var places: Dictionary = each["places"]
+		var spots: Dictionary = (places.get("spots", {}) as Dictionary).duplicate()
+		spots["inn"] = (spots.get("fire", []) as Array).filter(func(spot: Dictionary) -> bool: return World.is_fire(spot.get("face", Vector2i.ZERO)))
+		places["spots"] = spots
+		places["short_stands"] = true
+	return true
+
+
+## The floor's way out to its town's zone (875): the cell beside its link to the area of the floor's own
+## "town" (811: the Mughouse's "wilds/store", the wilds), inside the room (the northmost such floor cell
+## that is no link), read from [param level] alone (World may hold the town's zone); Companion.NONE for none.
+func _floor_door(level: Dictionary) -> Vector2i:
+	var town_area := str(level.get("town", "")).get_slice("/", 0)
+	var terrain: Dictionary = level.get("terrain", {})
+	var floor := {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+	var links: Array = terrain.get("links_at", [])
+	for link: Dictionary in level.get("links", []):
+		if str(link.get("to_map", "")) != town_area:
+			continue
+		var at: Vector2i = link["tile"]
+		var best := Companion.NONE
+		for way: Vector2i in World.DIRECTIONS:
+			var cell := at + way
+			if floor.has(cell) and not cell in links and (best == Companion.NONE or cell.y < best.y):
+				best = cell
+		return best if best != Companion.NONE else at
+	return Companion.NONE
+
+
+## The floor's side (875): [param town]'s goers on its shell inn's floor, at its "inn" and "talk" spots, the
+## common room their every place; one whose stint began within INN_WALK_HOURS comes in at the floor's door;
+## one whose stint ended within it, a body here, walks to that door and is let go there.
+func _inn_floor_side(wanted: Dictionary, level: Dictionary, town: String, tavern: Dictionary) -> void:
+	var now := DayNight.now()
+	var goers := _inn_goers(town, now)
+	var earlier := _inn_goers(town, now - _inn_walk_steps())
+	var spots := _inn_spots(town)
+	var common: Rect2i = tavern.get("rect", Rect2i())
+	var door := _floor_door(level)
+	var town_area := str(World.holdings.place(town).get("area", ""))
+	for who: String in goers:
+		_inn_walked_out.erase(who)
+		if wanted.size() >= RESIDENTS_MAX:
+			break
+		if not who in earlier and not _inn_walked_in.has(who) and _held_body(town_area, who) != null:
+			continue  # Still walking to the inn's door in the town (a player out there): not in yet.
+		wanted[who] = _inn_entry(who, town, {"inn": common, "square": common, "home": common, "work": common, "well": common,
+			"temple": common, "spots": {"inn": spots, "square": spots, "temple": spots, "well": spots}})  # A lodger up at night in any doing.
+		if not who in earlier and door != Companion.NONE:
+			wanted[who]["enter_at"] = door
+	for who: String in earlier:
+		if who in goers or wanted.size() >= RESIDENTS_MAX:
+			continue
+		var body := _resident_body(who)
+		if body == null or _inn_walked_out.has(who) or door == Companion.NONE:
+			continue
+		if World.distance(body.tile, door) <= 1:
+			_inn_walked_out[who] = true
+			continue
+		var out := Rect2i(door, Vector2i.ONE)
+		wanted[who] = _inn_entry(who, town, {"inn": out, "square": out, "home": out, "work": out, "well": out, "temple": out})
+
+
+## A _sync_residents entry for [param who] of [param town] with [param places] (875).
+func _inn_entry(who: String, town: String, places: Dictionary) -> Dictionary:
+	var person := _inn_person(town, who)
+	var entry := {"key": who, "name": person["name"], "trade": person["trade"], "player": "", "town": town, "type": person["type"], "places": places}
+	if person.has("look_trade"):
+		entry["look_trade"] = person["look_trade"]
+	return entry
 
 
 ## The taverner's places on a tavern floor [param level] ([param tavern],

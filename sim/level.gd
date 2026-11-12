@@ -1611,7 +1611,8 @@ static func furrows_from(config: Dictionary, warnings: Array[String]) -> Array[D
 ## The spots a level's people stand and sit at (the frozen-townsfolk mend, npc's, 2026-11-10;
 ## maps lays them, builder edits them): level.json's top-level "spots", an array of {"use", "cell",
 ## "face", "pose", "town", "trade", "pair"}. "use" is what the resident is doing when it takes one
-## (SPOT_USES: "work" needs a "trade"; "fire" and "talk" are taken from the square's hours);
+## (SPOT_USES: "work" needs a "trade"; "fire" and "talk" are taken from the square's hours, and a
+## shell inn's floor's "inn" and "talk" spots in the inn's, as many goers as it has: 875);
 ## "face" the cell it faces, one of the eight about "cell"; "pose" SPOT_POSES ("stand" when none);
 ## "town" the town's place key; "pair" a talk spot's partner's shared id. A spot that breaks a rule
 ## (its cell off [param floor] when given, another spot's cell, its face not beside it, a use or pose
