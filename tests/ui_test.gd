@@ -3795,12 +3795,21 @@ func _test_person_give() -> void:
 	_check(store_view.squares_shown("goods") == ["ware vendor:store|wares|knife 1"], "his wares as squares, the price on each (%s)" % [store_view.squares_shown("goods")])
 	_check(store_view.squares_shown("mine").slice(0, 3) == ["mine 0 -1", "mine 1 3", "mine 2 -1"],
 		"Rolf pays for a trophy: the pelt's square carries its price on the Store tab, the starter dagger (a gift) none (%s)" % [store_view.squares_shown("mine").slice(0, 3)])
+	# 852 amended (3): a click made to see whether a thing sells never gives it away; the gift says where it goes.
+	window._on_store_square("mine", 0)
+	_check(window.foot_shown() == "Rolf takes that back on the Donate tab." and store_view.foot_is_refused(),
+		"the starter dagger clicked on the Store tab: he takes it back on Donate, nothing handed over (%s)" % window.foot_shown())
 	window._on_store_tab("donate")
-	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and store_view.squares_shown("goods").is_empty(),
-		"the Donate tab: open, his goods away (%s)" % [store_view.tabs_shown()])
-	_check(store_view.squares_shown("mine").slice(0, 3) == ["mine 0 -1", "mine 1 3", "mine 2 -1"], "his takes lit on yours: a price only where he pays (%s)" % [store_view.squares_shown("mine").slice(0, 3)])
+	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and store_view.squares_shown("goods").is_empty()
+			and store_view.tab_words()[1] == "Donate", "the Donate tab: open, his goods away, always called Donate (%s)" % [store_view.tabs_shown()])
+	_check(store_view.squares_shown("mine").slice(0, 3) == ["mine 0 -1", "mine 1 -1", "mine 2 -1"], "on Donate no price anywhere: gold changes hands on Store (%s)" % [store_view.squares_shown("mine").slice(0, 3)])
+	var lit: Array = []
+	for each: Dictionary in window._store_state()["mine"]:
+		if bool(each.get("lit", false)):
+			lit.append(each["key"])
+	_check(lit == [0], "Donate lists only the gift: the dagger is lit, the paying pelt is not (%s)" % [lit])
 	window._on_store_hover("mine", 1, "Bear Pelt", Rect2(0, 0, 10, 10))
-	_check(store_view.lines_shown() == ["For tanning", "Pays 3 gold"], "the pointer on the pelt: what handing it over does (%s)" % [store_view.lines_shown()])
+	_check(store_view.lines_shown().is_empty(), "the pointer on the paying pelt on Donate: no hand-over lines (%s)" % [store_view.lines_shown()])
 	window._on_store_hover("mine", 1, "", Rect2())
 	var gave: Array = []
 	var catch_give := func(to: GridEntity, uids: Array) -> void: gave.append([to, uids])
@@ -3812,9 +3821,17 @@ func _test_person_give() -> void:
 	window.set_takes([takes_rows[1]])
 	_check(window.foot_shown() == "Handed back the dagger." and not store_view.foot_is_refused(), "the dagger gone from his takes: the foot line says it (%s)" % window.foot_shown())
 	window._on_store_square("mine", 1)
-	_check(gave.size() == 2 and gave[1][1] == [912], "one click on the pelt sells it (%s)" % [gave])
+	_check(gave.size() == 1 and window.foot_shown() == "Rolf buys that on the Store tab." and store_view.foot_is_refused(),
+		"the pelt clicked on Donate: not handed over, it sells on Store (%s | %s)" % [gave, window.foot_shown()])
+	window._on_store_tab("store")
+	window._on_store_square("mine", 1)
+	_check(gave.size() == 2 and gave[1][1] == [912], "one click on the pelt on the Store tab sells it (%s)" % [gave])
 	window._on_store_square("mine", 2)
 	_check(window.foot_shown() == "Rolf won't take that." and store_view.foot_is_refused(), "a thing he doesn't take: the line says so (%s)" % window.foot_shown())
+	window.set_takes([])
+	window._on_store_tab("donate")
+	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and window.foot_shown() == "Rolf takes back what he sold you; you carry none.",
+		"nothing he takes back in the pack: the Donate tab is still there and says what he takes (%s | %s)" % [store_view.tabs_shown(), window.foot_shown()])
 	window.give_asked.disconnect(catch_give)
 	window.give_asked.connect(_main._give_to_person)
 	var asked_locker: Array = []

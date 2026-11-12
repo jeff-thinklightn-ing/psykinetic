@@ -125,6 +125,12 @@ const SOLD_LINE := "Sold %s for %d gold."
 const SOLD_MANY_LINE := "Sold %d %s for %d gold."
 const HANDED_BACK_LINE := "Handed back %s."
 const LEFT_LINE := "Left %s on the shelves for the town."
+## The store's two hand-over roads (852 amended (3)): gold changes hands on the Store tab and nowhere else; Donate is for
+## what is given for nothing. A gift row clicked on Store says where it goes; a paying row clicked on Donate likewise;
+## Donate opened with nothing to give says what he takes back (voice's words, %s the keeper).
+const GIFT_ON_DONATE_LINE := "%s takes that back on the Donate tab."
+const PAYS_ON_STORE_LINE := "%s buys that on the Store tab."
+const DONATE_NOTHING_LINE := "%s takes back what he sold you; you carry none."
 const WONT_TAKE_LINE := "%s won't take that."
 const ENOUGH_LINE := "The town has enough of that."
 const ASLEEP_LINE := "%s is asleep. Come back by day."
@@ -807,13 +813,26 @@ func _open_on_give() -> void:
 
 
 ## 802 Give: the window gives ([param on]) or trades; the picks either way dropped.
+## Whether the store window has its Donate tab (852 amended (3)): a keeper with a stall always has it, so the tab row
+## is the same every visit; any other keeper when he takes a gift from what you carry.
+func has_donate_tab() -> bool:
+	if _locker_button != null and _locker_button.visible:
+		return true
+	for row: Dictionary in takes:
+		if int(row.get("gold", 0)) <= 0:
+			return true
+	return false
+
+
 func set_giving(on: bool) -> void:
-	on = on and not takes.is_empty()
+	on = on and (has_donate_tab() if _layout_store() else not takes.is_empty())
 	if on == giving:
 		_rebuild()
 		return
 	_clear_picks()
 	giving = on
+	_foot_text = ""  # The other tab starts with an empty foot: the last click's line was about the first.
+	_foot_refused = false
 	_total.visible = false
 	_rebuild()
 
@@ -1910,8 +1929,8 @@ static func thing_words(id: String, definite: bool) -> String:
 func _store_state() -> Dictionary:
 	var player: GridEntity = pack.player if pack != null else null
 	var tabs: Array = [{"id": "store", "text": STORE_TAB, "open": not giving}]
-	if not takes.is_empty():
-		tabs.append({"id": "donate", "text": DONATE_WORDS, "open": giving})
+	if has_donate_tab():
+		tabs.append({"id": "donate", "text": DONATE_WORDS, "open": giving})  # Always Donate here: gold changes hands on Store.
 	if _locker_button != null and _locker_button.visible:
 		tabs.append({"id": "locker", "text": LOCKER_TAB, "open": false})
 	var goods: Array = []
@@ -1927,6 +1946,7 @@ func _store_state() -> Dictionary:
 			goods.append({"kind": "ware", "key": str(each.get("id", "")), "item": item, "words": Items.name_of(item),
 				"price": cost, "short": cost > purse})
 	var mine: Array = []
+	var gifts_carried := false
 	if is_instance_valid(player):
 		for slot: int in World.pack_slots(player):
 			if slot >= player.slots.size():
@@ -1937,9 +1957,8 @@ func _store_state() -> Dictionary:
 			if not item.is_empty():
 				if giving:
 					var row := takes_at(slot)
-					spec["lit"] = not row.is_empty()
-					if not row.is_empty() and int(row.get("gold", 0)) > 0:
-						spec["price"] = int(row["gold"])
+					spec["lit"] = not row.is_empty() and int(row.get("gold", 0)) <= 0  # Donate lists only what is given for nothing.
+					gifts_carried = gifts_carried or bool(spec["lit"])
 				else:
 					var entry := pack_entry_at(slot)
 					var row := takes_at(slot)
@@ -1950,6 +1969,8 @@ func _store_state() -> Dictionary:
 			mine.append(spec)
 	var foot := _foot_text
 	var refused := _foot_refused
+	if giving and not gifts_carried and foot.is_empty() and not wares.is_empty():
+		foot = DONATE_NOTHING_LINE % _keeper_name()  # He says what he takes back (voice).
 	if asleep and person != null:
 		foot = ASLEEP_LINE % merchant
 		refused = true
@@ -1970,6 +1991,8 @@ func _donate_lines() -> Array:
 	if not giving or not _store_over.begins_with("mine:"):
 		return []
 	var row := takes_at(int(_store_over.get_slice(":", 1)))
+	if not row.is_empty() and int(row.get("gold", 0)) > 0 and _layout_store():
+		return []  # What pays is sold on Store, not here (852 amended (3)).
 	return give_lines([row]) if not row.is_empty() else []
 
 
@@ -2182,6 +2205,9 @@ func _sell(slot: int) -> void:
 		return
 	if entry.is_empty():
 		var paid := takes_at(slot)  # A keeper with no stock of his own who pays for a trophy (Rolf): a sale, by his takes row.
+		if not paid.is_empty() and int(paid.get("gold", 0)) <= 0:
+			_refuse("mine", slot, GIFT_ON_DONATE_LINE % _keeper_name())  # A gift: never handed over by a click that was made to see if it sells.
+			return
 		if not paid.is_empty() and int(paid.get("gold", 0)) > 0:
 			var paid_id := str(paid.get("what", ""))
 			_expect({"kind": "mine", "key": slot, "uid": int(paid.get("uid", 0)), "cue": "sold", "text": SOLD_LINE % [thing_words(paid_id, false), int(paid["gold"])]})
@@ -2210,6 +2236,9 @@ func _donate(slot: int) -> void:
 		return
 	if row.is_empty():
 		_refuse("mine", slot, _wont_take_words(str(pack.player.slots[slot]) if pack != null and is_instance_valid(pack.player) and slot < pack.player.slots.size() else ""))
+		return
+	if int(row.get("gold", 0)) > 0 and _layout_store():
+		_refuse("mine", slot, PAYS_ON_STORE_LINE % _keeper_name())
 		return
 	var uid := int(row.get("uid", 0))
 	var id := str(row.get("what", ""))

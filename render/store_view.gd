@@ -47,6 +47,7 @@ var _trusted: Label
 var _close: UiClose
 var _tabs: UiTabs
 var _tab_ids: Array[String] = []
+var _tab_names: Array[String] = []
 var _asleep: UiLine
 var _goods_head: Label
 var _goods_scroll: ScrollContainer
@@ -248,6 +249,7 @@ func _set_tabs(tabs: Array) -> void:
 			open = names.size()
 		_tab_ids.append(str(each.get("id", "")))
 		names.append(str(each.get("text", "")))
+	_tab_names = names
 	_tabs.set_tabs(names, open)
 
 
@@ -351,6 +353,11 @@ func squares_shown(side: String) -> Array[String]:
 
 
 ## The tabs shown, as "id" or "id*" for the open one (tests).
+## The tabs' words, in order.
+func tab_words() -> Array[String]:
+	return _tab_names.duplicate()
+
+
 func tabs_shown() -> Array[String]:
 	var out: Array[String] = []
 	for i in _tab_ids.size():
