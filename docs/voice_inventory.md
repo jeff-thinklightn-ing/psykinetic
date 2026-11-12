@@ -55,7 +55,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2847)
+## Lines in the code (2857)
 
 ### companions (Pip, Wren, Nix) (656)
 
@@ -1923,7 +1923,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: no floor to %s by it | `sim/world_routes.gd` _add_way() |
 |  | %s %d %d | `sim/world_routes.gd` _portal() |
 
-### residents (108)
+### residents (109)
 
 | | Line | Where |
 |---|---|---|
@@ -2000,6 +2000,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You stand at %s's door. | `sim/resident.gd` facts_now() |
 |  | A dispute is before you: %s, says %s.%s | `sim/resident.gd` facts_now() |
 |  | %s laid it before you. | `sim/resident.gd` facts_now() |
+|  | What was just asked, and what is true of it now: %s | `sim/resident.gd` facts_now() |
 |  | What you know of the world: %s | `sim/resident.gd` facts_now() |
 |  | This is the first time %s has spoken to you. | `sim/resident.gd` facts_now() |
 |  | You have been carried off by raiders %s, and brought home. | `sim/resident.gd` facts_now() |
@@ -2066,7 +2067,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (729)
+### server and windows (738)
 
 | | Line | Where |
 |---|---|---|
@@ -2319,6 +2320,15 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s the %s is found %s and is being led here. | `main.gd` _sought_words() |
 |  | Away %s. Back when I can. | `main.gd` _sought_notes() |
 |  | %s the %s has gone off, %s they say. | `main.gd` _rumour_for() |
+|  | Nobody here sells %s now. | `main.gd` _asked_facts() |
+|  | %s sells %s, at %s. | `main.gd` _asked_facts() |
+|  | Nobody here has asked for help today. | `main.gd` _asked_facts() |
+|  | %s, at %s, is asking for help. | `main.gd` _asked_facts() |
+|  | You are %s, %s. | `main.gd` _asked_facts() |
+|  | of the town | `main.gd` _asked_facts() |
+|  | %s lies %s of the town, %s. | `main.gd` _asked_facts() |
+|  | the stall by %s | `main.gd` _asked_sellers() |
+|  | the square by | `main.gd` _keeps_shop() |
 | U | %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
 |  | [reads the chronicle: %d lines] | `main.gd` _read_page() |
 | U | In %s, %s. | `main.gd` _offers_context() |
@@ -2994,7 +3004,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (893)
+## Lines in the data (902)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3327,7 +3337,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (125)
+### levels/residents.json (134)
 
 | | Line | Key |
 |---|---|---|
@@ -3422,6 +3432,15 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Thanks. Back to it. | `guard_fight.raised[1]` |
 |  | I'll not forget that. | `guard_fight.raised[2]` |
 |  | You were carried to the temple hurt in last night's fighting, and are off duty until tomorrow. | `guard_fight.laid_up` |
+|  | anything i can do | `asked.kinds.work[7]` |
+|  | what do you do | `asked.kinds.self[4]` |
+|  | who might you be | `asked.kinds.self[5]` |
+|  | %s sells %s, at %s. | `asked.frames.seller` |
+|  | Nobody here sells %s now. | `asked.frames.none` |
+|  | %s, at %s, is asking for help. | `asked.frames.work` |
+|  | Nobody here has asked for help today. | `asked.frames.no_work` |
+|  | You are %s, %s. | `asked.frames.self` |
+|  | %s lies %s of the town, %s. | `asked.frames.place` |
 |  | tells the tale of how | `bard.kinds[1]` |
 |  | has a song of how | `bard.kinds[2]` |
 |  | came to the town from the goblins and stays, somewhat outcast but tolerated | `settled.snagfin.came` |
