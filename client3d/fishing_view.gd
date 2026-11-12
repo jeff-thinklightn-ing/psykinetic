@@ -32,7 +32,7 @@ const RING_SECONDS := 0.7
 ## upper half a red cap. At the bite it is tugged right under twice, at
 ## BITE_TUGS seconds (the splashes), TUG_DOWN seconds down and TUG_BACK back,
 ## UNDER metres deep; between, it rides DIP low. Its ring spreads to
-## BITE_RING_WIDEST. The line hangs slack while it waits, sagging SAG of its
+## BITE_RING_WIDEST (2 m across). The line hangs slack while it waits, sagging SAG of its
 ## length at the middle (SAG_LEAST to SAG_MOST metres), and is drawn straight
 ## and taut through the bite: the change that reads at any zoom.
 const FLOAT_RADIUS := 0.12
@@ -42,7 +42,12 @@ const BITE_TUGS: Array[float] = [0.0, 1.2]
 const TUG_DOWN := 0.25
 const TUG_BACK := 0.35
 const UNDER := 0.35
-const BITE_RING_WIDEST := 1.1
+const BITE_RING_WIDEST := 1.0
+## The bite's ring at its start, as opaque as this, fading as it spreads; a
+## band BITE_RING_BAND of its radius wide (take 3: the thin pale ring didn't
+## show at the usual zoom).
+const BITE_RING_ALPHA := 0.95
+const BITE_RING_BAND := 0.22
 const SAG := 0.3
 const SAG_LEAST := 0.35
 const SAG_MOST := 1.4
@@ -287,7 +292,7 @@ func show_cast(key: String, entity: GridEntity) -> void:
 		var grown := ring_since / RING_SECONDS
 		ring.position = water + Vector3(0, 0.01, 0)
 		ring.scale = Vector3.ONE * lerpf(0.1, BITE_RING_WIDEST, grown)
-		(ring.material_override as StandardMaterial3D).albedo_color.a = 0.6 * (1.0 - grown)
+		(ring.material_override as StandardMaterial3D).albedo_color.a = BITE_RING_ALPHA * (1.0 - grown)
 
 
 ## A state begun: its sound, and noted.
@@ -338,7 +343,7 @@ func _make() -> Dictionary:
 	view.add_child(line)
 	var ring := MeshInstance3D.new()
 	var disc := TorusMesh.new()
-	disc.inner_radius = 0.9
+	disc.inner_radius = 1.0 - BITE_RING_BAND
 	disc.outer_radius = 1.0
 	ring.mesh = disc
 	var foam := StandardMaterial3D.new()
