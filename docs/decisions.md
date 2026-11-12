@@ -49976,7 +49976,7 @@ face_y, pose, use, state]...], state "new" (none on its cell in the level), "cha
 level as it is, sent so the whole place shows while spots are laid) or "gone" (taken away); none
 outside the area. Client3D.show_builder draws a flat mark a spot among builder mode's marks (cleared
 with them): its use group's colour (BUILDER_SPOT_USES beside the other BUILDER_ colours: work, the
-square's (square, fire, talk), well, inn, temple), a wedge toward its face cell, its shape its pose (a
+square's (square, fire, talk), well, inn, temple), an arrow a cell long to its face cell (SPOT_TIP: the first still showed a wedge inside the cell could not be made out at the builder's height, the coordinator), its shape its pose (a
 disc in a ring standing, a disc in a half-ring open to the face leaning, a square sitting); new and
 changed at BUILDER_SPOT_ALPHA, kept and gone at BUILDER_SPOT_KEPT_ALPHA, a gone one crossed out in
 BUILDER_SPOT_GONE. No words, so nothing for voice; a world mark like the roof outlines, so no

@@ -7345,6 +7345,10 @@ func _test_heights() -> void:
 		and absf((went.material_override as StandardMaterial3D).albedo_color.a - Client3D.BUILDER_SPOT_KEPT_ALPHA) < 0.01
 		and sat.basis.x.dot(Vector3(0.0, 0.0, 1.0)) > 0.99 and went.basis.x.dot(Vector3(0.0, 0.0, -1.0)) > 0.99,
 		"spots in the ghost: a mark each turned to its face, the gone one fainter with its cross (%d marks)" % _rig._builder_marks.get_child_count())
+	# The facing plain: the arrow reaches the face cell's middle, a cell out.
+	var reach := sat.mesh.get_aabb() if sat != null else AABB()
+	_check(reach.end.x >= Client3D.SPOT_TIP - 0.01 and reach.end.x - reach.position.x >= 1.25,
+		"a spot's arrow reaches its face cell, a cell out (the mark %.2f to %.2f along its facing)" % [reach.position.x, reach.end.x])
 	_rig.clear_builder()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 

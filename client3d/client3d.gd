@@ -5590,8 +5590,8 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 
 
 ## One townsfolk spot's mark (859 amended (2)), [x, y, face_x, face_y,
-## pose, use, state]: in its use's colour (BUILDER_SPOT_USES), a wedge toward
-## its face cell, its shape its pose (a disc in a ring standing, a disc in a
+## pose, use, state]: in its use's colour (BUILDER_SPOT_USES), an arrow a
+## cell long to its face cell, its shape its pose (a disc in a ring standing, a disc in a
 ## half-ring open to the face leaning, a square sitting); a kept or gone one
 ## fainter, a gone one crossed out. No words.
 func _add_spot_mark(spot: Array) -> void:
@@ -5611,8 +5611,16 @@ func _add_spot_mark(spot: Array) -> void:
 		_builder_marks.add_child(cross)
 
 
+## A spot mark's arrow to its face: its shaft's half-width, where the head
+## starts, its tip (a cell out, on the face cell's middle) and the head's half-width.
+const SPOT_SHAFT := 0.08
+const SPOT_NECK := 0.7
+const SPOT_TIP := 1.0
+const SPOT_HEAD := 0.26
+
+
 ## A spot mark's shape facing +x, flat quads round the cell's middle: the
-## pose's shape and a wedge toward the face.
+## pose's shape and an arrow a cell long toward the face.
 static func spot_mark_quads(pose: String) -> Array[PackedVector2Array]:
 	var quads: Array[PackedVector2Array] = []
 	var segments := 16
@@ -5633,7 +5641,11 @@ static func spot_mark_quads(pose: String) -> Array[PackedVector2Array]:
 			var outer := 0.38
 			quads.append(PackedVector2Array([Vector2(cos(a0), sin(a0)) * inner, Vector2(cos(a0), sin(a0)) * outer,
 				Vector2(cos(a1), sin(a1)) * outer, Vector2(cos(a1), sin(a1)) * inner]))
-	quads.append(PackedVector2Array([Vector2(0.32, -0.12), Vector2(0.5, 0.0), Vector2(0.5, 0.0), Vector2(0.32, 0.12)]))
+	# The facing: an arrow a cell long out of the mark to its face cell, plain
+	# at the builder's own height (the coordinator, on the first still: a wedge
+	# inside the cell could not be made out).
+	quads.append(PackedVector2Array([Vector2(0.3, -SPOT_SHAFT), Vector2(SPOT_NECK, -SPOT_SHAFT), Vector2(SPOT_NECK, SPOT_SHAFT), Vector2(0.3, SPOT_SHAFT)]))
+	quads.append(PackedVector2Array([Vector2(SPOT_NECK, -SPOT_HEAD), Vector2(SPOT_TIP, 0.0), Vector2(SPOT_TIP, 0.0), Vector2(SPOT_NECK, SPOT_HEAD)]))
 	return quads
 
 
