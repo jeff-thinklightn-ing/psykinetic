@@ -51452,6 +51452,20 @@ boards on a backing with ledges and straps, hinged where they were. Other sets' 
 palette walls until each is rebuilt the same way. view_test _test_window_wall_faces (the faces'
 material, place, turn and stretch, the other surfaces untouched, and every drawn one so). Client
 only; protocol unchanged; no new class_name.
+
+881 amended (2) (the script's label; split out of 881 amended (1), whose wood doors land later): the
+Mughouse's windows. Its walls are two storeys, so window_slot gives them wall.wood.window_tall, and
+881 left that slot as it was: its glb had no "wall_set" material, so Client3D._wall_faces found
+nothing to lay the wall's boards on and its wall faces drew in the palette's flat colour, a smooth
+brown band the wall's full height with an opening in it (buildings' first stills of 881 on main,
+C:/dev/review/win_inside/crop_out.png and C:/dev/review/win_inn/crop_in.png). wall.wood.window_tall
+(C:/dev/review/window_tall/make_window_tall.py on 881's wall.wood.window.blend): the wood window
+stacked two storeys as before, the ground storey's shutters the parts and the pane "glow", the upper's
+shutters closed in the body; 624 tris (was 1052), materials 4; its wall faces in "wall_set" with UVs
+in metres where they stand, so both storeys draw in the set's own boards, the upper going on from the
+lower. The same slot, size, origin and parts. Lands on: it makes 881's bullet ("wooden houses, the
+Mughouse among them") true, so it carries no bullet of its own. Watched: CPU sheets only, not yet in
+game. Client only (art); no new class_name.
 ## 877. The people's stance: feet under the hips
 
 (decision_number.sh's 877; Jeff, 2026-11-11, the people look like "bad claymation place holders";
