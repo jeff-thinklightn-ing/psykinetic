@@ -112,7 +112,7 @@
 		"drops": [{"item": "grey_pelt", "count": [1, 1]}, {"item": "grey_fang", "count": [1, 1]}],
 		"moves": {
 			"howl": {"windup": 12, "every": 120, "rush_tiles": 6},
-			"spring": {"windup": 8, "cells": 3, "damage": 4, "drag": 60.0, "every": 50},
+			"spring": {"windup": 8, "cells": 3, "damage": 8, "drag": 60.0, "every": 50},
 			"pant": {"ticks": 20}
 		}
 	},

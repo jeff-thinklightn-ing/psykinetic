@@ -9164,7 +9164,9 @@ func _tend_wind_ups() -> void:
 			continue
 		if entity.zone != zone.name:
 			continue  # Another zone's: its own step tends it, on its own tick.
-		if entity.tile != entity.wind_up["from"] or is_stunned(entity) or is_down(entity):
+		# 887: a lead walked off its way (_free_give_up_wind_up) goes with its walker off its cell.
+		var walked: bool = entity.wind_up.get("walked", false)
+		if (entity.tile != entity.wind_up["from"] and not walked) or is_stunned(entity) or is_down(entity):
 			cancel_wind_up(entity)
 			continue
 		if tick < int(entity.wind_up["lands"]):
@@ -9176,11 +9178,17 @@ func _tend_wind_ups() -> void:
 		var began: int = entity.wind_up.get("began", tick)
 		var bonus: int = entity.wind_up.get("bonus", 0)  # A told backstab's harm on top (a FLANK monster's, from behind).
 		var logs := _logs_wind_up(entity, entity.wind_up)
+		var reaches := is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead)
+		if walked and not reaches:
+			# 887: her step took her out of reach: given up, not swung at the air, its stamina back.
+			cancel_wind_up(entity)
+			if entity.max_stamina > 0 and entity.pays_swings:
+				entity.stamina = mini(entity.max_stamina, entity.stamina + swing_cost(entity))
+			continue
 		entity.wind_up = {}
 		_winders.erase(entity)
 		var first := _hits.size()
-		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead) \
-				and _try_hit(entity, aimed as GridEntity, entity.attack_damage + bonus, false, Vector2i.ZERO, true, lead):
+		if reaches and _try_hit(entity, aimed as GridEntity, entity.attack_damage + bonus, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
 				_hits[i].told = strikes_told(entity) and (not lead or tick - began >= TOLD_LEAD_TICKS)  # 340 amended (4).
@@ -9198,7 +9206,9 @@ func _tend_wind_ups() -> void:
 		if lead:
 			# Its next blow attack_ticks_of after this one began, not after it landed.
 			entity.next_attack_tick = mini(entity.next_attack_tick, began + attack_ticks_of(entity))
-			entity.free_halt_until = mini(entity.free_halt_until, entity.next_attack_tick)
+			# 887: the lead was its stand: once it lands it stands no longer than its plant through
+			# the landing tick (none, walked), so a reader steps out of the next red at once.
+			entity.free_halt_until = mini(entity.free_halt_until, mini(entity.next_attack_tick, tick + (0 if walked else 1)))
 
 
 ## Whether a wound-up blow by [param entity] reaches [param aimed] as it
@@ -11365,8 +11375,9 @@ func blow_of(entity: GridEntity, order: GridEntity.Order, target: GridEntity, di
 
 ## The whole stand of a blow of kind [param kind] fired now (688 amended (13)), its parts as
 ## the server halts them: {"ticks": from the fire to its end, "lands": ticks to a wind-up's
-## landing (0 none), "walked_off": whether a walk off its way gives it up before it lands (a
-## heavy's, _free_give_up_wind_up; a lead never is)}.
+## landing (0 none), "walked_off": whether a walk off its way ends the stand at once (a
+## heavy's given up, _free_give_up_wind_up; since 887 a lead's halt lifted, its blow judged by
+## reach as it lands)}.
 func blow_stand(entity: GridEntity, kind: StringName) -> Dictionary:
 	match kind:
 		&"blow", &"swing":
@@ -11381,8 +11392,8 @@ func blow_stand(entity: GridEntity, kind: StringName) -> Dictionary:
 			if heavy:
 				# Landed through _try_hit (its moment), then planted recover ticks (750).
 				return {"ticks": w + maxi(blow_stand_ticks(entity, &"blow"), blow_stand_ticks(entity, &"recover")), "lands": w, "walked_off": true}
-			# A lead: its strike's moment, cut to its next blow's start (attack_ticks_of after it began).
-			return {"ticks": mini(w + blow_stand_ticks(entity, &"blow"), attack_ticks_of(entity)), "lands": w, "walked_off": false}
+			# A lead (887): planted through its landing tick and no longer, cut to its next blow's start.
+			return {"ticks": mini(w + 1, attack_ticks_of(entity)), "lands": w, "walked_off": true}
 	return {"ticks": 0, "lands": 0, "walked_off": false}
 
 
@@ -11437,18 +11448,27 @@ func free_input(entity: GridEntity, intent: Vector2, seconds: float, seq := -1) 
 ## it (cancel_wind_up, paid and not refunded as ever) and lifts its halt, so
 ## the command walks. Pressing on at the foe, as a chase's late commands
 ## do, keeps it.
+##
+## 887: a lead (338 amended, the sword's 2 ticks) walked off its way is not given up here: it
+## is marked "walked" and its halt lifted, so the body steps at once (a reader steps out of a
+## robber's red); it lands as it falls due if the target is still in reach then (lead_slack
+## past it), so a click made walking still lands (392 amended (6)), and only a step that took
+## her out of reach gives it up, its stamina given back (_tend_wind_ups).
 func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
 	_free_drop_order(player, intent)
-	if player.wind_up.is_empty() or player.wind_up.get("lead", false) or intent.length() < WIND_UP_LEAVE_INTENT:
-		return  # A lead is the swing itself, never walked off (338 amended): 2 ticks at most.
+	if player.wind_up.is_empty() or intent.length() < WIND_UP_LEAVE_INTENT:
+		return
 	var target: Variant = player.wind_up.get("target")
 	var way := Vector2(player.wind_up["direction"])
 	if is_instance_valid(target):
 		way = body_centre(target) - body_centre(player)
 	if way.length() > 0.001 and intent.normalized().dot(way.normalized()) > cos(deg_to_rad(WIND_UP_KEEP_ANGLE)):
 		return
-	cancel_wind_up(player)
 	player.free_halt_until = tick
+	if player.wind_up.get("lead", false):
+		player.wind_up["walked"] = true
+		return
+	cancel_wind_up(player)
 
 
 ## Jeff's lost clicks: a move away from [param player]'s ordered target (an

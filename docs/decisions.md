@@ -44129,6 +44129,20 @@ Combat's, recorded for later (the coordinator: not now, both trees on Umbrage): 
 row, main included (weapon pace), and the giant axe holds him in his pant (never touched, he dead in 11.7 s at half
 a lunge a minute), a lock for 843's follow-up.
 780 amended (32): left to a losing fight, she breaks off and goes to him (the script's label; the coordinator's ruling on enemy-ai's pond runs: a new player and Isolde, bare with rods; he walked off at first sight and she fought on alone in GUARD beside a boar or two wolves until the scripted PULL_BACK, ending at 5, 4 and 2 of 20; her RETREAT looks for a cell no hostile is next to within RETREAT_REACH, and one as fast as she is stays next to her, so it fell back to fighting it). One break-off, two triggers. (a) 780 amended (21)'s, unchanged: fighting an apex with her under retreat_below or him under REFLEX_BELOW. (b) Left to it (Companion._left_to_it): something going for her (_going_for_her: next to her, or a monster in sight set on her), her under LEFT_BELOW 0.5, her player more than LEFT_REACH 6 (COMBAT_RANGE + 2) from each of them, none going for him, none of it his from range (a blow of his on a monster, World.entity_damaged; a shot, World.loosed; his bow drawn, or his attack set on a hostile, within LEFT_FOUGHT_TICKS 50: the coordinator's added condition, so she never walks a beast onto a player shooting it), and no word of his to wait or hold (HOLD, any order), no walk she leads, he up. From an apex the break is (21)'s berth (_apex_broke); from anything else (_left_broke) she goes to him at heel (Intent.FOLLOW) and strikes no blow on the way; cornered LEFT_STUCK_TICKS 10 with one next to her, she fights it. She stays broken off till within LEFT_DONE 3 of him, he is down or gone, or no hostile is in her sight: one that has let her go turns her back to it no more than one at her heels; beside him the usual rules again, so one that follows her there is a fight beside him. The reflex (under 0.3) and PULL_BACK are as they were, for a fight he is in; when he has gone, (b) at 0.5 comes first. BREAK_LEFT, voice's three ("Right behind you." / "I can't hold this alone. Coming." / "Too much for me here. I'm with you."), a call to him, never blame; said as she goes, through the fight hush like APEX_BREAK. Enemy-ai's wanderer rule (805 amended (12): a beast lets go of a body that never struck it) does not cover her, who strikes first; in the runs, once she pulled back the wolves stayed by the pond. companion_test _test_left_and_rest: at 45%, an imp beside her, her player 8 off: she breaks off, says it once, is with him, no blow on the imp; her player 3 off, told to wait, loosing at it from 8, his bow drawn at 8: no break. Server only, protocol unchanged, no new class_name.
+780 amended (34): the old grey's told lunge 4 to 8, his bite still 5 (the script's label; the coordinator's ruling, enemy-ai's
+yes as 780's owner, in 887's row). 887's sword (4 a blow) tipped (33)'s careless bar: careless with a sword fell in 13.2 s
+against his 12.6. His told lunge (moves.spring.damage) is its own number, and the lever that fits the rule: it is the blow
+the careless one misses and the reader doesn't. Before, the one blow he warned of (4) was weaker than his plain bite (5), so
+reading it bought a sword reader next to nothing. A careless one takes about 1.5 missed lunges a minute, so each point is
+worth about 1.5 hp a minute: 5 and 7 left the careless sword winning (13.0 / 12.6, 12.57 / 12.63), and 8 is the least that
+restores the margin (12.37 / 12.63). On 887's tip at 8: careless loses with every weapon (sword 12.4 s against 12.6, dagger
+12.4 against 13.6, fists 12.6 against 20.0); the sword reader (15.5 / 14.7), the fists reader (15.5 / 23.6) and one
+answering (never touched, he dead in 16.7 s) as at 4, since neither takes a lunge; one standing still falls in 7.7 s, not
+11.1. Bite 6 was ruled out: it passed careless but put the sword reader, the player doing everything right, from beating
+him by 0.8 s to losing by 1.8. 8 is 40% of a newcomer's 20: he roams within 40 of grey_den in the foothills by day, off
+Umbrage's first-hour paths and the crypt's, and a told 0.8 s lunge leaves them on 12 with time to run (enemy-ai). Fists
+losing to him is intended. _test_old_wolf_rates gains fists careless and reader rows, fists careless under the careless
+bar. Measured hosted (monster_test's bot rates); server and data only; protocol unchanged; no new class_name.
 
 ## 781. The mind log keeps no player names
 
@@ -51729,3 +51743,61 @@ the lantern's middle. Neither is solid. Their grey boxes are a 15 cm post and th
 first take's 12 cm post failed art_kit_test against the models' 15 cm foot). Package: the store's and Snagfin's
 lamps. They land off: nothing places them until buildings' code stands them in place of its own posts, which
 switches them on. Client only (art); no new class_name.
+## 887. The sword a clear gain over fists: 4 a blow, a lead walked off frees the body, no stand after it lands
+
+The coordinator's ask (11-12), from combat's fists rows for a newcomer against one robber: Rolf's
+sword, the first thing a new player is given, was no better than bare hands, and for a player who
+reads the robber's tell it was worse. Against Crake (the named robber, 26 hp; his lunge a 6-tick tell,
+3 a blow, one every 1.4 s), a newcomer of 20 hp, click bots over eight start layouts: fists won in 7.7 s
+losing 12 (careless) and in 10.3 s losing 3 (a reader stepping out of his red); the sword won in 7.5 s
+losing 12 both ways. Its 3 a blow every 0.7 s is 4.3 damage a second against fists' 4.0, and each blow
+planted her 5 of its 7 ticks (the 2-tick lead, 338 amended; its landing tick, 392 amended (6); the
+2-tick blow stand), a lead never walked off, so his red found her planted. The coordinator's bar: a kill
+in about two thirds of fists' time from her first blow, a reader losing no more than with fists.
+
+The sword's pace stays (Jeff: "sword swings a little too fast"; "a slower swing, plus a small reset
+between slashes", 338 amended): a first proposal at speed 1.0 put back the pace he called too fast and
+was withdrawn. Lead 0 met the bar too and was ruled out: the drawn swing is his ask. 874's wind-up slack
+on one-handers was not the lever (it follows the foe; it never frees her).
+
+- levels/items.json sword: damage 1.25 to 2.0 (4 a blow on attack_damage 2); speed 1.4 and lead 2 as
+  they were.
+- A lead walked off its way frees the body (World._free_give_up_wind_up): an intent of at least
+  WIND_UP_LEAVE_INTENT off WIND_UP_KEEP_ANGLE of the way to the target lifts its halt and marks the
+  wind-up "walked", where a heavy's is given up as ever. _tend_wind_ups lets a walked lead leave its
+  cell, and as it falls due strikes if the target is still in reach (lead_slack past it, 338 amended),
+  so a click made walking still lands (392 amended (6)); one whose step took the striker out of reach
+  is given up (cancel_wind_up), never swung at the air, and its swing_cost given back. A lead not
+  walked off is as before.
+- A landed lead stands no longer: its halt is cut to its landing tick (none if walked), not the blow's
+  2-tick stand after it, so a reader steps out of the next red at once. World.blow_stand says it: a
+  lead's stand is its ticks plus its landing tick, and a walk off its way ends it at once
+  (free_net_test _test_blow_stands, the stand line).
+
+The build's own rows, the same bots and layouts (before: main with 340 amended (4)):
+
+| | careless: kill, hp lost, lowest stamina | reader: kill, hp lost, lowest stamina |
+|---|---|---|
+| fists | 7.7 s, 12, 64 | 10.3 s, 3, 74 |
+| sword before | 7.5 s, 12, 46 | 7.5 s, 12, 46 |
+| sword after | 6.1 s, 9, 58 | 7.7 s, 3, 65 |
+
+From her first blow 4.2 s against fists' 6.0 (0.70); a reader loses 3, as with fists. Nobody winded:
+continuous sword swinging from 100 empties in 17 swings, the last 11.2 s after the first (6 a swing,
+one every 0.7 s, no regen while swinging), as before, pace and cost unchanged; a lead given up now
+gives its 6 back. No foe is newly felled by one blow; a plain robber, bandit and skeleton guard take 5
+blows (6 before), a skeleton 3 (4), the draugr 8 (10), Brand at 34 (806 amended (18)) 9 (12). Rows against Brand and the
+draugr in the same harness measured only a hold-off (Brand's first blow 58 s in, the draugr never
+engaging) and nothing of 887; the draugr row with the sword follows with 874 on dungeon's ZZFIGHT
+fight. Wren is not a free body (World.free_body is a Player's), so for her it is the 4 a blow alone;
+companions measure her against one robber.
+
+combat_test _test_wind_up_kept (the coordinator's pins, over a 10 by 10 spread of starting points):
+a sword's lead clicked walking past him, 93 of 93 landed; walking away, of 68, 40 landed with him in
+reach and 28 given up, every one out of reach, none swung at the air, none costing stamina; the giant
+axe pressed on at him as before (100 of 100). Its reader's step: from the far edge of his reach,
+straight away, the body steps the tick it is asked and the lead is given up, its stamina back.
+_test_sword_lead's own keys back and aside: kept, struck. Tested hosted, on the server authority;
+a joined client predicts its own walk and never read the stand, and whether it is put back during a
+lead walked off is playtest's joined count on main's tip before the cut. Server and data only;
+protocol unchanged; no new class_name.

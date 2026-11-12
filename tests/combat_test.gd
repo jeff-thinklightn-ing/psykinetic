@@ -990,8 +990,11 @@ func _test_sword_lead() -> void:
 			World.step()
 		_check((foe.hp < hp) == each[2], "%s (%d -> %d, %.2f apart)" % [each[3], hp, foe.hp,
 				World.body_centre(host).distance_to(World.body_centre(foe))])
-	# A stun still gives it up.
+	# A stun still gives it up (from where it stood: since 887 the last row's own keys walked it off).
+	World._relocate(host, Vector2i(3, 3))
+	host.free_pos = Vector2(3.0, 3.0)
 	host.next_attack_tick = 0
+	host.next_move_tick = 0
 	foe.free_pos = Vector2(4.0, 3.0)
 	_check(World.try_wind_up(host, foe), "(wound up again)")
 	host.stunned_until_tick = World.tick + 5
@@ -1089,29 +1092,81 @@ func _test_click_away() -> void:
 ## pressed on at him, its walk 20 degrees off the way to him each tick (within
 ## WIND_UP_KEEP_ANGLE, so the walk keeps it; off it, 392 amended gives it up as ever): how
 ## many of the wind-ups begun were given up.
+## 887 (the coordinator's pins): a sword's lead walked off its way now lets the body step, and
+## its blow is judged as it lands: every one with the foe still in reach (lead_slack past it)
+## lands, as 392 amended (6) had it; only one whose step took the striker out of reach is given
+## up, never swung at the air, and its stamina is given back.
 func _test_wind_up_kept() -> void:
 	print("
-== a wind-up clicked walking: his own walk never gives it up ==")
+== a wind-up clicked walking: his own walk never gives it up while he is in reach (392 amended (6), 887) ==")
 	for row: Array in [["sword", Vector2.UP, "walking past"], ["sword", Vector2.LEFT, "walking away"], ["giant_axe", Vector2.ZERO, "pressing on at him"]]:
-		var tally := {"began": 0, "given up": 0, "landed": 0, "struck the air": 0}
+		var tally := {"began": 0, "given up": 0, "landed": 0, "struck the air": 0, "given up in reach": 0, "landed out of reach": 0, "paid for nothing": 0}
 		for ix in 10:
 			for iy in 10:
 				var offset := Vector2(-0.45 + 0.1 * ix, -0.45 + 0.1 * iy)
-				var end := _wind_up_kept_run(row[0], row[1], offset)
+				var out := _wind_up_kept_run(row[0], row[1], offset)
+				var end: String = out["end"]
 				if end == "":
 					continue
 				tally["began"] += 1
 				tally[end] += 1
+				if end == "given up" and bool(out["reach"]):
+					tally["given up in reach"] += 1
+				if end == "landed" and not bool(out["reach"]):
+					tally["landed out of reach"] += 1
+				if end == "given up" and not bool(out["stamina_back"]):
+					tally["paid for nothing"] += 1
 		print("  measured: %s, %s: of %d wind-ups begun, %d given up, %d landed, %d struck the air" % [row[0], row[2], tally["began"],
 				tally["given up"], tally["landed"], tally["struck the air"]])
-		_check(tally["began"] >= 50 and tally["given up"] == 0, "%s %s: none of %d given up by his own walk (%d)" % [row[0], row[2], tally["began"], tally["given up"]])
+		if row[0] == "sword":
+			_check(tally["began"] >= 50 and tally["given up in reach"] == 0 and tally["struck the air"] == 0,
+					"%s %s: of %d, none given up with him in reach, none swung at the air (%d given up, all out of reach)" % [row[0], row[2], tally["began"], tally["given up"]])
+			_check(tally["paid for nothing"] == 0, "%s %s: a lead given up costs no stamina (%d paid)" % [row[0], row[2], tally["paid for nothing"]])
+		else:
+			_check(tally["began"] >= 50 and tally["given up"] == 0, "%s %s: none of %d given up by his own walk (%d)" % [row[0], row[2], tally["began"], tally["given up"]])
+	# The reader's step (887): from the edge of reach, straight away from him, the lead is let go.
+	var e := _build(["#########", "#.......#", "#.......#", "#..P.m..#", "#.......#", "#.......#", "#########"])
+	var host: GridEntity = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	foe.acts = false
+	_give(host, "sword")
+	# From the far edge of his reach (found 0.05 at a time), so a step of the lead's ticks takes her past lead_slack.
+	var x := 4.0
+	while x > 1.5:
+		World._relocate(host, Vector2i(roundi(x), 3))
+		host.free_pos = Vector2(x, 3.0)
+		if not World.in_reach(host, foe):
+			break
+		x -= 0.05
+	x += 0.05
+	World._relocate(host, Vector2i(roundi(x), 3))
+	host.free_pos = Vector2(x, 3.0)
+	host.next_attack_tick = 0
+	host.next_move_tick = 0
+	var hp := foe.hp
+	var stamina := host.stamina
+	_check(World.try_wind_up(host, foe), "(the reader's step: wound up from the edge of reach)")
+	var paid := stamina - host.stamina
+	var stepped_at := -1
+	for i in World.windup_ticks(host) + 1:
+		World.free_input(host, Vector2.LEFT, World.TICK_DT)
+		var was := host.free_pos
+		World.step()
+		if stepped_at < 0 and host.free_pos.distance_to(was) > 0.01:
+			stepped_at = i
+	_check(stepped_at == 0, "the reader's step: walked off the lead, the body steps the tick it is asked (step %d)" % stepped_at)
+	_check(host.wind_up.is_empty() and foe.hp == hp and host.stamina == stamina and paid > 0,
+			"out of reach as it fell due (from %.2f, now %.2f apart): given up, no blow, the %d stamina given back (%d -> %d)" % [
+			World.body_centre(foe).x - x, World.body_centre(host).distance_to(World.body_centre(foe)), paid, stamina, host.stamina])
 
 
 ## One of _test_wind_up_kept's: [param weapon] in hand, from his cell's centre plus
 ## [param offset], the walk key [param way] held (ZERO: pressed on at him, 20 degrees off
-## the way to him each tick) and the attack clicked the first tick: how
-## his wind-up ended ("given up", "landed", "struck the air"), "" if none began.
-func _wind_up_kept_run(weapon: String, way: Vector2, offset: Vector2) -> String:
+## the way to him each tick) and the attack clicked the first tick: {"end": how his wind-up
+## ended ("given up", "landed", "struck the air"; "" if none began), "reach": whether the foe
+## was in its reach as it ended (lead_slack past it for a lead), "stamina_back": whether the
+## stamina it cost was back by then}.
+func _wind_up_kept_run(weapon: String, way: Vector2, offset: Vector2) -> Dictionary:
 	var e := _build(["#########", "#.......#", "#.......#", "#....m..#", "#...P...#", "#.......#", "#########"])
 	var host: GridEntity = e["P"][0]
 	var foe: GridEntity = e["m"][0]
@@ -1126,23 +1181,27 @@ func _wind_up_kept_run(weapon: String, way: Vector2, offset: Vector2) -> String:
 	host.wind_up = {}
 	var hp0 := foe.hp
 	var began := false
+	var stamina0 := host.stamina
+	var lead := false
 	for i in 30:
 		var walk := way
 		if walk == Vector2.ZERO:
 			walk = (World.body_centre(foe) - World.body_centre(host)).normalized().rotated(deg_to_rad(-20.0))
 		World.free_input(host, walk, World.TICK_DT)
 		if i == 0:
+			stamina0 = host.stamina
 			World.command_attack(host, foe)
 		World.step()
 		if not began:
 			if host.wind_up.is_empty():
-				return ""
+				return {"end": ""}
 			began = true
+			lead = bool(host.wind_up.get("lead", false))
 		elif host.wind_up.is_empty():
-			if foe.hp < hp0:
-				return "landed"
-			return "struck the air" if host.next_attack_tick > World.tick else "given up"
-	return "given up"
+			var reach := World._wind_up_reaches(host, foe, lead)
+			var end := "landed" if foe.hp < hp0 else ("struck the air" if host.next_attack_tick > World.tick else "given up")
+			return {"end": end, "reach": reach, "stamina_back": host.stamina >= stamina0}
+	return {"end": "given up", "reach": World._wind_up_reaches(host, foe, lead), "stamina_back": host.stamina >= stamina0}
 
 
 ## Jeff on v0.1.208: the war hammer's knockback too high; the
