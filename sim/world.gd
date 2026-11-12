@@ -8035,7 +8035,9 @@ func _rod_to_hand(by: GridEntity) -> bool:
 
 ## [param by]'s rod back to the square it came from and what its right hand
 ## held back in that hand (805 amended (11)), if it was taken up to cast
-## (_rod_to_hand). With no room (a catch filled the square) the rod stays
+## (_rod_to_hand). Taken from an empty hand, its square may hold the catch
+## since (a first perch lands in the first free square, the rod's): then the
+## first free pack square (animation's dry run, 11-11); with none, it stays
 ## in hand.
 func _rod_back(by: GridEntity) -> void:
 	var put: Dictionary = _rod_put.get(by, {})
@@ -8051,6 +8053,10 @@ func _rod_back(by: GridEntity) -> void:
 	var held := str(put["held"])
 	if by.slots[back].is_empty() or (not held.is_empty() and by.slots[back] == held):
 		try_transfer(by, by, Items.RIGHT_HAND, by, back)  # The swap: the rod back, the weapon to hand.
+	elif held.is_empty():
+		var free := free_pack_slot(by)
+		if free >= 0:
+			try_transfer(by, by, Items.RIGHT_HAND, by, free)
 
 
 ## Each tick (805 amended (11)): a rod taken up to cast goes back once its

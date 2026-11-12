@@ -4246,6 +4246,25 @@ func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> v
 	_steps(1)
 	_check(host.fishing.is_empty() and World.fish_broke_why == "hurt" and host.slots[Items.RIGHT_HAND] == "sword",
 		"struck mid-cast: reeled in, the sword back in hand at once (%s, %s)" % [World.fish_broke_why, Array(host.slots)])
+	# Empty hands, the rod alone in the pack: the first perch lands in the rod's
+	# own square, and the rod goes back to the next free one (animation's dry run).
+	_clear(host)
+	_give(host, "fishing_rod", packed)
+	_check(World.try_fish(host, water) and host.slots[Items.RIGHT_HAND] == "fishing_rod" and host.slots[packed] == "",
+		"empty hands: the rod to hand, its square left free (%s)" % [Array(host.slots)])
+	_steps(World.FISH_CAST_TICKS)
+	World._fishing[host]["roll"] = 0.0
+	_steps(int(World._fishing[host]["bite"]) - World.tick)
+	_check(World.try_fish(host) and host.fishing.get("state") == "landed" and host.slots[packed] == "fish",
+		"struck: the perch in the rod's square, the first free one (%s)" % [Array(host.slots)])
+	_steps(World.FISH_END_TICKS)
+	World._relocate(host, _free_near(host, 1))
+	_steps(1)
+	var rod_at := Array(host.slots).find("fishing_rod")
+	_check(host.slots[Items.RIGHT_HAND] == "" and rod_at in Items.pack_slots_of(host.slots) and host.slots[packed] == "fish",
+		"the first step after: the rod to the next free pack square, the hand empty (slot %d, %s)" % [rod_at, Array(host.slots)])
+	World._relocate(host, stood)
+	_steps(1)
 	# Every water fishes: no "nothing takes the line"; no rod anywhere, no_rod.
 	_clear(host)
 	_check(World.fish_refusal(host, water) == "no_rod", "no rod anywhere: no_rod (%s)" % World.fish_refusal(host, water))
