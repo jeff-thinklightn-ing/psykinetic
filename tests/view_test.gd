@@ -9025,6 +9025,46 @@ func _test_camera_turn() -> void:
 	for i in 5:
 		_rig._drive_turn(0.1)
 	_check(not _rig._player_hidden and not _rig._line_fade and is_equal_approx(_rig.yaw, 0.0), "in the open: seen, nothing faded for them, and no turn back")
+	# A chimney between them and the camera hides them (801 amended): a
+	# building's "parts" Chimney, a tall stack 3 m up the line of sight from
+	# them, is indexed as a roof is, and they count hidden.
+	var holder: Dictionary = {}
+	for building in _rig._buildings:
+		var shown_parts := (building["node"] as Node3D).get_node_or_null("parts") as Node3D
+		if not building.get("fades", false) and not building.get("stands", false) and (building["node"] as Node3D).is_visible_in_tree() 				and (shown_parts == null or shown_parts.visible):
+			holder = building
+			break
+	var stack_parts := (holder["node"] as Node3D).get_node_or_null("parts") as Node3D if not holder.is_empty() else null
+	var made_parts := stack_parts == null and not holder.is_empty()
+	if made_parts:
+		stack_parts = Node3D.new()
+		stack_parts.name = "parts"
+		(holder["node"] as Node3D).add_child(stack_parts)
+	var stack := MeshInstance3D.new()
+	# Its own name, of the Chimney kind (_part_kind): a house's own chimney
+	# in its parts would leave a second "Chimney" renamed, and unindexed.
+	stack.name = "Chimney_probe"
+	var box := BoxMesh.new()
+	box.size = Vector3(1.2, 5.0, 1.2)
+	stack.mesh = box
+	if stack_parts != null:
+		stack_parts.add_child(stack)
+		var focus: Array[Vector3] = _rig._focus_points()
+		var toward: Vector3 = _rig._camera.global_transform.basis.z
+		stack.global_position = focus[1] + toward * 3.0
+		_rig._index_occluders()
+		var entry: int = _rig._occluder_of.get(stack, -1)
+		var hid: bool = _rig._is_hidden(focus, toward, {} as Dictionary[Node3D, bool])
+		_check(entry >= 0 and not _rig._occluders[entry][2] and hid,
+				"a chimney up the line of sight: indexed as a roof is, and they count hidden (entry %d, hidden %s; in %s at %s, parts shown %s, made %s)"
+				% [entry, hid, holder["node"].name, holder["rect"], stack_parts.visible, made_parts])
+		stack_parts.remove_child(stack)
+		_rig._index_occluders()
+	else:
+		_check(false, "a chimney up the line of sight: no building in the room to hold one")
+	stack.free()
+	if made_parts:
+		stack_parts.queue_free()
 	puppet.global_position = was
 	if other != null:
 		other.global_position = other_was

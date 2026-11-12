@@ -20818,6 +20818,18 @@ func _fight_points(focus: Array[Vector3]) -> Array[Vector3]:
 	return out
 
 
+## A building's "parts" that can stand between the camera and a player
+## outside (801 amended (1)), by name ([method _part_kind]): whether each
+## counts as a tree does (true: hidden whole near the low lens) or as a roof
+## (false).
+const PARTS_OVER := {"Chimney": false, "Porch": false, "Tent": true}
+
+
+## [param name]'s kind among a building's parts: "Tent_1" is "Tent".
+static func _part_kind(name: StringName) -> String:
+	return str(name).get_slice("_", 0)
+
+
 func _index_occluders() -> void:
 	_occluders.clear()
 	var runs := _wall_runs()
@@ -20856,6 +20868,17 @@ func _index_occluders() -> void:
 		elif building.get("stands", false):
 			# A landmark hides the player (the turn, their rim) but never fades: nothing to fade.
 			_occluders.append([building["node"], _bounds(building["node"]), true, [], _shapes_of(building["node"])])
+		else:
+			# What stands over its roof or out from its walls, in its "parts"
+			# (801 amended (1)): a chimney and a porch hide the player as its
+			# roof does (outdoors the turn, else their rim), a camp's tent as a
+			# tree does. Not the rest of its parts (a buttress, steps, a cruck,
+			# beds, furnishings: in or on its walls, or inside).
+			var parts := (building["node"] as Node3D).get_node_or_null("parts") as Node3D
+			if parts != null and parts.visible:
+				for piece: Node in parts.get_children():
+					if piece is Node3D and (piece as Node3D).visible and PARTS_OVER.has(_part_kind(piece.name)):
+						_occluders.append([piece, _bounds(piece), PARTS_OVER[_part_kind(piece.name)], [piece]])
 	_occluder_chunks.clear()
 	_occluder_of.clear()
 	_occluder_top = 0.0
