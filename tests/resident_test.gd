@@ -104,6 +104,11 @@ func _ready() -> void:
 	_test_tavern_keeper()  # 772 amended (2).
 	_test_taverner_end_to_end()  # 772 amended (2) with economy's 812.
 	_test_inn_night()  # 875: Umbrage at night.
+	var any_body: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).spawned and any_body == null:
+			any_body = entity
+	_test_inn_room(any_body)  # 875 amended (2): claims only, no steps.
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
@@ -1164,6 +1169,61 @@ func _test_take_places(body: Resident) -> void:
 	body._goal = was_goal
 
 
+## 875 amended (2): the inn's seats read as a room. Guests arriving one by one take a seat by Resident.inn_pick
+## (claims, no steps): three at the fire, then a pair at a table, then the counter; a seventh starts a pair.
+func _test_inn_room(body: Resident) -> void:
+	print("\n== the inn's seats read as a room: a table pair joined, the fire to three, the counter (875 amended (2)) ==")
+	if body == null:
+		_check(true, "(no body: skipped)")
+		return
+	var free: Array[Vector2i] = []
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var cell := body.tile + Vector2i(dx, dy)
+			if cell != body.tile and World.is_free(cell) and not World.is_link_cell(cell) and free.size() < 11:
+				free.append(cell)
+	_check(free.size() == 11, "(eleven free cells for the room's spots)")
+	if free.size() < 11:
+		return
+	var pool: Array = []
+	for i in 5:
+		pool.append({"use": "inn", "cell": free[i], "face": free[i], "pose": "sit"})
+	for i in 2:
+		pool.append({"use": "inn", "cell": free[5 + i], "face": free[5 + i], "pose": "stand"})
+	pool.append({"use": "talk", "cell": free[7], "face": free[8], "pose": "sit", "pair": "a"})
+	pool.append({"use": "talk", "cell": free[8], "face": free[7], "pose": "sit", "pair": "a"})
+	pool.append({"use": "talk", "cell": free[9], "face": free[10], "pose": "sit", "pair": "b"})
+	pool.append({"use": "talk", "cell": free[10], "face": free[9], "pose": "sit", "pair": "b"})
+	var left_was: Vector2i = body._left
+	body._left = Resident.NO_CELL
+	var taken := {}
+	var seated: Array[String] = []
+	for i in 7:
+		var spot: Dictionary = body.inn_pick(pool, taken)
+		if spot.is_empty():
+			seated.append("none")
+			continue
+		taken[spot["cell"]] = true
+		seated.append("fire" if str(spot.get("pose", "")) == "sit" and str(spot.get("use", "")) == "inn" else ("counter" if str(spot.get("pose", "")) == "stand" else "table " + str(spot.get("pair", ""))))
+	body._left = left_was
+	var six := seated.slice(0, 6)
+	var tables := six.filter(func(s: String) -> bool: return s.begins_with("table"))
+	_check(six.count("fire") == 3 and tables.size() == 2 and tables[0] == tables[1] and six.count("counter") == 1,
+		"six guests one by one: three at the fire, a pair at one table, one at the counter (%s)" % [six])
+	_check(seated[3].begins_with("table") and seated[4] == seated[3], "the fourth starts a pair, the fifth joins it (%s, %s)" % [seated[3], seated[4]])
+	_check(seated[6].begins_with("table") and seated[6] != seated[3], "a seventh starts the other pair (%s)" % seated[6])
+	# The taverner (the coordinator's ask): behind the counter end a guest stands at, else either.
+	var west := {"use": "work", "trade": "taverner", "cell": free[0], "face": free[5], "pose": "stand"}
+	var east := {"use": "work", "trade": "taverner", "cell": free[1], "face": free[6], "pose": "stand"}
+	_check(body.work_behind([west, east], {free[6]: true}) == east and body.work_behind([west, east], {free[5]: true}) == west
+		and body.work_behind([west, east], {}).is_empty(), "the taverner behind the end a guest drinks at; none held, as any")
+	var level := {"town": "wilds/store", "spots": [west.merged({"town": "store"}), {"use": "inn", "cell": free[2], "face": free[2], "pose": "sit", "town": "store"},
+		{"use": "work", "trade": "smith", "cell": free[3], "face": free[3], "pose": "stand", "town": "store"}]}
+	var her: Dictionary = _main._taverner_places(level, {"rect": Rect2i(body.tile - Vector2i(6, 6), Vector2i(13, 13)), "counter": body.tile})
+	_check((her.get("spots", {}).get("work", []) as Array).size() == 1 and her["spots"]["work"][0]["cell"] == free[0],
+		"her floor places carry its taverner work spots, no other trade's (%s)" % [her.get("spots", {})])
+
+
 func _test_inn_night() -> void:
 	print("\n== Umbrage at night (875): a shell inn's goers inside, as many as its spots; the walk in and out; the overflow strolls ==")
 	# Eight of the town's folk about (the tests before sent most away), the rest away; put back at the end.
@@ -1810,18 +1870,22 @@ func _test_short_sleep() -> void:
 	for id: String in ids:
 		var spell := Townsfolk.sleep_spell(id)
 		var length := fposmod(spell.y - spell.x, 24.0)
-		lengths_ok = lengths_ok and length >= 1.5 - 0.001 and length <= 2.5 + 0.001 and Townsfolk._within(spell.x, 21.0, 5.5)
+		lengths_ok = lengths_ok and length >= 1.5 - 0.001 and length <= 2.5 + 0.001 and Townsfolk._within(spell.x, 23.0, 5.5)
 		starts[snappedf(spell.x, 0.5)] = true
-	_check(lengths_ok, "each spell 1.5 to 2.5 hours, begun between 21:00 and 05:30")
+	_check(lengths_ok, "each spell 1.5 to 2.5 hours, begun between 23:00 and 05:30 (875 amended (2))")
 	_check(starts.size() >= 4, "staggered: their starts spread through the night (%d half-hours)" % starts.size())
 	var never_all := true
-	var some_up_each_hour := true
+	var most_abed := 0
+	var by_half: Array = []
 	for half in 18:
 		var hour := fposmod(21.0 + half * 0.5, 24.0)
 		var abed := ids.filter(func(id: String) -> bool: return Townsfolk.asleep_at(id, hour)).size()
 		never_all = never_all and abed < ids.size()
-		some_up_each_hour = some_up_each_hour and abed <= ids.size() / 2
-	_check(never_all and some_up_each_hour, "the town is never all abed; most are up at any hour")
+		most_abed = maxi(most_abed, abed)
+		by_half.append(abed)
+	# 875 amended (2): spells from 23:00 (not 21:00) to 05:30 crowd them into a shorter night; never all abed,
+	# and at most two in three abed at once (half before, the 21:00 window).
+	_check(never_all and most_abed * 3 <= ids.size() * 2, "the town is never all abed; at most two in three abed at once (most %d of %d; by half hour from 21:00 %s)" % [most_abed, ids.size(), by_half])
 	var id := ids[0]
 	var spell := Townsfolk.sleep_spell(id)
 	var mid := fposmod(spell.x + fposmod(spell.y - spell.x, 24.0) / 2.0, 24.0)
@@ -5527,7 +5591,7 @@ func _test_visible_work() -> void:
 	var mara := _body("rs-mara")
 	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
 	var sleep: Dictionary = Townsfolk.days().get("sleep", {})
-	_check(int(sleep.get("from", 0)) == 21 and is_equal_approx(float(sleep.get("to", 0)), 5.5) and sleep.get("spell") == [1.5, 2.5], "residents.json sleep: a spell of 1.5 to 2.5 hours, between 21 and 5.5 (772)")
+	_check(int(sleep.get("from", 0)) == 23 and is_equal_approx(float(sleep.get("to", 0)), 5.5) and sleep.get("spell") == [1.5, 2.5], "residents.json sleep: a spell of 1.5 to 2.5 hours, between 23 and 5.5 (772; 875 amended (2))")
 	_check(not Resident.asleep_now(), "noon: nobody sleeps")
 	# The bed and the head.
 	var home: Rect2i = mara.places.get("home", Rect2i())

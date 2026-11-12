@@ -51118,6 +51118,42 @@ rounds, a visit and a walk with someone keep theirs). The town's side gains the 
 inn's door in the town walks there at once. Resident._bed falls back on its home where its places have no
 bed (the floor's entries have none). resident_test _test_take_places. Server only; protocol unchanged; no
 new class_name.
+875 amended (2) (the coordinator's ruling on the Mughouse's evening numbers, 2026-11-12; the label from
+decision_number.sh). Maps' evening film on its take: six guests at most, five round the hearth, four or
+five spots free all evening, "a warm hearth in an empty dark room". npc's schedule table
+(C:/dev/review/npc/mughouse_evening_schedule_2026-11-12.txt): Umbrage has five residents and Rolf, four who
+can come, and all who can already do, so the room's size is the town's (economy's, with buildings).
+Two things of npc's:
+- Where they sit (Resident.inn_pick, for the "inn" use): the pick was uniform over the free spots, and a
+  sit is held twice a stand, so the hearth's five stools filled before the one table pair. Now, of the
+  spots not held or walked to by another body, the first group with one: a table seat (a "talk" spot
+  with a "pair") whose mate is held; the fire (a sit that is no table's) while fewer than INN_FIRE_MOST
+  (3) of its seats are held; a pair with neither held while no table is held; the counter (a "stand")
+  while fewer than INN_COUNTER_FIRST (1) stand there; another pair; the counter; any. Six guests arriving
+  one by one sit three at the fire, a pair at a table and one at the counter; a seventh starts another
+  pair. The ruling's order put an empty pair before the counter, which seats a sixth at a second table
+  before anyone at the counter; one counter stand comes before the second pair so the room has one
+  drinking by the taverner. Groups read from the spots themselves; maps lays the other three table pairs.
+- Sleep (residents.json "sleep" "from" 21 to 23): a spell's length is kept (1.5 to 2.5 hours) and every
+  spell still ends by "to", 05:30, so all are up by 06:00 and Rolf at his stall by its hour; the evening's
+  goers are up in the room until late (the hunter slept from 21:00). The priest's evening is unchanged
+  (his agreed day: the square, then the temple).
+- The taverner (the coordinator's ask): her floor places (Main._taverner_places) carry the floor's "work"
+  spots of her trade (maps lays two behind the counter, (8,2) and (10,2)); none reached her before, so
+  her "tend_bar" (animation's 877) never showed. Of them she takes the one facing the cell a guest's held
+  counter stand faces (Resident.work_behind), else either; between bouts she rests on it with no word. Her
+  hours are unchanged: her night pick ("work") keeps her behind the bar from 20:00 but for her spell.
+- A seated guest with no other spot free keeps its own (853 amended (13)'s rule, in inn_pick).
+resident_test _test_inn_room (with the taverner's pick and places) and the sleep rule's checks: never all
+abed, at most two in three at once (it was most up at any hour, with the night from 21:00; the
+coordinator's OK: of twelve, seven abed at most, at 01:30 to 02:00). Who is up then, and where: outside its
+spell a body keeps its night pick (772) the night through. The default trades (Umbrage's carpenter, hunter,
+woodcutter and Snagfin) go eight in ten to the Mughouse floor, seated by inn_pick, one in ten to the
+square's fire seats and one to the temple; Rolf lodges at the Mughouse, the taverner is behind her bar, the
+priest at the temple. So a player walking Umbrage at 01:30 finds the awake at the Mughouse, the temple or
+the square's fire, never standing at a wall; only a square-picker with no fire seat free strolls the
+square. That is what playtest reads, joined, when "Umbrage at night" is switched on. Server only;
+protocol unchanged; no new class_name; package "Umbrage at night", which lands off as 875 does.
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...

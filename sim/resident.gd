@@ -39,6 +39,10 @@ const WANDER_TICKS := 80
 ## seconds; the coordinator, 2026-11-11: a shorter wait reads as restless). A seat: SEAT_TICKS plus up to
 ## SEAT_SPREAD (30 to 60 game minutes, settling in).
 const STROLL_TICKS := 450
+## The inn's fire takes this many before a table pair is started, and the counter this many before a
+## second pair is (875 amended (2)).
+const INN_FIRE_MOST := 3
+const INN_COUNTER_FIRST := 1
 const STROLL_SPREAD := 750
 const SEAT_TICKS := 1125
 ## A night-goer the inn had no room for (875, "Umbrage at night"; Main's places "short_stands"): its stands
@@ -793,6 +797,23 @@ func _free_spot(use: String) -> Dictionary:
 		pool.append_array(spots.get(each, []))
 	if pool.is_empty():
 		return {}
+	if use == "work":
+		# Behind a guest (875 amended (2)): a work spot facing the cell a guest's held stand faces (the taverner's
+		# behind the counter end a drinker stands at), else as any.
+		var faces := {}
+		for other: GridEntity in World.entities():
+			if other != self and other is Resident and str((other as Resident)._spot.get("pose", "")) == "stand" \
+					and str((other as Resident)._spot.get("use", "")) == "inn":
+				faces[(other as Resident)._spot.get("face")] = true
+		var behind := work_behind(pool, faces)
+		if not behind.is_empty():
+			return behind
+	if use == "inn":
+		var taken := {}
+		for other: GridEntity in World.entities():
+			if other != self and other is Resident and not (other as Resident)._spot.is_empty():
+				taken[(other as Resident)._spot["cell"]] = true
+		return inn_pick(pool, taken)
 	_picks += 1
 	var start := absi(hash([id, World.tick, _picks])) % pool.size()
 	var back := {}
@@ -813,6 +834,68 @@ func _free_spot(use: String) -> Dictionary:
 	# None other free: at work it stays on its own (Rolf stepped off his stall's only spot each stroll, a minute or
 	# two each, to a free cell of his work rect: maps' day run); a seat on the square or a well's stand is still
 	# left for a stroll (the mend: folk move on). Else back to the one it left.
+	return here if not here.is_empty() else back
+
+
+## Of [param pool]'s free work spots, one facing a cell in [param faces] (the cells guests' held counter stands
+## face), {} for none (875 amended (2)): the taverner tends the end of the bar a guest drinks at.
+func work_behind(pool: Array, faces: Dictionary) -> Dictionary:
+	if faces.is_empty():
+		return {}
+	for spot: Dictionary in pool:
+		var cell: Vector2i = spot["cell"]
+		if faces.has(spot.get("face")) and (cell == tile or (World.is_free(cell) and not World.is_link_cell(cell))):
+			return spot
+	return {}
+
+
+## The inn's room (875 amended (2), the coordinator's ruling): of [param pool]'s free spots, not in
+## [param taken] (the cells other bodies hold or are walking to), the first group with one: a table seat (a
+## "talk" spot with a "pair") whose mate is held, so it joins a pair talking; the fire (a sit that is no
+## table's) while fewer than INN_FIRE_MOST of its seats are held; a table pair with neither held while no
+## table is held, so it starts the first; the counter (a "stand") while fewer than INN_COUNTER_FIRST stand
+## there; another table pair; the counter; then any. Groups read from the spots themselves, nothing in data:
+## Umbrage's five hearth stools all filled before a second table seat, a hearth in an empty room.
+func inn_pick(pool: Array, taken: Dictionary) -> Dictionary:
+	var pairs := {}  # pair -> its cells
+	var fire_held := 0
+	var counter_held := 0
+	var table_held := false
+	for spot: Dictionary in pool:
+		var pair := str(spot.get("pair", "")) if str(spot.get("use", "")) == "talk" else ""
+		if not pair.is_empty():
+			(pairs.get_or_add(pair, []) as Array).append(spot["cell"])
+			table_held = table_held or taken.has(spot["cell"])
+		elif taken.has(spot["cell"]):
+			if str(spot.get("pose", "")) == "stand":
+				counter_held += 1
+			else:
+				fire_held += 1
+	var groups: Array = [[], [], [], [], [], [], []]  # join, fire, the first pair, the counter's first, another pair, the counter, any
+	var back := {}
+	var here := {}
+	for spot: Dictionary in pool:
+		var cell: Vector2i = spot["cell"]
+		if cell == tile and not taken.has(cell):
+			here = spot  # Seated with nowhere else free, it stays (853 amended (13)'s rule).
+			continue
+		if cell == tile or taken.has(cell) or not World.is_free(cell) or World.is_link_cell(cell):
+			continue
+		if cell == _left:
+			back = spot
+			continue
+		var pair := str(spot.get("pair", "")) if str(spot.get("use", "")) == "talk" else ""
+		if not pair.is_empty():
+			var mate_held := (pairs[pair] as Array).any(func(c: Vector2i) -> bool: return c != cell and taken.has(c))
+			groups[0 if mate_held else (4 if table_held else 2)].append(spot)
+		elif str(spot.get("pose", "")) == "stand":
+			groups[3 if counter_held < INN_COUNTER_FIRST else 5].append(spot)
+		else:
+			groups[1 if fire_held < INN_FIRE_MOST else 6].append(spot)
+	_picks += 1
+	for group: Array in groups:
+		if not group.is_empty():
+			return group[absi(hash([id, World.tick, _picks])) % group.size()]
 	return here if not here.is_empty() else back
 
 

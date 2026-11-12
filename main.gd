@@ -14824,6 +14824,14 @@ func _taverner_places(level: Dictionary, tavern: Dictionary) -> Dictionary:
 	if keeper is Dictionary and not (keeper["rects"] as Array).is_empty():
 		home = keeper["rects"][0]
 	var out := {"work": Rect2i(counter - Vector2i.ONE, Vector2i(3, 3)).intersection(common), "home": home, "square": common, "inn": common, "bed": home}
+	# Her floor's work spots (875 amended (2)): maps' behind the counter, of her trade and town; she tends there in bouts.
+	var key := str(level.get("town", "")).get_slice("/", 1)
+	var work_spots: Array = []
+	for spot: Variant in level.get("spots", []):
+		if spot is Dictionary and str(spot.get("use", "")) == "work" and str(spot.get("trade", "")) == TAVERNER 				and (str(spot.get("town", "")).is_empty() or str(spot.get("town", "")) == key):
+			work_spots.append(spot)
+	if not work_spots.is_empty():
+		out["spots"] = {"work": work_spots}
 	for bed: Variant in level.get("beds", []):
 		if not bed is Dictionary or (bed.get("cells", []) as Array).is_empty() or not home.has_point(bed["cells"][0]):
 			continue
