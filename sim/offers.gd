@@ -575,8 +575,9 @@ static func _commission_offer(worker_id: String, who: Dictionary, card: Dictiona
 				var faction := ResidentCard.faction_name(str(captive.get("by", "")))
 				var relation := _relation(str(kin[other]), production.worker(other).get("card", {}))
 				var words := "Bring my %s %s home from the camp of %s%s." % [relation, name, faction, " at " + where if not where.is_empty() else ""]
-				return _offer(worker_id, COMMISSION, RESCUE + ":" + other, "Bring %s home" % name, words,
-					{"sub": RESCUE, "captive": other, "name": name, "held_by": held_by, "area": area, "faction": str(captive.get("by", ""))}, TAKE)
+				return _lined(_offer(worker_id, COMMISSION, RESCUE + ":" + other, "Bring %s home" % name, words,
+					{"sub": RESCUE, "captive": other, "name": name, "held_by": held_by, "area": area, "faction": str(captive.get("by", ""))}, TAKE),
+					"My %s never came back from that camp." % relation)
 	var saw_raiders := false
 	for fact: Variant in card.get("facts", []):
 		if fact is Dictionary and str(fact.get("text", "")).containsn("raid"):
@@ -593,9 +594,10 @@ static func _commission_offer(worker_id: String, who: Dictionary, card: Dictiona
 			var area := str(camp.get("area", ""))
 			var where := str(_call(given, "area_name", [area]))
 			var faction := ResidentCard.faction_name(str(camp.get("faction", "")))
-			return _offer(worker_id, COMMISSION, CAMP + ":" + str(camp.get("id", "")), "Clear the camp",
+			return _lined(_offer(worker_id, COMMISSION, CAMP + ":" + str(camp.get("id", "")), "Clear the camp",
 				"Clear the camp of %s%s, before they come again." % [faction, " at " + where if not where.is_empty() else ""],
-				{"sub": CAMP, "camp": str(camp.get("id", "")), "area": area, "faction": str(camp.get("faction", ""))}, TAKE)
+				{"sub": CAMP, "camp": str(camp.get("id", "")), "area": area, "faction": str(camp.get("faction", ""))}, TAKE),
+				"Before they come again.")
 	return {}  # Never a fetch (the rule above): what the town is short of is talk.
 
 
@@ -672,8 +674,9 @@ static func _page_offer(worker_id: String, who: Dictionary, town: String, given:
 	if not Townsfolk.whereabouts(_trade_of(who), hour, Season.name_at(at), SCHOLAR, worker_id, Townsfolk.day_of(at)) in PAGE_AT:
 		return {}
 	var name := str(who.get("name", worker_id))
-	return _offer(worker_id, PAGE, "chronicle", "Hear the chronicle",
-		"%s keeps the town's chronicle, with %s copy always to hand, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ)  # Voice's words (491 amended).
+	return _lined(_offer(worker_id, PAGE, "chronicle", "Hear the chronicle",
+		"%s keeps the town's chronicle, with %s copy always to hand, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ),
+		"Sit, and I'll read it to you.")  # Voice's words (491 amended; the line, 536 amended).
 
 
 ## "her", "his" or "their" for [param their_card]'s pronoun.
@@ -729,23 +732,26 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 		var theirs := Townsfolk.card_of(production, str(kin_id))
 		var healer := str(_call(given, "healer_of", [town]))
 		if not healer.is_empty() and healer != "<null>":
-			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Bring the medicine man",
+			return _lined(_offer(worker_id, PLEA, "heal:" + str(kin_id), "Bring the medicine man",
 				"My %s %s lies sick with %s; the medicine man is out at his hut. Fetch him to %s." % [_relation(str(kin[kin_id]), theirs), name, sick.get("kind", "a fever"), _them(theirs)],
-				{"sick": str(kin_id), "name": name, "healer": healer, "sub": "healing"}, TAKE)
+				{"sick": str(kin_id), "name": name, "healer": healer, "sub": "healing"}, TAKE),
+				"My %s is sick. The medicine man's out at his hut." % _relation(str(kin[kin_id]), theirs))
 		var hut := str(_call(given, "healers_hut", [town]))
 		if not hut.is_empty() and hut != "<null>":
-			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Walk %s to the healer's" % name,
+			return _lined(_offer(worker_id, PLEA, "heal:" + str(kin_id), "Walk %s to the healer's" % name,
 				"My %s %s lies sick with %s. If you could walk %s to the healer's hut, the healer would see to %s." % [_relation(str(kin[kin_id]), theirs), name, sick.get("kind", "a fever"), _them(theirs), _them(theirs)],
-				{"sick": str(kin_id), "name": name, "hut": hut, "sub": "healing"}, TAKE)
+				{"sick": str(kin_id), "name": name, "hut": hut, "sub": "healing"}, TAKE),
+				"My %s is sick. The healer would see to %s." % [_relation(str(kin[kin_id]), theirs), _them(theirs)])
 	# Kin lost beyond the walls (decision 487): walk them home.
 	for kin_id: Variant in kin_ids:
 		var theirs := Townsfolk.card_of(production, str(kin_id))
 		if theirs.is_empty() or not theirs.get(Townsfolk.STRAYED) is Dictionary or production.worker(str(kin_id)).is_empty():
 			continue
 		var name := str(production.worker(str(kin_id)).get("name", kin_id))
-		return _offer(worker_id, PLEA, "walk:" + str(kin_id), "Walk %s home" % name,
+		return _lined(_offer(worker_id, PLEA, "walk:" + str(kin_id), "Walk %s home" % name,
 			"My %s %s has not come back from beyond the walls; if you find %s out there, walk %s home." % [_relation(str(kin[kin_id]), theirs), name, _them(theirs), _them(theirs)],
-			{"stray": str(kin_id), "name": name, "sub": "escort"}, TAKE)
+			{"stray": str(kin_id), "name": name, "sub": "escort"}, TAKE),
+			"My %s hasn't come back from beyond the walls." % _relation(str(kin[kin_id]), theirs))
 	var owed := ceili(float(who.get("loan", 0.0)))
 	var can_lend: Variant = given.get("pay_loan")
 	if owed > 0 and can_lend is Callable and can_lend.is_valid():
@@ -759,12 +765,12 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 		var name := str(theirs.get("name", other))
 		if not law.is_empty() and law != worker_id and law != str(other):
 			# A quarrel for the lawspeaker (decision 486): speak for them when you see him.
-			return _offer(worker_id, PLEA, "quarrel:" + str(other), "Speak for %s" % str(who.get("name", "them")),
+			return _lined(_offer(worker_id, PLEA, "quarrel:" + str(other), "Speak for %s" % str(who.get("name", "them")),
 				"Lay my quarrel with %s before the lawspeaker when you see %s; say I was wronged." % [name, _them(production.worker(law).get("card", {}))],
-				{"other": str(other), "name": name, "law": law}, CARRY)
-		return _offer(worker_id, PLEA, "word:" + str(other), "Carry word to %s" % name,
+				{"other": str(other), "name": name, "law": law}, CARRY), "%s wronged me. The lawspeaker should hear it." % name)
+		return _lined(_offer(worker_id, PLEA, "word:" + str(other), "Carry word to %s" % name,
 			"If you see %s, tell %s the matter between us is forgotten." % [name, _them(theirs.get("card", {}))],
-			{"to": str(other), "name": name}, CARRY)
+			{"to": str(other), "name": name}, CARRY), "Tell %s it's forgotten between us." % name)
 	return {}
 
 

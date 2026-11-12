@@ -189,6 +189,7 @@ func _test_commission_kin() -> void:
 		and mine[0]["what"]["area"] == "wood", "Mara asks for her brother back: %s" % [mine])
 	_check(mine.size() == 1 and mine[0]["title"] == "Bring Bram home" and mine[0]["words"].begins_with("Bring my brother Bram home from the camp of ")
 		and mine[0]["words"].ends_with(" camp of %s at the Dark Wood." % ResidentCard.faction_name("goblins")), "in words, with the camp's place: %s" % (mine[0]["words"] if not mine.is_empty() else ""))
+	_line(mine, "My brother never came back from that camp.", "", "Bram's rescue")
 	_zone = "wood"
 	Offers.rescued(TOWN, "o-bram", _ctx)
 	_check(_paid == [["p1", TOWN, 10]] and _done.size() == 1 and _done[0][1]["kind"] == "notice" and _done[0][2] == "Bram is home; Mara's thanks. The town pays 10 gold.",
@@ -209,6 +210,7 @@ func _test_commission_camp_and_fetch() -> void:
 	_check(mine.size() == 1 and mine[0]["what"]["sub"] == Offers.CAMP and mine[0]["what"]["camp"] == CAMP and mine[0]["what"]["faction"] == "goblins",
 		"having seen raiders, she asks for the hostile camp cleared, not the deer's: %s" % [mine])
 	_check(mine.size() == 1 and mine[0]["title"] == "Clear the camp" and mine[0]["words"].contains("at the Dark Wood"), "with the place: %s" % (mine[0]["words"] if not mine.is_empty() else ""))
+	_line(mine, "Before they come again.", "", "the camp")
 
 
 func _test_rumour_and_lore() -> void:
@@ -233,6 +235,7 @@ func _test_plea() -> void:
 	var mine := _offers()
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.CARRY and mine[0]["what"]["to"] == "o-bram"
 		and mine[0]["title"] == "Carry word to Bram", "a word to carry to Bram: %s" % [mine])
+	_line(mine, "Tell Bram it's forgotten between us.", "", "a word for Bram")
 	_work.set_loan("o-mara", 14.0, false)
 	mine = _offers()
 	_check(mine.size() == 1 and mine[0]["accept"] == Offers.LEND and mine[0]["cost"] == 14 and mine[0]["words"] == "I owe the town 14 gold; could you spare some of it?",
@@ -381,6 +384,7 @@ func _test_quarrel() -> void:
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.CARRY and mine[0]["what"].get("law") == "o-law"
 		and mine[0]["title"] == "Speak for Mara" and str(mine[0]["words"]).begins_with("Lay my quarrel with Bram before the lawspeaker"),
 		"Mara's plea: speak for her before the lawspeaker: %s" % [mine])
+	_line(mine, "Bram wronged me. The lawspeaker should hear it.", "", "speak for me")
 	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
 	_check(taken["ok"] and taken["line"] == "Jeff will speak for Mara before the lawspeaker." and _asked.size() == 1, "taken, interest only: %s" % [taken])
 	Offers.spoke_to("p1", "o-bram", _ctx)
@@ -435,6 +439,7 @@ func _test_walk_home() -> void:
 	var mine := _offers()
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.TAKE and mine[0]["what"]["stray"] == "o-tam" and mine[0]["title"] == "Walk Tam home"
 		and str(mine[0]["words"]).begins_with("My ") and str(mine[0]["words"]).contains("Tam has not come back from beyond the walls"), "Mara's plea: walk her kin home: %s" % [mine])
+	_line(mine, "My ", " hasn't come back from beyond the walls.", "walk Tam home")
 	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
 	_check(taken["ok"] and _asked.size() == 1 and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "taken, interest only: %s" % [taken])
 	_check(Offers._promise(Townsfolk.card_of(_work, "o-mara")["asks"][0]) == "to walk Tam home", "the promise in words keeps the name (the soak's 'walk tam home')")
@@ -482,6 +487,7 @@ func _test_chronicle() -> void:
 	var mine := _offers("o-odo")
 	_check(mine.size() >= 1 and mine[0]["kind"] == Offers.PAGE and mine[0]["title"] == "Hear the chronicle" and mine[0]["accept"] == Offers.READ and mine[0]["cost"] == 0,
 		"at home, the scholar offers the chronicle first: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["kind"]))])
+	_line(mine, "Sit, and I'll read it to you.", "", "the chronicle")
 	_check(_offers("o-tam").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "a hauler keeps no chronicle")
 	var read := Offers.accept("o-odo", "p1", "Jeff", mine[0]["id"], 0, _ctx)
 	_check(read["ok"] and read.get("read", []).size() == 3 and read["read"][0] == "The chronicle of Ashford, kept by Odo the smith." and read["read"][1] == "The town has set down nothing yet."
@@ -538,6 +544,7 @@ func _test_sick_pleas() -> void:
 	var mine := _offers()
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["title"] == "Bring the medicine man" and mine[0]["what"]["sick"] == "o-tam" and mine[0]["what"]["healer"] == "o-doc"
 		and str(mine[0]["words"]).contains("lies sick with a cough"), "with a medicine man in the zone, Mara asks for him: %s" % [mine])
+	_line(mine, "My ", " is sick. The medicine man's out at his hut.", "the medicine man")
 	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
 	_check(taken["ok"] and Townsfolk.card_of(_work, "o-mara")["asks"].size() == 1, "taken, interest only")
 	_check(Offers._promise(Townsfolk.card_of(_work, "o-mara")["asks"][0]) == "bring the medicine man", "(the promise in words)")
@@ -556,6 +563,7 @@ func _test_sick_pleas() -> void:
 	Townsfolk._set_sickness(_work, "o-tam", {"since": 1, "kind": "the shakes", "treated": -1, "cured_by": ""})
 	mine = _offers()
 	_check(mine.size() == 1 and mine[0]["title"] == "Walk Tam to the healer's" and mine[0]["what"].get("hut") == "o/hut", "with no medicine man but a hut, walk him there: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	_line(mine, "My ", " is sick. The healer would see to him.", "to the healer")
 	Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"], 0, _ctx)
 	Offers.healed(TOWN, "o-tam", "", "", "died", _ctx)
 	_check(_done.size() == 2 and _done[1][3] == 0 and str(_done[1][2]) == "Tam died of the sickness." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),
@@ -909,3 +917,11 @@ func _test_scholar_and_merchant() -> void:
 	_goods = [{"uid": 9, "id": "knife", "price": 12}, {"uid": 11, "id": "wood", "price": 20}]
 	_check(_offers()[0]["what"]["uid"] == 9, "a steady smith still offers only her knife")
 	Lore.reload()
+
+
+## The first row's "line" (voice's aside, ui's 536 amended): [param head] then [param tail] (the whole
+## line when [param tail] is empty), within Offers.LINE_MOST characters with its names filled in.
+func _line(rows: Array, head: String, tail: String, what: String) -> void:
+	var line := str(rows[0].get("line", "")) if not rows.is_empty() else ""
+	var ok := line == head if tail.is_empty() else line.begins_with(head) and line.ends_with(tail) and line.length() > head.length() + tail.length()
+	_check(ok and line.length() <= Offers.LINE_MOST, "%s: its line \"%s\" (%d of %d)" % [what, line, line.length(), Offers.LINE_MOST])

@@ -18910,6 +18910,19 @@ flock.wool: 1 at 7 days, 2 at 14, the same a day either way, landed
 before 533 so the box never runs the longer seasons without it.
 farm_test _test_season_scale. Protocol unchanged.
 
+npc's rows (536 amended, ui's hand-out; no number of their own): each of npc's offer rows carries
+its asker's "line", voice's short aside under the row ("words" stays the whole speech), through
+economy's Offers._lined and LINE_MOST (60), one helper for every owner. The pleas: fetch the medicine
+man "My <kin> is sick. The medicine man's out at his hut.", walk to the healer's "My <kin> is sick.
+The healer would see to <them>.", stray kin "My <kin> hasn't come back from beyond the walls.";
+speak for <name> "<name> wronged me. The lawspeaker should hear it."; carry word "Tell <name> it's
+forgotten between us."; the chronicle "Sit, and I'll read it to you."; the commissions, bring home
+"My <kin> never came back from that camp." and clear the camp "Before they come again." The relic
+(714) and Aldous's crypt rows are dungeon's (its own wrap, the coordinator's routing). A debt and a
+rumour carry none. Nothing shows it until
+ui-design's UiRow and ui's build land; an old client ignores it (release: no new number).
+offers_test checks each row's line within LINE_MOST.
+
 ## 539. A landing checks the CHANGELOG before its tests
 
 On 2026-10-19 four bullets went in the wrong place. Economy's 522 and maps'
