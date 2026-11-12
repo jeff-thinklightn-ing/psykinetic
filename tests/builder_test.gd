@@ -1706,7 +1706,10 @@ func _test_runner() -> void:
 func _test_spots() -> void:
 	print("\n== the spot tool: where townsfolk stand, sit and lean (859, npc's 853) ==")
 	# Umbrage's square fire (wilds' square_fire, its seats) and the weapon stall's counter.
-	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	# From no spots: the wilds' own (Umbrage's square, well and talk spots, maps' laying) set aside.
+	var wilds_doc := MapDoc.from_level("wilds")
+	wilds_doc.config.erase("spots")
+	var wilds := BuilderSession.new(wilds_doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
 	var steps := wilds.working.undo_steps.size()
 	var seat := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"})
 	var seat_text := str(seat.get("text"))

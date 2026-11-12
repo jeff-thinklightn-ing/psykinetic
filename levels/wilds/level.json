@@ -232,7 +232,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "W1"
 		},
 		{
 			"slot": "building.house",
@@ -245,7 +246,8 @@
 				1
 			],
 			"use": "forge",
-			"town": "store"
+			"town": "store",
+			"code": "H1"
 		},
 		{
 			"slot": "building.shed",
@@ -258,7 +260,8 @@
 				0
 			],
 			"use": "kitchen",
-			"town": "store"
+			"town": "store",
+			"code": "S1"
 		},
 		{
 			"slot": "building.hut",
@@ -269,7 +272,8 @@
 			"facing": [
 				0,
 				-1
-			]
+			],
+			"code": "H2"
 		},
 		{
 			"slot": "building.hut",
@@ -280,7 +284,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "H3"
 		},
 		{
 			"slot": "building.house",
@@ -292,7 +297,8 @@
 				0,
 				1
 			],
-			"home": true
+			"home": true,
+			"code": "H4"
 		},
 		{
 			"kind": "temple",
@@ -314,7 +320,8 @@
 				],
 				"to_map": "barrow",
 				"to_spawn": "from_chapel"
-			}
+			},
+			"code": "T1"
 		},
 		{
 			"slot": "building.temple_altar",
@@ -336,7 +343,8 @@
 			"facing": [
 				0.0,
 				-1.0
-			]
+			],
+			"code": "T2"
 		},
 		{
 			"slot": "building.mound",
@@ -347,7 +355,8 @@
 			"facing": [
 				0,
 				-1
-			]
+			],
+			"code": "M1"
 		},
 		{
 			"slot": "building.great_tree",
@@ -358,7 +367,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "G1"
 		},
 		{
 			"slot": "building.cairn",
@@ -369,7 +379,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "C1"
 		},
 		{
 			"slot": "building.waystone",
@@ -380,7 +391,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "W2"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -393,7 +405,8 @@
 				1
 			],
 			"variant": 1,
-			"yaw": -100.0
+			"yaw": -100.0,
+			"code": "S2"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -406,7 +419,8 @@
 				1
 			],
 			"variant": 2,
-			"yaw": -129.0
+			"yaw": -129.0,
+			"code": "S3"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -419,7 +433,8 @@
 				1
 			],
 			"variant": 3,
-			"yaw": 181.0
+			"yaw": 181.0,
+			"code": "S4"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -432,7 +447,8 @@
 				1
 			],
 			"variant": 1,
-			"yaw": 131.0
+			"yaw": 131.0,
+			"code": "S5"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -445,7 +461,8 @@
 				1
 			],
 			"variant": 2,
-			"yaw": 81.0
+			"yaw": 81.0,
+			"code": "S6"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -458,7 +475,8 @@
 				1
 			],
 			"variant": 3,
-			"yaw": 52.0
+			"yaw": 52.0,
+			"code": "S7"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -471,7 +489,8 @@
 				1
 			],
 			"variant": 1,
-			"yaw": 2.0
+			"yaw": 2.0,
+			"code": "S8"
 		},
 		{
 			"slot": "building.standing_stone",
@@ -484,7 +503,8 @@
 				1
 			],
 			"variant": 2,
-			"yaw": -48.0
+			"yaw": -48.0,
+			"code": "S9"
 		},
 		{
 			"slot": "bridge",
@@ -497,7 +517,8 @@
 				0
 			],
 			"length": 3,
-			"width": 2
+			"width": 2,
+			"code": "B1"
 		},
 		{
 			"slot": "building.chopping_block",
@@ -508,7 +529,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "C2"
 		},
 		{
 			"slot": "building.woodpile",
@@ -520,7 +542,8 @@
 				0,
 				1
 			],
-			"variant": 2
+			"variant": 2,
+			"code": "W3"
 		},
 		{
 			"slot": "building.market_stall",
@@ -531,7 +554,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "M2"
 		},
 		{
 			"slot": "building.market_stall",
@@ -542,7 +566,8 @@
 			"facing": [
 				0,
 				-1
-			]
+			],
+			"code": "M3"
 		},
 		{
 			"kind": "inn",
@@ -561,7 +586,8 @@
 			"level_links": [
 				{"cell": [3, 8], "to_map": "umbrage_tavern", "to_spawn": "from_wilds"},
 				{"cell": [4, 8], "to_map": "umbrage_tavern", "to_spawn": "from_wilds"}
-			]
+			],
+			"code": "I1"
 		},
 		{
 			"kind": "cottage",
@@ -576,7 +602,8 @@
 				0,
 				1
 			],
-			"ruined": true
+			"ruined": true,
+			"code": "C3"
 		},
 		{
 			"kind": "barn",
@@ -591,7 +618,8 @@
 				0,
 				1
 			],
-			"ruined": true
+			"ruined": true,
+			"code": "B2"
 		},
 		{
 			"slot": "building.rubble_heap",
@@ -602,7 +630,8 @@
 			"facing": [
 				0,
 				1
-			]
+			],
+			"code": "R1"
 		}
 	],
 	"became": {
@@ -3357,6 +3386,129 @@
 			],
 			"up": "left",
 			"closed": false
+		}
+	],
+	"building_codes": {
+		"W": 3,
+		"H": 4,
+		"S": 9,
+		"T": 2,
+		"M": 3,
+		"G": 1,
+		"C": 3,
+		"B": 2,
+		"I": 1,
+		"R": 1
+	},
+	"spots": [
+		{
+			"use": "square",
+			"cell": [189, 196],
+			"face": [190, 196],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [200, 196],
+			"face": [199, 196],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [191, 193],
+			"face": [192, 194],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [197, 193],
+			"face": [196, 194],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [188, 206],
+			"face": [189, 206],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [201, 206],
+			"face": [200, 206],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [190, 215],
+			"face": [191, 214],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "square",
+			"cell": [198, 215],
+			"face": [197, 214],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "well",
+			"cell": [193, 190],
+			"face": [194, 190],
+			"pose": "lean",
+			"town": "store"
+		},
+		{
+			"use": "well",
+			"cell": [195, 190],
+			"face": [194, 190],
+			"pose": "lean",
+			"town": "store"
+		},
+		{
+			"use": "well",
+			"cell": [194, 189],
+			"face": [194, 190],
+			"pose": "lean",
+			"town": "store"
+		},
+		{
+			"use": "talk",
+			"cell": [190, 207],
+			"face": [191, 207],
+			"pose": "stand",
+			"town": "store",
+			"pair": "square_a"
+		},
+		{
+			"use": "talk",
+			"cell": [191, 207],
+			"face": [190, 207],
+			"pose": "stand",
+			"town": "store",
+			"pair": "square_a"
+		},
+		{
+			"use": "talk",
+			"cell": [197, 207],
+			"face": [198, 207],
+			"pose": "stand",
+			"town": "store",
+			"pair": "square_b"
+		},
+		{
+			"use": "talk",
+			"cell": [198, 207],
+			"face": [197, 207],
+			"pose": "stand",
+			"town": "store",
+			"pair": "square_b"
 		}
 	]
 }

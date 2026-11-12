@@ -50081,6 +50081,19 @@ lays Umbrage's work spots, the piece that switches it on. resident_test _test_sh
 the smith at his spot, eight bouts within their spans and lengths his own, a task first, a trade with
 no word and a body turned away showing nothing, spoken to and the fresh bout after, a hail across the
 square, the keeper serving, and a day of shown work moving no stock or gold.
+853, maps' side (Umbrage's spots, take 1; the coordinator's approval of npc's contract, npc's word
+on what goes first, 2026-11-11): levels/wilds/level.json "spots" holds Umbrage's first fifteen, all
+town "store", laid through builder's runner (851, tools/builder_run.gd), whose refusals were the check.
+The square: eight stands round the paving, each facing in, at (189,196), (200,196), (191,193),
+(197,193), (188,206), (201,206), (190,215), (198,215). The well: three leans on its coping, facing
+(194,190), at (193,190), (195,190) and (194,189); the cell south of the well, (194,191), is before
+its door and was refused, so the third stands north. Two talk pairs, square_a (190,207)-(191,207)
+and square_b (197,207)-(198,207), each facing the other. No sits: a sit plays the chair sit with
+nothing under it (animation, 566 amended (2)), so the fire's six land with art-kit's log seats,
+the temple's four with buildings' pews, the Mughouse's with the stools (875). No work spots: they
+switch on npc's people at work (c7b92f099) and wait for its ping. The runner's first save of the
+wilds also wrote each building's "code" (851's builder codes, Level.fill_codes) into level.json.
+builder_test's spot test starts from the wilds with its spots set aside. Levels data.
 
 853 amended (11) (people work: the stall's keeper's day is his work; the coordinator's approval, 2026-11-12;
 the label from decision_number.sh). Rolf's body has trade "" (_visitors_wanted), so his day was the
