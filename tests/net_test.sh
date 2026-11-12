@@ -413,7 +413,7 @@ check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)' "$LOGS/clie
 check "$(count '\[zone\] Vale went from test_room to sample' "$LOGS/server8.log")$(count '\[zone\] now in sample' "$LOGS/clientV.log")" 11 "phase 4b: Vale died and was brought back in another zone, her client there"
 check "$(count 'ERROR' "$LOGS/clientV.err")$(count 'ERROR' "$LOGS/clientV.log")" 00 "phase 4b: her client printed no ERROR (its old body gone before the new map)"
 check "$(count 'restarting in 3 s \(a test\), 1 connected' "$LOGS/admin.txt")" 1 "phase 5: the console says the restart is due"
-check "$(count "\\[party\\] Server: Restarting in 3 s \\(a test\\); you'll be reconnected\\." "$LOGS/clientR.log")$(count '\[party\] Server:' "$LOGS/clientR.log")" 11 "phase 5: Rex is told once (a countdown of 3 s has no later warnings)"
+check "$(count "\\[party\\] Notice: Restarting in 3 s \\(a test\\); you'll be reconnected\\." "$LOGS/clientR.log")$(count '\[party\] Notice:' "$LOGS/clientR.log")" 11 "phase 5: Rex is told once (a countdown of 3 s has no later warnings)"
 check "$(count '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75' "$LOGS/server5.log")" 1 "phase 5: the server saves and lets him go"
 check "$restart_code" 75 "phase 5: and exits 75, for systemd to start it again"
 check "$(cat "$LOGS/server5.log" "$LOGS/server5.err" | grep -c '^ERROR' || true)" 0 "phase 5: holding three zones, it went without an ERROR (decision 299)"

@@ -700,6 +700,25 @@ func _test_screenshot_key() -> void:
 		_main.town_notes.clear()
 		_main._on_message("party", {"from": "Server", "text": "You find yourself in the wilds."})
 		_check(_main.talk.lines.size() == before + 1, "a Server line still goes to the log")
+		# The game's own narration is plain dim text, a person's party line keeps its "[party]" and name, a true
+		# notice has its own mark and no "[party]" (voice's, with the coordinator).
+		var shown_of := func(index: int) -> String:
+			var row := _main.talk._list.get_child(_main.talk._list.get_child_count() - 1 - index) as RichTextLabel
+			return row.get_parsed_text()
+		_main._on_message("party", {"from": "Server", "text": "You pick up 5 gold."})
+		_main._on_message("party", {"from": "Wren", "text": "Over here."})
+		_main._on_message("party", {"from": TalkPanel.NOTICE, "text": "Restarting in 30 s."})
+		var notice_text: String = shown_of.call(0)
+		var person_text: String = shown_of.call(1)
+		var narration_text: String = shown_of.call(2)
+		_check(narration_text == "You pick up 5 gold.", "the game's narration: just its words, no name, no [party] (%s)" % narration_text)
+		_check(person_text == "[party] Wren: Over here.", "a person's party line keeps its [party] and its name (%s)" % person_text)
+		_check(notice_text == "Notice: Restarting in 30 s." and not "[party]" in notice_text, "a true notice: its own mark, no [party] (%s)" % notice_text)
+		var theme := UiTheme.theme()
+		_check(theme != null and theme.has_color(&"mark", &"TalkNotice") and theme.has_color(&"words", &"TalkNotice") and theme.has_font(&"mark_font", &"TalkNotice")
+				and theme.has_color(&"name", &"TalkName") and theme.has_font(&"name_font", &"TalkName")
+				and theme.get_color(&"mark", &"TalkNotice") == UiTheme.color("rust"),
+			"the notice's mark and words come from the theme's TalkNotice (rust mark), a speaker's name from TalkName: no colour or font of the panel's own")
 
 
 func _test_aim() -> void:

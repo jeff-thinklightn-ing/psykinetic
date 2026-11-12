@@ -432,7 +432,7 @@ Assert (@($server6Log | Select-String 'slots: Player2 moved bandaging_kit from C
 Assert (@($clientLLog | Select-String '\[test\] slots: Chest1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Lee sees the chest empty and the kit in their slots (Max has gone by then)'
 Assert (@($clientMLog | Select-String '\[test\] slots: Chest1=\[\] Player1=\[\] Player2=\[bandaging_kit\]$').Count -eq 1) 'phase 6: Max, who did nothing, sees the same'
 Assert ($adminReply -match 'restarting in 3 s \(a test\), 1 connected') "phase 7: the console says the restart is due ($adminReply)"
-Assert (@($clientRLog | Select-String "\[party\] Server: Restarting in 3 s \(a test\); you'll be reconnected\.").Count -eq 1 -and @($clientRLog | Select-String '\[party\] Server:').Count -eq 1) 'phase 7: Rex is told once (a countdown of 3 s has no later warnings)'
+Assert (@($clientRLog | Select-String "\[party\] Notice: Restarting in 3 s \(a test\); you'll be reconnected\.").Count -eq 1 -and @($clientRLog | Select-String '\[party\] Notice:').Count -eq 1) 'phase 7: Rex is told once (a countdown of 3 s has no later warnings)'
 Assert (@($server7Log | Select-String '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75').Count -eq 1) 'phase 7: the server saves and lets him go'
 Assert ($restartCode -eq 75) "phase 7: and exits 75, for systemd to start it again (exit $restartCode)"
 $restartErrors = @((Read-Log 'server7') + @(Get-Content (Join-Path $logs 'server7.err') -ErrorAction SilentlyContinue) | Select-String '^ERROR')

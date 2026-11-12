@@ -684,8 +684,10 @@ func add_said(speaker: String, text: String, aside := "") -> void:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
-	label.push_color(TalkPanel.SPEAKER)
+	label.push_font(get_theme_font(&"name_font", &"TalkName"))  # The talk box's speaker name (ui-design's TalkName).
+	label.push_color(get_theme_color(&"name", &"TalkName"))
 	label.add_text("%s: " % speaker)
+	label.pop()
 	label.pop()
 	label.add_text(text)
 	if not aside.is_empty():

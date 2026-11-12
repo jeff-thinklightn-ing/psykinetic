@@ -30,7 +30,6 @@ const FADE_AFTER := 8.0
 const WIDTH := 900.0
 const LIST_HEIGHT := 520.0
 ## The colours, the theme's.
-static var SPEAKER: Color = UiTheme.color("brass_bright")
 static var CHAT: Color = UiTheme.color("aloud")
 static var PARTY: Color = UiTheme.color("party")
 ## A resident's aside (npc's 336 amended, ui's side): how the line was said,
@@ -38,6 +37,10 @@ static var PARTY: Color = UiTheme.color("party")
 static var ASIDE: Color = UiTheme.color("text_dim")
 ## What sets an aside off from the speech on its row.
 const ASIDE_DASH := " — "
+## The speaker word of the game's own narration (the server's "party" lines, 36 senders in Main): shown as plain
+## dim text. NOTICE is the speaker of the true notices (a newer game, a restart): they keep a mark.
+const NARRATOR := "Server"
+const NOTICE := "Notice"
 
 ## Tab: kept shown, and scrollable.
 var pinned := false
@@ -160,15 +163,33 @@ func add_line(speaker: String, text: String, is_chat := false, party := false, a
 	label.tooltip_text = at
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
 	var said := PARTY if party else CHAT
-	if party:
-		label.push_color(PARTY)
-		label.add_text("[party] ")
+	var narration := party and speaker == NARRATOR
+	var notice := party and speaker == NOTICE
+	if narration:
+		# The game's own narration ("You pick up 5 gold."): plain dim text, no name, no "[party]" (voice's, with
+		# the coordinator): a machine is not in a party with the player.
+		said = ASIDE
+	elif notice:
+		# A true notice (an update, a restart) keeps its mark: its own word, no "[party]", in the theme's TalkNotice
+		# (ui-design's: the mark rust bold sans, the words bone), not a speaker's name.
+		said = get_theme_color(&"words", &"TalkNotice")
+		label.push_font(get_theme_font(&"mark_font", &"TalkNotice"))
+		label.push_color(get_theme_color(&"mark", &"TalkNotice"))
+		label.add_text("%s: " % NOTICE)
 		label.pop()
-	label.push_font(UiTheme.font("serif"))
-	label.push_color(SPEAKER)
-	label.add_text("%s: " % speaker)
-	label.pop()
-	label.pop()
+		label.pop()
+	else:
+		if party:
+			label.push_color(PARTY)
+			label.add_text("[party] ")
+			label.pop()
+		# A speaker's name in the theme's TalkName (ui-design's: brass bright, bold sans: the serif's hairlines go soft at
+		# the box's size).
+		label.push_font(get_theme_font(&"name_font", &"TalkName"))
+		label.push_color(get_theme_color(&"name", &"TalkName"))
+		label.add_text("%s: " % speaker)
+		label.pop()
+		label.pop()
 	label.push_color(said)
 	label.add_text(text)
 	label.pop()

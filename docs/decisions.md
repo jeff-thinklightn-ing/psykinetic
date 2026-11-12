@@ -12262,6 +12262,22 @@ that wait on them (the hit's flinch and sound, the block's knock, a shield's spa
 contact and a guarded stun's recoil). Its other timings (busy_until, a wound, sparks' fade) stay on
 the wall clock. view_test _test_reel_clock checks a swing's landing on a reel's clock. Client only,
 play unchanged, protocol unchanged, no new class_name, no bullet.
+
+427 amended (1) (ui, 2026-11-12; voice's finding through the coordinator: the game's own narration reached the
+talk box as "[party] Server: You pick up 5 gold.", a machine speaking in a party the solo player does not have):
+a "party" line whose speaker is "Server" (the 37 senders in Main and the server's own notices) is narration,
+shown as plain dim text, no name, no "[party]", no dash, no italics (TalkPanel.NARRATOR). The two true notices
+keep a mark of their own: the speaker "Notice" (TalkPanel.NOTICE) shows as "Notice: <words>" in the party
+colour, no "[party]": the newer-game line (client) and Main._server_says (the restart warnings, an admin's word
+to all) now send it. A person's party line keeps its "[party] <name>:". An old server's warnings arrive from
+"Server" and read as narration, and an old client would show the new speaker as a party line from "Notice":
+it shares PROTOCOL_REVISION 57 with environment's 882 and does not bump it: v0.1.214 (revision 57) is on the box, so the mixed pairs are not refused and each shows a cosmetic fault only in the restart warnings and an admin's word to all: a v0.1.214 client against the next server reads them as "[party] Notice: <words>", and a new client against the v0.1.214 server reads them as narration. Release asked for a number only if what a message means changes, and no field, kind or shape does. The server is redeployed with the next cut. "Notice" is release's word for their lines. The notice's mark and words are the theme's TalkNotice (the mark rust bold sans, the words bone at full strength:
+the coordinator's fix after ui-design's chat still, where the brass serif name with teal words read as a party
+member called Notice), and every speaker's name the theme's TalkName (brass bright, bold sans: the serif's
+hairlines go soft at the box's size); ui-design's 854 amended (3) is the rule that the serif is used from 54 units
+up. ui_test checks the three kinds and the types. Client, plus the speaker
+word in two server sends; no new class_name.
+
 ## 391. A companion inside buildings and in doorways
 
 Jeff's play (2026-10-17, through the coordinator): in Pip's house her voice

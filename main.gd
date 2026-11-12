@@ -17596,7 +17596,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			# The same protocol, so it plays; the next start updates it.
 			_told_newer = true
 			print("[update] the server runs v%s, newer than this v%s: launch.bat updates it" % [Net.server_version, Net.claimed_version()])
-			talk.add_line("Server", "A newer game, v%s, is out: start the game again with launch.bat to update." % Net.server_version, true, true)
+			talk.add_line(TalkPanel.NOTICE, "A newer game, v%s, is out: start the game again with launch.bat to update." % Net.server_version, true, true)
 		if not Net.is_authority() and wanted != map_name and Level.exists(wanted):
 			_client_zone(wanted)
 		return
@@ -25395,7 +25395,7 @@ func _raids_command(words: PackedStringArray) -> String:
 ## Server: a line to every player, from "Server", in the party chat.
 func _server_says(text: String) -> void:
 	print("[admin] told everyone: %s" % text)
-	Net.broadcast("party", {"from": "Server", "text": text})
+	Net.broadcast("party", {"from": TalkPanel.NOTICE, "text": text})  # A true notice (the restart warnings, an admin's word to all): its own mark.
 
 
 # --- Server console -----------------------------------------------------------

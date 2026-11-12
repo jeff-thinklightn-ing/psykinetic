@@ -654,6 +654,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## land sets it): the sim's dark follows a sun of -5.9 degrees, not -1 (DayNight.TWILIGHT_LOW -12,
 ## TWILIGHT_HIGH 10), so wolves turn bold, the hill cat reaches and hiding in the dark begin then; an
 ## old client would draw night about 27 game minutes before the server's dark.
+## 57 also (427 amended (1), "the game's narration reads as narration"; no bump, 57 is on the box with v0.1.214): a "party" line from
+## the speaker "Server" is the game's own narration and a new client shows it as plain dim text (no name, no [party]); the true
+## notices (the restart warnings, an admin's word to all) are sent from the speaker "Notice". Mixed pairs are not refused: an
+## old client shows a "Notice" line as "[party] Notice:", a new client shows an old server's warning as narration.
 const PROTOCOL_REVISION := 57
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
