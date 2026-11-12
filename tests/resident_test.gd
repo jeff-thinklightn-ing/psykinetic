@@ -6663,6 +6663,8 @@ func _test_relic() -> void:
 	_check(offers.size() == 1 and str(offers[0]["title"]).ends_with("the remains of Sir Ewald"), "the priest offers to take it (%s)" % [offers])
 	# A row naming a resident takes their own pronoun (playtest: "Give her the remains" from Aldous; lore's table).
 	_check(offers.size() == 1 and str(offers[0]["title"]) == "Give him the remains of Sir Ewald", "his own pronoun: %s" % [offers[0]["title"] if not offers.is_empty() else ""])
+	_check(offers.size() == 1 and str(offers[0].get("line", "")) == Offers.RELIC_LINE and Offers.RELIC_LINE.length() <= Offers.LINE_MOST,
+		"Aldous's aside under it (536 amended, voice's words): %s" % [offers[0].get("line", "") if not offers.is_empty() else ""])
 	var kept := {"traits": {"name": "Aldous", "pronoun": "she"}, "look": {"beard": "full"}, "card": "She keeps the temple.", "card_by": "model"}
 	_check(ResidentCard.mend_pronoun(kept) and kept["traits"]["pronoun"] == "he" and kept["card"] == "" and not ResidentCard.mend_pronoun(kept),
 		"a card kept from before mended to his name's, its paragraph to be written again, once (%s)" % [kept])

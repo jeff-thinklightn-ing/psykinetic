@@ -20194,6 +20194,17 @@ lands off. offers_test checks each row's line against the data and every one wit
 No CHANGELOG bullet. Wire: an optional key on an offer row, no new number (release; net.gd's
 note), an old client ignores it. No new class_name.
 
+536 amended, dungeon's side: Aldous's asides under his crypt rows (under ui's hand-out; no number of
+its own; voice's words, the coordinator's routing). Offers._lined puts Offers.OFFERING_LINE, "It must
+reach the stone. Tell no one.", on "Take the offering down"; RUNNER_LINE, "<runner> went down and
+never came back.", on "Find the runner"; and RELIC_LINE, "Bring them home to the altar.", on "Give
+<them> the remains of <knight>". The rows are npc's (546 part 3, 714's npc side); their asides are
+constants beside the rows' words, which live in offers.gd too, not residents.json. Each is within
+LINE_MOST with Pip's name. An open ask (_as_open) carries none, as economy's don't. Lands off: nothing
+draws "line" until ui's window does. offers_test (the offering's and the runner's, the runner named),
+resident_test (the remains'). No CHANGELOG bullet. Wire as economy's: an optional key, no new number;
+no new class_name.
+
 ## 544, ui's side: downed and brought back, read on the HUD
 
 Companions' 544 replicates downed_until, channel_of (the body's node

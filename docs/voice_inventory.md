@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2880)
+## Lines in the code (2883)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -740,7 +740,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Her card: %s%s Already true of her: %s She believes: %s What was just said: %s | `sim/companion_facts.gd` extract_prompt() |
 |  | - nothing more yet | `sim/companion_facts.gd` extract_prompt() |
 
-### deal and quest windows (205)
+### deal and quest windows (208)
 
 | | Line | Where |
 |---|---|---|
@@ -751,6 +751,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | can i do | `sim/offers.gd`  |
 |  | i'll take it | `sim/offers.gd`  |
 |  | i'll do it | `sim/offers.gd`  |
+|  | It must reach the stone. Tell no one. | `sim/offers.gd` OFFERING_LINE |
+|  | %s went down and never came back. | `sim/offers.gd` RUNNER_LINE |
+|  | Bring them home to the altar. | `sim/offers.gd` RELIC_LINE |
 |  | (?i)\\b(price\\w*\|gold\|coin\\w*\|cost\\w*\|sell\\w*\|sold\|buy\\w*\|bought\|short of\|dear\\w*\|cheap\\w*)\\b | `sim/offers.gd` TRADE_WORDS |
 |  | sister or brother | `sim/offers.gd` KIN_WORDS |
 |  | parent and child | `sim/offers.gd` KIN_WORDS |

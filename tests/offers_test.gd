@@ -804,6 +804,8 @@ func _test_crypt_commissions() -> void:
 	_check(not "Take the offering down" in titles.call("p2"), "nothing to one not told")
 	var offer: Dictionary = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")[0]
 	_check(str(offer["words"]) == "Carry the temple's offering, 12 gold, down to the offering stone in the crypt and lay it there. Tell no one." and str(offer["kind"]) == Offers.COMMISSION, "its words: %s" % offer["words"])
+	_check(str(offer.get("line", "")) == "It must reach the stone. Tell no one." and str(offer["line"]).length() <= Offers.LINE_MOST,
+		"and Aldous's aside under the row (536 amended, voice's words; within LINE_MOST): %s" % [offer.get("line", "")])
 	var taken := Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
 	_check(bool(taken["ok"]) and given == [["p1", 12]] and pot[0] == 0 and str(taken["line"]) == "Jeff takes the temple's offering, 12 gold, to carry down to the stone in the crypt.", "taken: the altar's gold into the purse: %s" % taken["line"])
 	var standing: Array = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")
@@ -817,6 +819,8 @@ func _test_crypt_commissions() -> void:
 	lost[0] = "Pip"
 	_check("Find the runner" in titles.call("p1") and not "Take the offering down" in titles.call("p1"), "Pip lost, the altar bare: find the runner: %s" % [titles.call("p1")])
 	offer = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Find the runner")[0]
+	_check(str(offer.get("line", "")) == "%s went down and never came back." % lost[0] and str(offer["line"]).length() <= Offers.LINE_MOST,
+		"its aside names the runner (536 amended, voice's words; within LINE_MOST): %s" % [offer.get("line", "")])
 	taken = Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
 	_check(bool(taken["ok"]) and str(taken["line"]) == "Jeff takes Aldous's commission: to find what became of Pip.", "taken: %s" % taken["line"])
 	_check(Offers.crypt_done(TOWN, "p1", Offers.RUNNER, _ctx) and _done.size() == 2 and str(_done[1][2]) == "Jeff found Pip's pack in the robbers' camp, and told Aldous."

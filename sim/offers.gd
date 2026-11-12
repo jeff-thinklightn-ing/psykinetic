@@ -71,6 +71,12 @@ const OFFERING := "offering"
 ## "relics" lists the player's; Main lays one on the altar (Main._relic_returned).
 const RELIC := "relic"
 const RUNNER := "runner"
+## Aldous's short asides under his crypt rows (536 amended, dungeon's side;
+## voice's words, ui's "line", each within LINE_MOST): the offering's, the
+## runner's (%s the runner) and the remains'.
+const OFFERING_LINE := "It must reach the stone. Tell no one."
+const RUNNER_LINE := "%s went down and never came back."
+const RELIC_LINE := "Bring them home to the altar."
 const RUMOUR := "rumour"
 const PLEA := "plea"
 ## A page read to the player (decision 491: the scholar's chronicle); its
@@ -393,8 +399,8 @@ static func _relic_offers(worker_id: String, who: Dictionary, card: Dictionary, 
 		if uid == 0:
 			continue
 		var knight := str(relic.get("knight", "the knight"))
-		out.append(_offer(worker_id, RELIC, str(uid), "Give %s the remains of %s" % [_them(card), knight],
-			"%s's remains, brought up from the crypt, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC))
+		out.append(_lined(_offer(worker_id, RELIC, str(uid), "Give %s the remains of %s" % [_them(card), knight],
+			"%s's remains, brought up from the crypt, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC), RELIC_LINE))
 	return out
 
 
@@ -516,14 +522,14 @@ static func _crypt_offers(worker_id: String, who: Dictionary, town: String, play
 	var has := func(sub: String) -> bool: return standing.any(func(ask: Dictionary) -> bool: return str(ask.get("sub", "")) == sub)
 	var gold := int(asks.get("offering", 0))
 	if gold > 0 and not has.call(OFFERING):
-		out.append(_offer(worker_id, COMMISSION, OFFERING + ":" + town, "Take the offering down",
+		out.append(_lined(_offer(worker_id, COMMISSION, OFFERING + ":" + town, "Take the offering down",
 			"Carry the temple's offering, %d gold, down to the offering stone in the crypt and lay it there. Tell no one." % gold,
-			{"sub": OFFERING, "gold": gold, "town": town}, TAKE))
+			{"sub": OFFERING, "gold": gold, "town": town}, TAKE), OFFERING_LINE))
 	var runner := str(asks.get("runner", ""))
 	if not runner.is_empty() and not has.call(RUNNER):
-		out.append(_offer(worker_id, COMMISSION, RUNNER + ":" + town, "Find the runner",
+		out.append(_lined(_offer(worker_id, COMMISSION, RUNNER + ":" + town, "Find the runner",
 			"%s went down with the offering and has not come back. Find what became of him." % runner,
-			{"sub": RUNNER, "name": runner, "town": town}, TAKE))
+			{"sub": RUNNER, "name": runner, "town": town}, TAKE), RUNNER_LINE % runner))
 	return out
 
 
