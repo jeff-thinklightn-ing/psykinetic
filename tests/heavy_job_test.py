@@ -84,6 +84,8 @@ check("suite_remote" in gate.KINDS["bench"]["excludes"] and "bench" in remote_ro
 check(gate.out_of_reach(dict(gate.KINDS["suite_lean3"]), [], 12.5) and not gate.out_of_reach(remote_row, [], 12.5),
     "12.5 GB free: a lean suite is out of reach, a saturn landing's local parts are not")
 check("variant_of" not in remote_row and "lean" not in remote_row, "and the suite's estimate never learns from it")
+check(remote_row.get("remote") and gate.limit_seconds(dict(remote_row, runs_s=[415.0])) == remote_row["max_minutes"] * 60.0,
+    "its limit is fixed, not three short runs' median: saturn's own timeouts sum past that")
 
 print("== going past those that wait on their own kind ==")
 import_row = dict(suite, kind="godot_import")

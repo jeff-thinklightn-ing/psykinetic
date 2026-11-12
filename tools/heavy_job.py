@@ -205,8 +205,12 @@ KINDS = {
     # this PC, so it asks for their room, not a suite's. A kind of its own, so
     # the suite's estimate never learns from a run that held no suite; land.sh
     # picks it when saturn answers, and a landing takes it by the name
-    # `tools/remote_tests.sh kind` prints.
-    "suite_remote": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 60},
+    # `tools/remote_tests.sh kind` prints. "remote": its work is on another
+    # machine, so this PC's CPU says nothing of whether it is hung (ssh and
+    # tee idle while saturn runs the suite); its limit is fixed instead, over
+    # the sum of remote_tests.sh's own timeouts.
+    "suite_remote": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 60,
+        "fixed_limit": True, "remote": True},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "suite_remote", "soak", "scene"], "max_minutes": 90},
     # Not counted under MAX_RUNNING, one at a time (394 amended (22)): six
     # imports waited on the count beside a suite and two scenes, 2026-11-04.
@@ -1520,7 +1524,7 @@ def run(tree, kind, command, expect_minutes=None):
                 ended = ("overrun", "over its limit of %.0f min (%s)" % (limit / 60,
                     "--expect" if expect_minutes is not None else "its kind's max_minutes" if row.get("fixed_limit")
                     else "%g x its kind's median run, or its max_minutes" % OVERRUN_FACTOR))
-            elif idle and not row["gpu"]:
+            elif idle and not row["gpu"] and not row.get("remote"):
                 ended = ("hung", "hung: %.1f%% of a core the last %.0f min" % (share * 100, HUNG_SECONDS / 60))
             if ended is not None:
                 job.stop()
@@ -1689,9 +1693,19 @@ def release(tree, kind):
 def holds(tree, kind):
     """Whether [tree] holds a [kind] now (a take, or a run going): a script
     called inside it (land.sh, under its session's take) does not queue
-    again."""
+    again. As a run adopts a take (394 amended (11)), one of [kind] held by
+    this process's own ancestor counts whatever tree it is named for: land.sh
+    asks this to choose between suite and suite_remote, and a landing script
+    that took suite under another name must not be sent to queue again for
+    suite_remote while it holds the land lock."""
     with StateLock():
-        return any(entry["tree"] == tree and entry["kind"] == kind for entry in _entries("running"))
+        entries = [entry for entry in _entries("running") if entry["kind"] == kind]
+    if any(entry["tree"] == tree for entry in entries):
+        return True
+    if not entries:
+        return False
+    mine = set(ancestors(os.getpid()))
+    return any(entry.get("pid") and int(entry["pid"]) in mine for entry in entries)
 
 
 def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
