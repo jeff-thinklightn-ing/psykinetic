@@ -7,7 +7,9 @@ extends RefCounted
 ## say exactly what "Claude" did. The bodies it was sent are kept.
 
 ## Turns, in order: an Array of {name, input} (tool calls), or a String
-## (the closing words).
+## (the closing words). In the closing words "{results}" is the last tool
+## calls' answers, each on its own line, as Claude would pass on a refusal
+## (859 amended (2): a shot of the ghost shows a refused spot's reason).
 var turns: Array = []
 var sent: Array[Dictionary] = []
 var _turn := 0
@@ -30,7 +32,14 @@ func send(body: Dictionary) -> Dictionary:
 	var turn: Variant = turns[_turn]
 	_turn += 1
 	if turn is String:
-		return {"model": body.get("model", ""), "stop_reason": "end_turn", "usage": usage, "content": [{"type": "text", "text": turn}]}
+		var words: String = turn
+		if "{results}" in words:
+			var said := PackedStringArray()
+			for part: Variant in last.get("content", []) if last.get("content") is Array else []:
+				if part is Dictionary and part.get("type") == "tool_result":
+					said.append(str(part.get("content", "")))
+			words = words.replace("{results}", "\n".join(said))
+		return {"model": body.get("model", ""), "stop_reason": "end_turn", "usage": usage, "content": [{"type": "text", "text": words}]}
 	var content: Array = []
 	for i in (turn as Array).size():
 		var call: Dictionary = turn[i]

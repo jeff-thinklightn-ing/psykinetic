@@ -49982,8 +49982,13 @@ changed at BUILDER_SPOT_ALPHA, kept and gone at BUILDER_SPOT_KEPT_ALPHA, a gone 
 BUILDER_SPOT_GONE. No words, so nothing for voice; a world mark like the roof outlines, so no
 ui-design mock (the coordinator). BuilderUI passes the proposal's spots through. The proposal message
 carries one key more and none changes, and accepting never depends on the ghost being drawn: no new
-protocol number (release, net.gd's rule): an old client ignores "spots" and draws no ghost. builder_test _test_spot_ghost (kept,
-changed, gone, new; none outside the area); view_test (a mark each, turned to its face, the gone one
+protocol number (release, net.gd's rule): an old client ignores "spots" and draws no ghost. For a shot of it (the coordinator: a spot being laid and a
+refused one with its reason), the stub (--builder-stub) answers "spots x,y x,y ..." by laying a spot
+on each cell named (a fire seat, a square standing, a cook leaning, in turn), and a stub's closing
+words may hold "{results}", the tool answers passed on as Claude would (BuilderHost.stub_spots,
+StubClaude): --test-builder="x,y,w,h:spots ..." shows the ghost and a refusal in game. builder_test
+_test_spot_ghost (kept, changed, gone, new; none outside the area; the stub's spots and its passed-on
+refusal); view_test (a mark each, turned to its face, the gone one
 fainter with its cross). Tools only: nothing a player outside builder mode sees, no package, no
 bullet; no new class_name.
 

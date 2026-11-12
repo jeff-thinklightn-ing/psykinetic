@@ -378,6 +378,8 @@ static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO, dungeon :
 			if sides[side]:
 				return StubClaude.new([[{"name": "new_area", "input": {"side": side, "width": 48, "height": 48, "name": "Stub Fields"}}],
 					"(Stub) A new level beyond the %s edge." % side])
+	if text.to_lower().begins_with("spots"):
+		return stub_spots(text)
 	var middle := Rect2i(area.position + area.size / 3, (area.size / 3).max(Vector2i.ONE))
 	var centre := middle.position + middle.size / 2
 	# Jeff's chest rules (807 amended (4), 806 amended (7)): a chest of things
@@ -389,6 +391,29 @@ static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO, dungeon :
 	if dungeon:
 		calls.append({"name": "place", "input": {"at": [middle.end.x - 1, middle.end.y - 1], "thing": "imp", "idle": {"mode": "guard"}}})
 	return StubClaude.new([calls, "(Stub) A patch of dirt with a chest and a torch."])
+
+
+## The stub's spots (859 amended (2), for a shot of the ghost): "spots x,y
+## x,y ..." (or ";" between) lays a spot on each cell named, facing east, the
+## uses and poses in turn (a fire seat, a square standing, a cook leaning);
+## its closing words pass on each tool's answer, so a refused spot's reason
+## shows as Claude's would.
+static func stub_spots(text: String) -> StubClaude:
+	var kinds := [{"use": "fire", "pose": "sit"}, {"use": "square", "pose": "stand"}, {"use": "work", "trade": "cook", "pose": "lean"}]
+	var calls: Array = []
+	# Cells apart by spaces or ";" (a shot's command line keeps no spaces).
+	for word: String in text.substr(5).replace(";", " ").strip_edges().split(" ", false):
+		var parts := word.split(",")
+		if parts.size() != 2 or not parts[0].is_valid_int() or not parts[1].is_valid_int():
+			continue
+		var at := Vector2i(int(parts[0]), int(parts[1]))
+		var input: Dictionary = (kinds[calls.size() % kinds.size()] as Dictionary).duplicate()
+		input["at"] = [at.x, at.y]
+		input["face"] = [at.x + 1, at.y]
+		calls.append({"name": "spot", "input": input})
+	if calls.is_empty():
+		return StubClaude.new(["(Stub) No cells named: spots x,y x,y ..."])
+	return StubClaude.new([calls, "(Stub) Spots laid where I could:\n{results}"])
 
 
 ## Removes level [param level_name]'s files from the overlay.
