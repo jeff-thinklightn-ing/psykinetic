@@ -7,8 +7,10 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.212
+
 - Your companion names things as you'd say them: some roast meat, soft boots, the holy remains, an Encolpion Amulet (294 amended (1)).
-- Umbrage at night has the wind in its timbers and eaves, with the creak of old wood, and the fire on the square crackles as a camp's fire does, heard from well across the square (578 amended (2))
+- Umbrage at night has the wind in its timbers and eaves, with the creak of old wood (578 amended (2)).
 - Umbrage's temple has its altar, pale stone under a plain linen cloth facing the pews, two candles burning on it, and Aldous takes offerings at a low oak table with a bronze bowl on it (734 amended (8)).
 - Umbrage's square has no chests standing in it now, and anything you left in the old chests by the stall waits for you with Aldous at the temple, where pews and candles stand by the stair down (734 amended (7)).
 - The corner map and the big map draw the ground as it looks: green grass, brown paths, grey stone and clear blue water, with the hills gently shaded (873).
@@ -18,7 +20,7 @@ notes (decision 324).
 - The castle and the dark tower on the horizon keep their place as you move, however many zones you've crossed into (650).
 - From Umbrage's north edge, the castle on the horizon stands on a low green hill of its own (650 amended (3)).
 - In Umbrage's square the roads stop at the cobbles' edge, and the square is stone all through (563 amended (1)).
-- At the edge of the land, by Umbrage's woodlot and south of the town, the low camera now shows the woods and the forest floor below you: treetops close to the camera thin away, as a tree right beside it already does, so you can see the ground and yourself there (326 amended (1))
+- At the edge of the land, by Umbrage's woodlot and south of the town, the low camera now shows the woods and the forest floor below you: treetops close to the camera thin away, as a tree right beside it already does, so you can see the ground and yourself there (326 amended (1)).
 - When you host a game yourself, your companion and the creatures around you walk evenly (350 amended (2)).
 - Towns: townsfolk out for a stroll pick open ground of their own, with room between them (853 amended (7)).
 - Towns: townsfolk walk in long straight and slanting runs, turning only where one run meets the next (853 amended (6)).
@@ -28,38 +30,38 @@ notes (decision 324).
 - Whatever blocks a click walk, you look for another way round at once, and where there's none, you stop and stand (689 amended (9)).
 - Click a chest or a person from afar, and if someone steps into the spot beside it as you go, you walk to another spot beside it and still reach it (724 amended (5)).
 - Your character walks smoothly the whole way, legs and facing steady, however long you keep walking (689 amended (10)).
-- Umbrage's map, and the name shown for where you stand, now read "the temple" and "the healer's hut" at those two places (832 amended (1))
+- Umbrage's map, and the name shown for where you stand, now read "the temple" and "the healer's hut" at those two places (832 amended (1)).
 - Your companion follows in your footsteps at your own pace, walking smoothly behind you, and stops beside you only when you turn back toward her (485 amended (2)).
-- Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856)
-- Towns: hold a pelt, a trophy or a bear claw in your hand at a keeper who buys it, and the keeper tells you it goes in your pack first (856 amended (2))
+- Towns: Rolf at the stall gives you your first fishing rod free and buys your fish at the store's price, and every sale or purchase at a counter now shows what changed hands and the gold it came to (856).
+- Towns: hold a pelt, a trophy or a bear claw in your hand at a keeper who buys it, and the keeper tells you it goes in your pack first (856 amended (2)).
 - Fishing: the pond round Snagfin's shack by Umbrage holds fish enough for you and your companion to fish a good while, and it's full again each day (805 amended (16)).
-- Towns: townsfolk greet you as they know you: a known face with their trade's own words, one you've wronged or who trusts you with words of their own, one who has only heard of you as a stranger, one whose task you're on glad you're seeing to it, and one who can't stop with the reason why (853 amended (5))
-- Towns: townsfolk answer what you ask first, so Aldous asked about the crypt talks of the crypt, and a hunter asked about wolves talks of wolves (853 amended (4))
-- Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10))
-- Townsfolk are a man or a woman as their names say: Aldous asks you to give him the remains, and a few townsfolk look different from this update on, their looks now matching their names (398 amended (1))
-- Towns: Umbrage's store sells at the same price by day and by night, and once the town trusts you, you pay trusted prices there too (586 amended (1))
+- Towns: townsfolk greet you as they know you: a known face with their trade's own words, one you've wronged or who trusts you with words of their own, one who has only heard of you as a stranger, one whose task you're on glad you're seeing to it, and one who can't stop with the reason why (853 amended (5)).
+- Towns: townsfolk answer what you ask first, so Aldous asked about the crypt talks of the crypt, and a hunter asked about wolves talks of wolves (853 amended (4)).
+- Towns: walk into the Last Light Mughouse and Margery is already at her counter, and a store chest that won't take something tells you who takes it and where: "Fish goes to the taverner, at the Last Light Mughouse." (772 amended (4), 802 amended (10)).
+- Townsfolk are a man or a woman as their names say: Aldous asks you to give him the remains, and a few townsfolk look different from this update on, their looks now matching their names (398 amended (1)).
+- Towns: Umbrage's store sells at the same price by day and by night, and once the town trusts you, you pay trusted prices there too (586 amended (1)).
 - Badly hurt with no bandaging kit between you, your companion names the nearest warm rest and offers to lead you there, and near Umbrage's store, with no rest to name, she tells you who sells kits (616 amended (4)).
 - Stop in a doorway with your companion following and she comes straight to you, with no pause in the game (818 amended (2)).
-- A companion you've just met carries a bandaging kit and bandages your wounds when things are quiet, once you're down a fifth of your health, and tells you the first time that she's seeing to it (681 amended (1))
-- When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32))
-- Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3))
-- Ask your companion to fish with something hostile near and she tells you why not yet, even straight after a fight, then takes up her rod once it's gone (805 amended (15))
-- The old grey's bite lands harder, so his lunge is worth reading: step off the line he marks and you hold your own, and step out of his bite as well and he never touches you (780 amended (33))
+- A companion you've just met carries a bandaging kit and bandages your wounds when things are quiet, once you're down a fifth of your health, and tells you the first time that she's seeing to it (681 amended (1)).
+- When your companion is losing a fight you've walked out of, she breaks off and comes after you, calling to you as she goes (780 amended (32)).
+- Hurt after a fight, your companion asks once whether you'll rest; say yes, or just stay by her a moment, and she sits down to rest (616 amended (3)).
+- Ask your companion to fish with something hostile near and she tells you why not yet, even straight after a fight, then takes up her rod once it's gone (805 amended (15)).
+- The old grey's bite lands harder, so his lunge is worth reading: step off the line he marks and you hold your own, and step out of his bite as well and he never touches you (780 amended (33)).
 
 - Your shield and your sword's parry never break or leave you stunned now: a raised shield holds any blow for stamina, a heavier one costing more and a wound-up heavy swing twice, and when you run short it gives out, letting that blow through and staying down a moment; your sword's ready parry turns light blows and lets heavier ones by; and the sword and the buckler catch a blow from a foe standing a little off your line, where before a heavy bite broke your guard and left you stunned, worse than holding nothing (340 amended (2)).
-- Goblins are solid all over, from chests and belts to legs, collars and ears, and every goblin wears his hood up, Snagfin at home too; people and goblins keep their full shape at a distance (494 amended (3))
-- Click to walk away from someone who never steps aside, such as the fallen knight with a wall at your back, and you walk round them at once (689 amended (7))
+- Goblins are solid all over, from chests and belts to legs, collars and ears, and every goblin wears his hood up, Snagfin at home too; people and goblins keep their full shape at a distance (494 amended (3)).
+- Click to walk away from someone who never steps aside, such as the fallen knight with a wall at your back, and you walk round them at once (689 amended (7)).
 
-- Towns: Rolf sells a bandaging kit at his stall for 5 gold, and a kit isn't used up, so one keeps mending you between fights (736 amended (5))
+- Towns: Rolf sells a bandaging kit at his stall for 5 gold, and a kit isn't used up, so one keeps mending you between fights (736 amended (5)).
 
-- Towns: stand close by a town's hearth or fire, unhit for a few seconds, and it heals you as a camp's fire does, with the Healing mark showing; in Umbrage, the hearth in the Last Light Mughouse's common room and the fire on the square (777 amended (2))
+- Towns: stand close by a town's hearth or fire, unhit for a few seconds, and it heals you as a camp's fire does, with the Healing mark showing; in Umbrage, the hearth in the Last Light Mughouse's common room and the fire on the square (777 amended (2)).
 - With the low camera, when a house or the temple comes between you and the view, the camera moves in to stand outside it and rises with you, so you see the whole of yourself (864).
 - Fishing: with a rod on you, click the water to cast, and if it's out of reach you walk to the bank first; the rod comes to your hand by itself and goes back when you walk on. Every pond, pool and stream has fish now. When the float dips, it keeps ringing and splashing for three seconds: click anywhere in that time to strike, and you land the fish nine times in ten, where a bite you leave alone lands about six (805 amended (11)).
 - Cooking: you can cook a couple of paces from a fire now, from round the square's fire pit or the benches by the Mughouse hearth, and you're told when it's done; with no fire near, you're told you need one, and in Umbrage that there's one in the square (805 amended (11)).
 - Fishing: a big red-topped float; the line hangs slack while you wait, snaps tight when a fish bites, and the float is pulled right under twice (805 amended (17)).
 - Towns: a townsperson's window lists what you can do for them or give them as rows to click, each with its price in gold where it has one, and a row you can't afford or are too far away for says why, where before you had to type the word for each (536 amended).
 - You arrive with a clear view now: your pack stays shut until you press I or open a chest, where before it and your character sheet lay open over the middle of the screen when you joined (787 amended (3)).
-- A chest with a name of its own is titled with it when you open it, such as the Runner's pack or the Robbers' chest (787 amended (5))
+- A chest with a name of its own is titled with it when you open it, such as the Runner's pack or the Robbers' chest (787 amended (5)).
 - Towns: Rolf's stall, pedlars and each town's store and shops now trade in one store window, the keeper's goods on the left and your pack on the right, square for square, each with its price and your gold at the head of your pack: one click buys or sells, the line at the foot says what happened or why not, coins are counted onto the counter as you buy and drop into your purse as you sell, goods you leave go down on a shelf with a sound of their own, and a thing the keeper won't take says so, and who will where the town knows; Donate and Locker sit beside Store as tabs where the keeper has them, and the window stands in for your pack and sheet until you close it (I swaps back to them); the healer's, the temple's and the forge's counters, and townsfolk you talk to, keep their own windows for now (852, 395 amended (1)).
 - Towns: buy with a full pack and you keep your gold, and the store window tells you "Your pack is full." (852).
 - The Barrow's quest card shows only while you're in the Barrow or the halls below it, and steps aside whenever a window opens over it (747 amended (7)).
