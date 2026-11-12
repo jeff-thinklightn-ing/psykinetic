@@ -219,6 +219,19 @@
 					],
 					"source": "game",
 					"status": "agreed"
+				},
+				{
+					"id": "pond.other_waters",
+					"text": "Any pool or stretch of river holds a few fish, though the little pond by the shack just south-east of town holds the most; a ford or a well holds none.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
 				}
 			]
 		},
