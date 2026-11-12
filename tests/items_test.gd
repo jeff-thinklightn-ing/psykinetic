@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_pickup()
 	_test_kills()
 	_test_bane()
+	_test_growth_told()
 	_test_style()
 	_test_short()
 	_test_bound()
@@ -3219,6 +3220,93 @@ func _test_reforge() -> void:
 	_check(World.story_line(uid).contains("reforged from a"), "its story tells it (%s)" % World.story_line(uid))
 	World.items.end(uid, "gone")
 	dagger = 0
+
+
+## Items' seven growth lines reach a screen (133 amended (1)'s say_to; the
+## coordinator's audience rule, voice's words): a thing growing is told to
+## whoever it is theirs to, "you" to a player holder, the third person to a
+## companion's keeper, nobody for a monster; kept and back to both ends; a
+## namer who is offline is told nothing, and nothing waits for them.
+func _test_growth_told() -> void:
+	print("
+== a thing's growth told on its holder's screen, kept and back to both ends (133 amended (1), items' lines) ==")
+	Net.companions = true
+	var host := _player(Net.local_id)
+	var pet: Companion = _main._companions.get(Net.player_id)
+	if pet == null:
+		_main._join_companion(_main._records[Net.player_id], host)
+		pet = _main._companions.get(Net.player_id)
+	_check(pet != null and pet.keeper == host, "the host's companion, kept by the host")
+	if pet == null:
+		return
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	var me: String = _main._display_name(host)
+	var her: String = _main._display_name(pet)
+	var dagger := World.items.mint("dagger", "built")
+	var noun := Items.name_of("dagger")
+	# A player's own thing: "your", on their screen; the log in the third person.
+	World.item_grew.emit(host, dagger, "bane", "imp")
+	_check(heard == ["Your %s has felled so many imps it is their bane." % noun]
+			and _main.party_log.last(1) == ["%s's %s has felled so many imps it is their bane." % [me, noun]],
+			"a bane: \"your\" on the holder's screen, the third person in the log (%s %s)" % [heard, _main.party_log.last(1)])
+	heard.clear()
+	World.item_grew.emit(host, dagger, "grudge", "wolf")
+	_check(heard == ["Your %s has seen you hurt by wolves often enough: it holds a grudge against them." % noun]
+			and _main.party_log.last(1) == ["%s's %s has seen its bearers hurt by wolves often enough: it holds a grudge against them." % [me, noun]],
+			"a grudge: \"seen you hurt\" to the holder, \"its bearers\" in the log (%s)" % [heard])
+	heard.clear()
+	World.item_grew.emit(host, dagger, "character", "")
+	World.item_named.emit(host, dagger, "Ash's fang")
+	_check(heard == ["Your %s has seen enough use to grow: it counts what it fells now." % noun, "Your %s is Ash's fang now." % noun],
+			"grown and named: both on the holder's screen (%s)" % [heard])
+	# A companion's thing: her keeper told, in the third person.
+	heard.clear()
+	World.item_grew.emit(pet, dagger, "avenged", "wolf")
+	_check(heard == ["%s's %s has had its vengeance on wolves." % [her, noun]],
+			"her thing: her keeper told, the third person (%s)" % [heard])
+	# A monster's thing: nobody told; the log keeps it.
+	heard.clear()
+	var open := _open_line(host, 1)
+	var foe: GridEntity = _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "GrowthFoe%d" % World.tick,
+		"tile": open, "kind": "imp", "props": {"sight_range": 0}}) as GridEntity if open != World.NO_CELL else null
+	_check(foe != null, "an imp spawned beside the host")
+	if foe != null:
+		foe.acts = false
+		World.item_grew.emit(foe, dagger, "bane", "wolf")
+		_check(heard.is_empty() and _main.party_log.last(1)[0].ends_with("has felled so many wolves it is their bane."),
+				"a monster's thing: on nobody's screen, in the log (%s)" % [heard])
+		World.despawn(foe)
+	# Kept and back: the title names its namer, so no line names them again.
+	World.items.set_name(dagger, {"form": "holder_possessive", "holder": "Gone", "who": "player:no-such-player",
+		"made_step": 0, "text": "Gone's dagger"}, "")
+	var title := World.item_title(dagger).get_slice(" (", 0)
+	_check(not title.is_empty(), "a named dagger has a title (%s)" % title)
+	heard.clear()
+	World.item_kept.emit(host, dagger, true)
+	_check(heard == ["%s is yours now." % title] and _main.party_log.last(1) == ["%s has %s now." % [me, title]]
+			and _main._namer_peer("player:no-such-player") == 0,
+			"kept from a namer who is offline: the taker told, nobody else, nothing kept for later (%s)" % [heard])
+	heard.clear()
+	World.item_kept.emit(pet, dagger, true)
+	_check(heard == ["%s has %s now." % [her, title]], "kept by her: her keeper told once, the third person (%s)" % [heard])
+	# Named for the host (one name for life, so the book is set by hand): his
+	# companion keeps it, and he is told once, keeper and namer being one peer.
+	World.items._book[dagger]["name"] = {"form": "holder_possessive", "holder": me, "who": "player:" + Net.player_id, "made_step": 0, "text": "%s's dagger" % me}
+	title = World.item_title(dagger).get_slice(" (", 0)
+	_check(_main._namer_peer("player:" + Net.player_id) == host.owner_peer, "the host's namer key finds his peer")
+	heard.clear()
+	World.item_kept.emit(pet, dagger, true)
+	_check(heard == ["%s has %s now." % [her, title]], "his named thing kept by her: he is told once (%s)" % [heard])
+	heard.clear()
+	World.item_kept.emit(host, dagger, false)
+	_check(heard == ["%s is back with you." % title] and _main.party_log.last(1) == ["%s is back with %s." % [title, me]],
+			"back with its namer: \"with you\" on his screen, the third person in the log (%s)" % [heard])
+	Net.message_received.disconnect(hear)
+	World.items.end(dagger, "gone")
 
 
 func _test_names() -> void:

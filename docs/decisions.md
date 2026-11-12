@@ -1208,6 +1208,28 @@ the proving by "proven" and "fallen knight". level_test asserts the you-forms
 on the actor's screen, the third person in the log, and that a line about
 another peer reaches this one in the third person only.
 
+133 amended (1), items' lines, 2026-11-12: a thing's growth reaches its
+holder's screen (the coordinator's approval of items' design; voice's
+words; voice's sweep, "items: 7 lines"). A thing growing is its holder's
+reward, so it is told to whoever the thing is theirs to, never the whole
+zone: Main._tell_of_thing sends a player holder the you-form (say_to_pair),
+a companion holder's keeper the third person (say_to), and a monster's
+thing to nobody; the party log keeps the third person every time. The
+lines: named ("Your dagger is Ash's fang now."), a bane, a grudge ("Your
+dagger has seen you hurt by wolves often enough: it holds a grudge against
+them."; the third person "has seen its bearers hurt by ... often enough"),
+vengeance, and growing; a named thing is called by its name to everyone,
+an unnamed one is "your dagger" to its holder and "Ash's dagger" to the
+rest. Kept and back go to both ends: kept, the taker "Ash's fang is yours
+now.", the namer (Main._namer_peer from the name's holder key: the
+player's own peer, a companion namer's keeper's) "Bo has Ash's fang now.";
+back, "Ash's fang is back with you." The title already names its namer
+(names.json's one form, "{holder}'s {thing}"), so no line names them again.
+A namer who is offline is told nothing and nothing waits for them; keeper
+and namer on one peer are told once. items_test _test_growth_told. Server
+only; the lines go by the existing "party" message, so the wire is
+unchanged.
+
 ## 134. Companions overhear; the server says what it knows of whom a line is for
 
 With two players together, every word was her own player's to her, so

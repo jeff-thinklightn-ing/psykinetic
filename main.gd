@@ -18335,7 +18335,53 @@ func _narrate_brace(holder: GridEntity, charger: GridEntity) -> void:
 
 ## A thing carried long took its name (World.item_named; decision 365).
 func _narrate_named(entity: GridEntity, uid: int, text: String) -> void:
-	party_log.add("%s's %s is %s now." % [_display_name(entity), Items.name_of(World.items.id_of(uid)), text])
+	var noun := Items.name_of(World.items.id_of(uid))
+	_tell_of_thing(entity, "Your %s is %s now." % [noun, text], "%s's %s is %s now." % [_display_name(entity), noun, text])
+
+
+## A line about a thing of [param holder]'s (133 amended (1)'s say_to, items'
+## lines; voice's words): a thing growing is its holder's reward, so it is
+## told to whoever the thing is theirs to. A player holder hears
+## [param you_line]; a companion holder's keeper hears [param third_line];
+## a monster's thing is told to nobody. [param also] (peers) hear
+## [param third_line] too (a named thing's namer, at its keeping). The party
+## log keeps [param third_line] either way.
+func _tell_of_thing(holder: GridEntity, you_line: String, third_line: String, also: Array[int] = []) -> void:
+	var own := _thing_peer(holder)
+	var others: Array[int] = []
+	for peer in also:
+		if peer != 0 and peer != own and peer not in others:
+			others.append(peer)
+	if holder is Player and own != 0:
+		say_to_pair(own, you_line, third_line, others)
+		return
+	if own != 0:
+		others.append(own)
+	say_to(others, third_line)
+
+
+## The peer told of [param holder]'s things (_tell_of_thing): a player's own,
+## a companion's keeper's; 0 for anyone else.
+func _thing_peer(holder: GridEntity) -> int:
+	if holder is Player:
+		return (holder as Player).owner_peer
+	if holder is Companion and (holder as Companion).keeper is Player:
+		return ((holder as Companion).keeper as Player).owner_peer
+	return 0
+
+
+## The peer told of what befalls a thing named for holder key [param key]
+## (World.holder_key: "player:<id>", "companion:<keeper id>:<name>"): the
+## player's own, or the companion's keeper's, while they play; 0 when
+## offline (nothing kept for later) or for anyone else.
+func _namer_peer(key: String) -> int:
+	var player_id := ""
+	if key.begins_with("player:"):
+		player_id = key.trim_prefix("player:")
+	elif key.begins_with("companion:"):
+		player_id = key.get_slice(":", 1)
+	var player := _player_of_id(player_id) if not player_id.is_empty() else null
+	return player.owner_peer if is_instance_valid(player) else 0
 
 
 ## Her card's facts of her things and her player (293 amended, Jeff: "it
@@ -18725,30 +18771,40 @@ static func return_fact(who: String, where: String, by: String) -> String:
 
 ## A thing grew (World.item_grew; decision 417): a bane, a grudge, avenged.
 func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> void:
+	# A named thing is called by its name to everyone; an unnamed one is
+	# "your dagger" to its holder and "Ash's dagger" to the rest.
 	var thing := World.item_title(uid)
+	var yours := thing
 	if thing.is_empty():
-		thing = "%s's %s" % [_display_name(entity), Items.name_of(World.items.id_of(uid))]
+		var noun := Items.name_of(World.items.id_of(uid))
+		thing = "%s's %s" % [_display_name(entity), noun]
+		yours = "Your %s" % noun
 	var kinds := World._plural(kind)
 	match mark:
 		"bane":
-			party_log.add("%s has felled so many %s it is their bane." % [thing, kinds])
-		"grudge":
-			party_log.add("%s has seen its bearers hurt by %s enough: it holds a grudge against them." % [thing, kinds])  # Decision 473.
+			var line := "%s has felled so many %s it is their bane."
+			_tell_of_thing(entity, line % [yours, kinds], line % [thing, kinds])
+		"grudge":  # Decision 473.
+			_tell_of_thing(entity, "%s has seen you hurt by %s often enough: it holds a grudge against them." % [yours, kinds],
+					"%s has seen its bearers hurt by %s often enough: it holds a grudge against them." % [thing, kinds])
 		"avenged":
-			party_log.add("%s has had its vengeance on %s." % [thing, kinds])
-		"character":
-			party_log.add("%s has seen enough use to grow: it counts what it fells now." % thing)  # Decision 472.
+			var line := "%s has had its vengeance on %s."
+			_tell_of_thing(entity, line % [yours, kinds], line % [thing, kinds])
+		"character":  # Decision 472.
+			var line := "%s has seen enough use to grow: it counts what it fells now."
+			_tell_of_thing(entity, line % yours, line % thing)
 
 
 ## A named thing kept from its namer, or back with them (World.item_kept;
 ## decision 370).
 func _narrate_kept(entity: GridEntity, uid: int, kept: bool) -> void:
-	var name := World.items.name_of(uid)
+	# The title names its namer ("Ash's fang"), so no line names them again.
 	var title := World.item_title(uid).get_slice(" (", 0)
 	if kept:
-		party_log.add("%s keeps %s from %s." % [_display_name(entity), title, name.get("holder", "")])
+		var namer: Array[int] = [_namer_peer(str(World.items.name_of(uid).get("who", "")))]
+		_tell_of_thing(entity, "%s is yours now." % title, "%s has %s now." % [_display_name(entity), title], namer)
 	else:
-		party_log.add("%s is back with %s." % [title, _display_name(entity)])
+		_tell_of_thing(entity, "%s is back with you." % title, "%s is back with %s." % [title, _display_name(entity)])
 
 
 ## A bundle of arrows swapped for one on the ground (World.bundle_swapped;
