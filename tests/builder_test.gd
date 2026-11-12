@@ -1930,7 +1930,9 @@ func _test_spot_ghost() -> void:
 		and not by.has(Vector2i(38, 28)),
 		"the proposal's spots: kept, changed, gone and new, none outside the area (%s)" % [rows])
 	# The stub's spots, for a shot of the ghost: laid where they can be, a refusal passed on in its words.
-	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", BuilderHost.stub_spots("spots 192,210;194,213 190,196"))
+	var ghost_doc := MapDoc.from_level("wilds")
+	ghost_doc.config.erase("spots")  # the wilds' own spots set aside (maps' spots take 1 lays 15): this checks only what the stub lays
+	var wilds := BuilderSession.new(ghost_doc, Rect2i(185, 190, 25, 25), "wilds", BuilderHost.stub_spots("spots 192,210;194,213 190,196"))
 	var asked: Dictionary = await wilds.ask("spots 192,210 194,213 190,196")
 	var ghost: Array = BuilderHost.proposal_spots(wilds)
 	_check(asked.get("ok", false) and ghost.size() >= 2 and "(190, 196) holds the store chest; lay the spot beside it" in str(asked.get("summary")),
