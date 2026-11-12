@@ -13444,7 +13444,12 @@ func _test_reel_clock() -> void:
 	var delta := roundi(get_tree().root.get_process_delta_time() * 1000.0)
 	_check(absi(step - delta) <= 1, "and on by the frame's own delta (%d ms, delta %d)" % [step, delta])
 	# A swing's drawn landing on it too (Client3D._swings, contact_msec): the reel's own moment.
-	OS.delay_msec(250)  # The wall now runs ahead of the frames, as in a reel.
+	# The wall now runs ahead of the frames, as in a reel: measured from just before the wait, so a
+	# long frame at the await above (the movie clock already on by its delta) never eats into it
+	# (items' and perf's report, 11-12: "wall 199 ahead" under load).
+	var movie_before := AnimRig.now_msec()
+	var wall_before := Time.get_ticks_msec()
+	OS.delay_msec(250)
 	var player := _player()
 	var id := player.get_instance_id()
 	var puppet: Node3D = _rig._puppets.get(id)
@@ -13453,9 +13458,10 @@ func _test_reel_clock() -> void:
 	var swing: Array = _rig._swings.get(id, [])
 	var at := AnimRig.now_msec()
 	_check(not swing.is_empty() and int(swing[0]) == at and int(swing[2]) >= at and int(swing[2]) - at < 1000
-			and int(swing[2]) == int(puppet.get_meta("contact_msec", -1)) and Time.get_ticks_msec() - at >= 200,
-			"a swing's landing timed on the reel's frames, its contact with it (%s at %d, wall %d ahead)"
-			% [swing, at, Time.get_ticks_msec() - at])
+			and int(swing[2]) == int(puppet.get_meta("contact_msec", -1)) and at == movie_before
+			and Time.get_ticks_msec() - wall_before >= 250,
+			"a swing's landing timed on the reel's frames, its contact with it (%s at %d, the movie clock still through a %d ms wall wait)"
+			% [swing, at, Time.get_ticks_msec() - wall_before])
 	# Calm again for the tests after (a swing is combat; its strike done).
 	_rig._swings.erase(id)
 	_rig._combat_at.erase(id)
