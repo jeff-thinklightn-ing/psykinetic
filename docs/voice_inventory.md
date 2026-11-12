@@ -2958,7 +2958,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (881)
+## Lines in the data (882)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3708,7 +3708,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Pip carries the temple's offering down into the crypt and lays it on the offering stone in the Low Hall. | `entries[2].facts[15].text` |
 |  | The crypt is dug beneath the temple in Umbrage. | `entries[2].facts[16].text` |
 |  | The temple has its own underground, the crypt, and keeps it wherever the temple stands. | `entries[2].facts[17].text` |
-|  | The temple's door down is locked and watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt. | `entries[2].facts[18].text` |
+|  | The temple's stair down is watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt. | `entries[2].facts[18].text` |
 |  | The Mound-breakers, the grave robbers in the crypt, have been looking for a way to break through to the holy relics, to sell them on the black market. | `entries[2].facts[19].text` |
 |  | The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the crypt are its work. | `entries[2].facts[20].text` |
 |  | The Mound-breakers stash their take in a chest at their camp in the crypt. | `entries[2].facts[21].text` |
@@ -3752,7 +3752,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The learned have tied the rot to the ore, some by watching and some by the gift. | `entries[1].facts[1].text` |
 |  | Ore from the mine carries the rot into those who work it or carry it long. | `entries[1].facts[2].text` |
 
-### levels/lore/people.json (58)
+### levels/lore/people.json (59)
 
 | | Line | Key |
 |---|---|---|
@@ -3761,6 +3761,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The priest blesses a thing brought to him for an offering of half its worth. | `entries[0].facts[1].text` |
 |  | The priest's keep comes from the temple's alms, and the town pays him nothing while it is a hamlet. | `entries[0].facts[2].text` |
 |  | The priest is at the temple from six till noon and again through the afternoon, and at the square at noon and in the evening. | `entries[0].facts[3].text` |
+|  | Beneath the temple lies the town's crypt, where the wealthy are laid in their families' tombs, and the Mound-breakers have broken into it from outside. | `entries[0].facts[4].text` |
 |  | The medicine man who lives in the healer's hut in the wilds and brings the fallen back. | `entries[1].summary` |
 |  | The medicine man in the healer's hut brings the fallen back. | `entries[1].facts[0].text` |
 |  | The medicine man gathers herbs near his hut and makes remedies, stamina potions, the bear's-claw charm and the bear's-grease draught, remedies first while anyone is sick. | `entries[1].facts[1].text` |
@@ -3787,32 +3788,32 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Half of what the Mughouse is paid for its beds is the taverner's and the rest goes to the town's treasury: two gold for a resident's bed, two to six for a traveller's stay. | `entries[7].facts[1].text` |
 |  | While the town has no cook, the taverner takes in the food, meat and fish brought to the Mughouse. | `entries[7].facts[2].text` |
 |  | The town's merchant, the settled goblin with his counter a little apart, and the only fence (decisions 471, 586). | `entries[8].summary` |
-|  | The merchant sells his goods dearer than the town's store does. | `entries[8].facts[0].text` |
+|  | The merchant sells dearer than the town's store does. | `entries[8].facts[0].text` |
 |  | By day the merchant turns away anything stolen or taken from the dead. | `entries[8].facts[1].text` |
-|  | By night, at his counter, the merchant buys stolen goods and grave goods, at half what the town would give. | `entries[8].facts[2].text` |
+|  | By night the merchant buys stolen goods and grave goods across the counter, at half what the town would give. | `entries[8].facts[2].text` |
 |  | The cook in the town's kitchen (economy's kitchen; residents.json's cook day). | `entries[9].summary` |
 |  | The cook makes travel rations from food, roast meat from meat and roast perch from fish, for the shop's shelf and the town's daily meals. | `entries[9].facts[0].text` |
 |  | The cook is at the well by five, in the kitchen from six till mid-afternoon, then at the square, and at the inn before going home. | `entries[9].facts[1].text` |
-|  | When the well runs dry the cook works at half pace, and before the first harvest is in he will not cook from the larder kept for the town's people. | `entries[9].facts[2].text` |
+|  | When the well runs dry the cook works at half pace, and before the first harvest is in, nothing is cooked from the larder kept for the town's people. | `entries[9].facts[2].text` |
 |  | The town's carpenter, who raises and mends its buildings (economy's builds and repairs). | `entries[10].summary` |
 |  | The carpenter raises every building in town, repairs what is damaged and mends the roofs a storm breaks. | `entries[10].facts[0].text` |
 |  | A build waits until its materials are in the store, and wood brought to the carpenter goes toward the build in hand. | `entries[10].facts[1].text` |
-|  | The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher he mends arrows. | `entries[10].facts[2].text` |
+|  | The townsfolk pay the carpenter three gold every two days to keep their homes mended, and while the town has no fletcher the carpenter also mends arrows. | `entries[10].facts[2].text` |
 |  | The town's farmer, once a field stands (economy's crop). | `entries[11].summary` |
 |  | The farmer sows in spring and harvests in autumn; rain helps the crop, a storm can flatten half of it, and a crop not in by winter rots. | `entries[11].facts[0].text` |
-|  | In winter the farmer digs roots, and his crop goes to the town's store, paid from the treasury. | `entries[11].facts[1].text` |
+|  | In winter the farmer digs roots, and the farm's crop goes to the town's store, paid from the treasury. | `entries[11].facts[1].text` |
 |  | The farmer is at the well by five and in the field from six till four, then at the square, and at the inn before going home. | `entries[11].facts[2].text` |
 |  | The town's hunter (economy's hunter, sites). | `entries[12].summary` |
 |  | The hunter hunts deer, boar and rabbit in the wilds near the store, for the town has no hunting ground of its own. | `entries[12].facts[0].text` |
-|  | The hunter sells his meat and hides to the store, and the antlers and tusks are kept there. | `entries[12].facts[1].text` |
-|  | Sometimes the hunter strays too far out, and whoever walks him home is paid for it. | `entries[12].facts[2].text` |
+|  | The hunter sells meat and hides to the store, and the antlers and tusks are kept there. | `entries[12].facts[1].text` |
+|  | Sometimes the hunter strays too far out, and whoever walks the hunter home is paid for it. | `entries[12].facts[2].text` |
 |  | The town's tanner, once one comes and a tannery stands (economy's tannery). | `entries[13].summary` |
 |  | The tanner makes leather from hides, and bucklers and leather armour from the leather. | `entries[13].facts[0].text` |
 |  | The tanner buys beasts' pelts for tanning, and claws, fangs, antlers and tusks for trimming leather. | `entries[13].facts[1].text` |
-|  | The tanner's leather goes to the store, and his bucklers and armour to the shop. | `entries[13].facts[2].text` |
+|  | The tanner's leather goes to the store, and the tanner's bucklers and armour to the shop. | `entries[13].facts[2].text` |
 |  | The town's woodcutter at the woodlot (economy's woodcutter). | `entries[14].summary` |
-|  | The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives him deadwood. | `entries[14].facts[0].text` |
-|  | The woodcutter sells his wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
+|  | The woodcutter fells trees at the woodlot's near edge, and a lot cut bare still gives deadwood. | `entries[14].facts[0].text` |
+|  | The woodcutter sells wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
 |  | The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening. | `entries[14].facts[2].text` |
 
 ### levels/lore/regions.json (92)
@@ -3830,7 +3831,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. | `entries[3].summary` |
 |  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[0].text` |
 |  | The wilds' fishing pond, far west of Umbrage by the west road (maps' reed_pond at (33,120), "the pond", holder nobody), with the other waters that fish: two pools (110..116 x 57..60 west of the north road; 221..223 x 224..228 east of the woodlot post) and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). No name of its own until Jeff picks one (Reed Pond is asked). Package "wilds basics: pond". | `entries[4].summary` |
-|  | Far west of town there is a pond: take the road out to the crossroads and keep on west along the west road almost to its end, and the pond lies beside it. | `entries[4].facts[0].text` |
+|  | The pond lies far west of town, near the end of the west road. | `entries[4].facts[0].text` |
 |  | Reeds grow along the pond's edge. | `entries[4].facts[1].text` |
 |  | Fish rise in the pond, and it is nobody's: anyone may fish it. | `entries[4].facts[2].text` |
 |  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[4].facts[3].text` |
