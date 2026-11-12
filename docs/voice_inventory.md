@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2816)
+## Lines in the code (2818)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -802,20 +802,20 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | What %s knows | `sim/offers.gd` _rumour_offer() |
 |  | What %s said | `sim/offers.gd` _rumour_offer() |
 |  | %s told me%s that %s. | `sim/offers.gd` _rumour_offer() |
-|  | Read the chronicle | `sim/offers.gd` _page_offer() |
+|  | Hear the chronicle | `sim/offers.gd` _page_offer() |
 |  | %s keeps the town's chronicle, with %s copy always to hand, and will read it to you. | `sim/offers.gd` _page_offer() |
 |  | %s the %s | `sim/offers.gd` chronicle_of() |
 |  | Bring the medicine man | `sim/offers.gd` _plea_offer() |
 |  | My %s %s lies sick with %s; the medicine man is out at his hut. Fetch him to %s. | `sim/offers.gd` _plea_offer() |
-|  | Take %s to the healer | `sim/offers.gd` _plea_offer() |
+|  | Walk %s to the healer's | `sim/offers.gd` _plea_offer() |
 |  | My %s %s lies sick with %s. If you could walk %s to the healer's hut, the healer would see to %s. | `sim/offers.gd` _plea_offer() |
 |  | Walk %s home | `sim/offers.gd` _plea_offer() |
 |  | My %s %s has not come back from beyond the walls; if you find %s out there, walk %s home. | `sim/offers.gd` _plea_offer() |
 |  | Help with a debt | `sim/offers.gd` _plea_offer() |
 |  | I owe the town %d gold; could you spare some of it? | `sim/offers.gd` _plea_offer() |
-|  | Speak for me | `sim/offers.gd` _plea_offer() |
+|  | Speak for %s | `sim/offers.gd` _plea_offer() |
 |  | Lay my quarrel with %s before the lawspeaker when you see %s; say I was wronged. | `sim/offers.gd` _plea_offer() |
-|  | A word for %s | `sim/offers.gd` _plea_offer() |
+|  | Carry word to %s | `sim/offers.gd` _plea_offer() |
 |  | If you see %s, tell %s the matter between us is forgotten. | `sim/offers.gd` _plea_offer() |
 |  | Pay ahead for his care | `sim/offers.gd` _care_offers() |
 |  | Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care. | `sim/offers.gd` _care_offers() |
@@ -825,7 +825,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s is in %s's care now: fall where they will, he will see to them. | `sim/offers.gd` _care_offers() |
 |  | Walk the sick to him | `sim/offers.gd` _care_offers() |
 |  | There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door. | `sim/offers.gd` _care_offers() |
-|  | The makings of a brew | `sim/offers.gd` _care_offers() |
+|  | Bring the makings of a brew | `sim/offers.gd` _care_offers() |
 |  | Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours. | `sim/offers.gd` _care_offers() |
 |  | %s %s; %s is in %s's care now. | `sim/offers.gd` _grant_care() |
 |  | %s is in %s's care now: fall where they will, he will see to them. | `sim/offers.gd` _grant_care() |
@@ -1109,7 +1109,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (186)
+### other (render) (188)
 
 | | Line | Where |
 |---|---|---|
@@ -1178,6 +1178,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | Walk left (click scheme: turn) | `render/keys.gd`  |
 |  | Walk right (click scheme: turn) | `render/keys.gd`  |
 |  | Open a chest or a door; talk to someone | `render/keys.gd`  |
+|  | Your gear and pack | `render/keys.gd`  |
 |  | Pin the talk box | `render/keys.gd`  |
 |  | Reset the room | `render/keys.gd`  |
 |  | The controls list | `render/keys.gd`  |
@@ -1207,6 +1208,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | "%s" by %s | `render/options_panel.gd` _credits_section() |
 |  | Show all credits | `render/options_panel.gd` toggle_credits() |
 |  | press a key | `render/options_panel.gd` begin_rebind() |
+|  | %s's gear and pack | `render/pack_panel.gd` title_of() |
 |  | Everything in your pack (not your hands or armour) into your chest | `render/pack_panel.gd` _ready() |
 |  | carrying %s of %s kg: %s | `render/pack_panel.gd` load_lines() |
 |  | slows the draw and the swing | `render/pack_panel.gd` load_lines() |
@@ -2515,7 +2517,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | %s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn | `main.gd` hint_lines() |
 |  | RMB, bow\thold to aim at the sky, let go to lob onto the circle: over walls, knocks down | `main.gd` hint_lines() |
 |  | %s\topen a chest, crate, cart, door; your companion's pack | `main.gd` hint_lines() |
-|  | %s\tyour pack | `main.gd` hint_lines() |
+|  | %s\tyour gear and pack | `main.gd` hint_lines() |
 |  | %s\tyour companion's card | `main.gd` hint_lines() |
 |  | %s\tthe town sheet | `main.gd` hint_lines() |
 |  | %s\tpick up | `main.gd` hint_lines() |
@@ -3413,7 +3415,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Walk the sick to him | `offers.care.sick_title` |
 |  | There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door. | `offers.care.sick` |
 |  | %s walked %s to %s, who saw to them. | `offers.care.sick_done` |
-|  | The makings of a brew | `offers.care.brew_title` |
+|  | Bring the makings of a brew | `offers.care.brew_title` |
 |  | Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours. | `offers.care.brew` |
 |  | %s brews what %s brought and hands them the potion. | `offers.care.brew_done` |
 |  | %s is in %s's care now: fall where they will, he will see to them. | `offers.care.kept` |
