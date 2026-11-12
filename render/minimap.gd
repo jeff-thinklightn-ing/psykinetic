@@ -274,9 +274,11 @@ static func _beyond_edge(image: Image, size: Vector2i) -> Dictionary:
 
 ## A landmark a player steers by (884; Forage.LANDMARKS: today the barrow's
 ## mound) drawn as it looks from above, on its footprint (Level.building_rect,
-## the data the game uses): a ring of kerb stones, a grass dome inside, lit
-## toward its crown, and a dark doorway where a way out the map shows meets its
-## edge. The map hides nothing of the ground, so the mark shows as the ground
+## the data the game uses): a ring of kerb stones on the footprint's inscribed
+## circle, so it reads round, not as a square yard (884 amended (1)), the
+## footprint's corners outside it the meadow's grass; a grass dome inside, lit
+## toward its crown; and a dark doorway where a way out the map shows meets its
+## ring. The map hides nothing of the ground, so the mark shows as the ground
 ## under it does; a hidden way (608) gets no doorway, as it gets no mark.
 static func _draw_landmarks(image: Image, level: Dictionary) -> void:
 	var inside := Rect2i(Vector2i.ZERO, image.get_size())
@@ -297,12 +299,33 @@ static func _draw_landmarks(image: Image, level: Dictionary) -> void:
 				var cell := Vector2i(x, y)
 				if not inside.has_point(cell):
 					continue
-				var ring := x == rect.position.x or y == rect.position.y or x == rect.end.x - 1 or y == rect.end.y - 1
+				if not in_round(cell, rect):
+					image.set_pixelv(cell, grass)  # A corner of the footprint, outside the round.
+					continue
 				var lift := clampf(1.0 - Vector2(cell).distance_to(crown) / reach, 0.0, 1.0) * RELIEF * 2.0
-				image.set_pixelv(cell, kerb if ring else grass.lightened(lift))
+				image.set_pixelv(cell, kerb if on_ring(cell, rect) else grass.lightened(lift))
 		for link: Dictionary in level.get("links", []):
 			if not bool(link.get("hidden", false)) and link.get("tile") is Vector2i and rect.has_point(link["tile"]) and inside.has_point(link["tile"]):
 				image.set_pixelv(link["tile"], doorway)
+
+
+## Whether [param cell] is in [param rect]'s inscribed round (884 amended (1)): its middle within
+## the footprint's half-width of the middle, so each side's middle cells are in.
+static func in_round(cell: Vector2i, rect: Rect2i) -> bool:
+	var crown := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) / 2.0
+	return rect.has_point(cell) and Vector2(cell).distance_to(crown) <= minf(rect.size.x, rect.size.y) / 2.0
+
+
+## Whether [param cell] is on the round's ring: in it, with a neighbour, sides or corners, outside
+## (so the ring is closed on the diagonals, never a stair of single cells).
+static func on_ring(cell: Vector2i, rect: Rect2i) -> bool:
+	if not in_round(cell, rect):
+		return false
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if not in_round(cell + Vector2i(dx, dy), rect):
+				return true
+	return false
 
 
 ## The rest of rebuild: the starts, the ways out and the places.

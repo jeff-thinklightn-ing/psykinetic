@@ -156,16 +156,30 @@ func _test_picture() -> void:
 		var kerb := UiTheme.color(&"map_kerb")
 		var ring_ok := true
 		var dome_ok := true
+		var round_ok := true
+		var rings := 0
 		for y in range(rect.position.y, rect.end.y):
 			for x in range(rect.position.x, rect.end.x):
 				var cell := Vector2i(x, y)
 				var drawn := map.image.get_pixelv(cell)
 				if cell == Vector2i(160, 160):
 					continue
-				if x == rect.position.x or y == rect.position.y or x == rect.end.x - 1 or y == rect.end.y - 1:
+				if not Minimap.in_round(cell, rect):
+					round_ok = round_ok and drawn.is_equal_approx(grass)
+				elif Minimap.on_ring(cell, rect):
 					ring_ok = ring_ok and drawn.is_equal_approx(kerb)
+					rings += 1
 				else:
 					dome_ok = dome_ok and absf(drawn.h - grass.h) < 0.02 and drawn.v >= grass.v - 0.001 and not drawn.is_equal_approx(Minimap.WOODS)
+		# 884 amended (1): it reads round: the footprint's corners are the meadow, and the ring touches each side's middle.
+		var middles: Array[Vector2i] = [Vector2i(rect.position.x + rect.size.x / 2, rect.position.y), Vector2i(rect.position.x, rect.position.y + rect.size.y / 2),
+			Vector2i(rect.end.x - 1, rect.position.y + rect.size.y / 2), Vector2i(rect.position.x + rect.size.x / 2, rect.end.y - 1)]
+		var sides_ok := true
+		for at: Vector2i in middles:
+			sides_ok = sides_ok and (at == Vector2i(160, 160) or map.image.get_pixelv(at).is_equal_approx(kerb))
+		_check(round_ok and rings > 8 and sides_ok and map.image.get_pixelv(rect.position).is_equal_approx(grass)
+			and map.image.get_pixelv(rect.end - Vector2i.ONE).is_equal_approx(grass),
+			"the mound reads round: its footprint's corners the meadow's grass, its ring touching each side (%d ring cells)" % rings)
 		var crown := map.image.get_pixelv(rect.get_center())
 		var foot := map.image.get_pixelv(rect.position + Vector2i(1, 1))
 		_check(rect == Rect2i(155, 160, 12, 12) and ring_ok and dome_ok and crown.v > foot.v,
