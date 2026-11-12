@@ -120,12 +120,72 @@
 			]
 		},
 		{
-			"id": "pond",
+			"id": "town_pond",
 			"type": "place",
-			"name": "the pond",
+			"name": "the pond by town",
 			"status": "agreed",
 			"source": "game",
-			"summary": "The wilds' fishing pond, far west of Umbrage by the west road (maps' reed_pond at (33,120), \"the pond\", holder nobody), with the other waters that fish: two pools (110..116 x 57..60 west of the north road; 221..223 x 224..228 east of the woodlot post) and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). No name of its own until Jeff picks one (Reed Pond is asked). Package \"wilds basics: pond\".",
+			"summary": "Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (about 221..223 x 224..228 with the shack and its dirt dock, east of the woodlot post (207,231), some 30 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size and the shack wait on Jeff's pond-and-shack picks; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package \"fishing that works\".",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"fishing",
+				"fish"
+			],
+			"facts": [
+				{
+					"id": "town_pond.where",
+					"text": "The pond by town is a little crescent of water round a shack, a short walk south-east of the square, just east of the woodlot post.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "town_pond.fish",
+					"text": "The pond by town holds the most fish of any water and fills again each day.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "town_pond.waters",
+					"text": "Any other pool or stretch of river holds a few fish; a ford or a well holds none.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"fishing"
+					],
+					"source": "game",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "pond",
+			"type": "place",
+			"name": "the far pond",
+			"status": "agreed",
+			"source": "game",
+			"summary": "The wilds' far fishing pond, a reed pond far west of Umbrage by the west road (maps' reed_pond at (33,120), \"the pond\" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). The facts call it the far pond, the reed pond only as a description: no name of its own until Jeff picks one (reed-pond.md). The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package \"wilds basics: pond\".",
 			"place_kind": "other",
 			"relations": [
 				{
@@ -140,7 +200,7 @@
 			"facts": [
 				{
 					"id": "pond.where",
-					"text": "The pond lies far west of town, near the end of the west road.",
+					"text": "The far pond, a reed pond, lies a long walk west of town, near the end of the west road.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -154,7 +214,7 @@
 				},
 				{
 					"id": "pond.reeds",
-					"text": "Reeds grow along the pond's edge.",
+					"text": "Reeds grow along the far pond's edge.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -168,7 +228,7 @@
 				},
 				{
 					"id": "pond.fish",
-					"text": "Fish rise in the pond, and it is nobody's: anyone may fish it.",
+					"text": "Fish rise in the far pond too, and it is nobody's: anyone may fish it.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -178,8 +238,7 @@
 					],
 					"source": "game",
 					"status": "agreed",
-					"sight": "the fish rising",
-					"weight": 2
+					"sight": "the fish rising"
 				},
 				{
 					"id": "pond.feeding",
@@ -196,7 +255,7 @@
 				},
 				{
 					"id": "pond.pools",
-					"text": "There are two pools with fish in them too: a small one south-east of town, just east of the woodlot post, and a bigger one west of the north road, a good way north of the crossroads.",
+					"text": "A pool west of the north road, a good way north of the crossroads, has fish in it too.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -210,19 +269,6 @@
 				{
 					"id": "pond.river",
 					"text": "In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"tags": [
-						"fishing"
-					],
-					"source": "game",
-					"status": "agreed"
-				},
-				{
-					"id": "pond.other_waters",
-					"text": "Any pool or stretch of river holds a few fish, though the little pond by the shack just south-east of town holds the most; a ford or a well holds none.",
 					"known": "common",
 					"where": [
 						"town_lands"

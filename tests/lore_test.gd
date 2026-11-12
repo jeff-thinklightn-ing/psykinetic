@@ -18,7 +18,7 @@ const RELATIONS := ["in", "holds", "enemy", "feud", "ally", "from", "member", "c
 ## Umbrage itself, which may weigh 2 (lore (d), the coordinator's ruling 2026-11-10; the crypt
 ## under the temple since its pointer, 11-11), never on a secret or a fact tagged history.
 const WEIGHED_TRADES := ["taverner", "merchant", "cook", "carpenter", "farmer", "hunter", "tanner", "woodcutter", "priest", "medicine_man"]
-const UMBRAGE_ITSELF := ["town", "temple", "last_light", "pond", "farmstead", "crypt"]
+const UMBRAGE_ITSELF := ["town", "temple", "last_light", "town_pond", "farmstead", "crypt"]
 
 var _failures := 0
 var _entries := {}
