@@ -11909,7 +11909,7 @@ func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
 		player.heart_at = World.tick
 		player.heart_debt = 0.0
 		Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": ("You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back." if _blessed(entity)
-			else "You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back.")})
+			else "You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back.")})
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and (pet.keeper == entity or pet == entity):
 			pet.note_downed(entity == pet.keeper)
@@ -22773,8 +22773,9 @@ func _on_returned(job: Dictionary) -> void:
 			else:
 				travel(peer, area, "", {}, cell)
 			var words := "%s brought you back from near death" % by if bool(job.get("near_death", false)) \
-				else "%s is brought back at %s by %s" % [record.name, where, by]  # Decision 587.
-			Net.broadcast_to([peer], "party", {"from": by, "text": "%s%s." % [words, ", for an offering of %d gold" % offered if offered > 0 else ""]})
+				else "%s brought you back at %s" % [by, where]  # Decision 587.
+			# A notice, not their speech (voice, 11-12: "Ned: ... by Ned." named them twice): from the server.
+			Net.broadcast_to([peer], "party", {"from": "Server", "text": "%s%s." % [words, ", for an offering of %d gold" % offered if offered > 0 else ""]})
 		"companion":
 			var record: PlayerRecord = _records.get(who)
 			if record == null or record.companion.is_empty():
@@ -22797,8 +22798,8 @@ func _on_returned(job: Dictionary) -> void:
 				World.enter_named(player.zone)
 				_join_companion(record, player)
 				if cell != World.NO_CELL:
-					Net.broadcast_to([peer], "party", {"from": by, "text": "%s is brought back at %s by %s%s." % [
-						record.companion.get("name", "Your companion"), where, by, ", for an offering of %d gold" % offered if offered > 0 else ""]})
+					Net.broadcast_to([peer], "party", {"from": "Server", "text": "%s brought %s back at %s%s." % [
+						by, record.companion.get("name", "your companion"), where, ", for an offering of %d gold" % offered if offered > 0 else ""]})
 		"resident":
 			if World.production.worker(who).is_empty():
 				return

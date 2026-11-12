@@ -1830,7 +1830,7 @@ func vendor_sale(player_id: String, item: String) -> Dictionary:
 	var cost := vendor_cost(player_id, item)
 	if gold(player_id) < cost:
 		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0, "count": 0}
-	var say := "Yours. Mind, no one will buy it off you."
+	var say := "Yours. Look after it."  # What he takes back is the Donate tab's to say (852 amended (3)).
 	if cost > 0:
 		add_gold(player_id, -cost, "a starter %s" % item)
 	elif first_free_for(player_id, item):

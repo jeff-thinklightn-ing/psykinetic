@@ -1460,7 +1460,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | an offering at the temple, %d gold | `sim/economy.gd` visitor_arrives() |
 |  | I've none of that. | `sim/economy.gd` vendor_sale() |
 |  | That's %d gold, friend. | `sim/economy.gd` vendor_sale() |
-|  | Yours. Mind, no one will buy it off you. | `sim/economy.gd` vendor_sale() |
+|  | Yours. Look after it. | `sim/economy.gd` vendor_sale() |
 |  | a starter %s | `sim/economy.gd` vendor_sale() |
 |  | That's %d gold, friend. | `sim/economy.gd` visitor_sale() |
 |  | %s from %s the pedlar | `sim/economy.gd` visitor_sale() |
@@ -2311,7 +2311,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | U | %s is mortally wounded. | `main.gd` _on_downed() |
 | U | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 |  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd` _on_downed() |
-|  | You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back. | `main.gd` _on_downed() |
+|  | You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
 |  | Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below. | `main.gd` SPENT_LINE |
 |  | Not while there's fighting close by. | `main.gd` _start_channel() |
@@ -2540,9 +2540,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | the healer's hut | `main.gd` _on_returned() |
 |  | a holy place | `main.gd` _on_returned() |
 |  | %s brought you back from near death | `main.gd` _on_returned() |
-|  | %s is brought back at %s by %s | `main.gd` _on_returned() |
+|  | %s brought you back at %s | `main.gd` _on_returned() |
 |  | , for an offering of %d gold | `main.gd` _on_returned() |
-|  | %s is brought back at %s by %s%s. | `main.gd` _on_returned() |
+|  | %s brought %s back at %s%s. | `main.gd` _on_returned() |
 |  | , for an offering of %d gold | `main.gd` _on_returned() |
 |  | retire and recall | `main.gd` _on_world_ticked() |
 |  | %s %s %ds | `main.gd` _on_world_ticked() |
