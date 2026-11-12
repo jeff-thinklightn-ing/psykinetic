@@ -7607,6 +7607,28 @@ draws nothing; a picked body (Main's pick by drawn place) is a tick behind as dr
 only: a host draws a tick later than before, a joined client unchanged; protocol unchanged;
 no new class_name.
 
+350 amended (2), a host's step reads its whole tick (decision_number.sh's label; the
+coordinator's go, from animation's hosted film of (1) on Umbrage, follow_hosted_repick): with
+(1) the stands at each cell were gone, but about twice a second the host drew its companion one
+frame of 0.25 of a cell and then one of 0.01, where two frames of 0.13 belong. World._process
+takes the ticks before it sets tick_alpha, so inside World.step tick_alpha still held the frame
+before's fraction (about 0.9; up to 1.0 at 60 frames a second) while tick was already the new
+tick. (1)'s queue test in GridEntity._world_slide_from read tick + tick_alpha less the delay
+almost a tick late, so her paced step dated half a tick back (2.5 ticks a cell) looked due, was
+started at once and cut the slide being drawn about 0.12 of a cell short. Now World._process
+sets tick_alpha to 0 before each step: a step happens on its tick, so whatever it does reads
+now as the whole tick, and tick_alpha is set again after the ticks as before. It mends every
+reader of tick + tick_alpha inside a step on a host (the queue test, arriving_in for a blow taken
+in the step); a client's display clock is untouched. mirror_test
+_test_host_step_reads_its_whole_tick drives the real World._process on a host at 60 frames a
+second and takes a 2.5-tick paced walk in the sim's own ticks (World.ticked), with the world's
+bodies held aside so the earlier tests' mirrors are not stepped: every step reads tick_alpha 0
+and each of 138 walking frames is within 0% of the pace; with the one line taken out it fails
+(tick_alpha 1.00 seen inside a step, a frame 500% off the pace). monster_test, combat_test,
+draugr_fight_test and controls_test pass with it. Host only; a joined client, as Jeff plays
+(a separate count found no such pair joined), and a dedicated server unchanged in what is
+shown; protocol unchanged; no new class_name.
+
 ## 351. A door redoes only the light and heat lines that go through it
 
 From the tick re-baseline on today's main (coordinator, after decision

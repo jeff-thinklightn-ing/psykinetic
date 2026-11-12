@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you host a game yourself, your companion and the creatures around you walk evenly (350 amended (2)).
 - Towns: townsfolk out for a stroll pick open ground of their own, with room between them (853 amended (7)).
 - Towns: townsfolk walk in long straight and slanting runs, turning only where one run meets the next (853 amended (6)).
 - Companions, townsfolk and creatures face the way they're walking and turn smoothly, while anything about to strike, or stopping to face you, still turns to you at once (655 amended (2)).

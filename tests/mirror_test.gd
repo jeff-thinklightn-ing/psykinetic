@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_facing_eases_on_a_zigzag()
 	_test_facing_told_and_stopped_for()
 	_test_host_draws_a_tick_behind()
+	_test_host_step_reads_its_whole_tick()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -642,6 +643,65 @@ func _test_host_draws_a_tick_behind() -> void:
 	striker.queue_free()
 	World.tick = tick_was
 	World.tick_alpha = 0.0
+	Net.mode = saved
+
+
+## The same walk with the real clock: World._process taking the ticks at 60
+## frames a second, each step taken in the sim's step (World.ticked), as a
+## companion's paced step is. The step read the frame before's tick_alpha,
+## so a slide dated half a tick back looked due and cut the one drawn short:
+## a frame of twice the pace, then one of almost nothing, twice a second
+## (animation's hosted film of 350 amended (1), 11-11).
+func _test_host_step_reads_its_whole_tick() -> void:
+	print("\n== a host's step reads its whole tick: a paced walk under the real clock is drawn evenly ==")
+	var saved := Net.mode
+	Net.mode = Net.Mode.HOST
+	var tick_was := World.tick
+	var accumulator_was := World._accumulator
+	World._accumulator = 0.0
+	# The steps taken with no one in the world: the bodies the tests before
+	# left are mirrors, never stepped by a sim.
+	var entities_was := World._entities
+	World._entities = [] as Array[GridEntity]
+	var wolf := _host_body("HostClockWolf", Vector2i(2, 60), 2)
+	var seen_alpha: Array[float] = []
+	var walk := {"due": float(World.tick) + 1.0, "steps": 0}
+	var on_tick := func(at_tick: int) -> void:
+		seen_alpha.append(World.tick_alpha)
+		if int(walk["steps"]) < 12 and float(at_tick) >= float(walk["due"]):
+			var from := wolf.tile
+			wolf.tile = from + Vector2i(1, 0)
+			wolf._world_slide_from(from, float(walk["due"]), 2.5)
+			walk["due"] = float(walk["due"]) + 2.5
+			walk["steps"] = int(walk["steps"]) + 1
+	World.ticked.connect(on_tick)
+	var frame := 1.0 / 60.0
+	var last := Iso.local_to_grid(wolf.position)
+	var moves: Array[float] = []
+	for f in 270:
+		World._process(frame)
+		wolf._process(frame)
+		var at := Iso.local_to_grid(wolf.position)
+		if int(walk["steps"]) >= 3 and int(walk["steps"]) < 12:  # Walking on steadily.
+			moves.append(at.distance_to(last))
+		last = at
+	World.ticked.disconnect(on_tick)
+	var whole := seen_alpha.size() > 0
+	for alpha in seen_alpha:
+		whole = whole and alpha == 0.0
+	_check(whole, "each of %d steps read its tick whole (tick_alpha 0 inside the step; the largest seen %.2f)" % [
+			seen_alpha.size(), seen_alpha.max() if seen_alpha.size() > 0 else -1.0])
+	var pace := 1.0 / (2.5 * World.TICK_DT * 60.0)  # Cells a frame at 2.5 ticks a cell.
+	var worst := 0.0
+	for m in moves:
+		worst = maxf(worst, absf(m - pace) / pace)
+	_check(moves.size() > 100 and worst <= 0.10,
+			"a 2.5-tick pace stepped in the sim's own ticks: each of %d frames within %.0f%% of %.3f cells (at most 10)" % [moves.size(), worst * 100.0, pace])
+	wolf.queue_free()
+	World.tick = tick_was
+	World.tick_alpha = 0.0
+	World._accumulator = accumulator_was
+	World._entities = entities_was
 	Net.mode = saved
 
 

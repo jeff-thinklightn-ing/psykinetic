@@ -1156,6 +1156,10 @@ func _process(delta: float) -> void:
 	while _accumulator >= TICK_DT:
 		_accumulator -= TICK_DT
 		if steps < MAX_CATCHUP_TICKS:
+			# 350 amended (2): a step happens on its tick, so what it does
+			# reads now as the whole tick, not the frame before's fraction
+			# (a host's slide judged a tick later than it was taken).
+			tick_alpha = 0.0
 			var started := Time.get_ticks_usec()
 			tick_parts.clear()
 			turn_parts.clear()
