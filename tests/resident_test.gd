@@ -96,6 +96,7 @@ func _ready() -> void:
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_keep_moving()  # 853, its moving on (Resident.keep_moving) for itself.
+	_test_abed_at_work()  # 751 amended (6).
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
@@ -6629,3 +6630,57 @@ func _test_visitors() -> void:
 	_sync()
 	_check(_body("visitor:visitor_rs_1") == null and _main._visitors_leaving.is_empty(), "past their time: gone")
 	Net.message_received.disconnect(heard)
+
+
+## Abed at work in its sleep spell (751 amended (6), the coordinator's ruling: the medicine man stood his
+## whole spell at his hut a cell from his own bed, his night pick being work): at work with no task and its
+## bed in the place it works at, in its spell it goes to its bed and lies down; its bed elsewhere, it keeps
+## to its work; at a task, the task.
+func _test_abed_at_work() -> void:
+	print("\n== abed at work in its spell (751 amended (6)): the medicine man sleeps at his hut ==")
+	var mara: Resident = null
+	for body: GridEntity in World.townsfolk():
+		if (body as Resident).town == STORE and not (body as Resident).worker_id.begins_with(Offers.VISITOR) and (body as Resident).task.is_empty():
+			mara = body
+			break
+	_check(mara != null, "one of the town's people has a body")
+	if mara == null:
+		return
+	var was := {"places": mara.places.duplicate(true), "tile": mara.tile, "task": mara.task.duplicate(true), "doing": mara.doing}
+	var hour_was := DayNight.hour(DayNight.now())
+	var asleep_hour := -1.0
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		if Resident.asleep_now(mara.worker_id):
+			asleep_hour = q / 4.0
+			break
+	_check(asleep_hour >= 0.0, "its sleep spell found (%.2f)" % asleep_hour)
+	var square: Rect2i = was["places"].get("square", Rect2i())
+	var work := Rect2i(_town_cell(square.get_center()) - Vector2i(2, 2), Vector2i(5, 5))
+	var bed: Vector2i = _main._nearest_free(work.get_center() + Vector2i(1, 1))
+	mara.task = {}
+	mara.places = {"square": square, "work": work, "home": square, "bed": Rect2i(bed, Vector2i.ONE)}
+	mara.doing = Resident.Doing.WORK
+	mara._goal = Resident.NO_CELL
+	mara._pick_goal()
+	_check(mara._abed_time() and mara._goal == mara._bed() and not mara._strolls(),
+		"at work, its bed in its work place, in its spell: to its bed, no stroll (goal %s, bed %s)" % [mara._goal, mara._bed()])
+	World._relocate(mara, mara._bed())
+	World.tick = maxi(World.tick, int(ceil(mara.next_move_tick)) + 1)
+	mara._show_work()
+	World.tick += 1
+	mara._show_work()
+	_check(mara.activity == "sleep" and mara.sleeping(), "on its bed it lies down (%s)" % mara.activity)
+	mara.task = {"kind": "chop", "cell": mara.tile}
+	_check(not mara._abed_time(), "at a task, the task, not the bed")
+	mara.task = {}
+	var far_bed: Vector2i = _main._nearest_free(square.get_center() + Vector2i(0, -12))
+	mara.places["bed"] = Rect2i(far_bed, Vector2i.ONE)
+	_check(work.has_point(far_bed) or not mara._abed_time(), "its bed away from its work: it keeps to its work (bed %s)" % far_bed)
+	mara.activity = ""
+	mara.places = was["places"]
+	mara.task = was["task"]
+	mara.doing = was["doing"]
+	World._relocate(mara, was["tile"])
+	mara._goal = Resident.NO_CELL
+	DayNight.set_hour(hour_was)

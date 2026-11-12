@@ -40199,6 +40199,17 @@ side (2)): he is the boss and his stamina already gates the spin, but a
 player gets a beat to step into after his plain strike. The spin is
 unchanged. monster_test _test_draugr checks his row's recover. Server only,
 protocol unchanged, no new class_name.
+
+751 amended (6) (abed at work in its sleep spell; the coordinator's ruling, 2026-11-12; the label from
+decision_number.sh). npc's probe of Umbrage at night found the medicine man standing his whole sleep
+spell at his hut, a cell from his own bed: 772's night picks keep him at work ("medicine_man": work),
+and only a body at home went to its bed. Resident._abed_time: in its spell, at home as before, or at
+work with no task when its bed lies in the place it works at or in the building that holds that place;
+it goes to its bed, lies down (_show_work_now), strolls not, and keeps the work for the rest of the
+night when its spell ends. A task comes first. resident_test _test_abed_at_work: its bed in its work
+place, to it and asleep; at a task, the task; its bed elsewhere, its work. look_day's 03:00 dump shows
+him on his bed. Server only, protocol unchanged, no new class_name.
+
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's

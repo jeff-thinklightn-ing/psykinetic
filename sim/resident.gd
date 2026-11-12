@@ -616,7 +616,7 @@ func _pick_goal() -> void:
 	if doing == Doing.WORK and not task.is_empty():
 		_goal = task["cell"]  # At the work the sim says (566): the woodlot's spot, the build's cells, the store with the log.
 		return
-	if doing == Doing.HOME and sleeps_now():
+	if _abed_time():
 		_goal = _bed()
 		return
 	# Staggered by body (the coordinator: thirteen at once must not look like a drill); a seat is kept twice as long.
@@ -731,7 +731,7 @@ func _set_goal(cell: Vector2i) -> void:
 
 ## Whether it strolls now (the mend): idle in a doing of STROLLS, no task, not abed, not addressing.
 func _strolls() -> bool:
-	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not (doing == Doing.HOME and sleeps_now())
+	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not _abed_time()
 
 
 ## The spots' use its doing takes (Level.spots_from's "use"): the square's hours take the square's,
@@ -1033,7 +1033,7 @@ func _show_work_now() -> void:
 		else:
 			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
 		return
-	if doing == Doing.HOME and sleeps_now():
+	if _abed_time():
 		var bed := _bed()
 		var head := _head()
 		if _goal != bed:
@@ -1131,6 +1131,27 @@ func _head() -> Vector2i:
 	if at is Dictionary and (at as Dictionary).get("head") is Vector2i and at["head"] != Vector2i.ZERO:
 		return at["head"]
 	return head_of(places["bed"], _bed())
+
+
+## Whether it goes to its bed now (751): in its sleep spell, at home; or (751 amended (6), the coordinator's
+## ruling: the medicine man stood his whole spell at his hut a cell from his own bed, his night pick being
+## work) at work with no task when its bed lies in the place it works at or in the building that holds it.
+## It sleeps there and keeps the work the rest of the night.
+func _abed_time() -> bool:
+	if not sleeps_now():
+		return false
+	if doing == Doing.HOME:
+		return true
+	if doing != Doing.WORK or not task.is_empty():
+		return false
+	var bed := _bed()
+	var work: Rect2i = places.get("work", Rect2i())
+	if work.size == Vector2i.ZERO:
+		return false
+	if work.has_point(bed):
+		return true
+	var roof: Dictionary = Companion.building_at(bed)
+	return not roof.is_empty() and roof == Companion.building_at(work.get_center())
 
 
 ## Whether it lies asleep in its bed now (decision 751): silent, no talk.
