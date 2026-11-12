@@ -10531,6 +10531,15 @@ granted as suite_remote, holds both kinds, is released by `release <tree> suite`
 takes it back. A probe that hangs (1 s limit) or errs leaves a suite. LAND_LOCAL=1 never asks, and a
 scene is never swapped. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (34) (perf, 2026-11-12; the coordinator's ask after 878; label from tools/decision_number.sh):
+a memory wait's line names the lean run. A full suite out of reach whose lean run is out of reach too
+is judged as the full suite (goes_lean's rule), and its line said "18.4 + 8 GB wanted" while at its
+turn it would start lean at 6.4. That misled the coordinator and buildings on 11-11. at_least() adds
+"(it runs lean at its turn: 6.4 + 8 GB)" to such a line: in heavy_job status, in a waiter's own
+line, and where a row behind names it. Text only; the judging is unchanged. tests/heavy_job_test: the
+figure added to a full suite's memory wait; a lean row, a kind with no lean run and a wait on the count
+left as they were. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

@@ -419,6 +419,20 @@ def judged_row(table, entry, default, running, free_ram_gb, free_commit_gb=None,
     return row
 
 
+def at_least(table, row, why):
+    """[why] for a full suite held by memory, with what it would run as at
+    its turn: a full suite out of reach whose lean run is out of reach too is
+    judged full, and its line said "18.4 + 8 GB wanted" while it would start
+    lean at 6.4 (the coordinator and buildings, 11-11). Text only: the
+    judging is unchanged."""
+    if not why or "GB wanted" not in why or not row.get("lean") or row.get("estimate", row.get("kind")) != row.get("kind"):
+        return why
+    lean = lean_row(table, row["kind"])
+    if lean is None:
+        return why
+    return "%s (it runs lean at its turn: %.1f + %.0f GB)" % (why, lean["ram_gb"], MARGIN_GB)
+
+
 def holder_name(queue, place):
     """How a wait names the queue row at [place] that holds it: "the head,
     <tree> <kind>" for the first, else "<tree> <kind> (<n>th in the queue)"."""
@@ -1457,6 +1471,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
             head, past, past_why, holder = passes_held(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
+            why = at_least(table, row, why)
             swapped = None
             probe_now = False
             if may_swap and "suite_remote" in table:
@@ -1504,6 +1519,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 # each said it waited on the head, a suite.
                 other = ahead[holder]
                 _, other_why = decide(other, running, True, free_ram, gpu_gb()[0] if other["gpu"] else None, free_commit)
+                other_why = at_least(table, other, other_why)
                 why = "%s, waits on: %s" % (holder_name(queue, holder), other_why or "its next look")
                 if past_why:
                     why += "; %s" % past_why
@@ -2032,10 +2048,11 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
         elif not head and holder is not None:
             other = ahead[holder]
             _, other_why = decide(other, running, True, free_ram, free_gpu if other["gpu"] else None, free_commit)
+            other_why = at_least(table, other, other_why)
             out.append("waits: behind %s, which waits on: %s%s" % (holder_name(queue, holder),
                 other_why or "its next look", "; " + past_why if past_why else ""))
         else:
-            out.append("waits: %s" % why)
+            out.append("waits: %s" % at_least(table, row, why))
     return out
 
 

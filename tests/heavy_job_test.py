@@ -1421,6 +1421,18 @@ check(len(lean_lines) == 1 and "at its turn, full 14.6 + 8 GB" in lean_lines[0],
 turn2.join(5)
 gate.release("turn2", "suite")
 clear_gate()
+print("== a memory wait names the lean run (394 amended (34)) ==")
+lean_table = {"suite": dict(gate.KINDS["suite"], ram_gb=18.4), "suite_lean3": dict(gate.KINDS["suite_lean3"], ram_gb=6.4)}
+full_row = dict(lean_table["suite"], kind="suite")
+_, full_why = gate.decide(full_row, [], True, 12.4, None, 40.0)
+check(gate.at_least(lean_table, full_row, full_why).endswith("18.4 + %.0f GB wanted (it runs lean at its turn: 6.4 + %.0f GB)" % (
+    gate.MARGIN_GB, gate.MARGIN_GB)), "a full suite out of reach says the lean run's figure: %s" % gate.at_least(lean_table, full_row, full_why))
+lean_only = gate.lean_row(lean_table, "suite")
+_, lean_why = gate.decide(lean_only, [], True, 12.4, None, 40.0)
+check(gate.at_least(lean_table, lean_only, lean_why) == lean_why, "a lean one, unchanged")
+check(gate.at_least(lean_table, dict(gate.KINDS["scene"], kind="scene"), "1 + 8 GB wanted") == "1 + 8 GB wanted"
+    and gate.at_least(lean_table, full_row, "1 suite running, at most 1 at once") == "1 suite running, at most 1 at once",
+    "a kind with no lean run, or a wait on the count, unchanged")
 print("== a take of suite swapped for saturn at its grant (394 amended (33)) ==")
 saved_swap = (gate._memory, gate.total_ram_gb, gate.MARGIN_GB, gate.COMMIT_MARGIN_GB, gate.PROBE_COMMAND, gate.PROBE_SECONDS)
 gate.total_ram_gb = lambda: None
