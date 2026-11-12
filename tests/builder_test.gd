@@ -61,6 +61,7 @@ func _ready() -> void:
 	_test_named_refusals()
 	_test_trades_preview()
 	_test_cached_checks()
+	_test_spot_ghost()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1903,3 +1904,28 @@ func _test_cached_checks() -> void:
 	var held := {Vector2i(192, 210): true}
 	_check(not kept_reach.is_empty() and is_same(session._held_reach(held), kept_reach) and kept_reach.size() == session.reached_round(held).size(),
 		"the reach with the spots held: kept from the last spot, the same as flooded fresh")
+
+
+func _test_spot_ghost() -> void:
+	print("\n== the proposal carries the area's spots for the ghost (859 amended (2)) ==")
+	var field := _doc()
+	field.config["starts"] = [[2, 2]]
+	field.config["places"] = {"store": {"at": [20, 15], "kind": "stockpile", "holder": "town"}}
+	field.config["spots"] = [{"use": "square", "cell": [10, 10], "face": [11, 10], "pose": "stand", "town": "store"},
+		{"use": "fire", "cell": [12, 10], "face": [12, 11], "pose": "sit", "town": "store"},
+		{"use": "square", "cell": [14, 10], "face": [15, 10], "pose": "stand", "town": "store"},
+		{"use": "square", "cell": [38, 28], "face": [37, 28], "pose": "stand", "town": "store"}]
+	var session := BuilderSession.new(field, Rect2i(0, 0, 30, 20), "test_field", StubClaude.new([]))
+	_check(not BuilderHost.proposal_message(session).has("spots") or BuilderHost.proposal_spots(session).all(func(row: Array) -> bool: return row[6] == "kept"),
+		"nothing changed: every spot in the area kept")
+	session.run_tool("spot", {"at": [12, 10], "use": "fire", "face": [13, 10], "pose": "sit"})
+	session.run_tool("spot", {"at": [14, 10], "remove": true})
+	session.run_tool("spot", {"at": [16, 12], "use": "work", "trade": "cook", "face": [16, 13], "pose": "lean"})
+	var rows: Array = BuilderHost.proposal_message(session).get("spots", [])
+	var by := {}
+	for row: Array in rows:
+		by[Vector2i(int(row[0]), int(row[1]))] = row
+	_check(rows.size() == 4 and by.get(Vector2i(10, 10), [])[6] == "kept" and by.get(Vector2i(12, 10), [])[6] == "changed"
+		and by.get(Vector2i(14, 10), [])[6] == "gone" and by.get(Vector2i(16, 12), []) == [16, 12, 16, 13, "lean", "work", "new"]
+		and not by.has(Vector2i(38, 28)),
+		"the proposal's spots: kept, changed, gone and new, none outside the area (%s)" % [rows])

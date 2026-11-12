@@ -49969,6 +49969,24 @@ spot yet; no names; a merchant's spot said both ways; the preview's last line; a
 said so). Tools only: nothing player-facing, no package, no bullet; protocol unchanged; no new
 class_name.
 
+859 amended (2) (step 2, the coordinator's approval): the spots in game, as a ghost. Laying spots by
+words alone, maps could not see which way a body faces or where the square's spots sit beside each
+other. BuilderHost.proposal_spots: the proposal message carries the area's spots, [[x, y, face_x,
+face_y, pose, use, state]...], state "new" (none on its cell in the level), "changed", "kept" (in the
+level as it is, sent so the whole place shows while spots are laid) or "gone" (taken away); none
+outside the area. Client3D.show_builder draws a flat mark a spot among builder mode's marks (cleared
+with them): its use group's colour (BUILDER_SPOT_USES beside the other BUILDER_ colours: work, the
+square's (square, fire, talk), well, inn, temple), a wedge toward its face cell, its shape its pose (a
+disc in a ring standing, a disc in a half-ring open to the face leaning, a square sitting); new and
+changed at BUILDER_SPOT_ALPHA, kept and gone at BUILDER_SPOT_KEPT_ALPHA, a gone one crossed out in
+BUILDER_SPOT_GONE. No words, so nothing for voice; a world mark like the roof outlines, so no
+ui-design mock (the coordinator). BuilderUI passes the proposal's spots through. The proposal message
+carries one key more and none changes, and accepting never depends on the ghost being drawn: no new
+protocol number (release, net.gd's rule): an old client ignores "spots" and draws no ghost. builder_test _test_spot_ghost (kept,
+changed, gone, new; none outside the area); view_test (a mark each, turned to its face, the gone one
+fainter with its cross). Tools only: nothing a player outside builder mode sees, no package, no
+bullet; no new class_name.
+
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 
 The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it

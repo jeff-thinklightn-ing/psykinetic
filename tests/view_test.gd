@@ -7334,6 +7334,17 @@ func _test_heights() -> void:
 	_check(not tops.is_empty() and tops.all(func(y: float) -> bool: return absf(y - 5 * Client3D.LEVEL_RISE - Client3D.ON_FLOOR * 2.0) < 0.01)
 			and colours.size() == 1 and colours[0].v > Client3D.BUILDER_LOW.v,
 			"a cell raised to 5 in the ghost: flat at 5, lighter than the ground's tint (%s)" % [colours])
+	# Townsfolk spots (859 amended (2)): a mark each, turned to its face; a gone one fainter and crossed out.
+	var east := stair + Vector2i.RIGHT
+	_rig.show_builder(Rect2i(stair - Vector2i.ONE, Vector2i(3, 3)), [], [], Rect2i(), [], [],
+		[[stair.x, stair.y, stair.x, stair.y + 1, "sit", "work", "new"], [east.x, east.y, east.x, east.y - 1, "stand", "fire", "gone"]])
+	var sat := _rig._builder_marks.get_node_or_null("Spot_%d_%d" % [stair.x, stair.y]) as MeshInstance3D
+	var went := _rig._builder_marks.get_node_or_null("Spot_%d_%d" % [east.x, east.y]) as MeshInstance3D
+	_check(sat != null and went != null and _rig._builder_marks.get_child_count() == 4
+		and absf((sat.material_override as StandardMaterial3D).albedo_color.a - Client3D.BUILDER_SPOT_ALPHA) < 0.01
+		and absf((went.material_override as StandardMaterial3D).albedo_color.a - Client3D.BUILDER_SPOT_KEPT_ALPHA) < 0.01
+		and sat.basis.x.dot(Vector3(0.0, 0.0, 1.0)) > 0.99 and went.basis.x.dot(Vector3(0.0, 0.0, -1.0)) > 0.99,
+		"spots in the ghost: a mark each turned to its face, the gone one fainter with its cross (%d marks)" % _rig._builder_marks.get_child_count())
 	_rig.clear_builder()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 

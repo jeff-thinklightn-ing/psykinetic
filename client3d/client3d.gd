@@ -5498,6 +5498,18 @@ const BUILDER_LOW := Color(0.3, 0.27, 0.22)
 const BUILDER_HIGH := Color(0.97, 0.95, 0.88)
 ## A roof the proposal adds: its rect outlined, raised to about the eaves.
 const BUILDER_ROOF := Color(0.85, 0.35, 0.25, 0.9)
+## A townsfolk spot's mark (859 amended (2)), by its use's group (square,
+## fire and talk are the square's): a work spot amber, the square's green,
+## the well's blue, the inn's red-brown, the temple's pale gold.
+const BUILDER_SPOT_USES := {
+	"work": Color(0.95, 0.65, 0.2), "square": Color(0.45, 0.85, 0.4), "well": Color(0.35, 0.6, 0.95),
+	"inn": Color(0.8, 0.4, 0.3), "temple": Color(0.95, 0.9, 0.6),
+}
+## A new or changed spot's mark this see-through; a kept one (already in the
+## level) fainter, as is a gone one, crossed out in BUILDER_SPOT_GONE.
+const BUILDER_SPOT_ALPHA := 0.85
+const BUILDER_SPOT_KEPT_ALPHA := 0.35
+const BUILDER_SPOT_GONE := Color(0.9, 0.2, 0.15, 0.9)
 var _builder_marks: Node3D
 ## Builder mode's building codes over the buildings (decision 537), and
 ## whether they are on (kept over a rebuilt level).
@@ -5510,8 +5522,10 @@ var _codes_on := false
 ## [[x, y, side, kind]...]), see-through, coloured as the legend;
 ## [param beyond] (a new level's place past the map's edge) outlined; and
 ## the cells whose height changes ([[x, y, level]...]) at their new height,
-## lighter the higher; and the roofs it adds ([[x, y, w, h]...]) outlined.
-func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i(), heights: Array = [], roofs: Array = []) -> void:
+## lighter the higher; the roofs it adds ([[x, y, w, h]...]) outlined; and
+## the townsfolk spots in the area ([[x, y, face_x, face_y, pose, use,
+## state]...], 859 amended (2)), a mark each (_add_spot_mark).
+func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := Rect2i(), heights: Array = [], roofs: Array = [], spots: Array = []) -> void:
 	clear_builder()
 	if area.size == Vector2i.ZERO:
 		return
@@ -5529,6 +5543,9 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		var outline := _make_flat(_frame_mesh(rect, 0.12), BUILDER_ROOF)
 		outline.position.y = _elevation(rect.position) + 0.75
 		_builder_marks.add_child(outline)
+	for each: Variant in spots:
+		if each is Array and (each as Array).size() >= 7:
+			_add_spot_mark(each)
 	# Cells, one mesh a colour; a thing as a smaller square on its cell.
 	var raised := {}
 	for each: Variant in heights:
@@ -5570,6 +5587,64 @@ func show_builder(area: Rect2i, cells: Array = [], edges: Array = [], beyond := 
 		box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		box.position = _tile_position(cell) + (Vector3(0.5, 0.35, 0.0) if key.z == Terrain.EAST else Vector3(0.0, 0.35, 0.5))
 		_builder_marks.add_child(box)
+
+
+## One townsfolk spot's mark (859 amended (2)), [x, y, face_x, face_y,
+## pose, use, state]: in its use's colour (BUILDER_SPOT_USES), a wedge toward
+## its face cell, its shape its pose (a disc in a ring standing, a disc in a
+## half-ring open to the face leaning, a square sitting); a kept or gone one
+## fainter, a gone one crossed out. No words.
+func _add_spot_mark(spot: Array) -> void:
+	var at := Vector2i(int(spot[0]), int(spot[1]))
+	var face := Vector2i(int(spot[2]), int(spot[3])) - at
+	var state := str(spot[6])
+	var group := "square" if str(spot[5]) in ["square", "fire", "talk"] else str(spot[5])
+	var colour: Color = BUILDER_SPOT_USES.get(group, BUILDER_SPOT_USES["square"])
+	var mark := _make_flat(_flat_mesh(spot_mark_quads(str(spot[4]))), Color(colour, BUILDER_SPOT_ALPHA if state in ["new", "changed"] else BUILDER_SPOT_KEPT_ALPHA))
+	mark.name = "Spot_%d_%d" % [at.x, at.y]
+	mark.position = Vector3(at.x, _height_in(at, Vector2(at)) + ON_FLOOR * 5.0, at.y)
+	mark.rotation.y = atan2(-float(face.y), float(face.x)) if face != Vector2i.ZERO else 0.0
+	_builder_marks.add_child(mark)
+	if state == "gone":
+		var cross := _make_flat(_flat_mesh(spot_cross_quads()), BUILDER_SPOT_GONE)
+		cross.position = mark.position + Vector3(0.0, ON_FLOOR, 0.0)
+		_builder_marks.add_child(cross)
+
+
+## A spot mark's shape facing +x, flat quads round the cell's middle: the
+## pose's shape and a wedge toward the face.
+static func spot_mark_quads(pose: String) -> Array[PackedVector2Array]:
+	var quads: Array[PackedVector2Array] = []
+	var segments := 16
+	if pose == "sit":
+		var half := 0.3
+		quads.append(PackedVector2Array([Vector2(-half, -half), Vector2(half, -half), Vector2(half, half), Vector2(-half, half)]))
+	else:
+		for i in segments:
+			var a0 := TAU * i / segments
+			var a1 := TAU * (i + 1) / segments
+			var p0 := Vector2(cos(a0), sin(a0)) * 0.18
+			var p1 := Vector2(cos(a1), sin(a1)) * 0.18
+			quads.append(PackedVector2Array([Vector2.ZERO, p0, p1, p1]))
+			# The ring round it; leaning, its back half alone (open to the face).
+			if pose == "lean" and cos((a0 + a1) * 0.5) > 0.0:
+				continue
+			var inner := 0.3
+			var outer := 0.38
+			quads.append(PackedVector2Array([Vector2(cos(a0), sin(a0)) * inner, Vector2(cos(a0), sin(a0)) * outer,
+				Vector2(cos(a1), sin(a1)) * outer, Vector2(cos(a1), sin(a1)) * inner]))
+	quads.append(PackedVector2Array([Vector2(0.32, -0.12), Vector2(0.5, 0.0), Vector2(0.5, 0.0), Vector2(0.32, 0.12)]))
+	return quads
+
+
+## A gone spot's cross: two bars over its mark.
+static func spot_cross_quads() -> Array[PackedVector2Array]:
+	var quads: Array[PackedVector2Array] = []
+	for turn: float in [PI / 4.0, -PI / 4.0]:
+		var along := Vector2(cos(turn), sin(turn)) * 0.42
+		var across := Vector2(-sin(turn), cos(turn)) * 0.05
+		quads.append(PackedVector2Array([-along - across, along - across, along + across, -along + across]))
+	return quads
 
 
 ## A ghost's square [param half] across from the middle of cell [param at],

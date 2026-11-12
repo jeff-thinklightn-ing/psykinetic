@@ -164,6 +164,34 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 
 
 ## [param session]'s proposal as the "builder" message's fields.
+## The townsfolk spots in the session's area for the ghost (859 amended
+## (2)): [[x, y, face_x, face_y, pose, use, state]...], state "new" (none on
+## its cell in the level), "changed", "kept" (in the level as it is, drawn
+## fainter, so the whole place shows while spots are laid) or "gone" (in the
+## level, taken away). [] when the area has none either side.
+static func proposal_spots(session: BuilderSession) -> Array:
+	var had := {}
+	for spot: Dictionary in Level.spots_from(session.doc.config, [] as Array[String]):
+		if session.area.has_point(spot["cell"]):
+			had[spot["cell"]] = spot
+	var out: Array = []
+	var row := func(spot: Dictionary, state: String) -> Array:
+		var cell: Vector2i = spot["cell"]
+		var face: Vector2i = spot["face"]
+		return [cell.x, cell.y, face.x, face.y, spot["pose"], spot["use"], state]
+	var now := {}
+	for spot: Dictionary in Level.spots_from(session.working.config, [] as Array[String]):
+		if not session.area.has_point(spot["cell"]):
+			continue
+		now[spot["cell"]] = true
+		var was: Variant = had.get(spot["cell"])
+		out.append(row.call(spot, "new" if was == null else ("kept" if str(was) == str(spot) else "changed")))
+	for cell: Vector2i in had:
+		if not now.has(cell):
+			out.append(row.call(had[cell], "gone"))
+	return out
+
+
 static func proposal_message(session: BuilderSession) -> Dictionary:
 	var proposal := session.proposal()
 	var cells: Array = []
@@ -188,6 +216,9 @@ static func proposal_message(session: BuilderSession) -> Dictionary:
 			if rect != null and not session.doc.config.get("roofs", []).has(entry):
 				roofs.append([rect.position.x, rect.position.y, rect.size.x, rect.size.y])
 		message["roofs"] = roofs
+	var spots := proposal_spots(session)
+	if not spots.is_empty():
+		message["spots"] = spots
 	if proposal.has("new_area"):
 		var plan: Dictionary = proposal["new_area"]
 		var footprint: Rect2i = plan["footprint"]
