@@ -1831,7 +1831,10 @@ func _test_named_refusals() -> void:
 
 func _test_trades_preview() -> void:
 	print("\n== the town's trades, by economy's rules, against the work spots (859 amended (1)) ==")
-	var wilds := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
+	# From no spots: the wilds' own (maps' square, well and talk spots) set aside, so the reading is the merchant's alone.
+	var wilds_doc := MapDoc.from_level("wilds")
+	wilds_doc.config.erase("spots")
+	var wilds := BuilderSession.new(wilds_doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
 	var before := wilds.trade_preview("store")
 	for words: String in ["the town's trades in store, by economy's rules: ", "smith at the forge, works about ", "cook at the kitchen",
 			"taverner at the inn (if economy seats one)", "priest at the temple (if economy seats one)", "woodcutter at the woodlot woodlot",
@@ -1870,7 +1873,10 @@ func _test_cached_checks() -> void:
 			var old: Array = []
 			sense._chests(level, sense._lay(level, [], options), options, old)
 			_check(str(sense.check_chests(level, options)) == str(old), "%s, dungeon %s: check_chests' faults as before (%d)" % [level_name, options["dungeon"], old.size()])
-	var session := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(176, 186, 40, 32), "wilds", StubClaude.new([]))
+	# The wilds' own spots set aside (maps' square, well and talk spots): the reach below holds one spot only.
+	var cached_doc := MapDoc.from_level("wilds")
+	cached_doc.config.erase("spots")
+	var session := BuilderSession.new(cached_doc, Rect2i(176, 186, 40, 32), "wilds", StubClaude.new([]))
 	var first := session.parsed_of(session.working)
 	_check(is_same(session.parsed_of(session.working), first), "read twice with no change: one parse")
 	var agree := func(when: String) -> void:
