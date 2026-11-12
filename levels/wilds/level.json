@@ -3676,8 +3676,34 @@
 			"pose": "stand",
 			"town": "store",
 			"trade": "tanner"
-
-
+		},
+		{
+			"use": "temple",
+			"cell": [193, 200],
+			"face": [194, 200],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "temple",
+			"cell": [195, 200],
+			"face": [196, 200],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "temple",
+			"cell": [193, 203],
+			"face": [194, 203],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "temple",
+			"cell": [195, 203],
+			"face": [196, 203],
+			"pose": "sit",
+			"town": "store"
 		}
 	]
 }

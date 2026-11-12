@@ -3064,7 +3064,7 @@ static func _a(word: String) -> String:
 
 
 ## What a sit spot sits on (859, npc's reading): what the warning names.
-const SEAT_SAYS := "a seat of a place (a tavern's, a fire's) or a chair or bench laid there"
+const SEAT_SAYS := "a seat of a place (a tavern's, a fire's) or a chair, bench or stool laid there"
 ## Building slots a body sits on (npc: the barrow's hall chair, the smith's bench).
 const SEAT_SLOTS: Array[String] = ["building.hall_chair", "building.smith_bench"]
 ## The trades that keep a stall or counter (npc's contract: they "tend"),
@@ -3075,7 +3075,8 @@ const KEEPER_TRADES: Array[String] = ["merchant", "taverner", "keeper", Main.VEN
 
 ## Whether a body sits on something at [param at] (859, npc's reading: the
 ## code knows no seat cell of its own): a place's "seats" cell (a tavern's,
-## a fire's), or a cell of a SEAT_SLOTS building.
+## a fire's), a cell of a SEAT_SLOTS building, or a decor row whose kind
+## sits ("seat" in Level.DECOR_KINDS, 875, maps' side).
 func seat_at(at: Vector2i) -> bool:
 	var places: Variant = working.config.get("places", {})
 	for key: Variant in places if places is Dictionary else {}:
@@ -3088,6 +3089,12 @@ func seat_at(at: Vector2i) -> bool:
 			var rect: Variant = Level.building_rect(entry)
 			if rect is Rect2i and (rect as Rect2i).has_point(at):
 				return true
+	# A decor seat laid on the cell (875, maps' side): a row whose kind's
+	# Level.DECOR_KINDS row has "seat" (the Mughouse's stools, the temple's pews).
+	for row: Variant in working.config.get("decor", []) if working.config.get("decor") is Array else []:
+		if row is Array and (row as Array).size() == 6 and Vector2i(int(row[0]), int(row[1])) == at \
+				and bool((Level.DECOR_KINDS.get(str(row[4]), {}) as Dictionary).get("seat", false)):
+			return true
 	return false
 
 

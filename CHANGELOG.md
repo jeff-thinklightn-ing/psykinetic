@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: of an evening Umbrage's townsfolk go inside the Last Light Mughouse and stay a while (875).
 - Towns: click someone from a little way off, such as the healer in his hut, and their window opens with what they sell once you're beside them (852 amended (8)).
 - Wilds: the old grey snarls as his bite's warning shows and his jaws snap shut as it lands, on you or on the air, and his lunge comes with a snarl and a bark (955).
 - Towns: gold you give toward a building stays in its fund and pays for that building's materials; the town window's card counts your gift at once, and the total it shows falls as the materials come in (918 amended (2)).

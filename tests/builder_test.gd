@@ -1789,6 +1789,17 @@ func _test_spots() -> void:
 	var bare := session.run_tool("spot", {"at": [10, 10], "use": "square", "face": [11, 10], "pose": "sit"})
 	_check(bare.get("ok", false) and "Warning: nothing at (10, 10) is sat on" in str(bare.get("text")) and session.working.config["spots"][0]["town"] == "store",
 		"a sit spot on bare grass: laid with a warning; the nearest store its town (%s)" % bare.get("text"))
+	# A decor seat (875, maps' side: a kind with "seat" in Level.DECOR_KINDS) quiets it; other decor doesn't.
+	session.working.config["decor"] = [[12, 12, 1, 0, "bench", 1], [12, 14, 1, 0, "crate", 1]]
+	session.working.revision += 1
+	var benched := session.run_tool("spot", {"at": [12, 12], "use": "square", "face": [13, 12], "pose": "sit"})
+	var crated := session.run_tool("spot", {"at": [12, 14], "use": "square", "face": [13, 14], "pose": "sit"})
+	_check(benched.get("ok", false) and not "is sat on" in str(benched.get("text")) and crated.get("ok", false) and "Warning: nothing at (12, 14) is sat on" in str(crated.get("text")),
+		"a sit on a decor bench: no warning; on a crate: the warning (%s | %s)" % [str(benched.get("text")).left(80), str(crated.get("text")).left(80)])
+	session.run_tool("spot", {"at": [12, 12], "remove": true})
+	session.run_tool("spot", {"at": [12, 14], "remove": true})
+	session.working.config.erase("decor")
+	session.working.revision += 1
 	session.working.map.set_edge(Terrain.edge_key(Vector2i(14, 10), Vector2i.RIGHT), "door")
 	session.working.revision += 1
 	var doorway := session.run_tool("spot", {"at": [14, 10], "use": "square", "face": [13, 10]})

@@ -56059,6 +56059,38 @@ guest's end; stays at a guest's or with none. Server only; protocol unchanged; n
 - On its seat it turns to the seat's face and sits (maps' joined look on 659186cfe, C:/dev/review/ui-design/looks/look_mug3_atlas_659186cfe/: a lodger stood on mug_ne (10, 7) an hour and never sat; economy's probe: every held lodger that reached its seat facing wrong stood so, Rolf too). Resident's tick turned a body to its spot (_face_open) only when its activity was a pose or it strolls, and a pose needs the facing, so a held lodger that came in facing wrong never turned. _face_open now runs for a body held by _night_seated too. _test_lodger_keeps_seat puts him on the seat with his back to the table: he turns and sits (FAIL before).
 - Server only; protocol unchanged; no new class_name; no bullet. Package "Umbrage at night".
 
+875, maps' side (the switch: the coordinator's order, spots take 1 then this): the Mughouse's floor
+spots and the temple's pews' sits, laid through builder's runner (851), its refusals the check.
+umbrage_tavern "spots" holds fifteen, town "store": two "inn" stands at the bar counter (8,4) and (10,4)
+facing it, five "inn" sits round the hearth (1,5), (1,6), (1,7), (1,8), (2,5) facing the fire (0,6)-(0,7),
+and the tables' eight seats as four talk pairs, each two facing each other across their table:
+mug_nw (2,6)-(5,7), mug_ne (7,6)-(10,7), mug_sw (2,10)-(5,11), mug_east (7,10)-(10,11) (the
+coordinator's: npc's seating rule, 875 amended (2), reads a pair as a table, a stand as the counter and
+the other sits as the fire). Two "work" stands of trade "taverner" behind the bar,
+(8,2) facing (8,3) and (10,2) facing (10,3), each face to face across the counter (8..10, 3) with a
+counter stand, inside her work rect (8..10, 1..3) (the coordinator's, npc's places): there she shows
+"tend_bar" (877) in bouts once 875 amended (2) gives the floor's taverner its work spots. A sixth hearth sit at (2,8) was refused (a body there closes (2,6)-(2,7) off), so the hearth
+has five. A sit with nothing under it floats (the clip's seat is 0.46 m): each sit has a stool, art-gen's
+prop.stool (art-kit's, riding this take on the coordinator's ruling that it lands with these rows), as a
+decor kind "stool" (flat, faced, never solid), thirteen rows: the five at the hearth and the tables'
+eight seats (places.tavern "seats"), each turned to its hearth or table. The wilds' "spots" gains the
+temple's four "temple" sits on buildings' pews (decor "bench", 734 amended (7)) at (193,200), (195,200),
+(193,203) and (195,203), facing the altar (east). Builder's sit warning ("nothing at ... is sat on")
+read only place seats and SEAT_SLOTS buildings, so it warned on every stool and pew: a Level.DECOR_KINDS
+row may now carry "seat": true (stool and bench; log_seat when the fire's sits come), and
+BuilderSession.seat_at counts a decor row on the cell whose kind has it (builder's ask: in this take,
+the flag and its reader together; builder read it). Animation's stills at the nearest zoom: a body sits
+on the bench and on both stools with the seat under it and the feet on the floor; at the hearth the
+boots touch the hearth's stone, kept as meant. The runner's first save of umbrage_tavern wrote its
+buildings' codes (B1, T1-T5), and the wilds' the altar's (T3). With these laid, 875 is on: the evening
+crowd goes inside as many as the floor has spots. Seen: hosted stills on the Atlas and a whole evening
+at its own pace on the Lenovo (at most six guests and the taverner, the spots never the cap); perf's
+bench of the tavern at 23:30 on the Atlas, 4.75 ms a frame, 0.9 ms over main, the extra bodies. town_day_test's
+keeper row (333 amended (4)) read Rolf's due to his sleep, as with no inn open; with the Mughouse open it takes
+him in from INN_TRADERS_DAY's end and he walks out of its door to his stand at its start (_inn_town_side, as
+built), so with spots on its floor the row's due runs from his first sample on his stand (within 0.25 h of
+6:00) to 18:00: 726 of 726 samples at (203,196), WORK. Levels data, a decor kind, builder's seat reading;
+server and client data only, protocol unchanged; no new class_name.
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...

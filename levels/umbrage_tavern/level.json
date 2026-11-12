@@ -81,21 +81,24 @@
 			"at": [
 				8,
 				3
-			]
+			],
+			"code": "B1"
 		},
 		{
 			"slot": "building.tap_rack",
 			"at": [
 				9,
 				0
-			]
+			],
+			"code": "T1"
 		},
 		{
 			"slot": "building.tavern_table",
 			"at": [
 				3,
 				6
-			]
+			],
+			"code": "T2"
 		},
 		{
 			"slot": "building.tavern_table",
@@ -103,14 +106,16 @@
 				8,
 				6
 			],
-			"variant": 2
+			"variant": 2,
+			"code": "T3"
 		},
 		{
 			"slot": "building.tavern_table",
 			"at": [
 				3,
 				10
-			]
+			],
+			"code": "T4"
 		},
 		{
 			"slot": "building.tavern_table",
@@ -118,7 +123,8 @@
 				8,
 				10
 			],
-			"variant": 2
+			"variant": 2,
+			"code": "T5"
 		}
 	],
 	"decor": [
@@ -144,6 +150,110 @@
 			0,
 			1,
 			"barrel",
+			1
+		],
+		[
+			1,
+			5,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			1,
+			6,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			1,
+			7,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			1,
+			8,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			2,
+			5,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			2,
+			6,
+			1,
+			0,
+			"stool",
+			1
+		],
+		[
+			5,
+			7,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			7,
+			6,
+			1,
+			0,
+			"stool",
+			1
+		],
+		[
+			10,
+			7,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			2,
+			10,
+			1,
+			0,
+			"stool",
+			1
+		],
+		[
+			5,
+			11,
+			-1,
+			0,
+			"stool",
+			1
+		],
+		[
+			7,
+			10,
+			1,
+			0,
+			"stool",
+			1
+		],
+		[
+			10,
+			11,
+			-1,
+			0,
+			"stool",
 			1
 		]
 	],
@@ -377,6 +487,141 @@
 			],
 			"top": 1.05,
 			"up": 1.4
+		}
+	],
+	"building_codes": {
+		"B": 1,
+		"T": 5
+	},
+	"spots": [
+		{
+			"use": "inn",
+			"cell": [8, 4],
+			"face": [8, 3],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [10, 4],
+			"face": [10, 3],
+			"pose": "stand",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [1, 6],
+			"face": [0, 6],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [1, 7],
+			"face": [0, 7],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [1, 5],
+			"face": [0, 6],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [1, 8],
+			"face": [0, 7],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "inn",
+			"cell": [2, 5],
+			"face": [1, 6],
+			"pose": "sit",
+			"town": "store"
+		},
+		{
+			"use": "talk",
+			"cell": [7, 10],
+			"face": [8, 10],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_east"
+		},
+		{
+			"use": "talk",
+			"cell": [10, 11],
+			"face": [9, 11],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_east"
+		},
+		{
+			"use": "talk",
+			"cell": [2, 6],
+			"face": [3, 6],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_nw"
+		},
+		{
+			"use": "talk",
+			"cell": [5, 7],
+			"face": [4, 7],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_nw"
+		},
+		{
+			"use": "talk",
+			"cell": [7, 6],
+			"face": [8, 6],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_ne"
+		},
+		{
+			"use": "talk",
+			"cell": [10, 7],
+			"face": [9, 7],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_ne"
+		},
+		{
+			"use": "talk",
+			"cell": [2, 10],
+			"face": [3, 10],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_sw"
+		},
+		{
+			"use": "talk",
+			"cell": [5, 11],
+			"face": [4, 11],
+			"pose": "sit",
+			"town": "store",
+			"pair": "mug_sw"
+		},
+		{
+			"use": "work",
+			"cell": [8, 2],
+			"face": [8, 3],
+			"pose": "stand",
+			"town": "store",
+			"trade": "taverner"
+		},
+		{
+			"use": "work",
+			"cell": [10, 2],
+			"face": [10, 3],
+			"pose": "stand",
+			"town": "store",
+			"trade": "taverner"
 		}
 	]
 }

@@ -88,7 +88,7 @@ func _run() -> void:
 	_check(_samples >= HOURS * 60,
 		"(%d samples; at the ten-minute ones, %d found beside a spot another chose too and stands on, none two running unless told above)" % [_samples, _taken_seen])
 	_check(int(_keeper.get("due", 0)) >= 60 and (_keeper["missing"] as Array).is_empty() and (_keeper["astray"] as Array).is_empty(),
-		"Rolf under the cap: from his first work spell to his sleep, a body at his stand at work in every one of %d samples (cells %s, doings %s; %d samples before work or asleep; missing %s; astray %s)" % [
+		"Rolf under the cap: from his first work spell to his sleep (with the Mughouse open, from his walk out of it to its taking him in), a body at his stand at work in every one of %d samples (cells %s, doings %s; %d samples before work or asleep; missing %s; astray %s)" % [
 			int(_keeper.get("due", 0)), (_keeper["cells"] as Dictionary).keys(), (_keeper["doings"] as Dictionary).keys(), int(_keeper.get("off", 0)),
 			(_keeper["missing"] as Array).slice(0, 5), (_keeper["astray"] as Array).slice(0, 5)])
 	_check(not (_fire["noon"] as Array).is_empty(), "853am18: someone sits at the square's fire at midday, %d:00 to %d:00 (first %s; %d samples)" % [
@@ -186,6 +186,10 @@ func _sample_fire() -> void:
 
 ## The stall's keeper under the cap (333 amended (4): keepers are never cut): from his clock's first work spell to his
 ## sleep spell, a body at every sample, on his stand, at work (his inn spell there read as work, 875 amended (4)).
+## With the Mughouse open (spots on its floor, 875 maps' side), it takes him in from INN_TRADERS_DAY's end
+## (_inn_town_side) and he walks out of its door to his stand at its start: his due runs from his first sample on
+## his stand, within KEEPER_WALK of the start, to the end.
+const KEEPER_WALK := 0.25
 func _sample_keeper() -> void:
 	var id := Offers.VENDOR + TOWN
 	var now := DayNight.now()
@@ -196,16 +200,23 @@ func _sample_keeper() -> void:
 	if not bool(_keeper.get("worked", false)) or clock == Resident.Doing.HOME:
 		_keeper["off"] = int(_keeper.get("off", 0)) + 1
 		return
-	_keeper["due"] = int(_keeper.get("due", 0)) + 1
 	var body: Resident = null
 	for entity in World.townsfolk():
 		if (entity as Resident).worker_id == id and entity.spawned:
 			body = entity
+	var stand: Rect2i = _main._vendor_spot(TOWN, World.holdings.place(TOWN).get("cell", Vector2i.ZERO))
+	if not _main._inn_spots(TOWN).is_empty():
+		var day: Vector2 = _main.INN_TRADERS_DAY
+		var there := body != null and stand.has_point(body.tile) and body.doing == Resident.Doing.WORK
+		if hour < day.x or hour >= day.y or (hour < day.x + KEEPER_WALK and not there and not bool(_keeper.get("arrived", false))):
+			_keeper["off"] = int(_keeper.get("off", 0)) + 1  # In the Mughouse, or on his way out of it to his stand.
+			return
+		_keeper["arrived"] = true
+	_keeper["due"] = int(_keeper.get("due", 0)) + 1
 	var line := "%.2f clock %s" % [hour, Resident.Doing.keys()[clock]]
 	if body == null:
 		(_keeper["missing"] as Array).append(line)
 		return
-	var stand: Rect2i = _main._vendor_spot(TOWN, World.holdings.place(TOWN).get("cell", Vector2i.ZERO))
 	(_keeper["cells"] as Dictionary)[body.tile] = true
 	(_keeper["doings"] as Dictionary)[Resident.Doing.keys()[body.doing]] = true
 	if not stand.has_point(body.tile) or body.doing != Resident.Doing.WORK:

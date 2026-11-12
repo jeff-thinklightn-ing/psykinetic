@@ -4947,9 +4947,15 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	_check(storeys["storeys"] == names and beds.size() == 6 and laid.size() == 6
 		and beds.filter(func(bed: Dictionary) -> bool: return bed["level"] == "umbrage_tavern_up").size() == 5,
 		"its beds over every floor: the keeper's below, five hired rooms upstairs (%d)" % beds.size())
-	var stores := func(level: Dictionary) -> Array: return (level["terrain"]["decor"] as Array).map(func(piece: Dictionary) -> String: return piece["kind"])
+	var stores := func(level: Dictionary) -> Array: return (level["terrain"]["decor"] as Array).map(func(piece: Dictionary) -> String: return piece["kind"]).filter(func(kind: String) -> bool: return kind != "stool")
 	_check(stores.call(ground) == ["wall_hearth", "crate", "barrel"] and stores.call(floors["umbrage_tavern_attic"]) == ["crate", "barrel", "sack", "crate"],
 		"the kitchen's and the attic's stores drawn as decor, nothing to open (%s)" % [stores.call(floors["umbrage_tavern_attic"])])
+	# Its stools (875, maps' side): one under every sit spot, the five round the hearth and the tables' eight seats.
+	var stools: Array = (ground["terrain"]["decor"] as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "stool").map(func(piece: Dictionary) -> Vector2i: return piece["cell"])
+	var seats: Array = (ground["places"]["tavern"].get("seats", []) as Array)
+	var sits: Array = (ground.get("spots", []) as Array).filter(func(spot: Dictionary) -> bool: return spot["pose"] == "sit").map(func(spot: Dictionary) -> Vector2i: return spot["cell"])
+	_check(stools.size() == 13 and seats.all(func(seat: Vector2i) -> bool: return stools.has(seat)) and sits.all(func(cell: Vector2i) -> bool: return stools.has(cell)),
+		"the Mughouse's thirteen stools: every table seat and every sit spot has one (%d stools, %d sits)" % [stools.size(), sits.size()])
 	# Its common room furnished (811 amended, art-kit's Mughouse pieces): the
 	# counter with the taverner behind it, the tap rack against the wall
 	# behind him, four tables (two laid), all solid, every seat and the

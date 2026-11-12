@@ -2682,7 +2682,9 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 ## bracket behind it, not +x), "posts" (a span's slot stood at each end,
 ## the beam's). A wall piece may be "wide" (811 amended: the Mughouse's
 ## hearth): that many cells along its wall from its cell, east or south,
-## each walled on the same side, drawn at their middle.
+## each walled on the same side, drawn at their middle. A kind with
+## "seat" is sat on (875, maps' side): a sit spot on its cell is seated,
+## and builder's spot tool says nothing of the ground (BuilderSession.seat_at).
 const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"moss_patch": {"sits": "flat", "variants": 3, "faced": false},
 	"moss_strip": {"sits": "wall", "variants": 2},
@@ -2743,6 +2745,10 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# sign out of the street front's wall, +x out.
 	"wall_hearth": {"sits": "wall", "variants": 1, "front": "z", "wide": 2},
 	"inn_sign": {"sits": "edge", "variants": 1},
+	# Its stools (875, maps' side; art-gen's prop.stool, art-kit's pass): one
+	# under each sit spot, its seat 0.45 up for animation's sit, its front
+	# turned to the table or the hearth it serves; never solid, as all decor.
+	"stool": {"sits": "flat", "variants": 1, "faced": true, "seat": true},
 	# Umbrage's smithy (811 amended (2), art-kit's pieces): the smith's tool
 	# wall hung on the forge hall's wall, its front +z out of it (variant 1
 	# while he is home, 2 the gaps while the town has none); the stores'
@@ -2773,7 +2779,7 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# 0.45 m): one to a nave cell, its front the way its sitter faces (the
 	# altar); never solid, so a townsperson sits on its own cell (npc's
 	# "temple" sit spots, maps' side).
-	"bench": {"sits": "flat", "variants": 1, "faced": true},
+	"bench": {"sits": "flat", "variants": 1, "faced": true, "seat": true},
 }
 
 
