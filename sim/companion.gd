@@ -4787,8 +4787,41 @@ func _place_words() -> String:
 	return place_name(World.zone.name if World.zone != null else "")
 
 
+## Words that start a name with its own article or measure: the name keeps
+## it ("half a cut coin", "the coin's other half") (294 amended (1), voice's).
+const OWN_ARTICLE: Array[String] = ["a", "an", "the", "some", "half"]
+## Heads said with "some" (voice's pick: food and loose stuff): "some
+## herbs", "some roast meat".
+const SOME_HEADS: Array[String] = ["herbs", "meat", "ore", "wood", "cloth", "food", "iron", "spice", "flint", "wine",
+	"grain", "leather", "berries", "mushrooms", "truffles", "feathers", "reeds", "nails"]
+## Heads said bare, worn or used things in the plural or a pair ("soft
+## boots", "bone dice", "leather armour"); any other plural head is bare too.
+const BARE_HEADS: Array[String] = ["dice", "armour"]
+## Heads said with "the": one thing of its kind ("the holy remains").
+const THE_HEADS: Array[String] = ["remains"]
+
+
+## [param word] with its article (294 amended (1), voice's pick): none when the
+## name brings its own ("half a cut coin"); its head (the word before " of ",
+## else its last) decides: "the" for THE_HEADS, "some" for SOME_HEADS, none
+## for BARE_HEADS or another plural, else "a" or "an" by its first letter,
+## either case ("an Encolpion Amulet"). A measure keeps its "a": "a bunch of
+## herbs", "a pair of tusks".
 static func _a(word: String) -> String:
-	return ("an " if not word.is_empty() and word[0] in "aeiou" else "a ") + word
+	if word.is_empty():
+		return "a " + word
+	var lower := word.to_lower()
+	if lower.get_slice(" ", 0) in OWN_ARTICLE:
+		return word
+	var before_of := lower.get_slice(" of ", 0)
+	var head := before_of.get_slice(" ", before_of.get_slice_count(" ") - 1)
+	if head in THE_HEADS:
+		return "the " + word
+	if head in SOME_HEADS:
+		return "some " + word
+	if head in BARE_HEADS or head.ends_with("s") and not head.ends_with("ss") and not head.ends_with("'s"):
+		return word
+	return ("an " if lower[0] in "aeiou" else "a ") + word
 
 
 ## Whether she was told to stay where she is: HOLD, standing as her

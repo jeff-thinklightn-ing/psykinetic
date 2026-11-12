@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion names things as you'd say them: some roast meat, soft boots, the holy remains, an Encolpion Amulet (294 amended (1)).
 - Umbrage at night has the wind in its timbers and eaves, with the creak of old wood, and the fire on the square crackles as a camp's fire does, heard from well across the square (578 amended (2))
 - Umbrage's temple has its altar, pale stone under a plain linen cloth facing the pews, two candles burning on it, and Aldous takes offerings at a low oak table with a bronze bowl on it (734 amended (8)).
 - Umbrage's square has no chests standing in it now, and anything you left in the old chests by the stall waits for you with Aldous at the temple, where pews and candles stand by the stair down (734 amended (7)).

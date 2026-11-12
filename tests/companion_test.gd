@@ -137,6 +137,7 @@ func _ready() -> void:
 	_test_follow_a_creep()
 	_test_one_cell_door()
 	_test_doorway_bound()
+	_test_articles()
 	_test_mind_log_no_names()
 	_test_mines_a_seam()
 	_test_mines_only_at_a_seam()
@@ -5470,6 +5471,26 @@ func _test_one_cell_door() -> void:
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+func _test_articles() -> void:
+	print("
+== her articles: every item's name as voice picked it, own-word names kept, a measure's \"a\" (294 amended (1)) ==")
+	var odd := {"Bone dice": "Bone dice", "forge tongs": "forge tongs", "leather armour": "leather armour",
+		"plate armour": "plate armour", "robes": "robes", "soft boots": "soft boots", "roast meat": "some roast meat",
+		"holy remains": "the holy remains", "half a cut coin": "half a cut coin", "the coin's other half": "the coin's other half",
+		"Encolpion Amulet": "an Encolpion Amulet", "axe head": "an axe head", "old grey's fang": "an old grey's fang",
+		"old grey's pelt": "an old grey's pelt"}
+	var wrong: Array[String] = []
+	for id: Variant in Items.ids():
+		var name := Items.name_of(str(id))
+		var want: String = odd.get(name, "a " + name)
+		if Companion._a(name) != want:
+			wrong.append("%s -> %s, not %s" % [name, Companion._a(name), want])
+	_check(wrong.is_empty(), "every item's name with its article (%s)" % [wrong])
+	var said := ["herbs", "bunch of herbs", "pair of tusks", "pouch of spice", "imp", "goblin", "boss", "woodcutter", "Ash bow"].map(func(each: String) -> String: return Companion._a(each))
+	_check(said == ["some herbs", "a bunch of herbs", "a pair of tusks", "a pouch of spice", "an imp", "a goblin", "a boss", "a woodcutter", "an Ash bow"],
+		"loose goods take some, a measure its a, a kind or trade its a or an, either case (%s)" % [said])
 
 
 func _test_doorway_bound() -> void:

@@ -5480,6 +5480,8 @@ new fact goes to her transcript ("[Now true of her: ...]") and the mind
 log (kind "fact", "facts"). The console's "companion facts <player>"
 lists them by id, "companion forget <player> <id>" removes one.
 
+294 amended (1): her articles (the script's label; voice's pick, after "a herbs"). Companion._a, which her facts, held and seen items, kinds and trades, and the offers' and residents' lines read: a name starting with its own article or measure (OWN_ARTICLE: a, an, the, some, half) keeps it ("half a cut coin", "the coin's other half"); else its head, the word before " of " or its last, decides: THE_HEADS ("the holy remains"), SOME_HEADS for food and loose stuff ("some roast meat", "some herbs"), none for BARE_HEADS (dice, armour) or another plural head ("soft boots", "robes", "forge tongs"), else "a" or "an" by its first letter in either case ("an Encolpion Amulet"). A measure keeps its "a" ("a bunch of herbs", "a pair of tusks"). Offers.gd's own plural checks and fallbacks are economy's (856 amended (3)), untouched. With it, voice's guide.set_off lines lose their "!" (companion_traits.json; no bullet). companion_test _test_articles: every items.json name against its expected words; loose goods, measures, kinds and trades. Server only, protocol unchanged, no new class_name.
+
 ## 302. A companion with no room to step aside changes places with her player
 
 The box, tonight: her player walked into her in a one-wide corridor and
