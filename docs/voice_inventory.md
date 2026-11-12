@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2818)
+## Lines in the code (2820)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -1302,7 +1302,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (602)
+### other (sim) (604)
 
 | | Line | Where |
 |---|---|---|
@@ -1603,7 +1603,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | [level] %s's removals (%d) wait: it still has a marker at %s (an overlay copy?); nothing removed | `sim/relaid.gd` _remove() |
 |  | %s@%d,%d | `sim/relaid.gd` _remove() |
 |  | [level] removed in %s (%d): %d saved entities removed, %d holding things, %d things laid on the ground, %d left where they were (no floor near) | `sim/relaid.gd` _remove() |
+|  | [level] removed in %s (%d): %d saved entities removed, %d holding things, %d kit things to the shop, %d players' things held for %d owners at the temple, %d of no known owner to the shop, %d laid on the ground | `sim/relaid.gd` _remove() |
 |  | , %d with an unknown destination laid on the ground | `sim/relaid.gd` _remove() |
+|  | a chest's, unrecorded | `sim/relaid.gd` to_temple() |
 |  | [level] %s not shelled (%d): it loads with no shell at %s (an overlay copy?); nothing moved, it waits | `sim/relaid.gd` shell() |
 |  | %s@%d,%d | `sim/relaid.gd` shell() |
 |  | %s@%d,%d | `sim/relaid.gd` shell() |
@@ -2965,7 +2967,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (891)
+## Lines in the data (893)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3128,7 +3130,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (37)
+### levels/economy.json (39)
 
 | | Line | Key |
 |---|---|---|
@@ -3136,6 +3138,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s the woodcutter comes to keep the town in wood | `gatherers.woodcutter` |
 |  | %s the hunter comes to keep the town in meat and hides | `gatherers.hunter` |
 |  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
+|  | %s, from the old chests | `kept.caption` |
+|  | This was in the old chests by the stall. I kept it for you. | `kept.says` |
 |  | That's %d gold, friend. | `camp_traders.say.short` |
 |  | I've none of that. | `camp_traders.say.none` |
 |  | There's %d gold for it. | `camp_traders.say.bought` |
