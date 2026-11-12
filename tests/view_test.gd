@@ -373,6 +373,15 @@ func _test_ambience_runs() -> void:
 	var places := {"square_fire": {"kind": "fire", "cell": hearth}, "well": {"kind": "other", "cell": by_road},
 		"camp": {"kind": "camp", "cell": listener}}
 	_check(Main.fire_places(places) == ([hearth] as Array[Vector2i]), "the fire places: the fire kind's cells (%s)" % [Main.fire_places(places)])
+	# And Umbrage's own, from the level as Level reads it (578 amended (2)'s
+	# check was only of the dict above): its square fire a fire place, on a
+	# cell the terrain lays fire on, the torch cell the view draws and hears.
+	var wilds := Level.load_level("wilds")
+	var umbrage_fires := Main.fire_places(wilds.get("places", {}))
+	var laid: Array = wilds.get("terrain", {}).get("fire", [])
+	var square: Variant = wilds.get("places", {}).get("square_fire", {}).get("cell")
+	_check(square is Vector2i and umbrage_fires.has(square) and umbrage_fires.all(func(c: Vector2i) -> bool: return laid.has(c)),
+			"Umbrage's level: its square fire a fire place, on a fire the terrain lays (%s)" % [umbrage_fires])
 	var had_torches: Array[Vector2i] = _rig.torch_cells.duplicate()
 	var had_places: Array[Vector2i] = _rig.fire_places
 	_rig.torch_cells.append_array([hearth, by_road] as Array[Vector2i])

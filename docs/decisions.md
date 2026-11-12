@@ -23657,6 +23657,23 @@ sound_kit_test (the town's night weight, two takes each over 200 s); view_test (
 a level's places; by the square's fire its crackle from its cell, the torch never from it, a torch
 again once it is no fire place); both pass with the takes and with them aside. Client only;
 protocol unchanged, no new class_name.
+
+578 amended (3) (the script's label; the coordinator's ruling, 11-12): the check that missed a
+fire heard as a torch. view_test's fire places check fed Main.fire_places a dict the test built, so
+it could not see what a running view holds. The ears tour on main e52e7cf3b, a headless client that
+makes its view after joining, heard Umbrage's square fire as amb.torch_fire at both hours:
+Client3D.setup() builds a view's first room without emitting room_built, so Main._show_3d() never
+runs _on_room_built for it, and Client3D.fire_places stays empty (with the night places and folds)
+until a rebuild. A launch.bat client makes its view at boot on test_room and gets that rebuild when
+the server puts it in its zone (_client_zone, _load_level), so a joined player hears it: the same
+tour with the join's rebuild heard amb.campfire at (194,211) at noon and at 23:00 and the torch
+loop never (the coordinator read the client's path; Jeff's v0.1.212 page corrected). The bullet's
+fire clause was struck from v0.1.212 until then and returns in v0.1.213 as its own line, voice's,
+by release. view_test now also reads Umbrage's level as Level.load_level gives it: its square_fire
+place a fire place by Main.fire_places, on a cell the terrain lays fire on (the torch cell the view
+draws and hears). The first room's gap is buildings' (782 amended, the coordinator's routing: one
+handler for setup's room and every rebuilt one). Test and docs only; protocol unchanged, no new
+class_name.
 ## 572 amended. The world's jobs never hold a freed node
 
 The same crash class as 572, in World: its per-tick jobs are kept in
