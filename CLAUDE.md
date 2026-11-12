@@ -105,11 +105,19 @@ that the walk looks like skipping and the people look like "bad claymation place
   Never wait on the gate while holding the land lock. The suite take covers that landing's
   import; elsewhere run an import as `sh tools/heavy_job.sh run <tree> godot_import --
   "$GODOT_PATH" --headless --path . --import`, and a plain test run just calls land.sh,
-  which gates itself. If the lock is held, keep working and try again in a
-  few minutes; never push while another tree holds it. Don't hold it for anything else
+  which gates itself. If the lock is held when your gate take starts, wait for it holding the
+  take (394 amended (31): every try beats the take, so it never goes stale while you wait):
+  `until sh tools/land_lock.sh take <tree> "<what>"; do c=$?; [ $c = 1 ] || break; sh
+  tools/heavy_job.sh holds <tree> $kind || break; sleep 30; done` (30 s, not less: every try
+  starts half a dozen processes, and this PC leaks memory by process starts). Exit 1 is
+  another tree landing, the only one to wait on; exit 3 is main frozen: release your take and
+  requeue after the unfreeze; a take no longer held, or any other exit: stop. A script pushes
+  only when its own take of the lock returned 0; never push while another tree holds it. Don't hold it for anything else
   (record clips and run benches before taking it): a landing takes under 20 minutes (a
-  lean one about 16), and a land lock is stale, and may be taken over, 25 minutes after its take or its last beat (667; since 667 amended land.sh beats it each minute while its tests run, so a live landing never goes stale and none is cut short to stay under 25). If taking it fails, stop: a
-  script must never push after a failed take.
+  lean one about 16), and a land lock is stale, and may be taken over, 25 minutes after its take or its last beat (667; since 667 amended land.sh beats it each minute while its tests run, so a live landing never goes stale and none is cut short to stay under 25). A
+  script must never push after a failed take. Before a landing, delete any untracked file in
+  your checkout that main now tracks (`git status` shows it; an import's `.uid` written before
+  the file was committed stopped three fronted landings at their rebase on 11-12).
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
