@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
 
 - A townsperson's window no longer stands as a tall empty dark column when she says a long line: it keeps its height, its name in view (802 amended (11)).
 - Small things on the ground, like a cut of meat, a fish, tusks or a key, are drawn big enough to spot at the nearest zoom (619 amended (3)).

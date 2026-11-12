@@ -53249,3 +53249,17 @@ combat_test _test_throws_into_walls: the draugr built from his real row
 bear and the boar king true; the hill cat, the old wolf, the robber and the
 wolf false; the draugr disarmed false; each one's dearest wall printed.
 Server only; protocol unchanged; no class_name; no bullet.
+Buildings' side, which switches them on (the coordinator's go on the Atlas stills, 11-12; no label, 892's own
+number): Client3D.lamp_post(slot) instances the post and hangs on its "hang" socket the town's hung lantern
+(_hanging_lantern: gear.lantern with its pane lit, the shared _town_pane, since 451 amended (4)), LAMP_LANTERN_SCALE
+1.7 as large, its ring's top at the hook (the lantern's node LANTERN_RING + LANTERN_TALL, scaled, under it), and
+gives the lantern's middle in its meta "lantern_middle" (the hook less half LANTERN_TALL, scaled). _add_store_lamp
+stands LAMP_POST_TALL there, its light at that middle (1.86 m) in place of the code post, arm and lantern;
+_add_lantern stands LAMP_POST_LOW (its middle 0.90 m; the terrain lantern's light stays LANTERN_LIGHT_UP 0.95 m,
+inside the lantern's 0.79 to 1.01) in place of the stake. Either slot missing, the code posts as before. The first
+look hung the raw gear.lantern and its panes stayed dark at night; the town's hung lantern is lit
+(C:/dev/review/lamp_posts/store_crop.png against store_near_crop.png). weather_test _test_night_town: each slot's
+lantern hangs by its ring on the hook at 1.7 with the right middle, and the terrain lantern's light stays inside the
+low post's lantern. Watched: hosted Atlas stills, C:/dev/review/lamp_posts/store_near_crop.png (main's code post
+beside the swap), shack_post_crop.png and shack_post_full.png (Snagfin's low post), near_sheet.png. Client only;
+protocol unchanged; no new class_name.

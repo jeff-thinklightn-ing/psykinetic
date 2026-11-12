@@ -691,6 +691,23 @@ func _test_night_town() -> void:
 	places["tavern"] = {"kind": "tavern", "cell": Vector2i(9, 2), "hearth": [0, 6]}
 	places["bare_tavern"] = {"kind": "tavern", "cell": Vector2i(1, 1)}
 	_check(Main.night_places(places)[2] == [Vector2i(0, 6)], "a tavern's hearth at its \"hearth\" cell, always burning; a tavern naming none has none (868)")
+	# The street lamp posts (892): art-gen's, the lantern on each's hook.
+	for slot: String in [Client3D.LAMP_POST_TALL, Client3D.LAMP_POST_LOW]:
+		var post := Client3D.lamp_post(slot)
+		var hang: Array = (ArtKit.spec(slot).get("sockets", {}) as Dictionary).get("hang", [0, 0, 0])
+		var lantern := post.get_node_or_null(^"Lantern") as Node3D if post != null else null
+		var middle: Vector3 = post.get_meta("lantern_middle", Vector3.ZERO) if post != null else Vector3.ZERO
+		var drop := Client3D.LANTERN_TALL * Client3D.LAMP_LANTERN_SCALE  # gear.lantern's 13 cm below its ring.
+		var ring := lantern.position + Vector3(0.0, (Client3D.LANTERN_RING + Client3D.LANTERN_TALL) * Client3D.LAMP_LANTERN_SCALE, 0.0) if lantern != null else Vector3.ZERO
+		_check(lantern != null and ring.is_equal_approx(Vector3(hang[0], hang[1], hang[2]))
+				and lantern.scale.is_equal_approx(Vector3.ONE * Client3D.LAMP_LANTERN_SCALE)
+				and is_equal_approx(middle.x, float(hang[0])) and absf(middle.y - (float(hang[1]) - drop * 0.5)) < 0.005,
+				"%s: the town's lantern (gear.lantern, its pane lit) hangs by its ring on the hook at %s, %.1f as large, its middle %.2f m up" % [slot, hang, Client3D.LAMP_LANTERN_SCALE, middle.y])
+		if slot == Client3D.LAMP_POST_LOW:
+			_check(Client3D.LANTERN_LIGHT_UP < float(hang[1]) and Client3D.LANTERN_LIGHT_UP > float(hang[1]) - drop,
+					"the terrain lantern's light (%.2f m) stays inside the low post's lantern (%.2f to %.2f)" % [Client3D.LANTERN_LIGHT_UP, float(hang[1]) - drop, float(hang[1])])
+		if post != null:
+			post.free()
 	var carriers := {}
 	var made: Array[Node3D] = []
 	for i in 6:

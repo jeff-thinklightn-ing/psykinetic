@@ -993,6 +993,18 @@ const HOUSE_DOOR_LAMP_RANGE := 3.5
 const DOORSTEP_SLOT := "prop.doorstep"
 const DOORSTEP_VARIANTS := {"wood": 1, "stone": 2}
 const STORE_LAMP_UP := 2.0
+## The street lamp posts (892, art-gen's by hand, art-kit's slots): the
+## store's tall one (_add_store_lamp) and the low one on a terrain lantern
+## cell (_add_lantern), each the town's hung lantern (_hanging_lantern,
+## gear.lantern) by its ring's top on the post's "hang" socket,
+## LAMP_LANTERN_SCALE as large as it is worn (the 9 cm hip lantern read
+## small at 2 m); the code posts while a slot isn't there.
+const LAMP_POST_TALL := "prop.lamp_post"
+const LAMP_POST_LOW := "prop.lamp_post_low"
+const LAMP_LANTERN_SCALE := 1.7
+## A terrain lantern's light, up from its cell's ground: inside the low
+## post's lantern (0.79 to 1.015 m) as it was over the code stake.
+const LANTERN_LIGHT_UP := 0.95
 ## A lantern's flicker: half a torch's.
 const LANTERN_FLICKER := 0.04
 ## A watch post's brazier (771's posts): art-kit's prop.brazier and a
@@ -18167,7 +18179,11 @@ func _add_lantern(cell: Vector2i) -> void:
 		_wall_lamps.append(light)
 		_wall_lamp_clock = WALL_LAMP_PICK
 		return
-	var post := _box(Vector3(0.06, 0.8, 0.06), _stone_opaque)
+	# Art-gen's low post with the lantern on its hook (892); else the code
+	# stake. The light stays where it was, inside the hung lantern either way.
+	var post := lamp_post(LAMP_POST_LOW)
+	if post == null:
+		post = _box(Vector3(0.06, 0.8, 0.06), _stone_opaque)
 	post.name = "Lantern_%d_%d" % [cell.x, cell.y]
 	post.position = at
 	_room.add_child(post)
@@ -18175,7 +18191,7 @@ func _add_lantern(cell: Vector2i) -> void:
 	light.light_color = LANTERN
 	light.light_energy = 1.1
 	light.omni_range = 4.0
-	light.position = at + Vector3(0.0, 0.95, 0.0)
+	light.position = at + Vector3(0.0, LANTERN_LIGHT_UP, 0.0)
 	_room.add_child(light)
 
 
@@ -19870,18 +19886,25 @@ func _add_brazier(cell: Vector2i) -> void:
 ## point: the post stands where it is given, not in a cell's middle).
 func _add_store_lamp(at: Vector2) -> void:
 	var cell := Vector2i(roundi(at.x), roundi(at.y))
-	var post := _box(Vector3(0.07, STORE_LAMP_UP + 0.1, 0.07), _stone_opaque)
+	# Art-gen's tall post with the lantern on its hook (892), its light at the
+	# lantern's middle; else the code post.
+	var post := lamp_post(LAMP_POST_TALL)
+	var lit := Vector3(0.3, STORE_LAMP_UP - 0.1, 0.0)
+	if post != null:
+		lit = post.get_meta("lantern_middle")
+	else:
+		post = _box(Vector3(0.07, STORE_LAMP_UP + 0.1, 0.07), _stone_opaque)
+		var arm := _box(Vector3(0.35, 0.04, 0.04), _stone_opaque)
+		arm.position = Vector3(0.16, STORE_LAMP_UP, 0.0)
+		post.add_child(arm)
+		var lantern := _hanging_lantern()
+		lantern.position = Vector3(0.3, STORE_LAMP_UP - 0.2, 0.0)
+		post.add_child(lantern)
 	post.name = "StoreLamp_%d_%d" % [cell.x, cell.y]
 	post.position = Vector3(at.x, _elevation(cell), at.y)
 	_night_places.add_child(post)
-	var arm := _box(Vector3(0.35, 0.04, 0.04), _stone_opaque)
-	arm.position = Vector3(0.16, STORE_LAMP_UP, 0.0)
-	post.add_child(arm)
-	var lantern := _hanging_lantern()
-	lantern.position = Vector3(0.3, STORE_LAMP_UP - 0.2, 0.0)
-	post.add_child(lantern)
 	var light := _night_light(LANTERN, DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
-	light.position = Vector3(0.3, STORE_LAMP_UP - 0.1, 0.0)
+	light.position = lit
 	post.add_child(light)
 	_fire_lights.append([light, DOOR_LAMP_ENERGY, _roll(cell, 153) * TAU, LANTERN_FLICKER])
 
@@ -23066,6 +23089,29 @@ func _sync_worn(entity: GridEntity, puppet: Node3D) -> void:
 		return
 	model.set_meta("worn", key)  # On the model: a body made again wears it again.
 	look.wear(model, id)
+
+
+## [param slot]'s lamp post (892) with the town's hung lantern
+## (_hanging_lantern: gear.lantern, its pane lit) on its "hang" socket by its
+## ring's top, LAMP_LANTERN_SCALE as large, its foot at the origin; the
+## lantern's middle (the post's own space) in its meta "lantern_middle".
+## Null while either slot isn't there.
+static func lamp_post(slot: String) -> Node3D:
+	if not ArtKit.has(slot) or not ArtKit.has(LANTERN_SLOT):
+		return null
+	var hang: Array = (ArtKit.spec(slot).get("sockets", {}) as Dictionary).get("hang", [])
+	if hang.size() != 3:
+		return null
+	var post := ArtKit.instance(slot)
+	var hook := Vector3(float(hang[0]), float(hang[1]), float(hang[2]))
+	var lantern := _hanging_lantern()
+	lantern.name = "Lantern"
+	# Its ring's top stands LANTERN_RING + LANTERN_TALL over its node: that, scaled, under the hook.
+	lantern.scale = Vector3.ONE * LAMP_LANTERN_SCALE
+	lantern.position = hook - Vector3(0.0, (LANTERN_RING + LANTERN_TALL) * LAMP_LANTERN_SCALE, 0.0)
+	post.add_child(lantern)
+	post.set_meta("lantern_middle", hook - Vector3(0.0, LANTERN_TALL * 0.5 * LAMP_LANTERN_SCALE, 0.0))
+	return post
 
 
 ## A lantern as it hangs (451; art-kit's gear.lantern since 451 amended (4)), a "LanternBody" whose
