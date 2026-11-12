@@ -31287,6 +31287,17 @@ the frames (8-9 against 27-31; an off-screen window presents at about 94 ms a fr
 are not timings). view_test's indoor build: the card lifts within INDOOR_LIFT_FRAMES (16; 7
 seen). Client only, protocol unchanged, no new class_name.
 
+660 amended (9) (perf, 2026-11-12; the coordinator's and dungeon's lean; label from tools/decision_number.sh):
+view_test's indoor build check holds the never-hangs bound, not 660 amended (7)'s frame count. In a loaded round
+on saturn (24 copies of view_test at once on main 9a3f4473d) 2 of 24 failed "the barrow's card lifts within 16
+frames" at 17 and 18: how many phases share a frame is wall time (_phase_fits packs them by CARD_BUDGET_USEC), so
+a starved machine fits fewer and takes more frames, up to a frame a phase. The check is now that the card lifts
+within the barrow's phase count (_room_phases) plus INDOOR_OWN_FRAMES (10: the occluders' and enclosed spaces'
+frames, the ground's and edges' waits on their workers, the card's first chunks; 27 to 31 frames were seen for
+its 22 phases before 7), which catches a build that never lifts or waits more than a frame a phase. The 7 to 9
+frames stay 660 amended (7)'s bench claim, measured under the bench lock where timings count. Tests only;
+protocol unchanged; no class_name; no bullet.
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and

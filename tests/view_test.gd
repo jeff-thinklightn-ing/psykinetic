@@ -12896,8 +12896,11 @@ func _settled_room() -> int:
 	return frames
 
 
-## The most frames a small indoor room's card may take to lift (660 amended (7)).
-const INDOOR_LIFT_FRAMES := 16
+## The frames a room's build takes of its own beyond a frame a phase: the
+## occluders' and enclosed spaces' frames, the ground's and edges' waits on their
+## workers, the card's first chunks (27 to 31 frames seen for the barrow's 22
+## phases before 660 amended (7) let phases share a frame).
+const INDOOR_OWN_FRAMES := 10
 
 
 ## 660 amended (4): an indoor zone built over frames (no wooded land, no
@@ -12926,9 +12929,13 @@ func _test_indoor_phased_build() -> void:
 	await _frames(Client3D.WARM_FRAMES + 2)
 	_check(not _rig._outdoor and not _rig.building_room and not _rig.ground_filling and _rig._curves_task == -1,
 			"the barrow built over %d frames, then whole" % frames)
-	# 660 amended (7): a small room's phases share frames while the card's
-	# budget allows (a frame each was 27 frames to the lift, 450 ms at 60 fps).
-	_check(lifted > 0 and lifted <= INDOOR_LIFT_FRAMES, "the barrow's card lifts within %d frames (%d)" % [INDOOR_LIFT_FRAMES, lifted])
+	# 660 amended (9): the card lifts, and within the never-hangs bound, a
+	# frame a phase at worst. How many phases share a frame is wall time
+	# (_phase_fits packs them by CARD_BUDGET_USEC), so a starved machine takes
+	# more frames: 17 and 18 in 2 of 24 loaded copies on saturn (11-12). 660
+	# amended (7)'s 7 to 9 frames is a bench claim, measured under the bench lock.
+	var ceiling := _rig._room_phases().size() + INDOOR_OWN_FRAMES
+	_check(lifted > 0 and lifted <= ceiling, "the barrow's card lifts within a frame a phase, %d (%d)" % [ceiling, lifted])
 	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
