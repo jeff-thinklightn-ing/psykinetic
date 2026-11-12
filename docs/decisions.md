@@ -50739,12 +50739,13 @@ work spot yet") and a place by its kind alone, with no head; trade_preview (the 
 Claude) puts "the town's trades in <town>, by economy's rules: " before them, as before.
 spot_users (the spot tool's answer to Claude) reads the same people (_spot_wants) and keeps its words.
 The runner's SPOTS lines are the panel's. Voice worded the lines ("one at a time", "short at", "nobody
-lives here yet", "but no trade here uses them", "no working hours set", a seated trade "(if the town takes one on)"); ui-design's sheet of the built panel
+lives here yet", "but no trade here uses them", "no working hours set", a seated trade "(if the town takes one on)", said only while no resident of the town holds that trade, the
+coordinator's: never that a town may get a priest it has); ui-design's sheet of the built panel
 beside the mock again before it lands (the panel's content changes); for it, --test-builder's request
 starting "*" shows the answer with every fold open (BuilderPanel.unfold_all, as each "N more" pressed),
 so a still shows the folded lines (ui-design's ask: a chip at a wrap). builder_test _test_spots (the
 lines laid, a spot taken up said, none of the old words; the hours too few) and _test_trades_preview
-(codes, no keys, the head on Claude's line alone). Server only, protocol unchanged, no new class_name,
+(codes, no keys, the head on Claude's line alone; a seated trade held, no condition). Server only, protocol unchanged, no new class_name,
 no bullet (builder mode is Jeff's tool).
 
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame

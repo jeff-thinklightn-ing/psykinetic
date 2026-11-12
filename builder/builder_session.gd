@@ -3131,8 +3131,16 @@ func trade_preview(town: String) -> String:
 ## trade_preview a trade a line (885), as the answer panel says them (859
 ## amended (3)): "Smith at F1 forge: works about 7-12 and 13-18; no work spot
 ## yet", a building by its code and kind (885 draws the code's chip), a place
-## by its kind alone, never a level's key.
-func trade_lines(town: String) -> PackedStringArray:
+## by its kind alone, never a level's key. A trade economy seats says "(if the
+## town takes one on)" only while none of the town's residents holds it (the
+## coordinator: never that a town may get a priest it has); [param held], the
+## trades held (trade -> true), read from the residents (_spot_residents) when null.
+func trade_lines(town: String, held: Variant = null) -> PackedStringArray:
+	if held == null:
+		held = {}
+		for resident: Dictionary in _spot_residents(town):
+			for trade: Variant in resident["trades"]:
+				held[str(trade)] = true
 	var economy := Production.read_rules(Economy.PATH)
 	var rows: Dictionary = economy.get("buildings", {})
 	var seats: Dictionary = economy.get("return", {}).get("places", {})
@@ -3184,7 +3192,7 @@ func trade_lines(town: String) -> PackedStringArray:
 			if Townsfolk.whereabouts(trade, float(hour)) == "work":
 				hours.append(hour)
 		var count := int(laid.get(trade, 0))
-		said.append("%s at %s%s%s: %s; %s" % [trade.capitalize(), ", ".join(row["where"]), " (if the town takes one on)" if row["seat"] else "",
+		said.append("%s at %s%s%s: %s; %s" % [trade.capitalize(), ", ".join(row["where"]), " (if the town takes one on)" if row["seat"] and not held.has(trade) else "",
 			", outside the town" if row["outside"] else "", "works about " + _spans(hours, " and ") if not hours.is_empty() else "no working hours set",
 			"no work spot yet" if count == 0 else ("one work spot" if count == 1 else "%d work spots" % count)])
 	for trade: String in laid:

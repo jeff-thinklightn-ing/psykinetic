@@ -1872,6 +1872,9 @@ func _test_trades_preview() -> void:
 	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines.slice(1) == Array(trades) and not "by economy's rules" in lines[1]
 		and wilds.trade_preview("store") == "the town's trades in store, by economy's rules: " + "; ".join(trades),
 		"the proposal's reading ends with the trades, a trade a line (885), no head on the first; Claude's tool text joins them under it (%s)" % [lines])
+	var seated := ", ".join(wilds.trade_lines("store", {"taverner": true}))
+	_check("Taverner at " in seated and not "inn (if the town takes one on)" in seated and "temple (if the town takes one on)" in seated,
+		"a seated trade a resident already holds: no \"(if the town takes one on)\"; one nobody holds keeps it (%s)" % seated)
 	var empty := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("No trades yet: no building with a use, no work site" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
 
