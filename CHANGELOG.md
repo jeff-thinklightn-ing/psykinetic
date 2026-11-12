@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: in Umbrage the ground between the houses is a close-cropped lawn with a few short tufts, worn footpaths run where the woodcutter walks from the woodlot to the store and the inn, and the square's cobbles fray into earth and loose stones at their edge (880).
 - In the crypt, a robber's lunge shows its red line for a full second, and after every lunge, landed or not, he stands a moment crying out, open to your blow (790 amended (6)).
 - A battle axe or giant axe swing reaches a foe who steps half a cell back while you wind it up, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 343 amended (2)).
 - Rolf's sword fells a robber in the barrow in five to seven blows, swung at the same pace for the same stamina (887).

@@ -61,6 +61,7 @@ func _ready() -> void:
 		_test_curve_passes()
 		_test_clearing()
 		_test_roads()
+		_test_worn_ground()
 		_test_relief()
 		_test_sight()
 		_test_ground_fields()
@@ -7381,6 +7382,92 @@ func _test_roads() -> void:
 					if _rig._road_near(item[1]).x > 0.0:
 						on_road.append(item[1])
 		_check(on_road.is_empty(), "%s: no scatter on a road (%s)" % [name, on_road.slice(0, 3)])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A town's worn ground (decision 880), on the wilds' Umbrage: the wear
+## texture's channels where they belong (a door's earth, a wall's foot, the
+## earth round the cobble, the turf by the houses and none past
+## TURF_REACH, the woodcutter's footway), its reads held to the town's box,
+## no tuft on the town's cobble or hard by a wall, and the footway's route
+## the one npc's bodies walk (World.find_path's costs and legs_path, the
+## route npc's step count of one Umbrage day bore out).
+func _test_worn_ground() -> void:
+	print("\n== worn ground: a town's turf, footways and cobble's edge (880) ==")
+	var level := Level.load_level("wilds")
+	_rig.rebuild(level["terrain"], level["centre"])
+	var walls: Dictionary = _rig._wear_walls
+	_check(not walls.is_empty() and not (level["terrain"]["town_places"] as Array).is_empty(),
+			"wilds: walled buildings (%d cells) and town places (%d) for the worn ground" % [walls.size(), (level["terrain"]["town_places"] as Array).size()])
+	# The inn's door (Umbrage's inn opens east at x 180), and a wall's foot:
+	# just outside the side of a walled cell that faces open grass.
+	var door: float = _rig.wear_at(Vector2(180, 209)).r
+	# g is WEAR_FOOT at the wall's face, 0 WEAR_FOOT off.
+	var foot := 0.0
+	var beyond := 1.0
+	for wall: Vector2i in walls:
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			if foot == 0.0 and _rig._ground_kinds.get(wall + way, "") == "grass" and not walls.has(wall + way) and not walls.has(wall + way * 2):
+				foot = _rig.wear_at(Vector2(wall) + Vector2(way) * 0.6).g
+				beyond = _rig.wear_at(Vector2(wall) + Vector2(way) * (0.6 + _rig.WEAR_FOOT)).g
+	# The earth round the cobble: the middle of a town cobble cell's side on grass.
+	var band := 0.0
+	for cell: Vector2i in _rig._ground_kinds:
+		if band > 0.5 or _rig._ground_kinds[cell] != "stone" or not _rig._wear_town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0))):
+			continue
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			if _rig._ground_kinds.get(cell + way, "") == "grass" and not walls.has(cell + way):
+				band = maxf(band, _rig.wear_at(Vector2(cell) + Vector2(way) * 0.5).b)
+	_check(door > 0.5 and foot > 0.3 and beyond < 0.05 and band > 0.5,
+			"wilds: earth at the inn's door (r %.2f), a wall's foot darker (g %.2f just out, %.2f past WEAR_FOOT), earth round the cobble (b %.2f)" % [door, foot, beyond, band])
+	# Turf: full between the west houses (worst3's alley), none past TURF_REACH.
+	var alley: float = _rig.wear_at(Vector2(176, 199)).a
+	var past := []
+	var box: Vector4 = _rig.wear_box()
+	for y in range(int(box.y) + 1, int(box.w)):
+		for x in range(int(box.x) + 1, int(box.z)):
+			var cell := Vector2i(x, y) - Vector2i(roundi(_rig._plane_at.x), roundi(_rig._plane_at.z))
+			if _rig._wall_distance(Vector2(cell)) == INF and _rig.wear_at(Vector2(cell)).a > 0.0:
+				var nearest := INF
+				for wall: Vector2i in walls:
+					nearest = minf(nearest, Vector2(cell - wall).length())
+				if nearest > _rig.TURF_REACH + 2.0:
+					past.append(cell)
+	_check(alley > 0.9 and past.is_empty(), "wilds: turf full between the west houses (a %.2f), none past TURF_REACH (%s)" % [alley, past.slice(0, 3)])
+	# The box: the walls inside it, and the shader reads the wear nowhere else.
+	var code := (load("res://client3d/ground.gdshaderinc") as ShaderInclude).code
+	var inside := true
+	for wall: Vector2i in walls:
+		var at := Vector2(wall) + Vector2(_rig._plane_at.x, _rig._plane_at.z)
+		inside = inside and at.x > box.x and at.y > box.y and at.x < box.z and at.y < box.w
+	_check(inside and code.contains("if (all(greaterThanEqual(at, wear_box.xy)) && all(lessThanEqual(at, wear_box.zw))) {"),
+			"wilds: the wear read only inside the town's box %s" % box)
+	# The woodcutter's footway, as npc's bodies walk it (World.find_path, then
+	# legs_path's long legs): the chopping block's side (209,230) back to the
+	# store (192,195), up x 202 where npc's day of steps has him.
+	var free := func(cell: Vector2i) -> bool:
+		return _rig._ground_kinds.has(cell) and not walls.has(cell) and _rig._ground_kinds[cell] != "water"
+	var route: Array[Vector2i] = _rig.way_route(Vector2i(209, 230), Vector2i(192, 195), free)
+	var walked: Array[Vector2i] = [Vector2i(209, 230), Vector2i(208, 229), Vector2i(207, 228), Vector2i(206, 227), Vector2i(205, 226),
+		Vector2i(204, 225), Vector2i(203, 224), Vector2i(202, 223)]
+	for y in range(222, 199, -1):
+		walked.append(Vector2i(202, y))
+	walked.append_array([Vector2i(201, 199), Vector2i(200, 198), Vector2i(199, 197), Vector2i(198, 196), Vector2i(197, 195),
+		Vector2i(196, 195), Vector2i(195, 195), Vector2i(194, 195), Vector2i(193, 195), Vector2i(192, 195)])
+	var worn: float = _rig.wear_at(Vector2(205, 226)).r
+	_check(route == walked and worn > 0.5, "wilds: the woodcutter's footway the route npc's bodies walk (%d cells%s), worn (r %.2f at (205,226))"
+			% [route.size(), "" if route == walked else ", got " + str(route), worn])
+	# Scatter: no tuft or flower on the town's cobble, none within WEAR_BARE of a wall.
+	var bad := []
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var plan: Dictionary = _rig._scatter_plan(chunk)
+		for kind: String in ["tuft", "flower"]:
+			for item: Array in plan.get(kind, []):
+				var cell: Vector2i = item[0]
+				var on_cobble: bool = _rig._ground_kinds.get(cell, "") == "stone" and _rig._wear_town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0)))
+				if on_cobble or _rig._wall_distance(item[1]) < _rig.WEAR_BARE:
+					bad.append(item[1])
+	_check(bad.is_empty(), "wilds: no tuft or flower on the town's cobble or within WEAR_BARE of a wall (%s)" % [bad.slice(0, 3)])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

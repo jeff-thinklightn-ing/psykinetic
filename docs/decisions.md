@@ -52060,3 +52060,61 @@ past (2.8 apart): the air; a giant axe's struck; the Sledge's not; a monster's t
 none); monster_test _test_meets_wind_up's cautious case (one cell back
 down a one-row room: the blow follows, once); items_test _test_battle_axe (x2.5) and the value case (15, under the
 giant axe). Server and data, protocol unchanged, no new class_name.
+## 880. A town's worn ground: turf by its buildings, footways where residents walk, earth round the cobble
+
+Terrain's three worst things on Umbrage's ground as a town (C:/dev/review/terrain/town_ground; the
+coordinator's approval of 11-11, mocks m1 to m8e, C:/dev/review/terrain/worn_mock): the square's
+cobble met the meadow on the cell grid with tufts growing on the stones, and the lawn between the
+houses was as bright and full as the open wilds. One wear texture beside the roads' (the same size
+and texels, SHORE_RES a cell, one more field job; Client3D._wear_field) carries four things, all
+from data the client has when it builds the ground, nothing baked:
+- r, beaten earth: WEAR_DOOR round the ground outside each walled building's door (a kind's door
+  edges, a slot's Level.solid_door_of), WEAR_PATH either side of the way from it to the nearest road
+  or cobble, and the footways residents walk off the cobble (_way_legs). A footway is a trip that
+  leaves work: from each town work site's spot (Main._site_spot: the chopping block's walkable
+  4-neighbour nearest the store) back to the woodpile within Main.WOODPILE_REACH of the store, else
+  the store's cell (Main._pile_spot), and on to the inn's door. Routed as npc's bodies walk
+  (way_route: World.find_path's A*, a straight step 1000 and a diagonal 1501, the octile guess,
+  equal costs in the order opened, then World.legs_path's diagonal and straight runs). Checked
+  against look_day's step count of one Umbrage day (3,127 steps over 393 cells; 368 on grass over 95
+  cells, road cells set aside): 59% of the grass steps fall on worn earth and 66% within a cell of
+  it, every step on the woodlot's way among them, and 11 worn cells had no step within a cell (the
+  door ways of buildings nobody used that day, as the door rule means). Nearly all the rest is one
+  walk west along the inn's south wall (y 213 to 215, x 180 to the box's edge; 38 cells, 121 steps)
+  by a walker not yet named: not worn, a follow-up once a look_day run counts who walks there (the
+  coordinator's ruling, 11-12); without it about 98% of the rest lies within a cell. Trips into
+  work, and legs from place to place by the stints, were never walked and are not worn (the first
+  mock, 45% on worn earth and 48 cells nobody walked). Visitors (711) walking
+  the meadow beside the west road are not worn: npc keeps them to the road (the coordinator's (ii)).
+  The shader lets grass grow back into a footway in patches, fading its earth there (by at most 55%)
+  rather than cutting it, so a way reads as one line walked and never as blots apart in the grass
+  (the coordinator's sheet, 11-12: cut, the woodlot way stood as islands); it never lays a way fully
+  to earth (at most 72%), and it
+  narrows to WAY_ARRIVE_HALF on or beside a road or cobble cell, widening back to WAY_HALF
+  WAY_ARRIVE cells off (the coordinator's note on m8e: Umbrage's woodlot way runs a cell or two
+  beside the south-east road for half its length and read as the road widened), so a way arrives
+  rather than merging, and one running by a road stays a trail apart from it. Held off stone as a
+  road is (563 amended (1)).
+- g, a wall's foot: darker over WEAR_FOOT outside every wall.
+- b, the earth round a town's cobble (town: within WEAR_TOWN cells of a walled building): a band
+  WEAR_BAND either side of the cobble's edge, read where the kinds are read so it follows the
+  cobble's own wandering edge, thinned by a warped noise (its teeth never keep the cobble's pitch),
+  with a cobble in five sitting loose in it. It is held off stone as a footway is, so it is earth
+  beside the cobble and never on it, and its breaks fade its earth rather than cut it (the
+  coordinator's sheet, 11-12: unmasked, it drew shards on the stones at the cobble's ragged edge,
+  and cut, it left islands of earth a cell out in the grass).
+- a, the town's turf: full to TURF_FULL from the nearest wall, none at TURF_REACH (_turf_paint, a
+  two-sweep nearest-wall field); the grass there the same texture at TURF_SAT of its colour, TURF_EARTH
+  toward the earth's hue, TURF_VAL as bright, its edge ragged; tufts on it kept at WEAR_GAP_KEEP and
+  WEAR_GAP_SCALE as tall and toned, flowers TURF_FLOWERS as many. Between two buildings nearer than
+  WEAR_GAP the same thinning across the whole gap.
+Scatter: no tuft or flower on a town's cobble, on beaten earth or the band, none within WEAR_BARE
+of a wall, fewer and shorter to WEAR_THIN. Level.town_places_of gives the client a town's places
+(terrain "town_places": the store, its work sites; watch posts left out). The shader reads the wear
+only inside wear_box (the walled buildings' box and WEAR_TOWN round it); a level with none reads
+nothing. Atlas, map_bench 40 s: the square 18.63/18.72 ms against 19.12 (fewer tufts), far from
+town 16.14/16.10 against 16.12. Umbrage's alley between the west houses (no step there all day)
+is turf and thinning only. view_test _test_worn_ground (the channels at the inn's door, its wall's
+foot, the band, the alley's turf and none past TURF_REACH, the box, the woodcutter's route cell for
+cell, no tuft on cobble or by a wall). Client only (Level.town_places_of is parsed on every peer;
+nothing is sent); protocol unchanged; no new class_name.

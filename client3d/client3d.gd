@@ -1828,6 +1828,41 @@ const SCATTER_DENSITY := {
 	"forest": {"tuft": 1.4, "root": 0.25, "stone": 0.1, "flower": 0.04},
 }
 const SCATTER_EDGE_ROOTS := 0.3
+## A town's worn ground (decision 880; _wear_field): beaten earth WEAR_DOOR
+## m round the ground outside a door and WEAR_PATH either side of the way
+## from it to the nearest road or cobble (at most WEAR_REACH cells); a
+## wall's foot darker over WEAR_FOOT; the earth band WEAR_BAND either side of
+## a town's cobble edge (town: within WEAR_TOWN cells of a walled building);
+## tufts kept off town cobble and from beaten earth, thinned and shorter
+## within WEAR_THIN of a wall (none nearer than WEAR_BARE).
+const WEAR_DOOR := 1.2
+const WEAR_PATH := 0.5
+const WEAR_REACH := 24
+const WEAR_FOOT := 0.5
+const WEAR_BAND := 0.3
+const WEAR_TOWN := 10
+const WEAR_THIN := 1.5
+const WEAR_BARE := 0.25
+## Between two walled buildings nearer than WEAR_GAP (the two walls'
+## distances from a point added), the whole gap thinned: WEAR_GAP_KEEP of
+## its tufts kept, WEAR_GAP_SCALE as tall.
+const WEAR_GAP := 4.0
+const WEAR_GAP_KEEP := 0.3
+const WEAR_GAP_SCALE := 0.6
+## A town's turf (880): within TURF_REACH of a walled building the grass
+## duller and shorter (the wear texture's a), full to TURF_FULL; tufts there
+## at the gap's rule, flowers TURF_FLOWERS as many.
+const TURF_FULL := 2.0
+const TURF_REACH := 7.0
+const TURF_FLOWERS := 0.15
+## The footways residents walk off the cobble (880, _way_legs): worn
+## WAY_HALF either side, narrowing to WAY_ARRIVE_HALF within WAY_ARRIVE
+## cells of a road or cobble (beside one, or the last cells before it), so a
+## way arrives rather than merging, and one running by a road stays a trail
+## apart from it.
+const WAY_HALF := 0.55
+const WAY_ARRIVE := 4
+const WAY_ARRIVE_HALF := 0.2
 ## Indoors nothing grows but on grass ground laid there on purpose (Jeff
 ## on the barrow: "moss and spiderwebs for decor, no live plants"; the
 ## sample's yard keeps its grass): elsewhere indoors only these kinds.
@@ -3091,6 +3126,12 @@ var _ledge_near_also: Dictionary[Vector2i, Array] = {}
 var _ledge_split: Dictionary[Vector2i, Dictionary] = {}
 var _road_image: Image
 var _road_mask: ImageTexture
+## The town's worn ground (_wear_field) and the walled buildings' cells it
+## came from, and the town's cells.
+var _wear_image: Image
+var _wear_mask: ImageTexture
+var _wear_walls: Dictionary[Vector2i, int] = {}
+var _wear_town: Dictionary[Vector2i, bool] = {}
 var _stream_ribbons: Array[MeshInstance3D] = []
 ## Built water (decision 595): water no "waters" curve lays and no stream's
 ## path, a stone basin, a well's or a cistern's cells; drawn square and still
@@ -11981,11 +12022,24 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var size := lerpf(fit[0].x, fit[0].y, _roll(cell, 103 + salt))
 		if kind == "tall" and _tall_edge(cell):
 			size *= TALL_EDGE_SCALE
+		if (kind == "tuft" or kind == "flower") and not _wear_walls.is_empty():
+			var by_wall := _wall_distance(at)
+			size *= lerpf(0.45, 1.0, clampf(by_wall / WEAR_THIN, 0.0, 1.0))
+			var shorter := 1.0
+			if _wear_town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0))) and _in_gap(at):
+				shorter = WEAR_GAP_SCALE
+			size *= minf(shorter, lerpf(1.0, WEAR_GAP_SCALE, wear_at(at).a))
 		var tilt: float = fit[1]
 		var lean := Vector3((_roll(cell, 104 + salt) - 0.5) * 2.0 * tilt, _roll(cell, 105 + salt) * TAU, (_roll(cell, 106 + salt) - 0.5) * 2.0 * tilt)
 		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
 		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
 		var tint := _scatter_tint(kind, cell, salt, items[i][3])
+		if kind == "tuft" and not _wear_walls.is_empty():
+			var turf := wear_at(at).a
+			if turf > 0.0:
+				var grey := tint.get_luminance()
+				var toned := tint.lerp(Color(grey, grey, grey, tint.a), 0.3 * turf)
+				tint = Color(toned.r * lerpf(1.0, 0.93, turf), toned.g * lerpf(1.0, 0.93, turf), toned.b * lerpf(1.0, 0.93, turf), tint.a)
 		multimesh.set_instance_color(i, tall_look(tint, World.is_trampled(cell)) if kind == "tall" else tint)
 		if swaying:
 			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall, kind != "reeds"))
@@ -12073,6 +12127,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
 					if not _road_curves.is_empty() and _road_near(at).x > -0.1:
 						continue  # On a road (563, terrain's side).
+					if (kind == "tuft" or kind == "flower") and not _wear_walls.is_empty() and not _wear_keeps(cell, at, 170 + salt + n * 7, kind == "flower"):
+						continue  # A town's worn ground (880).
 					if _ledge_split.has(cell) and _ledge_other_side(cell, at):
 						continue  # Past a ledge's curve, the other ground's (585).
 					if by_curve:
@@ -12097,6 +12153,512 @@ static func _scatter_fit(kind: String) -> Array:
 		var scale: Array = fields.get("scale", [SCATTER_SIZES[kind].x, SCATTER_SIZES[kind].y])
 		_scatter_fits[kind] = [Vector2(scale[0], scale[1]), deg_to_rad(float(fields.get("tilt_max", 8.0))), float(fields.get("sink", 0.01))]
 	return _scatter_fits[kind]
+
+
+## A town's worn ground (880), an RGBA8 image the roads' field's size and
+## texels (_road_field): r beaten earth outside each door, along the way
+## from it to the nearest road or cobble and on the footways (_way_legs),
+## 0.5 plus the signed distance in; g a wall's foot, WEAR_FOOT at the
+## wall's face to 0 WEAR_FOOT off; b the earth either side of a town's cobble edge, 0.5 plus
+## WEAR_BAND less the distance; a the town's turf (_turf_paint). Returns
+## [image, the walled buildings' cells (their building's index), the town's
+## 8-cell blocks].
+func _wear_field(origin: Vector2i, size: Vector2i, kinds: Dictionary) -> Array:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	var walls: Dictionary[Vector2i, int] = {}
+	var town: Dictionary[Vector2i, bool] = {}
+	if _glimpse:
+		return [image, walls, town]
+	var doors: Array = []
+	var all_buildings := _drawn_buildings()
+	for index in all_buildings.size():
+		var building: Dictionary = all_buildings[index]
+		var slot := str(building.get("slot", ""))
+		if not building.has("rect") or slot in Level.OPEN_AIR or slot in Level.ON_WATER or slot in Level.SPANS_WATER:
+			continue
+		var own: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in Level.building_cells(building):
+			own[cell] = true
+			walls[cell] = index
+			for y in range(-1, 2):
+				for x in range(-1, 2):
+					town[Vector2i(floori(cell.x / 8.0) + x, floori(cell.y / 8.0) + y)] = true
+		if building.has("kind"):
+			var keys: Array = building.get("doors", [])
+			if keys.is_empty():
+				keys = Level.kind_doors(building)
+			for key: Vector3i in keys:
+				var pair := Terrain.edge_cells(key)
+				var inside: Vector2i = pair[0] if own.has(pair[0]) else pair[1]
+				var outside: Vector2i = pair[1] if inside == pair[0] else pair[0]
+				if not own.has(outside):
+					doors.append([outside, Vector2(inside + outside) * 0.5, Vector2(outside - inside), index])
+		else:
+			var door := Level.solid_door_of(building)
+			if door == Level.NO_DOOR:
+				continue
+			var facing: Vector2i = building["facing"] if building.get("facing") is Vector2i else Level.building_facing(building)
+			if facing == Vector2i.ZERO:
+				continue
+			doors.append([door + facing, Vector2(door) + Vector2(facing) * 0.5, Vector2(facing), index])
+	var put := func(point: Vector2, channel: int, value: float) -> void:
+		var texel := Vector2i(((point - Vector2(origin) + Vector2(0.5, 0.5)) * SHORE_RES - Vector2(0.5, 0.5)).round())
+		if texel.x < 0 or texel.y < 0 or texel.x >= size.x or texel.y >= size.y:
+			return
+		var was := image.get_pixelv(texel)
+		if value > was[channel]:
+			was[channel] = clampf(value, 0.0, 1.0)
+			image.set_pixelv(texel, was)
+	# A channel painted within reach of a segment: 0.5 plus (half_width less the distance).
+	var stroke := func(a: Vector2, b: Vector2, half_width: float, channel: int) -> void:
+		var low := Vector2(minf(a.x, b.x), minf(a.y, b.y)) - Vector2.ONE * (half_width + 0.6)
+		var high := Vector2(maxf(a.x, b.x), maxf(a.y, b.y)) + Vector2.ONE * (half_width + 0.6)
+		var step := 1.0 / SHORE_RES
+		var py := low.y
+		while py <= high.y:
+			var px := low.x
+			while px <= high.x:
+				var point := Vector2(px, py)
+				var reach := Geometry2D.get_closest_point_to_segment(point, a, b).distance_to(point)
+				put.call(point, channel, 0.5 + half_width - reach)
+				px += step
+			py += step
+	for door: Array in doors:
+		var start: Vector2i = door[0]
+		var middle: Vector2 = door[1]
+		var outward: Vector2 = door[2]
+		stroke.call(middle, middle + outward * 0.7, WEAR_DOOR, 0)
+		# The way to the nearest road or cobble, cell by cell (eight ways).
+		var came: Dictionary[Vector2i, Vector2i] = {start: start}
+		var frontier: Array[Vector2i] = [start]
+		var found := Vector2i(-99999, -99999)
+		var steps := 0
+		while not frontier.is_empty() and steps < WEAR_REACH and found.x == -99999:
+			var next_frontier: Array[Vector2i] = []
+			for here: Vector2i in frontier:
+				if here != start and (_road_cells.has(here) or str(kinds.get(here, "")) == "stone"):
+					found = here
+					break
+				for way: Vector2i in World.DIRECTIONS:
+					var near := here + way
+					if came.has(near) or walls.has(near) or not kinds.has(near):
+						continue
+					came[near] = here
+					next_frontier.append(near)
+			frontier = next_frontier
+			steps += 1
+		if found.x == -99999:
+			continue
+		var back := found
+		var last := Vector2(found)
+		while back != start:
+			back = came[back]
+			stroke.call(last, Vector2(back), WEAR_PATH, 0)
+			last = Vector2(back)
+		stroke.call(last, middle, WEAR_PATH, 0)
+	_way_legs(doors, all_buildings, walls, kinds, stroke)
+	# A wall's foot, outside it.
+	for cell: Vector2i in walls:
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			if walls.has(cell + way):
+				continue
+			var side := Vector2(cell) + Vector2(way) * 0.5
+			var along := Vector2(way.y, way.x) * 0.5
+			stroke.call(side - along, side + along, WEAR_FOOT - 0.5, 1)
+	# The earth round a town's cobble.
+	for cell: Vector2i in kinds:
+		if str(kinds[cell]) != "stone" or not town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0))):
+			continue
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			var near := cell + way
+			if not kinds.has(near) or str(kinds[near]) == "stone" or walls.has(near):
+				continue
+			var side := Vector2(cell) + Vector2(way) * 0.5
+			var along := Vector2(way.y, way.x) * 0.5
+			stroke.call(side - along, side + along, WEAR_BAND, 2)
+	_turf_paint(image, origin, size, walls)
+	return [image, walls, town]
+
+
+## The footways residents walk off the cobble (880), stroked on r by [param
+## stroke]: each town (a store place)'s work sites (its places but the
+## store, stalls, fires and posts) to the woodpile within Main.WOODPILE_REACH
+## of the store, else the store's cell: a site's spot as Main._site_spot
+## (the chopping block's walkable 4-neighbour nearest the store, else the
+## site's cell), the pile's as Main._pile_spot. Routed as the bodies walk
+## (World.find_path, then World.legs_path's diagonal and straight runs).
+## The ways from a door to the nearest road or cobble are _wear_field's own.
+func _way_legs(doors: Array, buildings: Array, walls: Dictionary[Vector2i, int], kinds: Dictionary, stroke: Callable) -> void:
+	var free := func(cell: Vector2i) -> bool:  # A solid prop (block, pile) is in walls.
+		return kinds.has(cell) and not walls.has(cell) and str(kinds[cell]) != "water"
+	for store: Dictionary in _terrain.get("town_places", []):
+		if str(store["kind"]) != "stockpile":
+			continue
+		var key := str(store["key"])
+		var at: Vector2i = store["at"]
+		var pile := _prop_beside(buildings, Main.WOODPILE, at, Main.WOODPILE_REACH, at, free)
+		var back: Vector2i = pile if pile != Companion.NONE else at
+		var inn := Companion.NONE
+		for door: Array in doors:
+			var building: Dictionary = buildings[int(door[3])]
+			if inn == Companion.NONE and str(building.get("use", "")) == "inn" and str(building.get("town", "")) == key:
+				inn = door[0]
+		for place: Dictionary in _terrain.get("town_places", []):
+			if str(place["town"]) != key or str(place["kind"]) in ["stockpile", "stall", "fire"]:
+				continue
+			var spot := _prop_beside(buildings, Main.CHOPPING_BLOCK, place["at"], int(place["radius"]), at, free)
+			if spot == Companion.NONE:
+				spot = place["at"]
+			# Leaving work (npc's count: the ways into it were never walked):
+			# the load carried back, and on to the inn's stint.
+			for to: Vector2i in [back, inn]:
+				if to == Companion.NONE:
+					continue
+				var route := way_route(spot, to, free)
+				var halves := _way_halves(route, kinds)
+				for k in range(1, route.size()):
+					stroke.call(Vector2(route[k - 1]), Vector2(route[k]), minf(halves[k - 1], halves[k]), 0)
+
+
+## A footway's [param route] stroked narrower near a road or cobble: each
+## cell's half width WAY_ARRIVE_HALF on or beside a road's or stone cell,
+## widening to WAY_HALF WAY_ARRIVE cells (the larger of the two axes) off
+## the nearest.
+func _way_halves(route: Array[Vector2i], kinds: Dictionary) -> PackedFloat32Array:
+	var halves := PackedFloat32Array()
+	halves.resize(route.size())
+	for k in route.size():
+		var near := WAY_ARRIVE + 1
+		for y in range(-WAY_ARRIVE, WAY_ARRIVE + 1):
+			for x in range(-WAY_ARRIVE, WAY_ARRIVE + 1):
+				var cell := route[k] + Vector2i(x, y)
+				if maxi(absi(x), absi(y)) < near and (_road_cells.has(cell) or str(kinds.get(cell, "")) == "stone"):
+					near = maxi(absi(x), absi(y))
+		halves[k] = lerpf(WAY_ARRIVE_HALF, WAY_HALF, clampf(float(near - 1) / (WAY_ARRIVE - 1), 0.0, 1.0))
+	return halves
+
+
+## The cells a body walks from [param from] to [param to] over cells
+## [param free] says are open: World.find_path's way (_find_path) redrawn
+## as World.legs_path does (_legs_route); [] for none.
+func way_route(from: Vector2i, to: Vector2i, free: Callable) -> Array[Vector2i]:
+	return _legs_route(_find_path(from, to, free), free)
+
+
+## Main._prop_spot's cell: the walkable 4-neighbour of the [param slot] prop
+## within [param within] of [param around] nearest [param near];
+## Companion.NONE for none.
+func _prop_beside(buildings: Array, slot: String, around: Vector2i, within: int, near: Vector2i, free: Callable) -> Vector2i:
+	var best := Companion.NONE
+	var best_d := INF
+	for building: Dictionary in buildings:
+		if str(building.get("slot", "")) != slot or not building.get("rect") is Rect2i:
+			continue
+		var at: Vector2i = (building["rect"] as Rect2i).position
+		if World.distance(at, around) > within:
+			continue
+		for side: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			if not free.call(at + side):
+				continue
+			var d := float((at + side - near).length_squared()) + 0.5 * float((at - near).length_squared())
+			if d < best_d:
+				best_d = d
+				best = at + side
+	return best
+
+
+## A route [param path] ([param path][0] the start) redrawn as the bodies
+## walk it, as World.legs_path does (853 amended (6)): from each point, the
+## farthest of the next World.LEGS_REACH points that two legs reach (a
+## diagonal run and a straight one, the straight first when it goes on the
+## last step's way) with every cell [param free] and no corner cut, in no
+## more steps than the path took; the cells stepped, in order.
+func _legs_route(path: Array[Vector2i], free: Callable) -> Array[Vector2i]:
+	if path.size() < 4:
+		return path
+	var out: Array[Vector2i] = [path[0]]
+	var anchor := path[0]
+	var way := Vector2i.ZERO
+	var i := 1
+	while i < path.size():
+		var best := i
+		var best_legs: Array[Vector2i] = [path[i]]
+		for j in range(i + 1, mini(path.size(), i + World.LEGS_REACH)):
+			var legs := _two_legs(anchor, path[j], free, way)
+			if not legs.is_empty() and legs.size() <= j - i + 1:
+				best = j
+				best_legs = legs
+		way = best_legs[-1] - (best_legs[-2] if best_legs.size() > 1 else anchor)
+		out.append_array(best_legs)
+		anchor = path[best]
+		i = best + 1
+	return out
+
+
+## The cells from [param a] (left out) to [param b] as a diagonal run then a
+## straight one, or the straight first when it goes on [param way] (World's
+## _two_legs), the first order whose cells are all [param free] with no
+## corner cut; [] when neither is.
+func _two_legs(a: Vector2i, b: Vector2i, free: Callable, way := Vector2i.ZERO) -> Array[Vector2i]:
+	var d := b - a
+	var diag := mini(absi(d.x), absi(d.y))
+	var slant := Vector2i(signi(d.x), signi(d.y))
+	var rest := d - slant * diag
+	var flat := Vector2i(signi(rest.x), signi(rest.y))
+	var orders := [0, 1]
+	if rest != Vector2i.ZERO and way != Vector2i.ZERO and flat == way:
+		orders = [1, 0]
+	for order: int in orders:
+		var steps: Array[Vector2i] = []
+		var first := slant if order == 0 else flat
+		var second := flat if order == 0 else slant
+		var first_n := diag if order == 0 else maxi(absi(rest.x), absi(rest.y))
+		var second_n := maxi(absi(rest.x), absi(rest.y)) if order == 0 else diag
+		for k in first_n:
+			steps.append(first)
+		for k in second_n:
+			steps.append(second)
+		var here := a
+		var cells: Array[Vector2i] = []
+		var clear := true
+		for step: Vector2i in steps:
+			var next := here + step
+			if not free.call(next) or (step.x != 0 and step.y != 0 and (not free.call(here + Vector2i(step.x, 0)) or not free.call(here + Vector2i(0, step.y)))):
+				clear = false
+				break
+			cells.append(next)
+			here = next
+		if clear:
+			return cells
+	return []
+
+
+## World.find_path's way from [param from] to [param to] as the bodies
+## plan it (npc's answer, sim/world.gd): A* over the eight ways, a straight
+## step 1000 and a diagonal 1501 (no corner cut), the octile heuristic at
+## the same, equal costs in the order opened (World.DIRECTIONS); cells
+## [param free] says are open; [] for none within WEAR_REACH * 4 cells.
+func _find_path(from: Vector2i, to: Vector2i, free: Callable) -> Array[Vector2i]:
+	var guess := func(cell: Vector2i) -> int:
+		var dx := absi(cell.x - to.x)
+		var dy := absi(cell.y - to.y)
+		return 1501 * mini(dx, dy) + 1000 * (maxi(dx, dy) - mini(dx, dy))
+	var cost: Dictionary[Vector2i, int] = {from: 0}
+	var came: Dictionary[Vector2i, Vector2i] = {from: from}
+	var heap: Array = []  # [estimate, order, cell], a binary heap.
+	var before := func(x: Array, y: Array) -> bool:
+		return x[0] < y[0] or (x[0] == y[0] and x[1] < y[1])
+	var push := func(entry: Array) -> void:
+		heap.append(entry)
+		var k := heap.size() - 1
+		while k > 0 and before.call(heap[k], heap[(k - 1) / 2]):
+			var up := (k - 1) / 2
+			var held: Array = heap[up]
+			heap[up] = heap[k]
+			heap[k] = held
+			k = up
+	var order := 0
+	push.call([guess.call(from), order, from])
+	var limit := WEAR_REACH * 4 * 1000
+	while not heap.is_empty():
+		var item: Array = heap[0]
+		var last: Array = heap.pop_back()
+		if not heap.is_empty():
+			heap[0] = last
+			var k := 0
+			while true:
+				var low := k
+				for child in [k * 2 + 1, k * 2 + 2]:
+					if child < heap.size() and before.call(heap[child], heap[low]):
+						low = child
+				if low == k:
+					break
+				var held: Array = heap[low]
+				heap[low] = heap[k]
+				heap[k] = held
+				k = low
+		var here: Vector2i = item[2]
+		if here == to:
+			var path: Array[Vector2i] = [here]
+			while came[here] != here:
+				here = came[here]
+				path.append(here)
+			path.reverse()
+			return path
+		if cost[here] > limit:
+			continue
+		for way: Vector2i in World.DIRECTIONS:
+			var next := here + way
+			if not free.call(next):
+				continue
+			var slant := way.x != 0 and way.y != 0
+			if slant and (not free.call(here + Vector2i(way.x, 0)) or not free.call(here + Vector2i(0, way.y))):
+				continue
+			var total: int = cost[here] + (1501 if slant else 1000)
+			if total < int(cost.get(next, 1 << 60)):
+				cost[next] = total
+				came[next] = here
+				order += 1
+				push.call([total + guess.call(next), order, next])
+	return []
+
+
+## The town's turf into [param image]'s alpha: 1 to TURF_FULL from the
+## nearest walled cell (to its square's side), 0 at TURF_REACH, from each
+## cell's nearest wall found by two sweeps (eight ways), read between cell
+## middles.
+func _turf_paint(image: Image, origin: Vector2i, size: Vector2i, walls: Dictionary[Vector2i, int]) -> void:
+	if walls.is_empty():
+		return
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	for cell: Vector2i in walls:
+		low = low.min(cell)
+		high = high.max(cell)
+	var reach := ceili(TURF_REACH) + 2
+	low -= Vector2i.ONE * reach
+	high += Vector2i.ONE * reach
+	var span := high - low + Vector2i.ONE
+	var none := Vector2i(1 << 29, 1 << 29)
+	var nearest: Array[Vector2i] = []
+	nearest.resize(span.x * span.y)
+	nearest.fill(none)
+	for cell: Vector2i in walls:
+		nearest[(cell.y - low.y) * span.x + cell.x - low.x] = cell
+	var gap := func(cell: Vector2i, wall: Vector2i) -> float:
+		return Vector2(maxf(absf(cell.x - wall.x) - 0.5, 0.0), maxf(absf(cell.y - wall.y) - 0.5, 0.0)).length()
+	var forward: Array[Vector2i] = [Vector2i(-1, -1), Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0)]
+	var backward: Array[Vector2i] = [Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(1, 0)]
+	for sweep in 2:
+		for pass_index in 2:
+			var ways := forward if pass_index == 0 else backward
+			for j in span.y:
+				var y := j if pass_index == 0 else span.y - 1 - j
+				for i in span.x:
+					var x := i if pass_index == 0 else span.x - 1 - i
+					var cell := low + Vector2i(x, y)
+					var best: Vector2i = nearest[y * span.x + x]
+					var best_gap: float = gap.call(cell, best)
+					for way: Vector2i in ways:
+						var from := Vector2i(x, y) + way
+						if from.x < 0 or from.y < 0 or from.x >= span.x or from.y >= span.y:
+							continue
+						var their: Vector2i = nearest[from.y * span.x + from.x]
+						var their_gap: float = gap.call(cell, their)
+						if their_gap < best_gap:
+							best = their
+							best_gap = their_gap
+					nearest[y * span.x + x] = best
+	var turf := PackedFloat32Array()
+	turf.resize(span.x * span.y)
+	for y in span.y:
+		for x in span.x:
+			var d: float = gap.call(low + Vector2i(x, y), nearest[y * span.x + x])
+			turf[y * span.x + x] = 1.0 - smoothstep(TURF_FULL, TURF_REACH, d)
+	var first := ((Vector2(low - origin)) * SHORE_RES).floor()
+	var last := ((Vector2(high - origin) + Vector2.ONE) * SHORE_RES).ceil()
+	for ty in range(maxi(int(first.y), 0), mini(int(last.y), size.y)):
+		for tx in range(maxi(int(first.x), 0), mini(int(last.x), size.x)):
+			# The texel's middle in cells (as put's inverse), then between the
+			# four cell middles round it.
+			var point := (Vector2(tx, ty) + Vector2(0.5, 0.5)) / SHORE_RES - Vector2(0.5, 0.5) + Vector2(origin) - Vector2(low)
+			var base := Vector2i(floori(point.x), floori(point.y))
+			if base.x < 0 or base.y < 0 or base.x >= span.x - 1 or base.y >= span.y - 1:
+				continue
+			var f := point - Vector2(base)
+			var k := base.y * span.x + base.x
+			var value := lerpf(lerpf(turf[k], turf[k + 1], f.x), lerpf(turf[k + span.x], turf[k + span.x + 1], f.x), f.y)
+			if value <= 0.0:
+				continue
+			var was := image.get_pixel(tx, ty)
+			was.a = value
+			image.set_pixel(tx, ty, was)
+
+
+## The box round the walled buildings, WEAR_TOWN cells out, in plane
+## cells (x, y low; z, w high) as the ground shader reads it; empty with none.
+func wear_box() -> Vector4:
+	if _wear_walls.is_empty():
+		return Vector4(0.0, 0.0, -1.0, -1.0)
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	for cell: Vector2i in _wear_walls:
+		low = low.min(cell)
+		high = high.max(cell)
+	var plane := Vector2(_plane_at.x, _plane_at.z)  # On the plane (822), as kinds_origin.
+	return Vector4(low.x - WEAR_TOWN + plane.x, low.y - WEAR_TOWN + plane.y, high.x + WEAR_TOWN + plane.x, high.y + WEAR_TOWN + plane.y)
+
+
+## The worn ground (_wear_image) at [param point], read bilinearly.
+func wear_at(point: Vector2) -> Color:
+	if _wear_image == null:
+		return Color(0, 0, 0)
+	var texel := (point - Vector2(_mask_origin) + Vector2(0.5, 0.5)) * SHORE_RES - Vector2(0.5, 0.5)
+	var low := Vector2i(floori(texel.x), floori(texel.y))
+	var f := texel - Vector2(low)
+	var size := _wear_image.get_size()
+	var c: Array[Color] = []
+	for k in 4:
+		c.append(_wear_image.get_pixelv((low + Vector2i(k & 1, k >> 1)).clamp(Vector2i.ZERO, size - Vector2i.ONE)))
+	return c[0].lerp(c[1], f.x).lerp(c[2].lerp(c[3], f.x), f.y)
+
+
+## How far [param point] is from the nearest walled building's cell (to
+## its square's side), INF past two cells.
+func _wall_distance(point: Vector2) -> float:
+	var cell := Vector2i(point.round())
+	var best := INF
+	for y in range(-2, 3):
+		for x in range(-2, 3):
+			var near := cell + Vector2i(x, y)
+			if not _wear_walls.has(near):
+				continue
+			var off := Vector2(maxf(absf(point.x - near.x) - 0.5, 0.0), maxf(absf(point.y - near.y) - 0.5, 0.0))
+			best = minf(best, off.length())
+	return best
+
+
+## Whether [param point] is in the gap between two walled buildings: the
+## nearest walls of two of them together nearer than WEAR_GAP.
+func _in_gap(point: Vector2) -> bool:
+	var cell := Vector2i(point.round())
+	var reach := ceili(WEAR_GAP)
+	var nearest: Dictionary[int, float] = {}
+	for y in range(-reach, reach + 1):
+		for x in range(-reach, reach + 1):
+			var near := cell + Vector2i(x, y)
+			if not _wear_walls.has(near):
+				continue
+			var off := Vector2(maxf(absf(point.x - near.x) - 0.5, 0.0), maxf(absf(point.y - near.y) - 0.5, 0.0)).length()
+			var owner: int = _wear_walls[near]
+			nearest[owner] = minf(float(nearest.get(owner, INF)), off)
+	if nearest.size() < 2:
+		return false
+	var spans := nearest.values()
+	spans.sort()
+	return float(spans[0]) + float(spans[1]) < WEAR_GAP
+
+
+## Whether a tuft or flower at [param point] in [param cell] stays in a
+## town's worn ground: none on its cobble or its beaten earth, none within
+## WEAR_BARE of a wall, fewer to WEAR_THIN.
+func _wear_keeps(cell: Vector2i, point: Vector2, salt: int, flower := false) -> bool:
+	if _ground_kinds.get(cell, "") == "stone" and _wear_town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0))):
+		return false
+	var here := wear_at(point)
+	if here.r > 0.45 or here.b > 0.4:
+		return false
+	var reach := _wall_distance(point)
+	if reach < WEAR_BARE:
+		return false
+	var keep := 1.0 if reach >= WEAR_THIN else pow(reach / WEAR_THIN, 1.3)
+	var thinned := 1.0
+	if _wear_town.has(Vector2i(floori(cell.x / 8.0), floori(cell.y / 8.0))) and _in_gap(point):
+		thinned = WEAR_GAP_KEEP
+	keep *= minf(thinned, lerpf(1.0, WEAR_GAP_KEEP, here.a))
+	if flower:
+		keep *= lerpf(1.0, TURF_FLOWERS, here.a)
+	return _roll(cell, salt) < keep
 
 
 ## Whether a land [param cell] has water beside it (eight ways).
@@ -13647,6 +14209,8 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		return [shore, _water_depth(by_cells, origin, shore.get_size())]
 	var road_job := func() -> Image:
 		return _road_field(origin, fine, road_kept)
+	var wear_job := func() -> Array:
+		return _wear_field(origin, fine, ground_kinds)
 	var curve_cells: Array = _curve_near_sample.keys()
 	var edge_cells: Array = _edge_near_sample.keys() if not _edge_curves.is_empty() else []
 	var curve_slices := _slices(curve_cells.size())
@@ -13656,6 +14220,7 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		jobs.append(_curve_texels.bind(curve_cells, span.x, span.y, origin, fine))
 	for span: Vector2i in edge_slices:
 		jobs.append(_edge_texels.bind(edge_cells, span.x, span.y, origin, fine, edge_kept))
+	jobs.append(wear_job)
 	var made := _run_fields(jobs)
 	var shore_image_made: Image = made[0][0]
 	var depth_made: Image = made[0][1]
@@ -13682,7 +14247,7 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		"origin": origin, "at": at, "heights": heights, "kind_bytes": kind_bytes, "water_bytes": water_bytes,
 		"floor_bytes": floor_bytes, "chunks": chunks, "grounds": grounds, "ground_kinds": ground_kinds,
 		"corners": corners, "top": top, "bottom": bottom, "shore_image": shore_image_made, "depth_image": depth_made,
-		"road_image": made[1], "edge_image": edge_made, "shore_heights": shore_heights,
+		"road_image": made[1], "edge_image": edge_made, "shore_heights": shore_heights, "wear_image": made[-1][0], "wear_walls": made[-1][1], "wear_town": made[-1][2],
 		"curve_kept": curve_kept, "road_kept": road_kept, "edge_kept": edge_kept, "ford_beds": ford_beds}
 
 
@@ -13763,6 +14328,10 @@ func _apply_ground_fields(fields: Dictionary) -> void:
 	_depth_mask = ImageTexture.create_from_image(_depth_image)
 	_road_image = fields["road_image"]
 	_road_mask = ImageTexture.create_from_image(_road_image)
+	_wear_image = fields["wear_image"]
+	_wear_mask = ImageTexture.create_from_image(_wear_image)
+	_wear_walls = fields["wear_walls"]
+	_wear_town = fields["wear_town"]
 	_floor_mask = ImageTexture.create_from_image(Image.create_from_data(across, down, false, Image.FORMAT_R8, _floor_bytes))
 	_mask_origin = fields["origin"]
 	_mask_size = Vector2i(across, down)
@@ -13803,6 +14372,8 @@ func _ground_meshes_start(fields: Dictionary) -> Dictionary:
 	canopy_origin = origin
 	var material := _ground_material(kind_bytes, across, down, origin)
 	material.set_shader_parameter("roads", _road_mask)
+	material.set_shader_parameter("wear", _wear_mask)
+	material.set_shader_parameter("wear_box", wear_box())
 	material.set_shader_parameter("forest_edge", _edge_mask)
 	# Hills read (decision 525, terrain's side): slopes lit against the sun.
 	material.set_shader_parameter("slope_shade", SLOPE_SHADE if _relief_given else 0.0)

@@ -73,6 +73,7 @@ const ROOM: Array[StringName] = [
 	&"_road_near_also", &"_edge_curves", &"_edge_near_sample", &"_edge_near_also", &"_edge_mask",
 	&"_niche_at", &"_hidden_niches", &"_vaults", &"_plates_shown", &"_ledge_curves",
 	&"_ledge_near_sample", &"_ledge_near_also", &"_ledge_split", &"_road_image", &"_road_mask",
+	&"_wear_image", &"_wear_mask", &"_wear_walls", &"_wear_town",
 	&"_stream_ribbons", &"_built_water", &"_fall_feet", &"_mists", &"stream_falls",
 	&"_forest_distance", &"_ground_cells", &"_ground_water_end", &"_ground_floor_end",
 	&"_scatter_chunks", &"_scattered", &"_scatter_due", &"_scatter_aim", &"_scatter_reach_at",

@@ -1337,6 +1337,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
 	level["terrain"]["camps"] = camps_of(level["places"])
+	level["terrain"]["town_places"] = town_places_of(level["places"])
 	level["terrain"]["shelters"] = shelters_of(level["places"])
 	level["terrain"]["fire_rings"] = fire_rings_of(level["places"])
 	level["terrain"]["furrows"] = furrows_from(config, warnings)
@@ -1565,6 +1566,25 @@ static func lair_mouths_of(ambience: String, links: Array[Dictionary]) -> Array[
 ## A camp's fire and who holds it (795 amended (2), sound's side, reading
 ## 793, maps' side's "mix"): each camp place given a mix, {"at": its cell,
 ## "mix": "bandit", "trader" or "mixed"}, for Ambience's murmur by the fire.
+## A town's places for its worn ground (decision 880): [{key, at, radius, kind,
+## town}] for each place a town holds or is in, its watch posts left out
+## (their rounds keep to the roads).
+static func town_places_of(places: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		var kind := str(place.get("kind", ""))
+		if kind == "post" or not place.get("cell") is Vector2i:
+			continue
+		var town := str(place.get("town", ""))
+		if town.is_empty() and str(place.get("holder", "")) == "town":
+			town = key
+		if town.is_empty():
+			continue
+		out.append({"key": key, "at": place["cell"], "radius": int(place.get("radius", 1)), "kind": kind, "town": town})
+	return out
+
+
 static func camps_of(places: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for key: String in places:

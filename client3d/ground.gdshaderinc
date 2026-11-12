@@ -66,6 +66,15 @@ uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
 // g a stone road's, a half at its edge, from its curve; SHORE_RES texels a
 // cell over the kinds' cells.
 uniform sampler2D roads : hint_default_black, filter_linear, repeat_disable;
+// A town's worn ground (Client3D._wear_field), SHORE_RES texels a cell over
+// the kinds' cells: r beaten earth at doors and on the ways from them (0.5
+// plus the signed distance in, as the roads), g a wall's foot (1 at the
+// wall, 0 WEAR_FOOT off), b the earth round a town's cobble (read where the
+// kinds are read, so it follows the cobble's own wandering edge).
+uniform sampler2D wear : hint_default_black, filter_linear, repeat_disable;
+// The box (world cells: x, y low; z, w high) round the walled buildings and
+// a margin: no wear read outside it, nor on a level with none (empty box).
+uniform vec4 wear_box = vec4(0.0, 0.0, -1.0, -1.0);
 // Outdoors, the forest's floor (the mask's g): the land runs into it along
 // a ragged line.
 uniform vec3 forest_floor : source_color = vec3(0.17, 0.26, 0.14);
@@ -360,6 +369,11 @@ const float GRASS_SAT = 1.45;
 const float GRASS_VAL = 1.22;
 const float DIRT_SAT = 1.15;
 const float DIRT_VAL = 1.1;
+// A town's turf (880): TURF_SAT of the meadow's colour kept, TURF_EARTH of
+// the way to the earth's hue, TURF_VAL as bright.
+const float TURF_SAT = 0.72;
+const float TURF_EARTH = 0.12;
+const float TURF_VAL = 0.95;
 
 vec3 hue_turn(vec3 c, float degrees) {
 	float a = radians(degrees);
@@ -409,6 +423,42 @@ void fragment() {
 	float off_stone = 1.0 - smoothstep(0.3, 0.7, weights.b);
 	weights = mix(weights, vec4(0.0, 1.0, 0.0, 0.0), smoothstep(0.42, 0.58, road.r + worn) * off_stone);
 	weights = mix(weights, vec4(0.0, 0.0, 1.0, 0.0), smoothstep(0.42, 0.58, road.g + worn));
+	// A town's worn ground: beaten earth where feet go, grass wearing back
+	// in patches at its edge; the earth round the cobble, the stones thinning
+	// into it.
+	vec4 wear_here = vec4(0.0);
+	float wear_band = 0.0;
+	if (all(greaterThanEqual(at, wear_box.xy)) && all(lessThanEqual(at, wear_box.zw))) {
+		wear_here = texture(wear, (at - kinds_origin + 0.5) / kinds_size);
+		wear_band = texture(wear, uv).b;
+	}
+	// The band thinned here and there, its breaks warped and its width
+	// wandering, so its teeth never keep the cobble's own pitch. A break fades
+	// the earth rather than cutting it: cut, it left islands of earth standing
+	// apart in the grass once the band kept off the stones.
+	vec2 warp = vec2(noise(at * 0.37 + 11.0), noise(at * 0.37 + 29.0)) - 0.5;
+	float band_break = smoothstep(0.45, 0.7, noise(at * 1.3 + 95.0 + warp * 2.6));
+	wear_band -= 0.14 * (noise(at * 0.21 + 51.0) - 0.4);
+	// The band is earth beside the cobble, never on it: it stops at the paved
+	// edge as the footway does (the coordinator's sheet, 11-12: shards on the
+	// stones read as a glitch).
+	wear_band *= off_stone;
+	// A footway, not a road: grass grows back into it in patches and never
+	// quite leaves it, fading the earth there rather than cutting it, so a way
+	// reads as one line walked and not as blots apart in the grass.
+	float path = wear_here.r * off_stone - 0.12 * (noise(at * 3.1 + 5.0) - 0.5);
+	float grown_back = smoothstep(0.5, 0.78, noise(at * 0.8 + 77.0));
+	float beaten = smoothstep(0.42, 0.58, max(path, wear_band) + worn * 1.4)
+			* (1.0 - 0.55 * mix(band_break, grown_back, step(wear_band, path)));
+	weights = mix(weights, vec4(0.0, 1.0, 0.0, 0.0), beaten * mix(0.72, 1.0, smoothstep(0.0, 0.1, wear_band - path)));
+	// A few cobbles sit loose in the band's earth (the cobble's own stones,
+	// one in five or so).
+	if (wear_band > 0.3) {
+		vec2 stones = cobbles(mat2(vec2(0.94, 0.34), vec2(-0.34, 0.94)) * at * 1.6);
+		float loose = step(0.8, stones.y) * smoothstep(0.35, 0.6, wear_band);
+		weights = mix(weights, vec4(0.0, 0.0, 1.0, 0.0), loose);
+		beaten *= 1.0 - loose;
+	}
 
 	// Each kind's look, worked out only where it shows.
 	float fine = noise(at * 7.0);
@@ -429,7 +479,18 @@ void fragment() {
 		float grey = clamp(dot(here, vec3(0.3, 0.55, 0.15)) * 3.0, 0.6, 1.3);
 		here = mix(here, vec3(0.3, 0.25, 0.1) * grey, (1.0 - season.x) * 0.5);
 		here = mix(here, vec3(0.34, 0.17, 0.04) * grey, season.y * 0.3 * smoothstep(0.35, 0.7, noise(at * 0.5 + 60.0)));
-		colour += lift(max(hue_turn(here, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL) * weights.r;
+		vec3 meadow = lift(max(hue_turn(here, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL);
+		if (wear_here.a > 0.0) {
+			// A town's turf (a): duller, a little toward the earth, the same
+			// grass under it; its edge ragged.
+			float turf = smoothstep(0.0, 1.0, wear_here.a + (noise(at * 0.55 + 140.0) - 0.5) * 0.5);
+			float grey = dot(meadow, vec3(0.3, 0.55, 0.15));
+			vec3 dull = mix(vec3(grey), meadow, TURF_SAT);
+			vec3 earth = lift(dirt, DIRT_SAT, DIRT_VAL);
+			dull = mix(dull, earth * (grey / max(dot(earth, vec3(0.3, 0.55, 0.15)), 0.01)), TURF_EARTH) * TURF_VAL;
+			meadow = mix(meadow, dull, turf);
+		}
+		colour += meadow * weights.r;
 	}
 	if (weights.g > 0.0) {
 		colour += lift(dirt_own ? tiled(dirt_tex, at, kind_tiles.g, dx, dy, 7.0)
@@ -466,6 +527,12 @@ void fragment() {
 		colour = floor_look(floor_set, at, fine, abs(dx) + abs(dy));
 	}
 
+	if (floor_set == 0) {
+		// Beaten earth darker and duller than a road's; a wall's foot damp.
+		// Trodden earth duller and darker than a road's.
+		vec3 trodden = mix(vec3(dot(colour, vec3(0.3, 0.55, 0.15))), colour, 0.8) * 0.88;
+		colour = mix(colour, trodden, beaten) * (1.0 - 0.32 * wear_here.g);
+	}
 	colour *= mix(1.0, 0.5, relief.x) * (1.0 + 0.14 * relief.y);
 	// A slope facing the relief light lighter, one facing away plainly
 	// darker, the flat as it was: hills read at a glance at any hour (the
