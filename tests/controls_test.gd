@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_free_route_own_companion()
 	_test_free_pull_round_a_wall()
 	_test_free_pull_beside_a_talker()
+	_test_free_pull_keeps_off_a_link()
 	_test_free_route_held()
 	_test_free_route_passage()
 	_test_free_head_on_pulled()
@@ -1149,6 +1150,42 @@ func _test_free_pull_beside_a_talker() -> void:
 	_stop_walk()
 	World.despawn(talker)
 	talker.queue_free()
+	Net.controls = saved
+
+
+## 689 amended (next), with npc's 879 (find_path and World._line_clear never
+## step on a level link's cell but as the goal): the free body's own
+## straight way (Main.body_line_clear, _free_pull's pulls) keeps off one too,
+## or a route stepped round a link was pulled straight back over it and the
+## player taken through it mid-walk.
+func _test_free_pull_keeps_off_a_link() -> void:
+	print("\n== a link beside a straight run: the pulled way keeps off it; a click on the link still reaches it ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(6, 3)) <= 8:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(4, 3))
+	var link := Vector2i(6, 3)
+	var from := Vector2(4.4, 3.3)
+	_check(Main.body_line_clear(from, Vector2(9.0, 3.0), Vector2i(9, 3), player),
+			"(the open way from %s to (9, 3) clear with no link)" % from)
+	World.fields.link_cells[link] = true
+	_check(not Main.body_line_clear(from, Vector2(9.0, 3.0), Vector2i(9, 3), player),
+			"a link on (6, 3): the straight way across it to (9, 3) is not clear")
+	_check(Main.body_line_clear(from, Vector2(link), link, player),
+			"a click on the link itself: the straight way to it is clear")
+	# A route stepped round the link below it, as find_path gives once 879 is in.
+	var path: Array = [Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4), Vector2i(8, 3), Vector2i(9, 3)]
+	_main._free_pull(player, path, from)
+	var crosses := false
+	var head: Vector2i = path[0] if not path.is_empty() else Vector2i(9, 3)
+	for k in 41:
+		crosses = crosses or Vector2i(from.lerp(Vector2(head), k / 40.0).round()) == link
+	_check(not path.is_empty() and not crosses and path.back() == Vector2i(9, 3),
+			"the route round it pulled no further than its own way allows: the head %s, the straight way on never over (6, 3) (the route %s)" % [head, path])
+	World.fields.link_cells.erase(link)
+	_stop_walk()
 	Net.controls = saved
 
 

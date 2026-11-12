@@ -36734,6 +36734,20 @@ free_net_test _test_own_way_kept: held east 1.5 s on a host, every command appli
 going() over the stepping line (0.05) on every frame (the old code: standing on 30 of 90); let go, no
 way. Client only; protocol unchanged; no new class_name.
 
+689 amended (11) (decision_number.sh's label; physics' side of npc's 879, the coordinator's ruling
+2026-11-12; a fix, no package): a level link's cell is a way out, taken as the body's centre reaches it
+(Main._take_link), and since 879 find_path and World._line_clear never cross one but to end there. A
+click route's pull judges the body's own way too (body_line_clear, 689 amended (7)), from where the
+body is, off its cell's centre, so its straight way could still pass over a link the cells' line from
+its cell went by, and take the player through a door they never clicked. body_line_clear now refuses a
+straight way whose centre reaches a link's cell other than its goal; a click on the link itself still
+goes straight to it. controls_test _test_free_pull_keeps_off_a_link: from (4.4, 3.3), the way to
+(9, 3) clear with no link and not clear with one on (6, 3), the way to the link itself clear, and
+_free_pull on the route stepped round it below keeps its head off a straight line through (6, 3)
+(fails 2 with the guard taken out). The guard runs on the clicking player's own client; a joined
+client on v0.1.212 held the same 8 link cells on the wilds as the level load (each peer builds them
+from its own Level.load_level). Client only; protocol unchanged; no new class_name.
+
 ## 703: removing the player's grid path
 
 Free walk has been the default since 693; a player's body is to walk only

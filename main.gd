@@ -3383,6 +3383,12 @@ static func body_line_clear(a: Vector2, b: Vector2, goal: Vector2i, player: Grid
 			var other := World.get_entity_at(cell)
 			if other != null and other != player and not World._own_companion_of(other, player):
 				return false
+		# 689 amended (11), with npc's 879: a level link's cell is a way out,
+		# taken as the body's centre reaches it (Main._take_link), so the
+		# straight way never crosses one but to end there.
+		var centre := Vector2i(point.round())
+		if centre != goal and World.is_link_cell(centre):
+			return false
 	return true
 
 
