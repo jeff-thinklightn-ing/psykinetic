@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # A shot or clip run on the laptop runner (lenovo-tethys; the coordinator's
 # design, 2026-11-08), so a windowed run never takes this machine's screen:
-#   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] <sha> <name> -- <godot args>
+#   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] [--vsync off|default] <sha> <name> -- <godot args>
+# --vsync (828 amended (5)): off by default, the engine's --disable-vsync put first in the
+# godot args, so a run's timing is the game's and not the laptop's present: the Atlas holds
+# each frame 200 to 500 ms with vsync on (3.5 fps against 204 with it off, the same full
+# world, 11-12; the Lenovo is unaffected), so a vsync-on run there plays the game clock at a
+# third of its speed. --vsync default keeps the game's own setting, for a run that is about
+# what a player gets. runner.log in the review folder ends with which ("SHOT vsync: off").
 # --repeat N: the game run N times in a row with the same user data (the second
 # starts after the first has exited and saved its caches: a player's next
 # session); pass n's log comes back as out/godot-n.log.
@@ -42,12 +48,14 @@ RUNNER=lenovo
 REPEAT=1
 TIMEOUT=15
 WITH=()
+VSYNC=off
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--with) WITH+=("$2"); shift 2 ;;
 		--timeout) TIMEOUT="$2"; shift 2 ;;
 		--runner) RUNNER="$2"; shift 2 ;;
 		--repeat) REPEAT="$2"; shift 2 ;;
+		--vsync) VSYNC="$2"; shift 2 ;;
 		*) break ;;
 	esac
 done
@@ -55,6 +63,7 @@ done
 # Each runner: its ssh address, the drive its clone and runs are on, and the
 # shell its ssh server starts (atlas's is PowerShell; every line here is cmd's).
 case "$REPEAT" in [1-5]) ;; *) echo "repeat: 1 to 5"; exit 2 ;; esac
+case "$VSYNC" in off|default) ;; *) echo "vsync: off or default"; exit 2 ;; esac
 case "$RUNNER" in
 	lenovo) HOST=jequi@lenovo-tethys; DRIVE=D; SHELL_KIND=cmd ;;
 	atlas) HOST=jequi@asus-atlas; DRIVE=C; SHELL_KIND=powershell ;;
@@ -128,6 +137,8 @@ for arg in "$@"; do
 				echo "$arg: refused (the runner sets the window and the path; a laptop run is windowed)"; exit 2 ;;
 			res://tests/*|tests/*)
 				echo "$arg: refused (a test scene runs headless in the suite, not on a laptop)"; exit 2 ;;
+			--disable-vsync)
+				echo "$arg: refused (remote_shot's --vsync says it)"; exit 2 ;;
 		esac
 	else
 		# A mode named after the game's "--" (Net._parse_args); --menu wants the menu on purpose.
@@ -143,6 +154,9 @@ if [ $moded -eq 0 ]; then
 	echo "remote_shot: no mode named (--host, --client, --server, --practice or --menu): added --host"
 fi
 ARGS+=("--bind=127.0.0.1")
+# 828 amended (5): vsync off unless --vsync default, an engine arg (before the game's "--").
+[ "$VSYNC" = off ] && ARGS=("--disable-vsync" "${ARGS[@]}")
+echo "SHOT vsync: $VSYNC"
 printf '%s\n' "${ARGS[@]}" >"$TMP/args.txt"
 
 rsh "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
@@ -226,6 +240,7 @@ mkdir -p "$REVIEW"
 "${SCP[@]}" "$HOST:$(fwd "$DIR")/godot.log" "$REVIEW/godot.log" 2>/dev/null
 rsh "rmdir /s /q $DIR" >/dev/null 2>&1
 rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
+printf 'SHOT vsync: %s\n' "$VSYNC" >>"$REVIEW/runner.log"
 ls "$REVIEW"
 # A game that joined as a client and never hosted, unless --client was asked: no level of its own,
 # the connect screen over whatever it drew; its numbers and stills are void (828 amended (2)).

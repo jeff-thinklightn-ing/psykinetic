@@ -49874,6 +49874,23 @@ tests/remote_shot_clash_test.sh (a land.sh tool part): generated files the commi
 other stopped on, untracked files it doesn't track left alone. Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+828 amended (5) (perf, 2026-11-12; the coordinator's ruling; label from tools/decision_number.sh): a laptop run
+plays with vsync off unless asked otherwise. maps' full-world tavern case ran at 30 to 40% speed on the Atlas while
+map_bench's tavern ran at 200 fps there: map_bench sets VSYNC_DISABLED before its frames and the game does not, and
+the Atlas (GTX 1650 rendering, its Intel UHD 630 driving the 59.9 Hz screen) holds each vsync frame 200 to 500 ms in
+its present (the main view's render 0.8 ms CPU and 26 ms GPU inside it; the card at P8, about 9% busy). The same
+full world, 40 s: vsync on 139 frames (3.5 fps), off 8,153 (204), mailbox 8,146, adaptive 138. The Lenovo (GTX
+1660 Ti, Intel UHD 630 at 144 Hz) runs about 247 fps in all four. So every vsync-on Atlas run played the game clock
+at about a third of its speed: its pictures right, but a still taken "after N seconds" was N game seconds' worth
+short, and a pose or an hour in it may not be the one meant (films under movie maker are frame-timed, unaffected).
+Now remote_shot.sh takes --vsync off|default, off by default: off puts the engine's --disable-vsync first in the
+godot args (an engine flag; the runner adds nothing and the laptops' copy is unchanged), default leaves the game's
+own setting, for a run about what a player gets. A caller's own --disable-vsync is refused (the switch says it).
+The run prints "SHOT vsync: off" and its runner.log in the review folder ends with the same line. Proof on the
+Atlas, the full world 30 s: by default 6,293 frames, none over 200 ms; with --vsync default 106 frames, 96 over
+200 ms (C:/dev/review/vsync828_off, vsync828_game). What a player gets is decision 893's (the fallback). Tools
+only; protocol unchanged; no class_name; no bullet.
+
 ## 833. Windows renders with Vulkan, D3D12 as the fallback
 
 The coordinator's approval, on perf's laptop benches; release's number. project.godot's
