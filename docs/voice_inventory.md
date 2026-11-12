@@ -2965,7 +2965,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (886)
+## Lines in the data (891)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3827,7 +3827,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The woodcutter sells wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
 |  | The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening. | `entries[14].facts[2].text` |
 
-### levels/lore/regions.json (92)
+### levels/lore/regions.json (97)
 
 | | Line | Key |
 |---|---|---|
@@ -3841,88 +3841,93 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Where the players and their companions belong, and where the stockpile is. | `entries[2].summary` |
 |  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. | `entries[3].summary` |
 |  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[0].text` |
-|  | The wilds' fishing pond, far west of Umbrage by the west road (maps' reed_pond at (33,120), "the pond", holder nobody), with the other waters that fish: two pools (110..116 x 57..60 west of the north road; 221..223 x 224..228 east of the woodlot post) and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). No name of its own until Jeff picks one (Reed Pond is asked). Package "wilds basics: pond". | `entries[4].summary` |
-|  | The pond lies far west of town, near the end of the west road. | `entries[4].facts[0].text` |
-|  | Reeds grow along the pond's edge. | `entries[4].facts[1].text` |
-|  | Fish rise in the pond, and it is nobody's: anyone may fish it. | `entries[4].facts[2].text` |
-|  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[4].facts[3].text` |
-|  | There are two pools with fish in them too: a small one south-east of town, just east of the woodlot post, and a bigger one west of the north road, a good way north of the crossroads. | `entries[4].facts[4].text` |
-|  | In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach. | `entries[4].facts[5].text` |
-|  | The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended). | `entries[5].summary` |
-|  | Towerside is the land south of Umbrage, round the Old Tower. | `entries[5].facts[0].text` |
-|  | The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22). | `entries[6].summary` |
-|  | The Old Tower, across the river from Umbrage, is a broken-down castle the ancients lived in. | `entries[6].facts[0].text` |
-|  | The Old Tower, the ancients' castle, was conquered in the battle, and its fallen warriors were buried before the people moved on. | `entries[6].facts[1].text` |
-|  | Nothing is known of the ancients' history, or of them since they left. | `entries[6].facts[2].text` |
-|  | No dead lie by the Old Tower: the dead are in the barrows, and the tower is where they lived. | `entries[6].facts[3].text` |
-|  | Snagfin the goblin keeps his counter in the Old Tower. | `entries[6].facts[4].text` |
-|  | The town's temple, kept by a priest, where the fallen are brought back. | `entries[7].summary` |
-|  | The town has a temple, and a priest keeps it. | `entries[7].facts[0].text` |
-|  | A charm blessed at the temple becomes Theus's. | `entries[7].facts[1].text` |
-|  | Whoever the temple brings back makes a gold offering there, and is brought back even with less gold than it asks. | `entries[7].facts[2].text` |
-|  | the Last Light Mughouse | `entries[8].name` |
-|  | Umbrage's tavern on the west of the square, three floors (Jeff named it, 2026-11-05: "Last Light Mughouse"); locals call it the Mughouse. | `entries[8].summary` |
-|  | Umbrage's tavern is the Last Light Mughouse, and locals call it the Mughouse. | `entries[8].facts[0].text` |
-|  | The Mughouse has a hearth in its common room, ale on tap at the counter, and five rooms to hire upstairs under an attic. | `entries[8].facts[1].text` |
-|  | the hearth and the rooms upstairs | `entries[8].facts[1].sight` |
-|  | The Mughouse's sign hangs by its door: a board painted with a burning lantern and no letters, with a small iron lantern at the bracket's tip. | `entries[8].facts[2].text` |
-|  | The Last Light keeps a lamp in the window nearest its door that never goes out, day or night. | `entries[8].facts[3].text` |
-|  | the lamp in the window | `entries[8].facts[3].sight` |
-|  | Umbrage's smithy, cold since its smith went below the castle after the great dwarven forge and was taken. | `entries[9].summary` |
-|  | Umbrage's smithy has stood cold since the smith went below the castle. | `entries[9].facts[0].text` |
-|  | A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back. | `entries[10].summary` |
-|  | Out in the wilds stands a healer's hut, where a medicine man lives. | `entries[10].facts[0].text` |
-|  | The orc stronghold, outside the forest, in a land where the trees have been stripped (Jeff, 2026-10-27; maps' world_plane place "stronghold"). | `entries[11].summary` |
-|  | Cravenhold is the orc stronghold, outside the forest, in a land where the trees have been stripped. | `entries[11].facts[0].text` |
-|  | An ancient, dilapidated castle built by dwarven stone smiths over a known entrance to the shifting labyrinths, to guard it; mostly overrun now (docs/lore/castle.md). | `entries[12].summary` |
-| L | The castle is ancient and dilapidated. | `entries[12].facts[0].text` |
-|  | The castle was built by dwarven stone smiths, plain and utilitarian. | `entries[12].facts[1].text` |
-|  | The dwarves built the castle over the labyrinths, as a cover over a known entrance, to guard it. | `entries[12].facts[2].text` |
-|  | The castle guards a treasure that was rumoured and never found. | `entries[12].facts[3].text` |
-|  | The castle is no longer dwarven; it is mostly overrun. | `entries[12].facts[4].text` |
-|  | The maps of the labyrinths below the castle were lost long ago. | `entries[12].facts[5].text` |
-|  | The labyrinths shift: their ways are never the same twice for long, which is why their treasures were never carried out and why adventurers still come. | `entries[12].facts[6].text` |
-| L | Dwarven artifacts come from the dungeons below the castle. | `entries[12].facts[7].text` |
-|  | Who has overrun the castle: the Blood Rot, their orc or kobold allies, something from below, or several at once. | `entries[12].facts[8].text` |
-|  | An old mine, the heart of the Blood Rot's land, over the fallen star. | `entries[13].summary` |
-|  | The old mine is the heart of the Blood Rot's land, and they live in and around it. | `entries[13].facts[0].text` |
-|  | The deeper into the mine, the stronger the Blood Rot are. | `entries[13].facts[1].text` |
-| L | The mine was dug toward where the star fell. | `entries[13].facts[2].text` |
-|  | the tower over the mine | `entries[14].name` |
-|  | A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures. | `entries[14].summary` |
-| L | A tower stands over the mine. | `entries[14].facts[0].text` |
-|  | that tower over the mine | `entries[14].facts[0].sight` |
-|  | The tower over the mine was built by orcish labour to the designs of dark elven architects, in their majestic style. | `entries[14].facts[1].text` |
-|  | The tower over the mine holds old artifacts and treasures; dark elven artifacts come from it. | `entries[14].facts[2].text` |
-|  | The inside of the tower over the mine shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come. | `entries[14].facts[3].text` |
-| L | Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago. | `entries[15].summary` |
-|  | Deep in the Blood Rot's mine lies a fallen star, the source of the rot. | `entries[15].facts[0].text` |
-| L | Common folk call it a fallen star. | `entries[15].facts[1].text` |
-| L | Those who live near the mine call it the rot-source. | `entries[15].facts[2].text` |
-|  | Those the Blood Rot take are carried down toward the star and are not seen again. | `entries[15].facts[3].text` |
-|  | The town's old iron workings in the hills, dug by the first folk and lost when the deep seams broke into caves below; whatever is strongest in the hills holds it (Jeff, 2026-11-03: "I like the name of Hollowfell", and lore's story). Its level is 790's mine (57e3f9e2). | `entries[16].summary` |
-|  | Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations. | `entries[16].facts[0].text` |
-|  | Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left. | `entries[16].facts[1].text` |
-|  | Since Hollowfell was lost, whatever is strongest in the hills holds it. | `entries[16].facts[2].text` |
-|  | When Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed. | `entries[16].facts[3].text` |
-|  | A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house. | `entries[17].summary` |
-|  | The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau. | `entries[17].facts[0].text` |
-|  | The watchtower on the plateau was broken when the Old Tower was taken. | `entries[17].facts[1].text` |
-|  | A cold fire-basin at the top of the watchtower is where the watch lit its warning fire. | `entries[17].facts[2].text` |
-|  | the lone great oak | `entries[18].name` |
-|  | A lone great oak between the hills' rivers (maps' 778, hills (111,159)), older than the town. Jeff picked it for the Druids' hall, a hollow oak massive enough to walk into (2026-11-03); that stays out of the facts until the hall is built. | `entries[18].summary` |
-|  | The lone great oak between the rivers is older than the town, and the hill herders won't let it be felled. | `entries[18].facts[0].text` |
-|  | A herder who loses a beast ties a strip of cloth to the great oak, and they say the beast comes home. | `entries[18].facts[1].text` |
-|  | A standing stone on the hills plateau's east edge (maps' 778, hills (199,70)), older than the ancients. | `entries[19].summary` |
-|  | The standing stone on the plateau is older than the ancients; some say the old tribe raised it for their many gods. | `entries[19].facts[0].text` |
-|  | No one can read the worn carving on the standing stone, and nobody sleeps beside it. | `entries[19].facts[1].text` |
-|  | The road through the hills, west to the wilds and east to the spur and the shieling, and the small stories off it (maps' 778). | `entries[20].summary` |
-|  | The hills road is older than the town: the ancients laid it, and the town's folk have cut new names over the milestones' worn marks. | `entries[20].facts[0].text` |
-|  | A traveller on the hills road was caught by raiders; they took his pack but missed a note in his coat. | `entries[20].facts[1].text` |
-|  | Before the raiders caught him, the traveller hid his goods under a cairn north of the hills road, east of where he lies. | `entries[20].facts[2].text` |
-|  | Some years ago hill folk and Blood Rot raiders fought in the hills, and the broken gear still lies where they fell. | `entries[20].facts[3].text` |
-|  | One of the hill folk who fell in that fight was buried where he fell, the barrow being too far, and someone still brings his grave fresh offerings. | `entries[20].facts[4].text` |
-|  | His kin left the town for the hills after the fight and keeps a lean-to there, and is often out. | `entries[20].facts[5].text` |
+| L | the pond by town | `entries[4].name` |
+|  | Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (about 221..223 x 224..228 with the shack and its dirt dock, east of the woodlot post (207,231), some 30 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size and the shack wait on Jeff's pond-and-shack picks; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package "fishing that works". | `entries[4].summary` |
+|  | The pond by town is a little crescent of water round a shack, a short walk south-east of the square, just east of the woodlot post. | `entries[4].facts[0].text` |
+|  | The pond by town holds the most fish of any water and fills again each day. | `entries[4].facts[1].text` |
+|  | Any other pool or stretch of river holds a few fish; a ford or a well holds none. | `entries[4].facts[2].text` |
+|  | The wilds' far fishing pond, a reed pond far west of Umbrage by the west road (maps' reed_pond at (33,120), "the pond" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). The facts call it the far pond, the reed pond only as a description: no name of its own until Jeff picks one (reed-pond.md). The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package "wilds basics: pond". | `entries[5].summary` |
+|  | The far pond, a reed pond, lies a long walk west of town, near the end of the west road. | `entries[5].facts[0].text` |
+|  | Reeds grow along the far pond's edge. | `entries[5].facts[1].text` |
+|  | Fish rise in the far pond too, and it is nobody's: anyone may fish it. | `entries[5].facts[2].text` |
+|  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[5].facts[3].text` |
+|  | A pool west of the north road, a good way north of the crossroads, has fish in it too. | `entries[5].facts[4].text` |
+|  | In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach. | `entries[5].facts[5].text` |
+|  | The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended). | `entries[6].summary` |
+|  | Towerside is the land south of Umbrage, round the Old Tower. | `entries[6].facts[0].text` |
+|  | The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22). | `entries[7].summary` |
+|  | The Old Tower, across the river from Umbrage, is a broken-down castle the ancients lived in. | `entries[7].facts[0].text` |
+|  | The Old Tower, the ancients' castle, was conquered in the battle, and its fallen warriors were buried before the people moved on. | `entries[7].facts[1].text` |
+|  | Nothing is known of the ancients' history, or of them since they left. | `entries[7].facts[2].text` |
+|  | No dead lie by the Old Tower: the dead are in the barrows, and the tower is where they lived. | `entries[7].facts[3].text` |
+|  | Snagfin the goblin keeps his counter in the Old Tower. | `entries[7].facts[4].text` |
+|  | The town's temple, kept by a priest, where the fallen are brought back. | `entries[8].summary` |
+|  | The town has a temple, and a priest keeps it. | `entries[8].facts[0].text` |
+|  | A charm blessed at the temple becomes Theus's. | `entries[8].facts[1].text` |
+|  | Whoever the temple brings back makes a gold offering there, and is brought back even with less gold than it asks. | `entries[8].facts[2].text` |
+|  | the Last Light Mughouse | `entries[9].name` |
+|  | Umbrage's tavern on the west of the square, three floors (Jeff named it, 2026-11-05: "Last Light Mughouse"); locals call it the Mughouse. | `entries[9].summary` |
+|  | Umbrage's tavern is the Last Light Mughouse, and locals call it the Mughouse. | `entries[9].facts[0].text` |
+|  | The Mughouse has a hearth in its common room, ale on tap at the counter, and five rooms to hire upstairs under an attic. | `entries[9].facts[1].text` |
+|  | the hearth and the rooms upstairs | `entries[9].facts[1].sight` |
+|  | The Mughouse's sign hangs by its door: a board painted with a burning lantern and no letters, with a small iron lantern at the bracket's tip. | `entries[9].facts[2].text` |
+|  | The Last Light keeps a lamp in the window nearest its door that never goes out, day or night. | `entries[9].facts[3].text` |
+|  | the lamp in the window | `entries[9].facts[3].sight` |
+|  | Umbrage's smithy, cold since its smith went below the castle after the great dwarven forge and was taken. | `entries[10].summary` |
+|  | Umbrage's smithy has stood cold since the smith went below the castle. | `entries[10].facts[0].text` |
+|  | A healer's hut out in the wilds, where a medicine man lives and the fallen are brought back. | `entries[11].summary` |
+|  | Out in the wilds stands a healer's hut, where a medicine man lives. | `entries[11].facts[0].text` |
+|  | The orc stronghold, outside the forest, in a land where the trees have been stripped (Jeff, 2026-10-27; maps' world_plane place "stronghold"). | `entries[12].summary` |
+|  | Cravenhold is the orc stronghold, outside the forest, in a land where the trees have been stripped. | `entries[12].facts[0].text` |
+|  | An ancient, dilapidated castle built by dwarven stone smiths over a known entrance to the shifting labyrinths, to guard it; mostly overrun now (docs/lore/castle.md). | `entries[13].summary` |
+| L | The castle is ancient and dilapidated. | `entries[13].facts[0].text` |
+|  | The castle was built by dwarven stone smiths, plain and utilitarian. | `entries[13].facts[1].text` |
+|  | The dwarves built the castle over the labyrinths, as a cover over a known entrance, to guard it. | `entries[13].facts[2].text` |
+|  | The castle guards a treasure that was rumoured and never found. | `entries[13].facts[3].text` |
+|  | The castle is no longer dwarven; it is mostly overrun. | `entries[13].facts[4].text` |
+|  | The maps of the labyrinths below the castle were lost long ago. | `entries[13].facts[5].text` |
+|  | The labyrinths shift: their ways are never the same twice for long, which is why their treasures were never carried out and why adventurers still come. | `entries[13].facts[6].text` |
+| L | Dwarven artifacts come from the dungeons below the castle. | `entries[13].facts[7].text` |
+|  | Who has overrun the castle: the Blood Rot, their orc or kobold allies, something from below, or several at once. | `entries[13].facts[8].text` |
+|  | An old mine, the heart of the Blood Rot's land, over the fallen star. | `entries[14].summary` |
+|  | The old mine is the heart of the Blood Rot's land, and they live in and around it. | `entries[14].facts[0].text` |
+|  | The deeper into the mine, the stronger the Blood Rot are. | `entries[14].facts[1].text` |
+| L | The mine was dug toward where the star fell. | `entries[14].facts[2].text` |
+|  | the tower over the mine | `entries[15].name` |
+|  | A tower over the mine, built by orcs to dark elven designs, whose shifting inside still holds old artifacts and treasures. | `entries[15].summary` |
+| L | A tower stands over the mine. | `entries[15].facts[0].text` |
+|  | that tower over the mine | `entries[15].facts[0].sight` |
+|  | The tower over the mine was built by orcish labour to the designs of dark elven architects, in their majestic style. | `entries[15].facts[1].text` |
+|  | The tower over the mine holds old artifacts and treasures; dark elven artifacts come from it. | `entries[15].facts[2].text` |
+|  | The inside of the tower over the mine shifts, perhaps by magic; its treasures have never all been carried out, and adventurers still come. | `entries[15].facts[3].text` |
+| L | Deep in the mine lies the source of the rot: a star that fell into the land many thousands of years ago. | `entries[16].summary` |
+|  | Deep in the Blood Rot's mine lies a fallen star, the source of the rot. | `entries[16].facts[0].text` |
+| L | Common folk call it a fallen star. | `entries[16].facts[1].text` |
+| L | Those who live near the mine call it the rot-source. | `entries[16].facts[2].text` |
+|  | Those the Blood Rot take are carried down toward the star and are not seen again. | `entries[16].facts[3].text` |
+|  | The town's old iron workings in the hills, dug by the first folk and lost when the deep seams broke into caves below; whatever is strongest in the hills holds it (Jeff, 2026-11-03: "I like the name of Hollowfell", and lore's story). Its level is 790's mine (57e3f9e2). | `entries[17].summary` |
+|  | Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations. | `entries[17].facts[0].text` |
+|  | Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left. | `entries[17].facts[1].text` |
+|  | Since Hollowfell was lost, whatever is strongest in the hills holds it. | `entries[17].facts[2].text` |
+|  | When Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed. | `entries[17].facts[3].text` |
+|  | A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house. | `entries[18].summary` |
+|  | The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau. | `entries[18].facts[0].text` |
+|  | The watchtower on the plateau was broken when the Old Tower was taken. | `entries[18].facts[1].text` |
+|  | A cold fire-basin at the top of the watchtower is where the watch lit its warning fire. | `entries[18].facts[2].text` |
+|  | the lone great oak | `entries[19].name` |
+|  | A lone great oak between the hills' rivers (maps' 778, hills (111,159)), older than the town. Jeff picked it for the Druids' hall, a hollow oak massive enough to walk into (2026-11-03); that stays out of the facts until the hall is built. | `entries[19].summary` |
+|  | The lone great oak between the rivers is older than the town, and the hill herders won't let it be felled. | `entries[19].facts[0].text` |
+|  | A herder who loses a beast ties a strip of cloth to the great oak, and they say the beast comes home. | `entries[19].facts[1].text` |
+|  | A standing stone on the hills plateau's east edge (maps' 778, hills (199,70)), older than the ancients. | `entries[20].summary` |
+|  | The standing stone on the plateau is older than the ancients; some say the old tribe raised it for their many gods. | `entries[20].facts[0].text` |
+|  | No one can read the worn carving on the standing stone, and nobody sleeps beside it. | `entries[20].facts[1].text` |
+|  | The road through the hills, west to the wilds and east to the spur and the shieling, and the small stories off it (maps' 778). | `entries[21].summary` |
+|  | The hills road is older than the town: the ancients laid it, and the town's folk have cut new names over the milestones' worn marks. | `entries[21].facts[0].text` |
+|  | A traveller on the hills road was caught by raiders; they took his pack but missed a note in his coat. | `entries[21].facts[1].text` |
+|  | Before the raiders caught him, the traveller hid his goods under a cairn north of the hills road, east of where he lies. | `entries[21].facts[2].text` |
+|  | Some years ago hill folk and Blood Rot raiders fought in the hills, and the broken gear still lies where they fell. | `entries[21].facts[3].text` |
+|  | One of the hill folk who fell in that fight was buried where he fell, the barrow being too far, and someone still brings his grave fresh offerings. | `entries[21].facts[4].text` |
+|  | His kin left the town for the hills after the fight and keeps a lean-to there, and is often out. | `entries[21].facts[5].text` |
 
 ### levels/lore/roles.json (1)
 
