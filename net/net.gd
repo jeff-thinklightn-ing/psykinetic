@@ -644,7 +644,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {item id: words} (where what the keeper won't take goes), and a "takes" row "starter": true; an old
 ## client shows neither (no points, a plain row).
 ## 747 amended (6): Player.quest may carry "zones" [level names], the places its card shows in; an old client ignores it (draws everywhere), a new client draws everywhere without it. No new number (release).
-const PROTOCOL_REVISION := 56
+## 57 (882, "dusk follows the sky"; release's number, shared with ui's narration change, the first to
+## land sets it): the sim's dark follows a sun of -5.9 degrees, not -1 (DayNight.TWILIGHT_LOW -12,
+## TWILIGHT_HIGH 10), so wolves turn bold, the hill cat reaches and hiding in the dark begin then; an
+## old client would draw night about 27 game minutes before the server's dark.
+const PROTOCOL_REVISION := 57
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

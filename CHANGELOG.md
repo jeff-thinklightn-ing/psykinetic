@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Dusk and dawn light the ground as long as they light the sky, and night begins for beasts and for hiding only once the twilight has gone (882).
 ## v0.1.213
 
 - The Barrow's quest card stays out of town and the bear's cave: you see it only in the Barrow and the halls below it (747 amended (6)).

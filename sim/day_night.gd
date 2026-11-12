@@ -24,9 +24,13 @@ const NIGHT := 0.2
 ## The world's latitude, degrees: the equinoxes' noon is 90° less it.
 const LATITUDE := 45.0
 ## Daylight is NIGHT with the sun this far below the horizon and full this
-## far above it, degrees; smooth between.
-const TWILIGHT_LOW := -6.0
-const TWILIGHT_HIGH := 12.0
+## far above it, degrees; smooth between. Since decision 882 the dark
+## (Animal.NIGHT_LIGHT and Senses.DARK, 0.35) falls with the sun at -5.9,
+## the end of civil twilight, not at -1: the ground keeps the sky's dusk
+## (the floor read night at 18:30 under a glowing sky), and hiding and
+## the bold wolves still turn at one moment.
+const TWILIGHT_LOW := -12.0
+const TWILIGHT_HIGH := 10.0
 ## The zone kinds level.json's "zone" names (Level.zone_of), and the light
 ## each has where no daylight reaches, 0..1 (a level's "ambient" overrides
 ## it); outdoors under a roof is lit as indoors (decision 304). Against
