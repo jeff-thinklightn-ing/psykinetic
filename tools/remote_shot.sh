@@ -9,7 +9,9 @@
 # (asus-atlas, the low-spec player machine, C: only); D: below is the runner's drive.
 # 1. D:\psykinetic (a clone with no remote) brought to <sha> by a git bundle
 #    (only HEAD..sha when the laptop's HEAD is ours), refused if it has
-#    changes; each --with file (a git-ignored shot scene, say) copied to the
+#    changes. An untracked *.uid or *.import that <sha> tracks (the laptop's own
+#    import made it first) is removed and named; any other untracked file <sha>
+#    tracks refuses the run (828 amended (3)). Each --with file (a git-ignored shot scene, say) copied to the
 #    same path in it; imported (headless, over ssh).
 # 2. The game run in the laptop's logged-on session as a one-shot task
 #    (an ssh session has no desktop: a window there fails its swapchain),
@@ -30,6 +32,11 @@
 # No mode after the game's "--" gets --host (828 amended (2)): with none, a
 # fresh settings file waits as a client behind the connect screen. A locked
 # laptop is refused at once, and so are window and path flags and test scenes.
+# A bench's worst frame on the Atlas: a stray ~450 ms frame now and then is the
+# laptop's own (perf, 2026-11-12: 5 of 9 wilds runs on the Atlas, 0 of 5 on the
+# Lenovo; the one caught spent ~420 ms outside everything the engine times, with
+# nothing built). A bench whose worst frame matters runs on the Lenovo (--runner
+# lenovo), and map_bench's --hitch-ms=N says what a long frame did.
 set -u
 RUNNER=lenovo
 REPEAT=1
@@ -156,6 +163,22 @@ if [ "$(printf '%s\n' "$state" | sed -n '2,$p' | grep -c .)" -ne 0 ]; then
 	echo "$ROOT has changes; nothing touched:"; printf '%s\n' "$state" | sed -n '2,$p'; exit 1
 fi
 if [ "$remote_head" != "$SHA" ]; then
+	# Untracked files there that <sha> tracks would stop the checkout (828 amended
+	# (3)): a generated one (*.uid, *.import, the laptop's own import wrote it before
+	# its tree committed it) is removed and named; anything else refuses the run.
+	. "$here/tools/remote_shot_clash.sh"
+	git ls-tree -r --name-only "$SHA" > "$TMP/tracked.txt"
+	rsh "git -C $ROOT ls-files --others --exclude-standard" | tr -d '\r' > "$TMP/untracked.txt" \
+		|| { echo "the clone's untracked files could not be listed; nothing touched"; exit 1; }
+	clashes "$TMP/tracked.txt" "$TMP/untracked.txt" > "$TMP/clashes.txt"
+	if grep -q '^stop ' "$TMP/clashes.txt"; then
+		echo "$ROOT has untracked files $SHA tracks, not generated ones; nothing touched:"
+		sed -n 's/^stop //p' "$TMP/clashes.txt"; exit 1
+	fi
+	sed -n 's/^remove //p' "$TMP/clashes.txt" | while IFS= read -r path; do
+		rsh "del /q \"$ROOT\\$(printf '%s' "$path" | tr '/' '\\')\"" >/dev/null || { echo "could not remove $path"; exit 1; }
+		echo "remote_shot: removed $ROOT's untracked $path, which $SHA tracks (a generated file; 828 amended (3))"
+	done || exit 1
 	git update-ref refs/remote-shot/tip "$SHA"
 	if git merge-base --is-ancestor "$remote_head" "$SHA" 2>/dev/null; then
 		git bundle create -q "$TMP/tip.bundle" "^$remote_head" refs/remote-shot/tip
