@@ -1643,11 +1643,20 @@ BAG_HALF_WIDE, BAG_TOP, BAG_BOTTOM = 0.113, 0.024, -0.19
 ## from its fullest point and never tucks back under the rounded foot. Linear between them, held past
 ## the ends; never under the draft's 0.094, so the cloak is as before at the bag's top.
 BAG_FRONT_MIN = 0.094
+## A woman's bag hangs its foot swung out about its rings (Client3D.BAG_TILT_WOMAN, the same angle;
+## the rings at BAG_RING_HEIGHT): its front at height y further out by (ring - y) * sin, the cloak with it.
+BAG_TILT_FEMALE = math.radians(6.0)
+BAG_RING_HEIGHT = 0.014
 BAG_FRONT_BY_HEIGHT = ((0.024, 0.089), (0.0, 0.093), (-0.04, 0.097), (-0.08, 0.100), (-0.12, 0.106),
 	(-0.15, 0.107), (-0.185, 0.095))
 
 
 def _bag_front(y: float) -> float:
+	swing = max(BAG_RING_HEIGHT - y, 0.0) * math.sin(BAG_TILT_FEMALE) if female() else 0.0
+	return _bag_front_upright(y) + swing
+
+
+def _bag_front_upright(y: float) -> float:
 	pts = []
 	reach = BAG_FRONT_MIN
 	for h, z in BAG_FRONT_BY_HEIGHT:

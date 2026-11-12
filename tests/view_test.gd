@@ -14903,6 +14903,17 @@ func _test_satchel_worn() -> void:
 	_check((bag_art != null) == (ArtKit.has("worn.satchel") or ArtKit.has("item.satchel")), "the bag's art on its socket as it is made (%s)" % [bag_art != null])
 	_check(socket.global_basis.y.normalized().dot(model.global_basis.y.normalized()) > 0.99
 			and socket.global_basis.z.normalized().dot(level.normalized()) > 0.5, "the bag's frame level, +y up and +z out from the body")
+	# 819 amended (4): a woman's bag swung foot out about its rings, the rings where they were.
+	_check(Client3D.bag_tilt(look) == (Client3D.BAG_TILT_WOMAN if look.body == &"female" else 0.0), "the bag's swing by the build (%s, %.3f)" % [look.body, Client3D.bag_tilt(look)])
+	var upright := socket.global_transform
+	Client3D._place_bag_socket(model, sockets, strap, Client3D.BAG_TILT_WOMAN)
+	var swung := socket.global_transform
+	var ring := Vector3(0.08, Client3D.BAG_RING_HEIGHT, 0.0)
+	var foot := Vector3(0.0, -0.185, 0.0)
+	var foot_out := (upright.affine_inverse() * (swung * foot)).z  # In the bag's own frame (metres of the art).
+	_check((swung * ring).distance_to(upright * ring) < 0.002 and absf(foot_out - 0.199 * sin(Client3D.BAG_TILT_WOMAN)) < 0.003,
+			"a woman's swing: the rings in place (%.4f m), the foot %.3f m out" % [(swung * ring).distance_to(upright * ring) / body_y, foot_out])
+	Client3D._place_bag_socket(model, sockets, strap, Client3D.bag_tilt(look))
 	# A heavy body: the strap's ends further out, the socket with them (its shape keys as they stand).
 	look.keys["heavy"] = 1.0
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))

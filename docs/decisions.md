@@ -49159,7 +49159,20 @@ on the four strap fits and every body key, no vertex is through the cloak, the l
 (the woman, plate fit), where before the mend several touched it (build/cloak bagcloak2.py). human_m
 and human_f built again: of their 28 parts only Worn_Cloak_Strapped moved, the other 27 the same to
 the vertex on the base and all 13 keys (cmp_parts.py; an unchanged-code rebuild reproduces all 28).
-Art only, package "satchel", off; protocol unchanged; no new class_name.
+The probe on v2 with those bodies: the man's bottom clear (was 0.8 cm), but the woman's fuller thigh
+still held 2.3 cm of the bag's lower back, standing. The coordinator's order: nothing over 1 cm in any
+pose, the mend ours. A woman's bag hangs swung its foot out about its rings, Client3D.BAG_TILT_WOMAN
+(6 degrees, bag_tilt(look) by the look's body; _place_bag_socket turns the frame about the line
+through the rings at BAG_RING_HEIGHT), so the rings stay on the strap's ends and the foot comes 2.1 cm
+out; moving the whole bag out would have parted it from its strap. body_gen's BAG_TILT_FEMALE is the
+same: her strapped cloak's ease adds (ring - y) x sin of it, so v2 tilted clears her cloak by 3.1 mm at
+least (through it by 0.3 mm without). The probe after: the woman's back, bottom and rest clear, the
+man's back 0.6 cm standing; left over 1 cm only the front tab's ring where the strap's end meets the
+hip, 1.4 cm (the man) and 1.6 cm (the woman) at walk0, kept, since moving it lifts the strap off the
+body. view_test _test_satchel_worn checks the swing by build and that a woman's swing keeps the rings
+in place and puts the foot out. Stills (Blender, Cycles, the game's nearest-zoom framing beside the
+goblin): C:/dev/review/satchel/v2_sheet.png; the game's own windowed stills before switch-on. Art and
+client, package "satchel", off; protocol unchanged; no new class_name.
 
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 

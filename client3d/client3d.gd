@@ -24079,7 +24079,7 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 	var strap := _strap_shown(model, look, not cloak_id.is_empty(), armoured) if Items.worn_kind(bag_id) == "bag" else ""
 	if not strap.is_empty():
 		shown[strap] = bag_id
-		_place_bag_socket(model, sockets, model.find_child(strap, true, false) as MeshInstance3D)
+		_place_bag_socket(model, sockets, model.find_child(strap, true, false) as MeshInstance3D, bag_tilt(look))
 	var belt := sockets.get("belt_r") as Node3D
 	var lamp := belt.get_node_or_null("LanternBody") as Node3D if belt != null else null
 	if lamp != null:
@@ -24147,8 +24147,9 @@ func _strap_shown(model: Node3D, look: PersonLook, cloaked: bool, armoured: bool
 ## The "bag" socket (819 amended) on Hips, made the first time, set between
 ## the shown strap's two ends (its lowest vertices, in two bunches, as its
 ## shape keys stand), level in the bag's frame: +x toward the front end, +y up,
-## +z out from the body; the socket's scale the other sockets' (the model's).
-static func _place_bag_socket(model: Node3D, sockets: Dictionary, strap: MeshInstance3D) -> void:
+## +z out from the body; the socket's scale the other sockets' (the model's);
+## swung [param tilt] (radians) foot outward about its rings (bag_tilt).
+static func _place_bag_socket(model: Node3D, sockets: Dictionary, strap: MeshInstance3D, tilt := 0.0) -> void:
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	if strap == null or strap.mesh == null or skeletons.is_empty():
 		return
@@ -24159,6 +24160,11 @@ static func _place_bag_socket(model: Node3D, sockets: Dictionary, strap: MeshIns
 	var at := _bag_frame(strap)
 	if at == Transform3D():
 		return
+	if tilt != 0.0:
+		# About the line through its two rings (the frame's x at BAG_RING_HEIGHT): the rings stay on
+		# the strap's ends, the foot swings out (+z) by its depth under them times sin(tilt).
+		var pivot := Vector3(0.0, BAG_RING_HEIGHT, 0.0)
+		at = at * Transform3D(Basis(Vector3.RIGHT, -tilt), pivot - Basis(Vector3.RIGHT, -tilt) * pivot)
 	var socket := sockets.get("bag") as Node3D
 	if socket == null:
 		var on := BoneAttachment3D.new()
@@ -24227,6 +24233,17 @@ static func _bag_frame(strap: MeshInstance3D) -> Transform3D:
 	return Transform3D(Basis(across, Vector3.UP, across.cross(Vector3.UP)), (front + back) * 0.5)
 ## How far over the strap's lowest point a vertex counts as one of its ends.
 const BAG_END_BAND := 0.015
+## The satchel's tabs' rings over the bag frame's origin (art-kit's worn.satchel: (+-0.08, 0.014, 0.006)).
+const BAG_RING_HEIGHT := 0.014
+## 819 amended (4): a woman's bag swung its foot out about its rings (6 degrees; with v2's own 5 its
+## foot clears her fuller thigh: the region probe found 2.3 cm of its lower back in it, standing).
+## body_gen's BAG_TILT_FEMALE is the same, so her strapped cloak eases over it as it hangs.
+const BAG_TILT_WOMAN := 0.10472
+
+
+## The bag's swing for [param look]'s build: a woman's BAG_TILT_WOMAN, else none.
+static func bag_tilt(look: PersonLook) -> float:
+	return BAG_TILT_WOMAN if look != null and look.body == &"female" else 0.0
 
 
 ## A hat by its look word (npc's look_spec "hat=<word>"; the bard's): HATS'
