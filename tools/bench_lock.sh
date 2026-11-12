@@ -46,7 +46,15 @@ who() {
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOCK.log" 2>/dev/null || true; }
 beat_gate() {
 	[ -n "${PSYKINETIC_LOCK_BEATS_GATE:-}" ] || return 0
-	python -B "$(dirname "$0")/heavy_job.py" beat "$1" >/dev/null 2>&1 || true
+	# 0 beaten, 1 no take to beat (a docs push); anything else a fault, told
+	# (394 amended (37)): in the gate's log, else beside the lock.
+	said="$(python -B "$(dirname "$0")/heavy_job.py" beat "$1" 2>&1)"; code=$?
+	if [ "$code" -gt 1 ] || printf '%s' "$said" | grep -q "Traceback"; then
+		said="$(printf '%s' "$said" | tail -1)"
+		python -B "$(dirname "$0")/heavy_job.py" note "$1" beat_failed "exit $code: $said" >/dev/null 2>&1 \
+			|| log "beat_failed by $1: exit $code: $said"
+	fi
+	return 0
 }
 
 case "${1:-status}" in

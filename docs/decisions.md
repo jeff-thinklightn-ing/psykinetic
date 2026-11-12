@@ -10181,6 +10181,40 @@ taken and beats; with no kind named any landing's take is beaten, never a scene;
 open (a PermissionError in a run today, older than this). Tools and tests only; protocol unchanged;
 no class_name; no bullet.
 
+394 amended (37) (perf, 2026-11-12; release's ask, the coordinator's approval and its pid condition; label from
+tools/decision_number.sh): the guard. Older gate code is still run from checkouts that predate a change, and
+before 31 its stale check dropped a landing take 30 minutes after its start, beaten or not. art-kit's waiter
+queued at 01:29 dropped ui's Store A take (05:22:40) and pc-character's (04:36); perf-hitch's waiter, its worktree
+branched before 31, dropped perf's 90am1 take at 07:47. That check already spared a take whose adopted_by
+process lives (a land.sh run inside it), so:
+- Every take new code grants names its holder there, marked guard: its --pid, else its caller (tools/heavy_job.sh
+  now passes the shell that ran it as --caller, by Windows' id where Git Bash has one: `take` itself ends at once,
+  and a dead adopter shields nothing), else the python's parent; with its start time, against a reused id. Older
+  code then drops a new take only once its holder has died. New code ignores a guard (the beats decide, as
+  since 31). A run that adopts the take replaces the guard, and when the run ends the guard goes back on.
+- Every entry new code writes carries GATE_REVISION (37) and its checkout. `status` names, after its rows (their
+  lines unchanged for scripts), each entry older code wrote ("on older gate code: <tree> <kind> ..., pid N, its
+  checkout unknown (written before 394 amended (37)): ... rebase it": older entries carry no checkout, so the pid
+  and the tree's name are what find it), and each landing take 10 minutes old with no beat and no run
+  adopting it ("unbeaten", with its checkout). Each is logged once (old_gate, unbeaten; heavy_jobs/noted.json
+  remembers a day of them), and the daily summary counts them by tree.
+- tools/bench_lock.sh's beat_gate no longer drops a failed beat in /dev/null: a fault (an exit over 1, or a
+  traceback; exit 1 is "no take to beat") is a beat_failed note in the gate's log with its last line, else a line
+  beside the lock. HEAVY_JOB_BEAT_BREAK makes `beat` fail, for the test.
+This guards against older code's drops only, not its other choices (its order, its counts); and it ends when no
+checkout predates it: once every tree's folders are past this commit, the guard is no rule of the gate's, and a
+later amendment may drop it. tests/heavy_job_test.py:
+- the pre-31 check, kept as a copy, skips a guarded take 31 minutes old while its holder lives, and drops it once
+  the holder dies;
+- new code still drops an unbeaten guarded take at 30 minutes and keeps a beaten one;
+- a run's adoption gives the guard back when it ends;
+- the coordinator's case: a take made by `sh tools/heavy_job.sh take` from a waiting script names that script's
+  shell, which older code's check sees alive, and is dropped once the script has died;
+- status names an older entry and an unbeaten take, each logged once and counted by tree in the summary;
+- release's case: a refused lock try beats a suite_remote take;
+- a failed beat is logged as beat_failed.
+Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

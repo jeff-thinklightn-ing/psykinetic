@@ -354,6 +354,137 @@ else:
     except OSError:
         pass
 
+print("== the guard: older gate code's check skips a take new code holds (394 amended (37)) ==")
+
+
+def pre31_stale(entry):
+    """c89bb21fa^'s _entries check of a running entry, as it was: older gate
+    code still run from checkouts that predate 394 amended (31)."""
+    pid = entry.get("pid")
+    stale = bool(pid) and not gate.alive(pid, entry.get("pid_since"))
+    if not entry.get("watched") and not gate.alive(entry.get("adopted_by"), entry.get("adopted_since")):
+        stale = stale or time.time() - entry.get("started", entry["queued"]) > gate.TAKE_STALE_SECONDS
+    return stale
+
+
+def held_file(tree):
+    return next((name for name in os.listdir(gate._path("running")) if name.startswith(tree + "-")), None)
+
+
+def aged(tree, **more):
+    """[tree]'s take made 31 minutes old (and [more] set), as written."""
+    name = held_file(tree)
+    entry = gate._read(gate._path("running", name))
+    entry.update(dict({"started": time.time() - gate.TAKE_STALE_SECONDS - 60}, **more))
+    gate._write(gate._path("running", name), entry)
+    return entry
+
+
+holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+gate.take("pidded", "suite_remote", holder.pid)
+entry = aged("pidded")
+check(entry.get("gate") == gate.GATE_REVISION and entry.get("checkout") == gate.CHECKOUT,
+    "a take carries the gate's revision and its checkout (%s, %s)" % (entry.get("gate"), entry.get("checkout")))
+check(entry.get("guard") and entry.get("adopted_by") == holder.pid, "its --pid named as its guard")
+check(not pre31_stale(entry), "older code's check skips it, 31 minutes old, while its holder lives")
+with gate.StateLock():
+    check(held_file("pidded") is None or not any(each["tree"] == "pidded" for each in gate._entries("running")),
+        "new code drops it, unbeaten 31 minutes: the guard is no adoption to the beats")
+gate.take("pidded", "suite_remote", holder.pid)
+entry = aged("pidded", beat=time.time() - 60)
+with gate.StateLock():
+    check(any(each["tree"] == "pidded" for each in gate._entries("running")), "beaten a minute ago, new code keeps it")
+holder.kill()
+holder.wait()
+check(pre31_stale(entry), "its holder dead: older code drops it, as it should")
+gate.release("pidded", "suite_remote")
+
+# A run adopts the take, then gives it back: the guard returns, no gap.
+holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+gate.take("adopt", "suite_remote", holder.pid)
+check(gate.run("adopt", "suite_remote", [sys.executable, "-c", "pass"]) == 0, "a run inside the take")
+entry = gate._read(gate._path("running", held_file("adopt")))
+check(entry.get("guard") and entry.get("adopted_by") == holder.pid and not pre31_stale(dict(entry, started=0.0)),
+    "the run ended: its guard is back on the holder (%s, %s)" % (entry.get("guard"), entry.get("adopted_by")))
+gate.release("adopt", "suite_remote")
+holder.kill()
+holder.wait()
+
+# Older code's entries, and an unbeaten landing take: named, logged once each.
+gate._write(gate._path("queue", "0000000000000000001-oldie-1.json"), {"tree": "oldie", "kind": "scene", "pid": None,
+    "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+gate._write(gate._path("running", "stuck-suite_remote-1.json"), gate.guard({"tree": "stuck", "kind": "suite_remote", "pid": None,
+    "queued": time.time() - 700, "started": time.time() - 700, "ram_gb": 1.7, "gpu": False, "watched": False,
+    "gate": gate.GATE_REVISION, "checkout": "C:/dev/psykinetic-trees/stuck"}, os.getpid(), gate.started_at(os.getpid())))
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.status()
+    gate.status()
+said = said.getvalue()
+check("on older gate code: oldie scene (queued), pid %d, its checkout unknown" % os.getpid() in said,
+    "status names an entry older code wrote: %s" % [line for line in said.splitlines() if "older" in line][:1])
+check("unbeaten: stuck suite_remote held 12 min" in said and "C:/dev/psykinetic-trees/stuck" in said,
+    "status names a landing take 10 minutes unbeaten, with its checkout")
+with open(gate._path("heavy_jobs.log")) as handle:
+    logged = handle.read()
+check(logged.count("\told_gate\toldie\t") == 1 and logged.count("\tunbeaten\tstuck\t") == 1,
+    "each logged once, however often looked at")
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.summary(datetime.date.today().isoformat())
+by_tree = {line.split(" by tree: ")[0].split(": ")[-1]: line.split(" by tree: ")[1].split(", ")
+    for line in said.getvalue().splitlines() if " by tree: " in line}
+check("oldie 1" in by_tree.get("old_gate", []) and "stuck 1" in by_tree.get("unbeaten", []),
+    "the daily summary counts them by tree: %s" % by_tree)
+os.remove(gate._path("queue", "0000000000000000001-oldie-1.json"))
+os.remove(gate._path("running", "stuck-suite_remote-1.json"))
+
+if shell is not None:
+    # The case that bit (the coordinator's): a take made by `heavy_job.sh take`, a
+    # process that ends at once, from a script that then waits on the land lock.
+    env = dict(os.environ, HEAVY_JOBS_DIR=STATE)
+    script = subprocess.Popen([shell, "-c", "sh tools/heavy_job.sh take shortcall suite_remote && echo taken && read line"],
+        cwd=repo, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    start = time.time()
+    while held_file("shortcall") is None and time.time() - start < 60 and script.poll() is None:
+        time.sleep(0.2)
+    time.sleep(1.0)  # `take` itself gone.
+    entry = aged("shortcall") if held_file("shortcall") else {}
+    guard_by = entry.get("adopted_by")
+    check(entry.get("guard") and gate.alive(guard_by, entry.get("adopted_since")) and script.pid in gate.ancestors(guard_by),
+        "a take by a short process names the waiting script's shell, alive (%s, under %s)" % (guard_by, script.pid))
+    check(not pre31_stale(entry), "older code skips it, 31 minutes old, while that script lives")
+    subprocess.run(["taskkill", "/PID", str(guard_by), "/T", "/F"] if os.name == "nt" else ["kill", str(guard_by)],
+        capture_output=True)
+    script.kill()
+    script.wait()
+    time.sleep(0.5)
+    check(entry and pre31_stale(entry), "and drops it once the script has died")
+    if held_file("shortcall"):
+        os.remove(gate._path("running", held_file("shortcall")))
+
+    # release's case: a refused try against a held lock beats a suite_remote take.
+    gate._write(gate._path("running", "probe-suite_remote-1.json"), {"tree": "probe", "kind": "suite_remote", "pid": None,
+        "queued": time.time(), "started": time.time() - 600, "ram_gb": 1.7, "gpu": False, "watched": False})
+    hold_lock("buildings", "734 amended (7): the temple furnished")
+    code, said = try_lock("a landing")
+    check(code == 1 and "beat" in (gate._read(gate._path("running", "probe-suite_remote-1.json")) or {}),
+        "a refused try beats its tree's suite_remote take (release's case, 11-12) (%s)" % code)
+    # A beat that fails is told, not dropped into /dev/null.
+    lock_env["HEAVY_JOB_BEAT_BREAK"] = "1"
+    code, said = try_lock("a landing")
+    del lock_env["HEAVY_JOB_BEAT_BREAK"]
+    with open(gate._path("heavy_jobs.log")) as handle:
+        failed_beats = [line for line in handle if "\tbeat_failed\tprobe\t" in line]
+    check(code == 1 and len(failed_beats) == 1 and "HEAVY_JOB_BEAT_BREAK" in failed_beats[0],
+        "a failed beat is logged as beat_failed with its error (%s, %s)" % (code, failed_beats[:1]))
+    shutil.rmtree(lock, ignore_errors=True)
+    os.remove(gate._path("running", "probe-suite_remote-1.json"))
+    try:
+        os.remove(lock + ".log")
+    except OSError:
+        pass
+
 print("== going past a bench that waits on a suite (backfill, 394 amended (18)) ==")
 runs = {"suite": dict(table["suite"], runs_s=[450.0, 500.0, 460.0]), "suite_lean3": dict(table["suite_lean3"], runs_s=[1000.0]),
     "scene": dict(table["scene"], runs_s=[40.0, 70.0, 10.0]), "bench": dict(table["bench"], runs_s=[300.0])}

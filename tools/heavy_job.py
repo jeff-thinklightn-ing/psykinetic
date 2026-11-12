@@ -179,6 +179,22 @@ MAX_RESTARTS = 2
 ## take held while its tree waits on the land lock is never dropped: perf's
 ## 360 amended (1) and combat's 340 amended (2) lost theirs so, 11-11).
 TAKE_STALE_SECONDS = 30 * 60
+## The guard (394 amended (37)): the gate code's revision, written into every
+## entry it makes. Older gate code is still run from checkouts that predate
+## a change (perf-hitch's waiter, before 31, dropped perf's beaten take at
+## 30 minutes on 11-12; art-kit's 01:29 waiter dropped ui's and
+## pc-character's). An entry without it, or with a lower one, was written by
+## older code: `status` names it with its checkout, the daily summary counts
+## it by tree. Raise it with any change older code would get wrong.
+GATE_REVISION = 37
+## This checkout, written into every entry (which folder to rebase).
+CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+## A landing's take this old with no beat and no run adopting it: its land
+## lock tries are not beating it (a broken or old land_lock.sh), flagged in
+## `status` and counted in the daily summary by tree (release's ask, 11-12).
+UNBEATEN_SECONDS = 10 * 60
+## Who has been told of already (old_gate, unbeaten): each once in the log.
+NOTED_FILE = "noted.json"
 ## A wait this long goes in the log (and so in `summary`) with its reason.
 LONG_WAIT_SECONDS = 5 * 60
 ## The state's own lock, if its holder died holding it.
@@ -1204,7 +1220,11 @@ def _entries(folder):
         stale = stale or entry.get("queued", booted) < booted  # From before a reboot.
         if folder == "queue" and entry.get("waiter"):
             stale = stale or not alive(entry["waiter"], entry.get("waiter_since"))
-        if folder == "running" and not entry.get("watched") and not alive(entry.get("adopted_by"), entry.get("adopted_since")):
+        # A real adoption (a run of land.sh's, alive) shields a take; the guard
+        # (394 amended (37)), its holder named as adopter for older code's
+        # check, does not: here the beats decide.
+        adopted = not entry.get("guard") and alive(entry.get("adopted_by"), entry.get("adopted_since"))
+        if folder == "running" and not entry.get("watched") and not adopted:
             held_since = max(entry.get("started", entry["queued"]), entry.get("beat", 0.0))
             stale = stale or time.time() - held_since > TAKE_STALE_SECONDS
         if stale:
@@ -1215,9 +1235,83 @@ def _entries(folder):
             _write(_path(folder, name), entry)
         entry["file"] = name
         out.append(entry)
+    _note_odd(folder, out)
     if folder == "queue":
         out.sort(key=_order)  # A fronted entry's "order" puts it first (394 amended (25)).
     return out
+
+
+def older_code(entry):
+    """Whether [entry] was written by gate code older than this (394
+    amended (37)): none or a lower GATE_REVISION."""
+    return entry.get("gate", 0) < GATE_REVISION
+
+
+def unbeaten(entry, now=None):
+    """Whether [entry], a landing's take (not a run), has gone
+    UNBEATEN_SECONDS since its start with no beat and no run adopting it."""
+    if entry.get("watched") or not landing_kind(entry["kind"]) or entry.get("beat"):
+        return False
+    if not entry.get("guard") and entry.get("adopted_by"):
+        return False
+    return (now or time.time()) - entry.get("started", entry.get("queued", 0.0)) > UNBEATEN_SECONDS
+
+
+def _where(entry):
+    return entry.get("checkout") or "its checkout unknown (written before 394 amended (37))"
+
+
+def _note_odd(folder, entries):
+    """Logs, once each, an entry written by older gate code (old_gate) and a
+    landing's take gone unbeaten (unbeaten): the daily summary's counts by
+    tree. Under the state lock, as _entries is."""
+    odd = []
+    for entry in entries:
+        if older_code(entry):
+            odd.append(("old_gate", entry, "%s, pid %s, %s; rebase it (394 amended (37))" % (
+                folder, entry.get("waiter") if folder == "queue" else entry.get("pid"), _where(entry))))
+        if folder == "running" and unbeaten(entry):
+            odd.append(("unbeaten", entry, "held %.0f min with no beat from its land lock tries, pid %s, %s" % (
+                (time.time() - entry.get("started", 0.0)) / 60, entry.get("pid"), _where(entry))))
+    if not odd:
+        return
+    noted = _read(_path(NOTED_FILE)) or {}
+    changed = False
+    for event, entry, detail in odd:
+        key = "%s:%s:%s" % (event, folder, entry["file"])
+        if key in noted:
+            continue
+        noted[key] = time.time()
+        changed = True
+        log(event, entry["tree"], entry["kind"], detail)
+    if changed:
+        day = time.time() - 86400
+        _write(_path(NOTED_FILE), {key: when for key, when in noted.items() if when > day})
+
+
+def guard_holder(pid, caller):
+    """The process a take's guard names (394 amended (37)): its --pid, else
+    its caller's (heavy_job.sh passes the shell that ran it: `take` itself
+    ends at once, and a dead adopter shields nothing), else this process's
+    parent. (pid, its start time) or (None, None)."""
+    for each in (pid, caller):
+        if each and alive(each):
+            return int(each), started_at(each)
+    chain = ancestors(os.getpid())
+    if len(chain) > 1:
+        return chain[1], started_at(chain[1])
+    return None, None
+
+
+def guard(entry, holder, since):
+    """[entry], a take, shielded from older code's stale check (394 amended
+    (37)): before 31 it dropped a take 30 minutes after its start, beaten or
+    not, unless its adopted_by process lived. The holder is named so; new
+    code ignores a guard (the beats decide), and older code drops it only
+    once the holder has died."""
+    if holder:
+        entry.update({"adopted_by": holder, "adopted_since": since, "guard": True, "guard_by": holder, "guard_since": since})
+    return entry
 
 
 def _order(entry):
@@ -1238,7 +1332,7 @@ def log(event, tree, kind, detail=""):
 
 # --- Commands -----------------------------------------------------------------
 
-def wait_turn(tree, kind, pid, watched, expect_minutes=None):
+def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     """Queues, waits to be at the head with room, then moves to running.
     Returns the running entry's file name and the kind whose estimate it
     holds: [kind], or its lean variant (goes_lean). [expect_minutes]: how
@@ -1260,7 +1354,8 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
         # "expect_s": its --expect, for those behind it to judge its length
         # by (backfill_length, 394 amended (28)).
         _write(_path("queue", ticket), dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
-            "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued},
+            "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued,
+            "gate": GATE_REVISION, "checkout": CHECKOUT},
             **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {})))
     said = 0.0
     long_logged = False
@@ -1357,7 +1452,10 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 entry = {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
-                    "using_commit_gb": 0.0, "watched": watched, "estimate": estimate}
+                    "using_commit_gb": 0.0, "watched": watched, "estimate": estimate,
+                    "gate": GATE_REVISION, "checkout": CHECKOUT}
+                if not watched:
+                    guard(entry, *guard_holder(pid, caller))
                 if past:
                     # Gone past these by backfill (394 amended (18)): due
                     # to end before their blockers do.
@@ -1419,6 +1517,7 @@ def _adopt_take(tree, kind):
             name = entry.pop("file")
             entry["adopted_by"] = os.getpid()
             entry["adopted_since"] = started_at(os.getpid())
+            entry.pop("guard", None)
             _write(_path("running", name), entry)
             return name, entry.get("estimate", kind)
     return None, None
@@ -1616,6 +1715,11 @@ def run(tree, kind, command, expect_minutes=None, no_queue=False):
                     entry["using_gb"] = 0.0
                     entry["using_commit_gb"] = 0.0
                     entry.pop("adopted_by", None)
+                    entry.pop("adopted_since", None)
+                    # Its guard back (394 amended (37)): no gap in which older
+                    # code's check finds it unshielded.
+                    guard(entry, entry.get("guard_by") if alive(entry.get("guard_by"), entry.get("guard_since")) else None,
+                        entry.get("guard_since"))
                     _write(_path("running", name), entry)
             if not stopped and ended is None and (peak > 0.0 or commit_peak > 0.0 or code == 0):
                 table = _read(_path("kinds.json")) or {}
@@ -1665,13 +1769,13 @@ def keep_listing(tree, kind, listed, listed_gb, commit_peak):
         handle.write("%s\n%s\n" % (datetime.datetime.now().isoformat(timespec="seconds"), "\n".join(lines)))
 
 
-def take(tree, kind, pid):
+def take(tree, kind, pid, caller=None):
     outer = _outer_run()
     if outer is not None:
         print("heavy_job: %s %s inside %s's %s run, which holds it; nothing taken" % (
             tree, kind, outer["tree"], outer["kind"]))
         return 0
-    _, estimate = wait_turn(tree, kind, pid, False)
+    _, estimate = wait_turn(tree, kind, pid, False, caller=caller)
     print("heavy_job: %s %s taken%s" % (tree, kind, " (lean, as %s)" % estimate if estimate != kind else ""))
     return 0
 
@@ -1778,6 +1882,8 @@ def beat(owner, kind=None):
     [owner] (beat_rank: the nearest) marked alive now (394 amended (31)):
     its TAKE_STALE_SECONDS count from here. 0 if one was found, else 1. A
     run is watched and never goes stale so; nothing to beat."""
+    if os.environ.get("HEAVY_JOB_BEAT_BREAK"):
+        raise RuntimeError("HEAVY_JOB_BEAT_BREAK set (heavy_job_test's failed beat)")
     with StateLock():
         takes = [each for each in _entries("running") if not each.get("watched")
             and (each["kind"] == kind if kind else landing_kind(each["kind"]))]
@@ -1883,6 +1989,17 @@ def status():
             ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
             + (", fronted by %s: %s" % (entry["fronted"]["by"], entry["fronted"]["why"]) if entry.get("fronted") else "")
             + "; " + reasons[place - 1])
+    # After the rows (394 amended (37)): their lines and order unchanged for scripts.
+    for folder, entries in (("running", running), ("queued", queue)):
+        for entry in entries:
+            if older_code(entry):
+                print("on older gate code: %s %s (%s), pid %s, %s: it drops landing takes at 30 minutes; rebase it" % (
+                    entry["tree"], entry["kind"], folder, entry.get("waiter") if folder == "queued" else entry.get("pid"),
+                    _where(entry)))
+    for entry in running:
+        if unbeaten(entry):
+            print("unbeaten: %s %s held %.0f min, no beat from its land lock tries (pid %s, %s)" % (
+                entry["tree"], entry["kind"], (time.time() - entry["started"]) / 60, entry.get("pid"), _where(entry)))
     if not running and not queue:
         print("no heavy jobs")
     return 0
@@ -1930,6 +2047,15 @@ def summary(day):
         if each[1] == "backfill_late" and re.match(r"waited (\d+)", each[4])]
     counts.append("%d backfill, %d late (%.0f s in all)" % (sum(1 for each in lines if each[1] == "backfill"), len(late), sum(late)))
     print("%s: %s" % (day, ", ".join(counts)))
+    # By tree (394 amended (37)): a tree with old gate code, or whose land lock
+    # tries don't beat its take, shows up the same day.
+    for event in ("old_gate", "unbeaten", "beat_failed"):
+        by_tree = {}
+        for each in lines:
+            if each[1] == event:
+                by_tree[each[2]] = by_tree.get(each[2], 0) + 1
+        if by_tree:
+            print("%s: %s by tree: %s" % (day, event, ", ".join("%s %d" % pair for pair in sorted(by_tree.items()))))
     # Launch crashes by their top frame (530 amended): the same frame again
     # and again is an engine or asset bug to chase, not the machine.
     crashes = {}
@@ -1944,7 +2070,8 @@ def summary(day):
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late", "front")
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late", "front",
+    "old_gate", "unbeaten", "beat_failed")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
 ## tool) or on Jeff's word. Names are an honour system, as the land lock's are.
@@ -1999,7 +2126,7 @@ def front(tree, kind, by, why):
     return 0
 ## What a script outside the gate may log with `note` (decision 530: a test
 ## scene that died at launch, before any of its own code ran).
-NOTE_EVENTS = ("launch",)
+NOTE_EVENTS = ("launch", "beat_failed")
 
 
 def note(tree, event, detail):
@@ -2057,7 +2184,10 @@ def main(args):
         return run(args[1], args[2], command, expect, no_queue)
     if command == "take":
         pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
-        return take(args[1], args[2], pid)
+        # heavy_job.sh's --caller: the shell that ran it (394 amended (37)).
+        at = args.index("--caller") if "--caller" in args else -1
+        caller = int(args[at + 1]) if 0 <= at < len(args) - 1 and args[at + 1].isdigit() else None
+        return take(args[1], args[2], pid, caller)
     if command == "attach":
         if "--pid" not in args or args.index("--pid") == len(args) - 1 or not args[args.index("--pid") + 1].isdigit():
             print("heavy_job: attach <tree> <kind> --pid N", file=sys.stderr)
