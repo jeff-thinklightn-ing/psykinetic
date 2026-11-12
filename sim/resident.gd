@@ -1572,14 +1572,26 @@ func world_facts(about := PackedStringArray()) -> Array[String]:
 	if not asked_by.is_empty() and World.production != null:
 		var own := Townsfolk.card_of(World.production, worker_id)
 		trusted = not own.is_empty() and Standing.score(own, asked_by) >= Standing.setting("trusted")
-	facts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+	# Ties keep lore's file order (853 amended (9), lore's find): Godot's sort is not stable, so among equal
+	# weights which fact the budget cut fell to any reshuffle of the data (Aldous's six secrets, 634
+	# characters against 600: a new pond entry dropped the founding). Sorted by place, its index last.
+	var order: Array = range(facts.size())
+	order.sort_custom(func(i: int, j: int) -> bool:
+		var a: Dictionary = facts[i]
+		var b: Dictionary = facts[j]
 		if asked.has(str(a.get("id", ""))) != asked.has(str(b.get("id", ""))):
 			return asked.has(str(a.get("id", "")))  # What was asked about first (853 amended (4)).
 		if trusted and bool(a.get("secret", false)) != bool(b.get("secret", false)):
 			return bool(a.get("secret", false))  # A secret is the rarest thing it can say: first, within the budget.
 		if superstitious and bool(a.get("hearsay", false)) != bool(b.get("hearsay", false)):
 			return bool(a.get("hearsay", false))
-		return float(a["weight"]) > float(b["weight"]))
+		if float(a["weight"]) != float(b["weight"]):
+			return float(a["weight"]) > float(b["weight"])
+		return i < j)
+	var sorted: Array[Dictionary] = []
+	for i: int in order:
+		sorted.append(facts[i])
+	facts = sorted
 	var length := 0
 	for fact in facts:
 		if bool(fact.get("kept", false)):

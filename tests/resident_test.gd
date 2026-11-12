@@ -3667,7 +3667,21 @@ func _test_crypt_secrets() -> void:
 	World.production.set_card(priest, card)
 	voice.asked_by = "p-friend"
 	var facts := voice.world_facts()
-	_check(founders in facts and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"), "one he trusts is told, and Main hears which: %s / %s" % [told, facts])
+	# Which secrets fit the budget is lore's data (six of Aldous's are 634 characters against 600): what
+	# holds whatever the data is that each told is a secret in the words, and each secret in the words told.
+	var secret_text := {}
+	for fact: Dictionary in Lore.known_by("priest"):
+		if bool(fact.get("secret", false)):
+			secret_text[str(fact["id"])] = str(fact["text"]).strip_edges()
+	var told_ids: Array = told.filter(func(t: Array) -> bool: return t[0] == "p-friend").map(func(t: Array) -> String: return str(t[1]))
+	var in_words: Array = secret_text.keys().filter(func(id: String) -> bool: return facts.any(func(line: String) -> bool: return line.contains(secret_text[id])))
+	_check(not told_ids.is_empty() and told_ids.all(func(id: String) -> bool: return id in in_words) and in_words.all(func(id: String) -> bool: return id in told_ids),
+		"one he trusts is told, and Main hears which: each told a secret in the words, each in the words told (%s)" % [told_ids])
+	told.clear()
+	var on_crypt := voice.world_facts(Resident.asked_topics("What do you know of the crypt?"))
+	_check(founders in on_crypt and told.any(func(t: Array) -> bool: return t[0] == "p-friend" and t[1] == "crypt.founders"),
+		"asked of the crypt, its founding is told and Main hears it (%s)" % [told])
+	_check(voice.world_facts() == facts, "asked the same twice, the same words: ties keep lore's order")
 	_test_asked_first(voice, founders)
 	# A kept secret (615, npc's side; lore's kept_by ["pip"] on pip.paid_silence and crypt.pip_carries): Pip's
 	# body, an acolyte by trade and the runner by his card, speaks by the person knower too; what is kept never

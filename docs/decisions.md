@@ -49219,6 +49219,18 @@ only a reorder: a secret stays untold to a player it does not trust however plai
 (resident_test _test_asked_first: the crypt and Pip asked, not trusted and trusted). Hails pass no
 line and are unchanged; companions keep decision 400's way. Server only.
 
+853 amended (9) (lore's find, the coordinator's ruling, 2026-11-12): Resident.world_facts' ties keep
+lore's file order. Its sort (asked first, a secret first to one it trusts, hearsay first to the
+superstitious, then weight) left equal keys to Godot's sort_custom, which is not stable past 16
+elements, so among equal weights which fact the budget cut was a draw any data change reshuffled:
+Aldous's six secrets, all at w1, are 634 characters against his 600, and lore's town_pond entry
+(three facts, pond.fish to w1) dropped the founding where main had kept it. It sorts the facts'
+places now, each fact's index the last key, so equal facts stay in lore's order and lore ranks
+"asked first" ties by placing its entries (the near pond before the far for "Where can I fish?").
+resident_test: each secret told to one he trusts is in his words and each in his words is told
+(whichever the budget keeps), asked of the crypt its founding is told, and asked the same twice
+the same words. Server only; protocol unchanged; no new class_name.
+
 853 amended (5) (voice's audit, the coordinator's approval, 2026-11-11; voice's words): a click's
 greeting. (a) Resident.greet_word gave greet.standing's one word before the trade's lines, so anyone
 who knew you said "Back again?" or "Good to see you.": three words in place of thirty lines. Now
