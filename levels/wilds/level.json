@@ -546,6 +546,19 @@
 			"code": "W3"
 		},
 		{
+			"slot": "building.woodpile",
+			"at": [
+				188,
+				194
+			],
+			"facing": [
+				0,
+				1
+			],
+			"variant": 2,
+			"code": "W4"
+		},
+		{
 			"slot": "building.market_stall",
 			"at": [
 				203,
@@ -3389,7 +3402,7 @@
 		}
 	],
 	"building_codes": {
-		"W": 3,
+		"W": 4,
 		"H": 4,
 		"S": 9,
 		"T": 2,
