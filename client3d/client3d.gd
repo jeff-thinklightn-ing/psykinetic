@@ -13520,6 +13520,7 @@ func _on_pile_shown(pile: GroundPile) -> void:
 	for id in pile.ids:
 		if not kinds.has(id):
 			kinds.append(id)
+	var laid: Array[Node3D] = []  # Each thing laid so far (in the heap's space, not yet in it).
 	for i in kinds.size():
 		var slot := growing if not growing.is_empty() else str(Items.def(kinds[i]).get("art", ""))
 		if not ArtKit.has(slot):
@@ -13532,11 +13533,25 @@ func _on_pile_shown(pile: GroundPile) -> void:
 			thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, 0.0)
 			thing.position = Vector3(cos(i * 2.4) * 0.25 * mini(i, 1), 0.0, sin(i * 2.4) * 0.25 * mini(i, 1))
 		else:
-			# On its side, its length along the ground, turned by the cell and
-			# its place in the heap, a little apart from the others.
-			thing.rotation = Vector3(0.0, _roll(pile.tile, 10 + i) * TAU, PI * 0.5)
-			thing.position = Vector3(cos(i * 2.4) * 0.18 * mini(i, 1), ArtKit.size(slot).z * 0.5,
-					sin(i * 2.4) * 0.18 * mini(i, 1))
+			# Turned by the cell and its place in the heap, a little apart from
+			# the others, lying on its broad side: its thinnest axis up (619
+			# amended (2): a pelt, a fish, a cloak modelled lying stood a
+			# goblin's height tall, and a shield or a sword stood on its edge).
+			# How it turns is pile_turn's (by its size alone, so a thing lands
+			# the same way at every drop). It rests on its own lowest drawn
+			# point, on what lies under it or the ground (the old rest,
+			# size.z / 2, sank a sword 8 cm).
+			var along := Vector2(cos(i * 2.4), sin(i * 2.4)) * 0.18 * mini(i, 1)
+			var turn := pile_turn(ArtKit.size(slot))
+			thing.rotation = Vector3(turn.x, _roll(pile.tile, 10 + i) * TAU, turn.z)
+			# Its drawn middle on its place in the heap, not its grip (a pelt's
+			# grip is near one end: its body lay 0.8 m off the cell, the rest
+			# beyond it, P8's still).
+			var drawn := thing.transform * ArtKit.bounds_of(thing)
+			thing.position += Vector3(along.x - drawn.get_center().x, 0.0, along.y - drawn.get_center().z)
+			drawn = thing.transform * ArtKit.bounds_of(thing)
+			thing.position.y += _pile_floor(laid, Vector2(along.x, along.y)) - drawn.position.y
+			laid.append(thing)
 		heap.add_child(thing)
 		if i == kinds.size() - 1 and pile.thrown_from != World.NO_CELL and World.tick - pile.thrown_tick < THROWN_SHOWN_TICKS:
 			_fly(thing, _tile_position(pile.thrown_from) - heap.position + Vector3.UP * 1.2, thing.position)
@@ -13549,6 +13564,55 @@ func _on_pile_shown(pile: GroundPile) -> void:
 		heap.add_child(coins)
 	_room.add_child(heap)
 	_pile_nodes[pile] = heap
+
+
+## How a thing modelled [param size] big is turned to lie in a pile (619
+## amended (2)): on its broad side, its thinnest axis up, as Euler x and z
+## (y, the cell's turn, is the heap's). Thinnest in y, or within
+## PILE_STAND_MARGIN of it (a pot, a cup, dice: nothing clearly thinner), it
+## lies as modelled; else thinnest in z (a shield, a sword, an arrow), a
+## quarter about x; else (x: a bow) a quarter about z. Ties go y, then z, then
+## x, so a size has one rest, the same at every drop.
+const PILE_STAND_MARGIN := 1.25
+static func pile_turn(size: Vector3) -> Vector3:
+	if size.y <= minf(size.x, size.z) * PILE_STAND_MARGIN:
+		return Vector3.ZERO
+	if size.z <= size.x:
+		return Vector3(PI * 0.5, 0.0, 0.0)
+	return Vector3(0.0, 0.0, PI * 0.5)
+
+
+## Where a thing laid at [param at] (its middle, in its heap's space) rests:
+## on the highest surface of the things [param laid] before it straight
+## below that point (a ray down through their meshes), else on the ground
+## (619 amended (2): a heap lies on itself, not through itself. A rest on
+## the top of their bounds, as first built, floated a sword 20 cm over a
+## pelt, whose head and paws reach 0.25 m and whose body does not.)
+static func _pile_floor(laid: Array[Node3D], at: Vector2) -> float:
+	var floor_y := 0.0
+	for each in laid:
+		for node in each.find_children("*", "MeshInstance3D", true, false):
+			var mesh := node as MeshInstance3D
+			if mesh.mesh == null:
+				continue
+			var place := Transform3D.IDENTITY  # The mesh in the heap's space.
+			var up: Node = mesh
+			while up != null and up != each.get_parent() and up is Node3D:
+				place = (up as Node3D).transform * place
+				up = up.get_parent()
+			var inside := place.affine_inverse()
+			var hit := _pile_faces(mesh.mesh).intersect_ray(inside * Vector3(at.x, 50.0, at.y), inside.basis * Vector3.DOWN)
+			if not hit.is_empty():
+				floor_y = maxf(floor_y, (place * (hit["position"] as Vector3)).y)
+	return floor_y
+
+
+## A mesh's faces for _pile_floor's rays, made once per mesh.
+static var _pile_face_cache: Dictionary[Mesh, TriangleMesh] = {}
+static func _pile_faces(mesh: Mesh) -> TriangleMesh:
+	if not _pile_face_cache.has(mesh):
+		_pile_face_cache[mesh] = mesh.generate_triangle_mesh()
+	return _pile_face_cache[mesh]
 
 
 ## The plant a pile of [param ids] stands as: the first of Forage.PLANTS the

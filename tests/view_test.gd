@@ -766,6 +766,85 @@ func _test_piles() -> void:
 	_check(_rig._pile_nodes.has(pile) and _rig._pile_nodes[pile].get_child_count() == 2, "one taken: the heap has the other")
 	World.items.end(World.take_from_ground(cell, 0), "gone")
 	_check(not _rig._pile_nodes.has(pile) and World.ground_at(cell).is_empty(), "both taken: the heap is gone")
+	# 619 amended: a thing modelled lying (a pelt: longest across, 0.25 thick)
+	# lies flat on the ground, never stood up a goblin's height; one modelled
+	# along its length (a sword) still lies on its side; and a heap of both
+	# lies on itself, the second on the first, not through it.
+	var drawn_in := func(heap_node: Node3D, slot: String) -> AABB:
+		for child in heap_node.get_children():
+			if child.has_meta("slot") and str(child.get_meta("slot")) == slot:
+				return (child as Node3D).transform * ArtKit.bounds_of(child as Node3D)
+		return AABB(Vector3.ZERO, Vector3(-1.0, -1.0, -1.0))
+	var pelt_thick := ArtKit.size("item.bear_pelt").y
+	var pelt := World.items.mint("bear_pelt", "built")
+	World.put_on_ground(pelt, cell)
+	var alone: AABB = drawn_in.call(_rig._pile_nodes.get(World.zone.piles.get(cell)), "item.bear_pelt")
+	_check(alone.size.y > 0.0 and alone.size.y <= pelt_thick * 1.5 and absf(alone.position.y) < 0.03,
+			"a bear pelt lies flat: %.2f m high (modelled %.2f thick), its underside at %.2f" % [alone.size.y, pelt_thick, alone.position.y])
+	_check(Vector2(alone.get_center().x, alone.get_center().z).length() < 0.05,
+			"its middle on its cell, not its grip (%.2f m off)" % Vector2(alone.get_center().x, alone.get_center().z).length())
+	var sword := World.items.mint("sword", "built")
+	World.put_on_ground(sword, cell)
+	var heap_node: Node3D = _rig._pile_nodes.get(World.zone.piles.get(cell))
+	var under: AABB = drawn_in.call(heap_node, "item.bear_pelt")
+	var over: AABB = drawn_in.call(heap_node, "item.sword")
+	_check(over.size.y > 0.0 and over.size.y <= ArtKit.size("item.sword").z * 1.5,
+			"a sword lies on its flat: %.2f m high (modelled %.2f thick)" % [over.size.y, ArtKit.size("item.sword").z])
+	# Over the pelt across the ground (its middle inside the pelt's footprint),
+	# and on the pelt's body, not the top of its bounds: those are its head and
+	# paws, 0.25 m up, and a sword set there floated 20 cm over the body, read
+	# from the low camera as a heap behind the pelt (P8's after-stills).
+	var over_middle := over.get_center()
+	_check(Rect2(under.position.x, under.position.z, under.size.x, under.size.z).has_point(Vector2(over_middle.x, over_middle.z)),
+			"the sword lies over the pelt, not beside it: its middle (%.2f, %.2f), the pelt (%.2f..%.2f, %.2f..%.2f)" % [over_middle.x, over_middle.z, under.position.x, under.end.x, under.position.z, under.end.z])
+	_check(over.position.y > under.position.y + 0.005 and over.position.y < under.position.y + 0.12,
+			"the sword lies on the pelt's body, not through it nor over it: its underside %.3f, the pelt from %.3f to %.3f" % [over.position.y, under.position.y, under.end.y])
+	World.items.end(World.take_from_ground(cell, 0), "gone")
+	World.items.end(World.take_from_ground(cell, 0), "gone")
+	# A shield (as wide as it is tall, thin in z) stood on its edge before.
+	var shield := World.items.mint("shield", "built")
+	World.put_on_ground(shield, cell)
+	var flat: AABB = drawn_in.call(_rig._pile_nodes.get(World.zone.piles.get(cell)), "item.shield")
+	_check(flat.size.y > 0.0 and flat.size.y <= ArtKit.size("item.shield").z * 1.5 + 0.05 and absf(flat.position.y) < 0.03,
+			"a shield lies flat: %.2f m high, its underside at %.2f" % [flat.size.y, flat.position.y])
+	World.items.end(World.take_from_ground(cell, 0), "gone")
+	# A boar's heap (art-gen's hand-made meat, hide and tusks, and a kit
+	# beside them): each flat as its turn says, and each on the ground or on
+	# the surface of what lies under its middle, never floating over it (a
+	# rest on the top of the bounds below floated things; P8).
+	var boar: Array[String] = ["item.meat", "item.hide", "item.tusks", "item.bandaging_kit"]
+	for id: String in ["meat", "hide", "tusks", "bandaging_kit"]:
+		World.put_on_ground(World.items.mint(id, "built"), cell)
+	var boar_heap: Node3D = _rig._pile_nodes.get(World.zone.piles.get(cell))
+	var boar_faults: PackedStringArray = []
+	var below: Array[AABB] = []
+	for slot: String in boar:
+		var box: AABB = drawn_in.call(boar_heap, slot)
+		var size := ArtKit.size(slot)
+		var thin := minf(size.y, minf(size.x, size.z)) if Client3D.pile_turn(size) != Vector3.ZERO else size.y
+		var middle := Vector2(box.get_center().x, box.get_center().z)
+		var top := 0.0  # The highest thing laid before it that its middle lies over.
+		for each in below:
+			if Rect2(each.position.x, each.position.z, each.size.x, each.size.z).has_point(middle):
+				top = maxf(top, each.end.y)
+		if box.size.y <= 0.0 or box.size.y > thin * 1.5 + 0.01:
+			boar_faults.append("%s %.3f high (modelled %.3f thin)" % [slot, box.size.y, thin])
+		if box.position.y < -0.01 or box.position.y > top + 0.005:
+			boar_faults.append("%s underside %.3f (what lies under its middle tops at %.3f)" % [slot, box.position.y, top])
+		below.append(box)
+	_check(boar_faults.is_empty(), "a boar's heap and a kit: each flat as turned, none sunk, none floating (%s)" % ", ".join(boar_faults))
+	for i in boar.size():
+		World.items.end(World.take_from_ground(cell, 0), "gone")
+	# The turn by size alone: nothing clearly thinner (a pot a hair taller than
+	# wide, dice) stands as modelled; ties go y, z, x (a size has one rest).
+	var stand := Vector3.ZERO
+	var on_z := Vector3(PI * 0.5, 0.0, 0.0)
+	var on_x := Vector3(0.0, 0.0, PI * 0.5)
+	_check(Client3D.pile_turn(Vector3(0.20, 0.22, 0.20)) == stand and Client3D.pile_turn(Vector3(0.03, 0.02, 0.02)) == stand
+			and Client3D.pile_turn(Vector3(1.6, 0.25, 0.9)) == stand, "a pot a hair taller than wide, dice and a pelt lie as modelled")
+	_check(Client3D.pile_turn(Vector3(0.6, 0.6, 0.06)) == on_z and Client3D.pile_turn(Vector3(0.12, 0.75, 0.12)) == on_z
+			and Client3D.pile_turn(Vector3(0.06, 1.3, 0.25)) == on_x,
+			"a shield and arrows (a tie of x and z) a quarter about x, a bow about z")
 
 
 func _test_every_sound_has_its_files() -> void:

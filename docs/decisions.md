@@ -27427,6 +27427,49 @@ uids are now padded first, ahead of every branch. items_test _test_stacks
 splits one herb into a fresh box and back. Server only, protocol unchanged, no
 new class_name.
 
+619 amended (2): things on the ground lie as modelled, and on each other
+(items, the script's label; the coordinator's approval, 2026-11-12, from
+ui-design's laptop stills at the nearest zoom: a dropped bear pelt stood in
+Umbrage's square as a slab shoulder-high to the goblin). Client3D's
+_on_pile_shown laid every thing on its side (rotation.z a quarter turn), right
+for a held piece modelled along its length (+Y: a sword, a rod) and wrong for
+one modelled lying: 43 item slots are longest across, not along y, and stood
+up by it (the pelts 1.0 to 1.6 m, antlers, hide, cloak, leather, fish, the
+satchel, down to the dice), and a shield, as wide as it is long, stood on its
+edge. Now a thing lies on its broad side, its thinnest axis up: thinnest in y
+(a pelt, a fish, a cloak, leather) it lies as modelled; in z (a shield, a
+sword, an axe, antlers) it is turned a quarter about x; in x (a bow) a quarter
+about z; and turned by the cell about y as before. A thing with nothing
+clearly thinner (a pot, a cup, dice: y within PILE_STAND_MARGIN, 1.25, of the
+thinnest) lies as modelled, and ties go y, then z, then x, so the turn comes
+from the slot's size alone (Client3D.pile_turn) and a thing rests the same way
+at every drop. (The coordinator's first
+approval said "on its side only when y is longest"; the near stills showed
+that left the shield on its edge, so the rule is the thinnest axis.) It rests
+on its own lowest drawn point (ArtKit.bounds_of, so a grip origin anywhere on
+the piece still rests it on the ground; the side-laid rest had been size.z / 2
+while its height there was its art's x, and a sword sank 8 cm), with its
+drawn middle, not its grip, on its place in the heap (a sword's grip is near
+one end of it), and on the highest surface of the things laid before it straight below its
+middle, a ray down through their meshes' faces (Client3D._pile_floor; a rest
+on the top of their bounds, as first built, set a sword on a pelt's head and
+paws, 0.25 m up, floating 20 cm over its body; from the low camera at the
+nearest zoom, things floating over the pelt's far half read as a heap on the
+cobbles behind it, which is how ui-design's after-stills showed it; the
+shot scene run headless printed each thing's drawn box over the pelt's
+footprint), so a heap of several kinds lies on itself, not
+through itself. A piece that still sinks or floats has art whose
+bounds are off, and goes to art-kit, not a nudge here. view_test _test_piles:
+a bear pelt's drawn height within half again its modelled thickness, its
+underside on the ground, its middle on its cell; a sword beside it on its flat, within half again its
+thickness, its middle over the pelt's footprint and its underside on the pelt's body (above its
+underside, under 0.12 m: the bounds' top, 0.25, fails); a shield alone lying flat on the ground; a boar's
+heap of meat, hide and tusks with a bandaging kit, each flat as turned, none sunk, and none above the top
+of what lies under its middle (run also with art-gen's hand-made four in place, for art-kit's row);
+pile_turn on a pot a hair taller than wide, dice, a pelt, a shield, arrows and
+a bow.
+Client only, protocol unchanged, no new class_name.
+
 ## 623. The low-horizon camera, a trial toggle
 
 Jeff (2026-10-22): "drop the camera angle so we can see the sky and the
