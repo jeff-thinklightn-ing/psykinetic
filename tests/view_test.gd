@@ -3039,6 +3039,7 @@ func _test_tavern_inside() -> void:
 	_check(Client3D.window_slot("stone", Client3D.WALL_HEIGHT) == ("wall.stone.window_house" if ArtKit.has("wall.stone.window_house") else "")
 			and Client3D.window_slot("wood", Client3D.WALL_HEIGHT) == "wall.wood.window",
 			"a stone house's one-storey wall its shuttered window_house (never the castle's grate), a wood one's wall.wood.window (%s)" % Client3D.window_slot("stone", Client3D.WALL_HEIGHT))
+	_test_window_wall_faces()
 	# Inside, its common room's fireplace over the hearth's two fire cells,
 	# its back to the west wall, at their middle.
 	var ground := Level.load_level("umbrage_tavern")
@@ -3097,6 +3098,49 @@ func _test_tavern_inside() -> void:
 			and BuildingComposer.sill_lamp_edge(house, [] as Array[Vector3i]) == BuildingComposer.NO_SILL,
 			"no lamp on a building that is no shell, nor on a shell with no window")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A window's own wall faces (881): wall.wood.window's surfaces in the
+## material ArtKit.WALL_SET_NAME drawn in the wood wall's material, moved to
+## the piece's place along its run (u), turned with it, stretched with it
+## (v); its palette, glow and shutters left as they are. And every wood
+## window drawn in the rig so.
+func _test_window_wall_faces() -> void:
+	var made := ArtKit.instance("wall.wood.window")
+	made.position.z = 2.5
+	made.scale.y = 1.2
+	_rig._wall_faces(made, "wood", 2.5, true)
+	var wall := Client3D._wall_material("wood")
+	var faces := 0
+	var others_kept := true
+	var bad: Array = []
+	for node in made.find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		for surface in part.mesh.get_surface_count():
+			var own := part.mesh.surface_get_material(surface)
+			var over := part.get_surface_override_material(surface) as StandardMaterial3D
+			if own == null or own.resource_name != ArtKit.WALL_SET_NAME:
+				others_kept = others_kept and over == null
+				continue
+			faces += 1
+			if over == null or over.albedo_texture != wall.albedo_texture or not is_equal_approx(over.uv1_offset.x, 0.25) 					or not over.uv1_scale.is_equal_approx(Vector3(-1.0, 1.2, 1.0)):
+				bad.append([part.name, surface, over.uv1_offset if over != null else null, over.uv1_scale if over != null else null])
+	made.free()
+	var drawn := 0
+	for holder: Node in _rig.find_children("Wall_*", "Node3D", true, false):
+		for piece: Node in holder.get_children():
+			var window := piece.find_child("window", true, false) as MeshInstance3D
+			if window == null or window.mesh == null:
+				continue
+			for surface in window.mesh.get_surface_count():
+				var own := window.mesh.surface_get_material(surface)
+				if own != null and own.resource_name == ArtKit.WALL_SET_NAME:
+					drawn += 1
+					var over := window.get_surface_override_material(surface) as StandardMaterial3D
+					if over == null or over.albedo_texture != wall.albedo_texture 							or not is_equal_approx(over.uv1_offset.x, fposmod((piece as Node3D).position.z / Client3D.WALL_TILE, 1.0)):
+						bad.append(["drawn", holder.name, piece.name])
+	_check(faces > 0 and others_kept and bad.is_empty(),
+			"a wood window's wall faces drawn in the wood wall's own material, at its place along the run, turned and stretched with it; its other surfaces untouched (%d faces, %d drawn; bad %s)" % [faces, drawn, bad])
 
 
 ## Which window a wall takes by its height (489 amended (2)): a wood wall

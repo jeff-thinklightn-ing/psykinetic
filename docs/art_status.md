@@ -489,7 +489,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `wall.wood.straight_ruined` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.wood.t` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `wall.wood.tower` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `wall.wood.window` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `wall.wood.window` | 1 | art-kit, by hand | own | 2026-11-12 |
 | `wall.wood.window_tall` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `worn.amber_beads` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `worn.encolpion_amulet` | 1 | art-kit, by hand | own | 2026-11-06 |

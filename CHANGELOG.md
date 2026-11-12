@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: wooden houses, the Mughouse among them, have oak-framed windows cut through their own boards, with a glazing cross and board shutters strapped in iron (881).
 - In the crypt, a Mound-breaker comes to his mates' fight only when he can see or hear it, so one you meet alone in a side room stays alone where you meet him (806 amended (17)).
 - In the crypt, a robber across a wall's corner from you steps round to where he can strike (806 amended (16)).
 - A foe beside you at a stair or doorway fights you from another side of you (571 amended (1)).

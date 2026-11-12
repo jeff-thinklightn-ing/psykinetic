@@ -50843,3 +50843,25 @@ nothing of theirs relies on a route across one; physics carries the same rule in
 the straight way, the way and a resident's legs go round it to the goal, a line across it is not clear,
 and a way whose goal is the link ends on it. Server and client (the player's route); protocol
 unchanged; no new class_name.
+## 881. A window's wall faces drawn in its wall's own material; wall.wood.window by hand
+
+Art-gen's audit of the Mughouse's inside (C:/dev/review/art-gen_insides/insides_worst.png, the
+coordinator's order: Jeff's "placeholders" in Umbrage) named wall.wood.window, art-gen's fitted
+TRELLIS mesh, a lumpy slab with a pane, among the worst things a player stands beside. A window
+piece painted in the palette's flat plank colours also shows as a band in a wall drawn in its
+set's grained texture (material.wall.wood), however close the swatch (buildings' stills, 11-11).
+A wall piece may now carry its own wall: surfaces in the material named ArtKit.WALL_SET_NAME
+("wall_set"), their UVs in metres as Client3D._wall_quad lays a swept run's (u along the edge from
+the piece's middle, v up from its foot, both over WALL_TILE). Client3D._wall_faces, called from
+_dress_window, draws them in a copy of _wall_material(set) moved to the piece's place
+(uv1_offset.x = its middle along the run over WALL_TILE, wrapped), its u run back when the piece is
+turned half round (uv1_scale.x -1), its height stretch kept in v (uv1_scale.y = made.scale.y); the
+copies are kept by set, place, turn and stretch (_wall_face_materials), so a town shares a few.
+Its palette, glow and shutters are left as they are. ArtCheck counts "wall_set" as the game's own,
+not a foreign material. wall.wood.window is rebuilt by hand (art-kit,
+C:/dev/review/wood_window/make_wood_window_ws.py, 312 tris, materials 4): the wall's thickness round
+a framed oak opening, its two wall faces in "wall_set", the glow pane as before, the shutters three
+boards on a backing with ledges and straps, hinged where they were. Other sets' windows keep their
+palette walls until each is rebuilt the same way. view_test _test_window_wall_faces (the faces'
+material, place, turn and stretch, the other surfaces untouched, and every drawn one so). Client
+only; protocol unchanged; no new class_name.

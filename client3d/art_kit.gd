@@ -43,6 +43,9 @@ const ROOT := "res://art/kit/"
 ## named PALETTE_NAME draws with this one instead of its own copy.
 const PALETTE := "res://art/kit/palette.tres"
 const PALETTE_NAME := "palette"
+## A wall piece's faces that are its wall (881): drawn in the wall's own
+## set material (Client3D._wall_faces), their UVs in metres, not the palette.
+const WALL_SET_NAME := "wall_set"
 ## Where a creature's blow lands in its clip when the slot's clip names no
 ## "contact": this far through it (CreatureView strikes it so; ArtCheck
 ## checks a named one).

@@ -884,10 +884,10 @@
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
-			"materials": 3,
+			"materials": 4,
 			"size": [0.3, 3, 1],
 			"budget": 600,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/wall.wood.window/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 400 mesh cut to 1 m round the opening, depth to 0.3, 378 tris; art-kit, 2026-10-21 (566, buildings' stage set): the object \"glow\", a pane filling the opening at x 0.09, behind the shutters, its own warm emissive material \"glow\" (1.0, 0.72, 0.42) at energy 1, shown per building by the composer; art-kit, 2026-11-07 (buildings, from the coordinator's night street stills: the pane read as a flat cream square; C:/dev/review/house_light/glow_pane.py): each glow pane warmer and deeper, its centre on the material glow (a deep amber), a ring round it on glow_edge (dimmer and darker) so the light falls off to the frame, both faces as before, and a thin dark cross of glazing bars on the palette just in front, so the frame reads dark against it"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-12", "notes": "C:/dev/review/wood_window/make_wood_window_ws.py (881; art-gen's Mughouse audit, C:/dev/review/art-gen_insides/insides_worst.png: art-gen's fit read as a lumpy slab with a pane): a 1 m wall section the wall's own thickness round a framed opening, its two wall faces (80 tris) in the material \"wall_set\" with UVs in metres (u along from the middle, v up, over 2 m) so Client3D draws them in the wood wall's own texture where they stand (Client3D._wall_faces), the band of the window's own flat planks gone; an oak frame, sill and head, the glazing bars dark; the glow pane (glow, glow_edge) as before; shutter_a and shutter_b hinged at z -0.35 / +0.35, 1.3 up, each leaf three boards on a backing with ledges and iron straps, closing to 2 mm of the middle (buildings' stills); 312 tris"},
 			"uses": "a 1 m wall section with an opening to see through; it still blocks movement; shuttered: two shutters hung in the opening's reveal (z -0.35 to 0.35, 1.3 to 2.0 m up), flush with the outside face (+x), shutter_a hinged at z -0.35 and shutter_b at z +0.35, closed in the glb, swinging out to +x as BuildingComposer opens them (buildings, decision 489)",
 			"grey": [
 				{"at": [0, 0.6, 0], "size": [0.3, 1.2, 1]},

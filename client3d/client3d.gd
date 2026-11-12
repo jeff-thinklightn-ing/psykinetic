@@ -11028,6 +11028,7 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
 				DayNight.elevation(DayNight.now()))
 	made.scale.y = _height_of(key) / window_drawn_height(slot)
+	_wall_faces(made, slot.get_slice(".", 1), made.position.z, made.rotation.y != 0.0)
 	# A shell's lamp on its sill (811 amended), in the wall's middle, kept
 	# its own height however the window is stretched.
 	if _sill_lamps.has(key) and ArtKit.has(SILL_LAMP_SLOT):
@@ -11045,6 +11046,33 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		a.rotation_degrees.y = lerpf(90.0, 108.0, _roll(cell, 52 + key.z))
 	if b != null:
 		b.rotation_degrees.y = -lerpf(90.0, 108.0, _roll(cell, 54 + key.z))
+
+
+## A wall piece's own wall faces (881): its surfaces in the material
+## ArtKit.WALL_SET_NAME, their UVs in metres (u along the edge from its
+## middle, v up from its foot, over WALL_TILE as _wall_quad lays a run's),
+## drawn in [param set_name]'s wall material moved to the run's own place:
+## [param along] the piece's middle along its run (k + 0.5), [param flipped]
+## turned half round (its u runs back), its height stretch (made.scale.y)
+## kept in v. So the window's planks go on from the wall beside it, the
+## same texture, never a band of the piece's own flat colour.
+func _wall_faces(made: Node3D, set_name: String, along: float, flipped: bool) -> void:
+	var stretch := made.scale.y
+	var key := "%s|%.3f|%d|%.3f" % [set_name, fposmod(along / WALL_TILE, 1.0), int(flipped), stretch]
+	for node in made.find_children("*", "MeshInstance3D", true, false):
+		var part := node as MeshInstance3D
+		if part.mesh == null:
+			continue
+		for surface in part.mesh.get_surface_count():
+			var own := part.mesh.surface_get_material(surface)
+			if own == null or own.resource_name != ArtKit.WALL_SET_NAME:
+				continue
+			if not _wall_face_materials.has(key):
+				var material := _wall_material(set_name).duplicate() as StandardMaterial3D
+				material.uv1_offset = Vector3(fposmod(along / WALL_TILE, 1.0), 0.0, 0.0)
+				material.uv1_scale = Vector3(-1.0 if flipped else 1.0, stretch, 1.0)
+				_wall_face_materials[key] = material
+			part.set_surface_override_material(surface, _wall_face_materials[key])
 
 
 ## Sets wall edge [param key]'s state in _wall_states ("" takes it out),
@@ -18360,6 +18388,8 @@ static func _wall_set(set_name: String) -> Dictionary:
 ## plain StandardMaterial3D, so a near run's see-through copy is made as
 ## any other's (_see_through_of). One a set.
 static var _wall_stones: Dictionary[String, StandardMaterial3D] = {}
+## _wall_faces' materials by set, place along the tile, flip and stretch.
+static var _wall_face_materials: Dictionary[String, StandardMaterial3D] = {}
 
 
 static func _wall_material(set_name: String) -> StandardMaterial3D:
