@@ -46,14 +46,16 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# here. A take this tree already holds decides it (a landing takes the
 	# kind `tools/remote_tests.sh kind` prints, before the land lock);
 	# LAND_LOCAL=1 keeps everything here (the cut's suite on main does).
-	# A held suite first: it has this PC's room and runs here as before.
+	# A held suite_remote first: a take of suite the gate swapped when saturn
+	# answered (394 amended (33)) holds both, and runs on saturn. A held
+	# suite has this PC's room and runs here as before.
 	kind=suite
-	if python tools/heavy_job.py holds "$tree" suite >/dev/null 2>&1; then
-		kind=suite
-		echo "landing tests: this landing holds a suite take: every part here"
-	elif python tools/heavy_job.py holds "$tree" suite_remote >/dev/null 2>&1; then
+	if [ -z "${LAND_LOCAL:-}" ] && python tools/heavy_job.py holds "$tree" suite_remote >/dev/null 2>&1; then
 		kind=suite_remote
 		echo "landing tests: this landing holds a suite_remote take: the Godot parts on saturn"
+	elif python tools/heavy_job.py holds "$tree" suite >/dev/null 2>&1; then
+		kind=suite
+		echo "landing tests: this landing holds a suite take: every part here"
 	else
 		kind="$(bash tools/remote_tests.sh kind)"
 		echo "landing tests: no take held; tools/remote_tests.sh kind says $kind"

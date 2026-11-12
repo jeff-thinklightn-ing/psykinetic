@@ -1421,6 +1421,75 @@ check(len(lean_lines) == 1 and "at its turn, full 14.6 + 8 GB" in lean_lines[0],
 turn2.join(5)
 gate.release("turn2", "suite")
 clear_gate()
+print("== a take of suite swapped for saturn at its grant (394 amended (33)) ==")
+saved_swap = (gate._memory, gate.total_ram_gb, gate.MARGIN_GB, gate.COMMIT_MARGIN_GB, gate.PROBE_COMMAND, gate.PROBE_SECONDS)
+gate.total_ram_gb = lambda: None
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 8.0
+asked = os.path.join(STATE, "asked.txt")
+
+
+def probe(body):
+    """A stand-in for tools/remote_tests.sh kind: notes that it was asked, then [body]."""
+    return [sys.executable, "-c", "open(%r, 'a').write('x')\n" % asked + body]
+
+
+def swap_log():
+    with open(gate._path("heavy_jobs.log")) as handle:
+        return handle.read()
+
+
+# Saturn answers; 12.5 GB free: a suite, lean too, is out of reach; saturn's local parts are not.
+gate._memory = lambda: (12.5, 40.0)
+gate.PROBE_COMMAND = probe("print('suite_remote')")
+check(gate.take("swapper", "suite", os.getpid()) == 0, "a take of suite with 12.5 GB free and saturn answering")
+held = gate._entries("running")
+check(len(held) == 1 and held[0]["kind"] == "suite_remote" and held[0]["asked"] == "suite"
+    and held[0]["ram_gb"] == gate.kinds()["suite_remote"]["ram_gb"], "granted as suite_remote, asked suite: %s" % held)
+check(gate.holds("swapper", "suite") and gate.holds("swapper", "suite_remote"),
+    "it holds suite (a script's holds line unchanged) and suite_remote (land.sh's first check)")
+check("\tstart\tswapper\tsuite_remote\tasked suite, saturn answers" in swap_log(), "the start line says it was swapped")
+# tests/land.ps1 runs a suite here inside it: the take is taken back as a suite.
+name, estimate = gate._adopt_take("swapper", "suite")
+held = gate._entries("running")
+check(name is not None and len(held) == 1 and held[0]["kind"] == "suite" and "asked" not in held[0]
+    and "\tunswapped\tswapper\tsuite\t" in swap_log(), "a local suite run inside it takes it back as a suite: %s" % held)
+check(gate.release("swapper", "suite") == 0 and not gate._entries("running"), "released as a suite")
+gate.take("swapper", "suite", os.getpid())
+check(gate.release("swapper", "suite") == 0 and not gate._entries("running")
+    and "\tdone\tswapper\tsuite_remote\treleased" in swap_log(), "a swapped take released by `release <tree> suite`")
+# Fail safe: a probe that hangs past PROBE_SECONDS, or errs, leaves a suite.
+gate._memory = lambda: (60.0, 60.0)
+gate.PROBE_SECONDS = 1.0
+gate.PROBE_COMMAND = probe("import time; time.sleep(30); print('suite_remote')")
+began = time.time()
+gate.take("hang", "suite", os.getpid())
+held = gate._entries("running")
+check(len(held) == 1 and held[0]["kind"] == "suite" and "asked" not in held[0] and time.time() - began < 15,
+    "a probe that hangs: a suite here after the probe's limit (%.1f s): %s" % (time.time() - began, held))
+gate.release("hang", "suite")
+gate.PROBE_COMMAND = probe("import sys; print('suite_remote'); sys.exit(1)")
+gate.take("err", "suite", os.getpid())
+held = gate._entries("running")
+check(len(held) == 1 and held[0]["kind"] == "suite", "a probe that errs, whatever it printed: a suite here: %s" % held)
+gate.release("err", "suite")
+gate.PROBE_COMMAND = [sys.executable + "-missing"]
+check(gate.saturn_answers() is False, "a probe that cannot start is no")
+# LAND_LOCAL=1 (the cut) never asks; a scene is never swapped.
+if os.path.exists(asked):
+    os.remove(asked)
+gate.PROBE_COMMAND = probe("print('suite_remote')")
+os.environ["LAND_LOCAL"] = "1"
+gate.take("cut", "suite", os.getpid())
+del os.environ["LAND_LOCAL"]
+held = gate._entries("running")
+check(len(held) == 1 and held[0]["kind"] == "suite" and not os.path.exists(asked), "LAND_LOCAL=1: a suite, saturn never asked: %s" % held)
+gate.release("cut", "suite")
+gate.take("scener", "scene", os.getpid())
+held = gate._entries("running")
+check(len(held) == 1 and held[0]["kind"] == "scene" and not os.path.exists(asked), "a scene is never swapped nor asked about")
+gate.release("scener", "scene")
+(gate._memory, gate.total_ram_gb, gate.MARGIN_GB, gate.COMMIT_MARGIN_GB, gate.PROBE_COMMAND, gate.PROBE_SECONDS) = saved_swap
+clear_gate()
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:

@@ -1346,6 +1346,32 @@ def log(event, tree, kind, detail=""):
 
 # --- Commands -----------------------------------------------------------------
 
+## The swap (394 amended (33)): a take of "suite" whose landing saturn would
+## run is granted as suite_remote, asked "suite". The probe is the landing's own
+## `tools/remote_tests.sh kind`, run in the taker's checkout, at most once a
+## minute and only when the row could start as either; PROBE_SECONDS caps it,
+## and anything but a prompt "suite_remote" (a hang, an error, no script,
+## LAND_LOCAL=1) leaves the row a suite, waiting as before.
+PROBE_COMMAND = ["bash", "tools/remote_tests.sh", "kind"]
+PROBE_SECONDS = 8.0
+PROBE_EVERY_SECONDS = 60.0
+
+
+def saturn_answers():
+    """Whether the landing in this checkout would run on saturn now: True
+    only on a prompt "suite_remote" from PROBE_COMMAND."""
+    if os.environ.get("LAND_LOCAL"):
+        return False
+    if PROBE_COMMAND[:2] == ["bash", "tools/remote_tests.sh"] and not os.path.isfile(PROBE_COMMAND[1]):
+        return False
+    try:
+        done = subprocess.run(PROBE_COMMAND, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+            timeout=PROBE_SECONDS)
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+    return done.returncode == 0 and done.stdout.strip().splitlines()[-1:] == ["suite_remote"]
+
+
 def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     """Queues, waits to be at the head with room, then moves to running.
     Returns the running entry's file name and the kind whose estimate it
@@ -1381,6 +1407,10 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     # Since when it has been first in the queue: a long wait is mostly the
     # queue ahead of it, its time at the head what held it alone.
     head_since = None
+    # The swap (394 amended (33)): a take of suite only, never under LAND_LOCAL.
+    may_swap = kind == "suite" and not watched and not os.environ.get("LAND_LOCAL")
+    probed_at, answered = None, False
+    swapped = None
     while True:
         with StateLock():
             queue = _entries("queue")
@@ -1427,7 +1457,23 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
             head, past, past_why, holder = passes_held(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
-            if ok and row is not full:
+            swapped = None
+            probe_now = False
+            if may_swap and "suite_remote" in table:
+                # Judged as suite_remote too; saturn asked only when that
+                # row could start, outside the state lock (below).
+                remote_row = dict(table["suite_remote"], kind="suite_remote")
+                r_head, r_past, _, _ = passes_held(remote_row, ahead, running, free_ram, free_commit, table, now,
+                    backfill_length(remote_row, expect_minutes))
+                r_ok, _ = decide(remote_row, running, r_head, free_ram, None, free_commit)
+                fresh = probed_at is not None and now - probed_at < PROBE_EVERY_SECONDS
+                if r_ok and fresh and answered:
+                    swapped = remote_row
+                    ok, head, past, why = True, r_head, r_past, ""
+                elif r_ok and not fresh:
+                    probe_now = True
+                    ok, why = False, "asking saturn (tools/remote_tests.sh kind)"
+            if ok and swapped is None and row is not full:
                 estimate = row["estimate"]
                 entry = _read(_path("queue", ticket))
                 if entry is not None:
@@ -1461,6 +1507,22 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 why = "%s, waits on: %s" % (holder_name(queue, holder), other_why or "its next look")
                 if past_why:
                     why += "; %s" % past_why
+            if ok and swapped is not None:
+                _retried(os.remove, _path("queue", ticket))
+                name = "%s-%s-%s.json" % (tree, "suite_remote", pid or os.getpid())
+                entry = {"tree": tree, "kind": "suite_remote", "asked": kind, "pid": pid, "pid_since": started_at(pid),
+                    "queued": queued, "started": time.time(), "ram_gb": swapped["ram_gb"], "commit_gb": commit_of(swapped),
+                    "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": watched, "estimate": "suite_remote"}
+                if past:
+                    entry["backfill"] = {"past": ", ".join("%s %s" % (each["tree"], each["kind"]) for each in past),
+                        "due": min(each["due"] for each in past)}
+                _write(_path("running", name), entry)
+                waited = time.time() - queued
+                log("start", tree, "suite_remote", "asked suite, saturn answers (394 amended (33))" + (
+                    "; waited %.0f s" % waited if waited >= POLL_SECONDS else ""))
+                print("heavy_job: %s suite: saturn answers, taken as suite_remote (the Godot parts on saturn)" % tree,
+                    file=sys.stderr)
+                return name, "suite_remote"
             if ok:
                 _retried(os.remove, _path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
@@ -1489,6 +1551,10 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 if waited >= POLL_SECONDS:
                     print("heavy_job: %s %s starts after waiting %.0f s%s" % (tree, kind, waited, lean), file=sys.stderr)
                 return name, estimate
+        if probe_now:
+            answered = saturn_answers()
+            probed_at = time.time()
+            continue
         waited = time.time() - queued
         if time.time() - said >= 60.0:
             said = time.time()
@@ -1521,7 +1587,7 @@ def _adopt_take(tree, kind):
     mine = None
     with StateLock():
         for entry in _entries("running"):
-            if entry["kind"] != kind or entry.get("watched"):
+            if kind not in (entry["kind"], entry.get("asked")) or entry.get("watched"):
                 continue
             if entry["tree"] != tree:
                 if mine is None:
@@ -1529,6 +1595,15 @@ def _adopt_take(tree, kind):
                 if not entry.get("pid") or int(entry["pid"]) not in mine:
                     continue
             name = entry.pop("file")
+            if entry["kind"] != kind:
+                # A local suite run inside a take swapped for saturn (394
+                # amended (33)): tests/land.ps1, which has no saturn path. It
+                # runs here as the suite it asked for, held as a lean suite;
+                # the memory watch stops it if that is short.
+                lean = lean_row(kinds(), kind) or dict(kinds()[kind], kind=kind)
+                entry.update(kind=kind, estimate=lean.get("estimate", kind), ram_gb=lean["ram_gb"], commit_gb=commit_of(lean))
+                entry.pop("asked", None)
+                log("unswapped", entry["tree"], kind, "a local %s run inside a take saturn was to run" % kind)
             entry["adopted_by"] = os.getpid()
             entry["adopted_since"] = started_at(os.getpid())
             entry.pop("guard", None)
@@ -1790,7 +1865,8 @@ def take(tree, kind, pid, caller=None):
             tree, kind, outer["tree"], outer["kind"]))
         return 0
     _, estimate = wait_turn(tree, kind, pid, False, caller=caller)
-    print("heavy_job: %s %s taken%s" % (tree, kind, " (lean, as %s)" % estimate if estimate != kind else ""))
+    print("heavy_job: %s %s taken%s" % (tree, kind, " (on saturn, as suite_remote)" if estimate == "suite_remote" and kind != estimate
+        else " (lean, as %s)" % estimate if estimate != kind else ""))
     return 0
 
 
@@ -1805,7 +1881,7 @@ def attach(tree, kind, pid):
         return 1
     with StateLock():
         for entry in _entries("running"):
-            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
+            if entry["tree"] == tree and kind in (entry["kind"], entry.get("asked")) and not entry.get("watched"):
                 name = entry.pop("file")
                 attached = [each for each in entry.get("attached", []) if each.get("pid") != int(pid)]
                 entry["attached"] = attached + [{"pid": int(pid), "since": started_at(pid)}]
@@ -1844,13 +1920,14 @@ def release(tree, kind):
         return 0
     with StateLock():
         for entry in _entries("running"):
-            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
+            if entry["tree"] == tree and kind in (entry["kind"], entry.get("asked")) and not entry.get("watched"):
+                # A swapped take (394 amended (33)) released by the kind it asked for.
                 os.remove(_path("running", entry["file"]))
-                record_attached(kind, entry)
+                record_attached(entry["kind"], entry)
                 attached = (", attached peak %.1f GB, commit %.1f GB" % (entry.get("attached_peak_gb", 0.0),
                     entry.get("attached_peak_commit_gb", 0.0))) if entry.get("attached") else ""
-                log("done", tree, kind, "released after %.0f s%s" % (time.time() - entry["started"], attached))
-                print("heavy_job: %s %s released" % (tree, kind))
+                log("done", tree, entry["kind"], "released after %.0f s%s" % (time.time() - entry["started"], attached))
+                print("heavy_job: %s %s released" % (tree, entry["kind"]))
                 return 0
     print("heavy_job: %s holds no %s" % (tree, kind), file=sys.stderr)
     return 1
@@ -1922,7 +1999,8 @@ def holds(tree, kind):
     that took suite under another name must not be sent to queue again for
     suite_remote while it holds the land lock."""
     with StateLock():
-        entries = [entry for entry in _entries("running") if entry["kind"] == kind]
+        # A swapped take (394 amended (33)) holds the kind it asked for too.
+        entries = [entry for entry in _entries("running") if kind in (entry["kind"], entry.get("asked"))]
     if any(entry["tree"] == tree for entry in entries):
         return True
     if not entries:

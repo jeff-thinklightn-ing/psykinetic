@@ -10345,6 +10345,29 @@ would not have started it; memory held outside the gate did.
 tests/heavy_job_test: --expect 300 for a scene is refused unqueued; 20 runs. Tools and tests only;
 protocol unchanged; no class_name; no bullet.
 
+394 amended (33) (perf, 2026-11-11; the coordinator's design, approved, after 878; label from
+tools/decision_number.sh): the swap. A take of `suite`, as CLAUDE.md's landing flow and every tree's
+landing script make it, is granted as suite_remote when saturn would run the landing, so no script
+changes a line.
+- While it waits, the row is judged as a suite and as suite_remote too. When the suite_remote row
+  could start, the gate asks the landing's own `tools/remote_tests.sh kind`, run in the taker's
+  checkout, outside the gate's state lock, at most once a minute. On a prompt "suite_remote" the take
+  is granted as kind suite_remote, "asked": "suite". It is then judged, measured and logged as
+  suite_remote ("start ... asked suite, saturn answers").
+- Fail safe (the coordinator's condition): the probe has PROBE_SECONDS (8: ssh's own ConnectTimeout is
+  5). A hang, an error, no script, or anything but "suite_remote" leaves the row a suite, waiting and
+  starting here as before. A take under LAND_LOCAL=1 (the cut) is never swapped, nor saturn asked; nor
+  is a `run`, or any kind but suite.
+- `holds <tree> suite`, `release <tree> suite` and `attach` match a take by the kind it asked for too,
+  so a script's lines work unchanged. tests/land.sh asks `holds suite_remote` first (not under
+  LAND_LOCAL), so a swapped take runs its Godot parts on saturn.
+- tests/land.ps1 has no saturn path: a local suite run inside a swapped take takes it back as a lean
+  suite (logged "unswapped"), and the memory watch stops it if memory is short.
+tests/heavy_job_test, the probe stubbed: with 12.5 GB free and saturn answering, a take of suite is
+granted as suite_remote, holds both kinds, is released by `release <tree> suite`, and a local run inside
+takes it back. A probe that hangs (1 s limit) or errs leaves a suite. LAND_LOCAL=1 never asks, and a
+scene is never swapped. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
