@@ -459,6 +459,14 @@ func _test_answer() -> void:
 			off += 1
 	_check(off == 0, "a square in a grid in a scroll has its price chip bottom right once laid out (%d off)" % off)
 	quiet.queue_free()
+	# The talk box's marks (427 amended (1), the coordinator's ruling 11-12): a notice's mark
+	# rust in the bold sans, its words bone at full strength; a speaker's name brass in the
+	# bold sans (the serif's hairlines go soft at the talk box's size).
+	var theme := UiTheme.theme()
+	_check(theme.get_color(&"mark", &"TalkNotice") == UiTheme.color("rust") and theme.get_color(&"words", &"TalkNotice").a == 1.0
+		and theme.get_font(&"mark_font", &"TalkNotice") == UiTheme.font("sans_bold"), "a notice's mark rust bold sans, its words full bone")
+	_check(theme.get_color(&"name", &"TalkName") == UiTheme.color("brass_bright") and theme.get_font(&"name_font", &"TalkName") == UiTheme.font("sans_bold"),
+		"a speaker's name brass bold sans")
 	var block := PanelContainer.new()
 	block.theme_type_variation = &"FaultBlock"
 	add_child(block)
