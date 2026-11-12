@@ -268,6 +268,13 @@ var _beside_at := Vector2i(-1, -1)
 var _drawbacks_room := ""
 ## drawbacks --lunge-windup=<ticks>: the foe's told lunge that long (a tell ruled but not yet on the branch).
 var _lunge_windup := 0
+## --target=none: no body outlined as the target. Otherwise the film marks its own target every
+## frame, never the cursor's (the coordinator, 11-12: Main takes the target from whatever the
+## laptop's resting cursor is over, so one laptop's film had the foe's red rim and the other's not):
+## the foe fought (_monster, what a fighting player has under the cursor) while it stands, else
+## none; the target scenario's after its first half second. Logged as "CLIP target: <name|none>".
+var _target_mode := ""
+var _target_said := "-"
 ## draugr's part of the fight (_draugr_step), and the telegraphs seen
 ## ([id, kind]) and landed (ids).
 var _part := 0
@@ -317,6 +324,9 @@ func _ready() -> void:
 			_lunge_windup = int(pair[1])
 		elif pair.size() == 2 and pair[0] == "room":
 			_drawbacks_room = pair[1]
+		elif pair.size() == 2 and pair[0] == "target":
+			_target_mode = pair[1]
+	process_priority = 100  # After Main, whose cursor would set the target (_mark_target).
 	match scenario:
 		"sneak":
 			_sneak()
@@ -506,7 +516,6 @@ func _ready() -> void:
 		Net.camera_low = true  # Jeff's view in the wilds (623): the low camera.
 		if _main._client3d != null:
 			_main._client3d._apply_camera_mode()
-		process_priority = 100  # After Main, whose cursor would take the outline off.
 	if scenario == "items_use":
 		World.get_doors()[0].lock = "cellar"
 	_caption = Label.new()
@@ -541,10 +550,24 @@ func _ready() -> void:
 	World.ticked.connect(_on_tick)
 
 
+## The film's own target, each frame after Main's (see _target_mode): the foe fought while it
+## stands, or none; said in the log when it changes.
+func _mark_target() -> void:
+	if _main == null or _main._client3d == null:
+		return
+	var foe: GridEntity = null
+	if _target_mode != "none" and is_instance_valid(_monster) and _monster.hp > 0 and (scenario != "target" or _elapsed > 0.5):
+		foe = _monster
+	_main._client3d.target(foe)
+	var said := "none" if foe == null else str(foe.name)
+	if said != _target_said:
+		_target_said = said
+		print("CLIP target: %s (at %.2f s)" % [said, _elapsed])
+
+
 ## The camera on the middle of the player and the monster, so both are seen.
 func _process(delta: float) -> void:
-	if scenario == "target" and _main != null and _main._client3d != null and is_instance_valid(_monster) and _elapsed > 0.5:
-		_main._client3d.target(_monster)
+	_mark_target()
 	_elapsed += delta
 	if _elapsed > max_seconds:
 		push_warning("clip: %s ran past %d s; stopped" % [scenario, max_seconds])
