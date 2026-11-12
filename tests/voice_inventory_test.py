@@ -11,6 +11,7 @@ nothing committed); a page up to date is exit 0 with nothing committed; a
 generator that fails is exit 2, nothing committed, the page untouched.
   python tests/voice_inventory_test.py      exit 0 = pass
 """
+import json
 import os
 import shutil
 import subprocess
@@ -166,6 +167,41 @@ def broken():
     shutil.rmtree(root, ignore_errors=True)
 
 
+def chests():
+    """748 amended (10): chest titles listed by PackPanel.title_name's rule (chest_test's cases), read
+    ones marked R, an unread one a warning in --check and --land that never fails either."""
+    root, repo, lock = scratch(stale=False)
+    level = {"entities": [
+        {"at": [1, 1], "name": "Offering stone", "props": {"role": "offering", "slots": ["", "", "", ""]}},
+        {"at": [2, 1], "name": "Runner’s pack", "props": {"role": "commission"}},
+        {"at": [3, 1], "name": "Miser's hoard", "props": {"cache": "gold"}},
+        {"at": [4, 1], "name": "KitChest1", "props": {"slots": ["", ""]}},
+        {"at": [5, 1], "name": "Chest1", "props": {"slots": ["", ""]}},
+        {"at": [6, 1], "name": " altar", "props": {"temple": True}},
+        {"at": [7, 1], "name": "Robbers_chest", "props": {"cache": "loot"}},
+        {"at": [8, 1], "name": "Old Tam", "props": {"trade": "smith"}},
+    ]}
+    write(repo, "levels/crypt/level.json", json.dumps(level, ensure_ascii=False))
+    git(repo, "add", "-A")
+    check(run(repo).returncode == 0, "the generator runs over a level with chests")
+    page = read(repo)
+    rows = [line for line in page.splitlines() if line.endswith("| `levels/crypt/level.json` |")]
+    titles = [line.split(" | ")[1] for line in rows]
+    check(titles == ["Offering stone", "Runner’s pack", "Miser's hoard"],
+          "names that read as names are titles; working names, ids, a lowercase tag and a non-chest are not (%s)" % titles)
+    check("## Chest titles (3)" in page, "the section counts them")
+    check(rows[0].startswith("| R |") and rows[2].startswith("|  |"), "a read title is marked R, an unread one not")
+    git(repo, "commit", "-q", "-am", "chests")
+    done = run(repo, "--check")
+    check(done.returncode == 0, "an unread title never fails --check (%d)" % done.returncode)
+    # A curly apostrophe passes the rule but is not the read straight one: its own title, unread.
+    check("2 chest title(s) voice hasn't read: Runner’s pack (crypt), Miser's hoard (crypt)" in done.stdout,
+          "--check names the unread ones (%s)" % done.stdout.strip())
+    landed = run(repo, "--land", "voice", "--lock", lock)
+    check(landed.returncode == 0 and "Miser's hoard (crypt)" in landed.stdout, "--land warns of it too, exit 0 (%d)" % landed.returncode)
+    shutil.rmtree(root, ignore_errors=True)
+
+
 folds()
 folds("items-cast", "items")
 folds("psykinetic-release", "release")
@@ -178,5 +214,6 @@ warns("a dirty tree", dirty)
 warns("nothing ahead of origin/main", behind)
 fresh()
 broken()
+chests()
 print("voice_inventory_test: %s" % ("PASS" if failed == 0 else "FAIL (%d)" % failed))
 sys.exit(0 if failed == 0 else 1)

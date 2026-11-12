@@ -42,6 +42,18 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
+## Chest titles (3)
+
+A chest's own name is its window's title when `PackPanel.title_name` passes it (a capital, then
+only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads "Chest".
+**R** marks a title voice has read (the tool's CHEST_TITLES_WORDED); one without is a warning.
+
+| | Title | Level |
+|---|---|---|
+| R | Offering stone | `levels/barrow/level.json` |
+| R | Runner's pack | `levels/barrow/level.json` |
+| R | Robbers' chest | `levels/barrow/level.json` |
+
 ## Lines in the code (2845)
 
 ### companions (Pip, Wren, Nix) (658)

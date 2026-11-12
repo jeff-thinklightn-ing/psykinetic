@@ -310,6 +310,65 @@ def md_cell(s):
     return s.replace("|", "\\|")
 
 
+# Chest titles (748 amended (10)): a chest's own name is its window's title when
+# PackPanel.title_name passes it (787 amended (5)); this mirrors that rule. A chest in
+# a level file carries no script key (Level fills it from the layout's colour), so a chest
+# here is an entity holding one of the props tests/chest_test.gd's _test_chest_titles
+# requires of every named chest. A title voice hasn't read is a warning, never a failure.
+CHEST_PROPS = ("slots", "cache", "role", "temple", "shop", "depot", "locker")
+CHEST_TITLES_WORDED = {"Runner's pack", "Robbers' chest", "Offering stone", "Robbers' bundle"}
+CHEST_TITLES_UNREAD = []  # (title, level), filled by chest_titles
+
+
+def title_name(name):
+    """PackPanel.title_name: the name stripped when it starts with a capital and holds only
+    letters, spaces, apostrophes and hyphens; "" for anything else (a working name, an id)."""
+    trimmed = name.strip()
+    if not trimmed:
+        return ""
+    first = trimmed[0]
+    if first.upper() != first or first.lower() == first:
+        return ""
+    for letter in trimmed[1:]:
+        if letter.upper() == letter.lower() and letter not in (" ", "'", "’", "-"):
+            return ""
+    return trimmed
+
+
+def chest_titles():
+    """[(title, level)] for every chest in a tracked levels/<level>/level.json whose name passes title_name."""
+    out = []
+    del CHEST_TITLES_UNREAD[:]
+    for rel in sorted(TRACKED):
+        parts = rel.split("/")
+        if len(parts) != 3 or parts[0] != "levels" or parts[2] != "level.json":
+            continue
+        with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except ValueError:
+                continue
+        entities = data.get("entities", []) if isinstance(data, dict) else []
+        for spec in entities if isinstance(entities, list) else []:
+            if not isinstance(spec, dict) or not isinstance(spec.get("props"), dict):
+                continue
+            if not any(key in spec["props"] for key in CHEST_PROPS):
+                continue
+            title = title_name(str(spec.get("name", "")))
+            if title:
+                out.append((title, parts[1]))
+                if title not in CHEST_TITLES_WORDED:
+                    CHEST_TITLES_UNREAD.append((title, parts[1]))
+    return out
+
+
+def warn_chest_titles():
+    if CHEST_TITLES_UNREAD:
+        print("voice_inventory: %d chest title(s) voice hasn't read: %s; send them to voice, which adds each to"
+              " CHEST_TITLES_WORDED (a warning, 748 amended (10))"
+              % (len(CHEST_TITLES_UNREAD), ", ".join("%s (%s)" % pair for pair in CHEST_TITLES_UNREAD)))
+
+
 def build():
     lore = lore_text()
     out = [
@@ -344,6 +403,19 @@ def build():
         out.append("|---|---|")
         for rel, i, where, text in UNHEARD:
             out.append("| %s | `%s` %s |" % (md_cell(text), rel, where))
+        out.append("")
+    chests = chest_titles()
+    out.append("## Chest titles (%d)" % len(chests))
+    out.append("")
+    out.append("A chest's own name is its window's title when `PackPanel.title_name` passes it (a capital, then")
+    out.append("only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads \"Chest\".")
+    out.append("**R** marks a title voice has read (the tool's CHEST_TITLES_WORDED); one without is a warning.")
+    out.append("")
+    if chests:
+        out.append("| | Title | Level |")
+        out.append("|---|---|---|")
+        for title, level in chests:
+            out.append("| %s | %s | `levels/%s/level.json` |" % ("R" if title in CHEST_TITLES_WORDED else "", md_cell(title), level))
         out.append("")
     gd_total = sum(len(v) for v in by_speaker.values())
     out.append("## Lines in the code (%d)" % gd_total)
@@ -459,6 +531,7 @@ def land():
     if UNHEARD:
         print("voice_inventory: %d line(s) only in the party log, never shown to a player: see \"Only in the party log\""
               " in docs/voice_inventory.md (a warning, 748 amended (7))" % len(UNHEARD))
+    warn_chest_titles()
     try:
         with open(OUT, encoding="utf-8") as f:
             if f.read() == text:
@@ -513,6 +586,7 @@ def main():
             # A warning, never a failure (748 amended (7)): the count falls as trees give their lines a delivery.
             print("voice_inventory: %d line(s) only in the party log, never shown to a player: see \"Only in the party log\""
                   " in docs/voice_inventory.md (a warning, 748 amended (7))" % len(UNHEARD))
+        warn_chest_titles()
         if ok:
             print("voice_inventory: up to date")
         else:

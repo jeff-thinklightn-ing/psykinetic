@@ -41301,6 +41301,24 @@ land.sh's fold (a page-only fix by hand): `python -B tools/voice_inventory.py &&
 docs/voice_inventory.md && git commit -m "voice_inventory regenerated"`. Tools and tests only, no
 CHANGELOG bullet, protocol unchanged, no new class_name.
 
+748 amended (10), voice's side (2026-11-12, the script's label; release's ruling on the clash): the
+voice inventory lists chest titles. (9) was never issued: 787 amended (5) named it ahead of the script,
+corrected here. Since 787 amended (5) a chest's own
+name is its window's title when PackPanel.title_name passes it (a capital, then only letters, spaces,
+apostrophes and hyphens; anything else reads "Chest"), so a level's chest name is player-facing text the
+scan of strings never saw. tools/voice_inventory.py mirrors title_name in Python and adds "Chest titles
+(n)" to docs/voice_inventory.md: every chest in a tracked levels/<level>/level.json whose name passes,
+with its level. A level file's chest carries no script key (Level fills it from the layout's colour),
+so a chest here is an entity holding one of the props chest_test's _test_chest_titles requires of every
+named chest (slots, cache, role, temple, shop, depot, locker). A title in the tool's CHEST_TITLES_WORDED
+("Runner's pack", "Robbers' chest", "Offering stone", "Robbers' bundle", the last for dungeon's B) is
+marked R; any other is a warning in --check and --land ("N chest title(s) voice hasn't read: ...; send
+them to voice"), never a failure, and voice adds a title once worded. On main today: three, all read.
+tests/voice_inventory_test.py adds chests(): chest_test's cases both ways (KitChest1, Chest1, " altar",
+Robbers_chest are no titles; a capitalised non-chest is none), the R mark, a curly apostrophe its own
+unread title, and the warning in --check and --land with exit 0. Tools and tests only, no CHANGELOG
+bullet, protocol unchanged, no new class_name.
+
 ## 757. The Dwarven Halls' chests: dwarven_hoard
 
 castle_halls' three chests (its template's "chests": 3, decision 649's note: "the chests' loot the
@@ -44576,7 +44594,7 @@ entry's "name"; unnamed ones are "Chest1", "Chest2" by count). PackPanel.title_n
 begins with a capital and holds only letters, spaces, apostrophes and hyphens; anything else ("KitChest1", "Chest1",
 "altar", "Robbers_chest") reads "Chest", so a working name or an id never reaches a title unworded. The Locker ("Your
 chest") and Cargo ("Cart", "Crate") stay as they were. Voice's inventory mirrors the rule and warns on a passing name it
-has not read (748 amended (9)); the coordinator ruled that no level may call the barrow's chest an "Altar" (its own
+has not read (748 amended (10)); the coordinator ruled that no level may call the barrow's chest an "Altar" (its own
 ruling, not Jeff's: his page knight-and-altar.md is unanswered), and maps' 832 renamed it before this landed.
 tests/chest_test.gd _test_chest_titles: the agreed examples both ways, a named chest and a default one, and every
 level chest whose name passes holds one of slots, cache, role, temple, shop, depot or locker. Client only; protocol
