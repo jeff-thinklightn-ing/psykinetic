@@ -25058,6 +25058,7 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 			mesh.visible = name in look.parts and not hooded and not hats
 		elif name == "Cape":
 			mesh.visible = name in look.parts and not cloaked and not armoured
+	PersonLook.dye_hood(model)
 
 
 ## The satchel's strap for what [param model] shows under it (STRAP_OVER: its

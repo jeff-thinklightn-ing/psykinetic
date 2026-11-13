@@ -12818,6 +12818,29 @@ and picks, 2026-11-12/13): people are smooth-shaded, and the head is drawn a ten
   Its origin, the neck's top, doesn't move, so these stay where they were: the look-at's aim
   (_eyes_of) and the hand reach's pole, which read the origin, and the name plate, bubble, bar
   and pick capsule, which stand by the model's "height".
+- The modifier guards a pose nobody wrote since its last frame (a held pose): it takes its own scale
+  back off before scaling again, so the size can't compound. The skeleton already puts poses back
+  (a stopped animation read 1.0 under it in game), so this is a guard, not a fix. Proven by
+  build/head/probe.gd: x1.100 at four moments each of idle, walk, Sword_Slash_F, the kneel and a sit,
+  man and woman, and over 120 frames of a paused pose. The crown rises 1 to 2.3 cm.
+- The cape's fronts (art-kit, on the woad sheet): body_gen's cape rings had no bust. On a fuller
+  chest the tunic's front stood 1.7 to 3.4 cm past the cape's, and showed through mid-chest. Each
+  cape ring's front is now pushed out to clear the tunic's front at its height by CAPE_CLEAR (1.2 cm).
+  Measured on the glbs, base and each of the 12 keys alone, man and woman: 0.4 to 0.9 cm clear
+  (it was -1.2 to -3.4).
+- A hood worn with a cape is one garment, a hooded mantle (the coordinator's ruling, for Jeff on the
+  look sheet):
+  - human_body.gdshader gains an instance uniform `dye`, mixed over a part's colour by its alpha.
+    Alpha 0, the default, leaves the picture exactly as it was.
+  - PersonLook.dye_hood is the rule's one place. While a body shows both its look's Hood and its
+    Cape, the Hood takes the cape's colour, read from the palette at the Cape's own swatch (art-kit's
+    row 8 stays the one source). Otherwise alpha 0.
+  - It runs after anything that shows or hides either: PersonLook.apply (every person, the character
+    preview), PersonLook.wear (armour over the cape) and Client3D._sync_worn_gear (a cloak over the
+    cape, a worn hood over the look's).
+  - Not a second mesh, which would have added a part to every body. No new look word; the protocol
+    is unchanged.
+  - view_test _test_hood_dye reads the uniform on the Hood, not a pixel.
 - Lands after Jeff has seen both in game (C:/dev/review/decisions/people-look.md).
 
 ## 438. The counter's work: what can be done, ordered and collected; the reforge

@@ -52,7 +52,7 @@ SEX = "male"
 PEOPLE = "human"
 ## A person's surface smooth-shaded, an edge whose faces turn more than this (degrees) kept sharp
 ## (419 amended; --sharp-angle for a trial).
-SHARP_ANGLE = 55.0
+SHARP_ANGLE = 65.0
 
 
 def per(human, orc=None, kobold=None):
@@ -1386,10 +1386,27 @@ def cape(J: dict) -> list:
 	p = Part("Cape", "Cape")
 	p.bones = ["spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r"]
 	n, s3 = J["neck_01"], J["spine_03"]
+	# The tunic's front at a height (its rings' reach along FRONT, between rings by height): a
+	# fuller chest (the woman's bust, a heavy build) reached past the cape's front, and the
+	# tunic showed through mid-chest (art-kit, on the woad sheet; 419 amended (2)).
+	reach = sorted((r[0].z, max(q.dot(FRONT) for q in r)) for r in torso_rings(J))
+	def tunic_front(z: float) -> float:
+		for (z0, f0), (z1, f1) in zip(reach, reach[1:]):
+			if z0 <= z <= z1:
+				return f0 + (f1 - f0) * (z - z0) / max(z1 - z0, 1e-6)
+		return reach[0][1] if z < reach[0][0] else reach[-1][1]
 	for z, w, d, sq in [(s3.z - 0.10, 0.25, 0.16, 0.3), (s3.z - 0.02, 0.255, 0.15, 0.35), (s3.z + 0.07, 0.235, 0.13, 0.45),
 			(n.z - 0.01, 0.17, 0.105, 0.4), (n.z + 0.025, 0.085, 0.08, 0.2)]:
-		p.add(ring(Vector((0, 0.005, z)), X, FRONT, w * m("shoulders") * m("torso"), d * m("torso"), 12, sq))
+		centre = Vector((0, 0.005, z))
+		front = max(q.dot(FRONT) for q in ring(centre, X, FRONT, w * m("shoulders") * m("torso"), d * m("torso"), 12, sq))
+		# The cape's front a cloth's thickness (CAPE_CLEAR) clear of the tunic's, pushed out there only.
+		bulge = max(0.0, tunic_front(z) + CAPE_CLEAR - front)
+		p.add(ring(centre, X, FRONT, w * m("shoulders") * m("torso"), d * m("torso"), 12, sq, (bulge, 0.0)))
 	return [p]
+
+
+## How far the cape's front stands off the tunic's, at the least (metres).
+CAPE_CLEAR = 0.012
 
 
 def rolled_sleeves(J: dict) -> list:

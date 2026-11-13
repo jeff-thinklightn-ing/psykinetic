@@ -340,6 +340,56 @@ func apply(scene: Node3D, tunic := Color.WHITE) -> void:
 			mesh.set_instance_shader_parameter(part, colours[part])
 		if tunic != Color.WHITE:
 			mesh.set_instance_shader_parameter("tunic", tunic)
+	dye_hood(scene)
+
+
+## A hood worn with a cape is one garment, a hooded mantle (419 amended (2), the coordinator's
+## ruling): while [param scene] shows both its look's Hood and its Cape, the Hood takes the Cape's
+## colour, read from the palette at the Cape's own swatch (art-kit's row 8 the one source); a hood
+## worn alone keeps its own (the dye's alpha 0). Run after anything that shows or hides either (apply,
+## wear, Client3D._sync_worn_gear: a cloak or armour over the cape, a worn hood over the look's).
+## A body without both (an orc, a kobold, the goblin) is left alone.
+static func dye_hood(scene: Node3D) -> void:
+	var hood := scene.find_child("Hood", true, false) as MeshInstance3D
+	var cape := scene.find_child("Cape", true, false) as MeshInstance3D
+	if hood == null or cape == null:
+		return
+	var dyed := hood.visible and cape.visible
+	hood.set_instance_shader_parameter("dye", cape_colour(cape) if dyed else Color(0, 0, 0, 0))
+
+
+static var _cape_colours := {}
+
+
+## [param cape]'s colour as drawn: its material's palette at the mean of its UVs (each part is on one
+## swatch), alpha 1; the palette read once per mesh. Transparent where there is no palette to read.
+static func cape_colour(cape: MeshInstance3D) -> Color:
+	if cape.mesh == null:
+		return Color(0, 0, 0, 0)
+	var key := cape.mesh.get_rid()
+	if _cape_colours.has(key):
+		return _cape_colours[key]
+	var colour := Color(0, 0, 0, 0)
+	var material := cape.get_active_material(0) as ShaderMaterial
+	var palette := material.get_shader_parameter("palette") as Texture2D if material != null else null
+	if palette != null and cape.mesh.get_surface_count() > 0:
+		var image := palette.get_image()
+		if image == null or image.is_empty():
+			# No image back from a renderer that keeps none (headless): the palette's own file.
+			image = Image.load_from_file(palette.resource_path)
+		if image != null and not image.is_empty():
+			if image.is_compressed():
+				image.decompress()
+			var uvs: PackedVector2Array = cape.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+			var mean := Vector2.ZERO
+			for uv in uvs:
+				mean += uv
+			mean /= maxf(1.0, uvs.size())
+			var at := Vector2i((mean * Vector2(image.get_size())).floor()).clamp(Vector2i.ZERO, image.get_size() - Vector2i.ONE)
+			colour = image.get_pixelv(at)
+			colour.a = 1.0
+	_cape_colours[key] = colour
+	return colour
 
 
 ## [param scene] (as apply drew it) wearing armour (items' 622): the
@@ -363,6 +413,7 @@ func wear(scene: Node3D, id: String) -> void:
 				mesh.set_instance_shader_parameter("tunic", colour)
 		elif name in GARB_UNDER_ARMOUR:
 			mesh.visible = name in parts and part.is_empty()
+	dye_hood(scene)
 
 
 ## The first kind in the catalog whose armour looks [param look]; "" for none.

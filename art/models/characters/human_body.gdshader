@@ -11,11 +11,14 @@ instance uniform vec4 skin : source_color = vec4(0.77, 0.57, 0.46, 1.0);
 instance uniform vec4 hair : source_color = vec4(0.34, 0.25, 0.21, 1.0);
 instance uniform vec4 tunic : source_color = vec4(0.52, 0.50, 0.39, 1.0);
 instance uniform vec4 trousers : source_color = vec4(0.32, 0.24, 0.18, 1.0);
+// A dye over the part's own colour by its alpha (419 amended (2): a hood worn with a cape takes
+// the cape's, PersonLook.dye_hood); alpha 0, the default, leaves the picture as it was.
+instance uniform vec4 dye : source_color = vec4(0.0);
 
 void fragment() {
 	vec4 part = COLOR;
 	vec3 own = skin.rgb * part.r + hair.rgb * part.g + tunic.rgb * part.b + trousers.rgb * part.a;
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
-	ALBEDO = mix(texture(palette, UV).rgb, own, tinted);
+	ALBEDO = mix(mix(texture(palette, UV).rgb, own, tinted), dye.rgb, dye.a);
 	ROUGHNESS = 0.9;
 }

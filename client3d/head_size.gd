@@ -4,7 +4,7 @@ extends SkeletonModifier3D
 ## and hat). The Head bone's pose scaled after the animation, every frame: every clip keys every bone's
 ## scale, so a scale set once on the pose, or on the rest, is overwritten by the next frame's clip
 ## (the sheet's first render came out the same at all three sizes for that reason). The skeleton puts
-## its poses back after each frame's modifiers, so the scale is never compounded.
+## its poses back after each frame's modifiers, and _written guards a pose nobody wrote since.
 ##
 ## What rides the bone grows with it: the hair, beards, hood and brimmed hat (weighted to Head) and the
 ## "head" socket's pieces (the bard's hat). Its origin, the neck's top, does not move: the look-at's aim
@@ -15,6 +15,11 @@ extends SkeletonModifier3D
 const HEAD_SCALE := 1.10
 
 var _head := -1
+## The scale written last frame: a pose nobody wrote since (an animation player stopped or held, a
+## puppet not animated this frame) still holds it, and is taken back to its own before scaling, so the
+## size never compounds (a frame's 1.1 over a held pose would reach infinity, and a skeleton with a
+## bone not finite is culled whole, shadow and all).
+var _written := Vector3.ZERO
 
 
 func _process_modification() -> void:
@@ -25,4 +30,10 @@ func _process_modification() -> void:
 		_head = skeleton.find_bone("Head")
 		if _head < 0:
 			return
-	skeleton.set_bone_pose_scale(_head, skeleton.get_bone_pose_scale(_head) * HEAD_SCALE)
+	var scale := skeleton.get_bone_pose_scale(_head)
+	if scale.is_equal_approx(_written):
+		scale /= HEAD_SCALE
+	if not scale.is_finite() or scale.is_zero_approx():
+		scale = Vector3.ONE
+	_written = scale * HEAD_SCALE
+	skeleton.set_bone_pose_scale(_head, _written)

@@ -163,6 +163,7 @@ func _ready() -> void:
 		_test_asleep()
 		_test_person_looks()
 		_test_person_garb()
+		_test_hood_dye()
 		_test_attach_points()
 		_test_bow()
 		_test_standing_turn()
@@ -11692,6 +11693,46 @@ func _test_humans() -> void:
 		_check(pet.body == wanted and model != null
 				and model.scene_file_path == str((Client3D.HUMAN if wanted == &"male" else Client3D.HUMAN_F)["scene"]),
 				"%s wears her card's body, %s" % [pet.name, wanted])
+
+
+## A hood worn with a cape takes the cape's dye (419 amended (2), the coordinator's ruling): read on the
+## Hood's instance uniform, not a pixel (a headless run draws none), on both bodies; the cape's colour
+## the palette's at the Cape's own swatch; the hood alone, or with the cape covered, its own (alpha 0);
+## both ways at once as the look changes.
+func _test_hood_dye() -> void:
+	print("
+== a hood worn with a cape takes the cape's dye (419 amended (2)) ==")
+	for build: Array in [["res://art/models/characters/human_m.glb", "male"], ["res://art/models/characters/human_f.glb", "female"]]:
+		var model := (load(build[0]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var hood := model.find_child("Hood", true, false) as MeshInstance3D
+		var cape := model.find_child("Cape", true, false) as MeshInstance3D
+		var dye := func() -> Color: return hood.get_instance_shader_parameter("dye") if hood.get_instance_shader_parameter("dye") != null else Color(0, 0, 0, 0)
+		# The palette's pixel under the Cape's first vertex, read here on its own (the swatch is one cell).
+		var palette := (cape.get_active_material(0) as ShaderMaterial).get_shader_parameter("palette") as Texture2D
+		var image := palette.get_image()
+		if image == null or image.is_empty():
+			image = Image.load_from_file(palette.resource_path)
+		var uv: Vector2 = (cape.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV] as PackedVector2Array)[0]
+		var swatch := image.get_pixelv(Vector2i((uv * Vector2(image.get_size())).floor()))
+		var both := PersonLook.make("seed=7 body=%s headwear=hood garb=cape" % build[1])
+		both.apply(model)
+		var caped: Color = dye.call()
+		_check(caped.a == 1.0 and caped.is_equal_approx(Color(swatch, 1.0)),
+				"%s: hood and cape worn, the hood dyed the cape's palette swatch (%s, swatch %s)" % [build[1], caped, swatch])
+		var alone := PersonLook.make("seed=7 body=%s headwear=hood garb=none" % build[1])
+		alone.apply(model)
+		_check(hood.visible and not cape.visible and (dye.call() as Color).a == 0.0, "%s: a hood alone keeps its own (alpha 0)" % build[1])
+		both.apply(model)
+		_check((dye.call() as Color).a == 1.0, "%s: the cape put on again, the hood follows at once" % build[1])
+		both.wear(model, "leather_armour")
+		_check(not cape.visible and (dye.call() as Color).a == 0.0, "%s: armour over the cape, the hood its own again" % build[1])
+		both.wear(model, "")
+		_check(cape.visible and (dye.call() as Color).a == 1.0, "%s: the armour off, the hood dyed again" % build[1])
+		var hat := PersonLook.make("seed=7 body=%s headwear=hat garb=cape" % build[1])
+		hat.apply(model)
+		_check(not hood.visible and (dye.call() as Color).a == 0.0, "%s: a cape under a hat, no hood dyed" % build[1])
+		model.queue_free()
 
 
 func _test_person_garb() -> void:
