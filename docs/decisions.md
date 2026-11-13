@@ -42072,6 +42072,16 @@ night when its spell ends. A task comes first. resident_test _test_abed_at_work:
 place, to it and asleep; at a task, the task; its bed elsewhere, its work. look_day's 03:00 dump shows
 him on his bed. Server only, protocol unchanged, no new class_name.
 
+751 amended (7) (indoors is walled in; the coordinator's find from buildings' view_test street check,
+npc's ask, buildings' line; the label from decision_number.sh). A sleeper with no bed is drawn on a
+bedroll only out of doors (Client3D._sync_bedroll, `not _indoors`), and Client3D._indoors was true on any
+cell of a drawn building's rect, so one asleep under Umbrage's well W1 or a market stall (M2, M3) lay
+on the bare cobbles. Now, on a map out of doors, a cell is indoors only in a building's rect and in a
+space its walls close in (the camera's own _enclosed, 671: ruins still enclose, a gone plot, a well, a
+stall or a field not); on a map not out of doors (the tavern's rooms) the rect alone, as before (npc:
+keep interiors as they are). view_test, on the real wilds: under W1, M2 and M3 out of doors, in the hut
+H2 and the forge H1 indoors. Drawing only, protocol unchanged, no new class_name.
+
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's

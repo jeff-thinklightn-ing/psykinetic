@@ -25349,8 +25349,18 @@ func _bed_under(cell: Vector2i) -> Dictionary:
 	return {}
 
 
-## Whether [param cell] lies in a drawn building's rect.
+## Whether [param cell] lies in a drawn building's rect and, out of doors,
+## in a space its walls close in (_enclosed; 751 amended (7)): under a well's
+## or a stall's roof, or on a field, is out of doors, so a sleeper there
+## gets a bedroll. On a map not out of doors, the rect alone, as before.
 func _indoors(cell: Vector2i) -> bool:
+	if bool(_terrain.get("outdoor", false)):
+		if _enclosed_dirty:
+			_find_enclosed()
+		elif not _enclosed_changed.is_empty():
+			_find_enclosed(_enclosed_changed)
+		if not _enclosed.has(cell):
+			return false
 	for building: Variant in _drawn_buildings():
 		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and ((building as Dictionary)["rect"] as Rect2i).has_point(cell):
 			return true

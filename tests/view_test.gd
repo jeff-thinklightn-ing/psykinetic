@@ -3085,6 +3085,20 @@ func _test_tavern_inside() -> void:
 	_check(rect.size == Vector2i(10, 8) and drawn.size() == 1, "the inn drawn where it stands (%s, %d drawn)" % [rect, drawn.size()])
 	if drawn.size() != 1:
 		return
+	# Indoors is walled in (751 amended (7); the coordinator's find, npc's ask):
+	# under the well W1 and the stalls M2 and M3 a sleeper is out of doors and
+	# gets a bedroll; inside the hut H2 and the forge H1 not.
+	var roofed: Array[Vector2i] = [Vector2i(194, 190), Vector2i(203, 197), Vector2i(203, 207)]
+	var walled: Array[Vector2i] = [Vector2i(211, 205), Vector2i(215, 196)]
+	var by_code := {}
+	for building: Dictionary in wilds["buildings"]:
+		by_code[str(building.get("code", ""))] = building.get("rect", Rect2i())
+	var where := ["W1", "M2", "M3", "H2", "H1"].all(func(code: String) -> bool: return by_code.has(code)) \
+			and [by_code["W1"], by_code["M2"], by_code["M3"]].all(func(at: Rect2i) -> bool: return roofed.any(func(cell: Vector2i) -> bool: return at.has_point(cell))) \
+			and (by_code["H2"] as Rect2i).has_point(walled[0]) and (by_code["H1"] as Rect2i).has_point(walled[1])
+	_check(where and not roofed.any(func(cell: Vector2i) -> bool: return _rig._indoors(cell)) and walled.all(func(cell: Vector2i) -> bool: return _rig._indoors(cell)),
+			"under the well and the two stalls out of doors (a bedroll for a sleeper there); in the hut H2 and the forge H1 indoors (%s, %s)"
+			% [roofed.map(func(cell: Vector2i) -> bool: return _rig._indoors(cell)), walled.map(func(cell: Vector2i) -> bool: return _rig._indoors(cell))])
 	var told: Array = []
 	var listen := func(inside: bool, bounds: Rect2i) -> void: told.append([inside, bounds])
 	_rig.inside_changed.connect(listen)
