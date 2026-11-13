@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- After a reconnect or a walk into another area, trees and walls between you and the camera keep clearing out of the way, and your outline keeps showing behind things (623 amended (7)).
 - Builder mode: in the spots ghost, a spot the proposal keeps now shows as a firm ring at about three-quarters the strength of a new one, where it was a faint tint easily taken for moss; a spot taken away shows its red cross at the same strength (859 amended (7)).
 - A townsperson's window opened again keeps its width, so it no longer comes up as a small stub beside the pack before she speaks (802 amended (12)).
 - People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).

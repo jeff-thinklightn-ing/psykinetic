@@ -95,6 +95,7 @@ func _ready() -> void:
 		_test_indoor_camera()
 		_test_camera_feel()
 		_test_camera_turn()
+		_test_fade_lets_go()
 		_test_draw_pull()
 		_test_low_scatter()
 		await _test_far_restart()
@@ -2841,7 +2842,12 @@ func _test_roof_damage() -> void:
 	var whole: Node3D = roofed["roof"]
 	var tris := func(roof: Node3D) -> int: return ((roof.get_node("Slopes") as MeshInstance3D).mesh as ArrayMesh).surface_get_array_len(0) / 3
 	var before: int = tris.call(whole)
+	for list: Dictionary in [_rig._faded, _rig._faded_close, _rig._hiding, _rig._lined, _rig._hid_at, _rig._close_at]:
+		list[whole] = true
 	_rig.set_roofs("roof_fixture", [0])
+	_check([_rig._faded, _rig._faded_close, _rig._hiding, _rig._lined, _rig._hid_at, _rig._close_at].all(
+			func(list: Dictionary) -> bool: return not list.has(whole)),
+			"the roof made again lets go of the old one in every list the fade holds pieces in (623 amended (7))")
 	var holed: Node3D = roofed["roof"]
 	var pieces := holed.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("Broken_"))
 	_check(roofed["holed"] and holed != whole and tris.call(holed) < before and pieces.size() == open.size()
@@ -9294,6 +9300,76 @@ func _test_camera_turn() -> void:
 	_rig._set_yaw(yaw_was)
 	_rig._yaw_step = yaw_was
 	Net.camera_yaw = Client3D.wrapped_yaw(yaw_was)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_rig.set_process(true)
+
+
+## The fade lets go of a freed piece (623 amended (7), playtest's v0.1.214
+## Atlas error: a crown held by the low camera's lens, freed with the room on
+## a reconnect, threw in _update_fade's typed loop each frame after).
+func _test_fade_lets_go() -> void:
+	print("
+== the fade lets go of a piece freed while it held it (623 amended (7)) ==")
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	_rig.set_process(false)
+	_check(_rig._outdoor, "an outdoor room for the close fade")
+	# Freed mid-fade, by no helper: _update_fade runs to its end, the key gone.
+	var crown := Node3D.new()
+	_rig._room.add_child(crown)
+	_rig._close_at[crown] = _rig._fade_clock
+	_rig._hid_at[crown] = _rig._fade_clock
+	crown.free()
+	var marker := Node3D.new()
+	var stand_in: Dictionary[Node3D, bool] = {marker: true}
+	_rig._faded_close = stand_in  # Replaced only at _update_fade's end.
+	_rig._update_fade(true)
+	_check(_rig._close_at.is_empty() and _rig._hid_at.is_empty() and not _rig._faded_close.has(marker),
+			"a crown freed while held by the lens: the fade runs to its end and holds no key of it (%d close, %d hid)" % [_rig._close_at.size(), _rig._hid_at.size()])
+	marker.free()
+	# A rebuild (a zone change, a reconnect) lets go of the old room's held pieces.
+	var held := Node3D.new()
+	_rig._room.add_child(held)
+	var held_id := held.get_instance_id()
+	_rig._close_at[held] = _rig._fade_clock
+	_rig._lined[held] = true
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	_rig.set_process(false)
+	var not_held := func(piece: Variant) -> bool: return is_instance_valid(piece) and piece.get_instance_id() != held_id
+	_check(_rig._close_at.keys().all(not_held) and _rig._lined.keys().all(not_held),
+			"a rebuild lets go of the old room's pieces the lens and the line held")
+	# A felled tree (_forget_piece) and a rebuilt wall go out of every list.
+	var tree := Node3D.new()
+	_rig._room.add_child(tree)
+	for list: Dictionary in [_rig._faded, _rig._faded_close, _rig._hiding, _rig._lined]:
+		list[tree] = true
+	_rig._hid_at[tree] = _rig._fade_clock
+	_rig._close_at[tree] = _rig._fade_clock
+	_rig._forget_piece(tree)
+	_check([_rig._faded, _rig._faded_close, _rig._hiding, _rig._lined, _rig._hid_at, _rig._close_at].all(
+			func(list: Dictionary) -> bool: return not list.has(tree)),
+			"a felled tree goes out of every list the fade holds pieces in")
+	# The fault as a player met it (the coordinator's case): a walk through a
+	# link while the lens held a crown, the old room freed a frame later, then
+	# into a house in the new one: its near side still fades.
+	var old_crown := Node3D.new()
+	_rig._room.add_child(old_crown)
+	_rig._close_at[old_crown] = _rig._fade_clock
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	_rig._process(0.0)  # The player's puppet drawn.
+	_rig.set_process(false)
+	if is_instance_valid(old_crown):
+		old_crown.free()
+	var puppet: Node3D = _rig._puppets.get(_player().get_instance_id())
+	var faded_inside := 0
+	if puppet != null:
+		var was := puppet.global_position
+		puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(4, 6)))  # In the house (x 3..6, y 3..8).
+		_rig._update_fade()
+		faded_inside = _rig._faded.size()
+		puppet.global_position = was
+	_check(puppet != null and faded_inside > 0,
+			"through a link with a crown held by the lens, then into a house: its near side fades (%d pieces)" % faded_inside)
+	_rig._update_fade(true)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_rig.set_process(true)
 

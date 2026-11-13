@@ -3376,7 +3376,11 @@ var _occluder_chunks: Dictionary[Vector2i, Array] = {}
 var _occluder_top := 0.0
 var _faded: Dictionary[Node3D, bool] = {}
 var _hiding: Dictionary[Node3D, bool] = {}
-var _hid_at: Dictionary[Node3D, float] = {}
+## A piece -> when it last hid them (_hid_at) or stood by the lens
+## (_close_at, below): untyped (623 amended (7)), as a typed key's every
+## step and lookup names a freed piece an engine error; _still_held passes
+## a freed one over.
+var _hid_at: Dictionary = {}
 var _fade_key := ""
 ## The faded pieces within NEAR_CLOSE of the low camera (NEAR_CLOSE_ALPHA).
 var _faded_close: Dictionary[Node3D, bool] = {}
@@ -3391,7 +3395,7 @@ var _faded_close: Dictionary[Node3D, bool] = {}
 ## since 623 amended (5), the rim shows instead); the near side of a
 ## building they are in; whether their companion is hidden as they are.
 var _lined: Dictionary[Node3D, bool] = {}
-var _close_at: Dictionary[Node3D, float] = {}
+var _close_at: Dictionary = {}
 var _player_hidden := false
 var _companion_hidden := false
 const CameraTurn := preload("res://client3d/camera_turn.gd")
@@ -7014,6 +7018,11 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_occluder_of.clear()
 	_hiding.clear()
 	_hid_at.clear()
+	# The old room's pieces go with it (623 amended (7)): a crown the low
+	# camera's lens held in _close_at, freed with the room, threw in
+	# _update_fade on a reconnect or a zone change.
+	_lined.clear()
+	_close_at.clear()
 	_fade_key = ""
 	if _neighbour:
 		_outdoor = bool(_terrain.get("outdoor", false))  # Lit by the live view's sky (822).
@@ -10487,9 +10496,7 @@ func _show_holes(building: Dictionary) -> void:
 			holes.append(Vector2(-off.y, off.x) if building["along_x"] else off)
 	var was: Node3D = building["roof"]
 	_set_near(was, false)
-	_faded.erase(was)
-	_hid_at.erase(was)
-	_hiding.erase(was)
+	_drop_from_fade(was)  # Freed below: out of every list (623 amended (7)).
 	var span: Vector2 = building["span"]
 	var roof := _roof_mesh(str(building["set"]), span.x, span.y, holes)
 	roof.name = "roof"
@@ -13925,11 +13932,21 @@ func _clearing_prop(cell: Vector2i, slot: String, n: int, size: float) -> Node3D
 
 ## A piece taken off the room: out of the fade's lists, then freed.
 func _forget_piece(piece: Node3D) -> void:
-	_faded.erase(piece)
-	_hiding.erase(piece)
-	_hid_at.erase(piece)
+	_drop_from_fade(piece)
 	piece.queue_free()
 	_occluders_built = false
+
+
+## [param piece] out of every list the fade holds pieces in (623 amended
+## (7)): one about to be freed (a felled tree, a rebuilt wall) is let go,
+## not kept to throw in a typed loop once it is gone.
+func _drop_from_fade(piece: Node3D) -> void:
+	_faded.erase(piece)
+	_faded_close.erase(piece)
+	_hiding.erase(piece)
+	_hid_at.erase(piece)
+	_lined.erase(piece)
+	_close_at.erase(piece)
 
 
 ## The felled cells of a "clearing" message drawn (591, terrain's side;
@@ -18477,9 +18494,7 @@ func rebuild_walls(edges: Array[Vector3i]) -> void:
 			_posts.erase(vertex)
 	for piece in old:
 		piece.visible = false
-		_faded.erase(piece)
-		_hiding.erase(piece)
-		_hid_at.erase(piece)
+		_drop_from_fade(piece)
 	_free_later(old.keys())
 	_add_wall_runs(keys)
 	# A plot's edges (566) are none: no post stands on them; nor on a bank of
@@ -20485,22 +20500,14 @@ func _update_fade(force := false) -> void:
 	for piece in _hiding:
 		_hid_at[piece] = _fade_clock
 	var now: Dictionary[Node3D, bool] = {}
-	for piece: Node3D in _hid_at.keys():
-		if _fade_clock - _hid_at[piece] <= FADE_HOLD:
-			now[piece] = true
-		else:
-			_hid_at.erase(piece)
+	_hid_at = _still_held(_hid_at, now)
 	var close := _close_pieces(now)
 	if _outdoor:
 		# A crown or a stall by the low camera's lens on the line is still
 		# hidden (623 amended (2)), held FADE_HOLD as a fade is.
 		for piece in _close_pieces(_lined):
 			_close_at[piece] = _fade_clock
-		for piece: Node3D in _close_at.keys():
-			if _fade_clock - _close_at[piece] <= FADE_HOLD:
-				close[piece] = true
-			else:
-				_close_at.erase(piece)
+		_close_at = _still_held(_close_at, close)
 		if moved or close.size() != _faded_close.size():
 			_player_hidden = _is_hidden(points, toward, close)
 			_companion_hidden = _is_hidden(points, toward, close, FADE_HEIGHTS.size())
@@ -20541,6 +20548,21 @@ func _update_fade(force := false) -> void:
 		for node in _descendants(roof):
 			if node is GeometryInstance3D:
 				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+
+
+## Of [param held] (a piece -> when it last hid or stood by the lens), those
+## within FADE_HOLD of it, marked in [param into]; returned as what is still
+## held. A piece freed while held (623 amended (7)) is let go: the lists
+## and the loop are untyped, so a dead key is passed over, never assigned
+## to a Node3D (that threw and stopped the fade for good: the key's own
+## erase came after it).
+func _still_held(held: Dictionary, into: Dictionary[Node3D, bool]) -> Dictionary:
+	var kept := {}
+	for piece: Variant in held:
+		if is_instance_valid(piece) and _fade_clock - held[piece] <= FADE_HOLD:
+			kept[piece] = held[piece]
+			into[piece] = true
+	return kept
 
 
 ## Of [param faded], the trees and tall pieces within NEAR_CLOSE of the
