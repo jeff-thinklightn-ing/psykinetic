@@ -9345,9 +9345,12 @@ static func _wants_pond(record: PlayerRecord) -> bool:
 
 
 ## The nearest fishable water to [param player] within FISH_LEAD_NEAR, as a
-## walk's goal ending on its bank (803 amended (11)): a fishing place's own
-## (maps', named) when the water is one, else a water with no name
-## ("near_water"); its "want" when the pond is her want. {} for none.
+## walk's goal ending on its bank (803 amended (11)): "near_water", kind
+## "water", "a pool" or "the river", whether or not a named fishing place of
+## maps' covers it (803 amended (13): maps' "the pond by town" over Jeff's
+## pool by Snagfin's shack leads and is said as before); its "want" when the
+## pond is her want. {} for none. A named place she knows is led to only
+## with no water this near (_fish_lead_place).
 func _near_water(record: PlayerRecord, player: Player) -> Dictionary:
 	var best := World.NO_CELL
 	var best_d := 1 << 30
@@ -9363,9 +9366,10 @@ func _near_water(record: PlayerRecord, player: Player) -> Dictionary:
 	if best == World.NO_CELL:
 		return {}
 	var pond := World.pond_in(player.zone, best)
-	var named := World.holdings != null and World.holdings.all_places().has(pond)
-	var to := {"key": pond, "kind": "place" if named else "water", "name": World.pond_name(pond), "area": player.zone,
-		"cell": best, "bank": true, "near_water": not named}
+	# Its plain name, never a place's (803 amended (13)): World.pond_name's
+	# unnamed form.
+	var plain := "the river" if pond.get_file().begins_with("river_") else "a pool"
+	var to := {"key": pond, "kind": "water", "name": plain, "area": player.zone, "cell": best, "bank": true, "near_water": true}
 	if _wants_pond(record):
 		to["want"] = "pond"
 	return to

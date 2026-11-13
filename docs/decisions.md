@@ -46262,6 +46262,20 @@ she comes, and the pick alone does not tell it. The tests stand on a host; the p
 client sees it, and playtest's joined tour, with no model, can now hear it. Server only, protocol
 unchanged, no new class_name.
 
+803 amended (13) (the script's label; the coordinator's ruling): maps lays a named fishing place, "the
+pond by town", over Jeff's pool by Snagfin's shack, so the map, npc's fish answer and lore agree.
+Main._near_water made a water a named place covers kind "place", no "near_water", its place's name: a
+lead there would have dropped (11)'s "There's water close by. This way." and its plain walk, at the
+one pool Jeff fishes. Now _near_water gives the nearest fishable water the same goal whether or not a
+named place covers it: kind "water", near_water, its plain name ("a pool", "the river", World.pond_name's
+unnamed form), the same bank. A named place she knows is led to only when no water is within
+FISH_LEAD_NEAR (_fish_lead_place), as before. Whether she says the pond's name is voice's and the
+coordinator's, another day. companion_test _test_lead_to_near_water: with a named fishing place laid
+over the shack's pool under its own key (pool_221_224, as maps and economy settled), asked again in the
+square, the same water, bank and line as the plain water from that square, and her want's words
+unchanged. A hosted test; nothing a player sees changes. Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

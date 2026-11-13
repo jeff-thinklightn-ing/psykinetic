@@ -1965,6 +1965,39 @@ func _test_lead_to_near_water() -> void:
 	owner.led_by = ""
 	owner.led_to = ""
 	_main._guides.clear()
+	# 803 amended (13): maps' named fishing place laid over that pool ("the
+	# pond by town", under the pool's own key, as maps and economy settled):
+	# asked again in the square, the same lead and line. Compared with the
+	# plain water from the same square before it is laid (the first lead's
+	# goal "cell" became its bank as she walked, Guide.step).
+	var pool := str(goal.get("key", ""))
+	var named_was: Variant = World.holdings._places.get(pool) if World.holdings != null else null
+	var words_was := pet.want_words
+	_put(owner, start)
+	owner.free_pos = Vector2(start)
+	_put(pet, _main._nearest_free(start + Vector2i(1, 0)))
+	var plain_to: Dictionary = _main._near_water(record, owner)
+	if World.holdings != null:
+		World.holdings._places[pool] = {"id": pool, "area": "wilds", "key": pool.get_file(), "cell": plain_to.get("cell", shack), "name": "the pond by town"}
+	pet._said.clear()
+	var again: Dictionary = _main._near_water(record, owner)
+	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
+	var goal2: Dictionary = (pet.guide.goal as Dictionary).duplicate() if pet.guide != null else {}
+	_check(World.holdings != null and World.holdings.all_places().has(pool) and not plain_to.is_empty() and again == plain_to
+			and goal2.get("near_water") == true and goal2.get("key") == pool and Companion.FISH_NEAR_WATER in pet._said and pet.want_words == words_was,
+		"a named fishing place over the pool: the same water, bank and line, her want's words unchanged (named %s; plain %s; led %s; said %s; words %s / %s)" % [
+			again, plain_to, goal2, pet._said, pet.want_words, words_was])
+	if pet.guide != null:
+		pet.guide.stop("moved")
+	pet.guide = null
+	owner.led_by = ""
+	owner.led_to = ""
+	_main._guides.clear()
+	if World.holdings != null:
+		if named_was == null:
+			World.holdings._places.erase(pool)
+		else:
+			World.holdings._places[pool] = named_was
 	for key: String in keys:
 		if kept[key] == null:
 			record.companion.erase(key)
