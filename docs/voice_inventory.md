@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2931)
+## Lines in the code (2932)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1328,7 +1328,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (613)
+### other (sim) (614)
 
 | | Line | Where |
 |---|---|---|
@@ -1676,6 +1676,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [tick] stalled: the main loop stuck %.0f s, since tick %d; the last part done: %s; the last error: %s; quitting for a restart | `sim/tick_watch.gd` stalled_line() |
 |  | %s the %s, sent for, finds the way to %s alone | `sim/towns.gd` OWN_WAY |
 |  | town %s: %s; residents %d (%s); visitors %d; room %d of %d | `sim/towns.gd` boot_line() |
+|  | day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s | `sim/towns.gd` day_line() |
 |  | +%d experience: %s | `sim/towns.gd` add_xp() |
 |  | %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
 |  | %s the %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
