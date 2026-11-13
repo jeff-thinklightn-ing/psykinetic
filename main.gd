@@ -11296,6 +11296,21 @@ func zone_doors(zone_name: String) -> Array[Door]:
 	return out
 
 
+## Zone [param zone_name]'s entities, wherever World stands (896, after 540
+## amended (2)'s doors): World's when it is that zone, else the Zone's own;
+## none for a zone not loaded. A client has its one view: what it sees.
+func zone_entities(zone_name: String) -> Array[GridEntity]:
+	if not Net.is_authority():
+		return World.get_entities()
+	var held: Zone = World.zones.get(zone_name)
+	if held == World.zone or held == null and World.zone != null and World.zone.name == zone_name:
+		return World.get_entities()
+	var out: Array[GridEntity] = []
+	if held != null:
+		out.assign(held.entities)
+	return out
+
+
 ## The doors of the draugr's hall in zone [param zone_name] (573 amended):
 ## the door edges on the rim of its "lair" anchor (580's Hall of Fallen
 ## Souls, one in its north wall).
@@ -11457,10 +11472,7 @@ func throne_at(zone_name: String, cell: Vector2i) -> Dictionary:
 ## Whether zone [param zone_name]'s draugr is downed (Draugr.resting): the
 ## throne is the way home only then.
 func throne_downed(zone_name: String) -> bool:
-	var was := World.enter_named(zone_name)
-	var downed := World.get_entities().any(func(each: GridEntity) -> bool: return each is Draugr and (each as Draugr).resting())
-	World.enter(was)
-	return downed
+	return zone_entities(zone_name).any(func(each: GridEntity) -> bool: return is_instance_valid(each) and each is Draugr and (each as Draugr).resting())
 
 
 ## [param player] asks to sit on the throne at [param at] (the "throne"
@@ -11550,11 +11562,11 @@ const ALTAR_STEP := "Bring his remains to the altar"
 
 ## The bier the fallen knight stands by in zone [param zone_name] (896):
 ## the burial table nearest him, within two cells; an empty rect if he is
-## not here or stands by none. The zone is the one entered (or the view's).
+## not here or stands by none. Read by the zone's name (zone_entities).
 func knights_altar(zone_name: String) -> Rect2i:
 	var knight: GridEntity = null
-	for entity in World.get_entities():
-		if entity is AstralKnight and entity.spawned:
+	for entity in zone_entities(zone_name):
+		if is_instance_valid(entity) and entity is AstralKnight and entity.spawned:
 			knight = entity
 	if knight == null:
 		return Rect2i()
@@ -11600,8 +11612,8 @@ func _altar_asked(player: Player, at: Vector2i) -> void:
 ## AstralKnight's said signal, Main's talking-monster line) and the party
 ## line of it.
 func _knight_thanks(player: Player) -> void:
-	for entity in World.get_entities():
-		if entity is AstralKnight:
+	for entity in zone_entities(player.zone):
+		if is_instance_valid(entity) and entity is AstralKnight:
 			(entity as AstralKnight).said.emit(AstralKnight.LAID)
 	say_to_pair(player.owner_peer, "You lay %s remains on the altar." % AstralKnight.whose(),
 		"%s lays %s remains on the altar." % [_display_name(player), AstralKnight.whose()], World.peers_in(player.zone))
@@ -11622,8 +11634,8 @@ func _lay_remains(player: Player) -> bool:
 		return false
 	var record: PlayerRecord = _records.get(player.player_id)
 	mark_player(player.player_id, QUEST_DONE)
-	for entity in World.get_entities():
-		if entity is AstralKnight:
+	for entity in zone_entities(player.zone):
+		if is_instance_valid(entity) and entity is AstralKnight:
 			(entity as AstralKnight).lay_remains()  # Drawn on the bier for the generation (art-kit's piece).
 	if record != null:
 		record.barrow_task = {}
