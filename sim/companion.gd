@@ -4154,7 +4154,11 @@ static func harmless(entity: GridEntity) -> bool:
 		Animal.Role.PREDATOR:
 			return false
 		Animal.Role.GAME:
-			return not (animal.target is Player or animal.target is Companion)
+			# Untyped and checked first (572 amended (3)): its target may be
+			# freed (a player gone, a companion taken home, a kill of
+			# another's), and `is` on a freed instance throws.
+			var aim: Variant = animal.target
+			return not (is_instance_valid(aim) and (aim is Player or aim is Companion))
 	return true
 
 

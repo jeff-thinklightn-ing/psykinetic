@@ -130,6 +130,7 @@ func _ready() -> void:
 	_test_out_of_reach()
 	_test_knows_level()
 	_test_wild()
+	_test_freed_game_target()
 	_test_seated_boss()
 	_test_fallen_knight()
 	_test_truce()
@@ -9115,6 +9116,53 @@ func _test_wild() -> void:
 	Monster.noticing = true
 	_kill_monsters()
 	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+
+## 572 amended (3) (enemy-ai's audit after playtest's frozen robber): a game
+## animal (the boar; a deer is prey, never read for a target) whose target
+## was freed is read by harmless() from every companion's think (_hostile,
+## her fight's reach) and every resident's (_look). `is` on the freed target
+## threw there, ending harmless() as false: a script error each look, and
+## the boar a foe. The wolf and the resident check that the looks still
+## find what is beyond it. Her player and she are put back after.
+func _test_freed_game_target() -> void:
+	print("\n== a game animal whose target is gone: harmless, and her and a resident's looks go on past it (572 amended (3)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	_put(owner, Vector2i(7, 1))
+	_put(pet, Vector2i(6, 1))
+	_settle(pet)
+	Monster.noticing = false
+	var doe := _spawn_wild("boar", _free_tile_between(pet, 2, 3))
+	_check(doe.role == Animal.Role.GAME, "a boar is game, read for its target")
+	var gone := GridEntity.new()
+	doe.target = gone
+	gone.free()
+	_check(Companion.harmless(doe), "a boar whose target is freed is harmless")
+	_check(not pet._hostile(doe), "and no foe to her")
+	var wolf := _spawn_wild("wolf", _free_tile_between(pet, 2, 3))
+	_check(pet.in_fight(), "a wolf beside it: her look goes past the boar to it (in_fight)")
+	var smith := _main._spawn({"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_test_freed", "label": "Snagfin, smith",
+		"tile": _main._nearest_free(pet.tile + Vector2i(0, 1))}) as Resident
+	smith.person = "Snagfin"
+	smith.trade = "smith"
+	smith._hide_until = -1
+	var sees := smith.senses.sees(wolf)
+	smith._look()
+	_check(sees and smith._hide_until > World.tick, "a resident seeing both looks past the boar and hides from the wolf (sees it %s, hides till %d, tick %d)" % [sees, smith._hide_until, World.tick])
+	World.despawn(smith)
+	World.despawn(wolf)
+	World.despawn(doe)
+	Monster.noticing = true
+	_kill_monsters()
+	_put(owner, owner_was)
+	owner.free_pos = Vector2(owner_was)
+	_put(pet, pet_was)
 	_settle(pet)
 
 

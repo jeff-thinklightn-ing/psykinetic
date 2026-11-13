@@ -23105,6 +23105,34 @@ companion_test _test_death_and_respawn: at her player's death she holds
 nothing of them (keeper, an errand, an offer). Server sim, protocol
 unchanged, no new class_name.
 
+572 amended (3) (the script's label; enemy-ai's audit after playtest's
+frozen robber; the coordinator's ruling): what she reads of another body's
+holds is checked as her own are. Companion.harmless read a game animal's
+target with `animal.target is Player or ... is Companion`; that target is
+the animal's, which forget() never clears, and `is` on a freed instance
+throws (Godot 4.7: "Left operand of 'is' is a previously freed instance";
+the error ends that function alone, which returns false). A boar (the one
+game animal; a deer is prey, never read for a target) whose target left
+the world (a player gone, a companion taken home, another's kill) logged a
+script error on every companion's and resident's every look at it, and
+read as not harmless: a foe to her, and a raider to a resident, though it
+went for no one. Now the target is read into an untyped value and
+is_instance_valid first. A freed one goes for no one, so the animal is
+harmless. A probe in 4.7 showed `==`, `!=` and `!= null` on a freed
+instance are safe (a freed one equals null), so only `is` and member
+reads need the check. Her own stored nodes are already covered: keeper,
+intent_target, _quarry, _stalked and _apex_fought are cleared by forget();
+_held_foe goes through _alive; _mine_seam through is_instance_valid; her
+`is` on a monster's target and a noise's source go through
+is_instance_valid (_is_wolf, apex, apex_lines). companion_test
+_test_freed_game_target: a boar with a freed target is harmless and no
+foe to her; a wolf beside it is still in her fight's reach; a resident
+seeing both hides from the wolf; her player and she are put back after.
+On the old harmless() (the coordinator's ubuntu-1 run) the first two fail
+with that script error in the log; the wolf and the resident pass, since
+the error ends harmless() and not the look. Server only, protocol
+unchanged, no new class_name.
+
 ## 573, economy's side. A player's charges and the draugr's deals
 
 Dungeon's design (C:/dev/review/dungeon/crypt_tokens_design.md, Jeff's
