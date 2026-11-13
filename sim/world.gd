@@ -13286,6 +13286,23 @@ func reach_limit(attacker: GridEntity) -> float:
 	return span_of(blow_verb(attacker))
 
 
+## How far apart two centres may be for [param swinger]'s wound-up blow to
+## land on the body it aims at (_wind_up_reaches, read for the drawn step
+## of animation's heavy swings): reach_limit, plus windup_slack where it
+## takes it (not a monster's, not a knockback verb's). Leaves out 874
+## amended (1)'s one step back during the wind-up, so a drawing that reads
+## it errs short, never onto a body the blow misses.
+func wind_up_range(swinger: GridEntity) -> float:
+	return reach_limit(swinger) + (windup_slack if _takes_windup_slack(swinger) else 0.0)
+
+
+## Whether a blow from centre [param from] to centre [param to] has a clear
+## line by terrain (_cells_between: no wall, closed door or step up between),
+## as _body_reach asks; bodies between are the caller's to weigh.
+func blow_line_clear(from: Vector2, to: Vector2) -> bool:
+	return from.distance_to(to) >= 0.001 and not _cells_between(from, to).is_empty()
+
+
 ## How far apart two centres may be for a blow of [param verb] to land
 ## where a free body is in it (699 amended: striking distance): the verb's
 ## "span" in cells (metres), body to body, a sword's 1.6, an axe's 1.8;

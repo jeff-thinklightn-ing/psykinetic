@@ -37663,6 +37663,25 @@ with the flip gone. Nobody reported the shuffle; playtest may watch for a
 robber or skeleton stepping back and forth beside a player at a wall.
 free_walk_test _test_free_chase (six phases; fails on main at the robber's
 phase 4). Server only, protocol unchanged, no new class_name, no bullet.
+
+699 amended (4): two public reads of the sim's blow reach, for animation's
+drawn step on a heavy swing (the decision-number script's label; the
+coordinator's build 2 for the axes' long landings: a hit landed past about
+1.7 m between centres drew the head 0.26 to 0.59 m short of him, and
+longburst found her own contact on time, so the shortfall is reach, not
+timing). World.wind_up_range(swinger): how far apart two centres may be for
+a wound-up blow to land on the body it aims at, reach_limit plus
+windup_slack where it takes it (not a monster's, not a knockback verb's:
+_takes_windup_slack, 874); 874 amended (1)'s one step back during the
+wind-up is left out, so a drawing that reads it errs short, never onto a
+body the blow misses. World.blow_line_clear(from, to): no wall, closed door
+or step up between two centres (_cells_between, as _body_reach asks); bodies
+between are the caller's. Animation's step calls these, never the private
+ones, so the sim's rules stay in one place. combat_test
+_test_wind_up_range: a player's battle and giant axes 2.3, the tomb sledge
+1.8, fists with the slack, the draugr his reach alone; a clear line on open
+floor, none through a wall. Sim only, nothing calls them yet; protocol
+unchanged, no new class_name, no bullet.
 ## 344 amended. The spear's strike is a jab
 
 Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation

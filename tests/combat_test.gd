@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_spin_throws()
 	_test_throws_into_walls()
 	_test_test_foe_plan()
+	_test_wind_up_range()
 	_test_spin_broken()
 	_test_dropped_moves()
 	_test_throw_and_charge()
@@ -2749,6 +2750,33 @@ func _test_throws_into_walls() -> void:
 	World.set_slots(draugr, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
 	_check(slot >= 0 and not World.throws_into_walls(draugr) and dearest.call(draugr) < World.WALL_COST_AT,
 			"disarmed: his spin his fists', no wall worth naming (%d), till he has his axe again" % dearest.call(draugr))
+
+
+## The two reads animation's drawn step takes from the sim (699 amended (4)):
+## wind_up_range, a wound-up blow's reach to the body it aims at (reach_limit,
+## plus windup_slack for a player's, not a knockback's nor a monster's), and
+## blow_line_clear, a wall between or not.
+func _test_wind_up_range() -> void:
+	print("\n== wind_up_range and blow_line_clear: the sim's numbers for the drawn step (699 amended (4)) ==")
+	var e := _build(["#######", "#P....#", "#..#..#", "#######"])
+	var host: Player = e["P"][0]
+	var had := host.slots.duplicate()
+	World.set_slots(host, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	_check(is_equal_approx(World.wind_up_range(host), 2.3), "a player's battle axe: span 1.8 and the wind-up's 0.5, 2.3 (%.2f)" % World.wind_up_range(host))
+	World.set_slots(host, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	_check(is_equal_approx(World.wind_up_range(host), 2.3), "a giant axe: 2.3 (%.2f)" % World.wind_up_range(host))
+	World.set_slots(host, Items.tidy(["", "", "", "", "tomb_sledge", ""], Items.CARRIED))
+	_check(is_equal_approx(World.wind_up_range(host), 1.8), "the tomb sledge, a knockback: its span alone, 1.8 (%.2f)" % World.wind_up_range(host))
+	World.set_slots(host, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	_check(is_equal_approx(World.wind_up_range(host), World.melee_reach + 2.0 * World.FREE_RADIUS + World.windup_slack),
+			"fists: melee reach and both radii, and the slack (%.2f)" % World.wind_up_range(host))
+	World.set_slots(host, had)
+	var draugr := _real_draugr(Vector2i(5, 1))
+	_check(is_equal_approx(World.wind_up_range(draugr), World.reach_limit(draugr)), "the draugr, a monster: his reach alone, no slack (%.2f)" % World.wind_up_range(draugr))
+	_check(World.blow_line_clear(Vector2(1, 1), Vector2(3, 1)) and World.blow_line_clear(Vector2(1, 1), Vector2(2.4, 2.0)),
+			"open floor, straight or slanting: clear")
+	_check(not World.blow_line_clear(Vector2(2, 2), Vector2(4, 2)) and not World.blow_line_clear(Vector2(1, 1), Vector2(1, 1)),
+			"through the wall at (3,2): not clear; no line at all: not clear")
 
 
 ## One robber's lunge at a player whose drawn centre is moved without her tile (the lag).
