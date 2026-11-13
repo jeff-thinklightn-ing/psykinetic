@@ -273,7 +273,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.bench` | 1 | art-gen, by hand | own | 2026-11-11 |
 | `prop.bones` | 3 | art-kit, by hand | own | 2026-11-04 |
 | `prop.bookshelf` | 1 | art-kit, by hand | own | 2026-10-19 |
-| `prop.brazier` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
+| `prop.brazier` | 1 | art-gen, by hand | own | 2026-11-13 |
 | `prop.bridge` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.broken_cart` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `prop.burial_niche` | 4 | art-kit, by hand | own | 2026-10-22 |

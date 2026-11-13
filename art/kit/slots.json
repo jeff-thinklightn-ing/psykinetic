@@ -679,7 +679,7 @@
 			"size": [0.76, 1.088, 0.76],
 			"budget": 250,
 			"sockets": {"flame": [0, 1.03, 0]},
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "blender", "license": "own", "date": "2026-10-29", "notes": "art-gen's STANDING piece (734; Jeff approved the chapel look 2026-10-29), N:/assets/candidates/prop.brazier/prop.brazier.blend, fitted by art-kit (C:/dev/review/building_kits/fit_chapel.py): its flat colours and textures moved to the nearest palette swatches, one palette material; 204 tris"},
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-13", "notes": "C:/dev/review/brazier/make_brazier.py, a mend of Jeff's pick (734, the chapel look he approved 2026-10-29: art-gen's standing piece, fitted by art-kit) by the coordinator's ruling 2026-11-13 on art-gen's p5_worst, on Jeff's cut checklist: its shape kept (the 12-sided wide shallow bowl, 0.76 across, 1.088 tall, three near-upright legs at 0 and +-120 deg with flat feet), its legs seated up inside the bowl's wall and running into their feet (the fit's stood off the bowl, its feet loose), a rim band in the kit's iron round the lip, the outside iron dark (was near-black), the inside sooted, a bed of coals and embers under the flame; the empty \"flame\" at the socket (the fit's stood 1.8 cm off x); 220 tris"},
 			"uses": "an iron brazier on three legs (734: beside the chapel's steps, never in the door's way; placed by level content): its fire at the flame socket, drawn by Flames as prop.campfire's",
 			"grey": [{"at": [0, 0.536, 0], "size": [0.76, 1.088, 0.76]}]
 		},

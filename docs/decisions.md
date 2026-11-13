@@ -40893,6 +40893,25 @@ view_test _test_chapel: eight lancets, and the back end's two side by side in it
 _test_glow_outside: in a built house and a built temple, each window's glow pane on the wall's
 outside, found by where it is drawn. Client only; protocol unchanged, no new class_name.
 
+734 amended (11): prop.brazier mended by hand, art-gen's (the coordinator's ruling 2026-11-13 on
+art-gen's three worst at the nearest zoom, C:/dev/review/art-gen_near/p5/p5_worst.png; label from
+tools/decision_number.sh). The brazier 734 fitted from art-gen's standing piece, Jeff's chapel look
+of 10-29, stands at the six watch posts (782's POST_BRAZIER), the mine and the bear's cave (798),
+and at the nearest zoom it read near-black with one leg standing off its bowl and its feet loose
+beside the legs. This is a mend of his pick, not a new one, so it goes on his cut checklist (he
+vetoes in game): its shape is kept, the 12-sided wide shallow bowl 0.76 across and 1.088 tall on
+three near-upright legs at 0 and +-120 deg with flat feet and no braces (a pass with braces and
+splay read as a bar stool and was dropped). The legs are seated up inside the bowl's wall and run
+into their feet; a rim band in the kit's iron goes round the lip so it reads at 8 m; the outside is
+the kit's dark iron (was near-black), the inside sooted; a bed of coals and embers, palette colours
+and not emissive (by day embers kept in, by night lit by the post's light), has its top at 1.034,
+so the fire Flames stands at the "flame" socket has something to stand in. The socket is the
+slot's (0, 1.03, 0), which others place fire by; the fit's empty stood 1.8 cm off along x. Slot
+size, socket and grey unchanged; 220 tris of 250. Art-kit passed it (C:/dev/review/brazier/
+brazier_sheet.png), and the coordinator in game (C:/dev/review/art-gen-brazier2/
+brazier_ingame_sheet.png: the woodlot post at hour 20, the flame's foot on the coals). Client only
+(art); protocol unchanged, no new class_name.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

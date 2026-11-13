@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The braziers at the town's watch posts are iron now, with a band round the rim and a bed of coals for the fire to burn in, standing square on their three legs (734 amended (11)).
 - In the crypt, if you're unhurt and rested when the draugr's spin throws you into a wall, it leaves you badly hurt rather than dead (603 amended (9)).
 - Towns: Umbrage's square fire burns in a ring of stones, its logs leant together over glowing embers (523 amended (2)).
 - At night a fire at a roadside rest or a bandits' camp burns with a flame and lights the ground round it, and whoever sits by it, you too, can be seen from the dark (523 amended (2)).
