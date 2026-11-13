@@ -1,5 +1,5 @@
 class_name PackPanel
-extends PanelContainer
+extends UiGlass
 ## The player's pack ("Jeff's Pack"), and above it whatever they have open:
 ## a chest, or their companion's pack ("Wren's Pack"); at the HUD's bottom
 ## right, a box a slot, the item's icon in it (ItemIcons) over its short
@@ -38,6 +38,9 @@ const ICON_INSET := 3
 static var NAMED_COLOR: Color = UiTheme.color("brass_bright")
 ## One kept from its namer (World.KEPT_MARK; decision 370): rust.
 static var KEPT_COLOR: Color = UiTheme.color("rust")
+
+## The close mark pressed (Main closes as Esc does: a chest or the companion's pack, else the pack).
+signal close_pressed
 
 ## Called with (from, from_slot, to, to_slot) when an item is dropped.
 var transfer: Callable
@@ -126,6 +129,8 @@ var _other_head: HBoxContainer
 var _other_mood: Label
 var _other_row: HBoxContainer
 var _player_title: Label
+## The close mark at the head's right end (UiClose; Esc does the same).
+var _close: UiClose
 var _player_row: HBoxContainer
 ## The character sheet (787), the window's left side since the sheet pass:
 ## the player's hands, armour and worn things on a figure, the load drawn.
@@ -144,6 +149,12 @@ var promised: Array[String] = []:
 		if is_node_ready():
 			_refresh()
 var _promised: Label
+## The foot line (UiLine): a refused move says why in rust until the next move; nothing on success.
+var _foot: UiLine
+## The square the last drag, double click or right click acted on, and when (msec): the "Server" party line that
+## answers within ACT_WAIT_MSEC is its refusal (no protocol change: the server sends no square).
+var _acted := {"mine": true, "index": -1, "at": -100000}
+const ACT_WAIT_MSEC := 1500
 ## The resurrection charges the player holds, "charges 23 of 50" (dungeon's
 ## 573: Player.charges and charge_room, replicated; shown once blessed,
 ## charge_room over 0; no bar).
@@ -193,10 +204,11 @@ class PracticeBar:
 
 
 class SlotBox:
-	extends Panel
+	extends UiSlot
 	var panel: PackPanel
 	var mine := true
 	var index := 0
+	## The no-picture name over the picture (a Label in the square's face), the picture (UiSlot's own).
 	var label: Label
 	var icon: TextureRect
 	## The slot's note (World._show_notes), for the tip.
@@ -204,10 +216,12 @@ class SlotBox:
 	## A named thing's frame colour (365: brass_bright; kept, rust), clear for a
 	## plain one: the gilding the caption carried before 765.
 	var gild := Color(0, 0, 0, 0)
-	## The stack's count in the corner (619, ui's side): "5", nothing alone.
+	## The stack's count in the corner (619, ui's side): "5", nothing alone (UiSlot's own label).
 	var count: Label
-	## What an open store's seller pays for it (765), over the top-right corner.
-	var price: Control
+	## What an open store's seller pays for it (765): gold, -1 for no chip (UiSlot's UiPrice at the corner).
+	var price_gold := -1
+	## A hand's square keeps a brass rim (the mock: the two hands).
+	var hand := false
 	## Weapon memory (766, ui's side): the art's practice along its bottom.
 	var practice: PracticeBar
 	## Shown but not to be changed (787: another's companion on the sheet):
@@ -277,6 +291,7 @@ class SlotBox:
 				and panel.double_click.is_valid():
 			var entity_clicked := owner_entity()
 			if is_instance_valid(entity_clicked) and index < entity_clicked.slots.size() and not entity_clicked.slots[index].is_empty():
+				panel.acted(mine, index)
 				panel.double_click.call(mine, index)
 				viewport.set_input_as_handled()
 				return
@@ -284,6 +299,7 @@ class SlotBox:
 			return
 		var entity := owner_entity()
 		if is_instance_valid(entity) and index < entity.slots.size() and not entity.slots[index].is_empty() and panel.use.is_valid():
+			panel.acted(mine, index)
 			panel.use.call(index)
 			viewport.set_input_as_handled()
 
@@ -329,6 +345,7 @@ static func title_name(name: String) -> String:
 
 
 func _ready() -> void:
+	super()  # UiGlass: the frost and its group.
 	anchor_left = 1.0
 	anchor_right = 1.0
 	anchor_top = 1.0
@@ -381,11 +398,21 @@ func _ready() -> void:
 	pack_side.add_theme_constant_override("separation", UiTheme.constant("row"))
 	pack_side.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	mine.add_child(pack_side)
+	var pack_head := HBoxContainer.new()  # The title, the gold at its right end (ShopPanel), the close mark (pack-1080).
+	pack_side.add_child(pack_head)
 	_player_title = _title()
-	pack_side.add_child(_player_title)
+	_player_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	pack_head.add_child(_player_title)
+	_close = UiClose.new()
+	_close.pressed.connect(func() -> void: close_pressed.emit())
+	pack_head.add_child(_close)
+	# The two titles and the close mark on one row: both titles as tall as the mark, their words centred on it (pack-1080).
+	var head_side := float(_close.get_theme_constant(&"size", &"Close"))
+	for head: Label in [_player_title, sheet.title]:
+		head.custom_minimum_size.y = head_side
+		head.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_player_row = _row(true)
 	pack_side.add_child(_player_row)
-	add_theme_stylebox_override("panel", solid_panel())
 	_promised = Label.new()
 	_promised.theme_type_variation = &"Caption"
 	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -395,6 +422,8 @@ func _ready() -> void:
 	_charges.theme_type_variation = &"Caption"
 	_charges.add_theme_color_override("font_color", UiTheme.color("text_dim"))
 	column.add_child(_charges)
+	_foot = UiLine.new()  # The foot: empty until a move is refused (the approved window).
+	column.add_child(_foot)
 	_refresh()
 
 
@@ -451,8 +480,6 @@ static func layout_of(entity: GridEntity) -> String:
 const LOCKER_COLUMNS := 12
 ## The pack's grid, boxes a line (4 x 3: decision 722, 819).
 const PACK_COLUMNS := 4
-## The pack's and the sheet's backing's alpha (solid_panel).
-const SOLID := 0.97
 
 
 func _row(mine: bool) -> HBoxContainer:
@@ -541,20 +568,16 @@ func box_in(mine: bool, index: int) -> SlotBox:
 	return null
 
 
-## The pack's and the sheet's backing: the theme's panel, nearly opaque, so
-## a name or a float in the world never shows through the squares.
-static func solid_panel() -> StyleBox:
-	var box := UiTheme.style("panel", "PanelContainer")
-	if box is StyleBoxFlat:
-		box = box.duplicate()
-		(box as StyleBoxFlat).bg_color.a = SOLID
-	return box
-
-
 ## The pack's title's rect on screen ("Pack"), the gold at its right end
 ## (ShopPanel).
 func pack_title_rect() -> Rect2:
 	return _player_title.get_global_rect()
+
+
+## What an empty worn square shows, faint and grey (the approved mock, 854 amended (7)): the item's own picture.
+const EMPTY_PICTURES := {Items.HEAD: "felt_hat", Items.NECK: "encolpion_amulet", Items.BACK: "cloak",
+	Items.ARMOUR: "leather_armour", Items.RIGHT_HAND: "sword", Items.LEFT_HAND: "shield", Items.RING_1: "signet_ring",
+	Items.RING_2: "signet_ring", Items.CHARM: "bear_claw_charm", Items.FEET: "soft_boots", Items.BAG: "satchel"}
 
 
 func _box(mine: bool, i: int, hand: bool) -> SlotBox:
@@ -562,11 +585,10 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	box.panel = self
 	box.mine = mine
 	box.index = i
-	box.custom_minimum_size = SLOT_SIZE
-	# On the sheet no letters (the sheet pass): a worn square's place on the
-	# figure says what goes there, its name on hover while empty. A
-	# companion's hands and armour, beside her pack with no figure, keep R, L, A.
-	box.theme_type_variation = &"HandSlot" if hand else &"Inset"
+	box.hand = hand
+	# The shared square (UiSlot, ui-design's parts): its size, picture, count, chip and rim states.
+	# On the sheet no letters (the sheet pass): a worn square's name on hover while empty. A
+	# companion's hands and armour, beside her pack, keep R, L, A.
 	if hand and not mine and i in [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]:
 		var mark := Label.new()
 		mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
@@ -575,17 +597,8 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 		mark.position = Vector2(10, 4)
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		box.add_child(mark)
-	var picture := TextureRect.new()
-	picture.set_anchors_preset(Control.PRESET_FULL_RECT)
-	picture.offset_left = ICON_INSET
-	picture.offset_top = ICON_INSET
-	picture.offset_right = -ICON_INSET
-	picture.offset_bottom = -ICON_INSET
-	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	box.icon = picture
-	box.add_child(picture)
+	box.icon = box._picture
+	box.count = box._count
 	var label := Label.new()
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -594,24 +607,12 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", FONT_SIZE)
 	box.label = label
-	box.add_child(label)
-	# The stack's count, small in brass in the bottom-right corner (619,
-	# ui's side), over the caption's end.
-	var count := Label.new()
-	count.theme_type_variation = &"Small"
-	count.add_theme_color_override("font_color", UiTheme.color("brass"))
-	count.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	count.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	count.offset_right = -6
-	count.offset_bottom = -2
-	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	count.visible = false
-	box.count = count
-	box.add_child(count)
+	box._face.add_child(label)
 	if mine:
 		box.practice = PracticeBar.new()
-		box.add_child(box.practice)
+		box._face.add_child(box.practice)
+	if hand:
+		_frame(box)
 	return box
 
 
@@ -687,8 +688,39 @@ func open(opened: GridEntity) -> void:
 ## Moves an item, by way of transfer; [param count] units of a stack, 0 for
 ## all of them (619).
 func drop(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, count := 0) -> void:
+	acted(to == player, to_slot)
 	if transfer.is_valid() and is_instance_valid(from) and is_instance_valid(to):
 		transfer.call(from, from_slot, to, to_slot, count)
+
+
+## A move was started on square [param index] of the player's row ([param mine]) or the open row: the foot clears,
+## and a refusal that answers within ACT_WAIT_MSEC is said in it (refuse_words).
+func acted(mine: bool, index: int) -> void:
+	_acted = {"mine": mine, "index": index, "at": Time.get_ticks_msec()}
+	if _foot != null:
+		_foot.clear()
+
+
+## The server's "Server" party line [param words] while a move is waiting for its answer: said in the foot in rust,
+## the acted-on square's rim flashing; true when taken (the move was just made), false for any other line.
+func refuse_words(words: String) -> bool:
+	if _foot == null or int(_acted["index"]) < 0 or Time.get_ticks_msec() - int(_acted["at"]) > ACT_WAIT_MSEC:
+		return false
+	_foot.refuse(words)
+	var box := box_in(bool(_acted["mine"]), int(_acted["index"]))
+	if box != null:
+		box.flash_refused()
+	_acted["index"] = -1
+	return true
+
+
+## The foot as shown (tests): the words and whether it is a refusal.
+func foot_shown() -> String:
+	return _foot.text.strip_edges() if _foot != null else ""
+
+
+func foot_is_refused() -> bool:
+	return _foot != null and _foot.refused
 
 
 ## The corner badge's words for a slot holding [param count] things (619,
@@ -742,8 +774,14 @@ func set_selected(indices: Array) -> void:
 ## is gone); else the theme's.
 func _frame(box: SlotBox) -> void:
 	if box.mine and selected.has(box.index):
-		box.add_theme_stylebox_override("panel", selected_style())
-	elif box.gild.a > 0.0:
+		box.remove_theme_stylebox_override("panel")
+		box.set_state("picked")  # UiSlot's brass rim: picked to give.
+		return
+	if box.state == "picked":
+		box.set_state("hand" if box.hand else "rest")
+	elif box.state in UiSlot.RESTING:
+		box.set_state("hand" if box.hand else "rest")  # A held hand's square: the theme's WellHand (854 amended (6)).
+	if box.gild.a > 0.0:
 		var style := selected_style()
 		style.border_color = box.gild
 		style.set_border_width_all(2)
@@ -774,18 +812,12 @@ func set_prices(by_slot: Dictionary) -> void:
 func _show_price(box: SlotBox, held: bool) -> void:
 	var gold := int(prices.get(box.index, -1)) if held and not prices.is_empty() else -1
 	box.icon.modulate.a = 0.4 if gold == 0 else 1.0
-	if box.price != null and (gold <= 0 or str(box.price.get_meta("words", "")) != "gold %d" % gold):
-		box.remove_child(box.price)
-		box.price.queue_free()
-		box.price = null
-	if gold > 0 and box.price == null:
-		var chip := BarterPanel.make_chip("gold", gold, null)
-		chip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		chip.offset_right = -5
-		chip.offset_top = 5
-		box.add_child(chip)
-		box.price = chip
+	if gold != box.price_gold:
+		box.price_gold = gold if gold > 0 else -1
+		if box.price_gold > 0:
+			box.price().set_gold(box.price_gold)  # UiSlot's chip at the corner.
+		else:
+			box.clear_price()
 
 
 ## The price chips shown over the player's slots (tests): {slot: gold}.
@@ -793,8 +825,8 @@ func prices_shown() -> Dictionary:
 	var out := {}
 	if _player_row != null:
 		for box: SlotBox in row_boxes(_player_row):
-			if box.price != null:
-				out[box.index] = int(str(box.price.get_meta("words", "gold 0")).get_slice(" ", 1))
+			if box.price_gold > 0:
+				out[box.index] = box.price_gold
 	return out
 
 
@@ -876,9 +908,15 @@ func _refresh() -> void:
 			box.count.text = count_words(World.slot_count(entity, box.index)) if has and not item.is_empty() else ""
 			box.count.visible = not box.count.text.is_empty()
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
+			if EMPTY_PICTURES.has(box.index) and icons != null:
+				box.set_empty_picture(icons.icon(str(EMPTY_PICTURES[box.index])))  # What goes in a worn square, faint while empty.
 			_show_price(box, row == _player_row and has and not item.is_empty())
 			if box.practice != null:
 				_show_practice(box, entity if has else null, item)
+	if sheet != null and is_instance_valid(player) and sheet.boxes.has(Items.BAG):
+		# The satchel's square shows only while one is worn: its package is off (nothing sells or drops one yet),
+		# so an empty square would read as a place to fill (the coordinator).
+		sheet.boxes[Items.BAG].visible = player.slots.size() > Items.BAG and not player.slots[Items.BAG].is_empty()
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
 	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()
@@ -952,7 +990,7 @@ func charges_shown() -> String:
 func _show_icon(box: SlotBox, picture: Texture2D) -> void:
 	if box.icon.texture == picture:
 		return
-	box.icon.texture = picture
+	box.set_picture(picture)  # Shows and hides the faint empty picture under it (854 amended (7)).
 	box.label.visible = picture == null
 	box.label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER if picture == null else VERTICAL_ALIGNMENT_BOTTOM
 	box.label.add_theme_font_size_override("font_size", FONT_SIZE if picture == null else CAPTION_SIZE)

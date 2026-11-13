@@ -276,7 +276,7 @@ func _test_stacks_ui() -> void:
 			for child in armour_box.get_children():
 				if child is Label and child != armour_box.label and child != armour_box.count:
 					marks.append((child as Label).text)
-			_check(pack_for_armour.row_boxes(row).size() > Items.ARMOUR and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ([] if mine else ["A"]),
+			_check(pack_for_armour.row_boxes(row).size() > Items.ARMOUR and armour_box.index == Items.ARMOUR and armour_box.hand == (not mine) and marks == ([] if mine else ["A"]),
 				"%s row: the seventh box is the armour worn, edged like the hands, %s (%s)" % ["the player's" if mine else "the other", "unlettered" if mine else "marked A", marks])
 		var right_box: PackPanel.SlotBox = pack_for_armour.box_in(true, Items.RIGHT_HAND)
 		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}
@@ -2050,12 +2050,12 @@ func _test_inventory_panel() -> void:
 		gear.append(box.index)
 	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 1 and (grids[0] as GridContainer).columns == 4
 			and in_grid == Items.ALL_PACK_SLOTS and gear == CharacterSheet.SLOT_PLACES.keys()
-			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
+			and not pack.box_in(true, Items.ARMOUR).hand and not pack.box_in(true, Items.PACK_SLOTS[4]).hand,
 			"the player's row: the pack's twelve 4 x 3 (819) (%s), the hands, the armour and the worn slots on the sheet (787, 788: %s)" % [in_grid, gear])
 	var drawn: Array[int] = in_grid + gear
-	_check(in_grid.size() == 12 and gear.size() == 10 and not Items.BAG in drawn
+	_check(in_grid.size() == 12 and gear.size() == 11 and Items.BAG in gear
 			and not Items.SATCHEL_SLOTS.any(func(i: int) -> bool: return i in drawn),
-			"the satchel off (819 amended): twelve pack boxes and ten on the sheet, none for the bag or its row (%d, %d)" % [in_grid.size(), gear.size()])
+			"the satchel off (819 amended): twelve pack boxes and eleven worn squares on the sheet, the bag's among them (the approved window), none for its row (%d, %d)" % [in_grid.size(), gear.size()])
 	await _test_character_sheet(pack)
 	var locker := Locker.new()
 	locker.name = "TestLocker"
@@ -2926,36 +2926,64 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	_check(sheet.is_inside_tree() and sheet.is_visible_in_tree() == pack.visible and pack.is_ancestor_of(sheet),
 		"one window: the sheet is the pack's own left side, shown with it (%s, %s)" % [sheet.is_visible_in_tree(), pack.visible])
 	_check(sheet.boxes.keys() == CharacterSheet.SLOT_PLACES.keys() and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
-			and pack.box_in(true, Items.CHARM) == sheet.boxes[Items.CHARM]
-			and sheet.boxes[Items.RIGHT_HAND].position.x < sheet.boxes[Items.ARMOUR].position.x and sheet.boxes[Items.ARMOUR].position.x < sheet.boxes[Items.LEFT_HAND].position.x,
-		"the right hand on the figure's right (your left), the body in the middle, the left hand on its left, and 788's worn slots; the pack finds them as its own")
-	# Each worn square at its place on the body (the sheet pass, point 2): down
-	# the middle the hat, the amulet, the body, the charm, the boots; a ring
-	# under each hand; the cloak at the left shoulder; none overlapping, all on
-	# the figure, each the pack's size (point 1).
-	var at := func(slot: int) -> Rect2: return Rect2(sheet.boxes[slot].position, sheet.boxes[slot].size)
-	var middle: Array[int] = [Items.HEAD, Items.NECK, Items.ARMOUR, Items.CHARM, Items.FEET]
-	var down := true
-	for i in middle.size() - 1:
-		down = down and at.call(middle[i]).end.y < at.call(middle[i + 1]).position.y and at.call(middle[i]).position.x == at.call(middle[i + 1]).position.x
+			and pack.box_in(true, Items.CHARM) == sheet.boxes[Items.CHARM] and pack.box_in(true, Items.BAG) == sheet.boxes[Items.BAG],
+		"the worn squares are the pack's own boxes, and 788's slots and the satchel's among them; the pack finds them as its own")
+	# The approved window (no figure): the eleven worn squares in reading order, four to a line, head to feet:
+	# Head, Neck, Shoulders, Body / Right hand, Left hand, Ring, Ring / Charm, Feet, Satchel; each the shared square.
+	var order: Array[int] = [Items.HEAD, Items.NECK, Items.BACK, Items.ARMOUR, Items.RIGHT_HAND, Items.LEFT_HAND, Items.RING_1, Items.RING_2,
+		Items.CHARM, Items.FEET]
+	var bag_was: String = player.slots[Items.BAG]
+	var at := func(slot: int) -> Rect2: return sheet.boxes[slot].get_global_rect()
+	var in_order := sheet.boxes.keys() == order + [Items.BAG] and sheet.grid.columns == CharacterSheet.GEAR_COLUMNS
+	var lines_ok := true
+	for k in order.size() - 1:
+		var here: Rect2 = at.call(order[k])
+		var next: Rect2 = at.call(order[k + 1])
+		lines_ok = lines_ok and (next.position.x > here.position.x if (k + 1) % CharacterSheet.GEAR_COLUMNS != 0 else next.position.y > here.position.y)
 	var overlaps := 0
-	var rects: Array = sheet.boxes.keys().map(at)
-	for i in rects.size():
-		for j in range(i + 1, rects.size()):
-			if (rects[i] as Rect2).intersects(rects[j]):
+	var rects: Array = order.map(at)
+	for a in rects.size():
+		for b in range(a + 1, rects.size()):
+			if (rects[a] as Rect2).intersects(rects[b]):
 				overlaps += 1
-	var figure_rect := Rect2(Vector2.ZERO, sheet.figure.custom_minimum_size)
-	var on_figure := true
-	for r: Rect2 in rects:
-		on_figure = on_figure and figure_rect.encloses(r) and r.size.is_equal_approx(PackPanel.SLOT_SIZE)
-	var placed := [at.call(Items.RING_1).position.y > at.call(Items.RIGHT_HAND).end.y, at.call(Items.RING_2).position.y > at.call(Items.LEFT_HAND).end.y,
-		is_equal_approx(at.call(Items.RING_1).position.x, at.call(Items.RIGHT_HAND).position.x), at.call(Items.BACK).position.x > at.call(Items.NECK).end.x,
-		at.call(Items.BACK).end.y < at.call(Items.LEFT_HAND).position.y]
-	_check(down and placed.all(func(b: bool) -> bool: return b) and overlaps == 0 and on_figure,
-		"head to feet down the middle, a ring under each hand, the cloak at the shoulder; the pack's size, none over another, all on the figure (%s %s %d %s)" % [down, placed, overlaps, on_figure])
-	var gap := float(UiTheme.constant("slot_gap"))
-	_check(sheet.figure.custom_minimum_size.y >= 4 * PackPanel.SLOT_SIZE.y + 3 * gap,
-		"the figure at least four rows tall, so a fourth (a satchel) never grows the window (%s)" % sheet.figure.custom_minimum_size)
+	var same_size := rects.all(func(r: Rect2) -> bool: return r.size.is_equal_approx((rects[0] as Rect2).size))
+	_check(in_order and lines_ok and overlaps == 0 and same_size and sheet.boxes[Items.RIGHT_HAND] is UiSlot,
+		"eleven worn squares in reading order, four to a line, one size, none over another, each the shared UiSlot (%s %s %d %s)" % [in_order, lines_ok, overlaps, same_size])
+	_check(sheet.boxes[Items.RIGHT_HAND].hand and sheet.boxes[Items.LEFT_HAND].hand and not sheet.boxes[Items.HEAD].hand,
+		"the two hands keep a brass rim, no other worn square does")
+	_check(sheet.boxes[Items.RIGHT_HAND].state == "hand" and sheet.boxes[Items.LEFT_HAND].state == "hand" and sheet.boxes[Items.HEAD].state == "rest"
+			and not sheet.boxes[Items.RIGHT_HAND].has_theme_stylebox_override(&"panel"),
+		"a held hand's square is UiSlot's hand state with no loose stylebox of ours (%s, %s)" % [sheet.boxes[Items.RIGHT_HAND].state, sheet.boxes[Items.HEAD].state])
+	_check(PackPanel.EMPTY_PICTURES.size() == 11 and PackPanel.EMPTY_PICTURES.keys().all(func(slot: int) -> bool: return CharacterSheet.SLOT_PLACES.has(slot))
+			and PackPanel.EMPTY_PICTURES.values().all(func(id: String) -> bool: return Items.exists(id)),
+		"every worn square has an empty picture, each a real item (the approved mock's list)")
+	# The satchel's square (the eleventh) shows only while one is worn: its package is off.
+	player.slots[Items.BAG] = ""
+	pack._refresh()
+	var hidden_empty := not sheet.boxes[Items.BAG].visible
+	player.slots[Items.BAG] = "food_sack"
+	pack._refresh()
+	var shown_worn: bool = sheet.boxes[Items.BAG].visible
+	player.slots[Items.BAG] = bag_was
+	pack._refresh()
+	_check(hidden_empty and shown_worn, "the satchel's square is not drawn while none is worn, and is while one is (%s, %s)" % [hidden_empty, shown_worn])
+	# The foot (the approved window): empty on success; a refused move says why in rust with the acted-on square's
+	# rim, matched by the "Server" party line that answers within a short wait (the server sends no square).
+	pack._refresh()
+	pack.acted(true, -1)  # No move waits on an answer: a "Server" line from the join ("You find yourself in the wilds.") landed inside an earlier move's wait.
+	_check(pack.foot_shown().is_empty() and not pack.foot_is_refused(), "the pack window's foot is empty until a refusal (%s, %s)" % [pack.foot_shown(), pack.foot_is_refused()])
+	pack.acted(true, Items.HEAD)
+	_main._on_message("party", {"from": "Server", "text": "A sword is not worn on the head."})
+	var head_box := pack.box_in(true, Items.HEAD)
+	_check(pack.foot_shown() == "A sword is not worn on the head." and pack.foot_is_refused() and head_box.state == "refused",
+		"a refused move: the server's words in the foot, in rust, and the acted-on square's rust rim (%s, %s)" % [pack.foot_shown(), head_box.state])
+	_main._on_message("party", {"from": "Server", "text": "You pick up 5 gold."})
+	_check(pack.foot_shown() == "A sword is not worn on the head.", "a later Server line with no move waiting does not change the foot")
+	pack.acted(true, Items.HEAD)
+	_check(pack.foot_shown().is_empty(), "the next move clears the foot")
+	pack._acted["at"] = Time.get_ticks_msec() - PackPanel.ACT_WAIT_MSEC - 10
+	_main._on_message("party", {"from": "Server", "text": "No room in your pack for the cloak."})
+	_check(pack.foot_shown().is_empty(), "a Server line after the wait is not that move's refusal")
 	_check(sheet.boxes.values().all(func(b: PackPanel.SlotBox) -> bool: return b.get_children().filter(func(c: Node) -> bool: return c is Label and c.text.length() == 1).is_empty()),
 		"no letters on the worn squares (point 2)")
 	var right_was := player.slots[Items.RIGHT_HAND]
@@ -2981,7 +3009,24 @@ func _test_character_sheet(pack: PackPanel) -> void:
 			"the gold at the right end of the pack's title row, inside the pack (%s, %s)" % [gold.get_global_rect(), title])
 		var screen := get_viewport().get_visible_rect()
 		_check(screen.encloses(a), "the window on the screen (%s in %s)" % [a, screen])
+		# ui-design's reserved rect for the bottom-right windows (the HUD's rects, 11-11): 2128, 1056, 1672 x 1064 in
+		# the HUD's 3840 x 2160 units (the same at 1080 and 720: the canvas scales as one).
+		# The test window is not the game's 1920 x 1080 (headless gives it another canvas), so the rect is read from the
+		# screen's own bottom-right corner, as the window is anchored.
+		var reserved := Rect2(Vector2(2128.0, 1056.0) + (screen.end - Vector2(3840.0, 2160.0)), Vector2(1672.0, 1064.0))
+		_check(reserved.grow(1.0).encloses(a), "the pack window sits inside the reserved bottom-right rect (%s in %s, screen %s)" % [a, reserved, screen])
 		_check(pack.beside(Vector2(100, 100), 20).x + 100 <= a.position.x, "a store window goes clear of it")
+		# pack-1080: "Load" beside the weight meter, the close mark at the title row's right end, the gold left of it.
+		_check(sheet.load_word.text == "Load" and sheet.load_word.get_global_rect().end.x <= sheet.load_bar.get_global_rect().position.x + 1.0
+				and absf(sheet.load_word.get_global_rect().get_center().y - sheet.load_bar.get_global_rect().get_center().y) < 2.0,
+			"the word Load left of the weight meter, on its row (%s, %s)" % [sheet.load_word.get_global_rect(), sheet.load_bar.get_global_rect()])
+		var cross := pack._close.get_global_rect()
+		_check(a.encloses(cross) and title.end.x <= cross.position.x + 1.0 and absf(cross.get_center().y - title.get_center().y) < 2.0,
+			"the close mark at the pack title row's right end, the gold's end left of it (%s, %s)" % [cross, title])
+		pack._close.pressed.emit()
+		_check(not pack.shown, "the close mark closes the pack, as Esc does")
+		pack.shown = true
+		pack._refresh()
 	# The two modes: read-only takes no drag from or onto a square.
 	var data := {"slots_of": player, "slot": Items.PACK_SLOTS[0], "count": 0}
 	var right: PackPanel.SlotBox = sheet.boxes[Items.RIGHT_HAND]

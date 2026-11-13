@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The pack and your gear are one parchment window: the gear a plain grid with each empty square's picture faint, no body figure, the pack beside it, a close mark at the top right and "Load" beside the weight bar (787 amended (6)).
 - After a reconnect or a walk into another area, trees and walls between you and the camera keep clearing out of the way, and your outline keeps showing behind things (623 amended (7)).
 - Builder mode: in the spots ghost, a spot the proposal keeps now shows as a firm ring at about three-quarters the strength of a new one, where it was a faint tint easily taken for moss; a spot taken away shows its red cross at the same strength (859 amended (7)).
 - A townsperson's window opened again keeps its width, so it no longer comes up as a small stub beside the pack before she speaks (802 amended (12)).

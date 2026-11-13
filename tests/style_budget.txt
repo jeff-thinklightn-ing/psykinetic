@@ -25,7 +25,7 @@ render/main_menu.gd 1 0 0
 render/minimap.gd 1 4 0
 render/note_sheet.gd 2 0 0
 render/options_panel.gd 15 0 0
-render/pack_panel.gd 19 4 0
+render/pack_panel.gd 16 4 0
 render/quest_panel.gd 5 1 0
 render/shop_panel.gd 4 0 0
 render/speech_bubbles.gd 5 0 0

@@ -16500,6 +16500,11 @@ func _build_talk() -> void:
 	add_child(_options_layer)
 	_options_layer.add_child(options_panel)
 	pack_panel = PackPanel.new()
+	pack_panel.close_pressed.connect(func() -> void:
+		if pack_panel.other != null:
+			close_other()
+		else:
+			pack_panel.shown = false)  # The pack's close mark, as Esc.
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
 	pack_panel.double_click = pack_double_click
@@ -17647,6 +17652,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			town_notes[zone_name_here()] = str(data.get("text", ""))  # The big map's box, not the log.
 			return
 		talk.add_line(str(data.get("from", "")), str(data.get("text", "")), true, true)
+		if str(data.get("from", "")) == "Server" and pack_panel != null:
+			pack_panel.refuse_words(str(data.get("text", "")))  # A move just made was refused: said in the pack window's foot too.
 		if data.get("taken") is Array and _client3d != null and DisplayServer.get_name() != "headless":
 			_client3d.sweep_in(data["taken"], _local_player())  # F's sweep flies in (773).
 		return
