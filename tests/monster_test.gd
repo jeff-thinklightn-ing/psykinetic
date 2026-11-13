@@ -1853,6 +1853,7 @@ func _test_ambush() -> void:
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_freed_striker()
+	_test_freed_striker_den_walk()
 	_test_alert_note()
 	_test_despawn_forget()
 	_test_link_slots()
@@ -10013,3 +10014,59 @@ func _test_despawn_cost() -> void:
 	var each := spent / 1000.0
 	print("[897] cost: %.1f us a despawn over %d entities in the zone" % [each, World._entities.size()])
 	_check(each < 5000.0, "a despawn's pass over %d entities: %.1f us (bound 5000)" % [World._entities.size(), each])
+
+
+## 806 amended (20)'s walk home (the coordinator's ask, 11-12: playtest's
+## bots cannot wear a bear under 11 hp, so the joined walk was dropped): the
+## great bear and the old grey under DEN_BELOW, their striker gone (left and
+## freed), walk to their den. Twice each: the striker freed mid-walk (the
+## box's case: the one it broke off from), and freed before it saw anyone.
+func _test_freed_striker_den_walk() -> void:
+	print("%s== under 15%%, its striker gone (freed): it walks to its den ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for symbol: String in ["B", "G"]:
+		for mid_walk: bool in [true, false]:
+			var arena: Array[String] = ["##########################", "#........................#", "#........................#",
+				"#........................#", "#........................#", "##########################"]
+			arena[2] = "#" + ".".repeat(19) + symbol + "P...#"
+			var f := _build(arena)
+			var beast: Monster = f[symbol][0]
+			var striker: GridEntity = f["P"][0]
+			var den := Vector2i(2, 2)
+			beast.set("den", den)
+			beast.sight_range = 8  # _build leaves its monsters blind (sight 0).
+			beast.senses.cone_cos = -1.0
+			striker.max_hp = 9999
+			striker.hp = 9999
+			var held := int(floor(0.14 * beast.max_hp))
+			beast.hp = held
+			World.damage(beast, 1, striker)
+			held = beast.hp
+			var broke := not mid_walk
+			if mid_walk:
+				beast.target = striker
+				for i in 20:
+					World.step()
+					if beast.get("_wallow_from") == striker:
+						broke = true
+						break
+			World.despawn(striker)
+			striker.free()
+			var cleared: bool = beast.struck_by == null and beast.get("_wallow_from") == null
+			var start := beast.tile
+			var near := int((GreatBear.DEN_RULE if symbol == "B" else OldWolf.DEN_RULE)["near"])
+			var reached := -1
+			for i in 600:
+				World.step()
+				if beast.hp > 0 and beast.hp < held:
+					beast.hp = held
+				if World.distance(beast.tile, den) <= near:
+					reached = i
+					break
+			_check(broke and cleared and reached >= 0,
+				"%s at %d of %d, its striker freed %s: struck_by and its walk's foe read nobody, and it walks home from %s to its den %s (%s)" % [
+					str(beast.spawn_spec.get("kind", "")), held, beast.max_hp, "mid-walk" if mid_walk else "before it saw anyone",
+					start, den, "in %.1f s" % (reached / 10.0) if reached >= 0 else "never in 60 s, at %s" % beast.tile])
+	DayNight.reset()
+	Monster.idling = true
