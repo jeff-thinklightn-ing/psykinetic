@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Umbrage has a farmer, who walks in on their own, and the town lays out their field before any other build (613 amended (8)).
 - In the crypt, the fallen knight's quest ends at the bier in the First Hall: lay his remains there, and his thanks charges your Encolpion Amulet for any holy knight's remains you bring, as Aldous tells you; once the draugr rests, sit on his throne to be taken back to the First Hall (896).
 - Brought back after a fall with the low camera on, you are drawn where you wake from the first moment, not hidden until the camera gets there (912).
 - At night a trader at a forest camp sleeps on his bedroll, and a trader held by bandits stays where he's held all night (799 amended (3)).

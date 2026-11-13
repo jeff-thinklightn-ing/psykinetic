@@ -26,6 +26,9 @@ func _ready() -> void:
 	World.set_process(false)
 	DayNight.day_steps = DAY
 	_rules = Production.read_rules()
+	# 613 amended (8): a town with a field rule and no farmer has one walk in, and his field goes
+	# ahead of the roofs these cases watch the carpenter mend: off in this world (resident_test's switch).
+	_rules.get_or_add("crop", {})["walks_in"] = false
 	_test_water()
 	_test_season()
 	_test_roofs()

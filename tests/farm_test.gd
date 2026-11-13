@@ -1004,30 +1004,27 @@ func _test_maker_comes() -> void:
 
 func _test_sought() -> void:
 	print("
-== the sought (613 amended): the farmer's story ==")
-	var towns := _towns(1, false)
+== the sought (613 amended): a trade's story (the shepherd's; the farmer walks in since WALKIN) ==")
+	var towns := _towns(1, true)
 	var laid := {}  # Place key -> {place, where}: what maps has laid.
 	var asked := []
 	towns.place_sought = func(town: String, trade: String, variant: Dictionary, id: String) -> Variant:
 		asked.append([town, trade, variant, id])
 		return laid.get(str(variant.get("place", "")), "")
-	var farmers := func(of: Towns) -> Array:
-		return of.residents(TOWN).filter(func(id: String) -> bool: return "farmer" in of.production.worker(id)["trades"])
-	var story: Dictionary = _rules["sought"]["trades"]["farmer"]
-	# 613 amended (6): the farmer's camp variant is out of economy.json until its package is whole
-	# (every farmer seek at the farmstead); a story with two variants is still how the sought
-	# alternate, so this test gives his story its camp variant back in its own rules.
-	if not story.has("alt"):
-		story["alt"] = {"place": "camp", "where": "camp", "holder": "", "story": "sought.farmer.camp"}
-	_year(towns, int(_rules["crop"]["growth_days"]) + 1)
+	var trade := "shepherd"
+	var keepers := func(of: Towns) -> Array:
+		return of.residents(TOWN).filter(func(id: String) -> bool: return trade in of.production.worker(id)["trades"])
+	var story: Dictionary = _rules["sought"]["trades"][trade]
+	towns._seek(TOWN, "fm_shep", "Wat", trade)
+	_year(towns, 1)
 	var entries: Array = towns.sought(TOWN)
-	_check(farmers.call(towns).is_empty() and entries.size() == 1 and str(entries[0]["trade"]) == "farmer" and str(entries[0]["place"]) == "",
-		"no farmer walks in: one is sought, waiting while the farmstead isn't laid (%s)" % [entries])
+	_check(keepers.call(towns).is_empty() and entries.size() == 1 and str(entries[0]["trade"]) == trade and str(entries[0]["place"]) == "",
+		"one sought, waiting while his place isn't laid (%s)" % [entries])
 	var id := str(entries[0]["id"]) if not entries.is_empty() else ""
 	var worker: Dictionary = towns.production.worker(id)
 	_check(worker.get("origin") == "sought" and bool(worker.get("away")) and id not in towns.residents(TOWN),
 		"a worker of the town, away, not a resident (%s)" % [worker])
-	_check(not asked.is_empty() and asked[0][2] == story and asked[0][1] == "farmer", "maps asked with the farmer's story (%s)" % [asked.back() if not asked.is_empty() else []])
+	_check(not asked.is_empty() and asked[0][2] == story and asked[0][1] == trade, "maps asked with his story (%s)" % [asked.back() if not asked.is_empty() else []])
 	var tries := asked.size()
 	_year(towns, 1)
 	_check(asked.size() - tries <= 2, "tried about once a day (%d)" % (asked.size() - tries))
@@ -1035,8 +1032,8 @@ func _test_sought() -> void:
 	_year(towns, 2)
 	var entry: Dictionary = towns.sought_entry(id)
 	_check(entry.get("place") == "wilds/%s" % story["place"] and entry.get("where") == "wilds" and entry.get("holder") == ""
-		and entry.get("story") == str(story["story"]) and entry.get("town") == TOWN, "then at the old farmstead, lost, his story's (%s)" % [entry])
-	_check(towns.sought(TOWN).size() == 1 and farmers.call(towns).is_empty(), "only one sought, and still no farmer")
+		and entry.get("story") == str(story["story"]) and entry.get("town") == TOWN, "then at his place, lost, his story's (%s)" % [entry])
+	_check(towns.sought(TOWN).size() == 1 and keepers.call(towns).is_empty(), "only one sought, and still none home")
 	_check(towns.free_sought(id, "p1") and not towns.free_sought(id, "p2") and towns.sought_entry(id)["freed_by"] == "p1", "freed by p1, once")
 	_check(towns.sought_lost(id) and towns.sought_entry(id)["place"] == "" and towns.sought_entry(id)["freed_by"] == "", "lost on the way: unplaced again")
 	towns.camps = func() -> Array: return [{"id": "wilds/camp_1", "area": "wilds", "cell": Vector2i.ZERO, "faction": "goblins"}]
@@ -1052,8 +1049,8 @@ func _test_sought() -> void:
 	_check(again.sought_entry(id).get("story") == str(story["alt"]["story"]) and int(again.sought_entry(id).get("tries", 0)) == 2, "saved and loaded")
 	var xp := towns.xp(TOWN)
 	towns.camp_taken("wilds/camp_1", "goblins", Factions.NOBODY)
-	_check(farmers.call(towns) == [id] and not bool(towns.production.worker(id)["away"]) and towns.sought(TOWN).is_empty() and towns.xp(TOWN) > xp
-		and towns.captives(TOWN).is_empty(), "the camp falls: home, a resident farmer at work, rescue experience (%s)" % [farmers.call(towns)])
+	_check(keepers.call(towns) == [id] and not bool(towns.production.worker(id)["away"]) and towns.sought(TOWN).is_empty() and towns.xp(TOWN) > xp
+		and towns.captives(TOWN).is_empty(), "the camp falls: home, a resident, rescue experience (%s)" % [keepers.call(towns)])
 
 	print("
 == wandering off, low too long ==")
@@ -1062,6 +1059,7 @@ func _test_sought() -> void:
 	towns.production.set_owed(id, 5)
 	towns.note_rescue(TOWN, "h1", "Wat", "hunter")
 	towns.production.set_owed("h1", 5)
+	towns.production.set_owed("f1", 5)
 	var leave := int(_rules["sought"]["leave_days"])
 	var shop := towns.production.workshop_of(id)
 	_year(towns, leave - 1)
@@ -1069,11 +1067,12 @@ func _test_sought() -> void:
 	_year(towns, 2)
 	entry = towns.sought_entry(id)
 	_check(gone == [[TOWN, id]] and id not in towns.residents(TOWN) and bool(entry.get("wandered")) and bool(towns.production.worker(id)["away"])
-		and towns.sought(TOWN).filter(func(each: Dictionary) -> bool: return each["trade"] == "farmer").size() == 1,
-		"owed too long: the farmer wanders off, the same worker, sought again (%s %s)" % [entry, gone])
+		and towns.sought(TOWN).filter(func(each: Dictionary) -> bool: return each["trade"] == trade).size() == 1,
+		"owed too long: he wanders off, the same worker, sought again (%s %s)" % [entry, gone])
 	_check(entry.get("door") == (shop if not shop.is_empty() else "inn"), "the note on the door of the shop they kept (%s, %s)" % [entry.get("door"), shop])
 	_check(towns.sought(TOWN).all(func(each: Dictionary) -> bool: return each["door"] == "" or bool(each["wandered"])), "one who never came has no door")
 	_check("h1" in towns.residents(TOWN), "a hunter (no story of his trade) stays")
+	_check("f1" in towns.residents(TOWN) and towns.sought_entry("f1").is_empty(), "the farmer (never sought, WALKIN) stays, owed or not")
 	_check(entry.get("place") == "wilds/%s" % story["place"] or entry.get("place") == "wilds/camp_1", "back to a place of his story (%s)" % entry.get("place"))
 	_check(_year(towns, 1) >= 0 and towns.free_sought(id, "p1") and towns.sought_home(id) and id in towns.residents(TOWN), "found again and home")
 	# Low again at once: not within wander_every_days of the last (613 amended, tuned).
@@ -1089,13 +1088,13 @@ func _test_sought() -> void:
 
 	print("
 == the sought answered by another ==")
-	towns = _towns(1, false)
+	towns = _towns(1, true)
 	towns.place_sought = func(_t: String, _tr: String, _v: Dictionary, _i: String) -> String: return "wilds/x"
-	_year(towns, int(_rules["crop"]["growth_days"]) + 1)
-	id = str(towns.sought(TOWN)[0]["id"]) if not towns.sought(TOWN).is_empty() else ""
-	towns.note_rescue(TOWN, "f9", "Ada", "farmer")
+	towns._seek(TOWN, "fm_shep2", "Wat", trade)
 	_year(towns, 1)
-	_check(towns.sought(TOWN).is_empty() and towns.production.worker(id).is_empty() and farmers.call(towns) == ["f9"], "a farmer came another way: the word called off, the sought gone")
+	towns.note_rescue(TOWN, "s9", "Ada", trade)
+	_year(towns, 1)
+	_check(towns.sought(TOWN).is_empty() and towns.production.worker("fm_shep2").is_empty() and keepers.call(towns) == ["s9"], "a shepherd came another way: the word called off, the sought gone")
 
 	print("
 == the smith under the castle, held by the goblins ==")
@@ -1110,49 +1109,73 @@ func _test_sought() -> void:
 	_check(towns._story("medicine_man").is_empty(), "no story for the medicine man yet: he walks in")
 
 
-## The hill herders (decision 640, economy's side): a herder comes to each
-## hills refuge keyed in herder.places, with his start sheep; he lambs in
-## spring, and every few days walks all but keep down to the town with a
-## butchery, the fold's count dropping while he is away; the town buys
-## what its treasury pays; what it doesn't comes home with him. No
-## butchery: he stays home. Saved and loaded.
-## The first rescue (613 amended (3)): crop.sought_first, a town with no field
-## and no farmer seeks one at once, named at his refuge; home, the town plans
-## its field. Off, nothing comes without a field.
+## WALKIN (Jeff 11-13: "first farmer doesnt need a rescue at all, just farmhands or further
+## farmers as the town grows"): a town's own farmer is never sought. No field standing and no
+## farmer: one walks in at once and the town plans its field for him; a standing field with no
+## farmer (his death): the next walks in after growth_days. Never sought, even where the rules
+## give the farmer a story; a world saved with word out for him lets him come in at once, led or
+## not, with no hold on him left. Then the sought's words and food first, as before.
 func _test_sought_first() -> void:
 	print("
-== the first rescue (613 amended (3)): a farmer sought before the field ==")
-	# 613 amended (4): a tour's server argument turns it on for that server; without it, nothing.
-	var by_arg: Dictionary = _rules.duplicate(true)
-	by_arg["crop"]["sought_first"] = false
-	_check(not Towns.sought_first_by_arg(by_arg, PackedStringArray(["--seamless"])) and not bool(by_arg["crop"]["sought_first"]),
-		"no --sought-first: the flag stays as the level has it")
-	_check(Towns.sought_first_by_arg(by_arg, PackedStringArray(["--run-marker=1", "--sought-first"])) and bool(by_arg["crop"]["sought_first"])
-		and not bool(_rules["crop"].get("sought_first", false)), "--sought-first: on for this server's rules only")
-	for on: bool in [false, true]:
-		var rules := _rules.duplicate(true)
-		rules["crop"]["sought_first"] = on
+== the town's own farmer walks in (WALKIN) ==")
+	var farmers := func(of: Towns) -> Array:
+		return of.residents(TOWN).filter(func(id: String) -> bool: return "farmer" in of.production.worker(id)["trades"])
+	# The rules as an old save's level had them: the farmer with a story, the place laid.
+	var storied := _rules.duplicate(true)
+	storied["sought"]["trades"]["farmer"] = {"place": "old_farmstead", "where": "wilds", "holder": "", "story": "sought.farmer"}
+	var place_of := func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Variant:
+		return {"place": "wilds/%s" % variant.get("place", ""), "where": "wilds", "named": "the old farmstead"} if str(variant.get("place", "")) == "old_farmstead" else ""
+	_check(not _rules["sought"]["trades"].has("farmer") and not _rules["crop"].has("sought_first"), "economy.json: no farmer in sought.trades, no crop.sought_first")
+	_check(bool(_rules["crop"].get("walks_in", true)), "economy.json never sets crop.walks_in false (a test world's switch only)")
+	for rules: Dictionary in [_rules, storied]:
 		var towns := _towns(1, false, rules)
 		towns._town(TOWN)["buildings"].erase("field")
-		towns.place_sought = func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Variant:
-			return {"place": "wilds/%s" % variant.get("place", ""), "where": "wilds", "named": "the old farmstead"} if str(variant.get("place", "")) == "old_farmstead" else ""
+		towns.place_sought = place_of
 		_year(towns, 1)
-		var entries: Array = towns.sought(TOWN)
-		if not on:
-			_check(entries.is_empty() and towns.residents(TOWN).is_empty(), "off: no field, nobody sought (%s)" % [entries])
-			continue
-		_check(entries.size() == 1 and str(entries[0]["trade"]) == "farmer" and str(entries[0]["place"]) == "wilds/old_farmstead"
-			and str(entries[0].get("door", "")) == "", "on: a farmer sought on day one at the old farmstead, no door note (%s)" % [entries])
-		_check(not entries.is_empty() and Towns.sought_where(entries[0]) == "at the old farmstead", "the rumour's place is the map's name (%s)" % [Towns.sought_where(entries[0]) if not entries.is_empty() else ""])
-		_check(towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return str(line["what"]).ends_with("has no farmer: word goes out for one")), "word goes out, the town's first news")
-		var id := str(entries[0]["id"]) if not entries.is_empty() else ""
+		var came: Array = farmers.call(towns)
+		_check(came.size() == 1 and towns.sought(TOWN).is_empty() and not bool(towns.production.worker(str(came[0]))["away"]),
+			"no field, no farmer: one walks in on day one, nothing sought (%s; a story in the rules: %s)" % [came, rules == storied])
+		_check(towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return str(line["what"]).ends_with("the farmer comes to work the field"))
+			and not towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return str(line["what"]).contains("word goes out")), "the town's log: he comes; no word goes out")
+		# Planned the turn he came (free since the ruling), so by now it is ordered or built: choose has passed it.
+		var field_now := towns.building(TOWN, "field")
+		_check(towns.xp(TOWN) == 0 and towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the town sets about building a field")
+			and (int(field_now.get("job", 0)) != 0 or field_now.get("state") == Towns.STANDING),
+			"the town plans its field for him, with no experience (%s)" % [field_now])
 		_year(towns, 2)
-		_check(towns.sought(TOWN).size() == 1, "only one sought while he waits")
-		_check(towns.free_sought(id, "p1") and towns.sought_home(id) and id in towns.residents(TOWN), "led home: a resident")
-		_check(towns.choose(TOWN) == "field", "the town plans its field for him (%s)" % towns.choose(TOWN))
-		_check(Towns.sought_where({"place": "forest/camp_1", "where": "camp", "named": "x"}) == "held at a camp" and Towns.sought_where({"place": "", "where": "", "named": ""}) == "somewhere out there"
-			and Towns.sought_where({"place": "wilds/x", "where": "wilds", "named": ""}) == "in the wilds", "a camp, unplaced and unnamed keep where_words")
-	# voice's joining table, lore's names: the map's shown name, the word by its first words.
+		_check(farmers.call(towns) == came, "and only the one")
+	# A standing field whose farmer died: the next after growth_days, walking in.
+	var widow := _towns(1, false, storied)
+	widow.place_sought = place_of
+	var grow := int(_rules["crop"]["growth_days"])
+	_year(widow, grow - 1)
+	_check(farmers.call(widow).is_empty() and widow.sought(TOWN).is_empty(), "a field standing, no farmer: none before growth_days, nothing sought")
+	_year(widow, 2)
+	_check(farmers.call(widow).size() == 1 and widow.sought(TOWN).is_empty(), "then one walks in (%s)" % [farmers.call(widow)])
+
+	# A world saved with word out for its farmer (the first rescue, 613 amended (3)): placed at the
+	# farmstead and held at a camp, or being led home. Loaded, he comes in at the town's next turn.
+	for led: bool in [false, true]:
+		var old := _towns(1, false, storied)
+		old._town(TOWN)["buildings"].erase("field")
+		old._seek(TOWN, "fm_old", "Edda", "farmer")
+		var entry: Dictionary = old._town(TOWN)["sought"]["fm_old"]
+		entry.merge({"place": "wilds/camp_1", "where": "camp", "named": "", "story": "sought.farmer.camp", "holder": "goblins",
+			"freed_by": "p1" if led else ""}, true)
+		old._town(TOWN)["captives"].append({"id": "fm_old", "name": "Edda", "trade": "farmer", "origin": "sought:wilds/camp_1", "purse": 0,
+			"taken_at": 0, "by": "goblins", "held_by": "wilds/camp_1"})
+		var loaded := Towns.new(old.to_dict(), old.production, _rules, old.clock)
+		_check(loaded.sought(TOWN).size() == 1 and loaded.captives(TOWN).size() == 1, "(loaded mid-seek: the word and the hold as saved, led %s)" % led)
+		loaded._sought_turn(TOWN)
+		_check(loaded.sought(TOWN).is_empty() and loaded.captives(TOWN).is_empty() and "fm_old" in loaded.residents(TOWN)
+			and not bool(loaded.production.worker("fm_old")["away"]), "led %s: he comes in at once, no word or hold left (%s)" % [led, loaded.sought(TOWN)])
+		_check(loaded.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == Towns.OWN_WAY % ["Edda", "farmer", TOWN]), "the log: he finds the way alone")
+		loaded.tick()
+		_check(farmers.call(loaded) == ["fm_old"] and loaded.sought(TOWN).is_empty(), "and no second farmer walks in beside him (%s)" % [farmers.call(loaded)])
+
+	# The sought's words, as before (voice's joining table, lore's names).
+	_check(Towns.sought_where({"place": "forest/camp_1", "where": "camp", "named": "x"}) == "held at a camp" and Towns.sought_where({"place": "", "where": "", "named": ""}) == "somewhere out there"
+		and Towns.sought_where({"place": "wilds/x", "where": "wilds", "named": ""}) == "in the wilds", "a camp, unplaced and unnamed keep where_words")
 	var said := func(named: String, where: String, holder: String, secret: bool) -> String:
 		return Towns.sought_where({"place": "x/y", "where": where, "named": named, "holder": holder, "secret": secret})
 	_check(said.call("the path to the hunters' camps", "forest", "", false) == "on the path to the hunters' camps" and said.call("the thick of the forest", "forest", "", false) == "in the thick of the forest"
@@ -1170,7 +1193,7 @@ func _test_sought_first() -> void:
 	first._town(TOWN)["buildings"].erase("field")
 	first.note_rescue(TOWN, "w1", "Hazel", "woodcutter")
 	first.note_rescue(TOWN, "f1", "Edda", "farmer")
-	first._town(TOWN)["spent"] = first.xp_earned(TOWN) - 10  # 10 to spend: one build, as on the farmer's homecoming.
+	first._town(TOWN)["spent"] = first.xp_earned(TOWN) - 10  # 10 to spend: one build.
 	_check(first.xp(TOWN) == 10 and first.choose(TOWN) == "field", "food first: the farmer's field before Hazel's woodshed, wanted earlier (%s)" % first.choose(TOWN))
 	first._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	_check(first.choose(TOWN) == "woodshed", "a field standing: the woodshed's turn (%s)" % first.choose(TOWN))
@@ -1190,7 +1213,7 @@ func _test_sought_first() -> void:
 	_check(mid.production.building_in(TOWN) and mid._field_first(TOWN), "a build in hand, the farmer home: the field ordered all the same")
 	var field_job := int(mid.building(TOWN, "field").get("job", 0))
 	_check(field_job != 0 and mid.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the town sets about building a field")
-		and mid.xp(TOWN) == 0, "the field's job, the town's word, its xp price paid (%d, xp %d)" % [field_job, mid.xp(TOWN)])
+		and mid.xp(TOWN) == 10, "the field's job, the town's word, no experience spent on the first field (%d, xp %d)" % [field_job, mid.xp(TOWN)])
 	_check(mid.production.job(inn_job) == inn_before, "the inn's job and progress untouched (%s)" % [mid.production.job(inn_job)])
 	var order: Array[int] = mid.production.build_order()
 	_check(order.find(field_job) < order.find(shed_job) and order.find(field_job) != -1, "the field heads the queued builds, the woodshed ordered earlier after it (%s)" % [order])
@@ -1204,14 +1227,10 @@ func _test_sought_first() -> void:
 	_check(bool(reloaded.job(field_job).get("first", false)) and again.find(field_job) != -1 and again.find(field_job) < again.find(shed_job),
 		"saved and loaded: the field's \"first\" read back, still ahead of the woodshed (%s)" % [again])
 
-	# 613 amended (5): a field that doesn't stand is none to the seek (the box's town may hold any of
-	# these when the flip comes); one that stands is waited on by growth as before.
-	var place_of := func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Variant:
-		return {"place": "wilds/%s" % variant.get("place", ""), "where": "wilds", "named": "the old farmstead"} if str(variant.get("place", "")) == "old_farmstead" else ""
-	var on_rules := _rules.duplicate(true)
-	on_rules["crop"]["sought_first"] = true
+	# 613 amended (5), as WALKIN keeps it: a field that doesn't stand is none (the box's town may hold
+	# any of these), so a farmer walks in at once; one that stands is waited on by growth.
 	for state: String in [Towns.PLANNED, Towns.BUILDING, Towns.DAMAGED, Towns.DISREPAIR, Towns.RUIN, "gone", Towns.STANDING]:
-		var each := _towns(1, false, on_rules)
+		var each := _towns(1, false, storied)
 		each._town(TOWN)["buildings"].erase("field")
 		if state == "gone":
 			each._town(TOWN)["gone"] = ["field"]
@@ -1219,45 +1238,47 @@ func _test_sought_first() -> void:
 			each._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 0 if state in [Towns.PLANNED, Towns.RUIN] else 1, "state": state, "since": 0, "job": 0}
 		each.place_sought = place_of
 		each._farmer_comes(TOWN)
-		var asked := each.sought(TOWN).filter(func(entry: Dictionary) -> bool: return str(entry["trade"]) == "farmer")
 		if state == Towns.STANDING:
-			_check(asked.is_empty(), "a standing field with no farmer: waited on by growth, not sought at once (%s)" % [asked])
+			_check(farmers.call(each).is_empty() and each.sought(TOWN).is_empty(), "a standing field with no farmer: waited on by growth, not at once")
 		else:
-			_check(asked.size() == 1, "a field %s: none that stands, a farmer sought at once (%s)" % [state, asked])
+			_check(farmers.call(each).size() == 1 and each.sought(TOWN).is_empty(), "a field %s: none that stands, a farmer walks in at once (%s)" % [state, farmers.call(each)])
 
-	# 613 amended (5): a sought one whose place the world has lost is placed again at boot, by count.
-	var lost := _towns(1, false, on_rules)
-	lost._town(TOWN)["buildings"].erase("field")
-	lost.place_sought = place_of
-	lost._farmer_comes(TOWN)
+	# 613 amended (5): a sought one whose place the world has lost is placed again at boot, by count
+	# (the shepherd's story here; the farmer is never sought).
+	var lost := _towns(1, true)
+	lost.place_sought = func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Variant:
+		return {"place": "hills/%s" % variant.get("place", ""), "where": "hills", "named": "a hill cave"} if str(variant.get("place", "")) == "hill_cave" else ""
+	lost._seek(TOWN, "fm_lost", "Wat", "shepherd")
 	_year(lost, 1)
 	var held: Array = lost.sought(TOWN)
-	_check(held.size() == 1 and str(held[0]["place"]) == "wilds/old_farmstead", "(placed at the old farmstead: %s)" % [held])
+	_check(held.size() == 1 and str(held[0]["place"]) == "hills/hill_cave", "(placed at the hill cave: %s)" % [held])
 	_check(lost.place_again(func(_entry: Dictionary) -> bool: return true) == 0, "every place there: none placed again")
 	_check(lost.place_again(func(_entry: Dictionary) -> bool: return false) == 1 and str(lost.sought(TOWN)[0]["place"]).is_empty(),
 		"its place gone: let go, to be placed again (%s)" % [lost.sought(TOWN)])
 	lost._sought_turn(TOWN)
-	_check(str(lost.sought(TOWN)[0]["place"]) == "wilds/old_farmstead", "placed again on the town's next turn (%s)" % [lost.sought(TOWN)])
+	_check(str(lost.sought(TOWN)[0]["place"]) == "hills/hill_cave", "placed again on the town's next turn (%s)" % [lost.sought(TOWN)])
 
-	# 613 amended (5): a town that can't yet pay for the field still seeks its farmer (the rescue is the
-	# players' to make whatever the town holds); his homecoming's experience (xp.rescue) pays for it,
-	# and short of that he waits, unseated, the field the first thing it builds once it can.
-	var poor := _towns(1, false, on_rules)
+	# A town with no experience still plans its first field (the coordinator's ruling, 11-13): only its
+	# later levels ask experience. Short of wood or a carpenter is the only wait (the build's own).
+	var poor := _towns(1, false)
 	poor._town(TOWN)["buildings"].erase("field")
-	poor.place_sought = place_of
-	var field_xp := int(on_rules["buildings"]["field"]["xp"])
-	poor._town(TOWN)["spent"] = poor.xp_earned(TOWN) + int(on_rules["xp"]["rescue"]) - field_xp + 1  # Short of the field by one, even with the homecoming.
-	_check(poor.can_build_words(TOWN, "field") == "can build field no (xp %d of %d)" % [poor.xp(TOWN), field_xp], "the boot line's word: no (%s)" % poor.can_build_words(TOWN, "field"))
+	var field_xp := int(_rules["buildings"]["field"]["xp"])
+	poor._town(TOWN)["spent"] = poor.xp_earned(TOWN)
+	_check(poor.xp(TOWN) == 0 and poor.can_build_words(TOWN, "field") == "can build field yes (xp 0 of 0)", "the boot line's word: yes, the first costs none (%s)" % poor.can_build_words(TOWN, "field"))
 	poor._farmer_comes(TOWN)
-	_year(poor, 1)
-	var wanted: Array = poor.sought(TOWN)
-	_check(wanted.size() == 1 and str(wanted[0]["trade"]) == "farmer", "sought all the same (%s)" % [wanted])
-	var home := not wanted.is_empty() and poor.free_sought(str(wanted[0]["id"]), "p1") and poor.sought_home(str(wanted[0]["id"]))
-	_check(home and poor.choose(TOWN) != "field" and poor.xp(TOWN) < field_xp, "home short of the field's price: no field yet (xp %d, chooses %s)" % [poor.xp(TOWN), poor.choose(TOWN)])
-	poor.add_xp(TOWN, 1, "test")
-	_check(poor.choose(TOWN) == "field" and poor.can_build_words(TOWN, "field").begins_with("can build field yes"), "once it can: the field first (%s)" % poor.choose(TOWN))
+	_check(farmers.call(poor).size() == 1 and poor.choose(TOWN) == "field" and poor.unlock(TOWN, "field") and poor.xp(TOWN) == 0,
+		"he walks in; with no experience the town plans its field all the same, nothing spent (xp %d)" % poor.xp(TOWN))
+	poor._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	_check(poor.can_build_words(TOWN, "field") == "can build field no (xp 0 of %d)" % (field_xp * 2) and poor.xp_price(TOWN, "inn") == int(_rules["buildings"]["inn"]["xp"]),
+		"its second level, and every other build, at the price as before (%s)" % poor.can_build_words(TOWN, "field"))
 
 
+## The hill herders (decision 640, economy's side): a herder comes to each
+## hills refuge keyed in herder.places, with his start sheep; he lambs in
+## spring, and every few days walks all but keep down to the town with a
+## butchery, the fold's count dropping while he is away; the town buys
+## what its treasury pays; what it doesn't comes home with him. No
+## butchery: he stays home. Saved and loaded.
 func _test_herders() -> void:
 	print("
 == the hill herders ==")

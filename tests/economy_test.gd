@@ -1029,7 +1029,6 @@ func _test_town_sheet(host: Player) -> void:
 	_check(sheet["strain"] == World.towns.strain(STORE) and sheet["strain"].has("days") and sheet["strain"].has("why"), "its strain toward falling (649): %s" % [sheet["strain"]])
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 	await _test_town_window(host)
-	_test_farmer_ask()
 	_test_person_takes(host)
 	_test_trophies(host)
 	_test_charm_inputs(host)
@@ -1561,35 +1560,6 @@ func _test_admin_stock(host: Player) -> void:
 ## player at the store, Donate ("contribute") banking a thing the town is
 ## short of with the town's regard moved and the effect noted, the day's cap,
 ## and the refusal away from the store.
-## The first rescue (613 amended (3)): while someone in town goes hungry and a farmer is
-## sought, the town's asks carry him by trade and where (ui's "We have no farmer"); not
-## while nobody is hungry.
-func _test_farmer_ask() -> void:
-	print("
-== the town's ask for a farmer (613 amended (3)) ==")
-	var people := World.towns.residents(STORE)
-	if people.is_empty():
-		_check(false, "a resident to go hungry")
-		return
-	var who := people[0]
-	var was := str(World.production.worker(who).get("fed", ""))
-	World.towns._seek(STORE, "farmer_ask_test", "Tam", "farmer")
-	var entry: Dictionary = World.towns._town(STORE)["sought"]["farmer_ask_test"]
-	entry["place"] = "wilds/old_farmstead"
-	entry["where"] = "wilds"
-	entry["named"] = "the old farmstead"
-	var sought := func() -> Array: return _main.town_asks(STORE).filter(func(row: Dictionary) -> bool: return row.get("kind") == "sought")
-	World.production._workers[who]["fed"] = ""
-	var quiet: Array = sought.call()
-	World.production._workers[who]["fed"] = "hungry"
-	var asked: Array = sought.call()
-	_check(quiet.is_empty() and asked.size() == 1 and asked[0].get("trade") == "farmer" and asked[0].get("where") == "at the old farmstead",
-		"hungry with a farmer sought: one ask, by trade and where; none while fed (%s / %s)" % [quiet, asked])
-	World.production._workers[who]["fed"] = was
-	World.towns._town(STORE)["sought"].erase("farmer_ask_test")
-	World.production.remove_worker("farmer_ask_test")
-
-
 func _test_town_window(host: Player) -> void:
 	print("\n== the town window (768) ==")
 	var me := host.player_id

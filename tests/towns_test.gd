@@ -245,9 +245,9 @@ func _test_boot_line() -> void:
 	record["gone"] = ["pasture"]
 	record["sought"] = {"s1": {"id": "s1", "name": "Edda", "trade": "farmer"}}
 	var tail := "; buildings " + _towns.boot_line(TOWN).get_slice("; buildings ", 1)  # The inn standing adds room: cut at the new parts.
-	var field_xp := int(_towns.rules.get("buildings", {}).get("field", {}).get("xp", 0))  # This test's rules may have no field.
-	_check(tail == "; buildings field ruin 0, inn standing 1; gone pasture; sought 1 (farmer 1); can build field %s (xp %d of %d)" % [
-		"yes" if _towns.xp(TOWN) >= field_xp else "no", _towns.xp(TOWN), field_xp], "buildings, gone, sought and the field's price told (%s)" % tail)
+	# A field at level 0 (this ruin) is the town's first: no experience asked (613 amended (8)).
+	_check(tail == "; buildings field ruin 0, inn standing 1; gone pasture; sought 1 (farmer 1); can build field yes (xp %d of 0)" % _towns.xp(TOWN),
+		"buildings, gone, sought and the field's price told (%s)" % tail)
 	_check(not "Edda" in _towns.boot_line(TOWN), "no sought name in it")
 	record["buildings"] = kept_houses
 	record.erase("gone")

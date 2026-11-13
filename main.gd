@@ -4824,7 +4824,6 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
-	Towns.sought_first_by_arg(World.towns.rules, OS.get_cmdline_user_args())  # 613 amended (4): a tour's server only.
 	World.towns.herders_from_dict(snapshot.get("herders", {}))  # The hill herders (640).
 	World.towns.huts_from_dict(snapshot.get("huts", {}))  # The healers' huts (733).
 	# The forest felled and growing back, as the snapshot left it (591).
@@ -12882,6 +12881,14 @@ func _sync_residents() -> void:
 			Townsfolk.treat(World.production, body.worker_id, by, "the healer", body.escort_of)
 			body.escort_of = ""
 			body.escort_name = ""
+		if wanted.has(body.worker_id) and not body.sought.is_empty() and str(wanted[body.worker_id].get("sought", "")).is_empty():
+			# One sought who came in by himself (Towns._own_way_in: a gatherer after gatherers_days, an old
+			# save's farmer since 613 amended (8)) is wanted as a resident under the same key: the waiting
+			# body goes, and he stands again as the resident he is.
+			_travelling = true
+			World.despawn(body)
+			_travelling = false
+			continue
 		if wanted.has(body.worker_id):
 			have[body.worker_id] = true
 			body.take_places(wanted[body.worker_id]["places"])  # A goal its place left is picked again (875 amended (1)).
@@ -19098,15 +19105,9 @@ func town_asks(town: String) -> Array:
 				if not wants.is_empty():
 					wants.sort()
 					out.append({"kind": "healer", "open": true, "until": -1, "wants": wants})
-	# The first rescue (613 amended (3), the coordinator's ruling): a hungry town's sheet
-	# says what would feed it, its sought farmer by trade and where (ui's "We have no
-	# farmer"), only while someone in town is fed by it or goes hungry.
-	if World.production != null and World.production.on_dole(town) > 0:
-		for entry: Dictionary in World.towns.sought(town):
-			if str(entry.get("trade", "")) == "farmer":
-				out.append({"kind": "sought", "open": true, "until": -1, "trade": "farmer",
-					"where": Towns.sought_where(entry) if not str(entry.get("place", "")).is_empty() else ""})  # "" unplaced: voice's bare "We have no farmer."
-				break
+	# The first rescue's sheet row (613 amended (3): a sought farmer by trade and where, ui's
+	# "We have no farmer") went with it (WALKIN: the town's farmer is never sought);
+	# TownSheet's "sought" words stay for the package "further hands".
 	return out
 
 

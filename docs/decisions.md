@@ -31320,6 +31320,60 @@ the build order, the inn's job unchanged); level_test: the farmstead's cell, no 
 level data; protocol unchanged; no new class_name; the save gains a job's "first" (an old save has none); no
 bullet (the farmstead's yard and the road's dirt are maps' bullet if any).
 
+**613 amended (8): the town's own farmer walks in** (Jeff's answer to town-feeds-itself, 11-13: "first farmer doesnt
+need a rescue at all, just farmhands or further farmers as the town grows"; the coordinator's reading and ruling the
+same day: the replacement for a farmer who dies walks in too, and rescues bring a town's further hands, the package
+"further hands"). The first rescue (613 amended (3)) is undone; nothing a player can reach changes, since it never
+switched on:
+- Towns._farmer_comes: a town whose rules have a field, with no field standing (613 amended (5)'s sense: planned,
+  half-built, damaged, in disrepair, a ruin or gone count as none) and no farmer, resident or sought, gets one at
+  once; a town whose field stands with no farmer (his death) gets the next after crop.growth_days, as before.
+  Either way Towns._farmer_walks_in moves him in by growth (Towns._move_in, the half of _arrive that was there:
+  add_worker origin "growth", a resident, seated if there is room, "<name> the farmer comes to work the field" in the
+  town's log), whatever sought.trades says (Towns.WALKS_IN, "farmer"). Home, he is an unseated resident and the town
+  plans its field for him, first of all its builds (613 amended (6)'s _field_first).
+- A town's first field costs no experience (the coordinator's ruling, 11-13: he brings none, where a rescue's
+  xp.rescue paid for it before, and a town that needed a player's deed before its own farmer could plant would not
+  feed itself): Towns.xp_price(town, kind), its rules' xp times the next level, is 0 for the field's level 1, read
+  by choose, unlock and can_build_words. It is paid in the carpenter's time and wood as any build; a town short of
+  either is the only one that waits. The field's later levels and every other build keep their price. Umbrage (the
+  box's one town, release's journal counts 11-13: no farmer, nothing built, 66 experience gained since 10-05) gets
+  its farmer and plans its field at the deploy's first turn.
+- crop.walks_in (absent: true) false leaves only the replacement: resident_test's world sets it, its towns having
+  no farmer and its cases watching fixed bodies, and so do wells_test's (the carpenter's roofs) and return_test's
+  (the officials' worker counts); farm_test checks economy.json never sets it false.
+- What a player can see of the field first (wells_test's roof case, the coordinator's question, 11-13): the field is
+  one build like any other under 522's one at a time. With its 6 wood in the store, a storm-broken roof is ordered
+  as soon as the field stands: the carpenter's 3000 steps, about 1.3 hours of the game's day. Short of the wood,
+  the roof is ordered once the field has waited build_wait.days (2) as a stalled build, and the carpenter then
+  takes whichever of the two has its materials first (522). So in a town whose store lacks 6 wood when its farmer
+  walks in, a broken roof can stand broken up to two days longer than it would have; with the wood, a little over
+  an hour. That is the same wait as behind any build stalled on wood: what is new is only that the field is that
+  build, ordered at the farmer's first turn.
+- economy.json: "farmer" is out of sought.trades, so he neither seeks nor wanders off low too long (the wander rule
+  is for a trade with a story); crop.sought_first and its note are gone. Towns.sought_first_by_arg and its
+  "--sought-first" server argument are gone: the box's unit never carried it, and a server ignores an argument it
+  doesn't read, so a tour run at an older sha (tools/remote_shot.sh still passes it under --tour) boots as ever.
+  Main.town_asks' sought-farmer row (ui's "We have no farmer") went with it; TownSheet's words for a "sought" row
+  stay for the package "further hands". residents.json's sought.farmer and sought.farmer.camp notes are npc's and
+  now read by nothing.
+- A world saved with word out for its farmer (a tour's server, or a test world; the box never switched it on)
+  lets him come in at the town's next turn: Towns._own_way_in, the path 767 amended gave the gatherers, takes
+  the trade never sought at once, led or not: his entry and any camp's hold on him (_unhold) go, he is a resident
+  back at work, "<name> the farmer, sent for, finds the way to <town> alone" in the log, no rescue experience and
+  no rescued signal. His body at the refuge, his door note and the town's rumour of him are all read from the
+  entry (Main._sought_here, _sought_notes, _rumour_for), so they go with it; he had no band (the farmer's story
+  named no holder). Main._sync_residents: a body still sought whose worker is now wanted as a plain resident
+  (come in by himself, under the same key) is despawned and stands again as the resident, so no waiting body is
+  left at the refuge or carried into town (so for a gatherer's own way in since 767 amended as well).
+Tests: farm_test _test_sought (the sought's machinery on the shepherd's story, the farmer staying owed or not),
+_test_sought_first (no field: one walks in on day one, nothing sought, the field planned, even where the rules give
+him a story; a standing field: the next after growth_days; a save mid-seek, held at a camp or being led: he comes
+in at once, no word or hold left, no second farmer; each field state of 613 amended (5)); resident_test
+_test_farmer_walks_in (an old save's sought farmer: his body at the refuge, then none, no refuge spec, door note or
+rumour once he walks in); economy_test _test_farmer_ask removed. Server only; protocol and save format unchanged
+(an old save's sought entry is read as before and let go); no new class_name. Bullet (voice's words).
+
 ## 643. The sought's door note and the town's rumour
 
 Jeff (2026-10-23, on the sought of 613): "town knows rumors - they leave a

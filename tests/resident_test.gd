@@ -34,6 +34,9 @@ func _ready() -> void:
 	_register_levels()
 	Net.map_name = TOWN
 	await _boot()
+	# 613 amended (8): a town with no field and no farmer has one walk in at its next turn (a body in
+	# the houses and the square these cases watch): off in this world, as the towns here had no farmer before.
+	World.towns.rules.get_or_add("crop", {})["walks_in"] = false
 	# Every resident here is steady: a thief's night in the square (decision
 	# 404) would move the bodies these cases watch. A static method, not a
 	# lambda: a lambda kept in a static Callable outlives this node and
@@ -56,6 +59,7 @@ func _ready() -> void:
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
 	_test_sought_body()
+	_test_farmer_walks_in()
 	_test_pointers()  # 837.
 	_test_sought_band()
 	_test_what_is_true()
@@ -2412,6 +2416,33 @@ func _test_sought_body() -> void:
 	_check(home != null and home.sought.is_empty() and not home.strayed and home.escort_of.is_empty(), "the body is one of the town's")
 	_check(str(Townsfolk.card_of(World.production, "rs-sought").get("facts", [{}]).back().get("text", "")).contains(" brought you to "), "the card: who brought them")
 	World.production.set_away("rs-sought", true)
+	_sync()
+
+
+## 613 amended (8): the town's own farmer is never sought (Jeff 11-13). A world saved with word out
+## for him (the first rescue, 613 amended (3)) has his body waiting at the refuge, his door note and the
+## town's rumour of him; at the town's next turn he walks in, and with the entry go the body, the note
+## and the rumour: nothing left of him out there.
+func _test_farmer_walks_in() -> void:
+	print("\n== an old save's sought farmer walks in (613 amended (8)): no body, note or rumour left ==")
+	var id := "rs-old-farmer"
+	World.towns._seek(STORE, id, "Edda", "farmer")
+	var entry: Dictionary = World.towns._town(STORE)["sought"][id]
+	entry.merge({"place": NICHE, "where": "wilds", "holder": "", "story": "sought.farmer", "door": "inn", "named": "the old farmstead"}, true)
+	DayNight.set_hour(10.0)
+	_sync()
+	var before := _body(id)
+	_check(before != null and before.sought == id, "(saved mid-seek: his body waits at the refuge)")
+	World.towns._sought_turn(STORE)
+	_sync()
+	var after := _body(id)
+	_check(World.towns.sought_entry(id).is_empty() and id in World.towns.residents(STORE) and not bool(World.production.worker(id).get("away", true)),
+		"the town's next turn: he walks in, a resident, no word out (%s)" % [World.towns.sought(STORE)])
+	_check(after == null or after.sought.is_empty(), "no sought body of him left (%s)" % [after.sought if after != null else "none"])
+	_check(_main._sought_here().all(func(spec: Dictionary) -> bool: return str(spec.get("sought", "")) != id)
+		and _main._sought_notes(TOWN).all(func(note: Dictionary) -> bool: return not str(note.get("text", "")).contains("Edda"))
+		and not _main._rumour_for(STORE, "rs-walk-p", 9).contains("Edda"), "no refuge spec, door note or rumour of him")
+	World.towns.died(STORE, id, "a test ends")
 	_sync()
 
 

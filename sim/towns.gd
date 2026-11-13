@@ -393,8 +393,20 @@ func can_build_words(town: String, kind: String) -> String:
 	var level := int(building(town, kind).get("level", 0)) + 1
 	if level > int(spec.get("max_level", 3)):
 		return "can build %s no (at its top level)" % kind
-	var price := int(spec.get("xp", 0)) * level
+	var price := xp_price(town, kind)
 	return "can build %s %s (xp %d of %d)" % [kind, "yes" if xp(town) >= price else "no", xp(town), price]
+
+
+## The experience [param kind]'s next level costs [param town]: its rules' xp times that level. A
+## town's first field (its level 1) costs none (613 amended (8), the coordinator's ruling, 11-13: a
+## town feeds itself, no player's deed before its own farmer can plant): it is paid in the
+## carpenter's time and wood as any build. The field's later levels and every other build keep
+## their price.
+func xp_price(town: String, kind: String) -> int:
+	var level := int(building(town, kind).get("level", 0)) + 1
+	if kind == "field" and level == 1:
+		return 0
+	return int(rules.get("buildings", {}).get(kind, {}).get("xp", 0)) * level
 
 
 ## boot_line's "<key> n, ..." of [param counts], sorted by key ("" for none).
@@ -891,7 +903,7 @@ func choose(town: String) -> String:
 			continue  # Being built already (a stalled one, decision 522).
 		var level := int(building(town, kind).get("level", 0)) + 1
 		var top := int(kinds[kind].get("max_level", 3))
-		if level <= top and xp(town) >= int(kinds[kind].get("xp", 0)) * level:
+		if level <= top and xp(town) >= xp_price(town, kind):
 			return kind
 	return ""
 
@@ -929,7 +941,7 @@ func unlock(town: String, kind: String) -> bool:
 	if house.get("state") in [PLANNED, BUILDING] and int(house.get("job", 0)) != 0:
 		return false
 	var level := int(house.get("level", 0)) + 1
-	var price := int(spec.get("xp", 0)) * level
+	var price := xp_price(town, kind)
 	if xp(town) < price:
 		return false
 	var record := _town(town)
@@ -1555,20 +1567,20 @@ func _crop_turn(town: String, crop_now: Dictionary, was: String, now_season: Str
 		crop_now["roots"] = false
 
 
-## A town whose field stands with no farmer gets one, a newcomer, once it
-## has stood growth_days without one (by growth; a rescue may bring one
-## first).
+## A town's own farmer (WALKIN; Jeff 11-13: "first farmer doesnt need a rescue at all,
+## just farmhands or further farmers as the town grows"): never sought, he walks in.
+## A town with no field standing (613 amended (5): planned, half-built, damaged, in
+## disrepair, a ruin or gone to the wild count as none) and no farmer gets one at once;
+## home, he is an unseated resident and the town plans its field for him (choose), its
+## first field costing no experience (xp_price). A town whose field stands with no farmer (his death)
+## gets the next once it has stood growth_days without one. crop.walks_in false (a test
+## world watching fixed bodies) leaves only the second.
 func _farmer_comes(town: String) -> void:
 	var house := building(town, "field")
 	var rule: Dictionary = rules.get("crop", {})
-	# 613 amended (5): no field that stands is none (planned, half-built, damaged, in
-	# disrepair, a ruin, or gone to the wild), so the flip seeks whatever the box holds.
-	if not _stands(town, "field") and bool(rule.get("sought_first", false)) and _seeking("farmer") and not _has_trade(town, "farmer"):
-		# The first rescue (613 amended (3), the coordinator's ruling: Jeff's 10-27 "the
-		# town is shaped by player interactions"): a town with no field and no farmer
-		# seeks one at once, at his story's place (the old farmstead); home, he is an
-		# unseated resident, and the town plans its field for him (choose).
-		_farmer_sought(town, rule)
+	if rules.get("buildings", {}).has("field") and not _stands(town, "field") and not _has_trade(town, WALKS_IN) \
+			and bool(rule.get("walks_in", true)):
+		_farmer_walks_in(town, rule)
 		return
 	if int(house.get("level", 0)) < 1 or house.get("state") != STANDING:
 		return
@@ -1582,37 +1594,24 @@ func _farmer_comes(town: String) -> void:
 	if now() - waiting_since < int(float(rule.get("growth_days", 5)) * maxi(DayNight.day_steps, 1)):
 		return
 	record.erase("farmer_wanted")
-	_farmer_sought(town, rule)
+	_farmer_walks_in(town, rule)
 
 
-## A server's own argument for the first rescue (613 amended (4)): a tour's
-## server started with it seeks a farmer as crop.sought_first does, for that
-## server only (playtest's joined walk before the flip). The box's unit never
-## carries it: the box gets the rescue by the flag in economy.json.
-const SOUGHT_FIRST_ARG := "--sought-first"
-
-
-## Turns crop.sought_first on in [param with_rules] when [param args] (the
-## server's user arguments) hold SOUGHT_FIRST_ARG, saying so; true if it did.
-static func sought_first_by_arg(with_rules: Dictionary, args: PackedStringArray) -> bool:
-	if SOUGHT_FIRST_ARG not in args:
-		return false
-	var crop: Dictionary = with_rules.get_or_add("crop", {})
-	crop["sought_first"] = true
-	print("[towns] crop.sought_first on by %s (this server only)" % SOUGHT_FIRST_ARG)
-	return true
+## The trade a town never seeks (WALKIN): its own farmer walks in (_farmer_comes). One
+## sought in a world saved before, word out for him, comes in at once (_own_way_in).
+const WALKS_IN := "farmer"
 
 
 ## [param town]'s next farmer, named by the town and the count come (crop
-## names): sought where the trade has a story, else moved in by growth.
-func _farmer_sought(town: String, rule: Dictionary) -> void:
+## names), moved in by growth (WALKIN: never sought, whatever sought.trades says).
+func _farmer_walks_in(town: String, rule: Dictionary) -> void:
 	var record := _town(town)
 	var count := int(record.get("farmers_came", 0)) + 1
 	record["farmers_came"] = count
 	var names: Array = rule.get("names", ["Tam"])
 	var name := _free_name(town, names, absi(hash("%s/%d" % [town, count])))
 	var id := "farmer_%s_%d" % [town.replace("/", "_"), count]
-	_arrive(town, id, name, "farmer", "%s the farmer comes to work the field" % name)
+	_move_in(town, id, name, WALKS_IN, "%s the farmer comes to work the field" % name)
 
 
 # --- Sheep and wool (decision 500) ---------------------------------------------------
@@ -1993,6 +1992,13 @@ func _arrive(town: String, id: String, name: String, trade: String, line: String
 	if _seeking(trade):
 		_seek(town, id, name, trade)
 		return false
+	return _move_in(town, id, name, trade, line)
+
+
+## Newcomer [param id] ([param name], of [param trade]) moved into [param town] by
+## growth, the log saying [param line]: a resident at once, seated if there is room.
+## False if no worker could be made.
+func _move_in(town: String, id: String, name: String, trade: String, line: String) -> bool:
 	if not production.add_worker(id, name, [trade], town, "growth"):
 		return false
 	_town(town)["residents"].append(id)
@@ -2361,12 +2367,16 @@ func sought_home(id: String) -> bool:
 ## amended, the coordinator: a quiet server's town isn't stalled for ever):
 ## home as sought_home brings them, but no rescue experience and no rescued
 ## signal (nobody found them). True if they came.
+## WALKIN: one of the trade never sought (WALKS_IN, the farmer), in a world saved with
+## word out for him, comes in the same way at the town's next turn, at once, led or not
+## (his body, any hold on him and the rumour of him are the entry's, so they go with it).
 func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
-	var days := float(rules.get("gatherers_days", 0))
-	if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
-		return false
-	if now() < int(entry.get("since", 0)) + int(days * maxi(DayNight.day_steps, 1)):
-		return false
+	if str(entry["trade"]) != WALKS_IN:
+		var days := float(rules.get("gatherers_days", 0))
+		if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
+			return false
+		if now() < int(entry.get("since", 0)) + int(days * maxi(DayNight.day_steps, 1)):
+			return false
 	var record := _town(town)
 	_unhold(town, id)
 	record["sought"].erase(id)

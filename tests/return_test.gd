@@ -40,6 +40,9 @@ func _ready() -> void:
 	World.set_process(false)
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("return_test/no_overlay/")
 	_rules = Production.read_rules()
+	# 613 amended (8): a town with a field rule and no farmer has one walk in, a worker the officials'
+	# cases would count: off in this world (resident_test's switch).
+	_rules.get_or_add("crop", {})["walks_in"] = false
 	_test_job()
 	_test_due()
 	_test_officials()
