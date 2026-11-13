@@ -15,7 +15,7 @@ extends PanelContainer
 ## what a click does; the square only reports it (pressed).
 ## An empty square may show what goes there (set_empty_picture, 854 amended (7);
 ## the pack mock's worn squares without the figure): the picture grey and faint
-## (the theme's slot_empty), under the thing's own and shown only while it has none.
+## (the theme's slot_empty), shown only while the square has no picture of its own.
 
 signal pressed(slot: UiSlot)
 
@@ -75,13 +75,13 @@ func _init() -> void:
 	grey.shader = _grey
 	_empty.material = grey
 	_empty.modulate = UiTheme.color("slot_empty")
-	_face.add_child(_empty)
 	_picture = TextureRect.new()
 	_picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_picture.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_face.add_child(_picture)
+	_face.add_child(_empty)  # After the picture: shown only while there is none.
 	_count = Label.new()
 	_count.theme_type_variation = &"SquareCount"
 	_count.position = Vector2(INSET, INSET)
