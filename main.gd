@@ -4369,17 +4369,27 @@ func _apply_generation(level_name: String, config: Dictionary, generation: int, 
 		_rebuilding = false
 	# Places outside the anchors are gone: from the holdings, and from the
 	# maps of those who knew them, sent their world over again.
-	_world_map = WorldMap.build()
+	var gone := adopt_world_map(WorldMap.build())
 	if World.holdings != null:
-		var gone := World.holdings.rebind(_world_map)
+		_place_captives(_world_map, gone)  # A new generation's camps hold their captives; a gone camp's come home (decision 518).
+	return true
+
+
+## [param map] (a WorldMap built after a level changed) put in use everywhere the world map is held, and
+## the holdings' places it no longer has: a regenerated level's and builder mode's accept alike (197
+## amended (1): an accept built its own and gave it to the holdings and towns alone, so the residents,
+## whose places _sync_residents reads from this one, kept the old spots, homes and work until a restart).
+## The holdings rebound to it, a gone place forgotten by those who knew it; the map's other holders
+## (maps-2a's reading, 2026-10-18): the raid groups route over the new floor (their routes and legs
+## dropped, each group going on from where it is); the game's richness is worked out again on it (its
+## steps from the mines are per cell and read once), the herds pointed at it.
+func adopt_world_map(map: WorldMap) -> Array[String]:
+	_world_map = map
+	var gone: Array[String] = []
+	if World.holdings != null:
+		gone.assign(World.holdings.rebind(_world_map))
 		if not gone.is_empty():
 			_forget_places(gone)
-		_place_captives(_world_map, gone)  # A new generation's camps hold their captives; a gone camp's come home (decision 518).
-	# The map's other holders (maps-2a's reading, 2026-10-18): the raid
-	# groups route over the new floor (their routes and legs dropped, each
-	# group going on from where it is); the game's richness is worked out
-	# again on it (its steps from the mines are per cell and read once), the
-	# herds pointed at it.
 	if World.raid_groups != null:
 		World.raid_groups.use_map(_world_map)
 	if World.trade != null:
@@ -4388,7 +4398,7 @@ func _apply_generation(level_name: String, config: Dictionary, generation: int, 
 		_remake_richness()
 	if World.forage != null:
 		World.forage.world_map = _world_map
-	return true
+	return gone
 
 
 ## The game's richness worked out again on the world map now (368

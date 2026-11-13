@@ -2308,6 +2308,31 @@ already emptied is full again (a builder can duplicate loot) and a fight is
 interrupted. That is acceptable for a dev tool; changing only what the
 proposal touched is the better way when it matters.
 
+197 amended (1) (the coordinator, 2026-11-13: a bug fix, its own take; the label from
+decision_number.sh): an accept hands Main the new world map. BuilderHost._save_and_reload built a
+WorldMap after the reload and gave it to the holdings and the towns alone; Main._world_map, set only at
+boot and when a regenerating level rebuilt, stayed the old one. The residents' places are made from it
+at every sync (_sync_residents, _resident_places: the area's spots, homes, buildings, work), so after a
+live accept a town's people kept the old spots, homes and work rects until the server restarted, the
+panel and the level files saying one thing and the townsfolk doing another. Nobody met it: release
+counted the box's journal back to 10-20, 0 asks and 0 accepts; the town trees' spots go through the
+headless runner into level files that land with a restart. Now Main.adopt_world_map(map), shared with
+the regenerated level's path so the two can't drift again, puts a new map in use everywhere one is held:
+Main's own, the holdings (rebound, a gone place forgotten by those who knew it, which an accept did not
+do before), the raid groups, the trade, the richness (remade on its pool task) and the forage; the
+accept then seeds the towns and places the captives as before, the regenerated path its captives. And a
+resident holding a spot the new places no longer list (taken up, or changed: moved, turned, its pose)
+lets it go at the sync and picks again (Resident.take_places, _spot_listed), rather than standing on
+it or walking to its cell, which may be walled now: a work spot it shows its trade on was otherwise kept
+for good (853 amended (14)). builder_zone_test: after an accept, Main's map is a new one, its area as a
+map freshly built on the saved files reads it (floor, places, buildings, spots, links), the forage
+reading it too; a resident on a taken-up spot, and on a turned one, picks again, one still listed (a
+fresh copy, as each sync makes) kept. A client keeps its own world map from its files: the map window's
+names and places for a level changed live stay as they were until it restarts, as before (the level
+itself is drawn anew from the terrain message). Server only, protocol unchanged, no new class_name, no
+bullet (a live accept is a builder's tool; a bullet waits on playtest seeing a resident take a newly
+laid spot on a joined client).
+
 ## 198. The world map editor edits level.json, through MapDocs
 
 The node map (`--world-map`, `editor/world_map_view`, Godot's GraphEdit)

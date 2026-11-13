@@ -370,7 +370,12 @@ func _save_and_reload(zone_name: String) -> bool:
 		return false
 	main.reload_zone(zone_name)
 	var world_map := WorldMap.build()
-	if World.holdings != null:
+	if main != null and main.has_method("adopt_world_map"):
+		# 197 amended (1): the new map everywhere one is held, as a regenerated level's is: the residents'
+		# places (read from Main's each sync: spots, homes, work), the holdings (places added, moved or gone,
+		# a gone one forgotten by those who knew it), the raid groups, the trade, the richness, the forage.
+		main.adopt_world_map(world_map)
+	elif World.holdings != null:
 		# Places added, moved or gone with the change.
 		World.holdings.rebind(world_map)
 	if World.towns != null:

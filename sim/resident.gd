@@ -755,9 +755,24 @@ func take_places(given: Dictionary) -> void:
 	places = given
 	if _goal == NO_CELL or not task.is_empty() or doing in [Doing.ROUNDS, Doing.VISIT, Doing.ESCORT, Doing.STRAYED]:
 		return
+	# 197 amended (1): a spot it holds that its places no longer list (taken up or changed by a builder's
+	# accept, now handed to it at once) is let go and another picked, never stood on or walked to: a work
+	# spot it shows its trade on was otherwise kept for good (853 amended (14)), its cell maybe walled now.
+	if not _spot.is_empty() and places.get("spots") is Dictionary and not _spot_listed(_spot):
+		_spot = {}
+		_pick_goal()
+		return
 	var now: Variant = places.get(key)
 	if now is Rect2i and now != was and (now as Rect2i).size != Vector2i.ZERO and not (now as Rect2i).has_point(_goal):
 		_pick_goal()
+
+
+## Whether [param spot] is among its places' spots as it is (cell, face, pose, use, town, trade, pair).
+func _spot_listed(spot: Dictionary) -> bool:
+	for listed: Variant in (places["spots"] as Dictionary).values():
+		if listed is Array and spot in listed:
+			return true
+	return false
 
 
 func _set_goal(cell: Vector2i) -> void:

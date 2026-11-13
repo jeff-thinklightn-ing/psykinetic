@@ -35,6 +35,7 @@ func _ready() -> void:
 		World.step()
 
 	await _test_ask_and_accept()
+	_test_spot_taken_up()
 	_test_terrain_message()
 	await _test_refused()
 	await _test_undo()
@@ -72,8 +73,17 @@ func _test_ask_and_accept() -> void:
 	_check("(Stub)" in str(proposal.get("summary", "")), "and what was made: %s" % proposal.get("summary"))
 	_check(not Level.overlaid("test_room"), "nothing is saved yet")
 
+	var boot_map: WorldMap = _main._world_map
 	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
 	await _wait_for("accepted")
+	# 197 amended (1): Main's world map, the one the residents' places are read from each sync, is the new one.
+	var fresh := WorldMap.build()
+	var held: Dictionary = _main._world_map.areas.get("test_room", {}) if _main._world_map != null else {}
+	var built: Dictionary = fresh.areas.get("test_room", {})
+	var same := ["floor", "places", "buildings", "spots", "links"].all(func(key: String) -> bool: return str(held.get(key)) == str(built.get(key)))
+	_check(_main._world_map != null and _main._world_map != boot_map and not held.is_empty() and same
+		and (World.forage == null or World.forage.world_map == _main._world_map),
+		"accepted: Main holds a new world map, as a fresh one built on the saved files reads, and the forage reads it too")
 	_check(Level.overlaid("test_room"), "accepted: the level is saved to the overlay (%s)" % ProjectSettings.globalize_path(OVERLAY))
 	_check(FileAccess.file_exists(OVERLAY + "test_room/level.json"), "level.json too: the overlay is a whole level")
 	var level := Level.load_level("test_room")
@@ -87,6 +97,34 @@ func _test_ask_and_accept() -> void:
 		"and the rebuilt chest is in the interest index, so it is sent to those near it (decision 217)")
 	var after := _player(Net.local_id)
 	_check(after != null and after.tile == host_tile, "and the host is where they were (%s)" % [after.tile if after else "-"])
+
+
+## 197 amended (1): the places a sync hands a resident after an accept no longer list the spot it holds
+## (taken up): it lets it go and picks again, never standing on it or walking to its cell.
+func _test_spot_taken_up() -> void:
+	print("\n== a resident on a spot an accept took up picks again ==")
+	var a := {"use": "square", "cell": Vector2i(4, 4), "face": Vector2i(5, 4), "pose": "stand", "town": "", "trade": "", "pair": ""}
+	var b := a.duplicate()
+	b["cell"] = Vector2i(8, 6)
+	b["face"] = Vector2i(9, 6)
+	var square := Rect2i(3, 3, 9, 6)
+	var body := Resident.new()
+	body.doing = Resident.Doing.SQUARE
+	body.tile = Vector2i(4, 4)
+	body.places = {"square": square, "spots": {"square": [a, b]}}
+	body._spot = a
+	body._goal = a["cell"]
+	body.take_places({"square": square, "spots": {"square": [a.duplicate(), b.duplicate()]}})
+	_check(body._spot == a and body._goal == a["cell"], "its spot still listed (a fresh copy, as each sync makes): kept")
+	body.take_places({"square": square, "spots": {"square": [b.duplicate()]}})
+	_check(body._spot != a and body._goal != a["cell"], "its spot taken up: let go, another picked (%s, goal %s)" % [body._spot, body._goal])
+	body._spot = b
+	body._goal = b["cell"]
+	var turned := b.duplicate()
+	turned["face"] = Vector2i(8, 7)
+	body.take_places({"square": square, "spots": {"square": [turned]}})
+	_check(body._spot != b, "its spot changed (turned): picked again (%s)" % [body._spot])
+	body.free()
 
 
 func _test_terrain_message() -> void:
