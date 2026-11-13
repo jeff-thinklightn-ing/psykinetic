@@ -49759,6 +49759,22 @@ over, an old one whose holder lives not (exit 4). Over the real file it places e
 "D amended" label (none unplaced) and new gives 845 today, over 833. Tools only; protocol unchanged; no
 class_name; no bullet.
 
+834 amended (1) (perf, 2026-11-12; the coordinator's assignment, release's condition; label from
+tools/decision_number.sh, taken with the tool unmended, at the first ask): the lock waits out Windows' access
+denied. perf's stack2 take passed everything but decision_number_test ("12 asking new at once": 11 numbers), a
+tool it does not touch. Lock.__enter__ caught FileExistsError only; on Windows a mkdir of the lock folder while
+the last holder's rmdir is still delete-pending is refused as PermissionError [WinError 5] Access is denied, so
+that ask ended in a traceback (exit 1) and the test, which dropped its stderr, read one number short. In a scratch
+state, 12 at once: 11 such tracebacks in 720 asks (60 rounds, each ask's hold short); about one landing in six had
+met it. Now __enter__ takes PermissionError as a hold, under the same LOCK_WAIT_SECONDS deadline (a lock that
+never clears still ends in exit 4, "the lock is held", never a spin; release's condition), and the stale rule is
+unchanged (a folder past LOCK_STALE_SECONDS whose holder is gone is cleared as before); __exit__ tries its rmdir
+again on PermissionError for up to a second. The test's two at-once checks print a failed ask's own last lines.
+Proof on this PC (a Windows fault; saturn cannot show it): the same 720 asks, none failed; 30 rounds of 12 at
+once on an opened state, all 360 numbered; decision_number_test 20 of 20; its new checks: an mkdir refused as
+access denied forever ends in exit 4 within the 0.3 s test deadline, one refused three times is then taken; the
+stale take-over check passes unchanged. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 840. The look comes from the theme: the override check
 
 ui-design, 2026-11-09; the coordinator's approval, release's number. Jeff split the interface in two (2026-11-09): ui owns what a window does, ui-design how it looks, and "no window script sets a colour, font or size of its own" (CLAUDE.md). That rule had no check, and the game's code held 175 theme overrides and 49 loose colours when this landed. tests/style_test holds each file to a budget that can only fall, so the count drops as windows move onto the shared parts (ui-design's parts design, C:/dev/review/ui-design/parts_design.md) and nothing new is added meanwhile.

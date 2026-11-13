@@ -243,7 +243,11 @@ class Lock:
                 with open(os.path.join(lock, "owner"), "w") as handle:
                     handle.write("%d %f\n" % (os.getpid(), time.time()))
                 return self
-            except FileExistsError:
+            except (FileExistsError, PermissionError):
+                # PermissionError (834 amended (1)): on Windows, a mkdir while the last
+                # holder's rmdir is still delete-pending is refused as access denied, not
+                # as existing: held a moment longer, so waited for like any other hold
+                # (it took 5 of 360 asks, 12 at once, and failed a landing, 2026-11-12).
                 if self._stale(lock):
                     try:
                         os.remove(os.path.join(lock, "owner"))
@@ -278,7 +282,17 @@ class Lock:
             os.remove(_path("lock", "owner"))
         except OSError:
             pass
-        os.rmdir(_path("lock"))
+        # A waiter's look into the folder can hold it open for a moment on Windows: its
+        # rmdir then refused, tried again for up to a second (834 amended (1)).
+        until = time.time() + 1.0
+        while True:
+            try:
+                os.rmdir(_path("lock"))
+                return
+            except PermissionError:
+                if time.time() > until:
+                    raise
+                time.sleep(0.02)
 
 
 def _fail(message, code):

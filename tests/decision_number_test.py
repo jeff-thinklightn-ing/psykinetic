@@ -130,20 +130,27 @@ runner = ("import sys, time; sys.path.insert(0, %r); import decision_number as d
 procs = [subprocess.Popen([sys.executable, "-B", "-c", runner, "new", "t%d" % i, "at once"], stdout=subprocess.PIPE,
     stderr=subprocess.PIPE) for i in range(12)]
 got = []
+errors = []
 for proc in procs:
-    out, _ = proc.communicate(timeout=60)
+    out, err = proc.communicate(timeout=60)
     if proc.returncode == 0:
         got.append(int(out.decode().strip()))
-check(sorted(got) == list(range(base + 1, base + 13)), "12 asking new at once: 12 different, consecutive (%s)" % sorted(got))
+    else:
+        # A failed ask's own words in the check line (834 amended (1)): this once read only "11 got".
+        errors.append("exit %d: %s" % (proc.returncode, " | ".join(err.decode(errors="replace").strip().splitlines()[-2:])))
+check(sorted(got) == list(range(base + 1, base + 13)), "12 asking new at once: 12 different, consecutive (%s)%s"
+    % (sorted(got), "; " + "; ".join(errors) if errors else ""))
 k = int(ask("amend", "perf", "688", "x")[1].split("(")[1].rstrip(")"))
 start = time.time() + 1.5
 runner = ("import sys, time; sys.path.insert(0, %r); import decision_number as dn; "
     "time.sleep(max(0.0, %f - time.time())); sys.exit(dn.main(sys.argv[1:]))") % (os.path.join(ROOT, "tools"), start)
 procs = [subprocess.Popen([sys.executable, "-B", "-c", runner, "amend", "t%d" % i, "688", "at once"], stdout=subprocess.PIPE,
     stderr=subprocess.PIPE) for i in range(6)]
-labels = sorted(proc.communicate(timeout=60)[0].decode().strip() for proc in procs)
+answers = [proc.communicate(timeout=60) for proc in procs]
+labels = sorted(out.decode().strip() for out, _ in answers)
+errors = [" | ".join(err.decode(errors="replace").strip().splitlines()[-2:]) for (_, err), proc in zip(answers, procs) if proc.returncode != 0]
 want = sorted("688 amended (%d)" % n for n in range(k + 1, k + 7))
-check(labels == want, "6 asking amend 688 at once: (k+1) to (k+6): %s" % labels)
+check(labels == want, "6 asking amend 688 at once: (k+1) to (k+6): %s%s" % (labels, "; " + "; ".join(errors) if errors else ""))
 
 print("== the lock ==")
 lock = os.path.join(os.environ["DECISION_NUMBERS_DIR"], "lock")
@@ -165,6 +172,28 @@ code, out, err = ask("new", "perf", "x")
 dn.LOCK_WAIT_SECONDS = saved_wait
 check(code == 4 and out == "" and "lock is held" in err, "an old lock whose holder lives is not taken: exit 4 (%s)" % err)
 shutil.rmtree(lock)
+# 834 amended (1): Windows refusing the lock's mkdir as access denied (a delete still pending)
+# is waited for like a hold, within the same deadline: one that never clears ends in exit 4,
+# not a spin; one that clears is taken.
+real_mkdir = os.mkdir
+refusals = {"left": 10 ** 9}
+def refusing_mkdir(path, *rest):
+    if os.path.basename(path) == "lock" and refusals["left"] > 0:
+        refusals["left"] -= 1
+        raise PermissionError(5, "Access is denied", path)
+    return real_mkdir(path, *rest)
+dn.os.mkdir = refusing_mkdir
+saved_wait, dn.LOCK_WAIT_SECONDS = dn.LOCK_WAIT_SECONDS, 0.3
+began = time.time()
+code, out, err = ask("new", "perf", "x")
+took = time.time() - began
+check(code == 4 and out == "" and "lock is held" in err and took < 5,
+    "a lock mkdir refused as access denied forever: exit 4 within the deadline, %.1f s (%s)" % (took, err))
+refusals["left"] = 3
+code, out, err = ask("new", "perf", "x")
+check(code == 0 and out.isdigit() and refusals["left"] == 0, "refused three times, then taken: %s (%s)" % (out, err))
+dn.os.mkdir = real_mkdir
+dn.LOCK_WAIT_SECONDS = saved_wait
 
 print("== the real docs/decisions.md ==")
 real = os.path.join(ROOT, "docs", "decisions.md")
