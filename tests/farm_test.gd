@@ -1097,6 +1097,13 @@ func _test_sought() -> void:
 func _test_sought_first() -> void:
 	print("
 == the first rescue (613 amended (3)): a farmer sought before the field ==")
+	# 613 amended (4): a tour's server argument turns it on for that server; without it, nothing.
+	var by_arg: Dictionary = _rules.duplicate(true)
+	by_arg["crop"]["sought_first"] = false
+	_check(not Towns.sought_first_by_arg(by_arg, PackedStringArray(["--seamless"])) and not bool(by_arg["crop"]["sought_first"]),
+		"no --sought-first: the flag stays as the level has it")
+	_check(Towns.sought_first_by_arg(by_arg, PackedStringArray(["--run-marker=1", "--sought-first"])) and bool(by_arg["crop"]["sought_first"])
+		and not bool(_rules["crop"].get("sought_first", false)), "--sought-first: on for this server's rules only")
 	for on: bool in [false, true]:
 		var rules := _rules.duplicate(true)
 		rules["crop"]["sought_first"] = on

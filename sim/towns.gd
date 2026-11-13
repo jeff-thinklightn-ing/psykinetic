@@ -1518,6 +1518,24 @@ func _farmer_comes(town: String) -> void:
 	_farmer_sought(town, rule)
 
 
+## A server's own argument for the first rescue (613 amended (4)): a tour's
+## server started with it seeks a farmer as crop.sought_first does, for that
+## server only (playtest's joined walk before the flip). The box's unit never
+## carries it: the box gets the rescue by the flag in economy.json.
+const SOUGHT_FIRST_ARG := "--sought-first"
+
+
+## Turns crop.sought_first on in [param with_rules] when [param args] (the
+## server's user arguments) hold SOUGHT_FIRST_ARG, saying so; true if it did.
+static func sought_first_by_arg(with_rules: Dictionary, args: PackedStringArray) -> bool:
+	if SOUGHT_FIRST_ARG not in args:
+		return false
+	var crop: Dictionary = with_rules.get_or_add("crop", {})
+	crop["sought_first"] = true
+	print("[towns] crop.sought_first on by %s (this server only)" % SOUGHT_FIRST_ARG)
+	return true
+
+
 ## [param town]'s next farmer, named by the town and the count come (crop
 ## names): sought where the trade has a story, else moved in by growth.
 func _farmer_sought(town: String, rule: Dictionary) -> void:

@@ -30867,6 +30867,18 @@ never lived in the town. resident_test: the farmstead by its map name, the camp'
 is (crop.sought_first false: no farmer is sought, so nobody says it). Server only; protocol unchanged; no new
 class_name; no bullet (the package's, when it is switched on).
 
+**613 amended (4): --sought-first, a tour's server only** (the coordinator's, 11-13). The first rescue
+is a package a player meets whole, and before the flip playtest walks it joined on a fresh server with it
+on for that run alone. Nothing could set a rule for one server (economy.json is read at boot, no overlay,
+no rule argument), so a server user argument does: Towns.sought_first_by_arg(rules, args), called by Main
+once Towns is made, sets crop.sought_first true in the rules Towns reads when the arguments hold
+--sought-first, and prints "[towns] crop.sought_first on by --sought-first (this server only)"; without
+it the level's flag stands. The box's unit never carries it: the box gets the rescue by the flag in
+economy.json at the flip, nothing else. A laptop tour (perf's remote_shot --tour) passes it only once its
+server-argument allowlist carries it, under --tour. farm_test checks it on with the argument, the level's
+flag without, and the level's own rules untouched. Server only; protocol unchanged; no new class_name; no
+bullet.
+
 ## 643. The sought's door note and the town's rumour
 
 Jeff (2026-10-23, on the sought of 613): "town knows rumors - they leave a

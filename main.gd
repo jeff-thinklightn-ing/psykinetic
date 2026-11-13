@@ -4801,6 +4801,7 @@ func _boot() -> void:
 	World.production = Production.new(snapshot.get("production", {}), World.stockpile, World.holdings, World.steps_now)
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
+	Towns.sought_first_by_arg(World.towns.rules, OS.get_cmdline_user_args())  # 613 amended (4): a tour's server only.
 	World.towns.herders_from_dict(snapshot.get("herders", {}))  # The hill herders (640).
 	World.towns.huts_from_dict(snapshot.get("huts", {}))  # The healers' huts (733).
 	# The forest felled and growing back, as the snapshot left it (591).
