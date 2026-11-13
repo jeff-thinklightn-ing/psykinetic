@@ -595,8 +595,10 @@ def build(path: str, stem: str, target: int, keep: list, source: str, concept: s
 			weld(obj)
 			# Each mesh keeps its share of the budget.
 			decimate(obj, max(8, round(target * tris(obj) / total)), right)
-		for poly in obj.data.polygons:
-			poly.use_smooth = smooth
+			# A generated body keeps its own shading (body_gen's: a person's smooth with its sharp edges,
+			# 419 amended).
+			for poly in obj.data.polygons:
+				poly.use_smooth = smooth
 		if vertex_colours:
 			keep_vertex_colours(obj)
 		elif parts:

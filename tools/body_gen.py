@@ -50,6 +50,9 @@ PEOPLE_HEIGHTS = {"orc": 1.95, "kobold": 1.0}
 SEX = "male"
 ## Its people: "human", "orc" or "kobold" (set by main from --people).
 PEOPLE = "human"
+## A person's surface smooth-shaded, an edge whose faces turn more than this (degrees) kept sharp
+## (419 amended; --sharp-angle for a trial).
+SHARP_ANGLE = 55.0
 
 
 def per(human, orc=None, kobold=None):
@@ -2090,8 +2093,16 @@ def assemble(J: dict, which: str = "Body"):
 	bm.free()
 	if which == "Body" and PEOPLE == "kobold":
 		kobold_bands(body, J)  # Once its faces look outward.
-	for poly in body.data.polygons:
-		poly.use_smooth = False
+	if PEOPLE == "human":
+		# Smooth-shaded, edges sharper than SHARP_ANGLE kept sharp (419 amended: flat facets each took
+		# one value from the sun and broke a face or a chest into light and dark patches in the game's
+		# light; C:/dev/review/pc-character/light_faces_close.png).
+		for poly in body.data.polygons:
+			poly.use_smooth = True
+		body.data.set_sharp_from_angle(angle=math.radians(SHARP_ANGLE))
+	else:
+		for poly in body.data.polygons:
+			poly.use_smooth = False
 	return body
 
 
@@ -2105,6 +2116,8 @@ def main() -> None:
 	if SEX not in HEIGHTS:
 		raise SystemExit("--sex is male or female")
 	PEOPLE = a[a.index("--people") + 1] if "--people" in a else "human"
+	global SHARP_ANGLE
+	SHARP_ANGLE = float(a[a.index("--sharp-angle") + 1]) if "--sharp-angle" in a else SHARP_ANGLE
 	if PEOPLE not in ("human", "orc", "kobold"):
 		raise SystemExit("--people is human, orc or kobold")
 	if PEOPLE != "human" and SEX != "male":

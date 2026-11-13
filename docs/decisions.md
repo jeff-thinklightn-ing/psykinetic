@@ -12784,6 +12784,42 @@ rings at the shoulder, now sits flatter and 1.8 cm lower, under the torso's shou
 and the ring past the joint is half on the clavicle (Part.mixes): as high as the arm and
 turning wholly with it, it stood above the shoulder as a ridge when the arm came down.
 human_m, human_f (and 478's orc and kobold, the same sleeves) built again.
+Amended (2) (Jeff's "the bodies look like bad claymation place holders"; the coordinator's order
+and picks, 2026-11-12/13): people are smooth-shaded, and the head is drawn a tenth larger.
+- Smooth: body_gen built every face flat (use_smooth False) and body_build set each face flat
+  again. In the game's direct sun each facet took one value, so the near-equal facets of a face
+  or a chest came out as scattered light and dark patches. The light repro on the laptop (main's
+  bodies in the town's own sun and environment, one change at a time: shadows off, the shadow
+  bias raised, AgX, Filmic, the light under clipping, normals averaged; C:/dev/review/pc-character/
+  light_faces_close.png and light_sheet_front.png) found only the averaged normals calm. Neither
+  the tonemap nor the shadows were the cause. Cycles under a soft sky had hidden it.
+- So body_gen now builds a person's body and every part it wears smooth-shaded, with an edge
+  whose faces turn more than SHARP_ANGLE (65 degrees) kept sharp (Mesh.set_sharp_from_angle);
+  --sharp-angle N tries another. body_build keeps a generated body's own shading.
+- 65 was picked on a sheet under a hard sun (C:/dev/review/pc-character/smooth_angle_sheet.png):
+  at 35 and 50 the cheek and the side of the nose still split, at 65 the face, neck and chest are
+  one surface while the brim, the hood's rim, the belt, the hem, the collar and the boot soles
+  (80 to 90 degrees) stay crisp.
+- The orc and kobold that body_gen can still build (478's fallbacks) stay flat for now. The game
+  draws its painted ones (529).
+- human_m.glb went from 4.5 MB to 1.45 MB, with vertices shared across faces.
+- What changes: every body on human_m and human_f, which is the player, companions, residents
+  and the monsters drawn as people (580: robber, robber_brute, bandit, bandit_brute). art-kit's
+  pieces worn or carried (the lantern, the satchel, gear.hat, worn.felt_hat, the held
+  things) keep their own shading.
+- The head: client3d/head_size.gd (no class_name), a SkeletonModifier3D on every human
+  skeleton (Client3D._size_head from _make_model, and the character preview), scales the Head
+  bone's pose by HEAD_SCALE (1.10) after the animation each frame. Every clip keys every bone's
+  scale, so a scale set once on the pose or the rest is overwritten by the next frame's clip. The
+  skeleton puts its poses back after its modifiers, so the scale is never compounded.
+- 10 was picked from 0, 10 and 15 (C:/dev/review/pc-character/head_size_sheet.png): the heads sat
+  pinched on the shoulders under hood and hat, and at 15 the bare player looked young.
+- What rides the bone grows with it: hair, beards, hood, hats and the "head" socket's pieces.
+  Its origin, the neck's top, doesn't move, so these stay where they were: the look-at's aim
+  (_eyes_of) and the hand reach's pole, which read the origin, and the name plate, bubble, bar
+  and pick capsule, which stand by the model's "height".
+- Lands after Jeff has seen both in game (C:/dev/review/decisions/people-look.md).
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and

@@ -22765,6 +22765,19 @@ static func model_for(entity: GridEntity) -> Dictionary:
 	return MODELS.get(str(entity.spawn_spec.get("kind", "")), {})
 
 
+## A person's head drawn HEAD_SCALE of its built size (head_size.gd, after the animation each frame):
+## one on [param scene]'s skeleton, for a human look only (an orc's or a kobold's is its own art).
+const HeadSize := preload("res://client3d/head_size.gd")
+static func _size_head(scene: Node3D, look: PersonLook) -> void:
+	if look == null or look.people != "human":
+		return
+	for skeleton: Skeleton3D in scene.find_children("*", "Skeleton3D", true, false):
+		if skeleton.find_bone("Head") >= 0 and not skeleton.has_node("HeadSize"):
+			var size := HeadSize.new()
+			size.name = "HeadSize"
+			skeleton.add_child(size)
+
+
 ## The model as the puppet's Body: the scene turned to face +X (as the
 ## nose does, so Body turns with the facing; MODELS' "faces"), with an AnimationPlayer on
 ## its root playing its clips through an AnimRig of its own (decision 390),
@@ -22794,6 +22807,7 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		_dress(scene, tunic)
 		if puppet.has_meta("look"):
 			(puppet.get_meta("look") as PersonLook).apply(scene, tunic)
+			_size_head(scene, puppet.get_meta("look") as PersonLook)
 	if model.has("paint"):
 		# Its own paint (decision 529): its people's material, its variation as the goblin's is.
 		var look := painted_look(str(puppet.get_meta("entity_name", "")))

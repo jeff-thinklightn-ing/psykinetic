@@ -68,6 +68,7 @@ func show_look(look: PersonLook) -> void:
 		animator.play(Client3D.CLIP_IDLE)
 		Client3D._dress(_model, Color.WHITE)
 	look.apply(_model)
+	Client3D._size_head(_model, look)
 	_model.scale = Vector3.ONE * look.scale
 
 
