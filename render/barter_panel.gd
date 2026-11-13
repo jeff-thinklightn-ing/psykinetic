@@ -382,6 +382,7 @@ func _ready() -> void:
 	_line = LineEdit.new()
 	_line.name = "SayLine"
 	_line.max_length = LINE_MOST
+	_line.custom_minimum_size.x = CHAT_WIDTH  # The window keeps the chat's width with no line said yet, a reopen or a first open alike.
 	_line.visible = false
 	_line.text_submitted.connect(_submit)
 	_line.gui_input.connect(_line_input)

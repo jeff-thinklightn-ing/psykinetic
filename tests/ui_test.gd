@@ -3614,6 +3614,8 @@ func _test_person_window() -> void:
 		await get_tree().process_frame
 	_check(window.is_open() and window.person == body and window.talks and not window.trades and window.title_shown() == "Oda"
 		and not _main._bar.visible, "a click: their window, their name, the typing line, no squares for a farmer, no talk bar")
+	_check(window._box.get_combined_minimum_size().x >= float(BarterPanel.CHAT_WIDTH),
+		"with nothing said yet the window is as wide as its chat (a reopen is not a stub): %s" % [window._box.get_combined_minimum_size()])
 	_check(window.is_typing() and _main.is_typing(), "the typing line has the keys at once: no game key moves you")
 	_main._chat_sent_at = 0
 	window._submit("good morning")

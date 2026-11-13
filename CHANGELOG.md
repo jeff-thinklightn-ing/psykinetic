@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A townsperson's window opened again keeps its width, so it no longer comes up as a small stub beside the pack before she speaks (802 amended (12)).
 - People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).
 - Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
 
