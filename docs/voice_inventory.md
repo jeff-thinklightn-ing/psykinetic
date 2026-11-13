@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2867)
+## Lines in the code (2875)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -740,7 +740,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Her card: %s%s Already true of her: %s She believes: %s What was just said: %s | `sim/companion_facts.gd` extract_prompt() |
 |  | - nothing more yet | `sim/companion_facts.gd` extract_prompt() |
 
-### deal and quest windows (197)
+### deal and quest windows (205)
 
 | | Line | Where |
 |---|---|---|
@@ -788,27 +788,35 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s's pack was found in the robbers' camp under the mound | `sim/offers.gd` crypt_done() |
 |  | Bring my %s %s home from the camp of %s%s. | `sim/offers.gd` _commission_offer() |
 |  | Bring %s home | `sim/offers.gd` _commission_offer() |
+|  | My %s never came back from that camp. | `sim/offers.gd` _commission_offer() |
 |  | Clear the camp | `sim/offers.gd` _commission_offer() |
 |  | Clear the camp of %s%s, before they come again. | `sim/offers.gd` _commission_offer() |
+|  | Before they come again. | `sim/offers.gd` _commission_offer() |
 |  | The word the town sent out | `sim/offers.gd` _rumour_offer() |
 |  | What %s knows | `sim/offers.gd` _rumour_offer() |
 |  | What %s said | `sim/offers.gd` _rumour_offer() |
 |  | %s told me%s that %s. | `sim/offers.gd` _rumour_offer() |
 |  | Hear the chronicle | `sim/offers.gd` _page_offer() |
 |  | %s keeps the town's chronicle, with %s copy always to hand, and will read it to you. | `sim/offers.gd` _page_offer() |
+|  | Sit, and I'll read it to you. | `sim/offers.gd` _page_offer() |
 |  | %s the %s | `sim/offers.gd` chronicle_of() |
 |  | Bring the medicine man | `sim/offers.gd` _plea_offer() |
 |  | My %s %s lies sick with %s; the medicine man is out at his hut. Fetch him to %s. | `sim/offers.gd` _plea_offer() |
+|  | My %s is sick. The medicine man's out at his hut. | `sim/offers.gd` _plea_offer() |
 |  | Walk %s to the healer's | `sim/offers.gd` _plea_offer() |
 |  | My %s %s lies sick with %s. If you could walk %s to the healer's hut, the healer would see to %s. | `sim/offers.gd` _plea_offer() |
+|  | My %s is sick. The healer would see to %s. | `sim/offers.gd` _plea_offer() |
 |  | Walk %s home | `sim/offers.gd` _plea_offer() |
 |  | My %s %s has not come back from beyond the walls; if you find %s out there, walk %s home. | `sim/offers.gd` _plea_offer() |
+|  | My %s hasn't come back from beyond the walls. | `sim/offers.gd` _plea_offer() |
 |  | Help with a debt | `sim/offers.gd` _plea_offer() |
 |  | I owe the town %d gold; could you spare some of it? | `sim/offers.gd` _plea_offer() |
 |  | Speak for %s | `sim/offers.gd` _plea_offer() |
 |  | Lay my quarrel with %s before the lawspeaker when you see %s; say I was wronged. | `sim/offers.gd` _plea_offer() |
+|  | %s wronged me. The lawspeaker should hear it. | `sim/offers.gd` _plea_offer() |
 |  | Carry word to %s | `sim/offers.gd` _plea_offer() |
 |  | If you see %s, tell %s the matter between us is forgotten. | `sim/offers.gd` _plea_offer() |
+|  | Tell %s it's forgotten between us. | `sim/offers.gd` _plea_offer() |
 |  | Pay ahead for his care | `sim/offers.gd` _care_offers() |
 |  | Pay me %d gold now and I'll see to you after: fall where you will and you wake here, in my care. | `sim/offers.gd` _care_offers() |
 |  | Bring him herbs | `sim/offers.gd` _care_offers() |
