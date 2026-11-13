@@ -21,7 +21,7 @@ LOGS="$(mktemp -d)"
 . tests/test_ports.sh
 # The phases run at once (decision 279), each group on ports of its own:
 # phases 1 and 2 (2 reads 1's snapshot) on PORT, 3 on PORT + 1, 4 on PORT + 2,
-# 5 on PORT + 3 with its console on PORT + 4.
+# 5 on PORT + 3 with its console on PORT + 4, 6 on PORT + 7 (net_test.ps1 has + 5 and + 6).
 PORT=$((17760 + PORT_OFFSET))
 ADMIN=$((PORT + 4))
 TOKEN=test-secret
@@ -280,13 +280,31 @@ phase_5() {
 	echo "$quick_code" >"$LOGS/quick_code"
 }
 
+phase_6() {
+	P=$((PORT + 7))
+	# Phase 6: a foe's told lunge reaches a joined client (the coordinator's
+	# gap, 2026-11-12: playtest's joined crypt run recorded 0 of 26 robber
+	# lunge tells, and no test on main read a tell off the wire). Tess joins
+	# alone; the server lays a robber 3 cells east of her (--test-foe) and,
+	# with --test-tells, prints each tell it sends and whether its zone's
+	# peers (World.peers_in) hold her; her client prints each "telegraph"
+	# message it gets (cells, lands tick, its own tick) and each end.
+	server server9 --server --no-companions "--token=$TOKEN" --test-wait-players=1 --test-foe=robber,sword --test-tells
+	wait_for server9 'listening on port'
+	client clientT $GOOD --name=Tess --test-tells
+	wait_for server9 '\[test\] tell [0-9]+ lunge '
+	wait_for clientT '\[test\] tell got [0-9]+ lunge '
+	wait_for clientT '\[test\] tell end '
+	finish
+}
+
 # All the groups at once, each in a shell of its own (its instances and
 # helpers' state its own); what each printed (a wait given up) after. With
 # NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another: the
 # groups at once are fourteen Godots, a lean landing's peak.
 # NET_TEST_GROUPS (by hand only, never in a landing): just those groups,
 # e.g. "phase_3"; the checks of the others then fail.
-for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5}; do
+for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5 phase_6}; do
 	if [ -n "${NET_TEST_SERIAL:-}" ]; then
 		( "$group" ) >"$LOGS/$group.out" 2>&1
 	else
@@ -404,6 +422,20 @@ check "$(count '\[net\] lost the server; reconnecting' "$LOGS/clientR.log")$(cou
 check "$(count '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)' "$LOGS/server6.log")" 1 "phase 5: the restarted server puts him back on (9, 2)"
 check "$(count '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)' "$LOGS/clientR.log")" 1 "phase 5: and his client shows him there"
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)$' "$LOGS/clientR.log")" 1 "phase 5: and the room as it was, its entities sent again"
+# Phase 6: the server told her zone a lunge with her in it, and her client got
+# it, cells and all, at or before its lands tick, then its end. The first
+# check says which side fails: the server's peers_in leaving her out, or the
+# message lost on its way (no "tell got" with the server's line there).
+check "$(count '\[test\] tell [0-9]+ lunge lands [0-9]+, sent at tick [0-9]+: zone [^ ]+ holds 1 of 1 joined peers' "$LOGS/server9.log" | sed 's/^[1-9][0-9]*$/1/')" 1 "phase 6: the server sent a robber's told lunge to her zone, her peer in it (World.peers_in)"
+got_in_time=$(grep -oE '\[test\] tell got [0-9]+ lunge lands [0-9]+ with [0-9]+ cells at tick [0-9]+' "$LOGS/clientT.log" 2>/dev/null |
+	awk '{ if ($9 > 0 && $13 <= $7) n++ } END { print (n > 0) ? 1 : 0 }')
+check "$got_in_time" 1 "phase 6: her joined client got the lunge's telegraph, its cells, before its lands tick"
+got_ids=$(grep -oE '\[test\] tell got [0-9]+ lunge' "$LOGS/clientT.log" 2>/dev/null | awk '{print $4}' | sort -u)
+ended=0
+for id in $got_ids; do
+	grep -qE "\[test\] tell end $id landed=" "$LOGS/clientT.log" && ended=1
+done
+check "$ended" 1 "phase 6: and its end (landed or called off)"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

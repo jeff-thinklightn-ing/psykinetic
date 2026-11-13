@@ -1038,6 +1038,10 @@ var test_walk: Array[Dictionary] = []
 var test_walk_on_wind := false
 ## --test-foe: [monster kind, weapon] each joining player is given, or empty.
 var test_foe: PackedStringArray = []
+## --test-tells (net_test's tell phase): the server prints each told move it
+## sends (Main._tell_telegraph: its zone's peers and the joined ones), a client
+## each it gets and each end (Main._on_telegraph).
+var test_tells := false
 ## The voice A/B only (decision 803 amended): traits laid over a companion's
 ## roll (--test-traits), and a card that stands in for the written one
 ## (--test-card). Never on the box.
@@ -2315,6 +2319,8 @@ func _parse_args(given: Array = []) -> void:
 				console = true
 			"--no-companions":
 				companions = false
+			"--test-tells":
+				test_tells = true
 			"--still-monsters":
 				still_monsters = true
 				Monster.idling = false

@@ -7254,6 +7254,12 @@ func _on_hearths_changed(level: String) -> void:
 ## ("telegraph", its data).
 func _tell_telegraph(_id: int, data: Dictionary) -> void:
 	var peers := World.peers_in(str(data["zone"]))
+	if Net.test_tells:
+		# net_test's tell phase: who is told, against who is joined (no names).
+		var joined := _players.keys().filter(func(peer: int) -> bool: return peer != Net.local_id)
+		var told := joined.filter(func(peer: int) -> bool: return peer in peers)
+		print("[test] tell %d %s lands %d, sent at tick %d: zone %s holds %d of %d joined peers" % [
+				int(data["id"]), str(data.get("kind", "")), int(data.get("lands_tick", -1)), World.tick, str(data["zone"]), told.size(), joined.size()])
 	if not peers.is_empty():
 		Net.broadcast_to(peers, "telegraph", data)
 
@@ -7270,6 +7276,12 @@ func _tell_telegraph_ended(zone_name: String, id: int, landed: bool) -> void:
 ## telegraphs and telegraph_started; else one over, telegraph_ended.
 func _on_telegraph(data: Dictionary) -> void:
 	var id := int(data.get("id", 0))
+	if Net.test_tells and not Net.is_authority():
+		if data.has("cells"):
+			print("[test] tell got %d %s lands %d with %d cells at tick %d" % [id, str(data.get("kind", "")),
+					int(data.get("lands_tick", -1)), (data["cells"] as Array).size(), World.tick])
+		else:
+			print("[test] tell end %d landed=%s at tick %d" % [id, str(data.get("landed", false)), World.tick])
 	if data.has("cells"):
 		telegraphs[id] = data
 		_face_tell(data, true)

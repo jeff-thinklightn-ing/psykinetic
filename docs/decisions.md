@@ -25265,6 +25265,17 @@ whole, no unstruck centre covered or lit; a block unfilled; a ring's hole open, 
 wall or a pit on a notch's edge leaves it unfilled; two overlapping marks each whole, neither
 covering a centre of its own unstruck cells; _test_telegraph_smooth measures its band from the
 closed mark. Client only, protocol unchanged, no new class_name.
+602 amended (5) (the script's label; the coordinator's assignment, 2026-11-12): a told move reaching a joined client is
+tested on the wire. Playtest's joined crypt run on a7a708f5e recorded 0 of the 26 robber lunge tells its server logged
+(16 of 16 on f9d909eb2), and no test on main would have failed: net_test and state_test sent no telegraph, combat_test's
+_test_tell_truth and view_test's telegraph checks run in one process. net_test's phase 6 (PORT + 7; net_test.ps1's phase 8): one client joins a
+server whose --test-foe lays a robber 3 cells east of her. With --test-tells (Net.test_tells, a test flag) the server
+prints each tell it sends from Main._tell_telegraph, with how many joined peers its zone's World.peers_in holds (counts,
+no names), and the client prints each "telegraph" message Main._on_telegraph gets (its cells, its lands tick and the
+client's tick) and each end. The checks: the server sent a lunge's tell with her peer in its zone; her client got one
+with its cells at or before its lands tick; and its end. The first says which side a fail is on: the server's peers_in
+leaving her out, or the message lost on the way. Tests and test flags only; the box never passes --test-tells; protocol
+unchanged; no new class_name; no bullet.
 
 ## 603. The draugr's moves: the spin, the axe throw, the charge to his axe, disarmed
 

@@ -23,7 +23,7 @@ if (-not $Phase) {
 	Remove-Item (Join-Path $logs '*') -Force -ErrorAction SilentlyContinue
 }
 # Each group's port: phases 1 and 2 (2 reads 1's snapshot) $port, 3 + 1, 4 + 2,
-# 7 + 3 with its console on + 4, 5 + 5, 6 + 6.
+# 7 + 3 with its console on + 4, 5 + 5, 6 + 6, 8 + 7.
 $port = 17760 + $portOffset
 $adminPort = $port + 4
 $phasePort = switch ($Phase) {
@@ -32,6 +32,7 @@ $phasePort = switch ($Phase) {
 	'7' { $port + 3 }
 	'5' { $port + 5 }
 	'6' { $port + 6 }
+	'8' { $port + 7 }
 	default { $port }
 }
 $token = 'test-secret'
@@ -275,10 +276,25 @@ if ($Phase -eq '7') {
 	Set-Content (Join-Path $logs 'admin_reply') $adminReply
 }
 
+if ($Phase -eq '8') {
+	# Phase 8 (net_test.sh's phase 6; 602 amended (5)): a foe's told lunge
+	# reaches a joined client. Tess joins alone; the server lays a robber 3
+	# cells east of her (--test-foe) and, with --test-tells, prints each tell it
+	# sends and whether its zone's peers (World.peers_in) hold her; her client
+	# prints each "telegraph" message it gets and each end.
+	Start-Server 'serverT' @('--server', '--no-companions', "--token=$token", '--test-wait-players=1', '--test-foe=robber,sword', '--test-tells')
+	Wait-Log 'serverT' 'listening on port'
+	Start-Client 'clientT' ($good + @('--name=Tess', '--test-tells'))
+	Wait-Log 'serverT' '\[test\] tell \d+ lunge '
+	Wait-Log 'clientT' '\[test\] tell got \d+ lunge '
+	Wait-Log 'clientT' '\[test\] tell end '
+	Complete-Phase
+}
+
 if ($Phase) { exit 0 }
 
 # All the groups at once, then what each printed (a wait given up).
-$groups = @('12', '3', '4', '5', '6', '7')
+$groups = @('12', '3', '4', '5', '6', '7', '8')
 $running = foreach ($group in $groups) {
 	$process = Start-Process -FilePath 'powershell.exe' -NoNewWindow -PassThru `
 		-ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Phase', $group, '-Logs', "`"$logs`"" `
@@ -426,6 +442,17 @@ Assert (@($clientRLog | Select-String '\[net\] lost the server; reconnecting').C
 Assert (@($server8Log | Select-String '\[net\] Rex \(5e5e5e5e\) joined as Player1 at \(9, 2\) \(back\)').Count -eq 1) 'phase 7: the restarted server puts him back on (9, 2)'
 Assert (@($clientRLog | Select-String '\[test\] display: Player1 server_tile=\(9, 2\) shown_tile=\(9, 2\)').Count -eq 1) 'phase 7: and his client shows him there'
 Assert (@($clientRLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)$').Count -eq 1) 'phase 7: and the room as it was, its entities sent again'
+# Phase 8: the server told her zone a lunge with her in it, and her client got
+# it, cells and all, at or before its lands tick, then its end.
+$serverTLog = Read-Log 'serverT'
+$clientTLog = Read-Log 'clientT'
+Assert (@($serverTLog | Select-String '\[test\] tell \d+ lunge lands \d+, sent at tick \d+: zone \S+ holds 1 of 1 joined peers').Count -ge 1) "phase 8: the server sent a robber's told lunge to her zone, her peer in it (World.peers_in)"
+$gotInTime = @($clientTLog | Select-String '\[test\] tell got (\d+) lunge lands (\d+) with (\d+) cells at tick (\d+)' | Where-Object {
+	$g = $_.Matches[0].Groups; [int]$g[3].Value -gt 0 -and [int]$g[4].Value -le [int]$g[2].Value })
+Assert ($gotInTime.Count -ge 1) "phase 8: her joined client got the lunge's telegraph, its cells, before its lands tick"
+$gotIds = @($clientTLog | Select-String '\[test\] tell got (\d+) lunge' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
+$ended = @($gotIds | Where-Object { @($clientTLog | Select-String "\[test\] tell end $_ landed=").Count -gt 0 })
+Assert ($ended.Count -ge 1) 'phase 8: and its end (landed or called off)'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 
