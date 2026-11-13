@@ -52517,3 +52517,19 @@ The altar (896's second piece, off: Main.altar_turn_in false; the coordinator: "
 - Every read of a zone in the throne's and the altar's server paths is by the zone's name, never World's current zone (after 540 amended (2), where reading only the zone World stood in let the blessed into a held fight): Main.zone_entities(zone) as zone_doors does, so the draugr at rest (throne_downed), the knight by his bier (knights_altar) and his remains laid (_lay_remains, _knight_thanks) are the player's own zone's on a host's command and in another zone's tick alike; nothing enters a zone mid-tick.
 - The remains drawn on the bier for the generation: the first laying sets AstralKnight.remains_laid (replicated, kept in his spawn props: a restart keeps it, a new generation's spawn clears it), and art-kit's prop (its own slot on the table's top, the bundle the player carried, laid on a folded shroud; art-kit's words) is drawn there while it is true; its sheet first, after art-kit's stack.
 Tests: level_test _test_barrow_quest (on: the turn-in goes to the altar step, the card's one step, a late kill counts nowhere, the relic in the pack makes it carried and his row lays it: done, card closed, DONE_LAID) and _test_knights_altar (in the barrow: the altar is 38-40 by 8-9; off, a click lays nothing; on, from beside it, laid and done). Server and client. Protocol: AstralKnight.remains_laid replicated (seen by protocol(), with the throne's Player.seated; release: no new number) and an "altar" command an old server ignores (the click walks); no new class_name.
+
+863 amended (1) (the script's label; found by art-kit's own look at 863's pieces as the game culls
+them, for the coordinator's v0.1.214 check, C:/dev/review/stack_cull): the lit campfire's logs and
+flames turned the right way out. In prop.campfire, eight of its 23 closed shells, the five leant
+logs and three of the five flames, had their faces pointing inward; the game culls back faces
+(palette.tres), so each drew only its far inner faces, lit from behind, and the logs read black from
+every side (Blender sheets drawn without culling showed them right, which is how they passed). Their
+48 faces are reversed, nothing else: the same slot, size, origin, parts, palette swatches and 23
+shells, tris unchanged; its 10 open edges are the flat bed under the fire, lying on the ground and
+seen from above only. Culled before and after: C:/dev/review/campfire_flip/culled_old_new.png; old
+glb kept there. art-kit's other 863 and 871 amended (1) pieces checked the same way
+(C:/dev/review/stack_cull/sheet_a.png, sheet_b.png) have no inside-out shell; scatter.tuft's
+single-sided blades are drawn both sides by the scatter material. Two older shipped pieces carry the
+same fault, left to a row of their own: prop.campfire_cold (two logs, since v0.1.200) and
+prop.wall_hearth's body (six small shells: one iron bar, four pegs and a small block). Lands on, in
+the same build as 863. Client only (art); protocol unchanged; no new class_name.
