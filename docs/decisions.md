@@ -52658,6 +52658,13 @@ or nothing, the rod sellers once, the rod carried; the rests at most two and not
 there, then sent away (only those present, brought back after) and the none line. Server only: what the mind
 is told; protocol unchanged; no new class_name; no bullet until playtest's joined check.
 
+890 amended (2) (the label from decision_number.sh; playtest's item-5 question, the coordinator's go, lore's
+words, 11-13). "Where can I rest?" asked nothing: the rest words leave out "rest" alone (so "the rest of the
+town" asks nothing) and had no way of asking with "I". residents.json asked.kinds.rest adds "i rest", "we rest"
+(a player with a companion) and "rest up"; whole words on the plain line (Offers._has_word), so "the rest of the
+town" still asks nothing ("I rest my case" would ask rest, harmlessly). resident_test pins "where can I rest?",
+"where can we rest?" and "rest up" asking it, the town's rest not. Data only; server only; protocol unchanged.
+
 ## 884. The zone map's picture: the torn edge left to the frame, a landmark drawn as its own mark
 
 The zone-map mock's notes 5 and 6 (C:/dev/review/ui-design/zone/, the coordinator's ruling 2026-11-12: built as their own landing, ahead of ui's label build; the number from tools/decision_number.sh). Both are the map's picture (Minimap.made_for), so the corner map and the M map change together.

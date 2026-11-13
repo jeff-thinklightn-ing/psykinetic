@@ -6338,6 +6338,10 @@ func _test_asked_more(body: Resident, player: Player) -> void:
 		"rest: the warm rests, nearest first, at most two, nothing of beds (%s)" % [rest])
 	_check(not _main._asked_facts(body, player, "Tell me about the rest of the town.").any(func(s: String) -> bool: return " is warm, " in s),
 		"rest: \"the rest of the town\" asks nothing of rest")
+	# 890 amended (2) (lore's words, the coordinator's go): the plain ways of asking ask rest; the town's rest still not.
+	var asks_rest := func(line: String) -> bool: return Main._asked_is(Offers._plain(line), Main.asked_rule(), "rest")
+	_check(asks_rest.call("Where can I rest?") and asks_rest.call("Where can we rest?") and asks_rest.call("I need to rest up.")
+		and not asks_rest.call("Tell me about the rest of the town."), "rest: \"where can I rest?\", \"where can we rest?\", \"rest up\" ask it; the town's rest not")
 	# The smith: a smith there by name and place; none, then the sought word and blade sellers, never a smith who isn't there.
 	var smith: Array[String] = _main._asked_facts(body, player, "Where's the smith?")
 	# The smiths there: residents of the trade not away (an earlier case takes the town's; only these are sent off
