@@ -5545,11 +5545,16 @@ var _flank_guard_until: Dictionary = {}
 ## [param source] shows [param shape] (Telegraph's) on the ground, a
 ## [param kind] ("spin", "throw", "charge": the views' and sounds' word) for
 ## [param ticks] till it lands (decision 602): its id, 0 if the shape does
-## not read. The blow that follows strikes telegraph_cells(shape), the cells
+## not read, or (898) its cells hold a standing mate of a monster's
+## (Monster.tell_cuts_mate). The blow that follows strikes telegraph_cells(shape), the cells
 ## drawn. A [param flank] move may be broken from behind while it shows
 ## (780, combat's side: _try_flank); kept here, not sent. Server only.
 func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int, flank := false) -> int:
 	if not Net.is_authority() or not Telegraph.valid(shape) or not is_instance_valid(source):
+		return 0
+	if source is Monster and (source as Monster).tell_cuts_mate(telegraph_cells(shape)):
+		# Decision 898: never begun through a standing mate (its caller strikes plainly or goes round).
+		_log("tell: %s holds its %s, a mate in its line" % [source.name, kind])
 		return 0
 	var id := _next_telegraph
 	_next_telegraph += 1
@@ -5561,6 +5566,26 @@ func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int, 
 	_telegraphs[id] = {"source": source, "data": data, "flank": flank}
 	telegraph_started.emit(id, data)
 	return id
+
+
+## Decision 898's other half (the pair rows on 7b7119cc6: every robber
+## struck by his partner had walked into a line already told): whether
+## [param cell] lies in the cells of a told strike not yet landed whose
+## source spares [param mover] (Monster.spares: its mate), [param mover] not
+## already in them. A player who stands so that one line crosses the other
+## still has it; she can no longer count on him walking in.
+func _into_mates_tell(mover: GridEntity, cell: Vector2i) -> bool:
+	for id: int in _telegraphs:
+		var each: Dictionary = _telegraphs[id]
+		var source: Variant = each["source"]
+		# Live through the tick it lands (the landing resolves after the steps of that tick: the
+		# pair rows' every remaining case was a step on it).
+		if source == mover or not is_instance_valid(source) or not source is Monster or tick > int(each["data"]["lands_tick"]):
+			continue
+		var cells: Array = each["data"]["cells"]
+		if [cell.x, cell.y] in cells and not [mover.tile.x, mover.tile.y] in cells and (source as Monster).spares(mover):
+			return true
+	return false
 
 
 ## The flank-marked telegraph [param target] shows now, not yet landed and
@@ -9134,6 +9159,8 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	# other body steps onto one.
 	if not entity is Player and is_link_cell(entity.tile + direction):
 		return false
+	if entity is Monster and _into_mates_tell(entity, entity.tile + direction):
+		return false  # 898: never into a mate's told strike from outside it; it waits the tick.
 	var duration := step_ticks(entity, direction)
 	# A walk in progress keeps its own clock: a step due at 12.5 and taken
 	# on tick 13 starts at 12.5, so the next is due at 15, not 15.5.

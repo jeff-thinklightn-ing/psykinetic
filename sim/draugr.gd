@@ -364,6 +364,15 @@ func _world_damaged(amount: int, cause: StringName) -> void:
 
 # --- The fight (603, enemy-ai's side) --------------------------------------------------
 
+## Decision 898 (the coordinator's line, 11-12): bands and packs of the
+## living spare their mates; the draugr spends his dead. His spin, throw and
+## axe charge go through his own risen dead as before: he cuts through them,
+## and a player who puts his dead on his line has earned it. Not a leak:
+## never "mended" to spare them.
+func spares(_other: GridEntity) -> bool:
+	return false
+
+
 ## His choice each fighting tick (Monster._special_tick), the first that
 ## applies: back off when spent, spin, charge to his axe or throw it; else
 ## (false) he closes and strikes as any monster, with his fists if disarmed

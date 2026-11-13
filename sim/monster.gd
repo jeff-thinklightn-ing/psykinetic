@@ -1984,6 +1984,29 @@ func _hover() -> void:
 
 ## Its mate (806 amended (9)'s band rules): one of its pack where it has one
 ## (824), else of its side.
+## Decision 898: whether a told strike of its on [param cells] would cut a
+## living mate, up or down (_mate_of: its pack, else its side; an animal's herd, and
+## a herdless beast has none): World.telegraph begins none such. Bands and
+## packs of the living spare their mates; the draugr spends his dead
+## (Draugr's override).
+func tell_cuts_mate(cells: Array[Vector2i]) -> bool:
+	for body in World._bodies_in(self, cells):
+		if spares(body):
+			return true
+	return false
+
+
+## Decision 898: whether its told strikes spare [param other]: a living
+## mate, up or down (one kneeling in the line cannot step out). Its tell
+## never begins through one (tell_cuts_mate), and one never steps into its
+## told cells (World._into_mates_tell). A herdless beast has none; the
+## draugr spares nobody (his override).
+func spares(other: GridEntity) -> bool:
+	if self is Animal and (self as Animal).herd == "":
+		return false
+	return other is Monster and other != self and other.hp > 0 and _mate_of(other)
+
+
 func _mate_of(other: GridEntity) -> bool:
 	if pack_id != "":
 		return other is Monster and (other as Monster).pack_id == pack_id

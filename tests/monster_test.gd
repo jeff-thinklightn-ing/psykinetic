@@ -1862,6 +1862,7 @@ func _test_ambush() -> void:
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 	_test_lunge()
 	_test_backstab_clearly_behind()
+	_test_lunge_spares_mate()
 	_test_told_weapons_only()
 	_test_shield_wall()
 	_test_plain_lead()
@@ -10169,3 +10170,89 @@ func _test_backstab_clearly_behind() -> void:
 	var kept := not robber._chooses_backstab()
 	World.tick += 2
 	_check(kept and robber._chooses_backstab(), "she turned: he keeps the lunge for that strike, then chooses again (the backstab)")
+
+
+## Decision 898 (ui-design's dry run of two robbers, 11-12: one's lunge
+## through her struck his mate behind her, and the second killed him): a told
+## strike never begins through a mate. (1) His mate behind her on his line:
+## no lunge begun (World.telegraph refuses it); in play a blow winds up or he
+## goes round within 20 ticks, never a lunge through him, and the mate
+## unhurt over 60. (2) A mate never steps into a told line from outside it
+## (World._into_mates_tell), but steps elsewhere; one put into it (a shove)
+## is struck, as decision 810 has it. (3) The draugr spares nobody.
+func _test_lunge_spares_mate() -> void:
+	print("%s== 898: a told strike never begins through a standing mate ==" % char(10))
+	var rows: Array[String] = ["##############", "#............#", "#.x.x........#", "#............#", "##############"]
+	var e := _build(rows, {"x": {"facing": Vector2i(1, 0)}})
+	var robber: Monster = null
+	var mate: Monster = null
+	for each: Monster in e["x"]:
+		if each.tile == Vector2i(2, 2):
+			robber = each
+		else:
+			mate = each
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	player.facing = Vector2i(-1, 0)
+	robber.target = player
+	_check(robber._mate_of(mate) and robber.tell_cuts_mate([Vector2i(3, 2), Vector2i(4, 2)] as Array[Vector2i]),
+		"his mate at (4, 2), behind her on his line, is one")
+	_check(not robber.begin_lunge(player) and _telegraph_cells("lunge").is_empty() and not robber.ambushing(),
+		"no lunge begun through him, nothing told")
+	# In play: a blow or a way round, never the lunge; the mate unhurt.
+	Monster.idling = false
+	robber.temper = Monster.Temper.BOLD
+	robber.boldness = 1.0
+	robber.sight_range = 8
+	robber.senses.cone_cos = -1.0
+	mate.acts = false  # He stands in the line; he never steps out of it.
+	player.max_hp = 1000
+	player.hp = 1000
+	player.protected = false
+	var mate_hp := mate.hp
+	var start := robber.tile
+	var acted := -1
+	var lunged := false
+	for i in 60:
+		World.step()
+		player.hp = 1000
+		lunged = lunged or not _telegraph_cells("lunge").is_empty() and robber.tell_cuts_mate(_telegraph_cells("lunge"))
+		if acted < 0 and (not World.winding(robber).is_empty() or robber.tile != start or robber.ambushing()):
+			acted = i
+	_check(not lunged and mate.hp == mate_hp, "over 60 ticks no lunge through his mate, and the mate unhurt (%d of %d)" % [mate.hp, mate_hp])
+	_check(acted >= 0 and acted <= 20, "a blow wound up or a step round within 20 ticks, no standoff (at tick %d)" % acted)
+	Monster.idling = true
+	# A mate who walks into it after it is told: struck (810).
+	e = _build(rows, {"x": {"facing": Vector2i(1, 0)}})
+	for each: Monster in e["x"]:
+		if each.tile == Vector2i(2, 2):
+			robber = each
+		else:
+			mate = each
+	_move_to(mate, Vector2i(4, 3))
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	robber.target = player
+	_check(robber.begin_lunge(player), "his line clear: begun")
+	# 898's other half: his mate never steps into the told line from outside it; elsewhere he steps.
+	mate.next_move_tick = 0
+	_check(not World.try_move(mate, Vector2i(0, -1)) and mate.tile == Vector2i(4, 3), "his mate does not step into the told line (%s)" % mate.tile)
+	_check(World.try_move(mate, Vector2i(1, 0)) and mate.tile == Vector2i(5, 3), "but steps elsewhere (%s)" % mate.tile)
+	var before := World.tick
+	World.tick = int(robber._ambush["lands"])
+	mate.next_move_tick = 0
+	_check(not World.try_move(mate, Vector2i(-1, -1)) and mate.tile == Vector2i(5, 3),
+		"nor on the tick it lands, before it resolves (%s)" % mate.tile)
+	World.tick = before
+	_move_to(mate, Vector2i(4, 2))  # Put in it (a shove, a knock): struck, 810 whole.
+	mate_hp = mate.hp
+	for i in int(robber.lunge["windup"]):
+		World.tick += 1
+		robber._tend_ambush()
+	_check(mate.hp == mate_hp - 3, "his mate put into the told line: struck, as 810 has it (%d of %d)" % [mate.hp, mate_hp])
+	# The draugr spends his dead.
+	var draugr := Draugr.new()
+	_check(robber.spares(mate) and not draugr.spares(mate), "a robber spares his mate; the draugr spares nobody, his dead included (his override)")
+	draugr.free()

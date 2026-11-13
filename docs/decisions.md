@@ -54708,3 +54708,43 @@ camps and moves each trader's bedroll and bed under its canvas. Watched: joined,
 zoom, the player inside C4, C1 and C3 beside their tents, before (main 4701b51ca) and after
 (C:/dev/review/art-kit/tents_joined/tents_joined_sheet.png; passed by the coordinator). Lands on, with its bullet in voice's words. Client
 (art, the composer) and the level parse; protocol unchanged; no new class_name.
+## 898. A told strike never begins through a mate (enemy-ai)
+
+2026-11-12, the decision-number script's label; the coordinator's approval after ui-design's dry run of
+two robbers on a player walking in (C:/dev/review/uidesign_strip_try3/godot.log, 9f319af48): Robber2,
+south of her, lunged north through her cell; Robber1 stood at the far end of the line, and both
+lunges logged "-> struck 2", the second killing him. World.tell_struck strikes every body whose
+centre is in the told cells (810: the cells drawn are the cells read), and nothing chose a line
+clear of the striker's own. Live since the robber's told lunge (790 amended (4), v0.1.207).
+
+Now a monster never begins a told strike whose cells hold a living mate of its, standing or down (one
+kneeling in the line cannot step out of it; the pair rows on 7b7119cc6 showed lunges through a downed
+mate): one guard, where every tell begins (World.telegraph asks Monster.tell_cuts_mate: a body in the
+cells that is a living Monster and _mate_of it, its pack or its side, an animal's herd; a herdless
+beast has none), returning 0 as for a shape that does not read. Each caller already begins nothing
+on 0: the robber's lunge (Monster.begin_lunge) falls to its plain blow the same tick; Skeech's
+ambush to _strike(); the old grey's spring already kept off his pack's cells (old_wolf.gd), the
+guard backs it; the boar king's charge through his herd's boars falls to his other moves; the great
+bear and the hill cat have no mates. Plain wind-ups strike their one target and are untouched.
+And none steps into a mate's told line from outside it (World._into_mates_tell, in World.try_move,
+monster movers only, live through the tick it lands, whose landing resolves after that tick's
+steps; it waits the tick or goes another way, and one already in it may move): the
+pair rows on 7b7119cc6 (C:/dev/review/enemy-ai/probe_box/chase_run2/, MATEHIT) showed every one of
+16 robbers struck by his partner had walked into a line already told, about one pair fight in
+twenty, most against a player stepping about. Both halves ask Monster.spares (a living mate, up or
+down: one kneeling in the line cannot step out). 810 stays whole: a mate shoved or knocked into a
+told line is struck, and a player who stands so that one robber's line crosses another as it is
+told has earned it; she can no longer count on him walking into it.
+
+Bands and packs of the living spare their mates; the draugr spends his dead. His spin, axe throw and
+axe charge (World.try_spin, try_axe_throw, try_axe_charge) go through his own risen dead as before,
+and his dead walk where they will (Draugr.spares is false): a draugr cutting through his dead reads as what he is, and his
+wave raises them round him, so sparing them would end his spin in the crypt. This is not a leak:
+never "mend" it. If draugr_fight's rows show his dead falling to him so often that the fight is
+easier than its deals intend, that is its own question for Jeff.
+
+monster_test _test_lunge_spares_mate: his mate behind her on his line, no lunge begun and nothing
+told; in play a blow wound up or a step round within 20 ticks, never a lunge through him, the mate
+unhurt over 60; his mate refused a step into the told line, also on its landing tick, and taken one elsewhere; one put into it
+struck for 3; a robber spares his mate, the draugr nobody.
+Server only, protocol unchanged, no new class_name. No bullet until playtest has seen it joined.
