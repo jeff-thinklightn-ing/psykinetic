@@ -119,9 +119,15 @@ that the walk looks like skipping and the people look like "bad claymation place
   only when its own take of the lock returned 0; never push while another tree holds it. Don't hold it for anything else
   (record clips and run benches before taking it): a landing takes under 20 minutes (a
   lean one about 16), and a land lock is stale, and may be taken over, 25 minutes after its take or its last beat (667; since 667 amended land.sh beats it each minute while its tests run, so a live landing never goes stale and none is cut short to stay under 25). A
-  script must never push after a failed take. Before a landing, delete any untracked file in
-  your checkout that main now tracks (`git status` shows it; an import's `.uid` written before
-  the file was committed stopped three fronted landings at their rebase on 11-12).
+  script must never push after a failed take. Since 667 amended (2) (cd7f84f76) the lock's take
+  itself clears what would stop the rebase: an untracked `*.import` or `*.uid` in your checkout
+  that main has since begun to track (an import's `.uid` written before the file was committed
+  stopped three fronted landings at their rebase on 11-12, a model's `.import` four on 11-13);
+  each removal is logged in `C:/dev/land.lock.log`. Any other untracked file main now tracks
+  refuses the take with exit 4, a line naming the file, and nothing held: exit 4 means stop and
+  read the line, never retry it in a loop; move or commit the file, then take again.
+  `land.sh --checks` runs the same check, so you see it before you queue. A commit that adds a
+  model or image carries its `.import` (import first, then `git status --short` clean).
 - Releases are batched (Jeff, 2026-10-14): worktrees don't run `tools/release_client.ps1`.
   A tested change lands on `main` straight away, with its bullets added under
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
@@ -229,6 +235,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   at most, never beside a bench (394 amended (17); ungated solo scenes stole CPU from landings and
   failed their timing checks). Load a scene whose script you changed once this way before you send it
   to anyone or queue it: a parse error is seconds here and a failed landing in the queue.
+  Before that, run `bash tools/load_check.sh` on every take that changes a script (278 amended
+  (7)): it loads each changed `.gd` with the autoloads in, through the gate in seconds, and
+  prints `LOAD_CHECK: PASS` or `FAIL` with the file named; use it in place of
+  `--check-only`, which fails sound scripts and so was skipped or misread. It does not run the
+  code: a fault met only at run time (a typed array given a plain one) still needs the scene.
   net_test run alone is the `net` kind (394 amended (24)): it starts several Godots (about 12 GB at
   once), so it runs one at a time, never beside a bench, and the gate refuses it under any other kind.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
