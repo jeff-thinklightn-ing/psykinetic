@@ -55,6 +55,20 @@ $scenes = @(Get-ChildItem (Join-Path $PSScriptRoot '*_test.tscn') | ForEach-Obje
 
 function Get-Name($scene) { [IO.Path]::GetFileNameWithoutExtension($scene) }
 
+# A failed scene's lines that name its failure (278 amended (4)), as run.sh's digest: every
+# failed check, every engine error with the two lines after it and its RESULT line, at most 40,
+# for the summary at the end, where a reader's tail looks.
+function Get-Digest($path) {
+	$out = @()
+	$after = 0
+	foreach ($line in @(Get-Content $path -ErrorAction SilentlyContinue)) {
+		if ($after -gt 0) { $out += $line; $after--; continue }
+		if ($line -match 'SCRIPT ERROR|^ERROR:') { $out += $line; $after = 2; continue }
+		if ($line -match '^ *FAIL  |^RESULT:') { $out += $line }
+	}
+	$out | Select-Object -First 40
+}
+
 # The scene's verdict once its process has ended (or been killed), its output
 # put together in <name>.log: "PASS  name 12s" or "FAIL  name 3s: why".
 function Get-Verdict($scene, $process, $killed, $took) {
@@ -200,7 +214,7 @@ try {
 		$timedOut = @($failed | Where-Object { $verdicts[$_] -match ': timed out under load:' }).Count
 		$slow = if ($timedOut -gt 0) { "; $timedOut of them timed out under load, not a failed check" } else { '' }
 		Write-Output "SUITE: FAIL ($($failed.Count) of $($scenes.Count) failed: $(($failed | ForEach-Object { Get-Name $_ }) -join ' ')$slow; ${seconds}s$again)"
-		$failed | ForEach-Object { $verdicts[$_] } | Write-Output
+		$failed | ForEach-Object { $verdicts[$_]; Get-Digest (Join-Path $logs "$(Get-Name $_).log") } | Write-Output
 	}
 } finally {
 	foreach ($entry in $running.Values) { Stop-Scene $entry.Process }

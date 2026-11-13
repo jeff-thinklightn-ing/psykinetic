@@ -71,6 +71,16 @@ scenes="$(ls tests/*_test.tscn | awk -v durations="$DURATIONS" '
 	BEGIN { while ((getline line < durations) > 0) { split(line, f, " "); if (!(f[2] in took)) took[f[2]] = f[1] } }
 	{ print ($0 in took ? took[$0] : 999), $0 }' | sort -rn | cut -d' ' -f2)"
 
+# A failed scene's lines that name its failure (278 amended (4)): every failed check, every
+# engine error with the two lines after it and its RESULT line, at most 40, for the summary at
+# the end, where a reader's tail looks. combat's 874 amended (1) landing on saturn: its FAIL
+# line sat 800 lines up in sound_kit_test's whole output, and the last ten were all PASS.
+digest() {
+	awk 'after > 0 { print; after--; next }
+		/SCRIPT ERROR|^ERROR:/ { print; after = 2; next }
+		/^ *FAIL  |^RESULT:/ { print }' "$1" | head -40
+}
+
 # One scene, its output to its log; then its verdict line in <log>.result:
 # "PASS name 12s" or "FAIL name 3s (why)", and its time for DURATIONS.
 run_scene() {
@@ -214,6 +224,9 @@ else
 	slow=""
 	[ "$timed_out" -gt 0 ] && slow="; $timed_out of them timed out under load, not a failed check"
 	echo "SUITE: FAIL ($(echo "$failed" | wc -w | tr -d ' ') of $count failed:$failed$slow; $(( $(date +%s) - started ))s$again)"
-	for name in $failed; do cat "$LOGS/$name.log.result"; done
+	for name in $failed; do
+		cat "$LOGS/$name.log.result"
+		digest "$LOGS/$name.log"
+	done
 fi
 exit $code

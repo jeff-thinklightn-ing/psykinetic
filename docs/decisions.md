@@ -5438,6 +5438,18 @@ passes; an empty one counts; still missing, fails naming it, one import only. On
 (GODOT_PATH=/bin/false): "FAIL  art/fonts/AlegreyaSans-Bold.ttf: still no .fontdata after one re-import", exit 1.
 Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+278 amended (4) (perf, 2026-11-13; the coordinator's row from combat's failed landing; label from
+tools/decision_number.sh): the suite's summary names each failed scene's failure. combat's 874 amended (1) landing on
+saturn failed sound_kit_test, and the check had to be guessed from an earlier landing: the scene's whole output came
+back (848 lines), its one FAIL line 800 lines up, and the ten a reader's tail showed were all PASS. tests/run.sh:
+after "SUITE: FAIL", each failed scene's verdict line, then its digest: every failed check ("  FAIL  "), every engine
+error (SCRIPT ERROR, ERROR:) with the two lines after it and its RESULT line, in order, at most 40 a scene; the whole
+output before it as ever. tests/run.ps1 the same (Get-Digest). The digest repeats lines already in the output, so the
+landing scripts' checks of FAIL lines read the same set. tests/run_digest_test.sh (a land.sh part): run.sh on a fake
+project and godot, so no Godot runs: a check failed 800 lines up, an error and its two lines, the RESULT line, nothing
+of a scene that passed, 40 of 60; main's run.sh fails its four digest checks. Tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
