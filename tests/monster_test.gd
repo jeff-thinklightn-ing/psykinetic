@@ -1863,6 +1863,8 @@ func _test_ambush() -> void:
 	_test_lunge()
 	_test_backstab_clearly_behind()
 	_test_lunge_spares_mate()
+	_test_struck_foe_fights_front()
+	_test_dagger_open_after_miss()
 	_test_told_weapons_only()
 	_test_shield_wall()
 	_test_plain_lead()
@@ -10256,3 +10258,102 @@ func _test_lunge_spares_mate() -> void:
 	var draugr := Draugr.new()
 	_check(robber.spares(mate) and not draugr.spares(mate), "a robber spares his mate; the draugr spares nobody, his dead included (his override)")
 	draugr.free()
+
+
+## Decision 899 (ui-design's fists trial, 11-12: the robber she punched went
+## round her 2.0 s, FLANK_PATIENCE_TICKS, and never swung): with a mate beside
+## her, one struck within flank_patience_ticks never goes round her
+## (_front_ticks 0): it fights from her front, a wind-up or a lunge begun
+## within 15 ticks. The mate she does not strike still goes round.
+func _test_struck_foe_fights_front() -> void:
+	print("%s== 899: the robber she cuts fights from her front; his mate still goes round ==" % char(10))
+	Monster.idling = false
+	var rows: Array[String] = ["##########", "#........#", "#........#", "#........#", "#........#", "##########"]
+	var e := _build(rows)
+	var robbers: Array[Monster] = []
+	for at: Vector2i in [Vector2i(3, 3), Vector2i(3, 2)]:
+		var spec := Level._spec_for("monster_robber", Level.MONSTER_TYPES)
+		spec["tile"] = at
+		var robber := EntityFactory.build(spec) as Monster
+		_room.add_child(robber)
+		World.spawn(robber, at)
+		robber.temper = Monster.Temper.BOLD
+		robber.boldness = 1.0
+		robber.max_hp = 1000
+		robber.hp = 1000
+		robber.sight_range = 8
+		robber.senses.cone_cos = -1.0
+		robbers.append(robber)
+	var foe := robbers[0]  # In front of her, west: the one she cuts.
+	var mate := robbers[1]  # Beside her, north-west, never struck.
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 3))
+	player.facing = Vector2i(-1, 0)
+	player.max_hp = 100000
+	player.hp = 100000
+	player.protected = false
+	for robber in robbers:
+		robber.target = player
+	World.step()  # They take her up (their _noticed_tick).
+	var struck_back := -1
+	var foe_round := 0
+	var mate_round := 0
+	for i in 40:
+		if i % 10 == 0:
+			World.damage(foe, 1, player, &"attack")  # Her cut lands on him, every second.
+		World.step()
+		player.hp = 100000
+		foe_round = maxi(foe_round, foe._front_ticks)
+		mate_round = maxi(mate_round, mate._front_ticks)
+		if struck_back < 0 and (not World.winding(foe).is_empty() or foe.ambushing()):
+			struck_back = i
+	_check(struck_back >= 0 and struck_back <= 15 and foe_round == 0,
+		"the robber she cuts strikes from her front within 15 ticks, never going round (at %d, going round %d)" % [struck_back, foe_round])
+	_check(mate_round > 0, "his mate, never struck, still goes round her (going round %d ticks)" % mate_round)
+	Monster.idling = true
+
+
+## Decision 899 (combat's dagger row, the coordinator's ruling 11-12): a
+## dagger's double from behind also counts against a robber standing open
+## after a lunge she stepped out of; after one that struck her, it does not.
+func _test_dagger_open_after_miss() -> void:
+	print("%s== 899: the dagger's double on a robber open after a lunge she stepped out of ==" % char(10))
+	var cut := func(robber: Monster, player: Player) -> int:
+		robber.max_hp = 1000
+		robber.hp = 1000
+		player.next_attack_tick = 0
+		World._try_hit(player, robber, 10, false)
+		World._resolve_hits()  # A blow is queued, and lands as the step resolves its hits.
+		return 1000 - robber.hp
+	# Missed: she stepped aside; open, and her dagger's cut doubles.
+	var pair := _lunge_room()
+	var robber: Monster = pair[0]
+	var player: Player = pair[1]
+	player.slots[Items.RIGHT_HAND] = "dagger"
+	_check(robber.begin_lunge(player), "begun")
+	_move_to(player, Vector2i(3, 3))
+	for i in int(robber.lunge["windup"]):
+		World.tick += 1
+		robber._tend_ambush()
+	_check(robber.open_after_miss() and not World.is_behind(player, robber), "missed: open after a miss, she is not behind him")
+	var open_cut: int = cut.call(robber, player)
+	World.tick += int(robber.lunge["recover"])
+	_check(not robber.open_after_miss(), "the opening past: no longer")
+	var plain_cut: int = cut.call(robber, player)
+	_check(plain_cut > 0 and open_cut >= 2 * plain_cut - 1,
+		"her dagger's cut doubled in the opening (%d against %d after it)" % [open_cut, plain_cut])
+	# Landed: open too, but no double.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	player.slots[Items.RIGHT_HAND] = "dagger"
+	player.max_hp = 1000
+	player.hp = 1000
+	_check(robber.begin_lunge(player), "begun again")
+	for i in int(robber.lunge["windup"]):
+		World.tick += 1
+		robber._tend_ambush()
+	_check(robber.ambushing() and not robber.open_after_miss(), "landed: he stands open, but not after a miss")
+	var landed_cut: int = cut.call(robber, player)
+	_check(landed_cut < open_cut, "so her cut is plain (%d against %d)" % [landed_cut, open_cut])

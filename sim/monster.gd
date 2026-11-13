@@ -952,6 +952,9 @@ var lunge := {}
 var _ambush := {}
 ## Missed: it stands open till this tick.
 var _ambush_open_until := -1
+## Decision 899 (combat's dagger row): the open window follows a lunge (or an
+## ambush) that struck nobody, one she stepped out of (open_after_miss).
+var _open_missed := false
 
 
 ## Begins its told strike on [param on] (enemy-ai's to choose when: 790
@@ -1062,10 +1065,19 @@ func _tend_ambush() -> bool:
 	if hit.is_empty() or move == &"lunge":
 		# Stepped out of it, or any lunge, landed or missed (790 amended (6)): the opening.
 		_ambush_open_until = World.tick + int(numbers["recover"])
+		_open_missed = hit.is_empty()
 	if move == &"lunge":
 		_cry(&"overreach", 0)  # To whoever sees it (its drawn pose); no noise, so it wakes nobody.
 	print("[%s] %s at %s -> %s" % [move, name, aim, "struck %d" % hit.size() if not hit.is_empty() else "missed"])
 	return true
+
+
+## Decision 899 (combat's dagger row): whether it stands open after a lunge
+## that struck nobody (790 amended (6)'s overreach window, she stepped out of
+## it): a dagger's double counts against it as from behind (World._try_hit),
+## so reading him pays the dagger where his going round her used to.
+func open_after_miss() -> bool:
+	return _ambush.is_empty() and World.tick < _ambush_open_until and _open_missed
 
 
 func _end_ambush(landed: bool) -> void:
@@ -2014,9 +2026,18 @@ func _mate_of(other: GridEntity) -> bool:
 
 
 ## FLANK goes round only while it may (806 amended (9)): a band fighter only
-## while a mate of its side is beside its target; any other always.
+## while a mate of its side is beside its target; any other always. Never
+## while it has been struck within flank_patience_ticks (899: it circles for
+## an opening, is cut, turns and fights from her front; ui-design's fists
+## trial had the robber she punched going round her two seconds).
 func _flanks_now() -> bool:
-	return not band_fights or _mate_at_target()
+	return not _struck_lately() and (not band_fights or _mate_at_target())
+
+
+## Decision 899: a blow on it from anyone within flank_patience_ticks
+## (note_struck's struck_by and struck_tick).
+func _struck_lately() -> bool:
+	return is_instance_valid(struck_by) and World.tick - struck_tick <= flank_patience_ticks
 
 
 ## Whether its walk to [param to] is at most FLANK_DETOUR steps longer than

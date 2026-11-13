@@ -54748,3 +54748,40 @@ told; in play a blow wound up or a step round within 20 ticks, never a lunge thr
 unhurt over 60; his mate refused a step into the told line, also on its landing tick, and taken one elsewhere; one put into it
 struck for 3; a robber spares his mate, the draugr nobody.
 Server only, protocol unchanged, no new class_name. No bullet until playtest has seen it joined.
+
+
+## 899. The robber she cuts fights her from the front; a dagger's double counts in his opening (enemy-ai)
+
+Taken from the decision-number script; the coordinator's ruling 11-12 on enemy-ai's pair rows
+(C:/dev/review/enemy-ai/probe_box/split_run2 to split_run5) and on combat's dagger rows
+(C:/dev/review/combat/probe_box/dagger_run). ui-design's fists trial filmed it: against two
+robbers, the one she was punching went round her for two seconds (FLANK_PATIENCE_TICKS) and
+never swung, which looked broken. Live since v0.1.207, when band fighters took up going round
+(806 amended (9)).
+
+A FLANK monster struck by anyone within flank_patience_ticks (note_struck's struck_by and
+struck_tick) doesn't go round: it fights from her front, and goes round again once that long
+passes without a blow on it (Monster._flanks_now, _struck_lately). He circles for an opening, is
+cut, and turns to fight. A stronger form (never going round the one she attacks or winds up at)
+rowed the same and was not taken: the struck form keeps "fights back when cut" without reading
+her orders.
+
+A target that circled her showed her his back, and a dagger's cut from behind is doubled
+(Items "backstab", "behind": 2.0). On main about a fifth of a dagger reader's cuts against a pair
+landed from behind (7 to 8 of about 40 per duel); either form of 899 took that to 1 to 3, and
+dagger readers fell from 14 and 15 wins of 16 to 11, two seconds longer per fight. Fists and
+the sword were unchanged or better. So, combat's lever: the dagger's double also counts against
+a monster standing open after a lunge or ambush that struck nobody, one she stepped out of
+(Monster._open_missed, set beside _ambush_open_until in _tend_ambush; Monster.open_after_miss;
+World._try_hit). Reading him pays the dagger where his circling used to. Combat's rows: a pair
+16.8 s to 14.6 s, one robber 10.0 s to 7.2 s against the sword's 6.0; dagger readers against a
+pair at 12 and 10 of 16. Half of chase_reader's remaining losses are her own target's lunges,
+because her click-chase walks her back into his told line. That is combat's client chase hold
+(699 amended (3)), not this decision. Until it lands, the dagger is a little worse against a
+pair than before 899, said on the cut's checklist.
+
+monster_test _test_struck_foe_fights_front: the robber she cuts each second strikes from her
+front within 15 ticks and never goes round, while his never-struck mate does.
+_test_dagger_open_after_miss: a dagger's cut doubles on a robber open after a lunge she stepped
+out of, not after the opening, and not on one open after a lunge that struck her.
+Server only, protocol unchanged, no new class_name.

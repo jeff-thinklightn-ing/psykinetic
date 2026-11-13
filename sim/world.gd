@@ -10306,7 +10306,9 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 		force = 0.0  # A blow too light to knock back: damage only.
 	if not is_shove and hit_damage > 0 and not verb.is_empty():
 		var scale := float(verb["damage"])
-		if verb.get("kind") == "backstab" and is_behind(attacker, target):
+		# A dagger's double from behind, or (899) against a robber open after a lunge she stepped out of.
+		if verb.get("kind") == "backstab" and (is_behind(attacker, target) \
+				or (target is Monster and (target as Monster).open_after_miss())):
 			scale *= float(verb["behind"])
 		hit_damage = maxi(1, roundi(hit_damage * scale))
 	if not is_shove and hit_damage > 0 and attacker.winded:
