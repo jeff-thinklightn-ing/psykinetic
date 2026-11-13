@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_spin()
 	_test_spin_throws()
 	_test_throws_into_walls()
+	_test_test_foe_plan()
 	_test_spin_broken()
 	_test_dropped_moves()
 	_test_throw_and_charge()
@@ -3070,3 +3071,26 @@ func _test_own_blow() -> void:
 	boss.blows = {}
 	World.set_slots(boss, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
 	_check(World.blow_verb(boss) == Items.verb_of("giant_axe"), "a thing his row names no blow for: its own verb")
+
+
+## --test-foe's fields (392 amended (7), playtest's flank check of 891):
+## kinds and hands joined by "+", a count, and "around" laying the foes
+## beside her, east and west first; anything else is no plan.
+func _test_test_foe_plan() -> void:
+	print("\n== --test-foe's plan: several kinds, both hands, around her (392 amended (7)) ==")
+	var plain := Main.test_foe_plan(PackedStringArray(["draugr", "giant_axe"]))
+	_check(plain["kinds"] == ["draugr"] and plain["right"] == "giant_axe" and plain["left"] == "" and plain["offsets"] == [Vector2i(3, 0)] and not plain["around"],
+			"kind,weapon: one foe 3 east, the weapon in her right hand (%s)" % [plain])
+	var spaced := Main.test_foe_plan(PackedStringArray(["bandit", "sword", "2"]))
+	_check(spaced["kinds"] == ["bandit", "bandit"] and spaced["offsets"] == [Vector2i(3, 0), Vector2i(11, 0)], "a count: each 8 past the last, as before (%s)" % [spaced["offsets"]])
+	var flank := Main.test_foe_plan(PackedStringArray(["robber", "sword+shield", "2", "around"]))
+	_check(flank["kinds"] == ["robber", "robber"] and flank["right"] == "sword" and flank["left"] == "shield"
+			and flank["offsets"] == [Vector2i(1, 0), Vector2i(-1, 0)] and flank["around"],
+			"around: two robbers beside her, east and west, the shield in her left hand (%s)" % [flank])
+	var thrower := Main.test_foe_plan(PackedStringArray(["robber+robber+great_bear", "sword+shield", "1", "around"]))
+	_check(thrower["kinds"] == ["robber", "robber", "great_bear"] and thrower["offsets"] == [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1)],
+			"kinds joined: the count at least the kinds named, the bear north (%s)" % [thrower])
+	var many := Main.test_foe_plan(PackedStringArray(["wolf", "sword", "9", "around"]))
+	_check(many["kinds"].size() == 4, "around: four at most (%d)" % many["kinds"].size())
+	_check(Main.test_foe_plan(PackedStringArray(["robber", "sword", "2", "behind"])).is_empty() and Main.test_foe_plan(PackedStringArray(["robber"])).is_empty()
+			and Main.test_foe_plan(PackedStringArray([])).is_empty(), "anything else: no plan")

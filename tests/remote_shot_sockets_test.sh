@@ -79,6 +79,7 @@ refused "tour.tscn without --tour: refused (a test scene)" "res://tests/tour/tou
 	--joined "$sha" x -- --scene res://tests/tour/tour.tscn
 refused "--test-foe without --tour: refused" "--test-foe=rat,bow: refused (only with --tour)" \
 	--joined --server-args "--test-foe=rat,bow" "$sha" x --
+refused "--test-foe with a character past a-z, 0-9, _, + and ,: refused" "--test-foe=rat;bow: refused (foes and weapons" 	--tour smoke --server-args "--test-foe=rat;bow" "$sha" x --
 refused "--sought-first without --tour: refused" "--sought-first: refused (only with --tour)" \
 	--joined --server-args "--sought-first" "$sha" x --
 refused "--test-hp without --tour: refused" "--test-hp: refused (only with --tour)" \
@@ -94,9 +95,9 @@ refused "a tour not at the sha: refused" "--tour no_such_tour: no tests/tour/tou
 refused "--tour-only without --tour: refused" "only with --tour" --tour-only beds --joined "$sha" x --
 refused "--repeat with --tour: refused (one phase)" "--repeat: not with --tour" --tour smoke --repeat 2 "$sha" x --
 rm -f "$tmp/reached"
-sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=draugr,giant_axe --sought-first --test-hp" "$sha" tourx --)"
+sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp" "$sha" tourx --)"
 code=$?
-wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=draugr,giant_axe;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;tour: tour=kit;tour: only=wall;timeout: 17 min;"
+wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;tour: tour=kit;tour: only=wall;timeout: 17 min;"
 got_args="$(printf '%s\n' "$sent" | grep -E '^(args|server_args|tour|timeout): ' | tr '\n' ';')"
 if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
 	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its foe, --sought-first and --test-hp; no mode, port or token"

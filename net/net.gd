@@ -1040,7 +1040,9 @@ var test_smooth := false
 var test_walk: Array[Dictionary] = []
 ## --test-walk-on-wind: the walk waits for the local player's own wind-up.
 var test_walk_on_wind := false
-## --test-foe: [monster kind, weapon] each joining player is given, or empty.
+## --test-foe: [monster kind, weapon, count, "around"] each joining player is
+## given (Main.test_foe_plan reads them; kinds and hands may join several
+## with "+", 392 amended (7)), or empty.
 var test_foe: PackedStringArray = []
 ## --test-tells (net_test's tell phase): the server prints each told move it
 ## sends (Main._tell_telegraph: its zone's peers and the joined ones), a client

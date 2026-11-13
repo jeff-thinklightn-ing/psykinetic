@@ -27776,25 +27776,65 @@ func _test_arts(player: Player) -> void:
 ## optional count lays that many, Foe, Foe2, ..., each TEST_FOE_SPACING
 ## cells past the last, so each is a fight of its own (playtest's live
 ## check of 804 amended (5)'s held second deed).
+## 392 amended (7) (playtest's flank check of 891 and 891 amended (1)):
+## kinds and hands may name several, joined by "+": "robber+robber+great_bear"
+## lays Foe a robber, Foe2 a robber, Foe3 a great bear (the count at least
+## the kinds named; the last kind for any more); "sword+shield" puts the
+## sword in her right hand and the shield in her left. A fourth field
+## "around" lays them beside her instead, east, west, north, then south (4
+## at most), and ends her spawn grace, so each takes her up at once and
+## strikes from beside her: two on opposite sides for World.is_flanked,
+## a thrower third for World.throws_into_walls.
 const TEST_FOE_SPACING := 8
+const TEST_FOE_AROUND: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1)]
 func _test_foe(player: Player) -> void:
-	if Net.test_foe.size() < 2 or Net.test_foe.size() > 3:
+	var plan := test_foe_plan(Net.test_foe)
+	if plan.is_empty():
+		if not Net.test_foe.is_empty():
+			push_error("[test] --test-foe=%s: not kind,weapon[,count[,around]]: ignored" % ",".join(Net.test_foe))
 		return
-	var count := 1
-	if Net.test_foe.size() == 3:
-		count = clampi(Net.test_foe[2].to_int(), 1, 9)
-	World.set_slots(player, Items.tidy(["", "", "", "", Net.test_foe[1], ""], Items.CARRIED))
-	for k in count:
-		var spec := Level._spec_for("monster_" + Net.test_foe[0], Level.MONSTER_TYPES)
+	World.set_slots(player, Items.tidy(["", "", "", "", plan["right"], plan["left"]], Items.CARRIED))
+	var kinds: Array = plan["kinds"]
+	var offsets: Array = plan["offsets"]
+	for k in kinds.size():
+		var kind: String = kinds[k]
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
 		if spec.is_empty():
-			spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0]}
+			spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": kind}
 		spec["name"] = "Foe" if k == 0 else "Foe%d" % (k + 1)
-		spec["tile"] = _nearest_free(player.tile + Vector2i(3 + TEST_FOE_SPACING * k, 0))
+		var wanted: Vector2i = player.tile + (offsets[k] as Vector2i)
+		spec["tile"] = wanted if plan["around"] and World.is_free(wanted) else _nearest_free(wanted)
 		Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
 		var foe := _spawn(spec)
-		print("[test] foe %s at %s (wields %s, wind-up %d, recover %d), %s in hand at %s" % [Net.test_foe[0],
+		print("[test] foe %s at %s (wields %s, wind-up %d, recover %d), %s in hand at %s" % [kind,
 				foe.tile if foe != null else Vector2i.ZERO, World.wielded(foe) if foe != null else "", World.windup_ticks(foe),
-				World.recover_ticks(foe), Net.test_foe[1], player.tile])
+				World.recover_ticks(foe), "+".join([plan["right"], plan["left"]]).trim_suffix("+"), player.tile])
+	if plan["around"]:
+		player.protected = false  # Her spawn grace ended, as a step would end it: they take her up at once.
+		print("[test] around: %d beside %s, her grace ended" % [kinds.size(), player.tile])
+
+
+## --test-foe's fields read (392 amended (7)): {kinds (one a foe), right,
+## left, offsets (one a foe, from her tile), around}; {} if they don't
+## read as kind[+kind...],weapon[+left][,count[,around]]. Pure, for tests.
+static func test_foe_plan(fields: PackedStringArray) -> Dictionary:
+	if fields.size() < 2 or fields.size() > 4 or fields[0].is_empty():
+		return {}
+	var around := fields.size() == 4 and fields[3] == "around"
+	if fields.size() == 4 and not around:
+		return {}
+	var named := fields[0].split("+", false)
+	var hands := fields[1].split("+")
+	var count := clampi(fields[2].to_int(), 1, 9) if fields.size() >= 3 else 1
+	count = maxi(count, named.size())
+	if around:
+		count = mini(count, TEST_FOE_AROUND.size())
+	var kinds: Array[String] = []
+	var offsets: Array[Vector2i] = []
+	for k in count:
+		kinds.append(named[mini(k, named.size() - 1)])
+		offsets.append(TEST_FOE_AROUND[k] if around else Vector2i(3 + TEST_FOE_SPACING * k, 0))
+	return {"kinds": kinds, "right": hands[0], "left": hands[1] if hands.size() > 1 else "", "offsets": offsets, "around": around}
 
 
 ## --test-walk-on-wind: true once the local player's own wind-up has begun;
