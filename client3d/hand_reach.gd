@@ -85,7 +85,8 @@ func _process_modification() -> void:
 	if stage == TURN:
 		if hand >= 0:
 			var now := skeleton.get_bone_global_pose(hand)
-			skeleton.set_bone_global_pose(hand, Transform3D(_twin._hand.basis, now.origin))
+			_roll_forearm(skeleton, hand, now.origin, _twin._hand.basis)
+			skeleton.set_bone_global_pose(hand, Transform3D(_within_wrist(skeleton, hand, _twin._hand.basis), now.origin))
 		return
 	var right := skeleton.find_bone("RightHand")
 	var shoulder := skeleton.find_bone("LeftUpperArm")
@@ -100,3 +101,53 @@ func _process_modification() -> void:
 	target.global_transform = skeleton.global_transform * _hand
 	var height := skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin.y if skeleton.find_bone("Head") >= 0 else 1.6
 	pole.global_position = skeleton.global_transform * (skeleton.get_bone_global_pose(shoulder).origin + POLE * height)
+
+
+## The share of the left hand's twist about the forearm (its turn on the haft against the forearm the IK left)
+## that the forearm takes, rolled about its own line from the elbow to the wrist, as the forearm's two bones turn
+## the hand in life; the wrist keeps the rest (451 amended (6); Jeff, v0.1.213: "wrist bends at non anatomic
+## angle"; anim_rig_test _test_held_wrists holds every holding wrist within 45 degrees of twist: the ready's left
+## twisted up to 57 without it, 17 to 25 with it).
+const FOREARM_ROLL := 0.6
+
+
+## Rolls the left forearm about the line from its elbow to [param wrist] by FOREARM_ROLL of the twist the hand
+## turned to [param want] (skeleton space) would have about it: the wrist stays where it is.
+static func _roll_forearm(skeleton: Skeleton3D, hand: int, wrist: Vector3, want: Basis) -> void:
+	var lower := skeleton.get_bone_parent(hand)
+	if lower < 0:
+		return
+	var fore := skeleton.get_bone_global_pose(lower)
+	var d := Quaternion((fore.basis.orthonormalized() * skeleton.get_bone_rest(hand).basis.orthonormalized()).inverse() * want.orthonormalized())
+	var twist := 2.0 * atan2(d.y, d.w)
+	var axis := wrist - fore.origin
+	if axis.length() < 0.001 or absf(twist) < 0.001:
+		return
+	twist = wrapf(twist, -PI, PI)
+	skeleton.set_bone_global_pose(lower, Transform3D(Basis(axis.normalized(), twist * FOREARM_ROLL) * fore.basis, fore.origin))
+
+
+## The most the left wrist bends off the forearm's line (its swing from its rest), degrees: past it the fist turns
+## off the haft's line by what is over, up to FIST_OFF_MOST, as a wrist at its stop does, rather than bending on
+## (451 amended (6); anim_rig_test _test_held_wrists holds every holding wrist within 60). The ready's left bends
+## 35 to 48, inside it; a pose bent farther than both (the heavy axes' rests, about 110, open rows in
+## anim_rig_test) has its fist FIST_OFF_MOST off the haft and bends on past them.
+const WRIST_MOST := 55.0
+const FIST_OFF_MOST := 10.0
+
+
+## [param want] (the hand's turn on the haft, skeleton space) with its swing off the forearm past WRIST_MOST taken
+## back, by FIST_OFF_MOST at most, its twist kept.
+static func _within_wrist(skeleton: Skeleton3D, hand: int, want: Basis) -> Basis:
+	var lower := skeleton.get_bone_parent(hand)
+	if lower < 0:
+		return want
+	var rest := skeleton.get_bone_global_pose(lower).basis.orthonormalized() * skeleton.get_bone_rest(hand).basis.orthonormalized()
+	var d := Quaternion(rest.inverse() * want.orthonormalized())
+	var twist := Quaternion(0.0, d.y, 0.0, d.w).normalized()
+	var swing := d * twist.inverse()
+	var angle := swing.get_angle()
+	if angle <= deg_to_rad(WRIST_MOST):
+		return want
+	swing = Quaternion.IDENTITY.slerp(swing, (angle - minf(angle - deg_to_rad(WRIST_MOST), deg_to_rad(FIST_OFF_MOST))) / angle)
+	return (rest * Basis(swing * twist)).scaled(want.get_scale())

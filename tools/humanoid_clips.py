@@ -572,7 +572,32 @@ GREAT_GRIP = 0.45
 # (HELD_EDGE_TURN), edge x haft of what chop() is given, so a blow in the body's own upright plane takes the side,
 # as the pick's does (PICK_SIDE). Given ahead or down, as before, the head swung flat. The ready keeps its own.
 AXE_SIDE = (1.0, 0.0, 0.0)
-AXE_READY = chop((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), (0.0, -1.0, 0.0), grip=GREAT_GRIP)
+
+
+def rolled(haft: tuple, edge: tuple, degrees: float) -> tuple:
+	"""chop()'s [edge] (Blender's own axes) turned [degrees] round the haft [haft] = (ahead, to the right, up)."""
+	length = Vector((-haft[1], -haft[0], haft[2])).normalized()
+	e = Vector(edge)
+	e = (e - length * e.dot(length)).normalized()
+	return tuple(Quaternion(length, math.radians(degrees)) @ e)
+
+
+# Ready to fight with a two-hander (451 amended (6), Jeff's picks on C:/dev/review/decisions/axe-stance.md,
+# 11-12: A, "the stance turned", the edge out ahead and down, not up at her face). The right hand turned a
+# quarter round the haft (READY_ROLL) from the first ready, the grip point and the haft's line held where Jeff
+# approved them, so the head's place and the edge are his (the game then turned the drawn piece the same
+# quarter, Client3D.HAFT_TURN, now gone); the right elbow out to her side instead of back and down. The grip held
+# is the game's own: Client3D's hand_r socket, (-0.005, 0.07, 0) in this hand's frame, not HOLD_AT (3 cm farther
+# along the fingers), whose turn about the haft moved the game's grip 5 cm (the first take of this mend, measured
+# in game); here within 1 mm in Blender, the haft to 0.01 degree. The first ready bent the right wrist 148
+# degrees back on the forearm (C:/dev/review/animation/wrists_blender.png; Jeff's v0.1.213 report, "wrist bends
+# at non anatomic angle"), here 20 bent and 22 twisted (anim_rig_test's _wrist_turn, its bars 60 and 45).
+# Every two-hander the left hand reaches for (both axes, the Tomb Sledge, the Chief's pick-hammer, the pick)
+# plays it, so each is held so turned in its ready; the axes' blows (Axe_Sweep, Axe_Overhead) start and end on it.
+READY_HAFT = (0.57, -0.4, 0.66)
+READY_ROLL = 90.0
+AXE_READY = chop((0.108, -0.016, -0.358), READY_HAFT, rolled(READY_HAFT, (0.0, -1.0, 0.0), READY_ROLL),
+	((0.0, 1.0, 0.0), (0.8, -0.6, -0.4)), grip=GREAT_GRIP)
 AXE_UP = chop((0.2, 0.0, 0.0), (-0.3, -0.3, 0.9), AXE_SIDE, grip=GREAT_GRIP) + [
 	("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
 AXE_SWING = chop((0.22, 0.0, -0.12), (0.4, -0.35, 0.85), AXE_SIDE, grip=GREAT_GRIP) + [("spine_02", LIFT, 2.0)]

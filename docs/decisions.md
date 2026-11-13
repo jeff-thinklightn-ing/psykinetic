@@ -14030,6 +14030,44 @@ character preview set apart; 858's body fill not a sun), and tools/clip.gd logs 
 windowed, quits without frames unless each is one.
 CHANGELOG bullet in voice's words. Client only, protocol unchanged, no new class_name.
 
+451 amended (6): a one-sided axe's ready stance turned a quarter round its haft, the edge away from her face
+(label by tools/decision_number.sh; Jeff's report on v0.1.213: "its the direction in the roused stance, with axe
+blade up toward face, it should be down to ground"; his picks on C:/dev/review/decisions/axe-stance.md, 11-12: A,
+the stance turned, and B, the rest as it is today). HELD_EDGE_TURN lays the blade along the right hand's fingers
+so it leads a swing (451 amended (3)); standing ready, those fingers wrapped round the haft point across her, so
+the giant and battle axes' heads rose at her left shoulder with the edge up and across at her face. Axe_Ready
+(humanoid_clips' AXE_READY) holds the right hand turned a quarter round the haft's own line (READY_ROLL), the
+right elbow out at her side: the grip (the game's own, Client3D's hand_r socket) and the haft's line where Jeff
+approved them (in game 4 mm and 0.00 degrees from fdc9f91c5's ready), so the head stands where it stood and
+the edge points out ahead and down (1.00 along her feet's way, -0.51 up). The first take turned the drawn piece
+the same quarter at the root of the hold (HAFT_TURN, eased over 0.3 s, gone): standing ready it bent the right
+wrist 148 degrees back on the forearm (the coordinator, 11-13: "451 amended (6) does not land with that wrist";
+C:/dev/review/animation/wrists_blender.png); in the clip it bends 20 and twists 22. A second take held
+humanoid_clips' HOLD_AT, 3 cm along the fingers from the game's socket, and its roll moved the game's grip 5 cm
+(view_test's left hand below the neck caught it); the socket is (-0.005, 0.07, 0) in the clip's hand frame.
+Axe_Overhead and Axe_Sweep start and end on this ready, their contacts unchanged (0.42 s, 0.8 s), the sweep's
+edge leading from its coil. Every two-hander the left hand reaches for plays Axe_Ready, so the Tomb Sledge, the
+Chief's pick-hammer and the pick stand turned with it, one ready with no wobble into their blows (the
+coordinator's lean, ruled on the sheet). The rest is as held (his pick B). The left hand, on grip_2 by
+HandReach: the forearm rolls FOREARM_ROLL (0.6) of the hand's twist on the haft about its own line, as the
+forearm's two bones turn a hand (the ready's left twisted up to 57 degrees without it, 17 to 25 with it), and
+the wrist stops at WRIST_MOST (55 degrees), past it the fist turned off the haft's line by up to FIST_OFF_MOST
+(10) and the rest bent on (the heavy axes' rests, about 110). anim_rig_test: _test_haft_turned (the edge ahead
+and down with no runtime turn; the grip within 1 cm and the haft within 1 degree of the approved ready, in game;
+through Axe_Sweep the edge leading); _test_held_wrists, new (the coordinator: "so the next one fails at the
+gate instead of on a sheet"): every pose held with a tool in hand (the ready of each two-hander the left hand
+reaches for, each rest, each work with a tool in the right hand), its holding wrists within 60 degrees of bend
+and 45 of twist. Ten older poses are over them and printed as open rows (HELD_WRIST_ROWS), in the
+coordinator's order, each its own row with a close still beside the measure first: the heavy axes' rests
+(Haft_Rest 76/155, Haft_Rest_High 76/174), Hang_Rest (86/5), Spear_Rest (72/35), Chop (134/100), Hammer
+(120/89), Saw (101/62), Hoe (137/81), Herd (85/18), Kneel_Work's shears (36/53). Carrying a two-hander walking
+and running is 451 amended (7)'s, its own row (the coordinator's split, 11-13). Sheets at the nearest zoom:
+hosted Lenovo films (ui-design's runs; before 54a5e1884, this paragraph's first take, never landed; after
+799d6eb54; main's 58fae0dca), C:/dev/review/animation/ready6/ready_left_sheet.png and ready_front_sheet.png
+(each piece's blow from the ready and back to it, a frame each 0.25 s, time and phase marked; main's giant and
+battle axe ready beside the after) with C:/dev/review/animation/wrist_pair_blender.png (the wrists); the
+coordinator's OK on the sheet, 11-13. CHANGELOG bullet in voice's words. Client only, protocol unchanged, no new class_name.
+
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 
 Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:

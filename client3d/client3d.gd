@@ -1576,6 +1576,13 @@ const ARMED_HEAD_CLEAR := 0.12
 ## the piece is back as it is held. (The blades sheathe, step (c).)
 const RESTS := {"giant_axe": {"upper": "Haft_Rest"}, "battle_axe": {"upper": "Haft_Rest_High"},
 	"spear": {"upper": "Spear_Rest", "grip": 0.55}, "hammer": {"upper": "Hang_Rest"}, "pick": {"upper": "Hang_Rest", "grip": 0.16}}
+## The one-sided axes (Jeff, v0.1.213: "its the direction in the roused stance, with axe blade up toward face, it
+## should be down to ground"; his pick A, the stance turned): HELD_EDGE_TURN lays a blade along the right hand's
+## fingers so it leads a swing, and Axe_Ready (humanoid_clips' AXE_READY, 451 amended (6)) holds the right hand
+## turned a quarter round the haft so that standing ready the edge faces out ahead and down, not up at her face,
+## the right wrist straight (the turn first made at the root of the hold bent it 148 degrees back on the forearm).
+## The rest keeps the piece as held (his pick B). anim_rig_test reads these axes' edges.
+const HAFT_TURNED := ["giant_axe", "battle_axe"]
 const REST_SECONDS := 8.0
 const REST_STAND_SECONDS := 2.0
 const REST_ROUSED_CELLS := 6.0

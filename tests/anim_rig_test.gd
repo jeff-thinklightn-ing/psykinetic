@@ -41,6 +41,8 @@ func _ready() -> void:
 	_test_sleep_clips()
 	_test_axe_sweep()
 	await _test_rests()
+	await _test_haft_turned()
+	await _test_held_wrists()
 	_test_warm_painted()
 	await _test_upper()
 	await _test_upper_timed()
@@ -2151,6 +2153,250 @@ func _test_rests() -> void:
 			holder.queue_free()
 	_check(found.is_empty(), "each rest clear of the body and %.2f m from the head, five builds (%s)" % [Client3D.ARMED_HEAD_CLEAR, "; ".join(found)])
 	_check(lows.is_empty(), "each grounded piece's end within %.2f m of the ground, a hung one's off it, five builds (%s)" % [REST_GROUND, ", ".join(lows)])
+
+
+## [param piece]'s one blade side in its own frame (art_style: across +x or -x of its haft, +y): of its
+## points past half its farthest reach off the haft, the side whose span along the haft is at least
+## twice the other's (art-kit, 11-12: the giant axe's back spike reaches as far as its blade, 0.30 m,
+## but is 0.14 tall to the blade's 0.58); zero for a piece with no one side (a spear, a sledge).
+static func _blade_side(piece: Node3D) -> Vector3:
+	var points: Array[Vector3] = []
+	var reach := 0.0
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		var into := piece.global_transform.affine_inverse() * mesh.global_transform
+		for s in mesh.mesh.get_surface_count():
+			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				var p := into * v
+				points.append(p)
+				reach = maxf(reach, Vector2(p.x, p.z).length())
+	var spans := {1: Vector2(INF, -INF), -1: Vector2(INF, -INF)}
+	for p in points:
+		if Vector2(p.x, p.z).length() > reach * 0.5:
+			var side := 1 if p.x > 0.0 else -1
+			spans[side] = Vector2(minf(spans[side].x, p.y), maxf(spans[side].y, p.y))
+	var tall := {}
+	for side: int in spans:
+		tall[side] = maxf(0.0, spans[side].y - spans[side].x)
+	if tall[1] >= 2.0 * tall[-1] and tall[1] > 0.0:
+		return Vector3.RIGHT
+	if tall[-1] >= 2.0 * tall[1] and tall[-1] > 0.0:
+		return Vector3.LEFT
+	return Vector3.ZERO
+
+
+## How far [param direction] (world) points the way [param model]'s feet do (heels to toes, level),
+## -1 to 1, level only.
+static func _ahead_of_feet(model: Node3D, direction: Vector3) -> float:
+	var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var way := Vector3.ZERO
+	for side: String in ["Left", "Right"]:
+		way += sk.global_transform * sk.get_bone_global_pose(sk.find_bone(side + "Toes")).origin 			- sk.global_transform * sk.get_bone_global_pose(sk.find_bone(side + "Foot")).origin
+	var level := Vector3(direction.x, 0.0, direction.z)
+	way.y = 0.0
+	return level.normalized().dot(way.normalized()) if level.length() > 0.01 else 0.0
+
+
+## A one-sided axe in its ready stance (Client3D.HAFT_TURNED; Jeff, v0.1.213: "its the direction in the roused
+## stance, with axe blade up toward face, it should be down to ground"; his pick A, the stance turned, 451 amended
+## (6)): held as every piece is (HELD_EDGE_TURN), Axe_Ready's right hand turned a quarter round the haft puts its
+## edge out ahead (at least READY_EDGE_AHEAD along her feet's way) and down (at most READY_EDGE_UP); and through
+## Axe_Sweep from its coil's end to its follow-through the edge leads the head's motion (at least
+## SWEEP_EDGE_LEADS), so the turn that rights the stance never turns the blow. The turn moves neither the grip
+## (the hand_r socket, the man's body standing, within READY_GRIP_OFF of READY_GRIP) nor the haft's line (within
+## READY_HAFT_OFF degrees of READY_HAFT_LINE): both as Jeff approved them (fdc9f91c5's Axe_Ready, measured in game;
+## the coordinator, 11-13: "keep the grip point, the haft's line and the head's place as approved").
+const READY_GRIP := Vector3(-0.1771, 0.9724, 0.1231)
+const READY_HAFT_LINE := Vector3(0.4169, 0.6879, 0.5941)
+const READY_GRIP_OFF := 0.01
+const READY_HAFT_OFF := 1.0
+const READY_EDGE_AHEAD := 0.5
+const READY_EDGE_UP := -0.2
+const SWEEP_EDGE_LEADS := 0.85
+func _test_haft_turned() -> void:
+	print("== a one-sided axe: ready, its edge out and down; swung, its edge leading ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var off: Array[String] = []
+	var read: Array[String] = []
+	for kind: String in Client3D.HAFT_TURNED:
+		var model := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		var art := str(Items.def(kind).get("art", "item." + kind))
+		var piece := ArtKit.instance(art)
+		piece.name = "Held"
+		piece.basis = Client3D.HELD_EDGE_TURN
+		Client3D._grip_at(piece, art)
+		(sockets["hand_r"] as Node3D).add_child(piece)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		var blade := _blade_side(piece)
+		rig.loop("Idle", 0.0, 0.0, true)
+		rig.upper_at("Axe_Ready", 0.0)
+		await _frames(3)
+		var edge := piece.global_basis * blade
+		var ahead := _ahead_of_feet(model, edge)
+		var grip := (sockets["hand_r"] as Node3D).global_position
+		var line := rad_to_deg(piece.global_basis.y.normalized().angle_to(READY_HAFT_LINE.normalized()))
+		read.append("%s ready ahead %.2f up %.2f, the grip %.3f m from the approved, the haft %.2f deg" % [kind, ahead, edge.normalized().y,
+			grip.distance_to(READY_GRIP), line])
+		if grip.distance_to(READY_GRIP) > READY_GRIP_OFF or line > READY_HAFT_OFF:
+			off.append("%s ready: the grip %.3f m off the approved, the haft %.2f deg" % [kind, grip.distance_to(READY_GRIP), line])
+		if blade == Vector3.ZERO or ahead < READY_EDGE_AHEAD or edge.normalized().y > READY_EDGE_UP:
+			off.append("%s ready: ahead %.2f, up %.2f" % [kind, ahead, edge.normalized().y])
+		rig.upper_off()
+		var tip := _head_of(piece)
+		for t: float in [0.55, 0.68, 0.75, 0.8, 0.9]:
+			rig.base_at("Axe_Sweep", t)
+			await _frames(3)
+			var a := piece.global_transform * tip
+			rig.base_at("Axe_Sweep", t + 0.03)
+			await _frames(3)
+			var lead := (piece.global_basis * blade).normalized().dot((piece.global_transform * tip - a).normalized())
+			if lead < SWEEP_EDGE_LEADS:
+				off.append("%s sweep %.2f: leads %.2f" % [kind, t, lead])
+		model.queue_free()
+		holder.queue_free()
+	print("  ", "; ".join(read))
+	_check(off.is_empty() and read.size() == Client3D.HAFT_TURNED.size(), "each one-sided axe ready with its edge out ahead and down, its grip and haft as approved, and swung with it leading (%s)" % "; ".join(off))
+
+
+## Every pose held with a tool or weapon in hand keeps the wrists that hold it within HELD_WRIST_BEND of their rest
+## and HELD_WRIST_TWIST of twist (the coordinator, 11-13, after Axe_Ready bent the right wrist 148 degrees back on the
+## forearm, C:/dev/review/animation/wrists_blender.png: "so the next one fails at the gate instead of on a sheet"):
+## the ready of each two-hander the left hand reaches for, each rest of Client3D.RESTS, each work of
+## Client3D.ACTIVITIES with a tool in the right hand, the man's body, HELD_STEPS samples a loop; the right wrist,
+## and the left where HandReach holds it to the haft. A pose in HELD_WRIST_ROWS is printed, not failed: its own row
+## is open, named there.
+const HELD_STEPS := 12
+const HELD_WRIST_BEND := 60.0
+const HELD_WRIST_TWIST := 45.0
+## Every two-hander the left hand reaches for (a grip_2 within Client3D.REACH_SPAN of its grip).
+const REACHED_TWO := ["battle_axe", "giant_axe", "tomb_sledge", "rot_hammer", "pick"]
+## In the coordinator's order (11-13), each its own row with its own sheet, a close still beside the measure first:
+## the player's rests (on Jeff's body whenever he stands with a weapon out), then the woodcutter's chop, then the
+## work poses as people work comes on, the knelt work last.
+const HELD_WRIST_ROWS := {
+	"Haft_Rest": "1st, the heavy axes' rests (Haft_Rest, Haft_Rest_High)",
+	"Hang_Rest": "2nd, the hammer's and the pick's rest",
+	"Spear_Rest": "3rd, the spear's rest",
+	"Chop": "4th, the woodcutter's chop (its ready 116 degrees)",
+	"Hammer": "5th, the smith's hammer",
+	"Saw": "6th, the sawyer's saw",
+	"Hoe": "7th, the farmer's hoe",
+	"Herd": "8th, the herder's crook",
+	"Kneel_Work": "last, the knelt work's right hand with the shears (877 amended (1)'s Kneel_Work, twisted 53)"}
+func _test_held_wrists() -> void:
+	print("== every pose held with a tool in hand: the wrists that hold it in range ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var poses: Array = []  # [label, base clip, upper clip, held kind (an item id) or art id]
+	for kind: String in REACHED_TWO:
+		poses.append(["%s ready" % kind, "Idle", str(Client3D.HUMANOID_MOVES["ready"]), kind])
+	for kind: String in Client3D.RESTS:
+		if Items.def(kind).is_empty():
+			continue
+		poses.append(["%s at rest" % kind, "Idle", str(Client3D.RESTS[kind]["upper"]), kind])
+	for word: String in Client3D.ACTIVITIES:
+		var work: Dictionary = Client3D.ACTIVITIES[word]
+		if not work.has("right"):
+			continue
+		if work.has("upper"):
+			poses.append(["%s (%s)" % [word, work["upper"]], "Idle", str(work["upper"]), str(work["right"])])
+		else:
+			poses.append(["%s (%s)" % [word, work["clip"]], str(work["clip"]), "", str(work["right"])])
+	var off: Array[String] = []
+	var known: Array[String] = []
+	var read: Array[String] = []
+	for pose: Array in poses:
+		var model := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		add_child(holder)
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var id := str(pose[3])
+		var art := id if id.contains(".") else str(Items.def(id).get("art", "item." + id))
+		var piece := ArtKit.instance(art)
+		piece.name = "Held"
+		if not id.contains(".") and Client3D._edge_first(id):
+			piece.basis = Client3D.HELD_EDGE_TURN
+		Client3D._grip_at(piece, art)
+		(sockets["hand_r"] as Node3D).add_child(piece)
+		var reach := HandReach.make(sk, (sockets["hand_r"] as Node3D).transform, (sockets["hand_l"] as Node3D).transform)
+		if not id.contains("."):
+			Client3D._sync_reach(reach, sockets, [id, ""])
+		var at := {}
+		for bone: String in ["LeftLowerArm", "LeftHand", "RightLowerArm", "RightHand"]:
+			var on := BoneAttachment3D.new()
+			on.bone_name = bone
+			sk.add_child(on)
+			at[bone] = on
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		var base := str(pose[1])
+		var upper := str(pose[2])
+		var clip := upper if upper != "" else base
+		var length := rig.length(clip)
+		var most := Vector4.ZERO  # right bend, right twist, left bend, left twist (the left only on the haft)
+		for i in HELD_STEPS:
+			var t := length * float(i) / HELD_STEPS
+			if upper != "":
+				rig.loop(base, 0.0, 0.0, true)
+				rig.upper_at(upper, t)
+			else:
+				rig.base_at(base, t)
+			await _frames(3)
+			var wr := _wrist_turn(sk, at, "Right")
+			most = Vector4(maxf(most.x, wr.x), maxf(most.y, absf(wr.y)), most.z, most.w)
+			if reach.active:
+				var wl := _wrist_turn(sk, at, "Left")
+				most = Vector4(most.x, most.y, maxf(most.z, wl.x), maxf(most.w, absf(wl.y)))
+		read.append("%s: right %.0f/%.0f, left %s" % [pose[0], most.x, most.y, "%.0f/%.0f" % [most.z, most.w] if reach.active else "free"])
+		if most.x > HELD_WRIST_BEND or most.y > HELD_WRIST_TWIST or most.z > HELD_WRIST_BEND or most.w > HELD_WRIST_TWIST:
+			var row := ""
+			for name: String in HELD_WRIST_ROWS:
+				if clip.begins_with(name):
+					row = str(HELD_WRIST_ROWS[name])
+			(known if row != "" else off).append(read[-1] + (" (%s)" % row if row != "" else ""))
+		model.queue_free()
+		holder.queue_free()
+		await _frames(1)
+	for line in read:
+		print("  ", line)
+	for line in known:
+		print("  open row: ", line)
+	_check(off.is_empty() and read.size() == poses.size(), "every pose held with a tool in hand, its holding wrists within %.0f deg (twist %.0f) (%s)" % [
+		HELD_WRIST_BEND, HELD_WRIST_TWIST, "; ".join(off)])
+
+
+## The wrist's turn from its rest: x the swing off the forearm's line, y the twist about it (-180..180), degrees.
+static func _wrist_turn(sk: Skeleton3D, at: Dictionary, side: String) -> Vector2:
+	var hand := sk.find_bone(side + "Hand")
+	if hand < 0 or not at.has(side + "LowerArm") or not at.has(side + "Hand"):
+		return Vector2.ZERO
+	var rel := (at[side + "LowerArm"] as Node3D).global_basis.orthonormalized().inverse() * (at[side + "Hand"] as Node3D).global_basis.orthonormalized()
+	var d := Quaternion(sk.get_bone_rest(hand).basis.orthonormalized().inverse() * rel)
+	var twist := Quaternion(0.0, d.y, 0.0, d.w).normalized()
+	var y := (d * twist.inverse()) * Vector3.UP
+	return Vector2(rad_to_deg(acos(clampf(y.y, -1.0, 1.0))), wrapf(rad_to_deg(2.0 * atan2(twist.y, twist.w)), -180.0, 180.0))
+
+
+static func _head_of(piece: Node3D) -> Vector3:
+	var points: Array[Vector3] = []
+	var top := -INF
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		var into := piece.global_transform.affine_inverse() * mesh.global_transform
+		for s in mesh.mesh.get_surface_count():
+			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				points.append(into * v)
+				top = maxf(top, (into * v).y)
+	var sum := Vector3.ZERO
+	var n := 0
+	for p in points:
+		if p.y > top - 0.35:
+			sum += p
+			n += 1
+	return sum / maxf(n, 1)
 
 
 static func _box(points: PackedVector3Array) -> AABB:

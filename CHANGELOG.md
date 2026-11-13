@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Anyone ready to fight with a giant axe or battle axe holds its edge turned out, away from their face, and with a tomb sledge, rot hammer or pick, its head leads toward the foe, wrists straight either way (451 amended (6)).
 - When you're brought back or moved within an area, you and your companion show only where you arrive (911).
 - Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
 - In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
