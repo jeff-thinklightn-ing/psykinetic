@@ -2760,11 +2760,13 @@ func _spot(given: Dictionary) -> Dictionary:
 		face, ", pair %s" % pair if not pair.is_empty() else ""]
 	if unseated:
 		said += ". Warning: nothing at %s is sat on (%s), so the body sits on the ground" % [at, SEAT_SAYS]
-	var users := spot_users(town, use, trade)
-	if not users.is_empty():
-		said += ". " + users
-	if use == "work":
-		said += ". " + trade_preview(town)
+	# 859 amended (8): who comes and the town's trades are the answer panel's (spot_preview), said once
+	# there; the tool says what it laid, and a group short of spots as a warning (the prompt asks for
+	# more spots than people, and this is how Claude hears it has too few).
+	var read := _spot_wants(town, use, trade)
+	var short := shortfall(read["wants"], read["spots"])
+	if not short.is_empty():
+		said += ". Warning: %s spots in %s%s" % ["work (%s)" % trade if use == "work" else ("square, fire and talk" if _spot_group(use) == "square" else use), town, short]
 	return {"ok": true, "text": said}
 
 
@@ -2917,50 +2919,6 @@ func keeper_front(entry: Dictionary) -> String:
 var spot_world := ""
 
 
-## Who uses the spots of [param town]'s [param use] (and [param trade], a
-## work spot's) over one day (859, npc's rule): each resident whose
-## Townsfolk.whereabouts word at each hour is the use ("square" for square,
-## fire and talk alike; "work" with the trade among theirs), against the
-## spots there are. "" when no spot of that kind is laid.
-func spot_users(town: String, use: String, trade := "") -> String:
-	var spots := Level.spots_from(working.config, [] as Array[String]).filter(func(spot: Dictionary) -> bool:
-		return spot["town"] == town and _spot_group(spot["use"]) == _spot_group(use) and (use != "work" or spot["trade"] == trade))
-	if spots.is_empty():
-		return ""
-	var group := _spot_group(use)
-	var named := "work (%s)" % trade if use == "work" else ("square, fire and talk" if group == "square" else use)
-	var poses := PackedStringArray()
-	for spot: Dictionary in spots:
-		var pose: String = spot["pose"]
-		if pose != "stand" and not Client3D.ACTIVITIES.has(pose) and not poses.has(pose + " draws as stand until its clip lands"):
-			poses.append(pose + " draws as stand until its clip lands")
-	var head := "%s in %s (%d spot%s%s)" % [named, town, spots.size(), "" if spots.size() == 1 else "s", "; " + ", ".join(poses) if not poses.is_empty() else ""]
-	var read := _spot_wants(town, use, trade)
-	if not read["read"]:
-		return head + ": no residents read%s" % (" (%s)" % spot_world if not spot_world.is_empty() else "")
-	var hours: Dictionary = read["hours"]
-	var wants: Array[int] = read["wants"]
-	var where := " (%s)" % (spot_world if not spot_world.is_empty() else "this world, now")
-	if hours.is_empty():
-		return head + ": nobody comes all day" + where
-	var who := PackedStringArray()
-	for name: String in hours:
-		who.append("%s %s" % [name, _spans(hours[name])])
-	var over: Array[int] = []
-	var most := 0
-	for hour in 24:
-		most = maxi(most, mini(wants[hour], spots.size()))
-		if wants[hour] > spots.size():
-			over.append(hour)
-	var said := "%s: %s; at most %d at once of %d" % [head, ", ".join(who), most, spots.size()]
-	if not over.is_empty():
-		var peak := 0
-		for hour in over:
-			peak = maxi(peak, wants[hour])
-		said += "; too few at %s (%d want them): the rest stand anywhere in the place's rect" % [_spans(over), peak]
-	return said + where
-
-
 ## A spot use's group (859): square, fire and talk are all the square's hours.
 static func _spot_group(use: String) -> String:
 	return "square" if use in ["square", "fire", "talk"] else use
@@ -2987,7 +2945,7 @@ const SPOT_NAMES := {"fire": "Fire spot", "square": "Square spot", "talk": "Talk
 ## One laid or changed spot's line for the answer panel (859 amended (3),
 ## the coordinator's ruling on builder's worst two; the mock's words): its
 ## cell and pose, who comes when (any of [param town]'s residents whose hour
-## is the spot's group, as spot_users reads), "one at a time", and the hours
+## is the spot's group, as _spot_wants reads), "one at a time", and the hours
 ## more want the group than its spots seat. No "(this world, now)": a reading
 ## from residents.json alone (the headless runner) says so in a few words.
 func spot_reading(spot: Dictionary) -> String:
@@ -3029,8 +2987,8 @@ static func shortfall(wants: Array[int], seats: int) -> String:
 
 
 ## Who of [param town]'s residents wants a spot of [param use]'s group (and
-## [param trade], a work spot's) at each hour (859, npc's rule; shared by
-## spot_users and spot_reading): {read: any resident read, settled: read from
+## [param trade], a work spot's) at each hour (859, npc's rule; read by
+## spot_reading and the spot tool's shortfall warning): {read: any resident read, settled: read from
 ## residents.json alone, spots: how many such spots are laid, hours: name ->
 ## [hour], wants: [24] how many at each hour}.
 func _spot_wants(town: String, use: String, trade: String) -> Dictionary:
@@ -3123,13 +3081,9 @@ func spot_preview() -> Array[String]:
 ## from sites, a stall's keeper (Main.VENDOR_TRADE); the hours on the day's
 ## table alone (no resident's clock: "about"); a trade economy seats "(if
 ## the town takes one on)" (npc's condition, voice's words). No name is read. A trade with work spots laid and
-## nothing in the town that calls for it is said too (the coordinator).
-func trade_preview(town: String) -> String:
-	return "the town's trades in %s, by economy's rules: %s" % [town, "; ".join(trade_lines(town))]
-
-
-## trade_preview a trade a line (885), as the answer panel says them (859
-## amended (3)): "Smith at F1 forge: works about 7-12 and 13-18; no work spot
+## nothing in the town that calls for it is said too (the coordinator). A trade
+## a line (885), as the answer panel says them (859 amended (3); since 859
+## amended (8) the panel's alone, the spot tool no longer says them): "Smith at F1 forge: works about 7-12 and 13-18; no work spot
 ## yet", a building by its code and kind (885 draws the code's chip), a place
 ## by its kind alone, never a level's key. A trade economy seats says "(if the
 ## town takes one on)" only while none of the town's residents holds it (the

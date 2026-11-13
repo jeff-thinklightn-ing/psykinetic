@@ -51924,6 +51924,20 @@ cross drawn at that same alpha, so the mark and the cross read together; a new o
 at 0.85, still plainly the strongest. view_test (the cross at its mark's alpha, the kept alpha at least
 0.5). ui-design's still beside ghost5-vs-6 before it queues. Client only, protocol unchanged, no new
 class_name, no bullet.
+859 amended (8) (the coordinator's ruling on builder's three worst, 2026-11-13; the label from
+decision_number.sh): the spot tool says what it laid, the answer panel who comes. The panel said each
+spot twice (C:\dev\review\ui-design\builder\built\panel4-1080-crop.png): the reply above "Spots, who
+comes" carried the spot tool's own text, who comes in the old words ("square, fire and talk in store
+(1 spot): Maud 12-13, ...; at most 1 at once of 1 (this world, now)") and, for a work spot, the town's
+trades whole, which the stub passes on as it is and Claude reads and may quote. Now the tool's text is
+what it laid ("laid a work (merchant) spot at (204, 196), stand facing (204, 197)"), the sit warning
+as before, and one more warning when the group is short of spots, in voice's shortfall words
+("Warning: square, fire and talk spots in store; short at 20-22: 3 want its 2 spots"): the prompt asks
+Claude for more spots than people, and that is how it hears it has laid too few. Who comes and the
+trades stay the panel's (spot_reading, trade_lines, 859 amended (3)), said once. spot_users and
+trade_preview, left without a caller, go. builder_test _test_spots and _test_trades_preview (the
+merchant's text only what was laid; who comes and the mismatch read from the panel's lines). Server
+only (builder mode is Jeff's tool), protocol unchanged, no new class_name, no bullet.
 
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 

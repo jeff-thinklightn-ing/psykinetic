@@ -1717,7 +1717,7 @@ func _test_spots() -> void:
 		and wilds.working.undo_steps.size() == steps + 1 and not "Warning" in seat_text,
 		"a sit spot on the fire's seat: npc's shape, the store its town by default, one undo step, no seat warning (%s)" % seat_text)
 	if not Client3D.ACTIVITIES.has("sit"):
-		_check("sit draws as stand until its clip lands" in seat_text, "it says the sit draws as a stand until animation's clip lands")
+		_check("drawn standing until its clip lands" in wilds.spot_preview()[0], "the panel says the sit draws as a stand until animation's clip lands")
 	var turned := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 209], "pose": "sit"})
 	_check(turned.get("ok", false) and "changed it to" in str(turned.get("text")) and (wilds.working.config["spots"] as Array).size() == 1
 		and wilds.working.config["spots"][0]["face"] == [193, 209], "laid again on its cell: the spot turned, still one (%s)" % turned.get("text"))
@@ -1736,10 +1736,12 @@ func _test_spots() -> void:
 	# The keeper behind his counter; who comes (residents.json's settled people, read without a world).
 	var keeper := wilds.run_tool("spot", {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]})
 	var keeper_text := str(keeper.get("text"))
-	_check(keeper.get("ok", false) and "work (merchant) in store (1 spot)" in keeper_text and "Snagfin" in keeper_text,
-		"a merchant's spot behind the counter: laid, and who comes read (%s)" % keeper_text)
-	if World.towns == null:
-		_check("residents.json's settled people only" in keeper_text, "with no world, said: the settled people only")
+	# 859 amended (8): the tool says what it laid; who comes and the trades are the panel's, said once there.
+	_check(keeper.get("ok", false) and keeper_text == "laid a work (merchant) spot at (204, 196), stand facing (204, 197)",
+		"a merchant's spot behind the counter: laid, the tool saying only that (%s)" % keeper_text)
+	var keeper_line: String = wilds.spot_preview()[1]
+	_check("Snagfin" in keeper_line and (World.towns != null or "(settled folk only)" in keeper_line),
+		"who comes to it read in the panel's line, the settled folk only with no world (%s)" % keeper_line)
 	var gone := wilds.run_tool("spot", {"at": [192, 210], "remove": true})
 	_check(gone.get("ok", false) and "took away the fire spot at (192, 210)" in str(gone.get("text")) and (wilds.working.config["spots"] as Array).size() == 1, "removed (%s)" % gone.get("text"))
 	wilds.working.undo()
@@ -1846,14 +1848,14 @@ func _test_trades_preview() -> void:
 	var wilds_doc := MapDoc.from_level("wilds")
 	wilds_doc.config.erase("spots")
 	var wilds := BuilderSession.new(wilds_doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
-	var before := wilds.trade_preview("store")
+	var before := "; ".join(wilds.trade_lines("store"))
 	var code_of := func(use: String) -> String:
 		for building: Variant in wilds.working.config.get("buildings", []):
 			if building is Dictionary and str(building.get("use", "")) == use and str(building.get("town", "")) == "store":
 				return str(building.get("code", ""))
 		return ""
 	var forge: String = code_of.call("forge")
-	for words: String in ["the town's trades in store, by economy's rules: ", "Smith at %s forge: works about " % forge, "Cook at %s kitchen: " % code_of.call("kitchen"),
+	for words: String in ["Smith at %s forge: works about " % forge, "Cook at %s kitchen: " % code_of.call("kitchen"),
 			"Priest at %s temple (if the town takes one on)" % code_of.call("temple"), "Woodcutter at the woodlot: ", "Vendor at the stall: "]:
 		_check(words in before, "Umbrage's trades (859 amended (3)): \"%s\" (%s)" % [words, before])
 	_check(not forge.is_empty() and not "woodlot woodlot" in before and not "weapon_stall" in before and not "the forge" in before,
@@ -1865,13 +1867,13 @@ func _test_trades_preview() -> void:
 	_check(not named, "no name of economy's lists read into it")
 	var keeper := wilds.run_tool("spot", {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]})
 	var keeper_text := str(keeper.get("text"))
-	_check(keeper.get("ok", false) and "the town's trades in store" in keeper_text and "Merchant work spots laid, but no trade here uses them" in keeper_text,
-		"a merchant's spot, nothing in town calling for one: said both ways (%s)" % keeper_text)
+	var after_keeper := "; ".join(wilds.trade_lines("store"))
+	_check(keeper.get("ok", false) and not "trades" in keeper_text and not "Smith at" in keeper_text and "Merchant work spots laid, but no trade here uses them" in after_keeper,
+		"a merchant's spot, nothing in town calling for one: said both ways in the panel's lines, not in the tool's (859 amended (8)) (%s)" % after_keeper)
 	var lines := wilds.spot_preview()
 	var trades := wilds.trade_lines("store")
-	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines.slice(1) == Array(trades) and not "by economy's rules" in lines[1]
-		and wilds.trade_preview("store") == "the town's trades in store, by economy's rules: " + "; ".join(trades),
-		"the proposal's reading ends with the trades, a trade a line (885), no head on the first; Claude's tool text joins them under it (%s)" % [lines])
+	_check(trades.size() >= 6 and lines.size() == 1 + trades.size() and lines.slice(1) == Array(trades) and not "by economy's rules" in lines[1],
+		"the proposal's reading ends with the trades, a trade a line (885), no head on the first (%s)" % [lines])
 	var seated := ", ".join(wilds.trade_lines("store", {"taverner": true}))
 	_check("Taverner at " in seated and not "inn (if the town takes one on)" in seated and "temple (if the town takes one on)" in seated,
 		"a seated trade a resident already holds: no \"(if the town takes one on)\"; one nobody holds keeps it (%s)" % seated)
@@ -1887,7 +1889,7 @@ func _test_trades_preview() -> void:
 	_check("Hauler at the store: " in carried and "2 work spots" in carried.substr(carried.find("Hauler at")) and not "Hauler work spots laid" in carried,
 		"maps' two hauler spots, a hauler in town: \"2 work spots\", no condition, no mismatch (%s)" % carried)
 	var empty :=BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
-	_check("No trades yet: no building with a use, no work site" in empty.trade_preview("store"), "a town with nothing that calls for a trade: said so")
+	_check("No trades yet: no building with a use, no work site" in "; ".join(empty.trade_lines("store")), "a town with nothing that calls for a trade: said so")
 
 
 ## A parse's whole reading, as one string's hash: what a cached and a fresh one must share.
