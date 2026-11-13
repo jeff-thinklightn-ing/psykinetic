@@ -25,6 +25,10 @@ var _coords: Label
 var _coords_at := Vector2i(-2, -2)
 var _coords_me := Vector2i(-2, -2)
 var _proposal := {}
+## The request being worked on, for the panel's "Checking:" line (867 amended (1)).
+var _asked := ""
+## Esc pressed while it was worked on: the server stops it when its checks end (867 amended (1)).
+var _cancelling := false
 ## --test-builder with a request starting "+": accept the proposal when it comes.
 var _test_accept := false
 ## --test-builder with a request starting "*": the answer shown with every fold open (a shot's).
@@ -233,7 +237,14 @@ func toggle() -> void:
 
 ## Esc: the proposal discarded, else the box closed, else the area let go.
 func escape() -> void:
-	if state == "proposal":
+	if state == "working":
+		# 867 amended (1): the panel's "Esc cancel" while it works; the server ends it whole, then says "discarded".
+		if not _cancelling:
+			_cancelling = true
+			_send({"op": "discard"})
+			_say("Cancelling: %s ..." % _asked)
+			panel.working("Cancelling: %s ..." % _asked)
+	elif state == "proposal":
 		_send({"op": "discard"})
 		_proposal = {}
 		state = "asking"
@@ -293,6 +304,7 @@ func _submitted(text: String) -> void:
 		return
 	_send({"op": "ask", "area": [area.position.x, area.position.y, area.size.x, area.size.y], "text": asked})
 	state = "working"
+	_asked = asked
 	_say("Asking: %s ..." % asked)
 	panel.working("Asking: %s ..." % asked)
 
@@ -310,7 +322,12 @@ func on_message(data: Dictionary) -> void:
 	match str(data.get("state", "")):
 		"working":
 			state = "working"
+			# 867 amended (1): Claude's answer came, its changes being checked (voice's words).
+			if data.get("checking", false) and not _asked.is_empty() and not _cancelling:
+				_say("Checking: %s ..." % _asked)
+				panel.working("Checking: %s ..." % _asked)
 		"proposal":
+			_cancelling = false  # A server before 867 amended (1) said "discarded" at once and went on.
 			state = "proposal"
 			_proposal = data
 			var given: Array = data.get("area", [])
@@ -335,12 +352,20 @@ func on_message(data: Dictionary) -> void:
 			_reset()
 			_say("Built. Drag out another area, Ctrl+Z takes it back, B leaves.")
 		"discarded":
-			pass
+			if _cancelling:
+				# 867 amended (1): the Esc pressed while it worked, done; as a proposal's discard reads.
+				_cancelling = false
+				_proposal = {}
+				state = "asking"
+				_show_area()
+				_open_box()
+				_say("Discarded. Ask again, or drag out another area.")
 		"undone":
 			_say("Taken back.")
 		"nothing":
 			_say("Nothing to do.")
 		"error":
+			_cancelling = false
 			state = "proposal" if not _proposal.is_empty() else ("asking" if area.size != Vector2i.ZERO else "idle")
 			_say("Builder: %s" % data.get("error", "something went wrong"))
 			if panel.visible and _proposal.is_empty():

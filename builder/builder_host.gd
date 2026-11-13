@@ -87,6 +87,10 @@ func command(peer: int, player_id: String, zone_name: String, args: Dictionary) 
 		"accept":
 			_accept(peer, player_id)
 		"discard":
+			if sessions.has(peer) and sessions[peer].busy:
+				# 867 amended (1): kept to the ask's end, "discarded" said then (_ask).
+				sessions[peer].discard()
+				return
 			if sessions.has(peer):
 				sessions[peer].discard()
 			_reply(peer, {"state": "discarded"})
@@ -124,17 +128,23 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		_session_zone[peer] = zone_name
 	claude.log_tag = "%s in %s" % [player_id, zone_name]
 	_reply(peer, {"state": "working"})
+	# 867 amended (1): once a reply's tool calls start, the builder's panel says "Checking:".
+	session.on_checking = func() -> void: _reply(peer, {"state": "working", "checking": true})
 	var result: Dictionary = await session.ask(text)
 	spent += float(result["cost"])
 	print("[builder] %s in %s %s: \"%s\" -> %s, $%.4f (session $%.4f, %d in, %d out; server $%.4f)" % [player_id, zone_name,
 		[area.position.x, area.position.y, area.size.x, area.size.y], text, "ok" if result["ok"] else result["error"],
 		result["cost"], session.usage["cost"], session.usage["input"] + session.usage["cache_read"] + session.usage["cache_write"],
 		session.usage["output"], spent])
+	if result.get("discarded", false):
+		_reply(peer, {"state": "discarded"})  # Esc came while it ran, done now (867 amended (1)).
+		return
 	var proposed := session.proposal()
 	if not result["ok"] and proposed["cells"].is_empty() and proposed["edges"].is_empty() and proposed["heights"].is_empty():
 		_reply(peer, {"state": "error", "error": result["error"]})
 		return
 	var reply := proposal_message(session)
+	await BuilderSession.breathe()
 	var parts := answer_parts(session, result)
 	reply["summary"] = summary_of(parts)
 	reply["parts"] = panel_parts(parts, building_codes_of(session))

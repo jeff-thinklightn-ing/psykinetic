@@ -52166,6 +52166,37 @@ read fresh; a kept parse made wrong (the chest left out) and accept still refuse
 the doc's revision on and its faults read again; the spot reach kept and equal to one flooded fresh.
 Timings under the bench lock follow. Tools only: nothing player-facing, no package, no bullet;
 protocol unchanged; no new class_name.
+
+867 amended (1) (the coordinator's ruling on builder's page C:\dev\review\builder\accept_off_thread.md,
+2026-11-13, first of its order; the label from decision_number.sh): an ask's tool calls a piece a frame.
+The coordinator's probe on the box's own machine (bundle 8493c3ae1, C:\dev\review\builder\probe_box\),
+whose server lists builders, so its players would feel each of these the first time a builder asks there
+(none has: release's count of the box's journal back to 10-20, 0 asks and 0 accepts, is the fact this
+rests on, and why it is a guard, not a mend of anything felt): a tool call 434 to 830 ms on the main
+thread, each re-parsing the 256 by 256 working copy (435 ms) and checking its layout (433) and arrivals
+(437); BuilderSession.ask ran a reply's calls in one loop, so a five-call reply froze the server 6.8
+s; accept 1.6 s more (check 464, save 718, reload_zone 238, WorldMap.build 216). Only the wait for
+Claude's answer was asynchronous. Now BuilderSession.breathe() ends the frame (a SceneTree's
+process_frame; nothing outside a tree) before each call, after it, before its layout check and after
+it, after the level's own faults at the ask's start, and between the closing checks; the host pauses
+once more between the proposal message and the panel's reading. The longest freeze an ask can cause is
+one piece, about one parse (0.4 to 0.5 s on the box), not a reply: still over the coordinator's 100 ms
+rule, which the spots-only cut and the parse question (the page's order) are for. With a pause inside a
+reply, an Esc midway would have reset the working copy between a call and its checks: discard() while
+busy is kept (discard_waiting) and done whole as the ask ends, the host answering "discarded" then, not
+at once, and sending no proposal. The panel said "Esc cancel" while it worked, but Esc then only closed
+the panel on the builder's client, and the proposal came back up when the ask ended: now Esc while it
+works sends the discard and the panel says "Cancelling: <the request> ..." (voice's words; the
+coordinator: a held key must not read as ignored) until the server's "discarded", then "Discarded. Ask
+again, or drag out another area." as a proposal's discard reads. An old client never sends a discard
+while working, so the later answer changes nothing for it; against an old server, which answered at
+once and went on, a new client shows "Discarded" and then the proposal, as before.
+The builder's panel says "Checking: <the request> ..." (voice's words, the shape of "Asking:") when a
+reply's calls start: BuilderSession.on_checking, the host's repeated "working" with "checking": true
+(release: no new number; an old client takes a second "working" as it took the first, setting its state
+and nothing else). builder_test _test_breathes (three calls over at least twelve frames; told once; Esc
+midway kept to the end, at once when idle). Server and builder's client only, protocol unchanged, no new
+class_name, no bullet.
 ## 858. Umbrage at night: the ground lit once, a less blue night, a fill on bodies (lands off)
 
 Package "Umbrage at night" (the coordinator, 2026-11-10, under Jeff's "Umbrage first"; environment leads). Pieces: (a) this, environment's night light; (b) buildings' lamp numbers (the door lanterns, the store's and chapel's, the temple's candles of 734 amended (7)); (c) the window rule after 22:00 (566 with npc's sleep; playtest's count of lit windows on a lived-in town first). (a) lands switched off: `Client3D.NIGHT_LOOK_2 := false` keeps every number as it was. Environment alone flips it, in its own commit, on buildings' ping that (b) is on main, in the same landing take or the same cut, release told. A darker night without stronger lamps would make the town darker still, so never one without the other in a released build.

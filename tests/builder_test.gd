@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_named_refusals()
 	_test_trades_preview()
 	_test_cached_checks()
+	await _test_breathes()
 	await _test_spot_ghost()
 	_test_answer_parts()
 	await _test_answer_panel()
@@ -1895,6 +1896,37 @@ func _test_trades_preview() -> void:
 ## A parse's whole reading, as one string's hash: what a cached and a fresh one must share.
 func _parse_print(parsed: Dictionary) -> int:
 	return hash(str(parsed))
+
+
+func _test_breathes() -> void:
+	print("\n== an ask's tool calls a piece a frame, the panel told when checking starts, Esc kept to the end (867 amended (1)) ==")
+	var calls := [{"name": "paint", "input": {"ground": "dirt", "cells": [[6, 6]]}},
+		{"name": "paint", "input": {"ground": "dirt", "cells": [[7, 6]]}},
+		{"name": "paint", "input": {"ground": "dirt", "cells": [[8, 6]]}}]
+	var session := BuilderSession.new(_doc(), Rect2i(5, 5, 12, 10), "test_field", StubClaude.new([calls, "Three cells of dirt."]))
+	var frames := [0]
+	var count := func() -> void: frames[0] += 1
+	get_tree().process_frame.connect(count)
+	var checking := [0]
+	session.on_checking = func() -> void: checking[0] += 1
+	var result: Dictionary = await session.ask("a dirt path")
+	get_tree().process_frame.disconnect(count)
+	# Each call: a pause before it, after it, before the layout check and after it (four), and the stub's own frame.
+	_check(result["ok"] and session.proposal()["cells"].size() == 3 and frames[0] >= calls.size() * 4,
+		"three calls, no frame holding more than a piece of one: %d frames across the ask" % frames[0])
+	_check(checking[0] == 1, "the panel told once, as the reply's calls start (%d)" % checking[0])
+	# Esc while the calls run: kept until the ask ends, then the proposal forgotten whole.
+	var esc := BuilderSession.new(_doc(), Rect2i(5, 5, 12, 10), "test_field", StubClaude.new([calls, "Three cells of dirt."]))
+	var midway := [-1]
+	esc.on_checking = func() -> void:
+		esc.discard()
+		midway[0] = esc.working.revision
+	var dropped: Dictionary = await esc.ask("a dirt path")
+	_check(midway[0] >= 0 and esc.discard_waiting == false and dropped.get("discarded", false) and esc.proposal()["cells"].is_empty() and not esc.busy
+		and not esc.on_checking.is_valid(),
+		"Esc during the calls: the calls ran on, then the proposal forgotten at the end, its callable let go (%s)" % [esc.proposal()["cells"]])
+	esc.discard()
+	_check(esc.proposal()["cells"].is_empty(), "Esc when idle: at once, as before")
 
 
 func _test_cached_checks() -> void:

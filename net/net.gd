@@ -649,6 +649,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## client shows neither (no points, a plain row).
 ## 747 amended (6): Player.quest may carry "zones" [level names], the places its card shows in; an old client ignores it (draws everywhere), a new client draws everywhere without it. No new number (release).
 ## 859 amended (2): No new number (release): an absent "spots" draws no ghost (builder's proposal message; an old client ignores it).
+## 867 amended (1): builder: a repeated "working" may carry "checking": true (Checking... while a reply's tool calls run); an old client ignores it. No new number (release).
 ## 885: optional "parts" on builder proposals, no new number (release): without it a client draws the "summary" string, which the server still sends whole.
 ## 896 (full circle, the throne; no new number, release): Player.seated "" or "throne" (SUBCLASS_REPLICATED, seen by protocol()); a "throne" command {at: [x, y]} an old server ignores (the click walks).
 ## 896 also (the altar; no new number, release's rule): AstralKnight.remains_laid (SUBCLASS_REPLICATED, seen by protocol()); an "altar" command {at: [x, y]} an old server ignores (the click walks).

@@ -208,6 +208,19 @@ func _fresh_working() -> void:
 	_parses.clear()
 
 
+## Called once a reply whose tool calls are about to run (867 amended (1)): the host's "Checking:" line.
+var on_checking := Callable()
+
+
+## One frame's pause (867 amended (1)): an ask's tool calls and their checks run on the server's main
+## thread, so each piece ends its frame before the next starts; the box froze 6.8 s for one five-call
+## reply run whole. No pause outside a scene tree.
+static func breathe() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		await tree.process_frame
+
+
 ## Asks for [param text] (the first request, or a follow-up), running
 ## Claude's tool calls until it is done. Returns {ok, summary, cost (this
 ## request's), error, warnings (Stockpile.check's on the proposal)}; the
@@ -226,6 +239,7 @@ func ask(text: String) -> Dictionary:
 	# The level's own layout faults (806), and those the proposal adds already said.
 	var layout_before := doc_layout_faults()
 	var layout_said: Array[String] = []
+	await breathe()
 	# And the arrivals' (806 amended (13)): the level's own the baseline, what the proposal adds said once, a warning.
 	var arrivals_before := doc_arrival_faults()
 	var arrivals_said: Array[String] = []
@@ -240,13 +254,17 @@ func ask(text: String) -> Dictionary:
 		var stop := str(response.get("stop_reason", ""))
 		if stop == "tool_use":
 			var results: Array = []
+			if on_checking.is_valid():
+				on_checking.call()
 			for block: Dictionary in content:
 				if block.get("type") == "tool_use":
+					await breathe()
 					var before := Stockpile.check(working.config)
 					var ground_before := height_checks()
 					var sites_before := site_checks()
 					var streets_before := street_checks()
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
+					await breathe()
 					# What the change did to the town's store, said at once (decision 301).
 					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
 					if not new.is_empty():
@@ -265,13 +283,16 @@ Heights now: " + "; ".join(ground)
 					var streets := street_checks().filter(func(warning: String) -> bool: return warning not in streets_before)
 					if not streets.is_empty():
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
+					await breathe()
 					# And to the layout rules, which accepting it must not break (806).
 					var now := parsed_of(working)
+					await breathe()
 					var layout := layout_news(layout_before, now)
 					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
 					layout_said = layout
 					if not unsaid.is_empty():
 						outcome["text"] += "\nLayout now (fix it before you finish: the player can't accept a fault): " + "; ".join(unsaid)
+					await breathe()
 					# And to the ways in (806 amended (13)): a warning, never a refusal.
 					var arrivals := arrival_news(arrivals_before, now)
 					var unwarned := arrivals.filter(func(fault: String) -> bool: return fault not in arrivals_said)
@@ -298,15 +319,26 @@ Heights now: " + "; ".join(ground)
 	if not result["ok"] and result["error"].is_empty():
 		result["error"] = "Claude did not finish in %d turns" % MAX_TURNS
 	result["summary"] = summary
+	await breathe()
 	result["warnings"] = Stockpile.check(working.config)
 	result["height_warnings"] = height_checks()
 	result["site_warnings"] = site_checks()
 	result["street_warnings"] = street_checks()
+	await breathe()
 	var parsed_now := parsed_of(working)
+	await breathe()  # A parse, then its checks: each its own frame (the box: 459 ms a parse).
 	result["layout_warnings"] = layout_news(layout_before, parsed_now)
+	await breathe()
 	result["arrival_warnings"] = arrival_news(arrivals_before, parsed_now)
 	result["cost"] = spent
 	busy = false
+	# Set for one ask (the host sets it again each time); dropped, so a callable holding this session frees it.
+	on_checking = Callable()
+	if discard_waiting:
+		# Esc came while the reply's calls ran (867 amended (1)): forgotten now, whole, never midway.
+		discard_waiting = false
+		_fresh_working()
+		result["discarded"] = true
 	return result
 
 
@@ -3780,6 +3812,15 @@ static func draft_level(plan: Dictionary, beside: String, zone: String, region :
 	return made
 
 
-## Forgets the proposal (the conversation stays, for a new follow-up).
+## Forgets the proposal (the conversation stays, for a new follow-up); while an ask
+## runs, when it ends (867 amended (1): its calls pause between frames, and a working
+## copy reset midway would leave a tool call's checks reading another level).
 func discard() -> void:
+	if busy:
+		discard_waiting = true
+		return
 	_fresh_working()
+
+
+## A discard asked while busy, done as the ask ends (867 amended (1)).
+var discard_waiting := false
