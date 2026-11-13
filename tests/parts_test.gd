@@ -85,6 +85,19 @@ func _test_slot() -> void:
 	var lit := slot.state
 	slot.mouse_exited.emit()
 	_check(lit == "hover" and slot.state == "hand", "a hover on a hand's square goes back to hand (%s, then %s)" % [lit, slot.state])
+	# 854 amended (7): an empty square's picture of what goes there, grey and faint, only while it is empty.
+	var kind := PlaceholderTexture2D.new()
+	slot.set_picture(null)
+	slot.set_empty_picture(kind)
+	var shown_empty := slot.empty_shown()
+	slot.set_picture(PlaceholderTexture2D.new())
+	var hidden_full := not slot.empty_shown()
+	slot.set_picture(null)
+	_check(shown_empty and hidden_full and slot.empty_shown() and slot._empty.modulate == UiTheme.color("slot_empty")
+		and UiTheme.color("slot_empty").a < 0.5 and slot._empty.material is ShaderMaterial,
+		"an empty square shows what goes there, grey and faint, and hides it under a thing")
+	slot.set_empty_picture(null)
+	_check(not slot.empty_shown(), "no picture of what goes there: nothing shown")
 	slot.set_state("rest")
 	slot.set_count(1)
 	_check(slot.count_shown() == "", "a count of one isn't shown")

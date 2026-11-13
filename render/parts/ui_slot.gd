@@ -13,6 +13,9 @@ extends PanelContainer
 ## picked's, 854 amended (6); a hover goes back to it, as to rest). Never greyed:
 ## a square that can't be used shows nothing to use. The window's script says
 ## what a click does; the square only reports it (pressed).
+## An empty square may show what goes there (set_empty_picture, 854 amended (7);
+## the pack mock's worn squares without the figure): the picture grey and faint
+## (the theme's slot_empty), under the thing's own and shown only while it has none.
 
 signal pressed(slot: UiSlot)
 
@@ -36,6 +39,9 @@ var state := "rest"
 ## does nothing on a click stays still).
 var hoverable := true
 var _picture: TextureRect
+## What goes here, grey and faint, while the square is empty (854 amended (7)).
+var _empty: TextureRect
+static var _grey: Shader
 var _face: Control
 var _count: Label
 var _price: UiPrice
@@ -56,6 +62,20 @@ func _init() -> void:
 	_face = Control.new()
 	_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_face)
+	_empty = TextureRect.new()
+	_empty.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_empty.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_empty.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_empty.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_empty.visible = false
+	if _grey == null:
+		_grey = Shader.new()
+		_grey.code = "shader_type canvas_item;\nvoid fragment() {\n\tvec4 c = texture(TEXTURE, UV) * COLOR;\n\tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a);\n}\n"
+	var grey := ShaderMaterial.new()
+	grey.shader = _grey
+	_empty.material = grey
+	_empty.modulate = UiTheme.color("slot_empty")
+	_face.add_child(_empty)
 	_picture = TextureRect.new()
 	_picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -99,6 +119,18 @@ func _init() -> void:
 ## The thing's picture (an ItemIcons texture), or none.
 func set_picture(picture: Texture2D) -> void:
 	_picture.texture = picture
+	_empty.visible = picture == null and _empty.texture != null
+
+
+## What goes in this square, shown grey and faint while it is empty (a worn
+## square's kind: a hat on Head, a ring on a Ring), or none.
+func set_empty_picture(picture: Texture2D) -> void:
+	_empty.texture = picture
+	_empty.visible = _picture.texture == null and picture != null
+
+
+func empty_shown() -> bool:
+	return _empty.visible
 
 
 func picture() -> Texture2D:
