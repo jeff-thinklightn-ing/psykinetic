@@ -3080,7 +3080,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (948)
+## Lines in the data (951)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3598,7 +3598,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (139)
+### levels/townsfolk.json (142)
 
 | | Line | Key |
 |---|---|---|
@@ -3688,13 +3688,13 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Still on it? Good. | `greet.waiting[0]` |
 |  | Glad you're seeing to that. | `greet.waiting[1]` |
 |  | That's in good hands, then. | `greet.waiting[2]` |
-|  | You're in my care; fall where you will, I'll see to you. | `greet.care` |
+|  | You're one of mine now. Mind how you go. | `greet.care` |
 |  | What do you want now? | `greet.standing.wronged[1]` |
 |  | Say it and be on your way. | `greet.standing.wronged[2]` |
 |  | Good to see you. | `greet.standing.trusted[0]` |
 |  | There you are. What is it? | `greet.standing.trusted[1]` |
 |  | Ah, it's you. All well? | `greet.standing.trusted[2]` |
-|  | Herbs, if you have any; the town is short of them. | `greet.trades.medicine_man[1]` |
+|  | Herbs, if you have any; I'll put them to use. | `greet.trades.medicine_man[1]` |
 |  | Sit; let me look at you. | `greet.trades.medicine_man[2]` |
 |  | What is it? The forge won't wait. | `greet.trades.smith[0]` |
 |  | Aye? Make it quick, the iron's hot. | `greet.trades.smith[1]` |
@@ -3702,11 +3702,14 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Wares, if you have coin. | `greet.trades.merchant[0]` |
 |  | Peace on you. What is it? | `greet.trades.priest[0]` |
 |  | Quiet, you'll scare the game. What? | `greet.trades.hunter[0]` |
+|  | Softly, now. What is it? | `greet.trades.hunter[1]` |
 |  | Mind the block. What? | `greet.trades.butcher[0]` |
 |  | Meat's hung; what is it? | `greet.trades.butcher[1]` |
 |  | Wipe your feet, there's blood about. | `greet.trades.butcher[2]` |
 |  | What is it? I've work waiting. | `greet.trades.farmer[0]` |
+|  | Well? Out with it. | `greet.trades.farmer[1]` |
 |  | What? I've a load to shift. | `greet.trades.hauler[0]` |
+|  | Well? What do you need? | `greet.trades.hauler[1]` |
 |  | Up from the hills with the drove. What is it? | `greet.trades.herder[0]` |
 |  | Mind the sheep. Aye? | `greet.trades.herder[1]` |
 |  | The weather holds, for now. What? | `greet.trades.herder[2]` |
