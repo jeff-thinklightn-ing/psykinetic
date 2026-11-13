@@ -52679,3 +52679,17 @@ the same build as 863. Client only (art); protocol unchanged; no new class_name.
 - A record saved on the altar step keeps it: PlayerRecord.from_dict kept only taken and slain, so a save between the turn-in and the lay loaded at the robbers' step. Records saved before keep loading as they were.
 - What goes false at the switch-on, carried in that commit and not before: lore's crypt.relic_charges (9eecf3d4a), the amulet's "about" in levels/items.json, and voice's 870 line (SPENT_LINE, switched by the flag here).
 Tests: level_test _test_altar_charges (a later run's own remains: laid, charged, LAID_AGAIN; a brother's: LAID_BROTHER; full: kept, LAID_FULL; never blessed: kept, LAID_UNBLESSED; unpaid: laid, no charge, LAID_NO_BLESSING; off: nothing; way_revealed on the altar step and not before the turn-in; a record saved on the step, and one saved before the change, load as saved); resident_test _test_relic (on: no row, given back kept with ALDOUS_BACK, his fact says where they go).
+art-kit's side of 896 (the remains on the bier; no label of its own, the decision's):
+prop.knight_remains, a new cell slot, 600 tris of a 700 budget, one material (the palette), size
+[0.629, 0.139, 0.368], never solid. item.holy_remains as it is (its linen, three cords, the bone's
+knuckle, the small red cross) laid across a folded shroud of pale linen a shade lighter than the
+wrap (two layers, the top turned back with a rounded fold and a hemmed free edge), sunk 3 mm into
+the cloth; the shroud's underside follows the slab's slope (up +x, 2.4 cm a metre in the table's
+frame), so it is placed turned with the table and never mirrored. It faces the way players come: the
+cross, the parcel's fold and the hem toward the bier's -z side, the knuckle and the shroud's fold
+toward the knight at +z (dungeon, 11-12). Origin: the shroud's underside at its middle; dungeon
+places it at [-0.05, 0.975, 0.33] from the table's middle while AstralKnight.remains_laid is true,
+in its switch-on commit. Made by C:/dev/review/knight_remains/make_knight_remains.py; looks
+C:/dev/review/knight_remains (kr4_near.png, kr4_close.png), passed by the coordinator. Lands off:
+placed by nothing until dungeon's switch-on; a game still at the nearest zoom beside the goblin
+before that. Client only (art); protocol unchanged; no new class_name; no bullet.
