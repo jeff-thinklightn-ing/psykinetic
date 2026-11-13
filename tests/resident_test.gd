@@ -5292,8 +5292,8 @@ func _test_greet() -> void:
 	var saved := {"standing": {"p-old": {"score": 0, "met": 1, "since": 1, "why": [], "own": false}}}
 	_check(Standing.met_in_person(saved, "p-old"), "a standing saved before counts as met (no mark)")
 	_check(Resident.greet_word("weaver", "stranger", rules, 1) in rules["trades"]["default"], "a trade not listed: the default's")
-	_check(str(rules.get("care", "")).begins_with("You're in my care") and Resident.greet_word("medicine_man", "stranger", rules, 2) in rules["trades"]["medicine_man"]
-		and not Resident.greet_word("medicine_man", "stranger", rules, 2).begins_with("You're in my care"), "the medicine man's own lines; the care word only for one in his care, by Main (584 amended, npc's side)")
+	_check(str(rules.get("care", "")).begins_with("You're one of mine now") and Resident.greet_word("medicine_man", "stranger", rules, 2) in rules["trades"]["medicine_man"]
+		and not Resident.greet_word("medicine_man", "stranger", rules, 2).begins_with("You're one of mine now"), "the medicine man's own lines; the care word only for one in his care, by Main (584 amended, npc's side)")
 	var mind := VoiceMind.new()
 	_main._resident_mind = mind
 	var spoken: Array[String] = []
