@@ -73,6 +73,19 @@ func _test_slot() -> void:
 	_check(slot.get_child(0).get_child(0).modulate.a < 1.0, "work in hand fades the picture")
 	slot.set_state("rest")
 	_check(slot.get_child(0).get_child(0).modulate.a == 1.0, "and rest restores it")
+	# 854 amended (6): a held hand's square, a brass rim thinner than picked's, the Well's ground; a hover goes back to it.
+	var hand: StyleBoxFlat = UiTheme.theme().get_stylebox(&"panel", &"WellHand")
+	var picked: StyleBoxFlat = UiTheme.theme().get_stylebox(&"panel", &"WellPicked")
+	var well: StyleBoxFlat = UiTheme.theme().get_stylebox(&"panel", &"Well")
+	_check(hand.bg_color == well.bg_color and hand.border_width_top > well.border_width_top and hand.border_width_top < picked.border_width_top
+		and absf(hand.border_color.h - UiTheme.color("brass").h) < 0.01,
+		"a hand's square: the Well's ground, a brass rim between the Well's and picked's")
+	slot.set_state("hand")
+	slot.mouse_entered.emit()
+	var lit := slot.state
+	slot.mouse_exited.emit()
+	_check(lit == "hover" and slot.state == "hand", "a hover on a hand's square goes back to hand (%s, then %s)" % [lit, slot.state])
+	slot.set_state("rest")
 	slot.set_count(1)
 	_check(slot.count_shown() == "", "a count of one isn't shown")
 	slot.set_count(4)

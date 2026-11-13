@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=50 format=3]
+[gd_resource type="Theme" load_steps=51 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -451,6 +451,22 @@ corner_radius_bottom_right = 25
 corner_radius_bottom_left = 25
 
 ; A square picked (a thing chosen for a work at a counter): the brass rim.
+[sub_resource type="StyleBoxFlat" id="well_hand"]
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+bg_color = Color(0.702, 0.651, 0.5412, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.7804, 0.6039, 0.3333, 0.8)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
 [sub_resource type="StyleBoxFlat" id="well_picked"]
 content_margin_left = 14.0
 content_margin_top = 14.0
@@ -882,6 +898,8 @@ Strip/base_type = &"HBoxContainer"
 Strip/constants/separation = 12
 TimeChip/base_type = &"PanelContainer"
 TimeChip/styles/panel = SubResource("time_chip")
+WellHand/base_type = &"PanelContainer"
+WellHand/styles/panel = SubResource("well_hand")
 WellPicked/base_type = &"PanelContainer"
 WellPicked/styles/panel = SubResource("well_picked")
 KeyCap/base_type = &"PanelContainer"

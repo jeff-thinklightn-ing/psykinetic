@@ -8,14 +8,18 @@ extends PanelContainer
 ## left (what a work spends besides gold). Its state is its rim (the theme's
 ## Well types): rest, hover, picked (brass), new (flame: just arrived),
 ## refused (rust, for REFUSED_SECONDS, then back), ready (flame with its lit
-## corner: one click collects) and in_hand (the picture faded). Never greyed:
+## corner: one click collects), in_hand (the picture faded) and hand (a held
+## hand's square on the character sheet: a thinner, softer brass rim than
+## picked's, 854 amended (6); a hover goes back to it, as to rest). Never greyed:
 ## a square that can't be used shows nothing to use. The window's script says
 ## what a click does; the square only reports it (pressed).
 
 signal pressed(slot: UiSlot)
 
 const STATES := {"rest": &"Well", "hover": &"WellHover", "picked": &"WellPicked", "new": &"WellNew",
-	"refused": &"WellRefused", "ready": &"WellNew", "in_hand": &"Well"}
+	"refused": &"WellRefused", "ready": &"WellNew", "in_hand": &"Well", "hand": &"WellHand"}
+## The states a hover lights and goes back to (854 amended (6)).
+const RESTING: Array[String] = ["rest", "hand"]
 const REFUSED_SECONDS := 1.0
 ## How far the chips and the mark sit in from the square's edge, inside its margin.
 const INSET := -8.0
@@ -41,6 +45,8 @@ var _mark: TextureRect
 var level_have := 0
 var level_enough := -1
 var _back_to := "rest"
+## The resting state a hover goes back to.
+var _resting := "rest"
 var _refused_left := 0.0
 
 
@@ -76,11 +82,12 @@ func _init() -> void:
 	var size_now := float(UiTheme.constant("square"))
 	custom_minimum_size = Vector2(size_now, size_now)
 	mouse_entered.connect(func() -> void:
-		if hoverable and state == "rest":
+		if hoverable and state in RESTING:
+			_resting = state
 			_show_state("hover"))
 	mouse_exited.connect(func() -> void:
 		if state == "hover":
-			_show_state("rest"))
+			_show_state(_resting))
 	resized.connect(_place)
 	# The face is sized after the square (in a grid in a scroll, only once laid
 	# out): placed again then, so no chip stays where a zero-sized face put it
@@ -194,7 +201,7 @@ func set_state(name: String) -> void:
 ## The rust rim for REFUSED_SECONDS, then the state it had.
 func flash_refused() -> void:
 	if state != "refused":
-		_back_to = "rest" if state == "hover" else state
+		_back_to = _resting if state == "hover" else state
 	_show_state("refused")
 	_refused_left = REFUSED_SECONDS
 	set_process(true)
