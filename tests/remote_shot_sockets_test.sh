@@ -81,6 +81,10 @@ refused "--test-foe without --tour: refused" "--test-foe=rat,bow: refused (only 
 	--joined --server-args "--test-foe=rat,bow" "$sha" x --
 refused "--sought-first without --tour: refused" "--sought-first: refused (only with --tour)" \
 	--joined --server-args "--sought-first" "$sha" x --
+refused "--test-hp without --tour: refused" "--test-hp: refused (only with --tour)" \
+	--joined --server-args "--test-hp" "$sha" x --
+refused "--run-marker asked for: refused (the runner names it, under --tour)" "--server-args --run-marker=x: refused" \
+	--tour smoke --server-args "--run-marker=x" "$sha" x --
 refused "--regenerate asked for: refused (the runner adds it, under --tour)" "--server-args --regenerate: refused" \
 	--tour smoke --server-args "--regenerate" "$sha" x --
 refused "a tour with godot args of the caller's: refused" "--host: refused (a tour's args come from the runner" \
@@ -90,12 +94,12 @@ refused "a tour not at the sha: refused" "--tour no_such_tour: no tests/tour/tou
 refused "--tour-only without --tour: refused" "only with --tour" --tour-only beds --joined "$sha" x --
 refused "--repeat with --tour: refused (one phase)" "--repeat: not with --tour" --tour smoke --repeat 2 "$sha" x --
 rm -f "$tmp/reached"
-sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=draugr,giant_axe --sought-first" "$sha" tourx --)"
+sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=draugr,giant_axe --sought-first --test-hp" "$sha" tourx --)"
 code=$?
-wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=draugr,giant_axe;server_args: --sought-first;server_args: --regenerate;tour: tour=kit;tour: only=wall;timeout: 17 min;"
+wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=draugr,giant_axe;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;tour: tour=kit;tour: only=wall;timeout: 17 min;"
 got_args="$(printf '%s\n' "$sent" | grep -E '^(args|server_args|tour|timeout): ' | tr '\n' ';')"
 if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
-	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, its foe and --sought-first; no mode, port or token"
+	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its foe, --sought-first and --test-hp; no mode, port or token"
 else
 	echo "  FAIL  --tour's args: exit $code, got [$got_args], wanted [$wanted_args]"; failed=$((failed + 1))
 fi

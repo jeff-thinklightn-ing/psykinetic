@@ -64,7 +64,9 @@
 # id, --tour-admin=<that port>, --tour-out={out}, --tour-minutes (--tour-minutes N, default 20).
 # The tour's scripts are parsed on the laptop at <sha> first. No godot args of the caller's;
 # --tour-only SECTION sets the tour's TOUR_ONLY, and --server-args may add --test-foe=a,b and
-# --sought-first (economy's crop.sought_first on for that server only, 613 amended (4)).
+# --sought-first (economy's crop.sought_first on for that server only, 613 amended (4)) and
+# --test-hp (786: the admin verb "hp <player> <n>" for the tour's own top-ups; the runner gives
+# a tour's server --run-marker=tour-<name>, which the verb needs beside it, 828 amended (8)).
 # One phase: the restart tour (TOUR_PHASES=2) stays on tools/tour.sh. report.md, its stills
 # and both logs come back; report.md's first line is the server's SCRIPT ERROR count.
 set -u
@@ -256,11 +258,17 @@ if [ $JOINED -eq 1 ]; then
 			--sought-first)
 				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
-			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b and --sought-first with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
+			# A tour's hp top-ups (786, 828 amended (8)): the verb answers only with --run-marker,
+			# which the runner adds under --tour; never the box's.
+			--test-hp)
+				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b, --sought-first and --test-hp with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
 		esac
 	done
-	# A tour's server is laid as the box's is (tour.sh's --regenerate).
-	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" >>"$TMP/server_args.txt"
+	# A tour's server is laid as the box's is (tour.sh's --regenerate), and marked as a test's
+	# (--run-marker: test-only verbs such as --test-hp's answer only beside one; 828 amended (8)).
+	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" "--run-marker=tour-$NAME" >>"$TMP/server_args.txt"
 	# The tour's own file for the runner (its section): the runner starts the admin console when it is there.
 	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\n' "$TOUR" "$TOUR_ONLY" >"$TMP/tour.txt"
 fi
