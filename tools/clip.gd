@@ -272,8 +272,19 @@ var _turn_from := -1
 var _aside := Vector2i(-1, -1)
 
 
+var _env_zoom := -1.0
+
+
+func _hold_env_zoom() -> void:
+	if _env_zoom > 0.0 and _main != null and _main._client3d != null:
+		_main._client3d._zoom_to = _env_zoom
+
+
 func _ready() -> void:
+	get_tree().process_frame.connect(_hold_env_zoom)
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--env-zoom="):
+			_env_zoom = float(arg.trim_prefix("--env-zoom="))
 		var pair := arg.trim_prefix("--").split("=")
 		if pair.size() == 2 and pair[0] == "scenario":
 			scenario = pair[1]
