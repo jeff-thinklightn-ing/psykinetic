@@ -51880,6 +51880,16 @@ trade, as any seated one. builder_test _test_trades_preview (the line; two spots
 held, "2 work spots", no condition, no mismatch). Server only, protocol unchanged, no new class_name,
 no bullet.
 
+859 amended (7) (the coordinator's ruling on builder's three worst, 2026-11-13; the label from
+decision_number.sh): a gone spot's mark readable under its cross. In ghost6
+(C:\dev\review\builder_ghost\ghost5-vs-6.png) a gone spot's ring, drawn at the kept alpha 0.35 under a
+red cross at 0.9, all but vanished: at a glance only the cross read, not what had stood there.
+Client3D.BUILDER_SPOT_KEPT_ALPHA 0.35 to 0.5 (a kept mark and a gone one's), and BUILDER_SPOT_GONE's
+cross drawn at that same alpha, so the mark and the cross read together; a new or changed mark stays
+at 0.85, still plainly the strongest. view_test (the cross at its mark's alpha, the kept alpha at least
+0.5). ui-design's still beside ghost5-vs-6 before it queues. Client only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 864. The low camera's eye kept out of buildings, its aim risen to keep the figure in frame
 
 The coordinator's go, 11-11; terrain's walk of Umbrage's edges found it

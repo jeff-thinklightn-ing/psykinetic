@@ -5626,10 +5626,12 @@ const BUILDER_SPOT_USES := {
 	"inn": Color(0.8, 0.4, 0.3), "temple": Color(0.95, 0.9, 0.6),
 }
 ## A new or changed spot's mark this see-through; a kept one (already in the
-## level) fainter, as is a gone one, crossed out in BUILDER_SPOT_GONE.
+## level) fainter, as is a gone one, crossed out in BUILDER_SPOT_GONE at the
+## same alpha, so its own mark still reads under the cross (859 amended (7):
+## at 0.35 under a 0.9 cross only the cross read).
 const BUILDER_SPOT_ALPHA := 0.85
-const BUILDER_SPOT_KEPT_ALPHA := 0.35
-const BUILDER_SPOT_GONE := Color(0.9, 0.2, 0.15, 0.9)
+const BUILDER_SPOT_KEPT_ALPHA := 0.5
+const BUILDER_SPOT_GONE := Color(0.9, 0.2, 0.15, BUILDER_SPOT_KEPT_ALPHA)
 var _builder_marks: Node3D
 ## Builder mode's building codes over the buildings (decision 537), and
 ## whether they are on (kept over a rebuilt level).

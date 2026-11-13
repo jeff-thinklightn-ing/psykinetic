@@ -7969,6 +7969,12 @@ func _test_heights() -> void:
 	var reach := sat.mesh.get_aabb() if sat != null else AABB()
 	_check(reach.end.x >= Client3D.SPOT_TIP - 0.01 and reach.end.x - reach.position.x >= 1.25,
 		"a spot's arrow reaches its face cell, a cell out (the mark %.2f to %.2f along its facing)" % [reach.position.x, reach.end.x])
+	# 859 amended (7): a gone one's cross no stronger than its mark, so the mark still reads under it.
+	var cross: MeshInstance3D = _rig._builder_marks.get_child(went.get_index() + 1) as MeshInstance3D if went != null and went.get_index() + 1 < _rig._builder_marks.get_child_count() else null
+	var cross_alpha := (cross.material_override as StandardMaterial3D).albedo_color.a if cross != null else -1.0
+	_check(cross != null and cross != sat and Client3D.BUILDER_SPOT_KEPT_ALPHA >= 0.5 - 0.001
+		and absf(cross_alpha - (went.material_override as StandardMaterial3D).albedo_color.a) < 0.01,
+		"a gone spot's cross at its mark's alpha (%.2f, the mark %.2f)" % [cross_alpha, Client3D.BUILDER_SPOT_KEPT_ALPHA])
 	_rig.clear_builder()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
