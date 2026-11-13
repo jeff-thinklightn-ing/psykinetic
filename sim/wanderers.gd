@@ -181,7 +181,7 @@ func _step_one(id: String, record: Dictionary) -> void:
 		var broke: Dictionary = record["broke"].get(beast.get_instance_id(), {})
 		if not broke.is_empty():
 			beast._post = Monster.NO_TILE  # Let be wherever they stand (Monster._letting_be).
-			if beast.target != null and broke.has(beast.target.get_instance_id()) \
+			if is_instance_valid(beast.target) and broke.has(beast.target.get_instance_id()) \
 					and not record["fought"].has(beast.target.get_instance_id()):
 				beast.target = null  # Never back to one it broke off this visit.
 				beast._foe = null

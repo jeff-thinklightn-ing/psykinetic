@@ -171,7 +171,7 @@ func _sim_tick() -> void:
 		_winded_at = -1
 	if _tend_move():
 		return
-	if Apex.to_den(self, DEN_BELOW, den, struck_by, DEN_RULE):
+	if Apex.to_den(self, DEN_BELOW, den, struck_by if is_instance_valid(struck_by) else null, DEN_RULE):  # Guarded here: the getter is not called on a read inside the class (806 amended (20)).
 		return
 	if apex_goal != NO_TILE or apex_out and target == null 			and (_blow_tick < 0 or World.tick - _blow_tick > CALM_TICKS) and World.distance(tile, home) > wander_radius * 2 + 2:
 		_walk_to(apex_goal if apex_goal != NO_TILE else home)

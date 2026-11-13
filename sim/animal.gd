@@ -203,7 +203,7 @@ func _sim_tick() -> void:
 		if drawn and hp * 2 < max_hp:
 			drawn = false  # Driven off (805): it runs, and is gone out of sight.
 			_bold_tick = -1
-			_flee(_struck_by().tile if _struck_by() != null else (target.tile if target != null else tile - facing))
+			_flee(_struck_by().tile if _struck_by() != null else (target.tile if is_instance_valid(target) else tile - facing))
 			return
 		_settle_bold()
 		if _escort_step():
@@ -444,10 +444,10 @@ func _escort_target() -> GridEntity:
 			return foe
 		var turned: Variant = escort_lead.get("_wallow_tick")
 		if escort_lead.get("_wallow_from") != null and turned != null:
-			var striker := escort_lead.struck_by
+			var striker: GridEntity = escort_lead.struck_by if is_instance_valid(escort_lead.struck_by) else null  # Never a freed one (806 amended (20)).
 			if escort_lead.struck_tick > int(turned) and _covers(striker):
 				return striker
-			if _covers(target):
+			if is_instance_valid(target) and _covers(target):  # Never a freed one (806 amended (20)).
 				return target
 	if World.tick - hurt_tick < CHARGE_TICKS:
 		var struck := _struck_by()

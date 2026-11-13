@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A great bear, the old grey, a skeleton guard or the draugr fights on, or goes back to its den or its room, when whoever it was after leaves, and so does any pack with it (806 amended (20)).
 - A new companion wants to go fishing with you from the start, and if you ask her to fish where there's no water she leads you to some close by (803 amended (11)).
 - A click walk past a doorway or a way out goes round it; you go through only when you click on it (689 amended (11)).
 - At a keeper's counter the Donate tab lists only what you can hand back for nothing, and everything that pays is sold on the Store tab (852 amended (3)).

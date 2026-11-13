@@ -600,7 +600,7 @@ static func den_foe(body: Monster, seen: GridEntity) -> GridEntity:
 		return seen
 	if seen == null:
 		return null  # Its own look finds nobody yet (sight, notice): the order finds nobody either.
-	var last := body.struck_by
+	var last: GridEntity = body.struck_by if is_instance_valid(body.struck_by) else null  # Never a freed one (806 amended (20)).
 	if _den_able(last) and (last is Player or last is Companion) \
 			and World.distance(body.tile, last.tile) <= int(body.call("_set_reach")) \
 			and _den_knows(body, last, World.distance(body.tile, last.tile)):
@@ -690,7 +690,7 @@ static func to_den(body: Monster, below: float, den: Vector2i, biter: GridEntity
 	var far_way := bool(opts.get("far", false))
 	var log_as := str(opts.get("log", "wallow"))
 	var stored: Variant = body.get("_wallow_from")
-	if body.target != null and stored == null:
+	if body.target != null and is_instance_valid(body.target) and stored == null:  # Never a freed target (806 amended (20)).
 		if not far_way and (World.distance(body.tile, den) <= near or World.distance(body.target.tile, den) <= 3):
 			return false  # By its den already, or a foe there: it fights on, cornered.
 		# Where to: its den, unless the foe stands by it (within 3), when

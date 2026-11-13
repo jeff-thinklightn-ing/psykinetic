@@ -572,7 +572,15 @@ static var truce_broken: Dictionary[String, int] = {}
 ## each blow it answers them: seen whatever its cone, and fought by a room
 ## keeper from up to ANSWER_REACH outside its room, a step or two out after
 ## them. Unanswered that long, it lets them be as before.
-var struck_by: GridEntity = null
+var struck_by: GridEntity = null:
+	get:
+		# A striker freed since (a companion felled and taken home, a player
+		# gone; 806 amended (20), playtest's joined crypt run, 11-12): nobody,
+		# and forgotten, so no typed reader (Apex.to_den, _den_able, _covers)
+		# is handed a freed object and stops this body's tick.
+		if struck_by != null and not is_instance_valid(struck_by):
+			struck_by = null
+		return struck_by
 var struck_tick := -100000
 ## The players who have struck it (instance ids), for a named one's hold-back
 ## (806 amended (12)): a named foe a player has struck fights that player,
@@ -1218,7 +1226,7 @@ func _sim_tick() -> void:
 	if stands:
 		if _stand_at == NO_TILE:
 			_stand_at = home if home != NO_TILE else tile
-		if Apex.to_den(self, STAND_BELOW, _stand_at, struck_by, STAND_RULE):
+		if Apex.to_den(self, STAND_BELOW, _stand_at, struck_by if is_instance_valid(struck_by) else null, STAND_RULE):  # Guarded here: the getter is not called on a read inside the class (806 amended (20)).
 			return  # Low and off its ground: back to it (806 amended (14)'s stand).
 	if alert == Alert.FLEEING:
 		_flee_tick()
@@ -1239,7 +1247,7 @@ func _sim_tick() -> void:
 		slot = NO_TILE
 		_front_ticks = 0
 		if seen == null:
-			if not _hunt(target):
+			if not _hunt(target if is_instance_valid(target) else null):  # A target freed (806 amended (20)): nobody to hunt.
 				# The fight is over: back to where it idles, then on as before.
 				_returning = idle != Idle.NONE
 				_ran_to_call = false  # The fight over: next time it may run to call again.
@@ -2461,7 +2469,7 @@ func _bash() -> bool:
 ## fight at his throne, gave up 12 cells into his 32-cell hall).
 func _beyond_leash() -> bool:
 	if keeps_room and _room.has_area():
-		return not _room.has_point(tile) and not (_answering(target) and _room.grow(ANSWER_REACH).has_point(tile))
+		return not _room.has_point(tile) and not (is_instance_valid(target) and _answering(target) and _room.grow(ANSWER_REACH).has_point(tile))
 	if holds_post >= 0 and home != NO_TILE:
 		return World.distance(tile, home) > holds_post  # A chief at his post: from it, not from where he took up the chase.
 	return _post != NO_TILE and World.distance(tile, _post) > leash

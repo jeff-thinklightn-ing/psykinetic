@@ -1853,6 +1853,7 @@ func _test_ambush() -> void:
 	_test_band_hold_off()
 	_test_den_foe_order()
 	_test_den_walk_refused()
+	_test_freed_striker()
 	_test_link_slots()
 	_test_corner_fight()
 	_test_boar_king_aim()
@@ -9675,3 +9676,104 @@ func _test_den_bite_per_blow() -> void:
 					"%s's walk, answering: each told bite stepped out of, none lands (%d), her blows landing (%d)" % [kind, bites, blows])
 	DayNight.reset()
 	Monster.idling = true
+
+
+## 806 amended (20): a striker freed mid-fight (a companion felled and taken
+## home, a player gone) is nobody, and the struck body's tick runs on
+## (playtest's joined crypt run, 11-12: Brand's stand handed the freed one to
+## Apex.to_den's typed argument and stopped every tick after).
+func _test_freed_striker() -> void:
+	print("%s== a striker freed mid-fight: forgotten, and Brand's tick runs on ==" % char(10))
+	Monster.idling = false
+	var rows: Array[String] = ["############", "#..........#", "#.x...P....#", "#..........#", "############"]
+	var e := _build(rows, {"x": {"named": "brand", "kind": "robber_brute", "props": Level.MONSTER_TYPES["robber_brute"].duplicate()}})
+	var brand: Monster = e["x"][0]
+	var player: GridEntity = e["P"][0]
+	_check(brand.stands, "Brand's row stands")
+	brand.sight_range = 7  # _build leaves its monsters blind (sight 0): he must be able to see her.
+	brand.senses.cone_cos = -1.0
+	var striker := EntityFactory.build(SPECS["P"].merged({"name": "Striker", "tile": Vector2i(2, 1)})) as Player
+	_room.add_child(striker)
+	World.spawn(striker, Vector2i(2, 1))
+	brand.hp = maxi(2, roundi(brand.max_hp * 0.1))  # Low: his stand's rule is weighed every tick.
+	World.damage(brand, 1, striker)
+	_check(brand.struck_by == striker, "struck: the striker kept")
+	World.despawn(striker)
+	striker.free()
+	_check(brand.struck_by == null, "the striker freed: struck_by reads nobody")
+	var fought := -1
+	for i in 30:
+		World.step()
+		if fought < 0 and brand.target == player:
+			fought = i
+	_check(fought >= 0, "his tick runs on: he takes up the one he sees (tick %d; target %s)" % [fought, brand.target])
+	# The same read in the great bear's and the old grey's den walk (Apex.to_den with struck_by, every tick;
+	# shipped in v0.1.211), the boar king's (_bit_by), and, through the same field, Apex.den_foe's
+	# _den_able and a pack's escort (_covers): each struck by one then freed, its ticks run after.
+	DayNight.set_hour(12.0)
+	for symbol: String in ["B", "G", "K"]:
+		var arena: Array[String] = ["##############", "#............#", "#............#", "#............#", "#............#", "##############"]
+		arena[2] = "#..%s....P....#" % symbol
+		var f := _build(arena)
+		var beast: Monster = f[symbol][0]
+		var her: GridEntity = f["P"][0]
+		beast.sight_range = 8  # _build leaves its monsters blind (sight 0).
+		beast.senses.cone_cos = -1.0
+		her.max_hp = 9999
+		her.hp = 9999
+		var hitter := EntityFactory.build(SPECS["P"].merged({"name": "Hitter" + symbol, "tile": Vector2i(4, 1)})) as Player
+		_room.add_child(hitter)
+		World.spawn(hitter, Vector2i(4, 1))
+		World.damage(beast, 1, hitter)
+		var kept: bool = beast.struck_by == hitter and (symbol != "K" or beast.get("_bit_by") == hitter)
+		World.despawn(hitter)
+		hitter.free()
+		var none: bool = beast.struck_by == null and (symbol != "K" or beast.get("_bit_by") == null)
+		var took := -1
+		for i in 60:
+			World.step()
+			if took < 0 and beast.target == her:
+				took = i
+		_check(kept and none and took >= 0,
+			"%s: struck, then its striker freed: struck_by%s reads nobody, and its tick runs on to the one it sees (kept %s, none %s, tick %d, target %s)"
+			% [str(beast.spawn_spec.get("kind", "")), " and _bit_by" if symbol == "K" else "", kept, none, took, beast.target])
+	# A target freed while a room keeper stands outside its room (a skeleton guard, the draugr; live since
+	# v0.1.190): its leash handed the freed one to _answering's typed argument, every tick someone was in sight.
+	var yard: Array[String] = ["##############", "#............#", "#.g......P...#", "#............#", "##############"]
+	var y := _build(yard)
+	var guard: Monster = y["g"][0]
+	var seer: GridEntity = y["P"][0]
+	guard.keeps_room = true
+	guard._room = Rect2i(1, 1, 3, 3)
+	World._relocate(guard, Vector2i(6, 2))
+	guard.free_pos = Vector2(guard.tile)
+	var fled := EntityFactory.build(SPECS["P"].merged({"name": "Fled", "tile": Vector2i(6, 1)})) as Player
+	_room.add_child(fled)
+	World.spawn(fled, Vector2i(6, 1))
+	guard.target = fled
+	World.despawn(fled)
+	fled.free()
+	_check(guard._beyond_leash() == true and seer.spawned,
+		"a room keeper outside its room, its target freed: its leash reads it beyond, and nobody freed is handed on")
+	# A pack's escort whose own foe was freed while its lead walks home (live since v0.1.211): _covers(target).
+	var den_walk: Array[String] = ["##############", "#............#", "#.G..w..P....#", "#............#", "##############"]
+	var d := _build(den_walk)
+	var lead: Monster = d["G"][0]
+	var wolf: Animal = d["w"][0]
+	var hers: GridEntity = d["P"][0]
+	wolf.escort_lead = lead
+	lead._wallow_from = hers
+	lead._wallow_tick = World.tick
+	lead.target = null
+	var foe_gone := EntityFactory.build(SPECS["P"].merged({"name": "FoeGone", "tile": Vector2i(6, 1)})) as Player
+	_room.add_child(foe_gone)
+	World.spawn(foe_gone, Vector2i(6, 1))
+	wolf.target = foe_gone
+	World.despawn(foe_gone)
+	foe_gone.free()
+	wolf.struck_by = hers
+	wolf.struck_tick = World.tick
+	wolf.hurt_tick = World.tick
+	wolf.senses.heard.append({"tick": World.tick, "kind": &"fight", "at": wolf.tile, "radius": 1, "source": hers})
+	var covered := wolf._escort_target()
+	_check(covered == hers, "an escort whose own foe was freed while its lead walks home: it covers on whoever struck it (%s)" % [covered])

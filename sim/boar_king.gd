@@ -83,7 +83,12 @@ var _engager: Animal = null
 var _quiet_until := 0
 var _join_at := -1
 ## Who struck him last (his bite back on his way to his wallow).
-var _bit_by: GridEntity = null
+var _bit_by: GridEntity = null:
+	get:
+		# One freed since is nobody (806 amended (20), as Monster.struck_by).
+		if _bit_by != null and not is_instance_valid(_bit_by):
+			_bit_by = null
+		return _bit_by
 ## His charge's told cells while it is told or run ([] else): his sounder
 ## stands off them (Animal._ring).
 var told_line: Array[Vector2i] = []
@@ -170,7 +175,7 @@ func _settle_bold() -> void:
 ## if they are beside him, never chasing nor charging. At his wallow,
 ## cornered, he fights as ever. True while it holds him.
 func _to_wallow() -> bool:
-	return Apex.to_den(self, float(charge["wallow_below"]), den, _bit_by, {"near": 1, "far": true, "clear": WALLOW_CLEAR, "log": "wallow"})
+	return Apex.to_den(self, float(charge["wallow_below"]), den, _bit_by if is_instance_valid(_bit_by) else null, {"near": 1, "far": true, "clear": WALLOW_CLEAR, "log": "wallow"})
 
 
 ## His sounder: the living boars following him (Apex's escort).

@@ -107,7 +107,7 @@ func _sim_tick() -> void:
 		den = tile
 	if _tend_move():
 		return
-	if Apex.to_den(self, DEN_BELOW, den, struck_by, DEN_RULE):
+	if Apex.to_den(self, DEN_BELOW, den, struck_by if is_instance_valid(struck_by) else null, DEN_RULE):  # Guarded here: the getter is not called on a read inside the class (806 amended (20)).
 		return
 	if apex_goal != NO_TILE:
 		target = null
