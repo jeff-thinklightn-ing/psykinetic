@@ -46,6 +46,13 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		exit 1
 	}
 	$inventoryStale = (@($inventoryOut | Where-Object { $_ -like 'VOICE INVENTORY*' }) -join "`n")
+	# The commit these tests run, read once here, after the inventory's own commit and before
+	# any part starts; the result line names it, or fails if it moved (278 amended (1), as
+	# tools/land_tested.sh for tests/land.sh).
+	function Tree-State { "$(& git rev-parse HEAD 2>$null) $((& git diff HEAD 2>$null | Out-String))".GetHashCode() }
+	$tested = (& git rev-parse HEAD 2>$null)
+	$stateBefore = Tree-State
+	$dirtyBefore = (& git status --porcelain --untracked-files=no 2>$null | Out-String).Trim()
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
@@ -82,6 +89,15 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 	Remove-Item $result -ErrorAction SilentlyContinue
 	if (-not $line -and $code -eq 6) { $line = "LANDING TESTS: FAIL (lost the gate take while holding the land lock: release the lock, take the gate, then the lock again; 394 amended (31))" }
 	if (-not $line) { $line = "LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)" }
+	if ($line.StartsWith('LANDING TESTS: PASS') -and $tested) {
+		if ((Tree-State) -ne $stateBefore) {
+			$line = "LANDING TESTS: FAIL (the tree moved during the tests: $tested to $(& git rev-parse HEAD 2>$null), or its tracked files changed; 278 amended (1))"
+		} elseif ($dirtyBefore) {
+			$line = "$line tested $tested and uncommitted changes"
+		} else {
+			$line = "$line tested $tested"
+		}
+	}
 	Write-Output ''
 	if ($inventoryStale) { Write-Output $inventoryStale }
 	Write-Output $line

@@ -56,6 +56,10 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 		*) echo "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventory_code; run python -B tools/voice_inventory.py --check to see it)"; exit 1 ;;
 	esac
 	inventory_stale="$(printf '%s\n' "$inventory_out" | grep '^VOICE INVENTORY' || true)"
+	# The commit these tests run, read once here, after the inventory's own commit and
+	# before any part starts; the result line names it, or fails if it moved (278 amended (1)).
+	. tools/land_tested.sh
+	land_tested_begin
 	# The Godot parts on saturn when it answers (Jeff, 2026-11-11: "go ahead
 	# and move landings' test runs to saturn"; tools/remote_tests.sh): the
 	# gate is then asked for suite_remote, the room of the parts that stay
@@ -97,6 +101,7 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	rm -f "$result"
 	[ -z "$line" ] && [ "$code" -eq 6 ] && line="LANDING TESTS: FAIL (lost the gate take while holding the land lock: release the lock, take the gate, then the lock again; 394 amended (31))"
 	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
+	line="$(land_tested_end "$line")"
 	echo
 	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	echo "$line"
@@ -154,6 +159,7 @@ part voice_inventory_test python -B tests/voice_inventory_test.py
 part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
 part push_guard_test bash tests/push_guard_test.sh
 part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
+part land_tested_test bash tests/land_tested_test.sh
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 if [ -n "$remote" ]; then
@@ -192,7 +198,15 @@ wait
 
 code=0
 failed=""
-for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test voice_inventory_test ${remote:+remote_prepare} suite net_test state_test server_boot_test; do
+# The parts every run has, then any other part that wrote a status (remote_shot_clash_test
+# was run and never counted until 278 amended (1)).
+names="heavy_job_test decision_number_test changelog_check_test changelog_resolve_test voice_inventory_test ${remote:+remote_prepare} suite net_test state_test server_boot_test"
+for each in "$LOGS"/*.status; do
+	[ -f "$each" ] || continue
+	each="$(basename "$each" .status)"
+	case " $names " in *" $each "*) ;; *) names="$names $each" ;; esac
+done
+for name in $names; do
 	# A part killed before it wrote its status (no file, or empty) fails: an
 	# empty status passed the test once, and economy's landing pushed over a
 	# suite killed mid-run (2026-10-23). Only a status of exactly 0 passes.

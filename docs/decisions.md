@@ -5390,6 +5390,27 @@ scene's folder apart. The suite starts both with the slowest first, side by side
 main before 756: view_land_test 92 s, view_test 86 s (one scene, 210 s on 756's hills);
 suite_test passes. Tests only.
 
+278 amended (1) (perf, 2026-11-12; the coordinator's approval; label from tools/decision_number.sh): a landing's PASS
+line names the commit its tests ran. land.sh commits a stale docs/voice_inventory.md itself before its tests (748
+amended (8)), so HEAD at the PASS line could be one commit past the tip a landing script read after its rebase:
+ui's take passed 465 s on saturn and its script refused to push ("HEAD moved from the tested sha"), losing its
+place; a script that pushed the tip it read would have left the page's commit behind. Now tools/land_tested.sh,
+sourced by tests/land.sh: once after the inventory's own commit and before any part starts, HEAD and the tracked
+tree's state (HEAD and a hash of `git diff HEAD`) are read; at the result, a PASS line ends "tested <sha>" when
+neither moved, "tested <sha> and uncommitted changes" when the run began with tracked changes (no bare sha at the
+end, so no script pushes it), and becomes "LANDING TESTS: FAIL (the tree moved during the tests: <A> to <B>, or
+its tracked files changed; 278 amended (1))" when either moved. A FAIL line passes through unchanged. The line's
+start is unchanged, so every waiting script that greps "LANDING TESTS: PASS" still matches, and the A/B form
+(read the tip after the rebase, run land.sh, read HEAD again, allow only the page between them) stays valid for
+scripts in flight. A new script pushes what the line names:
+`sha=$(sed -n 's/^LANDING TESTS: PASS.* tested \([0-9a-f]\{40\}\)$/\1/p' out)` and `git push origin
+"$sha:refs/heads/main"` when it is non-empty. tests/land.ps1 the same. Also, land.sh's result counts every part that
+wrote a status, beside the fixed list: remote_shot_clash_test had run in every landing since 828 amended (3) without
+its result being read. tests/land_tested_test.sh (a land.sh part), in a scratch repository: a clean run's line
+carries the sha and the pattern finds it; a commit or a tracked edit made mid-run fails it; a run begun with tracked
+changes names no bare sha; a FAIL line is unchanged; land.sh and land.ps1 use it. Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
