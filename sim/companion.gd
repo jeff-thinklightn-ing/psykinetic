@@ -795,6 +795,10 @@ var want_words := "":
 		want_words = value
 var want_glad := ""
 var want_told := false
+## Her open want in her own plain words (the template's "says", voice's;
+## 803 amended (12)), said when her voice gives no line where she would
+## first tell it, or by a mind with no voice of its own. "" for none.
+var want_says := ""
 ## Her talk with her player (803 amended (5)), her record's "talk" itself
 ## (Main's, shared): {m, base, lo, hi}; m times her quiet gap.
 var talk_rate: Dictionary = {}
@@ -3786,8 +3790,12 @@ func _quiet_gap_mid() -> int:
 ## new_place_s; at most per_hour an hour. Her voice is asked with one
 ## thing to speak of (_quiet_pick_focus), and may still answer "...".
 func _quiet_moment() -> void:
-	if mind == null or not _alive(keeper) or World.is_downed(keeper) or quiet() \
-			or not quiet_minds.any(func(prefix: String) -> bool: return mind.kind.begins_with(prefix)):
+	if mind == null or not _alive(keeper) or World.is_downed(keeper) or quiet():
+		return
+	# A mind with no voice of its own gets one quiet moment: her untold want,
+	# in her plain words (803 amended (12)).
+	var voiced := quiet_minds.any(func(prefix: String) -> bool: return mind.kind.begins_with(prefix))
+	if not voiced and (want_words.is_empty() or want_told or want_says.is_empty()):
 		return
 	var rules := quiet_rules()
 	var day := Townsfolk.day_of(World.steps)
@@ -3814,6 +3822,11 @@ func _quiet_moment() -> void:
 	_quiet_ticks = _quiet_ticks.filter(func(at: int) -> bool: return World.tick - at < hour)
 	if _quiet_ticks.size() >= int(rules.get("per_hour", 12)):
 		_quiet_next_tick = _quiet_ticks[0] + hour
+		return
+	if not voiced:
+		_quiet_ticks.append(World.tick)
+		_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())
+		_tell_want_plainly()
 		return
 	var focus := _quiet_pick_focus()
 	if focus.is_empty():
@@ -3959,8 +3972,10 @@ func _quiet_pick_focus() -> Dictionary:
 		want_glad = ""
 		return glad  # A want just met (803 amended (4)): her own word on it, next.
 	if not want_words.is_empty() and not want_told:
-		want_told = true  # Kept on her record's want (Main._syncwant_told): told once, not again after a restart.
-		return {"key": "want", "words": want_words + "."}  # A want not yet told, next (803 amended (11)).
+		# A want not yet told, next (803 amended (11)); told only once a line
+		# is said (803 amended (12), _want_answered), so a slow or silent
+		# voice never marks it told unsaid.
+		return {"key": "want", "words": want_words + "."}
 	if not want_words.is_empty():
 		options.append({"key": "want", "weight": "want_told" if want_told else "want", "words": want_words + "."})
 	if options.is_empty():
@@ -7313,11 +7328,35 @@ func _out_of_reach(entity: GridEntity) -> bool:
 	return false
 
 
+## Her untold want, told only by a line said (803 amended (12)): her voice's
+## own line to the quiet moment that asked it ("said"), else, when her voice
+## gave none (silent, dropped, no answer: a timeout too), her plain line
+## (want_says). Held back (a fight, no one to hear, not asked), it stays
+## untold for her next quiet moment.
+func _want_answered(outcome: String) -> void:
+	if want_told or want_words.is_empty():
+		return
+	if outcome == "said":
+		want_told = true
+	elif outcome in ["silent", "dropped", "no answer"]:
+		_tell_want_plainly()
+
+
+## Her untold want in her plain words; told once said.
+func _tell_want_plainly() -> bool:
+	if want_says.is_empty() or not _say(want_says, true):
+		return false
+	want_told = true
+	return true
+
+
 ## [param entry] in the mind log, with her stance and how far her player is
 ## as it is written.
 func _log(entry: Dictionary) -> void:
 	if entry.get("kind") == "voice":
 		_count_voice(entry)
+		if str(entry.get("trigger", "")) == QUIET_TRIGGER + ": want" and entry.has("outcome"):
+			_want_answered(str(entry["outcome"]))
 		if str(entry.get("trigger", "")).begins_with(QUIET_TRIGGER) and entry.has("outcome") and entry["outcome"] != "not asked":
 			# Let pass ("..."), the next waits longer, up to max_gap_s; said, as before.
 			var widest := maxi(int(float(quiet_rules().get("max_gap_s", 600)) * World.TICK_RATE / float(_quiet_gap_mid())), 1)

@@ -14448,7 +14448,13 @@ func _set_mood(record: PlayerRecord) -> void:
 		if not record.companion.get("talk_rate") is Dictionary:
 			record.companion["talk_rate"] = Companion.talk_start()
 		pet.talk_rate = record.companion["talk_rate"]  # Shared: her moves are her record's (803 amended (5)).
-		_set_want_words(record)
+		if not record.companion.has("want") and not record.companion.has("want_rest"):
+			# A new companion's first want from her first tick, not her first
+			# world tick's tend (803 amended (12), playtest's pond 3): asked to
+			# fish at once, she leads to water close by.
+			_tend_want(record, int(World.steps / maxi(DayNight.day_steps, 1)))
+		else:
+			_set_want_words(record)
 	if record.companion.has("resident"):
 		_mood_to_worker(record)
 
@@ -18823,6 +18829,7 @@ func _set_want_words(record: PlayerRecord) -> void:
 	_keep_want_told(record, pet)
 	var want: Variant = record.companion.get("want")
 	pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
+	pet.want_says = Companion.want_said(str(want["key"]), "says", record.name) if want is Dictionary else ""
 	pet.want_told = want is Dictionary and bool(want.get("told", true))
 
 

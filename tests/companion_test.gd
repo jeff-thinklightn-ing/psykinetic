@@ -1710,6 +1710,10 @@ func _test_wants() -> void:
 		and Companion.focus_text({"key": "want", "words": "x."}).ends_with(Companion.QUIET_WANT_LEAD), "a want is told as hers, to say in her own words")
 	# Tended: picked once a game day, told her voice.
 	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	pet.want_words = ""
+	_main._set_mood(record)  # As she comes: no want and no rest yet.
+	_check(Main._wants_pond(record) and pet.want_words.begins_with("to go fishing with") and not pet.want_says.is_empty(),
+		"a new companion wants the pond as she comes, not at her first world tick's tend: asked to fish at once, she can lead (803 amended (12), playtest's pond 3) (%s)" % [record.companion.get("want")])
 	_main._tend_want(record, day)
 	var want: Dictionary = record.companion.get("want", {})
 	_check(want.get("key") == "pond" and int(want.get("since", -1)) == day and want.get("told") == false and pet.want_words.contains(record.name)
@@ -1717,7 +1721,9 @@ func _test_wants() -> void:
 		"her first want, the pond, on her record, not yet told, and in her voice (%s)" % pet.want_words)
 	pet._quiet_last_focus = "want"
 	var focus := pet._quiet_pick_focus()
-	_check(focus.get("key") == "want" and pet.want_told, "her next quiet moment tells it, first, whatever was last (%s)" % [focus])
+	_check(focus.get("key") == "want" and not pet.want_told,
+		"her next quiet moment speaks of it, first, whatever was last; not told till a line is said (803 amended (12)) (%s)" % [focus])
+	pet._want_answered("said")
 	_main._tend_want(record, day)
 	_check(record.companion["want"].get("told") == true and pet.want_told, "told: kept on her record's want")
 	pet.want_words = ""
@@ -1770,8 +1776,45 @@ func _test_wants() -> void:
 ## 803 amended (11), Jeff's loop 1: a new companion's first quiet moment, a
 ## model's mind (a stub recording what it is asked), speaks of the pond.
 func _test_first_want_told() -> void:
-	print("\n== a new companion voices the pond want in her first quiet moment (803 amended (11)) ==")
+	print("\n== a new companion tells the pond want in her first quiet moment; told only once a line is said (803 amended (11), (12)) ==")
 	_kill_monsters()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var plain := Companion.want_said("pond", "says", record.name)
+	_check(not plain.is_empty(), "the pond want has its plain line (%s)" % plain)
+	var spoke := _first_quiet_moment("ollama", {"say": "I'd like to go fishing with you.", "stance": ""})
+	_check(spoke["asked"] == ["quiet moment: want"] and ("You would like to go fishing with %s" % record.name) in str(spoke["words"])
+			and spoke["said"] == ["I'd like to go fishing with you."] and spoke["told"] and spoke["kept"] == true,
+		"a model's voice says it: told and kept told, no plain line besides (%s)" % _quiet_row(spoke))
+	var silent := _first_quiet_moment("ollama", {"say": "", "stance": ""})
+	_check(silent["asked"] == ["quiet moment: want"] and silent["said"] == [plain] and silent["told"] and silent["kept"] == true,
+		"her voice lets it pass (\"...\"): her plain line, told (%s)" % _quiet_row(silent))
+	var none := _first_quiet_moment("ollama", {}, false, false, true)
+	_check(none["asked"] == ["quiet moment: want"] and none["said"] == [plain] and none["told"] and none["kept"] == true,
+		"no answer (her model's ask timed out, as a slow or down model's comes back): her plain line, told (%s)" % _quiet_row(none))
+	var scripted := _first_quiet_moment("counting", {"say": "Never asked.", "stance": ""}, false, true)
+	_check(scripted["asked"].is_empty() and scripted["said"] == [plain] and scripted["told"] and scripted["kept"] == true
+			and scripted["again"].is_empty(),
+		"a mind with no voice of its own: her plain line at her first quiet moment, told, and no quiet moment after (%s)" % _quiet_row(scripted))
+	var held := _first_quiet_moment("ollama", {"say": "I'd like to go fishing with you.", "stance": ""}, true)
+	_check(held["asked"].is_empty() and held["said"].is_empty() and not held["told"] and held["kept"] == false,
+		"in a fight her quiet moment waits: nothing said, still untold (%s)" % _quiet_row(held))
+
+
+func _quiet_row(row: Dictionary) -> String:
+	return "asked %s, said %s, told %s, kept %s%s" % [row["asked"], row["said"], row["told"], row["kept"],
+		", again %s" % [row["again"]] if row.has("again") else ""]
+
+
+## Her first quiet moment with a fresh pond want (Main._tend_want), her mind
+## of [param kind] answering [param answer]: what her voice was asked, what
+## she said, and whether the want is told, on her and on her record. With
+## [param fight], a fight just now, her tongue held in one (decision 675,
+## on for this alone: these sections run with it off); with [param again],
+## a second quiet moment after and what she said in it; with
+## [param timeout], the ask left pending ({} from a synchronous mind) and
+## its result come back later with nothing, "timed out", as an Ollama or
+## Claude mind's does (the box's slow model).
+func _first_quiet_moment(kind: String, answer: Dictionary, fight := false, again := false, timeout := false) -> Dictionary:
 	var owner := _player()
 	var pet := _companion()
 	_put(pet, owner.tile + Vector2i(1, 0))
@@ -1784,10 +1827,10 @@ func _test_first_want_told() -> void:
 	pet.want_glad = ""
 	_main._tend_want(record, int(World.steps / maxi(DayNight.day_steps, 1)))
 	var mind := CountingMind.new()
-	mind.kind = "ollama"  # A quiet moment asks a model's mind only.
+	mind.kind = kind
 	var mind_was: CompanionMind = pet.mind
 	pet.mind = mind
-	mind.voice_answer = {"say": "I'd like to go fishing with you.", "stance": ""}
+	mind.voice_answer = answer
 	pet._fight_tick = -100000
 	pet._keeper_spoke_tick = -100000
 	pet._quiet_next_tick = -1
@@ -1795,22 +1838,42 @@ func _test_first_want_told() -> void:
 	pet._quiet_last_focus = ""
 	pet._quiet_ticks.clear()
 	pet._last_speech_tick = -1000
+	var said: Array[String] = []
+	var heard := func(line: String) -> void: said.append(line)
+	pet.said.connect(heard)
 	World.step()
 	pet._quiet_next_tick = World.tick
-	World.step()
+	if fight:
+		Companion.hold_tongue = true
+		pet._fight_tick = World.tick + 10
+	for i in 6:
+		World.step()
+	Companion.hold_tongue = false
 	var asked: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
-	var told: String = str(asked[0]["messages"].back()["content"]) if asked.size() == 1 else ""
+	if timeout and asked.size() == 1:
+		pet._take_result({"kind": "voice", "serial": asked[0]["serial"], "trigger": asked[0]["trigger"], "prompt": "", "raw": "",
+			"answer": {}, "error": "timed out after 30 s", "latency_ms": 30000})
+		World.step()
+	var row := {"asked": asked.map(func(ask: Dictionary) -> String: return str(ask["trigger"])),
+		"words": str(asked[0]["messages"].back()["content"]) if asked.size() == 1 else "", "said": said.duplicate()}
+	if again:
+		said.clear()
+		pet._quiet_next_tick = World.tick
+		pet._last_speech_tick = -1000
+		for i in 6:
+			World.step()
+		row["again"] = said.duplicate()
+	pet.said.disconnect(heard)
 	_main._remember_companion(Net.player_id)  # Her record kept: "told" with it.
-	_check(asked.size() == 1 and str(asked[0]["trigger"]).ends_with("want")
-			and ("You would like to go fishing with %s" % record.name) in told
-			and pet.want_told and record.companion.get("want", {}).get("told") == true,
-		"her first quiet moment speaks of the pond, told and kept told (%s; %s; told %s)" % [asked.map(func(ask: Dictionary) -> String: return ask["trigger"]),
-			told.right(160), record.companion.get("want", {}).get("told")])
+	row["told"] = pet.want_told
+	row["kept"] = record.companion.get("want", {}).get("told")
 	pet.mind = mind_was
+	pet._fight_tick = -100000
 	for key: String in keys:
 		record.companion.erase(key)
 	pet.want_words = ""
-
+	pet.want_says = ""
+	return row
 
 ## 803 amended (11), the coordinator's ruling (A): Jeff's "i keep taking
 ## companions to the pond to fish" is the pool by Snagfin's shack. A fresh
@@ -1837,7 +1900,7 @@ func _test_lead_to_near_water() -> void:
 		kept[key] = record.companion.get(key)
 		record.companion.erase(key)
 	var kept_bond: Variant = _bond_as(0)
-	_main._tend_want(record, int(World.steps / maxi(DayNight.day_steps, 1)))
+	_main._set_mood(record)  # As she comes, no world tick's tend yet (803 amended (12), playtest's pond 3): the pond her want already.
 	var shack := Vector2i(222, 227)
 	# From the square and each road into Umbrage: the water she would lead to.
 	var froms := {"the square's fire": Vector2i(194, 212), "the north road (west)": Vector2i(186, 188),
@@ -1869,7 +1932,7 @@ func _test_lead_to_near_water() -> void:
 	pet.guide = null
 	pet._said.clear()
 	_check(pet.fish_spot_near(owner.tile) == World.NO_CELL and record.companion.get("want", {}).get("key") == "pond" and pet.bond_step == "fond",
-		"in the square: no water within her reach, the pond her want, fond (%s)" % [record.companion.get("want")])
+		"in the square: no water within her reach, the pond her want as she came (no tend yet), fond (%s)" % [record.companion.get("want")])
 	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
 	var goal: Dictionary = pet.guide.goal if pet.guide != null else {}
 	_check(pet.guide != null and pet.guide.going() and goal.get("near_water") == true and str(goal.get("key", "")) != "wilds/reed_pond"

@@ -3023,7 +3023,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (908)
+## Lines in the data (913)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3061,7 +3061,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (120)
+### levels/companion_traits.json (125)
 
 | | Line | Key |
 |---|---|---|
@@ -3103,14 +3103,19 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | pray\|psalm\|candle\|temple | `needs.weights[8].words` |
 |  | to sit by a fire with {player} and rest a while | `wants.templates[0].words` |
 |  | sat by a fire with {player} and rested | `wants.templates[0].done` |
+|  | Could we sit by a fire a while, you and me? | `wants.templates[0].says` |
 |  | to spend a while in a town among other folk | `wants.templates[1].words` |
 |  | spent a while in a town among other folk | `wants.templates[1].done` |
+|  | I'd like to be among people for a bit. A town, maybe? | `wants.templates[1].says` |
 |  | to go fishing with {player} | `wants.templates[2].words` |
 |  | went fishing with {player} | `wants.templates[2].done` |
+|  | I've a mind to go fishing. Will you come with me? | `wants.templates[2].says` |
 |  | to win a fight with {player} beside you | `wants.templates[3].words` |
 |  | won a fight beside {player} | `wants.templates[3].done` |
+|  | I want to win a fight beside you. Something with teeth. | `wants.templates[3].says` |
 |  | to go to the temple and be blessed | `wants.templates[4].words` |
 |  | were blessed at the temple | `wants.templates[4].done` |
+|  | Could we stop at the temple? I'd like a blessing. | `wants.templates[4].says` |
 |  | This pack is breaking my back. | `bond.watch.heavy_warn` |
 |  | {player} asked you to travel with them, but {companion} travels with them; you will not go while she does. | `leaving.recruit_asked.with` |
 |  | {player} asked you to travel with them, but you travel with someone else now. | `leaving.recruit_asked.elsewhere` |

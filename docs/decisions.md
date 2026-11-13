@@ -45992,6 +45992,35 @@ Umbrage the water she would lead to is that pool, each walk printed (NEAR_WATER)
 route (695), unchanged, and playtest's loop 1 check stands on a joined client. Server only, protocol
 unchanged, no new class_name.
 
+803 amended (12) (the script's label; the coordinator's ruling, a condition of the cut after (11)):
+her untold want is told only once a line is said. Under (11), _quiet_pick_focus marked the want told
+when it picked it, before her voice answered, and (11) keeps "told" on her record. A model that timed
+out, answered "..." or had its line dropped marked the want told for good, never said, which would
+have made Jeff's line 12 permanent where a rejoin used to give her another try. And with no model
+(playtest's tours, a box whose model is down), quiet moments never ran at all (quiet_minds), so the
+want was never spoken. Now the pick leaves want_told alone. Companion._want_answered, on the quiet
+ask's voice entry ("quiet moment: want"), marks it told when her voice's line is said, and when her
+voice gives none (silent, dropped, no answer: a timeout too) says her plain line instead, want_says:
+the template's "says" (voice's words, one per want: fire "Could we sit by a fire a while, you and
+me?", town "I'd like to be among people for a bit. A town, maybe?", pond "I've a mind to go fishing.
+Will you come with me?", wolves "I want to win a fight beside you. Something with teeth.", temple
+"Could we stop at the temple? I'd like a blessing."), which tells it. Held back (a fight, no one to
+hear, the voice busy, the rate limit), it stays untold for her next quiet moment. A mind with no
+voice of its own (not quiet_minds) now gets one quiet moment, by the same timing: her untold want in
+her plain line; nothing else, and none once it is told. Main._set_want_words sets want_says beside
+want_words. A new companion's first want is tended as she comes (Main._set_mood, a record with no
+want and no want_rest), not at her first world tick's tend some 30 s later: playtest's pond 3,
+joined, asked "Let's go fishing." 6 s after joining and was told "We'd need a pond." with the
+shack's pool 21 cells off (_lead_to_fish leads only for a pond want or a devoted companion). A record (11) marked told with nothing said cannot be told apart from one told aloud;
+(11) is in no release (main only, after v0.1.213), so none exists on the box; a local world where it
+happened keeps it told, as an old want does. companion_test _test_first_want_told: a model that says
+it (told, kept on the record, no plain line besides), one that lets it pass and one with no answer
+(the plain line, told), a mind with no voice (the plain line at its first quiet moment, told, no
+quiet moment after), and a fight (nothing said, still untold); _test_wants: the pond is her want as
+she comes, and the pick alone does not tell it. The tests stand on a host; the plain line is said over her like any line, so a joined
+client sees it, and playtest's joined tour, with no model, can now hear it. Server only, protocol
+unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

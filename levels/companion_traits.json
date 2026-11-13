@@ -139,11 +139,11 @@
 		"rest_days": 1,
 		"met_gain": 0.3,
 		"templates": [
-			{"key": "fire", "need": "safety", "rung": 1, "after": 0, "met_by": ["fire"], "words": "to sit by a fire with {player} and rest a while", "done": "sat by a fire with {player} and rested"},
-			{"key": "town", "need": "company", "rung": 2, "after": 1, "met_by": ["leisure"], "words": "to spend a while in a town among other folk", "done": "spent a while in a town among other folk"},
-			{"key": "pond", "need": "leisure", "rung": 3, "after": 0, "first": true, "met_by": ["fished"], "ready": true, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
-			{"key": "wolves", "need": "adventure", "rung": 4, "after": 2, "met_by": ["fought", "cleared"], "words": "to win a fight with {player} beside you", "done": "won a fight beside {player}"},
-			{"key": "temple", "need": "faith", "rung": 5, "after": 3, "met_by": ["blessed"], "words": "to go to the temple and be blessed", "done": "were blessed at the temple"}
+			{"key": "fire", "need": "safety", "rung": 1, "after": 0, "met_by": ["fire"], "words": "to sit by a fire with {player} and rest a while", "done": "sat by a fire with {player} and rested", "says": "Could we sit by a fire a while, you and me?"},
+			{"key": "town", "need": "company", "rung": 2, "after": 1, "met_by": ["leisure"], "words": "to spend a while in a town among other folk", "done": "spent a while in a town among other folk", "says": "I'd like to be among people for a bit. A town, maybe?"},
+			{"key": "pond", "need": "leisure", "rung": 3, "after": 0, "first": true, "met_by": ["fished"], "ready": true, "words": "to go fishing with {player}", "done": "went fishing with {player}", "says": "I've a mind to go fishing. Will you come with me?"},
+			{"key": "wolves", "need": "adventure", "rung": 4, "after": 2, "met_by": ["fought", "cleared"], "words": "to win a fight with {player} beside you", "done": "won a fight beside {player}", "says": "I want to win a fight beside you. Something with teeth."},
+			{"key": "temple", "need": "faith", "rung": 5, "after": 3, "met_by": ["blessed"], "words": "to go to the temple and be blessed", "done": "were blessed at the temple", "says": "Could we stop at the temple? I'd like a blessing."}
 		]
 	},
 	"bond": {
