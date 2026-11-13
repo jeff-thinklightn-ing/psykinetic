@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2936)
+## Lines in the code (2940)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1330,7 +1330,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (616)
+### other (sim) (620)
 
 | | Line | Where |
 |---|---|---|
@@ -1418,6 +1418,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %d food for the hills | `sim/economy.gd` buy_drove() |
 |  | eaten by %s | `sim/economy.gd` buy_drove() |
 |  | %d food sold to %s | `sim/economy.gd` buy_drove() |
+|  | [economy] %s: the town fed a resident with no gold (%s) | `sim/economy.gd` dole_line() |
 |  | by %s at %s | `sim/economy.gd` _eat() |
 |  | sold a %s to %s | `sim/economy.gd` _eat() |
 |  | bought a %s | `sim/economy.gd` _eat() |
@@ -1677,7 +1678,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [tick] avg %.1f ms, worst %.1f ms, ticks %d over the last hour | `sim/tick_watch.gd` hour_line() |
 |  | [tick] stalled: the main loop stuck %.0f s, since tick %d; the last part done: %s; the last error: %s; quitting for a restart | `sim/tick_watch.gd` stalled_line() |
 |  | %s the %s, sent for, finds the way to %s alone | `sim/towns.gd` OWN_WAY |
-|  | town %s: %s; residents %d (%s); visitors %d; room %d of %d | `sim/towns.gd` boot_line() |
+|  | %s %s %d | `sim/towns.gd` boot_line() |
+|  | town %s: %s; residents %d (%s); visitors %d; room %d of %d; buildings %s; gone %s; sought %s; %s | `sim/towns.gd` boot_line() |
+|  | can build %s no (at its top level) | `sim/towns.gd` can_build_words() |
+|  | can build %s %s (xp %d of %d) | `sim/towns.gd` can_build_words() |
 |  | day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s | `sim/towns.gd` day_line() |
 |  | +%d experience: %s | `sim/towns.gd` add_xp() |
 |  | %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
