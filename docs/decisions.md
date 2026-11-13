@@ -48924,6 +48924,18 @@ _test_fishing_that_works, companion_test _test_fish_waters (every body; the wild
 PROTOCOL_REVISION 56, shared with 819 amended (the satchel; release's: it rides the 11-12 cut with this). No new
 class_name.
 
+805 amended (19): a catch keeps clear of the rod's own square while the rod is out (items; the script's label; the
+coordinator's OK, 2026-11-12, on playtest's pondbeast run, joined, main f9d909eb2: an unarmed fisher's rod went from
+pack square 0 to the hand, the first perch took square 0, and the rod came back to square 1). While a rod taken up to
+cast is out (World._rod_put) and its square stays empty (World._rod_square), a catch starting a new stack in its
+angler's own pack (World._stow_catch) takes the next free pack square instead, and the rod's only when nothing else
+is free: then the rod stays in hand on the step after, there being no square for it, and nothing is lost. A
+companion fishing is the same, her rod from her pack and her catch in her own. With a weapon in hand nothing
+changes (the swap fills the rod's square). items_test _test_fishing_that_works: empty hands, the perch in the next
+free square and the rod back in its own; the pack full but for the rod's square, the perch there, the rod staying in
+hand (both by the calls a cast makes, without ticks); a companion's rod, her perch past its square and the rod back in it. Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

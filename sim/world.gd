@@ -8392,10 +8392,10 @@ func _rod_to_hand(by: GridEntity) -> bool:
 
 ## [param by]'s rod back to the square it came from and what its right hand
 ## held back in that hand (805 amended (11)), if it was taken up to cast
-## (_rod_to_hand). Taken from an empty hand, its square may hold the catch
-## since (a first perch lands in the first free square, the rod's): then the
-## first free pack square (animation's dry run, 11-11); with none, it stays
-## in hand.
+## (_rod_to_hand). Taken from an empty hand, its square is kept for it (a
+## catch skips it, _stow_catch, 805 amended (19)) unless the pack had no
+## other room: then the first free pack square (animation's dry run, 11-11);
+## with none, it stays in hand.
 func _rod_back(by: GridEntity) -> void:
 	var put: Dictionary = _rod_put.get(by, {})
 	_rod_put.erase(by)
@@ -8414,6 +8414,16 @@ func _rod_back(by: GridEntity) -> void:
 		var free := free_pack_slot(by)
 		if free >= 0:
 			try_transfer(by, by, Items.RIGHT_HAND, by, free)
+
+
+## The empty pack square [param by]'s rod came from while it is out to
+## cast (_rod_put), kept for it (805 amended (19)); -1 if none.
+func _rod_square(by: GridEntity) -> int:
+	var put: Dictionary = _rod_put.get(by, {})
+	if put.is_empty():
+		return -1
+	var square := int(put["rod_slot"])
+	return square if square < by.slots.size() and by.slots[square].is_empty() else -1
 
 
 ## Each tick (805 amended (11)): a rod taken up to cast goes back once its
@@ -8722,6 +8732,16 @@ func _land_catch(by: GridEntity) -> void:
 ## coordinator's room rule), else at its feet. Where it went (fish_landed_to).
 func _stow_catch(by: GridEntity, uid: int) -> String:
 	var slot := room_for(by, uid)
+	var kept := _rod_square(by)
+	if slot >= 0 and slot == kept:
+		# 805 amended (19): a new stack skips the square a rod out to cast
+		# came from (playtest's pondbeast run: the first perch took it, and
+		# the rod came back to the next square); it takes it only when the
+		# pack has no other room.
+		for packed: int in pack_slots(by):
+			if packed != kept and packed < by.slots.size() and by.slots[packed].is_empty():
+				slot = packed
+				break
 	if slot >= 0 and put_item(by, by, slot, uid):
 		return "self"
 	var keeper: Variant = by.get("keeper") if by is Companion else null

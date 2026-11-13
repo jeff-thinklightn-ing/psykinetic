@@ -4384,8 +4384,9 @@ func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> v
 	_steps(1)
 	_check(host.fishing.is_empty() and World.fish_broke_why == "hurt" and host.slots[Items.RIGHT_HAND] == "sword",
 		"struck mid-cast: reeled in, the sword back in hand at once (%s, %s)" % [World.fish_broke_why, Array(host.slots)])
-	# Empty hands, the rod alone in the pack: the first perch lands in the rod's
-	# own square, and the rod goes back to the next free one (animation's dry run).
+	# Empty hands, the rod alone in the pack: its square is kept for it, the
+	# perch to the next free one, and the rod back in its own (805 amended
+	# (19), playtest's pondbeast run: the first perch took the rod's square).
 	_clear(host)
 	_give(host, "fishing_rod", packed)
 	_check(World.try_fish(host, water) and host.slots[Items.RIGHT_HAND] == "fishing_rod" and host.slots[packed] == "",
@@ -4393,14 +4394,50 @@ func _test_fishing_that_works(host: Player, water: Vector2i, caught: Array) -> v
 	_steps(World.FISH_CAST_TICKS)
 	World._fishing[host]["roll"] = 0.0
 	_steps(int(World._fishing[host]["bite"]) - World.tick)
-	_check(World.try_fish(host) and host.fishing.get("state") == "landed" and host.slots[packed] == "fish",
-		"struck: the perch in the rod's square, the first free one (%s)" % [Array(host.slots)])
+	var next_free := Items.ALL_PACK_SLOTS[1]
+	_check(World.try_fish(host) and host.fishing.get("state") == "landed" and host.slots[packed] == "" and host.slots[next_free] == "fish",
+		"struck: the perch in the next free square, the rod's kept (%s)" % [Array(host.slots)])
 	_steps(World.FISH_END_TICKS)
 	World._relocate(host, _free_near(host, 1))
 	_steps(1)
-	var rod_at := Array(host.slots).find("fishing_rod")
-	_check(host.slots[Items.RIGHT_HAND] == "" and rod_at in Items.pack_slots_of(host.slots) and host.slots[packed] == "fish",
-		"the first step after: the rod to the next free pack square, the hand empty (slot %d, %s)" % [rod_at, Array(host.slots)])
+	_check(host.slots[Items.RIGHT_HAND] == "" and host.slots[packed] == "fishing_rod" and host.slots[next_free] == "fish",
+		"the first step after: the rod back in its own square, the hand empty (%s)" % [Array(host.slots)])
+	World._relocate(host, stood)
+	_steps(1)
+	# The pack full but for the rod's square: the perch takes it (nothing is
+	# lost), and the rod stays in hand, there being no square for it. By the
+	# calls a cast makes, without ticks (the world's imps walk on them).
+	_clear(host)
+	_give(host, "fishing_rod", packed)
+	for slot: int in Items.pack_slots_of(host.slots):
+		if slot != packed:
+			_give(host, "knife", slot)
+	var out := World._rod_to_hand(host)
+	var full_fish := World.items.mint("fish", "caught")
+	var stowed := World._stow_catch(host, full_fish)
+	_check(out and stowed == "self" and World.slot_uids(host).find(full_fish) == packed,
+		"a full pack: the perch takes the rod's square, nothing lost (%s, %s)" % [stowed, Array(host.slots)])
+	World._rod_back(host)
+	_check(host.slots[Items.RIGHT_HAND] == "fishing_rod" and Array(host.slots).count("fishing_rod") == 1,
+		"then, no square free: the rod stays in hand (%s)" % [Array(host.slots)])
+	# A companion fishing: her rod out of her pack, her catch in her own pack
+	# skips its square, and the rod goes back to it.
+	var pet: Companion = _main._companions.get(Net.player_id)
+	if pet != null:
+		var pet_slots := pet.slots.duplicate()
+		var pet_uids := World.slot_uids(pet)
+		World.set_slots(pet, Items.tidy([], Companion.SLOTS), [])
+		var her_square := Items.ALL_PACK_SLOTS[0]
+		_give(pet, "fishing_rod", her_square)
+		var took := World._rod_to_hand(pet)
+		var her_fish := World.items.mint("fish", "caught")
+		var to := World._stow_catch(pet, her_fish)
+		var fish_at := World.slot_uids(pet).find(her_fish)
+		World._rod_back(pet)
+		_check(took and to == "self" and fish_at >= 0 and fish_at != her_square and pet.slots[her_square] == "fishing_rod"
+				and pet.slots[Items.RIGHT_HAND] == "",
+			"a companion's rod: her perch in her pack past its square (%d), the rod back in it (%s)" % [fish_at, Array(pet.slots)])
+		World.set_slots(pet, pet_slots, pet_uids)
 	World._relocate(host, stood)
 	_steps(1)
 	# Every water fishes: no "nothing takes the line"; no rod anywhere, no_rod.
