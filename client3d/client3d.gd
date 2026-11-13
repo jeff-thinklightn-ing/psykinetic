@@ -11127,10 +11127,6 @@ static func _broken_pick(key: Vector3i) -> bool:
 	return (hash ^ (hash >> 16)) % 3 == 0
 
 
-## A window piece [param made] on edge [param key] (489 amended): turned
-## half round where its outside is the run's -x (_window_flipped), as tall
-## as the wall there, its shutters open (two in three, by the edge: each
-## leaf 90 to 108 degrees, a little apart) or shut.
 ## The window piece a wall of [param wall_set] [param height] tall takes
 ## (489 amended (2): the Mughouse's two storeys, any set): a set's
 ## wall.<set>.window_tall on a wall two storeys high (within
@@ -11164,6 +11160,11 @@ static func window_drawn_height(slot: String) -> float:
 	return WALL_HEIGHT * (2.0 if two else 1.0)
 
 
+## A window piece [param made] on edge [param key] (489 amended): turned
+## half round where its outside is the run's -x (_window_flipped), as tall
+## as the wall there, its shutters open (two in three, by the edge: each
+## leaf 90 to 108 degrees, a little apart) or shut. An open window's leaf
+## stays shut where it has no room to swing (_leaf_room).
 func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 	if _window_flipped.get(key, false):
 		made.rotation.y = PI
@@ -11186,12 +11187,32 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 	var cell := Vector2i(key.x, key.y)
 	if _roll(cell, 50 + key.z) >= SHUTTERS_OPEN:
 		return
+	# Leaf a hangs at the piece's -z, the run's lower end, b at its +z;
+	# turned half round, the other way.
+	var a_side := 1 if _window_flipped.get(key, false) else -1
 	var a := made.find_child("shutter_a", true, false) as Node3D
 	var b := made.find_child("shutter_b", true, false) as Node3D
-	if a != null:
+	if a != null and _leaf_room(key, a_side):
 		a.rotation_degrees.y = lerpf(90.0, 108.0, _roll(cell, 52 + key.z))
-	if b != null:
+	if b != null and _leaf_room(key, -a_side):
 		b.rotation_degrees.y = -lerpf(90.0, 108.0, _roll(cell, 54 + key.z))
+
+
+## Whether a window's leaf on [param side] of wall edge [param key] (-1
+## toward the edge before it along its line, +1 the one after) has room to
+## swing open (489 amended (8), art-kit's evening stills: open, a leaf
+## reaches about 0.2 m into the next edge along the wall): only where that
+## edge is a plain wall, no window of its own, and no other wall meets the
+## vertex between (a corner's or a T's post). Beside a doorway its frame, at
+## a corner the post, beside a window that window's leaf would meet it.
+func _leaf_room(key: Vector3i, side: int) -> bool:
+	var kind_at := func(edge: Vector3i) -> int: return _terrain["edges"].get(edge, Terrain.Edge.OPEN)
+	var next := key + (Vector3i(0, side, 0) if key.z == Terrain.EAST else Vector3i(side, 0, 0))
+	if kind_at.call(next) != Terrain.Edge.WALL or _wall_states.get(next, "") == "window":
+		return false
+	# An east edge's lower end (its -y) is its vertex 1, a south edge's (its -x) its vertex 0.
+	var low := 1 if key.z == Terrain.EAST else 0
+	return not _needs_post(WallEdge.vertex_at(key, low if side < 0 else 1 - low), kind_at)
 
 
 ## A wall piece's own wall faces (881): its surfaces in the material

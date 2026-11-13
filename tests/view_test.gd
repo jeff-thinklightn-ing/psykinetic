@@ -3326,7 +3326,67 @@ func _test_tavern_inside() -> void:
 	_check(BuildingComposer.sill_lamp_edge(house.merged({"inside": ""}, true), windows) == BuildingComposer.NO_SILL
 			and BuildingComposer.sill_lamp_edge(house, [] as Array[Vector3i]) == BuildingComposer.NO_SILL,
 			"no lamp on a building that is no shell, nor on a shell with no window")
+	_test_shutter_room(level, windows)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A window's open leaf has room to swing (489 amended (8), art-kit's
+## evening stills: a leaf opened over the door frame beside it). In the
+## built [param level], each open leaf's next edge along the wall, on the
+## side its hinge is (read from where the leaf is drawn), is a plain wall,
+## no window, with nothing meeting the vertex between; and one of its
+## [param windows] whose leaf opens keeps that leaf shut with a doorway
+## put beside it.
+func _test_shutter_room(level: Dictionary, windows: Array[Vector3i]) -> void:
+	var edges: Dictionary = level["terrain"]["edges"]
+	var kind_at := func(edge: Vector3i) -> int: return edges.get(edge, Terrain.Edge.OPEN)
+	var leaves: Array = _rig._descendants(_rig._room).filter(func(each: Node) -> bool: return str(each.name).begins_with("shutter_"))
+	var opened: Array = []
+	var crowded: Array = []
+	for leaf: Node3D in leaves:
+		var hinge := _rig._room.to_local(leaf.global_position)
+		var owner_key := Vector3i(-1, -1, -1)
+		for key: Vector3i in windows:
+			var mid := _rig._edge_midpoint(key)
+			if Vector2(hinge.x - mid.x, hinge.z - mid.z).length() < 0.6:
+				owner_key = key
+		if owner_key.x < 0 or is_zero_approx(leaf.rotation.y):
+			continue
+		var owner_mid := _rig._edge_midpoint(owner_key)
+		var east := owner_key.z == Terrain.EAST
+		var side := -1 if ((hinge.z - owner_mid.z) if east else (hinge.x - owner_mid.x)) < 0.0 else 1
+		var next := owner_key + (Vector3i(0, side, 0) if east else Vector3i(side, 0, 0))
+		var low := 1 if east else 0
+		var vertex := WallEdge.vertex_at(owner_key, low if side < 0 else 1 - low)
+		opened.append([owner_key, side])
+		if kind_at.call(next) != Terrain.Edge.WALL or next in windows or Client3D._needs_post(vertex, kind_at):
+			crowded.append([owner_key, side, kind_at.call(next)])
+	_check(leaves.size() == 2 * windows.size() and crowded.is_empty(),
+			"each open shutter leaf has a plain wall beside it to swing over, never a door frame, a corner or a window (%d of %d leaves open, crowded %s)" % [opened.size(), leaves.size(), crowded])
+	# A doorway put beside an open leaf: that leaf stays shut.
+	var held := false
+	if not opened.is_empty():
+		var pick: Array = opened[0]
+		var pick_key: Vector3i = pick[0]
+		var pick_side: int = pick[1]
+		var beside := pick_key + (Vector3i(0, pick_side, 0) if pick_key.z == Terrain.EAST else Vector3i(pick_side, 0, 0))
+		var room_edges: Dictionary = _rig._terrain["edges"]
+		var was: int = room_edges.get(beside, Terrain.Edge.OPEN)
+		room_edges[beside] = Terrain.Edge.DOOR
+		var slot := Client3D.window_slot(_rig._set_of(pick_key), _rig._height_of(pick_key))
+		var made := ArtKit.instance(slot)
+		_rig._dress_window(made, pick_key, slot)
+		room_edges[beside] = was
+		var flipped: bool = _rig._window_flipped.get(pick_key, false)
+		var name_there := "shutter_a" if (pick_side < 0) != flipped else "shutter_b"
+		var shut_leaf := made.find_child(name_there, true, false) as Node3D
+		held = shut_leaf != null and is_zero_approx(shut_leaf.rotation.y)
+		var pane := made.find_child("glow", true, false)
+		for index in range(_rig._glows.size() - 1, -1, -1):
+			if _rig._glows[index][0] == pane:
+				_rig._glows.remove_at(index)
+		made.free()
+	_check(held, "a window's leaf beside a doorway stays shut (%s)" % [opened[0] if not opened.is_empty() else "no open leaf"])
 
 
 ## A window's own wall faces (881): wall.wood.window's surfaces in the

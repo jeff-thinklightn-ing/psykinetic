@@ -16255,6 +16255,21 @@ view_test _test_window_slot: the lancet's drawn height its own; and no window pi
 above its wall in any set, each set's window at each height window_slot gives it one (a storey,
 4.5 m, two storeys), stretched as _dress_window does. Client only; protocol unchanged, no new
 class_name.
+489 amended (8): a window's open shutter leaf stays shut where it has no room to swing (art-kit,
+from the coordinator's look at its evening stills, C:/dev/review/art-kit/look/home_house_out_crop.png;
+label from tools/decision_number.sh). _dress_window opened both leaves of two windows in three,
+each 90 to 108 degrees from shut; a leaf is 0.35 m wide, hinged 0.35 m off the window's middle,
+so open it reaches about 0.2 m into the next edge along the wall, and beside a doorway its
+plain back hung in front of the door's frame post, at a different depth from the other leaf:
+the window read as broken. No narrower leaf clears a door frame, so the rule is in the
+dressing, leaf by leaf: Client3D._leaf_room opens a leaf only where the next edge on its side
+is a plain wall (no doorway, no window of its own, whose leaf would meet it) and no other wall
+meets the vertex between (_needs_post: a corner or a T); leaf a hangs at the piece's -z, the
+run's lower end, b at its +z, the other way round where the window is turned (_window_flipped).
+The roll for whether a window opens is unchanged, so a window either side of which is clear
+looks as before. view_test (_test_shutter_room): in a built house, every open leaf, its side
+read from where it is drawn, has a plain wall beside it and no post between; and an open leaf
+with a doorway put beside it stays shut. Client only; protocol unchanged, no new class_name.
 
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 

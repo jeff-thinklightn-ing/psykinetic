@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a house window's shutter no longer swings open across the door frame beside it; a shutter with a door, a corner or another window next to it stays shut (489 amended (8)).
 - The Mughouse's fireplace burns day and night now, one fire on its logs with its warm light over the common room, where before only a glow showed at the wall's foot (868).
 - In the temple, beside the way down to the crypt, a thick candle burns on a tall iron candlestick (868).
 - The temple's tall pointed windows stand inside its walls, their tops under the eaves, where they ran up through the roof (489 amended (7)).
