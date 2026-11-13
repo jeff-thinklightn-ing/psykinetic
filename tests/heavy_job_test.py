@@ -156,10 +156,10 @@ with gate.StateLock():
     check(len(gate._entries("queue")) == 1, "a take waiting its turn that long is kept")
     gate._write(gate._path("queue", "dead-suite-1.json"), dict(old_take, tree="dead", waiter=999999))
     check(len(gate._entries("queue")) == 1, "a queued take whose waiter is gone (a stopped landing) is dropped")
-    os.remove(gate._path("queue", "forgot-suite-1.json"))
+    gate._retried(os.remove, gate._path("queue", "forgot-suite-1.json"))
     gate._write(gate._path("running", "forgot-suite-1.json"), dict(old_take, adopted_by=os.getpid()))
     check(len(gate._entries("running")) == 1, "a take that old is kept while a run inside it lives (a slow landing)")
-    os.remove(gate._path("running", "forgot-suite-1.json"))
+    gate._retried(os.remove, gate._path("running", "forgot-suite-1.json"))
 
 print("== an id reused, an entry from before a reboot (394 amended (8)) ==")
 me = gate.started_at(os.getpid())
@@ -180,7 +180,7 @@ with gate.StateLock():
     gate.boot_time = lambda: 0.0
     for folder in ("running", "queue"):
         for name in os.listdir(gate._path(folder)):
-            os.remove(gate._path(folder, name))
+            gate._retried(os.remove, gate._path(folder, name))
 if os.name == "nt":
     booted = real_boot_time()
     check(0 < time.time() - booted < 365 * 86400, "the machine's start read (%.1f h ago)" % ((time.time() - booted) / 3600))
@@ -221,7 +221,7 @@ with gate.StateLock():
     gate._write(gate._path("kinds.json"), {"bench": {"ram_gb": 1.2, "gpu_gb": 0.0, "gpu": False, "excludes": ["suite"]}})
 check("soak" in gate.kinds()["bench"]["excludes"], "a kinds.json from before the soak still keeps a bench from one")
 check("scene" in gate.kinds()["bench"]["excludes"], "and from a scene")
-os.remove(gate._path("kinds.json"))
+gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== a windowed Godot off-screen and silent, or refused (664 amended (2)) ==")
 G = "/c/Users/jequi/Godot/Godot_v4.7.2-stable_win64.exe"
@@ -313,7 +313,7 @@ check(gate.beat("release", "suite") == 0 and "beat" in takes()["renamed"],
     "a take whose holder is this process's ancestor comes before psykinetic-<owner>")
 check(gate.beat("nobody", "suite") == 0, "and is found whatever its name")
 for tree in list(takes()):
-    os.remove(gate._path("running", "%s-suite-1.json" % tree))
+    gate._retried(os.remove, gate._path("running", "%s-suite-1.json" % tree))
 check(gate.beat("release", "suite") == 1, "no take held: exit 1")
 gate._write(gate._path("running", "maps-suite_remote-1.json"), {"tree": "maps", "kind": "suite_remote", "pid": None,
     "queued": time.time(), "started": time.time() - 60, "ram_gb": 2.0, "gpu": False, "watched": False})
@@ -322,8 +322,8 @@ gate._write(gate._path("running", "maps-scene-1.json"), {"tree": "maps", "kind":
 check(gate.main(["beat", "maps"]) == 0 and "beat" in gate._read(gate._path("running", "maps-suite_remote-1.json"))
     and "beat" not in gate._read(gate._path("running", "maps-scene-1.json")),
     "with no kind named, any landing's take is beaten (a remote landing's suite_remote), never a scene")
-os.remove(gate._path("running", "maps-suite_remote-1.json"))
-os.remove(gate._path("running", "maps-scene-1.json"))
+gate._retried(os.remove, gate._path("running", "maps-suite_remote-1.json"))
+gate._retried(os.remove, gate._path("running", "maps-scene-1.json"))
 
 # tools/land_lock.sh itself: a frozen lock is never beaten, and says so with exit 3.
 shell = shutil.which("sh") or next((p for p in (r"C:\Program Files\Git\bin\sh.exe", r"C:\Program Files\Git\usr\bin\sh.exe")
@@ -359,7 +359,7 @@ else:
     code, said = try_lock("a landing")
     check(code == 0 and "beat" in takes().get("probe", {}), "free: taken, and beaten (%s)" % code)
     shutil.rmtree(lock, ignore_errors=True)
-    os.remove(gate._path("running", "probe-suite-1.json"))
+    gate._retried(os.remove, gate._path("running", "probe-suite-1.json"))
 
     print("== the land lock's order (394 amended (36)) ==")
     waiters_dir = lock + ".waiters"
@@ -408,7 +408,7 @@ else:
         check("\tpassed\tyounger\t" in handle.read(), "the pass is in the gate's log")
     code, said = try_as("probe")
     check(code == 1 and "no room yet" in said, "the head still gets no lock unreserved")
-    os.remove(gate._path("running", "probe-suite-1.json"))
+    gate._retried(os.remove, gate._path("running", "probe-suite-1.json"))
     shutil.rmtree(waiters_dir, ignore_errors=True)
     try:
         os.remove(lock + ".log")
@@ -515,8 +515,8 @@ check("lower 1" in by_tree.get("old_gate", "") and "early" not in by_tree.get("o
     and "stuck 1" in by_tree.get("unbeaten", ""),
     "the summary counts them by tree, leaving out 37's notes of unrevised entries (%s)" % by_tree)
 for name in ("0000000000000000001-oldie-1.json", "0000000000000000002-lower-1.json", "0000000000000000003-current-1.json"):
-    os.remove(gate._path("queue", name))
-os.remove(gate._path("running", "stuck-suite_remote-1.json"))
+    gate._retried(os.remove, gate._path("queue", name))
+gate._retried(os.remove, gate._path("running", "stuck-suite_remote-1.json"))
 
 if shell is not None:
     # The case that bit (the coordinator's): a take made by `heavy_job.sh take`, a
@@ -540,7 +540,7 @@ if shell is not None:
     time.sleep(0.5)
     check(entry and pre31_stale(entry), "and drops it once the script has died")
     if held_file("shortcall"):
-        os.remove(gate._path("running", held_file("shortcall")))
+        gate._retried(os.remove, gate._path("running", held_file("shortcall")))
 
     # release's case: a refused try against a held lock beats a suite_remote take.
     gate._write(gate._path("running", "probe-suite_remote-1.json"), {"tree": "probe", "kind": "suite_remote", "pid": None,
@@ -570,7 +570,7 @@ if shell is not None:
     check(code == 0 and owner == "probe" and len(failed_beats) >= 2,
         "a free lock still goes to a try whose beat fails, the fault logged (%s, %s, %s)" % (code, owner, said.strip()[-120:]))
     shutil.rmtree(lock, ignore_errors=True)
-    os.remove(gate._path("running", "probe-suite_remote-1.json"))
+    gate._retried(os.remove, gate._path("running", "probe-suite_remote-1.json"))
     try:
         os.remove(lock + ".log")
     except OSError:
@@ -834,7 +834,7 @@ if os.name == "nt":
 gate.LEAN_AFTER_SECONDS = after
 gate.total_ram_gb = real_total
 if saved_table is None:
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 else:
     gate._write(gate._path("kinds.json"), saved_table)
 
@@ -1008,7 +1008,7 @@ with open(gate._path("heavy_jobs.log")) as log:
 check("\tbackfill\tui\tscene\tpast environment bench, waiting on suite due in " in text, "the log says so")
 for each in gate._entries("queue"):
     gate._retried(os.remove, gate._path("queue", each["file"]))  # A waiter may hold it open a moment (Windows).
-os.remove(gate._path("running", "land-suite-%d.json" % os.getpid()))
+gate._retried(os.remove, gate._path("running", "land-suite-%d.json" % os.getpid()))
 # A backfilled scene still running when the suite has gone: the bench's wait
 # from then is logged as late.
 child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(6)"])
@@ -1059,13 +1059,13 @@ with contextlib.redirect_stdout(shown):
 check("1 backfill, 1 late (" in shown.getvalue(), "the summary counts both: %s" % [line for line in shown.getvalue().splitlines() if "late" in line])
 gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
-os.remove(gate._path("kinds.json"))
+gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== a take's own processes, and kinds never measured (394 amended (20)) ==")
 # comfy_batch is only ever taken, so never measured: its first 6 GB stood for
 # its commit while its ComfyUI server used up the machine's (2026-11-04).
 if os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 fresh = gate.kinds()
 check(fresh["comfy_batch"]["commit_gb"] == 20.0, "comfy_batch's commit estimate before any measure: 20 GB")
 check(fresh["godot_export"]["commit_gb"] == 2 * gate.KINDS["godot_export"]["ram_gb"], "an unmeasured kind: commit at twice its RAM")
@@ -1073,7 +1073,7 @@ gate._write(gate._path("kinds.json"), {"godot_export": dict(gate.KINDS["godot_ex
 check(gate.kinds()["godot_export"]["commit_gb"] == 2.6, "a measured one: its own")
 gate._write(gate._path("kinds.json"), {"godot_export": {"ram_gb": 2.5, "gpu_gb": 0.0, "gpu": False}})
 check(gate.kinds()["godot_export"]["commit_gb"] == 2.5, "an old measured row without commit: as before (_split)")
-os.remove(gate._path("kinds.json"))
+gate._retried(os.remove, gate._path("kinds.json"))
 # measure_attached with made-up numbers: sums now, peaks kept, a gone one nothing.
 me = {"pid": os.getpid(), "since": gate.started_at(os.getpid())}
 entry = {"attached": [dict(me), {"pid": 99999999, "since": 1}]}
@@ -1105,7 +1105,7 @@ with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tattach\tart\tgodot_export\tpid " in text and "attached peak " in text, "the log has the attach and the peak")
 if os.path.exists(gate._path("kinds.json")):  # Not there when the attach failed: the FAILs above say why.
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== a waiter re-reads its estimate at every look (394 amended (24)) ==")
 import threading
@@ -1117,7 +1117,7 @@ gate.total_ram_gb = lambda: None
 gate.POLL_SECONDS = 0.05
 for each in gate._entries("queue") + gate._entries("running"):
     folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
-    os.remove(gate._path(folder, each["file"]))
+    gate._retried(os.remove, gate._path(folder, each["file"]))
 def owed_job(tree, kind, ram):
     # Running, owed all of [ram] (nothing used yet): 40 GB free, 15 owed, 25 to give.
     gate._write(gate._path("running", "%s-%s-%d.json" % (tree, kind, os.getpid())), {"tree": tree, "kind": kind,
@@ -1156,7 +1156,7 @@ check(trees("queue") == ["first", "behind"] and "behind" not in trees("running")
     "a scene behind a suite waiting on memory stays behind it: the suite is never delayed (%s)" % trees("queue"))
 for each in gate._entries("queue") + gate._entries("running"):
     folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
-    os.remove(gate._path(folder, each["file"]))
+    gate._retried(os.remove, gate._path(folder, each["file"]))
 behind.join(5)
 check(gate.run("phys", "scene", ["bash", "tests/net_test.sh"]) == 2 and not trees("queue"),
     "net_test under scene: refused before it queues (run it as net)")
@@ -1173,7 +1173,7 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== release moves one queued entry to the front (394 amended (25)) ==")
 gate._memory = lambda: (40.0, 40.0)
@@ -1240,7 +1240,7 @@ check(gate.main(["front", "fix", "suite", "--by", "release", "--why", "every lan
 time.sleep(1.0)
 check(trees("running") == ["main"], "a suite running: the fronted suite waits for it (suite at most 1), the bench too (%s)" % trees("running"))
 for each in gate._entries("running"):
-    os.remove(gate._path("running", each["file"]))
+    gate._retried(os.remove, gate._path("running", each["file"]))
 check(until(lambda: trees("running") == ["fix"]), "the running suite done: the fronted one starts (%s)" % trees("running"))
 time.sleep(0.5)
 check(trees("running") == ["fix"] and queue_of() == ["ui bench"], "the bench never beside it (%s, %s)" % (trees("running"), queue_of()))
@@ -1255,7 +1255,7 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== status says why each row waits, and what each running job is owed (394 amended (26)) ==")
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
@@ -1294,7 +1294,7 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== a long --expect scene behind a bench holds no shorter scene (394 amended (28)) ==")
 # 11-10: playtest's tour (--expect 25) behind terrain's bench while suites ran
@@ -1370,7 +1370,7 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 print("== estimates by the working set at once (394 amended (27)) ==")
 saved_kinds = gate._read(gate._path("kinds.json"))
@@ -1731,7 +1731,7 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:
     gate._write(gate._path("kinds.json"), saved_kinds)
 elif os.path.exists(gate._path("kinds.json")):
-    os.remove(gate._path("kinds.json"))
+    gate._retried(os.remove, gate._path("kinds.json"))
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))

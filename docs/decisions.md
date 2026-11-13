@@ -10644,6 +10644,14 @@ among them, 36 minutes and more, with 27 GB free. Status run from the other side
   ending, all 30 light rows start in queue order while the suites keep theirs; main's code on
   the same copy holds them behind the head suite. Tools and tests only; protocol unchanged.
 
+394 amended (42): heavy_job_test removes the gate's files through _retried (the coordinator's ask and release's report,
+2026-11-12; label from tools/decision_number.sh). art-kit-lamps' landing failed at 18:31 on heavy_job_test alone: the
+cleanup after "a scene behind a suite waiting on memory stays behind it" removed a queue file while the test's own
+waiter thread (gate.take, still polling) had it open, and Windows refused (WinError 32). The case dates from 11-09, not
+41; the test's state folder is its own per run. Each of the test's 27 os.remove calls on the gate's files goes
+through gate._retried, the gate's own retry for a file in use (a second, then the error), as the gate removes them.
+Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
