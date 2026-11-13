@@ -94,6 +94,13 @@ static func overlay_safe() -> bool:
 	return not in_test_run() or Level.overlay_dir != Level.OVERLAY
 
 
+## [param path] as an overlay folder (541 amended (3), --overlay-dir): forward
+## slashes, one trailing slash, as Level.overlay_dir is read.
+static func overlay_path(path: String) -> String:
+	var out := path.strip_edges().replace("\\", "/")
+	return out if out.ends_with("/") else out + "/"
+
+
 ## Whether a generation may be laid when due: the server was started with
 ## --regenerate or the console switched it on (Net.regenerate, as raid
 ## groups with --raids, 328), and this is no test run on the shared

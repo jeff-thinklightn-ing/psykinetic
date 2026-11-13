@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_edited_level_refused()
 	_test_saved()
 	_test_castle_never_marked()
+	_test_overlay_dir()
 	_test_regenerate_now()
 	await _test_made_off_the_main_thread()
 	_test_richness_never_waited()
@@ -383,6 +384,30 @@ func _test_castle_never_marked() -> void:
 			marked.append(level_name)
 	_check(marked == ["barrow", "barrow_deep", "castle_halls", "hollowfell"],
 			"under levels/ the barrow's two depths (542, 580, 666), the Dwarven Halls under the castle (613) and Hollowfell's tunnels (790) alone are (%s)" % [marked])
+
+
+## --overlay-dir (541 amended (3)): a marked run (this one, --run-marker,
+## as a laptop tour's server since 828 amended (8)) lays generations in an
+## overlay of its own, named on its command line, and still lays nothing
+## on the shared one.
+func _test_overlay_dir() -> void:
+	print("
+== --overlay-dir: a marked run lays in its own overlay, never the shared one ==")
+	var kept_dir := Level.overlay_dir
+	var kept_given := Net.overlay_dir_given
+	_check(Regen.in_test_run(), "this run is marked (--run-marker), as a tour's server is")
+	Level.overlay_dir = Level.OVERLAY
+	_check(not Regen.overlay_safe() and not Regen.may_write(), "on the shared overlay: nothing is laid, --regenerate or not")
+	_check(_main._regenerate_now("rg_halls").contains("refused"), "and the console's regenerate now is refused there")
+	var own := kept_dir.trim_suffix("/").replace("/", "\\")  # As a Windows runner might spell it.
+	Net._set_option("--overlay-dir", own)
+	_check(Level.overlay_dir == kept_dir and Net.overlay_dir_given == own,
+		"--overlay-dir sets the overlay, its slashes forward and one at the end (%s from %s)" % [Level.overlay_dir, own])
+	_check(Regen.overlay_safe() and Regen.may_write(), "in its own overlay a marked run lays generations")
+	_check(Regen.overlay_path("user://tour_overlay") == "user://tour_overlay/" and Regen.overlay_path("user://tour_overlay/") == "user://tour_overlay/",
+		"a user:// path as the laptop runner gives it")
+	Level.overlay_dir = kept_dir
+	Net.overlay_dir_given = kept_given
 
 
 func _test_regenerate_now() -> void:

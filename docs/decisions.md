@@ -19795,6 +19795,27 @@ split from may_write), so release runs it after the deploy, players
 checked first, and Jeff meets the wider barrow then rather than at its
 next due day. labyrinth_test (the bands at 32 and 62, the width),
 level_test, regen_test (regenerate now); docs/levels.md; CHANGELOG.
+**541 amended (3): a server's own overlay, --overlay-dir** (the coordinator's
+ruling, perf and playtest agreeing; playtest found it). Since 828 amended (8)
+every laptop tour's server carries --run-marker (for --test-hp's verb), so
+Regen.overlay_safe took it for a test run on the shared overlay and laid no
+generation: the barrow, the Ossuary, the Dwarven Halls and Hollowfell's
+tunnels showed their bare templates in every tour from 409fad948, and any
+still or check of them from a runner since is void. A server now takes
+--overlay-dir=<path>: Level.overlay_dir is set to it (Regen.overlay_path:
+forward slashes, one trailing), so overlay_safe holds honestly where the run
+really points and generations are laid there. No tour is let through
+overlay_safe by its marker: a tour on this PC without a folder of its own
+must still be unable to write the shared user://levels/ (199 amended's
+accident). The server's start says which overlay it lays in and whether it
+lays ("[regen] overlay <dir> (its own, --overlay-dir | the shared one);
+generations laid when due | not laid: ..."), so a still can be checked
+against it. Perf's runner passes it for tours under 828's next amended,
+landed behind this; playtest's tools/tour.sh likewise. regen_test: a marked
+run on the shared overlay lays nothing and regenerate now is refused there;
+--overlay-dir (a Windows spelling) sets the overlay and a marked run lays in
+it. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 542. The Barrow: the first real level that regenerates
 
 Jeff asked for it (docs/lore/crypt.md, 2026-10-19: "the barrow is the

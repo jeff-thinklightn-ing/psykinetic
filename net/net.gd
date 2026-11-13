@@ -129,6 +129,8 @@ extends Node
 ##                                world (the world map), controls (the Options scrolled to its key rows, one waiting for a key)
 ##   --raids                      raid groups on from the start (decision 328; else the console's raids on)
 ##   --regenerate                 the shifting levels laid again on this server (decision 542; else the console's regenerate on)
+##   --overlay-dir=<path>         this server's own level overlay (Level.overlay_dir), a folder no other run reads:
+##                                Regen lays generations there even in a marked run (541 amended (3); a tour's)
 ##   --test-hover=<x>,<y>         keep the cursor over that cell (for screenshots)
 ##   --test-click=<seconds>       after this long, left-click where the cursor is
 ##   --test-fullscreen=<seconds>  after this long, toggle fullscreen as F11 does
@@ -976,6 +978,11 @@ var raids := false
 ## 542; the console can too). Off, a marked level stays as it is: tests, and
 ## any server not asked, never write a generation.
 var regenerate := false
+## --overlay-dir=<path>: this server's own level overlay (541 amended (3)):
+## Level.overlay_dir is set to it, so Regen.overlay_safe holds in a run with
+## --run-marker (a laptop tour's, 828 amended (8)) and generations are laid
+## there, never in the shared user://levels/. "" when not given.
+var overlay_dir_given := ""
 var test_wait_players := 0
 ## --test-herds=<n>: n mixed herds (deer, rabbits, boar, wolves) put in each
 ## outdoor zone the server builds, for benches with wildlife before economy's
@@ -2201,6 +2208,10 @@ func start() -> void:
 		print("[net] %s listening on port %d%s" % [
 			"server" if mode == Mode.SERVER else "host", port,
 			", token required" if token != "" else ", no token: open to anyone"])
+		# Which overlay generations go to, so a still can be checked against it (541 amended (3)).
+		print("[regen] overlay %s (%s); generations %s" % [Level.overlay_dir,
+			"its own, --overlay-dir" if not overlay_dir_given.is_empty() else "the shared one",
+			"laid when due" if Regen.may_write() else ("not laid: a test run on the shared overlay" if regenerate else "not laid: no --regenerate")])
 		multiplayer.peer_connected.connect(_on_peer_connected)
 		multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 		if mode == Mode.SERVER and status_port > 0:
@@ -2365,7 +2376,7 @@ func _parse_args(given: Array = []) -> void:
 				test_companion = true
 			"--lawspeaker-players":
 				lawspeaker_players = true
-			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
+			"--address", "--port", "--bind", "--state", "--overlay-dir", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--voice-ab", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
@@ -2389,6 +2400,10 @@ func _set_option(key: String, value: String) -> void:
 			bind_address = value
 		"--state":
 			state_path = value
+		"--overlay-dir":
+			if not value.is_empty():
+				overlay_dir_given = value
+				Level.overlay_dir = Regen.overlay_path(value)
 		"--token":
 			token = value
 			token_source = "flag"
