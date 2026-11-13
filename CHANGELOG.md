@@ -25,6 +25,7 @@ notes (decision 324).
 - The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
 - In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
 - The short shoulder cape that some companions and townsfolk wear is dyed a deep slate blue (480 amended (1)).
+- When you're brought back, or find yourself somewhere else in the same area, your companion is beside you at once (705 amended (1)).
 
 ## v0.1.214
 
