@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A townsperson's window no longer stands as a tall empty dark column when she says a long line: it keeps its height, its name in view (802 amended (11)).
 - Small things on the ground, like a cut of meat, a fish, tusks or a key, are drawn big enough to spot at the nearest zoom (619 amended (3)).
 - In the chat box, the game's own words, like "You pick up 5 gold." or what you're told in the crypt, are plain dim lines, and a restart warning or an admin's word reads "Notice: ..." (427 amended (1)).
 - In Umbrage, the temple's back wall has two tall pointed windows behind the altar, seen from the square and from inside, and at night every one of the temple's windows glows out to the street, not only those on its south side (734 amended (9)).

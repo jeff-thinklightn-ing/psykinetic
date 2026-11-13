@@ -3622,6 +3622,12 @@ func _test_person_window() -> void:
 	_main._on_message("speech", {"entity": str(body.get_path()), "speaker": "Oda", "text": "Morning to you.", "aside": ""})
 	_main._on_message("speech", {"entity": str(me.get_path()), "speaker": "Someone", "text": "not hers", "aside": ""})
 	_check(window.chat_shown().size() == 2 and window.chat_shown().back() == "Oda: Morning to you.", "their words in it; nobody else's (%s)" % [window.chat_shown()])
+	# The Agnes still (look pass, v0.1.214): a long line, her rumour, made the window's box thousands of pixels tall and headless of its name.
+	_main._on_message("speech", {"entity": str(body.get_path()), "speaker": "Oda", "text": "We're short of ore. Our usual lad dug iron at the mill, up in the hills, and nothing holds it now. Anyone with a pick would be welcome.", "aside": ""})
+	for i in 4:
+		await get_tree().process_frame
+	_check(window._box.get_combined_minimum_size().y < 900.0,
+		"a long line of theirs: the window stays a normal height, its name in view (%s)" % [window._box.get_combined_minimum_size()])
 	var band := Main.NONE
 	var far := Main.NONE
 	for dx in range(-8, 9):

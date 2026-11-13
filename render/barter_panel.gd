@@ -115,6 +115,8 @@ signal told(what: String)
 const CHAT_LINES := 6
 const CHAT_KEPT := 40
 const CHAT_WIDTH := 600
+## A chat line wraps at this width from its first measure (the scroll's width less its bar): a line measured before its box had a width stood one letter wide and thousands of pixels tall (the Agnes still, v0.1.214).
+const CHAT_LINE_WIDTH := 584
 ## 802: the typing line's longest line (Main.CHAT_MAX_CHARS's).
 const LINE_MOST := 200
 ## Voice's words (802): the button's foot while out of reach for a trade.
@@ -683,6 +685,7 @@ func add_said(speaker: String, text: String, aside := "") -> void:
 	label.scroll_active = false
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.custom_minimum_size.x = CHAT_LINE_WIDTH
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
 	label.push_font(get_theme_font(&"name_font", &"TalkName"))  # The talk box's speaker name (ui-design's TalkName).
 	label.push_color(get_theme_color(&"name", &"TalkName"))
