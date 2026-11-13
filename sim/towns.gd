@@ -88,6 +88,10 @@ var rules := {}
 var production: Production
 ## boot_lines' counts, by town, till _retell has told a change once.
 var _told := {}
+## The day line's (the coordinator's ask, 11-12): the game day last told, and each
+## town's deaths since.
+var _day_told := -1
+var _dead_today := {}
 ## () -> int: the World's steps.
 var clock := Callable()
 ## (town) -> float 0..1: how threatened [param town] is (maps' camps set
@@ -374,6 +378,40 @@ func boot_lines() -> Array[String]:
 	return out
 
 
+## Each town's day line once a game day, for the day just ended (the coordinator's
+## ask, 11-12, beside the boot line: so a hunger on the box is never silent): "day N
+## town <key>: food F; fed by the town D, hungry H; sick S", and "; dead D" for a day
+## someone died. Its residents only, counts only: never a name, an id or a player.
+func day_line(town: String, day: int) -> String:
+	var fed := 0
+	var hungry := 0
+	var sick := 0
+	for id: String in residents(town):
+		var who := production.worker(id)
+		if who.is_empty():
+			continue
+		if not bool(who.get("away", false)):
+			fed += 1 if str(who.get("fed", "")) == "dole" else 0
+			hungry += 1 if str(who.get("fed", "")) == "hungry" else 0
+		sick += 1 if Townsfolk.is_sick(production, id) else 0
+	var dead := int(_dead_today.get(town, 0))
+	return "day %d town %s: food %d; fed by the town %d, hungry %d; sick %d%s" % [day, town, production.stockpile.count(town, "food"),
+		fed, hungry, sick, "; dead %d" % dead if dead > 0 else ""]
+
+
+## The day lines, when the game day turns.
+func _tell_day() -> void:
+	var day := Townsfolk.day_of(now())
+	if day == _day_told:
+		return
+	if _day_told >= 0:
+		for town: String in ids():
+			if is_town(town):
+				print("[towns] " + day_line(town, _day_told))
+	_dead_today.clear()
+	_day_told = day
+
+
 ## boot_line once more for each town whose residents changed since boot_lines
 ## (a fresh world's first ticks seat its priest and taverner): printed once a
 ## town, so the journal shows the count as it settles.
@@ -518,6 +556,7 @@ func died(town: String, who_id: String, why: String) -> bool:
 	dead.append(name)
 	record["dead_names"] = dead.slice(-DEAD_NAMES)
 	_note(town, "%s died of %s" % [name, why])
+	_dead_today[town] = int(_dead_today.get(town, 0)) + 1  # Counted on the day line.
 	_seat(town)
 	resident_died.emit(town, who_id, name, why)
 	return true
@@ -642,6 +681,7 @@ func settle_companion(companion_id: String, new_id: String) -> bool:
 ## it can't afford it.
 func tick() -> void:
 	_retell()  # A count changed since boot (or the last tick): told once.
+	_tell_day()
 	_stock_camps()
 	_herders_turn()
 	_huts_turn()

@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_world_tick()
 	_test_stalled_build()
 	_test_boot_line()
+	_test_day_line()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -242,6 +243,27 @@ func _test_boot_line() -> void:
 	_check(_towns._told.get(TOWN) == 3, "boot_lines keeps the count it told (%s)" % [_towns._told])
 	_at(0)
 	_check(not _towns._told.has(TOWN), "a changed count is told again at the next tick, once (%s)" % [_towns._told])
+
+## The day line (the coordinator's ask, 11-12): food, fed by the town, hungry, sick, and the
+## day's dead only when someone died; counts only.
+func _test_day_line() -> void:
+	print("
+== the town's day line ==")
+	_fresh()
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_towns.note_rescue(TOWN, "bram", "Bram", "smith")
+	_towns.note_rescue(TOWN, "brom", "Brom", "smith")
+	_work._workers["dag"]["fed"] = "hungry"
+	_work._workers["bram"]["fed"] = "dole"
+	var line := _towns.day_line(TOWN, 4)
+	_check(line == "day 4 town %s: food 10; fed by the town 1, hungry 1; sick 0" % TOWN, "food, fed, hungry, sick (%s)" % line)
+	_check(_towns.died(TOWN, "brom", "a fever"), "Brom dies")
+	line = _towns.day_line(TOWN, 4)
+	_check(line.ends_with("; dead 1") and not ["Dag", "dag", "Bram", "bram", "Brom", "brom"].any(func(word: String) -> bool: return word in line),
+		"a death that day counted, no name or id (%s)" % line)
+	_towns._day_told = 3
+	_towns._tell_day()
+	_check(_towns._dead_today.is_empty() and _towns._day_told == Townsfolk.day_of(_now), "told once the day turns, the dead count cleared")
 
 func _check(ok: bool, label: String) -> void:
 	if not ok:
