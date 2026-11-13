@@ -3620,7 +3620,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Mind the block. What? | `greet.trades.butcher[0]` |
 |  | Meat's hung; what is it? | `greet.trades.butcher[1]` |
 |  | Wipe your feet, there's blood about. | `greet.trades.butcher[2]` |
-|  | What is it? The field won't hoe itself. | `greet.trades.farmer[0]` |
+|  | What is it? I've work waiting. | `greet.trades.farmer[0]` |
 |  | What? I've a load to shift. | `greet.trades.hauler[0]` |
 |  | Up from the hills with the drove. What is it? | `greet.trades.herder[0]` |
 |  | Mind the sheep. Aye? | `greet.trades.herder[1]` |
@@ -3900,7 +3900,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The town's farmer, once a field stands (economy's crop). | `entries[11].summary` |
 |  | The farmer sows in spring and harvests in autumn; rain helps the crop, a storm can flatten half of it, and a crop not in by winter rots. | `entries[11].facts[0].text` |
 |  | In winter the farmer digs roots, and the farm's crop goes to the town's store, paid from the treasury. | `entries[11].facts[1].text` |
-|  | The farmer is at the well by five and in the field from six till four, then at the square, and at the inn before going home. | `entries[11].facts[2].text` |
+|  | The farmer is at the well by five and at work from six till four, then at the square, and at the inn before going home. | `entries[11].facts[2].text` |
 |  | The town's hunter (economy's hunter, sites). | `entries[12].summary` |
 |  | The hunter hunts deer, boar and rabbit in the wilds near the store, for the town has no hunting ground of its own. | `entries[12].facts[0].text` |
 |  | The hunter sells meat and hides to the store, and the antlers and tusks are kept there. | `entries[12].facts[1].text` |
