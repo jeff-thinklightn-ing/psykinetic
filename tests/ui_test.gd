@@ -1844,6 +1844,10 @@ func _test_world_map() -> void:
 	panel.set_world_state({"guide": {"companion": "Wren", "places": ["wilds/camp"], "areas": ["castle"]}}, [])
 	_check(panel.knows_way("wilds/camp") and panel.knows_way("castle") and not panel.knows_way("wilds/well") and not panel.knows_way(""),
 		"what she knows the way to, from world_state's guide")
+	_check(TownSheet.ask_words({"kind": "sought", "trade": "farmer", "where": "at the old farmstead"}) == "We have no farmer. One is said to be at the old farmstead."
+			and TownSheet.ask_words({"kind": "sought", "trade": "farmer", "where": ""}) == "We have no farmer."
+			and TownSheet.status_picture("ask", {"kind": "sought", "trade": "farmer"}) == "food_sack",
+		"the first rescue's ask: voice's words with and without where, the farmer's picture (613 amended (3))")
 	_check(WorldMapPanel.knows_words("Wren") == "Wren knows the way" and WorldMapPanel.ask_words("Wren").begins_with("ask Wren to lead you there")
 		and WorldMapPanel.leads_words("Wren") == "> Wren leads you here", "the mark's words, the ask box's, the led row's")
 	_check(Main.led_words("Wren", "the Barrow") == "Following Wren to the Barrow: move to take the lead"

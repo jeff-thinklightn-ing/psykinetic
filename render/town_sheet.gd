@@ -941,6 +941,11 @@ static func ask_words(entry: Dictionary) -> String:
 			return "Caravan"
 		"healer":
 			return "Herbs wanted" if healer_wants(entry).has("herbs") else "Healer's need"
+		"sought":
+			# The first rescue (613 amended (3); voice): "We have no farmer. One is said to be at the old farmstead."
+			var trade := str(entry.get("trade", "")).replace("_", " ")
+			var where := str(entry.get("where", "")).strip_edges()
+			return "We have no %s. One is said to be %s." % [trade, where] if not where.is_empty() else "We have no %s." % trade
 	return str(entry.get("kind", "")).replace("_", " ").capitalize()
 
 
@@ -963,6 +968,8 @@ static func status_picture(kind: String, entry: Dictionary) -> String:
 				return str(TRADE_PICTURES.get(str(entry.get("trade", "")), ""))
 		return ""
 	match what:
+		"sought":
+			return str(TRADE_PICTURES.get(str(entry.get("trade", "")), ""))
 		"balance":
 			return "antlers"
 		"raid":
