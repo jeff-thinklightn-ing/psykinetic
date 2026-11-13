@@ -7,7 +7,8 @@
 #   tests/land.sh --checks   only the checks a landing runs before the gate (the CHANGELOG,
 #                            Godot launches' logs, the voice inventory), no Godot, gate, lock or
 #                            import: one "LANDING CHECKS: PASS|FAIL" line (278 amended (5)); it
-#                            names tools/load_check.sh, which it doesn't run (278 amended (7))
+#                            names tools/load_check.sh, which it doesn't run (278 amended (7)); it
+#                            clears what would stop the rebase, as the lock's take (667 amended (2))
 # The suite takes the job count (tests/jobs.sh) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its last line. tests/land.ps1 is the same; one of them is enough.
@@ -69,6 +70,11 @@ if [ "${1:-}" = "--checks" ]; then
 	land_checks "$no_lock"
 	code=$?
 	rm -rf "$no_lock"
+	# What would stop the rebase (667 amended (2)): the generated ones cleared, as the lock's take does.
+	if [ "$code" -eq 0 ] && ! sh tools/tracked_on_main.sh --clear; then
+		code=1
+		checks_why="an untracked path origin/main tracks, named above (667 amended (2))"
+	fi
 	echo "not run here: bash tools/load_check.sh loads your changed scripts in a Godot with the autoloads in, a few seconds through the gate (278 amended (7))"
 	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	if [ "$code" -eq 0 ]; then
@@ -193,6 +199,7 @@ part run_digest_test bash tests/run_digest_test.sh
 part land_checks_test bash tests/land_checks_test.sh
 part run_parse_test bash tests/run_parse_test.sh
 part load_check_test bash tests/load_check_test.sh
+part tracked_on_main_test bash tests/tracked_on_main_test.sh
 # Each font's .fontdata before any Godot part: a first import that segfaulted on the fonts left
 # them unmade and server_boot_test's export failed on it (perf-sha, 11-13). One more import if
 # one is missing, under this run's take; still missing, the part fails naming it.

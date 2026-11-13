@@ -34,6 +34,8 @@ check $(! printf '%s\n' "$out" | grep -qE "heavy-job gate|LANDING TESTS|land loc
 mkdir -p "$tmp/p/tests" "$tmp/p/tools" "$tmp/lock"
 cp tests/land.sh tests/land.ps1 "$tmp/p/tests/"
 cp tools/land_stamp.sh "$tmp/p/tools/"
+# tools/tracked_on_main.sh (667 amended (2)): says how it was run, exits FAKE_TRACKED.
+printf '#!/usr/bin/env sh\necho "tracked_on_main $* exit ${FAKE_TRACKED:-0}"\nexit "${FAKE_TRACKED:-0}"\n' >"$tmp/p/tools/tracked_on_main.sh"
 for tool in changelog_check godot_log_check voice_inventory; do
 	cat >"$tmp/p/tools/$tool.py" <<EOF
 import os, sys
@@ -70,6 +72,10 @@ out="$(run_fake FAKE_VOICE_INVENTORY=3)"; code=$?
 check $([ $code = 0 ] && printf '%s\n' "$out" | tail -2 | grep -q '^VOICE INVENTORY STALE' \
 	&& printf '%s\n' "$out" | tail -1 | grep -q "^LANDING CHECKS: PASS (.*its page stale"; echo $?) \
 	"a stale page: a warning said again before PASS"
+out="$(run_fake FAKE_TRACKED=1)"; code=$?
+check $([ $code = 1 ] && printf '%s\n' "$out" | grep -q '^tracked_on_main --clear exit 1' \
+	&& printf '%s\n' "$out" | grep -q '^LANDING CHECKS: FAIL (an untracked path origin/main tracks'; echo $?) \
+	"a path that would stop the rebase: tracked_on_main --clear run, FAIL naming it (667 amended (2))"
 
 # land.ps1 -Checks the same, where PowerShell is.
 if command -v powershell.exe >/dev/null 2>&1; then

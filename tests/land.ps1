@@ -55,6 +55,12 @@ if ($Checks) {
 	New-Item -ItemType Directory -Force $noLock | Out-Null
 	$why = Invoke-LandChecks $noLock
 	Remove-Item $noLock -Recurse -Force -ErrorAction SilentlyContinue
+	# What would stop the rebase (667 amended (2)): the generated ones cleared, as the lock's take does.
+	$bash = Get-Command bash -ErrorAction SilentlyContinue
+	if ($why -eq '' -and $bash) {
+		& $bash.Source tools/tracked_on_main.sh --clear | Write-Output
+		if ($LASTEXITCODE -ne 0) { $why = 'an untracked path origin/main tracks, named above (667 amended (2))' }
+	}
 	Write-Output "not run here: bash tools/load_check.sh loads your changed scripts in a Godot with the autoloads in, a few seconds through the gate (278 amended (7))"
 	if ($inventoryStale) { Write-Output $inventoryStale }
 	if ($why -eq '') {

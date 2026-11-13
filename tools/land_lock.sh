@@ -14,8 +14,13 @@
 #                                                A free lock goes first to the landing whose gate take
 #                                                started first among those trying (394 amended (36)): a later
 #                                                one's try answers exit 1, naming who is ahead.
+#                                                exit 4 if, once taken, the checkout holds an untracked
+#                                                path origin/main tracks that isn't a generated *.import
+#                                                or *.uid (those the take removes, one line each): the
+#                                                lock is given back, nothing held (tools/tracked_on_main.sh;
+#                                                667 amended (2)); never on release's freeze.
 #   sh tools/land_lock.sh release <tree>
 #   sh tools/land_lock.sh status
 # If it's held, keep working; check again in a few minutes. Before pushing, always:
 # take, fetch, rebase, retest, push, release.
-PSYKINETIC_LOCK_FROZEN_EXIT=3 PSYKINETIC_LOCK_BEATS_GATE=1 PSYKINETIC_LOCK_ORDERED=1 PSYKINETIC_LOCK_STALE=1500 PSYKINETIC_LOCK_LABEL="land lock" PSYKINETIC_BENCH_LOCK="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}" exec sh "$(dirname "$0")/bench_lock.sh" "$@"
+PSYKINETIC_LOCK_FROZEN_EXIT=3 PSYKINETIC_LOCK_CLEAR_TRACKED=1 PSYKINETIC_LOCK_TRACKED_EXIT=4 PSYKINETIC_LOCK_BEATS_GATE=1 PSYKINETIC_LOCK_ORDERED=1 PSYKINETIC_LOCK_STALE=1500 PSYKINETIC_LOCK_LABEL="land lock" PSYKINETIC_BENCH_LOCK="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}" exec sh "$(dirname "$0")/bench_lock.sh" "$@"

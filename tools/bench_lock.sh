@@ -14,7 +14,8 @@
 # says "main frozen" (release's freeze), which is never beaten; and
 # PSYKINETIC_LOCK_BEATS_GATE, each other take, refused or not, beats the
 # caller's gate take of its landing kind (suite, suite_*; heavy_job beat), so it
-# never goes stale here.
+# never goes stale here; and PSYKINETIC_LOCK_CLEAR_TRACKED, a take clears what would stop
+# its checkout's rebase or is refused, exit PSYKINETIC_LOCK_TRACKED_EXIT (667 amended (2)).
 set -u
 LOCK="${PSYKINETIC_BENCH_LOCK:-/c/dev/bench.lock}"
 STALE_SECONDS="${PSYKINETIC_LOCK_STALE:-1800}"
@@ -95,6 +96,21 @@ case "${1:-status}" in
 		# The checkout it was taken from (decision 883): tests/land.sh run there under
 		# another name lands under the lock's (physics' second take under the lock, 11-12).
 		git rev-parse --show-toplevel >"$LOCK/checkout" 2>/dev/null
+		# 667 amended (2), the land lock's (PSYKINETIC_LOCK_CLEAR_TRACKED): once taken, the
+		# checkout's untracked paths that origin/main tracks, which would stop its rebase, are
+		# cleared (a generated *.import or *.uid) or the take refused, the lock given back,
+		# exit PSYKINETIC_LOCK_TRACKED_EXIT. Never on release's freeze.
+		if [ -n "${PSYKINETIC_LOCK_CLEAR_TRACKED:-}" ] && ! printf '%s' "$what" | grep -qi "main frozen"; then
+			if ! TRACKED_LOG="$LOCK.log" TRACKED_TREE="$tree" sh "$(dirname "$0")/tracked_on_main.sh" --clear; then
+				# Given back, and no waiter either: its try left in .waiters would keep the next
+				# landing behind it by the lock's order (394 amended (36)) for LOCK_LIVE_SECONDS.
+				rm -rf "$LOCK"
+				rm -f "$LOCK.waiters/$tree.json"
+				log "refused $tree ($what): an untracked path origin/main tracks; given back (667 amended (2))"
+				echo "$LABEL: not taken: an untracked path origin/main tracks, named above; commit, move or remove it, then take again (667 amended (2))"
+				exit "${PSYKINETIC_LOCK_TRACKED_EXIT:-4}"
+			fi
+		fi
 		rm -f "$LOCK.waiters/$tree.json"  # 394 amended (36): in, no longer waiting.
 		log "taken by $tree ($what)"
 		PSYKINETIC_LOCK_ORDERED= beat_gate "$tree"  # A plain beat: no longer a waiter.

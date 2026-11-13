@@ -32016,6 +32016,34 @@ tree holds the land lock, and ends with the script or its process (394 amended (
 
 Tools only, protocol unchanged, no new class_name.
 
+667 amended (2) (perf, 2026-11-13; the coordinator's row and approval, release's conditions; label from
+tools/decision_number.sh): the land lock's take clears what would stop the landing's rebase. On 11-13 from 12:50 to
+12:59 four landings (environment's 623am7, buildings' street check, ui's 802am12, builder's row (7)), the first three
+each after 75 to 90 minutes in the gate, stopped at their rebase on prop.knight_remains.glb.import, which art-kit's
+88c63ff83 made main track while every checkout that had imported held its own untracked copy; the fourth day a
+generated .import or .uid did so. tools/tracked_on_main.sh fetches origin/main (at most 20 s) and takes exactly the
+paths a rebase stops on: those origin/main adds over HEAD (git diff --no-renames --diff-filter=A HEAD origin/main)
+that are on disk, not in the index and not ignored here. Not every untracked path against main's whole tree: the added
+paths are few and most are not on disk, so it is a second, not thousands of compares; and not --exclude-standard's
+list, whose question the coordinator asked: a path ignored here that main tracks does not stop the rebase, git
+overwrites it (tried on git 2.56, a throwaway repo: an ignored x.import was replaced, a not-ignored y.uid stopped it),
+so the tool leaves ignored ones alone. With --clear it removes such a path only when it is a file named *.import or
+*.uid, by its path, a line each; never a directory, never by pattern alone; anything else is named and it exits 1.
+tools/bench_lock.sh, under the land lock's PSYKINETIC_LOCK_CLEAR_TRACKED (tools/land_lock.sh): once a take has the
+lock it runs the tool with --clear in the caller's checkout; a path left refuses the take, the lock and the tree's
+waiter record (394 amended (36): left, it kept the next landing behind it, which the test found) given back, exit 4
+(PSYKINETIC_LOCK_TRACKED_EXIT; release's ask: 5 is the gate wrapper's stop, and two meanings in one log cost someone
+an hour), a line naming why. It runs once a landing, on a successful take, never on a waiting try; never on release's
+freeze ("main frozen" in the what: no fetch, no removal, never refused); a failed or slow fetch checks nothing and
+grants the take as before. Each removal and refusal is in the land lock's log (C:/dev/land.lock.log) with the tree,
+the path and origin/main's sha. tests/land.sh --checks and land.ps1 -Checks run it with --clear too, so a tree sees it
+before it queues. tests/tracked_on_main_test.sh (a land.sh part): a throwaway origin and clone, a private lock and
+gate: named without --clear and nothing removed; the ignored and the staged ones never named; --clear removing the
+.import and the .uid and naming the hand file; a directory named like a .import never removed; the take clearing and
+refusing, exit 4, no lock held, the log's lines, a second take straight after taken; the freeze, a failed fetch and a
+clean checkout taken as before; the bench lock never running it. land_checks_test: --checks runs it and fails naming
+it. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
 
 Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every
