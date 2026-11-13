@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2915)
+## Lines in the code (2916)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1113,7 +1113,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (203)
+### other (render) (204)
 
 | | Line | Where |
 |---|---|---|
@@ -1320,6 +1320,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
+|  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
 ### other (sim) (613)
 
