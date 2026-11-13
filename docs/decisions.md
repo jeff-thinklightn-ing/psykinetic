@@ -10861,6 +10861,27 @@ bench names that bash as its asker; the bash killed by its pid, its waiter gone 
 status over a stripped copy of the live queue (24 rows), the base's code against this: no line differs. Tools and
 tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (45): a queued bench that cannot start holds nobody (the coordinator's row, 2026-11-13; label from
+tools/decision_number.sh). perf's 817 bench was first in the queue from 08:38 while saturn suites ran back to back,
+and eleven rows waited behind it up to 58 minutes (nine scenes, combat's and perf's landings) until perf pulled it at
+09:01; it was four takes of up to 40 minutes, each to hold the head again. tools/heavy_job.py: bench_passable, a bench
+row whose blockers run (a suite, suite_remote, scene or soak it excludes, or another bench), is passed by every row
+behind it as if it weren't there (_passes skips it, no backfill and nothing due); it starts when nothing it excludes
+runs and memory allows, and then holds the rows behind it as a head, as before. Nothing it excludes starts while it
+runs, and release's front still moves any row. No promotion and no night rule: a bench in the day waits longer. Each
+start past one adds to its queue entry's passed_by (count_passed), and status says "bench waiting, passed by N" on its
+line while it cannot start, so nobody takes it for stuck. Only the bench excludes other kinds, so backfill (18, 28,
+40) is now reachable only by a bench going past rows, which it can't while anything it excludes runs; its code stays
+as it was, and its tests use "exclusive", a test-only copy of the bench kind that bench_passable doesn't take.
+GATE_REVISION 41: a waiter of 40 behind a bench still waits on it; nothing drops another's row.
+tests/heavy_job_test.py: the morning's case (the bench first, a suite_remote running, eleven behind: the scenes and
+landings take their places, the bench doesn't until nothing it excludes runs, then holds them), its passed_by and
+status line; the rules before 45 rewritten; and a race in its cleanup of the memory-wait case mended (a waiter moving
+its row as it was removed). Over a stripped copy of the live queue (twelve rows, three running) plus a bench first and
+a suite_remote running: revision 40's code has the bench hold 8 of the 12, revision 41's none, each row then waiting
+as revision 40 has it with no bench at all, 13 of 13 rows kept by each. Tools and tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

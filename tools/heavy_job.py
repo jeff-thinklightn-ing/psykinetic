@@ -190,7 +190,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 40  # 44: a queued take whose asker died is dropped.
+GATE_REVISION = 41  # 45: a bench that cannot start holds nobody.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -546,6 +546,32 @@ def goes_lean(row, lean, waited_s, running, free_ram_gb, free_commit_gb=None):
         and not out_of_reach(lean, running, free_ram_gb, free_commit_gb))
 
 
+def bench_passable(row, running):
+    """Whether queued [row] is a bench that cannot start for what runs (394
+    amended (45)): a kind it excludes (a suite, suite_remote, scene or soak)
+    or another bench. Such a bench holds nobody: the rows behind it that can
+    start go past it as if it weren't there, and it starts when nothing it
+    excludes runs and memory allows; nothing it excludes starts while it
+    runs, and release's front still moves any row. perf's 817 bench, first
+    in the queue at 08:38 on 11-13 while saturn suites ran back to back, held
+    eleven rows (scenes and two landings) up to 58 minutes until perf pulled
+    it. A bench in the day waits longer; its status line counts who passed."""
+    return row.get("kind") == "bench" and bool(blockers(row, running))
+
+
+def count_passed(queue, ahead, running):
+    """A job starting: each bench in [ahead] (judged rows of [queue]'s
+    entries before it, in order) it went past by bench_passable gets one more
+    on its entry's passed_by, for status (394 amended (45))."""
+    for entry, row in zip(queue, ahead):
+        if bench_passable(row, running):
+            path = _path("queue", entry["file"])
+            saved = _read(path)
+            if saved is not None:
+                saved["passed_by"] = saved.get("passed_by", 0) + 1
+                _write(path, saved)
+
+
 def kind_blocked(job, running):
     """Whether [job] waits only on its own kind: one it excludes running, or
     as many of its kind as its max_running."""
@@ -625,10 +651,13 @@ def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, 
     meets too, or on its own length at a backfill: then a shorter job of
     the same kind may go first. Playtest's tour (--expect 25, 1500 s) could
     never go past terrain's bench while suites ran back to back, and every
-    scene behind it waited 84 minutes (11-10)."""
+    scene behind it waited 84 minutes (11-10). A bench that cannot start
+    holds nobody (bench_passable, 394 amended (45))."""
     past = []
     for place, (other, waits) in enumerate(zip(ahead, held)):
         if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
+            continue
+        if bench_passable(other, running):
             continue
         if not waits:
             return False, [], "", place
@@ -1982,6 +2011,8 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 why = "%s, waits on: %s" % (holder_name(queue, holder), other_why or "its next look")
                 if past_why:
                     why += "; %s" % past_why
+            if ok:
+                count_passed(queue[:place - 1], ahead, running)
             if ok and swapped is not None:
                 _retried(os.remove, _path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, "suite_remote", pid or os.getpid())
@@ -2724,11 +2755,14 @@ def status():
             "/".join(LOCK_WAIT_KINDS), ", ".join("%s (%s)" % (each["tree"], time.strftime("%H:%M:%S", time.localtime(each["started"])))
             for each in waiting)))
     reasons = queue_reasons(queue, running, free_ram, free_commit, free_gpu)
+    bench_row = kinds().get("bench", KINDS["bench"])
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)%s%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
             ", first for %.0f s" % (time.time() - entry["head_since"]) if entry.get("head_since") else "",
             ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
             + (", fronted by %s: %s" % (entry["fronted"]["by"], entry["fronted"]["why"]) if entry.get("fronted") else "")
+            + (", bench waiting, passed by %d" % entry.get("passed_by", 0)
+                if entry["kind"] == "bench" and bench_passable(dict(bench_row, kind="bench"), running) else "")
             + "; " + reasons[place - 1])
     # After the rows (394 amended (37)): their lines and order unchanged for scripts.
     for folder, entries in (("running", running), ("queued", queue)):

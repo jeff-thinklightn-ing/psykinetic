@@ -582,7 +582,7 @@ if shell is not None:
     except OSError:
         pass
 
-print("== going past a bench that waits on a suite (backfill, 394 amended (18)) ==")
+print("== a bench that cannot start holds nobody (394 amended (45); before it, backfill only, 18) ==")
 runs = {"suite": dict(table["suite"], runs_s=[450.0, 500.0, 460.0]), "suite_lean3": dict(table["suite_lean3"], runs_s=[1000.0]),
     "scene": dict(table["scene"], runs_s=[40.0, 70.0, 10.0]), "bench": dict(table["bench"], runs_s=[300.0])}
 backfill_runs = runs
@@ -593,45 +593,51 @@ scene_long = gate.backfill_length(runs["scene"])
 check(scene_long == 87.5, "a scene counts on its longest run times 1.25: %s s" % scene_long)
 check(gate.backfill_length(runs["scene"], expect_minutes=3) == 180.0, "or its --expect")
 check(gate.backfill_length(dict(table["scene"], runs_s=[])) is None, "no runs recorded: none")
-check(not gate.may_pass(scene_row, [bench_queued], [suite_at(now - 100)]),
-    "without the kinds and the clock, the old rule: a scene never goes past a bench")
+check(gate.bench_passable(bench_queued, [suite_at(now - 100)]), "a bench with a suite running cannot start: passable")
+check(not gate.bench_passable(bench_queued, []) and not gate.bench_passable(scene_row, [suite_at(now - 100)]),
+    "not with nothing it excludes running, and only a bench")
+check(gate.may_pass(scene_row, [bench_queued], [suite_at(now - 100)]),
+    "a scene goes past a bench a suite keeps out, even without the kinds and the clock (before 45: never)")
 ok, past, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
-check(ok and past and past[0]["due"] == now - 100 + 460.0, "a scene goes past a bench whose suite is due in 360 s")
+check(ok and not past, "as if it weren't there: no backfill, nothing due")
 check(gate.decide(scene_row, [suite_at(now - 100)], ok, 60.0, None)[0], "and starts beside the suite")
-ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 400)], 60.0, None, runs, now, scene_long)
-check(not ok and "due in 60 s" in why, "not when it would still run as the suite ends (%s)" % why)
-ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 470)], 60.0, None, runs, now, scene_long)
-check(not ok and "past its usual length" in why, "nor once the suite is past its median (%s)" % why)
-ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, {"scene": runs["scene"]}, now, scene_long)
-check(not ok and "runs recorded" in why, "nor when the suite has no runs recorded (%s)" % why)
-ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, None)
-check(not ok, "nor a kind with no runs of its own")
+for started, runs_given, length, what in ((now - 400, runs, scene_long, "the suite due in 60 s"),
+        (now - 470, runs, scene_long, "the suite past its median"), (now - 100, {"scene": runs["scene"]}, scene_long, "no suite runs"),
+        (now - 100, runs, None, "no runs of its own")):
+    check(gate.passes(scene_row, [bench_queued], [suite_at(started)], 60.0, None, runs_given, now, length)[0],
+        "past it with %s too (each held it before 45)" % what)
 ok, past, _ = gate.passes(scene_row, [bench_queued], [suite_at(now - 300, estimate="suite_lean3")], 60.0, None, runs, now, scene_long)
-check(ok and past[0]["due"] == now + 700.0, "a lean suite's end from the lean runs")
+check(ok and not past, "and beside a lean suite")
 # The bench waits on memory, not kind: first come first served still.
 ok, _, _ = gate.passes(scene_row, [bench_queued], [], 60.0, None, runs, now, scene_long)
-check(not ok, "a bench waiting on memory or the count lets nobody past")
-check(not gate.passes(dict(table["bench"], kind="bench"), [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, 10.0)[0],
-    "nor its own kind")
+check(not ok, "a bench that may start, or waits on memory, lets nobody past")
+second = dict(table["bench"], kind="bench", tree="b")
+check(gate.passes(second, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, 10.0)[0]
+    and not gate.decide(second, [suite_at(now - 100)], True, 60.0, None)[0],
+    "a second bench is not held by the first in the queue, but waits on the suite itself")
+check(not gate.passes(second, [bench_queued], [], 60.0, None, runs, now, 10.0)[0], "and behind it once it may start")
 soak_at = dict(running(2, 2), kind="soak", started=now - 100)
 ok, _, why = gate.passes(dict(table["suite"], kind="suite"), [bench_queued], [soak_at], 60.0, None, runs, now,
     gate.backfill_length(runs["suite"]))
-check(not ok, "a suite behind a bench waiting on a soak (no soak runs) still waits (%s)" % why)
+check(ok, "a suite goes past a bench a soak keeps out (before 45: it waited, no soak runs) (%s)" % why)
 mesh_head = dict(table["trellis_mesh"], kind="trellis_mesh", ram_gb=1e12)
 ok, _, _ = gate.passes(scene_row, [mesh_head, bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
-check(ok, "an out-of-reach head ahead is passed as before, the bench by backfill")
+check(ok, "an out-of-reach head ahead is passed as before, the bench too")
 # 394 amended (21): a soak held only by the queue (behind a bench waiting on the
-# suite) held every scene and import behind it, 2026-11-04 10:00.
+# suite) held every scene and import behind it, 2026-11-04 10:00. Since 45 the
+# bench holds nobody, the soak first among them: it starts, and the rest wait on it as a head.
 soak_queued = dict(soak_row, tree="economy")
 import_queued = dict(table["godot_import"], kind="godot_import")
+check(gate.passes(soak_row, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, 600.0)[0],
+    "the soak behind the bench goes past it")
 ok, past, _ = gate.passes(scene_row, [bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
-check(ok and [each["kind"] for each in past] == ["bench"], "a scene goes past a soak the queue holds, the bench by backfill")
-check(gate.may_pass(import_queued, [bench_queued, soak_queued], [suite_at(now - 100)], 60.0),
-    "an import goes past both, without the clock")
-check(not gate.passes(scene_row, [bench_queued, soak_queued, dict(runs["scene"], kind="scene", tree="items")], [suite_at(now - 100)], 60.0,
+check(not ok, "a scene behind the soak waits for the soak, now a head, to start")
+check(gate.passes(scene_row, [bench_queued, soak_queued], [suite_at(now - 100), soak_at], 60.0, None, runs, now, scene_long)[0],
+    "a scene goes past a soak the cap holds, and the bench")
+check(gate.may_pass(import_queued, [bench_queued, soak_queued], [suite_at(now - 100), soak_at], 60.0),
+    "an import too, without the clock")
+check(not gate.passes(scene_row, [bench_queued, dict(runs["scene"], kind="scene", tree="items")], [suite_at(now - 100)], 60.0,
     None, runs, now, scene_long)[0], "a scene still waits behind a scene that may start")
-check(gate.passes(scene_row, [bench_queued, soak_queued, dict(scene_row, tree="items", expect_s=900.0)], [suite_at(now - 100)], 60.0,
-    None, runs, now, scene_long)[0], "but goes past one held only by its own length at the bench (394 amended (28))")
 ok, _, _ = gate.passes(dict(soak_row, tree="b"), [bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, 600.0)
 check(not ok, "a second soak still waits behind the first")
 check(not gate.passes(scene_row, [soak_queued], [], 60.0, None, runs, now, scene_long)[0],
@@ -643,6 +649,51 @@ check(not gate.passes(import_queued, [soak_queued, bench_queued], [suite_at(now 
     "a soak ahead of the bench may start: it is a head, not held")
 check(gate.blockers(dict(table["bench"], kind="bench"), [suite_at(now), dict(running(1, 1), kind="godot_import")]) == [suite_at(now)],
     "a bench's blockers: the suite, not an import")
+
+print("== perf's 817 bench, 11-13 08:38: first in the queue, a suite_remote running, eleven behind (394 amended (45)) ==")
+remote_at = dict(running(1.6, 0.1), kind="suite_remote", started=now - 600, excludes=["bench"])
+bench_817 = dict(table["bench"], kind="bench", tree="perf-817")
+behind = ([dict(scene_row, tree=tree) for tree in ("playtest", "animation", "pc-character", "economy", "pc-character2",
+    "items", "playtest2", "npc-campbed", "ui")]
+    + [dict(table["suite_remote"], kind="suite_remote", tree=tree) for tree in ("combat", "perf-faillines")])
+check(len(behind) == 11, "eleven rows behind it: nine scenes and two landings")
+reasons = []
+for place, row in enumerate(behind):
+    ahead = [bench_817] + behind[:place]
+    head, _, _, holder = gate.passes_held(row, ahead, [remote_at], 60.0, None, runs, now, gate.backfill_length(row))
+    reasons.append((row["tree"], row["kind"], head, holder))
+scenes_free = [each for each in reasons if each[1] == "scene"]
+check(scenes_free[0][2] and scenes_free[0][3] is None, "the first scene goes past the bench (%s)" % scenes_free[:1])
+check(gate.decide(scene_row, [remote_at], True, 60.0, None)[0], "and start beside the suite_remote")
+check(all(holder != 0 for _, _, head, holder in reasons if not head),
+    "no row behind is held by the bench: each waits on a row that may start, or on its own kind")
+landing = behind[9]
+check(gate.decide(landing, [remote_at], True, 60.0, None)[0], "a landing behind it takes its place too, to wait on the land lock (394 amended (36))")
+check(not gate.decide(bench_817, [remote_at], True, 60.0, None)[0], "the bench does not start while the suite_remote runs")
+check(gate.decide(bench_817, [], True, 60.0, None)[0], "it starts once nothing it excludes runs")
+check(not gate.passes(scene_row, [bench_817], [], 60.0, None, runs, now, scene_long)[0],
+    "and then holds the scenes behind it, as a head, till it starts")
+check(not gate.decide(scene_row, [dict(running(1, 1), kind="bench")], True, 60.0, None)[0], "nothing it excludes starts while it runs")
+# Its status line counts who passed it: count_passed on a written queue entry, as wait_turn does at a start.
+gate._write(gate._path("queue", "0000000000000000001-perf-817-1.json"), {"tree": "perf-817", "kind": "bench", "pid": None,
+    "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time(), "gate": gate.GATE_REVISION,
+    "checkout": gate.CHECKOUT})
+gate._write(gate._path("running", "combat-suite_remote-1.json"), gate.guard({"tree": "combat", "kind": "suite_remote", "pid": None,
+    "queued": time.time() - 60, "started": time.time() - 60, "ram_gb": 1.6, "gpu": False, "watched": False, "beat": time.time(),
+    "gate": gate.GATE_REVISION, "checkout": gate.CHECKOUT}, os.getpid(), gate.started_at(os.getpid())))
+queued_817 = gate._entries("queue")
+gate.count_passed(queued_817, [bench_817], [remote_at])
+gate.count_passed(queued_817, [bench_817], [remote_at])
+gate.count_passed(queued_817, [bench_817], [])
+check(gate._read(gate._path("queue", "0000000000000000001-perf-817-1.json")).get("passed_by") == 2,
+    "two starts past it while it could not start count; one when it could, not")
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.status()
+line = next((each for each in said.getvalue().splitlines() if each.startswith("queued perf-817 bench")), "")
+check(", bench waiting, passed by 2" in line, "status: bench waiting, passed by 2 (%s)" % line[:120])
+gate._retried(os.remove, gate._path("queue", "0000000000000000001-perf-817-1.json"))
+gate._retried(os.remove, gate._path("running", "combat-suite_remote-1.json"))
 # 394 amended (22): an import beside three counted jobs, one at a time so.
 import_now = dict(table["godot_import"], kind="godot_import")
 three = [suite_at(now), dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")]
@@ -993,10 +1044,14 @@ code = gate.run("killed", "suite", [sys.executable, "-c", "import sys; sys.exit(
 check(code == 137, "run hands on 137 for a child that exited 2304 (%s)" % code)
 
 print("== backfill through the queue (394 amended (18)) ==")
+# Since 394 amended (45) a bench that cannot start is passed outright, never by backfill: the
+# rules of 18, 28 and 40 stand for any kind that excludes others, here "exclusive", a test-only
+# copy of the bench kind (bench_passable takes only "bench").
+gate.KINDS["exclusive"] = dict(gate.KINDS["bench"])
 import subprocess
 real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
 real_total, gate.total_ram_gb = gate.total_ram_gb, lambda: None
-gate._write(gate._path("kinds.json"), backfill_runs)
+gate._write(gate._path("kinds.json"), dict(backfill_runs, exclusive=dict(gate.KINDS["exclusive"], runs_s=[300.0])))
 for folder in ("queue", "running"):
     for each in gate._entries(folder):
         gate._retried(os.remove, gate._path(folder, each["file"]))
@@ -1004,14 +1059,14 @@ for folder in ("queue", "running"):
 gate._write(gate._path("running", "land-suite-%d.json" % os.getpid()), {"tree": "land", "kind": "suite", "pid": os.getpid(),
     "pid_since": gate.started_at(os.getpid()), "started": time.time() - 100, "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
     "watched": False})
-gate._write(gate._path("queue", "%019d-environment-1.json" % time.time_ns()), {"tree": "environment", "kind": "bench", "pid": None,
+gate._write(gate._path("queue", "%019d-environment-1.json" % time.time_ns()), {"tree": "environment", "kind": "exclusive", "pid": None,
     "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
 started = time.time()
 code = gate.run("ui", "scene", [sys.executable, "-c", "pass"])
 check(code == 0 and time.time() - started < 30, "a scene runs at once past the bench (%.0f s)" % (time.time() - started))
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
-check("\tbackfill\tui\tscene\tpast environment bench, waiting on suite due in " in text, "the log says so")
+check("\tbackfill\tui\tscene\tpast environment exclusive, waiting on suite due in " in text, "the log says so")
 for each in gate._entries("queue"):
     gate._retried(os.remove, gate._path("queue", each["file"]))  # A waiter may hold it open a moment (Windows).
 gate._retried(os.remove, gate._path("running", "land-suite-%d.json" % os.getpid()))
@@ -1020,18 +1075,18 @@ gate._retried(os.remove, gate._path("running", "land-suite-%d.json" % os.getpid(
 child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(6)"])
 gate._write(gate._path("running", "ui-scene-%d.json" % child.pid), {"tree": "ui", "kind": "scene", "pid": child.pid,
     "pid_since": gate.started_at(child.pid), "started": time.time(), "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
-    "watched": False, "backfill": {"past": "environment bench", "due": time.time() - 1}})
+    "watched": False, "backfill": {"past": "environment exclusive", "due": time.time() - 1}})
 shown = io.StringIO()
 with contextlib.redirect_stdout(shown):
     gate.status()
-check("(went past environment bench, due by " in shown.getvalue(), "status shows it: %s" % shown.getvalue().splitlines()[1:2])
-gate.take("environment", "bench", os.getpid())
+check("(went past environment exclusive, due by " in shown.getvalue(), "status shows it: %s" % shown.getvalue().splitlines()[1:2])
+gate.take("environment", "exclusive", os.getpid())
 child.wait()
-gate.release("environment", "bench")
+gate.release("environment", "exclusive")
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
-check("\tbackfill_late\tenvironment\tbench\twaited " in text, "the bench's wait on it logged as late")
-started_line = [line for line in text.splitlines() if "\tstart\tenvironment\tbench\t" in line]
+check("\tbackfill_late\tenvironment\texclusive\twaited " in text, "the bench's wait on it logged as late")
+started_line = [line for line in text.splitlines() if "\tstart\tenvironment\texclusive\t" in line]
 check(started_line and "first in the queue)" in started_line[-1], "its start says how long it was first in the queue: %s" % started_line[-1:])
 # A job behind the head while a backfilled scene holds them both: those
 # minutes are the head's, never logged as late again (only the head's own
@@ -1039,9 +1094,9 @@ check(started_line and "first in the queue)" in started_line[-1], "its start say
 child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
 gate._write(gate._path("running", "ui-scene-%d.json" % child.pid), {"tree": "ui", "kind": "scene", "pid": child.pid,
     "pid_since": gate.started_at(child.pid), "started": time.time(), "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
-    "watched": False, "backfill": {"past": "environment bench", "due": time.time() - 1}})
+    "watched": False, "backfill": {"past": "environment exclusive", "due": time.time() - 1}})
 first = "%019d-front-1.json" % time.time_ns()
-gate._write(gate._path("queue", first), {"tree": "front", "kind": "bench", "pid": None,
+gate._write(gate._path("queue", first), {"tree": "front", "kind": "exclusive", "pid": None,
     "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
 threading = __import__("threading")
 # The head leaves once the scene has ended, not at a fixed time: under load the
@@ -1053,12 +1108,12 @@ def head_leaves(scene=child):
     time.sleep(1.0)
     gate._retried(os.remove, gate._path("queue", first))
 threading.Thread(target=head_leaves).start()
-gate.take("behind", "bench", os.getpid())
+gate.take("behind", "exclusive", os.getpid())
 child.wait()
-gate.release("behind", "bench")
+gate.release("behind", "exclusive")
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
-check("\tbackfill_late\tbehind\tbench\t" not in text, "a job behind the head held by it too: not logged late")
+check("\tbackfill_late\tbehind\texclusive\t" not in text, "a job behind the head held by it too: not logged late")
 shown = io.StringIO()
 with contextlib.redirect_stdout(shown):
     gate.summary(datetime.date.today().isoformat())
@@ -1160,10 +1215,18 @@ until(lambda: trees("queue") == ["first", "behind"])
 time.sleep(1.0)
 check(trees("queue") == ["first", "behind"] and "behind" not in trees("running"),
     "a scene behind a suite waiting on memory stays behind it: the suite is never delayed (%s)" % trees("queue"))
-for each in gate._entries("queue") + gate._entries("running"):
-    folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
-    gate._retried(os.remove, gate._path(folder, each["file"]))
+def clear_all():
+    # The waiter may move its row from queue to running between the listing and the
+    # removal: "first" gone, "behind" starts (11-13, a FileNotFoundError here).
+    for each in gate._entries("queue") + gate._entries("running"):
+        for folder in ("running", "queue"):
+            try:
+                gate._retried(os.remove, gate._path(folder, each["file"]))
+            except FileNotFoundError:
+                pass
+clear_all()
 behind.join(5)
+clear_all()
 check(gate.run("phys", "scene", ["bash", "tests/net_test.sh"]) == 2 and not trees("queue"),
     "net_test under scene: refused before it queues (run it as net)")
 check([gate.many_godot_test(each) for each in (["powershell", "-File", "tests\\net_test.ps1"],
@@ -1314,13 +1377,13 @@ now = 10000.0
 short_row = dict(gate.KINDS["scene"], kind="scene")
 suite_on = dict(running(6, 6), kind="suite", started=now - 30)
 long_runs = {"suite": dict(gate.KINDS["suite"], runs_s=[800.0]), "scene": dict(gate.KINDS["scene"], runs_s=[100.0]),
-    "bench": dict(gate.KINDS["bench"], runs_s=[300.0])}
-bench_ahead = dict(gate.KINDS["bench"], kind="bench", tree="terrain")
+    "exclusive": dict(gate.KINDS["exclusive"], runs_s=[300.0])}
+bench_ahead = dict(gate.KINDS["exclusive"], kind="exclusive", tree="terrain")
 tour = dict(short_row, tree="playtest", expect_s=1500.0)
 ok, _, why, holder = gate.passes_held(tour, [bench_ahead], [suite_on], 60.0, None, long_runs, now, gate.backfill_length(tour))
 check(not ok and holder == 0 and "needs 1500 s" in why, "the tour may not go past the bench: %s" % why)
 ok, past, _, holder = gate.passes_held(short_row, [bench_ahead, tour], [suite_on], 60.0, None, long_runs, now, 125.0)
-check(ok and holder is None and [each["kind"] for each in past] == ["bench"],
+check(ok and holder is None and [each["kind"] for each in past] == ["exclusive"],
     "a short scene behind it goes past both, the bench by backfill")
 two_scenes = [suite_on, dict(running(1, 1), kind="scene", started=now), dict(running(1, 1), kind="scene", started=now)]
 ok, _, _, holder = gate.passes_held(short_row, [bench_ahead, tour], two_scenes, 60.0, None, long_runs, now, 125.0)
@@ -1335,15 +1398,15 @@ gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
 saved_kinds = gate._read(gate._path("kinds.json"))
 gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=6.0, commit_gb=1.0, lean_first=False, runs_s=[800.0]),
     "scene": dict(gate.KINDS["scene"], ram_gb=1.0, commit_gb=1.0, runs_s=[100.0]),
-    "bench": dict(gate.KINDS["bench"], ram_gb=2.0, commit_gb=1.0, runs_s=[300.0])})
+    "exclusive": dict(gate.KINDS["exclusive"], ram_gb=2.0, commit_gb=1.0, runs_s=[300.0])})
 clear_gate()
 gate._write(gate._path("running", "physics-suite-%d.json" % os.getpid()), {"tree": "physics", "kind": "suite",
     "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()), "queued": time.time() - 60, "started": time.time() - 30,
     "ram_gb": 6.0, "commit_gb": 1.0, "gpu": False, "using_gb": 6.0, "using_commit_gb": 1.0, "watched": True})
-queued("terrain", "bench")
+queued("terrain", "exclusive")
 long_waiter = threading.Thread(target=lambda: gate.wait_turn("playtest", "scene", os.getpid(), False, 25), daemon=True)
 long_waiter.start()
-until(lambda: queue_of() == ["terrain bench", "playtest scene"])
+until(lambda: queue_of() == ["terrain exclusive", "playtest scene"])
 entry = [each for each in gate._entries("queue") if each["tree"] == "playtest"]
 check(entry and entry[0].get("expect_s") == 1500.0, "the tour's queue entry carries its --expect (%s)" % entry)
 shorts = []
@@ -1354,17 +1417,17 @@ for name in ("ea1", "ea2", "ea3"):
 check(until(lambda: sorted(trees("running")) == ["ea1", "ea2", "physics"]),
     "beside the suite, the first two short scenes run past the bench and the tour (%s)" % trees("running"))
 time.sleep(0.5)
-check(queue_of() == ["terrain bench", "playtest scene", "ea3 scene"], "the tour and the third wait (%s)" % queue_of())
+check(queue_of() == ["terrain exclusive", "playtest scene", "ea3 scene"], "the tour and the third wait (%s)" % queue_of())
 lines = status_lines(40.0)
 tour_line = [each for each in lines if each.startswith("queued playtest scene")]
-check(tour_line and "; waits: behind the head, terrain bench, which waits on: " in tour_line[0]
+check(tour_line and "; waits: behind the head, terrain exclusive, which waits on: " in tour_line[0]
     and "; going past it needs 1500 s" in tour_line[0], "status names the bench as what holds the tour, and why: %s" % tour_line)
 third = [each for each in lines if each.startswith("queued ea3 scene")]
 check(third and "; waits: behind playtest scene (2nd in the queue), which waits on: " in third[0],
     "the third waits on the tour (three jobs running, two of them scenes): %s" % third)
 gate.release("ea1", "scene")
 check(until(lambda: "ea3" in trees("running")), "a scene done: the third starts, the tour still waits (%s)" % trees("running"))
-check(queue_of() == ["terrain bench", "playtest scene"], "(%s)" % queue_of())
+check(queue_of() == ["terrain exclusive", "playtest scene"], "(%s)" % queue_of())
 gate.release("ea2", "scene")
 gate.release("ea3", "scene")
 clear_gate()  # The tour's waiter finds its place dropped and ends.
@@ -1875,16 +1938,16 @@ print("== a bench behind a convoy holds no scene it could not use (394 amended (
 # 352 s": the bench's start was some 90 minutes off, and a dozen scenes waited.
 now = 50000.0
 convoy_runs = {"suite_remote": dict(gate.KINDS["suite_remote"], runs_s=[480.0]), "scene": dict(gate.KINDS["scene"], runs_s=[300.0]),
-    "bench": dict(gate.KINDS["bench"], runs_s=[600.0]), "soak": dict(gate.KINDS["soak"], runs_s=[3000.0])}
+    "exclusive": dict(gate.KINDS["exclusive"], runs_s=[600.0]), "soak": dict(gate.KINDS["soak"], runs_s=[3000.0])}
 remote_on = dict(running(1, 1), kind="suite_remote", started=now - 128)
 # Three more landings' takes wait on the land lock (394 amended (36)), so the rows queued wait on their kind.
 lock_waits = [dict(running(0, 0), kind="suite_remote", started=now - 60, lock_wait=True) for _ in range(3)]
 landing = lambda n: dict(gate.KINDS["suite_remote"], kind="suite_remote", tree="t%d" % n)
 convoy = [landing(n) for n in range(12)]
-bench_13th = dict(gate.KINDS["bench"], kind="bench", tree="builder")
+bench_13th = dict(gate.KINDS["exclusive"], kind="exclusive", tree="builder")
 seven = dict(gate.KINDS["scene"], kind="scene", tree="playtest")
 ok, past, why, holder = gate.passes_held(seven, convoy + [bench_13th], [remote_on] + lock_waits, 60.0, None, convoy_runs, now, 420.0)
-check(ok and [each["kind"] for each in past] == ["bench"], "a 7-minute scene goes past the bench 13th (%s)" % why)
+check(ok and [each["kind"] for each in past] == ["exclusive"], "a 7-minute scene goes past the bench 13th (%s)" % why)
 check(past and past[0]["due"] == now - 128 + 480.0 + 15 * 480.0,
     "the bench's start counted after the running landing and the fifteen after it: %s" % (past and past[0]["due"] - now))
 ok, _, why, holder = gate.passes_held(seven, [bench_13th], [remote_on], 60.0, None, convoy_runs, now, 420.0)
@@ -1892,7 +1955,7 @@ check(not ok and holder == 0 and "due in 352 s" in why, "a bench at the true hea
 ok, _, _, _ = gate.passes_held(seven, [bench_13th], [remote_on], 60.0, None, convoy_runs, now, 300.0)
 check(ok, "and lets past one that ends before the landing does")
 ok, _, why, _ = gate.passes_held(dict(seven, expect_s=8000.0), convoy + [bench_13th], [remote_on] + lock_waits, 60.0, None, convoy_runs, now, 8000.0)
-check(not ok and "the bench may start in 7552 s (the suite_remote running, then 15 suite_remote ahead of it)" in why,
+check(not ok and "the exclusive may start in 7552 s (the suite_remote running, then 15 suite_remote ahead of it)" in why,
     "a scene longer than the convoy (8000 s) still waits, told why: %s" % why)
 # Past its median, the running landing's end is unknown: still at least now, and the fifteen after it.
 late = dict(remote_on, started=now - 900)
@@ -1908,7 +1971,7 @@ check(at == now + 300.0 and counted == {"scene": 3}, "three scenes ahead: the lo
 soak_ahead = dict(gate.KINDS["soak"], kind="soak", tree="economy")
 at, _, counted = gate.head_due(bench_13th, convoy[:2] + [soak_ahead], None, [remote_on], convoy_runs, now)
 check(at == now + 3000.0, "two landings and a soak, which run beside each other: the longer (%s)" % (at and at - now))
-at, _, counted = gate.head_due(bench_13th, convoy[:2], None, [remote_on], {"bench": convoy_runs["bench"]}, now)
+at, _, counted = gate.head_due(bench_13th, convoy[:2], None, [remote_on], {"exclusive": convoy_runs["exclusive"]}, now)
 check(at is None and counted == {}, "rows with no runs recorded count nothing (%s)" % ((at, counted),))
 huge = dict(landing(99), ram_gb=1e12)
 at, _, counted = gate.head_due(bench_13th, [huge], None, [], convoy_runs, now, 60.0, None)
