@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).
 - Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
 
 - A townsperson's window no longer stands as a tall empty dark column when she says a long line: it keeps its height, its name in view (802 amended (11)).
