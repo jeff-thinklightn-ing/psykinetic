@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2918)
+## Lines in the code (2927)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -2089,7 +2089,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (755)
+### server and windows (764)
 
 | | Line | Where |
 |---|---|---|
@@ -2362,6 +2362,15 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are %s, %s. | `main.gd` _asked_facts() |
 |  | of the town | `main.gd` _asked_facts() |
 |  | %s lies %s of the town, %s. | `main.gd` _asked_facts() |
+|  | The nearest fishing is %s, %s of the town, %s. | `main.gd` _asked_fish() |
+|  | Nobody here sells %s now. | `main.gd` _asked_fish() |
+|  | %s sells %s, at %s. | `main.gd` _asked_fish() |
+|  | The one asking carries a fishing rod already. | `main.gd` _asked_fish() |
+|  | %s is warm, %s of the town, %s; a while there does a tired traveller good. | `main.gd` _asked_rest() |
+|  | %s the smith works at %s. | `main.gd` _asked_smith() |
+|  | The town has no smith now. | `main.gd` _asked_smith() |
+|  | Word is the smith, %s, is %s. | `main.gd` _asked_smith() |
+|  | %s sells weapons, at %s. | `main.gd` _asked_smith() |
 |  | the stall by %s | `main.gd` _asked_sellers() |
 |  | the square by | `main.gd` _keeps_shop() |
 | U | %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
@@ -3058,7 +3067,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (914)
+## Lines in the data (922)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3397,7 +3406,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (140)
+### levels/residents.json (148)
 
 | | Line | Key |
 |---|---|---|
@@ -3502,6 +3511,14 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Nobody here has asked for help today. | `asked.frames.no_work` |
 |  | You are %s, %s. | `asked.frames.self` |
 |  | %s lies %s of the town, %s. | `asked.frames.place` |
+|  | The nearest fishing is %s, %s of the town, %s. | `asked.frames.water` |
+|  | The one asking already carries a fishing rod. | `asked.frames.rod_carried` |
+|  | %s is warm, %s of the town, %s; a while there does a tired traveller good. | `asked.frames.rest` |
+|  | %s the smith works at %s. | `asked.frames.smith` |
+|  | The town has no smith now. | `asked.frames.no_smith` |
+|  | Word is the smith, %s, was taken below the castle. | `asked.frames.smith_sought.castle_dungeon` |
+|  | Word is the smith, %s, is %s. | `asked.frames.smith_sought.default` |
+|  | %s sells weapons, at %s. | `asked.frames.weapons` |
 |  | tells the tale of how | `bard.kinds[1]` |
 |  | has a song of how | `bard.kinds[2]` |
 |  | came to the town from the goblins and stays, somewhat outcast but tolerated | `settled.snagfin.came` |
