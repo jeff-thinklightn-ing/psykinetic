@@ -2128,8 +2128,20 @@ func _note_pack() -> void:
 	_refresh_sig = ""
 
 
+## What the pack holds, a mark a slot: its thing and how many ("fish#3"), "" for empty: a stack that grew is as new to
+## the keeper's rows as a thing that arrived (his price for a stack is for that many).
 func _pack_ids() -> Array:
-	return Array(pack.player.slots).duplicate() if pack != null and is_instance_valid(pack.player) else []
+	var out: Array = []
+	if pack == null or not is_instance_valid(pack.player):
+		return out
+	for slot: int in pack.player.slots.size():
+		out.append(_slot_mark(slot))
+	return out
+
+
+func _slot_mark(slot: int) -> String:
+	var id := str(pack.player.slots[slot]) if slot < pack.player.slots.size() else ""
+	return "%s#%d" % [id, World.slot_count(pack.player, slot)] if not id.is_empty() else ""
 
 
 ## Whether [param slot] holds something other than when the keeper's rows were told: his rows say nothing about it
@@ -2138,7 +2150,7 @@ func _pack_ids() -> Array:
 func is_stale(slot: int) -> bool:
 	if not _open or _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
 		return false
-	var now := str(pack.player.slots[slot]) if slot < pack.player.slots.size() else ""
+	var now := _slot_mark(slot)
 	var then := str(_slots_seen[slot]) if slot < _slots_seen.size() else ""
 	return now != then
 

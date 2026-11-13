@@ -3884,6 +3884,12 @@ func _test_person_give() -> void:
 	World.set_slots(me, arrived)
 	window.set_takes([takes_rows[1], {"uid": 913, "slot": 3, "what": "bear_pelt", "count": 1, "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 3}])
 	_check(not window.is_stale(3) and store_view.squares_shown("mine")[3] == "mine 3 3", "his answer lays the square: priced (%s)" % [store_view.squares_shown("mine").slice(0, 4)])
+	# A stack that grew (a second perch landing on the first) is as new to his rows as a thing that arrived: the mark
+	# of a slot carries its count, so the same thing in more or fewer reads as changed.
+	window._slots_seen[3] = str(window._slots_seen[3]).get_slice("#", 0) + "#9"
+	_check(window.is_stale(3) and not window.is_stale(0), "a stack of another size than his rows were told for is stale (%s)" % [window._slots_seen[3]])
+	window._note_pack()
+	_check(not window.is_stale(3), "his next rows lay it right")
 	window.refresh_asked.disconnect(catch_refresh)
 	World.set_slots(me, stock)
 	window.set_takes([])
