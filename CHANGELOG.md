@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- At the near camera, you and the foe you're fighting show through as an outline only when something stands between you and the camera, so at a forest's edge in the open you look like yourselves (623 amended (6)).
 - Rolf's sword fells a plain robber in five blows, swung at the same pace for the same stamina (887).
 - The old grey's lunge, marked by a red line before it lands, hits harder than his bite: step out of the red (780 amended (34)).
 - A great bear, the old grey, a skeleton guard or the draugr fights on, or goes back to its den or its room, when whoever it was after leaves, and so does any pack with it (806 amended (20)).
