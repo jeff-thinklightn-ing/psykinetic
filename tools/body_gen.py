@@ -1669,6 +1669,13 @@ def _bag_front_upright(y: float) -> float:
 			return z0 + (z1 - z0) * (h0 - y) / (h0 - h1)
 	return pts[-1][1]
 BAG_FEATHER = 0.10
+## The cloak's rows over the bag taper in and out (819 amended (5), the coordinator's word on the
+## game's stills: a sharp dark fold at the bag's foot, a ledge at its top): under the foot it falls
+## from the bag's fullest point and comes back to the body over BAG_FALL, and above the top it leaves
+## the back over BAG_RISE, not BAG_FEATHER, so no row turns more than about 30 degrees from the one
+## beside it (the worst was 43 at the woman's foot and 47 at her top; her rows there are 4 to 7 cm apart).
+BAG_FALL = 0.40
+BAG_RISE = 0.20
 ## Past the bag's bounds still eased in full (the cloak's faces are flat between its vertices: round
 ## the bag's front corner, where the cloak turns toward the side, the face beyond cut the corner).
 BAG_PAD = 0.03
@@ -1691,9 +1698,14 @@ def _ease_over_bag(J: dict, p: Part) -> None:
 			z = -z
 		frames.append((mid, x, z))
 
-	def fade(past: float) -> float:
-		t = min(max(past / BAG_FEATHER, 0.0), 1.0)
+	def fade(past: float, over: float = BAG_FEATHER) -> float:
+		t = min(max(past / over, 0.0), 1.0)
 		return 1.0 - t * t * (3.0 - 2.0 * t)
+
+	def fade_height(y: float) -> float:
+		if y < BAG_BOTTOM - BAG_PAD:
+			return fade(BAG_BOTTOM - BAG_PAD - y, BAG_FALL)
+		return fade(y - BAG_TOP - BAG_PAD, BAG_RISE)
 
 	for k, ring in enumerate(p.rings):
 		n = len(ring)
@@ -1706,7 +1718,7 @@ def _ease_over_bag(J: dict, p: Part) -> None:
 				bz = d.dot(z)
 				if bz <= 0.0:
 					continue
-				w = fade(abs(d.dot(x)) - BAG_HALF_WIDE - BAG_PAD) * fade(max(BAG_BOTTOM - BAG_PAD - d.z, d.z - BAG_TOP - BAG_PAD))
+				w = fade(abs(d.dot(x)) - BAG_HALF_WIDE - BAG_PAD) * fade_height(d.z)
 				need = (_bag_front(d.z) + CLOAK_OVER_BAG - bz) * w
 				if need > move.length:
 					move = z * need

@@ -49303,6 +49303,21 @@ in place and puts the foot out. Stills (Blender, Cycles, the game's nearest-zoom
 goblin): C:/dev/review/satchel/v2_sheet.png; the game's own windowed stills before switch-on. Art and
 client, package "satchel", off; protocol unchanged; no new class_name.
 
+819 amended (5) (the strapped cloak's ease over the bag tapers, pc-character's side; the script's label;
+the coordinator's word on the game's own stills, C:/dev/review/satchel/stills3: "a sharp dark fold at
+the nearest zoom is exactly what Jeff picks out"). Under the strapped cloak the bag's swell ended in a
+sharp dark fold at its foot (the woman's deeper) and a lit ledge at its top. The ease faded over
+BAG_FEATHER (10 cm) past the bag's top and bottom as at its sides, but the cloak's rows there are 4 to
+7 cm apart and the ease about 10 cm, so a row turned in by 6.1 cm from the one above it at the woman's
+foot (43 degrees) and out by 4.6 cm at her top (47). Now it falls back to the body over BAG_FALL
+(40 cm) under the foot, as cloth hangs from the bag's fullest point, and leaves the back over BAG_RISE
+(20 cm) above the top; the sides keep BAG_FEATHER. The worst turn between rows: the woman 30 degrees at
+the top (spread over two rows, 30 and 19) and 22 at the foot, the man 29 and 6 at the top and 15 at the
+foot. The ease only grows, so the cloak is no nearer the bag anywhere than in (4). human_m and human_f built again:
+only Worn_Cloak_Strapped moved (cmp_parts.py). Stills (Blender, Cycles, the game's nearest-zoom framing
+beside the goblin; before, the fall alone, and both): C:/dev/review/satchel/taper_sheet.png; the game's own stills
+before switch-on. Art only, package "satchel", off; protocol unchanged; no new class_name.
+
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 
 Jeff approved T1+P1+T4+P2 from perf's seamless-zones page (C:/dev/review/umbrage_hill/seamless_zones.md).
