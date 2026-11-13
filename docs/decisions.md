@@ -12480,6 +12480,17 @@ question to 127.0.0.1 holds its socket on 127.0.0.1 (Get-NetUDPEndpoint on Windo
 neither answers). --print-protocol 8414d6cf60f4 before and after (the hash counts RPC signatures, replicated lists
 and message kinds, none touched). Client and server; protocol unchanged; no class_name; no bullet.
 
+431 amended (3) (perf, 2026-11-13; release's report; label from tools/decision_number.sh): status_test's (2) checks on
+ephemeral ports. Animation's landing of 451 amended (6) (saturn, aa07ed566) failed "the server's own answer is the one
+read" with "no answer", 1 of 94; later landings on the same base passed. _test_only_from_asked listened on BASE_PORT +
+8, 17858, camp_fall_test's game port: with both scenes at once (the suite runs them so, and the cut's suite on main
+too) the responder's listen failed unseen and the question went to camp_fall's ENet server. The socket check asked
+BASE_PORT + 10, 17860, regen_test's port. Now the responder listens on port 0 on 127.0.0.1, its bind checked, and the
+socket check asks a sink on port 0: no fixed port beyond the scene's own. A test's ports past its base land in other
+scenes' bases, which suite_test does not see (it checks bases). The mended test passed twice run alone through the
+gate here (perf's offset), and the landing's saturn suite runs it beside camp_fall_test. Tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 406. Credits in the options: who made the sounds, from the takes list
 
 The options panel ends with a Credits section. It names who made what the game

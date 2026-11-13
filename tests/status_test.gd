@@ -96,10 +96,13 @@ func _test_net() -> void:
 
 func _test_only_from_asked() -> void:
 	print("== an answer only from where it asked (431 amended (2)) ==")
-	var port: int = preload("res://tests/test_ports.gd").of(BASE_PORT + 8)
+	# An ephemeral port, never one of the suite's fixed ones (431 amended (3)): BASE_PORT + 8 was
+	# camp_fall_test's game port, and with both scenes running at once the listen failed unseen and
+	# the question went to that game's server ("no answer", animation's saturn landing, 11-13).
 	var server := ServerStatus.Responder.new()
 	server.info = _info
-	server.listen(port)
+	_check(server.listen(0, "127.0.0.1") == OK, "the server listens on an ephemeral loopback port")
+	var port: int = server._udp.get_local_port()
 	var query := ServerStatus.Query.new()
 	query.send("127.0.0.1", port)
 	# A stranger (another port on this machine) sends a well-formed answer first.
@@ -146,8 +149,11 @@ func _udp_sockets() -> Variant:
 
 func _test_loopback_socket() -> void:
 	print("== a question to this machine holds no socket past the loopback (431 amended (2)) ==")
+	# Asked of a sink on an ephemeral port, not a fixed one another scene may hold (431 amended (3)).
+	var sink := PacketPeerUDP.new()
+	sink.bind(0, "127.0.0.1")
 	var query := ServerStatus.Query.new()
-	query.send("127.0.0.1", preload("res://tests/test_ports.gd").of(BASE_PORT + 10))
+	query.send("127.0.0.1", sink.get_local_port())
 	var local := query._udp.get_local_port()
 	var sockets: Variant = _udp_sockets()
 	if sockets == null:
