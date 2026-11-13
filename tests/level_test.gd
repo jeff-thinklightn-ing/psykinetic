@@ -5457,6 +5457,15 @@ func _test_giver_rule() -> void:
 	_check(untold.is_empty(), "its tell (the block's hidden_tell, art-kit's candles bent by the draught) laid at the hidden niche and nowhere else, each of generations 1-8, kept by the parse (608 amended (3)) (%s)" % [untold])
 
 
+## The hall cell before the hidden niche in a generated config's "niches"
+## (608), or (-1, -1).
+func _hidden_niche_of(config: Dictionary) -> Vector2i:
+	for niche: Variant in config.get("niches", []):
+		if niche is Array and str(niche[4]) == "hidden":
+			return Vector2i(int(niche[0]), int(niche[1]))
+	return Vector2i(-1, -1)
+
+
 func _test_arrival_rule() -> void:
 	print("
 == layout sense: no arrival inside a fight (832) ==")
@@ -6738,12 +6747,3 @@ func _test_throne_way_held() -> void:
 	Net.message_received.disconnect(hear)
 	record.marks.assign(kept_marks)
 	_main.load_map("test_room")
-
-
-## The hall cell before the hidden niche in a generated config's "niches"
-## (608), or (-1, -1).
-func _hidden_niche_of(config: Dictionary) -> Vector2i:
-	for niche: Variant in config.get("niches", []):
-		if niche is Array and str(niche[4]) == "hidden":
-			return Vector2i(int(niche[0]), int(niche[1]))
-	return Vector2i(-1, -1)

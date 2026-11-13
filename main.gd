@@ -11409,7 +11409,7 @@ func _tell_hall_ahead(entity: GridEntity, to: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	var peer: int = entity.owner_peer
-	var zone_name: String = World.zone.name
+	var zone_name: String = entity.zone  # The player's own zone, by name (540 amended (2)'s rule).
 	if _told_hall.has(peer):
 		if _told_hall[peer] == zone_name:
 			return
