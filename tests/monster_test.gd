@@ -69,6 +69,7 @@ func _ready() -> void:
 	_test_sight_cone()
 	_test_cover()
 	_test_sight_by_light()
+	_test_camp_fire_light()
 	_test_hearing()
 	_test_noise_reach()
 	_test_hunt()
@@ -1023,6 +1024,40 @@ func _test_sight_cone() -> void:
 	World.step()
 	_check((e["b"][0] as Monster).target == e["P"][0], "right behind it, it notices them anyway")
 	Monster.idling = true
+
+
+## A camp's fire lights, never burns (523 amended (2), enemy-ai's case): in
+## the dark a cell 2 from it is lit and one 4 off is not; it is no fire
+## cell and gives no heat.
+func _test_camp_fire_light() -> void:
+	print("\n== a camp's fire lights the dark round it and burns nobody ==")
+	World.reset()
+	var rows: Array[String] = ["###########"]
+	for y in 9:
+		rows.append("#.........#")
+	rows.append("###########")
+	var terrain := Terrain.parse(rows)
+	var camp := {"kind": "camp", "rect": Rect2i(4, 3, 3, 3), "facing": Vector2i(0, 1)}
+	terrain["buildings"] = [camp]
+	World.load_terrain(terrain)
+	World.fields.ambient = 0.0
+	World.fields_changed()
+	var fire := Level.camp_fire(camp)
+	# A camp laid as a town plot is lit the same (enemy-ai's review): the
+	# client draws plot buildings' fires too.
+	var plotted := Terrain.parse(rows)
+	plotted["plot_buildings"] = [camp]
+	var plot_fields := Fields.new()
+	plot_fields.load(plotted)
+	_check(plot_fields._camp_fires == ([fire] as Array[Vector2i]), "a camp laid as a town plot has its fire lit too")
+	_check(Fields.camp_fires_of([camp, {"kind": "hut", "rect": Rect2i(0, 0, 2, 2)}]) == ([fire] as Array[Vector2i]),
+		"a camp's fire is a light source, nothing else's (%s)" % fire)
+	_check(Senses.is_lit(fire + Vector2i(2, 0)) and not Senses.is_lit(fire + Vector2i(4, 0)),
+		"at night a body 2 cells from it is lit (%.2f), 4 off not (%.2f)" % [Senses.light_level(fire + Vector2i(2, 0)), Senses.light_level(fire + Vector2i(4, 0))])
+	_check(not World.is_fire(fire) and World.heat_at(fire) == 0.0 and World.heat_at(fire + Vector2i(1, 0)) == 0.0,
+		"it is no fire cell and gives no heat: it burns nobody")
+	World.fields.ambient = 1.0
+	World.fields_changed()
 
 
 func _test_sight_by_light() -> void:

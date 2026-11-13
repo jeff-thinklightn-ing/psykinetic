@@ -1409,6 +1409,11 @@ static func _open_posts(building: Dictionary, parts: Node3D) -> void:
 		parts.add_child(post)
 
 
+## A camp's fire ring's node (523 amended (2)): Client3D._light_camp stands
+## its flame and light on it.
+const CAMP_FIRE := "Campfire"
+
+
 ## A camp's (649) fire ring and tents in [param parts]: art-kit's
 ## prop.campfire in from its middle toward its front, its prop.tent behind
 ## (two side by side on a camp six across), each facing the camp's front;
@@ -1422,7 +1427,7 @@ static func _camp(building: Dictionary, parts: Node3D) -> void:
 	var fire := middle + front * CAMP_FIRE_OUT
 	if ArtKit.has("prop.campfire"):
 		var ring := ArtKit.instance("prop.campfire")
-		ring.name = "Campfire"
+		ring.name = CAMP_FIRE
 		ring.position = Vector3(fire.x, 0.0, fire.y)
 		parts.add_child(ring)
 	if not ArtKit.has("prop.tent"):

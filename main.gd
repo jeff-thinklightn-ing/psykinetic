@@ -4663,6 +4663,18 @@ static func fire_places(places: Dictionary) -> Array[Vector2i]:
 	return out
 
 
+## This level's town fires (523 amended (2)): the cells of its places of
+## kind "fire" with a "town" (Umbrage's square fire), each drawn in art-kit's
+## campfire ring (Client3D.town_fires).
+static func town_fire_cells(places: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if str(place.get("kind", "")) == "fire" and place.has("town") and place.get("cell") is Vector2i:
+			out.append(place["cell"])
+	return out
+
+
 func _show_night_places() -> void:
 	if _client3d != null:
 		var night := night_places(level.get("places", {}))
@@ -4695,6 +4707,7 @@ func _repaint(crossing := false) -> void:
 			drop_neighbour()  # Not the zone held, or not whole: the card, as ever (822).
 		_shown_zone = map_name
 		_shown_level = level
+		_client3d.town_fires = town_fire_cells(level.get("places", {}))
 		_client3d.rebuild(_terrain, level_centre, crossing)
 
 
@@ -6008,6 +6021,7 @@ func _lay_neighbour(zone: String, loaded: Dictionary) -> void:
 	_neighbour = view
 	_neighbour_zone = zone
 	_neighbour_level = loaded
+	view.town_fires = town_fire_cells(loaded.get("places", {}))
 	view.build_neighbour(terrain, loaded["centre"], _client3d._sky_floor, true, _client3d._plane_at + plane_offset(map_name, zone))
 	_held_map = {}
 	if minimap != null and _map_task == -1:

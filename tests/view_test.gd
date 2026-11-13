@@ -135,6 +135,7 @@ func _ready() -> void:
 		_test_niches()
 		_test_fire()
 		_test_fire_ring()
+		_test_place_ring()
 		_test_cold_lamp()
 		await _test_wall_runs()
 		_test_cave_walls()
@@ -3817,7 +3818,7 @@ func _test_camp() -> void:
 	var art := ArtKit.has("prop.tent") and ArtKit.has("prop.campfire")
 	_check(not small.has_node("roof") and not large.has_node("roof") and named.call(small, "OpenPost") == 0,
 			"no roof over a camp, nor posts round it")
-	_check(not art or named.call(small, "Tent") == 1 and named.call(large, "Tent") == 2 and named.call(small, "Campfire") == 1,
+	_check(not art or named.call(small, "Tent") == 1 and named.call(large, "Tent") == 2 and named.call(small, BuildingComposer.CAMP_FIRE) == 1,
 			"a small camp's one tent, a large one's two, each a fire ring (%d, %d)" % [named.call(small, "Tent"), named.call(large, "Tent")])
 	if art:
 		var apart := ((large.get_node("parts/Tent_0") as Node3D).position - (large.get_node("parts/Tent_1") as Node3D).position).length()
@@ -5031,6 +5032,92 @@ func _test_fire_ring() -> void:
 	_check(inside and small and others,
 			"the ringed cell's %d flames within %.2f m and its patch %.2f wide; the other fire cells as before" % [flames.size(), Client3D.FIRE_RING_REACH, Client3D.FIRE_RING_SPREAD])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A town's fire laid in art-kit's ring (523 amended (2)): Main.town_fire_cells
+## finds the wilds' square fire and no fire place without a town; on the
+## castle, a burning town-fire cell draws one lit ring (no flame or light of
+## its own, no campfire_cold decor beside it, not a player's hearth) with its
+## flames inside the stones; a town-fire cell not burning, the cold ring.
+func _test_place_ring() -> void:
+	print("
+== place ring: a town's fire burns in art-kit's ring of stones ==")
+	var wilds := Level.load_level("wilds")
+	var places: Dictionary = (wilds.get("places", {}) as Dictionary).duplicate(true)
+	var found := Main.town_fire_cells(places)
+	places["no_town_fire"] = {"kind": "fire", "cell": Vector2i(3, 3)}
+	_check(found == ([Vector2i(194, 211)] as Array[Vector2i]) and Main.town_fire_cells(places) == found,
+			"the wilds' town fires: the square's only (%s), a fire place with no town left out" % [found])
+	_check(ArtKit.has(Client3D.HEARTH_LIT) and ArtKit.has(Client3D.HEARTH_COLD), "art-kit has the lit and the cold ring")
+	var castle := Level.load_level("castle")
+	var terrain: Dictionary = (castle["terrain"] as Dictionary).duplicate(true)
+	var fire: Array = terrain.get("fire", [])
+	_rig.rebuild(terrain, castle["centre"])
+	var lit := Vector2i(-1, -1)
+	var cold := Vector2i(-1, -1)
+	for cell: Vector2i in fire:
+		if _rig._grounds.has(cell):
+			lit = cell
+			break
+	for cell: Vector2i in _rig._grounds:
+		if not fire.has(cell) and (cell - lit).length() > 3.0:
+			cold = cell
+			break
+	_check(lit != Vector2i(-1, -1) and cold != Vector2i(-1, -1), "the castle has a burning cell and a cold one to lay rings on (%s, %s)" % [lit, cold])
+	if lit == Vector2i(-1, -1) or cold == Vector2i(-1, -1):
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var lights_before := _rig._fire_lights.size()
+	var decor: Array = (terrain.get("decor", []) as Array).duplicate()
+	decor.append({"kind": Client3D.FIRE_RING_KIND, "cell": lit, "out": Vector2i.ZERO})
+	terrain["decor"] = decor
+	var had: Array[Vector2i] = _rig.town_fires
+	_rig.town_fires = [lit, cold] as Array[Vector2i]
+	_rig.rebuild(terrain, castle["centre"])
+	var ring := _rig._room.get_node_or_null("PlaceRing_%d_%d" % [lit.x, lit.y]) as Node3D
+	var cold_ring := _rig._room.get_node_or_null("PlaceRing_%d_%d" % [cold.x, cold.y]) as Node3D
+	var decor_ring := _rig._room.get_node_or_null("Decor_%d_%d_%s_0_0" % [lit.x, lit.y, Client3D.FIRE_RING_KIND])
+	_check(ring != null and ring.get_meta("slot", "") == Client3D.HEARTH_LIT and ring.find_children("Flame*", "", true, false).is_empty()
+			and ring.find_children("*", "OmniLight3D", true, false).is_empty() and _rig._fire_lights.size() == lights_before,
+			"the burning town fire's ring is art-kit's lit one, with no flame or light of its own (lights %d, were %d)" % [_rig._fire_lights.size(), lights_before])
+	_check(decor_ring == null and not _rig._hearth_rings.has(lit), "no campfire_cold decor drawn under it, and it is no player's hearth")
+	_check(cold_ring != null and cold_ring.get_meta("slot", "") == Client3D.HEARTH_COLD, "a town fire's cell not burning: the cold ring")
+	var patch := _rig._room.get_node_or_null("Fire_%d_%d" % [lit.x, lit.y]) as MeshInstance3D
+	var flames: Array[Node] = []
+	if patch != null:
+		flames = patch.find_children("Flame*", "Node3D", false, false)
+	var inside := not flames.is_empty() and flames.all(func(flame: Node) -> bool:
+		var at := (flame as Node3D).position
+		return Vector2(at.x, at.z).length() <= Client3D.FIRE_RING_REACH + 0.0001)
+	_check(inside and patch != null and (patch.mesh as PlaneMesh).size == Vector2(Client3D.FIRE_RING_SPREAD, Client3D.FIRE_RING_SPREAD),
+			"its %d flames inside the stones and its patch the ring's" % flames.size())
+	_check(Client3D.place_ring_slot(lit, fire) == Client3D.HEARTH_LIT and Client3D.place_ring_slot(cold, fire) == Client3D.HEARTH_COLD,
+			"the ring follows the cell: lit while it burns, cold when not")
+	_rig.town_fires = had
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	# A camp's fire (the same row): its ring named by the composer (its slot ArtKit's),
+	# lit by the view with the kit's socket flame inside the stones and a
+	# hearth's light that flickers with the fires.
+	# Laid as the composer lays it (BuildingComposer._build): the ring in the
+	# building's "parts", the building node what _add_kind passes.
+	var camp_node := Node3D.new()
+	var parts := Node3D.new()
+	parts.name = "parts"
+	camp_node.add_child(parts)
+	BuildingComposer._camp({"rect": Rect2i(0, 0, 3, 3), "facing": Vector2i(0, 1)}, parts)
+	var camp_ring := parts.get_node_or_null(BuildingComposer.CAMP_FIRE) as Node3D
+	_rig._room.add_child(camp_node)
+	var camp_lights := _rig._fire_lights.size()
+	_rig._light_camp(camp_node, Vector2i(40, 40))
+	var camp_flame := camp_ring.get_node_or_null("CampFlame") as Node3D if camp_ring != null else null
+	var camp_light := camp_ring.get_node_or_null("CampLight") as OmniLight3D if camp_ring != null else null
+	_check(camp_ring != null and camp_ring.get_meta("slot", "") == Client3D.HEARTH_LIT and camp_flame != null
+			and Vector2(camp_flame.position.x, camp_flame.position.z).length() <= Client3D.FIRE_RING_REACH + 0.0001,
+			"a camp's ring burns with a flame inside its stones (%s)" % [camp_flame.position if camp_flame != null else null])
+	_check(camp_light != null and is_equal_approx(camp_light.light_energy, Client3D.HEARTH_ENERGY) and is_equal_approx(camp_light.omni_range, Client3D.HEARTH_RANGE)
+			and _rig._fire_lights.size() == camp_lights + 1 and float(Fields.CAMP_FIRE["heat"]) == 0.0,
+			"and a hearth's light, flickering with the fires, as the sim counts it light (no heat)")
+	camp_node.queue_free()
 
 
 ## The dark tower's cold lamps (659 amended): the sample tower's top floor

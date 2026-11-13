@@ -38,6 +38,12 @@ const LANTERN := {"heat": 0.0, "light": 0.9, "reach": 4}
 ## The dark tower's cold lamp (659 amended, terrain "lamps"): light, no
 ## heat, never put out by the damp.
 const LAMP := {"heat": 0.0, "light": 0.8, "reach": 4}
+## A camp's fire (523 amended (2), the coordinator's and enemy-ai's; 649's
+## camps, Level.camp_fire): a fire's light and reach, no heat, so a body by
+## it is seen at night (Senses) while it burns nobody (it is no terrain
+## fire cell: World.is_fire and heat_at are not its). The 3D view draws its
+## light to the same (Client3D._light_camp).
+const CAMP_FIRE := {"heat": 0.0, "light": 0.8, "reach": 4}
 ## A carried light reaches this far; on a damp level (level.json "damp",
 ## the barrow's deepest) DAMP_REACH of it (carried_reach).
 const CARRIED_REACH := 4
@@ -104,6 +110,7 @@ var _fire: Array[Vector2i] = []
 var _torches: Array[Vector2i] = []
 var _lanterns: Array[Vector2i] = []
 var _lamps: Array[Vector2i] = []
+var _camp_fires: Array[Vector2i] = []
 var _heat: Dictionary[Vector2i, float] = {}
 var _light: Dictionary[Vector2i, float] = {}
 var _dirty := true
@@ -142,6 +149,8 @@ func load(terrain: Dictionary) -> void:
 	_torches.assign(terrain.get("torches", []))
 	_lanterns.assign(terrain.get("lanterns", []))
 	_lamps.assign(terrain.get("lamps", []))
+	# A camp laid as a town plot too: the client draws both (Client3D._drawn_buildings).
+	_camp_fires = camp_fires_of(terrain.get("buildings", []) + terrain.get("plot_buildings", []))
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
 	damp = bool(terrain.get("damp", false))
 	daylight = bool(terrain.get("daylight", false))
@@ -195,6 +204,18 @@ func load(terrain: Dictionary) -> void:
 	_roofed = _roofed_whole.duplicate()
 	_source_list = []
 	mark_dirty()
+
+
+## The fires of the camps among [param buildings] (523 amended (2); a
+## level's buildings and plot buildings, as Client3D._drawn_buildings, so the
+## sim lights what the view draws lit): each camp's Level.camp_fire, once.
+static func camp_fires_of(buildings: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for building: Dictionary in buildings:
+		var fire := Level.camp_fire(building)
+		if fire.x >= 0 and not out.has(fire):
+			out.append(fire)
+	return out
 
 
 func mark_dirty() -> void:
@@ -256,6 +277,8 @@ func _sources() -> Array:
 		sources.append([cell, LANTERN])
 	for cell in _lamps:
 		sources.append([cell, LAMP])
+	for cell in _camp_fires:
+		sources.append([cell, CAMP_FIRE])
 	_source_list = sources
 	return sources
 

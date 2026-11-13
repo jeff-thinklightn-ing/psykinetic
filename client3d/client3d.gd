@@ -2937,6 +2937,11 @@ var torch_cells: Array[Vector2i] = []
 ## The cells of the level's fire places (level.json "places" of kind "fire":
 ## Umbrage's square fire), from Main with the night places (Main.fire_places).
 var fire_places: Array[Vector2i] = []
+## The cells of the level's town fires (523 amended (2): level.json places of
+## kind "fire" with a "town", Umbrage's square fire), from Main before the
+## room is built (Main.town_fire_cells): each draws art-kit's campfire ring
+## under it (_add_place_rings), its flames burning inside the stones.
+var town_fires: Array[Vector2i] = []
 
 
 ## The fires burning on a fire place's own cell (fire_places among
@@ -7561,6 +7566,7 @@ func _phase_ground_over_frames(generation: int) -> bool:
 		if _grounds.has(cell):
 			_add_fire(cell)
 	_add_fire_pools()
+	_add_place_rings()
 	return true
 
 
@@ -8246,6 +8252,7 @@ func _phase_ground() -> void:
 		if _grounds.has(cell):
 			_add_fire(cell)
 	_add_fire_pools()
+	_add_place_rings()
 
 
 func _phase_lights() -> void:
@@ -10452,6 +10459,7 @@ func _add_kind(building: Dictionary) -> void:
 	node.position = Vector3(rect.position.x, base, rect.position.y)
 	_room.add_child(node)
 	add_beds(node, building, base)
+	_light_camp(node, rect.position)
 	var roof: Node3D = node.get_node_or_null("roof")
 	var inside: Dictionary[Vector2i, bool] = {}
 	for cell in cells:
@@ -17388,6 +17396,9 @@ func _add_decor() -> void:
 	var fence_posts: Dictionary[Vector2i, bool] = {}
 	for entry: Dictionary in _terrain.get("decor", []):
 		var kind := str(entry["kind"])
+		# A town fire's cell has its own ring (_add_place_rings): never two.
+		if kind == FIRE_RING_KIND and town_fires.has(entry["cell"]):
+			continue
 		var slot := decor_slot(entry)
 		if not _deadwood_drawn(slot):
 			continue
@@ -19904,7 +19915,7 @@ static func fire_flame_offset(roll_x: float, roll_z: float, ringed: bool) -> Vec
 
 func _add_fire(cell: Vector2i) -> void:
 	torch_cells.append(cell)
-	var ringed := fire_ringed(_terrain.get("decor", []), cell)
+	var ringed := fire_ringed(_terrain.get("decor", []), cell) or town_fires.has(cell)
 	if _fire_mesh == null:
 		_fire_mesh = _fire_patch(FIRE_SPREAD)
 		_fire_ring_mesh = _fire_patch(FIRE_RING_SPREAD)
@@ -19930,6 +19941,57 @@ func _add_fire(cell: Vector2i) -> void:
 	light.position = _tile_position(cell) + Vector3(0.0, 0.5, 0.0)
 	_room.add_child(light)
 	_fire_lights.append([light, light.light_energy, _roll(cell, 147) * TAU, Flames.FIRE_FLICKER])
+
+
+## A camp's fire (523 amended (2)): the ring BuildingComposer._camp lays
+## (BuildingComposer.CAMP_FIRE) burns, its flame at the kit's flame socket
+## (in the stones' middle) as 825's lit hearth's; and, but in a far glimpse,
+## a hearth's light (HEARTH_ENERGY over HEARTH_RANGE, low over it),
+## flickering and faded by day in _fire_lights, as the sim counts it
+## (Fields.CAMP_FIRE: light to 4 cells, no heat). [param seed_at] rolls it.
+func _light_camp(node: Node3D, seed_at: Vector2i) -> void:
+	# In the composed building's "parts" (BuildingComposer._build), not on
+	# the node itself: asked there, no camp was ever lit.
+	var ring := node.get_node_or_null(NodePath("parts/" + BuildingComposer.CAMP_FIRE)) as Node3D
+	if ring == null:
+		return
+	var slot := str(ring.get_meta("slot", HEARTH_LIT))
+	var flame := Flames.at_socket(ring, slot, hash(seed_at))
+	if flame == null:
+		flame = Flames.light(ring, Vector3(0.0, HEARTH_FLAME_UP, 0.0), Flames.size_of(slot), hash(seed_at))
+	flame.name = "CampFlame"
+	if _glimpse:
+		return
+	var light := _night_light(FIRE_POOL, HEARTH_ENERGY, HEARTH_RANGE)
+	light.name = "CampLight"
+	light.position = Vector3(0.0, HEARTH_LIGHT_UP, 0.0)
+	ring.add_child(light)
+	_fire_lights.append([light, HEARTH_ENERGY, _roll(seed_at, 155) * TAU, Flames.FIRE_FLICKER])
+
+
+## A town's fire laid in art-kit's ring (523 amended (2)): on each of
+## town_fires on the ground, place_ring_slot's piece, turned by the cell as a
+## flat decor piece is. The lit ring has no flame or light of its own: the
+## fire cell's (_add_fire, inside the stones) and its pool are the fire's.
+func _add_place_rings() -> void:
+	for cell: Vector2i in town_fires:
+		if not _grounds.has(cell):
+			continue
+		var slot := place_ring_slot(cell, _terrain["fire"])
+		if not ArtKit.has(slot):
+			continue
+		var ring := ArtKit.instance(slot, 1)
+		ring.name = "PlaceRing_%d_%d" % [cell.x, cell.y]
+		ring.rotation.y = _roll(cell, 70) * TAU
+		ring.position = _tile_position(cell)
+		_room.add_child(ring)
+
+
+## A town fire's ring at [param cell] (523 amended (2)): HEARTH_LIT while
+## the cell burns ([param fire], the terrain's fire cells), else HEARTH_COLD.
+## It follows the cell: no town state puts a fire out.
+static func place_ring_slot(cell: Vector2i, fire: Array) -> String:
+	return HEARTH_LIT if fire.has(cell) else HEARTH_COLD
 
 
 ## Fire's drawn lights each frame (decision 523): each flickers on its own

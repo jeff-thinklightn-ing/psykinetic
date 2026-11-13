@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Umbrage's square fire burns in a ring of stones, its logs leant together over glowing embers (523 amended (2)).
+- At night a fire at a roadside rest or a bandits' camp burns with a flame and lights the ground round it, and whoever sits by it, you too, can be seen from the dark (523 amended (2)).
 - On the road past the farm, the field fences are split rails between hewn posts now, where before each length stood crooked between pointed posts of its own (827 amended (1)).
 - In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - When you're wet from the rain, you drip from the hem of your clothes (775 amended (1)).

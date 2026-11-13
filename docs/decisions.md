@@ -18964,6 +18964,55 @@ others as before. Stills at the nearest zoom, day and night, before and
 after (ui-design, Lenovo): C:/dev/review/environment/fire_ring. Client only,
 protocol unchanged, no new class_name.
 
+523 amended (2): a town's fire burns in art-kit's ring (the coordinator's
+row after the v0.1.214 cut and approval of 2026-11-13; the package "ring on
+the square fire", which was maps' campfire_cold decor at 194,211, withdrawn
+so one tree owns the square's fire). Umbrage's square fire was bare flames
+and a glow on the cobbles, while art-kit's prop.campfire (stones, leant
+logs, embers) stood only at camps and players' rings. Now each level place
+of kind "fire" with a "town" (Main.town_fire_cells; today the square's
+alone, the only fire place in any level) is passed to the view before its
+room is built (Client3D.town_fires, a room field; the held neighbour's from
+its own level), and _add_place_rings lays place_ring_slot's piece on its
+cell, turned by the cell's roll as a flat decor piece: HEARTH_LIT while the
+cell burns (the terrain's fire cells), HEARTH_COLD when not. It follows the
+cell; no town state puts a fire out, and none is invented. The lit ring has
+no flame or light of its own (no socket flame, unlike 825's hearths): the
+fire cell's flames, gathered inside the stones by 523 amended (1)
+(fire_ringed is true for a town fire), its patch, light and pool are the
+fire's. A campfire_cold decor on a town fire's cell is not drawn (never two
+rings) and is no player's hearth. The sim's fire cell, its heat and where
+it burns, the seats and the residents at it are untouched. The mended lit
+ring (863 amended (1)) has its stones from 0.324 m out, its leant logs within
+0.273 m, and their charred tips and embers within 0.165 m, up to 0.39 m (no
+flame of its own: its "flame" socket at 0.2 m is where a drawn one stands):
+FIRE_RING_REACH 0.18 and FIRE_RING_SPREAD 0.56 (0.28 m) stand inside the
+stones as they did in the cold ring, unchanged. The camp's socket flame
+(Flames.SIZES' 0.9 m from 0.2 m) rises through the knot of tips and above it.
+
+A camp's fire, the same row (the coordinator: one tree makes every lit fire
+look lit): BuildingComposer._camp laid prop.campfire with nothing at its flame
+socket, so a camp's fire was logs and embers. Its ring is now
+BuildingComposer.CAMP_FIRE (buildings' hook; its "slot" meta ArtKit's own), and
+Client3D._light_camp stands Flames.at_socket on it, as 825's lit hearth, and
+(not in a far glimpse) a hearth's light, HEARTH_ENERGY over HEARTH_RANGE at
+HEARTH_LIGHT_UP, flickering and faded by day in _fire_lights. No camp state
+puts a fire out (a camp falling to nobody, 429, is not out: a trader camp is
+nobody's from the start), so a camp's fire is always lit. The light is true
+in the sim too, in the same commit (the coordinator's ruling: a place that
+looks lit while Senses reads it dark is 882's dusk fault again; enemy-ai's
+review): Fields.CAMP_FIRE, light 0.8 over reach 4 as FIRE's and no heat (as
+659's LAMP), a fixed source at each camp's Level.camp_fire
+(Fields.camp_fires_of, terrain "buildings" and "plot_buildings", as the
+client draws them, enemy-ai's change), so a body by a camp's fire at
+night is seen; World.is_fire, heat_at and the terrain's fire cells are not
+its, so it burns nobody, and the warmed rest (777) is as it was. A client
+works it out from the same terrain: protocol unchanged. monster_test
+_test_camp_fire_light (enemy-ai's case: in the dark a cell 2 from it lit, 4
+off not; no fire cell, no heat; a camp laid as a town plot lit too); view_test's camp case (the composer's ring,
+its socket flame inside the stones, its light). Tests with camps at night or
+senses run on the tip: companion_test, resident_test, larder_test.
+
 ## 525. Relief: hills, valleys and ridges as data
 
 Jeff: "dirt having polys is not what i meant by elevation .. i meant hills
