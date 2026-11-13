@@ -30726,6 +30726,18 @@ rescue", approved 2026-11-12; Jeff's "Umbrage first").
 - Server only; protocol unchanged (an ask row is data in the existing
   message); no new class_name.
 
+**613 amended (3), npc's side: the first rescue's rumour** (the coordinator's package "the first rescue";
+voice's words, lore's check; economy's Towns.sought_where, a04c4d95f; no label of its own). A greeted
+townsperson's rumour of the sought farmer (Main._rumour_for, 643) reads his story's own line from
+residents.json "notes": "sought.farmer", "%s, a %s by trade, is out %s, they say. We could use a hand like
+that here.", and "sought.farmer.camp", the same with "is %s" for "held at a camp". A story with its own
+rumour line says where as Towns.sought_where does, by the refuge's map name joined by sought.joins ("at the
+old farmstead"); held, at a camp, secret or unplaced, its where-words as before. The default line ("%s the %s
+has gone off, %s they say.") keeps Towns.where_words, so no other rumour changes. No door note: the farmer
+never lived in the town. resident_test: the farmstead by its map name, the camp's words. Off as the package
+is (crop.sought_first false: no farmer is sought, so nobody says it). Server only; protocol unchanged; no new
+class_name; no bullet (the package's, when it is switched on).
+
 ## 643. The sought's door note and the town's rumour
 
 Jeff (2026-10-23, on the sought of 613): "town knows rumors - they leave a

@@ -2355,6 +2355,18 @@ func _test_sought_body() -> void:
 	var rumour: String = _main._rumour_for(STORE, "p1", 3)
 	_check(rumour.contains("Wat the butcher") and rumour.contains("hills") and _main._rumour_for(STORE, "p1", 3).is_empty() and not _main._rumour_for(STORE, "p2", 3).is_empty(),
 		"the rumour names them and the where, once a day per player (%s)" % rumour)
+	# The first rescue's rumour (613 amended (3), npc's side): a story's own line says where by the refuge's map
+	# name (Towns.sought_where); held at a camp, the camp's words; the default line above keeps the where-words.
+	var kept_entry := entry.duplicate(true)
+	entry.merge({"story": "sought.farmer", "place": "rs_farmstead", "named": "the old farmstead", "where": "wilds", "holder": ""}, true)
+	var farm: String = _main._rumour_for(STORE, "p4", 4)
+	entry.merge({"story": "sought.farmer.camp", "place": "camp", "named": "", "where": "camp"}, true)
+	var camp: String = _main._rumour_for(STORE, "p5", 4)
+	entry.clear()
+	entry.merge(kept_entry)
+	_check(farm == "Wat, a butcher by trade, is out %s, they say. We could use a hand like that here." % Towns.sought_where({"place": "rs_farmstead", "named": "the old farmstead", "where": "wilds"})
+		and farm.contains("at the old farmstead") and camp == "Wat, a butcher by trade, is held at a camp, they say. We could use a hand like that here.",
+		"the first rescue's rumour: the refuge by its map name, or held at a camp (%s / %s)" % [farm, camp])
 	# A world-map building's doors are edge keys already (economy's soak: a kind building's door read as a level
 	# entry's [x, y, side] raised a SCRIPT ERROR every tick): the note at the cell across its door edge.
 	# A kind building (one with a size of doors), so Level.kind_doors would read it.

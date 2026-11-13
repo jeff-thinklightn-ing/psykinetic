@@ -13387,7 +13387,8 @@ func _notes_tick() -> void:
 ## greeting on [param day] (decision 643): the first sought entry with a
 ## where and nobody leading them home, its story's rumour line
 ## (Offers.note_words) with the name, the trade and the where only, never
-## the mishap (lore's rule); once a day per player and town, "" after.
+## the mishap (lore's rule); once a day per player and town, "" after. A
+## story's own line says the where by the refuge's map name (613 amended (3)).
 func _rumour_for(town: String, player_id: String, day: int) -> String:
 	if World.towns == null:
 		return ""
@@ -13401,8 +13402,12 @@ func _rumour_for(town: String, player_id: String, day: int) -> String:
 			return ""
 		_rumour_said[key] = true
 		var line := str(Offers.note_words(str(entry.get("story", ""))).get("rumour", "%s the %s has gone off, %s they say."))
+		# A story's own rumour (613 amended (3), the first rescue's) says where by the map's name of the refuge
+		# (Towns.sought_where: "at the old farmstead"); the default line keeps the where-words, as before.
+		var own := line != str(Offers.note_words("").get("rumour", ""))
+		var where := Towns.sought_where(entry) if own else Towns.where_words(str(entry.get("where", "")))
 		if line.count("%s") == 3:
-			line = line % [entry.get("name", "Someone"), str(entry.get("trade", "")).replace("_", " "), Towns.where_words(str(entry.get("where", "")))]
+			line = line % [entry.get("name", "Someone"), str(entry.get("trade", "")).replace("_", " "), where]
 		return line
 	return ""
 
