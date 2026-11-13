@@ -155,7 +155,10 @@ that the walk looks like skipping and the people look like "bad claymation place
   and any `user://` path a test writes comes from `test_ports.gd`'s `scratch(name)`
   (`user://tests_<checkout>/name`), never a fixed `"user://x/"`.
   Each test scene needs a base port and scratch name of its own: `tests/suite_test` fails
-  the suite when two share one, since the scenes now run at the same time.
+  the suite when two share one, since the scenes now run at the same time. Since 278 amended
+  (2) it claims every port a test asks `test_ports.gd` for, base or not: write each as a
+  number, one of the file's constants, or either `+ k` (a variable it can't read fails,
+  naming the line), and run `suite_test` alone before queuing a take that adds a test or a port.
 - Worktrees share one machine's CPU: take the bench lock before any run whose timings
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
