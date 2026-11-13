@@ -23,6 +23,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import heavy_job as gate  # noqa: E402
 # main's GATE_REVISION as this code's, unless a check sets another (394 amended (43)).
 os.environ["HEAVY_JOB_MAIN_REVISION"] = str(gate.GATE_REVISION)
+# The cut runs land.sh with LAND_LOCAL=1, and this test inherited it: the swap's takes (394
+# amended (33)) then waited as local suites against the faked memory for ever (the v0.1.214
+# cut, 11-13). The checks set it themselves where they mean it.
+os.environ.pop("LAND_LOCAL", None)
 # Never ask saturn from a test (394 amended (33)): a take of suite asks the
 # checkout's own tools/remote_tests.sh kind, which reaches saturn. Stubbed
 # here as "saturn does not answer"; the swap's own checks set their own.
