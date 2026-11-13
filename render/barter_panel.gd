@@ -128,6 +128,8 @@ const SOLD_LINE := "Sold %s for %d gold."
 const SOLD_MANY_LINE := "Sold %d %s for %d gold."
 const HANDED_BACK_LINE := "Handed back %s."
 const LEFT_LINE := "Left %s on the shelves for the town."
+## A sale whose thing left and whose gold never came (852 amended (6); voice: true wherever it went, "unpaid" the honest word).
+const UNPAID_LINE := "Left %s with the town, unpaid."
 ## The store's two hand-over roads (852 amended (3)): gold changes hands on the Store tab and nowhere else; Donate is for
 ## what is given for nothing. A gift row clicked on Store says where it goes; a paying row clicked on Donate likewise;
 ## Donate opened with nothing to give says what he takes back (voice's words, %s the keeper).
@@ -150,6 +152,9 @@ const PACK_WAIT_MSEC := 500
 const REFRESH_MSEC := 600
 ## And the keeper is asked again no oftener than this, msec: a player sorting the pack is a few asks, not one a change.
 const REFRESH_GAP_MSEC := 3000
+## A sale whose thing has left the pack but whose gold has not come this long after the click is said as left, not
+## sold, msec (under ANSWER_MSEC, which drops a click not answered).
+const PAID_WAIT_MSEC := 2000
 ## The mark of the town's trusted prices (voice's word, the regard ladder's; no hover).
 const TRUSTED_WORDS := "Trusted"
 ## Voice's words for Give (802; 802 amended (8), give_word): the toggle and
@@ -1980,6 +1985,8 @@ func _store_state() -> Dictionary:
 						spec["price"] = pays_for(int(entry.get("uid", 0)))
 					elif entry.is_empty() and not row.is_empty() and int(row.get("gold", 0)) > 0:
 						spec["price"] = int(row["gold"])  # A keeper with no stock of his own who pays for a trophy (Rolf, economy): a price on the square.
+					if is_stale(slot):
+						spec["price"] = -1  # His rows are about the pack as it was: no price until he has told them again.
 			mine.append(spec)
 	var foot := _foot_text
 	var refused := _foot_refused
@@ -2063,14 +2070,22 @@ func _check_answer() -> void:
 			money = purse < int(_pending["purse"]) or not goods_have(uid)
 		"mine":
 			money = takes_row(uid).is_empty() if giving else (pack_entry(uid).is_empty() or purse > int(_pending["purse"]))
+			if str(_pending.get("cue", "")) == "sold" and int(_pending.get("gold", 0)) > 0:
+				money = purse > int(_pending["purse"])  # A sale is said only when the gold came (playtest, 3f88a5766: herbs "sold" for nothing).
 	# The line is said with the pack: the purse and the squares come as two messages, so it waits for
 	# both (the thing in the pack, or out of it) and, if the squares never change, for ANSWER_WAIT_MSEC.
 	var changed: bool = pack != null and is_instance_valid(pack.player) and Array(pack.player.slots) != _pending.get("slots", [])
 	gone = changed or Time.get_ticks_msec() - int(_pending.get("at", 0)) >= PACK_WAIT_MSEC
-	if not (money and gone):
-		return
 	var text := str(_pending.get("text", ""))
 	var cue := str(_pending.get("cue", ""))
+	if not money and changed and cue == "sold" and int(_pending.get("gold", 0)) > 0 			and Time.get_ticks_msec() - int(_pending.get("at", 0)) >= PAID_WAIT_MSEC:
+		# The thing is gone and no gold came: the keeper took it and paid nothing, whatever his row said. The line says
+		# what happened, not what the row promised.
+		text = UNPAID_LINE % thing_words(str(_pending.get("thing", "")), true)
+		cue = "left"
+		money = true
+	if not (money and gone):
+		return
 	if cue == "sold":
 		text = _counted_sale(text)
 	_pending = {}
@@ -2167,6 +2182,12 @@ func _refresh_stale() -> void:
 	var now := Time.get_ticks_msec()
 	if _changed_since < 0:
 		_changed_since = now
+		if not _foot_text.is_empty() and now - _answered_msec >= PACK_WAIT_MSEC * 3:
+			# The pack changed under the window by itself: the foot's last line (a sale) is about a click that is over,
+			# and beside a new thing it reads as if it were about that (playtest).
+			_foot_text = ""
+			_foot_refused = false
+			_rebuild()
 	elif now - _changed_since >= REFRESH_MSEC and now - _refreshed_at >= REFRESH_GAP_MSEC and _refresh_sig != str(ids):
 		_refresh_sig = str(ids)
 		_refreshed_at = now
@@ -2280,7 +2301,7 @@ func _sell(slot: int) -> void:
 			return
 		if not paid.is_empty() and int(paid.get("gold", 0)) > 0:
 			var paid_id := str(paid.get("what", ""))
-			_expect({"kind": "mine", "key": slot, "uid": int(paid.get("uid", 0)), "cue": "sold", "text": SOLD_LINE % [thing_words(paid_id, false), int(paid["gold"])]})
+			_expect({"kind": "mine", "key": slot, "uid": int(paid.get("uid", 0)), "cue": "sold", "gold": int(paid["gold"]), "text": SOLD_LINE % [thing_words(paid_id, false), int(paid["gold"])]})
 			give_asked.emit(person if person != null else with, [int(paid.get("uid", 0))])
 			return
 		if pack != null and is_instance_valid(pack.player) and slot < pack.player.slots.size() and not str(pack.player.slots[slot]).is_empty():
@@ -2295,7 +2316,7 @@ func _sell(slot: int) -> void:
 	if up_to(id) < 1:
 		_refuse("mine", slot, ENOUGH_LINE)
 		return
-	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold", "text": SOLD_LINE % [thing_words(id, false), pay]})
+	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold", "gold": pay, "text": SOLD_LINE % [thing_words(id, false), pay]})
 	trade_asked.emit(with, [uid], [], balance_of([uid], []))
 
 
@@ -2320,7 +2341,7 @@ func _donate(slot: int) -> void:
 	var text := SOLD_LINE % [thing_words(id, false), gold] if gold > 0 \
 			else HANDED_BACK_LINE % thing_words(id, true) if bool(row.get("starter", false)) \
 			else LEFT_LINE % thing_words(id, true)
-	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold" if gold > 0 else "left", "text": text})
+	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold" if gold > 0 else "left", "gold": gold, "text": text})
 	give_asked.emit(person if person != null else with, [uid])
 
 

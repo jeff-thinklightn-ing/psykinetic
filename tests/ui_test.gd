@@ -3830,6 +3830,27 @@ func _test_person_give() -> void:
 	window._on_store_tab("store")
 	window._on_store_square("mine", 1)
 	_check(gave.size() == 2 and gave[1][1] == [912], "one click on the pelt on the Store tab sells it (%s)" % [gave])
+	# playtest, 3f88a5766: the herbs "sold" for a row's gold the keeper never paid. The line is said by what happened: the
+	# thing gone and no gold after the wait is "Left ... unpaid", not "Sold ...".
+	var pelt_gone := stock.duplicate()
+	pelt_gone[1] = ""
+	World.set_slots(me, pelt_gone)
+	window._check_answer()
+	_check(window.foot_shown() != "Sold a bear pelt for 3 gold." and not window.foot_shown().begins_with("Sold"),
+		"the pelt gone and no gold yet: no sale is claimed at once (%s)" % window.foot_shown())
+	window._pending["at"] = Time.get_ticks_msec() - 2100
+	window._check_answer()
+	_check(window.foot_shown() == BarterPanel.UNPAID_LINE % BarterPanel.thing_words("bear_pelt", true) and window.foot_shown() == "Left the great bear's pelt with the town, unpaid." and not store_view.foot_is_refused(),
+		"and after the wait with no gold: it says what happened, left unpaid (%s)" % window.foot_shown())
+	World.set_slots(me, stock)
+	# And when the gold does come (both paths of the mend): the purse rose says the sale.
+	window._on_store_square("mine", 1)
+	World.set_slots(me, pelt_gone)
+	window.set_purse(window.purse + 3)
+	window._check_answer()
+	_check(window.foot_shown() == BarterPanel.SOLD_LINE % [BarterPanel.thing_words("bear_pelt", false), 3] and not store_view.foot_is_refused(),
+		"the thing gone and the purse up by its price: the sale is said (%s)" % window.foot_shown())
+	World.set_slots(me, stock)
 	window._on_store_square("mine", 2)
 	_check(window.foot_shown() == "Rolf won't take that." and store_view.foot_is_refused(), "a thing he doesn't take: the line says so (%s)" % window.foot_shown())
 	# 852 amended (4): a thing arriving in the pack while the window is open (a companion's hand-over, a catch) is not
@@ -3845,6 +3866,11 @@ func _test_person_give() -> void:
 	var refreshes: Array = []
 	var catch_refresh := func() -> void: refreshes.append(1)
 	window.refresh_asked.connect(catch_refresh)
+	window._foot_text = "Sold a bear pelt for 3 gold."  # The last click's line, long since said.
+	window._answered_msec = 0
+	window._rebuild()
+	window._refresh_stale()
+	_check(window.foot_shown().is_empty(), "the pack changed under the window: the last sale's line is cleared (%s)" % window.foot_shown())
 	_check(window.is_stale(3) and not window.is_stale(2), "the pelt that arrived: his rows are old for that square only")
 	window._on_store_square("mine", 3)
 	_check(refreshes.size() == 1 and window.foot_shown() == "" and not store_view.foot_is_refused(),
@@ -3888,8 +3914,11 @@ func _test_person_give() -> void:
 	# of a slot carries its count, so the same thing in more or fewer reads as changed.
 	window._slots_seen[3] = str(window._slots_seen[3]).get_slice("#", 0) + "#9"
 	_check(window.is_stale(3) and not window.is_stale(0), "a stack of another size than his rows were told for is stale (%s)" % [window._slots_seen[3]])
+	window._rebuild()
+	_check(store_view.squares_shown("mine")[3] == "mine 3 -1", "a stale square shows no price (%s)" % [store_view.squares_shown("mine")[3]])
 	window._note_pack()
-	_check(not window.is_stale(3), "his next rows lay it right")
+	window._rebuild()
+	_check(not window.is_stale(3) and store_view.squares_shown("mine")[3] == "mine 3 3", "his next rows lay it right: priced again (%s)" % [store_view.squares_shown("mine")[3]])
 	window.refresh_asked.disconnect(catch_refresh)
 	World.set_slots(me, stock)
 	window.set_takes([])
