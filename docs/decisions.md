@@ -30929,6 +30929,39 @@ economy.json at the flip, nothing else. A laptop tour (perf's remote_shot --tour
 server-argument allowlist carries it, under --tour. farm_test checks it on with the argument, the level's
 flag without, and the level's own rules untouched. Server only; protocol unchanged; no new class_name; no
 bullet.
+**613 amended (5): the flip made safe whatever the box holds** (the coordinator's rulings, 11-13). The box's
+Umbrage (day 474: 9 residents, no farmer, no hauler; its day line food 0, 7 of 9 hungry) is the town the first
+rescue is for, but nothing on the box could say beforehand what its record holds: the boot line counted
+people only, no console verb reads a town's buildings or its sought, and a day's journal names a field only
+when it changes. So the flip no longer needs a look first:
+- The seek: Towns._farmer_comes seeks a farmer at once when no field *stands* (Towns._stands), not only when
+  there is no field record: planned, half-built, damaged, in disrepair, a ruin, or gone to the wild are all
+  none. A standing field with no farmer is waited on by growth as before. Home, choose plans or raises the
+  field for him (a ruin's next level is 1; a kind gone to the wild is built again on its old ground, unlock
+  taking it back from the forest), and a field in disrepair is mended as any building.
+- A lost place: Towns.place_again(exists) lets go of each sought one whose place the world no longer has (a
+  camp no longer a holding, a refuge no longer in its area's map: Main._sought_place_stands; any other key
+  is taken as standing) and leaves it to be placed again by its story on its town's next turn, the word about
+  it renewed then; one being led home is left be. Main calls it at boot and prints "[towns] sought at boot:
+  N placed again, their places gone", a count.
+- The boot line gains "; buildings <kind> <state> <level>, ...; gone <kind>, ...; sought N (<trade> n, ...)"
+  ("none", or "sought 0"), and "; can build field yes|no (xp N of M)" (Towns.can_build_words: the experience
+  it has to spend against the field's next level's price; "no (at its top level)"): kinds, states and counts,
+  never a name. The deploy that carries the flip tells what stands, what's gone, who is sought, and whether a
+  farmer brought home gets a field.
+- A town that can't yet pay for the field still seeks its farmer (the rescue is the players' to make whatever
+  the town holds): his homecoming's experience (xp.rescue, 10, a field's level-1 price) pays for it, and short
+  of that he waits at home, unseated, the field the first thing choose builds once it can (food first).
+  Chosen, not an accident: not seeking would leave a town stuck with nothing a player could do about it.
+- The dole in the journal: a dole meal wrote only to the store's ledger (Stockpile.note), so the box's journal
+  never showed one and the day line's "fed by the town" was its only trace. Economy._eat now also prints
+  Economy.dole_line, "[economy] <town>: the town fed a resident with no gold (<food>)", the food named, never
+  who ate, to count beside the day line. Going hungry gets no line (the day line counts it; it would be many).
+farm_test: a farmer sought at once for a field planned, building, damaged, in disrepair, a ruin or gone; none
+for one standing; a lost place let go and placed again on the next turn; a town short of the field's price
+seeks all the same and builds it first once it can. towns_test: the boot line's new
+parts, no name in them. folk_test: the dole's line, no name in it. Server only; protocol unchanged; no new
+class_name; no bullet.
 
 ## 643. The sought's door note and the town's rumour
 

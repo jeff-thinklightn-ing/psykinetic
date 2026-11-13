@@ -160,6 +160,10 @@ func _test_meals() -> void:
 	_check(pell["fed"] == "dole" and _work.on_dole(TOWN) == 1, "Pell, with no gold, was fed by the town: the dole (%s)" % pell["fed"])
 	_check(_told == [[TOWN, 1]], "dole_changed told 1 on the dole (%s)" % [_told])
 	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "dole:p1"), "the ledger has the dole")
+	# 613 amended (5): the journal's line for it names the town and the food, never who ate.
+	var said := Economy.dole_line(TOWN, "food")
+	_check(said == "[economy] %s: the town fed a resident with no gold (food)" % TOWN and not str(pell["name"]) in said and not "p1" in said,
+		"the dole's journal line, no name in it (%s)" % said)
 	var signals := _work.signals_of(TOWN, CATALOG)
 	_check(signals["dole"] == 1 and is_equal_approx(float(signals["short"].get("food", 0.0)), 1.0) and signals["raw_tier"] == Production.STOCK,
 		"the dole makes food the town's first want (%s)" % [signals])

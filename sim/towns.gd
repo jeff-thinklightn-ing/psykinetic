@@ -353,7 +353,11 @@ func room(town: String) -> int:
 ## by their first trade as counts ("none" for no trade), visitors as a count, and room
 ## used of room(). Counts and trades only: never a name, an id or a player. Its words
 ## are release's grep: "town <key>: <stage>; residents N (<trade> n, ...); visitors N;
-## room N of N".
+## room N of N". Then (613 amended (5), the coordinator's before the first rescue's
+## flip: what the town holds, read from the journal with nobody joining) its
+## buildings, each "<kind> <state> <level>"; the kinds the wild took back ("gone");
+## and its sought as a count by trade: "; buildings <kind> <state> <level>, ...;
+## gone <kind>, ...; sought N (<trade> n, ...)", "none" for an empty list.
 func boot_line(town: String) -> String:
 	var record: Dictionary = _towns.get(town, {})
 	var people: Array = record.get("residents", [])
@@ -362,13 +366,51 @@ func boot_line(town: String) -> String:
 		var list: Array = production.worker(str(id)).get("trades", []) if production != null else []
 		var trade := str(list[0]) if not list.is_empty() else "none"
 		trades[trade] = int(trades.get(trade, 0)) + 1
-	var names: Array = trades.keys()
-	names.sort()
-	var counts := PackedStringArray()
-	for trade: String in names:
-		counts.append("%s %d" % [trade, trades[trade]])
-	return "town %s: %s; residents %d (%s); visitors %d; room %d of %d" % [town, stage(town) if not stage(town).is_empty() else "none",
-		people.size(), ", ".join(counts), (record.get("visitors", []) as Array).size(), people.size(), room(town)]
+	var houses: Dictionary = record.get("buildings", {})
+	var built := PackedStringArray()
+	for kind: String in _sorted_keys(houses):
+		built.append("%s %s %d" % [kind, str(houses[kind].get("state", "")), int(houses[kind].get("level", 0))])
+	var gone: Array = (record.get("gone", []) as Array).duplicate()
+	gone.sort()
+	var sought_trades := {}
+	for entry: Variant in (record.get("sought", {}) as Dictionary).values():
+		var trade := str((entry as Dictionary).get("trade", "none"))
+		sought_trades[trade] = int(sought_trades.get(trade, 0)) + 1
+	var sought_count := (record.get("sought", {}) as Dictionary).size()
+	return "town %s: %s; residents %d (%s); visitors %d; room %d of %d; buildings %s; gone %s; sought %s; %s" % [town,
+		stage(town) if not stage(town).is_empty() else "none", people.size(), _counted(trades), (record.get("visitors", []) as Array).size(),
+		people.size(), room(town), ", ".join(built) if not built.is_empty() else "none", ", ".join(PackedStringArray(gone)) if not gone.is_empty() else "none",
+		"%d (%s)" % [sought_count, _counted(sought_trades)] if sought_count > 0 else "0", can_build_words(town, "field")]
+
+
+## Whether [param town]'s experience pays for [param kind]'s next level,
+## the build choose makes (613 amended (5), the boot line's: does a farmer
+## brought home get a field): "can build <kind> yes (xp N of M)", "no (xp N
+## of M)", or "no (at its top level)"; N the experience it has to spend, M
+## the price. A sought one's homecoming adds rules' xp.rescue to N.
+func can_build_words(town: String, kind: String) -> String:
+	var spec: Dictionary = rules.get("buildings", {}).get(kind, {})
+	var level := int(building(town, kind).get("level", 0)) + 1
+	if level > int(spec.get("max_level", 3)):
+		return "can build %s no (at its top level)" % kind
+	var price := int(spec.get("xp", 0)) * level
+	return "can build %s %s (xp %d of %d)" % [kind, "yes" if xp(town) >= price else "no", xp(town), price]
+
+
+## boot_line's "<key> n, ..." of [param counts], sorted by key ("" for none).
+static func _counted(counts: Dictionary) -> String:
+	var out := PackedStringArray()
+	for key: String in _sorted_keys(counts):
+		out.append("%s %d" % [key, int(counts[key])])
+	return ", ".join(out)
+
+
+static func _sorted_keys(of: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for key: Variant in of:
+		out.append(str(key))
+	out.sort()
+	return out
 
 
 ## Every town's boot_line, sorted by key: holdings with workers of their own
@@ -1496,7 +1538,9 @@ func _crop_turn(town: String, crop_now: Dictionary, was: String, now_season: Str
 func _farmer_comes(town: String) -> void:
 	var house := building(town, "field")
 	var rule: Dictionary = rules.get("crop", {})
-	if house.is_empty() and bool(rule.get("sought_first", false)) and _seeking("farmer") and not _has_trade(town, "farmer"):
+	# 613 amended (5): no field that stands is none (planned, half-built, damaged, in
+	# disrepair, a ruin, or gone to the wild), so the flip seeks whatever the box holds.
+	if not _stands(town, "field") and bool(rule.get("sought_first", false)) and _seeking("farmer") and not _has_trade(town, "farmer"):
 		# The first rescue (613 amended (3), the coordinator's ruling: Jeff's 10-27 "the
 		# town is shaped by player interactions"): a town with no field and no farmer
 		# seeks one at once, at his story's place (the old farmstead); home, he is an
@@ -1986,6 +2030,30 @@ func sought(town: String) -> Array[Dictionary]:
 	for id: String in ids:
 		out.append((record[id] as Dictionary).duplicate())
 	return out
+
+
+## Each sought one placed at a place [param exists] (entry -> bool) says is
+## no longer there (613 amended (5), the coordinator's before the first
+## rescue's flip: an entry from an older build whose refuge the map has
+## lost can never be found): let go of where it was held and placed again
+## by its story on its town's next turn, the word about it renewed then.
+## One already being led home is left be. The count placed again (Main
+## prints it at boot, a count, never a name).
+func place_again(exists: Callable) -> int:
+	var count := 0
+	for town: String in _sorted_keys(_towns):
+		var record: Dictionary = _towns[town].get("sought", {})
+		for id: String in _sorted_keys(record):
+			var entry: Dictionary = record[id]
+			if str(entry.get("place", "")).is_empty() or not str(entry.get("freed_by", "")).is_empty() or bool(exists.call(entry)):
+				continue
+			_unhold(town, id)
+			for key: String in ["place", "where", "holder", "story", "named"]:
+				entry[key] = ""
+			entry["next_try"] = now()
+			count += 1
+			sought_changed.emit(town, id)
+	return count
 
 
 ## The sought entry [param id] with its "town", {} if none.

@@ -236,7 +236,24 @@ func _test_boot_line() -> void:
 	_towns.note_rescue(TOWN, "brom", "Brom", "smith")
 	var line := _towns.boot_line(TOWN)
 	var stage := _towns.stage(TOWN) if not _towns.stage(TOWN).is_empty() else "none"
-	_check(line == "town %s: %s; residents 3 (carpenter 1, smith 2); visitors 0; room 3 of 3" % [TOWN, stage], "residents by trade, room used of room (%s)" % line)
+	_check(line.begins_with("town %s: %s; residents 3 (carpenter 1, smith 2); visitors 0; room 3 of 3; buildings " % [TOWN, stage]), "residents by trade, room used of room (%s)" % line)
+	# 613 amended (5): its buildings by kind, state and level, the kinds gone to the wild, and its sought by trade.
+	var record: Dictionary = _towns._town(TOWN)
+	var kept_houses: Dictionary = record["buildings"].duplicate(true)
+	record["buildings"] = {"field": {"kind": "field", "level": 0, "state": Towns.RUIN, "since": 0, "job": 0},
+		"inn": {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}}
+	record["gone"] = ["pasture"]
+	record["sought"] = {"s1": {"id": "s1", "name": "Edda", "trade": "farmer"}}
+	var tail := "; buildings " + _towns.boot_line(TOWN).get_slice("; buildings ", 1)  # The inn standing adds room: cut at the new parts.
+	var field_xp := int(_towns.rules.get("buildings", {}).get("field", {}).get("xp", 0))  # This test's rules may have no field.
+	_check(tail == "; buildings field ruin 0, inn standing 1; gone pasture; sought 1 (farmer 1); can build field %s (xp %d of %d)" % [
+		"yes" if _towns.xp(TOWN) >= field_xp else "no", _towns.xp(TOWN), field_xp], "buildings, gone, sought and the field's price told (%s)" % tail)
+	_check(not "Edda" in _towns.boot_line(TOWN), "no sought name in it")
+	record["buildings"] = kept_houses
+	record.erase("gone")
+	record.erase("sought")
+	_check("; gone none; sought 0; can build " in _towns.boot_line(TOWN), "none gone, none sought (%s)" % _towns.boot_line(TOWN))
+	line = _towns.boot_line(TOWN)
 	_check(not ["Dag", "dag", "Bram", "bram", "Brom", "brom"].any(func(word: String) -> bool: return word in line), "no name or id in it")
 	_check(_towns.boot_lines() == [line], "one line per town (%s)" % [_towns.boot_lines()])
 	_check(_towns.move_in(TOWN, "cass", "Cass", "carpenter", "settled"), "a settled one past the room cap")

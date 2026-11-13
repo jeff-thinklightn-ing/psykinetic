@@ -1132,6 +1132,13 @@ func _meet(id: String, need: String, rule: Dictionary, cat: Dictionary) -> void:
 		_hire(id, need, rule)
 
 
+## The journal's line for one dole meal (613 amended (5), the coordinator's:
+## the store's ledger alone held it, so the box's journal never showed a
+## dole): [param town] and the food given ([param food]), never who ate it.
+static func dole_line(town: String, food: String) -> String:
+	return "[economy] %s: the town fed a resident with no gold (%s)" % [town, food]
+
+
 func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 	var who := production.worker(id)
 	var town: String = who["town"]
@@ -1198,6 +1205,7 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			return
 		stockpile.take(town, store, 1, "dole:%s" % id)
 		stockpile.note(town, store, 0, "dole:%s" % id, "the town fed %s, who has no gold" % who["name"])
+		print(dole_line(town, store))  # 613 amended (5): the journal's count of the dole, beside the day line's.
 		production.note_meal(id, "dole")
 		return
 	if str(who["fed"]) != "hungry":

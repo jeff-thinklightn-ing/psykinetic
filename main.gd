@@ -5031,6 +5031,9 @@ func _boot() -> void:
 	_seat_healers()
 	_seat_gatherers()
 	_seat_keepers()
+	# 613 amended (5): a sought one whose refuge or camp the world no longer has is placed again.
+	if World.towns.place_sought.is_valid():
+		print("[towns] sought at boot: %d placed again, their places gone" % World.towns.place_again(_sought_place_stands))
 	# Each town once its people are seated, counts only, for the box's journal (Towns.boot_line);
 	# again from the first town tick that changes its count.
 	for line: String in World.towns.boot_lines():
@@ -20086,6 +20089,20 @@ func _place_sought(_town: String, _trade: String, variant: Variant, _id: String)
 		if place.get("kind") == "refuge":
 			return {"place": "%s/%s" % [area, tag], "where": str(place.get("where", "")), "named": str(place.get("shown", place.get("name", "")))}  # The name the map shows (613 amended (3)).
 	return ""
+
+
+## Whether sought [param entry]'s place is still in the world (613 amended
+## (5), Towns.place_again at boot): a camp a holding still, a refuge
+## ("<area>/<tag>") a refuge of that area's map. Any other key (a dungeon's)
+## is taken as standing: nothing here can say it isn't.
+func _sought_place_stands(entry: Dictionary) -> bool:
+	var place := str(entry.get("place", ""))
+	if str(entry.get("where", "")) == "camp":
+		return World.holdings != null and not World.holdings.place(place).is_empty()
+	var area := place.get_slice("/", 0)
+	if place.count("/") != 1 or not _world_map.areas.has(area):
+		return place.count("/") != 1
+	return (_world_map.areas[area] as Dictionary).get("places", {}).get(place.get_slice("/", 1), {}).get("kind") == "refuge"
 
 
 ## A place changed hands (Holdings.place_taken): a camp's fall frees who it

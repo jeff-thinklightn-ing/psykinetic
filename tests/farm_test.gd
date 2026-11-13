@@ -1150,6 +1150,59 @@ func _test_sought_first() -> void:
 	first._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	_check(first.choose(TOWN) == "woodshed", "a field standing: the woodshed's turn (%s)" % first.choose(TOWN))
 
+	# 613 amended (5): a field that doesn't stand is none to the seek (the box's town may hold any of
+	# these when the flip comes); one that stands is waited on by growth as before.
+	var place_of := func(_town: String, _trade: String, variant: Dictionary, _id: String) -> Variant:
+		return {"place": "wilds/%s" % variant.get("place", ""), "where": "wilds", "named": "the old farmstead"} if str(variant.get("place", "")) == "old_farmstead" else ""
+	var on_rules := _rules.duplicate(true)
+	on_rules["crop"]["sought_first"] = true
+	for state: String in [Towns.PLANNED, Towns.BUILDING, Towns.DAMAGED, Towns.DISREPAIR, Towns.RUIN, "gone", Towns.STANDING]:
+		var each := _towns(1, false, on_rules)
+		each._town(TOWN)["buildings"].erase("field")
+		if state == "gone":
+			each._town(TOWN)["gone"] = ["field"]
+		else:
+			each._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 0 if state in [Towns.PLANNED, Towns.RUIN] else 1, "state": state, "since": 0, "job": 0}
+		each.place_sought = place_of
+		each._farmer_comes(TOWN)
+		var asked := each.sought(TOWN).filter(func(entry: Dictionary) -> bool: return str(entry["trade"]) == "farmer")
+		if state == Towns.STANDING:
+			_check(asked.is_empty(), "a standing field with no farmer: waited on by growth, not sought at once (%s)" % [asked])
+		else:
+			_check(asked.size() == 1, "a field %s: none that stands, a farmer sought at once (%s)" % [state, asked])
+
+	# 613 amended (5): a sought one whose place the world has lost is placed again at boot, by count.
+	var lost := _towns(1, false, on_rules)
+	lost._town(TOWN)["buildings"].erase("field")
+	lost.place_sought = place_of
+	lost._farmer_comes(TOWN)
+	_year(lost, 1)
+	var held: Array = lost.sought(TOWN)
+	_check(held.size() == 1 and str(held[0]["place"]) == "wilds/old_farmstead", "(placed at the old farmstead: %s)" % [held])
+	_check(lost.place_again(func(_entry: Dictionary) -> bool: return true) == 0, "every place there: none placed again")
+	_check(lost.place_again(func(_entry: Dictionary) -> bool: return false) == 1 and str(lost.sought(TOWN)[0]["place"]).is_empty(),
+		"its place gone: let go, to be placed again (%s)" % [lost.sought(TOWN)])
+	lost._sought_turn(TOWN)
+	_check(str(lost.sought(TOWN)[0]["place"]) == "wilds/old_farmstead", "placed again on the town's next turn (%s)" % [lost.sought(TOWN)])
+
+	# 613 amended (5): a town that can't yet pay for the field still seeks its farmer (the rescue is the
+	# players' to make whatever the town holds); his homecoming's experience (xp.rescue) pays for it,
+	# and short of that he waits, unseated, the field the first thing it builds once it can.
+	var poor := _towns(1, false, on_rules)
+	poor._town(TOWN)["buildings"].erase("field")
+	poor.place_sought = place_of
+	var field_xp := int(on_rules["buildings"]["field"]["xp"])
+	poor._town(TOWN)["spent"] = poor.xp_earned(TOWN) + int(on_rules["xp"]["rescue"]) - field_xp + 1  # Short of the field by one, even with the homecoming.
+	_check(poor.can_build_words(TOWN, "field") == "can build field no (xp %d of %d)" % [poor.xp(TOWN), field_xp], "the boot line's word: no (%s)" % poor.can_build_words(TOWN, "field"))
+	poor._farmer_comes(TOWN)
+	_year(poor, 1)
+	var wanted: Array = poor.sought(TOWN)
+	_check(wanted.size() == 1 and str(wanted[0]["trade"]) == "farmer", "sought all the same (%s)" % [wanted])
+	var home := not wanted.is_empty() and poor.free_sought(str(wanted[0]["id"]), "p1") and poor.sought_home(str(wanted[0]["id"]))
+	_check(home and poor.choose(TOWN) != "field" and poor.xp(TOWN) < field_xp, "home short of the field's price: no field yet (xp %d, chooses %s)" % [poor.xp(TOWN), poor.choose(TOWN)])
+	poor.add_xp(TOWN, 1, "test")
+	_check(poor.choose(TOWN) == "field" and poor.can_build_words(TOWN, "field").begins_with("can build field yes"), "once it can: the field first (%s)" % poor.choose(TOWN))
+
 
 func _test_herders() -> void:
 	print("
