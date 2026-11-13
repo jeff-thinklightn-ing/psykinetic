@@ -18663,7 +18663,9 @@ func give_outcome(town: String, player_id: String, raw: String, count: int) -> D
 		var row: Array = town_stock(town).filter(func(each: Dictionary) -> bool: return each["id"] == raw)
 		out["need"] = int(row[0]["enough"]) if not row.is_empty() else 0
 	out["have"] = have + count
-	out["gold"] = World.economy.bank_price(town, player_id, raw, count)
+	# The price and, where the store is short of it, the town's pay beside it (Offers.fetch_pays,
+	# commissions.fetch): what the purse gains (826 amended (1)).
+	out["gold"] = World.economy.bank_price(town, player_id, raw, count) + Offers.fetch_pays(town, player_id, raw, count)
 	return out
 
 

@@ -1037,6 +1037,42 @@ func _test_town_sheet(host: Player) -> void:
 	_test_admin_stock(host)
 
 
+## 826 amended (1): a Give row's gold is what the give pays (playtest's joined storearrive: herbs
+## quoted 1 at Rolf's, banked unpaid). Every raw a player can carry, one at a time, given to its
+## taker: the purse gains exactly the row's gold; herbs (maker_only) quote 0 and pay 0.
+func _test_rows_pay_what_they_quote(host: Player, me: String) -> void:
+	var checked: Array[String] = []
+	var wrong: Array[String] = []
+	var cat := Items.all()
+	var ids: Array = cat.keys()
+	ids.sort()
+	for id: String in ids:
+		var yields := Items.yield_of(id)
+		if yields.is_empty() or str(yields.keys()[0]) == "gold" or str(yields.keys()[0]) not in Stockpile.RESOURCES:
+			continue
+		var raw := str(yields.keys()[0])
+		var taker: String = _main.receiver_for(STORE, raw)
+		if taker.is_empty() or not _main._hand_item(me, id, "test"):
+			continue
+		var rows: Array = _main.person_takes(host, taker).filter(func(row: Dictionary) -> bool: return row["what"] == id)
+		if rows.is_empty():
+			World.consume(host, World.slot_uid(host, Array(host.slots).find(id)), "test")
+			continue
+		var quote := int(rows[0]["gold"])
+		var gold := World.gold_of(me)
+		var who_name := "Rolf" if taker.begins_with(Offers.VENDOR) else str(World.production.worker(taker).get("name", ""))
+		var given: Array = _main.give_to(host, taker, who_name, [int(rows[0]["uid"])])
+		if given.is_empty():
+			continue
+		checked.append("%s %d" % [id, quote])
+		if World.gold_of(me) - gold != quote:  # The row's gold is its whole stack's; the give gives the stack.
+			wrong.append("%s quoted %d, paid %d" % [id, quote, World.gold_of(me) - gold])
+	_check(wrong.is_empty() and checked.size() >= 4 and checked.any(func(each: String) -> bool: return each.begins_with("herbs ") or each.begins_with("herb")),
+		"every raw's row quotes what its give pays (%s; wrong: %s)" % [checked, wrong])
+	_check(World.economy.bank_price(STORE, me, "herbs", 1) == 0 and _main.give_outcome(STORE, me, "herbs", 1)["gold"] == 0,
+		"herbs, only their maker buys: the row and the bank both 0")
+
+
 ## 856 (the coordinator's go): the stall's keeper takes fish at the store's
 ## price beside its own takers; the pointer and the takers name him; paid in
 ## full, banked in the larder, thanked as a hand-in. Without vendor.takes,
@@ -1170,6 +1206,7 @@ func _test_person_takes(host: Player) -> void:
 	_check(_main.depot_pointer(STORE, "wood_bundle") == "Wood goes to the carpenter." and _main.depot_pointer(STORE, "sword") == "That goes to Rolf at the stall.",
 		"the pointers: wood to the carpenter, gear to Rolf (%s, %s)" % [_main.depot_pointer(STORE, "wood_bundle"), _main.depot_pointer(STORE, "sword")])
 	_test_keeper_takes_fish(host, me)
+	_test_rows_pay_what_they_quote(host, me)
 	# A thing held is never offered as a gift (802 amended (4); playtest's pick in hand).
 	_main._hand_item(me, "sword", "test")
 	var packed: int = Array(host.slots).find("sword")

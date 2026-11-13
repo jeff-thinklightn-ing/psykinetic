@@ -49802,6 +49802,27 @@ CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new 
 
 826, ui's side: no town owes a player (economy's 826, Jeff: the town shouldn't owe players; release's label). Supersedes 802 amended (9) before it shipped: every sale is paid in full at once, so a person's takes rows carry no "owed" and BarterPanel.give_word is Sell where a row's gold is over 0, Donate otherwise (the build fund, the larder, starter gear back to Rolf); give_lines drops "Owes you N gold". Gains drops the owed-gold reward (owed_words, OWED_COLOR, its uncued dim line): gold comes as gold, with its coin. A camp trader's or the town's limit on a good reaches the window only through up_to (BarterPanel.up_to, TownSheet.up_to; absent, no limit) and the refusal through the barter's own "why", so nothing more changes here. 802 amended (9)'s CHANGELOG bullet comes out unshipped (voice: economy's 826 bullet covers it, as both land in one cut). ui_test: voice's lines paid only, a trophy paid in full reads Sell with no owed line, a hand-in's gold its coin. Client only; protocol unchanged on this side; no new class_name.
 
+826 amended (1): a Give row quotes what the give pays. Playtest's joined storearrive on 3f88a5766:
+at Rolf's a stack of herbs showed 1 gold on the Store tab, the give banked them ("Tourbot banked 1
+herbs at wilds/store") and paid nothing. The row's gold came from Main.give_outcome, which priced
+through Economy.bank_price; the give banks through World._bank_thing and Economy.bank_sale, which
+skips a raw only its maker buys (maker_only: the herbs, 562) and pays 0 for it. Those were the two
+paths' only difference (bank_pays, the pack's tooltip, skipped maker_only already). bank_price now
+returns 0 for a maker_only raw, so every reader of it (the row, the bank, the tooltip, the sell
+guard _paid_back) has one price. A herbs row reads gold 0 (the town takes them, a gift) until 856
+amended (3) sends herbs to Hob, the healer, who buys them. The same run's box test found the
+one other part: raw food banked while the store is short of it (Production.signals_of's short: the
+wants, of which food is the only raw; or anyone on the dole) also pays commissions.fetch, 1 gold a
+unit, beside the price (Offers.deposited's notice, "The store was short of food."), and the row left
+it out (berries quoted 2, paid 3). Offers.fetch_pays is that pay, the notice's own test (short, and
+no fetch ask of the player's own counting it), and Main.give_outcome adds it to the price, so the
+row's gold is what the purse gains. A raw banked adds no gear, so the shortness holds through a
+give. A fetch ask's pay when met stays the ask's, on its card. Known, for after the cut: the
+pack's tooltip (Economy.bank_pays) still shows the price without the fetch pay. economy_test
+_test_rows_pay_what_they_quote: every raw a player can carry, given to its taker, gains the purse
+exactly the row's gold; herbs 0 and 0. Server only; protocol unchanged (the row's gold is the same
+key, now true); no new class_name; no bullet (the Store tab stops quoting a price it never paid).
+
 ## 827. Wilds basics: farm and barrow
 
 827, maps' side, the main text (2026-11-09; maps' design C:/dev/review/farmstead_barrow/design.md, the

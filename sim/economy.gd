@@ -2297,8 +2297,13 @@ func trophy_outcome(town: String, player_id: String, id: String, count := 1) -> 
 
 ## What [param town]'s store pays player [param player_id] for [param count]
 ## of raw [param what] banked (bank_sale, bank_pays, Main.give_outcome): raw
-## price x store.buy; a trusted player's each unit trusted_sell (831).
+## price x store.buy; a trusted player's each unit trusted_sell (831). None
+## for a raw only its maker buys (maker_only, the herbs, 562; 826 amended (1):
+## the Give row quoted 1 gold for herbs the give banked unpaid, playtest's
+## joined storearrive): one price for the row and the give.
 func bank_price(town: String, player_id: String, what: String, count: int) -> int:
+	if rules.get("maker_only", {}).has(what):
+		return 0
 	var unit := raw_price(town, what) * float(rules.get("store", {}).get("buy", 1.0))
 	var plain := roundi(unit * count)
 	if count <= 0 or not trusted(town, player_id):

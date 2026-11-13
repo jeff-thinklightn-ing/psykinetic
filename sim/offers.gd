@@ -1375,6 +1375,27 @@ static func camp_taken(camp_id: String, _from: String, to: String, given: Dictio
 			_close(pair[0], ask, "The camp of %s was cleared, though not by %s." % [faction, by], "The camp of %s is cleared; %s's promise is kept by another." % [faction, by], "", 1, given)
 
 
+## What banking [param count] of [param what] at [param place] pays player
+## [param player_id] beside its price (deposited's notice: the store short
+## of it, commissions.fetch each, unless their own ask to fetch it counts it
+## instead); 0 for none. Main.give_outcome quotes it with the price (826
+## amended (1): the row says what the purse gains). A raw banked adds no
+## gear, so the shortness holds for the whole of a give.
+static func fetch_pays(place: String, player_id: String, what: String, count: int, given: Dictionary = ctx) -> int:
+	var production: Production = given.get("production")
+	if production == null or player_id.is_empty() or count <= 0:
+		return 0
+	var short: Variant = _call(given, "short", [place])
+	if not (short is Array and what in short):
+		return 0
+	for pair: Array in _asks(production, place):
+		var held: Dictionary = pair[1]
+		if str(held.get("sub", "")) == FETCH and str(held.get("by", "")) == player_id and str(held.get("what", {}).get("item", "")) == what:
+			return 0
+	var pay: Variant = _call(given, "pay")
+	return (int(pay.get(FETCH, DEFAULT_PAY.get(FETCH, 0))) if pay is Dictionary else int(DEFAULT_PAY.get(FETCH, 0))) * count
+
+
 ## [param count] of [param what] banked at [param place] by [param by_id]
 ## (Stockpile.deposited, "player:<id>"): the asks to fetch it count it;
 ## met at their count.
@@ -1385,13 +1406,7 @@ static func deposited(place: String, _by: String, by_id: String, what: String, c
 	var player_id := by_id.trim_prefix("player:")
 	# What the store was short of, banked by a player: paid then and there
 	# (the rule above), the town's people a little the better for it.
-	var short: Variant = _call(given, "short", [place])
-	var owed_by_ask := false
-	for pair: Array in _asks(production, place):
-		var held: Dictionary = pair[1]
-		if str(held.get("sub", "")) == FETCH and str(held.get("by", "")) == player_id and str(held.get("what", {}).get("item", "")) == what:
-			owed_by_ask = true
-	if short is Array and what in short and not owed_by_ask:
+	if fetch_pays(place, player_id, what, count, given) > 0:
 		var item := what.replace("_", " ")
 		var thanks: Array[String] = []
 		for id: String in production.worker_ids(place):
