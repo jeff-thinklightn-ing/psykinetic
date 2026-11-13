@@ -4775,7 +4775,7 @@ func _test_show_work(mara: Resident) -> void:
 	var tending := mara.activity
 	var served: Resident = _main._serve(other, mara, mara.worker_id)
 	_check(tending == "tend" and served == mara and mara.activity == "" and mara._address_until - World.tick == Resident.SERVE_SECONDS * World.TICK_RATE
-		and mara._rise_until - World.tick == Resident.GET_UP["tend"], "serving at the window: the keeper stops tending and turns to the buyer (%s)" % tending)
+		and mara._rise_until - World.tick == Resident.get_up("tend"), "serving at the window: the keeper stops tending and turns to the buyer (%s)" % tending)
 	mara.addressing = ""
 	# Shown work is no production (economy: its trades read the worker ledger, never a body): a day of
 	# its own ticks at its work spot moves no stock and no gold.
@@ -4791,6 +4791,64 @@ func _test_show_work(mara: Resident) -> void:
 	mara._shown = ""
 	mara._bout_end = -1
 	mara.addressing = ""
+
+
+## 853 amended (14) (maps' film of the hunter): at a work spot showing its trade a stroll keeps the spot, though
+## another is free; leaving it, it stands through the kneel's get-up (animation's ticks), and struck it goes at once.
+func _test_hunter_rise(mara: Resident) -> void:
+	var here := _town_cell(mara.tile)
+	World._relocate(mara, here)
+	var there := _town_cell(here)  # It stands on here, so not that one.
+	var face := here + Vector2i(0, 1)
+	var hide_was := mara._hide_until
+	var mine := {"use": "work", "trade": "hunter", "cell": here, "face": face, "pose": "stand", "town": "store"}
+	var other := {"use": "work", "trade": "hunter", "cell": there, "face": there + Vector2i(0, 1), "pose": "stand", "town": "store"}
+	var places_was: Dictionary = mara.places.duplicate(true)
+	mara.places["spots"] = {"work": [mine, other]}
+	var leave := func(hurt: bool) -> int:
+		mara.doing = Resident.Doing.WORK
+		World._relocate(mara, here)
+		mara._world_set_facing(Vector2i(0, 1))
+		mara._spot = mine
+		mara._goal = here
+		mara.activity = "dress"
+		mara._rise_until = -1
+		mara._hide_until = -1
+		World.tick = maxi(World.tick, mara.next_move_tick)
+		mara.doing = Resident.Doing.SQUARE
+		mara._pick_goal()
+		mara._show_work()
+		var from := World.tick
+		if hurt:
+			mara.hurt_tick = World.tick
+		while mara.tile == here and World.tick < from + 60:
+			mara._step()
+			if mara.tile == here:
+				World.tick += 1
+		return World.tick - from
+	# A stroll at its spot, showing "dress": kept, though the other spot is free.
+	World._relocate(mara, here)
+	mara._world_set_facing(Vector2i(0, 1))
+	mara.doing = Resident.Doing.WORK
+	mara.task = {}
+	mara._spot = mine
+	mara._goal = here
+	mara.activity = "dress"
+	World.tick += 1
+	mara._pick_goal()
+	_check(there != here and mara._spot == mine and mara._goal == here, "a stroll at its hunter's spot keeps it, the other free (%s)" % [mara._goal])
+	var stood: int = leave.call(false)
+	_check(Resident.get_up("dress") == 17 and stood >= Resident.get_up("dress") and mara.tile != here,
+		"leaving its spot, the hunter stands through the kneel's get-up, then goes (%d ticks of %d)" % [stood, Resident.get_up("dress")])
+	var struck: int = leave.call(true)
+	_check(struck < Resident.get_up("dress") and mara.tile != here, "struck as it gets up, it goes at once (%d ticks)" % struck)
+	mara.places = places_was
+	mara._spot = {}
+	mara.activity = ""
+	mara._rise_until = -1
+	mara._hide_until = hide_was
+	mara.hurt_tick = -100000
+	mara.doing = Resident.Doing.WORK
 
 
 func _test_keep_moving() -> void:
@@ -4893,8 +4951,9 @@ func _test_keep_moving() -> void:
 	while mara.tile == seat and World.tick < risen + 60:
 		World.tick += 1
 		mara._step()
-	_check(World.tick - risen >= Resident.GET_UP["sit"] and mara.tile != seat,
+	_check(World.tick - risen >= Resident.get_up("sit") and mara.tile != seat,
 		"it stands on the seat's cell through its get-up, then steps off (%d ticks)" % (World.tick - risen))
+	_test_hunter_rise(mara)
 	# A trade with no building works its own patch of the square, not the whole of it.
 	var big := Rect2i(10, 10, 9, 9)
 	var cook: Rect2i = Main._open_work(big, "cook")

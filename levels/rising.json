@@ -1,0 +1,13 @@
+{
+	"_": "853 amended (14): the ticks (10 a second) a resident stands on its cell after one of these activities ends, before its first step, so the client plays its exit whole (Resident.get_up). Animation keeps these numbers in step with the clips, each the exit's length at the slowest body tempo (0.9) rounded up: Kneel_Up 1.46 s (dress, scrape, shear, bandage), Counter_Low_Exit and Counter_Bar_Exit 1.17 s (tend, tend_bar), a ground sit's get-up 1.45 s, a lean's step-off 0.5 s. A blow, a flight or being led cuts it short.",
+	"sit": 15,
+	"sit_talk": 15,
+	"sit_listen": 15,
+	"lean": 5,
+	"dress": 17,
+	"scrape": 17,
+	"shear": 17,
+	"bandage": 17,
+	"tend": 13,
+	"tend_bar": 13
+}

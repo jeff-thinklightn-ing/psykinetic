@@ -59,10 +59,11 @@ const POSES: Array[String] = ["sit", "lean"]
 ## 853's moving on (the strolls, and a new cell on every pick): off, a body keeps a cell it stands on in
 ## its place and only the square strolls, as before; resident_test's cases from before 853 run with it off.
 static var keep_moving := true
-## The ticks a body stands on its cell after a word of these ends, before its first step: the client's
-## get-up (animation's, 2026-11-10: Sitting_Exit 1.03 s for the seat words, Counter_Exit 1.17 s for tend);
-## stepped off sooner, the client cuts it short.
-const GET_UP := {"sit": 15, "sit_talk": 15, "sit_listen": 15, "tend": 12, "lean": 5}  # A ground sit's get-up 1.45 s, a lean's step-off 0.5 s (animation's, 853 amended (2)).
+## The ticks a body stands on its cell after a word ends, before its first step: the client's get-up, its
+## exit clip (853 amended (2); since 853 amended (14) animation's table, RISING_FILE, which it keeps in step
+## with the clips: the kneels' and the bar's too). Stepped off sooner, the client slides it off still low.
+const RISING_FILE := "res://levels/rising.json"
+static var _rising := {}
 ## Shown work's bouts (853 amended (8), the coordinator: "a smith hammering without pause for a whole
 ## stay reads as a machine"): seconds of the word, then seconds standing, each bout's length from the
 ## body's own seed.
@@ -184,7 +185,7 @@ var _left := NO_CELL
 var _picks := 0
 ## The spot it is going to or at ({} for a cell of the rect): Level.spots_from's {use, cell, face, pose}.
 var _spot: Dictionary = {}
-var _rise_until := -1  # Getting up (GET_UP): no step before this tick.
+var _rise_until := -1  # Getting up (get_up, animation's ticks): no step before this tick.
 ## When it chooses again after finding no way to its goal; -1 for none (762 amended (3)).
 var _retry_at := -1
 ## Addressing a player who clicked them (decision 560, npc's side): the
@@ -640,6 +641,8 @@ func _pick_goal() -> void:
 	_wander_at = World.tick + STROLL_TICKS + absi(hash([id, _picks])) % STROLL_SPREAD
 	if bool(places.get("short_stands", false)):
 		_wander_at = World.tick + SHORT_STAND_TICKS + absi(hash([id, _picks, "short"])) % SHORT_STAND_SPREAD  # 875.
+	if doing == Doing.WORK and _shows_on_spot():
+		return  # 853 amended (14): it keeps the work spot it shows its trade at (the hunter hopped between two).
 	_spot = {}
 	var spot := _free_spot(_spot_use())
 	if not spot.is_empty():
@@ -766,6 +769,15 @@ func _set_goal(cell: Vector2i) -> void:
 ## Whether it strolls now (the mend): idle in a doing of STROLLS, no task, not abed, not addressing.
 func _strolls() -> bool:
 	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not _abed_time()
+
+
+## Whether it stands on a work spot whose trade shows a word (residents.json "show", only words the
+## client plays): a stroll keeps it there (853 amended (14); maps' film, the hunter got up mid-bout and hopped
+## to his other spot two cells off). A trade with no word moves among its spots, as before; the taverner's
+## move to a guest's end is at a bout's end (Resident.guest_end), not a stroll's.
+func _shows_on_spot() -> bool:
+	return not _spot.is_empty() and str(_spot.get("use", "")) == "work" and tile == _spot.get("cell") \
+		and not show_word(str(_spot.get("trade", ""))).is_empty()
 
 
 ## The spots' use its doing takes (Level.spots_from's "use"): the square's hours take the square's,
@@ -1149,8 +1161,17 @@ static func hail_done(production: Production, worker_id: String, player_id: Stri
 func _show_work() -> void:
 	var was := activity
 	_show_work_now()
-	if GET_UP.has(was) and activity != was:
-		_rise_until = World.tick + int(GET_UP[was])  # Its get-up plays out on its cell (animation's).
+	if get_up(was) > 0 and activity != was:
+		_rise_until = World.tick + get_up(was)  # Its get-up plays out on its cell (animation's).
+
+
+## The ticks of [param word]'s get-up (RISING_FILE, animation's numbers), 0 for a word with none.
+static func get_up(word: String) -> int:
+	if _rising.is_empty():
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(RISING_FILE)) if FileAccess.file_exists(RISING_FILE) else null
+		_rising = data if data is Dictionary else {"_": "none"}
+	var ticks: Variant = _rising.get(word, 0) if not word.is_empty() and word != "_" else 0
+	return int(ticks) if ticks is int or ticks is float else 0
 
 
 func _show_work_now() -> void:
@@ -1355,7 +1376,7 @@ func address(target: GridEntity, ticks: int, reach := ADDRESS_REACH) -> void:
 	if showing_work():
 		# Spoken to, it stops its work for the talk (853 amended (8)): its get-up on its cell, and a fresh
 		# bout once the talk is over.
-		_rise_until = World.tick + int(GET_UP.get(activity, 0))
+		_rise_until = World.tick + get_up(activity)
 		activity = ""
 		_bout_end = -1
 	addressing = String(target.get_path())
@@ -1883,6 +1904,8 @@ static func _listed(parts: Array) -> String:
 ## A step along its route to its goal, a new route when it has none or is
 ## stuck.
 func _step() -> void:
+	if World.tick < _rise_until and (World.tick - hurt_tick <= 1 or World.tick < _hide_until or doing == Doing.HIDE):
+		_rise_until = -1  # Struck, or off from raiders (853 amended (14)): it goes at once, the get-up cut short.
 	if tile == _goal or World.tick < next_move_tick or World.tick < _rise_until:
 		return
 	if _route.is_empty():

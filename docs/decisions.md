@@ -51030,6 +51030,30 @@ run's take lacked animation's 877 (90f2f97be), whose client plays "dress"; nothi
 him. resident_test: a stroll on a sole spot keeps it; a hunter's spot shows "dress" in a bout. Server
 only; protocol unchanged; no new class_name; package "people work".
 
+853 amended (14) (maps' people-work film on the Lenovo, C:/dev/review/maps_work_kneel4/, burst 1; the
+coordinator's ruling of 11-13, both in one row; animation's measured exits; the label from
+decision_number.sh). The hunter, with two work spots two cells apart, got up at most bout ends: each stroll
+(45 to 120 s) re-picked a free spot of his trade (853 amended (13) keeps the one it stands on only when no
+other is free), and he set off about 0.1 s into Kneel_Up, sliding east still low, for "dress" had no
+get-up ticks (Resident.GET_UP held only the seat words, "tend" and "lean"). Now:
+- A body on a work spot whose trade shows a word (residents.json "show", only words the client plays) keeps
+  the spot through its strolls (Resident._shows_on_spot, in _pick_goal). A trade with no word still moves
+  among its spots; two hunters still take one each; the taverner's move to a guest's end is at a bout's end
+  (875 amended (3)), not a stroll's.
+- The get-up's ticks are data, levels/rising.json (Resident.get_up), animation's to keep in step with the
+  clips, each exit at the slowest body tempo (0.9) rounded up: the kneels (dress, scrape, shear, bandage) 17
+  for Kneel_Up's 1.46 s, the counters (tend, tend_bar) 13 for Counter_Low_Exit and Counter_Bar_Exit's 1.17 s
+  ("tend" was 12), the seat words 15 and "lean" 5 as before. The order is the one the client needs: the
+  activity clears (its cue for the exit, which starts only while the body is still), the body holds its
+  cell those ticks, then steps.
+- A blow (hurt_tick within a tick), raiders (hiding) cut the hold short: it goes at once (Resident._step).
+  A shove moves it by the push, not a step, as before.
+resident_test _test_hunter_rise: a stroll on a hunter's spot keeps it though the other is free; leaving, it
+stands the kneel's 17 ticks, then goes; struck, it goes at once. Animation adds a check to anim_rig_test once
+this is on main (every activity with an exit has a row, at least its clip's ticks). Server only; protocol
+unchanged (no field replicated); no new class_name; package "people work", after maps' take and not a
+condition of it; no bullet until playtest has the hunter through two bouts, joined and close.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
