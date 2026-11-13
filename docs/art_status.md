@@ -311,7 +311,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.heap_charcoal` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `prop.heap_ore` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `prop.inn_sign` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `prop.knight_remains` | 1 | art-kit, by hand | own | 2026-11-12 |
+| `prop.knight_remains` | 1 | art-kit, by hand | own | 2026-11-13 |
 | `prop.ladder` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.lamp_post` | 1 | art-gen, by hand | own | 2026-11-12 |
 | `prop.lamp_post_low` | 1 | art-gen, by hand | own | 2026-11-12 |

@@ -53157,6 +53157,38 @@ in its switch-on commit. Made by C:/dev/review/knight_remains/make_knight_remain
 C:/dev/review/knight_remains (kr4_near.png, kr4_close.png), passed by the coordinator. Lands off:
 placed by nothing until dungeon's switch-on; a game still at the nearest zoom beside the goblin
 before that. Client only (art); protocol unchanged; no new class_name; no bullet.
+
+896 amended (2), art-kit's side: the knight's laid remains remade, and the First Hall's bier
+re-laid round them (the coordinator, 11-13). 903's inside-out check came first: the old parcel's
+shroud fold was wound inward and its layers open; mended, it drew whole in the game
+(C:/dev/review/knight_remains/uidesign_bier_close.png, ui-design's Lenovo, the barrow's own light).
+But from the game's top-down camera it was a small pale card with a tiny barrel on it, off to one
+side of a big empty slab, the least thing in the room, at the moment the whole circle pays off; so
+what lies there is remade, and that mend never lands on its own. prop.knight_remains
+(C:/dev/review/knight_remains/make_laid_remains.py, 626 tris of 700): a length of cream linen 66 cm
+long down the slab's middle where a body would lie, wider at the head and tapering to the foot, so
+its outline says wrapped remains, both ends folded under and bound, tied by a hand with three thin
+rope cords round it, unevenly spaced, and one down its length knotted at the middle; on a shroud of
+warm brown wool a metre long folded twice, darker and warmer than the stone so its edge reads, the
+fold along the knight's side, a darker hem toward the players; and a tallow candle in a clay dish at
+the head, part of the piece so it appears at the laying, its flame and light the game's at the
+piece's "flame" socket (dungeon's switch-on lights it as Client3D's lit candles are lit: drawn only,
+so the sim's Senses keep the barrow dark; dungeon and environment took the candle over a torch, which
+would burn before the laying, stand where players do, and heat the sim). No mark on the linen and no
+shield: lore has no sign written for Theus or his knights, and a red cross is the crusaders'
+real-world sign, which this world does not borrow (the first sheet's cross is behind MARK in the
+script, a swatch for when Jeff names the sign; both questions are on his list). Its underside is cast
+onto the slab's real top. building.burial_table's variant 1 is art-kit's own and the First Hall is
+its one use, so its goods are re-laid round him (make_crypt.py table; make_crypt_v1.py keeps the old
+lay; 869 tris as before, 4 cm taller for the cup upright): the corroded sword at his side, the bronze
+bowl at the head, the cup upright beside it; nothing calls the bowl an offering to anyone. Variant
+2, the crypts' generated biers, is untouched. A "remains" socket on the table, the slab's top at its
+middle, [0, 0.977, 0], where dungeon lays the piece (its fallback the same), so the placement lives
+with the mesh. Watched: Blender sheets culled as the game, from the indoor camera and at 50 degrees,
+by the room's ambient and with the candle (C:/dev/review/knight_remains/bier_remake_sheet.png, the
+record of the takes in bier_remake_record.png); the game still follows (ui-design). Lands off with
+896's package: nothing places it until dungeon's switch-on. Client only (art); protocol unchanged;
+no new class_name; no bullet.
 ## 868. A tavern's hearth burning: its flame and light at the fireplace, from the tavern place's hearth
 
 The coordinator's go, 11-11, package "a newcomer can mend in town", on: the Mughouse's hearth
