@@ -19790,6 +19790,14 @@ rebase continues; THIRD_PARTY.md in conflict too, nothing written; a generator f
 still in conflict; the pages alone, resolved. The coordinator puts the rule in CLAUDE.md once this is on main.
 Tools only; protocol unchanged; no class_name; no bullet.
 
+539 amended (6) (release, 2026-11-13; npc's report, label from tools/decision_number.sh): no "- " line above the
+first "## " heading. CHANGELOG.md's intro names `## Unreleased` mid-sentence, and npc's helper, looking for the
+first "## Unreleased" text, put its camp bed bullet there; `land.sh --checks` passed it, since sections() starts
+at the first heading and never reads the intro. npc caught it in its diff. tools/changelog_check.py now fails any
+line beginning "- " before the first line that begins "## ", naming it ("move it under ## Unreleased").
+changelog_check_test: a bullet in the intro fails, named; the intro naming the heading mid-sentence with no bullet
+is clean. Tools only; protocol unchanged; no class_name; no bullet.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc

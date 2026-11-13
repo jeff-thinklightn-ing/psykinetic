@@ -14,6 +14,9 @@ keeps a bullet beside the heading it was next to, and a cut moves the heading.
     539 amended (2)) is warned of: probably already released, check.
   * Under ## Unreleased every non-blank line is a "- " bullet (539 amended
     (4)): a wrapped bullet, or one a resolver cut to its first line, fails.
+  * No "- " bullet stands above the first "## " heading (539 amended (6)):
+    the intro names `## Unreleased` mid-sentence, and a helper that looked
+    for that text put npc's bullet there (11-13).
 
 Tags are fetched first (git fetch -q --tags); a tag that cannot be had is a
 warning, not a failure.
@@ -75,6 +78,13 @@ def check(text, tag_changelog):
     found = sections(_lf(text))
     released = [(heading, body) for heading, body in found if _released(heading)]
     unreleased = [body for heading, body in found if heading.strip() == UNRELEASED]
+    # 539 amended (6): above the first "## " heading is the intro; a bullet there
+    # was meant for ## Unreleased (sections() never sees it).
+    for line in _lf(text).split("\n"):
+        if line.startswith("## "):
+            break
+        if line.startswith("- "):
+            problems.append("above the first \"## \" heading (the intro), a \"- \" bullet: move it under ## Unreleased: %s" % _short(line))
     # A bullet both unreleased and released: the same line, or (539 amended
     # (2)) the same first clause, for a cut may have shipped an edited copy.
     # A clause that begins two or more released bullets is a set phrase ("This

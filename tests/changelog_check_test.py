@@ -38,6 +38,14 @@ def run(text, reader=tags):
 print("== clean ==")
 problems, warnings = run(HEAD + "## Unreleased\n\n- A new thing (539).\n\n" + V158 + V157)
 check(problems == [] and warnings == [], "a bullet under Unreleased, released sections as tagged: %s %s" % (problems, warnings))
+
+print("== a bullet in the intro (539 amended (6)) ==")
+INTRO = "# Changelog\n\nNewest first. Worktrees add their bullets under `## Unreleased`. To cut a release\n- The camp bed is made (799).\nthe release session leaves that heading where it is.\n\n"
+problems, _ = run(INTRO + "## Unreleased\n\n- A new thing (539).\n\n" + V158 + V157)
+check(len(problems) == 1 and "above the first" in problems[0] and "The camp bed is made" in problems[0],
+    "a bullet above the first heading fails, naming it: %s" % problems)
+problems, _ = run(INTRO.replace("- The camp bed is made (799).\n", "") + "## Unreleased\n\n- A new thing (539).\n\n" + V158 + V157)
+check(problems == [], "the intro naming `## Unreleased` mid-sentence, with no bullet, is clean: %s" % problems)
 problems, _ = run((HEAD + "## Unreleased\n\n" + V158 + V157).replace("\n", "\r\n"))
 check(problems == [], "a CRLF checkout reads as the repository's LF")
 
