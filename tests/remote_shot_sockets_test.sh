@@ -86,6 +86,8 @@ refused "--test-hp without --tour: refused" "--test-hp: refused (only with --tou
 	--joined --server-args "--test-hp" "$sha" x --
 refused "--run-marker asked for: refused (the runner names it, under --tour)" "--server-args --run-marker=x: refused" \
 	--tour smoke --server-args "--run-marker=x" "$sha" x --
+refused "--overlay-dir asked for: refused (the runner names it, under --tour)" "--server-args --overlay-dir=x: refused" \
+	--tour smoke --server-args "--overlay-dir=x" "$sha" x --
 refused "--regenerate asked for: refused (the runner adds it, under --tour)" "--server-args --regenerate: refused" \
 	--tour smoke --server-args "--regenerate" "$sha" x --
 refused "a tour with godot args of the caller's: refused" "--host: refused (a tour's args come from the runner" \
@@ -97,10 +99,10 @@ refused "--repeat with --tour: refused (one phase)" "--repeat: not with --tour" 
 rm -f "$tmp/reached"
 sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp" "$sha" tourx --)"
 code=$?
-wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;tour: tour=kit;tour: only=wall;timeout: 17 min;"
+wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;server_args: --overlay-dir=user://tour_overlay/;tour: tour=kit;tour: only=wall;timeout: 17 min;"
 got_args="$(printf '%s\n' "$sent" | grep -E '^(args|server_args|tour|timeout): ' | tr '\n' ';')"
 if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
-	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its foe, --sought-first and --test-hp; no mode, port or token"
+	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its own overlay dir, its foe, --sought-first and --test-hp; no mode, port or token"
 else
 	echo "  FAIL  --tour's args: exit $code, got [$got_args], wanted [$wanted_args]"; failed=$((failed + 1))
 fi
@@ -109,6 +111,19 @@ if printf '%s' "$sent" | grep -qiE -- "--token|--admin-port|--address|--port=|--
 else
 	echo "  PASS  and no token, admin port, address or mode of its own (the runner names those on the laptop)"
 fi
+
+# A tour into a regenerating level with no generation laid is void (828 amended (9)): the barrow
+# laid (look214_crouch2's lines), barrow_deep bare (look214_ossuary's), the forest not regenerating.
+logs="$(mktemp -d -t bare_levels.XXXXXX)"
+printf '%s\r\n' "[regen] barrow: generation 1 (seed 1829380510, 6 of 16 tries, every 3 days)" \
+	"[level] barrow: 1294 cells, 20 entities, 1 starts, 4 links" "[level] forest: 40167 cells, 16 entities, 4 starts, 3 links" >"$logs/laid.log"
+printf '%s\n' "[level] umbrage: 900 cells, 3 entities, 1 starts, 2 links" "[level] barrow_deep: 715 cells, 2 entities, 1 starts, 1 links" >"$logs/bare.log"
+out="$(sh tools/tour_bare_levels.sh "$sha" "$logs/laid.log")"; code=$?
+if [ $code = 0 ] && [ -z "$out" ]; then echo "  PASS  a laid barrow and the forest: no bare level"; else echo "  FAIL  a laid barrow and the forest: no bare level ($code: $out)"; failed=$((failed + 1)); fi
+out="$(sh tools/tour_bare_levels.sh "$sha" "$logs/bare.log")"; code=$?
+if [ $code = 1 ] && [ "$out" = "barrow_deep" ]; then echo "  PASS  barrow_deep loaded with no [regen] line: named, exit 1"; else echo "  FAIL  barrow_deep loaded with no [regen] line: named, exit 1 ($code: $out)"; failed=$((failed + 1)); fi
+rm -rf "$logs"
+if grep -q 'tour_bare_levels.sh "$SHA" "$REVIEW/server.log"' tools/remote_shot.sh; then echo "  PASS  remote_shot.sh fails a tour on it"; else echo "  FAIL  remote_shot.sh fails a tour on it"; failed=$((failed + 1)); fi
 
 # The whole runner parses (its run mode needs a laptop's session; its proof is a laptop run).
 parsed="$(powershell -NoProfile -NonInteractive -Command "\$e = \$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$runner', [ref]\$null, [ref]\$e); \$e.Count" 2>&1 | tr -d '\r')"

@@ -67,6 +67,11 @@
 # --sought-first (economy's crop.sought_first on for that server only, 613 amended (4)) and
 # --test-hp (786: the admin verb "hp <player> <n>" for the tour's own top-ups; the runner gives
 # a tour's server --run-marker=tour-<name>, which the verb needs beside it, 828 amended (8)).
+# The marker makes the run a test's to Regen, which then lays nothing on the shared overlay: the
+# runner gives the server --overlay-dir=user://tour_overlay/, inside its own APPDATA in the run's
+# folder, fresh each run (828 amended (9)); a caller's --overlay-dir is refused. A tour whose
+# server loads a regenerating level (its level.json at <sha> marked "regenerate") with no
+# "[regen] <level>: generation" line in its log fails: its stills would show the bare template.
 # One phase: the restart tour (TOUR_PHASES=2) stays on tools/tour.sh. report.md, its stills
 # and both logs come back; report.md's first line is the server's SCRIPT ERROR count.
 set -u
@@ -269,7 +274,10 @@ if [ $JOINED -eq 1 ]; then
 	done
 	# A tour's server is laid as the box's is (tour.sh's --regenerate), and marked as a test's
 	# (--run-marker: test-only verbs such as --test-hp's answer only beside one; 828 amended (8)).
-	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" "--run-marker=tour-$NAME" >>"$TMP/server_args.txt"
+	# Marked, Regen lays only on an overlay of the run's own (dungeon's --overlay-dir, 541): one
+	# inside the server's APPDATA, which the runner makes in the run's folder (828 amended (9);
+	# from 409fad948 until it, every laptop tour's barrow and Ossuary were the bare template).
+	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" "--run-marker=tour-$NAME" "--overlay-dir=user://tour_overlay/" >>"$TMP/server_args.txt"
 	# The tour's own file for the runner (its section): the runner starts the admin console when it is there.
 	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\n' "$TOUR" "$TOUR_ONLY" >"$TMP/tour.txt"
 fi
@@ -405,6 +413,13 @@ if [ $JOINED -eq 1 ]; then
 			echo "remote_shot: the tour wrote no report.md"
 		fi
 		echo "server SCRIPT ERRORs: ${errors:-unread}"
+		# A regenerating level the server loaded with no generation laid (828 amended (9)): the
+		# stills show the template no player meets. Silent from 409fad948 (look214_ossuary).
+		bare="$(sh tools/tour_bare_levels.sh "$SHA" "$REVIEW/server.log" | paste -sd ' ' -)"
+		if [ -n "$bare" ]; then
+			echo "remote_shot: the tour's server loaded a regenerating level with no generation laid: $bare (no [regen] line): its stills show the bare template, void (828 amended (9)); generations are laid one level at a time on the slow tick (684), so a tour going in early sends \"regenerate now <level>\" first"
+			exit 1
+		fi
 		grep -hE "^\[tour\]|^RESULT" "$REVIEW/godot.log" 2>/dev/null | tail -40
 	fi
 # A game that joined as a client and never hosted, unless --client was asked: no level of its own,

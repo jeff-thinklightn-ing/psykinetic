@@ -50770,6 +50770,27 @@ server args exactly. Tools and tests only; protocol unchanged; no class_name; no
 
 832 amended (1) (maps, 2026-11-11; label from tools/decision_number.sh; the coordinator's package "the crypt under the temple, its pointer", with lore's facts and npc's hook; lands ON, before npc's hook): the wilds' level.json gains the place "crypt_stair" on the chapel stair (199,199), inside the temple, so npc's pointer has a key to send a player by ("wilds/crypt_stair") and a cell to name. Kind "other", radius 1, worth 0, nobody's (no holder), name "the crypt stair" (voice's words). Other isn't an explore kind, so reaching it gives no found-place reward; npc keeps its own once-a-player mark, not known_places. Like any named place it shows on the big minimap and in the where-line when standing on the stair, both pointing at a stair that is in. level_test checks the place and that it sits inside the chapel. No bullet of its own: the package's bullet (voice's) comes with npc's hook. Riding the same take (ui-design's zone map audit, the coordinator's ruling): the places Umbrage's temple and the healer's turf house make (Level.building_places, decision 372) were named by their kind capitalised, "Temple" and "Healers Hut", on the map and in the where-line. level.json now lists both under their generated keys, temple@189,201 and healers_hut@152,232, with lore's names "the temple" and "the healer's hut" and lore_id; building_places leaves a key level.json already has as it is. Moving either building in the editor would leave its listed place behind, so a move takes its entry too. level_test checks the names; one bullet (voice's words). Level data; protocol unchanged; no new class_name.
 
+828 amended (9) (perf, 2026-11-13; the coordinator's ruling, with dungeon's 541 amended (3); label from
+tools/decision_number.sh): a tour's server lays its generations again. 828 amended (8) (409fad948) gave every laptop
+tour's server --run-marker=tour-<name>, which --test-hp's verb needs beside it; with the marker in the user args
+Regen.in_test_run() is true, and Level.overlay_dir was still Level.OVERLAY (the runner's private APPDATA moves the
+folder, but overlay_safe compares the name), so --regenerate laid nothing and every laptop tour's barrow, barrow_deep,
+castle_halls and hollowfell were their bare templates, unseen, from 409fad948 until this. playtest found it:
+look214_ossuary's server.log has no [regen] line ("[level] barrow_deep: 715 cells, 2 entities", and the console's
+"regenerate now" answered refused in a test run on the shared overlay), while look214_crouch2, run before the marker,
+laid "[regen] barrow: generation 1 (seed 1829380510, ...)". (tools/tour.sh on this PC puts its marker before "--", an
+engine arg, so its tours laid; dungeon's half reads both lists.) tools/remote_shot.sh: under --tour the server also
+gets --overlay-dir=user://tour_overlay/ (dungeon's argument, 541 amended (3)), which resolves inside the server's own
+APPDATA in the run's folder, fresh each run, never Jeff's or the laptop user's user://; a caller's --overlay-dir is
+refused, as --run-marker is. Regen still refuses a marker alone, so a tour without a private folder cannot write the
+shared overlay. So it cannot be silent again: tools/tour_bare_levels.sh <sha> <server.log> names each level the server
+loaded (its "[level] <name>: N cells" line) whose level.json at <sha> is marked "regenerate" with no "[regen] <name>:
+generation" line, and remote_shot.sh fails such a tour as void (exit 1, the levels named) after the SCRIPT ERROR
+count. tests/remote_shot_sockets_test.sh: the dry run's server args carry the overlay dir, a caller's refused, and the
+bare-level check over crouch2's lines (laid barrow, forest not regenerating: none) and ossuary's (barrow_deep: named,
+exit 1). Lands behind dungeon's half. Crypt stills and checks from a runner between 409fad948 and this are void for a
+bullet. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
