@@ -7056,6 +7056,9 @@ func _test_camp_traders() -> void:
 	_check(_main._camp_captive(tk) and not _main._camp_toll(tk), "a captive's camp held: its trader held, no toll")
 	_check(_main._camp_toll(tt) and not _main._camp_captive(tt), "a camp held with no captive place: the toll")
 	var area: Dictionary = _main._world_map.areas[TOWN]
+	# 799 amended (3): the camp's decor bedroll on his bed cell, its step west, so its head end east.
+	var rolls_was: Variant = _main._camp_bedrolls.get(World.zone.name)
+	_main._camp_bedrolls[World.zone.name] = {Vector2i(21, 13): Vector2i(-1, 0)}
 	var wanted := {}
 	for each: Dictionary in _main._camp_traders_wanted(area):
 		wanted[each["key"]] = each
@@ -7065,8 +7068,11 @@ func _test_camp_traders() -> void:
 	if not wanted.has(open_key) or not wanted.has(held_key):
 		return
 	var open: Dictionary = wanted[open_key]["places"]
-	_check(open["work"] == Rect2i(20, 13, 1, 1) and open["home"] == Rect2i(18, 11, 5, 5) and open["bed"] == Rect2i(18, 11, 5, 5) and open["bed_at"] == Vector2i(21, 13),
-		"open: by the fire by day, his bedroll his bed, the camp his ground (%s)" % [open])
+	_check(open["work"] == Rect2i(20, 13, 1, 1) and open["home"] == Rect2i(18, 11, 5, 5) and open["bed"] == Rect2i(18, 11, 5, 5)
+		and open["bed_at"] == {"cell": Vector2i(21, 13), "head": Vector2i(1, 0)},
+		"open: by the fire by day, his bedroll his bed (its cell, its head end against the decor's step), the camp his ground (%s)" % [open])
+	var tk_bed: Variant = (wanted[held_key]["places"] as Dictionary).get("bed")
+	_check(tk_bed is Rect2i and (tk_bed as Rect2i).size == Vector2i.ZERO, "held: no bed, he stays up at his place (%s)" % [tk_bed])
 	_check(wanted[open_key]["camp_trader"] == tc + "_trader" and wanted[open_key]["town"] == tc, "keyed by his place, his camp his town")
 	_check((wanted[held_key]["places"] as Dictionary)["work"] == Rect2i(25, 10, 1, 1) and (wanted[held_key]["places"] as Dictionary)["home"] == Rect2i(25, 10, 1, 1),
 		"held: tied at the captive place, day and night")
@@ -7074,6 +7080,7 @@ func _test_camp_traders() -> void:
 	var body := _main._spawn_resident(wanted[open_key]) as Resident
 	_check(body != null and body.camp_trader == tc + "_trader" and Main.answers_clicks_only(body), "his body: camp_trader set (never a monster's foe), clicks only")
 	_check(Offers.of(held_key, Net.player_id).is_empty(), "held: no wares")
+	_test_camp_trader_abed(body, wanted, held_key)
 	_test_camp_sell(player, body, wanted[held_key], tc)
 	# A fight near: behind his cart, out of the camp, away from the fire.
 	_main._camp_carts[World.zone.name] = [Vector2i(20, 11)]
@@ -7086,6 +7093,10 @@ func _test_camp_traders() -> void:
 		covered[each["key"]] = each
 	_check(raider != null and (covered[open_key]["places"] as Dictionary)["work"] == Rect2i(20, 10, 1, 1), "a fight near: behind his cart, out of the camp (%s; raider hp %d, %d cells off, near %s)" % [covered[open_key]["places"]["work"],
 		raider.hp if raider != null else -1, World.distance(raider.tile, Vector2i(20, 13)) if raider != null else -1, _main._camp_fight_near(Vector2i(20, 13))])
+	if raider != null:
+		_main._bed_down_roofless(covered, area)
+		var cover_bed: Variant = (covered[open_key]["places"] as Dictionary).get("bed")
+		_check(cover_bed is Rect2i and (cover_bed as Rect2i).size == Vector2i.ZERO, "behind his cart: no sleep spot by the fire given him (%s)" % [cover_bed])
 	if raider != null:
 		World.despawn(raider)
 	_main._camp_carts.erase(World.zone.name)
@@ -7103,6 +7114,10 @@ func _test_camp_traders() -> void:
 	if body != null:
 		World.despawn(body)
 	_main._camp_holds.clear()
+	if rolls_was == null:
+		_main._camp_bedrolls.erase(World.zone.name)
+	else:
+		_main._camp_bedrolls[World.zone.name] = rolls_was
 	for key: String in added:
 		raw.erase(key)
 		var id := "%s/%s" % [TOWN, key]
@@ -7203,6 +7218,41 @@ func _test_visitors() -> void:
 ## whole spell at his hut a cell from his own bed, his night pick being work): at work with no task and its
 ## bed in the place it works at, in its spell it goes to its bed and lies down; its bed elsewhere, it keeps
 ## to its work; at a task, the task.
+## 799 amended (3): in his sleep spell the open camp's trader lies on his bedroll's cell, his head its head end;
+## the held one, given no bed, is not abed.
+func _test_camp_trader_abed(body: Resident, wanted: Dictionary, held_key: String) -> void:
+	if body == null:
+		return
+	var hour_was := DayNight.hour(DayNight.now())
+	var asleep_hour := -1.0
+	for q in 96:
+		DayNight.set_hour(q / 4.0)
+		if Resident.asleep_now(body.worker_id):
+			asleep_hour = q / 4.0
+			break
+	_check(asleep_hour >= 0.0, "his sleep spell found (%.2f)" % asleep_hour)
+	body.doing = Resident.Doing.HOME
+	body.task = {}
+	body._goal = Resident.NO_CELL
+	body._pick_goal()
+	_check(body.sleeps_now() and body._bed() == Vector2i(21, 13) and body._head() == Vector2i(1, 0),
+		"in his spell, to his bedroll's cell, head east (bed %s, head %s)" % [body._bed(), body._head()])
+	World._relocate(body, body._bed())
+	World.tick = maxi(World.tick, int(ceil(body.next_move_tick)) + 1)
+	body._show_work()
+	World.tick += 1
+	body._show_work()
+	_check(body.activity == "sleep" and body.tile == Vector2i(21, 13) and body.facing == Vector2i(1, 0),
+		"he lies on his bedroll, his head its head end (%s at %s facing %s)" % [body.activity, body.tile, body.facing])
+	var held := Resident.new()
+	held.worker_id = body.worker_id  # His spell's hour: only the missing bed keeps him up.
+	held.places = (wanted[held_key]["places"] as Dictionary).duplicate(true)
+	_check(not held.sleeps_now(), "held: never abed, though it is his spell")
+	held.free()
+	body.activity = ""
+	DayNight.set_hour(hour_was)
+
+
 func _test_abed_at_work() -> void:
 	print("\n== abed at work in its spell (751 amended (6)): the medicine man sleeps at his hut ==")
 	var mara: Resident = null

@@ -4068,6 +4068,22 @@ func _test_bedroll_drawn() -> void:
 	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
 		"on a bed's head cell: no bedroll, the bed's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
 	_check(not puppet.has_meta("lie_at"), "(a plain bed: no lie_at)")
+	# 799 amended (3): on the level's own bedroll (a camp trader's), no second one, the bedroll's height.
+	var decor: Array = _rig._terrain.get("decor", [])
+	var had_decor := _rig._terrain.has("decor")
+	_rig._terrain["decor"] = decor + [{"cell": Vector2i(-550, -550), "out": Vector2i(-1, 0), "kind": "bedroll", "variant": 1}]
+	resident.tile = Vector2i(-550, -550)
+	resident.facing = Vector2i(1, 0)
+	resident.activity = "sleep"
+	_rig._sync_bedroll(resident, puppet)
+	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.09),
+		"on the level's bedroll: none of its own, the bedroll's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
+	if had_decor:
+		_rig._terrain["decor"] = decor
+	else:
+		_rig._terrain.erase("decor")
+	resident.activity = ""
+	_rig._sync_bedroll(resident, puppet)
 	# A furnished (solid) bed (751 amended (4)): the sleeper beside its head, drawn on it, its head on the pillow end.
 	var turf_rect := Rect2i(-700, -700, 7, 5)
 	var solid_head := Vector2i(-697, -698)

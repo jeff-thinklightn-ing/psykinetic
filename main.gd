@@ -21988,6 +21988,20 @@ func _camp_mix(camp: String) -> String:
 	return str(_level_place(camp).get("mix", "trader"))
 
 
+## The step of the "bedroll" decor piece on [param cell] in this zone (799 amended (3)), zero for none: a flat
+## faced piece, its +z along the step, its head (art-kit's -z) against it. Read once a zone.
+var _camp_bedrolls: Dictionary = {}
+func _camp_bedroll_out(cell: Vector2i) -> Vector2i:
+	var zone := World.zone.name
+	if not _camp_bedrolls.has(zone):
+		var rolls := {}
+		for piece: Variant in Level.load_level(zone).get("terrain", {}).get("decor", []):
+			if piece is Dictionary and str(piece.get("kind", "")) == "bedroll" and piece.get("out") is Vector2i:
+				rolls[piece["cell"]] = piece["out"]
+		_camp_bedrolls[zone] = rolls
+	return (_camp_bedrolls[zone] as Dictionary).get(cell, Vector2i.ZERO)
+
+
 ## The cell behind [param rect]'s cart from the fire at [param at] (799): from
 ## the cart away from the fire, the first cell out of the camp; the fire's cell
 ## for no cart.
@@ -22045,12 +22059,19 @@ func _camp_traders_wanted(area: Dictionary) -> Array[Dictionary]:
 		var places := {}
 		if not camp.is_empty() and _camp_captive(camp):
 			places = _visitor_places(Rect2i(World.holdings.place(camp + "_captive").get("cell", at), Vector2i.ONE))
+			places["bed"] = Rect2i()  # 799 amended (3): held, he stays up at his place (no sleep spot by the fire).
 		elif _camp_fight_near(at):
 			places = _visitor_places(Rect2i(_camp_cover(at, rect), Vector2i.ONE))
+			places["bed"] = Rect2i()  # Behind his cart while the fight is near, never off to sleep.
 		else:
 			places = {"work": Rect2i(at, Vector2i.ONE), "home": rect, "square": rect, "bed": rect}
 			if raw.get("bed") is Vector2i:
-				places["bed_at"] = raw["bed"]
+				# 799 amended (3): his bedroll's cell and its head end (Resident._bed and _head read only this shape;
+				# a bare cell put him in his camp's corner): the head the camp's decor bedroll's (its -z, against its
+				# step), else his facing.
+				var roll_out := _camp_bedroll_out(raw["bed"])
+				var head: Vector2i = -roll_out if roll_out != Vector2i.ZERO else (raw["facing"] if raw.get("facing") is Vector2i else Vector2i.ZERO)
+				places["bed_at"] = {"cell": raw["bed"], "head": head}
 		out.append({"key": Offers.CAMP_TRADER + place_id, "name": str(place.get("name", "a trader")), "trade": "", "player": "",
 			"town": camp if not camp.is_empty() else place_id, "camp_trader": place_id, "places": places})
 	return out

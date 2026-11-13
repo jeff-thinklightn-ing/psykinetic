@@ -25172,7 +25172,8 @@ static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i)
 ## drawn bed's head cell, that bed. The puppet's "bed_height" is what the
 ## body lies on (LIE_HEIGHT, art-kit's measures; pc-character's _lay lifts it),
 ## 0 when up or on the floor. Kept as the puppet's "bedroll" key while the
-## same: its cell and facing.
+## same: its cell and facing. On a cell the level's decor lays a bedroll on (a
+## camp trader's, 799 amended (3)), that one: none of its own, the bedroll's height.
 const BEDROLL := "prop.bedroll"
 const LIE_HEIGHT := {"prop.bed": 0.37, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
 func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
@@ -25193,6 +25194,8 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 			# Beside a furnished (solid) bed (751 amended (4)): drawn on it, its head on the pillow.
 			puppet.set_meta("lie_at", furnished["at"])
 			height = float(furnished["height"])
+		elif bed.is_empty() and _decor_bedroll(body.tile):
+			height = float(LIE_HEIGHT[BEDROLL])
 		elif bed.is_empty() and not _indoors(body.tile) and ArtKit.has(BEDROLL):
 			var way := Vector2(body.facing)
 			var piece := ArtKit.instance(BEDROLL)
@@ -25241,6 +25244,14 @@ func _furnished_bed_lie(cell: Vector2i) -> Dictionary:
 				return {"at": Vector2(head.x - ground.x, head.z - ground.z),
 					"height": placed.origin.y + float(LIE_HEIGHT.get(prop, 0.37)) - ground.y}
 	return {}
+
+
+## Whether the level's decor lays a bedroll on [param cell] (799 amended (3): a camp trader's).
+func _decor_bedroll(cell: Vector2i) -> bool:
+	for entry: Variant in _terrain.get("decor", []):
+		if entry is Dictionary and str((entry as Dictionary).get("kind", "")) == "bedroll" and (entry as Dictionary).get("cell") == cell:
+			return true
+	return false
 
 
 ## The drawn bed whose head cell is [param cell] ({} for none).

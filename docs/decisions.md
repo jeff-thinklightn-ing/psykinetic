@@ -47786,6 +47786,22 @@ refusal stands. ui's side: the client's Main._barters opens his window ("Residen
 squares from "buys" beside his Buy list. resident_test _test_camp_sell. No new message kind ("barter"
 and "trade" already name a resident), no new class_name.
 
+799 amended (3), npc's side (the label from decision_number.sh; maps' read of the code, the coordinator's go
+of 11-13). A camp trader never lay on his bedroll: Main._camp_traders_wanted gave places["bed_at"] the
+level's bare "bed" cell (Level.PLACE_SHAPES), and Resident._bed and _head read only {cell, head}, so he
+slept on bed_cell's corner of his camp's rect. Now bed_at is {cell: the place's "bed", head}: the head
+the reverse of the step of the camp's "bedroll" decor piece on that cell (a flat faced piece, its +z along
+the step, its head art-kit's -z; Main._camp_bedroll_out, read once a zone), else his place's "facing". The
+client (Client3D._sync_bedroll) draws no bedroll of its own on a cell the level's decor lays one on
+(_decor_bedroll), only the bedroll's height, so he lies on the camp's one, not on a second half a cell
+back. Held captive, or behind his cart while a fight is near, his places get "bed" Rect2i() (none):
+before, _bed_down_roofless gave anyone without a bed a sleep spot by the camp's fire, and the captive
+walked off his place at night; now he stays up where he is held. Maps' camps row, moving a bed cell with
+its bedroll, needs nothing here: both are read from the level. resident_test: bed_at's shape and head, he
+lies on its cell facing it in his spell, the held trader not abed, the covered one given no sleep spot;
+view_test: on the level's bedroll, none of the client's own. Server and client; protocol unchanged (the
+sim's tile and facing, as before); no new class_name; package 799's camps (on).
+
 ## 811. Umbrage's tavern as its own zone: the Last Light Mughouse
 
 The tavern zone (2026-11-05, buildings; the coordinator's approved design,
