@@ -10,43 +10,45 @@ notes (decision 324).
 - In Umbrage, the temple's back wall has two tall pointed windows behind the altar, seen from the square and from inside, and at night every one of the temple's windows glows out to the street, not only those on its south side (734 amended (9)).
 - Towns: a house window's shutter no longer swings open across the door frame beside it; a shutter with a door, a corner or another window next to it stays shut (489 amended (8)).
 - The Mughouse's fireplace burns day and night now, one fire on its logs with its warm light over the common room, where before only a glow showed at the wall's foot (868).
+- A hunter at his work, or anyone binding a wound, kneels down to it, works on their knees and gets up when done (877 amended (1)).
+- Things on the ground lie as they would: a bear pelt, fish, hides, cloaks, leather and antlers flat, several dropped on one spot in a heap, and swords and tools on top of the ground (619 amended (2)).
+- A click walk past a doorway or a way out goes round it; you go through only when you click on it (689 amended (11)).
+- The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
+- In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
+
+## v0.1.214
+
 - In the temple, beside the way down to the crypt, a thick candle burns on a tall iron candlestick (868).
-- The temple's tall pointed windows stand inside its walls, their tops under the eaves, where they ran up through the roof (489 amended (7)).
+- The temple's tall pointed windows sit within its walls, their tops under the eaves (489 amended (7)).
 - In the crypt, while you fight the draugr, the way behind his throne and the crypt's way down to his hall stay shut until the fight is done (540 amended (1) and (2)).
 - Grass on the lawns grows in clumps of thin blades with a few straw tips (871 amended (1)).
 - In your pack, the bundle of wood is seven tied logs with pale cut ends, and the bolt of cloth a cream roll (871 amended (1)).
-- The dagger has a broad steel blade, an iron guard and a leather grip, and you can see it in a grave robber's hand (871 amended (1)).
+- The dagger has a broad steel blade, an iron guard and a leather grip (871 amended (1)).
 - Towns: the carts on Umbrage's square are plank hand carts on two spoked wheels (871 amended (1)).
-- Wooden walls are overlapping planks, each its own shade, and wooden floors, the Mughouse's among them, are boards of different lengths laid one way.
-- Umbrage's house roofs are wooden shakes laid in courses, its two market stalls have boarded counters under striped awnings, the shed by the square has a plank roof, and a damaged roof shows its rafters through the tear (863).
-- Double doors are straight oak planks with black iron straps and ring pulls, a lit campfire or hearth is five logs leant together over glowing embers, and the log pile where carried logs go stands in a rack, so a half-full pile shows as half full (863).
+- Wooden walls are overlapping planks, each its own shade, and wooden floors are boards of different lengths laid one way (863).
+- Umbrage's house roofs are wooden shakes laid in courses, its two market stalls have boarded counters under striped awnings, and the shed by the square has a plank roof (863).
+- Double doors are straight oak planks with black iron straps and ring pulls, a fire at a camp in the woods is five logs leant together over glowing embers, and the log pile where carried logs go stands in a rack (863).
 - In a store, something that lands in your pack while the window is open is priced as soon as it lands (852 amended (4)).
 - Indoors, a door between you and the camera goes see-through with the wall around it (864 amended (1)).
-- A hunter at his work, or anyone binding a wound, kneels down to it, works on their knees and gets up when done (877 amended (1)).
-- Things on the ground lie as they would: a bear pelt, fish, hides, cloaks, leather and antlers flat, several dropped on one spot in a heap, and swords and tools on top of the ground (619 amended (2)).
 - Footsteps on grass change from step to step, and footsteps on stone fall at an even loudness, the same as on grass (267 amended (1)).
 - A battle axe or giant axe swing reaches a foe who takes a step back while you wind it up, however you came at him, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 874 amended (1), 343 amended (2)).
 - Towns: in Umbrage the ground between the houses is a close-cropped lawn with a few short tufts, worn footpaths run where the woodcutter walks from the woodlot to the store and the inn, and the square's cobbles fray into earth and loose stones at their edge (880).
 - In the crypt, a robber's lunge shows its red line for a full second, and after every lunge, landed or not, he stands a moment crying out, open to your blow (790 amended (6)).
-- Rolf's sword fells a robber in the barrow in five to seven blows, swung at the same pace for the same stamina (887).
+- Rolf's sword fells a robber in the crypt in five to seven blows, swung at the same pace for the same stamina (887).
 - The old grey's lunge, marked by a red line before it lands, hits harder than his bite: step out of the red (780 amended (34)).
 - A great bear, the old grey, a skeleton guard or the draugr fights on, or goes back to its den or its room, when whoever it was after leaves, and so does any pack with it (806 amended (20)).
 - A new companion wants to go fishing with you from the start, and if you ask her to fish where there's no water she leads you to some close by (803 amended (11)).
-- A click walk past a doorway or a way out goes round it; you go through only when you click on it (689 amended (11)).
 - At a keeper's counter the Donate tab lists only what you can hand back for nothing, and everything that pays is sold on the Store tab (852 amended (3)).
 - Selling a stack in one click says how many went: "Sold 3 perch for 3 gold." (852 amended (2)).
 - Towns: Umbrage's townsfolk gather in the square from morning into the evening, standing in pairs, and at first light a few lean on the well (853, maps' side).
-- The maps show each place's own ragged edge against the frame instead of a square of woods, and the barrow's mound is drawn as you see it from above: a ring of stones, a grassy dome and its dark doorway (884).
+- The maps show each place's own ragged edge against the frame instead of a square of woods, and the mound over the Crypt of the Fallen is drawn as you see it from above: a ring of stones, a grassy dome and its dark doorway (884).
 - You're told in chat when your gear is named, grows, becomes a bane, takes a grudge or has its vengeance, and when a named thing of yours goes to someone else or comes back to you (133 amended (1)).
-- The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
 - Towns: a chimney between you and the camera shows your outline through it, as roofs and walls do (801 amended (1)).
-- In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
 - The Ossuary's dead lie in three rooms, well apart (870).
 - At the robbers' camp, a Robbers' bundle beside the two bedrolls holds two bandaging kits (870).
 - In the crypt, the first robber you meet on the way in is always alone (870).
-- People, you among them, stand easy, feet under their hips and knees soft, at rest, at work and at a stall; in the Mughouse the taverner stands behind her bar with her hands on the counter (877).
-
-- Towns: wooden houses, the Mughouse among them, have oak-framed windows cut through their own boards, with a glazing cross and board shutters strapped in iron (881).
+- People, you among them, stand easy, feet under their hips and knees soft (877).
+- Towns: Umbrage's wooden houses, the Mughouse among them, have oak-framed windows set in their own boards, with board shutters strapped in iron (881).
 - In the crypt, a Mound-breaker comes to his mates' fight only when he can see or hear it, so one you meet alone in a side room stays alone where you meet him (806 amended (17)).
 - In the crypt, a robber across a wall's corner from you steps round to where he can strike (806 amended (16)).
 - A foe beside you at a stair or doorway fights you from another side of you (571 amended (1)).
@@ -55,6 +57,13 @@ notes (decision 324).
 - Rain at night falls as faint grey streaks, shaded by the dark and by lamplight, with the view clear close to the camera (309 amended (5)).
 - A travel ration is a cloth-wrapped bundle tied with twine, a sack of food is a slumped burlap sack, a bag of nails is canvas with nails standing out of it, and a bench is two planks on splayed legs (871).
 - Dusk and dawn light the ground as long as they light the sky, and night begins for beasts and for hiding only once the twilight has gone (882).
+- In the crypt's First Hall, candles whose flames bend in a draught stand in the one niche on the west wall that hides the way down, and it opens to you once you have finished the fallen knight's quest (608 amended (3)).
+- In the crypt's Ossuary, pairs of torches light the long way from the stair down to the Hall of Fallen Souls (608 amended (3)).
+- In the crypt, the Ossuary's dead hold the door of the Hall of Fallen Souls shut while any of them stands, and once the last falls you can go through (666, 608 amended (3)).
+- In the crypt, at the door of the Hall of Fallen Souls, you're told who waits beyond it (608 amended (3)).
+- In the crypt, the draugr tells you when you carry too little gold to deal with him (608 amended (3)).
+- Towns: at night, chimney smoke over Umbrage is a faint grey wisp against the dark (710 amended (1)).
+
 ## v0.1.213
 
 - The Barrow's quest card stays out of town and the bear's cave: you see it only in the Barrow and the halls below it (747 amended (6)).
