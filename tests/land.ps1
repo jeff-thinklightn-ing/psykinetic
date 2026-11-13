@@ -129,7 +129,15 @@ Write-Output "$(if ($resolveOk) { 'PASS' } else { 'FAIL' })  changelog_resolve_t
 $inventoryTest = & python -B (Join-Path $root 'tests\voice_inventory_test.py') 2>&1
 $inventoryOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($inventoryOk) { 'PASS' } else { 'FAIL' })  voice_inventory_test"
-$parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
+# Each font's .fontdata before the Godot parts (278 amended (3)): one more import if one is
+# missing; still missing, it fails naming the font.
+Push-Location $root
+$fontImport = & bash tools/fonts_imported.sh . 2>&1
+$fontOk = $LASTEXITCODE -eq 0
+Pop-Location
+$fontImport | Where-Object { "$_" -like 're-imported: *' } | Write-Output
+Write-Output "$(if ($fontOk) { 'PASS' } else { 'FAIL' })  font_import"
+$parts =[ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
 if ($lean) {
 	# Lean (394 amended (19)): state_test and server_boot_test (a Godot or two
 	# each) beside the suite, net_test (many) after it.
@@ -169,6 +177,10 @@ if (-not $inventoryOk) {
 if (-not $resolveOk) {
 	$failed += 'changelog_resolve_test'
 	$resolveTest | Write-Output
+}
+if (-not $fontOk) {
+	$failed += 'font_import'
+	$fontImport | Write-Output
 }
 $done = @{}
 while ($done.Count -lt $parts.Count) {

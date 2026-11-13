@@ -5424,6 +5424,20 @@ before 431 amended (3) it failed, naming "port 17858: tests/camp_fall_test.gd:22
 "port 17860: tests/regen_test.gd:34 and tests/status_test.gd:150"; on main with it, PASS, 50 ports, every of() read.
 Tests only; protocol unchanged; no class_name; no bullet.
 
+278 amended (3) (perf, 2026-11-13; the coordinator's row from perf-sha's landing; label from
+tools/decision_number.sh): a landing makes each font's .fontdata before its Godot parts. perf-sha's landing at 05:00
+failed server_boot_test, not on its change: the import before land.sh segfaulted on the fonts (the first-import crash
+saturn's runs already pass twice for) and left their .fontdata unmade, and the export logged "Cannot open file
+...fontdata". tools/fonts_imported.sh reads each font's .import for the .fontdata it names; one missing or empty is
+said ("re-imported: <font> had no .fontdata") and gets one more import (headless, silent, under the run's own take),
+never a loop; still missing, it fails naming the font. tests/land.sh runs it as its font_import part before any Godot
+part, and prints its re-imported lines; tests/land.ps1 the same. tests/fonts_imported_test.sh (a land.sh part): a fake
+project and godot, so no Godot runs: all there, no import; one missing behind a CRLF .import, said, one import,
+passes; an empty one counts; still missing, fails naming it, one import only. On perf-font, AlegreyaSans-Bold's
+.fontdata removed: re-imported and PASS through the gate; removed again with the import made to fail
+(GODOT_PATH=/bin/false): "FAIL  art/fonts/AlegreyaSans-Bold.ttf: still no .fontdata after one re-import", exit 1.
+Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
