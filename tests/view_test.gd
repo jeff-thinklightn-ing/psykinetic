@@ -821,7 +821,7 @@ func _test_piles() -> void:
 	for slot: String in boar:
 		var box: AABB = drawn_in.call(boar_heap, slot)
 		var size := ArtKit.size(slot)
-		var thin := minf(size.y, minf(size.x, size.z)) if Client3D.pile_turn(size) != Vector3.ZERO else size.y
+		var thin := (minf(size.y, minf(size.x, size.z)) if Client3D.pile_turn(size) != Vector3.ZERO else size.y) * Client3D.pile_least_scale(size)
 		var middle := Vector2(box.get_center().x, box.get_center().z)
 		var top := 0.0  # The highest thing laid before it that its middle lies over.
 		for each in below:
@@ -835,6 +835,29 @@ func _test_piles() -> void:
 	_check(boar_faults.is_empty(), "a boar's heap and a kit: each flat as turned, none sunk, none floating (%s)" % ", ".join(boar_faults))
 	for i in boar.size():
 		World.items.end(World.take_from_ground(cell, 0), "gone")
+	# 619 amended (3): a small thing on the ground is drawn at least
+	# PILE_LEAST long, grown at most PILE_GROW times (meat and tusks were
+	# specks at the nearest zoom); a ring stays capped; a sword is unchanged.
+	var least_faults: PackedStringArray = []
+	for id: String in ["fish", "tusks", "meat", "silver_ring", "sword"]:
+		var slot := str(Items.def(id).get("art", ""))
+		World.put_on_ground(World.items.mint(id, "built"), cell)
+		var heap_now: Node3D = _rig._pile_nodes.get(World.zone.piles.get(cell))
+		var thing: Node3D = null
+		for child in heap_now.get_children():
+			if child.has_meta("slot") and str(child.get_meta("slot")) == slot:
+				thing = child as Node3D
+		var size := ArtKit.size(slot)
+		var longest := maxf(size.x, maxf(size.y, size.z))
+		var want := clampf(Client3D.PILE_LEAST, longest, longest * Client3D.PILE_GROW) / longest
+		var box: AABB = drawn_in.call(heap_now, slot)
+		if thing == null or (thing.scale - Vector3.ONE * want).length() > 0.01 or absf(box.position.y) > 0.01:
+			least_faults.append("%s drawn at %s (want %.2f: modelled %.3f long), underside %.3f" % [id, thing.scale if thing else "nothing", want, longest, box.position.y])
+		World.items.end(World.take_from_ground(cell, 0), "gone")
+	_check(Client3D.pile_least_scale(Vector3(0.395, 0.056, 0.156)) > 1.1 and is_equal_approx(Client3D.pile_least_scale(Vector3(0.18, 0.06, 0.06)), 2.5)
+			and Client3D.pile_least_scale(Vector3(0.03, 0.03, 0.02)) == Client3D.PILE_GROW and Client3D.pile_least_scale(Vector3(0.2, 0.9, 0.04)) == 1.0,
+			"the least size: a fish grown a little, tusks 2.5 times, a ring at most 3, a sword as it is")
+	_check(least_faults.is_empty(), "a fish, tusks, meat, a ring and a sword on the ground: each drawn at its least size, on the ground (%s)" % ", ".join(least_faults))
 	# The turn by size alone: nothing clearly thinner (a pot a hair taller than
 	# wide, dice) stands as modelled; ties go y, z, x (a size has one rest).
 	var stand := Vector3.ZERO

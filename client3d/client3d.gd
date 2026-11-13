@@ -13591,6 +13591,9 @@ func _on_pile_shown(pile: GroundPile) -> void:
 			# size.z / 2, sank a sword 8 cm).
 			var along := Vector2(cos(i * 2.4), sin(i * 2.4)) * 0.18 * mini(i, 1)
 			var turn := pile_turn(ArtKit.size(slot))
+			# Drawn at least PILE_LEAST long (619 amended (3)): true to size, a
+			# fish, meat or tusks were a few pixels at the nearest zoom.
+			thing.scale = Vector3.ONE * pile_least_scale(ArtKit.size(slot))
 			thing.rotation = Vector3(turn.x, _roll(pile.tile, 10 + i) * TAU, turn.z)
 			# Its drawn middle on its place in the heap, not its grip (a pelt's
 			# grip is near one end: its body lay 0.8 m off the cell, the rest
@@ -13612,6 +13615,22 @@ func _on_pile_shown(pile: GroundPile) -> void:
 		heap.add_child(coins)
 	_room.add_child(heap)
 	_pile_nodes[pile] = heap
+
+
+## The least drawn length of a thing lying in a pile, and the most it is grown
+## to reach it (619 amended (3), the coordinator's approval from the
+## before/after stills at the nearest zoom: true to size, meat was a red dot,
+## tusks a few white pixels, a fish shorter than the goblin's boot). Drawing
+## only: the thing, its icon, its hold and the wire are unchanged.
+const PILE_LEAST := 0.45
+const PILE_GROW := 3.0
+
+
+## The uniform scale a thing modelled [param size] big is drawn at in a pile:
+## its longest side grown to PILE_LEAST, at most PILE_GROW times, never shrunk
+## (a ring of 3 cm stays a speck at 9 cm: the pile's ring finds it).
+static func pile_least_scale(size: Vector3) -> float:
+	return clampf(PILE_LEAST / maxf(maxf(size.x, maxf(size.y, size.z)), 0.001), 1.0, PILE_GROW)
 
 
 ## How a thing modelled [param size] big is turned to lie in a pile (619

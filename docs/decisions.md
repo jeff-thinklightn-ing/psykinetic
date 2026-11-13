@@ -27745,6 +27745,25 @@ pile_turn on a pot a hair taller than wide, dice, a pelt, a shield, arrows and
 a bow.
 Client only, protocol unchanged, no new class_name.
 
+619 amended (3): the least drawn size on the ground (items, the script's
+label; the coordinator's approval, 2026-11-13, from items' before/after laptop
+stills at the nearest zoom beside the goblin). True to size, a small thing on
+the ground was lost: meat a red dot, tusks a few white pixels, a fish shorter
+than the goblin's boot, a ring and a key a speck. Client3D's
+_on_pile_shown now draws each thing in a pile at one uniform scale,
+Client3D.pile_least_scale(size): its longest modelled side grown to
+PILE_LEAST, 0.45 m, at most PILE_GROW, 3 times, and never shrunk (57 of the
+86 sized kinds in levels/items.json are shorter than 0.45; a ring of 3 cm is drawn at 9 cm and the pile's
+ring still finds it; a sword or a pelt is drawn as it is). The scale is set
+before 619 amended (2)'s rest, so the grown thing still rests on its own
+lowest drawn point and on what lies under its middle. Drawing only: the
+thing, its icon, its hold, its weight and the wire are unchanged. view_test
+_test_piles: pile_least_scale on a fish (grown a little), tusks (2.5 times),
+a ring (3 times) and a sword (1); a fish, tusks, meat, a ring and a sword each
+put on the ground alone, drawn at that scale and resting on the ground; the
+boar's heap check scales its thickness by it.
+Client only, protocol unchanged, no new class_name.
+
 ## 623. The low-horizon camera, a trial toggle
 
 Jeff (2026-10-22): "drop the camera angle so we can see the sky and the
