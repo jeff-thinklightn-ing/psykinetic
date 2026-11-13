@@ -1235,6 +1235,7 @@ func _process(delta: float) -> void:
 func step() -> void:
 	if not Net.is_authority():
 		return
+	_stepping = true
 	var was := zone
 	var t := Time.get_ticks_usec()
 	if zones.is_empty():
@@ -1276,6 +1277,8 @@ func step() -> void:
 	_world_tick_due(WORLD_TICK_BUDGET_USEC)
 	t = part("far and sleeping monsters", t)
 	enter(was)
+	_stepping = false
+	_tell_gone()  # The step's despawns, told to their holders (897).
 	stepped.emit()
 	part("after the tick (snapshot, sky)", t)
 
@@ -1996,6 +1999,8 @@ func update_visibility(peer: int, zone_name: String) -> void:
 func reset() -> void:
 	if not Net.is_authority():
 		return
+	_stepping = false
+	_gone_this_step.clear()  # 897: no room's gone told in the next.
 	for id: int in _telegraphs.keys():
 		end_telegraph(id, false)  # Decision 602: none outlives the room.
 	_fights.clear()  # Decision 740: its din goes with it.
@@ -8898,6 +8903,12 @@ func despawn(entity: GridEntity) -> void:
 				despawn(each)  # Its chest goes with it (722); the record keeps what is in it.
 	_let_go_things(entity)
 	_forget_jobs(entity)
+	if _laying_again:
+		pass  # The same body laid again at once (lay_again): a move, nobody forgets it.
+	elif _stepping:
+		_gone_this_step.append(entity)  # Told at the step's end (897): a holder may be mid-tick on it.
+	else:
+		_tell_holders(entity)
 	if _occupancy.get(entity.tile) == entity:
 		_occupancy.erase(entity.tile)  # Not one that holds no cell (vacate): another may stand there.
 	_entities.erase(entity)
@@ -8913,6 +8924,52 @@ func despawn(entity: GridEntity) -> void:
 
 func _freed(entity: GridEntity) -> void:
 	_freeing.erase(entity)
+
+
+## Decision 897: World.step is running (its zones' ticks): a despawn in it
+## is told to its holders at the step's end (_gone_this_step), not mid-tick,
+## where the one whose blow killed it is still reading its target. Freed only
+## at the frame's end, it is whole till then.
+var _stepping := false
+var _gone_this_step: Array[GridEntity] = []
+## lay_again is taking a body off to lay it again: its despawn tells nobody.
+var _laying_again := false
+
+
+## Decision 897: the same body taken off and laid at [param at] in one call,
+## spawn's resets and all (the tests' teleport): it never left the world, so
+## no holder forgets it, where a despawn would tell them all. Nothing in the
+## game lays one body again: a body that leaves is gone (travel makes a new).
+func lay_again(entity: GridEntity, at: Vector2i) -> bool:
+	_laying_again = true
+	despawn(entity)
+	_laying_again = false
+	return spawn(entity, at)
+
+
+## Every despawn of this step told to its holders (897), at the step's end.
+func _tell_gone() -> void:
+	var gone := _gone_this_step
+	_gone_this_step = []
+	for each: Variant in gone:
+		if is_instance_valid(each):
+			_tell_holders(each as GridEntity)
+
+
+## Decision 897: every entity of every loaded zone forgets [param entity],
+## which is leaving the world (GridEntity.forget): a monster's target, a
+## beast's foe, a pack's lead, an order. Every zone, since a holder may point
+## across a link (a player's travel is a despawn here and a new body there).
+## Nothing a tick; one pass over the loaded zones' entities a despawn.
+func _tell_holders(entity: GridEntity) -> void:
+	var lists: Array = [_entities]  # The zone World is in (or the one world, with no zones).
+	for each_zone: Zone in zones.values():
+		if each_zone != zone:
+			lists.append(each_zone.entities)
+	for listed: Array[GridEntity] in lists:
+		for each: GridEntity in listed:
+			if each != entity and is_instance_valid(each):
+				each.forget(entity)
 
 
 ## [param entity] leaving the world, before it is freed (decision 572

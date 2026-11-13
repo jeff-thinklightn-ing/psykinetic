@@ -53773,3 +53773,44 @@ lantern hangs by its ring on the hook at 1.7 with the right middle, and the terr
 low post's lantern. Watched: hosted Atlas stills, C:/dev/review/lamp_posts/store_near_crop.png (main's code post
 beside the swap), shack_post_crop.png and shack_post_full.png (Snagfin's low post), near_sheet.png. Client only;
 protocol unchanged; no new class_name.
+## 897. Whatever leaves the world, every holder forgets it (enemy-ai)
+
+The coordinator's, approved 2026-11-12 after the freed-striker fault (806 amended (20)): a body
+freed while others held it in a field threw on every tick that read it, and a player leaving by
+console rooted the great bear for 1976 ticks on the box (playtest's bearB, joined, v0.1.211's code).
+Read guards (806 amended (20)) stay; this clears the holds themselves.
+
+- World.despawn tells every entity of every loaded zone (World._entities, the zone World is in or
+  the one world with no zones, and each other zone's list): GridEntity.forget(gone). The base clears
+  its own (shelter_lead; an order on gone, dropped whole). A holder's class clears its own fields in
+  an override that calls super(gone) first: Monster (target with its slot, _provoked, _blocked_by,
+  _rally, struck_by, _quarry, _wallow_from), Animal (_foe, _prey, escort_lead), BoarKing (_engager,
+  _bit_by), Draugr (_retinue).
+- A despawn inside World.step (a blow kills inside a tick) is told at the step's end
+  (_stepping, _gone_this_step), never mid-tick, where the one whose blow it was still reads its
+  target; freed only at the frame's end, the body is whole till then. Outside a step, told at once.
+- A forget() may erase from a list its caller is walking: walk a copy. Draugr._restore despawned
+  his risen while walking _retinue, and each despawn's forget took one off it, so every other one
+  stood after his yield (monster_test caught it); it walks _retinue.duplicate().
+- World.lay_again(entity, at): the same body off and laid again in one call, spawn's resets and
+  all, telling nobody: the tests' teleport. Nothing in the game lays one body again (every
+  despawn in main.gd and sim/ is a leave; travel makes a new body at the far end).
+- Freed while the world still lists it (GridEntity._world_listed, set in _world_place, cleared in
+  _world_remove): "[free] a <kind> freed without World.despawn" once a kind in the server log, the
+  kind only, never a name or id. The notification reads only the entity itself (Net and World may
+  be gone at teardown).
+- Holders of other trees, each its own take on this one (the coordinator's order): Companion's
+  _held_foe, _mine_seam, and the base's fields through super(gone) (companions, with Main's
+  _on_entity_despawned loop moved in that take); Resident._foe (npc); Seam.struck_by (the mines,
+  769). Guide is RefCounted, in no zone: its pet and leader are Companion.forget's to clear.
+- Cost: one pass over the loaded zones' entities a despawn, nothing a tick: 11.1 µs a despawn over
+  287 entities on a quiet box (57-59 beside five soaks).
+
+monster_test _test_despawn_forget: a player leaving, every hold on her let go at once; a wolf gone,
+the king's engager and the draugr's retinue let go; a skeleton killed inside a step, its holder told
+by the step's end. _test_despawn_drift: every sim/ class under GridEntity, each field typed as an
+entity (or an array or dictionary of them, by get_property_list) set to a stand-in, forget(it),
+cleared; DESPAWN_PENDING names the other trees' fields to come, and fails both on a new field not
+forgotten and on a pending one now forgotten, so it only shrinks. _test_despawn_cost: 1,000
+despawns, µs each printed. monster_test's teleports call World.lay_again. Server only, protocol
+unchanged (v0.1.213 d08f85f24309 before and after), no new class_name, no bullet.

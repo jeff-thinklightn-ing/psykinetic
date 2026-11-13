@@ -265,6 +265,13 @@ func _ready() -> void:
 	peaceable = state == State.SEATED or state == State.AT_REST
 
 
+## Decision 897: [param gone] leaving the world; one of his raised retinue
+## gone is out of it (Monster.forget for the rest).
+func forget(gone: GridEntity) -> void:
+	super(gone)
+	_retinue.erase(gone)
+
+
 func _sim_tick() -> void:
 	# What a client may read of him (648, npc's side): seated and unprovoked, or at rest (573 amended (3):
 	# his rest words), a click or E talks; in a pact, struck or provoked, it strikes.
@@ -884,7 +891,7 @@ func _restore() -> void:
 	_angered = false
 	alert = Alert.IDLE
 	_returning = true
-	for raised_one in _retinue:
+	for raised_one in _retinue.duplicate():  # A copy: each despawn's forget (897) takes it off _retinue.
 		if is_instance_valid(raised_one) and raised_one.spawned:
 			World.despawn(raised_one)
 	_retinue.clear()

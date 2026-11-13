@@ -1574,8 +1574,7 @@ func _test_call_and_rout() -> void:
 
 ## Moves [param entity] to [param to] at once (a test's hand).
 func _move_to(entity: GridEntity, to: Vector2i) -> void:
-	World.despawn(entity)
-	World.spawn(entity, to)
+	World.lay_again(entity, to)
 
 
 ## A raid group's raiders: spawned into the room as a level's are, and a
@@ -1855,6 +1854,7 @@ func _test_ambush() -> void:
 	_test_den_walk_refused()
 	_test_freed_striker()
 	_test_alert_note()
+	_test_despawn_forget()
 	_test_link_slots()
 	_test_corner_fight()
 	_test_boar_king_aim()
@@ -2799,8 +2799,7 @@ func _test_apex_lair() -> void:
 		World.step()
 	_check(World.distance(bear.tile, Vector2i(30, 4)) <= 8 and not (bear as GreatBear).asleep, "it walks out to its ground and roams there (%s)" % bear.tile)
 	# Beaten back, seen: it walks to its door, then is in its lair.
-	World.despawn(walker)
-	World.spawn(walker, bear.tile + Vector2i(-3, 0))
+	World.lay_again(walker, bear.tile + Vector2i(-3, 0))
 	bear.hp = roundi(bear.max_hp * 0.3)
 	var hurt := bear.hp
 	Apex._check("great_bear", row)
@@ -2978,8 +2977,7 @@ func _test_great_bear() -> void:
 	for i in 10:
 		World.step()
 	_check(bear.asleep, "a hunter 4 off: it sleeps on (it sees %d asleep)" % GreatBear.SLEEP_SIGHT)
-	World.despawn(hunter)
-	World.spawn(hunter, Vector2i(5, 3))
+	World.lay_again(hunter, Vector2i(5, 3))
 	World.damage(bear, 3, hunter)
 	World.step()
 	_check(not bear.asleep and &"roar" in cries, "struck asleep, it wakes with a roar (%s)" % [cries])
@@ -3001,8 +2999,7 @@ func _test_great_bear() -> void:
 	_check(hunter.hp == before - int(bear.swipe["damage"]) and World.distance(hunter.tile, bear.tile) >= 2,
 			"then the swipe lands: %d hp and swept back (%d off)" % [before - hunter.hp, World.distance(hunter.tile, bear.tile)])
 	# A tell broken: knocked down mid-tell, the move is lost.
-	World.despawn(hunter)
-	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	World.lay_again(hunter, bear.tile + Vector2i(1, 0))
 	bear._next_swipe = 0
 	for i in 10:
 		World.step()
@@ -3020,8 +3017,7 @@ func _test_great_bear() -> void:
 		if bear._move.is_empty():
 			break
 	# Flanked (combat's 780 side): a blow from behind mid-tell staggers it, the move lost.
-	World.despawn(hunter)
-	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	World.lay_again(hunter, bear.tile + Vector2i(1, 0))
 	bear._next_swipe = 0
 	bear._next_slam = World.tick + 100000  # No slam with the flanker beside it; the slam's own check sets it.
 	for i in 20:
@@ -3050,8 +3046,7 @@ func _test_great_bear() -> void:
 	# The slam: two beside it.
 	var second := EntityFactory.build(SPECS["P"].merged({"name": "BearHunter2"})) as GridEntity
 	_room.add_child(second)
-	World.despawn(hunter)
-	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	World.lay_again(hunter, bear.tile + Vector2i(1, 0))
 	World.spawn(second, bear.tile + Vector2i(0, 1) if World.is_free(bear.tile + Vector2i(0, 1)) else bear.tile + Vector2i(0, -1))
 	bear._next_slam = 0
 	bear._next_swipe = World.tick + 1000
@@ -3075,8 +3070,7 @@ func _test_great_bear() -> void:
 	bear._next_swipe = World.tick + 1000
 	bear._next_slam = World.tick + 1000
 	bear._next_charge = 0
-	World.despawn(hunter)
-	World.spawn(hunter, bear.tile + Vector2i(5, 0))
+	World.lay_again(hunter, bear.tile + Vector2i(5, 0))
 	var charged := false
 	for i in 20:
 		World.step()
@@ -3086,8 +3080,7 @@ func _test_great_bear() -> void:
 	_check(charged, "a foe 5 off: the charge's tell, a line to them")
 	# Stepped off the line before it runs: the charge meets nobody; winded.
 	var off := hunter.tile + Vector2i(0, 2) if World.is_free(hunter.tile + Vector2i(0, 2)) else hunter.tile + Vector2i(0, -2)
-	World.despawn(hunter)
-	World.spawn(hunter, off)
+	World.lay_again(hunter, off)
 	before = hunter.hp
 	var winded := false
 	for i in 60:
@@ -3126,8 +3119,7 @@ func _test_great_bear() -> void:
 	World.tracks_changed.connect(on_tracks)
 	bear._last_tile = Monster.NO_TILE
 	for x in [20, 21, 22, 23, 24]:
-		World.despawn(bear)
-		World.spawn(bear, Vector2i(x, 3))
+		World.lay_again(bear, Vector2i(x, 3))
 		bear._track()
 	World.tracks_changed.disconnect(on_tracks)
 	var level := World.fields.level
@@ -3201,8 +3193,7 @@ func _test_watch_wave() -> void:
 	World.step()
 	_check(ends["beaten"] == [id] and raids.waves_at("t").is_empty() and raids.raiders(id).is_empty(), "every one down: the wave is beaten (%s)" % [ends])
 	# The post unwatched: wolves, more than a wave holds, go by it to the town.
-	World.despawn(watcher)
-	World.spawn(watcher, Vector2i(2, 1))
+	World.lay_again(watcher, Vector2i(2, 1))
 	var wolves_id := raids.wave("t", post, "wolves", 20)
 	var wolves := raids.raiders(wolves_id)
 	_check(wolves.size() == Raids.WAVE_MOST and wolves.all(func(each: Monster) -> bool: return each is Animal),
@@ -4558,8 +4549,7 @@ func _test_herd_hunt() -> void:
 				herds.moved(str((entity as Animal).spawn_spec["group"]), cross["to"], cross["at"])
 				World.despawn(entity)  # As Main's _animal_crossed: kept, not dead.
 	World.walked_off.connect(off)
-	World.despawn(hunter)
-	World.spawn(hunter, Vector2i(22, 3))
+	World.lay_again(hunter, Vector2i(22, 3))
 	for i in 120:
 		World.step()
 		if crossed.size() >= 2:
@@ -6051,8 +6041,7 @@ func _test_bane_and_grudge() -> void:
 			_check(imp.target == null, "a plain dagger's bearer %d off (sight %d): not seen" % [d, imp.sight_range])
 		# Heard: a fight's noise 6 round the bearer, the imp 8 off.
 		imp.senses.forget()
-		World.despawn(imp)
-		World.spawn(imp, player.tile - Vector2i(8, 0))
+		World.lay_again(imp, player.tile - Vector2i(8, 0))
 		var heard_before := imp.senses.heard.size()
 		World.noise(player.tile, 6, &"fight", player)
 		var heard := imp.senses.heard.size() > heard_before
@@ -7102,8 +7091,7 @@ func _test_old_wolf() -> void:
 	# No lunge into a downing.
 	var near_wolf: Animal = pack[0]
 	player.hp = player.max_hp / 2 - 1
-	World.despawn(near_wolf)
-	World.spawn(near_wolf, _free_beside(player.tile))
+	World.lay_again(near_wolf, _free_beside(player.tile))
 	_check(not grey._may_lunge(grey.pack()), "his target under half hp with his pack beside them: no lunge")
 	player.hp = player.max_hp
 	_check(grey._may_lunge(grey.pack()), "whole: he may")
@@ -7111,8 +7099,7 @@ func _test_old_wolf() -> void:
 	for wolf: Animal in pack:
 		if wolf.spawned:
 			World.despawn(wolf)
-	World.despawn(grey)
-	World.spawn(grey, player.tile + Vector2i(-3, 0))
+	World.lay_again(grey, player.tile + Vector2i(-3, 0))
 	World.face(grey, Vector2i(1, 0))
 	grey._move = {}
 	grey._next_spring = World.tick
@@ -7331,8 +7318,7 @@ func _test_boar_king() -> void:
 		World.step()
 		if not stepped_off and str(king._move.get("move", "")) == "charge":
 			stepped_off = true
-			World.despawn(player)
-			World.spawn(player, Vector2i(9, 8))  # Aside, off his line.
+			World.lay_again(player, Vector2i(9, 8))  # Aside, off his line.
 		if str(king._move.get("move", "")) == "skid":
 			skidded = World.tick
 			break
@@ -7361,8 +7347,7 @@ func _test_boar_king() -> void:
 		World.step()
 		if not stepped_off and str(king._move.get("move", "")) == "charge":
 			stepped_off = true
-			World.despawn(player)
-			World.spawn(player, Vector2i(27, 8))
+			World.lay_again(player, Vector2i(27, 8))
 		if World.is_stunned(king) and king.stun_cause == &"crash":
 			crashed = true
 			break
@@ -9844,3 +9829,187 @@ func _test_alert_note() -> void:
 		World.step()
 	_check(ear.alert_notes == 1 and ear.alert_why == "hears door struck at (6, 4) (4 cells)",
 		"a door struck out of its sight: one line, what and where (%d, %s)" % [ear.alert_notes, ear.alert_why])
+
+
+## Decision 897's holders not yet forgetting, each its tree's own take on
+## 897 (the coordinator's order): class -> fields. The drift check fails on a
+## field that no forget() clears and is not listed here, and on one listed
+## here that is now cleared, so the list only shrinks.
+const DESPAWN_PENDING := {
+	"Companion": ["_held_foe", "_mine_seam", "shelter_lead", "action_target"],  # companions: super(gone) in Companion.forget and its two fields
+	"Resident": ["_foe"],  # npc
+	"Seam": ["struck_by"],  # the mines (769)
+}
+
+
+## Decision 897: whatever leaves the world (World.despawn), every entity that
+## held it forgets it, in every loaded zone; a despawn mid-step is told at
+## the step's end; no field typed as an entity escapes forget() (drift).
+func _test_despawn_forget() -> void:
+	print("%s== 897: whatever leaves the world, every holder forgets it ==" % char(10))
+	Monster.idling = false
+	var rows: Array[String] = ["##########", "#........#", "#.x.w.B..#", "#...kP...#", "#.u...K..#", "##########"]
+	var e := _build(rows)
+	var robber: Monster = e["x"][0]
+	var wolf: Animal = e["w"][0]
+	var skel: Monster = e["k"][0]
+	var player: GridEntity = e["P"][0]
+	var draugr: Draugr = e["u"][0]
+	var king: BoarKing = e["K"][0]
+	var leaver := EntityFactory.build(SPECS["P"].merged({"name": "Leaver", "tile": Vector2i(7, 1)})) as Player
+	_room.add_child(leaver)
+	World.spawn(leaver, Vector2i(7, 1))
+	robber.target = leaver
+	robber._provoked = leaver
+	robber._blocked_by = leaver
+	robber._rally = leaver
+	robber.struck_by = leaver
+	robber._quarry = leaver
+	wolf._foe = leaver
+	wolf._prey = leaver
+	wolf.shelter_lead = leaver
+	king._bit_by = leaver
+	player.action_order = GridEntity.Order.ATTACK
+	player.action_target = leaver
+	World.despawn(leaver)  # Outside a step: told at once.
+	var held: Array[String] = []
+	for pair: Array in [[robber, "target"], [robber, "_provoked"], [robber, "_blocked_by"], [robber, "_rally"], [robber, "struck_by"],
+			[robber, "_quarry"], [wolf, "_foe"], [wolf, "_prey"], [wolf, "shelter_lead"], [king, "_bit_by"], [player, "action_target"]]:
+		if (pair[0] as Object).get(pair[1]) != null:
+			held.append("%s.%s" % [(pair[0] as Node).name, pair[1]])
+	_check(held.is_empty() and player.action_order == GridEntity.Order.NONE,
+			"a player leaving: every hold on her let go at once (still held: %s; her order %s)" % [held, player.action_order])
+	leaver.free()
+	# A beast gone: the king's engager and the draugr's retinue let it go.
+	king._engager = wolf
+	draugr._retinue.append(wolf)
+	World.despawn(wolf)
+	_check(king._engager == null and not draugr._retinue.has(wolf), "a wolf gone: the king's engager and the draugr's retinue let it go")
+	wolf.free()
+	# Mid-step: her blow kills the skeleton inside World.step; the one holding
+	# it is told at the step's end, never mid-tick.
+	skel.hp = 1
+	robber.shelter_lead = skel
+	World.order_attack(player, skel)
+	var gone_at := -1
+	for i in 30:
+		World.step()
+		if not skel.spawned:
+			gone_at = i
+			break
+	_check(gone_at >= 0 and robber.shelter_lead == null and World._gone_this_step.is_empty() and not World._stepping,
+			"a skeleton killed inside a step: gone at tick %d, its holder told by the step's end (held %s)" % [gone_at, robber.shelter_lead])
+	_test_despawn_drift()
+	_test_despawn_cost()
+	Monster.idling = true
+
+
+## 897's drift check: every class of sim/ under GridEntity, each field typed as
+## an entity (or an array or dictionary of them): set to one, forget(it), cleared.
+func _test_despawn_drift() -> void:
+	var classes := {}
+	for row: Dictionary in ProjectSettings.get_global_class_list():
+		classes[str(row["class"])] = row
+	var failing: Array[String] = []
+	var checked := 0
+	for name: String in classes:
+		if not _entity_class(name, classes) or not str(classes[name]["path"]).begins_with("res://sim/"):
+			continue
+		var script: Script = load(str(classes[name]["path"]))
+		if script == null or not script.can_instantiate():
+			continue
+		var holder: Object = script.new()
+		for prop: Dictionary in holder.get_property_list():
+			if not (int(prop["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE):
+				continue
+			var field := str(prop["name"])
+			var held := ""
+			var shape := ""
+			if int(prop["type"]) == TYPE_OBJECT and _entity_class(str(prop["class_name"]), classes):
+				held = str(prop["class_name"])
+				shape = "field"
+			elif int(prop["type"]) == TYPE_ARRAY and _entity_class(str(prop["hint_string"]).get_slice(":", str(prop["hint_string"]).get_slice_count(":") - 1), classes):
+				held = str(prop["hint_string"]).get_slice(":", str(prop["hint_string"]).get_slice_count(":") - 1)
+				shape = "array"
+			elif int(prop["type"]) == TYPE_DICTIONARY and _entity_class(str(prop["hint_string"]).get_slice(";", 0).get_slice(":", str(prop["hint_string"]).get_slice(";", 0).get_slice_count(":") - 1), classes):
+				held = str(prop["hint_string"]).get_slice(";", 0).get_slice(":", str(prop["hint_string"]).get_slice(";", 0).get_slice_count(":") - 1)
+				shape = "dictionary"
+			if held == "" or not classes.has(held) and held != "GridEntity":
+				continue
+			var dummy: GridEntity = (load(str(classes[held]["path"])) as Script).new()
+			match shape:
+				"field":
+					holder.set(field, dummy)
+				"array":
+					(holder.get(field) as Array).append(dummy)
+				"dictionary":
+					(holder.get(field) as Dictionary)[dummy] = null
+			holder.call("forget", dummy)
+			var still := false
+			match shape:
+				"field":
+					still = holder.get(field) == dummy
+				"array":
+					still = (holder.get(field) as Array).has(dummy)
+				"dictionary":
+					still = (holder.get(field) as Dictionary).has(dummy)
+			checked += 1
+			if still:
+				failing.append("%s.%s" % [name, field])
+			match shape:
+				"field":
+					holder.set(field, null)
+				"array":
+					(holder.get(field) as Array).erase(dummy)
+				"dictionary":
+					(holder.get(field) as Dictionary).erase(dummy)
+			dummy.free()
+		if holder is Node:
+			(holder as Node).free()
+	var drift: Array[String] = []
+	for each in failing:
+		var cls := each.get_slice(".", 0)
+		var fld := each.get_slice(".", 1)
+		if not (DESPAWN_PENDING.has(cls) and fld in DESPAWN_PENDING[cls]):
+			drift.append(each)
+	var stale: Array[String] = []
+	for cls: String in DESPAWN_PENDING:
+		for fld: String in DESPAWN_PENDING[cls]:
+			if not ("%s.%s" % [cls, fld]) in failing:
+				stale.append("%s.%s" % [cls, fld])
+	print("[897] drift: %d entity-typed fields checked; not forgotten %s" % [checked, failing])
+	_check(checked > 20 and drift.is_empty() and stale.is_empty(),
+			"every entity-typed field is forgotten (%d checked; new fields not forgotten %s; pending now forgotten, take them off DESPAWN_PENDING: %s)" % [checked, drift, stale])
+
+
+func _entity_class(name: String, classes: Dictionary) -> bool:
+	var at := name
+	for i in 12:
+		if at == "GridEntity":
+			return true
+		if not classes.has(at):
+			return false
+		at = str(classes[at]["base"])
+	return false
+
+
+## 897's cost, a bound (perf's ask): 1,000 despawns over a zone of a few hundred.
+func _test_despawn_cost() -> void:
+	var rows: Array[String] = []
+	for y in 18:
+		rows.append("#" + ("c".repeat(18) if y > 0 and y < 17 else "#".repeat(18)) + "#")
+	rows[1] = "#P" + "c".repeat(16) + ".#"
+	_build(rows)
+	var at := Vector2i(18, 1)
+	var spent := 0
+	for i in 1000:
+		var crate := EntityFactory.build(SPECS["c"].merged({"name": "Gone%d" % i, "tile": at}))
+		_room.add_child(crate)
+		World.spawn(crate, at)
+		var t := Time.get_ticks_usec()
+		World.despawn(crate)
+		spent += Time.get_ticks_usec() - t
+		crate.free()
+	var each := spent / 1000.0
+	print("[897] cost: %.1f us a despawn over %d entities in the zone" % [each, World._entities.size()])
+	_check(each < 5000.0, "a despawn's pass over %d entities: %.1f us (bound 5000)" % [World._entities.size(), each])

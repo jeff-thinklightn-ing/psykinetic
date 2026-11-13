@@ -1431,6 +1431,27 @@ func _sim_tick() -> void:
 			next_move_tick = World.tick + CHASE_RETRY_TICKS  # No way in: look again in a moment.
 
 
+## Decision 897: [param gone] leaving the world; its own fields let go of it
+## (GridEntity.forget). A gone target is nobody: the next tick looks again.
+func forget(gone: GridEntity) -> void:
+	super(gone)
+	if target == gone:
+		target = null
+		slot = NO_TILE
+	if _provoked == gone:
+		_provoked = null
+	if _blocked_by == gone:
+		_blocked_by = null
+	if _rally == gone:
+		_rally = null
+	if struck_by == gone:
+		struck_by = null
+	if _quarry == gone:
+		_quarry = null
+	if _wallow_from == gone:
+		_wallow_from = null
+
+
 ## noticing off: nobody seen or heard; it idles, IDLE.
 func _unnoticing() -> void:
 	target = null

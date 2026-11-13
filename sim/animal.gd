@@ -195,6 +195,18 @@ static func is_wild(kind: String) -> bool:
 	return str(kinds().get(kind, {}).get("side", "")) == "wild"
 
 
+## Decision 897: [param gone] leaving the world; a beast's foe, prey and the
+## lead it escorts let go of it (Monster.forget for the rest).
+func forget(gone: GridEntity) -> void:
+	super(gone)
+	if _foe == gone:
+		_foe = null
+	if _prey == gone:
+		_prey = null
+	if escort_lead == gone:
+		escort_lead = null
+
+
 func _sim_tick() -> void:
 	if not noticing:
 		_unnoticing()

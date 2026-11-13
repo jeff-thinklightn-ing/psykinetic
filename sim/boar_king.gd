@@ -128,6 +128,16 @@ func _hook() -> void:
 		World.entity_died.connect(_on_died)
 
 
+## Decision 897: [param gone] leaving the world; the one who engaged him and
+## the one who bit him let go of (Animal.forget for the rest).
+func forget(gone: GridEntity) -> void:
+	super(gone)
+	if _engager == gone:
+		_engager = null
+	if _bit_by == gone:
+		_bit_by = null
+
+
 func _sim_tick() -> void:
 	_hook()
 	if den == NO_TILE:

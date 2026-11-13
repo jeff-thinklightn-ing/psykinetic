@@ -589,6 +589,48 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		heat_carriers.erase(self)
+		if _world_listed:
+			_freed_unseen()
+
+
+## Decision 897: [param gone] is leaving the world (World.despawn, before it
+## is freed): nothing of this one's points at it after. The base clears its
+## own (shelter_lead; an order on it, dropped whole); a holder's class clears
+## its own fields in an override that calls super() first. A field typed as
+## an entity that no forget() clears fails monster_test's drift check
+## (_test_despawn_forget).
+func forget(gone: GridEntity) -> void:
+	if shelter_lead == gone:
+		shelter_lead = null
+	if action_target == gone:
+		action_order = Order.NONE
+		action_target = null
+		action_direction = Vector2i.ZERO
+
+
+## Kinds already told freed without World.despawn (897): one line each.
+static var _freed_told := {}
+
+
+## Decision 897: spawned into the server's world (_world_add) and not yet
+## removed from it (_world_remove): freed so, nobody was told to forget it.
+## A flag of its own, read at delete time, where Net and World may be gone.
+var _world_listed := false
+
+
+## Decision 897: freed while the world still listed it, so nobody was told to
+## forget it. Said once a kind in the server log, the kind only: the box's
+## journal is read by grep, so never a name or an id. Reads nothing but itself
+## (it runs at delete time, the tree coming down).
+func _freed_unseen() -> void:
+	var kind := str(spawn_spec.get("kind", "")) if spawn_spec is Dictionary else ""
+	if kind == "":
+		var own: Script = get_script()
+		kind = str(own.get_global_name()) if own != null else "entity"
+	if _freed_told.has(kind):
+		return
+	_freed_told[kind] = true
+	print("[free] a %s freed without World.despawn: its holders were not told (897)" % kind)
 
 
 func _exit_tree() -> void:
@@ -986,6 +1028,7 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	action_order = Order.NONE
 	action_target = null
 	spawned = true
+	_world_listed = true
 
 
 func _world_set_tile(to: Vector2i) -> void:
@@ -1272,6 +1315,7 @@ func _world_bashed(direction: Vector2i, by: NodePath) -> void:
 
 func _world_remove() -> void:
 	spawned = false
+	_world_listed = false
 
 
 # --- Client mirror ------------------------------------------------------------
