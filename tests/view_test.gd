@@ -3327,8 +3327,38 @@ func _test_tavern_inside() -> void:
 			and BuildingComposer.sill_lamp_edge(house, [] as Array[Vector3i]) == BuildingComposer.NO_SILL,
 			"no lamp on a building that is no shell, nor on a shell with no window")
 	_test_shutter_room(level, windows)
+	_test_glow_outside(house, windows, "a house's")
+	var chapel_level := _kinds_level([["building_temple_small", Vector2i(2, 2), false]])
+	var chapel: Dictionary = chapel_level["buildings"][0]
+	_rig.rebuild(chapel_level["terrain"], Vector2i(1, 1))
+	_test_glow_outside(chapel, BuildingComposer.windows(chapel, chapel_level["terrain"]["edges"]), "the temple's")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+## Each of [param building]'s [param windows] drawn in the room with its glow
+## pane on the wall's outside, so its light shows to the street (734 amended
+## (9): the chapel's lancets have their pane on their -x side, behind the
+## leading, and the north and east ones were lit only inside). The pane is
+## found by where it is drawn, nearer the edge's outside cell than its inside.
+func _test_glow_outside(building: Dictionary, windows: Array[Vector3i], what: String) -> void:
+	var inside := Level.building_cells(building)
+	var panes: Array = _rig._descendants(_rig._room).filter(func(each: Node) -> bool: return each.name == "glow" and each is MeshInstance3D)
+	var found := 0
+	var wrong: Array = []
+	for key: Vector3i in windows:
+		var mid := _rig._edge_midpoint(key)
+		var cells := Terrain.edge_cells(key)
+		var out_cell: Vector2i = cells[1] if inside.has(cells[0]) else cells[0]
+		for pane: Node3D in panes:
+			var at := _rig._room.to_local((pane as MeshInstance3D).global_transform * (pane as MeshInstance3D).get_aabb().get_center())
+			if Vector2(at.x - mid.x, at.z - mid.z).length() > 0.5:
+				continue
+			found += 1
+			var in_cell: Vector2i = cells[0] if out_cell == cells[1] else cells[1]
+			if Vector2(at.x, at.z).distance_to(Vector2(out_cell)) >= Vector2(at.x, at.z).distance_to(Vector2(in_cell)):
+				wrong.append(key)
+	_check(found == windows.size() and wrong.is_empty() and not windows.is_empty(),
+			"%s windows each lit to the street: its glow pane on the wall's outside (%d of %d found, inside %s)" % [what, found, windows.size(), wrong])
 
 ## A window's open leaf has room to swing (489 amended (8), art-kit's
 ## evening stills: a leaf opened over the door frame beside it). In the
@@ -3377,8 +3407,7 @@ func _test_shutter_room(level: Dictionary, windows: Array[Vector3i]) -> void:
 		var made := ArtKit.instance(slot)
 		_rig._dress_window(made, pick_key, slot)
 		room_edges[beside] = was
-		var flipped: bool = _rig._window_flipped.get(pick_key, false)
-		var name_there := "shutter_a" if (pick_side < 0) != flipped else "shutter_b"
+		var name_there := "shutter_a" if (pick_side < 0) != (made.rotation.y != 0.0) else "shutter_b"
 		var shut_leaf := made.find_child(name_there, true, false) as Node3D
 		held = shut_leaf != null and is_zero_approx(shut_leaf.rotation.y)
 		var pane := made.find_child("glow", true, false)
@@ -4336,9 +4365,22 @@ func _test_chapel() -> void:
 	for key: Vector3i in temple["doors"]:
 		door_at += (BuildingComposer._edge_out(temple, key)[0] as Vector2) / (temple["doors"] as Array).size()
 	var by_door := buttresses.filter(func(each: Node3D) -> bool: return Vector2(each.position.x, each.position.z).distance_to(door_at) < 2.0)
-	_check(buttresses.size() == 6 and lancets.size() == 6 and by_door.is_empty() and node.find_child("Steps", true, false) != null,
+	_check(buttresses.size() == 6 and lancets.size() == 8 and by_door.is_empty() and node.find_child("Steps", true, false) != null,
 			"734 amended (3): three buttresses and three lancets along each long side, a bay of three between, none by the door; steps at its door (%d, %d, %d)"
 			% [buttresses.size(), lancets.size(), by_door.size()])
+	# Its back end's pair (734 amended (9)): the two middle edges of the end
+	# opposite its door, side by side, facing out the back.
+	var back := -(temple["facing"] as Vector2i)
+	var end_lancets: Array = lancets.filter(func(lancet_key: Vector3i) -> bool: return BuildingComposer._edge_out(temple, lancet_key)[1] == back)
+	var end_across: Array = []
+	for end_key: Vector3i in end_lancets:
+		var spot: Vector2 = BuildingComposer._edge_out(temple, end_key)[0]
+		end_across.append(spot.y if back.x != 0 else spot.x)
+	end_across.sort()
+	var end_width := float((temple["rect"] as Rect2i).size.y if back.x != 0 else (temple["rect"] as Rect2i).size.x)
+	_check(end_lancets.size() == 2 and is_equal_approx(end_across[1] - end_across[0], 1.0)
+			and is_equal_approx((end_across[0] + end_across[1]) * 0.5, (end_width - 1.0) * 0.5),
+			"734 amended (9): a pair of lancets in the middle of its back end, behind its altar (%s across %.0f)" % [end_across, end_width])
 	# Each slope's hole leans off its own slope (734 amended (3)).
 	var leaning := holes.filter(func(hole: Node3D) -> bool:
 		var side := 1.0 if str(hole.name).ends_with("_1") else -1.0

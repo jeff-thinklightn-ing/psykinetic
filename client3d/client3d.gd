@@ -11164,12 +11164,17 @@ static func window_drawn_height(slot: String) -> float:
 ## half round where its outside is the run's -x (_window_flipped), as tall
 ## as the wall there, its shutters open (two in three, by the edge: each
 ## leaf 90 to 108 degrees, a little apart) or shut. An open window's leaf
-## stays shut where it has no room to swing (_leaf_room).
+## stays shut where it has no room to swing (_leaf_room). A piece whose glow
+## pane sits on its -x side is lit from there (734 amended (9): the chapel's
+## lancet, its pane behind the leading), so it is turned the other way, its
+## light out to the street.
 func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
-	if _window_flipped.get(key, false):
-		made.rotation.y = PI
 	# Its light (566): art-kit's "glow" pane, lit as its building is.
 	var glow := made.find_child("glow", true, false) as Node3D
+	var lit_minus := glow is MeshInstance3D \
+			and glow.position.x + (glow as MeshInstance3D).get_aabb().get_center().x < 0.0
+	if _window_flipped.get(key, false) != lit_minus:
+		made.rotation.y = PI
 	if glow != null and _window_code.has(key):
 		_glows.append([glow, _window_code[key]])
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
@@ -11189,7 +11194,7 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		return
 	# Leaf a hangs at the piece's -z, the run's lower end, b at its +z;
 	# turned half round, the other way.
-	var a_side := 1 if _window_flipped.get(key, false) else -1
+	var a_side := 1 if made.rotation.y != 0.0 else -1
 	var a := made.find_child("shutter_a", true, false) as Node3D
 	var b := made.find_child("shutter_b", true, false) as Node3D
 	if a != null and _leaf_room(key, a_side):

@@ -472,7 +472,44 @@ static func _wall_bays(building: Dictionary) -> Dictionary:
 		for i in range(1, run.size() - 1):
 			if i % 3 == 1 and not door.call(i - 1) and not door.call(i) and not door.call(i + 1):
 				windows.append(run[i][1])
+	windows.append_array(_back_lancets(building, main, along_x))
 	return {"buttresses": buttresses, "windows": windows}
+
+
+## The lancets in [param building]'s back end (734 amended (9), the
+## coordinator, from art-kit's still of the temple's bare east end): the
+## two middle edges of [param main]'s end opposite its facing, or the one
+## where the end has an odd count, behind its altar; none on a door, and
+## none where the back is a long side (its bays have them).
+static func _back_lancets(building: Dictionary, main: Rect2i, along_x: bool) -> Array[Vector3i]:
+	var out: Array[Vector3i] = []
+	var back := -(building["facing"] as Vector2i)
+	if (back.y if along_x else back.x) != 0:
+		return out
+	var rect: Rect2i = building["rect"]
+	var box := Rect2(Vector2(main.position) - Vector2(0.5, 0.5), Vector2(main.size))
+	var end_line := (box.end.x if back.x > 0 else box.position.x) if along_x else (box.end.y if back.y > 0 else box.position.y)
+	var low := box.position.y if along_x else box.position.x
+	var high := box.end.y if along_x else box.end.x
+	var end: Array = []
+	for key in Level.building_outline(building):
+		var edge := _edge_out(building, key)
+		if (edge[1] as Vector2i) != back:
+			continue
+		var middle: Vector2 = Vector2(rect.position) + edge[0]
+		var place := middle.y if along_x else middle.x
+		if is_equal_approx(middle.x if along_x else middle.y, end_line) and place > low and place < high:
+			end.append([place, key])
+	end.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+	var half := end.size() >> 1
+	var picks: Array[int] = [half]
+	if end.size() % 2 == 0:
+		picks = [half - 1, half]
+	var doors: Array = building.get("doors", [])
+	for i in picks:
+		if i >= 0 and i < end.size() and not doors.has(end[i][1]):
+			out.append(end[i][1])
+	return out
 
 
 ## A buttressed set's buttresses (734: wall.<set>.buttress_tall) in

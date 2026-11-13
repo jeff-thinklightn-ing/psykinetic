@@ -39971,6 +39971,28 @@ counter's art; and in the loaded wilds, nobody on the altar, the counter's front
 the candles' cell reached from just inside the door. Level data, Level.STANDS_INSIDE and three Level
 rows; protocol unchanged, no new class_name.
 
+734 amended (9): a pair of lancets in the temple's back end, behind the altar (the coordinator's
+ruling; label from tools/decision_number.sh). Art-kit's evening still from the square
+(C:/dev/review/art-kit/look/square_stall.png, looking west from (208.8, 200)) showed the chapel's
+east end as the largest face on screen and the least worked: 6 m of coursed stone with nothing in
+it, since _wall_bays puts its buttresses and lancets along the long sides only. Art-kit offered a
+plinth and string course as new pieces; the coordinator chose this instead, buildings' alone and no
+new art. BuildingComposer._back_lancets adds to the bays' windows the two middle edges of the main
+block's end opposite its facing (the one where the end has an odd count), never on a door, and none
+where the back is a long side; in Umbrage they are (199, 201) and (199, 202), east, behind the altar
+at (199, 201..202). They are lancets like the side ones (window_slot's wall.chapel.window_tall),
+drawn with both faces, lit from inside as the building is, so what shows from the square shows from
+the nave at the same height (the coordinator's condition); nothing of 896's package stands across
+them. Their first night stills showed them dark from the square and lit only inside, and so were
+the north side's since 734: the lancet's glow pane is at x -0.06, behind its leading (a 3 cm slab
+at x +-0.015), so it is lit from its -x side, where the wood and stone windows' panes are at +x
+(0.09, 0.19), and _window_flipped turns every window's +x out. _dress_window now turns a piece
+whose glow sits on its -x side the other way, so each window's light faces the street (the south
+side's lancets, turned already, were the only ones lit outside); leaf a's side follows the turn.
+view_test _test_chapel: eight lancets, and the back end's two side by side in its middle;
+_test_glow_outside: in a built house and a built temple, each window's glow pane on the wall's
+outside, found by where it is drawn. Client only; protocol unchanged, no new class_name.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In Umbrage, the temple's back wall has two tall pointed windows behind the altar, seen from the square and from inside, and at night every one of the temple's windows glows out to the street, not only those on its south side (734 amended (9)).
 - Towns: a house window's shutter no longer swings open across the door frame beside it; a shutter with a door, a corner or another window next to it stays shut (489 amended (8)).
 - The Mughouse's fireplace burns day and night now, one fire on its logs with its warm light over the common room, where before only a glow showed at the wall's foot (868).
 - In the temple, beside the way down to the crypt, a thick candle burns on a tall iron candlestick (868).
