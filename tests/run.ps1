@@ -7,11 +7,15 @@
 #                           running (other trees' tests), 2 to 8; 2 while
 #                           another tree holds the bench lock
 #   tests\run.ps1 -Serial   one after another, each scene's output as it goes
+#   tests\run.ps1 tests/x_test.tscn [...]   only the scenes named (a solo run); the other
+#                           scenes' times kept (278 amended (6))
+# A scene whose script fails to parse is stopped 3 s after the line, not left to its time
+# limit (278 amended (6)).
 # The slowest scenes start first (their last times are kept in
 # .godot\test_durations.txt); a line prints as each finishes, and at the end
 # the whole output of every scene that failed, then a summary.
 # Godot is taken from $env:GODOT_PATH, or `godot` on PATH.
-param([switch]$Serial)
+param([switch]$Serial, [Parameter(ValueFromRemainingArguments = $true)][string[]]$Named)
 $godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
 
 # The Windows GUI build detaches from the console (no output, no exit code);
@@ -53,6 +57,27 @@ function Get-Limit($scene) {
 $scenes = @(Get-ChildItem (Join-Path $PSScriptRoot '*_test.tscn') | ForEach-Object { "tests/$($_.Name)" } |
 	Sort-Object @{ Expression = { if ($last.ContainsKey($_)) { $last[$_] } else { 999 } }; Descending = $true })
 
+# Named scenes (278 amended (6), as tests/run.sh): only those; net_test is no scene, it runs
+# alone as the gate's net kind.
+function Refuse($why) { Write-Output $why; Remove-Item $logs -Recurse -Force -ErrorAction SilentlyContinue; exit 2 }
+if ($Named) {
+	$picked = @()
+	foreach ($arg in $Named) {
+		$scene = (($arg -replace '^res://', '') -replace '^\./', '') -replace '\\', '/'
+		if ($scene -match 'net_test') { Refuse "run.ps1: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.ps1), never as a scene (394 amended (24))" }
+		if ($scene -notmatch '\.tscn$') { Refuse "run.ps1: ${arg}: not -Serial or a scene (tests/x_test.tscn)" }
+		if (-not (Test-Path (Join-Path $root $scene))) { Refuse "run.ps1: no scene $scene" }
+		$picked += $scene
+	}
+	$scenes = @($scenes | Where-Object { $picked -contains $_ })
+}
+
+# A script that fails to parse leaves its scene idling to its time limit (278 amended (6), as
+# tests/run.sh): once one of these lines shows, $parseGrace seconds for the lines after it, then
+# the scene is stopped (Stop-Scene: its own process and those under it).
+$parseStop = '^SCRIPT ERROR: Parse Error|^ERROR: Failed to load script'
+$parseGrace = 3
+
 function Get-Name($scene) { [IO.Path]::GetFileNameWithoutExtension($scene) }
 
 # A failed scene's lines that name its failure (278 amended (4)), as run.sh's digest: every
@@ -71,11 +96,15 @@ function Get-Digest($path) {
 
 # The scene's verdict once its process has ended (or been killed), its output
 # put together in <name>.log: "PASS  name 12s" or "FAIL  name 3s: why".
-function Get-Verdict($scene, $process, $killed, $took) {
+function Get-Verdict($scene, $process, $killed, $took, $stopped) {
 	$log = Join-Path $logs "$(Get-Name $scene).log"
 	$output = @(Get-Content "$log.out" -ErrorAction SilentlyContinue) + @(Get-Content "$log.err" -ErrorAction SilentlyContinue) | ForEach-Object { "$_" }
 	$why = ''
-	if ($killed) {
+	if ($stopped) {
+		# Stopped early (278 amended (6)): the rest of the scene never ran.
+		$why = "a parse error: stopped early, ${parseGrace}s after it, the rest of the scene not run: $stopped"
+		$output += "FAIL  $scene $why"
+	} elseif ($killed) {
 		# Apart from a failed check (90 amended (1)), and noted in the gate's log.
 		$lastTook = if ($last.ContainsKey($scene)) { "$($last[$scene])" } else { 'no' }
 		$why = "timed out under load: did not finish within $(Get-Limit $scene)s (its last run took ${lastTook}s; a parse error or a hang ends here too): killed"
@@ -125,9 +154,11 @@ function Get-LaunchNote($scene, $process) {
 	$note -replace '; backtrace:.*$', ''  # The whole one is in the gate's log.
 }
 
-# Stops a scene's process and the game it runs under it (the console build's child).
+# Stops a scene's process and the game it runs under it (the console build's child), by its own
+# pid, a child only if made at or after it (278 amended (6)).
 function Stop-Scene($process) {
 	Get-CimInstance Win32_Process -Filter "ParentProcessId = $($process.Id)" -ErrorAction SilentlyContinue |
+		Where-Object { $_.CreationDate -ge $process.StartTime.AddSeconds(-1) } |
 		ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 	$process | Stop-Process -Force -ErrorAction SilentlyContinue
 	$process.WaitForExit()
@@ -152,7 +183,7 @@ try {
 			$process = Start-Process -FilePath $godot -ArgumentList '--log-file', "`"$(Get-GodotLog (Get-Name $scene))`"", '--headless', '--path', '.', '--scene', $scene `
 				-RedirectStandardOutput "$log.out" -RedirectStandardError "$log.err" -NoNewWindow -PassThru
 			$null = $process.Handle  # Without it Windows PowerShell may lose the exit code.
-			$running[$scene] = @{ Process = $process; Started = Get-Date }
+			$running[$scene] = @{ Process = $process; Started = Get-Date; Checked = Get-Date; ParseLine = ''; ParseAt = $null }
 			# Not all in the same instant (decision 530): two scenes died at launch
 			# in a suite's first burst of nine Godots.
 			Start-Sleep -Milliseconds 200
@@ -162,10 +193,18 @@ try {
 			$entry = $running[$scene]
 			$took = [int]((Get-Date) - $entry.Started).TotalSeconds
 			$killed = $false
+			$stopped = ''
 			if (-not $entry.Process.HasExited) {
-				if ($took -lt (Get-Limit $scene)) { continue }
+				# A parse error's line, looked for once a second (278 amended (6)).
+				if (-not $entry.ParseLine -and ((Get-Date) - $entry.Checked).TotalSeconds -ge 1) {
+					$entry.Checked = Get-Date
+					$hit = Get-SceneOutput $scene | Select-String $parseStop | Select-Object -First 1
+					if ($hit) { $entry.ParseLine = $hit.Line; $entry.ParseAt = Get-Date }
+				}
+				$parseDue = $entry.ParseLine -and ((Get-Date) - $entry.ParseAt).TotalSeconds -ge $parseGrace
+				if (-not $parseDue -and $took -lt (Get-Limit $scene)) { continue }
 				Stop-Scene $entry.Process
-				$killed = $true
+				if ($parseDue) { $stopped = $entry.ParseLine } else { $killed = $true }
 			}
 			$entry.Process.WaitForExit()
 			if (Test-LaunchFailed $scene $entry.Process $killed $took) {
@@ -180,7 +219,7 @@ try {
 				}
 				$retried[$scene] = "$($retried[$scene]); the retry too: $note"
 			}
-			$verdict = Get-Verdict $scene $entry.Process $killed $took
+			$verdict = Get-Verdict $scene $entry.Process $killed $took $stopped
 			if ($retried.ContainsKey($scene)) { $verdict += " (retried after a launch failure: $($retried[$scene]))" }
 			$verdicts[$scene] = $verdict
 			$times += "$took $scene"
@@ -194,6 +233,10 @@ try {
 		}
 	}
 	# The times, for the next run's order.
+	# A run of named scenes keeps every other scene's time (278 amended (6)).
+	if ($Named -and (Test-Path $durations)) {
+		$times += @(Get-Content $durations | Where-Object { $scenes -notcontains (($_ -split ' ', 2)[1]) })
+	}
 	$times | Sort-Object { [int]($_ -split ' ')[0] } -Descending | Set-Content $durations
 	$failed = @($scenes | Where-Object { $verdicts[$_] -notmatch '^PASS' })
 	if (-not $Serial) {

@@ -5462,6 +5462,27 @@ CHANGELOG's), a stale page, the lock never the land lock; land.ps1 -Checks the s
 run a land.sh without --checks, which would start a whole landing on the argument it ignores (its first try on main's
 land.sh queued one, stopped at the gate). Tests only; protocol unchanged; no class_name; no bullet.
 
+278 amended (6) (perf, 2026-11-13; the coordinator's approval of A and B; label from tools/decision_number.sh): a
+scene whose script fails to parse is stopped, not left to its time limit, and named scenes run alone. A parse error
+leaves the scene idling: maps' view_test sat 301 s in its 11-07 landing (a variable declared twice), enemy-ai's solo
+scene its ten minutes twice on 11-12, and the coordinator's 900 s on the box. tests/run.sh: each scene's Godot runs in
+the background with a watcher reading its log once a second; on a line "SCRIPT ERROR: Parse Error" or "ERROR: Failed
+to load script" it waits 3 s for the lines after (PARSE_GRACE), then stops the scene by its own pid: the timeout
+run.sh started and everything under it, walked by parent id (Git bash's ps tree, and on Windows each one's native
+children made at or after its start, the console build's game among them), never by a name or a marker. Its verdict
+reads "a parse error: stopped early, 3s after it, the rest of the scene not run: <the line>", so the short time is
+never read as a pass of the rest. The verdict is unchanged: any SCRIPT ERROR or ERROR: line already fails a scene
+(664); only the wait goes. A scene that ends within the grace keeps its own verdict; any other engine error is not
+stopped. On saturn the same run.sh runs (tools/remote_tests.sh's part suite), its walk by ps -o pid,ppid.
+tests/run.ps1 the same in its poll loop (Stop-Scene, its own process and the children made at or after it). Named
+scenes: bash tests/run.sh tests/x_test.tscn [...] (run.ps1 the same) runs only those, with the stop and each its own
+time limit, keeping every other scene's time in .godot/test_durations.txt; net_test is refused (the gate's net kind),
+as are an unknown argument and a scene not there. A solo scene runs as sh tools/heavy_job.sh run <tree> scene -- bash
+tests/run.sh tests/x_test.tscn; the old form works, without the stop. tests/run_parse_test.sh (a land.sh part, fake
+godots, no Godot): the fake suite ends in 30 s where main's run.sh took 305 s, the stopped scene's processes gone;
+run.ps1 likewise with a native fake. With a real Godot here, through the gate: a scene declaring a variable twice was
+stopped at 30 s in all (its limit 300 s), no Godot left. Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged

@@ -189,6 +189,7 @@ part land_tested_test bash tests/land_tested_test.sh
 part fonts_imported_test bash tests/fonts_imported_test.sh
 part run_digest_test bash tests/run_digest_test.sh
 part land_checks_test bash tests/land_checks_test.sh
+part run_parse_test bash tests/run_parse_test.sh
 # Each font's .fontdata before any Godot part: a first import that segfaulted on the fonts left
 # them unmade and server_boot_test's export failed on it (perf-sha, 11-13). One more import if
 # one is missing, under this run's take; still missing, the part fails naming it.

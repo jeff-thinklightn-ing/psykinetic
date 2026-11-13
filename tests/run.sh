@@ -8,6 +8,11 @@
 #                           running (other trees' tests), 2 to 8; 2 while
 #                           another tree holds the bench lock
 #   tests/run.sh --serial   one after another, each scene's output as it goes
+#   tests/run.sh tests/x_test.tscn [...]   only the scenes named (a solo run, through the
+#                           gate: sh tools/heavy_job.sh run <tree> scene -- bash tests/run.sh
+#                           tests/x_test.tscn); the other scenes' times kept
+# A scene whose script fails to parse is stopped 3 s after the line, not left to its time
+# limit (278 amended (6)).
 # The slowest scenes start first (their last times are kept in
 # .godot/test_durations.txt); a line prints as each finishes, and at the end
 # the whole output of every scene that failed, then a summary.
@@ -39,7 +44,21 @@ cd "$(dirname "$0")/.."
 . tests/godot_log.sh  # Its logs in build/logs (decision 664).
 . tests/jobs.sh
 SERIAL=0
-[ "${1:-}" = "--serial" ] && SERIAL=1
+# Named scenes (278 amended (6)): only those, as a solo run through the gate's scene kind; the
+# whole suite when none is named. net_test is no scene: it runs alone as the net kind.
+NAMED=""
+for arg in "$@"; do
+	case "$arg" in
+		--serial) SERIAL=1 ;;
+		*net_test*) echo "run.sh: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.sh), never as a scene (394 amended (24))"; exit 2 ;;
+		*.tscn)
+			arg="${arg#./}"
+			arg="${arg#res://}"
+			[ -f "$arg" ] || { echo "run.sh: no scene $arg"; exit 2; }
+			NAMED="$NAMED $arg" ;;
+		*) echo "run.sh: $arg: not --serial or a scene (tests/x_test.tscn)"; exit 2 ;;
+	esac
+done
 # Logs of this run's own: other worktrees may be running the suite too.
 LOGS="$(mktemp -d -t psykinetic-run.XXXXXX)"
 trap 'rm -rf "$LOGS"' EXIT
@@ -67,7 +86,7 @@ scene_limit() {
 # shared list made every tree adding a test conflict with the others). Slowest
 # first by the last run's times; a scene not timed yet goes first too (it may be slow).
 # One awk for all (a process a scene costs seconds on Windows).
-scenes="$(ls tests/*_test.tscn | awk -v durations="$DURATIONS" '
+scenes="$({ if [ -n "$NAMED" ]; then printf '%s\n' $NAMED | sort -u; else ls tests/*_test.tscn; fi; } | awk -v durations="$DURATIONS" '
 	BEGIN { while ((getline line < durations) > 0) { split(line, f, " "); if (!(f[2] in took)) took[f[2]] = f[1] } }
 	{ print ($0 in took ? took[$0] : 999), $0 }' | sort -rn | cut -d' ' -f2)"
 
@@ -81,6 +100,65 @@ digest() {
 		/^ *FAIL  |^RESULT:/ { print }' "$1" | head -40
 }
 
+# A script that fails to parse leaves its scene idling to its time limit (278 amended (6): maps'
+# view_test sat 301 s on 11-07, enemy-ai's solo scene its ten minutes twice on 11-12): once one of
+# these lines shows, the scene is given PARSE_GRACE seconds for the lines after it, then stopped.
+PARSE_STOP='^SCRIPT ERROR: Parse Error|^ERROR: Failed to load script'
+PARSE_GRACE=3
+
+# Stops the Godot this run started (278 amended (6)): the timeout at [param 1], this shell's own
+# background job, and everything under it, walked by parent id from its own pid, never by a name
+# or a marker: the shell's process tree (ps), and on Windows each one's native children (the
+# console build's game) created at or after [param 2] (epoch s), which Git bash's ps doesn't show.
+# On saturn (Linux) the same with ps -o.
+stop_own() {
+	if command -v powershell.exe >/dev/null 2>&1; then
+		# Git bash: "PID PPID PGID WINPID ...", a row maybe led by a flag letter.
+		rows="$(ps -l 2>/dev/null | awk 'NR > 1 { if ($1 !~ /^[0-9]+$/) { $1 = ""; $0 = $0 } print $1, $2, $4 }')"
+	else
+		rows="$(ps -e -o pid= -o ppid= 2>/dev/null | awk '{ print $1, $2, 0 }')"
+	fi
+	tree="$(printf '%s\n' "$rows" | awk -v root="$1" '{ parent[$1] = $2; win[$1] = $3 }
+		END { want[root] = 1; more = 1
+			while (more) { more = 0; for (p in parent) if (!(p in want) && (parent[p] in want)) { want[p] = 1; more = 1 } }
+			for (p in want) print p, (p in win ? win[p] : 0) }')"
+	wins="$(printf '%s\n' "$tree" | awk '$2 > 0 { printf "%s%s", sep, $2; sep = "," }')"
+	if [ -n "$wins" ]; then
+		powershell.exe -NoProfile -Command "\$since = [DateTimeOffset]::FromUnixTimeSeconds($2).LocalDateTime.AddSeconds(-1); \$all = @(Get-CimInstance Win32_Process); \$ids = @($wins); for (\$i = 0; \$i -lt \$ids.Count; \$i++) { \$p = \$ids[\$i]; \$all | Where-Object { \$_.ParentProcessId -eq \$p -and \$_.CreationDate -ge \$since -and \$ids -notcontains \$_.ProcessId } | ForEach-Object { \$ids += \$_.ProcessId } }; [array]::Reverse(\$ids); foreach (\$id in \$ids) { Stop-Process -Id \$id -Force -ErrorAction SilentlyContinue }" >/dev/null 2>&1
+	fi
+	for p in $(printf '%s\n' "$tree" | awk '{ print $1 }'); do kill -TERM "$p" 2>/dev/null; done
+}
+
+# Watches $log while the scene's Godot (the timeout at [param 1], started at [param 2]) runs: on a
+# PARSE_STOP line, PARSE_GRACE seconds more, then the line to <log>.parse and the scene stopped.
+watch_parse() {
+	while kill -0 "$1" 2>/dev/null; do
+		sleep 1
+		line="$(grep -m 1 -E "$PARSE_STOP" "$log" 2>/dev/null)"
+		[ -z "$line" ] && continue
+		sleep "$PARSE_GRACE"
+		kill -0 "$1" 2>/dev/null || return 0  # It ended on its own.
+		printf '%s\n' "$line" >"$log.parse"
+		stop_own "$1" "$2"
+		return 0
+	done
+}
+
+# The scene's Godot, its output to $log, under its time limit and watch_parse; its exit in status.
+# Godot log name [param 1].
+play() {
+	rm -f "$log.parse"
+	since=$(date +%s)
+	timeout --kill-after=10 "$limit" "$GODOT" --log-file "$(godot_log "$1")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1 &
+	godot=$!
+	watch_parse "$godot" "$since" &
+	watcher=$!
+	wait "$godot"
+	status=$?
+	kill "$watcher" 2>/dev/null
+	wait "$watcher" 2>/dev/null
+}
+
 # One scene, its output to its log; then its verdict line in <log>.result:
 # "PASS name 12s" or "FAIL name 3s (why)", and its time for DURATIONS.
 run_scene() {
@@ -92,8 +170,7 @@ run_scene() {
 	# The marker names this run's process of this scene, for the kill below.
 	marker="psykinetic-run-$$-$name"
 	limit="$(scene_limit "$scene")"
-	timeout --kill-after=10 "$limit" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
-	status=$?
+	play "$name"
 	retried=""
 	if launch_failed "$status" "$started" "$log"; then
 		# Died at launch, before any of its own code ran (decision 530: exit 127
@@ -103,8 +180,7 @@ run_scene() {
 		retried="${retried%%; backtrace:*}"  # The whole one is in the gate's log.
 		sleep 2
 		again=$(date +%s)
-		timeout --kill-after=10 "$limit" "$GODOT" --log-file "$(godot_log "$(basename "$scene" .tscn)_again")" --headless --path . --scene "$scene" -- "--run-marker=$marker" </dev/null >"$log" 2>&1
-		status=$?
+		play "${name}_again"
 		if launch_failed "$status" "$again" "$log"; then
 			again_note="$(launch_note "$name" "$status" "$log")"
 			retried="$retried; the retry too: ${again_note%%; backtrace:*}"
@@ -117,7 +193,11 @@ run_scene() {
 	fi
 	took=$(( $(date +%s) - started ))
 	why=""
-	if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+	if [ -f "$log.parse" ]; then
+		# Stopped early (278 amended (6)): the rest of the scene never ran.
+		why="a parse error: stopped early, ${PARSE_GRACE}s after it, the rest of the scene not run: $(cat "$log.parse")"
+		echo "FAIL  $scene $why" >>"$log"
+	elif [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
 		# Apart from a failed check (90 amended (1)): a kill for time, noted in
 		# the gate's log too, so the record tells the two apart.
 		why="timed out under load: did not finish within ${limit}s (its last run took ${LAST_TOOK[$scene]:-no}s; a parse error or a hang ends here too): killed"
@@ -203,7 +283,10 @@ for scene in $scenes; do
 	fi
 done
 # The times, for the next run's order.
-cat "$LOGS"/*.took 2>/dev/null | sort -rn >"$DURATIONS.new" && mv "$DURATIONS.new" "$DURATIONS"
+# A run of named scenes keeps every other scene's time (278 amended (6)).
+{ cat "$LOGS"/*.took 2>/dev/null
+	[ -n "$NAMED" ] && [ -f "$DURATIONS" ] && awk -v named="$scenes" 'BEGIN { n = split(named, s, /[ \n]+/); for (i = 1; i <= n; i++) if (s[i] != "") ran[s[i]] = 1 } !($2 in ran)' "$DURATIONS"
+} | sort -rn >"$DURATIONS.new" && mv "$DURATIONS.new" "$DURATIONS"
 if [ "$SERIAL" -eq 0 ]; then
 	for name in $failed; do
 		echo
