@@ -10739,6 +10739,16 @@ sound_kit_test (each trade cue's shape and fallback; five at once, one heard and
 then freed; a click among them not cut). No bullet: ui's Store tab carries the package's.
 Client only; protocol unchanged, no new class_name.
 
+395 amended (2) (sound; the script's label; release's flake report, 11-12): the cut takes the
+group's last sound whether or not it still reports playing. voice's landing at 19:42 on saturn
+failed sound_kit_test's "five trade cues at once" with 3 fading and 2 left. Sfx._cut asked the last
+player .playing, and a player can say no and still be there: its take (0.26 to 0.71 s) ended
+while the next cue's take loaded under load (the test's first use of those takes), its free only
+deferred, or it had not yet reported playing. Either way it went uncut, counted at full beside
+the new one. Now any last player still there is faded and freed; one already ended loses
+nothing by it. The test unchanged; it was right. Client only; protocol unchanged, no new
+class_name; no bullet.
+
 ## 402. door.single's opening 0.8 x 2.4 m, its own plank door
 
 Jeff on v0.1.149: "walking and scale seems good, but now the doors are way

@@ -289,13 +289,16 @@ func play_flat(slot: String, pitch := 1.0, volume_db := 0.0) -> void:
 
 
 ## [param player] the last of cut group [param group]: the one before it,
-## still playing, fades out over CUT_SECONDS and is freed (its tween is its
-## own, so one that ends first takes the tween with it).
+## while it is still there, fades out over CUT_SECONDS and is freed (its
+## tween is its own, so one that ends first takes the tween with it). Not
+## asked whether it still plays (395 amended (2)): one that ended while the
+## next take loaded, or not yet reported playing, was left out of the cut
+## and lingered until its own free, a second sound of the group at full.
 func _cut(group: String, player: AudioStreamPlayer) -> void:
 	if group.is_empty():
 		return
 	var was: Variant = _cut_last.get(group)  # Untyped: it may have been freed.
-	if is_instance_valid(was) and (was as AudioStreamPlayer).playing and not (was as Node).has_meta(&"cut"):
+	if is_instance_valid(was) and not (was as Node).has_meta(&"cut"):
 		var last := was as AudioStreamPlayer
 		last.set_meta(&"cut", true)
 		var fade := last.create_tween()
