@@ -117,6 +117,15 @@ static func check_node(slot: String, node: Node3D) -> Array[String]:
 	# Client3D's HUMAN_MATERIAL, its tints per person) names it: accepted.
 	var accepted := str(entry.get("body_material", ""))
 	var foreign: Array = counts.names.filter(func(name: String) -> bool: return name != "" and name != ArtKit.PALETTE_NAME and name != ArtKit.WALL_SET_NAME and name != accepted)
+	# The palette's name with a Blender suffix ("palette.001": a second
+	# "palette" made in a file that already held one) is never swapped for
+	# the shared palette, so the piece draws in plain grey-white (896
+	# amended (3): the knight's laid remains, seen only in the game).
+	var suffixed: Array = counts.names.filter(func(name: String) -> bool:
+		return name.begins_with(ArtKit.PALETTE_NAME + ".") and name.get_slice(".", 1).is_valid_int())
+	if not suffixed.is_empty():
+		out.append("error: material%s %s: name it exactly \"%s\" (Blender added the suffix to a second palette material; the game draws only that name with the palette, the rest grey-white)" % [
+			"s" if suffixed.size() > 1 else "", ", ".join(suffixed.map(func(name: String) -> String: return "\"%s\"" % name)), ArtKit.PALETTE_NAME])
 	if foreign.size() > allowed - 1 and not foreign.is_empty():
 		out.append("warning: material%s %s, not the shared \"palette\": colour it from the palette (the template's material), so it draws with every other piece" % [
 			"s" if foreign.size() > 1 else "", ", ".join(foreign.map(func(name: String) -> String: return "\"%s\"" % name))])

@@ -378,6 +378,11 @@ func _test_palette_shared() -> void:
 	var problems := ArtCheck.check_node("door.single", door)
 	_check(problems.any(func(line: String) -> bool: return line.begins_with("warning") and "Material.001" in line and "palette" in line),
 			"a material of its own is named, with what to use instead: %s" % [problems])
+	# 896 amended (3): the palette's name with Blender's suffix is an error, not a warning.
+	other.resource_name = ArtKit.PALETTE_NAME + ".001"
+	var suffixed := ArtCheck.check_node("door.single", door)
+	_check(suffixed.any(func(line: String) -> bool: return line.begins_with("error") and "palette.001" in line),
+			"a palette material with Blender's suffix (\"palette.001\") fails, naming it: %s" % [suffixed])
 	door.free()
 	ArtKit.show_placeholders = false
 	ArtKit.forget()

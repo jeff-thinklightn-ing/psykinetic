@@ -53449,6 +53449,23 @@ by the room's ambient and with the candle (C:/dev/review/knight_remains/bier_rem
 record of the takes in bier_remake_record.png); the game still follows (ui-design). Lands off with
 896's package: nothing places it until dungeon's switch-on. Client only (art); protocol unchanged;
 no new class_name; no bullet.
+
+896 amended (3), art-kit's side: prop.knight_remains' material named "palette". 896 amended
+(2) exported it as "palette.001" (the make script opened the table's blend, which already held a
+"palette", and made a second), and ArtKit swaps only a material named exactly PALETTE_NAME for the
+shared palette, so in the game the remains drew in the glb's own plain grey-white: ui-design's first
+hosted stills of the bier showed a white sheet and a grey segmented wrap that read as plate armour,
+not the brown wool shroud and cream linen of the sheets. Blender's sheets reassign every material
+whose name starts "palette", which hid it; ArtCheck names it only as a warning. The material renamed
+in the kit's blend and the glb exported again, the mesh untouched (626 tris); the make script now
+names it exactly (C:/dev/review/knight_remains/make_laid_remains.py). Every other kit glb's materials
+were checked: no other "palette.NNN". So it can't come back (the coordinator): ArtCheck names
+a material called the palette's name with a Blender suffix as an error, not the warning a foreign
+material gets, so art_kit_test's every-slot check fails on the file and the material (and a line
+checks it on a door given "palette.001"); and tools/blender/export_slot.py, where it is made, folds
+each such material in use onto "palette" in its run's copy (or renames it, if there is none) and
+says so. Still off with 896's package. Client only (art and its checks); protocol unchanged; no
+new class_name; no bullet.
 ## 868. A tavern's hearth burning: its flame and light at the fireplace, from the tavern place's hearth
 
 The coordinator's go, 11-11, package "a newcomer can mend in town", on: the Mughouse's hearth
