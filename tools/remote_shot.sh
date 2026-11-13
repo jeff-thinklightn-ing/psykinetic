@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # A shot or clip run on the laptop runner (lenovo-tethys; the coordinator's
 # design, 2026-11-08), so a windowed run never takes this machine's screen:
-#   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] [--vsync off|default] <sha> <name> -- <godot args>
+#   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] [--vsync off|default]
+#     [--joined [--server-args "ARGS"]] <sha> <name> -- <godot args>
 # --vsync (828 amended (5)): off by default, the engine's --disable-vsync put first in the
 # godot args, so a run's timing is the game's and not the laptop's present: the Atlas holds
 # each frame 200 to 500 ms with vsync on (3.5 fps against 204 with it off, the same full
@@ -43,12 +44,26 @@
 # Lenovo; the one caught spent ~420 ms outside everything the engine times, with
 # nothing built). A bench whose worst frame matters runs on the Lenovo (--runner
 # lenovo), and map_bench's --hitch-ms=N says what a long frame did.
+# --joined (828 amended (4)): the game joins a server as a client, both on the laptop.
+# The runner starts the game headless as `--server --bind 127.0.0.1` on a free
+# loopback port first, with a user folder of its own in the run's folder (a fresh
+# world: no state file, nothing of the box's, no player's id), waits for its
+# "listening" line, and checks its sockets: one bound past loopback stops the run
+# ("beyond loopback"; never a firewall rule). Then the windowed game as
+# `--client --address=127.0.0.1 --port=P`. --server-args "<args>" go to the server
+# alone (its clock, its map: --hour=21 --map=wilds), split on spaces. A joined run's
+# args name no mode, address or port (it joins 127.0.0.1 and nothing else).
+# out/server.log comes back with the rest. Every run's processes, joined or not,
+# are in a job object that Windows ends with the runner: a tray stop, a timeout,
+# the client's crash or the runner's own end take the server with them.
 set -u
 RUNNER=lenovo
 REPEAT=1
 TIMEOUT=15
 WITH=()
 VSYNC=off
+JOINED=0
+SERVER_ARGS=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--with) WITH+=("$2"); shift 2 ;;
@@ -56,10 +71,13 @@ while [ $# -gt 0 ]; do
 		--runner) RUNNER="$2"; shift 2 ;;
 		--repeat) REPEAT="$2"; shift 2 ;;
 		--vsync) VSYNC="$2"; shift 2 ;;
+		--joined) JOINED=1; shift ;;
+		--server-args) SERVER_ARGS="$2"; shift 2 ;;
 		*) break ;;
 	esac
 done
-[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] <sha> <name> -- <godot args>"; exit 2; }
+[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] <sha> <name> -- <godot args>"; exit 2; }
+[ -z "$SERVER_ARGS" ] || [ $JOINED -eq 1 ] || { echo "--server-args: only with --joined"; exit 2; }
 # Each runner: its ssh address, the drive its clone and runs are on, and the
 # shell its ssh server starts (atlas's is PowerShell; every line here is cmd's).
 case "$REPEAT" in [1-5]) ;; *) echo "repeat: 1 to 5"; exit 2 ;; esac
@@ -106,7 +124,14 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 # The laptop's paths for scp (forward slashes).
 fwd() { printf '%s' "$1" | tr '\\' '/'; }
-helper="$RUNS\\remote_shot_run.ps1"
+# The runner's copy is this run's own (828 amended (4)): one shared copy was written by every
+# remote_shot before it asks for the laptop's lock, so a tree waiting on the lock replaced the
+# runner under a run that held it, and that run's task started another tree's runner (main's,
+# which had no -Joined: four joined proofs ended in a parameter error before a line ran, 11-12).
+# A short random name (8 hex), not the run's: schtasks /tr holds 261 characters and the run's
+# name is in it once already (-Dir).
+helper="$RUNS\\r-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n').ps1"
+drop_helper() { rsh "if exist $helper del /q $helper" >/dev/null 2>&1; }
 # A cmd line run on the runner. Where its ssh server starts PowerShell, the line
 # goes as base64 inside a -EncodedCommand script that hands it to cmd.exe as it is
 # (no quoting of PowerShell's between), its exit code back.
@@ -143,13 +168,21 @@ for arg in "$@"; do
 	else
 		# A mode named after the game's "--" (Net._parse_args); --menu wants the menu on purpose.
 		case "$arg" in --host|--client|--server|--practice|--menu) moded=1 ;; esac
+		# Joined: the runner names the mode, the address and the port, 127.0.0.1 only (828 amended (4)).
+		if [ $JOINED -eq 1 ]; then
+			case "$arg" in
+				--host|--client|--server|--practice|--menu|--address|--address=*|--port|--port=*|--bind|--bind=*|--token|--token=*)
+					echo "$arg: refused (a joined run joins its own server on 127.0.0.1; the runner names the mode, address and port)"; exit 2 ;;
+			esac
+		fi
 	fi
 	ARGS+=("${arg//\{out\}/$OUT_FWD}")
 done
 [ $dashed -eq 1 ] || ARGS+=("--")
 # No mode named: a fresh settings file joins 127.0.0.1 as a client, finds no server and waits
 # behind the connect screen, so a bench times that screen and a shot finds no player (11-10).
-if [ $moded -eq 0 ]; then
+# A joined run's client mode comes from the runner, with the server's port.
+if [ $moded -eq 0 ] && [ $JOINED -eq 0 ]; then
 	ARGS+=("--host")
 	echo "remote_shot: no mode named (--host, --client, --server, --practice or --menu): added --host"
 fi
@@ -158,6 +191,19 @@ ARGS+=("--bind=127.0.0.1")
 [ "$VSYNC" = off ] && ARGS=("--disable-vsync" "${ARGS[@]}")
 echo "SHOT vsync: $VSYNC"
 printf '%s\n' "${ARGS[@]}" >"$TMP/args.txt"
+# The server's own args (828 amended (4)): the world it makes, nothing that reaches out
+# (no address, port, bind, state, token, admin, model or log): an allowlist, each --key=value.
+: >"$TMP/server_args.txt"
+if [ $JOINED -eq 1 ]; then
+	read -r -a server_words <<<"$SERVER_ARGS"
+	for arg in "${server_words[@]}"; do
+		case "$arg" in
+			--hour=*|--map=*|--day-minutes=*|--weather=*|--season=*|--season-days=*|--max-players=*|--no-companions|--still-monsters)
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters)"; exit 2 ;;
+		esac
+	done
+fi
 
 rsh "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
 # Locked (or at its logon screen): the task would never show a window, and the run would wait
@@ -166,9 +212,15 @@ if rsh "tasklist /nh /fi \"imagename eq LogonUI.exe\" | find /i \"LogonUI.exe\""
 	echo "the laptop is locked (LogonUI runs): nothing run; ask Jeff to unlock it"; exit 1
 fi
 "${SCP[@]}" tools/remote_shot_run.ps1 "$HOST:$(fwd "$helper")" || exit 1
-rps -Mode lock -Dir "$NAME" -StaleMin $((TIMEOUT + 25)) || { echo "the laptop runner is busy"; exit 1; }
-release() { rps -Mode unlock >/dev/null 2>&1; }
+rps -Mode lock -Dir "$NAME" -StaleMin $((TIMEOUT + 25)) || { echo "the laptop runner is busy"; drop_helper; exit 1; }
+release() { rps -Mode unlock >/dev/null 2>&1; drop_helper; }
 trap 'release; rm -rf "$TMP"' EXIT
+# A crashed run's runner copy is swept by the next run holding the lock: r-*.ps1 last written
+# before yesterday (forfiles' whole days; a run lasts under an hour, so none is in use).
+rsh "forfiles /p $RUNS /m r-*.ps1 /d -1 /c \"cmd /c del /q @path\"" >/dev/null 2>&1
+# The runner this run copied, by its hash: runner.log names the copy that ran, and the two match.
+RUNNER_SHA="$(sha256sum tools/remote_shot_run.ps1 | cut -c1-16)"
+echo "runner: $(fwd "$helper"), sha256 $RUNNER_SHA"
 
 # 1. The clone to <sha>.
 state="$(rsh "git -C $ROOT rev-parse HEAD && git -C $ROOT status --porcelain --untracked-files=no" | tr -d '\r')"
@@ -222,8 +274,13 @@ rsh "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run
 task="psyk_shot_$NAME"
 trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
 "${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
+joined_flag=""
+if [ $JOINED -eq 1 ]; then
+	"${SCP[@]}" "$TMP/server_args.txt" "$HOST:$(fwd "$DIR")/server_args.txt" || exit 1
+	joined_flag=" -Joined"
+fi
 # (2>nul: schtasks warns that /ST 00:00 is past; the task is run at once by /run.)
-rsh "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Root $ROOT -Runs $RUNS -Mode run -Dir $DIR -TimeoutMin $TIMEOUT -Repeat $REPEAT\" >nul 2>nul && schtasks /run /tn $task >nul" \
+rsh "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Root $ROOT -Runs $RUNS -Mode run -Dir $DIR -TimeoutMin $TIMEOUT -Repeat $REPEAT$joined_flag\" >nul 2>nul && schtasks /run /tn $task >nul" \
 	|| { echo "no task (is anyone logged on?)"; exit 1; }
 done=""
 for _ in $(seq 1 $(((TIMEOUT + 3) * 6))); do
@@ -242,9 +299,22 @@ rsh "rmdir /s /q $DIR" >/dev/null 2>&1
 rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
 printf 'SHOT vsync: %s\n' "$VSYNC" >>"$REVIEW/runner.log"
 ls "$REVIEW"
+# The runner that ran is the one sent (828 amended (4)), else this run's numbers and stills are
+# another tool's: said, and the run fails.
+ran_sha="$([ -f "$REVIEW/runner.log" ] && tr -d '\357\273\277\r' < "$REVIEW/runner.log" | sed -n 's/^runner: .*, sha256 \([0-9a-f]*\)$/\1/p' | tail -1)"
+if [ -n "$ran_sha" ] && [ "$ran_sha" != "$RUNNER_SHA" ]; then
+	echo "remote_shot: the runner that ran (sha256 $ran_sha) is not the one sent ($RUNNER_SHA): this run's results are another tool's"; exit 1
+fi
+# A joined run's client that never joined its server: the connect screen over whatever it drew;
+# its stills are void (828 amended (4)). runner.log's joined lines say why.
+if [ $JOINED -eq 1 ]; then
+	grep -h "^joined\|^server" "$REVIEW/runner.log" 2>/dev/null
+	if ! grep -q "\[net\] connected as peer" "$REVIEW/godot.log" 2>/dev/null; then
+		echo "remote_shot: the joined client never connected to its server: its stills are void"; exit 1
+	fi
 # A game that joined as a client and never hosted, unless --client was asked: no level of its own,
 # the connect screen over whatever it drew; its numbers and stills are void (828 amended (2)).
-if ! printf '%s\n' "${ARGS[@]}" | grep -qx -- "--client"; then
+elif ! printf '%s\n' "${ARGS[@]}" | grep -qx -- "--client"; then
 	if grep -q "client connecting to" "$REVIEW/godot.log" 2>/dev/null && ! grep -q "host listening" "$REVIEW/godot.log" 2>/dev/null; then
 		echo "remote_shot: the game ran as a client and never hosted: its numbers and stills are void"; exit 1
 	fi

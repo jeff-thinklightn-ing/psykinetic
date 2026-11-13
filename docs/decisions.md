@@ -49893,6 +49893,60 @@ tests/remote_shot_clash_test.sh (a land.sh tool part): generated files the commi
 other stopped on, untracked files it doesn't track left alone. Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+828 amended (4) (perf, 2026-11-12; maps' ask, the coordinator's design rule, approval and rulings with their
+conditions; label from tools/decision_number.sh): a joined run on a laptop, nothing a run starts outlives it, and
+each run starts the runner it sent. The cut gate asks which side a look was watched on, and remote_shot ran one
+Godot, a host. A shot scene could start its own server child, but a tray stop or a crash ends the parent hard and
+nothing in the scene runs: its child would be left on Jeff's laptop. So the runner holds both:
+- tools/remote_shot.sh --joined: the runner (remote_shot_run.ps1 -Joined) starts the game headless as `--server
+  --bind=127.0.0.1 --port=P` (P a free loopback UDP port Windows names), its user data its own folder in the run's
+  (a fresh world: no state file, nothing of the box's, no player's id), its log out/server.log, and its token one
+  made for the run in the runner's environment (two random GUIDs, never on a command line, removed after); waits
+  for its "[net] server listening on port P" (90 s); then each pass's windowed game with `--client
+  --address=127.0.0.1 --port=P`. A joined run's own args may name no mode, address, port, bind or token (refused
+  before the laptop is touched); --server-args "..." go to the server alone through an allowlist (--hour, --map,
+  --day-minutes, --weather, --season, --season-days, --max-players, --no-companions, --still-monsters). A joined
+  client that never says "[net] connected as peer" voids the run.
+- The sockets (the coordinator's rule (i)): the run's processes (the server, each game, their children by parent
+  and start time) and their UDP endpoints and TCP listeners are read when the server listens, every 2 s for the
+  first 30 s of each game, then every 10 s. Allowed: loopback (127.0.0.1, ::1, ::ffff:127.0.0.1), and exactly one
+  more, UDP, the game's own, on an ephemeral port (from Windows' dynamic range start), on :: or 0.0.0.0: its ENet
+  client socket, which Godot binds unbound (ENetMultiplayerPeer.create_client takes no address) to reach
+  127.0.0.1. Anything else off loopback, a second such socket, one owned by any other process, or a TCP listener
+  stops the run and comes to the coordinator; never a firewall rule. runner.log: "SOCKETS: server
+  ::ffff:127.0.0.1:P/udp; client ENet :::Q/udp (outgoing, allowed); client 127.0.0.1:R/udp (N looks, ephemeral
+  from L)". tests/remote_shot_sockets_test.sh (in land.sh) judges recorded sockets through the runner's own
+  judge mode: the one allowed, a second refused, a foreign owner refused, a listener refused, and the rest.
+- A firewall dialog: the runner lists top-level windows (EnumWindows) for Windows' "Windows Security Alert" at the
+  start and at each socket look. One showing at the start refuses a joined run; one during it stops the run;
+  nobody clicks it. runner.log: "firewall dialog at start: none showing" (or what it saw); a run that could not
+  list the windows says "not checked".
+- Every run, joined or not, puts the processes it starts in a Windows job object with kill-on-close, its handle
+  held by the runner alone: when the runner ends, however it ends, Windows ends whatever is left in the job. A
+  tray stop or a timeout stops the game by its PID as before and then the server; the game's own exit or crash,
+  the server. <Dir>\stop.txt, made over ssh, is the same stop as the tray's click (the proofs' way to stop a run
+  as the tray does). A runner that fails before its first line writes "runner error at line N: ..." to done.txt.
+- The runner's copy is the run's own. remote_shot copied it to one shared file on the laptop before it asked for
+  the laptop's lock (it needs the runner to take it), so a tree waiting on the lock replaced the runner under a
+  run that held it, and that run's task started another tree's runner: four joined proofs ran main's, which had
+  no -Joined, and ended in a parameter error before a line ran (Last Result 1, 11-12). Now each run copies it to
+  D:\psykinetic-runs\r-<8 random hex>.ps1 (short: schtasks' /tr holds 261 characters), uses it for its lock,
+  run and unlock, and deletes it at release or when the laptop is busy; the run holding the lock deletes any
+  r-*.ps1 last written before yesterday (a crashed run's). remote_shot prints the copy and its sha256 (16 hex),
+  runner.log's "runner: r-x.ps1, sha256 H" names the one that ran, and a run whose two differ fails: its numbers
+  and stills are another tool's. Until this is on main, a laptop run started while another tree waits may have
+  run that tree's runner: a bench number or a still from 11-12 is checked against its "BENCH ran:" or SHOT lines.
+- runner.log also: "joined: server pid N on 127.0.0.1:P, args ..., listening after S s", "joined: server
+  sockets: ...", "server at end: stopped by the runner after the game (gone)" or "it had exited by itself", and
+  "job: kill on close; <each process> in".
+Checked here without Godot: the job ends a process the moment its runner exits; the socket judge's cases; every
+refusal stops before the laptop. On the Lenovo (Jeff's OK to this session), on the code that lands (runner sha256
+edcfae14b0240c17 in each): a joined run to the end (A2: exit 0, the one ENet socket, no dialog), one stopped as
+the tray stops it (B2: "stopped by user", the server stopped after, both Godots gone), and one whose runner was
+killed by its PID (C6: killed 8 s after its window showed; 6 s later both Godots gone and the task back to Ready; the run's
+folder and the runner's copy removed at release). Earlier on the Atlas: the same three, before the socket rule. Tools and
+tests only; protocol unchanged; no class_name; no bullet.
+
 828 amended (5) (perf, 2026-11-12; the coordinator's ruling; label from tools/decision_number.sh): a laptop run
 plays with vsync off unless asked otherwise. maps' full-world tavern case ran at 30 to 40% speed on the Atlas while
 map_bench's tavern ran at 200 fps there: map_bench sets VSYNC_DISABLED before its frames and the game does not, and

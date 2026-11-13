@@ -153,6 +153,7 @@ part changelog_resolve_test python -B tests/changelog_resolve_test.py
 part voice_inventory_test python -B tests/voice_inventory_test.py
 part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
 part push_guard_test bash tests/push_guard_test.sh
+part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 if [ -n "$remote" ]; then
