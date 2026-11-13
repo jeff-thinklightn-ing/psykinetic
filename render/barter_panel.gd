@@ -134,6 +134,12 @@ const UNPAID_LINE := "Left %s with the town, unpaid."
 ## what is given for nothing. A gift row clicked on Store says where it goes; a paying row clicked on Donate likewise;
 ## Donate opened with nothing to give says what he takes back (voice's words, %s the keeper).
 const GIFT_ON_DONATE_LINE := "%s takes that back on the Donate tab."
+## A gift that is not starter gear handed back (herbs for the store, 826 amended (1)), voice's: it says it is unpaid, and
+## names whoever keeps the sheet ("That's taken..." where no name is to hand); a gift given to a keeper in front of you
+## who is no stall: "Gave Hob the herbs.".
+const GIFT_AS_GIFT_LINE := "%s takes that as a gift, on the Donate tab."
+const GIFT_AS_GIFT_NAMELESS := "That's taken as a gift, on the Donate tab."
+const GAVE_LINE := "Gave %s %s."
 const PAYS_ON_STORE_LINE := "%s buys that on the Store tab."
 ## (The "he" is Rolf's, the only stall keeper today. For another: the keeper's pronoun is on the resident's card, Townsfolk.card_of(World.production, worker_id)["traits"]["pronoun"] ("she", "he", "they"), as main.gd reads it; this line wants the subject form.)
 const DONATE_NOTHING_LINE := "%s takes back what he sold you; you carry none."
@@ -2235,6 +2241,14 @@ func _stopped(kind: String, key: Variant) -> bool:
 
 
 ## The keeper's name for a refusal line.
+## The Store tab's redirect for a gift row [param row] (gold 0): starter gear is taken back; any other gift is taken as one
+## (voice), by name where there is a name.
+func gift_redirect_words(row: Dictionary) -> String:
+	if bool(row.get("starter", false)):
+		return GIFT_ON_DONATE_LINE % _keeper_name()
+	return GIFT_AS_GIFT_LINE % merchant if not merchant.is_empty() else GIFT_AS_GIFT_NAMELESS
+
+
 func _keeper_name() -> String:
 	return merchant if not merchant.is_empty() else "They"
 
@@ -2297,7 +2311,7 @@ func _sell(slot: int) -> void:
 	if entry.is_empty():
 		var paid := takes_at(slot)  # A keeper with no stock of his own who pays for a trophy (Rolf): a sale, by his takes row.
 		if not paid.is_empty() and int(paid.get("gold", 0)) <= 0:
-			_refuse("mine", slot, GIFT_ON_DONATE_LINE % _keeper_name())  # A gift: never handed over by a click that was made to see if it sells.
+			_refuse("mine", slot, gift_redirect_words(paid))  # A gift: never handed over by a click that was made to see if it sells.
 			return
 		if not paid.is_empty() and int(paid.get("gold", 0)) > 0:
 			var paid_id := str(paid.get("what", ""))
@@ -2340,6 +2354,8 @@ func _donate(slot: int) -> void:
 	var gold := int(row.get("gold", 0))
 	var text := SOLD_LINE % [thing_words(id, false), gold] if gold > 0 \
 			else HANDED_BACK_LINE % thing_words(id, true) if bool(row.get("starter", false)) \
+			else LEFT_LINE % thing_words(id, true) if _locker_button != null and _locker_button.visible \
+			else GAVE_LINE % [_keeper_name(), thing_words(id, true)] if not merchant.is_empty() \
 			else LEFT_LINE % thing_words(id, true)
 	_expect({"kind": "mine", "key": slot, "uid": uid, "cue": "sold" if gold > 0 else "left", "gold": gold, "text": text})
 	give_asked.emit(person if person != null else with, [uid])

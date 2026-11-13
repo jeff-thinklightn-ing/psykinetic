@@ -3803,6 +3803,14 @@ func _test_person_give() -> void:
 	window._on_store_square("mine", 0)
 	_check(window.foot_shown() == "Rolf takes that back on the Donate tab." and store_view.foot_is_refused(),
 		"the starter dagger clicked on the Store tab: he takes it back on Donate, nothing handed over (%s)" % window.foot_shown())
+	# A gift that is not starter gear (herbs for the store, economy's 826 amended (1)): voice's other line, by name where there is one.
+	var keeper_was: String = window.merchant
+	_check(window.gift_redirect_words({"starter": false, "gold": 0}) == "Rolf takes that as a gift, on the Donate tab."
+			and window.gift_redirect_words({"starter": true, "gold": 0}) == "Rolf takes that back on the Donate tab.",
+		"a gift that isn't starter gear is taken as a gift, starter gear taken back (%s)" % window.gift_redirect_words({"starter": false}))
+	window.merchant = ""
+	_check(window.gift_redirect_words({"starter": false}) == "That's taken as a gift, on the Donate tab.", "no name to hand: the nameless form")
+	window.merchant = keeper_was
 	window._on_store_tab("donate")
 	_check(window.giving and store_view.tabs_shown() == ["store", "donate*", "locker"] and store_view.squares_shown("goods").is_empty()
 			and store_view.tab_words()[1] == "Donate", "the Donate tab: open, his goods away, always called Donate (%s)" % [store_view.tabs_shown()])
