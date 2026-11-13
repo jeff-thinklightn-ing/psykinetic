@@ -3072,7 +3072,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (922)
+## Lines in the data (924)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3411,7 +3411,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (148)
+### levels/residents.json (150)
 
 | | Line | Key |
 |---|---|---|
@@ -3530,6 +3530,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Snagfin is a goblin among humans; the town tolerates him, which is more than most do. | `settled.snagfin.fact` |
 |  | Away %s. Back when I can. | `notes.default.note` |
 |  | %s the %s has gone off, %s they say. | `notes.default.rumour` |
+|  | %s, a %s by trade, is out %s, they say. We could use a hand like that here. | `notes.sought.farmer.rumour` |
+|  | %s, a %s by trade, is %s, they say. We could use a hand like that here. | `notes.sought.farmer.camp.rumour` |
 |  | Ore's short here. There's iron yet at Hollowfell, up in the hills, where the miners gave it up; something's moved in since. | `pointers.ore.lines[0]` |
 |  | We're short of ore. Our first folk dug iron at Hollowfell, up in the hills; something holds it now. | `pointers.ore.towns.wilds/store[0]` |
 |  | Town's short of ore. The old iron workings at Hollowfell, in the hills, fed us once. Mind what's in there now. | `pointers.ore.towns.wilds/store[1]` |
