@@ -15185,6 +15185,14 @@ was the same face and every tunic bare.
 
 view_test _test_person_garb. Sheets for Jeff in C:\dev\review\people\: people_v1.png
 (ten seeds; a row of trades), faces_v1.png (each plane at full), garb_v1.png.
+
+Amended (1) (the coordinator's look pass of 2026-11-12; art-kit's swatch): the cape is dyed woad,
+palette row 8's 2f4f5c ("Match the concept colour 2f4f5c in row 8 only"), no longer row 5's
+linen c2b8a0. At the nearest zoom the linen mantle read as a pale bib or bare chest on every
+person wearing it; the woad reads as a dyed shoulder cape at every angle, apart from the tunics
+and from Wren's aqua. body_build's PALETTE_ROWS gives the Cape row 8 and PART_COLOURS 2f4f5c;
+human_m and human_f built again, only the Cape's UVs moved (swatch (0,5) to (4,8)). In game,
+before and after (hosted, the Lenovo): C:/dev/review/pc-character/cape_sheet.png.
 ## 483. A monster's hands are seen by every peer
 
 pc-character: on a client that is not the host no monster showed what it

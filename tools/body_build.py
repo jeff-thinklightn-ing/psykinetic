@@ -69,8 +69,9 @@ TINTED = ["Skin", "Hair", "Tunic", "Trousers"]
 ## (5 cloth and leather, 6 metal, 7 the accents: an orc's tusks, a kobold's horns and claws,
 ## decision 478).
 PALETTE_ROWS = {"Belt": (5,), "Boots": (5, 6), "Hat": (5,), "Apron": (5,), "Bone": (7,),
-	# Garb (decision 480): a leather vest, a cloth coat, a cape.
-	"Vest": (5,), "Coat": (5,), "Cape": (5,),
+	# Garb (decision 480): a leather vest, a cloth coat, a cape. The cape a dyed wool on row 8 (the
+	# coordinator's order and art-kit's pick, 2026-11-12: linen read as bare skin at the nearest zoom).
+	"Vest": (5,), "Coat": (5,), "Cape": (8,),
 	# A kobold's pale belly (decision 478's restyle): the skin row.
 	"Belly": (0,),
 	# An orc's iron (its shoulder plate, chain and buckle): the metal row.
@@ -457,7 +458,7 @@ def dress(obj, region: list, refs: dict) -> None:
 ## material's name; the tinted parts' colours are the concept c4's (PART_COLOURS).
 PART_COLOURS = {"Skin": "c49075", "Hair": "564135", "Tunic": "838065", "Trousers": "533e2d", "Belt": "3d2a1f",
 	"Boots": "29231b", "Hat": "6e5a44", "Apron": "b8a888", "Bone": "f4efe6",
-	"Vest": "6a4a32", "Coat": "4a4f5a", "Cape": "c2b8a0", "Belly": "f1d3bd", "Iron": "3e4044"}
+	"Vest": "6a4a32", "Coat": "4a4f5a", "Cape": "2f4f5c", "Belly": "f1d3bd", "Iron": "3e4044"}
 
 
 def colour_parts(obj) -> None:
