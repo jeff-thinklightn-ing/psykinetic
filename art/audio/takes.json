@@ -1980,6 +1980,33 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/RYK-Sounds - Footstep/grass 3 single step 3.wav",
 				"sha256": "1f3e71d8c893383a1fe9420ee7a620aba956fad9b318f6a23b016639643fac21"
+			},
+			{
+				"file": "sfx.footstep_grass_medium.2.ogg",
+				"from": "freesound",
+				"original": "freesound 384859: Left Grass/Grassy Footstep 3 (from 0 s for 0.65 s)",
+				"sha256": "de9b9f5cdde4a4f72831110e90be74e3dbd8f7bae3a4de0305fe24138057ef64",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384859/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_grass_medium.3.ogg",
+				"from": "freesound",
+				"original": "freesound 384858: Left Grass/Grassy Footstep 2 (from 0 s for 0.65 s)",
+				"sha256": "444b6d3dd8a1a5a24247b5b5200d63c84a97ba18f6dbd87ac2260ea5202cee05",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384858/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.footstep_grass_medium.4.ogg",
+				"from": "freesound",
+				"original": "freesound 384860: Left Grass/Grassy Footstep 1 (from 0 s for 0.65 s)",
+				"sha256": "0ed1897724e46aec61c7d7b96f78ac3f8dd41c4381261d7030a5e536ae63fb9e",
+				"by": "Ali_6868",
+				"url": "https://freesound.org/people/Ali_6868/sounds/384860/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.footstep_hooves": [
@@ -2086,7 +2113,7 @@
 				"file": "sfx.footstep_stone_medium.ogg",
 				"from": "freesound",
 				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 1.03 s for 0.5 s)",
-				"sha256": "a21c97df1456898841995e01318edcaec116337ce07acf0d8c16841978d97601",
+				"sha256": "0f53640039656a1fa9ca3370e6ad984ce1d1aa61fc6bd5af4d82a6f6b4743d72",
 				"by": "SecureSubset",
 				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
 				"license": "CC0 1.0"
@@ -2095,7 +2122,7 @@
 				"file": "sfx.footstep_stone_medium.2.ogg",
 				"from": "freesound",
 				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 2.19 s for 0.5 s)",
-				"sha256": "5577584b4fb6f19822a08abb808434d8a2750de0a2598cdea4fb0fe08c4092e9",
+				"sha256": "01037a9b1c69b5bac72becb12099b588a89b11f1abbf8843885441ceaa12dad4",
 				"by": "SecureSubset",
 				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
 				"license": "CC0 1.0"
@@ -2104,7 +2131,7 @@
 				"file": "sfx.footstep_stone_medium.3.ogg",
 				"from": "freesound",
 				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 3.44 s for 0.5 s)",
-				"sha256": "f11d052552b257f01f5bf94e43f3612380173e7b366a139d03cc7e130f13fc1a",
+				"sha256": "1b6b1a0d6d06fcbd6ab2b6a414b31a4589b3c4ddc5cfdfbe26494842dfe8e2f0",
 				"by": "SecureSubset",
 				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
 				"license": "CC0 1.0"
@@ -2113,7 +2140,7 @@
 				"file": "sfx.footstep_stone_medium.4.ogg",
 				"from": "freesound",
 				"original": "freesound 813622: Footsteps - Stone, Rock, Concrete, Cement (from 4.78 s for 0.5 s)",
-				"sha256": "9c4e1006b3cce9835c81c97c0e25f7d0fc51bd1ba59df9987077e7ef89245585",
+				"sha256": "db704a68f4408f13681a0525ba1fb15ced51b424e98a605a396e1e47ba86298a",
 				"by": "SecureSubset",
 				"url": "https://freesound.org/people/SecureSubset/sounds/813622/",
 				"license": "CC0 1.0"
@@ -2122,7 +2149,7 @@
 				"file": "sfx.footstep_stone_medium.5.ogg",
 				"from": "freesound",
 				"original": "freesound 521590: Hiking Boot Footsteps on Stone (from 0.68 s for 0.45 s)",
-				"sha256": "13ce31df1524ee0516acd4e7eefa93a35fe11b5e4b43db5805e5e627febe1b1f",
+				"sha256": "f27d79285a8e5260dce28ab99f7e665f346c5c8863c46a84c8ccfb0672cd8a54",
 				"by": "Fission9",
 				"url": "https://freesound.org/people/Fission9/sounds/521590/",
 				"license": "CC0 1.0"
@@ -2131,7 +2158,7 @@
 				"file": "sfx.footstep_stone_medium.6.ogg",
 				"from": "freesound",
 				"original": "freesound 521590: Hiking Boot Footsteps on Stone (from 1.79 s for 0.45 s)",
-				"sha256": "a742da4f5627642fe670174463c518022903a4044f8d24c34574f1f93da1e03e",
+				"sha256": "e944cc64cd28abcc5f56c35b976a34d1fb59b34f56f0220b97bf1b1a372f58fc",
 				"by": "Fission9",
 				"url": "https://freesound.org/people/Fission9/sounds/521590/",
 				"license": "CC0 1.0"

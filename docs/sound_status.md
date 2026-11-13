@@ -142,7 +142,7 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `sfx.footstep` | 5 | step 3 | Impact Sounds 1.0, Kenney | CC0 1.0 |
 | `sfx.footstep_claws` | 4 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `sfx.footstep_dirt_medium` | 4 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
-| `sfx.footstep_grass_medium` | 1 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
+| `sfx.footstep_grass_medium` | 4 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss, Freesound | Sonniss #GameAudioGDC Bundle licence v2.0, CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.footstep_hooves` | 4 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `sfx.footstep_paws` | 4 | step 3 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
 | `sfx.footstep_sand_medium` | 5 | step 3 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |

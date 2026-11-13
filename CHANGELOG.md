@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Footsteps on grass change from step to step, and footsteps on stone fall at an even loudness, the same as on grass (267 amended (1)).
 - A battle axe or giant axe swing reaches a foe who takes a step back while you wind it up, however you came at him, the battle axe hits harder, and nobody knocked down can be knocked down again for 4 seconds (874, 874 amended (1), 343 amended (2)).
 - Towns: in Umbrage the ground between the houses is a close-cropped lawn with a few short tufts, worn footpaths run where the woodcutter walks from the woodlot to the store and the inn, and the square's cobbles fray into earth and loose stones at their edge (880).
 - In the crypt, a robber's lunge shows its red line for a full second, and after every lunge, landed or not, he stands a moment crying out, open to your blow (790 amended (6)).

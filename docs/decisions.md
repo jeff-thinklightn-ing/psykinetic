@@ -4382,6 +4382,23 @@ SOURCES.txt already names each original), slots as a GDScript table
 (the tools, the status and the art side all read JSON), and silence for
 an empty slot (a missing sound goes unnoticed).
 
+267 amended (1) (the script's label; the coordinator's order, 11-12, the third of sound's three
+worst things in Umbrage): a slot's takes are levelled to one another, and a step slot has more than
+one. Measured on the ears tour on main (a joined client, real server; the player's own steps told
+from townsfolk's by their applied volume, about -16 dB against -39 to -41), each step at the ear as
+its take's loudest 50 ms plus its applied volume: sfx.footstep_grass_medium was one take (RYK's,
+Sonniss), played 136 times of 136, and sfx.footstep_stone_medium's six takes (freesound 813622 and
+521590, CC0) ran from -13.7 to -21.4 dB loudest 50 ms, so stone steps jumped 8.2 dB (p10 to p90).
+Now grass has three more takes, Ali_6868's single steps (freesound 384859, 384858, 384860, CC0, each
+0.65 s with a 0.12 s fade), and the six stone takes are cut again from the same points, each peaked
+so all ten sit within -18.3 to -19.6 dB loudest 50 ms (stone within 0.5 dB, grass within 1.1). The
+same walk after: grass median -35.4 dB, p10 to p90 2.9 dB, all four takes heard; stone median
+-35.5 dB, p10 to p90 2.5 dB. Rejected: 384866 (its stereo peak caps it 3.5 dB under the others),
+384868 (a spike 23 dB over its body); a per-take gain in takes.json (the cut is the take; one more
+field every reader must honour). The bar for a step slot from here: its own steps' p10 to p90 within
+about 3 dB, and the surfaces' medians within 3 dB of each other. Client sound only; protocol
+unchanged, no new class_name.
+
 ## 266. Inside is a cell of a footprint: the roof goes, its shadow stays, the near side fades
 
 Whether a player is inside a building is asked by each client of its own
