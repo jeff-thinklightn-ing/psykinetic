@@ -9185,6 +9185,107 @@ func _test_camera_turn() -> void:
 			and Color(fill.get_shader_parameter("colour")).b > Color(fill.get_shader_parameter("colour")).r
 			and Color(rim_pass.get_shader_parameter("colour")).get_luminance() > Color(fill.get_shader_parameter("colour")).get_luminance(),
 			"hidden outdoors: the player shows through what hides them, a cool fill marking its pixels and a brighter rim round it (623 amended (5))")
+	# 623 amended (6), behind body_marks: while the fill shows, the other
+	# bodies in view mark BODY_STENCIL and the player's passes draw only
+	# where the stencil holds 0, so a foe's arm in front takes no fill; the
+	# target's and the foe-seen rim keep their compare (through a body).
+	Client3D.body_marks = true
+	_rig._update_seen_through()
+	var clear: ShaderMaterial = _rig._player_through_clear
+	var clear_rim := clear.next_pass as ShaderMaterial
+	var others_marked := true
+	var others := 0
+	var unmarked_at: Array[String] = []
+	for id: int in _rig._puppets:
+		var body: Node3D = _rig._puppets[id]
+		if body == puppet or not body.visible or body.has_meta("seen_through"):
+			continue  # A body seen through itself (Wren hidden too) is marked 1: no fill over it either.
+		for source in Client3D._body_meshes(body):
+			others += 1
+			var drawn: Material = source.material_override if source.material_override != null else source.get_active_material(0)
+			var stencil := -1
+			if drawn is BaseMaterial3D:
+				stencil = (drawn as BaseMaterial3D).stencil_reference if (drawn as BaseMaterial3D).stencil_mode == BaseMaterial3D.STENCIL_MODE_CUSTOM else -1
+			elif drawn is ShaderMaterial and (drawn as ShaderMaterial).shader != null:
+				stencil = Client3D.BODY_STENCIL if "compare_always, %d;" % Client3D.BODY_STENCIL in (drawn as ShaderMaterial).shader.code else -1
+			var ok := stencil == Client3D.BODY_STENCIL and int(source.get_meta("marked_ref", 0)) == Client3D.BODY_STENCIL
+			others_marked = others_marked and ok
+			if not ok and unmarked_at.size() < 4:
+				unmarked_at.append("%s/%s %s stencil %d ref %d" % [body.name, source.name, drawn.get_class() if drawn != null else "no material", stencil, int(source.get_meta("marked_ref", 0))])
+	_check(puppet.get_meta("outline", null) == clear and others > 0 and others_marked
+			and "stencil_mode read, write, compare_greater, 1;" in clear.shader.code and "stencil_mode read, compare_greater, 1;" in clear_rim.shader.code
+			and "compare_not_equal, 1;" in _rig._target_through.shader.code and "compare_not_equal, 1;" in _rig._seen_through.shader.code,
+			"body_marks: the player's fill and rim pass only where the stencil holds 0, and the %d other body meshes in view mark %d; the target's and the foe-seen rim as before (623 amended (6)) %s" % [others, Client3D.BODY_STENCIL, unmarked_at])
+	var marked_id := -1
+	for id: int in _rig._puppets:
+		if _rig._body_marked.has(_rig._puppets[id]) and instance_from_id(id) is GridEntity and not Client3D._body_meshes(_rig._puppets[id]).is_empty():
+			marked_id = id
+			break
+	_check(marked_id != -1, "a body-marked body to target")
+	if marked_id != -1:
+		var marked: Node3D = _rig._puppets[marked_id]
+		_rig.target(instance_from_id(marked_id) as GridEntity)
+		_rig._update_seen_through()
+		var target_mark := Client3D._body_meshes(marked).all(func(source: MeshInstance3D) -> bool: return int(source.get_meta("marked_ref", 0)) == Client3D.OUTLINE_STENCIL)
+		_rig.target(null)
+		_rig._update_seen_through()
+		var refs := Client3D._body_meshes(marked).map(func(source: MeshInstance3D) -> int: return int(source.get_meta("marked_ref", 0)))
+		var back_to_body := refs.all(func(ref: int) -> bool: return ref == Client3D.BODY_STENCIL)
+		_check(target_mark and back_to_body, "a marked body made the target takes the target's mark, and its body mark again after (%s, %s: %s; outlined %s, seen %s)"
+				% [target_mark, back_to_body, refs, _rig._outlined, marked.has_meta("seen_through")])
+	# The through-passes take the day's light under body_marks (the shack's 21:00 still).
+	var dim_rim := clear.next_pass as ShaderMaterial
+	var outline_share: Variant = _rig._outline.get_shader_parameter("night_share")
+	_check(is_equal_approx(float(clear.get_shader_parameter("night_share")), Client3D.THROUGH_NIGHT_FILL)
+			and is_equal_approx(float(dim_rim.get_shader_parameter("night_share")), Client3D.THROUGH_NIGHT_RIM)
+			and is_equal_approx(float(_rig._target_through_dim.get_shader_parameter("night_share")), Client3D.THROUGH_NIGHT_FILL)
+			and (outline_share == null or is_equal_approx(float(outline_share), 1.0))
+			and "mix(night_share, 1.0, look_day)" in clear.shader.code and "global uniform float look_day" in clear.shader.code,
+			"body_marks: the through-fill at %.2f and its rim at %.2f of themselves at full night (look_day); the hover outline as by day" % [Client3D.THROUGH_NIGHT_FILL, Client3D.THROUGH_NIGHT_RIM])
+	Client3D.body_marks = false
+	_rig._update_seen_through()
+	var unmarked := true
+	var still: Array[String] = []
+	for id: int in _rig._puppets:
+		for source in Client3D._body_meshes(_rig._puppets[id]):
+			if _rig._puppets[id] != puppet and not _rig._puppets[id].has_meta("seen_through") and (source.has_meta("own_override") or source.has_meta("marked_ref")):
+				unmarked = false
+				if still.size() < 4:
+					still.append("%s/%s ref %d" % [_rig._puppets[id].name, source.name, int(source.get_meta("marked_ref", -1))])
+	_check(puppet.get_meta("outline", null) == _rig._player_through and unmarked and _rig._body_marked.is_empty(),
+			"switched off: the old fill again and every other body as it was (%s %s %s)" % [puppet.get_meta("outline", null) == _rig._player_through, still, _rig._body_marked.size()])
+	# The fill only near the camera's aim (623 amended (6), the coordinator's: the
+	# temple shot's cyan ghosts, the camera panned 40 cells off its player).
+	var reach_third: float = maxf(_rig._view_reach() * Client3D.THROUGH_NEAR_AIM, Client3D.THROUGH_NEAR_LEAST)
+	var followed_fill: bool = puppet.has_meta("seen_through")
+	# A bow's lead plus a heel off the aim (the floor, THROUGH_NEAR_LEAST): still drawn.
+	_rig._camera_target = puppet.position + Vector3(Client3D.AIM_LEAD_CELLS + 2.0, 0.0, 0.0)
+	_rig._update_seen_through()
+	var led_fill: bool = puppet.has_meta("seen_through")
+	_rig._camera_target = puppet.position + Vector3(40.0, 0.0, 0.0)
+	_rig._update_seen_through()
+	var aimed_off: bool = not puppet.has_meta("seen_through") and _rig._player_hidden
+	Client3D.body_marks = true
+	_rig._update_seen_through()
+	var off_unmarked: bool = not puppet.has_meta("seen_through") and _rig._body_marked.is_empty()
+	Client3D.body_marks = false
+	_rig._camera_target = puppet.position
+	_rig._update_seen_through()
+	_check(reach_third < 40.0 and followed_fill and led_fill and aimed_off and off_unmarked and puppet.has_meta("seen_through")
+			and puppet.get_meta("outline", null) == _rig._player_through,
+			"the through-fill only near the aim: followed behind the house it draws, and with the aim led 6 cells off; the camera aimed 40 cells off (near reach %.1f), still hidden, none and no body marked; aimed back, drawn again (%s %s %s %s)"
+			% [reach_third, followed_fill, led_fill, aimed_off, off_unmarked])
+	# The hidden test ends at the camera (623 amended (6); the probe of the lunge film): the house
+	# hides the player; with the camera put between them, the house beyond it hides nothing.
+	var skip_none: Dictionary[Node3D, bool] = {}
+	var chest: Vector3 = puppet.global_position + Vector3.UP * 1.0
+	var to_camera: Vector3 = _rig._camera.global_transform.basis.z
+	var eye_was: Vector3 = _rig._camera.global_position
+	var behind_house: bool = _rig._point_blocked(chest, to_camera, skip_none)
+	_rig._camera.global_position = chest + to_camera * 0.2
+	var past_camera: bool = _rig._point_blocked(chest, to_camera, skip_none)
+	_rig._camera.global_position = eye_was
+	_check(behind_house and not past_camera, "the hidden test ends at the camera: the house between hides them (%s), the house beyond the camera does not (%s)" % [behind_house, past_camera])
 	if other != null:
 		# Wren behind the house too (623 amended (5)): hers shows; marked, her rim is the target's, drawn through.
 		other.global_position = _rig.to_global(_rig._tile_position(Vector2i(2, 6)))

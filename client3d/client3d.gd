@@ -2003,10 +2003,48 @@ const THROUGH_TARGET: Array[Color] = [Color(0.9, 0.22, 0.18, 0.5), Color(1.0, 0.
 const TARGET_PIXELS := 3.0
 const OUTLINE_NEARER := 0.4
 const OUTLINE_STENCIL := 1
+## Bodies kept clear of the player's and companion's through-fills (623
+## amended (6); animation's lunge film, perf's cause): the fill is drawn
+## with no depth test over the hidden body's shape and kept off only where
+## the stencil holds OUTLINE_STENCIL, so a foe's arm in front of the player
+## at arm's length took the pale fill. With body_marks, while a player's or
+## companion's through-fill shows, every other body in view marks
+## BODY_STENCIL (_mark_bodies; its materials' copies, as the target's
+## mark), and the player's and companion's fills and rims draw only where
+## the stencil holds 0 (THROUGH_CLEAR_STENCIL: Godot compares the reference
+## with what is stored, 1 > stored), so never over a body; the foe-seen rim
+## and the target's red still draw through a body in front (combat's
+## design). Off (the old compare, no body marks) until a still shows both
+## cases: the compare's way round can't be read back headless.
+const BODY_MARKS := false
+static var body_marks := BODY_MARKS
+const BODY_STENCIL := 2
+## The through-passes' colour at full night under body_marks (623 amended
+## (6); buildings' 21:00 still behind Snagfin's shack: the player drawn as
+## the brightest thing in the frame): the fill and the rim at these shares
+## of themselves as the look's daylight (the look_day global) falls.
+const THROUGH_NIGHT_FILL := 0.35
+const THROUGH_NIGHT_RIM := 0.55
+## The player's and companion's through-fills draw only while the hidden
+## body stands within this share of _view_reach() of the camera's aim
+## (623 amended (6), the coordinator's): the shot's own player and
+## companion, hidden behind a temple with the camera panned some 40 cells
+## off, came out as two cyan ghosts at the screen's edge.
+const THROUGH_NEAR_AIM := 1.0 / 3.0
+## And never less than this many cells: the aim leads the followed player
+## by up to AIM_LEAD_CELLS (a drawn bow), and the companion heels up to
+## Heel.START off them. The high camera's nearest zoom reaches 6.6 cells,
+## so a third alone (2.2) dropped a followed companion's fill.
+const THROUGH_NEAR_LEAST := AIM_LEAD_CELLS + Heel.START
+const THROUGH_CLEAR_STENCIL := "stencil_mode read, compare_greater, 1;"
 const OUTLINE_SHADER := """shader_type spatial;
 render_mode unshaded, shadows_disabled, depth_draw_never;
 stencil_mode read, compare_not_equal, 1;
 uniform vec4 colour : source_color = vec4(1.0);
+// Its colour at full night (623 amended (6)): 1 keeps it as by day (the hover
+// outline, the foe-seen rim); the through-passes under body_marks less.
+uniform float night_share = 1.0;
+global uniform float look_day;
 uniform vec2 nudge = vec2(0.0);
 uniform float nearer = 0.4;
 void vertex() {
@@ -2021,7 +2059,7 @@ void vertex() {
 	POSITION.xy += nudge * 2.0 / VIEWPORT_SIZE * POSITION.w;
 }
 void fragment() {
-	ALBEDO = colour.rgb;
+	ALBEDO = colour.rgb * mix(night_share, 1.0, look_day);
 	// Drawn with the see-through things, after every solid one: the body has
 	// marked the stencil by then.
 	ALPHA = colour.a;
@@ -2741,10 +2779,19 @@ var _seen_through: ShaderMaterial
 var _target_through: ShaderMaterial
 var _player_through: ShaderMaterial
 var _companion_through: ShaderMaterial
+## Theirs under body_marks (623 amended (6)), and the puppets whose bodies
+## are marked now (_mark_bodies).
+var _player_through_clear: ShaderMaterial
+var _companion_through_clear: ShaderMaterial
+var _target_through_dim: ShaderMaterial
+var _body_marked: Dictionary[Node3D, bool] = {}
 var _outlined: Node3D
 var _marking: Dictionary[Material, Material] = {}
 ## Body shaders' stencil-marking twins (_marking_shader).
 var _marking_shaders: Dictionary[Shader, Shader] = {}
+## Their BODY_STENCIL twins (623 amended (6)).
+var _body_marking: Dictionary[Material, Material] = {}
+var _body_marking_shaders: Dictionary[Shader, Shader] = {}
 var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
 ## Main's speech bubbles, for last words.
@@ -3505,6 +3552,21 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_target_through = _through_passes(core_shader, seen_shader, THROUGH_TARGET)
 	_player_through = _through_passes(core_shader, seen_shader, THROUGH_PLAYER)
 	_companion_through = _through_passes(core_shader, seen_shader, THROUGH_COMPANION)
+	var clear_shader := Shader.new()
+	clear_shader.code = seen_shader.code.replace("stencil_mode read, compare_not_equal, 1;", THROUGH_CLEAR_STENCIL)
+	var clear_core := Shader.new()
+	clear_core.code = seen_shader.code.replace("stencil_mode read, compare_not_equal, 1;", THROUGH_CLEAR_STENCIL.replace("read,", "read, write,"))
+	_player_through_clear = _through_passes(clear_core, clear_shader, THROUGH_PLAYER)
+	_companion_through_clear = _through_passes(clear_core, clear_shader, THROUGH_COMPANION)
+	_target_through_dim = _through_passes(core_shader, seen_shader, THROUGH_TARGET)
+	for passes: ShaderMaterial in [_player_through_clear, _companion_through_clear, _target_through_dim]:
+		passes.set_shader_parameter("night_share", THROUGH_NIGHT_FILL)
+		var rim_pass := passes.next_pass as ShaderMaterial
+		while rim_pass != null:
+			rim_pass.set_shader_parameter("night_share", THROUGH_NIGHT_RIM)
+			rim_pass = rim_pass.next_pass as ShaderMaterial
+	if "--body-marks" in OS.get_cmdline_user_args():
+		body_marks = true  # Stills and benches with it on (623 amended (6)).
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
@@ -6720,13 +6782,16 @@ func _update_seen_through() -> void:
 	if _camera == null:
 		return
 	var now := Time.get_ticks_msec()
+	var near_aim := maxf(_view_reach() * THROUGH_NEAR_AIM, THROUGH_NEAR_LEAST)
+	var own_fill := false
 	for id: int in _puppets:
 		var puppet := _puppets[id]
 		var had := puppet.has_meta("seen_through")
 		if puppet == _outlined:
 			if had:
 				puppet.remove_meta("seen_through")  # Its target's rim is on it now (target()).
-			var rim := _target_through if _outdoor and puppet.visible and _body_hidden(puppet) else _outline
+			var through := _target_through_dim if body_marks else _target_through
+			var rim := through if _outdoor and puppet.visible and _body_hidden(puppet) else _outline
 			if puppet.get_meta("outline", null) != rim:
 				_show_outline(puppet, true, rim)
 			continue
@@ -6742,17 +6807,70 @@ func _update_seen_through() -> void:
 			# The player hidden outdoors (801): what hides them stays as it
 			# is (a landmark never fades, Level.FADES_ON_LINE), their rim
 			# shows through it until the camera's turn brings them back.
-			seen = _outdoor and _player_hidden
-			rim = _player_through
+			seen = _outdoor and _player_hidden and _near_aim(puppet, near_aim)
+			rim = _player_through_clear if body_marks else _player_through
+			own_fill = own_fill or seen
 		elif entity is Companion and entity.keeper_peer == Net.local_id and puppet.visible:
-			seen = _outdoor and _companion_hidden  # Their companion as they are (623 amended (5)).
-			rim = _companion_through
+			# Their companion as they are (623 amended (5)).
+			seen = _outdoor and _companion_hidden and _near_aim(puppet, near_aim)
+			rim = _companion_through_clear if body_marks else _companion_through
+			own_fill = own_fill or seen
 		if seen != had:
 			if seen:
 				puppet.set_meta("seen_through", true)
 			else:
 				puppet.remove_meta("seen_through")
 			_show_outline(puppet, seen, rim)
+		elif seen and puppet.get_meta("outline", null) != rim:
+			_show_outline(puppet, true, rim)  # body_marks switched.
+	_mark_bodies(body_marks and own_fill)
+
+
+## Whether [param puppet] stands, on the ground, within [param reach] of
+## the camera's aim (THROUGH_NEAR_AIM): a peek panned further off leaves
+## the hidden player and companion unmarked.
+func _near_aim(puppet: Node3D, reach: float) -> bool:
+	var at := to_local(puppet.global_position)
+	return Vector2(at.x - _camera_target.x, at.z - _camera_target.z).length() <= reach
+
+
+## While the player's or companion's through-fill shows (623 amended (6)):
+## every other body in view, not marked already (the target, a foe seen
+## through), marks BODY_STENCIL, so neither fill draws over it; after, as
+## it was. Swept each frame while on (a gear change, a body come into
+## view), only then: in ordinary play no body's materials change.
+func _mark_bodies(on: bool) -> void:
+	if not on:
+		if _body_marked.is_empty():
+			return
+		for each: Variant in _body_marked.keys():
+			if is_instance_valid(each):  # A freed body's key held as it was.
+				for source in _body_meshes(each as Node3D):
+					if int(source.get_meta("marked_ref", 0)) == BODY_STENCIL:
+						_mark_stencil(source, false)
+		_body_marked.clear()
+		return
+	for id: int in _puppets:
+		var puppet := _puppets[id]
+		if not is_instance_valid(puppet) or not puppet.visible or puppet == _outlined or puppet.has_meta("seen_through"):
+			continue
+		for source in _body_meshes(puppet):
+			if not source.has_meta("own_override"):
+				_mark_stencil(source, true, BODY_STENCIL)
+		_body_marked[puppet] = true
+
+
+## [param puppet]'s body's meshes (its "Body", as _show_outline marks).
+static func _body_meshes(puppet: Node3D) -> Array[MeshInstance3D]:
+	var out: Array[MeshInstance3D] = []
+	var body := puppet.get_node_or_null("Body") as Node3D
+	if body == null:
+		return out
+	for node in body.find_children("*", "MeshInstance3D", true, false):
+		out.append(node as MeshInstance3D)
+	if body is MeshInstance3D:
+		out.append(body as MeshInstance3D)
+	return out
 
 
 ## Outdoors: whether something standing (_point_blocked) hides [param
@@ -6804,8 +6922,15 @@ func in_telegraph(tile: Vector2i) -> bool:
 ## again, its surfaces' own overrides too (a painted ally's paint, the
 ## palette: put back, not cleared, or a body unmarked, as one is when it
 ## dies, went white). The copies look the same.
-func _mark_stencil(source: MeshInstance3D, mark: bool) -> void:
+##
+## [param reference]: OUTLINE_STENCIL (the target's, a body seen through)
+## or BODY_STENCIL (623 amended (6)); a mesh marked with the other is put
+## back first.
+func _mark_stencil(source: MeshInstance3D, mark: bool, reference := OUTLINE_STENCIL) -> void:
+	if mark and source.has_meta("own_override") and int(source.get_meta("marked_ref", OUTLINE_STENCIL)) != reference:
+		_mark_stencil(source, false)
 	if not mark:
+		source.remove_meta("marked_ref")
 		if source.has_meta("own_override"):
 			source.material_override = source.get_meta("own_override")
 			source.remove_meta("own_override")
@@ -6821,28 +6946,31 @@ func _mark_stencil(source: MeshInstance3D, mark: bool) -> void:
 	for surface in source.get_surface_override_material_count():
 		kept.append(source.get_surface_override_material(surface))
 	source.set_meta("own_surfaces", kept)
+	source.set_meta("marked_ref", reference)
 	if source.material_override != null:
-		source.material_override = _marking_copy(source.material_override)
+		source.material_override = _marking_copy(source.material_override, reference)
 		return
 	for surface in source.get_surface_override_material_count():
 		var own := source.get_active_material(surface)
 		if own != null:
-			source.set_surface_override_material(surface, _marking_copy(own))
+			source.set_surface_override_material(surface, _marking_copy(own, reference))
 
 
-## [param material]'s copy that marks the stencil as it draws (cached).
-func _marking_copy(material: Material) -> Material:
-	if not _marking.has(material):
+## [param material]'s copy that marks the stencil with [param reference]
+## as it draws (cached).
+func _marking_copy(material: Material, reference := OUTLINE_STENCIL) -> Material:
+	var cache := _marking if reference == OUTLINE_STENCIL else _body_marking
+	if not cache.has(material):
 		var copy := material.duplicate() as Material
 		if copy is BaseMaterial3D:
 			copy.stencil_mode = BaseMaterial3D.STENCIL_MODE_CUSTOM
 			copy.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE
 			copy.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
-			copy.stencil_reference = OUTLINE_STENCIL
+			copy.stencil_reference = reference
 		elif copy is ShaderMaterial and (material as ShaderMaterial).shader != null:
-			(copy as ShaderMaterial).shader = _marking_shader((material as ShaderMaterial).shader)
-		_marking[material] = copy
-	return _marking[material]
+			(copy as ShaderMaterial).shader = _marking_shader((material as ShaderMaterial).shader, reference)
+		cache[material] = copy
+	return cache[material]
 
 
 ## [param shader]'s twin that marks the stencil as it draws (cached): the
@@ -6852,18 +6980,23 @@ func _marking_copy(material: Material) -> Material:
 ## robber's body marked nothing, so the outline's passes drew over all of
 ## it, not round it). A shader that sets its own stencil, or is not a
 ## spatial one, is kept.
-func _marking_shader(shader: Shader) -> Shader:
-	if shader == GOBLIN_MATERIAL.shader:
+func _marking_shader(shader: Shader, reference := OUTLINE_STENCIL) -> Shader:
+	if shader == GOBLIN_MATERIAL.shader and reference == OUTLINE_STENCIL:
 		return GOBLIN_MARKING_SHADER
-	if not _marking_shaders.has(shader):
+	var cache := _marking_shaders if reference == OUTLINE_STENCIL else _body_marking_shaders
+	if not cache.has(shader):
 		var code := shader.code
 		var marked := shader
-		if code.begins_with("shader_type spatial;") and not "stencil_mode" in code:
+		if shader == GOBLIN_MATERIAL.shader:
+			marked = Shader.new()
+			marked.code = GOBLIN_MARKING_SHADER.code.replace("stencil_mode write, compare_always, %d;" % OUTLINE_STENCIL,
+					"stencil_mode write, compare_always, %d;" % reference)
+		elif code.begins_with("shader_type spatial;") and not "stencil_mode" in code:
 			marked = Shader.new()
 			marked.code = code.replace("shader_type spatial;", "shader_type spatial;
-stencil_mode write, compare_always, %d;" % OUTLINE_STENCIL)
-		_marking_shaders[shader] = marked
-	return _marking_shaders[shader]
+stencil_mode write, compare_always, %d;" % reference)
+		cache[shader] = marked
+	return cache[shader]
 
 
 ## The toss aim during a right drag: an arrow on the floor from
@@ -20966,6 +21099,12 @@ func _see_through_now(close: Dictionary[Node3D, bool]) -> Dictionary[Node3D, boo
 ## and a camera looking back along [param toward] (_hiding_pieces' test).
 func _point_blocked(point: Vector3, toward: Vector3, skip: Dictionary[Node3D, bool]) -> bool:
 	var reach := _camera_distance() * 2.0
+	# 623 amended (6): never past the camera (the probe of the lunge film: a foe in the open
+	# "hidden" by the ring of trees behind the low camera, so he wore the target's red), nor by a
+	# tree or tall piece by the low camera's lens, which it hides (NEAR_CLOSE, _close_pieces).
+	var to_eye := point.distance_to(_camera.global_position) if _camera != null else reach
+	reach = minf(reach, to_eye)
+	var eye := point + toward * to_eye
 	if toward.y > 0.01:
 		reach = minf(reach, maxf(_occluder_top - point.y, 0.0) / toward.y)
 	var end := point + toward * reach
@@ -20978,6 +21117,8 @@ func _point_blocked(point: Vector3, toward: Vector3, skip: Dictionary[Node3D, bo
 				if skip.has(entry[0]):
 					continue
 				var bounds: AABB = entry[1]
+				if _low and entry[2] and eye.clamp(bounds.position, bounds.end).distance_to(eye) <= NEAR_CLOSE:
+					continue
 				var ahead := bounds.get_center() - point
 				if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_segment(point, end) != null \
 						and (not (entry[3] as Array).is_empty() or shapes_meet(entry[4], point, end)):
