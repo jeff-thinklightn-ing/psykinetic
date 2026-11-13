@@ -30629,6 +30629,45 @@ their "door or shop"; the coordinator's ruling):
 
 Server only; protocol unchanged; no new class_name.
 
+**613 amended (3): the first rescue** (the coordinator's package "the first
+rescue", approved 2026-11-12; Jeff's "Umbrage first").
+- crop.sought_first (economy.json, off in this landing): while a town has
+  no farmer and no field, Towns._farmer_comes seeks one from the start
+  (_farmer_sought), at his story's place (the old farmstead). Brought home,
+  the town plans his field. With it off, a farmer still comes only to a
+  standing field.
+- Food first: while no field stands, choose() puts a wanted field ahead of
+  every other want, so his homecoming's experience plants it. It is "no
+  field standing", not "food low", so once a field stands the other wants
+  take their turn. farm_test checks both sides: the field before a woodshed
+  wanted earlier, then the woodshed.
+- Field xp 15 -> 10: a fresh town has 0 experience and a rescue brings 10.
+  At 15 the town could never plan his field. A town with a field is
+  unaffected.
+- Named refuges in the rumour (voice's joining table, lore's names):
+  - Towns._place keeps the place's shown map name (Main._place_sought's
+    "named") and lore's "secret" on the entry.
+  - Towns.sought_where(entry, joins) gives "at the old farmstead", "in the
+    thick of the forest", "on the path to ...", by sought.joins (the
+    longest prefix of the name; "at" otherwise).
+  - A held, camp, secret or unplaced entry keeps where_words. The smith's
+    row is secret, so his agreed town line stands.
+  - The town's word ("word is ... was seen ...") and the officials' lines
+    use it.
+- The town sheet's ask: Main.town_asks adds {"kind": "sought", "trade":
+  "farmer", "where"} while the town has anyone on the dole or hungry and a
+  farmer is sought ("where" is "" while he is unplaced). ui draws it as
+  voice's "We have no %s. One is said to be %s." economy_test checks it.
+- Soaks (ubuntu-1, 60 days, a fresh Umbrage, logs in
+  C:/dev/review/economy/probe_box/soak_run2/):
+  - Fetched by day 4: sown in spring, the harvest on day 21, nobody hungry
+    in 60 days.
+  - Fetched on day 7: misses the spring, 8 hungry from about day 50.
+  - Never fetched: 7 hungry from about day 50.
+  - The late farmer and year two go to Jeff as a pick.
+- Server only; protocol unchanged (an ask row is data in the existing
+  message); no new class_name.
+
 ## 643. The sought's door note and the town's rumour
 
 Jeff (2026-10-23, on the sought of 613): "town knows rumors - they leave a

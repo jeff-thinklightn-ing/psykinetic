@@ -771,6 +771,12 @@ func choose(town: String) -> String:
 		var lb := int(building(town, b)["level"])
 		return la < lb or la == lb and a < b)
 	wants.append_array(housing)
+	# Food first (613 amended (3), the first rescue): while no field stands, a wanted field
+	# comes before every other want, so the farmer's own homecoming plants it. Not "food low":
+	# once a field stands the rest take their turn.
+	if "field" in wants and int(building(town, "field").get("level", 0)) < 1:
+		wants.erase("field")
+		wants.push_front("field")
 	for kind in wants:
 		if int(building(town, kind).get("job", 0)) != 0:
 			continue  # Being built already (a stalled one, decision 522).
@@ -1445,11 +1451,18 @@ func _crop_turn(town: String, crop_now: Dictionary, was: String, now_season: Str
 ## first).
 func _farmer_comes(town: String) -> void:
 	var house := building(town, "field")
+	var rule: Dictionary = rules.get("crop", {})
+	if house.is_empty() and bool(rule.get("sought_first", false)) and _seeking("farmer") and not _has_trade(town, "farmer"):
+		# The first rescue (613 amended (3), the coordinator's ruling: Jeff's 10-27 "the
+		# town is shaped by player interactions"): a town with no field and no farmer
+		# seeks one at once, at his story's place (the old farmstead); home, he is an
+		# unseated resident, and the town plans its field for him (choose).
+		_farmer_sought(town, rule)
+		return
 	if int(house.get("level", 0)) < 1 or house.get("state") != STANDING:
 		return
 	if _has_trade(town, "farmer"):
 		return
-	var rule: Dictionary = rules.get("crop", {})
 	var record := _town(town)
 	var waiting_since := int(record.get("farmer_wanted", -1))
 	if waiting_since < 0:
@@ -1457,9 +1470,16 @@ func _farmer_comes(town: String) -> void:
 		return
 	if now() - waiting_since < int(float(rule.get("growth_days", 5)) * maxi(DayNight.day_steps, 1)):
 		return
+	record.erase("farmer_wanted")
+	_farmer_sought(town, rule)
+
+
+## [param town]'s next farmer, named by the town and the count come (crop
+## names): sought where the trade has a story, else moved in by growth.
+func _farmer_sought(town: String, rule: Dictionary) -> void:
+	var record := _town(town)
 	var count := int(record.get("farmers_came", 0)) + 1
 	record["farmers_came"] = count
-	record.erase("farmer_wanted")
 	var names: Array = rule.get("names", ["Tam"])
 	var name := _free_name(town, names, absi(hash("%s/%d" % [town, count])))
 	var id := "farmer_%s_%d" % [town.replace("/", "_"), count]
@@ -1972,7 +1992,7 @@ func _sought_turn(town: String) -> void:
 		tries[trade] = int(tries.get(trade, 0)) + 1
 		record["sought_tries"] = tries
 		entry["tries"] = int(tries[trade])
-		_note(town, "word is %s the %s was seen %s" % [entry["name"], trade.replace("_", " "), where_words(str(entry["where"]))])
+		_note(town, "word is %s the %s was seen %s" % [entry["name"], trade.replace("_", " "), sought_where(entry, rules.get("sought", {}).get("joins", {}))])
 		sought_changed.emit(town, id)
 
 
@@ -2001,9 +2021,13 @@ func _place_variant(town: String, id: String, entry: Dictionary, variant: Dictio
 	if found is Dictionary and not str(found.get("place", "")).is_empty():
 		entry["place"] = str(found["place"])
 		entry["where"] = str(found.get("where", variant.get("where", "")))
+		entry["named"] = str(found.get("named", ""))  # The refuge's map name (613 amended (3)): sought_where.
+		entry["secret"] = bool(variant.get("secret", false))  # Lore's: its place never told (the smith's forge).
 	elif found is String and not found.is_empty():
 		entry["place"] = found
 		entry["where"] = str(variant.get("where", ""))
+		entry["named"] = ""
+		entry["secret"] = bool(variant.get("secret", false))
 	else:
 		return false
 	entry["holder"] = str(variant.get("holder", ""))
@@ -2076,6 +2100,34 @@ func _low(id: String, worker: Dictionary) -> bool:
 
 ## The words for a sought's [param where] ("in the hills", "under the
 ## castle"), for the log and npc's officials.
+static var _joins := {}  # sought.joins, read once (sought_where).
+
+
+## Where sought [param entry] waits, as a rumour says it (613 amended (3), the
+## coordinator's rulings, lore's and voice's check): placed at a refuge the map
+## names, its shown name joined by sought.joins (rules: the name's first words
+## -> the word before it, "at" else): "at the old farmstead", "on the path to
+## the hunters' camps", "in the thick of the forest". Held (a holder), at a
+## camp, a secret place (the row's "secret", lore's: the smith's forge) or
+## unplaced: where_words of its where-word, as before. [param joins] for a
+## test; the rules' by default.
+static func sought_where(entry: Dictionary, joins := {}) -> String:
+	var named := str(entry.get("named", ""))
+	if str(entry.get("place", "")).is_empty() or named.is_empty() or str(entry.get("where", "")) == "camp" 			or not str(entry.get("holder", "")).is_empty() or bool(entry.get("secret", false)):
+		return where_words(str(entry.get("where", "")))
+	if joins.is_empty():
+		if _joins.is_empty():
+			_joins = Production.read_rules().get("sought", {}).get("joins", {"_": ""})
+		joins = _joins
+	var by := "at"
+	var lead := ""
+	for start: Variant in joins:
+		if not str(start).begins_with("_") and named.begins_with(str(start)) and str(start).length() > lead.length():
+			lead = str(start)
+			by = str(joins[start])
+	return named if by.is_empty() else "%s %s" % [by, named]
+
+
 static func where_words(where: String) -> String:
 	match where:
 		"camp":
@@ -2117,6 +2169,7 @@ func sought_lost(id: String) -> bool:
 	var kept: Dictionary = _town(town)["sought"][id]
 	kept["place"] = ""
 	kept["where"] = ""
+	kept["named"] = ""
 	kept["holder"] = ""
 	kept["freed_by"] = ""
 	kept["next_try"] = now() + int(float(rules.get("sought", {}).get("restock_days", 5)) * maxi(DayNight.day_steps, 1))

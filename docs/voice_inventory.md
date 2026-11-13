@@ -1711,7 +1711,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | roots dug in winter | `sim/towns.gd` _crop() |
 |  | roots dug: %d food | `sim/towns.gd` _crop() |
 |  | the crop rotted in the field | `sim/towns.gd` _crop_turn() |
-|  | %s the farmer comes to work the field | `sim/towns.gd` _farmer_comes() |
+|  | %s the farmer comes to work the field | `sim/towns.gd` _farmer_sought() |
 |  | a drove of their own | `sim/towns.gd` _herders_turn() |
 |  | driven to %s | `sim/towns.gd` _herders_turn() |
 |  | %s in the flock, %d sheep now | `sim/towns.gd` _flock_turn() |
@@ -3056,7 +3056,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (913)
+## Lines in the data (914)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3224,7 +3224,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (39)
+### levels/economy.json (40)
 
 | | Line | Key |
 |---|---|---|
@@ -3232,6 +3232,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s the woodcutter comes to keep the town in wood | `gatherers.woodcutter` |
 |  | %s the hunter comes to keep the town in meat and hides | `gatherers.hunter` |
 |  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
+|  | 613 amended (3), the first rescue (the coordinator's ruling; Jeff 10-27, the town shaped by player interactions): true, a town with no field and no farmer seeks one at once at his story's place (the old farmstead); home, the town plans its field. Off until npc's rumour and lore's farmer.day are in (package the first rescue). | `crop.sought_first_` |
 |  | %s, from the old chests | `kept.caption` |
 |  | This was in the old chests by the stall. I kept it for you. | `kept.says` |
 |  | That's %d gold, friend. | `camp_traders.say.short` |

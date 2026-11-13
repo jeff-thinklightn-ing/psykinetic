@@ -13295,9 +13295,9 @@ func _sought_words(town: String) -> Array[String]:
 			continue
 		var trade := str(entry.get("trade", "")).replace("_", " ")
 		if str(entry.get("freed_by", "")).is_empty():
-			out.append("We have no %s. Word is %s the %s was seen %s." % [trade, entry.get("name", "someone"), trade, Towns.where_words(str(entry.get("where", "")))])
+			out.append("We have no %s. Word is %s the %s was seen %s." % [trade, entry.get("name", "someone"), trade, Towns.sought_where(entry)])
 		else:
-			out.append("%s the %s is found %s and is being led here." % [entry.get("name", "Someone"), trade, Towns.where_words(str(entry.get("where", "")))])
+			out.append("%s the %s is found %s and is being led here." % [entry.get("name", "Someone"), trade, Towns.sought_where(entry)])
 	return out
 
 
@@ -18819,6 +18819,15 @@ func town_asks(town: String) -> Array:
 				if not wants.is_empty():
 					wants.sort()
 					out.append({"kind": "healer", "open": true, "until": -1, "wants": wants})
+	# The first rescue (613 amended (3), the coordinator's ruling): a hungry town's sheet
+	# says what would feed it, its sought farmer by trade and where (ui's "We have no
+	# farmer"), only while someone in town is fed by it or goes hungry.
+	if World.production != null and World.production.on_dole(town) > 0:
+		for entry: Dictionary in World.towns.sought(town):
+			if str(entry.get("trade", "")) == "farmer":
+				out.append({"kind": "sought", "open": true, "until": -1, "trade": "farmer",
+					"where": Towns.sought_where(entry) if not str(entry.get("place", "")).is_empty() else ""})  # "" unplaced: voice's bare "We have no farmer."
+				break
 	return out
 
 
@@ -19931,7 +19940,7 @@ func _place_sought(_town: String, _trade: String, variant: Variant, _id: String)
 	for area: String in areas:
 		var place: Dictionary = _world_map.areas[area].get("places", {}).get(tag, {})
 		if place.get("kind") == "refuge":
-			return {"place": "%s/%s" % [area, tag], "where": str(place.get("where", ""))}
+			return {"place": "%s/%s" % [area, tag], "where": str(place.get("where", "")), "named": str(place.get("shown", place.get("name", "")))}  # The name the map shows (613 amended (3)).
 	return ""
 
 
