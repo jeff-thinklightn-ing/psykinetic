@@ -48,9 +48,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2866)
+## Lines in the code (2867)
 
-### companions (Pip, Wren, Nix) (656)
+### companions (Pip, Wren, Nix) (657)
 
 | | Line | Where |
 |---|---|---|
@@ -111,6 +111,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\b(fish\\w*\|rods?\|cast(ing)?\|angl\\w*)\\b | `sim/companion.gd` FISH_LIKE |
 |  | No rod of my own, but I'll keep you company. | `sim/companion.gd` FISH_NO_ROD |
 |  | Nothing to fish in here. We'd need a pond. | `sim/companion.gd` FISH_NO_WATER |
+|  | There's water close by. This way. | `sim/companion.gd` FISH_NEAR_WATER |
 |  | This water's fished out for today. Tomorrow, maybe. | `sim/companion.gd` FISH_FISHED_OUT |
 |  | Too good a spot to walk past. | `sim/companion.gd` FISH_SELF |
 |  | I'll wet a line while we're here. | `sim/companion.gd` FISH_SELF |
