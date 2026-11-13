@@ -13641,7 +13641,121 @@ func _asked_facts(body: Resident, player: Player, line: String) -> Array[String]
 	if _asked_is(said, rule, "wilds"):
 		for each: Dictionary in _asked_places(body.town).slice(0, int(rule.get("places_most", 3))):
 			out.append(str(frames.get("place", "%s lies %s of the town, %s.")) % [Offers._upper_first(str(each["name"])), each["way"], each["far"]])
+	if _asked_is(said, rule, "fish"):
+		out.append_array(_asked_fish(body.town, player, rule, item == ROD and _asked_is(said, rule, "goods")))
+	if _asked_is(said, rule, "rest"):
+		out.append_array(_asked_rest(body.town, rule))
+	if _asked_is(said, rule, "smith"):
+		out.append_array(_asked_smith(body.town, player, rule))
 	return out
+
+
+## What a fisher asks after (890 amended (1)): the nearest fishable water to [param town]'s store, by its
+## name (World.pond_name: a fishing place's, the river, a pool), its way and distance from the town; who sells
+## a fishing rod through a window open to [param player] (not again when [param sellers_told], a goods
+## question about the rod having named them); and that the asker carries one, when they do.
+func _asked_fish(town: String, player: Player, rule: Dictionary, sellers_told: bool) -> Array[String]:
+	var out: Array[String] = []
+	var frames: Dictionary = rule.get("frames", {})
+	var water := _asked_water(town)
+	if not water.is_empty():
+		out.append(str(frames.get("water", "The nearest fishing is %s, %s of the town, %s.")) % [water["name"], water["way"], water["far"]])
+	if not sellers_told:
+		var sellers := _asked_sellers(town, ROD, player)
+		if sellers.is_empty():
+			out.append(str(frames.get("none", "Nobody here sells %s now.")) % _plural(Items.name_of(ROD)))
+		for each: Dictionary in sellers.slice(0, int(rule.get("sellers_most", 2))):
+			out.append(str(frames.get("seller", "%s sells %s, at %s.")) % [each["name"], _plural(Items.name_of(ROD)), each["at"]])
+	if World.count_of(player, ROD) > 0:
+		out.append(str(frames.get("rod_carried", "The one asking carries a fishing rod already.")))
+	return out
+
+
+## The fishable water nearest [param town]'s store in its area (World.fish_cells; a well's is no body's):
+## {name, way, far}, {} for none (no water laid there: nothing said, never a false "none").
+func _asked_water(town: String) -> Dictionary:
+	if World.holdings == null:
+		return {}
+	var home: Dictionary = World.holdings.place(town)
+	var area := str(home.get("area", ""))
+	var from: Vector2i = home.get("cell", Vector2i.ZERO)
+	var best := Vector2i(-1, -1)
+	var best_d := 1 << 30
+	for cell: Vector2i in World.fish_cells(area):
+		var d := World.distance(from, cell)
+		if d < best_d:
+			best = cell
+			best_d = d
+	if best_d == 1 << 30:
+		return {}
+	return {"name": World.pond_name(World.pond_in(area, best)), "way": World.compass(Vector2(best - from)), "far": asked_far(best_d, asked_rule())}
+
+
+## Where the asker might rest (890 amended (1); the coordinator, on lore's check): the nearest warm rests of
+## [param town]'s area (Main._warm_rest_places, 616 amended (4): a roadside rest, a never-held camp, the square's
+## fire while it burns, the Mughouse), at most "rests_most", nearest the store first. Nothing of beds: no room is
+## let to a player in the data, and lore's taverner lets travellers' stays, so a "no bed" would be false; when
+## room hire exists, this adds it.
+func _asked_rest(town: String, rule: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var frames: Dictionary = rule.get("frames", {})
+	var home: Dictionary = World.holdings.place(town) if World.holdings != null else {}
+	var from: Vector2i = home.get("cell", Vector2i.ZERO)
+	var rests := _warm_rest_places(str(home.get("area", "")))
+	rests.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return World.distance(from, a["at"]) < World.distance(from, b["at"]))
+	for each: Dictionary in rests.slice(0, int(rule.get("rests_most", 2))):
+		out.append(str(frames.get("rest", "%s is warm, %s of the town, %s; a while there does a tired traveller good.")) % [Offers._upper_first(str(each["name"])),
+			World.compass(Vector2(Vector2i(each["at"]) - from)), asked_far(World.distance(from, each["at"]), rule)])
+	return out
+
+
+## The smith, true to [param town] (890 amended (1); the coordinator: never a smith who isn't there): each
+## resident smith and where it works; with none, that there is none, the town's word of a sought smith (lore's
+## frame by where), and who sells weapons meanwhile (the weapon-tagged items, through a window
+## open to [param player], nearest first, at most "sellers_most", each once).
+func _asked_smith(town: String, player: Player, rule: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	if World.towns == null or World.production == null:
+		return out
+	var frames: Dictionary = rule.get("frames", {})
+	var place: Dictionary = World.holdings.place(town) if World.holdings != null else {}
+	var store: Vector2i = place.get("cell", player.tile)
+	for who: String in World.towns.residents(town):
+		# Away (taken, sent off) isn't there: the town has no smith now.
+		if SMITH in World.production.trades_of(who) and not bool(World.production.worker(who).get("away", false)):
+			var at := _keeps_shop(town, SMITH, store, str(place.get("name", "the store")))
+			out.append(str(frames.get("smith", "%s the smith works at %s.")) % [str(World.production.worker(who).get("name", who)), at["at"]])
+	if not out.is_empty():
+		return out
+	out.append(str(frames.get("no_smith", "The town has no smith now.")))
+	for entry: Dictionary in World.towns.sought(town):
+		if str(entry.get("trade", "")) == SMITH and not str(entry.get("place", "")).is_empty() and str(entry.get("freed_by", "")).is_empty():
+			# By where, as lore's town line has it ("smith_sought": {where: frame}, "default"): taken below the
+			# castle is the common fact, that he is held at the forge the secret.
+			var by_where: Variant = frames.get("smith_sought", {})
+			var line := "Word is the smith, %s, is %s."
+			if by_where is Dictionary:
+				line = str(by_where.get(str(entry.get("where", "")), by_where.get("default", line)))
+			var name := str(entry.get("name", "someone"))
+			out.append(line % [name, Towns.where_words(str(entry.get("where", "")))] if line.count("%s") == 2 else line % name)
+			break
+	var blades: Array[Dictionary] = []
+	var named := {}
+	for id: Variant in Items.ids():
+		if not Items.has_tag(str(id), "weapon"):
+			continue
+		for each: Dictionary in _asked_sellers(town, str(id), player):
+			if not named.has(each["name"]):
+				named[each["name"]] = true
+				blades.append(each)
+	blades.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return World.distance(player.tile, a["cell"]) < World.distance(player.tile, b["cell"]))
+	for each: Dictionary in blades.slice(0, int(rule.get("sellers_most", 2))):
+		out.append(str(frames.get("weapons", "%s sells weapons, at %s.")) % [each["name"], each["at"]])
+	return out
+
+
+const ROD := "fishing_rod"  # 890 amended (1): the fish answer's rod.
+const SMITH := "smith"  # 890 amended (1): the smith answer's trade.
 
 
 ## Whether [param said] (Offers._plain) asks a question of [param kind] (residents.json "asked" kinds: word lists).

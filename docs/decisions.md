@@ -52213,6 +52213,28 @@ residents.json for voice to edit). Server only: what the mind is told; protocol 
 class_name. Not yet: a sword at a camp trader's or a pedlar's (their windows are their own offers);
 zones beyond the area (a joined level's name) in the wilds answer. resident_test _test_asked_facts.
 
+890 amended (1) (the label from decision_number.sh; lore's survey's next three, the coordinator's rulings of
+11-13, lore's facts, voice's frames). Three more kinds, each from the data now:
+- fish ("fish", "fishing", "to angle", "catch fish"): the nearest fishable water of the town's area to its store
+  (World.fish_cells, the laid fish waters; named by World.pond_name, maps' names), by compass and distance
+  words, or nothing where none is laid; who sells a fishing rod, as the goods answer does (once, when the line
+  asks both); "already carries a fishing rod" when the asker does. "Any fish around here" now asks fish, never
+  the wilds (lore's "around here" stays out of the wilds words).
+- rest ("sleep", "a bed", "a room", "a rest", "to rest", "rest here", "get some rest", "stay the night",
+  "lodging", "somewhere warm"; not "rest" alone, so "the rest of the town" asks nothing): the nearest warm
+  rests of the area (Main._warm_rest_places, 616 amended (4)), at most "rests_most" (2), nearest the store
+  first. Nothing of beds: no room is let to a player in the data, and lore's taverner lets travellers' stays,
+  so a "no bed" would be false (the coordinator, on lore's check); when room hire exists this adds it.
+- smith ("the smith", "a smith", "blacksmith", "the forge", "smithy"): each smith of the town not away, by
+  name and where it keeps shop (_keeps_shop); with none, "The town has no smith now.", the town's sought word
+  for one by where (lore's "smith_sought" frames: taken below the castle is the common fact, held at the forge
+  the secret), and who sells weapons meanwhile (weapon-tagged items through a window open to the asker,
+  nearest first, at most two).
+Frames voice's, words and facts lore's, in residents.json "asked". resident_test _test_asked_more: the water
+or nothing, the rod sellers once, the rod carried; the rests at most two and nothing of beds; the smiths
+there, then sent away (only those present, brought back after) and the none line. Server only: what the mind
+is told; protocol unchanged; no new class_name; no bullet until playtest's joined check.
+
 ## 884. The zone map's picture: the torn edge left to the frame, a landmark drawn as its own mark
 
 The zone-map mock's notes 5 and 6 (C:/dev/review/ui-design/zone/, the coordinator's ruling 2026-11-12: built as their own landing, ahead of ui's label build; the number from tools/decision_number.sh). Both are the map's picture (Minimap.made_for), so the corner map and the M map change together.

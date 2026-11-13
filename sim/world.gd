@@ -8271,6 +8271,12 @@ func pond_at(cell: Vector2i, _from := NO_CELL) -> String:
 	return pond_in(zone.name, cell)
 
 
+## The fishable water cells of [param zone_name] (fish_waters_of, laid once at least), for the asked fish
+## answer (890 amended (1)); empty for a zone not laid.
+func fish_cells(zone_name: String) -> Array:
+	return (_fish_waters.get(zone_name, {}) as Dictionary).keys()
+
+
 ## Whether [param cell] is water that fishes (805 amended (11)): some body's,
 ## so not a well's (fish_waters_of). A click on it casts; is_water is what
 ## stops walkers.

@@ -6198,7 +6198,9 @@ func _test_asked_facts() -> void:
 	var me: Array = _main._asked_facts(body, player, "Who are you?")
 	var job: Array = _main._asked_facts(body, player, "What's your job?")
 	var sell: Array = _main._asked_facts(body, player, "Where can I sell my sword?")
-	var around: Array = _main._asked_facts(body, player, "Any fish around here?")
+	# "Around here" asks no wilds (lore); "any fish around here" asks fish since 890 amended (1), never the wilds.
+	var around: Array = _main._asked_facts(body, player, "Anything around here?")
+	around.append_array(_main._asked_facts(body, player, "Any fish around here?").filter(func(s: String) -> bool: return " lies " in s))
 	_check(job.size() == 1 and str(job[0]).begins_with("You are") and sell.is_empty() and around.is_empty(),
 		"lore's checks: \"your job\" asks who it is; selling asks for a buyer, no seller named; \"around here\" is no wilds question (%s, %s, %s)" % [job, sell, around])
 	_check(me.size() == 1 and body.person in me[0] and me[0].begins_with("You are"), "who are you: its own name and trade (%s)" % [me])
@@ -6225,6 +6227,7 @@ func _test_asked_facts() -> void:
 				"Where can I buy food?", "Tell me about this town.", "Any news?", "Where's the smith?", "What's that temple?", "Is it safe at night?"]:
 			print("  ASKED %s | %s | offers: %s | %s" % [asked.trade if not asked.trade.is_empty() else "townsperson", line,
 				Offers.ask_kind(line) if not Offers.ask_kind(line).is_empty() else "-", _main._asked_facts(asked, player, line)])
+	_test_asked_more(body, player)  # 890 amended (1).
 	body.asked_facts = ["Rolf sells swords, at the weapon stall."]
 	var facts := body.facts_now()
 	body.asked_facts = []
@@ -6234,6 +6237,56 @@ func _test_asked_facts() -> void:
 		if facts[i].begins_with("What you know of the world"):
 			lore = i
 	_check(at >= 0 and (lore < 0 or at < lore), "in the mind's facts, ahead of what it knows of the world (at %d, lore at %d)" % [at, lore])
+
+
+## 890 amended (1): fish, rest and the smith, each with the town as it is and as it isn't (no steps; put back).
+func _test_asked_more(body: Resident, player: Player) -> void:
+	var said_has := func(lines: Array[String], bit: String) -> bool: return lines.any(func(s: String) -> bool: return bit in s)
+	# Fish: the nearest water by its name, or nothing where none is laid; a rod's sellers; a rod carried.
+	var fish: Array[String] = _main._asked_facts(body, player, "Where can I go fishing?")
+	var water: Dictionary = _main._asked_water(STORE)
+	_check((water.is_empty() and not said_has.call(fish, "nearest fishing")) or (not water.is_empty() and said_has.call(fish, "The nearest fishing is " + str(water["name"]))),
+		"fish: the nearest water by its name, or nothing where none is laid (%s)" % [fish])
+	_check(said_has.call(fish, "fishing rods"), "fish: who sells a rod, or nobody (%s)" % [fish])
+	var free := -1
+	for slot in player.slots.size():
+		if player.slots[slot].is_empty() and free < 0:
+			free = slot
+	if free >= 0:
+		World.put_item(player, player, free, World.items.mint(Main.ROD, "built"))
+		var with_rod: Array[String] = _main._asked_facts(body, player, "Where can I go fishing?")
+		World.take_item(player, player, free)
+		_check(said_has.call(with_rod, "carries a fishing rod") and not said_has.call(fish, "carries a fishing rod"), "fish: a rod carried is said, and only then")
+	var both: Array[String] = _main._asked_facts(body, player, "Where can I buy a fishing rod to go fishing?")
+	_check(both.filter(func(s: String) -> bool: return "fishing rods" in s).size() == _main._asked_sellers(STORE, Main.ROD, player).slice(0, 2).size() + (1 if _main._asked_sellers(STORE, Main.ROD, player).is_empty() else 0),
+		"fish and goods both asked: the rod's sellers said once (%s)" % [both])
+	# Rest: the warm rests nearest first, at most two, or nothing with none; never a word of beds.
+	var rest: Array[String] = _main._asked_facts(body, player, "Where can I sleep tonight?")
+	var rests: Array[Dictionary] = _main._warm_rest_places(str(World.holdings.place(STORE).get("area", "")))
+	_check(rest.size() == mini(rests.size(), 2) and rest.all(func(s: String) -> bool: return " is warm, " in s and not "bed" in s),
+		"rest: the warm rests, nearest first, at most two, nothing of beds (%s)" % [rest])
+	_check(not _main._asked_facts(body, player, "Tell me about the rest of the town.").any(func(s: String) -> bool: return " is warm, " in s),
+		"rest: \"the rest of the town\" asks nothing of rest")
+	# The smith: a smith there by name and place; none, then the sought word and blade sellers, never a smith who isn't there.
+	var smith: Array[String] = _main._asked_facts(body, player, "Where's the smith?")
+	# The smiths there: residents of the trade not away (an earlier case takes the town's; only these are sent off
+	# and brought back below, so the town is left as it was).
+	var smiths: Array[String] = []
+	for who: String in World.towns.residents(STORE):
+		if Main.SMITH in World.production.trades_of(who) and not bool(World.production.worker(who).get("away", false)):
+			smiths.append(who)
+	if not smiths.is_empty():
+		_check(smith.size() == smiths.size() and smith.all(func(s: String) -> bool: return s.contains("the smith works at")), "smith: there, by name and where (%s)" % [smith])
+	else:
+		_check(smith.size() >= 1 and smith[0] == "The town has no smith now." and not said_has.call(smith, "the smith works"), "smith: none, said so (%s)" % [smith])
+	for who: String in smiths:
+		World.production.set_away(who, true)
+	var none: Array[String] = _main._asked_facts(body, player, "Where's the smith?")
+	for who: String in smiths:
+		World.production.set_away(who, false)
+	_check(none.size() >= 1 and none[0] == "The town has no smith now." and none.size() <= 4 and not none.any(func(s: String) -> bool: return "%s" in s),
+		"smith gone: none said, the sought word, at most two weapon sellers (%s)" % [none])
+	_check(not str(none).contains(player.name), "nothing of the player")
 
 
 func _test_vendor() -> void:
