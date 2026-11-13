@@ -914,11 +914,8 @@ func _test_told_guard() -> void:
 	_check(took == hp - holder.hp and took > 0 and holder.tile != Vector2i(3, 2),
 			"8 with a launch into the wall: the 8 taken whole, still thrown (%s), the wall's impact its own, %d in all" % [holder.tile, took])
 	# The draugr's spin on a shield raised at him.
-	e = _build(["#########", "#..PmP..#", "#########"])
-	var boss: GridEntity = e["m"][0]
-	_boss(boss)
-	boss.strength = 0
-	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	e = _build(["#########", "#..P.P..#", "#########"])
+	var boss := _real_draugr(Vector2i(4, 1))  # 603 amended (8).
 	var bearer: Player = e["P"][0]  # (3,1), ahead of him.
 	var bare: Player = e["P"][1]  # (5,1), behind.
 	World.put_item(bearer, bearer, Player.LEFT_HAND, World.items.mint("shield", "built"))
@@ -1921,22 +1918,41 @@ func _boss(dummy: GridEntity) -> void:
 	World.set_slots(dummy, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
 
 
+## The draugr as a level makes him (603 amended (8)): his monsters.json row's
+## body and kind, armed with his kind's battle axe (Level.arm), rested, facing
+## west, at [param at]. His strength is what a Monster has (6): the row's
+## "strength" is raid power (raids.gd), which no body reads; the spin's tests
+## once pinned it to 0 and so missed his real throw. A plain Monster's script,
+## not his class's: his seat and mind play no part in World's moves.
+func _real_draugr(at: Vector2i) -> Monster:
+	var row: Dictionary = Monster.kinds()["draugr"]
+	var spec := {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "draugr", "name": "Draugr", "tile": at,
+		"props": (row["body"] as Dictionary).duplicate()}
+	Level.arm(spec)
+	var boss: Monster = EntityFactory.build(spec)
+	_room.add_child(boss)
+	World.spawn(boss, at)
+	boss.stamina = boss.max_stamina
+	boss.facing = Vector2i(-1, 0)
+	return boss
+
+
 ## The spin throws whoever it strikes (603 amended (4); physics: an 80 kg
 ## rested player took 1.47, under knockback_min_force 1.5, and was never
 ## moved): its blow skips the floor (apply_blow's no_floor) and impulse_scale
 ## is 1.0, his 140 swing whole, so a rested,
-## unarmoured 80 kg player ahead is thrown, one beside swept into the wall
-## left at a sliver (3 of 20), and one in plate moves less: mass still
-## decides how far. The exhausted wall hit is printed for Jeff's checklist.
+## unarmoured 80 kg player ahead is thrown and one in plate moves less: mass
+## still decides how far. One beside swept into the wall: 603 amended (4)
+## meant a sliver (3 of 20) on a strength-0 boss; the real draugr (603
+## amended (8)) adds his strength's share, and the wall takes her down from
+## full, as the game does today, until Jeff picks. The exhausted wall hit is
+## printed for Jeff's checklist.
 func _test_spin_throws() -> void:
-	print("\n== the spin throws an 80 kg player, rested and bare; plate moves less (603 amended (4)) ==")
+	print("\n== the spin throws an 80 kg player, rested and bare; plate moves less (603 amended (4), the real draugr (8)) ==")
 	var cells := {}
 	for armour: String in ["", "plate_armour", "exhausted"]:
-		var e := _build(["##############", "#........P...#", "#.......PmP..#", "#............#", "##############"])  # Room ahead to show the distance.
-		var boss: GridEntity = e["m"][0]
-		_boss(boss)
-		boss.strength = 0  # The draugr's row: strength 0, his 7 kg battle axe, so the push is its swing alone (140 x 1.06: 1.86 on 80 kg, 1.48 on 100).
-		World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+		var e := _build(["##############", "#........P...#", "#.......P.P..#", "#............#", "##############"])  # Room ahead to show the distance.
+		var boss := _real_draugr(Vector2i(9, 2))  # 603 amended (8): strength 6, 120 kg, his 7 kg battle axe.
 		var front: GridEntity = e["P"][1]
 		var side: GridEntity = e["P"][0]
 		for body: GridEntity in [front, side]:
@@ -1951,7 +1967,11 @@ func _test_spin_throws() -> void:
 		var heard := func(_source: GridEntity, target: GridEntity, result: Dictionary) -> void:
 			if target == front:
 				speeds["speed"] = float(result["speed"])
+		var walled := func(body: GridEntity, _mover: GridEntity, _direction: Vector2i, _tiles: int, impact: int, _stopped_by: String) -> void:
+			if body == side:
+				speeds["wall"] = impact
 		World.blow_resolved.connect(heard)
+		World.entity_pushed.connect(walled)
 		World.try_spin(boss)
 		for i in 16:
 			if armour == "exhausted":
@@ -1959,17 +1979,25 @@ func _test_spin_throws() -> void:
 					body.stamina = 0  # Held there through the wind-up: they breathe back otherwise.
 			World.step()
 		World.blow_resolved.disconnect(heard)
+		World.entity_pushed.disconnect(walled)
 		cells[armour] = [World.distance(from, front.tile), float(speeds.get("speed", 0.0))]
-		print("    %s: %.1f kg, %d cell(s) at %.2f" % [armour if armour else "bare", front.mass, cells[armour][0], cells[armour][1]])
+		print("    %s: %.1f kg, %d cell(s) at %.2f; beside, the wall's impact %d" % [armour if armour else "bare", front.mass, cells[armour][0],
+				cells[armour][1], int(speeds.get("wall", -1))])
 		if armour.is_empty():
 			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] >= 2 and World.is_down(front),
 					"80 kg, rested, bare: thrown %d cells (%.2f) and knocked down" % [cells[armour][0], cells[armour][1]])
-			_check(side.spawned and side.hp == 3 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d; impulse_scale 1.06, 703)" % [side.hp, hp])
+			# Today's game, as the barrow's draugr throws (603 amended (8)): his
+			# strength's share on his swing, so the wall costs 14 or more and
+			# 8 + that takes a rested player from full to down. Jeff's pick (the
+			# sliver of 603 amended (4), or this) moves this check with it.
+			_check(int(speeds.get("wall", 0)) >= 13 and side.hp == 0 and hp == 20,
+					"the one beside, swept into the wall from full: the wall's impact %d, 8 + that, down (%d of %d left)" % [
+					int(speeds.get("wall", 0)), side.hp, hp])
 		elif armour == "exhausted":
 			print("    exhausted (stamina 0), 80 kg, bare: thrown %d cells at %.2f; swept into the wall from %d: %s" % [cells[armour][0], cells[armour][1], hp,
 					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])
-	_check(cells["plate_armour"][1] < World.knockback_min_force and cells["plate_armour"][1] < cells[""][1] and cells["plate_armour"][0] >= 1,
-			"in plate, heavier: under the floor, slower, yet thrown (%.3f, %d cells; bare %.3f, %d)" % [cells["plate_armour"][1], cells["plate_armour"][0], cells[""][1], cells[""][0]])
+	_check(cells["plate_armour"][1] < cells[""][1] and cells["plate_armour"][0] >= 1 and cells["plate_armour"][0] <= cells[""][0],
+			"in plate, heavier: slower and no farther, yet thrown (%.3f, %d cells; bare %.3f, %d)" % [cells["plate_armour"][1], cells["plate_armour"][0], cells[""][1], cells[""][0]])
 
 
 ## The axe's arc (343 amended; playtest: a player's giant axe knocked down
@@ -2755,11 +2783,8 @@ func _test_hurt_line() -> void:
 
 func _test_spin() -> void:
 	print("\n== the spin: 1.5 s standing, the whole disc struck, then spent (decision 603; 603 amended (7): no gap behind) ==")
-	var e := _build(["#########", "#...P...#", "#..PmP..#", "#.......#", "#########"])
-	var boss: GridEntity = e["m"][0]
-	_boss(boss)
-	boss.strength = 0  # The draugr's row, his battle axe (603 amended (4)): the stronger test boss kills from full.
-	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	var e := _build(["#########", "#...P...#", "#..P.P..#", "#.......#", "#########"])
+	var boss := _real_draugr(Vector2i(4, 2))  # 603 amended (8): his real row.
 	var front: GridEntity = e["P"][1]  # (3,2), the way he faces.
 	var behind: GridEntity = e["P"][2]  # (5,2), straight behind.
 	var side: GridEntity = e["P"][0]  # (4,1), beside.
@@ -2780,7 +2805,7 @@ func _test_spin() -> void:
 			"at 15: ahead, beside and behind struck (%d, %d, %d)" % [front.hp, side.hp, behind.hp])
 	_check(boss.spawned and boss.hp == boss.max_hp, "and never himself")
 	_check(World.is_down(front) and front.tile != Vector2i(3, 2), "the one ahead knocked down and thrown (%s)" % front.tile)
-	_check(side.spawned and side.hp > 0 and side.hp <= 5, "the one beside, swept into the wall from full: left at a sliver (%d)" % side.hp)
+	_check(side.hp == 0, "the one beside, swept into the wall from full: down, as the barrow's draugr does today (%d; 603 amended (8))" % side.hp)
 	_check(boss.stamina <= 10 and World.is_winded(boss), "spent: %d stamina, winded" % boss.stamina)
 	_check(not World.try_spin(boss), "winded: no spin")
 	_check(World.telegraphs().is_empty(), "its telegraph over")

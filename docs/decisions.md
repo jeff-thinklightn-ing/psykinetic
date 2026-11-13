@@ -53001,3 +53001,33 @@ stand flat, iron shaft and all, shown on Atlas against the glow off and the shar
 cream wax glows, the iron and brass don't, and the flame stays the brightest thing on it. level_test: the entry
 names the stand on the floor; view_test: a stand drawn for an entry naming it, no floor candles,
 its light over its wick, its flame on it.
+
+## 603 amended (8), combat's side: the spin's tests use the real draugr
+
+playtest's joined kit fight (main 41297c244, --test-foe=draugr,giant_axe):
+one spin at the refuse took a fresh 20 hp player from full to down, 8 from
+the cut and 14 from the wall at her back, where 603 amended (4) and (5)
+meant a sliver (3 of 20). The tests that tuned it pinned the boss's
+strength to 0, reading the draugr's monsters.json "strength": 0 as his
+body's. That field is raid power (raids.gd _strength_of), which no body
+reads, so the real draugr keeps a Monster's strength 6. His spin's throw
+is swing_impulse, his blow's push plus his axe's weight swung, and the
+blow's push is strength x his 120 kg x shove_scale x ATTACK_FORCE_FACTOR x
+his stamina fraction: up to 36 more on 140, times impulse_scale 1.06.
+Rested, that throws an 80 kg player at 2.36, and a wall at her back
+costs 15. With his breath partly spent, as in playtest's fight, it was
+2.22 and 14.
+
+Nothing in play changes here. The coordinator's ruling: no change before
+Jeff picks between the wall killing from full (today) and the sliver his
+list asked for. combat_test builds the draugr from his real row
+(_real_draugr: his kind's body and battle axe, a Monster's strength,
+rested) in _test_told_guard's spin, _test_spin_throws and _test_spin, and
+asserts what the game does today:
+- bare, 80 kg: thrown 3 cells at 2.36;
+- one beside, swept into the wall from full: impact 15, down;
+- in plate (100 kg): 1.89, thrown no farther, a wall's impact 12 (printed);
+- exhausted: 4.72, impact 32 (printed).
+Jeff's pick moves these checks with it. No other test pins a body's
+strength through that field. Tests only; protocol unchanged; no class_name;
+no bullet.
