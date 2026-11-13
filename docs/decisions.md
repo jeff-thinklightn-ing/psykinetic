@@ -31688,6 +31688,46 @@ in at once, no word or hold left, no second farmer; each field state of 613 amen
 _test_farmer_walks_in (an old save's sought farmer: his body at the refuge, then none, no refuge spec, door note or
 rumour once he walks in); economy_test _test_farmer_ask removed. Server only; protocol and save format unchanged
 (an old save's sought entry is read as before and let go); no new class_name. Bullet (voice's words).
+**613 amended (7), npc's side: a rescue's cry, the click that frees, the freed line alone, the led lines,
+the way** (the label from decision_number.sh; playtest's joined walk of the first rescue on 17f99d795 with
+--sought-first; the coordinator's rulings of 11-13). Nobody told a player a town sought someone unless they
+opened a resident's window; a found body's first click answered "Not now. I need to get back to town." and
+the next "Lead on.", a refusal and then an order. Mechanics only (the coordinator's split, after Jeff's
+answer of 11-13, "first farmer doesnt need a rescue at all, just farmhands or further farmers as the town
+grows"): no story ships a cry or a way, the farmer's own lines that were drafted here are withdrawn, and the
+first rescue's two rumours on main (notes "sought.farmer", "sought.farmer.camp", 613 amended (3)) come out with
+this take, which makes them unreachable (the coordinator: a line leaves main in the take that ends it); the
+words come with the package "further hands" (farmhand's story keys, voice's words, lore's way fact). It
+lands after economy's "the town's farmer is never sought", so nothing is sought and all of this is
+unreachable until that package: lands off.
+- The cry (Main._sought_cries, from the hail pass): to a player in a seeking town's square, the nearest of its
+  townsfolk awake and about within TALK_REACH calls out the sought story's "cry" (residents.json "notes" by
+  entry.story: a list of lines, name then where as the rumour says it, Towns.sought_where), said straight as
+  the 643 rumour is (_resident_says, no mind, no panel), at random and never the line that player last heard.
+  Once a player each Main.CRY_SECONDS (600), never inside _hail_blocked, and the cry counts as their hail
+  (_hail_at). None once anyone has freed them (freed_by), none for a story without a cry: a fixed line, not
+  a hail cue, since the hail is the mind's to word and the scripted mind says nothing.
+- A click on a found sought body not led is a word to them (Main._greeted calls _sought_spoken): it frees
+  them as a word does; watched by a holder it frees nobody and the refusal stands, as before.
+- The word (or click) that frees them is answered by their "freed" line alone: no mind's reply is asked after
+  it (Main._ask_resident).
+- Led, a click gives their trade's "led" lines (residents.json "sought" by trade) in turn to the one leading
+  them, in place of refuse_by "led_by_you" (Main._refuse_word); a trade without them, the stock word.
+- The way: a story's "way" in "notes" names lore's fact of the way to its refuge by id, never its words; a
+  greeted townsperson who tells the rumour says that fact's text next (Main._sought_way, Main.lore_fact_text:
+  the agreed fact by id), nothing while lore has no such fact or the story names none. The cry stays short (a
+  way shouted across the square is a speech). A cry heard clears that player's rumour mark for the town, so
+  their next click on any of its folk tells the rumour and the way again: with the mind off, that click is
+  how one who heard only the cry learns the way.
+resident_test _test_sought_cry (no shipped story has a cry or a way; on the test's own story, the nearest
+townsperson's cry with the name and the where, nothing again at once, the way read by the story's fact id
+with no words pinned and none for a story naming none, a cry clearing the rumour mark, a line again ten
+minutes on and never the same twice running, none once freed, none for a story without a cry) and
+_test_sought_body (watched, a click frees nobody; unwatched, a click frees with the freed line once and no
+mind's reply; the freeing word asks the mind nothing; led, a test trade's lines in turn, another trade the
+stock word; no farmer's lines ship), and the 643 story-rumour check on a story of its own (no farmer's
+rumour ships). Server only; protocol unchanged; no new class_name; no bullet (the
+package's, when it is switched on).
 
 ## 643. The sought's door note and the town's rumour
 

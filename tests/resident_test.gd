@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
 	_test_strayed_body()
+	_test_sought_cry()  # 613 amended (7): the town's cry for its sought, before the sought test sends the town away.
 	_test_sought_body()
 	_test_farmer_walks_in()
 	_test_pointers()  # 837.
@@ -2362,15 +2363,21 @@ func _test_sought_body() -> void:
 	# The first rescue's rumour (613 amended (3), npc's side): a story's own line says where by the refuge's map
 	# name (Towns.sought_where); held at a camp, the camp's words; the default line above keeps the where-words.
 	var kept_entry := entry.duplicate(true)
-	entry.merge({"story": "sought.farmer", "place": "rs_farmstead", "named": "the old farmstead", "where": "wilds", "holder": ""}, true)
+	Offers.note_words("")  # Loaded, so the test's own stories go in beside the shipped ones (none ships one since 11-13).
+	Offers._note_words["sought.rs_story"] = {"rumour": "%s, a %s, is out %s."}
+	Offers._note_words["sought.rs_story.camp"] = {"rumour": "%s, a %s, is %s."}
+	entry.merge({"story": "sought.rs_story", "place": "rs_farmstead", "named": "the old farmstead", "where": "wilds", "holder": ""}, true)
 	var farm: String = _main._rumour_for(STORE, "p4", 4)
-	entry.merge({"story": "sought.farmer.camp", "place": "camp", "named": "", "where": "camp"}, true)
+	entry.merge({"story": "sought.rs_story.camp", "place": "camp", "named": "", "where": "camp"}, true)
 	var camp: String = _main._rumour_for(STORE, "p5", 4)
 	entry.clear()
 	entry.merge(kept_entry)
-	_check(farm == "Wat, a butcher by trade, is out %s, they say. We could use a hand like that here." % Towns.sought_where({"place": "rs_farmstead", "named": "the old farmstead", "where": "wilds"})
-		and farm.contains("at the old farmstead") and camp == "Wat, a butcher by trade, is held at a camp, they say. We could use a hand like that here.",
-		"the first rescue's rumour: the refuge by its map name, or held at a camp (%s / %s)" % [farm, camp])
+	Offers._note_words.erase("sought.rs_story")
+	Offers._note_words.erase("sought.rs_story.camp")
+	_check(farm == "Wat, a butcher, is out %s." % Towns.sought_where({"place": "rs_farmstead", "named": "the old farmstead", "where": "wilds"})
+		and farm.contains("at the old farmstead") and camp == "Wat, a butcher, is held at a camp.",
+		"a story's own rumour: the refuge by its map name, or held at a camp (%s / %s)" % [farm, camp])
+	_check(not Offers._note_words.has("sought.farmer") and not Offers._note_words.has("sought.farmer.camp"), "no farmer's rumour ships (withdrawn, 11-13)")
 	# A world-map building's doors are edge keys already (economy's soak: a kind building's door read as a level
 	# entry's [x, y, side] raised a SCRIPT ERROR every tick): the note at the cell across its door edge.
 	# A kind building (one with a size of doors), so Level.kind_doors would read it.
@@ -2396,13 +2403,50 @@ func _test_sought_body() -> void:
 	_main._ask_resident(found, "Jeff", "Come with me.", player)
 	_check(found.escort_of.is_empty() and found.has_meta("sought_waiting") and str(World.towns.sought_entry("rs-sought").get("freed_by", "")).is_empty(),
 		"held and watched: a word frees nobody")
+	# 613 amended (7): a click is a word to the found; watched, it frees nobody and the refusal stands.
+	var player_was := player.tile
+	_put(player, _main._nearest_free(found.tile + Vector2i(-1, 0)))
+	_main._greet_at.erase(found.worker_id + "|" + player.player_id)
+	_main._greeted(player, found)
+	_check(found.escort_of.is_empty() and str(World.towns.sought_entry("rs-sought").get("freed_by", "")).is_empty(),
+		"held and watched: a click frees nobody either")
 	if imp != null:
 		World.despawn(imp)
 	_check(not found.watched(), "the watcher gone")
+	var asked_of := func() -> bool: return _main._resident_asks.any(func(each: Dictionary) -> bool: return int(each["body"]) == found.get_instance_id())
+	var logged: int = _main.party_log.size()
+	_main._greet_at.erase(found.worker_id + "|" + player.player_id)
+	_main._greeted(player, found)
+	var on_click: Array[String] = _main.party_log.last(_main.party_log.size() - logged)
+	_check(found.escort_of == player.player_id and str(World.towns.sought_entry("rs-sought").get("freed_by", "")) == player.player_id
+		and on_click.filter(func(s: String) -> bool: return s.contains("Lead on.")).size() == 1 and not on_click.any(func(s: String) -> bool: return s.contains("Not now"))
+		and not asked_of.call(), "nobody watching, a click frees them as a word: their freed line once, no refusal, no mind's reply (%s)" % [on_click])
+	found.escort_of = ""
+	found.escort_name = ""
+	World.towns._town(STORE)["sought"]["rs-sought"]["freed_by"] = ""
 	_main._ask_resident(found, "Jeff", "Come with me.", player)
+	_check(not asked_of.call(), "the word that frees them: no mind's reply after their freed line")
 	_check(found.escort_of == player.player_id and not found.has_meta("sought_waiting") and str(World.towns.sought_entry("rs-sought").get("freed_by", "")) == player.player_id,
 		"nobody watching: freed by the word, following, economy's entry led")
 	_check(found.facts_now().any(func(f: String) -> bool: return f.begins_with("Jeff found you in the hills and is leading you to")), "its thought: led home")
+	var led_said: Array[String] = []
+	var trade_was := found.trade
+	Offers.sought_words("")  # Loaded, so the test's own trade lines go in beside the shipped ones.
+	Offers._sought_words["rs_hand"] = {"led": ["Test led one.", "Test led two."]}
+	for trade: String in ["rs_hand", "rs_hand", "rs_hand", trade_was]:
+		found.trade = trade
+		_main._greet_at.erase(found.worker_id + "|" + player.player_id)
+		var before: int = _main.party_log.size()
+		_main._greeted(player, found)
+		led_said.append(" ".join(_main.party_log.last(_main.party_log.size() - before)))
+	found.trade = trade_was
+	found.remove_meta("led_said")
+	Offers._sought_words.erase("rs_hand")
+	_check(led_said[0].contains("Test led one.") and led_said[1].contains("Test led two.") and led_said[2].contains("Test led one.")
+		and (led_said[3].contains("Lead on, then.") or led_said[3].contains("Right behind you.")),
+		"led, a click: a trade's own led lines in turn, a trade without them the stock word (%s)" % [led_said])
+	_check(Offers.sought_words("farmer") == Offers.sought_words(""), "no farmer's lines ship (withdrawn with Jeff's 11-13: the town's farmer is never sought)")
+	_put(player, player_was)
 	_sync()
 	_check(_body("rs-sought") == found and found.escort_of == player.player_id, "the sync keeps the led body beside its leader")
 	_put(found, _town_cell(Vector2i(-1, -1)))
@@ -2450,6 +2494,110 @@ func _test_farmer_walks_in() -> void:
 ## a placing, topped up when placed again and never doubled; it leaves the
 ## waiting one alone; the one led home is beaten down, not killed, gets up
 ## at a word, and bleeding out unroused is lost on the way.
+## 613 amended (7): the seeking town's cry to a player in its square, said straight by the nearest townsperson,
+## name then where; once a player each CRY_SECONDS, another line next time; none once freed; none for a story
+## without a cry; and with crop.sought_first off (as shipped) no first-rescue entry, so nothing is ever cried.
+func _test_sought_cry() -> void:
+	print("\n== the seeking town's cry (613 amended (7)): unprompted in the square, name and where, on a cool-down ==")
+	var player := _player()
+	_check(player != null, "(a player to hear it)")
+	if player == null:
+		return
+	Offers.note_words("")  # Loaded, so the test's own story goes in beside the shipped ones.
+	var shipped: Array = []
+	for story: Variant in Offers._note_words:
+		var words: Variant = Offers._note_words[story]
+		if words is Dictionary and ((words as Dictionary).has("cry") or (words as Dictionary).has("way")):
+			shipped.append(story)
+	_check(shipped.is_empty() and _main._cry_for(STORE, "p-cry0").is_empty(), "no story ships a cry or a way yet (package further hands): no cry (%s)" % [shipped])
+	var way_id := ""
+	for entry: Variant in Lore.entries().values():
+		if way_id.is_empty() and entry is Dictionary and str((entry as Dictionary).get("status", "")) == "agreed":
+			for fact: Variant in (entry as Dictionary).get("facts", []):
+				if way_id.is_empty() and fact is Dictionary and str((fact as Dictionary).get("status", "")) == "agreed" and not str((fact as Dictionary).get("text", "")).is_empty():
+					way_id = str((fact as Dictionary).get("id", ""))
+	Offers._note_words["sought.rs_cry"] = {"rumour": "%s, a %s, is out %s.", "way": way_id,
+		"cry": ["Test cry one: %s, %s.", "Test cry two: %s, %s.", "Test cry three: %s, %s.", "Test cry four: %s, %s."]}
+	var hour_was := DayNight.hour(DayNight.now())
+	DayNight.set_hour(10.0)
+	World.production.set_away("rs-folk04", false)  # The strayed test leaves the town away: one of its folk back for this.
+	_sync()
+	var crier := _body("rs-folk04")
+	_check(crier != null and crier.places.get("square") is Rect2i, "(a townsperson of the town)")
+	if crier == null or not crier.places.get("square") is Rect2i:
+		World.production.set_away("rs-folk04", true)
+		DayNight.set_hour(hour_was)
+		_sync()
+		return
+	var crier_was := crier.tile
+	var doing_was := crier.doing
+	crier.doing = Resident.Doing.SQUARE
+	crier.activity = ""
+	_check(_main._hail_able(crier), "(the crier about in the square by day)")
+	var square: Rect2i = crier.places["square"]
+	World._relocate(crier, _main._nearest_free(square.get_center()))
+	var sought: Dictionary = World.towns._town(STORE).get_or_add("sought", {})
+	sought["rs-cry"] = {"id": "rs-cry", "name": "Ada", "trade": "farmer", "town": STORE, "place": "rs_farmstead", "named": "the old farmstead", "where": "wilds",
+		"holder": "", "secret": false, "freed_by": "", "story": "sought.rs_cry", "since": 0}
+	var player_was := player.tile
+	var hurt_was := player.hurt_tick
+	player.hurt_tick = -100000
+	_put(player, _main._nearest_free(crier.tile + Vector2i(1, 0)))
+	var rules: Dictionary = Townsfolk.rules().get("hail", {})
+	var lines: Array = Offers.note_words("sought.rs_cry").get("cry", [])
+	var heard := func() -> String:
+		var before: int = _main.party_log.size()
+		_main._sought_cries(rules)
+		return " ".join(_main.party_log.last(_main.party_log.size() - before))
+	_main._cry_at.erase(player.player_id)
+	_main._hail_at.erase(player.player_id)
+	var first: String = heard.call()
+	var where := Towns.sought_where(sought["rs-cry"])
+	_check(lines.size() == 4 and lines.any(func(l: Variant) -> bool: return first.contains(str(l) % ["Ada", where])) and first.contains("at the old farmstead"),
+		"in the square, unprompted: the nearest townsperson cries the sought one's name and where (%s)" % first)
+	_check(str(heard.call()).is_empty(), "again at once: nothing (the cool-down, and the cry counts as their hail)")
+	# The way: lore's fact by the story's id, never its words pinned; none while lore has no such fact.
+	var way_text := Main.lore_fact_text(way_id)
+	_check(not way_text.is_empty() and _main._sought_way(STORE) == way_text and Main.lore_fact_text("no.such_fact").is_empty(),
+		"the rumour's way: lore's fact by the story's id, none for a fact lore has not got (%s)" % [way_id])
+	Offers._note_words["sought.rs_cry"].erase("way")
+	_check(_main._sought_way(STORE).is_empty(), "a story naming no way: none said")
+	_main._rumour_said["%s|%s" % [STORE, player.player_id]] = true
+	_main._cry_at.erase(player.player_id)
+	_main._hail_at.erase(player.player_id)
+	heard.call()
+	_check(not _main._rumour_said.has("%s|%s" % [STORE, player.player_id]), "a cry heard: the next click tells the rumour and the way again")
+	var seen := [str(_main._cry_last.get(player.player_id, ""))]
+	var twice := false
+	for i in 6:
+		_main._cry_at[player.player_id] = Time.get_ticks_msec() - int(Main.CRY_SECONDS * 1000.0) - 1
+		_main._hail_at.erase(player.player_id)
+		var said: String = heard.call()
+		var line := str(_main._cry_last.get(player.player_id, ""))
+		twice = twice or said.is_empty() or line == seen.back()
+		seen.append(line)
+	_check(not twice, "ten minutes on, a line again, never the same twice running (%s)" % [seen])
+	sought["rs-cry"]["freed_by"] = "someone"
+	_main._cry_at.erase(player.player_id)
+	_main._hail_at.erase(player.player_id)
+	_check(str(heard.call()).is_empty(), "once someone has freed her: no cry")
+	sought["rs-cry"]["freed_by"] = ""
+	sought["rs-cry"]["story"] = "sought.butcher"
+	_check(str(heard.call()).is_empty(), "a story without a cry: none")
+	sought.erase("rs-cry")
+	Offers._note_words.erase("sought.rs_cry")
+	_main._cry_at.erase(player.player_id)
+	_main._cry_last.erase(player.player_id)
+	_main._hail_at.erase(player.player_id)
+	player.hurt_tick = hurt_was
+	_put(player, player_was)
+	World._relocate(crier, crier_was)
+	crier.doing = doing_was
+	World.production.set_away("rs-folk04", true)
+	DayNight.set_hour(hour_was)
+	_sync()
+
+
 func _test_sought_band() -> void:
 	print("
 == the sought's band (613, enemy-ai's side): stood once, topped up, the waiting left alone, the led downed ==")

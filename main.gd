@@ -13747,10 +13747,13 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 	_resident_serial += 1
 	var id := body.get_instance_id()
 	var player_id := player.player_id if player != null else ""
+	var freed_now := false
 	if not player_id.is_empty():
 		Offers.spoke_to(player_id, body.worker_id)  # An errand to them is done by speaking (decision 435).
 		if not body.sought.is_empty():
+			freed_now = body.escort_of.is_empty()
 			_sought_spoken(body, player_id, speaker, player)  # The sought: freed by a word when no holder sees them (decision 613).
+			freed_now = freed_now and body.escort_of == player_id
 		elif body.strayed:
 			body.start_escort(player_id, speaker)  # Lost beyond the walls: a word, and they follow you home (decision 487).
 		elif Townsfolk.is_sick(World.production, body.worker_id) and int(Townsfolk.sickness_of(World.production, body.worker_id).get("treated", -1)) < 0 \
@@ -13769,6 +13772,10 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 			body.first_words = true
 	if _resident_quiet(body, player):
 		_held_tongue("heard")  # Words to them mid-fight get no answer (675, npc's side).
+	elif freed_now:
+		# 613 amended (7): the word that frees them is answered by their freed line alone, no mind's reply after it
+		# (one of theirs still waiting, from a word while they were watched, dropped too).
+		_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
 	else:
 		_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != id)
 		_resident_asks.append({"body": id, "ask": body.voice_ask(speaker, line, _resident_serial), "at": World.tick,
@@ -21091,6 +21098,7 @@ func _hails_tick() -> void:
 	if not bool(rules.get("on", true)):
 		return
 	_balance_hails()  # The herder's word of the wolves, ahead of the mind's hails (761, npc's side (2)).
+	_sought_cries(rules)  # A town's cry for the one it seeks (613 amended (7)), said straight, no mind.
 	if not _resident_asks.is_empty() or not _resident_out.is_empty() or _mind_last_ticks > int(rules.get("slow_ticks", 50)):
 		return
 	var now_msec := Time.get_ticks_msec()
@@ -21109,6 +21117,100 @@ func _hails_tick() -> void:
 				continue  # No hail near a fight (675, npc's side).
 			if _hail_now(body, player, rules, now_msec, now, day, sky):
 				return
+
+
+## The seeking town's cry (613 amended (7), the first rescue; the coordinator's ruling, voice's words, lore's
+## check): to each player in a town's square, the nearest of its townsfolk awake and about within TALK_REACH
+## (not a visitor, vendor or camp trader, nor one sought) calls out its sought one's story's "cry"
+## (residents.json "notes", Offers.note_words; name, then where as the rumour says it, Towns.sought_where),
+## said straight as the 643 rumour is (_resident_says, no mind, no panel): once a player each CRY_SECONDS,
+## never inside _hail_blocked (a hail or an answer within the minute, a blow, led by a guide), the cry also
+## counting as their hail; none once someone has freed them (the entry's freed_by), none for a story without a
+## cry (only the first rescue's has one: off with crop.sought_first).
+const CRY_SECONDS := 600.0
+var _cry_at: Dictionary = {}  # player id -> msec of the last cry they heard.
+var _cry_last: Dictionary = {}  # player id -> the last cry line they heard, so the next is another.
+func _sought_cries(rules: Dictionary) -> void:
+	if World.towns == null:
+		return
+	var now_msec := Time.get_ticks_msec()
+	var wait := int(CRY_SECONDS * 1000.0)
+	for other in World.get_entities():
+		var player := other as Player
+		if player == null or not player.spawned or player.player_id.is_empty():
+			continue
+		if now_msec - int(_cry_at.get(player.player_id, -wait)) < wait or _hail_blocked(player, now_msec, rules):
+			continue
+		var crier: Resident = null
+		for entity in World.townsfolk():
+			var body := entity as Resident
+			if not _hail_able(body) or not body.sought.is_empty() or body.worker_id.begins_with(Offers.VISITOR) \
+					or body.worker_id.begins_with(Offers.VENDOR) or body.worker_id.begins_with(Offers.CAMP_TRADER):
+				continue
+			var square: Variant = body.places.get("square")
+			if not square is Rect2i or not (square as Rect2i).has_point(player.tile) or World.distance(player.tile, body.tile) > TALK_REACH:
+				continue
+			if crier == null or World.distance(body.tile, player.tile) < World.distance(crier.tile, player.tile):
+				crier = body
+		if crier == null or _resident_quiet(crier, player):
+			continue
+		var line := _cry_for(crier.town, player.player_id)
+		if line.is_empty():
+			continue
+		_cry_at[player.player_id] = now_msec
+		_hail_at[player.player_id] = now_msec
+		_resident_says(crier, line, "", player, false)
+		# Heard only the cry: their next click on any of the town's folk tells the rumour and the way again (the
+		# coordinator: the way by one question, mind or no mind).
+		_rumour_said.erase("%s|%s" % [crier.town, player.player_id])
+
+
+## The way to [param town]'s sought one's refuge (613 amended (7)): the entry the rumour names (a where, nobody
+## leading them home), its story's "way" (residents.json "notes": lore's fact id), that fact's text from lore
+## (agreed); "" for none, or a fact lore has not got.
+func _sought_way(town: String) -> String:
+	if World.towns == null:
+		return ""
+	for entry: Dictionary in World.towns.sought(town):
+		if str(entry.get("where", "")).is_empty() or not str(entry.get("freed_by", "")).is_empty():
+			continue
+		return lore_fact_text(str(Offers.note_words(str(entry.get("story", ""))).get("way", "")))
+	return ""
+
+
+## Lore's agreed fact [param id]'s text, by its id ("" for none).
+static func lore_fact_text(id: String) -> String:
+	if id.is_empty():
+		return ""
+	for entry: Variant in Lore.entries().values():
+		if not entry is Dictionary or str((entry as Dictionary).get("status", "agreed")) != "agreed":
+			continue
+		for fact: Variant in (entry as Dictionary).get("facts", []):
+			if fact is Dictionary and str((fact as Dictionary).get("id", "")) == id and str((fact as Dictionary).get("status", "agreed")) == "agreed":
+				return str((fact as Dictionary).get("text", ""))
+	return ""
+
+
+## [param town]'s cry for [param player_id] now (613 amended (7)): its first sought entry with a where, nobody
+## leading them home and a story with a "cry", one of its lines at random, never the one they last heard; "" for none.
+func _cry_for(town: String, player_id: String) -> String:
+	if World.towns == null:
+		return ""
+	for entry: Dictionary in World.towns.sought(town):
+		if str(entry.get("where", "")).is_empty() or not str(entry.get("freed_by", "")).is_empty():
+			continue
+		var lines: Variant = Offers.note_words(str(entry.get("story", ""))).get("cry", [])
+		if not lines is Array or (lines as Array).is_empty():
+			continue
+		var pool: Array = (lines as Array).filter(func(each: Variant) -> bool: return str(each) != str(_cry_last.get(player_id, "")))
+		if pool.is_empty():
+			pool = lines
+		var line := str(pool[randi() % pool.size()])
+		_cry_last[player_id] = line
+		if line.count("%s") == 2:
+			line = line % [entry.get("name", "Someone"), Towns.sought_where(entry)]
+		return line
+	return ""
 
 
 ## What [param body], sick in bed and awake, says to a click (501 amended
@@ -21839,6 +21941,16 @@ func _greeted(player: Player, body: Resident) -> void:
 		if record != null:
 			record.kit_given = true
 		return
+	if not body.sought.is_empty() and body.escort_of.is_empty():
+		# 613 amended (7) (playtest's walk of the first rescue: a click answered "Not now." was its worst moment): a
+		# click on the found is a word to them, freeing them as one does (_sought_spoken), ahead of any reply of
+		# theirs still waiting (dropped: their freed line is the answer); watched by a holder, as before.
+		var was_down := World.is_downed(body)
+		_sought_spoken(body, player.player_id, _display_name(player), player)
+		if not body.escort_of.is_empty():
+			_resident_asks = _resident_asks.filter(func(each: Dictionary) -> bool: return each["body"] != body.get_instance_id())
+		if was_down or not body.escort_of.is_empty():
+			return
 	var busy := false
 	for each: Dictionary in _resident_asks:
 		if int(each["body"]) == body.get_instance_id():
@@ -21883,6 +21995,9 @@ func _greeted(player: Player, body: Resident) -> void:
 	var rumour := _rumour_for(body.town, player.player_id, day)
 	if not rumour.is_empty():
 		_resident_says(body, rumour, "", player)  # The town's word of its sought, once a day (decision 643).
+		var way := _sought_way(body.town)
+		if not way.is_empty():
+			_resident_says(body, way, "", player, false)  # And the way there, lore's (613 amended (7)).
 	_ore_hint(body, player)
 	if body.trade == str(World.production.rules.get("herder", {}).get("trade", "herder")):
 		var shelter := _shelter_words(str(World.production.worker(body.worker_id).get("town", "")))
@@ -21907,6 +22022,12 @@ func _refuse_word(body: Resident, player: Player, rules: Dictionary, day: int) -
 	elif body.doing == Resident.Doing.BED and not body.sleeping():
 		reason = "abed"
 	var lines: Variant = rules.get("refuse_by", {}).get(reason, [])
+	var led: Variant = Offers.sought_words(body.trade).get("led", []) if not body.sought.is_empty() and reason == "led_by_you" else []
+	if led is Array and not (led as Array).is_empty():
+		# The found, led home by them (613 amended (7)): their own lines in turn, a click each.
+		var said := int(body.get_meta("led_said", 0))
+		body.set_meta("led_said", said + 1)
+		return str(led[said % (led as Array).size()])
 	if lines is Array and not (lines as Array).is_empty():
 		return str(lines[absi(hash(body.worker_id + ":" + str(day))) % (lines as Array).size()])
 	return str(rules.get("refuse", "Not now."))
