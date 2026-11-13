@@ -3278,6 +3278,35 @@ func _test_tavern_inside() -> void:
 			candle_lights.append(candle_light)
 	_check(candle_lights.size() == 5 and candles_bad.is_empty() and is_equal_approx(float(ground["terrain"]["ambient"]), 0.35),
 			"the Mughouse's candles lit on its four tables and its bar, warm and shadowless, over their tops (%d, wrong %s)" % [candle_lights.size(), candles_bad])
+	# A lit candles entry naming a slot (868's paragraph: the temple's
+	# prop.candle_stand beside the way down): the stand on the floor, its
+	# flame at its "flame" socket, the light "up" over that; no floor candles.
+	if ArtKit.has("prop.candle_stand") and ArtKit.filled_by("prop.candle_stand") != "placeholder":
+		var was_lit: Array = _rig._terrain.get("lit_candles", [])
+		var stand_at := Vector2(4.0, 4.0)
+		_rig._terrain["lit_candles"] = [{"at": stand_at, "top": 0.0, "up": 0.1, "energy": 0.9, "reach": 4.0, "falloff": 1.0, "slot": "prop.candle_stand"}]
+		_rig._add_lit_candles()
+		var stand := _rig._room.get_node_or_null("CandleStand_8_8") as Node3D
+		var stand_light := _rig._room.get_node_or_null("CandleLight_8_8") as OmniLight3D
+		var floor_ones := _rig._room.get_node_or_null("Candles_8_8")
+		var stand_socket: Vector3 = Flames.socket_of("prop.candle_stand")
+		var floor_y := _rig._height_in(Vector2i(4, 4), stand_at)
+		_check(stand != null and floor_ones == null and stand_light != null and is_equal_approx(stand.position.y, floor_y)
+				and absf(stand_light.position.y - (floor_y + stand_socket.y + 0.1)) < 0.01 and Vector2(stand_light.position.x, stand_light.position.z).is_equal_approx(stand_at)
+				and stand.get_child_count() > 1
+				and stand.find_children("*", "MeshInstance3D", true, false).any(func(mesh: MeshInstance3D) -> bool:
+					var iron := mesh.get_surface_override_material(0) as StandardMaterial3D
+					var wax := mesh.get_surface_override_material(1) as StandardMaterial3D if mesh.mesh != null and mesh.mesh.get_surface_count() == 2 else null
+					return iron != null and not iron.emission_enabled and wax != null and wax.emission_enabled and is_equal_approx(wax.emission_energy_multiplier, Client3D.CANDLE_WAX_GLOW) and wax.emission == Client3D.HOUSE_LIGHT),
+				"a candle stand drawn for a lit candles entry naming it: on the floor, no floor candles, its light %.2f m up over its wick (%.3f), its flame on it (%d children), its wax alone glowing warm (CANDLE_WAX_GLOW), the iron not"
+				% [stand_light.position.y - floor_y if stand_light != null else -1.0, stand_socket.y, stand.get_child_count() if stand != null else -1])
+		for node: Node in [stand, stand_light]:
+			if node != null:
+				for i in range(_rig._fire_lights.size() - 1, -1, -1):
+					if _rig._fire_lights[i][0] == node:
+						_rig._fire_lights.remove_at(i)
+				node.free()
+		_rig._terrain["lit_candles"] = was_lit
 	# A shell's lamp (811 amended, art-kit's prop.sill_lamp): one, on the
 	# sill of its window nearest its door, at the sill's height; none on a
 	# building that is no shell.

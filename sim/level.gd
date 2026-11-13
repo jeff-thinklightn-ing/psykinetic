@@ -2842,7 +2842,9 @@ static func secret_at(level_name: String, cell: Vector2i) -> Dictionary:
 ## too dark), as [{at: Vector2 in cells (a cell's middle its whole numbers),
 ## top: the metres up of the surface they stand on, up: the metres over it
 ## of their light, and its energy, reach and falloff where given (else the
-## client's own)}]: art-kit's prop.candles burning on a table or a bar,
+## client's own); slot: what is drawn there, where given (868's paragraph:
+## the temple's prop.candle_stand, standing on the floor, its light "up"
+## over its flame socket)}]: art-kit's prop.candles burning on a table or a bar,
 ## each with a warm light of its own, drawn on the client only (no heat, no
 ## light in Fields). One without an "at" [x, y] is said in
 ## [param warnings] and left out.
@@ -2862,6 +2864,8 @@ static func lit_candles_from(config: Dictionary, warnings: Array[String]) -> Arr
 		for key: String in ["energy", "reach", "falloff"]:
 			if entry.has(key):
 				lit[key] = float(entry[key])
+		if entry.get("slot") is String:
+			lit["slot"] = entry["slot"]
 		out.append(lit)
 	return out
 

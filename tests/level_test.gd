@@ -4216,8 +4216,8 @@ func _test_temple_furnished(wilds: Dictionary) -> void:
 	_check(cells.all(func(cell: Vector2i) -> bool: return (temple["rect"] as Rect2i).has_point(cell) and not keep.has(cell) and cell.y != 201 and cell.y != 202),
 		"each inside, off the cells its visitors keep off, the way down and its landing, and off the aisle")
 	var lit: Array = wilds["terrain"].get("lit_candles", [])
-	_check(lit.any(func(entry: Dictionary) -> bool: return entry["at"] == Vector2(199, 200)),
-		"candles burning on the floor beside the way down (%s)" % [lit])
+	_check(lit.any(func(entry: Dictionary) -> bool: return entry["at"] == Vector2(199, 200) and entry.get("slot") == "prop.candle_stand" and is_equal_approx(float(entry["top"]), 0.0)),
+		"a candle stand burning on the floor beside the way down (868's paragraph) (%s)" % [lit])
 	var drawn: Array = []
 	for spec: Dictionary in wilds["entities"]:
 		if str(spec.get("script", "")) == Level.CHEST and not spec.get("props", {}).has("cache") and str(spec.get("art", "")) != Level.UNDRAWN_ART 				and Rect2i(150, 170, 80, 60).has_point(spec["tile"]) and spec.get("props", {}).get("temple", false) != true:

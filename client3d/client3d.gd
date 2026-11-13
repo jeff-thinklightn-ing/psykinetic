@@ -142,6 +142,14 @@ const CANDLES_SLOT := "prop.candles"
 const CANDLE_ENERGY := 1.0
 const CANDLE_RANGE := 4.0
 const CANDLE_FALLOFF := 1.2
+## A lit stand's wax glows from within (environment, 11-12: lit only from
+## above it went as dark as the iron at night): the triangles its palette
+## draws in CANDLE_WAX (the slot's cream, within CANDLE_WAX_NEAR a channel)
+## glow flat in HOUSE_LIGHT at CANDLE_WAX_GLOW (_glow_wax), the iron and
+## brass as they were, the flame still the brightest thing on it.
+const CANDLE_WAX_GLOW := 0.3
+const CANDLE_WAX := Color8(194, 184, 160)
+const CANDLE_WAX_NEAR := 0.03
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
 const LAMP_OUT := 22.0
@@ -18130,27 +18138,111 @@ func _add_lantern(cell: Vector2i) -> void:
 ## art-kit's prop.candles stood on its top (none until the slot is drawn), its
 ## light "up" over that (its energy, reach and falloff the entry's if given,
 ## else CANDLE_ENERGY, _RANGE and _FALLOFF), shadowless, flickering as a
-## house's (with the fires, _flicker_fires).
+## house's (with the fires, _flicker_fires). One naming a "slot" (868's
+## paragraph: the temple's prop.candle_stand beside the way down) stands that
+## on its top, its flame drawn at the slot's "flame" socket (Flames) and its
+## light "up" over that; the floor's candles while the slot has no art.
 func _add_lit_candles() -> void:
 	for entry: Dictionary in _terrain.get("lit_candles", []):
 		var at: Vector2 = entry["at"]
 		var cell := Vector2i(roundi(at.x), roundi(at.y))
 		var top := _height_in(cell, at) + float(entry.get("top", 0.0))
 		var tag := "%d_%d" % [roundi(at.x * 2.0), roundi(at.y * 2.0)]
-		if ArtKit.has(CANDLES_SLOT) and ArtKit.filled_by(CANDLES_SLOT) != "placeholder":
-			var candles := ArtKit.instance(CANDLES_SLOT)
-			candles.name = "Candles_" + tag
+		var slot := str(entry.get("slot", CANDLES_SLOT))
+		if not (ArtKit.has(slot) and ArtKit.filled_by(slot) != "placeholder"):
+			slot = CANDLES_SLOT
+		var lit_at := top
+		if ArtKit.has(slot) and ArtKit.filled_by(slot) != "placeholder":
+			var candles := ArtKit.instance(slot)
+			candles.name = ("Candles_" if slot == CANDLES_SLOT else "CandleStand_") + tag
 			candles.position = Vector3(at.x, top, at.y)
 			candles.rotation.y = _roll(cell, 185) * TAU
 			_room.add_child(candles)
+			var flame := Flames.at_socket(candles, slot, hash(cell)) if slot != CANDLES_SLOT else null
+			if flame != null:
+				lit_at = (candles.transform * flame.position).y
+				_glow_wax(candles)
 		var energy := float(entry.get("energy", CANDLE_ENERGY))
 		var light := _night_light(HOUSE_LIGHT, energy, float(entry.get("reach", CANDLE_RANGE)))
 		light.name = "CandleLight_" + tag
 		light.omni_attenuation = float(entry.get("falloff", CANDLE_FALLOFF))
 		light.shadow_enabled = false
-		light.position = Vector3(at.x, top + float(entry.get("up", 0.0)), at.y)
+		light.position = Vector3(at.x, lit_at + float(entry.get("up", 0.0)), at.y)
 		_room.add_child(light)
 		_fire_lights.append([light, energy, _roll(cell, 186) * TAU, HOUSE_LIGHT_FLICKER])
+
+
+## [param stand]'s meshes drawn with their wax glowing (CANDLE_WAX_GLOW): each
+## palette surface split once (_wax_split, kept per mesh) into the triangles
+## its palette draws in CANDLE_WAX, given _wax_glow, and the rest, in the
+## shared palette; a mesh with no wax as it was. (An emission texture masked
+## to the wax swatch glowed the whole surface flat, iron and all, on Atlas.)
+func _glow_wax(stand: Node3D) -> void:
+	for mesh: MeshInstance3D in stand.find_children("*", "MeshInstance3D", true, false):
+		if mesh.mesh == null or mesh.mesh.get_surface_count() != 1:
+			continue
+		var own := mesh.get_active_material(0) as StandardMaterial3D
+		if own == null or own.resource_name != ArtKit.PALETTE_NAME:
+			continue
+		if not _wax_meshes.has(mesh.mesh):
+			_wax_meshes[mesh.mesh] = _wax_split(mesh.mesh, own)
+		var split: Mesh = _wax_meshes[mesh.mesh]
+		if split == null:
+			continue
+		mesh.mesh = split
+		mesh.set_surface_override_material(0, own)
+		mesh.set_surface_override_material(1, _wax_glow(own))
+
+
+static var _wax_meshes: Dictionary[Mesh, Mesh] = {}
+static var _wax_glow_material: StandardMaterial3D = null
+
+
+## The wax's own material: [param palette] again, glowing flat in
+## HOUSE_LIGHT at CANDLE_WAX_GLOW.
+static func _wax_glow(palette: StandardMaterial3D) -> StandardMaterial3D:
+	if _wax_glow_material == null:
+		_wax_glow_material = palette.duplicate() as StandardMaterial3D
+		_wax_glow_material.resource_name = "wax_glow"
+		_wax_glow_material.emission_enabled = true
+		_wax_glow_material.emission = HOUSE_LIGHT
+		_wax_glow_material.emission_energy_multiplier = CANDLE_WAX_GLOW
+	return _wax_glow_material
+
+
+## [param mesh]'s one surface as two (an ArrayMesh): its triangles whose
+## palette swatch ([param palette]'s albedo at their first corner's UV) is
+## CANDLE_WAX within CANDLE_WAX_NEAR a channel second, the rest first; null
+## with no palette to read, no indexed triangles, or no wax.
+static func _wax_split(mesh: Mesh, palette: StandardMaterial3D) -> Mesh:
+	var image := palette.albedo_texture.get_image() if palette.albedo_texture != null else null
+	if image == null or image.is_empty():
+		return null
+	if image.is_compressed():
+		image = image.duplicate() as Image
+		if image.decompress() != OK:
+			return null
+	var arrays := mesh.surface_get_arrays(0)
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV] if arrays[Mesh.ARRAY_TEX_UV] != null else PackedVector2Array()
+	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if uvs.is_empty() or indices.size() < 3:
+		return null
+	var rest := PackedInt32Array()
+	var wax := PackedInt32Array()
+	for k in range(0, indices.size() - 2, 3):
+		var uv := uvs[indices[k]]
+		var texel := image.get_pixel(clampi(int(uv.x * image.get_width()), 0, image.get_width() - 1),
+				clampi(int(uv.y * image.get_height()), 0, image.get_height() - 1))
+		var is_wax := absf(texel.r - CANDLE_WAX.r) <= CANDLE_WAX_NEAR and absf(texel.g - CANDLE_WAX.g) <= CANDLE_WAX_NEAR 				and absf(texel.b - CANDLE_WAX.b) <= CANDLE_WAX_NEAR
+		(wax if is_wax else rest).append_array([indices[k], indices[k + 1], indices[k + 2]])
+	if wax.is_empty() or rest.is_empty():
+		return null
+	var split := ArrayMesh.new()
+	for part: PackedInt32Array in [rest, wax]:
+		var copy := arrays.duplicate()
+		copy[Mesh.ARRAY_INDEX] = part
+		split.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, copy)
+	return split
 
 
 ## A cold lamp standing in its cell (659 amended): art-kit's prop.dark_lamp

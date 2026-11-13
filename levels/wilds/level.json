@@ -3113,7 +3113,7 @@
 		]
 	],
 	"lit_candles": [
-		{"at": [199, 200], "top": 0.0, "up": 0.4, "energy": 0.9, "reach": 4.0, "falloff": 1.0},
+		{"at": [199, 200], "top": 0.0, "up": 0.1, "energy": 0.9, "reach": 4.0, "falloff": 1.0, "slot": "prop.candle_stand"},
 		{"at": [199.15, 201.0], "top": 1.006, "up": 0.35, "energy": 0.7, "reach": 3.5, "falloff": 1.0},
 		{"at": [199.15, 202.0], "top": 1.006, "up": 0.35, "energy": 0.7, "reach": 3.5, "falloff": 1.0}
 	],

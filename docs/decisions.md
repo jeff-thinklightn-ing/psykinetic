@@ -52789,3 +52789,24 @@ tavern naming one, a tavern's at its "hearth" cell. view_test _test_tavern_insid
 Mughouse's flame at the socket on its fireplace, its light shadowless, flickering, the fire
 cells under it not drawn; a zone with none burns none. Client only; protocol unchanged (the
 hearth cell is level data), no new class_name.
+
+The temple's candle stand (art-gen's prop.candle_stand, art-kit's take 871; the coordinator's
+go, 11-12 06:05, a paragraph in this take with no label of its own): a level.json "lit_candles"
+entry may name a "slot" (Level.lit_candles_from passes it on), and Client3D._add_lit_candles
+stands that slot on the entry's top in place of the floor's prop.candles, its flame drawn at
+the slot's "flame" socket (Flames.at_socket, Flames.SIZES 0.12), and the entry's light "up"
+over the flame rather than over the top; while the slot has no art, the floor's candles as
+before. The wilds' candles beside the temple's way down, at (199, 200), name it: the stand on
+the floor (1.19 m, never solid, the stair mouth clear), its light 0.1 m over the wick (about
+1.3 m up), its energy and reach unchanged; no second set of floor candles. A lit stand's wax
+glows from within (environment's call, 11-12: lit only from above, the wax went as dark as the
+iron at night; emission, not a lower light, which would leave the sides dark and move the
+flame's pool): Client3D._glow_wax splits the stand's palette surface once per mesh
+(_wax_split) into the triangles its palette draws in CANDLE_WAX (the slot's cream, (194, 184,
+160), within CANDLE_WAX_NEAR 0.03 a channel) and the rest; the wax's surface glows flat in
+HOUSE_LIGHT at CANDLE_WAX_GLOW 0.3, the rest stays in the shared palette. An emission texture
+masked to the wax swatch (and before it the whole palette, and its pale texels) glowed the whole
+stand flat, iron shaft and all, shown on Atlas against the glow off and the shared palette. The
+cream wax glows, the iron and brass don't, and the flame stays the brightest thing on it. level_test: the entry
+names the stand on the floor; view_test: a stand drawn for an entry naming it, no floor candles,
+its light over its wick, its flame on it.
