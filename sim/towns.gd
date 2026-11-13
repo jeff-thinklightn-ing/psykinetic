@@ -103,6 +103,10 @@ var threat := Callable()
 ## bool, Main.companion_taken; (player_id, town) -> bool,
 ## Main.companion_freed; (player_id) -> {name, trade}, her record's.
 var in_play := Callable()
+## () -> Array of the names of everyone living outside Towns' records (552 amended (2); Main sets
+## it): residents and companions in the world by label and person (the stall's keeper, the settled,
+## a healer, Wren). A newcomer never takes one of them.
+var names_taken := Callable()
 var companion_taken := Callable()
 var companion_freed := Callable()
 var companion_of := Callable()
@@ -3134,19 +3138,28 @@ const DEAD_NAMES := 40
 
 ## A newcomer's name for [param town] from [param names], [param pick]
 ## first (552 amended, the two Bryns): the first from there on that no
-## resident, captive or remembered dead of the town already has; [param
-## pick]'s own when every one is taken.
+## resident, captive or sought of any town, nor remembered dead of this one, already has, nor
+## anyone living outside Towns (552 amended (2): a sought farmer was named Rolf beside Rolf at the
+## stall; the stall's keeper by rules.vendor.name, the rest by names_taken); [param pick]'s own
+## when every one is taken.
 func _free_name(town: String, names: Array, pick: int) -> String:
-	var record := _town(town)
 	var used := {}
-	for who: String in record["residents"]:
-		used[str(production.worker(who).get("name", ""))] = true
-	for each: Dictionary in record["captives"]:
-		used[str(each.get("name", ""))] = true
-	for each: Dictionary in record.get("sought", {}).values():
-		used[str(each.get("name", ""))] = true
-	for name: Variant in record.get("dead_names", []):
+	for each_town: String in _towns:
+		var record := _towns[each_town]
+		for who: Variant in record.get("residents", []):
+			used[str(production.worker(str(who)).get("name", ""))] = true
+		for each: Dictionary in record.get("captives", []):
+			used[str(each.get("name", ""))] = true
+		for each: Dictionary in record.get("sought", {}).values():
+			used[str(each.get("name", ""))] = true
+	for name: Variant in _town(town).get("dead_names", []):
 		used[str(name)] = true
+	var vendor: Dictionary = rules.get("vendor", {})
+	if not str(vendor.get("name", "")).is_empty():
+		used[str(vendor["name"])] = true
+	if names_taken.is_valid():
+		for name: Variant in names_taken.call():
+			used[str(name)] = true
 	for i in names.size():
 		var name := str(names[(pick + i) % names.size()])
 		if not used.has(name):

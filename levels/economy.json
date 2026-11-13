@@ -28,7 +28,7 @@
 	"water": {"spring": 4, "catch": 12, "cap": 30, "draw": 0.5, "dry_slows": "cook", "dry_rate": 0.5},
 	"crop": {"sought_first": false, "sought_first_": "613 amended (3), the first rescue (the coordinator's ruling; Jeff 10-27, the town shaped by player interactions): true, a town with no field and no farmer seeks one at once at his story's place (the old farmstead); home, the town plans its field. Off until npc's rumour and lore's farmer.day are in (package the first rescue).", "sow_steps": 3000, "harvest_steps": 3000, "harvest": 260, "roots": 30,
 		"growth": {"base": 0.7, "rain": 3.0, "least": 0.4, "most": 1.3}, "flatten": 0.5, "growth_days": 5,
-		"names": ["Tam", "Wynn", "Edda", "Rolf", "Hilde", "Bert"]},
+		"names": ["Tam", "Wynn", "Edda", "Wilf", "Hilde", "Bert"]},
 	"flock": {"trade": "shepherd", "start": 6, "per_level": 12, "lambs": 0.6, "wool": 2, "shear_steps": 2000, "growth_days": 3,
 		"names": ["Wat", "Morag", "Elin", "Gil", "Bryn", "Oda"],
 		"weaver": {"trade": "weaver", "wool": 6, "growth_days": 3, "names": ["Joan", "Lise", "Tobin", "Mabyn", "Cadoc", "Wenna"]}},

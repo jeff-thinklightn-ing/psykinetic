@@ -21607,6 +21607,18 @@ town has (Towns._free_name). If every name is taken it keeps the pick.
 Towns.died remembers the last DEAD_NAMES (40) names in the town's
 "dead_names". farm_test _test_maker_comes.
 
+552 amended (2): a newcomer never takes a living person's name. The 120-day soak (the
+coordinator's Y2) sought a farmer after Edda died: "word is Rolf the farmer was seen held at a
+camp", beside Rolf at the stall, since the stall's keeper (736) is Main's visitor and not one of
+Towns' residents, and "Rolf" stood in crop.names too. Towns._free_name now skips the residents,
+captives and sought of every town (not only its own; its own remembered dead as before), the
+stall's keeper by rules.vendor.name, and everyone Main names living outside Towns through
+Towns.names_taken = Main._names_taken (each Resident's person, each Resident's and Companion's
+label and the label's first word: the settled, a healer, the priest, Wren). crop.names gives up
+Rolf for Wilf (lore's name, "he" in resident_traits' pronoun_of). With every name taken it keeps
+the pick as before (a list of six is spent only by six of one trade living at once). farm_test
+_test_free_name. Server only; protocol unchanged; no new class_name.
+
 - After the proof run (the coordinator's, for Jeff): a drop is told her
   voice past the speech rate limit (always), as one just after she spoke
   was lost; and "warned" reads "ignored your warning and took you there",

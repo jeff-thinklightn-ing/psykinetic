@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_field_work()
 	_test_missed()
 	_test_farmer_comes()
+	_test_free_name()
 	_test_look()
 	_test_woodcutter()
 	_test_gatherers()
@@ -63,6 +64,24 @@ func _ready() -> void:
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
+
+
+## A newcomer's name (552 amended (2)): never a living one's. The stall's keeper (rules.vendor.name,
+## Rolf, once also a farmer's name), anyone Main names living outside Towns (names_taken: the
+## settled, a healer, Wren), and a resident of another town are all skipped; the farmer list no
+## longer holds Rolf.
+func _test_free_name() -> void:
+	var towns := _towns()
+	_check(not "Rolf" in towns.rules["crop"]["names"], "Rolf, the stall's keeper, no longer a farmer's name")
+	var names: Array = ["Rolf", "Wilf", "Tam", "Wren", "Hilde"]
+	_check(towns._free_name(TOWN, names, 0) == "Wilf", "the stall's keeper skipped: Rolf -> %s" % towns._free_name(TOWN, names, 0))
+	_check(towns._free_name(TOWN, names, 2) == "Wren", "this town's Tam skipped: %s" % towns._free_name(TOWN, names, 2))
+	towns.names_taken = func() -> Array: return ["Wren", "Snagfin"]
+	_check(towns._free_name(TOWN, names, 3) == "Hilde", "a companion named Wren skipped: %s" % towns._free_name(TOWN, names, 3))
+	towns.note_rescue("fm/other", "o1", "Hilde", "farmer")
+	_check(towns._free_name(TOWN, names, 3) == "Wilf" and towns._free_name(TOWN, ["Hilde", "Bert"], 0) == "Bert",
+		"another town's Hilde skipped: %s" % towns._free_name(TOWN, names, 3))
+	_check(towns._free_name(TOWN, ["Tam", "Wren"], 1) == "Wren", "every name taken: the pick's own, as before")
 
 
 func _towns(level := 1, with_farmer := true, rules := _rules) -> Towns:

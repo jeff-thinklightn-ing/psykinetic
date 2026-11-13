@@ -4879,6 +4879,7 @@ func _boot() -> void:
 		return zone != null and zone.awake and _towns_near.has(town)
 	World.towns.companion_taken = companion_taken
 	World.towns.companion_freed = companion_freed
+	World.towns.names_taken = _names_taken  # 552 amended (2).
 	# The temple counter's town: the temple building whose rect holds it
 	# (buildings' 424 amended), its "town" (decision 434).
 	World.counter_town = func(counter: GridEntity) -> String:
@@ -15735,6 +15736,20 @@ static func _is_healers_hut(building: Dictionary) -> bool:
 static func _is_temple(building: Dictionary) -> bool:
 	return str(building.get("use", "")) == "temple" or str(building.get("place", "")) == "temple" \
 		or str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), "")) == "temple"
+
+
+## Towns.names_taken (552 amended (2)): the names of the residents and companions in the world,
+## their person and label and the label's first word ("Snagfin the merchant": Snagfin), so a
+## newcomer never takes a living one's name (a sought farmer named Rolf beside Rolf at the stall).
+func _names_taken() -> Array:
+	var names: Array = []
+	for entity in World.get_entities():
+		if not (entity is Resident or entity is Companion):
+			continue
+		for name: String in [str(entity.get("person")) if entity is Resident else "", entity.label, entity.label.get_slice(" ", 0)]:
+			if not name.is_empty() and name != "<null>":
+				names.append(name)
+	return names
 
 
 ## The companion of player [param player_id] is held by raid group
