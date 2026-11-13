@@ -90,6 +90,7 @@ func _ready() -> void:
 	_test_crypt_spacing()
 	_test_hall_shortcut()
 	await _test_throne_way_held()
+	await _test_throne_home()
 	_test_barrow_quest()
 	_test_quest_card_place()
 	_test_decor()
@@ -6746,4 +6747,91 @@ func _test_throne_way_held() -> void:
 	_main._hold_hall_door("barrow_deep", false)
 	Net.message_received.disconnect(hear)
 	record.marks.assign(kept_marks)
+	_main.load_map("test_room")
+
+
+## The draugr's throne, the way home once he is downed (896, "full circle";
+## Jeff, 2026-11-12: "it would be cool if sitting on the throne kicks you
+## back to the entrance, but only possible if the draugr is downed"). Off,
+## a click on it is nothing; on, while he holds it he is told THRONE_HIS once;
+## at rest, a stand on it alone sends no one, a sit is undone by a step off
+## or another order, and a sit held THRONE_SIT_S sends the sitter to the
+## First Hall's from_deep.
+func _test_throne_home() -> void:
+	print("\n== the draugr's throne: the way home once he is downed (896) ==")
+	var kept_switch: bool = _main.throne_home
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "")
+	await get_tree().process_frame
+	var throne := Vector2i(49, 75)
+	var draugr: Draugr = null
+	for entity in World.get_entities():
+		if entity is Draugr:
+			draugr = entity as Draugr
+	var player := _player()
+	if draugr == null or player == null or _main.throne_at("barrow_deep", throne).is_empty():
+		_check(false, "barrow_deep's draugr, a player and the throne at %s (%s, %s)" % [throne, draugr, player])
+		_main.throne_home = kept_switch
+		_main.load_map("test_room")
+		return
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	var front: Vector2i = _main._beside(throne, throne + Vector2i(0, -2))
+	_put(player, front)
+	_main.throne_home = false
+	_main._told_throne.erase(Net.local_id)
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_check(player.seated == "" and heard.count(_main.THRONE_HIS) == 0 and not _main._throne_sits.has(Net.local_id),
+		"off: asked from beside it, nothing (%s, %s)" % [player.seated, heard])
+	_main.throne_home = true
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_check(draugr.state == Draugr.State.SEATED and player.seated == "" and heard.count(_main.THRONE_HIS) == 1,
+		"on, while he sits it: told once that it is his, not sat (%s, %s)" % [player.seated, heard])
+	draugr.state = Draugr.State.AT_REST
+	draugr.rests_until = World.steps + 100000
+	draugr._vanish()
+	_put(player, throne)
+	for i in roundi(_main.THRONE_SIT_S * World.TICK_RATE) + 3:
+		World.step()
+	_check(_main.map_name == "barrow_deep" and player.seated == "",
+		"downed, a walk onto it alone sends no one (%s, %s)" % [_main.map_name, player.seated])
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_check(player.seated == "throne" and player.facing == Vector2i(0, -1) and _main._throne_sits.has(Net.local_id),
+		"asked on it while he rests: she sits, facing the hall (%s, %s)" % [player.seated, player.facing])
+	World.step()
+	_put(player, front)
+	World.step()
+	_check(player.seated == "" and not _main._throne_sits.has(Net.local_id) and _main.map_name == "barrow_deep",
+		"a step off before the send stands her up, sent nowhere (%s, %s)" % [player.seated, _main.map_name])
+	_put(player, throne)
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_main._on_command(player, "stance", {"kind": ""})
+	_check(player.seated == "" and not _main._throne_sits.has(Net.local_id), "another order stands her up as well (%s)" % player.seated)
+	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
+	_main._on_command(player, "say", {"text": "home"})
+	_check(player.seated == "throne", "talk leaves her seated (%s)" % player.seated)
+	for i in roundi(_main.THRONE_SIT_S * World.TICK_RATE) + 2:
+		World.step()
+		if _main.map_name != "barrow_deep":
+			break
+	await get_tree().process_frame
+	await get_tree().process_frame
+	player = _player()
+	var at: Vector2i = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "barrow" and World.distance(at, Vector2i(31, 8)) <= 1 and player.seated == "" and _main._throne_sits.is_empty(),
+		"held THRONE_SIT_S, she is sent home to the First Hall's from_deep (%s, at %s)" % [_main.map_name, at])
+	Net.message_received.disconnect(hear)
+	var deep: Zone = World.zones.get("barrow_deep")
+	if deep != null:
+		var was := World.zone
+		World.enter(deep)
+		for entity in World.get_entities():
+			if entity is Draugr:
+				(entity as Draugr)._rise_again()
+		World.enter(was)
+	_main.throne_home = kept_switch
 	_main.load_map("test_room")

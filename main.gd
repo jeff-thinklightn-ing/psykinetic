@@ -1374,6 +1374,7 @@ func _process(delta: float) -> void:
 		_client3d.telegraph_tick(World.tick)  # 602, ui's side: the telegraphs' fill.
 	_update_pack()
 	_update_cast()
+	_update_throne()
 	_update_talk()
 	_update_deal()
 	_update_find()
@@ -1674,6 +1675,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if click.button_index == MOUSE_BUTTON_LEFT and target != player and talks_on_click(target):
 		_talk_to(player, target)
 		return
+	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _throne_click(player, tile):
+		return  # 896: the draugr's throne, walked to and sat on.
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
 		return
@@ -2273,6 +2276,8 @@ func _tap_e(player: Player) -> void:
 			and World.distance(player.tile, talk_cell(target)) <= HEARING_RANGE:
 		_open_talk(target)  # A resident (560), or a peaceable talking monster (629, ui's side).
 		return
+	if target == null and _throne_click(player, _mouse_tile()):
+		return  # 896: the draugr's throne, walked to and sat on.
 	# 825: a hearth under the cursor, from on it or beside it, lit (or its burn renewed).
 	var hearth := _mouse_tile()
 	if World.is_hearth(hearth) and maxi(absi(player.tile.x - hearth.x), absi(player.tile.y - hearth.y)) <= 1:
@@ -2821,6 +2826,7 @@ func _apply_azimuth() -> void:
 func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
+	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -11387,6 +11393,115 @@ func hall_link_held(link: Dictionary, here := "") -> bool:
 	return spawn is Vector2i and hall_lair_rect(there).has_point(spawn)
 
 
+## The way home from the draugr's hall (896, "full circle"; Jeff, 2026-11-12:
+## "the issue with the short cut is i didnt see it and clicked it mid fight
+## teleporting out. it would be cool if sitting on the throne kicks you back
+## to the entrance, but only possible if the draugr is downed"; the
+## coordinator's rulings): while the zone's draugr rests (Draugr.resting:
+## beaten, paid or unpaid, for his rise_s), anyone standing on his throne
+## who asks (a click or E on it: the "throne" command) sits, facing its
+## front (Player.seated "throne", animation's sit), and after THRONE_SIT_S
+## is sent to the barrow's First Hall (THRONE_WAYS). A step off it, any
+## order but talk, or his rising before then stands her up and sends no one:
+## a stray click after the fight costs nothing. Walked onto, it does nothing.
+## While he sits it, or a pact is on, a click on it says THRONE_HIS once a
+## stand. Off until the package is whole (dungeon switches it on with
+## (49,77)'s removal): the command is not heard, a click is a walk.
+var throne_home := false
+const THRONE_SLOT := "building.throne"
+## Animation's Sitting_Enter (1.3 s) and a beat seated (2 s) before the send.
+const THRONE_SIT_S := 3.3
+## Where each zone's throne sends its sitter: the barrow's First Hall, by
+## the knight and the bier, where the shortcut behind it led (540, 666).
+const THRONE_WAYS := {"barrow_deep": {"to_map": "barrow", "to_spawn": "from_deep"}}
+## Said on a click on the throne while he holds it (voice's words: seated
+## or fighting, it can change, with no hint how).
+const THRONE_HIS := "The throne is still his."
+## The orders that leave a sitter seated: talk, and the view's own.
+const THRONE_KEEPS: Array[String] = ["say", "party", "view_ready", "near", "throne"]
+## Peer -> {zone, at, until (World.tick)}: who sits now, until when.
+var _throne_sits: Dictionary[int, Dictionary] = {}
+## Peer -> the cell they were told THRONE_HIS on; erased once they leave it.
+var _told_throne: Dictionary[int, Vector2i] = {}
+
+
+## Zone [param zone_name]'s throne holding [param cell] (the parsed
+## building), or {} if none.
+func throne_at(zone_name: String, cell: Vector2i) -> Dictionary:
+	for building: Dictionary in _zone_level(zone_name).get("buildings", []):
+		if str(building.get("slot", "")) == THRONE_SLOT and (building["rect"] as Rect2i).has_point(cell):
+			return building
+	return {}
+
+
+## Whether zone [param zone_name]'s draugr is downed (Draugr.resting): the
+## throne is the way home only then.
+func throne_downed(zone_name: String) -> bool:
+	var was := World.enter_named(zone_name)
+	var downed := World.get_entities().any(func(each: GridEntity) -> bool: return each is Draugr and (each as Draugr).resting())
+	World.enter(was)
+	return downed
+
+
+## [param player] asks to sit on the throne at [param at] (the "throne"
+## command, 896).
+func _throne_asked(player: Player, at: Vector2i) -> void:
+	var peer := player.owner_peer
+	var throne := throne_at(player.zone, at)
+	if not throne_home or throne.is_empty() or not THRONE_WAYS.has(player.zone) or _throne_sits.has(peer):
+		return
+	if World.distance(player.tile, at) > 1:
+		return
+	if not throne_downed(player.zone):
+		if _told_throne.get(peer) != player.tile:
+			_told_throne[peer] = player.tile
+			say_to([peer], THRONE_HIS)
+		return
+	if player.tile != at:
+		return
+	World.face(player, throne.get("facing", Vector2i(0, -1)))
+	player.seated = "throne"
+	_throne_sits[peer] = {"zone": player.zone, "at": at, "until": World.tick + roundi(THRONE_SIT_S * World.TICK_RATE)}
+	print("[throne] %s sits on the throne in %s" % [_display_name(player), player.zone])
+
+
+## [param peer]'s sit ended before the send: stood up, sent nowhere.
+func _throne_stand(peer: int) -> void:
+	_throne_sits.erase(peer)
+	var player: Player = _players.get(peer)
+	if is_instance_valid(player):
+		player.seated = ""
+		print("[throne] %s stands up" % _display_name(player))
+
+
+## Each tick of a zone (896): its sitters still on the throne, he still at
+## rest, are sent home once their time is up; anyone else is stood up. A
+## told player off the cell they were told on may be told again.
+func _throne_tick() -> void:
+	for peer: int in _throne_sits.keys():
+		var sit: Dictionary = _throne_sits[peer]
+		if str(sit["zone"]) != World.zone.name:
+			continue
+		var player: Player = _players.get(peer)
+		if not is_instance_valid(player) or player.zone != sit["zone"]:
+			_throne_sits.erase(peer)
+			continue
+		if player.tile != sit["at"] or not throne_downed(player.zone):
+			_throne_stand(peer)
+			continue
+		if World.tick < int(sit["until"]):
+			continue
+		_throne_sits.erase(peer)
+		player.seated = ""
+		var way: Dictionary = THRONE_WAYS[sit["zone"]]
+		print("[throne] %s: sent home to %s" % [_display_name(player), way["to_map"]])
+		travel(peer, str(way["to_map"]), str(way["to_spawn"]))
+	for peer: int in _told_throne.keys():
+		var player: Player = _players.get(peer)
+		if not is_instance_valid(player) or player.tile != _told_throne[peer]:
+			_told_throne.erase(peer)
+
+
 ## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen
 ## Souls, an anchor of the Ossuary since 666); an empty rect for none.
 func hall_lair_rect(zone_name: String) -> Rect2i:
@@ -15615,6 +15730,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	# Arriving (decision 661): anything but talk and looking ends the shelter.
 	if entity is Player and command_name not in SHELTER_KEEPS and World.is_sheltered(entity):
 		entity.protected = false
+	if entity is Player and _throne_sits.has(entity.owner_peer) and command_name not in THRONE_KEEPS:
+		_throne_stand(entity.owner_peer)  # 896: any order before the send stands her up.
 	if entity is Player and (entity as Player).crouched and command_name in CROUCH_ENDS:
 		(entity as Player).crouched = false  # A blow, a shove, a guard or a draw stands it up (784 amended (2)).
 	if command_name == "view_ready" and entity is Player:
@@ -15653,6 +15770,10 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "take_find" and entity is Player:
 		take_find(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest, str(args.get("id", "")))
+	elif command_name == "throne" and entity is Player:
+		var on: Variant = args.get("at")
+		if on is Array and (on as Array).size() == 2:
+			_throne_asked(entity as Player, Vector2i(int(on[0]), int(on[1])))  # 896: sat on, the way home.
 	elif command_name == "hearth" and entity is Player:
 		var at: Variant = args.get("at")
 		if at is Array and (at as Array).size() == 2:
@@ -22881,6 +23002,7 @@ func _on_world_ticked(tick: int) -> void:
 		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
 		_all_fallen_tick()
 		_leaving_tick()  # A companion leaving her player (decision 581).
+		_throne_tick()  # 896: a sit on the draugr's throne held, cancelled or sent home.
 		if tick % World.WORLD_TICK_STEPS == 0:
 			_favour_tick()  # Winning back one who left (581 amended).
 		_check_respawns(tick)
@@ -24055,6 +24177,46 @@ func _fish_click(player: Player, tile: Vector2i, on_sprite: bool) -> bool:
 	_move_click(player, bank)
 	_cast_wanted = tile
 	return true
+
+
+## A left click or E on the draugr's throne at [param tile] (896, "full
+## circle"): on it, or beside it while another holds it, asked of the server
+## at once (the sit, or why not); from afar walked onto first and asked on
+## arrival (_throne_wanted, _update_throne). False when [param tile] is no
+## throne, or the way home is off (throne_home): the click is then the
+## ordinary walk.
+func _throne_click(player: Player, tile: Vector2i) -> bool:
+	_throne_wanted = NONE
+	if not throne_home or tile == NONE or throne_at(map_name, tile).is_empty():
+		return false
+	if player.tile == tile or World.distance(player.tile, tile) <= 1 and World.get_entity_at(tile) != null:
+		World.command(player, "throne", {"at": [tile.x, tile.y]})
+		return true
+	_move_click(player, tile)
+	_throne_wanted = tile
+	return true
+
+
+## The throne a click asked to sit on, walked to first; NONE if none.
+var _throne_wanted := NONE
+
+
+## Each frame (896): a throne clicked from afar is asked for once the local
+## player's route is walked out on it, or beside it when the walk could not
+## end on it (he, or another, holds it: the server says why). Another order
+## drops it (_move_click's routes replace it).
+func _update_throne() -> void:
+	if _throne_wanted == NONE:
+		return
+	var player := _local_player()
+	if player == null:
+		_throne_wanted = NONE
+		return
+	if not (_free.get("path", []) as Array).is_empty():
+		return
+	if World.distance(player.tile, _throne_wanted) <= 1:
+		World.command(player, "throne", {"at": [_throne_wanted.x, _throne_wanted.y]})
+	_throne_wanted = NONE
 
 
 ## The water cell a click asked to cast at, walked to first; NONE if none.

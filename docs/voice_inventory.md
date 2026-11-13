@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2890)
+## Lines in the code (2891)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -2083,7 +2083,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (747)
+### server and windows (748)
 
 | | Line | Where |
 |---|---|---|
@@ -2294,6 +2294,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
 |  | The hall's door opens. | `main.gd` _hold_hall_door() |
 |  | The way is shut until the fight is done. | `main.gd` HALL_WAY_HELD |
+|  | The throne is still his. | `main.gd` THRONE_HIS |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
 |  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |

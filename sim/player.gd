@@ -81,6 +81,10 @@ var charge_room := 0
 ## giver, items: [{name, done}], ready}; the server sets it from their
 ## record (Main._sync_quest).
 var quest: Dictionary = {}
+## Sat on the draugr's throne (896, "full circle"): "throne" from the sit
+## until the send home or a step off it, else "" (Main._throne_asked;
+## animation's ACTIVITIES "throne" draws the sit).
+var seated := ""
 ## Mortally Wounded (Jeff's down screen): the heart while downed, in beats a
 ## minute (field rules' heart.beats: 120, 80, 40), 0 when not downed;
 ## replicated for the heartbeat and the hold's read. Server only: whether
@@ -153,6 +157,7 @@ func _init() -> void:
 	replicate("charges")  # Decision 573: the resurrection charges, and the most they may hold.
 	replicate("charge_room")
 	replicate("quest")  # 747: the fallen knight's quest, for the tracker.
+	replicate("seated")  # 896: on the draugr's throne, for the sit.
 	replicate("heart")  # Mortally Wounded: the heart while downed.
 	replicate("free_state")  # Decision 689: its free body's centre.
 	replicate("art_feel")  # Decision 766: weapon memory's felt bonus.
