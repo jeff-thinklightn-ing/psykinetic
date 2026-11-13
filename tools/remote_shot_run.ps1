@@ -27,8 +27,13 @@
 #                 listens, its sockets are read and any past loopback stops the run;
 #                 then each pass's game as --client of 127.0.0.1:<port>. runner.log's
 #                 "joined:" and "server at end:" lines name both and how the server ended.
+#                 A tour (828 amended (6); <Dir>\tour.txt from remote_shot.sh --tour): the
+#                 server also gets --admin-port on a free loopback port and the client
+#                 --tour-admin=<it>, TOUR_ONLY its section. Every joined run looks through
+#                 what it returns for its token; a file holding it is removed and the run fails.
+#   -Mode parse   a tour's scripts (-Dir: its name) checked in the clone, parse errors only
 param(
-	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "run", "judge")][string]$Mode,
+	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge")][string]$Mode,
 	[string]$Dir = "",
 	[string]$Root = "D:\psykinetic",
 	[string]$Runs = "D:\psykinetic-runs",
@@ -176,6 +181,30 @@ switch ($Mode) {
 		if ($result -ne "exit 0") { exit 1 }
 		exit 0
 	}
+	# A tour's scripts parsed in the clone (828 amended (6), tour.sh's check): -Dir is the tour's
+	# name. Only a parse error counts (--check-only has no autoloads: "Identifier not found" is that).
+	"parse" {
+		if ($Dir -notmatch '^[a-z0-9_]+$') { Write-Output "parse: not a tour's name: $Dir"; exit 1 }
+		$console = $Godot -replace '\.exe$', '_console.exe'
+		$out = Join-Path $Runs "parse.log"
+		$bad = 0
+		foreach ($script in @("tests/tour/bot.gd", "tests/tour/tour.gd", "tests/tour/tours/$Dir.gd")) {
+			if (-not (Test-Path (Join-Path $Root $script))) { Write-Output "parse: no $script"; $bad += 1; continue }
+			$process = Start-Process -FilePath $console -ArgumentList @("--headless", "--audio-driver", "Dummy", "--path", $Root,
+				"--check-only", "--script", "res://$script") -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError "$out.err"
+			$null = $process.Handle
+			$result = Wait-Stop $process $TimeoutMin
+			$errors = @(Select-String -Path $out, "$out.err" -SimpleMatch "Parse Error" -ErrorAction SilentlyContinue)
+			if ($result -eq "timeout" -or $errors) {
+				Write-Output "parse: $script $(if ($errors) { $errors[0].Line } else { 'timed out' })"
+				$bad += 1
+			}
+		}
+		Remove-Item -Force $out, "$out.err" -ErrorAction SilentlyContinue
+		if ($bad -gt 0) { exit 1 }
+		Write-Output "parse: the tour's scripts parse"
+		exit 0
+	}
 	"run" {
 		$done = Join-Path $Dir "done.txt"
 		Remove-Item -Force $done -ErrorAction SilentlyContinue
@@ -310,6 +339,20 @@ public static class Dialogs {
 		$server = $null
 		$port = 0
 		$clientArgs = @()
+		# A tour (828 amended (6)): <Dir>\tour.txt, from remote_shot.sh --tour, names it and its
+		# section (TOUR_ONLY); the server gets its admin console on a free loopback port for the
+		# bot's setup, and the client that port.
+		$tourFile = Join-Path $Dir "tour.txt"
+		$tour = ""
+		$tourOnly = ""
+		$adminPort = 0
+		if ($Joined -and (Test-Path $tourFile)) {
+			foreach ($line in Get-Content $tourFile) {
+				if ($line -match '^tour=([a-z0-9_]+)$') { $tour = $Matches[1] }
+				if ($line -match '^only=([a-z0-9_]*)$') { $tourOnly = $Matches[1] }
+			}
+			if ($tour -eq "") { $result = "tour.txt names no tour: not started" }
+		}
 		# A Windows firewall prompt ("Windows Security Alert"; an English Windows' title) on the
 		# screen: never clicked, it is Jeff's. Said at the start of every run; a joined run
 		# with one showing runs nothing, and one appearing during it stops it.
@@ -326,10 +369,20 @@ public static class Dialogs {
 			New-Item -ItemType Directory -Force $serverData | Out-Null
 			$serverLog = Join-Path $Dir "out\server.log"
 			$serverGiven = @(Get-Content (Join-Path $Dir "server_args.txt") -ErrorAction SilentlyContinue | Where-Object { $_ -ne "" })
+			if ($tour -ne "") {
+				# A free loopback TCP port for the admin console, asked of Windows; main.gd binds it to 127.0.0.1.
+				$probeTcp = New-Object System.Net.Sockets.TcpListener ([System.Net.IPAddress]::Loopback, 0)
+				$probeTcp.Start()
+				$adminPort = $probeTcp.LocalEndpoint.Port
+				$probeTcp.Stop()
+				$serverGiven += "--admin-port=$adminPort"
+			}
 			# A --server refuses to run open; this run's own token, made here and thrown away with
 			# the run: in this runner's environment, which the server and each client inherit, never
 			# on argv (decision 690: any local process reads a command line), in a file or a log.
 			$env:PSYKINETIC_TOKEN = [guid]::NewGuid().ToString("N") + [guid]::NewGuid().ToString("N")
+			# Kept to look for in what comes back (828 amended (6)): no returned file may hold it.
+			$runToken = $env:PSYKINETIC_TOKEN
 			# Its own user data, a fresh world: no state file, nothing of the box's, no player's id.
 			# (The args just above the launch: tools/godot_log_check.py reads 3 lines around it.)
 			$serverArgs = @("--headless", "--audio-driver", "Dummy", "--path", $Root, "--log-file", $serverLog, "--",
@@ -348,6 +401,10 @@ public static class Dialogs {
 				if (((Get-Date) - $serverStart).TotalSeconds -gt 90) { $result = "server never listened (90 s)"; break }
 				# (The log is open in Godot as it writes: a read it refuses is tried again.)
 				$listening = try { (Test-Path $serverLog) -and [bool](Select-String -Path $serverLog -SimpleMatch "[net] server listening on port $port" -Quiet) } catch { $false }
+				# A tour's server is ready once its admin console is on as well (tour.sh's wait).
+				if ($listening -and $tour -ne "") {
+					$listening = try { [bool](Select-String -Path $serverLog -SimpleMatch "[admin] console on 127.0.0.1:$adminPort" -Quiet) } catch { $false }
+				}
 				if (-not $listening) { Start-Sleep -Milliseconds 250 }
 			}
 			$after = [int]((Get-Date) - $serverStart).TotalSeconds
@@ -368,7 +425,13 @@ public static class Dialogs {
 				}
 			}
 			$clientArgs = @("--client", "--address=127.0.0.1", "--port=$port")
+			if ($tour -ne "") {
+				$clientArgs += "--tour-admin=$adminPort"
+				$joinedLines += "tour: $tour$(if ($tourOnly) { ", section $tourOnly" }), admin console on 127.0.0.1:$adminPort"
+			}
 		}
+		# The tour's section in the client's environment (tour.sh's TOUR_ONLY), and no stray one otherwise.
+		if ($tourOnly -ne "") { $env:TOUR_ONLY = $tourOnly } else { Remove-Item Env:TOUR_ONLY -ErrorAction SilentlyContinue }
 		# A joined run whose server didn't come up (or was stopped) runs no game.
 		$blocked = $result -ne ""
 		# The joined socket check's state: the first ephemeral port (Windows' own range), the
@@ -469,6 +532,19 @@ public static class Dialogs {
 		$icon.Visible = $false
 		$icon.Dispose()
 		[Idle]::Release()
+		# No file the run returns holds its token (828 amended (6), the coordinator's condition): each
+		# looked through, and one that holds it removed, failing the run.
+		if ($runToken) {
+			$returned = @(Get-ChildItem -Recurse -File -Path (Join-Path $Dir "out") -ErrorAction SilentlyContinue)
+			$returned += @(Get-Item (Join-Path $Dir "godot.log") -ErrorAction SilentlyContinue)
+			$leaks = @($returned | Where-Object { Select-String -Path $_.FullName -SimpleMatch $runToken -Quiet -ErrorAction SilentlyContinue })
+			if ($leaks) {
+				$leaks | Remove-Item -Force -ErrorAction SilentlyContinue
+				$result = "the run's token was in $(($leaks | ForEach-Object { $_.Name }) -join ', '): removed, the run fails"
+			}
+			$joinedLines += "token: $(if ($leaks) { "FOUND in $(($leaks | ForEach-Object { $_.Name }) -join ', '), removed" } else { "in none of the $($returned.Count) files the run returns" })"
+			$runToken = $null
+		}
 		if ($Joined) {
 			$joinedLines += $(if ($socketLooks -gt 0 -or $socketLine -ne "") { "$socketLine ($socketLooks looks, ephemeral from $low)" } else { "SOCKETS: not looked at (no client ran)" })
 			if ($firewallUnread) { $firewallLine += "; during the run: not checked (the windows could not be listed)" }

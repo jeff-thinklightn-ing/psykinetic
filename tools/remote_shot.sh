@@ -56,14 +56,28 @@
 # out/server.log comes back with the rest. Every run's processes, joined or not,
 # are in a job object that Windows ends with the runner: a tray stop, a timeout,
 # the client's crash or the runner's own end take the server with them.
+# --tour <name> (828 amended (6)): a playtest tour (tests/tour/tours/<name>.gd, at <sha> or
+# sent --with) played by a joined client on the laptop, its window on screen: --joined, and
+# the runner gives the server --regenerate (laid fresh, as the box's) and its admin console on
+# a free loopback port (the bot's setup), and the client tour.sh's own args: tests/tour/tour.tscn
+# (the one test scene a laptop runs, and only so), --name=Tourbot, tour.sh's fixed test player
+# id, --tour-admin=<that port>, --tour-out={out}, --tour-minutes (--tour-minutes N, default 20).
+# The tour's scripts are parsed on the laptop at <sha> first. No godot args of the caller's;
+# --tour-only SECTION sets the tour's TOUR_ONLY, and --server-args may add --test-foe=a,b.
+# One phase: the restart tour (TOUR_PHASES=2) stays on tools/tour.sh. report.md, its stills
+# and both logs come back; report.md's first line is the server's SCRIPT ERROR count.
 set -u
 RUNNER=lenovo
 REPEAT=1
-TIMEOUT=15
+TIMEOUT=""
 WITH=()
 VSYNC=off
 JOINED=0
 SERVER_ARGS=""
+TOUR=""
+TOUR_ONLY=""
+TOUR_MINUTES=""
+DRY=0
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--with) WITH+=("$2"); shift 2 ;;
@@ -73,11 +87,30 @@ while [ $# -gt 0 ]; do
 		--vsync) VSYNC="$2"; shift 2 ;;
 		--joined) JOINED=1; shift ;;
 		--server-args) SERVER_ARGS="$2"; shift 2 ;;
+		--tour) TOUR="$2"; JOINED=1; shift 2 ;;
+		--tour-only) TOUR_ONLY="$2"; shift 2 ;;
+		--tour-minutes) TOUR_MINUTES="$2"; shift 2 ;;
+		# What would be sent (the game's and the server's args, the tour's file), the laptop
+		# untouched: for tests/remote_shot_sockets_test.sh.
+		--dry-run) DRY=1; shift ;;
 		*) break ;;
 	esac
 done
-[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] <sha> <name> -- <godot args>"; exit 2; }
+[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] [--tour NAME [--tour-only SECTION] [--tour-minutes N]] <sha> <name> -- <godot args>"; exit 2; }
 [ -z "$SERVER_ARGS" ] || [ $JOINED -eq 1 ] || { echo "--server-args: only with --joined"; exit 2; }
+if [ -n "$TOUR" ]; then
+	case "$TOUR" in *[!a-z0-9_]*) echo "--tour: a tour's name, a-z, 0-9 and _"; exit 2 ;; esac
+	case "$TOUR_ONLY" in *[!a-z0-9_]*) echo "--tour-only: a section's name, a-z, 0-9 and _"; exit 2 ;; esac
+	TOUR_MINUTES="${TOUR_MINUTES:-20}"
+	case "$TOUR_MINUTES" in [1-9]|[1-5][0-9]|60) ;; *) echo "--tour-minutes: 1 to 60"; exit 2 ;; esac
+	[ "$REPEAT" = 1 ] || { echo "--repeat: not with --tour (one phase; the restart tour stays on tools/tour.sh)"; exit 2; }
+	# The client's own limit (tour.sh's: the tour's watchdog, then 250 s), and the run's past it.
+	TOUR_SECONDS=$((TOUR_MINUTES * 60 + 250))
+	TIMEOUT="${TIMEOUT:-$((TOUR_SECONDS / 60 + 3))}"
+elif [ -n "$TOUR_ONLY$TOUR_MINUTES" ]; then
+	echo "--tour-only, --tour-minutes: only with --tour"; exit 2
+fi
+TIMEOUT="${TIMEOUT:-15}"
 # Each runner: its ssh address, the drive its clone and runs are on, and the
 # shell its ssh server starts (atlas's is PowerShell; every line here is cmd's).
 case "$REPEAT" in [1-5]) ;; *) echo "repeat: 1 to 5"; exit 2 ;; esac
@@ -93,6 +126,13 @@ SHA="$(git rev-parse --verify "$1^{commit}")" || exit 2
 NAME="$2"
 shift 3
 case "$NAME" in *[!A-Za-z0-9_-]*|"") echo "name: letters, digits, _ and - only"; exit 2 ;; esac
+if [ -n "$TOUR" ]; then
+	[ $# -eq 0 ] || { echo "$1: refused (a tour's args come from the runner: --tour-only, --tour-minutes, --server-args)"; exit 2; }
+	tour_file="tests/tour/tours/$TOUR.gd"
+	sent=0
+	for file in "${WITH[@]}"; do [ "$file" -ef "$tour_file" ] && sent=1; done
+	git cat-file -e "$SHA:$tour_file" 2>/dev/null || [ $sent -eq 1 ] || { echo "--tour $TOUR: no $tour_file at $SHA (commit it, or send it --with)"; exit 2; }
+fi
 DIR="$RUNS\\$NAME"
 OUT_FWD="$DRIVE:/psykinetic-runs/$NAME/out"  # Forward slashes: a bash replacement eats backslashes.
 REVIEW="C:/dev/review/$NAME"
@@ -178,6 +218,12 @@ for arg in "$@"; do
 	fi
 	ARGS+=("${arg//\{out\}/$OUT_FWD}")
 done
+if [ -n "$TOUR" ]; then
+	# tour.sh's client (828 amended (6)), the runner adding the mode, address, port and --tour-admin.
+	ARGS=(--scene res://tests/tour/tour.tscn -- --name=Tourbot --player-id=70a70000-0000-4000-8000-000000000001
+		"--tour=$TOUR" "--tour-out=$OUT_FWD" "--tour-minutes=$TOUR_MINUTES" "--test-exit-after=$TOUR_SECONDS" --tour-phase=1)
+	dashed=1
+fi
 [ $dashed -eq 1 ] || ARGS+=("--")
 # No mode named: a fresh settings file joins 127.0.0.1 as a client, finds no server and waits
 # behind the connect screen, so a bench times that screen and a shot finds no player (11-10).
@@ -200,9 +246,25 @@ if [ $JOINED -eq 1 ]; then
 		case "$arg" in
 			--hour=*|--map=*|--day-minutes=*|--weather=*|--season=*|--season-days=*|--max-players=*|--no-companions|--still-monsters)
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
-			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters)"; exit 2 ;;
+			# A tour's foe beside the player (828 amended (6)): under --tour only.
+			--test-foe=*)
+				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
+				case "${arg#--test-foe=}" in *[!a-z0-9_,]*|"") echo "--server-args $arg: refused (a foe and a weapon, a-z, 0-9, _ and ,)"; exit 2 ;; esac
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
 		esac
 	done
+	# A tour's server is laid as the box's is (tour.sh's --regenerate).
+	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" >>"$TMP/server_args.txt"
+	# The tour's own file for the runner (its section): the runner starts the admin console when it is there.
+	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\n' "$TOUR" "$TOUR_ONLY" >"$TMP/tour.txt"
+fi
+if [ $DRY -eq 1 ]; then
+	for file in args server_args tour; do
+		[ -f "$TMP/$file.txt" ] && sed "s/^/$file: /" "$TMP/$file.txt"
+	done
+	echo "timeout: $TIMEOUT min"
+	exit 0
 fi
 
 rsh "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
@@ -265,6 +327,11 @@ for i in "${!WITH[@]}"; do
 	"${SCP[@]}" "$file" "$HOST:$to" || { echo "--with $file: not copied"; exit 1; }
 done
 rps -Mode import -TimeoutMin 20 || { echo "import failed"; exit 1; }
+# A tour's scripts parsed there first, at <sha> (tour.sh's check): one that will not load leaves
+# the client with nothing to quit it.
+if [ -n "$TOUR" ]; then
+	rps -Mode parse -Dir "$TOUR" -TimeoutMin 5 || { echo "--tour $TOUR: its scripts do not parse at $SHA; nothing run"; exit 1; }
+fi
 
 # 2. The run, in the logged-on session.
 # (cmd: the parentheses keep the mkdir out of the if's body.)
@@ -277,6 +344,7 @@ trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; rsh "if exist $DIR rm
 joined_flag=""
 if [ $JOINED -eq 1 ]; then
 	"${SCP[@]}" "$TMP/server_args.txt" "$HOST:$(fwd "$DIR")/server_args.txt" || exit 1
+	[ -z "$TOUR" ] || "${SCP[@]}" "$TMP/tour.txt" "$HOST:$(fwd "$DIR")/tour.txt" || exit 1
 	joined_flag=" -Joined"
 fi
 # (2>nul: schtasks warns that /ST 00:00 is past; the task is run at once by /run.)
@@ -311,6 +379,19 @@ if [ $JOINED -eq 1 ]; then
 	grep -h "^joined\|^server" "$REVIEW/runner.log" 2>/dev/null
 	if ! grep -q "\[net\] connected as peer" "$REVIEW/godot.log" 2>/dev/null; then
 		echo "remote_shot: the joined client never connected to its server: its stills are void"; exit 1
+	fi
+	# A tour (828 amended (6)): report.md opens with the server's SCRIPT ERROR count (the
+	# coordinator's condition; a joined report reads that first), and its lines are said here.
+	if [ -n "$TOUR" ]; then
+		errors="$(grep -c "SCRIPT ERROR" "$REVIEW/server.log" 2>/dev/null)"
+		if [ -f "$REVIEW/report.md" ]; then
+			{ printf 'server SCRIPT ERRORs: %s (out/server.log)\n\n' "${errors:-unread}"; cat "$REVIEW/report.md"; } >"$TMP/report.md"
+			mv "$TMP/report.md" "$REVIEW/report.md"
+		else
+			echo "remote_shot: the tour wrote no report.md"
+		fi
+		echo "server SCRIPT ERRORs: ${errors:-unread}"
+		grep -hE "^\[tour\]|^RESULT" "$REVIEW/godot.log" 2>/dev/null | tail -40
 	fi
 # A game that joined as a client and never hosted, unless --client was asked: no level of its own,
 # the connect screen over whatever it drew; its numbers and stills are void (828 amended (2)).
