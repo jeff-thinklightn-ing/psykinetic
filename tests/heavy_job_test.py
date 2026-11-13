@@ -1797,6 +1797,71 @@ started = [line for line in open(gate._path("heavy_jobs.log")).read().splitlines
 check(took == 0 and len(started) == 1 and "free RAM 30.0 GB, commit 40.0 GB; owed RAM" in started[0],
     "a start line carries the free memory its decision read and what was owed (%s)" % started[:1])
 clear_gate()
+
+print("\n== a queued take whose asker died is dropped (394 amended (44)) ==")
+# 11-12: environment's landing script was stopped at about 23:30; its waiter held
+# its place 11,451 s, reached the head at 01:51 and handed the turn to nobody.
+
+
+def sleeper():
+    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+
+
+asker = sleeper()
+gone = subprocess.Popen([sys.executable, "-c", "pass"])
+gone.wait()
+check(gate.asker_of(None, None) is None and gate.asker_of(None, os.getpid()) is None
+    and gate.asker_of(asker.pid, asker.pid) is None and gate.asker_of(None, gone.pid) is None
+    and gate.asker_of(None, asker.pid) == asker.pid and gate.asker_of(os.getpid(), str(asker.pid)) == asker.pid,
+    "asker_of: the caller when it lives and is neither the take's pid nor the waiter; none for a dead one")
+# Queued behind another: dropped once its asker dies, with a line saying so.
+gate._write(gate._path("queue", "%019d-ahead-%d.json" % (time.time_ns(), os.getpid())), {"tree": "ahead", "kind": "suite",
+    "pid": None, "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+gate._write(gate._path("queue", "%019d-asked-%d.json" % (time.time_ns(), os.getpid())), {"tree": "asked", "kind": "suite",
+    "pid": None, "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time(),
+    "asker": asker.pid, "asker_since": gate.started_at(asker.pid)})
+check(trees("queue") == ["ahead", "asked"], "a row whose asker lives is kept (%s)" % trees("queue"))
+before = len(open(gate._path("heavy_jobs.log")).read().splitlines())
+asker.kill()
+asker.wait()
+check(trees("queue") == ["ahead"], "its asker gone, the row is dropped; the one ahead stays (%s)" % trees("queue"))
+dropped = [line for line in open(gate._path("heavy_jobs.log")).read().splitlines()[before:] if "\tstale\t" in line]
+check(len(dropped) == 1 and "asked" in dropped[0] and "its asker, pid %d, is gone" % asker.pid in dropped[0],
+    "the log says whose and why (%s)" % dropped)
+clear_gate()
+# A real take at the head, waiting on memory: its asker dies, it leaves (3) and never starts, even once there is room.
+gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=50.0, commit_gb=1.0)})
+gate._memory = lambda: (30.0, 40.0)
+asker = sleeper()
+ended = []
+
+
+def asked_take():
+    try:
+        ended.append(gate.take("headed", "scene", None, caller=asker.pid))
+    except SystemExit as stop:
+        ended.append(stop.code)
+
+
+said = io.StringIO()
+with contextlib.redirect_stderr(said):
+    waiting = threading.Thread(target=asked_take, daemon=True)
+    waiting.start()
+    until(lambda: trees("queue") == ["headed"])
+    rows = gate._entries("queue")
+    row = rows[0] if rows else {}
+    time.sleep(0.5)
+    check(trees("queue") == ["headed"] and row.get("asker") == asker.pid and row.get("asker_since") is not None
+        and not ended, "a take at the head, no room: it waits, its row naming its asker (%s)" % row)
+    asker.kill()
+    asker.wait()
+    gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=2.0, commit_gb=1.0)})
+    waiting.join(10)
+check(ended == [3] and not trees("queue") and "headed" not in trees("running"),
+    "its asker gone: it leaves with 3, nothing started though there is room now (%s)" % ended)
+check("the script that asked for it, pid %d, is gone" % asker.pid in said.getvalue(),
+    "and says why (%s)" % said.getvalue().strip()[-200:])
+clear_gate()
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved_kinds is not None:

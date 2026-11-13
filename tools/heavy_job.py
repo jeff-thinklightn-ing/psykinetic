@@ -190,7 +190,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 39  # 40: a head's due time counts the rows ahead of it.
+GATE_REVISION = 40  # 44: a queued take whose asker died is dropped.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -1628,6 +1628,10 @@ def _entries(folder):
         stale = stale or entry.get("queued", booted) < booted  # From before a reboot.
         if folder == "queue" and entry.get("waiter"):
             stale = stale or not alive(entry["waiter"], entry.get("waiter_since"))
+        # A take's asker (394 amended (44)): the script that asked, whose
+        # waiter may outlive it; with it gone nobody would use the turn.
+        gone = folder == "queue" and not stale and asker_gone(entry)
+        stale = stale or gone
         # A real adoption (a run of land.sh's, alive) shields a take; the guard
         # (394 amended (37)), its holder named as adopter for older code's
         # check, does not: here the beats decide.
@@ -1637,7 +1641,9 @@ def _entries(folder):
             stale = stale or time.time() - held_since > TAKE_STALE_SECONDS
         if stale:
             os.remove(_path(folder, name))
-            log("stale", entry["tree"], entry["kind"], "%s dropped" % folder)
+            log("stale", entry["tree"], entry["kind"], "%s dropped%s" % (folder,
+                ": its asker, pid %s, is gone (394 amended (44)); waiter pid %s" % (entry["asker"], entry.get("waiter"))
+                if gone else ""))
             continue
         if folder == "running" and not entry.get("watched") and measure_attached(entry):
             _write(_path(folder, name), entry)
@@ -1740,6 +1746,28 @@ def _note_odd(folder, entries):
         _write(_path(NOTED_FILE), {key: when for key, when in noted.items() if when > day})
 
 
+def asker_of(pid, caller):
+    """A take's asker (394 amended (44)): heavy_job.sh's --caller, the script
+    that ran `take` and waits on it, when that is a live process other than
+    its --pid (whose own death drops the row already) and this waiter. Killing
+    that script on Windows leaves heavy_job.sh and this waiter running:
+    environment's landing script was stopped at about 23:30 on 11-12 and its
+    waiter held its place 11,451 s, reached the head at 01:51 and handed the
+    turn to nobody. None for a run (its waiter runs the command itself) or a
+    caller that isn't a live process (Git Bash's own id, say)."""
+    if not caller:
+        return None
+    caller = int(caller)
+    if caller == os.getpid() or (pid and caller == int(pid)) or not alive(caller):
+        return None
+    return caller
+
+
+def asker_gone(entry):
+    """Whether [entry], a queue row, names an asker that has died."""
+    return bool(entry.get("asker")) and not alive(entry["asker"], entry.get("asker_since"))
+
+
 def guard_holder(pid, caller):
     """The process a take's guard names (394 amended (37)): its --pid, else
     its caller's (heavy_job.sh passes the shell that ran it: `take` itself
@@ -1829,11 +1857,15 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         # "waiter": this wrapper, which waits for the turn; a take's pid (its
         # holder) may be none, and a queue file whose waiter died is dropped.
         # "expect_s": its --expect, for those behind it to judge its length
-        # by (backfill_length, 394 amended (28)).
+        # by (backfill_length, 394 amended (28)). "asker": a take's caller
+        # (394 amended (44)), whose death drops the row.
+        asker = asker_of(pid, caller) if not watched else None
+        asker_since = started_at(asker) if asker else None
         _write(_path("queue", ticket), dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
             "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued,
             "gate": GATE_REVISION, "checkout": CHECKOUT, "lock_rule": LOCK_RULE},
-            **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {})))
+            **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {}),
+            **({"asker": asker, "asker_since": asker_since} if asker else {})))
     said = 0.0
     long_logged = False
     # Since when only backfilled jobs have kept this one out (394 amended
@@ -1856,9 +1888,12 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
             free_gpu, _ = gpu_gb() if row["gpu"] else (None, None)
             if not any(each["file"] == ticket for each in queue):
                 # Dropped as stale: its pid is no live Windows process (Git
-                # Bash's $$ is not one), so it would wait forever.
-                print("heavy_job: %s %s: its place in the queue was dropped (pid %s is no live process); not waiting" % (
-                    tree, kind, pid), file=sys.stderr)
+                # Bash's $$ is not one), so it would wait forever; or the
+                # script that asked for the take has died (394 amended (44)).
+                why = ("the script that asked for it, pid %s, is gone" % asker if asker and not alive(asker, asker_since)
+                    else "pid %s is no live process" % pid)
+                print("heavy_job: %s %s: its place in the queue was dropped (%s); not waiting" % (
+                    tree, kind, why), file=sys.stderr)
                 raise SystemExit(3)
             place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
             table = kinds()

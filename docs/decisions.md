@@ -10790,6 +10790,26 @@ start line's memory. The gate's decisions are unchanged (no GATE_REVISION change
 live queue (30 rows, memory fixed), main's code against this, differs only in the old-gate lines' wording ("of main's
 38"). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (44): a queued take whose asker died is dropped (the coordinator's case and ranking, 2026-11-13; the
+label from tools/decision_number.sh). Environment's landing task was stopped for low memory at about 23:30 on 11-12;
+its gate waiter (envfire suite_remote) lived on, held its place 11,451 s, reached the head at 01:51 ("starts after
+waiting") and ended with nothing behind it: no land log, no lock take, nothing pushed, the turn handed to nobody. A
+take's row named its waiter and its --pid, not the script that asked: on Windows, killing that script's bash leaves
+heavy_job.sh and the python waiter running, alive by every check the gate made.
+- The row names its asker (asker, asker_since): heavy_job.sh's --caller (394 amended (37)), the shell that ran `take`
+  and waits on it, when it is a live process other than the take's --pid and the waiter (asker_of). A run names
+  none: its waiter runs the command itself.
+- Any waiter's look drops a queue row whose asker has died, as it drops one whose waiter has ("stale ... queue
+  dropped: its asker, pid N, is gone"); the take's own waiter, finding its row gone, leaves with 3 and says why.
+  Every look is a beat and the turn is decided in the look that finds it, so a dead asker's take never starts.
+- GATE_REVISION 40: older code keeps such a row; a waiter on this code drops it.
+heavy_job_test: asker_of's cases; a row queued behind another kept while its asker lives and dropped once it dies, with
+its log line; a real take at the head waiting on memory, its asker killed, leaving with 3 and starting nothing once
+there is room. Through the shell (a private queue folder): a bash script's `sh tools/heavy_job.sh take` behind a held
+bench names that bash as its asker; the bash killed by its pid, its waiter gone within a second and the row dropped.
+status over a stripped copy of the live queue (24 rows), the base's code against this: no line differs. Tools and
+tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
