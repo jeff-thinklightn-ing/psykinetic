@@ -84,7 +84,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   changed: of the four takes that failed their landing for a real fault on 11-10 and 11-11, two
   had not run the failing test (a slot count raised from 22 to 27 with two tests hard-coding 22),
   one met a broken main and one a true clash with another tree's new check
-  (`C:/dev/review/perf/flakes.md`).
+  (`C:/dev/review/perf/flakes.md`). Also run `bash tests/land.sh --checks` (`land.ps1 -Checks`)
+  on the rebased take before you queue (278 amended (5)): the checks a landing makes before the
+  gate (the CHANGELOG's bullets, Godot launches' logs, the voice inventory), with no lock and no Godot,
+  in seconds; it prints `LANDING CHECKS: PASS` or `FAIL (why)`, and a FAIL there would have
+  failed your landing after its wait in the queue.
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `kind=$(bash tools/remote_tests.sh kind)`,
   `sh tools/heavy_job.sh take <tree> $kind`
