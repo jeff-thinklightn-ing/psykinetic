@@ -92,6 +92,7 @@ func _ready() -> void:
 	await _test_throne_way_held()
 	await _test_throne_home()
 	_test_barrow_quest()
+	await _test_knights_altar()
 	_test_quest_card_place()
 	_test_decor()
 	_test_barrow_level()
@@ -6006,6 +6007,28 @@ func _test_barrow_quest() -> void:
 	var over_the_dead: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
 	_check(over_the_dead["ok"] and _main.barrow_quest_of(id) == "ready" and ids.call() == ["turn_in"] and bool(player.quest.get("ready", false)),
 		"taken over the whole band felled first: straight to ready, the turn-in offered (747 amended (8))")
+	# 896 ("full circle"): the altar step on, the turn-in goes on to his remains, laid by his row.
+	_drop_relics(player)  # An earlier case's remains (714 amended (3)) are not his to lay here.
+	_main.altar_turn_in = true
+	var revealed: Dictionary = knight.accept_offer(player, {"id": "quest:%d:turn_in" % knight.id}, 0)
+	_check(revealed["ok"] and _main.barrow_quest_of(id) == "altar" and not (Main.QUEST_DONE in record.marks) and ids.call() == ["await"]
+		and player.quest.get("items", []) == [{"name": Main.ALTAR_STEP, "done": false}] and not bool(player.quest.get("ready", true))
+		and str(knight.offers_for(id)[0]["words"]) == AstralKnight.AWAIT,
+		"altar on, turned in: not yet done, the card's one step to the altar, his words that the remains wait (%s)" % [player.quest])
+	slay.call(band[2], player)
+	_check(not record.barrow_task.has("slain"), "a robber felled after the turn-in counts nowhere (%s)" % [record.barrow_task])
+	var relic := World.mint_relic(sir if not sir.is_empty() else "Sir Test", 0, player)
+	World.into_pack(player, relic)
+	_main._sync_quest(record)
+	_check(_main.barrow_quest_of(id) == "carried" and ids.call() == ["lay"] and bool(player.quest.get("ready", false))
+		and str(knight.offers_for(id)[0]["title"]) == AstralKnight.LAY_TITLE,
+		"his remains in the pack: carried, his row to lay them, the card ready (%s)" % [ids.call()])
+	var laid: Dictionary = knight.accept_offer(player, {"id": "quest:%d:lay" % knight.id}, 0)
+	_check(laid["ok"] and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty()
+		and _main.knights_relic_slot(player) < 0 and str(knight.offers_for(id)[0]["words"]) == AstralKnight.DONE_LAID
+		and knight.remains_laid and knight.spawn_spec["props"].get("remains_laid") == true,
+		"laid by his row: the remains gone from the pack, the quest done, the card closed, his thanks after (%s)" % [laid])
+	_main.altar_turn_in = false
 	_main.reset_barrow(id)
 	World.despawn(knight)
 	for slot in player.slots.size():
@@ -6835,3 +6858,59 @@ func _test_throne_home() -> void:
 		World.enter(was)
 	_main.throne_home = kept_switch
 	_main.load_map("test_room")
+
+
+## The knight's altar in the barrow itself (896, "full circle"): the bier
+## he stands by is the First Hall's (38-40 by 8-9); off, a click on it lays
+## nothing; on, from beside it with his remains, it is laid there and the
+## quest is done.
+func _test_knights_altar() -> void:
+	print("\n== the knight's altar: his remains laid on the First Hall's bier (896) ==")
+	var player := _player()
+	var id := player.player_id
+	var record: PlayerRecord = _main._records.get(id)
+	if record == null:
+		_check(false, "no record for the test player")
+		return
+	var kept := {"marks": record.marks.duplicate(), "task": record.barrow_task.duplicate(true)}
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow", "")
+	await get_tree().process_frame
+	player = _player()
+	var bier: Rect2i = _main.knights_altar("barrow")
+	var knight: AstralKnight = null
+	for entity in World.get_entities():
+		if entity is AstralKnight:
+			knight = entity
+	var was_laid := knight != null and knight.remains_laid
+	_check(bier == Rect2i(38, 8, 3, 2), "the altar is the bier the knight stands by, 38-40 by 8-9 (%s)" % [bier])
+	_main.mark_player(id, Main.QUEST_DONE, false)
+	record.barrow_task = {"taken": true, "step": "altar"}
+	var sir: String = _main.barrow_knight()
+	_drop_relics(player)
+	var relic := World.mint_relic(sir if not sir.is_empty() else "Sir Test", 0, player)
+	World.into_pack(player, relic)
+	var beside: Vector2i = _main.altar_beside(bier, player.tile)
+	_check(beside != Main.NONE and not bier.has_point(beside) and World.is_walkable(beside), "a free cell beside the bier to stand on (%s)" % [beside])
+	_put(player, beside)
+	_main.altar_turn_in = false
+	_main._on_command(player, "altar", {"at": [38, 8]})
+	_check(_main.knights_relic_slot(player) >= 0 and not (Main.QUEST_DONE in record.marks), "off: a click on the bier lays nothing")
+	_main.altar_turn_in = true
+	_main._on_command(player, "altar", {"at": [38, 8]})
+	_check(_main.knights_relic_slot(player) < 0 and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty(),
+		"on, from beside it with his remains: laid, the quest done, the card closed (%s, %s)" % [beside, record.barrow_task])
+	_check(not was_laid and knight != null and knight.remains_laid, "and his remains lie on the bier for the generation (remains_laid, for art-kit's piece)")
+	_main.altar_turn_in = false
+	record.marks.assign(kept["marks"])
+	record.barrow_task = kept["task"]
+	_main._sync_quest(record)
+	_main.load_map("test_room")
+
+
+## Every relic off [param player] (896's cases): only the one a case mints is theirs to lay.
+func _drop_relics(player: Player) -> void:
+	for slot in player.slots.size():
+		var uid := World.slot_uid(player, slot)
+		if not World.relic_of(uid).is_empty():
+			World.consume(player, uid, "test")

@@ -23,6 +23,23 @@ const TURN_IN_TITLE := "The robbers are put down"
 const TURN_IN_WORDS := "The Mound-breakers are put down."
 const REVEALED := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest."
 const DONE := "The way below is open to you. My remains wait in the Hall of Fallen Souls."
+## The altar step (896, "full circle", voice's words; no new fact of
+## the world, the coordinator): with Main.altar_turn_in on (altar_on), his
+## reveal sends the remains back to this hall's altar, not to Aldous; a
+## player without them hears AWAIT, one carrying them is asked to lay them
+## (LAY_TITLE, the coordinator's words), and once laid he thanks them.
+const REVEALED_ALTAR := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this altar, and let me rest."
+const AWAIT := "My remains wait in the Hall of Fallen Souls. Bring them here, to this altar."
+const LAY_TITLE := "Lay my remains on the altar"
+const LAY_WORDS := "You carry my bones. Lay them here, on the altar."
+const LAID := "I am home. Thank you."
+const DONE_LAID := "My bones are home. Go well."
+## Main.altar_turn_in's mirror (its setter): the altar step on.
+static var altar_on := false
+## His remains laid on his altar this generation, by anyone (896): art-kit's
+## piece lies on the bier while it is true. Kept in his spawn props, so a
+## restart keeps it and a new generation (a new spawn) clears it.
+var remains_laid := false
 ## A quest offer's accept that takes nothing (747 amended (5)): his words
 ## alone, ui's window closing on its one button.
 const WORDS_ONLY := "none"
@@ -33,6 +50,8 @@ func _ready() -> void:
 	talks = true
 	acts = false
 	body_material = BodyMaterial.STONE  # Not flesh: no blow lands (World.damage's is_breakable).
+	replicate("remains_laid")  # 896: for the remains on the bier.
+	remains_laid = bool((spawn_spec.get("props", {}) as Dictionary).get("remains_laid", false))
 	if Net.is_authority():
 		peaceable = true
 
@@ -57,9 +76,10 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var at := _quest(player_id)
 	var step: Array = {"ask": [":ask", ASK_TITLE, ask_words(), "take"], "open": [":not_yet", NOT_YET_TITLE, NOT_YET, "take"],
-		"ready": [":turn_in", TURN_IN_TITLE, TURN_IN_WORDS, "take"]}.get(at, [])
+		"ready": [":turn_in", TURN_IN_TITLE, TURN_IN_WORDS, "take"], "altar": [":await", "", AWAIT, WORDS_ONLY],
+		"carried": [":lay", LAY_TITLE, LAY_WORDS, "take"]}.get(at, [])
 	if step.is_empty() and at.is_empty() and _quest_known(player_id):
-		step = [":done", "", DONE, WORDS_ONLY]
+		step = [":done", "", DONE_LAID if altar_on else DONE, WORDS_ONLY]
 	if not step.is_empty():
 		out.append({"id": "quest:%d%s" % [id, step[0]], "kind": "deal", "title": step[1], "words": step[2],
 			"what": {"level": "quest", "steps": []}, "accept": step[3], "cost": 0})
@@ -75,13 +95,25 @@ func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 	if offer_id.ends_with(":ask") and at == "ask" and _quest_step(player.player_id, "take"):
 		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name,
 			"you_line": "You take up the fallen knight's task."}
+	if offer_id.ends_with(":lay") and at == "carried" and _quest_step(player.player_id, "lay"):
+		said.emit(LAID)  # 896: his remains on the altar, the same as a click on it.
+		return {"ok": true, "say": "", "line": "%s lays %s remains on the altar." % [player.name, whose()],
+			"you_line": "You lay %s remains on the altar." % whose()}
 	if offer_id.ends_with(":turn_in") and at == "ready" and _quest_step(player.player_id, "turn_in"):
-		said.emit(REVEALED)
+		said.emit(REVEALED_ALTAR if altar_on else REVEALED)
 		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % player.name,
 			"you_line": "You have proven your strength to the fallen knight."}
 	if at == "":
-		return {"ok": false, "say": DONE, "line": ""}
+		return {"ok": false, "say": DONE_LAID if altar_on else DONE, "line": ""}
+	if at == "altar":
+		return {"ok": false, "say": AWAIT, "line": ""}
 	return {"ok": false, "say": NOT_YET if at == "open" else "", "line": ""}
+
+
+## His remains are laid on his altar (896, Main._lay_remains): kept for the generation.
+func lay_remains() -> void:
+	remains_laid = true
+	_keep_prop("remains_laid", true)
 
 
 ## Rest words for a greeting with nothing to offer (Main's _monster_greeted):
@@ -91,7 +123,7 @@ func resting() -> bool:
 
 
 func rest_words() -> String:
-	return DONE
+	return DONE_LAID if altar_on else DONE
 
 
 ## His ask, naming him: the knight barrow_deep's generation keeps
@@ -99,6 +131,13 @@ func rest_words() -> String:
 func ask_words() -> String:
 	var knight := str(Offers._call(Offers.ctx, "barrow_knight")) if Offers.ctx.has("barrow_knight") else ""
 	return ASK_UNNAMED if knight.is_empty() or knight == "<null>" else ASK_WORDS % knight
+
+
+## Whose remains, for the party lines (voice): his name's, as ASK_WORDS
+## names him, "the knight's" before a generation names one (ASK_UNNAMED).
+static func whose() -> String:
+	var knight := str(Offers._call(Offers.ctx, "barrow_knight")) if Offers.ctx.has("barrow_knight") else ""
+	return "the knight's" if knight.is_empty() or knight == "<null>" else "%s's" % knight
 
 
 func _quest(player_id: String) -> String:

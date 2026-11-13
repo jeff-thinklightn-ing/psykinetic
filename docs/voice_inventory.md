@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2891)
+## Lines in the code (2903)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -2083,7 +2083,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (748)
+### server and windows (752)
 
 | | Line | Where |
 |---|---|---|
@@ -2295,6 +2295,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | The hall's door opens. | `main.gd` _hold_hall_door() |
 |  | The way is shut until the fight is done. | `main.gd` HALL_WAY_HELD |
 |  | The throne is still his. | `main.gd` THRONE_HIS |
+|  | Bring his remains to the altar | `main.gd` ALTAR_STEP |
+|  | You lay %s remains on the altar. | `main.gd` _knight_thanks() |
+|  | %s lays %s remains on the altar. | `main.gd` _knight_thanks() |
+|  | laid on the knight's altar | `main.gd` _lay_remains() |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
 |  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |
@@ -2865,7 +2869,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
-### the fallen knight (12)
+### the fallen knight (20)
 
 | | Line | Where |
 |---|---|---|
@@ -2877,8 +2881,16 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | The Mound-breakers are put down. | `sim/astral_knight.gd` TURN_IN_WORDS |
 | L | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |
 | L | The way below is open to you. My remains wait in the Hall of Fallen Souls. | `sim/astral_knight.gd` DONE |
+|  | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this altar, and let me rest. | `sim/astral_knight.gd` REVEALED_ALTAR |
+|  | My remains wait in the Hall of Fallen Souls. Bring them here, to this altar. | `sim/astral_knight.gd` AWAIT |
+|  | Lay my remains on the altar | `sim/astral_knight.gd` LAY_TITLE |
+|  | You carry my bones. Lay them here, on the altar. | `sim/astral_knight.gd` LAY_WORDS |
+|  | I am home. Thank you. | `sim/astral_knight.gd` LAID |
+|  | My bones are home. Go well. | `sim/astral_knight.gd` DONE_LAID |
 |  | %s takes up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | You take up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
+|  | %s lays %s remains on the altar. | `sim/astral_knight.gd` accept_offer() |
+|  | You lay %s remains on the altar. | `sim/astral_knight.gd` accept_offer() |
 |  | %s has proven their strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
 |  | You have proven your strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
 

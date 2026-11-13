@@ -1375,6 +1375,7 @@ func _process(delta: float) -> void:
 	_update_pack()
 	_update_cast()
 	_update_throne()
+	_update_altar()
 	_update_talk()
 	_update_deal()
 	_update_find()
@@ -1677,6 +1678,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _throne_click(player, tile):
 		return  # 896: the draugr's throne, walked to and sat on.
+	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _altar_click(player, tile):
+		return  # 896: the knight's altar, walked to and his remains laid.
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
 		return
@@ -2278,6 +2281,8 @@ func _tap_e(player: Player) -> void:
 		return
 	if target == null and _throne_click(player, _mouse_tile()):
 		return  # 896: the draugr's throne, walked to and sat on.
+	if target == null and _altar_click(player, _mouse_tile()):
+		return  # 896: the knight's altar, walked to and his remains laid.
 	# 825: a hearth under the cursor, from on it or beside it, lit (or its burn renewed).
 	var hearth := _mouse_tile()
 	if World.is_hearth(hearth) and maxi(absi(player.tile.x - hearth.x), absi(player.tile.y - hearth.y)) <= 1:
@@ -2827,6 +2832,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
 	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
+	_altar_wanted = NONE  # 896: and a far altar (_altar_click).
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -11048,6 +11054,11 @@ func barrow_quest_of(player_id: String) -> String:
 		return ""
 	if not bool(record.barrow_task.get("taken", false)):
 		return "ask"
+	if str(record.barrow_task.get("step", "")) == "altar":
+		# 896: the band put down, his remains to lay on the altar: "carried"
+		# while they hold them, else "altar".
+		var player: Player = _players.get(_peer_of(player_id))
+		return "carried" if is_instance_valid(player) and knights_relic_slot(player) >= 0 else "altar"
 	return "ready" if _quest_left(record).is_empty() else "open"
 
 
@@ -11082,9 +11093,14 @@ func barrow_quest_step(player_id: String, step: String) -> bool:
 		# 747 amended (8) (the coordinator): the band this player, or their
 		# companion, felled in this generation before the taking counts at it.
 		record.barrow_task = {"taken": true, "slain": _band_slain_by(player_id)}
+	elif step == "turn_in" and at == "ready" and altar_turn_in:
+		record.barrow_task = {"taken": true, "step": "altar"}  # 896: the quest goes on to the altar.
 	elif step == "turn_in" and at == "ready":
 		mark_player(player_id, QUEST_DONE)
 		record.barrow_task = {}
+	elif step == "lay" and at == "carried":
+		if not _lay_remains(_players.get(_peer_of(player_id))):
+			return false
 	else:
 		return false
 	_sync_quest(record)
@@ -11106,7 +11122,7 @@ func _quest_credit(entity: GridEntity, _cause: StringName) -> void:
 		_give_camp_key(id, entity.tile)
 	_note_band_slain(entity.zone, named, id)
 	var record: PlayerRecord = _records.get(id)
-	if record == null or barrow_quest_of(id) == "" or not bool(record.barrow_task.get("taken", false)):
+	if record == null or barrow_quest_of(id) == "" or not bool(record.barrow_task.get("taken", false)) or record.barrow_task.has("step"):
 		return
 	var slain: Array = record.barrow_task.get("slain", [])
 	if named in slain:
@@ -11183,7 +11199,11 @@ func _sync_quest(record: PlayerRecord) -> void:
 	if not is_instance_valid(player):
 		return
 	var quest := {}
-	if bool(record.barrow_task.get("taken", false)) and barrow_quest_of(record.player_id) != "":
+	var at := barrow_quest_of(record.player_id)
+	if at in ["altar", "carried"]:
+		quest = {"title": QUEST_TITLE, "giver": QUEST_GIVER, "items": [{"name": ALTAR_STEP, "done": false}],
+			"ready": at == "carried", "zones": quest_zones()}  # 896: his remains to the altar, then closed.
+	elif bool(record.barrow_task.get("taken", false)) and at != "":
 		var slain: Array = record.barrow_task.get("slain", [])
 		var items: Array = []
 		for id: String in _quest_band():
@@ -11500,6 +11520,116 @@ func _throne_tick() -> void:
 		var player: Player = _players.get(peer)
 		if not is_instance_valid(player) or player.tile != _told_throne[peer]:
 			_told_throne.erase(peer)
+
+
+## The knight's quest ends at the altar (896, "full circle"; Jeff,
+## 2026-11-12: "the quest should be turned back to the knight by placing the
+## remains on the altar in the crypt. thats full circle"; the coordinator's
+## rulings): with altar_turn_in on, the knight's turn-in (the band put down)
+## no longer ends his quest: it goes on to a step, ALTAR_STEP on his card,
+## until the player lays his remains (the generation knight's relic, 714,
+## won from the draugr at any tier) on the altar he stands by, the First
+## Hall's bier (knights_altar; Jeff's "the actual altar", 747 amended (8)):
+## a click or E on the bier ("altar" command), or the knight's own row
+## (AstralKnight's ":lay", which does the same). The relic is consumed, the
+## quest marked done (QUEST_DONE), the knight's thanks said. Each player
+## lays their own. What charges the amulet is Jeff's to say: altar_charges
+## (off) calls charge_from_relic here, as Aldous's row does (left as it is
+## until he answers). Off until the package is whole (dungeon switches it on).
+var altar_turn_in := false:
+	set(on):
+		altar_turn_in = on
+		AstralKnight.altar_on = on  # His words follow it.
+## Whether the altar charges the amulet by the relic's tier (Jeff's open
+## question; Aldous's _relic_returned the other place it may happen).
+var altar_charges := false
+const ALTAR_SLOT := "building.burial_table"
+## The card's step (the coordinator's words).
+const ALTAR_STEP := "Bring his remains to the altar"
+
+
+## The bier the fallen knight stands by in zone [param zone_name] (896):
+## the burial table nearest him, within two cells; an empty rect if he is
+## not here or stands by none. The zone is the one entered (or the view's).
+func knights_altar(zone_name: String) -> Rect2i:
+	var knight: GridEntity = null
+	for entity in World.get_entities():
+		if entity is AstralKnight and entity.spawned:
+			knight = entity
+	if knight == null:
+		return Rect2i()
+	var best := Rect2i()
+	var near := 3
+	for building: Dictionary in _zone_level(zone_name).get("buildings", []):
+		if str(building.get("slot", "")) != ALTAR_SLOT:
+			continue
+		var rect: Rect2i = building["rect"]
+		var far := maxi(maxi(rect.position.x - knight.tile.x, knight.tile.x - rect.end.x + 1),
+				maxi(rect.position.y - knight.tile.y, knight.tile.y - rect.end.y + 1))
+		if far < near:
+			near = far
+			best = rect
+	return best
+
+
+## The slot of [param player]'s pack holding the remains of this
+## generation's knight (barrow_knight; any knight's before the first
+## generation names one), -1 for none.
+func knights_relic_slot(player: Player) -> int:
+	var knight := barrow_knight()
+	for slot in player.slots.size():
+		var relic := World.relic_of(World.slot_uid(player, slot))
+		if not relic.is_empty() and (knight.is_empty() or str(relic.get("knight", "")) == knight):
+			return slot
+	return -1
+
+
+## [param player] lays the knight's remains by a click or E on his altar
+## (the "altar" command, 896): beside it, the altar step theirs and his
+## remains on them.
+func _altar_asked(player: Player, at: Vector2i) -> void:
+	if not altar_turn_in or not _beside_rect(player.tile, knights_altar(player.zone)) or not knights_altar(player.zone).has_point(at):
+		return
+	if barrow_quest_of(player.player_id) != "carried":
+		return
+	if barrow_quest_step(player.player_id, "lay"):
+		_knight_thanks(player)
+
+
+## The knight's thanks for [param player]'s laying, said as his (the
+## AstralKnight's said signal, Main's talking-monster line) and the party
+## line of it.
+func _knight_thanks(player: Player) -> void:
+	for entity in World.get_entities():
+		if entity is AstralKnight:
+			(entity as AstralKnight).said.emit(AstralKnight.LAID)
+	say_to_pair(player.owner_peer, "You lay %s remains on the altar." % AstralKnight.whose(),
+		"%s lays %s remains on the altar." % [_display_name(player), AstralKnight.whose()], World.peers_in(player.zone))
+
+
+## Server: [param player]'s knight's remains taken off them and laid (896):
+## the relic consumed, the quest marked done, the amulet charged by its tier
+## only with altar_charges. False, nothing done, without them.
+func _lay_remains(player: Player) -> bool:
+	if not Net.is_authority() or not is_instance_valid(player):
+		return false
+	var slot := knights_relic_slot(player)
+	if slot < 0:
+		return false
+	var uid := World.slot_uid(player, slot)
+	var relic := World.relic_of(uid)
+	if not World.consume(player, uid, "laid on the knight's altar"):
+		return false
+	var record: PlayerRecord = _records.get(player.player_id)
+	mark_player(player.player_id, QUEST_DONE)
+	for entity in World.get_entities():
+		if entity is AstralKnight:
+			(entity as AstralKnight).lay_remains()  # Drawn on the bier for the generation (art-kit's piece).
+	if record != null:
+		record.barrow_task = {}
+	var added := charge_from_relic(player, int(relic.get("tier", -1))) if altar_charges else 0
+	print("[relic] %s laid the remains of %s on the knight's altar, %d charge(s) added" % [_display_name(player), relic.get("knight", "the knight"), added])
+	return true
 
 
 ## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen
@@ -15774,6 +15904,10 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var on: Variant = args.get("at")
 		if on is Array and (on as Array).size() == 2:
 			_throne_asked(entity as Player, Vector2i(int(on[0]), int(on[1])))  # 896: sat on, the way home.
+	elif command_name == "altar" and entity is Player:
+		var by: Variant = args.get("at")
+		if by is Array and (by as Array).size() == 2:
+			_altar_asked(entity as Player, Vector2i(int(by[0]), int(by[1])))  # 896: his remains laid.
 	elif command_name == "hearth" and entity is Player:
 		var at: Variant = args.get("at")
 		if at is Array and (at as Array).size() == 2:
@@ -24199,6 +24333,70 @@ func _throne_click(player: Player, tile: Vector2i) -> bool:
 
 ## The throne a click asked to sit on, walked to first; NONE if none.
 var _throne_wanted := NONE
+
+
+## A left click or E on the knight's altar (896): with his remains on the
+## local player and the altar step theirs (Player.quest's card shows it
+## ready), beside it asked of the server at once, else walked beside first
+## and asked on arrival (_update_altar). False when the cell is no altar,
+## the altar step is off (altar_turn_in) or not ready: the click walks.
+func _altar_click(player: Player, tile: Vector2i) -> bool:
+	_altar_wanted = NONE
+	if not altar_turn_in or tile == NONE or not bool(player.quest.get("ready", false)):
+		return false
+	var bier := knights_altar(map_name)
+	if not bier.has_point(tile):
+		return false
+	if _beside_rect(player.tile, bier):
+		World.command(player, "altar", {"at": [tile.x, tile.y]})
+		return true
+	var beside := altar_beside(bier, player.tile)
+	if beside == NONE:
+		return false
+	_move_click(player, beside)
+	_altar_wanted = tile
+	return true
+
+
+## The altar cell a click asked to lay on, walked beside first; NONE if none.
+var _altar_wanted := NONE
+
+
+## Each frame (896): an altar clicked from afar is asked for once the local
+## player's route is walked out beside it.
+func _update_altar() -> void:
+	if _altar_wanted == NONE:
+		return
+	var player := _local_player()
+	if player == null:
+		_altar_wanted = NONE
+		return
+	if not (_free.get("path", []) as Array).is_empty():
+		return
+	if _beside_rect(player.tile, knights_altar(map_name)):
+		World.command(player, "altar", {"at": [_altar_wanted.x, _altar_wanted.y]})
+	_altar_wanted = NONE
+
+
+## The free floor cell round the bier [param bier] (a king's step from it)
+## nearest [param from], NONE if none: where a walk to lay the remains ends.
+## The bier is solid, so _beside's hand's reach into its cell never holds.
+func altar_beside(bier: Rect2i, from: Vector2i) -> Vector2i:
+	var best := NONE
+	var ring := bier.grow(1)
+	for y in range(ring.position.y, ring.end.y):
+		for x in range(ring.position.x, ring.end.x):
+			var cell := Vector2i(x, y)
+			if bier.has_point(cell) or not World.is_walkable(cell) or World.get_entity_at(cell) != null and cell != from:
+				continue
+			if best == NONE or World.distance(from, cell) < World.distance(from, best):
+				best = cell
+	return best
+
+
+## Whether [param cell] is on or beside (a king's step) [param rect].
+static func _beside_rect(cell: Vector2i, rect: Rect2i) -> bool:
+	return rect.size != Vector2i.ZERO and rect.grow(1).has_point(cell)
 
 
 ## Each frame (896): a throne clicked from afar is asked for once the local

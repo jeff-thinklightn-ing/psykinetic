@@ -649,6 +649,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 859 amended (2): No new number (release): an absent "spots" draws no ghost (builder's proposal message; an old client ignores it).
 ## 885: optional "parts" on builder proposals, no new number (release): without it a client draws the "summary" string, which the server still sends whole.
 ## 896 (full circle, the throne; no new number, release): Player.seated "" or "throne" (SUBCLASS_REPLICATED, seen by protocol()); a "throne" command {at: [x, y]} an old server ignores (the click walks).
+## 896 also (the altar; no new number, release's rule): AstralKnight.remains_laid (SUBCLASS_REPLICATED, seen by protocol()); an "altar" command {at: [x, y]} an old server ignores (the click walks).
 ## 57 (882, "dusk follows the sky"; release's number, shared with ui's narration change, the first to
 ## land sets it): the sim's dark follows a sun of -5.9 degrees, not -1 (DayNight.TWILIGHT_LOW -12,
 ## TWILIGHT_HIGH 10), so wolves turn bold, the hill cat reaches and hiding in the dark begin then; an
@@ -659,7 +660,7 @@ const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "r
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "find", "folds", "grass", "hearths", "huts", "map", "near", "notes", "offers", "party", "return", "reward", "roofs", "shop", "sky", "speech", "takers", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "aura", "body", "bond_bar", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "fishing", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "max_hp", "mending", "move_ticks", "needs", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "seated", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "aura", "body", "bond_bar", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "fishing", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "max_hp", "mending", "move_ticks", "needs", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "remains_laid", "seated", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
