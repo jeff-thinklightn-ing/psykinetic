@@ -2866,10 +2866,11 @@
 			"category": "props",
 			"type": "mesh",
 			"kind": "edge",
-			"size": [0.1, 1, 1],
+			"size": [0.1, 0.49, 1],
+			"base": 0.36,
 			"budget": 150,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.fence/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c3's 150 mesh squeezed to 0.1 x 1.0, 148 tris"},
-			"uses": "a 1 m fence section on a cell edge, tiling along z"
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-13", "notes": "C:/dev/review/fence/make_fence.py rails (the coordinator's ruling 2026-11-13 on art-gen's p5_worst: the fit's rails twisted and crossed; was art-gen's c3 fit, which had posts of its own doubling prop.fence_post): two split rails, a wedge's two split faces and its bark back, the low at 0.42 and the high at 0.80, each sagging a little to its middle and turned a little along its length, their ends inside the posts at the same height as the next section's; no posts (prop.fence_post stands at each end); 72 tris"},
+			"uses": "a 1 m fence section on a cell edge, tiling along z: the rails between two posts"
 		},
 		"prop.fence_post": {
 			"category": "props",
@@ -2877,7 +2878,7 @@
 			"kind": "vertex",
 			"size": [0.15, 1.1, 0.15],
 			"budget": 80,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.fence_post/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c4's 80 mesh slimmed to 0.15, 80 tris"},
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-13", "notes": "C:/dev/review/fence/make_fence.py post (with prop.fence's rails, the coordinator's ruling 2026-11-13; was art-gen's c4 fit): a hewn post, six uneven sides about 0.145 across, a darker foot, its top cut on a slant; 28 tris"},
 			"uses": "a fence post at a cell corner"
 		},
 		"prop.stairs": {

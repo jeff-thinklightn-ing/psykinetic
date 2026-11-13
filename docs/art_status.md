@@ -299,8 +299,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.doorstep` | 2 | art-kit, by hand | own | 2026-11-06 |
 | `prop.draugr_remains` | 1 | art-kit, by hand | own | 2026-10-24 |
 | `prop.fallen_guard` | 2 | art-kit, by hand | own | 2026-10-23 |
-| `prop.fence` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `prop.fence_post` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.fence` | 1 | art-gen, by hand | own | 2026-11-13 |
+| `prop.fence_post` | 1 | art-gen, by hand | own | 2026-11-13 |
 | `prop.footprints` | 1 | art-kit, by hand | own | 2026-10-27 |
 | `prop.forge` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.fur_tuft` | 1 | art-kit, by hand | own | 2026-11-06 |

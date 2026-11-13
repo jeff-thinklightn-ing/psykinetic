@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- On the road past the farm, the field fences are split rails between hewn posts now, where before each length stood crooked between pointed posts of its own (827 amended (1)).
 - In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - When you're wet from the rain, you drip from the hem of your clothes (775 amended (1)).
 - Towns: the Ledger shows a build as planned until someone starts it, and a damaged building is scaffolded only once its repair is under way (566 amended (7)).

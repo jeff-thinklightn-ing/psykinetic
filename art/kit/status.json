@@ -586,7 +586,7 @@
 			"type": "mesh",
 			"kind": "edge",
 			"category": "props",
-			"size": "0.1 x 1.0 x 1.0",
+			"size": "0.1 x 0.49 x 1.0",
 			"budget": 150
 		},
 		{

@@ -50904,6 +50904,26 @@ on its north; no roof, windlass, bucket or water, and nothing a resident treats 
 (cell) is the fallen one's scarecrow still on its pole, leaning to about 1.7 m, one arm hanging. Both decor,
 laid by maps as DECOR_KINDS rows. Art only; off.
 
+827 amended (1): the farm's fence by hand, art-gen's (the coordinator's ruling 2026-11-13 on art-gen's three
+worst at the nearest zoom, C:/dev/review/art-gen_near/p5/p5_worst.png; label from tools/decision_number.sh).
+prop.fence and prop.fence_post came in unnumbered on 10-18 (e09e8b729, art-gen's candidates applied on Jeff's
+"apply the candidates and ill veto in game") and are named since by 640, 654 and this decision; they sit under
+827 from now, the farm's plots being where a player meets them. The fitted fence's rails twisted and crossed,
+and it carried pointed posts of its own at both ends, so with the decor's posts every run stood two posts at
+each end. prop.fence is now the rails only, two split rails (a wedge's two split faces and its bark back) at
+0.42 and 0.80, each sagging a little and turned a little along its length, their ends inside the posts at the
+same height as the next section's, so a run reads as one rail a course; 72 tris (was 148). prop.fence_post is a
+hewn post, six uneven sides 0.145 across, a darker foot, its top cut on a slant; 28 tris (was 80). The
+manifest's box for prop.fence is now 0.1 x 0.49 x 1 with "base" 0.36: the rails' own box, standing off the
+ground, since the post is its own slot and stands at every end (Client3D._add_decor, one per corner however
+many runs meet); main's 0.1 x 1 x 1 from the ground held only because the fit's posts filled it. ArtCheck
+reads "base" for where the box's bottom is and the grey box stands there too; nothing else reads the slot's
+size (sim/level.gd's "fence" names the slot and its posts; view_test counts and places rails and posts). The
+kind, edge rule, footprint and origins are unchanged, so maps' 44 farm edges stand as they were. Art-kit passed
+it (C:/dev/review/fence/fence_sheet.png), and the coordinator in game (C:/dev/review/art-gen-fence3/
+fence_ingame_sheet.png: the farm road at noon, the fields reading over and through the top rail). Art and
+slots.json; protocol unchanged, no new class_name.
+
 ## 828. Windowed runs on the laptop
 
 Release's number; the coordinator's approved design, the first step of the laptop runners plan (Jeff,
