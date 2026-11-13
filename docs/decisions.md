@@ -30497,6 +30497,15 @@ the rumour names them and the where once a day per player; the inn not
 standing, no note; home, the note comes down and the rumour stops. Server
 side only; no new class_name.
 
+643 amended (1) (economy's fresh-town soak, 30 days; the label from decision_number.sh). 12,600 SCRIPT
+ERRORs once a resident wandered "low too long" and her door note was posted at the woodshed: Main._note_cell
+handed the world map's building to Level.kind_doors, which reads a level file's [x, y, side] doors, but a
+world-map building holds its doors as edge keys already (Vector3i, as Level.entrances reads them), so each
+tick's _sought_notes raised one. In the released server since v0.1.174. Now _note_cell takes the first door
+as it is when it is an edge key, and reads it through kind_doors only otherwise; the note stands at the cell
+across that edge, else at the front cell, as 643 meant. resident_test: a door as the world map holds it, the
+note across its edge. Server only; protocol unchanged; no new class_name.
+
 ## 643, ui's side. A note on the door, read
 
 Beside npc's 643 (the sought's door note; Jeff: "a small note saying where

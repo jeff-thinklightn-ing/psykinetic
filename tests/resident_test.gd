@@ -2346,6 +2346,21 @@ func _test_sought_body() -> void:
 	var rumour: String = _main._rumour_for(STORE, "p1", 3)
 	_check(rumour.contains("Wat the butcher") and rumour.contains("hills") and _main._rumour_for(STORE, "p1", 3).is_empty() and not _main._rumour_for(STORE, "p2", 3).is_empty(),
 		"the rumour names them and the where, once a day per player (%s)" % rumour)
+	# A world-map building's doors are edge keys already (economy's soak: a kind building's door read as a level
+	# entry's [x, y, side] raised a SCRIPT ERROR every tick): the note at the cell across its door edge.
+	# A kind building (one with a size of doors), so Level.kind_doors would read it.
+	var kind_name := ""
+	for each: String in Level.kinds():
+		if not Level.kind_size({"kind": each}).is_empty() and kind_name.is_empty():
+			kind_name = each
+	var door_out := Vector2i(12, 2)
+	inn["kind"] = kind_name
+	inn["doors"] = [Terrain.edge_key(Vector2i(13, 2), door_out - Vector2i(13, 2))]
+	var by_door: Array = _main._sought_notes(TOWN)
+	_check(not kind_name.is_empty() and by_door.size() == 1 and by_door[0]["tile"] == [door_out.x, door_out.y],
+		"a kind building's door as the world map holds it (%s): the note across its edge (%s)" % [kind_name, by_door])
+	inn.erase("doors")
+	inn.erase("kind")
 	World.towns._town(STORE)["buildings"]["inn"]["state"] = Towns.PLANNED
 	_check(_main._sought_notes(TOWN).is_empty(), "the inn not standing: no door, no note")
 	World.towns._town(STORE)["buildings"]["inn"]["state"] = Towns.STANDING

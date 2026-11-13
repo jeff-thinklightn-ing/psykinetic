@@ -12974,10 +12974,18 @@ func _note_cell(zone_name: String, town_id: String, key: String, use: String) ->
 		if str(building.get("town", "")) != key or str(building.get("use", "")) != use:
 			continue
 		var rect: Rect2i = building.get("rect", Rect2i())
-		if not (building.get("doors", []) as Array).is_empty():
-			var doors := Level.kind_doors(building)
-			if not doors.is_empty():
-				for cell: Vector2i in Terrain.edge_cells(doors[0]):
+		var doors: Array = building.get("doors", [])
+		if not doors.is_empty():
+			# The world map's buildings hold their doors as edge keys already (Level.entrances reads them so); a
+			# level file's entry holds [x, y, side] in its kind's frame. Read as the second, an edge key raised a
+			# SCRIPT ERROR every tick a wandered resident's note stood at a kind building (economy's fresh-town soak:
+			# the woodcutter's woodshed, 12,600 in 30 days).
+			var edge: Variant = doors[0]
+			if not edge is Vector3i:
+				var made := Level.kind_doors(building)
+				edge = made[0] if not made.is_empty() else null
+			if edge is Vector3i:
+				for cell: Vector2i in Terrain.edge_cells(edge):
 					if not rect.has_point(cell):
 						return cell
 		return Level.front_cell(rect, building.get("facing", Vector2i(0, 1)))
