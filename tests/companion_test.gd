@@ -145,6 +145,7 @@ func _ready() -> void:
 	_test_mines_a_seam()
 	_test_mines_only_at_a_seam()
 	_test_brought_back_ends_wait()
+	_test_far_bring_back_same_body()
 	_test_old_grey_seen()
 	_test_great_bear()
 	_test_break_off_holds()
@@ -6311,6 +6312,56 @@ func _test_brought_back_ends_wait() -> void:
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+## 705 amended (1): a far bring-back moves her body on the server and only
+## re-sends it to the clients (Main.resend, a fresh spawn on each), so she is
+## the same body in every way: pack, buffs, ailments, stance, mind, a foe's
+## aim at her; hittable and acting at once. In this room no peer sees her, so
+## resend leaves her alone.
+func _test_far_bring_back_same_body() -> void:
+	print("
+== come back far off: she is brought beside them as the same body, re-sent to clients, nothing lost (705 amended (1)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_put(owner, Vector2i(2, 3))
+	_put(pet, Vector2i(12, 9))
+	pet._set_stance(Companion.Stance.PRESS, pet._serial, "test")
+	pet.buffs["test_far"] = {"until": World.tick + 600}
+	pet.ailments["test_far"] = {"until": World.tick + 600}
+	var id_was := pet.get_instance_id()
+	var mind_was: Object = pet.mind
+	var slots_was := Array(pet.slots)
+	var uids_was := Array(World.slot_uids(pet))
+	var wolf := _spawn_wild("wolf", Vector2i(11, 6))
+	Monster.noticing = false
+	wolf.target = pet
+	_main._join_companion(record, owner)
+	_check(is_instance_valid(pet) and pet.get_instance_id() == id_was and pet.spawned and _companion() == pet
+			and World.distance(pet.tile, owner.tile) <= 2 and not pet.resending,
+			"brought beside them from %d cells: the same body, spawned, not left resending (%s)" % [World.distance(Vector2i(12, 9), Vector2i(2, 3)), pet.tile])
+	_check(pet.stance == Companion.Stance.PRESS and pet.mind == mind_was and Array(pet.slots) == slots_was and Array(World.slot_uids(pet)) == uids_was
+			and pet.buffs.has("test_far") and pet.ailments.has("test_far"),
+			"her stance, mind, pack and worn things, buffs and ailments as they were (%s)" % pet.stance_name())
+	_check(is_instance_valid(wolf) and wolf.target == pet, "a foe that had her in its aim has her still, a live body (%s)" % [wolf.target])
+	_check(not _main.resend(pet) and not pet.resending, "no peer sees her here: resend leaves her alone")
+	var hp_was := pet.hp
+	World.damage(pet, 1)
+	_check(pet.hp == hp_was - 1, "hittable at once (%d -> %d)" % [hp_was, pet.hp])
+	pet.hp = hp_was
+	World.despawn(wolf)
+	Monster.noticing = true
+	pet.buffs.erase("test_far")
+	pet.ailments.erase("test_far")
+	pet._set_stance(Companion.Stance.GUARD, pet._serial, "test")
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
 
 func _test_mines_a_seam() -> void:
 	print("

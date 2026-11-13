@@ -542,9 +542,15 @@ func _slots_set() -> void:
 	pass
 
 
+## True only inside Main.resend (705 amended (1)): sent to no peer while its
+## synchronizer is asked again, so each client that has it drops it and
+## spawns it afresh where it now is. Cleared in the same call: never saved.
+var resending := false
+
+
 ## Whether the client [param peer] is sent this entity (World.peer_sees).
 func _visible_to(peer: int) -> bool:
-	return World.peer_sees(peer, zone) and Net.interest.sees(peer, self)
+	return not resending and World.peer_sees(peer, zone) and Net.interest.sees(peer, self)
 
 
 ## The peers its events go to: those it can be sent to whose players are in

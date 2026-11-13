@@ -9093,8 +9093,10 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			# back 130 cells from Pip, and she walked it alone).
 			var was := existing.tile
 			World._relocate(existing, _nearest_free(player.tile))
-			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them" % [
-				record.name, existing.name, was, World.distance(was, player.tile), record.name])
+			# 705 amended (1): far, a fresh spawn on each client, not a slide across the map.
+			var resent := resend(existing)
+			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them%s" % [
+				record.name, existing.name, was, World.distance(was, player.tile), record.name, " (re-sent)" if resent else ""])
 			existing.keeper = player  # Her keeper_name for the narration below.
 			existing.brought_back()  # Beside them, her wait is over (badly13).
 		existing.works_as = ""
@@ -16070,6 +16072,24 @@ func _remember_companion(id: String) -> void:
 	_keep_want_told(record, pet)
 	record.companion["slots"] = Array(pet.slots)
 	record.companion["items"] = Array(World.slot_uids(pet))
+
+
+## [param body], moved far on the server, shown to every client that has it
+## as a fresh spawn where it is now (705 amended (1)), not one slide of up to
+## 3 ticks across the map (GridEntity._mirror_tile_changed). Its
+## synchronizer is asked once with the body sent to no peer (each client
+## drops it, as decision 217's interest edge does) and once as it is (each
+## client that sees it spawns it). The body on the server is untouched: its
+## pack, wounds, buffs, timers, order, mind and any foe's aim at it. A body
+## no peer sees is left alone. Whether it was re-sent.
+func resend(body: GridEntity) -> bool:
+	if not is_instance_valid(body) or body.sync == null or body.viewers().is_empty():
+		return false
+	body.resending = true
+	body.sync.update_visibility()
+	body.resending = false
+	body.sync.update_visibility()
+	return true
 
 
 ## What a newly met companion brings (681 amended (1)).

@@ -37161,6 +37161,38 @@ tile). Pip was 130 cells off with nothing said, and walked it alone. The
 
 resident_test _test_rejoin_moved, on the wilds' real cells. Server only,
 protocol unchanged, no new class_name.
+
+705 amended (1): a far bring-back is a fresh spawn on each client, not a streak (the decision-number
+script's label; the coordinator's question from a shot-tool fault items traced, and its approval of (B)).
+The bare World._relocate reached the keeper's client, which always holds her (Interest.sees passes
+keeper_peer), as one replicated tile change. GridEntity._mirror_tile_changed draws any jump over a cell as
+one straight slide of at most 3 ticks, so after a death 130 cells off she streaked in from off screen in
+0.3 s. Now, whenever the bring-back moves her (past REJOIN_NEAR, 8), Main.resend(body) asks her synchronizer once with GridEntity.resending true (_visible_to
+false for every peer: each client drops her, as decision 217's interest edge does) and once with it false
+(each client that sees her spawns her afresh where she is). Her body on the server is never changed: pack
+and worn things, wounds, buffs and ailments with their timers, a bandage in progress, stance, order, mind,
+and any foe's aim at her. resending is true only inside that call, so no save or snapshot carries it, and
+a body no peer sees is left alone. Interest has her at her new cell before the show: _relocate's
+entity_moved reaches Interest.moved at once. perf, owner of the visibility filter (217), told and agreed.
+A two-peer probe on saturn (one server, one client, test_room; C:/dev/review/companions/probe_saturn/probe.log):
+today's bare move drew her as one node streaking 14 frames; the hide and show in one call gave a new node
+at her new cell in the same frame, with no frame without her; hidden a tick, 26 frames with none. So one
+call, no tick between.
+The "[spawn] ... beside them" line ends "(re-sent)" when it was. Not chosen, (A): despawn her and spawn
+her from her record, as the zone-change branch does. That round trip keeps hp, stamina, pack and worn
+things, said lines, told flags, bond and facts, and loses buffs, ailments, a bandage in progress, stance,
+order and her mind. This is known for the zone-change branch (a rejoin in another zone) and left for its
+own row, where ailments and their timers are the one a player could lean on. An open pack of hers on the
+keeper's client closes as her node goes. No threshold of its own: a first draft re-sent only past 28
+cells (the view's widest, so a near one would step over), but the branch never fires under 8, and
+playtest's joined before-look (look214_compreturn2, C:/dev/review/look/main_d71eac0f6/look214_compreturn2,
+stills compreturn_fall_0680ms, _1067ms, _1415ms) showed a fall 24 cells off drawn as a stale stand: her
+tile beside him at once, her body at the old spot for 1.4 s, then a 23-cell jump in one frame. That
+stand is sidestepped here, not explained; whose it is (the draw queue or the far-puppet path, for other
+bodies too) is traced after this lands. companion_test _test_far_bring_back_same_body: brought from 10
+cells, she is the same body (instance, mind, stance, pack, buffs, ailments), a
+wolf's aim at her stands, she is hit at once, and resend leaves a body no peer sees alone. Server only,
+protocol unchanged, no new class_name.
 ## 703, step 2 (dungeon): level_test walks no player on the grid
 
 6b (703) takes the player's grid walking away; a tree's step 2 is that none
