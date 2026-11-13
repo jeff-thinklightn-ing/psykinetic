@@ -11708,6 +11708,10 @@ func _test_hood_dye() -> void:
 		var hood := model.find_child("Hood", true, false) as MeshInstance3D
 		var cape := model.find_child("Cape", true, false) as MeshInstance3D
 		var dye := func() -> Color: return hood.get_instance_shader_parameter("dye") if hood.get_instance_shader_parameter("dye") != null else Color(0, 0, 0, 0)
+		# Dressed in the people's material first, then the look, as Client3D._make_model does.
+		Client3D._dress(model, Color.WHITE)
+		var both := PersonLook.make("seed=7 body=%s headwear=hood garb=cape" % build[1])
+		both.apply(model)
 		# The palette's pixel under the Cape's first vertex, read here on its own (the swatch is one cell).
 		var palette := (cape.get_active_material(0) as ShaderMaterial).get_shader_parameter("palette") as Texture2D
 		var image := palette.get_image()
@@ -11715,8 +11719,6 @@ func _test_hood_dye() -> void:
 			image = Image.load_from_file(palette.resource_path)
 		var uv: Vector2 = (cape.mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV] as PackedVector2Array)[0]
 		var swatch := image.get_pixelv(Vector2i((uv * Vector2(image.get_size())).floor()))
-		var both := PersonLook.make("seed=7 body=%s headwear=hood garb=cape" % build[1])
-		both.apply(model)
 		var caped: Color = dye.call()
 		_check(caped.a == 1.0 and caped.is_equal_approx(Color(swatch, 1.0)),
 				"%s: hood and cape worn, the hood dyed the cape's palette swatch (%s, swatch %s)" % [build[1], caped, swatch])

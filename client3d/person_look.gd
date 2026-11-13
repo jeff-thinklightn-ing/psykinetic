@@ -388,7 +388,9 @@ static func cape_colour(cape: MeshInstance3D) -> Color:
 			var at := Vector2i((mean * Vector2(image.get_size())).floor()).clamp(Vector2i.ZERO, image.get_size() - Vector2i.ONE)
 			colour = image.get_pixelv(at)
 			colour.a = 1.0
-	_cape_colours[key] = colour
+	# Kept only when read: a cape not yet in the people's material (no palette) is asked again next time.
+	if colour.a > 0.0:
+		_cape_colours[key] = colour
 	return colour
 
 

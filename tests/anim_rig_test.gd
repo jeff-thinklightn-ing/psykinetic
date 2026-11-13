@@ -6,6 +6,7 @@ extends Node
 ## or tests/run.sh. Prints PASS/FAIL per assertion and quits with exit code
 ## 1 if any assertion failed, 0 otherwise.
 
+const HeadSize := preload("res://client3d/head_size.gd")
 const SCENE := "res://art/models/characters/goblin.glb"
 const CLIPS := "res://art/models/animations/goblin.res"
 
@@ -842,6 +843,27 @@ static func _closest_on_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3)
 	return a + ab * (vb * denom) + ac * (vc * denom)
 
 
+## Each of [param skin]'s binds posed as the game draws it: HeadSize scales the Head bone's pose by
+## HEAD_SCALE after the animation (419 amended (2)), here a uniform scale about the Head's origin of it
+## and every bone under it, the same thing.
+static func _bone_poses(skeleton: Skeleton3D, skin: Skin) -> Array[Transform3D]:
+	var head := skeleton.find_bone("Head")
+	var grown := Transform3D.IDENTITY
+	if head >= 0:
+		var origin := skeleton.global_transform * skeleton.get_bone_global_pose(head).origin
+		grown = Transform3D(Basis.from_scale(Vector3.ONE * HeadSize.HEAD_SCALE), origin - origin * HeadSize.HEAD_SCALE)
+	var poses: Array[Transform3D] = []
+	for b in skin.get_bind_count():
+		var bone_index := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
+		var under_head := false
+		var up := bone_index
+		while up >= 0 and not under_head:
+			under_head = up == head
+			up = skeleton.get_bone_parent(up)
+		poses.append((grown if under_head else Transform3D.IDENTITY) * skeleton.global_transform * skeleton.get_bone_global_pose(bone_index) * skin.get_bind_pose(b))
+	return poses
+
+
 ## [param mesh] skinned as it stands (as _skinned_parts: by hand, a headless run registers no skin),
 ## its shape keys added: [points, normals, the bone each vertex hangs on most, its triangles' corners]. The shaped rest is
 ## worked out once a mesh ("shaped" meta: a build's keys are set before the first call).
@@ -879,10 +901,7 @@ static func _skin(mesh: MeshInstance3D) -> Array:
 	var weights: PackedFloat32Array = src[Mesh.ARRAY_WEIGHTS]
 	var per := bones.size() / verts.size()
 	var skin := mesh.skin
-	var poses: Array[Transform3D] = []
-	for b in skin.get_bind_count():
-		var bone_index := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
-		poses.append(skeleton.global_transform * skeleton.get_bone_global_pose(bone_index) * skin.get_bind_pose(b))
+	var poses := _bone_poses(skeleton, skin)
 	var points := PackedVector3Array()
 	var turned := PackedVector3Array()
 	points.resize(verts.size())
@@ -1590,18 +1609,18 @@ static func _skinned_parts(model: Node3D) -> Dictionary:
 	var weights: PackedFloat32Array = src[Mesh.ARRAY_WEIGHTS]
 	var per := bones.size() / verts.size()
 	var skin := body.skin
-	var poses: Array[Transform3D] = []
-	for b in skin.get_bind_count():
-		var bone_index := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
-		poses.append(skeleton.global_transform * skeleton.get_bone_global_pose(bone_index) * skin.get_bind_pose(b))
+	var poses := _bone_poses(skeleton, skin)
 	# {part: [points, normals]}
 	var parts := {}
 	for part: String in ["trunk", "head", "leg", "forearm", "right"]:
-		parts[part] = [PackedVector3Array(), PackedVector3Array()]
+		parts[part] = [PackedVector3Array(), []]
 	var part_of := {"Head": "head", "LeftUpperLeg": "leg", "LeftLowerLeg": "leg", "LeftLowerArm": "forearm",
 		"RightLowerArm": "right", "RightHand": "right"}
 	for name: String in TRUNK_BONES:
 		part_of[name] = "trunk"
+	var placed := PackedVector3Array()
+	var turned := PackedVector3Array()
+	var part_at := PackedStringArray()
 	for i in verts.size():
 		var p := Vector3.ZERO
 		var n := Vector3.ZERO
@@ -1617,16 +1636,55 @@ static func _skinned_parts(model: Node3D) -> Dictionary:
 				best = k
 		var b := bones[i * per + best]
 		var bone := String(skin.get_bind_name(b)) if skin.get_bind_name(b) != &"" else skeleton.get_bone_name(skin.get_bind_bone(b))
-		if part_of.has(bone):
-			parts[part_of[bone]][0].append(p)
-			parts[part_of[bone]][1].append(n.normalized())
+		placed.append(p)
+		turned.append(n.normalized())
+		part_at.append(part_of.get(bone, ""))
+	# Each place once (a vertex shared or split, as the build left it), with the normals of every face
+	# that meets there, from the posed corners (turned to the side the corners' own normals face).
+	# What a body's normals were stored as no longer counts: a smooth body (419 amended (2)) shares its
+	# vertices with their normals averaged across a crease, and the nearest vertex's averaged normal
+	# called arms and blades by the heavy man's flank inside with no vertex moved.
+	var place_of := PackedInt32Array()
+	var places := {}
+	var where := PackedVector3Array()
+	var faces: Array[PackedVector3Array] = []
+	var place_part := PackedStringArray()
+	for i in placed.size():
+		var key := Vector3i((verts[i] * 100000.0).round())
+		if not places.has(key):
+			places[key] = where.size()
+			where.append(placed[i])
+			faces.append(PackedVector3Array())
+			place_part.append(part_at[i])
+		place_of.append(places[key])
+	var corners: PackedInt32Array = src[Mesh.ARRAY_INDEX] if src[Mesh.ARRAY_INDEX] != null else PackedInt32Array()
+	if corners.is_empty():
+		corners = PackedInt32Array(range(placed.size()))
+	for t in range(0, corners.size() - 2, 3):
+		var a := placed[corners[t]]
+		var face := (placed[corners[t + 1]] - a).cross(placed[corners[t + 2]] - a)
+		if face.length_squared() < 1e-14:
+			continue
+		face = face.normalized()
+		if face.dot(turned[corners[t]] + turned[corners[t + 1]] + turned[corners[t + 2]]) < 0.0:
+			face = -face
+		for c in 3:
+			faces[place_of[corners[t + c]]].append(face)
+	for k in where.size():
+		if place_part[k] != "" and not faces[k].is_empty():
+			parts[place_part[k]][0].append(where[k])
+			parts[place_part[k]][1].append(faces[k])
 	return parts
 
 
 ## [param boxed]: a point outside the surface's box (grown 1 cm) is never counted (a lone part:
 ## the head's nearest vertex to a string hand held out beside it was the neck's open rim, its normal
 ## up, and counted the hand inside the head 28 cm off the body's middle; 677, pc-character's side).
-static func _inside(points: PackedVector3Array, surface: PackedVector3Array, normals: PackedVector3Array, boxed := false) -> int:
+static func _inside(points: PackedVector3Array, surface: PackedVector3Array, faces: Array, boxed := false) -> int:
+	# [faces]: each of [surface]'s places, the normals of the faces that meet there (_skinned_parts).
+	# Inside: within 15 cm of its nearest place and 4 mm or more behind every one of its faces. A flat
+	# body's split corners each carried one of those faces and the first one decided, so nothing is
+	# counted here that that count let by (on main, and on a smooth body of the same corners).
 	var n := 0
 	if surface.is_empty():
 		return 0
@@ -1644,7 +1702,14 @@ static func _inside(points: PackedVector3Array, surface: PackedVector3Array, nor
 			if d < best:
 				best = d
 				at = j
-		if at >= 0 and best < 0.0225 and (p - surface[at]).dot(normals[at]) < -0.004:
+		if at < 0 or best >= 0.0225:
+			continue
+		var behind := true
+		for normal: Vector3 in faces[at] as PackedVector3Array:
+			if (p - surface[at]).dot(normal) >= -0.004:
+				behind = false
+				break
+		if behind:
 			n += 1
 	return n
 
