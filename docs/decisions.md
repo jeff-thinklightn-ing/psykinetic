@@ -12863,8 +12863,21 @@ and picks, 2026-11-12/13): people are smooth-shaded, and the head is drawn a ten
     the hood's smallest pass each run, so a drift toward it is seen before it fails.
   - Animation was told the woman's wind-up is 2 mm short of 0.02 and 11 mm short of its own 0.03,
     for its next pass over the slash; no row asked of it.
-  - The coordinator's sheet carries a close still of the woman in a hood at Slash_F 0.13 s, from the
-    side the blade passes, at the nearest zoom.
+  - The coordinator's sheet carries a close still of the woman in a hood at Slash_F 0.13 s (the
+    test's fourth step, 4/30 s), from the side the blade passes, at the nearest zoom
+    (C:/dev/review/pc-character/slash_still/).
+  - That still showed what the blade's samples miss: they run along the sword's centreline past
+    11 cm from the hand, and the cross-guard stands 4 to 6 cm out to the side. Measured on the whole
+    sword's edges, the guard's bar goes through the hood's cloth at the top of the forward slashes'
+    wind-up (Sword_Slash_F and Sword_Shield_Slash_F), between its own corners:
+    - already on main, exactly (the test run with the head at 1.0): at 4/30 s on all five builds, 10;
+    - with the 1.10 head, one frame more (5/30 s, about 33 ms), 20 in all.
+    (A first reading of 0.002 m at the old size was an approximation; exactly, it is 0.000.)
+  - The coordinator's ruling: 419 amended (2) is not held for it. anim_rig_test measures the whole
+    sword, guard included, against the hood (_whole_sword_by) and prints its least distance each
+    run; SWORD_HOOD_CROSSED names today's 20, and any other crossing fails. It is deleted when
+    animation's re-pose clears both frames: the coordinator gave animation a row for it, as a clip
+    already in the released game (about 2 cm of fist at those frames).
 - Lands after Jeff has seen both in game (C:/dev/review/decisions/people-look.md).
 
 ## 438. The counter's work: what can be done, ordered and collected; the reforge

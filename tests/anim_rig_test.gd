@@ -469,6 +469,15 @@ const SWORD_CLEAR := 0.03
 ## (Slash_B at 0.07 s), shield or not, never touching. The smallest pass is printed each run; under
 ## this the answer is animation's re-pose of the slash, not the bar.
 const SWORD_HOOD_CLEAR := 0.015
+## Where the sword's cross-guard goes through the hood's cloth today (419 amended (2), the coordinator's
+## ruling): Sword_Slash_F and Sword_Shield_Slash_F at 4/30 s on every build, already on main, and at
+## 5/30 s with the 1.10 head. Animation's re-pose of the slash (its row) clears them; then this goes.
+const SWORD_HOOD_CROSSED: Array[String] = [
+	"man Sword_Slash_F 0.13 s", "man Sword_Slash_F 0.17 s", "man Sword_Shield_Slash_F 0.13 s", "man Sword_Shield_Slash_F 0.17 s",
+	"man heavy Sword_Slash_F 0.13 s", "man heavy Sword_Slash_F 0.17 s", "man heavy Sword_Shield_Slash_F 0.13 s", "man heavy Sword_Shield_Slash_F 0.17 s",
+	"man broad Sword_Slash_F 0.13 s", "man broad Sword_Slash_F 0.17 s", "man broad Sword_Shield_Slash_F 0.13 s", "man broad Sword_Shield_Slash_F 0.17 s",
+	"man lean Sword_Slash_F 0.13 s", "man lean Sword_Slash_F 0.17 s", "man lean Sword_Shield_Slash_F 0.13 s", "man lean Sword_Shield_Slash_F 0.17 s",
+	"woman Sword_Slash_F 0.13 s", "woman Sword_Slash_F 0.17 s", "woman Sword_Shield_Slash_F 0.13 s", "woman Sword_Shield_Slash_F 0.17 s"]
 const SWORD_NEAR := 0.06
 const SWORD_FPS := 30.0
 const SWORD_ARM_IN := 0.01  # An arm resting on the trunk, its skin pressed in so far, is no clip.
@@ -491,6 +500,8 @@ func _test_sword_clear() -> void:
 	var coiled: Array[String] = []
 	var least := {}  # {clip: [clearance, where]}
 	var hood_least := [INF, "none"]
+	var whole_least := [INF, "none"]  # The whole sword, guard included, by the hood.
+	var whole_through: Array[String] = []
 	for build: Array in SWORD_BUILDS:
 		var made := _sword_body(self, build)
 		var model: Node3D = made[0]
@@ -514,6 +525,11 @@ func _test_sword_clear() -> void:
 						least[clip] = [c[0], at]
 					if target == "Hood" and float(c[0]) < float(hood_least[0]):
 						hood_least = [c[0], at]
+				var whole: Array = frame["hood_whole"]
+				if float(whole[0]) < float(whole_least[0]):
+					whole_least = [float(whole[0]), "%s %s %.2f s" % [build[0], clip, t]]
+				if bool(whole[1]):
+					whole_through.append("%s %s %.2f s" % [build[0], clip, t])
 				var coil: Array = frame["coil"]
 				if float(coil[0]) < -SWORD_ARM_IN or float(coil[1]) < -SWORD_ARM_IN:
 					coiled.append("%s %s %.2f s: off arm %.3f, sword forearm %.3f m" % [build[0], clip, t, coil[0], coil[1]])
@@ -523,10 +539,22 @@ func _test_sword_clear() -> void:
 	for clip: String in least:
 		print("  closest in %s: %s" % [clip, least[clip][1]])
 	print("  the hood's smallest pass: %.3f m, floor %.3f (%s)" % [float(hood_least[0]), SWORD_HOOD_CLEAR, hood_least[1]])
+	print("  the whole sword (guard and grip too) by the hood: %.3f m at least (%s)" % [float(whole_least[0]), whole_least[1]])
 	if not near.is_empty():
 		print("  near-misses (under %.2f m): %d, %s" % [SWORD_NEAR, near.size(), ", ".join(near.slice(0, 12))])
 	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears (the hood %.2f m), five builds, %d worn pieces, %s (%d: %s)" % [
 		SWORD_CLEAR, SWORD_HOOD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
+	# 419 amended (2), the coordinator's ruling: the sword's cross-guard goes through the hood's cloth at
+	# the top of the forward slashes' wind-up, already on main (4/30 s, every build) and one frame more
+	# with the 1.10 head (5/30 s). Those twenty are SWORD_HOOD_CROSSED; any other crossing fails. Deleted
+	# when animation's re-pose of the slash clears both frames.
+	var known: Array[String] = []
+	var new: Array[String] = []
+	for at in whole_through:
+		(known if at in SWORD_HOOD_CROSSED else new).append(at)
+	print("  the sword through the hood: %d of the %d known (%s)" % [known.size(), SWORD_HOOD_CROSSED.size(), ", ".join(known.slice(0, 4))])
+	_check(new.is_empty(), "the whole sword, guard included, through the hood nowhere but the forward slashes' known 4/30 and 5/30 s (%d new: %s)" % [
+		new.size(), ", ".join(new.slice(0, 12))])
 	_check(coiled.is_empty(), "neither forearm %.2f m or more into the rest of the body through them (%d: %s)" % [SWORD_ARM_IN, coiled.size(), ", ".join(coiled.slice(0, 16))])
 
 
@@ -679,6 +707,7 @@ const SWORD_REACH := 0.2
 const SWORD_ARM_RADIUS := 0.035
 static func _sword_frame(model: Node3D, sword: Node3D) -> Dictionary:
 	var blade := _sword_samples(sword)
+	var hood_whole := [SWORD_REACH, false]
 	var body := model.find_child("Body", true, false) as MeshInstance3D
 	var skinned := _skin(body)
 	var points: PackedVector3Array = skinned[0]
@@ -730,6 +759,8 @@ static func _sword_frame(model: Node3D, sword: Node3D) -> Dictionary:
 				best = [-0.001, k]
 				break
 		clear[name] = best
+		if name == "Hood":
+			hood_whole = _whole_sword_by(sword, on[0], shell)
 	var skeleton := body.get_parent() as Skeleton3D
 	var lines := []
 	for ends: Array in [["LeftLowerArm", "LeftHand"], ["RightLowerArm", "RightHand"]]:
@@ -762,7 +793,52 @@ static func _sword_frame(model: Node3D, sword: Node3D) -> Dictionary:
 		if bones[i] in TRUNK_BONES:
 			trunk_points.append(points[i])
 	return {"clear": clear, "blade": blade, "body": points, "coil": coil, "fore": lines[1], "trunk": trunk_points, "fore_at": fore_at,
-		"fore_part": fore_part}
+		"fore_part": fore_part, "hood_whole": hood_whole}
+
+
+## The whole sword, guard and grip too, against a worn piece's [param verts] / [param corners] (the
+## blade's samples are its centreline past SWORD_GRIP, and the guard stands out sideways of it):
+## [its vertices' least distance to the piece (SWORD_REACH if none near), whether any of its own
+## triangles' edges goes through the piece]. Only what is within SWORD_REACH of the piece's box is
+## measured. 419 amended (2): the guard's end grazes the hood at the slash's 4/30 s.
+static func _whole_sword_by(sword: Node3D, verts: PackedVector3Array, corners: PackedInt32Array) -> Array:
+	if verts.is_empty() or corners.is_empty():
+		return [SWORD_REACH, false]
+	var box := AABB(verts[0], Vector3.ZERO)
+	for v in verts:
+		box = box.expand(v)
+	box = box.grow(SWORD_REACH)
+	var least := SWORD_REACH
+	var through := false
+	var meshes: Array = sword.find_children("*", "MeshInstance3D", true, false)
+	if sword is MeshInstance3D:
+		meshes.append(sword)
+	for mesh: MeshInstance3D in meshes:
+		if mesh.mesh == null:
+			continue
+		for surface in mesh.mesh.get_surface_count():
+			var arrays := mesh.mesh.surface_get_arrays(surface)
+			var own: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var world := PackedVector3Array()
+			world.resize(own.size())
+			var near := PackedByteArray()
+			near.resize(own.size())
+			for i in own.size():
+				world[i] = mesh.global_transform * own[i]
+				near[i] = 1 if box.has_point(world[i]) else 0
+				if near[i] == 1:
+					least = minf(least, float(_nearest_triangle(world[i], verts, corners)[0]))
+			var tris: PackedInt32Array = arrays[Mesh.ARRAY_INDEX] if arrays[Mesh.ARRAY_INDEX] != null else PackedInt32Array(range(own.size()))
+			for t in range(0, tris.size() - 2, 3):
+				if through:
+					break
+				for e in 3:
+					var a := tris[t + e]
+					var b := tris[t + (e + 1) % 3]
+					if (near[a] == 1 or near[b] == 1) and _crosses(world[a], world[b], verts, corners):
+						through = true
+						break
+	return [least, through]
 
 
 ## Whether [param bone] is the off (left) arm's, from the upper arm to the fingertips.
