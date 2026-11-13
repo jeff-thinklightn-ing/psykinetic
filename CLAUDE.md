@@ -222,7 +222,21 @@ that the walk looks like skipping and the people look like "bad claymation place
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
-  stopping one, find its children by command line and stop them by PID too.
+  stopping one, find its children by command line and stop them by PID too. Stop a PID only
+  when it is in your own process tree and was created at or after your own run's start; never
+  one matched on generic arguments (2026-11-12: a filter on `run-marker=1` stopped another
+  tree's queued scene).
+- A landing's waiter (its land script, from the gate take to the push) runs detached from the
+  session's task shell: start it with the Start-Process wrapper (a .sh file it runs, not
+  `bash -c "..."`, which Start-Process splits; unset PYTHONIOENCODING in it), writing its own
+  log you read. Never as a run_in_background task alone: Claude Code stops an idle session's
+  background shells when the machine is short of memory (2026-11-12 23:44, about ten
+  sessions), and a waiter that dies with the shell loses its place.
+- After a "stopped because the system is running low on memory" notice, check by PID and
+  command line what actually died (the script, its heavy_job waiter, its Godots) before
+  believing it: on 11-12 most scripts under the reaped shells lived on. Never requeue a take
+  that is still alive. Restart only what is gone, and only when Jeff says so in that session,
+  as the notice asks: the coordinator's or a peer's go does not count.
 - Joining depends on `Net.protocol()`, not the build (decision 239). A new message kind,
   RPC script, or property you `replicate()` must be listed in `net/net.gd`
   (`MESSAGE_KINDS`, `RPC_SCRIPTS`, `SUBCLASS_REPLICATED`); `tests/protocol_test` names
