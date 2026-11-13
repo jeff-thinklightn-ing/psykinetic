@@ -4,6 +4,9 @@
 # 450), at the same time; one summary and one exit code: 0 when all pass. Their ports and folders are their own
 # (tests/suite_test checks), so they do not meet.
 #   tests/land.sh
+#   tests/land.sh --checks   only the checks a landing runs before the gate (the CHANGELOG,
+#                            Godot launches' logs, the voice inventory), no Godot, gate, lock or
+#                            import: one "LANDING CHECKS: PASS|FAIL" line (278 amended (5))
 # The suite takes the job count (tests/jobs.sh) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its last line. tests/land.ps1 is the same; one of them is enough.
@@ -31,31 +34,54 @@ if [ -z "${PSYKINETIC_TREE:-}" ] && [ -f "$land_lock_dir/checkout" ] 	&& [ "$(ca
 	fi
 fi
 . tools/land_stamp.sh
-# The commit this run tests: a PASS stamps it only if HEAD is still here at the end.
-export LAND_HEAD="${LAND_HEAD:-$(git rev-parse HEAD 2>/dev/null)}"
-if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
-	# The push guard's hook, when origin/main switches it on (tools/hooks/install).
-	land_hook_install
-	# The CHANGELOG first, no Godot, before any wait at the gate (decision
-	# 539): released sections as tagged, no bullet both unreleased and released.
-	python -B tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
+# The checks before the gate, no Godot: land.sh's first step, and all of --checks (278 amended
+# (5)). [param 1] is the land lock the voice inventory may fold its page under: land.sh's own,
+# or for --checks an empty folder, so it is never committed there. On a failure checks_why says
+# why; a stale page is inventory_stale, a warning.
+land_checks() {
+	checks_why=""
+	inventory_stale=""
+	# The CHANGELOG first, before any wait at the gate (decision 539): released
+	# sections as tagged, no bullet both unreleased and released.
+	python -B tools/changelog_check.py || { checks_why="CHANGELOG.md, decision 539: fix it as above"; return 1; }
 	# Every Godot the tooling starts writes its own log in build/logs, never
 	# the shared user:// logs folder (decision 664).
-	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, silence or off-screen, decision 664 and its amendments: fix it as above)"; exit 1; }
+	python -B tools/godot_log_check.py || { checks_why="a Godot launch without --log-file, silence or off-screen, decision 664 and its amendments: fix it as above"; return 1; }
 	# docs/voice_inventory.md is generated: a changed player's line means
 	# re-running its tool, never a hand edit (748 amended (6)). Under this
 	# tree's land lock, clean and ahead of origin/main, a stale page is
 	# regenerated as a commit of its own that goes out with the landing, its sha
 	# named; elsewhere a stale page is a warning, said again before the result
 	# line; a generator that fails stops the landing here (748 amended (8)).
-	inventory_out="$(python -B tools/voice_inventory.py --land "$tree" 2>&1)"
+	inventory_out="$(python -B tools/voice_inventory.py --land "$tree" --lock "$1" 2>&1)"
 	inventory_code=$?
 	[ -n "$inventory_out" ] && echo "$inventory_out"
 	case "$inventory_code" in
 		0|3) ;;
-		*) echo "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventory_code; run python -B tools/voice_inventory.py --check to see it)"; exit 1 ;;
+		*) checks_why="voice inventory, 748 amended (8): the generator failed, exit $inventory_code; run python -B tools/voice_inventory.py --check to see it"; return 1 ;;
 	esac
 	inventory_stale="$(printf '%s\n' "$inventory_out" | grep '^VOICE INVENTORY' || true)"
+	return 0
+}
+if [ "${1:-}" = "--checks" ]; then
+	no_lock="$(mktemp -d -t land-checks.XXXXXX)"
+	land_checks "$no_lock"
+	code=$?
+	rm -rf "$no_lock"
+	[ -n "$inventory_stale" ] && echo "$inventory_stale"
+	if [ "$code" -eq 0 ]; then
+		echo "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the voice inventory$([ -n "$inventory_stale" ] && echo ", its page stale: the landing regenerates it"))"
+		exit 0
+	fi
+	echo "LANDING CHECKS: FAIL ($checks_why)"
+	exit 1
+fi
+# The commit this run tests: a PASS stamps it only if HEAD is still here at the end.
+export LAND_HEAD="${LAND_HEAD:-$(git rev-parse HEAD 2>/dev/null)}"
+if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
+	# The push guard's hook, when origin/main switches it on (tools/hooks/install).
+	land_hook_install
+	land_checks "$land_lock_dir" || { echo "LANDING TESTS: FAIL ($checks_why)"; exit 1; }
 	# The commit these tests run, read once here, after the inventory's own commit and
 	# before any part starts; the result line names it, or fails if it moved (278 amended (1)).
 	. tools/land_tested.sh
@@ -162,6 +188,7 @@ part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
 part land_tested_test bash tests/land_tested_test.sh
 part fonts_imported_test bash tests/fonts_imported_test.sh
 part run_digest_test bash tests/run_digest_test.sh
+part land_checks_test bash tests/land_checks_test.sh
 # Each font's .fontdata before any Godot part: a first import that segfaulted on the fonts left
 # them unmade and server_boot_test's export failed on it (perf-sha, 11-13). One more import if
 # one is missing, under this run's take; still missing, the part fails naming it.

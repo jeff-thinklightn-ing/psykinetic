@@ -3,12 +3,16 @@
 # 450), at the same time; one summary and one exit code: 0 when all pass. Their ports and folders are their own
 # (tests/suite_test checks), so they do not meet.
 #   tests\land.ps1
+#   tests\land.ps1 -Checks   only the checks a landing runs before the gate (the CHANGELOG,
+#                            Godot launches' logs, the voice inventory), no Godot, gate, lock or
+#                            import: one "LANDING CHECKS: PASS|FAIL" line (278 amended (5))
 # The suite takes the job count (tests\jobs.ps1) less the two the others use
 # most of the time; each part's whole output is shown if it fails, else only
 # its result line. tests/land.sh is the same; one of them is enough.
 # A heavy job (decision 394): through the gate as <checkout> suite, adopting
 # this checkout's take of suite if it holds one (see tests/land.sh);
 # heavy_job_test first.
+param([switch]$Checks)
 $root = Split-Path $PSScriptRoot -Parent
 # PSYKINETIC_TREE, else the folder's name; a take under another name is still
 # adopted by its process (394 amended (11)).
@@ -17,35 +21,55 @@ $gate = Join-Path $root 'tools\heavy_job.py'
 # The commit this run tests (decision 883, as tests/land.sh): a PASS stamps it only if
 # HEAD is still here at the end; tools/hooks/pre-push wants the stamp for a push to main.
 if (-not $env:LAND_HEAD) { $env:LAND_HEAD = (& git -C $root rev-parse HEAD 2>$null) }
-if (-not $env:HEAVY_JOB_INSIDE) {
-	# The CHANGELOG first, no Godot, before any wait at the gate (decision
-	# 539): released sections as tagged, no bullet both unreleased and released.
-	& python -B (Join-Path $root 'tools\changelog_check.py')
-	if ($LASTEXITCODE -ne 0) {
-		Write-Output "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"
-		exit 1
-	}
+# The checks before the gate, no Godot: the landing's first step, and all of -Checks (278
+# amended (5)), as tests/land.sh's land_checks. $lock is the land lock the voice inventory may
+# fold its page under: the landing's own, or for -Checks an empty folder, so it is never
+# committed there. Returns why it failed, or '' ; a stale page is $script:inventoryStale.
+function Invoke-LandChecks($lock) {
+	$script:inventoryStale = ''
+	# The CHANGELOG first, before any wait at the gate (decision 539): released
+	# sections as tagged, no bullet both unreleased and released.
+	& python -B (Join-Path $root 'tools\changelog_check.py') | Write-Host
+	if ($LASTEXITCODE -ne 0) { return 'CHANGELOG.md, decision 539: fix it as above' }
 	# Every Godot the tooling starts writes its own log in build/logs, never
 	# the shared user:// logs folder (decision 664).
-	& python -B (Join-Path $root 'tools\godot_log_check.py')
-	if ($LASTEXITCODE -ne 0) {
-		Write-Output "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"
-		exit 1
-	}
+	& python -B (Join-Path $root 'tools\godot_log_check.py') | Write-Host
+	if ($LASTEXITCODE -ne 0) { return 'a Godot launch without --log-file, decision 664: fix it as above' }
 	# docs/voice_inventory.md is generated: a changed player's line means
 	# re-running its tool, never a hand edit (748 amended (6)). Under this
 	# tree's land lock, clean and ahead of origin/main, a stale page is
 	# regenerated as a commit of its own that goes out with the landing, its sha
 	# named; elsewhere a stale page is a warning, said again before the result
 	# line; a generator that fails stops the landing here (748 amended (8)).
-	$inventoryOut = @(& python -B (Join-Path $root 'tools\voice_inventory.py') --land $tree --lock 'C:\dev\land.lock' 2>&1 | ForEach-Object { "$_" })
+	$inventoryOut = @(& python -B (Join-Path $root 'tools\voice_inventory.py') --land $tree --lock $lock 2>&1 | ForEach-Object { "$_" })
 	$inventoryCode = $LASTEXITCODE
-	$inventoryOut | Write-Output
+	$inventoryOut | Write-Host
 	if ($inventoryCode -ne 0 -and $inventoryCode -ne 3) {
-		Write-Output "LANDING TESTS: FAIL (voice inventory, 748 amended (8): the generator failed, exit $inventoryCode; run python -B tools/voice_inventory.py --check to see it)"
+		return "voice inventory, 748 amended (8): the generator failed, exit $inventoryCode; run python -B tools/voice_inventory.py --check to see it"
+	}
+	$script:inventoryStale = (@($inventoryOut | Where-Object { $_ -like 'VOICE INVENTORY*' }) -join "`n")
+	return ''
+}
+if ($Checks) {
+	$noLock = Join-Path ([IO.Path]::GetTempPath()) ('land-checks-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+	New-Item -ItemType Directory -Force $noLock | Out-Null
+	$why = Invoke-LandChecks $noLock
+	Remove-Item $noLock -Recurse -Force -ErrorAction SilentlyContinue
+	if ($inventoryStale) { Write-Output $inventoryStale }
+	if ($why -eq '') {
+		$stale = if ($inventoryStale) { ', its page stale: the landing regenerates it' } else { '' }
+		Write-Output "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the voice inventory$stale)"
+		exit 0
+	}
+	Write-Output "LANDING CHECKS: FAIL ($why)"
+	exit 1
+}
+if (-not $env:HEAVY_JOB_INSIDE) {
+	$why = Invoke-LandChecks 'C:\dev\land.lock'
+	if ($why -ne '') {
+		Write-Output "LANDING TESTS: FAIL ($why)"
 		exit 1
 	}
-	$inventoryStale = (@($inventoryOut | Where-Object { $_ -like 'VOICE INVENTORY*' }) -join "`n")
 	# The commit these tests run, read once here, after the inventory's own commit and before
 	# any part starts; the result line names it, or fails if it moved (278 amended (1), as
 	# tools/land_tested.sh for tests/land.sh).

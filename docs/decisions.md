@@ -5450,6 +5450,18 @@ project and godot, so no Godot runs: a check failed 800 lines up, an error and i
 of a scene that passed, 40 of 60; main's run.sh fails its four digest checks. Tests only; protocol unchanged; no
 class_name; no bullet.
 
+278 amended (5) (perf, 2026-11-13; the coordinator's approval; label from tools/decision_number.sh): a landing's
+checks before the gate, alone. tests/land.sh --checks (land.ps1 -Checks) runs only the CHANGELOG check,
+godot_log_check and the voice inventory, the same function the landing runs first (land_checks, Invoke-LandChecks),
+and prints one line, "LANDING CHECKS: PASS" or "LANDING CHECKS: FAIL (<why>)", exit 0 or 1; no Godot, gate, land lock
+or import, about 3 s. The voice inventory is given an empty folder of its own as its land lock, so --checks never
+commits a regenerated page: a stale page is the landing's warning, said again before the PASS line. A tree runs it
+before it queues, so a fault these checks find costs nobody a place in the queue. tests/land_checks_test.sh (a land.sh
+part): this checkout passes without the gate; a fake project for each fault (each named, nothing run after the
+CHANGELOG's), a stale page, the lock never the land lock; land.ps1 -Checks the same where PowerShell is. It refuses to
+run a land.sh without --checks, which would start a whole landing on the argument it ignores (its first try on main's
+land.sh queued one, stopped at the gate). Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
