@@ -75,6 +75,8 @@ func _ready() -> void:
 	_test_weapon_memory()
 	_test_guard_rework()
 	_test_told_guard()
+	_test_guard_miss_line()
+	_test_flanked()
 	_test_arts_marks()
 	_test_lob_aim_on_client()
 	_test_armour()
@@ -767,6 +769,98 @@ func _test_guard_rework() -> void:
 	_check(World.guarding(holder, off).is_empty() and rad_to_deg(World.off_facing(holder, off)) > 15.0,
 			"and not one two cells down, its body %.1f degrees off at its nearest" % rad_to_deg(World.off_facing(holder, off)))
 	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+
+
+## 340 amended (5): a told blow or lunge reaching a raised shield that doesn't meet
+## it logs why, naming its holder by kind only (the box's journal is read by
+## grep): the degrees off, the facing, stunned when so. A blow met, an untold
+## blow out of the arc and a lowered shield log no such line.
+func _test_guard_miss_line() -> void:
+	print("
+== a told blow past a raised shield says why, no names (340 amended (5)) ==")
+	var e := _build(["#########", "#.......#", "#.......#", "#..mPm..#", "#.......#", "#########"])
+	var holder: Player = e["P"][0]
+	var west: GridEntity = e["m"][0]
+	var east: GridEntity = e["m"][1]
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	holder.facing = Vector2i(1, 0)
+	World.try_stance(holder, "block")
+	holder.stamina = 100
+	var before := World.logged
+	var met: Variant = World._meet_guard(holder, west, 3, 0.0, true, false, true)  # A robber's lunge (monster.gd).
+	var line := World.last_log
+	_check(met == null and World.logged == before + 1 and line.begins_with("guard: a player's raised shield misses %s's told lunge (off " % west.name)
+			and line.ends_with("°, facing E)") and not holder.name in line,
+			"a told lunge from behind a shield raised east: one line, by kind, its degrees and facing (%s)" % line)
+	var off := line.get_slice("(off ", 1).get_slice("°", 0).to_int()
+	_check(off > 140 and off < 160, "behind, his body's near edge: about 150 degrees off (%d)" % off)
+	before = World.logged
+	_check(World._meet_guard(holder, west, 2, 0.0, false, false, true) == null and World.last_log.contains("'s told blow (off "),
+			"a told blow likewise (%s)" % World.last_log)
+	before = World.logged
+	_check(World._meet_guard(holder, west, 2, 0.0) == null and World.logged == before, "an untold blow from behind: no line")
+	before = World.logged
+	met = World._meet_guard(holder, east, 3, 0.0, true, false, true)
+	_check(met == [0, 0.0] and World.logged == before + 1 and World.last_log.begins_with("guard: %s takes " % holder.name),
+			"one from ahead: met, the guard's own line, no miss (%s)" % World.last_log)
+	holder.stunned_until_tick = World.tick + 10
+	met = World._meet_guard(holder, east, 3, 0.0, true, false, true)
+	_check(met == null and World.last_log.ends_with("facing E, stunned)") and World.last_log.contains("(off 0°"),
+			"stunned, from ahead: missed, and the line says stunned (%s)" % World.last_log)
+	holder.stunned_until_tick = 0
+	World.try_stance(holder, "")
+	before = World.logged
+	World._meet_guard(holder, west, 3, 0.0, true, false, true)
+	_check(World.logged == before or not World.last_log.contains("raised shield misses"), "lowered: no miss line (%s)" % World.last_log)
+	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+
+
+## 340 amended (5), the coordinator's (companions call it, voice words the shout):
+## World.is_flanked is true when two or more foes fighting a shield's holder
+## within their reach stand where no one facing of its shield covers them all
+## (guarding's arc and body edge), raised or lowered; false with no shield,
+## one foe, two on neighbouring sides (the diagonal covers both), or a foe out
+## of reach or fighting someone else.
+func _test_flanked() -> void:
+	print("
+== flanked: no one facing of her shield covers the foes on her (340 amended (5)) ==")
+	var e := _build(["##########", "#........#", "#...m....#", "#..mPm..m#", "#...m....#", "##########"])
+	var holder: Player = e["P"][0]
+	var north: Monster = e["m"][0]
+	var west: Monster = e["m"][1]
+	var east: Monster = e["m"][2]
+	var far: Monster = e["m"][3]
+	var south: Monster = e["m"][4]
+	var on := func(foes: Array) -> void:
+		for each: Monster in [north, west, east, far, south]:
+			each.target = holder if each in foes else null
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	holder.facing = Vector2i(1, 0)
+	World.try_stance(holder, "block")
+	on.call([west])
+	_check(not World.is_flanked(holder), "one foe: not flanked")
+	on.call([west, south])
+	_check(not World.is_flanked(holder), "two on neighbouring sides (west, south): not flanked, the south-west facing covers both")
+	on.call([west, east])
+	_check(World.is_flanked(holder), "two on opposite sides (west, east): flanked")
+	on.call([west, east, north])
+	_check(World.is_flanked(holder), "three around (west, east, north): flanked")
+	on.call([west, far])
+	_check(not World.is_flanked(holder), "a second three cells off, no lunge of its own: out of reach, not counted")
+	far.lunge = Monster.LUNGE.duplicate()
+	far.lunge["reach"] = 4
+	_check(World.is_flanked(holder), "the same with a told lunge reaching 4: counted, flanked (west, far east)")
+	far.lunge = {}
+	on.call([west])
+	east.target = null
+	_check(not World.is_flanked(holder), "the east one fighting nobody: not counted")
+	on.call([west, east])
+	World.try_stance(holder, "")
+	_check(World.is_flanked(holder), "lowered: flanked all the same (the shout comes before she raises it)")
+	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+	_check(not World.is_flanked(holder), "no shield: never flanked")
+	_give(holder, "sword")
+	_check(not World.is_flanked(holder), "a sword alone: never flanked")
 
 
 ## 340 amended (3), the coordinator's rule 2, as 340 amended (4) has it: a

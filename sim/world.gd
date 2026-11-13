@@ -7327,6 +7327,76 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 + wider else {}
 
 
+## 340 amended (5) (the coordinator's, from playtest's joined crypt fight: two
+## lunges hurt a player holding her shield up, with no line saying why): a
+## told blow or lunge reaching a raised shield that doesn't meet it logs why,
+## for the box's journal: how far the striker's body lay off its holder's
+## facing, the facing, and stunned, in a bash's moment or its hands not free
+## when so. The holder is named by kind, never by name or id ("a player's", "a
+## companion's", a resident by trade): the journal is read by grep.
+const FACING_WORDS: Array[String] = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+func _log_guard_miss(target: GridEntity, source: GridEntity, what: String) -> void:
+	var why: Array[String] = []
+	if is_stunned(target):
+		why.append("stunned")
+	if tick < target.bash_moment_until:
+		why.append("in a bash's moment")
+	if not holds_in_hands(target):
+		why.append("hands not free")
+	var way := "none"
+	if target.facing != Vector2i.ZERO:
+		way = FACING_WORDS[posmod(roundi(rad_to_deg(atan2(float(target.facing.x), -float(target.facing.y))) / 45.0), 8)]
+	_log("guard: %s raised shield misses %s's %s (off %d°, facing %s%s)" % [_whose(target), source.name, what,
+			roundi(rad_to_deg(off_facing(target, source))), way, "" if why.is_empty() else ", " + ", ".join(why)])
+
+
+## [param body] named by kind for a journal line (no player's name or id):
+## "a player's", "a companion's", a resident by trade ("a smith's"), anything
+## else by its node name.
+func _whose(body: GridEntity) -> String:
+	if body is Player:
+		return "a player's"
+	if body is Companion:
+		return "a companion's"
+	if "trade" in body and not str(body.get("trade")).is_empty():
+		return "a %s's" % str(body.get("trade"))
+	return "%s's" % body.name
+
+
+## 340 amended (5) (the coordinator's: a companion shouts when her player is
+## flanked; companions call it, voice words it): whether [param body], holding
+## a shield (a block verb in its left hand, raised or lowered), has two or
+## more foes fighting it within their own reach (a monster whose target it
+## is: adjacent with no wall between, or within its told lunge's reach) where
+## no one of the eight facings covers them all by its shield's own arc and
+## the near edge of each body (guarding's rule, so it never says otherwise
+## than the shield would). False with no shield, with one foe, or with two
+## one facing covers (two on neighbouring sides, from the diagonal between).
+## Server side, read only; it may change each tick as they move.
+func is_flanked(body: GridEntity) -> bool:
+	if not _alive(body) or not holds_in_hands(body):
+		return false
+	var held: String = body.slots[Items.LEFT_HAND]
+	var verb := Items.verb_of(held) if not held.is_empty() else {}
+	if verb.get("kind") != "block":
+		return false
+	var foes: Array[GridEntity] = []
+	for each in _entities:
+		if each == body or not (each is Monster) or not _alive(each) or each.hp <= 0 or (each as Monster).target != body:
+			continue
+		var reach := int((each as Monster).lunge.get("reach", 1)) if not (each as Monster).lunge.is_empty() else 1
+		if can_melee(each.tile, body.tile) or distance(each.tile, body.tile) <= reach:
+			foes.append(each)
+	if foes.size() < 2:
+		return false
+	var arc := float(verb["arc"]) * PI / 4.0 + 0.01
+	for k in 8:
+		var facing := Vector2.UP.rotated(deg_to_rad(45.0 * k))
+		if foes.all(func(foe: GridEntity) -> bool: return _off_from(facing, body, foe) <= arc):
+			return false
+	return true
+
+
 ## How far [param source]'s body lies off [param target]'s facing, in
 ## radians (340 amended (2), the coordinator's: a guard meets a blow when
 ## any of the striker's body is in its arc, not only its centre, so a
@@ -7336,8 +7406,13 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 ## across each way: its cell's, without the corners, so a neighbour a
 ## diagonal off stays off a straight-ahead guard), a free body FREE_RADIUS.
 func off_facing(target: GridEntity, source: GridEntity) -> float:
+	return _off_from(Vector2(target.facing), target, source)
+
+
+## off_facing for [param facing] (one [param target] might turn to): flanked
+## asks it of each of the eight.
+func _off_from(facing: Vector2, target: GridEntity, source: GridEntity) -> float:
 	var at := body_centre(source) - body_centre(target)
-	var facing := Vector2(target.facing)
 	if at.length() < 0.001 or facing == Vector2.ZERO:
 		return 0.0
 	var radius := FREE_RADIUS if free_body(source) else 0.5
@@ -7390,6 +7465,8 @@ func lowered_guard(target: GridEntity, source: GridEntity) -> Dictionary:
 func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
 		crushing := false, told := false) -> Variant:
 	var verb := guarding(target, source)
+	if verb.is_empty() and told and target.raised == "block" and not is_sheltered(target):
+		_log_guard_miss(target, source, "told lunge" if shot else "told blow")
 	if verb.is_empty():
 		verb = lowered_guard(target, source)  # 340 amended: its shield's side, at half.
 	if verb.is_empty() or is_sheltered(target):

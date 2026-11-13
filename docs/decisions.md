@@ -7679,6 +7679,24 @@ _test_shield_breath are out, the tooltips and the bullet without their breath cl
 The wall stays a known fault, on the cut's list: a shield held up still, never striking, holds the
 draugr, Brand, a brute, Grull and a boar for ever (the still guard table, 3 min, nothing landed).
 No further variant (the coordinator).
+340 amended (5) (the decision-number script's label; the coordinator's rulings on playtest's joined crypt fight, 11-12):
+a raised shield guards a front, not a ring, and isn't changed; what it misses is said, and a companion is told when no
+facing would do. In that fight (fists, a shield up throughout) 8 of 19 blows hurt: four plain blows from behind and two
+lunges with no line saying why, read only by inference as her facing having turned to another robber. (1) World._meet_guard:
+a told blow or lunge (told, as 340 amended (4) has it) reaching a body whose shield is raised and not meeting it logs
+"guard: a player's raised shield misses Robber4's told lunge (off 150°, facing E[, stunned][, in a bash's moment][, hands
+not free])": the striker's body off the holder's facing (off_facing, its near edge), the facing as a compass point.
+The holder is named by kind only (World._whose: "a player's", "a companion's", a resident by its trade), never a name
+or id, since the box's journal is read by grep. A blow met, an untold blow out of the arc, a lowered shield and a told
+move's own path (told_guard: a charge, a throw, a cone) log no such line. A crypt fight like playtest's prints one per
+lunge or told blow that reaches her past the shield: two in its 19 blows. (2) World.is_flanked(body) (not
+World.flanked, 780's flank-stagger signal), for companions' shout (891, voice's words): true when the body holds a shield (a block verb in its left hand, raised or lowered: the shout comes
+before she raises it) and two or more monsters fighting it (its target) stand within their own reach (adjacent with no
+wall between, or within a told lunge's reach) where none of the eight facings covers them all by the shield's own arc
+and each body's near edge (World._off_from, guarding's rule, so it never says otherwise than the shield would). False
+with no shield, one foe, two on neighbouring sides (the diagonal between covers both), or a foe out of reach or fighting
+someone else. Read only; it may change each tick, the shout's cooldown companions'. combat_test _test_guard_miss_line
+and _test_flanked. Server only; protocol unchanged; no new class_name; no bullet.
 
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
