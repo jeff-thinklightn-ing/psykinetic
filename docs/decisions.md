@@ -5411,6 +5411,19 @@ carries the sha and the pattern finds it; a commit or a tracked edit made mid-ru
 changes names no bare sha; a FAIL line is unchanged; land.sh and land.ps1 use it. Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+278 amended (2) (perf, 2026-11-13; the coordinator's row after 431 amended (3); label from tools/decision_number.sh):
+suite_test claims every port a .gd test asks test_ports.gd for, not only of(<number>) written on test_ports.gd's own
+preload. status_test's of(BASE_PORT + 8) was camp_fall_test's game port and suite_test never read it: a constant, a
+sum and a preloaded name (var ports := preload(...), then ports.of(17972)) all went unclaimed, five ports on main
+(first_room_test, path_bound_test, seamless_test, status_test's two). Now _of_ports reads of(...) by any name the file
+preloads test_ports.gd under, its argument a number, a constant of the file's or either + k, and an argument it cannot
+read fails suite_test, named ("every test_ports.gd of(...) is read"). The shell tests' ports (base + PORT_OFFSET and
+the ports counted from it) were read before. A check on made-up lines pins the forms: a preloaded name, a constant, +
+k, a variable unread, Offers.of and comments not ports. Run alone through the gate (perf's offset): on main just
+before 431 amended (3) it failed, naming "port 17858: tests/camp_fall_test.gd:22 and tests/status_test.gd:99" and
+"port 17860: tests/regen_test.gd:34 and tests/status_test.gd:150"; on main with it, PASS, 50 ports, every of() read.
+Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
