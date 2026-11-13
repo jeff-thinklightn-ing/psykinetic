@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2940)
+## Lines in the code (2945)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1054,7 +1054,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [spawn] %s is not a GridEntity script; using the base class | `entities/entity_factory.gd` script_for() |
 |  | [spawn] unknown shape %s; drawing a capsule | `entities/entity_factory.gd` shape_for() |
 
-### other (net) (56)
+### other (net) (61)
 
 | | Line | Where |
 |---|---|---|
@@ -1082,6 +1082,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | PSYKINETIC_TOKEN empty | `net/net.gd` start() |
 |  | the token credential, PSYKINETIC_TOKEN or --token=<string> | `net/net.gd` start() |
 |  | , no token: open to anyone | `net/net.gd` start() |
+|  | its own, --overlay-dir | `net/net.gd` start() |
+|  | the shared one | `net/net.gd` start() |
+|  | laid when due | `net/net.gd` start() |
+|  | not laid: a test run on the shared overlay | `net/net.gd` start() |
+|  | not laid: no --regenerate | `net/net.gd` start() |
 |  | no ticks in the last minute | `net/net_stats.gd` server_text() |
 |  | tick avg %.2f ms, worst %.2f ms (tick %d) over %d ticks; frame worst %.1f ms; sent %.1f KB/s, received %.1f KB/s | `net/net_stats.gd` server_text() |
 |  | corrections %d/min (%d snapped), worst %.2f tiles (ever %.2f) | `net/net_stats.gd` client_text() |
