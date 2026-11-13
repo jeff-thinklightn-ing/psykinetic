@@ -738,10 +738,18 @@ func _test_free_dodge() -> void:
 ## between the centres, and the monster closes on strike cells (699,
 ## enemy-ai's side) rather than waiting out of reach; no dance at a cell's
 ## border (a dart's in and out is its tactic).
+## Her zig-zag's half period, in ticks, and so its phases.
+const ZIGZAG_PHASES := 6
+
+
 func _test_free_chase() -> void:
 	print("
 == a monster after a free body: blows within reach by bodies, no dance at a border ==")
-	for kind: String in ["imp", "brute", "skeleton", "robber"]:
+	# Each at every phase of her zig-zag (699 amended (2)): at one phase only, a
+	# robber's flip at the wall passed by luck, his arrival there and her zag in step.
+	for run: int in 4 * ZIGZAG_PHASES:
+		var kind: String = ["imp", "brute", "skeleton", "robber"][run / ZIGZAG_PHASES]
+		var phase := run % ZIGZAG_PHASES
 		var player := _sturdy(_build(_open(24, 9), Vector2i(4, 4)))
 		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": kind, "tile": Vector2i(2, 4), "temperament": "bold", "props": Monster.bodies()[kind]}) as Monster
 		_room.add_child(foe)
@@ -759,7 +767,7 @@ func _test_free_chase() -> void:
 		var last_way := Vector2i.ZERO
 		var last_tile := foe.tile
 		for i in 200:
-			var way := Vector2(1, 0) if i < 40 else Vector2(-1, 0.6 if (i / 6) % 2 == 0 else -0.6).normalized()
+			var way := Vector2(1, 0) if i < 40 else Vector2(-1, 0.6 if ((i + phase) / ZIGZAG_PHASES) % 2 == 0 else -0.6).normalized()
 			World.free_input(player, way, World.TICK_DT)
 			World.step()
 			if foe.tile != last_tile:
@@ -773,7 +781,7 @@ func _test_free_chase() -> void:
 		# lead_slack past reach, as a sword's lead does. The hits are snapped to 0.01.
 		var reach := World.reach_limit(foe) + World.lead_slack + 0.005
 		_check(not hits.is_empty() and hits.max() <= reach and (turns <= 1 or kind == "imp"),
-				"%s: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
+				"%s, her zig-zag at phase %d: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, phase, hits.size(), hits, reach, turns])
 
 
 ## A robber's plain blow is told (806 amended (14): lead_ticks 6, 0.6 s):

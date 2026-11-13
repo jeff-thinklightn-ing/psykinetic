@@ -36363,6 +36363,56 @@ monster_test _test_strike_reach (a bare-handed robber strikes from 1.17 off a
 free body at the back of its cell, with a battle axe 1.60, in a dead end
 from the one close cell, 0.60); free_walk_test's chase (skeleton 0, robber
 1). Server only, protocol unchanged, no new class_name.
+
+699 amended (2), enemy-ai's side (the decision-number script's label; the
+coordinator's go, after the lunge row's landing failed free_walk_test's chase
+on "back-and-forth steps 2"). The hold never held a robber who had not swung
+yet, and a held cell was never kept. Its fault was main's, and the test
+passed it by luck: run at each of the six phases of her zig-zag (her side
+changed every 6 ticks), main's robber turned twice at phase 4 (ubuntu-1).
+There he came to (1, 4) beside her on the wall with her at 1.25, in his
+reach; she zigged to 1.66 before his told blow began, and he stepped to
+(1, 3), she zagged to 1.54, he stepped back. The lunge row's longer tell only
+moved his coming to the wall onto that phase. Two things stopped the hold:
+- It held a cell only after a swing from it. Now a cell he had her in reach
+  from within the last STRIKE_HOLD_TICKS (Monster._reached_from, set where
+  _in_strike_reach is read at both chase sites) is held as well, swung or
+  not, while she is within his reach + STRIKE_HOLD_SLACK. A body never in
+  reach from there is closed on as before; one walking away is past the
+  slack within a tick or two.
+- A held cell picked as his slot is his own cell, and _go_to's path to it is
+  empty (World.find_path from a cell to itself), so the chase fell through to
+  "as near as it can get" and stepped toward her cell all the same. Now
+  _pick_slot says when it held (Monster._strike_holding) and he stands there
+  that tick, at the plain chase and the general one. A slot that is merely
+  his own cell falls through as before.
+No constant changed. free_walk_test's chase now runs every kind at each of
+the six phases (ZIGZAG_PHASES), each checked, so it no longer passes by luck.
+The robber's turns go from 1,1,0,0,2,1 to 1,1,0,0,1,1; the brute's and
+skeleton's are unchanged; the imp darts by design and is exempt.
+A body standing on a held cell could trade the shuffle for standing while she
+walks off, so here are the blows per phase, main beside the mend:
+
+| kind | plain blows, main | plain blows, mend |
+|---|---|---|
+| imp | 6, 5, 7, 6, 5, 6 | 6, 6, 7, 6, 6, 6 |
+| brute | 5, 4, 4, 5, 4, 4 | 5, 4, 4, 5, 5, 4 |
+| skeleton | 5, 4, 8, 5, 7, 8 | 6, 4, 8, 5, 7, 8 |
+| robber | 7, 7, 6, 8, 5, 6 | 7, 3, 6, 8, 6, 4 |
+
+| robber | main | mend |
+|---|---|---|
+| lunges landed | 0, 0, 0, 0, 0, 1 | 0, 2, 0, 0, 0, 2 |
+| all harm | 14, 14, 12, 16, 10, 15 (81) | 14, 12, 12, 16, 12, 14 (80) |
+
+No kind lands fewer plain blows in any phase but the robber at phases 1 and
+5, where he trades plain blows for lunges from the wall column. At phase 1
+he is held one tick on (1, 3) as she zags to 1.68, goes next to (0, 3) beside
+her, and lunges from there; his harm over the six phases is 80 against 81,
+with the flip gone. Nobody reported the shuffle; playtest may watch for a
+robber or skeleton stepping back and forth beside a player at a wall.
+free_walk_test _test_free_chase (six phases; fails on main at the robber's
+phase 4). Server only, protocol unchanged, no new class_name, no bullet.
 ## 344 amended. The spear's strike is a jab
 
 Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation

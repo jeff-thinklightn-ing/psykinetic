@@ -182,8 +182,12 @@ const STRIKE_GAP_SLACK := 0.3
 ## A free body it has swung at from the cell it stands on, now at most this
 ## far past its reach (World.reach_limit) of it: till STRIKE_HOLD_TICKS after
 ## its next swing is ready, it holds that cell, waiting for a dodge to swing
-## back, rather than step after each zig and back after each zag. A body it
-## has not swung at from there is closed on, as before.
+## back, rather than step after each zig and back after each zag. One that was
+## in its reach from there within the last STRIKE_HOLD_TICKS is held for the
+## same, swung at or not (699 amended (2): a robber come to a body zig-zagging
+## along a wall stepped after her before his told blow could start, and back).
+## A body never in its reach from there is closed on, as before. A held cell is
+## stood on (_strike_holding), not left for the way to her own cell.
 const STRIKE_HOLD_SLACK := 0.3
 const STRIKE_HOLD_TICKS := 8
 ## How far ahead, in ticks, it leads a moving free body (lead-the-target):
@@ -432,6 +436,13 @@ var slot := NO_TILE
 ## (STRIKE_HOLD_TICKS).
 var _strike_held := NO_TILE
 var _strike_held_tick := -1
+## The cell it last had its free target in reach from, and the tick
+## (STRIKE_HOLD_TICKS, 699 amended (2)).
+var _reached_from := NO_TILE
+var _reached_tick := -1
+## Its last _pick_slot held the cell it stands on (STRIKE_HOLD_SLACK): it
+## stands there this tick rather than close on her own cell.
+var _strike_holding := false
 ## Its last World.strike_cells against a free target, and where from (699).
 var _strike_plan := {}
 ## Its free target's way when it last led it, and the tick (lead-the-target).
@@ -1321,11 +1332,15 @@ func _sim_tick() -> void:
 			_guard_tick()
 	if tactic == Tactic.PLAIN:
 		if _in_strike_reach(target):
+			_reached_from = tile
+			_reached_tick = World.tick
 			if not _bash_guard():
 				_blow()
 		elif World.tick >= next_move_tick:
 			if World.free_body(target):
 				slot = _pick_slot()
+				if _strike_holding:
+					return  # Holds the cell it reached her from (699 amended (2)).
 				if slot != NO_TILE and _go_to(slot):
 					return  # To a cell it can strike a free body from (699).
 			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
@@ -1343,6 +1358,9 @@ func _sim_tick() -> void:
 	if pack_id != "" and World.tick >= _dart_until and _pack_waits():
 		_hover()
 		return  # Faced, or enough of its pack at it: it waits its turn round it (824).
+	if _in_strike_reach(target):
+		_reached_from = tile
+		_reached_tick = World.tick
 	if _in_strike_reach(target) or can_strike and _meets_in_stride():
 		if _darts() and World.tick < _dart_until:
 			if World.tick >= _dart_from:
@@ -1390,6 +1408,8 @@ func _sim_tick() -> void:
 				and World.has_clear_line(tile, target.tile)
 		move_ticks = _pace * (charge_pace if _charging else 1.0)
 	slot = _pick_slot()
+	if _strike_holding:
+		return  # Holds the cell it reached her from (699 amended (2)).
 	if slot == NO_TILE or not _go_to(slot):
 		# Nowhere free beside it: as near as it can get.
 		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
@@ -1758,6 +1778,8 @@ func _claimed_round(of: GridEntity) -> Dictionary:
 
 
 func _pick_slot() -> Vector2i:
+	_strike_holding = false
+	var held := false
 	var claims := _claimed_round(target)
 	var claimed := {}
 	for at: Vector2i in claims:
@@ -1799,10 +1821,12 @@ func _pick_slot() -> Vector2i:
 		if _strike_held != tile:
 			_strike_held = tile
 			_strike_held_tick = World.tick
-		if not cells.has(tile) and next_attack_tick > _strike_held_tick \
-				and World.tick <= next_attack_tick + STRIKE_HOLD_TICKS \
+		var swung_here := next_attack_tick > _strike_held_tick and World.tick <= next_attack_tick + STRIKE_HOLD_TICKS
+		var reached_here := _reached_from == tile and World.tick - _reached_tick <= STRIKE_HOLD_TICKS
+		if not cells.has(tile) and (swung_here or reached_here) \
 				and Vector2(tile).distance_to(meet) <= World.reach_limit(self) + STRIKE_HOLD_SLACK:
 			cells.append(tile)  # Just dodged out of reach: it holds its ground.
+			held = true
 		if cells.is_empty():
 			cells = any  # None that far: never without a cell to fight from.
 		aim = STRIKE_SPAN_SHARE * World.span_of(World.blow_verb(self))
@@ -1838,6 +1862,7 @@ func _pick_slot() -> Vector2i:
 		if not claims.has(best):
 			claims[best] = []
 		(claims[best] as Array).append(self)  # Seen by those picking after it this tick, once its slot is set.
+	_strike_holding = held and best == tile
 	return best
 
 
