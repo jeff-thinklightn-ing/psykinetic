@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2916)
+## Lines in the code (2918)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1113,7 +1113,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (204)
+### other (render) (206)
 
 | | Line | Where |
 |---|---|---|
@@ -1247,6 +1247,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Wolves in the lanes | `render/town_sheet.gd` state_words() |
 |  | Raiders in the town | `render/town_sheet.gd` state_words() |
 |  | Wolves at the fold | `render/town_sheet.gd` ask_words() |
+|  | We have no %s. One is said to be %s. | `render/town_sheet.gd` ask_words() |
+|  | We have no %s. | `render/town_sheet.gd` ask_words() |
 |  | %s %s %s %s%s | `render/town_sheet.gd` boxes_shown() |
 |  | Total gold %d | `render/town_sheet.gd` total_shown() |
 |  | %s, %s %s | `render/town_sheet.gd` title_words() |
