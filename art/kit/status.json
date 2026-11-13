@@ -696,7 +696,7 @@
 			"type": "mesh",
 			"kind": "cell",
 			"category": "props",
-			"size": "0.9 x 0.6 x 1.2",
+			"size": "0.9 x 0.5 x 1.2",
 			"budget": 800
 		},
 		{

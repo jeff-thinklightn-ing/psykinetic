@@ -169,11 +169,11 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `item.buckler` | 1 | art-kit, by hand | own | 2026-10-24 |
 | `item.camp_key` | 1 | art-kit, by hand | own | 2026-10-30 |
 | `item.cloak` | 1 | art-kit, by hand | own | 2026-11-06 |
-| `item.cloth_bolt` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `item.cloth_bolt` | 1 | art-gen, by hand | own | 2026-11-11 |
 | `item.coin_purse` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `item.cooked_fish` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `item.copper_brooch` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `item.dagger` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `item.dagger` | 1 | art-kit, by hand | own | 2026-11-12 |
 | `item.encolpion_amulet` | 1 | art-kit, by hand | own | 2026-10-28 |
 | `item.feathers` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `item.felt_hat` | 1 | art-kit, by hand | own | 2026-11-06 |
@@ -237,7 +237,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `item.tusks` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `item.wine` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `item.wood` | 1 | art-kit, by hand | own | 2026-11-10 |
-| `item.wood_bundle` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `item.wood_bundle` | 1 | art-gen, by hand | own | 2026-11-12 |
 | `item.wool` | 1 | art-kit, by hand | own | 2026-11-02 |
 | `material.rock` | 1 | art-gen | own | 2026-10-18 |
 | `material.roof.shingle` | 1 | art-gen, procedural (no model) | own | 2026-10-17 |
@@ -288,7 +288,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.candle_stand` | 1 | art-gen, by hand | own | 2026-11-11 |
 | `prop.candles` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `prop.captive_post` | 1 | art-kit, by hand | own | 2026-11-05 |
-| `prop.cart` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.cart` | 1 | art-gen, by hand | own | 2026-11-11 |
 | `prop.carved_relief` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `prop.chest` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `prop.collapse_drift` | 1 | art-kit, by hand | own | 2026-11-05 |
@@ -388,7 +388,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `scatter.reeds` | 1 | art-kit, by hand to art-gen's c1 | own | 2026-10-18 |
 | `scatter.root` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `scatter.stone` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
-| `scatter.tuft` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `scatter.tuft` | 1 | art-gen, by hand | own | 2026-11-12 |
 | `site.stake` | 1 | art-kit, by hand | own | 2026-10-21 |
 | `steps.chapel` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
 | `tool.axe` | 1 | art-kit, by hand | own | 2026-10-21 |
