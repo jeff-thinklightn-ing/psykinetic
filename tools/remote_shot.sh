@@ -63,7 +63,8 @@
 # (the one test scene a laptop runs, and only so), --name=Tourbot, tour.sh's fixed test player
 # id, --tour-admin=<that port>, --tour-out={out}, --tour-minutes (--tour-minutes N, default 20).
 # The tour's scripts are parsed on the laptop at <sha> first. No godot args of the caller's;
-# --tour-only SECTION sets the tour's TOUR_ONLY, and --server-args may add --test-foe=a,b.
+# --tour-only SECTION sets the tour's TOUR_ONLY, and --server-args may add --test-foe=a,b and
+# --sought-first (economy's crop.sought_first on for that server only, 613 amended (4)).
 # One phase: the restart tour (TOUR_PHASES=2) stays on tools/tour.sh. report.md, its stills
 # and both logs come back; report.md's first line is the server's SCRIPT ERROR count.
 set -u
@@ -251,7 +252,11 @@ if [ $JOINED -eq 1 ]; then
 				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
 				case "${arg#--test-foe=}" in *[!a-z0-9_,]*|"") echo "--server-args $arg: refused (a foe and a weapon, a-z, 0-9, _ and ,)"; exit 2 ;; esac
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
-			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
+			# The first rescue's walk (613 amended (4)): sought_first on for this server only.
+			--sought-first)
+				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b and --sought-first with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
 		esac
 	done
 	# A tour's server is laid as the box's is (tour.sh's --regenerate).
