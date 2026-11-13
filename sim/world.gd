@@ -6057,17 +6057,90 @@ func _tend_disarmed() -> void:
 			_take_axe(by)
 
 
-## The spin's sweep (decision 603): every body in its cells struck (a
-## raised shield facing him takes it whole: told_guard, 340 amended (3), (4)),
-## pushed outward and knocked down; then its maker spent.
-func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
+## The push [param by]'s spin throws with, as it stands (decision 603; 603
+## amended (4)): its blow's push and its two-handed weapon's weight swung
+## (swing_impulse, physics' 605), times impulse_scale. Disarmed, its blow's
+## push alone.
+func _spin_impulse(by: GridEntity) -> float:
 	var move: Dictionary = moves["spin"]
 	var slot := _axe_slot(by)
 	var id := by.slots[slot] if slot >= 0 else ""
 	var impulse := blow_impulse(by, blow_verb(by)) + (Items.weight_of(id) if not id.is_empty() else 0.0) * float(move["weight_impulse"])
 	if has_method("swing_impulse") and not id.is_empty():
 		impulse = float(call("swing_impulse", by, id))  # Physics' (605), when it is in.
-	impulse *= float(move.get("impulse_scale", 1.0))  # Jeff's knob (a wall's impact grows with its square).
+	return impulse * float(move.get("impulse_scale", 1.0))  # Jeff's knob (a wall's impact grows with its square).
+
+
+## The mass a wall's cost is judged on (decision 906): a rested, unarmoured
+## player's.
+const WALL_COST_MASS := 80.0
+## The wall's extra harm at which a foe throws into walls (906).
+const WALL_COST_AT := 5
+
+
+## Whether [param body]'s told moves throw a player into a wall hard enough
+## that the wall costs more than a scratch (decision 906; companions' 891
+## amended (1) reads it, so her flank lines never send her player's back to
+## a wall against such a foe): any of its told_impulses whose wall_cost is
+## WALL_COST_AT or more. Today the draugr (his spin, 14 to 15 at a wall),
+## the great bear (swipe and charge 9, slam 5) and the boar king (charge 9);
+## not the hill cat (pounce 2), the old wolf (drag 2), nor any plain blow
+## (under knockback_min_force: no push, so a wall costs nothing). Read from
+## the moves' numbers, never names: a new beast's decide. As it stands: a
+## disarmed draugr's spin is his fists' and throws no one, till he has his
+## axe again. Server only, no state.
+func throws_into_walls(body: GridEntity) -> bool:
+	for impulse in told_impulses(body):
+		if wall_cost(impulse) >= WALL_COST_AT:
+			return true
+	return false
+
+
+## The pushes [param body]'s told moves throw with (decision 906): every
+## move constant of its class and those above it holding an "impulse" or a
+## "drag" (the beasts' SWIPE, SLAM, CHARGE, POUNCE, SPRING), and the moves
+## World tells for it (its world_moves: the spin's _spin_impulse, the axe
+## throw's weight x speed).
+func told_impulses(body: GridEntity) -> Array[float]:
+	var out: Array[float] = []
+	if not is_instance_valid(body):
+		return out
+	var script: Script = body.get_script()
+	while script != null:
+		var consts := script.get_script_constant_map()
+		for key: String in consts:
+			var move: Variant = consts[key]
+			if not move is Dictionary:
+				continue
+			for field: String in ["impulse", "drag"]:
+				var value: Variant = (move as Dictionary).get(field)
+				if value is float or value is int:
+					out.append(float(value))
+		script = script.get_base_script()
+	if body.has_method("world_moves"):
+		var named: Array = body.call("world_moves")
+		var slot := _axe_slot(body)
+		if "spin" in named and slot >= 0:
+			out.append(_spin_impulse(body))
+		if "throw" in named and slot >= 0:
+			out.append(Items.weight_of(body.slots[slot]) * float(moves["throw"]["speed"]))
+	return out
+
+
+## The extra harm a wall at the back of a WALL_COST_MASS body takes from a
+## push of [param impulse] met at once (decision 906): its speed's energy at
+## impact_per_energy, as _push's wall meets it.
+func wall_cost(impulse: float) -> int:
+	var speed := impulse / WALL_COST_MASS
+	return roundi(impact_per_energy * 0.5 * WALL_COST_MASS * speed * speed)
+
+
+## The spin's sweep (decision 603): every body in its cells struck (a
+## raised shield facing him takes it whole: told_guard, 340 amended (3), (4)),
+## pushed outward and knocked down; then its maker spent.
+func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
+	var move: Dictionary = moves["spin"]
+	var impulse := _spin_impulse(by)
 	var struck := 0
 	for body in tell_struck(by, telegraph_cells(shape)):  # Decision 810.
 		if not can_target(by, body):

@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_hurt_line()
 	_test_spin()
 	_test_spin_throws()
+	_test_throws_into_walls()
 	_test_spin_broken()
 	_test_dropped_moves()
 	_test_throw_and_charge()
@@ -1922,12 +1923,12 @@ func _boss(dummy: GridEntity) -> void:
 ## body and kind, armed with his kind's battle axe (Level.arm), rested, facing
 ## west, at [param at]. His strength is what a Monster has (6): the row's
 ## "strength" is raid power (raids.gd), which no body reads; the spin's tests
-## once pinned it to 0 and so missed his real throw. A plain Monster's script,
-## not his class's: his seat and mind play no part in World's moves.
+## once pinned it to 0 and so missed his real throw. His own class, as his
+## row names it (906 reads its world_moves); his mind doesn't act here.
 func _real_draugr(at: Vector2i) -> Monster:
 	var row: Dictionary = Monster.kinds()["draugr"]
-	var spec := {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "draugr", "name": "Draugr", "tile": at,
-		"props": (row["body"] as Dictionary).duplicate()}
+	var spec := {"script": str(Level._spec_for("monster_draugr", Level.MONSTER_TYPES)["script"]), "shape": "capsule", "kind": "draugr", "name": "Draugr",
+		"tile": at, "props": (row["body"] as Dictionary).duplicate()}
 	Level.arm(spec)
 	var boss: Monster = EntityFactory.build(spec)
 	_room.add_child(boss)
@@ -2708,6 +2709,34 @@ func _test_tell_truth() -> void:
 	]
 	for each: Array in lunges:
 		_lunge_truth(each[0], each[1], each[2], each[3], each[4])
+
+
+## Decision 906: World.throws_into_walls, from the moves' numbers. True for
+## the draugr (built from his real row, 603 amended (8)), the great bear and
+## the boar king; false for the robber, the wolf, the hill cat and the old
+## wolf, and for the draugr disarmed. Each one's dearest wall printed.
+func _test_throws_into_walls() -> void:
+	print("\n== throws into walls: a foe whose told moves make a wall at a player's back cost (decision 906) ==")
+	_build(["#######", "#.....#", "#######"])
+	var draugr := _real_draugr(Vector2i(3, 1))
+	var dearest := func(body: GridEntity) -> int:
+		var most := 0
+		for impulse in World.told_impulses(body):
+			most = maxi(most, World.wall_cost(impulse))
+		return most
+	_check(World.throws_into_walls(draugr), "the draugr, his axe in hand: throws into walls (his dearest wall %d)" % dearest.call(draugr))
+	for kind: String in ["great_bear", "boar_king", "hill_cat", "old_wolf", "robber", "wolf"]:
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+		var script: Script = load(str(spec.get("script", "res://sim/monster.gd")))
+		var body: GridEntity = script.new()
+		var want := kind in ["great_bear", "boar_king"]
+		_check(World.throws_into_walls(body) == want, "the %s: %s (its dearest wall %d, %s)" % [kind,
+				"throws into walls" if want else "never", dearest.call(body), str(spec.get("script", "res://sim/monster.gd")).get_file()])
+		body.free()
+	var slot := World._axe_slot(draugr)
+	World.set_slots(draugr, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	_check(slot >= 0 and not World.throws_into_walls(draugr) and dearest.call(draugr) < World.WALL_COST_AT,
+			"disarmed: his spin his fists', no wall worth naming (%d), till he has his axe again" % dearest.call(draugr))
 
 
 ## One robber's lunge at a player whose drawn centre is moved without her tile (the lag).

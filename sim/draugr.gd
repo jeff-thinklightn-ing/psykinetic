@@ -223,6 +223,13 @@ const OSSUARY_KINDS: Array[String] = ["skeleton", "skeleton_guard"]
 var _ossuary := -1
 
 
+## The told moves World makes for him that throw a body (decision 603: the
+## spin, the axe throw; his charge to his axe meets one only as a rush's
+## collision at its own pace, no throw), for World.told_impulses (906).
+func world_moves() -> Array[String]:
+	return ["spin", "throw"]
+
+
 func _ready() -> void:
 	super()
 	talks = true

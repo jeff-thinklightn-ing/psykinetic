@@ -53069,3 +53069,40 @@ asserts what the game does today:
 Jeff's pick moves these checks with it. No other test pins a body's
 strength through that field. Tests only; protocol unchanged; no class_name;
 no bullet.
+
+## 906: World.throws_into_walls, a foe whose told moves make a wall cost
+
+companions' 891 shout sends a flanked player's back to a wall ("Get a wall
+behind you and fight!"). Against most foes that's right: a plain blow
+pushes under knockback_min_force, so a wall costs nothing. Against a foe
+whose told move throws, the wall is the dear part: the draugr's spin costs
+8 in the open and 8 + 15 at a wall (603 amended (8)). The coordinator
+approved combat's read, for companions' 891 amended (1): while her player is
+flanked and a monster fighting them throws into walls, she says no wall
+line.
+
+- World.throws_into_walls(body) -> bool: whether any of told_impulses(body)
+  has a wall_cost of WALL_COST_AT (5) or more.
+- World.told_impulses(body) -> Array[float]: from the moves' numbers, never
+  a list of names. Every constant Dictionary in the body's class and those
+  above it holding an "impulse" or a "drag" (the beasts' SWIPE, SLAM,
+  CHARGE, POUNCE, SPRING), and the World moves its class names in
+  world_moves(). Draugr.world_moves() is ["spin", "throw"]: the spin's
+  _spin_impulse (taken out of _spin_lands, unchanged) and the axe throw's
+  weight x speed. His charge to his axe meets a body only as a rush's
+  collision, with no throw. Read as he stands: disarmed, his spin is his
+  fists', so he throws no one into a wall till he has his axe again.
+- World.wall_cost(impulse) -> int: a wall met at once by a WALL_COST_MASS
+  (80 kg) body pushed at impulse, impact_per_energy x its energy, as _push
+  meets it (a little over what a real push leaves after its first fraction
+  of a cell: the draugr's 17 here, 15 in the spin test).
+
+Today: the draugr (17), the great bear (swipe and charge 9, slam 5) and the
+boar king (charge 9) throw into walls. The hill cat (pounce 2), the old
+wolf (drag 2), robbers, wolves and every plain blow do not. The read holds
+under either of Jeff's picks on the spin (15 today, 9 under the sliver).
+combat_test _test_throws_into_walls: the draugr built from his real row
+(_real_draugr now builds his own class, as his row names it), the great
+bear and the boar king true; the hill cat, the old wolf, the robber and the
+wolf false; the draugr disarmed false; each one's dearest wall printed.
+Server only; protocol unchanged; no class_name; no bullet.
