@@ -5994,6 +5994,13 @@ func _take_link(entity: GridEntity, to: Vector2i) -> void:
 				_told_closed[entity.owner_peer] = to
 				say_to([entity.owner_peer], str(SEALED_LINES.get(str(link["to_map"]), "The way is sealed.")))
 			return
+		if link["tile"] == to and hall_link_held(link):
+			# Into or out of a draugr's hall held shut (540 amended (1), Jeff: "the door closes when you
+			# enter"): no way round the held door for anyone, blessed or not, till it is let go.
+			if _told_closed.get(entity.owner_peer) != to:
+				_told_closed[entity.owner_peer] = to
+				say_to([entity.owner_peer], HALL_WAY_HELD)
+			return
 		if link["tile"] == to:
 			_told_closed.erase(entity.owner_peer)
 			print("[level] %s took the link at %s to %s (%s)" % [_display_name(entity), to, link["to_map"], link["to_spawn"]])
@@ -11194,6 +11201,42 @@ func _apply_hall_seal(zone_name: String) -> void:
 		else:
 			World.hold_door(door, false, DEAD_LOCK)
 	World.enter(was)
+
+
+## Said to one who steps on a way into or out of the draugr's hall while it
+## is held (540 amended (1); the coordinator's fight lock on Jeff's report of the
+## exit behind the throne): voice's words, the fight being the one thing the
+## same from either end.
+const HALL_WAY_HELD := "The way is shut until the fight is done."
+
+
+## Whether the draugr's hall in zone [param zone_name] is held shut now
+## (_hold_hall_door: a door on its rim locked with HALL_LOCK).
+func hall_held(zone_name: String) -> bool:
+	return _hall_doors(zone_name).any(func(door: Door) -> bool: return door.lock == HALL_LOCK)
+
+
+## Whether level link [param link], in zone [param here] (the zone entered
+## now when empty), is a way into
+## or out of a draugr's hall held shut (540 amended (1), the coordinator's fight
+## lock on Jeff's report, 2026-11-12: "draugr room to the rear his throne
+## there is a exit to return to the crypt entrance"; his rule for the room,
+## "the door closes when you enter"): it stands inside that zone's held lair
+## (barrow_deep's shortcut behind the throne), or its arrival lies inside the
+## held lair of the zone it leads to (the barrow's end in the First Hall).
+## From hall_door(false) to hall_door(true), for everyone: the blessed's
+## mark (540) opens the seal, never the held door.
+func hall_link_held(link: Dictionary, here := "") -> bool:
+	if here.is_empty():
+		here = World.zone.name
+	if hall_held(here) and hall_lair_rect(here).has_point(link["tile"]):
+		return true
+	var there := str(link.get("to_map", ""))
+	if there.is_empty() or there == here or not hall_held(there):
+		return false
+	# The zone's cached parse (_zone_level): the lair is an anchor, so its spawn point is every generation's.
+	var spawn: Variant = (_zone_level(there).get("spawn_points", {}) as Dictionary).get(str(link.get("to_spawn", "")))
+	return spawn is Vector2i and hall_lair_rect(there).has_point(spawn)
 
 
 ## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen

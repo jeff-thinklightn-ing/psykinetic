@@ -19209,6 +19209,26 @@ server alone refuses; nothing new reaches the client, so the protocol is
 unchanged. level_test (a sealed link, the console, the record), world_map_test
 (the way closed, no route). Server only; no new class_name.
 
+540 amended (1): the fight lock. This is Jeff's report of 2026-11-12, "draugr room to the rear his throne
+there is a exit to return to the crypt entrance": "i didnt see it and clicked it mid fight teleporting out".
+His rule for the room is "the door closes when you enter". The seal (540) opened the shortcut behind the
+throne to any player with the "draugr" mark at all times. A blessed player in a held fight could step or
+click out from behind the throne, and could come in from the First Hall's end at (30,8) past the held door.
+Now Main.hall_link_held(link) refuses, for everyone and whatever their mark, while a draugr's hall is held
+(from hall_door(false) to hall_door(true), read as a rim door locked HALL_LOCK, Main.hall_held). It refuses
+a link that stands inside the held lair, and a link whose arrival (its to_spawn in the zone it leads to)
+lies inside one. _take_link checks it after the seal and says HALL_WAY_HELD once a stand (voice's words).
+The mark still opens the seal at every other time. This is the first piece of Jeff's "full circle" (the
+way home by the throne, the quest's end at the crypt's altar), which follows on its own design. It ends the
+mid-fight entry by that way. 573 amended (enemy-ai's Hall) said "the blessed still come and go by the sealed
+shortcut behind the throne, the one way the heal rule fires mid-fight", but the rule never hung on the
+shortcut (enemy-ai, read from main): Draugr.living_came follows any player's spawn into his zone while a pact
+is on (a join, a travel in, a rejoin at a saved tile), so another player coming down the stair still heals
+him. The rule stays as the code has it, "into his zone". A companion's mark opens nothing while the Hall is
+held, nor does a player's: the check reads the held door, not the seal. level_test _test_throne_way_held: a blessed player behind the throne while the Hall is held is
+not moved and is told once; the barrow's end is held too; once the Hall lets go they go up as before.
+Server only; protocol unchanged; no new class_name.
+
 ## 535. The minimap turns with the view; the arrow is the body's facing
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the

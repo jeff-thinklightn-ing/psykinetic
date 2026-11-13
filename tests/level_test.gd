@@ -89,6 +89,7 @@ func _ready() -> void:
 	_test_chest_guardable()
 	_test_crypt_spacing()
 	_test_hall_shortcut()
+	await _test_throne_way_held()
 	_test_barrow_quest()
 	_test_quest_card_place()
 	_test_decor()
@@ -6575,3 +6576,66 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+## The way behind the throne under the fight lock (540 amended (1); Jeff's report,
+## 2026-11-12: "draugr room to the rear his throne there is a exit to return
+## to the crypt entrance"; his rule, "the door closes when you enter"): while
+## barrow_deep's Hall is held, its sealed shortcut up at (49,77) moves nobody,
+## blessed or not, and says why once; the barrow's end at (30,8), whose arrival
+## lies in the held lair, is held too; let go, the blessed go up as before.
+func _test_throne_way_held() -> void:
+	print("\n== the way behind the throne: shut while the Hall is held (540 amended (1)) ==")
+	var id: String = _main._peer_ids.get(Net.local_id, "")
+	var record: PlayerRecord = _main._records.get(id)
+	if record == null:
+		_check(false, "a player record to try the way with")
+		return
+	var kept_marks := record.marks.duplicate()
+	record.marks.assign(["draugr"])
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "")
+	await get_tree().process_frame
+	var player := _player()
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	_main._told_closed.erase(Net.local_id)
+	_main._hold_hall_door("barrow_deep", true)
+	var behind := Vector2i(49, 77)
+	var deep_link: Dictionary = {}
+	for link: Dictionary in _main.level.get("links", []):
+		if link["tile"] == behind:
+			deep_link = link
+	_check(_main.map_name == "barrow_deep" and _main.hall_held("barrow_deep") and _main.sealed_open(deep_link, Net.local_id)
+			and _main.hall_link_held(deep_link),
+		"the Hall held, the blessed player's seal opens, the held door does not (%s, %s)" % [_main.map_name, deep_link])
+	_main._take_link(player, behind)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "barrow_deep" and heard.count(_main.HALL_WAY_HELD) == 1,
+		"behind the throne while the Hall is held: not moved, told why once (%s, %s)" % [_main.map_name, heard])
+	_main._take_link(player, behind)
+	await get_tree().process_frame
+	_check(heard.count(_main.HALL_WAY_HELD) == 1, "stood on it again: not told twice (%s)" % [heard])
+	# The barrow's end, (30,8) in the First Hall: its arrival, from_temple, lies in the held lair.
+	var top_link: Dictionary = {}
+	for link: Dictionary in Level.load_level("barrow").get("links", []):
+		if link["tile"] == Vector2i(30, 8):
+			top_link = link
+	_check(top_link.get("to_spawn") == "from_temple" and _main.hall_link_held(top_link, "barrow"),
+		"the barrow's end at (30,8), into the held lair, is held as well (%s)" % [top_link])
+	_main._hold_hall_door("barrow_deep", false)
+	_check(not _main.hall_held("barrow_deep") and not _main.hall_link_held(deep_link) and not _main.hall_link_held(top_link, "barrow"),
+		"let go: neither end is held")
+	_main._told_closed.erase(Net.local_id)
+	_main._take_link(player, behind)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	player = _player()
+	var at: Vector2i = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "barrow" and World.distance(at, Vector2i(31, 8)) <= 1,
+		"let go, the blessed player goes up behind the throne to the First Hall (%s, at %s)" % [_main.map_name, at])
+	Net.message_received.disconnect(hear)
+	record.marks.assign(kept_marks)
+	_main.load_map("test_room")
