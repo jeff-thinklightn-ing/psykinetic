@@ -93,6 +93,7 @@ func _ready() -> void:
 	await _test_throne_home()
 	_test_barrow_quest()
 	await _test_knights_altar()
+	await _test_altar_charges()
 	_test_quest_card_place()
 	_test_decor()
 	_test_barrow_level()
@@ -6857,6 +6858,104 @@ func _test_throne_home() -> void:
 				(entity as Draugr)._rise_again()
 		World.enter(was)
 	_main.throne_home = kept_switch
+	_main.load_map("test_room")
+
+
+## The knight's thanks charges the amulet (896 amended (1), Jeff's answer):
+## off the quest the altar takes any holy knight's remains a player carries,
+## his own again or a brother's, charges by their tier and says which; an
+## amulet that can hold no more, or one never blessed, keeps them; remains
+## won unpaid are laid with no charge; the hidden way is the player's on the
+## altar step; a record saved on that step keeps it.
+func _test_altar_charges() -> void:
+	print("\n== the knight's altar charges the amulet (896 amended (1)) ==")
+	var player := _player()
+	var id := player.player_id
+	var record: PlayerRecord = _main._records.get(id)
+	if record == null:
+		_check(false, "no record for the test player")
+		return
+	var kept := {"marks": record.marks.duplicate(), "task": record.barrow_task.duplicate(true), "barrow": record.barrow.duplicate(true)}
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow", "")
+	await get_tree().process_frame
+	player = _player()
+	var bier: Rect2i = _main.knights_altar("barrow")
+	var knight: AstralKnight = null
+	for entity in World.get_entities():
+		if entity is AstralKnight:
+			knight = entity
+	var said: Array[String] = []
+	var hear := func(words: String) -> void: said.append(words)
+	if knight == null or not bier.has_area():
+		_check(false, "the knight and his bier in the barrow (%s)" % [bier])
+		return
+	knight.said.connect(hear)
+	_put(player, _main.altar_beside(bier, player.tile))
+	_drop_relics(player)
+	var deals := Economy.deals(_main._field_rules())
+	record.barrow = {"best": str(deals[0].get("name", "")), "containers": []}  # Blessed once: room on the amulet.
+	_main.mark_player(id, Main.QUEST_DONE)
+	record.barrow_task = {}
+	_main.altar_turn_in = true
+	var sir: String = _main.barrow_knight()
+	var own := sir if not sir.is_empty() else "Sir Test"
+	var charges := func() -> int: return World.totem_charges(World.totem_of(id))
+	var lay := func(name: String, tier: int) -> int:
+		var uid := World.mint_relic(name, tier, player)
+		World.into_pack(player, uid)
+		said.clear()
+		_main._on_command(player, "altar", {"at": [bier.position.x, bier.position.y]})
+		return uid
+	var before: int = charges.call()
+	var uid: int = lay.call(own, 0)
+	_check(not player.slot_items.has(uid) and charges.call() > before and said == [AstralKnight.LAID_AGAIN] and Main.QUEST_DONE in record.marks,
+		"a later run, his own remains: laid, the amulet charged, his thanks again (%s, %d -> %d)" % [said, before, charges.call()])
+	before = charges.call()
+	uid = lay.call("Sir Brother of the Test", 0)
+	_check(not player.slot_items.has(uid) and charges.call() > before and said == [Main.laid_words(false, 1, 0, "Sir Brother of the Test", sir)],
+		"an earlier generation's knight: taken, charged, his thanks by whose they are (%s)" % [said])
+	_check(Main.laid_words(false, 1, 0, "Sir Brother of the Test", "Sir Own") == AstralKnight.LAID_BROTHER
+		and Main.laid_words(false, 1, 0, "Sir Own", "Sir Own") == AstralKnight.LAID_AGAIN and Main.laid_words(false, 0, -1, "Sir Own", "Sir Own") == AstralKnight.LAID_NO_BLESSING
+		and Main.laid_words(true, 3, 0, "Sir Own", "Sir Own") == AstralKnight.LAID_QUEST and Main.laid_words(true, 0, 0, "Sir Own", "Sir Own") == AstralKnight.LAID,
+		"his words by whose remains: a brother's when a generation names another knight, his own again, unpaid, the quest's charged or not")
+	World.totem_add(World.totem_of(id), 1000, Economy.barrow_capacity(record.barrow, _main._field_rules()))  # Full.
+	before = charges.call()
+	uid = lay.call(own, 0)
+	_check(player.slot_items.has(uid) and charges.call() == before and said == [AstralKnight.LAID_FULL],
+		"an amulet that holds no more: kept, nothing laid, he says why (%s)" % [said])
+	World.consume(player, uid, "test")
+	record.barrow = {}  # Never blessed (or a quest reset).
+	uid = lay.call(own, 0)
+	_check(player.slot_items.has(uid) and said == [AstralKnight.LAID_UNBLESSED], "never blessed below: kept, he says why (%s)" % [said])
+	World.consume(player, uid, "test")
+	before = charges.call()
+	uid = lay.call(own, Main.RELIC_UNPAID)
+	_check(not player.slot_items.has(uid) and charges.call() == before and said == [AstralKnight.LAID_NO_BLESSING],
+		"remains won unpaid: laid though never blessed, no charge, no blessing on them (%s)" % [said])
+	_main.altar_turn_in = false
+	uid = lay.call(own, 0)
+	_check(player.slot_items.has(uid) and said.is_empty(), "off: the bier takes nothing")
+	World.consume(player, uid, "test")
+	# The hidden way on the altar step, and the step kept by a save.
+	var robbers_zone := str(World.economy.rules.get("robbers", {}).get("barrow", "")) if World.economy != null else ""
+	_main.mark_player(id, Main.QUEST_DONE, false)
+	record.barrow_task = {"taken": true, "step": "altar"}
+	_check(robbers_zone.is_empty() or _main.way_revealed(id, robbers_zone), "turned in, his remains still below: the hidden way is theirs (way_revealed)")
+	var back := PlayerRecord.from_dict(record.to_dict())
+	_check(str(back.barrow_task.get("step", "")) == "altar" and bool(back.barrow_task.get("taken", false)),
+		"a record saved on the altar step loads on it (%s)" % [back.barrow_task])
+	record.barrow_task = {"taken": true, "slain": []}
+	_check(robbers_zone.is_empty() or not _main.way_revealed(id, robbers_zone), "taken, not turned in: not yet")
+	var saved := record.to_dict()
+	saved["barrow_task"] = {"taken": true, "slain": ["7"]}  # As a record before 896 amended (1) was saved.
+	back = PlayerRecord.from_dict(saved)
+	_check(back.barrow_task == {"taken": true, "slain": ["7"]}, "a record saved before the change, mid-quest, loads as it was (%s)" % [back.barrow_task])
+	knight.said.disconnect(hear)
+	record.marks.assign(kept["marks"])
+	record.barrow_task = kept["task"]
+	record.barrow = kept["barrow"]
+	_main._sync_quest(record)
 	_main.load_map("test_room")
 
 

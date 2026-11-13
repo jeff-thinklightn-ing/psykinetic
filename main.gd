@@ -11565,16 +11565,15 @@ func _throne_tick() -> void:
 ## a click or E on the bier ("altar" command), or the knight's own row
 ## (AstralKnight's ":lay", which does the same). The relic is consumed, the
 ## quest marked done (QUEST_DONE), the knight's thanks said. Each player
-## lays their own. What charges the amulet is Jeff's to say: altar_charges
-## (off) calls charge_from_relic here, as Aldous's row does (left as it is
-## until he answers). Off until the package is whole (dungeon switches it on).
+## lays their own. The knight's thanks charges the amulet there (896
+## amended (1), Jeff's answer): any holy knight's remains a player carries,
+## on the quest or any later run, an earlier generation's knight's too, and
+## Aldous takes none while it is on. Off until the package is whole
+## (dungeon switches it on).
 var altar_turn_in := false:
 	set(on):
 		altar_turn_in = on
 		AstralKnight.altar_on = on  # His words follow it.
-## Whether the altar charges the amulet by the relic's tier (Jeff's open
-## question; Aldous's _relic_returned the other place it may happen).
-var altar_charges := false
 const ALTAR_SLOT := "building.burial_table"
 ## The card's step (the coordinator's words).
 const ALTAR_STEP := "Bring his remains to the altar"
@@ -11609,11 +11608,16 @@ func knights_altar(zone_name: String) -> Rect2i:
 ## generation names one), -1 for none.
 func knights_relic_slot(player: Player) -> int:
 	var knight := barrow_knight()
+	var any := -1
 	for slot in player.slots.size():
 		var relic := World.relic_of(World.slot_uid(player, slot))
-		if not relic.is_empty() and (knight.is_empty() or str(relic.get("knight", "")) == knight):
+		if relic.is_empty():
+			continue
+		if knight.is_empty() or str(relic.get("knight", "")) == knight:
 			return slot
-	return -1
+		if any < 0:
+			any = slot  # 896 amended (1): a brother's (an earlier generation's knight) if none of his own.
+	return any
 
 
 ## [param player] lays the knight's remains by a click or E on his altar
@@ -11622,27 +11626,54 @@ func knights_relic_slot(player: Player) -> int:
 func _altar_asked(player: Player, at: Vector2i) -> void:
 	if not altar_turn_in or not _beside_rect(player.tile, knights_altar(player.zone)) or not knights_altar(player.zone).has_point(at):
 		return
-	if barrow_quest_of(player.player_id) != "carried":
+	if barrow_quest_of(player.player_id) == "carried":
+		if barrow_quest_step(player.player_id, "lay"):
+			_knight_thanks(player)
 		return
-	if barrow_quest_step(player.player_id, "lay"):
+	if _lay_again(player):
 		_knight_thanks(player)
 
 
-## The knight's thanks for [param player]'s laying, said as his (the
-## AstralKnight's said signal, Main's talking-monster line) and the party
-## line of it.
-func _knight_thanks(player: Player) -> void:
-	for entity in zone_entities(player.zone):
+## Server: [param player] lays a holy knight's remains on his altar off the
+## quest (896 amended (1)): a later run's, or a brother's. Aldous's room
+## check, moved here: an amulet that can hold no more, or one never blessed
+## below, keeps them, and the knight says why; remains won unpaid are laid
+## all the same. True when laid.
+func _lay_again(player: Player) -> bool:
+	var slot := knights_relic_slot(player)
+	if slot < 0:
+		return false
+	var relic := World.relic_of(World.slot_uid(player, slot))
+	if int(relic.get("tier", -1)) >= 0:
+		var record: PlayerRecord = _records.get(player.player_id)
+		var capacity := Economy.barrow_capacity(record.barrow, _field_rules()) if record != null else 0
+		if capacity - World.totem_charges(World.totem_of(player.player_id)) <= 0:
+			_knight_says(player.zone, AstralKnight.LAID_FULL if capacity > 0 else AstralKnight.LAID_UNBLESSED)
+			return false
+	return _lay_remains(player, false)
+
+
+## The knight's words in zone [param zone_name], said as his (AstralKnight's
+## said signal, Main's talking-monster line), read by the zone's name.
+func _knight_says(zone_name: String, words: String) -> void:
+	for entity in zone_entities(zone_name):
 		if is_instance_valid(entity) and entity is AstralKnight:
-			(entity as AstralKnight).said.emit(AstralKnight.LAID)
+			(entity as AstralKnight).said.emit(words)
+
+
+## The party line of [param player]'s laying (his thanks itself is said by
+## _lay_remains, which knows what it charged).
+func _knight_thanks(player: Player) -> void:
 	say_to_pair(player.owner_peer, "You lay %s remains on the altar." % AstralKnight.whose(),
 		"%s lays %s remains on the altar." % [_display_name(player), AstralKnight.whose()], World.peers_in(player.zone))
 
 
 ## Server: [param player]'s knight's remains taken off them and laid (896):
-## the relic consumed, the quest marked done, the amulet charged by its tier
-## only with altar_charges. False, nothing done, without them.
-func _lay_remains(player: Player) -> bool:
+## the relic consumed, on the quest ([param quest]) the quest marked done,
+## the amulet charged by its tier (896 amended (1): the knight's thanks
+## charges it), his thanks said by what it did, and the temple's priest
+## told. False, nothing done, without them.
+func _lay_remains(player: Player, quest := true) -> bool:
 	if not Net.is_authority() or not is_instance_valid(player):
 		return false
 	var slot := knights_relic_slot(player)
@@ -11653,15 +11684,47 @@ func _lay_remains(player: Player) -> bool:
 	if not World.consume(player, uid, "laid on the knight's altar"):
 		return false
 	var record: PlayerRecord = _records.get(player.player_id)
-	mark_player(player.player_id, QUEST_DONE)
+	if quest:
+		mark_player(player.player_id, QUEST_DONE)
+		if record != null:
+			record.barrow_task = {}
 	for entity in zone_entities(player.zone):
 		if is_instance_valid(entity) and entity is AstralKnight:
 			(entity as AstralKnight).lay_remains()  # Drawn on the bier for the generation (art-kit's piece).
-	if record != null:
-		record.barrow_task = {}
-	var added := charge_from_relic(player, int(relic.get("tier", -1))) if altar_charges else 0
-	print("[relic] %s laid the remains of %s on the knight's altar, %d charge(s) added" % [_display_name(player), relic.get("knight", "the knight"), added])
+	var tier := int(relic.get("tier", -1))
+	var knight := str(relic.get("knight", ""))
+	var added := charge_from_relic(player, tier)
+	_knight_says(player.zone, laid_words(quest, added, tier, knight, barrow_knight()))
+	_tell_priests_laid(player, knight if not knight.is_empty() else "the knight")
+	print("[relic] the remains of %s laid on the knight's altar, %d charge(s) added" % [knight if not knight.is_empty() else "the knight", added])
 	return true
+
+
+## The knight's thanks for a laying (896 amended (1)): on the quest
+## LAID_QUEST when it charged ([param added]), else LAID; off it, remains
+## won unpaid (no [param tier]) LAID_NO_BLESSING, his own (the generation's
+## knight, [param generation_knight]; any, before a generation names one)
+## LAID_AGAIN, another's LAID_BROTHER.
+static func laid_words(quest: bool, added: int, tier: int, knight: String, generation_knight: String) -> String:
+	if quest:
+		return AstralKnight.LAID_QUEST if added > 0 else AstralKnight.LAID
+	if tier < 0:
+		return AstralKnight.LAID_NO_BLESSING
+	return AstralKnight.LAID_AGAIN if generation_knight.is_empty() or knight == generation_knight else AstralKnight.LAID_BROTHER
+
+
+## The temple's priest told of a laying (896 amended (1); Jeff: Aldous "is
+## glad when you're back"), for his talk only (Townsfolk.learn, lore's
+## words): each town with a priest, as Pip's alms runs go down to the crypt
+## from each (_towns_with_priests). No log line names the player.
+func _tell_priests_laid(player: Player, knight: String) -> void:
+	if World.production == null:
+		return
+	var who := Offers.name_of(Offers.ctx, player.player_id)
+	for town: String in _towns_with_priests():
+		var priest := _priest_of(town)
+		if not priest.is_empty():
+			Townsfolk.learn(World.production, priest, "%s laid the remains of %s on the knight's altar in the crypt's First Hall." % [who, knight])
 
 
 ## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen
@@ -11794,7 +11857,8 @@ func way_revealed(player_id: String, zone_name: String) -> bool:
 	if World.economy == null or zone_name != str(World.economy.rules.get("robbers", {}).get("barrow", "")):
 		return true
 	var record: PlayerRecord = _records.get(player_id)
-	return record != null and QUEST_DONE in record.marks
+	# 896 amended (1): on the altar step (turned in, his remains still below) the way is theirs too.
+	return record != null and (QUEST_DONE in record.marks or str(record.barrow_task.get("step", "")) == "altar")
 
 
 ## Whether the robbers of [param zone_name] are down (714, dungeon's side
@@ -12308,6 +12372,10 @@ func _all_fallen_tick() -> void:
 ## "The draugr gives more." stopped being true at 714, when the charges came
 ## to be Aldous's for a holy knight's remains; voice's words, lore's check).
 const SPENT_LINE := "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below."
+## SPENT_LINE once the knight's altar charges it (896 amended (1), voice's words).
+const SPENT_LINE_ALTAR := "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar."
+## Aldous handed remains while the altar charges (896 amended (1), voice's words).
+const ALDOUS_BACK := "You came back, and whole! These belong on the knight's altar, in the crypt's First Hall. Lay them there."
 
 
 ## Server: [param by] begins to bring back the downed [param body] (held E
@@ -12326,7 +12394,7 @@ func _start_channel(by: GridEntity, body: GridEntity) -> bool:
 	var record := _blessing_record(by)
 	if _uses_left(record) <= 0:
 		if by is Player:
-			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": SPENT_LINE})
+			Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": SPENT_LINE_ALTAR if altar_turn_in else SPENT_LINE})
 		return false
 	if not World.calm(by) or not World.calm(body):
 		# When it is safe (Mortally Wounded): nothing hostile near either, no blow just now.
@@ -22057,6 +22125,8 @@ func _visitor_places(spot: Rect2i) -> Dictionary:
 ## priest's offers): [{uid, knight}].
 func _relics_held(player_id: String) -> Array:
 	var out: Array = []
+	if altar_turn_in:
+		return out  # 896 amended (1): the knight's altar takes them; the priest offers no row for them.
 	for entity in World.get_entities():
 		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
 			for slot in entity.slots.size():
@@ -22104,6 +22174,11 @@ func _relic_returned(player: Player, body: Resident, uid: int) -> bool:
 		return false
 	var relic := World.relic_of(uid)
 	if relic.is_empty():
+		return false
+	if altar_turn_in:
+		# 896 amended (1) (Jeff: the knight's thanks charges it; Aldous only glad you're back): he
+		# gives them back, kept, and sends them to the knight's altar (voice's words).
+		_say_plain(body, body.person, ALDOUS_BACK)
 		return false
 	var knight := str(relic.get("knight", "the knight"))
 	var tier := int(relic.get("tier", 0))

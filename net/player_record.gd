@@ -216,6 +216,8 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var slain: Variant = task.get("slain", [])
 		record.barrow_task = {"taken": bool(task.get("taken", false)),
 			"slain": (slain as Array).map(func(id: Variant) -> String: return str(id)) if slain is Array else []}
+		if str(task.get("step", "")) == "altar":
+			record.barrow_task["step"] = "altar"  # 896 amended (1): turned in, his remains still to lay, kept by a save.
 	var part: Variant = entry.get("cache_taken", {})  # Before 599 amended (2): none.
 	if part is Dictionary:
 		for key: Variant in part:

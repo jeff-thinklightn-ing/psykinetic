@@ -34,6 +34,19 @@ const LAY_TITLE := "Lay my remains on the altar"
 const LAY_WORDS := "You carry my bones. Lay them here, on the altar."
 const LAID := "I am home. Thank you."
 const DONE_LAID := "My bones are home. Go well."
+## His thanks charges the amulet (896 amended (1); Jeff, 11-12: "the knight's
+## thanks charges it there"; voice's words, lore's brother of the order): the
+## quest's lay, his own remains laid again on a later run, a brother's (an
+## earlier generation's knight), and remains won unpaid, laid with no
+## blessing. The two refusals keep the remains with the player: an amulet
+## that can hold no more, and one never blessed below. No number, no rule
+## named (the coordinator).
+const LAID_QUEST := "I am home. Thank you. My blessing goes with you, on your amulet."
+const LAID_AGAIN := "Home again. My blessing goes with you, on your amulet."
+const LAID_BROTHER := "Not my bones, but a brother of the order's. Let him rest here too. My blessing goes with you, on your amulet."
+const LAID_NO_BLESSING := "Laid to rest. There is no blessing on them, whatever passed down there."
+const LAID_FULL := "Your amulet can hold no more. Keep these bones safe, and lay them here when it has room."
+const LAID_UNBLESSED := "You have not yet stood before what waits below. Keep these bones safe, and lay them here when you have."
 ## Main.altar_turn_in's mirror (its setter): the altar step on.
 static var altar_on := false
 ## His remains laid on his altar this generation, by anyone (896): art-kit's
@@ -96,7 +109,8 @@ func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name,
 			"you_line": "You take up the fallen knight's task."}
 	if offer_id.ends_with(":lay") and at == "carried" and _quest_step(player.player_id, "lay"):
-		said.emit(LAID)  # 896: his remains on the altar, the same as a click on it.
+		# 896: his remains on the altar, the same as a click on it; his thanks said by Main's laying
+		# (896 amended (1): which thanks follows the charge).
 		return {"ok": true, "say": "", "line": "%s lays %s remains on the altar." % [player.name, whose()],
 			"you_line": "You lay %s remains on the altar." % whose()}
 	if offer_id.ends_with(":turn_in") and at == "ready" and _quest_step(player.player_id, "turn_in"):

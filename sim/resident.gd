@@ -1694,6 +1694,11 @@ func lore_budget() -> int:
 ## knight] the one whose sepulcher stands now, "" for none.
 static func relic_line(knight: String) -> String:
 	var now := "" if knight.is_empty() or knight == "<null>" else " The knight whose sepulcher lies open below now is %s." % knight
+	if AstralKnight.altar_on:
+		# 896 amended (1) (Jeff: the knight's thanks charges it; the priest only glad you're back; lore's place name).
+		return ("Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s"
+			+ " Whoever brings a knight's remains up from below, you send to lay them on the knight's altar in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet;"
+			+ " you are glad of everyone who comes back from below.") % now
 	return ("Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s"
 		+ " Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet;"
 		+ " one who has no amulet is given one.") % now

@@ -6808,6 +6808,20 @@ func _test_relic() -> void:
 			smith = body
 	_check(smith != null and not _main._relic_returned(player, smith, uid) and player.slot_items.has(uid), "given to one who is no priest: nothing taken")
 	World.consume(player, uid, "the test")
+	# 896 amended (1) (Jeff: the knight's thanks charges it at his altar): with the altar on, he offers
+	# no row for them, and remains put in his hands are given back, kept, with voice's line.
+	_main.altar_turn_in = true
+	uid = mint.call()
+	spoken.clear()
+	var rows := Offers.of(priest, pid).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.RELIC)
+	var charged := World.totem_charges(World.totem_of(pid))
+	_check(rows.is_empty() and not _main._relic_returned(player, aldous, uid) and player.slot_items.has(uid) and World.totem_charges(World.totem_of(pid)) == charged
+		and spoken.size() == 1 and spoken[0].contains(_main.ALDOUS_BACK),
+		"the knight's altar on: no row for them, given back kept, sent to the altar (%s)" % [spoken])
+	_check(Resident.relic_line("Sir Ewald").contains("knight's altar in the crypt's First Hall") and not Resident.relic_line("Sir Ewald").contains("you lay them on the altar"),
+		"and what he knows of the remains says where they go now")
+	_main.altar_turn_in = false
+	World.consume(player, uid, "the test")
 	Net.message_received.disconnect(heard)
 	var voice := Resident.new()
 	voice.trade = "priest"

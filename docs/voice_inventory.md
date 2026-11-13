@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2903)
+## Lines in the code (2915)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1939,7 +1939,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: no floor to %s by it | `sim/world_routes.gd` _add_way() |
 |  | %s %d %d | `sim/world_routes.gd` _portal() |
 
-### residents (109)
+### residents (112)
 
 | | Line | Where |
 |---|---|---|
@@ -2048,6 +2048,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You last paid %s %d gold for %s%s. | `sim/resident.gd` _trade_words() |
 |  | The knight whose sepulcher lies open below now is %s. | `sim/resident.gd` relic_line() |
 |  | Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
+|  | Whoever brings a knight's remains up from below, you send to lay them on the knight's altar in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
+|  | you are glad of everyone who comes back from below. | `sim/resident.gd` relic_line() |
+|  | Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
 |  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
 |  | one who has no amulet is given one. | `sim/resident.gd` relic_line() |
 |  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd` KEPT_LINE |
@@ -2083,7 +2086,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (752)
+### server and windows (755)
 
 | | Line | Where |
 |---|---|---|
@@ -2299,6 +2302,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You lay %s remains on the altar. | `main.gd` _knight_thanks() |
 |  | %s lays %s remains on the altar. | `main.gd` _knight_thanks() |
 |  | laid on the knight's altar | `main.gd` _lay_remains() |
+|  | %s laid the remains of %s on the knight's altar in the crypt's First Hall. | `main.gd` _tell_priests_laid() |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
 |  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |
@@ -2326,6 +2330,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
 |  | Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below. | `main.gd` SPENT_LINE |
+|  | Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar. | `main.gd` SPENT_LINE_ALTAR |
+|  | You came back, and whole! These belong on the knight's altar, in the crypt's First Hall. Lay them there. | `main.gd` ALDOUS_BACK |
 |  | Not while there's fighting close by. | `main.gd` _start_channel() |
 |  | Not while there's fighting close by. | `main.gd` _start_channel() |
 |  | %s kneels beside %s. | `main.gd` _on_channel() |
@@ -2869,7 +2875,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
-### the fallen knight (20)
+### the fallen knight (26)
 
 | | Line | Where |
 |---|---|---|
@@ -2887,6 +2893,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You carry my bones. Lay them here, on the altar. | `sim/astral_knight.gd` LAY_WORDS |
 |  | I am home. Thank you. | `sim/astral_knight.gd` LAID |
 |  | My bones are home. Go well. | `sim/astral_knight.gd` DONE_LAID |
+|  | I am home. Thank you. My blessing goes with you, on your amulet. | `sim/astral_knight.gd` LAID_QUEST |
+|  | Home again. My blessing goes with you, on your amulet. | `sim/astral_knight.gd` LAID_AGAIN |
+|  | Not my bones, but a brother of the order's. Let him rest here too. My blessing goes with you, on your amulet. | `sim/astral_knight.gd` LAID_BROTHER |
+|  | Laid to rest. There is no blessing on them, whatever passed down there. | `sim/astral_knight.gd` LAID_NO_BLESSING |
+|  | Your amulet can hold no more. Keep these bones safe, and lay them here when it has room. | `sim/astral_knight.gd` LAID_FULL |
+|  | You have not yet stood before what waits below. Keep these bones safe, and lay them here when you have. | `sim/astral_knight.gd` LAID_UNBLESSED |
 |  | %s takes up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | You take up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | %s lays %s remains on the altar. | `sim/astral_knight.gd` accept_offer() |
