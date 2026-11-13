@@ -13650,6 +13650,25 @@ start_gold) is Jeff's to choose.
 Protocol unchanged. tests/farm_test (a normal year, a drought, a summer
 storm, level 2 twice, saved and loaded, unsown with the farmer away in
 spring, rotted with him away in autumn, a farmer coming by growth).
+
+**449 amended (1): sown in summer while unsown** (Jeff's answer to town-feeds-itself, pick 2 A, 11-13: "a field may be
+sown any time until autumn, and the later it's sown the smaller the crop"; the coordinator's approval of economy's
+table the same day). Towns._crop's summer: a field still unsown (stage "") is sown by the farmer's sow_steps of work, as
+in spring, and grows from the next step on; Towns.field_work counts his work in summer while it is unsown (npc's hoe
+shows it); crop_look already shows a sown field "growing" all summer, so a summer-sown one looks the same. Nothing new
+makes it smaller: growth comes only in summer, per_day / season_days a day, so a crop sown on summer's day k of a
+season of S days grows (S - k) / S of a spring-sown one's, in the same weather. On the box's 14-day seasons, base growth
+(0.7, a dry calm summer, about 365 grain at level 1; 174 in the soaks, one storm): sown in spring 100%; summer's day 1
+93 to 100% by the hour; day 4 79%; day 7 57%; day 11 29%; day 14 about 7% (12 to 25 grain). No sowing in autumn: a
+farmer home then waits for spring, as before. The box (release's journal numbers, 11-13: step 25947300 at 15:27, spring
+at year 0.153 at about 07:55, 90-minute days, 14-day seasons): spring's day 13 or 14 at 15:27, so summer's first hours
+about 17:00; deployed at 08:00 on 11-14, Umbrage is on summer's day 10 or 11, and its walked-in farmer (613 amended (8))
+sows once the field is built and sown (each about 5 real minutes of work): about 3.4 summer days left, about 24% of a
+crop, some 85 grain at base growth; each hour later costs about 5 points, and from about 13:00 on 11-14 (autumn) none
+until next spring. farm_test _test_late_sow (base growth: sown in spring a whole summer's; home on summer's day 0, 2,
+4 and 6 of 7, sown that day, (7 - k) / 7 of it; home in autumn, nothing sown), _test_field_work (summer counts while
+unsown), _test_missed (away all spring and summer: only the roots). Server only; protocol and save format unchanged;
+no new class_name. Bullet (voice's words).
 ## 446. The "world" message: what each player's world map knows
 
 ui's world map (its step 5; 445 reads this) draws areas, ways and places

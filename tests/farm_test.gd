@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_years()
 	_test_field_work()
 	_test_missed()
+	_test_late_sow()
 	_test_farmer_comes()
 	_test_free_name()
 	_test_look()
@@ -150,7 +151,7 @@ func _test_field_work() -> void:
 		var season := Season.name_at(_now)
 		var stage := str(towns.crop(TOWN).get("stage", ""))
 		var working := towns.field_work(TOWN)
-		var counts := (season == "spring" and stage == "" or season == "autumn" and stage == "sown") and towns.production.manned("%s:field" % TOWN)
+		var counts := (season in ["spring", "summer"] and stage == "" or season == "autumn" and stage == "sown") and towns.production.manned("%s:field" % TOWN)
 		if working != counts and wrong.size() < 3:
 			wrong.append([_now, season, stage, working])
 		seen["%s %s" % [season, working]] = true
@@ -203,10 +204,10 @@ func _test_missed() -> void:
 	_rain = 0.11
 	var towns := _towns()
 	towns.production.set_away("f1", true)
-	var spring := _year(towns, 7)
+	var spring := _year(towns, 14)
 	towns.production.set_away("f1", false)
-	var rest := _year(towns, 21)
-	_check(spring + rest == int(rule["roots"]) and towns.crop(TOWN)["stage"] == "", "away all spring: nothing sown, only the roots (%d)" % (spring + rest))
+	var rest := _year(towns, 14)
+	_check(spring + rest == int(rule["roots"]) and towns.crop(TOWN)["stage"] == "", "away all spring and summer: nothing sown, none in autumn (449 amended (1)), only the roots (%d)" % (spring + rest))
 	towns = _towns()
 	_year(towns, 13)
 	towns.production.set_away("f1", true)
@@ -216,6 +217,44 @@ func _test_missed() -> void:
 	_year(towns, 2)
 	_check(towns.crop(TOWN)["stage"] == "rotted" and towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the crop rotted in the field"),
 		"not brought in by winter: it rots")
+
+
+## 449 amended (1) (Jeff 11-13, pick 2 A): a field may be sown in summer while unsown, and the later
+## it is sown the smaller the crop, from the growth already there: a summer-sown crop grows the summer
+## days left. A farmer home on summer's day k (of the season's days) sows that day; his crop is about
+## (days - k) / days of a spring-sown one's. In autumn nothing is sown.
+func _test_late_sow() -> void:
+	print("
+== sown late, in summer (449 amended (1)) ==")
+	_rain = 0.0  # Base growth only: the crop is base x the summer days it grows.
+	_storm = false
+	var days := Season.season_days
+	var base := float(_rules["crop"]["growth"]["base"])
+	var spring_sown := _towns()
+	_year(spring_sown, 2 * days)  # Spring and summer.
+	var full := float(spring_sown.crop(TOWN)["growth"])
+	_check(is_equal_approx(full, base) or absf(full - base) < 0.01, "sown in spring: a whole summer's growth (%.3f)" % full)
+	var shares: Array[String] = []
+	for k: int in [0, 2, 4, 6]:
+		var late := _towns()
+		late.production.set_away("f1", true)
+		_year(late, days + k)  # All spring, and k days of summer.
+		late.production.set_away("f1", false)
+		_year(late, days - k)  # The rest of summer.
+		var got := float(late.crop(TOWN)["growth"])
+		var want := base * float(days - k) / days
+		shares.append("day %d: %.3f of %.3f" % [k, got, want])
+		_check(late.crop(TOWN)["stage"] == "sown" and absf(got - want) < 0.02 and late.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the field is sown"),
+			"home on summer's day %d of %d: sown that day, %.2f of a whole summer's growth (%.3f, wanted %.3f)" % [k, days, float(days - k) / days, got, want])
+	print("  (%s)" % ", ".join(shares))
+	var autumn := _towns()
+	autumn.production.set_away("f1", true)
+	_year(autumn, 2 * days)
+	autumn.production.set_away("f1", false)
+	_year(autumn, days)
+	_check(autumn.crop(TOWN)["stage"] == "" and not autumn.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the field is sown"),
+		"home in autumn: nothing sown (%s)" % autumn.crop(TOWN)["stage"])
+	_rain = 0.11
 
 
 func _test_farmer_comes() -> void:

@@ -1459,8 +1459,8 @@ func crop_look(town: String) -> String:
 
 ## Whether [param town]'s farmer's work counts toward its crop now (566
 ## amended, npc's hoe): its field standing (or building), the farm manned
-## and its site held, and spring with the crop unsown or autumn with it
-## sown, as _crop works it.
+## and its site held, and spring or summer with the crop unsown (449 amended
+## (1)) or autumn with it sown, as _crop works it.
 func field_work(town: String) -> bool:
 	if int(building(town, "field").get("level", 0)) < 1 or building(town, "field").get("state") not in [STANDING, BUILDING]:
 		return false
@@ -1472,13 +1472,17 @@ func field_work(town: String) -> bool:
 	match season:
 		"spring":
 			return stage == "" or str(crop_now.get("season", "")) != season  # A new year's, before _crop clears last year's.
+		"summer":
+			return stage == ""  # 449 amended (1): sown late, while it is unsown.
 		"autumn":
 			return stage == "sown"
 	return false
 
 
 ## The year's crop moved on to now (Season.name_at): sown in spring by the
-## farmer's sow_steps of work; in summer growth a day, clamp(base + rain x
+## farmer's sow_steps of work, or in summer while unsown (449 amended (1), Jeff
+## 11-13: "the later it's sown the smaller the crop", from the growth alone: a
+## summer-sown crop grows only the summer days left); in summer growth a day, clamp(base + rain x
 ## the day's rain, least, most) / season_days, each storm flattening it
 ## (by half) with chance flatten; in autumn brought in by his
 ## harvest_steps of work as harvest x the field's level x growth food,
@@ -1510,6 +1514,15 @@ func _crop(town: String) -> void:
 					crop_now["worked"] = 0
 					_note(town, "the field is sown")
 		"summer":
+			# 449 amended (1): a field not sown in spring may be sown in summer; it grows from the
+			# next step on, the summer days left (no sowing in autumn).
+			if crop_now["stage"] == "" and farming:
+				crop_now["worked"] = int(crop_now["worked"]) + since
+				if int(crop_now["worked"]) >= int(rule.get("sow_steps", 3000)):
+					crop_now["stage"] = "sown"
+					crop_now["worked"] = 0
+					_note(town, "the field is sown")
+				since = 0
 			if crop_now["stage"] == "sown" and since > 0:
 				var days := float(since) / maxi(DayNight.day_steps, 1)
 				var fell := float(rain.call(town, float(at - since), float(at))) if rain.is_valid() else 0.0
