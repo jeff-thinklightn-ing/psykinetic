@@ -1854,6 +1854,7 @@ func _test_ambush() -> void:
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_freed_striker()
+	_test_alert_note()
 	_test_link_slots()
 	_test_corner_fight()
 	_test_boar_king_aim()
@@ -9804,3 +9805,42 @@ func _test_freed_striker() -> void:
 	wolf.senses.heard.append({"tick": World.tick, "kind": &"fight", "at": wolf.tile, "radius": 1, "source": hers})
 	var covered := wolf._escort_target()
 	_check(covered == hers, "an escort whose own foe was freed while its lead walks home: it covers on whoever struck it (%s)" % [covered])
+
+
+## 806 amended (19): a monster leaving idle says why in the server log, once,
+## naming nobody but monsters (playtest's joined crypt walk, 11-12).
+func _test_alert_note() -> void:
+	print("%s== a monster leaving idle says why, once, and names no player ==" % char(10))
+	Monster.idling = false
+	var e := _build(["###########", "#.........#", "#.........#", "#.........#", "#.........#", "###########"])
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Tourbot", "tile": Vector2i(7, 2)})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(7, 2))
+	var spec: Dictionary = SPECS["x"].duplicate(true)
+	spec["props"] = (Level.MONSTER_TYPES[spec["kind"]] as Dictionary).duplicate()
+	spec.merge({"name": "Robber9", "tile": Vector2i(5, 2)}, true)
+	var foe := EntityFactory.build(spec) as Monster
+	_room.add_child(foe)
+	World.spawn(foe, Vector2i(5, 2))
+	World.face(foe, Vector2i(1, 0))
+	for i in 20:
+		World.step()
+		if foe.alert_notes > 0:
+			break
+	for i in 20:
+		World.step()
+	_check(foe.alert_why in ["sees a player (2 cells)", "glimpses something at (7, 2) (2 cells)"] and foe.alert_notes == 1 and not foe.alert_why.contains("Tourbot"),
+		"in sight of her: one line, what it saw and where, no name, nothing more while it fights (%d, %s)" % [foe.alert_notes, foe.alert_why])
+	_check(Monster.alert_who(foe) == "Robber9" and Monster.alert_who(player) == "a player",
+		"a monster by its name, a player as a player (%s, %s)" % [Monster.alert_who(foe), Monster.alert_who(player)])
+	World.despawn(player)
+	player.queue_free()
+	var ear := EntityFactory.build(spec.merged({"name": "Robber8", "tile": Vector2i(2, 4)}, true)) as Monster
+	_room.add_child(ear)
+	World.spawn(ear, Vector2i(2, 4))
+	World.face(ear, Vector2i(-1, 0))
+	World.noise(Vector2i(6, 4), Senses.NOISE_DOOR_STRUCK, &"door_struck", null)
+	for i in 10:
+		World.step()
+	_check(ear.alert_notes == 1 and ear.alert_why == "hears door struck at (6, 4) (4 cells)",
+		"a door struck out of its sight: one line, what and where (%d, %s)" % [ear.alert_notes, ear.alert_why])

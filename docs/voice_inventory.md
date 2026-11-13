@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2883)
+## Lines in the code (2889)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1321,7 +1321,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 
-### other (sim) (606)
+### other (sim) (612)
 
 | | Line | Where |
 |---|---|---|
@@ -1584,10 +1584,16 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a secret with fewer than two clues | `sim/layout_sense.gd` _coop() |
 |  | %s gives nothing | `sim/layout_sense.gd` _chests() |
 |  | %s outside a dungeon | `sim/layout_sense.gd` _chests() |
+|  | %s %s (%d cells) | `sim/monster.gd` _sim_tick() |
+|  | takes up its pack's fight on | `sim/monster.gd` _sim_tick() |
+|  | glimpses something at %s (%d cells) | `sim/monster.gd` _alert_tick() |
+|  | hears a call from %s at %s (%d cells) | `sim/monster.gd` _heard() |
+|  | hears %s at %s (%d cells) | `sim/monster.gd` _heard() |
 |  | no ground at %s | `sim/monster.gd` yielded() |
 |  | %s's blow with %s | `sim/monster.gd` _blows() |
 |  | begins, lands in %d ticks | `sim/old_wolf.gd` _begin_howl() |
 |  | tell, lands in %d ticks | `sim/old_wolf.gd` _begin() |
+|  | comes to %s's howl (%d cells) | `sim/old_wolf.gd` _pack_rush() |
 |  | the pack rushes, %d | `sim/old_wolf.gd` _pack_rush() |
 |  | for %d ticks | `sim/old_wolf.gd` _begin_pant() |
 |  | bit (%s)%s | `sim/old_wolf.gd` _on_rush_ended() |

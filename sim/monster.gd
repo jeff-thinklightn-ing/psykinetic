@@ -1254,8 +1254,10 @@ func _sim_tick() -> void:
 	var looked := Time.get_ticks_usec()
 	_fade_notice()
 	var seen := _nearest_visible_target()
+	var by_pack := false
 	if seen == null and pack_id != "":
 		seen = _pack_target()  # Its pack's fight is its own (824).
+		by_pack = seen != null
 	World.senses_usec += Time.get_ticks_usec() - looked  # Its own part, "senses" (784).
 	if seen != null and _wary and _beyond_leash():
 		_give_up(seen)
@@ -1297,6 +1299,8 @@ func _sim_tick() -> void:
 	var took_up := alert != Alert.FIGHTING
 	if alert == Alert.IDLE:
 		_post = tile
+		_alert_note("%s %s (%d cells)" % ["takes up its pack's fight on" if by_pack else "sees",
+				alert_who(target), World.distance(tile, target.tile)])
 	alert = Alert.FIGHTING
 	if (band_fights or stands) and not _rally_asked.is_empty():
 		_rally_send()
@@ -2275,7 +2279,8 @@ func _alert_tick() -> void:
 	if not noise.is_empty():
 		_heard(noise)
 	elif _glimpsed != NO_TILE and alert == Alert.IDLE and not lurking():
-		_follow(_glimpsed, Alert.SUSPICIOUS, SUSPICIOUS_TICKS)
+		_follow(_glimpsed, Alert.SUSPICIOUS, SUSPICIOUS_TICKS,
+				false, "glimpses something at %s (%d cells)" % [_glimpsed, World.distance(tile, _glimpsed)])
 	if alert == Alert.IDLE:
 		_idle_tick()
 		return
@@ -2316,7 +2321,8 @@ func _heard(noise: Dictionary) -> void:
 		# Its side calling for help: after whom they fight.
 		var caller := source as Monster
 		_listening_until = -1
-		_follow(caller.target.tile if is_instance_valid(caller.target) else caller.tile, Alert.HUNTING, HUNT_TICKS)
+		_follow(caller.target.tile if is_instance_valid(caller.target) else caller.tile, Alert.HUNTING, HUNT_TICKS,
+				false, "hears a call from %s at %s (%d cells)" % [caller.name, caller.tile, World.distance(tile, caller.tile)])
 		return
 	if at == tile and kind == &"fight" and is_instance_valid(source) and source != self:
 		var striker := source as GridEntity
@@ -2325,7 +2331,8 @@ func _heard(noise: Dictionary) -> void:
 		at = striker.tile
 	if urgent:
 		_listening_until = -1
-	_follow(at, Alert.HUNTING if urgent else Alert.SUSPICIOUS, HUNT_TICKS if urgent else SUSPICIOUS_TICKS)
+	_follow(at, Alert.HUNTING if urgent else Alert.SUSPICIOUS, HUNT_TICKS if urgent else SUSPICIOUS_TICKS,
+			false, "hears %s at %s (%d cells)" % [str(kind).replace("_", " "), at, World.distance(tile, at)])
 
 
 ## [param lost] went out of its sight: after it, to where it last saw it and
@@ -2354,10 +2361,13 @@ func _hunt(lost: GridEntity) -> bool:
 
 ## Off to [param lead] at [param level] (a hunt stays a hunt for a lesser
 ## lead), for [param ticks] from now; it looks round when there. A
-## [param guess] is no reason to open a door to it.
-func _follow(lead: Vector2i, level: Alert, ticks: int, guess := false) -> void:
+## [param guess] is no reason to open a door to it. [param why], what
+## rouses it from idle, goes to the server log (_alert_note).
+func _follow(lead: Vector2i, level: Alert, ticks: int, guess := false, why := "") -> void:
 	if alert == Alert.IDLE:
 		_post = tile
+		if not why.is_empty():
+			_alert_note(why)
 	if not (alert == Alert.HUNTING and level == Alert.SUSPICIOUS):
 		alert = level
 	_alert_until = World.tick + ticks
@@ -2370,6 +2380,33 @@ func _follow(lead: Vector2i, level: Alert, ticks: int, guess := false) -> void:
 	_look_until = -1
 	_returning = false
 	pose = Pose.STAND
+
+
+## Why it leaves idle (806 amended (19)): one server line as it does, so a
+## move toward someone always says why (playtest's joined crypt walk,
+## 11-12: robbers came with no line). A band's rally has its own [band]
+## line, and nothing prints while it stays roused. Nobody's name but a
+## monster's: the box's journal is read by grep (alert_who).
+var alert_why := ""
+var alert_notes := 0
+func _alert_note(why: String) -> void:
+	alert_why = why
+	alert_notes += 1
+	print("[alert] %s %s" % [name, why])
+
+
+## Who it saw, as the log may name it: a monster by its name; a player, a
+## companion, a resident by trade, never by name or id.
+static func alert_who(e: GridEntity) -> String:
+	if e is Monster:
+		return str(e.name)
+	if e is Companion:
+		return "a companion"
+	if e is Resident:
+		return "a %s" % (e as Resident).trade if not (e as Resident).trade.is_empty() else "a resident"
+	if e is Player:
+		return "a player"
+	return "something"
 
 
 ## SUSPICIOUS or HUNTING: a step toward its lead (at its idle pace or its

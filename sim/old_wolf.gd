@@ -295,7 +295,7 @@ func _pack_rush() -> void:
 		if World.distance(mate.tile, target.tile) > int(howl["rush_tiles"]):
 			continue
 		mate.target = target
-		mate._follow(target.tile, Alert.HUNTING, HUNT_TICKS)
+		mate._follow(target.tile, Alert.HUNTING, HUNT_TICKS, false, "comes to %s's howl (%d cells)" % [name, World.distance(mate.tile, tile)])
 		mate.next_attack_tick = mini(mate.next_attack_tick, World.tick)
 		mate.next_move_tick = mini(mate.next_move_tick, World.tick)
 		mate._dart_until = -1
