@@ -38465,6 +38465,20 @@ that is a room's only way through is 2 cells wide.
 The source is C:/dev/review/crypt_walls/make_cryptset.py (breach1/2/3, smashed, rubble). Nothing places
 these until dungeon's generator does, so there is no CHANGELOG bullet. Art only, protocol unchanged, no
 new class_name.
+
+714 amended (4), art-kit's side: item.holy_remains plain, its small red cross taken off. Lore, 11-13
+(the coordinator's ruling with it): nothing written gives Theus or his knights a sign or a colour,
+and a red cross on a knight's remains is the crusaders' real-world sign, which this world does not
+borrow (Jeff, 11-01: own world, not saga); the laid remains on the First Hall's bier went plain for
+the same reason (896 amended (2)), and the bundle a player carries is the same knight's, so they
+match. The twelve faces painted in the cross's red are deleted from the kit's own mesh and nothing
+else moves (the make script's rebuild jitters the roll a few millimetres differently from the kit's,
+so it was not run again); 348 tris (was 372), whole (0 open, 0 inside-out). Its icon is drawn from
+the mesh (ItemIcons), so it follows. If Jeff names Theus's sign it goes on both as a swatch; the
+question is on his list, with the encolpion amulet's cross shape (lore: that one waits for him).
+Watched: Blender, culled, beside the goblin by day and by a torch, near and from the game's camera
+(C:/dev/review/draugr_items/holy_remains_plain_sheet.png). Client only (art); protocol unchanged;
+no new class_name.
 ## 717. The game connection encrypted (DTLS)
 
 Jeff (decisions/server-encryption.md): "1 - encrypt it". The ENet game port

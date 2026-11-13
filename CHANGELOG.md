@@ -10,6 +10,7 @@ notes (decision 324).
 - People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).
 - Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
 
+- A holy knight's remains, carried out of the crypt, are wrapped in plain linen tied with cord (714 amended (4)).
 - A townsperson's window no longer stands as a tall empty dark column when she says a long line: it keeps its height, its name in view (802 amended (11)).
 - Small things on the ground, like a cut of meat, a fish, tusks or a key, are drawn big enough to spot at the nearest zoom (619 amended (3)).
 - In the chat box, the game's own words, like "You pick up 5 gold." or what you're told in the crypt, are plain dim lines, and a restart warning or an admin's word reads "Notice: ..." (427 amended (1)).
