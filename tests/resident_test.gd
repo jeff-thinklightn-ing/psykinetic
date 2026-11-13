@@ -1217,6 +1217,15 @@ func _test_inn_room(body: Resident) -> void:
 	var east := {"use": "work", "trade": "taverner", "cell": free[1], "face": free[6], "pose": "stand"}
 	_check(body.work_behind([west, east], {free[6]: true}) == east and body.work_behind([west, east], {free[5]: true}) == west
 		and body.work_behind([west, east], {}).is_empty(), "the taverner behind the end a guest drinks at; none held, as any")
+	# 875 amended (3): between bouts she moves to the end a guest has come to; at a guest's end, or with none, she stays.
+	var spot_was: Dictionary = body._spot
+	body._spot = west
+	var to_guest := body.guest_end([west, east], {free[6]: true})
+	var stays_by_guest := body.guest_end([west, east], {free[5]: true})
+	var stays_alone := body.guest_end([west, east], {})
+	body._spot = spot_was
+	_check(to_guest == east and stays_by_guest.is_empty() and stays_alone.is_empty(),
+		"between bouts: to the end a guest came to (%s); at a guest's end or with none, she stays" % [to_guest.get("cell", "none")])
 	var level := {"town": "wilds/store", "spots": [west.merged({"town": "store"}), {"use": "inn", "cell": free[2], "face": free[2], "pose": "sit", "town": "store"},
 		{"use": "work", "trade": "smith", "cell": free[3], "face": free[3], "pose": "stand", "town": "store"}]}
 	var her: Dictionary = _main._taverner_places(level, {"rect": Rect2i(body.tile - Vector2i(6, 6), Vector2i(13, 13)), "counter": body.tile})

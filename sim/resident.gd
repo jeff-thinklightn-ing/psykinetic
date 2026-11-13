@@ -800,12 +800,7 @@ func _free_spot(use: String) -> Dictionary:
 	if use == "work":
 		# Behind a guest (875 amended (2)): a work spot facing the cell a guest's held stand faces (the taverner's
 		# behind the counter end a drinker stands at), else as any.
-		var faces := {}
-		for other: GridEntity in World.entities():
-			if other != self and other is Resident and str((other as Resident)._spot.get("pose", "")) == "stand" \
-					and str((other as Resident)._spot.get("use", "")) == "inn":
-				faces[(other as Resident)._spot.get("face")] = true
-		var behind := work_behind(pool, faces)
+		var behind := work_behind(pool, _stand_faces())
 		if not behind.is_empty():
 			return behind
 	if use == "inn":
@@ -835,6 +830,25 @@ func _free_spot(use: String) -> Dictionary:
 	# two each, to a free cell of his work rect: maps' day run); a seat on the square or a well's stand is still
 	# left for a stroll (the mend: folk move on). Else back to the one it left.
 	return here if not here.is_empty() else back
+
+
+## The cells the inn's counter stands other bodies hold face (875 amended (2)): where guests drink.
+func _stand_faces() -> Dictionary:
+	var faces := {}
+	for other: GridEntity in World.entities():
+		if other != self and other is Resident and str((other as Resident)._spot.get("pose", "")) == "stand" \
+				and str((other as Resident)._spot.get("use", "")) == "inn":
+			faces[(other as Resident)._spot.get("face")] = true
+	return faces
+
+
+## The work spot of [param pool] to move to between bouts (875 amended (3)): when the one it holds faces
+## no guest's stand of [param faces] and another free one does, that one; else {} (it stays).
+func guest_end(pool: Array, faces: Dictionary) -> Dictionary:
+	if pool.size() < 2 or faces.is_empty() or _spot.is_empty() or faces.has(_spot.get("face")):
+		return {}
+	var end := work_behind(pool, faces)
+	return {} if end.is_empty() or end.get("cell") == _spot.get("cell") else end
 
 
 ## Of [param pool]'s free work spots, one facing a cell in [param faces] (the cells guests' held counter stands
@@ -1171,6 +1185,18 @@ func _show_work_now() -> void:
 	var on_spot: bool = not _spot.is_empty() and tile == _spot.get("cell") and facing == _toward(_spot["face"])
 	if on_spot and doing == Doing.WORK and task.is_empty() and str(_spot.get("use", "")) == "work":
 		var word := show_word(str(_spot.get("trade", "")))
+		if _bout_end >= 0 and World.tick >= _bout_end:
+			# Between bouts, to the counter end a guest has come to (875 amended (3); maps' film at 22:00: the
+			# taverner tended (8,2) with her one guest at (10,4), as she had picked on taking the spot).
+			var spots: Variant = places.get("spots")
+			var end := guest_end(spots.get("work", []) if spots is Dictionary else [], _stand_faces())
+			if not end.is_empty():
+				_spot = end
+				_set_goal(end["cell"])
+				_shown = ""
+				_bout_end = -1
+				activity = ""
+				return
 		if not word.is_empty():
 			activity = word if _bout(word) else ""  # Shown work (853 amended (8)): its trade's, in bouts.
 			return

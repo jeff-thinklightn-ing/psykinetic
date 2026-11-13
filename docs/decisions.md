@@ -51332,6 +51332,16 @@ priest at the temple. So a player walking Umbrage at 01:30 finds the awake at th
 the square's fire, never standing at a wall; only a square-picker with no fire seat free strolls the
 square. That is what playtest reads, joined, when "Umbrage at night" is switched on. Server only;
 protocol unchanged; no new class_name; package "Umbrage at night", which lands off as 875 does.
+875 amended (3) (maps' Mughouse film on its switch-on take, Lenovo, hosted, C:/dev/review/maps_mug_bar/; the
+label from decision_number.sh). The taverner's end of the bar was picked once, as she took a work spot: at
+20:30 and 21:15 it matched the guest at the counter, but at 22:00 she tended (8,2) with her one counter guest
+at (10,4) and nobody before her. Now, at the end of each work bout or rest (Resident._show_work_now), a body
+on a work spot facing no held counter stand moves to a free one that does (Resident.guest_end, by
+work_behind; the guests' stands from _stand_faces); at a guest's end, or with no guest at the counter, it
+stays. At most one move a bout (20 to 40 s of work, 5 to 15 s of rest). resident_test _test_inn_room: to the
+guest's end; stays at a guest's or with none. Server only; protocol unchanged; no new class_name; package
+"Umbrage at night", which lands off as 875 does.
+
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...
