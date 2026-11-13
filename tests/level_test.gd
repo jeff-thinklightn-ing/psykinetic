@@ -6636,6 +6636,23 @@ func _test_throne_way_held() -> void:
 	var at: Vector2i = player.tile if player != null else World.NO_CELL
 	_check(_main.map_name == "barrow" and World.distance(at, Vector2i(31, 8)) <= 1,
 		"let go, the blessed player goes up behind the throne to the First Hall (%s, at %s)" % [_main.map_name, at])
+	# 540 amended (2) (playtest's joined walk of c29726f18): the barrow's end as the game takes it,
+	# from a step in the barrow while barrow_deep, another zone, holds its Hall: _take_link reads
+	# the zone World stands in (the barrow's), never one passed by hand.
+	_main.travel(Net.local_id, "barrow", "", {}, Vector2i(31, 9))
+	await get_tree().process_frame
+	player = _player()
+	_main._hold_hall_door("barrow_deep", true)
+	_main._told_closed.erase(Net.local_id)
+	heard.clear()
+	var from_zone: String = World.zone.name
+	var deep_open := World.zones.has("barrow_deep")
+	_main._take_link(player, Vector2i(30, 8))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(from_zone == "barrow" and deep_open and _main.map_name == "barrow" and heard.count(_main.HALL_WAY_HELD) == 1,
+		"from the barrow, (30,8) into barrow_deep's held Hall (another zone): not moved, told why once (World in %s, barrow_deep open %s, now %s, %s)" % [from_zone, deep_open, _main.map_name, heard])
+	_main._hold_hall_door("barrow_deep", false)
 	Net.message_received.disconnect(hear)
 	record.marks.assign(kept_marks)
 	_main.load_map("test_room")

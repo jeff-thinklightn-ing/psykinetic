@@ -19229,6 +19229,8 @@ held, nor does a player's: the check reads the held door, not the seal. level_te
 not moved and is told once; the barrow's end is held too; once the Hall lets go they go up as before.
 Server only; protocol unchanged; no new class_name.
 
+540 amended (2): the fight lock read another zone's Hall as open. Playtest's joined walk of c29726f18 (main e9a8d5131, two players): inside the held Hall the way behind the throne held, but a second blessed player in the barrow stepped onto (30,8) and was taken down into the held lair ("[level] Tourbot2 took the link at (30, 8) to barrow_deep (from_temple)"). _hall_doors read World.get_doors, which is only the zone World stands in: a step in the barrow is the barrow's tick, so barrow_deep's held doors were never seen. level_test asked hall_link_held(top_link, "barrow") with World still in barrow_deep, which hid it. The rule, for every tree's server paths: a server function acting for a player reads that player's zone by name, never World's current zone (World.zone, get_doors, get_entities are the zone World stands in, which a step, a tick or a host's command elsewhere makes another one). Now Main.zone_doors(zone) reads a zone's own doors wherever World stands (World's when it is that zone, else the Zone's own, as World.update_visibility does; none for a zone not loaded), and _hall_doors uses it. Tests: level_test's lock case goes on to the game's own path: the player in the barrow (World there), barrow_deep's Hall held, _take_link at (30,8) with no zone passed: not moved, told why once. Server only; protocol unchanged; no new class_name.
+
 ## 535. The minimap turns with the view; the arrow is the body's facing
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the

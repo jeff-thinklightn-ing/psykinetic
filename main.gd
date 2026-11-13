@@ -11178,6 +11178,21 @@ func _sync_charges(record: PlayerRecord) -> void:
 		player.charge_room = Economy.barrow_capacity(record.barrow, _field_rules())
 
 
+## Zone [param zone_name]'s doors, wherever World stands (540 amended (2)):
+## World.get_doors is only the zone it is in, so a step in the barrow onto
+## its way down read barrow_deep's held Hall as open (playtest's joined walk
+## of c29726f18: the blessed walked into a held fight by (30,8)). A zone
+## not loaded has none.
+func zone_doors(zone_name: String) -> Array[Door]:
+	var out: Array[Door] = []
+	var held: Zone = World.zones.get(zone_name)
+	if held == World.zone or held == null and World.zone != null and World.zone.name == zone_name:
+		return World.get_doors()
+	if held != null:
+		out.assign(held.doors.values())
+	return out
+
+
 ## The doors of the draugr's hall in zone [param zone_name] (573 amended):
 ## the door edges on the rim of its "lair" anchor (580's Hall of Fallen
 ## Souls, one in its north wall).
@@ -11186,7 +11201,7 @@ func _hall_doors(zone_name: String) -> Array[Door]:
 	var rect := hall_lair_rect(zone_name)
 	if not rect.has_area():
 		return out
-	for door: Door in World.get_doors():
+	for door: Door in zone_doors(zone_name):
 		if door.zone != zone_name:
 			continue
 		var cells := Terrain.edge_cells(door.key)
