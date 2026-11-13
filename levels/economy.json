@@ -65,7 +65,7 @@
 			"butcher": {"place": "herders_hut", "where": "hills", "holder": "", "story": "sought.butcher", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.butcher.camp"}},
 			"fisherman": {"place": "far_bank", "where": "wilds", "holder": "", "story": "sought.fisherman", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.fisherman.camp"}},
 			"woodcutter": {"place": "woodcutters_lean_to", "where": "forest", "holder": "", "story": "sought.woodcutter", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.woodcutter.camp"}},
-			"farmer": {"place": "old_farmstead", "where": "wilds", "holder": "", "story": "sought.farmer", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.farmer.camp"}},
+			"farmer": {"place": "old_farmstead", "where": "wilds", "holder": "", "story": "sought.farmer"},
 			"shepherd": {"place": "hill_cave", "where": "hills", "holder": "", "story": "sought.shepherd", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.shepherd.camp"}},
 			"weaver": {"place": "hill_shieling", "where": "hills", "holder": "", "story": "sought.weaver", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.weaver.camp"}},
 			"carpenter": {"place": "ruined_barn", "where": "wilds", "holder": "", "story": "sought.carpenter", "alt": {"place": "camp", "where": "camp", "holder": "", "story": "sought.carpenter.camp"}},

@@ -82,6 +82,26 @@ func _test_free_name() -> void:
 	_check(towns._free_name(TOWN, names, 3) == "Wilf" and towns._free_name(TOWN, ["Hilde", "Bert"], 0) == "Bert",
 		"another town's Hilde skipped: %s" % towns._free_name(TOWN, names, 3))
 	_check(towns._free_name(TOWN, ["Tam", "Wren"], 1) == "Wren", "every name taken: the pick's own, as before")
+	# 613 amended (6), the two Eddas (playtest's rescue walk): a trader named Edda came the step the
+	# word went out of Edda the farmer. Both ways: a visitor's name skips the sought, and a sought
+	# one's (any newcomer's) skips the visitors of every town.
+	var kinds: Dictionary = towns.rules["visitors"]["kinds"]
+	var kept_names: Array = kinds["trader"]["names"]
+	kinds["trader"]["names"] = ["Edda", "Maud"]
+	towns._seek(TOWN, "fm_sought_edda", "Edda", "farmer")
+	var draw := RandomNumberGenerator.new()
+	var came: Array[String] = []
+	for seed in 4:  # Whichever the draw picks, the sought Edda's name is skipped.
+		draw.seed = seed
+		towns._town(TOWN)["visitors"] = []  # One at a time: a Maud already here would take the last free name.
+		towns._visitor_comes(TOWN, "trader", draw)
+		came.append(str((towns._town(TOWN)["visitors"] as Array).back()["name"]))
+	_check(came == ["Maud", "Maud", "Maud", "Maud"], "a visitor never takes a sought one's name (%s)" % [came])
+	kinds["trader"]["names"] = kept_names
+	towns._town(TOWN)["sought"].erase("fm_sought_edda")
+	towns._town("fm/other")["visitors"] = [{"id": "visitor_fm_other_1", "name": "Bert", "kind": "trader"}]
+	_check(towns._free_name(TOWN, ["Bert", "Cole"], 0) == "Cole", "a newcomer never takes a visitor's name, another town's too: %s" % towns._free_name(TOWN, ["Bert", "Cole"], 0))
+	towns._town("fm/other")["visitors"] = []
 
 
 func _towns(level := 1, with_farmer := true, rules := _rules) -> Towns:
@@ -994,6 +1014,11 @@ func _test_sought() -> void:
 	var farmers := func(of: Towns) -> Array:
 		return of.residents(TOWN).filter(func(id: String) -> bool: return "farmer" in of.production.worker(id)["trades"])
 	var story: Dictionary = _rules["sought"]["trades"]["farmer"]
+	# 613 amended (6): the farmer's camp variant is out of economy.json until its package is whole
+	# (every farmer seek at the farmstead); a story with two variants is still how the sought
+	# alternate, so this test gives his story its camp variant back in its own rules.
+	if not story.has("alt"):
+		story["alt"] = {"place": "camp", "where": "camp", "holder": "", "story": "sought.farmer.camp"}
 	_year(towns, int(_rules["crop"]["growth_days"]) + 1)
 	var entries: Array = towns.sought(TOWN)
 	_check(farmers.call(towns).is_empty() and entries.size() == 1 and str(entries[0]["trade"]) == "farmer" and str(entries[0]["place"]) == "",
@@ -1149,6 +1174,35 @@ func _test_sought_first() -> void:
 	_check(first.xp(TOWN) == 10 and first.choose(TOWN) == "field", "food first: the farmer's field before Hazel's woodshed, wanted earlier (%s)" % first.choose(TOWN))
 	first._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	_check(first.choose(TOWN) == "woodshed", "a field standing: the woodshed's turn (%s)" % first.choose(TOWN))
+
+	# 613 amended (6), the first field before all (read from the code, not seen in play): an inn
+	# being worked and a woodshed queued before the farmer came home; the field is ordered the
+	# same turn, past one build at a time, and heads the queued builds; the inn's job untouched.
+	var mid := _towns(1, false)
+	mid._town(TOWN)["buildings"].erase("field")
+	var inn_job := mid.production.order_build(TOWN, "inn", "carpenter", {"wood": 4}, 9000)
+	mid.production._jobs[inn_job].merge({"state": "working", "worker": "c1", "workshop": "%s:carpentry" % TOWN, "needed": 9000, "worked": 4000}, true)
+	mid._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 0, "state": Towns.PLANNED, "since": 0, "job": inn_job}
+	var shed_job := mid.production.order_build(TOWN, "woodshed", "carpenter", {"wood": 2}, 1000)
+	var inn_before: Dictionary = mid.production.job(inn_job)
+	mid.note_rescue(TOWN, "f1", "Edda", "farmer")
+	mid._town(TOWN)["spent"] = mid.xp_earned(TOWN) - 10
+	_check(mid.production.building_in(TOWN) and mid._field_first(TOWN), "a build in hand, the farmer home: the field ordered all the same")
+	var field_job := int(mid.building(TOWN, "field").get("job", 0))
+	_check(field_job != 0 and mid.log_of(TOWN).any(func(line: Dictionary) -> bool: return line["what"] == "the town sets about building a field")
+		and mid.xp(TOWN) == 0, "the field's job, the town's word, its xp price paid (%d, xp %d)" % [field_job, mid.xp(TOWN)])
+	_check(mid.production.job(inn_job) == inn_before, "the inn's job and progress untouched (%s)" % [mid.production.job(inn_job)])
+	var order: Array[int] = mid.production.build_order()
+	_check(order.find(field_job) < order.find(shed_job) and order.find(field_job) != -1, "the field heads the queued builds, the woodshed ordered earlier after it (%s)" % [order])
+	_check(not mid._field_first(TOWN), "once ordered: not again")
+	var standing := _towns(1, true)
+	_check(not standing._field_first(TOWN), "a field standing: nothing put first")
+	var reloaded := Production.new(JSON.parse_string(JSON.stringify(mid.production.to_dict())), mid.production.stockpile, null, func() -> int: return _now, _rules)
+	# The inn's job names a workshop this test's world never had, so the load lets it go; the woodshed's id is
+	# lower than the field's, so only a "first" read back keeps the field ahead of it.
+	var again: Array[int] = reloaded.build_order()
+	_check(bool(reloaded.job(field_job).get("first", false)) and again.find(field_job) != -1 and again.find(field_job) < again.find(shed_job),
+		"saved and loaded: the field's \"first\" read back, still ahead of the woodshed (%s)" % [again])
 
 	# 613 amended (5): a field that doesn't stand is none to the seek (the box's town may hold any of
 	# these when the flip comes); one that stands is waited on by growth as before.

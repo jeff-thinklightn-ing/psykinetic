@@ -701,12 +701,12 @@
 		},
 		"old_farmstead": {
 			"at": [
-				118,
-				150
+				120,
+				143
 			],
 			"kind": "refuge",
 			"where": "wilds",
-			"radius": 3,
+			"radius": 5,
 			"name": "the old farmstead"
 		},
 		"ruined_barn": {

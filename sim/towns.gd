@@ -762,6 +762,8 @@ func tick() -> void:
 		_maker_comes(town)
 		_sought_turn(town)
 		_visitors_turn(town)
+		if _field_first(town):
+			continue
 		# One build at a time, unless the one in hand has stalled on its
 		# materials (decision 522).
 		if production.building_in(town) and not production.builds_stalled(town):
@@ -773,6 +775,27 @@ func tick() -> void:
 		var kind := choose(town)
 		if not kind.is_empty():
 			unlock(town, kind)
+
+
+## The town's first field before all (613 amended (6), food first; a case read from the
+## code, not one seen in play: a build in hand ended the turn before choose, so a town
+## with its inn under way kept a farmer home with no field until the inn stood). While no
+## field stands at level 1 or more, none is being built and a resident farmer waits
+## unseated for one, it is ordered (unlock: its xp price as ever) past one build at a
+## time, repair and roof, and put at the head of the queued builds (Production.put_first).
+## A build already being worked is not stopped: its carpenter finishes it, then takes the
+## field. True if it ordered the field.
+func _field_first(town: String) -> bool:
+	var field := building(town, "field")
+	if not rules.get("buildings", {}).has("field") or int(field.get("level", 0)) >= 1 or int(field.get("job", 0)) != 0:
+		return false
+	var waits := residents(town).any(func(who: String) -> bool:  # Trades first: no record copied for the rest (each tick).
+		var trades := production.trades_of(who)
+		return not trades.is_empty() and kind_for(str(trades[0])) == "field" and not _seated(who) and not Production.off_work(production.worker(who)))
+	if not waits or not unlock(town, "field"):
+		return false
+	production.put_first(int(building(town, "field").get("job", 0)))
+	return true
 
 
 ## Each place the fallen come back at that is [param town]'s building
@@ -2282,7 +2305,7 @@ func free_sought(id: String, by: String) -> bool:
 	var town := str(entry["town"])
 	_unhold(town, id)
 	_town(town)["sought"][id]["freed_by"] = by
-	_note(town, "%s the %s is found and led home" % [entry["name"], str(entry["trade"]).replace("_", " ")])
+	_note(town, "%s the %s is found, and on the way home" % [entry["name"], str(entry["trade"]).replace("_", " ")])  # 613 amended (6), voice's: home only on arrival.
 	sought_changed.emit(town, id)
 	return true
 
@@ -3224,7 +3247,7 @@ const DEAD_NAMES := 40
 
 ## A newcomer's name for [param town] from [param names], [param pick]
 ## first (552 amended, the two Bryns): the first from there on that no
-## resident, captive or sought of any town, nor remembered dead of this one, already has, nor
+## resident, captive, sought or visitor (613 amended (6)) of any town, nor remembered dead of this one, already has, nor
 ## anyone living outside Towns (552 amended (2): a sought farmer was named Rolf beside Rolf at the
 ## stall; the stall's keeper by rules.vendor.name, the rest by names_taken); [param pick]'s own
 ## when every one is taken.
@@ -3237,6 +3260,8 @@ func _free_name(town: String, names: Array, pick: int) -> String:
 		for each: Dictionary in record.get("captives", []):
 			used[str(each.get("name", ""))] = true
 		for each: Dictionary in record.get("sought", {}).values():
+			used[str(each.get("name", ""))] = true
+		for each: Dictionary in record.get("visitors", []):  # 613 amended (6): Edda the trader beside Edda the farmer.
 			used[str(each.get("name", ""))] = true
 	for name: Variant in _town(town).get("dead_names", []):
 		used[str(name)] = true
@@ -3508,7 +3533,7 @@ func _visitor_comes(town: String, kind: String, draw: RandomNumberGenerator) -> 
 	var count := int(record.get("visitors_made", 0)) + 1
 	record["visitors_made"] = count
 	var entry := {"id": "visitor_%s_%d" % [town.replace("/", "_"), count], "kind": kind,
-		"name": str(names[draw.randi_range(0, names.size() - 1)]),
+		"name": _free_name(town, names, draw.randi_range(0, names.size() - 1)),  # 613 amended (6): none the living hold, the draw first.
 		"from": str(places[draw.randi_range(0, places.size() - 1)]) if not places.is_empty() else "the road",
 		"came": now(), "leaves": now() + draw.randi_range(int(days[0]), int(days[-1])) * maxi(DayNight.day_steps, 1),
 		"stock": {}, "news": []}

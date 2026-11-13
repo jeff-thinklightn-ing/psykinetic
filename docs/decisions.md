@@ -18806,6 +18806,10 @@ at its floor, paid what the town owed the weaver (28 times) and the
 shepherd (16) as well as the tanner, who was paid 8 times (25) and made 5
 leather (13); the inn ended 2 leather short. Officials unpaid 198 (201),
 treasury end 1 (5). Protocol unchanged. towns_test.
+One exception since 613 amended (6): a town's first field. While none stands and a farmer waits
+unseated for one, it is ordered past one build at a time (and repair and roof) and heads the queued
+builds (Production.put_first), so a town's farmer isn't kept from his field by an inn under way;
+food first. A build being worked isn't stopped.
 
 
 ## 526. The sun's shadow map at 8192, blur 1.0
@@ -31264,6 +31268,57 @@ for one standing; a lost place let go and placed again on the next turn; a town 
 seeks all the same and builds it first once it can. towns_test: the boot line's new
 parts, no name in them. folk_test: the dole's line, no name in it. Server only; protocol unchanged; no new
 class_name; no bullet.
+
+**613 amended (6): what stands of the first rescue's mends** (the coordinator's rulings on playtest's joined walk of
+rescue613 on 17f99d795, 11-13, slimmed the same day by Jeff's answer to town-feeds-itself: "first farmer doesnt
+need a rescue at all, just farmhands or further farmers as the town grows"; the town's own farmer walks in, its
+own row after this one). What was built for the farmer's rescue alone is withdrawn: the told lines
+(Main._tell_sought, residents.json sought.farmer told_freed/told_home), the town sheet's farmer row shown fed or
+hungry, and their tests; they come back, reworded, with the package "further hands". What stands, true of every
+rescue or of any town:
+- Home before home: Towns.free_sought noted "<name> the <trade> is found and led home" at the word, before any
+  walk. Now "is found, and on the way home" (voice's); "comes home to <town>" at sought_home stays the arrival.
+  Both are the town's log and the journal, which no client is sent.
+- Player names in the journal: Main's three [sought] prints (gets up at a word, will not follow while watched,
+  freed) and the home print named the player; they say "a player" now. A server log line never carries a
+  player's name or id.
+- The first field before all, a case read from the code and pinned by farm_test, not one seen in play
+  (rescue2's field was chosen 28 ticks after she came home; nothing held it there): Towns.tick ended a
+  town's build turn on a build in hand (522), a repair or a roof before choose, so food first (613 amended
+  (3)) ordered the wants but a town with its inn under way kept its farmer with no field until the inn
+  stood. Towns._field_first, before those: while no field stands at level 1 or more, none is being built and
+  a resident farmer waits unseated, unlock(field) (its xp price as ever, so the boot line's "can build field"
+  stays true) and Production.put_first(its job): a job's "first" (saved with it and read back, so a restart keeps it) puts it ahead of the
+  town's other queued builds in _bid's order (Production.build_order). A build being worked is not stopped
+  or paused (a job restarts from nothing and retakes its materials): its carpenter finishes it (an inn's
+  first stage, 9000 steps, a quarter of an hour at most) and takes the field next. A paragraph in 522 says
+  the exception. A field's first stage is 3000 steps of the carpenter's work (about 5 real minutes whatever
+  the day length; 1.3 game hours on the box's 90-minute day). It serves the walked-in farmer the same way.
+- The farmer's camp variant out (the coordinator's ruling): economy.json's sought.trades.farmer "alt" (held at a
+  camp, story sought.farmer.camp) is dropped. Freed by a camp's fall (Towns.note_rescue to sought_home) she never
+  passed Main._sought_home: no arrival and no word to her body. The walk-in row then takes the farmer out of
+  sought.trades altogether.
+- The old farmstead moved (maps' word, the coordinator's approval; geography only, the place of the package
+  "further hands"): levels/wilds/level.json places.old_farmstead at [118,150] to [120,143], radius 3 to 5. One
+  waiting there stands at the place's nearest free cell (Main._sought_here), so in the yard by the ruined
+  cottage's south door gap (the cottage x 118..122, y 137..142, gap (120,142)), on dirt east of plot 1's fence,
+  off the cache at (119,139); before, on bare dirt by the rubble heap 9 to 13 cells south. level_test checks the
+  cell. With it, lore's fact farmstead.where (levels/lore/regions.json, lore's commit, voice's words): the way from
+  Umbrage, "take the west road to its end, then turn north and walk a good while", no road named a player hasn't
+  seen; it says where the place is and what it is, nothing of anyone held or waiting there (the coordinator's
+  condition, lore's check). And maps' side (terrain's trace, maps' commit): three stone-floor cells, (129,146),
+  (129,147), (129,148), left in levels/wilds/layout.png by the old farmstead prefab that 827 didn't clear, lay
+  under the road beside the farm and drew as cobbles in the dirt; their pixels are dirt #8a6440 now, nothing else
+  in the image changed. level_test: no stone floor under the road from the west road's end (134,201) north past
+  the farmstead.
+- Two Eddas: a trader named Edda came the step the word went out of Edda the farmer. Towns._free_name now also
+  skips every town's visitors, and a visitor's name (Towns._visitor_comes) is _free_name's from the kind's
+  list, the draw first (the same draws as before), so neither takes a name in use.
+Tests: farm_test _test_free_name (a visitor never takes a sought one's name; a newcomer never a visitor's), the
+first field before all (an inn being worked and a woodshed queued: the field ordered the same turn and first in
+the build order, the inn's job unchanged); level_test: the farmstead's cell, no stone under the road. Server and
+level data; protocol unchanged; no new class_name; the save gains a job's "first" (an old save has none); no
+bullet (the farmstead's yard and the road's dirt are maps' bullet if any).
 
 ## 643. The sought's door note and the town's rumour
 

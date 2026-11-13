@@ -1267,6 +1267,34 @@ func _test_farm_and_barrow() -> void:
 	_check(cottage is Rect2i and (cottage as Rect2i).has_point(Vector2i(119, 139)) and barn is Rect2i and (barn as Rect2i).has_point(Vector2i(75, 143))
 		and lanterns.is_empty(),
 		"the old farmstead's cottage in ruin over its cache, the barn in ruin, no lantern left (%s, %s, %s)" % [cottage, barn, lanterns])
+	# 613 amended (6), maps' word: the sought farmer waits in the yard by the cottage's south door gap,
+	# the place's cell (Main._sought_here: its nearest free cell), on dirt, in no building, off the cache.
+	var farm_spot: Dictionary = wilds["places"].get("old_farmstead", {})
+	var raw: Variant = farm_spot.get("cell", farm_spot.get("at", []))
+	var yard: Vector2i = raw if raw is Vector2i else Vector2i(int(raw[0]), int(raw[1])) if raw is Array and (raw as Array).size() == 2 else Vector2i(-1, -1)
+	var in_building: bool = (wilds["buildings"] as Array).any(func(each: Dictionary) -> bool: return each.get("rect") is Rect2i and (each["rect"] as Rect2i).has_point(yard))
+	_check(yard == Vector2i(120, 143) and int(farm_spot.get("radius", 0)) == 5 and str(kinds.get(yard, "")) == "dirt" and not in_building and yard != Vector2i(119, 139),
+		"the old farmstead's cell in the yard by the cottage's south gap, on dirt, in no building, off the cache (%s, %s)" % [yard, kinds.get(yard, "")])
+	# The old prefab's stone floor left under the road by the farm, (129, 146..148), drew as cobbles in
+	# the dirt (terrain's trace, the coordinator 11-13; 613 amended (6), the road to the first rescue):
+	# the road from the west road's end (134, 201) north past the farmstead lies on no stone floor.
+	var paved: Array[Vector2i] = []
+	for road_row: Variant in Level.template_config("wilds").get("roads", []):
+		var road_points: Array = (road_row as Dictionary).get("points", []) if road_row is Dictionary else []
+		for i in range(road_points.size() - 1):
+			var from_point := Vector2(float(road_points[i][0]), float(road_points[i][1]))
+			var to_point := Vector2(float(road_points[i + 1][0]), float(road_points[i + 1][1]))
+			var reach := (float(road_points[i][2]) * 0.5 if (road_points[i] as Array).size() > 2 else 1.0) + 0.5
+			for step in 21:
+				var along := from_point.lerp(to_point, step / 20.0)
+				if along.y < 137.0 or along.y > 201.0 or along.x < 120.0 or along.x > 140.0:
+					continue
+				for dy in range(-2, 3):
+					for dx in range(-2, 3):
+						var spot := Vector2i(roundi(along.x) + dx, roundi(along.y) + dy)
+						if Vector2(spot).distance_to(along) <= reach and str(kinds.get(spot, "")) == "stone" and not paved.has(spot):
+							paved.append(spot)
+	_check(paved.is_empty(), "no stone floor under the road from the west road's end to the old farmstead (%s)" % [paved])
 	var cottage_entry: Dictionary = {}
 	for building: Dictionary in wilds["buildings"]:
 		if building.get("kind") == "cottage" and building.get("ruined", false):

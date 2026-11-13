@@ -779,6 +779,28 @@ func town_workers(town: String) -> Array[Dictionary]:
 	return out
 
 
+## Build job [param id] goes ahead of the town's other queued builds (613 amended (6):
+## the town's first field), its "first" kept with it (saved). A job being worked is
+## not stopped: its worker finishes it and takes this one next.
+func put_first(id: int) -> void:
+	if _jobs.has(id):
+		_jobs[id]["first"] = true
+
+
+## Every job's id in the order a workshop looks at them (_bid): those put first
+## (put_first), then the rest, each by id.
+func build_order() -> Array[int]:
+	var ids := jobs()
+	var out: Array[int] = []
+	for id in ids:
+		if bool(_jobs[id].get("first", false)):
+			out.append(id)
+	for id in ids:
+		if not bool(_jobs[id].get("first", false)):
+			out.append(id)
+	return out
+
+
 ## Every job's id, in order.
 func jobs() -> Array[int]:
 	var out: Array[int] = []
@@ -1549,7 +1571,7 @@ func _bid(shop: Dictionary, wants: Array[String], signals: Dictionary, cat: Dict
 	# materials are in the store, else the first (decision 522: a stalled
 	# build kept at the head, the next one built meanwhile).
 	var first_build := 0
-	for id in jobs():
+	for id in build_order():  # A build put first (the town's first field, 613 amended (6)) ahead.
 		var each: Dictionary = _jobs[id]
 		var builds_here: bool = each["kind"] == "build" and each["workshop"] == "" and each["trade"] == shop["trade"] \
 				and each["town"] == shop["town"]
@@ -2023,6 +2045,8 @@ func from_dict(saved: Dictionary) -> void:
 				"rework": int(entry.get("rework", 0)), "resources": {}, "uids": [], "needed": int(entry.get("needed", 0)),
 				"worked": int(entry.get("worked", 0)), "last": int(entry.get("last", 0)),
 				"trade": str(entry.get("trade", "")), "cost": {}, "steps": int(entry.get("steps", 0))}
+			if bool(entry.get("first", false)):
+				each["first"] = true  # 613 amended (6): put first (the town's first field), kept over a restart.
 			if each["kind"] in ["mend", "work"]:
 				# 414's "mend" jobs are the general job's effect "mend" now.
 				each["effect"] = str(entry.get("effect", "mend"))

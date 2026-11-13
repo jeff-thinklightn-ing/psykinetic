@@ -94,7 +94,7 @@
 			"name": "the old farmstead",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing.",
+			"summary": "An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. The way from town (the coordinator's ruling 11-13, maps' cells): the west road along y 201 to the south road at (134,201), then about 50 cells north up the road there (maps' label \"the south road\", shown nowhere, so the fact names no road at the turn); the farm lies a few cells west of the road (x 112..127, y 137..158), the place's circle at (120,143) by the cottage's south door gap; the crossroads (128,128) lies north beyond it. Seen: the roofless stone cottage with its timber roof-frame standing at its east end, two fenced fallow plots, a leaning scarecrow, a broken cart, a dry well.",
 			"place_kind": "farm",
 			"relations": [
 				{
@@ -104,6 +104,22 @@
 			],
 			"tags": [],
 			"facts": [
+				{
+					"id": "farmstead.where",
+					"text": "The old farmstead lies north-west of town: take the west road to its end, then turn north and walk a good while; it stands just west of the road, a stone cottage open to the sky, its rafters still up.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"farm",
+						"way"
+					],
+					"source": "game",
+					"status": "agreed",
+					"sight": "the old farmstead",
+					"weight": 2
+				},
 				{
 					"id": "farmstead.abandoned",
 					"text": "The old farmstead in the wilds stands abandoned; tools and bandages lie inside.",

@@ -13330,12 +13330,12 @@ func _player_body(player_id: String) -> Player:
 func _sought_spoken(body: Resident, player_id: String, speaker: String, player: Player) -> void:
 	if World.is_downed(body):
 		World.raise_downed(body, 1)  # Beaten down on the way home (613, enemy-ai's side): a word, and they get up.
-		print("[sought] %s the %s gets up at %s's word" % [body.person, body.trade.replace("_", " "), speaker])
+		print("[sought] %s the %s gets up at a player's word" % [body.person, body.trade.replace("_", " ")])  # 613 amended (6): no player's name in the journal.
 		return
 	if not body.escort_of.is_empty() or World.towns == null:
 		return
 	if not body.holder.is_empty() and body.watched():
-		print("[sought] %s will not follow %s: the %s watch" % [body.person, speaker, body.holder.replace("_", " ")])
+		print("[sought] %s will not follow a player: the %s watch" % [body.person, body.holder.replace("_", " ")])
 		return
 	if not World.towns.free_sought(body.sought, player_id):
 		return
@@ -13345,7 +13345,7 @@ func _sought_spoken(body: Resident, player_id: String, speaker: String, player: 
 		body.remove_meta("sought_waiting")
 	var town_word := str(World.holdings.place(body.town).get("name", body.town))
 	Townsfolk.learn(World.production, body.sought, "%s found you %s and is leading you to %s." % [speaker, Towns.where_words(body.where), town_word])
-	print("[sought] %s the %s is freed by %s %s, led to %s" % [body.person, body.trade.replace("_", " "), speaker, Towns.where_words(body.where), body.town])
+	print("[sought] %s the %s is freed by a player %s, led to %s" % [body.person, body.trade.replace("_", " "), Towns.where_words(body.where), body.town])
 	if player != null:
 		_resident_says(body, str(Offers.sought_words(body.trade).get("freed", "Lead on.")), "", player)
 
@@ -13363,7 +13363,7 @@ func _sought_home(body: Resident) -> void:
 	var town_word := str(World.holdings.place(body.town).get("name", body.town))
 	if World.towns.sought_home(id):
 		Townsfolk.learn(World.production, id, "%s brought you to %s, where you live and work now." % [by, town_word])
-		print("[sought] %s the %s is home in %s, brought by %s" % [body.person, trade.replace("_", " "), body.town, by])
+		print("[sought] %s the %s is home in %s, brought by a player" % [body.person, trade.replace("_", " "), body.town])
 		var leader := _player_body(body.escort_of)
 		if leader != null:
 			var line := str(Offers.sought_words(trade).get("arrival", "I am the %s you sent for."))
