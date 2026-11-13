@@ -1609,6 +1609,69 @@ check(go and passed == ["mid"], "after 3 minutes a waiter that fits passes it: %
 go, why, _ = gate.lock_order(order, "me", now, False)
 check(not go and "no room" in why, "no try goes unreserved, first or not")
 
+print("== rows judged by their own waiter's rule (394 amended (41)) ==")
+# Each queued row as its waiter judges itself: one with "lock_rule" by 36's rule, one
+# without (queued by code from before 36) by its kind's max_running, land-lock waiters
+# counted. 11-12: environment's suite (old code) waited on the one running suite, and
+# pc-character's import (36 code) judged it free to start and waited behind it.
+written = []
+real_write = gate._write
+def noting_write(path, value):
+    if os.path.basename(os.path.dirname(path)) == "queue":
+        written.append(dict(value))
+    return real_write(path, value)
+gate._write = noting_write
+gate.take("marker", "scene", os.getpid())
+gate._write = real_write
+gate.release("marker", "scene")
+check(written and written[0].get("lock_rule") == gate.LOCK_RULE and written[0].get("gate") == gate.GATE_REVISION == 38,
+    "a waiter's queue entry carries lock_rule and gate 38 (%s)" % (written[:1],))
+table41 = gate.kinds()
+def entry41(tree, kind, marked, n):
+    return dict({"file": "%019d-%s-1.json" % (n, tree), "tree": tree, "kind": kind, "queued": 1000.0 + n},
+        **({"lock_rule": gate.LOCK_RULE} if marked else {}))
+def judge41(queue, running):
+    """What a 38 waiter decides for each row: (ok, holder) from its own look, as wait_turn does."""
+    out = []
+    for place, entry in enumerate(queue):
+        row = dict(table41[entry["kind"]], kind=entry["kind"])
+        if entry.get("lock_rule") is None:
+            row = gate.judged_row(table41, entry, row, running, 40.0, 40.0)
+        ahead = [gate.judged_row(table41, each, row, running, 40.0, 40.0) for each in queue[:place]]
+        head, _, _, holder = gate.passes_held(row, ahead, running, 40.0, 40.0, table41, time.time(), gate.backfill_length(row))
+        ok, why = gate.decide(row, running, head, 40.0, None, 40.0)
+        out.append((ok, holder, why))
+    return out
+one_suite = [{"tree": "landing", "kind": "suite_remote", "ram_gb": 1.65, "gpu": False, "started": time.time() - 60}]
+old_suite = entry41("environment", "suite_remote", False, 1)
+check(gate.judged_row(table41, old_suite, {}, one_suite, 40.0, 40.0).get("own_cap") is True
+    and not gate.judged_row(table41, entry41("x", "suite_remote", True, 9), {}, one_suite, 40.0, 40.0).get("own_cap"),
+    "a row without lock_rule is judged by its own cap (own_cap); one with it is not")
+queue41 = [old_suite, entry41("pc-character", "godot_import", True, 2)]
+got = judge41(queue41, one_suite)
+check(not got[0][0] and "1 suite_remote running, at most 1 at once" in got[0][2],
+    "an unmarked suite with one suite running waits on its kind, as its old waiter says (%s)" % (got[0],))
+check(got[1][0], "an import behind it starts: it waits only on its own kind (%s)" % (got[1],))
+said = gate.queue_reasons(queue41, one_suite, 40.0, 40.0, None)
+check("at most 1 at once" in said[0] and said[1].startswith("may start"),
+    "status says the same of both: %s" % said)
+queue41 = [entry41("perf-convoy", "suite_remote", True, 1), entry41("pc-character", "godot_import", True, 2)]
+got = judge41(queue41, one_suite)
+check(got[0][0], "a marked suite with no land-lock waiters may take, by 36's rule (%s)" % (got[0],))
+check(not got[1][0] and got[1][1] == 0, "and the import behind it holds, as before (%s)" % (got[1],))
+said = gate.queue_reasons(queue41, one_suite, 40.0, 40.0, None)
+check(said[0].startswith("may start") and said[1].startswith("waits: behind") and "perf-convoy suite_remote" in said[1], "status says the same: %s" % said)
+waiting = [dict(one_suite[0], tree="w%d" % n, lock_wait=True) for n in range(3)]
+old_scene = gate.judged_row(table41, entry41("art-kit", "scene", False, 3), {}, one_suite + waiting, 40.0, 40.0)
+new_scene = dict(table41["scene"], kind="scene")
+ok_old, why_old = gate.decide(old_scene, one_suite + waiting, True, 40.0, None, 40.0)
+ok_new, why_new = gate.decide(new_scene, one_suite + waiting, True, 40.0, None, 40.0)
+check(not ok_old and "4 heavy jobs running" in why_old and ok_new,
+    "three land-lock waiters: an unmarked scene counts them, as its old waiter does (%s); a marked one does not (%s)" % (why_old, why_new))
+check(gate.blockers(dict(table41["suite_remote"], kind="suite_remote", own_cap=True), one_suite) == one_suite
+    and gate.blockers(dict(table41["suite_remote"], kind="suite_remote"), one_suite) == [],
+    "blockers: the running suite holds an unmarked suite, not a marked one")
+
 print("== a landing's take clears or refuses untracked files main tracks (394 amended (35)) ==")
 import subprocess  # noqa: E402
 repo = tempfile.mkdtemp(prefix="heavy_job_stray_")

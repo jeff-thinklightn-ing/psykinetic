@@ -186,8 +186,11 @@ TAKE_STALE_SECONDS = 30 * 60
 ## 30 minutes on 11-12; art-kit's 01:29 waiter dropped ui's and
 ## pc-character's). An entry without it, or with a lower one, was written by
 ## older code: `status` names it with its checkout, the daily summary counts
-## it by tree. Raise it with any change older code would get wrong.
-GATE_REVISION = 37
+## it by tree. Raise it with any change older code would get wrong, and with
+## any change to how a waiter judges itself or the rows ahead of it (394
+## amended (41): 36 changed that without raising it, and its waiters and older
+## ones judged each other wrong).
+GATE_REVISION = 38
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -331,14 +334,15 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     in GB (free_gpu_gb or free_commit_gb None: not known)."""
     if not head:
         return False, "behind others in the queue"
-    # Takes waiting on the land lock (394 amended (36)) run nothing yet: not counted.
-    going = [each for each in running if not each.get("lock_wait")]
+    # Takes waiting on the land lock (394 amended (36)) run nothing yet: not
+    # counted, except by a row whose waiter predates 36 (own_cap).
+    going = counted_going(job, running)
     if counted(going) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(going) < UNCOUNTED_MOST):
         return False, "%d heavy jobs running" % counted(going)
     for each in running:
         if each.get("kind") in job.get("excludes", []):
             return False, "a %s running (never beside a %s)" % (each.get("kind"), job.get("kind"))
-    if job.get("kind") in LOCK_WAIT_KINDS:
+    if waits_on_lock(job):
         waiting = sum(1 for each in running if each.get("lock_wait"))
         if waiting >= LOCK_WAIT_MOST:
             return False, "%d %s takes already wait on the land lock, at most %d (394 amended (36))" % (
@@ -372,6 +376,28 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
 # A take stops waiting when land.sh adopts it (_adopt_take).
 LOCK_WAIT_KINDS = ("suite_remote",)
 LOCK_WAIT_MOST = 3
+# 394 amended (41): a queued entry says its waiter knows 36's rule ("lock_rule":
+# LOCK_RULE). One without it was queued by older code, which counts land-lock
+# waiters as running jobs and holds a suite_remote at max_running; those behind
+# judge it so (judged_row's "own_cap"), as its waiter judges itself. Judged by
+# 36's rule instead, environment's suite (old code, held by the one running
+# suite) "could start", and pc-character's import (36 code) waited behind it,
+# with every import and scene behind that: 11-12 evening, 36 minutes and more.
+LOCK_RULE = 1
+
+
+def waits_on_lock(job):
+    """Whether [job] is held by 36's land-lock rule (at most LOCK_WAIT_MOST
+    takes waiting on the lock) rather than its kind's max_running: a
+    LOCK_WAIT_KINDS row whose waiter knows that rule (394 amended (41))."""
+    return job.get("kind") in LOCK_WAIT_KINDS and not job.get("own_cap")
+
+
+def counted_going(job, running):
+    """The running jobs [job]'s waiter counts against MAX_RUNNING and its
+    kind's max_running: all but the takes waiting on the land lock, or all of
+    them for a row queued by code from before 36 (own_cap, 394 amended (41))."""
+    return list(running) if job.get("own_cap") else [each for each in running if not each.get("lock_wait")]
 # The land lock's order (394 amended (36)): among landings trying for a free lock, the
 # one whose gate take started first (a front moves that start) goes first; a
 # waiter counts while its last try is under LOCK_LIVE_SECONDS old (150 s: two
@@ -479,6 +505,9 @@ def judged_row(table, entry, default, running, free_ram_gb, free_commit_gb=None,
     row = dict(due_row(table, entry, default, running, free_ram_gb, free_commit_gb, now=now), tree=entry["tree"])
     if entry.get("expect_s") is not None:
         row["expect_s"] = entry["expect_s"]
+    if entry.get("lock_rule") is None:
+        # Queued by code from before 36: judged by that code's rule (394 amended (41)).
+        row["own_cap"] = True
     return row
 
 
@@ -522,11 +551,10 @@ def kind_blocked(job, running):
     as many of its kind as its max_running."""
     if any(each.get("kind") in job.get("excludes", []) for each in running):
         return True
-    if job.get("kind") in LOCK_WAIT_KINDS:
+    if waits_on_lock(job):
         return sum(1 for each in running if each.get("lock_wait")) >= LOCK_WAIT_MOST
     cap = job.get("max_running")
-    return cap is not None and sum(1 for each in running if each.get("kind") == job.get("kind")
-        and not each.get("lock_wait")) >= cap
+    return cap is not None and sum(1 for each in counted_going(job, running) if each.get("kind") == job.get("kind")) >= cap
 
 
 def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
@@ -642,11 +670,11 @@ def blockers(job, running):
     """The running jobs that keep [job] out by kind: those it excludes or
     that exclude it, and its own kind's once at its cap."""
     found = [each for each in running if conflicts(job, each)]
-    if job.get("kind") in LOCK_WAIT_KINDS:
+    if waits_on_lock(job):
         waiting = [each for each in running if each.get("lock_wait")]
         return found + (waiting if len(waiting) >= LOCK_WAIT_MOST else [])
     cap = job.get("max_running")
-    same = [each for each in running if each.get("kind") == job.get("kind") and not each.get("lock_wait")]
+    same = [each for each in counted_going(job, running) if each.get("kind") == job.get("kind")]
     if cap is not None and len(same) >= cap:
         found += same
     return found
@@ -1478,7 +1506,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         # by (backfill_length, 394 amended (28)).
         _write(_path("queue", ticket), dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
             "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued,
-            "gate": GATE_REVISION, "checkout": CHECKOUT},
+            "gate": GATE_REVISION, "checkout": CHECKOUT, "lock_rule": LOCK_RULE},
             **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {})))
     said = 0.0
     long_logged = False

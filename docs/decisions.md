@@ -10609,6 +10609,41 @@ shows is 36's own, scenes held behind a suite_remote head held by the count alon
 are granted to wait on the lock, uncounted, after which scenes pass again. Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+394 amended (41): rows judged by their own waiter's rule (the coordinator's ask and approval,
+2026-11-12; label from tools/decision_number.sh). A waiter keeps the gate code it started with.
+36 changed how a queued suite_remote is held (at most LOCK_WAIT_MOST takes waiting on the land
+lock, not suite_remote's max_running) and landed after 37 without raising GATE_REVISION, so
+code from either side of it wrote "gate": 37. On the evening of 11-12, 42 of 60 waiters ran code
+from before 36, environment's suite at the head among them, held by its own rule on the one
+running suite: a wait on its own kind, which a light job passes. pc-character's import ran 36
+code, judged environment by 36's rule (no land-lock waiters, so free to start), and waited
+behind it; every import and scene behind that waited on the import, playtest's cut-gating runs
+among them, 36 minutes and more, with 27 GB free. Status run from the other side said "may start".
+- A waiter's queue entry says it knows 36's rule: "lock_rule": LOCK_RULE (1). GATE_REVISION 38.
+- A row without it (judged_row's "own_cap") is judged as its own waiter judges itself: a
+  suite_remote by its max_running, and land-lock waiters counted as running jobs (counted_going)
+  against MAX_RUNNING and its kind's cap; decide, kind_blocked and blockers alike. A marked row,
+  and a waiter's own row, by 36's rule as before. Status and the waiter agree on both.
+- What each side thinks of the other. 38 of rows from before 36: as they think of themselves.
+  38 of rows from 36 code (unmarked too): by the older rule, stricter than their own, so a light
+  job may pass a 36 suite that could have taken; harmless, a suite conflicts with no import or
+  scene, and one that takes is a land-lock waiter, which counts against no light job. Code from
+  before 36, of 38 rows: it ignores the marker and counts 38's land-lock waiters as running jobs,
+  so its own light jobs wait on them (at most three, each until its landing) and a 38 light
+  behind one of those waits too, first come, as on any count; no stall, only a slower lane
+  while such waiters remain. 36 code, of rows from before 36: wrong as on 11-12, until its
+  waiters are gone; release fronts a held one.
+- GATE_REVISION's comment: raise it with any change to how a waiter judges itself or the rows
+  ahead of it.
+- Proof: heavy_job_test (a waiter's entry carries lock_rule and 38; with one suite running an
+  unmarked suite waits on its kind and an import behind it starts, status saying the same; a
+  marked suite with no land-lock waiters holds the import, as before; three land-lock waiters
+  hold an unmarked scene, not a marked one; blockers). And tonight's live queue, stripped and
+  copied (scratch HEAVY_JOBS_DIR), looked at by this code with the 36-code light jobs marked: all
+  eight held ones pass the 21 queued suites; with only the suite running and each light job
+  ending, all 30 light rows start in queue order while the suites keep theirs; main's code on
+  the same copy holds them behind the head suite. Tools and tests only; protocol unchanged.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
