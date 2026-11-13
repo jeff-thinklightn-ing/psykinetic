@@ -647,6 +647,10 @@ var _idle_retry_tick := -1
 var _standoff_mark := []
 var _standoff_from := -1
 var _pressing := false
+## 806 amended (21): the ticks it began and last held back from its target
+## (the hold-back of 806 amended (16)); -1 never.
+var _held_back_since := -1
+var _held_back_last := -1
 var _watched := -1
 var _watched_from := NO_TILE
 var _glimpsed := NO_TILE
@@ -1435,8 +1439,17 @@ func _sim_tick() -> void:
 		# reach only across a wall's corner, and held so, its stand-off ran out, it
 		# watched her, her nearness roused it, and it held again: ten minutes
 		# FIGHTING and never a blow. Beside her it goes round to a cell it strikes from.
-		_standing_off()
-		return  # Waits for the others; a band that outnumbers them goes in together.
+		if _first_holder():
+			# 806 amended (21): two or more holding off one target, each waiting for
+			# another at her, stared five seconds and walked home. The one who held
+			# first presses; at her, it meets the others' _target_beset.
+			_pressing = true
+		else:
+			if _held_back_last < World.tick - 1:
+				_held_back_since = World.tick
+			_held_back_last = World.tick
+			_standing_off()
+			return  # Waits for the others; a band that outnumbers them goes in together.
 	if not _pressing and _rng.randf() < pause_chance:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
 		return
@@ -1685,6 +1698,29 @@ func _clear_shot() -> bool:
 		return false
 	# A friend inside even its narrowest cone (decision 620): no shot from here.
 	return _cone_clear(deg_to_rad(float(Items.verb_of(World.drawn_with(self)).get("spread_floor", 0.0))))
+
+
+## 806 amended (21): another of its side holds back from its target too (held
+## it this tick or the last), and it held first of them all (the earlier
+## since, then the lower id; one not holding yet holds from now), and the
+## holders outnumber the foes about it (_band_odds: two on one player, not on
+## two). A holder that dreads its target never goes first.
+func _first_holder() -> bool:
+	if _dreads_target():
+		return false
+	var mine := _held_back_since if _held_back_last >= World.tick - 1 else World.tick
+	var others := 0
+	for entity in World.monsters():
+		var other := entity as Monster
+		if other == null or other == self or not other.spawned or other.hp <= 0 or not _mate_of(other) \
+				or other.target != target or other._held_back_last < World.tick - 1:
+			continue
+		others += 1
+		if other._held_back_since < mine or other._held_back_since == mine and other.id < id:
+			return false
+	# Only holders that outnumber the foes about it (_band_odds' y: the players
+	# and companions within BAND_TILES): a pair on two holds as before.
+	return others > 0 and others + 1 > _band_odds().y
 
 
 ## A step away from its target, to the free neighbouring cell farthest from

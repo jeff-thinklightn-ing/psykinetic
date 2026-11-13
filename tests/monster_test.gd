@@ -1893,6 +1893,7 @@ func _test_ambush() -> void:
 	_test_den_walk_refused()
 	_test_freed_striker()
 	_test_freed_striker_den_walk()
+	_test_two_holders()
 	_test_alert_note()
 	_test_despawn_forget()
 	_test_link_slots()
@@ -10357,3 +10358,65 @@ func _test_dagger_open_after_miss() -> void:
 	_check(robber.ambushing() and not robber.open_after_miss(), "landed: he stands open, but not after a miss")
 	var landed_cut: int = cut.call(robber, player)
 	_check(landed_cut < open_cut, "so her cut is plain (%d against %d)" % [landed_cut, open_cut])
+
+
+## 806 amended (21) (the coordinator's ruling on combat's duel7 pair, 11-12):
+## Crake and Mott both rolled cautious, on a player who stands 3 off them.
+## Each held back for another at her (806 amended (16)), so they stared five
+## seconds and walked home. Now the one who held first presses, and the other
+## follows him in: both in reach of her within the standoff's 50 ticks. A lone
+## holder, a mate near but not in it, holds as before; and a pair on two
+## players holds as before ("a pair of cautious ones against two", unchanged).
+func _test_two_holders() -> void:
+	print("%s== two cautious robbers on one standing player: the first holder presses, the other follows ==" % char(10))
+	var rows: Array[String] = ["#".repeat(16)]
+	for y in 9:
+		rows.append("#" + ".".repeat(14) + "#")
+	rows.append("#".repeat(16))
+	for pair: bool in [true, false]:
+		_build(rows)
+		var robbers: Array[Monster] = []
+		for each: Array in [["crake", Vector2i(8, 3)], ["mott", Vector2i(8, 7)]]:
+			var spec := Level._spec_for("monster_robber", Level.MONSTER_TYPES)
+			spec["name"] = str(each[0]).capitalize()
+			spec["tile"] = each[1]
+			spec["named"] = each[0]
+			Level.arm(spec)
+			var robber := EntityFactory.build(spec) as Monster
+			_room.add_child(robber)
+			World.spawn(robber, each[1])
+			robber.boldness = 0.05  # Rolled cautious: each holds back for another at her.
+			robber.temper = Monster.Temper.CAUTIOUS
+			robber.sight_range = 9
+			robber.senses.cone_cos = -1.0
+			robbers.append(robber)
+		if not pair:
+			robbers[1].acts = false  # Near (his mate), but never in it: blind, a call would bring him (806am16's lone holder).
+		var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(5, 5))  # 3 off each, and she stands.
+		player.max_hp = 1000
+		player.hp = 1000
+		player.protected = false
+		var in_reach := [-1, -1]
+		var held := 0
+		var first_held := -1
+		for i in 50:
+			World.step()
+			player.hp = 1000
+			for k in 2:
+				if in_reach[k] < 0 and World.in_reach(robbers[k], player):
+					in_reach[k] = i
+			if robbers[0]._held_back_last == World.tick:
+				held += 1
+				if first_held < 0:
+					first_held = i
+		print("  %s: in her reach at ticks %s, the first held back %d ticks from tick %d, pressing %s" % [
+			"two holders" if pair else "a lone holder", in_reach, held, first_held, [robbers[0]._pressing, robbers[1]._pressing]])
+		if pair:
+			_check(in_reach[0] >= 0 and in_reach[1] >= 0 and (robbers[0]._pressing or robbers[1]._pressing),
+					"two holders on her: one presses, and both are in her reach within 50 ticks (%s)" % [in_reach])
+		else:
+			# Seen, roused and walked to his ring first (about 13 ticks); from then on he holds every tick.
+			_check(in_reach[0] < 0 and first_held >= 0 and first_held <= 20 and held == 50 - first_held and not robbers[0]._pressing,
+					"a lone holder, his mate near but not in it: he holds back as 806 amended (16) has it, every tick from his ring (held %d of 50, from tick %d)" % [held, first_held])
