@@ -433,6 +433,17 @@ var lead_slack := 0.5
 ## monster's (theirs is lead_slack), nor a knockback verb's (the Tomb
 ## Sledge: its push would keep a foe off for ever; its own look first).
 var windup_slack := 0.5
+## 874 amended (1): a wound-up blow that takes windup_slack also reaches a
+## foe no more than WINDUP_STEP_GAIN further apart than as it began (his one
+## step back, straight or diagonal, whoever moved), capped at WINDUP_STEP
+## past reach, nothing between (_wind_up_reaches). Two steps, a wall or a
+## body between still dodge.
+const WINDUP_STEP := 1.0
+## One cell's step any way, a diagonal's (about sqrt 2), as a gain in distance.
+const WINDUP_STEP_GAIN := 1.42
+## The landing wind-up's centres apart at its start (874 amended (1)), held
+## by _tend_wind_ups for the one _try_hit it makes, -1.0 otherwise.
+var _landing_apart := -1.0
 ## The knock-down grace (343 amended (2)): a body knocked down (or the
 ## draugr staggered) can't be again until this many ticks after that one
 ## began; a blow inside it lands with its harm and push, no down. So a
@@ -9128,6 +9139,8 @@ func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	# ticks come out of the weapon's own cycle, hit to hit attack_ticks_of.
 	var lead := not heavy
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile, "began": tick, "lead": lead}
+	if not lead and _takes_windup_slack(by):
+		by.wind_up["apart"] = body_centre(by).distance_to(body_centre(target))  # 874 amended (1).
 	# Planted through its landing tick (392 amended (6)): a free body's own walk is taken before its
 	# wind-ups are struck in a tick (_step_zone), so a plant ending as it lands let a step that
 	# tick carry it off its cell and give a paid blow up. Its strike, whiff or recover stands
@@ -9190,7 +9203,8 @@ func _tend_wind_ups() -> void:
 		var began: int = entity.wind_up.get("began", tick)
 		var bonus: int = entity.wind_up.get("bonus", 0)  # A told backstab's harm on top (a FLANK monster's, from behind).
 		var logs := _logs_wind_up(entity, entity.wind_up)
-		var reaches := is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead)
+		var apart: float = entity.wind_up.get("apart", -1.0)  # 874 amended (1): how far apart as it began.
+		var reaches := is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead, apart)
 		if walked and not reaches:
 			# 887: her step took her out of reach: given up, not swung at the air, its stamina back.
 			cancel_wind_up(entity)
@@ -9200,7 +9214,10 @@ func _tend_wind_ups() -> void:
 		entity.wind_up = {}
 		_winders.erase(entity)
 		var first := _hits.size()
-		if reaches and _try_hit(entity, aimed as GridEntity, entity.attack_damage + bonus, false, Vector2i.ZERO, true, lead):
+		_landing_apart = apart
+		var struck := reaches and _try_hit(entity, aimed as GridEntity, entity.attack_damage + bonus, false, Vector2i.ZERO, true, lead)
+		_landing_apart = -1.0
+		if struck:
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
 				_hits[i].told = strikes_told(entity) and (not lead or tick - began >= TOLD_LEAD_TICKS)  # 340 amended (4).
@@ -9227,12 +9244,23 @@ func _tend_wind_ups() -> void:
 ## lands: in reach, or for a [param lead] (338 amended) up to
 ## lead_slack past it with nothing between, where a body is free; for a
 ## wind-up that takes windup_slack (_takes_windup_slack, 874), up to that
-## past it with nothing between.
-func _wind_up_reaches(entity: GridEntity, aimed: GridEntity, lead: bool) -> bool:
+## past it with nothing between; or (874 amended (1)), given [param apart],
+## the centres apart as it began, no more than WINDUP_STEP_GAIN further
+## apart than that, capped at WINDUP_STEP past reach, nothing between: his
+## one step back, straight or diagonal, from wherever she began, the edge
+## of her reach or beside him.
+func _wind_up_reaches(entity: GridEntity, aimed: GridEntity, lead: bool, apart := -1.0) -> bool:
 	if in_reach(entity, aimed):
 		return true
 	if not lead and _takes_windup_slack(entity):
-		return _body_reach(body_centre(entity), body_centre(aimed), entity, aimed, blow_verb(entity), windup_slack)
+		var from := body_centre(entity)
+		var to := body_centre(aimed)
+		var verb := blow_verb(entity)
+		if _body_reach(from, to, entity, aimed, verb, windup_slack):
+			return true
+		if apart < 0.0 or from.distance_to(to) > apart + WINDUP_STEP_GAIN + 0.01:
+			return false
+		return _body_reach(from, to, entity, aimed, verb, WINDUP_STEP + 0.01)
 	if not lead or not (free_body(entity) or free_body(aimed)):
 		return false
 	return _body_reach(body_centre(entity), body_centre(aimed), entity, aimed, blow_verb(entity), lead_slack)
@@ -9976,7 +10004,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	if not can_target(attacker, target) or is_stunned(attacker):
 		return false
 	if tick < attacker.next_attack_tick or not (in_reach(attacker, target, is_shove) or lead and _wind_up_reaches(attacker, target, true)
-			or paid and not lead and not is_shove and _takes_windup_slack(attacker) and _wind_up_reaches(attacker, target, false)):
+			or paid and not lead and not is_shove and _takes_windup_slack(attacker) and _wind_up_reaches(attacker, target, false, _landing_apart)):
 		return false
 	# No hitting mid-step: the attacker's tile changes when a step starts, but
 	# on screen it is still crossing over, so the blow would land from afar.

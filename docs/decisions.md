@@ -52118,3 +52118,33 @@ is turf and thinning only. view_test _test_worn_ground (the channels at the inn'
 foot, the band, the alley's turf and none past TURF_REACH, the box, the woodcutter's route cell for
 cell, no tuft on cobble or by a wall). Client only (Level.town_places_of is parsed on every peer;
 nothing is sent); protocol unchanged; no new class_name.
+
+874 amended (1) (the decision-number script's label; the coordinator's approval, 11-12 evening): one step back never dodges a
+wound-up blow. The rows above came from bots that met him three ways, and the way decided it. A stander (combat's zz_duel7 click
+bot: no client runs in the harness, so nothing walks her and he comes to her) winds beside him, on a cell centre, and with 874
+alone wins one robber 16 of 16 in 13.7 s taking 6. A closer (enemy-ai's zz_duel5 careless: she walks in and her order fires the
+tick she is in reach) and a chaser (zz_duel5 chaser: a click on him, her client's chase walking her in as main.gd _free_chase
+does, stopping at 0.85 of the span, the server's order winding at full reach) wind at the edge of her reach, the battle axe's
+1.8 between centres. His one step back puts him 2.5 to 2.8 off, past 874's half cell. On main's lunge, 874 alone: closer 0 of
+16 (every miss "air, 2.5 apart"), chaser 9 of 16 taking 15.9. So a player who clicks him from afar, or walks up on her keys,
+met the 874 axe losing. 874's "a player meets it only once 790 amended (6) is on main" was the closer's reading, and is
+withdrawn: with the lunge row the closer wins in 17.5 s taking 14.6, still slower and costlier than fists.
+The rule: at a player's heavy wind-up's start World keeps the centres apart (wind_up "apart"); as it lands it reaches if he
+is within reach plus windup_slack, as 874, or no more than WINDUP_STEP_GAIN (1.42: one cell any way, a diagonal's) further
+apart than at its start, capped at reach plus WINDUP_STEP (1.0), consts, nothing between (_body_reach: a wall, or a body once more than 1.5 apart). Start against landing,
+whoever moved: her own push carrying him further counts as his move. Two steps, a wall or a body between still dodge (the
+coordinator's closer rows: she winds from 0.75 apart, nearly on him, and a robber, stepping every 3.5 ticks, fits two steps
+into the axe's 8: 33 of its 35 misses, true dodges). World._wind_up_reaches takes the start; _tend_wind_ups holds it for its one _try_hit (_landing_apart). Not a monster's, not a
+knockback verb's (the Tomb Sledge), as 874. On main every axe's span is 1.8, so no blow lands past 2.8 between centres.
+Rows (the coordinator, ubuntu-1, hp as the row's, 16 starts; C:/dev/review/combat/probe_box/axe874_run/duel874_logs/ostep_*):
+one robber, main's lunge, battle axe: chaser 16 of 16 in 11.3 s taking 9.6 (6 swings, 6 landed), closer 14 of 16 in 14.2 s
+taking 12.8, stander 13.7 s taking 6.0; the giant axe 9.1 to 11.3 s taking 7.1 to 9.0; fists 7.1 s taking 11.1 to 12.0; the
+sword 5.5 s taking 8.4 to 9.0. With the lunge row: battle axe chaser 11.3 s taking 9.0, closer 14.8 s taking 11.4, stander
+12.6 s taking 9.0. The axe wins one robber however she meets him, slower than the sword, taking less than fists; the giant axe
+above it. The grey (chaser): battle axe 12 of 16 in 20.5 s (6 of 16 before the diagonal gain: a wolf darts
+diagonally), the sword 15 of 16 in 8.8 s; a boar: 7.6 s against 4.8 s; the
+sword the quicker in both. Open for the tuning note after the cut: two robbers (battle axe 1 to 7 wins of 16 against the giant
+axe's 8 to 15), the grey, reading with a two-hander (a reader equals careless), and down_grace 40 against the axe's cycle.
+combat_test _test_windup_step (from the edge one step lands, two miss; from beside him one step and a diagonal step (a gain of 1.24) land, two
+miss; a wall between, a body between, her own push 1.6 further: miss; a monster's takes none). Server only; protocol
+unchanged; no new class_name.

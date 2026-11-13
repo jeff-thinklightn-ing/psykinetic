@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_sledge_recover()
 	_test_sword_lead()
 	_test_windup_slack()
+	_test_windup_step()
 	_test_down_grace()
 	_test_weapon_memory()
 	_test_guard_rework()
@@ -1040,6 +1041,67 @@ func _test_windup_slack() -> void:
 	var m := _build(["#######", "#.P.m.#", "#######"])
 	_check(World._takes_windup_slack(m["P"][0]) and not World._takes_windup_slack(m["m"][0]),
 			"a player's wind-up takes it, a monster's doesn't (its leads take lead_slack)")
+
+
+## One step back never dodges a wound-up blow (874 amended (1)): a player's
+## heavy wind-up reaches a foe no more than WINDUP_STEP_GAIN (a diagonal
+## cell) further apart than as it began (whoever moved), capped at
+## WINDUP_STEP past reach, nothing
+## between: from the edge of her reach or from beside him. Two steps, a
+## wall or a body between, or her own push carrying him further, still miss.
+func _test_windup_step() -> void:
+	print("
+== one step back never dodges a wound-up blow; two do, and a wall or a body between (874 amended (1)) ==")
+	var room: Array[String] = ["#########", "#......P#", "#.......#", "#.P.....#", "#...#...#", "#.......#", "#########"]
+	# [start x, start y, landing x, landing y, struck, what]; she stands at (2, 3), reach 1.8 (the battle axe's span).
+	for each: Array in [[3.75, 3.0, 4.75, 3.0, true, "from the edge of her reach (1.75 apart), one step straight back (2.75): struck"],
+			[3.75, 3.0, 5.75, 3.0, false, "from the edge, two steps back (3.75): the air"],
+			[3.0, 3.0, 4.0, 3.0, true, "from beside him (1.0 apart), one step back (2.0): struck"],
+			[3.0, 3.0, 5.0, 3.0, false, "from beside him, two steps back (3.0): the air"],
+			[3.0, 3.0, 4.0, 2.0, true, "from beside him, a diagonal step away to (4, 2) (2.24, a gain of 1.24): struck"],
+			[3.75, 2.9, 4.0, 4.6, false, "from the edge, a step round the wall at (4, 4), the wall between as it lands: the air"],
+			[3.0, 3.0, 4.6, 3.0, false, "whoever moved: from beside him, her own push carrying him 1.6 further (2.6): the air"]]:
+		var e := _build(room)
+		var host: Player = e["P"][1] if (e["P"][0] as Player).tile == Vector2i(7, 1) else e["P"][0]
+		var foe: Player = e["P"][0] if host == e["P"][1] else e["P"][1]
+		_give(host, "battle_axe")
+		foe.max_hp = 100
+		foe.hp = 100
+		host.free_pos = Vector2(2.0, 3.0)
+		foe.free_pos = Vector2(float(each[0]), float(each[1]))
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+		_check(World.try_wind_up(host, foe) and is_equal_approx(float(host.wind_up.get("apart", -1.0)), Vector2(2.0, 3.0).distance_to(foe.free_pos)),
+				"wound up in reach, %.2f apart kept" % float(host.wind_up.get("apart", -1.0)))
+		World.tick = int(host.wind_up["lands"])
+		foe.free_pos = Vector2(float(each[2]), float(each[3]))
+		World._tend_wind_ups()
+		World._resolve_hits()
+		_check((foe.hp < 100) == each[4], "%s (%d hp)" % [each[5], foe.hp])
+	# A body between as it lands: a grid monster on (4, 3), the line from her (2, 3) to him at (4.75, 3).
+	var e2 := _build(["#########", "#......P#", "#.......#", "#.P.m...#", "#.......#", "#########"])
+	var her: Player = e2["P"][1] if (e2["P"][0] as Player).tile == Vector2i(7, 1) else e2["P"][0]
+	var him: Player = e2["P"][0] if her == e2["P"][1] else e2["P"][1]
+	_give(her, "battle_axe")
+	him.max_hp = 100
+	him.hp = 100
+	her.free_pos = Vector2(2.0, 3.0)
+	him.free_pos = Vector2(3.75, 2.6)
+	her.next_attack_tick = 0
+	her.next_move_tick = 0
+	_check(World.try_wind_up(her, him), "wound up on him at the edge of her reach (%.2f apart)" % float(her.wind_up.get("apart", -1.0)))
+	World.tick = int(her.wind_up["lands"])
+	him.free_pos = Vector2(4.75, 3.0)
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(him.hp == 100, "one step on, but a body between as it lands: the air (%d hp)" % him.hp)
+	# Not a monster's: its wind-up keeps no start (its leads take lead_slack).
+	var m := _build(["#######", "#.P.m.#", "#######"])
+	var mon: Monster = m["m"][0]
+	var far := m["P"][0] as Player
+	far.free_pos = Vector2(2.0 - 1.0, 1.0)  # Out of its reach: neither the slack nor a kept start lands it.
+	_check(not World._takes_windup_slack(mon) and not World._wind_up_reaches(mon, far, false, 3.0),
+			"a monster's wind-up takes neither the slack nor the step")
 
 
 ## The knock-down grace (343 amended (2)): knocked down, a body can't be
