@@ -69,6 +69,18 @@
 		"blunt and fearless": ["Get a wall behind you and fight!"],
 		"cheerful under pressure": ["Too many friends round you! Back up!"]
 	},
+	"flank_says_no_wall": {
+		"_note": "Her shout when flanked by a thrower (891 amended (1)): no wall and no 'back', since a throw into a wall costs more than the blow; voice's words. Picked as flank_says is, when any monster fighting her player World.throws_into_walls.",
+		"default": ["Keep them all in front of you!", "Don't get pinned! Keep moving!", "Turn! Keep them where you can see them!", "Step out of it! Don't let them box you in!"],
+		"steady and watchful": ["Keep turning. Keep them all in front of you."],
+		"quick and wary": ["Move! Don't let them pin you!"],
+		"warm and talkative": ["They're all round you! Keep moving, keep them in front!"],
+		"careful and thoughtful": ["Step clear. Keep them all on one side of you."],
+		"restless and curious": ["Don't stand still! Keep them in front!"],
+		"quiet and patient": ["Turn. Keep them in sight."],
+		"blunt and fearless": ["Turn and face them! Don't get pinned!"],
+		"cheerful under pressure": ["Lots of company! Keep them where you can see them!"]
+	},
 	"bandage_says": {
 		"_note": "What she says when she won't or can't bandage (decision 625, Jeff: 'Pip seems lazy at bandaging ... just says fine'), at once, no model, by World.bandage_refusal's reason or bandage_broke_why; a key with _self is for her own wound. Drafts for Jeff.",
 		"not_safe": "Not here. Not with them this close.",

@@ -4289,15 +4289,26 @@ func _warn_flanked() -> void:
 		return
 	if not fight_roused() and not _sees(player.tile):
 		return  # Out of the fight and out of sight: she knows nothing of it.
-	var line := flank_line()
+	var line := flank_line(_thrower_on(player))
 	if not line.is_empty() and _say(line, true, true):
 		_flank_shouts[key] = [World.tick, World.tick]
 
 
-## Her flank_says line: her temperament's, else "default"'s, the same one
-## each time for her.
-func flank_line() -> String:
-	var lines: Variant = CompanionCard.tables().get("flank_says", {})
+## A monster fighting [param player] (its target) whose told moves throw a
+## body into a wall (combat's World.throws_into_walls, 906): the draugr, the
+## great bear, the boar king. Her flank shout then names no wall and no
+## "back" (891 amended (1)): a throw into a wall costs more than the blow.
+func _thrower_on(player: GridEntity) -> bool:
+	for entity in World.entities():
+		if entity is Monster and _alive(entity) and (entity as Monster).target == player and World.throws_into_walls(entity):
+			return true
+	return false
+
+
+## Her flank_says line ([param no_wall]: flank_says_no_wall's, 891 amended
+## (1)): her temperament's, else "default"'s, the same one each time for her.
+func flank_line(no_wall := false) -> String:
+	var lines: Variant = CompanionCard.tables().get("flank_says_no_wall" if no_wall else "flank_says", {})
 	if lines is not Dictionary:
 		return ""
 	var pick: Variant = lines.get(str(traits.get("temperament", "")), lines.get("default"))

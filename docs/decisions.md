@@ -52678,6 +52678,19 @@ Companion._log answers the want after recording the voice row, so the plain line
 companion_test _test_first_want_told checks the row. Server only, protocol unchanged, no new
 class_name. The bullet waits on playtest's joined crypt fight.
 
+891 amended (1): no wall line against a thrower (the decision-number script's label; the coordinator's
+approval; voice's words). Against a foe that throws a body into a wall, "back to the wall" is the wrong
+advice: the throw into the wall costs more than the blow. Companion._thrower_on(player) is true when any
+monster fighting her player (its target) World.throws_into_walls (combat's 906: today the draugr with
+his axe, the great bear and the boar king; it reads the moves' numbers, so a retuned or new foe follows
+on its own). Her flank shout is then picked as before, by temperament, from companion_traits.json
+"flank_says_no_wall", whose lines name no wall and no back. The thrower need not be one of the two that
+flank. companion_test _test_flank_shout: two wolves flanking with a great bear on him, she shouts her
+no-wall line; the bear on no one, her flank_says line again; no line of flank_says_no_wall names a wall
+or a back. docs/voice_inventory.md regenerated. Server only, protocol unchanged, no new class_name. No
+bullet yet: it rides 891's, after playtest's joined crypt fight with the bear or the boar king and a
+second foe.
+
 ## 892. The street lamp posts: prop.lamp_post and prop.lamp_post_low, art-gen's, for buildings' lamps
 
 The store's lamp (_add_store_lamp) and Snagfin's lamp by his shack door (_add_lantern) stand their lanterns on

@@ -3076,7 +3076,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (936)
+## Lines in the data (948)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3114,7 +3114,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (137)
+### levels/companion_traits.json (149)
 
 | | Line | Key |
 |---|---|---|
@@ -3135,6 +3135,18 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Back up. Something behind you. | `flank_says.quiet and patient[0]` |
 |  | Get a wall behind you and fight! | `flank_says.blunt and fearless[0]` |
 |  | Too many friends round you! Back up! | `flank_says.cheerful under pressure[0]` |
+|  | Keep them all in front of you! | `flank_says_no_wall.default[0]` |
+|  | Don't get pinned! Keep moving! | `flank_says_no_wall.default[1]` |
+|  | Turn! Keep them where you can see them! | `flank_says_no_wall.default[2]` |
+|  | Step out of it! Don't let them box you in! | `flank_says_no_wall.default[3]` |
+|  | Keep turning. Keep them all in front of you. | `flank_says_no_wall.steady and watchful[0]` |
+|  | Move! Don't let them pin you! | `flank_says_no_wall.quick and wary[0]` |
+|  | They're all round you! Keep moving, keep them in front! | `flank_says_no_wall.warm and talkative[0]` |
+|  | Step clear. Keep them all on one side of you. | `flank_says_no_wall.careful and thoughtful[0]` |
+|  | Don't stand still! Keep them in front! | `flank_says_no_wall.restless and curious[0]` |
+|  | Turn. Keep them in sight. | `flank_says_no_wall.quiet and patient[0]` |
+|  | Turn and face them! Don't get pinned! | `flank_says_no_wall.blunt and fearless[0]` |
+|  | Lots of company! Keep them where you can see them! | `flank_says_no_wall.cheerful under pressure[0]` |
 |  | Not here. Not with them this close. | `bandage_says.not_safe` |
 |  | Give it a breath. We're still bleeding from that. | `bandage_says.hurt_now` |
 |  | I've nothing to bandage with. | `bandage_says.no_kit` |

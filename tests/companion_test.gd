@@ -9261,6 +9261,32 @@ func _test_flank_shout() -> void:
 	Companion._flank_shouts[key] = [World.tick - gap - 1, World.tick - Companion.QUIET_AFTER - 1]
 	pet._warn_flanked()
 	_check(World.is_flanked(owner) and pet._said.size() == 2 and pet._said[1] == line, "a new fight past it: she shouts again (flanked %s; %s)" % [World.is_flanked(owner), pet._said])
+	# 891 amended (1): a thrower fighting him (a great bear, off his flank), her line names no wall.
+	var bear := _main._spawn({"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear",
+		"name": "FlankBear%d" % World.tick, "tile": at + Vector2i(4, 0)}) as Monster
+	var no_wall := pet.flank_line(true)
+	var walled: Array = []
+	for key_t: String in CompanionCard.tables().get("flank_says_no_wall", {}):
+		var each: Variant = CompanionCard.tables()["flank_says_no_wall"][key_t]
+		if each is Array:
+			walled.append_array((each as Array).filter(func(said: String) -> bool:
+				return "wall" in said.to_lower() or "back" in said.to_lower()))
+	_check(not no_wall.is_empty() and no_wall not in all_lines and walled.is_empty(),
+			"her no-wall flank line is her own, and no line of flank_says_no_wall names a wall or a back (%s; %s)" % [no_wall, walled])
+	bear.target = owner
+	Companion._flank_shouts.clear()
+	pet._said.clear()
+	pet._warn_flanked()
+	_check(bear != null and World.throws_into_walls(bear) and not World.throws_into_walls(west) and World.is_flanked(owner)
+			and pet._said.size() == 1 and pet._said[0] == no_wall,
+			"flanked by two wolves with a great bear on him: she shouts the no-wall line (%s)" % [pet._said])
+	bear.target = null
+	Companion._flank_shouts.clear()
+	pet._said.clear()
+	pet._warn_flanked()
+	_check(World.is_flanked(owner) and pet._said.size() == 1 and pet._said[0] == line,
+			"the bear on someone else: her own flank line again (%s)" % [pet._said])
+	World.despawn(bear)
 	World.despawn(west)
 	World.despawn(east)
 	Monster.noticing = true
