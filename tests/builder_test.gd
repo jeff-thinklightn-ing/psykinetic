@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_named_refusals()
 	_test_trades_preview()
 	_test_cached_checks()
+	await _test_spot_shortcut()
 	await _test_breathes()
 	await _test_spot_ghost()
 	_test_answer_parts()
@@ -1891,6 +1892,79 @@ func _test_trades_preview() -> void:
 		"maps' two hauler spots, a hauler in town: \"2 work spots\", no condition, no mismatch (%s)" % carried)
 	var empty :=BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("No trades yet: no building with a use, no work site" in "; ".join(empty.trade_lines("store")), "a town with nothing that calls for a trade: said so")
+
+
+## 867 amended (3): an ask that lays spots alone reads its checks from the kept parse with its spots read
+## again, and leaves out the layout, arrival and reach checks a spot can't change. The same asks run with
+## whole_checks (every check read whole, as before) must give the same words, call for call.
+func _test_spot_shortcut() -> void:
+	print("\n== spots alone: the kept parse's spots read again, no layout, arrival or reach check (867 amended (3)) ==")
+	# Every spot call of _test_spots, laid, turned, refused, removed.
+	var spot_calls := [
+		{"name": "spot", "input": {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [192, 210], "use": "fire", "face": [193, 209], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [192, 212], "use": "fire", "face": [195, 215]}},
+		{"name": "spot", "input": {"at": [192, 212], "use": "dance", "face": [193, 212]}},
+		{"name": "spot", "input": {"at": [192, 212], "use": "work", "face": [193, 212]}},
+		{"name": "spot", "input": {"at": [192, 212], "use": "fire", "face": [193, 212], "trade": "cook"}},
+		{"name": "spot", "input": {"at": [194, 211], "use": "fire", "face": [194, 210]}},
+		{"name": "spot", "input": {"at": [204, 196], "use": "work", "trade": "merchant", "face": [204, 197]}},
+		{"name": "spot", "input": {"at": [196, 212], "use": "fire", "face": [195, 211], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [192, 210], "remove": true}},
+	]
+	# A spot after a cell change in the same reply: the working copy no longer the level but for its spots.
+	var mixed := [{"name": "paint", "input": {"ground": "dirt", "cells": [[186, 200]]}},
+		{"name": "spot", "input": {"at": [198, 212], "use": "fire", "face": [197, 211], "pose": "sit"}}]
+	var said := {}
+	for whole: bool in [true, false]:
+		var doc := MapDoc.from_level("wilds")
+		doc.config.erase("spots")  # The wilds' own spots set aside, as _test_spots does.
+		var stub := StubClaude.new([spot_calls, "Spots."])
+		var session := BuilderSession.new(doc, Rect2i(185, 190, 25, 25), "wilds", stub)
+		session.whole_checks = whole
+		var first := await session.ask("spots by the fire")
+		var kept: Dictionary = session._parses.get(session.working.get_instance_id(), {})
+		if not whole:
+			_check(kept.get("spots_alone", false) and session.working_spots_at_most(),
+					"spots alone: the working copy read as the level but for its spots, its parse a patched one")
+			var fresh := session.working.parsed()
+			var patched: Dictionary = kept.get("parsed", {})
+			var sorted_warnings := func(parsed: Dictionary) -> Array:
+				var out: Array = (parsed["warnings"] as Array).duplicate()
+				out.sort()
+				return out
+			var bare := func(parsed: Dictionary) -> Dictionary:
+				var out := parsed.duplicate()
+				out.erase("warnings")
+				return out
+			_check(not patched.is_empty() and str(bare.call(patched)) == str(bare.call(fresh)) and sorted_warnings.call(patched) == sorted_warnings.call(fresh)
+					and str(patched["spots"]) == str(fresh["spots"]) and (patched["spots"] as Array).size() == 2,
+					"the patched parse is a fresh one's: its spots and every other reading, its warnings the same (%d spots)" % (patched.get("spots", []) as Array).size())
+			_check(str(session.reached()) == str(session.reached_round({})), "the reach kept through spot calls is a fresh flood's")
+		stub.turns = [mixed, "Mixed."]
+		var second := await session.ask("a path, then a seat")
+		var after: Dictionary = session._parses.get(session.working.get_instance_id(), {})
+		if not whole:
+			_check(not session.working_spots_at_most() and not after.get("spots_alone", false),
+					"a spot after a paint in the same reply: the full path (a parse of its own, not a patched one)")
+		var words: Array = []
+		for message: Dictionary in session.messages:
+			if message.get("content") is Array:
+				for block: Variant in message["content"]:
+					if block is Dictionary and block.get("type") == "tool_result":
+						words.append([block.get("content"), block.get("is_error")])
+		var closing := func(result: Dictionary) -> String:
+			return str([result.get("ok"), result.get("error"), result.get("warnings"), result.get("height_warnings"), result.get("site_warnings"),
+					result.get("street_warnings"), result.get("layout_warnings"), result.get("arrival_warnings")])
+		said[whole] = {"words": words, "first": closing.call(first), "second": closing.call(second), "spots": str(session.working.config.get("spots"))}
+	_check(said[false]["words"].size() == spot_calls.size() + mixed.size() and str(said[false]["words"]) == str(said[true]["words"]),
+			"every call's words as on the full path, call for call (%d calls)" % said[false]["words"].size())
+	for at: int in mini(said[false]["words"].size(), said[true]["words"].size()):
+		if str(said[false]["words"][at]) != str(said[true]["words"][at]):
+			print("  call %d differs:\n    shortcut %s\n    full     %s" % [at, said[false]["words"][at], said[true]["words"][at]])
+	_check(said[false]["first"] == said[true]["first"] and said[false]["second"] == said[true]["second"],
+			"each ask's closing checks as on the full path (%s)" % said[false]["first"])
+	_check(said[false]["spots"] == said[true]["spots"], "the same spots proposed both ways")
 
 
 ## A parse's whole reading, as one string's hash: what a cached and a fresh one must share.

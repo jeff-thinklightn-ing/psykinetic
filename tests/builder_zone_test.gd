@@ -282,7 +282,8 @@ func _test_flooded() -> void:
 	await _wait_for("undone")
 	var near := Vector2i(-1, -1)
 	for cell: Vector2i in _main._terrain["floor"]:
-		if World.is_free(cell) and _main._nearest_hostile_distance(cell) <= _main.SPAWN_SAFE_DISTANCE:
+		# Not a link's cell: _relocate onto one takes the link, a frame later (867 amended (3); (1, 1) to sample).
+		if World.is_free(cell) and not World.is_link_cell(cell) and _main._nearest_hostile_distance(cell) <= _main.SPAWN_SAFE_DISTANCE:
 			near = cell
 			break
 	World._relocate(_player(Net.local_id), near)

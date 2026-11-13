@@ -293,14 +293,20 @@ Heights now: " + "; ".join(ground)
 					# And to the layout rules, which accepting it must not break (806).
 					var now := parsed_of(working)
 					await breathe()
-					var layout := layout_news(layout_before, now)
+					# 867 amended (3): the level but for its spots has no layout fault the level hasn't.
+					var spots_alone := working_spots_at_most()
+					var layout: Array[String] = []  # A ternary of [] and a typed array is a plain Array: refused at run time.
+					if not spots_alone:
+						layout = layout_news(layout_before, now)
 					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
 					layout_said = layout
 					if not unsaid.is_empty():
 						outcome["text"] += "\nLayout now (fix it before you finish: the player can't accept a fault): " + "; ".join(unsaid)
 					await breathe()
 					# And to the ways in (806 amended (13)): a warning, never a refusal.
-					var arrivals := arrival_news(arrivals_before, now)
+					var arrivals: Array[String] = []
+					if not spots_alone:
+						arrivals = arrival_news(arrivals_before, now)
 					var unwarned := arrivals.filter(func(fault: String) -> bool: return fault not in arrivals_said)
 					arrivals_said = arrivals
 					if not unwarned.is_empty():
@@ -333,9 +339,17 @@ Heights now: " + "; ".join(ground)
 	await breathe()
 	var parsed_now := parsed_of(working)
 	await breathe()  # A parse, then its checks: each its own frame (the box: 459 ms a parse).
-	result["layout_warnings"] = layout_news(layout_before, parsed_now)
-	await breathe()
-	result["arrival_warnings"] = arrival_news(arrivals_before, parsed_now)
+	var spots_at_end := working_spots_at_most()  # 867 amended (3), as after each call.
+	var layout_end: Array[String] = []
+	if not spots_at_end:
+		layout_end = layout_news(layout_before, parsed_now)
+	result["layout_warnings"] = layout_end
+	if not spots_at_end:
+		await breathe()
+	var arrivals_end: Array[String] = []
+	if not spots_at_end:
+		arrivals_end = arrival_news(arrivals_before, parsed_now)
+	result["arrival_warnings"] = arrivals_end
 	result["cost"] = spent
 	busy = false
 	# Set for one ask (the host sets it again each time); dropped, so a callable holding this session frees it.
@@ -978,11 +992,15 @@ func run_tool(tool: String, input: Variant) -> Dictionary:
 		return _run_tool(tool, input)
 	var before := reached()
 	var last: Variant = working.undo_steps.back() if not working.undo_steps.is_empty() else null
+	var spots_before := working_spots_at_most()
 	var out := _run_tool(tool, input)
 	var changed := not working.undo_steps.is_empty() and not is_same(working.undo_steps.back(), last)
+	# 867 amended (3): the working copy the level but for its spots, before the call and after it: no cell,
+	# edge or building moved, so the ground reached is as it was and nothing can be cut off.
+	var spots_alone := changed and spots_before and working_spots_at_most()
 	if changed and not out.get("ok", false):
 		_reached = {}
-	elif changed:
+	elif changed and not spots_alone:
 		# Ground the edit cut off from every start and arrival (844): the edit undone, said in words.
 		_reached = {}
 		var after := reached()
@@ -3219,9 +3237,46 @@ func parsed_of(of: MapDoc) -> Dictionary:
 	var kept: Variant = _parses.get(of.get_instance_id())
 	if kept is Dictionary and int(kept["revision"]) == of.revision:
 		return kept["parsed"]
+	var spots_alone := is_same(of, working) and working_spots_at_most()
+	if spots_alone and kept is Dictionary and kept.get("spots_alone", false) and int(kept["doc_revision"]) == doc.revision:
+		# 867 amended (3): the level but for its spots then and now: the kept parse, its spots read again.
+		var patched := _spots_patched(kept)
+		_parses[of.get_instance_id()] = patched
+		return patched["parsed"]
 	var parsed := of.parsed()
-	_parses[of.get_instance_id()] = {"revision": of.revision, "parsed": parsed}
+	var entry := {"revision": of.revision, "parsed": parsed}
+	if spots_alone:
+		var floor := {}
+		for cell: Vector2i in parsed["terrain"]["floor"]:
+			floor[cell] = true
+		var spot_warnings: Array[String] = []
+		Level.spots_from(of.config, spot_warnings, floor)
+		entry.merge({"spots_alone": true, "doc_revision": doc.revision, "floor": floor, "spot_warnings": spot_warnings})
+	_parses[of.get_instance_id()] = entry
 	return parsed
+
+
+## [param kept] (a parse of the working copy when it was the level but for its spots, and its floor and
+## spot warnings) with the working copy's spots now (867 amended (3)): as Level.parse reads them
+## (Level.spots_from on its floor), their warnings in place of the old ones' among the parse's. Everything
+## else is the kept parse's own, shared: parsed_of's callers only read.
+func _spots_patched(kept: Dictionary) -> Dictionary:
+	var parsed: Dictionary = (kept["parsed"] as Dictionary).duplicate()
+	var spot_warnings: Array[String] = []
+	parsed["spots"] = Level.spots_from(working.config, spot_warnings, kept["floor"])
+	var warnings: Array[String] = []
+	warnings.assign(parsed["warnings"])
+	var at := warnings.size()
+	for old: String in kept["spot_warnings"]:
+		var i := warnings.find(old)
+		if i >= 0:
+			warnings.remove_at(i)
+			at = mini(at, i)
+	for i in spot_warnings.size():
+		warnings.insert(at + i, spot_warnings[i])
+	parsed["warnings"] = warnings
+	return {"revision": working.revision, "parsed": parsed, "spots_alone": true, "doc_revision": doc.revision,
+			"floor": kept["floor"], "spot_warnings": spot_warnings}
 
 
 ## The level's own layout faults (layout_faults(doc)), kept by its revision:
@@ -3784,12 +3839,29 @@ const ARRIVAL_SAYS := "a warning: a player coming in there lands inside a fight;
 ## running world without the layout, a reload or a world map built again (BuilderHost._save_spots).
 func spots_only() -> bool:
 	var changes := proposal()
+	return spots_at_most(changes) and (changes.get("config", {}) as Dictionary).keys() == ["spots"]
+
+
+## Whether [param changes] (a [method proposal]) changes level.json's spots and nothing else, or nothing at
+## all: spots_only's rule (867 amended (2)), which an ask's checks share (867 amended (3)). While it holds,
+## the working copy is the level but for its spots, so a parse of it is the level's with its spots read
+## again, and the layout and arrival rules (which read no spot) find what they find in the level itself.
+static func spots_at_most(changes: Dictionary) -> bool:
 	for key: String in ["cells", "edges", "heights", "covers", "entries", "links"]:
 		if not changes[key].is_empty():
 			return false
 	if changes.has("relief") or changes.has("new_area"):
 		return false
-	return (changes.get("config", {}) as Dictionary).keys() == ["spots"]
+	return (changes.get("config", {}) as Dictionary).keys() in [[], ["spots"]]
+
+
+## Every check read whole, as before 867 amended (3): builder_test's full path, to compare the words with.
+var whole_checks := false
+
+
+## Whether the working copy differs from the level in its spots at most (spots_at_most of the proposal).
+func working_spots_at_most() -> bool:
+	return not whole_checks and area.has_area() and spots_at_most(proposal())
 
 
 ## What a proposal made before another builder's accept here is refused with (867 amended (2); voice's words).

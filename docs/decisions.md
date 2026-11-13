@@ -52651,6 +52651,41 @@ and the probe's driver accepted inside that frame; nothing in the accept, and no
 An ask's tool calls are unchanged (867 amended (1)'s frames). Server only, protocol unchanged, no new
 class_name, no bullet.
 
+867 amended (3) (the coordinator's ruling on builder's page C:/dev/review/builder/parse_page.md, levers 1
+and 2, 2026-11-13): a tool call costs one parse when the call before it changed the working copy, and the
+ask's checks after it a parse, the layout rules and the arrival rule over the whole level (the box, wilds:
+a parse 454 ms; the two rules on a given parse under 0.1 ms there, outdoors, where the layout rules are the
+chest check: the page's "about 460" each was a parse inside them), with a reach flood (209 ms) after any
+change. A spot moves only level.json's
+"spots", and while the proposal changes nothing else the working copy is the level but for its spots: the
+cut's own classifier says so (BuilderSession.spots_at_most, spots_only's body, now true of no change at all
+too; working_spots_at_most over the proposal). Then: (1) the layout and arrival news are none, so neither
+check runs, after a call or at the ask's end (the level's own faults are the baseline, and LayoutSense and
+the arrival rule read no spot); run_tool floods the reach again only when the call left the proposal more
+than spots, or found it so (the map unchanged before and after: nothing cut off). (2) parsed_of patches a
+working copy's parse kept when it was spots at most, the doc at the same revision: the kept parse with
+"spots" read again by Level.spots_from on its floor, as Level.parse reads them, and those warnings in place
+of the old ones (their order among the rest may differ from a fresh parse's when there were none before;
+the only readers, the roof and stream tools, read a parse's warnings as a set). The spot tool's own body
+check floods as before. A spot after a cell change in the same reply takes the full path: the proposal is
+no longer spots at most. BuilderSession.whole_checks reads everything whole, for builder_test's
+_test_spot_shortcut: every spot call of _test_spots and a paint-then-spot reply, run both ways, give the
+same words call for call and the same closing checks; the patched parse equals a fresh one (warnings as a
+set), and the kept reach a fresh flood. builder_zone_test's flooded case picks its cell near a monster off
+link cells (World._relocate onto test_room's (1, 1) took the link to sample a frame later: the test's doing,
+not a reload's). On the box (the coordinator's probe868 and probe868_levers2, 2026-11-13, idle box, wilds,
+an ask of three spots): a spot call's frames a to e summed 2199, 1314 and 1318 ms before and 1542, 651 and
+647 after; the parse's frame (c) 463 to 470 ms before, 4.5 to 4.7 after; the tool in frame a 1315, 439 and
+439 before, 1123, 232 and 230 after (the after-change flood gone); the layout and arrival frames 0.0 to 0.1
+before (wilds' rules cost nothing on a given parse, so (1) saves its flood there, not those frames); the
+ask's longest frame 1522 ms before, 1329 after, still the first spot's tool: it parses the fresh working
+copy, which frame 0 has just parsed as the level, and floods the reach and the held reach for the first
+time (867's next step). Scene B's spot tool calls 595, 838, 441 ms before and 419, 242, 33 after; its
+whole ask (paint, paint, spot, spot, paint, no network) 6825 and 7012 ms, unhelped, since a spot after a
+paint is never spots at most. Accept's frame 346 and 350 ms (save_config), untouched. builder_test grew
+from 45 to 67 s with the shortcut's both-ways section. Server only, protocol unchanged, no new class_name,
+no bullet.
+
 ## 858. Umbrage at night: the ground lit once, a less blue night, a fill on bodies (lands off)
 
 Package "Umbrage at night" (the coordinator, 2026-11-10, under Jeff's "Umbrage first"; environment leads). Pieces: (a) this, environment's night light; (b) buildings' lamp numbers (the door lanterns, the store's and chapel's, the temple's candles of 734 amended (7)); (c) the window rule after 22:00 (566 with npc's sleep; playtest's count of lit windows on a lived-in town first). (a) lands switched off: `Client3D.NIGHT_LOOK_2 := false` keeps every number as it was. Environment alone flips it, in its own commit, on buildings' ping that (b) is on main, in the same landing take or the same cut, release told. A darker night without stronger lamps would make the town darker still, so never one without the other in a released build.
