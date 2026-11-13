@@ -16,6 +16,7 @@ notes (decision 324).
 - A click walk past a doorway or a way out goes round it; you go through only when you click on it (689 amended (11)).
 - The lantern at your hip, and your companion's, is a small iron lantern now, peaked and hung by its ring, its panes glowing warm while it's lit and dull horn when you cover it, and townsfolk walking at night carry the same (451 amended (4)).
 - In the crypt, a robber about to lunge keeps his crouch when you hit him and springs in with his dagger as the blow lands, stopping just short of you (790 amended (9)).
+- The short shoulder cape that some companions and townsfolk wear is dyed a deep slate blue (480 amended (1)).
 
 ## v0.1.214
 
