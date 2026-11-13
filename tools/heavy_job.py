@@ -146,7 +146,9 @@ COMMIT_MARGIN_GB = 4.0
 COMMIT_STOP_GB = 2.0
 MAX_RUNNING = 3
 ## Running jobs of an "uncounted" kind (godot_import: short, below normal
-## priority) left out of MAX_RUNNING, this many at most (394 amended (22)).
+## priority) left out of MAX_RUNNING, this many at most (394 amended (22)),
+## of each such kind (394 amended (46): an import beside never holds up a
+## load_check, nor one the other).
 UNCOUNTED_MOST = 1
 ## A job holding the gate this long is flagged in status, the log and the
 ## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
@@ -190,7 +192,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 41  # 45: a bench that cannot start holds nobody.
+GATE_REVISION = 42  # 46: load_check, and each uncounted kind its own UNCOUNTED_MOST.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -240,7 +242,8 @@ KINDS = {
     # the sum of remote_tests.sh's own timeouts.
     "suite_remote": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 60,
         "fixed_limit": True, "remote": True},
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "suite_remote", "soak", "scene"], "max_minutes": 90},
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "suite_remote", "soak", "scene", "load_check"],
+        "max_minutes": 90},  # load_check: 394 amended (46).
     # Not counted under MAX_RUNNING, one at a time (394 amended (22)): six
     # imports waited on the count beside a suite and two scenes, 2026-11-04.
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90,
@@ -265,6 +268,13 @@ KINDS = {
     # would pull the full suite's down and take the landings' one slot.
     "net": {"ram_gb": 13.6, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 30,
         "below_normal": True},
+    # tools/load_check.sh (394 amended (46), 278 amended (7)): one headless
+    # Godot loading a take's changed scripts with the autoloads in, seconds
+    # long, about 0.5 GB. Beside anything but a bench, one at a time, outside
+    # MAX_RUNNING (a check a tree runs before it queues should not wait
+    # behind the three it would queue behind); Jeff's 8 GB margin holds.
+    "load_check": {"ram_gb": 0.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 5,
+        "uncounted": True},
 }
 ## A many-Godot test, by its command (394 amended (24)): a run of one under
 ## another kind is refused, named, before it queues.
@@ -337,7 +347,7 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     # Takes waiting on the land lock (394 amended (36)) run nothing yet: not
     # counted, except by a row whose waiter predates 36 (own_cap).
     going = counted_going(job, running)
-    if counted(going) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(going) < UNCOUNTED_MOST):
+    if counted(going) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(going, job.get("kind")) < UNCOUNTED_MOST):
         return False, "%d heavy jobs running" % counted(going)
     for each in running:
         if each.get("kind") in job.get("excludes", []):
@@ -442,15 +452,18 @@ def lock_order(waiters, me, now, fits):
     return True, "", starved
 
 
-def uncounted(running):
-    """How many running jobs are of an uncounted kind (394 amended (22))."""
-    return sum(1 for each in running if KINDS.get(each.get("kind"), {}).get("uncounted"))
+def uncounted(running, kind=None):
+    """How many running jobs are of an uncounted kind (394 amended (22)), or
+    of [kind] alone."""
+    return sum(1 for each in running
+        if KINDS.get(each.get("kind"), {}).get("uncounted") and kind in (None, each.get("kind")))
 
 
 def counted(running):
-    """The running jobs MAX_RUNNING counts: all but UNCOUNTED_MOST of an
-    uncounted kind."""
-    return len(running) - min(UNCOUNTED_MOST, uncounted(running))
+    """The running jobs MAX_RUNNING counts: all but UNCOUNTED_MOST of each
+    uncounted kind (394 amended (46))."""
+    kinds_running = {each.get("kind") for each in running if KINDS.get(each.get("kind"), {}).get("uncounted")}
+    return len(running) - sum(min(UNCOUNTED_MOST, uncounted(running, kind)) for kind in kinds_running)
 
 
 def lean_row(table, kind):

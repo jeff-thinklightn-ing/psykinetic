@@ -707,6 +707,27 @@ check(gate.decide(scene_row, three[:2] + [dict(running(1, 1), kind="godot_import
     "one import is not counted: a scene starts beside it, a suite and a scene")
 check(not gate.decide(dict(table["godot_export"], kind="godot_export"), three, True, 60.0, None)[0],
     "an export still counts")
+# 394 amended (46): load_check, tools/load_check.sh's kind: beside anything but a bench, one
+# at a time, outside MAX_RUNNING; each uncounted kind has its own UNCOUNTED_MOST.
+load_row = dict(table["load_check"], kind="load_check")
+an_import = dict(running(1, 1), kind="godot_import")
+a_load = dict(running(0.5, 0.5), kind="load_check")
+check(load_row["ram_gb"] <= 0.5 and load_row.get("uncounted"), "load_check: about 0.5 GB, uncounted")
+check(gate.decide(load_row, three, True, 60.0, None)[0], "a load_check starts beside a suite and two scenes")
+check(gate.decide(load_row, three + [an_import], True, 60.0, None)[0],
+    "and beside them and an import (each uncounted kind its own slot)")
+check(gate.decide(import_now, three + [a_load], True, 60.0, None)[0], "an import starts beside them and a load_check")
+check(not gate.decide(load_row, three + [a_load], True, 60.0, None)[0], "but one load_check at a time")
+check(gate.counted(three + [an_import, a_load]) == 3, "a suite, two scenes, an import and a load_check count 3")
+check(not gate.decide(load_row, [dict(running(3, 3), kind="bench")], True, 60.0, None)[0], "never beside a bench")
+check(not gate.decide(dict(table["bench"], kind="bench"), [a_load], True, 60.0, None)[0], "nor a bench beside it")
+margins_here = gate.MARGIN_GB, gate.COMMIT_MARGIN_GB
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+check(not gate.decide(load_row, [], True, 8.4, None)[0] and gate.decide(load_row, [], True, 8.6, None)[0],
+    "Jeff's 8 GB margin holds for it: 0.5 + 8 GB wanted")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = margins_here
+check(gate.decide(load_row, [suite_at(now), dict(running(3, 3), kind="suite_remote"), dict(running(2, 2), kind="soak")],
+    True, 60.0, None)[0], "beside a suite, a suite_remote and a soak")
 
 if os.name == "nt":
     probe = "import ctypes; k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; " \
@@ -886,7 +907,13 @@ if os.name == "nt":
     check(code == 0 and done and "working set at once" in done[0], "the done line has the working set at once: %s" % (done[0].strip() if done else "none"))
     kept = gate._path("peaks", "lister-bench.txt")
     text = open(kept).read() if os.path.exists(kept) else ""
-    check("python" in text.lower() and "bytearray" in text, "the processes at the commit peak kept in peaks/: %s" % text.splitlines()[-1:])
+    # Its command line when Windows gave it; under load the one CIM read can come back empty or
+    # late and the line names its pid alone (dungeon's landing, 11-13 12:06: "0.30  0.31  pid
+    # 44012"), the 300 MB still kept, which is what this checks.
+    named = "python" in text.lower() and "bytearray" in text
+    unread = re.search(r"^ *0\.[23]\d +0\.[23]\d +pid \d+ *$", text, re.M) is not None
+    check(named or unread, "the processes at the commit peak kept in peaks/ (%s): %s"
+        % ("named" if named else "its command line unread under load", text.splitlines()[-1:]))
     gate.PEAK_LIST_SECONDS = 15.0
 gate.LEAN_AFTER_SECONDS = after
 gate.total_ram_gb = real_total

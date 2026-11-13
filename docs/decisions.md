@@ -5482,6 +5482,24 @@ tests/run.sh tests/x_test.tscn; the old form works, without the stop. tests/run_
 godots, no Godot): the fake suite ends in 30 s where main's run.sh took 305 s, the stopped scene's processes gone;
 run.ps1 likewise with a native fake. With a real Godot here, through the gate: a scene declaring a variable twice was
 stopped at 30 s in all (its limit 300 s), no Godot left. Tests only; protocol unchanged; no class_name; no bullet.
+278 amended (7): tools/load_check.sh loads a take's changed scripts for real before it queues (the coordinator's
+approval, option (i), 2026-11-13; label from tools/decision_number.sh; the gate's kind is 394 amended (46)). The probe
+is enemy-ai's, from 806 amended (20) on 11-12: a SceneTree script that load()s each file in _process, when the
+autoloads are in, and asks can_instantiate(). tools/load_check.gd is that, one "LOAD ok|FAIL <file>" line each and a
+"LOAD_CHECK: PASS|FAIL" verdict; tools/load_check.sh names the .gd files changed against origin/main (committed,
+staged, unstaged, new; not deleted) or those given, refuses a checkout with no class cache (import it first), runs one
+Godot through the gate as load_check with its own APPDATA (never the shared overlay), and prints the engine's SCRIPT
+ERROR lines, the LOAD lines and the verdict: exit 0, 1 on a failure, 2 when it could not check (no verdict is never a
+pass). What it gives that --check-only doesn't is a verdict a file at a time: check-only runs without the autoloads,
+so it fails sound scripts too ("Identifier not found: Net"; and main's tests/monster_test.gd fails it with a false
+"Invalid index type "Draugr"" Parse Error, while a copy of it loads here), and trees skipped its output as noise (npc)
+or read a real error as the known false one (enemy-ai). Proof, 11-13, perf-loadcheck: a := from an untyped call, a
+lambda's var clashing with its function's, and a script extending the first each failed, named with the engine's line;
+a sound script using Net loaded (check-only failed it); a copy of monster_test loaded and the same copy with one
+untyped := added failed; 14 s for four scripts, peak 0.9 GB. tests/land.sh --checks (and land.ps1 -Checks) names it on
+a line before its verdict and doesn't run it (it needs an import and the gate). tests/load_check_test.sh (a land.sh
+part): a fake Godot in a throwaway repo with a gate of its own; the files named, the refusals, PASS, FAIL with the
+engine's line, no verdict, nothing changed. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
@@ -10902,6 +10920,20 @@ its row as it was removed). Over a stripped copy of the live queue (twelve rows,
 a suite_remote running: revision 40's code has the bench hold 8 of the 12, revision 41's none, each row then waiting
 as revision 40 has it with no bench at all, 13 of 13 rows kept by each. Tools and tests only; protocol unchanged; no
 class_name; no bullet.
+
+394 amended (46): load_check, a kind for tools/load_check.sh (the coordinator's option (i), 2026-11-13; label from
+tools/decision_number.sh; the tool is 278 amended (7)). One headless Godot loading a take's changed scripts, seconds
+long: beside anything but a bench, one at a time (max_running 1), outside MAX_RUNNING ("uncounted", as an import), so
+a check a tree runs before it queues never waits behind the three jobs it would queue behind; Jeff's 8 GB margin holds
+as for every kind. Its first estimate is 0.5 GB; its first real run peaked at 0.9 GB, and the estimate learns from its
+runs as every kind's does. UNCOUNTED_MOST (22) is now of each uncounted kind (uncounted(running, kind), counted), so
+an import and a load_check never hold each other out. The bench names load_check among its excludes: decide reads only
+the starting job's own list, so without it a bench could start beside a load_check. Older gate code judges a
+load_check row by its default row (a suite's: one at a time, never beside a bench, counted), which keeps it out
+longer, never in sooner. GATE_REVISION 42. tests/heavy_job_test.py: a load_check beside a suite and two scenes, and
+beside them and an import; an import beside them and a load_check; one load_check at a time; counted 3 of five; never
+beside a bench, nor a bench beside it; the margin (0.5 + 8 GB); beside a suite, a suite_remote and a soak. Tools and
+tests only; protocol unchanged; no class_name; no bullet.
 
 ## 395. UI sounds
 

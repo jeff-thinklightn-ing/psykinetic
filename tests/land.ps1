@@ -55,6 +55,7 @@ if ($Checks) {
 	New-Item -ItemType Directory -Force $noLock | Out-Null
 	$why = Invoke-LandChecks $noLock
 	Remove-Item $noLock -Recurse -Force -ErrorAction SilentlyContinue
+	Write-Output "not run here: bash tools/load_check.sh loads your changed scripts in a Godot with the autoloads in, a few seconds through the gate (278 amended (7))"
 	if ($inventoryStale) { Write-Output $inventoryStale }
 	if ($why -eq '') {
 		$stale = if ($inventoryStale) { ', its page stale: the landing regenerates it' } else { '' }
