@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2932)
+## Lines in the code (2934)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1328,7 +1328,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (614)
+### other (sim) (616)
 
 | | Line | Where |
 |---|---|---|
@@ -1892,6 +1892,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | on the ground by %s | `sim/world.gd` _pick_unit() |
 |  | %s@%d,%d | `sim/world.gd` put_on_ground() |
 |  | %s@%d,%d | `sim/world.gd` put_on_ground() |
+|  | in a bash's moment | `sim/world.gd` _log_guard_miss() |
+|  | hands not free | `sim/world.gd` _log_guard_miss() |
 |  | into gold (601 amended) | `sim/world.gd` _purses_migrated() |
 |  | a coin purse | `sim/world.gd` _purses_migrated() |
 |  | not its body: %s | `sim/world.gd` free_from() |
