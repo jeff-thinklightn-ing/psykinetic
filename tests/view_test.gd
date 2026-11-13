@@ -222,6 +222,7 @@ func _ready() -> void:
 		await _test_creature_tells()
 		await _test_steadied()
 		_test_piles()
+		_test_tufts_under_piles()
 		_test_heard_as_monsters_hear()
 		_test_ambience_runs()
 		_test_heartbeat()
@@ -750,6 +751,80 @@ func _test_options_panel() -> void:
 	_check(not panel.visible, "O again hides it")
 	Net.set_volume("ambience_volume", was, false)
 	_check(not AudioServer.is_bus_mute(AudioServer.get_bus_index("Ambience")), "back as it was")
+
+
+## 252 amended (1): no tufts or flowers on a cell where a pile lies, each
+## put back exactly as it was when the pile goes; a chunk drawn while a
+## pile lies there draws them hidden.
+func _test_tufts_under_piles() -> void:
+	print("
+== no tufts or flowers under a pile: hidden in place, put back exactly ==")
+	# The pile's hooks on the live room (_on_pile_shown's last line, _drop_heap):
+	# its cell known while its heap is drawn, forgotten when it goes.
+	var floor_cell := Vector2i(-1, -1)
+	for each: Vector2i in _main._terrain["floor"]:
+		if World.is_walkable(each) and not World.is_water(each) and not World.is_link_cell(each) and World.ground_at(each).is_empty():
+			floor_cell = each
+			break
+	var thing := World.items.mint("sword", "built")
+	World.put_on_ground(thing, floor_cell)
+	var known := _rig._pile_cells.has(floor_cell)
+	World.items.end(World.take_from_ground(floor_cell, 0), "gone")
+	_check(known and not _rig._pile_cells.has(floor_cell), "a pile's cell known while its heap is drawn, forgotten when taken (%s)" % floor_cell)
+	# The hiding, on a grassy room's (the castle's, as _test_scatter).
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	_rig._scatter_all()
+	var cell := Vector2i(-1, -1)
+	var chunk := Vector2i.ZERO
+	for each: Vector2i in _rig._scatter_nodes:
+		for drawn: Node in _rig._scatter_nodes[each]:
+			if drawn.has_meta(&"cells") and cell == Vector2i(-1, -1) and not (drawn.get_meta(&"cells") as PackedByteArray).is_empty():
+				var b: int = (drawn.get_meta(&"cells") as PackedByteArray)[0]
+				cell = each * Client3D.FLOOR_CHUNK + Vector2i(b % Client3D.FLOOR_CHUNK, b / Client3D.FLOOR_CHUNK)
+				chunk = each
+	_check(cell != Vector2i(-1, -1), "a grassy cell with tufts (%s)" % cell)
+	if cell == Vector2i(-1, -1):
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var local := (cell.y - chunk.y * Client3D.FLOOR_CHUNK) * Client3D.FLOOR_CHUNK + cell.x - chunk.x * Client3D.FLOOR_CHUNK
+	# Each tuft and flower of the chunk's, its transform, and how many on the cell.
+	var drawn_now := func() -> Array:
+		var all := []
+		var on_cell := 0
+		for drawn: Node in _rig._scatter_nodes.get(chunk, []):
+			if not drawn.has_meta(&"cells"):
+				continue
+			var bytes: PackedByteArray = drawn.get_meta(&"cells")
+			var multimesh := (drawn as MultiMeshInstance3D).multimesh
+			for i in bytes.size():
+				all.append(multimesh.get_instance_transform(i))
+				on_cell += 1 if bytes[i] == local else 0
+		return [all, on_cell]
+	var before: Array = drawn_now.call()
+	var on_cell: int = before[1]
+	# Headless, a MultiMesh may keep no transforms: the zero size is then
+	# read from what was kept to put back.
+	var kept: bool = (before[0] as Array).any(func(placed: Transform3D) -> bool: return placed != Transform3D())
+	_rig._hide_tufts_under(cell, true)
+	var hidden: Array = _rig._tufts_hidden.get(cell, [])
+	var zero := hidden.all(func(held: Array) -> bool:
+		return not kept or (held[0] as MultiMesh).get_instance_transform(held[1]).basis.get_scale().is_zero_approx())
+	_check(on_cell > 0 and hidden.size() == on_cell and zero, "a pile laid: the cell's %d tufts and flowers drawn zero-sized (%d hidden; transforms kept headless: %s)" % [on_cell, hidden.size(), kept])
+	_check(_rig._laid_flat(cell), "its tall grass lies flat as trampled")
+	_rig._hide_tufts_under(cell, false)
+	var after: Array = drawn_now.call()
+	_check(not _rig._tufts_hidden.has(cell) and after[0] == before[0] and after[1] == on_cell, "taken: every one back exactly as it was (%d in the chunk)" % (after[0] as Array).size())
+	_check(not _rig._laid_flat(cell) or World.is_trampled(cell), "its tall grass stands again")
+	# A pile already there when the chunk is drawn: drawn hidden.
+	_rig._hide_tufts_under(cell, true)
+	_rig._rescatter(chunk)
+	var redrawn: Array = drawn_now.call()
+	_check(_rig._tufts_hidden.get(cell, []).size() == on_cell and redrawn[1] == on_cell, "a chunk drawn under a lying pile draws its %d hidden (%d)" % [on_cell, _rig._tufts_hidden.get(cell, []).size()])
+	_rig._hide_tufts_under(cell, false)
+	var again: Array = drawn_now.call()
+	_check(not _rig._tufts_hidden.has(cell) and again[0] == before[0], "and taken, as a chunk drawn with none")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_piles() -> void:

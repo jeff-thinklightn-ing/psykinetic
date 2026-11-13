@@ -3297,6 +3297,12 @@ var _scatter_jobs: Array[Array] = []
 var _tall: Dictionary[Vector2i, bool] = {}
 var _tall_where: Dictionary[Vector2i, Array] = {}
 var _tall_flat: Dictionary[Vector2i, bool] = {}
+## The scatter kinds a pile's cell hides (252 amended (1)), and each cell's
+## hidden ones: [its MultiMesh, the instance, its own transform] each.
+const PILE_HIDES: Array[String] = ["tuft", "flower"]
+var _tufts_hidden: Dictionary[Vector2i, Array] = {}
+## The cells a pile's heap is drawn on (_hide_tufts_under), gone with the heaps.
+var _pile_cells: Dictionary[Vector2i, bool] = {}
 var _mask_origin := Vector2i.ZERO
 var _mask_size := Vector2i.ONE
 ## The canopy over this map (decision 466; Fields.canopy_at, from the same
@@ -7155,6 +7161,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 				old.free()
 		_old_rooms.clear()
 	_pile_nodes.clear()
+	_pile_cells.clear()
 	_walls.clear()
 	_wall_breaches.clear()
 	_scattered.clear()
@@ -7396,6 +7403,7 @@ func _leave_as_built() -> void:
 		if is_instance_valid(heap):
 			heap.free()
 	_pile_nodes.clear()
+	_pile_cells.clear()
 	_pile_ids.clear()
 	for building: Dictionary in _buildings:
 		if building.get("off", false):
@@ -12270,6 +12278,9 @@ func _unscatter(chunk: Vector2i) -> void:
 		if Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK))) == chunk:
 			_tall_where.erase(cell)
 			_tall_flat.erase(cell)
+	for cell: Vector2i in _tufts_hidden.keys():
+		if Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK))) == chunk:
+			_tufts_hidden.erase(cell)  # Its MultiMeshes go with the chunk.
 
 
 ## Every chunk's scatter now, near or not (tests, benches).
@@ -12302,6 +12313,13 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 	multimesh.instance_count = items.size()
 	var fit := _scatter_fit(kind)
 	var over_tall := 1.0 / maxf(multimesh.mesh.get_aabb().end.y, 0.01)
+	# A tuft's or a flower's cell in the chunk, a byte each (FLOOR_CHUNK
+	# squared), for a pile's (_hide_tufts_under, 252 amended (1)).
+	var hides := kind in PILE_HIDES
+	var cell_bytes := PackedByteArray()
+	if hides:
+		cell_bytes.resize(items.size())
+	var corner := chunk * FLOOR_CHUNK
 	for i in items.size():
 		var cell: Vector2i = items[i][0]
 		var at: Vector2 = items[i][1]
@@ -12321,7 +12339,12 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var tilt: float = fit[1]
 		var lean := Vector3((_roll(cell, 104 + salt) - 0.5) * 2.0 * tilt, _roll(cell, 105 + salt) * TAU, (_roll(cell, 106 + salt) - 0.5) * 2.0 * tilt)
 		var basis := Basis.from_euler(lean).scaled(Vector3.ONE * size)
-		multimesh.set_instance_transform(i, Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y)))
+		var placed := Transform3D(basis, Vector3(at.x, _height_in(cell, at) - fit[2], at.y))
+		multimesh.set_instance_transform(i, placed)
+		if hides:
+			cell_bytes[i] = (cell.y - corner.y) * FLOOR_CHUNK + cell.x - corner.x
+			if _pile_drawn(cell):
+				_hide_instance(cell, multimesh, i, placed)  # A pile already lies there.
 		var tint := _scatter_tint(kind, cell, salt, items[i][3])
 		if kind == "tuft" and not _wear_walls.is_empty():
 			var turf := wear_at(at).a
@@ -12329,17 +12352,19 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 				var grey := tint.get_luminance()
 				var toned := tint.lerp(Color(grey, grey, grey, tint.a), 0.3 * turf)
 				tint = Color(toned.r * lerpf(1.0, 0.93, turf), toned.g * lerpf(1.0, 0.93, turf), toned.b * lerpf(1.0, 0.93, turf), tint.a)
-		multimesh.set_instance_color(i, tall_look(tint, World.is_trampled(cell)) if kind == "tall" else tint)
+		multimesh.set_instance_color(i, tall_look(tint, _laid_flat(cell)) if kind == "tall" else tint)
 		if swaying:
 			multimesh.set_instance_custom_data(i, scatter_custom(items[i][3], over_tall, kind != "reeds"))
 		if kind == "tall":
 			if not _tall_where.has(cell):
 				_tall_where[cell] = []
 			_tall_where[cell].append([multimesh, i])
-			if World.is_trampled(cell):
+			if _laid_flat(cell):
 				_tall_flat[cell] = true
 	var drawn := MultiMeshInstance3D.new()
 	drawn.name = "Scatter_%d_%d_%s" % [chunk.x, chunk.y, kind]
+	if hides:
+		drawn.set_meta(&"cells", cell_bytes)
 	drawn.multimesh = multimesh
 	drawn.material_override = _scatter_material(kind)
 	drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -13036,7 +13061,7 @@ static func tall_look(colour: Color, trampled: bool) -> Color:
 ## has it trampled now.
 func _show_trampled(cells: Array) -> void:
 	for cell: Vector2i in cells:
-		var trampled := World.is_trampled(cell)
+		var trampled := _laid_flat(cell)
 		if trampled:
 			_tall_flat[cell] = true
 		else:
@@ -13044,6 +13069,55 @@ func _show_trampled(cells: Array) -> void:
 		for drawn: Array in _tall_where.get(cell, []):
 			var multimesh: MultiMesh = drawn[0]
 			multimesh.set_instance_color(drawn[1], tall_look(multimesh.get_instance_color(drawn[1]), trampled))
+
+
+## Whether [param cell]'s tall grass lies flat: trampled (World), or a
+## drawn pile on it (252 amended (1)).
+func _laid_flat(cell: Vector2i) -> bool:
+	return World.is_trampled(cell) or _pile_drawn(cell)
+
+
+## Whether a pile's heap is drawn on [param cell] (_pile_cells).
+func _pile_drawn(cell: Vector2i) -> bool:
+	return _pile_cells.has(cell)
+
+
+## No tufts or flowers on a cell where a pile lies (252 amended (1); items'
+## sheet, a pair of tusks half hidden in a tuft): [param hide] each of
+## [param cell]'s in its chunk's MultiMeshes (their "cells" bytes) drawn
+## zero-sized where it stands, its own transform kept to put back; else
+## every one put back. Its tall grass lies flat as trampled grass does
+## (_show_trampled). Changed in place, never the chunk rebuilt; a chunk
+## drawn while a pile lies there draws them hidden (_scatter_build). Called
+## as a pile is drawn (_on_pile_shown's last line) and when its heap goes
+## (_drop_heap).
+func _hide_tufts_under(cell: Vector2i, hide: bool) -> void:
+	if hide:
+		_pile_cells[cell] = true
+	else:
+		_pile_cells.erase(cell)
+	for held: Array in _tufts_hidden.get(cell, []):
+		(held[0] as MultiMesh).set_instance_transform(held[1], held[2])
+	_tufts_hidden.erase(cell)
+	var chunk := Vector2i(floori(cell.x / float(FLOOR_CHUNK)), floori(cell.y / float(FLOOR_CHUNK)))
+	if hide:
+		var local := (cell.y - chunk.y * FLOOR_CHUNK) * FLOOR_CHUNK + cell.x - chunk.x * FLOOR_CHUNK
+		for drawn: Node in _scatter_nodes.get(chunk, []):
+			if not is_instance_valid(drawn) or not drawn.has_meta(&"cells"):
+				continue
+			var bytes: PackedByteArray = drawn.get_meta(&"cells")
+			var multimesh := (drawn as MultiMeshInstance3D).multimesh
+			for i in bytes.size():
+				if bytes[i] == local:
+					_hide_instance(cell, multimesh, i, multimesh.get_instance_transform(i))
+	_show_trampled([cell])
+
+
+## [param multimesh]'s instance [param i] on [param cell] drawn zero-sized
+## at [param placed]'s spot, [param placed] kept to put back.
+func _hide_instance(cell: Vector2i, multimesh: MultiMesh, i: int, placed: Transform3D) -> void:
+	(_tufts_hidden.get_or_add(cell, []) as Array).append([multimesh, i, placed])
+	multimesh.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ZERO), placed.origin))
 
 
 ## The scatter's materials: vertex colours times each instance's, rough,
@@ -13882,6 +13956,7 @@ func _on_pile_shown(pile: GroundPile) -> void:
 		heap.add_child(coins)
 	_room.add_child(heap)
 	_pile_nodes[pile] = heap
+	_hide_tufts_under(pile.tile, true)
 
 
 ## The least drawn length of a thing lying in a pile, and the most it is grown
@@ -13975,6 +14050,7 @@ func _drop_heap(pile: GroundPile) -> void:
 		_pile_nodes.erase(pile)
 		if is_instance_valid(heap):
 			heap.queue_free()
+		_hide_tufts_under(pile.tile, false)
 
 
 ## A pile's things now [param ids], against what it held: one more is a
@@ -14381,6 +14457,7 @@ func _ground_input(kinds: Dictionary) -> Dictionary:
 		_tall[cell] = true
 	_tall_where.clear()
 	_tall_flat.clear()
+	_tufts_hidden.clear()
 	var land: Array = []
 	for cell: Vector2i in _terrain["floor"]:
 		if not _bed_levels.has(cell):
