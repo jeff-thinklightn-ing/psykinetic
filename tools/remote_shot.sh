@@ -72,6 +72,12 @@
 # folder, fresh each run (828 amended (9)); a caller's --overlay-dir is refused. A tour whose
 # server loads a regenerating level (its level.json at <sha> marked "regenerate") with no
 # "[regen] <level>: generation" line in its log fails: its stills would show the bare template.
+# --tour-bots 2 (828 amended (10)): a second client joins the same server once the first has
+# (the runner refuses it under 4 GB free): --name=Tourbot2, the second fixed test id (its
+# record in the run's own server data, never the box's), --tour-bot=N to each (tests/tour/
+# bot.gd's tour_bot(), mark() and wait_mark() sync them through {out}/sync), 1536x864; its
+# report and stills come back in bot2/ (bot2_*.png, bot 1's bot1_*.png), report.md's first
+# line has every game's SCRIPT ERROR count, and the run is void if bot 2 never joined.
 # One phase: the restart tour (TOUR_PHASES=2) stays on tools/tour.sh. report.md, its stills
 # and both logs come back; report.md's first line is the server's SCRIPT ERROR count.
 set -u
@@ -85,6 +91,7 @@ SERVER_ARGS=""
 TOUR=""
 TOUR_ONLY=""
 TOUR_MINUTES=""
+TOUR_BOTS=""
 DRY=0
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -98,25 +105,28 @@ while [ $# -gt 0 ]; do
 		--tour) TOUR="$2"; JOINED=1; shift 2 ;;
 		--tour-only) TOUR_ONLY="$2"; shift 2 ;;
 		--tour-minutes) TOUR_MINUTES="$2"; shift 2 ;;
+		--tour-bots) TOUR_BOTS="$2"; shift 2 ;;
 		# What would be sent (the game's and the server's args, the tour's file), the laptop
 		# untouched: for tests/remote_shot_sockets_test.sh.
 		--dry-run) DRY=1; shift ;;
 		*) break ;;
 	esac
 done
-[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] [--tour NAME [--tour-only SECTION] [--tour-minutes N]] <sha> <name> -- <godot args>"; exit 2; }
+[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] [--tour NAME [--tour-only SECTION] [--tour-minutes N] [--tour-bots 2]] <sha> <name> -- <godot args>"; exit 2; }
 [ -z "$SERVER_ARGS" ] || [ $JOINED -eq 1 ] || { echo "--server-args: only with --joined"; exit 2; }
 if [ -n "$TOUR" ]; then
 	case "$TOUR" in *[!a-z0-9_]*) echo "--tour: a tour's name, a-z, 0-9 and _"; exit 2 ;; esac
 	case "$TOUR_ONLY" in *[!a-z0-9_]*) echo "--tour-only: a section's name, a-z, 0-9 and _"; exit 2 ;; esac
 	TOUR_MINUTES="${TOUR_MINUTES:-20}"
 	case "$TOUR_MINUTES" in [1-9]|[1-5][0-9]|60) ;; *) echo "--tour-minutes: 1 to 60"; exit 2 ;; esac
+	TOUR_BOTS="${TOUR_BOTS:-1}"
+	case "$TOUR_BOTS" in 1|2) ;; *) echo "--tour-bots: 1 or 2"; exit 2 ;; esac
 	[ "$REPEAT" = 1 ] || { echo "--repeat: not with --tour (one phase; the restart tour stays on tools/tour.sh)"; exit 2; }
 	# The client's own limit (tour.sh's: the tour's watchdog, then 250 s), and the run's past it.
 	TOUR_SECONDS=$((TOUR_MINUTES * 60 + 250))
 	TIMEOUT="${TIMEOUT:-$((TOUR_SECONDS / 60 + 3))}"
-elif [ -n "$TOUR_ONLY$TOUR_MINUTES" ]; then
-	echo "--tour-only, --tour-minutes: only with --tour"; exit 2
+elif [ -n "$TOUR_ONLY$TOUR_MINUTES$TOUR_BOTS" ]; then
+	echo "--tour-only, --tour-minutes, --tour-bots: only with --tour"; exit 2
 fi
 TIMEOUT="${TIMEOUT:-15}"
 # Each runner: its ssh address, the drive its clone and runs are on, and the
@@ -230,6 +240,8 @@ if [ -n "$TOUR" ]; then
 	# tour.sh's client (828 amended (6)), the runner adding the mode, address, port and --tour-admin.
 	ARGS=(--scene res://tests/tour/tour.tscn -- --name=Tourbot --player-id=70a70000-0000-4000-8000-000000000001
 		"--tour=$TOUR" "--tour-out=$OUT_FWD" "--tour-minutes=$TOUR_MINUTES" "--test-exit-after=$TOUR_SECONDS" --tour-phase=1)
+	# Two bots (828 amended (10)): this one says it is bot 1; the runner makes bot 2's args from these.
+	[ "$TOUR_BOTS" = 2 ] && ARGS+=(--tour-bot=1)
 	dashed=1
 fi
 [ $dashed -eq 1 ] || ARGS+=("--")
@@ -279,7 +291,7 @@ if [ $JOINED -eq 1 ]; then
 	# from 409fad948 until it, every laptop tour's barrow and Ossuary were the bare template).
 	[ -z "$TOUR" ] || printf '%s\n' "--regenerate" "--run-marker=tour-$NAME" "--overlay-dir=user://tour_overlay/" >>"$TMP/server_args.txt"
 	# The tour's own file for the runner (its section): the runner starts the admin console when it is there.
-	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\n' "$TOUR" "$TOUR_ONLY" >"$TMP/tour.txt"
+	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\nbots=%s\n' "$TOUR" "$TOUR_ONLY" "$TOUR_BOTS" >"$TMP/tour.txt"
 fi
 if [ $DRY -eq 1 ]; then
 	for file in args server_args tour; do
@@ -406,13 +418,29 @@ if [ $JOINED -eq 1 ]; then
 	# coordinator's condition; a joined report reads that first), and its lines are said here.
 	if [ -n "$TOUR" ]; then
 		errors="$(grep -c "SCRIPT ERROR" "$REVIEW/server.log" 2>/dev/null)"
+		# Two bots (828 amended (10)): each game's count on the first line, bot 2's report and
+		# stills in bot2/ (bot2_*.png; bot 1's bot1_*.png), void if bot 2 never joined.
+		counts="server SCRIPT ERRORs: ${errors:-unread} (out/server.log)"
+		if [ "$TOUR_BOTS" = 2 ]; then
+			# (grep -c prints 0 and exits 1 when none: its count is kept, "unread" only for no file.)
+			one="$([ -f "$REVIEW/godot.log" ] && grep -c "SCRIPT ERROR" "$REVIEW/godot.log"; true)"
+			two="$([ -f "$REVIEW/bot2/godot.log" ] && grep -c "SCRIPT ERROR" "$REVIEW/bot2/godot.log"; true)"
+			counts="$counts; bot 1: ${one:-unread} (godot.log); bot 2: ${two:-unread} (bot2/godot.log)"
+		fi
 		if [ -f "$REVIEW/report.md" ]; then
-			{ printf 'server SCRIPT ERRORs: %s (out/server.log)\n\n' "${errors:-unread}"; cat "$REVIEW/report.md"; } >"$TMP/report.md"
+			{ printf '%s\n\n' "$counts"; cat "$REVIEW/report.md"; } >"$TMP/report.md"
 			mv "$TMP/report.md" "$REVIEW/report.md"
 		else
 			echo "remote_shot: the tour wrote no report.md"
 		fi
-		echo "server SCRIPT ERRORs: ${errors:-unread}"
+		echo "$counts"
+		if [ "$TOUR_BOTS" = 2 ]; then
+			grep -h "^bot 2" "$REVIEW/runner.log" 2>/dev/null
+			if ! grep -q "\[net\] connected as peer" "$REVIEW/bot2/godot.log" 2>/dev/null; then
+				echo "remote_shot: bot 2 never connected to its server: a two-bot tour's stills are void"; exit 1
+			fi
+			grep -hE "^\[tour\]|^RESULT" "$REVIEW/bot2/godot.log" 2>/dev/null | tail -20 | sed 's/^/bot 2: /'
+		fi
 		# A regenerating level the server loaded with no generation laid (828 amended (9)): the
 		# stills show the template no player meets. Silent from 409fad948 (look214_ossuary).
 		bare="$(sh tools/tour_bare_levels.sh "$SHA" "$REVIEW/server.log" | paste -sd ' ' -)"

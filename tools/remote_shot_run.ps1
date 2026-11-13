@@ -29,11 +29,16 @@
 #                 "joined:" and "server at end:" lines name both and how the server ended.
 #                 A tour (828 amended (6); <Dir>\tour.txt from remote_shot.sh --tour): the
 #                 server also gets --admin-port on a free loopback port and the client
-#                 --tour-admin=<it>, TOUR_ONLY its section. Every joined run looks through
+#                 --tour-admin=<it>, TOUR_ONLY its section. With bots=2 in tour.txt (828 amended
+#                 (10)), a second client joins once the first has, if 4 GB are free: its args
+#                 the first's with --name=Tourbot2, the second fixed test id and --tour-bot=2,
+#                 1536x864, its log <Dir>\out\bot2\godot.log, its user data <Dir>\appdata_bot2;
+#                 in the job, its sockets judged as the first's, and a pass fails when either
+#                 game does. runner.log: its lines and each game's SCRIPT ERROR count. Every joined run looks through
 #                 what it returns for its token; a file holding it is removed and the run fails.
 #   -Mode parse   a tour's scripts (-Dir: its name) checked in the clone, parse errors only
 param(
-	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge")][string]$Mode,
+	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args")][string]$Mode,
 	[string]$Dir = "",
 	[string]$Root = "D:\psykinetic",
 	[string]$Runs = "D:\psykinetic-runs",
@@ -143,7 +148,27 @@ function Read-RunSockets([int]$clientPid, [int]$serverPid, [datetime]$since) {
 	return ,$found
 }
 
+## A two-bot tour's second client's args (828 amended (10)): the first's with its name, fixed
+## test id and bot number swapped; $null unless all three were there to swap (else bot 2
+## would join as bot 1's own player).
+function Bot2-Args([string[]]$first) {
+	$swaps = [ordered]@{
+		"--name=Tourbot" = "--name=Tourbot2"
+		"--player-id=70a70000-0000-4000-8000-000000000001" = "--player-id=70a70000-0000-4000-8000-000000000002"
+		"--tour-bot=1" = "--tour-bot=2"
+	}
+	foreach ($from in $swaps.Keys) { if (@($first | Where-Object { $_ -ceq $from }).Count -ne 1) { return $null } }
+	return ,@($first | ForEach-Object { if ($swaps.Contains($_) -and $swaps.Keys -ccontains $_) { $swaps[$_] } else { $_ } })
+}
+
 switch ($Mode) {
+	# Bot 2's args alone, for tests/remote_shot_sockets_test.sh: -Dir names a file of bot 1's
+	# args, one a line; prints bot 2's, one a line, or "REFUSED".
+	"bot2args" {
+		$made = Bot2-Args @(Get-Content $Dir)
+		if ($made -eq $null) { Write-Output "REFUSED" } else { $made | ForEach-Object { Write-Output $_ } }
+		exit 0
+	}
 	# The judgement alone, for tests/remote_shot_sockets_test.sh: -Dir names a JSON file
 	# {"low": n, "joining_local": bool, "sockets": [{owner, proto, address, port}]}.
 	"judge" {
@@ -346,10 +371,22 @@ public static class Dialogs {
 		$tour = ""
 		$tourOnly = ""
 		$adminPort = 0
+		# A second bot (828 amended (10), --tour-bots 2): started once the first has joined, its
+		# own log, window, settings and user data in the run's folder; see the pass loop.
+		$bots = 1
+		$bot2 = $null
+		$bot2Result = ""
+		$bot2Line = ""
+		$bot2Log = Join-Path $Dir "out\bot2\godot.log"
+		$bot2Data = Join-Path $Dir "appdata_bot2"
+		$bot2Settings = Join-Path $bot2Data "settings.cfg"
+		$bot2Shown = $false
+		$bot2Sockets = ""
 		if ($Joined -and (Test-Path $tourFile)) {
 			foreach ($line in Get-Content $tourFile) {
 				if ($line -match '^tour=([a-z0-9_]+)$') { $tour = $Matches[1] }
 				if ($line -match '^only=([a-z0-9_]*)$') { $tourOnly = $Matches[1] }
+				if ($line -match '^bots=([12])$') { $bots = [int]$Matches[1] }
 			}
 			if ($tour -eq "") { $result = "tour.txt names no tour: not started" }
 		}
@@ -454,8 +491,46 @@ public static class Dialogs {
 			$result = ""
 			$clientStart = Get-Date
 			$nextLook = $clientStart
-			while (-not $process.HasExited) {
+			while (-not $process.HasExited -or ($bot2 -ne $null -and -not $bot2.HasExited)) {
 				[System.Windows.Forms.Application]::DoEvents(); if (Test-Path $stopFile) { $asked.stop = $true }
+				# The second bot (828 amended (10)): once the first has joined, if the laptop has 4 GB
+				# free; its args the first's with its own name, fixed test id and bot number, its own
+				# log, window (1536x864), settings and user data, all in the run's folder; in the job.
+				if ($bots -eq 2 -and $bot2 -eq $null -and $bot2Result -eq "" -and -not $process.HasExited) {
+					$joinedFirst = try { (Test-Path $logFile) -and [bool](Select-String -Path $logFile -SimpleMatch "[net] connected as peer" -Quiet) } catch { $false }
+					if ($joinedFirst) {
+						$freeGb = try { [Math]::Round((Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).FreePhysicalMemory / 1MB, 1) } catch { -1 }
+						if ($freeGb -lt 4) {
+							$bot2Result = "not started: $freeGb GB free, under 4 GB"
+							$bot2Line = "bot 2: not started, $freeGb GB free on the laptop (4 GB wanted)"
+							Stop-Tree $process
+							$result = "bot 2 refused: $freeGb GB free on the laptop, under 4 GB"
+							break
+						}
+						$bot2Given = Bot2-Args $given
+						if ($bot2Given -eq $null) {
+							$bot2Result = "not started: bot 1's args lack --name=Tourbot, its fixed id or --tour-bot=1"
+							$bot2Line = "bot 2: not started, its args could not be made from bot 1's"
+							Stop-Tree $process
+							$result = "bot 2 refused: its args could not be made"
+							break
+						}
+						New-Item -ItemType Directory -Force (Split-Path $bot2Log), $bot2Data | Out-Null
+						Set-Content -Encoding utf8 $bot2Settings "window_width=1536`nwindow_height=864`nwindow_mode=windowed`nhints=off"
+						$bot2Engine = @("--audio-driver", "Dummy", "--position", "320,180", "--resolution", "1536x864", "--path", $Root)
+						$bot2Quoted = ($bot2Engine + @("--log-file", $bot2Log) + $bot2Given + $clientArgs + @("--settings=$bot2Settings")) | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+						$env:APPDATA = $bot2Data
+						$bot2 = Start-Process -FilePath $Godot -ArgumentList $bot2Quoted -PassThru
+						$env:APPDATA = $appdata
+						$null = $bot2.Handle
+						$jobbed += "bot 2's game pid $($bot2.Id): $(if (($code = [Job]::Add($bot2.Handle)) -eq 0) { 'in' } else { "not in (error $code)" })"
+						$bot2Line = "bot 2: pid $($bot2.Id), started $([int]((Get-Date) - $clientStart).TotalSeconds) s after bot 1 once it joined, $freeGb GB free; 1536x864; user data appdata_bot2; log out\bot2\godot.log"
+					}
+				}
+				if ($bot2 -ne $null -and -not $bot2Shown -and -not $bot2.HasExited) {
+					$bot2.Refresh()
+					if ($bot2.MainWindowHandle -ne [IntPtr]::Zero) { $bot2Shown = [Idle]::Topmost($bot2.MainWindowHandle) }
+				}
 				# Joined: the run's sockets judged every 2 s for the first 30 s, then every 10 s,
 				# and the screen looked at for a firewall prompt each time; either stops the run.
 				if ($Joined -and (Get-Date) -ge $nextLook) {
@@ -469,25 +544,40 @@ public static class Dialogs {
 						if (-not $verdict.ok) {
 							$socketLine = $verdict.line
 							Stop-Tree $process
+							if ($bot2 -ne $null) { Stop-Tree $bot2 }
 							$result = "a socket off loopback refused: stopped ($($verdict.why))"
 							break
+						}
+						if ($bot2 -ne $null -and -not $bot2.HasExited) {
+							$joining2 = try { (Test-Path $bot2Log) -and [bool](Select-String -Path $bot2Log -SimpleMatch "[net] client connecting to 127.0.0.1:$port" -Quiet) } catch { $false }
+							$verdict2 = Judge-Sockets (Read-RunSockets $bot2.Id 0 $runStart) $low $joining2
+							if ($verdict2.line.Length -ge $bot2Sockets.Length) { $bot2Sockets = $verdict2.line }
+							if (-not $verdict2.ok) {
+								$bot2Sockets = $verdict2.line
+								Stop-Tree $process
+								Stop-Tree $bot2
+								$result = "a socket off loopback refused (bot 2): stopped ($($verdict2.why))"
+								break
+							}
 						}
 					} catch {
 						$socketLine = "SOCKETS: could not be read ($($_.Exception.Message))"
 						Stop-Tree $process
+						if ($bot2 -ne $null) { Stop-Tree $bot2 }
 						$result = "sockets could not be read: stopped"
 						break
 					}
 					$dialogs = try { [Dialogs]::Count($firewallTitle) } catch { -1 }
 					if ($dialogs -gt 0) {
 						Stop-Tree $process
+						if ($bot2 -ne $null) { Stop-Tree $bot2 }
 						$firewallLine += "; one APPEARED at $([int]$age) s"
 						$result = "a firewall dialog appeared: stopped (it is Jeff's, not clicked)"
 						break
 					}
 					if ($dialogs -lt 0) { $firewallUnread = $true }
 				}
-				if (-not $shown) {
+				if (-not $shown -and -not $process.HasExited) {
 					$process.Refresh()
 					if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
 						$shown = [Idle]::Topmost($process.MainWindowHandle)
@@ -498,11 +588,13 @@ public static class Dialogs {
 				}
 				if ($asked.stop) {
 					Stop-Tree $process
+					if ($bot2 -ne $null) { Stop-Tree $bot2 }
 					$result = "stopped by user"
 					break
 				}
 				if ((Get-Date) -ge $deadline) {
 					Stop-Tree $process
+					if ($bot2 -ne $null) { Stop-Tree $bot2 }
 					$result = "timeout"
 					break
 				}
@@ -511,6 +603,15 @@ public static class Dialogs {
 			if ($result -eq "") {
 				$process.WaitForExit()
 				$result = "exit $($process.ExitCode)"
+			}
+			if ($bot2 -ne $null) {
+				if (-not $bot2.HasExited) { Stop-Tree $bot2 }
+				$null = $bot2.WaitForExit(10000)
+				if ($bot2Result -eq "") { $bot2Result = if ($bot2.HasExited) { "exit $($bot2.ExitCode)" } else { "STILL RUNNING" } }
+				if ($result -eq "exit 0" -and $bot2Result -ne "exit 0") { $result = "bot 2: $bot2Result" }
+			} elseif ($bots -eq 2 -and $bot2Result -eq "") {
+				$bot2Result = "never started (bot 1 never joined)"
+				if ($result -eq "exit 0") { $result = "bot 2 never started" }
 			}
 			$passes += "pass ${pass}: $result"
 			if ($result -ne "exit 0") { break }
@@ -544,6 +645,14 @@ public static class Dialogs {
 			}
 			$joinedLines += "token: $(if ($leaks) { "FOUND in $(($leaks | ForEach-Object { $_.Name }) -join ', '), removed" } else { "in none of the $($returned.Count) files the run returns" })"
 			$runToken = $null
+		}
+		if ($bots -eq 2) {
+			$joinedLines += @($(if ($bot2Line) { $bot2Line } else { "bot 2: not started" }), "bot 2 at end: $bot2Result",
+				"bot 2 $(if ($bot2Sockets) { $bot2Sockets } else { 'SOCKETS: not looked at' })")
+		}
+		if ($tour -ne "") {
+			$count = { param($f) if (Test-Path $f) { @(Select-String -Path $f -SimpleMatch "SCRIPT ERROR" -ErrorAction SilentlyContinue).Count } else { "unread" } }
+			$joinedLines += "script errors: server $(& $count (Join-Path $Dir 'out\server.log')), bot 1 $(& $count (Join-Path $Dir 'godot.log'))$(if ($bots -eq 2) { ", bot 2 $(& $count $bot2Log)" })"
 		}
 		if ($Joined) {
 			$joinedLines += $(if ($socketLooks -gt 0 -or $socketLine -ne "") { "$socketLine ($socketLooks looks, ephemeral from $low)" } else { "SOCKETS: not looked at (no client ran)" })

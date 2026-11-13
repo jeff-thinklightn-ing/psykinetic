@@ -15,6 +15,12 @@ var main: Node
 var admin_port := 0
 ## Where the report and stills go (a folder, absolute).
 var out_dir := ""
+## Which bot this is (828 amended (10)): --tour-bot=N, 2 for the second of
+## remote_shot.sh --tour-bots 2, else 1.
+var _tour_bot := 1
+## Whether the tour runs two bots (--tour-bot given): stills are named
+## bot<N>_<name>.png, and the second bot's stills and report go in out_dir/bot2.
+var _two_bots := false
 ## The report's lines: {"ok": bool, "what": String, "detail": String};
 ## "ok" null for a plain log line.
 var lines: Array[Dictionary] = []
@@ -36,6 +42,52 @@ func _init(client_main: Node, console_port: int, folder: String) -> void:
 	out_dir = folder
 	_started_msec = Time.get_ticks_msec()
 	Net.message_received.connect(_on_message)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--tour-bot="):
+			_two_bots = true
+			_tour_bot = 2 if arg.trim_prefix("--tour-bot=") == "2" else 1
+
+
+## Which bot this is: 2 for the second of --tour-bots 2, else 1 (828 amended (10)).
+func tour_bot() -> int:
+	return _tour_bot
+
+
+## Where this bot's stills and report go: out_dir, or out_dir/bot2 for the second bot.
+func own_dir() -> String:
+	return out_dir.path_join("bot2") if _tour_bot == 2 else out_dir
+
+
+## Marks [param name] in the run's sync folder (out_dir/sync, both bots' on one laptop),
+## for the other bot's wait_mark (828 amended (10)): "standing", "back".
+func mark(name: String) -> void:
+	if not _mark_ok(name):
+		return
+	var folder := out_dir.path_join("sync")
+	DirAccess.make_dir_recursive_absolute(folder)
+	var file := FileAccess.open(folder.path_join(name), FileAccess.WRITE)
+	if file != null:
+		file.store_line("bot %d at %d ms" % [_tour_bot, now_msec()])
+		file.close()
+	log_line("mark %s (bot %d)%s" % [name, _tour_bot, "" if file != null else ": NOT WRITTEN"])
+
+
+## Waits till [param name] is marked, by either bot, most [param most] seconds: whether it
+## was. A section fails on false rather than going on unsynced (828 amended (10)).
+func wait_mark(name: String, most := 60.0) -> bool:
+	if not _mark_ok(name):
+		return false
+	var path := out_dir.path_join("sync").path_join(name)
+	var got: bool = await until(func() -> bool: return FileAccess.file_exists(path), most)
+	log_line("wait_mark %s (bot %d): %s" % [name, _tour_bot, "marked" if got else "NOT marked in %.0f s" % most])
+	return got
+
+
+func _mark_ok(name: String) -> bool:
+	var ok := not out_dir.is_empty() and name.is_valid_identifier()
+	if not ok:
+		expect(false, "a sync mark", "%s (a name of a-z, 0-9 and _; --tour-out given)" % name)
+	return ok
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
@@ -559,7 +611,9 @@ func still(name: String, yaw := NAN, low := true) -> String:
 	RenderingServer.force_draw()
 	await RenderingServer.frame_post_draw
 	var image := get_viewport().get_texture().get_image()
-	var path := out_dir.path_join("%s.png" % name)
+	# Two bots (828 amended (10)): bot<N>_<name>.png, the second's in out_dir/bot2.
+	var path := own_dir().path_join(("bot%d_%s.png" % [_tour_bot, name]) if _two_bots else ("%s.png" % name))
+	DirAccess.make_dir_recursive_absolute(own_dir())
 	var error := image.save_png(path) if image != null and not image.is_empty() else ERR_UNAVAILABLE
 	var player := me()
 	log_line("still %s: %s (at %s in %s, hour %.1f, yaw %s, %s)" % [name, path if error == OK else "FAILED %d" % error,
@@ -570,8 +624,8 @@ func still(name: String, yaw := NAN, low := true) -> String:
 func write_report(tour_name: String) -> void:
 	if out_dir.is_empty():
 		return
-	DirAccess.make_dir_recursive_absolute(out_dir)
-	var file := FileAccess.open(out_dir.path_join("report.md"), FileAccess.WRITE)
+	DirAccess.make_dir_recursive_absolute(own_dir())
+	var file := FileAccess.open(own_dir().path_join("report.md"), FileAccess.WRITE)
 	if file == null:
 		return
 	var checks := 0

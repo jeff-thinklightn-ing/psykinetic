@@ -50927,6 +50927,27 @@ bare-level check over crouch2's lines (laid barrow, forest not regenerating: non
 exit 1). Lands behind dungeon's half. Crypt stills and checks from a runner between 409fad948 and this are void for a
 bullet. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+828 amended (10) (perf, 2026-11-13; playtest's ask, the coordinator's approval and additions, companions' 705 amended
+(1) the first to need it; label from tools/decision_number.sh): a tour with two players. tools/remote_shot.sh --tour
+NAME --tour-bots 2 (only with --tour; 1 or 2, 1 by default) runs a second joined client against the same laptop
+server, for what one player sees of another (a companion following someone else, a second body in a fight). The first
+client gets --tour-bot=1 and tour.txt says bots=2; the runner (tools/remote_shot_run.ps1) starts the second once the
+first's log says it connected, if the laptop has 4 GB free (else the run stops, saying so). Its args are the first's
+with three swapped, --name=Tourbot2, the second fixed test id 70a70000-0000-4000-8000-000000000002 and --tour-bot=2
+(Bot2-Args; a missing one refuses bot 2, which would otherwise join as bot 1's own player), its window 1536x864 at
+320,180, its user data the run's appdata_bot2 and its log out/bot2/godot.log, both in the run's folder; it goes in the
+run's job, its sockets are judged as the first's are (its own one outgoing ENet socket allowed), and every stop of the
+run (the tray, the time, a socket, a firewall prompt) stops both. A pass fails when either game does or bot 2 never
+started. runner.log has bot 2's lines and each game's SCRIPT ERROR count; remote_shot.sh puts server's, bot 1's and
+bot 2's counts on report.md's first line, prints bot 2's tour lines, and voids the run when bot 2 never connected.
+tests/tour/bot.gd: tour_bot() (1 or 2), own_dir() (out, or out/bot2 for the second), mark(name) and wait_mark(name,
+most) through out/sync, the run's folder both clients write on the one laptop (a tour section fails on a false
+wait_mark rather than going on unsynced); under two bots stills are bot1_<name>.png and bot2_<name>.png, the second's
+with its report.md in bot2/. A one-bot tour is as before: no --tour-bot, the same names and folders.
+tests/remote_shot_sockets_test.sh: --tour-bots refused without --tour and past 2; the two-bot dry run's args and
+tour.txt; the runner's -Mode bot2args swapping the three and refusing without --tour-bot=1; remote_shot.sh's void
+line. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

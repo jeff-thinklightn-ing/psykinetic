@@ -96,10 +96,12 @@ refused "a tour not at the sha: refused" "--tour no_such_tour: no tests/tour/tou
 	--tour no_such_tour "$sha" x --
 refused "--tour-only without --tour: refused" "only with --tour" --tour-only beds --joined "$sha" x --
 refused "--repeat with --tour: refused (one phase)" "--repeat: not with --tour" --tour smoke --repeat 2 "$sha" x --
+refused "--tour-bots without --tour: refused (828 amended (10))" "only with --tour" --tour-bots 2 --joined "$sha" x --
+refused "--tour-bots 3: refused (one or two)" "--tour-bots: 1 or 2" --tour smoke --tour-bots 3 "$sha" x --
 rm -f "$tmp/reached"
 sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp" "$sha" tourx --)"
 code=$?
-wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;server_args: --overlay-dir=user://tour_overlay/;tour: tour=kit;tour: only=wall;timeout: 17 min;"
+wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;server_args: --overlay-dir=user://tour_overlay/;tour: tour=kit;tour: only=wall;tour: bots=1;timeout: 17 min;"
 got_args="$(printf '%s\n' "$sent" | grep -E '^(args|server_args|tour|timeout): ' | tr '\n' ';')"
 if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
 	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its own overlay dir, its foe, --sought-first and --test-hp; no mode, port or token"
@@ -110,6 +112,40 @@ if printf '%s' "$sent" | grep -qiE -- "--token|--admin-port|--address|--port=|--
 	echo "  FAIL  a tour's args name a token, an admin port, an address or a mode: [$sent]"; failed=$((failed + 1))
 else
 	echo "  PASS  and no token, admin port, address or mode of its own (the runner names those on the laptop)"
+fi
+
+# Two bots (828 amended (10)): bot 1 says it is bot 1, tour.txt says two; the runner makes bot 2's
+# args from bot 1's (its own -Mode bot2args): name, fixed id and number swapped, nothing else;
+# refused when one of the three is missing (bot 2 would be bot 1's own player).
+sent="$(shot --dry-run --tour kit --tour-bots 2 "$sha" tourx --)"; code=$?
+got_args="$(printf '%s\n' "$sent" | grep -E '^(args|tour): ' | tr '\n' ';')"
+wanted_two="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=20;args: --test-exit-after=1450;args: --tour-phase=1;args: --tour-bot=1;args: --bind=127.0.0.1;tour: tour=kit;tour: only=;tour: bots=2;"
+if [ $code -eq 0 ] && [ "$got_args" = "$wanted_two" ]; then
+	echo "  PASS  --tour-bots 2 sends --tour-bot=1 to bot 1 and bots=2 in tour.txt"
+else
+	echo "  FAIL  --tour-bots 2: exit $code, got [$got_args], wanted [$wanted_two]"; failed=$((failed + 1))
+fi
+printf '%s\n' "$sent" | sed -n 's/^args: //p' >"$tmp/bot1.txt"
+bot2="$(powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$runner" -Mode bot2args \
+	-Dir "$(cygpath -w "$tmp/bot1.txt" 2>/dev/null || echo "$tmp/bot1.txt")" 2>&1 | tr -d '\r' | tr '\n' ';')"
+wanted_bot2="--disable-vsync;--scene;res://tests/tour/tour.tscn;--;--name=Tourbot2;--player-id=70a70000-0000-4000-8000-000000000002;--tour=kit;--tour-out=D:/psykinetic-runs/tourx/out;--tour-minutes=20;--test-exit-after=1450;--tour-phase=1;--tour-bot=2;--bind=127.0.0.1;"
+if [ "$bot2" = "$wanted_bot2" ]; then
+	echo "  PASS  the runner's bot 2: Tourbot2, the second fixed id, --tour-bot=2, the rest bot 1's"
+else
+	echo "  FAIL  the runner's bot 2: got [$bot2], wanted [$wanted_bot2]"; failed=$((failed + 1))
+fi
+grep -v -- "--tour-bot=1" "$tmp/bot1.txt" >"$tmp/bot1_one.txt"
+bot2="$(powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$runner" -Mode bot2args \
+	-Dir "$(cygpath -w "$tmp/bot1_one.txt" 2>/dev/null || echo "$tmp/bot1_one.txt")" 2>&1 | tr -d '\r')"
+if [ "$bot2" = "REFUSED" ]; then
+	echo "  PASS  the runner's bot 2 refused when bot 1's args lack --tour-bot=1"
+else
+	echo "  FAIL  the runner's bot 2 without --tour-bot=1: got [$bot2], wanted REFUSED"; failed=$((failed + 1))
+fi
+if grep -qF '"\[net\] connected as peer" "$REVIEW/bot2/godot.log"' tools/remote_shot.sh; then
+	echo "  PASS  remote_shot.sh voids a two-bot tour whose bot 2 never joined"
+else
+	echo "  FAIL  remote_shot.sh voids a two-bot tour whose bot 2 never joined"; failed=$((failed + 1))
 fi
 
 # A tour into a regenerating level with no generation laid is void (828 amended (9)): the barrow
