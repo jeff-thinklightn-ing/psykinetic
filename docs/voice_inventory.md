@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2889)
+## Lines in the code (2890)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1321,7 +1321,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 
-### other (sim) (612)
+### other (sim) (613)
 
 | | Line | Where |
 |---|---|---|
@@ -1668,6 +1668,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [tick] avg %.1f ms, worst %.1f ms, ticks %d over the last hour | `sim/tick_watch.gd` hour_line() |
 |  | [tick] stalled: the main loop stuck %.0f s, since tick %d; the last part done: %s; the last error: %s; quitting for a restart | `sim/tick_watch.gd` stalled_line() |
 |  | %s the %s, sent for, finds the way to %s alone | `sim/towns.gd` OWN_WAY |
+|  | town %s: %s; residents %d (%s); visitors %d; room %d of %d | `sim/towns.gd` boot_line() |
 |  | +%d experience: %s | `sim/towns.gd` add_xp() |
 |  | %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
 |  | %s the %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
