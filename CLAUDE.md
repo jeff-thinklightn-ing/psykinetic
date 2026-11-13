@@ -220,10 +220,15 @@ that the walk looks like skipping and the people look like "bad claymation place
   run) is the `soak` kind since 394's eighth amendment (751cb726): it runs beside suites, never beside a
   bench, one at a time, at below-normal priority, with a 180-minute default limit (`--expect` overrides);
   never register a soak as a bench (economy's 150-minute soak as a bench held five landings and a cut,
-  2026-10-21). A test scene run alone goes through the gate as `scene` (`sh tools/heavy_job.sh run
-  <tree> scene -- /usr/bin/timeout 900 "$GODOT_PATH" --headless --path . --scene tests/x.tscn --
-  --run-marker=<n> </dev/null`): beside a suite at below-normal priority, two at most, never beside a
-  bench (394 amended (17); ungated solo scenes stole CPU from landings and failed their timing checks).
+  2026-10-21). A test scene run alone goes through the gate as `scene`: `sh tools/heavy_job.sh run
+  <tree> scene -- bash tests/run.sh tests/x_test.tscn </dev/null` (278 amended (6), e0ecaa47b: several
+  scenes may be named; run.sh gives each its marker, port, log and time limit, stops a scene 3 s after
+  a script of its fails to parse, and refuses net_test; the older line still works, `sh
+  tools/heavy_job.sh run <tree> scene -- /usr/bin/timeout 900 "$GODOT_PATH" --headless --path .
+  --scene tests/x.tscn -- --run-marker=<n> </dev/null`): beside a suite at below-normal priority, two
+  at most, never beside a bench (394 amended (17); ungated solo scenes stole CPU from landings and
+  failed their timing checks). Load a scene whose script you changed once this way before you send it
+  to anyone or queue it: a parse error is seconds here and a failed landing in the queue.
   net_test run alone is the `net` kind (394 amended (24)): it starts several Godots (about 12 GB at
   once), so it runs one at a time, never beside a bench, and the gate refuses it under any other kind.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
