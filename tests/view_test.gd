@@ -96,6 +96,7 @@ func _ready() -> void:
 		_test_camera_feel()
 		_test_camera_turn()
 		_test_fade_lets_go()
+		_test_vigil_light()
 		_test_draw_pull()
 		_test_low_scatter()
 		await _test_far_restart()
@@ -9739,6 +9740,46 @@ func _test_fade_lets_go() -> void:
 	_rig._update_fade(true)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 	_rig.set_process(true)
+
+
+## The fallen knight's glow on the bier (909): his puppet's Body carries a
+## steady VigilLight ahead of him and over the slab's top; no other model,
+## and none in a far glimpse.
+func _test_vigil_light() -> void:
+	print("
+== the fallen knight's glow on what he keeps vigil over (909) ==")
+	var lit := func(kind: String, glimpse: bool) -> OmniLight3D:
+		var puppet := Node3D.new()
+		_rig.add_child(puppet)
+		puppet.add_child(Client3D._make_model(Client3D.MODELS[kind], puppet))
+		var was: bool = _rig._glimpse
+		_rig._glimpse = glimpse
+		_rig._light_vigil(puppet, Client3D.MODELS[kind])
+		_rig._glimpse = was
+		var light := puppet.get_node_or_null("Body/VigilLight") as OmniLight3D
+		var out := light.duplicate() as OmniLight3D if light != null else null
+		if out != null:
+			out.position = light.position
+		puppet.free()
+		return out
+	var light: OmniLight3D = lit.call("astral_knight", false)
+	_check(light != null and light.light_color == Client3D.KNIGHT_GLOW and is_equal_approx(light.light_energy, Client3D.VIGIL_ENERGY)
+			and is_equal_approx(light.omni_range, Client3D.VIGIL_RANGE) and not light.shadow_enabled
+			and light.position.is_equal_approx(Vector3(Client3D.VIGIL_AHEAD, Client3D.VIGIL_UP, 0.0)),
+			"the knight's Body carries a steady pale light ahead of him, over the slab (%s)" % [light.position if light != null else null])
+	_check(light != null and Client3D.VIGIL_ENERGY < 1.0 and Client3D.VIGIL_RANGE < 4.5 and Client3D.KNIGHT_GLOW == Color("#c8d8f0"),
+			"fainter and shorter than a torch's (1.4 over 4.5 m), in his legend colour")
+	var none := ["ghost", "draugr"].all(func(kind: String) -> bool:
+		var other: OmniLight3D = lit.call(kind, false)
+		if other != null:
+			other.free()
+		return other == null)
+	var far: OmniLight3D = lit.call("astral_knight", true)
+	_check(none and far == null, "a ghost and a draugr carry none, nor the knight in a far glimpse")
+	if light != null:
+		light.free()
+	if far != null:
+		far.free()
 
 
 ## Indoors (671): top-down in a walled space, eased; out after a hold, so a

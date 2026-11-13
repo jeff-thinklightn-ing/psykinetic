@@ -1472,11 +1472,25 @@ const MODELS := {
 		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 	"astral_knight": {"scene": "res://art/kit/creatures/creature.astral_knight/creature.astral_knight.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
-		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL, "one_shell": true},
+		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL, "one_shell": true,
+		"vigil_light": true},
 }
 ## The fallen knight's stance (humanoid_clips.py): head bowed, a hand on the
 ## hilt at his hip, a slow breath.
 const KNIGHT_VIGIL := "Knight_Vigil"
+## His glow on what he keeps vigil over (909, the coordinator's approval;
+## dungeon's ask: the barrow's First Hall bier, its darkest part, should read
+## as a bier with a sword on it): a model naming "vigil_light" carries one
+## steady light (_light_vigil) VIGIL_AHEAD in front of him and VIGIL_UP up,
+## over the slab's top, in his legend colour (KNIGHT_GLOW, #c8d8f0), at
+## VIGIL_ENERGY over VIGIL_RANGE: the slab and the sword, not the hall (a
+## torch is 1.4 over 4.5 m). No shadow, no flicker, no hour's fade; drawn
+## only (the sim's light leaves the bier dark); none in a far glimpse.
+const KNIGHT_GLOW := Color("#c8d8f0")
+const VIGIL_ENERGY := 0.35
+const VIGIL_RANGE := 2.5
+const VIGIL_AHEAD := 0.9
+const VIGIL_UP := 1.3
 ## A model's surface in this material (art-kit's ghost's shroud) is see-through
 ## and casts no shadow (the coordinator's ruling): its mesh's shadow is off.
 const GHOST_MATERIAL := "ghost"
@@ -23290,6 +23304,19 @@ static func _size_head(scene: Node3D, look: PersonLook) -> void:
 			skeleton.add_child(size)
 
 
+## A model naming "vigil_light" (909: the fallen knight) lights what it
+## faces: a VigilLight on [param puppet]'s Body (+X ahead, so it turns with
+## his facing), but in a far glimpse.
+func _light_vigil(puppet: Node3D, model: Dictionary) -> void:
+	var body := puppet.get_node_or_null("Body") as Node3D
+	if _glimpse or body == null or not model.get("vigil_light", false):
+		return
+	var light := _night_light(KNIGHT_GLOW, VIGIL_ENERGY, VIGIL_RANGE)
+	light.name = "VigilLight"
+	light.position = Vector3(VIGIL_AHEAD, VIGIL_UP, 0.0)
+	body.add_child(light)
+
+
 ## The model as the puppet's Body: the scene turned to face +X (as the
 ## nose does, so Body turns with the facing; MODELS' "faces"), with an AnimationPlayer on
 ## its root playing its clips through an AnimRig of its own (decision 390),
@@ -26954,6 +26981,7 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		collision.shape = _pick_shape(shape, body.mesh)
 	else:
 		puppet.add_child(_make_model(model, puppet))
+		_light_vigil(puppet, model)
 		var capsule := CapsuleShape3D.new()
 		capsule.radius = MODEL_RADIUS
 		capsule.height = height

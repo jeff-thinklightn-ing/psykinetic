@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt's First Hall, the fallen knight keeping his vigil gives off a faint pale light, enough to make out the bier and the sword on it (909).
 - Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
 - By day in the Forest, a bandits' camp has rough hide lean-tos on poles, open toward its fire, and a trader's camp a canvas awning raised on two poles over a bedroll (905).
 - Grass and flowers make way for anything dropped in them, so it shows plainly, and stand again once it's picked up (252 amended (1)).

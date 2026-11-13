@@ -54559,6 +54559,43 @@ look hung the raw gear.lantern and its panes stayed dark at night; the town's hu
 lantern hangs by its ring on the hook at 1.7 with the right middle, and the terrain lantern's light stays inside the
 low post's lantern. Watched: hosted Atlas stills, C:/dev/review/lamp_posts/store_near_crop.png (main's code post
 beside the swap), shack_post_crop.png and shack_post_full.png (Snagfin's low post), near_sheet.png. Client only;
+
+## 909. The fallen knight's vigil light
+
+Dungeon's ask, on the coordinator's ruling: the barrow's First Hall bier
+(building.burial_table at (38,8), 38 to 40 by 8 to 9) is the hall's darkest
+part. Its four corner torches, (30,2), (49,2), (30,15) and (49,15), are each
+about 11 cells off and reach 4.5 m. Its light shaft at (46,13) is 8 off, and
+the hall is "indoors" at 0.4. A dim middle is right for a tomb, but the slab
+should still read as a bier with a sword on it. Not a candle: the remains'
+own candle comes with the bones at the laying (art-kit's remake).
+
+The fallen knight who keeps his vigil there (747, astral_knight, his ghost's
+material) carries the light. Client3D.MODELS' astral_knight names
+"vigil_light", and Client3D._light_vigil gives that model's puppet one
+OmniLight3D, "VigilLight", on its Body. The Body faces +X ahead, so the
+light turns with him. It stands VIGIL_AHEAD 0.9 m in front of him and
+VIGIL_UP 1.3 m up, over the slab's top, in his legend colour (KNIGHT_GLOW,
+#c8d8f0). Its strength is VIGIL_ENERGY 0.35 over VIGIL_RANGE 2.5 m, enough
+for the slab and the sword but not the hall: a torch is 1.4 over 4.5 m, a
+candle 1.0 over 4 m. It is steady, with no shadow and no flicker, and it is
+not faded by the hour, being underground. It is drawn only: Fields and
+Senses are untouched, so the bier stays dark to the sim. A far glimpse
+draws none, as it draws no hearth light. Should he ever be met away from
+the bier, the glow goes with him, which reads right for a ghost.
+
+It lands on, his own piece and not part of the "full circle" package (the
+coordinator: he stands his vigil in the game today). The proof, from the
+game camera:
+- a before and after at the hall door (39,2) and at the bier;
+- a frame with a player beside him, to see 0.35 does not wash their skin
+  blue (if it does, the energy drops before the range);
+- once art-kit's remains and candle are in a shot, both lights together,
+  cool on the sword and warm on the bundle.
+
+view_test _test_vigil_light: the knight's Body carries the light with
+those values and that place, fainter and shorter than a torch's; a ghost
+and a draugr carry none, nor the knight in a far glimpse. Client only;
 protocol unchanged; no new class_name.
 ## 897. Whatever leaves the world, every holder forgets it (enemy-ai)
 
