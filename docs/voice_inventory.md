@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2928)
+## Lines in the code (2931)
 
 ### companions (Pip, Wren, Nix) (657)
 
@@ -1113,7 +1113,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (207)
+### other (render) (210)
 
 | | Line | Where |
 |---|---|---|
@@ -1139,6 +1139,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Left %s on the shelves for the town. | `render/barter_panel.gd` LEFT_LINE |
 |  | Left %s with the town, unpaid. | `render/barter_panel.gd` UNPAID_LINE |
 |  | %s takes that back on the Donate tab. | `render/barter_panel.gd` GIFT_ON_DONATE_LINE |
+|  | %s takes that as a gift, on the Donate tab. | `render/barter_panel.gd` GIFT_AS_GIFT_LINE |
+|  | That's taken as a gift, on the Donate tab. | `render/barter_panel.gd` GIFT_AS_GIFT_NAMELESS |
+|  | Gave %s %s. | `render/barter_panel.gd` GAVE_LINE |
 |  | %s buys that on the Store tab. | `render/barter_panel.gd` PAYS_ON_STORE_LINE |
 |  | %s takes back what he sold you; you carry none. | `render/barter_panel.gd` DONATE_NOTHING_LINE |
 |  | %s won't take that. | `render/barter_panel.gd` WONT_TAKE_LINE |
