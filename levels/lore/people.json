@@ -685,7 +685,7 @@
 				},
 				{
 					"id": "farmer.day",
-					"text": "The farmer is at the well by five and in the field from six till four, then at the square, and at the inn before going home.",
+					"text": "The farmer is at the well by five and at work from six till four, then at the square, and at the inn before going home.",
 					"known": "lived",
 					"knowers": [
 						"farmer"
