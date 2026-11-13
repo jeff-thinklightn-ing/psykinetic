@@ -1379,6 +1379,17 @@ the rest on the next import). And run from the project, Level reads the
 PNG itself before its import, so a save plays at once without one; an
 exported build, which has only the import, is unchanged.
 
+147 amended (1) (the coordinator, 2026-11-13, with 867 amended (2); the label from decision_number.sh):
+the round trip is unchanged as the game reads it, not pixel for pixel on the border. LevelMap.to_image
+draws only edges inside edge_in_bounds, so a wall painted on a level's outer east or south border (an
+edge of the last column or row) is not written back; Level.parse reads those edges and, with no pixel
+there, makes an outline wall beside walkable ground, so the level reads the same (builder mode's first
+save of test_room dropped 19 such wall pixels on its east border, cells and parsed edges unchanged). A
+door or any edge but a wall painted there would be lost at the first save; MapDoc's painting is held to
+edge_in_bounds, so only a hand-painted PNG could hold one. editor_test's round trip now fails a level in
+levels/ holding one, naming it and the edge: today none does (the round trip's parsed edges already
+agreed on every level).
+
 ## 148. Outdoor zones: the outline is a forest's edge, drawn, not simulated
 
 "outdoor" in level.json changes looks and words only. The sim keeps its
@@ -52222,6 +52233,63 @@ reply's calls start: BuilderSession.on_checking, the host's repeated "working" w
 and nothing else). builder_test _test_breathes (three calls over at least twelve frames; told once; Esc
 midway kept to the end, at once when idle). Server and builder's client only, protocol unchanged, no new
 class_name, no bullet.
+867 amended (2) (the coordinator's ruling on the box probe, 2026-11-13; the label from
+decision_number.sh): a proposal of spots alone is accepted without the layout, a reload or a world map.
+Most of what the town trees ask of builder mode lays or moves spots; on the box an accept was one frame
+of about 1.7 s, the fresh check's parse 485 ms, MapDoc.save 744 (the 256 x 256 layout.png encoded and the
+level parsed for its report), the reload 202, WorldMap.build 227. BuilderSession.spots_only() reads the
+proposal (no cell, edge, height, cover, entry, link, relief or new level; config "spots" its one key),
+asked before accept, after which the proposal is the level's own. Such an accept skips the fresh layout
+check (LayoutSense reads no spot, so spots add no fault), MapDoc.save_config writes level.json alone
+(every file when the overlay has none yet, see below), and BuilderHost._save_spots
+reads the spots again with Level.spots_from on the area's floor, as Level.parse does, into Main's world
+map (the residents' places are made from it at each sync, 197 amended (1)) and into an interior's parse
+Main keeps (_zone_levels, the taverner's work spots), and records the level's stamp so the console's
+reload all leaves it. No terrain message: no client reads spots. A spot a resident held that is gone or
+changed is let go at the next sync (197 amended (1)). A proposal of spots and anything else takes the
+whole way. builder_zone_test: two spots accepted alone leave Main's map the same object with both spots,
+layout.png unwritten, the zone's chest the same node, and spots equal to a map built fresh on the saved
+files and to the level read again; the console's reload all finds nothing changed; a spot removed with a
+paint goes the whole way, a new map with one spot. The coordinator asked what keeps a spot off a cell
+walled since it was proposed, which the fresh check was thought to guard. Inside the area nothing needs to:
+the proposal is what the working copy differs from the zone's doc at Enter, and every accept writes that doc,
+so a cell, edge, entry or link changed there since shows as a difference and the proposal is no longer spots
+alone. But that showed a gap on both ways, older than this: every session on a zone shares its doc, an
+accept refreshed no other session (an undo discards them all), and LayoutSense reads no spot, so the fresh
+check never guarded one either. A proposal made before another builder's accept was laid over it, its cells
+in the area put back and its whole level.json keys with them (its "spots" list taking away spots laid since).
+Now a session keeps the doc's revision its copy was taken from (BuilderSession.based_on), and accept refuses
+one made before another's (STALE_SAYS, voice's words: "another builder changed this level since this
+was proposed; ask again to build on their change"), laying nothing. builder_zone_test _test_stale_proposal: on a
+doc of its own, a spot proposed, rock painted on its cell by a second session and accepted, then the spot's
+accept refused with those words, the rock kept and no spot laid; discarded, it builds on the rock. Known and
+left: a regenerating level writes its new generation to the overlay without the builder's doc of it
+(a dungeon, Regen), on either way, as before. What is left of a spots-only accept is level.json's
+write and the spots' read, measured by the mended probe (its ask window now closes when accept's opens).
+Probe 4 on the box found the first save of a level still 746 ms: the box's levels have no overlay until
+a builder's first accept there, and MapDoc.from_level marks such a level's relief to be written, which made
+save() trace the ledges again (a parse of the level) and then parse it once more for its report. The
+images are a cheap encode; the parses were the cost. (A byte-for-byte copy of the level's images, first
+approved, can't work there: the server's export holds them only imported.) Now MapDoc.relief_changed is set
+only where the relief really changes (set_relief, _start_relief, an undo of a relief state) and the
+ledges are traced again only then, on every save, full or spots: a level's first save then behaves as its
+later ones, which never traced ledges again for a paint (ledges_of reads the floor and water too; a
+paint moving a ledge is left as it was). save(with_report): builder mode passes false on every path (an
+accept, a new level, an undo), showing a report only when a save fails, before its parse; the level
+editor keeps its report. save_config writes every file through save(false) when the overlay has no
+layout yet. builder_zone_test _test_first_spots_save, after the console's builder drop: spots alone on
+test_room with no overlay write it whole, reading in the game as the source does (Level.parse on both:
+cells, walls and doors, heights, things, starts, links, as 147's round trip compares; heights and relief
+read back equal; the LevelMap difference printed for information: to_image keeps no wall pixel on the
+outer east and south border, 147 amended (1), and draws its own corner and fill pixels, which nothing
+reads), its ledges unchanged, the spot in level.json; a second
+spots accept leaves layout.png as it was and reports level.json alone. The same probe placed the rest of probe 3's 6 s frame: its branches
+lacked 867 amended (1) (git merge-base), so the stub's whole reply ran back to back, about eleven parses,
+and the probe's driver accepted inside that frame; nothing in the accept, and nothing in 197 amended
+(1)'s adopt_world_map (each part under 1.1 ms).
+An ask's tool calls are unchanged (867 amended (1)'s frames). Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 858. Umbrage at night: the ground lit once, a less blue night, a fill on bodies (lands off)
 
 Package "Umbrage at night" (the coordinator, 2026-11-10, under Jeff's "Umbrage first"; environment leads). Pieces: (a) this, environment's night light; (b) buildings' lamp numbers (the door lanterns, the store's and chapel's, the temple's candles of 734 amended (7)); (c) the window rule after 22:00 (566 with npc's sleep; playtest's count of lit windows on a lived-in town first). (a) lands switched off: `Client3D.NIGHT_LOOK_2 := false` keeps every number as it was. Environment alone flips it, in its own commit, on buildings' ping that (b) is on main, in the same landing take or the same cut, release told. A darker night without stronger lamps would make the town darker still, so never one without the other in a released build.

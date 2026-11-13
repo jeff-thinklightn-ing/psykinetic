@@ -65,6 +65,15 @@ func _test_round_trip() -> void:
 		_check(str(before["entities"]) == str(after["entities"]) and before["starts"] == after["starts"] and str(before["links"]) == str(after["links"]),
 				"%s: the same things, starts and links (%d things)" % [folder, before["entities"].size()])
 		_check(map.unknown_pixels == 0, "%s: every colour is in the legend" % folder)
+		# 147 amended (1): a save keeps no pixel on the outer east and south border (LevelMap.to_image draws only
+		# edges in bounds), where Level.parse puts an outline wall beside walkable ground: a wall painted there
+		# reads the same after, anything else (a door) would be lost at the level's first save.
+		var border: Array[String] = []
+		for key: Vector3i in map.edges:
+			var outer := (key.z == Terrain.EAST and key.x >= map.size.x - 1) or (key.z == Terrain.SOUTH and key.y >= map.size.y - 1)
+			if outer and map.edges[key] != "wall":
+				border.append("%s %s" % [key, map.edges[key]])
+		_check(border.is_empty(), "%s: no door or other edge but a wall on its outer east or south border (%s)" % [folder, ", ".join(border)])
 
 
 func _test_painting() -> void:

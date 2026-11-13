@@ -312,21 +312,23 @@ func _accept(peer: int, player_id: String) -> void:
 		return
 	var zone_name: String = _session_zone[peer]
 	var plan := session.new_area.duplicate()
+	var spots_alone := session.spots_only()  # Before accept: after it the proposal is the level's own.
 	if not session.accept():
 		# 806: a layout fault the change adds keeps it off the level.
 		_reply(peer, {"state": "error", "error": session.refused} if not session.refused.is_empty() else {"state": "nothing"})
 		return
 	if session.created_doc != null:
 		# The new level first, so the way to it never leads nowhere.
-		if not session.created_doc.save():
+		if not session.created_doc.save(false):
 			push_warning("[builder] " + session.created_doc.report)
 		created[session.created] = {"parent": zone_name, "side": plan["side"]}
 		print("[builder] %s made a new level, %s (%d x %d), beyond the %s edge of %s" % [player_id, session.created,
 			plan["size"].x, plan["size"].y, plan["side"], zone_name])
-	if not _save_and_reload(zone_name):
+	var saved := _save_spots(zone_name) if spots_alone and session.created_doc == null else _save_and_reload(zone_name)
+	if not saved:
 		_reply(peer, {"state": "error", "error": "could not save: %s" % session.doc.report})
 		return
-	print("[builder] %s accepted their change to %s" % [player_id, zone_name])
+	print("[builder] %s accepted their change to %s%s" % [player_id, zone_name, " (spots only)" if spots_alone else ""])
 	_reply(peer, {"state": "accepted"})
 
 
@@ -361,11 +363,39 @@ func _undo(peer: int, player_id: String, zone_name: String) -> void:
 
 ## Saves the zone's doc to the overlay, has Main reload the zone, and says
 ## what the world map now finds wrong, if anything.
+## A spots-only accept (867 amended (2), BuilderSession.spots_only): level.json saved alone, and the
+## spots read again (Level.spots_from on the area's floor, as Level.parse reads them) into each place
+## the running world holds them: Main's world map, which the residents' places are made from at each
+## sync (197 amended (1)), and an interior's parse Main keeps (_zone_levels, the taverner's work spots).
+## No layout.png written, no reload_zone, no WorldMap built: on the box those were 1.2 s of one frame.
+## No terrain message: no client reads spots. Whether it saved.
+func _save_spots(zone_name: String) -> bool:
+	var doc: MapDoc = docs[zone_name]
+	if not doc.save_config():
+		push_warning("[builder] " + doc.report)
+		return false
+	var world_map: WorldMap = main._world_map if main != null else null
+	var area: Dictionary = world_map.areas.get(zone_name, {}) if world_map != null else {}
+	if area.is_empty():
+		return _save_and_reload(zone_name)  # A world map without the zone: the whole way.
+	var warnings: Array[String] = []
+	var spots := Level.spots_from(doc.config, warnings, area["floor"])
+	area["spots"] = spots
+	var kept: Dictionary = main._zone_levels.get(zone_name, {})
+	if not kept.is_empty():
+		kept["spots"] = spots.duplicate(true)
+	if main._level_stamps.has(zone_name):
+		main._level_stamps[zone_name] = main._level_stamp(zone_name)  # Read as it is: the console's reload all leaves it.
+	for warning in warnings:
+		push_warning("[builder] after the change to %s: %s" % [zone_name, warning])
+	return true
+
+
 func _save_and_reload(zone_name: String) -> bool:
 	var doc: MapDoc = docs[zone_name]
 	# The camps holding captives before the change (decision 519): one gone with it lets them go home.
 	var held_before := camps_holding(Level.source(zone_name).get("config", {}))
-	if not doc.save():
+	if not doc.save(false):  # 867 amended (2): no report's parse; builder mode shows a report only when it fails.
 		push_warning("[builder] " + doc.report)
 		return false
 	main.reload_zone(zone_name)

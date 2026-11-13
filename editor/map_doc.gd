@@ -39,6 +39,10 @@ var had_heights := false
 var heights_dirty := false
 ## Whether relief.png (decision 525: map.relief) has changes to write.
 var relief_dirty := false
+## Whether the relief was changed here since it was read or last saved (867 amended (2)): the ledges are
+## traced again from it only then. relief_dirty is also set on a level read with no overlay yet, whose
+## relief.png is written as it was read: tracing its ledges again was a parse for nothing.
+var relief_changed := false
 ## What the last load, save or resize said.
 var report := ""
 var undo_steps: Array[Dictionary] = []
@@ -104,9 +108,43 @@ static func from_level(level_name: String) -> MapDoc:
 	return doc
 
 
+## level.json alone, on the caller's word that nothing but the config changed
+## since the last save (867 amended (2): builder mode's spots-only accept, told so
+## by its proposal; [member dirty] is set by any change, a config one too), and
+## the folder holds the layout already. Else save(false): no layout there yet
+## (the overlay is a whole level), every file. False if it could not;
+## [member report] says.
+func save_config() -> bool:
+	if heights_dirty or relief_dirty or not FileAccess.file_exists(ProjectSettings.globalize_path(folder + "layout.png")):
+		# The level's first save (the box's levels have no overlay until a builder's accept): every file,
+		# the images as they were read (an exported game holds them imported, no file to copy).
+		return save(false)
+	if Level.fill_codes(config):
+		config_dirty = true
+	if config_dirty:
+		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
+		if json == null:
+			report = "could not save %slevel.json" % folder
+			return false
+		var written := JSON_KEEP.write(source_text, config)
+		json.store_string(written)
+		json.close()
+		source_text = written
+		config_dirty = false
+	dirty = false
+	report = "saved %slevel.json" % folder
+	return true
+
+
 ## Writes layout.png and its .import (as Image), level.json if it changed,
 ## height.png if it changed. False if it could not; [member report] says.
-func save() -> bool:
+## The ledges are traced again only when the relief was changed here
+## ([member relief_changed]), not when it is written as it was read (a level's
+## first save to the overlay; on the box those two parses, the trace and the
+## report's, were most of an accept's 744 ms save). [param with_report] false
+## (builder mode, which shows a report only when a save fails, before it
+## would parse): the report without the level's parse.
+func save(with_report := true) -> bool:
 	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(folder)):
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))
 	var png := folder + "layout.png"
@@ -120,7 +158,7 @@ func save() -> bool:
 	if Level.fill_codes(config):
 		config_dirty = true
 	# The ledges traced again from the relief as it now is (decision 585).
-	if relief_dirty and map.has_relief():
+	if relief_changed and map.has_relief():
 		var terrain: Dictionary = Level.parse(image, map.to_height_image() if had_heights or heights_dirty else null, config, map.to_relief_image())["terrain"]
 		var ledges := Level.ledges_of(terrain)
 		if ledges != config.get("ledges", []):
@@ -156,7 +194,11 @@ func save() -> bool:
 			return false
 		LevelMap.ensure_image_import(ProjectSettings.globalize_path(relief_png), relief_png)
 		relief_dirty = false
+	relief_changed = false
 	dirty = false
+	if not with_report:
+		report = "saved %s (%d x %d cells)" % [png, map.size.x, map.size.y]
+		return true
 	var level := Level.parse(image, map.to_height_image() if had_heights else null, config, map.to_relief_image())
 	var warnings: Array = level["warnings"]
 	report = "saved %s (%d x %d cells, %d floor, %d things)%s%s" % [png, map.size.x, map.size.y,
@@ -221,6 +263,7 @@ func _swap(step: Dictionary) -> Dictionary:
 			map.relief = step[key]["relief"]
 			map.heights = step[key]["heights"]
 			relief_dirty = true
+			relief_changed = true
 			heights_dirty = true
 		elif str(key).begins_with("config "):
 			var config_key := str(key).trim_prefix("config ")
@@ -351,6 +394,7 @@ func set_relief(at: Vector2i, metres: float) -> float:
 	var old := map.set_relief(at, metres)
 	if not is_equal_approx(old, map.relief_at(at)):
 		relief_dirty = true
+		relief_changed = true
 		dirty = true
 	return old
 
@@ -368,6 +412,7 @@ func _start_relief() -> void:
 		map.heights.clear()
 		heights_dirty = true
 	relief_dirty = true
+	relief_changed = true
 	dirty = true
 
 

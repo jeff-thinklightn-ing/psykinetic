@@ -204,6 +204,7 @@ func _fresh_working() -> void:
 	working.map = doc.map.copy()
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
+	based_on = doc.revision
 	_reached = {}
 	_parses.clear()
 
@@ -219,6 +220,11 @@ static func breathe() -> void:
 	var tree := Engine.get_main_loop() as SceneTree
 	if tree != null:
 		await tree.process_frame
+
+
+## The doc's revision the working copy was taken from (867 amended (2)): another session's accept on the
+## same zone moves it on, and a proposal made before it is refused at accept rather than laid back over it.
+var based_on := -1
 
 
 ## Asks for [param text] (the first request, or a follow-up), running
@@ -3773,17 +3779,42 @@ func arrival_news(before: Array, parsed: Dictionary = {}) -> Array[String]:
 const ARRIVAL_SAYS := "a warning: a player coming in there lands inside a fight; move the monster, or the way in, further apart"
 
 
+## Whether the proposal changes level.json's spots and nothing else (867 amended (2)): no cell, edge,
+## height, relief, entry, link or other config key, no new level. Such a change is saved and put into the
+## running world without the layout, a reload or a world map built again (BuilderHost._save_spots).
+func spots_only() -> bool:
+	var changes := proposal()
+	for key: String in ["cells", "edges", "heights", "covers", "entries", "links"]:
+		if not changes[key].is_empty():
+			return false
+	if changes.has("relief") or changes.has("new_area"):
+		return false
+	return (changes.get("config", {}) as Dictionary).keys() == ["spots"]
+
+
+## What a proposal made before another builder's accept here is refused with (867 amended (2); voice's words).
+const STALE_SAYS := "another builder changed this level since this was proposed; ask again to build on their change"
+
+
 func accept() -> bool:
 	created_doc = null
 	created = ""
 	refused = ""
+	# 867 amended (2): the level changed under the proposal (another builder's accept here): its cells in the
+	# area and every level.json key it holds (the spots, the places) would be laid back over that change.
+	if doc.revision != based_on:
+		refused = STALE_SAYS
+		return false
 	# 806 amended (7): the proposal may not add a layout fault (an empty
 	# room, a chest that gives nothing or stands unguarded, ...).
 	# The working copy parsed fresh, never from the cache (867: a stale one could let a fault through).
-	var news := layout_news(doc_layout_faults())
-	if not news.is_empty():
-		refused = "the change breaks the layout rules: " + "; ".join(news)
-		return false
+	# Spots alone pass without it (867 amended (2)): LayoutSense reads no spot, so they can add no fault,
+	# and the fresh parse was the whole of such an accept's freeze (485 ms on the box).
+	if not spots_only():
+		var news := layout_news(doc_layout_faults())
+		if not news.is_empty():
+			refused = "the change breaks the layout rules: " + "; ".join(news)
+			return false
 	var changes := proposal()
 	if not new_area.is_empty():
 		# A level beyond an edge is out of doors unless the one it leads from says otherwise.
