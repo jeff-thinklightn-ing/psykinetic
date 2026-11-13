@@ -21,6 +21,8 @@ STATE = tempfile.mkdtemp(prefix="heavy_job_test_")
 os.environ["HEAVY_JOBS_DIR"] = STATE
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "tools"))
 import heavy_job as gate  # noqa: E402
+# main's GATE_REVISION as this code's, unless a check sets another (394 amended (43)).
+os.environ["HEAVY_JOB_MAIN_REVISION"] = str(gate.GATE_REVISION)
 # Never ask saturn from a test (394 amended (33)): a take of suite asks the
 # checkout's own tools/remote_tests.sh kind, which reaches saturn. Stubbed
 # here as "saturn does not answer"; the swap's own checks set their own.
@@ -493,7 +495,7 @@ with contextlib.redirect_stdout(said):
     gate.status()
 said = said.getvalue()
 named = [line for line in said.splitlines() if line.startswith("on older gate code:")]
-check(len(named) == 2 and all("lower scene (queued), pid %d, gate revision %d of %d, C:/dev/psykinetic-trees/lower"
+check(len(named) == 2 and all("lower scene (queued), pid %d, gate revision %d of main's %d, C:/dev/psykinetic-trees/lower"
     % (os.getpid(), gate.GATE_REVISION - 1, gate.GATE_REVISION) in line for line in named),
     "status names only the entry of a known lower revision, with its checkout (%s)" % named[:1])
 check(not any("oldie" in line or "current" in line for line in named), "nor one with no revision, nor one of this code")
@@ -1725,6 +1727,71 @@ os.chdir(here)
 gate.STRAY_CHECK = False
 check(gate.stray_tracked(STATE) == ([], []), "not a checkout: nothing done")
 shutil.rmtree(repo, ignore_errors=True)
+
+print("\n== the machine's memory record, and old judged against main's revision (394 amended (43)) ==")
+# Old against main's revision, not this code's: a waiter on a branch not yet landed is ahead of main.
+branch = {"gate": gate.GATE_REVISION + 1}
+check(not gate.older_code(branch) and not gate.older_code({"gate": gate.GATE_REVISION})
+    and gate.older_code({"gate": gate.GATE_REVISION - 1}),
+    "main at this code's revision: a branch's newer row is not old, main's own not, a lower one is")
+os.environ["HEAVY_JOB_MAIN_REVISION"] = str(gate.GATE_REVISION + 2)
+check(gate.older_code(branch) and gate.older_code({"gate": gate.GATE_REVISION}),
+    "main moved on: this code's rows and the branch's are old")
+os.environ["HEAVY_JOB_MAIN_REVISION"] = str(gate.GATE_REVISION)
+# The groups: Claude Code's, Godot's, the rest the commit charge less the two.
+sizes = {1: (0.1, 1.0, 0, 0), 2: (0.1, 2.0, 0, 0), 3: (0.1, 0.5, 0, 0), 4: (0.1, 9.0, 0, 0)}
+machine = gate.machine_memory(names={1: "claude.exe", 2: "Claude.exe", 3: "Godot_v4.7.2-stable_win64_console.exe", 4: "Code.exe",
+    5: "claude.exe"}, read=sizes.get, status=(10.0, 12.0, 40.0, 80.0))
+check(machine["claude_n"] == 2 and abs(machine["claude_gb"] - 3.0) < 1e-9 and machine["godot_n"] == 1
+    and abs(machine["godot_gb"] - 0.5) < 1e-9 and abs(machine["rest_gb"] - 36.5) < 1e-9
+    and (machine["free_ram_gb"], machine["free_commit_gb"], machine["committed_gb"], machine["limit_gb"]) == (10.0, 12.0, 40.0, 80.0),
+    "machine_memory: Claude Code 2 (one unreadable left out), Godot 1, the rest the charge less them (%s)" % machine)
+# One line a minute, under its own lock.
+log_path = gate._path(gate.MEMORY_LOG)
+for leftover in (log_path, gate._path("memory.lock")):
+    if os.path.exists(leftover):
+        os.remove(leftover)
+check(gate.sample_memory(read=lambda: machine) and not gate.sample_memory(read=lambda: machine),
+    "sample_memory writes a line, and none again within the minute")
+rows = gate.read_memory_log(datetime.date.today().isoformat())
+check(len(rows) == 1 and rows[0]["claude_n"] == 2 and rows[0]["claude_gb"] == 3.0 and rows[0]["free_commit_gb"] == 12.0
+    and rows[0]["rest_gb"] == 36.5 and not gate.read_memory_log("1999-01-01"),
+    "read_memory_log reads it back, by day (%s)" % rows)
+os.utime(log_path, (time.time() - 120, time.time() - 120))
+open(gate._path("memory.lock"), "w").close()
+check(not gate.sample_memory(read=lambda: machine) and os.path.exists(gate._path("memory.lock")),
+    "another sampler's lock: none written, its lock left")
+os.utime(gate._path("memory.lock"), (time.time() - 120, time.time() - 120))
+check(not gate.sample_memory(read=lambda: machine) and not os.path.exists(gate._path("memory.lock"))
+    and gate.sample_memory(read=lambda: machine) and len(gate.read_memory_log()) == 2,
+    "a dead sampler's lock (over a minute old) is cleared, and the next look writes")
+# Two days kept, once the file is over its size.
+old_line = gate.memory_line(time.time() - 3 * 86400, machine)
+with open(log_path, "a") as handle:
+    handle.write(old_line * (gate.MEMORY_PRUNE_BYTES // len(old_line) + 1))
+os.utime(log_path, (time.time() - 120, time.time() - 120))
+check(gate.sample_memory(read=lambda: machine) and len(gate.read_memory_log()) == 3
+    and os.path.getsize(log_path) < gate.MEMORY_PRUNE_BYTES,
+    "over its size, lines older than two days are let go; the last two days' kept (%d lines)" % len(gate.read_memory_log()))
+# The day's low points in the summary.
+said = io.StringIO()
+with contextlib.redirect_stdout(said):
+    gate.summary(datetime.date.today().isoformat())
+check(re.search(r": memory \(394 amended \(43\), 3 minutes\): least RAM free 10\.0 GB at \d\d:\d\d, least commit free 12\.0 GB"
+    r" at \d\d:\d\d; Claude Code at most 3\.0 GB private in 2 processes", said.getvalue()) is not None,
+    "the summary gives the day's least free RAM and commit and Claude Code's most (%s)" % [
+        line for line in said.getvalue().splitlines() if "memory" in line][:1])
+# A start line says what its decision read.
+check(gate.machine_note(20.04, None, [{"ram_gb": 3.0, "using_gb": 1.0, "commit_gb": 4.0, "using_commit_gb": 1.0}])
+    == "free RAM 20.0 GB, commit unknown; owed RAM 2.0 GB, commit 3.0 GB", "machine_note: free, and owed by running jobs")
+gate.log("start", "probe", "scene", "x")  # A take's own start below writes the real one.
+clear_gate()
+before = len(open(gate._path("heavy_jobs.log")).read().splitlines())
+gate._memory = lambda: (30.0, 40.0)
+took = gate.take("memlog", "godot_import", os.getpid())
+started = [line for line in open(gate._path("heavy_jobs.log")).read().splitlines()[before:] if "\tstart\tmemlog\t" in line]
+check(took == 0 and len(started) == 1 and "free RAM 30.0 GB, commit 40.0 GB; owed RAM" in started[0],
+    "a start line carries the free memory its decision read and what was owed (%s)" % started[:1])
 clear_gate()
 gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = real_memory, real_total_ram, real_poll
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins

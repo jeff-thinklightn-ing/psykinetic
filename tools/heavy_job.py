@@ -998,6 +998,17 @@ def _memory():
     """(free RAM, free commit) in GB; free commit, what Windows can still
     promise (RAM and pagefile) before allocations fail, None elsewhere."""
     if os.name == "nt":
+        return _memory_status()[:2]
+    with open("/proc/meminfo") as meminfo:
+        for line in meminfo:
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) * 1024 / GB, None
+    return 0.0, None
+
+
+def _memory_status():
+    """Windows: (free RAM, free commit, committed, commit limit) in GB."""
+    if os.name == "nt":
         class Status(ctypes.Structure):
             _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong),
                 ("total_phys", ctypes.c_ulonglong), ("avail_phys", ctypes.c_ulonglong),
@@ -1007,12 +1018,181 @@ def _memory():
         status = Status()
         status.length = ctypes.sizeof(Status)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
-        return status.avail_phys / GB, status.avail_page / GB
-    with open("/proc/meminfo") as meminfo:
-        for line in meminfo:
-            if line.startswith("MemAvailable:"):
-                return int(line.split()[1]) * 1024 / GB, None
-    return 0.0, None
+        return (status.avail_phys / GB, status.avail_page / GB, (status.total_page - status.avail_page) / GB,
+            status.total_page / GB)
+    return 0.0, None, 0.0, 0.0
+
+
+## The machine's memory record (394 amended (43)): one line a minute in
+## memory.log, kept two days, by whichever gate process looks first. On
+## 2026-11-12 at 23:44 Claude Code stopped idle sessions' background shells
+## for low memory while the gate saw about 20 GB of RAM and 22 GB of commit
+## free; its threshold is not documented, so the next one is read here.
+MEMORY_LOG = "memory.log"
+MEMORY_EVERY_SECONDS = 60.0
+MEMORY_KEEP_SECONDS = 2 * 86400.0
+## memory.log is pruned to its last MEMORY_KEEP_SECONDS once over this.
+MEMORY_PRUNE_BYTES = 512 * 1024
+## A sampler's lock older than this was left by a process that died.
+MEMORY_LOCK_STALE_SECONDS = 60.0
+
+
+def _process_names():
+    """{pid: executable name} of every process now (a Toolhelp snapshot);
+    {} off Windows."""
+    names = {}
+    if os.name != "nt":
+        return names
+    class Entry(ctypes.Structure):
+        _fields_ = [("size", ctypes.c_ulong), ("usage", ctypes.c_ulong), ("pid", ctypes.c_ulong),
+            ("heap", ctypes.c_size_t), ("module", ctypes.c_ulong), ("threads", ctypes.c_ulong),
+            ("parent", ctypes.c_ulong), ("priority", ctypes.c_long), ("flags", ctypes.c_ulong),
+            ("exe", ctypes.c_wchar * 260)]
+    kernel = ctypes.windll.kernel32
+    kernel.CreateToolhelp32Snapshot.restype = ctypes.c_void_p
+    snapshot = kernel.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    if not snapshot or snapshot == ctypes.c_void_p(-1).value:
+        return names
+    entry = Entry()
+    entry.size = ctypes.sizeof(Entry)
+    more = kernel.Process32FirstW(ctypes.c_void_p(snapshot), ctypes.byref(entry))
+    while more:
+        names[int(entry.pid)] = entry.exe
+        more = kernel.Process32NextW(ctypes.c_void_p(snapshot), ctypes.byref(entry))
+    kernel.CloseHandle(ctypes.c_void_p(snapshot))
+    return names
+
+
+def memory_group(exe):
+    """Which of memory.log's groups an executable's memory counts in."""
+    name = exe.lower()
+    if name == "claude.exe" or name == "claude":
+        return "claude"
+    if name.startswith("godot"):
+        return "godot"
+    return "rest"
+
+
+def machine_memory(names=None, read=None, status=None):
+    """The machine's memory now (394 amended (43)): {free_ram_gb,
+    free_commit_gb, committed_gb, limit_gb, claude_n, claude_gb, godot_n,
+    godot_gb, rest_gb}, the groups' private commit as Windows counts it
+    (rest: the commit charge less the two, so what can't be read counts
+    there); None off Windows. [names], [read] and [status]: the test's."""
+    if status is None:
+        if os.name != "nt":
+            return None
+        status = _memory_status()
+    free_ram, free_commit, committed, limit = status
+    names = _process_names() if names is None else names
+    read = read or process_memory
+    out = {"free_ram_gb": free_ram, "free_commit_gb": free_commit, "committed_gb": committed, "limit_gb": limit,
+        "claude_n": 0, "claude_gb": 0.0, "godot_n": 0, "godot_gb": 0.0}
+    for pid, exe in names.items():
+        group = memory_group(exe)
+        if group == "rest":
+            continue
+        numbers = read(pid)
+        if numbers is None:
+            continue
+        out[group + "_n"] += 1
+        out[group + "_gb"] += numbers[1]
+    out["rest_gb"] = max(0.0, committed - out["claude_gb"] - out["godot_gb"])
+    return out
+
+
+def memory_line(now, numbers):
+    """One memory.log line: the local time, then key=value fields."""
+    return "%s\tfree_ram_gb=%.1f\tfree_commit_gb=%.1f\tcommitted_gb=%.1f\tlimit_gb=%.1f\tclaude=%d:%.1f\tgodot=%d:%.1f\trest_gb=%.1f\n" % (
+        datetime.datetime.fromtimestamp(now).isoformat(timespec="seconds"), numbers["free_ram_gb"], numbers["free_commit_gb"],
+        numbers["committed_gb"], numbers["limit_gb"], numbers["claude_n"], numbers["claude_gb"], numbers["godot_n"],
+        numbers["godot_gb"], numbers["rest_gb"])
+
+
+def read_memory_log(day=None):
+    """memory.log's lines as dicts (time a datetime; claude_n/_gb and
+    godot_n/_gb split out), those of [day] (YYYY-MM-DD) only if given."""
+    out = []
+    try:
+        with open(_path(MEMORY_LOG)) as handle:
+            for line in handle:
+                parts = line.rstrip("\n").split("\t")
+                if day and not parts[0].startswith(day):
+                    continue
+                try:
+                    row = {"time": datetime.datetime.fromisoformat(parts[0])}
+                    for field in parts[1:]:
+                        key, value = field.split("=", 1)
+                        if ":" in value:
+                            count, size = value.split(":", 1)
+                            row[key + "_n"], row[key + "_gb"] = int(count), float(size)
+                        else:
+                            row[key] = float(value)
+                except (ValueError, IndexError):
+                    continue
+                out.append(row)
+    except OSError:
+        pass
+    return out
+
+
+def sample_memory(now=None, read=None):
+    """Writes memory.log's next line if a minute has gone since its last
+    (394 amended (43)); whether it wrote. Its own lock (memory.lock), never
+    the state lock, so a caller holding that one can call it. [read]: the
+    test's machine_memory."""
+    now = time.time() if now is None else now
+    path = _path(MEMORY_LOG)
+    try:
+        if now - os.path.getmtime(path) < MEMORY_EVERY_SECONDS:
+            return False
+    except OSError:
+        pass
+    lock = _path("memory.lock")
+    try:
+        os.makedirs(STATE_DIR, exist_ok=True)
+        os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+    except OSError:
+        try:
+            if now - os.path.getmtime(lock) > MEMORY_LOCK_STALE_SECONDS:
+                os.remove(lock)
+        except OSError:
+            pass
+        return False
+    try:
+        try:
+            if now - os.path.getmtime(path) < MEMORY_EVERY_SECONDS:
+                return False  # Another wrote it while this one took the lock.
+        except OSError:
+            pass
+        numbers = (read or machine_memory)()
+        if numbers is None:
+            return False
+        with open(path, "a") as handle:
+            handle.write(memory_line(now, numbers))
+        if os.path.getsize(path) > MEMORY_PRUNE_BYTES:
+            kept_from = datetime.datetime.fromtimestamp(now - MEMORY_KEEP_SECONDS).isoformat(timespec="seconds")
+            with open(path) as handle:
+                kept = [line for line in handle if line[:19] >= kept_from]
+            with open(path + ".new", "w") as handle:
+                handle.writelines(kept)
+            os.replace(path + ".new", path)
+        return True
+    except OSError:
+        return False
+    finally:
+        try:
+            os.remove(lock)
+        except OSError:
+            pass
+
+
+def machine_note(free_ram, free_commit, running):
+    """A start line's tail (394 amended (43)): the free memory its decision
+    read and what running jobs were still owed then."""
+    return "free RAM %.1f GB, commit %s; owed RAM %.1f GB, commit %.1f GB" % (
+        free_ram, "%.1f GB" % free_commit if free_commit is not None else "unknown",
+        reserved_gb(running), reserved_commit_gb(running))
 
 
 def gpu_gb():
@@ -1469,13 +1649,46 @@ def _entries(folder):
     return out
 
 
+## main's GATE_REVISION as last read, and when (394 amended (43)).
+_main_revision = [None, 0.0]
+MAIN_REVISION_EVERY_SECONDS = 600.0
+
+
+def main_revision():
+    """The GATE_REVISION on origin/main (394 amended (43)): read from git at
+    most every MAIN_REVISION_EVERY_SECONDS; this code's own if it can't be
+    read. HEAVY_JOB_MAIN_REVISION sets it (the test's). A waiter on a
+    branch not yet landed runs newer code than main's, and judged by its
+    own revision it named every row old (11-12: 300 false "rebase it" lines
+    naming revision 38, beside 249 true ones naming 37)."""
+    given = os.environ.get("HEAVY_JOB_MAIN_REVISION")
+    if given:
+        return int(given)
+    if _main_revision[0] is not None and time.time() - _main_revision[1] < MAIN_REVISION_EVERY_SECONDS:
+        return _main_revision[0]
+    found = None
+    try:
+        shown = subprocess.run(["git", "-C", os.path.dirname(os.path.abspath(__file__)), "show",
+            "origin/main:tools/heavy_job.py"], capture_output=True, text=True, timeout=20)
+        if shown.returncode == 0:
+            match = re.search(r"^GATE_REVISION = (\d+)", shown.stdout, re.M)
+            if match:
+                found = int(match.group(1))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    _main_revision[0], _main_revision[1] = (found if found is not None else GATE_REVISION), time.time()
+    return _main_revision[0]
+
+
 def older_code(entry):
-    """Whether [entry] was written by gate code known to be older than this:
-    a lower GATE_REVISION. An entry with none was written before 394 amended
-    (37), by code from before 31 (which drops landing takes at 30 minutes) or
-    from 31 to 36 (which does not): the same on disk, so it is not named
-    (394 amended (38)); unrevised() counts them."""
-    return "gate" in entry and entry["gate"] < GATE_REVISION
+    """Whether [entry] was written by gate code older than main's: a lower
+    GATE_REVISION than origin/main's (main_revision; 394 amended (43): not
+    this code's own, which on a branch not yet landed is ahead of main's).
+    An entry with none was written before 394 amended (37), by code from
+    before 31 (which drops landing takes at 30 minutes) or from 31 to 36
+    (which does not): the same on disk, so it is not named (394 amended
+    (38)); unrevised() counts them."""
+    return "gate" in entry and entry["gate"] < main_revision()
 
 
 def unrevised(entry):
@@ -1636,6 +1849,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
     probed_at, answered = None, False
     swapped = None
     while True:
+        sample_memory()  # 394 amended (43): its own lock, before the state lock.
         with StateLock():
             queue = _entries("queue")
             running = as_owed(_entries("running"))
@@ -1749,7 +1963,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 _write(_path("running", name), entry)
                 waited = time.time() - queued
                 log("start", tree, "suite_remote", "asked suite, saturn answers (394 amended (33))" + (
-                    "; waited %.0f s" % waited if waited >= POLL_SECONDS else ""))
+                    "; waited %.0f s" % waited if waited >= POLL_SECONDS else "") + "; " + machine_note(free_ram, free_commit, running))
                 print("heavy_job: %s suite: saturn answers, taken as suite_remote (the Godot parts on saturn)" % tree,
                     file=sys.stderr)
                 return name, "suite_remote"
@@ -1777,7 +1991,8 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 waited = time.time() - queued
                 lean = ", lean" if estimate != kind else ""
                 at_head = " (%.0f s of it first in the queue)" % (now - head_since) if head_since is not None else ""
-                log("start", tree, kind, ("waited %.0f s%s" % (waited, at_head) if waited >= POLL_SECONDS else "") + lean)
+                log("start", tree, kind, ("waited %.0f s%s; " % (waited, at_head) if waited >= POLL_SECONDS else "")
+                    + machine_note(free_ram, free_commit, running) + lean)
                 if waited >= POLL_SECONDS:
                     print("heavy_job: %s %s starts after waiting %.0f s%s" % (tree, kind, waited, lean), file=sys.stderr)
                 return name, estimate
@@ -1964,6 +2179,7 @@ def run(tree, kind, command, expect_minutes=None, no_queue=False):
         samples, ended = [(started, job.cpu_seconds())], None
         while child.poll() is None:
             time.sleep(WATCH_SECONDS)
+            sample_memory()  # 394 amended (43)
             using, committed, peaks, top = job.memory()
             peak = max(peak, using, peaks)
             at_once = max(at_once, using, top)
@@ -2483,9 +2699,9 @@ def status():
     for folder, entries in (("running", running), ("queued", queue)):
         for entry in entries:
             if older_code(entry):
-                print("on older gate code: %s %s (%s), pid %s, gate revision %s of %s, %s; rebase it" % (
+                print("on older gate code: %s %s (%s), pid %s, gate revision %s of main's %s, %s; rebase it" % (
                     entry["tree"], entry["kind"], folder, entry.get("waiter") if folder == "queued" else entry.get("pid"),
-                    entry["gate"], GATE_REVISION, _where(entry)))
+                    entry["gate"], main_revision(), _where(entry)))
     # 394 amended (38): no revision says nothing of the code's age, so a count, no names.
     unknown = sum(1 for entry in running + queue if unrevised(entry))
     if unknown:
@@ -2498,6 +2714,12 @@ def status():
                 time.strftime("%H:%M", time.localtime(entry["started"])), entry.get("pid"), _where(entry)))
     if not running and not queue:
         print("no heavy jobs")
+    # 394 amended (43): last, so the lines above keep their places for scripts.
+    machine = machine_memory()
+    if machine is not None:
+        print("machine (394 amended (43)): %.1f of %.1f GB committed; private: Claude Code %d processes %.1f GB, Godot %d %.1f GB,"
+            " the rest %.1f GB" % (machine["committed_gb"], machine["limit_gb"], machine["claude_n"], machine["claude_gb"],
+            machine["godot_n"], machine["godot_gb"], machine["rest_gb"]))
     return 0
 
 
@@ -2564,6 +2786,15 @@ def summary(day):
     if crashes:
         print("%s: launch crashes by top frame: %s" % (day, ", ".join("%s %d" % (frame, count)
             for frame, count in sorted(crashes.items(), key=lambda item: -item[1]))))
+    memory = read_memory_log(day)
+    if memory:
+        ram = min(memory, key=lambda row: row.get("free_ram_gb", 1e9))
+        commit = min(memory, key=lambda row: row.get("free_commit_gb", 1e9))
+        claude = max(memory, key=lambda row: row.get("claude_gb", 0.0))
+        print("%s: memory (394 amended (43), %d minutes): least RAM free %.1f GB at %s, least commit free %.1f GB at %s;"
+            " Claude Code at most %.1f GB private in %d processes, at %s" % (day, len(memory),
+            ram.get("free_ram_gb", 0.0), ram["time"].strftime("%H:%M"), commit.get("free_commit_gb", 0.0),
+            commit["time"].strftime("%H:%M"), claude.get("claude_gb", 0.0), claude.get("claude_n", 0), claude["time"].strftime("%H:%M")))
     return 0
 
 

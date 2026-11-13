@@ -10719,6 +10719,38 @@ waiter thread (gate.take, still polling) had it open, and Windows refused (WinEr
 through gate._retried, the gate's own retry for a file in use (a second, then the error), as the gate removes them.
 Tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (43): the gate's memory record, and "old" judged against main's revision (the coordinator's rulings,
+2026-11-12; the label from tools/decision_number.sh). At 23:44 Claude Code stopped background shells in about ten
+idle sessions "because the system is running low on memory". The gate was not the cause: each admission decides
+and writes its running entry under the state lock, so a just-admitted job owes its whole estimate to the next
+decision (reserved_gb), and free commit (the commit limit less committed) is checked against the job's commit
+estimate + COMMIT_MARGIN_GB. The four jobs then running came to about 5.4 GB, with about 20 GB of RAM and 22 GB of
+commit free. Claude Code's threshold is not documented (its docs place the stop on macOS and Linux only, and it acts
+on a session idle 30 minutes with no turn running), so its level is to be read from the machine's own record.
+- memory.log in STATE_DIR: one line a minute (the time; free RAM, free commit, committed and the commit limit;
+  the private commit of Claude Code's processes and of Godot's, with their counts; the rest, the commit charge less
+  the two), kept two days (pruned once over 512 KB). sample_memory writes it from each waiter's look and each
+  run's watch beat, whichever comes first in the minute, under its own memory.lock (never the state lock, which a
+  waiter may hold; a lock over a minute old is a dead sampler's and is cleared). machine_memory reads a Toolhelp
+  snapshot and each Claude Code and Godot process's private commit: about 0.02 s for 39 Claude Code processes.
+- A start line ends with the free RAM and commit its decision read and what running jobs were still owed then
+  (machine_note).
+- status ends with the machine's line (committed of the limit; Claude Code's, Godot's and the rest's private
+  memory), after every other line, so their places stay for scripts. The daily summary gives the day's least free
+  RAM and commit, and Claude Code's most, with their times. The coordinator names a level for the sessions' share
+  once a week of memory.log exists; the commit margin's change, if the next stop shows one is needed, is the
+  coordinator's call. Jeff's 8 GB margin is unchanged.
+- older_code (the "old_gate ... rebase it" lines, 38) judges a row against origin/main's GATE_REVISION
+  (main_revision: git show, at most every 10 minutes; this code's own if git can't say), not the waiter's own. A
+  waiter on a branch not yet landed runs newer code than main's: perf's convoy take (40, revision 39) named every
+  revision-38 row old from about 20:00 on 11-12: 300 false lines, beside 249 true ones naming revision 37 (older code). A waiter
+  started before this lands keeps its own code and its own judging.
+heavy_job_test: old against main's revision (a branch's row not old, a lower one old, all old once main moves on);
+machine_memory's groups; one line a minute, a held lock and a dead one, two days kept; the summary's low points; a
+start line's memory. The gate's decisions are unchanged (no GATE_REVISION change): status over a stripped copy of the
+live queue (30 rows, memory fixed), main's code against this, differs only in the old-gate lines' wording ("of main's
+38"). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
