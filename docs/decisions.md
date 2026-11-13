@@ -12841,6 +12841,30 @@ and picks, 2026-11-12/13): people are smooth-shaded, and the head is drawn a ten
   - Not a second mesh, which would have added a part to every body. No new look word; the protocol
     is unchanged.
   - view_test _test_hood_dye reads the uniform on the Hood, not a pixel.
+- PersonLook.cape_colour keeps a colour only when it read one: a cape seen before it is dressed in the
+  people's material is asked again, never left linen for good.
+- anim_rig_test measures the body as the game draws it:
+  - Both hand skinners (_bone_poses) grow the head by HeadSize's 1.10 about the Head's origin, the
+    same as its pose scale. Before this the head checks ran at the old size.
+  - _inside no longer judges a point by its nearest vertex's stored normal. The smooth body's normals,
+    averaged across a crease, called the heavy man's forearm inside with no vertex moved (every
+    mesh's places are identical to the flat build's, checked on the glbs). Now each place once, with
+    the normals of every face that meets there, and a point is inside only 4 mm or more behind all of
+    them. That never counts more than the flat count did, and passes on main's flat bodies as on the
+    smooth. An exact nearest-triangle count was tried and flags main's own knife grips and hammer
+    rests, so it is not used.
+- The hood and the sword (the coordinator's ruling). The hood rides the Head bone and grows with the
+  1.10 head, and the slash's blade now passes it closer, never touching:
+  - the woman, Slash_F and Sword_Shield_Slash_F at 0.13 s: 0.019 m (0.032 before);
+  - the men: 0.021 m (Slash_F at 0.13 s) and 0.025 m (Slash_B at 0.07 s), shield or not (0.038
+    before).
+  - The test's blade clearance stays 0.03 m, the hood's alone 0.015 m (SWORD_HOOD_CLEAR). That is
+    the floor: under it the answer is animation's re-pose of the slash, not the bar. The test prints
+    the hood's smallest pass each run, so a drift toward it is seen before it fails.
+  - Animation was told the woman's wind-up is 2 mm short of 0.02 and 11 mm short of its own 0.03,
+    for its next pass over the slash; no row asked of it.
+  - The coordinator's sheet carries a close still of the woman in a hood at Slash_F 0.13 s, from the
+    side the blade passes, at the nearest zoom.
 - Lands after Jeff has seen both in game (C:/dev/review/decisions/people-look.md).
 
 ## 438. The counter's work: what can be done, ordered and collected; the reforge

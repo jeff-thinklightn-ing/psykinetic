@@ -463,6 +463,12 @@ func _test_sword_slash() -> void:
 ## printed, not failed. (The first slashes of 338 amended (3) failed it: the pommel into the face
 ## in both wind-ups, the backhand's forearm through the chin and its elbow into the flank.)
 const SWORD_CLEAR := 0.03
+## The hood's own (419 amended (2), the coordinator's ruling, its floor): it rides the Head bone and
+## grows with the 1.10 head, and the slash's blade passes it at 0.019 m (the woman, Slash_F and
+## Sword_Shield_Slash_F at 0.13 s; 0.032 before the head grew) and the men's 0.021 (Slash_F) and 0.025
+## (Slash_B at 0.07 s), shield or not, never touching. The smallest pass is printed each run; under
+## this the answer is animation's re-pose of the slash, not the bar.
+const SWORD_HOOD_CLEAR := 0.015
 const SWORD_NEAR := 0.06
 const SWORD_FPS := 30.0
 const SWORD_ARM_IN := 0.01  # An arm resting on the trunk, its skin pressed in so far, is no clip.
@@ -484,6 +490,7 @@ func _test_sword_clear() -> void:
 	var near: Array[String] = []
 	var coiled: Array[String] = []
 	var least := {}  # {clip: [clearance, where]}
+	var hood_least := [INF, "none"]
 	for build: Array in SWORD_BUILDS:
 		var made := _sword_body(self, build)
 		var model: Node3D = made[0]
@@ -499,12 +506,14 @@ func _test_sword_clear() -> void:
 					var c: Array = frame["clear"][target]
 					var at := "%s%s %s %.2f s: %s %.3f m" % [build[0], "" if target in SWORD_BODY_PARTS else " in " + target.trim_prefix("Armour_").to_lower(),
 						clip, t, target.trim_prefix("Armour_").to_lower(), c[0]]
-					if float(c[0]) < SWORD_CLEAR:
+					if float(c[0]) < (SWORD_HOOD_CLEAR if target == "Hood" else SWORD_CLEAR):
 						fails.append(at)
 					elif float(c[0]) < SWORD_NEAR:
 						near.append(at)
 					if float(c[0]) < float(least.get(clip, [INF])[0]):
 						least[clip] = [c[0], at]
+					if target == "Hood" and float(c[0]) < float(hood_least[0]):
+						hood_least = [c[0], at]
 				var coil: Array = frame["coil"]
 				if float(coil[0]) < -SWORD_ARM_IN or float(coil[1]) < -SWORD_ARM_IN:
 					coiled.append("%s %s %.2f s: off arm %.3f, sword forearm %.3f m" % [build[0], clip, t, coil[0], coil[1]])
@@ -513,10 +522,11 @@ func _test_sword_clear() -> void:
 		(made[3] as Node3D).free()
 	for clip: String in least:
 		print("  closest in %s: %s" % [clip, least[clip][1]])
+	print("  the hood's smallest pass: %.3f m, floor %.3f (%s)" % [float(hood_least[0]), SWORD_HOOD_CLEAR, hood_least[1]])
 	if not near.is_empty():
 		print("  near-misses (under %.2f m): %d, %s" % [SWORD_NEAR, near.size(), ", ".join(near.slice(0, 12))])
-	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears, five builds, %d worn pieces, %s (%d: %s)" % [
-		SWORD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
+	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears (the hood %.2f m), five builds, %d worn pieces, %s (%d: %s)" % [
+		SWORD_CLEAR, SWORD_HOOD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
 	_check(coiled.is_empty(), "neither forearm %.2f m or more into the rest of the body through them (%d: %s)" % [SWORD_ARM_IN, coiled.size(), ", ".join(coiled.slice(0, 16))])
 
 
