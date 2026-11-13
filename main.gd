@@ -5599,6 +5599,16 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	var record: PlayerRecord = _records.get(id)
 	if record == null or not Level.playable(to_map):
 		return false
+	if peer == Net.local_id:
+		# 689 amended (13): the local player's click route, chase, held steer and waiting click are
+		# its old body's, in the old place. A host's travel (a link, a waystone, a rescue, a move)
+		# re-makes the body within one frame, so _free_drive never saw a frame without one and the
+		# old route was walked on from the new place (physics' tavern door run). A route set after
+		# this is the new body's and stands.
+		_free["path"] = []
+		_free["chase"] = null
+		_free["held"] = false
+		_free_waiting = {}
 	# A regenerating level due is laid again before anyone arrives
 	# (decision 465); a zone already open does the same here.
 	_regenerate_if_due(to_map)

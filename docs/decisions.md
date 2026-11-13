@@ -37807,6 +37807,21 @@ _free_pull on the route stepped round it below keeps its head off a straight lin
 client on v0.1.212 held the same 8 link cells on the wilds as the level load (each peer builds them
 from its own Level.load_level). Client only; protocol unchanged; no new class_name.
 
+689 amended (13) (decision_number.sh's label; the coordinator's ruling 2026-11-13, landing before
+(12)): a click route is its body's, in its zone. Main._free["path"] was cleared only on a frame where
+the local player had no own free body, and a travel (a link, a respawn, a rescue, a waystone, a move)
+re-makes the body: on a host within one frame, so the old route lived on and the new body walked it
+from the new place (physics' tavern door run on the Lenovo: a move back west mid-walk, and the route
+toward (180, 209) took the player through the door at (178, 208)). Main.travel, for the local
+player, now drops the route, a chase, a held steer and a waiting click: a route set after it is the
+new body's and stands. (Kept first on the drive, as the route's body and zone checked each frame, it
+also dropped a route set for a body re-made since the drive last ran: chest_test's click on a chest
+after a death, refused at the landing.) controls_test _test_route_dropped_on_travel: walking to (9, 3), moved within the
+zone to (4, 4) (Main.travel): a new body, no route after it and no step (fails without). Joined it
+was not seen: playtest's routetravel on v0.1.214 (a joined client through the tavern door with no
+click, and a console move mid-walk in the wilds) stood still both times, so it is a host's fault (a
+tour, a test, the editor) and has no bullet; the test stands on the host.
+
 ## 703: removing the player's grid path
 
 Free walk has been the default since 693; a player's body is to walk only

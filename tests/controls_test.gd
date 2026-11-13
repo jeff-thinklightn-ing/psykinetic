@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_free_pull_round_a_wall()
 	_test_free_pull_beside_a_talker()
 	_test_free_pull_keeps_off_a_link()
+	_test_route_dropped_on_travel()
 	_test_free_route_held()
 	_test_free_route_passage()
 	_test_free_head_on_pulled()
@@ -1150,6 +1151,34 @@ func _test_free_pull_beside_a_talker() -> void:
 	_stop_walk()
 	World.despawn(talker)
 	talker.queue_free()
+	Net.controls = saved
+
+
+## 689 amended (13): a click route is its body's, in its zone; a travel re-making the body drops it.
+func _test_route_dropped_on_travel() -> void:
+	print("\n== a click route is its body's: a travel (the body re-made) mid-walk leaves no route and no step ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(6, 3)) <= 8:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(4, 3))
+	_main._free_route(player, Vector2i(9, 3))
+	_free_frames(player, 12)
+	_check(_walking() and player.free_pos.x > 4.05, "(walking to (9, 3): at %s, the route %s)" % [player.free_pos, _main._free["path"]])
+	var zone := String(player.zone)
+	var moved: bool = _main.travel(Net.local_id, zone, "", {}, Vector2i(4, 4))
+	var after := _player()
+	_check(moved and after != null and after != player and after.tile == Vector2i(4, 4),
+			"(moved within %s: a new body at %s)" % [zone, after.tile if after != null else Main.NONE])
+	if after == null:
+		Net.controls = saved
+		return
+	var from := after.free_pos
+	_free_frames(after, 24)
+	_check(not _walking() and after.tile == Vector2i(4, 4) and after.free_pos.distance_to(from) < 0.05,
+			"after it, no route and no step: the route %s, the body from %s to %s" % [_main._free["path"], from, after.free_pos])
+	_stop_walk()
 	Net.controls = saved
 
 
