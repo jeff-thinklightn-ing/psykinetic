@@ -28502,6 +28502,31 @@ its tail (unlit, alpha 0.3, no shadow; it marks the line, it isn't a comet).
 Both go as it comes to rest (_rest_arrow), so an arrow standing in the ground,
 stuck in wood or lying under a wall is its true size. No art-kit change; a
 chunkier fx.arrow is the next step if Jeff still can't see it in play.
+
+619 amended (4): bundles of arrows stack, five to a square, kept in wear order (items, the
+script's label; the coordinator's ruling from items' three worst: three bundles took three of the
+pack's twelve squares). arrows, flame_arrows and barbed_arrows carry "stack": 5, so the pack and
+the off hand hold five bundles of one kind in a square, never two kinds (stacks_onto: one id).
+Ammo alone may stack with a condition: Items.stack_problem and World._plain exempt a kind with an
+"ammo" field, so a worn thing that isn't ammo still stands alone. A stack of bundles is kept in
+order (World._order_ammo, on every join and every wear): the most worn with shots left first, the
+spent last, a tie in the order they came. The square's note is the first's ("bundle of arrows,
+4 of 10"), the bow draws from it (bundle_slot reads the first), and what wears a bundle (a blunt
+hit, an impact, a knockdown, 375; a shot wears nothing) wears the first; spent, it goes to the
+back and the next leads. A unit leaving with no choice is the last (_take_out, _move_units: a
+drop, a throw, a companion handed one, the bank, the priest); one asked for by a sale or barter
+(_sold), a donation (donate) or a payment in things (units(), read last first for ammo) is never
+the one in use while another is there (World._leaving maps it to the last); a gift to a
+townsperson (Main.give_to) gives the stack last first; a death's drop takes them all; a deal's
+offer moves only gold. Picked up with the bow out (_swap_bundle): a bundle that fits the hand's
+stack joins it; the same kind with the hand's five full goes to the pack by the ordinary
+pick-up; only another kind swaps the hand's whole stack, put down where the new one lay (375's
+swap, kept whole and only where it is the only way). Saves: unchanged; the book already saves
+each unit's condition and a stack's order (an old save's single bundles load as they were).
+Wire: unchanged; slot_notes and slot_counts as before. Load by weight and the store's banking
+unchanged. items_test _test_arrow_stacks; _test_arrows' fresh bundle now joins the held one.
+Server and client data; protocol unchanged; no new class_name.
+
 ## 620. The cone of flight
 
 Jeff, on v0.1.168: "I'm wondering if we can have an cone of flight that narrows the longer the

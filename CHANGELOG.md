@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - The draugr's and the fallen knight's windows open at the foot of the screen, left of the pack, and the draugr's closes by itself once he rests (629 amended (3)).
 - A name over someone's head sinks with them as they kneel, sleep or stoop tired, and their health bar with it (865 amended (2)).
 - When another player in your area goes down, you're told, and, when they can be saved, how long a blessed hand has to bring them back (914).

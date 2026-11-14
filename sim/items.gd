@@ -371,9 +371,11 @@ static func worn_slots(kind: String) -> Array[int]:
 
 ## Why definition [param definition] may not stack (decision 619), or "":
 ## a thing with a condition, gear (weapon, shield), a token or soulbound
-## thing, or a use other than eating or bandaging.
+## thing, or a use other than eating or bandaging. A bundle of arrows (an
+## "ammo" field) stacks with its condition (619 amended (4)): World keeps
+## its stack in wear order.
 static func stack_problem(definition: Dictionary) -> String:
-	if int(definition.get("condition", 0)) > 0:
+	if int(definition.get("condition", 0)) > 0 and (definition.get("ammo") is not Dictionary or definition["ammo"].is_empty()):
 		return "has a condition"
 	for tag: String in definition.get("tags", []):
 		if tag in UNSTACKED_TAGS:

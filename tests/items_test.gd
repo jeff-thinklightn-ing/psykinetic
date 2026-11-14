@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_battle_axe()
 	_test_cache()
 	_test_stacks()
+	_test_arrow_stacks()
 	_test_armour()
 	_test_worn()
 	_test_pack_twelve()
@@ -2507,8 +2508,8 @@ func _test_dungeon_caches(host: Player, chest: Chest) -> void:
 
 func _test_stacks() -> void:
 	print("\n== stacks: small things share a slot, each its own (decision 619) ==")
-	_check(Items.stack_of("herbs") == 10 and Items.stack_of("antlers") == 5 and Items.stack_of("knife") == 1 and Items.stack_of("arrows") == 1,
-			"herbs stack 10, antlers 5; a knife and a bundle of arrows alone")
+	_check(Items.stack_of("herbs") == 10 and Items.stack_of("antlers") == 5 and Items.stack_of("knife") == 1,
+			"herbs stack 10, antlers 5; a knife alone")
 	var odd := Items.read('{"items": [{"id": "blade", "tags": ["weapon"], "stack": 5}, {"id": "seed", "stack": 20}]}')
 	_check(int(odd["blade"]["stack"]) == 1 and int(odd["seed"]["stack"]) == 20, "a weapon that says it stacks is held alone (warned)")
 	var host := _player(Net.local_id)
@@ -2589,6 +2590,110 @@ func _test_stacks() -> void:
 		World.take_units(host, [uid])
 		World.items.end(uid, "gone")
 	World.set_slots(host, had_slots, had_uids)
+	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
+
+
+## Bundles of arrows stack five to a square in wear order (619 amended (4),
+## the coordinator's rule from items' three worst: three bundles took three
+## of the pack's twelve squares): the most worn with shots left first, the
+## spent last; what wears a bundle (a blunt hit or a knock, 375) wears the
+## first; a unit going without a choice is the last, and one asked for by a
+## sale, a donation or a payment never the one in use while another is there.
+func _test_arrow_stacks() -> void:
+	print("\n== arrow stacks: five bundles a square, the most worn in use first (619 amended (4)) ==")
+	_check(Items.stack_of("arrows") == 5 and Items.stack_of("flame_arrows") == 5 and Items.stack_of("barbed_arrows") == 5,
+			"arrows, flame and barbed arrows stack five")
+	var odd := Items.read('{"items": [{"id": "club", "condition": 5, "stack": 5}, {"id": "darts", "condition": 5, "stack": 5, "tags": ["ammo"], "ammo": {"effect": ""}}]}')
+	_check(int(odd["club"]["stack"]) == 1 and int(odd["darts"]["stack"]) == 5, "a worn thing still stands alone (warned); ammo stacks worn")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var had_tile := host.tile
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	var cell := _plain_cell(host)
+	World._relocate(host, cell)
+	# Saves from before: single bundles, in the pack and in the off hand, load as they were.
+	var single_a := World.items.mint("arrows", "built")
+	var single_b := World.items.mint("arrows", "built")
+	World.items.set_condition(single_b, 3)
+	var old_slots := Items.tidy([], Player.SLOTS)
+	var old_uids := PackedInt32Array()
+	old_uids.resize(old_slots.size())
+	old_slots[Items.PACK_SLOTS[0]] = "arrows"
+	old_uids[Items.PACK_SLOTS[0]] = single_a
+	old_slots[Items.LEFT_HAND] = "arrows"
+	old_uids[Items.LEFT_HAND] = single_b
+	var saved: Variant = JSON.parse_string(JSON.stringify(World.items.to_dict()))
+	World.set_slots(host, old_slots, old_uids)
+	var back := ItemBook.from_dict(saved)
+	_check(World.slot_count(host, Items.PACK_SLOTS[0]) == 1 and World.slot_count(host, Items.LEFT_HAND) == 1
+			and back.stack_of(single_a).is_empty() and back.stack_of(single_b).is_empty() and back.condition_of(single_b) == 3,
+			"an old save's single bundles, in the pack and in the off hand, load as they were (%s)" % host.slot_counts)
+	for uid in _units_of(host):
+		World.take_units(host, [uid])
+		World.items.end(uid, "gone")
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	# Three bundles in one square, in wear order.
+	_give(host, "bow", Player.RIGHT_HAND)
+	var fresh := World.items.mint("arrows", "built")
+	var half := World.items.mint("arrows", "built")
+	var low := World.items.mint("arrows", "built")
+	World.items.set_condition(half, 7)
+	World.items.set_condition(low, 4)
+	var hand := Items.LEFT_HAND
+	for uid in [fresh, half, low]:
+		World.put_item(host, host, hand, uid)
+	var order := World.slot_units(host, hand)
+	_check(World.slot_count(host, hand) == 3 and order == [low, half, fresh] and host.slot_counts.size() > hand and host.slot_counts[hand] == 3,
+			"three bundles in the off hand's one square, the most worn first (%s)" % [order])
+	var note := host.slot_notes[hand] if host.slot_notes.size() > hand else ""
+	_check(World.bundle_slot(host) == hand and "4 of 10" in note, "the bow draws from it; the square reads the first's condition (%s)" % note)
+	# What wears a bundle (a blunt hit, a knock, 375) wears the first; spent, it goes to the back.
+	for i in 4:
+		World._wear_bundle(host)
+	order = World.slot_units(host, hand)
+	_check(order == [half, fresh, low] and World.items.condition_of(low) == 0 and World.bundle_slot(host) == hand,
+			"four knocks spend the first: it goes to the back, the next leads, the bow still draws (%s)" % [order])
+	note = host.slot_notes[hand] if host.slot_notes.size() > hand else ""
+	_check("7 of 10" in note, "the square reads the new first's condition (%s)" % note)
+	# Ways out: a sale, a donation or a payment never takes the one in use while another is there.
+	_check(World._leaving(host, hand, half) == low and World._leaving(host, hand, fresh) == fresh,
+			"asked for the one in use, the last goes in its place; any other, itself")
+	var paid := World.units(host, "arrows")
+	_check(paid.size() == 3 and paid[0] == low and paid[2] == half, "a payment in bundles takes the last first, the one in use last (%s)" % [paid])
+	# A drop takes the last (the spent one); picked up again, it joins in order.
+	var dropped := World.take_item(host, host, hand)
+	_check(dropped == low and World.slot_units(host, hand) == [half, fresh], "a drop takes the last: the spent one")
+	World.put_on_ground(dropped, cell)
+	_check(World.try_pick_up(host, cell) and World.slot_units(host, hand) == [half, fresh, low] and World.ground_at(cell).is_empty(),
+			"picked up with the bow drawn, it joins the hand's stack at the back (%s)" % [World.slot_units(host, hand)])
+	# A stack saved with the book loads in order.
+	var copy := ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict())))
+	_check(copy.stack_of(half) == PackedInt32Array([fresh, low]) and copy.condition_of(half) == 7 and copy.condition_of(low) == 0,
+			"a saved stack loads in order, each bundle its own condition")
+	# A full stack: a sixth of the kind goes to the pack, nothing put down.
+	for i in 2:
+		World.put_item(host, host, hand, World.items.mint("arrows", "built"))
+	var sixth := World.items.mint("arrows", "built")
+	World.put_on_ground(sixth, cell)
+	_check(World.slot_count(host, hand) == 5 and World.try_pick_up(host, cell) and World.slot_count(host, hand) == 5
+			and World.slot_of_unit(host, sixth) in Items.PACK_SLOTS and World.ground_at(cell).is_empty(),
+			"a sixth bundle with the hand's five full: into the pack, the five kept in hand")
+	# Another kind swaps the hand's whole stack (375's swap, kept whole).
+	var flame := World.items.mint("flame_arrows", "built")
+	_check(not World.stacks_onto(World.slot_uid(host, hand), flame) and not World.stacks_onto(sixth, flame),
+			"a flame bundle never joins plain arrows: kinds are never mixed in a square")
+	World.put_on_ground(flame, cell)
+	_check(World.try_pick_up(host, cell) and host.slots[hand] == "flame_arrows" and World.ground_at(cell).count("arrows") == 5,
+			"flame arrows picked up with the bow drawn: the hand's five put down whole, the new in hand (%s)" % [World.ground_at(cell)])
+	# Put back as it was.
+	while not World.ground_uids(cell).is_empty():
+		World.items.end(World.take_from_ground(cell, 0), "gone")
+	for uid in _units_of(host):
+		World.take_units(host, [uid])
+		World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
+	World._relocate(host, had_tile)
 	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
 
 
@@ -3557,18 +3662,22 @@ func _test_arrows() -> void:
 	_check(back.condition_of(bundle) == 10 and ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict()))).condition_of(bundle) == 4,
 			"its condition is saved")
 	World.items.set_condition(bundle, 3)
-	# Another bundle on the ground: taken up, it swaps for the held one.
+	# Another bundle on the ground: taken up, it joins the held one (619
+	# amended (4): 375's swap kept the better of two; a stack keeps both, the
+	# worn one in use first), nothing put down. A swap is for another kind
+	# (_test_arrow_stacks).
 	var fresh := World.items.mint("arrows", "built")
 	var lay := World.put_on_ground(fresh, host.tile)
 	var swaps := []
 	var swapped := func(by: GridEntity, taken: int, left: int) -> void: swaps.append([taken, left])
 	World.bundle_swapped.connect(swapped)
-	_check(World.try_pick_up(host, lay) and host.slot_items[Player.RIGHT_HAND] == fresh and Array(World.ground_uids(lay)) == [bundle]
-			and swaps == [[fresh, bundle]] and World.item_note(bundle) == "bundle of arrows, 3 of 10",
-			"a fresh bundle taken up: the worn one is put down in its place (%s)" % World.item_note(bundle))
-	_check(World.try_pick_up(host, lay) and host.slot_items[Player.RIGHT_HAND] == bundle, "and back again: keeping the one you would rather mend")
+	_check(World.try_pick_up(host, lay) and World.slot_units(host, Player.RIGHT_HAND) == [bundle, fresh] and World.ground_uids(lay).is_empty()
+			and swaps.is_empty() and host.slot_notes[Player.RIGHT_HAND] == "bundle of arrows, 3 of 10",
+			"a fresh bundle taken up joins the held one, the worn one still in use (%s)" % host.slot_notes[Player.RIGHT_HAND])
 	World.bundle_swapped.disconnect(swapped)
-	World.items.end(World.take_from_ground(lay, 0), "gone")
+	_check(World.take_item(host, host, Player.RIGHT_HAND) == fresh and World.slot_units(host, Player.RIGHT_HAND) == [bundle],
+			"taken out again: the fresh one, the last, goes; the worn one stays")
+	World.items.end(fresh, "gone")
 	World.items.set_condition(bundle, 10)
 	# Flame and barbed.
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
@@ -4018,8 +4127,8 @@ func _test_inventory() -> void:
 	_check(locker != null and locker.slots[0] == "bandaging_kit" and World.slot_count(locker, 0) == 2 and locker.opened == 1, "case: opened again: the same things")
 	# Stacking (722): tokens and the heavy sacks stack; gear and bound things never.
 	_check(Items.stack_of("barrow_half") == 10 and Items.stack_of("ore_sack") == 5 and Items.stack_of("stamina_potion") == 5
-			and Items.stack_of("sword") == 1 and Items.stack_of("encolpion_amulet") == 1 and Items.stack_of("mail_armour") == 1 and Items.stack_of("arrows") == 1,
-			"case: tokens, sacks and drinks stack; weapons, the amulet, armour and arrow bundles stay single")
+			and Items.stack_of("sword") == 1 and Items.stack_of("encolpion_amulet") == 1 and Items.stack_of("mail_armour") == 1 and Items.stack_of("arrows") == 5,
+			"case: tokens, sacks, drinks and arrow bundles (619 amended (4)) stack; weapons, the amulet and armour stay single")
 	_clear(locker)
 	World.despawn(locker)
 	World.despawn(prop)

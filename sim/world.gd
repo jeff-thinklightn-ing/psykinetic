@@ -3518,7 +3518,10 @@ func units(entity: GridEntity, id: String) -> Array[int]:
 	var found: Array[int] = []
 	for slot in entity.slots.size():
 		if entity.slots[slot] == id:
-			found.append_array(slot_units(entity, slot))
+			var here := slot_units(entity, slot)
+			if not Items.ammo_of(id).is_empty():
+				here.reverse()  # Bundles of arrows last first: the one in use is paid last (619 amended (4)).
+			found.append_array(here)
 	return found
 
 
@@ -3572,11 +3575,13 @@ func stacks_onto(first: int, uid: int, more := 1, room := true) -> bool:
 	return not room or 1 + items.stack_of(first).size() + more <= Items.stack_of(id)
 
 
-## Whether [param uid] has nothing of its own a stack would hide.
+## Whether [param uid] has nothing of its own a stack would hide. A bundle
+## of arrows (an "ammo" kind) stacks worn (619 amended (4)): its stack is
+## kept in wear order (_order_ammo), so no bundle's wear is hidden.
 func _plain(uid: int) -> bool:
 	return items.name_of(uid).is_empty() and items.bound_to(uid).is_empty() and items.kept_from(uid).is_empty() \
 		and items.blessed_for(uid).is_empty() and items.bane_of(uid).is_empty() and items.grudge_of(uid).is_empty() \
-		and items.short_of(uid) >= 1.0 and items.condition_of(uid) < 0
+		and items.short_of(uid) >= 1.0 and (items.condition_of(uid) < 0 or not Items.ammo_of(items.id_of(uid)).is_empty())
 
 
 ## [param uid] joins the stack in [param entity]'s [param slot] (stacks_onto
@@ -3586,6 +3591,55 @@ func _join(entity: GridEntity, slot: int, uid: int) -> void:
 	var more := items.stack_of(first)
 	more.append(uid)
 	items.set_stack(first, more)
+	_order_ammo(entity, slot)
+
+
+## A stack of bundles of arrows in [param entity]'s [param slot] put in wear
+## order (619 amended (4), the coordinator's rule): the most worn with shots
+## left first, then the less worn, the spent (condition 0) last. A shot
+## wears the first (_wear_bundle), the slot's note shows the first's
+## condition, and a unit leaving without a choice is the last (_unit_out),
+## so the bundle in use stays and a stack never holds five half-worn ones.
+## Called on every join and every wear; a unit going out keeps the order.
+## Anything else, or one alone, is left as it is.
+func _order_ammo(entity: GridEntity, slot: int) -> void:
+	if slot < 0 or slot >= entity.slot_items.size() or Items.ammo_of(entity.slots[slot]).is_empty():
+		return
+	var first := entity.slot_items[slot]
+	if first == 0 or items.stack_of(first).is_empty():
+		return
+	var units: Array[int] = [first]
+	units.append_array(Array(items.stack_of(first)))
+	var worn := func(uid: int) -> int:
+		var left := items.condition_of(uid)
+		return left if left > 0 else 1 << 20  # Spent last.
+	var ordered := units.duplicate()
+	ordered.sort_custom(func(a: int, b: int) -> bool:
+		return worn.call(a) < worn.call(b) or worn.call(a) == worn.call(b) and units.find(a) < units.find(b))
+	if ordered == units:
+		return
+	items.set_stack(first, PackedInt32Array())
+	items.set_stack(ordered[0], PackedInt32Array(ordered.slice(1)))
+	var uids := entity.slot_items.duplicate()
+	uids[slot] = ordered[0]
+	entity.slot_items = uids
+
+
+## The unit of [param entity]'s [param slot] that goes when [param uid] is
+## asked for by a sale, a barter or a donation (619 amended (4)): a bundle
+## of arrows in use (the stack's first) is never handed over while the
+## stack holds another, the last going in its place, and one asked for
+## that has already gone (a list naming the whole stack) is the last left.
+## Anything else: [param uid] itself.
+func _leaving(entity: GridEntity, slot: int, uid: int) -> int:
+	if slot < 0 or slot >= entity.slots.size() or Items.ammo_of(entity.slots[slot]).is_empty():
+		return uid
+	var units := slot_units(entity, slot)
+	if units.size() <= 1:
+		return units[0] if not units.is_empty() and uid not in units else uid
+	if uid == units[0] or uid not in units:
+		return units[units.size() - 1]
+	return uid
 
 
 ## One unit out of [param entity]'s [param slot] (decision 619): [param uid]
@@ -4802,7 +4856,7 @@ func donate(by: GridEntity, uid: int, place: String) -> bool:
 	var item := by.slots[slot]
 	if items.yields_of(uid).keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 		return false
-	uid = _unit_out(by, slot, uid)
+	uid = _unit_out(by, slot, _leaving(by, slot, uid))  # Never the bundle of arrows in use while its stack holds another (619 amended (4)).
 	if uid == 0:
 		return false
 	_bank_thing(place, uid, _label_of(by), _label_of(by), by.zone, by.tile, owner_of(by))
@@ -5288,6 +5342,7 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 func _sold(by: GridEntity, from: GridEntity, from_slot: int, uid: int, place: String, who: String, paid: int,
 		shop: GridEntity) -> void:
 	var item := from.slots[from_slot]
+	uid = _leaving(from, from_slot, uid)  # Never the bundle of arrows in use while its stack holds another (619 amended (4)).
 	_unit_out(from, from_slot, uid)  # That unit, of a stack (decision 619).
 	if Items.yield_of(item).is_empty():
 		items.place(uid, "")
@@ -6680,12 +6735,31 @@ func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 	var hand := Items.LEFT_HAND if drawn_slot(by) == Items.RIGHT_HAND else Items.RIGHT_HAND
 	if Items.ammo_of(by.slots[hand]).is_empty():
 		return false
+	if stacks_onto(slot_uid(by, hand), uid):
+		# 619 amended (4): a bundle the hand's stack has room for joins it (in
+		# wear order), nothing put down.
+		take_from_ground(cell, index)
+		put_item(by, by, hand, uid)
+		_log("ground: %s adds %s to the hand's %d at %s" % [by.name, items.id_of(uid), slot_count(by, hand), cell])
+		return true
+	if by.slots[hand] == items.id_of(uid) and slot_count(by, hand) > 1:
+		return false  # The same kind, the hand's stack full: picked up into the pack as anything is.
 	take_from_ground(cell, index)
-	var left := take_item(by, by, hand)
+	# The hand's whole stack put down where the new one lay (the coordinator's
+	# rule, 619 amended (4)): the swap stays whole.
+	var left: Array[int] = []
+	while not by.slots[hand].is_empty():
+		var one := take_item(by, by, hand)
+		if one == 0:
+			break
+		left.append(one)
 	put_item(by, by, hand, uid)
-	put_on_ground(left, cell)
-	_log("ground: %s swaps %s for %s at %s" % [by.name, items.id_of(left), items.id_of(uid), cell])
-	bundle_swapped.emit(by, uid, left)
+	for one in left:
+		put_on_ground(one, cell)
+	if left.is_empty():
+		return true
+	_log("ground: %s swaps %d %s for %s at %s" % [by.name, left.size(), items.id_of(left[0]), items.id_of(uid), cell])
+	bundle_swapped.emit(by, uid, left[left.size() - 1])  # The one that was in use.
 	return true
 
 
@@ -6977,6 +7051,7 @@ func _wear_bundle(entity: GridEntity) -> void:
 			var uid := slot_uid(entity, slot)
 			if items.condition_of(uid) > 0:
 				items.set_condition(uid, items.condition_of(uid) - 1)
+				_order_ammo(entity, slot)  # A spent bundle goes to the back of its stack, the next leads (619 amended (4)).
 				_log("wear: %s's %s %d of %d" % [entity.name, entity.slots[slot], items.condition_of(uid), Items.condition_max(entity.slots[slot])])
 				if entity.raised == "draw" and off_hand(entity) != "draw":
 					entity.raised = ""  # Spent.

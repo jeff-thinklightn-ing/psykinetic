@@ -18072,6 +18072,8 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 		if not takes.has(uid):
 			continue
 		var units: Array = [uid] + Array(World.items.stack_of(uid))
+		if not Items.ammo_of(World.items.id_of(uid)).is_empty():
+			units.reverse()  # Bundles of arrows last first, the one in use last (619 amended (4)).
 		if worker.begins_with(Offers.VENDOR) and World.is_starter(uid):
 			# Starter gear handed back to the stall's keeper (807 amended (5), Jeff: "Trade or
 			# Donate"): no gold (736 holds), and it ends, never his stock to sell on.
