@@ -4651,6 +4651,13 @@ func _label_of(entity: GridEntity) -> String:
 	return label if not label.is_empty() else String(entity.name)
 
 
+## The name [param entity]'s plate shows (548 amended (2): Client3D's
+## caption, its replicated label, else its node name): a player's own name,
+## never the node's "Player<n>", in any line said or told of them.
+func shown_name(entity: GridEntity) -> String:
+	return entity.label if not entity.label.is_empty() else String(entity.name)
+
+
 ## slot_items as long as slots (0 for none yet).
 func _fit_uids(entity: GridEntity) -> void:
 	if entity.slot_items.size() != entity.slots.size():

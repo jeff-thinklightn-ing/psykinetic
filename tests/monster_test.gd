@@ -5120,7 +5120,8 @@ func _test_draugr_paid() -> void:
 	Level.register("mt_paidlair", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 8, 4], "name": "lair"}]}})
 	var e := _build(rows, {}, {}, "mt_paidlair")
 	var draugr := e["u"][0] as Draugr
-	var player := EntityFactory.build(SPECS["P"].merged({"name": "Payer"})) as Player
+	# Her node "Payer", her shown name Tove (548 amended (2): a line names the plate's name).
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Payer", "label": "Tove"})) as Player
 	player.player_id = "p1"
 	_room.add_child(player)
 	World.spawn(player, Vector2i(7, 2))
@@ -5137,7 +5138,7 @@ func _test_draugr_paid() -> void:
 	var taken := draugr.accept_offer(player, draugr.offers_for("p1")[0], 60)
 	_check(taken["ok"] and draugr.state == Draugr.State.PACT and book.get("p1|mt_paidlair", {}).get("level") == "normal",
 		"60 gold buys the normal pact, and the payer's deal is kept (%s)" % [book])
-	_check(taken["you_line"] == "You pay the draugr 60 gold for a pact worth 10 risings." and str(taken["line"]).ends_with(" pays the draugr 60 gold for a pact worth 10 risings."),
+	_check(taken["you_line"] == "You pay the draugr 60 gold for a pact worth 10 risings." and str(taken["line"]) == "Tove pays the draugr 60 gold for a pact worth 10 risings.",
 		"its line said of them to the others, its you-form to them (133 amended (2)): %s" % taken["you_line"])
 	_move_to(player, Vector2i(11, 2))
 	World.step()
@@ -5271,7 +5272,9 @@ func _test_draugr() -> void:
 		"752: the draugr a boss by his kind, no name given; a skeleton neither")
 	_check(int(draugr.blows.get("battle_axe", {}).get("recover", 0)) == 3,
 		"his plain heavy blow with his axe plants him 3 ticks after it (750's recover, through World.blow_verb)")
-	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	# Her node "Player1" as Main names it, her shown name Tove (548 amended (2), voice's find on
+	# look_draugrwall3: "Why have you entered my Hall, Player1?" under her plate's own name).
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1", "label": "Tove"})) as Player
 	player.player_id = "p1"
 	_room.add_child(player)
 	World.spawn(player, Vector2i(11, 2))
@@ -5302,7 +5305,7 @@ func _test_draugr() -> void:
 	_check(spoken.is_empty(), "outside his lair he says nothing")
 	_move_to(player, Vector2i(7, 2))
 	World.step()
-	_check(doors == [false] and said == [Draugr.ASKED % player.name] and spoken.is_empty() and draugr.hall_shut,
+	_check(doors == [false] and said == ["Why have you entered my Hall, Tove?"] and spoken.is_empty() and draugr.hall_shut,
 		"come into his lair: his Hall shuts, and he asks why (%s, %s)" % [doors, said])
 	for i in Draugr.ASK_DELAY_TICKS + 5:
 		World.step()
@@ -5418,8 +5421,9 @@ func _test_draugr() -> void:
 	var short := draugr.accept_offer(player, draugr.offers_for("p1")[0], 9)
 	World.step()
 	_check(short["ok"] and World.gold_of("p1") == gold_was - 9 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30
-		and short["you_line"] == "You give the draugr 9 gold, too little: he attacks.",
-		"9 gold, under the least deal (10): he keeps it and attacks, at his own level")
+		and short["you_line"] == "You give the draugr 9 gold, too little: he attacks."
+		and short["line"] == "Tove gives the draugr 9 gold, too little: he attacks.",
+		"9 gold, under the least deal (10): he keeps it and attacks, at his own level; the others read her shown name (%s)" % short["line"])
 	_check(said.count(Draugr.ANGER) == 2, "a new fight: his anger once more (%d)" % said.count(Draugr.ANGER))
 	World.damage(draugr, 999, player)
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT

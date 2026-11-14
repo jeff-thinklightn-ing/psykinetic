@@ -20579,6 +20579,20 @@ replicated property. dungeon's barrow swaps its stand-in for a
 monster_draugr marker in its level.json legend. monster_test
 (_test_draugr); level_test, protocol_test, builder_test unchanged.
 
+548 amended (2) (the script's label; voice's find on playtest's joined look_draugrwall3, main
+57e161b4d, and the coordinator's go): the draugr names a player by the name their plate shows,
+never their node's. His first line in his Hall read "Why have you entered my Hall, Player1?"
+under a plate that read the player's own name: ASKED % first.name, and Main names a player's
+node "Player<n>" by their record's index, so every player who entered heard "Player<n>"; his four
+pact lines told to the others ("... refuses the draugr", "... takes up the draugr's pact again",
+"... gives the draugr N gold, too little", "... pays the draugr N gold") did the same. Now each
+reads World.shown_name: the entity's replicated label (Main spawns a player with their name as
+it), else the node name, the same rule as Client3D's caption, so the line and the plate agree and
+nothing of the player's id or record goes into a line. The words are unchanged. monster_test
+_test_draugr and _test_draugr_paid: the player's node "Player1" (or "Payer") and her shown name
+Tove; his question and the pact lines name Tove. Server only, protocol unchanged, no new
+class_name.
+
 546 amended (2) (release's label; npc asked, for 771 amended (5): the barrow post's night waves bring
 the dead "while the robbers aren't cleared or the alms fall short"; lore's crypt.dead_rise): the alms
 fall short when no gold has gone down to the town's barrow altar for return.alms_short_days (3) game

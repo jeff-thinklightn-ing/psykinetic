@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - When you're wet from the rain, you drip from the hem of your clothes (775 amended (1)).
 - Towns: the Ledger shows a build as planned until someone starts it, and a damaged building is scaffolded only once its repair is under way (566 amended (7)).
 - The water by Snagfin's shack is a proper pond, running east and south of it, the ground sloping gently down to it and a dirt dock from his door out into the water (559 amended (2)).

@@ -562,14 +562,14 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		peaceable = false  # The same tick, for the client (648).
 		_angered = true
 		said.emit(REFUSED)
-		return {"ok": true, "say": "", "line": "%s refuses the draugr. He laughs, and rises to strike." % player.name,
+		return {"ok": true, "say": "", "line": "%s refuses the draugr. He laughs, and rises to strike." % World.shown_name(player),
 			"you_line": "You refuse the draugr. He laughs, and rises to strike."}
 	var paid := _paid(player.player_id)
 	if str(offer.get("id", "")).ends_with(":again"):
 		if paid.is_empty() or not SCALE.has(str(paid.get("level", ""))):
 			return {"ok": false, "say": "", "line": ""}
 		start_pact(player, str(paid["level"]))  # Paid once (548 amended): no gold.
-		return {"ok": true, "say": "", "line": "%s takes up the draugr's pact again." % player.name,
+		return {"ok": true, "say": "", "line": "%s takes up the draugr's pact again." % World.shown_name(player),
 			"you_line": "You take up the draugr's pact again."}
 	if not paid.is_empty():
 		return {"ok": false, "say": AGAIN_WORDS, "line": ""}  # A gold deal while one is paid: never twice.
@@ -583,14 +583,14 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		# kind's own level; beaten, he gives his respect and nothing more.
 		_provoked = player
 		target = player
-		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [player.name, gold],
+		return {"ok": true, "say": "", "line": "%s gives the draugr %d gold, too little: he attacks." % [World.shown_name(player), gold],
 			"you_line": "You give the draugr %d gold, too little: he attacks." % gold}
 	start_pact(player, str(deal["name"]))
 	_deal_paid(player.player_id, str(deal["name"]))  # Paid once: every fight after at this level (548 amended).
 	# 870, riding it (voice: a price paid, the risings the pact's worth, given
 	# later at the altar; 714): "pays", "a pact worth".
 	var worth := "%d rising%s" % [int(deal["charges"]), "" if int(deal["charges"]) == 1 else "s"]
-	return {"ok": true, "say": "", "line": "%s pays the draugr %d gold for a pact worth %s." % [player.name, gold, worth],
+	return {"ok": true, "say": "", "line": "%s pays the draugr %d gold for a pact worth %s." % [World.shown_name(player), gold, worth],
 		"you_line": "You pay the draugr %d gold for a pact worth %s." % [gold, worth]}
 
 
@@ -678,7 +678,7 @@ func _tend_hall() -> void:
 		_asking = first.player_id
 		_ask_at = World.tick + ASK_DELAY_TICKS
 		hall_door.emit(false)
-		said.emit(ASKED % first.name)
+		said.emit(ASKED % World.shown_name(first))  # 548 amended (2): the name her plate shows.
 		return
 	if _asking != "" and World.tick >= _ask_at:
 		var offers := offers_for(_asking)
