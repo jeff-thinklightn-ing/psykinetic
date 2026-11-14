@@ -60,6 +60,8 @@ func _ready() -> void:
 	_test_free_pull_beside_a_talker()
 	_test_free_pull_keeps_off_a_link()
 	_test_route_dropped_on_travel()
+	_test_link_corner_kept()
+	_test_head_judged_after_a_knock()
 	_test_free_route_held()
 	_test_free_route_passage()
 	_test_free_head_on_pulled()
@@ -1730,6 +1732,79 @@ func _test_free_pull_beside_a_talker() -> void:
 	World.despawn(talker)
 	talker.queue_free()
 	Net.controls = saved
+
+
+## 689 amended (12): a player's route takes no diagonal past a link's corner, and a straight way keeps off its square.
+func _test_link_corner_kept() -> void:
+	print("
+== a link's corner: a straight way clipping it is not clear; a player's route takes no diagonal past it (689 amended (12)) ==")
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(6, 3)) <= 8:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(4, 3))
+	var link := Vector2i(6, 3)
+	var open := true
+	for cell: Vector2i in [Vector2i(5, 3), Vector2i(7, 3), Vector2i(8, 3), Vector2i(4, 4), Vector2i(5, 4), Vector2i(6, 4), Vector2i(7, 4), Vector2i(8, 4), link]:
+		open = open and World.is_walkable(cell) and World.is_free(cell)
+	_check(open, "(the cells round (6, 3) open and free)")
+	# Under BODY_SAMPLE (0.25) of the square's corner: the samples of 689 amended (11) stepped over it.
+	var a := Vector2(4.3, 3.9)
+	var b := Vector2(8.0, 3.2)
+	_check(Main.body_line_clear(a, b, Vector2i(8, 3), player), "(the way from %s to %s clear with no link)" % [a, b])
+	World.fields.link_cells[link] = true
+	_check(not Main.body_line_clear(a, b, Vector2i(8, 3), player),
+			"a link on (6, 3): the way from %s to %s, clipping its corner, is not clear" % [a, b])
+	_check(Main.body_line_clear(Vector2(6.3, 3.2), Vector2(4.0, 4.0), Vector2i(4, 4), player),
+			"a body standing on the link (told it is shut) walks off it")
+	var mine := World.find_path(Vector2i(5, 3), Vector2i(6, 4), true, player)
+	var theirs := World.find_path(Vector2i(5, 3), Vector2i(6, 4), true, null)
+	_check(mine.size() == 2 and not mine.has(link),
+			"a player's route (5, 3) to (6, 4) goes round the link's corner, not across it: %s" % [mine])
+	_check(theirs.size() == 1 and theirs[0] == Vector2i(6, 4), "anyone else's steps the diagonal as before: %s" % [theirs])
+	var onto := World.find_path(Vector2i(5, 3), link, true, player)
+	_check(onto.size() == 1 and onto[0] == link, "a click on the link still steps onto it: %s" % [onto])
+	World.fields.link_cells.erase(link)
+	_stop_walk()
+
+
+## 689 amended (12): a body knocked off its route has the way to the route's head judged too.
+func _test_head_judged_after_a_knock() -> void:
+	print("\n== a body knocked off its route: the way to the route's head is judged too, never across a link (689 amended (12)) ==")
+	for entity in World.get_entities():
+		if entity.spawned and (entity is Monster or entity is Companion) and World.distance(entity.tile, Vector2i(6, 3)) <= 8:
+			World.despawn(entity)
+	var player := _place_player(Vector2i(4, 3))
+	var link := Vector2i(6, 3)
+	World.fields.link_cells[link] = true
+	# Its route west from (5, 3), planned before a knock (a blow, a shove, a throw's landing) set it
+	# down at (7.2, 3.3), past the link: straight at (5, 3) from there is straight over (6, 3).
+	var at := Vector2(7.2, 3.3)
+	var path: Array = [Vector2i(5, 3), Vector2i(4, 3)]
+	_main._free_pull(player, path, at)
+	var crosses := false
+	var leg_from := at
+	for cell: Vector2i in path:
+		if cell != link and _leg_meets_cell(leg_from, Vector2(cell), link):
+			crosses = true
+		leg_from = Vector2(cell)
+	_check(not path.is_empty() and path.back() == Vector2i(4, 3) and not crosses,
+			"its route planned again from where it stands, round the link to (4, 3), no leg over it: %s" % [path])
+	var near: Array = [Vector2i(8, 3), Vector2i(9, 3)]
+	_main._free_pull(player, near, at)
+	_check(near.back() == Vector2i(9, 3) and near.size() <= 2, "a route whose head is beside it is left as it was: %s" % [near])
+	World.fields.link_cells.erase(link)
+	_stop_walk()
+
+
+## Whether the centre's straight way from [param a] to [param b] enters [param cell]'s square, looked
+## at every 0.01 of a cell (the test's own, so it reads the same with or without the code it judges).
+func _leg_meets_cell(a: Vector2, b: Vector2, cell: Vector2i) -> bool:
+	var steps := maxi(ceili(a.distance_to(b) / 0.01), 1)
+	for t in steps + 1:
+		var p := a.lerp(b, float(t) / steps)
+		if absf(p.x - cell.x) < 0.5 and absf(p.y - cell.y) < 0.5:
+			return true
+	return false
 
 
 ## 689 amended (13): a click route is its body's, in its zone; a travel re-making the body drops it.

@@ -40734,6 +40734,61 @@ zone to (4, 4) (Main.travel): a new body, no route after it and no step (fails w
 was not seen: playtest's routetravel on v0.1.214 (a joined client through the tavern door with no
 click, and a console move mid-walk in the wilds) stood still both times, so it is a host's fault (a
 tour, a test, the editor) and has no bullet; the test stands on the host.
+689 amended (12) (decision_number.sh's label; the coordinator's ruling 2026-11-12 on physics' link
+scan; a fix, no package): (11) cut the walks that took a player through a way out he never clicked,
+but did not end them. A scan of every click walk from within 3 cells of each wilds link to within 4,
+on a joined client, counted the body's centre entering the link's cell: 900 of 3416 at (128, 20) on
+v0.1.212, 292 on main with (11), and playtest's linkpass took 7 of 9 walks through on v0.1.213, 2 on
+main. Two holes. body_line_clear looked at the centre every BODY_SAMPLE (0.25 of a cell), so a line
+clipping a link's corner by less went through; and find_path still took a diagonal between a link and
+its neighbour, whose corner the free body, off its cell's centre, cuts into the link's cell (linkpass:
+(14, 127) to (15, 128) past the forest link at (14, 128)). Now Main.clear_of_links tests the centre's
+segment exactly against each link cell's square (segment_meets_square, edges counted), the goal and
+the cell the body starts in excepted (a body told a way is shut stands on it and walks off it); and a
+player's own route (find_path with a Player as ignore: walk_path and Main's ways round; World._line_clear
+the same for walk_path's pulled lines) takes no diagonal past a link cell's corner, the goal's
+excepted (World._link_corner). Residents, companions and monsters step cell to cell, whose centres
+never cut a corner, and keep their routes unchanged. path_bound_test _test_link_scan walks every such
+walk as the free body does (_free_pull from where it is, straight at the head, on from there; from the
+start's centre and four points 0.3 off it), looking every 0.05 of a cell: on the wilds' eight links,
+Umbrage's (52, 0) and the tavern's four, 0 by route and 0 walked over, no way closed by the corner
+rule; routes made longer by it, 2 cells at most, a diagonal gone round: 472 of 3416 at (128, 20), 1429
+of 3304 at the wilds' door into the tavern, (178, 208)/(178, 209), open on every side, 4 of 1264 at the tavern's
+(16, 10), none at its (5, 14)/(6, 14). What the body walks (the pulled legs from the start's centre,
+the rule on and off: World.link_corner_rule, off only for that measure) is less: by the wilds' door into
+the tavern 1599 of 3304 walks go farther, 0.57 of a cell on average, 1.39 at worst (a diagonal from cell
+centres past a link's corner touches the link's square exactly, so the route turns at a cell centre
+beside the corner and the pull straightens what it can); at the other wilds links and Umbrage's 0.32 to
+0.44 on average, 1.17 at worst; the tavern's (16, 10)/(17, 10) 10 walks, 0.33, 0.59 at worst. Umbrage's house doors are not links (held has one, its way out),
+so the rule cannot close them. (160, 160) (the barrow breach, open only to (0, -1)) and (199, 199) (the
+crypt stair in the temple's corner, open to (0, 1), (-1, 0), (-1, 1)) have no walk passing beside them:
+0 on both builds. controls_test _test_link_corner_kept: a link on (6, 3), the way from (4.3, 3.9) to
+(8.0, 3.2) clipping its corner is not clear, a body on the link walks off it, a player's route (5, 3)
+to (6, 4) goes round its corner while anyone else's takes the diagonal, and a click on it steps onto
+it (fails 3 without). A third hole, found by physics' tavern door run: _free_pull judged the legs from
+path[0] on, never the one from the body to path[0], so a body set down off its route (a blow, a shove,
+a throw's landing; a route planned from where the body was shown) walked straight at a head across a
+link. Main._free_head_off_links judges that leg too and, when it meets a link, plans the route again from
+the body's own cell (World.free_cell), cell to cell (find_path: walk_path's pulled lines, judged by
+their cells, can graze a link's square that clear_of_links refuses), and a body on its cell's centre
+with its head a step away is never planned again: the first take planned again there for ever (its
+pretest's scan hung at (128, 19), its head (129, 20) past (128, 20)'s corner), and the scan now ends
+every walk it makes or fails. controls_test _test_head_judged_after_a_knock; the scan walks
+each route planned 2 cells off from the start's centre too: 0 walked over. Measured on the real drive
+(a headless host: Main._free_route, _free_drive and World.step, the server's own "took the link" line),
+playtest's ten linkpass rows on v0.1.214 from the start's centre and four points 0.3 off it: 10 of 50
+taken through on v0.1.214, in the rows and links playtest's joined walks were (3, 6, 9: (128, 20),
+(178, 208), (14, 128)), and 0 of 50 with this, every walk arriving, a step or two longer in rows 3 and
+6. From the centre the host took only row 9 through; the off-centre starts took rows 3 and 6 too, as
+a joined body, a little off its cell's centre, did: why a hosted check from cell centres missed them.
+A cell reached only over a link that is not the goal has no route, and a click on it moves nobody:
+counted over the wilds, held, umbrage_tavern (and its _up and _attic), umbrage_smithy and the forest
+(about 99,000 walkable cells; the path search's own steps, links shut with and without the corner
+rule), one: the forest's (222, 47), an empty nook beside its way back to the wilds at (222, 48), the
+same with the corner rule off (879's rule, not this one's). Mended in the level by maps (the
+coordinator's pick, over a click walking to the nearest reachable cell). The probes' lines are in
+C:/dev/review/physics/link-probes-2026-11-13/.
+Server and client (the routes are both's); protocol unchanged; no new class_name.
 
 ## 703: removing the player's grid path
 

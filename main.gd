@@ -3682,6 +3682,37 @@ func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 			and World._line_clear(here, path[1], path[1], player) and not segment_burns(at, Vector2(path[1]), World.is_burning) \
 			and body_line_clear(at, Vector2(path[1]), path[1], player):
 		path.pop_front()
+	_free_head_off_links(player, path, at)
+
+
+## The way from where the body stands to [param path]'s head judged too (689 amended (12)): a route
+## whose head is not beside the body (one planned before a knock, a shove or a throw's landing moved
+## it) would be walked straight at, unjudged, across a level link's cell. Then the route is planned
+## again from the body's own cell (World.free_cell) cell to cell (find_path, not walk_path's pulled
+## lines, whose cells' test can pass a line grazing a link's square that clear_of_links refuses), and,
+## if even its first step is not clear of the links from where the body stands, that cell's centre
+## first. A body on its cell's centre with its head a step away is never planned again: from a centre a
+## step is the route's own (the corner rule's), and planning it again there stood the body re-planning
+## for ever (path_bound_test's scan, with the rule off). _free_pull straightens the rest, judged exactly.
+func _free_head_off_links(player: Player, path: Array, at: Vector2) -> void:
+	if path.is_empty() or clear_of_links(at, Vector2(path[0]), path.back()):
+		return
+	var goal: Vector2i = path.back()
+	var here := World.free_cell(player, at)
+	var head: Vector2i = path[0]
+	if at.distance_to(Vector2(here)) < 0.05 and maxi(absi(head.x - here.x), absi(head.y - here.y)) <= 1:
+		return
+	var again: Array = []
+	if here != goal:
+		# Bounded as every click's search is (935: an unreachable goal searched the whole zone).
+		for cell: Vector2i in World.find_path(here, goal, true, player, World.CLICK_SEARCH_TILES):
+			again.append(cell)
+	if again.is_empty() or not clear_of_links(at, Vector2(again[0]), goal):
+		again.push_front(here)
+	if not _free.get("head_told", false):
+		_free["head_told"] = true  # Once a click: a test's thousands of walks are not each a line.
+		print("[free] a route planned again from %s at %s: its head %s was across a way out (tick %d)" % [here, at, head, World.tick])
+	path.assign(again)
 
 
 ## Whether [param player]'s free body could go straight from [param a] to
@@ -3717,11 +3748,43 @@ static func body_line_clear(a: Vector2, b: Vector2, goal: Vector2i, player: Grid
 			var other := World.get_entity_at(cell)
 			if other != null and other != player and not World._own_companion_of(other, player):
 				return false
-		# 689 amended (11), with npc's 879: a level link's cell is a way out,
-		# taken as the body's centre reaches it (Main._take_link), so the
-		# straight way never crosses one but to end there.
-		var centre := Vector2i(point.round())
-		if centre != goal and World.is_link_cell(centre):
+	# 689 amended (11), with npc's 879: a level link's cell is a way out,
+	# taken as the body's centre reaches it (Main._take_link), so the
+	# straight way never crosses one but to end there; (12) judged exactly,
+	# not at the samples (a corner clipped under BODY_SAMPLE went through).
+	return clear_of_links(a, b, goal)
+
+
+## Whether the straight way from [param a] to [param b] keeps the body's
+## centre out of every level link's cell but [param goal]'s and the one it
+## starts in (a body told a way is shut stands on it, and walks off it):
+## the segment against each cell's square, edges counted (689 amended (12)).
+static func clear_of_links(a: Vector2, b: Vector2, goal: Vector2i) -> bool:
+	var start := Vector2i(a.round())
+	for link: Vector2i in World.fields.link_cells:
+		if link != goal and link != start and segment_meets_square(a, b, Vector2(link), 0.5):
+			return false
+	return true
+
+
+## Whether the segment [param a] to [param b] meets the square of half side
+## [param half] round [param centre], its edges counted (the slab test).
+static func segment_meets_square(a: Vector2, b: Vector2, centre: Vector2, half: float) -> bool:
+	var t0 := 0.0
+	var t1 := 1.0
+	var d := b - a
+	for axis in 2:
+		var lo := centre[axis] - half
+		var hi := centre[axis] + half
+		if is_zero_approx(d[axis]):
+			if a[axis] < lo or a[axis] > hi:
+				return false
+			continue
+		var u := (lo - a[axis]) / d[axis]
+		var v := (hi - a[axis]) / d[axis]
+		t0 = maxf(t0, minf(u, v))
+		t1 = minf(t1, maxf(u, v))
+		if t0 > t1:
 			return false
 	return true
 
@@ -3951,6 +4014,7 @@ func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEA
 	_free.erase("replanned")  # 689 amended (9): a click's one plan again from where it stands.
 	_free.erase("no_route")  # 935 amended (1): and what the held button found of the last goal is forgotten.
 	_free.erase("repicked")  # Its one other cell beside a chest or a person (_free_beside_again).
+	_free.erase("head_told")  # 689 amended (12): its head planned again, said once.
 	var path: Array = []
 	var own := _free_own(player)
 	# From the cell the body is shown on (ahead of the server's claim), so

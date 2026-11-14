@@ -14336,6 +14336,11 @@ func _find_path_core(from: Vector2i, to: Vector2i, ignore_goal_occupant: bool,
 	# stalled at it for ever (Rolf stood asleep a night at the Mughouse's door re-finding one).
 	var links: Dictionary = fields.link_cells
 	var links_any := not links.is_empty()
+	# 689 amended (12): a player's own route (a Player as [param ignore]: walk_path, Main's ways round)
+	# takes no diagonal past a link cell's corner, the goal's excepted: his free body's centre, off its
+	# cell's, cuts that corner into the link's cell and is taken through (playtest's linkpass on
+	# v0.1.213: 7 of 9 walks clicked past a way out went through it). Others step cell to cell.
+	var link_corners := links_any and link_corner_rule and ignore is Player
 	heap_keys.append(best_left << PATH_ORDER_BITS)
 	heap_cells.append(from_at)
 	var offsets := PackedInt32Array()
@@ -14417,6 +14422,8 @@ func _find_path_core(from: Vector2i, to: Vector2i, ignore_goal_occupant: bool,
 				continue
 			var next := current + direction
 			if links_any and next_at != to_at and links.has(next):
+				continue
+			if link_corners and way >= 4 and _link_corner(current, direction, to):
 				continue
 			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore 					and not (ignore != null and _own_companion_of(_occupancy[next], ignore)) 					and (bodies_within <= 0 or maxi(absi(next.x - from.x), absi(next.y - from.y)) <= bodies_within):
 				continue
@@ -14588,6 +14595,9 @@ func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -
 			return false
 		if next != goal and fields.link_cells.has(next):
 			return false  # A link's cell is a step only as the goal (the link fix, as find_path).
+		var cut := next - at
+		if cut.x != 0 and cut.y != 0 and link_corner_rule and ignore is Player and _link_corner(at, cut, goal):
+			return false  # 689 amended (12): a player's line takes no diagonal past a link's corner (find_path).
 		if next != goal and _occupancy.has(next) and _occupancy[next] != ignore 				and not (ignore != null and _own_companion_of(_occupancy[next], ignore)):
 			return false
 		if is_burning(next):
@@ -14597,6 +14607,21 @@ func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -
 			return false  # 707 amended (2): never cut a burning cell's corner.
 		at = next
 	return true
+
+
+## 689 amended (12)'s corner rule on (find_path, _line_clear); off only for path_bound_test's
+## measure of what it costs a walk.
+var link_corner_rule := true
+
+
+## Whether the diagonal step from [param at] the way [param direction]
+## passes the corner of a level link's cell (either of the two it goes between)
+## other than [param goal] (689 amended (12)).
+func _link_corner(at: Vector2i, direction: Vector2i, goal: Vector2i) -> bool:
+	var links: Dictionary = fields.link_cells
+	var x_side := at + Vector2i(direction.x, 0)
+	var y_side := at + Vector2i(0, direction.y)
+	return x_side != goal and links.has(x_side) or y_side != goal and links.has(y_side)
 
 
 ## Whether the diagonal step from [param at] the way [param direction]

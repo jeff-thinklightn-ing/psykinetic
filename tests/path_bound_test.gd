@@ -18,6 +18,8 @@ extends Node
 const FROM_CELLS := 250
 
 var _failures := 0
+var _stuck := 0  # Walks of the scan's that never ended (a route planned again for ever).
+const SCAN_LEGS := 400
 var _main: Node
 
 
@@ -46,6 +48,8 @@ func _ready() -> void:
 		_test_companion_walks(map)
 	_test_walled_off()
 	_test_link_cells()
+	for map in ["wilds", "held", "umbrage_tavern"]:
+		_test_link_scan(map)
 	print("RESULT: %s" % ("PASS" if _failures == 0 else "FAIL (%d)" % _failures))
 	get_tree().quit(0 if _failures == 0 else 1)
 
@@ -330,3 +334,149 @@ func _test_link_cells() -> void:
 		"its goal the link: the way ends on it (%d steps, other links on it %s)" % [to_link.size(), before])
 	World.fields.link_cells.erase(link)
 	World.fields.link_cells.erase(link + Vector2i(0, 1))
+
+
+## Every level link of [param map] (689 amended (12)): every click walk a player makes from a cell
+## within 3 of it to one within 4 (both walkable, not the link, 2 or more apart), walked as his free
+## body walks it (Main._free_pull from where he is, straight at the head, on from there), from the
+## start cell's centre and four points 0.3 off it, never puts his centre in the link's cell before
+## the walk's end (looked at every 0.05 of a cell, apart from the code it judges), nor steps on it
+## by its route; and the link's corner rule closes no way and lengthens few (a doorway beside a
+## link stays open: the tavern's (16, 10), Umbrage's house doors).
+func _test_link_scan(map: String) -> void:
+	print("== %s: walks past each way out keep off it ==" % map)
+	_main.load_map(map)
+	World.enter_named(map)
+	var player: Player = null
+	for entity in World.sought():
+		if entity is Player:
+			player = entity
+	_check(player != null, "(a player to walk: %s)" % player)
+	if player == null:
+		return
+	var offs: Array[Vector2] = [Vector2.ZERO, Vector2(0.3, 0.3), Vector2(-0.3, 0.3), Vector2(0.3, -0.3), Vector2(-0.3, -0.3)]
+	var links: Array = World.fields.link_cells.keys()
+	_check(not links.is_empty(), "(%s has %d links)" % [map, links.size()])
+	for link: Vector2i in links:
+		# Its open sides (a step from it the terrain lets a walker take): a way out with one side open
+		# (a stair in a corner, a breach in a wall) has no walk passing beside it to judge.
+		var open: Array[Vector2i] = []
+		for way: Vector2i in World.DIRECTIONS:
+			if World.is_walkable(link + way) and not World._terrain_blocks_step(link, way, true):
+				open.append(way)
+		print("    %s link %s: open sides %s" % [map, link, open])
+		var walks := 0
+		_stuck = 0
+		var by_stale := 0
+		var by_route := 0
+		var by_walk := 0
+		var longer := 0
+		var most := 0
+		var extra_walked := 0.0
+		var worst_walked := 0.0
+		var walked_longer := 0
+		var closed := 0
+		var shown := 0
+		for ay in range(-3, 4):
+			for ax in range(-3, 4):
+				var a := link + Vector2i(ax, ay)
+				if a == link or not World.is_walkable(a) or World.is_link_cell(a):
+					continue
+				for by in range(-4, 5):
+					for bx in range(-4, 5):
+						var b := link + Vector2i(bx, by)
+						if b == link or World.is_link_cell(b) or not World.is_walkable(b) or maxi(absi(b.x - a.x), absi(b.y - a.y)) < 2:
+							continue
+						var route := World.walk_path(a, b, player)
+						var anyone := World.find_path(a, b, true, null)
+						if route.is_empty():
+							if not anyone.is_empty():
+								closed += 1
+							continue
+						walks += 1
+						var extra := World.find_path(a, b, true, player).size() - anyone.size()
+						if extra > 0:
+							longer += 1
+							most = maxi(most, extra)
+						# What the body walks (the pulled legs from the start's centre), the rule on and off.
+						World.link_corner_rule = false
+						var without := _walked(player, World.walk_path(a, b, player), Vector2(a))
+						World.link_corner_rule = true
+						var more := _walked(player, route, Vector2(a)) - without
+						if more > 0.001:
+							walked_longer += 1
+							extra_walked += more
+							worst_walked = maxf(worst_walked, more)
+						var on_route := route.slice(0, route.size() - 1).has(link)
+						var on_walk := false
+						for off: Vector2 in offs:
+							on_walk = on_walk or _walk_crosses(player, route, Vector2(a) + off, link)
+						# A route planned two cells off (before a knock, a shove or a throw's landing set the
+						# body down at a), walked from a: its head is not beside the body.
+						for away: Vector2i in [Vector2i(2, 0), Vector2i(0, 2), Vector2i(-2, 0), Vector2i(0, -2)]:
+							var a2 := a + away
+							if a2 == b or not World.is_walkable(a2) or World.is_link_cell(a2):
+								continue
+							var stale := World.walk_path(a2, b, player)
+							if not stale.is_empty() and _walk_crosses(player, stale, Vector2(a), link):
+								by_stale += 1
+								if shown < 3:
+									shown += 1
+									print("    %s (its route from %s) -> %s: walked over it (route %s)" % [a, a2, b, stale])
+						by_route += 1 if on_route else 0
+						by_walk += 1 if on_walk else 0
+						if (on_route or on_walk) and shown < 3:
+							shown += 1
+							print("    %s -> %s: route %s, walked over it %s (route %s)" % [a, b, on_route, on_walk, route])
+		print("    %s link %s: walked farther by the corner rule on %d walks, %.2f cells more on average, %.2f at worst" 				% [map, link, walked_longer, extra_walked / maxi(walked_longer, 1), worst_walked])
+		_check(_stuck == 0, "%s link %s: every walk ends (%d went on past %d legs)" % [map, link, _stuck, SCAN_LEGS])
+		_check(by_stale == 0, "%s link %s: routes planned 2 cells off, walked from the start: %d walked over it" % [map, link, by_stale])
+		_check(by_route == 0 and by_walk == 0 and closed == 0,
+				"%s link %s: %d walks, %d step on it by route, %d walked over it, %d closed by its corner, %d made longer (by %d steps at most)" 				% [map, link, walks, by_route, by_walk, closed, longer, most])
+
+
+## How far [param player]'s free body walks [param route] from [param at]: each pulled leg
+## (Main._free_pull from where it is, straight at the head), summed.
+func _walked(player: Player, route: Array[Vector2i], at: Vector2) -> float:
+	var path: Array = []
+	path.assign(route)
+	var length := 0.0
+	var legs := 0
+	while not path.is_empty():
+		legs += 1
+		if legs > SCAN_LEGS:
+			_stuck += 1
+			break
+		_main._free_pull(player, path, at)
+		if path.is_empty():
+			break
+		var head := Vector2(path[0])
+		length += at.distance_to(head)
+		at = head
+		path.pop_front()
+	return length
+
+
+## Whether [param player]'s free body, walking [param route] from [param at] as it does (Main._free_pull
+## from where it is, straight at the head, on from there), puts its centre in [param link]'s cell
+## before the walk's end; looked at every 0.05 of a cell.
+func _walk_crosses(player: Player, route: Array[Vector2i], at: Vector2, link: Vector2i) -> bool:
+	var path: Array = []
+	path.assign(route)
+	var legs := 0
+	while not path.is_empty():
+		legs += 1
+		if legs > SCAN_LEGS:
+			_stuck += 1
+			return false
+		_main._free_pull(player, path, at)
+		if path.is_empty():
+			break
+		var head := Vector2(path[0])
+		var steps := maxi(ceili(at.distance_to(head) / 0.05), 1)
+		for t in steps + 1:
+			if Vector2i(at.lerp(head, float(t) / steps).round()) == link and path[0] != link:
+				return true
+		at = head
+		path.pop_front()
+	return false
