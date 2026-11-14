@@ -48304,6 +48304,54 @@ square, the same water, bank and line as the plain water from that square, and h
 unchanged. A hosted test; nothing a player sees changes. Server only, protocol unchanged, no new
 class_name, no bullet.
 
+803 amended (14), the named lead (the script's label; voice's words of 11-13; the coordinator's
+approval 11-14, after maps' pond names, cf97c96a6): the near water she leads to is named once her
+player has found it. Main._near_water gives the plain name as (13) has it, unless the water's stock
+(World.pond_in) is a fishing place of Holdings and that place is on her player's own record's
+explored_places (reached, its name told by the game: WorldNews.explore, 804's found place); then the
+goal's name is World.pond_name's and it carries "named". The name is read from the found place's
+map name (its Holdings place's "name") at the time of each lead, through World.pond_name alone, and
+is never a string of its own: a renamed pond is led to by its new name, and none is written in
+companion code. Both lines are voice's (FISH_NEAR_WATER, 803 amended (11); FISH_NAMED_LEAD, voice's
+of 11-13). Found means reached, not
+seen (known_places): her line never gives a name her player has not met. It is read from the record
+of the player she leads, never another player's in the party. Main._lead_to_fish answers
+"near_named" for such a lead, and Companion._lead_to_fish_now says FISH_NAMED_LEAD, "Let's try %s.
+This way.", with the goal's name, where it said FISH_NEAR_WATER (a reply, 917); the goal her guide
+and voice are told carries the same name. A fresh player's first lead is plain; once they have
+reached the place, the next one names it ("Let's try Snagfin's Fishin' Hole. This way."). Water no
+fishing place covers, a river reach or an unnamed pool, stays plain. Measured on the way: the lead
+from the square ends on the west bank, (219, 222), 11.2 from the found place's centre (230, 224),
+radius 11, her player behind her at (214, 217), 17.5 off, so arriving told him nothing; the
+coordinator's ruling (a): maps' data moves (805 amended (21)), her walk does not. companion_test
+_test_lead_to_near_water: (13)'s laid name gone (maps' own is on main); the bank's distance from the
+found place's centre printed; not found at the lead's end today, then found walking on to the
+water; asked again, the named goal and line; the place renamed, the new name; the place off this
+player's record, plain, though another record has it; the place taken out of Holdings, plain though
+its id is on the record. Package "fishing that works" (a line about a place already in). Server
+only, protocol unchanged, no new class_name; the bullet, voice's, ships on a joined look of the
+second lead. ui-design's joined look of it (C:/dev/review/look_named_leadb, 6_second_ask) heard "Let's
+try a pool. This way." on the second ask while the HUD led to Snagfin's Fishin' Hole: the tour's
+player walked off from her first lead on his own, which stops a walk "moved" and leaves it hers in
+Main._guides (only an arrived walk leaves it), and the second ask of the same water took that walk
+up again (Guide.resume) with its first goal, named "a pool"; her line reads her guide's goal. Now a
+walk taken up again takes the new ask's name and its "named" mark (or loses the mark), so a place
+found or renamed since is said by its name; and, voice's rule, the named line is said only for a
+goal marked named with a name, else the plain FISH_NEAR_WATER, so "Let's try a pool." is never
+said. companion_test asked twice with the guides cleared between and missed it; it now asks first
+before the place is found and walks off from that lead ("moved", as the look's tour did), then
+asks again: on a4d82c6d3's code the named ask and the renamed ask failed with "Let's try a pool.",
+and pass with the mend. The rerun of that look (C:/dev/review/look_named_leadc) heard the plain line on
+the second ask: having stood at the pool with her player, she knew the place (Guide.observe), so her
+want, the pond, resolved to that same place (Main._want_place; the place's id is the pool's key), and
+Main._start_guide, which leads to her want's place in the asked goal's stead, dropped the asked
+goal's "named" mark. The swap now keeps it. companion_test gives her the place as the walk there did
+and checks her want's place is that pool: on a006c3fdc's code the named and renamed asks failed with
+the plain line; they pass now. Voice, reading the joined still of the mend (C:/dev/review/look_named_leadd,
+6_second_ask), took "This way." off both lead lines, since every lead is followed at once by "This
+way. Stay close.": FISH_NEAR_WATER is "There's water close by." and FISH_NAMED_LEAD "Let's try
+{place}." (the bullet quotes neither).
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

@@ -2061,39 +2061,102 @@ func _test_lead_to_near_water() -> void:
 	owner.led_by = ""
 	owner.led_to = ""
 	_main._guides.clear()
-	# 803 amended (13): maps' named fishing place laid over that pool ("the
-	# pond by town", under the pool's own key, as maps and economy settled):
-	# asked again in the square, the same lead and line. Compared with the
-	# plain water from the same square before it is laid (the first lead's
-	# goal "cell" became its bank as she walked, Guide.step).
+	# 803 amended (14), the named lead: the first lead was plain, and her
+	# player standing at the pool was told its name by the game (the found
+	# place, WorldNews.explore); asked again in the square, she names it.
 	var pool := str(goal.get("key", ""))
-	var named_was: Variant = World.holdings._places.get(pool) if World.holdings != null else null
-	var words_was := pet.want_words
-	_put(owner, start)
-	owner.free_pos = Vector2(start)
-	_put(pet, _main._nearest_free(start + Vector2i(1, 0)))
-	var plain_to: Dictionary = _main._near_water(record, owner)
-	if World.holdings != null:
-		World.holdings._places[pool] = {"id": pool, "area": "wilds", "key": pool.get_file(), "cell": plain_to.get("cell", shack), "name": "the pond by town"}
-	pet._said.clear()
-	var again: Dictionary = _main._near_water(record, owner)
-	pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
-	var goal2: Dictionary = (pet.guide.goal as Dictionary).duplicate() if pet.guide != null else {}
-	_check(World.holdings != null and World.holdings.all_places().has(pool) and not plain_to.is_empty() and again == plain_to
-			and goal2.get("near_water") == true and goal2.get("key") == pool and Companion.FISH_NEAR_WATER in pet._said and pet.want_words == words_was,
-		"a named fishing place over the pool: the same water, bank and line, her want's words unchanged (named %s; plain %s; led %s; said %s; words %s / %s)" % [
-			again, plain_to, goal2, pet._said, pet.want_words, words_was])
+	var explored_was := record.explored_places.duplicate()
+	var place_was: Dictionary = World.holdings.place(pool).duplicate() if World.holdings != null and World.holdings.all_places().has(pool) else {}
+	var centre: Vector2i = place_was.get("cell", Vector2i.ZERO)
+	var bank_off := Vector2(pet.tile - centre).length()
+	print("  her bank %s is %.1f from the found place's centre %s (radius %s): %s" % [pet.tile, bank_off, centre, place_was.get("radius"),
+		"within" if bank_off <= float(place_was.get("radius", 0)) else "outside, so the lead's end alone finds nothing"])
+	_check(not place_was.is_empty() and str(place_was.get("kind", "")) == "fishing" and not record.explored_places.has(pool),
+		"the pool is maps' fishing place, not yet found by her player (%s; %s)" % [pool, place_was])
+	# As in play (ui-design's look_named_leadb): her first walk stopped by her
+	# player's own step stays hers in Main._guides, and the same water asked
+	# again takes it up (Guide.resume), so it is not cleared here.
+	var ask_again := func() -> Dictionary:
+		if pet.guide != null:
+			pet.guide.stop("moved")
+		pet.guide = null
+		owner.led_by = ""
+		owner.led_to = ""
+		_main._guide_offers.clear()
+		_put(owner, start)
+		owner.free_pos = Vector2(start)
+		_put(pet, _main._nearest_free(start + Vector2i(1, 0)))
+		pet._said.clear()
+		pet._carry_out({"verb": "fish", "on": true}, "Let's go fishing.")
+		return (pet.guide.goal as Dictionary).duplicate() if pet.guide != null else {}
+	# Asked in the square before it is found: the plain lead, and her player
+	# walks off on their own (the look's tour did): that walk, stopped
+	# "moved", is the one the next ask of the same water takes up.
+	var first_goal: Dictionary = ask_again.call()
+	var pool_line := Companion.FISH_NAMED_LEAD % "a pool"
+	_check(first_goal.get("key") == pool and first_goal.get("named") != true and Companion.FISH_NEAR_WATER in pet._said
+			and _main._guides.has(Net.player_id),
+		"asked before it is found: the plain lead (%s; %s)" % [first_goal, pet._said])
+	if pet.guide != null:
+		_main._guide_done(pet, "moved")  # Her player's own step (the client's "guide" {"stop": "moved"}).
+	# Her player walks on to the water, within the place's radius: the game
+	# tells them its name (WorldNews.explore, 804, maps' side).
+	_put(owner, _main._nearest_free(centre))
+	for i in 15:
+		World.step()
+	_check(record.explored_places.has(pool), "walking on to the water her player found it (stood at %s, %.1f from %s; explored %s)" % [
+		owner.tile, Vector2(owner.tile - centre).length(), centre, record.explored_places])
+	# She stood there with them, so she knows the place too (Guide.observe, as
+	# in ui-design's look_named_leadc): her want's place (the pond) is now
+	# that same pool, which Main._start_guide leads to in its stead.
+	var roads := Guide.roads_of(record.companion)
+	var knew: bool = pool in roads["places"]
+	if not knew:
+		(roads["places"] as Array).append(pool)
+	_check(str(_main._want_place(record, pet).get("key", "")) == pool, "her want's place is that pool (%s)" % [_main._want_place(record, pet)])
+	var named_goal: Dictionary = ask_again.call()
+	var named_line := Companion.FISH_NAMED_LEAD % World.pond_name(pool)
+	print("  the second lead: %s (goal %s)" % [pet._said, named_goal])
+	_check(named_goal.get("near_water") == true and named_goal.get("named") == true and named_goal.get("key") == pool
+			and str(named_goal.get("name", "")) == World.pond_name(pool) and named_line in pet._said and not Companion.FISH_NEAR_WATER in pet._said and not pool_line in pet._said,
+		"asked again, she leads to the same pool and names it, its name her guide's goal too: %s (%s; %s)" % [named_line, named_goal, pet._said])
+	_check(named_line == "Let's try Snagfin's Fishin' Hole.", "the line as voice wrote it, with maps' name (%s)" % named_line)
+	# The name is World.pond_name's alone: the place renamed, her line follows.
+	World.holdings._places[pool]["name"] = "Test Water"
+	var renamed_goal: Dictionary = ask_again.call()
+	_check(str(renamed_goal.get("name", "")) == "Test Water" and Companion.FISH_NAMED_LEAD % "Test Water" in pet._said,
+		"the place renamed, her line and goal take the new name (%s; %s)" % [renamed_goal, pet._said])
+	World.holdings._places[pool] = place_was.duplicate()
+	# Per player: only the record asked for names it; another player's having
+	# found it names nothing for this one.
+	var other := PlayerRecord.new()
+	other.explored_places.append(pool)
+	record.explored_places.erase(pool)
+	var unfound: Dictionary = _main._near_water(record, owner)
+	var found_by_other: Dictionary = _main._near_water(other, owner)
+	var plain_goal: Dictionary = ask_again.call()
+	_check(str(unfound.get("name", "")) == "a pool" and not unfound.has("named") and found_by_other.get("named") == true
+			and plain_goal.get("named") != true and Companion.FISH_NEAR_WATER in pet._said and not named_line in pet._said
+			and not pool_line in pet._said,
+		"a player who has not found it: plain, whoever else in the party has (%s; another's %s; said %s)" % [unfound, found_by_other, pet._said])
+	# Water no fishing place covers stays plain, even an id on the record.
+	record.explored_places.append(pool)
+	World.holdings._places.erase(pool)
+	World._fish_stock_of.clear()
+	var bare: Dictionary = _main._near_water(record, owner)
+	World.holdings._places[pool] = place_was.duplicate()
+	World._fish_stock_of.clear()
+	_check(str(bare.get("name", "")) in ["a pool", "the river"] and not bare.has("named"),
+		"water no fishing place covers: plain (%s)" % [bare])
+	record.explored_places = explored_was
+	if not knew:
+		(roads["places"] as Array).erase(pool)
 	if pet.guide != null:
 		pet.guide.stop("moved")
 	pet.guide = null
 	owner.led_by = ""
 	owner.led_to = ""
 	_main._guides.clear()
-	if World.holdings != null:
-		if named_was == null:
-			World.holdings._places.erase(pool)
-		else:
-			World.holdings._places[pool] = named_was
 	for key: String in keys:
 		if kept[key] == null:
 			record.companion.erase(key)

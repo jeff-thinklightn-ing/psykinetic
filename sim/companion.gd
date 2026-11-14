@@ -283,7 +283,10 @@ const FISH_NO_ROD := "No rod of my own, but I'll keep you company."
 const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
 ## Asked to fish with no water near, she sets off leading them to water
 ## close by with no name (803 amended (11); voice's).
-const FISH_NEAR_WATER := "There's water close by. This way."
+const FISH_NEAR_WATER := "There's water close by."
+## Leading them to a fishing place her player has reached before, she names
+## it (803 amended (14); voice's words, the name World.pond_name's as given).
+const FISH_NAMED_LEAD := "Let's try %s."
 ## A fishing place near, fished out for today (voice's).
 const FISH_FISHED_OUT := "This water's fished out for today. Tomorrow, maybe."
 ## Her own start (805 amended (14), the coordinator's numbers): her player
@@ -1857,11 +1860,19 @@ static func castable(cell: Vector2i) -> bool:
 
 
 ## Main's lead to water (lead_to_fish): true if she leads or was asked to;
-## setting off to water with no name, she says so (803 amended (11)).
+## setting off to water with no name, she says so (803 amended (11)); to a
+## fishing place her player has reached, she names it, the name her guide's
+## goal carries (803 amended (14)).
 func _lead_to_fish_now() -> bool:
 	var led := str(lead_to_fish.call())
 	if led == "near":
 		_say(FISH_NEAR_WATER, true, false, Weight.REPLY)
+	elif led == "near_named":
+		# The named line only for a goal named (voice's rule): else the plain one.
+		if guide != null and guide.goal.get("named", false) and not str(guide.goal.get("name", "")).is_empty():
+			_say(FISH_NAMED_LEAD % str(guide.goal["name"]), true, false, Weight.REPLY)
+		else:
+			_say(FISH_NEAR_WATER, true, false, Weight.REPLY)
 	return not led.is_empty()
 
 

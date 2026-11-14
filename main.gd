@@ -9527,8 +9527,9 @@ func _note_lead_offer(pet: Companion, text: String) -> void:
 ## (803 amended (11), the coordinator's ruling (A): what a person would walk
 ## to, no data per town), else the fishing place she would lead to (her
 ## want's; devoted, the nearest she knows). "near" when she sets off to that
-## near water, "place" when she was asked to lead to a place (her voice told
-## whether she goes), "" when she knows nowhere.
+## near water ("near_named" when it is a fishing place her player has
+## reached, 803 amended (14)), "place" when she was asked to lead to a place
+## (her voice told whether she goes), "" when she knows nowhere.
 func _lead_to_fish(pet: Companion) -> String:
 	var player := pet.keeper as Player
 	var record := _record_of(pet)
@@ -9541,7 +9542,9 @@ func _lead_to_fish(pet: Companion) -> String:
 	if to.is_empty():
 		return ""
 	_start_guide(pet, player, to)
-	return "near" if to.get("near_water", false) and pet.guide != null and pet.guide.going() else "place"
+	if not (to.get("near_water", false) and pet.guide != null and pet.guide.going()):
+		return "place"
+	return "near_named" if to.get("named", false) else "near"
 
 
 ## How far from her player she looks for water to lead them to, asked to
@@ -9561,8 +9564,9 @@ static func _wants_pond(record: PlayerRecord) -> bool:
 ## walk's goal ending on its bank (803 amended (11)): "near_water", kind
 ## "water", "a pool" or "the river", whether or not a named fishing place of
 ## maps' covers it (803 amended (13): maps' "the pond by town" over Jeff's
-## pool by Snagfin's shack leads and is said as before); its "want" when the
-## pond is her want. {} for none. A named place she knows is led to only
+## pool by Snagfin's shack leads as before), said plain until her player
+## has reached that place, then by its name with "named" (803 amended (14));
+## its "want" when the pond is her want. {} for none. A named place she knows is led to only
 ## with no water this near (_fish_lead_place).
 func _near_water(record: PlayerRecord, player: Player) -> Dictionary:
 	var best := World.NO_CELL
@@ -9579,10 +9583,16 @@ func _near_water(record: PlayerRecord, player: Player) -> Dictionary:
 	if best == World.NO_CELL:
 		return {}
 	var pond := World.pond_in(player.zone, best)
-	# Its plain name, never a place's (803 amended (13)): World.pond_name's
-	# unnamed form.
+	# Its plain name (803 amended (13): World.pond_name's unnamed form), or,
+	# once her player has reached that fishing place and been told its name
+	# (WorldNews.explore, on their own record), the place's (803 amended
+	# (14)), World.pond_name's alone, so a renamed pond renames her line.
 	var plain := "the river" if pond.get_file().begins_with("river_") else "a pool"
-	var to := {"key": pond, "kind": "water", "name": plain, "area": player.zone, "cell": best, "bank": true, "near_water": true}
+	var named := World.holdings != null and World.holdings.all_places().has(pond) and record.explored_places.has(pond)
+	var to := {"key": pond, "kind": "water", "name": World.pond_name(pond) if named else plain, "area": player.zone, "cell": best,
+		"bank": true, "near_water": true}
+	if named:
+		to["named"] = true
 	if _wants_pond(record):
 		to["want"] = "pond"
 	return to
@@ -9807,6 +9817,8 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	var record := _record_of(pet)
 	var wanted := _want_place(record, pet)
 	if not wanted.is_empty() and wanted["key"] == to.get("key"):
+		if to.get("named", false):
+			wanted["named"] = true  # The found place she names is her want's (803 amended (14), look_named_leadc).
 		to = wanted
 	elif not to.has("bank") and World.holdings != null and to.get("kind") == "place" \
 			and str(World.holdings.place(str(to.get("key", ""))).get("kind", "")) == "fishing":
@@ -9837,6 +9849,14 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	_guide_offers.erase(pet.keeper_id)
 	var walk: Guide = _guides.get(pet.keeper_id)
 	if walk != null and walk.goal.get("key") == to.get("key"):
+		# The same water asked again: her walk goes on under the name it has
+		# now (803 amended (14), ui-design's look_named_leadb: a walk her player
+		# stepped off from kept its first, plain name), found since or renamed.
+		walk.goal["name"] = to["name"]
+		if to.get("named", false):
+			walk.goal["named"] = true
+		else:
+			walk.goal.erase("named")
 		walk.resume()
 	else:
 		walk = Guide.new(to)

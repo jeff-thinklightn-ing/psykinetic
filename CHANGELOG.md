@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Ask your companion to fish with no water in reach and she leads you to the nearest, naming it if it's a fishing place you've already found (803).
 
 - Seen from behind, a person's hair covers the whole back of their head, whatever its style (419 amended (3)).
 - Your companion kneels all the way down to bind a wound (877 amended (3)).
