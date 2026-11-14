@@ -129,7 +129,7 @@ static func apply_text_scale(k: float) -> void:
 				_base_sizes[[type, &"font_size"]] = found.get_font_size("font_size", type)
 		for name in found.get_font_size_list(TYPE):
 			_base_sizes[[TYPE, name]] = found.get_font_size(name, TYPE)
-		for rich: StringName in [&"RichTextLabel", &"Lines"]:  # Lines: 886's answer lines.
+		for rich: StringName in [&"RichTextLabel", &"Lines", &"Chat"]:  # Lines: 886's answer lines; Chat: a person's band.
 			for name in found.get_font_size_list(rich):
 				_base_sizes[[rich, name]] = found.get_font_size(name, rich)
 	text_scale = clampf(k, 0.5, 2.0)

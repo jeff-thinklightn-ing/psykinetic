@@ -2858,6 +2858,40 @@ var own_name_on_hud := true
 ## name_plates' reused rows, by the puppet's id, and the list it returns.
 var _plate_rows: Dictionary[int, Dictionary] = {}
 var _plates: Array[Dictionary] = []
+## When name_plates last ran (msec), for the plates' easing.
+var _plates_ms := 0
+## 865 amended (2): a plate goes with its head (down and across together) once the head
+## is this far below the body's standing Idle head (skeleton metres) and fully from
+## PLATE_FOLLOW_FULL, eased between. Measured over the clip library (ui-design's probe,
+## 11-13): every walk, run, swing, hit and the tired idle stays under 0.50 (the sword
+## attack's peak 0.48); crouch 0.70, kneel 0.82, ground-sit 0.90, sleep 1.34 are over 0.65.
+const PLATE_FOLLOW_FROM := 0.50
+const PLATE_FOLLOW_FULL := 0.65
+## Clips whose plate follows the head whatever its drop: the sitter (0.38 below Idle) and the
+## tired idle (0.42) sit under the sword's 0.48, so the drop can't tell them apart.
+const PLATE_FOLLOW_CLIPS: Array[String] = ["Sitting_Idle", "Sitting_Idle02", "Sitting_Idle03", "Sitting_Nodding",
+	"Sitting_Talking", "Sitting_Enter", "Sitting_Exit", "Idle_Tired"]
+## Clips whose plate stays put whatever the drop: a fighter's dodge, roll and landing go
+## deep (0.57, 1.23, 0.57 over their worst 0.4 s) and come straight back up; the sword
+## attacks (0.45, 0.37) stay under PLATE_FOLLOW_FROM and are named for the test.
+const PLATE_HOLD_CLIPS: Array[String] = ["Dodge_Left", "Dodge_Right", "Roll", "Jump_Land", "Sword_Attack",
+	"Sword_Attack_Standing"]
+## Clips whose plate follows by the drop alone, from PLATE_LOW_FROM and fully from PLATE_LOW_FULL
+## (never an upright stance, so a shallow drop is a real one): named so tests/parts_test can fail a
+## new deep clip on none of the three lists. The low band (the coordinator's ruling, 11-13): look_plate4
+## caught Rhea's Kneel_Work at half its depth (her head 0.42-0.47 below Idle, a half squat; 0.88-0.93
+## in look_plate3), under PLATE_FOLLOW_FROM, so her plate stood 217 px over her head.
+const PLATE_LOW_FROM := 0.15
+const PLATE_LOW_FULL := 0.30
+const PLATE_LOW_CLIPS: Array[String] = ["Crouch_Idle", "Crouch_Fwd", "Kneel_Down", "Kneel_Work", "Kneel_Up",
+	"Fixing_Kneeling", "PickUp_Kneeling", "GroundSit_Enter", "GroundSit_Idle", "GroundSit_Exit", "Sleep_Down",
+	"Sleep_Side", "Sleep_Up", "Lie", "Knockdown", "Get_Up", "Death01", "Death02"]
+## A plate comes to its head's new place in about this many seconds (95%), down and up.
+const PLATE_EASE := 0.25
+## A plate's body missing its skeleton or rig is looked for again every PLATE_LOOK_SOON ms for its first
+## PLATE_LOOK_QUICK ms missing, then once a second (_plate_shift).
+const PLATE_LOOK_SOON := 100
+const PLATE_LOOK_QUICK := 2000
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
 ## Main: the bodies (node paths) who take something in the player's pack,
@@ -4728,6 +4762,9 @@ func name_plates() -> Array[Dictionary]:
 	var own := _local_player()
 	var own_id := own.get_instance_id() if own != null and not own_name_on_hud else 0
 	var forward := -_camera.global_transform.basis.z
+	var now := Time.get_ticks_msec()
+	var seconds := float(now - _plates_ms) / 1000.0 if _plates_ms > 0 else 1.0
+	_plates_ms = now
 	for id: int in _puppets:
 		if id == own_id:
 			continue
@@ -4737,12 +4774,17 @@ func name_plates() -> Array[Dictionary]:
 		var label := puppet.get_node_or_null("Name") as Label3D
 		if label == null or not label.visible or label.text.is_empty():
 			continue
-		var head := label.global_position - Vector3.UP * NAME_LIFT
-		if _camera.is_position_behind(head):
-			continue
 		if not _plate_rows.has(id):
 			_plate_rows[id] = {"key": id}
 		var row: Dictionary = _plate_rows[id]
+		# 865 amended (2): the plate goes with the head when a pose carries it well off its
+		# stand (kneeling, sitting, asleep, knocked down), eased; an upright body's stays put.
+		var shift := _plate_shift(puppet, row)
+		row["shift"] = shift if not row.has("shift") else eased_shift(row["shift"] as Vector3, shift, seconds)
+		row["plated_ms"] = now
+		var head := label.global_position - Vector3.UP * NAME_LIFT + (row["shift"] as Vector3)
+		if _camera.is_position_behind(head):
+			continue
 		row["text"] = label.text
 		row["tint"] = label.modulate
 		row["plain"] = label.modulate == Color.WHITE
@@ -4751,6 +4793,107 @@ func name_plates() -> Array[Dictionary]:
 		row["boss"] = label.get_node_or_null("BossMark") != null
 		_plates.append(row)
 	return _plates
+
+
+## Where [param puppet]'s plate goes from its stand (world metres): its skeleton's "Head"
+## bone against the same head in the body's standing Idle (plate_shift), for the clip its
+## rig plays. The skeleton and its Idle head are found once per row. Nought for a body with
+## no such bone, rig or Idle: its plate stays at the label, as before.
+func _plate_shift(puppet: Node3D, row: Dictionary) -> Vector3:
+	var skeleton := instance_from_id(int(row.get("skeleton", 0))) as Skeleton3D
+	if skeleton == null or not skeleton.is_inside_tree() or not puppet.is_ancestor_of(skeleton):
+		# Looked for again, while missing, every PLATE_LOOK_SOON ms for its first PLATE_LOOK_QUICK ms (a body
+		# rebuilt as the camera comes near has no rig for a frame or two: look214's sleeper kept its stand
+		# 0.7 s), then at most once a second (a body with no head bone at all, never found).
+		var now := Time.get_ticks_msec()
+		if not row.has("missing"):
+			row["missing"] = now
+		var every := PLATE_LOOK_SOON if now - int(row["missing"]) < PLATE_LOOK_QUICK else 1000
+		if row.has("looked") and now - int(row["looked"]) < every:
+			return Vector3.ZERO
+		row["looked"] = now
+		row["skeleton"] = 0
+		row["bone"] = -1
+		var found := puppet.find_children("*", "Skeleton3D", true, false)
+		var found_rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+		if found.is_empty() or found_rig == null or found_rig.player == null or not found_rig.has("Idle"):
+			return Vector3.ZERO
+		skeleton = found[0] as Skeleton3D
+		row.erase("missing")
+		row["skeleton"] = skeleton.get_instance_id()
+		row["bone"] = skeleton.find_bone("Head")
+		row["idle"] = idle_head(skeleton, int(row["bone"]), found_rig.player.get_animation(found_rig.as_played("Idle")))
+	if int(row["bone"]) < 0 or not puppet.has_meta("rig"):
+		return Vector3.ZERO
+	var rig := puppet.get_meta("rig") as AnimRig
+	return plate_shift(skeleton, int(row["bone"]), row["idle"] as Vector3, rig.playing())
+
+
+## [param bone]'s place in [param skeleton]'s own space when [param idle] is posed at its
+## start: its bones' local rests up the chain, each replaced by the clip's track where it has
+## one. Read off the clip, never off the live skeleton, so it is the same whatever plays.
+static func idle_head(skeleton: Skeleton3D, bone: int, idle: Animation) -> Vector3:
+	if bone < 0:
+		return Vector3.ZERO
+	var tracks := {}
+	if idle != null:
+		for k in idle.get_track_count():
+			var name := str(idle.track_get_path(k).get_concatenated_subnames())
+			var b := skeleton.find_bone(name)
+			if b < 0 and name.contains(":"):
+				b = skeleton.find_bone(name.get_slice(":", name.get_slice_count(":") - 1))
+			if b >= 0:
+				if not tracks.has(b):
+					tracks[b] = {}
+				(tracks[b] as Dictionary)[idle.track_get_type(k)] = k
+	var at := Transform3D()
+	var b := bone
+	while b >= 0:
+		var rest := skeleton.get_bone_rest(b)
+		var own: Dictionary = tracks.get(b, {})
+		var origin := idle.position_track_interpolate(own[Animation.TYPE_POSITION_3D], 0.0) \
+			if own.has(Animation.TYPE_POSITION_3D) else rest.origin
+		var turn := idle.rotation_track_interpolate(own[Animation.TYPE_ROTATION_3D], 0.0) \
+			if own.has(Animation.TYPE_ROTATION_3D) else rest.basis.get_rotation_quaternion()
+		var size := idle.scale_track_interpolate(own[Animation.TYPE_SCALE_3D], 0.0) \
+			if own.has(Animation.TYPE_SCALE_3D) else rest.basis.get_scale()
+		at = Transform3D(Basis(turn).scaled(size), origin) * at
+		b = skeleton.get_bone_parent(b)
+	return at.origin
+
+
+## How much of the head's move a plate takes (0 to 1), for a head [param drop] metres below
+## its Idle head while [param clip] plays (865 amended (2)): all of it on PLATE_FOLLOW_CLIPS,
+## none on PLATE_HOLD_CLIPS, on PLATE_LOW_CLIPS nought under PLATE_LOW_FROM and all from
+## PLATE_LOW_FULL, else nought under PLATE_FOLLOW_FROM, all from PLATE_FOLLOW_FULL.
+static func plate_follow(drop: float, clip: String) -> float:
+	if clip in PLATE_FOLLOW_CLIPS:
+		return 1.0
+	if clip in PLATE_HOLD_CLIPS:
+		return 0.0
+	if clip in PLATE_LOW_CLIPS:
+		return clampf((drop - PLATE_LOW_FROM) / (PLATE_LOW_FULL - PLATE_LOW_FROM), 0.0, 1.0)
+	return clampf((drop - PLATE_FOLLOW_FROM) / (PLATE_FOLLOW_FULL - PLATE_FOLLOW_FROM), 0.0, 1.0)
+
+
+## [param skeleton]'s [param bone] off [param idle] (its Idle head, idle_head), in world
+## metres (the skeleton's turn and scale), down and across together, times plate_follow:
+## an upright body's plate stays on its stand exactly. Nought without the bone.
+static func plate_shift(skeleton: Skeleton3D, bone: int, idle: Vector3, clip: String) -> Vector3:
+	if bone < 0:
+		return Vector3.ZERO
+	var moved := skeleton.get_bone_global_pose(bone).origin - idle
+	var follow := plate_follow(-moved.y, clip)
+	if follow <= 0.0:
+		return Vector3.ZERO
+	var basis := skeleton.global_basis if skeleton.is_inside_tree() else skeleton.basis
+	return basis * (moved * follow)
+
+
+## A plate's shift [param seconds] on from [param was] toward [param shift]: most of the
+## way in PLATE_EASE's quarter second, never past it, and back the same way (865 amended (2)).
+static func eased_shift(was: Vector3, shift: Vector3, seconds: float) -> Vector3:
+	return was.lerp(shift, 1.0 - exp(-maxf(seconds, 0.0) * 3.0 / PLATE_EASE))
 
 
 ## [param puppet]'s Name label and its skull drawn or not as names_on_hud says.
@@ -22229,6 +22372,30 @@ func _sync_bar(entity: GridEntity, puppet: Node3D, now: int) -> void:
 	material.set_shader_parameter("fill", share)
 	material.set_shader_parameter("fill_color", hp_color(share))
 	bar.visible = alpha > 0.001
+	if bar.visible:
+		bar.position = bar_place(float(bar.get_meta("lift", bar.position.y)), puppet.global_basis, _bar_shift(id, puppet, now))
+
+
+## A bar's place on its puppet: [param lift] up, moved by the world [param shift] in the puppet's own frame
+## ([param basis] its turn and scale), so it lands [param shift] from its stand in the world.
+static func bar_place(lift: float, basis: Basis, shift: Vector3) -> Vector3:
+	return Vector3.UP * lift + basis.inverse() * shift
+
+
+## 865 amended (2): a shown bar rides its plate's eased shift (the head's drop from its standing Idle), so it
+## keeps its distance over a kneeling, tired or lying head. The plate's row is used when name_plates eased it
+## this frame or the last; else (the own body, a body whose name is off) the bar eases the row itself.
+func _bar_shift(id: int, puppet: Node3D, now: int) -> Vector3:
+	if not _plate_rows.has(id):
+		_plate_rows[id] = {"key": id}
+	var row: Dictionary = _plate_rows[id]
+	if now - int(row.get("plated_ms", -100000)) <= 100:
+		return row.get("shift", Vector3.ZERO)
+	var seconds := float(now - int(row.get("bar_ms", now - 1000))) / 1000.0
+	row["bar_ms"] = now
+	var shift := _plate_shift(puppet, row)
+	row["shift"] = shift if not row.has("shift") else eased_shift(row["shift"] as Vector3, shift, seconds)
+	return row["shift"]
 
 
 ## The bar's colour for [param share] of hp left.
@@ -27181,6 +27348,7 @@ func _make_bar(max_hp: int, height: float) -> MeshInstance3D:
 	bar.material_override = material
 	bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	bar.position.y = height
+	bar.set_meta("lift", height)
 	bar.visible = false
 	return bar
 

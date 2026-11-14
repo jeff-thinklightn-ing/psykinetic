@@ -384,6 +384,160 @@ func _test_name_plates() -> void:
 	_check(label.layers == 1 and mark.layers == 1, "and draw again without")
 	puppet.free()
 	client.free()
+	_test_plate_heights()
+
+
+## 865 amended (2) (the coordinator, on playtest's bind7 and bind8: a kneeling companion's
+## plate sat on the player's face, then 130 px off her head; its rulings of 11-13): a plate
+## goes with its head, down and across together, once the head is PLATE_FOLLOW_FROM below
+## the body's standing Idle head, fully from PLATE_FOLLOW_FULL, eased; the sitters and tired
+## idles follow by clip, a dodge, roll, landing or sword attack never does. On the people's
+## own body (human_m) and the game's clips.
+func _test_plate_heights() -> void:
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var model := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+	add_child(model)
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var head := skeleton.find_bone("Head")
+	var idle := Client3D.idle_head(skeleton, head, lib.get_animation("Idle"))
+	_plate_pose(skeleton, lib.get_animation("Idle"), 0.0)
+	_check(skeleton.get_bone_global_pose(head).origin.distance_to(idle) < 0.001,
+		"the Idle head read off the clip is where the skeleton puts it (%s)" % idle)
+	# Every clip whose head is held deep (its worst 0.4 s over 0.35 below Idle) is named on one of
+	# the three lists, so a new one can't go unseen; a posture is additive, never a body's clip.
+	var unnamed: Array[String] = []
+	for clip: String in lib.get_animation_list():
+		var plain := clip.trim_prefix(Client3D.PEOPLE_PREFIX)
+		if plain in Client3D.POSTURES.values() or plain in Client3D.PLATE_FOLLOW_CLIPS or plain in Client3D.PLATE_HOLD_CLIPS \
+				or plain in Client3D.PLATE_LOW_CLIPS:
+			continue
+		var worst := _plate_worst_window(skeleton, head, idle, lib.get_animation(clip))
+		if worst > 0.35:
+			unnamed.append("%s %.2f" % [clip, worst])
+	_check(unnamed.is_empty(), "every clip held over 0.35 below Idle is on FOLLOW, HOLD or LOW (not: %s)" % [unnamed])
+	# Upright bodies: the plate never moves over a whole clip, its own or its fight's.
+	for clip: String in ["Idle", "Walk", "Jog_Short", "Sprint_Short", "Sword_Attack", "Axe_Sweep", "Shield_Bash",
+			"Hit_Stomach", "Recoil", "Dodge_Left", "Roll", "Jump_Land"]:
+		var most := 0.0
+		var anim := lib.get_animation(clip)
+		for i in 31:
+			_plate_pose(skeleton, anim, anim.length * i / 30.0)
+			most = maxf(most, Client3D.plate_shift(skeleton, head, idle, clip).length())
+		_check(most == 0.0, "%s: the plate stays exactly on its stand over the whole clip (%.3f)" % [clip, most])
+	# Low bodies: the plate is on the head.
+	for clip: String in ["Kneel_Work", "Fixing_Kneeling", "Crouch_Idle", "GroundSit_Idle", "Sleep_Side", "Sitting_Idle",
+			"Idle_Tired"]:
+		var anim := lib.get_animation(clip)
+		_plate_pose(skeleton, anim, anim.length * 0.5)
+		var at := skeleton.get_bone_global_pose(head).origin
+		var plate := idle + Client3D.plate_shift(skeleton, head, idle, clip)
+		_check(plate.distance_to(at) < 0.01, "%s: the plate is over the head (%.3f m off)" % [clip, plate.distance_to(at)])
+	# In the world, at the body's own turn and scale.
+	_plate_pose(skeleton, lib.get_animation("Kneel_Work"), 0.0)
+	var local := Client3D.plate_shift(skeleton, head, idle, "Kneel_Work")
+	model.rotation.y = PI * 0.5
+	model.scale = Vector3.ONE * 0.5
+	var turned := Client3D.plate_shift(skeleton, head, idle, "Kneel_Work")
+	_check(turned.is_equal_approx(Basis(Vector3.UP, PI * 0.5) * local * 0.5), "turned and scaled with the body (%s, %s)" % [local, turned])
+	model.rotation.y = 0.0
+	model.scale = Vector3.ONE
+	# Getting up, and a sitter standing: the plate rides up with the head, eased, never a jump.
+	var up := lib.get_animation("Get_Up")
+	# Settled on the body as Get_Up begins (lying), the pose the rise starts from: a plate taken off any
+	# other pose starts the rise a metre or more from its head and its first eased step is that gap's share.
+	# Fixed 1/60 s steps: a long frame in the game closes more of the gap at once, as far as the head went.
+	_plate_pose(skeleton, up, 0.0)
+	var plate := Client3D.plate_shift(skeleton, head, idle, "Get_Up")
+	var step := 0.0
+	for i in int(up.length * 60.0) + 30:
+		_plate_pose(skeleton, up, minf(i / 60.0, up.length))
+		var was := plate
+		plate = Client3D.eased_shift(plate, Client3D.plate_shift(skeleton, head, idle, "Get_Up"), 1.0 / 60.0)
+		step = maxf(step, plate.distance_to(was))
+	_check(step < 0.12, "getting up, no frame moves the plate more than 0.12 m (%.3f)" % step)
+	_check(plate.length() < 0.02, "and it settles on the stand (%.3f)" % plate.length())
+	_plate_pose(skeleton, lib.get_animation("Sitting_Idle"), 0.0)
+	plate = Client3D.plate_shift(skeleton, head, idle, "Sitting_Idle")
+	var seated := plate.length()
+	_plate_pose(skeleton, lib.get_animation("Idle"), 0.0)
+	var rose := Client3D.eased_shift(plate, Client3D.plate_shift(skeleton, head, idle, "Idle"), 1.0 / 60.0)
+	_check(seated > 0.3 and rose.length() > seated * 0.7, "a sitter standing: one frame takes the plate only part way up (%.2f of %.2f m left)" % [rose.length(), seated])
+	_check(Client3D.eased_shift(plate, Vector3.ZERO, Client3D.PLATE_EASE).length() < seated * 0.06, "and most of the way in PLATE_EASE")
+	_check(Client3D.plate_follow(0.49, "Walk") == 0.0 and Client3D.plate_follow(0.65, "Walk") == 1.0
+		and is_equal_approx(Client3D.plate_follow(0.575, "Walk"), 0.5), "the ramp: nothing at 0.49, half at 0.575, all at 0.65")
+	# A low clip's band (look_plate4: Rhea's Kneel_Work at half depth, her head 0.42-0.47 below Idle).
+	_check(Client3D.plate_follow(0.14, "Kneel_Work") == 0.0 and is_equal_approx(Client3D.plate_follow(0.225, "Kneel_Work"), 0.5)
+		and Client3D.plate_follow(0.42, "Kneel_Work") == 1.0 and Client3D.plate_follow(0.47, "Kneel_Work") == 1.0,
+		"a low clip's band: nothing at 0.14, half at 0.225, all of a half squat's 0.42 to 0.47")
+	_check(Client3D.plate_follow(0.45, "Sword_Attack") == 0.0 and Client3D.plate_follow(0.45, "Walk") == 0.0,
+		"an upright or held clip at the same 0.45 keeps its plate on its stand")
+	model.free()
+	var client := Client3D.new()
+	var bare := Node3D.new()
+	add_child(bare)
+	var bare_row := {}
+	_check(client._plate_shift(bare, bare_row) == Vector3.ZERO and client._plate_shift(bare, bare_row) == Vector3.ZERO, "a body with no skeleton or rig keeps the label's place")
+	# Looked for again soon while newly missing (a body rebuilt as the camera nears), then once a second.
+	bare_row["looked"] = Time.get_ticks_msec() - Client3D.PLATE_LOOK_SOON - 1
+	_check(client._plate_shift(bare, bare_row) == Vector3.ZERO and int(bare_row["looked"]) >= Time.get_ticks_msec() - 50,
+		"newly missing, it is looked for again after PLATE_LOOK_SOON ms")
+	bare_row["missing"] = Time.get_ticks_msec() - Client3D.PLATE_LOOK_QUICK - 1
+	var was_looked := Time.get_ticks_msec() - Client3D.PLATE_LOOK_SOON - 1
+	bare_row["looked"] = was_looked
+	client._plate_shift(bare, bare_row)
+	_check(int(bare_row["looked"]) == was_looked, "missing past PLATE_LOOK_QUICK ms, only once a second")
+	# The HP bar rides the plate's eased shift (865 amended (2)): the plate's own row while it is plated...
+	var now := Time.get_ticks_msec()
+	var low := Vector3(0.1, -0.6, 0.0)
+	client._plate_rows[7] = {"key": 7, "shift": low, "plated_ms": now}
+	_check(client._bar_shift(7, bare, now) == low, "a plated body's bar takes its plate's shift")
+	# ...else (the own body, a name off) it eases the row itself: part way in a frame, toward the head's.
+	client._plate_rows[7] = {"key": 7, "shift": low, "plated_ms": now - 500, "bar_ms": now - 16}
+	var eased := client._bar_shift(7, bare, now)
+	_check(eased.length() > 0.0 and eased.length() < low.length(), "unplated, the bar eases on its own (%.3f of %.3f m)" % [eased.length(), low.length()])
+	var basis := Basis(Vector3.UP, PI * 0.5).scaled(Vector3.ONE * 0.5)
+	var place := Client3D.bar_place(2.0, basis, low)
+	_check((basis * place).is_equal_approx(basis * Vector3.UP * 2.0 + low), "the bar sits its shift from its stand in the world, at the body's turn and scale (%s)" % place)
+	bare.free()
+	client.free()
+
+
+## [param skeleton] posed as [param anim] at [param t] (its tracks, the rest elsewhere).
+func _plate_pose(skeleton: Skeleton3D, anim: Animation, t: float) -> void:
+	skeleton.reset_bone_poses()
+	for k in anim.get_track_count():
+		var name := str(anim.track_get_path(k).get_concatenated_subnames())
+		var b := skeleton.find_bone(name)
+		if b < 0 and name.contains(":"):
+			b = skeleton.find_bone(name.get_slice(":", name.get_slice_count(":") - 1))
+		if b < 0:
+			continue
+		match anim.track_get_type(k):
+			Animation.TYPE_POSITION_3D:
+				skeleton.set_bone_pose_position(b, anim.position_track_interpolate(k, t))
+			Animation.TYPE_ROTATION_3D:
+				skeleton.set_bone_pose_rotation(b, anim.rotation_track_interpolate(k, t))
+			Animation.TYPE_SCALE_3D:
+				skeleton.set_bone_pose_scale(b, anim.scale_track_interpolate(k, t))
+
+
+## The highest mean drop of [param skeleton]'s [param head] below [param idle] over any 0.4 s
+## of [param anim] (30 samples a second, a loop taken round its end).
+func _plate_worst_window(skeleton: Skeleton3D, head: int, idle: Vector3, anim: Animation) -> float:
+	var loops := anim.loop_mode != Animation.LOOP_NONE
+	var count := maxi(2, int(ceil(anim.length * 30.0)))
+	var drops := PackedFloat32Array()
+	for i in count:
+		_plate_pose(skeleton, anim, anim.length * i / float(count if loops else count - 1))
+		drops.append(idle.y - skeleton.get_bone_global_pose(head).origin.y)
+	var n := clampi(12, 1, count)
+	var worst := -INF
+	for s in (count if loops else count - n + 1):
+		var sum := 0.0
+		for i in n:
+			sum += drops[(s + i) % count]
+		worst = maxf(worst, sum / n)
+	return worst
 
 
 ## Builder's answer panel's look (886): a building's code inline as a chip, its
@@ -412,6 +566,18 @@ func _test_answer() -> void:
 	_check(theme.get_type_variation_base(&"LineBullet") == &"Label" and theme.get_color(&"font_color", &"LineBullet") == UiTheme.color("text_dim")
 		and theme.get_font_size(&"font_size", &"LineBullet") == theme.get_font_size(&"normal_font_size", &"Lines"),
 		"LineBullet: a Label, dim, the Lines' size")
+	# A person's chat band (the trader mock: 38 units a line, 52 between baselines): a RichTextLabel variation.
+	_check(theme.get_type_variation_base(&"Chat") == &"RichTextLabel" and theme.get_font_size(&"normal_font_size", &"Chat") == 38
+		and theme.get_font_size(&"bold_font_size", &"Chat") == 38 and theme.get_constant(&"line_separation", &"Chat") == 14,
+		"Chat: a RichTextLabel at 38 with 14 between lines (the trader mock's 52 a line)")
+	# The typing line's speech mark: the theme's size and colour, taking no press.
+	var say := UiSayMark.new()
+	add_child(say)
+	await get_tree().process_frame
+	_check(say.custom_minimum_size == Vector2(44, 42) and say.mouse_filter == Control.MOUSE_FILTER_IGNORE
+		and say.get_theme_color(&"mark", &"SayMark") == Color(UiTheme.color("brass_bright"), 0.86),
+		"UiSayMark: 44 by 42 (its tail 12), brass_bright, no press (%s)" % [say.custom_minimum_size])
+	say.queue_free()
 	_check(rich.get_theme_color(&"figure", &"CodeChip") != rich.get_theme_color(&"letter", &"CodeChip")
 		and rich.get_theme_color(&"back", &"CodeChip").a > 0.5, "a chip: a dark back, the figure brighter than the letter")
 	_check(UiCodeChip._split("T1") == PackedStringArray(["T", "1"]) and UiCodeChip._split("WS3") == PackedStringArray(["WS", "3"]),

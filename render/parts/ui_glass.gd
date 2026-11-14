@@ -21,6 +21,9 @@ var _frost: Node2D
 
 func _init() -> void:
 	theme_type_variation = &"Glass"
+	# A pane stops every press over its rect (PanelContainer's own default, said here so no window turns it
+	# off): a press on a window never reaches the world under it (ui_test's scan of the store and person).
+	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _ready() -> void:

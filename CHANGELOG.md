@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A name over someone's head sinks with them as they kneel, sleep or stoop tired, and their health bar with it (865 amended (2)).
 - When another player in your area goes down, you're told, and, when they can be saved, how long a blessed hand has to bring them back (914).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Anyone ready to fight with a giant axe or battle axe holds its edge turned out, away from their face, and with a tomb sledge, rot hammer or pick, its head leads toward the foe, wrists straight either way (451 amended (6)).
