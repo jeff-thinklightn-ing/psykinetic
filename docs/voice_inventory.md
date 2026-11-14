@@ -3123,7 +3123,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (949)
+## Lines in the data (947)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -4042,7 +4042,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The woodcutter sells wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
 |  | The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening. | `entries[14].facts[2].text` |
 
-### levels/lore/regions.json (98)
+### levels/lore/regions.json (96)
 
 | | Line | Key |
 |---|---|---|
@@ -4057,18 +4057,16 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. The way from town (the coordinator's ruling 11-13, maps' cells): the west road along y 201 to the south road at (134,201), then about 50 cells north up the road there (maps' label "the south road", shown nowhere, so the fact names no road at the turn); the farm lies a few cells west of the road (x 112..127, y 137..158), the place's circle at (120,143) by the cottage's south door gap; the crossroads (128,128) lies north beyond it. Seen: the roofless stone cottage with its timber roof-frame standing at its east end, two fenced fallow plots, a leaning scarecrow, a broken cart, a dry well. | `entries[3].summary` |
 |  | The old farmstead lies north-west of town: take the west road to its end, then turn north and walk a good while; it stands just west of the road, a stone cottage open to the sky, its rafters still up. | `entries[3].facts[0].text` |
 |  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[1].text` |
-| L | the pond by town | `entries[4].name` |
-|  | Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (221..223 x 224..228 with the shack and its dirt dock), grown east and south by terrain's 559 amended (2) (fa7b50ce5, package "Snagfin's bigger pond", Jeff's pick C) to about 221..236 x 224..234, the shack at its west end; east of the woodlot post (207,231), some 30 to 40 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size is Jeff's pick C (bigger); the shack waits on buildings' hut; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package "fishing that works". | `entries[4].summary` |
-|  | The pond by town is a broad pond a short walk south-east of the square, just east of the woodlot post. | `entries[4].facts[0].text` |
-|  | The pond by town holds the most fish of any water and fills again each day. | `entries[4].facts[1].text` |
+|  | Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (221..223 x 224..228 with the shack and its dirt dock), grown east and south by terrain's 559 amended (2) (fa7b50ce5, package "Snagfin's bigger pond", Jeff's pick C) to about 221..236 x 224..234, the shack at its west end; east of the woodlot post (207,231), some 30 to 40 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish; maps' fishing place of that name over it, keyed pool_221_224, since "fishing that works". Named by Jeff 11-12 (reed-pond.md: "Snagfins Fishin Hole", voice's spelling), said straight by everyone, no gloss. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to Reed Pond). Its size is Jeff's pick C ("needs to be bigger", so no "little"); the shack (Jeff: "fishing hut instead of stone tower"; today a 2x2 brick room that reads as a tower, so the facts name no building, only Snagfin's door, true before and after buildings' hut) waits on buildings' hut; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package "fishing that works". | `entries[4].summary` |
+|  | Snagfin's Fishin' Hole is a broad pond by Snagfin's door, a short walk south-east of the square, just east of the woodlot post. | `entries[4].facts[0].text` |
+|  | Snagfin's Fishin' Hole holds the most fish of any water and fills again each day. | `entries[4].facts[1].text` |
 |  | Any other pool or stretch of river holds a few fish; a ford or a well holds none. | `entries[4].facts[2].text` |
-|  | The wilds' far fishing pond, a reed pond far west of Umbrage by the west road (maps' reed_pond at (33,120), "the pond" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). The facts call it the far pond, the reed pond only as a description: no name of its own until Jeff picks one (reed-pond.md). The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package "wilds basics: pond". | `entries[5].summary` |
-|  | The far pond, a reed pond, lies a long walk west of town, near the end of the west road. | `entries[5].facts[0].text` |
-|  | Reeds grow along the far pond's edge. | `entries[5].facts[1].text` |
-|  | Fish rise in the far pond too, and it is nobody's: anyone may fish it. | `entries[5].facts[2].text` |
-|  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[5].facts[3].text` |
-|  | A pool west of the north road, a good way north of the crossroads, has fish in it too. | `entries[5].facts[4].text` |
-|  | In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach. | `entries[5].facts[5].text` |
+|  | The wilds' far fishing pond, a reed pond far west of Umbrage by the forest road (16..125,128, the wilds' road west from the crossroads at (128,128) to the forest link (14,128); "the west road" is the one leaving Umbrage along y 201 to the south road at (134,201), maps' 11-13) (maps' reed_pond at (33,120), "Reed Pond" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). Named by Jeff 11-12 (reed-pond.md: "Reed Pond"), with no article in a sentence. The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package "wilds basics: pond". | `entries[5].summary` |
+|  | Reed Pond lies a long walk west of town, beside the road that runs into the forest, a little short of the trees; its edge is thick with reeds. | `entries[5].facts[0].text` |
+|  | Fish rise in Reed Pond too, and it is nobody's: anyone may fish it. | `entries[5].facts[1].text` |
+|  | Fish feed keenest at dawn and at dusk, and more in a soft rain, rising more often and biting sooner then; at night they hardly feed. | `entries[5].facts[2].text` |
+|  | A pool west of the north road, a good way north of the crossroads, has fish in it too. | `entries[5].facts[3].text` |
+|  | In the far north-west of the wilds, west of where the north road ends, the river runs wide and deep, and there are fish in that reach. | `entries[5].facts[4].text` |
 |  | The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended). | `entries[6].summary` |
 |  | Towerside is the land south of Umbrage, round the Old Tower. | `entries[6].facts[0].text` |
 |  | The Old Tower across the river from Umbrage: a broken-down castle the ancients lived in, conquered in the battle; its fallen warriors were buried before the people moved on, and nothing is known of them since. Snagfin keeps his counter there (Jeff, 2026-10-22). | `entries[7].summary` |
