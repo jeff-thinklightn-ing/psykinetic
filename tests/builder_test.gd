@@ -1176,7 +1176,16 @@ func _test_place_cells() -> void:
 	places = session.working.config.get("places", {})
 	_check(trader.get("ok", false) and places["camp_trader"].get("bed") == [19, 10] and places["camp_trader"].get("facing") == [0, -1], "a trader's bed and facing north, written [0, -1] (%s)" % [places.get("camp_trader", trader)])
 	var far_bed := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [24, 10]})
-	_check(not far_bed.get("ok", true) and "beyond the place's radius" in str(far_bed.get("text")), "a bed beyond his radius: refused (%s)" % far_bed)
+	_check(not far_bed.get("ok", true) and "beyond 3 cells" in str(far_bed.get("text")), "a bed beyond his radius: refused (%s)" % far_bed)
+	# A bed under a camp tent (792 amended (3)): up to TRADER_BED_REACH from him though his radius is 2.
+	var tent_bed := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [17, 10]})
+	places = session.working.config.get("places", {})
+	_check(tent_bed.get("ok", false) and places["camp_trader"].get("bed") == [17, 10] and places["camp_trader"].get("radius") == 2,
+		"a bed 3 cells off at radius 2: taken, the radius kept (%s)" % [places.get("camp_trader", tent_bed)])
+	var past_tent := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [23, 11]})
+	_check(not past_tent.get("ok", true) and "a trader's bed's reach" in str(past_tent.get("text")), "a bed 3.16 cells off: refused, the reach named (%s)" % past_tent)
+	var trader_again := session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "radius": 2, "holder": "nobody", "bed": [19, 10], "facing": "north"})
+	_check(trader_again.get("ok", false), "the trader marked again as before, for the checks after")
 	_check(not session.run_tool("mark_place", {"key": "camp2", "kind": "camp", "at": [20, 12], "holder": "nobody", "bed": [20, 13]}).get("ok", true), "a bed on a camp: refused")
 	_check(not session.run_tool("mark_place", {"key": "camp_trader", "kind": "trader", "at": [20, 10], "holder": "nobody", "facing": "up"}).get("ok", true), "a facing not a side: refused")
 	# A perch: its watch within the radius, the cells near the road named.

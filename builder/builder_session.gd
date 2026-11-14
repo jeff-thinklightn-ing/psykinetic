@@ -82,6 +82,13 @@ const KEPT_FIELDS: Array[String] = ["den", "truce", "opens", "fire_ring", "explo
 ## How far a perch's watch lies from any road (make_hills' PERCH_OFF_SAFE, 814).
 const WATCH_OFF_ROAD := 6
 const MAX_WATCH := 32
+## How far from his spot a trader's bed may lie, when his place's radius is
+## less (792 amended (3)): art-kit's camp tents put the bedroll under the
+## canvas, up to 3 cells from where he trades (npc's word on C1 to C7), while
+## his place stays radius 2. A bare cell count, not read from the tent: a larger
+## tent whose bed lies further off raises it (or makes it the tent footprint's
+## far corner, once a tent's cells are in the level's data).
+const TRADER_BED_REACH := 3
 ## Why builder mode marks, changes or moves no "stall" place (792 amended (2),
 ## the coordinator's ruling on economy's answer): Main._vendor_spot stands a
 ## vendor town's seller at its first stall place in key order, so a new one
@@ -865,7 +872,7 @@ const TOOLS := [
 			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\": a draft until voice has seen it (it goes to voice when its level is put up to land, never straight into a released level)"},
 			"shown": {"type": "string", "description": "optional, the name a player reaching it is shown where its name is a where-phrase (\"the shieling\" for \"a shieling high on the hill\"); a draft as its name is"},
 			"where": {"type": "string", "enum": [], "description": "a refuge only, and needed there: where it is, the word the towns say it by"},
-			"bed": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "a trader only, optional, [x, y] within its radius: where he sleeps (his bedroll)"},
+			"bed": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "a trader only, optional, [x, y] within 3 cells of him (or its radius, if larger): where he sleeps (his bedroll, under his tent at a camp)"},
 			"facing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "a trader only, optional: the side he faces (his fire's)"},
 			"watch": {"type": "array", "items": _CELL, "description": "a perch only: the cells within its radius a hill cat pounces onto from it (low grass, kept 6 cells or more from any road)"},
 			"rect": {"type": "object", "description": "optional, the ground it covers (a post's 3 x 3, a tavern's room, a fire's ring): top-left x, y, width, height, in the area",
@@ -1337,7 +1344,8 @@ func _mark_place(given: Dictionary) -> Dictionary:
 ## A trader's bed and facing and a perch's watch from [param given] (792
 ## amended (2); Level.PLACE_SHAPES: bed a cell, facing a step, watch cells),
 ## each on its own kind only, the cells in the area, on ground and within
-## [param radius] of [param at]; else what is wrong.
+## [param radius] of [param at] (a bed within TRADER_BED_REACH, if that is
+## more); else what is wrong.
 func _own_cells(given: Dictionary, kind: String, at: Vector2i, radius: int) -> Variant:
 	var out := {}
 	for field: String in ["bed", "facing", "watch"]:
@@ -1363,8 +1371,10 @@ func _own_cells(given: Dictionary, kind: String, at: Vector2i, radius: int) -> V
 				return "the %s %s is outside the area" % [field, cell]
 			if working.map.cell(cell) in ["void", "water"]:
 				return "the %s %s is %s: it lies on ground" % [field, cell, working.map.cell(cell)]
-			if (cell - at).length_squared() > radius * radius:
-				return "the %s %s is beyond the place's radius %d of %s" % [field, cell, radius, at]
+			var reach := maxi(radius, TRADER_BED_REACH) if field == "bed" else radius
+			if (cell - at).length_squared() > reach * reach:
+				return "the %s %s is beyond %d cells of %s (%s)" % [field, cell, reach, at,
+					"the place's radius" if reach == radius else "a trader's bed's reach"]
 			cells.append([cell.x, cell.y])
 		out[field] = cells if field == "watch" else cells[0]
 	return out
