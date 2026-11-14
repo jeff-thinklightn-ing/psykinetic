@@ -2550,6 +2550,21 @@ func _test_fish_waters() -> void:
 		for cell: Vector2i in wilds:
 			if wilds[cell] == pond_key:
 				stocks[World.pond_in("wilds", cell)] = true
+		# Snagfin's Fishin' Hole (805 amended (20); the coordinator's pin, 11-14): every cell of the pond by
+		# town answers the ponds.at key "wilds/pool_221_224", so it runs on 805 amended (16)'s 40 and 40 (and
+		# 916's taught fisher on its own count), however the pond is reshaped: its body's own key moves with
+		# its first cell if a reshaping moves that, its place's id doesn't.
+		var hole_key := str(wilds.get(Vector2i(222, 226), ""))
+		var hole_stocks := {}
+		var hole_cells := 0
+		for cell: Vector2i in wilds:
+			if wilds[cell] == hole_key:
+				hole_stocks[World.pond_in("wilds", cell)] = true
+				hole_cells += 1
+		var rows: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
+		var own: Dictionary = ((rows as Dictionary).get("ponds", {}) as Dictionary).get("at", {}).get("wilds/pool_221_224", {}) if rows is Dictionary else {}
+		_check(not hole_key.is_empty() and hole_stocks.keys() == ["wilds/pool_221_224"] and int(own.get("fish", 0)) == 40 and int(own.get("refill", 0)) == 40,
+			"every one of the pond by town's %d water cells fishes \"wilds/pool_221_224\" (%s; its body %s), economy's own row 40 and 40 (%s)" % [hole_cells, hole_stocks.keys(), hole_key, own])
 		if waters_were == null:
 			World._fish_waters.erase("wilds")
 		else:
