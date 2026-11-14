@@ -215,7 +215,8 @@ static func _drip(client, puppet: Node3D, wet: float, from: float) -> void:
 		puppet.add_child(drips)
 	drips.emitting = dripping
 	if dripping:
-		drips.amount_ratio = clampf((wet - DRIPS_FROM) / (1.0 - DRIPS_FROM), 0.15, 1.0)
+		# Eight drops however wet (775 amended (1)): a CPUParticles3D has no amount_ratio, and its
+		# amount restarts the emitter when set.
 		drips.position.y = maxf(from * 0.85, 0.25)
 
 

@@ -12821,6 +12821,28 @@ func _test_wet() -> void:
 		"outlined while wet: the wet overlay, then the outline")
 	_rig._show_outline(puppet, false)
 	_check((meshes[0] as MeshInstance3D).material_overlay == WetLook.material_of(puppet), "the outline off: the wet overlay alone again")
+	# Drips (775 amended (1)): soaked to the waist within DRIPS_NEAR of the camera, a few of WetLook's
+	# steps set them going from the hem, with no error each step (a CPUParticles3D has no amount_ratio:
+	# v0.1.201 to v0.1.214 threw a SCRIPT ERROR there every frame and never set their height).
+	var camera: Camera3D = _rig._camera
+	var camera_was := camera.global_transform if camera != null else Transform3D()
+	if camera != null:
+		camera.global_position = puppet.global_position + Vector3(0.0, 6.0, 4.0)
+	puppet.set_meta("wet", 1.0)
+	puppet.set_meta("wet_line", 0.8)
+	puppet.set_meta("wet_all", 0.0)
+	for step in 3:
+		WetLook.update(_rig, WetLook.STEP)
+	var dripping := puppet.get_node_or_null("WetDrips") as CPUParticles3D
+	var soaked := float(puppet.get_meta("wet", 0.0))
+	var hem := minf(float(puppet.get_meta("wet_line", 0.0)), 1.0) if soaked >= float(puppet.get_meta("wet_all", 0.0)) else 1.0
+	var want := maxf(hem * 0.85, 0.25)
+	_check(camera != null and soaked >= WetLook.DRIPS_FROM and dripping != null and dripping.emitting
+			and absf(dripping.position.y - want) < 0.001 and dripping.amount == 8,
+		"soaked near the camera: eight drips from the hem, %.2f m up (want %.2f), set by WetLook.update" % [
+		dripping.position.y if dripping != null else -1.0, want])
+	if camera != null:
+		camera.global_transform = camera_was
 	dry.call()
 	WetLook.show(_rig, puppet)
 	var drips := puppet.get_node_or_null("WetDrips") as CPUParticles3D

@@ -45669,6 +45669,21 @@ walled in, a camp's fire ring two cells off and not three, the wade at a ford's 
 and the material and drips dropped when dry. Stills are at C:/dev/review/wet/wet_look.png. A CHANGELOG
 bullet. Client only, protocol unchanged, no new class_name.
 
+775 amended (1): the drips run without an error (ui-design's find in playtest's look_farmer on main
+ea376d859: 11,482 SCRIPT ERRORs in an 18-minute joined tour; the coordinator's ruling). WetLook._drip
+set amount_ratio on its WetDrips, a CPUParticles3D, which has none (only GPUParticles3D has it in
+4.7.2), so every wet body within DRIPS_NEAR of the camera threw each step from v0.1.201 on, and the
+line after it, the drips' height, never ran: they fell from the body's feet. The line is taken out:
+eight drops however wet, as players have always seen them, now from the hem. Not amount scaled to the
+wetness: setting a CPUParticles3D's amount restarts its emitter, so the thinning would cut the drops
+off at each step of drying; not speed_scale, which slows the fall too; not GPUParticles3D tonight.
+Every other particle node the client sets is a GPUParticles3D (weather_view's rain, snow and drips,
+the motes, mists, aura motes, slab dust, drafts, forge sparks, seam dust); WetDrips is the only
+CPUParticles3D. view_test _test_wet: soaked to the waist with the camera 7 m off, three of
+WetLook.update's steps leave eight drips going from the hem's height (it read 0 before, and the
+suite's error rule fails the scene on the old line). Client only, protocol unchanged, no new
+class_name; a bullet through voice.
+
 ## 778. Filling the hills, phase 2: landmarks, roadside sights, stories (bare)
 
 The coordinator's fill-the-lands plan and maps' plan sheet (C:/dev/review/lands/fill_hills), after

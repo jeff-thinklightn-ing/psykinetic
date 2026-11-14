@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you're wet from the rain, you drip from the hem of your clothes (775 amended (1)).
 - Towns: the Ledger shows a build as planned until someone starts it, and a damaged building is scaffolded only once its repair is under way (566 amended (7)).
 - The water by Snagfin's shack is a proper pond, running east and south of it, the ground sloping gently down to it and a dirt dock from his door out into the water (559 amended (2)).
 - Every pond has a bare, muddy rim, reeds out into the shallows and a stone or two, its bank curving down into the water (559 amended (2)).
