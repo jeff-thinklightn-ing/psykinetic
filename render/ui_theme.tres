@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=53 format=3]
+[gd_resource type="Theme" load_steps=54 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -665,6 +665,24 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
+; A health bar's backing in a name's row (865 amended (3), the coordinator's yes to C:/dev/review/ui-design/bar_mock):
+; the plate's dark and its faint rim, a little round, standing 3 px out round the strip.
+[sub_resource type="StyleBoxFlat" id="hp_bar"]
+bg_color = Color(0.102, 0.0784, 0.0627, 0.78)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.16)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+expand_margin_left = 3.0
+expand_margin_top = 3.0
+expand_margin_right = 3.0
+expand_margin_bottom = 3.0
+
 ; A fault in an answer (886; builder's answer panel, approved 11-12): a faint rust
 ; plate, a rust rim, a broad rust edge at the left.
 [sub_resource type="StyleBoxFlat" id="fault"]
@@ -991,6 +1009,17 @@ QuestReturn/fonts/font = ExtResource("sans_bold")
 Psykinetic/constants/mark = 28
 NamePlate/base_type = &"PanelContainer"
 NamePlate/styles/panel = SubResource("name_plate")
+HpBar/colors/fill_high = Color(0.35, 0.85, 0.35, 1)
+HpBar/colors/fill_mid = Color(0.95, 0.7, 0.2, 1)
+HpBar/colors/fill_low = Color(0.9, 0.2, 0.15, 1)
+HpBar/colors/track = Color(0.1, 0.1, 0.11, 1)
+HpBar/constants/gap = 8
+HpBar/constants/height = 10
+HpBar/constants/per_hp = 14
+HpBar/constants/least = 120
+HpBar/constants/most = 480
+HpBar/constants/hold = 16
+HpBar/styles/panel = SubResource("hp_bar")
 NameText/base_type = &"Label"
 NameText/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 1)
 NameText/font_sizes/font_size = 44

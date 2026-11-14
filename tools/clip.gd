@@ -589,12 +589,8 @@ func _process(delta: float) -> void:
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
-	# The player who can't die (max_hp 1,000,000) has no health bar: it would be HP_BAR_PER_HP
-	# wide per hp, a full-screen green line once he is hurt (a reel's artefact, not the game's).
-	if at != null and _player.max_hp >= 1000000 and at.get_node_or_null("HpBar") != null:
-		at.get_node("HpBar").queue_free()
-	if monster != null and _monster.max_hp >= 1000000 and monster.get_node_or_null("HpBar") != null:
-		monster.get_node("HpBar").queue_free()  # The same for a foe held unhurt (shieldcut).
+	# No bar to take off the player who can't die (max_hp 1,000,000): since 865 amended (3) a bar is drawn
+	# in its name's row, at most the theme's HpBar most long, and never the local player's own.
 	if at != null and monster != null and not scenario in ["camera_turn", "gains", "sheet", "target", "landmark"]:  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
 		if scenario == "steady":
