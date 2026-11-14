@@ -503,6 +503,38 @@ func assign(workshop_id: String, worker_id: String) -> bool:
 	return true
 
 
+## [param workshop_id]'s job cleared (915, Towns' bench audit) unless it is a job being worked
+## there by the bench's own worker; true if it cleared one.
+func clear_stale_job(workshop_id: String) -> bool:
+	var shop: Dictionary = _workshops.get(workshop_id, {})
+	if shop.is_empty() or int(shop["job"]) == 0:
+		return false
+	var each: Dictionary = _jobs.get(int(shop["job"]), {})
+	if each.get("state") == "working" and each.get("worker") == shop["worker"] and each.get("workshop") == workshop_id:
+		return false
+	shop["job"] = 0
+	return true
+
+
+## [param workshop_id]'s worker leaves the bench (915): a job of theirs at it goes back to the
+## queue with its materials back in the store (taken again when it starts), the bench's job
+## cleared; their record is untouched (away, they are seated again when a bench is free). Their
+## id; "" if the bench had nobody.
+func unseat(workshop_id: String) -> String:
+	var shop: Dictionary = _workshops.get(workshop_id, {})
+	if shop.is_empty() or str(shop["worker"]).is_empty():
+		return ""
+	var who := str(shop["worker"])
+	for each: Dictionary in _jobs.values():
+		if each["worker"] == who and each["state"] == "working" and each["workshop"] == workshop_id 				and each["kind"] != "return" and str(each.get("for", "")).is_empty():
+			_give_back(each)
+			each["state"] = "queued"
+			each["worker"] = ""
+	shop["worker"] = ""
+	shop["job"] = 0
+	return who
+
+
 ## [param worker_id] leaves their trades for [param trade] alone (decision 546,
 ## npc's side, amended: Pip the carpenter becomes the priest's acolyte in
 ## place): their record, name, card, purse and home kept; their workshop left
@@ -514,6 +546,7 @@ func retrain(worker_id: String, trade: String) -> bool:
 	for shop: Dictionary in _workshops.values():
 		if shop["worker"] == worker_id:
 			shop["worker"] = ""
+			shop["job"] = 0  # 915: the job goes back to the queue below; a bench left pointing at it never bid again.
 	for each: Dictionary in _jobs.values():
 		if each["worker"] == worker_id and each["state"] == "working":
 			each["state"] = "queued"
@@ -597,6 +630,7 @@ func remove_worker(worker_id: String) -> void:
 	for shop: Dictionary in _workshops.values():
 		if shop["worker"] == worker_id:
 			shop["worker"] = ""
+			shop["job"] = 0  # 915: the job goes back to the queue below; a bench left pointing at it never bid again.
 	for each: Dictionary in _jobs.values():
 		if each["worker"] == worker_id and each["state"] == "working":
 			each["state"] = "queued"
@@ -2081,5 +2115,11 @@ func from_dict(saved: Dictionary) -> void:
 				print("[production] the snapshot's job #%d is at %s, which is gone; its materials go back" % [each["id"], each["workshop"]])
 				_give_back(each)
 				_jobs.erase(each["id"])
+			elif each["state"] == "working" and not own_job and each["worker"] != _workshops[each["workshop"]]["worker"]:
+				# 915: working under someone the bench is no longer theirs: nobody could finish it.
+				print("[production] the snapshot's job #%d was worked by someone not at its bench; back to the queue" % each["id"])
+				_give_back(each)
+				each["state"] = "queued"
+				each["worker"] = ""
 			elif each["state"] == "working" and not own_job:
 				_workshops[each["workshop"]]["job"] = each["id"]

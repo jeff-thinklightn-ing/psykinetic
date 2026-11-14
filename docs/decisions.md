@@ -54240,3 +54240,66 @@ camera still and its zoom easing, the view left alone, and a control line moved 
 On main 0338ba32e with the pin alone: 20 cells after 1 and 2 frames, 27, 40 and 80 NEVER in 600 frames, the controls
 after 0. With 912: all eight after 1 frame, the controls after 0. The other scenes on the same code (respawn,
 companion, controls, monster, resident, mirror, stream, relief, level, builder, town_day) passed.
+
+## 915. A town's benches are audited each turn; a companion's sickness in town is stored on her player's record (economy)
+
+Umbrage's carpenter, a player's companion left in town, logged nothing at her bench from 10-21 to 11-13: no job
+started, no "waits for", through 12 stays, 35 leavings and dozens of deploys, with three repairs queued and, from
+11-13, 80 wood in the store. The cause, from the code and the box's journal (release's greps, names compared on the
+box only): Townsfolk keeps a companion's sickness on her player's record through Offers.ctx "companion_sick" and
+"set_companion_sick", and Main looked that record up by the worker id's tail. A resident companion's worker is
+"companion:<her name>" (Towns.note_companion_in), so the lookup always missed. When she fell sick in town (_falls_sick:
+"took to bed", 19 times for her from 10-20 day 103), her sickness was stored nowhere, Production's sick mark was set,
+and the day turn, which ends only what sickness_of returns, never ended it. The mark was saved and loaded, and
+note_companion_in clears "away", never "sick", so _present was false while she stood in town: no bid, no line. The
+day lines' sick counts read sickness_of, so she was never even counted.
+
+- Main._record_of_companion_worker: the two hooks find the record by the id as before ("companion:<player id>"),
+  else by the worker's origin ("companion:<player id>", set by note_companion_in). Server only: the player's id
+  never goes into a log line, a said line or anything sent.
+- Towns._bench_audit, each town's turn before its builds:
+  - A companion resident's sick mark follows her sickness (set, or cleared when nothing is behind it: the box's
+    stale marks clear on the first turn after the deploy).
+  - A bench whose holder is no worker is cleared.
+  - A bench's job that is not a job being worked there by its own worker is cleared (Production.clear_stale_job).
+  - A bench whose holder is away (not sick) while one of its trade here sits unseated passes to them.
+  - A present holder with job 0 bids by _choose's own rule; the audit only reports it.
+- Towns._seat: an unseated worker of a trade whose bench's holder is away (not sick) takes it (Production.unseat:
+  the holder's working job there back to the queue, its materials back in the store, the bench's job cleared). The
+  holder, back, is seated when a bench is free, else waits as any unseated worker; the audit gives it back when the
+  one at it is away in turn. A sick holder keeps the bench. A holder alone of the trade, taken out and left again
+  (the common case, 84 leavings on the box), keeps the bench and her job's progress, as before.
+- A carpenter who comes home to find his bench given away (a resident gone "low too long" and brought back, the
+  probe's case E) waits unseated, fed and paid as any resident. Unseated, he is not "low" for idle work (Towns._low
+  looks only at a seated worker's queue), so he does not wander off for it. At the town's next turn after the one
+  at the bench goes adventuring, the audit gives it back to him, and the bench passes back and forth so that
+  whoever is in town works it. No second bench is ordered: a town keeps one bench a trade, and a second carpenter
+  idles while the first works, as before 915.
+- Production.remove_worker and retrain clear the bench's job with its worker. Before, the bench was left pointing
+  at the job they put back in the queue, so it never bid again until a load.
+- Production's load puts a working job back on its bench only under the bench's own worker. Otherwise the job goes
+  back to the queue with its materials, since nobody could finish it.
+- One line per bench, no names, at its first turn after a boot and again whenever the audit acts in its town:
+  "[towns] <town> bench <trade>: holder present|away|sick|none, job <n> <state>, unseated of the trade <k>". The
+  first lines of the deploy say what the box's benches held.
+
+What her player sees: with the hook mending, a companion who falls sick in town is sick on her record, so taken
+out she "is sick with ... and goes with you all the same", her voice knows it, and it ends with her player after
+sick_days (Main._sickness_in_party, decision 501, companions' side, built and tested there but never reached for a
+town-sick companion until now). Taken out and back while still sick, the audit gives the town the mark again.
+
+farm_test _test_benches covers:
+- the box's save (a stale mark: cleared on the first turn, she bids; then 80 wood and the walk-in farmer: the field
+  planned, started and standing within 2 days);
+- Townsfolk's sickness on a companion resident through Offers.ctx by her worker's id (stored, ends on its day, the
+  mark with it);
+- an away holder and a second companion (the second takes the bench; the first, back, waits; the second away, the
+  first takes it back);
+- a loaded save with its holder away and a second unseated (the bench passes on the first turn);
+- the holder alone out and back (bench and progress kept);
+- a holder removed mid-job (the bench's job cleared).
+
+companion_test checks both hooks by the town worker's id. tools/probe_umbrage (not on main) reproduced the
+away-holder silence on rows3's tip (saturn, 94e1796ae, case D).
+
+Protocol unchanged; save format unchanged (no new key). No new class_name.

@@ -3527,6 +3527,29 @@ func _test_sickness() -> void:
 	_main._offers_context()["set_companion_sick"].call("companion:" + record.player_id, {})
 	_check(not record.companion.has("sick") and record.companion.get("was_sick", {}).get("kind", "") == "a fever"
 		and record.companion["was_sick"].get("cured_by", "") == "Orm", "ended in town (npc's set_companion_sick): was_sick keeps its kind and who cured her")
+	# 915: in town her worker is "companion:<her name>", its origin her player's (Towns.note_companion_in):
+	# the hooks find her record by that id too (before 915 they missed, and her sickness was stored nowhere).
+	var kept_sick: Variant = record.companion.get("sick")
+	var kept_was: Variant = record.companion.get("was_sick")
+	var town_id := "companion:" + her
+	var added := World.production.worker(town_id).is_empty()
+	if added:
+		World.production.add_worker(town_id, her, ["cook"], "", "companion:" + record.player_id)
+	_main._offers_context()["set_companion_sick"].call(town_id, {"since": today, "kind": "a cough", "treated": -1, "cured_by": ""})
+	var read_back: Dictionary = _main._offers_context()["companion_sick"].call(town_id)
+	_check(record.companion.get("sick", {}).get("kind", "") == "a cough" and read_back.get("kind", "") == "a cough",
+		"by her town worker's id (915): her sickness stored on her player's record and read back")
+	_main._offers_context()["set_companion_sick"].call(town_id, {})
+	_check(not record.companion.has("sick") and record.companion.get("was_sick", {}).get("kind", "") == "a cough",
+		"by her town worker's id: ended, was_sick kept to be told")
+	if added:
+		World.production.remove_worker(town_id)
+	for key: String in ["sick", "was_sick"]:
+		record.companion.erase(key)
+	if kept_sick != null:
+		record.companion["sick"] = kept_sick
+	if kept_was != null:
+		record.companion["was_sick"] = kept_was
 	log_size = _main.party_log.size()
 	_main._tell_sickness(pet, record, true)
 	lines = _main.party_log.last(_main.party_log.size() - log_size)

@@ -91,6 +91,8 @@ var _told := {}
 ## The day line's (the coordinator's ask, 11-12): the game day last told, and each
 ## town's deaths since.
 var _day_told := -1
+## The benches told (915), by workshop id: each at its first turn after a boot, again when the audit acts in its town.
+var _bench_told := {}
 var _dead_today := {}
 ## () -> int: the World's steps.
 var clock := Callable()
@@ -774,6 +776,7 @@ func tick() -> void:
 		_maker_comes(town)
 		_sought_turn(town)
 		_visitors_turn(town)
+		_bench_audit(town)
 		if _field_first(town):
 			continue
 		# One build at a time, unless the one in hand has stalled on its
@@ -1204,8 +1207,80 @@ func _seat(town: String) -> void:
 		var shop_id := "%s:%s" % [town, kind if not kind.is_empty() else trade]
 		if production.workshop(shop_id).is_empty():
 			production.add_workshop(shop_id, trade, town)
+		# 915: a bench whose holder is away (not sick) goes to one of its trade who is here; the holder,
+		# back, is seated when a bench is free.
+		var holder := str(production.workshop(shop_id)["worker"])
+		if not holder.is_empty() and holder != who and not Production.off_work(worker) and _away_well(holder):
+			production.unseat(shop_id)
+			print("[towns] %s bench %s: its holder away, it goes to another of the trade" % [town, trade])
 		if production.workshop(shop_id)["worker"] == "" and production.assign(shop_id, who):
 			_note(town, "%s the %s works at %s" % [worker["name"], trade.replace("_", " "), shop_id])
+
+
+## The bench audit (915, the coordinator's (a)), each town's turn. A companion resident's sick mark
+## follows her sickness (Townsfolk.sickness_of: before 915 her sickness was never stored, so the mark
+## never ended, and Umbrage's carpenter, in town, never bid from 10-20 to 11-13); a bench whose
+## holder is no worker is cleared; a bench's job that is not a job being worked there by its own
+## worker is cleared; a bench whose holder is away (not sick) while one of its trade here sits
+## unseated passes to them (_seat). Each bench's line, no names, at its first turn after a boot, and
+## the town's benches again whenever the audit acts there.
+func _bench_audit(town: String) -> void:
+	var record := _town(town)
+	var acted := false
+	for who: String in record["residents"]:
+		var worker := production.worker(who)
+		if not who.begins_with(Townsfolk.COMPANION) or worker.is_empty() or bool(worker.get("away", false)):
+			continue
+		var sick := not Townsfolk.sickness_of(production, who).is_empty()
+		if bool(worker.get("sick", false)) != sick:
+			production.set_sick(who, sick)
+			acted = true
+			print("[towns] %s: a companion's sick mark %s, as her sickness" % [town, "set" if sick else "cleared"])
+	var reseat := false
+	for shop_id: String in production.workshop_ids(town):
+		var shop := production.workshop(shop_id)
+		var holder := str(shop["worker"])
+		if not holder.is_empty() and production.worker(holder).is_empty():
+			production.unseat(shop_id)
+			acted = true
+			print("[towns] %s bench %s: its holder is gone; cleared" % [town, shop["trade"]])
+		if production.clear_stale_job(shop_id):
+			acted = true
+			print("[towns] %s bench %s: its job was not being worked there; cleared" % [town, shop["trade"]])
+		holder = str(production.workshop(shop_id)["worker"])
+		if not holder.is_empty() and _away_well(holder) and _unseated_of(town, str(shop["trade"])) > 0:
+			reseat = true
+	if reseat:
+		_seat(town)
+		acted = true
+	for shop_id: String in production.workshop_ids(town):
+		if acted or not _bench_told.has(shop_id):
+			_bench_told[shop_id] = true
+			print(_bench_line(town, shop_id))
+
+
+## Whether worker [param who] is away and not sick (915: a sick holder keeps the bench).
+func _away_well(who: String) -> bool:
+	var worker := production.worker(who)
+	return bool(worker.get("away", false)) and not bool(worker.get("sick", false))
+
+
+## How many of [param town]'s residents of [param trade], here (not away or sick), have no bench (915).
+func _unseated_of(town: String, trade: String) -> int:
+	return _town(town)["residents"].filter(func(who: String) -> bool:
+		var worker := production.worker(who)
+		return not worker.is_empty() and str(worker["trades"][0]) == trade and not Production.off_work(worker) and not _seated(who)).size()
+
+
+## A bench's state, no names (915): "[towns] <town> bench <trade>: holder present|away|sick|none,
+## job <n> <state>, unseated of the trade <k>".
+func _bench_line(town: String, shop_id: String) -> String:
+	var shop := production.workshop(shop_id)
+	var worker := production.worker(str(shop["worker"]))
+	var holder := "none" if worker.is_empty() else "sick" if bool(worker.get("sick", false)) else "away" if bool(worker.get("away", false)) else "present"
+	var job := int(shop["job"])
+	return "[towns] %s bench %s: holder %s, job %d %s, unseated of the trade %d" % [town, shop["trade"], holder, job,
+		str(production.job(job).get("state", "none")) if job != 0 else "-", _unseated_of(town, str(shop["trade"]))]
 
 
 ## Orders a repair of [param town]'s first damaged building with none

@@ -12592,6 +12592,18 @@ func _tell_sickness(pet: Companion, record: PlayerRecord, away: bool) -> void:
 	record.companion.erase("was_sick")
 
 
+## The player record whose companion is worker [param id] (915): a resident companion's worker
+## is "companion:<her name>" (Towns.note_companion_in), its origin "companion:<player id>"; an id
+## "companion:<player id>" is read as before. Before 915 only the second was looked up, so a
+## companion who fell sick in town had her sickness stored nowhere. Server only: the id never leaves.
+func _record_of_companion_worker(id: String) -> PlayerRecord:
+	var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
+	if record != null or World.production == null:
+		return record
+	var origin := str(World.production.worker(id).get("origin", ""))
+	return _records.get(origin.trim_prefix("companion:")) if origin.begins_with("companion:") else null
+
+
 ## Her record's sickness ends (decision 501): "sick" goes, and "was_sick"
 ## ({since, ended, cured_by, kind}) stays to be told once.
 func _end_companion_sickness(record: PlayerRecord) -> void:
@@ -14226,10 +14238,10 @@ func _offers_context() -> Dictionary:
 		"altar_down": func(town: String, gold: int) -> void: _altar_down(town, gold),
 		"give_gold": func(player_id: String, gold: int, why: String) -> void: _give_gold(player_id, gold, why),
 		"companion_sick": func(id: String) -> Dictionary:
-			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
+			var record := _record_of_companion_worker(id)
 			return record.companion.get("sick", {}).duplicate(true) if record != null and record.companion.get("sick") is Dictionary else {},
 		"set_companion_sick": func(id: String, sick: Dictionary) -> void:
-			var record: PlayerRecord = _records.get(id.trim_prefix("companion:"))
+			var record := _record_of_companion_worker(id)
 			if record == null:
 				return
 			if sick.is_empty():

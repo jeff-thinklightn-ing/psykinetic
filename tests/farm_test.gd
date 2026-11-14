@@ -62,6 +62,7 @@ func _ready() -> void:
 	_test_herders()
 	_test_visitors()
 	_test_trader()
+	_test_benches()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1376,3 +1377,168 @@ func _test_herders() -> void:
 	saved.herders_from_dict(JSON.parse_string(JSON.stringify(towns.herders_to_dict())))
 	_check(saved.herders_to_dict()[HUT]["next"] == towns.herders_to_dict()[HUT]["next"], "saved and loaded")
 	Level.unregister("fh")
+
+
+## Benches (915): Umbrage's carpenter, a player's companion, fell sick in town on 10-20; her sickness
+## was stored nowhere (Main's hook looked her player up by her own name), so it never ended, the
+## town's sick mark stayed, and her bench never bid again through three weeks and dozens of loads.
+## The bench audit on each town's turn: a companion's mark follows her sickness; a bench whose holder
+## is away (not sick) passes to one of its trade who is here; a bench's job not worked there by its
+## own worker is cleared. The box's whole shape: three repairs queued, two wanting ore, the store
+## bare, then 80 wood, the farmer walks in: the field planned, started and standing.
+func _test_benches() -> void:
+	print("\n== benches (915) ==")
+	var bench := "%s:carpenter" % TOWN
+	# The box's shape, through a load: her stale mark is cleared on the first turn and she bids.
+	var towns := _bench_world()
+	var work := towns.production
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	work.set_sick("companion:Wynn", true)  # What the hook that stored nothing left: a mark, no sickness.
+	towns = _bench_loaded(towns)
+	work = towns.production
+	_check(work.workshop_of("companion:Wynn") == bench and bool(work.worker("companion:Wynn").get("sick", false)),
+		"a save like the box's: her bench, her stale sick mark")
+	_bench_ticks(towns, 1)
+	_check(not bool(work.worker("companion:Wynn").get("sick", false)) and int(work.workshop(bench)["waited"]) > 0,
+		"the first turn: the mark cleared, and she bids (short of ore and wood: waited %d)" % int(work.workshop(bench)["waited"]))
+	work.stockpile.deposit(TOWN, "wood", 80, "test", "the woodcutter's trips")
+	var steps := _bench_field(towns)
+	_check(steps[0] >= 0 and steps[1] >= 0 and steps[2] >= 0 and steps[2] <= 2 * DAY,
+		"80 wood, the farmer walks in: the field planned +%d, started +%d, stands +%d steps" % steps)
+
+	# The real path on economy's side: Townsfolk's sickness on a companion resident, stored through
+	# Offers.ctx by her worker's id, ends on its day, and the town's mark ends with it.
+	var ctx_was := Offers.ctx
+	var stored := {}
+	Offers.ctx = {"companion_sick": func(id: String) -> Dictionary: return stored.get(id, {}).duplicate(true),
+		"set_companion_sick": func(id: String, record: Dictionary) -> void:
+			if record.is_empty():
+				stored.erase(id)
+			else:
+				stored[id] = record.duplicate(true)}
+	towns = _bench_world()
+	work = towns.production
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	var rng := RandomNumberGenerator.new()
+	Townsfolk._falls_sick(work, TOWN, "companion:Wynn", Townsfolk.day_of(_now), rng)
+	_bench_ticks(towns, 1)
+	_check(stored.has("companion:Wynn") and bool(work.worker("companion:Wynn").get("sick", false)),
+		"she falls sick in town: her sickness stored, the mark kept while it lasts")
+	var until := _now + (Townsfolk.sick_days() + 1) * DAY
+	while _now < until and bool(work.worker("companion:Wynn").get("sick", false)):
+		_bench_ticks(towns, 1)
+		Townsfolk.sicken(work)
+	_check(not stored.has("companion:Wynn") and not bool(work.worker("companion:Wynn").get("sick", false)),
+		"after its days her sickness ends, and the mark with it")
+	Offers.ctx = ctx_was
+
+	# An away holder (a first player's companion taken out for good): a second companion of the
+	# trade takes the bench; the first, back, waits; the second away, the first takes it back.
+	towns = _bench_world()
+	work = towns.production
+	towns.note_companion_in(TOWN, "Ada", "carpenter", "p0")
+	towns.note_companion_out(TOWN, "Ada")
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	_check(work.workshop_of("companion:Wynn") == bench and work.workshop_of("companion:Ada") == "",
+		"its holder away for good: the second companion takes the bench")
+	towns.note_companion_in(TOWN, "Ada", "carpenter", "p0")
+	_check(work.workshop_of("companion:Ada") == "" and work.workshop_of("companion:Wynn") == bench,
+		"the first back: she waits, the bench stays with the one at it")
+	towns.note_companion_out(TOWN, "Wynn")
+	_bench_ticks(towns, 1)
+	_check(work.workshop_of("companion:Ada") == bench, "the second away: the first takes it back at the town's turn")
+
+	# A save shaped like the box's other silence: the holder away, a second of the trade unseated.
+	towns = _bench_world()
+	work = towns.production
+	towns.note_companion_in(TOWN, "Ada", "carpenter", "p0")
+	towns.note_companion_out(TOWN, "Ada")
+	work.add_worker("companion:Wynn", "Wynn", ["carpenter"], TOWN, "companion:p1")
+	towns._town(TOWN)["residents"].append("companion:Wynn")
+	towns = _bench_loaded(towns)
+	work = towns.production
+	_bench_ticks(towns, 1)
+	_check(work.workshop_of("companion:Wynn") == bench and int(work.workshop(bench)["waited"]) > 0,
+		"a loaded save, its holder away and a second unseated: the second takes the bench on the first turn and bids")
+
+	# The common case (84 times on the box): she holds the bench alone, is taken out and left again:
+	# her bench and her job's progress are kept.
+	towns = _bench_world()
+	work = towns.production
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	work.stockpile.deposit(TOWN, "wood", 80, "test", "")
+	work.stockpile.deposit(TOWN, "ore", 20, "test", "")
+	var job := 0
+	for k in 40:
+		_bench_ticks(towns, 1)
+		job = int(work.workshop(bench)["job"])
+		if job != 0 and int(work.job(job).get("worked", 0)) > 0:
+			break
+	var worked := int(work.job(job).get("worked", 0))
+	towns.note_companion_out(TOWN, "Wynn")
+	_bench_ticks(towns, 20)
+	_check(work.workshop_of("companion:Wynn") == bench and int(work.workshop(bench)["job"]) == job and work.job(job).get("state") == "working"
+		and int(work.job(job)["worked"]) == worked, "taken out, nobody else of the trade: her bench and her job (#%d, %d worked) kept" % [job, worked])
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	_bench_ticks(towns, 2)
+	_check(int(work.job(job).get("worked", 0)) > worked or work.job(job).is_empty(), "left again: she goes on with it")
+
+	# Removed mid-job (died, or a companion handed back for good): the bench's job is cleared with her.
+	var mid := int(work.workshop(bench)["job"])
+	towns._town(TOWN)["residents"].erase("companion:Wynn")
+	work.remove_worker("companion:Wynn")
+	_check(mid == 0 or (int(work.workshop(bench)["job"]) == 0 and work.job(mid).get("state") == "queued"),
+		"removed mid-job: the job back in the queue, the bench's job cleared")
+
+
+## The box's Umbrage for the bench cases: temple, kitchen and forge damaged, their repairs queued
+## (Towns._repair's half costs), the store bare.
+func _bench_world() -> Towns:
+	_now = 0
+	var clock := func() -> int: return _now
+	var work := Production.new({}, Stockpile.new({}, clock, ItemBook.new(clock)), null, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	towns.rain = func(_town: String, from: float, to: float) -> float: return 0.1 * (to - from) / DAY
+	towns.storms = func(_town: String, _from: float, _to: float) -> Array: return []
+	var record := towns._town(TOWN)
+	for kind: String in ["temple", "kitchen", "forge"]:
+		var spec: Dictionary = _rules["buildings"][kind]
+		var cost := {}
+		for what: String in spec.get("cost", {}):
+			cost[what] = ceili(int(spec["cost"][what]) * 0.5)
+		record["buildings"][kind] = {"kind": kind, "level": 1, "state": Towns.DAMAGED, "since": 0, "job": 0}
+		record["buildings"][kind]["job"] = work.order_build(TOWN, Towns.REPAIR + kind, "carpenter", cost, maxi(ceili(int(spec.get("steps", 1)) * 0.5), 1))
+	return towns
+
+
+func _bench_loaded(towns: Towns) -> Towns:
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new(JSON.parse_string(JSON.stringify(towns.production.stockpile.to_dict())), clock, ItemBook.new(clock))
+	var work := Production.new(JSON.parse_string(JSON.stringify(towns.production.to_dict())), stock, null, clock, _rules)
+	var again := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), work, _rules, clock)
+	again.rain = towns.rain
+	again.storms = towns.storms
+	return again
+
+
+func _bench_ticks(towns: Towns, ticks: int) -> void:
+	for k in ticks:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		towns.production.tick()
+
+
+## Steps from now until the town's field is planned, started and standing ([-1, ...] for never, 2 days at most).
+func _bench_field(towns: Towns) -> Array:
+	var from := _now
+	var out := [-1, -1, -1]
+	while _now < from + 2 * DAY and out[2] < 0:
+		_bench_ticks(towns, 1)
+		var field := towns.building(TOWN, "field")
+		if out[0] < 0 and not field.is_empty():
+			out[0] = _now - from
+		if out[1] < 0 and towns.production.job(int(field.get("job", 0))).get("state") == "working":
+			out[1] = _now - from
+		if out[2] < 0 and int(field.get("level", 0)) >= 1 and field.get("state") == Towns.STANDING:
+			out[2] = _now - from
+	return out
