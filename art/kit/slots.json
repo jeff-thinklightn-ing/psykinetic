@@ -1479,7 +1479,7 @@
 			"kind": "cell",
 			"size": [0.8, 0.8, 0.8],
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c18 fit read as mush at game zoom): a frame of dark corner posts and rims, three planks a face over a dark core, a diagonal brace on each side; 168 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-19", "notes": "rebuilt by hand in big clean planes for Jeff's crispness note (2026-10-19, \"the graphics not crisp\"; the coordinator's ask; art-gen's c18 fit read as mush at game zoom): a frame of dark corner posts and rims, three planks a face over a dark core, a diagonal brace on each side; 184 tris. 2026-11-14 (art-kit): each of the 8 top and foot rims, a 3-face box with no inner side, gains it (C:/dev/review/crate_rim/close_rims.py), so the 2 cm of rim above the core is not seen through from across the lid (art-gen's cull check, magenta along the top rim; C:/dev/review/crate_rim/crate_rim_sheet.png)"},
 			"uses": "a crate, pushable and stackable to stand on (the crate entity; drawn as a primitive puppet until decision 264 draws it through ArtKit)"
 		},
 		"prop.chest": {
