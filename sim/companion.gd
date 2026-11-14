@@ -480,8 +480,9 @@ const MENTIONED_TOPICS := {
 	"the ledge": "ledge|edge|drop",
 	"the torches": "torch",
 	"the imps": "imp",
-	"the brute": "brute",
-	"the sneak": "sneak",
+	"the orcs": "orc|brute",
+	"the kobolds": "kobold|sneak",
+	"the crypt guards": "crypt guard|skeleton",
 	"%s's wounds": "hurt|wound|blood|bleed|heal",
 	"resting": "rest|breathe",
 	"keeping close": "stay close|keep close|beside|behind me",
@@ -509,7 +510,7 @@ by fires, and the open ground beyond."""
 const OPEN_WORLD := "You walk the open land: fields and forest, and towns where people live and work."
 ## The most of lore's facts her voice is told, in characters.
 const LORE_CHARS := 600
-const VOICE_WORLD := """Monsters prowl there, imps and brutes and worse, and they attack whoever they
+const VOICE_WORLD := """Monsters prowl there, imps and orcs and worse, and they attack whoever they
 see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors open and close.
 Wounds do not close on their own; a bandaging kit, used away from danger, mends them.
 Whoever falls can be brought back, but it hurts, and no one wants to fall.
@@ -2620,7 +2621,7 @@ func look_findings(cell: Vector2i) -> Array[String]:
 		var them: Array = kinds[kind]
 		var roused := them.any(func(each: Monster) -> bool: return each.alert != Monster.Alert.IDLE)
 		var count := them.size()
-		var named := counted(kind, count)
+		var named := kind_counted(kind, count)
 		seen.push_front("%s, %s" % [named, "on the watch" if roused else "unaware of you"])
 	var things: Array[String] = []
 	var burning := false
@@ -3155,7 +3156,7 @@ func note_death(who: String, her_player := false, entity: GridEntity = null, by:
 		note_fact("%s saw %s killed in %s." % [_name_of(self), refer(entity), _place_words()])
 	if entity is Animal and by != null and (by == self or by == keeper):
 		# A wild animal brought down by her player, or by her (decision 332).
-		note_fact("%s brought down %s in %s." % [_name_of(self) if by == self else keeper_name(), _a(kind_of(entity)),
+		note_fact("%s brought down %s in %s." % [_name_of(self) if by == self else keeper_name(), a_kind(kind_of(entity)),
 			_place_words()])
 	if entity == _quarry:
 		_quarry = null
@@ -3307,11 +3308,34 @@ func refer(entity: GridEntity, capital := false) -> String:
 				and World.distance(tile, other.tile) <= SIGHT_RANGE:
 			others = true
 			break
-	var words := ("the " if not others else "an " if kind[0] in "aeiou" else "a ") + kind
+	# Its label, never its id (112 amended (1); voice, 11-13): "the orc",
+	# "a crypt guard"; one of a kind as it is, "the old grey".
+	var word := World.kind_word(kind)
+	var words := word if word.begins_with("the ") else ("the " if not others else "an " if word[0] in "aeiou" else "a ") + word
 	return words[0].to_upper() + words.substr(1) if capital else words
 
 
-## [param count] of [param kind], in words: "an imp", "three brutes".
+## A creature [param kind] with its article, as she says it (112 amended
+## (1)): "an orc", "a crypt guard"; one of a kind as it is, "the old grey".
+static func a_kind(kind: String) -> String:
+	var word := World.kind_word(kind)
+	return word if word.begins_with("the ") else ("an " if word[0] in "aeiou" else "a ") + word
+
+
+## [param count] of creature [param kind], in words (112 amended (1)): "an
+## imp", "three orcs", "two wolves" (its plural, World.kind_plural); one of a
+## kind uncounted ("the old grey", "the old grey twice", World.kind_count).
+static func kind_counted(kind: String, count: int) -> String:
+	if count == 1:
+		return a_kind(kind)
+	if World.kind_word(kind).begins_with("the "):
+		return World.kind_count(kind, count)
+	const NUMBERS: Array[String] = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"]
+	return "%s %s" % [NUMBERS[mini(count, NUMBERS.size() - 1)], World.kind_plural(kind)]
+
+
+## [param count] of [param kind], in words: "an imp", "three brutes". A
+## thing's word, not a creature's kind: kind_counted is for those.
 static func counted(kind: String, count: int) -> String:
 	const NUMBERS: Array[String] = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"]
 	if count == 1:
@@ -3319,8 +3343,9 @@ static func counted(kind: String, count: int) -> String:
 	return "%s %ss" % [NUMBERS[mini(count, NUMBERS.size() - 1)], kind]
 
 
-## Who fell near her, monsters counted by kind: "three imps, a brute and
-## Jeff, who has risen again".
+## Who fell near her, monsters counted by kind: "three imps, an orc and
+## Jeff, who has risen again" (a monster's "word" is its kind; kind_counted
+## says it).
 func _fallen_words() -> String:
 	var kinds: Array[String] = []
 	var counts: Dictionary[String, int] = {}
@@ -3335,7 +3360,7 @@ func _fallen_words() -> String:
 			allies.append(word)
 	var parts: Array[String] = []
 	for kind in kinds:
-		parts.append(counted(kind, counts[kind]))
+		parts.append(kind_counted(kind, counts[kind]))
 	for ally in allies:
 		parts.append("%s, who has risen again" % ally if ally == keeper_name() and _alive(keeper) else ally)
 	if parts.size() == 1:
@@ -3540,7 +3565,18 @@ func _watch() -> void:
 			if not _kinds_seen.has(kind_of(entity)):
 				# The first of a kind this run: new to her, worth a word.
 				_kinds_seen[kind_of(entity)] = true
-				new_kind = "%s came into sight, the first %s you have seen here." % [_name_of(entity), kind_of(entity)]
+				# Its label, not its id (112 amended (1); voice's three forms): one
+				# with a given name by it and its kind ("Brand came into sight, the
+				# first orc you have seen here"), one of a kind ("The old grey came
+				# into sight, the first time you have seen it here"), else as she
+				# refers to it ("An orc came into sight, the first you have seen here").
+				var word := World.kind_word(kind_of(entity))
+				if word.begins_with("the "):
+					new_kind = "%s came into sight, the first time you have seen it here." % refer(entity, true)
+				elif not (entity as Monster).given_name.is_empty():
+					new_kind = "%s came into sight, the first %s you have seen here." % [(entity as Monster).given_name, word]
+				else:
+					new_kind = "%s came into sight, the first you have seen here." % refer(entity, true)
 				_fight_notable = true
 			# In a fight a sighting is no event; only what changes is.
 			if not fight and not _was_in_fight:
@@ -4333,7 +4369,8 @@ func _held_tongue(what: String) -> void:
 
 ## What keeps the fight on, for the mind log: the nearest roused hostile in
 ## COMBAT_RANGE as "<kind> <ALERT>[ after someone] <n> from her", else her
-## intent. No names or ids.
+## intent. No names or ids. Its kind as a player reads it, the kind's id after
+## when they differ: "orc (brute)" (112 amended (1)).
 func _fight_cause() -> String:
 	var best: GridEntity = null
 	var best_d := COMBAT_RANGE + 1
@@ -4350,6 +4387,9 @@ func _fight_cause() -> String:
 		return "her intent %s" % intent_name()
 	var monster := best as Monster
 	var kind := kind_of(best)
+	var word := World.kind_word(kind)
+	if word != kind.replace("_", " "):
+		kind = "%s (%s)" % [word, kind]
 	var how: String = str(Monster.Alert.keys()[monster.alert]) if monster != null else "?"
 	return "%s %s%s %d from her" % [kind, how, " after someone" if monster != null and monster.target != null else "", best_d]
 
@@ -5648,6 +5688,7 @@ func seen_things() -> Array[Dictionary]:
 		if entity is Monster and entity.spawned and entity.hp > 0:
 			var monster := _thing(kind_of(entity), cell, Vector2(cell))
 			monster["monster"] = true
+			monster["word"] = a_kind(monster["kind"])  # Its label, not its id (112 amended (1)); "kind" stays the id.
 			found.append(monster)
 		elif entity.pushable:
 			found.append(_thing(object_word(entity), cell, Vector2(cell)))
@@ -5836,7 +5877,17 @@ func perception_grid() -> String:
 		var at := far if World.get_entity_at(far) == null else near
 		if glyphs.has(at) and World.get_entity_at(at) == null:
 			glyphs[at] = "d" if door.is_open() else "D"
+	# Each kind's letter from its word (112 amended (1): "o orc", never the
+	# id's "b brute"), the seen kinds first, then the rest of the key.
 	var kinds: Array[String] = []
+	for cell: Vector2i in glyphs:
+		var entity := World.get_entity_at(cell)
+		if entity is Monster and entity.spawned and _sees(cell) and kind_of(entity) not in kinds:
+			kinds.append(kind_of(entity))
+	for kind: String in Level.MONSTER_TYPES:
+		if kind not in kinds:
+			kinds.append(kind)
+	var letters := kind_letters(kinds, [me, them])
 	for cell: Vector2i in glyphs:
 		var entity := World.get_entity_at(cell)
 		if entity == null or not _sees(cell):
@@ -5846,10 +5897,7 @@ func perception_grid() -> String:
 		elif entity == keeper:
 			glyphs[cell] = them
 		elif entity is Monster and entity.spawned:
-			var kind := kind_of(entity)
-			glyphs[cell] = kind[0]
-			if kind not in kinds:
-				kinds.append(kind)
+			glyphs[cell] = letters[kind_of(entity)]
 		elif entity.pushable:
 			glyphs[cell] = "o" if object_word(entity) == "boulder" else "c"
 		elif entity is Chest:
@@ -5866,15 +5914,36 @@ func perception_grid() -> String:
 	var key: Array[String] = ["%s you" % me]
 	if not them.is_empty():
 		key.append("%s %s" % [them, keeper_name()])
-	for kind: String in Level.MONSTER_TYPES:
-		if kind not in kinds:
-			kinds.append(kind)
 	for kind in kinds:
-		key.append("%s %s" % [kind[0], kind])
+		key.append("%s %s" % [letters[kind], World.kind_word(kind)])
 	key.append_array(["f fire", "~ water", "% shallow water, wadeable", "# wall" if not World.outdoor else "# wall or forest", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
 		"^ stair", "v drop to lower ground", ". floor", "? out of sight"])
 	return "A map of what you can see, you at the centre, north at the top, one character a pace:\n%s\nKey: %s." % [
 		"\n".join(rows), ", ".join(key)]
+
+
+## Her map's letter for each of [param kinds] (112 amended (1)), in order:
+## its word's first letter ("i" for an imp, past a leading "the"), else that
+## letter upper-cased ("O" for an orc, "C" for a crypt guard: o and c are the
+## map's own), else its word's next letters so, else its id's, else "*";
+## never one of the map's own marks or [param taken] (her initial, her
+## player's) or a letter already given.
+static func kind_letters(kinds: Array[String], taken: Array) -> Dictionary:
+	var used: Array = ["f", "~", "%", "#", "D", "d", "c", "o", "=", "^", "v", ".", "?", "&", "@"] + taken
+	var out := {}
+	for kind in kinds:
+		var word := World.kind_word(kind).trim_prefix("the ")
+		var tries: Array[String] = []
+		for each in (word + kind).replace(" ", "").replace("_", ""):
+			tries.append_array([each, each.to_upper()])
+		var letter := "*"
+		for each: String in tries:
+			if each not in used:
+				letter = each
+				break
+		used.append(letter)
+		out[kind] = letter
+	return out
 
 
 ## How [param cell] shows on the grid when she can see it.
@@ -6624,7 +6693,11 @@ static func _word_set(plain: String) -> Dictionary[String, bool]:
 static func event_report(kinds: Array) -> RegEx:
 	var names: Array[String] = ["monster", "one", "thing", "beast", "enemy", "foe", "it", "they", "them"]
 	for kind: Variant in kinds:
-		names.append(_escaped(str(kind).to_lower()))
+		# Its id, and its word and plural as she now says them (112 amended (1):
+		# "orc", "wolves"; the id still, should a line name it).
+		for word: String in [str(kind).to_lower(), World.kind_word(str(kind)), World.kind_plural(str(kind))]:
+			if _escaped(word) not in names:
+				names.append(_escaped(word))
 	var kind := "(%s)(s|es)?" % "|".join(names)
 	return RegEx.create_from_string(("(?i)^[^,;]*?\\b%s\\b[^,;]*?\\b((is|are|was|were|lies|lie)\\s+(now\\s+)?"
 		+ "(dead|down|fallen|not moving)|fell|died|dropped)\\s*([.!;,]|$)") % kind)

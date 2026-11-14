@@ -882,8 +882,9 @@ func _test_spoken_polish() -> void:
 	pet._said.clear()
 	_check(pet.spoken("The imp to the north-east is dead. Stay close.") == "Stay close.", "the event log said back goes: %s"
 			% pet.spoken("The imp to the north-east is dead. Stay close."))
-	_check(pet.spoken("Brute is down.").is_empty() and pet.spoken("The sneak fell.").is_empty() and pet.spoken("Two imps are dead.").is_empty(),
-			"any monster's fall, told back")
+	_check(pet.spoken("Brute is down.").is_empty() and pet.spoken("The sneak fell.").is_empty() and pet.spoken("Two imps are dead.").is_empty()
+			and pet.spoken("The orc is down.").is_empty() and pet.spoken("The kobold fell.").is_empty(),
+			"any monster's fall, told back, by its id or its label (112 amended (1))")
 	_check(pet.spoken("The brute is down the corridor.") == "The brute is down the corridor.", "but not a place")
 	_check(pet.spoken("The brute is dead.", false, true) == "The brute is dead.", "asked, she may say it")
 	pet._narrate("The fighting is over.")
@@ -940,8 +941,17 @@ func _test_quiet_after_minor() -> void:
 	pet._kinds_seen.erase("imp")
 	imp = _spawn_imp(Vector2i(4, 1))
 	World.step()
-	_check(mind.triggers("voice").size() == 1 and "the first imp" in mind.triggers("voice")[0],
-			"a kind she has not seen this run: her voice (%s)" % [mind.triggers("voice")])
+	_check(mind.triggers("voice").size() == 1 and "The imp came into sight, the first you have seen here." in mind.triggers("voice")[0],
+			"a kind she has not seen this run: her voice, as she refers to it (voice, 112 amended (1)) (%s)" % [mind.triggers("voice")])
+	mind.clear()
+	pet._kinds_seen.erase("imp")
+	World.despawn(imp)
+	imp = _spawn_imp(Vector2i(4, 1))
+	imp.given_name = "Nib"
+	pet._last_speech_tick = -1000
+	World.step()
+	_check(mind.triggers("voice").size() == 1 and "Nib came into sight, the first imp you have seen here." in mind.triggers("voice")[0],
+			"one with a given name: by it and its kind (%s)" % [mind.triggers("voice")])
 	World.despawn(imp)
 	pet.mind = ScriptedMind.new()
 	_settle(pet)
@@ -5508,7 +5518,7 @@ func _test_quiet() -> void:
 	robber.alert = Monster.Alert.FIGHTING
 	robber.target = owner
 	World.step()
-	_check(pet.fight_roused() and pet.quiet() and "robber FIGHTING after someone" in pet._fight_why,
+	_check(pet.fight_roused() and pet.quiet() and "grave robber (robber) FIGHTING after someone" in pet._fight_why,
 		"a robber at its post set on her player: quiet at first (%s)" % pet._fight_why)
 	for i in Companion.STANDOFF_S * World.TICK_RATE + 2:
 		World.step()
@@ -8414,7 +8424,8 @@ func _test_surroundings() -> void:
 	_check(at.call(0, 0) == mine and at.call(0, 1) == theirs, "her at the centre, her player below: %s" % grid)
 	_check(at.call(0, 2) == "D" and at.call(0, 3) == "?", "the closed door in its doorway, nothing seen past it")
 	_check(at.call(0, -1) == "#", "the wall at her back")
-	_check(rows[-1].begins_with("Key: %s you, %s Player, i imp, b brute" % [mine, theirs]), "and the key: %s" % rows[-1])
+	var letter: Dictionary = Companion.kind_letters(["imp", "brute"], [mine, theirs])
+	_check(rows[-1].begins_with("Key: %s you, %s Player, %s imp, %s orc" % [mine, theirs, letter["imp"], letter["brute"]]), "and the key, by label: %s" % rows[-1])
 	World._set_door(door, true, owner)
 	_check(pet.perception_grid().split("\n")[1 + centre + 2].split(" ")[centre] == "d", "an open door is d")
 	_check("- an open door" in pet.perception_list(), "and open in the list")
@@ -8844,7 +8855,7 @@ func _test_transcript() -> void:
 
 
 func _test_monsters_by_kind() -> void:
-	print("\n== the voice calls monsters by kind: an imp, the brute, never Imp2 ==")
+	print("\n== the voice calls monsters by kind, by their labels: an imp, the orc, never Imp2 or brute (112 amended (1)) ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -8859,7 +8870,21 @@ func _test_monsters_by_kind() -> void:
 	var brute := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "TestBrute%d" % World.tick,
 		"tile": Vector2i(12, 6), "kind": "brute", "props": {"mass": 70.0, "sight_range": 0}}) as Monster
 	_check(Companion.kind_of(imp_a) == "imp" and Companion.kind_of(brute) == "brute", "kinds from the level marker or the name")
-	_check(pet.refer(imp_a, true) == "An imp" and pet.refer(brute) == "the brute", "an imp, with two in sight; the brute, the only one")
+	_check(pet.refer(imp_a, true) == "An imp" and pet.refer(brute) == "the orc", "an imp, with two in sight; the orc (a brute's label), the only one")
+	# 112 amended (1): her words for kinds are their labels (World.kind_word,
+	# kind_plural, kind_count): plurals as monsters.json gives them, a "The"
+	# label one of a kind, never counted or given an article.
+	_check(Companion.a_kind("brute") == "an orc" and Companion.a_kind("skeleton_guard") == "a crypt guard"
+			and Companion.a_kind("old_wolf") == "the old grey",
+		"with an article: %s, %s, %s" % [Companion.a_kind("brute"), Companion.a_kind("skeleton_guard"), Companion.a_kind("old_wolf")])
+	_check(Companion.kind_counted("wolf", 2) == "two wolves" and Companion.kind_counted("draugr", 3) == "three draugr"
+			and Companion.kind_counted("sneak", 2) == "two kobolds" and Companion.kind_counted("old_wolf", 1) == "the old grey"
+			and Companion.kind_counted("old_wolf", 2) == "the old grey twice",
+		"counted: %s, %s, %s, %s" % [Companion.kind_counted("wolf", 2), Companion.kind_counted("draugr", 3),
+			Companion.kind_counted("sneak", 2), Companion.kind_counted("old_wolf", 2)])
+	var letters := Companion.kind_letters(["imp", "brute", "skeleton_guard", "old_wolf"], ["P", "&"])
+	_check(letters["imp"] == "i" and letters["brute"] == "O" and letters["skeleton_guard"] == "C" and letters["old_wolf"] == "l",
+		"her map's letters from the words, past the map's own marks (o boulder, c crate) and each other: %s" % [letters])
 	var level: Dictionary = Level.load_level("sample")
 	var kinds: Array[String] = []
 	for entity: Dictionary in level["entities"]:
@@ -8880,15 +8905,16 @@ func _test_monsters_by_kind() -> void:
 	_check(ids.search(text) == null, "no entity name anywhere in what the voice sees")
 	_check(RegEx.create_from_string("\\[(An|The) imp came into sight, (close by|a few paces|some way off|at the edge of sight) to the (north|south|east|west)").search(text) != null,
 			"sightings by kind, with paces and a compass point")
-	_check("The brute fell." in text and "An imp fell." in text, "deaths by kind")
-	_check("Lying dead near you, no threat now: " in text and "a brute" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
+	_check("The orc fell." in text and "An imp fell." in text and "The brute fell." not in text and "a brute" not in text,
+		"deaths by kind, by label (her lore facts are lore's to word)")
+	_check("Lying dead near you, no threat now: " in text and "an orc" in text, "who fell, counted by kind: %s" % pet.run_summary(false))
 	World.damage(imp_b, 999)
 	pet._fallen.clear()
 	pet.note_death("Player", true)
 	for kind in ["imp", "imp", "brute"]:
 		pet._fallen.append({"word": kind, "monster": true})
-	_check(pet._fallen_words() == "two imps, a brute and Player, who has risen again",
-			"three imps, a brute and Jeff (%s)" % pet._fallen_words())
+	_check(pet._fallen_words() == "two imps, an orc and Player, who has risen again",
+			"two imps, an orc and her player (%s)" % pet._fallen_words())
 	pet._deaths.clear()
 	pet._keeper_down = false
 	pet.mind = ScriptedMind.new()
@@ -9250,7 +9276,7 @@ func _test_wild() -> void:
 	_check(doe.hp == doe.max_hp and not pet.in_fight() and pet.current_intent != Companion.Intent.ATTACK,
 		"a deer 3-4 off is no foe: she leaves it be (%s)" % pet.intent_name())
 	_check(pet.stalking() == doe, "her player sees it, and it is not running: they are stalking it")
-	_check("is stalking the deer" in pet.voice_situation(), "her voice is told (%s)" % pet.voice_situation())
+	_check("is stalking the wild doe" in pet.voice_situation(), "her voice is told (%s)" % pet.voice_situation())
 	var far := Vector2i(-1, -1)
 	for dy in range(-4, 5):
 		for dx in range(-4, 5):
@@ -9270,7 +9296,7 @@ func _test_wild() -> void:
 	_check(doe.hp < doe.max_hp and pet.in_fight(), "and she goes for it (deer hp %d/%d)" % [doe.hp, doe.max_hp])
 	World.damage(doe, 999, owner)
 	World.step()
-	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "brought down a deer" in str(fact["text"])),
+	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "brought down a wild doe" in str(fact["text"])),
 		"her player brought it down where she saw: a fact about her (%s)" % [pet.grown.facts.map(func(f: Dictionary) -> String: return f["text"])])
 	_check(pet._quarry == null, "the quarry is gone with it")
 	var phase := DayNight.phase

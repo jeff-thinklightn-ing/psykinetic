@@ -989,6 +989,36 @@ kind comes from the level marker, carried in the spawn spec, so a level
 author's new monster type names itself. The hands' prompt and the mind
 log keep entity names, where telling two imps apart matters.
 
+112 amended (1): her words for a kind are its label, never its id (the
+decision-number script's label; the coordinator's approval after
+enemy-ai's plate row; voice, 11-13: the label wherever a player reads a
+kind). They come from enemy-ai's World.kind_word, kind_plural and
+kind_count (417 amended (1)), so monsters.json says them once: refer gives
+"the orc", "a crypt guard"; Companion.a_kind "an orc", a "The" label as it
+is ("the old grey", no article); Companion.kind_counted "three orcs", "two
+wolves" (its own "plural"), "three draugr", one of a kind uncounted ("the
+old grey twice"). Those carry her sightings (a kind's first sight in
+voice's three forms: "An orc came into sight, the first you have seen
+here.", as she refers to it, a bare label read as a name; "Brand came into
+sight, the first orc you have seen here.", a given name with its kind; "The
+old grey came into sight, the first time you have seen it here."), her look
+findings, who fell near her, the animals brought down,
+the word on each monster in perceived(), and her map's key. The map's
+letters come from the words (Companion.kind_letters: the word's first
+letter, then upper-cased, then its next letters; never the map's own marks
+o, c and the rest, her initial or her player's, or one already given:
+"i imp", "O orc", "C crypt guard"). The told-back filter (event_report)
+knows each kind's id, word and plural; MENTIONED_TOPICS has "the orcs",
+"the kobolds", "the crypt guards" in place of the brute and sneak, and
+VOICE_WORLD says "imps and orcs and worse". Ids stay
+where logic reads them: kind_of, _kinds_seen and _kinds_fallen keys, a
+thing's "kind", lore topics. The mind log's fight cause names the word,
+the id after when they differ ("orc (brute)"). Companion.counted stays for
+things (goods, resources). companion_test _test_monsters_by_kind and the
+map and told-back checks pin the new words. Server only, protocol
+unchanged, no new class_name, no bullet (what she says is the model's;
+what she is told changed).
+
 ## 113. Most monster deaths are not worth a word
 
 Every imp falling asked her voice, so she spent her lines on kill
