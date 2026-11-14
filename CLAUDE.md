@@ -184,7 +184,10 @@ that the walk looks like skipping and the people look like "bad claymation place
   back. A follow-up that lands on its own takes the next amended (k) from the script; a
   paragraph added to work not yet landed stays under its hand-out and takes nothing; a tree
   landing its side of a decision the coordinator named uses that decision's number and takes
-  nothing.
+  nothing. Until the script is mended, a paragraph never names another tree's unlanded label by
+  its number (it says "environment's speaker fade, unlanded"): the script counts a label as
+  landed wherever its words appear in `docs/decisions.md` (11-14: 623 amended (8), quoted in
+  another tree's landed paragraph, could not be given back).
 - After a pull or rebase that brings in a new `class_name`, run
   `godot --headless --path . --import` before testing: each worktree has its own `.godot`
   class cache, and without it scripts naming the new class fail to compile. Name any new
