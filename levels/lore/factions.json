@@ -117,7 +117,7 @@
 			"name": "the goblins",
 			"status": "agreed",
 			"source": "game",
-			"summary": "The Blood Rot's goblins, the imps, with their allies the orcs (the brutes) and the kobolds (the sneaks), as met in the land today.",
+			"summary": "The Blood Rot's goblins, the imps, with their allies the orcs and the kobolds, as met in the land today.",
 			"relations": [
 				{
 					"to": "town",
@@ -130,7 +130,7 @@
 			"facts": [
 				{
 					"id": "goblins.kinds_known",
-					"text": "Imps are goblins; brutes are orcs, and sneaks are kobolds.",
+					"text": "Imps are goblins; orcs and kobolds are peoples allied to the Blood Rot.",
 					"known": "common",
 					"where": [],
 					"tags": [
@@ -241,7 +241,7 @@
 			"name": "the orcs",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The orcs, the brutes met in the land, allied to the Blood Rot for pay.",
+			"summary": "The orcs met in the land, allied to the Blood Rot for pay.",
 			"relations": [
 				{
 					"to": "blood_rot",
@@ -258,7 +258,7 @@
 			"facts": [
 				{
 					"id": "orcs.brute",
-					"text": "The brute is an orc, big and heavy, and it stands guard.",
+					"text": "The orc is big and heavy, and it stands guard.",
 					"known": "common",
 					"where": [],
 					"tags": [
@@ -286,7 +286,7 @@
 			"name": "the kobolds",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The kobolds, the sneaks met in the land, allied to the Blood Rot, who dig for them.",
+			"summary": "The kobolds met in the land, allied to the Blood Rot, who dig for them.",
 			"relations": [
 				{
 					"to": "blood_rot",
@@ -307,7 +307,7 @@
 			"facts": [
 				{
 					"id": "kobolds.sneak",
-					"text": "The sneak is a kobold; it patrols and comes at its prey from the side.",
+					"text": "The kobold patrols and comes at its prey from the side.",
 					"known": "common",
 					"where": [],
 					"tags": [

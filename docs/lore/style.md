@@ -30,7 +30,9 @@ rules once it is answered. Until then:
   New companions and townsfolk can follow that.
 - Factions are called what people call them, with "the": the goblins, the Blood
   Rot, the town.
-- Monster kinds stay as they are in the game: imp, brute, sneak.
+- Creatures are called by the game's labels: imp, orc, kobold, crypt guard (d0de2f6fa). "brute"
+  and "sneak" are kind ids, never said: Jeff's 10-17 answer named the peoples behind them
+  ("brutes may be orcs, sneaks may be kobolds"), not a name folk use.
 - A named weapon or heirloom takes the name of its maker, its holder or a deed
   (as items will later name things after long-time holders: "Wren's dagger").
   The forms names take are in `levels/lore/names.json` (README, decision 366).

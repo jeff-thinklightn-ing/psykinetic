@@ -135,10 +135,10 @@ out and why adventurers still come. Dwarven artifacts come from the dungeons bel
 
 Three kinds are in the game today, and everyone in the land knows them (Jeff,
 2026-10-17). Imps are goblins, and every goblin in the Blood Rot's land is of the
-Blood Rot: the region is dominated by Blood Rot goblins. Brutes are orcs and
-sneaks are kobolds, peoples allied to the Blood Rot. The imp is small and darts in
-and out. The brute is big and heavy, and it stands guard. The sneak patrols and
-comes at its prey from the side.
+Blood Rot: the region is dominated by Blood Rot goblins. Orcs and kobolds are
+peoples allied to the Blood Rot. The imp is small and darts in and out. The orc is
+big and heavy, and it stands guard. The kobold patrols and comes at its prey from
+the side.
 
 The allies do not worship the fallen star. They are with the Blood Rot for what it
 gets them, so the alliance can break, and one of them can be turned. Kobolds dig
