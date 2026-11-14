@@ -1590,14 +1590,17 @@ func _test_wade_drip() -> void:
 ## 804 amended (18): a work's strokes heard at its blows. Each work clip run
 ## through three cycles a frame (1/60 s) at a time on a drawn body set to its
 ## work: its stroke sound exactly at each blow of Client3D.WORK_STROKES, at the
-## hands' height, none between; the work's clip without the work, none.
+## hands' height, none between; the work's clip without the work, none. 804
+## amended (22): a work on the upper layer (the hoe) run there, its clip on
+## the base layer instead heard not at all.
 func _test_work_strokes() -> void:
 	print("
-== a work's strokes at its blows: the axe biting, the saw's push and pull, the hammer's face (804 amended (18)) ==")
+== a work's strokes at its blows: the axe biting, the saw's push and pull, the hammer's face, the hoe's blade (804 amended (18), (22)) ==")
 	_check(Client3D.stroke_slot(null, "chop") == "sfx.chop_wood" and Client3D.stroke_slot(null, "saw") == "sfx.saw_stroke"
-			and Client3D.stroke_slot(null, "hammer") == "sfx.hammer_wood" and Client3D.stroke_slot(null, "hoe") == ""
+			and Client3D.stroke_slot(null, "hammer") == "sfx.hammer_wood" and Client3D.stroke_slot(null, "hoe") == "sfx.hoe_strike"
+			and Client3D.stroke_slot(null, "herd") == ""
 			and Client3D.STROKE_SLOTS.values().all(func(slot: String) -> bool: return SoundKit.has(slot)),
-			"each work's stroke its slot; a work with none (the hoe) silent")
+			"each work's stroke its slot; a work with none (the herd) silent")
 	var player := _player()
 	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
 	if puppet == null or not puppet.has_meta("rig"):
@@ -1607,7 +1610,9 @@ func _test_work_strokes() -> void:
 	var work_was: String = str(puppet.get_meta("work", ""))
 	for word: String in Client3D.STROKE_SLOTS:
 		var slot: String = Client3D.STROKE_SLOTS[word]
-		var clip := str(Client3D.ACTIVITIES[word]["clip"])
+		var row: Dictionary = Client3D.ACTIVITIES[word]
+		var upper := not row.has("clip")
+		var clip := str(row["upper"] if upper else row["clip"])
 		var length := rig.length(clip)
 		if SoundKit.files(slot).is_empty() or length <= 0.0:
 			_check(true, "%s: its takes are not synced here, or no %s clip: skipped" % [word, clip])
@@ -1618,7 +1623,10 @@ func _test_work_strokes() -> void:
 		var heard_at: Array[float] = []
 		var right := true
 		for frame in int(length * 3.0 * 60.0):
-			rig.base_at(clip, frame / 60.0)
+			if upper:
+				rig.upper_at(clip, frame / 60.0)
+			else:
+				rig.base_at(clip, frame / 60.0)
 			rig.tree.advance(0.0)
 			var before := _rig.sfx.played.size()
 			_rig._stroke_sounds(player, puppet, rig)
@@ -1633,6 +1641,15 @@ func _test_work_strokes() -> void:
 		# before any frame was seen, so one fewer then.
 		var want := blows.size() * 3 - (1 if blows.has(0.0) else 0)
 		_check(right and on_blows and heard_at.size() == want, "%s: %s at each of its %d blows a cycle, none between (%d of %d)" % [word, slot, blows.size(), heard_at.size(), want])
+		if upper:
+			rig.upper_off()
+			# Its clip on the base layer, not the one its row names: none.
+			var wrong_layer := _rig.sfx.played.size()
+			for frame in int(length * 2.0 * 60.0):
+				rig.base_at(clip, frame / 60.0)
+				rig.tree.advance(0.0)
+				_rig._stroke_sounds(player, puppet, rig)
+			_check(_rig.sfx.played.size() == wrong_layer, "%s: its %s clip on the base layer, not its row's upper layer: silent" % [word, clip])
 	# The clip playing without its work (another body's clip, a test pose): none.
 	puppet.set_meta("work", "")
 	var quiet_before := _rig.sfx.played.size()

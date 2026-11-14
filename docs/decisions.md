@@ -47666,6 +47666,34 @@ unchanged. ui_test _test_gains (rises held, then one float; a whole step at once
 the fight's end; Main's tenth). No bullet (804's line says what a gain shows). Client only, protocol
 unchanged, no new class_name.
 
+804 amended (22) (sound; the script's label; the coordinator's order, 11-12, the second of sound's three
+worst things in Umbrage, approved with (b) live): the work strokes sit no louder than talk, and the hoe
+strikes. (b) The strokes were too loud for a town: an axe blow two cells off, its take's loudest 50 ms
+plus its slot's volume plus Sfx.hearing's fall, came to about -23 dB at the ear, a hammer -32 and a saw
+-33, against the townsfolk murmur's planned -38 at two cells; each slot's own takes also spread 3 to
+4 dB. Every take of sfx.chop_wood, sfx.saw_stroke and sfx.hammer_wood is cut again from the same points,
+peaked so its loudest 50 ms is -16 dB (all within 0.1 dB), and the volumes fall: chop_wood -10 to -18,
+hammer_wood -12 to -21, saw_stroke -14 to -20.5 (its range 8, not 10). A saw or hammer stroke now comes
+to about -40 dB two cells off, level with talk, and -50 at six, under the town's day bed. The axe, the
+stroke a player knows, sits 3 dB over talk: about -37 dB at two cells and -47 at six (Jeff's answer B,
+11-12, to the clip pair 8 and 9 in C:/dev/review/sound/umbrage_ears). (a) The hoe, a piece of two
+packages (the coordinator's ruling, 11-13: sound follows the sight): "people work", heard once maps'
+work spots give npc's hoe bouts a place, and "the first rescue" (crop.sought_first), heard when the
+farmer hoes her field's rows (Main._farmer_task, "hoe" while Towns.field_work holds: spring until sown,
+autumn until harvest). Umbrage has neither today, so it is unheard until one is switched on: sfx.hoe_strike, four
+CC0 cuts of maxthrower's dig.wav (freesound 168810: a spade into soil, its thuds centred near 2 kHz;
+kvgarlic's 875637, a hoe turning compost, rejected, its hits a 4.5 to 5 kHz rustle), levelled as the
+others, range 8 at -20.5. The Hoe clip plays on the upper layer (over a stand or a walk), so
+_stroke_sounds reads the clip from the layer the work's ACTIVITIES row names, its "clip" the base and
+else its "upper" the upper (rig.upper_clip, rig.upper_position), never by the clip's name: the next
+upper-layer work is a row in WORK_STROKES and STROKE_SLOTS. Its blow is animation's key, the blade in at
+0.45 s of Hoe's 1.2 (0.375); the hammer at 0.22 of 0.7 and the saw's push and pull from 0 and 0.4 of 0.8
+were checked against animation's keys and already matched. Herd and tend keep no stroke (no tool
+contact). view_test _test_work_strokes: the hoe run on the upper layer, a blow a cycle; its clip on the
+base layer silent. Watched for the cut: no one works within hearing of a joined walk today, so playtest
+records a joined client 2 and 6 cells from a townsperson at the chop, saw or hammer. Client sound only;
+protocol unchanged, no new class_name.
+
 ## 805. The core loop's first slice: Wren wants to go fishing
 
 Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out

@@ -22203,10 +22203,15 @@ func _footfall_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 ## axe in at 0.62 s of Chop's 1.6, the hammer's face at 0.22 of Hammer's 0.7;
 ## the saw's push and its pull, each half of Saw's 0.8), passed over as the
 ## clip loops (footfall_between, as the footfalls), at the body's tool hand
-## height, while it stands to its work (the clip on its base layer).
-const WORK_STROKES: Dictionary[String, Array] = {"Chop": [0.3875], "Saw": [0.0, 0.5], "Hammer": [0.314]}
+## height, while it stands to its work (the clip on its base layer). The
+## clip is read from the layer the work's ACTIVITIES row names (804 amended
+## (22)): its "clip" the base layer's, else its "upper" the upper layer's,
+## so a work on either layer needs only its rows here: the hoe's blade into
+## the ground at 0.45 s of Hoe's 1.2, on the upper layer over a stand or a
+## walk.
+const WORK_STROKES: Dictionary[String, Array] = {"Chop": [0.3875], "Saw": [0.0, 0.5], "Hammer": [0.314], "Hoe": [0.375]}
 ## A work's stroke sound by its ACTIVITIES word.
-const STROKE_SLOTS := {"chop": "sfx.chop_wood", "saw": "sfx.saw_stroke", "hammer": "sfx.hammer_wood"}
+const STROKE_SLOTS := {"chop": "sfx.chop_wood", "saw": "sfx.saw_stroke", "hammer": "sfx.hammer_wood", "hoe": "sfx.hoe_strike"}
 ## How high over its feet a stroke is heard (the tool at the hands).
 const STROKE_UP := 1.0
 
@@ -22219,15 +22224,16 @@ static func stroke_slot(entity: GridEntity, word: String) -> String:
 func _stroke_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 	var word := str(puppet.get_meta("work", ""))
 	var work: Dictionary = ACTIVITIES.get(word, {})
-	var clip := rig.base_clip()
+	var on_base := work.has("clip")
+	var clip := rig.base_clip() if on_base else rig.upper_clip()
 	var blows: Array = WORK_STROKES.get(clip, [])
 	var length := rig.length(clip)
 	var slot := stroke_slot(entity, word)
-	if slot.is_empty() or blows.is_empty() or length <= 0.0 or str(work.get("clip", "")) != clip:
+	if slot.is_empty() or blows.is_empty() or length <= 0.0 or str(work.get("clip" if on_base else "upper", "")) != clip:
 		if puppet.has_meta("stroke_at"):
 			puppet.remove_meta("stroke_at")
 		return
-	var at := fposmod(rig.base_position(), length) / length
+	var at := fposmod(rig.base_position() if on_base else rig.upper_position(), length) / length
 	var was: Variant = puppet.get_meta("stroke_at") if puppet.has_meta("stroke_at") else null
 	puppet.set_meta("stroke_at", [clip, at])
 	if was is Array and was[0] == clip and footfall_between(float(was[1]), at, blows):

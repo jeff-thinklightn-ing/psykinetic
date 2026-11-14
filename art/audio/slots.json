@@ -2243,7 +2243,7 @@
 			"bus": "sfx",
 			"noise": null,
 			"range": 10,
-			"volume_db": -10.0,
+			"volume_db": -18.0,
 			"uses": "an axe biting into wood, a body at the \"chop\" work (804 amended (18)); Client3D._stroke_sounds, at the blow of the Chop clip"
 		},
 		"sfx.saw_stroke": {
@@ -2252,7 +2252,7 @@
 			"bus": "sfx",
 			"noise": null,
 			"range": 8,
-			"volume_db": -14.0,
+			"volume_db": -20.5,
 			"uses": "one stroke of a hand saw through wood, a body at the \"saw\" work (804 amended (18)); Client3D._stroke_sounds, its push and its pull in the Saw clip"
 		},
 		"sfx.hammer_wood": {
@@ -2261,8 +2261,17 @@
 			"bus": "sfx",
 			"noise": null,
 			"range": 10,
-			"volume_db": -12.0,
+			"volume_db": -21.0,
 			"uses": "a carpenter's hammer on wood, a body at the \"hammer\" work (804 amended (18)); Client3D._stroke_sounds, at the blow of the Hammer clip"
+		},
+		"sfx.hoe_strike": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 8,
+			"volume_db": -20.5,
+			"uses": "a hoe's blade biting into the ground, a body at the \"hoe\" work (804 amended (22)); Client3D._stroke_sounds, at the blow of the Hoe clip on the upper layer"
 		},
 		"sfx.ore_sack": {
 			"category": "world",

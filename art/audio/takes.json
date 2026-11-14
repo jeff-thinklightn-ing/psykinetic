@@ -1531,7 +1531,7 @@
 				"file": "sfx.chop_wood.ogg",
 				"from": "freesound",
 				"original": "freesound 452554: axe chop into wood little debris.wav (from 0 s for 0.5 s)",
-				"sha256": "1c5f637dbf33f4c8ee9f18c2ce0ff68c9d1b084257938ef8ca2ba31060a0a055",
+				"sha256": "fb79f1193edd2efc7af5090412e5c916c0c6349cf20ea4f8271fec1a89e75f3f",
 				"by": "kyles",
 				"url": "https://freesound.org/people/kyles/sounds/452554/",
 				"license": "CC0 1.0"
@@ -1540,7 +1540,7 @@
 				"file": "sfx.chop_wood.2.ogg",
 				"from": "freesound",
 				"original": "freesound 703420: chopping logs with an axe (from 0.48 s for 0.5 s)",
-				"sha256": "1562bf7274de4ab5cd4490483a2f30a4c79c52f1e831ffa4137698c6fdc27e15",
+				"sha256": "695c3a5e16b9ba4231fcfcaf2927fe7d49021667da7edcdce1e93f646c300133",
 				"by": "hadescolossus",
 				"url": "https://freesound.org/people/hadescolossus/sounds/703420/",
 				"license": "CC0 1.0"
@@ -1549,7 +1549,7 @@
 				"file": "sfx.chop_wood.3.ogg",
 				"from": "freesound",
 				"original": "freesound 703420: chopping logs with an axe (from 1.53 s for 0.5 s)",
-				"sha256": "022c5f156fb5987a6952d71cfc1775428354acc4f9d2366eeaeac0e58927e7f7",
+				"sha256": "8d22f0f99cb41b9e954bab6f38c28c1693006ffcdfed8b96f0fced9bbc235e81",
 				"by": "hadescolossus",
 				"url": "https://freesound.org/people/hadescolossus/sounds/703420/",
 				"license": "CC0 1.0"
@@ -2582,7 +2582,7 @@
 				"file": "sfx.hammer_wood.ogg",
 				"from": "freesound",
 				"original": "freesound 707864: Hammer on Wood (from 0.24 s for 0.32 s)",
-				"sha256": "1022a43fc4cb4d455adf66efc02cdffe7b9d7d5179752a3049430f9df21d3b6b",
+				"sha256": "edf6cd8cb61ce2a89622438232631d5fa8ddc58452621a5dc5d9a608899a9960",
 				"by": "L.i.Z.e.L.l.E_+",
 				"url": "https://freesound.org/people/L.i.Z.e.L.l.E_+/sounds/707864/",
 				"license": "CC0 1.0"
@@ -2591,7 +2591,7 @@
 				"file": "sfx.hammer_wood.2.ogg",
 				"from": "freesound",
 				"original": "freesound 707864: Hammer on Wood (from 1 s for 0.32 s)",
-				"sha256": "898e3707280ae0f9f3bbaf832edb1d754abb765e9c52ae12c725d7e2d8f29ccb",
+				"sha256": "02310b6cf779862215ab84fa6c4d41f23298898b1792c6da10f683eea80f8205",
 				"by": "L.i.Z.e.L.l.E_+",
 				"url": "https://freesound.org/people/L.i.Z.e.L.l.E_+/sounds/707864/",
 				"license": "CC0 1.0"
@@ -2600,7 +2600,7 @@
 				"file": "sfx.hammer_wood.3.ogg",
 				"from": "freesound",
 				"original": "freesound 342542: Outside Hammer (from 0.44 s for 0.35 s)",
-				"sha256": "b28a312a5fd6646bb8cbf69d08c9fe44532f139551fd09c94bf8762b9a97bbf1",
+				"sha256": "ed4487c2371840dd20b7531b31b9bad6a6c3c13105797406ac6cd5723d717b91",
 				"by": "sgrowe",
 				"url": "https://freesound.org/people/sgrowe/sounds/342542/",
 				"license": "CC0 1.0"
@@ -2609,7 +2609,7 @@
 				"file": "sfx.hammer_wood.4.ogg",
 				"from": "freesound",
 				"original": "freesound 337816: hammer v1.wav (from 2 s for 0.38 s)",
-				"sha256": "8ac6d7b4fc697704eae7664487bbe884dbade91a22271bb3d482133d9865d27e",
+				"sha256": "b06b86bf75ca0e35eea3ff3849ecb520ca3ef235c66764dcd9ee0eceaffdcada",
 				"by": "blukotek",
 				"url": "https://freesound.org/people/blukotek/sounds/337816/",
 				"license": "CC0 1.0"
@@ -2888,6 +2888,44 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/WOODImpt_Impact Wood 23_DDUMAIS_NONE.wav (from 0 s for 0.8 s)",
 				"sha256": "18cab85d1674a2c815b6ec71e252fd143ef1c028b97c34f7396fe00ecbd86df4"
+			}
+		],
+		"sfx.hoe_strike": [
+			{
+				"file": "sfx.hoe_strike.ogg",
+				"from": "freesound",
+				"original": "freesound 168810: dig.wav (from 7.62 s for 0.45 s)",
+				"sha256": "33e81c0782dec0091874f1b60903076dc998d5ec36b5baf6c660fa97d4e76b86",
+				"by": "maxthrower",
+				"url": "https://freesound.org/people/maxthrower/sounds/168810/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hoe_strike.2.ogg",
+				"from": "freesound",
+				"original": "freesound 168810: dig.wav (from 17.64 s for 0.45 s)",
+				"sha256": "2ebb6e996a477e9988bb20feb68f6cdab33cc2b0ea2bf6ee7ad69997cd806a75",
+				"by": "maxthrower",
+				"url": "https://freesound.org/people/maxthrower/sounds/168810/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hoe_strike.3.ogg",
+				"from": "freesound",
+				"original": "freesound 168810: dig.wav (from 41.15 s for 0.45 s)",
+				"sha256": "0346bebd702a3bacab8f3b465c515dce2f6eebdff731a18992064abe334c3175",
+				"by": "maxthrower",
+				"url": "https://freesound.org/people/maxthrower/sounds/168810/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hoe_strike.4.ogg",
+				"from": "freesound",
+				"original": "freesound 168810: dig.wav (from 51.15 s for 0.45 s)",
+				"sha256": "cec8da8f72e5d7d99e63b3658e1fd2abd58891d92ec166838879344131fc303b",
+				"by": "maxthrower",
+				"url": "https://freesound.org/people/maxthrower/sounds/168810/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.item_drop_heavy": [
@@ -3251,7 +3289,7 @@
 				"file": "sfx.saw_stroke.ogg",
 				"from": "freesound",
 				"original": "freesound 566040: Saw wood 3.wav (from 1.9 s for 0.38 s)",
-				"sha256": "2df5636c7dd549c0595218f06c8fbcb9d4d0832f66af94edda4fcae45cfa1257",
+				"sha256": "4b537ed033b7d4ff580c6577af8a345c18d4562700cf35d6105f451538ec2558",
 				"by": "Pagey1969",
 				"url": "https://freesound.org/people/Pagey1969/sounds/566040/",
 				"license": "CC0 1.0"
@@ -3260,7 +3298,7 @@
 				"file": "sfx.saw_stroke.2.ogg",
 				"from": "freesound",
 				"original": "freesound 566040: Saw wood 3.wav (from 2.28 s for 0.36 s)",
-				"sha256": "450e212aab742428e235a624c730ac4c7d75f6d29f2cbe7bf2a0cc5b29369f89",
+				"sha256": "24554965e4b2e136da301e4c8e82df0d08fc4a73216a96e188c959558f888185",
 				"by": "Pagey1969",
 				"url": "https://freesound.org/people/Pagey1969/sounds/566040/",
 				"license": "CC0 1.0"
@@ -3269,7 +3307,7 @@
 				"file": "sfx.saw_stroke.3.ogg",
 				"from": "freesound",
 				"original": "freesound 566040: Saw wood 3.wav (from 2.64 s for 0.38 s)",
-				"sha256": "2fb99ad056de8d02a6f6e8e9c7c6548cf8a7636dd8765ab2dbe5f536ba5f3f68",
+				"sha256": "8e4316d407053ee909fbf50ebaa4ce4bed6c7fe024d37c5617138cc2529eb864",
 				"by": "Pagey1969",
 				"url": "https://freesound.org/people/Pagey1969/sounds/566040/",
 				"license": "CC0 1.0"
@@ -3278,7 +3316,7 @@
 				"file": "sfx.saw_stroke.4.ogg",
 				"from": "freesound",
 				"original": "freesound 707527: Hand Saw.wav (from 3.32 s for 0.38 s)",
-				"sha256": "6e86cd213061be3d93ea7f1f980a734ed95090c4da283e4beff2c2bead9591fc",
+				"sha256": "c217850dcef50eafdf8e9bde0fdba4d8e5c439389edc7ac2d56bf322fef4e2f5",
 				"by": "LiezelDippenaar",
 				"url": "https://freesound.org/people/LiezelDippenaar/sounds/707527/",
 				"license": "CC0 1.0"
