@@ -2077,7 +2077,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You last paid %s %d gold for %s%s. | `sim/resident.gd` _trade_words() |
 |  | The knight whose sepulcher lies open below now is %s. | `sim/resident.gd` relic_line() |
 |  | Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
-|  | Whoever brings a knight's remains up from below, you send to lay them on the knight's altar in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
+|  | Whoever brings a knight's remains up from below, you send to lay them on the bier in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
 |  | you are glad of everyone who comes back from below. | `sim/resident.gd` relic_line() |
 |  | Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s | `sim/resident.gd` relic_line() |
 |  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd` relic_line() |
