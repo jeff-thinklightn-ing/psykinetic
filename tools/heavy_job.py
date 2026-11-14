@@ -226,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 44  # 49: an import starts past the queue too.
+GATE_REVISION = 45  # 52: a saturn landing uncounted.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -273,9 +273,14 @@ KINDS = {
     # `tools/remote_tests.sh kind` prints. "remote": its work is on another
     # machine, so this PC's CPU says nothing of whether it is hung (ssh and
     # tee idle while saturn runs the suite); its limit is fixed instead, over
-    # the sum of remote_tests.sh's own timeouts.
+    # the sum of remote_tests.sh's own timeouts. Uncounted under MAX_RUNNING
+    # (394 amended (52)): its parts here are the tool tests and one server
+    # boot, light, and a landing counted from its tests' start held one of the
+    # three places, so sixteen scenes of 37 s went one at a time behind two
+    # landings (11-14 09:28). One at a time still (UNCOUNTED_MOST: a second
+    # running one counts), its estimate still owed against the margin.
     "suite_remote": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 60,
-        "fixed_limit": True, "remote": True},
+        "fixed_limit": True, "remote": True, "uncounted": True},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "suite_remote", "soak", "scene", "load_check"],
         "max_minutes": 90},  # load_check: 394 amended (46).
     # Not counted under MAX_RUNNING, one at a time (394 amended (22)): six

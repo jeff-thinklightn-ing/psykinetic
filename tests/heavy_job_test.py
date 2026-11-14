@@ -1851,7 +1851,8 @@ old_scene = gate.judged_row(table41, entry41("art-kit", "scene", False, 3), {}, 
 new_scene = dict(table41["scene"], kind="scene")
 ok_old, why_old = gate.decide(old_scene, one_suite + waiting, True, 40.0, None, 40.0)
 ok_new, why_new = gate.decide(new_scene, one_suite + waiting, True, 40.0, None, 40.0)
-check(not ok_old and "4 heavy jobs running" in why_old and ok_new,
+# 394 amended (52): of the four suite_remote takes (one running, three waiting) one is uncounted.
+check(not ok_old and "3 heavy jobs running" in why_old and ok_new,
     "three land-lock waiters: an unmarked scene counts them, as its old waiter does (%s); a marked one does not (%s)" % (why_old, why_new))
 check(gate.blockers(dict(table41["suite_remote"], kind="suite_remote", own_cap=True), one_suite) == one_suite
     and gate.blockers(dict(table41["suite_remote"], kind="suite_remote"), one_suite) == [],
@@ -2126,7 +2127,7 @@ check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48
     "never past one of its own kind: first come among them")
 check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
     "a scene does not: first come, as before")
-check(gate.GATE_REVISION == 44, "gate revision 44")
+check(gate.GATE_REVISION == 45, "gate revision 45")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2322,6 +2323,45 @@ for name50, value50 in saved50.items():
 said50 = subprocess.run([sys.executable, "-B", os.path.join(os.path.dirname(os.path.abspath(gate.__file__)), "heavy_job.py"), "status"],
     env=dict(os.environ, HEAVY_JOBS_DIR=STATE, HEAVY_JOB_TEST_FREE_GB="64"), capture_output=True, text=True, timeout=120).stdout
 check("free RAM 64.0 GB" in said50, "a gate process of its own goes by the figure: %s" % [line for line in said50.splitlines() if "free RAM" in line][:1])
+
+print("== a saturn landing is uncounted (394 amended (52)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+remote52 = dict(gate.KINDS["suite_remote"], kind="suite_remote", ram_gb=1.6, commit_gb=1.6)
+landing52 = dict(running(1.6, 0.1), kind="suite_remote", tree="perf-timed")
+early52 = dict(running(1.6, 0.0), kind="suite_remote", tree="ui")  # its land.sh started before its lock: adopted, running
+scene52 = dict(running(1.2, 0.7), kind="scene", tree="physics")
+check(gate.counted([landing52]) == 0 and gate.counted([landing52, early52]) == 1,
+    "one running suite_remote counts for nothing; a second still counts")
+# This morning's shape (11-14 09:28): a landing testing on saturn, a second land.sh started early,
+# one scene running, sixteen scenes queued. Each head judged in turn, started when it may.
+going52 = [landing52, early52, scene52]
+started52 = 0
+for _ in range(16):
+    ok52, why52 = gate.decide(dict(gate.KINDS["scene"], kind="scene", ram_gb=1.2, commit_gb=1.2), going52, True, 30.0, None, 40.0)
+    if not ok52:
+        break
+    going52 = going52 + [dict(running(1.2, 0.0), kind="scene")]
+    started52 += 1
+check(started52 == 1 and sum(1 for each in going52 if each["kind"] == "scene") == 2,
+    "this morning's shape: two scenes run (one started; before, none could), the third held (%d started; %s)" % (started52, why52))
+check(not gate.decide(dict(gate.KINDS["scene"], kind="scene", ram_gb=1.2, commit_gb=1.2), [landing52, scene52, dict(running(1.2, 0.0), kind="scene")],
+    True, 30.0, None, 40.0)[0], "with the landing alone, still two scenes at most")
+ok52, why52 = gate.decide(dict(gate.KINDS["godot_export"], kind="godot_export", ram_gb=1.5, commit_gb=1.5), going52, True, 30.0, None, 40.0)
+check(not ok52 and "3 heavy jobs running" in why52, "and with the early land.sh counted, the three places are full (%s)" % why52)
+ok52, _ = gate.decide(dict(gate.KINDS["godot_export"], kind="godot_export", ram_gb=1.5, commit_gb=1.5), [landing52] + going52[2:], True, 30.0, None, 40.0)
+check(ok52, "without it, the landing on saturn leaves the third place to an export")
+three52 = [dict(running(1.2, 1.0), kind="scene"), dict(running(1.2, 1.0), kind="scene"), dict(running(1.5, 1.0), kind="godot_export")]
+check(gate.decide(remote52, three52, True, 30.0, None, 40.0)[0], "a landing's take starts beside three counted jobs")
+ok52, why52 = gate.decide(remote52, three52, True, 10.0, None, 40.0)
+check(not ok52 and "GB free" in why52, "but its 1.6 GB is still owed against the 8 GB margin (%s)" % why52)
+# One at a time is the land lock's: a second take is granted to wait on it (394 amended (36), uncounted
+# as a waiter), and one whose land.sh runs early counts, as above.
+check(gate.decide(remote52, [landing52], True, 30.0, None, 40.0)[0], "a second landing's take is granted to wait on the land lock, as before")
+suite52 = dict(gate.KINDS["suite"], kind="suite", ram_gb=6.5, commit_gb=6.5)
+check(gate.counted([dict(running(6.5, 1.0), kind="suite")]) == 1, "a local suite still counts")
+check(not gate.decide(dict(gate.KINDS["bench"], kind="bench", ram_gb=2.0, commit_gb=1.0), [landing52], True, 30.0, None, 40.0)[0],
+    "a bench still never starts beside a landing")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 
 print("== the sleepers ==")
 seen, left = [pid for pid, _ in sleepers_seen()], stop_sleepers()

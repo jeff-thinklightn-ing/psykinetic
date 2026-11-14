@@ -11134,6 +11134,22 @@ it logs as before. The gate is this PC's; nothing else in it runs on saturn. tes
 with none, the detail printed, exit 0, no state folder made; with one, logged. Tools and tests only; protocol
 unchanged; no class_name; no bullet.
 
+394 amended (52): a saturn landing is uncounted under MAX_RUNNING (the coordinator's report and approval, 2026-11-14;
+label from tools/decision_number.sh). At 09:28 the gate held three jobs: perf-timed's landing testing on saturn, ui's
+take whose land.sh had started ten minutes before it held the land lock (adopted, so running, so counted), and one
+scene; sixteen scenes of about 37 s waited behind "3 heavy jobs running", the slowest twenty minutes, while the two
+landings used 0.1 GB between them. MAX_RUNNING 3 was set for this PC's CPU when suites ran here; a suite_remote runs
+here only the tool tests and one server boot. suite_remote is now an "uncounted" kind as load_check and godot_import
+are: one running is left out of the count, a second counts (UNCOUNTED_MOST); its estimate is still owed against the
+8 GB margin; scenes stay two at most; a local suite counts as before; a bench still never runs beside it; net_test
+beside nothing. GATE_REVISION 45. A landing runs land.sh only once it holds the land lock, as CLAUDE.md's flow has it.
+tests/heavy_job_test.py: one suite_remote counts for nothing, a second still counts; this morning's shape (a landing,
+an early land.sh, a scene, sixteen queued) starts a second scene where before none could, and the three places are
+full with the early land.sh counted; without it an export takes the third place; a landing's take starts beside three
+counted jobs but owes its 1.6 GB against the margin; a local suite still counts; a bench never beside a landing. The
+case of three land-lock waiters now reads three counted where it read four. Tools and tests only; protocol unchanged;
+no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
