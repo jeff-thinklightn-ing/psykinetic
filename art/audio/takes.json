@@ -286,6 +286,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"amb.hearth": [
+			{
+				"file": "amb.hearth.ogg",
+				"from": "freesound",
+				"original": "freesound 558967: Ambiance_Campfire_Loop_Stereo.wav (from 0 s for 12.7 s)",
+				"sha256": "d8c45c9cdb126220ed1834923f10317030fde4ed44d1d71e2e1f5a9d88166038",
+				"by": "Nox_Sound",
+				"url": "https://freesound.org/people/Nox_Sound/sounds/558967/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.hearth.2.ogg",
+				"from": "freesound",
+				"original": "freesound 350757: campfire.wav (from 0 s for 30 s)",
+				"sha256": "5660c87f4cba43217a2d92a1f16f4a5e1f6b419fa4c745f6f5499f973a5e6a16",
+				"by": "aerror",
+				"url": "https://freesound.org/people/aerror/sounds/350757/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.hearth.3.ogg",
+				"from": "freesound",
+				"original": "freesound 508110: fire ambience, flames, crackles, pops, burning (from 2 s for 24 s)",
+				"sha256": "2b87a7bcaa4ea6db6c4a2e56571cd1401063f695e07962e841a2026ad910efe1",
+				"by": "ahriik",
+				"url": "https://freesound.org/people/ahriik/sounds/508110/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.lair_cave": [
 			{
 				"file": "amb.lair_cave.ogg",
@@ -1661,6 +1690,44 @@
 				"from": "sonniss-gdc-2024",
 				"original": "2024/DavidDumais - Explosion SFX Pack/WOODCrsh_Designed Wood Crash And Debris 13_DDUMAIS_NONE.wav (from 0 s for 1.3 s)",
 				"sha256": "a137926de2e10f16e2c348c6e1d9b27c2f7762f2f05be5cf209901c5013a34e2"
+			}
+		],
+		"sfx.cup_set_down": [
+			{
+				"file": "sfx.cup_set_down.ogg",
+				"from": "freesound",
+				"original": "freesound 584993: Cup_Sit_4.wav (from 0 s for 0.55 s)",
+				"sha256": "57075ea3c7926e0429842fde91539211748a853124cf0dbe57c02c9acd310db1",
+				"by": "flamingostrich",
+				"url": "https://freesound.org/people/flamingostrich/sounds/584993/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.cup_set_down.2.ogg",
+				"from": "freesound",
+				"original": "freesound 584996: Cup_Sit_1.wav (from 0.15 s for 0.5 s)",
+				"sha256": "486844bff98407b77ae95f337cd877908d9da2f27d16199b14285b67ba95f945",
+				"by": "flamingostrich",
+				"url": "https://freesound.org/people/flamingostrich/sounds/584996/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.cup_set_down.3.ogg",
+				"from": "freesound",
+				"original": "freesound 565917: setting down cups.wav (from 2.38 s for 0.28 s)",
+				"sha256": "5839b4c26d640b02888f09b163dcdd1fafbcb4c1c5e76a760b4de8e42efd97a8",
+				"by": "Fenodyrie",
+				"url": "https://freesound.org/people/Fenodyrie/sounds/565917/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.cup_set_down.4.ogg",
+				"from": "freesound",
+				"original": "freesound 565917: setting down cups.wav (from 3.16 s for 0.5 s)",
+				"sha256": "f5f5ca1509b35b4ddd2ce2040c49acbc6b2d4f8093d97488795c150c98a8f233",
+				"by": "Fenodyrie",
+				"url": "https://freesound.org/people/Fenodyrie/sounds/565917/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.deer_death": [

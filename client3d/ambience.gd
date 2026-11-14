@@ -82,7 +82,7 @@ const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.dungeon", "amb.town_day", "amb.town_night",
 	"amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips",
-	"amb.mine_tunnel", "amb.mine_chamber", "amb.lair_cave"]
+	"amb.mine_tunnel", "amb.mine_chamber", "amb.lair_cave", "amb.tavern_murmur"]
 ## A mine (769 amended (4)): a level whose decor has a mine's pieces. Under
 ## it no amb.dungeon (the crypt's cave bed): a near-silent tunnel's air or a
 ## chamber's, by how open the floor round the listener is (openness: the
@@ -155,6 +155,22 @@ const TOWN_DAY := {
 	"far_words": ["chop", "saw", "hammer"], "far_reach": 40, "far_peak_db": -52.0, "take_peak_db": -16.0,
 	"far_cutoff_hz": 2000.0,
 }
+## The tavern's sound (920; the coordinator's approval, package "Umbrage at
+## night"): its hearth burning (amb.hearth, a loop from each tavern hearth
+## the zone burns, Client3D.hearth_cells, 868, heard from the floor cell
+## before it when the hearth's own cell is wall), and its room's talk
+## (amb.tavern_murmur) in a room with a tavern's hearth, by how many goers
+## the client sees there: silent with none, full at "murmur_full" or more,
+## eased over "murmur_ease_s"; the taverner ("not_goers" by trade), a
+## companion, and anyone asleep ("quiet") aren't counted. Dealt in
+## "murmur_s" stretches as the floor is (Strand), from the town's chatter
+## takes. An empty tavern is its fire; a full one hums. Economy's hungry
+## town may read the same count later; nothing of it is built here.
+const TAVERN := {
+	"murmur_full": 4, "murmur_s": Vector2(40.0, 90.0), "murmur_fade_s": 4.0,
+	"not_goers": ["taverner"], "quiet": ["sleep"],
+}
+const HEARTH := "amb.hearth"
 ## The far twin of the Ambience bus (Sfx.apply_volumes makes it).
 const FAR_BUS := "Ambience_Far"
 
@@ -205,24 +221,23 @@ var _next_burst := 0.0
 var _chatter_deck: Array[Dictionary] = []
 var _chatter_dealt: Array[Dictionary] = []
 var _last_chatter := -1
-## The floor (amb.town_day): its two players, the stretch each plays
-## ({take, start, length, at}, empty for none), the one in front, and its
-## deck with the take last dealt.
-var _floor_players: Array[AudioStreamPlayer] = []
-var _floor_pieces: Array[Dictionary] = [{}, {}]
-var _floor_front := 0
-var _floor_deck: Array[Dictionary] = []
-var _floor_dealt: Array[Dictionary] = []
-var _last_floor := -1
 var _rng := RandomNumberGenerator.new()
-## The bed dealt in stretches, not looped.
+## The beds dealt in stretches, not looped: the town's floor (578 amended
+## (4)) and a tavern room's talk (920).
 const FLOOR := "amb.town_day"
+const MURMUR := "amb.tavern_murmur"
+var _town_floor := Strand.new(FLOOR, TOWN_DAY["floor_s"], TOWN_DAY["floor_fade_s"], "town_floor", _rng)
+var _murmur := Strand.new(MURMUR, TAVERN["murmur_s"], TAVERN["murmur_fade_s"], "tavern_murmur", _rng)
 ## Every burst begun ([take path, its length]) and every far stroke played
 ## ([slot, the worker's cell]), for tests and the ears tour.
 var bursts_played: Array = []
 var far_played: Array = []
-## Every stretch of the floor begun ([take path, start, length]).
-var floor_played: Array = []
+## Every stretch of the floor, and of a tavern's talk, begun ([take path,
+## start, length]).
+var floor_played: Array = _town_floor.played
+var murmur_played: Array = _murmur.played
+## The goers last counted in the room (920), for tests and the ears tour.
+var goers_seen := 0
 
 
 func _ready() -> void:
@@ -240,6 +255,8 @@ func _process(delta: float) -> void:
 		levels[bed] = level
 		if bed == FLOOR:
 			_play_floor(delta, level)
+		elif bed == MURMUR:
+			_murmur.step(self, delta, level, duck_db)
 		else:
 			_set_level(bed, level)
 	var town_day := float(levels.get("amb.town_day", 0.0))
@@ -272,6 +289,8 @@ func _weigh() -> void:
 	var town := _town_nearness(cell)
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, town,
 			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0, lair))
+	goers_seen = goers(_room_bodies())
+	targets[MURMUR] = murmur_weight(goers_seen, zone != "outdoors" and not view.hearth_cells().is_empty())
 	if arrival_step(arrival, zone == "outdoors" and under_sky, town, day_share(DayNight.daylight(steps)), WEIGH_EVERY):
 		_start_cue()
 	if lair == "cave_lair" and randf() < WEIGH_EVERY / (DRIP_SECONDS * LAIR_DRIP_SLOWER):
@@ -649,49 +668,83 @@ func _play_chatter(delta: float, town_day: float) -> void:
 ## stretch of the deck at a time, the next begun "floor_fade_s" before the
 ## last ends and cross-faded over it; nothing when silent.
 func _play_floor(delta: float, level: float) -> void:
-	var files := SoundKit.files(FLOOR)
-	if level < SILENT or files.is_empty():
-		for player: AudioStreamPlayer in _floor_players:
-			player.stop()
-		_floor_pieces = [{}, {}]
-		return
-	var fade := float(TOWN_DAY["floor_fade_s"])
-	var front: Dictionary = _floor_pieces[_floor_front]
-	if front.is_empty() or float(front["at"]) >= float(front["length"]) - fade and _floor_pieces[1 - _floor_front].is_empty():
-		if not front.is_empty():
-			_floor_front = 1 - _floor_front
-		if _floor_deck.is_empty():
-			_floor_dealt = deal(take_lengths(FLOOR), TOWN_DAY["floor_s"], _last_floor, _rng, _floor_dealt, false)
-			_floor_deck = _floor_dealt.duplicate()
-		if _floor_deck.is_empty():
+	_town_floor.step(self, delta, level, duck_db)
+
+
+## A bed dealt in stretches and never looped (578 amended (4)'s floor; 920's
+## tavern talk): [member slot]'s takes (its fallback's when it has none)
+## dealt by Ambience.deal, alternate off, in [member span] stretches, the
+## next begun [member fade] s before the last ends and cross-faded over it,
+## at the slot's volume; nothing when silent. Its two players, the stretch
+## each plays ({take, start, length, at}, empty for none), the one in front,
+## its deck and the take last dealt; every stretch begun in [member played]
+## ([take path, start, length]).
+class Strand:
+	var slot: String
+	var span: Vector2
+	var fade: float
+	var label: String
+	var rng: RandomNumberGenerator
+	var players: Array[AudioStreamPlayer] = []
+	var pieces: Array[Dictionary] = [{}, {}]
+	var front := 0
+	var deck: Array[Dictionary] = []
+	var dealt: Array[Dictionary] = []
+	var last := -1
+	var played: Array = []
+
+	func _init(of: String, stretch: Vector2, fade_s: float, name: String, random: RandomNumberGenerator) -> void:
+		slot = of
+		span = stretch
+		fade = fade_s
+		label = name
+		rng = random
+
+	## [param delta] on at [param level], under [param duck] dB, its players
+	## children of [param owner].
+	func step(owner: Node, delta: float, level: float, duck: float) -> void:
+		var files := SoundKit.files(slot)
+		if level < Ambience.SILENT or files.is_empty():
+			for player: AudioStreamPlayer in players:
+				player.stop()
+			pieces = [{}, {}]
 			return
-		var piece: Dictionary = _floor_deck.pop_front()
-		_last_floor = int(piece["take"])
-		piece["at"] = 0.0
-		_floor_pieces[_floor_front] = piece
-		while _floor_players.size() < 2:
-			var made := AudioStreamPlayer.new()
-			made.name = "town_floor_%d" % _floor_players.size()
-			made.bus = "Ambience"
-			add_child(made)
-			_floor_players.append(made)
-		var player := _floor_players[_floor_front]
-		player.stream = _once_of(files[_last_floor])
-		player.play(float(piece["start"]))
-		floor_played.append([files[_last_floor], float(piece["start"]), float(piece["length"])])
-	for side in 2:
-		var piece: Dictionary = _floor_pieces[side]
-		if piece.is_empty():
-			continue
-		piece["at"] = float(piece["at"]) + delta
-		var player := _floor_players[side]
-		var at := float(piece["at"])
-		if at >= float(piece["length"]):
-			player.stop()
-			_floor_pieces[side] = {}
-			continue
-		var share := clampf(minf(at, float(piece["length"]) - at) / fade, 0.0, 1.0)
-		player.volume_db = SoundKit.volume_db(FLOOR) + linear_to_db(maxf(share * level, 0.0001)) + duck_db
+		var ahead: Dictionary = pieces[front]
+		if ahead.is_empty() or float(ahead["at"]) >= float(ahead["length"]) - fade and pieces[1 - front].is_empty():
+			if not ahead.is_empty():
+				front = 1 - front
+			if deck.is_empty():
+				dealt = Ambience.deal(Ambience.take_lengths(slot), span, last, rng, dealt, false)
+				deck = dealt.duplicate()
+			if deck.is_empty():
+				return
+			var piece: Dictionary = deck.pop_front()
+			last = int(piece["take"])
+			piece["at"] = 0.0
+			pieces[front] = piece
+			while players.size() < 2:
+				var made := AudioStreamPlayer.new()
+				made.name = "%s_%d" % [label, players.size()]
+				made.bus = "Ambience"
+				owner.add_child(made)
+				players.append(made)
+			var player := players[front]
+			player.stream = Ambience._once_of(files[last])
+			player.play(float(piece["start"]))
+			played.append([files[last], float(piece["start"]), float(piece["length"])])
+		for side in 2:
+			var piece: Dictionary = pieces[side]
+			if piece.is_empty():
+				continue
+			piece["at"] = float(piece["at"]) + delta
+			var player := players[side]
+			var at := float(piece["at"])
+			if at >= float(piece["length"]):
+				player.stop()
+				pieces[side] = {}
+				continue
+			var share := clampf(minf(at, float(piece["length"]) - at) / fade, 0.0, 1.0)
+			player.volume_db = SoundKit.volume_db(slot) + linear_to_db(maxf(share * level, 0.0001)) + duck
 
 
 ## The take at [param path], played once (not looped).
@@ -1038,6 +1091,7 @@ func _door_open(edge: Variant) -> bool:
 func _place_torch(cell: Vector2i) -> void:
 	_place_point("amb.torch_fire", view.torch_fires(), cell)
 	_place_point("amb.campfire", view.campfire_cells(), cell)
+	_place_point(HEARTH, hearth_sources(view.hearth_cells(), World.is_walkable), cell)
 	var held := held_camps(view._terrain.get("camps", []), _camp_people())
 	for slot: String in CAMP_TALK:
 		_place_point(slot, held[slot], cell)
@@ -1089,6 +1143,50 @@ func _camp_people() -> Dictionary:
 		elif body is Resident and str(body.name).begins_with(CAMP_TRADER_PREFIX):
 			traders.append(body.tile)
 	return {"bandits": bandits, "traders": traders}
+
+
+## The goers among [param bodies] (920): residents but the taverner
+## (TAVERN "not_goers", by trade), none asleep (TAVERN "quiet"); a companion
+## or a player never counts.
+static func goers(bodies: Array) -> int:
+	var count := 0
+	for body: Variant in bodies:
+		if body is Resident and not body is Companion and str(body.trade) not in TAVERN["not_goers"] 				and str(body.activity) not in TAVERN["quiet"]:
+			count += 1
+	return count
+
+
+## A tavern room's talk (0..1) with [param count] goers, in [param tavern]
+## (a room with a tavern's hearth) or not: silent with none, full at
+## TAVERN "murmur_full".
+static func murmur_weight(count: int, tavern: bool) -> float:
+	return clampf(float(count) / float(TAVERN["murmur_full"]), 0.0, 1.0) if tavern else 0.0
+
+
+## The bodies the view draws in its zone (its puppets), as the player sees them.
+func _room_bodies() -> Array:
+	var out := []
+	for id: int in view._puppets:
+		var body := instance_from_id(id) as GridEntity
+		if body != null:
+			out.append(body)
+	return out
+
+
+## Where each hearth of [param cells] is heard from (920): its own cell if
+## [param walkable] says so, else the first walkable cell beside it (a wall
+## hearth's room side), else its own.
+static func hearth_sources(cells: Array[Vector2i], walkable: Callable) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		var at := cell
+		if not bool(walkable.call(cell)):
+			for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if bool(walkable.call(cell + way)):
+					at = cell + way
+					break
+		out.append(at)
+	return out
 
 
 ## [param slot]'s loop at whichever of [param cells] is heard best from

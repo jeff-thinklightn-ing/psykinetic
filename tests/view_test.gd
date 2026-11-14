@@ -105,6 +105,7 @@ func _ready() -> void:
 		await _test_armour_footfalls()
 		_test_work_strokes()
 		_test_town_day()
+		_test_tavern()
 		_test_wade_drip()
 		_test_bridge_ends()
 		_test_far_cry()
@@ -1651,6 +1652,9 @@ func _test_work_strokes() -> void:
 		var upper := not row.has("clip")
 		var clip := str(row["upper"] if upper else row["clip"])
 		var length := rig.length(clip)
+		if not Client3D.WORK_STROKES.has(clip):
+			_check(true, "%s: no blows on %s, its strokes on its asides (_test_tavern, 920)" % [word, clip])
+			continue
 		if SoundKit.files(slot).is_empty() or length <= 0.0:
 			_check(true, "%s: its takes are not synced here, or no %s clip: skipped" % [word, clip])
 			continue
@@ -1836,11 +1840,158 @@ func _test_town_day() -> void:
 		_check(stretches.size() >= int(600.0 / floor_span.y) and within,
 				"ten minutes of the floor: %d stretches, each inside its take clear of the seam" % stretches.size())
 	ambience._play_floor(1.0 / 60.0, 0.0)
-	_check(ambience._floor_players.all(func(player: AudioStreamPlayer) -> bool: return not player.playing), "away from a town: the floor stops")
+	_check(ambience._town_floor.players.all(func(player: AudioStreamPlayer) -> bool: return not player.playing), "away from a town: the floor stops")
 	for burst: Dictionary in ambience._bursts:
 		(burst["player"] as AudioStreamPlayer).stop()
 	ambience._bursts.clear()
 
+
+## 920, the tavern's sound, on the view. The hearth: a loop at a tavern
+## hearth the zone burns, as loud by distance in this small room as at the
+## Mughouse's seats, heard from the room side of a wall hearth, gone with the
+## hearth. The room's talk: silent with nobody, by the goers seen (the
+## taverner and the sleeping not counted), dealt in stretches from the
+## town's chatter takes, stopped when the room empties. The taverner's cup:
+## once each time her Counter_Bar_Show or Counter_Bar_Give aside comes round,
+## at its set-down; her idle at the counter silent.
+func _test_tavern() -> void:
+	print("\n== the tavern: its hearth burning, its room's talk by the goers, the taverner's cup (920) ==")
+	var player := _player()
+	var ambience := _rig.ambience
+	if player == null or ambience == null:
+		_check(true, "no player or no ambience: skipped")
+		return
+	var listener_was: Variant = _rig.sfx.listener
+	var posts_was: Array = _rig._night_posts
+	var stores_was: Array = _rig._night_stores
+	var hearths_was: Array = _rig._night_hearths
+	var zone_was: Variant = _rig._terrain.get("zone")
+	_rig._terrain["zone"] = "indoors"
+	# A hearth on the player's own floor cell, the listener on it.
+	var hearth: Vector2i = player.tile
+	_rig.set_night_places(posts_was, stores_was, [hearth])
+	_rig.sfx.listener = hearth
+	ambience._weigh()
+	var fire: AudioStreamPlayer3D = ambience.points.get(Ambience.HEARTH)
+	var synced := not SoundKit.files(Ambience.HEARTH).is_empty()
+	_check(not synced or fire != null and fire.playing and SoundKit.played_from(Ambience.HEARTH) == Ambience.HEARTH,
+			"a tavern hearth burning: amb.hearth on at its cell, from takes of its own (made %s, playing %s, from %s, hearths %s)"
+			% [fire != null, fire != null and fire.playing, SoundKit.played_from(Ambience.HEARTH), _rig.hearth_cells()])
+	# Its level by distance alone (Sfx.hearing's clear-line rule), the same in
+	# any room: this small one, and the Mughouse's eight seats from its
+	# hearth's room side (umbrage_tavern, hearth (0, 6), heard from (1, 6)).
+	var reach := SoundKit.reach(Ambience.HEARTH)
+	var carries := float(reach)
+	var levels := []
+	for d in [1, 4, 8, 11]:
+		levels.append("%d: %.1f" % [d, 0.0 if d <= 1 else Sfx.EDGE_DB * clampf((d - 1.0) / (carries - 1.0), 0.0, 1.0)])
+	var seats := [Vector2i(2, 6), Vector2i(5, 7), Vector2i(7, 6), Vector2i(10, 7), Vector2i(2, 10), Vector2i(5, 11), Vector2i(7, 10), Vector2i(10, 11)]
+	var at_seats := []
+	var all_in := true
+	for seat: Vector2i in seats:
+		var d := maxi(absi(seat.x - 1), absi(seat.y - 6))
+		at_seats.append("%.0f" % (SoundKit.volume_db(Ambience.HEARTH) + (0.0 if d <= 1 else Sfx.EDGE_DB * clampf((d - 1.0) / (carries - 1.0), 0.0, 1.0))))
+		all_in = all_in and d <= reach
+	print("  the hearth by distance (cells: dB): %s; at the Mughouse's eight seats, dB over the take: %s" % [", ".join(levels), ", ".join(at_seats)])
+	_check(all_in and reach >= 11, "every Mughouse seat within the hearth's reach (%d)" % reach)
+	var wall := func(cell: Vector2i) -> bool: return cell != Vector2i(0, 6)
+	var wall_hearth: Array[Vector2i] = [Vector2i(0, 6)]
+	var floor_hearth: Array[Vector2i] = [Vector2i(3, 3)]
+	_check(Ambience.hearth_sources(wall_hearth, wall) == [Vector2i(1, 6)] and Ambience.hearth_sources(floor_hearth, wall) == [Vector2i(3, 3)],
+			"a wall hearth heard from the floor cell before it; a floor hearth from its own")
+	# The room's talk by the goers seen.
+	ambience._weigh()
+	_check(float(ambience.targets.get(Ambience.MURMUR, -1.0)) == 0.0 and ambience.goers_seen == 0, "nobody in the room: no talk")
+	var bodies: Array[Resident] = []
+	for i in 6:
+		var body := Resident.new()
+		body.trade = "taverner" if i == 0 else "farmer"
+		body.activity = "sleep" if i == 1 else ""
+		bodies.append(body)
+	var counts := []
+	var stand_in := Node3D.new()
+	for n: int in [1, 2, 3, 6]:
+		for body: Resident in bodies.slice(0, n):
+			_rig._puppets[body.get_instance_id()] = stand_in
+		ambience._weigh()
+		counts.append([n, ambience.goers_seen, float(ambience.targets.get(Ambience.MURMUR, -1.0))])
+		for body: Resident in bodies:
+			_rig._puppets.erase(body.get_instance_id())
+	print("  bodies in the room -> goers, the talk's weight: %s" % [counts])
+	_check(counts[0][1] == 0 and counts[1][1] == 0 and counts[2][1] == 1 and counts[3][1] == 4 and is_equal_approx(counts[3][2], 1.0)
+			and is_equal_approx(counts[2][2], 0.25), "the taverner and the sleeping not counted; one goer a quarter, four full")
+	_check(Ambience.murmur_weight(4, false) == 0.0, "goers in a room with no tavern hearth: no talk")
+	for body: Resident in bodies:
+		body.free()
+	stand_in.free()
+	var talked := ambience.murmur_played.size()
+	for i in 60 * 200:
+		ambience._murmur.step(ambience, 1.0 / 60.0, 1.0, 0.0)
+	var stretches := ambience.murmur_played.slice(talked)
+	var chatter: Array = SoundKit.files("amb.town_chatter")
+	if chatter.is_empty():
+		_check(stretches.is_empty(), "no chatter takes synced here: no talk")
+	else:
+		var span: Vector2 = Ambience.TAVERN["murmur_s"]
+		var seam := float(Ambience.TOWN_DAY["seam_s"])
+		var from_chatter := stretches.all(func(row: Array) -> bool: return row[0] in chatter)
+		var clear := stretches.all(func(row: Array) -> bool: return _stretch_clear(row, seam))
+		_check(stretches.size() >= int(200.0 / span.y) and from_chatter and clear,
+				"a full room for 200 s: %d stretches of the town's chatter takes, each clear of its seam" % stretches.size())
+	ambience._murmur.step(ambience, 1.0 / 60.0, 0.0, 0.0)
+	_check(ambience._murmur.players.all(func(each: AudioStreamPlayer) -> bool: return not each.playing), "the room emptied: the talk stops")
+	_rig.set_night_places(posts_was, stores_was, hearths_was)
+	ambience._weigh()
+	var gone: AudioStreamPlayer3D = ambience.points.get(Ambience.HEARTH)
+	_check(gone == null or not gone.playing, "no hearth: the fire's loop off")
+	if zone_was == null:
+		_rig._terrain.erase("zone")
+	else:
+		_rig._terrain["zone"] = zone_was
+	_rig.sfx.listener = listener_was
+	ambience._weigh()
+	# The taverner's cup on his asides.
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id())
+	if puppet == null or not puppet.has_meta("rig"):
+		_check(true, "no drawn player: the cup skipped")
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var work_was: String = str(puppet.get_meta("work", ""))
+	# The taverner is one of the people: her clips are their copies (877), named plain.
+	var stood_was := rig.stood_as
+	rig.stood_as = Client3D.PEOPLE_PREFIX
+	puppet.set_meta("work", "tend_bar")
+	for clip: String in ["Counter_Bar_Show", "Counter_Bar_Give", "Counter_Bar_Idle"]:
+		var length := rig.length(clip)
+		if length <= 0.0 or SoundKit.files("sfx.cup_set_down").is_empty():
+			_check(true, "%s: no clip, or the cup's takes not synced here: skipped" % clip)
+			continue
+		var before := _rig.sfx.played.size()
+		# Three times round: an aside plays once from the counter's idle and
+		# back (its clip doesn't loop), so each is begun again from its start.
+		for round in 3:
+			rig.base_at("Counter_Bar_Idle", 0.0)
+			rig.tree.advance(0.0)
+			_rig._stroke_sounds(player, puppet, rig)
+			for frame in int(length * 60.0):
+				rig.base_at(clip, frame / 60.0)
+				rig.tree.advance(0.0)
+				_rig._stroke_sounds(player, puppet, rig)
+		var cups := _rig.sfx.played.slice(before)
+		var want: int = (Client3D.WORK_STROKES.get(clip, []) as Array).size() * 3
+		var all_cups := cups.all(func(entry: Array) -> bool: return entry[0] == "sfx.cup_set_down")
+		_check(cups.size() == want and all_cups, "%s at the tend_bar work, three times round: %d cups set down (%d)" % [clip, cups.size(), want])
+	puppet.set_meta("work", "")
+	var idle := _rig.sfx.played.size()
+	for frame in int(maxf(rig.length("Counter_Bar_Show"), 0.0) * 2.0 * 60.0):
+		rig.base_at("Counter_Bar_Show", frame / 60.0)
+		rig.tree.advance(0.0)
+		_rig._stroke_sounds(player, puppet, rig)
+	_check(_rig.sfx.played.size() == idle, "the aside's clip with no tend_bar work: no cup")
+	rig.stood_as = stood_was
+	puppet.set_meta("work", work_was)
+	if puppet.has_meta("stroke_at"):
+		puppet.remove_meta("stroke_at")
 
 ## 676 1b (Jeff on the first mixes: "the walking ones are approximately
 ## running speed"): worn armour clanks on the body's own footfalls, from its

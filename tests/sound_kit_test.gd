@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_takes()
 	_test_ambience_weights()
 	_test_town_day()
+	_test_tavern()
 	_test_music()
 	_test_folders()
 	_test_sfx_plays_slots()
@@ -680,6 +681,61 @@ func _test_town_day() -> void:
 			"the arrival: five stretches of the market or more (%d)" % SoundKit.files("amb.town_arrival").size())
 	_test_no_loop()
 
+
+## 920, the tavern's sound: the hearth's slot (a loop heard across a room,
+## takes of its own levelled to one body), the room's talk (a bed playing the
+## town's chatter takes, its weight by goers), the taverner's cup (a
+## positional one-shot, short range), and the talk dealt for an hour with no
+## piece twice in a deck nor at a seam.
+func _test_tavern() -> void:
+	print("\n== the tavern: its hearth, its room's talk by the goers, the taverner's cup (920) ==")
+	_check(SoundKit.has(Ambience.HEARTH) and SoundKit.positional(Ambience.HEARTH) and SoundKit.bus(Ambience.HEARTH) == "ambience"
+			and SoundKit.reach(Ambience.HEARTH) >= 11 and SoundKit.reach(Ambience.HEARTH) > SoundKit.reach("amb.campfire")
+			and str(SoundKit.spec(Ambience.HEARTH).get("fallback", "")) == "amb.campfire",
+			"amb.hearth: a positional ambience loop heard across the Mughouse (%d cells, the camp fire's %d), the camp fire behind it"
+			% [SoundKit.reach(Ambience.HEARTH), SoundKit.reach("amb.campfire")])
+	var bodies: Array[float] = []
+	for path: String in SoundKit.files(Ambience.HEARTH):
+		bodies.append((load(path) as AudioStream).get_length())
+	_check(SoundKit.takes(Ambience.HEARTH).size() >= 3, "the hearth: three takes of its own (%d listed; %d synced here)"
+			% [SoundKit.takes(Ambience.HEARTH).size(), bodies.size()])
+	_check(SoundKit.has(Ambience.MURMUR) and not SoundKit.positional(Ambience.MURMUR) and SoundKit.bus(Ambience.MURMUR) == "ambience"
+			and SoundKit.takes(Ambience.MURMUR).is_empty() and str(SoundKit.spec(Ambience.MURMUR).get("fallback", "")) == "amb.town_chatter"
+			and SoundKit.files(Ambience.MURMUR) == SoundKit.files("amb.town_chatter") and Ambience.MURMUR in Ambience.BEDS,
+			"amb.tavern_murmur: a flat bed with no takes of its own, playing the town's chatter takes (a take dropped there goes from both)")
+	_check(SoundKit.volume_db(Ambience.MURMUR) < SoundKit.volume_db(Ambience.HEARTH), "the talk set under the fire")
+	_check(SoundKit.has("sfx.cup_set_down") and SoundKit.positional("sfx.cup_set_down") and SoundKit.reach("sfx.cup_set_down") <= 6
+			and SoundKit.takes("sfx.cup_set_down").size() >= 3 and Client3D.stroke_slot(null, "tend_bar") == "sfx.cup_set_down",
+			"sfx.cup_set_down: a short-range one-shot with three takes or more, the tend_bar work's stroke")
+	_check(Ambience.murmur_weight(0, true) == 0.0 and is_equal_approx(Ambience.murmur_weight(1, true), 0.25)
+			and Ambience.murmur_weight(4, true) == 1.0 and Ambience.murmur_weight(8, true) == 1.0 and Ambience.murmur_weight(8, false) == 0.0,
+			"the talk's weight by goers: none silent, one a quarter, four or more full, none outside a tavern room")
+	var made: Array[Node] = []
+	var taverner := Resident.new()
+	taverner.trade = "taverner"
+	var sleeper := Resident.new()
+	sleeper.trade = "farmer"
+	sleeper.activity = "sleep"
+	var goer := Resident.new()
+	goer.trade = "farmer"
+	var friend := Companion.new()
+	made.assign([taverner, sleeper, goer, friend])
+	_check(Ambience.goers([taverner, sleeper, goer, friend, null]) == 1 and Ambience.goers([]) == 0,
+			"goers: a resident at their ease; not the taverner, one asleep, a companion")
+	for each: Node in made:
+		each.free()
+	var walkable := func(cell: Vector2i) -> bool: return cell.x > 0
+	var hearths: Array[Vector2i] = [Vector2i(0, 6), Vector2i(4, 4)]
+	_check(Ambience.hearth_sources(hearths, walkable) == [Vector2i(1, 6), Vector2i(4, 4)],
+			"a wall hearth heard from the room side, a floor hearth from its own cell")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 920
+	var chatter := Ambience.take_lengths(Ambience.MURMUR)
+	if chatter.is_empty():
+		chatter = [57.0, 26.0, 19.0, 59.0, 25.0, 152.0]
+	var fade := float(Ambience.TAVERN["murmur_fade_s"])
+	_no_loop_hour("the tavern's talk", chatter, Ambience.TAVERN["murmur_s"], rng,
+			func(piece: Dictionary) -> float: return float(piece["length"]) - fade, false)
 
 ## Jeff (11-14), on the town by day: "it needs multiple variations so its not
 ## a loop". An hour by day simulated with the game's own draws: no arrival

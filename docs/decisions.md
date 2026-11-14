@@ -56033,3 +56033,72 @@ without npc's --test-leaver (613 amended (9), which lands after this and takes "
 box's woodcutter back in Umbrage). Release reads the box's journal after the deploy's first town turn for the count of
 "sent for, finds the way to" lines and the step, never a name; if the line is there, voice's second half goes into
 the next cut's section as its own bullet.
+
+## 920. The tavern's sound: its hearth burning, the taverner's cup, the room's talk by the goers seen (sound)
+
+The coordinator's order of 11-14: maps' Mughouse take switches "Umbrage at
+night" on, and inside the Mughouse of an evening a player heard nothing (the
+interior level, umbrage_tavern, is zone "indoors", where every bed weighs 0,
+and Client3D.campfire_cells did not list its hearth). Approved by the
+coordinator, all three parts, as designed; package "Umbrage at night", lands
+on. Label from tools/decision_number.sh. It carries the cup half of 804
+amended (23)'s design; the hunter's dress cut (sfx.dress_cut, Kneel_Work) is
+not in it and waits on the hunter's kneel.
+
+(a) The hearth, amb.hearth (+5, range 12, a positional loop on Ambience):
+from each tavern hearth the zone burns (Client3D.hearth_cells, 868, always
+burning), placed as Ambience places a camp fire (Ambience._place_torch), and
+heard from the first walkable cell beside a hearth whose own cell is wall
+(Ambience.hearth_sources: the Mughouse's (0, 6) from (1, 6)). Today only
+umbrage_tavern has a hearth cell; any tavern given one later sounds the same.
+Its level is by distance alone (Sfx.hearing's clear-line rule), so a small
+room is no louder at a given distance than the Mughouse is; range 12 puts
+every one of the Mughouse's eight seats in it (the camp fire's 8 left the
+east seats silent). Its three takes are the camp fire's three CC0 sources
+(freesound 558967, 350757, 508110) cut again and levelled to one body (mean
+about -44 dBFS each): amb.campfire's own takes differ by 25 dB in body (the
+dense loop against two sparse crackles), so a hearth on them was loud or
+quiet by which take it drew. At the ear about -39 dB (mean) beside it, -56
+at the far seats.
+
+(b) The taverner's cup, sfx.cup_set_down (-21, range 6): a work's asides
+count as its own in Client3D._stroke_sounds (the clip on the base layer
+named in the work's ACTIVITIES "asides"), and the tend_bar work strikes with
+the cup, at 3.60 s of Counter_Bar_Show's 4.67 and 3.48 of Counter_Bar_Give's
+4.38 (Client3D.WORK_STROKES, from animation's measure of the hands,
+probe.log, 11-12); her idle at the counter is silent. Four takes of three
+CC0 recordings (flamingostrich 584993, 584996; Fenodyrie 565917), each to a
+loudest 50 ms of -16 dBFS.
+
+(c) The room's talk, amb.tavern_murmur (-4, a flat bed): in a room with a
+tavern's hearth, weighted by the goers the client sees there (Ambience.goers
+over the view's drawn bodies, so a joined client and the host hear the same
+room): none silent, one a quarter, four or more full (TAVERN "murmur_full"),
+eased as every bed is; the taverner (by trade), anyone asleep and a
+companion are not counted. It has no takes of its own: it plays the town's
+chatter takes by fallback (578 amended (4)'s six, cut above 650 Hz), dealt
+as the town's floor is, in 40 to 90 s stretches cross-faded over 4 s, never
+at a take's seam, no piece twice in a deck (Ambience.Strand, the floor's
+dealing made a class both use), so a take dropped on Jeff's ear goes from
+both. At full about -43 at the ear; with the fire beside it about -37, under
+talk at two cells (-38). An empty tavern is its fire; a full one hums.
+With 337 s of chatter dealt without a break, a room full for an hour hears
+a stretch again first at 2.0 min and at the least 0.9 min after it was
+heard (sound_kit_test's hour; the floor's 5.8 and 3.5): never a loop, but
+more takes would lengthen it, and dropping one shortens it.
+Economy's hungry town (Jeff, 11-14: a hungry town is seen and felt, the
+tavern empty) may read the same count later; nothing of it is built here.
+
+Measured, not heard by anyone: the levels above are the takes' own and the
+mixer's, and Jeff's ear is the check (a clip of the room by its fire, empty
+then full, beside clip 15). The bullet passes on a joined log read of the
+ears tour in the Mughouse of an evening (the hearth on at (0, 6), the talk
+off empty and on with goers, a cup on her aside, SCRIPT ERROR 0).
+sound_kit_test _test_tavern (the slots, the talk's weight and goers, the wall
+hearth, an hour of the talk with no piece twice in a deck nor at a seam);
+view_test _test_tavern (the hearth on at its cell from takes of its own and
+off with it, the seats' levels, the talk by goers 0, 0, 1 and 4 of 1, 2, 3
+and 6 bodies, 200 s of stretches from the chatter takes, a cup each time
+round of each aside, none at her idle or without the work). THIRD_PARTY: the
+three hearth and four cup lines (release's OK); sound_status regenerated.
+Client sound only; protocol unchanged; no new class_name.

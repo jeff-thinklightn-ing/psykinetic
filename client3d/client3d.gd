@@ -22508,10 +22508,16 @@ func _footfall_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 ## (22)): its "clip" the base layer's, else its "upper" the upper layer's,
 ## so a work on either layer needs only its rows here: the hoe's blade into
 ## the ground at 0.45 s of Hoe's 1.2, on the upper layer over a stand or a
-## walk.
-const WORK_STROKES: Dictionary[String, Array] = {"Chop": [0.3875], "Saw": [0.0, 0.5], "Hammer": [0.314], "Hoe": [0.375]}
+## walk. A work's asides count as its own (920, the cup half of 804 amended
+## (23)'s design): the taverner's cup set down at 3.60 s of
+## Counter_Bar_Show's 4.67 and 3.48 of Counter_Bar_Give's 4.38, played as
+## each aside comes round (animation's measure of the hands, probe.log,
+## 11-12).
+const WORK_STROKES: Dictionary[String, Array] = {"Chop": [0.3875], "Saw": [0.0, 0.5], "Hammer": [0.314], "Hoe": [0.375],
+		"Counter_Bar_Show": [0.771], "Counter_Bar_Give": [0.795]}
 ## A work's stroke sound by its ACTIVITIES word.
-const STROKE_SLOTS := {"chop": "sfx.chop_wood", "saw": "sfx.saw_stroke", "hammer": "sfx.hammer_wood", "hoe": "sfx.hoe_strike"}
+const STROKE_SLOTS := {"chop": "sfx.chop_wood", "saw": "sfx.saw_stroke", "hammer": "sfx.hammer_wood", "hoe": "sfx.hoe_strike",
+		"tend_bar": "sfx.cup_set_down"}
 ## How high over its feet a stroke is heard (the tool at the hands).
 const STROKE_UP := 1.0
 
@@ -22529,7 +22535,8 @@ func _stroke_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 	var blows: Array = WORK_STROKES.get(clip, [])
 	var length := rig.length(clip)
 	var slot := stroke_slot(entity, word)
-	if slot.is_empty() or blows.is_empty() or length <= 0.0 or str(work.get("clip" if on_base else "upper", "")) != clip:
+	var own: bool = str(work.get("clip" if on_base else "upper", "")) == clip or on_base and clip in work.get("asides", [])
+	if slot.is_empty() or blows.is_empty() or length <= 0.0 or not own:
 		if puppet.has_meta("stroke_at"):
 			puppet.remove_meta("stroke_at")
 		return
