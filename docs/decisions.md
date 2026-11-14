@@ -10906,6 +10906,21 @@ waiter thread (gate.take, still polling) had it open, and Windows refused (WinEr
 through gate._retried, the gate's own retry for a file in use (a second, then the error), as the gate removes them.
 Tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (50): heavy_job_test's real take goes by a free-memory figure of the test's own (the coordinator's go and
+release's, 2026-11-13; label from tools/decision_number.sh). buildings' landing failed at 21:36 on "a take by a short
+process names the waiting script's shell, alive (None, ...)" and then a KeyError at pre31_stale: the check starts a
+real `sh tools/heavy_job.sh take` as a process of its own with 60 s to write its take, and that process read this PC's
+free memory (the test's stand-in _memory is only in its own process). With the evening's queue the PC was short of a
+take's estimate plus the 8 GB margin, so the take waited, none was written, and the empty entry ended the test. Any
+landing that met the PC short could lose its turn so, whatever its diff. heavy_job.py's _memory returns
+HEAVY_JOB_TEST_FREE_GB as free RAM and commit only when HEAVY_JOBS_DIR names a state folder that is not the real one
+(REAL_STATE_DIR, compared by path and by samefile); with the real folder, or none named, it is ignored and the
+machine's memory read; the margin and every estimate are unchanged. The test gives its take 64 GB; a take not written
+is one failed check and its three checks skipped, never a traceback. heavy_job_test proves both sides (honoured with
+its own folder, ignored with the real one in four spellings, with none, and when not a number; a gate process of its
+own goes by it). Carried by the take that widens the tool tests' wall-clock bounds. Tests and the gate's test path only;
+GATE_REVISION unchanged (no real take reads it); protocol unchanged; no class_name; no bullet.
+
 394 amended (43): the gate's memory record, and "old" judged against main's revision (the coordinator's rulings,
 2026-11-12; the label from tools/decision_number.sh). At 23:44 Claude Code stopped background shells in about ten
 idle sessions "because the system is running low on memory". The gate was not the cause: each admission decides

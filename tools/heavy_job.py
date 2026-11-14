@@ -134,7 +134,8 @@ import subprocess
 import sys
 import time
 
-STATE_DIR = os.environ.get("HEAVY_JOBS_DIR", r"C:\dev\psykinetic-trees\heavy_jobs")
+REAL_STATE_DIR = r"C:\dev\psykinetic-trees\heavy_jobs"
+STATE_DIR = os.environ.get("HEAVY_JOBS_DIR", REAL_STATE_DIR)
 MARGIN_GB = 8.0
 ## Commit (RAM and pagefile, 100 GB here) kept free to start a job: past
 ## it allocations fail and programs crash. 4, not 8 (394 amended (16)): with
@@ -1036,9 +1037,33 @@ def total_ram_gb():
     return None
 
 
+def _test_free_gb():
+    """394 amended (50): HEAVY_JOB_TEST_FREE_GB, a test's own free memory (RAM and commit, in GB),
+    honoured only when HEAVY_JOBS_DIR names a state folder that is not the real one (REAL_STATE_DIR);
+    with the real folder, or none named, it is ignored and the machine's free memory read. The margin
+    and every estimate are unchanged. heavy_job_test's real `heavy_job.sh take`, a process of its
+    own, read the PC's free memory and waited past its 60 s when this PC was short (buildings'
+    landing, 11-13 21:36)."""
+    given, folder = os.environ.get("HEAVY_JOB_TEST_FREE_GB"), os.environ.get("HEAVY_JOBS_DIR")
+    if not given or not folder:
+        return None
+    real = os.path.normcase(os.path.abspath(REAL_STATE_DIR))
+    if os.path.normcase(os.path.abspath(folder)) == real:
+        return None
+    try:
+        if os.path.exists(folder) and os.path.exists(REAL_STATE_DIR) and os.path.samefile(folder, REAL_STATE_DIR):
+            return None
+        return float(given)
+    except (OSError, ValueError):
+        return None
+
+
 def _memory():
     """(free RAM, free commit) in GB; free commit, what Windows can still
     promise (RAM and pagefile) before allocations fail, None elsewhere."""
+    given = _test_free_gb()
+    if given is not None:
+        return given, given
     if os.name == "nt":
         return _memory_status()[:2]
     with open("/proc/meminfo") as meminfo:

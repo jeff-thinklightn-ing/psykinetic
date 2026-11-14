@@ -528,7 +528,10 @@ gate._retried(os.remove, gate._path("running", "stuck-suite_remote-1.json"))
 if shell is not None:
     # The case that bit (the coordinator's): a take made by `heavy_job.sh take`, a
     # process that ends at once, from a script that then waits on the land lock.
-    env = dict(os.environ, HEAVY_JOBS_DIR=STATE)
+    # Its own free memory (394 amended (50)): a take is a process of its own and would read the PC's,
+    # and wait past the 60 s below when the PC is short (buildings' landing, 11-13 21:36).
+    # HEAVY_JOB_TEST_SHORTCALL_GB sets it for the proof that an absent take is a plain FAIL.
+    env = dict(os.environ, HEAVY_JOBS_DIR=STATE, HEAVY_JOB_TEST_FREE_GB=os.environ.get("HEAVY_JOB_TEST_SHORTCALL_GB", "64"))
     script = subprocess.Popen([shell, "-c", "sh tools/heavy_job.sh take shortcall suite_remote && echo taken && read line"],
         cwd=repo, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     start = time.time()
@@ -537,15 +540,21 @@ if shell is not None:
     time.sleep(1.0)  # `take` itself gone.
     entry = aged("shortcall") if held_file("shortcall") else {}
     guard_by = entry.get("adopted_by")
-    check(entry.get("guard") and gate.alive(guard_by, entry.get("adopted_since")) and script.pid in gate.ancestors(guard_by),
-        "a take by a short process names the waiting script's shell, alive (%s, under %s)" % (guard_by, script.pid))
-    check(not pre31_stale(entry), "older code skips it, 31 minutes old, while that script lives")
-    subprocess.run(["taskkill", "/PID", str(guard_by), "/T", "/F"] if os.name == "nt" else ["kill", str(guard_by)],
-        capture_output=True)
-    script.kill()
-    script.wait()
-    time.sleep(0.5)
-    check(entry and pre31_stale(entry), "and drops it once the script has died")
+    if not entry:
+        # 394 amended (50): no take to read is a failed check, never a KeyError that ends the test.
+        check(False, "a take by a short process: none written in 60 s (the take waited or failed); its three checks not run")
+        script.kill()
+        script.wait()
+    else:
+        check(entry.get("guard") and gate.alive(guard_by, entry.get("adopted_since")) and script.pid in gate.ancestors(guard_by),
+            "a take by a short process names the waiting script's shell, alive (%s, under %s)" % (guard_by, script.pid))
+        check(not pre31_stale(entry), "older code skips it, 31 minutes old, while that script lives")
+        subprocess.run(["taskkill", "/PID", str(guard_by), "/T", "/F"] if os.name == "nt" else ["kill", str(guard_by)],
+            capture_output=True)
+        script.kill()
+        script.wait()
+        time.sleep(0.5)
+        check(pre31_stale(entry), "and drops it once the script has died")
     if held_file("shortcall"):
         gate._retried(os.remove, gate._path("running", held_file("shortcall")))
 
@@ -2043,6 +2052,31 @@ print("== the bench's status line (394 amended (40)) ==")
 line = gate.bench_wait(bench_13th, convoy, [remote_on] + lock_waits, convoy_runs, now, 60.0, None)
 check(line == "; after 15 landings ahead, about 126 min", "a bench behind the convoy: %r" % line)
 check(gate.bench_wait(bench_13th, [], [remote_on], convoy_runs, now, 60.0, None) == "", "none ahead: nothing said")
+
+print("== a test's own free memory, never a real take's (394 amended (50)) ==")
+saved50 = {name: os.environ.get(name) for name in ("HEAVY_JOBS_DIR", "HEAVY_JOB_TEST_FREE_GB")}
+os.environ["HEAVY_JOB_TEST_FREE_GB"] = "64"
+os.environ["HEAVY_JOBS_DIR"] = STATE
+check(gate._test_free_gb() == 64.0, "honoured with this test's own state folder")
+for folder50 in (gate.REAL_STATE_DIR, gate.REAL_STATE_DIR.replace(chr(92), "/"), gate.REAL_STATE_DIR.lower(), gate.REAL_STATE_DIR + chr(92)):
+    os.environ["HEAVY_JOBS_DIR"] = folder50
+    check(gate._test_free_gb() is None, "ignored with the real folder, spelled %s" % folder50)
+os.environ.pop("HEAVY_JOBS_DIR")
+check(gate._test_free_gb() is None, "ignored with no folder named (the real one)")
+os.environ["HEAVY_JOBS_DIR"] = STATE
+os.environ["HEAVY_JOB_TEST_FREE_GB"] = "a lot"
+check(gate._test_free_gb() is None, "ignored when not a number")
+os.environ.pop("HEAVY_JOB_TEST_FREE_GB")
+check(gate._test_free_gb() is None, "and when not set")
+for name50, value50 in saved50.items():
+    if value50 is None:
+        os.environ.pop(name50, None)
+    else:
+        os.environ[name50] = value50
+# Across a process, as the take itself reads it: status prints the free RAM it went by.
+said50 = subprocess.run([sys.executable, "-B", os.path.join(os.path.dirname(os.path.abspath(gate.__file__)), "heavy_job.py"), "status"],
+    env=dict(os.environ, HEAVY_JOBS_DIR=STATE, HEAVY_JOB_TEST_FREE_GB="64"), capture_output=True, text=True, timeout=120).stdout
+check("free RAM 64.0 GB" in said50, "a gate process of its own goes by the figure: %s" % [line for line in said50.splitlines() if "free RAM" in line][:1])
 
 print("== the sleepers ==")
 seen, left = sleepers_seen(), stop_sleepers()
