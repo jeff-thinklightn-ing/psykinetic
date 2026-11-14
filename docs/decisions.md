@@ -53775,7 +53775,12 @@ default now; a test turns them off by the switch or each by hand.
   CANDLE_RANGE, CANDLE_FALLOFF, shadowless, flickering as the hall's flames), as the shot's
   7deb93851 drew it; drawn only while the room's knight has his remains laid (AstralKnight.
   remains_laid, replicated), checked in _sync_puppets only in a room that has a bier, and hidden
-  otherwise. Drawn only: the sim's Senses keep the barrow as dark as before.
+  otherwise. Drawn only: the sim's Senses keep the barrow as dark as before. Kept through a
+  restart in the level's regen state ("remains_laid", saved with it, gone with the generation;
+  Main.remains_laid_in; a test level's in _plain_band_slain), and any knight Main._spawn makes
+  there is laid from it: AstralKnight.remains_laid alone was a kept prop, and a level entity's
+  props come from its spawn table at load (_level_spec_for), so a restart left the bier bare
+  (found by 747 amended (11)'s test on saturn, 11-13).
 - The cell to lay from (Main.altar_beside, the coordinator's word): never a cell another body
   holds, the knight's among them; the one held cell it names is the caller's own, held by a
   player. Before, any cell named as the caller's counted as free, so a player put on his cell (a

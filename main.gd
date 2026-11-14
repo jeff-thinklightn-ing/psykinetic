@@ -7191,6 +7191,8 @@ func _spawn(spec: Dictionary) -> GridEntity:
 		entity.queue_free()
 		return null
 	Net.interest.add(entity)
+	if entity is AstralKnight and remains_laid_in(World.zone.name):
+		(entity as AstralKnight).lay_remains()  # 896: his remains laid this generation, before a restart or a recall.
 	if entity is Monster and entity.has_method("offers_for"):
 		_hook_talker(entity)  # One that talks (the draugr, 548): its first words and its withdrawals (decision 546, npc's side).
 	if spec.has("spawn"):
@@ -11252,6 +11254,17 @@ func _note_band_slain(zone_name: String, named: String, player_id: String) -> vo
 	by[named] = ids
 
 
+## Whether the knight's remains lie on the bier of [param zone_name] this
+## generation (896's switch-on): its regen state's "remains_laid", saved
+## with it and gone with the generation (a test's level's in
+## _plain_band_slain). AstralKnight.remains_laid alone was a kept prop, and
+## a level entity's props come from the spawn table at load, so a restart
+## left the bier bare (saturn's run of 747 amended (11)'s test, 11-13).
+func remains_laid_in(zone_name: String) -> bool:
+	var state: Dictionary = _regen[zone_name] if _regen.has(zone_name) else _plain_band_slain
+	return bool(state.get("remains_laid", false))
+
+
 ## The band's ids [param player_id] (or their companion) felled in the
 ## band's zone this generation (_note_band_slain), in the band's order.
 func _band_slain_by(player_id: String) -> Array:
@@ -11793,6 +11806,7 @@ func _lay_remains(player: Player, quest := true) -> bool:
 	for entity in zone_entities(player.zone):
 		if is_instance_valid(entity) and entity is AstralKnight:
 			(entity as AstralKnight).lay_remains()  # Drawn on the bier for the generation (art-kit's piece).
+	(_regen[player.zone] if _regen.has(player.zone) else _plain_band_slain)["remains_laid"] = true  # Kept through a restart (remains_laid_in).
 	var tier := int(relic.get("tier", -1))
 	var knight := str(relic.get("knight", ""))
 	var added := charge_from_relic(player, tier)

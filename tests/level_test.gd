@@ -6029,6 +6029,8 @@ func _test_barrow_quest() -> void:
 	_main.altar_turn_in = false
 	_main.reset_barrow(id)
 	World.despawn(knight)
+	for state: Dictionary in _main._regen.values() + [_main._plain_band_slain]:
+		state.erase("remains_laid")  # The bier bare again for the tests after (remains_laid_in).
 	for slot in player.slots.size():
 		if player.slots[slot] == Main.CAMP_KEY:  # Brand's, from the nine.
 			var slots := player.slots.duplicate()
@@ -7046,6 +7048,23 @@ func _test_knights_altar() -> void:
 	_check(_main.knights_relic_slot(player) < 0 and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty(),
 		"on, from beside it with his remains: laid, the quest done, the card closed (%s, %s)" % [beside, record.barrow_task])
 	_check(not was_laid and knight != null and knight.remains_laid, "and his remains lie on the bier for the generation (remains_laid, for art-kit's piece)")
+	# Kept through a restart: in the level's regen state, which a save keeps
+	# and a new generation replaces; a knight made again there is laid.
+	var regen_state: Dictionary = _main._regen.get("barrow", _main._plain_band_slain)
+	var round_trip: Dictionary = Regen.states_from(JSON.parse_string(JSON.stringify({"barrow": regen_state})))
+	var again: AstralKnight = null
+	if knight != null:
+		var spec: Dictionary = knight.spawn_spec.duplicate(true)
+		(spec.get_or_add("props", {}) as Dictionary).erase("remains_laid")
+		spec["tile"] = knight.tile
+		World.despawn(knight)
+		await get_tree().process_frame
+		again = _main._spawn(spec) as AstralKnight
+	_check(_main.remains_laid_in("barrow") and bool(round_trip.get("barrow", {}).get("remains_laid", false)) and again != null and again.remains_laid,
+		"and through a restart: the level's state keeps them through a save, and the knight made again there has them laid")
+	if _main._regen.has("barrow"):
+		_main._regen["barrow"].erase("remains_laid")
+	_main._plain_band_slain.erase("remains_laid")
 	_main.altar_turn_in = true
 	record.marks.assign(kept["marks"])
 	record.barrow_task = kept["task"]

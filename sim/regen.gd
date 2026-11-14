@@ -227,6 +227,11 @@ static func states_from(saved: Variant) -> Dictionary:
 						if entry["band_slain"][named] is Array:
 							by[str(named)] = (entry["band_slain"][named] as Array).map(func(id: Variant) -> String: return str(id))
 					out[str(area)]["band_slain"] = by
+				# 896's switch-on: the knight's remains laid on the bier this
+				# generation, so a restart keeps them (a level entity's props
+				# come from its spawn table at load, not the save).
+				if bool(entry.get("remains_laid", false)):
+					out[str(area)]["remains_laid"] = true
 	return out
 
 
