@@ -1390,6 +1390,8 @@ func _process(delta: float) -> void:
 	_update_deal()
 	_update_find()
 	_update_store()
+	if _client3d != null:
+		_client3d.talking_to(_talking_entity_id())  # 623 amended (8): the fade clears the line to them.
 	_update_note()
 	_update_room()
 	_update_bar()
@@ -17234,6 +17236,45 @@ func _take_find() -> void:
 	find_panel.close()
 
 
+## How long a talking monster's word holds the fade's line to it (623
+## amended (8)): twice the draugr's wait from his question to his offer, so
+## his question at the Hall's rim holds it until his deal window takes over.
+const SPEAKER_HOLD_MS := 2.0 * Draugr.ASK_DELAY_TICKS * 1000.0 / World.TICK_RATE
+## The last talking monster at peace to speak to this client (623 amended
+## (8)): its instance id and when, from a "speech" message.
+var _speaker_id := 0
+var _speaker_at := -1
+
+
+## A "speech" from [param entity] (623 amended (8), enemy-ai's and the
+## coordinator's rule): a monster that can offer (talks_peaceably) is held
+## as the one speaking to this player for SPEAKER_HOLD_MS; a resident, a
+## monster fighting, or a server's line (say_to, no entity) never is.
+func _stamp_speaker(entity: GridEntity) -> void:
+	if entity != null and talks_peaceably(entity):
+		_speaker_id = entity.get_instance_id()
+		_speaker_at = Time.get_ticks_msec()
+
+
+## Who the local player is talking to (623 amended (8), ui's call site): the
+## deal window's speaker while it shows, else the store window's body (a
+## townsperson's or a store's), else a talking monster's word inside
+## SPEAKER_HOLD_MS, holding a cell (a draugr gone to rest leaves an empty
+## seat); 0 for none. Read each frame, so no way a window closes leaves it.
+func _talking_entity_id() -> int:
+	if deal_panel != null and deal_panel.visible:
+		return deal_panel.entity_id
+	if barter_panel != null and barter_panel.is_open():
+		var body: Node = barter_panel.person if barter_panel.person != null else barter_panel.with
+		if body != null and is_instance_valid(body):
+			return body.get_instance_id()
+	if _speaker_id != 0 and Time.get_ticks_msec() - _speaker_at < SPEAKER_HOLD_MS:
+		var who := instance_from_id(_speaker_id) as GridEntity
+		if who != null and is_instance_valid(who) and who.spawned and who.holds_cell:
+			return _speaker_id
+	return 0
+
+
 func _update_deal() -> void:
 	if deal_panel == null or not deal_panel.visible:
 		return
@@ -17903,6 +17944,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
 		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
+		_stamp_speaker(entity)  # 623 amended (8): a talking monster's word, the fade's line to it.
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
 		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
 			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.

@@ -21186,7 +21186,8 @@ func _update_fade(force := false) -> void:
 	var toward := _camera.global_transform.basis.z
 	# Outdoors (801) nothing fades for the lines to them: only the near side
 	# of a building they are in, its roof off; the camera turns instead.
-	var fought := points if _outdoor else points + _fight_points(points)
+	# Indoors the fight's other side and whoever speaks to them too (623 amended (8)).
+	var fought := points if _outdoor else points + _fight_points(points) + _speaker_points()
 	var key := "%s %s %s %s" % [toward, _camera.global_position, fought, _line_fade]
 	var moved := key != _fade_key or force
 	if moved:
@@ -21748,6 +21749,36 @@ func _focus_points() -> Array[Vector3]:
 		for height in FADE_HEIGHTS:
 			(out if entity is Player else hers).append(at + Vector3(0.0, height, 0.0))
 	out.append_array(hers)
+	return out
+
+
+## Who the local player is talking to (623 amended (8)): Main sets it
+## each frame (Main._talking_entity_id, its talk window's speaker or a
+## talking monster's word), 0 for none; a repeat is free.
+var _talking := 0
+
+
+func talking_to(id: int) -> void:
+	_talking = id
+
+
+## Where whoever speaks to the local player is ([method talking_to]), at
+## FADE_HEIGHTS, so indoors what stands between the camera and them fades as
+## for a foe (623 amended (8): the draugr seen on his seat as he asks). None
+## for nobody, one gone or holding no cell (a draugr laid to rest), or not
+## drawn near. Outdoors nothing fades on a line (_update_fade).
+func _speaker_points() -> Array[Vector3]:
+	var out: Array[Vector3] = []
+	if _talking == 0:
+		return out
+	var who := instance_from_id(_talking) as GridEntity
+	if who == null or not is_instance_valid(who) or not who.spawned or not who.holds_cell:
+		return out
+	var puppet: Node3D = _puppets.get(_talking)
+	if puppet == null or not puppet.visible or _far.has(_talking):
+		return out
+	for height in FADE_HEIGHTS:
+		out.append(puppet.global_position + Vector3(0.0, height, 0.0))
 	return out
 
 

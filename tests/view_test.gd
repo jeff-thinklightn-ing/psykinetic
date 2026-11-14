@@ -91,6 +91,7 @@ func _ready() -> void:
 		_test_ground_colours()
 		await _test_fade()
 		await _test_fight_fade()
+		await _test_speaker_fade()
 		_test_outdoor()
 		await _test_low_camera()
 		_test_indoor_camera()
@@ -10805,6 +10806,91 @@ func _test_fight_fade() -> void:
 		_rig._sync_puppets()
 	else:
 		print("  (no floor cell beyond FIGHT_TILES of the wall in the test room: the far check skipped)")
+	_place(player, start)
+	await get_tree().create_timer(1.5).timeout
+	_rig._update_fade(true)
+
+
+## 623 amended (8): indoors, what stands between the camera and whoever is
+## talking to the player fades as for a foe (the draugr seen on his seat as
+## he asks): a talking monster at peace behind a wall, no fight, its word
+## (a "speech") holding it SPEAKER_HOLD_MS, then its talk window; when they
+## stop, the wall comes back after FADE_HOLD; one holding no cell (laid to
+## rest) and a resident's word never; outdoors nothing fades on the line.
+func _test_speaker_fade() -> void:
+	print("
+== 623 amended (8): the fade clears the line to whoever speaks to you ==")
+	var player := _player()
+	var start := player.tile
+	var found := _wall_to_hide_behind()
+	var wall_key: Vector3i = found[0]
+	var behind: Vector2i = found[1]
+	var before: Vector2i = found[2]
+	if wall_key.z == -1:
+		_check(false, "the test room has a wall with floor on both sides")
+		return
+	var wall: Node3D = _rig._walls[wall_key]
+	_place(player, before)
+	var speaker := _spawn_imp(behind)
+	speaker.talks = true
+	speaker.peaceable = true
+	await get_tree().create_timer(1.5).timeout
+	_rig._sync_puppets()
+	_rig._update_fade(true)
+	_check(_main.talks_peaceably(speaker) and _rig._fight_points(_rig._focus_points()).is_empty() and not _rig._hiding.has(wall),
+		"a talking monster at peace behind the wall, silent: no fight, its cover stays")
+	var built := _rig.has_method("talking_to") and _main.has_method("_talking_entity_id") and _main.has_method("_stamp_speaker")
+	_check(built, "the fade has a speaker (Client3D.talking_to, Main._talking_entity_id, Main._stamp_speaker)")
+	if not built:
+		World.despawn(speaker)
+		_rig._sync_puppets()
+		_place(player, start)
+		return
+	_main.call("_stamp_speaker", speaker)
+	_check(_main.call("_talking_entity_id") == speaker.get_instance_id(), "its word: it is the one speaking to them")
+	_rig.call("talking_to", _main.call("_talking_entity_id"))
+	_rig._update_fade(true)
+	_check(_rig._hiding.has(wall) and _rig._faded.has(wall), "the wall between the camera and it fades as it speaks, as for a foe")
+	var hold := int((_main.get_script() as Script).get_script_constant_map().get("SPEAKER_HOLD_MS", 0))
+	_main.set("_speaker_at", Time.get_ticks_msec() - hold + 500)
+	_check(_main.call("_talking_entity_id") == speaker.get_instance_id(), "half a second short of SPEAKER_HOLD_MS (%d ms): still held" % hold)
+	_main.set("_speaker_at", Time.get_ticks_msec() - hold - 1)
+	_check(hold == 6000 and _main.call("_talking_entity_id") == 0, "its word held SPEAKER_HOLD_MS (%d ms, twice the draugr's ask), then let go" % hold)
+	_rig.call("talking_to", 0)
+	_rig._update_fade(true)
+	_check(not _rig._hiding.has(wall), "no one speaking: the wall hides nobody")
+	await get_tree().create_timer(Client3D.FADE_HOLD + 0.3).timeout
+	_rig._update_fade(true)
+	_check(not _rig._faded.has(wall), "after FADE_HOLD it comes back")
+	# The talk window's speaker holds it while it shows.
+	_main.deal_panel.entity_id = speaker.get_instance_id()
+	_main.deal_panel.visible = true
+	_check(_main.call("_talking_entity_id") == speaker.get_instance_id(), "its deal window open: it is the one speaking, its word long gone")
+	_main.deal_panel.visible = false
+	_check(_main.call("_talking_entity_id") == 0, "the window closed: nobody")
+	# Laid to rest (no cell held), or a resident's word: never.
+	_main.call("_stamp_speaker", speaker)
+	speaker.holds_cell = false
+	_check(_main.call("_talking_entity_id") == 0, "one holding no cell (a draugr laid to rest): nobody, no empty seat faded")
+	_rig.call("talking_to", speaker.get_instance_id())
+	_check(_rig.call("_speaker_points").is_empty(), "and the view gives it no points")
+	speaker.holds_cell = true
+	speaker.peaceable = false
+	_main.set("_speaker_id", 0)
+	_main.call("_stamp_speaker", speaker)
+	_check(_main.call("_talking_entity_id") == 0, "a monster fighting, its word: not held (its fight points carry it)")
+	speaker.peaceable = true
+	# Outdoors nothing fades on a line (623 amended (5)).
+	_rig.call("talking_to", speaker.get_instance_id())
+	_rig._outdoor = true
+	_rig._update_fade(true)
+	var outdoors_hidden := _rig._hiding.has(wall) and not _rig._inside_hiding.has(wall)
+	_rig._outdoor = false
+	_check(not outdoors_hidden, "outdoors, its line fades nothing")
+	_rig.call("talking_to", 0)
+	_rig._update_fade(true)
+	World.despawn(speaker)
+	_rig._sync_puppets()
 	_place(player, start)
 	await get_tree().create_timer(1.5).timeout
 	_rig._update_fade(true)
