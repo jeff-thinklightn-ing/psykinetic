@@ -42130,6 +42130,30 @@ some 10 cm low and inside his hip, short of the grip; VIGIL's right arm now
 reaches 0.22 across, 0.38 down and 0.36 ahead, the wrist at the grip
 (0.19, 1.02, 0.08 against the hips' 0.01, 0.84, -0.08). Seen in game in the
 barrow (C:/dev/review/knight_barrow.png).
+
+747 amended (10): the fallen knight drawn as one shell (2026-11-13; the
+coordinator's ruling: from above, beside the bier, he read as kneeling or
+striding, C:/dev/review/knight_remains/bier2_lit_vs_room.png, while
+ui-design measured his clip standing). All of him is in the ghost's
+material, half see-through and drawn both ways, so plain alpha drew his
+far leg and the cloak's back through his near leg, and the two read as one
+bent leg and one trailing. Client3D.MODELS["astral_knight"] is now
+"one_shell": _make_model gives each of his ghost surfaces Client3D.one_shell(),
+a copy of the art's material at GHOST_PRIORITY (0) whose next pass is
+GHOST_DEPTH_SHADER (depth only, both faces) at GHOST_DEPTH_PRIORITY (-1).
+This is the near walls' order (188): his depth first, then his colour
+where it matches, so only his nearest surface shows. The room behind him
+(opaque) shows through him as before, and so does a player behind him,
+who is opaque too. The player's through-fill (623 amended (5)) is drawn
+outdoors only, so it never meets him in the barrow; outdoors it is drawn
+with no depth test, so his depth would not stop it. Water (-1) and the
+floor marks (0) behind him are hidden where he covers them, as they are
+behind any solid body, and a faded near wall (1, 2) in front of him still
+shows him through it (the coordinator accepted both). creature.ghost keeps
+plain alpha: its shroud covers an opaque skeleton. anim_rig_test
+_test_knight_vigil: each of his ghost surfaces draws one shell, its depth
+first, and the shrouded ghost has none. Client only, protocol unchanged,
+no new class_name.
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.

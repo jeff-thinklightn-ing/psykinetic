@@ -1462,7 +1462,7 @@ const MODELS := {
 		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 	"astral_knight": {"scene": "res://art/kit/creatures/creature.astral_knight/creature.astral_knight.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
-		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL},
+		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL, "one_shell": true},
 }
 ## The fallen knight's stance (humanoid_clips.py): head bowed, a hand on the
 ## hilt at his hip, a slow breath.
@@ -1470,6 +1470,24 @@ const KNIGHT_VIGIL := "Knight_Vigil"
 ## A model's surface in this material (art-kit's ghost's shroud) is see-through
 ## and casts no shadow (the coordinator's ruling): its mesh's shadow is off.
 const GHOST_MATERIAL := "ghost"
+## A model all in the ghost's material ("one_shell": the fallen knight)
+## blends only its nearest surface, as a near wall does (188): his ghost's
+## depth first (GHOST_DEPTH_SHADER, both faces, at GHOST_DEPTH_PRIORITY),
+## then its colour where it matches (GHOST_PRIORITY). Plain alpha showed his
+## far leg and cloak through his near leg, so from above he read as kneeling
+## or striding while he stands (the coordinator, 11-13). The room behind
+## (opaque) shows through him as before; water (-1) and the marks (0)
+## behind him are hidden by him, and the faded walls (1, 2) in front of
+## him still show him through them.
+const GHOST_DEPTH_PRIORITY := -1
+const GHOST_PRIORITY := 0
+const GHOST_DEPTH_SHADER := """shader_type spatial;
+render_mode unshaded, shadows_disabled, depth_draw_always, cull_disabled;
+void fragment() {
+	ALBEDO = vec3(0.0);
+	ALPHA = 0.0;
+}
+"""
 ## Each modelled monster is its own (_vary, seeded by its name, so every
 ## view sees the same one): its size goes with its mass, as the cube root of
 ## its mass over MODEL_MASS, within MODEL_SCALE_MIN/MAX, give or take
@@ -7592,6 +7610,29 @@ func _fill_finished() -> void:
 
 ## The depth pass every near material draws first (_make_near).
 static var _near_depth: ShaderMaterial
+## The one-shell ghost's depth pass, made once, and each ghost material's
+## one-shell copy by the art's material id ([copy, the art's]: held).
+static var _ghost_depth: ShaderMaterial
+static var _one_shells: Dictionary = {}
+
+
+## [param own] (the art's ghost material) drawn as one shell: a copy at
+## GHOST_PRIORITY, its depth (GHOST_DEPTH_SHADER) as its next pass.
+static func one_shell(own: Material) -> Material:
+	var key := own.get_instance_id()
+	if _one_shells.has(key):
+		return _one_shells[key][0]
+	if _ghost_depth == null:
+		var shader := Shader.new()
+		shader.code = GHOST_DEPTH_SHADER
+		_ghost_depth = ShaderMaterial.new()
+		_ghost_depth.shader = shader
+		_ghost_depth.render_priority = GHOST_DEPTH_PRIORITY
+	var copy := own.duplicate() as Material
+	copy.render_priority = GHOST_PRIORITY
+	copy.next_pass = _ghost_depth
+	_one_shells[key] = [copy, own]
+	return copy
 
 
 func _stone(alpha: float) -> StandardMaterial3D:
@@ -22884,6 +22925,8 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 				mesh.set_surface_override_material(surface, load(ArtKit.PALETTE))
 			elif own != null and own.resource_name == GHOST_MATERIAL:
 				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				if model.get("one_shell", false):
+					mesh.set_surface_override_material(surface, one_shell(own))
 	if model.get("parts", false):
 		# A person's tunic in their colour; an ally's in its look's, and a monster drawn as a person's
 		# (793, pc-character's side: its sprite's tint is its mass's shade, not its clothes, and drew

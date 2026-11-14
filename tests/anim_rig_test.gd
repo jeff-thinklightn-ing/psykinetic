@@ -1866,7 +1866,32 @@ func _test_knight_vigil() -> void:
 	_check(rig.base_clip() == Client3D.KNIGHT_VIGIL and Client3D._idle_clip(puppet) == Client3D.KNIGHT_VIGIL
 		and (puppet.get_meta("fidgets") as Dictionary).is_empty() and shadows.is_empty(),
 		"his model stands it (%s), never fidgets, and casts no shadow (%d casting)" % [rig.base_clip(), shadows.size()])
+	# One shell: each ghost surface's colour after its own depth, so his far side never shows through his near.
+	var shells := 0
+	var plain := 0
+	for mesh: MeshInstance3D in puppet.find_children("*", "MeshInstance3D", true, false):
+		for surface in mesh.mesh.get_surface_count():
+			var own := mesh.mesh.surface_get_material(surface)
+			if own == null or own.resource_name != Client3D.GHOST_MATERIAL:
+				continue
+			var drawn := mesh.get_surface_override_material(surface)
+			var depth: Material = drawn.next_pass if drawn != null else null
+			if (drawn != null and drawn.render_priority == Client3D.GHOST_PRIORITY and depth != null
+					and depth.render_priority == Client3D.GHOST_DEPTH_PRIORITY and depth.render_priority < drawn.render_priority):
+				shells += 1
+			else:
+				plain += 1
 	puppet.free()
+	var ghost := Node3D.new()
+	add_child(ghost)
+	ghost.add_child(Client3D._make_model(Client3D.MODELS["ghost"], ghost))
+	var overridden := ghost.find_children("*", "MeshInstance3D", true, false).filter(func(mesh: MeshInstance3D) -> bool:
+		return range(mesh.mesh.get_surface_count()).any(func(i: int) -> bool:
+			var drawn := mesh.get_surface_override_material(i)
+			return drawn != null and drawn.next_pass != null and drawn.next_pass == Client3D._ghost_depth))
+	_check(shells > 0 and plain == 0 and overridden.is_empty(),
+		"he is drawn as one shell, his depth before his colour (%d surfaces, %d plain); the shrouded ghost as before (%d overridden)" % [shells, plain, overridden.size()])
+	ghost.free()
 
 
 ## The Tomb Sledge's blow (750, pc-character's side): authored at combat's times, so it plays at
