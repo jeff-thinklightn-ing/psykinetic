@@ -6324,6 +6324,14 @@ func _spawn_saved(section: Dictionary) -> bool:
 	var lockers_dropped := 0
 	var knights_dropped := 0
 	for entry: Dictionary in saved:
+		# A knight saved holding no key is a stray before anything else
+		# reads him: _level_spec_for's name match (for snapshots from before
+		# keys) would give him the marker's slot at his old cell, and the
+		# marker's own knight, saved keyed, would come back slotless and be
+		# the one dropped (the box's save after its re-lay, saturn 11-13).
+		if stray_knight(entry["spec"]):
+			knights_dropped += 1
+			continue
 		var spec := _level_spec_for(entry["spec"])
 		# A town's locker whose marker moved away (737: Umbrage's into the
 		# player's house) is the level's, never a stray: its slots are each
@@ -6580,8 +6588,9 @@ func _recall(record: Dictionary) -> GridEntity:
 	var parsed := Snapshot.parse_entry(record["entry"])
 	if parsed.is_empty():
 		return null
+	var stray := stray_knight(parsed["spec"])  # Before the name match can give him a slot (the load's note).
 	var spec := _level_spec_for(parsed["spec"])
-	if stray_knight(spec):
+	if stray or stray_knight(spec):
 		record["dropped"] = true  # Not kept again: his marker's own knight stands (747 amended (11)).
 		print("[state] %s: 1 fallen knight whose marker moved dropped" % World.zone.name)
 		return null
@@ -6704,7 +6713,8 @@ func _moved_marker(saved: Dictionary, key: String) -> int:
 ## MOVED_MARKER_REACH (747 amended (8) moved the barrow's 22 cells, from
 ## (38,32) to (39,10), inside the altar anchor a re-lay keeps) is dropped,
 ## at load and at a record's recall, never spawned as saved beside the new
-## one. His quest is the player's record's (barrow_task, marks), not his
+## one. Asked of the saved spec first (every knight was saved keyed: keys,
+## 433, came before him), then of what _level_spec_for makes of it. His quest is the player's record's (barrow_task, marks), not his
 ## body's, so nobody's quest changes.
 static func stray_knight(spec: Dictionary) -> bool:
 	if spec.has("spawn_key"):

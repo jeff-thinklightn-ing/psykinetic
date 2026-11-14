@@ -356,6 +356,31 @@ func _test_a_moved_knight() -> void:
 	_main._save_state()
 	knights = _knights_loaded()
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and a second restart: still one (%s)" % _knight_words(knights))
+	# The box's own save (saturn, 11-13): written after v0.1.214's re-lay, it
+	# holds the stray first (no key, "spawn": -1, at the old cell, named as
+	# the marker's) and the marker's knight keyed after. One knight, the
+	# marker's, on the marker; and through a re-lay, still there.
+	var both: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var both_zone: Dictionary = both["zones"][LEVEL]
+	var keyed: Dictionary = {}
+	for entry: Dictionary in both_zone["entities"]:
+		if str(entry.get("spawn_key", "")) == now_key:
+			keyed = entry
+	var stray: Dictionary = keyed.duplicate(true)
+	stray.erase("spawn_key")
+	stray["spawn"] = -1
+	stray["tile"] = [KNIGHT_WAS.x, KNIGHT_WAS.y]
+	if stray.has("home"):
+		stray["home"] = [KNIGHT_WAS.x, KNIGHT_WAS.y]
+	(both_zone["entities"] as Array).push_front(stray)
+	_write(path, both)
+	knights = _knights_loaded()
+	_check(not keyed.is_empty() and knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key,
+			"the box's save, the stray first and the marker's knight keyed: one knight, on the marker, not the stray in his old room (%s)" % _knight_words(knights))
+	_main._rebuild_regenerated(KNIGHT_LEVEL, [{"rect": Rect2i(0, 0, WIDTH, HEIGHT), "name": "all"}])
+	World.enter_named(KNIGHT_LEVEL)
+	knights = _knights()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and through a re-lay: still one, on the marker (%s)" % _knight_words(knights))
 	# A kept record of the old knight (retired while nobody was near), made again: dropped, not kept.
 	var as_record: Dictionary = saved.duplicate(true)
 	var zone: Dictionary = as_record["zones"][LEVEL]  # Saved under the zone's name, the test's (Main._start_level's "here").
