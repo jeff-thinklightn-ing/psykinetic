@@ -53962,6 +53962,17 @@ unchanged. Lands on, every lawn's tufts at once; an in-game still of the square'
 pond's meadow from main's tip comes before the 11-13 cut, and if the lawn reads sparse or wrong this
 commit is reverted and nothing else of 871 amended (1) is touched.
 
+871 amended (2), the sack (the coordinator's ruling 2026-11-14, from art-gen's culled-face check,
+C:/dev/review/store_door/store_door_sheet2.png: the c2 fit had 17 faces wound inward at its tie, a
+magenta patch where the game culls them): prop.sack by hand (art-gen, C:/dev/review/store_door/make_store_door.py
+sack, 122 tris, was 214): one standing sack in the fit's own sacking grey, a wide flat foot, the top
+tapering and leaning to one side, tied, the neck above the tie gathered into a tuft bent over to one
+side (art-kit's note: the first take's flared neck read as a clay jar at 8 m), every face wound outward
+(0 culled pixels). The slot's box exactly, 0.5 x 0.6 x 0.4; the same object, material and swatches. It is
+the store-door pile's sack reshaped, so a lone sack and a pile read as the same goods. Where it stands:
+the tavern attic (umbrage_tavern_attic, (1,6)) and the Forest camps' sacks. Sheet: C:/dev/review/store_door/sack/sack_sheet.png.
+Client only (art); protocol unchanged; no new class_name.
+
 ## 869. The gait pick holds through gaps: a stop held, a change dwelt on, the rate on a smoothed speed
 
 ## 885. Builder's answer panel: the summary as parts, in a window of the approved look

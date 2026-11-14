@@ -2956,7 +2956,7 @@
 			"kind": "cell",
 			"size": [0.5, 0.6, 0.4],
 			"budget": 300,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.sack/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c2's 300 mesh, 214 tris"},
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-14", "notes": "rebuilt by hand (871 amended (2), the coordinator's ruling 11-14: the c2 fit had 17 faces wound inward at the tie): one tied sack in the kit's sacking grey, its neck gathered into a tuft bent over to one side, 122 tris; C:/dev/review/store_door/sack (make_store_door.py sack, render_sack_cpu.py, sack_sheet.png). Before: art-gen's c2 fit (N:/assets/candidates/prop.sack/notes.md, Jeff 2026-10-18: \"go ahead and apply the candidates and ill veto in game\")"},
 			"uses": "a sack of grain or loot"
 		},
 		"prop.grave": {

@@ -332,7 +332,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.rubble_spill` | 1 | art-kit, by hand | own | 2026-10-27 |
 | `prop.rune_strip` | 2 | art-kit, by hand | own | 2026-10-24 |
 | `prop.rusted_gear` | 1 | art-kit, by hand | own | 2026-11-03 |
-| `prop.sack` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.sack` | 1 | art-gen, by hand | own | 2026-11-14 |
 | `prop.sawhorse` | 1 | art-kit, by hand | own | 2026-10-21 |
 | `prop.scarecrow_fallen` | 1 | art-kit, by hand | own | 2026-11-09 |
 | `prop.scarecrow_leaning` | 1 | art-kit, by hand | own | 2026-11-09 |
