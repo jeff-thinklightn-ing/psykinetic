@@ -578,6 +578,25 @@ func _test_answer() -> void:
 		and say.get_theme_color(&"mark", &"SayMark") == Color(UiTheme.color("brass_bright"), 0.86),
 		"UiSayMark: 44 by 42 (its tail 12), brass_bright, no press (%s)" % [say.custom_minimum_size])
 	say.queue_free()
+	# Inside its field (ui's speech mark take beside the trader mock, 11-14): a SayLine LineEdit leaves the mark
+	# its room (94 at the left: 24 in, 44 wide, the caret 26 after), stands about the mock's 94 tall, and the
+	# mark, its child, sits 24 in and centred, lit while the field has the keys.
+	var say_line := LineEdit.new()
+	say_line.theme_type_variation = &"SayLine"
+	say_line.size = Vector2(600, 10)
+	add_child(say_line)
+	var inner := UiSayMark.new()
+	say_line.add_child(inner)
+	await get_tree().process_frame
+	var tall := say_line.get_combined_minimum_size().y
+	_check(theme.get_type_variation_base(&"SayLine") == &"LineEdit" and say_line.get_theme_stylebox(&"normal").get_margin(SIDE_LEFT) == 94.0
+		and say_line.get_theme_stylebox(&"focus").get_margin(SIDE_LEFT) == 94.0 and tall >= 88.0 and tall <= 100.0,
+		"SayLine: 94 at its left for the mark and the caret's gap, %.0f tall (the mock's 94)" % tall)
+	say_line.size = Vector2(600, tall)
+	await get_tree().process_frame
+	_check(inner.position == Vector2(24, roundf((tall - 42.0) / 2.0)), "the mark inside its field, 24 in, centred down it (%s)" % [inner.position])
+	_check(inner.get_theme_color(&"mark_idle", &"SayMark").a < inner.get_theme_color(&"mark", &"SayMark").a, "resting, the mark dims; lit while the field has the keys")
+	say_line.queue_free()
 	_check(rich.get_theme_color(&"figure", &"CodeChip") != rich.get_theme_color(&"letter", &"CodeChip")
 		and rich.get_theme_color(&"back", &"CodeChip").a > 0.5, "a chip: a dark back, the figure brighter than the letter")
 	_check(UiCodeChip._split("T1") == PackedStringArray(["T", "1"]) and UiCodeChip._split("WS3") == PackedStringArray(["WS", "3"]),

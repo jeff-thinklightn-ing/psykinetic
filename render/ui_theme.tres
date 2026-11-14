@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=51 format=3]
+[gd_resource type="Theme" load_steps=53 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -630,6 +630,41 @@ corner_radius_top_right = 30
 corner_radius_bottom_right = 30
 corner_radius_bottom_left = 30
 
+; A person window's typing line (SayLine, the trader mock C:/dev/review/ui-design/trader/): the inset's
+; dark, a little rounder, 94 tall (27.5 over and under the 38's 39), room at its left for the speech mark (24 in, 44 wide) and the caret
+; 70 after the mark's left; lit flame, 4 wide, while it has the keys.
+[sub_resource type="StyleBoxFlat" id="say_line"]
+content_margin_left = 94.0
+content_margin_top = 27.5
+content_margin_right = 18.0
+content_margin_bottom = 27.5
+bg_color = Color(0.0627, 0.0471, 0.0314, 0.63)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.6)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="say_line_focus"]
+content_margin_left = 94.0
+content_margin_top = 27.5
+content_margin_right = 18.0
+content_margin_bottom = 27.5
+bg_color = Color(0.0627, 0.0471, 0.0314, 0.63)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(1, 0.8235294117647058, 0.47843137254901963, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 ; A fault in an answer (886; builder's answer panel, approved 11-12): a faint rust
 ; plate, a rust rim, a broad rust edge at the left.
 [sub_resource type="StyleBoxFlat" id="fault"]
@@ -994,6 +1029,12 @@ SayMark/constants/width = 44
 SayMark/constants/height = 42
 SayMark/constants/tail = 12
 SayMark/constants/radius = 9
+SayMark/constants/inset = 24
+SayMark/colors/mark_idle = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.47)
+SayLine/base_type = &"LineEdit"
+SayLine/styles/normal = SubResource("say_line")
+SayLine/styles/focus = SubResource("say_line_focus")
+SayLine/styles/read_only = SubResource("say_line")
 CodeChip/colors/back = Color(0.102, 0.0784, 0.0627, 0.9)
 CodeChip/colors/letter = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
 CodeChip/colors/figure = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
