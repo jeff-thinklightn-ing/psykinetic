@@ -53791,6 +53791,11 @@ default now; a test turns them off by the switch or each by hand.
   to him ("He rests. Come back in ...") before the throne's click was asked, so nobody could sit
   (playtest's look_circle2 on aea809552). On a throne's cell while throne_home is on, remains_at
   is null and the click or E is the throne's.
+- His going on a joined client (Draugr.gone's setter): World.vacate is the server's, and a client's
+  occupancy is a mirror rebuilt on a roster change or a replicated tile (World.mirror_changed), not
+  on a replicated gone. So a player who came into barrow_deep after he went down met his seat still
+  held, and a click on the throne routed nowhere (playtest's look_circle3 on cb0441b37). A change
+  of gone now rebuilds the mirror on a client.
 - The cell to lay from (Main.altar_beside, the coordinator's word): never a cell another body
   holds, the knight's among them; the one held cell it names is the caller's own, held by a
   player. Before, any cell named as the caller's counted as free, so a player put on his cell (a

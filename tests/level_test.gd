@@ -6770,6 +6770,17 @@ func _test_throne_home() -> void:
 	_check(refused.begins_with("unknown command") and rested == "rest draugr: barrow_deep's draugr laid to rest" and draugr.resting()
 		and again == "rest draugr: the draugr in barrow_deep already rests",
 		"the test-only console lays him to rest, once; without --test-hp it is unknown, as on the box (%s / %s / %s)" % [refused, rested, again])
+	# A joined client's mirror: his going (replicated "gone") frees his seat
+	# there too, so a click's route can end on the throne (look_circle3).
+	var kept_mode: int = Net.mode
+	Net.mode = Net.Mode.CLIENT
+	draugr.gone = false
+	var held_mirrored: bool = World.get_entity_at(draugr.tile) == draugr
+	draugr.gone = true
+	var freed_mirrored: bool = World.get_entity_at(draugr.tile) != draugr
+	Net.mode = kept_mode
+	_check(held_mirrored and freed_mirrored and not draugr.holds_cell,
+		"on a client, his going frees his seat in the mirror (held %s, freed %s)" % [held_mirrored, freed_mirrored])
 	# Laid to rest on his seat, his remains lie on the throne: a click or E
 	# there is the throne's, not his rest words (playtest's look_circle2).
 	_main.throne_home = false

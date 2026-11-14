@@ -146,10 +146,17 @@ var state := State.SEATED
 ## (art-kit's prop.draugr_remains) lie at pile_at, turned pile_facing (a
 ## prop's facing, Client3D's), and a click or E there hears his rest words.
 ## He comes back at his seat when his rest is over. Replicated, all three.
+## A client's mirror of who holds which cell is rebuilt when it changes
+## (World.mirror_changed, as a replicated tile's is): else a joined player
+## met him gone, still holding his throne, and a click's route there ended
+## before it began (playtest's look_circle3 on 896's switch-on).
 var gone := false:
 	set(value):
+		var was := gone
 		gone = value
 		holds_cell = not value
+		if was != value and is_inside_tree() and not Net.is_authority():
+			World.mirror_changed()
 var pile_at := NO_TILE
 var pile_facing := Vector2i(0, 1)
 ## The pact's: whose it is (a player id), at what deal (its name), and the
