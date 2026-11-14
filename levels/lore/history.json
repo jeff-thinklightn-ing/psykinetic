@@ -438,7 +438,7 @@
 				},
 				{
 					"id": "crypt.relic_charges",
-					"text": "A holy knight's remains, laid on the knight's altar in the crypt's First Hall, charge the Encolpion Amulet.",
+					"text": "A holy knight's remains, laid on the bier in the crypt's First Hall, charge the Encolpion Amulet.",
 					"known": "rumour",
 					"true": true,
 					"where": [
