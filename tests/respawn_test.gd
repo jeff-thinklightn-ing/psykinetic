@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_renderer_setting()
 	_test_player_body()
 	_test_same_zone_travel_keeps_names()
+	_test_kept_body_shelter_ends()
 	_test_closed_link()
 
 	print("")
@@ -370,6 +371,35 @@ func _test_same_zone_travel_keeps_names() -> void:
 	if pet != null:
 		pet_now = _pet_of(player)
 		_check(pet_now == null or String(pet_now.name) == pet_name, "and her name, if she came with him (%s)" % [pet_now.name if pet_now != null else "not re-sent"])
+
+
+## A body kept through a travel within its zone (911) is sheltered on arriving (661) and harm lands
+## again once the shelter ends, by time alone, with no view_ready from a client (playtest's 914 looks
+## on 19c8dad11 struck 6.5 s after an in-area move and nothing landed: inside the shelter, not a hole).
+func _test_kept_body_shelter_ends() -> void:
+	print("
+== a body kept through a travel within its zone is sheltered, then can be hurt again (911, 661) ==")
+	_kill_monsters()
+	var player := _player()
+	var peer := player.owner_peer
+	var id := player.player_id
+	var name_was := String(player.name)
+	_main._sheltered_at.erase(id)  # Not within an earlier arrival's cooldown: a full shelter.
+	_check(_main.travel(peer, World.zone.name, "", {}, player.tile), "travels within its own zone")
+	player = _player()
+	var hp := player.hp
+	_check(String(player.name) == name_was and World.is_sheltered(player), "kept as %s and sheltered on arriving (%s)" % [player.name, World.is_sheltered(player)])
+	World.damage(player, 1, null, &"attack")
+	_check(player.hp == hp, "a blow now lands nothing (%d, was %d)" % [player.hp, hp])
+	for i in _main.ARRIVAL_SHELTER_TICKS + 1:
+		World.step()
+	player = _player()
+	_check(String(player.name) == name_was and not World.is_sheltered(player) and not player.protected,
+			"%d ticks on, with no view_ready: neither sheltered nor in grace (%s, %s)" % [_main.ARRIVAL_SHELTER_TICKS + 1, World.is_sheltered(player), player.protected])
+	hp = player.hp
+	World.damage(player, 1, null, &"attack")
+	_check(player.hp == hp - 1, "and a blow lands (%d, was %d)" % [player.hp, hp])
+	player.hp = player.max_hp
 
 
 func _pet_of(player: Player) -> Companion:
