@@ -200,6 +200,11 @@ func load(terrain: Dictionary) -> void:
 				# A plot's, with the edges it laid (Clearing.lay_plots), so
 				# World.unplot can take them off again (649, maps' side).
 				entry.merge({"plot": true, "laid": building.get("laid", []), "edges": Level.plot_edges(building)})
+				# A plot camp's fire, off World's floor from the load (523
+				# amended (3)), for World.unplot to put back.
+				var fire := Level.camp_fire(building)
+				if fire.x >= 0 and fire in terrain.get("floor", []):
+					entry["unstood"] = fire
 			town_buildings.append(entry)
 	_roofed = _roofed_whole.duplicate()
 	_source_list = []

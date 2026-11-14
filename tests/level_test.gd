@@ -3345,6 +3345,7 @@ func _test_relaid() -> void:
 	_test_town_places(wilds)
 	_test_explorables()
 	_test_forest_camps()
+	_test_camp_fires_unstood()
 	_test_boar_lair()
 	_test_wolf_cave()
 	_test_grey_den()
@@ -3794,6 +3795,82 @@ func _test_forest_camps() -> void:
 		if things == 0:
 			bare.append(key)
 	_check(bare.is_empty(), "every camp has goods or plunder lying in it besides its fire and people (bare: %s)" % [bare])
+
+
+## A camp's fire is no floor (523 amended (3)): in the wilds, the forest and
+## the hills nothing is laid on a camp's fire nor on the place's cell before
+## it (an entity, make_forest.gd's band spots among them, whose sixth is the
+## fire's front cell; a start, a spawn, a link, a bed, another place's cell or
+## bed, a piece of decor); to World the fire is no floor while the terrain's
+## floor keeps it (the view's ground under the ring); a route reaches each
+## camp's place from outside the camp; and a body saved on the fire comes back
+## on a free neighbour (Main._nearest_free: a player's record, as the saved
+## entities' recall).
+func _test_camp_fires_unstood() -> void:
+	print("\n== a camp's fire is no floor; its place stands before it (523 amended (3)) ==")
+	var wrong: Array[String] = []
+	var unrouted: Array[String] = []
+	var fires := 0
+	for zone: String in ["wilds", "forest", "hills"]:
+		var level := Level.load_level(zone)
+		var laid := {}
+		for spec: Dictionary in level["entities"]:
+			if spec.get("tile") is Vector2i:
+				laid[spec["tile"]] = "entity %s (make_forest's band spots among them)" % spec.get("name", spec.get("kind", "?"))
+		for at: Vector2i in level["starts"]:
+			laid[at] = "a start"
+		for key: String in level["spawn_points"]:
+			laid[level["spawn_points"][key]] = "spawn point %s" % key
+		for link: Dictionary in level["links"]:
+			laid[link["tile"]] = "a link"
+		for bed: Dictionary in level["beds"]:
+			for cell: Vector2i in bed["cells"]:
+				laid[cell] = "a bed"
+		for piece: Dictionary in level["terrain"].get("decor", []):
+			laid[piece["cell"]] = "decor %s" % piece.get("kind", "?")
+		var places: Dictionary = level["places"]
+		for key: String in places:
+			if places[key].get("bed") is Vector2i:
+				laid[places[key]["bed"]] = "%s's bed" % key
+		var camps: Array = (level["buildings"] as Array).filter(func(b: Dictionary) -> bool: return Level.camp_fire(b).x >= 0)
+		if camps.is_empty():
+			continue
+		_check(_main.load_map(zone), "%s loads" % zone)
+		var floor := {}
+		for cell: Vector2i in level["terrain"]["floor"]:
+			floor[cell] = true
+		for building: Dictionary in camps:
+			fires += 1
+			var fire := Level.camp_fire(building)
+			var front := fire + (building["facing"] as Vector2i)
+			for cell: Vector2i in [fire, front]:
+				if laid.has(cell):
+					wrong.append("%s %s: %s" % [zone, cell, laid[cell]])
+			var owners := places.keys().filter(func(key: String) -> bool: return places[key].get("fire") == fire)
+			for key: String in places:
+				if places[key]["cell"] == fire or places[key]["cell"] == front and not key in owners:
+					wrong.append("%s %s: place %s" % [zone, places[key]["cell"], key])
+			if World.is_walkable(fire) or not floor.has(fire) or not World.is_walkable(front):
+				wrong.append("%s %s: the fire walkable %s, in the terrain's floor %s, its front walkable %s" % [zone, fire,
+					World.is_walkable(fire), floor.has(fire), World.is_walkable(front)])
+			var rect: Rect2i = building["rect"]
+			var outside := Vector2i(-1, -1)
+			for step in 12:
+				var at := front + (building["facing"] as Vector2i) * (step + 1)
+				if not rect.has_point(at) and World.is_free(at):
+					outside = at
+					break
+			for key: String in owners:
+				var path := World.find_path(outside, places[key]["cell"], true)
+				if outside.x < 0 or path.is_empty() or fire in path:
+					unrouted.append("%s %s from %s (%d steps)" % [zone, key, outside, path.size()])
+			var back: Vector2i = _main._nearest_free(fire)
+			if back == fire or World.distance(back, fire) != 1 or not World.is_free(back):
+				wrong.append("%s: a body saved on the fire %s comes back at %s" % [zone, fire, back])
+	_check(fires >= 9, "the camps' fires tried (%d: the forest's seven, the hills' two rests)" % fires)
+	_check(wrong.is_empty(), "nothing laid on a fire or the place before it; each fire no floor to World, kept in the terrain's; a body saved on it back beside it (%s)" % [wrong])
+	_check(unrouted.is_empty(), "a route from outside each camp to its place, never through the fire (%s)" % [unrouted])
+	_main.load_map("test_room")
 
 
 ## The places a player is rewarded for reaching (decision 804, maps'

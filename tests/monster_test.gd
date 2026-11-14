@@ -70,6 +70,8 @@ func _ready() -> void:
 	_test_cover()
 	_test_sight_by_light()
 	_test_camp_fire_light()
+	_test_camp_fire_unstood()
+	_test_camp_fire_fight()
 	_test_hearing()
 	_test_noise_reach()
 	_test_hunt()
@@ -1059,6 +1061,111 @@ func _test_camp_fire_light() -> void:
 		"it is no fire cell and gives no heat: it burns nobody")
 	World.fields.ambient = 1.0
 	World.fields_changed()
+
+
+## A camp's fire is no floor (523 amended (3)): by the floor alone, with no
+## refusal of its own, a bandit homed beside the ring never picks it to
+## wander to nor steps on it, and a body heeling a leader in front of it never
+## takes it for her heel cell (Heel.cell); the terrain's floor keeps it (the
+## view's ground). A plot's camp added and dropped (World.add_plot, unplot)
+## leaves World's floor as it found it.
+func _test_camp_fire_unstood() -> void:
+	print("\n== a camp's fire is no floor: wanderers and heelers keep off it ==")
+	var rows: Array[String] = ["###########"]
+	for y in 9:
+		rows.append("#.........#")
+	rows.append("###########")
+	var e := _build(rows)
+	var camp := {"kind": "camp", "rect": Rect2i(4, 3, 3, 3), "facing": Vector2i(0, 1)}
+	var fire := Level.camp_fire(camp)
+	var front := fire + Vector2i(0, 1)
+	var terrain := Terrain.parse(Terrain.expand(rows))
+	terrain["buildings"] = [camp]
+	World.load_terrain(terrain)
+	_check(not World.is_walkable(fire) and fire in terrain["floor"] and World.is_walkable(front) and not World._solid.has(fire),
+		"the fire %s is no floor to World, the terrain's floor keeps it, it is no solid (sight crosses it), its front %s walkable" % [fire, front])
+	var spec: Dictionary = SPECS["b"].duplicate(true)
+	spec["props"] = (Level.MONSTER_TYPES[spec["kind"]] as Dictionary).duplicate()
+	spec.merge({"name": "Bandit1", "tile": fire + Vector2i(-1, 0)}, true)
+	var bandit: Monster = EntityFactory.build(spec)
+	_room.add_child(bandit)
+	World.spawn(bandit, fire + Vector2i(-1, 0))
+	bandit.sight_range = 0
+	bandit.home = fire + Vector2i(-1, 0)
+	bandit.wander_radius = 2
+	bandit.idle = Monster.Idle.WANDER
+	var picked := {}
+	for i in 300:
+		picked[bandit._wander_goal()] = true
+	_check(not picked.has(fire) and picked.size() > 3, "a bandit homed beside the ring never picks it to wander to (%d spots picked)" % picked.size())
+	var stood := false
+	for i in 400:
+		World.step()
+		stood = stood or bandit.tile == fire
+	_check(not stood, "wandering 40 s beside it, it never steps on it")
+	var leader: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player1", "tile": front}))
+	_room.add_child(leader)
+	World.spawn(leader, front)
+	leader.facing = Vector2i(0, 1)
+	var heel := Heel.cell(bandit, leader, {}, Vector2i(0, 1))
+	_check(heel != fire and heel != Heel.NONE, "heeling a leader standing before it, back to it, her heel cell is beside it, never on it (%s)" % heel)
+	World.despawn(leader)
+	World.despawn(bandit)
+	# A plot's camp, as a town plot is laid and dropped on a loaded zone.
+	World.load_terrain(Terrain.parse(Terrain.expand(rows)))
+	var before := World.floor_cells()
+	before.sort()
+	var plot := camp.merged({"use": "camp", "town_id": "t", "plot": true})
+	World.add_plot(World.fields.level, plot, {})
+	_check(not World.is_walkable(fire) and World.is_walkable(front), "a plot's camp laid: its fire no floor, its front floor")
+	World.unplot(World.fields.level, plot["rect"])
+	var after := World.floor_cells()
+	after.sort()
+	_check(after == before and World.is_walkable(fire), "the plot dropped: World's floor as it found it")
+	e.clear()
+
+
+## 523 amended (3), enemy-ai's check: a bandit beside the ring still fights.
+## Its foe stands on the fire's far side, on one line with it: it goes round
+## the fire and strikes, and never steps on it.
+func _test_camp_fire_fight() -> void:
+	print("
+== a camp's fire is no floor: a bandit beside it goes round it to fight ==")
+	var rows: Array[String] = ["###########"]
+	for y in 9:
+		rows.append("#.........#")
+	rows.append("###########")
+	_build(rows)
+	var camp := {"kind": "camp", "rect": Rect2i(4, 3, 3, 3), "facing": Vector2i(0, 1)}
+	var fire := Level.camp_fire(camp)
+	var terrain := Terrain.parse(Terrain.expand(rows))
+	terrain["buildings"] = [camp]
+	World.load_terrain(terrain)
+	var spec: Dictionary = SPECS["b"].duplicate(true)
+	spec["props"] = (Level.MONSTER_TYPES[spec["kind"]] as Dictionary).duplicate()
+	spec.merge({"name": "Bandit1", "tile": fire + Vector2i(-1, 0)}, true)
+	var bandit: Monster = EntityFactory.build(spec)
+	_room.add_child(bandit)
+	World.spawn(bandit, fire + Vector2i(-1, 0))
+	bandit.home = bandit.tile
+	bandit.idle = Monster.Idle.WANDER
+	var player: Player = EntityFactory.build(SPECS["P"].merged({"name": "Player1"}))
+	_room.add_child(player)
+	World.spawn(player, fire + Vector2i(1, 0))
+	player.max_hp = 1000
+	player.hp = 1000
+	player.protected = false
+	var stood := false
+	var struck := -1
+	for i in 200:
+		World.step()
+		stood = stood or bandit.tile == fire
+		if struck < 0 and player.hp < 1000:
+			struck = i
+		player.hp = 1000
+	_check(struck >= 0 and not stood, "a bandit beside the ring, its foe across the fire: it goes round and strikes (tick %d), never on the fire" % struck)
+	World.despawn(player)
+	World.despawn(bandit)
 
 
 func _test_sight_by_light() -> void:

@@ -1791,8 +1791,16 @@ func add_plot(level: String, building: Dictionary, edges: Dictionary) -> void:
 		if not at.has(key):
 			at[key] = edges[key]
 			laid.append(key)
-	fields_of.town_buildings.append({"rect": building["rect"], "use": building["use"], "town_id": building["town_id"],
-		"outline": Level.building_outline(building), "plot": true, "laid": laid, "edges": edges})
+	var entry := {"rect": building["rect"], "use": building["use"], "town_id": building["town_id"],
+		"outline": Level.building_outline(building), "plot": true, "laid": laid, "edges": edges}
+	# A plot's camp's fire off the floor as a zone load takes it (523 amended
+	# (3)), kept to be put back by unplot only if it was floor.
+	var floor_of: Dictionary = _floor if fields_of == fields else (zone_of.floor if zone_of != null else {})
+	var fire := Level.camp_fire(building)
+	if fire.x >= 0 and floor_of.has(fire):
+		floor_of.erase(fire)
+		entry["unstood"] = fire
+	fields_of.town_buildings.append(entry)
 	if fields_of == fields:
 		_grid_rect = Rect2i()
 		_grid_steps = PackedByteArray()
@@ -1818,6 +1826,9 @@ func unplot(level: String, rect: Rect2i) -> void:
 		if not building.get("plot", false) or not rect.encloses(building["rect"]):
 			continue
 		fields_of.town_buildings.remove_at(i)
+		if building.get("unstood") is Vector2i:
+			var floor_of: Dictionary = _floor if fields_of == fields else (zone_of.floor if zone_of != null else {})
+			floor_of[building["unstood"]] = true  # Its camp's fire floor again (523 amended (3)).
 		var edges: Dictionary = building["edges"]
 		for key: Vector3i in building["laid"]:
 			down.erase(key)
@@ -2248,6 +2259,11 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_load_cover(terrain)
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
+	# A camp's fire is no floor (523 amended (3)): nobody stands or rests in
+	# the flame, routes go round; sight crosses it, and the terrain's floor
+	# (the view's ground and grass under the ring) is left as it is.
+	for t: Vector2i in Fields.camp_fires_of(terrain.get("buildings", []) + terrain.get("plot_buildings", [])):
+		_floor.erase(t)
 	_load_relief(terrain)
 	for t: Vector2i in terrain["fire"]:
 		_fire[t] = true
