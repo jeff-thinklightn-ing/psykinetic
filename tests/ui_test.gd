@@ -69,6 +69,7 @@ func _ready() -> void:
 	_test_fire_click()
 	await _test_person_window()
 	await _test_person_dock()
+	await _test_open_window_rects()
 	await _test_person_give()
 	_test_taker_hint()
 	print("")
@@ -3874,6 +3875,38 @@ func _test_taker_hint() -> void:
 	me.slots = was
 	_check(marks.keys() == ["/root/Bran"] and with_gear.has("/root/Rolf") and with_gear.has("/root/Bran") and none.is_empty(),
 		"carrying ore: the smith's name marked (an unspawned taker, none); a sword: Rolf's too; nothing they take: none (%s, %s)" % [marks, with_gear])
+
+## Main.open_window_rects (the builder panel's right home gives way to the windows open): none open, none; the pack, a deal window, a
+## person's window each add their rect and the pack's reserved rect once.
+func _test_open_window_rects() -> void:
+	print("
+== the rects of the windows open now (for the builder panel's right home) ==")
+	var window: BarterPanel = _main.barter_panel
+	var pack: PackPanel = _main.pack_panel
+	var deal: DealPanel = _main.deal_panel
+	if window == null or pack == null or deal == null:
+		print("  (no windows in this scene: skipped)")
+		return
+	window.close()
+	deal.close()
+	pack.shown = false
+	_main.close_other()
+	await get_tree().process_frame
+	var reserved := PackPanel.reserved_rect(get_viewport().get_visible_rect())
+	_check(_main.open_window_rects().is_empty(), "no window open: no rects (%s)" % [_main.open_window_rects()])
+	pack.shown = true
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var with_pack: Array[Rect2] = _main.open_window_rects()
+	_check(with_pack.has(pack.get_global_rect()) and with_pack.has(reserved) and with_pack.count(reserved) == 1,
+		"the pack open: its rect and the reserved rect once (%s)" % [with_pack])
+	pack.shown = false
+	deal.show_deals("the draugr", [{"id": "d:1", "cost": 10, "what": {"steps": [10]}, "words": "Return it."}], 20, 0)  # Read at once: _update_deal closes a window with no speaker in the world at the next frame.
+	var with_deal: Array[Rect2] = _main.open_window_rects()
+	_check(with_deal.has(deal.get_global_rect()) and with_deal.has(reserved), "the deal window open: its rect and the reserved rect (%s)" % [with_deal])
+	deal.close()
+	await get_tree().process_frame
+
 
 ## The person window docked (ui-design's trader mock, 11-13): one place and one size for a plain person, a bare-shelf trader and a
 ## stocked one, first open or reopened, empty or full; the sheet (or SHEET_WAIT_MSEC) decides the form; the pack stays as the player had it.

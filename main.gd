@@ -17250,6 +17250,32 @@ func _take_find() -> void:
 	find_panel.close()
 
 
+## The screen rects of the windows open now (the builder panel's right home gives way to any of them, before it is drawn): the pack,
+## the store and the townsperson's window (BarterPanel.window_rect), the deal window, the world map, the town sheet, the card page,
+## the options and the find window, and, while the pack, the store, a person's or the deal window is open, the pack's reserved
+## bottom-right rect (PackPanel.reserved_rect: the room they open beside each other in).
+func open_window_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	var beside := false
+	if pack_panel != null and pack_panel.is_visible_in_tree():
+		rects.append(pack_panel.get_global_rect())
+		beside = true
+	if barter_panel != null:
+		var rect := barter_panel.window_rect()
+		if rect.size != Vector2.ZERO:
+			rects.append(rect)
+		beside = beside or barter_panel.is_open()
+	if deal_panel != null and deal_panel.is_visible_in_tree():
+		rects.append(deal_panel.get_global_rect())
+		beside = true
+	for panel: Control in [world_map_panel, town_panel, card_page, options_panel, find_panel]:
+		if panel != null and panel.is_visible_in_tree():
+			rects.append(panel.get_global_rect())
+	if beside:
+		rects.append(PackPanel.reserved_rect(get_viewport().get_visible_rect()))
+	return rects
+
+
 func _update_deal() -> void:
 	if deal_panel == null or not deal_panel.visible:
 		return

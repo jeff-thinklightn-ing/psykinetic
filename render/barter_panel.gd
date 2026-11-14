@@ -2011,6 +2011,16 @@ func _holds_pack() -> bool:
 	return not (docked() and not trades)
 
 
+## The rect on screen of the window this panel draws now: the store window's, else the docked person's or the old window's box; an empty
+## rect when none is drawn (802 amended: Main.open_window_rects).
+func window_rect() -> Rect2:
+	if _store_view != null and _store_view.visible:
+		return _store_view.get_global_rect()
+	if _box != null and _box.is_visible_in_tree():
+		return _box.get_global_rect()
+	return Rect2()
+
+
 ## Whether the store window is open and owns the pack: the separate pack and sheet
 ## are not drawn meanwhile (Main closes the window when I is pressed).
 func owns_pack() -> bool:
