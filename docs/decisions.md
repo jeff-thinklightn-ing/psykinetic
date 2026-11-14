@@ -15338,6 +15338,20 @@ enemy-ai's side, agreed with npc.
 
 tests/spawn_key_test (_test_became).
 
+471 amended (1) (economy's; the coordinator's approval, 11-14, after buildings'
+still found no Snagfin at a fresh host's step 100): the settled are seated at a
+fresh host's boot. Main's boot seated them (_seat_settled) before it seated the
+town's own people (_seat_gatherers, _seat_keepers), so on a fresh host it found
+the town empty and Snagfin came only at the first town turn, step 300 (about
+30 s of play), and a tour or still that settled by frames could miss him. Main
+now calls _seat_settled once more after the boot's seating: a fresh host's
+"Snagfin is found to have lived here all along" reads step 0. A saved world
+is unchanged (he is a worker from the save, so the call passes him by). The
+first call stays, for a world whose town has its people from the save but not
+yet him. tests/first_room_test _test_settled_at_boot (every settled entry a
+resident of its town before step 300 on a fresh wilds host; it fails without
+the second call). Server only; protocol unchanged; no new class_name.
+
 ## 470. The labyrinth generator: dwarven rooms and halls, or the old caverns, between the anchors
 
 The second generator for regenerating levels (465), the coordinator's

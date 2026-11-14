@@ -26,6 +26,7 @@ func _ready() -> void:
 	for i in 30:
 		await get_tree().process_frame
 	_test_first_room()
+	_test_settled_at_boot()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -35,6 +36,19 @@ func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+## Economy's (the coordinator's approval, 11-14): a fresh host on the wilds has
+## Snagfin and his like (residents.json's settled) in the town at boot, before
+## its first turn at step 300; tours and stills found him only after it.
+func _test_settled_at_boot() -> void:
+	print("\n== a fresh host's settled are in the town at boot, before its first turn ==")
+	var table := Townsfolk.settled()
+	_check(not table.is_empty(), "residents.json names the settled (%s)" % [table.keys()])
+	for id: String in table:
+		var town := str(table[id].get("town", ""))
+		_check(World.steps < World.WORLD_TICK_STEPS and not World.production.worker(id).is_empty() and id in World.towns.residents(town),
+			"%s a resident of %s at step %d" % [table[id].get("name", id), town, World.steps])
 
 
 func _test_first_room() -> void:

@@ -5101,6 +5101,9 @@ func _boot() -> void:
 	_seat_healers()
 	_seat_gatherers()
 	_seat_keepers()
+	# Snagfin and his like again, now the boot has seated a fresh host's people (the coordinator's approval, 11-14):
+	# the call above found its towns empty, so they came only at the first town turn, step 300.
+	_seat_settled()
 	# 613 amended (5): a sought one whose refuge or camp the world no longer has is placed again.
 	if World.towns.place_sought.is_valid():
 		print("[towns] sought at boot: %d placed again, their places gone" % World.towns.place_again(_sought_place_stands))
