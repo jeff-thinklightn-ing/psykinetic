@@ -6788,6 +6788,33 @@ func _test_throne_home() -> void:
 	_main.throne_home = true
 	_check(draugr.pile_at == throne and pile_talks and _main.remains_at(throne) == null,
 		"his remains on the throne's cell: with the throne off a click there talks to him; on, it is the throne's (%s)" % [draugr.pile_at])
+	# The whole click as a player makes it (look_circle3 and the two-phase
+	# walk on 32438be87: joined, the walk stopped a cell short and nobody
+	# sat): from two cells off, him at rest and his remains on the seat, the
+	# click's own route walked out by the free drive, the throne asked on
+	# arrival (_update_throne), seated.
+	var two_off := throne + Vector2i(0, -2)
+	_put(player, two_off)
+	player.free_view = null
+	player.free_halt_until = 0
+	_main._throne_click(player, throne)
+	var route: Array = (_main._free["path"] as Array).duplicate()
+	var wanted: Vector2i = _main._throne_wanted
+	var sat_by_click := false
+	for i in 600:
+		player.free_allowance = World.FREE_COMMANDS_PER_SECOND  # The test runs faster than the clock.
+		_main._free_drive(1.0 / 60.0)
+		_main._update_throne()
+		if i % 6 == 5:
+			World.step()
+		if player.seated == "throne":
+			sat_by_click = true
+			break
+	_check(sat_by_click, "a click on the throne from two cells off, him at rest: walked onto it and seated (route %s, wanted %s, at %s, free at %s)"
+			% [route, wanted, player.tile, player.free_pos])
+	if sat_by_click:
+		_main._throne_stand(Net.local_id)
+	_main._free["path"] = []
 	_put(player, throne)
 	for i in roundi(_main.THRONE_SIT_S * World.TICK_RATE) + 3:
 		World.step()
