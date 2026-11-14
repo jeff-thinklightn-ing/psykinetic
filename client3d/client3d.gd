@@ -23825,7 +23825,10 @@ static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> voi
 	if ArtKit.has(art):
 		var thing := ArtKit.instance(art)
 		thing.name = "Held"
-		if not own and "shield" in Items.def(id).get("tags", []) and sockets.has("arm_l"):
+		var hangs := not own and bool(ArtKit.spec(art).get("hangs", false))
+		if hangs:
+			pass  # Hung from the fist (_hang, after it is in the hand): no strap, edge turn or grip slid.
+		elif not own and "shield" in Items.def(id).get("tags", []) and sockets.has("arm_l"):
 			# Strapped on the outside of the forearm (451 amended (2); Jeff: "shield
 			# should be carried on the outside of arm, not inside"): the arm_l
 			# socket's frame is the shield's, so its strap point goes on the
@@ -23839,11 +23842,54 @@ static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> voi
 			thing.basis = Basis(Vector3.UP, PI * 0.5)
 		elif not own and _edge_first(id):
 			thing.basis = HELD_EDGE_TURN
-		if not own:
+		if not own and not hangs:
 			_grip_at(thing, art)
 		if own and hand == 0:
 			_grip(thing, work)
 		socket.add_child(thing)
+		if hangs:
+			_hang(socket, thing)
+
+
+## A held piece whose slot hangs (art-kit's "hangs", 916: a string of fish), its origin the loop in
+## the fist: kept plumb below the fist each frame, turned with the body and not with the hand, by a
+## Hang on the hand's skeleton after its other modifiers (HandReach), so from this frame's pose.
+## Held rigid as other pieces are, the string tipped up to 41 degrees off plumb in the walk and swung
+## into the left leg; hung, it was inside no build's leg in any pose (art-kit's probe,
+## C:/dev/review/fish_string_grip/results.txt). Nothing else reads it: no sheath, stow or rest takes
+## a left hand's piece that is not a bow or a shield.
+static func _hang(socket: Node3D, piece: Node3D) -> void:
+	var attachment := socket.get_parent() as BoneAttachment3D
+	var skeleton := attachment.get_parent() as Skeleton3D if attachment != null else null
+	if skeleton == null or skeleton.find_bone(attachment.bone_name) < 0:
+		return
+	var hang := Hang.new()
+	hang.name = "Hang"
+	hang.piece = piece
+	hang.bone = skeleton.find_bone(attachment.bone_name)
+	hang.socket = socket.transform
+	skeleton.add_child(hang)
+	piece.set_meta("hangs", true)
+
+
+## _hang's: [member piece]'s turn in its hand socket set so that it stands as the body does (its +y
+## up, its +z the skeleton's front), whatever this frame's pose turned the hand; gone with the piece.
+class Hang extends SkeletonModifier3D:
+	var piece: Node3D
+	var bone := -1
+	## The hand socket in its bone's frame.
+	var socket := Transform3D.IDENTITY
+
+	func _process_modification() -> void:
+		var skeleton := get_skeleton()
+		if skeleton == null or not is_instance_valid(piece) or piece.is_queued_for_deletion():
+			queue_free()
+			return
+		if not piece.is_inside_tree():
+			return
+		var hand := (skeleton.global_basis * skeleton.get_bone_global_pose(bone).basis * socket.basis).orthonormalized()
+		var ahead := skeleton.global_basis.z
+		piece.basis = hand.inverse() * Basis(Vector3.UP, atan2(ahead.x, ahead.z))
 
 
 ## A held piece in the hand at its own grip (its slot's "grip" socket: up its

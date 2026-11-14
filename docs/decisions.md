@@ -55826,3 +55826,36 @@ Tests (production_test):
 
 Server only; wire unchanged (no message, RPC or replicated value is new); no new class_name. No
 CHANGELOG bullet: voice's one bullet comes with npc's switch-on.
+
+## 919. Held pieces that hang
+
+A held piece is rigid in its hand socket (451): its length along +y from the grip, turned only by the hand. A piece
+that hangs from the fist by a cord does not: 916's string of fish (economy's, queued; package "the taught fisher",
+the resident's walk home with hands [fishing_rod, fish_string]). art-gen built it by hand, the cord's loop at the top
+as its origin where the fist closes, the string down -y. Held rigid as every item is, art-kit's headless probe
+(C:/dev/review/fish_string_grip/, the woman, the man and the heavy man, Idle and 16 poses of Walk) found the hand
+turning about 40 degrees through the walk: turned plumb at Idle, the string still tipped up to 41 degrees off plumb
+and passed inside the woman's left leg in 12 of 16 poses (three fish; 6 with one); not turned, it stood out 67 to
+76 degrees. Hung plumb below the fist each pose, turned with the body, it was inside no build's leg in any pose
+(nearest 1.1 cm, its lowest point 0.33 m, under the knee). So (the coordinator's approval, 2026-11-14): a slot
+may say "hangs": true, its origin the loop, and the client keeps such a piece plumb at its grip each frame.
+
+Client3D._hold gives a hanging slot's piece no strap, edge turn or grip slide and, once it is in the hand, _hang
+puts a Hang (an inner class, a SkeletonModifier3D) on the hand's skeleton, after the skeleton's other modifiers
+(HandReach's three, made with the puppet). Each skeleton update it sets the piece's turn in its socket to the hand's
+turn, as this frame's pose has it (the bone's global pose and the socket's place on it, not the BoneAttachment3D's
+last frame), undone and the body's yaw put in its place (the skeleton's +z, flattened): the piece's +y up, its +z
+the body's front, the fist its pivot. One basis set per hanging piece per update, nothing on the wire; it frees
+itself when its piece is let go. Only a slot that says hangs is touched; no sheath, stow or rest takes a left hand's
+piece that is not a bow or a shield. No swing lag (a later line if anyone wants it).
+
+Slots item.fish_string (three pond fish, 292 tris) and item.fish_string_one (the thin catch, 150), art-gen's by
+hand, under their working names until items rows a held-only prop and voice names it; never looted, bought or
+packed. view_test _test_held_hangs: both strings within HANG_PLUMB_DEG (1 degree) of plumb and of the body's front
+through Idle and the walk, three builds, read after each frame's pose (AnimRig stepped, then the modifiers); and the
+sword, the rod and the bear's-claw charm held exactly where they were (HELD_PINS, their global transforms in Idle at
+0 s and Walk at 0.5 s read on main d285b73ee before the change, the same to 1e-5). Ownership: art-kit wrote it in
+pc-character's held-drawing code (Client3D._hold, _hang), and pc-character read it before it queued. It lands off:
+nothing holds a hanging piece until npc's part of "the taught fisher" puts the string in a resident's hand. No
+bullet; the joined look of the string at a walk is owed when the package switches on. Client and art only; protocol
+unchanged; no new class_name (Hang is an inner class).

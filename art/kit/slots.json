@@ -4305,6 +4305,32 @@
 			"uses": "a sack carried on the shoulder (566 amended, art-kit's side; npc's townsfolk shown at their work, the coordinator's ask), for the carry_sack activity on pc-character's \"shoulder\" socket (+x forward, +y up, as carry.log): its origin where it rests on the shoulder's top, its underside there; fore and aft along x, the tied neck at the front (+x), more of it down the back",
 			"grey": [{"at": [-0.05, 0.022, 0], "size": [0.762, 0.43, 0.405]}]
 		},
+		"item.fish_string": {
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-14", "notes": "C:/dev/review/fish_string/make_fish_string.py three (916, the taught fisher; sheet fish_string_sheet.png): three pond fish on a cord through their gills, a bronze carp lowest and biggest with two greys a third of a turn apart round the gill ring, each broad flank out; the cord's loop at the top (the origin, where the fist closes) in the sack's tie colour; the kit's item.fish swatches; 292 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"hangs": true,
+			"size": [0.251, 0.443, 0.228],
+			"base": -0.4,
+			"budget": 300,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a string of fish carried home in a hand (916, \"the taught fisher\": the resident's walk home, hands [fishing_rod, fish_string]; held only, never looted, bought or packed; the working name until items rows it and voice names it), hung plumb below the fist each frame (\"hangs\": Client3D._hang), its origin the middle of the cord's loop, the string down -y 0.40 m to the lowest tail",
+			"grey": [{"at": [0.004, -0.179, -0.017], "size": [0.251, 0.443, 0.228]}]
+		},
+		"item.fish_string_one": {
+			"source": {"by": "art-gen, by hand", "tool": "blender", "license": "own", "date": "2026-11-14", "notes": "C:/dev/review/fish_string/make_fish_string.py one (916; sheet fish_string_sheet.png): the thin catch, one grey pond fish on the same cord and loop; 150 tris"},
+			"category": "items",
+			"type": "mesh",
+			"kind": "held",
+			"hangs": true,
+			"size": [0.105, 0.439, 0.044],
+			"base": -0.397,
+			"budget": 200,
+			"sockets": {"grip": [0, 0, 0]},
+			"uses": "a string of one fish carried home in a hand, the thin catch (916, as item.fish_string, its working name too), hung plumb below the fist (\"hangs\")",
+			"grey": [{"at": [-0.017, -0.178, -0.001], "size": [0.105, 0.439, 0.044]}]
+		},
 		"carry.game": {
 			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-24", "notes": "C:/dev/review/tools/make_work.py game: a doe, reworked after the coordinator's read of the first cut (\"a smooth tan crescent across the shoulders, more a horn or a bow than a deer\"): a lumpy body with the withers' hump and the haunch's round, a near-black back over deep fawn flanks (darker after the in-game still read pale pink-orange, the tunic's colour) and a pale belly, her neck and a clear head hanging over the right side (ears hanging down, dark muzzle and eyes), a pale tail over the left, the four dark legs forward to meet before the chest at [0.25, -0.15, -0.2] from the origin, bound there with a cord, dark hooves past it; 716 tris"},
 			"category": "items",

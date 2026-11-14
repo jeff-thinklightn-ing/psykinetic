@@ -192,6 +192,7 @@ func _ready() -> void:
 		await _test_pick_meets_seam()  # Lets frames run to the swing's contact.
 		_test_bow_back()  # Reads a draw's pose on the wall clock: right after the pick's swing, as fitted.
 		_test_sheathed()
+		await _test_held_hangs()  # Lets frames run: the hung piece is read after each frame's pose.
 		await _test_fishing_pose()  # Lets frames run: the rod's tip is read off the pose.
 		_test_fish_rise()
 		await _test_axe_edge_leads()
@@ -13588,6 +13589,99 @@ func _test_bow_back() -> void:
 ## both hands free to the fidgets; a blow seen near, the Draw clip, back in hand at DRAW_GRIP; a
 ## raised guard during either clip cuts it at once with both in hand (the coordinator's guard);
 ## the sword let go while sheathed, the sheath gone with it and the shield's back socket emptied.
+## 916 (art-kit's side, in pc-character's held-drawing code): a slot that "hangs" (the string of fish)
+## is kept plumb below the fist, turned with the body, through Idle and the walk, three builds, read
+## after each frame's pose (AnimRig's advance, then the skeleton's modifiers); every other held piece
+## sits where it did (HELD_PINS: the sword, the rod and the bear's-claw charm, Idle at 0 s and Walk at
+## 0.5 s, read on main d285b73ee before Client3D._hang, kept as var_to_str wrote them; the same to 1e-5).
+const HANG_BUILDS := [["woman", "res://art/models/characters/human_f.glb", {}],
+	["man", "res://art/models/characters/human_m.glb", {}],
+	["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}]]
+const HANG_PLUMB_DEG := 1.0
+const HELD_PINS := {
+	"sword Idle 0.0": "Transform3D(-0.15405375, 0.07860357, -0.9849307, -0.85843015, 0.4829428, 0.17280951, 0.48924866, 0.87211657, -0.006923585, -0.2714714, 0.77633125, -0.13710397)",
+	"sword Walk 0.5": "Transform3D(-0.12245014, -0.0077535547, -0.99244446, -0.8240261, 0.55813235, 0.097309485, 0.5531606, 0.8297156, -0.07473281, -0.21886216, 0.78160113, -0.012863386)",
+	"fishing_rod Idle 0.0": "Transform3D(0.9849307, 0.07860357, -0.1540537, -0.17280947, 0.4829428, -0.85843015, 0.006923564, 0.87211657, 0.48924866, -0.2714714, 0.77633125, -0.13710397)",
+	"fishing_rod Walk 0.5": "Transform3D(0.99244446, -0.0077535547, -0.1224501, -0.09730945, 0.55813235, -0.8240261, 0.07473279, 0.8297156, 0.5531606, -0.21886216, 0.78160113, -0.012863386)",
+	"bear_claw_charm Idle 0.0": "Transform3D(0.87510526, -0.48307163, 0.028857568, 0.24363288, 0.3882586, -0.8887621, 0.41813162, 0.78479123, 0.45745924, 0.31426197, 0.7525619, 0.03824293)",
+	"bear_claw_charm Walk 0.5": "Transform3D(0.972458, -0.21907316, 0.079579, 0.20837967, 0.6642015, -0.7179238, 0.10442145, 0.71473324, 0.69155824, 0.3160283, 0.8319316, 0.18282884)",
+}
+func _hang_body(build: Array, hand: int, id: String) -> Array:
+	var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+	add_child(model)
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		for key: String in build[2]:
+			var i := mesh.find_blend_shape_by_name(key)
+			if i >= 0:
+				mesh.set_blend_shape_value(i, build[2][key])
+	var holder := Node3D.new()
+	add_child(holder)
+	Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+	var sockets: Dictionary = holder.get_meta("sockets")
+	Client3D._hold(sockets, hand, id)
+	var rig := AnimRig.make(model, load("res://art/models/animations/goblin.res") as AnimationLibrary, 0.0, true, null)
+	rig.set_process(false)  # Driven below by set steps, so the poses are the same each run.
+	var socket := sockets["hand_r" if hand == 0 else "hand_l"] as Node3D
+	return [model, holder, rig, socket.get_node_or_null("Held") as Node3D]
+
+
+func _test_held_hangs() -> void:
+	print("== 916: a hanging piece plumb below the fist; every other held piece where it was ==")
+	var worst := 0.0
+	var turned := 0.0
+	var worst_at := ""
+	var made := 0
+	for build: Array in HANG_BUILDS:
+		for slot: String in ["fish_string", "fish_string_one"]:
+			var body := _hang_body(build, 1, slot)
+			var model := body[0] as Node3D
+			var rig := body[2] as AnimRig
+			var piece := body[3] as Node3D
+			if piece == null or not piece.has_meta("hangs"):
+				_check(false, "%s %s: in the left hand, hung (%s)" % [build[0], slot, piece])
+				model.queue_free()
+				(body[1] as Node3D).queue_free()
+				return
+			made += 1
+			for clip: String in ["Idle", "Walk"]:
+				rig.loop(clip, 1.0, 0.0, true)
+				for k in 12:
+					rig._process(0.1)
+					await get_tree().process_frame
+					await get_tree().process_frame
+					var lean := rad_to_deg((piece.global_basis * Vector3.DOWN).angle_to(Vector3.DOWN))
+					var ahead := model.global_basis.z
+					ahead.y = 0.0
+					var facing := rad_to_deg((piece.global_basis * Vector3.BACK).angle_to(ahead))
+					turned = maxf(turned, facing)
+					if lean > worst:
+						worst = lean
+						worst_at = "%s %s %s %.1f s" % [build[0], slot, clip, 0.1 * (k + 1)]
+			model.queue_free()
+			(body[1] as Node3D).queue_free()
+	_check(made == 6 and worst <= HANG_PLUMB_DEG and turned <= HANG_PLUMB_DEG,
+		"the strings of fish hang plumb below the fist through Idle and the walk, three builds: %.2f deg off plumb at most (%s), %.2f deg off the body's front" % [worst, worst_at, turned])
+	var moved: Array[String] = []
+	for pin: Array in [["sword", 0], ["fishing_rod", 0], ["bear_claw_charm", 1]]:
+		var body := _hang_body(HANG_BUILDS[0], pin[1], pin[0])
+		var rig := body[2] as AnimRig
+		var piece := body[3] as Node3D
+		for at: Array in [["Idle", 0.0], ["Walk", 0.5]]:
+			rig.loop(at[0], 1.0, 0.0, true)
+			rig._process(at[1])
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var key := "%s %s %.1f" % [pin[0], at[0], at[1]]
+			var now := piece.global_transform if piece != null else Transform3D()
+			print("      HELD_PIN %s: %s" % [key, var_to_str(now)])
+			var was: Variant = str_to_var(str(HELD_PINS.get(key, "")))
+			if piece == null or piece.has_meta("hangs") or not was is Transform3D or not (was as Transform3D).is_equal_approx(now):
+				moved.append(key)
+		(body[0] as Node3D).queue_free()
+		(body[1] as Node3D).queue_free()
+	_check(moved.is_empty(), "the sword, the rod and the bear's-claw charm held exactly as on main, Idle and a walk frame (%s)" % (", ".join(moved) if not moved.is_empty() else "all six"))
+
+
 func _test_sheathed() -> void:
 	print("== the blade at the hip, the shield on the back (662 (c)) ==")
 	var player := _player()
