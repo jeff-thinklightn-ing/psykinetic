@@ -4688,6 +4688,26 @@ trade, she does not stay. Her voice is told, as a fact in her now,
 Not told to stay, or off the town's ground, she goes with her player as
 before.
 
+284 amended (1): server log lines name no player (the decision-number
+script's label; the coordinator, from economy's read of the box's
+journal counts). _stay_in_town's line carried her player's name; it
+reads "[town] a player's companion <companion> stays in <town> and works
+as its <trade>" now, the words release's deploy checks and economy's
+journal greps read ("stays in", "works as its") kept. Every companions'
+print that named a player (record.name, or _display_name of a player)
+goes the same way, 33 in main.gd: _join_companion's ([net], [spawn]),
+the guide's ([guide] "<companion> leads her player to ..."), the bond's
+and recruit's ([bond] "a player's companion ...", "a player asked ..."),
+the raids' holding and freeing, her revival, her traits, her rest in
+town, her body kept off the world on a leave, and her mind's bump line.
+A player's node name (Player<n>) is not used instead: n is the record's
+index, as good as an id. tests/net_test.ps1 read each companion by her
+player's name ("Jo's companion (\w+) is at"); it takes the two from "a
+player's companion (\w+) is at" and pairs them by which client shows
+which (net_test.sh does not read the line). Other trees' prints that
+name a player were listed to the coordinator. Server only, protocol
+unchanged, no new class_name, no bullet.
+
 ## 289. Lore is read by one class, Lore, and asked one thing: what a knower knows
 
 `Lore` (`sim/lore.gd`) reads levels/lore/ once and keeps it (read on first use,

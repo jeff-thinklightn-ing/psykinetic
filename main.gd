@@ -9157,7 +9157,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		return  # Nobody with them since theirs went home to her town (686): none given.
 	# Carried off by raiders (decision 314): held till she is freed.
 	if record.companion.has("taken"):
-		print("[net] %s's companion %s is held by raiders (%s); none spawned" % [record.name, record.companion.get("name", "?"),
+		print("[net] a player's companion %s is held by raiders (%s); none spawned" % [record.companion.get("name", "?"),
 			record.companion["taken"].get("by", "?")])
 		_tell_whereabouts(record, player)
 		return
@@ -9168,7 +9168,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# Gone home, having left them (decision 581): she does not come.
 	if record.companion.has("left"):
 		var town := _town_words(str(record.companion["left"].get("place", "")))
-		print("[net] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), town])
+		print("[net] a player's companion %s left them and lives in %s" % [record.companion.get("name", "?"), town])
 		_tell_whereabouts(record, player)
 		return
 	# Working in a town (decision 284): elsewhere, she stays at it; here,
@@ -9180,7 +9180,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		_fill_home(record)
 	if not resident.is_empty():
 		if str(resident.get("zone", "")) != World.zone.name:
-			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
+			print("[net] a player's companion %s works in %s; not here" % [record.companion.get("name", "?"), resident.get("zone", "?")])
 			_tell_whereabouts(record, player)  # Told where she is, so she does not read as lost.
 			return
 		_heard_from_worker(record)
@@ -9218,8 +9218,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			World._relocate(existing, _free_beside(player.tile))  # On his side of a door (705 amended (2)).
 			# 705 amended (1): far, a fresh spawn on each client, not a slide across the map.
 			var resent := resend(existing)
-			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them%s" % [
-				record.name, existing.name, was, World.distance(was, player.tile), record.name, " (re-sent)" if resent else ""])
+			print("[spawn] a player's companion %s waited at %s, %d from where they came back; beside them%s" % [
+				existing.name, was, World.distance(was, player.tile), " (re-sent)" if resent else ""])
 			existing.keeper = player  # Her keeper_name for the narration below.
 			existing.brought_back()  # Beside them, her wait is over (badly13).
 		existing.works_as = ""
@@ -9231,8 +9231,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		existing.current_intent = Companion.Intent.FOLLOW
 		if existing.mind != null:
 			existing.mind.warm()
-		print("[net] %s's companion %s was waiting at %s and follows again" % [
-			record.name, existing.name, existing.tile])
+		print("[net] a player's companion %s was waiting at %s and follows again" % [
+			existing.name, existing.tile])
 		_tell_sickness(existing, record, true)
 		return
 	# A record from before companions existed, or one that never got one,
@@ -9242,7 +9242,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true}
 	_give_traits(record)
 	if not record.companion.get("alive", true):
-		print("[net] %s's companion %s died earlier; none spawned" % [record.name, record.companion["name"]])
+		print("[net] a player's companion %s died earlier; none spawned" % [record.companion["name"]])
 		return
 	# Where it was, unless that is no place to appear alone: it has no saved
 	# tile, or a hostile is close to it. Then beside its owner, who was put
@@ -9257,11 +9257,11 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		if _nearest_hostile_distance(saved) > SPAWN_SAFE_DISTANCE:
 			wanted = saved
 		else:
-			print("[spawn] %s's companion %s: hostile within %d of its saved tile %s; beside its owner instead" % [
-				record.name, record.companion["name"], SPAWN_SAFE_DISTANCE, saved])
+			print("[spawn] a player's companion %s: hostile within %d of its saved tile %s; beside its owner instead" % [
+				record.companion["name"], SPAWN_SAFE_DISTANCE, saved])
 	var tile := _free_beside(wanted) if wanted == player.tile else _nearest_free(wanted)
 	if not World.is_free(tile):
-		print("[net] no free tile for %s's companion %s near %s" % [record.name, record.companion["name"], wanted])
+		print("[net] no free tile for a player's companion %s near %s" % [record.companion["name"], wanted])
 		return
 	var pet := _spawn({
 		"script": COMPANION, "shape": "capsule", "name": String(record.companion["name"]), "tile": tile,
@@ -9338,8 +9338,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
 	_set_mood(record)  # Once she is hers: before it, her step never reached her (fond after every join).
-	print("[net] %s's companion %s is at %s%s" % [
-		record.name, Companion._name_of(pet), tile, " (new)" if is_new else ""])
+	print("[net] a player's companion %s is at %s%s" % [
+		Companion._name_of(pet), tile, " (new)" if is_new else ""])
 	_tell_sickness(pet, record, true)
 
 
@@ -9788,7 +9788,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again.%s" % [
 		_display_name(player), to["name"], " It is where you wanted to go fishing with them." if to.get("want") == "pond" else ""]
 	party_log.add("%s leads the way to %s." % [Companion._name_of(pet), to["name"]])
-	print("[guide] %s leads %s to %s (%s)" % [Companion._name_of(pet), _display_name(player), to["name"], to["key"]])
+	print("[guide] %s leads her player to %s (%s)" % [Companion._name_of(pet), to["name"], to["key"]])
 
 
 ## [param walk]'s route for its leader's free body to her heel (695): the
@@ -9873,7 +9873,7 @@ func _guide_cross(pet: Companion, walk: Guide) -> bool:
 		var out: Vector2i = Guide.SIDES.get(str(way["side"]), Vector2i.ZERO)
 		travel.call_deferred(peer, str(way["to"]), "", {"side": way["side"], "cell": walk.crossing_at + out})
 	walk.crossing_now = true
-	print("[guide] %s takes %s through to %s" % [Companion._name_of(pet), _display_name(walk.leader), way["to"]])
+	print("[guide] %s takes her player through to %s" % [Companion._name_of(pet), way["to"]])
 	# Through this area from a way in to a way out with no stop: a safe
 	# passage halves its dangers (551 phase 2, RoadKnowledge's).
 	var record := _record_of(pet)
@@ -9920,7 +9920,7 @@ func _guide_refuse(pet: Companion, player: Player, to: Dictionary, no: Dictionar
 		_guide_offers.erase(pet.keeper_id)
 	else:
 		_guide_offers[pet.keeper_id] = {"day": day, "to": no["as_far"]}
-	print("[guide] %s refuses to lead %s to %s: %s" % [Companion._name_of(pet), _display_name(player), to["key"], no["reason"]])
+	print("[guide] %s refuses to lead her player to %s: %s" % [Companion._name_of(pet), to["key"], no["reason"]])
 
 
 ## Her offer in [param no], for her voice: " You would lead them as far as
@@ -10064,7 +10064,7 @@ func _check_leaving(record: PlayerRecord, event: String, why: String) -> void:
 	var straw_at := Companion.STEPS.find(str(straw.get("at", "sullen")))
 	if step == Companion.STEPS[0] or event == str(straw.get("deed", "")) and Companion.STEPS.find(step) <= straw_at:
 		record.companion["leaving"] = {"deed": event, "why": why, "day": Townsfolk.day_of(World.steps)}
-		print("[bond] %s's companion %s will leave them (%s: %s)" % [record.name, record.companion.get("name", "?"), event, why])
+		print("[bond] a player's companion %s will leave them (%s: %s)" % [record.companion.get("name", "?"), event, why])
 
 
 ## Each tick, this zone's companions who will leave: at a calm moment
@@ -10161,14 +10161,14 @@ func _gone_home(record: PlayerRecord, pet: Companion, id: String) -> void:
 		# Parted as friends (581 amended (3)): no wrong to put right; asked, she comes.
 		record.companion["parted"] = {"day": Townsfolk.day_of(World.steps), "place": str(record.companion.get("resident", {}).get("place", place))}
 		record.companion.erase("leaving")
-		print("[bond] %s's companion %s parted with them and rests in %s" % [record.name, record.companion.get("name", "?"), record.companion["parted"]["place"]])
+		print("[bond] a player's companion %s parted with them and rests in %s" % [record.companion.get("name", "?"), record.companion["parted"]["place"]])
 		return
 	record.companion["left"] = {"day": Townsfolk.day_of(World.steps), "deed": str(going.get("deed", "")), "why": str(going.get("why", "")),
 		"place": str(record.companion.get("resident", {}).get("place", place)), "repaired": false,
 		"area": str(record.companion.get("warned_area", "")), "grave": going.get("grave", [])}
 	record.companion.erase("leaving")
 	_favour_words(record)
-	print("[bond] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), record.companion["left"]["place"]])
+	print("[bond] a player's companion %s left them and lives in %s" % [record.companion.get("name", "?"), record.companion["left"]["place"]])
 
 
 ## The grave goods [param pet] carries (555 amended), their uids: given back
@@ -10221,7 +10221,7 @@ func _part_said(player: Player, pet: Companion, line: String) -> bool:
 		if record.companion.has(state):
 			return false
 	record.companion["leaving"] = {"deed": PARTED, "why": "", "day": Townsfolk.day_of(World.steps)}
-	print("[bond] %s asked their companion %s to go home for a while" % [record.name, Companion._name_of(pet)])
+	print("[bond] a player asked their companion %s to go home for a while" % [Companion._name_of(pet)])
 	return true
 
 
@@ -10255,7 +10255,7 @@ func _recruit_said(body: Resident, player: Player, line: String) -> bool:
 		return false
 	var gate := favour_gate(record)
 	if not gate.is_empty():
-		print("[bond] %s asked %s to come again: not yet (%s)" % [record.name, record.companion.get("name", "?"), gate])
+		print("[bond] a player asked %s to come again: not yet (%s)" % [record.companion.get("name", "?"), gate])
 		return false
 	var left: Dictionary = record.companion["left"]
 	record.companion.erase("left")
@@ -10266,7 +10266,7 @@ func _recruit_said(body: Resident, player: Player, line: String) -> bool:
 	if World.production != null and World.production.has_method("set_left"):
 		World.production.call("set_left", _left_worker(record), "", "")
 	_set_mood(record)
-	print("[bond] %s's companion %s goes with them again (left over %s on day %s)" % [record.name, record.companion.get("name", "?"),
+	print("[bond] a player's companion %s goes with them again (left over %s on day %s)" % [record.companion.get("name", "?"),
 		left.get("deed", "?"), left.get("day", "?")])
 	party_log.add("%s agrees to travel with %s again." % [body.person, _display_name(player)])
 	_join_companion(record, player)
@@ -10369,11 +10369,11 @@ func _resident_recruit_said(body: Resident, player: Player, line: String) -> boo
 				.replace("{player}", record.name).replace("{companion}", str(record.companion.get("name", "another"))) \
 				.replace("{trade}", str(their_trades[0]).replace("_", " ") if not their_trades.is_empty() else "worker")
 		production.set_asked(worker_id, record.player_id, said)
-		print("[bond] %s asked %s along: not now (%s)" % [record.name, body.person, why])
+		print("[bond] a player asked %s along: not now (%s)" % [body.person, why])
 		return false
 	var former := _former_of(record, worker_id)
 	if record.companion.has("name") and not _hand_companion_over(record):
-		print("[bond] %s asked %s along: %s could not be settled in her town" % [record.name, body.person, record.companion.get("name", "?")])
+		print("[bond] a player asked %s along: %s could not be settled in her town" % [body.person, record.companion.get("name", "?")])
 		return false
 	var worker := production.worker(worker_id)
 	var card := Townsfolk.card_of(production, worker_id)
@@ -10412,7 +10412,7 @@ func _resident_recruit_said(body: Resident, player: Player, line: String) -> boo
 	World.despawn(body)
 	_travelling = false
 	_set_mood(record)
-	print("[bond] %s's new companion: %s, the %s of %s (%s)" % [record.name, hers["name"], trade, town, "again" if not former.is_empty() else "first time"])
+	print("[bond] a player's new companion: %s, the %s of %s (%s)" % [hers["name"], trade, town, "again" if not former.is_empty() else "first time"])
 	party_log.add("%s leaves %s work in the town and goes with %s." % [body.person,
 		{"she": "her", "he": "his", "they": "their"}.get(str(hers.get("traits", {}).get("pronoun", "she")), "her"), _display_name(player)])
 	_join_companion(record, player)
@@ -10507,7 +10507,7 @@ func _hand_companion_over(record: PlayerRecord) -> bool:
 		record.former.push_front({"companion": kept, "worker": worker_id})
 		record.former.resize(mini(record.former.size(), int(recruit_rule("former_most", 3))))
 	record.companion = {"solo": true}
-	print("[bond] %s's companion %s is the town's %s now%s" % [record.name, hers.get("name", "?"), worker_id,
+	print("[bond] a player's companion %s is the town's %s now%s" % [hers.get("name", "?"), worker_id,
 		" (another of her name lives in every town: someone else now, not to be asked back)" if not fresh.is_empty() else ""])
 	return true
 
@@ -10566,7 +10566,7 @@ func _recruit_home(record: PlayerRecord, pet: Companion, id: String, deed: Strin
 		record.companion["left"] = {"day": day, "deed": deed, "why": why, "place": place, "repaired": false}
 	var name := str(record.companion.get("name", "?"))
 	if not _hand_companion_over(record):
-		print("[bond] %s's companion %s went home, but has no worker there" % [record.name, name])
+		print("[bond] a player's companion %s went home, but has no worker there" % [name])
 
 
 ## Her town (a store place id) since she left [param record]'s player: her
@@ -10624,7 +10624,7 @@ func _favour(record: PlayerRecord, kind: String, why: String) -> bool:
 	today["kinds"].append(kind)
 	left["favour_today"] = today
 	Standing.bump(record.companion, record.player_id, delta, why, World.steps)
-	print("[bond] %s's companion %s, away: %s (%+d, %d)" % [record.name, record.companion.get("name", "?"), why, delta,
+	print("[bond] a player's companion %s, away: %s (%+d, %d)" % [record.companion.get("name", "?"), why, delta,
 		Standing.score(record.companion, record.player_id)])
 	_favour_words(record)
 	return true
@@ -10639,7 +10639,7 @@ func _favour_repaired(record: PlayerRecord, how: String) -> void:
 	if bool(left.get("repaired", false)) or repair_of(str(left.get("deed", ""))) != how:
 		return
 	left["repaired"] = true
-	print("[bond] %s's companion %s, away: the wrong put right (%s)" % [record.name, record.companion.get("name", "?"), how])
+	print("[bond] a player's companion %s, away: the wrong put right (%s)" % [record.companion.get("name", "?"), how])
 	_favour_words(record)
 
 
@@ -16024,7 +16024,7 @@ func companion_taken(player_id: String, by: String) -> bool:
 	record.companion.erase("resident")
 	record.companion["taken"] = {"by": by, "zone": World.zone.name if World.zone != null else "", "at": World.steps}
 	record.companion["tile"] = null
-	print("[raids] %s's companion %s is held by %s" % [record.name, record.companion.get("name", "?"), by])
+	print("[raids] a player's companion %s is held by %s" % [record.companion.get("name", "?"), by])
 	return true
 
 
@@ -16078,7 +16078,7 @@ func companion_freed(player_id: String, place := "") -> bool:
 		"event", player_id)
 	record.companion["facts"] = grown.facts
 	record.companion["beliefs"] = grown.beliefs
-	print("[raids] %s's companion %s is free%s" % [record.name, pet_name, " in " + town if not town.is_empty() else ""])
+	print("[raids] a player's companion %s is free%s" % [pet_name, " in " + town if not town.is_empty() else ""])
 	party_log.add("%s is free%s." % [pet_name, " and waits in " + town if not town.is_empty() else ""])
 	if town.is_empty():
 		# Freed in the field (her captors beaten): back beside her player at
@@ -16105,7 +16105,7 @@ func _revive_companions(zone_name := "") -> Array[String]:
 		record.companion["hp"] = 0  # Not a saved value: spawn at full stats.
 		record.companion["tile"] = null  # No place of its own: beside its owner.
 		revived.append("%s (%s's)" % [record.companion.get("name", "?"), record.name])
-		print("[world] %s's companion %s is back" % [record.name, record.companion.get("name", "")])
+		print("[world] a player's companion %s is back" % [record.companion.get("name", "")])
 	return revived
 
 
@@ -16129,7 +16129,7 @@ func _give_traits(record: PlayerRecord) -> void:
 	record.companion["card_by"] = "plain"
 	var met := CompanionCard.met(traits, record.name)
 	record.companion["how_we_met"] = met.left(1).to_upper() + met.substr(1) + "."
-	print("[net] %s's companion %s: traits rolled (%s, %s)" % [record.name, traits["name"], traits["profession"], traits["temperament"]])
+	print("[net] a player's companion %s: traits rolled (%s, %s)" % [traits["name"], traits["profession"], traits["temperament"]])
 
 
 ## What has become true of her changed (decision 294): kept in her record
@@ -16223,7 +16223,7 @@ func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	record.companion["home"] = record.companion["resident"].duplicate()
 	pet.works_as = trade
 	pet.home = record.companion["home"]
-	print("[town] %s's companion %s stays in %s and works as its %s" % [record.name, pet_name, place, trade])
+	print("[town] a player's companion %s stays in %s and works as its %s" % [pet_name, place, trade])
 	party_log.add("%s stays in the town and works as its %s." % [pet_name, trade])
 	return true
 
@@ -16252,7 +16252,7 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String, at := "", t
 	World.despawn(pet)
 	_travelling = false
 	_companions.erase(id)
-	print("[town] %s's companion %s rests in %s between trips" % [record.name, pet_name, place])
+	print("[town] a player's companion %s rests in %s between trips" % [pet_name, place])
 	if told:
 		party_log.add("%s goes back to the town to rest." % pet_name)
 	return true
@@ -17566,7 +17566,7 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 		return
 	if pet.bumped(direction):
 		party_log.add("%s bumped into %s." % [_display_name(mover), Companion._name_of(pet)])
-		print("[mind] %s bumped into %s going %s" % [_display_name(mover), Companion._name_of(pet), direction])
+		print("[mind] her player bumped into %s going %s" % [Companion._name_of(pet), direction])
 
 
 ## Server: [param player] clicked their own companion beside them (the
@@ -20152,8 +20152,8 @@ func _leave(peer: int, player: Player, id: String) -> void:
 			# stood in the foothills all night): her record keeps her (above),
 			# and she comes back with them, at her tile when they come back
 			# within REJOIN_NEAR of it (705), else beside them, as after a restart.
-			print("[net] %s's companion %s kept off the world at %s in %s till they are back" % [
-				record.name if record != null else "?", pet.name, pet.tile, pet.zone])
+			print("[net] a player's companion %s kept off the world at %s in %s till they are back" % [
+				pet.name, pet.tile, pet.zone])
 			_travelling = true
 			World.despawn(pet)
 			_travelling = false

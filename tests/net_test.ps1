@@ -419,11 +419,13 @@ Assert (@($clientILog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player
 Assert (@($clientHLog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)').Count -eq 1) 'phase 4: Hal, who did not ask, sees the same room'
 Assert (@($server5Log | Select-String '\[zone\] Jo went from test_room to sample').Count -eq 1) 'phase 5: Jo took the link to the sample; the server says so'
 Assert (@($clientJLog | Select-String '\[zone\] now in sample').Count -eq 1) 'phase 5: her client switched to the sample'
-# Companions' names are rolled from their player's id (decision 293): read them.
-$joPet = @($server5Log | Select-String "Jo's companion (\w+) is at" | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
-$kimPet = @($server5Log | Select-String "Kim's companion (\w+) is at" | ForEach-Object { $_.Matches[0].Groups[1].Value }) | Select-Object -First 1
+# Companions' names are rolled from their player's id (decision 293): read them. The server's line names
+# no player (the coordinator, 11-13), so the two are told apart by which client shows which.
+$pets = @($server5Log | Select-String "\[net\] a player's companion (\w+) is at" | ForEach-Object { $_.Matches[0].Groups[1].Value } | Select-Object -Unique)
 $joTiles = @($clientJLog | Select-String '\[test\] tiles: ')
 $kimTiles = @($clientKLog | Select-String '\[test\] tiles: ')
+$joPet = $pets | Where-Object { $joTiles.Count -eq 1 -and $joTiles[0].Line -match "$_=" } | Select-Object -First 1
+$kimPet = $pets | Where-Object { $_ -ne $joPet -and $kimTiles.Count -eq 1 -and $kimTiles[0].Line -match "$_=" } | Select-Object -First 1
 Assert ($joPet -and $kimPet -and $joTiles.Count -eq 1 -and $joTiles[0].Line -match 'Sneak=' -and $joTiles[0].Line -match 'Player1=' -and $joTiles[0].Line -match "$joPet=" -and $joTiles[0].Line -notmatch "CorridorImp|Player2=|$kimPet=") "phase 5: Jo sees the sample, herself and her companion $joPet, nothing of the test room ($($joTiles | ForEach-Object { $_.Line }))"
 Assert ($joPet -and $kimPet -and $kimTiles.Count -eq 1 -and $kimTiles[0].Line -match 'CorridorImp1=' -and $kimTiles[0].Line -match 'Player2=' -and $kimTiles[0].Line -match "$kimPet=" -and $kimTiles[0].Line -notmatch "Sneak=|Player1=|$joPet=") "phase 5: Kim, who stayed, sees the test room and her companion $kimPet, not Jo or $joPet ($($kimTiles | ForEach-Object { $_.Line }))"
 Assert (@($clientKLog | Select-String '\[zone\] now in').Count -eq 0) 'phase 5: and Kim never left it'
