@@ -3866,8 +3866,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Everything brought home goes into the town's shared stockpile. | `entries[0].facts[5].text` |
 | L | People rescued from captivity come to live in the town and work their trade. | `entries[0].facts[6].text` |
 | L | Who rules or speaks for the town. | `entries[0].facts[7].text` |
-|  | The Blood Rot's goblins, the imps, with their allies the orcs (the brutes) and the kobolds (the sneaks), as met in the land today. | `entries[1].summary` |
-|  | Imps are goblins; brutes are orcs, and sneaks are kobolds. | `entries[1].facts[0].text` |
+|  | The Blood Rot's goblins, the imps, with their allies the orcs and the kobolds, as met in the land today. | `entries[1].summary` |
+|  | Imps are goblins; orcs and kobolds are peoples allied to the Blood Rot. | `entries[1].facts[0].text` |
 |  | Every goblin in the Blood Rot's land is of the Blood Rot. | `entries[1].facts[1].text` |
 |  | The region is dominated by Blood Rot goblins. | `entries[1].facts[2].text` |
 |  | Orcs and kobolds are allied to the Blood Rot. | `entries[1].facts[3].text` |
@@ -3877,11 +3877,11 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Whether goblins can be bargained with, and whether one could leave its own. | `entries[1].facts[7].text` |
 |  | The orcs and kobolds who live near the mine are changed by the rot, as the Blood Rot are; those who keep to the edges are not. | `entries[1].facts[8].text` |
 |  | The Blood Rot daub a crude star in rust-red on what they hold. | `entries[1].facts[9].text` |
-|  | The orcs, the brutes met in the land, allied to the Blood Rot for pay. | `entries[2].summary` |
-|  | The brute is an orc, big and heavy, and it stands guard. | `entries[2].facts[0].text` |
+|  | The orcs met in the land, allied to the Blood Rot for pay. | `entries[2].summary` |
+| L | The orc is big and heavy, and it stands guard. | `entries[2].facts[0].text` |
 |  | Orcs fight for the Blood Rot for a share of what the raids bring in. | `entries[2].facts[1].text` |
-|  | The kobolds, the sneaks met in the land, allied to the Blood Rot, who dig for them. | `entries[3].summary` |
-|  | The sneak is a kobold; it patrols and comes at its prey from the side. | `entries[3].facts[0].text` |
+|  | The kobolds met in the land, allied to the Blood Rot, who dig for them. | `entries[3].summary` |
+| L | The kobold patrols and comes at its prey from the side. | `entries[3].facts[0].text` |
 | L | Kobolds dig the mine's shafts for the Blood Rot. | `entries[3].facts[1].text` |
 |  | A band of goblins born changed, who live in and around an old mine over a fallen star, worship it, and raid the region for food and people. | `entries[4].summary` |
 | L | The Blood Rot are a band of goblins who live in and around an old mine. | `entries[4].facts[0].text` |
