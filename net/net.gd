@@ -661,6 +661,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## the speaker "Server" is the game's own narration and a new client shows it as plain dim text (no name, no [party]); the true
 ## notices (the restart warnings, an admin's word to all) are sent from the speaker "Notice". Mixed pairs are not refused: an
 ## old client shows a "Notice" line as "[party] Notice:", a new client shows an old server's warning as narration.
+## 911: a same-frame respawn keeps its name; the despawn precedes the spawn; an old client draws the fade as before. No new number (release).
 const PROTOCOL_REVISION := 57
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

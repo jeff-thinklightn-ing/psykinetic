@@ -54961,3 +54961,53 @@ front within 15 ticks and never goes round, while his never-struck mate does.
 _test_dagger_open_after_miss: a dagger's cut doubles on a robber open after a lunge she stepped
 out of, not after the opening, and not on one open after a lunge that struck her.
 Server only, protocol unchanged, no new class_name.
+## 911. A body keeps its name when it is spawned again in the same frame, and is drawn once
+
+items' shot on the Atlas (11-13, C:/dev/review/items-standfar2/) drew its host clean-shaven, then
+bearded after a travel within the wilds; playtest's compreturn4 and compahead (joined, main 76852ee4c
+and cbefbbe72) drew two of the companion, and two of the player himself, for about half a second at
+the spot they left. One cause on the server, one on the client.
+
+The server: a travel within one zone, a fall's return and an admin's `move` despawn a body
+(queue_free, so it lingers to the frame's end) and spawn its new one in the same frame under the same
+parent, so Godot named it Player2 (and the companion Isolde2, Rhea2), and the next time Player1 again.
+Main._spend_name, in _spawn: a body despawned and still holding the name a spawn wants leaves the
+holder first, so its despawn goes out before the new spawn and the name passes to the new body on the
+server and on every client's mirror. The player stays Player1 and the companion Isolde through all of
+them; nothing else changes on the wire (a spawn's name is a value; no new message, RPC or replicated
+property). Release's check against v0.1.214's client: it routes by instance id
+(Client3D._puppets, Main._local_player by owner_peer, _entity_named over spawned entities), so an old
+client follows the new body; its one edge is a death message within 0.5 s of a return, which it plays
+on the fading old puppet (on_death looks in _departed by name), cosmetic, and already so for a
+companion since 705 amended (1). No new number (net.gd's note under 57).
+
+Seeded or found by a node's name, and so changed by such a rename until now:
+- Client3D._vary: a look with no seed (Client3D.look_for), a puppet's size spread, pace and tempo;
+  the rng that picks its blows and flinches; its fidget clock.
+- Monster (a companion among them): _rng, _idle_rng, its temper and bundle draws, its idle goal.
+- Main._entity_named, through which a channel (544) names its body by channel_of; the "will not open
+  up now" line picked by hash(who).
+- World's shot and lob rolls (by.name with the tick): harmless.
+A channel begun before a travel within the zone ends as it does across a link: the channeler's body
+is despawned, so _tend_downed breaks it, and the new body channels nothing.
+
+The client (the coordinator's ruling, from what companions found on its far bring-back, 705 amended
+(1), which re-sends a companion as a despawn and a spawn): Client3D keeps a gone body's puppet still
+for DEPARTED_SECONDS (0.5 s) in _departed, keyed by name, in case its death comes after the despawn.
+A body drawn again under its name inside that half second left two of it on screen (the old at the
+old spot, without its plate), the new puppet auto-named @Node3D@n, and one key for both; and in the
+same frame _sync_puppets makes the new puppet before it lets the old go, so the old still held the
+name then. Client3D._free_name_for, first in _make_puppet: a puppet holding the name for an entity
+that is gone (freed, unspawned or queued for deletion) goes as _entity_went has it (falling if its
+death came: a fallen puppet is renamed Corpse_, so it never holds the name), then a _departed puppet
+under the name is hidden, renamed and freed, its key cleared (left in the tree
+until the free: its lantern's light is still among _shadow_lights, and _update_shadows reads its
+global place, an engine error out of the tree; seamless_test's crossing met it at the first landing). A live entity of the same name (another
+zone, on a host) is left alone; the linger stays for every real leaving and death.
+
+Tests: respawn_test _test_same_zone_travel_keeps_names (the player's and the companion's names and
+faces through a travel within the zone; the channel; a fall's return in the same frame keeps the
+player's name). view_test _respawn_under_one_name (a despawn and a spawn under one name, in the same
+frame and 0.2 s on: one puppet, named so, none at the old spot). The joined look is playtest's
+compahead on the landed sha ("never two of her, never two of mine, in frame", farthest zoom).
+A second take seeds a player's look once on the server so the face Options shows is the one he wears.

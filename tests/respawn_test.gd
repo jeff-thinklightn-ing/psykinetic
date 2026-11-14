@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_click_snaps_to_floor()
 	_test_renderer_setting()
 	_test_player_body()
+	_test_same_zone_travel_keeps_names()
 	_test_closed_link()
 
 	print("")
@@ -321,6 +322,59 @@ func _monsters() -> int:
 		if entity is Monster and entity.spawned:
 			count += 1
 	return count
+
+
+func _test_same_zone_travel_keeps_names() -> void:
+	print("
+== a travel within one zone keeps the player's and the companion's names (decision 911) ==")
+	var player := _player()
+	var peer := player.owner_peer
+	var name_was := String(player.name)
+	var face_was := Client3D.look_for(player)
+	var pet: Companion = _pet_of(player)
+	var pet_name := String(pet.name) if pet != null else ""
+	var pet_face := Client3D.look_for(pet) if pet != null else null
+	var to := player.tile
+	_check(_main.travel(peer, World.zone.name, "", {}, to), "the host's player travels within its own zone")
+	player = _player()
+	var pet_now: Companion = _pet_of(player)
+	_check(String(player.name) == name_was, "the player keeps its name (%s, was %s)" % [player.name, name_was])
+	var face := Client3D.look_for(player)
+	_check(face.keys == face_was.keys and face.colours == face_was.colours and face.hair == face_was.hair and face.beard == face_was.beard,
+			"and its face")
+	if pet != null:
+		_check(pet_now != null and String(pet_now.name) == pet_name, "its companion keeps hers (%s, was %s)" % [pet_now.name if pet_now != null else "none", pet_name])
+		var her := Client3D.look_for(pet_now)
+		_check(her.keys == pet_face.keys and her.colours == pet_face.colours and her.hair == pet_face.hair, "and her face")
+		# The channel pin: one begun before a travel within the zone ends cleanly, as across a link.
+		World.lay_downed(pet_now, 400)
+		var began := World.try_channel(player, pet_now, 200)
+		_check(began and player.channel_of == String(pet_now.name), "a channel begun on her, by her name (%s)" % player.channel_of)
+		_check(_main.travel(peer, World.zone.name, "", {}, player.tile), "travels within the zone again, channeling")
+		player = _player()
+		pet_now = _pet_of(player)
+		_check(player.channel_of.is_empty() and (pet_now == null or World.channeler_of(pet_now) == null),
+				"the channel ended: the new body channels nothing and nobody holds her")
+		if pet_now != null:
+			World.raise_downed(pet_now, pet_now.max_hp)
+	else:
+		_check(false, "the host has a companion to travel with")
+	# A fall's return (compahead's case): the body gone and brought back in the same frame, as
+	# _respawn_due_players does; on main it came back as Player2 and the client kept the old one.
+	var id := player.player_id
+	World.despawn(player)
+	_main._join_player(peer, id, _main._records[id].name, true)
+	player = _player()
+	_check(player != null and String(player.name) == name_was, "brought back after a fall in the same frame: still %s (%s)" % [
+			name_was, player.name if player != null else "none"])
+	if pet != null:
+		pet_now = _pet_of(player)
+		_check(pet_now == null or String(pet_now.name) == pet_name, "and her name, if she came with him (%s)" % [pet_now.name if pet_now != null else "not re-sent"])
+
+
+func _pet_of(player: Player) -> Companion:
+	var pet: Companion = _main._companions.get(player.player_id)
+	return pet if is_instance_valid(pet) and not pet.is_queued_for_deletion() else null
 
 
 func _test_closed_link() -> void:

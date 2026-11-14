@@ -22093,6 +22093,31 @@ func _drop_departed() -> void:
 			_departed.erase(entity_name)
 
 
+## [param entity] is drawn again under a name a gone body's puppet holds (911: a travel within its
+## zone, a companion's far bring-back, any despawn and spawn under one name). A body gone this very
+## frame still has its puppet (_sync_puppets makes the new before it lets the old go), so it goes
+## first, as _entity_went has it (falling if its death came); then the puppet a going left standing
+## for a death goes at once, hidden and renamed (left in the tree till its free), so the new puppet takes the name, no second body
+## stands at the old spot, and a death that comes later is the new body's.
+func _free_name_for(entity: GridEntity) -> void:
+	var entity_name := String(entity.name)
+	var held := get_node_or_null(NodePath(entity_name.validate_node_name()))
+	if held != null and held.has_meta("entity_id") and int(held.get_meta("entity_id")) != entity.get_instance_id():
+		var old_id := int(held.get_meta("entity_id"))
+		var old := instance_from_id(old_id) as GridEntity
+		if _puppets.get(old_id) == held and (old == null or not old.spawned or old.is_queued_for_deletion()):
+			_entity_went(old_id)
+	var left: Dictionary = _departed.get(entity_name, {})
+	_departed.erase(entity_name)
+	var puppet: Variant = left.get("puppet")
+	if is_instance_valid(puppet) and puppet is Node3D:
+		# Hidden and renamed, never taken out of the tree: its lantern's light stays in
+		# _shadow_lights until the free, and _update_shadows reads its global place.
+		puppet.visible = false
+		puppet.name = &"Gone"
+		puppet.queue_free()
+
+
 ## The HP bar: its fill and colour from the hp, and whether it shows: hurt,
 ## in a fight lately, or Alt held; faded either way.
 func _sync_bar(entity: GridEntity, puppet: Node3D, now: int) -> void:
@@ -26900,6 +26925,7 @@ static func body_of(entity: GridEntity) -> StringName:
 
 
 func _make_puppet(entity: GridEntity) -> Node3D:
+	_free_name_for(entity)
 	var puppet := Node3D.new()
 	puppet.name = entity.name
 	puppet.set_meta("body", body_of(entity))

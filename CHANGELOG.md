@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you're brought back or moved within an area, you and your companion show only where you arrive (911).
 - Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
 - In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - Towns: a companion left in town who falls sick gets well again and goes back to work; before, she stayed off work for good (915).

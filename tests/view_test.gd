@@ -1824,6 +1824,38 @@ func _death_after_despawn() -> void:
 	_rig._process(0.0)
 	await get_tree().create_timer(Client3D.DEPARTED_SECONDS + 0.2).timeout
 	_check(not is_instance_valid(gone), "gone without a death: freed after %d ms" % roundi(Client3D.DEPARTED_SECONDS * 1000.0))
+	await _respawn_under_one_name()
+
+
+## 911: a body despawned and drawn again under its name (a travel within its zone, a companion's far
+## bring-back), in the same frame or 0.2 s on, leaves one puppet, named as the body is, and none at
+## the old spot; a death after a despawn with nothing drawn again still falls (above).
+func _respawn_under_one_name() -> void:
+	for apart: float in [0.0, 0.2]:
+		var imp := _spawn_imp(Vector2i(11, 4))
+		_rig._process(0.0)
+		var entity_name := String(imp.name)
+		var old: Node3D = _rig._puppets[imp.get_instance_id()]
+		World.despawn(imp)
+		if apart > 0.0:
+			_rig._process(0.0)
+			await get_tree().create_timer(apart).timeout
+		var again := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": entity_name, "tile": Vector2i(12, 4)}) as Monster
+		again.sight_range = 0
+		_rig._process(0.0)
+		await _frames(2)
+		var drawn: Array[String] = []
+		for child in _rig.get_children():
+			if child.get_meta("entity_name", "") == entity_name and not child.is_queued_for_deletion():
+				drawn.append(String(child.name))
+		var puppet: Node3D = _rig._puppets.get(again.get_instance_id())
+		_check(String(again.name) == entity_name and drawn == [entity_name] and puppet != null and String(puppet.name) == entity_name
+				and not is_instance_valid(old) and not _rig._departed.has(entity_name),
+				"drawn again under its name %s: one puppet, named so, none left at the old spot (%s)" % [
+				"in the same frame" if apart == 0.0 else "%.1f s on" % apart, drawn])
+		World.despawn(again)
+		_rig._process(0.0)
+		await get_tree().create_timer(Client3D.DEPARTED_SECONDS + 0.1).timeout
 
 
 ## A charm's aura (789): a cool, steady light over its wearer after

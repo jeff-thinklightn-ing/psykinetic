@@ -7200,6 +7200,7 @@ func _spawn(spec: Dictionary) -> GridEntity:
 	spec["zone"] = World.zone.name
 	if Apex.holds_marker(spec, World.zone.name):
 		return null  # An apex's den: its record lays it (780 amended (13)).
+	_spend_name(str(spec.get("name", "")))
 	var entity := spawner.spawn(spec) as GridEntity
 	if not World.spawn(entity, spec["tile"]):
 		entities.remove_child(entity)
@@ -7214,6 +7215,20 @@ func _spawn(spec: Dictionary) -> GridEntity:
 		_alive_slots[spec["spawn"]] = entity
 		_dead_since.erase(spec["spawn"])
 	return entity
+
+
+## A body despawned this frame still holds its name till it is freed at the
+## frame's end; one spawned under that name now (a travel within one zone: the
+## player and the companion beside him) was renamed Player2 and Isolde2, and
+## whatever is seeded or found by name changed with it (decision 911). The old
+## body leaves the tree now, so its despawn goes out before the new spawn and the
+## name passes to the new body on the server and on every client.
+func _spend_name(entity_name: String) -> void:
+	if entity_name == "" or entities == null:
+		return
+	var old := entities.get_node_or_null(NodePath(entity_name.validate_node_name()))
+	if old != null and old.is_queued_for_deletion():
+		entities.remove_child(old)
 
 
 ## Gives [param peer] the player its [param id] stands for: back where that
