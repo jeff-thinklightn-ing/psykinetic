@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=53 format=3]
+[gd_resource type="Theme" load_steps=55 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -694,6 +694,33 @@ content_margin_bottom = 4.0
 ; Store A as built showed the ScrollContainer's inset as a dark sunken box).
 [sub_resource type="StyleBoxEmpty" id="quiet"]
 
+; The rule under a panel's head (886 amended (3); the builder panel mock, 11-14): a
+; 2-unit line in the glass rim's bone at 60 of 255.
+[sub_resource type="StyleBoxLine" id="head_rule"]
+color = Color(0.9569, 0.9373, 0.902, 0.235)
+thickness = 2
+
+; The answer panel's pane (886 amended (3)): the Glass pane with 34 under its keys
+; (the mock's), where a window's pane keeps 24.
+[sub_resource type="StyleBoxFlat" id="answer_glass"]
+content_margin_left = 40.0
+content_margin_top = 24.0
+content_margin_right = 40.0
+content_margin_bottom = 34.0
+bg_color = Color(0.3686, 0.3059, 0.2314, 0.7)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.9569, 0.9373, 0.902, 0.27)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+shadow_color = Color(0.0314, 0.0235, 0.0157, 0.43)
+shadow_size = 18
+shadow_offset = Vector2(4, 14)
+
 [resource]
 default_font = ExtResource("sans")
 default_font_size = 38
@@ -1064,6 +1091,17 @@ LineBullet/base_type = &"Label"
 LineBullet/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
 LineBullet/font_sizes/font_size = 42
 LineBullet/fonts/font = ExtResource("sans")
+HeadRule/base_type = &"HSeparator"
+HeadRule/constants/separation = 22
+HeadRule/styles/separator = SubResource("head_rule")
+KeyGroups/base_type = &"HBoxContainer"
+KeyGroups/constants/separation = 40
+AnswerGlass/base_type = &"PanelContainer"
+AnswerGlass/styles/panel = SubResource("answer_glass")
+WorkingDots/base_type = &"Label"
+WorkingDots/colors/font_color = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
+WorkingDots/font_sizes/font_size = 42
+WorkingDots/fonts/font = ExtResource("sans_bold")
 TalkNotice/colors/mark = Color(0.9098039215686274, 0.4745098039215686, 0.1803921568627451, 1)
 TalkNotice/colors/words = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 1)
 TalkNotice/fonts/mark_font = ExtResource("sans_bold")

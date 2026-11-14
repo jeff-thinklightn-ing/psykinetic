@@ -645,8 +645,36 @@ func _test_answer() -> void:
 	close.pressed.emit()
 	_check(pressed[0] == 1 and close.text.is_empty(), "a close presses, and has no words: its x is drawn")
 	close.queue_free()
-	for type: StringName in [&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused"]:
+	for type: StringName in [&"Body", &"Note", &"FaultHead", &"FoldLink", &"WordsRefused", &"WorkingDots"]:
 		_check(type in UiTheme.SIZED_TYPES, "%s follows the text scale" % type)
+	# 886 amended (3), the builder panel's spacing (the mock beside the hosted sheet, 11-14): the rule under a
+	# panel's head (2 units, the rim's bone faint, 22 its height), the key groups 40 apart, the answer pane 34
+	# under its keys and otherwise the Glass pane, the working line's dots in brass_bright.
+	var rule := HSeparator.new()
+	rule.theme_type_variation = &"HeadRule"
+	add_child(rule)
+	var line_style := rule.get_theme_stylebox(&"separator") as StyleBoxLine
+	_check(line_style != null and line_style.thickness == 2 and line_style.color.a < 0.3 and line_style.color.r > 0.9
+		and rule.get_theme_constant(&"separation") == 22, "HeadRule: a 2-unit faint bone line, 22 high")
+	rule.queue_free()
+	var groups := HBoxContainer.new()
+	groups.theme_type_variation = &"KeyGroups"
+	add_child(groups)
+	_check(groups.get_theme_constant(&"separation") == 40, "KeyGroups: 40 between a key and its words and the next key")
+	groups.queue_free()
+	var answer_pane := PanelContainer.new()
+	answer_pane.theme_type_variation = &"AnswerGlass"
+	add_child(answer_pane)
+	var answer_style := answer_pane.get_theme_stylebox(&"panel") as StyleBoxFlat
+	var glass_style := theme.get_stylebox(&"panel", &"Glass") as StyleBoxFlat
+	_check(answer_style != null and glass_style != null and answer_style.content_margin_bottom == 34.0
+		and answer_style.content_margin_left == glass_style.content_margin_left and answer_style.content_margin_top == glass_style.content_margin_top
+		and answer_style.bg_color == glass_style.bg_color and answer_style.border_color == glass_style.border_color
+		and answer_style.corner_radius_top_left == glass_style.corner_radius_top_left and answer_style.shadow_size == glass_style.shadow_size,
+		"AnswerGlass: the Glass pane with 34 under its keys")
+	answer_pane.queue_free()
+	_check(theme.get_type_variation_base(&"WorkingDots") == &"Label" and theme.get_color(&"font_color", &"WorkingDots") == UiTheme.color("brass_bright"),
+		"WorkingDots: a Label in brass_bright")
 	var quiet := ScrollContainer.new()
 	quiet.theme_type_variation = &"QuietScroll"
 	quiet.custom_minimum_size = Vector2(800.0, 400.0)
