@@ -9906,7 +9906,6 @@ func _test_alert_note() -> void:
 ## field that no forget() clears and is not listed here, and on one listed
 ## here that is now cleared, so the list only shrinks.
 const DESPAWN_PENDING := {
-	"Companion": ["_held_foe", "_mine_seam", "shelter_lead", "action_target"],  # companions: super(gone) in Companion.forget and its two fields
 	"Resident": ["_foe"],  # npc
 }
 

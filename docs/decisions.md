@@ -55074,3 +55074,11 @@ player's name). view_test _respawn_under_one_name (a despawn and a spawn under o
 frame and 0.2 s on: one puppet, named so, none at the old spot). The joined look is playtest's
 compahead on the landed sha ("never two of her, never two of mine, in frame", farthest zoom).
 A second take seeds a player's look once on the server so the face Options shows is the one he wears.
+897, companions' side (enemy-ai's ask): Companion.forget, decision 572's let-go of what she holds,
+overrode the base's without calling it, so her shelter_lead and an order on the gone (action_target)
+were left; it calls super(entity) first now, then clears the foe she keeps a moment (_held_foe, 706;
+read through _alive, so null is a lost foe) and the seam she mines (_mine_seam, 769; null, and her
+mining step goes back to following). Main's own call on entity_despawned stays: it lets go at once,
+where World tells a despawn inside a step at the step's end, and a second forget is a no-op.
+Companion off monster_test's DESPAWN_PENDING. Server only, protocol unchanged, no new class_name, no
+bullet.

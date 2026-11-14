@@ -3183,7 +3183,15 @@ func note_carried_off() -> void:
 ## naming it. A freed node read later crashed the box's server: her voice,
 ## asked after her player died in the barrow, read the freed Player through
 ## keeper (_wound_words), which the release template dereferences.
+## Decision 897 (World.despawn tells every entity; Main's call above, at
+## once, stays): the base's own first (shelter_lead, an order on it), then
+## hers, the foe she keeps a moment (706) and the seam she mines.
 func forget(entity: GridEntity) -> void:
+	super(entity)
+	if _held_foe == entity:
+		_held_foe = null
+	if _mine_seam == entity:
+		_mine_seam = null
 	if keeper == entity:
 		keeper = null
 	if intent_target == entity:
