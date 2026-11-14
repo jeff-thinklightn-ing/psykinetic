@@ -11092,6 +11092,18 @@ unchanged, one at a time as before. tests/heavy_job_test.py: first_come_only by 
 queued by 42 and an import by 43 behind the head, passed; the same at the head, held; a load_check queued by 43,
 first come; a judged row carries its revision.
 
+394 amended (51): a gate note off Windows writes nothing without HEAVY_JOBS_DIR (the coordinator's report and ask,
+2026-11-14; label from tools/decision_number.sh). tests/run.sh notes a scene's timeout (90 amended (1)) and a launch
+failure (530) through `heavy_job.py note`, and run.sh runs on saturn too: there the gate's Windows state path is no
+absolute path, so the note made one folder in the checkout named with its backslashes (the coordinator found one in
+its probe worktree and one in ~/land/pc-character-drips, its log one timeout line stamped 01:54:36), and
+art_kit_test's walk of res:// then failed the same run on an engine error, a second false failure after any timeout.
+remote_tests.sh's git clean removed it before the next landing. note() off Windows with no HEAVY_JOBS_DIR only prints
+the detail and returns 0, so run.sh's launch line still shows it; with HEAVY_JOBS_DIR set (a Linux test of the gate)
+it logs as before. The gate is this PC's; nothing else in it runs on saturn. tests/heavy_job_test.py: off Windows
+with none, the detail printed, exit 0, no state folder made; with one, logged. Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

@@ -3086,7 +3086,15 @@ NOTE_EVENTS = ("launch", "timeout", "beat_failed", "push_guard")  # timeout: a t
 
 def note(tree, event, detail):
     """Logs [param event] for [param tree] with the machine's free RAM and
-    commit added, and prints that line's detail (for the caller's own log)."""
+    commit added, and prints that line's detail (for the caller's own log).
+    Off Windows with no HEAVY_JOBS_DIR it only prints [param detail] (394
+    amended (51)): the gate is this PC's, and on saturn tests/run.sh's
+    timeout note made its Windows path (REAL_STATE_DIR) one folder in the
+    checkout, named with its backslashes, which art_kit_test's walk of
+    res:// then failed on (11-14 01:54)."""
+    if os.name != "nt" and not os.environ.get("HEAVY_JOBS_DIR"):
+        print(detail)
+        return 0
     ram, commit = _memory()
     detail = "%s; free RAM %.1f GB, commit %s" % (detail, ram, "%.1f GB" % commit if commit is not None else "unknown")
     log(event, tree, "suite", detail)

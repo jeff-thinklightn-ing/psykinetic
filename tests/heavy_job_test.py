@@ -1116,6 +1116,36 @@ with contextlib.redirect_stdout(shown):
     gate.summary(datetime.date.today().isoformat())
 check("launch crashes by top frame: main+40d4d61 2" in shown.getvalue() and "3 launch" in shown.getvalue()
     and "backtrace:" not in shown.getvalue(), "crashes grouped by top frame, the backtrace kept to the log: %s" % shown.getvalue().splitlines()[-1])
+# 394 amended (51): off Windows (saturn's run.sh) with no HEAVY_JOBS_DIR, a note only prints its
+# detail; with one (this test, a Linux test of the gate), it logs as on Windows.
+saved51 = (os.name, os.environ.get("HEAVY_JOBS_DIR"), gate.STATE_DIR)
+here51 = tempfile.mkdtemp(prefix="note51_")
+before51 = os.path.getsize(os.path.join(STATE, "heavy_jobs.log"))
+try:
+    gate.STATE_DIR = os.path.join(here51, "state")  # Where it would write, were the guard to fail: never the real one.
+    os.name = "posix"
+    os.environ.pop("HEAVY_JOBS_DIR", None)
+    shown = io.StringIO()
+    with contextlib.redirect_stdout(shown):
+        code51 = gate.main(["note", "suite", "timeout", "view_test after 300s"])
+    check(code51 == 0 and shown.getvalue().strip() == "view_test after 300s" and not os.path.exists(gate.STATE_DIR),
+        "off Windows, no HEAVY_JOBS_DIR: the detail printed, exit 0, no state folder made (%r)" % shown.getvalue())
+    os.environ["HEAVY_JOBS_DIR"] = STATE
+    os.environ["HEAVY_JOB_TEST_FREE_GB"] = "64"  # This PC has no /proc/meminfo to read as Linux.
+    gate.STATE_DIR = STATE
+    with contextlib.redirect_stdout(io.StringIO()):
+        code51 = gate.main(["note", "suite", "timeout", "view_test after 300s"])
+    check(code51 == 0 and os.path.getsize(os.path.join(STATE, "heavy_jobs.log")) > before51,
+        "off Windows with HEAVY_JOBS_DIR: logged")
+finally:
+    os.environ.pop("HEAVY_JOB_TEST_FREE_GB", None)
+    os.name = saved51[0]
+    if saved51[1] is None:
+        os.environ.pop("HEAVY_JOBS_DIR", None)
+    else:
+        os.environ["HEAVY_JOBS_DIR"] = saved51[1]
+    gate.STATE_DIR = saved51[2]
+    shutil.rmtree(here51, ignore_errors=True)
 
 print("== a child's exit code as a shell sees it ==")
 # A killed Git Bash hands Windows its wait status (signal 9: 2304), which a
