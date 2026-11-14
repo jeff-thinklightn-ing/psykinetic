@@ -3376,3 +3376,21 @@ func _test_test_foe_plan() -> void:
 			and Main.test_foe_plan(PackedStringArray(["robber", "sword", "2", "around", "around"])).is_empty(), "a flag twice: no plan")
 	_check(not Main.hp_verb_allowed(true, ["--server"]) and Main.hp_verb_allowed(true, ["--server", "--run-marker=tour-x"])
 			and not Main.hp_verb_allowed(false, ["--run-marker=tour-x"]), "the foes verb answers only with --test-foe and a run marker, as hp")
+	# 392 amended (10): the pair on free opposite cells, whatever cell her companion holds.
+	var at := Vector2i(8, 111)
+	var taken := {}
+	var is_open := func(cell: Vector2i) -> bool: return not taken.has(cell)
+	var all_open := Main.around_pair(at, is_open)
+	taken[Vector2i(9, 111)] = true  # Her companion east of her (playtest's flank_around2c, 3c).
+	var east_held := Main.around_pair(at, is_open)
+	taken[Vector2i(8, 110)] = true  # And something north.
+	var two_held := Main.around_pair(at, is_open)
+	var two_free: bool = two_held.size() == 2 and is_open.call(two_held[0]) and is_open.call(two_held[1])
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			taken[at + Vector2i(dx, dy)] = true
+	var none := Main.around_pair(at, is_open)
+	_check(all_open == [Vector2i(7, 111), Vector2i(9, 111)] and east_held == [Vector2i(8, 110), Vector2i(8, 112)]
+			and two_held.size() == 2 and two_held[0] - at == at - two_held[1] and (two_held[0] - at).length_squared() == 2
+			and two_free and none.is_empty(),
+			"around lays a pair on free opposite cells: west and east, else north and south, else a diagonal; none when all are taken (392 amended (10)) (%s, %s, %s, %s)" % [all_open, east_held, two_held, none])

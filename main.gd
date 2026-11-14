@@ -29495,10 +29495,16 @@ func _test_foe(player: Player) -> void:
 
 ## Lays [param plan]'s foes round [param player] (392 amended (7)): beside
 ## her where "around" asks and the cell is free, else the nearest free cell
-## to where each is wanted; each made and armed as a level's.
+## to where each is wanted; each made and armed as a level's. Since 392
+## amended (10) "around" lays the first two on an opposite pair of free cells
+## (around_pair), so they flank her whatever cell her companion holds, and any
+## more on the ring's cells left free.
 func _lay_test_foes(player: Player, plan: Dictionary) -> void:
 	var kinds: Array = plan["kinds"]
 	var offsets: Array = plan["offsets"]
+	var pair: Array[Vector2i] = []
+	if plan["around"] and kinds.size() >= 2:
+		pair = around_pair(player.tile, func(cell: Vector2i) -> bool: return World.is_free(cell))
 	for k in kinds.size():
 		var kind: String = kinds[k]
 		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
@@ -29509,6 +29515,13 @@ func _lay_test_foes(player: Player, plan: Dictionary) -> void:
 		if not str(plan["tempers"][k]).is_empty():
 			spec["temperament"] = plan["tempers"][k]
 		var wanted: Vector2i = player.tile + (offsets[k] as Vector2i)
+		if k < pair.size():
+			wanted = pair[k]
+		elif plan["around"]:
+			for step: Vector2i in TEST_FOE_AROUND:  # A third or fourth: a ring cell the pair left free.
+				if World.is_free(player.tile + step):
+					wanted = player.tile + step
+					break
 		spec["tile"] = wanted if plan["around"] and World.is_free(wanted) else _nearest_free(wanted)
 		Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
 		var foe := _spawn(spec)
@@ -29517,7 +29530,8 @@ func _lay_test_foes(player: Player, plan: Dictionary) -> void:
 				World.recover_ticks(foe), "+".join([plan["right"], plan["left"]]).trim_suffix("+"), player.tile])
 	if plan["around"]:
 		player.protected = false  # Her spawn grace ended, as a step would end it: they take her up at once.
-		print("[test] around: %d beside %s, her grace ended" % [kinds.size(), player.tile])
+		print("[test] around: %d beside %s, her grace ended%s" % [kinds.size(), player.tile,
+				"; the pair at %s and %s" % [pair[0], pair[1]] if pair.size() == 2 else ""])
 
 
 ## foes <player> (392 amended (8), test-only): --test-foe's ring laid round
@@ -29541,6 +29555,25 @@ func _foes_command(words: PackedStringArray) -> String:
 	_lay_test_foes(found[0], plan)
 	print("[test] foes: %d laid round %s at tick %d" % [(plan["kinds"] as Array).size(), found[0].name, World.tick])
 	return "foes: %d round %s at tick %d" % [(plan["kinds"] as Array).size(), found[0].name, World.tick]
+
+
+## The nearest opposite pair of cells round [param at] that [param free]
+## says are free (392 amended (10)): west and east, else north and south,
+## else the nearest pair farther out (diagonals, then two off, up to three);
+## [] if none. Two foes there flank her (World.is_flanked) whatever cell
+## another body beside her holds. Pure, for tests.
+static func around_pair(at: Vector2i, free: Callable) -> Array[Vector2i]:
+	var steps: Array[Vector2i] = []
+	for dy in range(-3, 4):
+		for dx in range(-3, 4):
+			if dy < 0 or dy == 0 and dx < 0:  # One of each opposite pair: the step back from it is its partner.
+				steps.append(Vector2i(dx, dy))
+	steps.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return [a.length_squared(), int(a.y != 0), a.y, a.x] < [b.length_squared(), int(b.y != 0), b.y, b.x])
+	for step: Vector2i in steps:
+		if free.call(at + step) and free.call(at - step):
+			return [at + step, at - step]
+	return []
 
 
 ## --test-foe's fields read (392 amended (7); tempers, 392 amended (9): one a
