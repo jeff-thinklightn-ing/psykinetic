@@ -8,7 +8,11 @@ set -u
 cd "$(dirname "$0")/.."
 tmp="$(mktemp -d -t run_parse.XXXXXX)"
 # The fake's own processes, by the pids it wrote, should a stop have missed them.
-trap 'for f in "$tmp"/pids/*; do [ -f "$f" ] && kill -9 "$(cat "$f")" 2>/dev/null; done; rm -rf "$tmp"' EXIT
+# Only while the pid is still the fake's (its idle `sleep 600`, or the fake godot's shell, whose
+# command line names $tmp): an id reused by another process is never stopped (perf-timed's
+# landing, 11-13 22:19, met a reused id in heavy_job_test).
+ours() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null && tr '\000' ' ' <"/proc/$1/cmdline" 2>/dev/null | grep -qE "^sleep 600 *$|$tmp"; }
+trap 'for f in "$tmp"/pids/*; do [ -f "$f" ] && ours "$(cat "$f")" && kill -9 "$(cat "$f")" 2>/dev/null; done; rm -rf "$tmp"' EXIT
 failed=0
 check() {
 	if [ "$1" = 0 ]; then echo "  PASS  $2"; else echo "  FAIL  $2"; failed=$((failed + 1)); fi
@@ -56,7 +60,7 @@ check $(printf '%s' "$verdict" | grep -q "a parse error: stopped early, 3s after
 secs="$(printf '%s' "$verdict" | sed -n 's/^FAIL  parse_test \([0-9]*\)s:.*/\1/p')"
 check $([ -n "$secs" ] && [ "$secs" -ge 3 ] && [ "$secs" -le 20 ]; echo $?) "stopped 3 s after the line (${secs:-?}s in all)"
 sleep 1
-check $(! kill -0 "$(cat "$tmp/pids/godot" 2>/dev/null || echo 999999)" 2>/dev/null && ! kill -0 "$(cat "$tmp/pids/idle" 2>/dev/null || echo 999999)" 2>/dev/null; echo $?) \
+check $(! ours "$(cat "$tmp/pids/godot" 2>/dev/null)" && ! ours "$(cat "$tmp/pids/idle" 2>/dev/null)"; echo $?) \
 	"its process and the one under it are gone"
 check $(printf '%s\n' "$out" | grep -q '^FAIL  late_test [0-9]*s: an engine error: ERROR: Failed to load script'; echo $?) \
 	"a scene that ends within the grace: its own verdict, not stopped"
