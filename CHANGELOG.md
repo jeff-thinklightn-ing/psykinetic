@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A townsperson's window opens at the foot of the screen, left of the pack, the same size every time, its name in view whatever they say, and your pack stays as you had it, opening beside the window when they have something to trade (802 amended (11), (12), (13)).
 - Towns: a companion left in town who falls sick gets well again and goes back to work; before, she stayed off work for good (915).
 - At the near camera, you and the foe you're fighting show through as an outline only when something stands between you and the camera, so at a forest's edge in the open you look like yourselves (623 amended (6)).
 - Towns: a field left unsown in spring is sown in summer, with a smaller crop the later it goes in (449 amended (1)).
@@ -17,12 +18,10 @@ notes (decision 324).
 - The pack and your gear are one parchment window: the gear a plain grid with each empty square's picture faint, no body figure, the pack beside it, a close mark at the top right and "Load" beside the weight bar (787 amended (6)).
 - After a reconnect or a walk into another area, trees and walls between you and the camera keep clearing out of the way, and your outline keeps showing behind things (623 amended (7)).
 - Builder mode: in the spots ghost, a spot the proposal keeps now shows as a firm ring at about three-quarters the strength of a new one, where it was a faint tint easily taken for moss; a spot taken away shows its red cross at the same strength (859 amended (7)).
-- A townsperson's window opened again keeps its width, so it no longer comes up as a small stub beside the pack before she speaks (802 amended (12)).
 - People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).
 - Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
 
 - A holy knight's remains, carried out of the crypt, are wrapped in plain linen tied with cord (714 amended (4)).
-- A townsperson's window no longer stands as a tall empty dark column when she says a long line: it keeps its height, its name in view (802 amended (11)).
 - Small things on the ground, like a cut of meat, a fish, tusks or a key, are drawn big enough to spot at the nearest zoom (619 amended (3)).
 - In the chat box, the game's own words, like "You pick up 5 gold." or what you're told in the crypt, are plain dim lines, and a restart warning or an admin's word reads "Notice: ..." (427 amended (1)).
 - In Umbrage, the temple's back wall has two tall pointed windows behind the altar, seen from the square and from inside, and at night every one of the temple's windows glows out to the street, not only those on its south side (734 amended (9)).

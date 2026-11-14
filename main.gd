@@ -1974,6 +1974,7 @@ func _open_person(body: GridEntity) -> void:
 		who = _display_name(body)
 	var clicks_only := answers_clicks_only(body)
 	var trade := _barters(body)
+	var waits := false  # A trader who hears typed words: nothing drawn till her sheet (or SHEET_WAIT_MSEC), then once in the right form.
 	if trade and str(body.get("trade")) == "merchant":
 		var counter := _shop_counter_near(body)
 		barter_panel.open(counter, who)
@@ -1981,11 +1982,12 @@ func _open_person(body: GridEntity) -> void:
 	elif trade:
 		barter_panel.open(body, who)
 		World.command(player, "barter", {"resident": str(body.get_path())})
+		waits = not clicks_only
 	elif not (barter_panel.is_open() and barter_panel.with == body):
 		barter_panel.open(body, who)  # A ware seller's wares come with their "offers" (show_wares).
-	barter_panel.set_person(body, not clicks_only, trade or clicks_only)
-	if not trade and not clicks_only and pack_panel != null:
-		pack_panel.shown = false  # A talk window takes the pack's place (ui-design's mock, 11-11).
+	barter_panel.set_person(body, not clicks_only, (trade or clicks_only) and not waits)
+	if waits:
+		barter_panel.hold_for_sheet()
 	_person_far_since = -1.0
 
 
@@ -24108,8 +24110,6 @@ func toggle_pack() -> void:
 	pack_panel.shown = not pack_panel.shown
 	if pack_panel.shown and _local_player() != null:
 		_sound("sfx.pack_open", _local_player())
-	if pack_panel.shown and barter_panel != null and barter_panel.is_open() and barter_panel.person != null and not barter_panel.trades:
-		barter_panel.close()  # The pack and a talk window take the same place: opening one closes the other.
 
 
 ## E on a chest or on the player's own companion, a left click on a chest (779), a right click on the companion (779 amended (3)): open it

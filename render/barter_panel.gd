@@ -115,6 +115,11 @@ signal told(what: String)
 const CHAT_LINES := 6
 const CHAT_KEPT := 40
 const CHAT_WIDTH := 600
+## The person window's dock (ui-design's trader mock, C:/dev/review/ui-design/trader/): its foot on the screen's foot margin and its
+## right edge DOCK_GAP units left of the pack's reserved rect, whatever is open beside it.
+const DOCK_GAP := 24
+## How long a trader's window waits for her sheet before it opens as the talk alone, msec (a joined client's round trip).
+const SHEET_WAIT_MSEC := 200
 ## A chat line wraps at this width from its first measure (the scroll's width less its bar): a line measured before its box had a width stood one letter wide and thousands of pixels tall (the Agnes still, v0.1.214).
 const CHAT_LINE_WIDTH := 584
 ## 802: the typing line's longest line (Main.CHAT_MAX_CHARS's).
@@ -242,6 +247,10 @@ var _answered_msec := -1000000
 ## Where each thing in the pack that the keeper won't take goes ({item id: words}, the server's depot pointers); the foot line says them.
 var points: Dictionary = {}
 var _box: PanelContainer
+## The close mark at the head's right end, shown in the docked person window.
+var _close: UiClose
+## When the window began to wait for a trader's sheet (msec), -1 when it is not waiting: nothing is drawn meanwhile.
+var _sheet_since := -1
 var _title: Label
 ## "Trusted" (economy's trusted prices, voice's word, no hover) after the
 ## title, while the barter's prices are the town's trusted ones ("trusted").
@@ -324,7 +333,7 @@ class StoreBox:
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_box = PanelContainer.new()
+	_box = UiGlass.new()  # The window's pane in the approved look (the dock's mock).
 	_box.visible = false
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
@@ -333,7 +342,7 @@ func _ready() -> void:
 	head.add_theme_constant_override("separation", UiTheme.constant("row"))
 	column.add_child(head)
 	_title = Label.new()
-	_title.theme_type_variation = &"Heading"
+	_title.theme_type_variation = &"Title"  # The name in the title face, as the store's keeper and the pack's Gear and Pack (the trader mock).
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
 	_trusted = Label.new()
@@ -365,6 +374,10 @@ func _ready() -> void:
 		if with != null:
 			locker_asked.emit(with))
 	head.add_child(_locker_button)
+	_close = UiClose.new()
+	_close.visible = false
+	_close.pressed.connect(func() -> void: closed.emit())
+	head.add_child(_close)
 	_state = Label.new()
 	_state.theme_type_variation = &"Caption"
 	_state.add_theme_color_override("font_color", DIM)
@@ -434,6 +447,9 @@ func _ready() -> void:
 	_why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_why.custom_minimum_size.x = 600
 	column.add_child(_why)
+	# The goods, the Buy and the reasons come above the talk, so the typing line stays at the window's foot (the trader mock's stage 1 rule).
+	column.move_child(_chat_scroll, column.get_child_count() - 1)
+	column.move_child(_line, column.get_child_count() - 1)
 	add_child(_box)
 	# The Total, a pop-up beside the button while the mouse is on it.
 	_total = PanelContainer.new()
@@ -640,6 +656,32 @@ func set_person(body: GridEntity, chat: bool, trade: bool) -> void:
 		focus_line()
 
 
+## A trader's window waits for her sheet before it is drawn (the coordinator's ruling after playtest's agnescol2): the click sent
+## "barter", nothing shows until the sheet comes (the window opens once, in the right form: the talk alone, or with her goods and the pack)
+## or SHEET_WAIT_MSEC passes (the talk alone, switching once when a stocked sheet comes later). What is said meanwhile waits in the chat.
+func hold_for_sheet() -> void:
+	_sheet_since = Time.get_ticks_msec()
+	_rebuild()
+
+
+## Whether the window is still waiting for the sheet (tests).
+func waiting_for_sheet() -> bool:
+	return _sheet_since >= 0
+
+
+## Whether a sheet has anything to trade: goods or wares to buy, something she buys or takes, or a healer's care.
+static func sheet_stock(sheet: Dictionary) -> bool:
+	for key: String in ["goods", "takes"]:
+		var rows: Variant = sheet.get(key, [])
+		if rows is Array and not (rows as Array).is_empty():
+			return true
+	var buys: Variant = sheet.get("buys", {})
+	if buys is Dictionary and not (buys as Dictionary).is_empty():
+		return true
+	var care_rows: Variant = sheet.get("care", {})
+	return care_rows is Dictionary and not (care_rows as Dictionary).is_empty()
+
+
 ## 802: the typing line takes the keys (a click on it does too); the frame
 ## the window first shows if it is not shown yet (_place).
 func focus_line() -> void:
@@ -687,6 +729,7 @@ func add_said(speaker: String, text: String, aside := "") -> void:
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.custom_minimum_size.x = CHAT_LINE_WIDTH
+	label.theme_type_variation = &"Chat"  # ui-design's chat lines (their next take's theme type; the default look until it is on main).
 	label.mouse_filter = Control.MOUSE_FILTER_PASS
 	label.push_font(get_theme_font(&"name_font", &"TalkName"))  # The talk box's speaker name (ui-design's TalkName).
 	label.push_color(get_theme_color(&"name", &"TalkName"))
@@ -722,16 +765,27 @@ func _clear_chat() -> void:
 	for line: Node in _chat.get_children():
 		_chat.remove_child(line)
 		line.queue_free()
-	_chat_scroll.visible = false
 
 
 ## The chat area as tall as its lines, up to CHAT_LINES, scrolled to the newest.
 func _size_chat() -> void:
-	if _chat.get_child_count() == 0:
-		return
-	var line_height := maxf((_chat.get_child(0) as Control).get_combined_minimum_size().y, 1.0)
-	_chat_scroll.custom_minimum_size.y = minf(_chat.get_combined_minimum_size().y, line_height * CHAT_LINES)
 	_chat_scroll.scroll_vertical = int(_chat.get_combined_minimum_size().y)
+
+
+## The chat band: shown with a person's typing line, CHAT_LINES lines tall whether or not anything is said (the mock: the window
+## never shrinks on a reopen), the newest at its foot.
+func _show_band(shown: bool) -> void:
+	_chat_scroll.visible = shown
+	if not shown:
+		return
+	# The bar's width is always in the band's minimum, so the window is as wide when a line brings the bar as it was without one.
+	_chat_scroll.custom_minimum_size.x = CHAT_WIDTH + _chat_scroll.get_v_scroll_bar().get_combined_minimum_size().x
+	var kind := &"Chat" if _chat_scroll.has_theme_font(&"normal_font", &"Chat") else &"RichTextLabel"  # The type a line wears, once the theme has it.
+	var font := _chat_scroll.get_theme_font(&"normal_font", kind)
+	var size := _chat_scroll.get_theme_font_size(&"normal_font_size", kind)
+	var line_height := (font.get_height(size) if font != null else 24.0) + float(_chat_scroll.get_theme_constant(&"line_separation", kind))
+	var gap := float(_chat.get_theme_constant(&"separation", &"VBoxContainer"))
+	_chat_scroll.custom_minimum_size.y = CHAT_LINES * line_height + (CHAT_LINES - 1) * gap
 
 
 func _submit(text: String) -> void:
@@ -750,6 +804,7 @@ func _line_input(event: InputEvent) -> void:
 
 func close() -> void:
 	_open = false
+	_sheet_since = -1
 	with = null
 	person = null
 	talks = false
@@ -802,6 +857,9 @@ func show_barter(given: Dictionary) -> void:
 		return
 	data = given
 	purse = int(given.get("gold", purse))
+	_sheet_since = -1  # The sheet is in: the window is drawn now, in the right form.
+	if person != null and talks and not trades and sheet_stock(given):
+		trades = true  # Her goods, the pack beside them: once, and never back (a later bare sheet changes nothing).
 	for uid: Variant in take.keys():
 		if not goods_have(int(uid)):
 			take.erase(uid)
@@ -1591,6 +1649,8 @@ func _rebuild() -> void:
 	_state.text = ASLEEP_WORDS
 	_state.visible = person != null and asleep
 	_line.visible = person != null and talks
+	_close.visible = docked()
+	_show_band(person != null and talks)
 	for child: Node in _asks_box.get_children():
 		_asks_box.remove_child(child)
 		child.queue_free()
@@ -1694,7 +1754,7 @@ func _rebuild() -> void:
 				slots.append(at)
 		pack.set_selected(slots)
 		pack.set_prices(lights)
-		pack.held_open = true
+		pack.held_open = _holds_pack()
 	elif pack != null:
 		var slots := []
 		for uid: Variant in give:
@@ -1705,8 +1765,8 @@ func _rebuild() -> void:
 			if each is Dictionary:
 				prices[int(each.get("slot", -1))] = pays_for(int(each.get("uid", 0)))
 		pack.set_prices(prices)
-		pack.held_open = true
-	_box.visible = true
+		pack.held_open = _holds_pack()
+	_box.visible = _sheet_since < 0
 
 
 ## A counter's material ("ore") as the item its chip pictures ("ore_sack").
@@ -1938,6 +1998,17 @@ func _counter_work() -> bool:
 		if rows is Array and not (rows as Array).is_empty():
 			return true
 	return false
+
+
+## Whether the window is the person's, docked at the screen's foot (a townsperson who hears typed words, her talk and her goods; not a
+## keeper at a counter, whose work or care keeps the counter window beside the pack, nor the store window).
+func docked() -> bool:
+	return _open and person != null and talks and not _layout_store() and not _counter_work() and care().is_empty()
+
+
+## Whether the window has the pack open beside it (held): every window but the docked person's talk alone.
+func _holds_pack() -> bool:
+	return not (docked() and not trades)
 
 
 ## Whether the store window is open and owns the pack: the separate pack and sheet
@@ -2416,6 +2487,24 @@ func _place() -> void:
 		_store_view.position = Vector2(screen.x - _store_view.size.x - margin, screen.y - _store_view.size.y - margin)
 		_box.visible = false
 		_total.visible = false
+		return
+	if _sheet_since >= 0 and Time.get_ticks_msec() - _sheet_since >= SHEET_WAIT_MSEC:
+		_sheet_since = -1  # No sheet in time: the talk alone, switching when a stocked one comes.
+		_rebuild()
+	if docked():
+		# The person window: one place, one width, foot on the foot margin, right edge left of the pack's reserved rect; it grows upward only.
+		_box.visible = _open and _sheet_since < 0
+		if not _box.visible:
+			_total.visible = false
+			_tip.visible = false
+			return
+		_box.reset_size()
+		var screen := get_viewport_rect()
+		var reserved := PackPanel.reserved_rect(screen)
+		_box.global_position = Vector2(reserved.position.x - float(DOCK_GAP) - _box.size.x,
+			screen.end.y - float(UiTheme.constant("margin")) - _box.size.y)
+		if _focus_due:
+			focus_line()
 		return
 	var pack_shown := pack != null and pack.visible
 	_box.visible = _open and pack_shown

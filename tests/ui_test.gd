@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_seam_click()
 	_test_fire_click()
 	await _test_person_window()
+	await _test_person_dock()
 	await _test_person_give()
 	_test_taker_hint()
 	print("")
@@ -2623,38 +2624,109 @@ func _test_store_face_clicks() -> void:
 		var panels: Array[Control] = []
 		if barter._box.is_visible_in_tree():
 			panels.append(barter._box)
+		if person and _main.pack_panel.is_visible_in_tree():
+			panels.append(_main.pack_panel)  # Open beside the person window, "both stay": its face is scanned too.
 		var rect: Rect2 = barter._box.get_global_rect()
 		print("  %s window: rect %s, %d panels" % ["person" if person else "store", rect, panels.size()])
-		for ix in 9:
-			for iy in 9:
-				var at := rect.position + rect.size * Vector2(0.06 + 0.88 * ix / 8.0, 0.06 + 0.88 * iy / 8.0)
-				if not panels.any(func(p: Control) -> bool: return p.get_global_rect().has_point(at)):
-					continue
-				scanned += 1
-				var before: int = _main.world_clicks
-				var motion := InputEventMouseMotion.new()
-				motion.position = at
-				motion.global_position = at
-				get_viewport().push_input(motion, true)
+		if person:
+			print("  (the pack's rect %s, visible %s; the window's min %s, its scroll min %s, the chat's %s)" % [_main.pack_panel.get_global_rect(),
+				_main.pack_panel.visible, barter._box.get_combined_minimum_size(), barter._chat_scroll.get_combined_minimum_size(), barter._chat.get_combined_minimum_size()])
+		# The face's nine by nine, and the points 4 units inside each edge and corner (a margin cannot hide between the columns).
+		var points: Array[Vector2] = []
+		for panel: Control in panels:
+			var face := panel.get_global_rect()
+			for ix in 9:
+				for iy in 9:
+					points.append(face.position + face.size * Vector2(0.06 + 0.88 * ix / 8.0, 0.06 + 0.88 * iy / 8.0))
+			for fx: float in [0.0, 0.5, 1.0]:
+				for fy: float in [0.0, 0.5, 1.0]:
+					if fx != 0.5 or fy != 0.5:
+						points.append(face.position + Vector2(4.0, 4.0) + (face.size - Vector2(8.0, 8.0)) * Vector2(fx, fy))
+		for at: Vector2 in points:
+			# The close mark is the window's own button: a press on it closes the window, as it should (the scan's first leaks
+			# were the presses after it had closed the window), so it is left out of the scan.
+			if barter._close != null and barter._close.is_visible_in_tree() and barter._close.get_global_rect().has_point(at):
+				continue
+			if person and _main.pack_panel._close != null and _main.pack_panel._close.is_visible_in_tree() and _main.pack_panel._close.get_global_rect().has_point(at):
+				continue  # The pack's close mark likewise.
+			if not panels.any(func(p: Control) -> bool: return p.get_global_rect().has_point(at)):
+				continue
+			scanned += 1
+			var before: int = _main.world_clicks
+			var motion := InputEventMouseMotion.new()
+			motion.position = at
+			motion.global_position = at
+			get_viewport().push_input(motion, true)
+			await get_tree().process_frame
+			var under := get_viewport().gui_get_hovered_control()
+			for pressed: bool in [true, false]:
+				var click := InputEventMouseButton.new()
+				click.button_index = MOUSE_BUTTON_LEFT
+				click.pressed = pressed
+				click.position = at
+				click.global_position = at
+				get_viewport().push_input(click, true)
 				await get_tree().process_frame
-				var under := get_viewport().gui_get_hovered_control()
-				for pressed: bool in [true, false]:
-					var click := InputEventMouseButton.new()
-					click.button_index = MOUSE_BUTTON_LEFT
-					click.pressed = pressed
-					click.position = at
-					click.global_position = at
-					get_viewport().push_input(click, true)
-					await get_tree().process_frame
-				if _main.world_clicks > before:
-					leaks.append("%s at %s under %s" % ["person" if person else "store", at, under.name if under != null else "nothing"])
+			if _main.world_clicks > before:
+				leaks.append("%s at %s under %s" % ["person" if person else "store", at, under.name if under != null else "nothing"])
+				if leaks.size() == 1:
+					print("  (first leak: every control with a rect holding the point, topmost last: %s; the canvas transform %s; the box %s, filter %d)" % [
+						_controls_at(_main, at), barter._box.get_global_transform_with_canvas(), barter._box.get_global_rect(), barter._box.mouse_filter])
 		barter.close()
 		await get_tree().process_frame
 	print("  %d presses on the window's face, %d reached the world" % [scanned, leaks.size()])
 	for leak in leaks.slice(0, 12):
 		print("    leak: " + leak)
-	_check(scanned > 20 and leaks.is_empty(), "no press on a store's or a person's window reaches the world (%d scanned, %d leaked)" % [scanned, leaks.size()])
+	_check(scanned > 20 and leaks.is_empty(), "no press on a store's or a person's window, or the pack open beside it, reaches the world (%d scanned, %d leaked)" % [scanned, leaks.size()])
+	# The gap between the docked window and the pack beside it is the one place a press reaches the world.
+	barter.open(_main._local_player(), "Hob")
+	barter.set_person(_main._local_player(), true, true)
+	barter.show_wares(_main._local_player(), "Hob", [
+		{"id": "hob|wares|a", "kind": Offers.WARES, "accept": Offers.WARES, "title": "A knife", "words": "", "cost": 3, "what": {"item": "knife"}}], 7)
+	for i in 3:
+		await get_tree().process_frame
+	var box_rect: Rect2 = barter._box.get_global_rect()
+	var pack_rect: Rect2 = _main.pack_panel.get_global_rect()
+	if _main.pack_panel.is_visible_in_tree() and pack_rect.position.x > box_rect.end.x + 8.0:
+		var gap_at := Vector2((box_rect.end.x + pack_rect.position.x) / 2.0, box_rect.end.y - 40.0)
+		var gap_before: int = _main.world_clicks
+		await _press_at(gap_at)
+		_check(_main.world_clicks > gap_before, "a press in the gap between the docked window and the pack reaches the world (%s, between %s and %s)" % [gap_at, box_rect, pack_rect])
+	else:
+		print("  (no gap between the window and the pack in this scene (%s, %s): the gap unchecked)" % [box_rect, pack_rect])
+	# The close mark closes the window, and the press that does it is the window's: it does not walk the player as the window goes.
+	var cross_before: int = _main.world_clicks
+	await _press_at(barter._close.get_global_rect().get_center())
+	_check(not barter.is_open() and _main.world_clicks == cross_before, "a press on the close mark closes the window and does not reach the world")
+	barter.close()
 
+
+## A left press and release at [param at], the pointer first moved there, a frame between each.
+func _press_at(at: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.global_position = at
+	get_viewport().push_input(motion, true)
+	await get_tree().process_frame
+	for pressed: bool in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		click.position = at
+		click.global_position = at
+		get_viewport().push_input(click, true)
+		await get_tree().process_frame
+
+
+## Diagnostics: the visible controls under [param root] whose global rect holds [param at], "path[filter]" each.
+func _controls_at(root: Node, at: Vector2) -> Array[String]:
+	var found: Array[String] = []
+	for child: Node in root.get_children():
+		var control := child as Control
+		if control != null and control.is_visible_in_tree() and control.get_global_rect().has_point(at):
+			found.append("%s[%d]" % [control.get_path(), control.mouse_filter])
+		found.append_array(_controls_at(child, at))
+	return found
 
 ## The store's squares as built (Jeff's 11-10 store, the Lenovo stills of Store A: chips straddling each
 ## square's top edge, one loose over the pack, no dark box round the goods): once laid out, every price chip and
@@ -3776,6 +3848,112 @@ func _test_taker_hint() -> void:
 	_check(marks.keys() == ["/root/Bran"] and with_gear.has("/root/Rolf") and with_gear.has("/root/Bran") and none.is_empty(),
 		"carrying ore: the smith's name marked (an unspawned taker, none); a sword: Rolf's too; nothing they take: none (%s, %s)" % [marks, with_gear])
 
+## The person window docked (ui-design's trader mock, 11-13): one place and one size for a plain person, a bare-shelf trader and a
+## stocked one, first open or reopened, empty or full; the sheet (or SHEET_WAIT_MSEC) decides the form; the pack stays as the player had it.
+func _test_person_dock() -> void:
+	print("
+== the person window at the dock: one place, one size, the sheet decides its form ==")
+	var me: Player = _main._local_player()
+	var window: BarterPanel = _main.barter_panel
+	var pack: PackPanel = _main.pack_panel
+	if me == null or window == null or pack == null:
+		print("  (no player in this scene: skipped)")
+		return
+	var plain: Resident = load(Main.RESIDENT).new()
+	plain.name = "UiDockOda"
+	plain.person = "Oda"
+	plain.trade = "farmer"
+	var trader: Resident = load(Main.RESIDENT).new()
+	trader.name = "UiDockBran"
+	trader.person = "Bran"
+	trader.trade = "carpenter"
+	var cells: Array[Vector2i] = []
+	for body: Resident in [plain, trader]:
+		var cell: Vector2i = _main._beside(me.tile, Vector2i(-1000, -1000))
+		if cell == Main.NONE or not World.spawn(body, cell):
+			_check(false, "a townsperson stands beside the player")
+			return
+		if not body.is_inside_tree():
+			_main.add_child(body)
+		cells.append(cell)
+	var screen := get_viewport().get_visible_rect()
+	var reserved := PackPanel.reserved_rect(screen)
+	var margin := float(UiTheme.constant("margin"))
+	# A plain person: the dock, an empty band six lines tall, the pack not opened by her.
+	window.close()
+	pack.shown = false
+	_main._open_talk(plain)
+	for i in 4:
+		await get_tree().process_frame
+	var first := window._box.get_global_rect()
+	_check(window.docked() and window._box.visible and not window.waiting_for_sheet(),
+		"a plain person: the window is docked and drawn at once")
+	_check(absf(first.end.x - (reserved.position.x - float(BarterPanel.DOCK_GAP))) < 1.0 and absf(first.end.y - (screen.end.y - margin)) < 1.0,
+		"its right edge DOCK_GAP left of the pack's reserved rect, its foot on the foot margin (%s)" % [first])
+	_check(window._chat_scroll.visible and window._chat_scroll.custom_minimum_size.y > 0.0 and not pack.visible,
+		"the chat band is shown, empty or not, and a talker opens no pack beside it")
+	var column: Node = window._line.get_parent()
+	_check(window._title.theme_type_variation == &"Title" and window._line.get_index() == column.get_child_count() - 1
+			and window._chat_scroll.get_index() > window._grid.get_index() and window._chat_scroll.get_index() > window._foot_row.get_index(),
+		"the name in the Title face; the goods and the Buy above the chat band, the typing line last, at the window's foot")
+	window.close()
+	_main._open_talk(plain)
+	for i in 4:
+		await get_tree().process_frame
+	var again := window._box.get_global_rect()
+	_check(again.is_equal_approx(first), "a QUIET reopen: the same rect as the first open (%s, then %s)" % [first, again])
+	window.add_said("Oda", "Quiet, you'll scare the game. What?")
+	window.add_said("Oda", "We're short of ore. Our usual lad dug iron at the mill, up in the hills, and nothing holds it now.")
+	for i in 4:
+		await get_tree().process_frame
+	print("  (two lines: the window's min %s, the band's %s, the chat's %s, the bar's %s)" % [window._box.get_combined_minimum_size(),
+		window._chat_scroll.get_combined_minimum_size(), window._chat.get_combined_minimum_size(), window._chat_scroll.get_v_scroll_bar().get_combined_minimum_size()])
+	_check(window._box.get_global_rect().is_equal_approx(first), "two lines said: the window neither grows nor moves (%s)" % [window._box.get_global_rect()])
+	# A trader waits for her sheet: nothing drawn, then once in the right form.
+	var bare := {"resident": str(trader.get_path()), "gold": 5, "goods": [], "buys": {}, "pack": [], "takes": []}
+	var stocked := {"resident": str(trader.get_path()), "gold": 5, "goods": [], "buys": {"herbs": {"gold": 2, "up_to": 10}}, "pack": [], "takes": []}
+	window.close()
+	window.open(trader, "Bran")
+	window.set_person(trader, true, false)
+	window.hold_for_sheet()
+	await get_tree().process_frame
+	_check(window.waiting_for_sheet() and not window._box.visible and not pack.visible, "a trader's window draws nothing while her sheet is out")
+	window.show_barter(bare)
+	for i in 3:
+		await get_tree().process_frame
+	_check(not window.waiting_for_sheet() and window._box.visible and not window.trades and not pack.visible and window._box.get_global_rect().is_equal_approx(first),
+		"a bare sheet: the talk alone, the pack never opened, the same rect as a plain person's (%s)" % [window._box.get_global_rect()])
+	window.show_barter(stocked)
+	for i in 3:
+		await get_tree().process_frame
+	var trade := window._box.get_global_rect()
+	_check(window.trades and pack.visible and absf(trade.end.x - first.end.x) < 1.0 and absf(trade.end.y - first.end.y) < 1.0 and absf(trade.size.x - first.size.x) < 1.0,
+		"a stocked sheet (later or first): her trade, the pack beside it, the same foot, right edge and width (%s)" % [trade])
+	window.show_barter(bare)
+	await get_tree().process_frame
+	_check(window.trades, "a later bare sheet while the trade shows changes nothing")
+	# No sheet in time: the talk alone, switching once when a stocked one comes.
+	window.close()
+	pack.shown = false
+	window.open(trader, "Bran")
+	window.set_person(trader, true, false)
+	window.hold_for_sheet()
+	await get_tree().create_timer(float(BarterPanel.SHEET_WAIT_MSEC) / 1000.0 + 0.15).timeout
+	_check(not window.waiting_for_sheet() and window._box.visible and not window.trades and not pack.visible, "no sheet in time: the talk alone")
+	window.show_barter(stocked)
+	for i in 3:
+		await get_tree().process_frame
+	_check(window.trades and pack.visible and window._box.visible, "then a stocked sheet switches it once, the pack coming with it")
+	# The pack the player had open stays open through a talker's or a bare trader's window.
+	window.close()
+	pack.shown = true
+	_main._open_talk(plain)
+	for i in 3:
+		await get_tree().process_frame
+	_check(pack.visible and window.docked() and window._box.visible, "the pack open before the click stays open beside a plain person's window")
+	window.close()
+	pack.shown = false
+
 
 func _test_person_give() -> void:
 	print("
@@ -4090,7 +4268,7 @@ func _test_resident_asks() -> void:
 	_check(talk_line.get_index() > panel._asks_scroll.get_index(), "the typing line sits below the asks")
 	_main.pack_panel.shown = false
 	_main.toggle_pack()
-	_check(_main.pack_panel.shown and not panel.is_open(), "opening the pack closes a talk window: they take the same place")
+	_check(_main.pack_panel.shown and panel.is_open(), "opening the pack opens it beside the docked talk window: both stay (the dock takes no one's place)")
 	_main.pack_panel.shown = pack_was
 	panel.close()
 	_check(panel.asks_shown().is_empty() and panel.why_shown().is_empty() and not panel._asks_box.visible, "closed: no rows, no refusal")

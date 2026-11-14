@@ -568,6 +568,12 @@ func box_in(mine: bool, index: int) -> SlotBox:
 	return null
 
 
+## ui-design's reserved rect for the bottom-right windows (the HUD's rects, 11-11): 2128, 1056, 1672 x 1064 in the HUD's 3840 x 2160
+## units, read from [param screen]'s own bottom-right corner as the pack is anchored. The person window docks left of it.
+static func reserved_rect(screen: Rect2) -> Rect2:
+	return Rect2(Vector2(2128.0, 1056.0) + (screen.end - Vector2(3840.0, 2160.0)), Vector2(1672.0, 1064.0))
+
+
 ## The pack's title's rect on screen ("Pack"), the gold at its right end
 ## (ShopPanel).
 func pack_title_rect() -> Rect2:
