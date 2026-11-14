@@ -14671,6 +14671,40 @@ at boot. zone_test on main: 280 s run, 115 s from RESULT to exit; with it,
 33 s and 1 s. land.sh 694 s, state_test 233 s. A deploy's restart quits as
 fast. Server only, no bullet, protocol unchanged, no new class_name.
 
+465 amended (4): a generation remembers the template it was laid from, and
+one whose template has changed is laid again (the coordinator's rule; label
+from tools/decision_number.sh). Found building the full circle's switch-on:
+a laid generation keeps its own copy of level.json, links included, so a
+template change (a link taken out, a marker, art) reached the box only at
+the level's next due, up to every_days (3) after the deploy that carried it,
+never in the cut that names it. Regen.write now stamps the generation's
+level.json "laid_from" with Regen.template_mark: an MD5 of the template's
+level.json (sorted) and its layout, height and relief pixels (an 8-bit image
+taken as RGBA, so a PNG saved again with the same pixels is no change).
+Regen.template_changed is true for a laid generation (its level.json has
+"generation" and "regenerate", so never a level edited in the game) whose
+mark is another; both marks are cached until Regen.forget. Main's
+_may_regenerate takes "due, or its template changed": the three-day path
+otherwise unchanged (may_write, never while its zone is awake, made off the
+main thread, 684; the overlay's own refusal of an edited level), tried once
+a run per level, so one whose map will not join waits for its ordinary due.
+Templates change only with a deploy, so in practice it is the boot after it,
+on the first slow ticks, one level at a time, nobody connected. The log
+line names the level and the reason only ("[regen] <level>: template
+changed since its generation was laid: laid again"). The generation's saved
+level.json gains one key, "laid_from"; one laid before this has none and
+counts as changed, once: the first deploy after this lays all four
+generated levels afresh (the barrow, barrow_deep, castle_halls,
+hollowfell), each with a new generation number and what a three-day re-lay
+resets (the band's state, the robbers' clear, what lay outside the
+anchors). regen_test _test_template_changed: the written generation names
+its template's mark; the same template, not laid again; the same pixels
+saved again as RGBA or RGB, no change; a changed template, laid again
+though not due, once a run, and the new generation names it; a generation
+with no mark counts as changed; a level edited in the game from a
+generation (its number, no "regenerate") never. Server only; protocol
+unchanged; no class_name; no bullet.
+
 ## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
 
 Jeff (2026-10-17, through the coordinator): "a forest zone - while walking

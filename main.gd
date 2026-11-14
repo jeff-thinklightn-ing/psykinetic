@@ -4335,10 +4335,23 @@ func _may_regenerate(level_name: String) -> bool:
 	if not Net.is_authority() or not Regen.marked(level_name) or not Regen.may_write():
 		return false
 	var state: Dictionary = _regen.get(level_name, {"generation": 0, "at_step": 0})
-	if not Regen.due(state, Regen.config_of(level_name), World.steps):
+	# Due, or laid from a template since changed (465 amended (4)): tried once a run, then its ordinary due.
+	var changed := not _relaid_for_template.has(level_name) and Regen.template_changed(level_name)
+	if not changed and not Regen.due(state, Regen.config_of(level_name), World.steps):
 		return false
 	var zone: Zone = World.zones.get(level_name)
-	return zone == null or not World.zone_awake(zone)  # Never under anyone's feet: it waits for the zone to sleep.
+	if zone != null and World.zone_awake(zone):
+		return false  # Never under anyone's feet: it waits for the zone to sleep.
+	if changed:
+		_relaid_for_template[level_name] = true
+		print("[regen] %s: template changed since its generation was laid: laid again" % level_name)
+	return true
+
+
+## The levels laid again this run because their template changed (465
+## amended (4)): each tried once, so one whose map will not join waits for
+## its ordinary due rather than trying every tick.
+var _relaid_for_template: Dictionary[String, bool] = {}
 
 
 ## Server: level [param level_name]'s next generation made (Regen.generate),

@@ -115,6 +115,51 @@ static func may_write() -> bool:
 ## reloaded from edited files (Main.reload_zone).
 static func forget() -> void:
 	_marked = null
+	_template_marks.clear()
+	_laid_marks.clear()
+
+
+## A generation remembers the template it was laid from (465 amended (4);
+## the coordinator's rule, from the full circle's switch-on, whose links
+## would have stayed on the box up to every_days after the deploy): write
+## stamps its level.json "laid_from" with template_mark, and a laid
+## generation whose template has changed since (template_changed) is laid
+## again the next time nobody is in it, by the same path as one due. One
+## laid before this has no mark: it counts as changed, once.
+static var _template_marks: Dictionary[String, String] = {}
+static var _laid_marks: Dictionary[String, String] = {}
+
+
+## Level [param level_name]'s template, as one mark: an MD5 of its
+## level.json (sorted) and its images' pixels (so a PNG saved again the
+## same is no change). Cached until forget().
+static func template_mark(level_name: String) -> String:
+	if not _template_marks.has(level_name):
+		var made := Level.template(level_name)
+		var hashing := HashingContext.new()
+		hashing.start(HashingContext.HASH_MD5)
+		hashing.update(JSON.stringify(made.get("config", {}), "", true).to_utf8_buffer())
+		for key: String in ["layout", "height", "relief"]:
+			var image: Variant = made.get(key)
+			if image is Image:
+				var pixels: Image = image
+				if pixels.get_format() in [Image.FORMAT_L8, Image.FORMAT_LA8, Image.FORMAT_RGB8]:
+					pixels = pixels.duplicate()
+					pixels.convert(Image.FORMAT_RGBA8)  # A PNG saved again as RGB or RGBA: the same pixels, the same mark.
+				hashing.update(("%s %dx%d %d" % [key, pixels.get_width(), pixels.get_height(), pixels.get_format()]).to_utf8_buffer())
+				hashing.update(pixels.get_data())
+		_template_marks[level_name] = hashing.finish().hex_encode()
+	return _template_marks[level_name]
+
+
+## Whether level [param level_name]'s laid generation (a level.json with
+## "generation", never a level edited in the game) was laid from another
+## template than its own now. Cached until forget().
+static func template_changed(level_name: String) -> bool:
+	if not _laid_marks.has(level_name):
+		var laid: Dictionary = Level.source(level_name).get("config", {})
+		_laid_marks[level_name] = str(laid.get("laid_from", "")) if laid.has("generation") and laid.get("regenerate") is Dictionary else "-"
+	return _laid_marks[level_name] != "-" and _laid_marks[level_name] != template_mark(level_name)
 
 
 ## Name -> block of every level that regenerates, in name order.
@@ -818,6 +863,7 @@ static func write(level_name: String, made: Dictionary) -> bool:
 			return false
 	if not Level._templates.has(level_name):
 		Level.keep_template(level_name, Level.template(level_name))
+	made["config"]["laid_from"] = template_mark(level_name)  # 465 amended (4): what it was laid from.
 	var absolute := ProjectSettings.globalize_path(folder)
 	if not DirAccess.dir_exists_absolute(absolute):
 		DirAccess.make_dir_recursive_absolute(absolute)

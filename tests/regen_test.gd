@@ -40,7 +40,7 @@ func _ready() -> void:
 		DirAccess.remove_absolute(Net.state_path)
 	# The overlay of this test's own: never the shared user://levels.
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("regen_overlay/")
-	for level_name in ["rg_halls", "rg_edited"]:
+	for level_name in ["rg_halls", "rg_edited", "rg_now", "rg_built"]:
 		BuilderHost.remove_overlay(level_name)
 	_register_levels()
 	_period = 3 * DayNight.day_steps
@@ -65,6 +65,7 @@ func _ready() -> void:
 	_test_castle_never_marked()
 	_test_overlay_dir()
 	_test_regenerate_now()
+	_test_template_changed()
 	await _test_made_off_the_main_thread()
 	_test_richness_never_waited()
 	_test_routes_never_waited()
@@ -425,6 +426,59 @@ func _test_regenerate_now() -> void:
 	var second: String = _main.admin_command("regenerate now rg_now")
 	_check(second == "regenerate now: rg_now laid again, generation 2" and _main.generation_of("rg_now") == 2, "and again, due or not (%s)" % second)
 	Net.regenerate = true
+
+
+## 465 amended (4): a generation remembers the template it was laid from
+## ("laid_from"); one whose template has changed since is laid again when
+## nobody is in it, once a run; one laid before the mark counts as changed;
+## the same pixels saved again are no change; a level edited in the game is
+## never laid again for it.
+func _test_template_changed() -> void:
+	print("
+== a generation laid from a template since changed is laid again (465 amended (4)) ==")
+	Regen.forget()
+	var laid: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Level.overlay_dir + "rg_now/level.json"))
+	_check(str(laid.get("laid_from", "")) == Regen.template_mark("rg_now") and not Regen.template_changed("rg_now"),
+		"the written generation names its template's mark (%s)" % laid.get("laid_from", ""))
+	_check(not _main._may_regenerate("rg_now"), "just laid, its template the same: not laid again")
+	var kept: Dictionary = Level.template("rg_now").duplicate()
+	var reencoded := Image.new()
+	reencoded.load_png_from_buffer((kept["layout"] as Image).save_png_to_buffer())
+	var rgb: Image = (kept["layout"] as Image).duplicate()
+	rgb.convert(Image.FORMAT_RGB8)
+	var same_marks: Array[bool] = []
+	for layout: Image in [reencoded, rgb]:
+		Level.keep_template("rg_now", {"layout": layout, "height": kept["height"], "config": kept["config"], "relief": kept.get("relief")})
+		same_marks.append(not Regen.template_changed("rg_now"))
+	_check(same_marks == [true, true], "the same pixels saved again, as RGBA or RGB: no change (%s)" % [same_marks])
+	var changed_config: Dictionary = (kept["config"] as Dictionary).duplicate(true)
+	changed_config["name"] = "Halls, changed"
+	Level.keep_template("rg_now", {"layout": kept["layout"], "height": kept["height"], "config": changed_config, "relief": kept.get("relief")})
+	_check(Regen.template_changed("rg_now") and _main._may_regenerate("rg_now"), "its template changed: laid again, not due")
+	_check(not _main._may_regenerate("rg_now"), "once a run: asked again, it waits for its ordinary due")
+	var generation: int = _main.generation_of("rg_now")
+	_check(_main._regenerate("rg_now", Regen.config_of("rg_now")) and _main.generation_of("rg_now") == generation + 1 and not Regen.template_changed("rg_now"),
+		"laid from the changed template, it names it (generation %d)" % _main.generation_of("rg_now"))
+	var now := Level.source("rg_now")
+	var unmarked: Dictionary = (now["config"] as Dictionary).duplicate(true)
+	unmarked.erase("laid_from")
+	Level.register("rg_now", now["layout"], now["height"], unmarked)
+	_check(Regen.template_changed("rg_now"), "a generation laid before the mark: changed, once")
+	Level.register("rg_now", now["layout"], now["height"], now["config"])
+	# A level edited in the game from a generation (its level.json keeps the
+	# number, not "regenerate"): never laid again for a template change.
+	var folder := ProjectSettings.globalize_path(Level.overlay_dir + "rg_built")
+	DirAccess.make_dir_recursive_absolute(folder)
+	(kept["layout"] as Image).save_png(folder.path_join("layout.png"))
+	var json := FileAccess.open(folder.path_join("level.json"), FileAccess.WRITE)
+	json.store_string("{\"name\": \"Built over\", \"generation\": 2}
+")
+	json.close()
+	Level.keep_template("rg_built", {"layout": kept["layout"], "height": null, "config": changed_config})
+	_check(Level.overlaid("rg_built") and not Regen.template_changed("rg_built"), "a level edited in the game: never laid again for its template")
+	BuilderHost.remove_overlay("rg_built")
+	Level._templates.erase("rg_built")
+	Level.keep_template("rg_now", kept)
 
 
 func _test_made_off_the_main_thread() -> void:
