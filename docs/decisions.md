@@ -55878,3 +55878,78 @@ pc-character's held-drawing code (Client3D._hold, _hang), and pc-character read 
 nothing holds a hanging piece until npc's part of "the taught fisher" puts the string in a resident's hand. No
 bullet; the joined look of the string at a walk is owed when the package switches on. Client and art only; protocol
 unchanged; no new class_name (Hang is an inner class).
+## 918. Hunger harms nobody (economy)
+
+Jeff, 11-14, on the box-town-grain page: "dont punish town people for being hungry, have hunger be something the
+players can see and feel - store closes, tavern empty, beggars begging etcbe creative and make it fun for players".
+He picked none of the stocking choices: nothing is written to the box. The coordinator ruled what this take stops
+(the list economy gave from main's code) and what stays.
+
+Stopped:
+- **Leaving.** Towns._low no longer counts "fed == hungry". A hungry resident is never low, so never wanders off
+  (613 amended). The other two lows stay as they are (unpaid wages owed to him; a seated hand whose bench has work
+  queued and none going), since Jeff's words are about hunger.
+- **Sickness.** townsfolk.json sick.hungry is 1 (was 3): going without, or eating on the dole, adds nothing to the
+  day's chance (501).
+- **A stage lost.** Towns._falling no longer counts "hunger the store can't feed" as strain (649). A stage lost
+  stops its officials' wages, which is townspeople worse off for hunger. decline.hungry_share is unread. The count
+  stays readable as Towns.hungry_now(town), for the hungry-town page's states.
+
+Stays: the dole (the town feeds its people from the store), a mind's "nothing to eat since yesterday" (how he feels
+it), and the thief passing over the hungry.
+
+**Those gone for hunger come home.** A leaving now records why on its sought entry: "wages" or "bench"
+(_wander_turn), never "hunger", saved with the entry and loaded back (Towns' load keeps "why" where the save has
+one; without that a restart read every leaver as gone for hunger, farm_test's save case found it). A wandered entry whose why is "hunger" or missing comes home by himself at the town's
+next turn (Towns._own_way_in, _gone_for_hunger, OWN_WAY's line, naming the resident and his trade). A missing why
+means he left before this take. One gone for wages or bench, or whom a player has freed and is leading, waits as
+before.
+
+On the box (the coordinator's question, 11-14): its world was saved before "why", so at the deploy's first town turn
+every wandered entry not being led comes home, whatever he left for, not the woodcutter alone; a one-time homecoming
+on an old save (the coordinator's ruling). A sought one who never lived there (a story's newcomer, not wandered) is
+untouched. One who left for wages or a bench and is still owed, or still idle at a bench with work queued, is low
+again from his first turn home, and after sought.leave_days (10) gone again at a wander turn, one a town every
+sought.wander_every_days (7), now with his why kept, and waits to be found as before. The town's log lines ("has
+gone, low too long", OWN_WAY's) go to the server's journal only, never to a player. What a player meets is the body,
+the door note and the rumour, all read from the entry (npc's): so a player could meet the same resident gone, home,
+and gone again, as could any wandered resident before 918. The count to expect on the box from the code alone: one
+"sent for, finds the way to" line for each wandered entry out at the deploy. A wandered gatherer (the woodcutter,
+hunter, carpenter) already walked home after gatherers_days (7) by 767 amended's path, so from those only one gone
+less than 7 days counts; others out from before the journal's reach (10-25) would add theirs, a number the code
+cannot know. (Release found the box's woodcutter home since 11-14 07:12 by the gatherers' path, so his share is 0.)
+
+The journal lines that name why (release's ask, 11-14), print only, never the town's log (which a resident's mind
+may read): "[towns] <town>: <name> the <trade> left for wages|bench (owed N)" beside each "has gone, low too long",
+and "[towns] <town>: <name> comes home, gone for hunger|a reason no save kept (left before 918)" before OWN_WAY's
+line on 918's path. Each names the worker, as every [towns] line does, never a player.
+
+A hungry town can still lose a resident for wages (economy's finding from the year's soak tool, 11-14). A treasury at
+its gold_floor owes its gatherers for every delivery they bank (Economy._owe_or_pay, "N wood delivered"), and that
+debt prints no journal line: only the wage floor's "[economy] ... owed" and production's "goes unpaid" do, and
+neither covers a delivery. In town_balance's Umbrage from an empty store (--gatherers --food=0, before this take's
+code), its woodcutter, owed for her wood, left on day 10, which the label would read as wages. So the box's nine
+"low too long" leavings were not hunger alone: its treasury was at its floor (the "paid 0 of 5" of 11-14), and with
+918 a gatherer owed for deliveries still leaves for wages. The new "left for" line tells which on the box. Paying a
+gatherer for what a town at its floor can't pay is the hungry-town package's (C:/dev/review/economy/hungry_town.md),
+not this take's.
+
+Tests (farm_test):
+- _test_hunger_harms_none:
+  - twenty hungry days in a hamlet of four story-trade residents, the store bare: the same heads and the same stage
+    at the end, nobody gone;
+  - sick.hungry is 1;
+  - a save with one gone and no why: home at the next turn; one gone for wages stays out, his why saved and loaded;
+  - the box's case: a save from before 918 with one gone for wages and no why (sought under a trade no resident has,
+    so 918's path and not "the town has one again" brings him): home at the next turn, and still owed, gone again
+    leave_days later with why "wages".
+- _test_settle: a hungry day is no strain, and the calm days go on.
+- The wandering test: a wanderer owed wages keeps "why" = "wages".
+
+Server only, no wire change, no new class_name. For v0.1.216 with the server deployed. The CHANGELOG bullet is voice's
+words, its first half only (the coordinator's ruling, 11-14): the homecoming can't be watched joined before the cut
+without npc's --test-leaver (613 amended (9), which lands after this and takes "why" as Towns.wander_off's argument and
+--test-leaver's "hunger" field), and no clause ships unwatched. The homecoming is on v0.1.216's checklist for Jeff (the
+box's woodcutter back in Umbrage). Release reads the box's journal after the deploy's first town turn for the count of
+"sent for, finds the way to" lines and the step, never a name; if the line is there, voice's second half goes into
+the next cut's section as its own bullet.

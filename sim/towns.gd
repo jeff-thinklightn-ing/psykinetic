@@ -2333,15 +2333,22 @@ func _wander_turn(town: String) -> void:
 	var trade := str(worker["trades"][0])
 	_note(town, "%s the %s has gone, low too long; they say back where they were found" % [worker["name"], trade.replace("_", " ")])
 	_seek(town, leaving, str(worker["name"]), trade, true)
+	# Why they went (918): unpaid wages, else idle at a bench; never hunger now.
+	_town(town)["sought"][leaving]["why"] = "wages" if int(worker.get("owed", 0)) > 0 else "bench"
+	# For the box's journal only, never the town's log (release's ask, 11-14: a line that names why): the worker's
+	# name as every [towns] line has it, no player's.
+	print("[towns] %s: %s the %s left for %s (owed %d), step %d" % [town, worker["name"], trade.replace("_", " "),
+		_town(town)["sought"][leaving]["why"], int(worker.get("owed", 0)), now()])
 	_seat(town)
 	wandered.emit(town, leaving)
 
 
-## Whether worker [param id] ([param worker]) is low (613 amended): hungry
-## and not on the dole, owed unpaid wages, or seated with work queued at
-## their workshop and none of it going.
+## Whether worker [param id] ([param worker]) is low (613 amended): owed
+## unpaid wages, or seated with work queued at their workshop and none of it
+## going. Not hunger (918, Jeff 11-14: "dont punish town people for being
+## hungry"): a hungry resident stays.
 func _low(id: String, worker: Dictionary) -> bool:
-	if str(worker.get("fed", "")) == "hungry" or int(worker.get("owed", 0)) > 0:
+	if int(worker.get("owed", 0)) > 0:
 		return true
 	var shop := production.workshop_of(id)
 	if shop.is_empty():
@@ -2472,7 +2479,11 @@ func sought_home(id: String) -> bool:
 ## word out for him, comes in the same way at the town's next turn, at once, led or not
 ## (his body, any hold on him and the rumour of him are the entry's, so they go with it).
 func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
-	if str(entry["trade"]) != WALKS_IN:
+	if _gone_for_hunger(entry) and str(entry.get("freed_by", "")).is_empty():
+		# 918: home at the town's next turn, nobody needing to fetch them. The box's journal only (release's ask).
+		print("[towns] %s: %s comes home, gone for %s, step %d" % [town, entry["name"],
+			"hunger" if str(entry.get("why", "")) == "hunger" else "a reason no save kept (left before 918)", now()])
+	elif str(entry["trade"]) != WALKS_IN:
 		var days := float(rules.get("gatherers_days", 0))
 		if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
 			return false
@@ -2489,6 +2500,14 @@ func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
 	_arrived(town, str(entry["trade"]))
 	sought_changed.emit(town, id)
 	return true
+
+
+## Whether sought [param entry] is a resident who left for hunger (918): a
+## wandered entry whose "why" is "hunger", or none at all (every one who
+## left before 918 recorded why; on the box, hunger). Since 918 nobody
+## leaves for hunger, so these are the old saves' alone.
+static func _gone_for_hunger(entry: Dictionary) -> bool:
+	return bool(entry.get("wandered", false)) and str(entry.get("why", "")) in ["", "hunger"]
 
 
 ## Sought [param id] no longer a captive held at a camp (518's path).
@@ -2900,8 +2919,8 @@ func _neglect_turn(town: String, rule: Dictionary, day: int) -> void:
 ## A day's strain on [param town] (649, Jeff's list: the people fall, the
 ## resources can't keep up, raids and captives): its stage short of the
 ## residents it needs, a standing kind it needs out of use (disrepair, a
-## ruin), or more than decline.hungry_share of its residents hungry with
-## the store unable to feed them adds a day; a day with none takes one off. At decline.strain_days it falls a
+## ruin) adds a day (hunger no longer does, 918; decline.hungry_share is
+## unread); a day with none takes one off. At decline.strain_days it falls a
 ## stage (never below the first) and starts again.
 func _strain_turn(town: String, rule: Dictionary) -> void:
 	var record := _town(town)
@@ -2934,29 +2953,28 @@ func _strain_turn(town: String, rule: Dictionary) -> void:
 
 
 ## What strains [param town] at stage [param need] today, "" for nothing:
-## the first of too few residents, a needed kind out of use, hunger the
-## store can't feed (the hungry more than its food, meat and fish: hunger
-## with food in the store is a purse's, not the town's). A needed kind
-## never built doesn't count: a stage is
-## lost for what goes, not for a need added after it was reached.
-func _falling(town: String, need: Dictionary, rule: Dictionary) -> String:
+## the first of too few residents, a needed kind out of use. A needed kind
+## never built doesn't count: a stage is lost for what goes, not for a need
+## added after it was reached. Hunger is no strain (918, Jeff 11-14: "dont
+## punish town people for being hungry"; a stage lost stops its officials'
+## wages): a hungry town shows it instead (hungry_now).
+func _falling(town: String, need: Dictionary, _rule: Dictionary) -> String:
 	var people := residents(town)
 	if people.size() < int(need.get("residents", 0)):
 		return "too few people (%d of %d)" % [people.size(), int(need["residents"])]
 	for kind: Variant in need.get("standing", []):
 		if building(town, str(kind)).get("state") in [DISREPAIR, RUIN]:
 			return "the %s out of use" % kind
-	var hungry := 0
-	for who in people:
-		var worker := production.worker(who)
-		if str(worker.get("fed", "")) == "hungry" and not bool(worker.get("away", false)):
-			hungry += 1
-	var food := 0
-	for what: String in ["food", "meat", "fish"]:
-		food += production.stockpile.count(town, what)
-	if not people.is_empty() and hungry > float(rule.get("hungry_share", 0.5)) * people.size() and hungry > food:
-		return "hunger"
 	return ""
+
+
+## How many of [param town]'s residents here went without at their last
+## meal (918: what was the "hunger" strain, kept readable for the page's
+## states; it drops no stage).
+func hungry_now(town: String) -> int:
+	return residents(town).filter(func(who: String) -> bool:
+		var worker := production.worker(who)
+		return str(worker.get("fed", "")) == "hungry" and not bool(worker.get("away", false))).size()
 
 
 ## A resident carried off adds decline.captive_strain days of strain (649).
@@ -4121,6 +4139,8 @@ func from_dict(saved: Dictionary) -> void:
 						"place": str(each.get("place", "")), "where": str(each.get("where", "")), "holder": str(each.get("holder", "")),
 						"since": int(each.get("since", 0)), "next_try": int(each.get("next_try", 0)), "freed_by": str(each.get("freed_by", "")),
 						"story": str(each.get("story", "")), "tries": maxi(int(each.get("tries", 0)), 0), "wandered": bool(each.get("wandered", false)), "door": str(each.get("door", ""))}
+					if each.has("why"):
+						record["sought"][str(id)]["why"] = str(each["why"])  # 918: why a resident left, kept (a save from before has none: hunger).
 		# The trade's times out (613 amended: its variants in turn), the low and when one last wandered off.
 		for key: String in ["sought_tries", "low"]:
 			if entry.get(key) is Dictionary:
