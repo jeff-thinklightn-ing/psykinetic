@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2945)
+## Lines in the code (2946)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1335,7 +1335,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (620)
+### other (sim) (621)
 
 | | Line | Where |
 |---|---|---|
@@ -1639,6 +1639,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | cancel job #%d | `sim/production.gd` _give_back() |
 |  | in the shifting halls | `sim/regen.gd` LOST |
 |  | gathered at the way in | `sim/regen.gd` MOVED |
+|  | %s %dx%d %d | `sim/regen.gd` template_mark() |
 |  | %s#%d#%d | `sim/regen.gd` seed_for() |
 |  | [level] %s not re-laid (%d): it loads laid out the old way (an overlay copy?); nothing moved, it waits | `sim/relaid.gd` move() |
 |  | [level] re-laid %s (%d): %d place keys renamed, %d saved markers carried, %d things moved onto floor, %d left where they were (no floor near) | `sim/relaid.gd` move() |
