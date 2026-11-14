@@ -192,6 +192,13 @@ part changelog_resolve_test python -B tests/changelog_resolve_test.py
 part voice_inventory_test python -B tests/voice_inventory_test.py
 part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
 part push_guard_test bash tests/push_guard_test.sh
+# About 80 s, and the parts here run one after another before the Godot parts (667 amended (3), the
+# coordinator's ask): only when the take changes the push helper, the lock it checks or the test.
+if git diff --name-only origin/main...HEAD -- tools/land_push.sh tools/land_lock.sh tools/bench_lock.sh tests/land_push_test.sh 2>/dev/null | grep -q .; then
+	part land_push_test bash tests/land_push_test.sh
+else
+	echo "land_push_test: not run (the take changes none of tools/land_push.sh, land_lock.sh, bench_lock.sh or its test)"
+fi
 part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
 part land_tested_test bash tests/land_tested_test.sh
 part fonts_imported_test bash tests/fonts_imported_test.sh

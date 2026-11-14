@@ -32080,6 +32080,32 @@ refusing, exit 4, no lock held, the log's lines, a second take straight after ta
 clean checkout taken as before; the bench lock never running it. land_checks_test: --checks runs it and fails naming
 it. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+667 amended (3) (perf, 2026-11-13; the coordinator's proposal, release's ruling and conditions; label from
+tools/decision_number.sh): a landing's push is cut at a minute and tried again on a network error. On 11-13 at 15:30
+buildings' street check passed its landing (LANDING TESTS: PASS on 7ce0c4b37, 809 s) and lost the push to "Connection
+timed out after 300048 milliseconds": nothing reached main, the lock was held five minutes doing nothing, and the
+suite and its place in the gate were lost to one network call (the coordinator's docs push went through at 15:35).
+land.sh never pushes: each tree's own script does, after the PASS. tools/land_push.sh <tree> <tested sha>, which every
+land script calls in place of `git push origin <sha>:refs/heads/main`, pushes only a 40-hex sha that origin/main as
+last fetched (the tested base) is an ancestor of, and only while the land lock is <tree>'s (beaten before each try);
+release's freeze in its place is exit 3, as land_lock.sh take's. Each try is one push under `timeout 60` with
+http.lowSpeedLimit/lowSpeedTime, its output to a file, not a command substitution (a hung push's git-remote-https
+holds the pipe past the cut; the test found it). A push git refuses (rejected, non-fast-forward, the push guard's
+hook, permission) or one failing in a way it can't name as the network is never tried again: exit 1. On a network
+error (cut at 60 s, unable to access, timed out, could not resolve, the remote hung up...), up to two more tries a
+minute apart; before each, the lock still <tree>'s and beaten (else exit 1, or 3 for the freeze), then a fetch (60 s
+at most): origin/main the tested sha is a push that went through with its answer lost (exit 0, "landed after all");
+still the tested base, push again; anything else, or a failed fetch, stop (exit 1). Three network failures: exit 1.
+Exit 0 means the sha is on main; 1 is a fresh run as before; 2 a usage fault (no lock check, nothing pushed). Each
+try, its outcome and each stop are lines in the land lock's log (C:/dev/land.lock.log) with the tree and the sha. A
+tree gains it only once its own script calls it (the coordinator writes CLAUDE.md's line); until then a lost push
+stays a fresh run. tests/land_push_test.sh (a land.sh part, about 80 s, run only when the take changes tools/land_push.sh, land_lock.sh, bench_lock.sh or the test: land.sh's tool parts run one after another before the Godot parts, so every landing would pay it, the coordinator's ask): a scratch bare origin and clone, git's push
+and fetch faked by a shim, a scratch lock: pushed at once and the lock beaten; a fake timeout (no answer, cut at
+LAND_PUSH_TIMEOUT) then pushed on the second try; landed after all, found by the fetch, no second push; refused, never
+retried; main moved during the wait, not pushed; a failed fetch; the lock taken by another; the freeze before the push
+and between tries, exit 3; three network failures and no fourth; a short sha, no tree and a sha off origin/main, exit
+2. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
 
 Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every
