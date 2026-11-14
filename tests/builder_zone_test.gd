@@ -147,8 +147,13 @@ func _test_first_spots_save() -> void:
 	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
 	await _wait_for("accepted")
 	var after := Level.source("test_room")
-	_check(Level.overlaid("test_room") and _main._builder.docs["test_room"].report.begins_with("saved") and not "floor" in _main._builder.docs["test_room"].report,
-		"accepted: the overlay is written whole, saved without a parse (%s)" % _main._builder.docs["test_room"].report)
+	var report: String = _main._builder.docs["test_room"].report
+	_check(Level.overlaid("test_room") and _saved_unparsed(report),
+		"accepted: the overlay is written whole, saved without a parse (%s)" % report)
+	_check(_saved_unparsed("saved user://tests_companions-floor/builder_zone_test/x/test_room/layout.png (31 x 35 cells)")
+		and not _saved_unparsed("saved user://tests_builder/builder_zone_test/x/test_room/layout.png (31 x 35 cells, 275 floor, 3 things)")
+		and not _saved_unparsed("could not save user://tests_builder/x/layout.png (31 x 35 cells)"),
+		"the report's check reads its words after the path: a checkout named with \"floor\" passes, a parse's counts and a failed save do not")
 	# The images as the level reads them. Since 867 amended (5) a spots-only first save writes the layout
 	# the level was read from (not LevelMap.to_image's, RGBA8 with its own corner and fill pixels), so its
 	# pixels equal the source's; what each cell, edge, height and relief value reads as must agree too.
@@ -523,6 +528,16 @@ func _test_console() -> void:
 	_check(_main.admin_command("reload nowhere").contains("not open"), "reload of a zone not open: says so")
 	_check("dropped" in _main.admin_command("builder drop test_room") and not Level.overlaid("test_room"), "builder drop: the repo's level again")
 	_check("usage" in _main.admin_command("builder drop nothing_here"), "builder drop of a level not edited: how to use it")
+
+
+## Whether a MapDoc report says a save without a parse: "saved <path> (W x H cells)", where one with a
+## parse adds ", N floor, N things". Its words after the path are read, never the path: the path holds
+## the checkout's name, and companions' saturn take ran in "companions-floor" (2026-11-14).
+static func _saved_unparsed(report: String) -> bool:
+	if not report.begins_with("saved "):
+		return false
+	var words := report.substr(report.rfind(" ("))
+	return RegEx.create_from_string("^ \\(\\d+ x \\d+ cells\\)$").search(words) != null
 
 
 func _wait_for(state: String) -> Dictionary:
