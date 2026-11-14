@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2960)
+## Lines in the code (2961)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1335,7 +1335,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (621)
+### other (sim) (622)
 
 | | Line | Where |
 |---|---|---|
@@ -1725,12 +1725,13 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s %s a %s; it waits to be fetched | `sim/towns.gd` _on_work_done() |
 |  | %s the %s was held at %s | `sim/towns.gd` camp_taken() |
 |  | the field is sown | `sim/towns.gd` _crop() |
+|  | the field is sown | `sim/towns.gd` _crop() |
 |  | a storm flattened half the crop | `sim/towns.gd` _crop() |
 |  | the harvest is in: %d food | `sim/towns.gd` _crop() |
 |  | roots dug in winter | `sim/towns.gd` _crop() |
 |  | roots dug: %d food | `sim/towns.gd` _crop() |
 |  | the crop rotted in the field | `sim/towns.gd` _crop_turn() |
-|  | %s the farmer comes to work the field | `sim/towns.gd` _farmer_sought() |
+|  | %s the farmer comes to work the field | `sim/towns.gd` _farmer_walks_in() |
 |  | a drove of their own | `sim/towns.gd` _herders_turn() |
 |  | driven to %s | `sim/towns.gd` _herders_turn() |
 |  | %s in the flock, %d sheep now | `sim/towns.gd` _flock_turn() |
@@ -1753,7 +1754,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | in the wilds | `sim/towns.gd` where_words() |
 |  | somewhere out there | `sim/towns.gd` where_words() |
 |  | in the %s | `sim/towns.gd` where_words() |
-|  | %s the %s is found and led home | `sim/towns.gd` free_sought() |
+|  | %s the %s is found, and on the way home | `sim/towns.gd` free_sought() |
 |  | %s the %s was lost on the way | `sim/towns.gd` sought_lost() |
 | L | %s the %s, found %s, comes home to %s | `sim/towns.gd` sought_home() |
 |  | the woodlot has moved out: %s walks %d steps there and back now | `sim/towns.gd` _felled() |
@@ -3292,7 +3293,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (40)
+### levels/economy.json (39)
 
 | | Line | Key |
 |---|---|---|
@@ -3300,7 +3301,6 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s the woodcutter comes to keep the town in wood | `gatherers.woodcutter` |
 |  | %s the hunter comes to keep the town in meat and hides | `gatherers.hunter` |
 |  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
-|  | 613 amended (3), the first rescue (the coordinator's ruling; Jeff 10-27, the town shaped by player interactions): true, a town with no field and no farmer seeks one at once at his story's place (the old farmstead); home, the town plans its field. Off until npc's rumour and lore's farmer.day are in (package the first rescue). | `crop.sought_first_` |
 |  | %s, from the old chests | `kept.caption` |
 |  | This was in the old chests by the stall. I kept it for you. | `kept.says` |
 |  | That's %d gold, friend. | `camp_traders.say.short` |
@@ -4022,7 +4022,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The woodcutter sells wood to the store, and wood that others bring in goes to the carpenter. | `entries[14].facts[1].text` |
 |  | The woodcutter is at the well at six, at the woodlot through the day, and at the inn at noon and in the evening. | `entries[14].facts[2].text` |
 
-### levels/lore/regions.json (97)
+### levels/lore/regions.json (98)
 
 | | Line | Key |
 |---|---|---|
@@ -4034,8 +4034,9 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 | L | Umbrage sits in the Woodlands. | `entries[1].facts[0].text` |
 |  | Farmsteads and fields lie near the town. | `entries[1].facts[1].text` |
 |  | Where the players and their companions belong, and where the stockpile is. | `entries[2].summary` |
-|  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. | `entries[3].summary` |
-|  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[0].text` |
+|  | An old farmstead in the wilds, abandoned, with tools and bandages left inside (Jeff, 2026-10-22; built by maps' 827 as a farm gone to ruin west of the crossroads, its cache bandaging kits, a knife and a pick); not the Blood Rot's doing. The way from town (the coordinator's ruling 11-13, maps' cells): the west road along y 201 to the south road at (134,201), then about 50 cells north up the road there (maps' label "the south road", shown nowhere, so the fact names no road at the turn); the farm lies a few cells west of the road (x 112..127, y 137..158), the place's circle at (120,143) by the cottage's south door gap; the crossroads (128,128) lies north beyond it. Seen: the roofless stone cottage with its timber roof-frame standing at its east end, two fenced fallow plots, a leaning scarecrow, a broken cart, a dry well. | `entries[3].summary` |
+|  | The old farmstead lies north-west of town: take the west road to its end, then turn north and walk a good while; it stands just west of the road, a stone cottage open to the sky, its rafters still up. | `entries[3].facts[0].text` |
+|  | The old farmstead in the wilds stands abandoned; tools and bandages lie inside. | `entries[3].facts[1].text` |
 | L | the pond by town | `entries[4].name` |
 |  | Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (about 221..223 x 224..228 with the shack and its dirt dock, east of the woodlot post (207,231), some 30 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size and the shack wait on Jeff's pond-and-shack picks; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package "fishing that works". | `entries[4].summary` |
 |  | The pond by town is a little crescent of water round a shack, a short walk south-east of the square, just east of the woodlot post. | `entries[4].facts[0].text` |
