@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2972)
+## Lines in the code (2975)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1126,7 +1126,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (210)
+### other (render) (211)
 
 | | Line | Where |
 |---|---|---|
@@ -1207,6 +1207,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | strikes two cells away | `render/item_tip.gd`  |
 |  | more from behind | `render/item_tip.gd`  |
 | L | %s: kept from the one it is named for | `render/item_tip.gd` lines_for() |
+|  | the bane of | `render/item_tip.gd` lines_for() |
 |  | Walk forward (click scheme: the view overhead) | `render/keys.gd`  |
 |  | Walk back (click scheme: the view back to normal) | `render/keys.gd`  |
 |  | Walk left (click scheme: turn) | `render/keys.gd`  |
@@ -1341,7 +1342,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (623)
+### other (sim) (625)
 
 | | Line | Where |
 |---|---|---|
@@ -1866,6 +1867,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | blessed at the temple | `sim/world.gd` story_line() |
 |  | reforged from a %s | `sim/world.gd` story_line() |
 |  | avenged on %s | `sim/world.gd` story_line() |
+|  | %s %d times | `sim/world.gd` kind_count() |
+|  | the bane of %s | `sim/world.gd` bane_mark() |
 |  | %s to %s | `sim/world.gd` _moved_item() |
 |  | %s by %s | `sim/world.gd` _moved_item() |
 |  | %s by %s | `sim/world.gd` _bank_thing() |
@@ -2519,7 +2522,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | tended your wounds when you were badly hurt | `main.gd` _bond_bandaged() |
 |  | bandaged your wounds | `main.gd` _bond_bandaged() |
 |  | fell with you at their side | `main.gd` _bond_stood_by() |
-|  | is %s-bane now | `main.gd` _card_grew() |
+|  | is %s now | `main.gd` _card_grew() |
 |  | holds a grudge against %s | `main.gd` _card_grew() |
 |  | has had its vengeance on %s | `main.gd` _card_grew() |
 |  | %s fell, and was brought back at %s%s. | `main.gd` return_fact() |
