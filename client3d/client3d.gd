@@ -2974,6 +2974,10 @@ var _low := false
 ## it swings], flickered and faded by day each frame (_flicker_fires), on
 ## the view's own clock (_fire_time, accumulated frame time).
 var _fire_lights: Array[Array] = []
+## The knight's remains on each bier of the room (896's switch-on, "full
+## circle"): drawn while the knight here has had them laid
+## (AstralKnight.remains_laid, replicated), hidden otherwise (_sync_puppets).
+var _bier_remains: Array[Node3D] = []
 ## The cold lamps' lights (_add_lamp): [light, energy, phase].
 var _lamp_lights: Array[Array] = []
 var _fire_time := 0.0
@@ -7375,6 +7379,7 @@ func _phase_ground_over_frames(generation: int) -> bool:
 		_fill_jobs.append(["ground", chunk])
 	ground_filling = true  # The shade waits from here: the lights' phase asks for it.
 	_fire_lights.clear()
+	_bier_remains.clear()
 	_lamp_lights.clear()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in fire:
@@ -8036,6 +8041,7 @@ func _edges_read() -> void:
 func _phase_ground() -> void:
 	_build_ground(_terrain.get("kinds", {}))
 	_fire_lights.clear()
+	_bier_remains.clear()
 	_lamp_lights.clear()
 	var fire: Array[Vector2i] = _terrain["fire"]
 	for cell: Vector2i in fire:
@@ -9809,6 +9815,8 @@ func _add_buildings() -> void:
 			node.add_child(parts)
 		_room.add_child(node)
 		add_beds(node, building, _elevation(rect.position))
+		if slot == Main.ALTAR_SLOT and int(building.get("variant", 1)) == 1:
+			_add_bier_remains(node, slot)
 		var index := _buildings.size()
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
@@ -18256,6 +18264,37 @@ func _add_lit_candles() -> void:
 		_fire_lights.append([light, energy, _roll(cell, 186) * TAU, HOUSE_LIGHT_FLICKER])
 
 
+## The knight's remains laid on the bier [param table] (896's switch-on; the
+## coordinator's ruling from ui-design's stills, 11-13: the candle lit):
+## art-kit's prop.knight_remains at the table's "remains" socket (so in its
+## yaw), the candle's flame at the remains' "flame" socket (Flames.at_socket,
+## its size in Flames.SIZES), and a lit candle's light there (CANDLE_ENERGY, _RANGE and
+## _FALLOFF, shadowless, flickering as the hall's flames do), as the shot's
+## 7deb93851 drew it. Hidden until the knight's remains_laid says so.
+const BIER_REMAINS_AT := [0.0, 0.977, 0.0]
+const BIER_REMAINS_SLOT := "prop.knight_remains"
+func _add_bier_remains(table: Node3D, slot: String) -> void:
+	if not (ArtKit.has(BIER_REMAINS_SLOT) and ArtKit.filled_by(BIER_REMAINS_SLOT) != "placeholder"):
+		return
+	var laid := ArtKit.instance(BIER_REMAINS_SLOT, 1)
+	laid.name = "BierRemains"
+	var at: Array = ArtKit.spec(slot).get("sockets", {}).get("remains", BIER_REMAINS_AT)
+	laid.position = Vector3(float(at[0]), float(at[1]), float(at[2]))
+	table.add_child(laid)
+	var flame := Flames.at_socket(laid, BIER_REMAINS_SLOT, hash(table.position))
+	if flame != null:
+		var wick_at := flame.position
+		var candle := _night_light(HOUSE_LIGHT, CANDLE_ENERGY, CANDLE_RANGE)
+		candle.name = "BierCandleLight"
+		candle.omni_attenuation = CANDLE_FALLOFF
+		candle.shadow_enabled = false
+		candle.position = wick_at
+		laid.add_child(candle)
+		_fire_lights.append([candle, CANDLE_ENERGY, _roll(Vector2i(roundi(table.position.x), roundi(table.position.z)), 186) * TAU, HOUSE_LIGHT_FLICKER])
+	laid.visible = false
+	_bier_remains.append(laid)
+
+
 ## [param stand]'s meshes drawn with their wax glowing (CANDLE_WAX_GLOW): each
 ## palette surface split once (_wax_split, kept per mesh) into the triangles
 ## its palette draws in CANDLE_WAX, given _wax_glow, and the rest, in the
@@ -21306,12 +21345,16 @@ func _sync_puppets() -> void:
 	# place with the camera, not up to FAR_EVERY frames after it.
 	var relook := _relook_far
 	_relook_far = false
+	var biers := not _bier_remains.is_empty()
+	var laid := false
 	# World's own list, not a copy: nothing here spawns or despawns.
 	for entity in World.entities():
 		if not entity.spawned:
 			continue
 		var id := entity.get_instance_id()
 		seen[id] = true
+		if biers and entity is AstralKnight and (entity as AstralKnight).remains_laid:
+			laid = true  # 896: his remains drawn on the bier (_add_bier_remains).
 		if not relook and (id + frame) % FAR_EVERY != 0 and _far.has(id):
 			# Far off when last looked at: looked at again every FAR_EVERY
 			# frames (a big map holds thousands of them).
@@ -21443,6 +21486,9 @@ func _sync_puppets() -> void:
 			view.frame(puppet, entity as Monster)
 		_sync_bar(entity, puppet, now)
 		_step_sound(entity, puppet)
+	for remains: Node3D in _bier_remains:
+		if remains.visible != laid:
+			remains.visible = laid
 	for id in _puppets.keys():
 		if not seen.has(id):
 			_entity_went(id)

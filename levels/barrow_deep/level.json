@@ -205,10 +205,6 @@
 		"from_above": [
 			49,
 			2
-		],
-		"from_temple": [
-			49,
-			76
 		]
 	},
 	"links": [
@@ -219,15 +215,6 @@
 			],
 			"to_map": "barrow",
 			"to_spawn": "from_below"
-		},
-		{
-			"at": [
-				49,
-				77
-			],
-			"to_map": "barrow",
-			"to_spawn": "from_deep",
-			"sealed": "draugr"
 		}
 	],
 	"entities": [

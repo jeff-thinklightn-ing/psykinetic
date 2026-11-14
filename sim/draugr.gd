@@ -849,6 +849,14 @@ func _yield() -> void:
 		said.emit(RESPECT)
 		# The knight's remains all the same (714 amended (3)): Main gives them, no blessing with them.
 		beaten_unpaid.emit(_lair_players())  # blessed_last stays the pact's blessed.
+	lay_to_rest()
+
+
+## Laid to rest (his fight's end, won or not; or the test-only console's
+## "rest draugr", 896's switch-on, for a walk to his throne): his rest
+## begun if none is on (rest_steps), gone with his remains where he stands,
+## his hall opened and his dead stilled; a rest already over seats him again.
+func lay_to_rest() -> void:
 	if rests_until <= World.steps:
 		rests_until = World.steps + rest_steps()
 		_keep_prop("rests_until", rests_until)

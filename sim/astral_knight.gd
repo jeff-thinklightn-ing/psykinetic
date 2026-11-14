@@ -47,8 +47,9 @@ const LAID_BROTHER := "Not my bones, but a brother of the order's. Let him rest 
 const LAID_NO_BLESSING := "Laid to rest. There is no blessing on them, whatever passed down there."
 const LAID_FULL := "Your amulet can hold no more. Keep these bones safe, and lay them here when it has room."
 const LAID_UNBLESSED := "You have not yet stood before what waits below. Keep these bones safe, and lay them here when you have."
-## Main.altar_turn_in's mirror (its setter): the altar step on.
-static var altar_on := false
+## Main.altar_turn_in's mirror (its setter): the altar step on (on since
+## 896's switch-on, as Main's).
+static var altar_on := true
 ## His remains laid on his altar this generation, by anyone (896): art-kit's
 ## piece lies on the bier while it is true. Kept in his spawn props, so a
 ## restart keeps it and a new generation (a new spawn) clears it.

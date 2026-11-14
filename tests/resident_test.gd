@@ -6785,6 +6785,7 @@ func _test_hut_ruin() -> void:
 func _test_relic() -> void:
 	print("
 == a knight's remains given to the priest: laid on the altar, the amulet charged, thanked by name (714, npc's side) ==")
+	_main.altar_turn_in = false  # Aldous's own path first (714); the knight's altar's below (on since 896's switch-on).
 	var player := _player()
 	_check(player != null, "(a player in the town)")
 	if player == null:
@@ -6948,7 +6949,6 @@ func _test_relic() -> void:
 		"the knight's altar on: no row for them, given back kept, sent to the altar (%s)" % [spoken])
 	_check(Resident.relic_line("Sir Ewald").contains("knight's altar in the crypt's First Hall") and not Resident.relic_line("Sir Ewald").contains("you lay them on the altar"),
 		"and what he knows of the remains says where they go now")
-	_main.altar_turn_in = false
 	World.consume(player, uid, "the test")
 	Net.message_received.disconnect(heard)
 	var voice := Resident.new()

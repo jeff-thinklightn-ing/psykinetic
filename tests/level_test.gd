@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_barrow_quest()
 	await _test_knights_altar()
 	await _test_altar_charges()
+	await _test_full_circle_on()
 	_test_quest_card_place()
 	_test_decor()
 	_test_barrow_level()
@@ -408,11 +409,11 @@ func _test_link_cues() -> void:
 			"the wilds' way north (the castle's till 745, the foothills' since): a stone arch facing north, out to it (%s)" % [castle_way])
 	var gate: Dictionary = cue_of.call("castle", Vector2i(16, 23))
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
-	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
-			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
+	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).is_empty(),
+			"the barrow's depths: the Ossuary's stair up to the shallower; behind the throne no way and no slab (896 switched on: the throne is the way home)")
 	_check(cue_of.call("wilds", Vector2i(160, 160)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "down"
-		and cue_of.call("barrow", Vector2i(30, 8)).get("cue") == "sealed" and cue_of.call("barrow", Vector2i(31, 52)).get("cue") == "up",
-			"the mound's door is its own cue; the chapel stair (the temple's back corner, 832 switched on: open, into the First Hall) a way down; the First Hall's way down to the Ossuary its slab, the camp's breach a way up")
+		and cue_of.call("barrow", Vector2i(30, 8)).is_empty() and cue_of.call("barrow", Vector2i(31, 52)).get("cue") == "up",
+			"the mound's door is its own cue; the chapel stair (the temple's back corner, 832 switched on: open, into the First Hall) a way down; no way down from the First Hall (896 switched on: the short cut in dropped), the camp's breach a way up")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
@@ -3051,9 +3052,9 @@ func _test_barrow_won() -> void:
 	_main._sync_charges(record)
 	World.lay_downed(player, 300)
 	_heard.clear()
-	_check(not _main._start_channel(player, player) and _heard.slice(-1) == [Main.SPENT_LINE]
-		and Main.SPENT_LINE == "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below.",
-		"at zero charges: no return, and the spent amulet's line on their screen (%s)" % [_heard.slice(-1)])
+	_check(not _main._start_channel(player, player) and _heard.slice(-1) == [Main.SPENT_LINE_ALTAR]
+		and Main.SPENT_LINE_ALTAR == "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar.",
+		"at zero charges: no return, and the spent amulet's line on their screen, the knight's altar its way back since 896's switch-on (%s)" % [_heard.slice(-1)])
 	World.raise_downed(player, player.max_hp)
 	_main.reset_barrow(id)
 	# 714 (1): the generation's knight, lore's fourteen, drawn by its seed.
@@ -4766,13 +4767,13 @@ func _test_barrow_level() -> void:
 		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742), the Robbers' bundle by their bedding (870) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
 	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and not grave_marked.get("Robbers' bundle", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
-	_check(barrow["links"].size() == 4 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
+	_check(barrow["links"].size() == 3 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
 		and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
 		and barrow["links"][2]["tile"] == Vector2i(31, 52) and barrow["links"][2]["to_map"] == "wilds" and barrow["links"][2]["to_spawn"] == "from_barrow"
-		and barrow["links"][3]["tile"] == Vector2i(30, 8) and barrow["links"][3]["to_spawn"] == "from_temple" and barrow["links"][3]["sealed"] == "draugr"
-		and deep["links"].size() == 2 and deep["links"][0]["to_map"] == "barrow" and deep["links"][0]["to_spawn"] == "from_below"
-		and deep["links"][1]["sealed"] == "draugr" and deep["links"][1]["to_map"] == "barrow" and deep["links"][1]["to_spawn"] == "from_deep",
-		"the stairs link the depths both ways; 832 switched on: the First Hall's stair up to the chapel, the camp's breach out by the mound, the First Hall's sealed way down, the deep's sealed shortcut up into the First Hall (%s)" % [barrow["links"]])
+		and deep["links"].size() == 1 and deep["links"][0]["to_map"] == "barrow" and deep["links"][0]["to_spawn"] == "from_below"
+		and not deep["spawn_points"].has("from_temple") and barrow["spawn_points"].has("from_deep") and barrow["terrain"]["floor"].has(Vector2i(30, 8))
+		and not deep["terrain"]["floor"].has(Vector2i(49, 77)),
+		"the stairs link the depths both ways; 832 switched on: the First Hall's stair up to the chapel, the camp's breach out by the mound; 896 switched on: no shortcut either way, (30,8) plain floor, (49,77) rock, from_temple gone, from_deep kept for the throne's sitter (%s)" % [barrow["links"]])
 	# The rooms named on entering (666, ui's 665 card).
 	var barrow_rooms: Dictionary = Level.template_config("barrow").get("rooms", {})
 	var deep_rooms: Dictionary = Level.template_config("barrow_deep").get("rooms", {})
@@ -4789,17 +4790,17 @@ func _test_barrow_level() -> void:
 		and hidden[0]["out"] == Vector2i(-1, 0) and barrow["terrain"]["edges"][hidden[0]["edge"]] == Terrain.Edge.DOOR and barrow["spawn_points"]["from_below"] == Vector2i(51, 16),
 		"the template's stair down is hidden behind the first hall's south-east niche, a door edge, from_below before it; 14 niches on the hall's walls (%d, %s)" % [niches.size(), hidden])
 	var floor_ok := true
-	for pair: Array in [[barrow, "from_chapel"], [barrow, "from_deep"], [barrow, "from_breach"], [barrow, "from_below"], [deep, "from_above"], [deep, "from_temple"]]:
+	for pair: Array in [[barrow, "from_chapel"], [barrow, "from_deep"], [barrow, "from_breach"], [barrow, "from_below"], [deep, "from_above"]]:
 		var level: Dictionary = pair[0]
 		if not level["spawn_points"].has(pair[1]) or not level["terrain"]["floor"].has(level["spawn_points"][pair[1]]):
 			floor_ok = false
 	var wilds := Level.load_level("wilds")
 	var shortcut: Array = barrow["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_temple")
 	var chapel_stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_spawn"] == "from_chapel")
-	_check(floor_ok and shortcut.size() == 1 and shortcut[0]["to_map"] == "barrow_deep" and shortcut[0]["sealed"] == "draugr"
+	_check(floor_ok and shortcut.is_empty()
 		and chapel_stair.size() == 1 and chapel_stair[0]["to_map"] == "barrow" and chapel_stair[0]["sealed"] == ""
 		and wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep").is_empty(),
-		"every spawn point the stairs and the wilds come in by is floor; the First Hall's sealed way leads to the draugr's hall in the Ossuary (832 switched on, the coordinator: the quick way down kept), the wilds' temple stair open into the First Hall, none from the wilds into the deep")
+		"every spawn point the stairs and the wilds come in by is floor; no quick way down from the First Hall (896 switched on), the wilds' temple stair open into the First Hall, none from the wilds into the deep")
 	_check(Level.template_config("barrow_deep").get("stills", []) == ["barrow"] and not Level.template_config("barrow_deep").has("damp")
 		and not Level.template_config("barrow_deep").has("ambient") and not Level.template_config("barrow_deep").has("dead"),
 		"his rest stills the barrow above as well as his own zone; the dark below's damp, light and word on the dead are gone with it (666)")
@@ -4836,8 +4837,8 @@ func _test_barrow_level() -> void:
 		if stairs.get(Vector2i(x, 73)) != Vector2i(0, 1):
 			stairs_ok = false
 	_check(dais_ok and stairs_ok and int(deep["terrain"]["heights"].get(Vector2i(43, 75), 0)) == 0 and int(deep["terrain"]["heights"].get(Vector2i(49, 73), 0)) == 0
-		and deep["spawn_points"]["from_temple"] == Vector2i(49, 76) and deep["links"][1]["tile"] == Vector2i(49, 77),
-		"the dais is one level up, its front row twelve stairs climbing south, its back row against the wall, the shortcut's end behind the throne (%d stairs)" % stairs.size())
+		and deep["terrain"]["floor"].has(Vector2i(49, 76)),
+		"the dais is one level up, its front row twelve stairs climbing south, its back row against the wall, the cell behind the throne floor (%d stairs)" % stairs.size())
 	_check(Level.narrow_runs(barrow["terrain"]).is_empty() and Level.narrow_runs(deep["terrain"]).is_empty(),
 		"no way in the dressed halls is one cell wide, the table, the pillars and the dais's ledges seen (%s)" % [Level.narrow_runs(deep["terrain"]).slice(0, 8)])
 	var made := Regen.generate("barrow", 1)
@@ -5150,16 +5151,14 @@ func _test_barrow_exits() -> void:
 	var temple_stair := Main.building_link_back(wilds, "barrow")
 	# [from level, link cell, to level, where it should land, within]. 832
 	# switched on: the First Hall's stair up comes out beside the chapel
-	# stair, the camp's breach at the mound (its named spawn, not the stair),
-	# the First Hall's sealed way down before the throne, the deep's sealed
-	# shortcut up in the First Hall.
+	# stair, the camp's breach at the mound (its named spawn, not the stair).
+	# 896 switched on: the sealed shortcut both ways is gone; the throne is
+	# the way home (_test_throne_home).
 	var ways: Array = [
 		["barrow", Vector2i(40, 1), "wilds", temple_stair, 1],
 		["barrow", Vector2i(31, 52), "wilds", wilds["spawn_points"]["from_barrow"], 1],
 		["barrow", Vector2i(52, 16), "barrow_deep", Vector2i(49, 2), 1],
-		["barrow", Vector2i(30, 8), "barrow_deep", Vector2i(49, 76), 1],
 		["barrow_deep", Vector2i(49, 1), "barrow", Vector2i(51, 16), 1],
-		["barrow_deep", Vector2i(49, 77), "barrow", Vector2i(31, 8), 1],
 	]
 	var landed := {}
 	for way: Array in ways:
@@ -5185,24 +5184,21 @@ func _test_barrow_exits() -> void:
 	var by_stair: Vector2i = landed.get(Vector2i(40, 1), World.NO_CELL)
 	_check(World.distance(by_breach, Vector2i(160, 159)) <= 1 and World.distance(by_stair, temple_stair) <= 1 and World.distance(by_breach, by_stair) > 20,
 		"from the barrow by the breach one comes out at the mound (%s), by the First Hall's stair beside the temple's stair (%s): a named spawn beside another way back down holds" % [by_breach, by_stair])
-	# 749 amended: down the temple's shortcut one comes out at from_temple,
-	# before the Hall's throne, his draugr peaceable beside it; spawn safety
-	# counts only monsters that are not peaceable, so a provoked one still
-	# moves the arrival off.
+	# 749 amended: spawn safety counts only monsters that are not peaceable:
+	# the cell behind the throne (the shortcut's end till 896 switched on),
+	# his draugr peaceable beside it, is safe; provoked, it is not.
 	_main.load_map("test_room")
-	_main.travel(Net.local_id, "barrow_deep", "from_temple")
-	var from_temple: Vector2i = _main.level["spawn_points"]["from_temple"]
+	_main.travel(Net.local_id, "barrow_deep", "")
+	var by_throne := Vector2i(49, 76)
 	var seated: Array = World.get_entities().filter(func(e: GridEntity) -> bool: return e is Draugr and e.spawned)
-	var came := _player()
-	_check(seated.size() == 1 and (seated[0] as Draugr).peaceable and World.distance(seated[0].tile, from_temple) <= 1
-		and came != null and came.tile == from_temple,
-		"down the temple's shortcut, the draugr peaceable beside it: one arrives on from_temple %s (at %s)" % [from_temple, came.tile if came != null else World.NO_CELL])
+	_check(seated.size() == 1 and (seated[0] as Draugr).peaceable and World.distance(seated[0].tile, by_throne) <= 1
+		and _main._safe_tile_near(by_throne) == by_throne,
+		"behind the throne, the draugr peaceable beside it: a safe cell (%s)" % [_main._safe_tile_near(by_throne)])
 	if seated.size() == 1:
 		(seated[0] as Draugr).peaceable = false  # As provoked, the same tick (Draugr._sim_tick).
-		_main.travel(Net.local_id, "barrow_deep", "from_temple")
-		came = _player()
-		_check(came != null and came.tile != from_temple and World.distance(came.tile, seated[0].tile) > Main.SPAWN_SAFE_DISTANCE,
-			"the draugr provoked, spawn safety still moves the arrival off (at %s)" % [came.tile if came != null else World.NO_CELL])
+		var moved: Vector2i = _main._safe_tile_near(by_throne)
+		_check(moved != by_throne and (moved == World.NO_CELL or World.distance(moved, seated[0].tile) > Main.SPAWN_SAFE_DISTANCE),
+			"the draugr provoked, spawn safety moves an arrival there off (to %s)" % [moved])
 	_main.mark_player(id, "draugr", false)
 	_main.load_map("test_room")
 	Level.overlay_dir = overlay
@@ -5549,8 +5545,9 @@ func _test_arrival_rule() -> void:
 ## replaces the wilds temple's stair as the reward for beating him. It reads
 ## as a shut way (the slab cue the temple stair had, no words), and a player
 ## whose saved record already holds the mark finds it open from the first
-## build it is in. Until maps' switch-on carries it, the test lays it on a
-## copy of the barrow (HALL_SHORTCUT).
+## build it is in. 896 switched on (the full circle; Jeff: "drop the short
+## cut in") took it out of the barrow; the sealed way stays a level.json
+## link of any level, tried here on a copy of the barrow (HALL_SHORTCUT).
 const HALL_SHORTCUT := {"at": [30, 8], "to_map": "barrow_deep", "to_spawn": "from_temple", "sealed": "draugr"}
 func _test_hall_shortcut() -> void:
 	print("
@@ -5573,9 +5570,8 @@ func _test_hall_shortcut() -> void:
 	for each: Dictionary in level["terrain"]["link_cues"]:
 		if each["tile"] == Vector2i(30, 8):
 			cue = each
-	var deep := Level.load_level("barrow_deep")
 	_check(link.get("to_map") == "barrow_deep" and link.get("to_spawn") == "from_temple" and link.get("sealed") == "draugr"
-			and deep["spawn_points"].has("from_temple") and level["warnings"].is_empty(),
+			and level_name == "hall_shortcut_test" and level["warnings"].is_empty(),
 		"the First Hall's way down at (30,8): to the Ossuary's from_temple, sealed by the draugr (%s, %s)" % [link, level["warnings"]])
 	_check(cue.get("cue") == "sealed" and not cue.has("words") and not cue.has("text"),
 		"it reads as a shut way: the sealed slab, no words (%s)" % [cue])
@@ -5761,9 +5757,9 @@ func _test_deep_crypt() -> void:
 				if in_rooms.has(cell):
 					stray.append(cell)
 		var faults: Array = LAYOUT_SENSE.check(level, laid_config.get("laid_rooms", []), Regen.layout_options(block))
-		_check(rooms_ok and wing_ok and packs_ok and int(kinds.get("draugr", 0)) == 1 and Vector2i(49, 1) in links and Vector2i(49, 77) in links
+		_check(rooms_ok and wing_ok and packs_ok and int(kinds.get("draugr", 0)) == 1 and Vector2i(49, 1) in links and not Vector2i(49, 77) in links
 				and torches >= 4 and stray.is_empty() and faults.is_empty() and level["warnings"].is_empty(),
-				"deep crypt generation %d: uses %s, the wing %d rooms, packs %s, the draugr, both links, %d torches along its way (lit_way, the Umbrage crypt follow-up), none in a room %s, faults %s %s"
+				"deep crypt generation %d: uses %s, the wing %d rooms, packs %s, the draugr, the stair up and no way behind the throne (896), %d torches along its way (lit_way, the Umbrage crypt follow-up), none in a room %s, faults %s %s"
 				% [generation, uses, wing.size(), packs.values(), torches, stray, LAYOUT_SENSE.counts(faults), level["warnings"]])
 
 
@@ -5909,6 +5905,7 @@ func _test_monster_names(knight: AstralKnight) -> void:
 func _test_barrow_quest() -> void:
 	print("
 == the fallen knight's quest (747): his ask, the nine on the list, the turn-in, the way revealed ==")
+	_main.altar_turn_in = false  # The turn-in's own end first; the altar step below (896, on since its switch-on).
 	var barrow := Level.load_level("barrow")
 	var knights := (barrow.get("entities", []) as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "astral_knight")
 	_check(knights.size() == 1 and knights[0]["script"] == "res://sim/astral_knight.gd" and knights[0]["tile"] == Vector2i(39, 10),
@@ -6041,6 +6038,7 @@ func _test_barrow_quest() -> void:
 			World.set_slots(player, slots, uids)
 	record.marks.assign(kept["marks"])
 	record.barrow_task = kept["task"]
+	_main.altar_turn_in = true
 	_main._sync_quest(record)
 
 
@@ -6694,83 +6692,27 @@ func _check(ok: bool, label: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
 ## The way behind the throne under the fight lock (540 amended (1); Jeff's report,
 ## 2026-11-12: "draugr room to the rear his throne there is a exit to return
-## to the crypt entrance"; his rule, "the door closes when you enter"): while
-## barrow_deep's Hall is held, its sealed shortcut up at (49,77) moves nobody,
-## blessed or not, and says why once; the barrow's end at (30,8), whose arrival
-## lies in the held lair, is held too; let go, the blessed go up as before.
+## to the crypt entrance"; his rule, "the door closes when you enter"). 896
+## switched on took that way out both ends (the throne is the way home): the
+## held Hall has no way out in it and no way from the barrow arrives in it;
+## the lock still holds a way laid in a held lair, whatever level lays one.
 func _test_throne_way_held() -> void:
-	print("\n== the way behind the throne: shut while the Hall is held (540 amended (1)) ==")
-	var id: String = _main._peer_ids.get(Net.local_id, "")
-	var record: PlayerRecord = _main._records.get(id)
-	if record == null:
-		_check(false, "a player record to try the way with")
-		return
-	var kept_marks := record.marks.duplicate()
-	record.marks.assign(["draugr"])
+	print("\n== no way out behind the throne; the held lair holds any way in it (540 amended (1), 896) ==")
 	_main.load_map("test_room")
 	_main.travel(Net.local_id, "barrow_deep", "")
 	await get_tree().process_frame
-	var player := _player()
-	var heard: Array[String] = []
-	var hear := func(kind: String, data: Dictionary) -> void:
-		if kind == "party":
-			heard.append(str(data.get("text", "")))
-	Net.message_received.connect(hear)
-	_main._told_closed.erase(Net.local_id)
 	_main._hold_hall_door("barrow_deep", true)
-	var behind := Vector2i(49, 77)
-	var deep_link: Dictionary = {}
-	for link: Dictionary in _main.level.get("links", []):
-		if link["tile"] == behind:
-			deep_link = link
-	_check(_main.map_name == "barrow_deep" and _main.hall_held("barrow_deep") and _main.sealed_open(deep_link, Net.local_id)
-			and _main.hall_link_held(deep_link),
-		"the Hall held, the blessed player's seal opens, the held door does not (%s, %s)" % [_main.map_name, deep_link])
-	_main._take_link(player, behind)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(_main.map_name == "barrow_deep" and heard.count(_main.HALL_WAY_HELD) == 1,
-		"behind the throne while the Hall is held: not moved, told why once (%s, %s)" % [_main.map_name, heard])
-	_main._take_link(player, behind)
-	await get_tree().process_frame
-	_check(heard.count(_main.HALL_WAY_HELD) == 1, "stood on it again: not told twice (%s)" % [heard])
-	# The barrow's end, (30,8) in the First Hall: its arrival, from_temple, lies in the held lair.
-	var top_link: Dictionary = {}
-	for link: Dictionary in Level.load_level("barrow").get("links", []):
-		if link["tile"] == Vector2i(30, 8):
-			top_link = link
-	_check(top_link.get("to_spawn") == "from_temple" and _main.hall_link_held(top_link, "barrow"),
-		"the barrow's end at (30,8), into the held lair, is held as well (%s)" % [top_link])
+	var lair: Rect2i = _main.hall_lair_rect("barrow_deep")
+	var in_lair: Array = _main.level.get("links", []).filter(func(link: Dictionary) -> bool: return lair.has_point(link["tile"]))
+	_check(_main.map_name == "barrow_deep" and _main.hall_held("barrow_deep") and lair.has_area() and in_lair.is_empty(),
+		"the Hall held: no way out in its lair (%s, %s)" % [lair, in_lair])
+	var into: Array = Level.load_level("barrow").get("links", []).filter(func(link: Dictionary) -> bool:
+		return link["to_map"] == "barrow_deep" and _main.hall_link_held(link, "barrow"))
+	_check(into.is_empty(), "no way from the barrow arrives in the held Hall (%s)" % [into])
+	var laid := {"tile": Vector2i(49, 77), "to_map": "barrow", "to_spawn": "from_deep", "sealed": "draugr"}
+	_check(_main.hall_link_held(laid), "a way laid in the held lair would be held all the same")
 	_main._hold_hall_door("barrow_deep", false)
-	_check(not _main.hall_held("barrow_deep") and not _main.hall_link_held(deep_link) and not _main.hall_link_held(top_link, "barrow"),
-		"let go: neither end is held")
-	_main._told_closed.erase(Net.local_id)
-	_main._take_link(player, behind)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	player = _player()
-	var at: Vector2i = player.tile if player != null else World.NO_CELL
-	_check(_main.map_name == "barrow" and World.distance(at, Vector2i(31, 8)) <= 1,
-		"let go, the blessed player goes up behind the throne to the First Hall (%s, at %s)" % [_main.map_name, at])
-	# 540 amended (2) (playtest's joined walk of c29726f18): the barrow's end as the game takes it,
-	# from a step in the barrow while barrow_deep, another zone, holds its Hall: _take_link reads
-	# the zone World stands in (the barrow's), never one passed by hand.
-	_main.travel(Net.local_id, "barrow", "", {}, Vector2i(31, 9))
-	await get_tree().process_frame
-	player = _player()
-	_main._hold_hall_door("barrow_deep", true)
-	_main._told_closed.erase(Net.local_id)
-	heard.clear()
-	var from_zone: String = World.zone.name
-	var deep_open := World.zones.has("barrow_deep")
-	_main._take_link(player, Vector2i(30, 8))
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(from_zone == "barrow" and deep_open and _main.map_name == "barrow" and heard.count(_main.HALL_WAY_HELD) == 1,
-		"from the barrow, (30,8) into barrow_deep's held Hall (another zone): not moved, told why once (World in %s, barrow_deep open %s, now %s, %s)" % [from_zone, deep_open, _main.map_name, heard])
-	_main._hold_hall_door("barrow_deep", false)
-	Net.message_received.disconnect(hear)
-	record.marks.assign(kept_marks)
+	_check(not _main.hall_held("barrow_deep") and not _main.hall_link_held(laid), "let go: not held")
 	_main.load_map("test_room")
 
 
@@ -6815,9 +6757,17 @@ func _test_throne_home() -> void:
 	_main._on_command(player, "throne", {"at": [throne.x, throne.y]})
 	_check(draugr.state == Draugr.State.SEATED and player.seated == "" and heard.count(_main.THRONE_HIS) == 1,
 		"on, while he sits it: told once that it is his, not sat (%s, %s)" % [player.seated, heard])
-	draugr.state = Draugr.State.AT_REST
-	draugr.rests_until = World.steps + 100000
-	draugr._vanish()
+	# Laid to rest by the test-only console (896's switch-on, for playtest's walk): unknown without --test-hp.
+	var had_hp: bool = Net.test_hp
+	Net.test_hp = false
+	var refused: String = _main.admin_command("rest draugr")
+	Net.test_hp = true
+	var rested: String = _main.admin_command("rest draugr")
+	var again: String = _main.admin_command("rest draugr")
+	Net.test_hp = had_hp
+	_check(refused.begins_with("unknown command") and rested == "rest draugr: barrow_deep's draugr laid to rest" and draugr.resting()
+		and again == "rest draugr: the draugr in barrow_deep already rests",
+		"the test-only console lays him to rest, once; without --test-hp it is unknown, as on the box (%s / %s / %s)" % [refused, rested, again])
 	_put(player, throne)
 	for i in roundi(_main.THRONE_SIT_S * World.TICK_RATE) + 3:
 		World.step()
@@ -6858,6 +6808,92 @@ func _test_throne_home() -> void:
 				(entity as Draugr)._rise_again()
 		World.enter(was)
 	_main.throne_home = kept_switch
+	_main.load_map("test_room")
+
+
+## Package "full circle" switched on (896): one switch turns the throne
+## and the altar together, on by default; the shortcut's two ends gone, so
+## an arrival by its old spawn or a saved stand on its old cell lands on
+## open floor; no cell a player lays from beside the bier is the knight's.
+func _test_full_circle_on() -> void:
+	print("\n== package full circle switched on (896) ==")
+	_check(_main.full_circle and _main.throne_home and _main.altar_turn_in and AstralKnight.altar_on, "on by default: the throne, the altar and his words")
+	# The test-only relic verb (playtest's walk): a brother's remains in the pack, by name.
+	var had_hp: bool = Net.test_hp
+	Net.test_hp = true
+	var me := _player()
+	var my_record: PlayerRecord = _main._records.get(me.player_id) if me != null else null
+	var my_name := my_record.name if my_record != null else ""
+	var given: String = _main.admin_command("relic %s Sir Ansel the Faithful" % my_name)
+	Net.test_hp = had_hp
+	var brother_slot := -1
+	if me != null:
+		for slot in me.slots.size():
+			if str(World.relic_of(World.slot_uid(me, slot)).get("knight", "")) == "Sir Ansel the Faithful":
+				brother_slot = slot
+	_check(given == "relic: the remains of Sir Ansel the Faithful at %s's pack" % my_name and brother_slot >= 0,
+		"the test-only relic verb puts a named knight's remains in the pack (%s)" % given)
+	if brother_slot >= 0:
+		World.consume(me, World.slot_uid(me, brother_slot), "test")
+	# The test-only strike verb: the player's blow of all its hp, the player its slayer.
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "")
+	await get_tree().process_frame
+	me = _player()
+	var foe: Monster = null
+	if me != null:
+		for entity in _main.zone_entities(me.zone):
+			if is_instance_valid(entity) and entity is Monster and not entity is Draugr and entity.spawned and entity.hp > 0:
+				foe = entity
+				break
+	Net.test_hp = true
+	var struck_words: String = _main.admin_command("strike %s %s" % [my_name, _main.monster_name(foe)]) if foe != null else ""
+	var nobody: String = _main.admin_command("strike %s nobody at all" % my_name)
+	Net.test_hp = had_hp
+	var refused: String = _main.admin_command("strike %s nobody at all" % my_name)
+	_check(foe != null and struck_words.begins_with("strike: %s struck " % my_name) and (not is_instance_valid(foe) or foe.hp <= 0 or foe.struck_by == me),
+		"the test-only strike verb fells a monster in the player's zone, the player its slayer (%s)" % struck_words)
+	_check(nobody.begins_with("strike: no monster in barrow_deep") and not refused.begins_with("strike"),
+		"a name nobody bears strikes nothing, and without --test-hp the verb is unknown (%s / %s)" % [nobody, refused])
+	_main.full_circle = false
+	_check(not _main.throne_home and not _main.altar_turn_in and not AstralKnight.altar_on, "the one switch turns both halves off together")
+	_main.full_circle = true
+	_check(_main.throne_home and _main.altar_turn_in and AstralKnight.altar_on, "and on again")
+	# Mid-crossing at the switch-on: a send still naming from_temple, and a
+	# player saved on (49,77), the shortcut's cell, now rock.
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "from_temple")
+	await get_tree().process_frame
+	var player := _player()
+	var at: Vector2i = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "barrow_deep" and World.is_walkable(at), "sent by the old spawn: in the Ossuary on open floor (at %s)" % [at])
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "", {}, Vector2i(49, 77))
+	await get_tree().process_frame
+	player = _player()
+	at = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "barrow_deep" and at != Vector2i(49, 77) and World.is_walkable(at),
+		"saved on the shortcut's old cell: placed on open floor, not in the rock (at %s)" % [at])
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow", "", {}, Vector2i(30, 8))
+	await get_tree().process_frame
+	player = _player()
+	at = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "barrow" and World.is_walkable(at) and World.distance(at, Vector2i(30, 8)) <= 1,
+		"saved on the First Hall's old way down: plain floor there (at %s)" % [at])
+	# No laying cell is the knight's (the coordinator's (1), 11-13: he holds his cell).
+	var bier: Rect2i = _main.knights_altar("barrow")
+	var knight: GridEntity = null
+	for entity in World.get_entities():
+		if entity is AstralKnight:
+			knight = entity
+	var on_him: Array[Vector2i] = []
+	if bier.has_area() and knight != null:
+		for cell in Level.rect_cells(bier.grow(4)):
+			if World.is_walkable(cell) and _main.altar_beside(bier, cell) == knight.tile:
+				on_him.append(cell)
+	_check(bier.has_area() and knight != null and on_him.is_empty(),
+		"from any cell near the bier, the cell to lay from is never the knight's (%s, from %s)" % [knight.tile if knight != null else World.NO_CELL, on_him])
 	_main.load_map("test_room")
 
 
@@ -6936,6 +6972,7 @@ func _test_altar_charges() -> void:
 	_main.altar_turn_in = false
 	uid = lay.call(own, 0)
 	_check(player.slot_items.has(uid) and said.is_empty(), "off: the bier takes nothing")
+	_main.altar_turn_in = true
 	World.consume(player, uid, "test")
 	# The hidden way on the altar step, and the step kept by a save.
 	var robbers_zone := str(World.economy.rules.get("robbers", {}).get("barrow", "")) if World.economy != null else ""
@@ -7000,7 +7037,7 @@ func _test_knights_altar() -> void:
 	_check(_main.knights_relic_slot(player) < 0 and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty(),
 		"on, from beside it with his remains: laid, the quest done, the card closed (%s, %s)" % [beside, record.barrow_task])
 	_check(not was_laid and knight != null and knight.remains_laid, "and his remains lie on the bier for the generation (remains_laid, for art-kit's piece)")
-	_main.altar_turn_in = false
+	_main.altar_turn_in = true
 	record.marks.assign(kept["marks"])
 	record.barrow_task = kept["task"]
 	_main._sync_quest(record)

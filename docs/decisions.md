@@ -26056,7 +26056,9 @@ corner"; voice's lines).
   wall.crypt.cracked frame art-kit built it in); not solid; it stays when the slab is found.
 - The Hall's door held by the dead (666, DEAD_LOCK): World.door_pressed (a step refused by a shut door the walker
   may not open) tells that player DEAD_LINE, "The dead bar the way.", as E at it does, at most every DEAD_TOLD_S
-  (10 s) while they keep walking into it; a challenge's held door and every other door say nothing.
+  (10 s) while they keep walking into it; a challenge's held door and every other door say nothing. The
+  dead's hold on the door begins at the draugr's first think, which comes only within MID (60 cells) of a
+  player, never at the zone's load: a walk that reaches the door before he has thought meets it open.
 - Ahead of the Hall: a player on either cell of an open Hall door (lock lifted), outside the lair, while the
   draugr sits waiting (SEATED), is told HALL_AHEAD_LINE, "Beyond this door waits one who wants back the gold
   stolen from this place.", once a visit (_told_hall, forgotten by a move in another zone); in a pact or at rest
@@ -53753,6 +53755,50 @@ checks it on a door given "palette.001"); and tools/blender/export_slot.py, wher
 each such material in use onto "palette" in its run's copy (or renames it, if there is none) and
 says so. Still off with 896's package. Client only (art and its checks); protocol unchanged; no
 new class_name; no bullet.
+896, switched on (dungeon; the coordinator's word, 11-13, from ui-design's stills of 896 amended (3):
+the bier's candle lit; Jeff, 2026-11-12: "thats full circle", and "drop the short cut in"). The
+package is whole on main and one switch turns it on: Main.full_circle (on), whose setter turns
+throne_home and altar_turn_in together (AstralKnight.altar_on follows the altar's), each on by
+default now; a test turns them off by the switch or each by hand.
+- The shortcut out of both templates, in the same commit as the switch: barrow's (30,8) link to
+  barrow_deep's from_temple is plain stone floor (it lay in the open First Hall; a wall there would
+  be a lone pillar beside the throne's arrival, from_deep at (31,8), which stays); barrow_deep's
+  (49,77) link behind the throne is rock (no slab, no cue), and its from_temple spawn is gone. Laid
+  generations on the box carry their old level.json until laid again; 465 amended (4), landed before
+  this, lays a generation again at the first boot after its template changes, so the deploy that
+  carries this lays both levels afresh. A send still naming from_temple lands on the level's start,
+  and a player saved on (49,77) is placed on open floor, as any arrival on a cell no longer walked.
+- The remains on the bier (Client3D._add_bier_remains): on every variant-1 burial table (the First
+  Hall's, its one use), art-kit's prop.knight_remains at the table's "remains" socket (fallback
+  [0, 0.977, 0]) in its yaw, the candle's flame at the remains' "flame" socket (Flames.at_socket,
+  "prop.knight_remains": 0.12 in Flames.SIZES), and a lit candle's light there (CANDLE_ENERGY,
+  CANDLE_RANGE, CANDLE_FALLOFF, shadowless, flickering as the hall's flames), as the shot's
+  7deb93851 drew it; drawn only while the room's knight has his remains laid (AstralKnight.
+  remains_laid, replicated), checked in _sync_puppets only in a room that has a bier, and hidden
+  otherwise. Drawn only: the sim's Senses keep the barrow as dark as before.
+- Lore's crypt.relic_charges (9eecf3d4a: the remains laid on the knight's altar charge the amulet,
+  not Aldous) and voice's abouts for the Encolpion Amulet and the holy remains ride this commit.
+- Test-only: the console's "rest draugr [<zone>]" (the "hp" verb's gate, --test-hp with a
+  --run-marker; an unknown command on the box) lays the zone's draugr to rest as a fight's end does
+  (Draugr.lay_to_rest, the end of _fight_over moved into it unchanged), with no blessing, pact or
+  yield, so playtest's joined walk can try his throne; and "relic <player> [<knight>]", the same
+  gate, puts a holy knight's remains (tier 0) in that player's pack, the generation's knight's or
+  one named (a brother's), so the walk can lay his and a brother's without a fight for each; the
+  blessing stays the fight's (an amulet never blessed below still refuses them); and "strike
+  <player> <monster>", the same gate, one blow of all its hp from that player to a monster in their
+  zone named as a player reads it, the nearest of several (World.damage, the player its source,
+  cause attack, so it is the slayer), so the game's own end runs:
+  a band robber falls on the player's quest list, and the draugr yields in a pact taken the real
+  way and blesses whoever is in his lair (Draugr._yield), as "hp <player> 0" runs a player's fall.
+level_test: the cue, link and spawn checks of both templates say the shortcut is gone ((30,8)
+floor, (49,77) rock, from_temple gone, from_deep kept); 832's sealed way is tried on a copy only;
+the fight lock's test now holds that the held Hall has no way out in it and no barrow link arrives
+in it, and that a way laid in a held lair would be held; spawn safety's peaceable case behind the
+throne by _safe_tile_near; _test_full_circle_on (the one switch, both halves; a send by from_temple
+and a stand saved on (49,77) or (30,8) land on open floor; no cell laid from beside the bier is the
+knight's); the throne test lays him to rest by the console; the quest's and Aldous's own paths turn
+the altar off for their cases and on again after. resident_test likewise. Protocol unchanged; no new
+class_name; the bullet (voice's words) stays under Unreleased until playtest walks the circle joined.
 ## 868. A tavern's hearth burning: its flame and light at the fireplace, from the tavern place's hearth
 
 The coordinator's go, 11-11, package "a newcomer can mend in town", on: the Mughouse's hearth

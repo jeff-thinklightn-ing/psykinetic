@@ -64,15 +64,6 @@
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_barrow"
-		},
-		{
-			"at": [
-				30,
-				8
-			],
-			"to_map": "barrow_deep",
-			"to_spawn": "from_temple",
-			"sealed": "draugr"
 		}
 	],
 	"niches": [

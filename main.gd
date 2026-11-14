@@ -11545,9 +11545,10 @@ func hall_link_held(link: Dictionary, here := "") -> bool:
 ## order but talk, or his rising before then stands her up and sends no one:
 ## a stray click after the fight costs nothing. Walked onto, it does nothing.
 ## While he sits it, or a pact is on, a click on it says THRONE_HIS once a
-## stand. Off until the package is whole (dungeon switches it on with
-## (49,77)'s removal): the command is not heard, a click is a walk.
-var throne_home := false
+## stand. On since the package's switch-on (full_circle), which took the
+## sealed shortcut out of both templates; off (a test's), the command is not
+## heard and a click is a walk.
+var throne_home := true
 const THRONE_SLOT := "building.throne"
 ## Animation's Sitting_Enter (1.3 s) and a beat seated (2 s) before the send.
 const THRONE_SIT_S := 3.3
@@ -11653,13 +11654,29 @@ func _throne_tick() -> void:
 ## lays their own. The knight's thanks charges the amulet there (896
 ## amended (1), Jeff's answer): any holy knight's remains a player carries,
 ## on the quest or any later run, an earlier generation's knight's too, and
-## Aldous takes none while it is on. Off until the package is whole
-## (dungeon switches it on).
-var altar_turn_in := false:
+## Aldous takes none while it is on. On since the package's switch-on
+## (full_circle).
+var altar_turn_in := true:
 	set(on):
 		altar_turn_in = on
 		AstralKnight.altar_on = on  # His words follow it.
 const ALTAR_SLOT := "building.burial_table"
+
+
+## Package "full circle" (896), whole and switched on (the coordinator's
+## word, 11-13: the bier's candle lit; Jeff, 2026-11-12: "thats full
+## circle"): the throne the way home once the draugr is downed
+## (throne_home), the knight's altar the end of his quest and what charges
+## the amulet (altar_turn_in), the shortcut behind the throne and the
+## blessed's way down from the First Hall taken out of the templates
+## (Jeff: "drop the short cut in"), and his remains drawn on the bier with
+## its candle lit once laid. One switch for the package: a test turns its
+## two halves together with it.
+var full_circle := true:
+	set(on):
+		full_circle = on
+		throne_home = on
+		altar_turn_in = on
 ## The card's step (the coordinator's words).
 const ALTAR_STEP := "Bring his remains to the altar"
 
@@ -26126,6 +26143,15 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"hp":
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _hp_command(words)
+		"rest":
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _rest_command(words)
+		"relic":
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _relic_command(words)
+		"strike":
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _strike_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -26163,6 +26189,87 @@ func _hp_command(words: PackedStringArray) -> String:
 	who.hp = clampi(int(words[2]), 1, who.max_hp)
 	print("[test] hp %s: %d/%d (786)" % [who.name, who.hp, who.max_hp])
 	return "hp %s: %d/%d" % [who.name, who.hp, who.max_hp]
+
+
+## rest draugr [<zone>] (896's switch-on, test-only, the "hp" verb's gate:
+## --test-hp and a --run-marker): the zone's draugr (barrow_deep's unless
+## named) laid to rest as a fight's end lays him (Draugr.lay_to_rest), with
+## no blessing, no pact and nothing yielded, so a walk can try his throne.
+## The zone must be open. On the box it is an unknown command.
+func _rest_command(words: PackedStringArray) -> String:
+	if words.size() < 2 or words[1] != "draugr":
+		return "rest draugr [<zone>]: the zone's draugr laid to rest (test-only)"
+	var zone_name := words[2] if words.size() > 2 else "barrow_deep"
+	if not World.zones.has(zone_name):
+		return "rest draugr: %s is not open; nobody laid to rest" % zone_name
+	for entity in zone_entities(zone_name):
+		if is_instance_valid(entity) and entity is Draugr:
+			var draugr := entity as Draugr
+			if draugr.resting():
+				return "rest draugr: the draugr in %s already rests" % zone_name
+			draugr.lay_to_rest()
+			print("[test] rest draugr: %s's draugr laid to rest (896)" % zone_name)
+			return "rest draugr: %s's draugr laid to rest" % zone_name
+	return "rest draugr: no draugr in %s" % zone_name
+
+
+## relic <player> [<knight>] (896's switch-on, test-only, the "hp" verb's
+## gate): a holy knight's remains (World.mint_relic, the least deal's tier,
+## 0) put in that online player's pack, the generation's knight's unless
+## another is named (a brother's, an earlier generation's: "Sir Ansel the
+## Faithful"), so a walk can lay his remains and a brother's without
+## fighting for each. Blessing stays the fight's: an amulet never blessed
+## below still refuses them at the altar.
+func _relic_command(words: PackedStringArray) -> String:
+	if words.size() < 2:
+		return "relic <player> [<knight>]: a holy knight's remains in their pack (test-only)"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	var player := _player_of_id(id) if not id.is_empty() else null
+	if player == null:
+		return "no player %s in the game" % words[1]
+	var knight := " ".join(words.slice(2)) if words.size() > 2 else barrow_knight()
+	if knight.is_empty():
+		knight = KNIGHT_UNNAMED
+	var uid := World.mint_relic(knight, 0, player)
+	if uid == 0:
+		return "relic: none made"
+	var where := "pack" if World.into_pack(player, uid) >= 0 else "feet (the pack all bound)"
+	print("[test] relic: the remains of %s to %s (896)" % [knight, player.name])
+	return "relic: the remains of %s at %s's %s" % [knight, words[1], where]
+
+
+## strike <player> <monster> (896's switch-on, test-only, the "hp" verb's
+## gate): that online player strikes a monster in their own zone, named as
+## a player reads it (a band robber's name, "Crake"; "the draugr"; its
+## named id; several of that name, the nearest), one blow of all its hp
+## through World.damage, the player its
+## source, so the game's own end runs: a robber falls on the player's
+## quest list (_quest_credit), and the draugr yields, blessing whoever
+## stands in his lair if a pact is on (Draugr._yield), as "hp <player> 0"
+## runs a player's fall (786 amended). Playtest's walk of the full circle.
+func _strike_command(words: PackedStringArray) -> String:
+	if words.size() < 3:
+		return "strike <player> <monster>: a blow of all its hp from that player (test-only)"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	var player := _player_of_id(id) if not id.is_empty() else null
+	if player == null:
+		return "no player %s in the game" % words[1]
+	var wanted := " ".join(words.slice(2)).to_lower()
+	var found: Array[Monster] = []
+	for entity in zone_entities(player.zone):
+		if not is_instance_valid(entity) or not entity is Monster or not entity.spawned or entity.hp <= 0:
+			continue
+		var monster := entity as Monster
+		if wanted in [monster_name(monster).to_lower(), monster.given_name.to_lower(), monster.named_id.to_lower()]:
+			found.append(monster)
+	if found.is_empty():
+		return "strike: no monster in %s is called %s; none struck" % [player.zone, wanted]
+	found.sort_custom(func(a: Monster, b: Monster) -> bool: return World.distance(a.tile, player.tile) < World.distance(b.tile, player.tile))
+	var struck := found[0]  # Several of that name: the nearest.
+	var name_said := monster_name(struck)
+	World.damage(struck, struck.hp, player, &"attack")
+	print("[test] strike: %s struck %s in %s (896)" % [player.name, name_said, player.zone])
+	return "strike: %s struck %s, %d hp left" % [words[1], name_said, struck.hp if is_instance_valid(struck) else 0]
 
 
 ## "makers [<filter>]" (562 amended (7)): town by town, one line a worker
