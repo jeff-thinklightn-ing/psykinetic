@@ -11042,6 +11042,36 @@ meets it), the log's jumped line and the summary's count; short of memory itself
 past the two; behind a scene waiting on memory it waits, then goes past with room for both; a bench running, it waits,
 and starts when the bench ends. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (49): an import starts past the queue too (the coordinator's ruling and conditions, 2026-11-13; label from
+tools/decision_number.sh). (48)'s numbers: a godot_import is 1.41 GB, 24 s median, and on 11-13 108 of them waited 58
+hours in all, the largest waste on this machine. PAST_QUEUE_KINDS is load_check and godot_import, under (48)'s rule
+and guards: its own decide() (1.41 GB plus the 8 GB margin, RAM and commit), the head never waiting on memory it took,
+never beside a running bench or past a queued one that could start. Added for both kinds, and named for imports in
+JUMP_NEVER_BESIDE: never past one of its own kind queued ahead (first come among imports, one past the queue at a
+time: none starts past the queue while one of its kind runs, UNCOUNTED_MOST 1 as before); an import never starts past
+the queue beside a local `suite` running, nor past one queued that could start (the cut's suite on main and a landing
+with saturn down keep their timing checks; beside suite_remote is fine), nor beside a bench (a bench lets an import
+start at its own turn, not past the queue). A run that started past the queue and ran JUMP_LONG_SECONDS (300) or more
+is a "jump_long" line in the gate's log, by tree and kind, and the daily summary lists it. If a landing's local part
+fails a timing check with a jumped import beside it, the coordinator takes imports back out (one word). GATE_REVISION
+44. tests/heavy_job_test.py: past two exports held by the count with a suite_remote running; held by an export ahead
+that could start but not beside it; a local suite running, or queued able to start: held; a suite_remote held by its
+own kind: passed; an import ahead: first come; a bench queued or running: held; an import running: one at a time;
+through run(): at once past two exports, its row never written, the jumped and jump_long lines and the summary;
+through take(): a local suite running, it waits, and starts when the suite ends. Tools and tests only; protocol
+unchanged; no class_name; no bullet.
+
+With it, a row queued by older code no longer holds one that may pass (dungeon's report, 2026-11-14). (48) landed at
+03:59, and at 04:05 dungeon's load_check, from a checkout rebased onto it, waited out its 15 minutes 19th behind
+buildings' load_check queued 17th by revision 42: 43 judged that row "would start now, and not beside this
+load_check" (one at a time), but code from before 43 waits for its turn, so neither started. PAST_QUEUE_SINCE gives
+the revision from which each kind starts past the queue (load_check 43, godot_import 44); judged_row carries a queue
+row's revision; a row of the job's own kind queued by older code (first_come_only; no revision counts as older) is
+passed away from the head, and holds as any row at the head, where it starts at its turn. Its own later turn is
+unchanged, one at a time as before. tests/heavy_job_test.py: first_come_only by kind and revision; a load_check
+queued by 42 and an import by 43 behind the head, passed; the same at the head, held; a load_check queued by 43,
+first come; a judged row carries its revision.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

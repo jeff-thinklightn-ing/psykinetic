@@ -2076,7 +2076,7 @@ scene48 = dict(gate.KINDS["scene"], kind="scene", ram_gb=1.5, commit_gb=1.0)
 busy48 = [dict(running(1, 1), kind="suite"), dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")]
 export48 = dict(gate.KINDS["godot_export"], kind="godot_export")
 owing48 = [dict(running(0.6, 0.0), kind="godot_export")]  # Owed 0.6 GB, to give back.
-check(gate.PAST_QUEUE_KINDS == ("load_check",), "only load_check starts past the queue")
+check(gate.PAST_QUEUE_KINDS == ("load_check", "godot_import"), "load_check and godot_import start past the queue (49)")
 check(not gate.passes_held(load48, [export48, export48], busy48, 40.0, 40.0)[0]
     and gate.jumps(load48, [export48, export48], busy48, 40.0, 40.0)[0],
     "two exports ahead held by the count (three running) held it before; now it goes past them")
@@ -2092,9 +2092,11 @@ ok48, holder48, _ = gate.jumps(load48, [bench48], [], 40.0, 40.0)
 check(not ok48 and holder48 == 0, "a bench ahead that could start now: held (the bench never waits on it)")
 check(gate.jumps(load48, [bench48], [dict(running(1, 1), kind="suite")], 40.0, 40.0)[0],
     "a bench ahead held by a running suite holds nobody: it goes past")
-check(not gate.jumps(dict(gate.KINDS["godot_import"], kind="godot_import"), [scene48], busy48, 40.0, 40.0)[0],
-    "an import does not: first come, as before")
-check(gate.GATE_REVISION == 43, "gate revision 43")
+check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48, [load48], [], 40.0, 40.0)[0],
+    "never past one of its own kind: first come among them")
+check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
+    "a scene does not: first come, as before")
+check(gate.GATE_REVISION == 44, "gate revision 44")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2173,6 +2175,96 @@ gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = mem48, total48, poll48
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 if saved48 is not None:
     gate._write(gate._path("kinds.json"), saved48)
+elif os.path.exists(gate._path("kinds.json")):
+    gate._retried(os.remove, gate._path("kinds.json"))
+
+print("== an import starts past the queue too (394 amended (49)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+import49 = dict(gate.KINDS["godot_import"], kind="godot_import", ram_gb=1.41, commit_gb=1.4)
+export49 = dict(gate.KINDS["godot_export"], kind="godot_export", ram_gb=1.5, commit_gb=1.5)
+count49 = [dict(running(1, 1), kind="suite_remote"), dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")]
+check(gate.jumps(import49, [export49, export49], count49, 40.0, 40.0)[0],
+    "two exports ahead held by the count, a suite_remote among the three running: it goes past them")
+check(not gate.jumps(import49, [export49], [], 10.0, 40.0)[0] and gate.decide(import49, [], True, 10.0, None, 40.0)[0],
+    "the room it would take: 10 GB free, an export ahead able to start (1.5 + 8) but not beside 1.41 GB: held")
+ok49, holder49, why49 = gate.jumps(import49, [export49], [dict(running(1, 1), kind="suite"), dict(running(1, 1), kind="scene"),
+    dict(running(1, 1), kind="scene")], 40.0, 40.0)
+check(not ok49 and "never beside" in why49, "a local suite running: never past the queue beside it (%s)" % why49)
+suite49 = dict(gate.KINDS["suite"], kind="suite", ram_gb=4.0, commit_gb=4.0)
+ok49, holder49, why49 = gate.jumps(import49, [suite49], [], 40.0, 40.0)
+check(not ok49 and holder49 == 0, "a local suite ahead that could start now: held (%s)" % why49)
+check(gate.jumps(import49, [dict(gate.KINDS["suite_remote"], kind="suite_remote")], [dict(running(1, 1), kind="suite_remote")],
+    40.0, 40.0)[0], "a suite_remote ahead held by its own kind: it goes past")
+ok49, holder49, why49 = gate.jumps(import49, [export49, dict(import49, gate=44)], count49, 40.0, 40.0)
+check(not ok49 and holder49 == 1 and "first come" in why49, "an import ahead: first come among imports (%s)" % why49)
+# Rows queued by code from before their kind started past the queue wait for their turn (dungeon's
+# load_check, 11-14 04:05, behind buildings' queued by revision 42): away from the head they hold
+# none of their kind that may go past; at the head, as any row.
+load49 = dict(gate.KINDS["load_check"], kind="load_check")
+check(gate.first_come_only(dict(load49, gate=42)) and not gate.first_come_only(dict(load49, gate=43))
+    and gate.first_come_only(dict(import49, gate=43)) and not gate.first_come_only(dict(import49, gate=44))
+    and gate.first_come_only(load49) and not gate.first_come_only(dict(export49, gate=1)),
+    "first come only: a load_check queued before 43, an import before 44, a row with no revision; never another kind")
+check(gate.jumps(load49, [export49, dict(load49, gate=42)], count49, 40.0, 40.0)[0],
+    "a load_check queued by revision 42 behind the head: passed")
+check(gate.jumps(import49, [export49, dict(import49, gate=43)], count49, 40.0, 40.0)[0],
+    "an import queued by revision 43 behind the head: passed")
+ok49, holder49, _ = gate.jumps(load49, [dict(load49, gate=42)], count49, 40.0, 40.0)
+check(not ok49 and holder49 == 0, "the same at the head: held, it starts at its turn")
+ok49, holder49, _ = gate.jumps(load49, [export49, dict(load49, gate=43)], count49, 40.0, 40.0)
+check(not ok49 and holder49 == 1, "a load_check queued by 43 behind the head: first come among them")
+check(gate.judged_row(gate.kinds(), {"tree": "t", "kind": "load_check", "queued": 0, "gate": 42}, load49, [], 40.0, 40.0)["gate"] == 42,
+    "a judged row carries its revision")
+check(not gate.jumps(import49, [dict(gate.KINDS["bench"], kind="bench", ram_gb=2.0, commit_gb=1.0)], [], 40.0, 40.0)[0],
+    "a bench ahead that could start: held")
+check(not gate.jumps(import49, [export49], [dict(running(1, 1), kind="bench")], 40.0, 40.0)[0],
+    "a bench running: never past the queue beside it")
+check(not gate.jumps(import49, [export49], count49[:1] + [dict(running(1, 1), kind="godot_import")], 40.0, 40.0)[0],
+    "an import running: one past the queue at a time")
+
+mem49, total49, poll49, long49 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS, gate.JUMP_LONG_SECONDS
+saved49 = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"godot_import": dict(gate.KINDS["godot_import"], ram_gb=1.41, commit_gb=1.4),
+    "godot_export": dict(gate.KINDS["godot_export"], ram_gb=1.5, commit_gb=1.5)})
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.05
+gate._memory = lambda: (40.0, 40.0)
+clear_gate()
+owed_job("a49", "suite_remote", 0.5)
+owed_job("b49", "scene", 0.5)
+owed_job("c49", "godot_export", 0.5)
+queued("art", "godot_export")
+queued("ui", "godot_export")
+gate.JUMP_LONG_SECONDS = 0.5
+code49 = gate.run("perf", "godot_import", [sys.executable, "-c", "import time; time.sleep(1.0)"])
+check(code49 == 0 and queue_of() == ["art godot_export", "ui godot_export"],
+    "a gated import with three running and two exports queued ahead on the count: ran at once (%s)" % queue_of())
+with open(gate._path("heavy_jobs.log")) as log49:
+    text49 = log49.read()
+check("\tjumped\tperf\tgodot_import\tpast 2 queued" in text49, "the log's jumped line")
+check("\tjump_long\tperf\tgodot_import\tran " in text49, "one that ran past JUMP_LONG_SECONDS is logged by name")
+out49 = io.StringIO()
+with contextlib.redirect_stdout(out49):
+    gate.summary(datetime.date.today().isoformat())
+check("1 godot_import" in out49.getvalue() and "perf godot_import jump_long" in out49.getvalue(),
+    "the summary counts it past the queue and lists the long one (%s)" % [l for l in out49.getvalue().splitlines() if "jump" in l or "past the queue" in l])
+clear_gate()
+owed_job("local49", "suite", 0.5)
+queued("art", "godot_export")
+taker49 = threading.Thread(target=lambda: gate.take("perf", "godot_import", os.getpid()), daemon=True)
+taker49.start()
+time.sleep(0.5)
+check("perf" not in trees("running"), "a local suite running: no import past the queue (%s)" % trees("running"))
+for each in gate._entries("running"):
+    gate._retried(os.remove, gate._path("running", each["file"]))
+check(until(lambda: "perf" in trees("running"), 10.0), "the suite done: it starts")
+taker49.join(5)
+gate.release("perf", "godot_import")
+clear_gate()
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS, gate.JUMP_LONG_SECONDS = mem49, total49, poll49, long49
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved49 is not None:
+    gate._write(gate._path("kinds.json"), saved49)
 elif os.path.exists(gate._path("kinds.json")):
     gate._retried(os.remove, gate._path("kinds.json"))
 

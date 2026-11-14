@@ -158,9 +158,32 @@ UNCOUNTED_MOST = 1
 ## running, under its max_running and UNCOUNTED_MOST) and no row ahead waits on memory or would
 ## lose the room it is about to start in (jumps). Its queue entry is written only when it must
 ## wait, so a waiter from before 46 (37 to 41), whose local suite fails on a queued load_check
-## (KeyError in lean_row), never meets one in the ordinary case. Imports stay first-come: see
-## the decision.
-PAST_QUEUE_KINDS = ("load_check",)
+## (KeyError in lean_row), never meets one in the ordinary case. 394 amended (49), the
+## coordinator's ruling: imports too (1.41 GB, 24 s median; 108 on 11-13 waited 58 hours in all),
+## one at a time (UNCOUNTED_MOST), first come among their own kind, never beside a local suite.
+PAST_QUEUE_KINDS = ("load_check", "godot_import")
+## The gate revision from which each such kind starts past the queue. A row of its kind queued by
+## older code waits first-come, so it never starts past the queue: away from the head it holds
+## none of its kind that may (dungeon's load_check, 11-14 04:05, waited out its 15 minutes behind
+## buildings', queued by revision 42, which 43 judged "would start now").
+PAST_QUEUE_SINCE = {"load_check": 43, "godot_import": 44}
+## The running entries this process started past the queue (394 amended (49): run() logs a
+## long one by name).
+JUMPED = set()
+
+
+def name_of(tree, kind, pid):
+    """A running entry's file name, as wait_turn writes it."""
+    return "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
+
+
+## Kinds a past-the-queue kind never starts beside when it goes past the queue, running or
+## queued ahead able to start (394 amended (49)): a local suite keeps its timing checks (the
+## cut's suite on main, a landing with saturn down), and a bench its numbers (a bench allows an
+## import at its turn, not one that went past the queue); beside suite_remote is fine.
+JUMP_NEVER_BESIDE = {"godot_import": ("suite", "bench")}
+## A run that started past the queue and ran this long is logged by name ("jump_long", 49).
+JUMP_LONG_SECONDS = 300
 ## A job holding the gate this long is flagged in status, the log and the
 ## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
 LONG_HOLD_SECONDS = 3600
@@ -203,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 43  # 48: a load_check starts past the queue.
+GATE_REVISION = 44  # 49: an import starts past the queue too.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -532,7 +555,15 @@ def judged_row(table, entry, default, running, free_ram_gb, free_commit_gb=None,
     if entry.get("lock_rule") is None:
         # Queued by code from before 36: judged by that code's rule (394 amended (41)).
         row["own_cap"] = True
+    row["gate"] = entry.get("gate")
     return row
+
+
+def first_come_only(row):
+    """Whether queue [row], of a kind that starts past the queue, was queued by code from
+    before its kind did (PAST_QUEUE_SINCE): it waits for its turn, never past the queue."""
+    since = PAST_QUEUE_SINCE.get(row.get("kind"))
+    return since is not None and (row.get("gate") or 0) < since
 
 
 def at_least(table, row, why):
@@ -714,12 +745,23 @@ def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
     rows and passable benches are passed, as by everyone."""
     if job.get("kind") not in PAST_QUEUE_KINDS or free_ram_gb is None:
         return False, None, ""
+    never = JUMP_NEVER_BESIDE.get(job.get("kind"), ())
+    if any(each.get("kind") in never for each in running):
+        return False, None, "a %s running: never beside one past the queue (394 amended (49))" % "/".join(never)
+    if any(each.get("kind") == job.get("kind") for each in running):
+        return False, None, "a %s running: one past the queue at a time (394 amended (49))" % job.get("kind")
     beside = running + [{"kind": job.get("kind"), "ram_gb": job["ram_gb"], "commit_gb": commit_of(job),
         "using_gb": 0.0, "using_commit_gb": 0.0, "gpu": job.get("gpu", False)}]
     for place, other in enumerate(ahead):
+        if place > 0 and other.get("kind") == job.get("kind") and first_come_only(other):
+            continue  # It waits for its turn, not for room; at the head it holds as any row.
+        if other.get("kind") == job.get("kind"):
+            return False, place, "one of its own kind ahead: first come among them (394 amended (49))"
         if out_of_reach(other, running, free_ram_gb, free_commit_gb) or bench_passable(other, running):
             continue
         if decide(other, running, True, free_ram_gb, None, free_commit_gb)[0]:
+            if other.get("kind") in never:
+                return False, place, "it would start now, and never beside this %s (394 amended (49))" % job.get("kind")
             if not decide(other, beside, True, free_ram_gb, None, free_commit_gb)[0]:
                 return False, place, "it would start now, and not beside this %s" % job.get("kind")
         elif memory_short(other, running, free_ram_gb, free_commit_gb):
@@ -2134,6 +2176,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 if jumped:
                     log("jumped", tree, kind, "past %d queued (394 amended (48)); %s" % (place - 1,
                         machine_note(free_ram, free_commit, running)))
+                    JUMPED.add(name_of(tree, kind, pid))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 entry = {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
@@ -2450,6 +2493,9 @@ def run(tree, kind, command, expect_minutes=None, no_queue=False):
         if not stopped:
             log("done", tree, kind, "exit %s, %.0f s, peak %.1f GB, commit %.1f GB, working set at once %.1f GB%s" % (
                 code, duration, peak, commit_peak, at_once, ", lean" if estimate != kind else ""))
+            if name in JUMPED and duration >= JUMP_LONG_SECONDS:
+                log("jump_long", tree, kind, "ran %.0f s after starting past the queue, over %d s (394 amended (49))" % (
+                    duration, JUMP_LONG_SECONDS))
             keep_listing(tree, kind, listed, listed_gb, commit_peak)
             return shell_code(code)
         restarts += 1
@@ -2979,7 +3025,7 @@ def summary(day):
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front",
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front", "jump_long",
     "old_gate", "unbeaten", "beat_failed")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
