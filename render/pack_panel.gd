@@ -568,10 +568,20 @@ func box_in(mine: bool, index: int) -> SlotBox:
 	return null
 
 
+## The HUD canvas's units, and the reserved rect's place and size in them.
+const HUD_UNITS := Vector2(3840.0, 2160.0)
+const RESERVED_AT := Vector2(2128.0, 1056.0)
+const RESERVED_SIZE := Vector2(1672.0, 1064.0)
 ## ui-design's reserved rect for the bottom-right windows (the HUD's rects, 11-11): 2128, 1056, 1672 x 1064 in the HUD's 3840 x 2160
 ## units, read from [param screen]'s own bottom-right corner as the pack is anchored. The person window docks left of it.
 static func reserved_rect(screen: Rect2) -> Rect2:
-	return Rect2(Vector2(2128.0, 1056.0) + (screen.end - Vector2(3840.0, 2160.0)), Vector2(1672.0, 1064.0))
+	return Rect2(RESERVED_AT + (screen.end - HUD_UNITS), RESERVED_SIZE)
+
+
+## How far the talk windows' right edge stands from the screen's right edge: the reserved rect's left, and the dock's gap
+## (the person window and the deal window, which dock the same).
+static func dock_inset() -> float:
+	return HUD_UNITS.x - RESERVED_AT.x + float(BarterPanel.DOCK_GAP)
 
 
 ## The pack's title's rect on screen ("Pack"), the gold at its right end

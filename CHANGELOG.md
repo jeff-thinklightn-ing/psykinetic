@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr's and the fallen knight's windows open at the foot of the screen, left of the pack, and the draugr's closes by itself once he rests (629 amended (3)).
 - A name over someone's head sinks with them as they kneel, sleep or stoop tired, and their health bar with it (865 amended (2)).
 - When another player in your area goes down, you're told, and, when they can be saved, how long a blessed hand has to bring them back (914).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).

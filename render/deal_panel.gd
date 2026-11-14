@@ -1,5 +1,5 @@
 class_name DealPanel
-extends PanelContainer
+extends UiGlass
 ## A talking monster's deals as buttons (decision 629, ui's side; Jeff on
 ## v0.1.169: "no way to give gold to draugr"). E on a peaceable talking
 ## monster within hearing greets him (npc's "greet" command, his first
@@ -35,7 +35,8 @@ extends PanelContainer
 ## A button pressed: the deal's id and the gold it offers.
 signal offered(id: String, gold: int)
 
-const WIDTH := 620.0
+## The person window's width (the chat's, BarterPanel.CHAT_WIDTH, and its scroll bar's 10): the deal window docks beside it and is the same width.
+const WIDTH := float(BarterPanel.CHAT_WIDTH + 10)
 ## The free deal's one button (548 amended, ui's side).
 const AGAIN_WORDS := "Face him again"
 ## His refusal's button (Jeff: "just put the word refuse"): it starts the fight.
@@ -55,6 +56,7 @@ var deal: Dictionary = {}
 var purse := -1
 
 var _title: Label
+var _close: UiClose
 var _words: Label
 var _buttons: HFlowContainer
 var _purse: Label
@@ -62,22 +64,38 @@ var _strike: Label
 
 
 func _init() -> void:
+	super()
 	name = "DealPanel"
 	visible = false
-	set_anchors_preset(Control.PRESET_CENTER)
-	grow_horizontal = Control.GROW_DIRECTION_BOTH
-	grow_vertical = Control.GROW_DIRECTION_BOTH
-	custom_minimum_size = Vector2(WIDTH, 0)
+	# At the person window's dock (ui-design's deal mock, C:/dev/review/ui-design/deal/): its foot on the foot margin, its right edge
+	# left of the pack's reserved rect, growing upward; it never covers the speaker's bubble in the middle of the screen.
+	anchor_left = 1.0
+	anchor_right = 1.0
+	anchor_top = 1.0
+	anchor_bottom = 1.0
+	grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	grow_vertical = Control.GROW_DIRECTION_BEGIN
+	custom_minimum_size = Vector2(WIDTH, 0)  # The face's width; _ready adds the pane's margins.
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _ready() -> void:
+	super()  # UiGlass: the frost and its group.
+	custom_minimum_size.x = WIDTH + get_theme_stylebox(&"panel").get_minimum_size().x  # The person window's width: its chat's plus the same pane's margins.
+	offset_right = -PackPanel.dock_inset()
+	offset_bottom = -float(UiTheme.constant("margin"))
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(column)
+	var head := HBoxContainer.new()
+	column.add_child(head)
 	_title = Label.new()
-	_title.theme_type_variation = &"Heading"
-	column.add_child(_title)
+	_title.theme_type_variation = &"Title"  # The speaker's name in the title face, as the person window's.
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_title)
+	_close = UiClose.new()  # The shared close mark (Esc does the same); it sends nothing.
+	_close.pressed.connect(close)
+	head.add_child(_close)
 	_words = Label.new()
 	_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_words)

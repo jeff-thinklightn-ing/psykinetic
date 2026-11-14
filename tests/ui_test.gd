@@ -1166,6 +1166,22 @@ func _test_deal_window() -> void:
 	panel.show_deals("the draugr", [], 20, 0)
 	_check(not panel.visible and panel.entity_id == 0, "empty offers (a pact on): closed")
 	_main.escape()
+	# The dock (ui-design's deal mock): the person window's place, its foot on the foot margin and its right edge left of the pack's
+	# reserved rect, the person window's width, growing upward; the shared close mark closes it and sends nothing.
+	panel.show_deals("the draugr", [offers[0]], 20, 0)
+	for i in 3:
+		await get_tree().process_frame
+	var dock := panel.get_global_rect()
+	var screen := get_viewport().get_visible_rect()
+	var reserved := PackPanel.reserved_rect(screen)
+	_check(absf(dock.end.x - (reserved.position.x - float(BarterPanel.DOCK_GAP))) < 1.0 and absf(dock.end.y - (screen.end.y - float(UiTheme.constant("margin")))) < 1.0,
+		"the deal window at the person window's dock: right edge DOCK_GAP left of the reserved rect, foot on the foot margin (%s)" % [dock])
+	_check(is_equal_approx(dock.size.x, float(BarterPanel.CHAT_WIDTH + 10) + panel.get_theme_stylebox(&"panel").get_minimum_size().x) and not dock.intersects(reserved),
+		"the person window's width (its chat's plus the pane's margins: %s), and clear of the pack's rect" % [dock.size.x])
+	var closed_sends: Array = []
+	panel.offered.connect(func(id: String, gold_sent: int) -> void: closed_sends.append([id, gold_sent]))
+	panel._close.pressed.emit()
+	_check(not panel.visible and closed_sends.is_empty(), "the close mark closes the deal window and sends nothing")
 	# The live path on the host: a seated draugr beside the player, E on him, the least sum, the pact.
 	var player: GridEntity = _main._local_player()
 	if player == null or not Net.is_authority():
@@ -1200,6 +1216,17 @@ func _test_deal_window() -> void:
 		"the least sum pressed: his pact begins, the gold his, he is no longer peaceable and the window closes (%s, %s)" % [draugr.get("state"), panel.visible])
 	_main._open_talk(draugr)
 	_check(not panel.visible, "E on him in a pact: the window stays closed")
+	# The speaker laid to rest (playtest's look_bossbar2): his body stays, vacated, and the window left open closes; peaceable again, holding
+	# his cell, it stays.
+	draugr.peaceable = true
+	draugr.holds_cell = true
+	panel.show_deals("the draugr", [offers[0]], 20, draugr.get_instance_id())
+	_main._update_deal()
+	_check(panel.visible, "a peaceable speaker holding his cell: the window stays")
+	draugr.holds_cell = false
+	_main._update_deal()
+	_check(not panel.visible and panel.entity_id == 0, "the speaker holds no cell (laid to rest): the window closes")
+	draugr.holds_cell = true
 	World.despawn(draugr)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -3892,6 +3919,8 @@ func _test_person_dock() -> void:
 		"its right edge DOCK_GAP left of the pack's reserved rect, its foot on the foot margin (%s)" % [first])
 	_check(window._chat_scroll.visible and window._chat_scroll.custom_minimum_size.y > 0.0 and not pack.visible,
 		"the chat band is shown, empty or not, and a talker opens no pack beside it")
+	_check(is_equal_approx(first.size.x, float(BarterPanel.CHAT_WIDTH + 10) + _main.deal_panel.get_theme_stylebox(&"panel").get_minimum_size().x),
+		"the person window and the deal window dock at one width (%s)" % [first.size.x])
 	var column: Node = window._line.get_parent()
 	_check(window._title.theme_type_variation == &"Title" and window._line.get_index() == column.get_child_count() - 1
 			and window._chat_scroll.get_index() > window._grid.get_index() and window._chat_scroll.get_index() > window._foot_row.get_index(),

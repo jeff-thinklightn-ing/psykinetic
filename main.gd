@@ -17208,9 +17208,9 @@ func _update_deal() -> void:
 		return
 	var who := instance_from_id(deal_panel.entity_id) as GridEntity
 	var player := _local_player()
-	if who == null or not is_instance_valid(who) or not who.spawned or not (who is Resident or talks_peaceably(who)) \
+	if who == null or not is_instance_valid(who) or not who.spawned or not who.holds_cell or not (who is Resident or talks_peaceably(who)) \
 			or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
-		deal_panel.close()
+		deal_panel.close()  # Also a speaker holding no cell: the draugr laid to rest keeps his body, vacated, and left the window open.
 	elif deal_panel.purse != gold:
 		deal_panel.set_purse(gold)
 
