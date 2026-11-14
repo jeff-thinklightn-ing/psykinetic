@@ -11164,6 +11164,27 @@ counted jobs but owes its 1.6 GB against the margin; a local suite still counts;
 case of three land-lock waiters now reads three counted where it read four. Tools and tests only; protocol unchanged;
 no class_name; no bullet.
 
+394 amended (53): takes waiting on the land lock are marked again, and a kind's flags never come from kinds.json (the
+coordinator's and release's rulings, 2026-11-14, fronted; label from tools/decision_number.sh). Two faults, found when
+52 landed at 10:13. (b) Since 37 every take's guard names an adopter as the take is granted, and _mark_lock_wait skipped
+any entry with an adopter, so from 37 on no take was marked waiting on the lock and 36's rule (waiting takes uncounted,
+at most 3) never applied: every take waiting on the lock held a place. ui's take at 09:19 was one; 52's own account of
+it (a land.sh started early) was wrong. A take is now marked by the running file wait_turn hands back. (a) Every run
+wrote its kind's whole row back to kinds.json, 52's "uncounted" with it; a waiter queued by gate-44 code read the flag
+from the file while counting by its own table, so each of its suite_remote takes started past MAX_RUNNING: five at
+10:13:43-54 beside lore's landing, with scenes held at "7 heavy jobs running". The rule: a kind's flags live in the
+code's table, never in the state file, since waiters of every age read that file. kinds() reads no CODE_ONLY_KEYS
+("uncounted") from kinds.json and _write_kinds writes none. Until this landed a stopgap of perf's (one sleeping
+process, its pid given to release and the coordinator) stripped the flag from the file every 10 s under the state
+lock, and the five granted takes were marked waiting by hand, once, under the lock, after a copy of running/ (the
+coordinator's ruling, release's conditions); art-kit's gate-44 waiter cleared its mark at its take and was counted
+while it ran, as 36 designs. GATE_REVISION 46. tests/heavy_job_test.py: a take granted with its guard's adopter is
+marked, nothing else of it changed; five granted takes beside a landing and a scene, all marked, hold no place, a
+second scene starts and a sixth take queues (at most 3 wait); land.sh's adoption ends the wait; a waiter whose table
+has no flag reads none from a file row that has one, and its suite_remote never starts past MAX_RUNNING; the code's
+flag holds whatever the file says; kinds.json is written with none. Each fails on e387750dc. Tools and tests only;
+protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

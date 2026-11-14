@@ -226,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 45  # 52: a saturn landing uncounted.
+GATE_REVISION = 46  # 53: takes waiting on the lock marked again; flags never from kinds.json.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -1096,7 +1096,7 @@ def seed_measures():
             row["ram_gb"] = row[MEASURE_FIELDS[RAM_MEASURE]]
             wrote = True
         if wrote:
-            _write(_path("kinds.json"), table)
+            _write_kinds(table)
             log("measure", "heavy_job", "kinds", "RAM estimates seeded, by %s: %s" % (RAM_MEASURE, ", ".join(
                 "%s %.1f (summed peaks %.1f)" % (name, row["ram_once_gb"], row["ram_peaks_gb"])
                 for name, row in sorted(table.items()) if "ram_once_gb" in row)))
@@ -1730,8 +1730,25 @@ def _retried(action, *paths):
     return action(*paths)
 
 
+## A kind's flags the code alone sets (394 amended (53)): never read from kinds.json nor
+## written to it. A kind's flags live in the code's table, never in the state file, since
+## waiters of every age read that file: every run wrote its whole row back, 52's
+## "uncounted" with it, and a waiter of older code read the flag from the file while
+## counting by its own table, so each of its suite_remote takes started past MAX_RUNNING
+## (five at 10:13 on 11-14).
+CODE_ONLY_KEYS = ("uncounted",)
+
+
+def _write_kinds(table):
+    """kinds.json written with no row carrying a CODE_ONLY_KEYS flag."""
+    _write(_path("kinds.json"), {name: ({key: value for key, value in row.items() if key not in CODE_ONLY_KEYS}
+        if isinstance(row, dict) else row) for name, row in table.items()})
+
+
 def kinds():
     saved = _read(_path("kinds.json")) or {}
+    saved = {name: {key: value for key, value in row.items() if key not in CODE_ONLY_KEYS}
+        for name, row in saved.items() if isinstance(row, dict)}
     table = {}
     for name, first in KINDS.items():
         row = dict(first, **saved.get(name, {}))
@@ -2489,7 +2506,7 @@ def run(tree, kind, command, expect_minutes=None, no_queue=False):
                     # Clean runs only, and no declared soak, set the limit.
                     saved["runs_s"] = (saved.get("runs_s", []) + [round(duration, 1)])[-RUN_HISTORY:]
                 table[estimate] = saved
-                _write(_path("kinds.json"), table)
+                _write_kinds(table)
         if ended is not None:
             log(ended[0], tree, kind, "stopped after %.0f min, %s; peak %.1f GB" % (duration / 60, ended[1], peak))
             print("heavy_job: %s %s stopped after %.0f min, %s; if it is meant to run longer, pass --expect MIN "
@@ -2534,23 +2551,23 @@ def take(tree, kind, pid, caller=None):
         return 0
     if stray_refused(tree, kind):
         return 2
-    _, estimate = wait_turn(tree, kind, pid, False, caller=caller)
+    name, estimate = wait_turn(tree, kind, pid, False, caller=caller)
     if estimate in LOCK_WAIT_KINDS:
-        _mark_lock_wait(tree, kind, pid)
+        _mark_lock_wait(name)
     print("heavy_job: %s %s taken%s" % (tree, kind, " (on saturn, as suite_remote)" if estimate == "suite_remote" and kind != estimate
         else " (lean, as %s)" % estimate if estimate != kind else ""))
     return 0
 
 
-def _mark_lock_wait(tree, kind, pid):
-    """The take just granted to [tree] waits on the land lock (394 amended (36)) until
-    land.sh adopts it."""
+def _mark_lock_wait(name):
+    """The take just granted, running/[name], waits on the land lock (394 amended (36))
+    until land.sh adopts it. Found by its file, not by an "adopted_by" test (394 amended
+    (53)): 37's guard names an adopter on every take as it is granted, so that test
+    skipped them all, no take was marked from 37 on, and every take waiting on the lock
+    counted (ui's at 09:19 on 11-14; five at 10:13)."""
     with StateLock():
-        for entry in _entries("running"):
-            if entry["tree"] != tree or kind not in (entry["kind"], entry.get("asked")) or entry.get("watched") \
-                    or entry.get("adopted_by") or (pid is not None and entry.get("pid") != pid):
-                continue
-            name = entry.pop("file")
+        entry = _read(_path("running", name)) if name else None
+        if entry is not None and not entry.get("watched"):
             entry["lock_wait"] = True
             _write(_path("running", name), entry)
 
@@ -2663,7 +2680,7 @@ def record_attached(kind, entry):
         saved["commit_gb"] = updated_estimate(commit_of(saved), peak_commit)
         saved["last_commit_gb"] = round(peak_commit, 2)
     table[kind] = saved
-    _write(_path("kinds.json"), table)
+    _write_kinds(table)
 
 
 def release(tree, kind):

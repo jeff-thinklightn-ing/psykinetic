@@ -2127,7 +2127,7 @@ check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48
     "never past one of its own kind: first come among them")
 check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
     "a scene does not: first come, as before")
-check(gate.GATE_REVISION == 45, "gate revision 45")
+check(gate.GATE_REVISION == 46, "gate revision 46")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2361,6 +2361,66 @@ suite52 = dict(gate.KINDS["suite"], kind="suite", ram_gb=6.5, commit_gb=6.5)
 check(gate.counted([dict(running(6.5, 1.0), kind="suite")]) == 1, "a local suite still counts")
 check(not gate.decide(dict(gate.KINDS["bench"], kind="bench", ram_gb=2.0, commit_gb=1.0), [landing52], True, 30.0, None, 40.0)[0],
     "a bench still never starts beside a landing")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+
+print("== takes waiting on the lock marked again; flags never from kinds.json (394 amended (53)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+saved53 = (gate.wait_turn, gate._outer_run, gate.stray_refused)
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+def granted53(tree, kind, pid, watched, expect_minutes=None, caller=None):
+    """A take granted as 37's guard grants it: an adopter named at once."""
+    name = "%s-suite_remote-%d.json" % (tree, pid)
+    gate._write(gate._path("running", name), gate.guard({"tree": tree, "kind": "suite_remote", "pid": pid, "ram_gb": 1.6,
+        "commit_gb": 1.6, "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": False, "started": time.time(), "queued": time.time(),
+        "estimate": "suite_remote", "gate": gate.GATE_REVISION}, pid, 1.0))
+    return name, "suite_remote"
+gate.wait_turn, gate._outer_run, gate.stray_refused = granted53, (lambda: None), (lambda tree, kind: False)
+try:
+    with contextlib.redirect_stdout(io.StringIO()):
+        gate.take("art-kit", "suite_remote", os.getpid())
+    marked53 = gate._read(gate._path("running", "art-kit-suite_remote-%d.json" % os.getpid()))
+    check(bool(marked53.get("adopted_by") and marked53.get("guard") and marked53.get("lock_wait")),
+        "a take granted with its guard's adopter named is marked waiting on the land lock (none was from 37 on): %s" % marked53)
+    check(marked53.get("pid") == os.getpid() and marked53.get("ram_gb") == 1.6, "and nothing else of it changes")
+    # This morning's second shape (10:13): a landing testing (adopted by its land.sh), a scene, five granted takes.
+    with contextlib.redirect_stdout(io.StringIO()):
+        for n53, tree53 in enumerate(("npc-forget", "pc-character-shelter", "maps", "dungeon-followup")):
+            gate.take(tree53, "suite_remote", os.getpid())  # A live pid: a dead one is pruned as stale.
+    landing53 = dict(running(1.6, 1.2), kind="suite_remote", tree="lore", adopted_by=1, started=time.time() - 600)
+    going53 = [landing53, dict(running(1.2, 0.7), kind="scene", tree="economy")] + gate._entries("running")
+    check(sum(1 for each in going53 if each.get("lock_wait")) == 5, "all five granted takes are marked")
+    ok53, why53 = gate.decide(dict(gate.KINDS["scene"], kind="scene", ram_gb=1.2, commit_gb=1.2), going53, True, 34.0, None, 40.0)
+    check(ok53, "five takes waiting on the lock and a landing hold no place: a second scene starts (%s)" % why53)
+    ok53, why53 = gate.decide(dict(gate.KINDS["suite_remote"], kind="suite_remote", ram_gb=1.6, commit_gb=1.6), going53, True, 34.0, None, 40.0)
+    check(not ok53 and "wait on the land lock" in why53, "and a sixth take queues at the gate: at most 3 wait (%s)" % why53)
+    # land.sh adopting a marked take: counted again while its tests run.
+    gate._adopt_take("art-kit", "suite_remote")
+    adopted53 = gate._read(gate._path("running", "art-kit-suite_remote-%d.json" % os.getpid()))
+    check(not adopted53.get("lock_wait") and not adopted53.get("guard"), "its land.sh adopting it ends the wait")
+finally:
+    gate.wait_turn, gate._outer_run, gate.stray_refused = saved53
+    for each in gate._entries("running"):
+        os.remove(gate._path("running", each["file"]))
+# A kind's flags from the code's table only. An old waiter's table (gate 44) has no flag for suite_remote;
+# kinds.json carries one, as every run of 52's code wrote it.
+table53 = gate._read(gate._path("kinds.json")) or {}
+table53["suite_remote"] = dict(table53.get("suite_remote", {"ram_gb": 1.6}), uncounted=True)
+gate._write(gate._path("kinds.json"), table53)
+saved_kinds53 = gate.KINDS["suite_remote"]
+try:
+    gate.KINDS["suite_remote"] = {key: value for key, value in saved_kinds53.items() if key != "uncounted"}
+    old53 = dict(gate.kinds()["suite_remote"], kind="suite_remote", ram_gb=1.6, commit_gb=1.6)
+    check("uncounted" not in old53, "a waiter whose table has no flag reads none from a kinds.json row that has it")
+    three53 = [dict(running(1.2, 1.0), kind="scene"), dict(running(1.2, 1.0), kind="scene"), dict(running(1.5, 1.0), kind="godot_export")]
+    ok53, why53 = gate.decide(old53, three53 + [dict(running(1.6, 0.1), kind="suite_remote")], True, 30.0, None, 40.0)
+    check(not ok53 and "heavy jobs running" in why53, "so its suite_remote never starts past MAX_RUNNING (%s)" % why53)
+finally:
+    gate.KINDS["suite_remote"] = saved_kinds53
+check(gate.kinds()["suite_remote"].get("uncounted"), "the code's own flag holds whatever the file says")
+gate._write_kinds(gate._read(gate._path("kinds.json")))
+check(all("uncounted" not in row for row in gate._read(gate._path("kinds.json")).values()),
+    "kinds.json is written with no row carrying a code-only flag")
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 
 print("== the sleepers ==")
