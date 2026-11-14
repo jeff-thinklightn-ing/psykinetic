@@ -110,7 +110,7 @@ if command -v powershell.exe >/dev/null 2>&1; then
 	code=$?
 	check $([ $code = 2 ] && grep -q "net_test runs alone" "$tmp/ps.out"; echo $?) "run.ps1: net_test refused"
 fi
-grep -q "^part run_parse_test bash tests/run_parse_test.sh" tests/land.sh
+grep -q "^tool_part run_parse_test bash tests/run_parse_test.sh" tests/land.sh
 check $? "tests/land.sh runs this test"
 echo
 echo "RESULT: $([ $failed = 0 ] && echo PASS || echo FAIL) ($failed failed)"

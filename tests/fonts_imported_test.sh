@@ -56,7 +56,7 @@ out="$(GODOT_PATH="$tmp/godot" bash "$tool" "$tmp/p")"; code=$?
 check $([ $code = 1 ] && [ "$(calls)" = 1 ] && printf '%s' "$out" | grep -qxF "FAIL  art/fonts/A.ttf: still no .fontdata after one re-import"; echo $?) \
 	"still missing after the re-import: fails naming it, one import only ($(calls) import, $out)"
 
-grep -q "^part font_import bash tools/fonts_imported.sh" tests/land.sh
+grep -q "^tool_part font_import bash tools/fonts_imported.sh" tests/land.sh
 check $? "tests/land.sh runs it as its font_import part"
 grep -q "& bash tools/fonts_imported.sh \. 2>&1" tests/land.ps1 && grep -q "\$failed += 'font_import'" tests/land.ps1
 check $? "tests/land.ps1 runs it too, and fails on it"

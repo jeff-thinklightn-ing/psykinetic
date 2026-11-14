@@ -5537,6 +5537,28 @@ a line before its verdict and doesn't run it (it needs an import and the gate). 
 part): a fake Godot in a throwaway repo with a gate of its own; the files named, the refusals, PASS, FAIL with the
 engine's line, no verdict, nothing changed. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+278 amended (8): a landing's tool test retried once on a temp-folder fault (the coordinator's approval, 2026-11-13;
+label from tools/decision_number.sh). (48)'s landing that evening lost its turn after every Godot part had passed:
+changelog_resolve_test and voice_inventory_test died in the same second on "git add -A: error: unable to write file
+.git/objects/..: Permission denied" in their %TEMP% scratch repos, and both passed run alone at once in the same
+checkout (C:/dev/review/perf/flakes.md). tests/land_retry.sh, sourced by land.sh: the tool parts (heavy_job_test to
+tracked_on_main_test, land_push_test and land_retry_test when they run, font_import) go through tool_part; the Godot
+parts (the suite, net_test, state_test, server_boot_test, remote_prepare) keep part() and are never retried. A tool
+part runs once more, LAND_RETRY_WAIT (5 s) later, only when it failed, its log carries "Permission denied", "unable to
+write file" or "Access is denied", and it printed no failed check of its own (a line opening "FAIL ", as every tool
+test prints one); the rerun's exit is the part's, and a second failure fails the landing as before. A retry prints
+"retried: <test> (temp folder: <the line>)", keeps the first log as <test>.first.log beside the rerun's (a failed run
+keeps both), and the result line a tree copies says "; retried: <tests> (temp folder)" in its PASS or FAIL, so release
+sees it without the logs and flakes.md can count them. --checks ends before any part, so it never retries. Not chosen:
+a retry in each test's scratch-repo helper (six or more files, python and bash, and the fault hidden).
+tests/land_retry_test.sh (about 10 s, run only when a take changes land.sh, land_retry.sh or the test, as
+land_push_test): denied once then passing, PASS with the line and both logs; Windows' "Access is denied"; a failed
+check beside the denied line, run once; any other failure, run once; denied twice, run twice and FAIL; a pass run
+once; the note; no Godot part through tool_part and every tool part through it; --checks ends first; the PASS and FAIL
+lines carry the note. fonts_imported_test, land_checks_test, run_digest_test and run_parse_test look for their own
+line as "tool_part ...". land.ps1 (no saturn path, rarely run) is unchanged. Tests and tools only; protocol unchanged;
+no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged

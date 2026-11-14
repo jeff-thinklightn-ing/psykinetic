@@ -91,7 +91,7 @@ if command -v powershell.exe >/dev/null 2>&1; then
 	check $(case "$lock_given" in *land-checks-*) [ ! -e "$lock_given" ]; echo $? ;; *) echo 1 ;; esac) \
 		"land.ps1 -Checks: the voice inventory's lock is an empty folder of its own"
 fi
-grep -q "^part land_checks_test bash tests/land_checks_test.sh" tests/land.sh
+grep -q "^tool_part land_checks_test bash tests/land_checks_test.sh" tests/land.sh
 check $? "tests/land.sh runs this test"
 echo
 echo "RESULT: $([ $failed = 0 ] && echo PASS || echo FAIL) ($failed failed)"

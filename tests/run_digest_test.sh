@@ -51,7 +51,7 @@ check $(! printf '%s\n' "$summary" | grep -qE "later check|early check|all well"
 check $([ "$(printf '%s\n' "$summary" | grep -c '^  FAIL  many ')" = 40 ]; echo $?) "at most 40 lines a scene ($(printf '%s\n' "$summary" | grep -c '^  FAIL  many ') of 60 failed checks)"
 grep -q '^function Get-Digest' tests/run.ps1 && grep -qF 'Get-Digest (Join-Path $logs' tests/run.ps1
 check $? "tests/run.ps1 prints the same digest in its summary"
-grep -q "^part run_digest_test bash tests/run_digest_test.sh" tests/land.sh
+grep -q "^tool_part run_digest_test bash tests/run_digest_test.sh" tests/land.sh
 check $? "tests/land.sh runs this test"
 echo
 echo "RESULT: $([ $failed = 0 ] && echo PASS || echo FAIL) ($failed failed)"

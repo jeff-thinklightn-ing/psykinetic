@@ -145,6 +145,7 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	esac
 fi
 . tests/jobs.sh
+. tests/land_retry.sh  # tool_part: a tool part retried once on a temp-folder fault (278 amended (8)).
 LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
 trap 'rm -rf "$LOGS"' EXIT
 
@@ -185,32 +186,38 @@ part() {
 	read -r code took <"$LOGS/$name.status"
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
-part heavy_job_test python -B tests/heavy_job_test.py
-part decision_number_test python -B tests/decision_number_test.py
-part changelog_check_test python -B tests/changelog_check_test.py
-part changelog_resolve_test python -B tests/changelog_resolve_test.py
-part voice_inventory_test python -B tests/voice_inventory_test.py
-part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
-part push_guard_test bash tests/push_guard_test.sh
+tool_part heavy_job_test python -B tests/heavy_job_test.py
+tool_part decision_number_test python -B tests/decision_number_test.py
+tool_part changelog_check_test python -B tests/changelog_check_test.py
+tool_part changelog_resolve_test python -B tests/changelog_resolve_test.py
+tool_part voice_inventory_test python -B tests/voice_inventory_test.py
+tool_part remote_shot_clash_test bash tests/remote_shot_clash_test.sh
+tool_part push_guard_test bash tests/push_guard_test.sh
 # About 80 s, and the parts here run one after another before the Godot parts (667 amended (3), the
 # coordinator's ask): only when the take changes the push helper, the lock it checks or the test.
 if git diff --name-only origin/main...HEAD -- tools/land_push.sh tools/land_lock.sh tools/bench_lock.sh tests/land_push_test.sh 2>/dev/null | grep -q .; then
-	part land_push_test bash tests/land_push_test.sh
+	tool_part land_push_test bash tests/land_push_test.sh
 else
 	echo "land_push_test: not run (the take changes none of tools/land_push.sh, land_lock.sh, bench_lock.sh or its test)"
 fi
-part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
-part land_tested_test bash tests/land_tested_test.sh
-part fonts_imported_test bash tests/fonts_imported_test.sh
-part run_digest_test bash tests/run_digest_test.sh
-part land_checks_test bash tests/land_checks_test.sh
-part run_parse_test bash tests/run_parse_test.sh
-part load_check_test bash tests/load_check_test.sh
-part tracked_on_main_test bash tests/tracked_on_main_test.sh
+# The retry's own test (278 amended (8)), about 15 s: only when the take changes land.sh, the retry or the test.
+if git diff --name-only origin/main...HEAD -- tests/land.sh tests/land_retry.sh tests/land_retry_test.sh 2>/dev/null | grep -q .; then
+	tool_part land_retry_test bash tests/land_retry_test.sh
+else
+	echo "land_retry_test: not run (the take changes none of tests/land.sh, land_retry.sh or its test)"
+fi
+tool_part remote_shot_sockets_test bash tests/remote_shot_sockets_test.sh
+tool_part land_tested_test bash tests/land_tested_test.sh
+tool_part fonts_imported_test bash tests/fonts_imported_test.sh
+tool_part run_digest_test bash tests/run_digest_test.sh
+tool_part land_checks_test bash tests/land_checks_test.sh
+tool_part run_parse_test bash tests/run_parse_test.sh
+tool_part load_check_test bash tests/load_check_test.sh
+tool_part tracked_on_main_test bash tests/tracked_on_main_test.sh
 # Each font's .fontdata before any Godot part: a first import that segfaulted on the fonts left
 # them unmade and server_boot_test's export failed on it (perf-sha, 11-13). One more import if
 # one is missing, under this run's take; still missing, the part fails naming it.
-part font_import bash tools/fonts_imported.sh .
+tool_part font_import bash tools/fonts_imported.sh .
 grep -h "^re-imported: " "$LOGS/font_import.log"
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
@@ -289,10 +296,12 @@ if [ -n "$failed" ]; then
 	keep_failure land "$LOGS"/*.log
 fi
 echo
+# A tool part retried on the temp folder is named in the line a tree copies (278 amended (8)).
+retried="$(land_retried)"
 if [ "$code" -eq 0 ]; then
-	line="LANDING TESTS: PASS (suite, net_test, state_test${remote:+ on saturn}, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test, voice_inventory_test; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: PASS (suite, net_test, state_test${remote:+ on saturn}, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test, voice_inventory_test$retried; $(( $(date +%s) - started ))s)"
 else
-	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: FAIL ($failed$retried; $(( $(date +%s) - started ))s)"
 fi
 echo "$line"
 [ "$code" -eq 0 ] && land_stamp_write "$LAND_HEAD" "$tree" "$line"
