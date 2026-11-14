@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2966)
+## Lines in the code (2967)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -1340,7 +1340,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (622)
+### other (sim) (623)
 
 | | Line | Where |
 |---|---|---|
@@ -1724,6 +1724,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | the %s stands at its %s stage | `sim/towns.gd` _built() |
 |  | %s the %s waits for a %s | `sim/towns.gd` _seat() |
 |  | %s the %s works at %s | `sim/towns.gd` _seat() |
+|  | [towns] %s bench %s: holder %s, job %d %s, unseated of the trade %d | `sim/towns.gd` _bench_line() |
 |  | the %s is to be repaired | `sim/towns.gd` _repair() |
 |  | at %s's %s for %s, %s by %s | `sim/towns.gd` _on_work_done() |
 |  | could not remake | `sim/towns.gd` _on_work_done() |
