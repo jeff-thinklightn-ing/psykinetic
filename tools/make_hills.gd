@@ -1064,12 +1064,13 @@ func _hollowfell() -> void:
 
 
 ## The rest camps (777): each a building {kind camp, size small} on its pad,
-## and a "rest" place at its fire (Level.camp_fire), held by nobody.
+## and a "rest" place at its fire (Level.camp_fire), held by nobody. Their one
+## tent is the traders' canvas with its awning ("tents" [2], 905; roadside rests).
 func _camps() -> void:
 	for camp in CAMPS:
 		var at: Vector2i = camp["at"]
 		var facing: Vector2i = camp["facing"]
-		var building := {"kind": "camp", "size": "small", "at": [at.x, at.y], "facing": [facing.x, facing.y]}
+		var building := {"kind": "camp", "size": "small", "at": [at.x, at.y], "facing": [facing.x, facing.y], "tents": [2]}
 		config["buildings"].append(building)
 		var fire := Level.camp_fire({"kind": "camp", "rect": Rect2i(at, Vector2i(CAMP_SIZE, CAMP_SIZE)), "facing": facing})
 		config["places"][camp["key"]] = {"at": [fire.x, fire.y], "kind": "rest", "radius": 3, "name": camp["name"]}

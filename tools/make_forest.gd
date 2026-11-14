@@ -128,6 +128,12 @@ const CAMPS: Array[Dictionary] = [
 ## Cells cleared round a camp's footprint, and the bandits' marker colours.
 const CAMP_MARGIN := 2
 const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3218"}
+## A tent's footprint in its camp's frame (art-kit's 905), and how far behind
+## its centre a trader's bed lies (793 amended (1)).
+const TENT_HALF_WIDE := 1.25
+const TENT_BEFORE := 1.45
+const TENT_BEHIND := 1.55
+const TENT_BED_BACK := 0.5
 ## The apex lairs' mouths here (780 amended (12), forest phase D; enemy-ai's
 ## lair rule): each a link cell "at" into its own small level, laid only
 ## once its package takes it off Level.SHELVED (the boar's lair: open, the
@@ -395,12 +401,25 @@ func _camps(camps: Array[Dictionary]) -> void:
 			for x in range(rect.position.x - CAMP_MARGIN, rect.end.x + CAMP_MARGIN):
 				if map.cell(Vector2i(x, y)) == "void":
 					map.set_cell(Vector2i(x, y), "grass")
+		var mix: String = camp["mix"]
+		# Its tents (793 amended (1), art-kit's 905): where BuildingComposer._camp
+		# stands them, one on a small camp, two on a large, and which each is: the
+		# traders' canvas (2) where a trader sleeps (the side he stands at, +side),
+		# else the bandits' hide shelter (1).
+		var centres: Array[Vector2] = []
+		var tents: Array[int] = []
+		var count := 1 if camp["size"] == 5 else 2
+		for index in count:
+			var at := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5 - Vector2(facing) * BuildingComposer.CAMP_TENT_BACK
+			if count > 1:
+				at += Vector2(side) * BuildingComposer.CAMP_TENT_APART * (index * 2 - 1)
+			centres.append(at)
+			tents.append(2 if mix == "trader" or (mix == "mixed" and index == count - 1) else 1)
 		config["buildings"].append({"kind": "camp", "size": "small" if camp["size"] == 5 else "large",
-			"at": [rect.position.x, rect.position.y], "facing": [facing.x, facing.y]})
+			"at": [rect.position.x, rect.position.y], "facing": [facing.x, facing.y], "tents": tents})
 		var fire := Level.camp_fire({"kind": "camp", "rect": rect, "facing": facing})
 		# The canopy open over it (a clearing: light on the camp, its smoke out).
 		config["clearings"].append({"centre": [fire.x, fire.y], "radius": camp["size"] / 2 + CAMP_MARGIN})
-		var mix: String = camp["mix"]
 		config["places"][camp["key"]] = {"at": [fire.x, fire.y], "kind": "camp", "radius": 4, "name": camp["name"],
 			"holder": "nobody" if mix == "trader" else "bandits", "worth": 2 if camp["size"] == 6 else 1, "mix": mix}
 		if camp.get("truce", false):
@@ -408,7 +427,10 @@ func _camps(camps: Array[Dictionary]) -> void:
 		var taken: Dictionary[Vector2i, bool] = {fire: true}
 		if mix != "bandit":
 			var stand := fire + side
-			var bed := fire + side - facing
+			# His bed under his canvas, in its back half (905: standing room in
+			# the front half only), his bedroll across it: the cell half a metre
+			# behind the tent's centre.
+			var bed := Vector2i((centres[count - 1] - Vector2(facing) * TENT_BED_BACK).round())
 			config["places"][camp["key"] + "_trader"] = {"at": [stand.x, stand.y], "kind": "trader", "radius": 2,
 				"name": "a trader", "facing": [-side.x, -side.y], "bed": [bed.x, bed.y],
 				"rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y]}
@@ -450,10 +472,22 @@ func _camps(camps: Array[Dictionary]) -> void:
 			var sack := rect.position + Vector2i(i, 0) if facing.y > 0 else rect.end - Vector2i.ONE - Vector2i(i, 0)
 			if facing.x != 0:
 				sack = Vector2i(rect.position.x if facing.x > 0 else rect.end.x - 1, rect.position.y + i)
+			# One under a tent's low back goes a cell further behind it.
+			if centres.any(func(centre: Vector2) -> bool: return _under_tent(Vector2(sack), centre, facing)):
+				sack -= facing
 			if not taken.has(sack):
 				decor.append([sack.x, sack.y, facing.x, facing.y, "sack", 1])
 				taken[sack] = true
 	config["decor"] = decor
+
+
+## Whether [param cell] lies under the tent at [param centre] in a camp facing
+## [param facing] (art-kit's footprint: 2.5 m wide, 1.45 m before its centre
+## to 1.55 m behind it).
+static func _under_tent(cell: Vector2, centre: Vector2, facing: Vector2i) -> bool:
+	var front := Vector2(facing)
+	var off := cell - centre
+	return absf(off.dot(Vector2(-front.y, front.x))) <= TENT_HALF_WIDE and off.dot(front) <= TENT_BEFORE and off.dot(front) >= -TENT_BEHIND
 
 
 ## The links: back to the wilds at [param east], on to the stronghold

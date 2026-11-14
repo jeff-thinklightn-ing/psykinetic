@@ -48316,6 +48316,23 @@ monster_test _test_bandit_rows (the rows fight as the robbers', drawn in a vest;
 plainly); world_map_test (the factions, the layers). Server and data only, protocol unchanged, no
 new class_name.
 
+793 amended (1): the camps' beds under their tents, and each camp's tents named (the script's label;
+the coordinator, 11-13, with art-kit's 905 rework of the tent, in art-kit's take). 905 makes two tents
+that open toward the fire: 1, the bandits' hide shelter, and 2, the traders' canvas with its long side
+raised as an awning; there is standing room in the front half only, and the roof comes down to the
+ground behind. A camp's building entry now says which tent stands where: "tents", one variant per tent in
+BuildingComposer._camp's order (index 0 at the side's minus end, 1 at its plus end; a small camp has
+one tent, a large one two; a missing entry is 1). Forest: C1 [2] and C5 [2] (traders'); C2 [1], C4 [1,1]
+and C6 [1] (bandits'); C3 [1,2] and C7 [1,2] (mixed, the canvas on the trader's side). Hills: the two
+roadside rests (777) [2], set in tools/make_hills.gd. Each sleeping trader's bedroll lies across its
+canvas tent's back half: C1 (153,38) to (152,39), C3 (100,71) to (98,71), C5 (124,146) to (123,145), C7
+(172,172) to (172,173), each within 0.1 m of the tent's middle line and 0.1 to 0.6 m behind its centre,
+with its step unchanged. Each trader place's "bed" moves with its bedroll to the same cell, so npc's
+bed_at reads its head from that bedroll's step. Two sacks were under the hide's low back and move one
+cell further behind: C2's (188,89) to (187,89) and C6's (49,164) to (48,164). The sacks behind C3's, C4's
+and C7's tents stay, 1.6 m behind the centre at the hems' line. Decor is never solid, so no walk or camp
+cell changes. Levels data and tools/make_hills.gd; protocol unchanged; no new class_name.
+
 ## 793, pc-character's side: the bandits dressed for the forest
 
 PersonLook learns "clothes=forest", the word enemy-ai's bandit rows already said (c5486e10; release's
