@@ -108,6 +108,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, import, `bash
   tests/land.sh` (it sees your take and doesn't queue again), push,
   `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> $kind`.
+  Fetch and rebase onto `origin/main` before you take the gate as well as after the lock, so
+  the gate's waiter runs main's code: a take queued from an older checkout is judged by that
+  older code until the tree rebases (394 amended (53), (54); `heavy_job.sh status` lists each
+  take "on older gate code"). The fetch and rebase after the lock's take stay as they are: they
+  make the tested sha main's tip.
   Since 667 amended (3) (ffeb4a634) a land script's push is `sh tools/land_push.sh <tree>
   <tested sha>` in place of its own `git push`: `<tree>` is the lock take's name, `<tested
   sha>` the 40-hex sha the `LANDING TESTS: PASS ... tested <sha>` line names, called only
