@@ -9882,7 +9882,6 @@ func _test_alert_note() -> void:
 const DESPAWN_PENDING := {
 	"Companion": ["_held_foe", "_mine_seam", "shelter_lead", "action_target"],  # companions: super(gone) in Companion.forget and its two fields
 	"Resident": ["_foe"],  # npc
-	"Seam": ["struck_by"],  # the mines (769)
 }
 
 

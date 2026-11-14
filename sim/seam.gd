@@ -62,6 +62,15 @@ func _init() -> void:
 	replicate("spent")
 
 
+## Whatever left the world is forgotten (897, World.despawn's
+## GridEntity.forget): its last striker, and the tick of that blow with it.
+func forget(gone: GridEntity) -> void:
+	super(gone)
+	if struck_by == gone:
+		struck_by = null
+		struck_at = -1
+
+
 ## Its state written into its spawn spec's props, for the snapshot.
 func keep() -> void:
 	var props: Dictionary = spawn_spec.get("props", {})

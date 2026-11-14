@@ -54434,6 +54434,8 @@ Read guards (806 amended (20)) stay; this clears the holds themselves.
   _held_foe, _mine_seam, and the base's fields through super(gone) (companions, with Main's
   _on_entity_despawned loop moved in that take); Resident._foe (npc); Seam.struck_by (the mines,
   769). Guide is RefCounted, in no zone: its pet and leader are Companion.forget's to clear.
+- Seam's side (the mines, dungeon): Seam.forget clears struck_by, and struck_at with it, after
+  super(gone); Seam is out of DESPAWN_PENDING.
 - Cost: one pass over the loaded zones' entities a despawn, nothing a tick: 11.1 µs a despawn over
   287 entities on a quiet box (57-59 beside five soaks).
 
