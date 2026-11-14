@@ -53776,6 +53776,10 @@ default now; a test turns them off by the switch or each by hand.
   7deb93851 drew it; drawn only while the room's knight has his remains laid (AstralKnight.
   remains_laid, replicated), checked in _sync_puppets only in a room that has a bier, and hidden
   otherwise. Drawn only: the sim's Senses keep the barrow as dark as before.
+- The cell to lay from (Main.altar_beside, the coordinator's word): never a cell another body
+  holds, the knight's among them; the one held cell it names is the caller's own, held by a
+  player. Before, any cell named as the caller's counted as free, so a player put on his cell (a
+  shove, a bring-back's spot) would have been told to lay from under him.
 - Lore's crypt.relic_charges (9eecf3d4a: the remains laid on the knight's altar charge the amulet,
   not Aldous) and voice's abouts for the Encolpion Amulet and the holy remains ride this commit.
 - Test-only: the console's "rest draugr [<zone>]" (the "hp" verb's gate, --test-hp with a

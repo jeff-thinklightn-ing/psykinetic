@@ -6891,11 +6891,15 @@ func _test_full_circle_on() -> void:
 			knight = entity
 	var on_him: Array[Vector2i] = []
 	if bier.has_area() and knight != null:
-		# From every cell a player can stand on: not one another body holds (the
-		# knight holds his own; altar_beside counts only the caller's cell as theirs).
+		# From every walkable cell, his own among them (a shove or a bring-back
+		# could put a player there): the pick never names a cell another body
+		# holds; only the caller's own cell, held by a player, may be named.
 		for cell in Level.rect_cells(bier.grow(4)):
-			var holder: GridEntity = World.get_entity_at(cell)
-			if World.is_walkable(cell) and (holder == null or holder is Player) and _main.altar_beside(bier, cell) == knight.tile:
+			if not World.is_walkable(cell):
+				continue
+			var picked: Vector2i = _main.altar_beside(bier, cell)
+			var holder: GridEntity = World.get_entity_at(picked) if picked != Main.NONE else null
+			if picked == knight.tile or holder != null and not (picked == cell and holder is Player):
 				on_him.append(cell)
 	_check(bier.has_area() and knight != null and World.get_entity_at(knight.tile) == knight and on_him.is_empty(),
 		"from any cell near the bier, the cell to lay from is never the knight's (%s, from %s)" % [knight.tile if knight != null else World.NO_CELL, on_him])

@@ -24794,13 +24794,17 @@ func _update_altar() -> void:
 ## The free floor cell round the bier [param bier] (a king's step from it)
 ## nearest [param from], NONE if none: where a walk to lay the remains ends.
 ## The bier is solid, so _beside's hand's reach into its cell never holds.
+## Never a cell another body holds, the knight's among them (896's
+## switch-on, the coordinator): the one held cell it may name is [param
+## from] held by a player, the caller standing there.
 func altar_beside(bier: Rect2i, from: Vector2i) -> Vector2i:
 	var best := NONE
 	var ring := bier.grow(1)
 	for y in range(ring.position.y, ring.end.y):
 		for x in range(ring.position.x, ring.end.x):
 			var cell := Vector2i(x, y)
-			if bier.has_point(cell) or not World.is_walkable(cell) or World.get_entity_at(cell) != null and cell != from:
+			var holder: GridEntity = World.get_entity_at(cell)
+			if bier.has_point(cell) or not World.is_walkable(cell) or holder != null and not (cell == from and holder is Player):
 				continue
 			if best == NONE or World.distance(from, cell) < World.distance(from, best):
 				best = cell
