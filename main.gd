@@ -10775,8 +10775,8 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		say_to_pair(player.owner_peer, you_line, line, there)
 		if tier >= 0 and not knight.is_empty():
 			World.into_pack(player, World.mint_relic(knight, tier, player))
-			say_to(there, SEPULCHER_PLAQUE % knight)  # The carved words alone (voice: read as carved).
-			say_to_pair(player.owner_peer, "You take the holy remains, for the altar.", "%s takes the holy remains, for the altar." % record.name, there)
+			say_to(there, sepulcher_plaque() % knight)  # The carved words alone (voice: read as carved).
+			say_to_pair(player.owner_peer, "You take the holy remains, %s." % remains_for(), "%s takes the holy remains, %s." % [record.name, remains_for()], there)
 		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
 
@@ -10812,8 +10812,8 @@ func remains_unpaid(player_ids: Array) -> int:
 			continue
 		World.into_pack(player, World.mint_relic(knight, RELIC_UNPAID, player))
 		var there := World.peers_in(player.zone)
-		say_to(there, SEPULCHER_PLAQUE % knight)  # The carved words alone, as barrow_won says them.
-		say_to_pair(player.owner_peer, "You take the holy remains, for the altar.", "%s takes the holy remains, for the altar." % record.name, there)
+		say_to(there, sepulcher_plaque() % knight)  # The carved words alone, as barrow_won says them.
+		say_to_pair(player.owner_peer, "You take the holy remains, %s." % remains_for(), "%s takes the holy remains, %s." % [record.name, remains_for()], there)
 		given += 1
 	return given
 
@@ -10859,6 +10859,21 @@ func say_to_pair(actor_peer: int, you_line: String, others_line: String, peers: 
 ## The knight's sepulcher's plaque (714, lore's line, Jeff passed), said
 ## as a winner takes the relic: %s the knight.
 const SEPULCHER_PLAQUE := "Here rest the holy remains of %s, knight of Theus, until the altar calls them home."
+## The plaque with the knight's bier on (896's switch-on; lore's words, kept
+## by voice): the remains go to the bier above, not the temple's altar.
+const SEPULCHER_PLAQUE_BIER := "Here rest the holy remains of %s, knight of Theus, until they are laid on the bier above."
+
+
+## The plaque's words by the switch (altar_turn_in): off, "the altar" is the
+## temple's and true; on, the bier above (voice).
+func sepulcher_plaque() -> String:
+	return SEPULCHER_PLAQUE_BIER if altar_turn_in else SEPULCHER_PLAQUE
+
+
+## What a winner takes the remains for, by the same switch (voice): his bier
+## on, the temple's altar off.
+func remains_for() -> String:
+	return "for his bier" if altar_turn_in else "for the altar"
 
 
 ## The level the holy knights lie in (714): its generation names the one.
@@ -11692,7 +11707,7 @@ var full_circle := true:
 		throne_home = on
 		altar_turn_in = on
 ## The card's step (the coordinator's words).
-const ALTAR_STEP := "Bring his remains to the altar"
+const ALTAR_STEP := "Bring his remains to his bier"
 
 
 ## The bier the fallen knight stands by in zone [param zone_name] (896):
@@ -11723,17 +11738,7 @@ func knights_altar(zone_name: String) -> Rect2i:
 ## generation's knight (barrow_knight; any knight's before the first
 ## generation names one), -1 for none.
 func knights_relic_slot(player: Player) -> int:
-	var knight := barrow_knight()
-	var any := -1
-	for slot in player.slots.size():
-		var relic := World.relic_of(World.slot_uid(player, slot))
-		if relic.is_empty():
-			continue
-		if knight.is_empty() or str(relic.get("knight", "")) == knight:
-			return slot
-		if any < 0:
-			any = slot  # 896 amended (1): a brother's (an earlier generation's knight) if none of his own.
-	return any
+	return AstralKnight.relic_slot(player, barrow_knight())  # 896 amended (1): a brother's if none of his own.
 
 
 ## [param player] lays the knight's remains by a click or E on his altar
@@ -11742,12 +11747,13 @@ func knights_relic_slot(player: Player) -> int:
 func _altar_asked(player: Player, at: Vector2i) -> void:
 	if not altar_turn_in or not _beside_rect(player.tile, knights_altar(player.zone)) or not knights_altar(player.zone).has_point(at):
 		return
+	var laid := AstralKnight.relic_whose(player, barrow_knight())  # Read before the laying takes them.
 	if barrow_quest_of(player.player_id) == "carried":
 		if barrow_quest_step(player.player_id, "lay"):
-			_knight_thanks(player)
+			_knight_thanks(player, laid)
 		return
 	if _lay_again(player):
-		_knight_thanks(player)
+		_knight_thanks(player, laid)
 
 
 ## Server: [param player] lays a holy knight's remains on his altar off the
@@ -11778,10 +11784,14 @@ func _knight_says(zone_name: String, words: String) -> void:
 
 
 ## The party line of [param player]'s laying (his thanks itself is said by
-## _lay_remains, which knows what it charged).
-func _knight_thanks(player: Player) -> void:
-	say_to_pair(player.owner_peer, "You lay %s remains on the altar." % AstralKnight.whose(),
-		"%s lays %s remains on the altar." % [_display_name(player), AstralKnight.whose()], World.peers_in(player.zone))
+## _lay_remains, which knows what it charged): [param laid] whose remains
+## they were (AstralKnight.relic_whose, read before the laying), his own or
+## a brother's (voice's words).
+func _knight_thanks(player: Player, laid: String) -> void:
+	if laid.is_empty():
+		laid = AstralKnight.whose()
+	say_to_pair(player.owner_peer, "You lay %s remains on the bier." % laid,
+		"%s lays %s remains on the bier." % [_display_name(player), laid], World.peers_in(player.zone))
 
 
 ## Server: [param player]'s knight's remains taken off them and laid (896):
@@ -11797,7 +11807,7 @@ func _lay_remains(player: Player, quest := true) -> bool:
 		return false
 	var uid := World.slot_uid(player, slot)
 	var relic := World.relic_of(uid)
-	if not World.consume(player, uid, "laid on the knight's altar"):
+	if not World.consume(player, uid, "laid on the knight's bier"):
 		return false
 	var record: PlayerRecord = _records.get(player.player_id)
 	if quest:
@@ -11813,7 +11823,7 @@ func _lay_remains(player: Player, quest := true) -> bool:
 	var added := charge_from_relic(player, tier)
 	_knight_says(player.zone, laid_words(quest, added, tier, knight, barrow_knight()))
 	_tell_priests_laid(player, knight if not knight.is_empty() else "the knight")
-	print("[relic] the remains of %s laid on the knight's altar, %d charge(s) added" % [knight if not knight.is_empty() else "the knight", added])
+	print("[relic] the remains of %s laid on the knight's bier, %d charge(s) added" % [knight if not knight.is_empty() else "the knight", added])
 	return true
 
 
@@ -11841,7 +11851,7 @@ func _tell_priests_laid(player: Player, knight: String) -> void:
 	for town: String in _towns_with_priests():
 		var priest := _priest_of(town)
 		if not priest.is_empty():
-			Townsfolk.learn(World.production, priest, "%s laid the remains of %s on the knight's altar in the crypt's First Hall." % [who, knight])
+			Townsfolk.learn(World.production, priest, "%s laid the remains of %s on the bier in the crypt's First Hall." % [who, knight])
 
 
 ## The rect of zone [param zone_name]'s "lair" anchor (580's Hall of Fallen
@@ -12490,9 +12500,9 @@ func _all_fallen_tick() -> void:
 ## to be Aldous's for a holy knight's remains; voice's words, lore's check).
 const SPENT_LINE := "Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below."
 ## SPENT_LINE once the knight's altar charges it (896 amended (1), voice's words).
-const SPENT_LINE_ALTAR := "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar."
+const SPENT_LINE_ALTAR := "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his bier."
 ## Aldous handed remains while the altar charges (896 amended (1), voice's words).
-const ALDOUS_BACK := "You came back, and whole! These belong on the knight's altar, in the crypt's First Hall. Lay them there."
+const ALDOUS_BACK := "You came back, and whole! These belong on the knight's bier, in the crypt's First Hall. Lay them there."
 
 
 ## Server: [param by] begins to bring back the downed [param body] (held E
@@ -17054,7 +17064,9 @@ func boss_in_sight() -> GridEntity:
 		return null
 	var best: GridEntity = null
 	for entity in World.monsters():
-		if entity.spawned and entity.hp > 0 and entity.zone == player.zone and BossBar.is_boss(entity):
+		# A body that holds no cell (a draugr gone to rest, his remains on the
+		# seat) is not in sight: the bar stood over a rested draugr (v0.1.214).
+		if entity.spawned and entity.hp > 0 and entity.holds_cell and entity.zone == player.zone and BossBar.is_boss(entity):
 			var d := World.distance(entity.tile, player.tile)
 			if d <= BossBar.SIGHT and (best == null or d < World.distance(best.tile, player.tile)):
 				best = entity
@@ -26249,7 +26261,12 @@ func _rest_command(words: PackedStringArray) -> String:
 			var draugr := entity as Draugr
 			if draugr.resting():
 				return "rest draugr: the draugr in %s already rests" % zone_name
+			# In his zone, as a fight's end lays him: lay_to_rest vacates his cell
+			# and stills the dead in World's current zone (a rest asked from
+			# another zone vacated a cell there, 11-13's saturn stop at (49,74)).
+			var was := World.enter_named(zone_name)
 			draugr.lay_to_rest()
+			World.enter(was)
 			print("[test] rest draugr: %s's draugr laid to rest (896)" % zone_name)
 			return "rest draugr: %s's draugr laid to rest" % zone_name
 	return "rest draugr: no draugr in %s" % zone_name

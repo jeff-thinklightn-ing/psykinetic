@@ -53986,6 +53986,38 @@ and a stand saved on (49,77) or (30,8) land on open floor; no cell laid from bes
 knight's); the throne test lays him to rest by the console; the quest's and Aldous's own paths turn
 the altar off for their cases and on again after. resident_test likewise. Protocol unchanged; no new
 class_name; the bullet (voice's words) stays under Unreleased until playtest walks the circle joined.
+
+896 amended (4) (dungeon; the full circle's follow-up, the coordinator's rows after the switch-on
+landed; label from tools/decision_number.sh). The knight's slab is "the bier" wherever a player
+meets it with the switch on (voice's sweep; lore's crypt.relic_charges already says so):
+- On-side lines changed outright (each said only with altar_turn_in on): Main.ALTAR_STEP "Bring
+  his remains to his bier"; _lay_remains' consume note and log "laid on the knight's bier";
+  _tell_priests_laid "on the bier in the crypt's First Hall"; SPENT_LINE_ALTAR and ALDOUS_BACK
+  (voice's words, "his bier", "the knight's bier"); AstralKnight.AWAIT and REVEALED_ALTAR "to this
+  bier"; LAY_TITLE and LAY_WORDS "on the bier" (dungeon's, by voice's rule, sent to voice).
+- Lines with both sides split on the switch: the sepulcher's plaque (Main.sepulcher_plaque():
+  on, lore's "until they are laid on the bier above", SEPULCHER_PLAQUE_BIER; off, "until the altar
+  calls them home") and the taking line in barrow_won and remains_unpaid (Main.remains_for(): "for
+  his bier" on, "for the altar" off, the temple's and true there).
+- The party line of a laying names whose remains were laid, read before the laying takes them
+  (AstralKnight.relic_whose, on the pack slot a laying takes, AstralKnight.relic_slot, which
+  Main.knights_relic_slot now calls): "You lay Sir Ansel the Faithful's remains on the bier." and
+  "<player> lays ...", a brother's by his own name, and "a brother knight's remains" for remains
+  with no name (voice's words). Before, both the click and the knight's row named the generation's
+  knight, a brother's remains too.
+- Main.boss_in_sight skips a body that holds no cell: a draugr at rest is vacated with his remains
+  on the seat, and the bar stood over him (seen in v0.1.214).
+- Test-only: the console's "rest draugr" lays him to rest in his own zone (World.enter_named
+  around Draugr.lay_to_rest, World put back after): asked from another zone, it vacated a cell in
+  the zone World was in and his seat stayed held (11-13's headless stop at (49,74)). Play never
+  made this; the fight's end runs in his zone.
+The old temple path's lines (Aldous laying them on the temple's altar, offers.gd's "for the
+altar" rows) stay untouched while altar_turn_in is the way back: they are unreachable with it on
+and true with it off, and come out with the switch in the cleanup take. level_test: the plaque and
+taking lines read the side that is on, and both sides' words are held once; the lay line named for
+his own remains, a brother's and the knight's row; the console's rest asked from another zone
+frees his own zone's seat and leaves World where it was; the boss bar over him seated and gone at
+rest. Protocol unchanged; no new class_name.
 ## 868. A tavern's hearth burning: its flame and light at the fireplace, from the tavern place's hearth
 
 The coordinator's go, 11-11, package "a newcomer can mend in town", on: the Mughouse's hearth

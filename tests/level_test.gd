@@ -3003,10 +3003,10 @@ func _test_barrow_won() -> void:
 	_check(not knight.is_empty() and won.size() == relics_before + 1 and World.relic_of(won[-1]) == {"knight": knight, "tier": 1} and World.soulbound(won[-1]),
 		"from the sepulcher, the holy remains of %s at the normal deal's tier, bound to the winner, in their pack (%s)" % [knight, World.relic_of(won[-1]) if not won.is_empty() else {}])
 	_check(_main.party_log.last(3) == ["The draugr yields. %s is blessed and takes up the %s, uncharged." % [record.name, Items.name_of(World.TOTEM)],
-			Main.SEPULCHER_PLAQUE % knight, "%s takes the holy remains, for the altar." % record.name],
+			_main.sepulcher_plaque() % knight, "%s takes the holy remains, %s." % [record.name, _main.remains_for()]],
 		"the win, the plaque as its own line and the taking kept in the party log in the third person (%s)" % [_main.party_log.last(3)])
 	_check(_heard.slice(-3) == ["The draugr yields. You are blessed, and take up the %s, uncharged." % Items.name_of(World.TOTEM),
-			Main.SEPULCHER_PLAQUE % knight, "You take the holy remains, for the altar."],
+			_main.sepulcher_plaque() % knight, "You take the holy remains, %s." % _main.remains_for()],
 		"and on the winner's screen as said to them (133 amended (2)): \"You are blessed\", the plaque's carved words, \"You take\" (%s)" % [_heard.slice(-3)])
 	var others_from := _heard.size()
 	var another := Net.local_id + 1000  # A peer not this one: its you-line goes to it, never here.
@@ -3045,8 +3045,8 @@ func _test_barrow_won() -> void:
 	var unpaid_before: int = unpaid_of.call()
 	_check(_main.remains_unpaid([id, "nobody"]) == 1 and unpaid_of.call() == unpaid_before + 1 and World.totem_charges(uid) == charges_were
 		and record.marks == marks_were and record.barrow == best_was
-		and _main.party_log.last(2) == [Main.SEPULCHER_PLAQUE % knight, "%s takes the holy remains, for the altar." % record.name]
-		and _heard.slice(-2) == [Main.SEPULCHER_PLAQUE % knight, "You take the holy remains, for the altar."],
+		and _main.party_log.last(2) == [_main.sepulcher_plaque() % knight, "%s takes the holy remains, %s." % [record.name, _main.remains_for()]]
+		and _heard.slice(-2) == [_main.sepulcher_plaque() % knight, "You take the holy remains, %s." % _main.remains_for()],
 		"beaten unpaid: the holy remains of %s at no tier, the plaque and the taking said as a winner's are; no charge, no mark, best unchanged; nobody without a record (%s %s)" % [knight, _main.party_log.last(2), _heard.slice(-2)])
 	# 714, dungeon's side (1): a relic laid on the altar charges the amulet
 	# with its tier's deal, up to the room; the spill said.
@@ -3081,7 +3081,7 @@ func _test_barrow_won() -> void:
 	World.lay_downed(player, 300)
 	_heard.clear()
 	_check(not _main._start_channel(player, player) and _heard.slice(-1) == [Main.SPENT_LINE_ALTAR]
-		and Main.SPENT_LINE_ALTAR == "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar.",
+		and Main.SPENT_LINE_ALTAR == "Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his bier.",
 		"at zero charges: no return, and the spent amulet's line on their screen, the knight's altar its way back since 896's switch-on (%s)" % [_heard.slice(-1)])
 	World.raise_downed(player, player.max_hp)
 	_main.reset_barrow(id)
@@ -6052,8 +6052,9 @@ func _test_barrow_quest() -> void:
 	var laid: Dictionary = knight.accept_offer(player, {"id": "quest:%d:lay" % knight.id}, 0)
 	_check(laid["ok"] and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty()
 		and _main.knights_relic_slot(player) < 0 and str(knight.offers_for(id)[0]["words"]) == AstralKnight.DONE_LAID
-		and knight.remains_laid and knight.spawn_spec["props"].get("remains_laid") == true,
-		"laid by his row: the remains gone from the pack, the quest done, the card closed, his thanks after (%s)" % [laid])
+		and knight.remains_laid and knight.spawn_spec["props"].get("remains_laid") == true
+		and str(laid.get("you_line", "")) == "You lay %s's remains on the bier." % (sir if not sir.is_empty() else "Sir Test"),
+		"laid by his row: the remains gone from the pack, the quest done, the card closed, his thanks after, the line naming them on the bier (%s)" % [laid])
 	_main.altar_turn_in = false
 	_main.reset_barrow(id)
 	World.despawn(knight)
@@ -6792,12 +6793,27 @@ func _test_throne_home() -> void:
 	Net.test_hp = false
 	var refused: String = _main.admin_command("rest draugr")
 	Net.test_hp = true
+	# Asked from another zone (11-13's saturn stop at (49,74): the rest
+	# vacated a cell in the zone World was in, and his seat stayed held).
+	var bar_before: bool = _main.boss_in_sight() == draugr
+	var seat_at: Vector2i = draugr.tile
+	var other := ""
+	for each: String in World.zones:
+		if each != "barrow_deep":
+			other = each
+	var was_zone := World.enter_named(other) if not other.is_empty() else World.zone
 	var rested: String = _main.admin_command("rest draugr")
+	var still_other: bool = World.zone.name == other
 	var again: String = _main.admin_command("rest draugr")
+	World.enter(was_zone)
 	Net.test_hp = had_hp
 	_check(refused.begins_with("unknown command") and rested == "rest draugr: barrow_deep's draugr laid to rest" and draugr.resting()
 		and again == "rest draugr: the draugr in barrow_deep already rests",
 		"the test-only console lays him to rest, once; without --test-hp it is unknown, as on the box (%s / %s / %s)" % [refused, rested, again])
+	_check(not other.is_empty() and still_other and World.get_entity_at(seat_at) != draugr and not draugr.holds_cell,
+		"asked from another zone (%s): his own zone's seat freed, World left where it was (%s)" % [other, seat_at])
+	_check(bar_before and _main.boss_in_sight() == null,
+		"the boss bar: over him seated, gone once he rests and holds no cell (in v0.1.214 it stood over him)")
 	# A joined client's mirror: his going (replicated "gone") frees his seat
 	# there too, so a click's route can end on the throne (look_circle3).
 	var kept_mode: int = Net.mode
@@ -6893,6 +6909,16 @@ func _test_throne_home() -> void:
 func _test_full_circle_on() -> void:
 	print("\n== package full circle switched on (896) ==")
 	_check(_main.full_circle and _main.throne_home and _main.altar_turn_in and AstralKnight.altar_on, "on by default: the throne, the altar and his words")
+	# The sepulcher's plaque and the taking line by the switch (voice): on, the bier above; off, the temple's altar.
+	var plaque_on: String = _main.sepulcher_plaque()
+	var for_on: String = _main.remains_for()
+	_main.altar_turn_in = false
+	var plaque_off: String = _main.sepulcher_plaque()
+	var for_off: String = _main.remains_for()
+	_main.altar_turn_in = true
+	_check(plaque_on == "Here rest the holy remains of %s, knight of Theus, until they are laid on the bier above." and for_on == "for his bier"
+		and plaque_off == "Here rest the holy remains of %s, knight of Theus, until the altar calls them home." and for_off == "for the altar",
+		"the plaque and the taking: the bier above when on, the temple's altar when off (%s / %s)" % [for_on, for_off])
 	# The test-only relic verb (playtest's walk): a brother's remains in the pack, by name.
 	var had_hp: bool = Net.test_hp
 	Net.test_hp = true
@@ -7048,10 +7074,18 @@ func _test_altar_charges() -> void:
 	var uid: int = lay.call(own, 0)
 	_check(not player.slot_items.has(uid) and charges.call() > before and said == [AstralKnight.LAID_AGAIN] and Main.QUEST_DONE in record.marks,
 		"a later run, his own remains: laid, the amulet charged, his thanks again (%s, %d -> %d)" % [said, before, charges.call()])
+	_check(_heard.slice(-1) == ["You lay %s's remains on the bier." % own]
+		and _main.party_log.last(1) == ["%s lays %s's remains on the bier." % [_main._display_name(player), own]],
+		"the party line names his remains, on the bier (voice): to the layer and in the log (%s, %s)" % [_heard.slice(-1), _main.party_log.last(1)])
 	before = charges.call()
 	uid = lay.call("Sir Brother of the Test", 0)
 	_check(not player.slot_items.has(uid) and charges.call() > before and said == [Main.laid_words(false, 1, 0, "Sir Brother of the Test", sir)],
 		"an earlier generation's knight: taken, charged, his thanks by whose they are (%s)" % [said])
+	_check(_heard.slice(-1) == ["You lay Sir Brother of the Test's remains on the bier."]
+		and _main.party_log.last(1) == ["%s lays Sir Brother of the Test's remains on the bier." % _main._display_name(player)],
+		"a brother's: the party line names the remains laid, not the generation's knight (%s)" % [_heard.slice(-1)])
+	_check(AstralKnight.laid_whose("") == "a brother knight's" and AstralKnight.laid_whose("Sir Ansel the Faithful") == "Sir Ansel the Faithful's",
+		"remains with no name read as a brother knight's (voice)")
 	_check(Main.laid_words(false, 1, 0, "Sir Brother of the Test", "Sir Own") == AstralKnight.LAID_BROTHER
 		and Main.laid_words(false, 1, 0, "Sir Own", "Sir Own") == AstralKnight.LAID_AGAIN and Main.laid_words(false, 0, -1, "Sir Own", "Sir Own") == AstralKnight.LAID_NO_BLESSING
 		and Main.laid_words(true, 3, 0, "Sir Own", "Sir Own") == AstralKnight.LAID_QUEST and Main.laid_words(true, 0, 0, "Sir Own", "Sir Own") == AstralKnight.LAID,

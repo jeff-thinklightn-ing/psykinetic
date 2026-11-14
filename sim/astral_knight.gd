@@ -28,10 +28,10 @@ const DONE := "The way below is open to you. My remains wait in the Hall of Fall
 ## reveal sends the remains back to this hall's altar, not to Aldous; a
 ## player without them hears AWAIT, one carrying them is asked to lay them
 ## (LAY_TITLE, the coordinator's words), and once laid he thanks them.
-const REVEALED_ALTAR := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this altar, and let me rest."
-const AWAIT := "My remains wait in the Hall of Fallen Souls. Bring them here, to this altar."
-const LAY_TITLE := "Lay my remains on the altar"
-const LAY_WORDS := "You carry my bones. Lay them here, on the altar."
+const REVEALED_ALTAR := "Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this bier, and let me rest."
+const AWAIT := "My remains wait in the Hall of Fallen Souls. Bring them here, to this bier."
+const LAY_TITLE := "Lay my remains on the bier"
+const LAY_WORDS := "You carry my bones. Lay them here, on the bier."
 const LAID := "I am home. Thank you."
 const DONE_LAID := "My bones are home. Go well."
 ## His thanks charges the amulet (896 amended (1); Jeff, 11-12: "the knight's
@@ -109,11 +109,16 @@ func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 	if offer_id.ends_with(":ask") and at == "ask" and _quest_step(player.player_id, "take"):
 		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name,
 			"you_line": "You take up the fallen knight's task."}
-	if offer_id.ends_with(":lay") and at == "carried" and _quest_step(player.player_id, "lay"):
-		# 896: his remains on the altar, the same as a click on it; his thanks said by Main's laying
-		# (896 amended (1): which thanks follows the charge).
-		return {"ok": true, "say": "", "line": "%s lays %s remains on the altar." % [player.name, whose()],
-			"you_line": "You lay %s remains on the altar." % whose()}
+	if offer_id.ends_with(":lay") and at == "carried":
+		# 896: his remains on the bier, the same as a click on it; his thanks said by Main's laying
+		# (896 amended (1): which thanks follows the charge). The line names whose remains were
+		# laid, read before the laying takes them (voice).
+		var laid := relic_whose(player, _generation_knight())
+		if laid.is_empty():
+			laid = whose()
+		if _quest_step(player.player_id, "lay"):
+			return {"ok": true, "say": "", "line": "%s lays %s remains on the bier." % [player.name, laid],
+				"you_line": "You lay %s remains on the bier." % laid}
 	if offer_id.ends_with(":turn_in") and at == "ready" and _quest_step(player.player_id, "turn_in"):
 		said.emit(REVEALED_ALTAR if altar_on else REVEALED)
 		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % player.name,
@@ -151,8 +156,48 @@ func ask_words() -> String:
 ## Whose remains, for the party lines (voice): his name's, as ASK_WORDS
 ## names him, "the knight's" before a generation names one (ASK_UNNAMED).
 static func whose() -> String:
+	var knight := _generation_knight()
+	return "the knight's" if knight.is_empty() else "%s's" % knight
+
+
+## The generation's knight (Main.barrow_knight, through Offers.ctx); empty
+## before a generation names one.
+static func _generation_knight() -> String:
 	var knight := str(Offers._call(Offers.ctx, "barrow_knight")) if Offers.ctx.has("barrow_knight") else ""
-	return "the knight's" if knight.is_empty() or knight == "<null>" else "%s's" % knight
+	return "" if knight == "<null>" else knight
+
+
+## The slot of [param player]'s pack holding the holy knight's remains a
+## laying takes (896 amended (1); Main.knights_relic_slot): [param knight]'s,
+## the generation's, first; else a brother's (an earlier generation's
+## knight's); any knight's before a generation names one ([param knight]
+## empty). -1 for none.
+static func relic_slot(player: Player, knight: String) -> int:
+	var any := -1
+	for slot in player.slots.size():
+		var relic := World.relic_of(World.slot_uid(player, slot))
+		if relic.is_empty():
+			continue
+		if knight.is_empty() or str(relic.get("knight", "")) == knight:
+			return slot
+		if any < 0:
+			any = slot
+	return any
+
+
+## Whose remains a laying by [param player] would take (relic_slot), as a
+## party line names them (voice's words): "Sir Ansel the Faithful's", or "a
+## brother knight's" for remains with no name; empty when they carry none.
+static func relic_whose(player: Player, knight: String) -> String:
+	var slot := relic_slot(player, knight)
+	if slot < 0:
+		return ""
+	return laid_whose(str(World.relic_of(World.slot_uid(player, slot)).get("knight", "")))
+
+
+## [param knight]'s, for a laying's party line (relic_whose).
+static func laid_whose(knight: String) -> String:
+	return "a brother knight's" if knight.is_empty() else "%s's" % knight
 
 
 func _quest(player_id: String) -> String:
