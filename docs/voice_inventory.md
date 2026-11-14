@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2975)
+## Lines in the code (2979)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -2119,7 +2119,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (781)
+### server and windows (785)
 
 | | Line | Where |
 |---|---|---|
@@ -2903,6 +2903,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | a hill cat | `main.gd` _on_cat_spotted() |
 |  | spotted a hill cat | `main.gd` _on_cat_spotted() |
 |  | came somewhere new with you | `main.gd` _discovered() |
+|  | foes: only with --test-foe=...,held | `main.gd` _foes_command() |
+|  | foes <player>: the player by name as "players" lists them | `main.gd` _foes_command() |
+|  | foes: %d players online are called %s; none laid | `main.gd` _foes_command() |
+|  | foes: %d round %s at tick %d | `main.gd` _foes_command() |
 |  | %d ms at %s | `main.gd` _report_walk() |
 
 ### the draugr (24)
