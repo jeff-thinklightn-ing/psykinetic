@@ -62,6 +62,28 @@ const NONE := Vector2i(-1, -1)
 const DECISION_INTERVAL_TICKS := 30
 ## One line of speech per this many ticks, but to her player's words.
 const SPEECH_INTERVAL_TICKS := 50
+## What a line of hers is, for her floor (decision 917): REPLY answers her
+## player (never held); DANGER is about a present danger, a fight warning, a
+## yield, a foe seen (never held, though it starts the floor); NEEDED is a
+## wound, a rest, a load, a watch (held through the floor, said when it
+## clears if still true); IDLE is a wish, a remark, a quiet moment (dropped
+## inside the floor to her next quiet moment, and never while anyone near
+## wants tending or within SETTLE_TICKS of a fight's end).
+enum Weight {REPLY, DANGER, NEEDED, IDLE}
+## Decision 917 (the coordinator, on playtest's look_flank_around3c: her
+## wish and her bandage line 0.2 s apart): any two of her unasked lines at
+## least this far apart, an always line too.
+const FLOOR_TICKS := 50
+## A needed line held this long past the floor's end, at most, then let go.
+const HELD_GRACE_TICKS := 20
+## No idle line of hers this soon after a fight ends (917): the tend first.
+const SETTLE_TICKS := 100
+## Off in a test that counts her lines without the floor (917's "before").
+static var speech_floor := true
+## On only in a test measuring (c)'s first form beside the narrowed one
+## (917): any wound of hers, her player's or one in her sight hushes her
+## idle talk, kit or not.
+static var idle_waits_any_wound := false
 ## She holds her tongue in combat (decision 675, Jeff: "they should hold
 ## their tongue during combat"): no line and no voice asked while she or her
 ## player fights (in_fight, or her intent ATTACK, DODGE or RETREAT), nor for
@@ -916,6 +938,10 @@ var _known_friends: Dictionary[int, String] = {}
 ## steps away and back is not new.
 var _adjacent_before: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
+## Her last unasked line's tick (917's floor), and a needed line held
+## through it ({"line", "until", "still", "voice"}), else {}.
+var _last_unasked_tick := -1000
+var _held_line: Dictionary = {}
 ## Decision 803: while her voice's reply is being said (a line said
 ## otherwise is a fixed one), and every companion's voice counts since the
 ## journal's last "[voice]" line (voice_report).
@@ -1329,7 +1355,7 @@ func step_aside(direction: Vector2i) -> void:
 		_yield_tile = tile
 	elif _yield_tile == NONE:
 		_yield_tile = tile
-		_say(NO_ROOM_LINE, true)
+		_say(NO_ROOM_LINE, true, false, Weight.REPLY)
 	current_intent = Intent.YIELD
 	intent_target = null
 	_yield_until = World.tick + DECISION_INTERVAL_TICKS
@@ -1627,7 +1653,7 @@ func owner_spoke(text: String, phrase := 0) -> void:
 			# Her player's word sends her at an apex (780 amended (5), order wins): wary, she goes.
 			_apex_broke = false
 			var ordered := apex_lines(_quarry, "ordered")
-			_say(ordered[World.tick % ordered.size()], true)
+			_say(ordered[World.tick % ordered.size()], true, false, Weight.REPLY)
 	if phrase == 0 and _sleeping.has("asked_at") and _answered_watch(text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
@@ -1835,7 +1861,7 @@ static func castable(cell: Vector2i) -> bool:
 func _lead_to_fish_now() -> bool:
 	var led := str(lead_to_fish.call())
 	if led == "near":
-		_say(FISH_NEAR_WATER, true)
+		_say(FISH_NEAR_WATER, true, false, Weight.REPLY)
 	return not led.is_empty()
 
 
@@ -1995,7 +2021,7 @@ func _tend_fish() -> void:
 	_fish_joined = their_cast
 	if _rod_slot() < 0:
 		var day := Townsfolk.day_of(World.steps)
-		if day != _fish_wish_day and _say(FISH_WISH, true):
+		if day != _fish_wish_day and _say(FISH_WISH, true, false, Weight.IDLE):
 			_fish_wish_day = day  # Counted only once said (805 amended (15)): the hush drops a line.
 		return
 	var spot := fish_spot_near(keeper.tile)
@@ -2043,7 +2069,7 @@ func _fish_self_start() -> bool:
 			if int(_fish_self_days.get(each, -1)) != day:
 				line = each
 				break
-	if not line.is_empty() and _say(line, true):
+	if not line.is_empty() and _say(line, true, false, Weight.IDLE):
 		# Counted only once said (805 amended (15)): within the hush after a
 		# fight the line is dropped, and kept for her next start.
 		if line == FISH_SIT:
@@ -2069,7 +2095,7 @@ func _fish_hint(text: String) -> bool:
 	var place: Dictionary = fish_lead_place.call()
 	if place.is_empty() or not (_rod_slot() >= 0 or place.has("want")):
 		return false
-	if not _say(FISH_ASK_HINT, true):
+	if not _say(FISH_ASK_HINT, true, false, Weight.REPLY):
 		return false  # Dropped by the hush (805 amended (15)): not counted.
 	_fish_hint_day = day
 	_log({"kind": "voice", "companion": _name_of(self), "trigger": text, "outcome": "hint",
@@ -2200,7 +2226,7 @@ func _tend_rest_ask() -> void:
 			or not fishing.is_empty() or _left_broke or not _alive(keeper) or World.is_downed(keeper) \
 			or World.distance(tile, keeper.tile) > REST_LEAVE or World.tick - _calm_since < REST_ASK_AFTER_S * World.TICK_RATE:
 		return
-	if _say(REST_ASK[absi(hash(_name_of(self) + str(World.tick))) % REST_ASK.size()], true):
+	if _say(REST_ASK[absi(hash(_name_of(self) + str(World.tick))) % REST_ASK.size()], true, false, Weight.NEEDED):
 		_rest_asked = true  # Counted only once said: the hush drops a line.
 		_rest_offer_at = World.tick
 		_log({"kind": "voice", "companion": _name_of(self), "trigger": "hurt after a fight", "outcome": "asked to rest",
@@ -2214,7 +2240,7 @@ func _fish_cannot(why: String) -> void:
 	var line: String = {"no_hand": FISH_NO_HAND, "no_rod": FISH_NO_HAND, "fished_out": FISH_FISHED_OUT,
 		"no_water": FISH_NO_WATER, "no_fish": FISH_NO_WATER}.get(why, "")
 	var day := Townsfolk.day_of(World.steps)
-	if not line.is_empty() and int(_fish_cannot_days.get(why, -1)) != day and _say(line, true):
+	if not line.is_empty() and int(_fish_cannot_days.get(why, -1)) != day and _say(line, true, false, Weight.NEEDED):
 		_fish_cannot_days[why] = day  # Counted only once said (805 amended (15)).
 	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "her cast", "outcome": "refused", "note": why})
 
@@ -2662,7 +2688,7 @@ func obey(read: Dictionary, text: String) -> bool:
 		# word, and the order done HESITATE_TICKS later.
 		_hesitant = {"read": read, "text": text, "at": World.tick + HESITATE_TICKS}
 		var lines: Array = loyalty().get("hesitate", ["Must I?"])
-		_say(str(lines[absi(hash(_name_of(self) + text)) % lines.size()]), true)
+		_say(str(lines[absi(hash(_name_of(self) + text)) % lines.size()]), true, false, Weight.REPLY)
 		_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "hesitates", "note": bond_step})
 		return true
 	return _carry_out(read, text)
@@ -2716,14 +2742,14 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 					# goes once it is gone (_tend_fish's _fish_resume).
 					_fish_resume = {"spot": spot, "asked": true}
 					_fish_danger_said = World.tick
-					_say(FISH_DANGER, true, true)
+					_say(FISH_DANGER, true, true, Weight.REPLY)
 					done = "%s asked you to fish, but something hostile is near: you keep your eyes on it, and fish once it is gone." % keeper_name()
 				elif spot == World.NO_CELL:
-					_say(FISH_NO_WATER, true)
+					_say(FISH_NO_WATER, true, false, Weight.REPLY)
 					done = "%s asked you to fish, but there is no water with fish in it near." % keeper_name()
 				elif _rod_slot() < 0:
 					# No rod of her own (ruling C): she comes, and keeps them company.
-					_say(FISH_NO_ROD, true)
+					_say(FISH_NO_ROD, true, false, Weight.REPLY)
 					_go_fish(spot, true)
 					done = "You have no rod of your own, so you go to the water's edge to keep %s company while they fish, as asked." % keeper_name()
 				else:
@@ -2880,7 +2906,7 @@ func _watch_deeds() -> void:
 		var heavy := int(rules.get("heavy_cells", 400))
 		if int(_deeds["heavy"]) * 2 >= heavy and not _deeds["warned_heavy"]:
 			_deeds["warned_heavy"] = true
-			_say(str(rules.get("heavy_warn", "This pack is breaking my back.")), true)
+			_say(str(rules.get("heavy_warn", "This pack is breaking my back.")), true, false, Weight.NEEDED)
 		if int(_deeds["heavy"]) >= heavy:
 			_deeds["mule_spent"] = true
 			deed.emit("mule", "worked you like a mule")
@@ -3012,7 +3038,7 @@ func _keep_watch() -> void:
 		if World.tick - int(_sleeping["asked_at"]) >= int(rules.get("answer_ticks", 200)):
 			if not _sleeping.get("asked", false):
 				# Her line asked nothing (or she let it pass): the plain ask, once, and wait again.
-				if _say(WATCH_ASK[absi(hash(_name_of(self))) % WATCH_ASK.size()], true):
+				if _say(WATCH_ASK[absi(hash(_name_of(self))) % WATCH_ASK.size()], true, false, Weight.NEEDED):
 					_sleeping["asked"] = true
 					_sleeping["asked_at"] = World.tick
 					_sleeping["their_tile"] = keeper.tile
@@ -3100,7 +3126,7 @@ func _keep_order() -> void:
 	if _ack_due >= 0 and World.tick >= _ack_due:
 		_ack_due = -1
 		if _last_speech_tick < _order_tick:
-			_say(ORDER_ACKS[absi(hash(_name_of(self))) % ORDER_ACKS.size()], true)
+			_say(ORDER_ACKS[absi(hash(_name_of(self))) % ORDER_ACKS.size()], true, false, Weight.REPLY)
 	_play_on()
 	_keep_watch()
 	_tend_rest_ask()
@@ -3653,6 +3679,7 @@ func _watch() -> void:
 			waiting.get("own", true), waiting.get("report", false))
 	elif not fight:
 		_quiet_moment()
+	_flush_held_line()
 	_tend_keeper_falling()
 	_tend_reply()
 	_tend_fish()
@@ -3860,6 +3887,7 @@ func _quiet_moment() -> void:
 	if World.tick < _quiet_next_tick:
 		return
 	if _on_errand() or current_intent in [Intent.REST, Intent.SLEEP] or order in ["rest", "watch"] \
+			or (speech_floor and not _idle_ok()) \
 			or _hostile_within(SIGHT_RANGE) or not heard_by_anyone() or mind.busy("voice") \
 			or World.tick - _keeper_spoke_tick < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE 			or World.tick - _others_spoke_tick() < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE:
 		return  # Not now: looked at again next tick (others talking near her too: not hers to cut into, 803 amended (9)).
@@ -4421,7 +4449,7 @@ func _tend_unasked() -> void:
 			_narrate("Unasked, you set about bandaging %s." % ("your own wounds" if own else "%s's wounds" % keeper_name()))
 			if not own and not told_tending:
 				told_tending = true  # Before _say, so Main's record of what she said keeps it.
-				told_tending = _say(TEND_FIRST, true)
+				told_tending = _say(TEND_FIRST, true, false, Weight.NEEDED, func() -> bool: return str(errand.get("verb", "")) == "bandage")
 			return
 
 
@@ -4454,7 +4482,7 @@ func _warm_tell() -> void:
 		# By the tick over TEND_EVERY: hash() of a string is x33 a character, so
 		# mod 3 it is its last; a tick on TEND_EVERY always ends in 0.
 		var line := WARM_TELL[absi(hash(_name_of(self) + str(World.tick / TEND_EVERY))) % WARM_TELL.size()] % str(place["name"])
-		if _say(line, true):
+		if _say(line, true, false, Weight.NEEDED):
 			_warm_spell = true
 			(told_warm["places"] as Array).append(str(place["key"]))
 			if warm_offer.is_valid():
@@ -4465,7 +4493,7 @@ func _warm_tell() -> void:
 	if told_kit_seller or not kit_seller.is_valid():
 		return
 	var seller := str(kit_seller.call())
-	if not seller.is_empty() and _say(KIT_SELLER % seller, true):
+	if not seller.is_empty() and _say(KIT_SELLER % seller, true, false, Weight.NEEDED):
 		_warm_spell = true
 		told_kit_seller = true
 		_log({"kind": "voice", "companion": _name_of(self), "trigger": "hurt, no kit, no rest", "outcome": "kit seller", "note": seller})
@@ -6329,7 +6357,7 @@ func _take_result(result: Dictionary) -> void:
 		entry["say_dropped"] = line
 		entry["note"] = "what we should do, unasked, within %d ticks of the last" % WE_SHOULD_TICKS
 		line = ""
-	elif not _say(line, always):
+	elif not _say(line, always, false, _voice_weight(spoken_to, str(result.get("trigger", "")))):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
@@ -6350,7 +6378,7 @@ func _take_result(result: Dictionary) -> void:
 		# "Are you hurt?").
 		var about_unseen := not asked_about_player(players_unseen()).is_empty()
 		var answer_line := dont_know() if about_unseen else raw_line.strip_edges() if echo == "her own line" else ""
-		if not answer_line.is_empty() and _say(answer_line, true):
+		if not answer_line.is_empty() and _say(answer_line, true, false, Weight.REPLY):
 			line = answer_line
 			entry["say"] = line
 			entry["note"] = "%s; her player's question answered: %s" % [entry.get("note", entry["outcome"]),
@@ -6402,7 +6430,12 @@ func _set_stance(wanted: int, serial: int, source: String) -> void:
 ## Says [param line] (over her, to everyone) unless the rate limit holds it
 ## back; [param always] for an answer to her player and her own notices;
 ## [param in_fight] through a fight's hush (BREAK_HOLD, 803 amended (8)).
-func _say(line: String, always: bool, in_fight := false) -> bool:
+## [param weight] (decision 917) keeps two unasked lines of hers FLOOR_TICKS
+## apart: a NEEDED one inside the floor is held and said when it clears
+## while [param still] (if given) says it is still true, and counts as said;
+## an IDLE one inside it, or while _idle_ok() says no, is not said. REPLY
+## and DANGER (and anything [param in_fight]) are never held.
+func _say(line: String, always: bool, in_fight := false, weight := Weight.NEEDED, still := Callable()) -> bool:
 	if World.is_downed(self):
 		return false  # Downed (decision 544): no word.
 	if quiet() and not in_fight:
@@ -6410,6 +6443,18 @@ func _say(line: String, always: bool, in_fight := false) -> bool:
 		return false
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
+	if in_fight:
+		weight = Weight.DANGER
+	if speech_floor and weight == Weight.IDLE and not _idle_ok():
+		return false
+	if speech_floor and weight >= Weight.NEEDED and World.tick - _last_unasked_tick < FLOOR_TICKS:
+		if weight == Weight.IDLE or not _held_line.is_empty():
+			return false  # Idle, or one already held: one at a time.
+		_held_line = {"line": line, "until": _last_unasked_tick + FLOOR_TICKS + HELD_GRACE_TICKS, "still": still,
+			"voice": _saying_voice}
+		return true
+	if weight != Weight.REPLY:
+		_last_unasked_tick = World.tick
 	_last_speech_tick = World.tick
 	if _saying_voice and _sleeping.has("asked_at") and not _sleeping.get("asked", false) and "?" in line:
 		_sleeping["asked"] = true  # Her own words asked it (621 amended (2)).
@@ -6425,6 +6470,52 @@ func _say(line: String, always: bool, in_fight := false) -> bool:
 		_talked("%s: %s" % [_name_of(self), line])
 	said.emit(line)
 	return true
+
+
+## Whether an idle line of hers may be said now (decision 917): none held,
+## the last fight SETTLE_TICKS behind her, and no tend of hers to come (her
+## player or she wanting tending while she has a kit). A wound no one here
+## can bind (no kit; another's, which she never tends) does not hush her:
+## wounds do not close on their own, and her talk would wait for a rest.
+func _idle_ok() -> bool:
+	if not _held_line.is_empty() or World.tick - _fight_ended_tick < SETTLE_TICKS:
+		return false
+	if idle_waits_any_wound:
+		return not World.get_entities().any(func(entity: GridEntity) -> bool:
+			return (entity == self or entity == keeper or ((entity is Player or entity is Companion) and entity.zone == zone
+				and World.distance(tile, entity.tile) <= PERCEPTION_RANGE)) and _wants_tending(entity))
+	if World.bandage_kit(self) < 0:
+		return true
+	return not ((_alive(keeper) and keeper.zone == zone and _wants_tending(keeper)) or _wants_tending(self))
+
+
+## Her voice's line's weight (decision 917): a reply when her player spoke
+## to her; danger with a hostile in her sight (a sighting, a fight); idle
+## for a quiet moment; else needed (a fight's end, a fall, a wound).
+func _voice_weight(spoken_to: bool, trigger: String) -> Weight:
+	if spoken_to:
+		return Weight.REPLY
+	if _hostile_within(SIGHT_RANGE):
+		return Weight.DANGER
+	if trigger.begins_with(QUIET_TRIGGER):
+		return Weight.IDLE
+	return Weight.NEEDED
+
+
+## Each tick (decision 917): a needed line held through her floor is said
+## once it clears, if still true and not past its time; else let go.
+func _flush_held_line() -> void:
+	if _held_line.is_empty() or World.tick - _last_unasked_tick < FLOOR_TICKS:
+		return
+	var held := _held_line
+	_held_line = {}
+	var still: Callable = held["still"]
+	if World.tick > int(held["until"]) or (still.is_valid() and not still.call()):
+		print("[mind] %s: a held line let go" % name)
+		return
+	_saying_voice = held["voice"]
+	_say(str(held["line"]), true, false, Weight.NEEDED)
+	_saying_voice = false
 
 
 ## Whether [param heard] (her player's words to her) asks about what she
@@ -7360,7 +7451,7 @@ func _mine_pick() -> Seam:
 	if not _mine_told and not _mine_at_seam():
 		return null
 	if not _mine_room():
-		if not _mine_full_said and _say(MINE_FULL_LINE, true):
+		if not _mine_full_said and _say(MINE_FULL_LINE, true, false, Weight.NEEDED):
 			_mine_full_said = true
 			_narrate("Your pack is full of ore: you stop mining.")
 		return null
@@ -7490,7 +7581,7 @@ func _want_answered(outcome: String) -> void:
 ## mind log with [param why] (playtest's wanttold found no row for it): not a
 ## "voice" row, so her voice's counts and quiet backoff are untouched.
 func _tell_want_plainly(why: String) -> bool:
-	if want_says.is_empty() or not _say(want_says, true):
+	if want_says.is_empty() or not _say(want_says, true, false, Weight.IDLE):
 		return false
 	want_told = true
 	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": want", "outcome": "plain line",
@@ -8083,7 +8174,7 @@ func _say_bandage(why: String, patient: GridEntity) -> void:
 	if line.is_empty():
 		line = str(says.get(why, says.get("broken", "")))
 	if not line.is_empty():
-		_say(line, true)
+		_say(line, true, false, Weight.REPLY)
 
 
 ## There: the door opened or closed, the chest looked in, the thing taken
@@ -8493,7 +8584,7 @@ func _apex_after_choose() -> void:
 			var asleep_now: bool = entity.get("asleep") == true
 			var pool := apex_lines(entity, "asleep" if asleep_now else "seen")
 			if not pool.is_empty():
-				_say(pool[World.tick % pool.size()], true)
+				_say(pool[World.tick % pool.size()], true, false, Weight.DANGER)
 			_narrate("You see %s%s: too strong to take on lightly. Keep clear of it unless %s takes it on." % [
 				refer(entity), ", asleep" if asleep_now else "", keeper_name()])
 	if _apex_broke and _hp_over(self, HP_THRESHOLDS[0]) and (not _alive(keeper) or _hp_over(keeper, HP_THRESHOLDS[0])):
@@ -8506,7 +8597,7 @@ func _apex_after_choose() -> void:
 		_apex_broke = true
 		_quarry = null
 		var broke := apex_lines(fighting, "break")
-		_say(broke[World.tick % broke.size()], true)
+		_say(broke[World.tick % broke.size()], true, false, Weight.DANGER)
 		_narrate("You break off from %s and call %s back." % [refer(fighting), keeper_name()])
 		current_intent = Intent.RETREAT
 		intent_target = null
@@ -8544,7 +8635,7 @@ func _point_out_cats() -> void:
 				or bool(entity.call("spotted_by", keeper_id)) or World.distance(keeper.tile, entity.tile) > CAT_POINT_RANGE \
 				or not senses.sees(entity):
 			continue
-		_say(CAT_POINT[World.tick % CAT_POINT.size()], true)
+		_say(CAT_POINT[World.tick % CAT_POINT.size()], true, false, Weight.DANGER)
 		_narrate("You point out %s to %s, lying up on a rise, watching." % [refer(entity), keeper_name()])
 		entity.call("mark_spotted", keeper_id)
 		return  # One at a time.

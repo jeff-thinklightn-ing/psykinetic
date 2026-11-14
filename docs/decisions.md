@@ -56102,3 +56102,47 @@ and 6 bodies, 200 s of stretches from the chatter takes, a cup each time
 round of each aside, none at her idle or without the work). THIRD_PARTY: the
 three hearth and four cup lines (release's OK); sound_status regenerated.
 Client sound only; protocol unchanged; no new class_name.
+## 917. Her unasked lines one at a time: a floor between any two, the needed first, no idle wish beside a wound
+
+Playtest's look_flank_around3c (v0.1.215's main, joined) heard her quiet moment's wish ("I've a mind to go
+fishing. Will you come with me?") and her first bandage line (TEND_FIRST) 0.2 s apart, as the bear fell: the
+quiet moment fired as she finished bandaging herself, and two ticks later _tend_unasked started on her player.
+Both were said with always=true, which skips the only floor there was (SPEECH_INTERVAL_TICKS, 5 s, binding only
+lines said with always=false), and the quiet moment never asked whether anyone was hurt. The coordinator's ruling
+(the decision-number script's label; Jeff, 11-04: her presence is the fun, so nothing here may quiet her).
+
+Each Companion._say carries a weight (Companion.Weight). REPLY answers her player and is never held. DANGER is
+about a present danger (a fight warning, a yield, a break from a losing fight, a flank, an apex newly seen or broken
+off from, a cat lying up, a line said in_fight, her voice's line while a hostile is in her sight) and is never held,
+though it starts the floor. NEEDED (a wound tended, a rest asked, a mend tell, a kit seller, a load too heavy, a watch
+asked, a mine pack full, why a cast failed, her voice's line on a fight's end, a fall, a wound) inside the floor is
+held, one at a time, and said when the floor clears while its check (if any) still holds and within HELD_GRACE_TICKS
+(2 s) of it, else let go; a held line counts to its caller as said. IDLE (a quiet moment's line, her want, her fishing
+wish and her own cast's start) inside the floor is not said, and waits for her next quiet moment. Any two unasked
+lines of hers are FLOOR_TICKS (5 s) apart, always=true included. Companion._idle_ok: no idle line while a line is held,
+within SETTLE_TICKS (10 s) of a fight's end, or while a tend of hers is to come: her player (in her zone) or she
+wanting tending (_wants_tending) while she has a kit; her quiet moment waits on it too. A wound no one here can bind
+(no kit; another player's or companion's, which she never tends) does not hush her: wounds do not close on their own,
+so her idle talk would wait for a rest (the coordinator's narrowing of its first form, "no idle line while she, her
+player or another of her party wants tending", kept as Companion.idle_waits_any_wound for the test alone). TEND_FIRST is held only while her bandage
+errand is still on.
+
+The call sites (31 on 19c8dad11): REPLY: step_aside's NO_ROOM_LINE, owner_spoke's phrase answer, _lead_to_fish_now,
+_fish_hint, obey's answer, _carry_out's three (FISH_DANGER, FISH_NO_WATER, FISH_NO_ROD), _keep_order's ORDER_ACKS,
+_take_result's answer to her player's question, _say_bandage (asked errands only), the guide's set-off line (guide.gd).
+DANGER: _tend_fish's FISH_DANGER, BREAK_LEFT, BREAK_HOLD, _warn_flanked (all in_fight), the apex's warning and
+break-off lines, CAT_POINT. NEEDED: REST_ASK, _fish_cannot, the heavy pack, WATCH_ASK, TEND_FIRST, the warm tell and
+KIT_SELLER, MINE_FULL_LINE. IDLE: FISH_WISH, _fish_self_start, _tell_want_plainly. Her voice's lines by
+Companion._voice_weight (spoken to: REPLY; a hostile in sight: DANGER; a quiet moment: IDLE; else NEEDED).
+
+companion_test _test_speech_floor (Companion.speech_floor on; off in the older sections, which stage lines ticks
+apart): two always lines 2 ticks apart, the second held and said once at the floor's end; an idle one inside it not
+said; danger and a reply said at once; a held line no longer true let go; no idle line while her player wants tending
+and her kit is to hand, but with no kit her talk goes on; none just after a fight; the flank run's case (a wound and a due wish together: the tend line, the wish only once he is
+tended and 5 s on); and her quiet moments' lines in five calm quarter hours with a voice of her own (monsters kept down, each run's
+lines its own, her talk rate and draws from the same start), printed: her player whole, 3 without the floor, 4 with
+(c)'s first form, 4 narrowed; her player hurt with no kit anywhere, 0 with the first form, 5 narrowed. The floor does
+not quiet her, and the narrowing is what keeps her talking beside a wound she cannot bind. (Two earlier runs read 0
+with the floor; both were the test's: the room's monsters back in sight, then each run's lines echoing the last's.)
+The section runs late in companion_test, as its quarter hours move the clock on. Server only, protocol unchanged, no new class_name. Its bullet waits on playtest's
+rerun of look_flank_around3c.

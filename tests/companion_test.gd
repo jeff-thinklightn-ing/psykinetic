@@ -20,6 +20,7 @@ func _ready() -> void:
 	Companion.hold_tongue = false  # Her voice in a fight, for the sections that test it; _test_quiet has it on (decision 675).
 	Companion.ask_rest = false  # Her rest ask (616 amended (3)) only where _test_left_and_rest tests it.
 	Companion.tends_unasked = false  # The older sections hurt bodies she would tend; _test_tends_unasked and _test_drinks_a_remedy have it on (decision 681).
+	Companion.speech_floor = false  # The older sections stage lines ticks apart; _test_speech_floor has it on (decision 917).
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -174,6 +175,7 @@ func _ready() -> void:
 	_test_lead_to_near_water()  # Loads the wilds and back.
 	_test_return_cell_his_side()  # Loads the wilds and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
+	_test_speech_floor()  # Late: its five calm quarter hours move the clock on (917).
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	await _test_old_record_gets_a_companion()
 
@@ -7609,6 +7611,160 @@ func _test_heel_on_the_line() -> void:
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+## Decision 917 (playtest's look_flank_around3c: her wish and her bandage
+## line 0.2 s apart): two unasked lines of hers FLOOR_TICKS apart, an always
+## one too; a needed one held and said when the floor clears, an idle one
+## dropped; danger and replies never held; no idle line while anyone wants
+## tending or within SETTLE_TICKS of a fight; no fewer lines in a calm
+## quarter hour.
+func _test_speech_floor() -> void:
+	print("\n== her unasked lines: one at a time, the needed first, no idle wish beside a wound (decision 917) ==")
+	Companion.speech_floor = true
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var spoken: Array[String] = []
+	var on_said := func(line: String) -> void: spoken.append(line)
+	pet.said.connect(on_said)
+	_put(owner, Vector2i(9, 7))
+	_put(pet, Vector2i(10, 9))
+	pet._fight_ended_tick = -100000
+	pet._last_unasked_tick = -1000
+	pet._held_line = {}
+	_check(pet._say("A needed line.", true, false, Companion.Weight.NEEDED) and spoken == ["A needed line."], "a needed line, said (%s)" % [spoken])
+	var first := World.tick
+	World.step()
+	World.step()
+	_check(pet._say("Another needed line.", true, false, Companion.Weight.NEEDED) and spoken.size() == 1,
+		"a second always line 2 ticks on: held, not said yet (%s)" % [spoken])
+	_check(not pet._say("An idle line.", true, false, Companion.Weight.IDLE) and spoken.size() == 1, "an idle one inside the floor: not said")
+	_check(pet._say("Behind you!", true, false, Companion.Weight.DANGER) and spoken.back() == "Behind you!", "a present danger: never held")
+	_check(pet._say("Yes, I'll come.", true, false, Companion.Weight.REPLY) and spoken.back() == "Yes, I'll come.", "a reply to her player: never held")
+	_step_until(func() -> bool: return "Another needed line." in spoken, Companion.FLOOR_TICKS + 5)
+	_check("Another needed line." in spoken and World.tick - first >= Companion.FLOOR_TICKS and spoken.count("Another needed line.") == 1,
+		"the held line said once, when the floor clears (%d ticks after the first)" % (World.tick - first))
+	var still_true := [true]
+	_check(pet._say("Held, then not true.", true, false, Companion.Weight.NEEDED, func() -> bool: return still_true[0]) and not pet._held_line.is_empty(),
+		"another, held")
+	still_true[0] = false
+	for i in Companion.FLOOR_TICKS + 2:
+		World.step()
+	_check("Held, then not true." not in spoken and pet._held_line.is_empty(), "no longer true when the floor clears: let go (%s)" % [spoken])
+	for i in Companion.FLOOR_TICKS:
+		World.step()
+	var hp_was := owner.hp
+	var slots_were := pet.slots.duplicate()
+	World.set_slots(pet, [])
+	owner.hp = owner.max_hp / 2
+	owner.mending = 0
+	_check(pet._idle_ok(), "her player hurt, but no kit for a tend: her idle talk goes on (no wound closes on its own)")
+	World.set_slots(pet, ["bandaging_kit"])
+	_check(not pet._idle_ok() and not pet._say("A wish.", true, false, Companion.Weight.IDLE) and "A wish." not in spoken,
+		"her player wanting tending, her kit to hand: no idle line")
+	owner.hp = owner.max_hp
+	pet._fight_ended_tick = World.tick
+	_check(not pet._idle_ok(), "nor within %d ticks of a fight's end" % Companion.SETTLE_TICKS)
+	pet._fight_ended_tick = -100000
+	_check(pet._idle_ok() and pet._say("A wish.", true, false, Companion.Weight.IDLE) and spoken.back() == "A wish.", "whole and settled: said")
+
+	# The flank run's case: a wound and a due wish in the same moment.
+	Companion.tends_unasked = true
+	var told_was := pet.told_tending
+	pet.told_tending = false
+	var want := {"words": pet.want_words, "says": pet.want_says, "told": pet.want_told}
+	pet.want_words = "to go fishing with you"
+	pet.want_says = "I've a mind to go fishing. Will you come with me?"
+	pet.want_told = false
+	pet._keeper_spoke_tick = -100000
+	for i in Companion.FLOOR_TICKS:
+		World.step()
+	owner.hp = owner.max_hp / 2
+	owner.mending = 0
+	owner.hurt_tick = World.tick - World.BANDAGE_CALM_TICKS - 1
+	pet._tend_after = 0
+	pet._quiet_next_tick = 0
+	spoken.clear()
+	_step_until(func() -> bool: return Companion.TEND_FIRST in spoken or pet.want_says in spoken, Companion.TEND_EVERY * 4 + 40)
+	_check(spoken == [Companion.TEND_FIRST], "a wound and a due wish: the tend line, the wish not (%s)" % [spoken])
+	var tend_at := World.tick
+	# Her want line asked for each tick (as her quiet moment would, without
+	# its other gates: others' talk, her gap): held till he is tended and
+	# the floor clears.
+	var early := pet._tell_want_plainly("test") or pet.want_says in spoken
+	_step_until(func() -> bool: return pet._tell_want_plainly("test"), World.BANDAGE_TICKS + Companion.FLOOR_TICKS + 40)
+	_check(not early and pet.want_says in spoken and owner.mending != 0 and World.tick - tend_at >= Companion.FLOOR_TICKS,
+		"the wish only once he is tended and the floor clears, %d ticks after the tend line (%s)" % [World.tick - tend_at, spoken])
+	Companion.tends_unasked = false
+	_step_until(func() -> bool: return pet.errand.is_empty(), World.BANDAGE_TICKS + 40)
+	World.set_slots(pet, slots_were)
+	pet.told_tending = told_was
+	owner.hp = hp_was
+	owner.mending = 0
+
+	# Her quarter hour of calm, with and without the floor: no fewer lines.
+	var mind_was := pet.mind
+	var kit_was := pet.slots.duplicate()
+	World.set_slots(pet, [])
+	pet.hp = pet.max_hp
+	# Five quarter hours of calm, monsters kept down: her player whole with the
+	# floor off, with (c)'s first form, narrowed; then her player hurt with no
+	# kit anywhere, (c)'s first form and narrowed.
+	var counts: Array[int] = []
+	var talk_was: Dictionary = pet.talk_rate.duplicate()
+	for run: Array in [[false, false, false], [true, true, false], [true, false, false], [true, true, true], [true, false, true]]:
+		Companion.speech_floor = run[0]
+		Companion.idle_waits_any_wound = run[1]
+		owner.hp = owner.max_hp / 2 if run[2] else owner.max_hp
+		owner.mending = 0
+		var mind := CountingMind.new()
+		mind.kind = "ollama_counting"  # A voice of her own: her quiet moments ask it.
+		# Lines of their own in each run, so none echoes one she said in another.
+		var run_lines: Array[String] = []
+		for i in 12:
+			var k := counts.size() * 12 + i
+			run_lines.append("%s %s %s, as calm hours go." % [["Those", "My", "Our", "Your", "The"][k % 5],
+				["oaks", "boots", "lanterns", "rivers", "clouds", "hens", "stones", "barrels", "ferns", "kettles", "crows", "fences", "ropes"][k % 13],
+				["creak", "shine", "wander", "settle", "drift", "doze", "steam", "hum", "sway", "glint", "rest", "lean"][(k / 13) % 12]])
+		for line in run_lines:
+			mind.next_voice_answers.append({"say": line, "stance": ""})
+		mind.voice_answer = mind.next_voice_answers.pop_front()
+		pet.mind = mind
+		pet._quiet_next_tick = World.tick + 600
+		pet._quiet_ticks.clear()
+		pet._quiet_backoff = 1
+		pet._keeper_spoke_tick = -100000
+		# Each run from the same start: her talk rate (it slows unanswered)
+		# and her quiet moments' draws (seeded by the day, which moves on).
+		for key: String in talk_was:
+			pet.talk_rate[key] = talk_was[key]
+		pet._quiet_day = Townsfolk.day_of(World.steps)
+		pet._quiet_rng.seed = 917
+		_kill_monsters()  # The room's dead come back in minutes: kept down, so no foe in sight hushes her.
+		pet._fight_ended_tick = -100000
+		spoken.clear()
+		for i in 15 * 60 * World.TICK_RATE:
+			if i % 10 == 0:
+				for slot: int in _main._dead_since:
+					_main._dead_since[slot] = World.tick
+			World.step()
+		counts.append(spoken.filter(func(line: String) -> bool: return line in run_lines).size())
+	Companion.idle_waits_any_wound = false
+	# (counted: her quiet moments' lines, each run's own; a needed line, a warm tell, is not idle talk)
+	print("  her unasked lines in a calm quarter hour, her player whole: %d without the floor, %d with (c)'s first form, %d narrowed" % counts.slice(0, 3))
+	print("  her unasked lines in a calm quarter hour, her player hurt and no kit: %d with (c)'s first form, %d narrowed" % counts.slice(3, 5))
+	_check(counts[0] > 0 and counts[2] >= counts[0], "the floor does not quiet her: %d before, %d after" % [counts[0], counts[2]])
+	_check(counts[3] == 0 and counts[4] > 0, "a wound she cannot bind: (c)'s first form hushes her (%d), the narrowed form does not (%d)" % [counts[3], counts[4]])
+	World.set_slots(pet, kit_was)
+	pet.mind = mind_was
+	owner.hp = hp_was
+	pet.want_words = str(want["words"])
+	pet.want_says = str(want["says"])
+	pet.want_told = bool(want["told"])
+	pet.said.disconnect(on_said)
+	Companion.speech_floor = false
 
 
 func _test_tends_unasked() -> void:

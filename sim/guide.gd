@@ -499,7 +499,7 @@ func _set_off_line() -> void:
 	var temper := str(pet.traits.get("temperament", ""))
 	var pick: Variant = lines.get("resume") if _resumed else lines.get(temper, lines.get("default"))
 	if pick is Array and not (pick as Array).is_empty():
-		pet._say(str(pick[World.tick % (pick as Array).size()]), true)
+		pet._say(str(pick[World.tick % (pick as Array).size()]), true, false, Companion.Weight.REPLY)  # His ask's answer (917).
 
 
 ## The cells of [param leg] ahead of her: maps' WorldRoutes.leg_cells
