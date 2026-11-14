@@ -5,7 +5,8 @@
 #   tools/bench_lock.sh take <tree> "<what>"   exit 1 if another tree holds it (prints who)
 #   tools/bench_lock.sh release <tree>
 #   tools/bench_lock.sh status
-#   tools/bench_lock.sh beat <tree>            the holder is alive (no-op unless <tree> holds it)
+#   tools/bench_lock.sh beat <tree>            the holder is alive (no-op unless <tree> holds it,
+#                                              or it was taken from the caller's checkout)
 # The lock is the folder C:/dev/bench.lock (mkdir is atomic); one quiet for 30 minutes
 # (PSYKINETIC_LOCK_STALE seconds) since its take or its holder's last beat is stale and may
 # be taken over.
@@ -40,6 +41,9 @@ held_min() {
 who() {
 	beat=""
 	[ -f "$LOCK/taken" ] && [ "$(cat "$LOCK/taken")" != "$(cat "$LOCK/since" 2>/dev/null)" ] && beat=", last beat $(age) s ago"
+	# 667 amended (5): a lock whose holder has not beaten since its take (its taken equals its
+	# since) says so, with the seconds: a landing's land.sh beats in its first second.
+	[ -f "$LOCK/taken" ] && [ ! -d "$LOCK/first_beat" ] && [ "$(cat "$LOCK/taken")" = "$(cat "$LOCK/since" 2>/dev/null)" ] 		&& beat=", never beaten ($(age) s)"
 	echo "$(cat "$LOCK/owner" 2>/dev/null) ($(cat "$LOCK/what" 2>/dev/null)), $(held_min) min$beat"
 }
 # Every take, takeover and release, with the time, beside the lock (<lock>.log), so two
@@ -186,8 +190,26 @@ case "${1:-status}" in
 		# The holder is alive: "since" moves to now, so staleness counts from here.
 		# Silent and exit 0 unless <tree> holds it (a loop beats whatever happened).
 		tree="${2:?tree name}"
-		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
+		# 667 amended (5): or a beat from the checkout the lock was taken from ($LOCK/checkout,
+		# decision 883), whatever name land.sh runs under there; the same exact compare of
+		# `git rev-parse --show-toplevel` as land.sh's. A free lock, or one another checkout
+		# took under another name, is never beaten.
+		mine=""
+		if held; then
+			if [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
+				mine=1
+			elif [ -s "$LOCK/checkout" ] && [ "$(cat "$LOCK/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
+				mine=1
+			fi
+		fi
+		if [ -n "$mine" ]; then
 			date +%s >"$LOCK/since.tmp" 2>/dev/null && mv -f "$LOCK/since.tmp" "$LOCK/since" 2>/dev/null
+			# Its first beat logged once per take (mkdir is atomic): how long the take waited for
+			# its tests, the number a stale time before the first beat is to be set from.
+			if mkdir "$LOCK/first_beat" 2>/dev/null; then
+				taken=$(cat "$LOCK/taken" 2>/dev/null)
+				log "first beat by $tree after $(( $(date +%s) - ${taken:-$(date +%s)} )) s ($(cat "$LOCK/owner" 2>/dev/null)'s take)"
+			fi
 		fi
 		beat_mark "$tree"  # The freeze holding the lock keeps its mark live (667 amended (4)).
 		exit 0

@@ -32878,6 +32878,31 @@ its gate take and stops, the holder still holding the lock (the coordinator's ad
 holder's push during a pending freeze lands, exit 0, never 3. Tools and tests only; protocol unchanged; no
 class_name; no bullet.
 
+667 amended (5): the land lock logs each take's first beat, takes a beat from its own checkout under any name, and
+says "never beaten" (the coordinator's step A of perf's design for an unbeaten lock, 2026-11-14; release reads the
+diff; label from tools/decision_number.sh). npc-forget's landing hung after its take at 10:35:22 (a forked subshell
+that never started git, before land.sh), never beat, and held every tree for the full 1500 s until a takeover at
+11:00:45. A shorter stale time for a lock never beaten is step B, ruled on after a day of this step's lines; nothing
+here changes when a lock goes stale. tools/bench_lock.sh: `beat` is also accepted from the checkout the lock was taken
+from ($LOCK/checkout, decision 883; the same exact compare of `git rev-parse --show-toplevel` as land.sh's), whatever
+name land.sh runs under there, so a landing run under another name than its take is beaten; a free lock, or one
+another checkout took under another name, is never beaten. Its first beat after each take writes "first beat by
+<tree> after N s (<owner>'s take)" to the lock's log, once per take ($LOCK/first_beat, made with mkdir). Status and
+every message naming the holder say "never beaten (N s)" while its taken equals its since and no first beat came.
+Measured for step B: from the take to land.sh's start (its first beat), 294 landings since 11-11 12:00, p50 58 s, p90
+106 s, p99 228 s, max 417 s (npc-campbed, a row script running scenes alone after its take); four holds over 600 s
+with no gated run under the lock's name (animation 1411 s, physics-clock 1286 s, envfade 799 s, enemy-ai-despawn
+644 s) are unexplained, which this step's lines and the checkout beat answer. The waiter does not beat: a beat means
+the tests started, so a hung script stays unbeaten. tests/land_beat_test.sh (land.sh runs it when the lock or the
+test changes): status never beaten with the seconds; the first beat logged with them, once per take, again for the
+next take, once for a beat in the take's own second; a beat from the lock's checkout under another name, not from
+another checkout under that name, the owner's name from anywhere; no checkout recorded, only the owner; a free lock
+never taken by a beat; another checkout's lock never beaten from here; never beaten 1400 s held, 1600 s taken over as
+before; release's freeze reads as before. A known limit (release's note): a checkout's beats are that checkout's,
+whoever runs them; C:/dev/psykinetic is shared by the coordinator and release, so a beat from there under either name
+renews the other's take there (harmless today: the coordinator's docs landings take seconds, and release cuts from
+C:/dev/psykinetic-release). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
 
 Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every
