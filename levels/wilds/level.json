@@ -3596,6 +3596,14 @@
 		},
 		{
 			"use": "work",
+			"cell": [203, 196],
+			"face": [203, 197],
+			"pose": "stand",
+			"town": "store",
+			"trade": "vendor"
+		},
+		{
+			"use": "work",
 			"cell": [208, 199],
 			"face": [209, 198],
 			"pose": "stand",
