@@ -12864,6 +12864,13 @@ func _test_visible_work() -> void:
 	puppet.set_meta("busy_until", 0)
 	show.call("shear")
 	_check(rig.base_clip() == "Kneel_Work", "shearing, knelt down: the knelt work loops (%s)" % rig.base_clip())
+	# 877 amended (3)'s counter row: a keeper come to its counter (its body at its cell) steps up to it at
+	# once, as before the wait for the body.
+	puppet.set_meta("entered", "")
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("unseat_until", 0)
+	show.call("tend")
+	_check(rig.base_clip() == "Counter_Low_Enter", "a keeper at its counter's cell: steps up to it at once (%s)" % rig.base_clip())
 	puppet.set_meta("entered", "")
 	puppet.set_meta("busy_until", 0)
 	puppet.set_meta("unseat_until", 0)
@@ -12909,6 +12916,62 @@ func _test_visible_work() -> void:
 			patient = other
 	_check(patient != null, "a body to tend")
 	if patient != null:
+		# 877 amended (3), the joined fault (ui-design's take 3, C:/dev/review/ui-design/kneel877): the state
+		# says kneel while the drawn body is still a cell short of its cell, its catch-up slide to come (a cell
+		# in 0.4 s, 2.5 tiles a second). It kneels only once its body is within reach of its cell (0.25
+		# tiles), down from standing: no Kneel_* while short, no walk or jog after its first Kneel_*.
+		var cell_at := puppet.position
+		var seen: Array[String] = []
+		var kneel_from := -1.0
+		var gait_after := false
+		player.tending = String(patient.name)
+		_rig._sync_work(player, puppet)
+		for f in 31:
+			var short := maxf(0.0, 1.0 - 2.5 * maxf(0.0, f - 1.0) / 60.0)  # Two frames a cell short, then the slide.
+			puppet.position = cell_at + Vector3(short, 0.0, 0.0)
+			puppet.set_meta("last_at", puppet.position)
+			puppet.set_meta("speed", 2.5 if f > 1 and short > 0.0 else 0.0)
+			_rig._animate(puppet)
+			var clip := rig.base_clip()
+			if seen.is_empty() or seen[-1] != clip:
+				seen.append(clip)
+			if clip.begins_with("Kneel_") and kneel_from < 0.0:
+				kneel_from = short
+			elif kneel_from >= 0.0 and not clip.begins_with("Kneel_"):
+				gait_after = true
+		_check(kneel_from >= 0.0 and kneel_from < 0.25 and not gait_after and rig.base_clip() == "Kneel_Down",
+				"told to kneel a cell short of its cell: it kneels once there (first knelt %.2f tiles short), down from standing, no gait after (%s)" % [kneel_from, " > ".join(seen)])
+		# (a) The work ends while it waits for its body: it never knelt, so it stands, with no Kneel_Up from
+		# standing and no half kneel.
+		player.tending = ""
+		_rig._sync_work(player, puppet)
+		puppet.set_meta("busy_until", 0)
+		puppet.set_meta("rise_until", 0)
+		puppet.set_meta("entered", "")
+		puppet.position = cell_at + Vector3(1.0, 0.0, 0.0)
+		puppet.set_meta("last_at", puppet.position)
+		player.tending = String(patient.name)
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		var waiting := rig.base_clip()
+		player.tending = ""
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		_check(not waiting.begins_with("Kneel_") and not rig.base_clip().begins_with("Kneel_"),
+				"the work over while it waits a cell short: never knelt, stands (%s, then %s)" % [waiting, rig.base_clip()])
+		# (b) A body that never comes within reach (blocked, or a slide that restarts): stood still short
+		# WORK_ARRIVE_WAIT, it steps in where it stands, as before; it is never kept from its work for good.
+		player.tending = String(patient.name)
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		var held_off := rig.base_clip()
+		puppet.set_meta("arrive_since", Time.get_ticks_msec() - int(Client3D.WORK_ARRIVE_WAIT * 1000.0) - 10)
+		_rig._animate(puppet)
+		_check(not held_off.begins_with("Kneel_") and rig.base_clip() == "Kneel_Down",
+				"stood still a cell short for %.1f s: it kneels where it stands (%s, then %s)" % [Client3D.WORK_ARRIVE_WAIT, held_off, rig.base_clip()])
+		puppet.position = cell_at
+		puppet.set_meta("last_at", cell_at)
+		puppet.set_meta("speed", 0.0)
 		player.tending = String(patient.name)
 		_rig._sync_work(player, puppet)
 		_rig._animate(puppet)

@@ -54533,6 +54533,32 @@ its own "rise_until", not "unseat_until" (which draws a body over its seat: the 
 forward as it rose), and is cut short by a move or a fight (not calm): a bandager in a fight stands at once, its
 guard and ready stance with it. It is drawing only; the world never held her.
 
+877 amended (3): a work stepped into waits for its body (the decision-number script's label; the coordinator's
+go, 11-14, from the plate tours' stills of Rhea's bandage kneeling half way, head drops of 0.42 to 0.60 m where
+her full kneel is 0.88). Its cause, measured joined by ui-design (take 3, C:/dev/review/ui-design/kneel877, five
+binds a build with Rhea jogging in, every frame's base clip, head drop and x/z): her cell turned (207 to 206)
+while her drawn body still stood a cell back in Idle; Kneel_Down began there; the catch-up slide, a whole cell in
+about 0.4 s, played Walk then Jog_Short for 30 to 40 frames (877 amended (1)'s cut of a moved step-in); and
+Kneel_Work began at a drop of 0.24 to 0.41, rising to full over the next frames. Client3D._work_enter now starts a
+work's "enter" (a kneel's Kneel_Down, a keeper's step up to its counter) only once the drawn body stands within
+WORK_REACH (0.25 tiles) of its own cell (the entity's tile); until then the body does what it would without the
+work (it walks or jogs the catch-up, and stands the frame it arrives), and the work's loop never plays before its
+enter has. What a player sees: Rhea jogs the last cell to his side, stops, and kneels straight down, Kneel_Work at
+full depth from its first frame. Two edges. (a) The work ends while it waits (a bind is about 1.1 s, a catch-up
+0.4 s): nothing was entered, so nothing is got up from; she stands, never playing Kneel_Up from standing nor left
+in a half kneel. Ended during the enter, the get-up follows it as before. (b) A drawn body that never comes within
+reach (blocked, or a slide that restarts): stood still short of its cell WORK_ARRIVE_WAIT (1.5 s, "arrive_since",
+timed for that work only and begun again by any move), it steps in where it stands, as before, so no body is kept
+from its work for good. A body first seen at its work is already at it, as before; a keeper who walks to his
+counter arrives at its cell as he stops, so his step up comes at once, as it did. The first form of this
+amendment (a settle rule: a move under 1.0 tiles a second within 0.25 tiles of where the work began read as
+standing) was withdrawn unlanded: it was proved only on a headless probe of 30 ms sub-cell slides, which no joined
+run made, and the joined fault's whole-cell slide at about 2.5 tiles a second was past both its bounds, so take 3
+faulted on it as on main. view_test: told to kneel a cell short, it kneels only once within reach, down from
+standing, no gait after (on main: Kneel_Down, Jog_Short, Kneel_Work); the work over while it waits, it never knelt;
+stood still short 1.5 s, it kneels where it stands; a keeper at its counter's cell steps up at once. Client only;
+protocol unchanged.
+
 ## 870. The crypt bar, dungeon's side: the band's posts out of each other's reach, the Ossuary's packs apart, two kits in the robbers' camp
 
 The coordinator set a bar for package "the crypt under the temple": a newcomer with a companion and starter gear finishes the knight's quest with at most two falls, resting between rooms. Playtest's unboosted walk on 3bedbeee9 fell four times to the band and was downed by the Ossuary's dead in 8 s. The joint page is C:/dev/review/enemy-ai/crypt_bar.md (enemy-ai leads; section 5 is dungeon's, with the measures). The coordinator picked P1 and O1, and the kits as built.

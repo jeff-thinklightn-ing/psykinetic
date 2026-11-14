@@ -1807,6 +1807,13 @@ const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "
 ## (a monster easing into its last cell before a blow) slide standing
 ## ("blows you can see", 2iii).
 const WALKING := 0.2
+## A work stepped into (877 amended (3): a kneel, a keeper's counter) waits for its body: its "enter"
+## starts only once the drawn body stands within WORK_REACH (tiles) of its own cell, or has stood still
+## short of it WORK_ARRIVE_WAIT (s), when it steps in where it stands, as before. A joined body's cell can
+## turn while its drawn body still stands a cell back, the catch-up slide to come (ui-design's take 3:
+## Rhea knelt a cell short, slid the cell in Walk and Jog_Short for 0.4 s, and began Kneel_Work shallow).
+const WORK_REACH := 0.25
+const WORK_ARRIVE_WAIT := 1.5
 ## A wind-up held for a slide less than this starts at once (_strike).
 const STRIKE_HOLD_LEAST := 0.02
 ## Seconds the legs take to give way to the gait under a strike, and back.
@@ -26651,7 +26658,9 @@ func _animate(puppet: Node3D) -> void:
 	elif puppet.has_meta("fish_state"):
 		puppet.remove_meta("fish_state")  # Reeled in: the next cast is cast again.
 	var at_work := _work_clip(puppet, work)
-	if speed <= WALKING and at_work != "" and rig.has(at_work):
+	var stepped_in := not (work.has("enter") and rig.has(str(work["enter"]))) \
+			or str(puppet.get_meta("entered", "")) == str(puppet.get_meta("work", ""))
+	if speed <= WALKING and at_work != "" and rig.has(at_work) and stepped_in:
 		# At its work (566): the work's clip, looped; now and then one of its asides (a keeper's show).
 		if _work_aside(puppet, rig, work, now, tempo):
 			return
@@ -26743,6 +26752,25 @@ func _gait_held(puppet: Node3D, rig: AnimRig) -> bool:
 	return clock - int(puppet.get_meta("still_since", clock)) < int(ArtKit.feel("client3d.stop_hold", STOP_HOLD) * 1000.0)
 
 
+## Whether [param puppet]'s drawn body has come to its own cell (877 amended (3)): within WORK_REACH of
+## its entity's tile, or stood still short of it WORK_ARRIVE_WAIT ("arrive_since", from the first still
+## frame short; a move starts it again), so a body that never comes within reach (blocked, a slide that
+## restarts) is never kept from its work for good. True with no entity.
+static func _work_arrived(puppet: Node3D, now: int) -> bool:
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+	if entity == null or Vector2(puppet.position.x, puppet.position.z).distance_to(Vector2(entity.tile)) < WORK_REACH:
+		puppet.remove_meta("arrive_since")
+		return true
+	var word := str(puppet.get_meta("work", ""))
+	if not puppet.has_meta("arrive_since") or str(puppet.get_meta("arrive_for", "")) != word:
+		puppet.set_meta("arrive_since", now)  # Timed for this work only: a wait left over from one ended counts nothing.
+		puppet.set_meta("arrive_for", word)
+	if now - int(puppet.get_meta("arrive_since")) < int(WORK_ARRIVE_WAIT * 1000.0):
+		return false
+	puppet.remove_meta("arrive_since")
+	return true
+
+
 ## [param work]'s clip for [param puppet]: its "clip", else one of its "clips" by the body
 ## (each the same every time it is seen, its neighbour likely another); "" for none.
 static func _work_clip(puppet: Node3D, work: Dictionary) -> String:
@@ -26806,7 +26834,11 @@ func _work_enter(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 			else:
 				puppet.set_meta("unseat_until", until)
 			return true
+	if speed > WALKING or not work.has("enter"):
+		puppet.remove_meta("arrive_since")  # Moving, or no work to step into: its wait for its body (_work_arrived) starts again.
 	if work.has("enter") and speed <= WALKING and rig.has(str(work["enter"])):
+		if not _work_arrived(puppet, now):
+			return false
 		puppet.set_meta("entered", word)
 		# Moved off while still stepping in (a tender shoved mid-kneel, 877 amended (1)): it goes,
 		# as from the exit (_animate's "enter_until"), not slid along in the pose till the clip is done.
