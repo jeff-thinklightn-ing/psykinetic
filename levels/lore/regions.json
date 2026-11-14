@@ -141,7 +141,7 @@
 			"name": "the pond by town",
 			"status": "agreed",
 			"source": "game",
-			"summary": "Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (about 221..223 x 224..228 with the shack and its dirt dock, east of the woodlot post (207,231), some 30 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size and the shack wait on Jeff's pond-and-shack picks; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package \"fishing that works\".",
+			"summary": "Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (221..223 x 224..228 with the shack and its dirt dock), grown east and south by terrain's 559 amended (2) (fa7b50ce5, package \"Snagfin's bigger pond\", Jeff's pick C) to about 221..236 x 224..234, the shack at its west end; east of the woodlot post (207,231), some 30 to 40 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size is Jeff's pick C (bigger); the shack waits on buildings' hut; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package \"fishing that works\".",
 			"place_kind": "other",
 			"relations": [
 				{
@@ -156,7 +156,7 @@
 			"facts": [
 				{
 					"id": "town_pond.where",
-					"text": "The pond by town is a little crescent of water round a shack, a short walk south-east of the square, just east of the woodlot post.",
+					"text": "The pond by town is a broad pond a short walk south-east of the square, just east of the woodlot post.",
 					"known": "common",
 					"where": [
 						"town_lands"

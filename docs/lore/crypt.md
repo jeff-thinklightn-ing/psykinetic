@@ -460,7 +460,8 @@ Lines (set dressing and refusals; items and npc word their own):
 - The sepulcher's plaque: "Here rest the holy remains of <knight>, knight of Theus, until the
   altar calls them home."
 - The relic's text: "The holy remains of <knight>, knight of Theus. Aldous would lay them on the
-  temple altar."
+  temple altar." (Superseded, never in the game: the remains go on the bier in the crypt's First
+  Hall, crypt.relic_charges, aa50bf016.)
 
 Facts that change once dungeon's build lands (same window, so the town never says what the game
 no longer shows): crypt.ossuary and crypt.fallen_souls move from "below the barrow" to "beneath
