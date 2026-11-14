@@ -6071,6 +6071,20 @@ and a caved-in roof needs the whole one gone.
 Until terrain passes a set in (decisions 285, 286), client3d draws every
 wall in the castle set, so nothing changes on screen.
 
+287 amended (1) (the script's label; the coordinator's ruling 11-14 on buildings' measured A/B,
+C:/dev/review/lean_ab_sheet.png): wall.wood.profile's variation "lean" goes from 2 to 0, so wood runs stand
+plumb. The 2 was the set's starting value here (10-14), a look knob for Jeff to tune, not a measured one. Each
+swept wood run leaned up to 2 degrees (Client3D's sweep, a run's roll times the variation's lean), while the
+window pieces and the doors' frames set in it stand upright, so the run's planks and the piece's parted by up
+to 7 cm at the eaves: stepped plank rows at every wood window and door, and corners out of plumb under the roof.
+At 0 the rows meet and the corners stand plumb. The sag (3 cm post to post) stays. Jeff has the pick
+(C:/dev/review/decisions/wood-lean.md: A plumb, which this is, or B keep the lean and make the set-in pieces
+lean with their run); A goes in meanwhile as one number that turns back as easily. Watched: buildings' A/B
+(the lean at 0, its left panes); buildings reshoots H4 and H1 joined on main for the bullet. view_test's
+wood-set pin turns with it (buildings' section, read by buildings): "most runs lean a little" becomes "every
+wood run stands plumb" (0 of N lean, its measure kept, so a lean coming back fails it); the sag is still read
+by the level check beside it. Art kit data and that test; protocol unchanged; no new class_name.
+
 ## 288. Monster AI stays in GDScript: C# measured, not adopted
 
 Jeff asked for real numbers on moving monster AI, starting with

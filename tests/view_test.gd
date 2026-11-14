@@ -2316,7 +2316,7 @@ func _test_wall_runs() -> void:
 	var castle_width := _rig._edge_bounds(some).size.x if some.z == Terrain.EAST else _rig._edge_bounds(some).size.z
 	_check(_rig._set_of(some) == "castle" and is_equal_approx(castle_width, 0.5), "a map's walls are in its set, castle by default, %.2f m thick" % castle_width)
 	# In the wood set (a home's): no breach, no broken top, the cap at the
-	# profile's top less its sag, 0.3 m thick at the foot, leaning a little.
+	# profile's top less its sag, 0.3 m thick at the foot, standing plumb (287 amended (1)).
 	for key: Vector3i in terrain["edges"]:
 		if terrain["edges"][key] == Terrain.Edge.WALL:
 			_rig._wall_sets[key] = "wood"
@@ -2346,7 +2346,7 @@ func _test_wall_runs() -> void:
 	_check(_rig._wall_breaches.is_empty() and level, "wood walls: no breach, no broken top, every cap within %.2f m of %s m" % [sag, Client3D.WALL_HEIGHT])
 	_check(thin and is_equal_approx(bounds.size.x if some.z == Terrain.EAST else bounds.size.z, 0.3),
 			"0.3 m thick, as the set's profile, in what hides the player too")
-	_check(leant > wood_runs.size() / 3, "most runs lean a little (%d of %d)" % [leant, wood_runs.size()])
+	_check(not wood_runs.is_empty() and leant == 0, "every wood run stands plumb (287 amended (1): %d of %d lean)" % [leant, wood_runs.size()])
 	_rig._wall_sets.clear()
 	_rig.rebuild(terrain, castle["centre"])
 	# A town's walls broken or in rubble (buildings: _wall_states and

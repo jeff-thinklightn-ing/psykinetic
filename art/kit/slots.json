@@ -365,7 +365,7 @@
 			"points": [[-0.15, 0], [0.15, 0], [0.15, 3], [-0.15, 3]],
 			"cap_y": 2.8,
 			"material": "material.wall.wood",
-			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 2, "jitter": 0, "sag": 0.03}
+			"variation": {"sway": 0, "broken": 0, "gap": 0, "lean": 0, "jitter": 0, "sag": 0.03}
 		},
 		"material.wall.wood": {
 			"category": "materials",
