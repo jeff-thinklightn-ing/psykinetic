@@ -356,78 +356,6 @@ func _test_name_plates() -> void:
 	_check(inside.encloses(held) and is_equal_approx(held.size.y, a.size.y), "a head on the screen's edge keeps its plate whole, held inside it, the same size (%s)" % held)
 	var faded: Rect2 = placed[1]["rect"]
 	_check(inside.encloses(faded) and placed[1]["alpha"] == UiNamePlates.SHADED, "and one that can't step up past the top fades in place, still inside (%s)" % faded)
-	# The health bar in the name's row (865 amended (3), the approved C:/dev/review/ui-design/bar_mock): under
-	# the name, centred, one size at every depth, its length by max hp within least and most.
-	var gap := float(plates.get_theme_constant(&"gap", &"HpBar"))
-	var per_hp := float(plates.get_theme_constant(&"per_hp", &"HpBar"))
-	var least := float(plates.get_theme_constant(&"least", &"HpBar"))
-	var most := float(plates.get_theme_constant(&"most", &"HpBar"))
-	var hold := float(plates.get_theme_constant(&"hold", &"HpBar"))
-	_check(gap > 0.0 and per_hp > 0.0 and least < most and hold >= 8.0 and plates.get_theme_stylebox(&"panel", &"HpBar") is StyleBoxFlat,
-		"the theme's HpBar: gap %d, %d per hp, %d to %d long, hold %d, and its backing" % [gap, per_hp, least, most, hold])
-	var hurt := {"key": 11, "text": "Agnes", "at": Vector2(1000, 600), "depth": 8.0, "plain": true, "bar": 1.0, "share": 0.5, "max_hp": 20}
-	var small := {"key": 12, "text": "Imp", "at": Vector2(2000, 600), "depth": 30.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 2}
-	var huge := {"key": 13, "text": "Hale", "at": Vector2(3000, 600), "depth": 9.0, "plain": true, "bar": 0.5, "share": 1.0, "max_hp": 1000000}
-	var unbarred := {"key": 14, "text": "Rolf", "at": Vector2(1000, 1600), "depth": 9.0, "plain": true, "bar": 0.0, "max_hp": 20}
-	placed = plates.place([hurt, small, huge, unbarred], font, size, plate)
-	var keyed := {}  # Two share a depth, so their order is the sort's: look each up by its key.
-	for one: Dictionary in placed:
-		keyed[(one["entry"] as Dictionary)["key"]] = one
-	var name_rect: Rect2 = keyed[11]["rect"]
-	var bar_rect: Rect2 = keyed[11]["bar"]
-	_check(is_equal_approx(bar_rect.position.y, name_rect.end.y + gap) and is_equal_approx(bar_rect.end.y, 600.0 - UiNamePlates.LIFT)
-		and is_equal_approx(bar_rect.get_center().x, name_rect.get_center().x),
-		"the bar just under the name, centred on it, its foot where the plate's was (%s under %s)" % [bar_rect, name_rect])
-	_check(is_equal_approx(bar_rect.size.x, clampf(per_hp * 20.0, least, most)) and is_equal_approx((keyed[12]["bar"] as Rect2).size.x, least)
-		and is_equal_approx((keyed[13]["bar"] as Rect2).size.x, most) and is_equal_approx((keyed[12]["bar"] as Rect2).size.y, bar_rect.size.y),
-		"its length by max hp (20: %d), never under least nor over most, the same height far and near" % bar_rect.size.x)
-	_check(keyed[14]["bar"] == null and is_equal_approx((keyed[14]["rect"] as Rect2).end.y, 1600.0 - UiNamePlates.LIFT), "no bar shown: the name alone, on its head")
-	_check(UiNamePlates.bar_fill(1.0) == &"fill_high" and UiNamePlates.bar_fill(0.4) == &"fill_mid" and UiNamePlates.bar_fill(0.2) == &"fill_low",
-		"the fill by the share left")
-	# The bar whenever it shows, its name drawn or not (the coordinator, 11-14): a hurt foe at arm's length,
-	# nearer than NEAR, keeps its bar with no name; a body whose name the view hides keeps its bar; with no bar
-	# shown, neither has a row. Off the screen, none.
-	var arms := {"key": 31, "text": "Imp", "at": Vector2(1900, 300), "depth": 1.0, "plain": true, "bar": 1.0, "share": 0.4, "max_hp": 12}
-	var hidden := {"key": 32, "text": "Imp", "at": Vector2(600, 1200), "depth": 30.0, "plain": true, "named": false, "bar": 1.0, "share": 0.5, "max_hp": 12}
-	var quiet := {"key": 33, "text": "Imp", "at": Vector2(3000, 1200), "depth": 30.0, "plain": true, "named": false, "bar": 0.0, "max_hp": 12}
-	var gone := {"key": 34, "text": "Imp", "at": Vector2(-50, 900), "depth": 6.0, "plain": true, "bar": 1.0, "share": 0.5, "max_hp": 12}
-	placed = plates.place([arms, hidden, quiet, gone], font, size, plate, screen)
-	_check(placed.size() == 2 and placed[0]["entry"] == arms and placed[1]["entry"] == hidden,
-		"a hurt body at 1.0 m and one whose name is hidden each keep a row; one with no bar shown, or off the screen, has none (%d)" % placed.size())
-	var arm_bar: Rect2 = placed[0]["bar"] if placed.size() > 0 and placed[0]["bar"] != null else Rect2()
-	_check(placed.size() == 2 and not bool(placed[0]["named"]) and not bool(placed[1]["named"]) and arm_bar.has_area()
-		and is_equal_approx(arm_bar.end.y, 300.0 - UiNamePlates.LIFT) and inside.encloses(arm_bar),
-		"at arm's length: the bar drawn, no name, its foot just over the head, inside the screen (%s)" % arm_bar)
-	# Two rows brushing past each other (the no-twitch rule): the farther steps up on touching, stays up
-	# till clear by hold, and comes to each place eased, never in a frame.
-	var row_high := name_rect.size.y + gap + bar_rect.size.y
-	var front := {"key": 21, "text": "Hale", "at": Vector2(1000, 600), "depth": 8.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
-	var back := {"key": 22, "text": "Tourbot", "at": Vector2(1000, 600.0 + row_high - 2.0), "depth": 9.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
-	var stand := func() -> float: return float((back["at"] as Vector2).y) - UiNamePlates.LIFT
-	placed = plates.place([front, back], font, size, plate, Rect2(), 1.0)
-	var top := (placed[0]["rect"] as Rect2).position.y
-	_check((placed[1]["bar"] as Rect2).end.y <= top - UiNamePlates.GAP + 0.5, "touching by 2 px: the farther row steps up, bar and all")
-	back["at"] = Vector2(1000, 600.0 + row_high + hold * 0.5)
-	placed = plates.place([front, back], font, size, plate, Rect2(), 1.0)
-	_check((placed[1]["bar"] as Rect2).end.y <= top - UiNamePlates.GAP + 0.5, "clear by %d px, under hold: it stays up" % (hold * 0.5))
-	back["at"] = Vector2(1000, 600.0 + row_high + hold + 4.0)
-	placed = plates.place([front, back], font, size, plate, Rect2(), 0.016)
-	var easing := (placed[1]["bar"] as Rect2).end.y
-	_check(easing > top and easing < stand.call() - 1.0, "clear by more than hold: it comes down, eased, part way in a frame (%.0f of %.0f)" % [easing, stand.call()])
-	placed = plates.place([front, back], font, size, plate, Rect2(), 1.0)
-	_check(is_equal_approx((placed[1]["bar"] as Rect2).end.y, stand.call()), "and settles on its own head")
-	# Up, then met where it stands by a third (bar_row4: a row dropped to fade on its stand for 35 ms and stepped
-	# back): it stays up and fades there.
-	var low := {"key": 41, "text": "Hale", "at": Vector2(1000, 600), "depth": 8.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
-	var rising := {"key": 42, "text": "Tourbot", "at": Vector2(1000, 600.0 + row_high - 2.0), "depth": 10.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
-	placed = plates.place([low, rising], font, size, plate, Rect2(), 1.0)
-	var low_top := (placed[0]["rect"] as Rect2).position.y
-	var up_foot := (placed[1]["bar"] as Rect2).end.y
-	var meeting := {"key": 43, "text": "Rolf", "at": Vector2(1000, low_top - UiNamePlates.GAP - 5.0 + UiNamePlates.LIFT), "depth": 9.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
-	placed = plates.place([low, rising, meeting], font, size, plate, Rect2(), 1.0)
-	var kept: Dictionary = placed[2] if (placed[2]["entry"] as Dictionary)["key"] == 42 else placed[1]
-	_check(is_equal_approx((kept["bar"] as Rect2).end.y, up_foot) and float(kept["alpha"]) < 0.5,
-		"met up there by a third: it stays up (%.0f, was %.0f) and fades there (%.2f), never back to its stand for a frame" % [(kept["bar"] as Rect2).end.y, up_foot, float(kept["alpha"])])
 	remove_child(plates)
 	plates.free()
 	var client := Client3D.new()  # Never in the tree: the layers alone.
@@ -558,6 +486,18 @@ func _test_plate_heights() -> void:
 	bare_row["looked"] = was_looked
 	client._plate_shift(bare, bare_row)
 	_check(int(bare_row["looked"]) == was_looked, "missing past PLATE_LOOK_QUICK ms, only once a second")
+	# The HP bar rides the plate's eased shift (865 amended (2)): the plate's own row while it is plated...
+	var now := Time.get_ticks_msec()
+	var low := Vector3(0.1, -0.6, 0.0)
+	client._plate_rows[7] = {"key": 7, "shift": low, "plated_ms": now}
+	_check(client._bar_shift(7, bare, now) == low, "a plated body's bar takes its plate's shift")
+	# ...else (the own body, a name off) it eases the row itself: part way in a frame, toward the head's.
+	client._plate_rows[7] = {"key": 7, "shift": low, "plated_ms": now - 500, "bar_ms": now - 16}
+	var eased := client._bar_shift(7, bare, now)
+	_check(eased.length() > 0.0 and eased.length() < low.length(), "unplated, the bar eases on its own (%.3f of %.3f m)" % [eased.length(), low.length()])
+	var basis := Basis(Vector3.UP, PI * 0.5).scaled(Vector3.ONE * 0.5)
+	var place := Client3D.bar_place(2.0, basis, low)
+	_check((basis * place).is_equal_approx(basis * Vector3.UP * 2.0 + low), "the bar sits its shift from its stand in the world, at the body's turn and scale (%s)" % place)
 	bare.free()
 	client.free()
 

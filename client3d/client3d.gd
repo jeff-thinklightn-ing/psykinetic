@@ -67,13 +67,12 @@ extends Node3D
 ## follows the player; in WASD it leans toward the cursor as the 2D camera
 ## does (Main.camera_lean).
 ##
-## Combat reads off the puppets. A creature with hp has an HP bar, a strip
-## in its name's row under the name (865 amended (3): UiNamePlates draws it at
-## one screen size, the theme's HpBar long per hp of its max, its fill by the
-## share left), shown while it is hurt or has been in a fight in the last
-## COMBAT_SECONDS, or while Alt is held (show_all_bars, set by Main), and faded
-## in and out; never the local player's own (the HUD has his hp); hp_bars=0 in
-## settings.cfg turns them off. A death (on_death, from the
+## Combat reads off the puppets. A creature with hp has an HP bar over it
+## (hp_bar.gdshader: billboarded, over everything, HP_BAR_PER_HP wide per
+## hp of its max, green, amber below HP_AMBER, red below HP_RED), shown
+## while it is hurt or has been in a fight in the last COMBAT_SECONDS, or
+## while Alt is held (show_all_bars, set by Main), and faded in and out;
+## hp_bars=0 in settings.cfg turns them off. A death (on_death, from the
 ## server's "death" message) makes a corpse of the puppet: it tips onto its
 ## side over FALL_SECONDS with a little bounce, flashes, drops its lantern,
 ## lies CORPSE_SECONDS, then sinks over SINK_SECONDS. A companion says a
@@ -2215,9 +2214,16 @@ const TOSS_LENGTH := 1.3
 ## A speech bubble's tail sits this far over a creature's head (just
 ## above its name).
 const BUBBLE_OVER_HEAD := 0.55
-## HP bars (865 amended (3): drawn in the name's row by UiNamePlates, sized and
-## coloured by the theme's HpBar): how long after a fight one stays, how fast it
-## fades in and out (its whole alpha per second).
+## HP bars: units wide per hp of max hp, how tall, how high over the head,
+## when the colour turns, how long after a fight one stays, how fast it fades.
+const HP_BAR_PER_HP := 0.045
+const HP_BAR_HEIGHT := 0.1
+const HP_BAR_ABOVE := 0.1
+const HP_AMBER := 0.5
+const HP_RED := 0.25
+const HP_GREEN_COLOR := Color(0.35, 0.85, 0.35)
+const HP_AMBER_COLOR := Color(0.95, 0.7, 0.2)
+const HP_RED_COLOR := Color(0.9, 0.2, 0.15)
 const COMBAT_SECONDS := 4.0
 const HP_BAR_FADE := 4.0
 ## Death: the fall (with its bounce), the flash, how long the body lies,
@@ -3108,6 +3114,7 @@ func _on_hearths_changed(zone_name: String) -> void:
 		_draw_hearths()
 
 
+var _hp_bar_shader: Shader
 ## The boss's skull for nameplates (752, ui's side), made once.
 var _boss_mark: ImageTexture
 var _terrain: Dictionary = {}
@@ -3668,6 +3675,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
+	_hp_bar_shader = preload("res://client3d/hp_bar.gdshader")
 	sfx = Sfx.new()
 	sfx.name = "Sfx"
 	add_child(sfx)
@@ -4748,9 +4756,8 @@ func ridge_pitch(at: Vector3) -> float:
 ## The names over heads to draw on the HUD this frame (UiNamePlates.source): each
 ## shown Name label (its words, tint and showing as _sync_name, _sync_ailments and
 ## _sync_named leave them) of a puppet in view (the local player's own only while
-## own_name_on_hud), as {key, text, tint, plain, at: its head's screen point, depth, boss, named, and the
-## health bar's bar, share and max_hp (_sync_bar)}; a body whose name is hidden is listed while its bar
-## shows, named false (865 amended (3)). Rows and the list are reused, so nothing is made a frame.
+## own_name_on_hud), as {key, text, tint, plain, at: its head's screen point, depth, boss}. Rows and
+## the list are reused, so nothing is made a frame.
 func name_plates() -> Array[Dictionary]:
 	_plates.clear()
 	if _camera == null:
@@ -4768,16 +4775,11 @@ func name_plates() -> Array[Dictionary]:
 		if not puppet.visible or not puppet.is_inside_tree():
 			continue
 		var label := puppet.get_node_or_null("Name") as Label3D
-		if label == null:
+		if label == null or not label.visible or label.text.is_empty():
 			continue
 		if not _plate_rows.has(id):
 			_plate_rows[id] = {"key": id}
 		var row: Dictionary = _plate_rows[id]
-		# 865 amended (3): a body whose bar shows has its row, its name shown or not.
-		var named := label.visible and not label.text.is_empty()
-		if not named and float(row.get("bar", 0.0)) <= 0.001:
-			continue
-		row["named"] = named
 		# 865 amended (2): the plate goes with the head when a pose carries it well off its
 		# stand (kneeling, sitting, asleep, knocked down), eased; an upright body's stays put.
 		var shift := _plate_shift(puppet, row)
@@ -22353,27 +22355,59 @@ func _free_name_for(entity: GridEntity) -> void:
 		puppet.queue_free()
 
 
-## The HP bar (865 amended (3)): kept on the body's name row (_plate_rows) for UiNamePlates to draw under
-## the name: "share" of hp left, "max_hp", and "bar", how much it shows (0 to 1): hurt, in a fight lately, or
-## Alt held, faded either way at HP_BAR_FADE; never the local player's own, whose hp the HUD shows.
+## The HP bar: its fill and colour from the hp, and whether it shows: hurt,
+## in a fight lately, or Alt held; faded either way.
 func _sync_bar(entity: GridEntity, puppet: Node3D, now: int) -> void:
-	if not entity.is_creature() or entity.max_hp <= 0 or puppet.has_meta("corpse"):
+	var bar := puppet.get_node_or_null("HpBar") as MeshInstance3D
+	if bar == null:
 		return
 	var id := entity.get_instance_id()
 	if _last_hp.get(id, entity.hp) != entity.hp:
 		_combat_at[id] = now
 	_last_hp[id] = entity.hp
+	var share := clampf(float(entity.hp) / maxf(entity.max_hp, 1.0), 0.0, 1.0)
+	var material := bar.material_override as ShaderMaterial
+	var wanted := 0.0
+	if Net.hp_bars and (show_all_bars or share < 1.0 or now - _combat_at.get(id, -100000) < COMBAT_SECONDS * 1000.0):
+		wanted = 1.0
+	var alpha := move_toward(float(material.get_shader_parameter("alpha")), wanted, get_process_delta_time() * HP_BAR_FADE)
+	material.set_shader_parameter("alpha", alpha)
+	material.set_shader_parameter("fill", share)
+	material.set_shader_parameter("fill_color", hp_color(share))
+	bar.visible = alpha > 0.001
+	if bar.visible:
+		bar.position = bar_place(float(bar.get_meta("lift", bar.position.y)), puppet.global_basis, _bar_shift(id, puppet, now))
+
+
+## A bar's place on its puppet: [param lift] up, moved by the world [param shift] in the puppet's own frame
+## ([param basis] its turn and scale), so it lands [param shift] from its stand in the world.
+static func bar_place(lift: float, basis: Basis, shift: Vector3) -> Vector3:
+	return Vector3.UP * lift + basis.inverse() * shift
+
+
+## 865 amended (2): a shown bar rides its plate's eased shift (the head's drop from its standing Idle), so it
+## keeps its distance over a kneeling, tired or lying head. The plate's row is used when name_plates eased it
+## this frame or the last; else (the own body, a body whose name is off) the bar eases the row itself.
+func _bar_shift(id: int, puppet: Node3D, now: int) -> Vector3:
 	if not _plate_rows.has(id):
 		_plate_rows[id] = {"key": id}
 	var row: Dictionary = _plate_rows[id]
-	var share := clampf(float(entity.hp) / maxf(entity.max_hp, 1.0), 0.0, 1.0)
-	var wanted := 0.0
-	if (Net.hp_bars and entity != _local_player()
-			and (show_all_bars or share < 1.0 or now - _combat_at.get(id, -100000) < COMBAT_SECONDS * 1000.0)):
-		wanted = 1.0
-	row["bar"] = move_toward(float(row.get("bar", 0.0)), wanted, get_process_delta_time() * HP_BAR_FADE)
-	row["share"] = share
-	row["max_hp"] = entity.max_hp
+	if now - int(row.get("plated_ms", -100000)) <= 100:
+		return row.get("shift", Vector3.ZERO)
+	var seconds := float(now - int(row.get("bar_ms", now - 1000))) / 1000.0
+	row["bar_ms"] = now
+	var shift := _plate_shift(puppet, row)
+	row["shift"] = shift if not row.has("shift") else eased_shift(row["shift"] as Vector3, shift, seconds)
+	return row["shift"]
+
+
+## The bar's colour for [param share] of hp left.
+static func hp_color(share: float) -> Color:
+	if share < HP_RED:
+		return HP_RED_COLOR
+	if share < HP_AMBER:
+		return HP_AMBER_COLOR
+	return HP_GREEN_COLOR
 
 
 ## A footstep when a creature's replicated tile moves on by one.
@@ -23199,7 +23233,7 @@ func _sync_alert(monster: Monster, puppet: Node3D) -> void:
 func _fall(puppet: Node3D, data: Dictionary) -> void:
 	puppet.name = "Corpse_" + str(data.get("entity", ""))
 	puppet.set_meta("corpse", true)
-	for part: String in ["Pick", "Name"]:
+	for part: String in ["Pick", "HpBar", "Name"]:
 		var node := puppet.get_node_or_null(part)
 		if node != null:
 			puppet.remove_child(node)
@@ -27282,6 +27316,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		if entity is Monster:
 			_hook((entity as Monster).cried, _on_cried.bind(id))
 			puppet.set_meta("creature", str(entity.spawn_spec.get("kind", "")))
+		if entity.max_hp > 0:
+			puppet.add_child(_make_bar(entity.max_hp, height + HP_BAR_ABOVE))
 	elif entity.is_breakable():
 		# Hooked once: a zone entered again builds its breakables' puppets again.
 		_hook(entity.impacted, _on_impacted.bind(entity.get_instance_id()))
@@ -27302,6 +27338,25 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 			belt.add_child(_hanging_lantern(true))
 	add_child(puppet)
 	return puppet
+
+
+## An HP bar [param max_hp] long, [param height] up.
+func _make_bar(max_hp: int, height: float) -> MeshInstance3D:
+	var bar := MeshInstance3D.new()
+	bar.name = "HpBar"
+	var quad := QuadMesh.new()
+	quad.size = Vector2(HP_BAR_PER_HP * max_hp, HP_BAR_HEIGHT)
+	bar.mesh = quad
+	var material := ShaderMaterial.new()
+	material.shader = _hp_bar_shader
+	material.set_shader_parameter("alpha", 0.0)
+	material.render_priority = 10
+	bar.material_override = material
+	bar.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bar.position.y = height
+	bar.set_meta("lift", height)
+	bar.visible = false
+	return bar
 
 
 ## A swing: the body goes out toward the blow and back, with a whoosh

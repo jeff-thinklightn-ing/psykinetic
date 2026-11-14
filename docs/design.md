@@ -1855,17 +1855,13 @@ fire stopped it), and a death as a message, since the node goes at once:
 cause, say})`, `kind` one of player, companion, monster or object, `say` a
 companion's last line (`Main.COMPANION_DEATH_LINES`).
 
-**HP bars** (865 amended (3)): a thin strip in each creature's name row,
-under its name, drawn by `UiNamePlates` on the HUD at one screen size at
-every distance (the theme's `HpBar`: 14 px per hp of its max, 120 to 480,
-so a player's 20 is longer than an imp's 12); its fill is the hp left,
-green above half, amber to a quarter, red below. It shows while the
-creature is hurt or has been in a fight (hit, swung, pushed, an impact) in
-the last `COMBAT_SECONDS` (4), or while Alt is held (read by Main,
-`Client3D.show_all_bars`), fading in and out, and sinks with the name when
-the body kneels, sits or lies. The local player's own is never drawn (the
-HUD has his hp). Two rows that would touch step apart, the farther moving
-up and staying up till clear by the theme's `hold`. `hp_bars=0` in
+**HP bars** (`client3d/hp_bar.gdshader`): a thin bar over each creature
+with hp, billboarded and drawn over everything, `HP_BAR_PER_HP` wide per
+hp of its max (a player's 20 is longer than an imp's 12); its fill is
+the hp left, green above half, amber to a quarter, red below. It shows
+while the creature is hurt or has been in a fight (hit, swung, pushed, an
+impact) in the last `COMBAT_SECONDS` (4), or while Alt is held (read by
+Main, `Client3D.show_all_bars`), fading in and out. `hp_bars=0` in
 `settings.cfg` turns them off, for later diegetic work.
 
 **Death.** The puppet becomes a corpse (`Client3D._fall`): nothing on it
