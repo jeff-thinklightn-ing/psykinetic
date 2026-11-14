@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_guide_route()
 	_test_free_pull()
 	_test_free_chase()
+	_test_free_chase_hold()
 	_test_free_route_own_companion()
 	_test_free_pull_round_a_wall()
 	_test_free_pull_beside_a_talker()
@@ -1632,6 +1633,82 @@ func _test_free_chase() -> void:
 	_main._free_chase_start(player, imp)
 	_main._move_click(player, Vector2i(4, 3))
 	_check(_main._free["chase"] == null, "a click elsewhere: the chase given up")
+	World.despawn(imp)
+	player.free_view = null
+
+
+## 699 amended (3): a chase holds at the edge of a live told line, never
+## walking her into it; spent, it goes on. In the red already, it goes on;
+## a plain click-walk is never held.
+func _test_free_chase_hold() -> void:
+	print("
+== a chase holds at a told line's edge, then goes on (699 amended (3)) ==")
+	var player := _place_player(Vector2i(4, 3))
+	_free_start(player)
+	for cell: Vector2i in [Vector2i(9, 3), Vector2i(6, 3), Vector2i(7, 3), Vector2i(8, 3)]:
+		var occupant := World.get_entity_at(cell)
+		if occupant != null and occupant != player:
+			World.despawn(occupant)
+	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
+		"name": "HoldImp", "tile": Vector2i(9, 3), "props": {"mass": 40.0}}) as Monster
+	imp.sight_range = 0
+	var hp := imp.hp
+	player.hp = player.max_hp
+	player.stunned_until_tick = 0
+	player.downed_until = 0
+	player.down_until = 0
+	player.free_halt_until = 0
+	_free_frames(player, 2)
+	# His told line west of him, between them (as a lunge's "telegraph" message has it).
+	var tell := 990001
+	_main.telegraphs[tell] = {"id": tell, "source": str(imp.get_path()), "kind": "lunge",
+		"cells": [[6, 3], [7, 3], [8, 3]], "lands_tick": World.tick + 9999}
+	World.command_attack(player, imp)
+	_main._free_chase_start(player, imp)
+	var entered := false
+	for i in 40:
+		_free_frames(player, 6)
+		if _main.told_cells().has(World.free_cell(player, player.free_pos)):
+			entered = true
+	_check(not entered and _main._free.get("chase_held", false) and imp.hp == hp and _main._free["chase"] != null,
+			"chasing, she stops short of his told line and holds (at %s, held %s, the chase on)" % [player.free_pos, _main._free.get("chase_held", false)])
+	# At the edge, not a cell short: the line starts at x 5.5 (6.0 less half a
+	# cell), entered at 5.6 by free_cell's hysteresis; the hold looks 0.3 ahead.
+	_check(World.free_cell(player, player.free_pos) == Vector2i(5, 3) and player.free_pos.x > 5.2,
+			"held at the line's edge, a route in the open its goal alone (at %s, route %s)" % [player.free_pos, _main._free["path"]])
+	_check(player.facing == Vector2i(1, 0), "holding, she faces him (facing %s)" % player.facing)
+	print("held: order %s, %d ticks since it was given (FREE_CHASE_TICKS %d)" % [player.action_order, World.tick - player.action_tick, Player.FREE_CHASE_TICKS])
+	_main.telegraphs.erase(tell)
+	var frames := 0
+	while frames < 400 and imp.hp == hp:
+		_free_frames(player, 6)
+		frames += 6
+	_check(imp.hp < hp, "the tell spent, the chase goes on and strikes (%d -> %d, %d frames)" % [hp, imp.hp, frames])
+	# In the red already: the chase is never held.
+	_place_player(Vector2i(4, 3))
+	_free_start(player)
+	player.free_halt_until = 0
+	_free_frames(player, 2)
+	_main.telegraphs[tell] = {"id": tell, "source": str(imp.get_path()), "kind": "lunge",
+		"cells": [[4, 3], [5, 3], [6, 3], [7, 3], [8, 3]], "lands_tick": World.tick + 9999}
+	var from := player.free_pos
+	World.command_attack(player, imp)
+	_main._free_chase_start(player, imp)
+	_free_frames(player, 60)
+	_check(not _main._free.get("chase_held", false) and player.free_pos.x > from.x + 0.5,
+			"standing in his told line, the chase walks on, never held (%s -> %s)" % [from, player.free_pos])
+	_main._free["chase"] = null
+	_main._free["path"] = []
+	# A plain click-walk onto a told cell: walked, never held.
+	_place_player(Vector2i(4, 5))
+	_free_start(player)
+	_main.telegraphs[tell] = {"id": tell, "source": str(imp.get_path()), "kind": "lunge",
+		"cells": [[6, 5], [7, 5]], "lands_tick": World.tick + 9999}
+	_main._move_click(player, Vector2i(6, 5))
+	var reached := _free_frames(player, 240, Vector2i(6, 5))
+	_check(reached, "a click-walk onto a told cell walks there, never held (at %s)" % player.free_pos)
+	_main.telegraphs.erase(tell)
+	_stop_walk()
 	World.despawn(imp)
 	player.free_view = null
 

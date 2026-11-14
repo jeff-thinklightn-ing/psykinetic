@@ -38292,6 +38292,31 @@ robber or skeleton stepping back and forth beside a player at a wall.
 free_walk_test _test_free_chase (six phases; fails on main at the robber's
 phase 4). Server only, protocol unchanged, no new class_name, no bullet.
 
+699 amended (3): the click chase holds at a live told line's edge (the
+decision-number script's label, 2026-11-12; the coordinator's ruling on
+combat's dagger rows: a chase walked the body back into a told line the
+moment after she had stepped out of it, for every weapon, on main too).
+While a chase is on and she stands outside every live told cell (Main's
+telegraphs, any source's, host and client alike: Main.told_cells), it never
+steps her into one. Main._free_chase_holds, called each frame after
+_free_chase, holds her where she stands, turned to her target. It holds
+when the straight walk ahead of her would enter a told cell within
+CHASE_HOLD_LOOK (0.3 cells: World.free_cell's rule, its hysteresis kept), so
+she stands at the line's edge. The walk ahead is read by
+Main._free_cell_ahead, not by the route's next point: a route in the open is
+its goal alone (World.walk_path's straight stretches), and the first take
+read only that point, so it never held (measured: route [(9, 3)] from
+(4, 3)). Once the tell is spent the chase goes on, and its attack order is
+sent again at once (Main._free_chase_hold_ends). Measured in controls_test,
+a hold of 40 ticks reached Player.FREE_CHASE_TICKS and the server dropped
+the order; from two cells or nearer a chase never resends, so the walk went
+into reach and ended with no blow. Standing in the red already, the chase
+goes on as before, and her own keys step her out. A plain click-walk is
+never held. controls_test _test_free_chase_hold: she holds at x 5.32 before
+a line starting at 6, faces him, strikes once the tell is spent, walks on
+when already in the line, and a click-walk onto a told cell is never held.
+Client only; protocol unchanged; no new class_name.
+
 699 amended (4): two public reads of the sim's blow reach, for animation's
 drawn step on a heavy swing (the decision-number script's label; the
 coordinator's build 2 for the axes' long landings: a hit landed past about

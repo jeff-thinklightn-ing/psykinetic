@@ -2948,6 +2948,9 @@ const BODY_SLACK := 0.02
 const FREE_CHASE_RESEND_MS := 1000
 ## A chase stops this share of its weapon's span off its foe (699 amended).
 const CHASE_SPAN_SHARE := 0.85
+## How far ahead, in cells, a chase looks for a told cell it would step into
+## (699 amended (3)): a few frames' walk, so it holds at the line's edge.
+const CHASE_HOLD_LOOK := 0.3
 
 
 ## The own body's view while it is a free body, else null: a client's from
@@ -3062,6 +3065,8 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			if (_free["path"] as Array).is_empty():
 				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
 	_free_chase(player, at)
+	if _free_chase_holds(player, at):
+		return Vector2.ZERO
 	var path: Array = _free["path"]
 	_free_pull(player, path, at)
 	while not path.is_empty():
@@ -3518,6 +3523,87 @@ func _free_chase_start(player: Player, target: GridEntity, shove := false) -> vo
 	_free["chase_sent"] = Time.get_ticks_msec()
 
 
+## 699 amended (3) (the coordinator's ruling on combat's dagger rows, 11-12:
+## a chase walked the body back into a told line the moment after she had
+## stepped out of it, for every weapon, on main too): while a chase is on
+## and she stands outside every live told cell (telegraphs, any source's,
+## host and client alike), it never steps her into one. It holds at the
+## edge, turned to its target, and goes on once the tell is spent (its
+## telegraph over). Standing in the red already, the chase goes on as ever
+## (it walks on, and the server strikes once in reach); her own keys step
+## her out. A plain click-walk is never held: only the chase. True while it
+## holds (this frame walks nowhere).
+func _free_chase_holds(player: Player, at: Vector2) -> bool:
+	var foe: Variant = _free.get("chase")
+	var path: Array = _free["path"]
+	if foe == null or not is_instance_valid(foe) or path.is_empty() or telegraphs.is_empty():
+		_free_chase_hold_ends(player, foe)
+		return false
+	var told := told_cells()
+	var mine := World.free_cell(player, at)
+	var to: Vector2i = path[0]
+	if to == mine and path.size() > 1:
+		to = path[1]
+	var next := _free_cell_ahead(mine, at, Vector2(to))
+	if told.has(mine) or not told.has(next):
+		_free_chase_hold_ends(player, foe)
+		return false
+	if not _free.get("chase_held", false):
+		_free["chase_held"] = true
+		print("[chase] held at a told line's edge, %s short of %s" % [mine, next])
+	face_toward(player, grid_direction(World.body_centre(foe as GridEntity) - at))
+	return true
+
+
+## A held chase let go (its tell spent, or the line no longer ahead): its
+## attack order sent again at once, the chase going on as a fresh click's
+## would. A hold can outlast the server's order (Player.FREE_CHASE_TICKS),
+## and from two cells or nearer the chase never resends, so without this the
+## walk went into reach and ended there with no blow (699 amended (3)).
+func _free_chase_hold_ends(player: Player, foe: Variant) -> void:
+	if not _free.get("chase_held", false):
+		return
+	_free["chase_held"] = false
+	if foe != null and is_instance_valid(foe) and not _free["chase_shove"]:
+		_free_chase_send(player, foe as GridEntity)
+
+
+## The first cell other than [param mine] that the straight walk from
+## [param at] towards [param to] would take the body into within
+## CHASE_HOLD_LOOK cells (World.free_cell's rule, its hysteresis kept), so
+## a held chase stands at the told line's edge, not a cell short of it;
+## [param mine] when none. A route in the open is its goal alone
+## (World.walk_path's straight stretches), so its next point can lie past a
+## told line the walk crosses on the way (699 amended (3)).
+static func _free_cell_ahead(mine: Vector2i, at: Vector2, to: Vector2) -> Vector2i:
+	var way := to - at
+	var look := minf(way.length(), CHASE_HOLD_LOOK)
+	if look <= 0.0:
+		return mine
+	var steps := ceili(look / 0.05)
+	for i in range(1, steps + 1):
+		var cell := World._free_cell_from(mine, at + way.normalized() * (look * float(i) / steps))
+		if cell != mine:
+			return cell
+	return mine
+
+
+## Every live told cell (telegraphs: any source's, 602), as a set. Every one
+## can harm her: only foes tell (monsters, the beasts, the draugr's moves),
+## and a tell strikes every body on its cells (World.tell_struck, 810). A
+## friend's tell, if one is ever added, is filtered here by tell_struck's
+## rule (699 amended (3)).
+func told_cells() -> Dictionary:
+	var told := {}
+	for id: Variant in telegraphs:
+		for cell: Variant in (telegraphs[id] as Dictionary).get("cells", []):
+			if cell is Vector2i:
+				told[cell] = true
+			elif cell is Array and (cell as Array).size() >= 2:
+				told[Vector2i(int(cell[0]), int(cell[1]))] = true
+	return told
+
+
 ## Each frame of a chase (697): in reach of the target (the centres within
 ## World.reach_limit, 699) or the target
 ## gone, done; its tile moved, the route planned again; the attack order
@@ -3556,11 +3642,16 @@ func _free_chase(player: Player, at: Vector2) -> void:
 		_free["path"] = route
 	var now := Time.get_ticks_msec()
 	if not _free["chase_shove"] and apart > 2 and now - int(_free["chase_sent"]) >= FREE_CHASE_RESEND_MS:
-		_free["chase_sent"] = now
-		if Net.is_authority():
-			World.order_attack(player, target)
-		else:
-			World._to_server(&"request_attack", [player.get_path(), target.get_path()])
+		_free_chase_send(player, target)
+
+
+## The chase's attack order, sent (697) and its time kept.
+func _free_chase_send(player: Player, target: GridEntity) -> void:
+	_free["chase_sent"] = Time.get_ticks_msec()
+	if Net.is_authority():
+		World.order_attack(player, target)
+	else:
+		World._to_server(&"request_attack", [player.get_path(), target.get_path()])
 
 
 ## The player's own key, click or held steer (697): a chase given up, and
