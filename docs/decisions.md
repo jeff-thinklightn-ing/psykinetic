@@ -37822,6 +37822,37 @@ bodies too) is traced after this lands. companion_test _test_far_bring_back_same
 cells, she is the same body (instance, mind, stance, pack, buffs, ailments), a
 wolf's aim at her stands, she is hit at once, and resend leaves a body no peer sees alone. Server only,
 protocol unchanged, no new class_name.
+
+Note on 705 amended (1), the cause of the stale stand it sidestepped (the coordinator's trace, closed
+11-13): it was Client3D's, not GridEntity's. saturn's stand3 probe (headless, no Client3D) showed a bare
+42-cell move standing only 145 ms (the 1.5-tick display delay) and then streaking about 100 ms, a
+resident moved 20 cells bare the same. The rest is _sync_puppets' far path (perf's): while the player is
+dead there is no local puppet, so Client3D._follow returns early and _camera_target stays at the death
+spot; any body that moves beyond reach of that stale aim (max(view reach + 4, 20): about 23 to 26 cells
+at the ordinary zoom) goes _far, its processing stopped and its drawing frozen where it was; once his
+new body is placed, _follow cuts the camera (CUT_TILES) and within FAR_EVERY (4) frames the body leaves
+_far and _display_caught_up snaps it across in one frame. So the stand lasted as long as the aim stayed
+stale, plus up to four frames. 705 amended (1) covers her; perf's 912 covers his own body and a full far
+pass on the frame the camera cuts for every other body. No row for the bare 145 ms stand and streak:
+nothing a player sees moves a body bare over many cells (hill-cat leaps of 4 cells or fewer, World.walk
+only far from everyone, pushes with their own slide hints).
+
+705 amended (2): her return cell on his side of a door (the decision-number script's label;
+environment's read of playtest's compreturn4, the coordinator's row). Brought back at the wilds temple,
+the player stands on its doorstep (189, 201), outside its west door (the edge between 189 and 190);
+_nearest_free, searching from his cell and taking east first, put her at (190, 201), one cell inside,
+and she walked out over about a second, the temple's roof coming off for her on its cell meanwhile.
+Main._free_beside(at) is her pick now: the nearest free cell (breadth first, the eight directions) he
+could walk to without crossing a wall or any door edge, open or shut (World.terrain_step_open,
+Main.crosses_door: straight across a door edge, or a diagonal past the corner of one), so inside with
+him when he is in, outside when he is out; _nearest_free when none is within 2000 cells. _join_companion
+uses it in both its picks, the far bring-back's move and the fresh spawn beside him (its saved tile,
+when kept, is her own and stays), so every rejoin has it: a respawn at a temple or a hut, a zone change
+or travel (_join_player), a far rejoin in the same zone, a recruit, freed, back from work.
+companion_test _test_return_cell_his_side: at the temple's west door and the Mughouse's, from either
+side, the pick is free, not the cell across the door, and the shortest walk to it crosses no door edge;
+brought back far onto the temple's doorstep, she is beside him outside. Server only, protocol unchanged,
+no new class_name.
 ## 703, step 2 (dungeon): level_test walks no player on the grid
 
 6b (703) takes the player's grid walking away; a tree's step 2 is that none

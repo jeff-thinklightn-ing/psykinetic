@@ -9177,7 +9177,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			# town): she comes with him, beside him (decision 705; Jeff came
 			# back 130 cells from Pip, and she walked it alone).
 			var was := existing.tile
-			World._relocate(existing, _nearest_free(player.tile))
+			World._relocate(existing, _free_beside(player.tile))  # On his side of a door (705 amended (2)).
 			# 705 amended (1): far, a fresh spawn on each client, not a slide across the map.
 			var resent := resend(existing)
 			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them%s" % [
@@ -9221,7 +9221,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		else:
 			print("[spawn] %s's companion %s: hostile within %d of its saved tile %s; beside its owner instead" % [
 				record.name, record.companion["name"], SPAWN_SAFE_DISTANCE, saved])
-	var tile := _nearest_free(wanted)
+	var tile := _free_beside(wanted) if wanted == player.tile else _nearest_free(wanted)
 	if not World.is_free(tile):
 		print("[net] no free tile for %s's companion %s near %s" % [record.name, record.companion["name"], wanted])
 		return
@@ -19904,6 +19904,43 @@ func _nearest_free(wanted: Vector2i) -> Vector2i:
 				seen[next] = true
 				queue.append(next)
 	return _free_start_tile()
+
+
+## 705 amended (2): where a companion is put beside her player at
+## [param at] on a rejoin (a bring-back, a zone change, a recruit): the
+## nearest free cell he could walk to from there without crossing a wall or
+## any door edge, open or shut, so on his side of a building's door, inside
+## with him or outside with him (environment's read of playtest's
+## compreturn4: back on the wilds temple's doorstep (189, 201) she was put at
+## (190, 201), one cell in, and its roof came off). _nearest_free when there
+## is none within 2000 cells (he stands in a shut closet).
+func _free_beside(at: Vector2i) -> Vector2i:
+	var queue: Array[Vector2i] = [at]
+	var seen: Dictionary[Vector2i, bool] = {at: true}
+	var i := 0
+	while i < queue.size() and seen.size() <= 2000:
+		var tile := queue[i]
+		i += 1
+		if World.is_free(tile) and not World.is_burning(tile):
+			return tile
+		for direction in World.DIRECTIONS:
+			var next := tile + direction
+			if not seen.has(next) and not crosses_door(tile, direction) and World.terrain_step_open(tile, direction):
+				seen[next] = true
+				queue.append(next)
+	return _nearest_free(at)
+
+
+## Whether a step from [param from] the way [param direction] points crosses
+## a door edge, open or shut: straight across one, or a diagonal past the
+## corner of one (705 amended (2)).
+func crosses_door(from: Vector2i, direction: Vector2i) -> bool:
+	if direction.x == 0 or direction.y == 0:
+		return World.edge_kind(from, direction) == Terrain.Edge.DOOR
+	var via_x := Vector2i(direction.x, 0)
+	var via_y := Vector2i(0, direction.y)
+	return [World.edge_kind(from, via_x), World.edge_kind(from + via_x, via_y), World.edge_kind(from, via_y),
+		World.edge_kind(from + via_y, via_x)].has(Terrain.Edge.DOOR)
 
 
 func _free_start_tile() -> Vector2i:

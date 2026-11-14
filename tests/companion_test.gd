@@ -172,6 +172,7 @@ func _ready() -> void:
 	_test_warm_tell()
 	_test_drinks_a_remedy()
 	_test_lead_to_near_water()  # Loads the wilds and back.
+	_test_return_cell_his_side()  # Loads the wilds and back.
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
 	await _test_old_record_gets_a_companion()
@@ -1881,6 +1882,83 @@ func _first_quiet_moment(kind: String, answer: Dictionary, fight := false, again
 	pet.want_words = ""
 	pet.want_says = ""
 	return row
+
+## 705 amended (2), environment's read of playtest's compreturn4: brought
+## back on the wilds temple's doorstep (189, 201), outside its west door, she
+## was put at (190, 201), one cell inside, and its roof came off. Her return
+## cell is on his side of any door: at the temple's west door and at the
+## Mughouse's, from either side, the pick (_free_beside, the one every rejoin
+## uses: a bring-back, a zone change, a far rejoin in the same zone) is free,
+## not the cell across the door, and the shortest walk to it crosses no door
+## edge; and a far bring-back onto the temple's doorstep puts her outside.
+func _test_return_cell_his_side() -> void:
+	print("
+== brought back on a doorstep: she is put on his side of the door, never in a building he is not in (705 amended (2)) ==")
+	var was := String(World.zone.name)
+	if not _main.load_map("wilds"):
+		_check(false, "the wilds load")
+		return
+	var owner := _player()
+	var pet := _companion()
+	if owner == null or pet == null or not pet.spawned or pet.zone != "wilds":
+		_check(false, "a player and her companion in the wilds (%s, %s)" % [owner, pet])
+		_main.load_map(was)
+		return
+	_kill_monsters()
+	var owner_was := owner.tile
+	var doorstep := Vector2i(189, 201)
+	var inside := Vector2i(190, 201)
+	var west_door := World.door_across(doorstep, Vector2i(1, 0))
+	_check(World.edge_kind(doorstep, Vector2i(1, 0)) == Terrain.Edge.DOOR and west_door != null,
+		"the temple's west door is the edge between %s and %s" % [doorstep, inside])
+	var doors := {"the temple's west door": west_door}
+	var tavern: Array = _main._warm_rest_places("wilds").filter(func(each: Dictionary) -> bool: return each["key"] == "umbrage_tavern/tavern")
+	var by_tavern: Door = null
+	if not tavern.is_empty():
+		var at: Vector2i = tavern[0]["at"]
+		for door: Door in World.get_doors():
+			if door.zone == "wilds" and (by_tavern == null
+					or World.distance(Vector2i(door.key.x, door.key.y), at) < World.distance(Vector2i(by_tavern.key.x, by_tavern.key.y), at)):
+				by_tavern = door
+	_check(by_tavern != null, "the Mughouse's door found (%s)" % [tavern])
+	doors["the Mughouse's door"] = by_tavern
+	_put(owner, doorstep)
+	print("before 705 amended (2), the plain nearest free cell to the doorstep: %s" % _main._nearest_free(doorstep))
+	for name: String in doors:
+		var door: Door = doors[name]
+		if door == null:
+			continue
+		var a := Vector2i(door.key.x, door.key.y)
+		var b := a + (Vector2i(1, 0) if door.key.z == Terrain.EAST else Vector2i(0, 1))
+		for side: Vector2i in [a, b]:
+			var other := b if side == a else a
+			_put(owner, side)
+			var pick: Vector2i = _main._free_beside(side)
+			var crossed := _walk_crosses_door(side, pick)
+			_check(owner.tile == side and World.is_free(pick) and pick != other and not crossed,
+				"%s, him at %s: she is put at %s, free, not across it (%s), a walk there through no door (%s)" % [name, side, pick, other, crossed])
+	# The whole bring-back: she waits 20 off, he comes back on the doorstep.
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_put(owner, doorstep)
+	_put(pet, _main._nearest_free(doorstep + Vector2i(0, 20)))
+	_main._join_companion(record, owner)
+	_check(World.distance(pet.tile, doorstep) <= 2 and pet.tile != inside and not _walk_crosses_door(doorstep, pet.tile),
+		"brought back far onto the temple's doorstep: she is beside him outside, at %s, not in the temple" % [pet.tile])
+	_put(owner, owner_was)
+	_put(pet, _main._nearest_free(owner_was + Vector2i(1, 0)))
+	_main.load_map(was)
+
+
+## Whether the shortest walk from [param from] to [param to] crosses a door
+## edge (Main.crosses_door at each step).
+func _walk_crosses_door(from: Vector2i, to: Vector2i) -> bool:
+	var prev := from
+	for cell: Vector2i in World.find_path(from, to, true, null, 400):
+		if cell != prev and _main.crosses_door(prev, cell - prev):
+			return true
+		prev = cell
+	return false
+
 
 ## 803 amended (11), the coordinator's ruling (A): Jeff's "i keep taking
 ## companions to the pond to fish" is the pool by Snagfin's shack. A fresh
