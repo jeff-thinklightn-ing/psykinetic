@@ -65,7 +65,13 @@ that the walk looks like skipping and the people look like "bad claymation place
   nearest zoom) and brings the coordinator its three worst things: one line each, with a still
   or a number, and what it would do. A report of Jeff's goes first, then queued work, then this.
 - Passing tests and a far-camera still are not "it looks right". Art and animation are shown at
-  the nearest zoom beside Jeff's goblin before they land.
+  the nearest zoom beside Jeff's goblin before they land. A look names its camera distance and
+  is shot with the player standing in the place: a panned lens shows what no player sees
+  (2026-11-14: a "tipped fir" was a branch round a panned lens). A check that reads the same
+  for the right pose and the wrong one is no watch: a stance is read by its clip's name, and a
+  still's time comes from the run's log (11-14: an axe's edge direction passed for the ready
+  and the rest alike). A still that needs the town's people settles on the town's step
+  (`World.steps >= 310`: the settled are found at the first turn, step 300), not a frame count.
 - Playtest runs a look pass on every released build: close stills of each kind of person and
   creature, the player walking and a companion following, kept in
   `C:/dev/review/look/<version>/` and laid beside the last build's. A difference nobody intended
@@ -88,7 +94,13 @@ that the walk looks like skipping and the people look like "bad claymation place
   on the rebased take before you queue (278 amended (5)): the checks a landing makes before the
   gate (the CHANGELOG's bullets, Godot launches' logs, the voice inventory), with no lock and no Godot,
   in seconds; it prints `LANDING CHECKS: PASS` or `FAIL (why)`, and a FAIL there would have
-  failed your landing after its wait in the queue.
+  failed your landing after its wait in the queue. A tool test (not a Godot part) that fails
+  on a temp-folder fault (Permission denied, unable to write file, Access is denied, no failed
+  check) is rerun once, 5 s later, and the PASS/FAIL line says "; retried: <tests> (temp
+  folder)" (278 amended (8)). A tool test stops only a process it can still show is its own
+  (its pid made before it recorded it, or its command line unchanged), never a pid alone
+  (perf-timed's landing, 11-13 22:19); heavy_job_test's real takes go by a free-memory figure
+  of the test's own, never read by a real take (394 amended (50)).
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `kind=$(bash tools/remote_tests.sh kind)`,
   `sh tools/heavy_job.sh take <tree> $kind`
@@ -104,12 +116,20 @@ that the walk looks like skipping and the people look like "bad claymation place
   and lost its turn to a five-minute connection timeout, 2026-11-13). Exit 0: on main; 1: not
   landed, run the landing again from the start; 2: a usage fault; 3: main frozen, release the
   gate's take and requeue. Every try is logged in `C:/dev/land.lock.log`.
+  At a cut release first runs `land_lock.sh freeze`: from then a take answers exit 3, "main
+  frozen (pending)", while the landing holding the lock finishes; treat it as a held freeze
+  (release your gate take, requeue after the unfreeze) (667 amended (4)).
   Since 878 (Jeff, 2026-11-11: "go ahead and move landings' test runs to saturn") a landing's
   Godot tests (the suite, state_test, net_test) run on saturn through `tools/remote_tests.sh`,
   in about 8 minutes, with server_boot_test and the tool tests here: `kind` prints
   `suite_remote` when saturn answers and your work is committed, else `suite`, which runs
   everything here as before. Saturn tests the commit, so commit before you take. A lost
-  connection fails the landing: run it again, never push on it. `LAND_LOCAL=1` keeps
+  connection fails the landing: run it again, never push on it. A saturn slot whose landing
+  is gone on this PC (no land-lock beat in 150 s and no gate take, or this tree's own earlier
+  sha while it holds the lock) is taken over at once by the next prepare, logged in saturn's
+  `~/land/.slot_clears.log` (878 amended (1)). A first landing under a new tree name takes
+  saturn's newest scene times (90 amended (2)); the landing log's "durations:" line says where
+  its caps came from, and a tree that reads "durations: none" tells perf. `LAND_LOCAL=1` keeps
   everything here (the cut's suite on main does); `land.ps1` has no saturn path. This is the
   only thing of a tree's that runs on saturn: a solo scene, a probe or a bench there is asked
   of the coordinator, and beyond a landing's own run no session writes to saturn without
@@ -248,6 +268,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   prints `LOAD_CHECK: PASS` or `FAIL` with the file named; use it in place of
   `--check-only`, which fails sound scripts and so was skipped or misread. It does not run the
   code: a fault met only at run time (a typed array given a plain one) still needs the scene.
+  A load_check starts past the gate's queue when its 0.5 GB and the margin are free and no
+  bench runs, one at a time, never counted toward the heavy-job cap (394 amended (48)); run it
+  before queueing a take. An import (godot_import) also starts past the gate's queue (394
+  amended (49)): one at a time, never beside a local suite or a bench; a load_check or import
+  from a checkout older than that waits its turn, so rebase before running one.
   net_test run alone is the `net` kind (394 amended (24)): it starts several Godots (about 12 GB at
   once), so it runs one at a time, never beside a bench, and the gate refuses it under any other kind.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
