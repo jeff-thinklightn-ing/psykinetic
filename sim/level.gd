@@ -4123,6 +4123,10 @@ static func _kind_of(building: Dictionary, entry: Dictionary) -> void:
 	building["storeys"] = int(kind.get("storeys", 1))
 	building["eaves"] = float(kind.get("eaves", STOREY * building["storeys"]))
 	building["place"] = str(kind.get("place", ""))
+	# A camp's tents (905 amended): art-kit's prop.tent variant for each, in
+	# BuildingComposer._camp's order (missing: the slot's first, the hide
+	# shelter; 2 the traders' canvas).
+	building["tents"] = (entry.get("tents", []) as Array).map(func(variant: Variant) -> int: return int(variant))
 	# Each block's role, as its blocks are ordered (main, wing, leanto, ...).
 	building["roles"] = (kind_size(entry)["blocks"] as Array).map(func(block: Array) -> String:
 		return str(block[4]) if block.size() > 4 else "main")

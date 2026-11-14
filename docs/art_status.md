@@ -350,7 +350,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `prop.stairs` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.star_daub` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `prop.table` | 1 | art-kit, by hand | own | 2026-10-19 |
-| `prop.tent` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `prop.tent` | 2 | art-kit, by hand | own | 2026-11-13 |
 | `prop.tool_wall` | 2 | art-kit, by hand | own | 2026-11-06 |
 | `prop.torch` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `prop.torch_post` | 1 | art-kit, by hand | own | 2026-10-19 |

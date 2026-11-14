@@ -54656,3 +54656,22 @@ companion_test checks both hooks by the town worker's id. tools/probe_umbrage (n
 away-holder silence on rows3's tip (saturn, 94e1796ae, case D).
 
 Protocol unchanged; save format unchanged (no new key). No new class_name.
+## 905. The camps' tents by hand: a bandits' hide shelter and a traders' canvas with an awning, each camp naming its own
+
+The coordinator's rulings of 11-13 on art-gen's 10-18 prop.tent fit (a pale slab by day and the brightest thing
+in the woods at night; an earlier take of this number, a plain ridge tent, never landed). prop.tent is two
+variants by hand (art-kit), same slot, size, origin and kind; each opens toward +z, the fire, as
+BuildingComposer._camp turns it. 1 (C:/dev/review/tent/make_shelter_hide.py, 624 tris): a lean-to of unequal
+hides laced dark over a sagging ridge pole, its +x end rolled back, four low stones along its hem; the bandits'.
+2 (C:/dev/review/tent/make_tent_awning.py, 788 tris): a weathered canvas tent, its +z slope raised on two poles
+as an awning, the edge rolled, guyed and pegged, standing room under the front half; the traders'. Both one
+palette material, wound outward and whole under the culled-face check. The hide is 2.51 m deep in the
+slot's 3, its middle 0.21 m behind the slot's: its back hem lies on the canvas's, at the line maps' sacks keep,
+and it has no awning in front, so prop.tent's "tolerance" is 0.17 (ArtCheck alone reads it). A camp's level entry names its tents'
+variants in "tents" (one per tent in _camp's order, index 0 at the side's minus end; missing or past the list:
+1). Level._kind_of copies it into the building (parsed on both sides from level.json, never sent), and _camp
+instances that variant, clamped to the slot's count. Maps' 793 amended (1) sets the forest's and the hills'
+camps and moves each trader's bedroll and bed under its canvas. Watched: joined, the Lenovo, noon, the nearest
+zoom, the player inside C4, C1 and C3 beside their tents, before (main 4701b51ca) and after
+(C:/dev/review/art-kit/tents_joined/tents_joined_sheet.png; passed by the coordinator). Lands on, with its bullet in voice's words. Client
+(art, the composer) and the level parse; protocol unchanged; no new class_name.

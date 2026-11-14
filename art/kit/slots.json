@@ -3044,9 +3044,11 @@
 			"type": "mesh",
 			"kind": "cell",
 			"size": [2.4, 2, 3],
+			"tolerance": 0.17,
 			"budget": 800,
-			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-18", "notes": "N:/assets/candidates/prop.tent/notes.md (Jeff, 2026-10-18: \"go ahead and apply the candidates and ill veto in game\"; art-gen's best for the slot): c1's 800 mesh, cloth and poles from the concept, 628 tris"},
-			"uses": "a goblin tent, its opening toward +z"
+			"variants": 2,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-13", "notes": "905 reworked (the coordinator's rulings 11-13; art-gen's 10-18 fit, a slab by day and the brightest thing at night, replaced): 1 C:/dev/review/tent/make_shelter_hide.py, a hide lean-to on a sagging ridge pole, unequal hides laced dark, the +x end rolled back, four low stones on the hem, 624 tris; 2 C:/dev/review/tent/make_tent_awning.py, a traders' weathered canvas tent with its +z slope raised on two poles as an awning, its edge rolled, guyed and pegged, 788 tris; 1 is 2.51 m deep, its middle 0.21 m behind the slot's (its back hem on 2's, at the line maps' sacks keep, with no awning in front), so the slot's tolerance is 0.17 for it; both culled-whole (cull sheet), seen on a host beside the goblin at the nearest zoom (C:/dev/review/tent/game/tent_close_sheet.png)"},
+			"uses": "a camp's tent, its opening toward +z (the fire, as _camp turns it): 1 the hide shelter (goblins', bandits'), 2 the traders' canvas with its awning; a camp entry's \"tents\" picks each tent's variant (missing: 1)"
 		},
 		"prop.palisade": {
 			"category": "props",

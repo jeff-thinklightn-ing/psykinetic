@@ -1416,8 +1416,10 @@ const CAMP_FIRE := "Campfire"
 
 ## A camp's (649) fire ring and tents in [param parts]: art-kit's
 ## prop.campfire in from its middle toward its front, its prop.tent behind
-## (two side by side on a camp six across), each facing the camp's front;
-## a piece art-kit has not is left out.
+## (two side by side on a camp six across, the first at -side), each facing
+## the camp's front, each the variant its "tents" names (905 amended: 1 the
+## hide shelter, 2 the traders' canvas; missing, 1); a piece art-kit has
+## not is left out.
 static func _camp(building: Dictionary, parts: Node3D) -> void:
 	var rect: Rect2i = building["rect"]
 	var facing: Vector2i = building["facing"]
@@ -1433,11 +1435,13 @@ static func _camp(building: Dictionary, parts: Node3D) -> void:
 	if not ArtKit.has("prop.tent"):
 		return
 	var tents := 2 if mini(rect.size.x, rect.size.y) >= 6 else 1
+	var variants: Array = building.get("tents", [])
 	for index in tents:
 		var at := middle - front * CAMP_TENT_BACK
 		if tents > 1:
 			at += side * CAMP_TENT_APART * (index * 2 - 1)
-		var tent := ArtKit.instance("prop.tent")
+		var variant := int(variants[index]) if index < variants.size() else 1
+		var tent := ArtKit.instance("prop.tent", clampi(variant, 1, maxi(1, ArtKit.variant_count("prop.tent"))))
 		tent.name = "Tent_%d" % index
 		tent.position = Vector3(at.x, 0.0, at.y)
 		tent.rotation.y = atan2(front.x, front.y)
