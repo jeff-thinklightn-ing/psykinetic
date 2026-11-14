@@ -6978,7 +6978,7 @@ func _test_relic() -> void:
 	_check(rows.is_empty() and not _main._relic_returned(player, aldous, uid) and player.slot_items.has(uid) and World.totem_charges(World.totem_of(pid)) == charged
 		and spoken.size() == 1 and spoken[0].contains(_main.ALDOUS_BACK),
 		"the knight's altar on: no row for them, given back kept, sent to the altar (%s)" % [spoken])
-	_check(Resident.relic_line("Sir Ewald").contains("knight's altar in the crypt's First Hall") and not Resident.relic_line("Sir Ewald").contains("you lay them on the altar"),
+	_check(Resident.relic_line("Sir Ewald").contains("on the bier in the crypt's First Hall") and not Resident.relic_line("Sir Ewald").contains("you lay them on the altar"),
 		"and what he knows of the remains says where they go now")
 	World.consume(player, uid, "the test")
 	Net.message_received.disconnect(heard)

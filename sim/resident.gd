@@ -1733,7 +1733,7 @@ static func relic_line(knight: String) -> String:
 	if AstralKnight.altar_on:
 		# 896 amended (1) (Jeff: the knight's thanks charges it; the priest only glad you're back; lore's place name).
 		return ("Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s"
-			+ " Whoever brings a knight's remains up from below, you send to lay them on the knight's altar in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet;"
+			+ " Whoever brings a knight's remains up from below, you send to lay them on the bier in the crypt's First Hall, where the knight's thanks charges that one's Encolpion Amulet;"
 			+ " you are glad of everyone who comes back from below.") % now
 	return ("Holy knights of the temple lie in the Hall of Fallen Souls, deep beneath this temple, and the Mound-breakers, the grave robbers in the crypt above it, dig for their bones to sell.%s"
 		+ " Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet;"
