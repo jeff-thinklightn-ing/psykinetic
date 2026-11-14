@@ -7,7 +7,9 @@ set -u
 cd "$(dirname "$0")/.."
 here="$(pwd)"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+# A hang left alive (a check failed early) is stopped by pid at exit, before its folder goes.
+hang_left() { for pid in $(cat "$tmp/hang.pids" 2>/dev/null); do kill -0 "$pid" 2>/dev/null && echo "$pid"; done; }
+trap 'for pid in $(hang_left); do kill -9 "$pid" 2>/dev/null; done; rm -rf "$tmp"' EXIT
 failed=0
 check() {
 	if [ "$1" = 0 ]; then echo "  PASS  $2"; else echo "  FAIL  $2"; failed=$((failed + 1)); sed "s/^/      | /" "$tmp/out.txt" 2>/dev/null; echo "      calls: $(tr "
@@ -37,7 +39,7 @@ case " $* " in
 	echo push >> "$tmp/calls"
 	case "$(next plan)" in
 	ok) exec git "$@" ;;
-	hang) exec sleep 8 ;;
+	hang) echo $$ >>"$tmp/hang.pids"; exec sleep 120 ;;
 	net) neterr ;;
 	landed) git "$@" >/dev/null 2>&1; neterr ;;
 	refuse) echo " ! [rejected]        main -> main (non-fast-forward)" >&2; echo "error: failed to push some refs" >&2; exit 1 ;;
@@ -52,7 +54,7 @@ case " $* " in
 *) exec git "$@" ;;
 esac
 EOF
-export LAND_PUSH_GIT="bash $tmp/fakegit.sh" LAND_PUSH_TIMEOUT=3 LAND_PUSH_WAIT=0
+export LAND_PUSH_GIT="bash $tmp/fakegit.sh" LAND_PUSH_TIMEOUT=20 LAND_PUSH_WAIT=0
 export PSYKINETIC_LAND_LOCK="$tmp/land.lock"
 lock() {  # lock <owner> <what>: the scratch land lock, held.
 	rm -rf "$PSYKINETIC_LAND_LOCK"; mkdir -p "$PSYKINETIC_LAND_LOCK"
@@ -85,9 +87,9 @@ echo "== no answer (the fake timeout), then it answers =="
 take "hang ok" "ok"
 started=$(date +%s)
 push; check $? "pushed on the second try: exit 0"
-[ $(( $(date +%s) - started )) -lt 20 ]; check $? "the dead try cut at LAND_PUSH_TIMEOUT, not left to hang"
+[ $(( $(date +%s) - started )) -lt 60 ]; check $? "the dead try cut at LAND_PUSH_TIMEOUT (20 s, the hang 120), not left to hang"
 [ "$(remote)" = "$sha" ] && [ "$(pushes)" = 2 ]; check $? "main is the tested sha, after two pushes"
-logged "failed on the network: $(echo "$sha" | cut -c1-9) (try 1 of 3): no answer in 3 s"; check $? "the timed-out try logged"
+logged "failed on the network: $(echo "$sha" | cut -c1-9) (try 1 of 3): no answer in 20 s"; check $? "the timed-out try logged"
 
 echo "== it landed after all =="
 take "landed ok" "ok"
@@ -145,5 +147,9 @@ sh "$here/tools/land_push.sh" t "$aside" > "$tmp/out.txt" 2>&1; check $(( $? == 
 [ "$(pushes)" = 0 ]; check $? "nothing pushed"
 
 echo
+echo "== the hangs =="
+started_pids="$(tr -s '\n' ' ' < "$tmp/hang.pids" 2>/dev/null)"
+left="$(hang_left | tr -s '\n' ' ')"
+[ -n "$started_pids" ] && [ -z "$left" ]; check $? "each hung push stopped with its try, none left alive (started: $started_pids; alive: ${left:-none})"
 [ "$failed" = 0 ] && echo "RESULT: PASS" || echo "RESULT: FAIL ($failed failed)"
 [ "$failed" = 0 ]

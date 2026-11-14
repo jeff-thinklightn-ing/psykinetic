@@ -5,6 +5,7 @@ release through a state folder of its own (HEAVY_JOBS_DIR), never the real
 one.
   python tests/heavy_job_test.py
 """
+import atexit
 import contextlib
 import datetime
 import io
@@ -780,6 +781,37 @@ table["trellis_mesh"] = dict(gate.kinds()["trellis_mesh"], ram_gb=1e12, commit_g
 table["soak"] = dict(gate.kinds()["soak"], ram_gb=0.1, commit_gb=0.1)
 gate._write(gate._path("kinds.json"), table)
 real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
+## The test's long sleepers (stand-ins the gate must stop: a run over its --expect, an idle run, a
+## hung probe). Each writes its pid as it starts; at the end, and at exit on any failure or crash,
+## any still alive is stopped by pid, and the end checks there were none (the coordinator's
+## condition, 2026-11-13: the sleepers were made long so load cannot reach the bounds).
+SLEEPERS_FILE = os.path.join(tempfile.gettempdir(), "heavy_job_test_sleepers_%d.txt" % os.getpid())
+
+
+def sleeper_body(seconds):
+    return "import os, time; open(%r, 'a').write('%%d\\n' %% os.getpid()); time.sleep(%d)" % (SLEEPERS_FILE, seconds)
+
+
+def sleepers_seen():
+    try:
+        with open(SLEEPERS_FILE) as handle:
+            return [int(line) for line in handle if line.strip()]
+    except OSError:
+        return []
+
+
+def stop_sleepers():
+    """Stops any sleeper still alive, by pid; returns the pids it found alive."""
+    left = [pid for pid in sleepers_seen() if gate.alive(pid)]
+    for pid in left:
+        subprocess.run(["taskkill", "/PID", str(pid), "/F"] if os.name == "nt" else ["kill", "-9", str(pid)],
+            capture_output=True)
+    return left
+
+
+atexit.register(lambda: (stop_sleepers(), os.path.exists(SLEEPERS_FILE) and os.remove(SLEEPERS_FILE)))
+
+
 def wait_for(condition, seconds=60.0):
     # Polled, not slept: under a loaded landing a fixed wait was overrun
     # (release, art-kit's landing 2026-10-18).
@@ -991,16 +1023,16 @@ check(not gate.hung([(0.0, 0.0), (window, 0.2 * window)], window, 0.0)[0], "a fi
 check(not gate.hung([(0.0, 0.0), (window - 1, 0.0)], window - 1, 0.0)[0], "not before the window has run")
 
 print("== a run over its limit, hung, or busy ==")
-sleeper = [sys.executable, "-c", "import time; time.sleep(60)"]
+sleeper = [sys.executable, "-c", sleeper_body(600)]  # Ten minutes: the bounds below are 120 s.
 began = time.time()
 code = gate.run("slow", "bench", sleeper, expect_minutes=0.05)
-check(code == gate.STOPPED_CODE and time.time() - began < 30, "over its --expect: stopped, exit 5 (got %s after %.0f s)" % (
+check(code == gate.STOPPED_CODE and time.time() - began < 120, "over its --expect (3 s, the sleeper 600): stopped, exit 5 (got %s after %.0f s)" % (
     code, time.time() - began))
 check(not gate._entries("running"), "and nothing left held")
 real_window, gate.HUNG_SECONDS = gate.HUNG_SECONDS, 4.0
 began = time.time()
 code = gate.run("idle", "bench", sleeper)
-check(code == gate.STOPPED_CODE and time.time() - began < 30, "idle the whole window: stopped as hung, exit 5 (got %s after %.0f s)" % (
+check(code == gate.STOPPED_CODE and time.time() - began < 120, "idle the whole window (4 s, the sleeper 600): stopped as hung, exit 5 (got %s after %.0f s)" % (
     code, time.time() - began))
 # A wider window for the busy one: a 4 s window can be mostly the child's
 # own start on a loaded machine (lore's landing beside an import, 688 s,
@@ -1090,7 +1122,7 @@ gate._write(gate._path("queue", "%019d-environment-1.json" % time.time_ns()), {"
     "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
 started = time.time()
 code = gate.run("ui", "scene", [sys.executable, "-c", "pass"])
-check(code == 0 and time.time() - started < 30, "a scene runs at once past the bench (%.0f s)" % (time.time() - started))
+check(code == 0 and time.time() - started < 120, "a scene runs at once past the bench, which never ends (%.0f s)" % (time.time() - started))
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tbackfill\tui\tscene\tpast environment exclusive, waiting on suite due in " in text, "the log says so")
@@ -1576,8 +1608,10 @@ waited_from = time.time()
 gate.release("holder", "suite")
 wait_for(lambda: any(each["tree"] == "turn2" for each in gate._entries("running")))
 held = [each for each in gate._entries("running") if each["tree"] == "turn2"]
-check(held and held[0]["estimate"] == "suite_lean3" and time.time() - waited_from < 5.0,
-    "no room at its turn: lean at once, no wait first (%s)" % held)
+# Against LEAN_AFTER_SECONDS (300), the wait a suite (lean_first) skips: a fifth of it. It was 5 s, and
+# a loaded PC took 6.2 (dungeon's landing, 11-13 19:39) and more (perf's own run, 17:23).
+check(held and held[0]["estimate"] == "suite_lean3" and time.time() - waited_from < gate.LEAN_AFTER_SECONDS / 5,
+    "no room at its turn: lean at once, not after LEAN_AFTER_SECONDS (%.1f s; %s)" % (time.time() - waited_from, held))
 with open(gate._path("heavy_jobs.log")) as log:
     lean_lines = [line for line in log if "\tlean\tturn2\tsuite\t" in line]
 check(len(lean_lines) == 1 and "at its turn, full 14.6 + 8 GB" in lean_lines[0], "the lean line, once, with the full figure: %s" % (
@@ -1639,11 +1673,11 @@ check(gate.release("swapper", "suite") == 0 and not gate._entries("running")
 # Fail safe: a probe that hangs past PROBE_SECONDS, or errs, leaves a suite.
 gate._memory = lambda: (60.0, 60.0)
 gate.PROBE_SECONDS = 1.0
-gate.PROBE_COMMAND = probe("import time; time.sleep(30); print('suite_remote')")
+gate.PROBE_COMMAND = probe(sleeper_body(300) + "\nprint('suite_remote')")  # Five minutes: the bound below is 60 s.
 began = time.time()
 gate.take("hang", "suite", os.getpid())
 held = gate._entries("running")
-check(len(held) == 1 and held[0]["kind"] == "suite" and "asked" not in held[0] and time.time() - began < 15,
+check(len(held) == 1 and held[0]["kind"] == "suite" and "asked" not in held[0] and time.time() - began < 60,
     "a probe that hangs: a suite here after the probe's limit (%.1f s): %s" % (time.time() - began, held))
 gate.release("hang", "suite")
 gate.PROBE_COMMAND = probe("import sys; print('suite_remote'); sys.exit(1)")
@@ -2010,6 +2044,10 @@ line = gate.bench_wait(bench_13th, convoy, [remote_on] + lock_waits, convoy_runs
 check(line == "; after 15 landings ahead, about 126 min", "a bench behind the convoy: %r" % line)
 check(gate.bench_wait(bench_13th, [], [remote_on], convoy_runs, now, 60.0, None) == "", "none ahead: nothing said")
 
+print("== the sleepers ==")
+seen, left = sleepers_seen(), stop_sleepers()
+check(len(seen) >= 3 and not left, "each long sleeper stopped with its run, none left alive (%d started: %s; alive at the end: %s)" % (
+    len(seen), seen, left))
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)

@@ -49,7 +49,7 @@ run() { (cd "$tmp/p" && GODOT_PATH="$tmp/godot" PSYKINETIC_TEST_JOBS=4 bash test
 started=$(date +%s)
 out="$(run)"; code=$?
 took=$(( $(date +%s) - started ))
-check $([ $code = 1 ] && [ "$took" -lt 60 ]; echo $?) "the suite ends in ${took}s, not at the parse scene's limit (300 s)"
+check $([ $code = 1 ] && [ "$took" -lt 200 ]; echo $?) "the suite ends in ${took}s, not at the parse scene's limit (300 s)"
 verdict="$(printf '%s\n' "$out" | grep -m 1 '^FAIL  parse_test ')"
 check $(printf '%s' "$verdict" | grep -q "a parse error: stopped early, 3s after it, the rest of the scene not run: SCRIPT ERROR: Parse Error: There is already"; echo $?) \
 	"its verdict says stopped early, naming the line ($verdict)"
@@ -95,7 +95,7 @@ if command -v powershell.exe >/dev/null 2>&1; then
 	code=$?
 	took=$(( $(date +%s) - started ))
 	out="$(tr -d '\r' <"$tmp/ps.out")"
-	check $([ $code = 1 ] && [ "$took" -lt 90 ]; echo $?) "run.ps1: the suite ends in ${took}s, not at the parse scene's limit"
+	check $([ $code = 1 ] && [ "$took" -lt 200 ]; echo $?) "run.ps1: the suite ends in ${took}s, not at the parse scene's limit"
 	check $(printf '%s\n' "$out" | grep -q '^FAIL  parse_test [0-9]*s: a parse error: stopped early, 3s after it, the rest of the scene not run: SCRIPT ERROR: Parse Error'; echo $?) \
 		"run.ps1: its verdict says stopped early, naming the line"
 	idle="$(powershell.exe -NoProfile -Command "@(Get-CimInstance Win32_Process -Filter \"Name = 'PING.EXE'\" | Where-Object { \$_.CommandLine -like '*-n 597 127.0.0.1*' }).Count" | tr -d '\r')"

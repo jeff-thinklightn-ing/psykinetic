@@ -187,7 +187,7 @@ saved_wait, dn.LOCK_WAIT_SECONDS = dn.LOCK_WAIT_SECONDS, 0.3
 began = time.time()
 code, out, err = ask("new", "perf", "x")
 took = time.time() - began
-check(code == 4 and out == "" and "lock is held" in err and took < 5,
+check(code == 4 and out == "" and "lock is held" in err and took < 30,
     "a lock mkdir refused as access denied forever: exit 4 within the deadline, %.1f s (%s)" % (took, err))
 refusals["left"] = 3
 code, out, err = ask("new", "perf", "x")
