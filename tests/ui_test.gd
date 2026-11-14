@@ -3023,6 +3023,8 @@ func _test_character_sheet(pack: PackPanel) -> void:
 		var cross := pack._close.get_global_rect()
 		_check(a.encloses(cross) and title.end.x <= cross.position.x + 1.0 and absf(cross.get_center().y - title.get_center().y) < 2.0,
 			"the close mark at the pack title row's right end, the gold's end left of it (%s, %s)" % [cross, title])
+		_check(sheet.title.theme_type_variation == &"Title" and pack._player_title.theme_type_variation == &"Title",
+			"Gear and Pack are headed in the theme's Title face, as the store's keeper name is (ui-design's stills, pack3)")
 		pack._close.pressed.emit()
 		_check(not pack.shown, "the close mark closes the pack, as Esc does")
 		pack.shown = true

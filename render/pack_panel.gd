@@ -460,7 +460,7 @@ func load_shown() -> String:
 
 func _title() -> Label:
 	var title := Label.new()
-	title.theme_type_variation = &"Heading"
+	title.theme_type_variation = &"Title"
 	return title
 
 

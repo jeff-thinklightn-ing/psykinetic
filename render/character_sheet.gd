@@ -104,7 +104,7 @@ func _init() -> void:
 func build(owner_pack: PackPanel) -> void:
 	pack = owner_pack
 	title = Label.new()
-	title.theme_type_variation = &"Heading"
+	title.theme_type_variation = &"Title"
 	add_child(title)
 	grid = GridContainer.new()
 	grid.columns = GEAR_COLUMNS

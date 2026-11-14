@@ -46211,6 +46211,8 @@ tests/chest_test.gd _test_chest_titles: the agreed examples both ways, a named c
 level chest whose name passes holds one of slots, cache, role, temple, shop, depot or locker. Client only; protocol
 unchanged; no new class_name.
 
+787 amended (7) (ui; ui-design's stills of the built pack window on 9c13307f5, C:/dev/review/ui-design/pack3/, matched pack-1080 but for this): "Gear" and "Pack" were set as Heading (the body serif at 44) and read as small dim captions; the mock heads the two halves in the title face like the store's keeper name. CharacterSheet's title and PackPanel._title() (the pack's, a chest's) are the theme's Title type now: no new style. ui_test pins both. Client only; protocol unchanged; no new class_name.
+
 ## 788. Worn slots: head, neck, back, feet, two rings, the charm
 
 Jeff (11-03, via the coordinator): "I meant to add the other item slots like the hat, the boots,
