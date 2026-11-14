@@ -298,6 +298,7 @@ func _test_accept_and_meet() -> void:
 	var brams := _offers("o-bram")
 	var third := Offers.accept("o-bram", "p1", "Jeff", brams[0]["id"], 0, _ctx) if not brams.is_empty() else {"ok": true, "line": ""}
 	_check(not brams.is_empty() and not third["ok"] and third["line"] == "Jeff has taken on enough already.", "a third is refused by the per-player cap (2 here): %s" % [third])
+	_check(str(third.get("say", "")) == Offers.ENOUGH_TAKEN, "and Bram's words to the player say so (914): %s" % [third.get("say", "")])
 	# Met: Bram comes home with the player in the camp's area.
 	_zone = "wood"
 	Offers.rescued(TOWN, "o-bram", _ctx)
@@ -806,6 +807,12 @@ func _test_crypt_commissions() -> void:
 	_check(str(offer["words"]) == "Carry the temple's offering, 12 gold, down to the offering stone in the crypt and lay it there. Tell no one." and str(offer["kind"]) == Offers.COMMISSION, "its words: %s" % offer["words"])
 	_check(str(offer.get("line", "")) == "It must reach the stone. Tell no one." and str(offer["line"]).length() <= Offers.LINE_MOST,
 		"and Aldous's aside under the row (536 amended, voice's words; within LINE_MOST): %s" % [offer.get("line", "")])
+	var altar: Callable = _ctx["take_altar"]
+	_ctx["take_altar"] = func(_town: String) -> int: return 0  # Emptied meanwhile.
+	var empty := Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
+	_ctx["take_altar"] = altar
+	_check(not bool(empty["ok"]) and given.is_empty() and str(empty.get("say", "")) == "There is nothing at the altar to carry.",
+		"an altar emptied meanwhile: nothing taken, and Aldous's words to the player say so (914): %s" % [empty])
 	var taken := Offers.accept("o-aldous", "p1", "Jeff", offer["id"], 0, _ctx)
 	_check(bool(taken["ok"]) and given == [["p1", 12]] and pot[0] == 0 and str(taken["line"]) == "Jeff takes the temple's offering, 12 gold, to carry down to the stone in the crypt.", "taken: the altar's gold into the purse: %s" % taken["line"])
 	var standing: Array = _offers("o-aldous", "p1").filter(func(o: Dictionary) -> bool: return str(o["title"]) == "Take the offering down")

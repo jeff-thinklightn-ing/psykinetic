@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Only in the party log (16)
+## Only in the party log (14)
 
 Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
 client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
@@ -23,11 +23,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s won't carry that for %s | `sim/companion.gd` turns_down() |
 | %s leaves you %s. | `main.gd` _return_gear() |
 | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
-| %s is mortally wounded. | `main.gd` _on_downed() |
-| %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
 | Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
-| %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
+| %s must stand at the town's counter to buy. | `main.gd` _offer_done() |
 | In %s, %s. | `main.gd` _offers_context() |
 | %s is free%s. | `main.gd` companion_freed() |
 | and waits in | `main.gd` companion_freed() |
@@ -48,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2979)
+## Lines in the code (2981)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -742,7 +740,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Her card: %s%s Already true of her: %s She believes: %s What was just said: %s | `sim/companion_facts.gd` extract_prompt() |
 |  | - nothing more yet | `sim/companion_facts.gd` extract_prompt() |
 
-### deal and quest windows (208)
+### deal and quest windows (209)
 
 | | Line | Where |
 |---|---|---|
@@ -756,6 +754,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | It must reach the stone. Tell no one. | `sim/offers.gd` OFFERING_LINE |
 |  | %s went down and never came back. | `sim/offers.gd` RUNNER_LINE |
 |  | Bring them home to the altar. | `sim/offers.gd` RELIC_LINE |
+|  | You've enough on your hands already. See one through first. | `sim/offers.gd` ENOUGH_TAKEN |
 |  | (?i)\\b(price\\w*\|gold\|coin\\w*\|cost\\w*\|sell\\w*\|sold\|buy\\w*\|bought\|short of\|dear\\w*\|cheap\\w*)\\b | `sim/offers.gd` TRADE_WORDS |
 |  | sister or brother | `sim/offers.gd` KIN_WORDS |
 |  | parent and child | `sim/offers.gd` KIN_WORDS |
@@ -2119,7 +2118,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (785)
+### server and windows (786)
 
 | | Line | Where |
 |---|---|---|
@@ -2131,6 +2130,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Tell them I tried. | `main.gd` COMPANION_DEATH_LINES |
 |  | Yes to what? Name your gold. | `main.gd` YES_TO_WHAT |
 |  | There is nothing between us to say yes to. | `main.gd` NOTHING_STANDS |
+|  | Come to the counter and I'll sell it to you. | `main.gd` COUNTER_FIRST |
 |  | The axe will not leave his hall. | `main.gd` BOUND_AXE_WORDS |
 |  | time x%s | `main.gd` tuning_key() |
 |  | paused: "." steps one tick | `main.gd` tuning_key() |
@@ -2360,8 +2360,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s@%s:%d,%d#%d | `main.gd` _secret_key() |
 |  | Nothing more here. | `main.gd` _search_secret() |
 |  | The slab swings aside from behind. | `main.gd` _reveal_from_below() |
-| U | %s is mortally wounded. | `main.gd` _on_downed() |
-| U | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
+|  | %s is mortally wounded. | `main.gd` _on_downed() |
+|  | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd` _on_downed() |
 |  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd` _on_downed() |
 |  | You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
@@ -2406,7 +2406,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s sells weapons, at %s. | `main.gd` _asked_smith() |
 |  | the stall by %s | `main.gd` _asked_sellers() |
 |  | the square by | `main.gd` _keeps_shop() |
-| U | %s must stand at the town's counter to buy. | `main.gd` _accept_offer() |
+| U | %s must stand at the town's counter to buy. | `main.gd` _offer_done() |
 |  | [reads the chronicle: %d lines] | `main.gd` _read_page() |
 | U | In %s, %s. | `main.gd` _offers_context() |
 |  | a gift from %s | `main.gd` _on_handed() |

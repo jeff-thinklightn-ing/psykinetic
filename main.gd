@@ -389,6 +389,8 @@ const HEARING_RANGE := Companion.HEARING_RANGE
 ## nothing to offer (a pact on).
 const YES_TO_WHAT := "Yes to what? Name your gold."
 const NOTHING_STANDS := "There is nothing between us to say yes to."
+## A shop's offer taken from off the counter (914): the seller's words to that player.
+const COUNTER_FIRST := "Come to the counter and I'll sell it to you."
 ## The draugr's zone before the barrow's redesign -> after (548 amended;
 ## dungeon's barrow_two_depths.md: he stands in barrow_deep, barrow_lair
 ## retires): a paid deal is keyed by the zone after, whichever he stands in.
@@ -12418,12 +12420,12 @@ func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
 		_guard_told(entity as Resident, "downed")  # 791: a guard down says so; no party line.
 		return
 	var seconds := ceili(float(ticks) / World.TICK_RATE)
-	if not _blessed(entity):
-		party_log.add("%s is mortally wounded." % _display_name(entity))
-	else:
-		party_log.add("%s is down. A blessed hand beside them can bring them back within %d seconds." % [_display_name(entity), seconds])
+	var down_line := ("%s is mortally wounded." % _display_name(entity)) if not _blessed(entity) \
+		else ("%s is down. A blessed hand beside them can bring them back within %d seconds." % [_display_name(entity), seconds])
+	party_log.add(down_line)
 	if entity is Player:
 		var player := entity as Player
+		Net.broadcast_to(_zone_peers_but(player), "party", {"from": "Server", "text": down_line})  # The others in the zone hear it (914).
 		# Mortally Wounded: the heart beats at the first of the field rules' beats.
 		player.heart = int((_field_rules().get("heart", {}).get("beats", [120]) as Array)[0])
 		player.heart_held = false
@@ -12434,6 +12436,18 @@ func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
 	for pet: Companion in _companions.values():
 		if is_instance_valid(pet) and pet.spawned and (pet.keeper == entity or pet == entity):
 			pet.note_downed(entity == pet.keeper)
+
+
+## The peers of the other players in [param player]'s zone, each once (914): a friend
+## down is told to them, as the downed player is told their own line.
+func _zone_peers_but(player: Player) -> Array[int]:
+	var peers: Array[int] = []
+	for entity: GridEntity in World.get_entities():
+		var other := entity as Player
+		if other != null and other != player and other.spawned and other.zone == player.zone and other.owner_peer > 0 \
+				and other.owner_peer != player.owner_peer and not peers.has(other.owner_peer):
+			peers.append(other.owner_peer)
+	return peers
 
 
 # --- Mortally Wounded (Jeff's down screen) ---------------------------------------
@@ -14127,6 +14141,14 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		return
 	var result := Offers.accept(worker_id, player.player_id, _display_name(player), offer_id, gold)
 	_standing.erase(player.player_id)  # Taken, or tried: nothing stands (decision 536).
+	_offer_done(player, body, worker_id, result)
+
+
+## What [param body]'s accepted offer does for [param player], from Offers.accept's
+## [param result]; the offers sent again after. A refusal reaches the player (914): a buy
+## from off the counter is the seller's COUNTER_FIRST, and a result's "say" (the task cap,
+## the empty altar) is the resident's, both said to that player alone.
+func _offer_done(player: Player, body: Resident, worker_id: String, result: Dictionary) -> void:
 	if result.get("read") is Array and not result["read"].is_empty():
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
 	elif not str(result.get("ware", "")).is_empty():
@@ -14143,11 +14165,26 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
 		if counter == null:
 			party_log.add("%s must stand at the town's counter to buy." % _display_name(player))
+			_say_to(player, body, COUNTER_FIRST)
 		else:
 			World.try_buy(player, counter, int(result["buy"]))  # Answered by traded.
 	elif not str(result.get("line", "")).is_empty():
 		party_log.add(str(result["line"]))
+		if not str(result.get("say", "")).is_empty():
+			_say_to(player, body, str(result["say"]))
 	_send_offers(body, player.player_id, player.owner_peer)
+
+
+## [param body] says [param words] to [param player] alone (914): their answer to that
+## player's own offer, as _resident_says is said but with no hearers (npc's review): held
+## near a fight or asleep (675, 751; the party log's line still stands), else in the
+## transcript, so the mind's next answer knows it, and the speech on that player's peer.
+func _say_to(player: Player, body: Resident, words: String) -> void:
+	if _resident_quiet(body, player):
+		_held_tongue("say")
+		return
+	Transcript.record(body.person, body.person, words)
+	Net.broadcast_to([player.owner_peer], "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": words, "aside": ""})
 
 
 ## Server: [param body] reads [param lines] (a page: the scholar's

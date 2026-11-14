@@ -55202,3 +55202,42 @@ mining step goes back to following). Main's own call on entity_despawned stays: 
 where World tells a despawn inside a step at the step's end, and a second forget is a no-op.
 Companion off monster_test's DESPAWN_PENDING. Server only, protocol unchanged, no new class_name, no
 bullet.
+## 914. A line that reached only the party log reaches the player
+
+Voice's idle round after the restart (2026-11-13; the coordinator's go). docs/voice_inventory.md's "Only in the party
+log" lists lines whose only delivery is `party_log.add`, the server's own list that no client is sent (748 amended (7)).
+Three of them are what a player in Umbrage most needs to hear, each a moment where something is refused or at stake
+and the game was silent. Found by reading main 4701b51ca, and seen joined by playtest on it (two clients, Lenovo,
+C:/dev/review/look/main_4701b51ca/, SCRIPT ERROR 0): in look_friend_alone2 and look_friend_blessed2 the second player,
+2 cells off, got no party line, speech or screen text in the 15 s after the first went down, only the body and its
+plate. The buy away from the counter has no before: in look_buyaway to look_buyaway5 nobody in a fresh Umbrage has
+a shop line (Rolf's stall is VENDOR_WARES, sold by Main._vendor_sells from anywhere in hearing, with his own words;
+a shop line needs a good on the town's counter, which a fresh town lacks), so it stands on the reading alone.
+
+- A friend down. Main._on_downed told the downed player their own line and put "X is mortally wounded." or "X is down.
+  A blessed hand beside them can bring them back within N seconds." in the party log alone, so in joined play the one
+  player who could bring them back was never told, nor how long they had. Now that line, its words unchanged, goes as a
+  "party" message from the server to every other player in the zone (Main._zone_peers_but: each peer once, never the
+  downed's own); a companion or a resident down is unchanged. No new server log line.
+- A buy away from the counter. A shop's offer (Offers.SHOP, accepted as BUY: "I have a knife at the counter for 12
+  gold.") can be taken from anywhere in hearing (HEARING_RANGE, Senses.NOISE_SPEECH, 10 cells), but Main sells it only
+  with the town's shop chest within the player's reach (World.reaches: can_melee); from farther it only logged
+  "X must stand at the town's counter to buy." Now the seller also says Main.COUNTER_FIRST, "Come to the counter and
+  I'll sell it to you.", to that player alone (Main._say_to, npc's review: as _resident_says, held when the resident
+  is quiet near a fight or asleep (675, 751) and written to the transcript so the mind's next answer knows it, but a
+  "speech" message on that player's peer alone, no hearers: his answer to their own offer). The store window's own Buy is the "shop" command, which needs the counter in reach and never comes
+  here.
+- A task too many, and an empty altar. Offers.accept's TAKE at the per-player cap (3) and the temple's offering with
+  nothing at the altar return a "line" that Main put in the party log alone, like every offer's result line. Now
+  each also returns "say": Offers.ENOUGH_TAKEN, "You've enough on your hands already. See one through first.", and
+  "There is nothing at the altar to carry." unchanged; Main has the resident say it to that player alone. A taken
+  task's or a paid debt's line stays the party log's (the quest card and the notices show those).
+
+_accept_offer's tail is Main._offer_done(player, body, worker_id, result), so a test gives it a result. Net keeps each
+broadcast_to as [peers, kind, data] in Net.test_sends while Net.test_keep_sends is true (tests only), so a test sees
+what a joined peer, not the host, is sent. resident_test _test_told_refusals: three more players (a joined peer 4242,
+the downed 4243, one in another zone 4244); the friend's line once, to 4242 and the host, not to 4243 or 4244, the
+downed's own to 4243 alone; COUNTER_FIRST, the cap's and the altar's words to 4242 alone and nothing here; a taken
+task's line said to nobody; the store window's buy at a shop chest in reach never says COUNTER_FIRST. offers_test: the
+cap's "say", and an altar emptied meanwhile refused with its "say" and no gold given. Server only; the protocol
+unchanged (the messages are the "party" and "speech" kinds clients already read); no new class_name.

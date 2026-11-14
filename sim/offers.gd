@@ -84,6 +84,8 @@ const PLEA := "plea"
 const PAGE := "page"
 const READ := "read"
 const BUY := "buy"
+## A task taken past the per-player cap (914): the resident's words to that player.
+const ENOUGH_TAKEN := "You've enough on your hands already. See one through first."
 ## A visitor's body (711, npc's side): "visitor:" + their Towns.visitors id;
 ## no worker, no card. A pedlar's things are WARES, sold by WARES.
 const VISITOR := "visitor:"
@@ -1016,7 +1018,8 @@ static func _them(their_card: Variant) -> String:
 ## [param player_id] (named [param player_name]) accepts [param offer_id]
 ## of [param worker_id], with [param gold] for a loan: {"line": the party
 ## log's words or "", "buy": a uid for Main to sell them at the counter,
-## or 0, "ok": whether anything happened}.
+## or 0, "ok": whether anything happened, and "say" on a refusal the
+## player is told: the resident's words to them, 914}.
 static func accept(worker_id: String, player_id: String, player_name: String, offer_id: String, gold := 0, given: Dictionary = ctx) -> Dictionary:
 	var out := {"line": "", "buy": 0, "ok": false}
 	var production: Production = given.get("production")
@@ -1060,6 +1063,7 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		TAKE:
 			if _open_count(production, player_id) >= int(settings().get("per_player", 3)):
 				out["line"] = "%s has taken on enough already." % player_name
+				out["say"] = ENOUGH_TAKEN  # Said to the player by Main (914).
 				return out
 			var ask := {"id": offer_id, "kind": COMMISSION, "sub": str(offer["what"].get("sub", "")), "by": player_id, "by_name": player_name,
 				"step": now, "town": str(who.get("town", "")), "worker": worker_id, "title": offer["title"], "words": offer["words"],
@@ -1070,6 +1074,7 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				var carried := int(took) if took is int or took is float else int(offer["what"].get("gold", 0))
 				if carried <= 0:
 					out["line"] = "There is nothing at the altar to carry."
+					out["say"] = out["line"]  # Said to the player by Main (914).
 					return out
 				ask["what"]["gold"] = carried
 				_call(given, "give_gold", [player_id, carried, "the temple's offering, to carry down"])

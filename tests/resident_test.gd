@@ -117,6 +117,7 @@ func _ready() -> void:
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
+	_test_told_refusals()  # 914.
 	_test_lower_first()  # Lore's finding: a name keeps its capital.
 	_test_sick_word()  # 501 amended (2): last, as it moves the day on.
 
@@ -4711,6 +4712,127 @@ func _test_alms_run() -> void:
 	World.production.set_away(pip, true)
 	World.production.set_away(priest, true)
 	_put(player, Vector2i(2, 2))
+
+## 914: lines that reached only the party log go to the player, each on a joined peer's own
+## line (Net.test_sends; this peer hears nothing of theirs): a friend down to the others in
+## the zone (not one in another zone, not the downed, who has their own line); a shop's
+## offer taken from off the counter, the seller's COUNTER_FIRST; an offer's "say" (the task
+## cap, the empty altar) as the resident's; a taken task's line stays the party log's; the
+## store window's own buy, at the counter, never says COUNTER_FIRST.
+func _test_told_refusals() -> void:
+	print("\n== 914: a friend down, a buy off the counter and a task too many reach the player ==")
+	var player := _player()
+	var body: Resident = null
+	for each: GridEntity in World.townsfolk():
+		if each is Resident and each.spawned and not (each as Resident).worker_id.is_empty() and (each as Resident).player_id.is_empty():
+			body = each
+			break
+	var own_body := false
+	if body == null and player != null:  # The cases before may leave no body in town: Aldous of his own, as _test_relic does.
+		var priest := "priest:" + STORE
+		if World.production.worker(priest).is_empty():
+			World.production.add_worker(priest, "Aldous", ["priest"], STORE, "appointed")
+		var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+		var spot := Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+		body = _main._spawn_resident({"key": priest, "town": STORE, "trade": "priest", "name": "Aldous", "player": "", "type": "",
+			"places": {"work": spot, "home": spot, "square": spot}}) as Resident
+		own_body = body != null
+	_check(player != null and body != null, "(a player and a townsperson: %s, %s)" % [player, body])
+	if player == null or body == null:
+		return
+	# The cases before leave the town at night: awake, with no fight heard, for this case alone (a quiet one holds its tongue, 675, 751).
+	var was_doing := body.activity
+	var held := Companion.hold_tongue
+	body.activity = ""
+	Companion.hold_tongue = false
+	_check(not _main._resident_quiet(body, player), "(%s awake and not held quiet)" % body.person)
+	var made: Array[GridEntity] = []
+	for at: Vector2i in [Vector2i(0, 2), Vector2i(0, -2), Vector2i(2, 2)]:
+		made.append(_main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "Peer914_%d" % made.size(), "tile": _main._nearest_free(player.tile + at)}))
+	var joined := made[0] as Player
+	var fallen := made[1] as Player
+	var away := made[2] as Player
+	_check(joined != null and fallen != null and away != null, "(three more players)")
+	if joined == null or fallen == null or away == null:
+		for each: GridEntity in made:
+			if each != null:
+				World.despawn(each)
+		body.activity = was_doing
+		Companion.hold_tongue = held
+		if own_body:
+			World.despawn(body)
+		return
+	joined.owner_peer = 4242
+	joined.player_id = "p914-joined"
+	fallen.owner_peer = 4243
+	away.owner_peer = 4244
+	var zone := away.zone
+	away.zone = "elsewhere914"  # Another zone's player: not told.
+	Net.test_sends.clear()
+	Net.test_keep_sends = true
+	var mine: Array[Dictionary] = []
+	var ear := func(kind: String, data: Dictionary) -> void:
+		if kind in ["party", "speech"]:
+			mine.append(data)
+	Net.message_received.connect(ear)
+	# (1) A friend down.
+	_main._on_downed(fallen, null, 30 * World.TICK_RATE)
+	var friend: Array = []
+	var own: Array = []
+	for send: Array in Net.test_sends:
+		var text := str((send[2] as Dictionary).get("text", ""))
+		if send[1] == "party" and text.begins_with("You are mortally wounded"):
+			own.append(send[0])
+		elif send[1] == "party" and (text.ends_with(" is mortally wounded.") or text.contains(" is down. A blessed hand beside them can bring them back within 30 seconds.")):
+			friend.append(send[0])
+	_check(friend.size() == 1 and (friend[0] as Array).has(4242) and (friend[0] as Array).has(player.owner_peer)
+		and not (friend[0] as Array).has(4243) and not (friend[0] as Array).has(4244),
+		"a friend down: one party line to the joined peer and the host's, not the downed's nor another zone's (%s)" % [Net.test_sends])
+	_check(own.size() == 1 and (own[0] as Array).size() == 1 and int((own[0] as Array)[0]) == 4243,"the downed has their own line, to their peer alone (%s)" % [own])
+	# (2) A shop's offer taken from off the counter.
+	var town := str(World.production.worker(body.worker_id).get("town", ""))
+	_check(_main._counter_near(joined, town) == null, "(no counter within the joined player's reach)")
+	Net.test_sends.clear()
+	mine.clear()
+	_main._offer_done(joined, body, body.worker_id, {"buy": 9, "ok": true})
+	_check(" | ".join(_speech(4242, body)) == Main.COUNTER_FIRST and mine.is_empty(),
+		"a buy off the counter: the seller's words to the joined peer alone (%s / here %s)" % [Net.test_sends, mine])
+	# (3) An offer's "say": the task cap, the empty altar; a taken task says nothing more.
+	Net.test_sends.clear()
+	_main._offer_done(joined, body, body.worker_id, {"line": "Peer914_0 has taken on enough already.", "say": Offers.ENOUGH_TAKEN, "ok": false})
+	_main._offer_done(joined, body, body.worker_id, {"line": "There is nothing at the altar to carry.", "say": "There is nothing at the altar to carry.", "ok": false})
+	_main._offer_done(joined, body, body.worker_id, {"line": "Peer914_0 takes a commission.", "ok": true})
+	_check(" | ".join(_speech(4242, body)) == Offers.ENOUGH_TAKEN + " | There is nothing at the altar to carry." and mine.is_empty(),
+		"the task cap and the empty altar said to the joined peer; a taken task's line not (%s)" % [_speech(4242, body)])
+	# The store window's own buy at the counter: never the counter line.
+	var stall := _main._spawn({"script": "res://sim/chest.gd", "name": "Shop914", "tile": _main._nearest_free(joined.tile + Vector2i(1, 0))}) as Chest
+	if stall != null:
+		stall.shop = true
+		Net.test_sends.clear()
+		_main._on_command(joined, "shop", {"shop": str(stall.get_path()), "do": "buy", "uid": 9})
+		var counter_said := Net.test_sends.filter(func(send: Array) -> bool: return str((send[2] as Dictionary).get("text", "")) == Main.COUNTER_FIRST)
+		_check(counter_said.is_empty(), "the store window's buy at the counter never says the counter line (%s)" % [Net.test_sends])
+		World.despawn(stall)
+	Net.message_received.disconnect(ear)
+	Net.test_keep_sends = false
+	Net.test_sends.clear()
+	away.zone = zone
+	for each: GridEntity in made:
+		World.despawn(each)
+	body.activity = was_doing
+	Companion.hold_tongue = held
+	if own_body:
+		World.despawn(body)
+
+
+## What [param body] said to [param peer] alone in Net.test_sends (914).
+func _speech(peer: int, body: Resident) -> PackedStringArray:
+	var out := PackedStringArray()
+	for send: Array in Net.test_sends:
+		if (send[0] as Array).size() == 1 and int((send[0] as Array)[0]) == peer and send[1] == "speech" and str((send[2] as Dictionary).get("entity", "")) == String(body.get_path()):
+			out.append(str((send[2] as Dictionary).get("text", "")))
+	return out
+
 
 func _test_lower_first() -> void:
 	print("

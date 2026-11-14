@@ -958,6 +958,10 @@ var test_contest_tick := 0
 var test_reset_tick := 0
 ## --test-die-travel=<tick>,<zone> (server): Main._run_test_die_travel.
 var test_die_travel: PackedStringArray = []
+## Tests only (914): while true, broadcast_to keeps each send as [peers, kind, data] in
+## test_sends, so a test sees what a joined peer (not this one) is sent.
+var test_keep_sends := false
+var test_sends: Array[Array] = []
 ## --test-builder=<x>,<y>,<w>,<h>:<request>: once the local player is in,
 ## builder mode asks that for that area (for screenshots of the ghost).
 var test_builder := ""
@@ -2096,6 +2100,8 @@ func broadcast(kind: String, data: Dictionary) -> void:
 func broadcast_to(peers: Array[int], kind: String, data: Dictionary) -> void:
 	if kind not in MESSAGE_KINDS:
 		push_error("[net] message kind %s is not in Net.MESSAGE_KINDS: add it there (and so to protocol())" % kind)
+	if test_keep_sends:
+		test_sends.append([peers.duplicate(), kind, data.duplicate(true)])
 	if local_id in peers:
 		message_received.emit(kind, data)
 	if online:

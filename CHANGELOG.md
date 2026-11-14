@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When another player in your area goes down, you're told, and, when they can be saved, how long a blessed hand has to bring them back (914).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Anyone ready to fight with a giant axe or battle axe holds its edge turned out, away from their face, and with a tomb sledge, rot hammer or pick, its head leads toward the foe, wrists straight either way (451 amended (6)).
 - When you're brought back or moved within an area, you and your companion show only where you arrive (911).
