@@ -924,8 +924,15 @@ func _refresh() -> void:
 			box.count.text = count_words(World.slot_count(entity, box.index)) if has and not item.is_empty() else ""
 			box.count.visible = not box.count.text.is_empty()
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
-			if EMPTY_PICTURES.has(box.index) and icons != null:
-				box.set_empty_picture(icons.icon(str(EMPTY_PICTURES[box.index])))  # What goes in a worn square, faint while empty.
+			# What goes in a worn square, faint while empty: on a body's worn squares only (the player's, a companion's), never on a
+			# chest's or a locker's rows, whose slot numbers only happen to match (the look of the mend of Rolf's locker: a hat and a
+			# sword pictured in empty chest squares read as things you own).
+			# A body gone (freed) keeps its own row's pictures as before: layout_of takes no freed instance.
+			var worn := row == _player_row if not is_instance_valid(entity) else layout_of(entity) == "carrier"
+			if EMPTY_PICTURES.has(box.index) and icons != null and worn:
+				box.set_empty_picture(icons.icon(str(EMPTY_PICTURES[box.index])))
+			else:
+				box.set_empty_picture(null)
 			_show_price(box, row == _player_row and has and not item.is_empty())
 			if box.practice != null:
 				_show_practice(box, entity if has else null, item)

@@ -2095,6 +2095,8 @@ func _test_inventory_panel() -> void:
 			and (pack._other_row.get_child(0) as GridContainer).columns == PackPanel.LOCKER_COLUMNS
 			and pack.title_shown(false) == "Your chest" and pack._other_head.get_node(^"Deposit").visible,
 			"your chest: %d boxes, 12 a line, titled \"Your chest\", Deposit unequipped shown" % chest_boxes.size())
+	_check(chest_boxes.all(func(box: PackPanel.SlotBox) -> bool: return not box.empty_shown()),
+		"no empty square of your chest pictures a hat or a sword (their slot numbers only match the worn squares')")
 	var carrier := Chest.new()  # A companion's row is a carrier's (Items.CARRIED slots), as here.
 	carrier.name = "TestCarrier"
 	carrier.slots = Items.tidy([], Items.CARRIED)
@@ -2112,6 +2114,18 @@ func _test_inventory_panel() -> void:
 			her_drawn.append((box as PackPanel.SlotBox).index)
 	_check(her_drawn.size() == 15 and not Items.BAG in her_drawn and not Items.SATCHEL_SLOTS.any(func(i: int) -> bool: return i in her_drawn),
 			"the satchel off (819 amended): her row draws 15 boxes, none for the bag or its row (%s)" % [her_drawn])
+	# The player's body freed under its row (maps' view_world_test, 11-14: the freed player went to layout_of): the refresh
+	# draws on, never faulting.
+	var kept_player: GridEntity = pack.player
+	var gone := Chest.new()
+	gone.slots = Items.tidy([], Items.CARRIED)
+	add_child(gone)
+	pack.player = gone
+	gone.free()
+	pack._refresh()
+	_check(not is_instance_valid(pack.player),
+		"the player freed under the pack: it refreshes without a fault (787 amended (8); the engine error fails the scene)")
+	pack.player = kept_player
 	pack.open(locker)  # Your chest again, for the double-clicks below.
 	carrier.queue_free()
 	var player: Player = _main._local_player()

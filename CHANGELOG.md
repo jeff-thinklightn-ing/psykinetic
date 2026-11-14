@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The empty squares of your chest are empty, not faint pictures of gear (787 amended (8)).
 - Where hair and skin are close in tone, such as chestnut on darker skin, the hair is drawn a shade apart from the skin and a beard a shade further, so each reads against the face; the hair colour and skin you picked keep their names (419 amended (4)).
 - If you've never picked a look, Options shows the face you wear in the game (911 amended (1)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).

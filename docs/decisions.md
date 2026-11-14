@@ -47436,6 +47436,8 @@ the controls list's line and the keys' name for it now say "your pack and what y
 (voice's words), so the list says the sheet is in it. ui_test _test_escape: the pack is closed
 at join. Client only, protocol unchanged, no new class_name.
 
+787 amended (8) (ui; ui-design's joined look of the locker mend, 11-14: the empty chest showed a hat, a sword, a shield and the rest, faint, "so an empty chest looks full of things"): PackPanel._refresh set a worn square's faint picture (EMPTY_PICTURES, 787 amended (6)) on every box of both rows by slot number, and a locker's or chest's slots 0 to 10 carry the same numbers as the worn squares. It is set now only on a body's worn squares (the player's row and a companion's carrier row: layout_of(entity) == "carrier"), and cleared everywhere else. A row whose body is freed (the player's, gone under the pack: maps' view_world_test met it) never reaches layout_of, which takes no freed instance: the player's row keeps its pictures, another's row has none. ui_test: no box of a locker's row shows one; the player freed under the pack refreshes without a fault. Client only; protocol unchanged; no new class_name.
+
 ## 774. Umbrage laid out again round its chapel (plan B), and Relaid
 
 Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator approved the stills
