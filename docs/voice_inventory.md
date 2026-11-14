@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2946)
+## Lines in the code (2960)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -2108,7 +2108,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (764)
+### server and windows (778)
 
 | | Line | Where |
 |---|---|---|
@@ -2788,6 +2788,20 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | hp: %d players online are called %s; not set | `main.gd` _hp_command() |
 |  | hp %s: struck to 0 | `main.gd` _hp_command() |
 |  | hp %s: %d/%d | `main.gd` _hp_command() |
+|  | rest draugr [<zone>]: the zone's draugr laid to rest (test-only) | `main.gd` _rest_command() |
+|  | rest draugr: %s is not open; nobody laid to rest | `main.gd` _rest_command() |
+|  | rest draugr: the draugr in %s already rests | `main.gd` _rest_command() |
+|  | rest draugr: %s's draugr laid to rest | `main.gd` _rest_command() |
+|  | rest draugr: no draugr in %s | `main.gd` _rest_command() |
+|  | relic <player> [<knight>]: a holy knight's remains in their pack (test-only) | `main.gd` _relic_command() |
+|  | no player %s in the game | `main.gd` _relic_command() |
+|  | relic: none made | `main.gd` _relic_command() |
+|  | feet (the pack all bound) | `main.gd` _relic_command() |
+|  | relic: the remains of %s at %s's %s | `main.gd` _relic_command() |
+|  | strike <player> <monster>: a blow of all its hp from that player (test-only) | `main.gd` _strike_command() |
+|  | no player %s in the game | `main.gd` _strike_command() |
+|  | strike: no monster in %s is called %s; none struck | `main.gd` _strike_command() |
+|  | strike: %s struck %s, %d hp left | `main.gd` _strike_command() |
 |  | no production here (the server keeps it) | `main.gd` _makers_command() |
 |  | %s at %s | `main.gd` _makers_command() |
 |  | %s (a companion) at %s | `main.gd` _makers_command() |
@@ -3345,8 +3359,8 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | A miner's tin token, scratched with his mark. | `items[33].about` |
 |  | A dark red stone, still in its rock. | `items[34].about` |
 |  | A town miner's lamp, its glass cracked and its wick long burnt away. | `items[35].about` |
-|  | A reliquary amulet of the temple. Aldous charges it when you bring him a knight's holy remains; carried, it gives you another chance to fight. | `items[36].about` |
-|  | A holy knight's bones, wrapped in linen. Bring them to Aldous at the temple. | `items[37].about` |
+|  | A reliquary amulet of the temple. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar; carried, it gives you another chance to fight. | `items[36].about` |
+|  | A holy knight's bones, wrapped in linen. Lay them on the knight's altar in the crypt's First Hall. | `items[37].about` |
 |  | half a cut coin | `items[38].name` |
 |  | the coin's other half | `items[39].name` |
 |  | staggers whoever it hits and shoves them back a step; its blunt blows wear their arrows | `items[52].verb.says` |
@@ -3909,7 +3923,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | The secret way down to the Ossuary is found only once the Mound-breakers have been put down. | `entries[2].facts[24].text` |
 |  | The draugr is angry because the robbers in the crypt dig for the holy relics. | `entries[2].facts[25].text` |
 |  | Aldous cannot reach the holy knights' relics beneath the temple, because the draugr has taken up residence there. | `entries[2].facts[26].text` |
-|  | A holy knight's remains, returned to Aldous, charge the Encolpion Amulet. | `entries[2].facts[27].text` |
+|  | A holy knight's remains, laid on the bier in the crypt's First Hall, charge the Encolpion Amulet. | `entries[2].facts[27].text` |
 |  | On nights the robbers have dug, or when the temple's alms fall short, the crypt's dead come up out of the dark. | `entries[2].facts[28].text` |
 |  | the old burial mound | `entries[3].name` |
 |  | An old burial mound a little outside town, north-west of Umbrage: grass over it, a stone-framed door, warriors' spears planted round it. No name of its own. The Mound-breakers forced its door and dug from it through to the crypt under the temple (Jeff 2026-10-27: "the barrows is an ancient burial mound ... its connected to the barrows"; art-kit's building.mound, maps' (155,160); 832; crypt-names.md pick 4 A). | `entries[3].summary` |
