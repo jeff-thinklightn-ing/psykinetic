@@ -1251,7 +1251,9 @@ def people_copy(name: str) -> dict:
 	return spec
 # A person's fidgets, talk and tiredness (HUMAN_FIDGETS, "talk", CLIP_TIRED's people): the same,
 # stood as People_Idle stands. The orc's, the kobold's and the dead's keep the UAL's stance.
-for _name in ("Fidget_LookBack", "Fidget_Shoulders", "Fidget_Sleeve", "Fidget_ArmsCrossed"):
+# The fallen knight's vigil too (747 amended (12)): keyed on Idle_Loop, its feet were the UAL's pace
+# apart, which under his floor-length cloth read from above as a man down on one knee.
+for _name in ("Fidget_LookBack", "Fidget_Shoulders", "Fidget_Sleeve", "Fidget_ArmsCrossed", "Knight_Vigil_Loop"):
 	CLIPS["People_" + _name] = people_copy(_name)
 # The shift's hips go 3.5 cm aside: keyed every 0.1 s on the way over and back, so the planted feet
 # stay put between keys (a key at each end only let the left one drift 3.5 cm).
