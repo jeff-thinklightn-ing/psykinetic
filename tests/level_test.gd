@@ -3241,6 +3241,15 @@ func _test_hall_door() -> void:
 	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
 	_hold_free(player, Vector2(0, 1), 2)
 	_check(heard.count(_main.DEAD_LINE) == 2, "and again once %.0f s have passed while they keep at it (%s)" % [_main.DEAD_TOLD_S, heard])
+	# E at it is held to the same bound (playtest's look_bossbar2: six lines running from E presses).
+	var edge := [key.x, key.y, key.z]
+	_main._on_command(player, "door", {"edge": edge})
+	_main._on_command(player, "door", {"edge": edge})
+	_check(heard.count(_main.DEAD_LINE) == 2, "E at it straight after: nothing more, the walk's bound holds for E (%s)" % [heard])
+	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
+	_main._on_command(player, "door", {"edge": edge})
+	_main._on_command(player, "door", {"edge": edge})
+	_check(heard.count(_main.DEAD_LINE) == 3, "E once the bound has passed: told once, not at each press (%s)" % [heard])
 	Net.message_received.disconnect(hear)
 	_main._told_dead.clear()
 	_main._seal_hall("lt_hall", false)
@@ -6053,10 +6062,14 @@ func _test_barrow_quest() -> void:
 	var saved_slain: Variant = JSON.parse_string(JSON.stringify({"barrow": {"generation": 2, "at_step": 5, "band_slain": {band[1]: [id]}}}))
 	_check(Regen.states_from(saved_slain)["barrow"].get("band_slain") == {band[1]: [id]},
 		"whom they felled is saved and read back with the generation: a restart keeps it (747 amended (8))")
+	var kept_label := player.label
+	player.label = "Wren of the Test"  # The name the plate shows, not the node's (548 amended (2)'s World.shown_name).
 	_main._monster_accepts(knight, player, {"id": "quest:%d:ask" % knight.id}, 0)
 	var took := {"ok": _main.barrow_quest_of(id) == "open"}
-	_check(_heard.slice(-1) == ["You take up the fallen knight's task."] and _main.party_log.last(1) == ["%s takes up the fallen knight's task." % player.name],
-		"the deal's line (the knight's taking) reaches the screens there, not the party log alone (%s)" % [_heard.slice(-1)])
+	var taking_logged: Array = _main.party_log.last(1)
+	player.label = kept_label
+	_check(_heard.slice(-1) == ["You take up the fallen knight's task."] and taking_logged == ["Wren of the Test takes up the fallen knight's task."],
+		"the deal's line (the knight's taking) reaches the screens there, not the party log alone, naming the player as their plate does (%s, %s)" % [_heard.slice(-1), taking_logged])
 	var items: Array = player.quest.get("items", [])
 	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
 		and player.quest.get("title") == Main.QUEST_TITLE and player.quest.get("giver") == "the fallen knight" and items.size() == 9

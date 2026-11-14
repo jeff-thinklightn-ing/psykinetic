@@ -107,7 +107,7 @@ func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 	var offer_id := str(offer.get("id", ""))
 	var at := _quest(player.player_id)
 	if offer_id.ends_with(":ask") and at == "ask" and _quest_step(player.player_id, "take"):
-		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % player.name,
+		return {"ok": true, "say": "", "line": "%s takes up the fallen knight's task." % World.shown_name(player),
 			"you_line": "You take up the fallen knight's task."}
 	if offer_id.ends_with(":lay") and at == "carried":
 		# 896: his remains on the bier, the same as a click on it; his thanks said by Main's laying
@@ -117,11 +117,11 @@ func accept_offer(player: Player, offer: Dictionary, _gold: int) -> Dictionary:
 		if laid.is_empty():
 			laid = whose()
 		if _quest_step(player.player_id, "lay"):
-			return {"ok": true, "say": "", "line": "%s lays %s remains on the bier." % [player.name, laid],
+			return {"ok": true, "say": "", "line": "%s lays %s remains on the bier." % [World.shown_name(player), laid],
 				"you_line": "You lay %s remains on the bier." % laid}
 	if offer_id.ends_with(":turn_in") and at == "ready" and _quest_step(player.player_id, "turn_in"):
 		said.emit(REVEALED_ALTAR if altar_on else REVEALED)
-		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % player.name,
+		return {"ok": true, "say": "", "line": "%s has proven their strength to the fallen knight." % World.shown_name(player),
 			"you_line": "You have proven your strength to the fallen knight."}
 	if at == "":
 		return {"ok": false, "say": DONE_LAID if altar_on else DONE, "line": ""}

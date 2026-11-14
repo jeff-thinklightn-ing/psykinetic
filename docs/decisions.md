@@ -33911,6 +33911,18 @@ combat_test _test_dropped_moves: a spin dropped sweeps nobody; a throw dropped s
 the axe kept; a charge dropped in its roar never runs, and dropped under way stops where it
 was. Server only, protocol unchanged, no new class_name.
 
+666 amended (2) (dungeon; the coordinator's row from voice's read of playtest's look_bossbar2;
+label from tools/decision_number.sh). E at the Hall's door while the Ossuary's dead seal it
+(DEAD_LOCK) tells DEAD_LINE under the same bound as walking into it: the "door" command now
+goes through Main._on_door_pressed, at most once every DEAD_TOLD_S (10 s) a player, kept in the
+party log as the walk's is. Before, each E press said it, unbounded and unlogged ("The dead bar
+the way." six times running in the look). Same words. Riding the take: the fallen knight's
+three party lines (his task taken, his remains laid by his row, his test passed) name the player
+by World.shown_name (548 amended (2)), the name their plate shows, not the node's ("Player1").
+level_test: E straight after a walk's line says nothing more, and once the bound has passed two
+presses say it once; the taking line names a player by their label. Server only; protocol
+unchanged; no new class_name.
+
 ## 669. The bow's draw: damage, reach and stamina over the hold
 
 Jeff on the bow: "it takes full pull back to get damage maxed", "holding at max nock narrowest

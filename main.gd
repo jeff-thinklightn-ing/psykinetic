@@ -11955,9 +11955,10 @@ func _tell_hall_ahead(entity: GridEntity, to: Vector2i) -> void:
 
 ## Server: [param entity] walked into a shut door it may not open
 ## (World.door_pressed; the Umbrage crypt follow-up). The Hall's door held
-## by the Ossuary's dead (666, DEAD_LOCK) tells that player DEAD_LINE, as E
-## at it does, at most every DEAD_TOLD_S while they keep walking into it;
-## any other door says nothing here.
+## by the Ossuary's dead (666, DEAD_LOCK) tells that player DEAD_LINE at
+## most every DEAD_TOLD_S while they keep walking into it or pressing E at it
+## (one bound for both: E said it at every press, six times running in
+## playtest's look_bossbar2); any other door says nothing here.
 func _on_door_pressed(entity: GridEntity, door: Door) -> void:
 	if not Net.is_authority() or not entity is Player or door.open or door.lock != DEAD_LOCK:
 		return
@@ -16495,7 +16496,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			if held != null and not held.open and held.lock == HALL_LOCK and entity is Player:
 				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "The door is shut."})
 			elif held != null and not held.open and held.lock == DEAD_LOCK and entity is Player:
-				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": DEAD_LINE})
+				_on_door_pressed(entity, held)  # E as a walk into it: DEAD_LINE at most every DEAD_TOLD_S.
 			if held != null and World.niche_edges.get(key, "") == "hidden" and not held.open:
 				_on_niche_pressed(entity, key)  # E at the hidden niche presses on it (608).
 				return
