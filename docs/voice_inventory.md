@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2971)
+## Lines in the code (2972)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -968,7 +968,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s\|rose\|%d | `sim/named_mind.gd` rose_news() |
 |  | %s\|%s\|%d | `sim/named_mind.gd` emote() |
 
-### other (client3d) (79)
+### other (client3d) (80)
 
 | | Line | Where |
 |---|---|---|
@@ -993,6 +993,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | #5f8a8c | `client3d/client3d.gd`  |
 |  | #2f4f5c | `client3d/client3d.gd`  |
 |  | shader_type spatial; render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled; uniform vec4 tint : source_color; void fragment() { \tfloat d = clamp(length(UV - vec2(0.5)) * 2.0, 0.0, 1.0); \tfloat a = 1.0 - d * d; \tALBEDO = tint.rgb * a * a * tint.a; } | `client3d/client3d.gd` AURA_DISC_SHADER |
+|  | #c8d8f0 | `client3d/client3d.gd` KNIGHT_GLOW |
 |  | stencil_mode read, compare_greater, 1; | `client3d/client3d.gd` THROUGH_CLEAR_STENCIL |
 |  | depth_draw_never; | `client3d/client3d.gd` setup() |
 |  | depth_draw_never, depth_test_disabled; | `client3d/client3d.gd` setup() |
