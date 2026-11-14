@@ -1917,6 +1917,20 @@ const SCATTER_ROOF_SNOW := 0.12
 ## the roof's shade is put in.
 const SCATTER_ROOF_STRAW := 0.5
 const SCATTER_REEDS := 1.6
+## A pond's brim (Snagfin's pond, Jeff's pick C): the grass kept POND_CLEAR m back
+## from the water, reeds in clumps (POND_REEDS a cell), a few big stones on the rim.
+## A pond's bank (a closed curve's): its earth reaches POND_BANK m onto the
+## land, in the depth image's g (1 at the edge to 0 POND_BANK off), the
+## ground's rim drawn within it, its width wandering (ground.gdshaderinc).
+const POND_BANK := 2.0
+const POND_CLEAR := 0.7
+const POND_REEDS := 9.0
+## Fewer stones on a pond's brim, and each POND_STONE_SIZE times a field
+## stone (they barely showed at the near zoom as pebbles); marked by their
+## salt (POND_STONE_SALT and up) for _scatter_build.
+const POND_STONES := 0.35
+const POND_STONE_SIZE := 2.6
+const POND_STONE_SALT := 100000
 ## Tall grass (decision 508, terrain's side): its clumps in place of the
 ## grass's tufts, a few flowers among them; at the patch's edge, where the
 ## camera sees them side-on, a little taller.
@@ -12277,6 +12291,8 @@ func _scatter_build(chunk: Vector2i, kind: String, items: Array) -> void:
 		var size := lerpf(fit[0].x, fit[0].y, _roll(cell, 103 + salt))
 		if kind == "tall" and _tall_edge(cell):
 			size *= TALL_EDGE_SCALE
+		if kind == "stone" and salt >= POND_STONE_SALT:
+			size *= POND_STONE_SIZE  # A pond's brim stone.
 		if (kind == "tuft" or kind == "flower") and not _wear_walls.is_empty():
 			var by_wall := _wall_distance(at)
 			size *= lerpf(0.45, 1.0, clampf(by_wall / WEAR_THIN, 0.0, 1.0))
@@ -12350,9 +12366,20 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 		if not forest and _forest_distance.has(cell) and _forest_edge(cell):
 			density = density.duplicate()
 			density["root"] = density.get("root", 0.0) + SCATTER_EDGE_ROOTS
-		if not forest and _by_water(cell):
+		var by_water := not forest and _by_water(cell)
+		# A pond's (a closed curve's) brim: its own reeds and stones, kept by
+		# the edge below; a river's and a cell water's as ever.
+		var pond_near: Vector2i = _curve_near_sample.get(cell, Vector2i(-1, 0))
+		var by_pond := by_water and pond_near.x >= 0 and pond_near.x < _curve_waters.size() and bool(_curve_waters[pond_near.x]["closed"])
+		if by_pond and ground != "grass":
+			# A dock's dirt by a pond (Jeff's at Snagfin's shack): its own, no brim.
+			by_pond = false
+			by_water = false
+		if by_water:
 			density = density.duplicate()
-			density["reeds"] = SCATTER_REEDS
+			density["reeds"] = POND_REEDS if by_pond else SCATTER_REEDS
+		if by_pond:
+			density["stone"] = POND_STONES
 		# By the forest's edge's curve (decision 575) each point is the
 		# forest's or the land's by its side of the curve, not by its cell:
 		# the land's kinds and the forest's both offered, each point kept
@@ -12384,6 +12411,21 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 						continue  # On a road (563, terrain's side).
 					if (kind == "tuft" or kind == "flower") and not _wear_walls.is_empty() and not _wear_keeps(cell, at, 170 + salt + n * 7, kind == "flower"):
 						continue  # A town's worn ground (880).
+					var brim_stone := false
+					if not on_forest and by_pond:
+						# A pond's brim, by the water's edge (signed: + in the
+						# water): the grass kept back, reeds in clumps from the
+						# bank out into the shallows, a few big stones on the rim.
+						var edge := _curve_near(at).x
+						if edge != -INF:
+							if (kind == "tuft" or kind == "flower" or kind == "tall") and edge > -POND_CLEAR:
+								continue
+							if kind == "reeds" and (edge < -0.5 or edge > 0.45 or _field(at, 2.5, 77) < 0.38):
+								continue
+							if kind == "stone":
+								if edge < -0.9 or edge > -0.15:
+									continue
+								brim_stone = true
 					if _ledge_split.has(cell) and _ledge_other_side(cell, at):
 						continue  # Past a ledge's curve, the other ground's (585).
 					if by_curve:
@@ -12392,7 +12434,7 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 							continue
 					if not placed.has(kind):
 						placed[kind] = []
-					placed[kind].append([cell, at, n + salt, on_forest])
+					placed[kind].append([cell, at, n + salt + (POND_STONE_SALT if brim_stone else 0), on_forest])
 	return placed
 
 
@@ -15292,6 +15334,12 @@ func _read_curves() -> void:
 			_curve_waters[w]["profile"] = _curve_profile(_curve_waters[w]["curve"])
 			_curve_waters[w]["shoal"] = _curve_shoal(w)
 			_meet_at_end(w)
+	# A pond's surface is its cells' level (as _build_curve_ribbon lays it),
+	# so its bank is drawn from its curve as a river's is.
+	for cell: Vector2i in _curve_cells:
+		var w: int = _curve_cells[cell]
+		if _curve_waters[w]["closed"]:
+			_curve_waters[w]["level"] = maxf(_curve_waters[w].get("level", -INF), _bed_levels.get(cell, _elevation(cell)))
 	for cell: Vector2i in _curve_cells:
 		if not _curve_near_sample.has(cell):
 			_curve_near_sample[cell] = Vector2i(_curve_cells[cell], 0)
@@ -15568,12 +15616,14 @@ func _curve_shoal(w: int) -> PackedFloat32Array:
 	return shoal
 
 
-## The water's surface over [param point] on a river curve (559, terrain's side):
-## its profile at the nearest sample; NAN off any.
+## The water's surface over [param point] on a water curve (559, terrain's side):
+## a river's profile at the nearest sample, a pond's level; NAN off any.
 func _curve_surface(point: Vector2, kept: Dictionary = _curve_kept) -> float:
 	var near := _curve_near(point, kept)
-	if near.z < 0.0 or _curve_waters[int(near.z)]["closed"]:
+	if near.z < 0.0:
 		return NAN
+	if _curve_waters[int(near.z)]["closed"]:
+		return _curve_waters[int(near.z)].get("level", NAN)
 	var profile: PackedFloat32Array = _curve_waters[int(near.z)]["profile"]
 	var i := clampi(floori(near.y), 0, profile.size() - 1)
 	return lerpf(profile[i], profile[mini(i + 1, profile.size() - 1)], near.y - i)
@@ -15598,9 +15648,12 @@ func _curve_texels(cells: Array, from: int, to: int, origin: Vector2i, size: Vec
 	var kept: Dictionary[Vector4i, PackedInt32Array] = {}
 	var points := PackedInt32Array()
 	var values := PackedFloat32Array()
+	var banks := PackedByteArray()
 	for i in range(from, to):
 		var cell: Vector2i = cells[i]
 		var at := cell - origin
+		var near: Vector2i = _curve_near_sample.get(cell, Vector2i(-1, 0))
+		var pond := near.x >= 0 and near.x < _curve_waters.size() and bool(_curve_waters[near.x]["closed"])
 		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
 			continue
 		for v in SHORE_RES:
@@ -15611,18 +15664,22 @@ func _curve_texels(cells: Array, from: int, to: int, origin: Vector2i, size: Vec
 					continue
 				points.append_array([at.x * SHORE_RES + u, at.y * SHORE_RES + v])
 				values.append(signed)
-	return [points, values, kept]
+				banks.append(1 if pond else 0)
+	return [points, values, kept, banks]
 
 
 ## _curve_texels' [param texels] into [param image] and [param depth].
 static func _put_curve_texels(image: Image, depth: Image, texels: Array) -> void:
 	var points: PackedInt32Array = texels[0]
 	var values: PackedFloat32Array = texels[1]
+	var banks: PackedByteArray = texels[3]
 	for t in values.size():
 		var texel := Vector2i(points[t * 2], points[t * 2 + 1])
 		var signed := values[t]
 		image.set_pixelv(texel, Color(maxf(image.get_pixelv(texel).r, clampf(0.5 + signed, 0.0, 1.0)), 0.0, 0.0))
-		depth.set_pixelv(texel, Color(maxf(depth.get_pixelv(texel).r, clampf(signed * 0.5, 0.0, 1.0)), 0.0, 0.0))
+		var was := depth.get_pixelv(texel)
+		var bank := clampf(1.0 + signed / POND_BANK, 0.0, 1.0) if banks[t] == 1 else 0.0
+		depth.set_pixelv(texel, Color(maxf(was.r, clampf(signed * 0.5, 0.0, 1.0)), maxf(was.g, bank), 0.0))
 
 
 ## Each river curve's water as a ribbon (559, terrain's side, 557 on the curve):
@@ -16390,7 +16447,7 @@ static func _ribbon_quads(size: int, indices: PackedInt32Array) -> void:
 ## (as water.gdshader worked it out per pixel before), 0 elsewhere. Only
 ## the water's own texels are written.
 static func _water_depth(wet: Dictionary, origin: Vector2i, size: Vector2i) -> Image:
-	var out := Image.create(size.x, size.y, false, Image.FORMAT_L8)
+	var out := Image.create(size.x, size.y, false, Image.FORMAT_RG8)
 	for cell: Vector2i in wet:
 		var at := cell - origin
 		if at.x < 0 or at.y < 0 or at.x * SHORE_RES >= size.x or at.y * SHORE_RES >= size.y:
@@ -16409,14 +16466,11 @@ static func _water_depth(wet: Dictionary, origin: Vector2i, size: Vector2i) -> I
 
 
 ## Whether [param cell], picked for the shore's finer cells, is drawn from
-## a river's curve (559, terrain's side): near one, not a pond's. Read on the
-## fields' workers from [param g]'s own copies (the input's curve_near and
-## curve_open), never the members a build remakes (the fields race, 11-12).
+## a water's curve (559, terrain's side): near one, a river's or a pond's.
+## Read on the fields' workers from [param g]'s own copy (the input's
+## curve_near), never the members a build remakes (the fields race, 11-12).
 func _curve_band(cell: Vector2i, g: Dictionary) -> bool:
-	var near: Dictionary = g["curve_near"]
-	if not near.has(cell):
-		return false
-	return (g["curve_open"] as PackedByteArray)[(near[cell] as Vector2i).x] == 1
+	return (g["curve_near"] as Dictionary).has(cell)
 
 
 ## [param cell]'s finer heights from its river's curve (559, terrain's
@@ -16693,6 +16747,7 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("water", _water_mask)
 	material.set_shader_parameter("shore", _shore_mask)
+	material.set_shader_parameter("bank", _depth_mask)  # A pond's bank (g).
 	# Past pine stands the forest's edge runs into their needles (423), as
 	# dark as the floor beyond looks in the canopy's shade (the edge is in
 	# the sun).

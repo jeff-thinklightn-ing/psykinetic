@@ -255,6 +255,7 @@ func _test_every_level() -> void:
 	_test_fill_hills()
 	_test_wilds_on_foot()
 	_test_farm_and_barrow()
+	_test_jeffs_pond_corner()
 	_test_hearth()
 	_test_town_warm_rests()
 	_test_fill_hills_sights()
@@ -1222,6 +1223,46 @@ func _test_wilds_on_foot() -> void:
 ## farmstead a farm gone to ruin (a ruined cottage over its floorboard cache,
 ## a rubble heap, two fields striped in furrows of dirt and weeds) and the
 ## ruined barn a ruined barn; no lantern left at the farmstead.
+## Jeff's own build at Snagfin's shack, from the box (c027f4bc7, 10-14): his
+## pond's eleven water cells, the dock's three dirt cells running from under the
+## shack's door to his water, and the shack's four dirt floor cells. His hand
+## work: no town plan, water tool or wholesale re-lay may repaint them (774 laid
+## the floor and dock over with grass and 568's river took (222, 226); both put
+## back by the pond take, the coordinator's ruling). Snagfin's bigger pond grows
+## from his east and south only, so the pool keeps its first cell (221, 224)
+## and its key, pool_221_224: levels/economy.json stocks that key (40 fish, 40
+## back a day, 805 amended (16)) and economy_test and companion_test name it; a
+## reshape that moves the first cell fails here by name, not by dropping the
+## pond quietly to the default stock.
+func _test_jeffs_pond_corner() -> void:
+	print("\n== Jeff's own build at Snagfin's shack (c027f4bc7) and its pool's key ==")
+	var wilds := Level.load_level("wilds")
+	var terrain: Dictionary = wilds["terrain"]
+	var kinds: Dictionary = terrain["kinds"]
+	var water := {}
+	for cell: Vector2i in terrain.get("water", []):
+		water[cell] = true
+	var his_water: Array[Vector2i] = [Vector2i(221, 224), Vector2i(222, 224), Vector2i(223, 224), Vector2i(222, 225),
+		Vector2i(223, 225), Vector2i(222, 226), Vector2i(223, 226), Vector2i(223, 227), Vector2i(221, 228),
+		Vector2i(222, 228), Vector2i(223, 228)]
+	var dock: Array[Vector2i] = [Vector2i(220, 227), Vector2i(221, 227), Vector2i(222, 227)]
+	var floor_cells: Array[Vector2i] = [Vector2i(220, 225), Vector2i(221, 225), Vector2i(220, 226), Vector2i(221, 226)]
+	var lost: Array = his_water.filter(func(cell: Vector2i) -> bool: return not water.has(cell))
+	_check(lost.is_empty(), "his pond's eleven cells are water (none lost: %s)" % [lost])
+	var not_dirt: Array = (dock + floor_cells).filter(func(cell: Vector2i) -> bool:
+		return water.has(cell) or str(kinds.get(cell, "")) != "dirt")
+	_check(not_dirt.is_empty(), "his dock (220..222, 227) and the shack's floor (220..221 x 225..226) are dirt (not: %s)" % [not_dirt])
+	var keys := World.fish_waters_of(terrain)
+	_check(str(keys.get(Vector2i(221, 224), "")) == "pool_221_224" and str(keys.get(Vector2i(230, 230), "")) == "pool_221_224",
+		"the shack's pond, his crescent and the water grown east and south of it, keeps the key pool_221_224 (%s, %s): economy's stock" \
+		% [keys.get(Vector2i(221, 224), "none"), keys.get(Vector2i(230, 230), "none")])
+	var first := Vector2i(9999, 9999)
+	for cell: Vector2i in keys:
+		if keys[cell] == "pool_221_224" and (cell.y < first.y or cell.y == first.y and cell.x < first.x):
+			first = cell
+	_check(first == Vector2i(221, 224), "its first cell is his (221, 224): nothing north of row 224 or west of it on that row (%s)" % first)
+
+
 func _test_farm_and_barrow() -> void:
 	print("
 == wilds basics: farm and barrow (827) ==")

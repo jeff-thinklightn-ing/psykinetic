@@ -22813,6 +22813,50 @@ tests/view_test:
 Shots and A/B in C:\dev\review\curves. Client only. The protocol is 559's
 (29). No new class_name.
 
+559 amended (2), ponds drawn as ponds, and Snagfin's bigger pond (the
+coordinator's approval, 11-13, on Jeff's 07:04 UTC answer "needs to be
+bigger", read as pick C of C:\dev\review\decisions\pond-and-shack.md and
+marked there as his to undo; package "Snagfin's bigger pond", on, whole; the
+label from tools/decision_number.sh). A closed curve, every pond, is now drawn
+from its curve as a river is. Its bank's finer heights come from the curve
+(_curve_band takes any curve; _curve_surface gives a pond its cells' level,
+kept on _read_curves). Ponds had been left to their cells, and a steep bank
+showed the grid. On grass round a pond (the depth image's g, POND_BANK 2 m) a
+bare muddy rim of wandering width lies in the ground shader, under the wet
+band. The water has no foam line and no flow (water.gdshader: a curved
+ribbon's band only where it runs). The brim keeps the grass POND_CLEAR back,
+puts reeds in clumps from the bank out into the shallows (POND_REEDS), and a
+few big stones on the rim (POND_STONES, POND_STONE_SIZE times a field stone).
+Rim, reeds and stones are on grass only, so a dock's dirt, a floor or a road
+by the water keeps its own. This reaches every closed water in the released
+levels: the wilds' waters 1, 2 and 3, and the castle's 0, 1 and 2.
+
+Snagfin's pond (wilds waters 3) grows from Jeff's own crescent east and south
+only, to 127 cells (about 221..236 x 224..234), at his level of 5.20 m. Nothing
+at y < 224 and nothing at x < 223 but his cells, so the pool keeps its first
+cell (221, 224) and its key, pool_221_224, which economy's stock (805 amended
+(16)) and the companion's lead (803 amended (11)) name. The curve wraps his
+crescent's two tips round the shack's north and south ends. His corner reads
+as his build did (c027f4bc7, from the box, 10-14):
+- his eleven water cells, the eleventh, (222, 226), lost in 568's river laying
+  and put back;
+- the dock's dirt (220..222, 227) from under the shack's door to his water;
+- the shack's dirt floor (220..221 x 225..226).
+774 had laid the floor and dock over with grass. His chest stays out (734
+amended (7); asked of him on the page), and the shack's walls, door and
+lantern were never touched. The land round the pond eases from the water: 0.3
+m over it beside it, then 0.2 m a cell. That lowers 100 cells east, north-east
+and south, by up to 0.97 m, ground walked before, with nothing placed on it;
+the steepest land step left near it is 0.35 m. From each of main's bank cells
+still land a cast reaches the pond (FISH_REACH); the old east bank (x 224) is
+water now, its fishers a cell or more east.
+
+level_test _test_jeffs_pond_corner pins his cells and the key, so that a town
+plan, a water tool or a reshape that moves them fails by name. Stills of the
+mock and the take: C:\dev\review\terrain\pond_C\. Known: the north shore runs
+near-straight east from his north tip for a few cells, as nothing may lie north
+of row 224. Client and level data; protocol unchanged; no new class_name.
+
 ## 566. Visible work: the town's people seen doing it
 
 Jeff (2026-10-21): "town people need to be doing activities to better

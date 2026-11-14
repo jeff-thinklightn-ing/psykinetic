@@ -194,6 +194,17 @@ void fragment() {
 	// The foam: a band at the shore, on the land side, broken up and drifting.
 	float band = smoothstep(-FOAM, -FOAM * 0.4, into) * (1.0 - smoothstep(0.0, 0.06, into));
 	band *= smoothstep(0.3, 0.6, churn);
+	// Still water never foams at its edge, which read as a drawn outline
+	// (Snagfin's pond, Jeff's pick C): a closed curve (a pond's polygon,
+	// running all 0; a river's speed is 0.5 at least), or a cell water's body
+	// with no stream's cell or ford near (the mask read filtered, so a
+	// stream's bank a cell off keeps its band).
+	if (curved) {
+		band *= step(0.01, running.b + running.a);
+	} else if (!ribbon) {
+		vec4 near = texture(water, uv);
+		band *= smoothstep(0.02, 0.2, max(near.a, near.b));
+	}
 	// The riffle: broken patches over the whole ford, drifting down the
 	// flow, rising with how shallow it is. Never a line where deep water
 	// meets the ford: at full strength there it read as a bank across the

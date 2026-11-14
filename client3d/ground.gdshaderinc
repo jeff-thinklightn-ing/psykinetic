@@ -62,6 +62,9 @@ uniform sampler2D water : hint_default_black, filter_linear, repeat_disable;
 // The shore field (decision 553, Client3D.shore_image): over the same cells,
 // Client3D.SHORE_RES texels a cell, the water's edge where it is a half.
 uniform sampler2D shore : hint_default_black, filter_linear, repeat_disable;
+// A pond's bank (Client3D.POND_BANK, the depth image's g): 1 at its edge to 0
+// POND_BANK m onto the land.
+uniform sampler2D bank : hint_default_black, filter_linear, repeat_disable;
 // The roads (563, terrain's side, Client3D._road_field): r a dirt road's,
 // g a stone road's, a half at its edge, from its curve; SHORE_RES texels a
 // cell over the kinds' cells.
@@ -541,7 +544,16 @@ void fragment() {
 		float facing = dot(slope_normal, relief_light) - relief_light.y;
 		colour *= clamp(1.0 + slope_shade * facing, SLOPE_DARKEST, SLOPE_LIGHTEST);
 	}
-	float wet = smoothstep(0.3, 0.55, texture(shore, (at - kinds_origin + 0.5) / kinds_size).r);
+	float shore_r = texture(shore, (at - kinds_origin + 0.5) / kinds_size).r;
+	// A pond's bank (Client3D.POND_BANK): a bare, muddy rim, its width wandering,
+	// broken by noise; the wet band over it.
+	float bank_g = texture(bank, (at - kinds_origin + 0.5) / kinds_size).g;
+	float rim = smoothstep(0.15 + 0.4 * noise(at * 0.6 + 23.0), 0.8, bank_g) * (1.0 - smoothstep(0.5, 0.6, shore_r));
+	rim *= smoothstep(0.25, 0.55, noise(at * 1.3 + 17.0) + 0.25);
+	// On grass only: a dock's dirt, a floor or a road by the water keeps its own.
+	rim *= weights.r * float(floor_set == 0);
+	colour = mix(colour, dirt * vec3(0.72, 0.68, 0.62), rim);
+	float wet = smoothstep(0.3, 0.55, shore_r);
 	colour = mix(colour, colour * vec3(0.5, 0.58, 0.62), wet);
 	vec2 edge = texture(forest_edge, uv).rg;
 	float forest = smoothstep(0.35, 0.65, mix(texture(water, uv).g, edge.r, edge.g) + (noise(at * 1.9 + 40.0) - 0.5) * 0.35);
