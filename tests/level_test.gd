@@ -6840,12 +6840,14 @@ func _test_full_circle_on() -> void:
 	_main.travel(Net.local_id, "barrow_deep", "")
 	await get_tree().process_frame
 	me = _player()
+	# The template lays no monsters of its own (a generation does), so one is spawned beside the player.
 	var foe: Monster = null
 	if me != null:
-		for entity in _main.zone_entities(me.zone):
-			if is_instance_valid(entity) and entity is Monster and not entity is Draugr and entity.spawned and entity.hp > 0:
-				foe = entity
-				break
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(2, 0), Vector2i(0, 2)]:
+			if World.is_walkable(me.tile + step):  # An occupied cell: World.spawn refuses it, _spawn gives null.
+				foe = _main._spawn({"script": Level.MONSTER, "shape": "capsule", "name": "Struck_test", "tile": me.tile + step, "props": {"sight_range": 0}})
+				if foe != null:
+					break
 	Net.test_hp = true
 	var struck_words: String = _main.admin_command("strike %s %s" % [my_name, _main.monster_name(foe)]) if foe != null else ""
 	var nobody: String = _main.admin_command("strike %s nobody at all" % my_name)
@@ -6889,10 +6891,13 @@ func _test_full_circle_on() -> void:
 			knight = entity
 	var on_him: Array[Vector2i] = []
 	if bier.has_area() and knight != null:
+		# From every cell a player can stand on: not one another body holds (the
+		# knight holds his own; altar_beside counts only the caller's cell as theirs).
 		for cell in Level.rect_cells(bier.grow(4)):
-			if World.is_walkable(cell) and _main.altar_beside(bier, cell) == knight.tile:
+			var holder: GridEntity = World.get_entity_at(cell)
+			if World.is_walkable(cell) and (holder == null or holder is Player) and _main.altar_beside(bier, cell) == knight.tile:
 				on_him.append(cell)
-	_check(bier.has_area() and knight != null and on_him.is_empty(),
+	_check(bier.has_area() and knight != null and World.get_entity_at(knight.tile) == knight and on_him.is_empty(),
 		"from any cell near the bier, the cell to lay from is never the knight's (%s, from %s)" % [knight.tile if knight != null else World.NO_CELL, on_him])
 	_main.load_map("test_room")
 
