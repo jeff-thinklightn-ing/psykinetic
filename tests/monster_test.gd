@@ -1895,6 +1895,7 @@ func _test_ambush() -> void:
 	_test_freed_striker()
 	_test_freed_striker_den_walk()
 	_test_two_holders()
+	_test_test_foe_temper()
 	_test_alert_note()
 	_test_despawn_forget()
 	_test_link_slots()
@@ -10413,7 +10414,7 @@ func _test_two_holders() -> void:
 			robbers.append(robber)
 		if not pair:
 			robbers[1].acts = false  # Near (his mate), but never in it: blind, a call would bring him (806am16's lone holder).
-		var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+		var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1", "label": "Tove"})) as Player
 		_room.add_child(player)
 		World.spawn(player, Vector2i(5, 5))  # 3 off each, and she stands.
 		player.max_hp = 1000
@@ -10422,8 +10423,13 @@ func _test_two_holders() -> void:
 		var in_reach := [-1, -1]
 		var held := 0
 		var first_held := -1
+		var lines: Array[String] = []  # 392 amended (9): its [hold] and [press] lines.
 		for i in 50:
+			var before := World.logged
 			World.step()
+			for line: String in World.recent_logs.slice(World.recent_logs.size() - mini(World.logged - before, World.recent_logs.size())):
+				if line.begins_with("[hold]") or line.begins_with("[press]"):
+					lines.append("%d %s" % [i, line])
 			player.hp = 1000
 			for k in 2:
 				if in_reach[k] < 0 and World.in_reach(robbers[k], player):
@@ -10434,10 +10440,58 @@ func _test_two_holders() -> void:
 					first_held = i
 		print("  %s: in her reach at ticks %s, the first held back %d ticks from tick %d, pressing %s" % [
 			"two holders" if pair else "a lone holder", in_reach, held, first_held, [robbers[0]._pressing, robbers[1]._pressing]])
+		print("  its lines: %s" % [lines])
+		var named := lines.filter(func(line: String) -> bool: return "Tove" in line or "Player1" in line)
+		_check(named.is_empty(), "392 amended (9): no [hold] or [press] line names the player (%s)" % [named])
+		var holds := lines.filter(func(line: String) -> bool: return "[hold]" in line)
+		var presses := lines.filter(func(line: String) -> bool: return "[press]" in line)
 		if pair:
 			_check(in_reach[0] >= 0 and in_reach[1] >= 0 and (robbers[0]._pressing or robbers[1]._pressing),
 					"two holders on her: one presses, and both are in her reach within 50 ticks (%s)" % [in_reach])
+			_check(presses.size() == 1 and holds.size() >= 1 and holds.size() <= 2 and lines[0].contains("[hold]")
+					and presses[0].contains("presses in on a player"),
+					"392 amended (9): a [hold] line as each holds off, then one [press] as the first holder presses in on a player (%s)" % [lines])
 		else:
+			_check(holds.size() == 1 and presses.is_empty() and holds[0].ends_with("[hold] Crake holds off a player"),
+					"392 amended (9): a lone holder, one [hold] line and no [press] (%s)" % [lines])
 			# Seen, roused and walked to his ring first (about 13 ticks); from then on he holds every tick.
 			_check(in_reach[0] < 0 and first_held >= 0 and first_held <= 20 and held == 50 - first_held and not robbers[0]._pressing,
 					"a lone holder, his mate near but not in it: he holds back as 806 amended (16) has it, every tick from his ring (held %d of 50, from tick %d)" % [held, first_held])
+
+
+## 392 amended (9) (the coordinator's approval, for playtest's joined look of
+## 806 amended (21)): --test-foe's kinds may carry a temperament, laid as a
+## level entry's "temperament" in place of the draw by name; a bad one is no
+## plan. A server line names a body by what it is, never a player's name.
+func _test_test_foe_temper() -> void:
+	print("%s== --test-foe=robber:cautious: the foe's temperament, told ==" % char(10))
+	var plan := Main.test_foe_plan(PackedStringArray(["robber:cautious+robber:cautious", "sword", "2"]))
+	_check(plan.get("kinds") == ["robber", "robber"] and plan.get("tempers") == ["cautious", "cautious"]
+			and plan.get("offsets") == [Vector2i(3, 0), Vector2i(11, 0)],
+			"robber:cautious+robber:cautious,sword,2: two robbers, both told cautious, 8 apart (%s)" % [plan])
+	var mixed := Main.test_foe_plan(PackedStringArray(["robber+wolf:bold", "sword", "3"]))
+	_check(mixed.get("kinds") == ["robber", "wolf", "wolf"] and mixed.get("tempers") == ["", "bold", "bold"],
+			"robber+wolf:bold,sword,3: the robber drawn, each wolf bold (%s)" % [mixed])
+	_check(Main.test_foe_plan(PackedStringArray(["robber:brave", "sword"])).is_empty()
+			and Main.test_foe_plan(PackedStringArray(["robber:", "sword"])).is_empty()
+			and Main.test_foe_plan(PackedStringArray(["robber:cautious:bold", "sword"])).is_empty()
+			and Main.test_foe_plan(PackedStringArray([":cautious", "sword"])).is_empty(),
+			"a temperament that isn't bold, cautious or cowardly, or a malformed one: no plan")
+	_build(["#####", "#...#", "#####"])
+	for temper: String in ["cautious", "bold"]:
+		var spec := Level._spec_for("monster_robber", Level.MONSTER_TYPES)
+		spec["name"] = "Foe"
+		spec["temperament"] = temper
+		var robber := EntityFactory.build(spec) as Monster
+		_room.add_child(robber)
+		World.spawn(robber, Vector2i(1, 1))
+		_check(robber.temper == Monster.TEMPER_NAMES[temper], "a Foe told %s is %s, whatever its name draws" % [temper, temper])
+		World.despawn(robber)
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1", "label": "Tove"})) as Player
+	_room.add_child(player)
+	var wolf_spec := Level._spec_for("monster_wolf", Level.MONSTER_TYPES)
+	wolf_spec["name"] = "Wolf1"
+	var wolf := EntityFactory.build(wolf_spec) as Monster
+	_room.add_child(wolf)
+	_check(World.plain_name(player) == "a player" and World.plain_name(wolf) == "a wolf",
+			"World.plain_name: a player is 'a player', never her name; a wolf 'a wolf' (%s, %s)" % [World.plain_name(player), World.plain_name(wolf)])

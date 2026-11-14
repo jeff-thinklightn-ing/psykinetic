@@ -28313,6 +28313,9 @@ func _test_arts(player: Player) -> void:
 ## (test-only, as "hp": the flag and a --run-marker) lays the ring round that
 ## player then, and each call one ring more, so a tour counts from its own
 ## tick. Without "held" each join lays them, as before.
+## 392 amended (9) (playtest's joined look of 806 amended (21)): a kind may
+## carry ":<temperament>" (bold, cautious, cowardly), "robber:cautious+robber:cautious":
+## its spawn spec's "temperament", as a level entry's, in place of the draw by name.
 const TEST_FOE_SPACING := 8
 const TEST_FOE_AROUND: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1)]
 ## How many test foes laid so far, so a later ring's names follow on (Foe4...).
@@ -28321,7 +28324,7 @@ func _test_foe(player: Player) -> void:
 	var plan := test_foe_plan(Net.test_foe)
 	if plan.is_empty():
 		if not Net.test_foe.is_empty():
-			push_error("[test] --test-foe=%s: not kind,weapon[,count[,around][,held]]: ignored" % ",".join(Net.test_foe))
+			push_error("[test] --test-foe=%s: not kind[:temperament],weapon[,count[,around][,held]]: ignored" % ",".join(Net.test_foe))
 		return
 	World.set_slots(player, Items.tidy(["", "", "", "", plan["right"], plan["left"]], Items.CARRIED))
 	if plan["held"]:
@@ -28344,6 +28347,8 @@ func _lay_test_foes(player: Player, plan: Dictionary) -> void:
 			spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": kind}
 		_test_foes_laid += 1
 		spec["name"] = "Foe" if _test_foes_laid == 1 else "Foe%d" % _test_foes_laid
+		if not str(plan["tempers"][k]).is_empty():
+			spec["temperament"] = plan["tempers"][k]
 		var wanted: Vector2i = player.tile + (offsets[k] as Vector2i)
 		spec["tile"] = wanted if plan["around"] and World.is_free(wanted) else _nearest_free(wanted)
 		Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
@@ -28379,10 +28384,11 @@ func _foes_command(words: PackedStringArray) -> String:
 	return "foes: %d round %s at tick %d" % [(plan["kinds"] as Array).size(), found[0].name, World.tick]
 
 
-## --test-foe's fields read (392 amended (7)): {kinds (one a foe), right,
-## left, offsets (one a foe, from her tile), around, held}; {} if they don't
-## read as kind[+kind...],weapon[+left][,count[,around][,held]] ("around"
-## and "held" each at most once, either order). Pure, for tests.
+## --test-foe's fields read (392 amended (7); tempers, 392 amended (9): one a
+## foe, "" for drawn by name): {kinds (one a foe), tempers, right, left,
+## offsets (one a foe, from her tile), around, held}; {} if they don't read
+## as kind[:temperament][+kind...],weapon[+left][,count[,around][,held]]
+## ("around" and "held" each at most once, either order). Pure, for tests.
 static func test_foe_plan(fields: PackedStringArray) -> Dictionary:
 	if fields.size() < 2 or fields.size() > 5 or fields[0].is_empty():
 		return {}
@@ -28391,18 +28397,29 @@ static func test_foe_plan(fields: PackedStringArray) -> Dictionary:
 		if flag not in ["around", "held"] or flags.count(flag) > 1:
 			return {}
 	var around := "around" in flags
-	var named := fields[0].split("+", false)
+	var named: Array[String] = []
+	var told: Array[String] = []
+	for each: String in fields[0].split("+", false):
+		var parts := each.split(":")
+		if parts.size() > 2 or parts[0].is_empty() or parts.size() == 2 and not Monster.TEMPER_NAMES.has(parts[1]):
+			return {}
+		named.append(parts[0])
+		told.append(parts[1] if parts.size() == 2 else "")
+	if named.is_empty():
+		return {}
 	var hands := fields[1].split("+")
 	var count := clampi(fields[2].to_int(), 1, 9) if fields.size() >= 3 else 1
 	count = maxi(count, named.size())
 	if around:
 		count = mini(count, TEST_FOE_AROUND.size())
 	var kinds: Array[String] = []
+	var tempers: Array[String] = []
 	var offsets: Array[Vector2i] = []
 	for k in count:
 		kinds.append(named[mini(k, named.size() - 1)])
+		tempers.append(told[mini(k, told.size() - 1)])
 		offsets.append(TEST_FOE_AROUND[k] if around else Vector2i(3 + TEST_FOE_SPACING * k, 0))
-	return {"kinds": kinds, "right": hands[0], "left": hands[1] if hands.size() > 1 else "", "offsets": offsets,
+	return {"kinds": kinds, "tempers": tempers, "right": hands[0], "left": hands[1] if hands.size() > 1 else "", "offsets": offsets,
 			"around": around, "held": "held" in flags}
 
 

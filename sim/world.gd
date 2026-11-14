@@ -14366,12 +14366,34 @@ func _logs_for(by: GridEntity) -> bool:
 var logged := 0
 ## The last line _log wrote (544 amended (2): tests read the hurt line).
 var last_log := ""
+## The last LOG_KEEP lines _log wrote, oldest first (392 amended (9): a test
+## reads every line of a step, not only its last).
+var recent_logs: Array[String] = []
+const LOG_KEEP := 32
 
 
 func _log(message: String) -> void:
 	logged += 1
 	last_log = message
+	recent_logs.append(message)
+	if recent_logs.size() > LOG_KEEP:
+		recent_logs.pop_front()
 	print("[tick %d] %s" % [tick, message])
+
+
+## [param entity] as a server line names it (392 amended (9), the
+## coordinator's standing rule: a line the box prints never carries a
+## player's name or id): "a player", "a companion", a creature by its kind
+## word ("a robber", "the old grey"), else "someone".
+static func plain_name(entity: GridEntity) -> String:
+	if entity is Player:
+		return "a player"
+	if entity is Companion:
+		return "a companion"
+	if entity is Monster:
+		var word := kind_word(str(entity.spawn_spec.get("kind", "")))
+		return word if word.begins_with("the ") else "a " + word
+	return "someone"
 
 
 ## How long fire or bleeding on one body is gathered into one hurt line

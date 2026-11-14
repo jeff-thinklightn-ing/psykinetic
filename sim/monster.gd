@@ -1443,10 +1443,13 @@ func _sim_tick() -> void:
 			# 806 amended (21): two or more holding off one target, each waiting for
 			# another at her, stared five seconds and walked home. The one who held
 			# first presses; at her, it meets the others' _target_beset.
+			if not _pressing:
+				World._log("[press] %s presses in on %s" % [name, World.plain_name(target)])  # 392 amended (9).
 			_pressing = true
 		else:
 			if _held_back_last < World.tick - 1:
 				_held_back_since = World.tick
+				World._log("[hold] %s holds off %s" % [name, World.plain_name(target)])  # 392 amended (9).
 			_held_back_last = World.tick
 			_standing_off()
 			return  # Waits for the others; a band that outnumbers them goes in together.

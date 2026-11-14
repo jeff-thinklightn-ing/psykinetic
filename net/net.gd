@@ -152,6 +152,7 @@ extends Node
 ##   --test-walk-on-wind          --test-walk starts at the local player's own wind-up (392 amended), logged
 ##   --test-foe=<kind>,<weapon>[,<n>]  server: each player joins with that weapon in hand and that monster 3 cells
 ##                                east; n (1..9) lays n of them, Foe, Foe2, ..., 8 cells apart, each a fight of its own
+##                                (a kind may carry :bold, :cautious or :cowardly, its temperament; 392 amended (9))
 ##   --test-traits=<k>:<v>;...    server, the voice A/B only (803 amended): over a companion's rolled traits,
 ##                                e.g. temperament:warm and talkative
 ##   --test-card=<file>           server, the voice A/B only: her card is that file's text, not the model's
