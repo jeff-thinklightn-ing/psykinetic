@@ -1883,6 +1883,23 @@ func _test_knight_vigil() -> void:
 				shells += 1
 			else:
 				plain += 1
+	# He stands as the people stand (877): his vigil, talk and tiredness their People_ copies,
+	# the feet under the hips within _test_people_feet's bounds (the UAL's pace apart read as a kneel).
+	var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var scene := puppet.get_node("Body/Model") as Node3D
+	var gaps: Array[String] = []
+	var stands := true
+	for t: float in [0.0, 1.0, 2.0, 3.0]:
+		rig.base_at(Client3D.KNIGHT_VIGIL, t)
+		rig.tree.advance(0.0)
+		var at: Array = ["LeftFoot", "RightFoot"].map(func(bone: String) -> Vector3:
+			return scene.global_transform.affine_inverse() * skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone)).origin)
+		var gap: Vector3 = at[0] - at[1]
+		gaps.append("%.2f across, %.2f ahead" % [absf(gap.x), absf(gap.z)])
+		stands = stands and absf(gap.x) <= 0.30 and absf(gap.z) <= 0.20
+	var played := [rig.as_played(Client3D.KNIGHT_VIGIL), rig.as_played(Client3D.CLIP_TALKING), rig.as_played(Client3D.CLIP_TIRED)]
+	_check(rig.stood_as == Client3D.PEOPLE_PREFIX and played == ["People_Knight_Vigil", "People_Idle_Talking", "People_Idle_Tired"] and stands,
+		"he stands as the people stand: %s, his feet under his hips (%s)" % [played, ", ".join(gaps)])
 	puppet.free()
 	var ghost := Node3D.new()
 	add_child(ghost)

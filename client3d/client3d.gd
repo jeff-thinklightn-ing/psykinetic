@@ -1449,7 +1449,10 @@ const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.39], ["Jog_Short", 1.63], ["Sp
 ## gaits and sockets so too); the ghost creature.ghost, the skeleton under a
 ## translucent shroud that casts no shadow (GHOST_MATERIAL); the fallen knight
 ## (747, astral_knight) creature.astral_knight, all of him in the ghost's
-## material, keeping his vigil (KNIGHT_VIGIL) and never fidgeting.
+## material, keeping his vigil (KNIGHT_VIGIL) and never fidgeting; he stands
+## as the people stand (877's "people_stance": his vigil, talk and tiredness
+## played as their People_ copies, the feet under the hips, where the UAL's
+## pace apart under his floor-length cloth read from above as a kneel).
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS, "goblin": true},
@@ -1476,7 +1479,7 @@ const MODELS := {
 	"astral_knight": {"scene": "res://art/kit/creatures/creature.astral_knight/creature.astral_knight.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
 		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL, "one_shell": true,
-		"vigil_light": true},
+		"vigil_light": true, "people_stance": true},
 }
 ## The fallen knight's stance (humanoid_clips.py): head bowed, a hand on the
 ## hilt at his hip, a slow breath.

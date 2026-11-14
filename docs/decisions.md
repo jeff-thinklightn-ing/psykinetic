@@ -42824,6 +42824,30 @@ plain alpha: its shroud covers an opaque skeleton. anim_rig_test
 _test_knight_vigil: each of his ghost surfaces draws one shell, its depth
 first, and the shrouded ghost has none. Client only, protocol unchanged,
 no new class_name.
+
+747 amended (12): the fallen knight stands as the people stand (2026-11-13;
+the coordinator's ruling, after the one shell: from above he still read as
+a man down on one knee with the other leg thrown out). Measured (the
+scratch probe tests/knight_pose_probe on saturn, C:/dev/review/pc-character/saturn/pose):
+in Knight_Vigil his hips stand 0.84 m over his feet and his knees at 0.5 m,
+nothing folded, the same to the centimetre as human_m's; but his feet are
+the UAL's pace apart, the left 0.20 m ahead of the hips and the right 0.18
+behind, 0.34 m across, the stance 877 took off the people ("a lunge
+held"). 877 stands a body with the feet under the hips through the
+People_ copies of the stood clips, played for a model that says
+"people_stance"; the knight's model did not, and the library had no copy
+of his vigil, so under his floor-length cloth and one pale shape the
+stride read as a kneel. Client3D.MODELS["astral_knight"] now says
+"people_stance": his vigil plays as People_Knight_Vigil (animation's side:
+Knight_Vigil_Loop joins humanoid_clips.py's people_copy list, goblin.res
+re-extracted), his talk as People_Idle_Talking and his tiredness as
+People_Idle_Tired; he has no fidgets, so no look-round, yawn or shift comes
+with it, and he never walks. anim_rig_test _test_knight_vigil: he plays
+the three People_ copies and his feet stand under his hips within
+_test_people_feet's bounds (0.30 m across, 0.20 fore and aft) through the
+loop; view_test _test_knight_stands: a spawned knight's rig plays his vigil
+as People_Knight_Vigil, no fidgets. Client only, protocol unchanged, no new
+class_name.
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.

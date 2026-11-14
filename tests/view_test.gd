@@ -82,6 +82,7 @@ func _ready() -> void:
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
+		_test_knight_stands()
 		await _test_forge()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1863,6 +1864,22 @@ func _respawn_under_one_name() -> void:
 ## with no aura.
 ## The lantern hung (451 amended (4), pc-character's side): art-kit's gear.lantern at the belt where
 ## the boxes were, its panes lit as the coordinator's rule says, each body its own; the town's share one.
+## The fallen knight's spirit (747 amended): drawn standing as the people stand, his vigil played
+## as its People_ copy, no fidgets, one shell.
+func _test_knight_stands() -> void:
+	print("
+== the fallen knight stands his vigil as the people stand ==")
+	var knight := _spawn_imp(Vector2i(12, 4), "astral_knight")
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets.get(knight.get_instance_id()) if knight != null else null
+	var rig := puppet.get_meta("rig") as AnimRig if puppet != null else null
+	_check(rig != null and rig.stood_as == Client3D.PEOPLE_PREFIX and rig.base_clip() == Client3D.KNIGHT_VIGIL
+			and rig.as_played(rig.base_clip()) == "People_Knight_Vigil" and (puppet.get_meta("fidgets", {}) as Dictionary).is_empty(),
+			"he plays his vigil as the people stand (%s), and never fidgets" % (rig.as_played(rig.base_clip()) if rig != null else "no rig"))
+	if knight != null:
+		World.despawn(knight)
+
+
 func _test_hip_lantern() -> void:
 	print("
 == the hip lantern: art-kit's gear.lantern under belt_r, its panes lit by the light and the dark ==")
