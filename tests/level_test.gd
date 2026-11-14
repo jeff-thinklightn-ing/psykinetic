@@ -5801,6 +5801,9 @@ func _test_crypt_spacing() -> void:
 ## block's guard packs whole (one shared "pack" each, three of three), the
 ## draugr in the lair, both links kept, no torches out of the anchors, and
 ## no fault of any layout rule, where the old caverns have a dozen.
+## The Charnel Vault's torches in barrow_deep's template (608 amended (4)):
+## its south corners, either side of the way out at (47..52, 7).
+const VAULT_TORCHES: Array[Vector2i] = [Vector2i(46, 6), Vector2i(53, 6)]
 const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "chests": 3,
 	"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"]}
 ## 806 amended (15): a chest only where its guard can stand. On main the
@@ -5876,6 +5879,13 @@ func _test_deep_crypt() -> void:
 				torches += 1
 				if in_rooms.has(cell):
 					stray.append(cell)
+		# 608 amended (4): the Charnel Vault's pair, the template's, either side of its way out (the
+		# vault's south corners, rock beyond each, the way's mouth between them).
+		var mouth := range(47, 53).filter(func(x: int) -> bool: return map.walkable(Vector2i(x, 7)))
+		_check(VAULT_TORCHES.all(func(cell: Vector2i) -> bool: return map.cells.get(cell) == "torch" and not map.walkable(cell + Vector2i(0, 1)))
+				and mouth.size() >= 4,
+				"deep crypt generation %d: the Charnel Vault's two torches kept, at its south corners %s, the way out between them (x %s at y 7)"
+				% [generation, VAULT_TORCHES, mouth])
 		var faults: Array = LAYOUT_SENSE.check(level, laid_config.get("laid_rooms", []), Regen.layout_options(block))
 		_check(rooms_ok and wing_ok and packs_ok and int(kinds.get("draugr", 0)) == 1 and Vector2i(49, 1) in links and not Vector2i(49, 77) in links
 				and torches >= 4 and stray.is_empty() and faults.is_empty() and level["warnings"].is_empty(),

@@ -26569,6 +26569,21 @@ door; the line ahead once a visit, again after another zone, never in a pact or 
 its way, none in a room), monster_test (the short purse's words). Level data and server lines; protocol
 unchanged; no new class_name.
 
+608 amended (4), dungeon's side (the coordinator's approval of the third worst thing in dungeon's
+audit, from playtest's look214_ossuary2; label from tools/decision_number.sh): the Charnel Vault
+lit. Down the stair into the Ossuary, the vault (the entrance anchor, 46,1 8x6) was black but for
+the player's own pool: the lit way's first pair stands at y 12 or 13, past it. Two torch markers
+in barrow_deep's layout, in the anchor so every generation keeps them: (46,6) and (53,6), the
+vault's south corners, either side of its way out. The way out is the same every generation
+(Labyrinth._exit, the vault cell nearest the heart: (47..52, 7), or 48..52), and each corner has
+rock beyond it on generations 1 to 6. The torch is drawn light only, as the way's: no new light
+kind, no Senses change, nothing blocks a step. So the first lit thing a newcomer sees from the
+stair's foot is the exit, with the vault's far corners still dark, and the vault's pair and the
+way's first pair read as one line. A template change: the box lays it afresh at the next
+deploy (465 amended (4)). level_test (_test_deep_crypt): on each generation, both torches kept
+with rock beyond them and the way's mouth between them. Level data; protocol unchanged; no new
+class_name.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)
