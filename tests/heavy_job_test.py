@@ -2069,6 +2069,113 @@ line = gate.bench_wait(bench_13th, convoy, [remote_on] + lock_waits, convoy_runs
 check(line == "; after 15 landings ahead, about 126 min", "a bench behind the convoy: %r" % line)
 check(gate.bench_wait(bench_13th, [], [remote_on], convoy_runs, now, 60.0, None) == "", "none ahead: nothing said")
 
+print("== a load_check starts past the queue (394 amended (48)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+load48 = dict(gate.KINDS["load_check"], kind="load_check")
+scene48 = dict(gate.KINDS["scene"], kind="scene", ram_gb=1.5, commit_gb=1.0)
+busy48 = [dict(running(1, 1), kind="suite"), dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")]
+export48 = dict(gate.KINDS["godot_export"], kind="godot_export")
+owing48 = [dict(running(0.6, 0.0), kind="godot_export")]  # Owed 0.6 GB, to give back.
+check(gate.PAST_QUEUE_KINDS == ("load_check",), "only load_check starts past the queue")
+check(not gate.passes_held(load48, [export48, export48], busy48, 40.0, 40.0)[0]
+    and gate.jumps(load48, [export48, export48], busy48, 40.0, 40.0)[0],
+    "two exports ahead held by the count (three running) held it before; now it goes past them")
+ok48, holder48, why48 = gate.jumps(load48, [scene48], owing48, 9.6, 40.0)
+check(not ok48 and holder48 == 0 and "memory" in why48 and gate.decide(load48, owing48, True, 9.6, None, 40.0)[0],
+    "a scene ahead waiting on memory the queue gives back (9.0 GB room, 1.5 + 8 wanted) holds it, though 0.5 + 8 fit: %s" % why48)
+ok48, holder48, why48 = gate.jumps(load48, [scene48], [], 9.7, 40.0)
+check(not ok48 and holder48 == 0 and "not beside" in why48,
+    "a scene ahead that fits now (9.7 GB) but not with 0.5 GB taken beside it: held, the head never waits on its room (%s)" % why48)
+check(gate.jumps(load48, [scene48], [], 10.1, 40.0)[0], "room for both (10.1 GB): it goes past")
+bench48 = dict(gate.KINDS["bench"], kind="bench", ram_gb=2.0, commit_gb=1.0)
+ok48, holder48, _ = gate.jumps(load48, [bench48], [], 40.0, 40.0)
+check(not ok48 and holder48 == 0, "a bench ahead that could start now: held (the bench never waits on it)")
+check(gate.jumps(load48, [bench48], [dict(running(1, 1), kind="suite")], 40.0, 40.0)[0],
+    "a bench ahead held by a running suite holds nobody: it goes past")
+check(not gate.jumps(dict(gate.KINDS["godot_import"], kind="godot_import"), [scene48], busy48, 40.0, 40.0)[0],
+    "an import does not: first come, as before")
+check(gate.GATE_REVISION == 43, "gate revision 43")
+
+mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
+saved48 = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"scene": dict(gate.KINDS["scene"], ram_gb=1.5, commit_gb=1.0),
+    "load_check": dict(gate.KINDS["load_check"], ram_gb=0.5, commit_gb=0.5),
+    "bench": dict(gate.KINDS["bench"], ram_gb=2.0, commit_gb=1.0)})
+gate.total_ram_gb = lambda: None
+gate.POLL_SECONDS = 0.05
+gate._memory = lambda: (40.0, 40.0)
+clear_gate()
+for name48 in ("a48", "b48", "c48"):
+    owed_job(name48, "suite_remote" if name48 == "a48" else "scene", 0.5)
+queued("art", "godot_export")
+queued("ui", "godot_export")
+written48 = []
+def note48(path, value):
+    if os.path.basename(os.path.dirname(path)) == "queue":
+        written48.append(value.get("kind"))
+    return real_write(path, value)
+gate._write = note48
+taker48 = threading.Thread(target=lambda: gate.take("perf", "load_check", os.getpid()), daemon=True)
+taker48.start()
+check(until(lambda: "perf" in trees("running"), 10.0) and queue_of() == ["art godot_export", "ui godot_export"],
+    "a take with three running and two exports queued ahead on the count: starts at once (%s, %s)" % (trees("running"), queue_of()))
+taker48.join(5)
+gate._write = real_write
+check("load_check" not in written48,
+    "its row never written to the queue: a waiter from 37 to 41 behind it never meets a queued load_check (%s)" % written48)
+with open(gate._path("heavy_jobs.log")) as log48:
+    check("\tjumped\tperf\tload_check\tpast 2 queued (394 amended (48))" in log48.read(), "the log says it went past two")
+gate.release("perf", "load_check")
+out48 = io.StringIO()
+with contextlib.redirect_stdout(out48):
+    gate.summary(datetime.date.today().isoformat())
+check("started past the queue (394 amended (48)): 1 load_check" in out48.getvalue(),
+    "the day's summary counts it apart from the waits")
+# Short of memory for itself: it waits, queued last, and starts once there is room.
+gate._memory = lambda: (9.0, 40.0)  # 1.5 owed: 7.5 room, under 0.5 + 8.
+taker48 = threading.Thread(target=lambda: gate.take("perf", "load_check", os.getpid()), daemon=True)
+taker48.start()
+check(until(lambda: queue_of() == ["art godot_export", "ui godot_export", "perf load_check"], 10.0) and "perf" not in trees("running"),
+    "memory short (0.5 + 8 GB wanted): it waits, queued last (%s)" % queue_of())
+gate._memory = lambda: (40.0, 40.0)
+check(until(lambda: "perf" in trees("running"), 10.0) and queue_of() == ["art godot_export", "ui godot_export"],
+    "room again: it starts, still past the two (%s)" % queue_of())
+taker48.join(5)
+gate.release("perf", "load_check")
+# A scene ahead waiting on memory holds it, though it would fit itself.
+clear_gate()
+owed_job("owing48", "godot_export", 0.6)
+queued("art", "scene")
+gate._memory = lambda: (9.6, 40.0)  # 0.6 owed: 9.0 room, the scene's 9.5 short (in reach), its own 8.5 not.
+taker48 = threading.Thread(target=lambda: gate.take("perf", "load_check", os.getpid()), daemon=True)
+taker48.start()
+check(until(lambda: queue_of() == ["art scene", "perf load_check"], 10.0) and "perf" not in trees("running"),
+    "a scene ahead waiting on memory: it waits behind it, first come (%s)" % queue_of())
+gate._memory = lambda: (40.0, 40.0)
+check(until(lambda: "perf" in trees("running"), 10.0), "room for both: it goes past (%s)" % trees("running"))
+taker48.join(5)
+gate.release("perf", "load_check")
+# A bench running: it waits beside it, never starts.
+clear_gate()
+owed_job("bench48", "bench", 2.0)
+taker48 = threading.Thread(target=lambda: gate.take("perf", "load_check", os.getpid()), daemon=True)
+taker48.start()
+time.sleep(0.5)
+check(queue_of() == ["perf load_check"] and trees("running") == ["bench48"],
+    "a bench running: it waits, queued (%s, %s)" % (queue_of(), trees("running")))
+for each in gate._entries("running"):
+    gate._retried(os.remove, gate._path("running", each["file"]))
+check(until(lambda: "perf" in trees("running"), 10.0), "the bench done: it starts")
+taker48.join(5)
+gate.release("perf", "load_check")
+clear_gate()
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS = mem48, total48, poll48
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+if saved48 is not None:
+    gate._write(gate._path("kinds.json"), saved48)
+elif os.path.exists(gate._path("kinds.json")):
+    gate._retried(os.remove, gate._path("kinds.json"))
+
 print("== a test's own free memory, never a real take's (394 amended (50)) ==")
 saved50 = {name: os.environ.get(name) for name in ("HEAVY_JOBS_DIR", "HEAVY_JOB_TEST_FREE_GB")}
 os.environ["HEAVY_JOB_TEST_FREE_GB"] = "64"

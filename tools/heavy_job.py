@@ -151,6 +151,16 @@ MAX_RUNNING = 3
 ## of each such kind (394 amended (46): an import beside never holds up a
 ## load_check, nor one the other).
 UNCOUNTED_MOST = 1
+## Kinds that start past the queue (394 amended (48); the coordinator's approval and conditions,
+## 2026-11-13): a load check is meant to cost seconds before a take queues, and waited first-come
+## behind the whole queue (perf's, 19th and 25th, as long as a landing). One starts at once when
+## its own decide() allows it (room for its 0.5 GB estimate plus Jeff's 8 GB margin, no bench
+## running, under its max_running and UNCOUNTED_MOST) and no row ahead waits on memory or would
+## lose the room it is about to start in (jumps). Its queue entry is written only when it must
+## wait, so a waiter from before 46 (37 to 41), whose local suite fails on a queued load_check
+## (KeyError in lean_row), never meets one in the ordinary case. Imports stay first-come: see
+## the decision.
+PAST_QUEUE_KINDS = ("load_check",)
 ## A job holding the gate this long is flagged in status, the log and the
 ## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
 LONG_HOLD_SECONDS = 3600
@@ -193,7 +203,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 42  # 46: load_check, and each uncounted kind its own UNCOUNTED_MOST.
+GATE_REVISION = 43  # 48: a load_check starts past the queue.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -683,6 +693,38 @@ def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, 
                 return False, [], why, place
             past.append(dict(other, due=due))
     return True, past, "", None
+
+
+def memory_short(job, running, free_ram_gb, free_commit_gb=None):
+    """Whether [job] waits on memory now, as decide() judges it: RAM over
+    what running jobs are owed, or commit, short of its estimate and margin."""
+    if free_ram_gb - reserved_gb(running) < job["ram_gb"] + MARGIN_GB:
+        return True
+    return free_commit_gb is not None and free_commit_gb - reserved_commit_gb(running) < commit_of(job) + COMMIT_MARGIN_GB
+
+
+def jumps(job, ahead, running, free_ram_gb, free_commit_gb=None):
+    """Whether [job], of PAST_QUEUE_KINDS, may start past the rows [ahead]
+    (394 amended (48)): (ok, holder, why), holder the index of the row that
+    keeps it in the queue. Never past a row that waits on memory (its room
+    first: the queue's order for memory is everyone's), nor one that could
+    start now but not with [job] beside it (the head's take is never made to
+    wait on memory [job] just took, nor a bench on [job] itself). A row held
+    by the count, its own kind or a running bench holds it not. Out-of-reach
+    rows and passable benches are passed, as by everyone."""
+    if job.get("kind") not in PAST_QUEUE_KINDS or free_ram_gb is None:
+        return False, None, ""
+    beside = running + [{"kind": job.get("kind"), "ram_gb": job["ram_gb"], "commit_gb": commit_of(job),
+        "using_gb": 0.0, "using_commit_gb": 0.0, "gpu": job.get("gpu", False)}]
+    for place, other in enumerate(ahead):
+        if out_of_reach(other, running, free_ram_gb, free_commit_gb) or bench_passable(other, running):
+            continue
+        if decide(other, running, True, free_ram_gb, None, free_commit_gb)[0]:
+            if not decide(other, beside, True, free_ram_gb, None, free_commit_gb)[0]:
+                return False, place, "it would start now, and not beside this %s" % job.get("kind")
+        elif memory_short(other, running, free_ram_gb, free_commit_gb):
+            return False, place, "it waits on memory, first come"
+    return True, None, ""
 
 
 def conflicts(job, other):
@@ -1928,11 +1970,16 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         # (394 amended (44)), whose death drops the row.
         asker = asker_of(pid, caller) if not watched else None
         asker_since = started_at(asker) if asker else None
-        _write(_path("queue", ticket), dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
+        ticket_entry = dict({"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid),
             "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued,
             "gate": GATE_REVISION, "checkout": CHECKOUT, "lock_rule": LOCK_RULE},
             **({"expect_s": expect_minutes * 60.0} if expect_minutes is not None else {}),
-            **({"asker": asker, "asker_since": asker_since} if asker else {})))
+            **({"asker": asker, "asker_since": asker_since} if asker else {}))
+        # A kind that starts past the queue (394 amended (48)) writes its row only once it
+        # must wait: till then it is judged as the last row, and nobody else meets it.
+        written = kind not in PAST_QUEUE_KINDS
+        if written:
+            _write(_path("queue", ticket), ticket_entry)
     said = 0.0
     long_logged = False
     # Since when only backfilled jobs have kept this one out (394 amended
@@ -1951,6 +1998,8 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         sample_memory()  # 394 amended (43): its own lock, before the state lock.
         with StateLock():
             queue = _entries("queue")
+            if not written:
+                queue = queue + [dict(ticket_entry, file=ticket)]
             running = as_owed(_entries("running"))
             free_gpu, _ = gpu_gb() if row["gpu"] else (None, None)
             if not any(each["file"] == ticket for each in queue):
@@ -1996,6 +2045,14 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                     _write(_path("queue", ticket), entry)
             head, past, past_why, holder = passes_held(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
+            jumped = False
+            if not head and kind in PAST_QUEUE_KINDS:
+                # 394 amended (48): past the queue when nothing ahead waits on memory.
+                jumped, jump_holder, jump_why = jumps(row, ahead, running, free_ram, free_commit)
+                if jumped:
+                    head, past, past_why, holder = True, [], "", None
+                elif jump_holder is not None:
+                    holder, past_why = jump_holder, jump_why
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             why = at_least(table, row, why)
             swapped = None
@@ -2072,7 +2129,11 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                     file=sys.stderr)
                 return name, "suite_remote"
             if ok:
-                _retried(os.remove, _path("queue", ticket))
+                if written:
+                    _retried(os.remove, _path("queue", ticket))
+                if jumped:
+                    log("jumped", tree, kind, "past %d queued (394 amended (48)); %s" % (place - 1,
+                        machine_note(free_ram, free_commit, running)))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
                 entry = {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
@@ -2100,6 +2161,11 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                 if waited >= POLL_SECONDS:
                     print("heavy_job: %s %s starts after waiting %.0f s%s" % (tree, kind, waited, lean), file=sys.stderr)
                 return name, estimate
+            if not written:
+                # It must wait (memory, a bench, a row ahead on memory): queued as any
+                # other from here, its place the one it asked for.
+                _write(_path("queue", ticket), ticket_entry)
+                written = True
         if probe_now:
             answered = saturn_answers()
             probed_at = time.time()
@@ -2806,7 +2872,7 @@ def status():
     for folder, entries in (("running", running), ("queued", queue)):
         for entry in entries:
             if older_code(entry):
-                print("on older gate code: %s %s (%s), pid %s, gate revision %s of main's %s, %s; rebase it" % (
+                print("on older gate code: %s %s (%s), pid %s, gate revision %s of main's %s, %s: it keeps its place; rebase before the next take" % (
                     entry["tree"], entry["kind"], folder, entry.get("waiter") if folder == "queued" else entry.get("pid"),
                     entry["gate"], main_revision(), _where(entry)))
     # 394 amended (38): no revision says nothing of the code's age, so a count, no names.
@@ -2853,10 +2919,14 @@ def measures(row):
 
 def summary(day):
     lines = []
+    jumped = {}
     try:
         with open(_path("heavy_jobs.log")) as handle:
             for line in handle:
                 parts = line.rstrip("\n").split("\t")
+                if len(parts) == 5 and parts[0].startswith(day) and parts[1] == "jumped":
+                    jumped[parts[3]] = jumped.get(parts[3], 0) + 1  # Started past the queue: no wait.
+                    continue
                 if len(parts) == 5 and parts[0].startswith(day) and (parts[1] in SUMMARY_EVENTS or "waited" in parts[4]):
                     if parts[1] == "old_gate" and "gate revision" not in parts[4]:
                         continue  # 37's own notes of an unrevised entry: its age unknown (394 amended (38)).
@@ -2865,6 +2935,9 @@ def summary(day):
         pass
     if not lines:
         print("%s: no heavy job waited or was stopped" % day)
+    if jumped:
+        print("%s: started past the queue (394 amended (48)): %s" % (day, ", ".join(
+            "%d %s" % (count, kind) for kind, count in sorted(jumped.items()))))
     for when, event, tree, kind, detail in lines:
         if event == "launch":
             detail = detail.split("; backtrace:")[0]  # The whole one stays in the log.

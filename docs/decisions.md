@@ -11008,6 +11008,38 @@ beside them and an import; an import beside them and a load_check; one load_chec
 beside a bench, nor a bench beside it; the margin (0.5 + 8 GB); beside a suite, a suite_remote and a soak. Tools and
 tests only; protocol unchanged; no class_name; no bullet.
 
+394 amended (48): a load_check starts past the queue (the coordinator's approval and conditions, 2026-11-13; label
+from tools/decision_number.sh). 46 made it uncounted so a check a tree runs before it queues would not wait behind the
+three jobs running; it still waited first-come behind the whole queue (perf's two on 11-13 sat 19th and 25th, over an
+hour each: the check before the queue cost a second trip through it), and a local suite waiter on gate code 37 to 41
+judging a queued load_check failed (KeyError in lean_row: an unknown kind is judged by the waiter's own row, and a
+suite's has a lean variant; ui-design's status from a v0.1.212 checkout showed it; simulated on each revision; scene,
+suite_remote, import, net and bench waiters and release and holds are unharmed, and nothing is written wrong: the
+waiter dies, its row is dropped, its script queues again at the back). PAST_QUEUE_KINDS (load_check alone): such a
+take is judged as the last row, and starts at once when its own decide() allows (room for its estimate plus Jeff's 8
+GB margin, RAM and commit, as every kind; no bench running; max_running 1; UNCOUNTED_MOST, 1 of each uncounted kind
+outside MAX_RUNNING's three) and jumps() finds no row ahead that keeps it: never past a row waiting on memory the
+queue will give back (that order is everyone's), nor past one that could start now but not with it beside (decide()
+again with its 0.5 GB reserved: the head's take never waits on memory a load check just took, and a bench ahead that
+could start is never held by one). Rows held by the count, by their own kind or by a running bench do not hold it;
+rows out of reach and passable benches are passed, as by everyone. Its queue row is written only when it must wait, so
+in the ordinary case no queue entry exists for an old waiter to meet; one that must wait is queued as before. Each
+start past the queue is a "jumped" line in the gate's log (past N queued, the machine's memory) and the daily summary
+counts them apart from the waits ("started past the queue: N load_check"). Its estimate is 0.5 GB (46; first real run
+0.9 GB, and it learns from its runs). Imports stay first-come (the coordinator's question): a godot_import is 1.41 GB
+(kinds.json), 24 s median and 60 s at most over 133 runs on 11-13, and 108 started that day after waiting a median 20
+minutes, 45 of them 30 minutes or more, 24 an hour or more, 58 hours in all; jumps() would take one as it takes a
+load_check (the same rule, one word in PAST_QUEUE_KINDS), but that is the coordinator's to rule, and until then a
+take's import that cannot wait goes to saturn through the coordinator. GATE_REVISION 43. status's older-code line now
+reads "...gate revision N of main's M, <checkout>: it keeps its place; rebase before the next take" (the coordinator's
+wording, 11-13). tests/heavy_job_test.py: jumps() past two exports held by the count (held before), held by a scene
+waiting on memory the queue gives back though it fits itself, held by a scene that fits now but not beside it, past
+both with room for both, held by a bench that could start, past one a running suite holds, an import never; through
+take(): with three running and two exports queued it starts at once, its row never written (an old waiter behind never
+meets it), the log's jumped line and the summary's count; short of memory itself it waits queued last, then starts
+past the two; behind a scene waiting on memory it waits, then goes past with room for both; a bench running, it waits,
+and starts when the bench ends. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
