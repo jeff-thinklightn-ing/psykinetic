@@ -53780,7 +53780,11 @@ default now; a test turns them off by the switch or each by hand.
   Main.remains_laid_in; a test level's in _plain_band_slain), and any knight Main._spawn makes
   there is laid from it: AstralKnight.remains_laid alone was a kept prop, and a level entity's
   props come from its spawn table at load (_level_spec_for), so a restart left the bier bare
-  (found by 747 amended (11)'s test on saturn, 11-13).
+  (found by 747 amended (11)'s test on saturn, 11-13). A re-lay (465, a new generation, laid again
+  at the first boot after it since 465 amended (4)) starts the level's regen state afresh, and with
+  it the bier: a new generation's knight has nothing laid. That is by design, not a loss: the
+  remains he thanked a player for are already charged into their amulet, and the new barrow's
+  knight is met anew. Each new laying lays his remains again.
 - A click or E on the bier (Main._altar_click) asks the server whenever the local player carries
   a holy knight's remains (World.RELIC in their pack), not only at the quest's ready step: a later
   run's own or a brother's (896 amended (1)) were laid by no click and refused by no word before
