@@ -52894,6 +52894,21 @@ has no hauler yet (economy's to found; package "the hauler": this row, maps' two
 his barks; on when the last of those lands): tools/look_day --haul-spots lays maps' spots in memory and
 makes one townsperson the hauler for the probe day only, in its scratch world. Server only, protocol
 unchanged, no new class_name.
+853, maps' side (people work, the switch: the coordinator's go after 853 amended (11)): Umbrage's work
+spots, laid through builder's runner (851), its refusals the check; wilds "spots" gains three, town
+"store", all stands. Rolf's vendor spot (203,196) behind his weapon stall's counter, facing it (203,197).
+The tanner's two by the hut H3's west wall, (208,199) facing (209,198) and (207,198) facing (208,198),
+for a tanner economy seats (Umbrage has none yet, so they stand empty; nothing is drawn there, bare
+ground, no prop). Each one's show (853 amended (11): "scrape", the vendor's "tend", silent by sound's 804
+amended (22)) plays at its spot. The hunter's two beside the cook shed's woodpile, (183,195) and (181,195),
+facing (182,194), are not laid here (the coordinator, 2026-11-14): his "dress" has no sound on main yet
+(sound's 804 amended (23), sfx.dress_cut), and his kneel is to be seen on a joined still first; they come
+as a take of their own when both are in. The hauler's two ends, (190,195) at the store's depot
+chest and (204,196) behind Rolf's stall, are not laid here: they are package "the hauler"'s, laid when
+npc's and economy's sides are in (the coordinator, 2026-11-12). No work spot in the Mughouse (the
+taverner's "tend" waits on animation's tend_bar). With these laid, package "people work" is on: the
+folk at their trades by day where they stood at a wall. Levels data only; protocol unchanged; no new
+class_name.
 
 853 amended (13) (maps' people-work day run on the Lenovo, C:/dev/review/maps_work_day2/, and the
 coordinator's ruling; the label from decision_number.sh). Rolf stood off his stall's only spot for a

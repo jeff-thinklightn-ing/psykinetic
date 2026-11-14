@@ -332,7 +332,8 @@
 			"facing": [
 				-1,
 				0
-			]
+			],
+			"code": "T3"
 		},
 		{
 			"slot": "building.turf_house",
@@ -3475,7 +3476,7 @@
 		"W": 4,
 		"H": 4,
 		"S": 9,
-		"T": 2,
+		"T": 3,
 		"M": 3,
 		"G": 1,
 		"C": 3,
@@ -3592,6 +3593,32 @@
 			"pose": "stand",
 			"town": "store",
 			"pair": "square_b"
+		},
+		{
+			"use": "work",
+			"cell": [203, 196],
+			"face": [203, 197],
+			"pose": "stand",
+			"town": "store",
+			"trade": "vendor"
+		},
+		{
+			"use": "work",
+			"cell": [208, 199],
+			"face": [209, 198],
+			"pose": "stand",
+			"town": "store",
+			"trade": "tanner"
+		},
+		{
+			"use": "work",
+			"cell": [207, 198],
+			"face": [208, 198],
+			"pose": "stand",
+			"town": "store",
+			"trade": "tanner"
+
+
 		}
 	]
 }

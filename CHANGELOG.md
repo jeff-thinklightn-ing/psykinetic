@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
 - Sacks of grain in the tavern's attic and the Forest's camps are whole, plain sacking tied at the neck (871 amended (2)).
 - Robbers fight as a band: one holds their lunge while a mate stands in the way, one your companion cuts turns to face her, and when two hang back, one soon presses in (898, 899, 806 amended (21)).

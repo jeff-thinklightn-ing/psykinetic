@@ -3,8 +3,9 @@ extends Node
 ## the wilds town as town_soak sets it up (its folk), a player in the square, run through the
 ## waking day (06:00 to 22:00), every resident body within sight of a player read each game minute.
 ## No awake body stands on one cell and facing longer than STAY_MINUTES with no clip but the stand,
-## and none stands idle facing shut ground longer than SHUT_MINUTES. A body at a task's work, in a
-## pose of a spot, asleep, sick, hiding, led or addressing a player is not standing idle.
+## and none stands idle facing shut ground longer than SHUT_MINUTES. A body at a task's work, or at its
+## work spot showing a trade the client draws, in a pose of a spot, asleep, sick, hiding, led or
+## addressing a player is not standing idle.
 
 const TOWN := "wilds/store"
 const HOUR := 2250
@@ -76,6 +77,12 @@ func _idle(body: Resident) -> bool:
 	if body.activity == "sleep" or not body.task.is_empty() or not body.addressing.is_empty():
 		return false
 	if body.doing in [Resident.Doing.BED, Resident.Doing.HIDE, Resident.Doing.ESCORT, Resident.Doing.STRAYED, Resident.Doing.VISIT]:
+		return false
+	# At its work spot (853 amended (8), maps' people work) showing a trade the client draws: the
+	# show in bouts, the rests between facing the same work (the hunter's at the woodpile). A trade
+	# with no word, or one the client doesn't draw, stands there idle as far as a player sees (npc).
+	if body.doing == Resident.Doing.WORK and str(body._spot.get("use", "")) == "work" and body.tile == body._spot.get("cell") \
+			and Client3D.ACTIVITIES.has(Resident.show_word(str(body._spot.get("trade", "")))):
 		return false
 	return not (body.activity in Resident.POSES and Client3D.ACTIVITIES.has(body.activity))
 
