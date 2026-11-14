@@ -7,25 +7,28 @@ notes (decision 324).
 
 ## Unreleased
 
-- In the crypt's First Hall, the fallen knight keeping his vigil gives off a faint pale light, enough to make out the bier and the sword on it (909).
 - Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
+- In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
+- Towns: a companion left in town who falls sick gets well again and goes back to work; before, she stayed off work for good (915).
+
+## v0.1.215
+
+- In the crypt's First Hall, the fallen knight keeping his vigil gives off a faint pale light, enough to make out the bier and the sword on it (909).
 - By day in the Forest, a bandits' camp has rough hide lean-tos on poles, open toward its fire, and a trader's camp a canvas awning raised on two poles over a bedroll (905).
 - Grass and flowers make way for anything dropped in them, so it shows plainly, and stand again once it's picked up (252 amended (1)).
 - The braziers at the town's watch posts are iron now, with a band round the rim and a bed of coals for the fire to burn in, standing square on their three legs (734 amended (11)).
 - In the crypt, if you're unhurt and rested when the draugr's spin throws you into a wall, it leaves you badly hurt rather than dead (603 amended (9)).
 - Towns: Umbrage's square fire burns in a ring of stones, its logs leant together over glowing embers (523 amended (2)).
-- At night a fire at a roadside rest or a bandits' camp burns with a flame and lights the ground round it, and whoever sits by it, you too, can be seen from the dark (523 amended (2)).
+- At night the fire at a traders' camp burns with a flame and lights the ground round it, and whoever is by it, you too, can be seen from the dark (523 amended (2)).
 - On the road past the farm, the field fences are split rails between hewn posts now, where before each length stood crooked between pointed posts of its own (827 amended (1)).
-- In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - When you're wet from the rain, you drip from the hem of your clothes (775 amended (1)).
-- Towns: the Ledger shows a build as planned until someone starts it, and a damaged building is scaffolded only once its repair is under way (566 amended (7)).
+- Towns: the Ledger lists a build as planned until work starts on it (566 amended (7)).
 - The water by Snagfin's shack is a proper pond, running east and south of it, the ground sloping gently down to it and a dirt dock from his door out into the water (559 amended (2)).
 - Every pond has a bare, muddy rim, reeds out into the shallows and a stone or two, its bank curving down into the water (559 amended (2)).
 - A townsperson's window opens at the foot of the screen, left of the pack, the same size every time, its name in view whatever they say, and your pack stays as you had it, opening beside the window when they have something to trade (802 amended (11), (12), (13)).
-- Towns: a companion left in town who falls sick gets well again and goes back to work; before, she stayed off work for good (915).
 - At the near camera, you and the foe you're fighting show through as an outline only when something stands between you and the camera, so at a forest's edge in the open you look like yourselves (623 amended (6)).
 - Towns: a field left unsown in spring is sown in summer, with a smaller crop the later it goes in (449 amended (1)).
-- Towns: Umbrage has a farmer, who walks in on their own, and the town lays out their field before any other build (613 amended (8)).
+- Towns: Umbrage takes on a farmer, who walks in on their own, and the town's Ledger shows their field planned and built before anything else (613 amended (8)).
 - In the crypt, the fallen knight's quest ends at the bier in the First Hall: lay his remains there, and his thanks charges your Encolpion Amulet for any holy knight's remains you bring, as Aldous tells you; once the draugr rests, sit on his throne to be taken back to the First Hall (896).
 - In the crypt, laying a knight's remains on the bier tells you whose they are, and the draugr's health bar leaves the screen once he rests (896 amended (4)).
 - Brought back after a fall with the low camera on, you are drawn where you wake from the first moment, not hidden until the camera gets there (912).
@@ -35,7 +38,6 @@ notes (decision 324).
 - Builder mode: in the spots ghost, a spot the proposal keeps now shows as a firm ring at about three-quarters the strength of a new one, where it was a faint tint easily taken for moss; a spot taken away shows its red cross at the same strength (859 amended (7)).
 - People, you among them, catch the light smoothly, sharp only at brims, belts, hems and boot soles, their heads sit in proportion on their shoulders, and a cape closes over the chest, with a hood worn with it dyed to match (419 amended (2)).
 - Towns: in Umbrage, the lanterns by the store and by Snagfin's shack door hang from iron hooks on wooden lamp posts (892).
-
 - A holy knight's remains, carried out of the crypt, are wrapped in plain linen tied with cord (714 amended (4)).
 - Small things on the ground, like a cut of meat, a fish, tusks or a key, are drawn big enough to spot at the nearest zoom (619 amended (3)).
 - In the chat box, the game's own words, like "You pick up 5 gold." or what you're told in the crypt, are plain dim lines, and a restart warning or an admin's word reads "Notice: ..." (427 amended (1)).
