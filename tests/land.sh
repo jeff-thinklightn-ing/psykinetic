@@ -207,6 +207,12 @@ if git diff --name-only origin/main...HEAD -- tools/remote_tests.sh tests/remote
 else
 	echo "remote_slot_test: not run (the take changes neither tools/remote_tests.sh nor its test)"
 fi
+# A pending freeze's own test (667 amended (4)), about 20 s: only when the take changes the lock or the test.
+if git diff --name-only origin/main...HEAD -- tools/land_lock.sh tools/bench_lock.sh tests/land_freeze_test.sh 2>/dev/null | grep -q .; then
+	tool_part land_freeze_test bash tests/land_freeze_test.sh
+else
+	echo "land_freeze_test: not run (the take changes none of tools/land_lock.sh, bench_lock.sh or its test)"
+fi
 # The retry's own test (278 amended (8)), about 15 s: only when the take changes land.sh, the retry or the test.
 if git diff --name-only origin/main...HEAD -- tests/land.sh tests/land_retry.sh tests/land_retry_test.sh 2>/dev/null | grep -q .; then
 	tool_part land_retry_test bash tests/land_retry_test.sh

@@ -70,9 +70,65 @@ turn_ok() {
 	python -B "$(dirname "$0")/heavy_job.py" lock_turn "$1" "$LOCK" --free
 }
 
+# 667 amended (4), the land lock's (PSYKINETIC_LOCK_FREEZE_MARK, a folder: owner, why, since,
+# beat): a pending freeze. Release writes it at once; from then a take whose what lacks
+# "main frozen" is refused as by a held freeze (exit PSYKINETIC_LOCK_FROZEN_EXIT), saying
+# "main frozen (pending)", while a landing already holding the lock goes on (its beat, push and
+# release never read the mark). Unbeaten for STALE_SECONDS, the mark is passed and logged.
+MARK="${PSYKINETIC_LOCK_FREEZE_MARK:-}"
+mark_age() {
+	beat=$(cat "$MARK/beat" 2>/dev/null)
+	[ -n "$beat" ] || beat=$(date +%s)
+	echo $(( $(date +%s) - beat ))
+}
+mark_who() {
+	echo "$(cat "$MARK/owner" 2>/dev/null) ($(cat "$MARK/why" 2>/dev/null)), $(( ($(date +%s) - $(cat "$MARK/since" 2>/dev/null || date +%s)) / 60 )) min, last beat $(mark_age) s ago"
+}
+beat_mark() {
+	[ -n "$MARK" ] && [ -d "$MARK" ] && [ "$(cat "$MARK/owner" 2>/dev/null)" = "$1" ] || return 0
+	date +%s >"$MARK/beat.tmp" 2>/dev/null && mv -f "$MARK/beat.tmp" "$MARK/beat" 2>/dev/null
+	return 0
+}
+
 case "${1:-status}" in
+	freeze)
+		tree="${2:?tree name}"; why="${3:?why}"
+		[ -n "$MARK" ] || { echo "$LABEL: no freeze mark here"; exit 2; }
+		if [ -d "$MARK" ] && [ "$(cat "$MARK/owner" 2>/dev/null)" != "$tree" ] && [ "$(mark_age)" -le "$STALE_SECONDS" ]; then
+			echo "$LABEL: a freeze is already pending by $(mark_who)"; exit 1
+		fi
+		rm -rf "$MARK"; mkdir "$MARK" || exit 1
+		now=$(date +%s)
+		echo "$tree" >"$MARK/owner"; echo "$why" >"$MARK/why"; echo "$now" >"$MARK/since"; echo "$now" >"$MARK/beat"
+		log "freeze pending by $tree ($why)"
+		echo "$LABEL: freeze pending by $tree ($why): no new take but its own; $(if held; then echo "held by $(who), which goes on"; else echo "free"; fi)"
+		;;
+	unfreeze)
+		tree="${2:?tree name}"
+		if [ -n "$MARK" ] && [ -d "$MARK" ]; then
+			if [ "$(cat "$MARK/owner" 2>/dev/null)" != "$tree" ] && [ "$(mark_age)" -le "$STALE_SECONDS" ]; then
+				echo "$LABEL: the freeze is pending by $(mark_who), not $tree; not removed"; exit 1
+			fi
+			rm -rf "$MARK"; log "freeze mark removed by $tree"
+		fi
+		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
+			rm -rf "$LOCK"; log "released by $tree"; echo "$LABEL: unfrozen and released by $tree"
+		else
+			echo "$LABEL: unfrozen by $tree"
+		fi
+		;;
 	take)
 		tree="${2:?tree name}"; what="${3:-bench}"
+		if [ -n "$MARK" ] && [ -d "$MARK" ] && ! printf '%s' "$what" | grep -qi "main frozen"; then
+			if [ "$(mark_age)" -gt "$STALE_SECONDS" ]; then
+				log "pending freeze stale, passed by $tree: $(mark_who)"
+			else
+				log "refused $tree ($what): main frozen (pending) by $(mark_who)"
+				echo "$LABEL: main frozen (pending) by $(mark_who): release your suite take and requeue"
+				exit "${PSYKINETIC_LOCK_FROZEN_EXIT:-3}"
+			fi
+		fi
+		beat_mark "$tree"  # The freeze's own tries keep its mark live while it waits.
 		if [ ! -d "$LOCK" ] && ! turn_ok "$tree" "$what"; then
 			exit 1
 		fi
@@ -133,10 +189,12 @@ case "${1:-status}" in
 		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
 			date +%s >"$LOCK/since.tmp" 2>/dev/null && mv -f "$LOCK/since.tmp" "$LOCK/since" 2>/dev/null
 		fi
+		beat_mark "$tree"  # The freeze holding the lock keeps its mark live (667 amended (4)).
 		exit 0
 		;;
 	status)
 		if held; then echo "$LABEL: held by $(who)"; else echo "$LABEL: free"; fi
+		if [ -n "$MARK" ] && [ -d "$MARK" ]; then echo "$LABEL: freeze pending by $(mark_who)"; fi
 		;;
-	*) echo "usage: $0 take <tree> \"<what>\" | release <tree> | beat <tree> | status"; exit 2 ;;
+	*) echo "usage: $0 take <tree> \"<what>\" | release <tree> | beat <tree> | freeze <tree> \"<why>\" | unfreeze <tree> | status"; exit 2 ;;
 esac

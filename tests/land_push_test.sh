@@ -132,6 +132,14 @@ take "freeze ok" "ok"
 push; check $(( $? == 3 ? 0 : 1 )) "frozen between tries: exit 3"
 [ "$(pushes)" = 1 ]; check $? "no second push"
 
+echo "== a pending freeze (667 amended (4)): the holder's push still lands =="
+take "ok"
+sh "$here/tools/land_lock.sh" freeze release "the cut" >/dev/null 2>&1
+[ -d "$PSYKINETIC_LAND_LOCK.freeze" ]; check $? "the freeze pending"
+push; check $? "pushed: exit 0, never 3"
+[ "$(remote)" = "$sha" ]; check $? "main is the tested sha"
+rm -rf "$PSYKINETIC_LAND_LOCK.freeze"
+
 echo "== the network down through every try =="
 take "net net net ok" "ok ok ok"
 push; check $(( $? == 1 ? 0 : 1 )) "exit 1"

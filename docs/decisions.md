@@ -32685,6 +32685,27 @@ retried; main moved during the wait, not pushed; a failed fetch; the lock taken 
 and between tries, exit 3; three network failures and no fourth; a short sha, no tree and a sha off origin/main, exit
 2. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+667 amended (4): a pending freeze (the coordinator's ask, release's wording, 2026-11-14; label from
+tools/decision_number.sh). At v0.1.215's freeze a queued landing took the land lock 6 s after the one before it
+released, 17 min after the freeze began; it failed, and the cut lost 11 min. tools/land_lock.sh freeze <tree> "<why>"
+writes C:/dev/land.lock.freeze (owner, why, since, beat) and returns at once. From then every land-lock take not by
+release with "main frozen" in its what exits 3, as a held freeze does, saying and logging "main frozen (pending)" (the
+coordinator's addition: a tree reading its own log knows a landing may still be finishing), so its waiter releases its
+gate take and requeues after the unfreeze. A landing already holding the lock is untouched: its beats, its push
+through land_push.sh and its release go on (none of them refuses on the mark), and the freeze takes the lock the moment
+it is free. The freeze beats the mark each minute it waits (each of its takes) and while it holds the lock (its beat);
+land_lock.sh unfreeze <tree> removes it with the lock's release. A mark unbeaten for 25 min is stale: a take passes it
+and logs "pending freeze stale, passed". Only release removes a live one. The bench lock never reads it. Every write,
+pass and removal is logged in C:/dev/land.lock.log. tests/land_freeze_test.sh (scratch lock and gate; land.sh runs it
+when a take changes land_lock.sh, bench_lock.sh or the test): a take during a pending freeze gets 3, "main frozen
+(pending)", logged; the holder's beat and release still land, the mark kept; release's frozen take gets the free lock
+and beats the mark, as its beat does; another tree's unfreeze is refused; release's unfreeze clears the mark and the
+lock; a stale mark is passed and logged; the bench lock ignores it; a tree whose wait loop (the gate's take, then the
+lock's tries with the take's holds check) is already running when the mark is written gets 3 on its next try, releases
+its gate take and stops, the holder still holding the lock (the coordinator's addition). tests/land_push_test.sh: the
+holder's push during a pending freeze lands, exit 0, never 3. Tools and tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
 
 Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every
