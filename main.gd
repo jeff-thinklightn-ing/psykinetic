@@ -20716,8 +20716,9 @@ func _speak_offer(speaker: GridEntity, key: String, name: String, player: Player
 
 
 ## [param body] says [param words] with no mind asked: the transcript (with
-## [param note]), the party log, those near, the speech bubble.
-func _say_plain(speaker: GridEntity, name: String, words: String, note := "") -> void:
+## [param note]), the party log, those near, the speech bubble; [param also]
+## more peers to give it to (548 amended (3): a draugr's Hall).
+func _say_plain(speaker: GridEntity, name: String, words: String, note := "", also: Array[int] = []) -> void:
 	if speaker is Resident and _resident_quiet(speaker):
 		_held_tongue("say")  # 675, npc's side.
 		return
@@ -20725,7 +20726,40 @@ func _say_plain(speaker: GridEntity, name: String, words: String, note := "") ->
 	party_log.add("%s said: \"%s\"" % [name, words])
 	if speaker is Resident:
 		_heard_near(speaker, name, words)
-	Net.broadcast_to(hearers(speaker.tile), "speech", {"entity": String(speaker.get_path()), "speaker": name, "text": words})
+	var peers := hearers(speaker.tile)
+	for peer in also:
+		if peer not in peers:
+			peers.append(peer)
+	Net.broadcast_to(peers, "speech", {"entity": String(speaker.get_path()), "speaker": name, "text": words})
+
+
+## A draugr's unasked line (548 amended (3); playtest's look_drhall_c: he asks
+## a player at his Hall's rim, 19 off, and HEARING_RANGE is 10): heard by
+## every player standing in his Hall (Draugr.in_hall) as well as by anyone in
+## ordinary earshot, the same "speech" message. Each companion standing in
+## his Hall or in earshot overhears it (Companion.overheard, unasked), so
+## she knows what her player was just asked.
+func _say_in_hall(monster: GridEntity, text: String) -> void:
+	var name := _speaker_name(monster)
+	_say_plain(monster, name, text, "", hall_peers(monster))
+	for entity in World.get_entities():
+		var pet := entity as Companion
+		if pet != null and pet.spawned and pet.zone == monster.zone 				and (World.distance(pet.tile, monster.tile) <= HEARING_RANGE or monster is Draugr and (monster as Draugr).in_hall(pet)):
+			pet.overheard(name, text, false)
+
+
+## The peers whose players stand in [param monster]'s Hall (548 amended (3)):
+## a draugr's (Draugr.in_hall); none for any other.
+func hall_peers(monster: GridEntity) -> Array[int]:
+	var peers: Array[int] = []
+	var draugr := monster as Draugr
+	if draugr == null:
+		return peers
+	for peer in World.peers_in(monster.zone):
+		var player: Player = _players.get(peer)
+		if is_instance_valid(player) and draugr.in_hall(player):
+			peers.append(peer)
+	return peers
 
 
 ## The offer standing for [param player_id] with [param worker_id], {} for
@@ -20922,10 +20956,11 @@ func _hook_talker(monster: GridEntity) -> void:
 		# The draugr's (666): whether any of his zone's dead stands, the hall sealed while one does.
 		monster.connect("ossuary_sealed", func(sealed: bool) -> void: _seal_hall(monster.zone, sealed))
 	if monster.has_signal("said"):
-		# His unasked lines (573 amended: why one entered, the win, his respect).
+		# His unasked lines (573 amended: why one entered, the win, his respect),
+		# heard the length of his Hall (548 amended (3)).
 		monster.connect("said", func(text: String) -> void:
 			if is_instance_valid(monster) and monster.spawned:
-				_say_plain(monster, _speaker_name(monster), text))
+				_say_in_hall(monster, text))
 
 
 func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary) -> void:

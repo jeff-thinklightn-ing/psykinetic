@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_console()
 	_test_speech_by_zone()
 	_test_overheard()
+	_test_hall_voice()
 	_test_stats_with_nobody_on()
 	_test_slow_tick_line()
 	_test_arrival_shelter()
@@ -567,6 +568,90 @@ func _test_arrival_shelter() -> void:
 		World.step()
 		_check(not pet.sheltered and not pet.protected, "hers cleared on the next tick (%s)" % act)
 		World.enter(was)
+
+
+## 548 amended (3) (playtest's look_drhall_c: the draugr asked a player at
+## his Hall's rim, 19 off, and nobody heard it, HEARING_RANGE being 10): his
+## unasked lines reach every player standing in his Hall, as well as anyone in
+## ordinary earshot; a player outside it and out of earshot hears nothing. A
+## companion in the Hall overhears it, so she knows what her player was asked.
+func _test_hall_voice() -> void:
+	print("
+== 548 amended (3): the draugr's lines carry the length of his Hall ==")
+	_main.travel(BO, "test_room")
+	var host := _player(Net.local_id)
+	var bo := _player(BO)
+	var host_pet: Companion = _main._companions.get(Net.player_id)
+	var bo_pet: Companion = _main._companions.get(BO_ID)
+	_check(host != null and bo != null and World.zone.name == "test_room", "(both players in the test room)")
+	if host == null or bo == null:
+		return
+	# His seat, a rim 15 or more off, his Hall the rect round both; outside it, a cell out of his earshot.
+	var floor: Array = _main._terrain["floor"]
+	var seat := Vector2i(-1, -1)
+	var rim := Vector2i(-1, -1)
+	for a: Vector2i in floor:
+		if not World.is_free(a):
+			continue
+		for b: Vector2i in floor:
+			if World.is_free(b) and a.y == b.y and b.x - a.x >= 15 and b.x - a.x <= 20:
+				seat = a
+				rim = b
+				break
+		if seat.x >= 0:
+			break
+	var hall := Rect2i(seat - Vector2i(0, 1), Vector2i(rim.x - seat.x + 1, 3))
+	var outside := Vector2i(-1, -1)
+	for c: Vector2i in floor:
+		if World.is_free(c) and not hall.has_point(c) and World.distance(c, seat) > _main.HEARING_RANGE + 2:
+			outside = c
+			break
+	_check(seat.x >= 0 and outside.x >= 0, "(a seat %s, a rim %s %d off, and a cell outside his Hall %s)" % [seat, rim, World.distance(seat, rim), outside])
+	if seat.x < 0 or outside.x < 0:
+		return
+	var spec := Level._spec_for("monster_draugr", Level.MONSTER_TYPES)
+	spec["name"] = "HallDraugr"
+	spec["tile"] = seat
+	var draugr := _main._spawn(spec) as Draugr
+	_check(draugr != null, "(a draugr seated at %s)" % [seat])
+	if draugr == null:
+		return
+	draugr.acts = false
+	draugr._room = hall
+	World._relocate(host, rim)
+	World._relocate(bo, outside)
+	if host_pet != null:
+		World._relocate(host_pet, _main._nearest_free(rim - Vector2i(1, 0)))
+	if bo_pet != null:
+		World._relocate(bo_pet, _main._nearest_free(outside))
+	var heard: Array[Dictionary] = []
+	var listen := func(kind: String, data: Dictionary) -> void: heard.append({"kind": kind, "data": data})
+	Net.message_received.connect(listen)
+	var asked := Draugr.ASKED % World.shown_name(host)
+	draugr.said.emit(asked)
+	var speech := _kinds(heard, "speech")
+	_check(World.distance(host.tile, seat) > _main.HEARING_RANGE and speech.size() == 1 and speech[0]["text"] == asked
+			and speech[0]["entity"] == String(draugr.get_path()),
+			"at his Hall's rim, %d off (earshot %d): she hears him ask (%s)" % [World.distance(host.tile, seat), _main.HEARING_RANGE, speech])
+	# Her plate's name, her label (548 amended (2)), never her node's "Player<n>".
+	_check(not host.label.is_empty() and host.label != String(host.name) and host.label in asked and not String(host.name) in asked,
+			"named as her plate shows (%s), not her node (%s): %s" % [host.label, host.name, asked])
+	var hall_peers: Array[int] = _main.hall_peers(draugr)
+	_check(Net.local_id in hall_peers and BO not in hall_peers and BO not in _main.hearers(seat),
+			"Bo, outside his Hall and %d off: not given it (%s)" % [World.distance(bo.tile, seat), hall_peers])
+	_check(host_pet == null or _heard(host_pet, asked), "her companion beside her in the Hall overhears it")
+	_check(bo_pet == null or not _heard(bo_pet, asked), "Bo's, outside it and out of earshot, does not")
+	heard.clear()
+	draugr.said.emit(Draugr.REFUSED)
+	speech = _kinds(heard, "speech")
+	_check(speech.size() == 1 and speech[0]["text"] == Draugr.REFUSED, "her refusal answered: \"%s\" reaches her at the rim (%s)" % [Draugr.REFUSED, speech])
+	heard.clear()
+	World._relocate(host, _main._nearest_free(outside))
+	draugr.said.emit(Draugr.RESPECT)
+	_check(_kinds(heard, "speech").is_empty() and Net.local_id not in _main.hall_peers(draugr),
+			"she steps out of his Hall, out of earshot: she hears nothing (%s)" % [_kinds(heard, "speech")])
+	Net.message_received.disconnect(listen)
+	World.despawn(draugr)
 
 
 func _kinds(heard: Array[Dictionary], kind: String) -> Array[Dictionary]:

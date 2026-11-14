@@ -1148,6 +1148,13 @@ func _in_lair(entity: GridEntity) -> bool:
 	return _in_lair_cell(entity.tile)
 
 
+## Whether [param entity] stands in his Hall (548 amended (3)): his lair, in
+## his zone. Main's "said" hook gives his unasked lines to every player and
+## companion standing in it, as well as those in ordinary earshot.
+func in_hall(entity: GridEntity) -> bool:
+	return is_instance_valid(entity) and entity.spawned and entity.zone == zone and _in_lair(entity)
+
+
 ## His lair: the room he keeps (his level's anchor round him); anywhere
 ## within his leash when his level gives none.
 func _in_lair_cell(cell: Vector2i) -> bool:

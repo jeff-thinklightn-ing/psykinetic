@@ -20983,6 +20983,35 @@ _test_draugr and _test_draugr_paid: the player's node "Player1" (or "Payer") and
 Tove; his question and the pact lines name Tove. Server only, protocol unchanged, no new
 class_name.
 
+548 amended (3) (the script's label; the coordinator's approval of enemy-ai's design (b), after playtest's
+look_drhall_c on 9d1fed17c): the draugr's unasked lines carry the length of his Hall. He asks ASKED on the
+tick the first player stands in his lair (his level's anchor rect; barrow_deep's rim, row 56, is 19 off his
+seat at (49,75)), and Main's "said" hook gave the line to _say_plain, heard within HEARING_RANGE 10: nobody
+at the rim heard it, nor REFUSED, said when she refuses in the deal window that opens there. (a), asking
+when she first comes within his hearing, was rejected: the offer is timed from the rim (ASK_DELAY_TICKS),
+so it would come before the question, and a player who stays at the rim would never be asked. Now every
+unasked line of his (ASKED, REFUSED, ANGER, WON, RESPECT) is heard by every player standing in his Hall as
+well as by anyone in ordinary earshot: Draugr.in_hall(entity) (his lair, in his zone, the body spawned) is
+public; Main._say_in_hall gives _say_plain the peers of the players in his Hall (Main.hall_peers) through
+a new optional parameter, so everyone else's speech is unchanged; the same "speech" message, the order
+unchanged (door line, question, the offer 3 s later). A companion standing in his Hall or in earshot
+overhears each line (Companion.overheard, unasked, as a resident's or a monster's words are not
+otherwise given her), so she knows what her player was just asked; the zone's party log had it already.
+Environment's speaker fade keys on this message, agreed word for word in both paragraphs: "The fade's
+speaker (623 amended (8)) starts on a 'speech' message whose entity, got by its node path, is a Monster
+for which Main.talks_peaceably() is true (the draugr at peace, or any monster that can offer). Main stamps
+that entity and the time, and holds it SPEAKER_HOLD (2 × Draugr.ASK_DELAY_TICKS, 6 s). The talk window
+that opens (the 'offers' message, the same entity) takes over, and the speaker stays while the window
+shows. Keyed on the entity, never the text. Main.say_to's lines and residents' speech never start it."
+His REFUSED, WON and RESPECT reach the Hall the same way, said while he is unpeaceable, and the fight's own
+cues carry those. zone_test _test_hall_voice (each check fails on main): a player at his Hall's rim, 15 or
+more off, hears ASKED named as her plate shows; a second player outside the Hall and out of earshot is not
+given it; her companion in the Hall overhears it, his outside does not; REFUSED reaches her at the rim; out
+of the Hall and earshot, she hears nothing. The joined look (playtest's look_drhall_c on the landed take,
+a second player outside the Hall) reads the chat line and whether his bubble shows from the rim; a bubble
+not seen 19 off behind his wall is environment's fade to solve (623 amended (8)). The held 548 amended (2)
+bullet ships with that look. Server only; protocol unchanged; no new class_name.
+
 546 amended (2) (release's label; npc asked, for 771 amended (5): the barrow post's night waves bring
 the dead "while the robbers aren't cleared or the alms fall short"; lore's crypt.dead_rise): the alms
 fall short when no gold has gone down to the town's barrow altar for return.alms_short_days (3) game
