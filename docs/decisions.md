@@ -11209,6 +11209,31 @@ has no flag reads none from a file row that has one, and its suite_remote never 
 flag holds whatever the file says; kinds.json is written with none. Each fails on e387750dc. Tools and tests only;
 protocol unchanged; no class_name; no bullet.
 
+394 amended (54): a saturn take still under its guard is read as waiting on the land lock, whatever its flag (the
+coordinator's ruling (b), 2026-11-14; release reads the diff; label from tools/decision_number.sh). A landing's take
+runs its own checkout's gate code, and the landing flow takes the gate before its final rebase, so after 53 landed
+every tree whose checkout predated it queued under gate 44/45 code, whose grants carry no mark: builder, voice and
+ui-design held the three places at 11:46 and were marked by hand, with art-kit, combat, pc-character-shell and
+dungeon-torch queued behind under old code. _entries now reads a running suite_remote entry that carries its guard
+(granted, its land.sh not yet adopting it) and is not watched as lock_wait: what 36's mark means, set at the grant and
+cleared by the adoption. Set in memory by every judge of this code, and written to the file by the take's own beat or
+an attach, each of which writes back the entry _entries read (release's reading of the diff; first written as "read
+so, not written", which was wrong): the same flag 53 sets at the grant; land.sh's adoption clears it with the guard.
+A take is beaten by its own tree's land_lock.sh tries, which run that checkout's gate code, so a take granted by older
+code is beaten by older code and keeps no mark in its file: older judges go on counting it until its tree rebases, and
+the write matters only for takes this code beats, which 53 already marks at the grant. The lock's holder before
+land.sh adopts its take reads as a waiter, as it did under 53 (the lock take's beat never cleared the mark; only the adoption does): from the take to land.sh's start,
+58 s at the median, 228 s at p99 and 417 s at most over 294 landings from 11-11 to 11-14. In that time it fills one of
+the three waiting places and owes nothing unless it is the oldest waiter, so a fourth take waits that much longer and
+nothing extra starts. A plain `heavy_job run` (watched) never has a guard, and no other kind is read so. GATE_REVISION
+47. tests/heavy_job_test.py: three guarded unmarked takes read as waiting, an adopted take not, a guarded scene not,
+the file unchanged by a read; an unmarked guarded take beaten, its file then carrying lock_wait, the adoption clearing
+it; a landing, a scene and those three: a second scene starts, a fourth take waits on 36's cap; the
+mixed state: an old judge reads them unmarked and its head scene waits on the count, a new judge's starts; a guarded
+suite, scene, net, bench, soak, import or load check never read so, nor a plain run; the lock take's beat leaves a 53
+mark, an unmarked holder reads the same, the adoption ends both. Tools and tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

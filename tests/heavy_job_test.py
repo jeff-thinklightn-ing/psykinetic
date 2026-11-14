@@ -2127,7 +2127,7 @@ check(gate.jumps(load48, [scene48], [], 40.0, 40.0)[0] and not gate.jumps(load48
     "never past one of its own kind: first come among them")
 check(not gate.jumps(dict(gate.KINDS["scene"], kind="scene"), [export48], busy48, 40.0, 40.0)[0],
     "a scene does not: first come, as before")
-check(gate.GATE_REVISION == 46, "gate revision 46")
+check(gate.GATE_REVISION == 47, "gate revision 47")
 
 mem48, total48, poll48 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS
 saved48 = gate._read(gate._path("kinds.json"))
@@ -2421,6 +2421,85 @@ check(gate.kinds()["suite_remote"].get("uncounted"), "the code's own flag holds 
 gate._write_kinds(gate._read(gate._path("kinds.json")))
 check(all("uncounted" not in row for row in gate._read(gate._path("kinds.json")).values()),
     "kinds.json is written with no row carrying a code-only flag")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
+
+print("== a take granted by older code read as waiting on the lock (394 amended (54)) ==")
+gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+def old_take54(tree, adopted=False, kind="suite_remote"):
+    """A take as a waiter of gate 44/45 left it: its guard, no lock_wait; or adopted by its land.sh."""
+    entry = {"tree": tree, "kind": kind, "pid": os.getpid(), "ram_gb": 1.6, "commit_gb": 1.6, "gpu": False,
+        "using_gb": 0.0, "using_commit_gb": 0.0, "watched": False, "started": time.time(), "queued": time.time(),
+        "estimate": kind, "gate": 45}
+    if adopted:
+        entry.update(adopted_by=os.getpid(), adopted_since=gate.started_at(os.getpid()))
+    else:
+        gate.guard(entry, os.getpid(), 1.0)
+    gate._write(gate._path("running", "%s-%s-1.json" % (tree, kind)), entry)
+for tree54 in ("builder", "voice", "ui-design"):
+    old_take54(tree54)
+old_take54("enemy-ai-temper", adopted=True)
+old_take54("pc-character", kind="scene")
+read54 = {each["tree"]: each for each in gate._entries("running")}
+check(all(read54[tree].get("lock_wait") for tree in ("builder", "voice", "ui-design")),
+    "three takes an older waiter granted (guard, no mark) are read as waiting on the land lock")
+check(not read54["enemy-ai-temper"].get("lock_wait"), "a take its land.sh adopted is not: its landing runs")
+check(not read54["pc-character"].get("lock_wait"), "nor a scene with a guard")
+check(not gate._read(gate._path("running", "builder-suite_remote-1.json")).get("lock_wait"), "a read alone leaves the file as its waiter left it")
+going54 = list(read54.values())
+ok54, why54 = gate.decide(dict(gate.KINDS["scene"], kind="scene", ram_gb=1.2, commit_gb=1.2), going54, True, 30.0, None, 40.0)
+check(ok54, "a landing, a scene and three such takes: a second scene starts (%s)" % why54)
+ok54, why54 = gate.decide(dict(gate.KINDS["suite_remote"], kind="suite_remote", ram_gb=1.6, commit_gb=1.6), going54, True, 30.0, None, 40.0)
+check(not ok54 and "wait on the land lock" in why54, "and a fourth take waits on 36's cap (%s)" % why54)
+# The mixed state (11-14 after 53): an old judge reads the file as written, the three takes counted.
+raw54 = [dict(gate._read(gate._path("running", each["file"])), file=each["file"]) for each in going54]
+check(sum(1 for each in raw54 if each.get("lock_wait")) == 0, "an old judge reads them unmarked, as the file has them")
+ok54, why54 = gate.decide(dict(gate.KINDS["scene"], kind="scene", ram_gb=1.2, commit_gb=1.2), raw54, True, 30.0, None, 40.0)
+check(not ok54 and "heavy jobs running" in why54, "so an old judge's head scene waits on the count (%s), a new judge's starts" % why54)
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+# Every other kind read exactly as before, guard or none; a plain run (watched, never guarded) never a waiter.
+for kind54 in ("suite", "scene", "net", "bench", "soak", "godot_import", "load_check"):
+    old_take54("t-" + kind54, kind=kind54)
+plain54 = {"tree": "plain", "kind": "suite_remote", "pid": os.getpid(), "pid_since": gate.started_at(os.getpid()),
+    "ram_gb": 1.6, "commit_gb": 1.6, "gpu": False, "using_gb": 0.0, "using_commit_gb": 0.0, "watched": True,
+    "started": time.time(), "queued": time.time(), "estimate": "suite_remote", "gate": 46}
+gate._write(gate._path("running", "plain-suite_remote-1.json"), plain54)
+read54 = {each["tree"]: each for each in gate._entries("running")}
+check(not any(read54["t-" + kind].get("lock_wait") for kind in ("suite", "scene", "net", "bench", "soak", "godot_import", "load_check")),
+    "a guarded suite, scene, net, bench, soak, import or load check is never read as waiting on the lock")
+check("plain" in read54 and not read54["plain"].get("lock_wait"), "a plain heavy_job run of suite_remote (watched, no guard) never is")
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+# The lock's holder before land.sh adopts its take: the lock take's own beat leaves 53's mark, so 53 and
+# this read agree (a waiter until the adoption, 58 s at the median on 11-11 to 11-14, 417 s at most).
+old_take54("holder")
+marked54 = gate._read(gate._path("running", "holder-suite_remote-1.json"))
+gate._write(gate._path("running", "holder-suite_remote-1.json"), dict(marked54, lock_wait=True))
+with contextlib.redirect_stdout(io.StringIO()):
+    gate.beat("holder", "suite_remote")
+check(gate._read(gate._path("running", "holder-suite_remote-1.json")).get("lock_wait"), "the lock take's beat leaves a 53 mark")
+gate._write(gate._path("running", "holder-suite_remote-1.json"), marked54)
+with contextlib.redirect_stdout(io.StringIO()):
+    gate.beat("holder", "suite_remote")
+check([each.get("lock_wait") for each in gate._entries("running")] == [True], "and an unmarked holder reads the same")
+gate._adopt_take("holder", "suite_remote")
+check([each.get("lock_wait") for each in gate._entries("running")] == [None], "land.sh's adoption ends it for both")
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
+# A take's own beat writes back the entry as read (release's reading of the diff): the file then carries 53's mark.
+old_take54("beaten")
+check(not gate._read(gate._path("running", "beaten-suite_remote-1.json")).get("lock_wait"), "an older waiter's grant: no mark in its file")
+with contextlib.redirect_stdout(io.StringIO()):
+    gate.beat("beaten", "suite_remote")
+check(gate._read(gate._path("running", "beaten-suite_remote-1.json")).get("lock_wait") is True,
+    "beaten under this code: its file now carries lock_wait, as 53's grant writes it")
+gate._adopt_take("beaten", "suite_remote")
+adopted54 = gate._read(gate._path("running", "beaten-suite_remote-1.json"))
+check(not adopted54.get("lock_wait") and not adopted54.get("guard"), "and land.sh's adoption clears it with the guard")
+for each in gate._entries("running"):
+    os.remove(gate._path("running", each["file"]))
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = real_margins
 
 print("== the sleepers ==")

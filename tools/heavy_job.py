@@ -226,7 +226,7 @@ TAKE_STALE_SECONDS = 30 * 60
 ## any change to how a waiter judges itself or the rows ahead of it (394
 ## amended (41): 36 changed that without raising it, and its waiters and older
 ## ones judged each other wrong).
-GATE_REVISION = 46  # 53: takes waiting on the lock marked again; flags never from kinds.json.
+GATE_REVISION = 47  # 54: a guarded saturn take read as waiting on the lock.
 ## This checkout, written into every entry (which folder to rebase).
 CHECKOUT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ## A landing's take this old with no beat and no run adopting it: its land
@@ -1820,6 +1820,16 @@ def _entries(folder):
             continue
         if folder == "running" and not entry.get("watched") and measure_attached(entry):
             _write(_path(folder, name), entry)
+        # 394 amended (54): a saturn take still under its guard (granted, its land.sh not yet
+        # adopting it) is read as waiting on the land lock, whatever its flag: that is what 36's
+        # mark means, set at the grant and cleared by the adoption. A take granted by a waiter of
+        # older code (before 53, no mark) so stops holding a place for every judge of this code.
+        # Set in memory by every judge of this code, and written to the file by the take's own
+        # beat or an attach (each writes back the entry read here; release's reading): the same
+        # flag 53 sets at the grant. The adoption clears it. (A take is beaten by its own tree's
+        # checkout's code, so one granted by older code keeps no mark in its file.)
+        if folder == "running" and entry.get("kind") in LOCK_WAIT_KINDS and entry.get("guard") and not entry.get("watched"):
+            entry["lock_wait"] = True
         entry["file"] = name
         out.append(entry)
     _note_odd(folder, out)
