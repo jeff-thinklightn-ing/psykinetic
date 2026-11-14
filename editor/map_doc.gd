@@ -43,6 +43,10 @@ var relief_dirty := false
 ## traced again from it only then. relief_dirty is also set on a level read with no overlay yet, whose
 ## relief.png is written as it was read: tracing its ledges again was a parse for nothing.
 var relief_changed := false
+## The images a level not yet in the overlay was read from (867 amended (5)): {layout, height, relief},
+## from_level's. A first save on the caller's word that nothing but level.json changed (save_config)
+## encodes these as they were read, not LevelMap.to_image's (about 400 ms on the wilds) of the same cells.
+var _read_images := {}
 ## What the last load, save or resize said.
 var report := ""
 var undo_steps: Array[Dictionary] = []
@@ -104,6 +108,7 @@ static func from_level(level_name: String) -> MapDoc:
 		doc.config_dirty = true
 		doc.heights_dirty = doc.had_heights
 		doc.relief_dirty = doc.map.has_relief()
+		doc._read_images = {"layout": made["layout"], "height": made["height"], "relief": made.get("relief")}
 	doc.report = "loaded %s: %d x %d cells" % [level_name, doc.map.size.x, doc.map.size.y]
 	return doc
 
@@ -117,8 +122,9 @@ static func from_level(level_name: String) -> MapDoc:
 func save_config() -> bool:
 	if heights_dirty or relief_dirty or not FileAccess.file_exists(ProjectSettings.globalize_path(folder + "layout.png")):
 		# The level's first save (the box's levels have no overlay until a builder's accept): every file,
-		# the images as they were read (an exported game holds them imported, no file to copy).
-		return save(false)
+		# the images as they were read (an exported game holds them imported, no file to copy), encoded
+		# from the images themselves, the cells being unchanged on the caller's word (867 amended (5)).
+		return save(false, _read_images)
 	if Level.fill_codes(config):
 		config_dirty = true
 	if config_dirty:
@@ -143,12 +149,14 @@ func save_config() -> bool:
 ## first save to the overlay; on the box those two parses, the trace and the
 ## report's, were most of an accept's 744 ms save). [param with_report] false
 ## (builder mode, which shows a report only when a save fails, before it
-## would parse): the report without the level's parse.
-func save(with_report := true) -> bool:
+## would parse): the report without the level's parse. [param as_read] (save_config's first save, 867
+## amended (5)): the images the level was read from, written in place of the map's own, which hold the
+## same cells; empty, the map's.
+func save(with_report := true, as_read := {}) -> bool:
 	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(folder)):
 		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))
 	var png := folder + "layout.png"
-	var image := map.to_image()
+	var image: Image = as_read["layout"] if as_read.get("layout") is Image else map.to_image()
 	var error := image.save_png(ProjectSettings.globalize_path(png))
 	if error != OK:
 		report = "could not save %s (%s)" % [png, error_string(error)]
@@ -196,6 +204,9 @@ func save(with_report := true) -> bool:
 		relief_dirty = false
 	relief_changed = false
 	dirty = false
+	# The overlay holds the level now: what it was read from is no save's any more (a later first-save
+	# fallback must never write the pack's layout over a builder's cells).
+	_read_images = {}
 	if not with_report:
 		report = "saved %s (%d x %d cells)" % [png, map.size.x, map.size.y]
 		return true

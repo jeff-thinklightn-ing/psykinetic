@@ -53613,6 +53613,27 @@ spots alone, its request out ten frames, one parse and five floods. Left for lev
 0's parse of the level, accept's save_config, and a cell change's parse. Server only, protocol
 unchanged, no new class_name, no bullet.
 
+867 amended (5) (the decision-number script's label; the coordinator's ruling on builder's lever 4 page,
+C:/dev/review/builder/lever4_page.md, 2026-11-14): a level's first spots-only save writes the images it
+was read from, not LevelMap.to_image's. The page's plan was to copy the pack's PNG bytes, but an exported
+server holds a level's PNGs only as imported Image resources (export_presets.cfg carries levels/*.json,
+not *.png), so there is no file to copy. The split of that save, timed on this PC first (the wilds, five
+runs each, medians; C:/dev/review/builder/time_first_save.gd): LevelMap.to_image 404 to 435 ms, the
+layout's PNG encode 6.2 to 6.6, the image as read encoded 6.0 to 6.8, to_relief_image 3.4 to 4.0, the
+relief's encode 6.3 to 6.4. So the encode is not the cost: rebuilding the picture from the map's cells is.
+MapDoc.from_level keeps the images of a level not yet in the overlay (_read_images), and save_config's
+first-save fallback, taken only on the caller's word that nothing but level.json changed (builder mode's
+spots-only accept), passes them to save(), which encodes them in place of the map's own: the layout as
+read, about 6 ms here against about 420. Any save clears them, so a later fallback can never write the
+pack's layout over a builder's cells. A save after a cell change encodes the map's image as before. On
+the box the first-save frame was 379 ms (save_config 341); it is not re-timed there. builder_zone_test
+_test_first_spots_save: the layout written equals the source image pixel for pixel (it differed in its
+corner and fill pixels before) and reads in the game as the source's; a first save after a changed cell
+encodes the map's image, the cell changed in it, and a config-only save after it writes level.json alone.
+The same timing found that Level.parse of the wilds is about 74 ms here, so builder mode's parse of a
+working copy (MapDoc.parsed: to_image, then Level.parse) is about 85 per cent to_image: on the page as
+a lever of its own, not taken here. Server only, protocol unchanged, no new class_name, no bullet.
+
 ## 858. Umbrage at night: the ground lit once, a less blue night, a fill on bodies (lands off)
 
 Package "Umbrage at night" (the coordinator, 2026-11-10, under Jeff's "Umbrage first"; environment leads). Pieces: (a) this, environment's night light; (b) buildings' lamp numbers (the door lanterns, the store's and chapel's, the temple's candles of 734 amended (7)); (c) the window rule after 22:00 (566 with npc's sleep; playtest's count of lit windows on a lived-in town first). (a) lands switched off: `Client3D.NIGHT_LOOK_2 := false` keeps every number as it was. Environment alone flips it, in its own commit, on buildings' ping that (b) is on main, in the same landing take or the same cut, release told. A darker night without stronger lamps would make the town darker still, so never one without the other in a released build.

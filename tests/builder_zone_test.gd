@@ -149,9 +149,9 @@ func _test_first_spots_save() -> void:
 	var after := Level.source("test_room")
 	_check(Level.overlaid("test_room") and _main._builder.docs["test_room"].report.begins_with("saved") and not "floor" in _main._builder.docs["test_room"].report,
 		"accepted: the overlay is written whole, saved without a parse (%s)" % _main._builder.docs["test_room"].report)
-	# The images as the level reads them: MapDoc writes the layout through LevelMap.to_image (RGBA8, its own
-	# corner and fill pixels, as every accept has), the source is the repo's PNG (RGB8), so the bytes differ
-	# where nothing reads them; what each cell, edge, height and relief value reads as is what must agree.
+	# The images as the level reads them. Since 867 amended (5) a spots-only first save writes the layout
+	# the level was read from (not LevelMap.to_image's, RGBA8 with its own corner and fill pixels), so its
+	# pixels equal the source's; what each cell, edge, height and relief value reads as must agree too.
 	var read := func(made: Dictionary) -> LevelMap:
 		var map := LevelMap.from_image(made["layout"], made["config"])
 		if made.get("height") != null:
@@ -169,8 +169,10 @@ func _test_first_spots_save() -> void:
 		for x in mini(a.get_width(), b.get_width()):
 			if a.get_pixel(x, y) != b.get_pixel(x, y):
 				differ += 1
-	print("    layout pixels: source format %d, saved format %d, %d pixels differ as RGBA (corners and fills)" % [
+	print("    layout pixels: source format %d, saved format %d, %d pixels differ as RGBA" % [
 		(before["layout"] as Image).get_format(), (after["layout"] as Image).get_format(), differ])
+	_check(differ == 0 and a.get_size() == b.get_size(),
+		"867 amended (5): the layout written is the image the level was read from, pixel for pixel (no LevelMap.to_image; %d differ)" % differ)
 	# What the game reads (Level.parse on both pictures, as decision 147's round trip in editor_test does):
 	# the cells, the edges as walls, doors and open, the things, starts and links. The LevelMap difference
 	# is printed for information: to_image keeps no edge on the outer east and south border, which Level.parse
@@ -220,6 +222,23 @@ func _test_first_spots_save() -> void:
 		and (Level.source("test_room")["config"].get("spots", []) as Array).size() == 2,
 		"a second spots accept writes level.json alone, both spots in it (%s)" % _main._builder.docs["test_room"].report)
 	_main._builder.test_turns = []
+	# 867 amended (5)'s other branch: a first save with a cell changed encodes the map's own image.
+	BuilderHost.remove_overlay("test_room")
+	var doc := MapDoc.from_level("test_room")
+	var cell := Vector2i(6, 6)
+	var was_cell := doc.map.cell(cell)
+	doc.apply_changes({"cells": {cell: "dirt" if was_cell != "dirt" else "grass"}})
+	_check(doc.save(false), "a first save with a changed cell (%s)" % doc.report)
+	var saved := Image.load_from_file(ProjectSettings.globalize_path(OVERLAY + "test_room/layout.png"))
+	var from_map := doc.map.to_image()
+	saved.convert(Image.FORMAT_RGBA8)
+	from_map.convert(Image.FORMAT_RGBA8)
+	_check(saved.get_data() == from_map.get_data() and LevelMap.from_image(saved, doc.config).cell(cell) != was_cell,
+		"a changed cell: the layout encoded from the map as before, the cell changed in it")
+	doc.apply_changes({"config": {"spots": []}})
+	_check(doc.save_config() and doc.report.ends_with("level.json"),
+		"after it, a config-only save writes level.json alone, never the images it was read from (%s)" % doc.report)
+	BuilderHost.remove_overlay("test_room")
 
 
 func _test_terrain_message() -> void:
