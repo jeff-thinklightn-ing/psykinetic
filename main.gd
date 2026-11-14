@@ -17056,8 +17056,14 @@ static func talk_cell(entity: GridEntity) -> Vector2i:
 
 
 ## The gone draugr whose remains lie at [param cell] (573 amended (4)), for
-## a click or E there; null if none.
+## a click or E there; null if none, or if the cell is his throne while it
+## is the way home (896's switch-on): laid to rest on his seat (the
+## console's, or beaten there), his remains lie on the throne's cell, and a
+## click or E there sits (_throne_click), never his rest words (playtest's
+## look_circle2: every click on the throne talked to him, none sat).
 func remains_at(cell: Vector2i) -> GridEntity:
+	if throne_home and not throne_at(map_name, cell).is_empty():
+		return null
 	for entity in World.entities():
 		if entity is Draugr and entity.spawned and (entity as Draugr).gone and (entity as Draugr).pile_at == cell:
 			return entity

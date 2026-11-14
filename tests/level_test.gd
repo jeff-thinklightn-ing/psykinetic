@@ -6770,6 +6770,13 @@ func _test_throne_home() -> void:
 	_check(refused.begins_with("unknown command") and rested == "rest draugr: barrow_deep's draugr laid to rest" and draugr.resting()
 		and again == "rest draugr: the draugr in barrow_deep already rests",
 		"the test-only console lays him to rest, once; without --test-hp it is unknown, as on the box (%s / %s / %s)" % [refused, rested, again])
+	# Laid to rest on his seat, his remains lie on the throne: a click or E
+	# there is the throne's, not his rest words (playtest's look_circle2).
+	_main.throne_home = false
+	var pile_talks: bool = _main.remains_at(draugr.pile_at) == draugr
+	_main.throne_home = true
+	_check(draugr.pile_at == throne and pile_talks and _main.remains_at(throne) == null,
+		"his remains on the throne's cell: with the throne off a click there talks to him; on, it is the throne's (%s)" % [draugr.pile_at])
 	_put(player, throne)
 	for i in roundi(_main.THRONE_SIT_S * World.TICK_RATE) + 3:
 		World.step()

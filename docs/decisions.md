@@ -53786,6 +53786,11 @@ default now; a test turns them off by the switch or each by hand.
   run's own or a brother's (896 amended (1)) were laid by no click and refused by no word before
   (playtest's look_circle on 31e35af1b). The server lays them or the knight says why not
   (Main._lay_again). His row stays the quest's: off the quest, the bier is the way.
+- His throne under his remains (Main.remains_at): laid to rest on his seat (the console's "rest
+  draugr", or beaten there), his remains lie on the throne's cell, and a click or E there talked
+  to him ("He rests. Come back in ...") before the throne's click was asked, so nobody could sit
+  (playtest's look_circle2 on aea809552). On a throne's cell while throne_home is on, remains_at
+  is null and the click or E is the throne's.
 - The cell to lay from (Main.altar_beside, the coordinator's word): never a cell another body
   holds, the knight's among them; the one held cell it names is the caller's own, held by a
   player. Before, any cell named as the caller's counted as free, so a player put on his cell (a
