@@ -14198,10 +14198,11 @@ func _offer_done(player: Player, body: Resident, worker_id: String, result: Dict
 			_say_to(player, body, COUNTER_FIRST)
 		else:
 			World.try_buy(player, counter, int(result["buy"]))  # Answered by traded.
-	elif not str(result.get("line", "")).is_empty():
-		party_log.add(str(result["line"]))
+	else:
+		if not str(result.get("line", "")).is_empty():
+			party_log.add(str(result["line"]))
 		if not str(result.get("say", "")).is_empty():
-			_say_to(player, body, str(result["say"]))
+			_say_to(player, body, str(result["say"]))  # A say with no line (914 amended (1)): to them alone.
 	_send_offers(body, player.player_id, player.owner_peer)
 
 

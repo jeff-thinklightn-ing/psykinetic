@@ -86,6 +86,11 @@ const READ := "read"
 const BUY := "buy"
 ## A task taken past the per-player cap (914): the resident's words to that player.
 const ENOUGH_TAKEN := "You've enough on your hands already. See one through first."
+## A debt or a build given toward with an empty purse (914 amended (1)): said to that player
+## alone, nothing in the party log (the coordinator: nobody else is told a player is broke).
+const NO_GOLD := "You've no gold on you. Another time."
+## The same, with gold in the purse but the debt or the fund met before the yes (914 amended (1)).
+const PAID_ALREADY := "That's paid already."
 ## A visitor's body (711, npc's side): "visitor:" + their Towns.visitors id;
 ## no worker, no card. A pedlar's things are WARES, sold by WARES.
 const VISITOR := "visitor:"
@@ -212,6 +217,13 @@ static func _call(given: Dictionary, key: String, args: Array = []) -> Variant:
 	if callable is Callable and callable.is_valid():
 		return callable.callv(args)
 	return null
+
+
+## A debt or a build's yes that paid nothing (914 amended (1)): NO_GOLD with an empty
+## purse (or no purse to read), else PAID_ALREADY (the debt or fund met meanwhile).
+static func _nothing_paid(player_id: String, given: Dictionary) -> String:
+	var purse: Variant = _call(given, "gold_of", [player_id])
+	return PAID_ALREADY if (purse is int or purse is float) and int(purse) > 0 else NO_GOLD
 
 
 # --- The offers -------------------------------------------------------------------------
@@ -1030,6 +1042,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		if str(each.get("id", "")) == offer_id and not bool(each.get("open", false)):
 			offer = each
 	if offer.is_empty():
+		var key := offer_id.get_slice(SEP, 2)  # worker|kind|key (_offer).
+		if key == "loan" or key.begins_with("give:"):
+			out["say"] = PAID_ALREADY  # The row's debt or fund was met before this yes (914 amended (1)).
 		return out
 	var who := production.worker(worker_id)
 	var name := str(who.get("name", worker_id))
@@ -1096,6 +1111,8 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				_regard(production, worker_id, player_id, delta, "cleared their debt to the town" if cleared else "paid %d gold of their debt" % paid)
 				out["line"] = "%s gives %d gold toward %s's debt." % [player_name, paid, name]
 				out["ok"] = true
+			else:
+				out["say"] = _nothing_paid(player_id, given)
 		GIVE:
 			# Gold toward the next build (decision 499, npc's side): economy takes what it still wants and the player has.
 			var town := str(who.get("town", ""))
@@ -1108,6 +1125,8 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 				_notice(player_id, town, "gave:" + str(offer["what"].get("kind", "")), "You gave %d gold toward %s." % [given_gold, kind], "", 1, given)
 				out["line"] = "%s gives %d gold toward %s." % [player_name, given_gold, kind]
 				out["ok"] = true
+			else:
+				out["say"] = _nothing_paid(player_id, given)
 		CARE:
 			# The retainer paid ahead (584 amended, npc's side): economy takes it into his purse, or says why not.
 			var took: Variant = _call(given, "retain", [player_id, worker_id, "gold"])

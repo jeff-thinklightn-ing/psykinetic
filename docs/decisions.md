@@ -55428,3 +55428,16 @@ downed's own to 4243 alone; COUNTER_FIRST, the cap's and the altar's words to 42
 task's line said to nobody; the store window's buy at a shop chest in reach never says COUNTER_FIRST. offers_test: the
 cap's "say", and an altar emptied meanwhile refused with its "say" and no gold given. Server only; the protocol
 unchanged (the messages are the "party" and "speech" kinds clients already read); no new class_name.
+
+914 amended (1), lend and give with no gold (the decision-number script's label; the coordinator's approval,
+2026-11-14, with the party-log line taken out). A yes to "Help with a debt" (LEND) or "Give toward ..." (GIVE) that
+paid nothing did nothing at all: no line, no words, the window sent again; a player with an empty purse heard silence.
+Offers.accept now answers it in a "say" alone, with no "line", so nothing goes to the party log and no server line
+names him (the coordinator: nobody else needs telling that a player is broke): Offers.NO_GOLD, "You've no gold on
+you. Another time.", when his purse is empty or can't be read (Offers._nothing_paid); Offers.PAID_ALREADY, "That's
+paid already.", when he has gold but the debt or the fund was met before his yes, whether economy took nothing or the
+row was already gone (an id whose key, the third slice of worker|kind|key, is "loan" or "give:..."). A sum over his
+purse keeps amount_refusal's "You have but N gold.". Main._offer_done says a result's "say" to that player alone
+whether or not it has a "line" (only a "line" goes to the party log). offers_test: a debt and a gift with an empty
+purse (NO_GOLD, no line, nothing paid), and a gift after the fund was met (PAID_ALREADY, no gold taken). No bullet:
+a refusal heard only when broke. Server only; protocol unchanged; no new class_name.

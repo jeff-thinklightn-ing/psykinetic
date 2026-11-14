@@ -243,6 +243,12 @@ func _test_plea() -> void:
 	var lent := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 5, _ctx)
 	_check(lent["ok"] and lent["line"] == "Jeff gives 5 gold toward Mara's debt." and is_equal_approx(float(_work.worker("o-mara")["loan"]), 9.0),
 		"lending pays the loan down through economy: %s, loan now %s" % [lent, _work.worker("o-mara")["loan"]])
+	_ctx["gold_of"] = func(_player_id: String) -> int: return 0
+	mine = _offers()
+	var broke := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(not bool(broke["ok"]) and str(broke["line"]).is_empty() and str(broke.get("say", "")) == Offers.NO_GOLD and is_equal_approx(float(_work.worker("o-mara")["loan"]), 9.0),
+		"a yes to the debt with an empty purse: nothing paid, nothing for the party log, Mara's words to the player alone (914 amended (1)): %s" % [broke])
+	_ctx.erase("gold_of")
 	_lend = false
 	_setup([["o-mara", "Mara", "smith"], ["o-bram", "Bram", "hauler"]])
 	_work.set_loan("o-mara", 14.0, false)
@@ -761,6 +767,16 @@ func _test_give() -> void:
 	_wanted = {"kind": "inn", "gold": 7}
 	mine = _offers("o-ald").filter(func(o: Dictionary) -> bool: return o["kind"] == Offers.GIVE)
 	_check(mine.size() == 1 and mine[0]["title"] == "Give toward the inn" and mine[0]["cost"] == 7, "within the step: one line at what is wanted")
+	_purse = 0
+	var counted := _given.size()
+	var broke := Offers.accept("o-ald", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(not bool(broke["ok"]) and str(broke["line"]).is_empty() and str(broke.get("say", "")) == Offers.NO_GOLD and int(_wanted["gold"]) == 7,
+		"a yes with an empty purse: nothing given, nothing for the party log, Alder's words to the player alone (914 amended (1)): %s" % [broke])
+	_purse = 60
+	_wanted = {"kind": "inn", "gold": 0}  # Paid up by another before this yes.
+	var late := Offers.accept("o-ald", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
+	_check(not bool(late["ok"]) and str(late["line"]).is_empty() and str(late.get("say", "")) == Offers.PAID_ALREADY and _purse == 60 and _given.size() <= counted + 1,
+		"a yes after the fund was met: no gold taken, and the words say it's paid (914 amended (1)): %s" % [late])
 	Offers.ctx = _ctx
 
 
