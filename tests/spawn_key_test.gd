@@ -321,8 +321,8 @@ func _knight_words(knights: Array) -> String:
 
 ## Jeff's two knights (747 amended (11), 11-13: "2 copies of sir
 ## athelstan"): the fallen knight is placed only by his marker, one per
-## level. One whose marker has not moved comes back as himself, his remains
-## still laid; one whose marker moved past the reach is dropped, at load,
+## level. One whose marker has not moved comes back as himself, on his
+## slot; one whose marker moved past the reach is dropped, at load,
 ## through a second restart, at a record's recall and through a re-lay of
 ## the level, never spawned as saved beside his marker's new one.
 func _test_a_moved_knight() -> void:
@@ -336,16 +336,14 @@ func _test_a_moved_knight() -> void:
 	_main._start_level(false)  # Fresh: no save of it yet.
 	var knights := _knights()
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_WAS, "a fresh level: its one knight on his marker (%s)" % _knight_words(knights))
-	if knights.size() == 1:
-		(knights[0] as AstralKnight).lay_remains()
 	var was_name: String = knights[0].name if knights.size() == 1 else ""
 	_main._save_state()
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	# (c) His marker where it was: he comes back as himself, remains and all.
+	# (c) His marker where it was: he comes back as himself, kept, not dropped.
 	knights = _knights_loaded()
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_WAS and knights[0].name == was_name
-			and knights[0].spawn_spec.get("spawn_key", "") == "%d,%d" % [KNIGHT_WAS.x, KNIGHT_WAS.y] and (knights[0] as AstralKnight).remains_laid,
-			"his marker unmoved: the saved knight back as himself, holding his slot, his remains still laid (%s)" % _knight_words(knights))
+			and knights[0].spawn_spec.get("spawn_key", "") == "%d,%d" % [KNIGHT_WAS.x, KNIGHT_WAS.y] and _main._alive_slots.values().has(knights[0]),
+			"his marker unmoved: the saved knight back as himself, holding his slot (%s)" % _knight_words(knights))
 	# (a) His marker moved past the reach: one knight, the new marker's.
 	_write(path, saved)
 	_register_knight(KNIGHT_NOW)
@@ -360,7 +358,7 @@ func _test_a_moved_knight() -> void:
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and a second restart: still one (%s)" % _knight_words(knights))
 	# A kept record of the old knight (retired while nobody was near), made again: dropped, not kept.
 	var as_record: Dictionary = saved.duplicate(true)
-	var zone: Dictionary = as_record["zones"][KNIGHT_LEVEL]
+	var zone: Dictionary = as_record["zones"][LEVEL]  # Saved under the zone's name, the test's (Main._start_level's "here").
 	var entries: Array = []
 	for entry: Dictionary in zone["entities"]:
 		if str(entry.get("spawn_key", "")) == "%d,%d" % [KNIGHT_WAS.x, KNIGHT_WAS.y]:
@@ -389,6 +387,7 @@ func _test_a_moved_knight() -> void:
 			and not Main.stray_knight({"script": "res://sim/monster.gd"}), "only a knight holding no slot is a stray")
 	DirAccess.remove_absolute(path)
 	Level.unregister(KNIGHT_LEVEL)
+	_register(false)
 	_main._load_level(LEVEL)
 
 
