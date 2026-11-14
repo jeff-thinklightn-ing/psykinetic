@@ -1154,8 +1154,14 @@ func _town_work_fee(each: Dictionary, worker_record: Dictionary) -> void:
 	var paid := mini(owed - given, stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)))
 	if paid > 0 and stockpile.take(town, "gold", paid, "town_work:%s" % worker_record["id"]):
 		worker_record["purse"] = int(worker_record["purse"]) + paid
-	print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], maxi(paid, 0) + given, owed, town,
-		each["recipe"], now()])
+	var got := maxi(paid, 0) + given
+	if got >= owed:
+		print("[production] %s paid %d of %d gold by %s for %s, step %d" % [worker_record["name"], got, owed, town, each["recipe"], now()])
+	else:
+		# Short at the treasury's floor (Jeff, 11-08: a town never owes; the rest is let go): the line carries the
+		# treasury and its floor at that step, the box's journal having no other treasury line.
+		print("[production] %s paid %d gold by %s for %s: treasury %d at its floor %d (%d due), step %d" % [worker_record["name"], got,
+			town, each["recipe"], stockpile.count(town, "gold"), int(rules.get("gold_floor", 0)), owed, now()])
 
 
 ## The town's fee for [param steps] of its work (rules' town_work): 0 for

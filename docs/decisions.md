@@ -31998,7 +31998,12 @@ switched on:
   xp.rescue paid for it before, and a town that needed a player's deed before its own farmer could plant would not
   feed itself): Towns.xp_price(town, kind), its rules' xp times the next level, is 0 for the field's level 1, read
   by choose, unlock and can_build_words. It is paid in the carpenter's time and wood as any build; a town short of
-  either is the only one that waits. The field's later levels and every other build keep their price. Umbrage (the
+  either is the only one that waits. "No experience" is the whole of "free": the builder's town_work fee
+  (Production._town_work_fee) is owed him as for any build, paid from the treasury above its gold_floor; a treasury
+  at its floor pays him what it can, 0 at the floor, and owes nothing for the rest (Jeff, 11-08, the towns never
+  owe). The journal line for such a build reads "<name> paid 0 gold by <town> for <recipe>: treasury T at its floor
+  F (N due)", short by any part the same way; paid in full it stays "paid N of N" (the coordinator's ruling on the
+  box's "paid 0 of 5" of 11-14, Umbrage's field, a treasury at its floor). The field's later levels and every other build keep their price. Umbrage (the
   box's one town, release's journal counts 11-13: no farmer, nothing built, 66 experience gained since 10-05) gets
   its farmer and plans its field at the deploy's first turn.
 - crop.walks_in (absent: true) false leaves only the replacement: resident_test's world sets it, its towns having
