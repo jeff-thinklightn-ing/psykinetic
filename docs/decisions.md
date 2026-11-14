@@ -33914,13 +33914,21 @@ was. Server only, protocol unchanged, no new class_name.
 666 amended (2) (dungeon; the coordinator's row from voice's read of playtest's look_bossbar2;
 label from tools/decision_number.sh). E at the Hall's door while the Ossuary's dead seal it
 (DEAD_LOCK) tells DEAD_LINE under the same bound as walking into it: the "door" command now
-goes through Main._on_door_pressed, at most once every DEAD_TOLD_S (10 s) a player, kept in the
-party log as the walk's is. Before, each E press said it, unbounded and unlogged ("The dead bar
-the way." six times running in the look). Same words. Riding the take: the fallen knight's
+goes through Main._on_door_pressed, kept in the party log as the walk's is. Before, each E
+press said it, unbounded and unlogged ("The dead bar the way." six times running in the look).
+The bound itself (the coordinator's ruling from playtest's look_bossbar_window, eight lines
+running on main: the walk's every 10 s and an E every 3 s between): the line is said once as a
+player meets the seal, and not again until they have stepped away and come back, with
+DEAD_TOLD_S (60 s) between any two. Stepped away is a step more than DEAD_AWAY (2, E's reach)
+cells from the door's two cells, or into another zone (Main._leave_dead, on the move hook;
+_dead_near holds the door till then); a push held there, or E pressed again and again, says
+nothing more. Same words. Riding the take: the fallen knight's
 three party lines (his task taken, his remains laid by his row, his test passed) name the player
 by World.shown_name (548 amended (2)), the name their plate shows, not the node's ("Player1").
-level_test: E straight after a walk's line says nothing more, and once the bound has passed two
-presses say it once; the taking line names a player by their label. Server only; protocol
+level_test: E straight after a walk's line says nothing more; a held push or E with the minute
+gone but never stepped away says nothing; a step back within 2 cells is not away; away and
+back inside the minute says nothing; away and back with it gone tells once; the taking line
+names a player by their label. Server only; protocol
 unchanged; no new class_name.
 
 ## 669. The bow's draw: damage, reach and stamina over the hold

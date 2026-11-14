@@ -3192,6 +3192,7 @@ func _test_hall_door() -> void:
 			heard.append(str(data.get("text", "")))
 	Net.message_received.connect(hear)
 	_main._told_dead.clear()
+	_main._dead_near.clear()
 	_main._hold_hall_door("lt_hall", true)
 	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
 		and _main.party_log.last(1) == ["The hall's door shuts behind you."] and _heard.slice(-1) == ["The hall's door shuts behind you."],
@@ -3238,20 +3239,32 @@ func _test_hall_door() -> void:
 	_hold_free(player, Vector2(0, 1), 8)
 	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "and stops a walk at its face (%s)" % player.free_pos)
 	_check(heard.count(_main.DEAD_LINE) == 1, "walking into it tells them \"%s\" once, not every step (%s)" % [_main.DEAD_LINE, heard])
-	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
-	_hold_free(player, Vector2(0, 1), 2)
-	_check(heard.count(_main.DEAD_LINE) == 2, "and again once %.0f s have passed while they keep at it (%s)" % [_main.DEAD_TOLD_S, heard])
-	# E at it is held to the same bound (playtest's look_bossbar2: six lines running from E presses).
+	# Once as they meet it (666 amended (2); playtest's look_bossbar_window: eight lines running).
 	var edge := [key.x, key.y, key.z]
 	_main._on_command(player, "door", {"edge": edge})
 	_main._on_command(player, "door", {"edge": edge})
-	_check(heard.count(_main.DEAD_LINE) == 2, "E at it straight after: nothing more, the walk's bound holds for E (%s)" % [heard])
+	_check(heard.count(_main.DEAD_LINE) == 1, "E at it straight after: nothing more (%s)" % [heard])
+	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
+	_hold_free(player, Vector2(0, 1), 2)
+	_main._on_command(player, "door", {"edge": edge})
+	_check(heard.count(_main.DEAD_LINE) == 1, "a push held there, or E, with %.0f s gone but never stepped away: nothing more (%s)" % [_main.DEAD_TOLD_S, heard])
+	_put(player, Vector2i(5, 3 - _main.DEAD_AWAY))
+	_put(player, Vector2i(5, 3))
+	_main._on_command(player, "door", {"edge": edge})
+	_check(heard.count(_main.DEAD_LINE) == 1, "a step back still within %d cells of it is not away: nothing (%s)" % [_main.DEAD_AWAY, heard])
+	_main._told_dead[player.owner_peer] = World.tick
+	_put(player, Vector2i(5, 2 - _main.DEAD_AWAY))
+	_put(player, Vector2i(5, 3))
+	_main._on_command(player, "door", {"edge": edge})
+	_check(heard.count(_main.DEAD_LINE) == 1, "away and back inside %.0f s of the last telling: nothing (the floor) (%s)" % [_main.DEAD_TOLD_S, heard])
 	_main._told_dead[player.owner_peer] -= roundi(_main.DEAD_TOLD_S * World.TICK_RATE)
 	_main._on_command(player, "door", {"edge": edge})
 	_main._on_command(player, "door", {"edge": edge})
-	_check(heard.count(_main.DEAD_LINE) == 3, "E once the bound has passed: told once, not at each press (%s)" % [heard])
+	_hold_free(player, Vector2(0, 1), 2)
+	_check(heard.count(_main.DEAD_LINE) == 2, "stepped away and come back with %.0f s gone: told again, once (%s)" % [_main.DEAD_TOLD_S, heard])
 	Net.message_received.disconnect(hear)
 	_main._told_dead.clear()
+	_main._dead_near.clear()
 	_main._seal_hall("lt_hall", false)
 	_check(door.lock.is_empty(), "every one of them down: the seal lifted")
 	await get_tree().process_frame

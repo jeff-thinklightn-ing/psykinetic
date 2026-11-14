@@ -434,6 +434,10 @@ var _told_niche: Dictionary[int, Vector3i] = {}
 ## Peer -> World.tick when "The dead bar the way." was last said to them
 ## for a walk into the held Hall door (_on_door_pressed).
 var _told_dead: Dictionary[int, int] = {}
+## Peer -> [door key, zone] of the held Hall door it was last told DEAD_LINE
+## at, until it steps more than DEAD_AWAY cells from that door's cells
+## (_leave_dead): while it stays, trying the door says nothing more.
+var _dead_near: Dictionary[int, Array] = {}
 ## Peer -> the zone it was told HALL_AHEAD_LINE in (_tell_hall_ahead): once
 ## a visit; a move in any other zone forgets it.
 var _told_hall: Dictionary[int, String] = {}
@@ -6080,6 +6084,7 @@ func _on_entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 		return
 	_tell_draft(entity, to)
 	_tell_hall_ahead(entity, to)
+	_leave_dead(entity, to)
 	_take_link(entity, to)
 
 
@@ -10008,9 +10013,12 @@ const HALL_SEAL_EVERY := 10
 const DEAD_LOCK := "ossuary_dead"
 ## Said to one who tries the sealed hall door (666; a draft for lore).
 const DEAD_LINE := "The dead bar the way."
-## How often (seconds) a player walking into the held Hall door is told
-## DEAD_LINE again, while they keep at it.
-const DEAD_TOLD_S := 10.0
+## The least time (seconds) between two DEAD_LINEs to one player, even
+## when they step away and come back (666 amended (2)).
+const DEAD_TOLD_S := 60.0
+## How far (cells, either way) from the held door's two cells a player
+## steps before trying it again tells them again: E reaches 2.
+const DEAD_AWAY := 2
 ## Said once a visit to a player who comes to the Hall's door, open to them,
 ## before stepping through, while the draugr sits waiting (608 amended (3),
 ## voice's narration; the coordinator's ruling on playtest's crypt walk): what
@@ -11954,19 +11962,40 @@ func _tell_hall_ahead(entity: GridEntity, to: Vector2i) -> void:
 
 
 ## Server: [param entity] walked into a shut door it may not open
-## (World.door_pressed; the Umbrage crypt follow-up). The Hall's door held
-## by the Ossuary's dead (666, DEAD_LOCK) tells that player DEAD_LINE at
-## most every DEAD_TOLD_S while they keep walking into it or pressing E at it
-## (one bound for both: E said it at every press, six times running in
-## playtest's look_bossbar2); any other door says nothing here.
+## (World.door_pressed; the Umbrage crypt follow-up), or pressed E at it
+## (the "door" command). The Hall's door held by the Ossuary's dead (666,
+## DEAD_LOCK) tells that player DEAD_LINE once as they meet it, and not again
+## until they have stepped away (_leave_dead) and come back, DEAD_TOLD_S
+## apart at the least: a push held there, or E pressed again and again, says
+## nothing more (666 amended (2): eight lines running in playtest's
+## look_bossbar_window). Any other door says nothing here.
 func _on_door_pressed(entity: GridEntity, door: Door) -> void:
 	if not Net.is_authority() or not entity is Player or door.open or door.lock != DEAD_LOCK:
 		return
 	var peer: int = entity.owner_peer
+	if _dead_near.has(peer):
+		return
 	if _told_dead.has(peer) and World.tick - _told_dead[peer] < roundi(DEAD_TOLD_S * World.TICK_RATE):
 		return
 	_told_dead[peer] = World.tick
+	_dead_near[peer] = [door.key, door.zone]
 	say_to([peer], DEAD_LINE)
+
+
+## Server: [param entity] (a player) stepped to [param to]: more than
+## DEAD_AWAY cells from the held door it was last told DEAD_LINE at, or in
+## another zone, it has stepped away, and trying that door again may tell it
+## again (_on_door_pressed, 666 amended (2)).
+func _leave_dead(entity: GridEntity, to: Vector2i) -> void:
+	var peer: int = entity.owner_peer
+	if not _dead_near.has(peer):
+		return
+	var near: Array = _dead_near[peer]
+	if entity.zone == str(near[1]):
+		for cell in Terrain.edge_cells(near[0]):
+			if maxi(absi(to.x - cell.x), absi(to.y - cell.y)) <= DEAD_AWAY:
+				return
+	_dead_near.erase(peer)
 
 
 ## The first hall of regenerating level [param zone_name] (608 amended: where
@@ -16496,7 +16525,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			if held != null and not held.open and held.lock == HALL_LOCK and entity is Player:
 				Net.broadcast_to([entity.owner_peer], "party", {"from": "Server", "text": "The door is shut."})
 			elif held != null and not held.open and held.lock == DEAD_LOCK and entity is Player:
-				_on_door_pressed(entity, held)  # E as a walk into it: DEAD_LINE at most every DEAD_TOLD_S.
+				_on_door_pressed(entity, held)  # E as a walk into it: DEAD_LINE once as they meet it.
 			if held != null and World.niche_edges.get(key, "") == "hidden" and not held.open:
 				_on_niche_pressed(entity, key)  # E at the hidden niche presses on it (608).
 				return
