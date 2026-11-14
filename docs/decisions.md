@@ -53848,3 +53848,55 @@ cleared; DESPAWN_PENDING names the other trees' fields to come, and fails both o
 forgotten and on a pending one now forgotten, so it only shrinks. _test_despawn_cost: 1,000
 despawns, µs each printed. monster_test's teleports call World.lay_again. Server only, protocol
 unchanged (v0.1.213 d08f85f24309 before and after), no new class_name, no bullet.
+
+## 912. The followed player is never culled by the low camera's near reach
+
+(perf, 2026-11-13; the coordinator's row and approval, from playtest's joined look214_compreturn4 on main 76852ee4c,
+read by pc-character; label from tools/decision_number.sh.) After a fall the player was brought back 24 cells off at
+the wilds' temple (C:/dev/review/look/main_76852ee4c/look214_compreturn4/godot.log: "me drawn (189.0, 201.0) HIDDEN"
+on the 812 ms frame). The camera does not travel there: client3d/camera_ease.gd (337) takes a jump of CUT_TILES (8) or
+more at once. But the view's _process runs _sync_puppets before _follow, so on the frame his new body is made the cull
+reads last frame's aim, where he fell: under the low camera (238, the low-angle fight's REACH_EASE) a body past
+World.NEAR_TILES (22) of the aim is made hidden, and eases in over REACH_EASE (0.5 s) once the aim has moved. In that
+run the next frame came 2.6 s later (a cold stall of its own, a row of perf's), so it read as hidden till the camera
+came.
+
+Client3D._sync_puppets takes the followed player (_local_player) once a frame, and his own body is never far off (made
+at once, never left to FAR_MAKE_USEC's later frames, never stopped as far) and always within the low camera's near
+reach: he is the aim. Every other body keeps the cull and the stale aim's one frame, which REACH_EASE covers. Not
+chosen: running _follow first (other things that frame read the aim as it was), or snapping the aim (it already
+snaps). Environment, whose roof cut-away follows the drawn puppet's cell, was told the aim cuts at CUT_TILES; its own
+row. view_test _test_reach_ease: under the low camera the player's new body made NEAR_TILES + 2 cells from the stale
+aim is drawn, solid, not easing in and not far; an imp made at the same move is hidden by the cull. Client only;
+protocol unchanged; no class_name; a bullet for the cull alone (the coordinator's, 2026-11-13: watched joined on playtest's fall912).
+
+The same rule fixes a worse lock past the puppets' reach (the coordinator's proof, terrain's --stand at the wilds'
+(229,235) that never arrived): _sync_puppets stops any body whose cell is past reach (the view's reach plus
+PUPPET_MARGIN, at least Sfx.MAX_DISTANCE: 26 under the low camera, where it does not grow with the zoom) from last
+frame's aim, the player's own too, and the aim follows his puppet: moved past reach in one step, his puppet stayed
+where he was and the camera with it. No ordinary move of a living player reaches it today; tools did (the code read,
+2026-11-13): a level link, a map edge, a stair, the bring-back and the admin's "move" all go through Main.travel or
+_join_player, which despawn him and make a new entity, whose new puppet is never judged far on the frame it is made;
+the living body's own moves (a step, the free walk, a push, a kick's slide, a lunge, a server correction) are a few
+cells a tick; tools/shot_guard.gd's put(), the shot scene's --stand, clip.gd, look_day.gd, map_bench.gd and
+town_soak.gd _relocate him far. There, on main, only what moves the aim without him freed it: the mouse lean
+(CAMERA_LEAN_CELLS 3, WASD on a window) and the aim lead, at most aim_lead_cells (4) together, a drag pan, or a zoom
+out under the high camera (its reach is the screen's): a move of 27 cells freed once the lean pointed a cell his way,
+40 or 80 not until a pan or the high camera. A fall meets only the near cull above (compreturn2's and compreturn4's 24
+cells), and compreturn2's 1.4 s fits the far bodies round him looked at once every FAR_EVERY (4) frames on that tour's
+~350 ms frames.
+
+The frame after the camera cuts (camera_ease's `cut`, a jump of CUT_TILES or more), _sync_puppets looks at every far
+body (_relook_far, a view field in room_fields' VIEW), not one in FAR_EVERY a frame: a body that moved while the aim
+stood elsewhere is in its place when the camera arrives, not up to four frames after. Its cost, map_bench --relook=10
+on the Atlas at the wilds' temple under the low camera (21 bodies, 5 far): a frame's ordinary _sync_puppets 2.79 ms
+median, the pass with every far body looked at 2.06 ms, the longest 3.98 ms, below the noise; a far body's look is a
+distance and a continue, and the pass comes once per cut.
+
+view_test _test_far_jump (the coordinator's proof on saturn, 2026-11-13): under the low camera the player moved 20,
+27, 40 and 80 cells from the aim as a server tick moves him (World._relocate and his free body's own prediction given
+the new place; the World is stopped in view_test, and a body drawn from its prediction is pulled back to it), the
+camera still and its zoom easing, the view left alone, and a control line moved as tools/shot_guard.gd's put() does.
+On main 0338ba32e with the pin alone: 20 cells after 1 and 2 frames, 27, 40 and 80 NEVER in 600 frames, the controls
+after 0. With 912: all eight after 1 frame, the controls after 0. The other scenes on the same code (respawn,
+companion, controls, monster, resident, mirror, stream, relief, level, builder, town_day) passed.

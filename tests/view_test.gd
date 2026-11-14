@@ -101,6 +101,7 @@ func _ready() -> void:
 		await _test_far_restart()
 		await _test_low_pick()
 		await _test_reach_ease()
+		await _test_far_jump()
 		await _test_low_names()
 		_test_cone_lift()
 		_test_bent_walk()
@@ -16148,11 +16149,168 @@ func _test_reach_ease() -> void:
 	_check(puppet.visible and solid.call() and not puppet.has_meta("reach_in") and not puppet.has_meta("reach_at"), "the low camera off: drawn, solid, nothing remembered")
 	imp.tile = near_tile
 	imp.position = Iso.grid_to_local(Vector2(near_tile))
+	# A bring-back (912): the player's new body made NEAR_TILES + 2 (24) cells from the
+	# aim, which is still where he fell (_follow runs after _sync_puppets): his own is
+	# drawn and solid on the frame it is made, not eased in; another body made at the
+	# same move keeps the cull.
+	Net.set_camera_low(true, false)
+	var me := _rig._local_player()
+	_check(me != null and _rig._puppets.has(me.get_instance_id()), "the bring-back: the player and his puppet are there")
+	if me != null and _rig._puppets.has(me.get_instance_id()):
+		var mine_id := me.get_instance_id()
+		var fell_tile := me.tile
+		var fell_at := me.position
+		aim = Vector2(_rig._camera_target.x, _rig._camera_target.z)
+		var back := Vector2i(roundi(aim.x) + World.NEAR_TILES + 2, roundi(aim.y))
+		for each in [mine_id, id]:
+			_rig._puppets[each].queue_free()
+			_rig._puppets.erase(each)
+			_rig._far.erase(each)
+		me.tile = back
+		me.position = Iso.grid_to_local(Vector2(back))
+		imp.tile = back + Vector2i(0, 1)
+		imp.position = Iso.grid_to_local(Vector2(imp.tile))
+		_rig._sync_puppets()
+		var mine: Node3D = _rig._puppets.get(mine_id)
+		var theirs: Node3D = _rig._puppets.get(id)
+		_check(mine != null and mine.visible and bool(mine.get_meta("reach_in", false)) and not mine.has_meta("reach_at")
+				and not _rig._far.has(mine_id),
+				"his own body made %.0f cells from the stale aim: drawn at once, not easing in, not far (%s)" % [Vector2(back).distance_to(aim), mine.get_meta("reach_in", "-") if mine != null else "none"])
+		_check(theirs != null and not theirs.visible and not bool(theirs.get_meta("reach_in", true)),
+				"another body made at the same move: hidden by the cull (%s)" % (theirs.get_meta("reach_in", "-") if theirs != null else "none"))
+		me.tile = fell_tile
+		me.position = fell_at
+		imp.tile = near_tile
+		imp.position = Iso.grid_to_local(Vector2(near_tile))
+		_rig._sync_puppets()
+		_rig._follow(0.016)
+		# A body that moved while the aim stood elsewhere (912): far off, it is looked at
+		# every FAR_EVERY frames; the frame after the camera's cut it is looked at at once.
+		var far_tile := Vector2i(roundi(aim.x) - 40, roundi(aim.y))
+		imp.tile = far_tile
+		imp.position = Iso.grid_to_local(Vector2(far_tile))
+		for i in Client3D.FAR_EVERY + 1:
+			_rig._sync_puppets()
+			await _frames(1)
+		_check(_rig._far.has(id), "an imp 40 cells off the aim: far (%s)" % _rig._far.has(id))
+		# A frame on which the imp's own turn to be looked at is not due.
+		while (id + Engine.get_process_frames()) % Client3D.FAR_EVERY == 0:
+			await _frames(1)
+		var jump := Vector2i(far_tile.x + 1, far_tile.y)
+		me.tile = jump
+		me.position = Iso.grid_to_local(Vector2(jump))
+		imp.tile = far_tile + Vector2i(0, 1)
+		imp.position = Iso.grid_to_local(Vector2(imp.tile))
+		_rig._relook_far = false
+		_rig._sync_puppets()  # The aim still where he was: the imp's turn not due, left far.
+		var left_far := _rig._far.has(id)
+		_rig._follow(0.016)
+		var cut: bool = _rig._camera_ease.cut
+		_rig._sync_puppets()  # The frame after the cut.
+		_check(left_far and cut and not _rig._far.has(id) and _rig._puppets[id].visible,
+				"after the camera's cut every far body looked at once: the imp beside him drawn on the next pass (left far before %s, cut %s, far after %s)" % [left_far, cut, _rig._far.has(id)])
+		me.tile = fell_tile
+		me.position = fell_at
+		imp.tile = near_tile
+		imp.position = Iso.grid_to_local(Vector2(near_tile))
+		_rig._sync_puppets()
+		_rig._follow(0.016)
+	Net.set_camera_low(false, false)
 	World.despawn(imp)
 	_rig._sync_puppets()
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
+
+## The player moved far in one step (912; the coordinator's proof, 2026-11-13): terrain's
+## --stand at the wilds' (229,235) never arrived, and a bring-back of more than the
+## puppets' reach froze the player's view. Under the low camera, he is moved 20, 27, 40
+## and 80 cells from where the camera stands, with the camera still and with its zoom
+## easing, as a server tick moves him (World._relocate, and his free body's own
+## prediction given the new place, as the tick's reconcile does: the World is stopped
+## here), the view left alone: the frames until his puppet stands at the new cell and the
+## camera's aim is on it (FAR_JUMP_CAP at most), one line each, and the first frames'
+## places. A control line moves him as tools/shot_guard.gd's put() does (the puppet and
+## the aim set by hand). Before 912 the view judged his own puppet far against last
+## frame's aim and left it, and the aim follows the puppet: past the reach neither moved.
+const FAR_JUMP_CAP := 600
+const FAR_JUMP_FRAMES := 5
+const FAR_JUMP_TRACE := 5
+const ShotGuard := preload("res://tools/shot_guard.gd")
+const FreeNet := preload("res://net/free_net.gd")
+
+
+func _test_far_jump() -> void:
+	print("\n== the player moved far in one step: his puppet and the camera follow him (912) ==")
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	await _frames(4)
+	var me := _rig._local_player()
+	_check(me != null and _rig._puppets.has(me.get_instance_id()), "far jump: the player and his puppet are there")
+	if me != null and _rig._puppets.has(me.get_instance_id()):
+		print("    the rig: processing %s, building %s, low %s, free view %s" % [_rig.is_processing(), _rig.building_room,
+				_rig._low, "Own" if me.get("free_view") is FreeNet.Own else str(me.get("free_view"))])
+		var home := me.tile
+		var zoom_was: float = _rig.zoom
+		for how: String in ["tick", "put"]:
+			for easing: bool in [false, true]:
+				for cells: int in [20, 27, 40, 80]:
+					await _far_jump_to(me, home, "put")  # Home first, the camera on him.
+					var aim := Vector2(_rig._camera_target.x, _rig._camera_target.z)
+					var cell := Vector2i(roundi(aim.x) + cells, roundi(aim.y))
+					if easing:
+						_rig._zoom_to = Client3D.LOW_ZOOM_MIN if zoom_was > 0.8 else Client3D.ZOOM_MAX
+					var took := await _far_jump_to(me, cell, how)
+					var line := "moved %d cells as %s (%s): puppet and aim at the cell %s, reach %.0f" % [cells,
+							"a tick" if how == "tick" else "shot_guard's put (control)", "zoom easing" if easing else "camera still",
+							"after %d frames" % int(took.x) if took.x <= FAR_JUMP_CAP else "NEVER (%d frames)" % FAR_JUMP_CAP,
+							maxf(_rig._view_reach() + Client3D.PUPPET_MARGIN, Sfx.MAX_DISTANCE)]
+					_check(took.x <= FAR_JUMP_FRAMES, line + (", aim to puppet %.1f" % took.y))
+					_rig._zoom_to = zoom_was
+					_rig.zoom = zoom_was
+					_rig._apply_size()
+		await _far_jump_to(me, home, "put")
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Moves [param entity] to [param cell], [param how]: "tick" as a server tick does
+## (World._relocate, its own prediction given the new place), "put" as shot_guard's put()
+## (the puppet and the aim too). Then counts frames until its puppet stands within a cell
+## of [param cell] and the camera's aim within 1.5 of the puppet (shot_guard's at_spot),
+## printing the first FAR_JUMP_TRACE frames' places for a "tick" move: Vector2(frames, the
+## aim's last distance), frames FAR_JUMP_CAP + 1 if never.
+func _far_jump_to(entity: GridEntity, cell: Vector2i, how: String) -> Vector2:
+	var id := entity.get_instance_id()
+	if how == "put":
+		ShotGuard.put(_rig, entity, cell)
+	else:
+		World._relocate(entity, cell)
+		entity._display_caught_up()
+		if entity.get("free_view") is FreeNet.Own:
+			var own: FreeNet.Own = entity.free_view
+			own.base = Vector2.INF
+			own.error = Vector2.ZERO
+			own.pending.clear()
+			own.open_intent = Vector2.ZERO
+			own.open_seconds = 0.0
+	var spot := _rig._tile_position(cell)
+	var off := INF
+	for frame in FAR_JUMP_CAP + 1:
+		var puppet: Node3D = _rig._puppets.get(id)
+		if puppet != null:
+			var drawn := Vector2(puppet.position.x, puppet.position.z)
+			off = drawn.distance_to(Vector2(_rig._camera_target.x, _rig._camera_target.z))
+			if how == "tick" and frame < FAR_JUMP_TRACE:
+				print("    frame %d: tile %s, entity at %s, puppet at (%.1f, %.1f), aim (%.1f, %.1f), far %s, processing %s" % [
+						frame, entity.tile, Iso.local_to_grid(entity.position), drawn.x, drawn.y, _rig._camera_target.x,
+						_rig._camera_target.z, _rig._far.has(id), entity.is_processing()])
+			if drawn.distance_to(Vector2(spot.x, spot.z)) < 1.0 and off < 1.5:
+				return Vector2(frame, off)
+		await _frames(1)
+	return Vector2(FAR_JUMP_CAP + 1, off)
 
 ## The low-angle fight, 5: names under the low camera read at every
 ## depth, the nearest on top, and past NAME_TILES only the party's and a

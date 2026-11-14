@@ -2817,6 +2817,8 @@ var _door_node: Dictionary[Vector3i, int] = {}
 var _doors_due: Dictionary[Vector3i, bool] = {}
 ## The puppets of entities too far off to keep up (_sync_puppets).
 var _far: Dictionary[int, bool] = {}
+## The camera cut last frame (912): the next _sync_puppets looks at every far body.
+var _relook_far := false
 ## The local player's entity name while there is one.
 var _local_name := ""
 ## The local player's death: 0 alive .. 1 fully mourned.
@@ -4464,6 +4466,8 @@ func _follow(delta: float) -> void:
 	if _aim_lead_to == Vector3.ZERO and _aim_lead.length() < 0.001:
 		_aim_lead = Vector3.ZERO
 	_camera_target = _camera_ease.follow(puppet.position, delta) + lead_offset(_lead, _aim_lead, aim_lead_cells) * (1.0 - box_rise()) + pan
+	if _camera_ease.cut:
+		_relook_far = true  # 912: every far body looked at next frame, against the aim as it now is.
 	_ridge_pitch = move_toward(_ridge_pitch, ridge_pitch(puppet.position), RIDGE_EASE * delta)
 	_ease_box_pull(eye_clear_share(), delta)
 	_place_camera()
@@ -21290,15 +21294,25 @@ func _sync_puppets() -> void:
 	_idle_voices(now)
 	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
 	var aim := Vector2(_camera_target.x, _camera_target.z)
+	# The followed player is never far off nor past the low camera's near cull
+	# (912): he is the aim. Here the aim is last frame's (_follow runs after),
+	# so on the frame he is made after a jump (a bring-back 24 cells off) he
+	# was made hidden against where he fell, and eased in after.
+	var followed := _local_player()
 	var frame := Engine.get_process_frames()
 	var far_making := 0
+	# The frame after the camera cut (912): every far body looked at, so one
+	# that moved while the aim stood elsewhere (the player dead) is in its
+	# place with the camera, not up to FAR_EVERY frames after it.
+	var relook := _relook_far
+	_relook_far = false
 	# World's own list, not a copy: nothing here spawns or despawns.
 	for entity in World.entities():
 		if not entity.spawned:
 			continue
 		var id := entity.get_instance_id()
 		seen[id] = true
-		if (id + frame) % FAR_EVERY != 0 and _far.has(id):
+		if not relook and (id + frame) % FAR_EVERY != 0 and _far.has(id):
 			# Far off when last looked at: looked at again every FAR_EVERY
 			# frames (a big map holds thousands of them).
 			continue
@@ -21309,7 +21323,8 @@ func _sync_puppets() -> void:
 				target(null)
 			_puppets[id].queue_free()
 			made = true
-		var far_off := made and Vector2(entity.tile).distance_to(aim) > reach
+		var mine := entity == followed
+		var far_off := made and not mine and Vector2(entity.tile).distance_to(aim) > reach
 		if far_off and far_making >= FAR_MAKE_USEC and not _puppets.has(id):
 			seen.erase(id)
 			continue  # Made in a later frame (FAR_MAKE_USEC).
@@ -21319,7 +21334,7 @@ func _sync_puppets() -> void:
 			if far_off:
 				far_making += Time.get_ticks_usec() - making
 		var puppet := _puppets[id]
-		if not made and Vector2(entity.tile).distance_to(aim) > reach:
+		if not made and not mine and Vector2(entity.tile).distance_to(aim) > reach:
 			# Far off: unseen and unheard. Its tile and hp are kept, so it
 			# makes no footstep for the way it came and its bar shows a
 			# fight it had, when it comes near. Its puppet (animation,
@@ -21359,7 +21374,7 @@ func _sync_puppets() -> void:
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238); one crossing
 			# the edge eases in or out (REACH_EASE), as does one come back.
-			_ease_reach(puppet, not _low or Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES, made, now)
+			_ease_reach(puppet, not _low or mine or Vector2(entity.tile).distance_to(aim) <= World.NEAR_TILES, made, now)
 		var grid := Iso.local_to_grid(entity.position)
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:

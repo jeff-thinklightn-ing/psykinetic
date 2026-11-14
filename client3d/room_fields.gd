@@ -30,7 +30,7 @@ const VIEW: Array[StringName] = [
 	&"taker_marks", &"_combat_at", &"_idle_next", &"_idle_heard", &"_idle_slot_at", &"_swings", &"_steadied",
 	&"_pile_ids", &"_piles_quiet_until", &"_door_hp", &"_last_hp", &"_last_tile", &"_last_step_ms",
 	&"_step_pace", &"_step_slot", &"_flattened", &"_arrows", &"_pending_deaths", &"_break_sounds",
-	&"_departed", &"_door_open", &"_door_node", &"_far", &"_local_name", &"_mourning", &"_mourn",
+	&"_departed", &"_door_open", &"_door_node", &"_far", &"_relook_far", &"_local_name", &"_mourning", &"_mourn",
 	&"_down", &"_environment", &"_listener", &"sfx", &"ambience", &"music", &"heartbeat",
 	&"bandaging", &"fishing_view", &"_hp_bar_shader", &"_boss_mark", &"_sun", &"_body_fill", &"_low", &"_fire_time",
 	&"_night", &"_carriers", &"_carried_lights", &"_carried_by", &"_carried_clock",

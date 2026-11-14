@@ -58,6 +58,9 @@ extends Node
 ## scenes added to the tree in it, most first; at the end, how many came in
 ## each half of the frames (a first-time build comes once; a second pass of
 ## the same ground in one run, with --walk, shows whether it comes back).
+## --relook=N (912): every N frames, the view's _sync_puppets timed twice
+## more, as in any frame and as on the frame after a camera cut (every far
+## body looked at), with how many are far: what the cut's full pass costs.
 ## --bench-state=PATH starts the host from that saved world (a copy: the
 ## host writes it back), e.g. tools/town_state's wilds town with its
 ## residents; with the game's --test-herds=N after "--", N sets of herds.
@@ -91,6 +94,7 @@ var low := false
 var low_given := false
 var scatter_reach := 0.0
 var hitch_ms := 0.0
+var relook := 0
 ## --weather-at: the kind, and when in the frames ("" once done).
 var weather_at := ""
 var weather_at_s := 0.0
@@ -141,6 +145,7 @@ func _ready() -> void:
 				low_given = true
 			"scatter-reach": scatter_reach = pair[1].to_float()
 			"hitch-ms": hitch_ms = maxf(0.0, pair[1].to_float())
+			"relook": relook = maxi(0, pair[1].to_int())
 			"hour": Net.start_hour = fposmod(pair[1].to_float(), 24.0)
 			"weather-at":
 				weather_at = pair[1].get_slice("@", 0).to_lower()
@@ -448,6 +453,10 @@ func _frames() -> bool:
 	# longest, to find what a spike is.
 	var spikes: Array[Vector2] = []
 	var hitches: Array[float] = []
+	# --relook: each sample's ordinary pass and full pass (usec), and the far count.
+	var ordinary_usec: Array[int] = []
+	var full_usec: Array[int] = []
+	var far_counts: Array[int] = []
 	if hitch_ms > 0.0:
 		get_tree().node_added.connect(_hitch_added)
 		RenderingServer.frame_pre_draw.connect(_hitch_pre_draw)
@@ -465,6 +474,15 @@ func _frames() -> bool:
 		last = now
 		frames += 1
 		_shut_pack()
+		if view != null and relook > 0 and frames % relook == 0:
+			far_counts.append(view._far.size())
+			var at := Time.get_ticks_usec()
+			view._sync_puppets()
+			ordinary_usec.append(Time.get_ticks_usec() - at)
+			view._relook_far = true
+			at = Time.get_ticks_usec()
+			view._sync_puppets()
+			full_usec.append(Time.get_ticks_usec() - at)
 		if view != null and spin != 0.0:
 			var turn_started := Time.get_ticks_usec()
 			view._set_yaw(view.yaw + spin * delta)
@@ -532,6 +550,14 @@ func _frames() -> bool:
 			(_main.minimap.draw_usec - map_usec) / 1000.0 / maxi(drawn, 1), (_main.minimap.draw_usec - map_usec) / 1000.0 / frames])
 	if view != null and "_scatter_chunks" in view:
 		print("BENCH scatter after the frames: %s" % _scatter_drawn(view))
+	if not full_usec.is_empty():
+		ordinary_usec.sort()
+		full_usec.sort()
+		far_counts.sort()
+		var half := full_usec.size() / 2
+		print("BENCH relook (912): %d samples, far bodies median %d (of %d entities); _sync_puppets as in a frame median %.2f ms, "
+				% [full_usec.size(), far_counts[half], World.entities().size(), ordinary_usec[half] / 1000.0]
+				+ "with every far body looked at median %.2f ms, longest %.2f ms" % [full_usec[half] / 1000.0, full_usec[-1] / 1000.0])
 	var times: Array[float] = []
 	for spike in spikes:
 		times.append(spike.x)

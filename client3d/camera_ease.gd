@@ -22,17 +22,22 @@ var _last := Vector3.ZERO
 var _started := false
 ## Where the camera is held from the followed point; eases to zero.
 var _offset := Vector3.ZERO
+## Whether this frame's follow was a cut (a jump of CUT_TILES or more), for
+## the view to look at every far body again next frame (912).
+var cut := false
 
 
 ## The point to aim at this frame, following [param at] (tiles, 3D).
 func follow(at: Vector3, delta: float) -> Vector3:
+	cut = false
 	if not _started:
 		_started = true
 		_last = at
 		return at
 	var moved := at - _last
 	_last = at
-	if moved.length() >= CUT_TILES:
+	cut = moved.length() >= CUT_TILES
+	if cut:
 		_offset = Vector3.ZERO
 	elif moved.length() > JUMP_TILES + FASTEST_TILES_PER_SECOND * delta:
 		_offset -= moved
