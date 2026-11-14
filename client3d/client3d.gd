@@ -6585,27 +6585,112 @@ func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float) -> bool:
 	puppet.set_meta("wound_until", now + int(lands_in * 1000.0) + 400)
 	puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)
 	_combat_at[source.get_instance_id()] = now
-	var body := puppet.get_node_or_null("Body") as Node3D
-	if body != null and source.facing != Vector2i.ZERO:
-		var rest := Vector3(0.0, body.position.y, 0.0)
+	if puppet.has_node("Body") and source.facing != Vector2i.ZERO:
 		var thrust := minf(TOLD_THRUST, lands_in)
 		puppet.set_meta("told_thrust_at", now + int(maxf(lands_in - thrust, 0.0) * 1000.0))
-		var tween := create_tween()
-		tween.tween_interval(maxf(lands_in - thrust, 0.0))
-		tween.tween_property(body, "position", rest + Vector3(source.facing.x, 0.0, source.facing.y).normalized() * _told_reach(source), thrust) \
-				.set_ease(Tween.EASE_OUT)
-		tween.tween_property(body, "position", rest, TOLD_RECOVER).set_ease(Tween.EASE_IN_OUT)
-		puppet.set_meta("told_tween", tween)
+		puppet.set_meta("told_thrust", thrust)
+		puppet.set_meta("told_way", Vector3(source.facing.x, 0.0, source.facing.y).normalized())
+		puppet.set_meta("told_source", source.get_instance_id())
+		_told_body(puppet)
 	return true
 
 
-## How far [param source]'s told thrust carries its body (790 amended (9)): TOLD_REACH, or short of
-## the first body in its way along its facing, TOLD_GAP m off it (not through the one it strikes).
-func _told_reach(source: GridEntity) -> float:
-	for cells in 2:
-		if World.get_entity_at(source.tile + source.facing * (cells + 1)) != null:
-			return clampf(float(cells + 1) - TOLD_GAP, 0.0, TOLD_REACH)
-	return TOLD_REACH
+## [param puppet]'s Body over a told strike from now (790 amended (11)): rocked back and home first
+## over [param rock] seconds (a blow taken as it gathers), held till its thrust, thrust out over
+## "told_thrust" s as far as _told_reach lets it then (the bodies where they are drawn as it springs,
+## not as it was told), and eased back over TOLD_RECOVER. The Body's one tween meanwhile (_body_tween:
+## _on_swung's lunge kept off it, _body_held).
+func _told_body(puppet: Node3D, rock := 0.0) -> void:
+	var body := puppet.get_node("Body") as Node3D
+	var rest := _body_rest(puppet, body)
+	var way: Vector3 = puppet.get_meta("told_way", Vector3.ZERO)
+	var thrust := float(puppet.get_meta("told_thrust", TOLD_THRUST))
+	var wait := (int(puppet.get_meta("told_thrust_at", 0)) - Time.get_ticks_msec()) / 1000.0
+	var tween := _body_tween(puppet, "told")
+	if rock > 0.0:
+		var back := -body.transform.basis.x.normalized() * ArtKit.feel("client3d.steady_rock", STEADY_ROCK)
+		tween.tween_property(body, "position", rest + back, rock * 0.3).set_ease(Tween.EASE_OUT)
+		tween.tween_property(body, "position", rest, rock * 0.7).set_ease(Tween.EASE_IN_OUT)
+		wait -= rock
+	tween.tween_interval(maxf(wait, 0.0))
+	# Its reach taken as the thrust begins (a Dictionary: the lambdas share it).
+	var out := {}
+	var ids := [puppet.get_instance_id(), int(puppet.get_meta("told_source", 0))]
+	var spring := func(f: float) -> void:
+		if not out.has("at"):
+			var sprung := instance_from_id(ids[0]) as Node3D
+			var striker := instance_from_id(ids[1]) as GridEntity
+			out["at"] = way * (_told_reach(sprung, striker, way) if is_instance_valid(sprung) and is_instance_valid(striker) else 0.0)
+		body.position = rest + (out["at"] as Vector3) * f
+	var settle := func(f: float) -> void:
+		body.position = rest + (out.get("at", Vector3.ZERO) as Vector3) * (1.0 - f)
+	tween.tween_method(spring, 0.0, 1.0, thrust).set_ease(Tween.EASE_OUT)
+	tween.tween_method(settle, 0.0, 1.0, TOLD_RECOVER).set_ease(Tween.EASE_IN_OUT)
+	puppet.set_meta("told_tween", tween)
+
+
+## How far [param source]'s told thrust carries [param puppet]'s Body along [param way] (790 amended
+## (11)): TOLD_REACH, or as far as keeps its centre TOLD_GAP m off every drawn body it passes
+## (_bodies_on_line: one on the faced cell stops it TOLD_GAP short, as before; a free body beside the
+## line, off the faced cell, as near as it lets it come; one further aside, not at all).
+func _told_reach(puppet: Node3D, source: GridEntity, way: Vector3) -> float:
+	var reach := TOLD_REACH
+	for near: Dictionary in _bodies_on_line(puppet.position, way, TOLD_REACH + TOLD_GAP, TOLD_GAP, source.get_instance_id()):
+		var aside := float(near["aside"])
+		reach = minf(reach, float(near["along"]) - sqrt(maxf(TOLD_GAP * TOLD_GAP - aside * aside, 0.0)))
+	return clampf(reach, 0.0, TOLD_REACH)
+
+
+## The drawn bodies ahead of [param from] along [param way] (a unit vector on the ground), nearest
+## first: {"id", "along" (m ahead), "aside" (m off the line)} for each no further than [param most]
+## ahead and [param aside] off the line, the entity [param skip] left out. Drawn: each puppet where it
+## is drawn (a free body at its own place, a grid one sliding between its cells), a fallen one left
+## out. Shared by the told thrust (790 amended (11)) and the axe's step.
+func _bodies_on_line(from: Vector3, way: Vector3, most: float, aside: float, skip: int) -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	for id: int in _puppets:
+		if id == skip:
+			continue
+		var other: Node3D = _puppets[id]
+		if not is_instance_valid(other) or other.has_meta("corpse") or not instance_from_id(id) is GridEntity:
+			continue
+		var d := other.position - from
+		d.y = 0.0
+		var along := d.dot(way)
+		if along <= 0.0 or along > most:
+			continue
+		var off := (d - way * along).length()
+		if off <= aside:
+			found.append({"id": id, "along": along, "aside": off})
+	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["along"]) < float(b["along"]))
+	return found
+
+
+## Where [param puppet]'s Body rests as _lay keeps it (its seat, bed or work offset), the place every
+## push of the Body starts and ends at.
+static func _body_rest(puppet: Node3D, body: Node3D) -> Vector3:
+	return puppet.get_meta("lay_at", Vector3(0.0, body.position.y, 0.0))
+
+
+## The one tween that moves [param puppet]'s Body (790 amended (11)): a new one kills the last, so no
+## two write its place in the same frame (the newer won every frame: a told thrust undone by the
+## lunge _on_swung began as the sim's blow landed). [param owner] names it ("told", "lunge", "rock",
+## "jolt", "home").
+static func _body_tween(puppet: Node3D, owner: String) -> Tween:
+	var last: Variant = puppet.get_meta("body_tween") if puppet.has_meta("body_tween") else null
+	if last is Tween and (last as Tween).is_valid():
+		(last as Tween).kill()
+	var tween := (puppet.get_node("Body") as Node3D).create_tween()
+	puppet.set_meta("body_tween", tween)
+	puppet.set_meta("body_owner", owner)
+	return tween
+
+
+## Whether [param puppet]'s Body is held by a strike's own push (790 amended (11)): a told strike's,
+## from its tell to its recovery's end. _on_swung's lunge leaves it be.
+static func _body_held(puppet: Node3D) -> bool:
+	var tween: Variant = puppet.get_meta("body_tween") if puppet.has_meta("body_tween") else null
+	return tween is Tween and (tween as Tween).is_valid() and str(puppet.get_meta("body_owner", "")) == "told"
 
 
 ## Whether [param puppet] (a person) is gathering a told strike: drawn back or held, its thrust's
@@ -6623,7 +6708,7 @@ func _told_gathering(puppet: Node3D) -> bool:
 func _told_rock(puppet: Node3D) -> void:
 	var left := (int(puppet.get_meta("told_thrust_at", 0)) - AnimRig.now_msec()) / 1000.0
 	if left >= TOLD_ROCK_MIN:
-		_steady_rock(puppet, minf(STEADY_ROCK_SECONDS, left))
+		_told_body(puppet, minf(STEADY_ROCK_SECONDS, left))  # The rock and the thrust on the Body's one tween.
 
 
 ## Telegraph [param id] over: the tell it began ends (cut short when it did not land).
@@ -6639,14 +6724,12 @@ func creature_tell_over(id: int, landed: bool) -> void:
 		(puppet.get_meta("rig") as AnimRig).cancel_strike()
 		puppet.set_meta("busy_until", 0)
 		puppet.set_meta("wound_until", 0)
-		var tween: Variant = puppet.get_meta("told_tween", null)
-		if tween is Tween and (tween as Tween).is_valid():
-			(tween as Tween).kill()
 		var body := puppet.get_node_or_null("Body") as Node3D
-		if body != null and not is_zero_approx(Vector2(body.position.x, body.position.z).length()):
-			# Broken on the thrust itself: eased home (the pose fades out as cancel_strike fades it).
-			var home := create_tween()
-			home.tween_property(body, "position", Vector3(0.0, body.position.y, 0.0), TOLD_RECOVER * 0.5).set_ease(Tween.EASE_IN_OUT)
+		if body != null and _body_held(puppet):
+			# Its push given up (790 amended (11)): eased home from wherever it is (the pose fades out as
+			# cancel_strike fades it), and the Body free for anything else at once.
+			var home := _body_tween(puppet, "home")
+			home.tween_property(body, "position", _body_rest(puppet, body), TOLD_RECOVER * 0.5).set_ease(Tween.EASE_IN_OUT)
 			puppet.set_meta("told_tween", home)
 
 
@@ -26280,6 +26363,7 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 			offset -= Vector3(-ahead.z, 0.0, ahead.x) * SLEEP_ASIDE * float(puppet.get_meta("model_scale", 1.0))
 		# On a bed or bedroll drawn under it (npc's and buildings' side, 751): its height.
 		offset.y = float(puppet.get_meta("bed_height", 0.0))
+	puppet.set_meta("lay_at", offset)  # Where the Body rests (_body_rest).
 	if body.position != offset:
 		body.position = offset
 	var model := body.get_node_or_null("Model") as Node3D
@@ -27471,13 +27555,15 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).swing()
 	var body := puppet.get_node("Body") as Node3D
-	var rest := Vector3(0.0, body.position.y, 0.0)
+	if _body_held(puppet):
+		return  # A told strike's own push has the Body (790 amended (11)): its thrust is the lunge.
+	var rest := _body_rest(puppet, body)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
 	# Leading the drawn blow ("blows you can see" (b)), not its news: back at rest as it lands,
 	# where each clip's contact is placed (a pick's point at the seam's face, 769 amended (9)).
 	var reach := LUNGE_SECONDS * 0.4
 	var landing := (int(_swings[id][2]) - now) / 1000.0
-	var tween := create_tween()
+	var tween := _body_tween(puppet, "lunge")
 	if landing > LUNGE_SECONDS:
 		tween.tween_interval(landing - LUNGE_SECONDS)
 	tween.tween_property(body, "position", out, reach).set_ease(Tween.EASE_OUT)
@@ -27674,9 +27760,12 @@ func _steady_rock(puppet: Node3D, seconds := STEADY_ROCK_SECONDS) -> void:
 	if not puppet.has_node("Body"):
 		return
 	var body := puppet.get_node("Body") as Node3D
-	var rest := body.position  # Where _lay keeps it (as _bash_taken's jolt).
+	if _body_held(puppet):
+		_told_rock(puppet)  # Its told strike's push keeps the Body: rocked on that one tween.
+		return
+	var rest := _body_rest(puppet, body)
 	var back := -body.transform.basis.x.normalized() * ArtKit.feel("client3d.steady_rock", STEADY_ROCK)
-	var tween := body.create_tween()
+	var tween := _body_tween(puppet, "rock")
 	tween.tween_property(body, "position", rest + back, seconds * 0.3).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, seconds * 0.7).set_ease(Tween.EASE_IN_OUT)
 
@@ -27724,9 +27813,12 @@ func _bash_taken(puppet: Node3D, target: GridEntity, direction: Vector2i, from: 
 	if direction != Vector2i.ZERO or not puppet.has_node("Body") or from.length() < 0.001:
 		return
 	var body := puppet.get_node("Body") as Node3D
-	var rest := body.position
+	if _body_held(puppet):
+		_told_rock(puppet)  # As a blow taken as it gathers: its told strike keeps the Body (790 amended (11)).
+		return
+	var rest := _body_rest(puppet, body)
 	var away := -Vector3(from.x, 0.0, from.y).normalized() * BASH_JOLT
-	var tween := body.create_tween()
+	var tween := _body_tween(puppet, "jolt")
 	tween.tween_property(body, "position", rest + away, BASH_JOLT_SECONDS * 0.3).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, BASH_JOLT_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
 

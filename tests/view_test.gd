@@ -11241,14 +11241,24 @@ func _test_told_lunge() -> void:
 		return at.z - hips.z
 	var gathered: float = ahead.call()
 	var landed_ahead := -9.0
+	# The sim's blow lands STRIKE_LANDS_IN before the drawn one: its "swung" arrives mid-thrust, and its
+	# plain lunge leaves the Body to the thrust (790 amended (11): it took the Body back to rest by the
+	# contact, the spring never drawn in the game).
+	var swung := false
+	var at_contact := 0.0
 	while AnimRig.now_msec() < start + int(lands_in * 1000.0) + 20:
 		await get_tree().process_frame
+		if not swung and AnimRig.now_msec() >= start + int(lands_ticks * World.TICK_DT * 1000.0):
+			swung = true
+			_rig._on_swung(robber.facing, robber.get_instance_id())
 		if body.position.x > furthest + 0.001:
 			furthest = body.position.x
 			out_at = AnimRig.now_msec() - start
+		at_contact = body.position.x
 		landed_ahead = maxf(landed_ahead, -signf(gathered) * float(ahead.call()))
-	_check(furthest > Client3D.TOLD_REACH * 0.8 and rig.speed() > 0.0,
-			"thrust as it lands: out %.2f m along his facing (furthest at %d ms), the recovery playing (speed %.2f)" % [furthest, out_at, rig.speed()])
+	_check(swung and furthest > Client3D.TOLD_REACH * 0.8 and at_contact > Client3D.TOLD_REACH * 0.8 and rig.speed() > 0.0,
+			"thrust as it lands, the sim's swung arriving mid-thrust: out %.2f m along his facing (furthest at %d ms, %.2f m at the contact), the recovery playing (speed %.2f)"
+			% [furthest, out_at, at_contact, rig.speed()])
 	# The pose is read as last drawn, so the stretch is followed a little past the contact (Blender
 	# measures the clip 0.42 m behind the hips at the gather, 0.44 m ahead at its 0.33 s contact).
 	while AnimRig.now_msec() < rig.contact_msec + 120:
@@ -11273,6 +11283,22 @@ func _test_told_lunge() -> void:
 			"a body in his way a cell off: out %.2f m, %.2f m short of its cell" % [short, 1.0 - short])
 	_rig.creature_tell_over(23, true)
 	await _until_msec(AnimRig.now_msec() + int((Client3D.TOLD_RECOVER + 0.1) * 1000.0))
+	# Off the faced cell (790 amended (11), playtest's crouch_open: she stood beside his diagonal, a free
+	# body): the thrust keeps his centre TOLD_GAP off a body beside its line, as near as it lets it
+	# come; one further aside never stops it. Drawn places, set by hand (read before the next frame).
+	var way := Vector3(1.0, 0.0, 0.0)
+	var beside := _rig._puppets[in_way.get_instance_id()] as Node3D
+	var cases := [[Vector3(0.75, 0.0, 0.5), 0.75 - sqrt(Client3D.TOLD_GAP * Client3D.TOLD_GAP - 0.25)],
+			[Vector3(0.75, 0.0, 0.8), Client3D.TOLD_REACH], [Vector3(1.0, 0.0, 0.0), 1.0 - Client3D.TOLD_GAP],
+			[Vector3(-0.5, 0.0, 0.0), Client3D.TOLD_REACH]]
+	var reaches: Array[String] = []
+	var right := true
+	for case: Array in cases:
+		beside.position = puppet.position + (case[0] as Vector3)
+		var got := _rig._told_reach(puppet, robber, way)
+		reaches.append("%.2f (want %.2f)" % [got, float(case[1])])
+		right = right and absf(got - float(case[1])) < 0.01
+	_check(right, "a body beside his line, off it, on it, behind him: out %s" % ", ".join(reaches))
 	World.despawn(in_way)
 	_rig._process(0.0)
 	# Called off (stunned mid-tell): the thrust never comes, and he eases out of the gather (no snap).
