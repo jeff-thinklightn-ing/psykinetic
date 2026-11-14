@@ -3123,6 +3123,29 @@ func _test_tavern_inside() -> void:
 	_check(not told.back()[0] and _rig.inside_building() == Rect2i(), "out of its door again: not inside")
 	_rig._fade_clock += Client3D.FADE_HOLD + Client3D.ROOF_FADE * 4.0
 	at.call(path[0])
+	# Out in the street the view stays the street's (the coordinator, 11-13: a
+	# player out of doors never gets the inside view): walked west to east
+	# along y 205 beside the hut H2's east wall, then under the well W1 and
+	# the stalls M2 and M3, whose roofs close nothing in, never inside.
+	var codes := {}
+	for building: Dictionary in wilds["buildings"]:
+		codes[str(building.get("code", ""))] = building.get("rect", Rect2i())
+	var street: Array[Vector2i] = []
+	for x in range(213, 221):
+		street.append(Vector2i(x, 205))
+	var under: Array[Vector2i] = [Vector2i(194, 190), Vector2i(203, 197), Vector2i(203, 207)]
+	var placed := ["H2", "W1", "M2", "M3"].all(func(code: String) -> bool: return codes.has(code))
+	var beside := placed and street.all(func(cell: Vector2i) -> bool: return not (codes["H2"] as Rect2i).has_point(cell))
+	var roofs_over := placed and [codes["W1"], codes["M2"], codes["M3"]].all(func(rect: Rect2i) -> bool: return under.any(func(cell: Vector2i) -> bool: return rect.has_point(cell)))
+	var tellings: int = told.size()
+	var indoors: Array[Vector2i] = []
+	for cell: Vector2i in street + under:
+		at.call(cell)
+		if _rig.inside_building() != Rect2i():
+			indoors.append(cell)
+	_check(placed and beside and roofs_over and indoors.is_empty() and told.size() == tellings,
+			"the street beside H2 (x 213..220, y 205) and under the well and two stalls: never inside, never told so (inside at %s, %d tellings; H2 %s)"
+			% [indoors, told.size() - tellings, codes.get("H2")])
 	_rig.inside_changed.disconnect(listen)
 	# The Mughouse's front (811 amended, art-kit's pieces): its sign out of
 	# the street front's wall beside the door; its two-storey walls' windows
