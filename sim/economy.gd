@@ -3210,21 +3210,59 @@ func pond_rule() -> Dictionary:
 
 ## Pond [param pond]'s fish now: ponds.fish to start, refilled ponds.refill
 ## a game day up to ponds.fish; a water of its own in ponds.at (805 amended
-## (16): Jeff's crescent by Umbrage) has its own fish and refill.
+## (16): Jeff's crescent by Umbrage) has its own fish and refill. A water a
+## fisher was taught at (916) holds and refills its "raise" more, and keeps
+## "without", the fish it would hold without her, on the old rule.
 func pond_fish(pond: String) -> int:
 	var rule := pond_rule()
 	var own: Variant = rule.get("at", {}).get(pond, {})
 	if own is Dictionary and not (own as Dictionary).is_empty():
 		rule = rule.merged(own, true)
 	var most := int(rule.get("fish", 8))
+	var refill := int(rule.get("refill", 2))
 	var day := now() / maxi(DayNight.day_steps, 1)
 	if not _ponds.has(pond):
 		_ponds[pond] = {"fish": most, "day": day}
 	var entry: Dictionary = _ponds[pond]
 	if day > int(entry["day"]):
-		entry["fish"] = mini(int(entry["fish"]) + (day - int(entry["day"])) * int(rule.get("refill", 2)), most)
+		var days := day - int(entry["day"])
+		var raise := int(entry.get("raise", 0))
+		entry["fish"] = mini(int(entry["fish"]) + days * (refill + raise), most + raise)
+		if entry.has("without"):
+			entry["without"] = mini(int(entry["without"]) + days * refill, most)
 		entry["day"] = day
 	return int(entry["fish"])
+
+
+## A fisher was taught at pond [param pond] (916, the taught fisher): it holds
+## and refills [param share] more a game day from now (the larger, if taught
+## before), and begins its count without her at what it holds now, so a
+## player there never finds fewer fish than before.
+func pond_teach(pond: String, share: int) -> void:
+	if pond.is_empty() or share <= 0:
+		return
+	var fish := pond_fish(pond)
+	var entry: Dictionary = _ponds[pond]
+	if not entry.has("without"):
+		entry["without"] = fish
+	var more := share - int(entry.get("raise", 0))
+	if more > 0:
+		entry["raise"] = share
+		entry["fish"] = fish + more
+
+
+## What a taught fisher takes from pond [param pond] (916): at most
+## [param wanted], and only what it holds above its count without her (the
+## coordinator's condition: teaching her never leaves a player fewer fish);
+## 0 on a day it holds no more than that.
+func pond_take(pond: String, wanted: int) -> int:
+	if pond.is_empty() or wanted <= 0:
+		return 0
+	var fish := pond_fish(pond)
+	var entry: Dictionary = _ponds[pond]
+	var took := clampi(fish - int(entry.get("without", fish)), 0, wanted)
+	entry["fish"] = fish - took
+	return took
 
 
 ## Player [param player_id]'s cast at pond [param pond] ends (805; items'
@@ -3239,6 +3277,8 @@ func pond_catch(pond: String, player_id: String, roll := -1.0) -> bool:
 	if fish <= 0 or (roll if roll >= 0.0 else randf()) >= float(pond_rule().get("catch", 0.6)):
 		return false
 	_ponds[pond]["fish"] = fish - 1
+	if _ponds[pond].has("without"):  # A player's catch is one the water without her would have lost too (916).
+		_ponds[pond]["without"] = maxi(int(_ponds[pond]["without"]) - 1, 0)
 	return true
 
 

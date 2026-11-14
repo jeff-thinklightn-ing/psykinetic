@@ -554,6 +554,7 @@ func retrain(worker_id: String, trade: String) -> bool:
 	set_apprentice(worker_id, "")
 	var trades: Array = [trade]
 	_workers[worker_id]["trades"] = trades
+	_workers[worker_id].erase("site")  # A taught fisher's water goes with her trade (916).
 	return true
 
 
@@ -1386,9 +1387,47 @@ func site_blocked(town: String, site: Dictionary) -> String:
 	var id := str(site["id"])
 	if holdings.ground(str(site["area"]), site["cell"]) == Factions.CONTESTED:
 		return "contested"
+	if bool(site.get("own", false)):
+		return ""  # A worker's own spot (916, a taught fisher's): no place to hold, only its ground.
 	if holdings.holder(id) != Stockpile.TOWN or holdings.strength(id) <= 0:
 		return "held by %s" % holdings.holder(id)
 	return ""
+
+
+## Worker [param id]'s site for [param trade]: their own (916: a taught
+## fisher's spot at her water, set_own_site) while that is their trade, else
+## [param town]'s site of the trade's kind (site_of).
+func site_for(town: String, id: String, trade: String) -> Dictionary:
+	var own := _own_site(id)
+	return own if not own.is_empty() and trade in _workers[id].get("trades", []) else site_of(town, trade)
+
+
+## Worker [param id]'s own site as a place reads ({} for none): its cell a
+## Vector2i (saved as [x, y]).
+func _own_site(id: String) -> Dictionary:
+	var own: Dictionary = _workers.get(id, {}).get("site", {})
+	if own.is_empty():
+		return {}
+	var site := own.duplicate(true)
+	var cell: Variant = own.get("cell", [0, 0])
+	site["cell"] = cell if cell is Vector2i else Vector2i(int(cell[0]), int(cell[1]))
+	return site
+
+
+## Worker [param id]'s own site (916, the taught fisher): {id (the stock it
+## draws on), kind, area, cell (the spot she stands at)}, marked "own" (no
+## Holdings place to hold); saved with the worker. {} clears it.
+func set_own_site(id: String, site: Dictionary) -> void:
+	if not _workers.has(id):
+		return
+	if site.is_empty():
+		_workers[id].erase("site")
+	else:
+		var own := site.duplicate(true)
+		own["own"] = true
+		var cell: Vector2i = site.get("cell", Vector2i.ZERO)
+		own["cell"] = [cell.x, cell.y]
+		_workers[id]["site"] = own
 
 
 ## Steps for [param town]'s worker's trip to [param site] and back: the
@@ -1412,7 +1451,7 @@ func site_walk(town: String, site: Dictionary) -> int:
 ## (outside the walls, at no other work), BACK when they are home and it
 ## yields. A trip in hand when the site is lost ends: home with nothing.
 func site_turn(town: String, id: String, trade: String) -> String:
-	var site := site_of(town, trade)
+	var site := site_for(town, id, trade)
 	if site.is_empty():
 		_trips.erase(id)
 		_trip_from.erase(id)
@@ -1467,9 +1506,33 @@ func trip(worker_id: String) -> Dictionary:
 		site = site_of(str(worker_record.get("town", "")), str(trade))
 		if not site.is_empty():
 			break
+	if not (worker_record.get("site", {}) as Dictionary).is_empty():
+		site = _own_site(worker_id)
 	var back_at := int(_trips[worker_id])
 	var from := int(_trip_from.get(worker_id, back_at - site_walk(str(worker_record.get("town", "")), site) if not site.is_empty() else back_at))
-	return {"site": site, "from": from, "back_at": back_at, "catch": str(_trip_catch.get(worker_id, ""))}
+	var out := {"site": site, "from": from, "back_at": back_at, "catch": str(_trip_catch.get(worker_id, ""))}
+	if bool(site.get("own", false)):
+		out["fish"] = trip_fish(worker_id)  # 916: what a taught fisher's trip brings home, decided as she set out.
+	return out
+
+
+## A taught fisher's trip (916): the fish it took from her water as she set
+## out, carried in _trip_catch as "fish:<n>" (saved with it); banked at
+## back_at by Towns (take_trip_fish).
+func set_trip_fish(worker_id: String, fish: int) -> void:
+	_trip_catch[worker_id] = "fish:%d" % maxi(fish, 0)
+
+
+func trip_fish(worker_id: String) -> int:
+	var what := str(_trip_catch.get(worker_id, ""))
+	return int(what.trim_prefix("fish:")) if what.begins_with("fish:") else 0
+
+
+## The fish her trip brought home, and the trip's catch cleared.
+func take_trip_fish(worker_id: String) -> int:
+	var fish := trip_fish(worker_id)
+	_trip_catch.erase(worker_id)
+	return fish
 
 
 ## Whether [param town]'s [param trade] may work its site now: no site, or
@@ -2019,6 +2082,11 @@ func from_dict(saved: Dictionary) -> void:
 				for player_id: Variant in entry["asked"]:
 					if entry["asked"][player_id] is String and not entry["asked"][player_id].is_empty():
 						_workers[id].get_or_add("asked", {})[str(player_id)] = entry["asked"][player_id]
+			# A taught fisher's own site (916): her water's stock and her spot.
+			var own: Variant = entry.get("site", {})
+			if own is Dictionary and not str(own.get("id", "")).is_empty() and own.get("cell") is Array and (own["cell"] as Array).size() == 2:
+				_workers[id]["site"] = {"id": str(own["id"]), "kind": str(own.get("kind", "fishing")), "area": str(own.get("area", "")),
+					"cell": [int(own["cell"][0]), int(own["cell"][1])], "own": true}
 			var last: Variant = entry.get("last_trade", {})
 			if last is Dictionary and not last.is_empty():
 				_workers[id]["last_trade"] = {"step": int(last.get("step", 0)), "what": str(last.get("what", "")),

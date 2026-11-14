@@ -27564,6 +27564,16 @@ production_test (the fisherman's trip and catch, nothing from a bank not
 held, the fort's counter the town's shop). Level data both sides read:
 the new place kinds under the open revision; no new class_name.
 
+594 amended (1), economy's (with 916, the taught fisher; the coordinator's approval of the joint page
+C:/dev/review/economy/player_feeds_town.md after Jeff's answer of 11-14 to the town-fish page): no
+fisherman comes on his own any more. Towns._fisherman_comes and its call in the town's turn are
+gone, so a town gets a fisherman only by a player teaching one of its residents (916). His work is
+kept as hers: Towns._fish still walks any resident of the trade to the town's fishing place and
+back, and a taught fisher goes to her own spot instead. On the box this changes nothing: no town
+there holds a fishing place, so none ever came. economy.json's fisherman.stage, growth_days and
+names stay unread. production_test _test_fisherman: a village with a fishing place and no
+fisherman comes; one of the trade in its residents still works the bank.
+
 ## 573 amended, economy's side. The record's charge helpers retired
 
 Dungeon's 573 amended (1beb8148) moved the resurrection charges onto the
@@ -55719,3 +55729,74 @@ axe, not on these rows. combat_test _test_axe_arcs: the giant axe knocks
 down five for 6 each, the battle axe three for 5, never the one behind,
 both wound up 6; the pace rows and items_test's verb rows moved with it.
 Data and tests; protocol unchanged; no class_name.
+## 916. The taught fisher (economy; npc, items, maps, voice and animation land their sides under it)
+
+Jeff, 11-14, on the town-fish page: "Id rather it be several avenues of impact from the player like
+teaching npca fishing by taking them to the pond or stream.. setting up and capturing harvesting
+points, etc. not just a background calculation". The four trees' page
+(C:/dev/review/economy/player_feeds_town.md) was approved as the direction, and this is its first
+package: a resident a player teaches to fish at Snagfin's Fishin' Hole (the pond by town) is the
+town's fisherman for good. It lands OFF. Every piece is switched off until all are on main, and
+npc switches it on in one take after playtest's joined look of the whole.
+
+Economy's side (this take; nothing acts until npc's teach calls it):
+
+- **Teaching.** Towns.teach_fisher(town, who, water, spot) is npc's teach's call at the third
+  catch. It makes the resident's trade fisherman for good (Production.retrain: a bench they held
+  and its job are left for the town to fill again by its own rule), and gives them their own site
+  (Production.set_own_site, saved with the worker): {id: the water's stock, Economy's pond id
+  (World.pond_at), kind fishing, area, cell: the spot, maps' "fisherman" work spot on the dock's
+  end}. It marks the site "own", so Production.site_blocked asks only whether its ground is
+  contested, with no Holdings place to hold. It returns false, changing nothing, for one not of the
+  town, one already a fisherman, or no water. Towns.seated(who) and Towns.has_fisher(town) are what
+  npc's offer row asks.
+- **The water's raise.** Teaching raises the water's fish and refill by taught_fisher.share (6):
+  the pond by town goes from 40 and 40 to 46 and 46. From then the water keeps a second count,
+  "without", the fish it would hold without her, on its old rule (Economy.pond_teach). A player's
+  catch takes from both counts. She takes only what the water holds above that count
+  (Economy.pond_take). So whatever a player does there, at any moment they find at least what they
+  would have found without her (the coordinator's condition: teaching her never leaves a player
+  fewer fish).
+- **Her day** is 594's trip (Towns._fish, Production.site_turn and trip, as the hunter's). A trip
+  sets out only while (_taught_sets_out):
+  - today's share is not yet in;
+  - her day has her at work both as she sets out and when she is due home (Towns.at_work; Main
+    reads Resident.doing_at for "fisherman", the clock her body keeps, so a trip never runs into
+    her rest);
+  - her water is safe (Towns.water_safe, npc's to set; safe while unset).
+  As she sets out, the trip's catch is decided (Towns._taught_sets_catch): taught_fisher.catch (2)
+  fish, scaled by the season and capped at what is left of the day's share, taken from the water
+  by pond_take. It is carried as Production.trip(id)["fish"] (saved in the trip's catch as
+  "fish:<n>"), so her body's show at the water (npc's, the coordinator's ruling on animation's
+  side) lands a fish only on a trip that yields, and an empty trip shows casts and nothing. At
+  back_at, when her body is home (npc's _fisher_task walks to the spot and back on the trip's from
+  and back_at), the fish are banked at the store as "<her name>'s catch". A trip that took none is
+  a walk home with nothing ("[towns] <town>: <her name> home from the water with nothing"). The
+  town log has "<name>, the <old trade>, is taught to fish". No line names a player.
+- **Sizing.** A share of 6 a game day, beside one field's 6 or so, closes most of a 12-person
+  town's shortfall of about 8. It is tuned by a 175-day soak on saturn, asked of the coordinator
+  once the package is built.
+
+Off until the switch-on: nothing here acts until someone is taught, and only npc's offer teaches.
+The rules sit in economy.json "taught_fisher" {share, catch}, with no flag of their own.
+
+Tests (production_test):
+- _test_taught_fisher:
+  - nothing is taught without a water or a resident;
+  - taught, her trade is fisherman and the water holds 46;
+  - her own site is saved and loaded;
+  - she makes trips to her spot, and the store's fish rise only at back_at;
+  - at most 6 fish a game day;
+  - out of her work hours, and on an unsafe day, she doesn't go;
+  - with the water fished down by a player, she walks home with nothing;
+  - retrained away, she has no water of her own.
+- _test_water_beside_her, at the pond by town (40, full each day) and at an 8-and-2 water over 12
+  days, in different orders: a player beside her lands no fewer fish than alone, and the count
+  without her never stands above the water's.
+- Not here: the dock's spot answering the pond's ponds.at key. That is maps' level_test pin with
+  its pond-names take (805 amended (20)). Measured headless on v0.1.215 (d974d9b6c) and on maps'
+  take, all 127 of the pond's cells answer "wilds/pool_221_224" (40, full each day), so 916 doesn't
+  wait on it. The Fishin' Hole place keeps the key if the pond is ever reshaped.
+
+Server only; wire unchanged (no message, RPC or replicated value is new); no new class_name. No
+CHANGELOG bullet: voice's one bullet comes with npc's switch-on.

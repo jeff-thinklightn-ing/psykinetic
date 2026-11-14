@@ -61,6 +61,8 @@ func _ready() -> void:
 	_test_world_tick()
 	_test_sites()
 	_test_fisherman()
+	_test_taught_fisher()
+	_test_water_beside_her()
 	_test_made_needs()
 	_test_mail_never_made()
 	_test_workshop_makes()
@@ -360,7 +362,12 @@ func _test_fisherman() -> void:
 	_now += 4 * DayNight.day_steps
 	towns.tick()
 	var fishers := towns.residents(STORE).filter(func(id: String) -> bool: return "fisherman" in _work.worker(id)["trades"])
-	_check(fishers.size() == 1, "a village with a fishing place: a fisherman comes (%s)" % [fishers])
+	_check(fishers.is_empty() and not towns.has_fisher(STORE),
+		"594 amended (1): a village with a fishing place, and no fisherman comes on his own (%s)" % [fishers])
+	# One of the town's who fishes (an old save's fisherman) still works its fishing place.
+	_work.add_worker("finn", "Finn", ["fisherman"], STORE)
+	towns._town(STORE)["residents"].append("finn")
+	_check(towns.has_fisher(STORE), "with a fisherman among its residents, the town has one")
 	var until := _now + 7000
 	while _now < until:
 		_now += World.WORLD_TICK_STEPS
@@ -373,6 +380,161 @@ func _test_fisherman() -> void:
 		_now += World.WORLD_TICK_STEPS
 		towns.tick()
 	_check(_stock.count(STORE, "fish") == had, "goblins on the bank: no fish")
+
+
+## The taught fisher (916): a resident a player teaches to fish is the town's
+## fisherman for good, her trips to her own spot at her water in her work
+## hours, the fish taken from its stock (only what stands above its count
+## without her) and banked as she comes home, never before; at most the day's
+## share; an empty trip banks nothing; an unsafe day she stays; saved.
+func _test_taught_fisher() -> void:
+	print("\n== the taught fisher (916) ==")
+	var file := Production.read_rules()
+	var rules := RULES.duplicate(true)
+	rules["sites"] = file["sites"]
+	rules["fisherman"] = file["fisherman"]
+	rules["taught_fisher"] = file["taught_fisher"]
+	rules["stages"] = file["stages"]
+	_check(int(file["taught_fisher"]["share"]) == 6 and int(file["taught_fisher"]["catch"]) == 2,
+		"the rules are economy.json's: 6 a game day, 2 a trip")
+	_fresh({}, rules)
+	var clock := func() -> int: return _now
+	var economy := Economy.new({}, _stock, _work, clock, {"ponds": file["ponds"]}, func() -> Dictionary: return CATALOG)
+	const WATER := "wilds/pool_221_224"
+	var towns := Towns.new({}, _work, rules, clock)
+	towns._town(STORE)
+	towns.fish_teach = economy.pond_teach
+	towns.fish_take = economy.pond_take
+	var working := [true]
+	towns.at_work = func(_who: String, _from: int, _to: int) -> bool: return working[0]
+	var safe := [true]
+	towns.water_safe = func(_town: String, _who: String, _site: Dictionary) -> bool: return safe[0]
+	_work.add_worker("wynn", "Wynn", ["woodcutter"], STORE)
+	towns._town(STORE)["residents"].append("wynn")
+	towns._town(STORE)["residents"].append("dag")
+	var spot: Vector2i = _holdings.place(STORE)["cell"] + Vector2i(10, 0)
+	_check(not towns.has_fisher(STORE) and not towns.seated("wynn") and towns.seated("dag"),
+		"before: no fisher, the woodcutter unseated, the carpenter at his bench")
+	_check(not towns.teach_fisher(STORE, "wynn", "", spot) and not towns.teach_fisher(STORE, "nobody", WATER, spot),
+		"no water, or not one of the town: nothing taught")
+	var before := economy.pond_fish(WATER)
+	_check(towns.teach_fisher(STORE, "wynn", WATER, spot), "taught at the pond by town")
+	_check(_work.worker("wynn")["trades"] == ["fisherman"] and towns.has_fisher(STORE) and not towns.teach_fisher(STORE, "wynn", WATER, spot),
+		"her trade is fisherman for good; the town has its fisher; taught once")
+	_check(before == 40 and economy.pond_fish(WATER) == 46, "the water holds 6 more: %d, then %d" % [before, economy.pond_fish(WATER)])
+	var site := _work.site_for(STORE, "wynn", "fisherman")
+	var saved := Production.new(JSON.parse_string(JSON.stringify(_work.to_dict())), _stock, _holdings, clock, rules)
+	_check(site.get("id") == WATER and site.get("cell") == spot and bool(site.get("own", false))
+		and saved.site_for(STORE, "wynn", "fisherman").get("cell") == spot,
+		"her site is her spot at the water, saved and loaded (%s)" % [site])
+
+	# Her day: trips only while at work and safe; each trip's fish in the store only once she is home.
+	var fish_at := func() -> int: return _stock.count(STORE, "fish")
+	var early := true
+	var told: Array = []  # Each trip's "fish" as she set out (what her body's show lands).
+	var banked: Array = []  # What reached the store as she came home.
+	var back_at := -1
+	var trips := 0
+	var day0 := _now / DayNight.day_steps
+	while _now / DayNight.day_steps == day0 or _now % DayNight.day_steps < DayNight.day_steps / 2:
+		var had: int = fish_at.call()
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		var trip := _work.trip("wynn")
+		if not trip.is_empty() and int(trip["back_at"]) != back_at:
+			back_at = int(trip["back_at"])
+			trips += 1
+			early = early and trip["site"].get("cell") == spot and trip.has("fish")
+			told.append(int(trip.get("fish", -1)))
+		if fish_at.call() > had:
+			banked.append(fish_at.call() - had)
+		if fish_at.call() > had and _now < back_at:
+			early = false
+	var first_days: int = fish_at.call()
+	_check(told.filter(func(n: int) -> bool: return n > 0) == banked,
+		"each trip's catch is known as she sets out, and what she banks is that (told %s, banked %s)" % [told, banked])
+	_check(trips >= 3 and early and first_days > 0 and first_days <= 2 * 6,
+		"she walks to her spot and home %d times; her fish reach the store only as she comes home, %d in all, at most 6 a day" % [trips, first_days])
+	var day := _now / DayNight.day_steps
+	var today := 0
+	while _now / DayNight.day_steps == day:
+		var had: int = fish_at.call()
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		today += fish_at.call() - had
+	_check(today <= 6, "the rest of that game day: %d fish more, never past the share" % today)
+
+	working[0] = false
+	while not _work.trip("wynn").is_empty():  # A trip already out comes home first.
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+	var idle: int = fish_at.call()
+	for k in 40:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+	_check(fish_at.call() == idle and _work.trip("wynn").is_empty(), "out of her work hours: she doesn't set out")
+	working[0] = true
+	safe[0] = false
+	for k in 40:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+	_check(fish_at.call() == idle and _work.trip("wynn").is_empty(), "an unsafe day: she stays in town")
+	safe[0] = true
+
+	# A player has fished the water down to what it would hold without her: she walks home with nothing.
+	_now = (_now / DayNight.day_steps + 1) * DayNight.day_steps
+	while economy.pond_catch(WATER, "p1", 0.0):
+		pass
+	var empty: int = fish_at.call()
+	var walked := false
+	for k in 60:
+		_now += World.WORLD_TICK_STEPS
+		towns.tick()
+		walked = walked or not _work.trip("wynn").is_empty()
+		if _now % DayNight.day_steps < World.WORLD_TICK_STEPS:
+			break
+	_check(walked and fish_at.call() == empty and economy.pond_fish(WATER) == 0, "the water fished out by a player: she goes and comes home with nothing")
+
+	# Retrained away, her water goes with the trade.
+	_work.retrain("wynn", "woodcutter")
+	_check(not _work.worker("wynn").has("site") and not towns.has_fisher(STORE), "retrained: no fisher, no water of her own")
+
+
+## The condition on the stock (916, the coordinator's (3)): a player fishing a
+## water every day beside a taught fisher lands no fewer fish than alone, at
+## the pond by town (40, full again each day) and at any other water (8, 2 a
+## day back); the count without her never stands above what it holds.
+func _test_water_beside_her() -> void:
+	print("\n== a player beside her lands no fewer (916) ==")
+	var file := Production.read_rules()
+	for water: String in ["wilds/pool_221_224", "wilds/test_pond"]:
+		_now = 0
+		var clock := func() -> int: return _now
+		var with_her := Economy.new({}, null, null, clock, {"ponds": file["ponds"]}, func() -> Dictionary: return CATALOG)
+		var alone := Economy.new({}, null, null, clock, {"ponds": file["ponds"]}, func() -> Dictionary: return CATALOG)
+		with_her.pond_teach(water, 6)
+		var fewer := 0
+		var above := true
+		var hers := 0
+		var mine := [0, 0]
+		for d in 12:
+			# Her three trips and the player's casts in a different order each day; some days he empties it.
+			var casts: int = [5, 60, 15, 0, 40, 3][d % 6]
+			var order: Array = [["her", "him", "her", "her"], ["him", "her", "her", "her"], ["her", "her", "her", "him"]][d % 3]
+			for who: String in order:
+				_now += DayNight.day_steps / 6
+				if who == "her":
+					hers += with_her.pond_take(water, 2)
+					continue
+				for c in casts:
+					mine[0] += int(with_her.pond_catch(water, "p1", 0.1))
+					mine[1] += int(alone.pond_catch(water, "p1", 0.1))
+				above = above and int(with_her._ponds[water].get("without", 0)) <= with_her.pond_fish(water)
+			if mine[0] < mine[1]:
+				fewer += 1
+			_now = (d + 1) * DayNight.day_steps
+		_check(fewer == 0 and mine[0] >= mine[1] and above and hers > 0,
+			"%s, 12 days: he lands %d beside her, %d alone; she brought %d; the count without her never above the water's" % [water, mine[0], mine[1], hers])
 
 
 ## Work sites (decision 521): a trade works from its town's site of its

@@ -4960,6 +4960,22 @@ func _boot() -> void:
 		# A town's gatherers re-seated on its turn when lacking (767 amended): as at boot, a store the town holds.
 		World.towns.gatherers_here = func(town: String) -> bool:
 			return World.holdings != null and World.holdings.place(town).get("kind") == "stockpile" and World.holdings.holder(town) == "town"
+	# The taught fisher (916): her water's stock is Economy's (its raise when she is taught, and
+	# only what it holds above its count without her taken); her hours are the day her body keeps,
+	# at work both as she sets out and as she is due home. water_safe is npc's to set.
+	World.towns.fish_teach = func(water: String, share: int) -> void:
+		if World.economy != null:
+			World.economy.pond_teach(water, share)
+	World.towns.fish_take = func(water: String, wanted: int) -> int:
+		return int(World.economy.pond_take(water, wanted)) if World.economy != null else 0
+	World.towns.at_work = func(who: String, from: int, to: int) -> bool:
+		var type := str(World.production.worker(who).get("type", ""))
+		var trade := str(World.towns.rules.get("fisherman", {}).get("trade", "fisherman"))
+		for at: int in [from, to]:
+			if Resident.doing_at(trade, DayNight.hour(at), Season.name_at(at), type, who, Townsfolk.day_of(at),
+					Townsfolk.mood_of(World.production, who)) != Resident.Doing.WORK:
+				return false
+		return true
 	# Wells and roofs (decision 426): a town's are its level's.
 	World.towns.wells = func(town: String) -> int:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})

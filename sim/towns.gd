@@ -160,6 +160,15 @@ signal hut_changed(place_id: String)
 ## for nobody. Unset: its workshop's worker, while alive, not away and not
 ## held at a camp.
 var hut_keeper := Callable()
+## The taught fisher (916; Main sets them from Economy and the residents' day, tests stand in):
+## (water, share) -> void, Economy.pond_teach; (water, wanted) -> int, Economy.pond_take, the fish
+## she may take (none while unset); (who, from, to) -> bool, whether her day has her at work at
+## both steps (Resident.doing_at, the clock her body keeps; at work while unset); (town, who,
+## site) -> bool, whether her water is safe to go to as she sets out (safe while unset).
+var fish_teach := Callable()
+var fish_take := Callable()
+var at_work := Callable()
+var water_safe := Callable()
 ## (hut_id, keeper_id, needs) -> bool: the keeper buys a mend's supplies
 ## from the store of the hut's town, brought to the hut (733; Main, through
 ## Economy.hut_supplies). Nothing bought, no mend, while unset.
@@ -775,7 +784,6 @@ func tick() -> void:
 		_woodcut(town)
 		_woodcutter_comes(town)
 		_fish(town)
-		_fisherman_comes(town)
 		_stage_turn(town)
 		_decline(town)
 		_maker_comes(town)
@@ -2564,11 +2572,14 @@ func _felled(town: String, site: Dictionary, wood: int, worker: Dictionary) -> i
 ## the town's fishing place on the bank and back (Production.site_turn, as
 ## the woodcutter) and brings fisherman.catch fish, the season's scale of
 ## it, into the store at its price. A bank the town doesn't hold yields
-## nothing; no fishing place, no fishing.
+## nothing; no fishing place, no fishing. A taught fisher (916) goes to her
+## own water's spot instead, and only as _taught_sets_out and _taught_catch
+## allow. Since 594 amended (1) no fisherman comes on his own: a town has one
+## only by a player teaching one of its residents.
 func _fish(town: String) -> void:
 	var rule: Dictionary = rules.get("fisherman", {})
 	var trade := str(rule.get("trade", ""))
-	if trade.is_empty() or production.site_of(town, trade).is_empty():
+	if trade.is_empty():
 		return
 	var record := _town(town)
 	var due: Dictionary = record.get("fish_due", {})
@@ -2578,32 +2589,122 @@ func _fish(town: String) -> void:
 		var worker := production.worker(who)
 		if worker.is_empty() or trade not in worker.get("trades", []) or Production.off_work(worker):
 			continue
+		var site := production.site_for(town, who, trade)
+		if site.is_empty():
+			continue
+		var own := bool(site.get("own", false))
 		if not due.has(who):
 			due[who] = now() + every
 			continue
 		if now() < int(due[who]):
 			continue
+		var setting_out := own and production.trip(who).is_empty()
+		if setting_out and not _taught_sets_out(town, who, site):
+			continue
 		var trip := production.site_turn(town, who, trade)
 		if trip == Production.WALKING:
+			if setting_out:
+				_taught_sets_catch(town, who, site)
 			continue
 		due[who] = now() + every
 		if trip != Production.BACK:
+			continue
+		if own:
+			_taught_catch(town, who, worker, site)
 			continue
 		var fish := floori(int(rule.get("catch", 2)) * season_scale())
 		if fish > 0:
 			production.deliver_to(town, who, "fish", fish, "fisherman:%s" % who, "%s's catch" % worker["name"])
 
 
-## A town that holds a fishing place on its river's bank and has reached
-## fisherman.stage gets a fisherman, a newcomer, once it has waited
-## fisherman.growth_days (594).
-func _fisherman_comes(town: String) -> void:
-	var rule: Dictionary = rules.get("fisherman", {})
-	var trade := str(rule.get("trade", "fisherman"))
-	var stages: Array = rules.get("stages", []).map(func(each: Variant) -> String: return str(each.get("name", "")) if each is Dictionary else "")
-	var wanted: bool = not rule.is_empty() and not production.site_of(town, trade).is_empty() \
-			and stages.find(stage(town)) >= stages.find(str(rule.get("stage", "")))
-	_comes(town, trade, wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Finn"]), "fisherman")
+## Whether [param town]'s taught fisher [param who] sets out for her water
+## [param site] now (916): today's share not yet brought in, her day at work
+## from now until she is home (at_work, the clock her body keeps, so the trip
+## never runs into her rest), and the water safe (water_safe).
+func _taught_sets_out(town: String, who: String, site: Dictionary) -> bool:
+	if _fish_left(town, who) <= 0:
+		return false
+	var span := production.site_walk(town, site)
+	if at_work.is_valid() and not bool(at_work.call(who, now(), now() + span)):
+		return false
+	return not water_safe.is_valid() or bool(water_safe.call(town, who, site))
+
+
+## The fish [param town]'s taught fisher [param who] may still bring in
+## today: taught_fisher.share a game day, less what she has.
+func _fish_left(town: String, who: String) -> int:
+	var today: Dictionary = _town(town).get("fish_today", {})
+	var day := now() / maxi(DayNight.day_steps, 1)
+	var had: Array = today.get(who, [day, 0])
+	return int(rules.get("taught_fisher", {}).get("share", 6)) - (int(had[1]) if int(had[0]) == day else 0)
+
+
+## A taught fisher setting out for her water (916): her trip's catch is
+## decided now, so her body's show at the water (npc's) lands a fish only on a
+## trip that yields: taught_fisher.catch fish, the season's scale, within the
+## day's share, taken from the water's stock (fish_take: only what it holds
+## above its count without her) and carried as the trip's "fish"
+## (Production.trip).
+func _taught_sets_catch(town: String, who: String, site: Dictionary) -> void:
+	var wanted := mini(floori(int(rules.get("taught_fisher", {}).get("catch", 2)) * season_scale()), _fish_left(town, who))
+	var got := int(fish_take.call(str(site["id"]), wanted)) if fish_take.is_valid() and wanted > 0 else 0
+	production.set_trip_fish(who, got)
+	var record := _town(town)
+	var today: Dictionary = record.get("fish_today", {})
+	record["fish_today"] = today
+	var day := now() / maxi(DayNight.day_steps, 1)
+	var had: Array = today.get(who, [day, 0])
+	today[who] = [day, (int(had[1]) if int(had[0]) == day else 0) + got]
+
+
+## A taught fisher home from her water (916): the fish her trip took, banked as
+## she comes in; a trip that took none is a walk home with nothing.
+func _taught_catch(town: String, who: String, worker: Dictionary, _site: Dictionary) -> void:
+	var got := production.take_trip_fish(who)
+	if got > 0:
+		production.deliver_to(town, who, "fish", got, "fisherman:%s" % who, "%s's catch" % worker["name"])
+	else:
+		print("[towns] %s: %s home from the water with nothing, step %d" % [town, worker["name"], now()])
+
+
+## Whether resident [param who] holds a bench of their trade (916: npc's
+## offer to teach goes only to one who doesn't).
+func seated(who: String) -> bool:
+	return _seated(who)
+
+
+## Whether [param town] has a fisherman among its residents (916: npc's
+## offer to teach goes only to a town without one).
+func has_fisher(town: String) -> bool:
+	var trade := str(rules.get("fisherman", {}).get("trade", "fisherman"))
+	return residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", []))
+
+
+## [param town]'s resident [param who] is taught to fish (916, the taught
+## fisher; npc's teach calls it at the third catch): their trade is
+## fisherman for good (Production.retrain: a bench they held and its job
+## left for the town to fill again), their own site the spot [param spot]
+## (a cell of the town's area) at the water whose stock is [param water]
+## (Economy's pond id, World.pond_at), and the water holds and refills
+## taught_fisher.share more a game day (fish_teach). Her day takes her there
+## after. False (nothing changed) for one not of the town, already a
+## fisherman, or no water.
+func teach_fisher(town: String, who: String, water: String, spot: Vector2i) -> bool:
+	var trade := str(rules.get("fisherman", {}).get("trade", "fisherman"))
+	var worker := production.worker(who)
+	if water.is_empty() or worker.is_empty() or who not in residents(town) or trade in worker.get("trades", []):
+		return false
+	var trades: Array = worker.get("trades", [])
+	var was := str(trades[0]) if not trades.is_empty() else ""
+	production.retrain(who, trade)
+	production.set_own_site(who, {"id": water, "kind": "fishing", "area": town.get_slice("/", 0), "cell": spot})
+	if fish_teach.is_valid():
+		fish_teach.call(water, int(rules.get("taught_fisher", {}).get("share", 6)))
+	var due: Dictionary = _town(town).get("fish_due", {})
+	due[who] = now() + DayNight.day_steps / 4  # Not out again the hour she is taught; her day decides after.
+	_town(town)["fish_due"] = due
+	_note(town, "%s, the %s, is taught to fish" % [worker["name"], was if not was.is_empty() else "hand"])
+	return true
 
 
 ## Whether [param town] has reached stage [param name] of rules' "stages"
