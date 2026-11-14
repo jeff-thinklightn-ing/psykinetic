@@ -1826,6 +1826,7 @@ func _test_ambush() -> void:
 	World.spawn(player, Vector2i(3, 2))
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 	_test_lunge()
+	_test_backstab_clearly_behind()
 	_test_told_weapons_only()
 	_test_shield_wall()
 	_test_plain_lead()
@@ -10073,3 +10074,60 @@ func _test_freed_striker_den_walk() -> void:
 					start, den, "in %.1f s" % (reached / 10.0) if reached >= 0 else "never in 60 s, at %s" % beast.tile])
 	DayNight.reset()
 	Monster.idling = true
+
+
+## 790 amended (10) (playtest's open-air crouch run, 11-13: a robber due east of a
+## player facing south backstabbed her 26 minutes and never lunged, the rear
+## half's edge read through the bodies' drift): a robber chooses his backstab
+## only when clearly behind her, past about 110 degrees from her facing;
+## side-on he lunges, told; a hair either side of side-on, on ten seeds, is
+## the lunge every time; once chosen for a strike the choice stands.
+func _test_backstab_clearly_behind() -> void:
+	print("%s== 790 amended (10): a robber backstabs only when clearly behind; side-on he lunges ==" % char(10))
+	# Side-on: she faces south, he stands due beside her (the hills' run).
+	var pair := _lunge_room()
+	var robber: Monster = pair[0]
+	var player: Player = pair[1]
+	player.facing = Vector2i(0, 1)
+	robber.next_attack_tick = 0
+	robber._strike()
+	var id := int(robber._ambush.get("telegraph", 0))
+	_check(str(robber._ambush.get("move", "")) == "lunge" and World._telegraphs.has(id) and World.winding(robber).is_empty(),
+		"side-on he lunges, told (%s), the crouch's tell" % robber._ambush.get("move", "nothing"))
+	# Clearly behind: she faces away from him.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	player.facing = Vector2i(1, 0)
+	robber.next_attack_tick = 0
+	robber._strike()
+	_check(robber._ambush.is_empty() and int(World.winding(robber).get("bonus", 0)) == robber.backstab_damage and robber.backstab_damage > 0,
+		"behind her he winds up his backstab, told (bonus %d)" % int(World.winding(robber).get("bonus", 0)))
+	# A hair either side of side-on, ten seeds: never the backstab.
+	var rng := RandomNumberGenerator.new()
+	var backstabs := 0
+	for k in 10:
+		rng.seed = k
+		var hair := rng.randf_range(0.001, 0.05)
+		for side: float in [-1.0, 1.0]:
+			for way: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+				var across := Vector2(-way.y, way.x)
+				if Monster.clearly_behind_offset(across + Vector2(way) * side * hair, way):
+					backstabs += 1
+	_check(backstabs == 0, "a hair either side of side-on, ten seeds and four facings: the lunge every time (%d backstabs)" % backstabs)
+	# The edge itself, about 110 degrees: 100 is not behind, 120 is.
+	var at := func(degrees: float) -> Vector2: return Vector2.RIGHT.rotated(deg_to_rad(degrees))
+	_check(not Monster.clearly_behind_offset(at.call(100.0), Vector2i(1, 0)) and Monster.clearly_behind_offset(at.call(120.0), Vector2i(1, 0))
+		and Monster.clearly_behind_offset(at.call(180.0) * 3.0, Vector2i(1, 0)),
+		"past about 110 degrees from her facing he is behind, short of it not, at any distance")
+	# Chosen once a strike: she turns her back after he chose; he keeps the lunge till it lapses.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	player.facing = Vector2i(0, 1)
+	_check(not robber._chooses_backstab(), "side-on: he chooses the lunge")
+	player.facing = Vector2i(1, 0)
+	World.tick += Monster.STRIKE_CHOICE_TICKS - 1
+	var kept := not robber._chooses_backstab()
+	World.tick += 2
+	_check(kept and robber._chooses_backstab(), "she turned: he keeps the lunge for that strike, then chooses again (the backstab)")

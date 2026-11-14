@@ -692,6 +692,19 @@ var charge_range := CHARGE_RANGE
 var charge_pace := CHARGE_PACE
 var dart_after_ticks := DART_AFTER_TICKS
 var backstab_damage := BACKSTAB_DAMAGE
+## 790 amended (10) (the coordinator's ruling on playtest's open-air crouch run,
+## 11-13): a FLANK foe chooses its told backstab only when clearly behind its
+## target, more than about 110 degrees round from her facing (the unit
+## offset's dot on her facing under this); side-on, or anything short of
+## that, it is its told lunge (clearly_behind).
+const CLEARLY_BEHIND_DOT := -0.34
+## The choice it made for the strike it is about to make (true: the
+## backstab), kept for that strike, till a blow begins or this many ticks
+## pass, so the bodies' drift at the edge never flips it (_chooses_backstab).
+const STRIKE_CHOICE_TICKS := 20
+var _strike_behind := false
+var _strike_chosen_until := -1
+var _strike_chosen_on: GridEntity = null
 var pace_spread := PACE_SPREAD
 var cooldown_spread := COOLDOWN_SPREAD
 var flank_patience_ticks := FLANK_PATIENCE_TICKS
@@ -1450,6 +1463,9 @@ func forget(gone: GridEntity) -> void:
 		_quarry = null
 	if _wallow_from == gone:
 		_wallow_from = null
+	if _strike_chosen_on == gone:
+		_strike_chosen_on = null  # 790 amended (10): its strike's choice was for gone.
+		_strike_chosen_until = -1
 
 
 ## noticing off: nobody seen or heard; it idles, IDLE.
@@ -1694,8 +1710,10 @@ func _strike() -> void:
 			World.face(self, direction)
 			_world_winding(direction, windup_ticks)
 		Tactic.FLANK:
-			var behind := (World.body_centre(self) - World.body_centre(target)).dot(Vector2(target.facing)) < 0.0
+			# Clearly behind her, or not (790 amended (10): side-on is the lunge), chosen once a strike.
+			var behind := _chooses_backstab()
 			if not behind and begin_lunge(target):
+				_strike_chosen_until = -1
 				return  # From in front or side-on, told (790 amended (4)).
 			if behind:
 				# From behind, told too (the coordinator's approval of combat's
@@ -1704,11 +1722,14 @@ func _strike() -> void:
 				# "bonus"). Before, at once and untold.
 				if _stood_settle() and World.try_wind_up(self, target, lead_ticks):
 					wind_up["bonus"] = backstab_damage
+					_strike_chosen_until = -1
 					_recover_after_blow()
 					if pack_id != "":
 						_dart_out()  # A pack's: in, and out again (824).
-			elif _blow() and pack_id != "":
-				_dart_out()
+			elif _blow():
+				_strike_chosen_until = -1
+				if pack_id != "":
+					_dart_out()
 		_:
 			if _blow() and tactic == Tactic.DART:
 				_dart_out()
@@ -2050,6 +2071,35 @@ func _breaks() -> bool:
 	_call_to = mate.tile
 	_alert_until = World.tick + CALL_RUN_TICKS
 	return true
+
+
+## FLANK (790 amended (10)): whether the strike it is about to make is its
+## backstab. Chosen by clearly_behind when it has no choice standing for this
+## target, then kept till a blow begins (_strike clears it) or
+## STRIKE_CHOICE_TICKS pass.
+func _chooses_backstab() -> bool:
+	if World.tick > _strike_chosen_until or _strike_chosen_on != target:
+		_strike_behind = clearly_behind(self, target)
+		_strike_chosen_until = World.tick + STRIKE_CHOICE_TICKS
+		_strike_chosen_on = target
+	return _strike_behind
+
+
+## Whether [param by] stands clearly behind [param of] (790 amended (10)): its
+## centre more than about 110 degrees round from where [param of] faces
+## (clearly_behind_offset). Not World.is_behind, the rear half, which stays
+## the player's (a bonus, the coordinator's).
+static func clearly_behind(by: GridEntity, of: GridEntity) -> bool:
+	return clearly_behind_offset(World.body_centre(by) - World.body_centre(of), of.facing)
+
+
+## Whether [param offset] (a foe's centre less its target's) lies clearly
+## behind a target facing [param facing]: normalised, so the rule is the
+## same at any distance; no offset or no facing is never behind.
+static func clearly_behind_offset(offset: Vector2, facing: Vector2i) -> bool:
+	if offset.is_zero_approx() or facing == Vector2i.ZERO:
+		return false
+	return offset.normalized().dot(Vector2(facing).normalized()) < CLEARLY_BEHIND_DOT
 
 
 ## FLANK: beside its target's front (where it faces, or either side of it).
