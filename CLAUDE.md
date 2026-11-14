@@ -96,6 +96,14 @@ that the walk looks like skipping and the people look like "bad claymation place
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, import, `bash
   tests/land.sh` (it sees your take and doesn't queue again), push,
   `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> $kind`.
+  Since 667 amended (3) (ffeb4a634) a land script's push is `sh tools/land_push.sh <tree>
+  <tested sha>` in place of its own `git push`: `<tree>` is the lock take's name, `<tested
+  sha>` the 40-hex sha the `LANDING TESTS: PASS ... tested <sha>` line names, called only
+  after that PASS line with the lock still held. Each try is cut at 60 s; a network error is
+  tried twice more, a minute apart, a refusal never (buildings' street check passed its tests
+  and lost its turn to a five-minute connection timeout, 2026-11-13). Exit 0: on main; 1: not
+  landed, run the landing again from the start; 2: a usage fault; 3: main frozen, release the
+  gate's take and requeue. Every try is logged in `C:/dev/land.lock.log`.
   Since 878 (Jeff, 2026-11-11: "go ahead and move landings' test runs to saturn") a landing's
   Godot tests (the suite, state_test, net_test) run on saturn through `tools/remote_tests.sh`,
   in about 8 minutes, with server_boot_test and the tool tests here: `kind` prints
