@@ -24908,6 +24908,66 @@ place a fire place by Main.fire_places, on a cell the terrain lays fire on (the 
 draws and hears). The first room's gap is buildings' (782 amended, the coordinator's routing: one
 handler for setup's room and every rebuilt one). Test and docs only; protocol unchanged, no new
 class_name.
+578 amended (4) (the script's label; Jeff's answer C to the day bed's two clips, 11-12: "play it once
+on arrival then fade to village chatter mixed in with work sounds at slightly higher level but still
+faint"; the coordinator's approval of the design and of clip 14 by its numbers, 11-14; Jeff's answer on
+C:/dev/review/answered_pages/umbrage-day-sound.md, 11-14: "Yes perfect but it needs multiple variations
+so its not a loop", the coordinator's approval of the variations as below): the town by day. It was one
+58 s market recording (Sonniss, UK) looping at full within 10 cells of any building, the same at the
+square, the temple and the huts, round 2.5 times in a 146 s walk (sound's second worst thing in
+Umbrage, 11-11). Now:
+(a) The arrival, amb.town_arrival (-14 dB: a cut's first 25 s about -41 to -44 at the ear): five
+stretches of that market recording (its 180 s: the take that was the bed, from 10 s, and 37 s cuts from
+48, 84, 120 and 143 s), one played once: on crossing into a town (its weight past 0.5) by day (the
+day's share at least 0.5) after 180 s outside every town's reach (weight 0), or on joining into one;
+never twice within 600 s, and never the cut last played (Ambience.next_take); full 25 s, gone over the
+next 10; under the town's day weight, so walking out takes it with the bed. Time indoors counts neither
+way, so a door is no arrival; a respawn or a link is one only under the same outside rule
+(Ambience.arrival_step).
+(b) The chatter, amb.town_chatter: six CC0 recordings of crowd murmur from freesound, 337 s in all,
+whole, cut off above 650 Hz (three low-pass passes) so only the rise and fall of voices is left: kyles
+637466 and blaastaal 766658 as heard in clip 14, and IENBA 653920 (performed walla), IENBA 867051 (a
+street crowd), Mariayolanda511 850562 (a theatre audience, "without any single conversation being
+intelligible") and kyles 452484 (students in a theatre), each screened on its page; brunoboselli 757318
+was dropped (a conference coffee break, real conversations, mainly English). Each take peaked so its
+bursts' median loudest 50 ms matches the first's. Bursts of 3 to 10 s faded in and out over 0.8 s,
+with rests of 4 to 15 s, one in five begun at 0.4 to 0.8 of the last; none in an arrival's first 22 s.
+At -13.5 dB a burst's loudest 50 ms is about -46 at the ear (the takes' medians -43 to -48), under two
+people talking two cells off (-38). The bursts are dealt from a deck (Ambience.deal): every take cut
+into consecutive pieces from a random start, shuffled, never the same take twice running, so no piece
+comes again until the deck is spent (about 10 minutes of town by day), the next deck cut at new points
+with what was heard in the last one's second half put at its back; each burst at a pitch within 5% of
+its own. Clip 15 in C:/dev/review/sound/umbrage_ears is the chatter alone across all six, for Jeff's ear.
+(c) The floor: amb.town_day is now open meadow air, bruno.auzet's la vilaine summer meadow (CC0): pm1
+(810415) from 0 to 205 s, pm3 (810412) from 0 to 152 s and 312 to 383 s cross-faded, both clear of a
+held 5.3 kHz bell tone and of close loud sound; at -19 dB about -54 and -56 mean at the ear, its
+loudest under the chatter's. It is not looped: it is dealt as the chatter is, in stretches of 40 to 90 s
+cross-faded over 4 s, never within 2 s of a take's ends, each deck laid in the order its parts were heard
+in the last (one take's two parts in a row have no seam, so the floor may take one twice running), so it
+has no period and its loop seam is never heard.
+(d) Far work: a stroke a resident's own work clip lays (Client3D._stroke_sounds, from its replicated
+word: chop, saw or hammer) beyond its slot's range and within 40 cells, with the listener outdoors
+under the sky, plays faint and dull (Ambience.far_stroke): its loudest 50 ms -52 dB at the ear (the
+stroke takes are cut to -16) on Ambience_Far, the Ambience bus's twin cut off above 2 kHz
+(Sfx.apply_volumes), from the stroke's own takes, never the same twice running. Within the range it is
+Sfx's, as before. Only while the word is live: none at rest, asleep, or once the bout ends; nothing new
+on the wire (interest's own reach, about 36 cells held to 44, bounds it).
+Every time here and the far work's level are one table, Ambience.TOWN_DAY, and the other levels the
+three slots' volume_db, so "louder, fainter, rarer" is a number changed. sound_kit_test
+_test_town_day: the arrival rule (joining, three minutes out, ten minutes between, night, a door, a
+town's edge, a respawn), the cue's envelope, the bursts' lengths, rests and overlaps over 2000 draws,
+far work's bounds, the takes' counts and lengths; _test_no_loop, Jeff's ask over a simulated hour by
+day: no arrival cut twice running over 600 arrivals, and for the chatter and the floor no piece twice
+in a deck, never at a take's seam and (the chatter) no take twice running, printing the first stretch
+heard again and the least time before a stretch comes again: the chatter's first at 9.6 minutes, then
+none sooner than 2.3 minutes after it was heard (a short take come round in a new deck, cut at other
+points and pitch); the floor's at 5.8 minutes, then none sooner than 3.5. view_test _test_town_day: a woodcutter at the axe
+beyond range lays a far stroke a blow on the far bus at its level and none near; her word cleared, none
+for a whole minute; past 40 cells none; two minutes in town by day begin bursts within their span and
+pitch, none away from a town, none in a cue's first 22 s; ten minutes of the floor in stretches inside
+their takes clear of the seam, stopped away from a town. THIRD_PARTY: the six
+CC0 chatter takes and two meadow takes, and the Sonniss row's slot now amb.town_arrival. Client sound
+only; protocol unchanged, no new class_name.
 ## 572 amended. The world's jobs never hold a freed node
 
 The same crash class as 572, in World: its per-tick jobs are kept in
@@ -48186,7 +48246,8 @@ plus its slot's volume plus Sfx.hearing's fall, came to about -23 dB at the ear,
 4 dB. Every take of sfx.chop_wood, sfx.saw_stroke and sfx.hammer_wood is cut again from the same points,
 peaked so its loudest 50 ms is -16 dB (all within 0.1 dB), and the volumes fall: chop_wood -10 to -18,
 hammer_wood -12 to -21, saw_stroke -14 to -20.5 (its range 8, not 10). A saw or hammer stroke now comes
-to about -40 dB two cells off, level with talk, and -50 at six, under the town's day bed. The axe, the
+to about -40 dB two cells off, level with talk, and at six cells -50 (the hammer) to -54 (the saw; -50 was
+written here first, mended in 578 amended (4)), under the town's day bed. The axe, the
 stroke a player knows, sits 3 dB over talk: about -37 dB at two cells and -47 at six (Jeff's answer B,
 11-12, to the clip pair 8 and 9 in C:/dev/review/sound/umbrage_ears). (a) The hoe, a piece of two
 packages (the coordinator's ruling, 11-13: sound follows the sight): "people work", heard once maps'

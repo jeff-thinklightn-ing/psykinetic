@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: by day, coming into a town you hear its market for a while, a little different each time, before it fades into open air, with townsfolk's talk coming and going too low to make out, and work out of sight sounding faint and far off (578 amended (4)).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
 - Sacks of grain in the tavern's attic and the Forest's camps are whole, plain sacking tied at the neck (871 amended (2)).

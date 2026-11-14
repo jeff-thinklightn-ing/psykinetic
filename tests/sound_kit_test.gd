@@ -21,6 +21,7 @@ func _ready() -> void:
 	_test_placeholder()
 	_test_takes()
 	_test_ambience_weights()
+	_test_town_day()
 	_test_music()
 	_test_folders()
 	_test_sfx_plays_slots()
@@ -590,6 +591,178 @@ func _test_ambience_weights() -> void:
 	_check(SoundKit.positional("amb.falls") and SoundKit.reach("amb.falls") > 0, "a fall heard from %d cells" % SoundKit.reach("amb.falls"))
 	for bed: String in Ambience.BEDS:
 		_check(SoundKit.has(bed) and not SoundKit.positional(bed), "%s is a flat slot" % bed)
+
+
+## 578 amended (4): the town by day. The market once on arriving (after
+## three minutes outside every town, or on joining; never twice in ten, never
+## at night, a door no arrival), the chatter in bursts with rests, the far
+## work only beyond a stroke's range, and the meadow under it all.
+func _test_town_day() -> void:
+	print("\n== the town by day: the market once on arriving, chatter in bursts, far work, the meadow under it (578 amended (4)) ==")
+	var day := 1.0
+	var minute := func(state: Dictionary, seconds: float, outdoors: bool, town: float, share: float) -> int:
+		var cues := 0
+		var steps := int(seconds / Ambience.WEIGH_EVERY)
+		for i in steps:
+			cues += 1 if Ambience.arrival_step(state, outdoors, town, share, Ambience.WEIGH_EVERY) else 0
+		return cues
+	var state := Ambience.arrival_state()
+	_check(minute.call(state, 5.0, true, 1.0, day) == 1, "joining into a town by day: the market once")
+	_check(minute.call(state, 60.0, true, 1.0, day) == 0, "standing in town a minute: not again")
+	_check(minute.call(state, 600.0, true, 0.0, day) + minute.call(state, 5.0, true, 1.0, day) == 1,
+			"out ten minutes and back by day: the market again")
+	state = {"outside": 0.0, "since_cue": INF}
+	_check(minute.call(state, 170.0, true, 0.0, day) + minute.call(state, 5.0, true, 1.0, day) == 0,
+			"out of every town's reach under three minutes and back: no cue")
+	state = Ambience.arrival_state()
+	minute.call(state, 5.0, true, 1.0, day)
+	_check(minute.call(state, 200.0, true, 0.0, day) + minute.call(state, 5.0, true, 1.0, day) == 0,
+			"out over three minutes but back within ten of the last cue: none")
+	state = Ambience.arrival_state()
+	_check(minute.call(state, 5.0, true, 1.0, 0.0) == 0, "joining into a town at night: none")
+	_check(minute.call(state, 200.0, true, 0.0, 0.0) + minute.call(state, 5.0, true, 1.0, 0.0) == 0, "arriving at night: none")
+	state = {"outside": 0.0, "since_cue": INF}
+	_check(minute.call(state, 900.0, false, 0.0, day) + minute.call(state, 5.0, true, 1.0, day) == 0,
+			"fifteen minutes indoors, then out of the door into the town: no arrival")
+	state = {"outside": 0.0, "since_cue": INF}
+	_check(minute.call(state, 200.0, true, 0.3, day) + minute.call(state, 5.0, true, 1.0, day) == 0,
+			"at a town's edge (its weight under the arrival's) three minutes, then in: no arrival")
+	state = {"outside": 0.0, "since_cue": INF}
+	_check(minute.call(state, 200.0, true, 0.0, day) + minute.call(state, 1.0, true, 1.0, day) == 1,
+			"a respawn or a link into town after three minutes in the wilds: an arrival (the same rule)")
+	var full := float(Ambience.TOWN_DAY["cue_full_s"])
+	var fade := float(Ambience.TOWN_DAY["cue_fade_s"])
+	_check(Ambience.cue_envelope(0.0) == 1.0 and Ambience.cue_envelope(full) == 1.0
+			and is_equal_approx(Ambience.cue_envelope(full + fade / 2.0), 0.5) and Ambience.cue_envelope(full + fade) == 0.0,
+			"the market: full %.0f s, gone over the next %.0f" % [full, fade])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 578
+	var lengths: Array[float] = []
+	var gaps: Array[float] = []
+	var overlaps := 0
+	for i in 2000:
+		var length := Ambience.burst_length(rng)
+		var gap := Ambience.next_burst_in(length, rng)
+		lengths.append(length)
+		gaps.append(gap - length)
+		overlaps += 1 if gap < length else 0
+	var burst: Vector2 = Ambience.TOWN_DAY["burst_s"]
+	var rest: Vector2 = Ambience.TOWN_DAY["rest_s"]
+	var rests := gaps.filter(func(gap: float) -> bool: return gap >= 0.0)
+	_check(lengths.min() >= burst.x and lengths.max() <= burst.y and rests.min() >= rest.x and rests.max() <= rest.y
+			and absf(overlaps / 2000.0 - float(Ambience.TOWN_DAY["overlap"])) < 0.03,
+			"the chatter: bursts of %.1f-%.1f s, rests of %.1f-%.1f s, %.0f%% begun over the last" % [lengths.min(), lengths.max(),
+			rests.min(), rests.max(), overlaps / 20.0])
+	var fade_in := float(Ambience.TOWN_DAY["burst_fade_s"])
+	_check(Ambience.burst_envelope(0.0, 6.0) == 0.0 and Ambience.burst_envelope(fade_in, 6.0) == 1.0
+			and Ambience.burst_envelope(3.0, 6.0) == 1.0 and Ambience.burst_envelope(6.0, 6.0) == 0.0, "a burst fades in and out")
+	var reach := SoundKit.reach("sfx.chop_wood")
+	var far := int(Ambience.TOWN_DAY["far_reach"])
+	_check(Ambience.is_far("chop", reach, reach + 1, true) and Ambience.is_far("saw", reach, far, true)
+			and Ambience.is_far("hammer", reach, 20, true), "far work: an axe, a saw or a hammer beyond its range, out to %d cells" % far)
+	_check(not Ambience.is_far("chop", reach, reach, true) and not Ambience.is_far("chop", reach, far + 1, true)
+			and not Ambience.is_far("chop", reach, 20, false) and not Ambience.is_far("", reach, 20, true)
+			and not Ambience.is_far("hoe", reach, 20, true) and not Ambience.is_far("sweep", reach, 20, true),
+			"none within its range (Sfx's), past %d cells, from indoors, from no work or another work" % far)
+	for slot: String in ["amb.town_arrival", "amb.town_chatter"]:
+		_check(SoundKit.has(slot) and not SoundKit.positional(slot) and SoundKit.bus(slot) == "ambience", "%s: a flat ambience slot" % slot)
+	var day_lengths: Array[float] = []
+	for path: String in SoundKit.files("amb.town_day"):
+		day_lengths.append(snappedf((load(path) as AudioStream).get_length(), 1.0))
+	_check(day_lengths.is_empty() or day_lengths.size() >= 2 and day_lengths.min() >= 200.0,
+			"the town's day bed (the meadow): two takes or more, each over 200 s (%s)" % [day_lengths if not day_lengths.is_empty() else "no takes"])
+	var chatter_lengths: Array[float] = []
+	for path: String in SoundKit.files("amb.town_chatter"):
+		chatter_lengths.append(snappedf((load(path) as AudioStream).get_length(), 1.0))
+	_check(chatter_lengths.is_empty() or chatter_lengths.size() >= 5 and chatter_lengths.min() > burst.y,
+			"the chatter: five takes or more (six landed; one may be dropped on Jeff's ear), each longer than a burst (%s)" % [chatter_lengths if not chatter_lengths.is_empty() else "no takes"])
+	_check(SoundKit.files("amb.town_arrival").is_empty() or SoundKit.files("amb.town_arrival").size() >= 5,
+			"the arrival: five stretches of the market or more (%d)" % SoundKit.files("amb.town_arrival").size())
+	_test_no_loop()
+
+
+## Jeff (11-14), on the town by day: "it needs multiple variations so its not
+## a loop". An hour by day simulated with the game's own draws: no arrival
+## cut twice running; the chatter's and the floor's decks never play a piece
+## twice in one deck, never reach a take's seam, nor (the chatter) a take
+## twice running; and
+## the longest stretch with nothing heard again, and the least time before a
+## stretch heard comes again.
+func _test_no_loop() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1114
+	var cuts := maxi(SoundKit.files("amb.town_arrival").size(), 5)
+	var last := -1
+	var twice := 0
+	var drawn := {}
+	for i in 600:
+		var take := Ambience.next_take(cuts, last, rng)
+		twice += 1 if take == last else 0
+		drawn[take] = true
+		last = take
+	_check(twice == 0 and drawn.size() == cuts, "the arrival over 600 arrivals: all %d cuts drawn, none twice running" % cuts)
+	# The takes' own lengths where synced, else the ones cut (s).
+	var chatter := Ambience.take_lengths("amb.town_chatter")
+	if chatter.is_empty():
+		chatter = [57.0, 26.0, 19.0, 59.0, 25.0, 152.0]
+	var floor_takes := Ambience.take_lengths("amb.town_day")
+	if floor_takes.is_empty():
+		floor_takes = [203.0, 218.0]
+	var fade := float(Ambience.TOWN_DAY["floor_fade_s"])
+	_no_loop_hour("the chatter", chatter, Ambience.TOWN_DAY["burst_s"], rng,
+			func(piece: Dictionary) -> float: return Ambience.next_burst_in(float(piece["length"]), rng))
+	_no_loop_hour("the floor", floor_takes, Ambience.TOWN_DAY["floor_s"], rng,
+			func(piece: Dictionary) -> float: return float(piece["length"]) - fade, false)
+
+
+## One layer dealt for an hour from takes [param lengths] in pieces of
+## [param span] s, the next begun [param after] (piece) -> s after each;
+## [param alternate] as Ambience.deal (the floor's stretches cross-fade, so
+## a take twice running has no seam and is allowed it).
+func _no_loop_hour(layer: String, lengths: Array, span: Vector2, rng: RandomNumberGenerator, after: Callable, alternate := true) -> void:
+	var seam := float(Ambience.TOWN_DAY["seam_s"])
+	var now := 0.0
+	var last := -1
+	var dealt: Array[Dictionary] = []
+	var heard: Array = []
+	var twice_in_deck := 0
+	var twice_running := 0
+	var at_seam := 0
+	var first_again := INF
+	var least_gap := INF
+	var decks := 0
+	var pieces := 0
+	while now < 3600.0:
+		dealt = Ambience.deal(lengths, span, last, rng, dealt, alternate)
+		decks += 1
+		for i in dealt.size():
+			var piece: Dictionary = dealt[i]
+			var take := int(piece["take"])
+			var start := float(piece["start"])
+			var end := start + float(piece["length"])
+			for j in i:
+				var other: Dictionary = dealt[j]
+				if int(other["take"]) == take and float(other["start"]) < end and start < float(other["start"]) + float(other["length"]):
+					twice_in_deck += 1
+			twice_running += 1 if take == last and lengths.size() > 1 and alternate else 0
+			at_seam += 1 if start < seam or end > float(lengths[take]) - seam else 0
+			for row: Array in heard:
+				if int(row[0]) == take and float(row[1]) < end and start < float(row[2]):
+					first_again = minf(first_again, now)
+					least_gap = minf(least_gap, now - float(row[3]))
+			heard.append([take, start, end, now])
+			last = take
+			pieces += 1
+			now += float(after.call(piece))
+			if now >= 3600.0:
+				break
+	var total := 0.0
+	for length: float in lengths:
+		total += length
+	print("  %s: %d takes (%.0f s); an hour: %d pieces in %d decks; the first stretch heard again at %.1f min; a stretch heard comes again %.1f min later at the least" % [
+		layer, lengths.size(), total, pieces, decks, first_again / 60.0, least_gap / 60.0])
+	_check(twice_in_deck == 0 and twice_running == 0 and at_seam == 0,
+			"%s over an hour: no piece twice in a deck (%d), no take twice running (%d), never at a take's seam (%d)" % [layer, twice_in_deck, twice_running, at_seam])
 
 
 func _test_placeholder() -> void:

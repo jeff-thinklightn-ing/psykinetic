@@ -74,6 +74,7 @@ func _ready() -> void:
 		await _test_bow_sounds()
 		await _test_armour_footfalls()
 		_test_work_strokes()
+		_test_town_day()
 		_test_wade_drip()
 		_test_bridge_ends()
 		_test_far_cry()
@@ -1661,6 +1662,150 @@ func _test_work_strokes() -> void:
 		_rig._stroke_sounds(player, puppet, rig)
 	_check(_rig.sfx.played.size() == quiet_before and not puppet.has_meta("stroke_at"), "the Chop clip with no work: silent")
 	puppet.set_meta("work", work_was)
+
+
+## Whether a chatter burst row [take, length, start, piece length, pitch]
+## is a piece within [param span] at a pitch within TOWN_DAY "burst_pitch".
+func _burst_in_span(row: Array, span: Vector2) -> bool:
+	return float(row[3]) >= span.x and float(row[3]) <= span.y and absf(float(row[4]) - 1.0) <= float(Ambience.TOWN_DAY["burst_pitch"]) + 0.0001
+
+
+## Whether a floor stretch row [take, start, length] lies inside its take,
+## [param seam] clear of its ends.
+func _stretch_clear(row: Array, seam: float) -> bool:
+	return float(row[1]) >= seam and float(row[1]) + float(row[2]) <= (load(row[0]) as AudioStream).get_length() - seam + 0.001
+
+
+## 578 amended (4): the town by day on the view. Far work: a worker at the
+## axe beyond its range lays far strokes, one a blow, and none reach Sfx; its
+## word cleared, none for a whole minute. The chatter: bursts begun under the
+## town's day weight, none in an arrival cue's first seconds, none without
+## the town.
+func _test_town_day() -> void:
+	print("\n== the town by day: far work only while the work is live, chatter in bursts (578 amended (4)) ==")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
+	var ambience := _rig.ambience
+	if puppet == null or not puppet.has_meta("rig") or ambience == null:
+		_check(true, "no drawn player: skipped")
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var work_was: String = str(puppet.get_meta("work", ""))
+	var listener_was: Variant = _rig.sfx.listener
+	var out_was := _rig._outdoor
+	var reach := SoundKit.reach("sfx.chop_wood")
+	var length := rig.length("Chop")
+	_rig._outdoor = true
+	# The test's room taken for open ground, the listener on a cell under the
+	# sky reach + 6 off (the room's own zone put back after).
+	var zone_was: Variant = _rig._terrain.get("zone")
+	_rig._terrain["zone"] = "outdoors"
+	var fields_out: bool = World.fields.outdoor if World.fields != null else true
+	if World.fields != null:
+		World.fields.outdoor = true
+	var under_sky := false
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		_rig.sfx.listener = player.tile + way * (reach + 6)
+		if World.fields == null or World.fields.under_sky(_rig.sfx.listener):
+			under_sky = true
+			break
+	if length <= 0.0 or not under_sky:
+		_check(true, "no Chop clip, or no cell under the sky %d off: skipped" % (reach + 6))
+	else:
+		puppet.set_meta("work", "chop")
+		if puppet.has_meta("stroke_at"):
+			puppet.remove_meta("stroke_at")
+		var far_before := ambience.far_played.size()
+		var near_before := _rig.sfx.played.size()
+		for frame in int(length * 3.0 * 60.0):
+			rig.base_at("Chop", frame / 60.0)
+			rig.tree.advance(0.0)
+			_rig._stroke_sounds(player, puppet, rig)
+		var laid := ambience.far_played.slice(far_before)
+		var want := (Client3D.WORK_STROKES["Chop"] as Array).size() * 3 - (1 if (Client3D.WORK_STROKES["Chop"] as Array).has(0.0) else 0)
+		_check(laid.size() == want and laid.all(func(row: Array) -> bool: return row[0] == "sfx.chop_wood")
+				and _rig.sfx.played.size() == near_before,
+				"a woodcutter at the axe %d cells off (its range %d): %d far strokes, one a blow, none near (%d)" % [reach + 6, reach, laid.size(), want])
+		var players := ambience.get_children().filter(func(node: Node) -> bool:
+				return node is AudioStreamPlayer3D and (node as AudioStreamPlayer3D).bus == Ambience.FAR_BUS)
+		_check(not players.is_empty() and players.all(func(node: AudioStreamPlayer3D) -> bool:
+				return is_equal_approx(node.volume_db, float(Ambience.TOWN_DAY["far_peak_db"]) - float(Ambience.TOWN_DAY["take_peak_db"]) + ambience.duck_db)),
+				"on the far bus, at %.0f dB over the take (its loudest 50 ms %.0f at the ear)" % [float(Ambience.TOWN_DAY["far_peak_db"])
+				- float(Ambience.TOWN_DAY["take_peak_db"]), float(Ambience.TOWN_DAY["far_peak_db"])])
+		puppet.set_meta("work", "")
+		var cleared := ambience.far_played.size()
+		for frame in 60 * 60:
+			rig.base_at("Chop", frame / 60.0)
+			rig.tree.advance(0.0)
+			_rig._stroke_sounds(player, puppet, rig)
+		_check(ambience.far_played.size() == cleared and _rig.sfx.played.size() == near_before,
+				"her word cleared (resting, asleep): no far stroke for a whole minute")
+		var way := (_rig.sfx.listener as Vector2i - player.tile).sign()
+		_rig.sfx.listener = player.tile + way * (int(Ambience.TOWN_DAY["far_reach"]) + 1)
+		puppet.set_meta("work", "chop")
+		puppet.remove_meta("stroke_at")
+		var past := ambience.far_played.size()
+		for frame in int(length * 2.0 * 60.0):
+			rig.base_at("Chop", frame / 60.0)
+			rig.tree.advance(0.0)
+			_rig._stroke_sounds(player, puppet, rig)
+		_check(ambience.far_played.size() == past, "past %d cells: none" % int(Ambience.TOWN_DAY["far_reach"]))
+	puppet.set_meta("work", work_was)
+	if puppet.has_meta("stroke_at"):
+		puppet.remove_meta("stroke_at")
+	_rig.sfx.listener = listener_was
+	_rig._outdoor = out_was
+	if World.fields != null:
+		World.fields.outdoor = fields_out
+	if zone_was == null:
+		_rig._terrain.erase("zone")
+	else:
+		_rig._terrain["zone"] = zone_was
+	# The chatter on its own clock: bursts under the town's day weight.
+	var begun := ambience.bursts_played.size()
+	for i in 60 * 120:
+		ambience._play_chatter(1.0 / 60.0, 1.0)
+	var bursts := ambience.bursts_played.slice(begun)
+	var span: Vector2 = Ambience.TOWN_DAY["burst_s"]
+	var rest: Vector2 = Ambience.TOWN_DAY["rest_s"]
+	var fewest := int(120.0 / (span.y + rest.y))
+	if SoundKit.files("amb.town_chatter").is_empty():
+		_check(bursts.is_empty(), "no chatter takes synced here: none begun")
+	else:
+		_check(bursts.size() >= fewest and bursts.size() <= int(120.0 / (span.x * float(Ambience.TOWN_DAY["overlap_at"].x))) + 1
+				and bursts.all(func(row: Array) -> bool: return _burst_in_span(row, span)),
+				"two minutes in town by day: %d bursts of the chatter (at least %d)" % [bursts.size(), fewest])
+	var quiet := ambience.bursts_played.size()
+	for i in 60 * 60:
+		ambience._play_chatter(1.0 / 60.0, 0.0)
+	_check(ambience.bursts_played.size() == quiet, "away from a town: no chatter begun in a minute")
+	var held := ambience.bursts_played.size()
+	ambience._next_burst = 0.0
+	for i in int(float(Ambience.TOWN_DAY["chatter_after_s"]) * 60.0) - 60:
+		ambience._cue_at = i / 60.0
+		ambience._play_chatter(1.0 / 60.0, 1.0)
+	_check(ambience.bursts_played.size() == held, "in an arrival cue's first %.0f s: no chatter over the market" % float(Ambience.TOWN_DAY["chatter_after_s"]))
+	ambience._cue_at = -1.0
+	# The floor dealt in stretches for ten minutes: each within its take, clear
+	# of the seam, the next begun as the last fades.
+	var floor_files := SoundKit.files(Ambience.FLOOR)
+	var stretched := ambience.floor_played.size()
+	for i in 60 * 600:
+		ambience._play_floor(1.0 / 60.0, 1.0)
+	var stretches := ambience.floor_played.slice(stretched)
+	var seam := float(Ambience.TOWN_DAY["seam_s"])
+	var within := stretches.all(func(row: Array) -> bool: return _stretch_clear(row, seam))
+	if floor_files.is_empty():
+		_check(stretches.is_empty(), "no floor takes synced here: none")
+	else:
+		var floor_span: Vector2 = Ambience.TOWN_DAY["floor_s"]
+		_check(stretches.size() >= int(600.0 / floor_span.y) and within,
+				"ten minutes of the floor: %d stretches, each inside its take clear of the seam" % stretches.size())
+	ambience._play_floor(1.0 / 60.0, 0.0)
+	_check(ambience._floor_players.all(func(player: AudioStreamPlayer) -> bool: return not player.playing), "away from a town: the floor stops")
+	for burst: Dictionary in ambience._bursts:
+		(burst["player"] as AudioStreamPlayer).stop()
+	ambience._bursts.clear()
 
 
 ## 676 1b (Jeff on the first mixes: "the walking ones are approximately

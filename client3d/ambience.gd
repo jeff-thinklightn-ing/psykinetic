@@ -15,7 +15,8 @@ extends Node
 ##   outdoor beds are quieter and muffled (the Ambience bus's low-pass twin);
 ## - rain quietening the birds;
 ## - a town: its day or night bed within TOWN_NEAR cells of a building that
-##   serves one, fading out by TOWN_FAR;
+##   serves one, fading out by TOWN_FAR; by day its market once on arriving,
+##   its chatter and its far work over the day bed (TOWN_DAY);
 ## - a forest's canopy (decision 466) round the view (Client3D's eased
 ##   cover, the mean of Fields.canopy_at the drawn canopy uses): the deep
 ##   forest's day and night beds taking over from the open forest's as the
@@ -110,6 +111,52 @@ const LAIR_DRIP_SLOWER := 2.0
 ## Beds of the open air: muffled under a roof.
 const OUTDOOR_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
+## The town by day (578 amended (4); Jeff, 11-12: "play it once on arrival
+## then fade to village chatter mixed in with work sounds at slightly higher
+## level but still faint"). amb.town_day is the open air under it all (the
+## meadow), and over it, by this table (every time here, and the far work's
+## level; the other levels are their slots' volume_db), so "louder, fainter,
+## rarer" is a number changed:
+## - the arrival: the market (amb.town_arrival) once, on crossing into a town
+##   (its weight past "arrive_town") by day (the day's share at least
+##   "arrive_day") after "arrive_outside_s" outside every town's reach (its
+##   weight 0), or on joining into one (the count starts full); never twice
+##   within "arrive_again_s"; full for "cue_full_s", then gone over
+##   "cue_fade_s". Time indoors counts neither way, so a door is no arrival;
+##   a respawn or a link is one only under the outside rule (arrival_step);
+## - the chatter (amb.town_chatter): bursts of "burst_s" seconds (a stretch
+##   of a take, faded in and out over "burst_fade_s") with rests of "rest_s"
+##   between, the next now and then ("overlap") begun at "overlap_at" of the
+##   last, under the town's day weight; none in an arrival's first
+##   "chatter_after_s";
+## - far work: a stroke of a resident at one of "far_words" beyond its slot's
+##   range and within "far_reach" cells, heard while the listener is
+##   outdoors under the sky: faint and dull, its loudest 50 ms "far_peak_db"
+##   at the ear (the stroke takes are cut to "take_peak_db" there), on the
+##   Ambience bus's far twin, cut off above "far_cutoff_hz" (is_far,
+##   far_stroke). Only a stroke the resident's own work clip lays, so only
+##   while its replicated word is live: none at rest or asleep.
+## Nothing in it is heard as a loop (Jeff, 11-14: "it needs multiple
+## variations so its not a loop"): the arrival draws one of its takes (five
+## stretches of the market), never the one last played; the chatter's bursts
+## and the floor's stretches are dealt from a deck (deal): every take cut
+## into consecutive pieces ("burst_s", "floor_s") from a random start, kept
+## "seam_s" clear of a take's ends (its loop seam), shuffled, never the same
+## take twice running, so no piece comes again until the whole deck has been
+## heard, and the next deck is cut at new points; a burst plays at a pitch
+## within "burst_pitch" of its own, and the floor's stretches cross-fade over
+## "floor_fade_s".
+const TOWN_DAY := {
+	"arrive_town": 0.5, "arrive_day": 0.5, "arrive_outside_s": 180.0, "arrive_again_s": 600.0,
+	"cue_full_s": 25.0, "cue_fade_s": 10.0,
+	"burst_s": Vector2(3.0, 10.0), "burst_fade_s": 0.8, "rest_s": Vector2(4.0, 15.0),
+	"overlap": 0.2, "overlap_at": Vector2(0.4, 0.8), "chatter_after_s": 22.0, "burst_pitch": 0.05,
+	"floor_s": Vector2(40.0, 90.0), "floor_fade_s": 4.0, "seam_s": 2.0,
+	"far_words": ["chop", "saw", "hammer"], "far_reach": 40, "far_peak_db": -52.0, "take_peak_db": -16.0,
+	"far_cutoff_hz": 2000.0,
+}
+## The far twin of the Ambience bus (Sfx.apply_volumes makes it).
+const FAR_BUS := "Ambience_Far"
 
 ## The view this plays for (its listener, zone, torches and buildings).
 var view: Client3D
@@ -142,6 +189,44 @@ var _mine_terrain: Dictionary = {}
 var _mine := {}
 var _floor: Dictionary[Vector2i, bool] = {}
 var _skylights: Array[Vector2i] = []
+## The arrival's count (arrival_step), its cue's player and how far into it
+## (s; below 0 none playing), and how many cues have played.
+var arrival := arrival_state()
+var _cue: AudioStreamPlayer
+var _cue_at := -1.0
+var cues := 0
+## The arrival's take last played.
+var _last_cue := -1
+## The chatter's bursts playing ({player, at, length}), its two players, the
+## seconds until the next, and its deck (deal) with the take last dealt.
+var _bursts: Array[Dictionary] = []
+var _chatter: Array[AudioStreamPlayer] = []
+var _next_burst := 0.0
+var _chatter_deck: Array[Dictionary] = []
+var _chatter_dealt: Array[Dictionary] = []
+var _last_chatter := -1
+## The floor (amb.town_day): its two players, the stretch each plays
+## ({take, start, length, at}, empty for none), the one in front, and its
+## deck with the take last dealt.
+var _floor_players: Array[AudioStreamPlayer] = []
+var _floor_pieces: Array[Dictionary] = [{}, {}]
+var _floor_front := 0
+var _floor_deck: Array[Dictionary] = []
+var _floor_dealt: Array[Dictionary] = []
+var _last_floor := -1
+var _rng := RandomNumberGenerator.new()
+## The bed dealt in stretches, not looped.
+const FLOOR := "amb.town_day"
+## Every burst begun ([take path, its length]) and every far stroke played
+## ([slot, the worker's cell]), for tests and the ears tour.
+var bursts_played: Array = []
+var far_played: Array = []
+## Every stretch of the floor begun ([take path, start, length]).
+var floor_played: Array = []
+
+
+func _ready() -> void:
+	_rng.randomize()
 
 
 func _process(delta: float) -> void:
@@ -153,7 +238,13 @@ func _process(delta: float) -> void:
 	for bed: String in targets:
 		var level := lerpf(float(levels.get(bed, 0.0)), targets[bed], ease)
 		levels[bed] = level
-		_set_level(bed, level)
+		if bed == FLOOR:
+			_play_floor(delta, level)
+		else:
+			_set_level(bed, level)
+	var town_day := float(levels.get("amb.town_day", 0.0))
+	_play_cue(delta, town_day)
+	_play_chatter(delta, town_day)
 
 
 ## Every sound stopped as this goes: a stream still playing at quit is
@@ -178,8 +269,11 @@ func _weigh() -> void:
 	var drip := Weather.drip_at(World.fields.region, steps, canopy) if World.fields != null else 0.0
 	var mine := _mine_of()
 	var lair := str(view._terrain.get("ambience", ""))
-	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
+	var town := _town_nearness(cell)
+	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, town,
 			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0, lair))
+	if arrival_step(arrival, zone == "outdoors" and under_sky, town, day_share(DayNight.daylight(steps)), WEIGH_EVERY):
+		_start_cue()
 	if lair == "cave_lair" and randf() < WEIGH_EVERY / (DRIP_SECONDS * LAIR_DRIP_SLOWER):
 		_drip(cell, _floor)
 	_place_point("amb.skylight_air", _skylights, cell)
@@ -223,7 +317,7 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 	var rain := float(weather.get("rain", 0.0))
 	var wind := float(weather.get("wind", 0.0))
 	if zone == "outdoors":
-		var day := clampf((daylight - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
+		var day := day_share(daylight)
 		var dawn := clampf(1.0 - absf(hour - DAWN_HOUR) / DAWN_HOURS, 0.0, 1.0)
 		var hush := 1.0 - RAIN_HUSH * rain
 		var open := 1.0 - DEEP * canopy
@@ -251,6 +345,361 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 	else:
 		out["amb.dungeon"] = 1.0 if zone in ["cave", "dungeon"] else 0.0
 	return out
+
+
+## The day's share of the sky's [param daylight] (0 night .. 1 day).
+static func day_share(daylight: float) -> float:
+	return clampf((daylight - DayNight.NIGHT) / (1.0 - DayNight.NIGHT), 0.0, 1.0)
+
+
+## A fresh arrival count (578 amended (4)): full, so joining into a town by
+## day is an arrival; no cue yet.
+static func arrival_state() -> Dictionary:
+	return {"outside": float(TOWN_DAY["arrive_outside_s"]), "since_cue": INF}
+
+
+## [param state] (arrival_state) moved on [param dt] seconds with the
+## listener [param outdoors] (under the sky) or not, [param town] (0..1) and
+## the [param day] share; whether the town's cue plays now. Outside every
+## town's reach (town 0) the count grows; well into a town it starts again
+## (after the cue, if one plays); between, and indoors, it holds.
+static func arrival_step(state: Dictionary, outdoors: bool, town: float, day: float, dt: float) -> bool:
+	state["since_cue"] = float(state["since_cue"]) + dt
+	var cue := outdoors and town > float(TOWN_DAY["arrive_town"]) and day >= float(TOWN_DAY["arrive_day"]) \
+			and float(state["outside"]) >= float(TOWN_DAY["arrive_outside_s"]) \
+			and float(state["since_cue"]) >= float(TOWN_DAY["arrive_again_s"])
+	if cue:
+		state["since_cue"] = 0.0
+	if outdoors and town <= 0.0:
+		state["outside"] = float(state["outside"]) + dt
+	elif outdoors and town > float(TOWN_DAY["arrive_town"]):
+		state["outside"] = 0.0
+	return cue
+
+
+## The cue's share of its loudness [param seconds] into it: full, then fading
+## to 0.
+static func cue_envelope(seconds: float) -> float:
+	var full := float(TOWN_DAY["cue_full_s"])
+	return clampf(1.0 - (seconds - full) / float(TOWN_DAY["cue_fade_s"]), 0.0, 1.0)
+
+
+## A chatter burst's share of its loudness [param seconds] into its
+## [param length]: faded in and out.
+static func burst_envelope(seconds: float, length: float) -> float:
+	var fade := float(TOWN_DAY["burst_fade_s"])
+	return clampf(minf(seconds, length - seconds) / fade, 0.0, 1.0)
+
+
+## A burst's length (s), and the seconds from its start to the next's: the
+## burst and a rest, or now and then a share of it (the next over its end).
+static func burst_length(rng: RandomNumberGenerator) -> float:
+	var span: Vector2 = TOWN_DAY["burst_s"]
+	return rng.randf_range(span.x, span.y)
+
+
+static func next_burst_in(length: float, rng: RandomNumberGenerator) -> float:
+	if rng.randf() < float(TOWN_DAY["overlap"]):
+		var at: Vector2 = TOWN_DAY["overlap_at"]
+		return length * rng.randf_range(at.x, at.y)
+	var rest: Vector2 = TOWN_DAY["rest_s"]
+	return length + rng.randf_range(rest.x, rest.y)
+
+
+## A take of [param count] other than [param last] (any when there is one).
+static func next_take(count: int, last: int, rng: RandomNumberGenerator) -> int:
+	if count <= 1:
+		return 0
+	if last < 0 or last >= count:
+		return rng.randi() % count
+	var take := rng.randi() % (count - 1)
+	return take + 1 if take >= last and last >= 0 else take
+
+
+## A deck of pieces from takes [param lengths] (s): each take cut into
+## consecutive pieces of [param span] seconds from a random start, kept
+## TOWN_DAY "seam_s" clear of its ends; shuffled, and never the same take
+## twice running (nor the first the same as [param last]); a take's pieces
+## beyond what can alternate with the others are left for the next deck. A
+## piece over any of the second half of [param before] (the last deck) comes
+## last of its take's, so what was heard lately comes round last. Not
+## [param alternate] (the floor, whose stretches cross-fade, so one take's
+## two parts in a row have no seam), the whole deck is laid in the order its
+## parts were heard in [param before]. Each {take, start, length}.
+static func deal(lengths: Array, span: Vector2, last: int, rng: RandomNumberGenerator,
+		before: Array[Dictionary] = [], alternate := true) -> Array[Dictionary]:
+	var seam := float(TOWN_DAY["seam_s"])
+	var pieces: Array[Dictionary] = []
+	for take in lengths.size():
+		var end := float(lengths[take]) - seam
+		var at := seam + rng.randf_range(0.0, span.x)
+		while true:
+			var length := minf(rng.randf_range(span.x, span.y), end - at)
+			if length < span.x:
+				break
+			pieces.append({"take": take, "start": at, "length": length})
+			at += length
+	# Each take's pieces shuffled (Fisher-Yates on the deck's own rng), those
+	# over the last deck's second half put last.
+	var lately := before.slice(before.size() / 2)
+	var by_take: Array[Array] = []
+	for take in lengths.size():
+		by_take.append([])
+	for i in range(pieces.size() - 1, 0, -1):
+		var j := rng.randi() % (i + 1)
+		var swap := pieces[i]
+		pieces[i] = pieces[j]
+		pieces[j] = swap
+	if not alternate:
+		# Each piece laid in the order its part was heard in the last deck
+		# (unheard first, a little at random), so a part comes again about a
+		# deck after it was heard.
+		var keyed: Array = []
+		for piece: Dictionary in pieces:
+			var heard_at := -1.0
+			for j in before.size():
+				if overlaps(before[j], piece):
+					heard_at = float(j)
+			keyed.append([heard_at + rng.randf() * 1.5, piece])
+		keyed.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) < float(b[0]))
+		var dealt: Array[Dictionary] = []
+		for row: Array in keyed:
+			dealt.append(row[1])
+		return dealt
+	for stale in [false, true]:
+		for piece: Dictionary in pieces:
+			var over := false
+			for heard: Dictionary in lately:
+				over = over or overlaps(heard, piece)
+			if over == stale:
+				by_take[int(piece["take"])].append(piece)
+	# No take may hold more pieces than can alternate with the rest (one more
+	# than all the others, none more when it is [param last]): its last
+	# pieces wait for the next deck, which is cut at new points.
+	var total := pieces.size()
+	for take in (by_take.size() if by_take.size() > 1 else 0):
+		var others := total - by_take[take].size()
+		var most := others + (0 if take == last and lengths.size() > 1 else 1)
+		while by_take[take].size() > most:
+			by_take[take].pop_back()
+			total -= 1
+	# Laid a take at a time, drawn at random by how many it has left, never the
+	# one just laid; a take with more left than all the others goes now.
+	var laid: Array[Dictionary] = []
+	var prev := last
+	while total > 0:
+		var pick := -1
+		var weight := 0
+		for take in by_take.size():
+			if take != prev or lengths.size() == 1:
+				weight += by_take[take].size()
+			if take != prev and by_take[take].size() > total - by_take[take].size():
+				pick = take
+		if pick < 0:
+			var at := rng.randi() % maxi(weight, 1)
+			for take in by_take.size():
+				if take == prev and lengths.size() > 1:
+					continue
+				at -= by_take[take].size()
+				if at < 0:
+					pick = take
+					break
+		if pick < 0:
+			break
+		laid.append(by_take[pick].pop_front())
+		total -= 1
+		prev = pick
+	return laid
+
+
+## Whether pieces [param a] and [param b] ({take, start, length}) share any
+## of one take.
+static func overlaps(a: Dictionary, b: Dictionary) -> bool:
+	return int(a["take"]) == int(b["take"]) and float(a["start"]) < float(b["start"]) + float(b["length"]) and float(b["start"]) < float(a["start"]) + float(a["length"])
+
+
+## The lengths (s) of [param slot]'s takes.
+static func take_lengths(slot: String) -> Array:
+	return SoundKit.files(slot).map(func(path: String) -> float: return (load(path) as AudioStream).get_length())
+
+
+## Whether a stroke of a resident at [param word], [param cells] off (its
+## slot heard within [param reach]), is far work heard by a listener
+## [param outdoors] (under the sky).
+static func is_far(word: String, reach: int, cells: int, outdoors: bool) -> bool:
+	return outdoors and word in TOWN_DAY["far_words"] and cells > reach and cells <= int(TOWN_DAY["far_reach"])
+
+
+## [param slot]'s stroke of a resident at [param word] in [param cell], at
+## [param at]: played as far work and true when is_far, else false (Sfx's
+## to play, or nobody's).
+func far_stroke(slot: String, word: String, cell: Vector2i, at: Vector3) -> bool:
+	if view == null or view.sfx == null or view.sfx.listener == null or not SoundKit.has(slot):
+		return false
+	var listener: Vector2i = view.sfx.listener
+	var cells := maxi(absi(cell.x - listener.x), absi(cell.y - listener.y))
+	var zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
+	var outdoors := zone == "outdoors" and (World.fields == null or World.fields.under_sky(listener))
+	if not is_far(word, SoundKit.reach(slot), cells, outdoors):
+		return false
+	far_played.append([slot, cell])
+	var stream := view.sfx._pick(slot)
+	if stream == null:
+		return true
+	var player := AudioStreamPlayer3D.new()
+	player.stream = stream
+	player.bus = FAR_BUS
+	player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
+	player.volume_db = float(TOWN_DAY["far_peak_db"]) - float(TOWN_DAY["take_peak_db"]) + duck_db
+	player.position = at
+	add_child(player)
+	player.finished.connect(player.queue_free)
+	player.play()
+	return true
+
+
+## The arrival's cue begun (the market once, from its start).
+func _start_cue() -> void:
+	var files := SoundKit.files("amb.town_arrival")
+	if files.is_empty():
+		return
+	_last_cue = next_take(files.size(), _last_cue, _rng)
+	var stream := _once_of(files[_last_cue])
+	if _cue == null:
+		_cue = AudioStreamPlayer.new()
+		_cue.name = "town_arrival"
+		_cue.bus = "Ambience"
+		add_child(_cue)
+	_cue.stream = stream
+	_cue_at = 0.0
+	cues += 1
+	_cue.volume_db = SoundKit.volume_db("amb.town_arrival") + duck_db + linear_to_db(SILENT)
+	_cue.play()
+
+
+## The cue [param delta] on, at its envelope under the town's day weight
+## [param town_day] (walking out of town takes it with the bed), stopped once
+## faded.
+func _play_cue(delta: float, town_day: float) -> void:
+	if _cue_at < 0.0 or _cue == null:
+		return
+	_cue_at += delta
+	var share := cue_envelope(_cue_at) * town_day
+	if cue_envelope(_cue_at) <= 0.0 or not _cue.playing:
+		_cue.stop()
+		_cue_at = -1.0
+		return
+	_cue.volume_db = SoundKit.volume_db("amb.town_arrival") + linear_to_db(maxf(share, 0.0001)) + duck_db
+
+
+## The chatter [param delta] on under the town's day weight [param town_day]:
+## each burst at its envelope, and the next begun when due.
+func _play_chatter(delta: float, town_day: float) -> void:
+	for burst: Dictionary in _bursts.duplicate():
+		var player: AudioStreamPlayer = burst["player"]
+		burst["at"] = float(burst["at"]) + delta
+		if float(burst["at"]) >= float(burst["length"]) or not player.playing:
+			player.stop()
+			_bursts.erase(burst)
+			continue
+		var share := burst_envelope(float(burst["at"]), float(burst["length"])) * town_day
+		player.volume_db = SoundKit.volume_db("amb.town_chatter") + linear_to_db(maxf(share, 0.0001)) + duck_db
+	if town_day < SILENT or (_cue_at >= 0.0 and _cue_at < float(TOWN_DAY["chatter_after_s"])):
+		return
+	_next_burst -= delta
+	if _next_burst > 0.0:
+		return
+	var files := SoundKit.files("amb.town_chatter")
+	if files.is_empty():
+		_next_burst = next_burst_in(burst_length(_rng), _rng)
+		return
+	if _chatter_deck.is_empty():
+		_chatter_dealt = deal(take_lengths("amb.town_chatter"), TOWN_DAY["burst_s"], _last_chatter, _rng, _chatter_dealt)
+		_chatter_deck = _chatter_dealt.duplicate()
+	if _chatter_deck.is_empty() or _bursts.size() >= 2:
+		_next_burst = next_burst_in(burst_length(_rng), _rng)
+		return
+	var piece: Dictionary = _chatter_deck.pop_front()
+	var take := int(piece["take"])
+	_last_chatter = take
+	# At a pitch a little off its own, so a piece heard again is not the same.
+	var pitch := 1.0 + _rng.randf_range(-1.0, 1.0) * float(TOWN_DAY["burst_pitch"])
+	var length := float(piece["length"]) / pitch
+	_next_burst = next_burst_in(length, _rng)
+	var stream := _once_of(files[take])
+	var player: AudioStreamPlayer = null
+	for free: AudioStreamPlayer in _chatter:
+		if not _bursts.any(func(burst: Dictionary) -> bool: return burst["player"] == free):
+			player = free
+	if player == null:
+		player = AudioStreamPlayer.new()
+		player.name = "town_chatter_%d" % _chatter.size()
+		player.bus = "Ambience"
+		add_child(player)
+		_chatter.append(player)
+	player.stream = stream
+	player.pitch_scale = pitch
+	player.volume_db = SoundKit.volume_db("amb.town_chatter") + linear_to_db(0.0001) + duck_db
+	player.play(float(piece["start"]))
+	_bursts.append({"player": player, "at": 0.0, "length": length})
+	bursts_played.append([files[take], length, float(piece["start"]), float(piece["length"]), pitch])
+
+
+## The floor [param delta] on at [param level] (its eased weight): one
+## stretch of the deck at a time, the next begun "floor_fade_s" before the
+## last ends and cross-faded over it; nothing when silent.
+func _play_floor(delta: float, level: float) -> void:
+	var files := SoundKit.files(FLOOR)
+	if level < SILENT or files.is_empty():
+		for player: AudioStreamPlayer in _floor_players:
+			player.stop()
+		_floor_pieces = [{}, {}]
+		return
+	var fade := float(TOWN_DAY["floor_fade_s"])
+	var front: Dictionary = _floor_pieces[_floor_front]
+	if front.is_empty() or float(front["at"]) >= float(front["length"]) - fade and _floor_pieces[1 - _floor_front].is_empty():
+		if not front.is_empty():
+			_floor_front = 1 - _floor_front
+		if _floor_deck.is_empty():
+			_floor_dealt = deal(take_lengths(FLOOR), TOWN_DAY["floor_s"], _last_floor, _rng, _floor_dealt, false)
+			_floor_deck = _floor_dealt.duplicate()
+		if _floor_deck.is_empty():
+			return
+		var piece: Dictionary = _floor_deck.pop_front()
+		_last_floor = int(piece["take"])
+		piece["at"] = 0.0
+		_floor_pieces[_floor_front] = piece
+		while _floor_players.size() < 2:
+			var made := AudioStreamPlayer.new()
+			made.name = "town_floor_%d" % _floor_players.size()
+			made.bus = "Ambience"
+			add_child(made)
+			_floor_players.append(made)
+		var player := _floor_players[_floor_front]
+		player.stream = _once_of(files[_last_floor])
+		player.play(float(piece["start"]))
+		floor_played.append([files[_last_floor], float(piece["start"]), float(piece["length"])])
+	for side in 2:
+		var piece: Dictionary = _floor_pieces[side]
+		if piece.is_empty():
+			continue
+		piece["at"] = float(piece["at"]) + delta
+		var player := _floor_players[side]
+		var at := float(piece["at"])
+		if at >= float(piece["length"]):
+			player.stop()
+			_floor_pieces[side] = {}
+			continue
+		var share := clampf(minf(at, float(piece["length"]) - at) / fade, 0.0, 1.0)
+		player.volume_db = SoundKit.volume_db(FLOOR) + linear_to_db(maxf(share * level, 0.0001)) + duck_db
+
+
+## The take at [param path], played once (not looped).
+static func _once_of(path: String) -> AudioStream:
+	var stream: AudioStream = load(path)
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = false
+	return stream
 
 
 ## The mine's parts of [param terrain] (769 amended (4)): {floor (cell ->

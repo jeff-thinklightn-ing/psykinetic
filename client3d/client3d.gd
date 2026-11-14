@@ -22537,7 +22537,10 @@ func _stroke_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 	var was: Variant = puppet.get_meta("stroke_at") if puppet.has_meta("stroke_at") else null
 	puppet.set_meta("stroke_at", [clip, at])
 	if was is Array and was[0] == clip and footfall_between(float(was[1]), at, blows):
-		sfx.play(slot, puppet.position + Vector3.UP * STROKE_UP)
+		# Beyond the slot's range, out in the open: the town's far work (578 amended (4)).
+		var stroke := puppet.position + Vector3.UP * STROKE_UP
+		if ambience == null or not ambience.far_stroke(slot, word, entity.tile, stroke):
+			sfx.play(slot, stroke)
 
 
 ## Whether a share of a clip in [param falls] lies after [param from] and up

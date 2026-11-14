@@ -101,6 +101,12 @@ static func apply_volumes() -> void:
 			var low_pass := AudioEffectLowPassFilter.new()
 			low_pass.cutoff_hz = MUFFLED_CUTOFF_HZ
 			AudioServer.add_bus_effect(muffled, low_pass)
+	# Far work's dull twin of the Ambience bus (578 amended (4)).
+	var far := _bus(Ambience.FAR_BUS, "Ambience")
+	if AudioServer.get_bus_effect_count(far) == 0:
+		var far_pass := AudioEffectLowPassFilter.new()
+		far_pass.cutoff_hz = float(Ambience.TOWN_DAY["far_cutoff_hz"])
+		AudioServer.add_bus_effect(far, far_pass)
 	_set_bus_volume(0, Net.master_volume)
 	for name: String in VOLUME_SETTINGS:
 		_set_bus_volume(AudioServer.get_bus_index(name), float(Net.get(VOLUME_SETTINGS[name])),

@@ -1875,8 +1875,8 @@
 			"type": "bed",
 			"bus": "ambience",
 			"positional": false,
-			"volume_db": -12.0,
-			"uses": "the town's daily noise; a bed under a zone, time or weather; Ambience.weights"
+			"volume_db": -19.0,
+			"uses": "the town by day under its chatter and the far work: open meadow air, insects, far birds (578 amended (4)); a bed under a zone, time or weather; Ambience.weights"
 		},
 		"amb.town_night": {
 			"category": "ambience",
@@ -1885,6 +1885,22 @@
 			"positional": false,
 			"volume_db": -12.0,
 			"uses": "the town at night; a bed under a zone, time or weather; Ambience.weights"
+		},
+		"amb.town_arrival": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -14.0,
+			"uses": "a town's market heard once on arriving by day, then faded (578 amended (4)); Ambience, played once by Ambience.TOWN_DAY's arrival rule, not looped"
+		},
+		"amb.town_chatter": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -13.5,
+			"uses": "townsfolk talking somewhere about the town by day, wordless (cut off above 650 Hz): bursts with rests between (578 amended (4)); Ambience, by Ambience.TOWN_DAY, under the town's day weight"
 		},
 		"amb.rain": {
 			"category": "ambience",

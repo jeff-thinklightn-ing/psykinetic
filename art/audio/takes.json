@@ -539,12 +539,112 @@
 				"sha256": "8c60cf365839213cd04eedc979bb6761c97d4e7636badf9b6015ade3b22e44b0"
 			}
 		],
-		"amb.town_day": [
+		"amb.town_arrival": [
 			{
-				"file": "amb.town_day.ogg",
+				"file": "amb.town_arrival.ogg",
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 10 s for 60 s)",
 				"sha256": "bf68f1751cb11c261c3040dc7ddd83cbc360f6ff4ebd7aafd83cb73f60b2c904"
+			},
+			{
+				"file": "amb.town_arrival.2.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 48 s for 37 s) (from 48 s for 37 s)",
+				"sha256": "cf1ed35e0eb8e8b3e71b813b29db571a242011ce2b558c3f86a94b44652b460b"
+			},
+			{
+				"file": "amb.town_arrival.3.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 84 s for 37 s) (from 84 s for 37 s)",
+				"sha256": "2abbcc2f5e118663ef77aab59c01350e29ddbce976c326493493030dd59b549f"
+			},
+			{
+				"file": "amb.town_arrival.4.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 120 s for 37 s) (from 120 s for 37 s)",
+				"sha256": "06e8bb95288050be31cc4c921de22fdc0123480c41fb2ad1cc4a006a5c14c3c4"
+			},
+			{
+				"file": "amb.town_arrival.5.ogg",
+				"from": "sonniss-gdc-2021-23",
+				"original": "2021-23/344 Audio - UK Shops & Markets/AMBMrkt_Outdoor Market, People, Sellers, Distant_344 Audio_Shops & Markets.wav (from 143 s for 37 s) (from 143 s for 37 s)",
+				"sha256": "76463a16589dd74645ec0ec74dd37bc9f83ffae1a398c8d8e2647ee489b6ba98"
+			}
+		],
+		"amb.town_chatter": [
+			{
+				"file": "amb.town_chatter.ogg",
+				"from": "freesound",
+				"original": "freesound 637466: crowd int show movement walla murmur active whispers no steps nice smooth detailed sweetener.flac (whole, cut off above 650 Hz)",
+				"sha256": "5be9bba92efd32073b3c708daca3f9baf104b08e28738f2b4e96955b9ccaf866",
+				"by": "kyles",
+				"url": "https://freesound.org/people/kyles/sounds/637466/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_chatter.2.ogg",
+				"from": "freesound",
+				"original": "freesound 653920: Small Crowd Walla (whole, cut off above 650 Hz)",
+				"sha256": "203f433660caf7d36ea964741eee538fcc9dc3e202b4ba1e4f5ed61d609ee2d4",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/653920/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_chatter.3.ogg",
+				"from": "freesound",
+				"original": "freesound 867051: Medium Crowd Walla (whole, cut off above 650 Hz)",
+				"sha256": "c31fb8bbaf23a05966b345dd64b2c4faaad2c433567aa593df0e9599799461e6",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/867051/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_chatter.4.ogg",
+				"from": "freesound",
+				"original": "freesound 850562: Walla Teatro (whole, cut off above 650 Hz)",
+				"sha256": "be756ad55a8086a5b721a13c412f641734c2940d8eb88c55137f5d6a752eeeda",
+				"by": "Mariayolanda511",
+				"url": "https://freesound.org/people/Mariayolanda511/sounds/850562/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_chatter.5.ogg",
+				"from": "freesound",
+				"original": "freesound 452484: crowd int medium students murmur walla large theatre active cinema politica Concordia short Montreal, Canada.flac (whole, cut off above 650 Hz)",
+				"sha256": "33d111a78ef751863bd51241c8c20b6e83d0ca9f3d4e629e283e92fb47119cf4",
+				"by": "kyles",
+				"url": "https://freesound.org/people/kyles/sounds/452484/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_chatter.6.ogg",
+				"from": "freesound",
+				"original": "freesound 766658: murmuring (whole, cut off above 650 Hz)",
+				"sha256": "f8cd294e8c6ca469ed0636ac921a098deaeb46748d49325b0abe0ba8f0c0aed3",
+				"by": "blaastaal",
+				"url": "https://freesound.org/people/blaastaal/sounds/766658/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.town_day": [
+			{
+				"file": "amb.town_day.ogg",
+				"from": "freesound",
+				"original": "freesound 810415: La vilaine summer meadow pm1 (from 0 s for 205 s)",
+				"sha256": "a2a4a6e5edb1e0cbdb0e7d7f9f9259a41c94a191abedc4bc44da5f558e0a118f",
+				"by": "bruno.auzet",
+				"url": "https://freesound.org/people/bruno.auzet/sounds/810415/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.town_day.2.ogg",
+				"from": "freesound",
+				"original": "freesound 810412: la vilaine summer meadow pm3 (from 0 s to 152 s and 312 s to 383 s, cross-faded)",
+				"sha256": "d0bce6a36620d678ed6b32064c7adbe4dd6112beba34c066edd150f5bbee447b",
+				"by": "bruno.auzet",
+				"url": "https://freesound.org/people/bruno.auzet/sounds/810412/",
+				"license": "CC0 1.0"
 			}
 		],
 		"amb.town_night": [
