@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_trades_preview()
 	_test_cached_checks()
 	await _test_spot_shortcut()
+	await _test_built_ahead()
 	await _test_breathes()
 	await _test_spot_ghost()
 	_test_answer_parts()
@@ -1901,6 +1902,106 @@ func _test_trades_preview() -> void:
 		"maps' two hauler spots, a hauler in town: \"2 work spots\", no condition, no mismatch (%s)" % carried)
 	var empty :=BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
 	_check("No trades yet: no building with a use, no work site" in "; ".join(empty.trade_lines("store")), "a town with nothing that calls for a trade: said so")
+
+
+## 867 amended (4): an ask's first spot call builds nothing twice. A fresh working copy shares the doc's
+## parse, the four checks are kept per revision (a call's before is the last one's after), and the ground
+## reached, the held reach and the checks are built while the request is out. The same asks, the reply
+## at once (built ahead cut short) or four frames late (built whole), give the words and closing checks
+## of the full path (whole_checks); the two ways a kept thing goes stale, and an ask abandoned mid-wait.
+func _test_built_ahead() -> void:
+	print("\n== an ask builds ahead while its request is out, and keeps its checks by revision (867 amended (4)) ==")
+	var spot_calls := [
+		# First one of wilds' own spots changed (the box's host probe): its after holds every spot, as the
+		# held reach built ahead does. Then new ones, and one refused at the store chest.
+		{"name": "spot", "input": {"at": [201, 206], "use": "fire", "face": [202, 206], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [196, 212], "use": "fire", "face": [195, 211], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [190, 196], "use": "square", "face": [191, 196]}},
+	]
+	var mixed := [{"name": "paint", "input": {"ground": "dirt", "cells": [[186, 200]]}},
+		{"name": "spot", "input": {"at": [198, 212], "use": "fire", "face": [197, 211], "pose": "sit"}}]
+	var said := {}
+	for way: String in ["whole", "at once", "late"]:
+		var doc := MapDoc.from_level("wilds")  # Its own spots kept: the held reach is a flood of its own.
+		var stub := StubClaude.new([spot_calls, "Spots."])
+		stub.wait_frames = 0 if way == "at once" else 4
+		var session := BuilderSession.new(doc, Rect2i(176, 186, 40, 32), "wilds", stub)
+		session.whole_checks = way == "whole"
+		var first := await session.ask("seats by the fire")
+		var built := session.built_ahead.duplicate()
+		var parses := session.parses
+		var floods := session.floods
+		var laid := 0
+		var changed := 0
+		for message: Dictionary in session.messages:
+			if message.get("content") is Array:
+				for block: Variant in message["content"]:
+					if block is Dictionary and block.get("type") == "tool_result":
+						laid += 1 if str(block.get("content")).begins_with("laid") else 0
+						changed += 1 if str(block.get("content")).begins_with("changed it to") else 0
+		stub.turns = [mixed, "Mixed."]
+		var second := await session.ask("a path, then a seat")
+		var words: Array = []
+		for message: Dictionary in session.messages:
+			if message.get("content") is Array:
+				for block: Variant in message["content"]:
+					if block is Dictionary and block.get("type") == "tool_result":
+						words.append([block.get("content"), block.get("is_error")])
+		var closing := func(result: Dictionary) -> String:
+			return str([result.get("ok"), result.get("error"), result.get("warnings"), result.get("height_warnings"), result.get("site_warnings"),
+				result.get("street_warnings"), result.get("layout_warnings"), result.get("arrival_warnings")])
+		said[way] = {"words": words, "first": closing.call(first), "second": closing.call(second), "built": built,
+			"parses": parses, "floods": floods, "laid": laid, "changed": changed}
+		print("  %s: built ahead %s; the first ask %d parses, %d floods, %d spots laid, %d changed" % [way, built, parses, floods, laid, changed])
+	for way: String in ["at once", "late"]:
+		_check(str(said[way]["words"]) == str(said["whole"]["words"]) and said[way]["words"].size() == spot_calls.size() + mixed.size(),
+			"%s: every call's words as on the full path (%d calls)" % [way, said[way]["words"].size()])
+		_check(said[way]["first"] == said["whole"]["first"] and said[way]["second"] == said["whole"]["second"], "%s: each ask's closing checks as on the full path" % way)
+	_check(str(said["late"]["built"]) == str(["reach", "held", "checks"]), "four frames out: the reach, the held reach and the checks built ahead (%s)" % [said["late"]["built"]])
+	_check(said["at once"]["built"].size() < 3, "a reply in at once: the build-ahead stopped short (%s), the tool built the rest" % [said["at once"]["built"]])
+	_check(said["whole"]["built"].is_empty(), "whole_checks builds nothing ahead")
+	_check(said["late"]["parses"] == 1 and said["whole"]["parses"] > 1,
+		"one parse for an ask of spots: the level's, shared with the fresh working copy (%d; whole %d)" % [said["late"]["parses"], said["whole"]["parses"]])
+	_check(said["late"]["laid"] == 2 and said["late"]["changed"] == 1 and said["late"]["floods"] == 2 + said["late"]["laid"] + said["late"]["changed"],
+		"floods: the reach and the held reach once, then one per spot laid or changed, a changed one's after the reach built ahead (%d; whole %d)" % [said["late"]["floods"], said["whole"]["floods"]])
+	# (5a) The doc moved on between the working copy's taking and its first parse: its own parse, not the doc's.
+	var small := _doc()
+	var session := BuilderSession.new(small, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var level_parse := session.parsed_of(small)
+	_check(session.working_as_taken() and is_same(session.parsed_of(session.working), level_parse), "a fresh working copy shares the doc's parse")
+	session._fresh_working()
+	small.apply_changes({"cells": {Vector2i(5, 5): "water"}})  # Another builder's accept, or a regeneration.
+	var parses_before := session.parses
+	var own := session.parsed_of(session.working)
+	_check(not session.working_as_taken() and session.parses == parses_before + 1 and str(own) == str(session.working.parsed())
+		and str(own) != str(session.parsed_of(small)), "the doc changed since the working copy was taken: the working copy parsed for itself, the doc's parse not used")
+	# (5b) A kept check is one revision's: a change to the working copy or the doc, and the next read is new.
+	var checked := session.checks_now()
+	_check(is_same(session.checks_now(), checked), "the checks kept while nothing changes")
+	session.working.apply_changes({"cells": {Vector2i(6, 6): "water"}})
+	_check(not is_same(session.checks_now(), checked), "the working copy changed: the checks read again")
+	checked = session.checks_now()
+	small.apply_changes({"cells": {Vector2i(8, 8): "water"}})
+	_check(not is_same(session.checks_now(), checked), "the doc changed: the checks read again")
+	# (5c) An ask whose request fails mid-wait, and one discarded mid-wait: nothing kept after.
+	for how: String in ["error", "discard"]:
+		var stub := StubClaude.new([{"error": "the connection was lost"}] if how == "error" else [spot_calls, "Spots."])
+		stub.wait_frames = 6
+		var asked := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", stub)
+		if how == "discard":
+			_discard_after(asked, 2)
+		var result := await asked.ask("seats")
+		_check((not result["ok"] if how == "error" else result.get("discarded", false)) and asked._reached.is_empty() and asked._held.is_empty()
+			and asked._checks.is_empty(), "%s mid-wait: nothing built kept (built ahead %s)" % [how, asked.built_ahead])
+		if how == "discard":
+			_check("checks" not in asked.built_ahead, "discarded mid-wait: the build-ahead stopped there (%s)" % [asked.built_ahead])
+
+
+func _discard_after(session: BuilderSession, frames: int) -> void:
+	for frame in frames:
+		await get_tree().process_frame
+	session.discard()
 
 
 ## 867 amended (3): an ask that lays spots alone reads its checks from the kept parse with its spots read

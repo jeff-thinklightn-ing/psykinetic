@@ -53005,6 +53005,52 @@ paint is never spots at most. Accept's frame 346 and 350 ms (save_config), untou
 from 45 to 67 s with the shortcut's both-ways section. Server only, protocol unchanged, no new class_name,
 no bullet.
 
+867 amended (4) (the decision-number script's label; the coordinator's ruling on the box's probe868 lines,
+2026-11-13): an ask's first spot call builds nothing twice. The box's longest frame of an ask after (3)
+was the first spot's tool, 1123 ms of a 1328 ms frame a, about 880 of it built once: a parse of the fresh
+working copy (460), which frame 0 had just parsed as the level for its layout baseline, and the first
+reach flood and held-reach flood (209 each); and the four checks (sites 145, heights 49, streets 12 ms)
+ran before and after every call and again at the ask's end. (a) A fresh working copy shares the doc's
+parse while it is the doc as taken (BuilderSession.working_as_taken: no change made to it, and the doc's
+revision still based_on); _fresh_working keeps the doc's own kept parse while its revision stands. A
+doc moved on since the working copy was taken (another builder's accept, a regeneration) is never read
+for it: the working copy is parsed for itself. (b) The four checks are kept per revision of the working
+copy and of the doc (checks_now): a call's before-checks are the last call's after-checks, unchanged, and
+the ask's closing checks the last call's. (c) While the ask's first request is out, _build_ahead builds
+what the first call would: the ground reached, the ground reached with the level's spots held (a spot
+call's before) and the four checks, one to a frame. These are the server's frames, which every player on
+the host shares (on the box's wilds about 209, 209 and 195 ms), spent in the first frames after the
+request is sent, while the builder waits on Claude; never two in one frame, and never in a frame the ask
+itself runs a piece in: each piece runs only while the request is still out, the ask the same one and
+not discarded, and the working copy unchanged since it began; else it stops and the tool builds what it
+lacks as before. The spot tool reads its after, as its before, through _held_reach: a spot changed where
+one stands already holds every spot's cell, the held reach built ahead, so it floods once (its before,
+that cell free), as a new spot does (its after); the box's first probe of this showed a changed spot
+first and paid both. An ask that ends in an error, or is discarded, keeps nothing built (_drop_built), and
+every piece is kept by revision, so one never read costs a frame and nothing else. whole_checks (every
+check read whole) builds nothing ahead and keeps nothing. StubClaude.wait_frames holds a request out for
+some frames, and a turn that is a Dictionary is the whole answer ({"error": ...}). BuilderSession.parses
+and floods count the whole parses and reach floods made. builder_test _test_built_ahead: four spot calls
+on wilds (one of its own spots changed first, two laid, one refused) and a paint-then-spot follow-up, run
+whole, with the reply at once (the build-ahead cut short) and four frames late (built whole), give the
+same words call for call and the same closing checks; late, the first ask makes one parse (the level's)
+and floods the reach and the held reach once, then once per spot laid or changed; the doc changed after the working copy was taken: its own parse, not the doc's; a kept check
+read again after a change to the working copy or the doc; an ask failed or discarded mid-wait keeps
+nothing. On the box (the coordinator's probe 869c, 2026-11-13 16:25, wilds, the host's stub reply held out
+six frames as a network wait would hold it; beside economy's three soaks, its unchanged frames about 6 %
+slower than the idle box's, so every number here is about 6 % high): the first spot's frame a 1328 ms
+before this row (1123 of it the tool) to 254 (the checks 0.0, the tool 254: one flood, no parse); every
+later spot's frame a 435 to 246; the closing checks' frame 205 to 0; the three pieces built ahead 222,
+222 and 213 ms, each in its own frame (frames 268 to 270, the request out); the ask's whole count one
+parse and five floods. The longest frame of the ask, 1329 ms before (the first spot's), is now frame 0's
+frame, 585 ms host to host: the ask's start, 513 (its layout baseline, the level's parse, 479), and 72 ms
+more in the same frame that no probe line accounts for (Main._process took under 50 ms there, as its
+probe line prints only over 50: the sim's tick and the host's own start of the ask share that frame).
+Accept's frame, 379 (save_config 341), is untouched, and now the second longest. Scene B's ask of three
+spots alone, its request out ten frames, one parse and five floods. Left for lever 4, its own page: frame
+0's parse of the level, accept's save_config, and a cell change's parse. Server only, protocol
+unchanged, no new class_name, no bullet.
+
 ## 858. Umbrage at night: the ground lit once, a less blue night, a fill on bodies (lands off)
 
 Package "Umbrage at night" (the coordinator, 2026-11-10, under Jeff's "Umbrage first"; environment leads). Pieces: (a) this, environment's night light; (b) buildings' lamp numbers (the door lanterns, the store's and chapel's, the temple's candles of 734 amended (7)); (c) the window rule after 22:00 (566 with npc's sleep; playtest's count of lit windows on a lived-in town first). (a) lands switched off: `Client3D.NIGHT_LOOK_2 := false` keeps every number as it was. Environment alone flips it, in its own commit, on buildings' ping that (b) is on main, in the same landing take or the same cut, release told. A darker night without stronger lamps would make the town darker still, so never one without the other in a released build.

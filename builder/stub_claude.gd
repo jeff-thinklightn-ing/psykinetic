@@ -13,6 +13,9 @@ extends RefCounted
 var turns: Array = []
 var sent: Array[Dictionary] = []
 var _turn := 0
+## Frames each request is out before its answer (867 amended (4): builder_test's network wait, while an
+## ask builds ahead). A turn that is a Dictionary is the whole answer, as {"error": ...} for a failed request.
+var wait_frames := 0
 
 
 func _init(script_turns: Array = []) -> void:
@@ -21,6 +24,8 @@ func _init(script_turns: Array = []) -> void:
 
 func send(body: Dictionary) -> Dictionary:
 	sent.append(body.duplicate(true))
+	for frame in wait_frames:
+		await Engine.get_main_loop().process_frame
 	# A new request (the last message is the player's words, not tool results) starts the script again.
 	var last: Dictionary = body["messages"].back()
 	if last.get("content") is String:
@@ -31,6 +36,8 @@ func send(body: Dictionary) -> Dictionary:
 			"content": [{"type": "text", "text": "Done."}]}
 	var turn: Variant = turns[_turn]
 	_turn += 1
+	if turn is Dictionary:
+		return turn
 	if turn is String:
 		var words: String = turn
 		if "{results}" in words:

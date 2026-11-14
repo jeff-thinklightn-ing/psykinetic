@@ -212,8 +212,13 @@ func _fresh_working() -> void:
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
 	based_on = doc.revision
-	_reached = {}
+	_taken_revision = working.revision
+	_drop_built()
+	# The doc's own parse stays while its revision stands (867 amended (4)): the new working copy shares it.
+	var doc_parse: Variant = _parses.get(doc.get_instance_id())
 	_parses.clear()
+	if doc_parse is Dictionary and int(doc_parse["revision"]) == doc.revision:
+		_parses[doc.get_instance_id()] = doc_parse
 
 
 ## Called once a reply whose tool calls are about to run (867 amended (1)): the host's "Checking:" line.
@@ -256,8 +261,14 @@ func ask(text: String) -> Dictionary:
 	# And the arrivals' (806 amended (13)): the level's own the baseline, what the proposal adds said once, a warning.
 	var arrivals_before := doc_arrival_faults()
 	var arrivals_said: Array[String] = []
+	_ask_token += 1
+	built_ahead = []
 	for turn in MAX_TURNS:
+		_request_out = true
+		if turn == 0:
+			_build_ahead(_ask_token)  # Not awaited: it runs in the frames the request is out (867 amended (4)).
 		var response: Dictionary = await client.send(_body())
+		_request_out = false
 		if response.has("error"):
 			result["error"] = str(response["error"])
 			break
@@ -272,28 +283,31 @@ func ask(text: String) -> Dictionary:
 			for block: Dictionary in content:
 				if block.get("type") == "tool_use":
 					await breathe()
-					var before := Stockpile.check(working.config)
-					var ground_before := height_checks()
-					var sites_before := site_checks()
-					var streets_before := street_checks()
+					# 867 amended (4): the last call's after, kept by revision, is this one's before.
+					var checked := checks_now()
+					var before: Array = checked["store"]
+					var ground_before: Array = checked["heights"]
+					var sites_before: Array = checked["sites"]
+					var streets_before: Array = checked["streets"]
 					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
 					await breathe()
+					checked = checks_now()
 					# What the change did to the town's store, said at once (decision 301).
-					var new := Stockpile.check(working.config).filter(func(warning: String) -> bool: return warning not in before)
+					var new := (checked["store"] as Array).filter(func(warning: String) -> bool: return warning not in before)
 					if not new.is_empty():
 						outcome["text"] += "
 The town's store now: " + "; ".join(new)
 					# And to the ways up and down (decision 356).
-					var ground := height_checks().filter(func(warning: String) -> bool: return warning not in ground_before)
+					var ground := (checked["heights"] as Array).filter(func(warning: String) -> bool: return warning not in ground_before)
 					if not ground.is_empty():
 						outcome["text"] += "
 Heights now: " + "; ".join(ground)
 					# And to the work sites' ways to their towns (decision 520).
-					var sites := site_checks().filter(func(warning: String) -> bool: return warning not in sites_before)
+					var sites := (checked["sites"] as Array).filter(func(warning: String) -> bool: return warning not in sites_before)
 					if not sites.is_empty():
 						outcome["text"] += "\nWork sites now: " + "; ".join(sites)
 					# And to the doors onto the streets and the plots (decision 564).
-					var streets := street_checks().filter(func(warning: String) -> bool: return warning not in streets_before)
+					var streets := (checked["streets"] as Array).filter(func(warning: String) -> bool: return warning not in streets_before)
 					if not streets.is_empty():
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
 					await breathe()
@@ -339,10 +353,20 @@ Heights now: " + "; ".join(ground)
 		result["error"] = "Claude did not finish in %d turns" % MAX_TURNS
 	result["summary"] = summary
 	await breathe()
-	result["warnings"] = Stockpile.check(working.config)
-	result["height_warnings"] = height_checks()
-	result["site_warnings"] = site_checks()
-	result["street_warnings"] = street_checks()
+	# 867 amended (4): the last call's after-checks, kept, unless something changed since.
+	var closing := checks_now()
+	var store_end: Array[String] = []
+	store_end.assign(closing["store"])
+	result["warnings"] = store_end
+	var heights_end: Array[String] = []
+	heights_end.assign(closing["heights"])
+	result["height_warnings"] = heights_end
+	var sites_end: Array[String] = []
+	sites_end.assign(closing["sites"])
+	result["site_warnings"] = sites_end
+	var streets_end: Array[String] = []
+	streets_end.assign(closing["streets"])
+	result["street_warnings"] = streets_end
 	await breathe()
 	var parsed_now := parsed_of(working)
 	await breathe()  # A parse, then its checks: each its own frame (the box: 459 ms a parse).
@@ -358,6 +382,8 @@ Heights now: " + "; ".join(ground)
 		arrivals_end = arrival_news(arrivals_before, parsed_now)
 	result["arrival_warnings"] = arrivals_end
 	result["cost"] = spent
+	if not result["ok"]:
+		_drop_built()  # 867 amended (4): an ask ended in an error keeps nothing built.
 	busy = false
 	# Set for one ask (the host sets it again each time); dropped, so a callable holding this session frees it.
 	on_checking = Callable()
@@ -2807,7 +2833,9 @@ func _spot(given: Dictionary) -> Dictionary:
 			held[Level._tile(other.get("cell"))] = true
 	var before := _held_reach(held)
 	held[at] = true
-	var after := reached_round(held)
+	# 867 amended (4): a spot changed where one stands already holds the cells the build-ahead held (every
+	# spot's): its after is that kept reach, and only its before (that cell free) floods.
+	var after := _held_reach(held)
 	var cut: Array[Vector2i] = []
 	for cell: Vector2i in before:
 		if cell != at and not after.has(cell):
@@ -3237,6 +3265,86 @@ var _parses := {}
 var _baselines := {}
 ## The ground reached with every spot's cell held (the spot tool's before).
 var _held := {}
+## How many whole parses and reach floods this session has made (867 amended (4)): builder_test's count of
+## what an ask built, and a probe's.
+var parses := 0
+var floods := 0
+
+
+## Whether the working copy is the doc as _fresh_working took it, and the doc not changed since (867
+## amended (4)): no change made to it (its revision as taken) and the doc's revision still based_on, so a
+## parse of the one is a parse of the other. Another builder's accept or a regeneration moves the doc on.
+func working_as_taken() -> bool:
+	return not whole_checks and working.revision == _taken_revision and doc.revision == based_on
+
+var _taken_revision := -1
+
+
+## The four checks an ask's tool call reads before and after it (the store's, heights', work sites' and
+## streets'), kept per revision of the working copy and the doc (867 amended (4)): a call's before is the
+## last call's after, unchanged, and the ask's closing checks are the last call's. {store, heights, sites,
+## streets}, each an Array of warnings; read only.
+func checks_now() -> Dictionary:
+	if not whole_checks and not _checks.is_empty() and is_same(_checks["working"], working) \
+			and int(_checks["revision"]) == working.revision and int(_checks["doc_revision"]) == doc.revision:
+		return _checks["said"]
+	var said := {"store": Stockpile.check(working.config), "heights": height_checks(), "sites": site_checks(), "streets": street_checks()}
+	_checks = {"working": working, "revision": working.revision, "doc_revision": doc.revision, "said": said}
+	return said
+
+var _checks := {}
+
+
+## Each spot's cell in the working copy, held as a body would hold it (the spot tool's held, but for the
+## spot a call lays or changes).
+func spot_cells() -> Dictionary:
+	var held := {}
+	for entry: Variant in working.config["spots"] if working.config.get("spots") is Array else []:
+		if entry is Dictionary and Level._tile(entry.get("cell")) != null:
+			held[Level._tile(entry.get("cell"))] = true
+	return held
+
+
+## What the first tool call of an ask would build for itself, built while its request is out (867 amended
+## (4)): the ground reached, the ground reached with the level's spots held (a spot call's before) and the
+## four checks, each in a frame of its own (the server's frame, every player on the host shares it: about
+## 209, 209 and 195 ms on the box's wilds), never in a frame the ask itself runs a piece in. Each piece is
+## built only while the request is still out, the ask the same one, not discarded, and the working copy
+## unchanged since it began; else it stops, and the tool builds what it lacks as before. Every piece is
+## kept by revision, so one built and never read is a miss for nothing.
+func _build_ahead(token: int) -> void:
+	var of := working
+	var revision := working.revision
+	for piece: String in ["reach", "held", "checks"]:
+		await breathe()
+		if token != _ask_token or not _request_out or not busy or discard_waiting or not is_same(of, working) \
+				or working.revision != revision or whole_checks:
+			return
+		match piece:
+			"reach":
+				reached()
+			"held":
+				var held := spot_cells()
+				_held = {"doc": working, "revision": working.revision, "cells": _cells_key(held),
+					"reach": reached() if held.is_empty() else reached_round(held)}
+			"checks":
+				checks_now()
+		built_ahead.append(piece)
+
+## The ask now running (867 amended (4)): a build-ahead of an earlier one stops.
+var _ask_token := 0
+## Whether the ask is waiting on Claude's reply: the only time a build-ahead runs.
+var _request_out := false
+## What the last ask's build-ahead built, in order (builder_test reads it).
+var built_ahead: Array[String] = []
+
+
+## What an ask built ahead and its checks kept, dropped (867 amended (4)): an ask that ends in an error, or
+## is discarded, leaves nothing kept for a proposal nobody is asking about.
+func _drop_built() -> void:
+	_reached = {}
+	_held = {}
+	_checks = {}
 
 
 ## [param of] parsed (MapDoc.parsed), kept while its revision stands (867):
@@ -3253,7 +3361,14 @@ func parsed_of(of: MapDoc) -> Dictionary:
 		var patched := _spots_patched(kept)
 		_parses[of.get_instance_id()] = patched
 		return patched["parsed"]
-	var parsed := of.parsed()
+	var parsed: Dictionary
+	if is_same(of, working) and working_as_taken():
+		# 867 amended (4): the working copy is still the doc as it was taken, and the doc unchanged since:
+		# the doc's own parse (frame 0's, for the layout baseline), shared, read only like any.
+		parsed = parsed_of(doc)
+	else:
+		parsed = of.parsed()
+		parses += 1
 	var entry := {"revision": of.revision, "parsed": parsed}
 	if spots_alone:
 		var floor := {}
@@ -3309,8 +3424,8 @@ func _baseline(kind: String, read: Callable) -> Array:
 	return faults
 
 
-## The ground reached with [param held]'s cells solid: the last spot's after
-## when nothing has changed since, else flooded (867).
+## The ground reached with [param held]'s cells solid: the last spot's after, or the reach built ahead
+## (867 amended (4)), when nothing has changed since and the same cells are held, else flooded (867).
 func _held_reach(held: Dictionary) -> Dictionary:
 	if not _held.is_empty() and is_same(_held["doc"], working) and int(_held["revision"]) == working.revision and _held["cells"] == _cells_key(held):
 		return _held["reach"]
@@ -3521,6 +3636,7 @@ func reached() -> Dictionary:
 
 ## reached() with the cells of [param extra] solid too (859: a body standing on a spot).
 func reached_round(extra: Dictionary) -> Dictionary:
+	floods += 1
 	var ground := flood_ground()
 	if not extra.is_empty():
 		var solid: Dictionary = (ground.get("solid", {}) as Dictionary).duplicate()
