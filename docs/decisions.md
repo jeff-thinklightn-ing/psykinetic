@@ -53784,7 +53784,11 @@ default now; a test turns them off by the switch or each by hand.
   at the first boot after it since 465 amended (4)) starts the level's regen state afresh, and with
   it the bier: a new generation's knight has nothing laid. That is by design, not a loss: the
   remains he thanked a player for are already charged into their amulet, and the new barrow's
-  knight is met anew. Each new laying lays his remains again.
+  knight is met anew. Each new laying lays his remains again. The biers' nodes (_bier_remains) are
+  a ROOM field in client3d/room_fields.gd (822): cleared and filled again with the room as it
+  builds, beside _fire_lights and _lamp_lights, and traded with the room by swap_room on a
+  seamless crossing. Seamless crossings are off (--seamless only); whoever switches 822 on checks
+  a laid bier across a crossing, the remains drawn there and out of the way of the room left.
 - A click or E on the bier (Main._altar_click) asks the server whenever the local player carries
   a holy knight's remains (World.RELIC in their pack), not only at the quest's ready step: a later
   run's own or a brother's (896 amended (1)) were laid by no click and refused by no word before
