@@ -8,7 +8,9 @@ cd "$(dirname "$0")/.."
 here="$(pwd)"
 tmp="$(mktemp -d)"
 # A hang left alive (a check failed early) is stopped by pid at exit, before its folder goes.
-hang_left() { for pid in $(cat "$tmp/hang.pids" 2>/dev/null); do kill -0 "$pid" 2>/dev/null && echo "$pid"; done; }
+# Only a pid still running the hang's own `sleep 120`: an id reused by another process is never
+# counted or stopped (perf-timed's landing, 11-13 22:19, met a reused id in heavy_job_test).
+hang_left() { for pid in $(cat "$tmp/hang.pids" 2>/dev/null); do kill -0 "$pid" 2>/dev/null && tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null | grep -q "^sleep 120 *$" && echo "$pid"; done; }
 trap 'for pid in $(hang_left); do kill -9 "$pid" 2>/dev/null; done; rm -rf "$tmp"' EXIT
 failed=0
 check() {

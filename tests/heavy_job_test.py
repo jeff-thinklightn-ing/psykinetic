@@ -798,20 +798,36 @@ SLEEPERS_FILE = os.path.join(tempfile.gettempdir(), "heavy_job_test_sleepers_%d.
 
 
 def sleeper_body(seconds):
-    return "import os, time; open(%r, 'a').write('%%d\\n' %% os.getpid()); time.sleep(%d)" % (SLEEPERS_FILE, seconds)
+    # Its pid and the time it wrote it: a process at that pid made later is another (an id reused).
+    return "import os, time; open(%r, 'a').write('%%d %%f\\n' %% (os.getpid(), time.time())); time.sleep(%d)" % (
+        SLEEPERS_FILE, seconds)
 
 
 def sleepers_seen():
+    """[(pid, the time it wrote its line)] of each sleeper started."""
     try:
         with open(SLEEPERS_FILE) as handle:
-            return [int(line) for line in handle if line.strip()]
-    except OSError:
+            return [(int(line.split()[0]), float(line.split()[1])) for line in handle if len(line.split()) == 2]
+    except (OSError, ValueError):
         return []
 
 
+def still_the_sleeper(pid, wrote):
+    """Whether [pid] is alive and is still that sleeper: on Windows, a process at that id made after
+    the sleeper wrote its line is another, its id reused (perf-timed's landing, 11-13 22:19: one of
+    the three ids was alive at the end, 99 s on a busy PC, and the end check stopped it)."""
+    if not gate.alive(pid):
+        return False
+    made = gate.started_at(pid)
+    if made is None:
+        return os.name != "nt"
+    return made / 1e7 - 11644473600.0 <= wrote + 1.0  # 100 ns since 1601, as epoch seconds.
+
+
 def stop_sleepers():
-    """Stops any sleeper still alive, by pid; returns the pids it found alive."""
-    left = [pid for pid in sleepers_seen() if gate.alive(pid)]
+    """Stops any sleeper still alive, by pid, never another process at a reused id; returns the
+    pids it found alive."""
+    left = [pid for pid, wrote in sleepers_seen() if still_the_sleeper(pid, wrote)]
     for pid in left:
         subprocess.run(["taskkill", "/PID", str(pid), "/F"] if os.name == "nt" else ["kill", "-9", str(pid)],
             capture_output=True)
@@ -2079,9 +2095,13 @@ said50 = subprocess.run([sys.executable, "-B", os.path.join(os.path.dirname(os.p
 check("free RAM 64.0 GB" in said50, "a gate process of its own goes by the figure: %s" % [line for line in said50.splitlines() if "free RAM" in line][:1])
 
 print("== the sleepers ==")
-seen, left = sleepers_seen(), stop_sleepers()
+seen, left = [pid for pid, _ in sleepers_seen()], stop_sleepers()
 check(len(seen) >= 3 and not left, "each long sleeper stopped with its run, none left alive (%d started: %s; alive at the end: %s)" % (
     len(seen), seen, left))
+# The reused id: this test's own process, made before any sleeper wrote, is never taken for one
+# written now; and a sleeper's line is told from a process made after it.
+check(not still_the_sleeper(os.getpid(), time.time() - 3600) and still_the_sleeper(os.getpid(), time.time()) == (gate.started_at(os.getpid()) is not None or os.name != "nt"),
+    "an id is its sleeper only if its process was made before the sleeper wrote its line")
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
