@@ -11724,6 +11724,20 @@ item_note), and the party log tells each as it comes (World.item_grew). Saved in
 ItemBook; display text only, so the protocol is unchanged. Questions with Jeff:
 whether a bane should cost stealth, whether drawing a kind's fire is too harsh a
 cost for vengeance.
+
+417 amended (1): a player reads a creature kind by its label, never its id (voice's rules, 11-13, after
+enemy-ai's plate row gave the imp, brute and sneak labels: a sword that felled an Orc noted "1 brute", the
+skeleton guard showed as "skeleton_guards" and the draugr tallied "draugrs"). World.kind_word is a kind's
+label lower-cased ("orc", "crypt guard"), its id's words only for a kind with none ("person");
+World.kind_plural is monsters.json's "plural" lower-cased where given ("wolves", "draugr"), else the
+word by World._plural ("orcs", "crypt guards"); World.kind_count is a tally's "1 orc", "2 crypt guards";
+World.bane_mark is a one-word kind hyphenated ("orc-bane"), a longer one "the bane of crypt guards". A
+label beginning "The" is one of a kind: it keeps its "the" and takes no plural and no count ("the old
+grey", "the old grey twice", "the old grey 3 times"; its bane "the old grey's bane"), and World.the_label
+gives the win line and Main.monster_name such a label as it is, never "The the old grey". The item note,
+kills_line, story_line, the companion card's grew facts and the grew narration all go through these, and
+ItemTip knows all three bane forms; a new line that names a kind to a player uses them too. Server log
+lines keep the kind id. Display text only: protocol unchanged, no new class_name, no bullet (voice).
 ## 398. Resident cards: who a town's person is, rolled once and grown from events
 
 Every town resident has a card, as a companion has hers (293/294): who they

@@ -106,6 +106,7 @@ func _ready() -> void:
 	_test_senses()
 	_test_crouch()
 	_test_wild_kinds()
+	_test_kind_words()
 	_test_wild_prey()
 	_test_wild_ears()
 	_test_clank()
@@ -3745,6 +3746,27 @@ func _test_wild_kinds() -> void:
 			"a doe's side: the stag (her herd), not a boar or an imp")
 	_check(not (e["i"][0] as Monster)._same_side(e["o"][0]) and not (e["i"][0] as Monster)._same_side(doe),
 			"an imp's side has no animals in it")
+
+
+## A kind as a player reads it (voice, 11-13: the label wherever a player
+## reads a kind, never its id): the plates' new labels in the tally, the bane
+## mark and the win line; one of a kind ("The old grey") keeps its "the" and
+## takes no count or plural, and is never "The the old grey".
+func _test_kind_words() -> void:
+	print("%s== a kind reads as its label: orcs, crypt guards, draugr, the old grey ==" % char(10))
+	_check(World.kind_count("brute", 1) == "1 orc" and World.kind_count("sneak", 3) == "3 kobolds" and World.kind_count("imp", 2) == "2 imps"
+		and World.kind_count("skeleton_guard", 2) == "2 crypt guards",
+		"the tally names the label: %s, %s, %s" % [World.kind_count("brute", 1), World.kind_count("sneak", 3), World.kind_count("skeleton_guard", 2)])
+	_check(World.kind_plural("wolf") == "wolves" and World.kind_plural("draugr") == "draugr" and World.kind_plural("person") == "people",
+		"a given plural lower-cased, never \"draugrs\" (%s, %s)" % [World.kind_plural("wolf"), World.kind_plural("draugr")])
+	_check(World.kind_count("old_wolf", 1) == "the old grey" and World.kind_count("old_wolf", 2) == "the old grey twice"
+		and World.kind_plural("old_wolf") == "the old grey",
+		"one of a kind: no count, no plural (%s; %s)" % [World.kind_count("old_wolf", 1), World.kind_count("old_wolf", 2)])
+	_check(World.bane_mark("brute") == "orc-bane" and World.bane_mark("imp") == "imp-bane" and World.bane_mark("skeleton_guard") == "the bane of crypt guards"
+		and World.bane_mark("old_wolf") == "the old grey's bane",
+		"bane: one word hyphenates, two read \"the bane of\" (%s, %s, %s)" % [World.bane_mark("brute"), World.bane_mark("skeleton_guard"), World.bane_mark("old_wolf")])
+	_check(World.the_label(str(Monster.kinds()["old_wolf"]["label"])) == "The old grey" and World.the_label("Imp") == "The imp",
+		"the win line: \"%s\", never \"The the old grey\"" % World.the_label(str(Monster.kinds()["old_wolf"]["label"])))
 
 
 func _test_wild_prey() -> void:

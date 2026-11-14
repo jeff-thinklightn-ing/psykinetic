@@ -98,7 +98,7 @@ static func lines_for(id: String, note: String) -> Array[Dictionary]:
 	for mark in marks:
 		# A growth mark (items' 417, 421) explained in the catalog's words.
 		var says := ""
-		if mark.ends_with("-bane"):
+		if mark.ends_with("bane") or mark.begins_with("the bane of "):  # "orc-bane", "the old grey's bane", "the bane of crypt guards" (World.bane_mark).
 			says = str(Items.growth().get("says", {}).get("bane", ""))
 		elif mark.begins_with("vengeance"):
 			says = str(Items.growth().get("says", {}).get("vengeance", ""))

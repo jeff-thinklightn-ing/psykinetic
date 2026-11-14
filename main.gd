@@ -19249,7 +19249,7 @@ func monster_name(monster: Monster) -> String:
 	var label := str(Monster.kinds().get(kind, {}).get("label", ""))
 	if label.is_empty() and not kind.is_empty():
 		label = kind.replace("_", " ")
-	return "the " + (label.to_lower() if not label.is_empty() else "creature")
+	return World.the_label(label if not label.is_empty() else "creature").to_lower()  # "the old grey", never "the the old grey".
 
 
 ## [param monster]'s name as a label (a window title, the talk log's
@@ -19718,8 +19718,9 @@ func _card_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> voi
 	var thing := World.item_title(uid).get_slice(" (", 0)
 	if thing.is_empty():
 		thing = "%s's %s" % [entity.name, Items.name_of(World.items.id_of(uid))]
-	var words: String = {"bane": "is %s-bane now" % kind, "grudge": "holds a grudge against %s" % World._plural(kind),
-		"avenged": "has had its vengeance on %s" % World._plural(kind)}.get(mark, "")
+	# The kind as a player reads it (voice, 11-13): "is orc-bane now", "is the bane of crypt guards now", "is the old grey's bane now".
+	var words: String = {"bane": "is %s now" % World.bane_mark(kind), "grudge": "holds a grudge against %s" % World.kind_plural(kind),
+		"avenged": "has had its vengeance on %s" % World.kind_plural(kind)}.get(mark, "")
 	if not words.is_empty():
 		(entity as Companion).note_fact("%s %s." % [thing, words])
 
@@ -19740,7 +19741,7 @@ func _narrate_grew(entity: GridEntity, uid: int, mark: String, kind: String) -> 
 		var noun := Items.name_of(World.items.id_of(uid))
 		thing = "%s's %s" % [_display_name(entity), noun]
 		yours = "Your %s" % noun
-	var kinds := World._plural(kind)
+	var kinds := World.kind_plural(kind)  # The label's, never the id (voice, 11-13).
 	match mark:
 		"bane":
 			var line := "%s has felled so many %s it is their bane."

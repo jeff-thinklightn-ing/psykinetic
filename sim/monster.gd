@@ -3030,7 +3030,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"lifts": row.get("lifts"),
-			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
+			"label": str(row.get("label", "")), "plural": str(row.get("plural", "")), "fearless": bool(row.get("fearless", false)),
 			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "holds_off": bool(row.get("holds_off", false)), "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},

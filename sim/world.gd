@@ -3977,6 +3977,13 @@ static func fight_reward(beaten: Array, at: Vector2i) -> Dictionary:
 	return out
 
 
+## A creature's label as its win line names it: "The imp"; a label that
+## already starts with "The " ("The old grey") as it is, never "The the old
+## grey" (voice, 11-13). Main.monster_name lower-cases it mid-line.
+static func the_label(label: String) -> String:
+	return "The " + label.to_lower().trim_prefix("the ")
+
+
 ## [param foe] beaten (804, combat's side): fallen, or [param fled] broken
 ## and running (a rout; a foe that gives up the chase is no win). Each
 ## player fighting it has it beaten; _tend_fights tells the win when none is
@@ -3985,7 +3992,7 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 	var kind := kind_of(foe)
 	var hard := Monster.is_apex(kind) or foe.boss or not foe.given_name.is_empty() or not foe.named_id.is_empty()
 	var label := str(Monster.kinds().get(kind, {}).get("label", kind))
-	var name := foe.given_name if not foe.given_name.is_empty() else "The " + label.to_lower()
+	var name := foe.given_name if not foe.given_name.is_empty() else the_label(label)
 	var id := foe.get_instance_id()
 	if not fled:
 		# Routed, then brought down before the win is told (804 amended (9):
@@ -4384,9 +4391,9 @@ func item_note(uid: int) -> String:
 	if items.id_of(uid) == TOTEM:
 		more.append("%d charge%s" % [items.charges_of(uid), "" if items.charges_of(uid) == 1 else "s"])  # Decision 573 amended.
 	if not items.bane_of(uid).is_empty():
-		more.append("%s-bane" % items.bane_of(uid))  # Decision 417.
+		more.append(bane_mark(items.bane_of(uid)))  # Decision 417.
 	if not items.grudge_of(uid).is_empty():
-		more.append("vengeance on %s" % _plural(str(items.grudge_of(uid)["kind"])))
+		more.append("vengeance on %s" % kind_plural(str(items.grudge_of(uid)["kind"])))
 	if not items.blessed_for(uid).is_empty():
 		more.append("blessed")  # Decision 424.
 	if not more.is_empty():
@@ -4406,7 +4413,7 @@ func kills_line(uid: int) -> String:
 	var total := 0
 	for kind: String in kinds:
 		total += int(felled[kind])
-		parts.append("%d %s" % [felled[kind], kind if int(felled[kind]) == 1 else _plural(kind)])
+		parts.append(kind_count(kind, int(felled[kind])))
 	return "felled %d: %s" % [total, ", ".join(parts)]
 
 
@@ -4462,7 +4469,7 @@ func story_line(uid: int) -> String:
 			break
 	for event: Dictionary in history["events"]:
 		if event["kind"] == "avenged":
-			parts.append("avenged on %s" % _plural(str(event["what"])))
+			parts.append("avenged on %s" % kind_plural(str(event["what"])))
 	while not parts.is_empty() and ("story: " + "; ".join(parts)).length() > STORY_LONGEST:
 		parts.remove_at(parts.size() - 1)
 	return "" if parts.is_empty() else "story: " + "; ".join(parts)
@@ -4477,6 +4484,50 @@ func kind_of(entity: GridEntity) -> String:
 	if entity is Monster:
 		return str(entity.spawn_spec.get("kind", ""))
 	return ""
+
+
+## A creature kind as a player reads it (voice, 11-13: the label wherever a
+## player reads a kind, never its id): its label lower-cased ("orc", "crypt
+## guard", "the old grey"); a kind with no label, its id's words ("person").
+static func kind_word(kind: String) -> String:
+	var label := str(Monster.kinds().get(kind, {}).get("label", ""))
+	return (label if not label.is_empty() else kind.replace("_", " ")).to_lower()
+
+
+## More than one of [param kind] (voice, 11-13): its "plural" lower-cased
+## where monsters.json gives one ("wolves", "draugr"), else its word by the
+## rule ("orcs", "crypt guards"); a "the" label is one of a kind and stays as
+## it is ("the old grey").
+static func kind_plural(kind: String) -> String:
+	var word := kind_word(kind)
+	if word.begins_with("the "):
+		return word
+	var own := str(Monster.kinds().get(kind, {}).get("plural", ""))
+	return own.to_lower() if not own.is_empty() else _plural(word)
+
+
+## [param count] of [param kind] as a tally reads it (voice, 11-13): "1 orc",
+## "2 crypt guards"; one of a kind uncounted, "the old grey", "the old grey
+## twice", "the old grey 3 times".
+static func kind_count(kind: String, count: int) -> String:
+	var word := kind_word(kind)
+	if word.begins_with("the "):
+		if count == 1:
+			return word
+		return "%s twice" % word if count == 2 else "%s %d times" % [word, count]
+	return "%d %s" % [count, word if count == 1 else kind_plural(kind)]
+
+
+## A thing's bane mark on [param kind] (decision 417; voice, 11-13): a
+## one-word kind hyphenates ("orc-bane"), a longer one is "the bane of crypt
+## guards", one of a kind "the old grey's bane" (ItemTip knows all three).
+static func bane_mark(kind: String) -> String:
+	var word := kind_word(kind)
+	if word.begins_with("the "):
+		return "%s's bane" % word
+	if word.contains(" "):
+		return "the bane of %s" % kind_plural(kind)
+	return "%s-bane" % word
 
 
 static func _plural(kind: String) -> String:
