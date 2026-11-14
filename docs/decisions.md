@@ -55097,6 +55097,89 @@ three and "7 more", unfolded in place; four shown whole; a chip, not its mark; a
 old server's summary). New class_name: BuilderPanel. Tools only (builder mode is Jeff's): no package,
 no bullet.
 
+885 amended (1) (the decision-number script's label; the coordinator's approval of ui-design's final mock,
+C:/dev/review/ui-design/builder_panel/index.md and its panel2-*.png stills, with its rule for the right
+home, 2026-11-14): the panel takes the home that covers less of the area, and reads short while he
+judges the ghost. Builder's three worst found the whole answer, 1560 wide at the left, over the area he
+was building in about half the asks. Now the pane has three states. Asking and working are the box alone
+and a one-line brief. Reading (an answer come) is NARROW (1286, one width in every cut-down state: the reading keys row at KeyGroups' 40 and the margins, ui-design on the joined stills) wide: the words' first BRIEF_LINES lines
+and, when the layout refuses it, the fault's head and first line (a code as its letters, no chip); the
+foot's keys end in "Tab more" (a FoldLink). Tab, the words or a click on the pane open it full: WIDTH
+(1560), the whole answer and the typing box, "Tab less". Esc in full with words in the box clears them,
+from an empty box cuts it down; Esc in reading discards, as before. The box takes Tab and Esc in its
+own gui_input (accept_event, ui's advice: Main's escape is reached only through _unhandled_input); Tab
+is the box's always, so the LineEdit never moves the focus off a shown box, and a held key's echo does
+nothing. BuilderUI.handle_input takes Tab while an answer shows, ahead of the talk log's Tab, so Tab
+pins the talk log again only once the proposal is accepted or discarded. While he reads, the box has
+no focus and a letter is the game's (the coordinator withdrew its lean that a letter opens it). The
+cost line is gone from every state (the mock's). The spacing is ui-design's parts (886 amended (3)),
+named on the panel's containers with no size in the script: AnswerGlass on the pane (after UiGlass's
+Glass), a HeadRule separator under the head, KeyGroups on the keys; while the server works its line
+is the asked words (cut at WORKING_CHARS, 64, so it never widens the pane) and then WorkingDots, the
+mock's three flame dots, which an error's line has not. The home (BuilderUI.choose_home; the right one's right
+edge RIGHT_GAP in, its top at RIGHT_TOP under the corner map and its label), by the coordinator's rules
+after ui-design's hosted sheet (C:/dev/review/ui-design/builder_panel/stills3/contact.png), chosen
+before it is drawn: the right home gives way to any window open in the room the pane may take there
+(Main.open_window_rects, ui's 802 amended (15)): full it is WIDTH wide and runs to the screen's foot and
+never changes home on Tab, so the pack, whose rect at 16:9 starts under the reading pane's (y 1309
+against 1078), still sends it left. Otherwise a new area (a drag's end) takes the home covering fewer
+of the area's outline cells on the screen (Client3D.screen_of_tile); under neither, the home whose
+middle is farther from the outline's middle (the side away from the area: the sheet's reading plate
+with the area at the left took the left home on the mock's written "tie goes left"; its picture was
+right), left if those are equal. At an answer the pane keeps the home chosen at the ask, whatever the
+outline (the coordinator: "the home is chosen once, when the ask is made, and kept until the answer is
+closed"; an earlier switch, when the kept home covered the outline and the other less, moved stills13's
+answer over Juno); only a window opened at the right moves it, left, and the log names that rule. The pane's width is its
+least (custom_minimum_size.x) and the right home grows leftward: _fit's reset_size had shrunk it to
+its contents' width (1177 in full, found by builder_test). builder_test _test_answer_panel (reading's
+brief, no cost, "more" at NARROW; Tab more at WIDTH, "less"; the right home's rect; choose_home's
+cases: covered, a window, the pack under the reading pane's rect, a new area on a tie each side, an answer on a tie keeping its home, an answer
+moving only off a covered home to one covering less) and builder_zone_test _test_home_gives_way (the pack open: Main's rects meet the right home's reach, an outline under the left
+home goes left with them and right without, a new area goes left) and _test_panel_keys (keys pushed through the viewport: Tab, an echo, Esc from
+an empty box, Esc with words, Tab in the box, Esc in reading, Tab while he asks). For the stills, two
+stub requests (tools only): "chest" lays a chest of loot at the area's middle with no guard by it, which a
+dungeon's chest rule refuses (a refused answer; out of doors the place tool takes no chest of loot and nothing
+else is a layout fault, so that still is shot with the server's --map in a dungeon), and "slow "
+before any request holds the reply STUB_SLOW_FRAMES, 900 (the working state); builder_test
+_test_stub_name (in the barrow near its start, the chest refused; the slow one the same answer,
+held). ui-design's stills beside the mock at 1080p and 4K, joined, before it queues. On the joined
+stills (stills5) the pane took the left home asking and the right as the answer came, for one area:
+--test-builder asked at tick 20 while the camera still came in from the level's start, so the outline was
+read from a view he never drags in (the camera at the level's middle, not yet following him). Main's
+--test-builder, called each world tick, now waits for BuilderUI.view_settled: the 3D view's camera on
+him (Client3D.camera_on: its target within 2 m of his drawn place) and standing still (Client3D.camera_pose:
+its eye, its look, its ortho size and fov within EYE_STILL, 0.02, of where it stood as the run began,
+BuilderUI.camera_moved; the zoom eases the ortho size with the eye unmoved, and stills9 and stills10 read the
+outline and the bodies from a camera still zooming in; stills11 from an ease's tail creeping under 0.02 a tick,
+the roofs' pull easing out at 1.2 a second, so the run is measured from its start) for VIEW_STILL_TICKS, 24
+(2 s), ticks running, or VIEW_WAIT_TICKS, 360 (about 30 s:
+a 4K start under its arrival card outran 120, stills8), gone, the cause said in a line; at once without a 3D view (his place on the screen still and
+near its middle took a parked camera as settled, stills6, and counted in frames from that tick-paced
+caller never let the ask go inside a 30 s run, stills7), and each pick prints its home, the kept one and the outline's middle and count on
+the screen, for a still's log, each body's box on a line of its own (stills12's one line was cut off at the
+companion's box) (builder_zone_test _test_view_settled). On stills6 the right home covered the companion's head
+and shoulders, and on stills12 it still did, the outline crossing the left home's band, so the bodies were never
+weighed: the coordinator's rule (2026-11-14, and 2026-11-15 on stills12: a person outranks a line on the ground),
+a new area's home is ranked first by the bodies, one over neither wins, then one over the companion only, one
+over the player last, and only then by how many outline points it covers, then the tie rule. The bodies are
+their figures on the screen with the plate over the head (Client3D.screen_rect_of): the column from the feet to
+the head, where the HUD plate's foot sits (the Name label NAME_LIFT, 0.35 m, down: the label stands over the
+plate, and stills13's boxes rose 250 to 320 px over the plates at 4K), BODY_COLUMN_HALF across, so a body whose model is not up yet has one (stills9); each bone of its
+skeleton as posed, BODY_LIMB_PAD (0.12 m) round it; and its name plate on the HUD as last drawn
+(BuilderUI.body_rects adds it, read through UiNamePlates.placed_rect, ui-design's part, read only). Not its meshes'
+boxes: a skinned mesh's get_aabb is its rest pose (the player's Body 1.68 m across, arms out in a T; on
+view_world_test's camera its box 457 by 530 against his posed bones' 131 by 224), which made stills12's player
+box 1388 by 2210 on a 3840 screen against about 420 by 1340 drawn, and met both homes; a Label3D's is a 0.62 m
+cube, and with the names on the HUD (865) it draws nothing; a carried light's is its reach (stills8: boxes many times the screen). What a body holds is not counted.
+Counted only as the home is first chosen, never at an answer (a pane that follows bodies about is worse than one
+over a shoulder). builder_test (stills6's case: the left where the tie rule gives the right; the order;
+stills12's: a home over a body and no outline loses to one over none and some; stills13's: kept at an answer
+though its outline now lies under it), view_world_test _test_body_on_screen (the player's box holds every posed
+bone and his head and is narrower than his Body's rest box; his column alone runs from the feet to the head), parts_test (placed_rect). --test-exit-after-ask and --test-exit-after-answer quit, with
+--screenshot, that long after the ask goes or the answer comes, for ui-design's joined stills. A drag is made in a live view, so
+play is unchanged. Client, and the server's stub (tools only); protocol unchanged, no new class_name; a
+bullet in voice's words.
+
 878 amended (1): saturn's slot is taken over at once from a landing gone on this PC (release's ask and conditions, the
 coordinator's approval and its added case, 2026-11-13; label from tools/decision_number.sh). perf-timed's landing lost
 its turn at 22:50: its prepare waited the full 10 minutes on a slot ("physics 2b928b9f7", 1332 s) whose landing had

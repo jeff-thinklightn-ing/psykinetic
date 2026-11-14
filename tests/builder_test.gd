@@ -1936,6 +1936,45 @@ func _test_stub_name() -> void:
 		_check(BuilderSession.SIDES.has(str((turned.turns[0] as Array)[0]["input"].get("facing", ""))), "a trader's facing goes as a side's word (%s)" % trader_key)
 	var unknown := BuilderHost._stub_for(area, "name nowhere Chapel Green", doc.map.size, false, places)
 	_check(unknown.turns.size() == 1 and str(unknown.turns[0]).begins_with("(Stub) Name what"), "a key the level has not: the stub says what it takes, and calls nothing")
+	# 885 amended (1): "chest", a refused answer for ui-design's still of the panel's fault, in a
+	# dungeon (out of doors the place tool itself takes no chest of loot, and nothing else there is a
+	# layout fault): a chest with no guard, in an area whose middle is a floor cell near the start.
+	var plain := MapDoc.from_level("barrow")
+	var barrow_parsed := plain.parsed()
+	var arrivals: Array = (barrow_parsed.get("starts", []) as Array) + (barrow_parsed.get("spawn_points", {}) as Dictionary).values()
+	var start: Vector2i = arrivals[0] if not arrivals.is_empty() and arrivals[0] is Vector2i else Vector2i.ZERO
+	var sense := BuilderSession.LAYOUT_SENSE
+	var lay: Dictionary = sense._lay(barrow_parsed, plain.config.get("laid_rooms", []), Regen.layout_options(plain.config["regenerate"]))
+	var monsters: Array[Vector2i] = []
+	var guarded_rooms := {}
+	for thing: Dictionary in lay["things"]:
+		if thing["kind"] == "monster":
+			monsters.append(thing["cell"])
+			guarded_rooms[sense._node(lay, thing["cell"])] = true
+	var floor_cell := start
+	var best := -1
+	for at: Vector2i in plain.map.cells:
+		var room := sense._node(lay, at)
+		if room <= 0 or room >= 1000 or guarded_rooms.has(room) or not plain.map.walkable(at) 				or at.x < 4 or at.y < 4 or at.x >= plain.map.size.x - 4 or at.y >= plain.map.size.y - 4 				or plain.map.cell(at) != "stone" and plain.map.cell(at) not in Level.GROUNDS:
+			continue
+		if monsters.any(func(m: Vector2i) -> bool: return maxi(absi(m.x - at.x), absi(m.y - at.y)) <= sense.GUARD_REACH + 2):
+			continue
+		var away := absi(at.x - start.x) + absi(at.y - start.y)
+		if best < 0 or away < best:
+			best = away
+			floor_cell = at
+	var chest_area := Rect2i(floor_cell - Vector2i(4, 4), Vector2i(9, 9))
+	var chest_stub := BuilderHost._stub_for(chest_area, "chest", plain.map.size, true, plain.config.get("places", {}))
+	var chest_call: Dictionary = (chest_stub.turns[0] as Array)[0] if chest_stub.turns.size() == 2 and chest_stub.turns[0] is Array else {}
+	var chest_session := BuilderSession.new(plain, chest_area, "barrow", chest_stub)
+	var laid: Dictionary = chest_session.run_tool(str(chest_call.get("name", "")), chest_call.get("input", {}))
+	var news := chest_session.layout_news()
+	_check(laid.get("ok", false) and not news.is_empty(),
+		"\"chest\" in the barrow (--test-builder=\"%d,%d,%d,%d:chest\", the start %s): a chest with no guard laid, and the layout check refuses it (%s; %s)"
+		% [chest_area.position.x, chest_area.position.y, chest_area.size.x, chest_area.size.y, start, laid.get("text", laid.get("error", "")), news])
+	var slow := BuilderHost._stub_for(chest_area, "slow chest", plain.map.size, true, plain.config.get("places", {}))
+	_check(slow.wait_frames == BuilderHost.STUB_SLOW_FRAMES and str(slow.turns) == str(chest_stub.turns) and chest_stub.wait_frames == 0,
+		"\"slow chest\": the same answer, held %d frames (a still of the panel working)" % slow.wait_frames)
 
 
 ## [param value] with every whole float an int, through arrays (level.json's
@@ -2343,16 +2382,106 @@ The temple's door opens on the square."], "fault": false},
 	_check(sites.find_child("More", false, false) == null and sites.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Line")).size() == 4, "four lines show whole, no fold")
 	var text := (spots.get_child(1).find_child("Text", true, false) as RichTextLabel).get_parsed_text()
 	_check(("T" + UiCodeChip.HAIR + "1") in text and "[T1]" not in text and "(180,\u00a0199)" in text, "a code drawn as its chip, not its mark; the coordinate held whole (%s)" % text)
+	# 885 amended (1): the answer cut down while he reads the ghost.
+	var brief := panel.find_child("Brief", true, false) as Control
+	_check(not panel.full and brief.visible and not (answer.get_parent() as Control).visible and not panel.box.visible
+		and panel.brief_text() == "I laid a fire spot. The temple's door opens on the square.|%s|The door of the T1 temple at (190,\u00a0199) does not open onto a street" % BuilderHost.LAYOUT_HEAD,
+		"reading: the words' lines, the fault's head and first line (its code as letters), no box, the whole answer hidden (%s)" % panel.brief_text())
+	_check(panel.find_child("Cost", true, false) == null, "no cost in any state")
+	# ui-design's spacing parts (886 amended (3)), named on the panel's own containers.
+	var head_rule := panel.find_child("HeadRule", true, false) as HSeparator
+	var keys_row := panel.find_child("Foot", true, false).get_child(0) as Control
+	_check(panel.theme_type_variation == &"AnswerGlass" and head_rule != null and head_rule.theme_type_variation == &"HeadRule"
+		and head_rule.get_index() == 1 and keys_row.theme_type_variation == &"KeyGroups",
+		"the spacing parts: AnswerGlass on the pane, HeadRule under the head, KeyGroups on the keys")
+	var dots := panel.find_child("WorkingDots", true, false) as Label
+	_check(dots != null and dots.theme_type_variation == &"WorkingDots" and not dots.visible, "no dots while he reads")
+	var tab := panel.find_child("TabWords", true, false) as Button
+	# The mock's width (ui-design's panel2.py): NARROW, or its keys row and margins when they need more
+	# (KeyGroups' 40 between the groups makes the reading keys about 1286 wide).
+	var wanted := maxf(BuilderPanel.NARROW, panel.get_combined_minimum_size().x)
+	_check(tab != null and tab.text == "more" and absf(panel.size.x - wanted) <= 1.0,
+		"the keys end in Tab more; the pane NARROW wide, or as its keys need (%.0f, wanted %.0f)" % [panel.size.x, wanted])
+	tab.pressed.emit()
+	await get_tree().process_frame
+	_check(panel.full and (answer.get_parent() as Control).visible and panel.box.visible and not brief.visible
+		and (panel.find_child("TabWords", true, false) as Button).text == "less" and panel.size.x >= BuilderPanel.WIDTH - 1.0,
+		"Tab more opens it whole, WIDTH wide: the whole answer and the box, Tab less (%.0f)" % panel.size.x)
+	panel.set_full(false)
+	panel.place("right")
+	await get_tree().process_frame
+	var rect := panel.get_global_rect()
+	_check(absf(rect.end.x - (holder.size.x - BuilderPanel.RIGHT_GAP)) < 1.0 and absf(rect.position.y - BuilderPanel.RIGHT_TOP) < 1.0,
+		"the right home: RIGHT_GAP in from the edge, under the corner map (%s)" % rect)
+	panel.place("left")
+	# Which home: the one covering less of the area's outline; the right gives way.
+	var screen := Vector2(3840, 2160)
+	var pane := Vector2(BuilderPanel.NARROW, BuilderUI.BRIEF_HEIGHT)
+	var on_left: Array = [Vector2(300, 400), Vector2(600, 500)]
+	var on_right: Array = [Vector2(3300, 800), Vector2(3500, 900)]
+	_check(BuilderUI.choose_home(on_left, pane, screen, []) == "right" and BuilderUI.choose_home(on_right, pane, screen, []) == "left"
+		and BuilderUI.choose_home([], pane, screen, []) == "left", "an outline under the left home sends it right; under the right, left; none, left")
+	_check(BuilderUI.choose_home(on_left, pane, screen, [Rect2(3000, 1000, 600, 400)]) == "left", "a window meeting the right home keeps the pane left, wherever the area is")
+	# The coordinator's tie rule (2026-11-14): under neither home, a new area takes the home farther from
+	# its middle; an answer keeps the home chosen at the ask (stills13: it moved over Juno by the outline).
+	var low_left: Array = [Vector2(400, 1400), Vector2(700, 1600)]
+	var mid_right: Array = [Vector2(1900, 1500), Vector2(2200, 1700)]
+	_check(BuilderUI.choose_home(low_left, pane, screen, []) == "right" and BuilderUI.choose_home(mid_right, pane, screen, []) == "left",
+		"a new area under neither home: the home away from it (left of the screen: right; mid and right, as the square plate: left)")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "left") == "left" and BuilderUI.choose_home(mid_right, pane, screen, [], "right") == "right",
+		"an answer on a tie keeps the home the pane has while he asked")
+	_check(BuilderUI.choose_home(on_left, pane, screen, [], "left") == "left" and BuilderUI.choose_home(on_right, pane, screen, [], "right") == "right"
+		and BuilderUI.choose_home(on_left + on_right + on_right, pane, screen, [], "left") == "left",
+		"stills13: an answer keeps the home chosen at the ask, though its outline now lies under it")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [Rect2(3000, 1000, 600, 400)], "right") == "left", "a window meeting the right home moves a kept right pane left")
+	# The bodies (the coordinator on ui-design's stills6, 2026-11-14, and stills12, 2026-11-15): a home over
+	# neither body wins, then one over the companion only, the player last, before the outline; never at an answer.
+	var under_right := Rect2(2700, 820, 180, 420)  # The companion's box with its plate, under the right home.
+	var under_left := Rect2(500, 400, 180, 420)
+	var right_home := BuilderPanel.home_rect("right", pane, screen)
+	_check(under_right.intersects(right_home) and not under_right.intersects(BuilderPanel.home_rect("left", pane, screen))
+		and BuilderUI.choose_home(low_left, pane, screen, [], "", {"player": [], "companion": [under_right]}) == "left",
+		"stills6: the area off to the left, the companion under the right home: the left (the tie rule alone gives the right)")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "", {"player": [under_left], "companion": [under_right]}) == "right"
+		and BuilderUI.choose_home(mid_right, pane, screen, [], "", {"player": [under_right], "companion": [under_left]}) == "left",
+		"over the companion before over the player: the player under the left, she under the right, the right; turned about, the left")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "", {"player": [under_left, under_right], "companion": []}) == "right"
+		and BuilderUI.choose_home(mid_right, pane, screen, [], "", {"player": [], "companion": []}) == "left",
+		"bodies under both or neither: the tie rule as before")
+	_check(BuilderUI.choose_home(on_left, pane, screen, [], "", {"player": [under_right], "companion": []}) == "left"
+		and BuilderUI.choose_home(on_right, pane, screen, [], "", {"player": [], "companion": [under_left]}) == "right",
+		"stills12: a home over a body and none of the outline loses to one over no body and some of it (a person outranks a line on the ground)")
+	_check(BuilderUI.choose_home(on_left, pane, screen, [], "", {"player": [under_left], "companion": [under_right]}) == "right"
+		and BuilderUI.choose_home(on_left, pane, screen, [], "", {"player": [under_left, under_right], "companion": []}) == "right",
+		"both homes over a body: the player's kept clear before the companion's; equal on bodies, the outline decides")
+	_check(BuilderUI.choose_home(low_left, pane, screen, [], "right", {"player": [under_right], "companion": [under_right]}) == "right",
+		"an answer keeps its home though a body walked under it")
+	# The right home's reach: the pack below the corner map (its rect at 16:9, ui's open_window_rects) misses the
+	# reading pane but not the full one, which opens in the same home; a window at the left does not count.
+	var pack_at := Rect2(2194, 1309, 1606, 811)
+	_check(not pack_at.intersects(BuilderPanel.home_rect("right", pane, screen)) and BuilderUI.choose_home(on_left, pane, screen, [pack_at]) == "left"
+		and BuilderUI.choose_home(on_left, pane, screen, [Rect2(100, 1500, 600, 400)]) == "right",
+		"the pack under the reading pane's rect still sends it left (the full pane would open over it); a window at the left does not")
 	panel.show_answer({"area": [186, 199, 14, 10], "cost": 0.01, "total": 0.02, "summary": "Done.
 Streets: the door of the T1 temple"})
 	await get_tree().process_frame
 	words = answer.get_children().filter(func(node: Node) -> bool: return node.name.begins_with("Words"))
 	_check(words.size() == 2 and panel.acceptable and panel.enter_words() == "accept", "an old server's summary: its lines as the words, Enter accepts")
-	_check((panel.find_child("Cost", true, false) as Label).text == "$0.010   this area $0.020", "the cost at the foot")
+	panel.set_full(true)
 	for i in 4:
 		await get_tree().process_frame
 	var scroll := answer.get_parent() as Control
 	var box_gap := panel.box.get_global_rect().position.y - scroll.get_global_rect().end.y
 	_check(scroll.size.y <= answer.get_combined_minimum_size().y + 1.0 and box_gap < 60.0 and panel.size.y < holder.size.y - BuilderPanel.TOP - BuilderPanel.FOOT_ROOM - 200.0,
 		"a short answer: the pane hugs it, the box straight after it (answer %.0f, shown %.0f, gap %.0f, pane %.0f)" % [answer.get_combined_minimum_size().y, scroll.size.y, box_gap, panel.size.y])
+	# Working: the asked words, then the flame dots; an error's line has none.
+	var long_ask := "Asking: " + "a pond with reeds ".repeat(12)
+	panel.working(long_ask, true)
+	await get_tree().process_frame
+	var said := panel.brief_text().get_slice("|", 0)
+	_check(dots.visible and said.begins_with("Asking: a pond") and said.length() <= BuilderPanel.WORKING_CHARS and said.ends_with("…")
+		and panel.size.x <= BuilderPanel.NARROW + 1.0,
+		"working: the words cut to one line, then the dots, the pane NARROW wide (%d chars, %.0f wide)" % [said.length(), panel.size.x])
+	panel.working("Builder: something went wrong")
+	_check(not dots.visible, "an error's line: no dots")
 	holder.queue_free()

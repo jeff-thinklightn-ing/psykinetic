@@ -5825,6 +5825,76 @@ func screen_of_tile(tile: Vector2i) -> Vector2:
 	return _camera.unproject_position(_tile_position(tile))
 
 
+## Whether the camera follows [param entity] now: its target (the WASD lean and
+## a pan aside) within [param metres] of the entity's drawn place on the ground.
+## False with no puppet or camera, and while the view still sits where a new map
+## put it (885 amended (1): --test-builder asks only once the view has him).
+func camera_on(entity: GridEntity, metres := 2.0) -> bool:
+	var puppet: Node3D = _puppets.get(entity.get_instance_id()) if entity != null else null
+	if puppet == null or _camera == null:
+		return false
+	var off := _camera_target - puppet.global_position
+	return Vector2(off.x, off.z).length() <= metres
+
+
+## [param entity]'s figure on the screen in viewport coordinates, as screen_of_tile's
+## (885 amended (1): the builder panel's home keeps off the player and his companion;
+## its HUD plate is added there, UiNamePlates.placed_rect). Its column, from its feet
+## to its head, where the HUD plate's foot sits (its Name label NAME_LIFT down, or
+## BODY_COLUMN_HIGH up: the label itself stands over the plate, stills13's boxes
+## 250 to 320 px over the plates at 4K), BODY_COLUMN_HALF to each side across
+## the screen, so a body whose model is not built yet still has one (stills9: the
+## companion's list empty at the ask); and each bone of its skeleton as it stands
+## posed, BODY_LIMB_PAD round it, so an arm held out counts. Not its meshes' boxes: a
+## skinned mesh's is its rest pose, arms out in a T (the player's Body 1.68 m across;
+## stills12's boxes three times the figure), a Label3D's a cube (and it draws nothing
+## with the names on the HUD), a light's its whole reach (stills8). What it holds (a
+## lantern, a weapon) is not body. Empty when it has no puppet in view.
+func screen_rect_of(entity: GridEntity) -> Rect2:
+	var puppet: Node3D = _puppets.get(entity.get_instance_id()) if entity != null else null
+	if puppet == null or _camera == null or not puppet.is_visible_in_tree():
+		return Rect2()
+	var across := _camera.global_transform.basis.x
+	var up := _camera.global_transform.basis.y
+	var feet := puppet.global_position
+	var label := puppet.get_node_or_null("Name") as Node3D
+	var top := label.global_position - Vector3.UP * NAME_LIFT if label != null else feet + Vector3.UP * BODY_COLUMN_HIGH
+	var at: Array[Vector3] = [feet - across * BODY_COLUMN_HALF, feet + across * BODY_COLUMN_HALF,
+		top - across * BODY_COLUMN_HALF, top + across * BODY_COLUMN_HALF]
+	for skeleton: Skeleton3D in puppet.find_children("*", "Skeleton3D", true, false):
+		if not skeleton.is_visible_in_tree():
+			continue
+		for bone in skeleton.get_bone_count():
+			var joint := skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin
+			at.append(joint - (across + up) * BODY_LIMB_PAD)
+			at.append(joint + (across + up) * BODY_LIMB_PAD)
+	var found := false
+	var box := Rect2()
+	for point3: Vector3 in at:
+		if _camera.is_position_behind(point3):
+			continue
+		var point := _camera.unproject_position(point3)
+		box = box.expand(point) if found else Rect2(point, Vector2.ZERO)
+		found = true
+	return box
+
+## A body's column in screen_rect_of: its height without a Name label, and its half width, metres;
+## and how far round each posed bone its figure is taken to reach (a limb's half thickness).
+const BODY_COLUMN_HIGH := 1.9
+const BODY_COLUMN_HALF := 0.3
+const BODY_LIMB_PAD := 0.12
+
+
+## The camera as it draws now: [its eye, the way it looks, its ortho size, its
+## fov], empty with no camera (885 amended (1): --test-builder waits for it to
+## stand still, not only its target on him; the zoom eases the ortho size, the
+## eye standing where it was: stills10's boxes read from a camera still zooming).
+func camera_pose() -> Array:
+	if _camera == null:
+		return []
+	return [_camera.global_position, -_camera.global_transform.basis.z, _camera.size, _camera.fov]
+
+
 # --- Rings ------------------------------------------------------------------------
 
 ## A flat annulus in the ground plane, radii in units.

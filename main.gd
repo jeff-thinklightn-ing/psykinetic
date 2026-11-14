@@ -24821,7 +24821,7 @@ func _on_world_ticked(tick: int) -> void:
 	_run_test_move(player)
 	_run_test_contest(player, tick)
 	_run_test_reset(player, tick)
-	if player != null and Net.test_builder != "" and _builder_ui != null and tick > 20:
+	if player != null and Net.test_builder != "" and _builder_ui != null and tick > 20 and _builder_ui.view_settled(player):
 		_builder_ui.test_ask(Net.test_builder)
 		Net.test_builder = ""
 	_run_test_door(player, tick)

@@ -162,6 +162,8 @@ const STREETS_HEAD := "Streets"
 const SPOTS_HEAD := "Spots, who comes"
 const ARRIVALS_HEAD := "Arrivals (a player coming in there lands inside a fight)"
 const LAYOUT_HEAD := "Layout (can't be accepted until fixed)"
+## The stub's "slow " hold, in the server's frames (about 15 s at 60).
+const STUB_SLOW_FRAMES := 900
 ## The panel's order after Claude's words and the fault (ui-design's mock, 885).
 const PANEL_ORDER: Array[String] = [STORE_HEAD, STREETS_HEAD, SITES_HEAD, SPOTS_HEAD, HEIGHTS_HEAD, ARRIVALS_HEAD]
 
@@ -485,8 +487,14 @@ static func register_terrain(data: Dictionary) -> bool:
 ## chest and a torch on it; or, asked for a "new area" with the area on the
 ## edge of a map [param size] across, a new level beyond that edge; or
 ## "spots ..." (stub_spots); or "name <key> <words>" (stub_name, the level's
-## [param places]).
+## [param places]); or "chest", an unguarded chest a dungeon's layout check refuses. "slow "
+## before any of them holds the reply STUB_SLOW_FRAMES (a still of the panel
+## while it works).
 static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO, dungeon := false, places := {}) -> StubClaude:
+	if text.to_lower().begins_with("slow "):
+		var held := _stub_for(area, text.substr(5), size, dungeon, places)
+		held.wait_frames = STUB_SLOW_FRAMES
+		return held
 	if text.to_lower().begins_with("new area"):
 		var sides := {"north": area.position.y == 0, "east": area.end.x == size.x, "south": area.end.y == size.y, "west": area.position.x == 0}
 		for side: String in sides:
@@ -499,6 +507,11 @@ static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO, dungeon :
 		return stub_name(text, places)
 	var middle := Rect2i(area.position + area.size / 3, (area.size / 3).max(Vector2i.ONE))
 	var centre := middle.position + middle.size / 2
+	# "chest" (885 amended (1), for a still of a refused answer): a chest of loot at the middle with no
+	# guard by it, which a dungeon's chest rule refuses.
+	if text.to_lower().begins_with("chest"):
+		return StubClaude.new([[{"name": "place", "input": {"at": [centre.x, centre.y], "thing": "chest", "items": ["bandaging_kit"]}}],
+			"(Stub) A chest in the middle of the area, nobody guarding it."])
 	# Jeff's chest rules (807 amended (4), 806 amended (7)): a chest of things
 	# only in a dungeon, with a guard by it; elsewhere a shop counter's.
 	var calls: Array = [{"name": "paint", "input": {"ground": "dirt", "rects": [{"x": middle.position.x, "y": middle.position.y, "w": middle.size.x, "h": middle.size.y}]}},

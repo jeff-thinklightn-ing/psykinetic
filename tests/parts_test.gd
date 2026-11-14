@@ -338,6 +338,8 @@ func _test_name_plates() -> void:
 	_check(is_equal_approx(a.end.y, 600.0 - UiNamePlates.LIFT) and is_equal_approx(a.get_center().x, 1000.0), "its foot just over the head, centred on it")
 	_check(not a.intersects(b) and b.end.y <= a.position.y and placed[1]["alpha"] == 1.0, "the farther one that would meet it steps up a plate")
 	_check(is_equal_approx(c.size.y, a.size.y) and placed[2]["alpha"] == 1.0, "one apart: the same size, untouched, at any depth")
+	_check(plates.placed_rect(1) == a and plates.placed_rect(3) == c and plates.placed_rect(99) == Rect2(),
+		"placed_rect: a key's plate as last placed, none for a key not shown (885 amended (1): the builder panel keeps off it)")
 	var third := {"key": 4, "text": "Bram", "at": Vector2(1005, 602), "depth": 10.0, "plain": true}
 	placed = plates.place([near, far, third], font, size, plate)
 	_check(placed[2]["alpha"] == UiNamePlates.SHADED, "a third that still meets is faded")

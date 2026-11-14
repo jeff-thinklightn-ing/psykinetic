@@ -124,6 +124,16 @@ func place(entries: Array, font: Font, size: int, plate: StyleBox, screen := Rec
 	return _placed
 
 
+## The plate drawn for [param key] (Client3D.name_plates' key: its puppet's id) at the
+## last draw, in this part's coordinates (the HUD's); empty if it had none. Read only
+## (885 amended (1): the builder panel's home keeps off the player's and his companion's).
+func placed_rect(key: int) -> Rect2:
+	for one: Dictionary in _placed:
+		if int((one["entry"] as Dictionary).get("key", 0)) == key:
+			return one["rect"]
+	return Rect2()
+
+
 ## The first placed plate's rect that meets [param rect], or null.
 func _meets(rect: Rect2) -> Variant:
 	for one: Dictionary in _placed:

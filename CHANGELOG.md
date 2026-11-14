@@ -9,6 +9,7 @@ notes (decision 324).
 
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
+- Builder mode: the answer panel shows the start of Claude's answer, with Tab for more, and opens at the left when a window is open at the right or your companion stands there (885 amended (1)).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).

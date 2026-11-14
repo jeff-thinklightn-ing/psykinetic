@@ -45,7 +45,11 @@ func _ready() -> void:
 	await _test_stale_proposal()
 	await _test_new_area()
 	_test_console()
+	await _test_panel_keys()
+	await _test_home_gives_way()
 	await _test_first_spots_save()
+	await _test_view_settled()
+	await _test_asking_focus()  # Last: its walk wakes the room's imps.
 
 	_remove_tree(ProjectSettings.globalize_path(OVERLAY))
 	Level.overlay_dir = Level.OVERLAY
@@ -538,6 +542,208 @@ static func _saved_unparsed(report: String) -> bool:
 		return false
 	var words := report.substr(report.rfind(" ("))
 	return RegEx.create_from_string("^ \\(\\d+ x \\d+ cells\\)$").search(words) != null
+
+
+## The builder panel's keys on the host's own client (885 amended (1)), through the viewport as a
+## keyboard sends them: an answer comes cut down, the box without the keys; Tab opens it whole, the box
+## taking them; Esc from the empty box cuts it down again, the proposal kept; Esc with words in the box
+## clears them; Tab in the box cuts it down; Esc cut down discards, as before.
+func _test_panel_keys() -> void:
+	print("\n== the builder panel's keys: cut down while he reads, Tab whole, Esc back ==")
+	var ui: BuilderUI = _main._builder_ui
+	_check(ui != null, "the host's client has builder mode")
+	if ui == null:
+		return
+	_main._builder.sessions.clear()
+	_main._builder.test_turns = [[{"name": "spot", "input": {"at": [4, 4], "use": "square", "face": [5, 4], "town": "test"}}], "A spot."]
+	ui.test_ask("%d,%d,%d,%d:a spot" % AREA)
+	await _wait_for("proposal")
+	for i in 2:
+		await get_tree().process_frame
+	var panel := ui.panel
+	_check(ui.state == "proposal" and panel.visible and panel.has_answer() and not panel.full and not ui.is_typing(),
+		"the answer cut down, the box without the keys (state %s, full %s, typing %s)" % [ui.state, panel.full, ui.is_typing()])
+	get_viewport().push_input(_key(KEY_TAB))
+	_check(panel.full and ui.is_typing(), "Tab: whole, the box takes the keys (full %s, typing %s)" % [panel.full, ui.is_typing()])
+	get_viewport().push_input(_key(KEY_ESCAPE, true))
+	get_viewport().push_input(_key(KEY_TAB, true))
+	_check(panel.full and ui.is_typing() and ui.state == "proposal", "a held key's echo in the box: nothing (full %s, typing %s)" % [panel.full, ui.is_typing()])
+	get_viewport().push_input(_key(KEY_ESCAPE))
+	_check(not panel.full and ui.state == "proposal" and not ui.is_typing(), "Esc from the empty box: cut down again, the proposal kept (%s)" % ui.state)
+	get_viewport().push_input(_key(KEY_TAB))
+	panel.box.text = "bigg"
+	get_viewport().push_input(_key(KEY_ESCAPE))
+	_check(panel.full and panel.box.text.is_empty() and ui.state == "proposal", "Esc with words in the box: the words gone, still whole")
+	get_viewport().push_input(_key(KEY_TAB))
+	_check(not panel.full and ui.state == "proposal", "Tab in the box: cut down, the talk log left closed")
+	get_viewport().push_input(_key(KEY_ESCAPE))
+	_check(ui.state == "asking" and panel.box.visible, "Esc cut down: discarded, as before, the box asking again (%s)" % ui.state)
+	await _wait_for("discarded")
+	await get_tree().process_frame
+	var typing_before := ui.is_typing()
+	get_viewport().push_input(_key(KEY_TAB))
+	_check(typing_before and ui.is_typing() and panel.box.has_focus() and ui.state == "asking",
+		"Tab while he asks: the box keeps the keys, the focus not moved off it (typing %s then %s)" % [typing_before, ui.is_typing()])
+	ui.escape()
+	ui.toggle()
+	_main._builder.test_turns = []
+
+
+## 885 amended (1) with ui's Main.open_window_rects (802 amended (15)): the pack open, the right home
+## gives way before the pane is drawn, whatever the area's outline.
+func _test_home_gives_way() -> void:
+	print("\n== the pack open: the right home gives way to it, chosen before the pane is drawn ==")
+	var ui: BuilderUI = _main._builder_ui
+	if ui == null or _main.pack_panel == null:
+		_check(false, "the host's client has builder mode and a pack")
+		return
+	var was_open: bool = _main.pack_panel.is_visible_in_tree()
+	if not was_open:
+		_main.toggle_pack()
+	await get_tree().process_frame
+	var holder := ui.panel.get_parent_control()
+	var screen := holder.size if holder != null else ui.panel.get_viewport_rect().size
+	# The room a right-home pane may take: full, WIDTH wide, to the screen's foot (choose_home's reach).
+	var reach := BuilderPanel.home_rect("right", Vector2(BuilderPanel.WIDTH, screen.y - BuilderPanel.RIGHT_TOP - BuilderPanel.FOOT_ROOM), screen)
+	var rects: Array[Rect2] = _main.open_window_rects()
+	_check(_main.pack_panel.is_visible_in_tree() and rects.any(func(rect: Rect2) -> bool: return rect.intersects(reach)),
+		"the pack open: Main's open windows meet the right home's reach (%s against %s)" % [rects, reach])
+	var under_left: Array = [Vector2(300, 400), Vector2(600, 500)]
+	var pane := Vector2(BuilderPanel.NARROW, BuilderUI.BRIEF_HEIGHT)
+	_check(BuilderUI.choose_home(under_left, pane, screen, []) == "right" and BuilderUI.choose_home(under_left, pane, screen, rects) == "left",
+		"an outline under the left home: right with nothing open, left with Main's rects while the pack is open")
+	ui.test_ask("%d,%d,%d,%d:" % AREA)
+	await get_tree().process_frame
+	var bare := BuilderUI.choose_home(ui.outline_points(), Vector2(BuilderPanel.NARROW, BuilderUI.BRIEF_HEIGHT), screen, [])
+	_check(ui.state == "asking" and ui.panel.home == "left",
+		"a new area with the pack open: the left home (%s; with nothing open it would be %s)" % [ui.panel.home, bare])
+	ui.escape()
+	if ui.active:
+		ui.toggle()
+	if not was_open and _main.pack_panel.is_visible_in_tree():
+		_main.toggle_pack()
+
+
+## ui-design's joined stills (2026-11-14): --test-builder asked while the camera still came in, so the
+## pane took one home asking and the other at the answer. It now waits for the view to rest on him.
+func _test_view_settled() -> void:
+	print("\n== --test-builder waits for the camera to rest on the player ==")
+	var ui: BuilderUI = _main._builder_ui
+	var me: Player = _main._local_player()
+	if ui == null or me == null:
+		_check(false, "the host's client has builder mode and a player")
+		return
+	_check(_main._client3d != null or ui.view_settled(me), "without a 3D view (headless): asked at once")
+	# Whether the camera follows him, tick by tick, as Client3D.camera_on would say (the test has no view).
+	var reset := func() -> void:
+		ui._view_ticks = 0
+		ui._view_still = 0
+		ui._pose_anchor = []
+	reset.call()
+	# stills5-7: the camera parked at the level's middle, then coming in, then on him.
+	var early := 0
+	for i in 40:
+		if ui.settle_step(false):
+			early += 1
+	var on_after := -1
+	for i in BuilderUI.VIEW_STILL_TICKS + 5:
+		if ui.settle_step(true):
+			on_after = i + 1
+			break
+	_check(early == 0 and on_after == BuilderUI.VIEW_STILL_TICKS,
+		"the camera not yet on him: never settled (%d); on him, settled on the %dth tick running (%d)" % [early, BuilderUI.VIEW_STILL_TICKS, on_after])
+	reset.call()
+	var broken := -1
+	var looks := [true, true, false]
+	for i in BuilderUI.VIEW_STILL_TICKS + 2:
+		looks.append(true)
+	for i in looks.size():
+		if ui.settle_step(looks[i]):
+			broken = i + 1
+			break
+	_check(broken == 3 + BuilderUI.VIEW_STILL_TICKS, "a tick off him starts the count again (settled on look %d)" % broken)
+	reset.call()
+	# stills11: an ease's tail creeping under EYE_STILL a tick never settles; the camera at rest then does.
+	var creep := -1
+	for i in 60:
+		var pose := [Vector3(0.0, 10.0, 0.0), Vector3.FORWARD, 12.0 + i * BuilderUI.EYE_STILL * 0.4, 75.0]
+		if ui.settle_step(true, pose):
+			creep = i
+			break
+	var rest := -1
+	for i in BuilderUI.VIEW_STILL_TICKS + 5:
+		if ui.settle_step(true, [Vector3(0.0, 10.0, 0.0), Vector3.FORWARD, 13.0, 75.0]):
+			rest = i + 1
+			break
+	_check(creep == -1 and rest == BuilderUI.VIEW_STILL_TICKS,
+		"a camera creeping %.3f a tick (under %.2f) never settles in 60 ticks; at rest, on the %dth tick (%d, %d)" % [
+			BuilderUI.EYE_STILL * 0.4, BuilderUI.EYE_STILL, BuilderUI.VIEW_STILL_TICKS, creep, rest])
+	reset.call()
+	var capped := -1
+	for i in BuilderUI.VIEW_WAIT_TICKS + 5:
+		if ui.settle_step(false):
+			capped = i + 1
+			break
+	_check(capped == BuilderUI.VIEW_WAIT_TICKS, "a camera never on him: asked after the cap, %d ticks (%d)" % [BuilderUI.VIEW_WAIT_TICKS, capped])
+	reset.call()
+	await get_tree().process_frame
+	# ui-design's joined stills quit at a moment of the builder's: the two flags are read, either form.
+	var kept := [Net.test_exit_after_ask, Net.test_exit_after_answer]
+	Net._parse_args(["--test-exit-after-ask=2", "--test-exit-after-answer", "3.5"])
+	_check(Net.test_exit_after_ask == 2.0 and Net.test_exit_after_answer == 3.5,
+		"--test-exit-after-ask=2 and --test-exit-after-answer 3.5 are read (%s, %s)" % [Net.test_exit_after_ask, Net.test_exit_after_answer])
+	Net.test_exit_after_ask = kept[0]
+	Net.test_exit_after_answer = kept[1]
+
+
+## The coordinator's question on ui-design's asking still (2026-11-14): right after the drag, does the
+## typing box hold the keys, and does a walk ordered then go on or stop, and by which line of Main.
+func _test_asking_focus() -> void:
+	print("\n== asking: the box has the keys the frame after the drag; a walk waits while he types ==")
+	var ui: BuilderUI = _main._builder_ui
+	var me: Player = _main._local_player()
+	_check(ui != null and me != null, "the host's client has builder mode and its own player")
+	if ui == null or me == null:
+		return
+	var from := me.tile
+	var to := Vector2i(-1, -1)
+	for step: Vector2i in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3)]:
+		if not World.walk_path(from, from + step, me).is_empty():
+			to = from + step
+			break
+	ui.test_ask("%d,%d,%d,%d:" % AREA)
+	await get_tree().process_frame
+	_check(ui.state == "asking" and ui.panel.visible and ui.panel.box.visible and ui.panel.box.has_focus() and ui.is_typing() and _main.is_typing(),
+		"the frame after the drag: asking, the box shown and holding the focus (has_focus %s, BuilderUI typing %s, Main typing %s)"
+		% [ui.panel.box.has_focus(), ui.is_typing(), _main.is_typing()])
+	var own: Variant = _main._free_own(me)
+	print("    (information) the own body free: %s; walk from %s to %s" % [own != null, from, to])
+	if own != null and to.x >= 0:
+		_check(_main._free_intent(me, own) == Vector2.ZERO, "Main._free_intent: ZERO while Main.is_typing() (its first line): no way meant, so no step")
+		_main._move_click(me, to, false)
+		for i in 60:
+			World.step()
+			await get_tree().process_frame
+		var held := me.tile
+		_check(held == from, "a walk ordered while he types waits: still at %s after 60 steps (at %s)" % [from, held])
+		print("    (information) the route kept while he types: %d cells" % (_main._free["path"] as Array).size())
+		ui.panel.box.release_focus()
+		for i in 120:
+			World.step()
+			await get_tree().process_frame
+		print("    (information) the box let go: at %s (from %s), the route %d cells, Main typing %s" % [me.tile, from, (_main._free["path"] as Array).size(), _main.is_typing()])
+	ui.escape()
+	if ui.active:
+		ui.toggle()
+
+
+func _key(code: Key, echo := false) -> InputEventKey:
+	var key := InputEventKey.new()
+	key.keycode = code
+	key.physical_keycode = code
+	key.pressed = true
+	key.echo = echo
+	return key
 
 
 func _wait_for(state: String) -> Dictionary:

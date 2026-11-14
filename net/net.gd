@@ -107,6 +107,8 @@ extends Node
 ##   --test-reset=<tick>          at that server tick, ask for a room reset as the R key does
 ##   --test-exit-after=<seconds>  quit after this long
 ##   --test-exit-on=<path>        quit once that file exists (a client in the game sees 20 more ticks first)
+##   --test-exit-after-ask=<s>    with --test-builder: quit (and --screenshot) this long after its ask goes
+##   --test-exit-after-answer=<s> with --test-builder: quit (and --screenshot) this long after its answer comes
 ##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --test-die-travel=<t>,<zone> server: at tick t the first player dies and is brought back in zone, in one frame (the at-once return, 587)
@@ -975,6 +977,10 @@ var test_sends: Array[Array] = []
 ## --test-builder=<x>,<y>,<w>,<h>:<request>: once the local player is in,
 ## builder mode asks that for that area (for screenshots of the ghost).
 var test_builder := ""
+## --test-exit-after-ask / --test-exit-after-answer (885 amended (1), ui-design's joined stills): seconds
+## from --test-builder's ask going, or its answer coming, to the quit and its screenshot; 0, none.
+var test_exit_after_ask := 0.0
+var test_exit_after_answer := 0.0
 var test_exit_after := 0.0
 var test_exit_on := ""
 var test_minimap := false
@@ -2436,7 +2442,7 @@ func _parse_args(given: Array = []) -> void:
 			"--address", "--port", "--bind", "--state", "--overlay-dir", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--voice-ab", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
-					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-face-trips", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
+					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-face-trips", "--test-builder", "--test-exit-after", "--test-exit-after-ask", "--test-exit-after-answer", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--test-visitor", "--test-traits", "--test-card", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
 				if not has_value and i + 1 < args.size():
@@ -2628,6 +2634,10 @@ func _set_option(key: String, value: String) -> void:
 			test_builder = value
 		"--test-exit-after":
 			test_exit_after = value.to_float()
+		"--test-exit-after-ask":
+			test_exit_after_ask = value.to_float()
+		"--test-exit-after-answer":
+			test_exit_after_answer = value.to_float()
 		"--test-exit-on":
 			test_exit_on = value
 		"--test-wait-players":

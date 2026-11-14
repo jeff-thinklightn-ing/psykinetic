@@ -282,6 +282,7 @@ func _ready() -> void:
 		_test_hair_value()
 		_test_hair_pick_kept()
 		_test_belt_over_tunic()
+		_test_body_on_screen()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
@@ -296,6 +297,114 @@ func _ready() -> void:
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
+
+
+## 885 amended (1): a body's drawn box on the screen (Client3D.screen_rect_of), which the builder panel's
+## home keeps off (the coordinator on ui-design's stills6, 2026-11-14: the right home over Juno's head).
+## Its column from feet to head and its posed bones; the HUD plate over the head is added by BuilderUI.body_rects.
+func _test_body_on_screen() -> void:
+	print("
+== a body's drawn box on the screen, its plate with it (the builder panel's home keeps off it) ==")
+	var imp := _spawn_imp(Vector2i(9, 6))
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[imp.get_instance_id()]
+	var box := _rig.screen_rect_of(imp)
+	var feet := _rig._camera.unproject_position(puppet.global_position)
+	var label := puppet.get_node_or_null("Name") as Label3D
+	var plate := _rig._camera.unproject_position(label.global_position - Vector3.UP * Client3D.NAME_LIFT) if label != null else feet
+	_check(box.has_area() and box.grow(2.0).has_point(feet),
+		"its box holds where it stands (%s, feet %s)" % [box, feet.round()])
+	_check(label == null or not label.is_visible_in_tree() or (box.grow(2.0).has_point(plate) and plate.y < feet.y),
+		"its head (its Name label NAME_LIFT down, where the HUD plate's foot sits) inside the box, above the feet (%s)" % [plate.round()])
+	_check(_rig.screen_rect_of(null) == Rect2(), "no body: an empty box")
+	# The player's figure as it stands (stills12: his box three times the figure, his skinned Body's own box its
+	# rest pose, arms out in a T): every posed bone and his plate in it, and narrower than that rest box.
+	var player := _player()
+	_rig._process(0.0)
+	var his_puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var figure := _rig.screen_rect_of(player)
+	var rest := Rect2()
+	var skinned := his_puppet.find_children("*", "MeshInstance3D", true, false).filter(func(node: Node) -> bool:
+		return (node as MeshInstance3D).skin != null and node.name == "Body")
+	if not skinned.is_empty():
+		var mesh := skinned[0] as MeshInstance3D
+		var aabb := mesh.get_aabb()
+		for corner in 8:
+			var point := _rig._camera.unproject_position(mesh.global_transform * aabb.get_endpoint(corner))
+			rest = rest.expand(point) if corner > 0 else Rect2(point, Vector2.ZERO)
+	var joints_out: Array[String] = []
+	for skeleton: Skeleton3D in his_puppet.find_children("*", "Skeleton3D", true, false):
+		for bone in skeleton.get_bone_count():
+			var joint := _rig._camera.unproject_position(skeleton.global_transform * skeleton.get_bone_global_pose(bone).origin)
+			if not figure.grow(1.0).has_point(joint):
+				joints_out.append(skeleton.get_bone_name(bone))
+	var his_label := his_puppet.get_node_or_null("Name") as Node3D
+	var head := his_label.global_position - Vector3.UP * Client3D.NAME_LIFT if his_label != null else his_puppet.global_position + Vector3.UP * Client3D.BODY_COLUMN_HIGH
+	var head_at := _rig._camera.unproject_position(head)
+	_check(not skinned.is_empty() and joints_out.is_empty() and figure.grow(1.0).has_point(head_at)
+		and figure.size.x < rest.size.x * 0.75 and figure.size.y > figure.size.x,
+		"the player's box holds every posed bone and his head, stands taller than wide, and is narrower than his Body's rest box (%s against %s; bones out %s)" % [
+			figure, rest, joints_out])
+	# Its column alone (the skeleton hidden) runs from the feet to the head, where the HUD plate's foot sits, not to
+	# the Name label NAME_LIFT over it (stills13's boxes 250 to 320 px over the plates at 4K): exactly those corners.
+	var hid: Array[Skeleton3D] = []
+	for skeleton: Skeleton3D in his_puppet.find_children("*", "Skeleton3D", true, false):
+		if skeleton.visible:
+			skeleton.visible = false
+			hid.append(skeleton)
+	var column := _rig.screen_rect_of(player)
+	for skeleton: Skeleton3D in hid:
+		skeleton.visible = true
+	var across := _rig._camera.global_transform.basis.x * Client3D.BODY_COLUMN_HALF
+	var want := Rect2(_rig._camera.unproject_position(his_puppet.global_position - across), Vector2.ZERO)
+	for corner: Vector3 in [his_puppet.global_position + across, head - across, head + across]:
+		want = want.expand(_rig._camera.unproject_position(corner))
+	_check(not hid.is_empty() and column.is_equal_approx(want),
+		"its column runs from the feet to the head, where the HUD plate's foot sits, not to the Name label over it (%s against %s)" % [column, want])
+	# A player's and a companion's lantern (an OmniLight3D: its box is its reach), particles and a shadow-only
+	# mesh are not body (ui-design's stills8: the player's box many times the screen).
+	var lantern := OmniLight3D.new()
+	lantern.omni_range = 12.0
+	var motes := GPUParticles3D.new()
+	var shade := MeshInstance3D.new()
+	shade.mesh = BoxMesh.new()
+	shade.scale = Vector3.ONE * 8.0
+	shade.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	for extra: Node3D in [lantern, motes, shade]:
+		puppet.add_child(extra)
+	var carried := _rig.screen_rect_of(imp)
+	for extra: Node3D in [lantern, motes, shade]:
+		extra.free()
+	_check(carried.is_equal_approx(box), "a lantern, particles and a shadow-only mesh under it leave its box as it was (%s against %s)" % [carried, box])
+	# A body whose drawn parts are not up yet (stills9: the companion's list empty at the ask): its column.
+	var hidden: Array[Node] = []
+	for part: Node in puppet.find_children("*", "GeometryInstance3D", true, false):
+		if (part as GeometryInstance3D).visible:
+			(part as GeometryInstance3D).visible = false
+			hidden.append(part)
+	var bare := _rig.screen_rect_of(imp)
+	for part: Node in hidden:
+		(part as GeometryInstance3D).visible = true
+	_check(not hidden.is_empty() and bare.has_area() and bare.grow(2.0).has_point(feet) and bare.grow(2.0).has_point(plate),
+		"every drawn part hidden, its column still makes a box from its feet to its head (%s)" % [bare])
+	# --test-builder waits for the camera to stand still: the zoom eases the ortho size with the eye unmoved (stills10).
+	var pose := _rig.camera_pose()
+	var size_was: float = _rig._camera.size
+	_rig._camera.size = size_was + 0.5
+	var zoomed := _rig.camera_pose()
+	_rig._camera.size = size_was
+	_check(pose.size() == 4 and pose[0] == _rig._camera.global_position and BuilderUI.camera_moved(pose, _rig.camera_pose()) < BuilderUI.EYE_STILL
+		and BuilderUI.camera_moved(pose, zoomed) >= BuilderUI.EYE_STILL and BuilderUI.camera_moved([], pose) == INF,
+		"the camera standing still reads still; its ortho size eased alone (the eye unmoved) reads moved; none, moved")
+	var here: Vector3 = _rig._camera_target
+	_rig._camera_target = puppet.global_position + Vector3(1.0, 0.0, 1.0)
+	var on := _rig.camera_on(imp)
+	_rig._camera_target = puppet.global_position + Vector3(5.0, 0.0, 0.0)
+	var off := _rig.camera_on(imp)
+	_rig._camera_target = here
+	_check(on and not off and not _rig.camera_on(null), "the camera on a body: its target 1.4 m off, yes; 5 m off, no; no body, no (--test-builder waits for it)")
+	World.despawn(imp)
+	_rig._process(0.0)
 
 
 func _test_heard_as_monsters_hear() -> void:
