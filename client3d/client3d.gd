@@ -18350,6 +18350,12 @@ func _shade_floor() -> void:
 	_shade_due = false
 	if _grounds.is_empty():
 		return
+	# 660 amended (11): over frames the new fields are laid (_grounds, the
+	# cells' shades) a frame before ground_filling, and their vertex spans are
+	# gathered only once the last chunk is built. Nothing to shade into till
+	# then; _fill_finished shades it all once the spans are in.
+	if _cell_vertex_start.size() * 2 != _cell_shades.size() + 2:
+		return
 	var touched := World.fields.take_touched(World)
 	var cells: Array = _grounds.keys() if touched["all"] or _shade_all else touched["cells"]
 	_shade_all = false

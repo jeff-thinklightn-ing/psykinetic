@@ -211,6 +211,7 @@ func _ready() -> void:
 		await _test_phased_build()
 		await _test_kept_fields()
 		await _test_indoor_phased_build()
+		await _test_shade_mid_build()
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
@@ -14177,6 +14178,56 @@ func _test_indoor_phased_build() -> void:
 	var ceiling := _rig._room_phases().size() + INDOOR_OWN_FRAMES
 	_check(lifted > 0 and lifted <= ceiling, "the barrow's card lifts within a frame a phase, %d (%d)" % [ceiling, lifted])
 	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 660 amended (11): a shade pass while a zone change builds over frames.
+## Playtest's joined walk from the barrow into barrow_deep (Atlas, 11-13)
+## logged "Out of bounds get index '0' (on base: 'PackedInt32Array') at
+## _shade_floor": the new ground's fields laid (fields_done) a frame before
+## its vertex spans were gathered, and a pass in that frame read the empty
+## spans (a SCRIPT ERROR, which fails the scene, but ends only that pass: the
+## case runs on). Here a pass runs at fields_done and in every frame of the
+## build. A pass that shades a cell while the spans are not yet the new
+## ground's has recorded its shade (_ground_shades, cleared at the rebuild)
+## and then reads the spans, so a cell recorded while they differ is the fault,
+## counted by the case's own check; and the floor ends shaded as a pass from
+## scratch shades it.
+func _test_shade_mid_build() -> void:
+	print("\n== a shade pass during a zone change built over frames (barrow to barrow_deep) ==")
+	var barrow := Level.load_level("barrow")
+	var deep := Level.load_level("barrow_deep")
+	_rig.rebuild(barrow["terrain"], barrow["centre"])
+	await _frames(Client3D.WARM_FRAMES + 2)
+	var passes := [0, 0]  # At the fields; those that shaded a cell before the spans were in.
+	var shade_once := func() -> void:
+		_rig._shade_all = true
+		_rig._shade_floor()
+		if _rig._cell_vertex_start.size() * 2 != _rig._cell_shades.size() + 2 and not _rig._ground_shades.is_empty():
+			passes[1] += 1
+	var at_fields := func() -> void:
+		passes[0] += 1
+		shade_once.call()
+	_rig.fields_done.connect(at_fields)
+	_rig.rebuild(deep["terrain"], deep["centre"], true)
+	var frames := 0
+	while (_rig.building_room or _rig.ground_filling) and frames < 400:
+		shade_once.call()
+		await get_tree().process_frame
+		frames += 1
+	_rig.fields_done.disconnect(at_fields)
+	await _settled_room()
+	await _frames(2)
+	var spans_match := _rig._cell_vertex_start.size() * 2 == _rig._cell_shades.size() + 2
+	var settled := _rig._ground_bytes.duplicate()
+	_rig._ground_shades.clear()
+	_rig._shade_all = true
+	_rig._shade_floor()
+	_check(passes[0] >= 1 and passes[1] == 0 and frames > 1,
+			"passes at the fields (%d) and in each of %d frames shade no cell before its spans are in (%d did)" % [
+			passes[0], frames, passes[1]])
+	_check(spans_match and settled.size() > 0 and settled == _rig._ground_bytes,
+			"the floor ends shaded as from scratch (%d bytes, spans %s)" % [settled.size(), spans_match])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

@@ -33094,6 +33094,30 @@ the rest; so an arrival from kept fields has its fords' beds too, where before i
 empty and the fords' middles had no bed scatter. view_test _test_kept_fields: a ford's beds the same
 on a kept arrival as on a fresh one. Client only, protocol unchanged, no new class_name; not a
 package piece.
+660 amended (11) (terrain, 2026-11-13; the coordinator's report and reading, playtest's find; the
+label from tools/decision_number.sh): the floor's shade pass waits while a zone change has the new
+ground's cells but not its vertex spans. Playtest's joined walks on the Atlas (look_circle2 and 4, a
+console move from the barrow into barrow_deep) logged "Out of bounds get index '0' (on base:
+'PackedInt32Array') at Client3D._shade_floor", in the released game. Over frames
+(_phase_ground_over_frames), the rebuild clears _grounds and _ground_shades, _ground_input resets the
+cells' arrays, _cell_vertex_start among them, and while the fields' worker runs a pass finds no
+ground and returns. _apply_ground_fields then lays the new _grounds and sizes _cell_shades,
+fields_done is told, and a frame passes before ground_filling (the shade's wait) is set. The spans
+themselves are gathered only by _ground_meshes_finish, once the last chunk is built
+(_fill_finished). A pass in that frame (the zone's light and heat changing on arrival defer one)
+found every cell changed, recorded the first's shade and read the empty spans: the error, and that
+pass dropped. It is the ground phase's order, not the room build's timing. _shade_floor now returns
+while the spans are not the cells' (_cell_vertex_start's size is not _cell_shades' cells plus one);
+_fill_finished shades the whole floor once the spans are in, as before, so nothing is lost. No
+player-visible effect was found beyond the error line: the chunks drawn at the lift take the seeded
+shades, and the full pass follows. view_test _test_shade_mid_build: the barrow built, then
+barrow_deep over frames with a pass at fields_done and in each frame of the build. A script error
+ends only the pass, not the case, so the case's own check counts the passes that recorded a cell's
+shade while the spans were not yet in (the coordinator's hardening). On main (saturn, 4a5e93745) 7
+of the passes did, two of them dying with a SCRIPT ERROR (at fields_done and the frame after); the
+recorded shades stay until the spans are in, so each later pass in the wait counts too. With the
+guard none did, and the floor's bytes are as a pass from scratch gives them. Client only, protocol unchanged, no new class_name; not a package
+piece; no bullet.
 
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
