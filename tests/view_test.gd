@@ -3395,15 +3395,58 @@ func _test_tavern_inside() -> void:
 				or not is_equal_approx(lamp_light.omni_range, Client3D.HOUSE_DOOR_LAMP_RANGE) or lamp_light.shadow_enabled or entry[5] == null):
 			doorway_bad.append(["lamp", corner])
 			continue
+		# Its pane (489 amended (9): art-kit's glow surface, its "flame" an
+		# empty socket) lit and out with it, never the flame alone.
+		var pane := Client3D.lamp_pane(piece)
+		if pane == null or float(pane.get_meta(&"lit", 0.0)) <= 0.0:
+			doorway_bad.append(["no pane", corner])
+			continue
 		var shown: Array = []
-		for state: Array in [[false, false], [true, false], [true, true]]:
+		for state: Array in [[false, false], [true, false], [true, true], [false, false]]:
 			Client3D._show_house_lamp(entry, state[0], state[1])
-			shown.append([(entry[5] as Node3D).visible, lamp_light.visible])
-		if shown != [[false, false], [true, false], [true, true]]:
+			shown.append([(entry[5] as Node3D).visible, lamp_light.visible, pane.emission_energy_multiplier > 0.0])
+		if shown != [[false, false, false], [true, false, true], [true, true, true], [false, false, false]]:
 			doorway_bad.append(["shown %s" % [shown], corner])
 	_check(lamped >= 3 and doorway_bad.is_empty() and Client3D.DOORSTEP_VARIANTS == {"wood": 1, "stone": 2},
-			"each lived-in house its doorstep at each front door and its lantern beside them, its light %.2f m off the wall, %.1f m up, lit with its house, picked with it (%d lamps; bad %s)"
+			"each lived-in house its doorstep at each front door and its lantern beside them, its light %.2f m off the wall, %.1f m up, its pane and flame lit with its house, its light picked with it too (%d lamps; bad %s)"
 			% [(socket + Client3D.DOOR_LAMP_ART_LIGHT).x, (socket + Client3D.DOOR_LAMP_ART_LIGHT).y, lamped, doorway_bad])
+	# The hours a house lantern turns on (489 amended (9)): pane and light both
+	# follow one lamp_lit answer in _light_houses, so they go together at noon,
+	# at the sun's setting and at LAMP_OUT.
+	var hours: Array = []
+	for pin: Array in [[12.0, 0.8], [18.5, 0.01], [18.6, -0.01], [20.0, -0.3], [21.99, -0.4], [Client3D.LAMP_OUT, -0.4]]:
+		hours.append(Client3D.lamp_lit({}, "H4", pin[0], pin[1]))
+	_check(hours == [false, false, true, true, true, false],
+			"a house lantern out at noon and while the sun is up, lit from the sun's setting till LAMP_OUT (%s)" % [hours])
+	# A trade's door lantern (782): its pane faded by day by its light's own
+	# share, full at night, never lit with its light faded or the other way.
+	var trade := _rig._add_door_lamp(Vector2i(186, 214), Vector2i(0, 1))
+	var trade_pane := Client3D.lamp_pane(trade)
+	var trade_light: OmniLight3D = null
+	var trade_row: Array = []
+	for fire: Array in _rig._fire_lights:
+		if is_instance_valid(fire[0]) and trade.is_ancestor_of(fire[0]):
+			trade_light = fire[0]
+			trade_row = fire
+	var faded: Array = []
+	var outdoor_was: bool = _rig._outdoor
+	var daylight_was: float = _rig._look_daylight
+	_rig._outdoor = true
+	for daylight: float in [1.0, 0.5, 0.0]:
+		_rig._look_daylight = daylight
+		_rig._flicker_fires(0.016)
+		var share := Flames.day_share(daylight, true, World.fields.canopy_shade if World.fields != null else 0.0)
+		var flicker := Flames.flicker(_rig._fire_time, float(trade_row[2]), float(trade_row[3])) if not trade_row.is_empty() else 0.0
+		faded.append(trade_pane != null and trade_light != null
+				and is_equal_approx(trade_pane.emission_energy_multiplier, float(trade_pane.get_meta(&"lit")) * share)
+				and is_equal_approx(trade_light.light_energy, Client3D.DOOR_LAMP_ENERGY * share * flicker))
+	_rig._outdoor = outdoor_was
+	_rig._look_daylight = daylight_was
+	_check(faded == [true, true, true],
+			"a trade's door lantern's pane faded by day with its light, by the same share, full at night (%s)" % [faded])
+	_rig._fire_lights = _rig._fire_lights.filter(func(fire: Array) -> bool: return is_instance_valid(fire[0]) and not trade.is_ancestor_of(fire[0]))
+	_rig._fire_panes = _rig._fire_panes.filter(func(each: Array) -> bool: return each[1] != trade)
+	trade.free()
 	var lamp_spot := Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
 		[Vector3(3.0, 0.0, 8.5), Vector3(4.0, 0.0, 8.5)], true)
 	_check(lamp_spot.is_equal_approx(Vector3(3.0 - Client3D.DOOR_LAMP_ASIDE, 0.0, 8.5 + Client3D.DOOR_LAMP_STONE)),

@@ -115,6 +115,9 @@ const SHUTTERS_OPEN := 0.66
 ## The lamp on a shell's window sill (811 amended, art-kit's): its slot,
 ## and how high its foot stands (wall.wood.window's sill).
 const SILL_LAMP_SLOT := "prop.sill_lamp"
+## An inn's sign (decor "inn_sign"): its lamp's pane faded by day as the
+## town's fires (_fire_panes, 489 amended (9)).
+const INN_SIGN_SLOT := "prop.inn_sign"
 const SILL_LAMP_LIFT := 1.3
 ## A lit house's light inside (489 amended (3), Jeff: "no light inside";
 ## environment's numbers): warm, shadowless, HOUSE_LIGHT_UP m over the
@@ -3095,6 +3098,15 @@ var _fire_lights: Array[Array] = []
 var _bier_remains: Array[Node3D] = []
 ## The cold lamps' lights (_add_lamp): [light, energy, phase].
 var _lamp_lights: Array[Array] = []
+## The glowing panes kept with the town's fires' day share (489 amended
+## (9)): a trade's or a temple's door lantern (its light one of
+## _fire_lights) and an inn's sign: [its pane (lamp_pane), its piece], each
+## shaded by _flicker_fires as its light is faded by day.
+var _fire_panes: Array[Array] = []
+## The sill lamps' panes (811 amended's prop.sill_lamp, 489 amended (9)):
+## [its pane, its window's _window_code row, its piece], lit with that
+## window (_update_lamps).
+var _sill_panes: Array[Array] = []
 var _fire_time := 0.0
 ## The night town (782): the sun down outdoors (_update_lamps); the door
 ## lanterns hung, by their front cell; Main's night places and their
@@ -8122,6 +8134,8 @@ func _phase_sets() -> void:
 	_window_code.clear()
 	_sill_lamps.clear()
 	_glows.clear()
+	_sill_panes.clear()
+	_fire_panes.clear()
 	for key in _town_wall_sets:
 		_wall_sets.erase(key)
 	_town_wall_sets.clear()
@@ -10360,6 +10374,7 @@ func _add_house_front(building: Dictionary, cells: Dictionary, wall_set: String)
 	(made[1] as OmniLight3D).visible = false
 	if made[2] != null:
 		(made[2] as Node3D).visible = false
+	light_pane(lamp_pane(made[0]), 0.0)  # Out till its house is lit (489 amended (9)).
 	var inside: Array = doors.map(func(door: Array) -> Vector2i: return door[0])
 	_house_seats[rect.position].append([made[0], inside, 0.0])
 	var entry: Array = _house_lights[rect.position]
@@ -10392,7 +10407,54 @@ func _door_lamp_piece(at: Vector3, turn: float, energy: float, reach: float) -> 
 	var light := _night_light(LANTERN, energy, reach)
 	light.position = (socket if socket != null else Vector3(0.57, 1.92, 0.0)) + DOOR_LAMP_ART_LIGHT
 	lamp.add_child(light)
+	lamp_pane(lamp)
 	return [lamp, light, lamp.find_child("flame", true, false)]
+
+
+## The material of a lamp piece's glowing pane (489 amended (9)): art-kit's
+## door lantern, inn sign and sill lamp carry it on their own mesh, a surface
+## on GLOW_MATERIAL (their "flame" an empty socket, so hiding it hid
+## nothing and every door lantern glowed at noon).
+const GLOW_MATERIAL := "glow"
+
+
+## [param piece]'s own copy of its first GLOW_MATERIAL surface's material,
+## set on that surface and kept in its meta "pane", its lit emission in the
+## copy's meta "lit"; made on first asking; null where it has none. Shaded
+## by light_pane, out at 0 to the material's own albedo (art-kit: a cold
+## lantern's sooted horn, from its material, no colour of ours).
+static func lamp_pane(piece: Node) -> StandardMaterial3D:
+	if piece == null:
+		return null
+	if piece.has_meta(&"pane"):
+		return piece.get_meta(&"pane") as StandardMaterial3D
+	var meshes: Array[Node] = piece.find_children("*", "MeshInstance3D", true, false)
+	if piece is MeshInstance3D:
+		meshes.push_front(piece)
+	for node: Node in meshes:
+		var drawn := node as MeshInstance3D
+		if drawn.mesh == null:
+			continue
+		for surface in drawn.mesh.get_surface_count():
+			var material := drawn.mesh.surface_get_material(surface) as StandardMaterial3D
+			if material == null or material.resource_name != GLOW_MATERIAL:
+				continue
+			var own := material.duplicate() as StandardMaterial3D
+			own.set_meta(&"lit", own.emission_energy_multiplier)
+			drawn.set_surface_override_material(surface, own)
+			piece.set_meta(&"pane", own)
+			return own
+	return null
+
+
+## [param pane] (lamp_pane's) glowing at [param share] of its lit emission:
+## 1 lit, a fire's day share as its light is faded, 0 out.
+static func light_pane(pane: StandardMaterial3D, share: float) -> void:
+	if pane == null:
+		return
+	var energy := float(pane.get_meta(&"lit", 1.0)) * maxf(share, 0.0)
+	if not is_equal_approx(pane.emission_energy_multiplier, energy):
+		pane.emission_energy_multiplier = energy
 
 
 ## Every HOUSE_LIGHT_PICK s: the lit houses' lights nearest the view's aim
@@ -10434,8 +10496,10 @@ func _light_houses(delta: float) -> void:
 
 
 ## A house light's row [param entry]'s door lantern (_add_house_front; none on
-## a row without one): its flame shown while [param lit], its light only
-## while [param near] too (picked with the house's, house_lights_near).
+## a row without one): its flame and its pane (489 amended (9)) shown while
+## [param lit], its light only while [param near] too (picked with the
+## house's, house_lights_near: a lit lantern out of the pick glows, its
+## light left to the near ones).
 static func _show_house_lamp(entry: Array, lit: bool, near: bool) -> void:
 	if entry.size() <= 4:
 		return
@@ -10443,6 +10507,8 @@ static func _show_house_lamp(entry: Array, lit: bool, near: bool) -> void:
 		(entry[4] as OmniLight3D).visible = lit and near
 	if entry[5] != null and is_instance_valid(entry[5]):
 		(entry[5] as Node3D).visible = lit
+	if entry.size() > 7 and is_instance_valid(entry[7]):
+		light_pane(lamp_pane(entry[7]), 1.0 if lit else 0.0)
 
 
 ## How far a house light reaches in [param rect] (489 amended (3)): half
@@ -11363,6 +11429,11 @@ func _update_lamps() -> void:
 	_hang_door_lamps()
 	for each in _glows:
 		(each[0] as Node3D).visible = _window_lit(each[1], hour, sun)
+	# The sill lamps' panes with their windows, the lanterns' let go with their pieces (489 amended (9)).
+	_sill_panes = _sill_panes.filter(func(each: Array) -> bool: return is_instance_valid(each[2]))
+	_fire_panes = _fire_panes.filter(func(each: Array) -> bool: return is_instance_valid(each[1]))
+	for each in _sill_panes:
+		light_pane(each[0], 1.0 if _window_lit(each[1], hour, sun) else 0.0)
 	# And the chimneys, as told or by the hour (489 amended (4)).
 	for building in _buildings:
 		if building.has("smoke") or building.has("hearth"):
@@ -11457,6 +11528,12 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		lamp.position = Vector3(0.0, SILL_LAMP_LIFT / made.scale.y, 0.0)
 		lamp.scale = Vector3(1.0, 1.0 / made.scale.y, 1.0)
 		made.add_child(lamp)
+		# Its pane lit with its window (489 amended (9)); a window of no
+		# building's light, lit as before.
+		var pane := lamp_pane(lamp)
+		if pane != null and _window_code.has(key):
+			_sill_panes.append([pane, _window_code[key], lamp])
+			light_pane(pane, 1.0 if _window_lit(_window_code[key], DayNight.hour(DayNight.now()), DayNight.elevation(DayNight.now())) else 0.0)
 	var cell := Vector2i(key.x, key.y)
 	if _roll(cell, 50 + key.z) >= SHUTTERS_OPEN:
 		return
@@ -17508,6 +17585,8 @@ func _add_decor() -> void:
 		var row: Dictionary = Level.DECOR_KINDS.get(kind, {})
 		var piece := ArtKit.instance(slot, clampi(variant, 1, maxi(1, ArtKit.variant_count(slot))))
 		piece.name = "Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]
+		if slot == INN_SIGN_SLOT and lamp_pane(piece) != null:
+			_fire_panes.append([lamp_pane(piece), piece])  # Its lamp's pane as the town's fires by day (489 amended (9)).
 		var at := Vector2(cell)
 		match str(Level.DECOR_KINDS.get(kind, {}).get("sits", "edge")):
 			"flat":
@@ -20103,7 +20182,7 @@ static func place_ring_slot(cell: Vector2i, fire: Array) -> String:
 ## (Flames.day_share). World's light (Fields) is never touched: it stays
 ## steady for Senses.
 func _flicker_fires(delta: float) -> void:
-	if _fire_lights.is_empty() and _lamp_lights.is_empty() and _forge_lights.is_empty():
+	if _fire_lights.is_empty() and _lamp_lights.is_empty() and _forge_lights.is_empty() and _fire_panes.is_empty():
 		return
 	_fire_time += delta
 	for lamp: Array in _lamp_lights:
@@ -20115,6 +20194,10 @@ func _flicker_fires(delta: float) -> void:
 		var light := fire[0] as OmniLight3D
 		if is_instance_valid(light):
 			light.light_energy = float(fire[1]) * share * Flames.flicker(_fire_time, float(fire[2]), float(fire[3]))
+	# A lantern's pane with its light (489 amended (9)): faded by day by the same share, steady.
+	for pane: Array in _fire_panes:
+		if is_instance_valid(pane[1]):
+			light_pane(pane[0], share)
 	_flicker_forges()
 
 
@@ -20250,6 +20333,7 @@ func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
 		var made := _door_lamp_piece(at, atan2(-float(facing.y), float(facing.x)), DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
 		made[0].name = "DoorLamp_%d_%d" % [front.x, front.y]
 		_fire_lights.append([made[1], DOOR_LAMP_ENERGY, _roll(front, 150) * TAU, LANTERN_FLICKER])
+		_fire_panes.append([lamp_pane(made[0]), made[0]])  # Its pane faded by day with its light (489 amended (9)).
 		return made[0]
 	var lamp := Node3D.new()
 	lamp.name = "DoorLamp_%d_%d" % [front.x, front.y]

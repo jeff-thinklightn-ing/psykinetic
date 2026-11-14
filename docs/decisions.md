@@ -16839,6 +16839,34 @@ looks as before. view_test (_test_shutter_room): in a built house, every open le
 read from where it is drawn, has a plain wall beside it and no post between; and an open leaf
 with a doorway put beside it stays shut. Client only; protocol unchanged, no new class_name.
 
+489 amended (9): a lamp's glowing pane lit and out with its light (the coordinator's find on
+ui-design's noon still of H4's door, C:/dev/review/buildings/shutter_front2_13/shutter_front2_13.png,
+and its approval of the code helper over a re-export; label from tools/decision_number.sh).
+Art-kit's prop.door_lamp, prop.inn_sign and prop.sill_lamp carry their pane on their own mesh, a
+surface on the material "glow" (albedo a dark smoked amber, emission warm), their "flame" an empty
+socket: hiding "flame" (489 amended (4)'s house lanterns) hid nothing, so every door lantern glowed
+at every hour, the house's light out and its windows dark. Client3D.lamp_pane(piece) gives a piece
+its own copy of its first GLOW_MATERIAL surface (meta "pane", its lit emission in meta "lit"),
+light_pane(pane, share) sets it to that share of its lit emission, 0 out: the material's own albedo,
+no emission (art-kit: a cold lantern's sooted horn; no colour of ours, nothing in its glbs changed).
+Used by: a lived-in house's door lantern (_show_house_lamp: the pane with the flame, lit while its
+house is lit, out by day and from LAMP_OUT, both from the one lamp_lit answer _light_houses asks,
+so the pane and the light go together at the sun's setting and at lamp-out; a lit lantern outside
+the near pick glows with its light left to the near ones, as the windows do); a trade's or temple's
+door lantern (782's, _add_door_lamp) and an inn's sign (decor inn_sign), _fire_panes, shaded each
+frame by the day share their light is faded by (Flames.day_share: at noon outdoors DAY_SHARE of
+full, the light the same, as the town's fires; never out, as those lights never are); a shell's sill
+lamp (811 amended), _sill_panes, lit with its window (_update_lamps). Left as they are, each lit by
+its own rule: the town's hung lanterns (the store's and Snagfin's posts, 892; a walker's; a
+carried lantern) already share one shaded pane (451 amended (4), _town_pane: always lit, at
+PANE_FLOOR of full by day), the windows' "glow" part is a node of its own and already shown with its
+window (566), candles and the altar's (prop.candles, prop.candle_draft, the lit_candles stands)
+burn day and night as lit candles do, and the forges', the crypt's pieces' and the link arch's glow
+are their fire's or their place's, not a lamp's. view_test: each lived-in house's lantern its pane
+lit and out with its flame, its light only when picked too; lamp_lit out at noon and while the sun
+is up, lit from the setting till LAMP_OUT; a trade's door lantern's pane and light faded by the same
+share at daylight 1, 0.5 and 0. Client only; protocol unchanged, no new class_name.
+
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
 A material's pipelines are compiled the first time it is drawn, so its first

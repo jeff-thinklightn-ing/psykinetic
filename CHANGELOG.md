@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Anyone ready to fight with a giant axe or battle axe holds its edge turned out, away from their face, and with a tomb sledge, rot hammer or pick, its head leads toward the foe, wrists straight either way (451 amended (6)).
 - When you're brought back or moved within an area, you and your companion show only where you arrive (911).
 - Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
