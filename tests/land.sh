@@ -233,6 +233,8 @@ if [ -n "$remote" ]; then
 	part remote_prepare bash tools/remote_tests.sh prepare
 	prepared=""
 	read -r prepared _ <"$LOGS/remote_prepare.status"
+	# Where saturn's scene caps came from (90 amended (2)): own, seeded from a tree, or none.
+	grep -h "^durations: " "$LOGS/remote_prepare.log"
 	if [ "$prepared" = "0" ]; then
 		part state_test bash tools/remote_tests.sh part state_test &
 		sleep 0.3

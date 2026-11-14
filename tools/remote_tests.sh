@@ -13,6 +13,7 @@
 #   tools/remote_tests.sh part <name>        suite | state_test | net_test, on HEAD
 #   tools/remote_tests.sh finish             give saturn's slot back
 #   tools/remote_tests.sh slot               take saturn's slot only (tests/remote_slot_test.sh's)
+#   tools/remote_tests.sh seed               prepare's durations step only (the same test's)
 #   tools/remote_tests.sh run                prepare, the three parts, finish
 # One landing's tests at a time there (a slot, ~/land/.busy, stale after 40
 # minutes; waited for 10). A slot whose landing is gone on this PC is taken
@@ -138,6 +139,24 @@ take_slot() {
 	done
 	echo "$tree $sha" > "$BUSY/holder"
 }
+# 90 amended (2): a scene's cap is twice its last run in .godot/test_durations.txt
+# (90 amended (1)), which a checkout keeps between its tree's landings (git clean
+# without -x). A fresh ~/land/<tree> has none, and its scenes met the bare 300 s
+# floor (view_test, 271 s alone, failed that way at 01:57 on 11-14): it takes the
+# newest one under ~/land. Only into this landing's own folder; said in one line.
+seed_durations() {
+	if [ -f "$W/.godot/test_durations.txt" ]; then
+		echo "durations: own"
+		return 0
+	fi
+	newest="$(ls -t "$HOME"/land/*/.godot/test_durations.txt 2>/dev/null | head -1)"
+	if [ -z "$newest" ]; then
+		echo "durations: none (each scene's cap the 300 s floor)"
+		return 0
+	fi
+	from="${newest#"$HOME/land/"}"
+	mkdir -p "$W/.godot" && cp "$newest" "$W/.godot/test_durations.txt" && echo "durations: seeded from ${from%%/*}"
+}
 
 case "$verb" in
 available)
@@ -179,7 +198,13 @@ prepare)
 		grep -E "SCRIPT ERROR|^ERROR" -A3 "$LOGS/import2.log" | head -40
 		echo "remote: the import failed (exit $code)"; exit 1
 	fi
+	seed_durations
 	echo "remote: $tree at $sha checked out and imported on $(hostname)"
+	;;
+seed)
+	# tests/remote_slot_test.sh's: the durations step of prepare alone.
+	mkdir -p "$W"
+	seed_durations
 	;;
 part)
 	mine || { echo "remote: the slot is not $tree's for $sha (held by '$(holder)'): prepare first"; exit 1; }
@@ -304,6 +329,10 @@ prepare)
 slot)
 	# tests/remote_slot_test.sh's: take saturn's slot only, as prepare would.
 	remote slot "$tree" "$sha" "$JOBS" "$(slot_said)"
+	;;
+seed)
+	# tests/remote_slot_test.sh's: prepare's durations step alone (90 amended (2)).
+	remote seed "$tree" "$sha" "$JOBS"
 	;;
 part)
 	name="${2:-}"

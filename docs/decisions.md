@@ -815,6 +815,26 @@ FAIL line counts such scenes, and each is noted in the gate's log as a
 `timeout` event (heavy_job note; heavy_job summary counts them), so the
 record tells load from a broken check. Tests and tools only.
 
+90 amended (2) (2026-11-14, perf; the coordinator's approval and conditions; label from
+tools/decision_number.sh): a fresh checkout on saturn takes its scene times from the newest
+there. A tree's ~/land/<tree> keeps .godot/test_durations.txt between its landings (prepare's
+git clean has no -x), so (1)'s caps reach saturn from its second landing; a first landing
+under a new tree name met the bare 300 s floor, and view_test, which takes 271 s alone there
+(median of 29 trees' last suites on 11-14; 248 on 11-12, 263 on 11-13), failed that way at
+01:57 on 11-14 with a suite beside it. The five slowest scenes there by median of 117 trees:
+view_test 262, view_land_test 234, anim_rig_test 199, level_test 186, town_day_test 170.
+tools/remote_tests.sh's prepare, after its checkout and import, inside the landing's own ssh
+run: a folder with no test_durations.txt takes a copy of the newest
+~/land/*/.godot/test_durations.txt, into that folder only; its own file, however old, is left
+alone; with none anywhere, none. One line says which ("durations: own", "durations: seeded
+from <tree>", "durations: none ..."), and tests/land.sh prints it after prepare, so a timeout
+can be read against its cap. The floor stays 300 s for a scene with no history; the cap twice
+the last run, at most 900. A verb `seed` runs that step alone, for tests/remote_slot_test.sh
+(its local run, 878 amended (1)): none anywhere, no file; a fresh folder, the newest copied
+and the others untouched; its own older file, left alone. Splitting view_test and
+view_land_test for landing speed is a design of its own (the coordinator's). Tools and tests
+only; protocol unchanged; no class_name; no bullet.
+
 ## 91. The voice is told what she is doing and what just happened
 
 Lines came out generic ("Stay close." while she was pulling back) because

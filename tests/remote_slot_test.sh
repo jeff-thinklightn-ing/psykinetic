@@ -103,5 +103,24 @@ lock_by; take_by
 count=$(cleared)
 check $([ "$count" = 3 ]; echo $?) "three takeovers logged in all ($count)"
 
+echo "== a fresh checkout's scene times (90 amended (2)) =="
+mine_file="$home/land/slottest/.godot/test_durations.txt"
+rm -rf "$home/land/slottest/.godot" "$home/land/physics/.godot"
+out="$(timeout 60 bash tools/remote_tests.sh seed 2>/dev/null)"  # stdout: what land.sh greps (here ps -o errs)
+check $([ "$out" = "durations: none (each scene's cap the 300 s floor)" ] && [ ! -e "$mine_file" ]; echo $?) "none anywhere: no file, said ($out)"
+mkdir -p "$home/land/physics/.godot" "$home/land/builder/.godot"
+printf '262 tests/view_test.tscn\n' >"$home/land/builder/.godot/test_durations.txt"
+touch -d "@$(( $(date +%s) - 600 ))" "$home/land/builder/.godot/test_durations.txt"
+printf '271 tests/view_test.tscn\n' >"$home/land/physics/.godot/test_durations.txt"
+out="$(timeout 60 bash tools/remote_tests.sh seed 2>/dev/null)"  # stdout: what land.sh greps (here ps -o errs)
+check $([ "$out" = "durations: seeded from physics" ] && [ "$(cat "$mine_file" 2>/dev/null)" = "271 tests/view_test.tscn" ]; echo $?) \
+	"a fresh folder: the newest file copied in ($out: $(cat "$mine_file" 2>/dev/null))"
+check $([ "$(cat "$home/land/builder/.godot/test_durations.txt")" = "262 tests/view_test.tscn" ] \
+	&& [ "$(cat "$home/land/physics/.godot/test_durations.txt")" = "271 tests/view_test.tscn" ]; echo $?) "the others untouched"
+printf '140 tests/view_test.tscn\n' >"$mine_file"
+touch -d "@$(( $(date +%s) - 3600 ))" "$mine_file"
+out="$(timeout 60 bash tools/remote_tests.sh seed 2>/dev/null)"  # stdout: what land.sh greps (here ps -o errs)
+check $([ "$out" = "durations: own" ] && [ "$(cat "$mine_file")" = "140 tests/view_test.tscn" ]; echo $?) "its own, though older: left alone ($out)"
+
 [ "$failed" = 0 ] && echo "RESULT: PASS" || echo "RESULT: FAIL ($failed failed)"
 [ "$failed" = 0 ]
