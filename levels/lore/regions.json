@@ -138,10 +138,10 @@
 		{
 			"id": "town_pond",
 			"type": "place",
-			"name": "the pond by town",
+			"name": "Snagfin's Fishin' Hole",
 			"status": "agreed",
 			"source": "game",
-			"summary": "Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (221..223 x 224..228 with the shack and its dirt dock), grown east and south by terrain's 559 amended (2) (fa7b50ce5, package \"Snagfin's bigger pond\", Jeff's pick C) to about 221..236 x 224..234, the shack at its west end; east of the woodlot post (207,231), some 30 to 40 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to the far pond). Its size is Jeff's pick C (bigger); the shack waits on buildings' hut; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package \"fishing that works\".",
+			"summary": "Jeff's crescent of water round the shack by Umbrage, his own build of 10-14 (221..223 x 224..228 with the shack and its dirt dock), grown east and south by terrain's 559 amended (2) (fa7b50ce5, package \"Snagfin's bigger pond\", Jeff's pick C) to about 221..236 x 224..234, the shack at its west end; east of the woodlot post (207,231), some 30 to 40 cells east-south-east of the square's fire (194,211)): economy's wilds/pool_221_224, 40 fish and full again each game day (805 amended (16)), where Jeff takes a companion to fish; maps' fishing place of that name over it, keyed pool_221_224, since \"fishing that works\". Named by Jeff 11-12 (reed-pond.md: \"Snagfins Fishin Hole\", voice's spelling), said straight by everyone, no gloss. The pond a resident of Umbrage means (the coordinator's ruling 11-12, after 75e51925e sent a player asking where to fish to Reed Pond). Its size is Jeff's pick C (\"needs to be bigger\", so no \"little\"); the shack (Jeff: \"fishing hut instead of stone tower\"; today a 2x2 brick room that reads as a tower, so the facts name no building, only Snagfin's door, true before and after buildings' hut) waits on buildings' hut; where it lies is the level's as laid. Who lives in the shack is left out (where Snagfin sells is pick 3). Package \"fishing that works\".",
 			"place_kind": "other",
 			"relations": [
 				{
@@ -156,7 +156,7 @@
 			"facts": [
 				{
 					"id": "town_pond.where",
-					"text": "The pond by town is a broad pond a short walk south-east of the square, just east of the woodlot post.",
+					"text": "Snagfin's Fishin' Hole is a broad pond by Snagfin's door, a short walk south-east of the square, just east of the woodlot post.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -169,7 +169,7 @@
 				},
 				{
 					"id": "town_pond.fish",
-					"text": "The pond by town holds the most fish of any water and fills again each day.",
+					"text": "Snagfin's Fishin' Hole holds the most fish of any water and fills again each day.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -198,10 +198,10 @@
 		{
 			"id": "pond",
 			"type": "place",
-			"name": "the far pond",
+			"name": "Reed Pond",
 			"status": "agreed",
 			"source": "game",
-			"summary": "The wilds' far fishing pond, a reed pond far west of Umbrage by the west road (maps' reed_pond at (33,120), \"the pond\" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). The facts call it the far pond, the reed pond only as a description: no name of its own until Jeff picks one (reed-pond.md). The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package \"wilds basics: pond\".",
+			"summary": "The wilds' far fishing pond, a reed pond far west of Umbrage by the forest road (16..125,128, the wilds' road west from the crossroads at (128,128) to the forest link (14,128); \"the west road\" is the one leaving Umbrage along y 201 to the south road at (134,201), maps' 11-13) (maps' reed_pond at (33,120), \"Reed Pond\" on the level, holder nobody), with the other waters that fish far from town: a pool (110..116 x 57..60) west of the north road and the river's wide reach (60..77 x 16..40) in the far north-west (805 amended (8); environment's fish rise). Named by Jeff 11-12 (reed-pond.md: \"Reed Pond\"), with no article in a sentence. The pond a resident means is town_pond, by town (the coordinator's ruling 11-12). Package \"wilds basics: pond\".",
 			"place_kind": "other",
 			"relations": [
 				{
@@ -216,7 +216,7 @@
 			"facts": [
 				{
 					"id": "pond.where",
-					"text": "The far pond, a reed pond, lies a long walk west of town, near the end of the west road.",
+					"text": "Reed Pond lies a long walk west of town, beside the road that runs into the forest, a little short of the trees; its edge is thick with reeds.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -229,22 +229,8 @@
 					"sight": "the pond"
 				},
 				{
-					"id": "pond.reeds",
-					"text": "Reeds grow along the far pond's edge.",
-					"known": "common",
-					"where": [
-						"town_lands"
-					],
-					"tags": [
-						"fishing"
-					],
-					"source": "game",
-					"status": "agreed",
-					"sight": "the reeds"
-				},
-				{
 					"id": "pond.fish",
-					"text": "Fish rise in the far pond too, and it is nobody's: anyone may fish it.",
+					"text": "Fish rise in Reed Pond too, and it is nobody's: anyone may fish it.",
 					"known": "common",
 					"where": [
 						"town_lands"

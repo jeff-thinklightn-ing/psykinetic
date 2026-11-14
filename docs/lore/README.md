@@ -121,8 +121,8 @@ count. A fact may give a `weight` (a number above 0, how much it matters beside
 others when a prompt has room for only some). Without one it is
 `Lore.DEFAULT_WEIGHT`. Weights put a resident's own trade and town first (lore (d), the
 coordinator's ruling 2026-11-10, Jeff's to re-weigh): 3 a trade's lived facts, 2 Umbrage
-itself (the town, the temple, the Mughouse, the farmstead, the pond by town (since 11-12; the far
-pond west of town is not), and since 11-11 the crypt under the temple, never a secret or a fact
+itself (the town, the temple, the Mughouse, the farmstead, Snagfin's Fishin' Hole (since 11-12; Reed
+Pond west of town is not), and since 11-11 the crypt under the temple, never a secret or a fact
 tagged history; but the town's name, which the map shows, is 1 since 11-12), else DEFAULT_WEIGHT. lore_test
 refuses any other weight.
 Fact text is a third-person statement: lore_test refuses I, we or you in a fact or
