@@ -17,6 +17,13 @@ const HEIGHT := 5
 const MARKERS := {Vector2i(1, 2): "start", Vector2i(4, 2): "crate", Vector2i(6, 2): "chest",
 	Vector2i(8, 2): "monster_imp", Vector2i(10, 2): "monster_imp", Vector2i(12, 2): "crate"}
 const GAINED := Vector2i(3, 0)
+## The fallen knight's level (747 amended (11)): his marker at KNIGHT_WAS
+## when saved, moved past the reach to KNIGHT_NOW (as 747 amended (8) moved
+## the barrow's 22 cells, from (38,32) to (39,10)).
+const KNIGHT_LEVEL := "spawn_key_knight"
+const KNIGHT_WAS := Vector2i(13, 2)
+const KNIGHT_NOW := Vector2i(2, 2)
+const KNIGHT_LEGEND := {"monster_astral_knight": "#c8d8f0"}
 
 var _failures := 0
 var _main: Node
@@ -44,6 +51,7 @@ func _run() -> void:
 	_test_became(path, saved)
 	_test_a_moved_marker(path, saved)
 	_test_a_moved_locker(path, saved)
+	_test_a_moved_knight()
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -275,6 +283,113 @@ func _test_a_moved_marker(path: String, data: Dictionary) -> void:
 	var crate: Variant = at.get(Vector2i(12, 4))
 	_check(crate is Pushable and not crate.spawn_spec.has("spawn_key") and at.get(Vector2i(15, 2)) is Pushable,
 			"a marker moved past the reach: the saved one as saved, a new one on the marker (%s)" % [_names(at)])
+
+
+## The knight's level, his marker at [param at], a start at (0, 2).
+func _register_knight(at: Vector2i) -> void:
+	Level.unregister(KNIGHT_LEVEL)
+	var colour := func(meaning: String) -> Color: return Color(str(KNIGHT_LEGEND.get(meaning, Level.LEGEND.get(meaning, "#000000"))))
+	var image := Image.create_empty(WIDTH * 2 + 1, HEIGHT * 2 + 1, false, Image.FORMAT_RGBA8)
+	image.fill(colour.call("void"))
+	var ground: Color = colour.call(Level.GROUNDS[0])
+	for y in HEIGHT:
+		for x in WIDTH:
+			var cell := Vector2i(x, y)
+			var meaning := "monster_astral_knight" if cell == at else "start" if cell == Vector2i(0, 2) else ""
+			image.set_pixel(x * 2, y * 2, colour.call(meaning) if not meaning.is_empty() else ground)
+			if x + 1 < WIDTH:
+				image.set_pixel(x * 2 + 1, y * 2, ground)
+			if y + 1 < HEIGHT:
+				image.set_pixel(x * 2, y * 2 + 1, ground)
+	Level.register(KNIGHT_LEVEL, image, null, {"name": "Knight keys", "legend": KNIGHT_LEGEND})
+
+
+## The knight's level loaded from [param path] as it stands: its knights.
+func _knights_loaded() -> Array:
+	_main._load_level(KNIGHT_LEVEL)
+	_main._start_level(true)
+	return _knights()
+
+
+func _knights() -> Array:
+	return World.get_entities().filter(func(entity: GridEntity) -> bool: return entity.spawned and entity is AstralKnight)
+
+
+func _knight_words(knights: Array) -> String:
+	return str(knights.map(func(each: GridEntity) -> String: return "%s@%s key %s" % [each.name, each.tile, each.spawn_spec.get("spawn_key", "-")]))
+
+
+## Jeff's two knights (747 amended (11), 11-13: "2 copies of sir
+## athelstan"): the fallen knight is placed only by his marker, one per
+## level. One whose marker has not moved comes back as himself, his remains
+## still laid; one whose marker moved past the reach is dropped, at load,
+## through a second restart, at a record's recall and through a re-lay of
+## the level, never spawned as saved beside his marker's new one.
+func _test_a_moved_knight() -> void:
+	print("
+== the fallen knight's marker moved far: one knight, on the new marker (747 amended (11)) ==")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("spawn_key_knight.json")
+	DirAccess.remove_absolute(path)
+	Net.state_path = path
+	_register_knight(KNIGHT_WAS)
+	_main._load_level(KNIGHT_LEVEL)
+	_main._start_level(false)  # Fresh: no save of it yet.
+	var knights := _knights()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_WAS, "a fresh level: its one knight on his marker (%s)" % _knight_words(knights))
+	if knights.size() == 1:
+		(knights[0] as AstralKnight).lay_remains()
+	var was_name: String = knights[0].name if knights.size() == 1 else ""
+	_main._save_state()
+	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	# (c) His marker where it was: he comes back as himself, remains and all.
+	knights = _knights_loaded()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_WAS and knights[0].name == was_name
+			and knights[0].spawn_spec.get("spawn_key", "") == "%d,%d" % [KNIGHT_WAS.x, KNIGHT_WAS.y] and (knights[0] as AstralKnight).remains_laid,
+			"his marker unmoved: the saved knight back as himself, holding his slot, his remains still laid (%s)" % _knight_words(knights))
+	# (a) His marker moved past the reach: one knight, the new marker's.
+	_write(path, saved)
+	_register_knight(KNIGHT_NOW)
+	knights = _knights_loaded()
+	var now_key := "%d,%d" % [KNIGHT_NOW.x, KNIGHT_NOW.y]
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key
+			and _main._alive_slots.values().has(knights[0]),
+			"his marker moved far: one knight, on the new marker and holding its slot; the saved one dropped (%s)" % _knight_words(knights))
+	# (b) A second restart on what that load saved: still one.
+	_main._save_state()
+	knights = _knights_loaded()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and a second restart: still one (%s)" % _knight_words(knights))
+	# A kept record of the old knight (retired while nobody was near), made again: dropped, not kept.
+	var as_record: Dictionary = saved.duplicate(true)
+	var zone: Dictionary = as_record["zones"][KNIGHT_LEVEL]
+	var entries: Array = []
+	for entry: Dictionary in zone["entities"]:
+		if str(entry.get("spawn_key", "")) == "%d,%d" % [KNIGHT_WAS.x, KNIGHT_WAS.y]:
+			zone["records"] = [{"entry": entry, "route": [], "route_index": 0, "route_step": 1}]
+		else:
+			entries.append(entry)
+	zone["entities"] = entries
+	_write(path, as_record)
+	knights = _knights_loaded()
+	_main._recall_near(KNIGHT_WAS, 64)
+	knights = _knights()
+	var kept := World.record_list().filter(func(record: Dictionary) -> bool: return str(record["entry"].get("script", "")).ends_with("astral_knight.gd"))
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and kept.is_empty(),
+			"the old knight kept as a record: made again, he is dropped, not kept again (%s, %d records)" % [_knight_words(knights), kept.size()])
+	# (b) A re-lay of the level (the box's 14): the zone held with the old
+	# knight, laid again on the moved marker, its whole floor kept.
+	_write(path, saved)
+	_register_knight(KNIGHT_WAS)
+	knights = _knights_loaded()
+	_register_knight(KNIGHT_NOW)
+	_main._rebuild_regenerated(KNIGHT_LEVEL, [{"rect": Rect2i(0, 0, WIDTH, HEIGHT), "name": "all"}])
+	World.enter_named(KNIGHT_LEVEL)
+	knights = _knights()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and laid again over the moved marker: still one, the new marker's (%s)" % _knight_words(knights))
+	_check(Main.stray_knight({"script": "res://sim/astral_knight.gd"}) and not Main.stray_knight({"script": "res://sim/astral_knight.gd", "spawn_key": "2,2"})
+			and not Main.stray_knight({"script": "res://sim/monster.gd"}), "only a knight holding no slot is a stray")
+	DirAccess.remove_absolute(path)
+	Level.unregister(KNIGHT_LEVEL)
+	_main._load_level(LEVEL)
 
 
 ## A town's locker whose marker moved past the reach (737: Umbrage's into

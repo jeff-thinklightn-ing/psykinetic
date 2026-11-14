@@ -6322,6 +6322,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 	_saved_keys.erase("")
 	_adopted = 0
 	var lockers_dropped := 0
+	var knights_dropped := 0
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
 		# A town's locker whose marker moved away (737: Umbrage's into the
@@ -6329,6 +6330,9 @@ func _spawn_saved(section: Dictionary) -> bool:
 		# player's record's, so it is dropped, not spawned as saved.
 		if not spec.has("spawn_key") and spec.get("props") is Dictionary and bool((spec["props"] as Dictionary).get("locker", false)):
 			lockers_dropped += 1
+			continue
+		if stray_knight(spec):
+			knights_dropped += 1  # His marker's own knight stands (747 amended (11)).
 			continue
 		var entity := _spawn(spec)
 		if entity == null:
@@ -6343,6 +6347,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 		print("[state] %s: %d saved level entities found their moved markers" % [World.zone.name, _adopted])
 	if lockers_dropped > 0:
 		print("[state] %s: %d town lockers whose marker moved dropped" % [World.zone.name, lockers_dropped])
+	if knights_dropped > 0:
+		print("[state] %s: %d fallen knights whose marker moved dropped" % [World.zone.name, knights_dropped])
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))
@@ -6426,7 +6432,7 @@ func _retire_and_recall() -> void:
 		waiting.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return _nearest_of(World.record_tile(a), near) < _nearest_of(World.record_tile(b), near))
 		for record in waiting:
-			if Time.get_ticks_usec() - started > RECALL_BUDGET_USEC or _recall(record) == null:
+			if (Time.get_ticks_usec() - started > RECALL_BUDGET_USEC or _recall(record) == null) and not record.has("dropped"):
 				World.add_record(record)  # Its turn on the next pass.
 	for keeper: Object in World.keepers:
 		for at in near:
@@ -6461,7 +6467,7 @@ func _recall_due() -> void:
 	var started := Time.get_ticks_usec()
 	while not due.is_empty() and Time.get_ticks_usec() - started < RECALL_BUDGET_USEC:
 		var record: Dictionary = due.pop_front()
-		if _recall(record) == null:
+		if _recall(record) == null and not record.has("dropped"):
 			World.add_record(record)  # No room for it now: kept, tried again later.
 
 
@@ -6561,7 +6567,7 @@ func _despawn_kept(monster: Monster) -> void:
 func _recall_near(at: Vector2i, reach := -1) -> void:
 	reach = recall_tiles if reach < 0 else reach
 	for record in World.take_records_near(at, reach):
-		if _recall(record) == null:
+		if _recall(record) == null and not record.has("dropped"):
 			World.add_record(record)  # No room for it now: kept, tried again later.
 	for keeper: Object in World.keepers:
 		keeper.recall_near(at, reach)
@@ -6575,6 +6581,10 @@ func _recall(record: Dictionary) -> GridEntity:
 	if parsed.is_empty():
 		return null
 	var spec := _level_spec_for(parsed["spec"])
+	if stray_knight(spec):
+		record["dropped"] = true  # Not kept again: his marker's own knight stands (747 amended (11)).
+		print("[state] %s: 1 fallen knight whose marker moved dropped" % World.zone.name)
+		return null
 	spec["tile"] = _nearest_free(spec["tile"])
 	var entity := _spawn(spec)
 	if entity == null:
@@ -6685,6 +6695,21 @@ func _moved_marker(saved: Dictionary, key: String) -> int:
 		if best < 0 or Vector2(off).length() < Vector2(Vector2i(level_entities[best]["tile"]) - was).length():
 			best = slot
 	return best
+
+
+## Whether [param spec] (as _level_spec_for gives it) is a fallen knight
+## holding no slot (747 amended (11), Jeff, 11-13: "2 copies of sir
+## athelstan"): the knight is placed only by his level's marker, one per
+## level, so a saved or kept one whose marker moved past
+## MOVED_MARKER_REACH (747 amended (8) moved the barrow's 22 cells, from
+## (38,32) to (39,10), inside the altar anchor a re-lay keeps) is dropped,
+## at load and at a record's recall, never spawned as saved beside the new
+## one. His quest is the player's record's (barrow_task, marks), not his
+## body's, so nobody's quest changes.
+static func stray_knight(spec: Dictionary) -> bool:
+	if spec.has("spawn_key"):
+		return false
+	return str(spec.get("script", "")).ends_with("astral_knight.gd") or str(spec.get("kind", "")) == "astral_knight"
 
 
 ## The spawn slots the zone's records hold.
