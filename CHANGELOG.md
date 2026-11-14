@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Rolf serves you across his counter: his window stays open and his locker comes out from the front and the sides of his stall, and when you are too far from his counter he tells you so (807 amended (8)).
 - The empty squares of your chest are empty, not faint pictures of gear (787 amended (8)).
 - Where hair and skin are close in tone, such as chestnut on darker skin, the hair is drawn a shade apart from the skin and a beard a shade further, so each reads against the face; the hair colour and skin you picked keep their names (419 amended (4)).
 - If you've never picked a look, Options shows the face you wear in the game (911 amended (1)).

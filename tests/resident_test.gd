@@ -6783,6 +6783,7 @@ func _test_vendor() -> void:
 	_test_keeper(player, rolf)
 	_test_keeper_buttons(player, rolf)
 	_test_keeper_locker_reach(player, rolf)
+	_test_keeper_counter_sight(player, rolf)
 	Net.message_received.disconnect(heard)
 	rule["towns"] = towns_was
 	_sync()
@@ -6854,6 +6855,59 @@ func _test_keeper_locker_reach(player: Player, rolf: Resident) -> void:
 			if not ok:
 				bad.append("%s -> %s" % [beside, locker.tile if locker != null else null])
 	_check(sides >= 2 and bad.is_empty(), "the locker is off the player's cell and within their reach from every free side (%d sides; bad: %s)" % [sides, bad])
+	var kept: Locker = World.locker_of(player.player_id)
+	if kept != null and is_instance_valid(kept):
+		World.despawn(kept)
+
+
+## 807 amended (8): a keeper serves across his own counter. A solid counter cell next to him, with the player in line beyond it, stops
+## World's sight (the fault: his window shut from the front, the server refusing the locker in silence); keeper_sees sees to the counter
+## by what it is (a COUNTERS piece), and a wall cell as near is no counter: refused, and he says so (voice's "away").
+func _test_keeper_counter_sight(player: Player, rolf: Resident) -> void:
+	print("
+== a keeper is seen over his own counter, never through a wall (807 amended (8)) ==")
+	var record: PlayerRecord = _main._records.get(player.player_id)
+	if record == null:
+		_check(false, "(a record for the player)")
+		return
+	if rolf.doing == Resident.Doing.HIDE:
+		rolf.doing = Resident.Doing.WORK
+	var counter := Main.NONE
+	var far := Main.NONE
+	for dir: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var near := rolf.tile + dir
+		var beyond := rolf.tile + dir * 2
+		if World.is_walkable(near) and World.is_walkable(beyond) and World.get_entity_at(near) == null and World.get_entity_at(beyond) == null:
+			counter = near
+			far = beyond
+			break
+	if counter == Main.NONE:
+		print("  (no free line of two cells beside him here: skipped)")
+		return
+	World._solid[counter] = true
+	_main._counter_cells[rolf.zone] = {counter: true}
+	_put(player, far)
+	_check(not World.has_line_of_sight(far, rolf.tile), "the counter cell stops World's sight to him (the fault's own precondition)")
+	_check(_main.keeper_sees(far, rolf.tile, rolf.zone), "his counter is no bar: he is seen over it")
+	var locker: Locker = _main.keeper_locker(player, rolf)
+	_check(locker != null, "served across his counter: the locker comes out")
+	if locker != null and is_instance_valid(locker):
+		World.despawn(locker)
+	# The same cell is a wall, not his counter: refused, and he says why.
+	_main._counter_cells[rolf.zone] = {}
+	var heard: Array[String] = []
+	var listen := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech" and str(data.get("entity", "")) == String(rolf.get_path()):
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(listen)
+	_check(not _main.keeper_sees(far, rolf.tile, rolf.zone), "a wall cell as near is no counter: he is not seen through it")
+	_check(_main.keeper_locker(player, rolf) == null, "through a wall: no locker")
+	var away: Array = Townsfolk.days().get("keeper", {}).get("away", [])
+	var quiet: bool = _main._resident_quiet(rolf, player)
+	_check(away.size() == 3 and (quiet or heard.size() == 1 and heard[0] in away), "and he says why, in voice's words (%s)" % [heard])
+	Net.message_received.disconnect(listen)
+	World._solid.erase(counter)
+	_main._counter_cells.erase(rolf.zone)
 	var kept: Locker = World.locker_of(player.player_id)
 	if kept != null and is_instance_valid(kept):
 		World.despawn(kept)

@@ -4299,6 +4299,7 @@ func reload_zone(zone_name: String) -> void:
 	if not Net.is_authority() or not World.zones.has(zone_name):
 		return
 	var was := World.enter_named(zone_name)
+	_counter_cells.erase(zone_name)  # Its buildings may have changed (807 amended (8): read again at the next ask).
 	Regen.forget()  # An edited level.json may mark it, or no longer.
 	_load_level(zone_name)
 	_reloading = true
@@ -4691,6 +4692,7 @@ func _on_terrain(data: Dictionary) -> void:
 	if Net.is_authority() or not BuilderHost.register_terrain(data):
 		return
 	var level_name := str(data.get("name", ""))
+	_counter_cells.erase(level_name)  # A level changed live (a builder's accept): its counters are read again (807 amended (8)).
 	if level_name == map_name:
 		_load_level(level_name)
 		World.mirror_terrain(_terrain)
@@ -17540,7 +17542,7 @@ func _update_person_window() -> void:
 		return
 	var cell := talk_cell(who)
 	var distance := World.distance(player.tile, cell)
-	var seen := World.has_line_of_sight(player.tile, cell)
+	var seen := keeper_sees(player.tile, cell, who.zone) if answers_clicks_only(who) else World.has_line_of_sight(player.tile, cell)  # A stall's keeper over his counter (807 amended (8)).
 	var now := Time.get_ticks_msec() / 1000.0
 	if distance > World.PERSON_REACH + 1 or not seen:
 		if _person_far_since < 0.0:
@@ -25692,7 +25694,9 @@ func keeper_locker(player: Player, keeper: Resident) -> Locker:
 		# A line the journal can read (no name, no id): why a keeper didn't serve the locker (the keeper's cell, the player's).
 		if player != null and keeper != null and is_instance_valid(keeper):
 			print("[locker] the keeper at %s did not serve (player at %s: distance %d, in sight %s, hiding %s, same zone %s)" % [keeper.tile, player.tile,
-				World.distance(player.tile, keeper.tile), World.has_line_of_sight(player.tile, keeper.tile), keeper.doing == Resident.Doing.HIDE, keeper.zone == player.zone])
+				World.distance(player.tile, keeper.tile), keeper_sees(player.tile, keeper.tile, keeper.zone), keeper.doing == Resident.Doing.HIDE, keeper.zone == player.zone])
+			if keeper.spawned and keeper.worker_id.begins_with(Offers.VENDOR) and keeper.zone == player.zone and keeper.doing != Resident.Doing.HIDE:
+				_keeper_says(keeper, "away", player)  # Too far, or unseen: he says so (voice), never silence.
 		return null
 	var cell := _locker_cell(player, keeper)
 	if cell == NONE:
@@ -25739,7 +25743,44 @@ func _keeper_serves(player: Player, keeper: Resident) -> bool:
 	return player != null and keeper != null and is_instance_valid(keeper) and keeper.spawned \
 		and keeper.worker_id.begins_with(Offers.VENDOR) and keeper.zone == player.zone \
 		and keeper.doing != Resident.Doing.HIDE and World.distance(player.tile, keeper.tile) <= World.COMPANION_REACH \
-		and World.has_line_of_sight(player.tile, keeper.tile)
+		and keeper_sees(player.tile, keeper.tile, keeper.zone)
+
+
+## The cells of the counters (COUNTERS: a stall's) laid in [param zone]'s level, read from its buildings list once ({cell: true}):
+## World keeps only that a cell is solid, not what made it so.
+var _counter_cells := {}
+func _counters_of(zone: String) -> Dictionary:
+	if not _counter_cells.has(zone):
+		var cells := {}
+		var buildings: Array = Level.load_level(zone).get("buildings", []) if Level.exists(zone) else []
+		for each: Variant in buildings:
+			if each is Dictionary and str(each.get("slot", "")) in COUNTERS:
+				var rect: Variant = Level.building_rect(each)
+				if rect is Rect2i:
+					for y in range((rect as Rect2i).position.y, (rect as Rect2i).end.y):
+						for x in range((rect as Rect2i).position.x, (rect as Rect2i).end.x):
+							cells[Vector2i(x, y)] = true
+		_counter_cells[zone] = cells
+	return _counter_cells[zone]
+
+
+## Whether [param from] sees a stall's keeper at [param at] in [param zone] (807 amended (8)): World's sight, or sight to his own counter
+## beside him and nearer than he is: a counter is solid and so stops World's sight to the man behind it, and a keeper is served across
+## his counter. Only a counter piece counts (not a wall he stands against: the end of a sight walk never blocks, so any solid cell
+## would serve him through it). World.has_line_of_sight itself is not changed.
+func keeper_sees(from: Vector2i, at: Vector2i, zone: String) -> bool:
+	if World.has_line_of_sight(from, at):
+		return true
+	var counters := _counters_of(zone)
+	if counters.is_empty():
+		return false
+	var away := World.distance(at, from)
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var next := at + Vector2i(dx, dy)
+			if (dx != 0 or dy != 0) and counters.has(next) and World.distance(next, from) < away and World.has_line_of_sight(from, next):
+				return true
+	return false
 
 
 ## [param keeper]'s own line of [param kind] ("greet", "locker", "back": residents.json
@@ -25750,7 +25791,7 @@ func _keeper_says(keeper: Resident, kind: String, player: Player) -> void:
 	if not lines.is_empty():
 		# His word over the locker and over "nowhere" sends no offers (807 amended (7)): the offers open his store window on the
 		# client, which, the store layout, hides the pack and with it the locker's row just put down beside him.
-		_resident_says(keeper, str(lines[absi(hash(keeper.worker_id + player.player_id)) % lines.size()]), "", player, not kind in ["locker", "nowhere"])
+		_resident_says(keeper, str(lines[absi(hash(keeper.worker_id + player.player_id)) % lines.size()]), "", player, not kind in ["locker", "nowhere", "away"])
 
 
 ## Server: [param player]'s locker (722) opened on [param tile] of [param
