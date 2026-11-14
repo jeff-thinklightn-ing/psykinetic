@@ -46,9 +46,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2981)
+## Lines in the code (2985)
 
-### companions (Pip, Wren, Nix) (659)
+### companions (Pip, Wren, Nix) (663)
 
 | | Line | Where |
 |---|---|---|
@@ -147,6 +147,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\b(where\|see\|look\|around\|near\|next\|here\|this\|that\|fire\|flames?\|burn\\w*\|glow\\w*\|warm\|water\|door\|crates?\|box\\w*\|boulders?\|rocks?\|carts?\|chests?\|ledges?\|edge\|drop\|stairs?\|torch\\w*\|light)\\b | `sim/companion.gd` SURROUNDINGS_WORDS |
 |  | fire\|flame\|burn | `sim/companion.gd`  |
 |  | ledge\|edge\|drop | `sim/companion.gd`  |
+|  | the crypt guards | `sim/companion.gd`  |
+|  | crypt guard\|skeleton | `sim/companion.gd`  |
 |  | hurt\|wound\|blood\|bleed\|heal | `sim/companion.gd`  |
 |  | stay close\|keep close\|beside\|behind me | `sim/companion.gd`  |
 |  | move\|forward\|onward\|keep going | `sim/companion.gd`  |
@@ -386,7 +388,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is badly hurt | `sim/companion.gd` _watch() |
 |  | %s has risen again. | `sim/companion.gd` _watch() |
 |  | %s came into sight, %s | `sim/companion.gd` _watch() |
+|  | %s came into sight, the first time you have seen it here. | `sim/companion.gd` _watch() |
 |  | %s came into sight, the first %s you have seen here. | `sim/companion.gd` _watch() |
+|  | %s came into sight, the first you have seen here. | `sim/companion.gd` _watch() |
 |  | %s came into sight. | `sim/companion.gd` _watch() |
 |  | %s came into sight, %s. | `sim/companion.gd` _watch() |
 |  | %s came into sight. | `sim/companion.gd` _watch() |
