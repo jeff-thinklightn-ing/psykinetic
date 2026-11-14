@@ -8027,7 +8027,20 @@ func _phase_ground_over_frames(generation: int) -> bool:
 	var fields := _kept_fields(key)
 	if fields.is_empty():
 		var result := {}
-		var task := WorkerThreadPool.add_task(func() -> void: result["fields"] = _ground_fields(input), true, "ground fields")
+		# On a copy of what they read (660 amended (10)): the view's own
+		# members are never read off the main thread.
+		_end_fields_state()
+		var state: Client3D
+		if _neighbour:
+			# Built in play (822): the copy spread over frames.
+			state = await _fields_state_over_frames(generation, FIELDS_COPY_USEC)
+			if state == null:
+				return false
+		else:
+			# Behind the arrival card: in one go, no frame added to it.
+			state = _fields_state()
+			_fields_state_held = state
+		var task := WorkerThreadPool.add_task(func() -> void: result["fields"] = state._ground_fields(input), true, "ground fields")
 		_fields_task = task
 		while _fields_task == task and not WorkerThreadPool.is_task_completed(task):
 			await get_tree().process_frame
@@ -8035,6 +8048,7 @@ func _phase_ground_over_frames(generation: int) -> bool:
 			return false  # A newer rebuild waited for it and took over.
 		WorkerThreadPool.wait_for_task_completion(task)
 		_fields_task = -1
+		_end_fields_state()
 		if generation != _build_generation or not is_inside_tree():
 			return false
 		fields = result["fields"]
@@ -8112,6 +8126,155 @@ func _keep_fields(key: String, fields: Dictionary) -> void:
 		_fields_kept.pop_front()
 
 
+## Every member of the view that _ground_fields and what it calls read
+## (660 amended (10)): the fields run on a private copy of these
+## (_fields_state), so a worker never reads the view itself. view_test
+## _test_fields_own_state reads client3d.gd and fails on a member read in
+## the fields' calls and not named here.
+const FIELDS_READ: Array[StringName] = [&"_bed_levels", &"_built_water", &"_curve_cells", &"_curve_near_also",
+		&"_curve_near_sample", &"_curve_waters", &"_edge_curves", &"_edge_near_also", &"_edge_near_sample",
+		&"_floor_sets", &"_floor_worn", &"_floors_set", &"_fords", &"_glimpse", &"_glimpse_ground", &"_ramp_heights",
+		&"_relief", &"_relief_given", &"_relief_size", &"_road_cells", &"_road_curves", &"_road_near_also",
+		&"_road_near_sample", &"_rocks", &"_stream_cells", &"_wet"]
+## The keys of [member _terrain] the fields read (the same test): only
+## these are copied, the rest of a level's terrain is no business of theirs.
+const FIELDS_TERRAIN: Array[String] = ["buildings", "heights", "plot_buildings", "streams", "town_places"]
+
+
+## A bare view, never in the tree, holding copies of what the fields read
+## (FIELDS_READ, FIELDS_TERRAIN's keys of the terrain), made on the main
+## thread: _ground_fields runs on it, on a worker or here, and it is freed
+## when they are done (_end_fields_state). Packed arrays are copied on write,
+## so the relief costs nothing; a dictionary of plain values (cells to a
+## float, a bool, a packed array) is copied a level deep, any other all
+## through (_state_copy).
+func _fields_state() -> Client3D:
+	var state: Client3D = (get_script() as GDScript).new()
+	for field: StringName in FIELDS_READ:
+		state.set(field, _state_copy(get(field)))
+	var terrain := {}
+	for key: String in FIELDS_TERRAIN:
+		if _terrain.has(key):
+			terrain[key] = _state_copy(_terrain[key])
+	state._terrain = terrain
+	return state
+
+
+## [param value] copied for _fields_state: deep only where it holds
+## containers that could be changed in place.
+static func _state_copy(value: Variant) -> Variant:
+	if value is Dictionary:
+		var held := (value as Dictionary).get_typed_value_builtin()
+		return (value as Dictionary).duplicate(held == TYPE_NIL or held == TYPE_ARRAY or held == TYPE_DICTIONARY or held == TYPE_OBJECT)
+	if value is Array:
+		return (value as Array).duplicate(true)
+	return value
+
+
+## The copy _phase_ground_over_frames' worker reads (_fields_state), freed
+## here once the worker is done with it.
+var _fields_state_held: Client3D = null
+
+
+func _end_fields_state() -> void:
+	if _fields_state_held != null:
+		_fields_state_held.free()
+		_fields_state_held = null
+
+
+## What the held neighbour's copy (_fields_state_over_frames) may take of a
+## frame: it is built while the player walks (822), and in one go the
+## wilds' copy took 15 to 20 ms, its terrain heights (65536 cells) 10.
+const FIELDS_COPY_USEC := 2000
+## A dictionary longer than this is copied in steps of FIELDS_COPY_STEP of
+## its keys, the frame's time looked at after each.
+const FIELDS_COPY_LONG := 4096
+const FIELDS_COPY_STEP := 512
+## The held neighbour's terrain keys its copy shares, not copies: its
+## terrain is Main's own read of the zone, and in play only a crossing's
+## Clearing writes it (_open_kept), while the worker may still read; Clearing
+## reads the heights and never writes them (only Level.load_level's bridges
+## do, before it is handed over). The other keys it can write (plot
+## buildings) stay copied. view_test pins both (_test_fields_own_state).
+const FIELDS_SHARED_HELD: Array[String] = ["heights"]
+## Each frame's time the last copy over frames took (microseconds): the
+## bench and view_test read it.
+var fields_copy_frames: Array[int] = []
+
+
+## _fields_state's copy made over frames, no frame's part longer than about
+## [param budget_usec]: whole members one by one, a long dictionary in steps
+## of its keys, a frame awaited when the budget is spent. The same copy
+## (view_test compares the fields built on each). Held in
+## _fields_state_held from the start, so a rebuild meanwhile frees it; null
+## when a newer rebuild came (or the view left the tree).
+func _fields_state_over_frames(generation: int, budget_usec: int) -> Client3D:
+	fields_copy_frames.clear()
+	var frame_start := Time.get_ticks_usec()
+	var state: Client3D = (get_script() as GDScript).new()
+	_fields_state_held = state
+	var jobs: Array = []
+	for field: StringName in FIELDS_READ:
+		jobs.append([true, field, get(field)])
+	for key: String in FIELDS_TERRAIN:
+		if _terrain.has(key):
+			jobs.append([false, key, _terrain[key]])
+	var terrain := {}
+	for job: Array in jobs:
+		var value: Variant = job[2]
+		var copy: Variant
+		if not job[0] and job[1] in FIELDS_SHARED_HELD:
+			terrain[job[1]] = value  # Never written once read (FIELDS_SHARED_HELD).
+			continue
+		if value is Dictionary and (value as Dictionary).size() > FIELDS_COPY_LONG:
+			var source: Dictionary = value
+			var held := source.get_typed_value_builtin()
+			var deep := held == TYPE_NIL or held == TYPE_ARRAY or held == TYPE_DICTIONARY or held == TYPE_OBJECT
+			var made := Dictionary({}, source.get_typed_key_builtin(), source.get_typed_key_class_name(), source.get_typed_key_script(),
+					held, source.get_typed_value_class_name(), source.get_typed_value_script())
+			var keys := source.keys()
+			var at := 0
+			while at < keys.size():
+				var end := mini(at + FIELDS_COPY_STEP, keys.size())
+				for k in range(at, end):
+					var item: Variant = source[keys[k]]
+					made[keys[k]] = item.duplicate(true) if deep and (item is Array or item is Dictionary) else item
+				at = end
+				if Time.get_ticks_usec() - frame_start >= budget_usec:
+					fields_copy_frames.append(Time.get_ticks_usec() - frame_start)
+					await get_tree().process_frame
+					if not _copy_goes_on(generation, state):
+						return null
+					frame_start = Time.get_ticks_usec()
+			copy = made
+		else:
+			copy = _state_copy(value)
+		if job[0]:
+			state.set(job[1], copy)
+		else:
+			terrain[job[1]] = copy
+		if Time.get_ticks_usec() - frame_start >= budget_usec:
+			fields_copy_frames.append(Time.get_ticks_usec() - frame_start)
+			await get_tree().process_frame
+			if not _copy_goes_on(generation, state):
+				return null
+			frame_start = Time.get_ticks_usec()
+	state._terrain = terrain
+	fields_copy_frames.append(Time.get_ticks_usec() - frame_start)
+	return state
+
+
+## Whether _fields_state_over_frames goes on after a frame: no newer
+## rebuild, still in the tree and its copy still held (else freed, or freed
+## here).
+func _copy_goes_on(generation: int, state: Variant) -> bool:
+	if generation == _build_generation and is_inside_tree() and is_same(_fields_state_held, state):
+		return true
+	if is_same(_fields_state_held, state):
+		_end_fields_state()
+	return false
+
+
 ## [param fields] copied all through, its images too.
 static func _fields_copy(fields: Dictionary) -> Dictionary:
 	var copy := fields.duplicate(true)
@@ -8131,6 +8294,7 @@ func _end_fields_task() -> void:
 	if _fields_task != -1:
 		WorkerThreadPool.wait_for_task_completion(_fields_task)
 		_fields_task = -1
+	_end_fields_state()
 
 
 ## Whether the curves or the ground's fields are being worked out on a
@@ -15086,7 +15250,11 @@ func _build_ground(kinds: Dictionary) -> void:
 	var input := _ground_input(kinds)
 	if input.is_empty():
 		return
-	var fields := _ground_fields(input)
+	# On a copy as over frames (660 amended (10)): its slices' workers read
+	# that, never the view, though this thread waits on them.
+	var state := _fields_state()
+	var fields := state._ground_fields(input)
+	state.free()
 	_apply_ground_fields(fields)
 	_build_ground_meshes(fields)
 

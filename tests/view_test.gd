@@ -96,6 +96,7 @@ func _ready() -> void:
 		_test_ground_fields()
 		_test_glimpses_meet()
 		_test_world_map_kept()
+		await _test_fields_own_state()
 	elif _half() == 0:
 		# view_test: sounds, deaths and bars, the camera and fades, the ground's look by season and hour.
 		_test_every_sound_has_its_files()
@@ -16404,6 +16405,246 @@ func _under_pile(node: Node) -> bool:
 			return true
 		up = up.get_parent()
 	return false
+
+
+## The ground's fields read only their own copy of the view (660 amended
+## (10); the saturn crash's class, a worker reading members the main thread
+## remakes). Counted: client3d.gd read as text, every function _ground_fields
+## calls (or binds) followed, and each member they read must be one
+## Client3D.FIELDS_READ names, each terrain key one of FIELDS_TERRAIN, the
+## terrain never handed on whole. Poisoned: the hills' fields built on a
+## worker from the copy while this thread rebuilds the same view to the test
+## room again and again (every member they read cleared and remade), the
+## result the same as a quiet build's.
+func _test_fields_own_state() -> void:
+	print("\n== the ground's fields read their own copy of the view, never the view (660 amended (10)) ==")
+	var found := _fields_reads()
+	var reached: Dictionary = found["reached"]
+	_check(reached.size() > 30 and reached.has("_curve_surface") and reached.has("_wear_field") and reached.has("_edge_texels"),
+			"the fields' calls followed (%d functions, the shore's curves, the wear and a bound job among them)" % reached.size())
+	var named: Array[String] = []
+	for field: StringName in Client3D.FIELDS_READ:
+		named.append(str(field))
+	var unnamed: Array[String] = []
+	for member: String in found["reads"]:
+		if member != "_terrain" and not named.has(member):
+			unnamed.append(member)
+	_check(unnamed.is_empty(), "every member the fields read is copied for them (not in FIELDS_READ: %s)" % [unnamed])
+	var stale: Array[String] = []
+	for member: String in named:
+		if not (found["reads"] as Dictionary).has(member):
+			stale.append(member)
+	_check(stale.is_empty(), "FIELDS_READ names only what they read (read by none: %s)" % [stale])
+	var statics: Array = (found["statics"] as Dictionary).keys()
+	_check(statics == ["field_threads"], "the one static they read is the thread count, set before any build (%s)" % [statics])
+	var keys: Array[String] = []
+	for key: String in found["keys"]:
+		if not Client3D.FIELDS_TERRAIN.has(key):
+			keys.append(key)
+	_check(keys.is_empty() and (found["whole"] as Array).is_empty(),
+			"the terrain's keys they read are copied, and it is never handed on whole (not in FIELDS_TERRAIN: %s; whole: %s)" % [keys, found["whole"]])
+
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	_check(not _rig._curve_waters.is_empty() and not _rig._wet.is_empty(),
+			"the hills have waters, so the shore's reads are in it (%d curves)" % _rig._curve_waters.size())
+	var input: Dictionary = _rig._ground_input(_rig._terrain.get("kinds", {}))
+	var digest := func(fields: Dictionary) -> int:
+		var parts := []
+		var names := fields.keys()
+		names.sort()
+		for name: Variant in names:
+			var value: Variant = fields[name]
+			parts.append(name)
+			parts.append((value as Image).get_data() if value is Image else value)
+		return parts.hash()
+	var copy_started := Time.get_ticks_usec()
+	var quiet_state := _rig._fields_state()
+	print("  (the hills' copy made in %d us)" % (Time.get_ticks_usec() - copy_started))
+	var quiet: int = digest.call(quiet_state._ground_fields(input.duplicate(true)))
+	quiet_state.free()
+	const ROUNDS := 3
+	# Each round's copy made now, beside the quiet one, while the view holds
+	# the hills as first loaded: the rounds (last below) rebuild it to the test room.
+	var states: Array[Client3D] = []
+	for round in ROUNDS:
+		states.append(_rig._fields_state())
+	# The held neighbour's copy over frames (built in play, 822): the same
+	# fields, spread over several frames on a small budget; a rebuild in the
+	# middle of one ends it, its copy freed.
+	var spread: Client3D = await _rig._fields_state_over_frames(_rig._build_generation, 300)
+	var spread_frames := _rig.fields_copy_frames.duplicate()
+	var spread_same: bool = spread != null and digest.call(spread._ground_fields(input.duplicate(true))) == quiet
+	_rig._end_fields_state()
+	_check(spread_same and spread_frames.size() >= 3,
+			"the copy made over frames builds the same fields, on %d frames at a 0.3 ms budget (%s us)" % [spread_frames.size(), spread_frames])
+	var cut_short := {}
+	var ending := func() -> void:
+		cut_short["state"] = await _rig._fields_state_over_frames(_rig._build_generation, 300)
+	ending.call()
+	await get_tree().process_frame
+	var hills_again := Level.load_level("hills")
+	_rig.rebuild(hills_again["terrain"], hills_again["centre"])
+	for i in 400:
+		if cut_short.has("state"):
+			break
+		await get_tree().process_frame
+	_check(cut_short.has("state") and cut_short["state"] == null and _rig._fields_state_held == null,
+			"a rebuild in the middle of the copy over frames ends it and frees its copy")
+	# Nothing writes a held neighbour's source while its copy runs but a
+	# crossing into its zone (_open_kept: Clearing on Main's own read of the
+	# zone, which no builder or editor holds), and that same _load_level
+	# swaps it (only whole: no copy running) or drops it: drop_neighbour,
+	# release_room, _end_fields_task, which ends the copy. Main's functions
+	# that touch the held level are these; a new one fails here, to be weighed.
+	var main_bodies := _bodies_of("res://main.gd")
+	var touching: Array[String] = []
+	for name: String in main_bodies:
+		for line: String in main_bodies[name]:
+			if line.contains("_neighbour_level"):
+				touching.append(name)
+				break
+	touching.sort()
+	var expected: Array[String] = ["_can_swap", "_client_zone", "_lay_neighbour", "_open_kept", "_poll_neighbour_read", "_swap_neighbour", "drop_neighbour"]
+	var drop_text := "\n".join(PackedStringArray(main_bodies.get("drop_neighbour", [])))
+	var release_text := "\n".join(PackedStringArray(_bodies_of("res://client3d/client3d.gd").get("release_room", [])))
+	var chain := drop_text.contains("release_room()") and release_text.contains("_end_fields_task()")
+	var ended := {}
+	var ended_by_task := func() -> void:
+		ended["state"] = await _rig._fields_state_over_frames(_rig._build_generation, 300)
+	ended_by_task.call()
+	await get_tree().process_frame
+	_rig._end_fields_task()
+	for i in 400:
+		if ended.has("state"):
+			break
+		await get_tree().process_frame
+	_check(touching == expected and chain and ended.has("state") and ended["state"] == null and _rig._fields_state_held == null,
+			"only a crossing writes a held neighbour's source, and it ends the copy (Main's: %s; drop, release, end: %s; ended: %s)" % [touching, chain, ended.has("state")])
+	# That crossing's Clearing never writes a heights dictionary, so the held
+	# copy shares them (FIELDS_SHARED_HELD): clearing.gd and the Level code it
+	# calls (relay_outline) read them only.
+	var writes_heights := RegEx.create_from_string("heights(?:\"\\])?(?:\\[[^\\]]*\\]\\s*=[^=]|\\.(?:erase|clear|merge|assign|get_or_add)\\()")
+	var heights_written: Array[String] = []
+	var clearing_text := FileAccess.get_file_as_string("res://sim/clearing.gd").replace("\r", "").split("\n")
+	var outline_lines: Array = _bodies_of("res://sim/level.gd").get("relay_outline", [])
+	for line: String in Array(clearing_text) + outline_lines:
+		var code := line.split("#")[0]
+		if writes_heights.search(code) != null:
+			heights_written.append(code.strip_edges())
+	_check(Array(Client3D.FIELDS_SHARED_HELD) == ["heights"] and heights_written.is_empty() and not outline_lines.is_empty(),
+			"a crossing's Clearing writes no heights, so the held copy shares them (shared: %s; written: %s)" % [Client3D.FIELDS_SHARED_HELD, heights_written])
+	var rebuilt := 0
+	var same := 0
+	for round in ROUNDS:
+		var state := states[round]
+		var own := input.duplicate(true)
+		var out := {}
+		var task := WorkerThreadPool.add_task(func() -> void: out["fields"] = state._ground_fields(own), true, "fields own state test")
+		while not WorkerThreadPool.is_task_completed(task):
+			# Every member the fields read cleared and remade, under them.
+			_rig.rebuild(_main._terrain, Vector2i.ZERO)
+			rebuilt += 1
+			await get_tree().process_frame
+		WorkerThreadPool.wait_for_task_completion(task)
+		state.free()
+		if out.has("fields") and digest.call(out["fields"]) == quiet:
+			same += 1
+	_check(same == ROUNDS and rebuilt >= ROUNDS,
+			"built on a worker while the view was rebuilt %d times under them, the same fields as a quiet build (%d of %d)" % [rebuilt, same, ROUNDS])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## [param path]'s functions' bodies as text, comments cut: name -> its lines
+## (_test_fields_own_state).
+func _bodies_of(path: String) -> Dictionary:
+	var func_head := RegEx.create_from_string("^(static )?func (\\w+)\\(")
+	var bodies := {}
+	var current := ""
+	for line: String in FileAccess.get_file_as_string(path).replace("\r", "").split("\n"):
+		var head := func_head.search(line)
+		if head != null:
+			current = head.get_string(2)
+			bodies[current] = []
+			continue
+		if not line.is_empty() and not line.begins_with("\t") and not line.begins_with(" ") and not line.begins_with("#"):
+			current = ""
+			continue
+		if not current.is_empty():
+			(bodies[current] as Array).append(line.split("#")[0])
+	return bodies
+
+
+## client3d.gd read as text (_test_fields_own_state): the functions
+## _ground_fields reaches by calls and binds ("reached"), the instance
+## members they read ("reads"), the static ones ("statics"), the terrain's
+## keys ("keys") and any line handing the terrain on whole ("whole").
+## Comments and strings are cut first; a signature's lines (defaults) are
+## not its body.
+func _fields_reads() -> Dictionary:
+	# Its lines end CRLF in a Windows checkout: a signature's ":" is last only without the "\r".
+	var lines := FileAccess.get_file_as_string("res://client3d/client3d.gd").replace("\r", "").split("\n")
+	var func_head := RegEx.create_from_string("^(static )?func (\\w+)\\(")
+	var var_head := RegEx.create_from_string("^(?:@\\w+(?:\\([^)]*\\))?\\s+)*(static )?var (\\w+)")
+	var text := RegEx.create_from_string("\"(?:[^\"\\\\]|\\\\.)*\"")
+	var called := RegEx.create_from_string("(?<![\\w.])(\\w+)(?=\\(|\\.bind\\(|\\.call\\()")
+	var word := RegEx.create_from_string("(?<![\\w.])(\\w+)")
+	var key_read := RegEx.create_from_string("(?<![\\w.])_terrain(?:\\.get\\(|\\[|\\.has\\()\"(\\w+)\"")
+	var terrain_at := RegEx.create_from_string("(?<![\\w.])_terrain\\b")
+	var keyed := RegEx.create_from_string("^\\s*(\\.get\\(|\\[|\\.has\\()\"")
+	var bodies := {}
+	var members := {}
+	var current := ""
+	var in_signature := false
+	for line: String in lines:
+		var head := func_head.search(line)
+		if head != null:
+			current = head.get_string(2)
+			bodies[current] = []
+			in_signature = not line.split("#")[0].strip_edges(false, true).ends_with(":")
+			continue
+		if not line.is_empty() and not line.begins_with("\t") and not line.begins_with(" ") and not line.begins_with("#"):
+			current = ""
+			var member := var_head.search(line)
+			if member != null:
+				members[member.get_string(2)] = member.get_string(1) != ""
+			continue
+		if current.is_empty():
+			continue
+		if in_signature:
+			in_signature = not line.split("#")[0].strip_edges(false, true).ends_with(":")
+			continue
+		(bodies[current] as Array).append(line.split("#")[0])
+	var reached := {}
+	var todo: Array[String] = ["_ground_fields"]
+	while not todo.is_empty():
+		var name: String = todo.pop_back()
+		if reached.has(name) or not bodies.has(name):
+			continue
+		reached[name] = true
+		for line: String in bodies[name]:
+			for found: RegExMatch in called.search_all(text.sub(line, "\"\"", true)):
+				if bodies.has(found.get_string(1)) and not reached.has(found.get_string(1)):
+					todo.append(found.get_string(1))
+	var reads := {}
+	var statics := {}
+	var keys := {}
+	var whole: Array[String] = []
+	for name: String in reached:
+		for line: String in bodies[name]:
+			for found: RegExMatch in word.search_all(text.sub(line, "\"\"", true)):
+				var member := found.get_string(1)
+				if members.has(member):
+					if members[member]:
+						statics[member] = true
+					else:
+						reads[member] = true
+			for found: RegExMatch in key_read.search_all(line):
+				keys[found.get_string(1)] = true
+			for found: RegExMatch in terrain_at.search_all(line):
+				if keyed.search(line.substr(found.get_end())) == null:
+					whole.append("%s: %s" % [name, line.strip_edges()])
+	return {"reached": reached, "reads": reads, "statics": statics, "keys": keys.keys(), "whole": whole}
 
 
 ## Decision 660 (a): a zone's ground fields kept for its next arrival, the

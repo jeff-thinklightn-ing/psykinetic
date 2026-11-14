@@ -19,7 +19,7 @@ const VIEW: Array[StringName] = [
 	&"_tilt_seconds", &"_peek_pitch", &"_peeking", &"_peek", &"_peek_from", &"_peek_t", &"_lead",
 	&"building_room", &"_steady_count", &"_steady_usec", &"_steady_told", &"_lift", &"lift_report",
 	&"_build_generation", &"_fields_task", &"_fields_result", &"_stamped",
-	&"_fields_held", &"_curves_task", &"_curves_result", &"ground_filling", &"_fill_jobs",
+	&"_fields_held", &"_fields_state_held", &"fields_copy_frames", &"_curves_task", &"_curves_result", &"ground_filling", &"_fill_jobs",
 	&"_fill_ground", &"_fill_cliffs", &"_old_rooms", &"_ground_appear", &"_shades_seeded",
 	&"_phase_usec", &"_fields_kept", &"fields_hits", &"_warming", &"_warm_frames", &"_glimpse",
 	&"_neighbour", &"_puppets", &"_remains", &"_hover", &"_stand_ring", &"_channel_ring", &"_aim_arc",

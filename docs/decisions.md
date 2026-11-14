@@ -34176,6 +34176,29 @@ the rest; so an arrival from kept fields has its fords' beds too, where before i
 empty and the fords' middles had no bed scatter. view_test _test_kept_fields: a ford's beds the same
 on a kept arrival as on a fresh one. Client only, protocol unchanged, no new class_name; not a
 package piece.
+660 amended (10): the fields run on a private copy of the view (terrain, 2026-11-12; the coordinator's
+ruling, ahead of the crossing prefetch; the label from tools/decision_number.sh). 660 amended (8) gave
+_curve_band its own copies, but the fields' other calls still read the view's members on a worker: the
+shore's (_ground_corners, _shore_bed, _curve_surface, _curve_near on _curve_waters and
+_curve_near_sample), the roads', the relief, 880's wear (_terrain's buildings, _road_cells), 26 members and the terrain
+in all over 49 functions. A harness that built the wilds' fields on a worker while Main rebuilt the same
+view took index errors in _curve_surface and then signal 11, the saturn crash's class. No play path was
+found that does the same: rebuild waits for a running fields or curves task before it writes
+(_end_fields_task), both Main paths hold a clearing while the fields run (_held_clearings), Main edits a
+terrain's cells in place only through Clearing, a town's buildings raised in play never touch the
+level's list, and swap_room takes whole rooms only (Main._can_swap). So it is made true by construction,
+not left to those guards: _fields_state makes, on the main thread, a bare Client3D never put in the
+tree, holding copies of the members Client3D.FIELDS_READ names and of the terrain keys FIELDS_TERRAIN
+names (no other key is read); _ground_fields runs on it, over frames on its worker
+(_phase_ground_over_frames, freed by _end_fields_state when the worker is done or a rebuild waits it)
+and at once on this thread with its slices on workers (_build_ground). The fields write no member (they
+return everything, 660 amended (8)'s _ford_beds the last). The one static they read is field_threads.
+view_test.gd's _test_fields_own_state (run in view_land_far_test's half, 278 amended (9)): client3d.gd read as text, the functions _ground_fields calls or binds
+followed, every member they read named in FIELDS_READ (and none named that none read), every terrain
+key in FIELDS_TERRAIN and the terrain never handed on whole; and the hills' fields built on a worker
+from the copy while the test rebuilds the same view to the test room under them, three times, the
+same fields as a quiet build. Behind the arrival card the copy is made in one go, a frame the card already hides: 16.6 ms for the wilds and 9.0 ms for the hills (medians, build/copybench as a solo scene on this PC beside other trees' landings, not a bench). That is a whole frame and more at 60 fps: were the card ever gone, a player would see the picture hold once, for about 17 ms (up to 19 on the wilds), as the new zone's ground starts building, a single stutter with nothing drawn wrong; the spread copy below is the mend if a build without the card ever needs one. The held neighbour (822) is built in play, so its copy is spread over frames (_fields_state_over_frames): member by member, a dictionary over 4096 keys in steps of 512, a frame given up once FIELDS_COPY_USEC (2 ms) is spent; a rebuild, the view leaving the tree or a newer copy ends it and frees its copy (_copy_goes_on). The longest such frame was 2.44 ms on the wilds (6 to 7 frames) and 2.31 ms on the hills (3 to 4); freeing the copy once the worker is done takes 2.0 to 2.6 ms on the wilds and 0.6 to 1.0 ms on the hills, in a frame of its own. The held neighbour copies at all because its terrain is Main's own read of the zone (_neighbour_level), and a crossing into that zone runs Clearing on it (_open_kept) while the worker may still be reading. No other writer touches it, and the same _load_level then swaps the room in (only once whole, so no copy is running) or drops it (drop_neighbour, release_room, _end_fields_task), which ends the copy: a write in the middle of a copy is always followed, in that call, by the copy's end, and the half-made copy is never built. Its heights alone are shared, not copied (FIELDS_SHARED_HELD): they are the copy's largest part (10.2 ms of the wilds' 16.6, and their keys() alone 0.74 ms, up to 2.65), and that crossing's Clearing, with the Level code it calls (relay_outline), only reads heights. The other terrain keys stay copied, the plot buildings among them, as Clearing writes those. view_test _test_fields_own_state also builds the hills' fields from a copy made over frames at a 0.3 ms budget (the same fields, on 3 frames or more), ends one with a rebuild partway (null, its copy freed) and one with _end_fields_task. It also checks that Main's functions touching _neighbour_level are the known seven, with drop_neighbour reaching _end_fields_task, and that no line of clearing.gd or relay_outline writes a heights dictionary. Client only, protocol unchanged,
+no new class_name; not a package piece; no bullet.
 660 amended (11) (terrain, 2026-11-13; the coordinator's report and reading, playtest's find; the
 label from tools/decision_number.sh): the floor's shade pass waits while a zone change has the new
 ground's cells but not its vertex spans. Playtest's joined walks on the Atlas (look_circle2 and 4, a
