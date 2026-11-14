@@ -21,7 +21,8 @@ LOGS="$(mktemp -d)"
 . tests/test_ports.sh
 # The phases run at once (decision 279), each group on ports of its own:
 # phases 1 and 2 (2 reads 1's snapshot) on PORT, 3 on PORT + 1, 4 on PORT + 2,
-# 5 on PORT + 3 with its console on PORT + 4, 6 on PORT + 7 (net_test.ps1 has + 5 and + 6).
+# 5 on PORT + 3 with its console on PORT + 4, 6 on PORT + 7 (net_test.ps1 has + 5 and + 6),
+# 7 on PORT + 8.
 PORT=$((17760 + PORT_OFFSET))
 ADMIN=$((PORT + 4))
 TOKEN=test-secret
@@ -316,13 +317,45 @@ phase_6() {
 	finish
 }
 
+# The companions the server placed or moved, by name, one a line: its test
+# run's line (--test-exit-after; a released server's names none, 279
+# amended (1)), test players' companions only.
+pets_in() {
+	grep -oE "^\[test\] a companion [A-Za-z]+ is at" "$LOGS/$1.log" 2>/dev/null | awk '{print $4}' | sort -u
+}
+
+phase_7() {
+	P=$((PORT + 8))
+	# Phase 7: companions on two joined clients, the one phase with companions
+	# on (the coordinator, 11-14: net_test.ps1's phase 5 brought here, as no
+	# landing ran the .ps1). Jo walks onto the test room's link at (1, 1) and
+	# goes to the sample with her companion; Kim stays with hers. Each client
+	# must be sent its own zone's entities, its own companion among them and not
+	# the other's. Only lines naming no player are read: the server's test-run
+	# companion line (279 amended (1)), each client's own zone, slot and tiles lines.
+	server server10 --server --still-monsters "--token=$TOKEN"
+	wait_for server10 'listening on port'
+	client clientJ $GOOD --name=Jo --test-move=-10,-1
+	wait_for server10 "^\[test\] a companion [A-Za-z]+ is at"
+	client clientK $GOOD --name=Kim
+	wait_for clientK '\[net\] connected as peer'
+	# Two companions by name: the line comes again as one travels with her player.
+	waited=0
+	until [ "$(pets_in server10 | wc -l)" -ge 2 ] || [ "$waited" -gt $((WAIT_LIMIT * 4)) ]; do
+		waited=$((waited + 1))
+		sleep 0.25
+	done
+	wait_for clientJ '\[zone\] now in sample'
+	finish
+}
+
 # All the groups at once, each in a shell of its own (its instances and
 # helpers' state its own); what each printed (a wait given up) after. With
 # NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another: the
 # groups at once are fourteen Godots, a lean landing's peak.
 # NET_TEST_GROUPS (by hand only, never in a landing): just those groups,
 # e.g. "phase_3"; the checks of the others then fail.
-for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5 phase_6}; do
+for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5 phase_6 phase_7}; do
 	if [ -n "${NET_TEST_SERIAL:-}" ]; then
 		( "$group" ) >"$LOGS/$group.out" 2>&1
 	else
@@ -459,6 +492,35 @@ check "$(count '\[test\] face Player1: ' "$LOGS/clientL.log")" 5 "phase 6b: his 
 faces=$(cat "$LOGS/clientL.log" "$LOGS/clientM.log" 2>/dev/null | grep -E '^\[test\] face (Player[0-9]+|options): ' | sed -E 's/^\[test\] face [^:]+: //' | sort -u | wc -l | tr -d ' ')
 check "$faces" 1 "phase 6b: one face through his zone, a link, a death's return and a rejoin, and the face Options shows is it"
 check "$(count '\[net\] look adopted' "$LOGS/clientL.log")$(count '\[net\] look adopted' "$LOGS/clientM.log")$(grep -cE '^look=seed=[0-9]+' "$LOGS/face.cfg" 2>/dev/null || echo 0)" 101 "phase 6b: his client kept the server's look once, in its settings, and asked with it when he came back"
+# Phase 7: each joined client sees its own zone and its own companion, not
+# the other's. The two companions are told apart by which client shows which,
+# and the two players by each client's own slot (its display line), so no line
+# naming a player is read.
+pets=$(pets_in server10)
+jo_tiles=$(grep -E '^\[test\] tiles: ' "$LOGS/clientJ.log" 2>/dev/null | tail -n 1)
+kim_tiles=$(grep -E '^\[test\] tiles: ' "$LOGS/clientK.log" 2>/dev/null | tail -n 1)
+jo_slot=$(grep -oE '^\[test\] display: Player[0-9]+ ' "$LOGS/clientJ.log" 2>/dev/null | awk '{print $3}' | tail -n 1)
+kim_slot=$(grep -oE '^\[test\] display: Player[0-9]+ ' "$LOGS/clientK.log" 2>/dev/null | awk '{print $3}' | tail -n 1)
+jo_pet=""
+kim_pet=""
+for pet in $pets; do
+	case " $jo_tiles " in *" $pet="*) [ -z "$jo_pet" ] && jo_pet=$pet ;; esac
+done
+for pet in $pets; do
+	[ "$pet" = "$jo_pet" ] && continue
+	case " $kim_tiles " in *" $pet="*) [ -z "$kim_pet" ] && kim_pet=$pet ;; esac
+done
+check "$(echo "$pets" | grep -c . || true)" 2 "phase 7: the server placed a companion for each joined player"
+check "$(count '\[zone\] now in sample' "$LOGS/clientJ.log")$(count '\[zone\] now in' "$LOGS/clientK.log")" 10 "phase 7: Jo's client switched to the sample; Kim's never left the test room"
+sees() { case " $1 " in *" $2="*) echo 1 ;; *) echo 0 ;; esac; }
+sees_kind() { echo "$1" | grep -qE "(^| )[A-Za-z_]*$2[0-9]*=" && echo 1 || echo 0; }
+if [ -n "$jo_slot" ] && [ -n "$kim_slot" ] && [ "$jo_slot" != "$kim_slot" ] && [ -n "$jo_pet" ] && [ -n "$kim_pet" ]; then
+	check "$(sees_kind "$jo_tiles" Sneak)$(sees "$jo_tiles" "$jo_slot")$(sees "$jo_tiles" "$jo_pet")$(sees_kind "$jo_tiles" CorridorImp)$(sees "$jo_tiles" "$kim_slot")$(sees "$jo_tiles" "$kim_pet")" 111000 		"phase 7: Jo sees the sample, herself and her companion $jo_pet, nothing of the test room ($jo_tiles)"
+	check "$(sees_kind "$kim_tiles" CorridorImp)$(sees "$kim_tiles" "$kim_slot")$(sees "$kim_tiles" "$kim_pet")$(sees_kind "$kim_tiles" Sneak)$(sees "$kim_tiles" "$jo_slot")$(sees "$kim_tiles" "$jo_pet")" 111000 		"phase 7: Kim, who stayed, sees the test room and her companion $kim_pet, not Jo or $jo_pet ($kim_tiles)"
+else
+	check "slots ${jo_slot:-none}/${kim_slot:-none}, companions ${jo_pet:-none}/${kim_pet:-none}" "two of each" "phase 7: each client's slot and its own companion read ($jo_tiles | $kim_tiles)"
+fi
+check "$(cat "$LOGS/server10.log" "$LOGS/server10.err" 2>/dev/null | grep -c '^ERROR' || true)" 0 "phase 7: with companions on it went without an ERROR"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

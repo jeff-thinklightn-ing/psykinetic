@@ -5956,6 +5956,35 @@ random ids, and the check named Pip and Nix); it reads their names from the
 server's log now. land.sh runs net_test.sh, which has no zones phase, so it
 went unseen.
 
+279 amended (1) (the script's label; the coordinator's order 11-14, as no landing runs
+net_test.ps1 and perf's wrapper is to replace it): net_test.sh has the zones phase, as group
+phase_7 on PORT + 8, the one group with companions on (every other server keeps
+--no-companions). Its own server (server10, test_room, --still-monsters); Jo joins with
+--test-move=-10,-1 onto the link at (1, 1) and goes to the sample with her companion; Kim joins
+and stays with hers. It reads only lines that name no player: the server's test-run companion
+line, and each client's own "[zone] now in", "[test] display: <slot>" and "[test] tiles:". The
+server's line "[net] a player's companion <name> is at <cell>" (284 amended (1) took the player's
+name off it) held the companion's own name (Companion._name_of: her card's, decision 293, drawn
+from levels/companion_traits.json's names seeded by her player's id when she was first made, and
+kept on the record): one way from the id, never the id back, but the same for that player every
+session, a steady stand-in for them in the journal. Nothing derived from a player's id sits in a
+server log line (the coordinator's ruling, 11-14), so a released server's line is now "[net] a
+player's companion is at <cell>", with no name. A test run (--test-exit-after, which the box never
+sets) also prints "[test] a companion <name> is at <cell>", test players' companions only, and
+phase 7 tells its two companions apart by that. Her name still goes on the wire to clients as
+before: every player in her zone sees it on her plate. The other server lines that print a
+companion's name are counted for the coordinator's later ruling, unchanged here. The server prints
+its companion line again when a companion travels with her player, so the phase waits for two
+companions by name, never a count of two lines; and for Kim's "connected as peer" before that, as
+a client not yet connected was stopped by the phase's end in the first run. The checks: two
+companions placed; Jo's client switched to the sample and Kim's never left; Jo sees the sample
+(a Sneak), her slot and her companion, nothing of the test room (no CorridorImp), not Kim's slot
+or companion; Kim the reverse; no ERROR on its server. The companions are told apart by which
+client shows which, the players by each client's own slot. Measured through the gate as `net`,
+one run each, beside other trees' jobs: the whole 177 s with it, 165 s without (+12 s); its three
+Godots peak 2.8 GB alone; the whole's peak 14.8 GB with it, 12.0 without (working set at once
+12.6 and 9.9), over the kind's 12 GB row (perf: it fits). net_test.ps1 is left as it is: its zones phase reads the old line, so it fails there until perf's wrapper replaces it.
+
 ## 320. Companions bandage, and heal only by being bandaged
 
 Companions step 4's last verb. Items' bandaging (#272: World.try_bandage,

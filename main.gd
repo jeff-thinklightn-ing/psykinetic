@@ -9399,8 +9399,13 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet
 	_set_mood(record)  # Once she is hers: before it, her step never reached her (fond after every join).
-	print("[net] a player's companion %s is at %s%s" % [
-		Companion._name_of(pet), tile, " (new)" if is_new else ""])
+	# No name on a released server's line (279 amended (1)): hers is rolled
+	# from her player's id (293) and kept, a steady stand-in for them in the
+	# journal. A test run (--test-exit-after, never set on the box) prints it
+	# apart, for net_test's phase 7 to tell two companions by.
+	print("[net] a player's companion is at %s%s" % [tile, " (new)" if is_new else ""])
+	if Net.test_exit_after > 0.0:
+		print("[test] a companion %s is at %s" % [Companion._name_of(pet), tile])
 	_tell_sickness(pet, record, true)
 
 
