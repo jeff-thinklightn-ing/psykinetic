@@ -719,6 +719,16 @@
 			"radius": 3,
 			"name": "a ruined barn"
 		},
+		"pool_221_224": {
+			"at": [
+				230,
+				224
+			],
+			"kind": "fishing",
+			"holder": "nobody",
+			"radius": 11,
+			"name": "Snagfin's Fishin' Hole"
+		},
 		"reed_pond": {
 			"at": [
 				33,
@@ -727,7 +737,7 @@
 			"kind": "fishing",
 			"holder": "nobody",
 			"radius": 10,
-			"name": "the pond"
+			"name": "Reed Pond"
 		},
 		"square_fire": {
 			"at": [

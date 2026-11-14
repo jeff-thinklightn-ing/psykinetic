@@ -2555,8 +2555,8 @@ func _test_fish_waters() -> void:
 		else:
 			World._fish_waters["wilds"] = waters_were
 		World._fish_stock_of.clear()
-		_check(stocks.keys() == ["wilds/reed_pond"] and World.pond_name("wilds/reed_pond") == "the pond",
-			"every cell of the pond fishes the pond's stock, called the pond (%s)" % [stocks.keys()])
+		_check(stocks.keys() == ["wilds/reed_pond"] and World.pond_name("wilds/reed_pond") == "Reed Pond",
+			"every cell of the pond fishes the pond's stock, called Reed Pond (%s)" % [stocks.keys()])
 
 
 ## The Reed Pond as built (Jeff, v0.1.207: "neither pond works for fishing but wren says

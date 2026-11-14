@@ -106,6 +106,7 @@ func _ready() -> void:
 	await _test_barrow_exits()
 	await _test_spawn_near()
 	_test_reed_pond()
+	_test_fishin_hole()
 	_test_kind_lists()
 
 	_main.load_map(Level.DEFAULT_MAP)
@@ -2530,6 +2531,34 @@ func _test_kind_lists() -> void:
 ## grass), and the place on its bank, its radius taking in all of
 ## it and every dry cell within World.FISH_REACH of it (companions' check:
 ## pond_at's covers is the place's circle).
+## Snagfin's Fishin' Hole (Jeff, 11-12: "Reed Pond and Snagfins Fishin Hole"; the coordinator's
+## 803 amended (13) id): the crescent by Snagfin's shack is a fishing place keyed by its pool's own
+## key, "pool_221_224", so economy's stock and every pond_at keep the id when terrain grows the
+## water; nobody's, a found place by Jeff's name, its circle taking in the crescent's water and no
+## other body's.
+func _test_fishin_hole() -> void:
+	print("\n== Snagfin's Fishin' Hole: the crescent's fishing place keeps its pool's key ==")
+	var config := Level.template_config("wilds")
+	var warnings: Array[String] = []
+	var place: Dictionary = Level.places_from(config, warnings).get("pool_221_224", {})
+	var waters := World.fish_waters_of(Level.load_level("wilds")["terrain"])
+	var at: Vector2i = place.get("cell", Vector2i(-1, -1))
+	var radius: int = place.get("radius", 0)
+	var inside := {}
+	for cell: Vector2i in waters:
+		if (cell - at).length_squared() <= radius * radius:
+			inside[waters[cell]] = true
+	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "Snagfin's Fishin' Hole" and place.get("holder", "") == Factions.NOBODY
+			and place.get("explore", false) == true and inside.size() == 1,
+		"pool_221_224: fishing, nobody's, Snagfin's Fishin' Hole, a found place; its circle (%s, %d) takes in one body of water (%s; its own key moves with its first cell, the place's id doesn't)" % [at, radius, inside.keys()])
+	# Terrain's bigger pond (559 amended (2)): the whole of that body inside the circle, as at Reed Pond, from a cell on its dry shore.
+	var left_out: Array[Vector2i] = []
+	for cell: Vector2i in waters:
+		if inside.has(waters[cell]) and (cell - at).length_squared() > radius * radius:
+			left_out.append(cell)
+	_check(inside.size() == 1 and left_out.is_empty() and not at in waters, "the Fishin' Hole's circle holds all of Snagfin's pond (%d cells outside: %s), from a dry cell %s" % [left_out.size(), left_out.slice(0, 6), at])
+
+
 func _test_reed_pond() -> void:
 	print("
 == The Reed Pond (805): all its water and banks its fishing place's ==")
@@ -2588,7 +2617,7 @@ func _test_reed_pond() -> void:
 			longest = maxi(longest, run)
 		rows = rows + 1 if longest >= 8 else 0
 		most = maxi(most, rows)
-	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "the pond" and place.get("holder", "") == Factions.NOBODY
+	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "Reed Pond" and place.get("holder", "") == Factions.NOBODY
 			and pond.size() >= 48 and most >= 6 and open_water.is_empty() and open_bank.is_empty() and reeds * 2 >= bank,
 		"reed_pond: fishing, nobody's, %d water cells by %s (%d rows 8 wide), radius %d; outside it: water %s, bank %s; reeds on %d of %d bank cells"
 			% [pond.size(), at, most, radius, open_water, open_bank.slice(0, 4), reeds, bank])

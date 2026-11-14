@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The pond a long walk west of Umbrage is Reed Pond, and the water round Snagfin's shack is Snagfin's Fishin' Hole, a place of its own to find and named on your map (805 amended (20)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - The draugr's and the fallen knight's windows open at the foot of the screen, left of the pack, and the draugr's closes by itself once he rests (629 amended (3)).
