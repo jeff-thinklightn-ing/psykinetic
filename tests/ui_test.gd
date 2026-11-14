@@ -4254,6 +4254,13 @@ func _test_person_give() -> void:
 	window.locker_asked.connect(catch_locker)
 	window._on_store_tab("locker")
 	window.locker_asked.disconnect(catch_locker)
+	var ware := {"id": "hob|wares|a", "kind": Offers.WARES, "accept": Offers.WARES, "title": "A knife", "words": "", "cost": 3, "what": {"item": "knife"}}
+	_main._on_offers_message({"entity": str(body.get_path()), "speaker": "Rolf", "offers": [ware]})
+	_check(not window.is_open(), "his offers right after the Locker tab (his locker line sends them on an older server) leave his store window shut, the locker's row not hidden under it (807 amended (7))")
+	_main._locker_asked[body.get_instance_id()] = -1000000
+	_main._on_offers_message({"entity": str(body.get_path()), "speaker": "Rolf", "offers": [ware]})
+	_check(window.is_open() and window.with == body, "later, his offers open his window again (a greeting is how it opens)")
+	window.close()
 	_check(asked_locker == [body] and not window.is_open() and not window.pack.suppressed, "the Locker tab: asks for his locker, the store window out of the way, the pack back")
 	World.set_slots(me, had_slots, had_uids)
 	window.close()

@@ -2039,10 +2039,21 @@ func _refresh_barter() -> void:
 		World.command(me, "barter", {"shop": str(barter_panel.with.get_path())})
 
 
+## Rolf's offers within this long of the Locker tab don't open his store window again (807 amended (7); an older server sends them with
+## his locker line): who -> when, msec.
+const LOCKER_QUIET_MSEC := 2500
+var _locker_asked := {}
+
+
 func _keeper_command(keeper: GridEntity, command: String) -> void:
 	var me := _local_player()
 	if me != null and keeper != null and is_instance_valid(keeper) and keeper.is_inside_tree():
+		if command == "locker":
+			_locker_asked[keeper.get_instance_id()] = Time.get_ticks_msec()
+			print("[locker] asked of the keeper at %s from %s" % [keeper.tile, me.tile])
 		World.command(me, command, {"keeper": str(keeper.get_path())})
+	elif command == "locker":
+		print("[locker] not asked: no body (player %s, keeper %s)" % [me != null, keeper != null and is_instance_valid(keeper)])
 
 
 func _give_to_person(to: GridEntity, uids: Array) -> void:
@@ -17162,7 +17173,8 @@ func _on_offers_message(data: Dictionary) -> void:
 	elif who is Resident and deal_panel != null:
 		# A townsperson's wares (the Rolf fix): Rolf's starter stall (736), a pedlar's pack (711), in the
 		# store window since 765 (none closes it if it shows theirs).
-		if barter_panel != null:
+		var locker_quiet: bool = barter_panel != null and not barter_panel.is_open() and Time.get_ticks_msec() - int(_locker_asked.get(who.get_instance_id(), -1000000)) < LOCKER_QUIET_MSEC
+		if barter_panel != null and not locker_quiet:
 			barter_panel.show_wares(who, str(data.get("speaker", "")), data.get("offers", []) if data.get("offers") is Array else [], gold)
 			barter_panel.set_points(data.get("points", {}) if data.get("points") is Dictionary else {})  # 852: where what he won't take goes.
 			if data.has("takes") and barter_panel.is_open() and barter_panel.person == who:
@@ -25010,6 +25022,7 @@ func _watch_locker() -> void:
 			if count != int(_locker_opened.get(entity.get_instance_id(), 0)):
 				_locker_opened[entity.get_instance_id()] = count
 				if count > 0 and pack_panel.other != entity:
+					print("[locker] its row opened (opened %d)" % count)
 					open_other(entity)
 
 
@@ -25061,6 +25074,8 @@ func _update_pack() -> void:
 		open_other(_pack_wanted)
 	var other := pack_panel.other
 	if other != null and (not is_instance_valid(other) or not World.reaches(player, other)):
+		if other is Locker:
+			print("[locker] its row closed: out of reach (player at %s, it at %s)" % [player.tile, other.tile if is_instance_valid(other) else "gone"])
 		close_other()
 
 
@@ -25456,15 +25471,25 @@ func open_locker(player: Player, prop: Chest) -> Locker:
 ## hiding, brings it out on the cell beside him toward them and says so
 ## (residents.json "keeper" "locker", voice's words). Its Locker, or null.
 func keeper_locker(player: Player, keeper: Resident) -> Locker:
-	if not Net.is_authority() or not _keeper_serves(player, keeper):
+	if not Net.is_authority():
+		return null
+	if not _keeper_serves(player, keeper):
+		# A line the journal can read (no name, no id): why a keeper didn't serve the locker (the keeper's cell, the player's).
+		if player != null and keeper != null and is_instance_valid(keeper):
+			print("[locker] the keeper at %s did not serve (player at %s: distance %d, in sight %s, hiding %s, same zone %s)" % [keeper.tile, player.tile,
+				World.distance(player.tile, keeper.tile), World.has_line_of_sight(player.tile, keeper.tile), keeper.doing == Resident.Doing.HIDE, keeper.zone == player.zone])
 		return null
 	var cell := _locker_cell(player, keeper)
 	if cell == NONE:
+		print("[locker] no free cell beside the keeper at %s that the player at %s can reach" % [keeper.tile, player.tile])
 		_keeper_says(keeper, "nowhere", player)  # No free cell beside him that they can reach: said, not silent (807 amended (6)).
 		return null
 	var locker := _open_locker_at(player, keeper.zone, cell)
 	if locker != null:
+		print("[locker] set down at %s beside the keeper at %s (opened %d)" % [cell, keeper.tile, locker.opened])
 		_keeper_says(keeper, "locker", player)
+	else:
+		print("[locker] could not be set down at %s beside the keeper at %s (no record or spawn)" % [cell, keeper.tile])
 	return locker
 
 
@@ -25508,7 +25533,9 @@ func _keeper_serves(player: Player, keeper: Resident) -> bool:
 func _keeper_says(keeper: Resident, kind: String, player: Player) -> void:
 	var lines: Array = Townsfolk.days().get("keeper", {}).get(kind, [])
 	if not lines.is_empty():
-		_resident_says(keeper, str(lines[absi(hash(keeper.worker_id + player.player_id)) % lines.size()]), "", player)
+		# His word over the locker and over "nowhere" sends no offers (807 amended (7)): the offers open his store window on the
+		# client, which, the store layout, hides the pack and with it the locker's row just put down beside him.
+		_resident_says(keeper, str(lines[absi(hash(keeper.worker_id + player.player_id)) % lines.size()]), "", player, not kind in ["locker", "nowhere"])
 
 
 ## Server: [param player]'s locker (722) opened on [param tile] of [param

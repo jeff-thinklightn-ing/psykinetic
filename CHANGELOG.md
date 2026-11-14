@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Rolf's "Open locker" shows your locker beside your pack again: the store window stays shut and the locker's squares are there, where before it came back over them (807 amended (7)).
 - Towns: by day, coming into a town you hear its market for a while, a little different each time, before it fades into open air, with townsfolk's talk coming and going too low to make out, and work out of sight sounding faint and far off (578 amended (4)).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
