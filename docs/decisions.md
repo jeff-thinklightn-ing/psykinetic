@@ -5655,6 +5655,25 @@ lines carry the note. fonts_imported_test, land_checks_test, run_digest_test and
 line as "tool_part ...". land.ps1 (no saturn path, rarely run) is unchanged. Tests and tools only; protocol unchanged;
 no class_name; no bullet.
 
+278 amended (9): view_test and view_land_test each run as two scenes (the coordinator's approval, 2026-11-14; label
+from tools/decision_number.sh). The suite runs its scenes at once, so a landing's Godot part lasts as long as its
+slowest scene, and these two were the slowest on saturn. view_test now stops after _test_dusk_floor (sections 1 to
+48), and view_world_test (tests/view_world_test.gd, extends view_test.gd, base port 17723) runs from _test_dais on.
+view_land_test stops after _test_forest_edge (sections 1 to 12), and view_land_far_test (base port 17724) runs from
+_test_forest_floor_whole on. Each half keeps today's order, and both halves of a scene together print the same
+sorted PASS lines as the scene did whole, name for name. A half is picked by _half() (0 in view_test, 1 in the
+subclass), and each half has its own port and scratch names. One state carried across the cut: view_world_test
+opens with _as_at_the_cut(), which leaves the world as the first half did: the host's companion dead
+(_test_companion_death) and the world's clock 22 steps on (Main.RESPAWN_TICKS + 2, _test_player_death's respawn
+wait, the first half's only steps). At tick 0 a body that never moved is still a draw delay from arriving
+(GridEntity.arriving_in), so _test_goblin's strike would wait on the walk and show Walk. land.sh prints "slow
+scene: <name> N s, over 220 s; split it at its next row" for any suite line over 220 s, which names a scene to split
+before it is killed at its time limit (90 amended (1)); anim_rig_test (about 205 s) is next, and it is animation's.
+A new row goes in the half whose list names its subject in the comment above it (view_test: sounds, deaths and bars,
+the camera and fades, the ground's look; view_world_test: places and decor, water, buildings and doors, people and
+gear, creatures, music; view_land_test: the horizon to the forest's edge; view_land_far_test: the forest floor,
+roads, relief, sight, fields), at the end of that list unless it needs another row's state. Tests and tools only; protocol unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged

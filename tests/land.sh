@@ -275,6 +275,9 @@ else
 fi
 wait
 [ -n "$remote" ] && bash tools/remote_tests.sh finish
+# 278 amended (9): a scene over 220 s in this suite is named, a warning and not a failure; the
+# tree adding its next row splits it, as view_test and view_land_test were.
+awk '($1 == "PASS" || $1 == "FAIL") && $3 ~ /^[0-9]+s/ { s = $3 + 0; if (s > 220) print "slow scene: " $2 " " s " s, over 220 s; split it at its next row (278 amended (9))" }' "$LOGS/suite.log" 2>/dev/null
 
 code=0
 failed=""

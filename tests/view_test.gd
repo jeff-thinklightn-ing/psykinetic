@@ -14,7 +14,7 @@ var _until_frames := 0
 
 
 ## Its base port: not 7777 (the editor may be hosting there), nor any other
-## test's or eval's. view_land_test has its own.
+## test's or eval's. view_land_test, view_world_test and view_land_far_test have their own.
 func _base_port() -> int:
 	return preload("res://tests/test_ports.gd").of(17791)
 
@@ -26,6 +26,32 @@ func _base_port() -> int:
 ## sections' order.
 func _land() -> bool:
 	return false
+
+
+## Which half of its list this scene runs (278 amended (k)): 0 the first, 1 the
+## second (view_world_test, view_land_far_test, the same script with ports of
+## their own). Each list is cut at a subject line and keeps its order, so the
+## suite's longest scene (view_test, 271 s on saturn) runs in two of about 140.
+## A new section's call line goes in the half its subject belongs to.
+func _half() -> int:
+	return 0
+
+
+## The world as view_test's first half leaves it, for view_world_test's first
+## section (278 amended (9)): the host's companion dead, as _test_companion_death
+## leaves her (the second half's sections were written after it; with her alive
+## her focus points and her place beside the player change what they see), and
+## the world's clock where _test_player_death's respawn wait leaves it, its only
+## steps (at tick 0 a body that never moved is still a draw delay from arriving,
+## so _test_goblin's strike would wait on his walk and show Walk).
+func _as_at_the_cut() -> void:
+	var pet := _companion()
+	if pet != null:
+		World.damage(pet, 999, null, &"attack")
+		_rig._process(0.0)
+	for i in Main.RESPAWN_TICKS + 2:
+		World.step()
+	await _frames(2)
 
 
 func _ready() -> void:
@@ -44,7 +70,8 @@ func _ready() -> void:
 	_rig._process(0.0)
 	_rig.sfx.hear_everything = true  # Which sounds events make; who hears them is _test_heard_as_monsters_hear.
 
-	if _land():
+	if _land() and _half() == 0:
+		# view_land_test: the horizon, sky, landmarks, hills, shores, water, ledges, the forest's edge.
 		_test_horizon()
 		_test_eye_kept_out()
 		_test_doors_fade_inside()
@@ -57,6 +84,8 @@ func _ready() -> void:
 		_test_built_water()
 		_test_ledge_curves()
 		_test_forest_edge()
+	elif _land():
+		# view_land_far_test: the forest floor, curve passes, clearings, roads, worn ground, relief, sight, fields.
 		_test_forest_floor_whole()
 		_test_curve_passes()
 		_test_clearing()
@@ -67,7 +96,8 @@ func _ready() -> void:
 		_test_ground_fields()
 		_test_glimpses_meet()
 		_test_world_map_kept()
-	else:
+	elif _half() == 0:
+		# view_test: sounds, deaths and bars, the camera and fades, the ground's look by season and hour.
 		_test_every_sound_has_its_files()
 		await _test_hp_bars()
 		await _test_sounds_follow_events()
@@ -118,6 +148,9 @@ func _ready() -> void:
 		_test_damp_look()
 		_test_night_look_2()
 		_test_dusk_floor()
+	else:
+		# view_world_test: places and decor, water, buildings and doors, people and gear, creatures, music.
+		await _as_at_the_cut()
 		_test_dais()
 		_test_dark_set()
 		_test_lair()
