@@ -46936,6 +46936,15 @@ from the level; the watch's post rect, raid waves and the captain's visit are me
 dropped at the old post stays on its wilds floor. Moving the barrow and the Old Tower farther out
 waits on Jeff's pick. level_test _test_held: the mound and link are outside the room. Level data
 only; protocol unchanged, no new class_name.
+774 amended (3): the smithy post is the east road post (2026-11-13, maps; the coordinator's ruling, from lore's
+check of what Umbrage tells a player against what stands; the script's label). post_smithy at (234, 206) stands
+4 cells south of the east road's end (x 235, y 201), about 20 east and 12 south of the forge (H1, (214, 194)), so
+a player sent to "the smithy post" walked past the smithy to reach it. Its name, the one the map and the
+name-where-you-stand show, is now "the east road post", for where it stands, beside the crossroads, barrow, hill
+road, woodlot and healer's posts; lore's directions already speak of the west and north roads (lore's check). The
+id post_smithy stays (level_test's post ids). Nothing else named it on main: no line, sign, waystone, rumour or lore
+row. It reverses the coordinator's 11-10 note to Jeff that the name stays (the coordinator tells him). Level data
+only; protocol unchanged, no new class_name.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's
