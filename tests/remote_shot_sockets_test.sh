@@ -98,6 +98,35 @@ refused "--tour-only without --tour: refused" "only with --tour" --tour-only bed
 refused "--repeat with --tour: refused (one phase)" "--repeat: not with --tour" --tour smoke --repeat 2 "$sha" x --
 refused "--tour-bots without --tour: refused (828 amended (10))" "only with --tour" --tour-bots 2 --joined "$sha" x --
 refused "--tour-bots 3: refused (one or two)" "--tour-bots: 1 or 2" --tour smoke --tour-bots 3 "$sha" x --
+# Builder mode's panel joined (828 amended (11)): --builders only beside --builder-stub, and only fixed test ids.
+refused "--builders without --builder-stub: refused (a laptop's server never makes a real builder request)" \
+	"--server-args --builders=70a70000-0000-4000-8000-000000000001: refused without --builder-stub (a laptop's server never makes a real builder request)" \
+	--joined --server-args "--builders=70a70000-0000-4000-8000-000000000001" "$sha" x --
+refused "--builders with an id not a fixed test id: refused, beside the stub too" "is not a fixed test id" \
+	--joined --server-args "--builder-stub --builders=70a70000-0000-4000-8000-000000000001,3f2b9c1e-0000-4000-8000-000000000001" "$sha" x --
+refused "--builders= empty: refused" "--server-args --builders=: refused (a test id" \
+	--joined --server-args "--builder-stub --builders=" "$sha" x --
+refused "--builder-stub without --joined: refused (--server-args only with --joined)" "--server-args: only with --joined" \
+	--server-args "--builder-stub" "$sha" x --
+rm -f "$tmp/reached"
+sent="$(shot --dry-run --joined --server-args "--builders=70a70000-0000-4000-8000-000000000001,70a70000-0000-4000-8000-000000000002 --builder-stub" "$sha" builderx -- --player-id=70a70000-0000-4000-8000-000000000001)"
+code=$?
+got_args="$(printf '%s\n' "$sent" | grep -E '^server_args: ' | tr '\n' ';')"
+wanted_args="server_args: --builders=70a70000-0000-4000-8000-000000000001,70a70000-0000-4000-8000-000000000002;server_args: --builder-stub;"
+if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
+	echo "  PASS  --builder-stub with --builders=<test ids>, in either order: both sent to the joined server"
+else
+	echo "  FAIL  --builder-stub and --builders: exit $code, got [$got_args], wanted [$wanted_args]"; failed=$((failed + 1))
+fi
+rm -f "$tmp/reached"
+sent="$(shot --dry-run --joined --server-args "--builder-stub" "$sha" builderx --)"
+code=$?
+got_args="$(printf '%s\n' "$sent" | grep -E '^server_args: ' | tr '\n' ';')"
+if [ $code -eq 0 ] && [ "$got_args" = "server_args: --builder-stub;" ] && [ ! -f "$tmp/reached" ]; then
+	echo "  PASS  --builder-stub alone: sent (harmless: on a dedicated server no player builds without --builders)"
+else
+	echo "  FAIL  --builder-stub alone: exit $code, got [$got_args]"; failed=$((failed + 1))
+fi
 rm -f "$tmp/reached"
 sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp" "$sha" tourx --)"
 code=$?

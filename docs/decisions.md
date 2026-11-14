@@ -52205,6 +52205,20 @@ tests/remote_shot_sockets_test.sh: --tour-bots refused without --tour and past 2
 tour.txt; the runner's -Mode bot2args swapping the three and refusing without --tour-bot=1; remote_shot.sh's void
 line. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+828 amended (11): a joined run's server may take --builder-stub and --builders (the coordinator's ruling,
+2026-11-14, for the builder panel's joined stills; label from tools/decision_number.sh). The panel's states change on
+the server's replies (asking, working, the answer, a fault), and a hosted run never shows a reply arriving over the
+wire, so the joined stills need builder mode on the laptop's own server. remote_shot.sh's --server-args allowlist
+takes --builder-stub (StubClaude answers from its script, no key) and --builders=<id,id>, but --builders only together
+with --builder-stub: alone it is refused, "refused without --builder-stub (a laptop's server never makes a real
+builder request)", since --builders with a key in the laptop's environment would ask the API. The ids are fixed test
+ids only (70a70000-0000-4000-8000-<12 digits>, as tour.sh's Tourbot); any other id is refused ("never a player's"),
+so no player's id is named in a laptop run. The client takes the same id as its own --player-id among its godot args.
+--builder-stub alone is sent and is harmless: a dedicated server has no host player, so no one builds without
+--builders. tests/remote_shot_sockets_test.sh: --builders alone refused; an id not a test id refused beside the stub;
+an empty --builders refused; --server-args without --joined refused; both flags sent in either order; the stub alone
+sent. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

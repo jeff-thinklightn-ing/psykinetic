@@ -53,6 +53,11 @@
 # `--client --address=127.0.0.1 --port=P`. --server-args "<args>" go to the server
 # alone (its clock, its map: --hour=21 --map=wilds), split on spaces. A joined run's
 # args name no mode, address or port (it joins 127.0.0.1 and nothing else).
+# Builder mode's panel (828 amended (11)): --server-args "--builder-stub
+# --builders=70a70000-0000-4000-8000-000000000001" with the client's own
+# --player-id=70a70000-0000-4000-8000-000000000001: the stub's answers over the wire. --builders
+# takes only fixed test ids and only beside --builder-stub: a laptop's server never makes a real
+# builder request.
 # out/server.log comes back with the rest. Every run's processes, joined or not,
 # are in a job object that Windows ends with the runner: a tray stop, a timeout,
 # the client's crash or the runner's own end take the server with them.
@@ -262,9 +267,27 @@ printf '%s\n' "${ARGS[@]}" >"$TMP/args.txt"
 : >"$TMP/server_args.txt"
 if [ $JOINED -eq 1 ]; then
 	read -r -a server_words <<<"$SERVER_ARGS"
+	builder_stub=0
+	builders=""
 	for arg in "${server_words[@]}"; do
 		case "$arg" in
 			--hour=*|--map=*|--day-minutes=*|--weather=*|--season=*|--season-days=*|--max-players=*|--no-companions|--still-monsters)
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			# Builder mode's panel, joined (828 amended (11)): answers from StubClaude's script.
+			--builder-stub)
+				builder_stub=1
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			# Who may build besides a host: only beside --builder-stub (checked after the loop), and
+			# only the fixed test ids (70a70000-0000-4000-8000-<12 digits>, the client's --player-id),
+			# never a player's.
+			--builders=*)
+				ids="${arg#--builders=}"
+				[ -n "$ids" ] || { echo "--server-args $arg: refused (a test id, 70a70000-0000-4000-8000-<12 digits>)"; exit 2; }
+				IFS=, read -r -a id_words <<<"$ids"
+				for id in "${id_words[@]}"; do
+					[[ "$id" =~ ^70a70000-0000-4000-8000-[0-9]{12}$ ]] || { echo "--server-args $arg: refused ($id is not a fixed test id, 70a70000-0000-4000-8000-<12 digits>; never a player's)"; exit 2; }
+				done
+				builders="$arg"
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
 			# A tour's foe beside the player (828 amended (6)): under --tour only.
 			--test-foe=*)
@@ -281,9 +304,12 @@ if [ $JOINED -eq 1 ]; then
 			--test-hp)
 				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
-			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters; --test-foe=a,b, --sought-first and --test-hp with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters, --builder-stub, --builders=<test ids> with it; --test-foe=a,b, --sought-first and --test-hp with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
 		esac
 	done
+	# A laptop's server never makes a real builder request: --builders turns builder mode on only
+	# for a key in its environment, so it comes with the stub or not at all (828 amended (11)).
+	[ -z "$builders" ] || [ $builder_stub -eq 1 ] || { echo "--server-args $builders: refused without --builder-stub (a laptop's server never makes a real builder request)"; exit 2; }
 	# A tour's server is laid as the box's is (tour.sh's --regenerate), and marked as a test's
 	# (--run-marker: test-only verbs such as --test-hp's answer only beside one; 828 amended (8)).
 	# Marked, Regen lays only on an overlay of the run's own (dungeon's --overlay-dir, 541): one
