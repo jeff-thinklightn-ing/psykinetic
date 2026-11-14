@@ -48,7 +48,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2967)
+## Lines in the code (2971)
 
 ### companions (Pip, Wren, Nix) (659)
 
@@ -2115,7 +2115,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (778)
+### server and windows (781)
 
 | | Line | Where |
 |---|---|---|
@@ -2304,12 +2304,15 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are blessed, and take up the %s, uncharged | `main.gd` barrow_won() |
 |  | You are blessed | `main.gd` barrow_won() |
 |  | You stand over him again | `main.gd` barrow_won() |
-|  | You take the holy remains, for the altar. | `main.gd` barrow_won() |
-|  | %s takes the holy remains, for the altar. | `main.gd` barrow_won() |
+|  | You take the holy remains, %s. | `main.gd` barrow_won() |
+|  | %s takes the holy remains, %s. | `main.gd` barrow_won() |
 |  | There is no blessing on them, whatever passed down there. | `main.gd` RELIC_UNBLESSED |
-|  | You take the holy remains, for the altar. | `main.gd` remains_unpaid() |
-|  | %s takes the holy remains, for the altar. | `main.gd` remains_unpaid() |
+|  | You take the holy remains, %s. | `main.gd` remains_unpaid() |
+|  | %s takes the holy remains, %s. | `main.gd` remains_unpaid() |
 | L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd` SEPULCHER_PLAQUE |
+|  | Here rest the holy remains of %s, knight of Theus, until they are laid on the bier above. | `main.gd` SEPULCHER_PLAQUE_BIER |
+|  | for his bier | `main.gd` remains_for() |
+|  | for the altar | `main.gd` remains_for() |
 | U | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | L | the draugr's blessing | `main.gd` reset_barrow() |
 |  | the deal won | `main.gd` reset_barrow() |
@@ -2327,11 +2330,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | The hall's door opens. | `main.gd` _hold_hall_door() |
 |  | The way is shut until the fight is done. | `main.gd` HALL_WAY_HELD |
 |  | The throne is still his. | `main.gd` THRONE_HIS |
-|  | Bring his remains to the altar | `main.gd` ALTAR_STEP |
-|  | You lay %s remains on the altar. | `main.gd` _knight_thanks() |
-|  | %s lays %s remains on the altar. | `main.gd` _knight_thanks() |
-|  | laid on the knight's altar | `main.gd` _lay_remains() |
-|  | %s laid the remains of %s on the knight's altar in the crypt's First Hall. | `main.gd` _tell_priests_laid() |
+|  | Bring his remains to his bier | `main.gd` ALTAR_STEP |
+|  | You lay %s remains on the bier. | `main.gd` _knight_thanks() |
+|  | %s lays %s remains on the bier. | `main.gd` _knight_thanks() |
+|  | laid on the knight's bier | `main.gd` _lay_remains() |
+|  | %s laid the remains of %s on the bier in the crypt's First Hall. | `main.gd` _tell_priests_laid() |
 |  | The slab swings aside: a stair goes down into the dark. | `main.gd` _on_niche_pressed() |
 |  | Only the dead lie here. | `main.gd` _on_niche_pressed() |
 |  | You feel a cool draught coming from one of the niches. | `main.gd` _tell_draft() |
@@ -2359,8 +2362,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You are mortally wounded, and nobody here can save you. When you bleed out, you will be brought back. | `main.gd` _on_downed() |
 |  | All have fallen. | `main.gd` _all_fallen_tick() |
 |  | Your amulet is spent. Aldous charges it again when you bring him a holy knight's remains from below. | `main.gd` SPENT_LINE |
-|  | Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his altar. | `main.gd` SPENT_LINE_ALTAR |
-|  | You came back, and whole! These belong on the knight's altar, in the crypt's First Hall. Lay them there. | `main.gd` ALDOUS_BACK |
+|  | Your amulet is spent. The knight in the crypt's First Hall blesses it again when you lay a holy knight's remains on his bier. | `main.gd` SPENT_LINE_ALTAR |
+|  | You came back, and whole! These belong on the knight's bier, in the crypt's First Hall. Lay them there. | `main.gd` ALDOUS_BACK |
 |  | Not while there's fighting close by. | `main.gd` _start_channel() |
 |  | Not while there's fighting close by. | `main.gd` _start_channel() |
 |  | %s kneels beside %s. | `main.gd` _on_channel() |
@@ -2927,7 +2930,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | He rests. Come back in %d day%s. | `sim/draugr.gd` rest_words() |
 |  | He rests. Come back in %d minute%s. | `sim/draugr.gd` rest_words() |
 
-### the fallen knight (26)
+### the fallen knight (27)
 
 | | Line | Where |
 |---|---|---|
@@ -2939,10 +2942,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | L | The Mound-breakers are put down. | `sim/astral_knight.gd` TURN_IN_WORDS |
 | L | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest. | `sim/astral_knight.gd` REVEALED |
 | L | The way below is open to you. My remains wait in the Hall of Fallen Souls. | `sim/astral_knight.gd` DONE |
-|  | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this altar, and let me rest. | `sim/astral_knight.gd` REVEALED_ALTAR |
-|  | My remains wait in the Hall of Fallen Souls. Bring them here, to this altar. | `sim/astral_knight.gd` AWAIT |
-|  | Lay my remains on the altar | `sim/astral_knight.gd` LAY_TITLE |
-|  | You carry my bones. Lay them here, on the altar. | `sim/astral_knight.gd` LAY_WORDS |
+|  | Then you are strong enough. Here in this hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them here, to this bier, and let me rest. | `sim/astral_knight.gd` REVEALED_ALTAR |
+|  | My remains wait in the Hall of Fallen Souls. Bring them here, to this bier. | `sim/astral_knight.gd` AWAIT |
+|  | Lay my remains on the bier | `sim/astral_knight.gd` LAY_TITLE |
+|  | You carry my bones. Lay them here, on the bier. | `sim/astral_knight.gd` LAY_WORDS |
 |  | I am home. Thank you. | `sim/astral_knight.gd` LAID |
 |  | My bones are home. Go well. | `sim/astral_knight.gd` DONE_LAID |
 |  | I am home. Thank you. My blessing goes with you, on your amulet. | `sim/astral_knight.gd` LAID_QUEST |
@@ -2953,10 +2956,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You have not yet stood before what waits below. Keep these bones safe, and lay them here when you have. | `sim/astral_knight.gd` LAID_UNBLESSED |
 |  | %s takes up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
 |  | You take up the fallen knight's task. | `sim/astral_knight.gd` accept_offer() |
-|  | %s lays %s remains on the altar. | `sim/astral_knight.gd` accept_offer() |
-|  | You lay %s remains on the altar. | `sim/astral_knight.gd` accept_offer() |
+|  | %s lays %s remains on the bier. | `sim/astral_knight.gd` accept_offer() |
+|  | You lay %s remains on the bier. | `sim/astral_knight.gd` accept_offer() |
 |  | %s has proven their strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
 |  | You have proven your strength to the fallen knight. | `sim/astral_knight.gd` accept_offer() |
+|  | a brother knight's | `sim/astral_knight.gd` laid_whose() |
 
 ### the lawspeaker (21)
 
