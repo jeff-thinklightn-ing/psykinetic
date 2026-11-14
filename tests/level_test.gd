@@ -1138,8 +1138,9 @@ func _test_fill_hills() -> void:
 	var camps: Array = (area["buildings"] as Array).filter(func(b: Dictionary) -> bool: return str(b.get("kind", "")) == "camp")
 	var rests: Array = places.values().filter(func(p: Dictionary) -> bool: return p["kind"] == "rest")
 	_check(camps.size() == 2 and rests.size() == 2 and camps.all(func(b: Dictionary) -> bool:
-		return rests.any(func(p: Dictionary) -> bool: return p["cell"] == Level.camp_fire(b))),
-		"two rest camps, a rest place at each one's fire (%s)" % [rests.map(func(p: Dictionary) -> Vector2i: return p["cell"])])
+		return rests.any(func(p: Dictionary) -> bool:
+			return p.get("fire") == Level.camp_fire(b) and p["cell"] == Level.camp_fire(b) + (b["facing"] as Vector2i))),
+		"two rest camps, a rest place one cell in front of each one's fire (523 amended (3); %s)" % [rests.map(func(p: Dictionary) -> Vector2i: return p["cell"])])
 	var patches: Array = area["forage"]
 	var size: Vector2i = area["size"]
 	_check(patches.size() == 7 and patches.all(func(p: Dictionary) -> bool:
@@ -3728,9 +3729,18 @@ func _test_forest_camps() -> void:
 	_check(camps.size() == 7, "seven camps (%s)" % [camps.keys()])
 	_check(Factions.read().hostile("bandits", "town"), "the camps' holder, the bandits, is hostile to the town (793)")
 	var rects := {}
+	var fronts := {}
 	for building: Dictionary in forest["buildings"]:
 		if building.get("kind") == "camp":
 			rects[Level.camp_fire(building)] = building["rect"]
+			fronts[Level.camp_fire(building)] = Level.camp_fire(building) + (building["facing"] as Vector2i)
+	# Laid at its fire; loaded, the place stands one cell in front of it (523 amended (3)).
+	var placed: Array[String] = []
+	for key: String in camps:
+		var loaded: Dictionary = forest["places"].get(key, {})
+		if loaded.get("fire") != camps[key]["cell"] or loaded.get("cell") != fronts.get(camps[key]["cell"]):
+			placed.append("%s: %s, fire %s" % [key, loaded.get("cell"), loaded.get("fire")])
+	_check(placed.is_empty(), "each camp's place loaded one cell in front of its fire, the fire kept (%s)" % [placed])
 	var wrong: Array[String] = []
 	var band := {}
 	for spec: Dictionary in forest["entities"]:

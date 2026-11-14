@@ -19191,6 +19191,57 @@ off not; no fire cell, no heat; a camp laid as a town plot lit too); view_test's
 its socket flame inside the stones, its light). Tests with camps at night or
 senses run on the tip: companion_test, resident_test, larder_test.
 
+523 amended (3): nobody stands in a camp's fire (the coordinator's ruling of
+11-14, (a); ui-design's sheet on main 98c6da2e0 showed bandits at the forest's
+C3 and C4 on the ring's edge and in the flame, there before 523 amended (2)
+lit it; maps' yes to the places; label from tools/decision_number.sh). The
+cause: a camp's place cell was its fire, and the fire's cell was floor, light
+only (above), so a bandit's wander, a heeling companion, a lead or route to the
+place and a player could all stand in it. Taking the cell off the floor alone
+would have left every goal aimed at the place unroutable (World.find_path
+gives no path to a goal that is no floor), so the place moves first, two
+commits in one take. (i) Level.before_fires, in load_level after
+buildings_from: each place of kind "camp" or "rest" (BEFORE_FIRE_KINDS; 649's
+camps, 777's roadside rests) whose cell is a camp building's Level.camp_fire
+stands on the fire's front cell (the fire plus the camp's facing), the fire
+kept as its "fire"; places_from alone (the builder's, raw data) is
+unchanged. Readers checked: Level.camps_of (terrain "camps", Ambience's
+murmur "under the fire") reads the place's "fire" (it is worked out in _place,
+before the move, so on the fire either way); Fields.camp_fires_of,
+Main._warm_rests, Client3D.campfire_cells, WetLook and BuildingComposer._camp
+read Level.camp_fire from the building, not the place; the forest's traders
+(their own "_trader" places, cell plus facing the fire) are unchanged; the
+rest read the place's cell as a goal, a circle or a pin, one cell off
+(Main's lead goals ~9505 by reach, Holdings' route search, the camp held and
+cleared checks by radius, the cleared reward's pin, Guide, Herds, HillCat,
+TradeRoutes, RoadKnowledge), and now reach it. Maps checked the nine front
+cells (forest C1 to C7, the hills' bridge_camp and spur_camp; the wilds has
+none) free of decor, places, beds, entities, caches and markers, and drops the
+front cell from make_forest.gd's band spots in its next forest take.
+(ii) World, at a zone's terrain read, takes Fields.camp_fires_of (terrain
+"buildings" and "plot_buildings") out of its own floor; World.add_plot does
+the same for a plot's camp laid on a loaded zone and unplot puts it back
+("unstood", marked by Fields.load for a plot camp laid before the read), so a
+dropped camp leaves the floor as it found it. The terrain's floor keeps the
+cell (the view's ground and grass under the ring: Client3D counts a cell
+neither floor, solid nor rock as the forest), and it is no "solid", so sight
+crosses it. A body saved on a fire comes back on a free neighbour by the way
+it always did, Main._nearest_free (a player's record; the saved entities'
+_recall), which leaves a cell that is no floor for the nearest free one. A
+client reads the same terrain: protocol unchanged; the server and the client
+both carry it, so the server goes out with its cut. Umbrage's square fire is
+a terrain fire cell (World.is_fire, it burns) and is not this. Tests:
+level_test _test_camp_fires_unstood (the wilds, the forest and the hills:
+nothing laid on a fire or the place before it, the band's spots among the
+entities; each fire no floor to World and in the terrain's; a route from
+outside each camp to its place never through the fire; a body saved on it
+back beside it), _test_forest_camps and _test_fill_hills (the places one cell
+in front of their fires); monster_test _test_camp_fire_unstood (a brute homed
+beside the ring never picks it nor steps on it in 400 ticks; Heel.cell for a
+leader before it, back to it, beside it, never on it; a plot's camp added and
+dropped, the floor as before), by the floor alone with no refusal of their
+own (enemy-ai's _wander_goal refusal not built).
+
 ## 525. Relief: hills, valleys and ridges as data
 
 Jeff: "dirt having polys is not what i meant by elevation .. i meant hills

@@ -1049,6 +1049,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["regenerate"] = regenerate_from(config, warnings)
 	_check_anchors(level, warnings)
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
+	# Its camps' and rests' places before their fires, terrain["camps"] (_place) on them (523 amended (3)).
+	before_fires(level["places"], level["buildings"])
 	_lay_bridges(level)
 	_lay_solid(level)
 	_building_links(level, config, warnings)
@@ -1590,8 +1592,35 @@ static func camps_of(places: Dictionary) -> Array[Dictionary]:
 	for key: String in places:
 		var place: Dictionary = places[key]
 		if str(place.get("kind", "")) == "camp" and place.has("mix") and place.get("cell") is Vector2i:
-			out.append({"at": place["cell"], "mix": str(place["mix"])})
+			# Under the fire (the murmur's), not the place's cell before it (523 amended (3)).
+			out.append({"at": place.get("fire", place["cell"]), "mix": str(place["mix"])})
 	return out
+
+
+## The place kinds laid at a camp's fire (649's camps, 777's rests) that
+## stand before it instead (523 amended (3)).
+const BEFORE_FIRE_KINDS: Array[String] = ["camp", "rest"]
+
+
+## Each camp's or rest's place in [param places] whose cell is a camp
+## building's fire (Level.camp_fire, among [param buildings]) put on the
+## fire's front cell (the fire plus the camp's facing), the fire kept as its
+## "fire" (523 amended (3)): the fire's cell is no floor to World (nobody
+## stands in the flame), so a lead, a route or an arrival aimed at the place
+## ends before the fire, not in it. Other places as they are.
+static func before_fires(places: Dictionary, buildings: Array) -> void:
+	var fronts := {}
+	for building: Dictionary in buildings:
+		var fire := camp_fire(building)
+		if fire.x >= 0:
+			fronts[fire] = fire + (building.get("facing", Vector2i(0, 1)) as Vector2i)
+	if fronts.is_empty():
+		return
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if str(place.get("kind", "")) in BEFORE_FIRE_KINDS and fronts.has(place.get("cell")):
+			place["fire"] = place["cell"]
+			place["cell"] = fronts[place["cell"]]
 
 
 ## The rock shelters drawn at places (798 amended (4): the hills' hill cave):
