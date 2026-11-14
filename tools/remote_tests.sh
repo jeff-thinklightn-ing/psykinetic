@@ -12,9 +12,16 @@
 #   tools/remote_tests.sh prepare            send HEAD, check it out, import it
 #   tools/remote_tests.sh part <name>        suite | state_test | net_test, on HEAD
 #   tools/remote_tests.sh finish             give saturn's slot back
+#   tools/remote_tests.sh slot               take saturn's slot only (tests/remote_slot_test.sh's)
 #   tools/remote_tests.sh run                prepare, the three parts, finish
 # One landing's tests at a time there (a slot, ~/land/.busy, stale after 40
-# minutes; waited for 10). The timeouts there (slot 10 min, two imports 5
+# minutes; waited for 10). A slot whose landing is gone on this PC is taken
+# over at once (878 amended (1)): prepare tells saturn which trees are live
+# here (the land lock's holder beaten in the last 150 s, and every tree with a
+# running gate take) and whether this tree holds the lock; a holder that is
+# neither live nor this tree's own earlier take is taken over only when
+# nothing runs under ~/land/<holder> and the slot has gone 2 minutes
+# untouched, each one logged in saturn's ~/land/.slot_clears.log. The timeouts there (slot 10 min, two imports 5
 # each, the suite 20 with state_test's 15 beside it, net_test 10) sum under
 # the gate's 60 for suite_remote. A part prints the remote log and ends with
 #   REMOTE <name>: PASS|FAIL sha=<sha> <seconds>s
@@ -36,7 +43,15 @@ esac
 # What runs on saturn. Arguments: verb tree sha jobs [part]. Sent on stdin so
 # nothing is installed there but Godot and the clone.
 remote() {
-	"${SSH[@]}" "$HOST" bash -s -- "$@" <<'REMOTE'
+	if [ -n "${PSYKINETIC_REMOTE_HERE:-}" ]; then
+		remote_script | HOME="$PSYKINETIC_REMOTE_HERE" bash -s -- "$@"
+	else
+		remote_script | "${SSH[@]}" "$HOST" bash -s -- "$@"
+	fi
+}
+# tests/remote_slot_test.sh runs it here, its HOME a scratch folder (PSYKINETIC_REMOTE_HERE).
+remote_script() {
+	cat <<'REMOTE'
 set -u
 verb="$1"; tree="$2"; sha="$3"; jobs="$4"; part="${5:-}"
 export PATH="$HOME/.local/bin:$PATH"
@@ -55,14 +70,16 @@ trap 'trap - TERM HUP INT; end_session' HUP TERM INT
 # What an earlier run left in a tree's checkout (its shell died with the
 # connection, its Godots ran on): this user's processes whose folder is that
 # checkout, stopped by id.
-stop_leftovers() {
-	left=""
+running_in() {
 	for p in /proc/[0-9]*; do
 		pid="${p#/proc/}"
 		[ "$pid" = "$$" ] && continue
 		c="$(readlink "$p/cwd" 2>/dev/null)" || continue
-		case "$c" in "$1"|"$1"/*) left="$left $pid" ;; esac
+		case "$c" in "$1"|"$1"/*) printf ' %s' "$pid" ;; esac
 	done
+}
+stop_leftovers() {
+	left="$(running_in "$1")"
 	[ -n "$left" ] || return 0
 	echo "remote: stopping what an earlier run left in $1:$left"
 	kill -TERM $left 2>/dev/null; sleep 3; kill -KILL $left 2>/dev/null
@@ -71,11 +88,44 @@ stop_leftovers() {
 
 holder() { cat "$BUSY/holder" 2>/dev/null; }
 mine() { [ "$(holder)" = "$tree $sha" ]; }
+# 878 amended (1): what this PC said with prepare ("live=a,b;mine=1"; nothing
+# said, nothing taken over early). A holder is gone when its tree is not live
+# here (no land-lock beat in 150 s and no gate take: both signs, never one),
+# or is this tree's own earlier take while this take holds the land lock.
+said_live=""; said_mine=""; said_wait=600; said_any=""
+case "${part:-}" in
+live=*|wait=*)
+	for each in $(printf '%s' "$part" | tr ';' ' '); do
+		case "$each" in
+		live=*) said_live=",${each#live=},"; said_any=1 ;;
+		mine=*) said_mine="${each#mine=}" ;;
+		wait=*) said_wait="${each#wait=}" ;;
+		esac
+	done
+	;;
+esac
+gone_why() {
+	[ -n "$said_any" ] || return 1
+	case "$1" in
+	"$tree") [ "$2" != "$sha" ] && [ "$said_mine" = 1 ] && echo "this tree's earlier take; this take holds the land lock" ;;
+	*) case "$said_live" in *",$1,"*) return 1 ;; esac
+		echo "no land-lock beat in 150 s and no gate take" ;;
+	esac
+}
 take_slot() {
 	waited=0
 	while ! mkdir "$BUSY" 2>/dev/null; do
 		if mine; then return 0; fi
 		age=$(( $(date +%s) - $(stat -c %Y "$BUSY" 2>/dev/null || echo 0) ))
+		other="$(holder)"
+		why=""
+		[ "$age" -ge 120 ] && [ -n "$other" ] && why="$(gone_why "${other%% *}" "${other#* }")"
+		if [ -n "$why" ] && [ -z "$(running_in "$HOME/land/${other%% *}")" ] && [ "$(holder)" = "$other" ]; then
+			echo "$(date '+%Y-%m-%d %H:%M:%S') taken over by $tree $sha from '$other' ($age s untouched): its landing gone on the PC ($why), nothing running under ~/land/${other%% *}" >>"$HOME/land/.slot_clears.log"
+			echo "remote: the slot held by '$other' ($age s untouched) taken over: its landing is gone on the PC ($why)"
+			rm -rf "$BUSY"
+			continue
+		fi
 		if [ "$age" -gt 2400 ]; then
 			echo "remote: the slot held by '$(holder)' is $age s old: taken over"
 			other="$(holder)"; other="${other%% *}"
@@ -83,7 +133,7 @@ take_slot() {
 			rm -rf "$BUSY"
 			continue
 		fi
-		[ "$waited" -ge 600 ] && { echo "remote: saturn's slot is held by '$(holder)' ($age s); waited 10 minutes"; return 1; }
+		[ "$waited" -ge "$said_wait" ] && { echo "remote: saturn's slot is held by '$(holder)' ($age s); waited $(( said_wait / 60 )) minutes"; return 1; }
 		sleep 5; waited=$(( waited + 5 ))
 	done
 	echo "$tree $sha" > "$BUSY/holder"
@@ -97,6 +147,10 @@ available)
 	;;
 has)
 	git -C "$REPO" cat-file -e "$sha^{commit}" 2>/dev/null
+	;;
+slot)
+	take_slot || exit 1
+	echo "remote: the slot is $tree's for $sha"
 	;;
 prepare)
 	take_slot || exit 1
@@ -165,6 +219,39 @@ REMOTE
 }
 
 sha="$(git rev-parse HEAD)" || exit 1
+# 878 amended (1): the trees whose landings are live on this PC, for saturn's
+# slot: the land lock's holder when beaten in the last 150 s, and every tree
+# with a running gate take (the gate drops the dead and those from before a
+# boot). With "mine=1" when this tree holds the lock. Nothing printed when
+# either can't be read: saturn then takes nothing over early.
+live_here() {
+	lock="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}"
+	owner=""; mine=0
+	if [ -d "$lock" ]; then
+		owner="$(cat "$lock/owner" 2>/dev/null)"
+		since="$(cat "$lock/since" 2>/dev/null)"
+		[ "$owner" = "$tree" ] && mine=1
+		case "$since" in ''|*[!0-9]*) return 1 ;; esac
+		[ $(( $(date +%s) - since )) -le 150 ] || owner=""
+	fi
+	gate="$(python -B -c "
+import sys
+sys.path.insert(0, 'tools')
+import heavy_job as gate
+with gate.StateLock():
+    print(','.join(sorted({each['tree'] for each in gate._entries('running')})))
+" 2>/dev/null)" || return 1
+	case "$owner,$gate" in *[!A-Za-z0-9_.,-]*) return 1 ;; esac
+	echo "live=$owner,$gate;mine=$mine"
+}
+# What prepare tells saturn's slot: the live list, and a test's own wait (tests/remote_slot_test.sh;
+# a landing never sets PSYKINETIC_REMOTE_SLOT_WAIT, so its prepare waits the 10 minutes).
+slot_said() {
+	said="$(live_here)"
+	[ -n "${PSYKINETIC_REMOTE_SLOT_WAIT:-}" ] && said="${said:-live_unread=1};wait=$PSYKINETIC_REMOTE_SLOT_WAIT"
+	case "$said" in live_unread=*) said="wait=${said#*;wait=}" ;; esac
+	printf '%s' "$said"
+}
 # Tracked files changed and not committed, less the pages a landing
 # regenerates (no Godot test reads them): the commit is what saturn tests.
 uncommitted() {
@@ -212,7 +299,11 @@ prepare)
 		fi
 		( cd "$tmp" && "${SCP[@]}" "$tree.bundle" "$HOST:land/.in/$tree.bundle" ) || { echo "remote_tests: could not send the bundle"; exit 1; }
 	fi
-	remote prepare "$tree" "$sha" "$JOBS"
+	remote prepare "$tree" "$sha" "$JOBS" "$(slot_said)"
+	;;
+slot)
+	# tests/remote_slot_test.sh's: take saturn's slot only, as prepare would.
+	remote slot "$tree" "$sha" "$JOBS" "$(slot_said)"
 	;;
 part)
 	name="${2:-}"

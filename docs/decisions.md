@@ -53656,6 +53656,30 @@ whole, T10 not taken for T1) and _test_answer_panel (the fault block and its Ent
 three and "7 more", unfolded in place; four shown whole; a chip, not its mark; a coordinate whole; an
 old server's summary). New class_name: BuilderPanel. Tools only (builder mode is Jeff's): no package,
 no bullet.
+
+878 amended (1): saturn's slot is taken over at once from a landing gone on this PC (release's ask and conditions, the
+coordinator's approval and its added case, 2026-11-13; label from tools/decision_number.sh). perf-timed's landing lost
+its turn at 22:50: its prepare waited the full 10 minutes on a slot ("physics 2b928b9f7", 1332 s) whose landing had
+died with the PC's restart, and the slot goes stale only 40 minutes after its last touch, so every landing in that
+window could lose its turn the same way; release cleared it by hand at 22:52. Saturn can't see this PC's lock or gate,
+so the PC says what is live: tools/remote_tests.sh's prepare sends "live=<trees>;mine=<0|1>": the land lock's holder
+when beaten in the last 150 s, every tree with a running gate take (the gate drops the dead and those from before a
+boot), and whether this tree holds the lock. Nothing is sent when either can't be read, and then nothing is taken over
+early. Saturn's take_slot takes a held slot over at once only when its holder is gone (another tree in neither list:
+both signs, never one, release's condition, since a landing between its gate take and its lock take holds no lock yet;
+or this tree's own earlier sha while this take holds the lock, the coordinator's case), the slot has gone 2 minutes
+untouched (a live part touches it at its start and end), nothing of this user's runs under ~/land/<holder> (by /proc
+cwd, as release checked by hand; nothing is stopped) and the holder line is unchanged when read again. Each takeover is
+a line in ~/land/.slot_clears.log, the log release's hand clear wrote. The 40-minute takeover stays as the backstop.
+All of it runs inside a landing's own ssh run; nothing else is written on saturn. The saturn side is sent through
+remote_script, so tests/remote_slot_test.sh runs it here with a scratch HOME (PSYKINETIC_REMOTE_HERE), a scratch lock
+and a scratch gate, through a new verb `slot` (take the slot only): taken over with no lock and no take, and with the
+lock unbeaten 200 s; waits with the lock beaten 30 s ago, with a live gate take (lock unbeaten or none), when touched
+60 s ago, with a process under ~/land/<holder> (left alive), and with the lock unreadable; this tree's own earlier sha
+taken over while it holds the lock, and kept when another tree holds it; three takeovers logged. land.sh runs it only
+when a take changes tools/remote_tests.sh or the test. Tools and tests only; protocol unchanged; no class_name; no
+bullet.
+
 ## 879. A level link's cell is a step only as the goal
 
 A level link's cell is a player's way out alone (571): World.try_move refuses any other body onto one,

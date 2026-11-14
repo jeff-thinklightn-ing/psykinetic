@@ -200,6 +200,13 @@ if git diff --name-only origin/main...HEAD -- tools/land_push.sh tools/land_lock
 else
 	echo "land_push_test: not run (the take changes none of tools/land_push.sh, land_lock.sh, bench_lock.sh or its test)"
 fi
+# Saturn's slot taken from a landing gone here (878 amended (1)), about 30 s: only when the take
+# changes tools/remote_tests.sh or the test.
+if git diff --name-only origin/main...HEAD -- tools/remote_tests.sh tests/remote_slot_test.sh 2>/dev/null | grep -q .; then
+	tool_part remote_slot_test bash tests/remote_slot_test.sh
+else
+	echo "remote_slot_test: not run (the take changes neither tools/remote_tests.sh nor its test)"
+fi
 # The retry's own test (278 amended (8)), about 15 s: only when the take changes land.sh, the retry or the test.
 if git diff --name-only origin/main...HEAD -- tests/land.sh tests/land_retry.sh tests/land_retry_test.sh 2>/dev/null | grep -q .; then
 	tool_part land_retry_test bash tests/land_retry_test.sh
