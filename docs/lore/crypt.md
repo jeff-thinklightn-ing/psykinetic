@@ -124,6 +124,13 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
 - **[Jeff]** Skeletons protect the altar in return.
 - **[Jeff]** Robbers and skeletons are both hostile to Pip.
 - **[Jeff]** A hidden passage in the altar room leads deeper, to the draugr's lair.
+  (2026-11-14, Jeff: "in the crypt we dont even need the room that has two guards a chest and a knight
+  anymore -- remove it all together": the Low Hall, the old altar room, is gone, with its two
+  skeleton guards, in dungeon's package "the crypt without the old altar room"; the offering stone
+  stands in the First Hall. The way down is in the First Hall since 747 amended (8), as his approved
+  reveal has it ("the niche that breathes cold air hides the way down to the Ossuary"; Jeff 11-14: "the
+  niche is in the first room around the altar"; the hidden link at (52,16)). This line is kept as his
+  words of its day.)
 - **[Jeff]** You talk to the draugr first and take his deal. If you defeat him, he
   blesses you or your companion, and the blessed can be brought back without the
   gold offering.
@@ -192,6 +199,13 @@ Companion files: `castle.md` (the labyrinths, the other delve-again place),
 - **[Jeff]** A shortcut from the temple to the draugr's room, unlocked from the
   draugr's side, for later trips.
 - **[Jeff]** The altar room, with a hidden passage leading deeper to the draugr's lair.
+  (2026-11-14, Jeff: "in the crypt we dont even need the room that has two guards a chest and a knight
+  anymore -- remove it all together": the Low Hall, the old altar room, is gone, with its two
+  skeleton guards, in dungeon's package "the crypt without the old altar room"; the offering stone
+  stands in the First Hall. The way down is in the First Hall since 747 amended (8), as his approved
+  reveal has it ("the niche that breathes cold air hides the way down to the Ossuary"; Jeff 11-14: "the
+  niche is in the first room around the altar"; the hidden link at (52,16)). This line is kept as his
+  words of its day.)
 - **[proposal]** Fixed anchors: the mound's entrance, the altar room and its hidden
   passage, the draugr's lair, and the shortcut's two ends. The halls between
   regenerate.

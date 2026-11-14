@@ -279,7 +279,7 @@
 				},
 				{
 					"id": "crypt.pip_carries",
-					"text": "Pip carries the temple's offering down into the crypt and lays it on the offering stone in the Low Hall.",
+					"text": "Pip carries the temple's offering down into the crypt and lays it on the offering stone in the First Hall.",
 					"known": "secret",
 					"where": [],
 					"knowers": [
