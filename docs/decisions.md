@@ -53800,6 +53800,42 @@ Jeff's pick moves these checks with it. No other test pins a body's
 strength through that field. Tests only; protocol unchanged; no class_name;
 no bullet.
 
+## 603 amended (9), combat's side: a wall at your back leaves a sliver
+
+Jeff's pick on the draugr's wall page (C:/dev/review/answered_pages/draugr-wall.md,
+2026-11-13 23:58 UTC): B, no words added. The wall costs 9 instead of 14 or
+15, so the whole spin leaves a rested player 3 of 20, and the throw is a
+little gentler, still about three cells. The lever is the spin's own
+impulse_scale (levels/combat.json moves.spin and World.moves), 1.06 to 0.84;
+physics' impact_per_energy and swing_impulse, which every wall hit, throw
+and fall reads, are untouched (physics' word: the spin's knob is combat's).
+The wall's cost grows faster than the scale, so the number came from a
+probe of the real draugr on saturn, not from the formula (rows in
+C:/dev/review/combat/saturn/wall_probe/zz_wall_probe.log). At 0.84, on an
+80 kg player at full:
+- rested, bare: thrown 3 cells at 1.87 (2.36 before); beside him and swept
+  into a wall, 8 for the blow and 9 for the wall, 3 of 20 left;
+- rested, in plate (100 kg): 2 cells at 1.50, the wall 7, 5 left (12 and
+  down before): never worse than bare;
+- exhausted (stamina 0), bare: 6 cells at 3.74, the wall 20 (32 before),
+  still killed from full. Jeff's pick was about the rested player; out of
+  breath at a wall against the draugr still kills, and the checklist and
+  the bullet say so.
+World.told_impulses' dearest wall for him is now 10 (17 before), the
+wall_cost of his push met at once on a rested 80 kg body, which only
+decides throws_into_walls (906; he still throws into walls, companions'
+flank lines read it); no player is told that number. Only the draugr's
+spin moves: the great bear's and the boar king's dearest walls stay 9,
+pinned. No new line for the knight's spirit (that was A's).
+
+combat_test: _test_spin_throws pins bare 3 cells and 9 + 3 left, plate's
+wall below bare's and its hp left at or above, exhausted still killed;
+_test_spin's one beside is hurt and alive; _test_throws_into_walls pins the
+draugr's 10 and the bear's and boar king's 9. Server only (World.moves is
+the server's); protocol unchanged; no new class_name. Its bullet, in
+voice's words, ships on playtest's joined look (back to the wall south of
+his seat, the spin taken rested, alive at 3).
+
 ## 906: World.throws_into_walls, a foe whose told moves make a wall cost
 
 companions' 891 shout sends a flanked player's back to a wall ("Get a wall

@@ -1944,14 +1944,17 @@ func _real_draugr(at: Vector2i) -> Monster:
 ## moved): its blow skips the floor (apply_blow's no_floor) and impulse_scale
 ## is 1.0, his 140 swing whole, so a rested,
 ## unarmoured 80 kg player ahead is thrown and one in plate moves less: mass
-## still decides how far. One beside swept into the wall: 603 amended (4)
-## meant a sliver (3 of 20) on a strength-0 boss; the real draugr (603
-## amended (8)) adds his strength's share, and the wall takes her down from
-## full, as the game does today, until Jeff picks. The exhausted wall hit is
-## printed for Jeff's checklist.
+## still decides how far. One beside swept into the wall: Jeff's B (603
+## amended (9)), impulse_scale 0.84 on the real draugr (8): rested and bare,
+## 8 for the blow and 9 for the wall, 3 of 20 left, the one ahead still
+## thrown three cells; in plate the wall costs less and leaves more, never
+## worse than bare. Exhausted, the wall still kills from full (20, was 32):
+## Jeff's pick was the rested player's.
 func _test_spin_throws() -> void:
-	print("\n== the spin throws an 80 kg player, rested and bare; plate moves less (603 amended (4), the real draugr (8)) ==")
+	print("\n== the spin throws an 80 kg player, rested and bare; plate moves less; a wall leaves a sliver (603 amended (4), (8), (9)) ==")
 	var cells := {}
+	var left := {}  # Armour -> the one beside's hp after the wall (0 down or killed).
+	var walls := {}  # Armour -> the wall's impact on the one beside.
 	for armour: String in ["", "plate_armour", "exhausted"]:
 		var e := _build(["##############", "#........P...#", "#.......P.P..#", "#............#", "##############"])  # Room ahead to show the distance.
 		var boss := _real_draugr(Vector2i(9, 2))  # 603 amended (8): strength 6, 120 kg, his 7 kg battle axe.
@@ -1983,21 +1986,25 @@ func _test_spin_throws() -> void:
 		World.blow_resolved.disconnect(heard)
 		World.entity_pushed.disconnect(walled)
 		cells[armour] = [World.distance(from, front.tile), float(speeds.get("speed", 0.0))]
+		left[armour] = side.hp if side.spawned else 0
+		walls[armour] = int(speeds.get("wall", -1))
 		print("    %s: %.1f kg, %d cell(s) at %.2f; beside, the wall's impact %d" % [armour if armour else "bare", front.mass, cells[armour][0],
 				cells[armour][1], int(speeds.get("wall", -1))])
 		if armour.is_empty():
-			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] >= 2 and World.is_down(front),
-					"80 kg, rested, bare: thrown %d cells (%.2f) and knocked down" % [cells[armour][0], cells[armour][1]])
-			# Today's game, as the barrow's draugr throws (603 amended (8)): his
-			# strength's share on his swing, so the wall costs 14 or more and
-			# 8 + that takes a rested player from full to down. Jeff's pick (the
-			# sliver of 603 amended (4), or this) moves this check with it.
-			_check(int(speeds.get("wall", 0)) >= 13 and side.hp == 0 and hp == 20,
-					"the one beside, swept into the wall from full: the wall's impact %d, 8 + that, down (%d of %d left)" % [
-					int(speeds.get("wall", 0)), side.hp, hp])
+			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] == 3 and World.is_down(front),
+					"80 kg, rested, bare: thrown about three cells (%d at %.2f) and knocked down (603 amended (9): 3 at 1.87; 3 at 2.36 before)" % [
+					cells[armour][0], cells[armour][1]])
+			# Jeff's B (603 amended (9)): 8 for the blow, 9 for the wall, 3 of 20 left.
+			_check(walls[armour] == 9 and left[armour] == 3 and hp == 20,
+					"the one beside, swept into the wall from full: the wall's impact %d, 8 + that, alive at %d of %d (Jeff's B)" % [
+					walls[armour], left[armour], hp])
 		elif armour == "exhausted":
 			print("    exhausted (stamina 0), 80 kg, bare: thrown %d cells at %.2f; swept into the wall from %d: %s" % [cells[armour][0], cells[armour][1], hp,
 					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])
+	_check(walls["plate_armour"] < walls[""] and left["plate_armour"] >= left[""],
+			"in plate, rested: the wall costs %d and leaves %d, never worse than bare (%d, %d left)" % [walls["plate_armour"], left["plate_armour"], walls[""], left[""]])
+	_check(walls["exhausted"] > walls[""] and left["exhausted"] == 0,
+			"exhausted, bare: the wall costs %d and still kills from full (603 amended (9): Jeff's pick was the rested player's)" % walls["exhausted"])
 	_check(cells["plate_armour"][1] < cells[""][1] and cells["plate_armour"][0] >= 1 and cells["plate_armour"][0] <= cells[""][0],
 			"in plate, heavier: slower and no farther, yet thrown (%.3f, %d cells; bare %.3f, %d)" % [cells["plate_armour"][1], cells["plate_armour"][0], cells[""][1], cells[""][0]])
 
@@ -2725,7 +2732,9 @@ func _test_throws_into_walls() -> void:
 		for impulse in World.told_impulses(body):
 			most = maxi(most, World.wall_cost(impulse))
 		return most
-	_check(World.throws_into_walls(draugr), "the draugr, his axe in hand: throws into walls (his dearest wall %d)" % dearest.call(draugr))
+	_check(World.throws_into_walls(draugr) and dearest.call(draugr) == 10,
+			"the draugr, his axe in hand: throws into walls, his dearest wall 10 (told on a rested 80 kg body met at once; 17 before 603 amended (9)) (%d)" % dearest.call(draugr))
+	var pinned := {"great_bear": 9, "boar_king": 9}  # 603 amended (9) moved the draugr's spin alone: these stay.
 	for kind: String in ["great_bear", "boar_king", "hill_cat", "old_wolf", "robber", "wolf"]:
 		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
 		var script: Script = load(str(spec.get("script", "res://sim/monster.gd")))
@@ -2733,6 +2742,8 @@ func _test_throws_into_walls() -> void:
 		var want := kind in ["great_bear", "boar_king"]
 		_check(World.throws_into_walls(body) == want, "the %s: %s (its dearest wall %d, %s)" % [kind,
 				"throws into walls" if want else "never", dearest.call(body), str(spec.get("script", "res://sim/monster.gd")).get_file()])
+		if kind in pinned:
+			_check(dearest.call(body) == int(pinned[kind]), "the %s's dearest wall still %d, the draugr's knob his spin's alone (%d)" % [kind, pinned[kind], dearest.call(body)])
 		body.free()
 	var slot := World._axe_slot(draugr)
 	World.set_slots(draugr, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
@@ -2835,7 +2846,7 @@ func _test_spin() -> void:
 			"at 15: ahead, beside and behind struck (%d, %d, %d)" % [front.hp, side.hp, behind.hp])
 	_check(boss.spawned and boss.hp == boss.max_hp, "and never himself")
 	_check(World.is_down(front) and front.tile != Vector2i(3, 2), "the one ahead knocked down and thrown (%s)" % front.tile)
-	_check(side.hp == 0, "the one beside, swept into the wall from full: down, as the barrow's draugr does today (%d; 603 amended (8))" % side.hp)
+	_check(side.hp > 0 and side.hp < hp[1 + 1], "the one beside, swept into the wall from full: hurt, alive (%d of %d; Jeff's B, 603 amended (9))" % [side.hp, hp[1 + 1]])
 	_check(boss.stamina <= 10 and World.is_winded(boss), "spent: %d stamina, winded" % boss.stamina)
 	_check(not World.try_spin(boss), "winded: no spin")
 	_check(World.telegraphs().is_empty(), "its telegraph over")

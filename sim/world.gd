@@ -470,7 +470,7 @@ var _steady_after: Dictionary = {}  # Monster -> true: staggered, steadied as it
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
 	"spin": {"windup": 15, "length": 2.0, "half_angle": 180.0, "fists_length": 1.0, "damage_scale": 2.5,
-		"down_ticks": 15, "needs": 50, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 1.06},
+		"down_ticks": 15, "needs": 50, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 0.84},
 	"throw": {"windup": 12, "length": 8.0, "width": 1, "damage_scale": 2.0, "cost": 40, "speed": 14.0},
 	"charge": {"roar": 6, "cells": 12},
 }
@@ -6073,7 +6073,7 @@ func _spin_impulse(by: GridEntity) -> float:
 	var impulse := blow_impulse(by, blow_verb(by)) + (Items.weight_of(id) if not id.is_empty() else 0.0) * float(move["weight_impulse"])
 	if has_method("swing_impulse") and not id.is_empty():
 		impulse = float(call("swing_impulse", by, id))  # Physics' (605), when it is in.
-	return impulse * float(move.get("impulse_scale", 1.0))  # Jeff's knob (a wall's impact grows with its square).
+	return impulse * float(move.get("impulse_scale", 1.0))  # Jeff's knob: 0.84, his B (603 amended (9)); a wall's impact grows faster than it.
 
 
 ## The mass a wall's cost is judged on (decision 906): a rested, unarmoured
@@ -6087,7 +6087,8 @@ const WALL_COST_AT := 5
 ## that the wall costs more than a scratch (decision 906; companions' 891
 ## amended (1) reads it, so her flank lines never send her player's back to
 ## a wall against such a foe): any of its told_impulses whose wall_cost is
-## WALL_COST_AT or more. Today the draugr (his spin, 14 to 15 at a wall),
+## WALL_COST_AT or more. Today the draugr (his spin, told 10; 9 at a rested
+## bare player's back since Jeff's B, 603 amended (9)),
 ## the great bear (swipe and charge 9, slam 5) and the boar king (charge 9);
 ## not the hill cat (pounce 2), the old wolf (drag 2), nor any plain blow
 ## (under knockback_min_force: no push, so a wall costs nothing). Read from
