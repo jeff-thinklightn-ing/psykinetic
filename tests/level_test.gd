@@ -6905,6 +6905,23 @@ func _test_full_circle_on() -> void:
 				on_him.append(cell)
 	_check(bier.has_area() and knight != null and World.get_entity_at(knight.tile) == knight and on_him.is_empty(),
 		"from any cell near the bier, the cell to lay from is never the knight's (%s, from %s)" % [knight.tile if knight != null else World.NO_CELL, on_him])
+	# A click on the bier sends with any holy knight's remains in the pack,
+	# not only the quest's ready step (playtest's look_circle: a later run's
+	# or a brother's were never sent, nor refused aloud).
+	var walker := _player()
+	if walker != null and bier.has_area():
+		var stand: Vector2i = _main.altar_beside(bier, walker.tile)
+		_put(walker, stand)
+		var had_quest: Dictionary = walker.quest
+		walker.quest = {}
+		_drop_relics(walker)
+		var bare: bool = _main._altar_click(walker, Vector2i(38, 8))
+		var brother: int = World.mint_relic("Sir Ansel the Faithful", 0, walker)
+		World.into_pack(walker, brother)
+		var carrying: bool = _main._altar_click(walker, Vector2i(38, 8))
+		_check(not bare and carrying, "a click on the bier: with nothing to lay it walks; with a brother's remains in the pack, no quest ready, it asks the server (%s, %s)" % [bare, carrying])
+		_drop_relics(walker)
+		walker.quest = had_quest
 	_main.load_map("test_room")
 
 

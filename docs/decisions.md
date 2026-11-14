@@ -53781,6 +53781,11 @@ default now; a test turns them off by the switch or each by hand.
   there is laid from it: AstralKnight.remains_laid alone was a kept prop, and a level entity's
   props come from its spawn table at load (_level_spec_for), so a restart left the bier bare
   (found by 747 amended (11)'s test on saturn, 11-13).
+- A click or E on the bier (Main._altar_click) asks the server whenever the local player carries
+  a holy knight's remains (World.RELIC in their pack), not only at the quest's ready step: a later
+  run's own or a brother's (896 amended (1)) were laid by no click and refused by no word before
+  (playtest's look_circle on 31e35af1b). The server lays them or the knight says why not
+  (Main._lay_again). His row stays the quest's: off the quest, the bier is the way.
 - The cell to lay from (Main.altar_beside, the coordinator's word): never a cell another body
   holds, the knight's among them; the one held cell it names is the caller's own, held by a
   player. Before, any cell named as the caller's counted as free, so a player put on his cell (a

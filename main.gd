@@ -24763,13 +24763,18 @@ var _throne_wanted := NONE
 
 
 ## A left click or E on the knight's altar (896): with his remains on the
-## local player and the altar step theirs (Player.quest's card shows it
-## ready), beside it asked of the server at once, else walked beside first
-## and asked on arrival (_update_altar). False when the cell is no altar,
-## the altar step is off (altar_turn_in) or not ready: the click walks.
+## local player (the altar step theirs, Player.quest's card ready) or any
+## holy knight's remains in their pack (896 amended (1): his own on a later
+## run, a brother's; the server lays them or the knight says why not:
+## Main._lay_again), beside it asked of the server at once, else walked
+## beside first and asked on arrival (_update_altar). False when the cell
+## is no altar, the altar step is off (altar_turn_in) or nothing is carried
+## to lay: the click walks. (Before, only the card's ready step sent, so a
+## later run's or a brother's remains were never laid, nor refused aloud:
+## playtest's look_circle on 31e35af1b.)
 func _altar_click(player: Player, tile: Vector2i) -> bool:
 	_altar_wanted = NONE
-	if not altar_turn_in or tile == NONE or not bool(player.quest.get("ready", false)):
+	if not altar_turn_in or tile == NONE or not (bool(player.quest.get("ready", false)) or World.RELIC in player.slots):
 		return false
 	var bier := knights_altar(map_name)
 	if not bier.has_point(tile):
