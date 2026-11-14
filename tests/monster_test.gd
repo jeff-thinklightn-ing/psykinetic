@@ -3690,8 +3690,11 @@ func _test_wild_kinds() -> void:
 	_check(Animal.is_wild("deer") and Animal.is_wild("wolf") and not Animal.is_wild("imp"), "deer and wolves are wild, imps not")
 	var labels := ["deer", "stag", "boar", "rabbit", "wolf", "imp"].map(
 			func(kind: String) -> String: return str(Level._spec_for("monster_" + kind, Level.MONSTER_TYPES).get("label", "")))
-	_check(labels == ["Wild doe", "Wild stag", "Wild boar", "Wild rabbit", "Wolf", ""],
-			"an animal's spec is labelled by its kind, no number; an imp's not (%s)" % [labels])
+	# The plate row (11-13): an imp has its kind's label too, so a plate names
+	# what a creature is, never a number: two imps both read "Imp", as two
+	# wolves read "Wolf"; a named one (716) its own name.
+	_check(labels == ["Wild doe", "Wild stag", "Wild boar", "Wild rabbit", "Wolf", "Imp"],
+			"a spec is labelled by its kind, no number, an imp's too (%s)" % [labels])
 	_check(["deer", "stag", "boar", "rabbit", "wolf"].all(func(kind: String) -> bool: return Monster.art_of(kind) == "creature." + kind),
 			"each animal names its creature slot")
 	_check(Level._spec_for("monster_deer", Level.MONSTER_TYPES)["script"] == Level.ANIMAL

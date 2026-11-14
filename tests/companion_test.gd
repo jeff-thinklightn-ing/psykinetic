@@ -8822,7 +8822,7 @@ func _test_death_triggers() -> void:
 	World.despawn(imps[0])  # Out of her sight from where she stands (_test_senses has that).
 	World.damage(brute, 999)
 	World.step()
-	_check(mind.triggers("voice").size() == 2 and "the brute" in mind.triggers("voice").back(), "the brute dies, by its kind, never its node name (752, dungeon's side): her voice (%s)" % [mind.triggers("voice")])
+	_check(mind.triggers("voice").size() == 2 and "the orc" in mind.triggers("voice").back(), "the brute dies, by its label (the plate row, 11-13: \"the orc\"), never its node name (752, dungeon's side): her voice (%s)" % [mind.triggers("voice")])
 	World.damage(imps[1], 999)
 	World.step()
 	_check(mind.triggers("voice").size() == 3 and "the last of them" in mind.triggers("voice").back(),

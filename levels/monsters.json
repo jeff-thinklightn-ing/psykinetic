@@ -4,6 +4,7 @@
 		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
 		"band_min": 3, "lead_ticks": 3, "strike_recover_ticks": 4, "settle_ticks": 1},
 	"imp": {
+		"label": "Imp",
 		"body": {"max_hp": 20, "mass": 40.0},
 		"tactic": "dart",
 		"idle": "wander",
@@ -17,6 +18,7 @@
 		"aim_hold_max": 12
 	},
 	"brute": {
+		"label": "Orc",
 		"body": {"max_hp": 22, "mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
 		"tactic": "heavy",
 		"idle": "guard",
@@ -30,6 +32,7 @@
 		"aim_hold_max": 8
 	},
 	"sneak": {
+		"label": "Kobold",
 		"body": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 14},
 		"tactic": "flank",
 		"idle": "patrol",
@@ -74,7 +77,7 @@
 		"drops": [{"item": "meat", "count": [3, 4]}, {"item": "hide", "count": [1, 1]}, {"item": "tusks", "count": [1, 1]}]
 	},
 	"wolf": {
-		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
+		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "plural": "Wolves", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
 		"body": {"mass": 40.0, "max_hp": 20, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
 		"senses": {"cone": 160, "night": 0.6, "hearing": 1.5, "alert_sight": 2, "notice": 1.2},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 15,
@@ -166,7 +169,7 @@
 	},
 	"skeleton_guard": {
 		"bound": true,
-		"label": "Barrow guard",
+		"label": "Crypt guard",
 		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 18, "attack_damage": 2, "sight_range": 5},
 		"fight": {"lead_ticks": 6},
 		"tactic": "plain",
@@ -266,6 +269,7 @@
 		"bound": true,
 		"boss": true,
 		"label": "Draugr",
+		"plural": "Draugr",
 		"script": "res://sim/draugr.gd",
 		"never_lies": true,
 		"body": {"mass": 120.0, "move_ticks": 4.5, "max_hp": 30, "attack_ticks": 14, "attack_damage": 3, "sight_range": 5, "max_stamina": 100},

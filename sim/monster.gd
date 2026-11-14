@@ -966,7 +966,7 @@ func begin_ambush(on: GridEntity) -> bool:
 	_ambush = {"move": &"ambush", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": aim,
 		"cells": [aim] as Array[Vector2i], "from": World.tick, "at": tile}
 	_cry(&"ambush", int(ambush["cue_reach"]))
-	print("[ambush] %s winds up at %s on %s at %s, lands in %d ticks" % [name, tile, on.name, aim, ticks])
+	print("[ambush] %s winds up at %s on %s at %s, lands in %d ticks" % [name, tile, alert_who(on), aim, ticks])  # Never a player's name (alert_who).
 	return true
 
 
@@ -996,7 +996,7 @@ func begin_lunge(on: GridEntity) -> bool:
 		return false
 	_ambush = {"move": &"lunge", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": at,
 		"cells": cells, "from": World.tick, "at": tile}
-	print("[lunge] %s winds up at %s on %s, lands in %d ticks" % [name, tile, on.name, ticks])
+	print("[lunge] %s winds up at %s on %s, lands in %d ticks" % [name, tile, alert_who(on), ticks])  # Never a player's name (alert_who).
 	return true
 
 
