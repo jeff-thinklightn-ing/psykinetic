@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
 	_test_arc_spares_friends()
+	_test_axe_arcs()
 	_test_flank()
 	_test_downed_fire()
 	_test_flank_party()
@@ -142,7 +143,7 @@ func _test_paid_on_a_blow() -> void:
 	_check(player.stamina >= 88 and player.wind_up.is_empty(), "and its blow lands without paying again (%d)" % player.stamina)
 
 
-## 392 amended (5): the great axe hits for 5, and its wind-up stands
+## 392 amended (5): the great axe hits for 6 (5 before 908), and its wind-up stands
 ## through a blow lighter than 3 (hurt, not pushed or staggered); a heavier
 ## one, or a stun, spoils it as ever.
 func _test_committed_axe() -> void:
@@ -152,7 +153,7 @@ func _test_committed_axe() -> void:
 	var player: GridEntity = e["P"][0]
 	var foe: GridEntity = e["m"][0]
 	_give(player, "giant_axe")
-	_check(_blow_damage(player, foe) == 5, "the great axe hits for 5, a sword's 3 outdone (%d)" % _blow_damage(player, foe))
+	_check(_blow_damage(player, foe) == 6, "the great axe hits for 6 (908; 5 before), a sword's 3 outdone (%d)" % _blow_damage(player, foe))
 	_check(World.windup_ticks(player) == 6, "its wind-up 6 ticks (%d)" % World.windup_ticks(player))
 	e = _build(["#########", "#..Pm...#", "#########"])  # Afresh: the blows above knocked it down.
 	player = e["P"][0]
@@ -641,9 +642,9 @@ func _test_sledge_recover() -> void:
 	World._tend_wind_ups()
 	World._resolve_hits()
 	_check(lifter.free_halt_until >= landed + 8 and World.free_held(lifter), "held at least 8 ticks after it lands (until %d, landed %d)" % [lifter.free_halt_until, landed])
-	# 750, combat's side (2): the heavy axes' sweep, the battle axe's wound up 8,
-	# planted 5; the giant axe's 6 and 4 since 392 amended (5).
-	for axe: Array in [["giant_axe", 6, 4], ["battle_axe", 8, 5]]:
+	# 750, combat's side (2): the heavy axes' sweep, the giant axe's wound up 6,
+	# planted 4 since 392 amended (5); the battle axe's the same since 908.
+	for axe: Array in [["giant_axe", 6, 4], ["battle_axe", 6, 4]]:
 		World.set_slots(lifter, Items.tidy(["", "", "", "", axe[0], ""], Items.CARRIED))
 		_check(World.windup_ticks(lifter) == axe[1] and World.recover_ticks(lifter) == axe[2], "a %s: wound up %d, planted %d after (%d, %d)" % [axe[0], axe[1], axe[2], World.windup_ticks(lifter), World.recover_ticks(lifter)])
 	World.set_slots(lifter, Items.tidy(["", "", "", "", "pick", ""], Items.CARRIED))
@@ -2041,6 +2042,40 @@ func _test_arc_spares_friends() -> void:
 	World._tend_wind_ups()
 	World._resolve_hits()
 	_check(World.is_down(e2["P"][0]) and World.is_down(e2["P"][1]) and World.is_down(e2["P"][2]), "a monster's sweep: all three players knocked down")
+
+
+## The two axes' sweeps (908, the coordinator's ruling on combat's axe
+## proposal): the giant axe's arc 2 falls on five cells, the one struck,
+## both diagonals and the two straight at her sides, for 6 a blow (2 x
+## 3.0); the battle axe's arc 1 on three, for 5, at the giant axe's pace.
+## Never the cell behind.
+func _test_axe_arcs() -> void:
+	print("\n== the axes' sweeps: the giant axe five cells side to side for 6, the battle axe three for 5 (908) ==")
+	for row: Array in [["giant_axe", 5, 6], ["battle_axe", 3, 5]]:
+		var e := _build(["#######", "#..mm.#", "#.mPm.#", "#..mm.#", "#######"])
+		var host: Player = e["P"][0]  # (3,2), swinging east.
+		var at := {}
+		for dummy: GridEntity in e["m"]:
+			at[dummy.tile] = dummy
+		var aimed: GridEntity = at[Vector2i(4, 2)]
+		var arc: Array[Vector2i] = [Vector2i(4, 2), Vector2i(4, 1), Vector2i(4, 3), Vector2i(3, 1), Vector2i(3, 3)]
+		_give(host, row[0])
+		host.free_pos = Vector2(3.0, 2.0)
+		host.next_attack_tick = 0
+		host.next_move_tick = 0
+		_check(World.windup_ticks(host) == 6 and World.try_wind_up(host, aimed), "a %s wound up 6 ticks at the one ahead" % row[0])
+		World.tick = int(host.wind_up["lands"])
+		World._tend_wind_ups()
+		World._resolve_hits()
+		var downed: Array[Vector2i] = []
+		var lost: Array[int] = []
+		for cell: Vector2i in at:
+			if World.is_down(at[cell]):
+				downed.append(cell)
+				lost.append(500 - (at[cell] as GridEntity).hp)
+		var want: Array[Vector2i] = arc.slice(0, row[1])
+		_check(downed.size() == row[1] and want.all(func(cell: Vector2i) -> bool: return cell in downed) and lost.all(func(n: int) -> bool: return n == row[2]),
+				"a %s: %d knocked down for %d each, not the one behind (%s, lost %s)" % [row[0], row[1], row[2], downed, lost])
 
 
 ## Flanking (780, combat's side): a blow from behind on a body winding a

@@ -55453,3 +55453,54 @@ purse keeps amount_refusal's "You have but N gold.". Main._offer_done says a res
 whether or not it has a "line" (only a "line" goes to the party log). offers_test: a debt and a gift with an empty
 purse (NO_GOLD, no line, nothing paid), and a gift after the fund was met (PAID_ALREADY, no gold taken). No bullet:
 a refusal heard only when broke. Server only; protocol unchanged; no new class_name.
+## 908: the battle axe swings at the giant axe's pace; the giant axe hits harder and sweeps side to side
+
+Jeff's axe report: the battle axe, the draugr's own and the one a player is
+most likely to carry out of the barrow, is too slow. Combat rowed it
+against the crypt's pair of robbers on enemy-ai's settled sim (898 mended,
+899 struck form; 4c96369a9, ubuntu-1, 16 starts a row; logs in
+C:/dev/review/combat/probe_box/yard2_run/, the page at
+C:/dev/review/combat/axe_proposal.md). It wins 1, 0, 1 and 2 fights of 16
+(chaser, chase_reader, careless, reader). Against one robber it was level
+with bare hands, safer but slower. No single key of its pace lifted it (a
+quicker wind-up alone, a quicker cycle alone, standing through a light
+blow: none of them reached the bar); only the giant axe's whole pace did.
+The coordinator's ruling, shape (a): the starter axe takes that pace, and
+the smith's axe gains what a player feels, so it stays the better buy.
+
+- Battle axe: windup 8 -> 6, recover 5 -> 4, speed 2.2 -> 1.8. Damage 2.5,
+  arc 1, down 15, no committed: unchanged. Its says loses "winds up long"
+  (voice's words). The draugr's own blow with it is his row's "blows"
+  (windup 8, recover 3, speed 2.2, read by World.blow_verb in place of the
+  item's), and his spin, throw and charge are World's own moves, so he
+  fights with his own numbers and the change is the player's alone (the
+  sword's row against him is the same to the digit on both refs). No other
+  foe carries either axe. A companion handed a battle axe gets the same
+  quicker pace as a player.
+- Giant axe: damage 2.5 -> 3.0 (6 a blow on a robber, not 5) and arc 1 ->
+  2: it falls on five cells, the one struck, both diagonals and the two
+  straight at her sides ("on five in a wide arc, side to side", voice's).
+  Its pace, committed 3 and 20 gold, smith-made: unchanged.
+
+The rows, won of 16 against the pair (chaser, chase_reader, careless,
+reader): the battle axe 12, 12, 12, 13; the giant axe 14, 15, 16, 16
+(from 12, 13, 13, 14); the sword 10, 16, 14, 16 and fists 2, 13, 2, 14,
+untouched. One robber, the chaser: the battle axe 9.4 s, harm 3.9 (from
+11.3 s, 9.0); the giant axe 7.9 s, 3.2; the sword 5.5 s, the quickest by
+more than 2 s. The grey, the draugr and two wolves: the sword quicker, the
+giant axe safer, the giant axe above the battle axe in every row.
+
+One bar was missed, and is kept here as measured, not rounded away (the
+coordinator's): the pair with the battle axe was to be no worse than fists
+for a player who reads his tells, and it is 13 against fists' 14, and 12
+against 13 for one who steps out of a lunge. The coordinator takes it as
+inside the noise of 16 starts. The bar was there so that the starting axe
+is never worse than bare hands, and against a player who only clicks it
+wins 12 where fists win 2.
+
+The numbers hold once 898 and 899 are on main; this lands after them. The
+bullet ships on playtest's joined fight against the crypt's pair with each
+axe, not on these rows. combat_test _test_axe_arcs: the giant axe knocks
+down five for 6 each, the battle axe three for 5, never the one behind,
+both wound up 6; the pace rows and items_test's verb rows moved with it.
+Data and tests; protocol unchanged; no class_name.

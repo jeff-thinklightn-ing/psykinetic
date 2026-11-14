@@ -1190,7 +1190,7 @@ func _test_bash() -> void:
 
 func _test_axe() -> void:
 	print("
-== the giant axe: slow, a 3-cell arc, each struck knocked down; lying, they cannot act and push easily (decision 343) ==")
+== the giant axe: slow, its arc (five cells since 908; the three ahead here), each struck knocked down; lying, they cannot act and push easily (decision 343) ==")
 	var host := _player(Net.local_id)
 	var home := host.tile
 	for dy in range(-6, 7):
@@ -1225,8 +1225,8 @@ func _test_axe() -> void:
 	var before: Array = foes.map(func(foe: GridEntity) -> int: return foe.hp)
 	_check(World.try_attack(host, foes[0]) and host.next_attack_tick - World.tick == 9, "a swing at the middle one; slow: 9 ticks to the next (392 amended (5)) (%d)" % (host.next_attack_tick - World.tick))
 	World._resolve_hits()
-	var hurt := range(3).all(func(i: int) -> bool: return foes[i].hp == before[i] - 5)
-	_check(hurt, "all three in the arc struck for 5 (2 times 2.5, 392 amended (5)) (%s -> %s)" % [before, foes.map(func(foe: GridEntity) -> int: return foe.hp)])
+	var hurt := range(3).all(func(i: int) -> bool: return foes[i].hp == before[i] - 6)
+	_check(hurt, "all three in the arc struck for 6 (2 times 3.0, 908) (%s -> %s)" % [before, foes.map(func(foe: GridEntity) -> int: return foe.hp)])
 	_check(foes.all(func(foe: GridEntity) -> bool: return World.is_down(foe) and World.is_stunned(foe) and foe.down_until == World.tick + 15),
 			"and all three knocked down for 15 ticks, unable to act")
 	var lying := foes[1]
@@ -1740,8 +1740,9 @@ func _test_battle_axe() -> void:
 == the draugr's battle axe, left at his feet when he yields (decision 603, items' side) ==")
 	var verb := Items.verb_of("battle_axe")
 	_check(Items.def("battle_axe")["hands"] == 2 and is_equal_approx(Items.def("battle_axe")["weight"], 7.0) and verb["kind"] == "knockdown"
-			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 2.5) and is_equal_approx(verb["speed"], 2.2) and verb["windup"] == 8,
-			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x2.5 (874), x2.2 slower, wound up 8 (%s)" % [verb])
+			and verb["arc"] == 1 and verb["down_ticks"] == 15 and is_equal_approx(verb["damage"], 2.5) and is_equal_approx(verb["speed"], 1.8) and verb["windup"] == 6
+			and verb["recover"] == 4 and int(verb.get("committed", 0)) == 0,
+			"two hands, 7 kg, a knockdown: arc 1, 15 ticks down, x2.5 (874), the giant axe's pace (908): x1.8, wound up 6, recover 4, no standing through a blow (%s)" % [verb])
 	_check(Items.def("battle_axe")["made"].is_empty() and Monster.kinds()["draugr"]["yields"] == [{"item": "battle_axe"}],
 			"nobody makes one; the draugr's row yields it")
 	var host := _player(Net.local_id)
