@@ -3114,7 +3114,8 @@ func _test_own_blow() -> void:
 
 ## --test-foe's fields (392 amended (7), playtest's flank check of 891):
 ## kinds and hands joined by "+", a count, and "around" laying the foes
-## beside her, east and west first; anything else is no plan.
+## beside her, east and west first; "held" (392 amended (8)) waiting for the
+## foes verb; anything else is no plan.
 func _test_test_foe_plan() -> void:
 	print("\n== --test-foe's plan: several kinds, both hands, around her (392 amended (7)) ==")
 	var plain := Main.test_foe_plan(PackedStringArray(["draugr", "giant_axe"]))
@@ -3133,3 +3134,13 @@ func _test_test_foe_plan() -> void:
 	_check(many["kinds"].size() == 4, "around: four at most (%d)" % many["kinds"].size())
 	_check(Main.test_foe_plan(PackedStringArray(["robber", "sword", "2", "behind"])).is_empty() and Main.test_foe_plan(PackedStringArray(["robber"])).is_empty()
 			and Main.test_foe_plan(PackedStringArray([])).is_empty(), "anything else: no plan")
+	var held := Main.test_foe_plan(PackedStringArray(["robber+robber", "sword+shield", "2", "around", "held"]))
+	var held_first := Main.test_foe_plan(PackedStringArray(["robber", "sword", "1", "held", "around"]))
+	var held_alone := Main.test_foe_plan(PackedStringArray(["robber", "sword", "1", "held"]))
+	_check(held["held"] and held["around"] and held["offsets"] == [Vector2i(1, 0), Vector2i(-1, 0)] and held_first["held"] and held_first["around"]
+			and held_alone["held"] and not held_alone["around"] and not flank["held"] and not plain["held"],
+			"held (392 amended (8)): with around in either order, or alone; none without it (%s)" % [held])
+	_check(Main.test_foe_plan(PackedStringArray(["robber", "sword", "2", "held", "held"])).is_empty()
+			and Main.test_foe_plan(PackedStringArray(["robber", "sword", "2", "around", "around"])).is_empty(), "a flag twice: no plan")
+	_check(not Main.hp_verb_allowed(true, ["--server"]) and Main.hp_verb_allowed(true, ["--server", "--run-marker=tour-x"])
+			and not Main.hp_verb_allowed(false, ["--run-marker=tour-x"]), "the foes verb answers only with --test-foe and a run marker, as hp")

@@ -26394,6 +26394,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"strike":
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _strike_command(words)
+		"foes":
+			if hp_verb_allowed(not Net.test_foe.is_empty(), Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _foes_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -28234,15 +28237,35 @@ func _test_arts(player: Player) -> void:
 ## at most), and ends her spawn grace, so each takes her up at once and
 ## strikes from beside her: two on opposite sides for World.is_flanked,
 ## a thrower third for World.throws_into_walls.
+## 392 amended (8) (playtest's flank reruns: the ring struck from tick 11, a
+## joined tour's load and kit taking till about tick 260, and a re-join after
+## a fall laid a second ring at the temple): "held" among the fields after the
+## count lays nobody at a join, only the hands; the admin verb "foes <player>"
+## (test-only, as "hp": the flag and a --run-marker) lays the ring round that
+## player then, and each call one ring more, so a tour counts from its own
+## tick. Without "held" each join lays them, as before.
 const TEST_FOE_SPACING := 8
 const TEST_FOE_AROUND: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1)]
+## How many test foes laid so far, so a later ring's names follow on (Foe4...).
+var _test_foes_laid := 0
 func _test_foe(player: Player) -> void:
 	var plan := test_foe_plan(Net.test_foe)
 	if plan.is_empty():
 		if not Net.test_foe.is_empty():
-			push_error("[test] --test-foe=%s: not kind,weapon[,count[,around]]: ignored" % ",".join(Net.test_foe))
+			push_error("[test] --test-foe=%s: not kind,weapon[,count[,around][,held]]: ignored" % ",".join(Net.test_foe))
 		return
 	World.set_slots(player, Items.tidy(["", "", "", "", plan["right"], plan["left"]], Items.CARRIED))
+	if plan["held"]:
+		print("[test] held: %s in hand at %s; the foes wait for \"foes %s\"" % [
+				"+".join([plan["right"], plan["left"]]).trim_suffix("+"), player.tile, player.name])
+		return
+	_lay_test_foes(player, plan)
+
+
+## Lays [param plan]'s foes round [param player] (392 amended (7)): beside
+## her where "around" asks and the cell is free, else the nearest free cell
+## to where each is wanted; each made and armed as a level's.
+func _lay_test_foes(player: Player, plan: Dictionary) -> void:
 	var kinds: Array = plan["kinds"]
 	var offsets: Array = plan["offsets"]
 	for k in kinds.size():
@@ -28250,7 +28273,8 @@ func _test_foe(player: Player) -> void:
 		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
 		if spec.is_empty():
 			spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": kind}
-		spec["name"] = "Foe" if k == 0 else "Foe%d" % (k + 1)
+		_test_foes_laid += 1
+		spec["name"] = "Foe" if _test_foes_laid == 1 else "Foe%d" % _test_foes_laid
 		var wanted: Vector2i = player.tile + (offsets[k] as Vector2i)
 		spec["tile"] = wanted if plan["around"] and World.is_free(wanted) else _nearest_free(wanted)
 		Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
@@ -28263,15 +28287,41 @@ func _test_foe(player: Player) -> void:
 		print("[test] around: %d beside %s, her grace ended" % [kinds.size(), player.tile])
 
 
+## foes <player> (392 amended (8), test-only): --test-foe's ring laid round
+## that online player now, at World.tick, for a plan with "held".
+func _foes_command(words: PackedStringArray) -> String:
+	var plan := test_foe_plan(Net.test_foe)
+	if plan.is_empty() or not plan["held"]:
+		return "foes: only with --test-foe=...,held"
+	if words.size() < 2:
+		return "foes <player>: the player by name as \"players\" lists them"
+	var found: Array[Player] = []
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned:
+			continue
+		var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
+		if player.name == words[1] or record != null and record.name == words[1]:
+			found.append(player)
+	if found.size() != 1:
+		return "foes: %d players online are called %s; none laid" % [found.size(), words[1]]
+	_lay_test_foes(found[0], plan)
+	print("[test] foes: %d laid round %s at tick %d" % [(plan["kinds"] as Array).size(), found[0].name, World.tick])
+	return "foes: %d round %s at tick %d" % [(plan["kinds"] as Array).size(), found[0].name, World.tick]
+
+
 ## --test-foe's fields read (392 amended (7)): {kinds (one a foe), right,
-## left, offsets (one a foe, from her tile), around}; {} if they don't
-## read as kind[+kind...],weapon[+left][,count[,around]]. Pure, for tests.
+## left, offsets (one a foe, from her tile), around, held}; {} if they don't
+## read as kind[+kind...],weapon[+left][,count[,around][,held]] ("around"
+## and "held" each at most once, either order). Pure, for tests.
 static func test_foe_plan(fields: PackedStringArray) -> Dictionary:
-	if fields.size() < 2 or fields.size() > 4 or fields[0].is_empty():
+	if fields.size() < 2 or fields.size() > 5 or fields[0].is_empty():
 		return {}
-	var around := fields.size() == 4 and fields[3] == "around"
-	if fields.size() == 4 and not around:
-		return {}
+	var flags := fields.slice(3)
+	for flag in flags:
+		if flag not in ["around", "held"] or flags.count(flag) > 1:
+			return {}
+	var around := "around" in flags
 	var named := fields[0].split("+", false)
 	var hands := fields[1].split("+")
 	var count := clampi(fields[2].to_int(), 1, 9) if fields.size() >= 3 else 1
@@ -28283,7 +28333,8 @@ static func test_foe_plan(fields: PackedStringArray) -> Dictionary:
 	for k in count:
 		kinds.append(named[mini(k, named.size() - 1)])
 		offsets.append(TEST_FOE_AROUND[k] if around else Vector2i(3 + TEST_FOE_SPACING * k, 0))
-	return {"kinds": kinds, "right": hands[0], "left": hands[1] if hands.size() > 1 else "", "offsets": offsets, "around": around}
+	return {"kinds": kinds, "right": hands[0], "left": hands[1] if hands.size() > 1 else "", "offsets": offsets,
+			"around": around, "held": "held" in flags}
 
 
 ## --test-walk-on-wind: true once the local player's own wind-up has begun;
