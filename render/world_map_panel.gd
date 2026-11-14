@@ -105,19 +105,34 @@ func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
 
-## Opened: the graph built the first time, the view centred on the
+## Opened: the graph built the first time, and again when a level changed
+## since it was built (197 amended (2): a builder's accept the server sent
+## as a "terrain" message, a regenerated level), the view centred on the
 ## player's area.
 func open() -> void:
+	if world != null and Client3D._world_map_key() != _built_key:
+		world = null
 	_ensure_world()
 	visible = true
 	centre_on(own_area)
 	queue_redraw()
 
 
-## The graph built once (the HUD's place words may ask before the first open).
+## What WorldMap.build() read when the graph was built (Client3D's key: the
+## levels registered and the overlay's files): open() builds again on a
+## different one. Only open() compares, so the HUD's place words, asked each
+## frame while she leads, never read every level's files.
+var _built_key := ""
+
+
+## The graph built if there is none (the HUD's place words may ask before
+## the first open), the boxes laid out anew.
 func _ensure_world() -> void:
 	if world == null:
+		_built_key = Client3D._world_map_key()
 		world = WorldMap.build()
+		positions.clear()
+		sizes.clear()
 		_read_layout()
 		_lay_out()
 		_read_factions()

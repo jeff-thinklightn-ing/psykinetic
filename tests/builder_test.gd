@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_trades_preview()
 	_test_cached_checks()
 	await _test_spot_shortcut()
+	_test_stub_name()
 	await _test_built_ahead()
 	await _test_breathes()
 	await _test_spot_ghost()
@@ -1909,6 +1910,44 @@ func _test_trades_preview() -> void:
 ## reached, the held reach and the checks are built while the request is out. The same asks, the reply
 ## at once (built ahead cut short) or four frames late (built whole), give the words and closing checks
 ## of the full path (whole_checks); the two ways a kept thing goes stale, and an ask abandoned mid-wait.
+func _test_stub_name() -> void:
+	print("\n== the stub's \"name <key> <words>\": a place marked again as it stands, named anew (197 amended (2)) ==")
+	var doc := MapDoc.from_level("wilds")
+	var places: Dictionary = doc.config["places"]
+	var before: Dictionary = (places["square_fire"] as Dictionary).duplicate(true)
+	var area := Rect2i(188, 194, 24, 22)
+	var stub := BuilderHost._stub_for(area, "name square_fire Chapel Green", doc.map.size, false, places)
+	var call: Dictionary = (stub.turns[0] as Array)[0] if stub.turns.size() == 2 and stub.turns[0] is Array else {}
+	_check(call.get("name", "") == "mark_place" and call["input"]["key"] == "square_fire" and call["input"]["name"] == "Chapel Green",
+		"one mark_place call, the key and the new name (%s)" % call)
+	var session := BuilderSession.new(doc, area, "wilds", stub)
+	var done: Dictionary = session.run_tool("mark_place", call.get("input", {}))
+	var after: Dictionary = session.working.config["places"].get("square_fire", {})
+	var same := func(field: String) -> bool: return str(_whole(after.get(field))) == str(_whole(before.get(field)))
+	_check(done.get("ok", false) and after.get("name") == "Chapel Green"
+		and ["at", "kind", "radius", "holder", "town", "rect", "seats"].all(same),
+		"marked again: named Chapel Green, its at, kind, radius, holder, town, rect and seats as they were (%s; %s)" % [done.get("text", done.get("error", "")), after])
+	var trader_key := ""
+	for key: String in places:
+		if str(places[key].get("kind", "")) == "trader" and places[key].get("facing") is Array:
+			trader_key = key
+	if not trader_key.is_empty():
+		var turned := BuilderHost.stub_name("name %s Old Fen" % trader_key, places)
+		_check(BuilderSession.SIDES.has(str((turned.turns[0] as Array)[0]["input"].get("facing", ""))), "a trader's facing goes as a side's word (%s)" % trader_key)
+	var unknown := BuilderHost._stub_for(area, "name nowhere Chapel Green", doc.map.size, false, places)
+	_check(unknown.turns.size() == 1 and str(unknown.turns[0]).begins_with("(Stub) Name what"), "a key the level has not: the stub says what it takes, and calls nothing")
+
+
+## [param value] with every whole float an int, through arrays (level.json's
+## numbers read as floats; the tools write ints).
+static func _whole(value: Variant) -> Variant:
+	if value is float and is_equal_approx(value, roundf(value)):
+		return int(value)
+	if value is Array:
+		return (value as Array).map(func(each: Variant) -> Variant: return _whole(each))
+	return value
+
+
 func _test_built_ahead() -> void:
 	print("\n== an ask builds ahead while its request is out, and keeps its checks by revision (867 amended (4)) ==")
 	var spot_calls := [

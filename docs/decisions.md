@@ -2394,6 +2394,30 @@ itself is drawn anew from the terrain message). Server only, protocol unchanged,
 bullet (a live accept is a builder's tool; a bullet waits on playtest seeing a resident take a newly
 laid spot on a joined client).
 
+197 amended (2) (the coordinator, 2026-11-14, on builder's three worst in builder mode; the label from
+decision_number.sh): a joined client's world map window reads a level changed live on its next open,
+with no restart. The client already took the change: Main._on_terrain registers the level's new files
+(BuilderHost.register_terrain, Level.register), and Client3D's far landmarks build again on
+Client3D._world_map_key (the registered images and the overlay's files). Only the window kept the
+WorldMap it built at its first open for the session, so the name a builder gave a place, or a place
+added, read as before until the client restarted (v0.1.215's checklist, a known limit). Now
+WorldMapPanel remembers the key it built on, and open() builds again, its boxes laid out anew, when
+the key differs. Only open() compares: the HUD's place words, asked each frame while she leads, read
+the graph as built and never read every level's files. A build is about 35 ms (Client3D's figure),
+once, at the first open after a change. For playtest's joined run, the stub takes "name <key>
+<words>" (BuilderHost.stub_name): the level's place <key> marked again with mark_place as it stands,
+named anew. A field mark_place does not take, such as a worth, goes as Claude's mark_place would lose
+it, and the take-back brings it back. builder_zone_test _test_world_map_window: the wilds' square fire
+read by its name, the graph kept when opened again unchanged, the wilds registered with the fire named
+Chapel Green, the HUD's words as built until the next open, which reads Chapel Green, then the level's
+own name again once unregistered. builder_test _test_stub_name: one mark_place call, the place marked
+again with its at, kind, radius, holder, town, rect and seats, an unknown key answered with what the
+stub takes (a trader's facing as a side's word is checked where the level has a trader with a facing;
+the wilds today has none, so that check does not run). The window's look is unchanged (no mock; ui read the
+lines). Client and builder's stub only, protocol unchanged, no new class_name, no bullet of its own:
+197 amended (1)'s bullet ships on playtest's joined run, which reads the world map before and after a
+live change without a restart.
+
 ## 198. The world map editor edits level.json, through MapDocs
 
 The node map (`--world-map`, `editor/world_map_view`, Godot's GraphEdit)

@@ -37,6 +37,7 @@ func _ready() -> void:
 	await _test_ask_and_accept()
 	_test_spot_taken_up()
 	_test_terrain_message()
+	_test_world_map_window()
 	await _test_refused()
 	await _test_undo()
 	await _test_flooded()
@@ -234,6 +235,39 @@ func _test_terrain_message() -> void:
 	_check(after["entities"].any(func(spec: Dictionary) -> bool: return spec["tile"] == _chest_cell()), "and its test room has the chest now")
 	Level.unregister("test_room")
 	Level.overlay_dir = overlay
+
+
+## A joined client's world map window after a live change (197 amended (2)):
+## a level the server sent is registered (BuilderHost.register_terrain), and
+## the window's next open builds its graph again and reads the new name;
+## opened with nothing changed it keeps the graph it has.
+func _test_world_map_window() -> void:
+	print("\n== the world map window after a live change: built again on its next open ==")
+	var panel: WorldMapPanel = _main.world_map_panel
+	_check(panel != null, "Main has its world map window")
+	if panel == null:
+		return
+	panel.open()
+	var first := panel.world
+	_check(panel.place_words("wilds/square_fire") == "the square's fire", "the wilds' square fire by its own name (%s)" % panel.place_words("wilds/square_fire"))
+	panel.close()
+	panel.open()
+	_check(panel.world == first, "opened again with nothing changed: the graph it had, not built again")
+	panel.close()
+	var source := Level.source("wilds")
+	var config: Dictionary = (source["config"] as Dictionary).duplicate(true)
+	config["places"]["square_fire"]["name"] = "Chapel Green"
+	Level.register("wilds", source["layout"], source["height"], config, source["relief"])
+	_check(panel.place_words("wilds/square_fire") == "the square's fire",
+		"before the next open the HUD's words read the graph as built (no level read each frame)")
+	panel.open()
+	_check(panel.world != first and panel.place_words("wilds/square_fire") == "Chapel Green" and panel.boxes().has("wilds"),
+		"the wilds changed live: the next open builds again and reads Chapel Green, the wilds' box laid out (%s)" % panel.place_words("wilds/square_fire"))
+	panel.close()
+	Level.unregister("wilds")
+	panel.open()
+	_check(panel.place_words("wilds/square_fire") == "the square's fire", "its registration gone, the next open reads the level's own name again")
+	panel.close()
 
 
 func _test_refused() -> void:
