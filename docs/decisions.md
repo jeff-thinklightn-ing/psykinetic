@@ -22994,6 +22994,28 @@ tick already does: no yield or clock moves. Economy gives the readers.
 Phase 2 (field_work, shearing) is 566 amended, later. towns_test (progress,
 the stages told, walls_up, awake), production_test (trip, its start
 saved). No new class_name.
+
+566 amended (7), economy's side (playtest's look_farmer2 on ea376d859, the coordinator's go, 11-14): a build
+only queued has no progress. Towns.build_progress gave worked / needed for any job the building had, so an order
+nobody had taken up went out with progress 0. On the Ledger, Umbrage's ordered field read "Building: the field,
+begun." before any wood or carpenter came, and the box's three repairs waiting on ore read "being mended" for three
+weeks. Its doc already said "while one builds it".
+- Towns.build_progress is -1 unless the job is "working". The "town" message carries no "progress" key then, as it
+  never did for a building without a job: no new value and no new meaning, and net.gd is untouched (the protocol
+  prints the same before and after).
+- The client already meets a building without "progress":
+  - BuildingComposer.stage reads it as 0.0, the same as the queued job's 0 before, so a planned building is drawn
+    as before.
+  - BuildingComposer.scaffolded needs the key, so a damaged building whose repair only waits is no longer in
+    scaffold. That is the change a player sees in the world: the scaffold goes up when the carpenter starts.
+  - TownSheet.buildings_words reads "Planned: the field." and "Damaged: the temple." until the work is taken up.
+- Towns._stages also tells the views when a build goes back to the queue (stage to -1). This happens with 915's
+  handover of an away holder's bench, and with remove_worker and retrain.
+Readers checked: towns_test's case (a job taken at once: 0, then 0.3); ui_test's buildings_words (given dicts);
+view_test's stage and scaffolded (given dicts); Main's body site (reads build_progress only for a working job); the
+voice inventory's "being mended" (wording unchanged). farm_test _test_progress_queued: a queued order has no
+progress and reads "Planned"; the start tells the views; 915's unseat sends the working field back to the queue,
+the views told, the Ledger back to "Planned", and the new holder takes it up.
 ## 566, builder's side: a woodlot's standing cell, and builds with no site
 
 On npc's visible-work page (566, the coordinator's approval): a marked but

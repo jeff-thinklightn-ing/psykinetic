@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_visitors()
 	_test_trader()
 	_test_benches()
+	_test_progress_queued()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1542,3 +1543,40 @@ func _bench_field(towns: Towns) -> Array:
 		if out[2] < 0 and int(field.get("level", 0)) >= 1 and field.get("state") == Towns.STANDING:
 			out[2] = _now - from
 	return out
+
+
+## A build only queued shows no progress (566 amended, playtest's look_farmer2): the ordered field
+## reads "Planned" on the Ledger until a carpenter takes it up, and a repair waiting on ore is not
+## "being mended"; the start tells the views, and so does a build put back in the queue.
+func _test_progress_queued() -> void:
+	print("
+== a queued build shows no progress (566 amended) ==")
+	var towns := _bench_world()
+	var work := towns.production
+	_bench_ticks(towns, 1)  # The farmer walks in; the field is ordered at the head of the queue.
+	var houses := towns.buildings_of(TOWN)
+	_check(houses.has("field") and not houses["field"].has("progress") and not houses["temple"].has("progress"),
+		"ordered, nobody at it: the field and the temple's repair have no progress (%s, %s)" % [houses.get("field", {}), houses["temple"]])
+	_check(TownSheet.buildings_words(houses).contains("Planned: the field."), "the Ledger: \"%s\"" % TownSheet.buildings_words(houses))
+	var told: Array[String] = []
+	towns.building_changed.connect(func(_town: String, kind: String) -> void: told.append(kind))
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	work.stockpile.deposit(TOWN, "wood", 80, "test", "")
+	for k in 3:
+		_bench_ticks(towns, 1)
+	houses = towns.buildings_of(TOWN)
+	_check(is_equal_approx(float(houses["field"].get("progress", -1.0)), 0.0) or float(houses["field"].get("progress", -1.0)) > 0.0,
+		"taken up: the field has its progress (%s)" % [houses["field"]])
+	_check(told.has("field"), "the start told to the views (%s)" % [told])
+	told.clear()
+	towns.note_companion_out(TOWN, "Wynn")
+	work.add_worker("carpenter_pg", "Pell", ["carpenter"], TOWN, "growth")
+	towns._town(TOWN)["residents"].append("carpenter_pg")
+	towns._seat(TOWN)  # Wynn away: Pell takes the bench (915), her field back in the queue.
+	towns._stages(TOWN)  # The town's turn reads the stages first.
+	houses = towns.buildings_of(TOWN)
+	_check(work.workshop_of("carpenter_pg") != "" and told.has("field") and not houses["field"].has("progress")
+		and TownSheet.buildings_words(houses).contains("Planned: the field."),
+		"handed over (915's unseat): the field back in the queue, the views told, the Ledger \"%s\" (%s)" % [TownSheet.buildings_words(houses), told])
+	_bench_ticks(towns, 2)
+	_check(towns.buildings_of(TOWN)["field"].has("progress"), "the new holder takes it up: its progress again")

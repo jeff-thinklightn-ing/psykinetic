@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: the Ledger shows a build as planned until someone starts it, and a damaged building is scaffolded only once its repair is under way (566 amended (7)).
 - The water by Snagfin's shack is a proper pond, running east and south of it, the ground sloping gently down to it and a dirt dock from his door out into the water (559 amended (2)).
 - Every pond has a bare, muddy rim, reeds out into the shallows and a stone or two, its bank curving down into the water (559 amended (2)).
 - A townsperson's window opens at the foot of the screen, left of the pack, the same size every time, its name in view whatever they say, and your pack stays as you had it, opening beside the window when they have something to trade (802 amended (11), (12), (13)).

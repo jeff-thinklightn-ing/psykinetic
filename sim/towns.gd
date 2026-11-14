@@ -282,11 +282,14 @@ func buildings_of(town: String) -> Dictionary:
 
 ## How far [param town]'s [param kind] is built (decision 566: visible
 ## work): its job's worked / needed steps, 0..1, while one builds it (a
-## planned one, a raise: "building", a repair: "damaged"); -1 with no job.
+## planned one, a raise: "building", a repair: "damaged"); -1 with no job,
+## or a job only queued (566 amended: an order nobody has taken up read
+## "Building: the field, begun" on the Ledger, and Umbrage's waiting repairs
+## "being mended" for three weeks).
 func build_progress(town: String, kind: String) -> float:
 	var job_id := int(_towns.get(town, {}).get("buildings", {}).get(kind, {}).get("job", 0))
 	var job := production.job(job_id) if job_id != 0 else {}
-	if job.is_empty():
+	if job.is_empty() or job.get("state") != "working":
 		return -1.0
 	return clampf(float(job.get("worked", 0)) / maxf(float(job.get("needed", 0)), 1.0), 0.0, 1.0)
 
@@ -310,9 +313,11 @@ func _stages(town: String) -> void:
 	for kind: String in houses:
 		var progress := build_progress(town, kind)
 		var stage := BUILD_STAGES.filter(func(at: float) -> bool: return progress >= at).size() if progress >= 0.0 else -1
-		if stage != int(houses[kind].get("stage", -1)):
+		var was := int(houses[kind].get("stage", -1))
+		if stage != was:
 			houses[kind]["stage"] = stage
-			if progress >= 0.0:
+			# Told as it starts and at each stage; and (566 amended) when its build goes back to the queue.
+			if progress >= 0.0 or was >= 0:
 				building_changed.emit(town, kind)
 
 
