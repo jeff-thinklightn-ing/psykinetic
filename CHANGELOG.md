@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: the post at the end of Umbrage's east road is the east road post, on your map and where you stand (774 amended (3)).
 - The pond a long walk west of Umbrage is Reed Pond, and the water round Snagfin's shack is Snagfin's Fishin' Hole, a place of its own to find and named on your map (805 amended (20)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
