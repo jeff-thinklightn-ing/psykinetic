@@ -13544,6 +13544,46 @@ belt is laid outside the tunic by rays, on every shape key, as the collar and th
 
 419 amended (6) (ui, 2026-11-15; label by decision_number.sh; the coordinator's ask after pc-character's hair rule, 5b7a7065b): the Options hair swatches are the colours you get. The hair rule moves a hair colour up to 13 L* from the skin when the two are nearly one tone, and the Character preview already drew the moved colour, but the swatch row drew the named ones, so on a dark skin a swatch was lighter than the hair it gave. OptionsPanel._show_look now draws each hair swatch (all four states of its style) through PersonLook.hair_against(name, the picked look's skin colour), and redraws the row whenever the Character section is shown or a pick changes it, so changing the skin changes the row at once (no animation: the style is set, not eased). The name picked, the tooltip, what is saved and the swatch's own meta colour are unchanged; the window script sets no colour of its own (the swatch takes what the rule returns), and tests/style_budget.txt does not move. The cost is pc-character's: the first call for a name and skin walks lightness, about 100 steps, and each answer is cached by name and skin, so a redraw is eight lookups. Test: view_world_test (_test_options_panel): for every skin the eight hair swatches' drawn colours are hair_against's for that skin's colour, and some skin moves one off its named colour. Client only, protocol unchanged, no new class_name. No bullet until ui-design's joined still (a dark skin picked, the swatch row beside the preview's hair).
 
+419 amended (7) (pc-character, 2026-11-15; label by decision_number.sh; the coordinator's go on pc-character's worst
+three, items 2 and 1 as one take): arms, not pipes, and hands, not paddles, on the two human bodies.
+- Before, measured on main's bodies:
+  - The arm was an eight-sided pipe, with one ring at the elbow, so a bent arm folded at a point.
+  - The cuff was 8.0 by 7.2 cm, deeper than wide.
+  - The hand was a mitten 15 cm long (8.6% of 1.75 m), 10.6 cm across and 5.4 thick.
+  - The thumb was a 4.6 cm stub pointing forward, off the rig's thumb bones.
+  At 2.5 m the hand read as a lump at the sleeve.
+- Now, in body_gen, for humans only (the orc's and the kobold's limbs are as they were):
+  - Sleeve: a ring ELBOW_SPAN (3.5 cm) above the elbow and one ELBOW_SPAN_BELOW (5 cm) under it, so the bend
+    curves over three rings. The forearm is fullest below the elbow and tapers to a wrist of WRIST (5.8 by 5.0 cm
+    with the cuff, wider than deep).
+    - At 2.2 and 3.5 cm under the elbow, the heavy and broad man's left forearm stood 5 to 17 mm into the belly where
+      Chop tucks the elbow in (anim_rig_test's work clear). The old arm's surface passed there too, with no vertex
+      for the test to count; at 5 cm it is clear.
+  - rolled_sleeves' bare forearm tapers the same way.
+  - Hand: HAND_LENGTH (17.4 cm, the woman's 0.95 as long; a tenth of either's height), 8.4 cm across the knuckles
+    and 2.8 cm thick there.
+    - Its base sits inside the cuff, with a ring at the knuckles (middle_01).
+    - The fingers keep their thickness to a closed, blunt end, never a thin lip (the coordinator on the first
+      empty hand).
+    - The fingers are weighted to middle_01 to middle_03.
+  - Thumb: lofted along thumb_01 and thumb_02 and THUMB_REACH (35%) of the way on to thumb_03, then a narrower ring
+    that closes the tip. It is 6.4 cm from where it leaves the palm (the woman's 6.1), about a third of the hand.
+    The bones run on to 17 cm from the wrist, a long finger's length, so the mesh stops short of them.
+  - Each body is 304 triangles more (9,598 against 9,294).
+- No bone moves and no clip changes. Every clip in goblin.res holds the pack's one finger and thumb pose (animation's
+  count: 171 clips, 102 with no finger movement at all). It was unseen while the mitten could not bend. Skinned to
+  those bones, the fingers curl under the palm into a fist with the thumb over them, at rest and holding alike.
+- One package, landed together as animation's stack, so main never has these bodies alone:
+  - These bodies.
+  - Animation's hand relax (938, with the thumb's own target): an empty hand opened part way toward rest, since the
+    pack's pose reads as a hook on an empty hand.
+  - The hand socket stays at HAND_GRIP 0.07 and HAND_PALM 0.005: no palm offset passed the held rows (animation's
+    938), so the grip is a later row of animation's.
+- Tests: anim_rig_test (work clear, the two hands on the two-handed hafts), seamless_test, parts_test,
+  view_world_test and view_test pass on the bodies. No bullet until ui-design's joined look on the whole package
+  (sword, axe and bow in hand, the empty hand at rest, a frame of the walk; slim and heavy, man and woman, beside
+  Jeff's goblin) and the coordinator's pass. Client only, protocol unchanged, no new class_name.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and

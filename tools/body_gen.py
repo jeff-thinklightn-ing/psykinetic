@@ -529,6 +529,23 @@ def torso_rings(J: dict) -> list:
 	return rings
 
 
+## A human sleeve's wrist (half across, half deep: 5.8 by 5.0 cm with its cuff) and the elbow's rings either side
+## of the joint (m along the arm). The ring below it sits 5 cm down: at 2.2 and 3.5 cm, the heavy and broad man's
+## left forearm stood 5 to 17 mm into the belly in Chop, where the elbow tucks in (anim_rig_test's work clear; the
+## old arm's surface passed there too, with no vertex to count it).
+WRIST = (0.029, 0.025)
+ELBOW_SPAN = 0.035
+ELBOW_SPAN_BELOW = 0.05
+## A human hand from the wrist to the middle fingertip (m, the man's; the woman's 0.95 as long).
+HAND_LENGTH = 0.174
+## A human thumb: how far from thumb_02 (its web knuckle) toward thumb_03 its tip reaches, the rounded end past
+## that (m), and its half-thickness at each of its five rings (inside the palm, thumb_01, thumb_02, the tip's
+## full ring, the rounded end).
+THUMB_REACH = 0.35
+THUMB_ROUND = 0.006
+THUMB_RADII = (0.018, 0.017, 0.014, 0.012, 0.007)
+
+
 def sleeve(J: dict, side: str) -> Part:
 	"""An arm in its sleeve, T-pose along X: from inside the shoulder to the wrist."""
 	sign = 1.0 if side == "l" else -1.0
@@ -550,6 +567,14 @@ def sleeve(J: dict, side: str) -> Part:
 	down = Vector((0.0, 0.0, -0.018))
 	stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.060, 0.074), (sh.lerp(el, 0.45), 0.058, 0.058),
 		(el, 0.048, 0.050), (el.lerp(wr, 0.5), 0.046, 0.044), (wr - along * 0.01, 0.040, 0.036)]
+	if PEOPLE == "human":
+		# Arms, not pipes (the coordinator's go on pc-character's worst three, 11-15): a ring either side of
+		# the elbow (ELBOW_SPAN) so a bent arm folds over three rings, not at one point; the forearm
+		# fullest below the elbow and tapering to a wrist of WRIST (across, its depth; the sleeve's
+		# cuff on it), wider across than deep as a wrist is (the old cuff 8.0 by 7.2 cm, deeper than wide).
+		stations = [(inner + down, 0.052, 0.075), (sh + along * 0.03 + down, 0.060, 0.074), (sh.lerp(el, 0.45), 0.056, 0.057),
+			(el - along * ELBOW_SPAN, 0.049, 0.050), (el, 0.046, 0.047), (el + along * ELBOW_SPAN_BELOW, 0.044, 0.045),
+			(el.lerp(wr, 0.42), 0.041, 0.043), (el.lerp(wr, 0.78), 0.032, 0.036), (wr - along * 0.01, WRIST[1], WRIST[0])]
 	if PEOPLE == "orc":
 		# The revision (478 amended): a capped deltoid, the biceps, an elbow, a heavy forearm
 		# swelling below it, the wrist thick.
@@ -666,6 +691,21 @@ def hand(J: dict, side: str) -> Part:
 	reach = per(1.0, *PROPORTIONS_OF("hands"))  # As long as the skeleton's fingers.
 	stations = [(-0.015, 0.036, 0.028), (0.02, 0.050, 0.027), (0.065, 0.053, 0.023), (0.105, 0.048, 0.018),
 		(0.135, 0.034, 0.013)]
+	if PEOPLE == "human":
+		# A hand, not a paddle (the coordinator's go, 11-15): wrist to fingertip HAND_LENGTH (about a tenth of
+		# the height; the old 15 cm was 8.6%), 8.4 cm across the knuckles, 2.8 cm thick there (the old
+		# 10.6 by 5.4), its base inside the sleeve's cuff (WRIST); the woman's 0.95 as long (10.0% of her
+		# height). The length is in the fingers, past middle_01 (0.116), weighted to the middle finger's
+		# bones: every clip holds the pack's one hand pose (animation, 11-15), which curls them under the palm
+		# into a fist, and the thumb (thumb()) over it; Client3D's HAND_GRIP and HAND_PALM put a held thing
+		# inside that fist (animation's side, measured on these bodies). A ring at the knuckles (near
+		# middle_01) so the curl bends round them; the fingers as thick to their end as along them and the end
+		# closed blunt (the coordinator on arms6's empty hand: a tip thinning to a lip read as a hook).
+		reach = pick(1.0, 0.95)
+		p.bones = ["lowerarm_" + side, "hand_" + side, "middle_01_" + side, "middle_02_" + side, "middle_03_" + side]
+		stations = [(-0.012, WRIST[0] - 0.002, WRIST[1] - 0.004), (0.010, 0.034, 0.020), (0.050, 0.041, 0.017),
+			(0.090, 0.042, 0.014), (0.112, 0.041, 0.013), (0.135, 0.038, 0.012), (0.158, 0.034, 0.011),
+			(0.168, 0.030, 0.010), (HAND_LENGTH, 0.022, 0.008)]
 	if PEOPLE == "orc":
 		# The palm to the knuckles only, its fingers their own (fingers()).
 		stations = [(-0.015, 0.034, 0.026), (0.02, 0.044, 0.026), (0.065, 0.047, 0.024), (0.105, 0.045, 0.020)]
@@ -702,6 +742,29 @@ def fingers(J: dict, side: str) -> list:
 
 def thumb(J: dict, side: str) -> Part:
 	sign = 1.0 if side == "l" else -1.0
+	if PEOPLE == "human":
+		# Laid along the rig's own thumb bones (the coordinator's go, 11-15; the old one a 4.6 cm stub pointing
+		# forward, off them): from inside the palm's heel through thumb_01 and thumb_02 (the web's knuckle) and
+		# THUMB_REACH of the way on to thumb_03, then a short narrow ring rounding the tip closed (the bones run
+		# on to 17 cm from the wrist, a long finger's length: the coordinator, "a thumb is about a third of the
+		# hand ... its tip closed and blunt"), weighted to those bones so the clips' one hand pose sets it.
+		p = Part("Thumb_" + side, "Skin")
+		p.sparse = True
+		bones = ["thumb_0%d_" % i + side for i in (1, 2, 3)]
+		p.bones = ["hand_" + side] + bones
+		pts = [J[b] for b in bones]
+		start = pts[0] + (pts[0] - pts[1]) * 0.35
+		tip = pts[1] + (pts[2] - pts[1]) * THUMB_REACH
+		path = [start, pts[0], pts[1], tip, tip + (pts[2] - pts[1]).normalized() * THUMB_ROUND]
+		k = pick(1.0, 0.88)
+		for i, c in enumerate(path):
+			along = (path[min(i + 1, len(path) - 1)] - path[max(i - 1, 0)]).normalized()
+			u = along.cross(Z).normalized() if abs(along.z) < 0.9 else X
+			v = u.cross(along).normalized()
+			r = THUMB_RADII[i] * k
+			p.add(ring(c, u, v, r, r * 0.85, 6, 0.3))
+		p.pins = {0: "hand_" + side}
+		return p
 	p = Part("Thumb_" + side, "Skin")
 	p.bones = ["hand_" + side, "thumb_01_" + side, "thumb_02_" + side]
 	wr = J["hand_" + side]
@@ -1510,7 +1573,9 @@ def rolled_sleeves(J: dict) -> list:
 		k = pick(1.0, 0.86) * m("arms")
 		arm = Part("Forearm_" + side, "Skin")
 		arm.bones = ["lowerarm_" + side, "hand_" + side]
-		for c, rv, ru in [(el + along * 0.02, 0.052, 0.054), (el.lerp(wr, 0.5), 0.050, 0.048), (wr - along * 0.012, 0.044, 0.040)]:
+		# The bare forearm tapered to the wrist as the sleeve's is (WRIST, less its cuff).
+		for c, rv, ru in [(el + along * 0.02, 0.050, 0.052), (el.lerp(wr, 0.42), 0.043, 0.045), (el.lerp(wr, 0.78), 0.031, 0.035),
+				(wr - along * 0.012, WRIST[1] - 0.002, WRIST[0] - 0.002)]:
 			arm.add(ring(c, FRONT, Z, ru * k, rv * k, 8, 0.3))
 		roll = Part("Roll_" + side, "Tunic")
 		roll.bones = ["upperarm_" + side, "lowerarm_" + side]
