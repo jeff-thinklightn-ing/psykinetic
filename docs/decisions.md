@@ -52908,7 +52908,7 @@ keep" (a game stopped, not quit, may not save it), and ends "SHOT cache: ..."; t
 PSYKINETIC_PIPELINE_CACHE ("cold" or "warm from RUN"), and map_bench's "BENCH ran:" line ends
 "pipeline cache <it>" ("unknown (not a laptop runner's run)" elsewhere), so no figure is read
 without it. Bot 2 (two-bot tours) always starts cold. --gpu-sample: nvidia-smi's own loop
-(timestamp, pstate, graphics and memory clocks, utilization, power, temperature, every 250 ms) into
+(timestamp, pstate, graphics and memory clocks, utilization, power, temperature, once a second) into
 out\gpu-<pass>.csv, started after each pass's game, in the run's job (kill on close), stopped with
 the game by its own PID; runner.log names its pid, rows and how it ended, or "asked, no nvidia-smi
 on this laptop". Read-only on the laptop: nothing written, installed or left running.

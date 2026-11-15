@@ -11,7 +11,7 @@
 # none. runner.log says "cache: cold" or "cache: warm from RUN", the files and bytes, and
 # whether the builds match, and ends "SHOT cache: ..."; the game reads it from
 # PSYKINETIC_PIPELINE_CACHE (map_bench's "BENCH ran:" line).
-# --gpu-sample (828 amended (12)): nvidia-smi samples the laptop's GPU every 250 ms while each
+# --gpu-sample (828 amended (12)): nvidia-smi samples the laptop's GPU once a second while each
 # pass's game runs (out/gpu-<pass>.csv), started after the game and stopped with it by its PID.
 # --vsync (828 amended (5)): off by default, the engine's --disable-vsync put first in the
 # godot args, so a run's timing is the game's and not the laptop's present: the Atlas holds

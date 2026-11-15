@@ -598,13 +598,13 @@ public static class Dialogs {
 			$null = $process.Handle
 			$jobbed += "pass $pass's game pid $($process.Id): $(if (($code = [Job]::Add($process.Handle)) -eq 0) { 'in' } else { "not in (error $code)" })"
 			$full = [Idle]::FullSpeed($process.Handle)
-			# gpu=1 (828 amended (12)): nvidia-smi's own loop, every 250 ms, started after the game, in the job.
+			# gpu=1 (828 amended (12)): nvidia-smi's own loop, once a second (the coordinator's; 250 ms moved the frames), started after the game, in the job.
 			$smi = $null
 			$smiCsv = Join-Path $Dir "out\gpu-$pass.csv"
 			if ($smiExe -ne $null) {
 				$smi = Start-Process -FilePath $smiExe -WindowStyle Hidden -PassThru -ArgumentList @(
 					"--query-gpu=timestamp,pstate,clocks.gr,clocks.mem,utilization.gpu,power.draw,temperature.gpu",
-					"--format=csv", "-lms", "250", "-f", $smiCsv)
+					"--format=csv", "-lms", "1000", "-f", $smiCsv)
 				$null = $smi.Handle
 				$jobbed += "pass $pass's nvidia-smi pid $($smi.Id): $(if (($code = [Job]::Add($smi.Handle)) -eq 0) { 'in' } else { "not in (error $code)" })"
 			}
@@ -729,7 +729,7 @@ public static class Dialogs {
 				# Stopped with the game, by its own PID (the job ends it too should this runner go first).
 				$smiState = if ($smi.HasExited) { "it had exited by itself ($($smi.ExitCode))" } else { Stop-Tree $smi; if ($smi.WaitForExit(5000)) { "stopped by its PID (gone)" } else { "stopped by its PID (STILL RUNNING)" } }
 				$rows = if (Test-Path $smiCsv) { [Math]::Max(0, @(Get-Content $smiCsv).Count - 1) } else { 0 }
-				$gpuLines += "gpu sampling, pass ${pass}: nvidia-smi pid $($smi.Id) every 250 ms from the game's start, $rows rows in out\gpu-$pass.csv; $smiState"
+				$gpuLines += "gpu sampling, pass ${pass}: nvidia-smi pid $($smi.Id) every second from the game's start, $rows rows in out\gpu-$pass.csv; $smiState"
 			}
 			if ($bot2 -ne $null) {
 				if (-not $bot2.HasExited) { Stop-Tree $bot2 }
