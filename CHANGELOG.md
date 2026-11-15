@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: at night a newcomer arriving in Umbrage sees the Mughouse's door lit ahead, its lantern lighting the step and the wall beside the door (927 amended (2)).
 - Towns: a hut's gable ends are upright boards with dark gaps between them, its ridge comes to a point at each end, and its roof has a thin straw edge with a ragged fringe beneath it (art-kit).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Towns: at Umbrage's square the town's own sound leads, with the woods behind the houses, and the forest rises as you walk out past the last buildings; inside a hut, a house or the Mughouse the street is heard faint and dulled through the walls, and in the Mughouse it sits under the hearth (939).
