@@ -79,7 +79,8 @@ func _test_spawn_grace() -> void:
 	var player := _player()
 	_check(player.protected, "a newly spawned player is protected")
 	# 661 amended (2): the arrival card holds a joiner's hands, so the grace waits on his client's view_ready.
-	_check(player.protected_until_tick == World.tick + _main.ARRIVAL_SHELTER_TICKS, "a join's grace is held to the shelter's bound (%d ticks) till the lift" % _main.ARRIVAL_SHELTER_TICKS)
+	var bound: int = _main.ARRIVAL_SHELTER_TICKS + _main.SPAWN_GRACE_TICKS
+	_check(player.protected_until_tick == World.tick + bound, "a join's grace is held till the lift, at most %d ticks (the shelter's bound, then the grace)" % bound)
 	var foe := _spawn_imp(player.tile + Vector2i(1, 0))
 	foe.sight_range = 7
 	var foe_at := foe.tile
@@ -92,9 +93,18 @@ func _test_spawn_grace() -> void:
 	_check(player.protected and player.protected_until_tick == World.tick + _main.SPAWN_GRACE_TICKS, "the lift: the %d ticks run from now" % _main.SPAWN_GRACE_TICKS)
 	_rejoin()
 	player = _player()
-	for i in _main.ARRIVAL_SHELTER_TICKS + 1:
+	for i in 75:
 		World.step()
-	_check(not player.protected, "a client that never lifts is open after the bound (%d ticks)" % _main.ARRIVAL_SHELTER_TICKS)
+	_check(player.protected, "a client that never lifts is still in grace at 60 and 75 ticks")
+	for i in bound - 75:
+		World.step()
+	_check(not player.protected, "and open at %d (the bound as its lift, then the grace)" % bound)
+	_rejoin()
+	player = _player()
+	for i in 70:
+		World.step()
+	_main._on_command(player, "view_ready", {"zone": player.zone})
+	_check(player.protected and player.protected_until_tick <= World.tick + 20, "a lift at 70 ticks gets no more than the bound's %d (until %d, now %d)" % [bound, player.protected_until_tick, World.tick])
 	_rejoin()
 	player = _player()
 	_main._on_command(player, "view_ready", {"zone": player.zone})
