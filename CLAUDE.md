@@ -222,7 +222,12 @@ that the walk looks like skipping and the people look like "bad claymation place
 - Worktrees share one machine's CPU: take the bench lock before any run whose timings
   you report (map_bench, frame numbers, network benches with many processes):
   `sh tools/bench_lock.sh take <tree> "<what>"`, then `release <tree>` after. If it's
-  held, wait. Keep many-process runs short. A windowed clip recording (Godot's movie
+  held, wait. Take a bench's gate take first and the bench lock when it starts (`heavy_job.sh
+  run` for the bench with the bench lock taken inside it, or take/holds before the lock);
+  never hold the bench lock while waiting on the gate, as with the land lock (2026-11-14: a
+  bench queued about five hours behind the evening's landings held the bench lock all that
+  time; a timing that can't find its gap is asked of the coordinator for saturn or a laptop).
+  Keep many-process runs short. A windowed clip recording (Godot's movie
   maker writes gigabytes of frames and starves everything else) counts as a heavy run:
   take the bench lock for it too, and clear its frames from `%TEMP%` after.
 - A windowed Godot (a shot run, a clip, a windowed bench, the editor) takes the screen and the GPU
