@@ -14253,6 +14253,8 @@ func _plan_glimpses() -> Array[Dictionary]:
 ## twice. Read it, never change it.
 static var _world_built: WorldMap = null
 static var _world_key := ""
+## How many times _world_map built (world_key_test).
+static var world_builds := 0
 
 
 static func _world_map() -> WorldMap:
@@ -14260,22 +14262,27 @@ static func _world_map() -> WorldMap:
 	if _world_built == null or key != _world_key:
 		_world_built = WorldMap.build()
 		_world_key = key
+		world_builds += 1
 	return _world_built
 
 
 ## What WorldMap.build() reads, each level by its folder (the overlay's
-## files by modified time) or the identity of the images registered for
-## it: equal keys, equal builds.
+## files by modified time) or, registered, by the digest of what it was
+## registered with (Level.register; 822 amended (7): a "terrain" message
+## with the same bytes is the same key, where the images' identity was not)
+## and its config's hash now: equal keys, equal builds.
 static func _world_map_key() -> String:
 	var parts := PackedStringArray()
 	for level_name in Level.names():
 		var made: Dictionary = Level._registered.get(level_name, {})
 		if not made.is_empty():
-			var ids: Array[int] = []
-			for image_key: String in ["layout", "height", "relief"]:
-				var image: Variant = made.get(image_key)
-				ids.append((image as Object).get_instance_id() if image is Object else 0)
-			parts.append("%s=made %s %d" % [level_name, ids, (made.get("config", {}) as Dictionary).hash()])
+			var digest := str(made.get("digest", ""))
+			if digest.is_empty():
+				# None made (no layout): its images' identity, as before 822 amended (7).
+				for image_key: String in ["layout", "height", "relief"]:
+					var image: Variant = made.get(image_key)
+					digest += " %d" % ((image as Object).get_instance_id() if image is Object else 0)
+			parts.append("%s=made %s %d" % [level_name, digest, (made.get("config", {}) as Dictionary).hash()])
 			continue
 		var folder := Level.folder_of(level_name)
 		if folder.begins_with(Level.DIR):

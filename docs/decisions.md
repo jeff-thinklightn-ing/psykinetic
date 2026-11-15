@@ -52744,6 +52744,32 @@ another generation, none sent, a level loaded with none sent, another plane zone
 _test_fields_own_state (660 amended (10)) lists Main's functions on _neighbour_level: _client_zone's
 read of the kept level (seamless only) moved into _enter_level, the list with it. Client only,
 protocol unchanged, no new class_name.
+822 amended (7): the world map's key by content (the coordinator's approval, 11-15; the label from
+tools/decision_number.sh). Probe 6 (perf's Atlas run) split Client3D.rebuild's first part: at the
+join 1727 of 1785 ms, back into the wilds 109 of 125 ms, were WorldMap.build() on the main thread,
+which Client3D._start_glimpse_reads asks for through _world_map() whenever _world_map_key() changes.
+The key named a registered level by its images' instance ids, and a client's "terrain" message
+registers new images on every crossing into an overlaid zone, the same bytes too: each crossing then
+built the world map again (warm, every level's images hashed: 41 ms headless here, 109 on the Atlas).
+Level.register now keeps the digest of what it registers, WorldMap._digest (maps' read: build reads
+of a level only Level.source's layout, height, relief and config, and _digest covers all four, so the
+key and _read_before can never disagree), made once per register; the key names a registered level
+by it and its config's hash now (one registered with no layout, by its images as before). The set of
+names and the overlay's files by modified time stay in the key; build's sources argument (the
+editor's unsaved levels) never goes through the key. WorldMapPanel's own key is the same, so it
+gains too. world_key_test: asked again, no build; the same bytes registered three more times, the
+same key and no build; the digest is WorldMap's own; one cell of the wilds changed, another key,
+built, only the wilds parsed again; a regenerating level laid again with another floor, and let go,
+each another key; a level saved in the overlay, and its level.json saved again, each another key and
+a build. Where the gain is met: a client of a server that sends "terrain" for an overlay zone, as
+the box does for its edited levels, on each crossing into one. It is shown by world_key_test's build
+counts alone: perf's Lenovo pair (C:/dev/review/perf_wm_before_lenovo, perf_wm_after_lenovo; SCRIPT
+ERROR 0 both) ran a tour with no overlay zone, where neither twin built the world map past the join,
+so it shows no harm and no gain (the return's step 72.2 and 70.6 ms, glimpse reads); no joined run
+has shown the rebuild or its going, so no crossing time is claimed for this take (the coordinator's
+ruling: no bullet, the Atlas half given back). Client only in effect (a server never asks
+_world_map), protocol unchanged, no new class_name; the join's cold build is the next take (on a
+worker at boot).
 
 Still to come, each behind the flag. Next, the maps step: the five corridors, each neighbour's plane
 origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam

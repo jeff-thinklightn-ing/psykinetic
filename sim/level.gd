@@ -538,8 +538,13 @@ static var _registered: Dictionary[String, Dictionary] = {}
 
 
 ## Makes a level from images and a config, without files (tests).
+## Each registered level keeps the digest of what it was registered with
+## (WorldMap._digest: what WorldMap.build reads of it), made once here, so a
+## level registered again with the same bytes reads as unchanged (Client3D's
+## world map key, 822 amended (7)).
 static func register(level_name: String, layout: Image, height: Image = null, config := {}, relief: Image = null) -> void:
-	_registered[level_name] = {"layout": layout, "height": height, "config": config, "relief": relief}
+	var digest := WorldMap._digest(layout, height, config, relief) if layout != null and not layout.is_empty() else ""
+	_registered[level_name] = {"layout": layout, "height": height, "config": config, "relief": relief, "digest": digest}
 	Regen.forget()
 
 
