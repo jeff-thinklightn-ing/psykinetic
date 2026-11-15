@@ -43278,6 +43278,27 @@ cell and a restart; _test_a_marker_moved_by_word: a chest keyed by the old cell,
 thing, comes back on the new marker with it, at load and through a re-lay whose anchors hold
 only the new cell). The barrow tour's knight post is (39,10). Level data and server; protocol
 unchanged; no new class_name.
+
+747 amended (14): the knight as a kept record, tested end to end (the coordinator's order after
+v0.1.217, when the box's journal showed the Offering stone moved and no knight line; label from
+tools/decision_number.sh). On the box he was most likely a record: retired (_retire, past
+retire_tiles and calm for RETIRE_AFTER_TICKS) with nobody near, and a record is not read at load
+or at a lay, only at its recall, where _level_spec_for puts him on his marker with (13)'s line.
+Headless on dungeon's own fixture (a knight record at (38,32), the player in the wilds): no
+line at boot or at the lay; on the first arrival "set on his marker at 39,10, saved at (38, 32)";
+the next start a body there and no line. No test ran that path before: spawn_key_test built its
+records by hand, and the crypt walk's fixtures saved with the player standing in the barrow, so
+the knight never retired. Two rows now: a keyed record of the marker's knight, off his marker:
+nothing at load and no line (the host's join queues him for the ticks after, Zone.recalls_due),
+on his marker at that recall (_recall_due) with the line, holding his slot, and a body there with
+no line at the load after; and retire then recall, run once: on a level 100
+cells wide, the knight left 96 cells from the host and calm past RETIRE_AFTER_TICKS is kept as
+a record with his key, not dead; a save and a load with the host still far keep him a record;
+the host come near brings him back on his marker, holding his slot, with no line. The first row's
+record sits 15 cells from the host's start: at 9 the host's own join recall at load
+(RECALL_JOIN_NOW_TILES, 12) brought him back, the same way a fixture with its player near the
+place hides the record path. Main.knights_set_on_marker counts (13)'s line for the test. Tests
+and server (a counter); protocol unchanged; no new class_name.
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.

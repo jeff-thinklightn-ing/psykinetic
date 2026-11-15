@@ -6854,6 +6854,10 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 ## and how many of its level entities found their moved markers.
 var _saved_keys := {}
 var _adopted := 0
+## How many fallen knights a save or a record put back on their markers
+## (747 amended (13)), each with its "[state] ... set on his marker" line;
+## spawn_key_test reads it.
+var knights_set_on_marker := 0
 
 
 ## The slot of the marker [param saved] (a saved level entity whose key
@@ -6967,6 +6971,7 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 		var was: Variant = saved["tile"] if saved["tile"] is Vector2i else Snapshot.vector(saved["tile"])
 		spec["tile"] = level_entities[slot]["tile"]
 		if was != spec["tile"]:
+			knights_set_on_marker += 1
 			print("[state] %s: 1 fallen knight set on his marker at %s, saved at %s" % [World.zone.name, _key_of(slot), was])
 	return spec
 

@@ -26,6 +26,9 @@ const KNIGHT_NOW := Vector2i(2, 2)
 const KNIGHT_LEGEND := {"monster_astral_knight": "#c8d8f0"}
 ## The knight's marker's facing in KNIGHT_LEVEL (the barrow's faces north, [0, -1]).
 const KNIGHT_FACING := Vector2i(0, -1)
+## The width of the knight's level for the retire row: his marker past
+## retire_tiles (80) from the start at (0, 2).
+const KNIGHT_FAR_WIDTH := 100
 
 var _failures := 0
 var _main: Node
@@ -55,6 +58,7 @@ func _run() -> void:
 	_test_a_marker_moved_by_word(path, saved)
 	_test_a_moved_locker(path, saved)
 	_test_a_moved_knight()
+	_test_a_knight_retired_and_recalled()
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -337,18 +341,18 @@ func _test_a_marker_moved_by_word(path: String, data: Dictionary) -> void:
 
 
 ## The knight's level, his marker at [param at], a start at (0, 2).
-func _register_knight(at: Vector2i) -> void:
+func _register_knight(at: Vector2i, width := WIDTH) -> void:
 	Level.unregister(KNIGHT_LEVEL)
 	var colour := func(meaning: String) -> Color: return Color(str(KNIGHT_LEGEND.get(meaning, Level.LEGEND.get(meaning, "#000000"))))
-	var image := Image.create_empty(WIDTH * 2 + 1, HEIGHT * 2 + 1, false, Image.FORMAT_RGBA8)
+	var image := Image.create_empty(width * 2 + 1, HEIGHT * 2 + 1, false, Image.FORMAT_RGBA8)
 	image.fill(colour.call("void"))
 	var ground: Color = colour.call(Level.GROUNDS[0])
 	for y in HEIGHT:
-		for x in WIDTH:
+		for x in width:
 			var cell := Vector2i(x, y)
 			var meaning := "monster_astral_knight" if cell == at else "start" if cell == Vector2i(0, 2) else ""
 			image.set_pixel(x * 2, y * 2, colour.call(meaning) if not meaning.is_empty() else ground)
-			if x + 1 < WIDTH:
+			if x + 1 < width:
 				image.set_pixel(x * 2 + 1, y * 2, ground)
 			if y + 1 < HEIGHT:
 				image.set_pixel(x * 2, y * 2 + 1, ground)
@@ -489,6 +493,51 @@ func _test_a_moved_knight() -> void:
 	var kept := World.record_list().filter(func(record: Dictionary) -> bool: return str(record["entry"].get("script", "")).ends_with("astral_knight.gd"))
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and kept.is_empty(),
 			"the old knight kept as a record: made again, he is dropped, not kept again (%s, %d records)" % [_knight_words(knights), kept.size()])
+	# A record of the marker's own knight, keyed, kept off his marker (the box after v0.1.217:
+	# he retired with nobody near, at a cell off it): nothing at load and no line; at his
+	# recall, on his marker with the line; and the load after, a body there, no line.
+	_write(path, saved)
+	_register_knight(KNIGHT_NOW)
+	_knights_loaded()
+	_main._save_state()
+	var keyed_record: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var record_zone: Dictionary = keyed_record["zones"][LEVEL]
+	# 15 cells from the host at the start, past the join's own recall (RECALL_JOIN_NOW_TILES,
+	# 12): at 9 cells the host's join at load brought him back, so "nothing at load" read a
+	# recall. A fixture whose player stands near the place hides the record path the same way.
+	var off := Vector2i(WIDTH - 1, 2)
+	var record_entry: Dictionary = {}
+	var others: Array = []
+	for entry: Dictionary in record_zone["entities"]:
+		if str(entry.get("spawn_key", "")) == now_key:
+			record_entry = entry.duplicate(true)
+			record_entry["tile"] = [off.x, off.y]
+			if record_entry.has("home"):
+				record_entry["home"] = [off.x, off.y]
+		else:
+			others.append(entry)
+	record_zone["entities"] = others
+	record_zone["records"] = [{"entry": record_entry, "route": [], "route_index": 0, "route_step": 1}]
+	_write(path, keyed_record)
+	var lines_were: int = _main.knights_set_on_marker
+	knights = _knights_loaded()
+	var knight_records := func() -> Array: return World.record_list().filter(func(record: Dictionary) -> bool:
+			return str(record["entry"].get("script", "")).ends_with("astral_knight.gd"))
+	_check(not record_entry.is_empty() and knights.is_empty() and knight_records.call().size() == 1 and World.zone.recalls_due.size() == 1
+			and _main.knights_set_on_marker == lines_were,
+			"his record keyed, off his marker at %s: nothing at load, no line, the record kept, queued by the host's join for the ticks after (%s, %d records, %d lines)"
+			% [off, _knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
+	_main._recall_due()  # The next tick's (decision 352): what the host's join queued, made again.
+	knights = _knights()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key
+			and _main._alive_slots.values().has(knights[0]) and knight_records.call().is_empty() and _main.knights_set_on_marker == lines_were + 1,
+			"recalled: on his marker, holding his slot, the record gone, with the line (%s, %d records, %d lines)"
+			% [_knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
+	_main._save_state()
+	lines_were = _main.knights_set_on_marker
+	knights = _knights_loaded()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knight_records.call().is_empty() and _main.knights_set_on_marker == lines_were,
+			"and the load after: a body on his marker, no record, no line (%s, %d lines)" % [_knight_words(knights), _main.knights_set_on_marker - lines_were])
 	# (b) A re-lay of the level (the box's 14): the zone held with the old
 	# knight, laid again on the moved marker, its whole floor kept.
 	_write(path, saved)
@@ -505,6 +554,67 @@ func _test_a_moved_knight() -> void:
 	Level.unregister(KNIGHT_LEVEL)
 	_register(false)
 	_main._load_level(LEVEL)
+
+## The whole road a kept knight takes, retire and recall, run once (the box
+## after v0.1.217: he went to a record with nobody near, and came back only
+## when a player did): a body left past retire_tiles (80) and calm for
+## RETIRE_AFTER_TICKS is kept as a record, not dead and not respawned; a save
+## and a load with the player still far keep him a record; a player come near
+## brings him back on his marker, holding his slot, with no line (he was kept
+## where he stood, on it).
+func _test_a_knight_retired_and_recalled() -> void:
+	print("
+== the fallen knight left far behind: kept as a record, then back on his marker (747 amended (14)) ==")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("spawn_key_knight_far.json")
+	DirAccess.remove_absolute(path)
+	Net.state_path = path
+	var marker := Vector2i(KNIGHT_FAR_WIDTH - 4, 2)
+	var key := "%d,%d" % [marker.x, marker.y]
+	_register_knight(marker, KNIGHT_FAR_WIDTH)
+	_main._load_level(KNIGHT_LEVEL)
+	_main._start_level(false)
+	var knights := _knights()
+	var host := _host()
+	_check(knights.size() == 1 and knights[0].tile == marker and host != null and World.distance(host.tile, marker) > _main.retire_tiles,
+			"a fresh level: his one knight on his marker, the host past retire_tiles from him (%s, host at %s)" % [_knight_words(knights), host.tile if host else null])
+	var lines_were: int = _main.knights_set_on_marker
+	var knight_records := func() -> Array: return World.record_list().filter(func(record: Dictionary) -> bool:
+			return str(record["entry"].get("script", "")).ends_with("astral_knight.gd"))
+	for i in Main.RETIRE_AFTER_TICKS + Main.RETIRE_EVERY_TICKS + 40:
+		World.step()
+	knights = _knights()
+	var kept: Array = knight_records.call()
+	_check(knights.is_empty() and kept.size() == 1 and str(kept[0]["entry"].get("spawn_key", "")) == key
+			and _main._dead_since.is_empty() and _main._recorded_slots().size() == 1,
+			"left far behind and calm: kept as a record with his key, not dead (%s, %d records)" % [_knight_words(knights), kept.size()])
+	_main._save_state()
+	knights = _knights_loaded()
+	_check(knights.is_empty() and knight_records.call().size() == 1, "saved and loaded with the host still far: a record, no body (%s, %d records)"
+			% [_knight_words(knights), knight_records.call().size()])
+	host = _host()
+	if host != null:
+		World._relocate(host, marker - Vector2i(6, 0))
+	for i in Main.RETIRE_EVERY_TICKS * 2 + 2:
+		if knight_records.call().is_empty() and not _knights().is_empty():
+			break
+		World.step()
+	knights = _knights()
+	_check(knights.size() == 1 and knights[0].tile == marker and knights[0].spawn_spec.get("spawn_key", "") == key
+			and _main._alive_slots.values().has(knights[0]) and knight_records.call().is_empty() and _main.knights_set_on_marker == lines_were,
+			"a player near again: back on his marker, holding his slot, the record gone, no line (%s, %d records, %d lines)"
+			% [_knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
+	DirAccess.remove_absolute(path)
+	Level.unregister(KNIGHT_LEVEL)
+	_register(false)
+	_main._load_level(LEVEL)
+
+
+## The host's player, if it stands in the world.
+func _host() -> Player:
+	for entity: GridEntity in World.get_entities():
+		if entity is Player and entity.spawned and entity.owner_peer == Net.local_id:
+			return entity
+	return null
 
 
 ## A town's locker whose marker moved past the reach (737: Umbrage's into
