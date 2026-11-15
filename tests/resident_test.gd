@@ -7891,7 +7891,8 @@ func _test_pedlar_stand() -> void:
 	World.holdings._places[stand_id] = {"id": stand_id, "area": TOWN, "key": "rs_pedlar_stall", "cell": keeper_cell, "name": "a stall",
 		"kind": "stall", "radius": 1, "worth": 0, "start": "", "town": STORE}
 	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
-	var m3 := {"slot": "building.market_stall", "at": [counter.x, counter.y], "facing": [0, -1], "code": "M3", "rect": Rect2i(counter, Vector2i.ONE)}
+	# As a world's area holds it (a rect and a Vector2i facing, no level.json "at"), the market stall's 2 x 1.
+	var m3 := {"slot": "building.market_stall", "facing": Vector2i(0, -1), "code": "M3", "rect": Rect2i(counter, Vector2i(2, 1))}
 	buildings.append(m3)
 	var kind_rule: Dictionary = World.towns.rules.get("visitors", {}).get("kinds", {}).get("pedlar", {})
 	var key_was: Variant = kind_rule.get("stall")
@@ -7910,8 +7911,10 @@ func _test_pedlar_stand() -> void:
 	var wat := _body("visitor:visitor_rs_p10")
 	var behind := Main._behind_counter(Rect2i(keeper_cell - Vector2i.ONE, Vector2i(3, 3)), counter, Vector2i(0, -1))
 	_check(behind == Rect2i(11, 10, 3, 2), "(the keeper's side of a north-facing counter: the rows south of it, %s)" % [behind])
-	_check(bess != null and bess.places.get("work", Rect2i()) == behind and bess.places.get("square", Rect2i()) == behind,
-		"Bess, come first: behind the stall's counter (%s)" % [bess.places.get("work") if bess != null else null])
+	# Of his side, the row beside the counter: a click across it reaches him (keeper_sees), never the back corner.
+	var at_counter := Rect2i(11, 10, 3, 1)
+	_check(bess != null and bess.places.get("work", Rect2i()) == at_counter and bess.places.get("square", Rect2i()) == at_counter and behind.encloses(at_counter),
+		"Bess, come first: behind the stall's counter, the row beside it, read from the area's building as laid (%s)" % [bess.places.get("work") if bess != null else null])
 	_check(wat != null and wat.places.get("work", Rect2i()) == five, "Wat, come a day after: the store's 5x5 (%s)" % [wat.places.get("work") if wat != null else null])
 	var saved: Array = JSON.parse_string(JSON.stringify(visitors))
 	visitors.clear()

@@ -23209,13 +23209,27 @@ func _stall_spot(place_id: String, key: String) -> Rect2i:
 		return Rect2i()
 	var radius := maxi(int(stall.get("radius", 1)), 0)
 	var spot := Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
-	# His side of the counter only (853, the coordinator's rule): he strolls, never round to the front.
+	# His side of the counter only (853, the coordinator's rule): he strolls, never round to the front. The counter read
+	# through Level.building_rect and building_facing (711 amended (2)): a world's area holds a building as laid (a rect,
+	# a Vector2i facing), never level.json's "at" array, so the check by "at" alone never matched in the game and he had
+	# the whole square about the stall, its front corners too.
 	var buildings: Array = _world_map.areas.get(str(town.get("area", "")), {}).get("buildings", []) if _world_map != null else []
 	for each: Variant in buildings:
-		if each is Dictionary and str(each.get("slot", "")) in COUNTERS and each.get("at") is Array and each.get("facing") is Array:
-			var at := Vector2i(int(each["at"][0]), int(each["at"][1]))
-			if World.distance(at, Vector2i(stall["cell"])) <= 1:
-				return _behind_counter(spot, at, Vector2i(int(each["facing"][0]), int(each["facing"][1])))
+		if not each is Dictionary or not str(each.get("slot", "")) in COUNTERS:
+			continue
+		var rect: Variant = Level.building_rect(each)
+		if not rect is Rect2i or not (rect as Rect2i).grow(1).has_point(Vector2i(stall["cell"])):
+			continue
+		var facing: Vector2i = each["facing"] if each.get("facing") is Vector2i else Level.building_facing(each)  # As laid, or level.json's.
+		var behind := _behind_counter(spot, (rect as Rect2i).position, facing)
+		# Within a click across it (keeper_sees: a counter cell beside him): the cells of his side next to the counter.
+		var near := Rect2i()
+		for y in range(behind.position.y, behind.end.y):
+			for x in range(behind.position.x, behind.end.x):
+				var cell := Vector2i(x, y)
+				if (rect as Rect2i).grow(1).has_point(cell) and not (rect as Rect2i).has_point(cell):
+					near = Rect2i(cell, Vector2i.ONE) if near.size == Vector2i.ZERO else near.merge(Rect2i(cell, Vector2i.ONE))
+		return near if near.size != Vector2i.ZERO else behind
 	return spot
 
 
