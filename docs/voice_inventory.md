@@ -3935,7 +3935,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Whoever refuses the draugr's bargain must fight him for it. | `entries[2].facts[12].text` |
 | L | The door of the Hall of Fallen Souls closes behind whoever enters, and opens again for gold returned or for his defeat. | `entries[2].facts[13].text` |
 |  | The Encolpion Amulet encases blessed ashes that protect the wearer, and gives its holder another chance to fight. | `entries[2].facts[14].text` |
-|  | Pip carries the temple's offering down into the crypt and lays it on the offering stone in the Low Hall. | `entries[2].facts[15].text` |
+|  | Pip carries the temple's offering down into the crypt and lays it on the offering stone in the First Hall. | `entries[2].facts[15].text` |
 |  | The crypt is dug beneath the temple in Umbrage. | `entries[2].facts[16].text` |
 |  | The temple has its own underground, the crypt, and keeps it wherever the temple stands. | `entries[2].facts[17].text` |
 |  | The temple's stair down is watched, so the Mound-breakers broke into the old mound outside town and dug through from it to the crypt. | `entries[2].facts[18].text` |
