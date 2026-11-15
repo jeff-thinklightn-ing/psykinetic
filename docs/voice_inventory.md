@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2989)
+## Lines in the code (2991)
 
 ### companions (Pip, Wren, Nix) (663)
 
@@ -2126,7 +2126,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (786)
+### server and windows (788)
 
 | | Line | Where |
 |---|---|---|
@@ -2200,6 +2200,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | usage: season <%s> \| season_days <n> | `main.gd` _season_command() |
 |  | usage: season <%s> \| season_days <n> | `main.gd` _season_command() |
 |  | %s (year %.3f), a season takes %d days, cold %.2f, snow cover %.2f | `main.gd` _season_command() |
+|  | seed=%d %s | `main.gd` _join_player() |
 |  | The ways have shifted since you were last here. | `main.gd` _join_player() |
 |  | Nobody in town is on the dole now. | `main.gd` _on_dole_changed() |
 |  | %d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd` _on_dole_changed() |
@@ -2908,6 +2909,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | ; went on %.2f cells | `main.gd` _lat_report() |
 |  | nothing in sight | `main.gd` _lat_turn_done() |
 |  | nothing in sight | `main.gd` _run_test_chase() |
+|  | hair %s %s beard %s skin %s keys %s scale %.3f | `main.gd` _face_words() |
 |  | a hill cat | `main.gd` _on_cat_spotted() |
 |  | spotted a hill cat | `main.gd` _on_cat_spotted() |
 |  | came somewhere new with you | `main.gd` _discovered() |
