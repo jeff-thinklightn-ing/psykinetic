@@ -16969,6 +16969,14 @@ func _build_talk() -> void:
 	options_panel.name = "Options"
 	options_panel.visible = false
 	options_panel.dev_keys = func() -> bool: return is_admin or Net.mode == Net.Mode.HOST  # The Testing keys.
+	# The Character preview's tunic: this player's join colour, read where Client3D reads it for the body (the
+	# Sprite's modulate, PLAYER_TINTS by join index); null before a join (or a body freed), the look's own tunic.
+	options_panel.own_tunic = func() -> Variant:
+		var me := _local_player()
+		if me == null or not is_instance_valid(me):
+			return null
+		var sprite := me.get_node_or_null("Sprite") as Sprite2D
+		return sprite.modulate if sprite != null and is_instance_valid(sprite) else null
 	options_panel.hints_changed.connect(func(shown: bool) -> void:
 		if hint_panel != null:
 			hint_panel.visible = shown)

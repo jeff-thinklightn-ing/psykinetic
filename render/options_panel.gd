@@ -72,6 +72,9 @@ const KEY_GROUPS := [
 ]
 ## Whether the Testing keys show (Main sets it); none: hidden.
 var dev_keys: Callable
+## The preview's tunic (Main's: this player's join colour, as the game dresses the body; null before a join, and the
+## preview shows the look's own). Asked each time the look is shown: at every open and every change on the panel.
+var own_tunic: Callable
 ## The Testing keys' rows, with their heading.
 var dev_rows: VBoxContainer
 ## The tabs, a page per add_section.
@@ -432,7 +435,11 @@ func _show_look() -> void:
 	if beard_row != null:
 		beard_row.visible = look.body == &"male"
 	if preview != null:
-		preview.show_look(look)
+		var tunic: Variant = own_tunic.call() if own_tunic.is_valid() else null
+		if tunic is Color:
+			preview.show_look(look, tunic)
+		else:
+			preview.show_look(look)
 
 
 ## Anti-aliasing: a button per Net.ANTIALIAS, applied and saved at a click.

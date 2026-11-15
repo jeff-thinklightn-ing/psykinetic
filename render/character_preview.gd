@@ -52,8 +52,9 @@ func _ready() -> void:
 	_view.add_child(_turntable)
 
 
-## Drawn as [param look] (PersonLook) on the [param body]'s model.
-func show_look(look: PersonLook) -> void:
+## Drawn as [param look] (PersonLook) on the [param body]'s model, its tunic [param tunic] as Client3D._make_model
+## dresses a player (the join colour), white for the look's own (before a join there is no join colour).
+func show_look(look: PersonLook, tunic := Color.WHITE) -> void:
 	if _model == null or look.body != _body:
 		if _model != null:
 			_model.queue_free()
@@ -66,8 +67,8 @@ func show_look(look: PersonLook) -> void:
 		animator.root_node = NodePath("..")
 		animator.add_animation_library("", load(model["clips"]) as AnimationLibrary)
 		animator.play(Client3D.CLIP_IDLE)
-		Client3D._dress(_model, Color.WHITE)
-	look.apply(_model)
+	Client3D._dress(_model, tunic)
+	look.apply(_model, tunic)
 	Client3D._size_head(_model, look)
 	_model.scale = Vector3.ONE * look.scale
 

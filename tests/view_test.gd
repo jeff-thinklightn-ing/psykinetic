@@ -272,6 +272,7 @@ func _ready() -> void:
 		_test_level_music()
 		_test_room_music()
 		_test_options_panel()
+		await _test_preview_tunic()
 		_test_hair_covers_head()
 		_test_hair_value()
 		_test_hair_pick_kept()
@@ -886,6 +887,78 @@ func _test_options_panel() -> void:
 ## 252 amended (1): no tufts or flowers on a cell where a pile lies, each
 ## put back exactly as it was when the pile goes; a chunk drawn while a
 ## pile lies there draws them hidden.
+## The Character preview's tunic is the one the game dresses this player in (their join colour, the
+## Sprite's modulate, PLAYER_TINTS by join index), not the look's own: voice's freshface stills showed
+## a purple tunic in Options and another colour in play. White (no player, before a join) leaves the
+## look's own. A colour that changes while the panel is open (a rejoin gives another index) shows at
+## the next open or the next change on the panel, not live.
+func _test_preview_tunic() -> void:
+	print("\n== the Character preview wears this player's tunic, as the game draws it ==")
+	var panel: OptionsPanel = _main.options_panel
+	if not panel.visible:
+		_main.toggle_options()
+	var drawn := func() -> Variant:
+		var body := panel.preview._model.find_child("Body", true, false) as MeshInstance3D if panel.preview._model != null else null
+		return body.get_instance_shader_parameter("tunic") if body != null else null
+	# Joined as a client is (the host's own join): the record's PLAYER_TINTS colour, the spawn's tint, the
+	# Sprite's modulate, the body dressed from it; left again at the end if this row joined.
+	var joined := _main._local_player() == null
+	if joined:
+		_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+		World.step()
+		await get_tree().process_frame
+	_rig._process(0.0)
+	var player: Player = _main._local_player()
+	var sprite := player.get_node_or_null("Sprite") as Sprite2D if player != null else null
+	var tint: Color = sprite.modulate if sprite != null else Color.WHITE
+	_check(sprite != null and tint != Color.WHITE and panel.own_tunic.is_valid() and panel.own_tunic.call() == tint,
+			"Main's hook gives the local player's join colour, the Sprite's modulate the game dresses from (%s)" % [tint])
+	panel._show_look()
+	var puppet := _rig._puppets.get(player.get_instance_id()) as Node3D if player != null else null
+	# The body's mesh (puppet/Body/Model/.../Body), not the puppet's "Body" node above it.
+	var meshes: Array = puppet.find_children("Body", "MeshInstance3D", true, false) if puppet != null else []
+	var model := meshes[0] as MeshInstance3D if not meshes.is_empty() else null
+	var game: Variant = model.get_instance_shader_parameter("tunic") if model != null else null
+	_check(drawn.call() == tint and game == tint,
+			"the preview wears it, the tunic the game draws on this player's body (%s, the game %s)" % [drawn.call(), game])
+	var hook := panel.own_tunic
+	var held := {"tunic": Color(0.2, 0.55, 0.3)}
+	panel.own_tunic = func() -> Color: return held["tunic"]
+	panel._show_look()
+	_check(drawn.call() == held["tunic"], "another colour given: the preview wears it (%s)" % [drawn.call()])
+	var was: Color = held["tunic"]
+	held["tunic"] = Color(0.6, 0.25, 0.2)
+	for i in 3:
+		await get_tree().process_frame
+	_check(drawn.call() == was, "changed while the panel stays open: the preview keeps the colour it opened with (not live)")
+	_main.toggle_options()
+	_main.toggle_options()
+	_check(panel.visible and drawn.call() == held["tunic"], "shut and opened again: the preview wears the new colour (%s)" % [drawn.call()])
+	held["tunic"] = Color(0.3, 0.3, 0.6)
+	var settings: Array = [Net._settings_override, Net.player_look, Net.player_id, Net.player_name]
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("view_test_tunic.cfg")
+	Net.save_settings("127.0.0.1", 17789, "", Net.player_name)  # A file to rewrite, as a client has.
+	(panel.swatches["skin"]["3"] as Button).pressed.emit()
+	_check(drawn.call() == held["tunic"], "a change on the panel (a skin picked) shows the new colour too")
+	DirAccess.remove_absolute(Net._settings_override)
+	Net._settings_override = settings[0]
+	Net.player_look = settings[1]
+	Net.player_id = settings[2]
+	Net.player_name = settings[3]
+	held["tunic"] = Color.WHITE
+	panel._show_look()
+	_check(drawn.call() == panel._look().colours["tunic"],
+			"no join colour (before a join): the look's own tunic (%s)" % [drawn.call()])
+	panel.own_tunic = hook
+	if joined:
+		_main._on_peer_disconnected(Net.local_id)
+		World.step()
+		await get_tree().process_frame
+	_check(_main._local_player() != null or panel.own_tunic.call() == null, "no local player: Main's hook gives none (the look's own tunic)")
+	panel._show_look()
+	_main.toggle_options()
+
+
 func _test_tufts_under_piles() -> void:
 	print("
 == no tufts or flowers under a pile: hidden in place, put back exactly ==")

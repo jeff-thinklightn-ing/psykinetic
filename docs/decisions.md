@@ -56162,6 +56162,27 @@ picked, through a travel within his zone, to sample and back, a death's return w
 with one face each time, always Player1, the face Options shows the same; his client keeps the server's look once,
 in its settings file, and asks with it when he comes back (--test-face-trips on the server, --test-face on the
 client). record_keys_test's sample look carries its seed.
+911 amended (2), pc-character (the coordinator's go; voice's freshface stills): the Character preview wore the look's
+own seeded tunic (often purple) while the game dressed the same player in their join colour (PLAYER_TINTS by join
+index, on the Sprite's modulate, which Client3D._make_model reads for a player's body). Now the preview wears what
+the game draws.
+- OptionsPanel.own_tunic, a Callable beside dev_keys (ui's file; ui's yes, keeping the Callable): Main sets it to read
+  the local player's Sprite modulate, or null when there is no local player or the player or its Sprite is freed
+  (is_instance_valid on both). _show_look passes a Color through to CharacterPreview.show_look(look, tunic), which
+  dresses and applies with it on every call. With null it calls show_look(look), and the preview's default (white,
+  the look's own tunic) applies. The panel names no colour of its own (style_test: a literal would count against
+  main.gd's and options_panel.gd's lines).
+- When it follows: the hook is asked each time the look is shown, at every open and every change on the panel. A
+  colour that changes while the panel stays open (a rejoin gives another index) shows at the next open or change,
+  not live.
+- Before a join (the title screen's Options) the look's own tunic shows, and no words in the panel or preview speak
+  of the in-game colour.
+- Test: view_world_test _test_preview_tunic. It joins as the host does when no player is there (and leaves at the
+  end). It checks that Main's hook gives the Sprite's modulate, and that the preview and the body the game draws
+  wear the same tunic. A colour given shows; a change while open does not; it shows on reopening and on a swatch
+  picked. No colour gives the look's own; no player gives none.
+- The joined pair (Options and the game, the same client) goes on ui-design's list. Client only, protocol
+  unchanged, no new class_name, no bullet.
 897, companions' side (enemy-ai's ask): Companion.forget, decision 572's let-go of what she holds,
 overrode the base's without calling it, so her shelter_lead and an order on the gone (action_target)
 were left; it calls super(entity) first now, then clears the foe she keeps a moment (_held_foe, 706;
