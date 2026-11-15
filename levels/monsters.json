@@ -109,7 +109,7 @@
 		"escort": {"kind": "wolf", "count": [2, 2], "follow": 4},
 		"body": {"mass": 60.0, "max_hp": 40, "move_ticks": 2.9, "attack_damage": 5, "attack_ticks": 30, "sight_range": 8},
 		"senses": {"cone": 160, "night": 0.6, "hearing": 2.0, "alert_sight": 2, "notice": 1.2},
-		"fight": {"lead_ticks": 6},
+		"fight": {"lead_ticks": 7},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"drops": [{"item": "grey_pelt", "count": [1, 1]}, {"item": "grey_fang", "count": [1, 1]}],

@@ -1879,7 +1879,9 @@ func _test_ambush() -> void:
 	_test_boar_king_far_chase()
 	_test_boar_king_rates()
 	_test_old_wolf_lunge_line()
+	_test_old_wolf_told_bite()
 	_test_old_wolf_fights()
+	_test_old_wolf_fights_along()
 	_test_told_runs_stop()
 	_test_den_bite_per_blow()
 	_test_den_pack_covers()
@@ -8106,6 +8108,65 @@ func _live_grey(at: Vector2i) -> OldWolf:
 	return grey
 
 
+## His bite is told (the coordinator's ruling, 2026-11-15; combat's cap of a
+## 7-tick lead): as it begins, his target's struck cell is told, flank-marked,
+## for its whole lead, and stays where it was laid; standing on it as it lands
+## she is bitten, stepped off it she is clear though still beside him. His den
+## bite (Apex.to_den's) is untold, as before.
+func _test_old_wolf_told_bite() -> void:
+	print("%s== the old grey's told bite: his target's cell told for his 7-tick lead, fixed; off it you're clear ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for case: String in ["stays", "steps", "den"]:
+		var rows: Array[String] = ["#".repeat(20)]
+		for y in 11:
+			rows.append("#" + ".".repeat(18) + "#")
+		rows.append("#".repeat(20))
+		rows[5] = rows[5].substr(0, 10) + "P" + rows[5].substr(11)
+		var e := _build(rows)
+		var player: GridEntity = e["P"][0]
+		player.protected = false
+		player.max_hp = 1000
+		player.hp = 1000
+		var grey := _live_grey(Vector2i(11, 5))
+		grey.acts = false  # Only the bite begun here.
+		grey.next_attack_tick = 0
+		var her := World.struck_cell(player)
+		var began := grey._den_bite(player) if case == "den" else World.try_wind_up(grey, player, grey.lead_ticks)
+		_check(began, "%s: his bite begins" % case)
+		var tell := int(grey.wind_up.get("tell", 0))
+		if case == "den":
+			_check(tell == 0 and World.telegraphs().is_empty(), "den: his den bite lays no told cell, as before (%s)" % World.telegraphs())
+			continue
+		var shown: Dictionary = World.telegraphs().get(tell, {})
+		var cells: Array[Vector2i] = []
+		for c: Array in shown.get("cells", []):
+			cells.append(Vector2i(int(c[0]), int(c[1])))
+		_check(cells == [her] and str(shown.get("kind", "")) == "bite" and int(shown.get("lands_tick", 0)) - int(shown.get("from_tick", 0)) == 7
+				and bool(World._telegraphs[tell]["flank"]),
+			"%s: his target's cell told as it begins, a bite, 7 ticks, flank-marked (%s, %s)" % [case, cells, shown])
+		if case == "steps":
+			Walk.step(player, Vector2i(0, 1), 5)
+			_check(World.struck_cell(player) != her and World.distance(player.tile, grey.tile) <= 1,
+				"steps: she stands off the told cell, still beside him, at %s" % player.tile)
+			var still: Array[Vector2i] = World.told_cells(tell)
+			_check(still == [her], "steps: the told cell stays where it was laid (%s)" % still)
+		_damage_log.clear()
+		for i in 10:
+			World.step()
+		var bit := 0
+		for d: Dictionary in _damage_log:
+			if d["entity"] == player and d["source"] == grey:
+				bit += int(d["amount"])
+		_check(not World._telegraphs.has(tell), "%s: the tell over as the bite lands" % case)
+		if case == "stays":
+			_check(bit > 0, "stays: on the told cell as it lands, she is bitten (%d)" % bit)
+		else:
+			_check(bit == 0, "steps: off it, she is clear (%d)" % bit)
+	DayNight.reset()
+	Monster.idling = true
+
+
 ## His lunge strikes only who its told line shows (780 amended (23), the
 ## coordinator's ruling: step off the red and you're clear): a player who
 ## steps one cell off the line before it lands takes nothing from it though
@@ -8187,25 +8248,32 @@ func _test_old_wolf_lunge_line() -> void:
 ## is walked in, as the game's client does) and reader (careless, but steps off
 ## a red cell GREY_REACT ticks after it lies on her), as combat's yard harness
 ## plays them. The whole table prints every run (won, fell, both down, harm, of
-## it told), so a tuner sees what moved while it passes. It asserts only what
-## the design means and the table holds (the coordinator's ruling, 2026-11-14):
-## with each weapon the reader takes no more harm a fight than the careless one
-## plus GREY_HARM_SLACK (their gap is 0.9-1.4 hp at 64 starts); over the three
-## weapons together the reader takes less harm and wins more often; careless
-## fists win at most GREY_FISTS_WINS of the starts. Not per weapon wins (a coin
-## flip with the sword: 54 against 53 of 64), nor "a careless sword loses": it
-## wins 83% today. Under the players who do not read (780 amended (37), the
-## coordinator's ruling, 2026-11-15, after a hold on ordered blows took them
-## away: careless sword 27 to 18 here, chaser sword 32 to 25): each wins at
-## least its GREY_UNREAD_FLOORS, five and six under main's figure. One
-## sided, wins only: no assert on which weapon wins most at the top, and no
-## harm band here (that stays with the change that sets its figure).
+## it told), so a tuner sees what moved while it passes. It asserts what the
+## design means and the table holds (the coordinator's rulings, 2026-11-14 and,
+## with his bite told at a 7-tick lead, 2026-11-15): with fists and the dagger
+## the reader takes at least GREY_READ_SAVES less harm a fight than the careless
+## one and wins at least GREY_READ_WINS more of the starts; with the sword (her
+## own wind-up holds her under a told bite, the sword's, not the tell's) no
+## more than the careless one plus GREY_HARM_SLACK; careless fists win at most
+## GREY_FISTS_WINS and a careless sword GREY_SWORD_WINS; and the careless one's
+## harm stays within GREY_CARELESS_DRIFT of GREY_MAIN_CARELESS, main's table
+## before the bite was told, with every weapon: he stays as dangerous to a
+## player who doesn't read him. Under the players who do not read (780 amended
+## (37)), each wins at least its GREY_UNREAD_FLOORS, re-set by this change to six
+## under its own lead-7 figure.
 const GREY_STARTS := 32
-## Of GREY_STARTS: main reads careless sword 27, chaser sword 32 (11-15, the same each run); the
-## coordinator's floors. A change that sets the table again re-sets each to six under its own figure.
-const GREY_UNREAD_FLOORS := {"careless sword": 22, "chaser sword": 26}
-const GREY_HARM_SLACK := 0.5  # Hp a fight.
-const GREY_FISTS_WINS := 2  # Of GREY_STARTS.
+## Of GREY_STARTS: at lead 7 careless sword 28, chaser sword 29 (the same each run); six under each
+## (780 amended (37): main's 22 and 26 under its untold bite's 27 and 32). A change that sets the
+## table again re-sets each to six under its own figure.
+const GREY_UNREAD_FLOORS := {"careless sword": 22, "chaser sword": 23}
+const GREY_HARM_SLACK := 0.5  # Hp a fight (the sword).
+const GREY_READ_SAVES := 4.0  # Hp a fight (fists, dagger): at lead 7, 4.07 and 4.41.
+const GREY_READ_WINS := 4  # Of GREY_STARTS (fists, dagger): at lead 7, +23 and +19.
+const GREY_FISTS_WINS := 4  # Of GREY_STARTS: at lead 7, 3.
+const GREY_SWORD_WINS := [24, 30]  # Of GREY_STARTS: at lead 7, 28.
+const GREY_CARELESS_DRIFT := 1.0  # Hp a fight: at lead 7, -0.06, -0.25, 0.00.
+## Main's careless harm a fight on 29451d8cd, his bite untold (6-tick lead): won 2, 4, 27 of 32.
+const GREY_MAIN_CARELESS := {"fists": 19.69, "dagger": 19.75, "sword": 14.34}
 const GREY_REACT := 6  # A person's reaction to the red, ticks (the harness's DF_REACT).
 const GREY_HER_HP := 20
 const GREY_MAX_TICKS := 900
@@ -8217,15 +8285,15 @@ func _test_old_wolf_fights() -> void:
 	Monster.idling = false
 	DayNight.set_hour(12.0)
 	var row: Dictionary = Monster.kinds()["old_wolf"]
-	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 5 and int(row["fight"]["lead_ticks"]) == 6,
-		"his bite slow and told: 5 a bite (780 amended (33)), a 6-tick lead, one each 3 s (the coordinator's rulings)")
+	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 5 and int(row["fight"]["lead_ticks"]) == 7,
+		"his bite slow and told: 5 a bite (780 amended (33)), a 7-tick lead, its cell told, one each 3 s (the coordinator's rulings)")
 	_check(int(row["moves"]["spring"]["damage"]) == 8,
 		"his told lunge hurts more than his bite: 8 (780 amended (34)), against 5 (%d)" % int(row["moves"]["spring"]["damage"]))
 	var table := {}
 	var rolled := false
 	for bot: String in ["careless", "chaser", "reader"]:
 		for weapon: String in ["fists", "dagger", "sword"]:
-			var acc := {"won": 0, "fell": 0, "both": 0, "timed": 0, "harm": 0, "told": 0, "won_t": 0, "lunges": 0}
+			var acc := {"won": 0, "fell": 0, "both": 0, "timed": 0, "harm": 0, "told": 0, "won_t": 0, "lunges": 0, "pet": 0, "pet_down": 0}
 			for start in GREY_STARTS:
 				var out := _grey_fight(bot, weapon, start, not rolled)
 				rolled = true
@@ -8236,36 +8304,98 @@ func _test_old_wolf_fights() -> void:
 			print("  %s, %s: won %d/%d (in %.1f s), fell %d, both down %d, timed out %d; harm %.2f of %d a fight (%.2f of it from told lunges; %.2f lunges)" % [
 				bot, weapon, acc["won"], GREY_STARTS, float(acc["won_t"]) / 10.0 / maxf(1.0, float(acc["won"])), acc["fell"], acc["both"], acc["timed"],
 				float(acc["harm"]) / f, GREY_HER_HP, float(acc["told"]) / f, float(acc["lunges"]) / f])
-	var sums := {"careless": [0, 0], "reader": [0, 0]}  # [won, harm] over the three weapons.
 	for weapon: String in ["fists", "dagger", "sword"]:
 		var careless: Dictionary = table["careless " + weapon]
 		var reader: Dictionary = table["reader " + weapon]
-		for bot: String in sums:
-			var acc: Dictionary = table["%s %s" % [bot, weapon]]
-			sums[bot] = [int(sums[bot][0]) + int(acc["won"]), int(sums[bot][1]) + int(acc["harm"])]
 		var r_harm := float(reader["harm"]) / GREY_STARTS
 		var c_harm := float(careless["harm"]) / GREY_STARTS
-		var harm_ok := r_harm <= c_harm + GREY_HARM_SLACK
-		_check(harm_ok,
-			"with %s the reader takes no more harm than the careless one (%.1f slack): %.2f against %.2f a fight%s" % [weapon, GREY_HARM_SLACK, r_harm, c_harm,
-			"" if harm_ok else _grey_moved("reader %s harm %.2f, bound careless %.2f + %.1f" % [weapon, r_harm, c_harm, GREY_HARM_SLACK])])
-	var sum_ok := int(sums["reader"][1]) < int(sums["careless"][1]) and int(sums["reader"][0]) > int(sums["careless"][0])
-	_check(sum_ok,
-		"over fists, dagger and sword the reader takes less harm and wins more often than the careless one: harm %.2f against %.2f a fight, won %d against %d of %d%s" % [
-		float(sums["reader"][1]) / (GREY_STARTS * 3), float(sums["careless"][1]) / (GREY_STARTS * 3), sums["reader"][0], sums["careless"][0], GREY_STARTS * 3,
-		"" if sum_ok else _grey_moved("the three weapons summed: reader harm %d and wins %d, bound under careless harm %d and over careless wins %d" % [
-		sums["reader"][1], sums["reader"][0], sums["careless"][1], sums["careless"][0]])])
+		if weapon == "sword":
+			var harm_ok := r_harm <= c_harm + GREY_HARM_SLACK
+			_check(harm_ok,
+				"with the sword the reader takes no more harm than the careless one (%.1f slack): %.2f against %.2f a fight%s" % [GREY_HARM_SLACK, r_harm, c_harm,
+				"" if harm_ok else _grey_moved("reader sword harm %.2f, bound careless %.2f + %.1f" % [r_harm, c_harm, GREY_HARM_SLACK])])
+		else:
+			var saves_ok := r_harm <= c_harm - GREY_READ_SAVES
+			_check(saves_ok,
+				"with %s reading his told bite saves harm: the reader %.2f against the careless %.2f a fight (at least %.1f less)%s" % [weapon, r_harm, c_harm, GREY_READ_SAVES,
+				"" if saves_ok else _grey_moved("reader %s harm %.2f, bound careless %.2f - %.1f" % [weapon, r_harm, c_harm, GREY_READ_SAVES])])
+			var wins_ok := int(reader["won"]) >= int(careless["won"]) + GREY_READ_WINS
+			_check(wins_ok,
+				"with %s the reader wins more: %d against %d of %d (at least %d more)%s" % [weapon, reader["won"], careless["won"], GREY_STARTS, GREY_READ_WINS,
+				"" if wins_ok else _grey_moved("reader %s won %d, bound careless %d + %d" % [weapon, reader["won"], careless["won"], GREY_READ_WINS])])
+		var was := float(GREY_MAIN_CARELESS[weapon])
+		var drift_ok := absf(c_harm - was) <= GREY_CARELESS_DRIFT
+		_check(drift_ok,
+			"with %s he is as dangerous to the careless one as before his bite was told: %.2f a fight against main's %.2f (within %.1f)%s" % [weapon, c_harm, was, GREY_CARELESS_DRIFT,
+			"" if drift_ok else _grey_moved("careless %s harm %.2f, bound main's %.2f +- %.1f" % [weapon, c_harm, was, GREY_CARELESS_DRIFT])])
 	var fists_ok := int(table["careless fists"]["won"]) <= GREY_FISTS_WINS
 	_check(fists_ok,
 		"careless fists all but never beat him: won %d of %d (at most %d)%s" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS,
 		"" if fists_ok else _grey_moved("careless fists won %d of %d, bound at most %d" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS])])
+	var sword_won := int(table["careless sword"]["won"])
+	var sword_ok := sword_won >= int(GREY_SWORD_WINS[0]) and sword_won <= int(GREY_SWORD_WINS[1])
+	_check(sword_ok,
+		"a careless sword wins as before: %d of %d (%d to %d)%s" % [sword_won, GREY_STARTS, GREY_SWORD_WINS[0], GREY_SWORD_WINS[1],
+		"" if sword_ok else _grey_moved("careless sword won %d of %d, bound %d to %d" % [sword_won, GREY_STARTS, GREY_SWORD_WINS[0], GREY_SWORD_WINS[1]])])
 	for cell: String in GREY_UNREAD_FLOORS:
 		var won := int(table[cell]["won"])
 		var floor_at := int(GREY_UNREAD_FLOORS[cell])
 		_check(won >= floor_at,
 			"a player who does not read still beats him with a sword: %s won %d of %d (at least %d)%s" % [cell, won, GREY_STARTS, floor_at,
 			"" if won >= floor_at else _grey_moved("%s won %d of %d, floor %d" % [cell, won, GREY_STARTS, floor_at])])
+	_grey_alone = table
 	print("  (the table's %d fights in %d ms)" % [GREY_STARTS * 9, Time.get_ticks_msec() - began])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## The old grey's table with her companion along (780 amended (38), the
+## coordinator's rulings (a), 2026-11-16, on the live body, the one players
+## meet): the same 32 starts, the careless one and the reader with fists, a
+## dagger and a sword, Rhea (20 hp) a cell off her. Per weapon the player
+## with her along takes less harm a fight than alone (_test_old_wolf_fights'
+## table). Nothing is asserted of her harm: every blow of his is told and she
+## dodges each (663 amended (2)), which the coordinator takes to companions to
+## bound; whoever bounds her dodge sees what moved here. Along, main 7009f0bea
+## untold (lead 6) -> told (lead 7), fists / dagger / sword:
+##   her companion's harm a fight: careless 5.47 / 5.94 / 5.16 -> 0.00 / 0.00 / 0.16;
+##     reader 6.41 / 6.09 / 5.31 -> 0.00 / 0.00 / 0.00
+##   the player's harm along: careless 7.56 / 7.00 / 4.31 -> 6.88 / 6.72 / 4.41;
+##     reader 5.78 / 5.63 / 4.22 -> 3.44 / 3.38 / 3.38
+##   won along: 32 of 32 every row, both (main's already)
+##   the player alone: careless 19.69 / 19.75 / 14.34 -> 19.63 / 19.50 / 14.81;
+##     reader 18.59 / 19.22 / 14.25 -> 15.56 / 15.09 / 13.50
+var _grey_alone := {}
+
+
+func _test_old_wolf_fights_along() -> void:
+	print("%s== the old grey on one player, her companion along: the player takes less than alone ==" % char(10))
+	var began := Time.get_ticks_msec()
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	_check(not _grey_alone.is_empty(), "the alone table ran first (_test_old_wolf_fights)")
+	var along := {}
+	for bot: String in ["careless", "reader"]:
+		for weapon: String in ["fists", "dagger", "sword"]:
+			var acc := {"won": 0, "fell": 0, "both": 0, "timed": 0, "harm": 0, "told": 0, "won_t": 0, "lunges": 0, "pet": 0, "pet_down": 0}
+			for start in GREY_STARTS:
+				var out := _grey_fight(bot, weapon, start, false, true)
+				for k: String in out:
+					acc[k] = int(acc[k]) + int(out[k])
+			along["%s %s" % [bot, weapon]] = acc
+			var f := float(GREY_STARTS)
+			print("  along, %s, %s: won %d/%d, fell %d; her harm %.2f a fight; her companion's %.2f, down %d" % [bot, weapon, acc["won"], GREY_STARTS, acc["fell"],
+				float(acc["harm"]) / f, float(acc["pet"]) / f, acc["pet_down"]])
+	if not _grey_alone.is_empty():
+		for weapon: String in ["fists", "dagger", "sword"]:
+			for bot: String in ["careless", "reader"]:
+				var cell := "%s %s" % [bot, weapon]
+				var with_her := float(along[cell]["harm"]) / GREY_STARTS
+				var alone := float(_grey_alone[cell]["harm"]) / GREY_STARTS
+				var less_ok := with_her < alone
+				_check(less_ok, "%s: with her companion along the player takes less than alone: %.2f against %.2f a fight%s" % [cell, with_her, alone,
+					"" if less_ok else _grey_moved("%s along, the player's harm %.2f, bound under alone %.2f" % [cell, with_her, alone])])
+	print("  (the along rows' %d fights in %d ms)" % [GREY_STARTS * 6, Time.get_ticks_msec() - began])
 	DayNight.reset()
 	Monster.idling = true
 
@@ -8278,8 +8408,9 @@ func _grey_moved(cell: String) -> String:
 
 
 ## One fight of the old grey's table: [param bot] with [param weapon] from
-## start [param start] (seeded), to his fall, her 20th hp of harm, or 90 s.
-func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> Dictionary:
+## start [param start] (seeded), to his fall, her 20th hp of harm, or 90 s;
+## [param along], her companion beside her ("pet": his harm to the companion).
+func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool, along := false) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7000 + start
 	seed(3000 + start)
@@ -8301,6 +8432,12 @@ func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> D
 	World.load_combat_rules(FileAccess.get_file_as_string(World.COMBAT_RULES))
 	var player: GridEntity = e["P"][0]
 	var grey := _live_grey(his)
+	var pet: Companion = null
+	if along:
+		pet = EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Rhea", "props": {"max_hp": 20}}) as Companion
+		_room.add_child(pet)
+		World.spawn(pet, her + Vector2i(-1, 0))
+		pet.keeper = player
 	if check_roll:
 		_check(World.attack_ticks_of(grey) == 31 and absf(grey.boldness - 0.75) < 0.005 and grey.reaction_ticks == 5,
 			"his roll as the server lays him (%s): attack_ticks 31 (his row's 30, rolled), boldness 0.75, reaction 5 (%d, %.3f, %d)" % [
@@ -8318,6 +8455,7 @@ func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> D
 	var harm := 0
 	var told := 0
 	var lunges := 0
+	var pet_harm := 0
 	var was := ""
 	var red_since := -1
 	var t := 0
@@ -8332,6 +8470,8 @@ func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> D
 		var lunge_landed := move == "pant" and int(grey._move.get("from", -1)) >= t0
 		for k in range(n0, _damage_log.size()):
 			var d: Dictionary = _damage_log[k]
+			if along and d["entity"] == pet and d["source"] == grey:
+				pet_harm += int(d["amount"])
 			if d["entity"] == player and d["source"] == grey:
 				harm += int(d["amount"])
 				if lunge_landed:
@@ -8345,7 +8485,8 @@ func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> D
 	var fell := harm >= GREY_HER_HP
 	return {"won": 1 if down and not fell else 0, "fell": 1 if fell and not down else 0, "both": 1 if down and fell else 0,
 		"timed": 1 if not down and not fell else 0, "harm": mini(harm, GREY_HER_HP), "told": mini(told, GREY_HER_HP),
-		"won_t": t if down and not fell else 0, "lunges": lunges}
+		"won_t": t if down and not fell else 0, "lunges": lunges, "pet": pet_harm,
+		"pet_down": 1 if along and (not is_instance_valid(pet) or pet.hp <= 0 or World.is_downed(pet)) else 0}
 
 
 ## Her bot's tick in the grey's table (combat's yard harness, zz_duel5's

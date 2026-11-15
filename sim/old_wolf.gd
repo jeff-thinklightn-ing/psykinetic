@@ -83,6 +83,16 @@ func _ready() -> void:
 	_next_howl = World.tick + int(howl["every"]) / 2
 
 
+## His bite is told (World.try_wind_up): his lead lays his target's cell,
+## fixed, for its whole lead (enemy-ai, the coordinator's approval 11-15).
+func tells_bite() -> bool:
+	return not _den_biting
+
+
+## On his den bite (_den_bite, untouched by the told bite): true while it begins.
+var _den_biting := false
+
+
 ## His set's reach (Apex.den_foe, 780 amended (29)): his lunge's line.
 func _set_reach() -> int:
 	return maxi(int(spring["cells"]), 1)
@@ -149,7 +159,10 @@ func _no_flee() -> void:
 ## his fight's led bite at [param by], its lead_ticks told (780 amended (23),
 ## (26)). True if begun.
 func _den_bite(by: GridEntity) -> bool:
-	return World.try_wind_up(self, by, lead_ticks)
+	_den_biting = true
+	var began := World.try_wind_up(self, by, lead_ticks)
+	_den_biting = false
+	return began
 
 
 ## His pack about him: living wolves of his herd within PACK_TILES (his

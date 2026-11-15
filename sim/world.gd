@@ -9748,6 +9748,15 @@ func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile, "began": tick, "lead": lead}
 	if not lead and _takes_windup_slack(by):
 		by.wind_up["apart"] = body_centre(by).distance_to(body_centre(target))  # 874 amended (1).
+	if lead and by.has_method("tells_bite") and bool(by.call("tells_bite")):
+		# The old grey's told bite (enemy-ai, the coordinator's approval 11-15): his lead lays
+		# his target's struck cell, fixed as it begins and flank-marked, for its whole lead; as it
+		# lands it strikes whoever stands there (_land_told_bite).
+		var aim := struck_cell(target) - by.tile
+		var told := telegraph(by, "bite", Telegraph.line(by.tile, Vector2(aim).normalized(), Vector2(aim).length(), 1), ticks, true)
+		if told > 0:
+			by.wind_up["tell"] = told
+			by.wind_up["bite_tell"] = told_cells(told)
 	# Planted through its landing tick (392 amended (6)): a free body's own walk is taken before its
 	# wind-ups are struck in a tick (_step_zone), so a plant ending as it lands let a step that
 	# tick carry it off its cell and give a paid blow up. Its strike, whiff or recover stands
@@ -9778,6 +9787,8 @@ func cancel_wind_up(entity: GridEntity) -> void:
 		return
 	var direction: Vector2i = entity.wind_up["direction"]
 	var logs := _logs_wind_up(entity, entity.wind_up)
+	if entity.wind_up.has("tell"):
+		end_telegraph(int(entity.wind_up["tell"]), false)  # A told bite given up (the old grey's).
 	entity.wind_up = {}
 	_winders.erase(entity)
 	entity._world_winding(direction, 0)
@@ -9811,6 +9822,9 @@ func _tend_wind_ups() -> void:
 		var bonus: int = entity.wind_up.get("bonus", 0)  # A told backstab's harm on top (a FLANK monster's, from behind).
 		var logs := _logs_wind_up(entity, entity.wind_up)
 		var apart: float = entity.wind_up.get("apart", -1.0)  # 874 amended (1): how far apart as it began.
+		if entity.wind_up.has("bite_tell"):
+			_land_told_bite(entity, began)
+			continue
 		var reaches := is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead, apart)
 		if walked and not reaches:
 			# 887: her step took her out of reach: given up, not swung at the air, its stamina back.
@@ -9845,6 +9859,29 @@ func _tend_wind_ups() -> void:
 			# 887: the lead was its stand: once it lands it stands no longer than its plant through
 			# the landing tick (none, walked), so a reader steps out of the next red at once.
 			entity.free_halt_until = mini(entity.free_halt_until, mini(entity.next_attack_tick, tick + (0 if walked else 1)))
+
+
+## The old grey's told bite lands (try_wind_up's "bite_tell"): whoever
+## stands on its cell, fixed as it began (tell_struck, its pack spared), is
+## bitten; nobody, a bite at the air. Its next bite attack_ticks_of after this
+## one began, as every lead's.
+func _land_told_bite(entity: GridEntity, began: int) -> void:
+	var cells: Array[Vector2i] = entity.wind_up["bite_tell"]
+	var told := int(entity.wind_up.get("tell", 0))
+	var direction: Vector2i = entity.wind_up["direction"]
+	entity.wind_up = {}
+	_winders.erase(entity)
+	end_telegraph(told, true)
+	var bitten := false
+	for body in tell_struck(entity, cells):
+		if body != entity and body.spawned and body.hp > 0 and body.max_hp > 0 and not (entity is Monster and (entity as Monster).spares(body)):
+			if _try_hit(entity, body, entity.attack_damage, false, Vector2i.ZERO, true, true):
+				bitten = true
+				break  # One bite, one body.
+	if not bitten:
+		try_swing(entity, direction, true)
+	entity.next_attack_tick = mini(entity.next_attack_tick, began + attack_ticks_of(entity))
+	entity.free_halt_until = mini(entity.free_halt_until, entity.next_attack_tick)
 
 
 ## Whether a wound-up blow by [param entity] reaches [param aimed] as it
