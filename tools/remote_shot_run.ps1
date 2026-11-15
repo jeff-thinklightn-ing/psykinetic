@@ -183,8 +183,17 @@ function Count-Files([string]$folder) {
 	return "$($files.Count) files, $([long]($files | Measure-Object Length -Sum).Sum) bytes"
 }
 
+## The game's user://vulkan under a run's [param appdata]: user:// is <APPDATA>\Godot\app_userdata\
+## <the project's config/name> (no custom user dir; not <APPDATA> itself: the first Atlas pair
+## kept nothing, looking in appdata\vulkan, 2026-11-15).
+function User-Vulkan([string]$appdata) {
+	$project = try { "$((Select-String -Path (Join-Path $Root 'project.godot') -Pattern '^config/name="(.*)"$' -ErrorAction Stop | Select-Object -First 1).Matches[0].Groups[1].Value)" } catch { "" }
+	if ($project -eq "") { $project = "Psykinetic" }
+	return Join-Path $appdata "Godot\app_userdata\$project\vulkan"
+}
+
 ## Before the game (828 amended (12)): warm=<run> copies the pipeline cache that run kept
-## (<caches>\<run>\vulkan) into [param appdata]\vulkan, else the run is refused. Returns
+## (<caches>\<run>\vulkan) into bot 1's user://vulkan (User-Vulkan), else the run is refused. Returns
 ## {result ("" or the refusal), line (runner.log's "cache: ..."), state (for the game's
 ## PSYKINETIC_PIPELINE_CACHE)}.
 function Warm-Cache([hashtable]$opts, [string]$caches, [string]$appdata, [string]$build) {
@@ -195,19 +204,19 @@ function Warm-Cache([hashtable]$opts, [string]$caches, [string]$appdata, [string
 		$why = "warm from ${from}: refused, no pipeline cache kept by a run of that name on this laptop (a run keeps its own with --keep-cache)"
 		return @{ result = $why; line = "cache: $why"; state = "" }
 	}
-	$vulkan = Join-Path $appdata "vulkan"
-	New-Item -ItemType Directory -Force $appdata | Out-Null
+	$vulkan = User-Vulkan $appdata
+	New-Item -ItemType Directory -Force (Split-Path $vulkan) | Out-Null
 	Copy-Item -Recurse -Force $source $vulkan
 	$fromBuild = try { "$(Get-Content (Join-Path $caches "$from\build.txt") -TotalCount 1 -ErrorAction Stop)".Trim() } catch { "unread" }
 	$builds = if ($fromBuild -eq $build) { "the builds match ($build)" } else { "the builds DIFFER ($fromBuild kept, $build now)" }
 	return @{ result = ""; line = "cache: warm from $from, $(Count-Files $vulkan) copied into bot 1's user://vulkan; $builds"; state = "warm from $from" }
 }
 
-## After the game (828 amended (12)): keep=1 keeps [param appdata]\vulkan as <caches>\<name>
+## After the game (828 amended (12)): keep=1 keeps bot 1's user://vulkan as <caches>\<name>
 ## with its build; the six newest kept, older ones removed and named. Returns runner.log's lines.
 function Keep-Cache([hashtable]$opts, [string]$caches, [string]$name, [string]$appdata, [string]$build) {
 	if ($opts.keep -ne "1") { return @() }
-	$vulkan = Join-Path $appdata "vulkan"
+	$vulkan = User-Vulkan $appdata
 	if (-not (Test-Path $vulkan -PathType Container)) {
 		return @("cache: nothing to keep (the game wrote no user://vulkan; a game stopped, not quit, may not save it)")
 	}
@@ -229,7 +238,8 @@ function Keep-Cache([hashtable]$opts, [string]$caches, [string]$name, [string]$a
 
 switch ($Mode) {
 	# The pipeline cache's two steps alone, for tests/remote_shot_sockets_test.sh (828 amended
-	# (12)): -Dir a run folder holding opts.txt (and appdata\vulkan as a game would leave it),
+	# (12)): -Dir a run folder holding opts.txt (and appdata\Godot\app_userdata\<project>\vulkan
+	# as a game would leave it),
 	# -Runs the runner's folder; warms before and keeps after as a run does, printing each line
 	# and "result: ..." ("" when it would run).
 	"cache" {
@@ -466,7 +476,7 @@ public static class Dialogs {
 		# The pipeline cache and the GPU's samples (828 amended (12); <Dir>\opts.txt from
 		# remote_shot.sh, one name=value a line): Godot keeps compiled pipelines in
 		# user://vulkan, which a run's own APPDATA starts empty (a first play). keep=1: when the
-		# run ends its appdata\vulkan is kept as <Runs>\caches\<name> with its build; warm=<run>:
+		# run ends its user://vulkan is kept as <Runs>\caches\<name> with its build; warm=<run>:
 		# bot 1's appdata starts with the one kept by that run of this runner (a player's next
 		# play), else nothing runs; gpu=1: nvidia-smi samples the GPU into out\gpu-<pass>.csv while
 		# each pass's game runs, stopped with it by its PID. Nothing outside the run's folder and

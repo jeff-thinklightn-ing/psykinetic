@@ -460,7 +460,8 @@ rsh "rmdir /s /q $DIR" >/dev/null 2>&1
 rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
 printf 'SHOT vsync: %s\n' "$VSYNC" >>"$REVIEW/runner.log"
 # 828 amended (12): no figure read without its pipeline cache's state (the runner's "cache:" line).
-cache_line="$(tr -d '\r' <"$REVIEW/runner.log" 2>/dev/null | grep "^cache: " | head -1 | sed 's/^cache: //')"
+# (The BOM too: PowerShell's Add-Content opens runner.log with one, before its first line, "cache: ...".)
+cache_line="$(sed -e '1s/^\xEF\xBB\xBF//' -e 's/\r$//' "$REVIEW/runner.log" 2>/dev/null | grep "^cache: " | head -1 | sed 's/^cache: //')"
 printf 'SHOT cache: %s%s\n' "${cache_line:-unread}" "$([ $KEEP_CACHE -eq 1 ] && echo "; kept as $NAME")" >>"$REVIEW/runner.log"
 grep -h "^cache\|^gpu sampling\|^SHOT cache" "$REVIEW/runner.log" 2>/dev/null
 ls "$REVIEW"

@@ -52884,8 +52884,9 @@ sent. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
 828 amended (12) (perf, 2026-11-15; the coordinator's approval and bounds; label from
 tools/decision_number.sh): the runner keeps and warms the pipeline cache, and samples the GPU, each
-opt-in. Godot 4.7.2 keeps compiled pipelines in user://vulkan (pipelines.<driver>.<device>.cache),
-and the runner gives each run an APPDATA of its own in the run's folder, so every laptop figure
+opt-in. Godot 4.7.2 keeps compiled pipelines in user://vulkan (pipelines.<driver>.<device>.cache;
+user:// is <APPDATA>\Godot\app_userdata\<config/name>, the runner's User-Vulkan: the first Atlas
+pair looked in <APPDATA>\vulkan and kept nothing), and the runner gives each run an APPDATA of its own in the run's folder, so every laptop figure
 before this was a first play on an empty pipeline cache (perf's join and crossing probes: about
 120 compiles at the join); a player's installed game keeps that folder between plays. The clone's
 res://.godot/shader_cache and the driver's own cache stay warm across runs either way, so a "cold"
