@@ -54646,6 +54646,28 @@ longer by the tour's 23:00: asleep in his bed inside it, awake and off his doorw
 only; protocol unchanged; no new class_name; no bullet (v0.1.218's known line: "the healer may stand in
 his own doorway for a while; then you can't reach him or get into his hut").
 
+853 amended (18) (the coordinator's go, 2026-11-15; the label from decision_number.sh): the square's fire's
+seats join the square's spots while it burns. The coordinator's look: at noon nobody stood within six cells
+of Umbrage's square fire, the first thing a newcomer walks past. Resident._free_spot has always pooled the
+square's, the fire's and the talk's spots in the square's hours, but Umbrage lays no "fire" spots; its fire
+place (square_fire, level.json "places") lists eight seats, which only the night's rules for lodgers and
+inn-goers turned away read, and found none either. Now Main._resident_places gives a town whose level lays
+no "fire" spots its fire place's seats as "fire" spots (Main.fire_seat_spots: a sit facing the cell next to
+it toward the pit, "fire" the pit). In the square's hours a body takes a free seat of a burning fire first
+while fewer than Resident.FIRE_SITTERS (2) of its town hold one, so one or two are always at it and the
+stands and talk pairs keep the rest of the square; past two, or with the fire out, the seats leave the pool.
+A laid "fire" spot (no pit given) is taken as before, burning or not. The night's lodgers and the inn-goers
+turned away (Main._inn_town_side) keep their rules, every lit seat theirs, the burning read from the pit
+(Resident.fire_burns); in Umbrage they now find the seats their rules named. A seat is taken as any spot is
+(853 amended (16)).
+- resident_test _test_fire_seats: the seats' faces; burning, the seat on every pick of six; out, the stand;
+  two of the town at its seats, the stand.
+- town_day_test: between 12:00 and 14:00 someone sits at the square's fire facing it (first: Maud at
+  (192, 212), 12.00, SQUARE; on main's code 0 samples, FAIL); before 17:00 never more than two hold its
+  seats; no sitter faces away.
+Server only; protocol unchanged; no new class_name; no bullet until a joined still shows one or two sitting
+at it at midday from the square, at the nearest zoom (ui-design shoots it once on main).
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

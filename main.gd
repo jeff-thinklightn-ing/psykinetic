@@ -17397,7 +17397,7 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 		night_places["bed"] = Rect2i()
 		night_places.erase("keep_work")  # Up at night, not at work.
 		var lit := ((night_places.get("spots", {}) as Dictionary).get("fire", []) as Array).filter(func(spot: Dictionary) -> bool:
-			return World.is_fire(spot.get("face", Vector2i.ZERO)))
+			return Resident.fire_burns(spot))
 		if not lit.is_empty():
 			var seats: Dictionary = (night_places.get("spots", {}) as Dictionary).duplicate()
 			for use: String in ["inn", "square", "home", "temple", "well", "work"]:
@@ -17410,7 +17410,7 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 		# No room inside: the lit fire's seats, else a stroll with short stands, never a vigil in the open.
 		var places: Dictionary = each["places"]
 		var spots: Dictionary = (places.get("spots", {}) as Dictionary).duplicate()
-		spots["inn"] = (spots.get("fire", []) as Array).filter(func(spot: Dictionary) -> bool: return World.is_fire(spot.get("face", Vector2i.ZERO)))
+		spots["inn"] = (spots.get("fire", []) as Array).filter(func(spot: Dictionary) -> bool: return Resident.fire_burns(spot))
 		places["spots"] = spots
 		places["short_stands"] = true
 	return true
@@ -17516,6 +17516,17 @@ func _taverner_places(level: Dictionary, tavern: Dictionary) -> Dictionary:
 	return out
 
 
+## [param fire]'s seats (Level.fires_of) as "fire" spots of the town [param key] (853 amended (18)): each a sit
+## facing the cell next to it toward the pit, "fire" the pit, whose burning (World.is_fire) says whether it is sat at.
+static func fire_seat_spots(fire: Dictionary, key: String) -> Array:
+	var pit: Vector2i = fire["cell"]
+	var out: Array = []
+	for seat: Vector2i in fire.get("seats", []):
+		out.append({"use": "fire", "cell": seat, "face": seat + (pit - seat).sign(), "pose": "sit", "town": key, "trade": "", "pair": "",
+			"fire": pit})
+	return out
+
+
 ## Where a resident of [param trade] (the [param index]th of its town:
 ## residents in id order, then companions) goes, in [param area] for the town at [param place]: "work", the
 ## inside of the standing building its trade works in (none: the square);
@@ -17549,6 +17560,13 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		if str(spot.get("town", "")) != key or (spot["use"] == "work" and str(spot.get("trade", "")) != trade):
 			continue
 		(spots.get_or_add(spot["use"], []) as Array).append(spot)
+	# Its town's fire's seats (853 amended (18), the coordinator's: nobody stood at the square's fire at noon) where
+	# the level lays no "fire" spots of its own: the square's hours sit there while it burns (Resident._free_spot).
+	if not spots.has("fire"):
+		for fires: Array in _fire_places.values():
+			for fire: Dictionary in fires:
+				if str(fire.get("town", "")) == str(place.get("id", "")) and not (fire.get("seats", []) as Array).is_empty():
+					spots["fire"] = fire_seat_spots(fire, key)
 	if not spots.is_empty():
 		out["spots"] = spots
 	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside

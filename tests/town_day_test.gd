@@ -6,7 +6,9 @@ extends Node
 ## and none stands idle facing shut ground longer than SHUT_MINUTES. A body at a task's work, or at its
 ## work spot showing a trade the client draws, in a pose of a spot, asleep, sick, hiding, led or
 ## addressing a player is not standing idle. At every tenth sample, no body stands beside its goal while
-## another that chose that cell too stands on it, two samples running (853 amended (16)).
+## another that chose that cell too stands on it, two samples running (853 amended (16)). Between 12:00 and 14:00
+## someone sits at the square's fire facing it, and before 17:00 never more than Resident.FIRE_SITTERS hold its seats
+## (853 amended (18)).
 
 const TOWN := "wilds/store"
 const HOUR := 2250
@@ -32,6 +34,11 @@ var _samples := 0
 var _taken := {}  # worker id -> the ten-minute samples running it was found so
 var _taken_seen := 0
 var _keeper := {"missing": [], "astray": [], "cells": {}, "doings": {}}  # 333 amended (4): Rolf, sample by sample
+## 853 amended (18): the square's fire by day, sample by sample: who sat at it at noon, the most holding its seats
+## at once before the evening, and any sitter not facing it.
+const FIRE_NOON := Vector2(12.0, 14.0)
+const FIRE_DAY_END := 17.0
+var _fire := {"noon": [], "most": 0, "most_at": "", "askew": []}
 
 
 func _ready() -> void:
@@ -83,6 +90,11 @@ func _run() -> void:
 		"Rolf under the cap: from his first work spell to his sleep, a body at his stand at work in every one of %d samples (cells %s, doings %s; %d samples before work or asleep; missing %s; astray %s)" % [
 			int(_keeper.get("due", 0)), (_keeper["cells"] as Dictionary).keys(), (_keeper["doings"] as Dictionary).keys(), int(_keeper.get("off", 0)),
 			(_keeper["missing"] as Array).slice(0, 5), (_keeper["astray"] as Array).slice(0, 5)])
+	_check(not (_fire["noon"] as Array).is_empty(), "853am18: someone sits at the square's fire at midday, %d:00 to %d:00 (first %s; %d samples)" % [
+		int(FIRE_NOON.x), int(FIRE_NOON.y), (_fire["noon"] as Array).slice(0, 1), (_fire["noon"] as Array).size()])
+	_check(int(_fire["most"]) <= Resident.FIRE_SITTERS, "853am18: by day never more than %d of the square's people hold the fire's seats at once (most %d%s)" % [
+		Resident.FIRE_SITTERS, int(_fire["most"]), (" at " + str(_fire["most_at"])) if not str(_fire["most_at"]).is_empty() else ""])
+	_check((_fire["askew"] as Array).is_empty(), "853am18: a sitter at the fire faces it (%s)" % [(_fire["askew"] as Array).slice(0, 3)])
 	var names: Array = _worst.keys()
 	names.sort()
 	print("  longest idle stay each, game minutes: %s" % ", ".join(names.map(func(n: String) -> String: return "%s %d" % [n, _worst[n]])))
@@ -140,6 +152,27 @@ func _sample() -> void:
 		if not seen.has(who):
 			_runs.erase(who)
 	_sample_keeper()
+	_sample_fire()
+
+
+## The square's fire (853 amended (18)): who sits at a seat of it, facing in, and how many hold its seats before evening.
+func _sample_fire() -> void:
+	var hour := DayNight.hour(DayNight.now())
+	var holding := 0
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned or body.town != TOWN or str(body._spot.get("use", "")) != "fire":
+			continue
+		holding += 1
+		if body.tile != body._spot.get("cell") or body.activity != "sit":
+			continue
+		if body.facing != body._toward(body._spot["face"]):
+			(_fire["askew"] as Array).append("%s at %s facing %s, %.2f" % [body.person, body.tile, body.facing, hour])
+		if hour >= FIRE_NOON.x and hour < FIRE_NOON.y:
+			(_fire["noon"] as Array).append("%s %s at %.2f (%s)" % [body.person, body.tile, hour, Resident.Doing.keys()[body.doing]])
+	if hour < FIRE_DAY_END and holding > int(_fire["most"]):
+		_fire["most"] = holding
+		_fire["most_at"] = "%.2f" % hour
 
 
 ## The stall's keeper under the cap (333 amended (4): keepers are never cut): from his clock's first work spell to his

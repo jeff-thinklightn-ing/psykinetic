@@ -834,8 +834,19 @@ func _free_spot(use: String) -> Dictionary:
 		return {}
 	var spots: Dictionary = places["spots"]
 	var pool: Array = []
-	for each: String in (["square", "fire", "talk"] if use == "square" else [use]):
+	for each: String in (["square", "talk"] if use == "square" else [use]):
 		pool.append_array(spots.get(each, []))
+	if use == "square":
+		# The square's hours at its fire (853 amended (18), the coordinator's: nobody at the square's fire at noon):
+		# while it burns and fewer than FIRE_SITTERS of the town's sit there, a free seat of it first, so one or two
+		# are always at it; past that its seats are left to the stands and talk pairs. A night's lodger and an
+		# inn-goer turned away keep their own rules (Main._inn_town_side), every seat theirs.
+		var fire: Array = (spots.get("fire", []) as Array).filter(func(spot: Dictionary) -> bool:
+			return not spot.has("fire") or World.is_fire(spot["fire"]))  # A seat of a fire place while it burns; a laid one as laid.
+		if not fire.is_empty() and _fire_sitters() < FIRE_SITTERS:
+			var seat := _pick_in(fire, use, false)
+			if not seat.is_empty():
+				return seat
 	if pool.is_empty():
 		return {}
 	if use == "work":
@@ -850,6 +861,12 @@ func _free_spot(use: String) -> Dictionary:
 			if other != self and other is Resident and not (other as Resident)._spot.is_empty():
 				taken[(other as Resident)._spot["cell"]] = true
 		return inn_pick(pool, taken)
+	return _pick_in(pool, use, true)
+
+
+## A free spot of [param pool] for [param use] by _free_spot's changing hash: not the one it stands on, nor the one it
+## just left, which [param or_back] gives back when no other is free; {} for none.
+func _pick_in(pool: Array, use: String, or_back: bool) -> Dictionary:
 	_picks += 1
 	var start := absi(hash([id, World.tick, _picks])) % pool.size()
 	var back := {}
@@ -870,7 +887,25 @@ func _free_spot(use: String) -> Dictionary:
 	# None other free: at work it stays on its own (Rolf stepped off his stall's only spot each stroll, a minute or
 	# two each, to a free cell of his work rect: maps' day run); a seat on the square or a well's stand is still
 	# left for a stroll (the mend: folk move on). Else back to the one it left.
-	return here if not here.is_empty() else back
+	return here if not here.is_empty() else (back if or_back else {})
+
+
+## The most of a town's bodies the square's hours seat at its fire at once (853 amended (18)).
+const FIRE_SITTERS := 2
+
+
+## Whether the fire [param spot] is sat at burns (853 amended (18)): its "fire" (the pit), else the cell it faces.
+static func fire_burns(spot: Dictionary) -> bool:
+	return World.is_fire(spot.get("fire", spot.get("face", Vector2i.ZERO)))
+
+
+## How many other bodies of this town hold a "fire" spot now (853 amended (18)).
+func _fire_sitters() -> int:
+	var count := 0
+	for other: GridEntity in World.entities():
+		if other != self and other is Resident and (other as Resident).town == town and str((other as Resident)._spot.get("use", "")) == "fire":
+			count += 1
+	return count
 
 
 ## The cells the inn's counter stands other bodies hold face (875 amended (2)): where guests drink.

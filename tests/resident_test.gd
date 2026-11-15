@@ -5443,6 +5443,61 @@ func _test_show_work(mara: Resident) -> void:
 
 ## 853 amended (14) (maps' film of the hunter): at a work spot showing its trade a stroll keeps the spot, though
 ## another is free; leaving it, it stands through the kneel's get-up (animation's ticks), and struck it goes at once.
+## The square's fire's seats in the square's hours (853 amended (18), the coordinator's: nobody at the square's fire
+## at noon): a fire place's seats as sits facing in, taken first while it burns, never while it is out, and left to
+## the stands once FIRE_SITTERS of the town's hold its seats.
+func _test_fire_seats(mara: Resident) -> void:
+	print("
+== the square's hours sit at its fire while it burns, two at most (853 amended (18)) ==")
+	var made := Main.fire_seat_spots({"cell": Vector2i(5, 5), "seats": [Vector2i(3, 5), Vector2i(7, 7), Vector2i(5, 3)]}, "store")
+	_check(made.map(func(spot: Dictionary) -> Vector2i: return spot["face"]) == [Vector2i(4, 5), Vector2i(6, 6), Vector2i(5, 4)]
+			and made.all(func(spot: Dictionary) -> bool: return spot["use"] == "fire" and spot["pose"] == "sit" and spot["fire"] == Vector2i(5, 5) and spot["town"] == "store"),
+		"a fire place's seats: sits of the town facing the cell next to them toward the pit (%s)" % [made.map(func(spot: Dictionary) -> Vector2i: return spot["face"])])
+	var seat := _town_cell(mara.tile)
+	var stand := _town_cell(seat)
+	var pit := seat + Vector2i(2, 0)
+	var was_places: Dictionary = mara.places.duplicate(true)
+	var was_doing := mara.doing
+	var was_fire := World._fire.has(pit)
+	var was_picks := mara._picks  # The later rows' picks hash as they did.
+	mara.places["spots"] = {"square": [{"use": "square", "cell": stand, "face": stand + Vector2i(0, 1), "pose": "stand", "town": "store", "trade": "", "pair": ""}],
+		"fire": Main.fire_seat_spots({"cell": pit, "seats": [seat]}, "store")}
+	mara.doing = Resident.Doing.SQUARE
+	var picks := func() -> Array:
+		var got: Array = []
+		for i in 6:
+			mara._left = Resident.NO_CELL
+			got.append(mara._free_spot("square").get("cell", Resident.NO_CELL))
+		return got
+	World._fire[pit] = true
+	var lit: Array = picks.call()
+	_check(lit.all(func(c: Vector2i) -> bool: return c == seat), "burning, a free seat of it first, every pick (%s; seat %s, stand %s)" % [lit, seat, stand])
+	World._fire.erase(pit)
+	var out: Array = picks.call()
+	_check(out.all(func(c: Vector2i) -> bool: return c == stand), "out, never its seat (%s)" % [out])
+	World._fire[pit] = true
+	var others: Array[Resident] = []  # Any two bodies, of this town for the row.
+	for body: GridEntity in World.entities():
+		if body != mara and body is Resident and others.size() < Resident.FIRE_SITTERS:
+			others.append(body as Resident)
+	var spots_was: Array = others.map(func(body: Resident) -> Dictionary: return body._spot)
+	var towns_was: Array = others.map(func(body: Resident) -> String: return body.town)
+	for body: Resident in others:
+		body._spot = {"use": "fire", "cell": Vector2i(-5, -5), "face": Vector2i(-5, -4), "pose": "sit"}
+		body.town = mara.town
+	var full: Array = picks.call()
+	_check(others.size() == Resident.FIRE_SITTERS and full.all(func(c: Vector2i) -> bool: return c == stand),
+		"%d of the town's at its seats, the stands' (%s)" % [others.size(), full])
+	for i in others.size():
+		others[i]._spot = spots_was[i]
+		others[i].town = towns_was[i]
+	mara._picks = was_picks
+	if not was_fire:
+		World._fire.erase(pit)
+	mara.places = was_places
+	mara.doing = was_doing
+
+
 func _test_hunter_rise(mara: Resident) -> void:
 	var here := _town_cell(mara.tile)
 	World._relocate(mara, here)
@@ -5602,6 +5657,7 @@ func _test_keep_moving() -> void:
 	_check(World.tick - risen >= Resident.get_up("sit") and mara.tile != seat,
 		"it stands on the seat's cell through its get-up, then steps off (%d ticks)" % (World.tick - risen))
 	_test_hunter_rise(mara)
+	_test_fire_seats(mara)
 	# A trade with no building works its own patch of the square, not the whole of it.
 	var big := Rect2i(10, 10, 9, 9)
 	var cook: Rect2i = Main._open_work(big, "cook")
