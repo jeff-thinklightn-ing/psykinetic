@@ -46,9 +46,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3010)
+## Lines in the code (3013)
 
-### companions (Pip, Wren, Nix) (667)
+### companions (Pip, Wren, Nix) (670)
 
 | | Line | Where |
 |---|---|---|
@@ -161,6 +161,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You walk the open land: fields and forest, and towns where people live and work. | `sim/companion.gd` OPEN_WORLD |
 |  | I wish I could climb that | `sim/companion.gd`  |
 |  | I'd love to see the sea one day | `sim/companion.gd`  |
+|  | Well, here we are in %s. I'll walk with you a while, if you'll have me. | `sim/companion.gd` FIRST_WORDS |
 |  | If you speak now, speak of that, in your own way. | `sim/companion.gd` QUIET_LEAD |
 |  | You want to ask | `sim/companion.gd` QUIET_OPENERS |
 |  | You would like | `sim/companion.gd` QUIET_OPENERS |
@@ -609,6 +610,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s's line of fire | `sim/companion.gd` _read_telegraphs() |
 |  | Your pack is full of ore: you stop mining. | `sim/companion.gd` _mine_pick() |
 |  | her voice gave none (%s) | `sim/companion.gd` _want_answered() |
+|  | her player new to her | `sim/companion.gd` _say_first_words() |
+|  | after her first words | `sim/companion.gd` _say_first_words() |
 |  | ; talk: answered %d of %d (said %d, did %d), unanswered %d | `sim/companion.gd` talk_report() |
 |  | , gap x median %.2f, range %.2f-%.2f | `sim/companion.gd` talk_report() |
 |  | , set less %d more %d | `sim/companion.gd` talk_report() |
@@ -3252,19 +3255,19 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | pray\|psalm\|candle\|temple | `needs.weights[8].words` |
 |  | to sit by a fire with {player} and rest a while | `wants.templates[0].words` |
 |  | sat by a fire with {player} and rested | `wants.templates[0].done` |
-|  | Could we sit by a fire a while, you and me? | `wants.templates[0].says` |
+|  | I'd like to sit by a fire a while, you and me. | `wants.templates[0].says` |
 |  | to spend a while in a town among other folk | `wants.templates[1].words` |
 |  | spent a while in a town among other folk | `wants.templates[1].done` |
-|  | I'd like to be among people for a bit. A town, maybe? | `wants.templates[1].says` |
+|  | I'd like to be among people for a bit, in a town. | `wants.templates[1].says` |
 |  | to go fishing with {player} | `wants.templates[2].words` |
 |  | went fishing with {player} | `wants.templates[2].done` |
-|  | I've a mind to go fishing. Will you come with me? | `wants.templates[2].says` |
+|  | I've a mind to fish today. Shall I take us to some water? | `wants.templates[2].says` |
 |  | to win a fight with {player} beside you | `wants.templates[3].words` |
 |  | won a fight beside {player} | `wants.templates[3].done` |
 |  | I want to win a fight beside you. Something with teeth. | `wants.templates[3].says` |
 |  | to go to the temple and be blessed | `wants.templates[4].words` |
 |  | were blessed at the temple | `wants.templates[4].done` |
-|  | Could we stop at the temple? I'd like a blessing. | `wants.templates[4].says` |
+|  | I'd like to stop at the temple for a blessing. | `wants.templates[4].says` |
 |  | This pack is breaking my back. | `bond.watch.heavy_warn` |
 |  | {player} asked you to travel with them, but {companion} travels with them; you will not go while she does. | `leaving.recruit_asked.with` |
 |  | {player} asked you to travel with them, but you travel with someone else now. | `leaving.recruit_asked.elsewhere` |
