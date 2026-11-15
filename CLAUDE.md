@@ -166,7 +166,7 @@ that the walk looks like skipping and the people look like "bad claymation place
   `## Unreleased` at the top of `CHANGELOG.md` (create the heading if it's missing). The
   release session cuts releases: it freezes `main` briefly, runs the suite on `main`, inserts
   the next `## vX.Y.Z` heading under `## Unreleased` (decision 324), runs the release script, deploys the server,
-  and unfreezes. Between releases `main` runs ahead of the box; that's expected. The cadence (coordinator, 2026-10-21, after a day's work sat unreleased): release cuts once a day in the morning, and sooner when Jeff asks or a fix he has seen is in. Say in
+  and unfreezes. Between releases `main` runs ahead of the box; that's expected. The cadence (coordinator, 2026-10-21, after a day's work sat unreleased): release cuts once a day in the morning, and sooner when Jeff asks or a fix he has seen is in. A mend for a report of Jeff's is cut the day it lands, not held for the morning, and a regression that blocks that cut is reverted, not waited on (Jeff, 2026-11-14, reporting the same four things a second time: "if the lag between feedback and change it is very difficult to give feedback"); its row in `C:/dev/review/your_reports.md` names the build to check and is fixed only when seen joined in the released build. Say in
   your landing message if your change alters the wire format, so it isn't left unreleased.
   Every cut comes with a checklist for Jeff (Jeff, 2026-10-23: "for every cut i need a change
   log of things to check"): when release says the box is up, the coordinator writes
