@@ -35,6 +35,7 @@ func _ready() -> void:
 		World.step()
 
 	await _test_ask_and_accept()
+	await _test_world_map_given()
 	_test_spot_taken_up()
 	_test_terrain_message()
 	_test_world_map_window()
@@ -49,6 +50,7 @@ func _ready() -> void:
 	await _test_home_gives_way()
 	await _test_first_spots_save()
 	await _test_view_settled()
+	await _test_threaded_soak()
 	await _test_asking_focus()  # Last: its walk wakes the room's imps.
 
 	_remove_tree(ProjectSettings.globalize_path(OVERLAY))
@@ -779,3 +781,98 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## 933 (the coordinator's soak row): several asks in a row through the host, the world stepping each frame
+## while they run (_wait_for), a town's plot laid as the second goes out, inline (--builder-inline) and then
+## on a worker: every answer the same. An engine error or a script error anywhere fails the scene (run.sh).
+func _test_threaded_soak() -> void:
+	print("\n== asks in a row on a worker, the town ticking, a plot laid meanwhile: the answers as inline (933) ==")
+	await _host_home()
+	if World.clearing == null:
+		_check(false, "the host has the town's clearing (plots)")
+		return
+	var turns := [
+		[[{"name": "paint", "input": {"ground": "grass", "rects": [{"x": 10, "y": 5, "w": 1, "h": 1}]}}], "Grass."],
+		[[{"name": "spot", "input": {"at": [4, 4], "use": "square", "face": [5, 4], "town": "test"}}], "A spot."],
+		[[{"name": "paint", "input": {"ground": "dirt", "rects": [{"x": 9, "y": 5, "w": 1, "h": 1}]}},
+			{"name": "spot", "input": {"at": [9, 7], "use": "work", "face": [9, 6], "trade": "cook", "town": "test"}}], "Dirt and a cook."],
+		[[{"name": "paint", "input": {"ground": "grass", "rects": [{"x": 6, "y": 6, "w": 2, "h": 1}]}}], "More grass."],
+	]
+	var plot := Rect2i(14, 12, 2, 2)
+	var kept_inline := Net.builder_inline
+	var kept_state: String = _main._builder_ui.state if _main._builder_ui != null else ""
+	var said := {}
+	for inline: bool in [true, false]:
+		Net.builder_inline = inline
+		_main._builder.sessions.clear()
+		var answers: Array[String] = []
+		for i in turns.size():
+			_main._builder.sessions.clear()  # A fresh session takes the new turns: one kept replays its first.
+			_main._builder.test_turns = turns[i]
+			_heard.clear()
+			_main._on_command(_player(Net.local_id), "builder", {"op": "ask", "area": AREA, "text": "ask %d" % i})
+			if i == 1:
+				World.clearing.lay_plot("test_room", "test", "house", plot, Vector2i(0, 1))
+			var heard := await _wait_for("proposal")
+			answers.append(str(heard))
+		World.clearing.unplot("test_room", plot)
+		said[inline] = answers
+		_main._builder.sessions.clear()
+	Net.builder_inline = kept_inline
+	_main._builder.test_turns = []
+	# The answers reached the host's own panel too, as proposals of sessions cleared above: put it
+	# back here, with no discard sent (an empty ask after would read as an accept, "Nothing to do").
+	var ui: BuilderUI = _main._builder_ui
+	if ui != null and ui.state != kept_state:
+		ui._reset()
+	var all_came := (said[false] as Array).all(func(answer: String) -> bool: return answer.contains("\"proposal\""))
+	var own := func(answer: String, words: String) -> bool: return answer.contains(words)
+	all_came = all_came and own.call(said[false][1], "A spot.") and own.call(said[false][2], "Dirt and a cook.") and own.call(said[false][3], "More grass.")
+	_check(all_came and str(said[false]) == str(said[true]),
+		"%d asks in a row, each answer on a worker as inline (%s)" % [turns.size(), "same" if str(said[false]) == str(said[true]) else str(said[false]).left(300)])
+
+
+## 933: the world map the host hands each ask (Main's, BuilderSession.world_map_of) gives the session's
+## answers a fresh WorldMap.build() gives: the other towns' stockpiles (town_ids) and the names a milestone
+## may carry (reachable_names), now, after an accept in the zone and after a regeneration's write (both of
+## which have Main adopt a new map). No worker ever builds one.
+func _test_world_map_given() -> void:
+	print("\n== the host's world map in place of a fresh build: the same towns and names (933) ==")
+	await _host_home()
+	var zone_doc: MapDoc = MapDoc.from_level("test_room")
+	var area := Rect2i(AREA[0], AREA[1], AREA[2], AREA[3])
+	# Run early: the test room's overlay as later sections leave it has a link marker going nowhere, past which
+	# neither map reaches a name.
+	var compare := func(when: String) -> void:
+		var given := BuilderSession.new(zone_doc, area, "test_room", StubClaude.new([]))
+		given.world_map_of = func() -> WorldMap: return _main._world_map
+		var built := BuilderSession.new(zone_doc, area, "test_room", StubClaude.new([]))
+		var towns := given.town_ids()
+		var built_towns := built.town_ids()
+		var names := BuilderSession.reachable_names(_main._world_map)
+		var fresh_names := BuilderSession.reachable_names(WorldMap.build())
+		_check(_main._world_map != null and str(towns) == str(built_towns) and str(names) == str(fresh_names) and not names.is_empty(),
+			"%s: the host's map gives the towns and the names a fresh build gives (%d and %d towns, %d and %d names)" % [
+				when, towns.size(), built_towns.size(), names.size(), fresh_names.size()])
+		given.world_map_of = Callable()
+	compare.call("at the start")
+	var map_before: WorldMap = _main._world_map
+	_main._builder.sessions.clear()
+	_main._builder.test_turns = [[{"name": "paint", "input": {"ground": "grass", "rects": [{"x": 5, "y": 7, "w": 1, "h": 1}]}}], "Grass."]
+	_main._on_command(_player(Net.local_id), "builder", {"op": "ask", "area": AREA, "text": "grass"})
+	await _wait_for("proposal")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	await _wait_for("accepted")
+	_main._builder.test_turns = []
+	_check(_main._world_map != map_before, "the accept had Main adopt a new map")
+	compare.call("after an accept in the zone")
+	var shifting := Regen.marked_levels()
+	shifting.sort()
+	var level_name := shifting[0] if not shifting.is_empty() else ""
+	map_before = _main._world_map
+	var laid: String = _main._regenerate_now(level_name) if level_name != "" else "no shifting level"
+	_check(laid.contains("laid again") and _main._world_map != map_before, "a regeneration's write (%s) had Main adopt a new map" % laid)
+	compare.call("after a regeneration's write")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "undo"})
+	await _wait_for("undone")

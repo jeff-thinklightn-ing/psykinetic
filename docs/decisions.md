@@ -57546,6 +57546,18 @@ before. Also run on the take: level_test, regen_test, labyrinth_test, builder_zo
 
 Editor and server; protocol unchanged; no new class_name; no bullet (nothing a player is told).
 
+921 amended (1), the figures corrected (the decision-number script's label; the coordinator's ruling on
+933, 2026-11-15). The Level.parse figure this decision and 867 amended (5) rest on ("about 74 ms here", so
+"at most Level.parse's ~60 ms" on the box) was timed under --script, where no autoload runs: Level.parse
+stopped early at DayNight.base_ambient (48 SCRIPT ERRORs in the coordinator's rerun), so it read fast and
+is void. Timed again from a scene (two-line .tscn, SCRIPT ERROR 0, "TIME DONE" last) on saturn, quiet,
+the wilds, medians of five: MapDoc.parsed 204 ms, of it Level.parse 169, to_image 30 (this decision's
+40.4 on this PC stands), the relief image 3. So after this decision a working copy's parse is about 85 per
+cent Level.parse, not to_image, and a cell change's frame on the box is near 200 ms, not the 95 expected
+above. On this PC, loaded, a shares-only reading agrees (Level.parse about 80 per cent of a parse). Lever
+4c would save more than written, and 4b (the heavy steps off the main thread) is decision 933. The
+to_image change and its pin stand as they are. Docs only.
+
 
 ## 924. A held stab's sounds: an effort floor per swinger, swing and hit takes dealt from a deck, two voices of one hit slot per swinger (sound)
 
@@ -58144,3 +58156,110 @@ foothills and forest):
   worst are the hills' 5,098 and castle_halls generation 1's 2,157.
 
 Client only; protocol unchanged; no new class_name; no bullet.
+## 933. Builder mode's heavy ask steps run on a worker, one at a time, the world they read taken on the main thread first
+
+The coordinator's approval of builder's option B, 2026-11-15 (C:/dev/review/builder/parse_frames_page.md,
+the audit C:/dev/review/builder/thread_audit_page.md), with its six choices and its ruling on the world
+map. After 921 amended (1), each heavy step of an ask (a parse, a cell-changing tool's own work, the checks
+after a call) still holds the server's frame for about 200 ms on the box, every player on the host sharing
+it; 867 amended (1) put each in a frame of its own, but a frame of 200 ms is still a stall.
+
+Now BuilderSession.off_frame(work, guard) runs a step on a WorkerThreadPool task and awaits process_frame
+until it is done, the world going on meanwhile. Wrapped: frame 0's baselines (doc_layout_faults,
+doc_arrival_faults), each tool call (run_tool) and the checks before and after it (checks_now), the parse
+after it (parsed_of(working)), whether the change is spots alone (working_spots_at_most, which builds the
+whole proposal) and its layout and arrival news, the ask's closing checks, parse and news, each request's
+body (_body: its system prompt reads every prefab) and each of the build-ahead's three pieces (867 amended
+(4); _build_piece, its guard asked again when its turn comes: the same ask, the request still out, not
+discarded, the working copy unchanged). One step of a session at a time, the build-ahead's included: a step
+waits while another runs. Sending Claude's request (ClaudeClient.send), the working copy's taking, the
+situation prompt (it reads the live towns) and accept stay on the main thread. proposal() reads the doc as
+_doc_read gives it: working_spots_at_most and parsed_of call it on a worker. The host refuses every call
+on a busy session (builder_host's busy checks), so nothing else reads the session while a step runs.
+
+What a step reads of the world is read on the main thread just before it (_take_shared, its time kept in
+shared_ms) and handed to it in _shared; on a worker the session reads only that:
+- the zone's doc (one MapDoc per zone, every session there sharing it; another's accept, the host's undo
+  or a save writes it): a copy, map.copy() and config.duplicate(true), taken fresh at each ask's first
+  step and kept while the doc's revision stands (_doc_read gives it; 53 reads of the doc go through it).
+  No hold on accept, undo or save (the coordinator's choice 1). A write that moves no revision (a save's
+  building codes, Level.fill_codes) is read from the next ask, as the doc's own kept parse reads it;
+- the plots the towns laid (laid_plots, World.clearing, which a town grows as it plots);
+- the residents of every town the working copy and the doc name (_spot_residents read live from
+  World.towns and World.production); a town a tool adds within a step reads residents.json's settled people
+  alone (_settled_residents), as a town no running world holds does;
+- the world map's two answers, other towns' stockpiles (_far_stockpiles, for town_ids) and the names a
+  milestone may carry (reachable_names), from the host's map: BuilderHost hands each ask world_map_of, a
+  getter of Main's _world_map, asked at each take, so a map Main adopts mid-ask (another's accept, a
+  regeneration) is the next step's; the session never names Main and is dropped from it at the ask's end,
+  as on_checking is. With no host (builder_test, the editor) one WorldMap.build() serves the ask's steps.
+  A spots-only accept writes spots into Main's map in place (867 amended (2)); neither answer reads spots,
+  so no case is left where the overlay changes and Main's map is not rebuilt. No worker ever calls
+  WorldMap.build: its static _read_before and the overlay files it reads are the main thread's;
+- the levels' configs Level.parse's link cues read (the coordinator's choice 2): Level.templates_now()
+  gives template_config's answer for every registered and template level, as references (a regeneration's
+  write replaces an entry whole, never changes one in place), and Level.parse, MapDoc.parsed and link_cues
+  take it as templates; template_given reads a level not among them from its res:// file, as
+  template_config does. A regeneration never waits on a builder;
+- the first-use caches (Level.kinds, Monster.kinds, Items.all and loot_tables, Lore._load,
+  Townsfolk.settled), called before each take: each fills once and only reads after.
+The cached layout Images load() gives (prefabs, Level.source) are read on a worker and on the main thread
+at once; nothing writes them. Godot's threading page (4.7) says Dictionary and Array element reads across
+threads are fine and resizing needs a lock, and has no section on Image: that reading a shared Image from
+two threads is safe is not confirmed by Godot's page. The pin below parses beside the main thread instead.
+
+The switch (the coordinator's choice 5a): the server argument --builder-inline (Net.builder_inline) runs
+every step on the main thread as before 933, read at each ask's start (BuilderSession.threaded); off,
+threads on, as it lands. Release's to set on the box if a server ever dies in an ask.
+
+Measured on this PC, loaded, shares only (C:/dev/review/builder/parse_thread_921.gd and main_reads_933.gd,
+scenes, SCRIPT ERROR 0): Level.parse of the wilds on a worker 224 ms against 230 on the main thread, about
+30 main-thread frames running meanwhile, the answers deep-equal; on the main thread before a step, the doc
+copy 13.6 ms (once an ask, and again only when the doc's revision moves), WorldMap.build 50 ms warm (1538
+cold), which a server no longer does in an ask; Lore's first load 5.9 ms, once a run. builder_test's
+threaded asks: 32 takes, the longest 60.3 ms (its first, which builds the world map: there is no host).
+Saturn's figure (the coordinator's runs of C:/dev/review/builder/ask_frames_933.gd, a scene, quiet, the
+wilds, four cell-changing calls an ask, a world map handed in as the host does, three asks after a warm-up,
+two runs): inline the longest frame 625.6 to 676.8 ms (five of six 625 to 633), the next 246 to 261, 15
+frames over 50 ms an ask, the ask 4277 to 4392 ms over 66 frames; on a worker the longest 38.5 to 40.5 ms,
+the next 26.9 to 38.5, none over 50 ms, 31 takes of at most 6.0 ms, the ask 4348 to 4460 ms over 623 to 638
+frames; the median frame 6.90 both ways. So the ask takes no longer on a quiet machine and its longest
+frame falls about sixteen times. Under load (a run beside a landing, load 8.9, not counted) the worker's
+ask ran about twice as long, 8.1 to 9.3 s, while its frames stayed short (42.7 to 50.8 ms, one over 50).
+That probe started each ask's clock at 0, so the ask's own first frame was never counted. A second probe
+on this PC (ask_frames_933b.gd: each frame tagged with what ran in it, a take, a request sent, the share of
+the frame our code ran) named the worker's two repeating frames: the 38.5 ms one was the request's body
+built on the main thread (_body, 37.8 ms here alone; no take in that frame, a take's own figure apart,
+under 7), and the 27 ms one was working_spots_at_most's proposal() (25 to 34 ms of ours beside a take of
+1.5). Both are on the worker now.
+
+Saturn again, after it (the coordinator's runs of both probes, mended to count the first frame, 9c9125973
+on 122a67c49, two runs each, no landing beside, load 1.4 to 3.7): inline the ask 4280 to 4311 ms over 67
+frames, the longest frame 622.5 to 629.6 ms, the next 244 to 262, 16 over 50 ms; on a worker the ask 4391
+to 4557 ms over 637 to 661 frames, the longest 16.1 to 17.8 ms, the next 10.2 to 10.4, none over 50 ms,
+38 takes of at most 3.7 ms; the median frame 6.9 both ways. So on saturn the longest main-thread frame of an
+ask is about 625 ms inline and under 20 ms on a worker, and the ask about 3 per cent longer (4.30 s to
+4.43 s). The worker's longest is always the ask's first frame, 16.6 to 19.5 ms, all ours: the pieces alone
+on saturn, _fresh_working 3.1 ms, _situation 9.5 (it reads the live towns, so it stays), the first take with
+the doc copied afresh 3.8 (0.6 with the copy kept), _body 14.2 (now on the worker). Each next longest is a
+frame with a take, about 10 ms, of which ours 3 to 4. (The probe's step names read "?": the meta it reads
+was set by a local probe line only; the pieces name the parts.) This is saturn's, not the box's: no figure
+here is the box's frame, and none is claimed for players. No frame-time bound goes into a test (one tips
+under seven scenes at once).
+
+The pins. builder_test _test_off_frame: on the wilds, a spot ask and a follow-up mixing a paint and a spot,
+inline and threaded: every call's words, each ask's closing checks and summary and the proposal the same;
+inline nothing is taken, threaded every step is. _test_accept_during_task: another session's accept on the
+same doc while the first ask's frame 0 runs on a worker: that step's baseline is the level's before the
+accept (its revision and faults), the ask ends well, and its proposal is refused at accept as made before
+another's (867 amended (2)). _test_parse_on_worker: a dozen rounds of a worker's parse beside the main
+thread's of the same doc, deep-equal every round. _test_built_ahead's late ask waits for the three pieces
+by what is built (StubClaude.wait_until), since a piece on a worker takes its flood's time, not a frame.
+builder_zone_test _test_threaded_soak: four asks in a row through the host, each its own session, the world
+stepping every frame, a town's plot laid as the second goes out, inline then threaded: every answer the
+same, and no engine or script error in the scene. _test_world_map_given: town_ids and reachable_names from
+the host's map equal a fresh build's at the start, after an accept in the zone and after a regeneration's
+write (barrow, by the console's regenerate now), each of which had Main adopt a new map.
+
+Server only; protocol unchanged; no new class_name; no bullet, no ui-design part, no new words: the panel
+says "Asking:" and "Checking:" as before, and the builder's view now keeps moving while he waits.

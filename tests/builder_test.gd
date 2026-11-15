@@ -65,6 +65,9 @@ func _ready() -> void:
 	await _test_spot_shortcut()
 	_test_stub_name()
 	await _test_built_ahead()
+	await _test_off_frame()
+	await _test_accept_during_task()
+	_test_parse_on_worker()
 	await _test_breathes()
 	await _test_spot_ghost()
 	_test_answer_parts()
@@ -2006,6 +2009,9 @@ func _test_built_ahead() -> void:
 		stub.wait_frames = 0 if way == "at once" else 4
 		var session := BuilderSession.new(doc, Rect2i(176, 186, 40, 32), "wilds", stub)
 		session.whole_checks = way == "whole"
+		if way == "late" and session.threaded():
+			# 933: on a worker a piece takes its flood's time, not a frame: the answer waits for the three.
+			stub.wait_until = func() -> bool: return session.built_ahead.size() >= 3
 		var first := await session.ask("seats by the fire")
 		var built := session.built_ahead.duplicate()
 		var parses := session.parses
@@ -2020,6 +2026,7 @@ func _test_built_ahead() -> void:
 						changed += 1 if str(block.get("content")).begins_with("changed it to") else 0
 		stub.turns = [mixed, "Mixed."]
 		var second := await session.ask("a path, then a seat")
+		stub.wait_until = Callable()  # It holds the session, which holds the stub: let both go.
 		var words: Array = []
 		for message: Dictionary in session.messages:
 			if message.get("content") is Array:
@@ -2036,7 +2043,7 @@ func _test_built_ahead() -> void:
 		_check(str(said[way]["words"]) == str(said["whole"]["words"]) and said[way]["words"].size() == spot_calls.size() + mixed.size(),
 			"%s: every call's words as on the full path (%d calls)" % [way, said[way]["words"].size()])
 		_check(said[way]["first"] == said["whole"]["first"] and said[way]["second"] == said["whole"]["second"], "%s: each ask's closing checks as on the full path" % way)
-	_check(str(said["late"]["built"]) == str(["reach", "held", "checks"]), "four frames out: the reach, the held reach and the checks built ahead (%s)" % [said["late"]["built"]])
+	_check(str(said["late"]["built"]) == str(["reach", "held", "checks"]), "the request out (four frames; on a worker, until they are built): the reach, the held reach and the checks built ahead (%s)" % [said["late"]["built"]])
 	_check(said["at once"]["built"].size() < 3, "a reply in at once: the build-ahead stopped short (%s), the tool built the rest" % [said["at once"]["built"]])
 	_check(said["whole"]["built"].is_empty(), "whole_checks builds nothing ahead")
 	_check(said["late"]["parses"] == 1 and said["whole"]["parses"] > 1,
@@ -2485,3 +2492,131 @@ Streets: the door of the T1 temple"})
 	panel.working("Builder: something went wrong")
 	_check(not dots.visible, "an error's line: no dots")
 	holder.queue_free()
+
+
+## 933: an ask's heavy steps on a worker (BuilderSession.off_frame) give what they give on the main thread
+## (--builder-inline): every call's words, each ask's closing checks and the proposal, on the wilds, a spot
+## ask and a follow-up mixing a paint and a spot. Only the threaded asks take the world before a step.
+func _test_off_frame() -> void:
+	print("\n== an ask's heavy steps on a worker: the same answers as on the main thread (933) ==")
+	var spots := [{"name": "spot", "input": {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"}},
+		{"name": "spot", "input": {"at": [190, 196], "use": "square", "face": [191, 196]}}]
+	var mixed := [{"name": "paint", "input": {"ground": "dirt", "cells": [[186, 200], [187, 200]]}},
+		{"name": "spot", "input": {"at": [198, 212], "use": "fire", "face": [197, 211], "pose": "sit"}}]
+	var kept_inline := Net.builder_inline
+	var said := {}
+	for inline: bool in [true, false]:
+		Net.builder_inline = inline
+		var stub := StubClaude.new([spots, "Spots."])
+		stub.wait_frames = 2
+		var session := BuilderSession.new(MapDoc.from_level("wilds"), Rect2i(176, 186, 40, 32), "wilds", stub)
+		var first := await session.ask("seats by the fire")
+		stub.turns = [mixed, "Mixed."]
+		var second := await session.ask("a path, then a seat")
+		var words: Array = []
+		for message: Dictionary in session.messages:
+			if message.get("content") is Array:
+				for block: Variant in message["content"]:
+					if block is Dictionary and block.get("type") == "tool_result":
+						words.append([block.get("content"), block.get("is_error")])
+		var closing := func(result: Dictionary) -> String:
+			return str([result.get("ok"), result.get("error"), result.get("summary"), result.get("warnings"), result.get("height_warnings"),
+				result.get("site_warnings"), result.get("street_warnings"), result.get("layout_warnings"), result.get("arrival_warnings")])
+		said[inline] = {"words": words, "first": closing.call(first), "second": closing.call(second), "proposal": str(session.proposal()),
+			"takes": session.shared_ms.duplicate()}
+	Net.builder_inline = kept_inline
+	var on: Dictionary = said[false]
+	var off: Dictionary = said[true]
+	_check(str(on["words"]) == str(off["words"]) and on["words"].size() == spots.size() + mixed.size(),
+		"every call's words as on the main thread (%d calls)" % on["words"].size())
+	_check(on["first"] == off["first"] and on["second"] == off["second"], "each ask's closing checks and summary as on the main thread")
+	_check(on["proposal"] == off["proposal"] and on["proposal"] != "{}", "and the proposal")
+	var takes: Array = on["takes"]
+	var longest := 0.0
+	for each: float in takes:
+		longest = maxf(longest, each)
+	_check((off["takes"] as Array).is_empty() and not takes.is_empty(),
+		"inline nothing is taken; threaded the world is taken before each step on the main thread (%d takes, longest %.1f ms)" % [takes.size(), longest])
+
+
+## 933: another builder's accept on the same zone while an ask's frame 0 runs on a worker: that step read a
+## copy of the zone's doc taken before it, so its baseline (the level's own layout faults) is the level's
+## before the accept, and the ask's proposal is refused at its own accept as one made before another's.
+func _test_accept_during_task() -> void:
+	print("\n== another builder's accept while an ask's first step runs on a worker (933) ==")
+	if not BuilderSession.threaded():
+		_check(false, "this scene runs threaded (no --builder-inline)")
+		return
+	var doc := MapDoc.from_level("wilds")
+	var area := Rect2i(176, 186, 40, 32)
+	var other := BuilderSession.new(doc, area, "wilds", StubClaude.new([[{"name": "paint", "input": {"ground": "dirt", "cells": [[200, 200]]}}], "Dirt."]))
+	await other.ask("a patch of dirt")
+	var before := MapDoc.new()
+	before.folder = doc.folder
+	before.map = doc.map.copy()
+	before.config = doc.config.duplicate(true)
+	var asker := BuilderSession.new(doc, area, "wilds", StubClaude.new([[{"name": "paint", "input": {"ground": "grass", "cells": [[190, 200]]}}], "Grass."]))
+	var want: Array = BuilderSession.layout_faults(before)
+	var revision := doc.revision
+	var box := {}
+	var run := func() -> void: box["result"] = await asker.ask("a patch of grass")
+	run.call()
+	var frames := 0
+	while not asker._task_running and frames < 600:
+		await get_tree().process_frame
+		frames += 1
+	var during := asker._task_running and asker._baselines.is_empty()
+	var accepted := other.accept()
+	while not box.has("result"):
+		await get_tree().process_frame
+	var kept: Dictionary = asker._baselines.get("layout", {})
+	_check(during and accepted and doc.revision != revision, "the other's accept lands while the ask's first step runs on a worker (revision %d to %d)" % [revision, doc.revision])
+	_check(int(kept.get("revision", -1)) == revision and str(kept.get("faults")) == str(want),
+		"that step's baseline is the level's before the accept (%d faults, revision %d)" % [want.size(), int(kept.get("revision", -1))])
+	_check(bool(box["result"]["ok"]) and not asker.accept() and asker.refused == BuilderSession.STALE_SAYS,
+		"the ask ends well, and its proposal is refused as made before another's accept (%s)" % asker.refused)
+
+
+## 933: Level.parse on a worker while the main thread parses the same doc (the cached layout Images read on
+## both at once: Godot's threading page does not say a shared Image's reads are safe), a dozen rounds, the
+## worker given the levels' configs read first (Level.templates_now): equal every round, key by key.
+func _test_parse_on_worker() -> void:
+	print("\n== a parse on a worker beside one on the main thread, the same doc, a dozen rounds (933) ==")
+	var doc := MapDoc.from_level("wilds")
+	var templates := Level.templates_now()
+	var differs: Array = []
+	for round in 12:
+		var box := [null]
+		var task := WorkerThreadPool.add_task(func() -> void: box[0] = doc.parsed(templates))
+		var here := doc.parsed()
+		WorkerThreadPool.wait_for_task_completion(task)
+		differs.append_array(_differences(here, box[0], "round %d" % round))
+	_check(differs.is_empty(), "equal every round, every key (%s)" % [differs.slice(0, 6)])
+
+
+## What differs between [param want] and [param got], each a path, through Dictionaries and Arrays.
+static func _differences(want: Variant, got: Variant, path: String) -> Array:
+	if typeof(want) != typeof(got):
+		return ["%s (type %d against %d)" % [path, typeof(want), typeof(got)]]
+	if want is Dictionary:
+		var found: Array = []
+		if (want as Dictionary).size() != (got as Dictionary).size():
+			found.append("%s (%d keys against %d)" % [path, (want as Dictionary).size(), (got as Dictionary).size()])
+		for key: Variant in want:
+			if not (got as Dictionary).has(key):
+				found.append("%s/%s (missing)" % [path, key])
+				continue
+			found.append_array(_differences(want[key], got[key], "%s/%s" % [path, key]))
+		return found
+	if want is Array:
+		if (want as Array).size() != (got as Array).size():
+			return ["%s (%d items against %d)" % [path, (want as Array).size(), (got as Array).size()]]
+		var found: Array = []
+		for i in (want as Array).size():
+			found.append_array(_differences(want[i], got[i], "%s[%d]" % [path, i]))
+			if found.size() > 12:
+				break
+		return found
+	if want is Object:
+		return [] if want == got else ["%s (another object)" % path]
+	return [] if want == got else ["%s (%s against %s)" % [path, str(want).left(40), str(got).left(40)]]

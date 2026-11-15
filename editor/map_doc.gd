@@ -220,8 +220,9 @@ func save(with_report := true, as_read := {}) -> bool:
 
 
 ## The level as Level.parse reads it from what is here now (saved or not).
-func parsed() -> Dictionary:
-	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, map.to_relief_image())
+## [param templates]: Level.parse's (933), the linked levels' configs read on the main thread first.
+func parsed(templates: Dictionary = {}) -> Dictionary:
+	return Level.parse(map.to_image(), map.to_height_image() if had_heights or not map.heights.is_empty() else null, config, map.to_relief_image(), templates)
 
 
 ## A change made: the revision on, and said (867).

@@ -130,6 +130,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	_reply(peer, {"state": "working"})
 	# 867 amended (1): once a reply's tool calls start, the builder's panel says "Checking:".
 	session.on_checking = func() -> void: _reply(peer, {"state": "working", "checking": true})
+	# 933: the world map this host runs on now (a new one adopted on an accept or a regeneration), asked at
+	# each of the ask's steps on the main thread: the session never builds its own, nor names Main.
+	session.world_map_of = func() -> WorldMap: return main._world_map if main != null and "_world_map" in main else null
 	var result: Dictionary = await session.ask(text)
 	spent += float(result["cost"])
 	print("[builder] %s in %s %s: \"%s\" -> %s, $%.4f (session $%.4f, %d in, %d out; server $%.4f)" % [player_id, zone_name,

@@ -197,7 +197,7 @@ var refused := ""
 func _init(level_doc: MapDoc, selected: Rect2i, level_name: String, claude: Object) -> void:
 	doc = level_doc
 	# The codes the level's buildings go by (decision 537), as Level.parse derives them.
-	Level.fill_codes(doc.config)
+	Level.fill_codes(_doc_read().config)
 	area = selected.intersection(Rect2i(Vector2i.ZERO, level_doc.map.size))
 	map_name = level_name
 	client = claude
@@ -208,21 +208,129 @@ func _fresh_working() -> void:
 	new_area = {}
 	working = MapDoc.new()
 	working.folder = doc.folder
-	working.map = doc.map.copy()
-	working.config = doc.config.duplicate(true)
-	working.had_heights = doc.had_heights
-	based_on = doc.revision
+	working.map = _doc_read().map.copy()
+	working.config = _doc_read().config.duplicate(true)
+	working.had_heights = _doc_read().had_heights
+	based_on = _doc_read().revision
 	_taken_revision = working.revision
 	_drop_built()
 	# The doc's own parse stays while its revision stands (867 amended (4)): the new working copy shares it.
 	var doc_parse: Variant = _parses.get(doc.get_instance_id())
 	_parses.clear()
-	if doc_parse is Dictionary and int(doc_parse["revision"]) == doc.revision:
+	if doc_parse is Dictionary and int(doc_parse["revision"]) == _doc_read().revision:
 		_parses[doc.get_instance_id()] = doc_parse
 
 
 ## Called once a reply whose tool calls are about to run (867 amended (1)): the host's "Checking:" line.
 var on_checking := Callable()
+
+
+## 933: the world map the host runs on now, given by the host for each ask (Main's: a new one adopted on an
+## accept or a regeneration, so it is asked again at each step's take); unset, or giving null,
+## WorldMap.build() on the main thread as before. Dropped at the ask's end, as on_checking is.
+var world_map_of := Callable()
+## 933: this ask's heavy steps on a worker (Net.builder_inline off, read at the ask's start).
+var _threaded := false
+## 933: a step of this session on a worker now: one at a time, the build-ahead's included.
+var _task_running := false
+## 933: what a step on a worker reads of the world, taken on the main thread just before it (_take_shared).
+var _shared := {}
+var _doc_copy: MapDoc = null
+var _ask_world: WorldMap = null
+## 933: the main thread's time taking _shared before each step, ms (builder_test and the probe read them).
+var shared_ms: Array[float] = []
+
+
+## Whether an ask's heavy steps go to a worker now (933): unless the server runs --builder-inline, and only
+## inside a scene tree.
+static func threaded() -> bool:
+	return not Net.builder_inline and Engine.get_main_loop() is SceneTree
+
+
+## The world map world_map_of gives now (933); null when unset.
+func _world_map() -> WorldMap:
+	return world_map_of.call() if world_map_of.is_valid() else null
+
+
+## The zone's doc as this session may read it now (933): while a step of its own runs on a worker, the
+## copy taken on the main thread before it; else the doc itself. The doc is shared by every session in
+## the zone, and another's accept, the host's undo or a save writes it on the main thread.
+func _doc_read() -> MapDoc:
+	return _shared["doc"] if _task_running and _shared.has("doc") else doc
+
+
+## [param work] run off the main thread (933): on a WorkerThreadPool task, each frame meanwhile left to
+## the world, its result returned when it is done. One step of this session at a time; [param guard],
+## when given, is asked again once the step's turn comes and the step is skipped (null) if it says no
+## (the build-ahead's: only while the request is out). Inline, as before 933, with --builder-inline or
+## outside a scene tree.
+func off_frame(work: Callable, guard := Callable()) -> Variant:
+	var tree := Engine.get_main_loop() as SceneTree
+	if not _threaded or tree == null:
+		return work.call()
+	while _task_running:
+		await tree.process_frame
+	if guard.is_valid() and not guard.call():
+		return null
+	var began := Time.get_ticks_usec()
+	_take_shared()
+	shared_ms.append((Time.get_ticks_usec() - began) / 1000.0)
+	_task_running = true
+	var box := [null]
+	var task := WorkerThreadPool.add_task(func() -> void: box[0] = work.call())
+	while not WorkerThreadPool.is_task_completed(task):
+		await tree.process_frame
+	WorkerThreadPool.wait_for_task_completion(task)
+	_task_running = false
+	_shared = {}
+	return box[0]
+
+
+## What a step on a worker reads of the world, read here on the main thread (933; the audit,
+## C:/dev/review/builder/thread_audit_page.md): a copy of the zone's doc (kept while its revision
+## stands), the plots the towns laid, the residents of the level's towns, the world map's two answers
+## (other towns' stockpiles, the names a milestone may carry) and the levels' configs Level.parse's
+## link cues read (Level.templates_now). The first-use caches are filled here.
+func _take_shared() -> void:
+	# Each fills its cache on first use and only reads it after: cheap once full, and a test that empties
+	# one (Items) has it full again before the worker reads it.
+	Level.kinds()
+	Monster.kinds()
+	Items.all()
+	Items.loot_tables()
+	Lore._load()
+	Townsfolk.settled()
+	if _doc_copy == null or _doc_copy.revision != doc.revision or _doc_copy.folder != doc.folder:
+		_doc_copy = MapDoc.new()
+		_doc_copy.folder = doc.folder
+		_doc_copy.map = doc.map.copy()
+		_doc_copy.config = doc.config.duplicate(true)
+		_doc_copy.had_heights = doc.had_heights
+		_doc_copy.revision = doc.revision
+	# The host's map now; with none (builder_test, the editor), one built for this ask's steps.
+	var world := _world_map()
+	if world == null:
+		if _ask_world == null:
+			_ask_world = WorldMap.build()
+		world = _ask_world
+	var residents := {}
+	for town: String in _town_keys():
+		residents[town] = _spot_residents(town)
+	_shared = {"doc": _doc_copy, "plots": laid_plots(working.config), "residents": residents,
+		"far_stockpiles": _far_stockpiles(world), "reachable": reachable_names(world), "templates": Level.templates_now()}
+
+
+## The keys a spot's town may name in the working copy and the doc: every place's, and every spot's town.
+func _town_keys() -> Array[String]:
+	var out: Array[String] = []
+	for config: Dictionary in [working.config, _doc_read().config]:
+		for key: String in Level.places_from(config, [] as Array[String]):
+			if key not in out:
+				out.append(key)
+		for entry: Variant in config.get("spots", []) if config.get("spots") is Array else []:
+			if entry is Dictionary and str(entry.get("town", "")) != "" and str(entry["town"]) not in out:
+				out.append(str(entry["town"]))
+	return out
 
 
 ## One frame's pause (867 amended (1)): an ask's tool calls and their checks run on the server's main
@@ -247,6 +355,12 @@ func ask(text: String) -> Dictionary:
 	if busy:
 		return {"ok": false, "error": "still working on the last request"}
 	busy = true
+	# 933: the heavy steps below on a worker, one at a time, unless the server runs --builder-inline.
+	_threaded = threaded()
+	# A fresh copy at the ask's first step; then kept while the doc's revision stands. A write to the doc that
+	# moves no revision (a save's building codes, Level.fill_codes) is read from the next ask.
+	_doc_copy = null
+	_ask_world = null
 	_fresh_working()
 	var first := messages.is_empty()
 	var prompt := (_situation() + "\n\nThe request: " + text) if first \
@@ -255,19 +369,21 @@ func ask(text: String) -> Dictionary:
 	var spent := 0.0
 	var result := {"ok": false, "summary": "", "cost": 0.0, "error": ""}
 	# The level's own layout faults (806), and those the proposal adds already said.
-	var layout_before := doc_layout_faults()
+	var layout_before: Array = await off_frame(doc_layout_faults)
 	var layout_said: Array[String] = []
 	await breathe()
 	# And the arrivals' (806 amended (13)): the level's own the baseline, what the proposal adds said once, a warning.
-	var arrivals_before := doc_arrival_faults()
+	var arrivals_before: Array = await off_frame(doc_arrival_faults)
 	var arrivals_said: Array[String] = []
 	_ask_token += 1
 	built_ahead = []
 	for turn in MAX_TURNS:
+		# 933: the request built on a worker too (its system prompt reads every prefab: about 38 ms a request).
+		var body: Dictionary = await off_frame(_body)
 		_request_out = true
 		if turn == 0:
 			_build_ahead(_ask_token)  # Not awaited: it runs in the frames the request is out (867 amended (4)).
-		var response: Dictionary = await client.send(_body())
+		var response: Dictionary = await client.send(body)
 		_request_out = false
 		if response.has("error"):
 			result["error"] = str(response["error"])
@@ -284,14 +400,14 @@ func ask(text: String) -> Dictionary:
 				if block.get("type") == "tool_use":
 					await breathe()
 					# 867 amended (4): the last call's after, kept by revision, is this one's before.
-					var checked := checks_now()
+					var checked: Dictionary = await off_frame(checks_now)
 					var before: Array = checked["store"]
 					var ground_before: Array = checked["heights"]
 					var sites_before: Array = checked["sites"]
 					var streets_before: Array = checked["streets"]
-					var outcome := run_tool(str(block.get("name")), block.get("input", {}))
+					var outcome: Dictionary = await off_frame(run_tool.bind(str(block.get("name")), block.get("input", {})))
 					await breathe()
-					checked = checks_now()
+					checked = await off_frame(checks_now)
 					# What the change did to the town's store, said at once (decision 301).
 					var new := (checked["store"] as Array).filter(func(warning: String) -> bool: return warning not in before)
 					if not new.is_empty():
@@ -312,13 +428,13 @@ Heights now: " + "; ".join(ground)
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
 					await breathe()
 					# And to the layout rules, which accepting it must not break (806).
-					var now := parsed_of(working)
+					var now: Dictionary = await off_frame(parsed_of.bind(working))
 					await breathe()
 					# 867 amended (3): the level but for its spots has no layout fault the level hasn't.
-					var spots_alone := working_spots_at_most()
+					var spots_alone: bool = await off_frame(working_spots_at_most)
 					var layout: Array[String] = []  # A ternary of [] and a typed array is a plain Array: refused at run time.
 					if not spots_alone:
-						layout = layout_news(layout_before, now)
+						layout = await off_frame(layout_news.bind(layout_before, now))
 					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
 					layout_said = layout
 					if not unsaid.is_empty():
@@ -327,7 +443,7 @@ Heights now: " + "; ".join(ground)
 					# And to the ways in (806 amended (13)): a warning, never a refusal.
 					var arrivals: Array[String] = []
 					if not spots_alone:
-						arrivals = arrival_news(arrivals_before, now)
+						arrivals = await off_frame(arrival_news.bind(arrivals_before, now))
 					var unwarned := arrivals.filter(func(fault: String) -> bool: return fault not in arrivals_said)
 					arrivals_said = arrivals
 					if not unwarned.is_empty():
@@ -354,7 +470,7 @@ Heights now: " + "; ".join(ground)
 	result["summary"] = summary
 	await breathe()
 	# 867 amended (4): the last call's after-checks, kept, unless something changed since.
-	var closing := checks_now()
+	var closing: Dictionary = await off_frame(checks_now)
 	var store_end: Array[String] = []
 	store_end.assign(closing["store"])
 	result["warnings"] = store_end
@@ -368,18 +484,18 @@ Heights now: " + "; ".join(ground)
 	streets_end.assign(closing["streets"])
 	result["street_warnings"] = streets_end
 	await breathe()
-	var parsed_now := parsed_of(working)
+	var parsed_now: Dictionary = await off_frame(parsed_of.bind(working))
 	await breathe()  # A parse, then its checks: each its own frame (the box: 459 ms a parse).
-	var spots_at_end := working_spots_at_most()  # 867 amended (3), as after each call.
+	var spots_at_end: bool = await off_frame(working_spots_at_most)  # 867 amended (3), as after each call.
 	var layout_end: Array[String] = []
 	if not spots_at_end:
-		layout_end = layout_news(layout_before, parsed_now)
+		layout_end = await off_frame(layout_news.bind(layout_before, parsed_now))
 	result["layout_warnings"] = layout_end
 	if not spots_at_end:
 		await breathe()
 	var arrivals_end: Array[String] = []
 	if not spots_at_end:
-		arrivals_end = arrival_news(arrivals_before, parsed_now)
+		arrivals_end = await off_frame(arrival_news.bind(arrivals_before, parsed_now))
 	result["arrival_warnings"] = arrivals_end
 	result["cost"] = spent
 	if not result["ok"]:
@@ -387,6 +503,7 @@ Heights now: " + "; ".join(ground)
 	busy = false
 	# Set for one ask (the host sets it again each time); dropped, so a callable holding this session frees it.
 	on_checking = Callable()
+	world_map_of = Callable()
 	if discard_waiting:
 		# Esc came while the reply's calls ran (867 amended (1)): forgotten now, whole, never midway.
 		discard_waiting = false
@@ -402,7 +519,7 @@ func _body() -> Dictionary:
 		"max_tokens": 16000,
 		"output_config": {"effort": effort},
 		"system": [{"type": "text", "text": system_prompt(prefab_dir), "cache_control": {"type": "ephemeral"}}],
-		"tools": tools(doc.config),
+		"tools": tools(_doc_read().config),
 		"messages": messages,
 		"cache_control": {"type": "ephemeral"},
 	}
@@ -652,22 +769,22 @@ Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; 
 
 ## What the first request starts with: the level, the area, what is in it.
 func _situation() -> String:
-	var zone := Level.zone_of(doc.config)
-	var shown := area.grow(MARGIN).intersection(Rect2i(Vector2i.ZERO, doc.map.size))
+	var zone := Level.zone_of(_doc_read().config)
+	var shown := area.grow(MARGIN).intersection(Rect2i(Vector2i.ZERO, _doc_read().map.size))
 	var text := "The level: %s (\"%s\"), %d x %d cells, %s. The area: x %d to %d, y %d to %d (%d x %d cells).\n\n%s" % [
-		map_name, str(doc.config.get("name", map_name)), doc.map.size.x, doc.map.size.y,
+		map_name, str(_doc_read().config.get("name", map_name)), _doc_read().map.size.x, _doc_read().map.size.y,
 		"outdoors (void is forest)" if zone == "outdoors" else "%s (void is nothing, walled off)" % {"indoors": "indoors", "cave": "a cave", "dungeon": "a dungeon"}.get(zone, zone),
 		area.position.x, area.end.x - 1, area.position.y, area.end.y - 1, area.size.x, area.size.y,
-		grid(doc.map, doc.config, shown, area, relief())]
+		grid(_doc_read().map, _doc_read().config, shown, area, relief())]
 	var edges := edges_touched()
 	if not edges.is_empty():
 		var beyond := PackedStringArray()
 		for side in edges:
-			var neighbour := str(doc.config.get("neighbours", {}).get(side, ""))
+			var neighbour := str(_doc_read().config.get("neighbours", {}).get(side, ""))
 			beyond.append("%s (%s)" % [side, "beyond it: %s" % neighbour if not neighbour.is_empty() else "nothing beyond it yet: new_area can make a level there"])
 		text += "\n\nThe area touches the map's edge on the " + ", ".join(beyond) + "."
 	var places := PackedStringArray()
-	var listed: Dictionary = Level.places_from(doc.config, [] as Array[String])
+	var listed: Dictionary = Level.places_from(_doc_read().config, [] as Array[String])
 	for key: String in listed:
 		var place: Dictionary = listed[key]
 		if area.grow(MARGIN).has_point(place["cell"]):
@@ -675,26 +792,26 @@ func _situation() -> String:
 	if not places.is_empty():
 		text += "\n\nPlaces here: " + ", ".join(places) + "."
 	var decor := PackedStringArray()
-	for entry: Variant in doc.config.get("decor", []) if doc.config.get("decor") is Array else []:
+	for entry: Variant in _doc_read().config.get("decor", []) if _doc_read().config.get("decor") is Array else []:
 		if entry is Array and (entry as Array).size() == 6 and area.grow(MARGIN).has_point(Vector2i(int(entry[0]), int(entry[1]))):
 			var step := Vector2i(int(entry[2]), int(entry[3]))
 			decor.append("%s at %s%s" % [entry[4], Vector2i(int(entry[0]), int(entry[1])), " (%s)" % side_name(step) if step != Vector2i.ZERO else ""])
 	if not decor.is_empty():
 		text += "\n\nDecor here: " + ", ".join(decor) + "."
-	var spots := spot_words(doc.config)
+	var spots := spot_words(_doc_read().config)
 	if not spots.is_empty():
 		text += "\n\nSpots here: " + spots + "."
 	if not relief().is_empty():
 		text += "\n\nThis level's ground is shaped in metres: the Heights block is in half metres."
 	var coded := PackedStringArray()
-	for entry: Variant in doc.config.get("buildings", []) if doc.config.get("buildings") is Array else []:
+	for entry: Variant in _doc_read().config.get("buildings", []) if _doc_read().config.get("buildings") is Array else []:
 		if entry is Dictionary and entry.has("code"):
 			coded.append("%s %s at %s" % [entry["code"], building_name(entry), Level._tile(entry.get("at"))])
 	if not coded.is_empty():
 		text += "\n\nBuildings in this level, by code (the player may name one so; it is the same entry's \"code\" in the settings): " + ", ".join(coded) + "."
 	var plots := PackedStringArray()
 	var laid := PackedStringArray()
-	for plot: Dictionary in plots_from(doc.config) + laid_plots(doc.config):
+	for plot: Dictionary in plots_from(_doc_read().config) + laid_plots(_doc_read().config):
 		var rect: Rect2i = plot["rect"]
 		if area.grow(MARGIN).intersects(rect):
 			(laid if plot.has("laid") else plots).append("%s at (%d, %d), %d x %d, its street to the %s" % [plot["key"], rect.position.x, rect.position.y, rect.size.x, rect.size.y, side_name(plot["facing"])])
@@ -708,9 +825,9 @@ func _situation() -> String:
 	var towns := town_ids()
 	if not towns.is_empty():
 		text += "\n\nTowns a camp may hold captives from: " + ", ".join(towns) + "."
-	var chars_here := chars(doc.config)
+	var chars_here := chars(_doc_read().config)
 	var own := PackedStringArray()
-	for kind in monster_kinds(doc.config):
+	for kind in monster_kinds(_doc_read().config):
 		if not Monster.kinds().has(kind):
 			own.append("%s (%s on the grid)" % [kind, chars_here["monster_" + kind]])
 	if not own.is_empty():
@@ -723,9 +840,9 @@ func edges_touched() -> Array[String]:
 	var out: Array[String] = []
 	if area.position.y == 0:
 		out.append("north")
-	if area.end.x == doc.map.size.x:
+	if area.end.x == _doc_read().map.size.x:
 		out.append("east")
-	if area.end.y == doc.map.size.y:
+	if area.end.y == _doc_read().map.size.y:
 		out.append("south")
 	if area.position.x == 0:
 		out.append("west")
@@ -1232,7 +1349,7 @@ func _new_area(given: Dictionary) -> Dictionary:
 	var side := str(given.get("side", ""))
 	if side not in edges_touched():
 		return _no("the area does not touch the %s edge (it touches: %s)" % [side, ", ".join(edges_touched()) if not edges_touched().is_empty() else "none"])
-	var neighbour := str(doc.config.get("neighbours", {}).get(side, ""))
+	var neighbour := str(_doc_read().config.get("neighbours", {}).get(side, ""))
 	if not neighbour.is_empty():
 		return _no("beyond the %s edge is %s already" % [side, neighbour])
 	var title := str(given.get("name", "")).strip_edges()
@@ -1249,13 +1366,13 @@ func _new_area(given: Dictionary) -> Dictionary:
 	var exit := middle
 	match side:
 		"east":
-			exit.x = doc.map.size.x - 1
+			exit.x = _doc_read().map.size.x - 1
 		"west":
 			exit.x = 0
 		"north":
 			exit.y = 0
 		"south":
-			exit.y = doc.map.size.y - 1
+			exit.y = _doc_read().map.size.y - 1
 	var points: Array[Vector2i] = [middle, exit]
 	var draft_seed := int(given.get("seed", 1))
 	_lay(AreaTools.path(working.map, points, draft_seed, 3, "dirt"), "")
@@ -1264,8 +1381,8 @@ func _new_area(given: Dictionary) -> Dictionary:
 	working.apply_changes({"config": {"neighbours": neighbours}})
 	var along := exit.y if side in ["east", "west"] else exit.x
 	var gate := clampi(along, 0, (size.y if side in ["east", "west"] else size.x) - 1)
-	var footprint := {"east": Rect2i(doc.map.size.x, 0, size.x, size.y), "west": Rect2i(-size.x, 0, size.x, size.y),
-		"south": Rect2i(0, doc.map.size.y, size.x, size.y), "north": Rect2i(0, -size.y, size.x, size.y)}[side] as Rect2i
+	var footprint := {"east": Rect2i(_doc_read().map.size.x, 0, size.x, size.y), "west": Rect2i(-size.x, 0, size.x, size.y),
+		"south": Rect2i(0, _doc_read().map.size.y, size.x, size.y), "north": Rect2i(0, -size.y, size.x, size.y)}[side] as Rect2i
 	new_area = {"name": level_name, "title": title if not title.is_empty() else level_name.capitalize(), "side": side,
 		"size": size, "seed": draft_seed, "description": str(given.get("description", "")).strip_edges(),
 		"gate": gate, "footprint": footprint}
@@ -1915,19 +2032,29 @@ static func _spawn_points_of(other: String) -> Variant:
 ## place on the world map, "<level>/<key>", this level's as it is being made.
 func town_ids() -> Array[String]:
 	var out: Array[String] = []
-	var world_map := WorldMap.build()
-	for area_name: String in world_map.areas:
-		if area_name == map_name:
-			continue
-		var places: Dictionary = world_map.areas[area_name].get("places", {})
-		for key: String in places:
-			if str(places[key].get("kind", "")) == "stockpile":
-				out.append("%s/%s" % [area_name, key])
+	out.append_array(_shared["far_stockpiles"] if _task_running and _shared.has("far_stockpiles") else _far_stockpiles())
 	var here: Dictionary = Level.places_from(working.config, [] as Array[String])
 	for key: String in here:
 		if here[key]["kind"] == "stockpile":
 			out.append("%s/%s" % [map_name, key])
 	out.sort()
+	return out
+
+
+## Every other area's stockpile places, "<level>/<key>", for town_ids (933: from [param given], the
+## host's map taken before a step; null, the host's now or WorldMap.build(); on the main thread only).
+func _far_stockpiles(given: WorldMap = null) -> Array[String]:
+	var out: Array[String] = []
+	if given == null:
+		given = _world_map()
+	var world := given if given != null else WorldMap.build()
+	for area_name: String in world.areas:
+		if area_name == map_name:
+			continue
+		var places: Dictionary = world.areas[area_name].get("places", {})
+		for key: String in places:
+			if str(places[key].get("kind", "")) == "stockpile":
+				out.append("%s/%s" % [area_name, key])
 	return out
 
 
@@ -2551,7 +2678,9 @@ static func laid_plots(config: Dictionary) -> Array[Dictionary]:
 ## not to a street: left out.
 func street_checks() -> Array[String]:
 	var out: Array[String] = []
-	var plots := plots_from(working.config) + laid_plots(working.config)
+	var laid: Array[Dictionary] = []
+	laid.assign(_shared["plots"] if _task_running and _shared.has("plots") else laid_plots(working.config))
+	var plots := plots_from(working.config) + laid
 	for plot: Dictionary in plots:
 		var room: Rect2i = plot["rect"]
 		if area.intersects(room) and mini(room.size.x, room.size.y) < Level.MIN_ROOM:
@@ -3116,6 +3245,13 @@ func _spot_wants(town: String, use: String, trade: String) -> Dictionary:
 ## spot_world says so.
 func _spot_residents(town: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
+	# 933: on a worker, as read on the main thread before the step; a town not among them, the settled
+	# people alone (no world holds a town this level does not name).
+	if _task_running and _shared.has("residents"):
+		if (_shared["residents"] as Dictionary).has(town):
+			out.assign(_shared["residents"][town])
+			return out
+		return _settled_residents(town)
 	var whole := "%s/%s" % [map_name, town]
 	if World.towns != null and World.production != null and not World.towns.residents(whole).is_empty():
 		for id: String in World.towns.residents(whole):
@@ -3127,6 +3263,14 @@ func _spot_residents(town: String) -> Array[Dictionary]:
 			out.append({"id": id, "name": str(worker.get("name", id)), "trade": str(trades[0]) if not trades.is_empty() else "",
 				"trades": trades, "type": str(worker.get("type", ""))})
 		return out
+	return _settled_residents(town)
+
+
+## residents.json's settled people of this level's [param town] (Townsfolk.settled, warmed on the main
+## thread before a worker reads it), for _spot_residents when no running world names the town's people.
+func _settled_residents(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var whole := "%s/%s" % [map_name, town]
 	var settled := Townsfolk.settled()
 	for id: String in settled:
 		var card: Dictionary = settled[id]
@@ -3145,7 +3289,7 @@ func _spot_residents(town: String) -> Array[Dictionary]:
 func spot_preview() -> Array[String]:
 	var out: Array[String] = []
 	var had := {}
-	for spot: Dictionary in Level.spots_from(doc.config, [] as Array[String]):
+	for spot: Dictionary in Level.spots_from(_doc_read().config, [] as Array[String]):
 		had[spot["cell"]] = spot
 	var towns: Array[String] = []
 	var now := {}
@@ -3275,7 +3419,7 @@ var floods := 0
 ## amended (4)): no change made to it (its revision as taken) and the doc's revision still based_on, so a
 ## parse of the one is a parse of the other. Another builder's accept or a regeneration moves the doc on.
 func working_as_taken() -> bool:
-	return not whole_checks and working.revision == _taken_revision and doc.revision == based_on
+	return not whole_checks and working.revision == _taken_revision and _doc_read().revision == based_on
 
 var _taken_revision := -1
 
@@ -3286,10 +3430,10 @@ var _taken_revision := -1
 ## streets}, each an Array of warnings; read only.
 func checks_now() -> Dictionary:
 	if not whole_checks and not _checks.is_empty() and is_same(_checks["working"], working) \
-			and int(_checks["revision"]) == working.revision and int(_checks["doc_revision"]) == doc.revision:
+			and int(_checks["revision"]) == working.revision and int(_checks["doc_revision"]) == _doc_read().revision:
 		return _checks["said"]
 	var said := {"store": Stockpile.check(working.config), "heights": height_checks(), "sites": site_checks(), "streets": street_checks()}
-	_checks = {"working": working, "revision": working.revision, "doc_revision": doc.revision, "said": said}
+	_checks = {"working": working, "revision": working.revision, "doc_revision": _doc_read().revision, "said": said}
 	return said
 
 var _checks := {}
@@ -3315,21 +3459,30 @@ func spot_cells() -> Dictionary:
 func _build_ahead(token: int) -> void:
 	var of := working
 	var revision := working.revision
+	# 933: asked again when a piece's turn on the worker comes (an ask's own step may run first).
+	var still := func() -> bool:
+		return token == _ask_token and _request_out and busy and not discard_waiting and is_same(of, working) 				and working.revision == revision and not whole_checks
 	for piece: String in ["reach", "held", "checks"]:
 		await breathe()
-		if token != _ask_token or not _request_out or not busy or discard_waiting or not is_same(of, working) \
-				or working.revision != revision or whole_checks:
+		if not still.call():
 			return
-		match piece:
-			"reach":
-				reached()
-			"held":
-				var held := spot_cells()
-				_held = {"doc": working, "revision": working.revision, "cells": _cells_key(held),
-					"reach": reached() if held.is_empty() else reached_round(held)}
-			"checks":
-				checks_now()
+		if await off_frame(_build_piece.bind(piece), still) == null:
+			return
 		built_ahead.append(piece)
+
+
+## One piece of the build-ahead (_build_ahead), kept as the tool that needs it keeps its own; true.
+func _build_piece(piece: String) -> bool:
+	match piece:
+		"reach":
+			reached()
+		"held":
+			var held := spot_cells()
+			_held = {"doc": working, "revision": working.revision, "cells": _cells_key(held),
+				"reach": reached() if held.is_empty() else reached_round(held)}
+		"checks":
+			checks_now()
+	return true
 
 ## The ask now running (867 amended (4)): a build-ahead of an earlier one stops.
 var _ask_token := 0
@@ -3352,14 +3505,18 @@ func _drop_built() -> void:
 ## for accept's refusal, which parses fresh. Read only: a caller that wrote
 ## into it would change what the next one reads.
 func parsed_of(of: MapDoc) -> Dictionary:
-	var kept: Variant = _parses.get(of.get_instance_id())
+	# 933: the zone's doc is read as _doc_read gives it (a copy on a worker), kept under the doc's own id.
+	var key := of.get_instance_id()
+	if is_same(of, doc):
+		of = _doc_read()
+	var kept: Variant = _parses.get(key)
 	if kept is Dictionary and int(kept["revision"]) == of.revision:
 		return kept["parsed"]
 	var spots_alone := is_same(of, working) and working_spots_at_most()
-	if spots_alone and kept is Dictionary and kept.get("spots_alone", false) and int(kept["doc_revision"]) == doc.revision:
+	if spots_alone and kept is Dictionary and kept.get("spots_alone", false) and int(kept["doc_revision"]) == _doc_read().revision:
 		# 867 amended (3): the level but for its spots then and now: the kept parse, its spots read again.
 		var patched := _spots_patched(kept)
-		_parses[of.get_instance_id()] = patched
+		_parses[key] = patched
 		return patched["parsed"]
 	var parsed: Dictionary
 	if is_same(of, working) and working_as_taken():
@@ -3367,7 +3524,7 @@ func parsed_of(of: MapDoc) -> Dictionary:
 		# the doc's own parse (frame 0's, for the layout baseline), shared, read only like any.
 		parsed = parsed_of(doc)
 	else:
-		parsed = of.parsed()
+		parsed = of.parsed(_shared.get("templates", {}))
 		parses += 1
 	var entry := {"revision": of.revision, "parsed": parsed}
 	if spots_alone:
@@ -3376,8 +3533,8 @@ func parsed_of(of: MapDoc) -> Dictionary:
 			floor[cell] = true
 		var spot_warnings: Array[String] = []
 		Level.spots_from(of.config, spot_warnings, floor)
-		entry.merge({"spots_alone": true, "doc_revision": doc.revision, "floor": floor, "spot_warnings": spot_warnings})
-	_parses[of.get_instance_id()] = entry
+		entry.merge({"spots_alone": true, "doc_revision": _doc_read().revision, "floor": floor, "spot_warnings": spot_warnings})
+	_parses[key] = entry
 	return parsed
 
 
@@ -3400,27 +3557,27 @@ func _spots_patched(kept: Dictionary) -> Dictionary:
 	for i in spot_warnings.size():
 		warnings.insert(at + i, spot_warnings[i])
 	parsed["warnings"] = warnings
-	return {"revision": working.revision, "parsed": parsed, "spots_alone": true, "doc_revision": doc.revision,
+	return {"revision": working.revision, "parsed": parsed, "spots_alone": true, "doc_revision": _doc_read().revision,
 			"floor": kept["floor"], "spot_warnings": spot_warnings}
 
 
 ## The level's own layout faults (layout_faults(doc)), kept by its revision:
 ## the doc changes only on accept or a host's undo, both through MapDoc (867).
 func doc_layout_faults() -> Array:
-	return _baseline("layout", func() -> Array: return layout_faults(doc, parsed_of(doc)))
+	return _baseline("layout", func() -> Array: return layout_faults(_doc_read(), parsed_of(doc)))
 
 
 ## The level's own arrival faults (arrival_faults(doc)), kept as doc_layout_faults is.
 func doc_arrival_faults() -> Array:
-	return _baseline("arrival", func() -> Array: return arrival_faults(doc, parsed_of(doc)))
+	return _baseline("arrival", func() -> Array: return arrival_faults(_doc_read(), parsed_of(doc)))
 
 
 func _baseline(kind: String, read: Callable) -> Array:
 	var kept: Variant = _baselines.get(kind)
-	if kept is Dictionary and int(kept["revision"]) == doc.revision and is_same(kept["doc"], doc):
+	if kept is Dictionary and int(kept["revision"]) == _doc_read().revision and is_same(kept["doc"], doc):
 		return kept["faults"]
 	var faults: Array = read.call()
-	_baselines[kind] = {"doc": doc, "revision": doc.revision, "faults": faults}
+	_baselines[kind] = {"doc": doc, "revision": _doc_read().revision, "faults": faults}
 	return faults
 
 
@@ -3465,8 +3622,10 @@ static func piece_line() -> String:
 ## hidden or sealed link is closed; a shelved level is no area), its name, its
 ## towns' (a named room, as Main._town_display says a town) and its named
 ## places' names and shown names; [method _name_key] of each -> as written.
-static func reachable_names() -> Dictionary:
-	var world := WorldMap.build()
+## [param given]: the world map to read (933: the host's, handed in); null, WorldMap.build(). On the
+## main thread only.
+static func reachable_names(given: WorldMap = null) -> Dictionary:
+	var world := given if given != null else WorldMap.build()
 	var seen := {WorldMap.root(): true}
 	var queue: Array[String] = [WorldMap.root()]
 	while not queue.is_empty():
@@ -3535,7 +3694,7 @@ func _piece(given: Dictionary) -> Dictionary:
 			return _no("a milestone says where its road goes: give carved, a level, a town or a named place players can reach")
 		if carved.length() > Level.CARVED_MAX:
 			return _no("carved is %d letters at most" % Level.CARVED_MAX)
-		var names := reachable_names()
+		var names: Dictionary = _shared["reachable"] if _task_running and _shared.has("reachable") else reachable_names(_world_map())
 		if not names.has(_name_key(carved)):
 			var listed: Array = names.values()
 			listed.sort()
@@ -3773,7 +3932,7 @@ func height_checks() -> Array[String]:
 	var out: Array[String] = []
 	var map := working.map
 	var ground := relief()
-	if ground.is_empty() and map.heights.is_empty() and doc.map.heights.is_empty():
+	if ground.is_empty() and map.heights.is_empty() and _doc_read().map.heights.is_empty():
 		return out
 	var things: Array[Vector2i] = []
 	for y in range(area.position.y, area.end.y):
@@ -3854,15 +4013,15 @@ func proposal() -> Dictionary:
 	for y in range(area.position.y, area.end.y):
 		for x in range(area.position.x, area.end.x):
 			var at := Vector2i(x, y)
-			if working.map.cell(at) != doc.map.cell(at):
+			if working.map.cell(at) != _doc_read().map.cell(at):
 				cells[at] = working.map.cell(at)
-			if int(working.map.heights.get(at, 0)) != int(doc.map.heights.get(at, 0)):
+			if int(working.map.heights.get(at, 0)) != int(_doc_read().map.heights.get(at, 0)):
 				heights[at] = int(working.map.heights.get(at, 0))
-			if working.map.has_relief() and absf(working.map.relief_at(at) - doc.map.relief_at(at)) > Relief.EPSILON:
+			if working.map.has_relief() and absf(working.map.relief_at(at) - _doc_read().map.relief_at(at)) > Relief.EPSILON:
 				ground[at] = working.map.relief_at(at)
 			var entry := working.entry_of(at)
 			var link := working.link_of(at)
-			if cells.has(at) or str(entry) != str(doc.entry_of(at)) or str(link) != str(doc.link_of(at)):
+			if cells.has(at) or str(entry) != str(_doc_read().entry_of(at)) or str(link) != str(_doc_read().link_of(at)):
 				covers.append(at)
 				if not entry.is_empty():
 					entries.append(entry.duplicate(true))
@@ -3870,14 +4029,14 @@ func proposal() -> Dictionary:
 					links.append(link.duplicate(true))
 			for side in [Terrain.EAST, Terrain.SOUTH]:
 				var key := Vector3i(x, y, side)
-				if working.map.edge(key) != doc.map.edge(key):
+				if working.map.edge(key) != _doc_read().map.edge(key):
 					edges[key] = working.map.edge(key)
 	var out := {"cells": cells, "edges": edges, "heights": heights, "covers": covers, "entries": entries, "links": links}
 	if not ground.is_empty():
 		out["relief"] = ground
 	var config := {}
 	for key in CONFIG_KEYS:
-		if str(working.config.get(key)) != str(doc.config.get(key)):
+		if str(working.config.get(key)) != str(_doc_read().config.get(key)):
 			config[key] = working.config.get(key)
 	if not config.is_empty():
 		out["config"] = config
@@ -3910,7 +4069,7 @@ static func layout_faults(of: MapDoc, parsed: Dictionary = {}) -> Array:
 ## the edit adds is refused, a fault moved with its chest or room included.
 func layout_news(before: Variant = null, parsed: Dictionary = {}) -> Array[String]:
 	var had := {}
-	for fault: Dictionary in (before if before is Array else layout_faults(doc)):
+	for fault: Dictionary in (before if before is Array else layout_faults(_doc_read())):
 		had["%s %s" % [fault["rule"], fault["cell"]]] = true
 	var out: Array[String] = []
 	for fault: Dictionary in layout_faults(working, parsed):
@@ -4000,7 +4159,7 @@ func accept() -> bool:
 	refused = ""
 	# 867 amended (2): the level changed under the proposal (another builder's accept here): its cells in the
 	# area and every level.json key it holds (the spots, the places) would be laid back over that change.
-	if doc.revision != based_on:
+	if _doc_read().revision != based_on:
 		refused = STALE_SAYS
 		return false
 	# 806 amended (7): the proposal may not add a layout fault (an empty
@@ -4016,8 +4175,8 @@ func accept() -> bool:
 	var changes := proposal()
 	if not new_area.is_empty():
 		# A level beyond an edge is out of doors unless the one it leads from says otherwise.
-		var zone := Level.zone_of(doc.config) if doc.config.has("zone") or doc.config.has("outdoor") else "outdoors"
-		created_doc = draft_level(new_area, map_name, zone, Level.region_of(doc.config))
+		var zone := Level.zone_of(_doc_read().config) if _doc_read().config.has("zone") or _doc_read().config.has("outdoor") else "outdoors"
+		created_doc = draft_level(new_area, map_name, zone, Level.region_of(_doc_read().config))
 		created = str(new_area["name"])
 	var changed := doc.apply_changes(changes)
 	_fresh_working()

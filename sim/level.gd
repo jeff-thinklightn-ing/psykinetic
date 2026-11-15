@@ -589,6 +589,36 @@ static func template_config(level_name: String) -> Dictionary:
 	return {}
 
 
+## template_config's answer for [param level_name], from [param templates] when they were handed in
+## (933: read on the main thread; a level not among them read from its res:// file alone, never from
+## the registered levels); else template_config itself.
+static func template_given(level_name: String, templates: Dictionary) -> Dictionary:
+	if templates.is_empty():
+		return template_config(level_name)
+	if templates.has(level_name):
+		return templates[level_name]
+	var path := DIR + level_name + "/level.json"
+	if FileAccess.file_exists(path):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if parsed is Dictionary:
+			return parsed
+	return {}
+
+
+## template_config's answers for every level it would read from memory (the templates made and the levels
+## registered), by name, for a parse on a worker (933: taken on the main thread first, as references: a
+## regeneration's write replaces an entry whole, never changes one in place). A level not among them is read
+## from its res:// file by template_given, as template_config reads it. The marker "" keeps the result never
+## empty, so a parse given it never falls back to the registered levels.
+static func templates_now() -> Dictionary:
+	var out := {"": {}}
+	for level_name: String in _registered:
+		out[level_name] = template_config(level_name)
+	for level_name: String in _templates:
+		out[level_name] = template_config(level_name)
+	return out
+
+
 ## Whether level [param level_name]'s template marks it regenerating
 ## (level.json "regenerate"; decision 465).
 static func regenerates(level_name: String) -> bool:
@@ -821,8 +851,11 @@ static func _rgb(colour: Color) -> int:
 
 
 ## The level in [param layout] (and [param height]) with [param config]:
-## see the class doc for what comes back.
-static func parse(layout: Image, height: Image, config: Dictionary, relief: Image = null) -> Dictionary:
+## see the class doc for what comes back. [param templates] (933): the linked levels' configs
+## (template_config's answers, read on the main thread before a worker parses), so a parse off the
+## main thread never reads Level's registered levels while a regeneration writes them; empty, read
+## here as before.
+static func parse(layout: Image, height: Image, config: Dictionary, relief: Image = null, templates: Dictionary = {}) -> Dictionary:
 	var by_colour := legend(config)
 	var warnings: Array[String] = []
 	var unknown: Dictionary[int, bool] = {}
@@ -1089,7 +1122,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_lay_bridges(level)
 	_lay_solid(level)
 	_building_links(level, config, warnings)
-	level["terrain"]["link_cues"] = link_cues(level, config)
+	level["terrain"]["link_cues"] = link_cues(level, config, templates)
 	var derived := _lay_curves(level["terrain"], config, warnings)
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
@@ -3293,7 +3326,7 @@ const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.wayston
 ## "variant" as the link says (1: a timber arch, a stone
 ## stair; 2: a stone arch, a timber stair or a ladder; 3: the dark
 ## tower's, art-kit's dark-stone arch and stairs, 659 amended).
-static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary]:
+static func link_cues(level: Dictionary, config: Dictionary, templates: Dictionary = {}) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var size: Vector2i = level["size"]
 	var depth := int(config.get("depth", 0))
@@ -3314,7 +3347,7 @@ static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary
 		var at: Vector2i = link["tile"]
 		# A building's link (715) carries its own cue and variant.
 		var entry: Dictionary = entries.get(at, link if link.has("building") else {})
-		var far := template_config(str(link["to_map"]))
+		var far := template_given(str(link["to_map"]), templates)
 		var cue := "none"
 		# A lair's "mouth" (maps' make_forest) is its cue.
 		var given := str(entry.get("cue", entry.get("mouth", "")))

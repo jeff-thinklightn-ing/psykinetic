@@ -764,6 +764,10 @@ var builders: PackedStringArray = []
 ## player; empty, none. Logged as a count only, never an id.
 var admins: PackedStringArray = []
 var builder_stub := false
+## --builder-inline (933): builder mode's heavy ask steps run on the main thread as before 933,
+## not on a worker; release's switch on the box, read at each ask's start, if a server ever dies in an
+## ask. Off (threads on) by default.
+var builder_inline := false
 ## --test-temple-day (404 amended): today everyone's temple day, for
 ## playtest's tours; honoured only beside --run-marker (Main._test_temple_day),
 ## else one ERROR and ignored, so a stray flag on the box is loud.
@@ -2431,6 +2435,8 @@ func _parse_args(given: Array = []) -> void:
 				world_map = true
 			"--builder-stub":
 				builder_stub = true
+			"--builder-inline":
+				builder_inline = true
 			"--test-temple-day":
 				test_temple_day = true
 			"--test-hp":

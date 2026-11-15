@@ -16,6 +16,9 @@ var _turn := 0
 ## Frames each request is out before its answer (867 amended (4): builder_test's network wait, while an
 ## ask builds ahead). A turn that is a Dictionary is the whole answer, as {"error": ...} for a failed request.
 var wait_frames := 0
+## 933: and then until this says yes (at most 30 s): an ask's build-ahead on a worker takes the time its
+## floods take, not a frame each, so builder_test waits for it by what it built, not by frames.
+var wait_until := Callable()
 
 
 func _init(script_turns: Array = []) -> void:
@@ -25,6 +28,9 @@ func _init(script_turns: Array = []) -> void:
 func send(body: Dictionary) -> Dictionary:
 	sent.append(body.duplicate(true))
 	for frame in wait_frames:
+		await Engine.get_main_loop().process_frame
+	var began := Time.get_ticks_msec()
+	while wait_until.is_valid() and not wait_until.call() and Time.get_ticks_msec() - began < 30000:
 		await Engine.get_main_loop().process_frame
 	# A new request (the last message is the player's words, not tool results) starts the script again.
 	var last: Dictionary = body["messages"].back()
