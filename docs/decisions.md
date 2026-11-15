@@ -56891,3 +56891,46 @@ _test_heard_over_list holds the list to art-kit's heights, so a SOLID piece
 drawn low or tall later is named. Package: none. Its bullet ships only on a
 joined read at the Mughouse bar and at Rolf's stall (Rolf's half waits for
 maps' Rolf-on). Client sound only; protocol unchanged; no new class_name.
+## 931. A town greets a newcomer by telling them where they are and what it needs (voice)
+
+The first five minutes (Jeff's report, 2026-11-14 21:20, a real player's words: "still dont know where am i going or
+why or where i am"). Voice's run of a fresh character (tour firstfive) found that no line in the first five minutes
+said why the player was there, and that two of a stranger's six greetings (Resident.HAIL_STRANGER, each resident's
+own by its id) asked the newcomer exactly that: "what brings them here" and "where they've come from". The
+coordinator's ruling, the same night: those two tell instead. Voice built it in npc's place (npc stopped at Jeff's
+prompt); economy read the diff; npc may reshape the code, not the words.
+
+- TELL_WANT: the resident tells them they've come to the town (its name as its people say it, Main._town_called: the
+  named room its store stands in, "Umbrage", else the area's shown name) and the one thing the town is short of now.
+- TELL_WHO: the resident tells them their own name and trade, and who in town would be glad of what it wants; the
+  speaker themselves when they are the one. The one named must have a body a player can walk to now
+  (Main._walkable_body: spawned in the zone, not hiding, strayed, led or sick); else nobody is named and the town's
+  want is told.
+- The want is economy's Towns.newcomer_want (World.towns'): only economy.json's newcomer_wants rows are asked: things
+  to eat (fish and meat count), firewood, a sought newcomer to bring home. A good is short by how far the store is
+  under its comfort, the shortest wins, under a quarter short asks nothing; a build's materials and a trade's own
+  stock are never asked. The asker is the first resident by id whose first trade is in the row's trades, not away,
+  not sick; the sought has none, and is told as one of the town's people not yet home (HAIL_TELL_SOUGHT). With no
+  want, both are the plain good day (HAIL_PLAIN). Resident.stranger_cue fills them; hail_cue takes the want from Main
+  (_newcomer_want), which words the trade (_trade_word).
+- No mind, no silence: each telling cue carries a fixed line of voice's ("You've come to Umbrage. We're short of fish
+  just now."; "I'm Hazel, the farmer here. Snagfin would be glad of fish, if you come by some."), said as it stands
+  when the mind gives no words (Main._resident_answered) or the ask waits past RESIDENT_ASK_TICKS (_resident_voices).
+  So every local server and the first minute on a slow box say it too. With a mind, the cue tells the resident what
+  to say and they say it in their own voice. Any other hail the mind leaves unsaid is given back as before (554
+  amended).
+- Greeted is met: once a greeting is said, the resident has met the player (Standing.met), so a resident greets a
+  newcomer as a stranger once and as one they know after, never again with the telling line. The town's cap of
+  hail.greetings_a_day stands.
+
+It stands as its own piece of "the first five minutes", beside companions' 929 (her greeting names the place) and
+ui's place line: it ships when its own joined look passes, waits for neither, and points only at what is in (the
+town's wants already take what a player gives). The look: a fresh character joined to a server with a mind, a hungry
+town by economy's local recipe, two residents' first greetings read off the screen with seconds, and the player then
+finding the one named where the line said.
+
+resident_test _test_telling_greetings: each telling cue and its fixed line, the sought told with nobody named, nobody
+named without a body, the speaker as the one, no trade word, the plain good day with no want or no town name, no
+greeting asking why or whence; and at _test_hails' end (Mara standing, no hour of its own: a test that set the hour
+and back left Bram awake in _test_threat), the fixed line said with no words from the mind and on a slow mind's
+drop, silence for a greeting with none, greeted is met. towns_test _test_newcomer_want (economy's). Server only; protocol unchanged; no new class_name; the bullet waits for the look.

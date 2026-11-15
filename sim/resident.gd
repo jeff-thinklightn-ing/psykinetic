@@ -1001,14 +1001,77 @@ const HAIL_GREETINGS := {
 ## greet a newcomer with one line three times (playtest's reward tour; the
 ## coordinator: Jeff's "same things a lot"; voice's words: none says "as the
 ## town does a newcomer", which made "You're new to the town" every time).
+## Two of them tell rather than ask (decision 931, the first five minutes: a
+## newcomer was asked "what brings you here?" and "where have you come
+## from?", the very things the game never told them): TELL_WANT, the town's
+## name and the one thing it is short of now; TELL_WHO, the resident's name
+## and trade and who in town would be glad of a hand. Both are filled from
+## [param want] (stranger_cue); with no want they are the plain good day.
+const TELL_WANT := "tell:want"
+const TELL_WHO := "tell:who"
 const HAIL_STRANGER := [
 	"%s is a stranger to you; you remark on something they carry or wear.",
-	"%s is a stranger to you; you ask them what brings them here.",
+	TELL_WANT,
 	"%s is a stranger to you; you tell them your name and your trade.",
 	"%s is a stranger to you; you wish them a good day and ask whether they mean to stay.",
 	"%s is a stranger to you; you give them a short nod and a word of welcome, no more.",
-	"%s is a stranger to you; you ask where they've come from and say a word about the road.",
+	TELL_WHO,
 ]
+## The plain good day a telling greeting falls back to when the town wants nothing.
+const HAIL_PLAIN := "%s is a stranger to you; you wish them a good day and ask whether they mean to stay."
+## The telling cues (931): the newcomer, the town's name, the want's words ("fish").
+const HAIL_TELL_WANT := "%s is a stranger to you; you tell them they've come to %s, and that the town is short of %s just now."
+## The newcomer, the one who would be glad of it, their trade, the want's words.
+const HAIL_TELL_WHO := "%s is a stranger to you; you tell them your name and your trade, and that %s the %s would be glad of %s."
+const HAIL_TELL_WHO_NAME := "%s is a stranger to you; you tell them your name and your trade, and that %s would be glad of %s."
+## The newcomer, the want's words: the one who wants it is the speaker.
+const HAIL_TELL_SELF := "%s is a stranger to you; you tell them your name and your trade, and that you'd be glad of %s yourself."
+## What each says with no mind to say it (931: the first minute on a slow box,
+## and every local server): the town's name, the want's words.
+const SAY_TELL_WANT := "You've come to %s. We're short of %s just now."
+## The speaker's name and trade ("Hazel", "farmer"), the one glad of it, the want's words.
+const SAY_TELL_WHO := "I'm %s, the %s here. %s would be glad of %s, if you come by some."
+## The speaker's name and trade, the want's words.
+const SAY_TELL_SELF := "I'm %s, the %s here, and I'd be glad of %s, if you come by some."
+## The town's sought (economy's "sought" want: one of its people not yet led
+## home; nobody asks it): the newcomer, the town's name; then its fixed line.
+const HAIL_TELL_SOUGHT := "%s is a stranger to you; you tell them they've come to %s, and that one of the town's people is out there somewhere, not yet home, and the town would be glad to see them brought back."
+const SAY_TELL_SOUGHT := "You've come to %s. One of ours is out there somewhere, not yet home. We'd be glad to see them brought back."
+## The same without a trade word: the speaker's name, then as above.
+const SAY_TELL_WHO_NAME := "I'm %s. %s would be glad of %s, if you come by some."
+const SAY_TELL_SELF_NAME := "I'm %s, and I'd be glad of %s, if you come by some."
+
+
+## The stranger's greeting [param pick] (one of HAIL_STRANGER) to
+## [param player_name] as a cue: {kind "greeting", text} and, for a telling
+## one, "say", its fixed line (931). [param speaker] and [param trade] are
+## the resident's own name and trade word; [param want] is Main's
+## (_newcomer_want): {words, town_name, person (the one glad of it, only
+## when their body can be walked to now), trade (theirs), self (the speaker
+## is the one)}. TELL_WHO with no one to name tells the town's want; either
+## with no want, or no town name for TELL_WANT, is the plain good day.
+static func stranger_cue(pick: String, player_name: String, speaker: String, trade: String, want: Dictionary) -> Dictionary:
+	var words := str(want.get("words", ""))
+	var sought := str(want.get("good", "")) == "sought"
+	if pick == TELL_WHO and not words.is_empty() and not sought:
+		if bool(want.get("self", false)):
+			return {"kind": "greeting", "text": HAIL_TELL_SELF % [player_name, words],
+				"say": SAY_TELL_SELF % [speaker, trade, words] if not trade.is_empty() else SAY_TELL_SELF_NAME % [speaker, words]}
+		var person := str(want.get("person", ""))
+		if not person.is_empty():
+			var theirs := str(want.get("trade", ""))
+			var text := HAIL_TELL_WHO % [player_name, person, theirs, words] if not theirs.is_empty() \
+				else HAIL_TELL_WHO_NAME % [player_name, person, words]
+			return {"kind": "greeting", "text": text,
+				"say": SAY_TELL_WHO % [speaker, trade, person, words] if not trade.is_empty() else SAY_TELL_WHO_NAME % [speaker, person, words]}
+	if pick == TELL_WANT or pick == TELL_WHO:
+		var town := str(want.get("town_name", ""))
+		if sought and not town.is_empty():
+			return {"kind": "greeting", "text": HAIL_TELL_SOUGHT % [player_name, town], "say": SAY_TELL_SOUGHT % town}
+		if not words.is_empty() and not town.is_empty():
+			return {"kind": "greeting", "text": HAIL_TELL_WANT % [player_name, town, words], "say": SAY_TELL_WANT % [town, words]}
+		return {"kind": "greeting", "text": HAIL_PLAIN % player_name}
+	return {"kind": "greeting", "text": pick % player_name}
 ## A stranger the town already knows of (Main's known_of: what they did here,
 ## or that others in town have met them): no longer new to all of it.
 const HAIL_KNOWN_OF := "%s is a stranger to you, but you have heard of them: %s. You greet them as someone whose name has reached you, and say what you heard."
@@ -1060,10 +1123,13 @@ static func hailed_today(card: Dictionary, player_id: String, day: int) -> bool:
 ## is false (Main's cap of hail.greetings_a_day a player a day from the
 ## whole town, the coordinator's: a newcomer is greeted, not mobbed). A
 ## stranger's greeting is the resident's own of HAIL_STRANGER, or, with
-## [param known_of] (what the town knows of them), HAIL_KNOWN_OF.
-## {kind, text}, {} for nothing to say.
+## [param known_of] (what the town knows of them), HAIL_KNOWN_OF; a telling
+## one (931) is filled from [param want] (Main's _newcomer_want, with the
+## speaker's own "speaker" and "speaker_trade") and carries "say", its
+## fixed line for when the mind gives none.
+## {kind, text[, say]}, {} for nothing to say.
 static func hail_cue(worker_id: String, town: String, player_id: String, player_name: String, production: Production, now: int, sky: String,
-		given: Dictionary = Offers.ctx, heard: Array = [], greeting_ok := true, known_of := "") -> Dictionary:
+		given: Dictionary = Offers.ctx, heard: Array = [], greeting_ok := true, known_of := "", want: Dictionary = {}) -> Dictionary:
 	var card := Townsfolk.card_of(production, worker_id)
 	if card.is_empty():
 		return {}
@@ -1101,8 +1167,9 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 		cues.append({"kind": "sky", "text": _sentence(sky)})
 	var word := Standing.words(card, player_id) if Standing.met_in_person(card, player_id) else "stranger"  # Heard of, not met (853 amended (5)).
 	if greeting_ok and word == "stranger":
-		cues.append({"kind": "greeting", "text": HAIL_KNOWN_OF % [player_name, known_of.trim_suffix(".")] if not known_of.is_empty()
-			else str(HAIL_STRANGER[absi(hash(worker_id)) % HAIL_STRANGER.size()]) % player_name})
+		cues.append({"kind": "greeting", "text": HAIL_KNOWN_OF % [player_name, known_of.trim_suffix(".")]} if not known_of.is_empty()
+			else stranger_cue(str(HAIL_STRANGER[absi(hash(worker_id)) % HAIL_STRANGER.size()]), player_name, str(want.get("speaker", "")),
+				str(want.get("speaker_trade", "")), want))
 	elif greeting_ok and HAIL_GREETINGS.has(word):
 		cues.append({"kind": "greeting", "text": HAIL_GREETINGS[word] % player_name})
 	for cue: Dictionary in cues:

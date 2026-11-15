@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_placed_captive()
 	_test_aloud()
 	_test_hails()
+	_test_telling_greetings()
 	_test_greet()
 	_test_names_never_ids()
 	_test_crypt_secrets()
@@ -5362,6 +5363,39 @@ func _check(ok: bool, label: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
 
 
+## Decision 931: two of a stranger's six greetings tell (the town's name and
+## its want; who would be glad of a hand), each with a fixed line for no
+## mind, and fall back to the plain good day when the town wants nothing.
+func _test_telling_greetings() -> void:
+	var want := {"words": "fish", "town_name": "Umbrage", "person": "Snagfin", "trade": "merchant"}
+	var tell := Resident.stranger_cue(Resident.TELL_WANT, "Jeff", "Hazel", "farmer", want)
+	_check(tell.get("text") == "Jeff is a stranger to you; you tell them they've come to Umbrage, and that the town is short of fish just now."
+		and tell.get("say") == "You've come to Umbrage. We're short of fish just now.", "the want told, with its fixed line (%s)" % [tell])
+	var who := Resident.stranger_cue(Resident.TELL_WHO, "Jeff", "Hazel", "farmer", want)
+	_check(who.get("text") == "Jeff is a stranger to you; you tell them your name and your trade, and that Snagfin the merchant would be glad of fish."
+		and who.get("say") == "I'm Hazel, the farmer here. Snagfin would be glad of fish, if you come by some.", "who would be glad of it, named (%s)" % [who])
+	var gone := want.duplicate()
+	gone.erase("person")
+	_check(Resident.stranger_cue(Resident.TELL_WHO, "Jeff", "Hazel", "farmer", gone).get("say") == "You've come to Umbrage. We're short of fish just now.",
+		"no body to walk to: nobody named, the town's want told")
+	var own := want.duplicate()
+	own["self"] = true
+	_check(Resident.stranger_cue(Resident.TELL_WHO, "Jeff", "Snagfin", "merchant", own).get("say") == "I'm Snagfin, the merchant here, and I'd be glad of fish, if you come by some.",
+		"the speaker wants it: says so of themselves")
+	_check(Resident.stranger_cue(Resident.TELL_WHO, "Jeff", "Snagfin", "", own).get("say") == "I'm Snagfin, and I'd be glad of fish, if you come by some.", "no trade word: the name alone")
+	for pick: String in [Resident.TELL_WANT, Resident.TELL_WHO]:
+		var plain := Resident.stranger_cue(pick, "Jeff", "Hazel", "farmer", {})
+		_check(plain.get("text") == Resident.HAIL_PLAIN % "Jeff" and not plain.has("say"), "the town wants nothing: the plain good day, no fixed line (%s)" % pick)
+	_check(Resident.stranger_cue(Resident.TELL_WANT, "Jeff", "Hazel", "farmer", {"words": "fish"}).get("text") == Resident.HAIL_PLAIN % "Jeff", "no town name: the plain good day")
+	var sought := {"good": "sought", "words": "someone brought home", "town_name": "Umbrage"}
+	for pick: String in [Resident.TELL_WANT, Resident.TELL_WHO]:
+		_check(Resident.stranger_cue(pick, "Jeff", "Hazel", "farmer", sought).get("say") == "You've come to Umbrage. One of ours is out there somewhere, not yet home. We'd be glad to see them brought back.",
+			"the town's sought: told as one of theirs not yet home, nobody named (%s)" % pick)
+	for each: String in Resident.HAIL_STRANGER:
+		var cue := Resident.stranger_cue(each, "Jeff", "Hazel", "farmer", want)
+		_check(not str(cue.get("text", "")).contains("what brings") and not str(cue.get("text", "")).contains("come from"), "no greeting asks a newcomer why or whence (%s)" % each)
+
+
 func _test_hails() -> void:
 	print("\n== a resident with something to say hails a player come near, once a day, one a minute, the lowest ask (decision 554) ==")
 	for body: GridEntity in World.townsfolk().duplicate():
@@ -5400,7 +5434,7 @@ func _test_hails() -> void:
 	var cue := Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
 	_check(cue.get("kind") == "greeting" and "Jeff is a stranger to you" in str(cue.get("text", "")), "nothing else to say: a greeting by standing, a stranger (%s)" % [cue])
 	# A stranger's greeting is each resident's own; one the town knows of is greeted as such (playtest's reward tour).
-	var own_text: String = Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()] % "Jeff"
+	var own_text: String = Resident.stranger_cue(Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()], "Jeff", "", "", {})["text"]
 	_check(cue.get("text") == own_text, "her own of the stranger greetings, by her id (%s)" % [cue])
 	var picks := {}
 	for n in 40:
@@ -5445,7 +5479,7 @@ func _test_hails() -> void:
 		"her card remembers the day, the four things said and the sky spoken of")
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "It is dusk; rain falls", Offers.ctx, ["It is dusk; rain falls."]).is_empty(),
 		"but not one this player heard today from someone else")
-	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, [Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()] % "Bo"]).get("kind") == "greeting",
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, [Resident.stranger_cue(Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()], "Bo", "", "", {})["text"]]).get("kind") == "greeting",
 		"a greeting is each resident's own: another's does not silence it")
 	var undone := Townsfolk.card_of(World.production, "rs-mara")
 	var said_before: int = undone["hails"]["said"].size()
@@ -5552,6 +5586,28 @@ func _test_hails() -> void:
 		"a new day: greeted, and counted (%s)" % trigger)
 	_main._resident_asks.clear()
 	_main._hail_greetings.clear()
+	# Decision 931 (_test_telling_greetings has the cues): a telling greeting the mind gave no words for is said
+	# as its fixed line, on its answer or a slow mind's drop, and greeted is met; one with none stays silent.
+	var met_card := Townsfolk.card_of(World.production, "rs-mara").duplicate(true)
+	if met_card.get("standing") is Dictionary:
+		met_card["standing"].erase(pid)
+	World.production.set_card("rs-mara", met_card)
+	var fixed := "You've come to Umbrage. We're short of fish just now."
+	spoken.clear()
+	_main._resident_answered({"ask": {"trigger": "hail: greeting", "speaker": "Mara", "hail": "greeting", "cue": "x", "fixed": fixed},
+		"body": mara.get_instance_id(), "player": pid, "peer": player.owner_peer}, {}, "no mind")
+	_check(spoken.has("Mara: " + fixed) and str(MindLog.last.get("Mara", {}).get("outcome", "")) == "said as fixed", "931: no words from the mind: the fixed line said (%s)" % [spoken])
+	_check(Standing.met_in_person(Townsfolk.card_of(World.production, "rs-mara"), pid), "931: greeted is met: a stranger no more to her")
+	spoken.clear()
+	_main._resident_answered({"ask": {"trigger": "hail: greeting", "speaker": "Mara", "hail": "greeting", "cue": "x"},
+		"body": mara.get_instance_id(), "player": pid, "peer": player.owner_peer}, {}, "no mind")
+	_check(spoken.is_empty(), "931: a greeting with no fixed line and no words: silence, as before")
+	_main._resident_asks.append({"body": mara.get_instance_id(), "at": World.tick - Main.RESIDENT_ASK_TICKS - 1, "player": pid, "peer": player.owner_peer,
+		"ask": {"serial": 0, "trigger": "hail: greeting", "speaker": "Mara", "hail": "greeting", "cue": "x", "fixed": fixed}})
+	_main._resident_voices()
+	_check(spoken.has("Mara: " + fixed) and _main._resident_asks.is_empty(), "931: a slow mind: the waiting greeting said as its fixed line, not dropped (%s)" % [spoken])
+	_main._claims_asks.clear()  # Her line heard by those near (378): nothing of this left for the checks after.
+	_main._claims_out.clear()
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
 	_main._hail_at.clear()

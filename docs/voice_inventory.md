@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2998)
+## Lines in the code (3010)
 
 ### companions (Pip, Wren, Nix) (667)
 
@@ -1983,7 +1983,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: no floor to %s by it | `sim/world_routes.gd` _add_way() |
 |  | %s %d %d | `sim/world_routes.gd` _portal() |
 
-### residents (112)
+### residents (122)
 
 | | Line | Where |
 |---|---|---|
@@ -2022,11 +2022,21 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You trust %s; you greet them warmly. | `sim/resident.gd` system_for() |
 |  | %s wronged you once; you greet them coolly, and say so without a quarrel. | `sim/resident.gd` system_for() |
 |  | %s is a stranger to you; you remark on something they carry or wear. | `sim/resident.gd` system_for() |
-|  | %s is a stranger to you; you ask them what brings them here. | `sim/resident.gd` system_for() |
 |  | %s is a stranger to you; you tell them your name and your trade. | `sim/resident.gd` system_for() |
 |  | %s is a stranger to you; you wish them a good day and ask whether they mean to stay. | `sim/resident.gd` system_for() |
 |  | %s is a stranger to you; you give them a short nod and a word of welcome, no more. | `sim/resident.gd` system_for() |
-|  | %s is a stranger to you; you ask where they've come from and say a word about the road. | `sim/resident.gd` system_for() |
+|  | %s is a stranger to you; you wish them a good day and ask whether they mean to stay. | `sim/resident.gd` HAIL_PLAIN |
+|  | %s is a stranger to you; you tell them they've come to %s, and that the town is short of %s just now. | `sim/resident.gd` HAIL_TELL_WANT |
+|  | %s is a stranger to you; you tell them your name and your trade, and that %s the %s would be glad of %s. | `sim/resident.gd` HAIL_TELL_WHO |
+|  | %s is a stranger to you; you tell them your name and your trade, and that %s would be glad of %s. | `sim/resident.gd` HAIL_TELL_WHO_NAME |
+|  | %s is a stranger to you; you tell them your name and your trade, and that you'd be glad of %s yourself. | `sim/resident.gd` HAIL_TELL_SELF |
+|  | You've come to %s. We're short of %s just now. | `sim/resident.gd` SAY_TELL_WANT |
+|  | I'm %s, the %s here. %s would be glad of %s, if you come by some. | `sim/resident.gd` SAY_TELL_WHO |
+|  | I'm %s, the %s here, and I'd be glad of %s, if you come by some. | `sim/resident.gd` SAY_TELL_SELF |
+|  | %s is a stranger to you; you tell them they've come to %s, and that one of the town's people is out there somewhere, not yet home, and the town would be glad to see them brought back. | `sim/resident.gd` HAIL_TELL_SOUGHT |
+|  | You've come to %s. One of ours is out there somewhere, not yet home. We'd be glad to see them brought back. | `sim/resident.gd` SAY_TELL_SOUGHT |
+|  | I'm %s. %s would be glad of %s, if you come by some. | `sim/resident.gd` SAY_TELL_WHO_NAME |
+|  | I'm %s, and I'd be glad of %s, if you come by some. | `sim/resident.gd` SAY_TELL_SELF_NAME |
 |  | %s is a stranger to you, but you have heard of them: %s. You greet them as someone whose name has reached you, and say what you heard. | `sim/resident.gd` HAIL_KNOWN_OF |
 |  | %s: %s, %s to %s. | `sim/resident.gd` hail_ask() |
 |  | You have a plea to make: %s | `sim/resident.gd` hail_cue() |
@@ -2130,7 +2140,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (791)
+### server and windows (793)
 
 | | Line | Where |
 |---|---|---|
@@ -2437,8 +2447,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | did a job for your town | `main.gd` _on_commission_done() |
 |  | %s's card, from the facts | `main.gd` _write_resident_card() |
 |  | waited too long for the mind | `main.gd` _resident_voices() |
+|  | waited too long for the mind | `main.gd` _resident_voices() |
 |  | What you know of the world: | `main.gd` _send_claims() |
 |  | who travels with %s | `main.gd` _send_claims() |
+|  | said as fixed | `main.gd` _resident_answered() |
 |  | %s said: "%s"%s | `main.gd` _resident_answered() |
 |  | companion let go by the raiders | `main.gd` companion_let_go() |
 |  | a raid group's captive | `main.gd` companion_let_go() |

@@ -15161,6 +15161,9 @@ func _resident_voices() -> void:
 	for each: Dictionary in _resident_asks.duplicate():
 		if World.tick - int(each["at"]) > RESIDENT_ASK_TICKS:
 			_resident_asks.erase(each)
+			if not str(each["ask"].get("fixed", "")).is_empty():
+				_resident_answered(each, {}, "waited too long for the mind")  # 931: its fixed line, not silence.
+				continue
 			MindLog.record({"kind": "voice", "companion": str(each["ask"].get("speaker", "")), "mind": "resident",
 				"trigger": each["ask"].get("trigger", ""), "outcome": "dropped", "note": "waited too long for the mind"})
 	_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return World.tick - int(each["at"]) <= RESIDENT_ASK_TICKS)
@@ -15487,9 +15490,15 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 	if held:
 		said = false
 		_held_tongue("voice")
+	var fixed := not said and not held and body != null and is_instance_valid(body) and body.spawned and not str(ask.get("fixed", "")).is_empty() \
+		and not _resident_quiet(body, _player_of_id(str(out.get("player", ""))))
+	if fixed:  # 931: a telling greeting the mind gave no words for is said as it stands.
+		line = str(ask["fixed"])
+		aside = ""
+		said = true
 	MindLog.record({"kind": "voice", "companion": str(ask.get("speaker", "")), "mind": "resident", "trigger": ask.get("trigger", ""),
 		"prompt": "%s\n\n%s" % [ask.get("system", ""), ask.get("user", "")], "say": "" if held else line, "aside": "" if held else aside, "error": error,
-		"outcome": "held tongue" if held else ("said" if said else "not said")})
+		"outcome": "held tongue" if held else ("said as fixed" if fixed else ("said" if said else "not said"))})
 	if not said:
 		if not str(ask.get("hail", "")).is_empty() and body != null and is_instance_valid(body) and World.production != null:
 			# A hail the mind did not answer (554 amended): its marks go back, so the thing can be said later today.
@@ -15501,6 +15510,11 @@ func _resident_answered(out: Dictionary, answer: Dictionary, error: String) -> v
 			if str(ask.get("hail", "")) == "greeting" and _hail_greetings.has(player_id):
 				_hail_greetings[player_id]["n"] = maxi(int(_hail_greetings[player_id].get("n", 1)) - 1, 0)
 		return
+	if str(ask.get("hail", "")) == "greeting" and World.production != null:
+		# Greeted is met (931): a resident greets a newcomer as a stranger once, then as one they know.
+		var greeted_card := Townsfolk.card_of(World.production, body.worker_id)
+		if not greeted_card.is_empty() and Standing.met(greeted_card, str(out.get("player", "")), World.production.now()):
+			World.production.set_card(body.worker_id, greeted_card)
 	Transcript.record(body.person, body.person, line)
 	if not aside.is_empty():
 		Transcript.record(body.person, body.person, "[aside] " + aside)
@@ -21737,7 +21751,7 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 		_stop_work_for(body, player)
 		return true
 	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok,
-		_known_of(body, player.player_id))
+		_known_of(body, player.player_id), _newcomer_want(body) if greeting_ok else {})
 	if cue.is_empty():
 		_hail_tried[tried] = World.tick
 		return false
@@ -21747,12 +21761,83 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 	Resident.hail_done(World.production, body.worker_id, player.player_id, cue, day, sky)
 	_write_resident_card(body)
 	_resident_serial += 1
-	_resident_asks.append({"body": body.get_instance_id(), "ask": body.hail_ask(_display_name(player), cue, _resident_serial, "greet" if clicked else "hail"), "at": World.tick,
-		"player": player.player_id, "peer": player.owner_peer})
+	var ask := body.hail_ask(_display_name(player), cue, _resident_serial, "greet" if clicked else "hail")
+	if not str(cue.get("say", "")).is_empty():
+		ask["fixed"] = str(cue["say"])  # 931: said as it stands when the mind gives none.
+	_resident_asks.append({"body": body.get_instance_id(), "ask": ask, "at": World.tick, "player": player.player_id, "peer": player.owner_peer})
 	_hail_at[player.player_id] = now_msec
 	print("[%s] %s to %s: %s" % ["greet" if clicked else "hail", body.person, _display_name(player), cue.get("kind", "")])
 	_stop_work_for(body, player)
 	return true
+
+
+## What a newcomer's telling greeting names (decision 931): the town's want a
+## new player can answer (economy's Towns.newcomer_want: {good, words, short,
+## worker, person, trade}), with the town's name as its people say it
+## (_town_called), the speaker's own name and trade word, and "self" when
+## the speaker is the one who wants it. The one who wants it is named only
+## when their body can be walked to now (_walkable_body); else their name
+## goes and the town's want is told. {} when the town wants nothing a
+## newcomer can answer.
+func _newcomer_want(body: Resident) -> Dictionary:
+	if World.production == null or World.towns == null or body.town.is_empty():
+		return {}
+	var want := World.towns.newcomer_want(body.town).duplicate()
+	if str(want.get("words", "")).is_empty():
+		return {}
+	want["town_name"] = _town_called(body.town)
+	want["speaker"] = body.person
+	want["speaker_trade"] = _trade_word(body.trade)
+	want["trade"] = _trade_word(str(want.get("trade", "")))
+	var asker := str(want.get("worker", ""))
+	if asker == body.worker_id:
+		want["self"] = true
+	elif _walkable_body(asker) == null:
+		want.erase("person")
+	return want
+
+
+## A town's name as its people say it (931): the named room its store stands
+## in (the wilds' town: "Umbrage"), else its area's shown name; "" for none.
+func _town_called(place: String) -> String:
+	if World.holdings == null or place.is_empty():
+		return ""
+	var at := World.holdings.place(place)
+	var area := str(at.get("area", ""))
+	if area.is_empty():
+		return ""
+	var rooms := _rooms_of(area)
+	var key := Level.room_at({"rooms": rooms}, at.get("cell", Vector2i(-1, -1)))
+	if not key.is_empty() and not str(rooms[key].get("name", "")).is_empty():
+		return str(rooms[key]["name"])
+	return Companion.place_name(area)
+
+
+## [param trade]'s word after "the" ("farmer", "medicine man"): _trade_words without its article.
+static func _trade_word(trade: String) -> String:
+	if trade.is_empty():
+		return ""
+	var words := _trade_words(trade)
+	for article: String in ["a ", "an ", "the "]:
+		if words.begins_with(article):
+			return words.trim_prefix(article)
+	return words
+
+
+## Worker [param worker_id]'s body when a player could walk to it now (931):
+## spawned in this zone, not hiding, not strayed or led, not sick; else null.
+func _walkable_body(worker_id: String) -> Resident:
+	if worker_id.is_empty():
+		return null
+	for entity: GridEntity in World.townsfolk():
+		var each := entity as Resident
+		if each == null or each.worker_id != worker_id:
+			continue
+		if not each.spawned or each.doing == Resident.Doing.HIDE or each.strayed or not each.escort_of.is_empty() \
+				or Townsfolk.is_sick(World.production, worker_id):
+			return null
+		return each
+	return null
 
 
 ## A resident at its shown work who hails [param player] stops it and turns to them for the greeting's
