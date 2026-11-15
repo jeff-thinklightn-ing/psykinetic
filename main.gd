@@ -4485,6 +4485,78 @@ func _may_regenerate(level_name: String) -> bool:
 var _relaid_for_template: Dictionary[String, bool] = {}
 
 
+## Boot (684 amended (1); 465 amended (4)): each regenerating level whose
+## template changed since its generation was laid is laid now, in the boot's
+## load, once every saved zone and the default zone are open: the same
+## _regenerate_if_due an empty zone takes on the slow tick, made here on the
+## main thread. _go_online reads no join till _boot returns, so the first
+## player in finds the new layout, and the line "template changed ... laid
+## again" comes before "[state] loaded". A level only due on its period
+## waits for the slow ticks as before. Never a town's level
+## (_boot_lay_refusal), which keeps the slow tick's rule; a lay that fails
+## (no map joins its anchors, the overlay refuses it) leaves the level as
+## saved, said in one line, and the boot goes on.
+func _lay_changed_at_boot() -> void:
+	if not Net.is_authority():
+		return
+	for level_name in Regen.marked_levels():
+		if _relaid_for_template.has(level_name) or not Regen.template_changed(level_name):
+			continue
+		var refusal := _boot_lay_refusal(level_name)
+		if not refusal.is_empty():
+			print("[regen] %s: not laid at boot: %s; it waits for the slow tick as before" % [level_name, refusal])
+			continue
+		var zone: Zone = World.zones.get(level_name)
+		if zone != null and zone.awake and not World._is_awake(zone):
+			# Nobody in it, nobody joined yet: asleep, as the first step would find
+			# it (a zone opens awake, Zone.awake), so the lay is not held for it.
+			zone.awake = false
+			zone.asleep_since = Time.get_ticks_msec()
+			World.zone_slept.emit(zone)
+		var was := generation_of(level_name)
+		var started := Time.get_ticks_msec()
+		_regenerate_if_due(level_name)
+		if generation_of(level_name) > was:
+			print("[regen] %s: laid at boot in %d ms" % [level_name, Time.get_ticks_msec() - started])
+		else:
+			var why := "no generation could be made or written (no map joined its anchors, or the overlay refused it)"
+			if zone != null and World.zone_awake(zone):
+				why = "someone is in it"
+			elif not Regen.may_write():
+				why = "the overlay is not written here"
+			print("[regen] %s: not laid at boot: %s; it stands as saved" % [level_name, why])
+
+
+## Why level [param level_name] is never laid at boot, "" when it may be
+## (684 amended (1), the coordinator: a crypt's risk is not a town's): a
+## building of a town's or a house in its template, a town's place (a
+## stockpile, or one naming a town) in it or held there, or a home kind
+## ("home_kinds") that is no monster's.
+func _boot_lay_refusal(level_name: String) -> String:
+	var config := Level.template_config(level_name)
+	var buildings: Variant = config.get("buildings", [])
+	for building: Variant in buildings if buildings is Array else []:
+		if not building is Dictionary:
+			continue
+		var kind := str(building.get("kind", building.get("slot", ""))).trim_prefix("building.")
+		if not str(building.get("town", "")).is_empty() or kind.begins_with("house"):
+			return "a town's building or a house stands in it"
+	var places: Variant = config.get("places", {})
+	for key: Variant in places if places is Dictionary else {}:
+		var place: Variant = places[key]
+		if place is Dictionary and (str(place.get("kind", "")) == "stockpile" or place.has("town")):
+			return "a town's place is in it"
+	if World.holdings != null:
+		for id in World.holdings.places_in(level_name):
+			if str(World.holdings.place(id).get("kind", "")) == "stockpile":
+				return "a town's place is held there"
+	var home: Variant = config.get("home_kinds", [])
+	for kind: Variant in home if home is Array else []:
+		if not Level.MONSTER_TYPES.has(str(kind)):
+			return "its home kind %s is no monster's" % kind
+	return ""
+
+
 ## Server: level [param level_name]'s next generation made (Regen.generate),
 ## written (Regen.write) and, when its zone is open, the zone rebuilt on
 ## it: what sits in an anchor stays as it was, the rest is laid fresh from
@@ -5311,6 +5383,7 @@ func _boot() -> void:
 		_open_zone(zone_name, saved[zone_name], false)
 		restored += saved[zone_name]["entities"].size()
 	_open_zone(default_zone())
+	_lay_changed_at_boot()  # 684 amended (1): a level whose template changed, laid before any join.
 	if snapshot["ok"]:
 		print("[state] loaded %d entities and %d player records from %s (zones: %s)" % [
 			restored, snapshot["players"].size(), Net.state_path, ", ".join(saved.keys())])
@@ -6499,6 +6572,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if saved.size() < was:
 			print("[herds] culled %d bodies in %s: the level keeps none of their kind" % [was - saved.size(), World.zone.name])
 		records = World.herds.fold_records(World.zone.name, records)  # Animals of before the herds (decision 367).
+	_knight_records_on_marker(records)
 	World.set_records(records)
 	# A record from before keys (decision 433) gets its slot's key now, while
 	# its index still means what it did, so the next save keeps it by key.
@@ -6871,6 +6945,33 @@ func _top_up(entity: GridEntity, saved_spec: Dictionary) -> void:
 	if not given.is_empty():
 		World.set_slots(entity, slots, uids)
 		print("[state] %s topped up: %s" % [entity.name, ", ".join(given)])
+
+
+## Each kept record of a fallen knight holding his slot set on his marker's
+## cell before it is kept (684 amended (1), the coordinator after v0.1.217:
+## the box's journal could not show the knight while he was a record, read
+## only at his recall), at every load and every lay (_spawn_saved, which
+## _boot, _open_zone and _rebuild_regenerated go through), with 747 amended
+## (13)'s line: so a deploy's journal shows it when the level is laid, not
+## at the first visitor. Any other kind's record keeps where it was left.
+func _knight_records_on_marker(records: Array) -> void:
+	for record: Variant in records:
+		if not record is Dictionary or not record.get("entry") is Dictionary:
+			continue
+		var entry: Dictionary = record["entry"]
+		var key := str(entry.get("spawn_key", ""))
+		var slot: int = _key_slots.get(key, -1)
+		if slot < 0 or not knight_on_marker(entry):
+			continue
+		var marker: Vector2i = level_entities[slot]["tile"]
+		var was := World.record_tile(record)
+		if was == marker:
+			continue
+		entry["tile"] = [marker.x, marker.y]
+		if entry.has("home"):
+			entry["home"] = [marker.x, marker.y]
+		knights_set_on_marker += 1
+		print("[state] %s: 1 fallen knight set on his marker at %s, saved at %s" % [World.zone.name, key, was])
 
 
 ## The keys the snapshot being loaded names (_spawn_saved; decision 610),

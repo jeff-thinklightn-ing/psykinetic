@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3020)
+## Lines in the code (3027)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2143,7 +2143,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (800)
+### server and windows (807)
 
 | | Line | Where |
 |---|---|---|
@@ -2178,6 +2178,13 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s walkable %s held %s line %s | `main.gd` _free_round() |
 |  | %s no way on from it | `main.gd` _free_round() |
 |  | no plan from %s | `main.gd` _free_round() |
+|  | no generation could be made or written (no map joined its anchors, or the overlay refused it) | `main.gd` _lay_changed_at_boot() |
+|  | someone is in it | `main.gd` _lay_changed_at_boot() |
+|  | the overlay is not written here | `main.gd` _lay_changed_at_boot() |
+|  | a town's building or a house stands in it | `main.gd` _boot_lay_refusal() |
+|  | a town's place is in it | `main.gd` _boot_lay_refusal() |
+|  | a town's place is held there | `main.gd` _boot_lay_refusal() |
+|  | its home kind %s is no monster's | `main.gd` _boot_lay_refusal() |
 |  | %s@%d,%d | `main.gd` _move_items() |
 |  | usage: reload <zone> \| reload all (zones: %s) | `main.gd` _reload_command() |
 |  | no open zone's level changed on disk (%d open) | `main.gd` _reload_command() |

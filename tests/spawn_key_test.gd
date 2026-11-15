@@ -495,8 +495,9 @@ func _test_a_moved_knight() -> void:
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and kept.is_empty(),
 			"the old knight kept as a record: made again, he is dropped, not kept again (%s, %d records)" % [_knight_words(knights), kept.size()])
 	# A record of the marker's own knight, keyed, kept off his marker (the box after v0.1.217:
-	# he retired with nobody near, at a cell off it): nothing at load and no line; at his
-	# recall, on his marker with the line; and the load after, a body there, no line.
+	# he retired with nobody near, at a cell off it): set on his marker at load, with the line
+	# (684 amended (1)); the host's join beside the marker makes him there at once; and the
+	# load after, a body there, no line. (The host far: the retire row below.)
 	_write(path, saved)
 	_register_knight(KNIGHT_NOW)
 	_knights_loaded()
@@ -524,16 +525,12 @@ func _test_a_moved_knight() -> void:
 	knights = _knights_loaded()
 	var knight_records := func() -> Array: return World.record_list().filter(func(record: Dictionary) -> bool:
 			return str(record["entry"].get("script", "")).ends_with("astral_knight.gd"))
-	_check(not record_entry.is_empty() and knights.is_empty() and knight_records.call().size() == 1 and World.zone.recalls_due.size() == 1
-			and _main.knights_set_on_marker == lines_were,
-			"his record keyed, off his marker at %s: nothing at load, no line, the record kept, queued by the host's join for the ticks after (%s, %d records, %d lines)"
-			% [off, _knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
-	_main._recall_due()  # The next tick's (decision 352): what the host's join queued, made again.
+	_main._recall_due()  # The next tick's (decision 352): anything the host's join queued, made again.
 	knights = _knights()
-	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key
+	_check(not record_entry.is_empty() and knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key
 			and _main._alive_slots.values().has(knights[0]) and knight_records.call().is_empty() and _main.knights_set_on_marker == lines_were + 1,
-			"recalled: on his marker, holding his slot, the record gone, with the line (%s, %d records, %d lines)"
-			% [_knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
+			"his record keyed, off his marker at %s: set on his marker at load with the line, and the host's join beside it makes him there, holding his slot (%s, %d records, %d lines)"
+			% [off, _knight_words(knights), knight_records.call().size(), _main.knights_set_on_marker - lines_were])
 	_main._save_state()
 	lines_were = _main.knights_set_on_marker
 	knights = _knights_loaded()
@@ -590,8 +587,24 @@ func _test_a_knight_retired_and_recalled() -> void:
 			"left far behind and calm: kept as a record with his key, not dead (%s, %d records)" % [_knight_words(knights), kept.size()])
 	_main._save_state()
 	knights = _knights_loaded()
-	_check(knights.is_empty() and knight_records.call().size() == 1, "saved and loaded with the host still far: a record, no body (%s, %d records)"
-			% [_knight_words(knights), knight_records.call().size()])
+	_check(knights.is_empty() and knight_records.call().size() == 1 and _main.knights_set_on_marker == lines_were,
+			"saved and loaded with the host still far: a record, no body, no line (%s, %d records)" % [_knight_words(knights), knight_records.call().size()])
+	# The box's own shape (684 amended (1)): his record saved off his marker, the host far.
+	# Loaded, it is set on his marker with the line, and is still a record.
+	var far_save: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var off := marker - Vector2i(10, 0)
+	for record: Dictionary in far_save["zones"][LEVEL].get("records", []):
+		if str(record["entry"].get("spawn_key", "")) == key:
+			record["entry"]["tile"] = [off.x, off.y]
+			if record["entry"].has("home"):
+				record["entry"]["home"] = [off.x, off.y]
+	_write(path, far_save)
+	knights = _knights_loaded()
+	kept = knight_records.call()
+	_check(knights.is_empty() and kept.size() == 1 and World.record_tile(kept[0]) == marker and _main.knights_set_on_marker == lines_were + 1,
+			"his record saved off his marker at %s, the host far: loaded, set on his marker with the line, still a record (%s, %s, %d lines)"
+			% [off, _knight_words(knights), World.record_tile(kept[0]) if kept.size() == 1 else null, _main.knights_set_on_marker - lines_were])
+	lines_were = _main.knights_set_on_marker
 	host = _host()
 	if host != null:
 		World._relocate(host, marker - Vector2i(6, 0))

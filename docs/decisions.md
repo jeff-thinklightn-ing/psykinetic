@@ -36704,6 +36704,87 @@ runs clean under them.
 
 Server only, protocol unchanged, no new class_name.
 
+684 amended (1): a level whose template changed is laid at boot (the coordinator's approval of
+dungeon's design after v0.1.217, cites 465 amended (4); label from tools/decision_number.sh).
+The crypt walk on v0.1.216's save showed a joined client the old Low Hall: boot opened the
+barrow as saved (this entry's boot rule), its template-changed lay was made off-thread on a
+slow tick and waited for the zone to empty, so a player saved in the barrow stood in the old
+layout till they stepped out and back; release waited for the journal's line before the
+checklist. Now Main._lay_changed_at_boot runs in _boot once every saved zone and the default
+zone are open: each regenerating level whose template changed since its generation was laid
+(Regen.template_changed) goes through _regenerate_if_due, the path an empty zone takes on a
+slow tick, made on the main thread; an open zone with nobody in it is marked asleep first, as
+the first step would find it (a zone opens awake, Zone.awake, which held the lay in the first
+try of the test). _go_online reads no join till _boot returns, so the first
+player in finds the new layout, and "[regen] <level>: template changed ... laid again" and
+"[regen] <level>: laid at boot in N ms" come before "[state] loaded". A player saved standing in
+it is placed by 465's rule at join (their seen generation is behind: the nearest anchor's
+spawn, their companion beside them). Levels only due on their period still wait for the slow
+ticks, off the main thread, as above; 465 amended (4)'s once a run holds (the boot try is the
+one try, _relaid_for_template).
+- Never a town's level: Main._boot_lay_refusal refuses a level whose template has a building of
+  a town's or a house, a town's place (a stockpile, or one naming a town) in it or held there,
+  or a home kind that is no monster's; one line names the level and why, and it keeps the slow
+  tick's rule. The levels with a generation today are barrow, barrow_deep (crypts),
+  castle_halls (labyrinth) and hollowfell (a mine): none has residents, a town or a house. The
+  wilds and the town are not among them, and the wilds are refused (regen_test checks both).
+- A lay that fails never stops a boot: no generation made (no map joined its anchors, a
+  generator there is not) or the overlay refusing the write leaves the level as saved, said in
+  one line ("not laid at boot: ...; it stands as saved"), and the boot goes on. GDScript has
+  no catch: a script fault inside a generator returns from the faulting call with nothing
+  written (Regen.write comes after the whole make), the engine goes on, and the level stands as
+  saved the same way; the test makes the lay fail by a generator there is not.
+- A kept knight record on his marker at every load and lay (the coordinator, after the box's
+  journal could not show the knight while he was a record): Main._knight_records_on_marker in
+  _spawn_saved, which _boot, _open_zone and _rebuild_regenerated go through, sets a record of a
+  knight holding his slot (knight_on_marker) on his marker's cell before it is kept, with 747
+  amended (13)'s line, so a deploy's journal shows it when the level loads, not at the first
+  visitor. Any other kind's record keeps where it was left (its patrol goes on from there).
+  What is set is his cell alone (and his home, the same cell); nothing else of him changes.
+  He has no other state to carry: no senses, no fight and no step (AstralKnight._sim_tick does
+  nothing, acts false, peaceable, threatens nobody, no blow lands on him), so he is never in a
+  fight, never asleep or risen, and his hp is what it was; his facing comes from his marker at
+  his recall (Main._recall). His quest is each player's (World.barrow_quest) and his remains on
+  the bier are the regen state's (remains_laid_in) and his props', none of it in the cell. A
+  restart drops every client as ever; whoever comes back finds him on his bier as he was, any
+  talk with him asked again from its step.
+- What a boot lay moves: boot is longer by each changed level's lay (this entry's measures:
+  barrow 132 to 168 ms, barrow_deep 360 to 1091 ms to make); ground outside the anchors is lost
+  or gathered at boot, ItemBook noting it as at any lay; the holdings, world map and captives are
+  taken again at boot after every zone is open, as on a tick. Release's wait for the journal's
+  generation line and the cut checklist's step out and back go.
+Tests: regen_test _test_laid_at_boot (a restart as items_test's: Bo saved standing on a corridor
+of the halls, the halls' template changed, a level with a home kind no monster's and one naming
+a generator there is not; booted, the halls are laid before any step or join and a slow tick
+does not lay them again; the other two stand as saved; Bo joins at the nearest anchor's spawn on
+the new generation, his companion beside him; the wilds refused, the four levels not);
+spawn_key_test (a keyed knight record off his marker set on it at load with the line, the host
+far: still a record; the host near: made there with no line). Server only; protocol unchanged;
+no new class_name.
+- Two corrections to the record (the coordinator's, 11-14). 747 amended (13)'s account of why a
+  knight stood in the Low Hall (a second boot giving the stray the marker's key) was a rebuilt
+  case; the box's own lines do not show it (v0.1.217's boot printed no "set on his marker" line,
+  so its save held him on (39,10)); what was seen there on v0.1.215 is not explained by a server
+  body. Measured on that save shape (the knight keyed "39,10" on (38,32)): v0.1.216's code laid
+  the barrow by the console and kept him on (38,32), printing nothing about him (a lay before
+  747 amended (13) keeps a kept body's cell); v0.1.217's code set him on (39,10) at the
+  snapshot's open and again at the template-changed lay, each with the line (spawn_key_test's
+  rows hold the second). A v0.1.215 server and client on a barrow saved like the box's (the
+  keyless knight at (38,32) dropped at load, the keyed one on (39,10)) held one knight, on (39,10),
+  in the client's world at every read: walked in by the stair, beside the bier, on the Low Hall's
+  cells, and again after a lay while it was away; the Low Hall held the Offering stone and the two
+  barrow guards. The shape that does put him there is made with no hand edit: a fresh world on
+  v0.1.210 (the knight keyed "38,32" on (38,32)); a start on v0.1.214 ("AstralKnight1 is new":
+  the old one kept keyless on (38,32), a keyed one made on (39,10)); a second start on v0.1.214
+  (the name match gives the stray, read first, the key "39,10" at (38,32), and the marker's own
+  comes back keyless); a start on v0.1.215 (the keyless one dropped, the keyed one kept on
+  (38,32), and a joined client sees him there before and after a lay); a start on v0.1.217's
+  code (set on his marker, with the line). Which knight a v0.1.211 to v0.1.214 start reads first
+  decides whether a world ends there or at the bier; the box's lines say it ended at the bier.
+  And 573 amended (6)'s Draugr.in_hall sentence is wrong: the draugr row
+  sets keeps_room, so his _room is the lair rect, the one Main.hall_lair_rect gives, not his
+  leash round home (enemy-ai's 548 amended (4) pin holds it).
+
 ## 685. Companions' short searches bounded
 
 A companion asked for short answers through World.find_path with no

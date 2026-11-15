@@ -27,6 +27,8 @@ var _failures := 0
 var _main: Node
 var _party: Array[String] = []
 var _period := 0
+## World.steps when _test_laid_at_boot saved: the boot goes on from it, no step taken.
+var _steps_saved := 0
 
 
 func _ready() -> void:
@@ -69,6 +71,7 @@ func _ready() -> void:
 	await _test_made_off_the_main_thread()
 	_test_richness_never_waited()
 	_test_routes_never_waited()
+	await _test_laid_at_boot()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -704,6 +707,100 @@ func _only_due(level_name: String) -> void:
 	for other in Regen.marked_levels():
 		if other != level_name:
 			_main._regen[other] = {"generation": _main.generation_of(other), "at_step": World.steps}
+
+
+## 684 amended (1): at boot, a level whose template changed since its
+## generation was laid is laid in the boot's load, before any step or join;
+## a player saved standing in it comes back at the nearest anchor's spawn
+## on the new layout, their companion beside them; a slow tick after does
+## not lay it again. A level with a home kind that is no monster's (a town's
+## risk) is refused, left for the slow tick; one whose lay fails stands as
+## saved, and the boot goes on and serves a join. The wilds are refused;
+## barrow, barrow_deep, castle_halls and hollowfell may be laid.
+## A restart, as items_test's: the main freed, the zones cleared, a new main
+## booting from the snapshot. Run last: it replaces the main.
+func _test_laid_at_boot() -> void:
+	print("
+== a level whose template changed is laid at boot, before any join (684 amended (1)) ==")
+	for level_name in ["rg_town", "rg_fail"]:
+		BuilderHost.remove_overlay(level_name)
+		var config := _halls_config()
+		config["name"] = level_name
+		Level.register(level_name, Level.template("rg_halls")["layout"], null, config)
+	Regen.forget()
+	for level_name in ["rg_town", "rg_fail"]:
+		_main._regenerate(level_name, Regen.config_of(level_name))
+	# Bo saved standing in the halls, on a corridor.
+	_main._admit(BO, BO_ID, "Bo")
+	_check(_main.travel(BO, "rg_halls", "deep"), "Bo goes down to the deep room")
+	await get_tree().process_frame
+	var bo := _player(BO)
+	var was := World.enter_named("rg_halls")
+	var corridor := _corridor_cell(Vector2i(14, 10))
+	if bo != null:
+		World._relocate(bo, corridor)
+	World.enter(was)
+	_main._on_peer_disconnected(BO)
+	_check(_main._records[BO_ID].zone == "rg_halls" and _main._records[BO_ID].tile == corridor, "Bo leaves standing on a corridor at %s" % [corridor])
+	# The templates changed while the server is down: the halls' name; the
+	# town's a home kind no monster's; the failing one a generator there is not.
+	var changes := {"rg_halls": {"name": "The Halls, changed"}, "rg_town": {"home_kinds": ["farmer"]}, "rg_fail": {"regenerate": "none_such"}}
+	var before := {}
+	for level_name: String in changes:
+		var kept: Dictionary = Level.template(level_name)
+		var config: Dictionary = (kept["config"] as Dictionary).duplicate(true)
+		for field: String in changes[level_name]:
+			if field == "regenerate":
+				config["regenerate"]["generator"] = changes[level_name][field]
+			else:
+				config[field] = changes[level_name][field]
+		Level.keep_template(level_name, {"layout": kept["layout"], "height": kept["height"], "config": config, "relief": kept.get("relief")})
+		before[level_name] = _main.generation_of(level_name)
+	Regen.forget()
+	_check(changes.keys().all(func(level_name: String) -> bool: return Regen.template_changed(level_name)), "(each of the three changed since its generation)")
+	_main._save_state()
+	_steps_saved = World.steps
+	# The restart.
+	remove_child(_main)
+	_main.free()
+	World.clear_zones()
+	World.items = ItemBook.new()
+	_main = preload("res://main.tscn").instantiate()
+	add_child(_main)
+	# Its own row (the coordinator): a zone opens awake (Zone.awake) till the first step finds it
+	# empty, which held the boot's lay of a level open from the save in this test's first try,
+	# the box's barrow exactly. A change to waking that loses it fails here by name.
+	var halls_zone: Zone = World.zones.get("rg_halls")
+	_check(halls_zone != null and not halls_zone.awake and World.steps == _steps_saved,
+			"the halls, open from the save with nobody in it (a zone opens awake), marked asleep at boot before any step, as the first step would (%s)"
+			% ["no zone" if halls_zone == null else "awake %s, steps %d of %d" % [halls_zone.awake, World.steps, _steps_saved]])
+	_check(_main.generation_of("rg_halls") == before["rg_halls"] + 1 and _main._relaid_for_template.has("rg_halls") and not Regen.template_changed("rg_halls"),
+			"booted: the halls laid in the boot's load, before any step or join (generation %d to %d)" % [before["rg_halls"], _main.generation_of("rg_halls")])
+	_check(_main.generation_of("rg_town") == before["rg_town"] and Regen.template_changed("rg_town") and not _main._relaid_for_template.has("rg_town")
+			and _main._boot_lay_refusal("rg_town") == "its home kind farmer is no monster's",
+			"a level with a home kind that is no monster's: refused at boot, left for the slow tick (%s)" % _main._boot_lay_refusal("rg_town"))
+	_check(_main.generation_of("rg_fail") == before["rg_fail"] and _main._relaid_for_template.has("rg_fail"),
+			"a lay that fails at boot: the level stands as saved (generation %d), tried once" % _main.generation_of("rg_fail"))
+	var may: Array = ["barrow", "barrow_deep", "castle_halls", "hollowfell"].filter(func(level_name: String) -> bool: return _main._boot_lay_refusal(level_name) == "")
+	_check(not _main._boot_lay_refusal("wilds").is_empty() and may.size() == 4,
+			"the wilds refused (%s); barrow, barrow_deep, castle_halls and hollowfell may be laid (%s)" % [_main._boot_lay_refusal("wilds"), may])
+	var laid: int = _main.generation_of("rg_halls")
+	_main._regenerate_due()
+	_await_maker()
+	_main._regenerate_due()
+	_check(_main.generation_of("rg_halls") == laid, "a slow tick after the boot does not lay it again (%d)" % _main.generation_of("rg_halls"))
+	# Bo comes back: the server serves the join, on the new layout.
+	_main._admit(BO, BO_ID, "Bo")
+	bo = _player(BO)
+	var spawn: Variant = Regen.anchor_spawn_near(Level.load_level("rg_halls"), corridor)
+	_check(bo != null and bo.zone == "rg_halls" and spawn is Vector2i and World.distance(bo.tile, spawn) <= 1 and _main._records[BO_ID].seen_generation.get("rg_halls") == laid,
+			"Bo joins after the boot: in the halls at the nearest anchor's spawn %s, on the new generation (%s)" % [spawn, bo.tile if bo else null])
+	var pet: Companion = _main._companions.get(BO_ID)
+	_check(bo != null and pet != null and pet.zone == "rg_halls" and World.distance(pet.tile, bo.tile) <= 2, "his companion beside him (%s)" % [pet.tile if pet else null])
+	_main._on_peer_disconnected(BO)
+	for level_name in ["rg_town", "rg_fail"]:
+		BuilderHost.remove_overlay(level_name)
+		Level.unregister(level_name)
 
 
 ## Waits for Main's worker to finish making (its result not yet laid).
