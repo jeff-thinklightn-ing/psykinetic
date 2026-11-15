@@ -11753,6 +11753,10 @@ func _test_person_monster() -> void:
 ## "lunge" draws his dagger back to its gather, holds it there through the tell and thrusts as it
 ## lands, his body out along his facing on the thrust; his plain blow kept off meanwhile; called
 ## off, it stops and his body is back at rest.
+## The called-off lunge's ease (_test_told_lunge): the most of the hand's way home one frame may carry,
+## GATHER_SNAP, or GATHER_FADE_SHARE times that frame's share of the rig's fade when more (a long frame).
+const GATHER_SNAP := 0.6
+const GATHER_FADE_SHARE := 1.5
 func _test_told_lunge() -> void:
 	print("\n== a robber's told lunge: drawn back, held, thrust as it lands (790 amended (7)) ==")
 	var robber := _spawn_imp(Vector2i(9, 6), "robber")
@@ -11874,17 +11878,34 @@ func _test_told_lunge() -> void:
 	var held: Vector3 = hand.call()
 	_rig.creature_tell_over(22, false)
 	var was := held
-	var jump := 0.0
+	var steps: Array[Vector2] = []  # [the hand's move, the frame's seconds] for each frame.
 	var off_at := AnimRig.now_msec()
+	var frame_at := off_at
 	while AnimRig.now_msec() < off_at + int(lands_in * 1000.0):
 		await get_tree().process_frame
 		var now_at: Vector3 = hand.call()
-		jump = maxf(jump, now_at.distance_to(was))
+		steps.append(Vector2(now_at.distance_to(was), (AnimRig.now_msec() - frame_at) / 1000.0))
+		frame_at = AnimRig.now_msec()
 		was = now_at
 	_check(not rig.striking() and absf(body.position.x) < 0.01 and int(puppet.get_meta("wound_until", 0)) == 0,
 			"called off: stopped where it was, his body at rest (%.2f m), his blows his own again" % body.position.x)
-	_check(was.distance_to(held) > 0.05 and jump < 0.6 * was.distance_to(held),
-			"and eased out of the gather, not snapped: the hand %.2f m back to rest, at most %.2f m a frame" % [was.distance_to(held), jump])
+	# A snap is all of it in one frame. The rig eases by its frames' own time (its fade, rig.blend), so a
+	# frame of a loaded machine long enough to cover most of the fade may carry most of the move (maps'
+	# Mughouse take, 11-15: seven scenes at once, 0.15 of 0.16 m in one frame; alone, it passed): each
+	# frame may move GATHER_SNAP of the way, or its share of the fade (GATHER_FADE_SHARE x its time over
+	# the fade) when that is more. So a frame of 0.1 s or longer (1.5 x 0.1 over the 0.15 s fade) can no longer
+	# fail the row: under load it is no watch of the ease, only a normal frame is.
+	var back := was.distance_to(held)
+	var worst := 0.0
+	var worst_step := Vector2.ZERO
+	for step: Vector2 in steps:
+		var allowed := clampf(maxf(GATHER_SNAP, GATHER_FADE_SHARE * step.y / maxf(0.001, rig.blend)), 0.0, 1.0) * back
+		if step.x / maxf(0.0001, allowed) > worst:
+			worst = step.x / maxf(0.0001, allowed)
+			worst_step = step
+	_check(back > 0.05 and worst < 1.0,
+			"and eased out of the gather, not snapped: the hand %.2f m back to rest, its largest move %.2f m in a %.0f ms frame (%.0f%% of what that frame may carry)" % [
+			back, worst_step.x, worst_step.y * 1000.0, worst * 100.0])
 	# Two robbers told at once: each his own timing (two rigs), one held while the other thrusts.
 	var other := _spawn_imp(Vector2i(9, 9), "robber")
 	other.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
