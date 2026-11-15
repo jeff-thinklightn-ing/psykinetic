@@ -22042,7 +22042,7 @@ uniform float sun = 1.0;
 uniform int count = 0;
 uniform float flat_share = 0.35;  // full strength out to this share of its radius, gone at its rim
 uniform bool contact = false;  // the darker of the mark and the sun's shadow, never their product
-uniform float shadow_drop = 0.2;  // the sun's full shadow on lit ground (it reads about 0.8)
+uniform float shadow_drop = 0.2;  // the sun's full shadow on lit ground, as shown (it reads about 0.8)
 uniform vec4 mark_at[64];
 uniform vec4 mark_size[64];
 varying vec3 world;
@@ -22097,9 +22097,11 @@ void light() {
 		if (contact) {
 			// Under a roof's or a tree's shade (covered): its k already cut on the CPU, laid on as a
 			// plain multiply. In the open: the darker of the mark and the sun's shadow here.
+			// Its numbers are as the screen shows them (sRGB, as the stills are read: foot4 read
+			// a linear 0.5 as 0.73), so the multiply here, in the linear buffer, is their 2.2 power.
 			float lit_share = 1.0 - shadow_drop * sun * (1.0 - ATTENUATION);
-			float keep = mark_covered > 0.5 ? 1.0 - mark_k : min(1.0, (1.0 - mark_k) / max(lit_share, 0.01));
-			DIFFUSE_LIGHT += vec3(keep);
+			float shown = mark_covered > 0.5 ? 1.0 - mark_k : min(1.0, (1.0 - mark_k) / max(lit_share, 0.01));
+			DIFFUSE_LIGHT += vec3(pow(shown, 2.2));
 		} else {
 			DIFFUSE_LIGHT += vec3((1.0 - shaded) * (1.0 - sun * ATTENUATION));
 		}
@@ -22117,6 +22119,9 @@ var _foot_marks: MultiMeshInstance3D
 ## follows, its "size" (along, across), "height", and its "cell" and whether
 ## that cell is "inside" a walled building.
 var _foot_mark_bodies: Dictionary[int, Dictionary] = {}
+## Each occluder piece's triangles for the contact mark's cover ray, made the
+## first time its box is met (_foot_mark_covered).
+var _foot_mark_shapes: Dictionary[Node3D, Array] = {}
 
 
 func _make_foot_marks() -> void:
@@ -22286,8 +22291,16 @@ func _foot_mark_covered(body: Dictionary, foot: Vector3) -> bool:
 				if not is_instance_valid(entry[0]) or not (entry[0] as Node3D).is_visible_in_tree():
 					continue
 				var bounds: AABB = entry[1]
-				if bounds.intersects_segment(point, end) != null \
-						and (not (entry[3] as Array).is_empty() or shapes_meet(entry[4], point, end)):
+				if bounds.intersects_segment(point, end) == null:
+					continue
+				# Its box met: its own triangles asked (foot4: a stall's box
+				# covered a body standing in the sun beside it). A piece with no
+				# plain meshes (a wall run's MultiMesh) is its box, an edge's own.
+				var piece := entry[0] as Node3D
+				if not _foot_mark_shapes.has(piece):
+					_foot_mark_shapes[piece] = entry[4] if entry.size() > 4 else _shapes_of(piece)
+				var shapes: Array = _foot_mark_shapes[piece]
+				if shapes.is_empty() or shapes_meet(shapes, point, end):
 					body["covered"] = true
 					return true
 	return false

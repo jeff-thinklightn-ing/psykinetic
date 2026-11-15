@@ -92,5 +92,5 @@ const ROOM: Array[StringName] = [
 	&"_occluder_of", &"_mass_box", &"_mass_distance", &"_stood", &"_forest_low", &"_forest_high",
 	&"_blood", &"_blood_drawn", &"_blood_due", &"_blood_specks", &"_blood_shades", &"_tracks",
 	&"_tracks_drawn", &"_tracks_due", &"_track_parts", &"_track_shades", &"_house_lights",
-	&"_house_seats"
+	&"_house_seats", &"_foot_mark_shapes"
 ]
