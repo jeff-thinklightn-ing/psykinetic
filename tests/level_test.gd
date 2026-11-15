@@ -15,6 +15,9 @@ const CELL_WATER_FIXTURES: Array[String] = ["sample"]
 ## How far a ledge's curve may lie from the cliff edges it traces (585;
 ## terrain's bound, as the forest edge's EDGE_BOUND).
 const LEDGE_BOUND := 0.45
+## The furthest any of a level's starts lies from its first (World.distance; 774 amended (4)): the other levels'
+## starts lie 3 or less from their first, the wilds' 7 (its second, by the dirt square).
+const START_SPREAD := 10
 
 var _failures := 0
 var _main: Node
@@ -260,6 +263,7 @@ func _test_every_level() -> void:
 	_test_farm_and_barrow()
 	_test_jeffs_pond_corner()
 	_test_hearth()
+	_test_starts()
 	_test_town_warm_rests()
 	_test_fill_hills_sights()
 	_test_relaid()
@@ -1402,6 +1406,91 @@ func _test_town_warm_rests() -> void:
 		_check((World.buff(player, "heal") == _main.WARM_HEAL) == at[1], "%s at %s, unhurt: %s (%.1f)" % [at[2], at[0], "warmed" if at[1] else "not", World.buff(player, "heal")])
 	player.buffs = {}
 	_main.load_map("test_room")
+
+
+## Every level's starts (maps, 2026-11-15; the coordinator's ruling: the wilds' second start stood inside
+## hut H2, so a second newcomer arrived beside its bed): none inside any building's cells, each on floor with
+## nothing solid and no entity on it, and each walked to from the first over the level's floor (a wall or a
+## solid cell stops the walk, a door doesn't), none further than START_SPREAD from the first (774 amended (4): the
+## wilds' four painted north markers stood starts 5 to 8, about 190 from the town). The wilds' second start also
+## stands open all round, near the first, on no spot; the foothills' way in still arrives at (128, 22).
+func _test_starts() -> void:
+	print("\n== every level's starts: open floor, outside every building, walked to from the first ==")
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty() or level["starts"].is_empty():
+			continue
+		var terrain: Dictionary = level["terrain"]
+		var solid: Variant = terrain.get("solid", {})
+		var built := {}
+		for building: Dictionary in level["buildings"]:
+			for cell: Vector2i in Level.building_cells(building):
+				built[cell] = str(building.get("code", building.get("slot", "")))
+		var taken := {}
+		for spec: Dictionary in level["entities"]:
+			taken[spec["tile"]] = str(spec.get("name", ""))
+		var bad: Array[String] = []
+		var first: Vector2i = level["starts"][0]
+		for start: Vector2i in level["starts"]:
+			if built.has(start):
+				bad.append("%s inside %s" % [start, built[start]])
+			elif not terrain["floor"].has(start) or solid.has(start):
+				bad.append("%s not open floor" % [start])
+			elif taken.has(start):
+				bad.append("%s under %s" % [start, taken[start]])
+			elif World.distance(start, first) > START_SPREAD:
+				bad.append("%s %d from the first %s" % [start, World.distance(start, first), first])
+			elif start != first and not _floor_walks(terrain, first, start):
+				bad.append("%s not walked to from %s" % [start, first])
+		_check(bad.is_empty(), "%s: its %d start(s) open, outside every building, within %d of the first, walked to from it (%s)" % [folder, level["starts"].size(), START_SPREAD, bad])
+	# The foothills' way in still arrives where it did: the start markers that came out sat on its arrival.
+	var foothills := Level.load_level("foothills")
+	var way_in: Array = foothills["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
+	var wilds_level := Level.load_level("wilds")
+	var arrival: Vector2i = wilds_level["spawn_points"].get("from_foothills", Vector2i(-1, -1))
+	var way_out: Array = wilds_level["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "foothills")
+	_check(way_in.size() == 1 and way_in[0]["to_spawn"] == "from_foothills" and arrival == Vector2i(128, 22)
+		and way_out.size() == 1 and way_out[0]["tile"] == Vector2i(128, 20) and wilds_level["terrain"]["floor"].has(arrival) and not wilds_level["starts"].has(arrival)
+		and _floor_walks(wilds_level["terrain"], arrival, wilds_level["starts"][0]),
+		"a walk in from the foothills arrives at the wilds' %s, open floor, no start, walked from there to the town's start" % [arrival])
+	var wilds := wilds_level
+	var second: Vector2i = wilds["starts"][1]
+	var around := true
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var cell := second + Vector2i(dx, dy)
+			around = around and wilds["terrain"]["floor"].has(cell) and not wilds["terrain"]["solid"].has(cell)
+	_check(around and World.distance(second, wilds["starts"][0]) <= 8 and wilds["spots"].all(func(spot: Dictionary) -> bool: return spot["cell"] != second),
+		"the wilds' second start %s near the first %s (within 8), open floor all round it, no spot on it" % [second, wilds["starts"][0]])
+
+
+## Whether [param to] is walked to from [param from] over [param terrain]'s floor: four steps, a wall edge or a
+## solid cell stopping it, a door not.
+static func _floor_walks(terrain: Dictionary, from: Vector2i, to: Vector2i) -> bool:
+	var open := {}
+	for cell: Vector2i in terrain["floor"]:
+		open[cell] = true
+	for cell: Vector2i in terrain.get("solid", []):
+		open.erase(cell)
+	var seen := {from: true}
+	var queue: Array[Vector2i] = [from]
+	var head := 0
+	while head < queue.size():
+		var cell: Vector2i = queue[head]
+		head += 1
+		if cell == to:
+			return true
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := cell + step
+			if seen.has(next) or not open.has(next):
+				continue
+			if terrain["edges"].get(Terrain.edge_key(cell, step)) == Terrain.Edge.WALL:
+				continue
+			seen[next] = true
+			queue.append(next)
+	return false
 
 
 func _test_hearth() -> void:

@@ -77,12 +77,14 @@ func _initialize() -> void:
 	for blob in AreaTools.blobs(pond_cells, MIN_POND):
 		for at: Vector2i in blob:
 			map.set_cell(at, "water")
-	# The link, the starts beside the arrival.
+	# The link, the starts beside the arrival: written to level.json only, never painted as start markers
+	# (774 amended (4)): Level adds every painted marker after level.json's starts, so the four this once
+	# painted at (126..130, 22) stayed starts 5 to 8 after the town took level.json's starts, and spawn
+	# safety's fallback put players there, a map from Umbrage.
 	map.set_cell(link, "link")
 	var starts := []
 	for dx in [-1, 1, -2, 2]:
 		var start := arrival + Vector2i(dx, 0)
-		map.set_cell(start, "start")
 		starts.append([start.x, start.y])
 	config["centre"] = [arrival.x, arrival.y]
 	config["starts"] = starts

@@ -47669,6 +47669,32 @@ road, woodlot and healer's posts; lore's directions already speak of the west an
 id post_smithy stays (level_test's post ids). Nothing else named it on main: no line, sign, waystone, rumour or lore
 row. It reverses the coordinator's 11-10 note to Jeff that the name stays (the coordinator tells him). Level data
 only; protocol unchanged, no new class_name.
+
+774 amended (4): the wilds' second start is out of hut H2 (2026-11-15, maps; the coordinator's ruling; the
+script's label). terrain's settled stills for the flow page (C:/dev/review/umb_noon2/u-b0.png) showed a player on
+the second start standing inside a hut beside its bed: (212, 205) lay in hut H2's 3 x 3 at (210, 204), x 210..212,
+y 204..206, so whoever arrived while someone stood on (208, 205) (Main._free_start_tile takes the first free start)
+arrived in a resident's hut. It is now (206, 212), out on the open ground south-east of the square, the first
+of the cells terrain's (A)(1) for the flow page puts the starts on, so the mend and the proposal agree (the
+coordinator's ruling); the first start stays at (208, 205) until Jeff picks. The third and fourth, (208, 211)
+and (212, 211), already passed. The four start markers tools/make_wilds.gd painted in layout.png at (126, 22),
+(127, 22), (129, 22) and (130, 22), beside the foothills link's arrival, come out as a fault (the coordinator's
+word, on release's journal counts): Level.load_level adds painted markers after level.json's starts, so they stayed
+starts 5 to 8 after the town took level.json's, about 190 cells from Umbrage, and spawn safety's hostile fallback
+(Main._safest_start_tile, which picks among all starts; 749 names (126, 22)) put players there six times in
+October. Each pixel is repainted to the ground beside it (grass, dirt, dirt, grass), nothing else changed: the
+link at (128, 20) and the "from_foothills" arrival (128, 22), a level.json spawn point, stay as they are.
+make_wilds.gd writes its starts to level.json only, never painted, with a line saying why, so a rerun cannot bring
+them back. level_test _test_starts, for every level in levels/: no start inside any building's cells, each on
+floor with nothing solid and no entity on it, none further than START_SPREAD (10) from the level's first (the
+other 22 levels' starts lie 3 or less from their first: bear_yard, foothills, forest, held, hills; the wilds' 7),
+each walked to from the first over the floor (a wall or a solid cell stops the walk, a door doesn't); the wilds'
+second start within 8 of the first, open floor all round, on no spot; and the foothills' one link to the wilds
+names "from_foothills", which is (128, 22), open floor, no start, beside the wilds' link back at (128, 20), and
+walked from there to the town's start. The playtest tours'
+"town square" (212, 205) (barrow, fish_click, folk, restart, seams) is a cell of their own, not a start, and still
+names H2's inside; playtest is told. The flow page's (A) may move all four starts later; the row stays. Level data
+and a test; protocol unchanged; no new class_name; no bullet.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's
