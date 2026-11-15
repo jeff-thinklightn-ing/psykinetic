@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_visitors()  # After them: its syncs step the world.
+	_test_pedlar_stand()  # 711 amended (2): beside the visitors' case, its own pedlars.
 	_test_camp_traders()  # 799: the forest camps' traders.
 	_test_relic()  # 714: the knight's remains to Aldous.
 	_test_vendor()  # 736: the starter stall.
@@ -7867,6 +7868,88 @@ func _test_visitors() -> void:
 	_sync()
 	_check(_body("visitor:visitor_rs_1") == null and _main._visitors_leaving.is_empty(), "past their time: gone")
 	Net.message_received.disconnect(heard)
+
+
+## The visiting pedlar's stand (711 amended (2), the coordinator's approval, 11-14, package "Umbrage: the
+## pedlar's stand"): the pedlar who came first stands behind the stall visitors.kinds.pedlar.stall names,
+## his side of its counter; a second keeps the store's 5x5; no stall laid, the 5x5; his wares bought from the
+## customers' side, across the counter.
+func _test_pedlar_stand() -> void:
+	print("
+== the pedlar's stand: the first come behind its counter, a second at the store, none laid the store; bought across the counter (711 amended (2)) ==")
+	var player := _player()
+	if player == null or World.economy == null:
+		_check(true, "(no player or economy: skipped)")
+		return
+	var pid := Net.player_id
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	var five := Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+	# Umbrage's M3 in small: the keeper's cell (12, 10), the stall's counter north of it at (12, 9) facing north.
+	var stand_id := "%s/rs_pedlar_stall" % TOWN
+	var keeper_cell := Vector2i(12, 10)
+	var counter := Vector2i(12, 9)
+	World.holdings._places[stand_id] = {"id": stand_id, "area": TOWN, "key": "rs_pedlar_stall", "cell": keeper_cell, "name": "a stall",
+		"kind": "stall", "radius": 1, "worth": 0, "start": "", "town": STORE}
+	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
+	var m3 := {"slot": "building.market_stall", "at": [counter.x, counter.y], "facing": [0, -1], "code": "M3", "rect": Rect2i(counter, Vector2i.ONE)}
+	buildings.append(m3)
+	var kind_rule: Dictionary = World.towns.rules.get("visitors", {}).get("kinds", {}).get("pedlar", {})
+	var key_was: Variant = kind_rule.get("stall")
+	kind_rule["stall"] = "rs_pedlar_stall"
+	var visitors: Array = World.towns._towns[STORE].get_or_add("visitors", [])
+	var was_visitors := visitors.duplicate(true)
+	visitors.clear()
+	# The first come has the larger id: "came" decides, never the id's spelling.
+	visitors.append({"id": "visitor_rs_p9", "kind": "pedlar", "name": "Bess", "from": "Saltmarsh", "came": World.towns.now() - 2 * DayNight.day_steps,
+		"leaves": World.towns.now() + DayNight.day_steps, "stock": {"spice": 2}, "news": []})
+	visitors.append({"id": "visitor_rs_p10", "kind": "pedlar", "name": "Wat", "from": "Saltmarsh", "came": World.towns.now() - DayNight.day_steps,
+		"leaves": World.towns.now() + DayNight.day_steps, "stock": {"spice": 2}, "news": []})
+	DayNight.set_hour(12.0)
+	_main._sync_residents()  # No world step: the cases after this count ticks from where they were.
+	var bess := _body("visitor:visitor_rs_p9")
+	var wat := _body("visitor:visitor_rs_p10")
+	var behind := Main._behind_counter(Rect2i(keeper_cell - Vector2i.ONE, Vector2i(3, 3)), counter, Vector2i(0, -1))
+	_check(behind == Rect2i(11, 10, 3, 2), "(the keeper's side of a north-facing counter: the rows south of it, %s)" % [behind])
+	_check(bess != null and bess.places.get("work", Rect2i()) == behind and bess.places.get("square", Rect2i()) == behind,
+		"Bess, come first: behind the stall's counter (%s)" % [bess.places.get("work") if bess != null else null])
+	_check(wat != null and wat.places.get("work", Rect2i()) == five, "Wat, come a day after: the store's 5x5 (%s)" % [wat.places.get("work") if wat != null else null])
+	var saved: Array = JSON.parse_string(JSON.stringify(visitors))
+	visitors.clear()
+	visitors.append(saved[1])
+	visitors.append(saved[0])
+	_check(_main._stall_pedlar(STORE) == "visitor_rs_p9", "their records loaded in the other order (a restart): still Bess")
+	# His wares from the customers' side, the counter between.
+	if bess != null:
+		var her_cell: Vector2i = _main._nearest_free(keeper_cell + Vector2i(0, 1))
+		_put(bess, her_cell if her_cell.y > counter.y else keeper_cell + Vector2i(0, 1))
+		_put(player, _main._nearest_free(counter + Vector2i(0, -1)))
+		var offers := Offers.of(bess.worker_id, pid)
+		_check(not offers.is_empty() and player.tile.y < counter.y and bess.tile.y > counter.y, "(the player north of the counter at %s, Bess south at %s)" % [player.tile, bess.tile])
+		if not offers.is_empty():
+			World.economy.add_gold(pid, int(offers[0]["cost"]) + 5, "the test")
+			var gold_before := World.economy.gold(pid)
+			var had := World.count_of(player, "spice")
+			_main._accept_offer(player, str(offers[0]["id"]), 0)
+			_check(World.economy.gold(pid) == gold_before - int(offers[0]["cost"]) and World.count_of(player, "spice") == had + 1,
+				"bought across the counter: the gold paid, the spice in hand")
+	kind_rule["stall"] = ""
+	_main._sync_residents()  # No world step: the cases after this count ticks from where they were.
+	bess = _body("visitor:visitor_rs_p9")
+	_check(bess != null and bess.places.get("work", Rect2i()) == five, "no stall named: Bess by the store, as ever")
+	kind_rule["stall"] = "rs_pedlar_stall"
+	buildings.erase(m3)
+	World.holdings._places.erase(stand_id)
+	_main._sync_residents()  # No world step: the cases after this count ticks from where they were.
+	bess = _body("visitor:visitor_rs_p9")
+	_check(bess != null and bess.places.get("work", Rect2i()) == five, "the stall's place gone: by the store")
+	if key_was == null:
+		kind_rule.erase("stall")
+	else:
+		kind_rule["stall"] = key_was
+	visitors.clear()
+	visitors.append_array(was_visitors)
+	_main._visitors_leaving.clear()
+	_main._sync_residents()  # No world step: the cases after this count ticks from where they were.
 
 
 ## Abed at work in its sleep spell (751 amended (6), the coordinator's ruling: the medicine man stood his

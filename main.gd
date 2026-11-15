@@ -5218,6 +5218,7 @@ func _boot() -> void:
 	for line: String in World.towns.boot_lines():
 		print("[towns] " + line)
 	_test_temple_day()
+	_test_visitor_comes()  # 711 amended (2): --test-visitor=pedlar, test only.
 	if Net.test_hp and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 		push_error("[test] --test-hp without --run-marker: ignored (786: a test-only flag, never the box's)")
 	if Net.test_companion and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
@@ -22834,10 +22835,16 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 		places["keep_work"] = true
 		out.append({"key": Offers.VENDOR + place_id, "name": str(vendor.get("name", "Rolf")), "trade": "", "player": "",
 			"town": place_id, "look_trade": "smith", "places": places})
+	# The pedlar's stand (711 amended (2)): the stall visitors.kinds.pedlar.stall names, kept by the pedlar who came first.
+	var stand_key := str(World.towns.rules.get("visitors", {}).get("kinds", {}).get("pedlar", {}).get("stall", ""))
+	var stand := _stall_spot(place_id, stand_key)
+	var stand_pedlar := _stall_pedlar(place_id) if stand.size != Vector2i.ZERO else ""
 	for entry: Dictionary in World.towns.visitors(place_id):
 		var kind := str(entry.get("kind", ""))
 		var spot: Rect2i = base.get("inn", base["square"])
-		if kind == "pedlar":
+		if kind == "pedlar" and not stand_pedlar.is_empty() and str(entry.get("id", "")) == stand_pedlar:
+			spot = stand
+		elif kind == "pedlar":
 			spot = Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
 		elif kind == "pilgrim" and base.has("temple"):
 			spot = base["temple"]
@@ -23185,21 +23192,62 @@ func _camp_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
 ## other stall place (another one laid, keyed before it, never takes him);
 ## none, or not a stall of his town, the store's 5x5 at [param store].
 func _vendor_spot(place_id: String, store: Vector2i) -> Rect2i:
-	var town := World.holdings.place(place_id)
 	var key := str(World.economy.rules.get("vendor", {}).get("stall", "")) if World.economy != null else ""
-	var stall := World.holdings.place("%s/%s" % [town.get("area", ""), key]) if not key.is_empty() else {}
-	if str(stall.get("kind", "")) == "stall" and str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
-		var radius := maxi(int(stall.get("radius", 1)), 0)
-		var spot := Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
-		# His side of the counter only (853, the coordinator's rule): he strolls, never round to the front.
-		var buildings: Array = _world_map.areas.get(str(town.get("area", "")), {}).get("buildings", []) if _world_map != null else []
-		for each: Variant in buildings:
-			if each is Dictionary and str(each.get("slot", "")) in COUNTERS and each.get("at") is Array and each.get("facing") is Array:
-				var at := Vector2i(int(each["at"][0]), int(each["at"][1]))
-				if World.distance(at, Vector2i(stall["cell"])) <= 1:
-					return _behind_counter(spot, at, Vector2i(int(each["facing"][0]), int(each["facing"][1])))
-		return spot
-	return Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+	var spot := _stall_spot(place_id, key)
+	return spot if spot.size != Vector2i.ZERO else Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+
+
+## The cells a stall's keeper keeps to at the "stall" place keyed [param key] in [param place_id]'s area,
+## the town's own (its "town" the town's id or key): within the place's radius of its cell, his side of a
+## counter beside it (_behind_counter); Rect2i() for no such stall (736, and 711 amended (2): the pedlar's).
+func _stall_spot(place_id: String, key: String) -> Rect2i:
+	if key.is_empty():
+		return Rect2i()
+	var town := World.holdings.place(place_id)
+	var stall := World.holdings.place("%s/%s" % [town.get("area", ""), key])
+	if str(stall.get("kind", "")) != "stall" or not str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
+		return Rect2i()
+	var radius := maxi(int(stall.get("radius", 1)), 0)
+	var spot := Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	# His side of the counter only (853, the coordinator's rule): he strolls, never round to the front.
+	var buildings: Array = _world_map.areas.get(str(town.get("area", "")), {}).get("buildings", []) if _world_map != null else []
+	for each: Variant in buildings:
+		if each is Dictionary and str(each.get("slot", "")) in COUNTERS and each.get("at") is Array and each.get("facing") is Array:
+			var at := Vector2i(int(each["at"][0]), int(each["at"][1]))
+			if World.distance(at, Vector2i(stall["cell"])) <= 1:
+				return _behind_counter(spot, at, Vector2i(int(each["facing"][0]), int(each["facing"][1])))
+	return spot
+
+
+## --test-visitor=pedlar (711 amended (2), test only, never set on the box): with --test-hp beside a --run-marker
+## (hp_verb_allowed, as hp and strike), a pedlar comes at boot to each town with a pedlar's stand and no pedlar in
+## it, for the joined look of his stand; anything else, or without both, nothing.
+func _test_visitor_comes() -> void:
+	if Net.test_visitor.is_empty():
+		return
+	if Net.test_visitor != "pedlar" or not hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+		push_error("[test] --test-visitor=%s: only \"pedlar\", with --test-hp and a --run-marker: ignored" % Net.test_visitor)
+		return
+	var key := str(World.towns.rules.get("visitors", {}).get("kinds", {}).get("pedlar", {}).get("stall", ""))
+	var draw := RandomNumberGenerator.new()
+	draw.seed = 711
+	for place_id: String in World.holdings.all_places():
+		if World.holdings.place(place_id).get("kind") != "stockpile" or _stall_spot(place_id, key).size == Vector2i.ZERO 				or not _stall_pedlar(place_id).is_empty():
+			continue
+		World.towns._visitor_comes(place_id, "pedlar", draw)
+		print("[test] --test-visitor: a pedlar comes to %s, his stand %s" % [place_id, _stall_spot(place_id, key)])
+
+
+## The visiting pedlar given [param place_id]'s pedlar's stand (711 amended (2)): of the pedlars in town, the one
+## who came first (the visitor's own record: "came", then its id), so two never swap at a restart; "" for none.
+func _stall_pedlar(place_id: String) -> String:
+	var first := {}
+	for entry: Dictionary in World.towns.visitors(place_id):
+		if str(entry.get("kind", "")) != "pedlar":
+			continue
+		if first.is_empty() or int(entry.get("came", 0)) < int(first.get("came", 0)) 				or int(entry.get("came", 0)) == int(first.get("came", 0)) and str(entry.get("id", "")) < str(first.get("id", "")):
+			first = entry
+	return str(first.get("id", ""))
 
 
 ## The starter stall's keeper's own spots in [param area] for the town at [param place] (853 amended (3),

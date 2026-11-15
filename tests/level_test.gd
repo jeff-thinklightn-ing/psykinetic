@@ -2772,6 +2772,19 @@ func _test_umbrage_locker() -> void:
 		and place.get("town") == "store" and wilds["terrain"]["floor"].has(Vector2i(203, 196)) and wilds["terrain"]["floor"].has(Vector2i(204, 196))
 		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not Rect2i(203, 196, 2, 3).has_point(spec["tile"])),
 		"the place weapon_stall, a stall worth nothing, at (203, 196) behind it on floor, no marker in or about it (%s)" % [place])
+	# Package "Umbrage: the pedlar's stand" (maps' side, in economy's switch take): the visiting pedlar's place at
+	# his keeper's cell behind M3, which faces north into the square; he keeps (202..204, 208..209), served from the north.
+	var pedlar: Dictionary = wilds["places"].get("pedlar_stall", {})
+	var pedlar_side := Rect2i(202, 208, 3, 2)
+	var side_clear := true
+	for x in range(pedlar_side.position.x, pedlar_side.end.x):
+		for y in range(pedlar_side.position.y, pedlar_side.end.y):
+			side_clear = side_clear and wilds["terrain"]["floor"].has(Vector2i(x, y)) and not wilds["terrain"]["solid"].has(Vector2i(x, y))
+	_check(pedlar.get("cell") == Vector2i(203, 208) and pedlar.get("kind") == "stall" and pedlar.get("radius") == 1 and pedlar.get("worth") == 0
+		and pedlar.get("town") == "store" and pedlar.get("holder") == "town" and pedlar.get("explore") == false
+		and pedlar.get("name") == "the pedlar's stall" and side_clear
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not pedlar_side.has_point(spec["tile"])),
+		"the place pedlar_stall, a stall worth nothing, at (203, 208) behind M3, his side (202..204, 208..209) clear floor, no marker on it (%s)" % [pedlar])
 
 
 func _test_building_links() -> void:

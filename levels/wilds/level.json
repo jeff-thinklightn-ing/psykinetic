@@ -678,6 +678,18 @@
 			"worth": 0,
 			"name": "the weapon stall"
 		},
+		"pedlar_stall": {
+			"at": [
+				203,
+				208
+			],
+			"kind": "stall",
+			"holder": "town",
+			"town": "store",
+			"radius": 1,
+			"worth": 0,
+			"name": "the pedlar's stall"
+		},
 		"woodlot": {
 			"at": [
 				210,

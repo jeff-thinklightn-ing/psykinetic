@@ -1062,6 +1062,9 @@ var test_walk_on_wind := false
 ## several with "+", 392 amended (7); "held" waits for the admin verb "foes
 ## <player>", 392 amended (8)), or empty.
 var test_foe: PackedStringArray = []
+## --test-visitor=pedlar (711 amended (2), test only): Main._test_visitor_comes brings a pedlar to each town
+## with a pedlar's stand at boot, with --test-hp beside a --run-marker; "" for none.
+var test_visitor := ""
 ## --test-tells (net_test's tell phase): the server prints each told move it
 ## sends (Main._tell_telegraph: its zone's peers and the joined ones), a client
 ## each it gets and each end (Main._on_telegraph).
@@ -2429,7 +2432,7 @@ func _parse_args(given: Array = []) -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-face-trips", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--test-traits", "--test-card", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--test-visitor", "--test-traits", "--test-card", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -2498,6 +2501,8 @@ func _set_option(key: String, value: String) -> void:
 					test_walk.append({"keys": pieces[0].to_lower(), "seconds": pieces[1].to_float()})
 		"--test-foe":
 			test_foe = value.split(",")
+		"--test-visitor":
+			test_visitor = value
 		"--test-traits":
 			# Decision 803 amended, the voice A/B only: "key:value;key:value" over a companion's roll.
 			test_traits.clear()

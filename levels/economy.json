@@ -96,7 +96,7 @@
 			"trader": {"weight": 0, "every": 4, "days": [1, 1], "market": "market:castle", "load": 20, "goods": 4, "sells": 5, "town_gold_most": 300, "never_buys": ["food", "meat"],
 				"names": ["Hale", "Oswin", "Maud", "Tamsin", "Garrick", "Edda"]},
 			"traveller": {"weight": 3, "inn": [2, 6], "names": ["Hale", "Oswin", "Maud", "Tamsin", "Garrick", "Edda"]},
-			"pedlar": {"weight": 2, "raws": ["ore", "wood", "cloth", "meat", "hide"], "buys": 4, "draw": [3, 5], "names": ["Jory", "Bess", "Wat", "Nell"],
+			"pedlar": {"weight": 2, "stall": "pedlar_stall", "raws": ["ore", "wood", "cloth", "meat", "hide"], "buys": 4, "draw": [3, 5], "names": ["Jory", "Bess", "Wat", "Nell"],
 				"wares": [{"item": "spice", "count": 2, "weight": 3}, {"item": "wine", "count": 2, "weight": 2},
 					{"item": "silver_ring", "count": 1, "weight": 1, "unless": "smith"}, {"item": "remedy", "count": 2, "weight": 2, "unless": "medicine_man"},
 					{"item": "tusks", "count": 1, "weight": 1}, {"item": "buckler", "count": 1, "weight": 1, "unless": "tanner"},
