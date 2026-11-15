@@ -1199,6 +1199,14 @@ var guide_wait := 0
 const DODGE_LOOK := 12
 const DODGE_REACT := 2
 const DODGE_WARY := 2
+## A plain told blow's reaction (663 amended (2), drafts for Jeff): a tell
+## whose kind is on companion_traits.json "dodge" "plain_tells" (the old
+## grey's told "bite") is nothing to her until she has seen it this many
+## ticks (the player's middle react), DODGE_WARY more when wary: no danger
+## cells, no dodge, no going round behind its maker (_unread). 663's
+## DODGE_REACT read every one of his bites. Every other tell (bosses', apex
+## moves, lunges) keeps DODGE_REACT.
+const DODGE_REACT_PLAIN := 6
 const DODGE_REACH := 3
 ## The cells a dodge's way is looked for in at most (685): the square two
 ## cells wider than DODGE_REACH round her.
@@ -3917,6 +3925,48 @@ func _tend_keeper_falling() -> void:
 		keeper_name(), refer(foe, false), was])
 	_log({"kind": "stance", "companion": _name_of(self), "mind": "hands", "trigger": "her player near death, a foe on them",
 		"stance": "GUARD", "outcome": "applied", "note": "the order to %s broken" % was})
+
+
+## The telegraph kinds that are plain told blows (663 amended (2)):
+## companion_traits.json "dodge" "plain_tells"; enemy-ai names a new one to
+## companions before it lands it.
+static func plain_tells() -> Array:
+	var table: Variant = CompanionCard.tables().get("dodge", {})
+	var kinds: Variant = (table as Dictionary).get("plain_tells", []) if table is Dictionary else []
+	return kinds if kinds is Array else []
+
+
+## Her reaction to a telegraph (663, 663 amended (2)): DODGE_REACT_PLAIN for
+## a kind on [param plain], else DODGE_REACT; DODGE_WARY more when wary.
+func _react_to(data: Dictionary, plain: Array) -> int:
+	return (DODGE_REACT_PLAIN if str(data.get("kind", "")) in plain else DODGE_REACT) + (DODGE_WARY if hangs_back() else 0)
+
+
+## Whether telegraph [param id] is a plain told blow she has not read yet
+## (663 amended (2)): its kind on the list, and seen fewer than its
+## reaction's ticks, or not seen at all. Until then she neither goes round
+## behind its maker (_flank_step) nor is told it can be staggered.
+func _unread(id: int) -> bool:
+	var plain := plain_tells()
+	var data: Dictionary = World.telegraphs().get(id, {})
+	if not str(data.get("kind", "")) in plain:
+		return false
+	return not _dodge_seen.has(id) or World.tick - int(_dodge_seen[id]) < _react_to(data, plain)
+
+
+## Whether telegraph [param id] is a plain told blow (663 amended (2)).
+func _plain_tell(id: int) -> bool:
+	return str(World.telegraphs().get(id, {}).get("kind", "")) in plain_tells()
+
+
+## Her own swing holding her (663 amended (2), the coordinator's (ii)): a
+## player stands World.blow_stand_ticks after each blow (688, a free body's
+## halt); she is no free body, so nothing held her. Off a plain told blow's
+## cells she steps no sooner than her last swing's stand is done (its start,
+## next_attack_tick less her attack's ticks, plus the stand).
+func _swing_holds() -> bool:
+	var began := next_attack_tick - World.attack_ticks_of(self)
+	return World.tick < began + World.blow_stand_ticks(self, &"blow")
 
 
 ## Decision 803 amended (step 4): companion_traits.json "quiet" over
@@ -7322,7 +7372,7 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 	for id: int in _dodge_seen.keys():
 		if not shown.has(id):
 			_dodge_seen.erase(id)
-	var react := DODGE_REACT + (DODGE_WARY if hangs_back() else 0)
+	var plain := plain_tells()
 	var from: GridEntity = null
 	# Her player's drawn bow (663 amended): its cone is danger too,
 	# and in it she steps clear at once.
@@ -7341,12 +7391,17 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 			continue
 		if not _dodge_seen.has(id):
 			_dodge_seen[id] = World.tick
+		var read := World.tick - int(_dodge_seen[id]) >= _react_to(data, plain)
+		if not read and str(data.get("kind", "")) in plain:
+			continue  # A plain told blow not yet read (663 amended (2)).
 		var mine := false
 		for cell: Array in data.get("cells", []):
 			var at := Vector2i(int(cell[0]), int(cell[1]))
 			_danger[at] = true
 			mine = mine or at == tile
-		if mine and World.tick - int(_dodge_seen[id]) >= react and int(data.get("lands_tick", 0)) - World.tick <= DODGE_LOOK:
+		if mine and read and str(data.get("kind", "")) in plain and _swing_holds():
+			continue  # Her swing not done: she stands, as a player's swing holds them.
+		if mine and read and int(data.get("lands_tick", 0)) - World.tick <= DODGE_LOOK:
 			from = source
 			_dodge_from = "%s's %s" % [source.name, str(data.get("kind", "blow"))]
 	if from == null:
@@ -8759,7 +8814,7 @@ func _apex_after_choose() -> void:
 		return
 	if fighting != null and current_intent == Intent.ATTACK:
 		var flank := World.flankable(fighting)
-		if flank != 0 and flank != _apex_told_flank:
+		if flank != 0 and flank != _apex_told_flank and not _unread(flank):
 			_apex_told_flank = flank
 			_narrate("%s is winding up a blow; from behind it can be staggered." % refer(fighting).capitalize())
 	if current_intent in [Intent.FOLLOW, Intent.IDLE, Intent.MINE] and stance != Stance.HOLD and order.is_empty() \
@@ -8998,7 +9053,8 @@ func _avoid_step() -> void:
 ## apex: to a free cell behind it she can strike from, out of the blow's
 ## cells; there, she strikes. True while she is at it.
 func _flank_step(target: GridEntity) -> bool:
-	if not apex(target) or World.flankable(target) == 0:
+	var tell := World.flankable(target) if apex(target) else 0
+	if tell == 0 or _unread(tell) or _plain_tell(tell) and _swing_holds():
 		return false
 	if World.in_reach(self, target) and World.is_behind(self, target):
 		World.try_attack(self, target)

@@ -396,6 +396,10 @@
 		"guide_words": {"devoted": "If they speak of one of these places or seem unsure of the way, offer to lead them.", "close": "But you follow them; you do not take the lead yet.", "fond": "But you follow them; you do not take the lead yet.", "cooling": "But you follow them; you do not take the lead.", "wary": "But you follow them; you do not take the lead.", "sullen": "But you will not lead them anywhere now.", "apart": "But you will not lead them anywhere now."},
 		"hesitate": ["Must I?", "If I have to.", "Hm. Fine.", "You're sure?"]
 	},
+	"dodge": {
+		"_note": "Her reading of told blows (decision 663 amended (2), drafts for Jeff): a telegraph whose kind is in plain_tells she steps clear of only after Companion.DODGE_REACT_PLAIN ticks; every other telegraph after DODGE_REACT. Enemy-ai names a new plain told blow to companions before it lands one.",
+		"plain_tells": ["bite"]
+	},
 	"quiet": {
 		"_note": "Her quiet moments (decision 803 amended, step 4): calm, her player near and not speaking for player_quiet_s, she is asked now and then with one thing to speak of, and may answer nothing. first_s after she comes, gap_s after any line of hers (doubled after each moment she lets pass, up to max_gap_s), new_place_s when a zone is new today, at most per_hour. focus_weights: what a moment offers, by weight, never the same twice running: sight (something she sees, not yet told of today), today (what happened lately), likes (her hobby or food), ask (a question for her player), place (where she is and the sky; least, as weather talk reads as filler). Seconds. Drafts for Jeff.",
 		"first_s": [60, 120],

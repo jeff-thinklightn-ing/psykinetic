@@ -6111,6 +6111,57 @@ func _test_dodge() -> void:
 	World.end_telegraph(id, true)
 	World.step()
 	_check(pet._danger.is_empty(), "landed: nothing showing for her")
+	# A plain told blow (663 amended (2)): a kind on the list waits
+	# DODGE_REACT_PLAIN; one not on it DODGE_REACT; the list is the JSON's.
+	_check(Companion.plain_tells() == ["bite"], "the plain told blows: companion_traits.json's list (%s)" % [Companion.plain_tells()])
+	var kind_reacts := {}
+	for kind: String in ["bite", "spin", "lunge"]:
+		_put(pet, Vector2i(10, 6))
+		pet.current_intent = Companion.Intent.FOLLOW
+		var bite_shape := {"kind": "ring", "origin": [imp.tile.x, imp.tile.y], "facing": [1, 0], "length": 2}
+		var told := World.telegraph(imp, kind, bite_shape, Companion.DODGE_LOOK)
+		var waited := -1
+		for i in Companion.DODGE_LOOK:
+			World.step()
+			if pet.current_intent == Companion.Intent.DODGE:
+				waited = i + 1
+				break
+		kind_reacts[kind] = waited
+		World.end_telegraph(told, false)
+		World.step()
+	_check(int(kind_reacts["bite"]) >= Companion.DODGE_REACT_PLAIN and int(kind_reacts["spin"]) >= Companion.DODGE_REACT
+			and int(kind_reacts["spin"]) < Companion.DODGE_REACT_PLAIN and int(kind_reacts["lunge"]) < Companion.DODGE_REACT_PLAIN,
+		"a told bite: she steps clear after %d ticks or more; a spin or a lunge (not on the list) after %d, as 663 (ticks to her dodge %s)" % [
+			Companion.DODGE_REACT_PLAIN, Companion.DODGE_REACT, kind_reacts])
+	# Her own swing holds her (663 amended (2)), as a player's holds them:
+	# a read plain tell over her during her swing's stand, no dodge; the
+	# tick it is done, she steps; another telegraph she dodges as before.
+	var swing := {}
+	for kind: String in ["bite", "spin"]:
+		_put(pet, Vector2i(10, 6))
+		pet.current_intent = Companion.Intent.FOLLOW
+		var told := World.telegraph(imp, kind, {"kind": "ring", "origin": [imp.tile.x, imp.tile.y], "facing": [1, 0], "length": 2}, Companion.DODGE_LOOK)
+		pet._dodge_seen[told] = World.tick - 100  # Read long since.
+		pet.next_attack_tick = World.tick + World.attack_ticks_of(pet)  # Her swing begun this tick.
+		var waited := -1
+		var free_at := -1
+		var held_dodges := 0
+		for i in Companion.DODGE_LOOK:
+			World.step()
+			var held := pet._swing_holds()
+			if free_at < 0 and not held:
+				free_at = i + 1
+			if pet.current_intent == Companion.Intent.DODGE:
+				held_dodges += 1 if held else 0
+				waited = i + 1
+				break
+		swing[kind] = [waited, free_at, held_dodges]
+		World.end_telegraph(told, false)
+		World.step()
+	_check(int(swing["bite"][2]) == 0 and int(swing["bite"][0]) >= int(swing["bite"][1]) and int(swing["bite"][0]) <= int(swing["bite"][1]) + 1
+			and int(swing["spin"][0]) == 1,
+		"her swing holds her off a read told bite till its stand is done (%d ticks), then she steps; a spin she dodges mid-swing as before ([ticks to her dodge, ticks to the stand's end, dodges while held] %s)" % [
+			World.blow_stand_ticks(pet, &"blow"), swing])
 	World.despawn(imp)
 	_kill_monsters()
 	_settle(pet)
@@ -6809,6 +6860,80 @@ func _test_great_bear() -> void:
 	owner.hp = hp_was
 	World.step()
 	_check(not pet._apex_broke, "both whole again, she would take it up again")
+	# A plain told blow, flank-marked (663 amended (2), the old grey's told
+	# bite): nothing to her until read; no danger cells, no going round.
+	_put(pet, Vector2i(10, 3))
+	pet._quarry = bear
+	pet.current_intent = Companion.Intent.ATTACK
+	pet.intent_target = bear
+	World._flank_guard_until.erase(bear)  # Staggered before: a fresh blow.
+	for i in 3:
+		World.step()
+	var left_over: Array[String] = []
+	var shows := World.telegraphs()
+	for id: int in shows:
+		left_over.append("%s %s" % [str(shows[id].get("kind", "")), str(shows[id].get("source", ""))])
+		World.end_telegraph(id, false)
+	World.step()
+	var clear_before := pet._danger.is_empty() and World.telegraphs().is_empty()
+	var flank_by := {}
+	var on_bite_flank := func(target: GridEntity, source: GridEntity, _id: int) -> void:
+		if target == bear:
+			flank_by["by"] = source
+	World.flanked.connect(on_bite_flank)
+	var bite := World.telegraph(bear, "bite", shape, 60, true)
+	var bite_flank := -1
+	var early := 0
+	var trace: Array[String] = []
+	for i in 30:
+		var was := pet.tile
+		World.step()
+		trace.append("%d:%s%s d%d %s" % [i + 1, pet.tile, "*" if pet.tile != was else "", pet._danger.size(), pet.intent_name()])
+		if i + 1 < Companion.DODGE_REACT_PLAIN:
+			early += pet._danger.size() + (1 if pet._flank_step(bear) else 0)
+		if flank_by.has("by"):
+			bite_flank = i + 1
+			break
+	World.end_telegraph(bite, false)
+	World.flanked.disconnect(on_bite_flank)
+	_check(clear_before and early == 0 and flank_by.get("by") == pet and bite_flank >= Companion.DODGE_REACT_PLAIN,
+		"a told bite: nothing to her for %d ticks, then she goes round behind it (left over %s; clear before %s; staggered on tick %d; %d early danger cells or flank steps; %s)" % [
+			Companion.DODGE_REACT_PLAIN, left_over, clear_before, bite_flank, early, " ".join(PackedStringArray(trace))])
+	# The told-bite fight row (663 amended (2); saturn's grey rows, 0a231c3dc:
+	# she took about a quarter of main's harm, between a careless player's and
+	# a reader's): 16 bites told as enemy-ai lays the grey's (a line from it to
+	# her cell, 7 ticks, flank-marked), each begun at another point of her
+	# swing; caught when she stands on it as it lands. A read with no hold
+	# caught none on saturn and a read after the lead all.
+	var caught := 0
+	var laid := 0
+	var held_flanks := 0
+	for n in 16:
+		bear.hp = bear.max_hp
+		World._flank_guard_until.erase(bear)
+		pet.current_intent = Companion.Intent.ATTACK
+		pet.intent_target = bear
+		for i in 3 + n % 8:
+			World.step()
+		var aim := pet.tile - bear.tile
+		var line := Telegraph.line(bear.tile, Vector2(aim).normalized(), Vector2(aim).length(), 1)
+		var struck := World.telegraph_cells(line)
+		if not pet.tile in struck:
+			continue
+		laid += 1
+		var told := World.telegraph(bear, "bite", line, 7, true)
+		for i in 7:
+			World.step()
+			if pet._swing_holds() and World.flankable(bear) == told and not pet._unread(told) and pet._flank_step(bear):
+				held_flanks += 1
+		caught += 1 if pet.tile in struck else 0
+		World.end_telegraph(told, true)
+		World.step()
+	_check(laid >= 12 and caught >= 1 and caught * 2 <= laid and held_flanks == 0,
+		"told bites beside the bear: she is caught by some, as her swing holds her, never most, and never steps round mid-stand (%d of %d caught; %d flank steps while held)" % [caught, laid, held_flanks])
+	pet._quarry = null
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
 	World.despawn(bear)
 	bear.queue_free()
 	pet.stance = stance_was

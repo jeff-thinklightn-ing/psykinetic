@@ -35417,6 +35417,43 @@ companion_test _test_dodge: a ring telegraphed over her; not before it
 nears and her reaction; clear of it before it lands; into none of it while
 it shows; nothing once it lands. Server only, protocol unchanged, no new
 class_name.
+
+663 amended (2): a plain told blow gets her own reaction (the coordinator's ruling, 11-15, on
+enemy-ai's told bite for the old grey, e39b8de36: on saturn she took 8.1 to 9.9 a fight on main and
+0.0 to 0.5 under the told bite, 663's 2 ticks reading every one of his 7-tick bites; a companion the
+grey never bites is not a person, and 663 was made for a boss's big blows, Jeff's draugr spin). A
+telegraph whose kind is on companion_traits.json "dodge" "plain_tells", today ["bite"], is nothing
+to her until she has seen it DODGE_REACT_PLAIN (6) ticks, the player's middle react, DODGE_WARY more
+when wary: its cells are no danger to her yet, she makes no dodge, and she does not go round behind
+its maker (Companion._unread, read by _read_telegraphs, _flank_step and the "can be staggered"
+narration). The first scratch gated only the named dodge, and changed nothing on saturn (the
+coordinator's rows, C:/dev/review/enemy-ai/grey/bitetell/saturn_comp663_rows.txt, to the decimal):
+the grey is an apex and his told bite flank-marked, so 780 amended (5)'s flank step took her behind
+him the tick it showed, and its cells, danger at once, kept her off them. That mended, a read on tick 6
+of his 7-tick lead still cleared every bite (saturn_comp663b_rows.txt), and a reaction of 7 cleared
+none, main's 8 to 10 (saturn_comp663c_rows.txt). So her own swing holds her as a player's holds them:
+a player stands World.blow_stand_ticks (2) after each blow (688, a free body's halt), and she, no free
+body, had nothing holding her. Off a read plain tell's cells she steps no sooner than her last swing's
+stand is done (Companion._swing_holds: its start, next_attack_tick less attack_ticks_of, plus the
+same stand): no dodge and no flank step till then. On saturn (0a231c3dc, the coordinator's pick) she
+took 1.9 to 2.7 a fight beside the grey, never down, between the careless player's 3.4 to 6.1 and the
+reader's 0.6 to 1.9. Every other telegraph keeps DODGE_REACT (2), its cells and flank at once, and is
+dodged mid-swing as before: bosses' moves, apex moves (the bear's swipe, slam
+and charge, the boar king's charge, the hill cat's pounce, the grey's lunge), robbers' lunges.
+Keyed on the tell's kind, not Monster.boss (enemy-ai: the grey, the bear, the boar king and the hill
+cat are all no boss, so a boss key would have slowed her against their big moves too). Enemy-ai
+names a new plain told blow to companions before it lands one; it needs only the JSON line. It
+lands before enemy-ai's told bite, so the bite never reaches main with her untouchable. Aims
+(drafts): under the told bite she takes between a third of main's harm and main's, never down more
+than on main; Brand's band's figures identical; the draugr's spin unchanged. companion_test
+_test_dodge: the list as the JSON gives it; a told "bite" over her cell, her dodge after
+DODGE_REACT_PLAIN ticks or more; a "spin" and a "lunge", after DODGE_REACT and before
+DODGE_REACT_PLAIN. _test_great_bear: a flank-marked "bite" from the bear, no danger cells and no flank
+step before DODGE_REACT_PLAIN, then she goes round behind and staggers it; 16 bites told as enemy-ai
+lays the grey's, at points through her swing, some catching her and never most, no flank step while
+held. _test_dodge: a read told bite during her swing's stand, no dodge till the stand is done, then
+she steps; a spin mid-swing dodged at once. Server only, protocol unchanged, no new class_name; no bullet (it rides the told
+bite's).
 ## 548 amended, enemy-ai's side: paid once, a payer fights the draugr again for no gold till won
 
 Jeff picked (b): "as long as you paid once you get unlimited attempts". The
