@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: in the evening lit windows throw their light onto the ground outside, the temple's in long strips across its forecourt; a shuttered window throws none (927).
 - Towns: walking through Umbrage, its houses come into view and drop out of it without a hitch (351 amended (2)).
 - A person's belt sits close round their tunic, whatever their build (419 amended (5)).
 - Towns: when a pedlar visits Umbrage, they keep the second stall in the square, behind its counter by day; click them across it to see their wares (711 amended (2)).
