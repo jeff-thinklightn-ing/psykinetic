@@ -52907,7 +52907,13 @@ builds match (<sha>)" or "the builds DIFFER (<kept>, <now>)", "cache kept as ...
 keep" (a game stopped, not quit, may not save it), and ends "SHOT cache: ..."; the game gets
 PSYKINETIC_PIPELINE_CACHE ("cold" or "warm from RUN"), and map_bench's "BENCH ran:" line ends
 "pipeline cache <it>" ("unknown (not a laptop runner's run)" elsewhere), so no figure is read
-without it. Bot 2 (two-bot tours) always starts cold. --gpu-sample: nvidia-smi's own loop
+without it. Bot 2 (two-bot tours) always starts cold. Two faults of the first build, met on the
+first Atlas pair and mended before its figures: the cache was looked for in <APPDATA>\vulkan, not
+user://'s folder, so a keep found nothing and, had a cache been put there by hand, every "warm" run
+would have run cold under a warm line; and remote_shot.sh's SHOT line missed runner.log's first
+line behind PowerShell's BOM and read the keep line in its place (the BOM is now stripped from the
+first line alone). Since then a warm run whose copy leaves 0 files in user://vulkan is refused
+("0 files copied"), never run cold under a warm line (the coordinator's ask). --gpu-sample: nvidia-smi's own loop
 (timestamp, pstate, graphics and memory clocks, utilization, power, temperature, once a second) into
 out\gpu-<pass>.csv, started after each pass's game, in the run's job (kill on close), stopped with
 the game by its own PID; runner.log names its pid, rows and how it ended, or "asked, no nvidia-smi

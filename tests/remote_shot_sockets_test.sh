@@ -246,6 +246,11 @@ row $(grep -qF "the builds DIFFER (0123abc kept, $sha now)" "$tmp/cache.txt"; ec
 cache idle_none warm=no_such_run
 row $(has "result: warm from no_such_run: refused, no pipeline cache kept by a run of that name on this laptop (a run keeps its own with --keep-cache)" \
 	&& [ ! -d "$runs/idle_none/appdata/Godot/app_userdata/Psykinetic/vulkan" ]; echo $?) "--warm-from a run that kept nothing: refused, nothing copied"
+mkdir -p "$runs/caches/empty_run/vulkan"
+cache idle_empty warm=empty_run
+row $(has "result: warm from empty_run: refused, 0 files copied into bot 1's user://vulkan (the kept cache holds none)"; echo $?) \
+	"a kept cache with no files: refused, never a cold run under a warm line"
+rm -rf "$runs/caches/empty_run"
 cache idle_path 'warm=..\idle_cold' keep=1
 row $(has "cache: cold (bot 1's user://vulkan empty)" && has "cache: nothing to keep (the game wrote no user://vulkan; a game stopped, not quit, may not save it)"; echo $?) \
 	"a path in opts.txt is no run's name: read as cold; and a game that wrote no cache keeps nothing"

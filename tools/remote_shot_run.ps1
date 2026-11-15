@@ -207,6 +207,12 @@ function Warm-Cache([hashtable]$opts, [string]$caches, [string]$appdata, [string
 	$vulkan = User-Vulkan $appdata
 	New-Item -ItemType Directory -Force (Split-Path $vulkan) | Out-Null
 	Copy-Item -Recurse -Force $source $vulkan
+	# A warm run that copied nothing would run cold under a "warm" line (the coordinator's ask,
+	# after the first Atlas pair's wrong folder): refused instead.
+	if (@(Get-ChildItem -Recurse -File $vulkan -ErrorAction SilentlyContinue).Count -eq 0) {
+		$why = "warm from ${from}: refused, 0 files copied into bot 1's user://vulkan (the kept cache holds none)"
+		return @{ result = $why; line = "cache: $why"; state = "" }
+	}
 	$fromBuild = try { "$(Get-Content (Join-Path $caches "$from\build.txt") -TotalCount 1 -ErrorAction Stop)".Trim() } catch { "unread" }
 	$builds = if ($fromBuild -eq $build) { "the builds match ($build)" } else { "the builds DIFFER ($fromBuild kept, $build now)" }
 	return @{ result = ""; line = "cache: warm from $from, $(Count-Files $vulkan) copied into bot 1's user://vulkan; $builds"; state = "warm from $from" }
