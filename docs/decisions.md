@@ -57744,7 +57744,14 @@ Client only; protocol unchanged; no new class_name; a bullet (voice's words) whe
   measure is one joined run on the landed sha that passes nightfall in play, with the longest frame across
   the first night draw beside the same on main.
 - Looked at: ui-design's joined stills were taken on d004cda9f, the floor before the two mends. The mends
-  draw nothing different.
+  draw nothing different. The look is C:/dev/review/ui-design/looks/floor_pairs_d004cda9f, beside main
+  3ae6678ce, at 21:30, with the player at (190,219). Three patches show at the south lancets' foot, about
+  (60, 44, 36) against main's about (33, 29, 33). His ground and his body are within 1 to 3 levels, and no
+  SHADER ERROR lines. How much a newcomer sees of it: from the first view the whole frame is nearly the
+  same picture, because the temple's lit side faces away from the start. The patch is there when you walk
+  toward it, which is what v0.1.218's line promised. The floor makes that line true, so it carries no
+  bullet of its own. What changes the first view is the lancets set against the inn's panes, a take of its
+  own.
 Client only; protocol unchanged; no new class_name.
 
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
