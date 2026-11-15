@@ -13407,6 +13407,12 @@ func _sync_residents() -> void:
 ## nobody leaves and comes back within the hour. Ties go by key: the same world gives the same
 ## order. More of rank 0 than the cap: the nearest stand, and a line once a game hour, with counts
 ## and trades only. Server only: nothing new goes on the wire.
+## 333 amended (5): a resident at work now whose trade keeps a window (_cap_working: Items.TRADES, or
+## the merchant at the store's counter) ranks 0 through the stint, so a player walking to the counter
+## meets him, and the hour's cut never holds him out. Over the cap the cap holds: keepers, then the rest
+## who must stand, then the working, and the working go first, the farthest from every player first;
+## with the keep margin, to cut the one a player walks toward, twelve must-stand or working bodies would
+## have to be nearer every player than he is.
 const CAP_KEEP_MARGIN := 6
 const CAP_SIGHT := 24
 const CAP_CUT_HOURS := 1.0
@@ -13449,12 +13455,15 @@ func _cap_pick(wanted: Dictionary, bodies: Dictionary, players: Array[Vector2i],
 		var stands := not body.is_empty()
 		var d := _cap_distance(body["tile"] if stands else _wanted_spot(each), players)
 		var rank := _cap_rank(key, each, body, d, asked)
+		var working := rank > 0 and _cap_working(key, each, now)
+		if working:
+			rank = 0  # At his window in his working stint (333 amended (5)): never held out by the hour's cut.
 		if rank > 0 and not stands and _cap_cut.has(key):
 			continue  # Cut within the hour: not back yet.
-		# The keepers first of all (never cut: a zone has a few); the rest of rank 0 by distance alone (the
-		# nearest stand when there are more than the cap); ranks 1 and 2 hold a standing body in a player's
-		# sight ahead of any candidate of its rank.
-		var tier := (-1 if _cap_keeper(key, each) else 0) if rank == 0 else rank * 2 + (0 if stands and d <= CAP_SIGHT else 1)
+		# The keepers first of all (never cut: a zone has a few); then the rest who must stand, then the working
+		# tradesmen (333 amended (5)), each by distance alone (over the cap the farthest working one goes first);
+		# ranks 1 and 2 hold a standing body in a player's sight ahead of any candidate of its rank.
+		var tier := (-2 if _cap_keeper(key, each) else (0 if working else -1)) if rank == 0 else rank * 2 + (0 if stands and d <= CAP_SIGHT else 1)
 		rows.append([tier, d - (CAP_KEEP_MARGIN if stands else 0), key, rank])
 	rows.sort_custom(func(a: Array, b: Array) -> bool:
 		if a[0] != b[0]:
@@ -13512,6 +13521,19 @@ func _cap_rank(key: String, each: Dictionary, body: Dictionary, d: int, asked: D
 	if key.begins_with(Offers.VISITOR) or key.begins_with(herder) or bool(each.get("strayed", false)):
 		return 1
 	return 2
+
+
+## Whether [param key] (a _sync_residents entry [param each]) works at a window now, at world step [param now]
+## (333 amended (5)): a trade that keeps one (Items.TRADES, or the merchant at the store's counter), not sick,
+## and his day puts him at work then. Ranks 0 through the stint, behind everyone else of rank 0 (_cap_pick).
+func _cap_working(key: String, each: Dictionary, now: float) -> bool:
+	var trade := str(each.get("trade", ""))
+	if not (trade in Items.TRADES or trade == "merchant") or bool(each.get("strayed", false)) or World.production == null:
+		return false
+	if Townsfolk.is_sick(World.production, key):
+		return false
+	return Resident.doing_at(trade, DayNight.hour(now), Season.name_at(int(now)), str(each.get("type", "")), key, Townsfolk.day_of(now),
+		Townsfolk.mood_of(World.production, key)) == Resident.Doing.WORK
 
 
 ## Whether [param key] is a keeper a player's window, locker or care hangs on (333 amended (4)): the stall's

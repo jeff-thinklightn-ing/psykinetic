@@ -6011,9 +6011,108 @@ func _test_cap_rank() -> void:
 	_check(_main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "cap-player", "trade": ""}, 50, {}) == 0
 		and _main._cap_rank("cap-x", plain, {}, 50, {"cap-x": true}) == 0,
 		"one a player leads, or one carrying a player's ask: rank 0 wherever they are")
+	_test_cap_working(now, hour, me, ids)
 	World.holdings._places.erase(hut)
 	_main._cap_cut = cut_was
 	_main._cap_over_hour = over_was
+
+
+## A world step from [param day_start] in the next 48 game hours (of [param hour] steps) when [param key] of
+## [param trade] is at work ([param working] true) or not, by Main._cap_working; -1.0 for none.
+func _cap_hour_when(key: String, trade: String, day_start: float, hour: float, working: bool) -> float:
+	var each := _cap_entry(key, Vector2i.ZERO, STORE, {"trade": trade})
+	for h in 48:
+		var t := day_start + (h + 0.5) * hour
+		if _main._cap_working(key, each, t) == working:
+			return t
+	return -1.0
+
+
+## Working tradesmen at a window (333 amended (5), the coordinator's approval, 11-14): rank 0 through
+## their stint, never held out by the hour's cut; over the cap the working go first, the farthest first.
+func _test_cap_working(now: float, hour: float, me: Array[Vector2i], ids: Dictionary) -> void:
+	print("\n== under the cap: the merchant at his counter and the smith at the forge stand through their working hours; over the cap the farthest working one goes (333 amended (5)) ==")
+	for trade: String in ["merchant", "smith"]:
+		var key := "cap-%s" % trade
+		var at_work := _cap_hour_when(key, trade, now, hour, true)
+		var off_work := _cap_hour_when(key, trade, now, hour, false)
+		_check(at_work >= 0.0 and off_work >= 0.0, "(the %s's day has working hours and others: steps %.0f and %.0f)" % [trade, at_work, off_work])
+		if at_work < 0.0:
+			continue
+		# A full town: twelve farmers standing along the square's south side, 6 cells off the road the player
+		# walks (in sight, out of a window's reach), the counter 60 cells east.
+		var square := {}
+		var standing := {}
+		for i in 12:
+			var folk := "cap-sq%02d" % i
+			square[folk] = _cap_entry(folk, Vector2i(2 * i, 6), STORE)
+			standing[folk] = {"tile": Vector2i(2 * i, 6), "escort": "", "trade": "farmer"}
+		var counter := Vector2i(60, 0)
+		var him := _cap_entry(key, counter, STORE, {"trade": trade})
+		square[key] = him
+		# The player walks from the square to the counter, a cell a step, in his working hours.
+		_main._cap_cut.clear()
+		_main._cap_cut[key] = at_work - hour * 0.25  # Cut a quarter hour ago: the hour's rule never holds him out at work.
+		var bodies := standing.duplicate(true)
+		var missing_at: Array[int] = []
+		var seen_go := 0
+		for x in range(0, counter.x - 1):
+			var player_at: Array[Vector2i] = [Vector2i(x, 0)]
+			var pick := square.duplicate()
+			_main._cap_pick(pick, bodies, player_at, ids, at_work + x * 0.01)
+			if not pick.has(key):
+				missing_at.append(x)
+			for folk: String in bodies.keys():
+				if not pick.has(folk):
+					if World.distance(bodies[folk]["tile"], player_at[0]) <= Main.CAP_SIGHT and folk != key:
+						seen_go += 1
+					bodies.erase(folk)
+			for folk: String in pick:
+				if not bodies.has(folk):
+					bodies[folk] = {"tile": (square[folk]["places"]["square"] as Rect2i).position, "escort": "", "trade": str(square[folk]["trade"])}
+		_check(missing_at.is_empty() and bodies.has(key), "cap full, the walk from the square to the counter in his working hours: the %s stands there all the way, at %d cells as within %d (missing at %s)" % [
+			trade, counter.x, Main.CAP_SIGHT, missing_at])
+		_check(bodies.size() == Main.RESIDENTS_MAX, "the cap kept: %d bodies; one farmer went for him (%d in sight then: a higher rank takes a seen one's place, 333 amended (4))" % [bodies.size(), seen_go])
+		# Twelve within a window's reach of the player (they must stand, 333 amended (4)) come before him at work.
+		_main._cap_cut.clear()
+		var reach_bodies := {}
+		var reach_town := {key: him}
+		for i in 12:
+			var folk := "cap-rc%02d" % i
+			reach_town[folk] = _cap_entry(folk, Vector2i(i % 4 - 1, i / 4 - 1), STORE)
+			reach_bodies[folk] = {"tile": Vector2i(i % 4 - 1, i / 4 - 1), "escort": "", "trade": "farmer"}
+		_main._cap_pick(reach_town, reach_bodies, me, ids, at_work)
+		_check(not reach_town.has(key) and reach_town.size() == Main.RESIDENTS_MAX,
+			"twelve standing within a window's reach of the player: they stand, the %s at work waits (who must stand before the working)" % trade)
+		# Off work he is an ordinary resident again: far off, out of sight, cut for those standing.
+		_main._cap_cut.clear()
+		var pick_off := square.duplicate()
+		_main._cap_pick(pick_off, standing, me, ids, off_work)
+		_check(not pick_off.has(key), "off work, 60 cells from the player in a full town: the %s goes, a resident like any other" % trade)
+		# Within the hour's cut, off work: kept out; at work: back.
+		_main._cap_cut.clear()
+		_main._cap_cut[key] = off_work - hour * 0.25
+		var pick_cut := square.duplicate()
+		_main._cap_pick(pick_cut, standing, [counter] as Array[Vector2i], ids, off_work)
+		_check(not pick_cut.has(key), "cut a quarter hour ago and off work: not back within the hour, the player beside the counter")
+	_main._cap_cut.clear()
+	# The order over the cap: ten companions and Rolf (who must stand, the farthest of all), two smiths at work
+	# nearer than any of them: thirteen of rank 0 with Rolf, so one goes, and it is a smith, the farther.
+	var at_work := _cap_hour_when("cap-smith-a", "smith", now, hour, true)
+	if at_work >= 0.0:
+		var crowd := {Offers.VENDOR + STORE: _cap_entry(Offers.VENDOR + STORE, Vector2i(90, 0), STORE, {"trade": ""})}
+		for i in 10:
+			crowd["companion:cap-w%02d" % i] = _cap_entry("companion:cap-w%02d" % i, Vector2i(30 + i, 0), STORE, {"player": "cap-w%02d" % i})
+		crowd["cap-smith-a"] = _cap_entry("cap-smith-a", Vector2i(12, 0), STORE, {"trade": "smith"})
+		crowd["cap-smith-b"] = _cap_entry("cap-smith-b", Vector2i(16, 0), STORE, {"trade": "smith"})
+		_main._cap_over_hour.erase(World.zone.name)
+		var pick := crowd.duplicate()
+		_main._cap_pick(pick, {}, me, ids, at_work)
+		var gone: Array = crowd.keys().filter(func(k: String) -> bool: return not pick.has(k))
+		_check(gone == ["cap-smith-b"] and pick.size() == Main.RESIDENTS_MAX,
+			"thirteen of rank 0 (Rolf, 10 companions, 2 smiths at work nearer than all): the one gone is a working smith, the farther (%s)" % [gone])
+		_check(int(_main._cap_over_hour.get(World.zone.name, -1)) == int(at_work / hour), "and the over-the-cap line printed for the hour, kinds counted")
+	_main._cap_cut.clear()
 
 
 func _test_hails() -> void:

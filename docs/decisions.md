@@ -7465,6 +7465,24 @@ is.
 - **Not changed.** The tests that seat the taverner, the healer and the rest under the cap keep their own room. town_day_test passes on maps' Mughouse take with it.
 - No bullet until a joined look: Rolf at his stall in the afternoon in a town at the cap. No package of its own; it bears on maps' Rolf-on look.
 
+333 amended (5) (label from tools/decision_number.sh; the coordinator's approval, 11-14, of economy's design answer): a tradesman at his window through his working stint ranks 0.
+- **The gap 333 amended (4) left.** The merchant at the store's counter and the smith at the forge ranked 2 out of a window's reach. A full town (Umbrage at 13 or 14 wanted at 07-11 and 14-16 with Rolf on, maps' probe of the box's ten residents) cut one or two a day. A player walking to the counter could meet it empty for up to an hour.
+- **Now.** A resident whose trade keeps a window (Items.TRADES, or the merchant) and whose day puts him at work now, not sick or strayed, ranks 0 through the stint (Main._cap_working, from the schedule at _cap_pick's step, never from where a body is). The hour's cut never holds him out while he works. Off work he is an ordinary resident again.
+- **Over the cap the cap holds; it never gives.** The order:
+  - (a) the keepers, never cut;
+  - (b) the rest who must stand: companions resting, the sought, one a player leads, an open ask's carrier or the one it is for, a body within a window's reach;
+  - (c) the working tradesmen.
+  - When (a)+(b)+(c) pass 12, (c) goes first, farthest from every player first, then (b), farthest first.
+- **The one a player walks toward.** The server has no heading, only distance. A standing body counts CAP_KEEP_MARGIN (6) cells nearer, so the one a player is closing on keeps his place: each step brings him nearer while the cut falls on the far side. To cut him, twelve must-stand or working bodies would have to be nearer every player than he is.
+- **The line.** 333 amended (4)'s "[residents] N to stand first, over the cap of 12 ..." keeps printing once a game hour per zone, kinds and trades counted, no name.
+- **Cost.** One schedule read per candidate of a trade with a window while the zone is over 12 or a cut is within its hour. Server only; nothing on the wire.
+- **Tests.** resident_test _test_cap_working (from _test_cap_rank, Main._cap_pick on made-up candidates):
+  - For the merchant and the smith in turn: cap full (twelve farmers in sight, out of reach), the player walks from the square to the counter 60 cells off in his working hours, cut a quarter hour before; he stands at every step and the cap holds at 12.
+  - Twelve within a window's reach of the player stand before him at work.
+  - Off work, 60 cells off in a full town, he goes. Cut a quarter hour ago and off work, he is not back within the hour.
+  - Thirteen of rank 0 (Rolf, ten companions, two smiths at work nearer than all): the one gone is the farther smith, and the hour's line is printed.
+- No bullet; no package of its own (it rides Rolf-on's cut with 333 amended (4)).
+
 ## 330. Loot: tables as data, named by a level or the builder; monsters drop what they carried
 
 Jeff's items step 6, as mechanism only (2026-10-15, through the
