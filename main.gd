@@ -14401,6 +14401,26 @@ func _companions_resting(place_id: String) -> Array[Dictionary]:
 	return out
 
 
+## Server: whether [param line] from [param player] is a yes to their
+## companion [param pet]'s own offer to lead, still open (929 amended (1)):
+## her offer noted within Guide.OFFER_S (_guide_offers, as _guide_said takes
+## it up), the line a yes (Guide.AGREES, not an ask), and no resident's
+## standing offer to them up (that resident keeps a yes, as the Y key does).
+## _player_said gives such a line to her, not to the nearest townsperson,
+## unless it names someone else: a newcomer's "yes" to her fishing wish
+## beside Umbrage's square went to whoever stood by.
+func _yes_to_her_offer(player: Player, pet: Companion, line: String) -> bool:
+	if pet == null or player == null:
+		return false
+	var offered: Dictionary = _guide_offers.get(pet.keeper_id, {})
+	if not offered.has("tick") or World.tick - int(offered["tick"]) > roundi(Guide.OFFER_S * World.TICK_RATE):
+		return false
+	if Guide.asks(line) or RegEx.create_from_string(Guide.AGREES).search(line) == null:
+		return false
+	var standing: Dictionary = _standing.get(player.player_id, {})
+	return standing.is_empty() or _standing_for(player.player_id, str(standing.get("worker", ""))).is_empty()
+
+
 ## Server: the resident [param player] speaks to with [param line], or
 ## null (decision 336): one it names within earshot, else the nearest within
 ## RESIDENT_EARSHOT; none when the line names [param pet] (their own
@@ -18344,10 +18364,17 @@ func _player_said(player: Player, text: String, phrase := 0, to_path := "") -> v
 	var aimed := not to_path.is_empty() and phrase == 0
 	var meant := _speaker_meant(player, to_path) if aimed else null
 	var resident: Resident = meant as Resident if aimed else (_resident_addressed(player, line, pet if hears else null) if phrase == 0 else null)
+	# A bare yes to her live offer to lead is hers (929 amended (1)), not
+	# a townsperson's beside them; one named keeps it.
+	var hers := not aimed and phrase == 0 and hears and _yes_to_her_offer(player, pet, line)
+	if hers and resident != null and not Companion._named(line, resident.person):
+		resident = null
 	if resident != null:
 		to = resident.person
 	# Or a monster that talks (the draugr, 548; decision 546, npc's side): named, or nearest within earshot.
 	var talker: GridEntity = (meant if meant is Monster else null) if aimed 		else (_monster_addressed(player, line) if resident == null and phrase == 0 else null)
+	if hers and talker != null and not Companion._named(line, _display_name(talker)):
+		talker = null
 	if talker != null:
 		to = _display_name(talker)
 	if aimed and meant == null:

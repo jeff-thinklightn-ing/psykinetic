@@ -81,6 +81,7 @@ func _ready() -> void:
 	_test_herbs()
 	_test_resident_voices()
 	_test_said_to()
+	_test_yes_to_her_offer()
 	_test_hand_in_thanked()
 	_test_means_in_voice()
 	_test_hearsay()
@@ -3630,6 +3631,71 @@ class ClaimsMind:
 	func facts(ask: Dictionary) -> Dictionary:
 		claims_asks.append(ask)
 		return claims.duplicate(true)
+
+
+## 929 amended (1): a bare yes to her live offer to lead is hers, though a
+## townsperson stands nearer; lapsed, naming the townsperson, a standing
+## offer of theirs up, or no yes, it is routed as before.
+func _test_yes_to_her_offer() -> void:
+	print("\n== a bare yes to her open offer is hers, not the townsperson's beside them (929 amended (1)) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.production.set_away("rs-bram", true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	World.production.set_away("rs-mara", false)
+	_sync()
+	var mara := _body("rs-mara")
+	var player := _player()
+	var pet := _companion()
+	if mara == null or player == null or pet == null:
+		_check(false, "(Mara in the town, a player and their companion: %s, %s, %s)" % [mara, player, pet])
+		return
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_put(pet, _main._nearest_free(player.tile + Vector2i(0, 3)))
+	var record: PlayerRecord = _main._record_of(pet)
+	var to: Dictionary = _main._wish_lead_to(record, pet) if record != null else {}
+	if to.is_empty():
+		to = {"key": "rs-test-pond", "name": "the test pond", "kind": "place"}
+	var cases := [
+		# [what, line, offer age in ticks (-1 none), a standing offer of Mara's, hers]
+		["a bare yes, her offer open", "Yes.", 0, false, true],
+		["\"sure\", her offer open", "Sure, let's go", 0, false, true],
+		["a yes after her offer lapsed", "Yes.", roundi(Guide.OFFER_S * World.TICK_RATE) + 1, false, false],
+		["a yes naming Mara", "Yes, Mara.", 0, false, false],
+		["a yes with Mara's standing offer up", "Yes.", 0, true, false],
+		["a question, her offer open", "What are you making today?", 0, false, false],
+	]
+	var results: Array[String] = []
+	var right := true
+	for each: Array in cases:
+		_main._guide_offers[pet.keeper_id] = {"day": Townsfolk.day_of(World.steps), "to": to, "tick": World.tick - int(each[2])}
+		_main._standing.erase(player.player_id)
+		if bool(each[3]):
+			_main._standing[player.player_id] = {"worker": mara.worker_id, "id": "rs-test-offer", "at": World.steps}
+		pet.guide = null
+		pet.guide_note = ""
+		_main._guides.erase(pet.keeper_id)
+		_main._resident_asks.clear()
+		_main._chat_tick.clear()
+		_main._player_said(player, str(each[1]))
+		var mara_asked: bool = _main._resident_asks.any(func(ask: Dictionary) -> bool: return int(ask["body"]) == mara.get_instance_id())
+		var took := pet.guide != null or str(to["name"]) in pet.guide_note
+		var hers: bool = took and not mara_asked
+		right = right and hers == bool(each[4]) and (hers or not took)
+		results.append("%s: %s%s" % [each[0], "hers" if hers else ("Mara's" if mara_asked else "nobody's"), "" if hers == bool(each[4]) else " (WRONG)"])
+	_check(World.distance(mara.tile, player.tile) < World.distance(pet.tile, player.tile) and World.distance(mara.tile, player.tile) <= Main.RESIDENT_EARSHOT,
+		"(Mara stands nearer than she does, within RESIDENT_EARSHOT: %d and %d off)" % [World.distance(mara.tile, player.tile), World.distance(pet.tile, player.tile)])
+	_check(right, "her offer open, a bare yes sets her off though Mara stands nearer; lapsed, naming Mara, Mara's standing offer up, or no yes, routed as before (%s)" % [results])
+	_main._guide_offers.erase(pet.keeper_id)
+	_main._standing.erase(player.player_id)
+	pet.guide = null
+	pet.guide_note = ""
+	_main._guides.erase(pet.keeper_id)
+	_main._resident_asks.clear()
+	World.despawn(mara)
 
 
 class VoiceMind:

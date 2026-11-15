@@ -57829,6 +57829,22 @@ untold, then said once water is near and a yes leads. record_keys_test's sample 
 Server only; protocol unchanged; no new class_name. The bullet, voice's, ships on a joined look: a
 fresh character, the first 30 s, her two lines read off the screen with their seconds, a "yes"
 typed, and her leading.
+
+929 amended (1): a bare yes to her open offer is hers (the script's label; the coordinator's ruling,
+from ui's Y key, 551 amended (5)). _player_said gave an unaddressed line to a townsperson within
+RESIDENT_EARSHOT (2 cells) of the player before her (_resident_addressed, decision 336), so a
+newcomer's "yes" to her fishing wish with someone standing by was the townsperson's to answer, she
+only overheard it and never set off; 934 starts every newcomer beside Umbrage's square. Now, inside
+her offer's Guide.OFFER_S (_guide_offers, as _guide_said takes it up), an unaddressed line from her
+own player that she hears and that is a yes (Guide.AGREES, not an ask) goes to her
+(Main._yes_to_her_offer), unless a resident's standing offer to that player is up (that resident
+keeps it, as with the Y key). A line naming a resident or a talking monster, a line said in a
+townsperson's window (802), and every other line are routed as before. ui-design's
+look_first_words_bubble had nobody within 2 cells at its yes, so it led. resident_test
+_test_yes_to_her_offer, Mara standing nearer than she does: "Yes." and "Sure, let's go" with her
+offer open, hers; a yes after it lapsed, "Yes, Mara.", a yes with Mara's standing offer up, and a
+question, Mara's. Server only; protocol unchanged; no new class_name; no bullet (929's covers a
+"yes" setting her off).
 ## 928. The bow's draw is one snap pull; the time after it is the aim's (combat; Jeff's report, 2026-11-14)
 
 Jeff, 21:20, as a real player: "drawing shouldnt take a long time, its a fast twitch pull, you dont really
