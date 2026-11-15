@@ -11824,6 +11824,43 @@ func _test_fishing_pose() -> void:
 	var middle := slack[slack.size() / 2] if slack.size() > 2 else Vector3.ZERO
 	var straight := slack[0].lerp(slack[-1], 0.5) if slack.size() > 2 else Vector3.ZERO
 	_check(slack.size() > 2 and middle.y < straight.y - 0.2, "waiting: the line hangs slack (%d points, %.2f m low at its middle)" % [slack.size(), straight.y - middle.y])
+	# 916's watcher: a resident at "watch" looks at the nearest float within WATCH_CELLS; past them, or at
+	# no watch, it looks ahead.
+	var watcher := Resident.new()
+	watcher.name = "WatchTestResident"
+	watcher.tile = player.tile + Vector2i(3, 0)
+	watcher.activity = "watch"
+	var seen: Variant = _rig._watched_float(watcher)
+	# It turns to face the float (the head's look has only so far to turn): from a body drawn at its cell.
+	var stand := Node3D.new()
+	stand.position = Vector3(watcher.tile.x, 0.0, watcher.tile.y)
+	var faced := _rig._watching_yaw(watcher, stand, 1.0)
+	var toward := -Vector2(bobber.global_position.x - stand.position.x, bobber.global_position.z - stand.position.z).angle() if bobber != null else 0.0
+	watcher.tile = player.tile + Vector2i(Client3D.WATCH_CELLS + 1, 0)
+	var far: Variant = _rig._watched_float(watcher)
+	watcher.tile = player.tile + Vector2i(3, 0)
+	watcher.activity = ""
+	var unwatched: Variant = _rig._watched_float(watcher)
+	var unfaced := _rig._watching_yaw(watcher, stand, 1.0)
+	stand.free()
+	_check(bobber != null and absf(angle_difference(faced, toward)) < 0.01 and is_equal_approx(unfaced, 1.0),
+			"a watcher turns to face the float (%.2f rad, the float at %.2f), and at no watch keeps its facing (%.2f)" % [faced, toward, unfaced])
+	# The look hook (--look-watch=<name>): that resident drawn watching whatever its activity; off, as it was.
+	Client3D.look_watch = String(watcher.name)
+	var hooked: Variant = _rig._watched_float(watcher)
+	var hooked_word := Client3D.work_word(watcher)
+	Client3D.look_watch = ""
+	_check(hooked is Vector3 and hooked_word == "watch" and Client3D.work_word(watcher) == "",
+			"the look hook draws that resident watching (%s, %s), and off it is as it was" % [hooked_word, hooked])
+	# Its hands (--look-hands=<name>:<right>,<left>): drawn in that resident's hands as a guard's spear is.
+	Client3D.look_hands[String(watcher.name)] = PackedStringArray(["fishing_rod", "sword"])
+	Client3D._mirror_hands(watcher)
+	var hooked_hands := [watcher.slots[Items.RIGHT_HAND], watcher.slots[Items.LEFT_HAND]]
+	Client3D.look_hands.clear()
+	_check(hooked_hands == ["fishing_rod", "sword"], "the look hook's hands drawn in that resident's hands (%s)" % [hooked_hands])
+	watcher.free()
+	_check(seen is Vector3 and bobber != null and (seen as Vector3).is_equal_approx(bobber.global_position) and far == null and unwatched == null,
+			"a watcher 3 cells off looks at the float (%s), none %d cells off (%s) or at no watch (%s)" % [seen, Client3D.WATCH_CELLS + 1, far, unwatched])
 	player.fishing = {"state": "bite", "at": player.tile + Vector2i(0, 2)}
 	for i in 2:
 		await get_tree().process_frame
@@ -13650,7 +13687,7 @@ func _test_townsfolk_spots() -> void:
 == townsfolk at their spots: sat on a seat, leant on the well, talking and listening ==")
 	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
 	var missing: Array[String] = []
-	for word: String in ["sit", "sit_talk", "sit_listen", "lean", "talk", "listen", "tend", "tend_bar", "dress", "scrape"]:
+	for word: String in ["sit", "sit_talk", "sit_listen", "lean", "talk", "listen", "tend", "tend_bar", "dress", "scrape", "watch"]:
 		var spot: Dictionary = Client3D.ACTIVITIES.get(word, {})
 		var clips: Array = spot.get("clips", [spot.get("clip", "")]) + spot.get("asides", [])
 		for key: String in ["enter", "exit"]:

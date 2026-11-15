@@ -2076,6 +2076,16 @@ const OUTLINE_STENCIL := 1
 ## cases: the compare's way round can't be read back headless.
 const BODY_MARKS := false
 static var body_marks := BODY_MARKS
+## A look's test hook (916's watcher, the coordinator's stance pick): the drawn body of the resident so named
+## plays "watch" whatever its activity (work_word), so a still can show the watcher beside a player really
+## fishing. Set by the client flag --look-watch=<name>; off by default, ignored in a release build
+## (OS.has_feature("template")); it changes nothing the server sends and no game state, only one body's drawing.
+static var look_watch := ""
+## The same hook's hands (916's string of fish, art-kit's look): {resident name: [right, left]} drawn in that
+## resident's hands on a joined client, as _mirror_hands draws a guard's spear, whatever its own hands. Set by
+## --look-hands=<name>:<right>,<left>; off by default, ignored in a release build and on the authority (there
+## the slots are the world's), so nothing sent and no game state changes.
+static var look_hands := {}
 const BODY_STENCIL := 2
 ## The through-passes' colour at full night under body_marks (623 amended
 ## (6); buildings' 21:00 still behind Snagfin's shack: the player drawn as
@@ -3687,6 +3697,13 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 			rim_pass = rim_pass.next_pass as ShaderMaterial
 	if "--body-marks" in OS.get_cmdline_user_args():
 		body_marks = true  # Stills and benches with it on (623 amended (6)).
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--look-watch=") and not OS.has_feature("template"):
+			look_watch = arg.trim_prefix("--look-watch=")  # 916's look hook: one resident drawn watching.
+		if arg.begins_with("--look-hands=") and arg.contains(":") and not OS.has_feature("template"):
+			var spec := arg.trim_prefix("--look-hands=")
+			var held_ids := spec.get_slice(":", 1).split(",")
+			look_hands[spec.get_slice(":", 0)] = PackedStringArray([held_ids[0], held_ids[1] if held_ids.size() > 1 else ""])
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
@@ -22208,7 +22225,7 @@ func _sync_puppets() -> void:
 		var at := Vector3(grid.x, _ground_height(grid), grid.y)
 		if puppet.position != at:
 			puppet.position = at
-		var yaw := _sleeping_yaw(entity, _tending_yaw(entity, _aimed_yaw(entity, -entity.shown_facing().angle())))
+		var yaw := _watching_yaw(entity, puppet, _sleeping_yaw(entity, _tending_yaw(entity, _aimed_yaw(entity, -entity.shown_facing().angle()))))
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null:
@@ -24273,7 +24290,8 @@ const QUIVER := "gear.quiver"
 ## A mirror only (never the authority: there the slots are World's and
 ## hands follows them).
 static func _mirror_hands(resident: Resident) -> void:
-	if resident.hands.is_empty():
+	var hands: PackedStringArray = look_hands.get(String(resident.name), resident.hands)  # 916's look hook first.
+	if hands.is_empty():
 		return
 	var slots := resident.slots
 	if slots.size() < Items.HANDED:
@@ -24281,7 +24299,7 @@ static func _mirror_hands(resident: Resident) -> void:
 	var changed := false
 	for i in 2:  # hands is [right, left]; the slots number them Items.RIGHT_HAND, LEFT_HAND.
 		var slot: int = [Items.RIGHT_HAND, Items.LEFT_HAND][i]
-		var id := resident.hands[i] if resident.hands.size() > i else ""
+		var id := hands[i] if hands.size() > i else ""
 		if slots[slot] != id:
 			slots[slot] = id
 			changed = true
@@ -25776,6 +25794,10 @@ const ACTIVITIES := {
 	# scraper.
 	"dress": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up"},
 	"scrape": {"clip": "Kneel_Work", "enter": "Kneel_Down", "exit": "Kneel_Up"},
+	# 916, the taught fisher: a resident watching a player fish, the left forearm folded across, the right at
+	# its side with the rod it was given, leant toward the water, its head on the float (_watched_float).
+	# (The coordinator's pick, 11-14, over a crouch at the bank, whose head the look could not lift.)
+	"watch": {"clip": "Watch", "asides": ["Fidget_Shoulders"]},
 }
 ## A hand's id that names an art slot, not an item (a work's tool).
 const ART_ID := "art:"
@@ -25795,6 +25817,8 @@ static func work_of(entity: GridEntity) -> Dictionary:
 ## The ACTIVITIES word of [param entity]'s work: a resident's activity,
 ## "sleep_side" for a companion asleep, "bandage" while it tends; "" for none.
 static func work_word(entity: GridEntity) -> String:
+	if not look_watch.is_empty() and entity is Resident and String(entity.name) == look_watch:
+		return "watch"  # 916's look hook (--look-watch): drawn watching, nothing else changed.
 	if entity is Resident and ACTIVITIES.has((entity as Resident).activity):
 		return (entity as Resident).activity
 	if entity is Companion and (entity as Companion).asleep:
@@ -26592,8 +26616,9 @@ func _sync_addressing(resident: Resident, puppet: Node3D) -> void:
 	var whom := resident.get_node_or_null(NodePath(resident.addressing)) as GridEntity if resident.addressing != "" else null
 	var body: Node3D = _puppets.get(whom.get_instance_id()) if whom != null else null
 	puppet.set_meta("addressing", resident.addressing if body != null else "")
+	var watched: Variant = _watched_float(resident) if body == null else null
 	var look := puppet.get_node_or_null("Look") as Node3D
-	if body == null and look == null:
+	if body == null and watched == null and look == null:
 		return
 	if look == null:
 		var skeletons := puppet.find_children("*", "Skeleton3D", true, false)
@@ -26620,12 +26645,47 @@ func _sync_addressing(resident: Resident, puppet: Node3D) -> void:
 		turn.target_node = turn.get_path_to(look)
 		look.set_meta("turn", turn)
 	var turn := look.get_meta("turn") as LookAtModifier3D
-	var wanted := 1.0 if body != null else 0.0
+	var wanted := 1.0 if body != null or watched != null else 0.0
 	if body != null:
 		look.global_position = _eyes_of(body)
+	elif watched != null:
+		look.global_position = watched as Vector3
 	var step := clampf((Time.get_ticks_msec() - int(look.get_meta("eased_ms", Time.get_ticks_msec()))) / 1000.0 / LOOK_EASE, 0.0, 1.0)
 	look.set_meta("eased_ms", Time.get_ticks_msec())
 	turn.influence = move_toward(turn.influence, wanted, step)
+
+
+## A resident watching someone fish (916's "watch") looks at the float: the drawn float (FishingView) of
+## the nearest other body fishing within WATCH_CELLS (Chebyshev, cells); null while it does not watch, or
+## no one near fishes (it looks ahead).
+const WATCH_CELLS := 10
+func _watched_float(resident: Resident) -> Variant:
+	if work_word(resident) != "watch" or fishing_view == null:
+		return null
+	var best: Variant = null
+	var nearest := WATCH_CELLS + 1
+	for other: GridEntity in World.sought():
+		if other == resident or other.fishing.is_empty() or not fishing_view.casts.has(String(other.name)):
+			continue
+		var away := maxi(absi(other.tile.x - resident.tile.x), absi(other.tile.y - resident.tile.y))
+		var bobber := (fishing_view.casts[String(other.name)] as Dictionary).get("float") as Node3D
+		if away < nearest and bobber != null and bobber.is_inside_tree():
+			nearest = away
+			best = bobber.global_position
+	return best
+
+
+## A watcher's facing (916): turned to the float it watches (_watched_float, where it is drawn), so the
+## head's look (LOOK_LIMIT round the face, reached only part way past about 45 degrees) has little left to
+## turn; [param yaw] while it watches none. Turned as any standing turn is (_standing_turn).
+func _watching_yaw(entity: GridEntity, puppet: Node3D, yaw: float) -> float:
+	if not entity is Resident or work_word(entity) != "watch":
+		return yaw
+	var watched: Variant = _watched_float(entity as Resident)
+	if watched == null:
+		return yaw
+	var way := Vector2((watched as Vector3).x - puppet.position.x, (watched as Vector3).z - puppet.position.z)
+	return yaw if way.length() < 0.01 else -way.angle()
 
 
 ## Where [param body]'s eyes are: its head bone as posed, else LOOK_EYES m up.

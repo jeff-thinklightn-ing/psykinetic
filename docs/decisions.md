@@ -56309,6 +56309,33 @@ Tests (production_test):
 Server only; wire unchanged (no message, RPC or replicated value is new); no new class_name. No
 CHANGELOG bullet: voice's one bullet comes with npc's switch-on.
 
+Animation's side (package "the taught fisher", lands off; the coordinator's approval, 11-14, and his
+pick of the stance, 11-14): the watcher. A resident at "watch" plays Watch
+(tools/humanoid_clips.py's Watch_Loop, 4 s, looped: the left forearm folded across the body, the
+right at its side where it holds the rod it was given, leant a little toward the water from the
+waist and neck, a slow breath; People_Watch_Loop for the people's build, its feet under the hips;
+aside Fidget_Shoulders). It faces the float it watches (Client3D._watched_float: the drawn float of
+the nearest other body fishing within WATCH_CELLS 10; _watching_yaw, after _tending_yaw in the
+facing's chain, turned as any standing turn), and its head is turned onto the float by 560's look.
+The body turns because the look alone could not reach it: LookAtModifier3D measures its limits
+(LOOK_LIMIT 70 degrees round, LOOK_LIMIT_UP 35 up and down) from the rest pose and reaches only part
+of a turn past about 45 degrees, and ui-design's first shoot had the float 74 degrees off the face.
+The look's pose exists only during the skeleton's update (skeleton_updated): read after the frame,
+the head shows the clip's pose without it, which is why the first shoot read the head at rest. Shot
+on the Atlas (ui-design, shoot916_watch4, 4 cells from the crescent's bank, read on
+skeleton_updated): once settled the body stands 0.0 to 0.1 degrees off the float and the head 1.6 to
+3.2. The crouch at the bank (Crouch_Idle), shot beside it for the pick, held its head 39 to 45
+degrees down, where a look measured from rest cannot lift it (43 degrees off in height); it is not
+taken, and a crouched watcher would be its own design line with a look measured from the clip's pose
+(LookAtModifier3D.relative), a change to every looker. A look hook for stills, test-only and off by
+default (ignored in a release build and, for hands, on the authority; nothing sent, no game state):
+--look-watch=<resident name> draws that resident watching, --look-hands=<name>:<right>,<left> its
+drawn hands (art-kit's string of fish). Nothing gives "watch" until npc's side, so nothing shows
+until the switch-on. view_test: a watcher 3 cells off looks at the float, none 11 off or at no
+watch; it turns to face the float and, at no watch, keeps its facing; "watch" among the spot words
+with its clips. Client and art only; protocol unchanged; no new class_name; no bullet (voice's comes
+with the switch-on).
+
 ## 919. Held pieces that hang
 
 A held piece is rigid in its hand socket (451): its length along +y from the grip, turned only by the hand. A piece

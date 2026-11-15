@@ -810,6 +810,14 @@ VIGIL = right_arm(0.22, -0.38, -0.36, (-1.0, 0.3, -0.3)) + left_arm(0.02, 0.04, 
 VIGIL_IN = [("spine_03", LIFT, 3.0), ("neck_01", LIFT, 2.0)] + both("clavicle", LIFT, 4.0, mirror=False)
 CLIPS["Knight_Vigil_Loop"] = {"loop": True, "keys": [
 	(t, P("Idle_Loop", 0.0, VIGIL + (VIGIL_IN if breath else []))) for t, breath in ((0.0, 0), (2.0, 1), (4.0, 0))]}
+# A resident watching a player fish (916, the taught fisher's "watch"): the left forearm folded across the
+# body (CROSSED's left arm), the right at its side where it holds the rod it was given, leant a little
+# toward the water from the waist and the neck, easing with a slow breath, 4 s. Its head is turned to the
+# float by the game (Client3D's watch look), not here.
+WATCH = CROSSED[:2] + [("spine_01", LIFT, -4.0), ("spine_02", LIFT, -3.0), ("neck_01", LIFT, -6.0), ("Head", LIFT, -6.0)]
+WATCH_EASE = [("spine_01", TILT, 2.0), ("spine_03", LIFT, 2.0), ("Head", TILT, -3.0)]
+CLIPS["Watch_Loop"] = {"loop": True, "keys": [
+	(t, P("Idle_Loop", 0.0, WATCH + (WATCH_EASE if eased else []))) for t, eased in ((0.0, 0), (2.0, 1), (4.0, 0))]}
 CLIPS["Axe_Overhead"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
 	(0.3, P("Idle_Loop", 0.0, AXE_UP)),
@@ -1255,6 +1263,7 @@ def people_copy(name: str) -> dict:
 # apart, which under his floor-length cloth read from above as a man down on one knee.
 for _name in ("Fidget_LookBack", "Fidget_Shoulders", "Fidget_Sleeve", "Fidget_ArmsCrossed", "Knight_Vigil_Loop"):
 	CLIPS["People_" + _name] = people_copy(_name)
+CLIPS["People_Watch_Loop"] = people_copy("Watch_Loop")  # 916's watcher, stood as a person stands.
 # The shift's hips go 3.5 cm aside: keyed every 0.1 s on the way over and back, so the planted feet
 # stay put between keys (a key at each end only let the left one drift 3.5 cm).
 def smooth(x: float) -> float:
