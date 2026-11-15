@@ -11,11 +11,12 @@
 	"thief": {"every": 54000, "chance": 1.0, "leave": 2, "takes": ["cloth", "ore", "wood", "food"], "gold_take": 5, "fence": 0.5, "margin": 0.4, "caught": 0.06, "caught_guard": 0.12, "lie_low_days": 30, "caught_season_days": 90, "caught_before_lying_low": 3},
 	"hail": {
 		"lively": true, "_lively": "554 amended, a trial on Jeff's word (2026-10-22): the hail's user turn allows one small everyday detail within the bound (no person, place, name, price or contradiction invented); false turns the strict sentence back on.",
-		"_note": "Residents speaking unprompted (decision 554, narrowing 336): a resident with something to say (Resident.hail_cue: a plea of their own, what the town noted today, a ruling of the lawspeaker today, the sky turning, a greeting by standing) says one line as a player first comes within talking reach that day, the lowest ask of all. on: the switch; quiet_seconds: no hail to a player who gave or took a blow this recently; minute_seconds: one hail in a player's hearing per this long, and none within it of a resident's answer to them; slow_ticks: no hails while the resident mind's last answer took longer; said_kept: how many said cues a card keeps, so the same thing is not said twice; greetings_a_day: greetings by standing a player hears in a day from the whole town (the first residents met), so a newcomer is greeted, not mobbed (the coordinator, after the soak).",
+		"_note": "Residents speaking unprompted (decision 554, narrowing 336): a resident with something to say (Resident.hail_cue: a plea of their own, what the town noted today, a ruling of the lawspeaker today, the sky turning, a greeting by standing) says one line as a player first comes within talking reach that day, the lowest ask of all. on: the switch; quiet_seconds: no hail to a player who gave or took a blow this recently; minute_seconds: one hail in a player's hearing per this long, and none within it of a resident's answer to them; slow_ticks: no hails while the resident mind's last answer took longer, timed from its send; slow_hold: seconds that stop holds before the next hail is tried and measures afresh (554 amended (3)); said_kept: how many said cues a card keeps, so the same thing is not said twice; greetings_a_day: greetings by standing a player hears in a day from the whole town (the first residents met), so a newcomer is greeted, not mobbed (the coordinator, after the soak).",
 		"on": true,
 		"quiet_seconds": 10,
 		"minute_seconds": 60,
 		"slow_ticks": 50,
+		"slow_hold": 60,
 		"said_kept": 8,
 		"greetings_a_day": 3
 	},

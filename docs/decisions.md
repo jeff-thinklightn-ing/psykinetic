@@ -22633,6 +22633,38 @@ the bound, 1 undercutting, 1 with old rain; the pleas lost their sum twice
 under either, hence the kinds gate. Jeff judges it in play; the
 nothing-invented rule stands for everything but this colour.
 
+554 amended (3) (2026-11-15, voice, npc's session stopped; the
+coordinator's ruling on voice's answer before v0.1.218): the slow-mind stop
+lapses, and is timed from the send. It was found reading 931: one answer
+over hail.slow_ticks (50 ticks, 5 s) stopped every hail in every town, for
+every player, with nothing to lift it but a click or a spoken line answered
+quickly (hails send no ask while stopped, so they could never measure
+afresh). The answer was timed from the ask's queuing, so a wait in line
+behind companions' talk (sends wait while any companion's mind is busy)
+counted as the mind's slowness. The box's first answer after a restart
+takes about 30 s while the model loads. Now Main._resident_voices stamps
+each ask "sent" as it goes to the mind, and Main._mind_answered_in times
+the answer from that. An answer over slow_ticks stops hails from its tick
+(_mind_slow_at), for hail.slow_hold seconds (townsfolk.json, 60 as the
+draft value). Past the hold, _mind_slow lets the next hail through, and
+its answer measures afresh. A quick answer while stopped (a click's, a
+spoken line's) starts them at once. A cost accepted (economy's read):
+while the mind stays slow, one hail goes out each hold and holds the mind
+while out, so a click in that window may wait behind it, the lowest ask
+(about 30 s in each 90 at the box's first answer, only while slow). Each
+stop and each start is one
+server line ("[hail] stopped: the residents' mind answered in N ticks
+(over 50)", "[hail] resumed: ..."), ticks and seconds only, no name or
+id, so the box's journal shows whether it happens. Not done: warming the
+residents' mind at boot. It shares the companions' model (Main._make_mind),
+which their warm on join already loads, and when a model loads on the
+box is Jeff's to change. resident_test's _test_hails rows: a busy
+companion's mind holds the ask unsent, its wait not counted; a slow answer
+stops hails; still stopped a tick before the hold ends, tried again at it
+with no click; a quick answer starts them. Server only; nothing
+replicated; protocol unchanged; no class_name; no bullet (a player was
+never told hails could stop).
+
 ## 555, items' side: grave goods, marked where they are minted
 
 companions' loyalty design (555, the coordinator's approval): a

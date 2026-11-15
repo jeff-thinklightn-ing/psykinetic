@@ -312,7 +312,8 @@ var _resident_asks: Array[Dictionary] = []
 ## nothing to say to a player (worker id + player id -> tick).
 var _hail_at: Dictionary = {}
 var _blow_at: Dictionary = {}
-var _mind_last_ticks := 0
+var _mind_last_ticks := 0  # The resident mind's last answer, ticks from its send (554 amended (3)).
+var _mind_slow_at := 0  # The tick of its last answer over hail.slow_ticks: hails wait hail.slow_hold from it.
 var _hail_tried: Dictionary = {}
 var _resident_fight_at: Dictionary = {}  # worker id -> the last tick a hostile was near them or their listener (675, npc's side)
 var _hail_heard: Dictionary = {}  # player id -> {cue text: day}: no two residents tell one player the same thing in a day
@@ -15569,7 +15570,7 @@ func _resident_voices() -> void:
 		var out: Dictionary = _resident_out.get(int(result.get("serial", 0)), {})
 		_resident_out.erase(int(result.get("serial", 0)))
 		if not out.is_empty():
-			_mind_last_ticks = World.tick - int(out.get("at", World.tick))  # A slow mind hails nobody (decision 554).
+			_mind_answered_in(World.tick - int(out.get("sent", out.get("at", World.tick))))  # A slow mind hails nobody (decision 554).
 			if not str(out.get("player", "")).is_empty():
 				_hail_at[str(out["player"])] = Time.get_ticks_msec()  # An answer to them is a talk: no hail within the minute.
 			_resident_answered(out, result.get("answer", {}), str(result.get("error", "")))
@@ -15593,6 +15594,7 @@ func _resident_voices() -> void:
 			_send_claims(_claims_asks.pop_front())
 		return
 	var next: Dictionary = _resident_asks.pop_front()
+	next["sent"] = World.tick  # Its answer is timed from here: its wait in line is no slowness of the mind's (554 amended (3)).
 	_resident_out[int(next["ask"]["serial"])] = next
 	var answer := _resident_mind.voice(next["ask"])
 	if not answer.is_empty():
@@ -21968,6 +21970,35 @@ func _crypt_asks(town: String, player_id: String) -> Dictionary:
 	return {"offering": gold, "runner": runner}
 
 
+## Server: the resident mind answered an ask [param ticks] after it was
+## sent (554 amended (3)). Over hail.slow_ticks, hails stop (_mind_slow) for
+## hail.slow_hold from now; a quick one while they are stopped starts them
+## again. Each stop and each start is one log line, ticks only, no name.
+func _mind_answered_in(ticks: int) -> void:
+	var slow := int(Townsfolk.rules().get("hail", {}).get("slow_ticks", 50))
+	if ticks > slow:
+		if _mind_last_ticks <= slow:
+			print("[hail] stopped: the residents' mind answered in %d ticks (over %d)" % [ticks, slow])
+		_mind_slow_at = World.tick
+	elif _mind_last_ticks > slow:
+		print("[hail] resumed: the residents' mind answered in %d ticks" % ticks)
+	_mind_last_ticks = ticks
+
+
+## Server: whether hails wait on a slow mind (554 amended (3)): its last
+## answer came over hail.slow_ticks, less than hail.slow_hold seconds ago.
+## Past the hold the stop lapses (one log line) and the next hail's answer
+## measures afresh.
+func _mind_slow(rules: Dictionary) -> bool:
+	if _mind_last_ticks <= int(rules.get("slow_ticks", 50)):
+		return false
+	if World.tick - _mind_slow_at < int(float(rules.get("slow_hold", 60)) * World.TICK_RATE):
+		return true
+	print("[hail] resumed: %d s after the residents' mind answered in %d ticks" % [int((World.tick - _mind_slow_at) / float(World.TICK_RATE)), _mind_last_ticks])
+	_mind_last_ticks = 0
+	return false
+
+
 ## Server, on the world tick: a player with a crypt commission standing
 ## within reach of the barrow's Altar (the offering laid) or of the Runner's
 ## pack (the runner's fate found) has met it (Offers.crypt_done).
@@ -21976,7 +22007,8 @@ func _crypt_asks(town: String, player_id: String) -> Dictionary:
 ## (Resident.hail_cue: a plea, the town's news, a ruling, the sky, a
 ## greeting) hails the first player within TALK_REACH it has not hailed
 ## today, as the lowest ask of all: none while any ask waits or is out, or
-## the mind's last answer came slower than hail.slow_ticks, and none to a
+## for hail.slow_hold after the mind's last answer came slower than
+## hail.slow_ticks (_mind_slow), and none to a
 ## player led, fighting, in a talk, or hailed within hail.minute_seconds.
 ## One a tick. The card remembers (Resident.hail_done); the answer takes
 ## 336's spoken path (_resident_answered: the words and the aside).
@@ -21988,7 +22020,7 @@ func _hails_tick() -> void:
 		return
 	_balance_hails()  # The herder's word of the wolves, ahead of the mind's hails (761, npc's side (2)).
 	_sought_cries(rules)  # A town's cry for the one it seeks (613 amended (7)), said straight, no mind.
-	if not _resident_asks.is_empty() or not _resident_out.is_empty() or _mind_last_ticks > int(rules.get("slow_ticks", 50)):
+	if not _resident_asks.is_empty() or not _resident_out.is_empty() or _mind_slow(rules):
 		return
 	var now_msec := Time.get_ticks_msec()
 	var now := World.production.now()

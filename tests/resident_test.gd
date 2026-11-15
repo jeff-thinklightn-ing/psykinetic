@@ -3648,6 +3648,23 @@ class BusyMind:
 		return what == "voice"
 
 
+## A mind that answers later, as Ollama's does: voice() gives nothing at
+## once; each answer put in results comes out of take_results.
+class LateMind:
+	extends CompanionMind
+	var asks: Array[Dictionary] = []
+	var results: Array[Dictionary] = []
+
+	func voice(ask: Dictionary) -> Dictionary:
+		asks.append(ask)
+		return {}
+
+	func take_results() -> Array[Dictionary]:
+		var out := results.duplicate()
+		results.clear()
+		return out
+
+
 ## A town far from everyone has no bodies, and is not in play: a raid on
 ## it takes its people off the record (decision 355). The room is small,
 ## so the distances are made small (Main.recall_tiles, retire_tiles).
@@ -6295,6 +6312,7 @@ func _test_hails() -> void:
 	_check(_main._resident_asks.is_empty(), "a blow given just now: nothing")
 	_main._blow_at.clear()
 	_main._mind_last_ticks = 999
+	_main._mind_slow_at = World.tick
 	_main._hails_tick()
 	_check(_main._resident_asks.is_empty(), "the mind slow over its last answer: nothing")
 	_main._mind_last_ticks = 0
@@ -6348,6 +6366,56 @@ func _test_hails() -> void:
 	_main._resident_voices()
 	_check(spoken.has("Mara: " + fixed) and _main._resident_asks.is_empty(), "931: a slow mind: the waiting greeting said as its fixed line, not dropped (%s)" % [spoken])
 	_main._claims_asks.clear()  # Her line heard by those near (378): nothing of this left for the checks after.
+	_main._claims_out.clear()
+	# 554 amended (3): the mind is timed from the send, so a wait in line (a companion's talk ahead) is no
+	# slowness; a slow answer stops hails for hail.slow_hold, then they are tried again with no click.
+	var rules: Dictionary = Townsfolk.rules().get("hail", {})
+	var slow := int(rules.get("slow_ticks", 50))
+	var hold := int(float(rules.get("slow_hold", 60)) * World.TICK_RATE)
+	_check(hold > slow, "554am3: the hold is the rules' slow_hold, longer than slow_ticks (%d, %d)" % [hold, slow])
+	var late := LateMind.new()
+	_main._resident_mind = late
+	_main._mind_last_ticks = 0
+	var pet := Companion.new()
+	pet.mind = BusyMind.new()
+	_main._companions["slow-test"] = pet
+	_main._resident_asks.append({"body": 0, "ask": {"serial": 9301, "trigger": "x", "speaker": "Someone"}, "at": World.tick - (slow + 20), "player": "", "peer": -1})
+	_main._resident_voices()
+	_check(late.asks.is_empty() and _main._resident_asks.size() == 1, "554am3: a companion's mind busy: the ask waits in line, unsent")
+	_main._companions.erase("slow-test")
+	pet.free()
+	_main._resident_voices()
+	_check(late.asks.size() == 1 and _main._resident_out.has(9301), "554am3: sent once she is done")
+	late.results.append({"serial": 9301, "answer": {}, "error": ""})
+	_main._resident_voices()
+	_check(_main._mind_last_ticks == 0 and not _main._mind_slow(rules), "554am3: timed from the send, its wait in line not counted: no stop (%d)" % _main._mind_last_ticks)
+	_main._resident_asks.append({"body": 0, "ask": {"serial": 9302, "trigger": "x", "speaker": "Someone"}, "at": World.tick, "player": "", "peer": -1})
+	_main._resident_voices()
+	_main._resident_out[9302]["sent"] = World.tick - (slow + 30)  # (The clock is left alone: a minute's ticks would move the town.)
+	late.results.append({"serial": 9302, "answer": {}, "error": ""})
+	_main._resident_voices()
+	_check(_main._mind_last_ticks == slow + 30 and _main._mind_slow_at == World.tick, "554am3: a slow answer measured and the stop's tick kept (%d)" % _main._mind_last_ticks)
+	again.call()
+	_main._hail_at.clear()
+	_main._hail_heard.clear()
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "554am3: the mind slow over its last answer: no hail")
+	_main._mind_slow_at = World.tick - hold + 1
+	_main._hails_tick()
+	_check(_main._resident_asks.is_empty(), "554am3: still within the hold: no hail")
+	_main._mind_slow_at = World.tick - hold
+	_main._hails_tick()
+	trigger = str(_main._resident_asks[0]["ask"].get("trigger", "")) if not _main._resident_asks.is_empty() else ""
+	_check(_main._resident_asks.size() == 1 and trigger.begins_with("hail:") and _main._mind_last_ticks == 0,
+		"554am3: the hold past, with no click: her hail tried again, the stop lapsed (%s)" % trigger)
+	_main._resident_asks.clear()
+	_main._mind_answered_in(slow + 1)
+	_check(_main._mind_slow(rules), "554am3: slow again: stopped again")
+	_main._mind_answered_in(3)
+	_check(not _main._mind_slow(rules) and _main._mind_last_ticks == 3, "554am3: a quick answer (a click's, a spoken line's) starts them at once")
+	_main._resident_out.clear()
+	_main._mind_last_ticks = 0
+	_main._claims_asks.clear()
 	_main._claims_out.clear()
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
