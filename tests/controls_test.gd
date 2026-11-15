@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
 	_test_bow_click_walks()
+	await _test_lob_tap_through_main()
 	_test_friend_click()
 	_test_peaceable_click()
 	_test_bubble_click_goes_through()
@@ -754,6 +755,71 @@ func _test_bow_click_walks() -> void:
 	_check(not World.free_held(player), "let down: it walks again")
 	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
 	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")
+	Net.controls = saved
+
+
+## 677 amended (4): a quick right click with a bow, through Main's own input with frames between
+## (Main._process runs; nothing per frame touches a lob, so the press and release go to Main's
+## handler with the frame's pick set): let go at 1, 2, 3 or 4 ticks, the body stays drawn at the
+## sky, Main holds the arc on the cell let go at (lob_let_at), and the lob goes up at tick 5 there.
+func _test_lob_tap_through_main() -> void:
+	print("\n== a quick right click with a bow lobs at its first step, on the cell let go at (677 amended (4)) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var outdoor_was := World.fields.outdoor
+	World.fields.outdoor = true
+	var cell := Vector2i(7, 3)
+	var rows := []
+	for early: int in [1, 2, 3, 4]:
+		_main._stance = ""
+		World.try_stance(player, "")
+		player.lob_held = World.NO_CELL
+		player.bow_ready_tick = World.tick
+		var lobs := World._lobs.size()
+		_main._pick_grid = Vector2(cell) + Vector2(0.1, 0.1)
+		var right := InputEventMouseButton.new()
+		right.button_index = MOUSE_BUTTON_RIGHT
+		right.pressed = true
+		_main._unhandled_input(right)
+		var drew := World.tick
+		for i in early:
+			await get_tree().process_frame
+			World.step()
+		_main._pick_grid = Vector2(cell) + Vector2(0.1, 0.1)
+		var up := InputEventMouseButton.new()
+		up.button_index = MOUSE_BUTTON_RIGHT
+		up.pressed = false
+		_main._unhandled_input(up)
+		var held: bool = player.raised == "draw" and player.lobbing and player.lob_held == cell and _main.lob_let_at == cell and _main._stance == ""
+		var at := -1
+		var landed_at := World.NO_CELL
+		for i in 8:
+			await get_tree().process_frame
+			World.step()
+			if World._lobs.size() > lobs:
+				at = World.tick - drew
+				var m := RegEx.create_from_string("^lob: \\S+ at \\((\\d+), (\\d+)\\)").search(World.last_log)
+				if m != null:
+					landed_at = Vector2i(int(m.get_string(1)), int(m.get_string(2)))
+				break
+		rows.append([early, held, at, landed_at, player.raised])
+		for i in 12:
+			World.step()
+	print("  right taps: %s" % [rows])
+	_check(rows.all(func(r: Array) -> bool: return r[1] and r[2] == 5 and r[3] == cell and r[4] == ""),
+			"a quick right click let go at 1, 2, 3 or 4 ticks: drawn at the sky till tick 5, the arc held on the cell let go at, the lob up at 5 there (%s)" % [rows])
+	World.fields.outdoor = outdoor_was
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	player.stamina = player.max_stamina  # The lobs' cost paid back, for the rows after.
+	_main.lob_let_at = Main.NONE
+	for i in 20:
+		World.step()  # The last lob down.
+	_stop_walk()
 	Net.controls = saved
 
 

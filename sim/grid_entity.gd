@@ -165,6 +165,15 @@ var loose_held := NAN
 ## client draws again at once); World._tend_held_looses sets it once the shot has flown and the bow allows.
 ## A let-down (stance "") clears it. The server's alone.
 var draw_queued := false
+## A lob let go before its first step, held (677 amended (4), the flat loose's 928 rule): the cell it
+## was aimed at, lobbed the tick its first step counts (World._tend_held_looses); World.NO_CELL for
+## none. The server's alone.
+var lob_held := Vector2i(-99999, -99999)
+## The other kind's whole tap asked while a shot is held, or a lob asked in loose_recover (677 amended
+## (4)): {"lob": bool, "let": bool, "angle": float, "cell": Vector2i}, replayed once the held shot has
+## gone and the string hand is back (World._tend_held_looses): drawn, and if "let" (its release in)
+## held at what it was let go at. {} for none; one at a time. The server's alone.
+var shot_queued := {}
 ## Server: a shield bash (World.try_bash, decision 379) is ready again at
 ## this tick, and until bash_moment_until its raised shield is down for the
 ## bash's moment (World.guarding finds no guard).

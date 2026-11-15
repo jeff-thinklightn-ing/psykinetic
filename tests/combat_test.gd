@@ -65,6 +65,7 @@ func _ready() -> void:
 	_test_draw_held()
 	_test_snap_draw()
 	_test_lob()
+	_test_lob_tap()
 	_test_free_blows()
 	_test_click_away()
 	_test_wind_up_kept()
@@ -1649,7 +1650,11 @@ func _test_lob() -> void:
 			"under a roof: nothing loosed, the stance ended")
 	World.try_stance(host, "draw", true)
 	host.raised_tick = World.tick - 2
-	_check(not World.try_lob(host, Vector2i(5, 1)), "let go before its first step: nothing")
+	var lobs_before := World._lobs.size()
+	_check(World.try_lob(host, Vector2i(5, 1)) and host.lob_held == Vector2i(5, 1) and host.raised == "draw" and host.lobbing and World._lobs.size() == lobs_before,
+			"let go before its first step: held on its cell, still drawn, nothing up yet (677 amended (4); _test_lob_tap)")
+	host.lob_held = World.NO_CELL
+	World.try_stance(host, "")
 	World.fields.outdoor = false
 	_check(not World.lob_open(Vector2i(5, 1)), "indoors: nowhere to come down")
 	World.lob_landed.disconnect(on_landed)
@@ -1657,6 +1662,245 @@ func _test_lob() -> void:
 	var b := Vector3(10, 0, 0)
 	_check(World.lob_point(a, b, 0.0) == a and World.lob_point(a, b, 1.0) == b and World.lob_point(a, b, 0.5).y > 3.0,
 			"lob_point: from the bow to the ground, 2.5 m up at its middle over 10 m (%s)" % World.lob_point(a, b, 0.5))
+
+
+## 677 amended (4): the lob takes the flat loose's 928 rule. A right tap let go before the
+## first step keeps its cell and stance and lobs the tick that step counts, the step-0 lob
+## exactly (an 8-tick hold is step 0 too; 12 ticks is step 1); a let-down after the release
+## keeps it; a blow before then drops it; a closed aim lobs nothing and prints nothing; taps in
+## a row never lob faster than the flat cycle looses; the other kind's tap inside a held shot
+## waits whole and is replayed at what it was let go at (both crossings), cleared by a let-down
+## before its release, dropped with nothing loosed by a blow or the bow leaving the hand.
+func _test_lob_tap() -> void:
+	print("\n== a quick right click lobs: held to the first step, the step-0 lob; the crossings with the flat shot wait whole (677 amended (4)) ==")
+	var e := _build(["####################", "#P.......m.........#", "####################"])
+	World.fields.outdoor = true
+	var host: GridEntity = e["P"][0]
+	var mark: GridEntity = e["m"][0]
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	World.set_arts(host, {})
+	var verb := Items.verb_of("bow")
+	var aim := Vector2i(7, 1)  # 6 cells east, inside the first step's 9.
+	var flat := []
+	var on_loose := func(by: GridEntity, angle: float, step: int) -> void:
+		if by == host:
+			flat.append([World.tick, step, angle])
+	World.loosed.connect(on_loose)
+	# The lob loose lines _log wrote since the last call (seen[0]: World.logged then).
+	var seen := [World.logged]
+	var lobs_since := func() -> Array:
+		var fresh := mini(World.logged - int(seen[0]), World.recent_logs.size())
+		seen[0] = World.logged
+		var out := []
+		for line: String in World.recent_logs.slice(World.recent_logs.size() - fresh):
+			if line.begins_with("lob: ") and " falls in a circle " in line:  # The loose's line; a fall's hit reads "lob: X's hits".
+				out.append(line)
+		return out
+	var ready := func() -> void:
+		World.try_stance(host, "")
+		host.loose_held = NAN
+		host.lob_held = World.NO_CELL
+		host.shot_queued = {}
+		host.draw_queued = false
+		host.stamina = host.max_stamina
+		mark.hp = 500
+		for i in 12:
+			World.step()
+		host.bow_ready_tick = World.tick
+		flat.clear()
+		lobs_since.call()
+	var circle := func(line: String) -> String:
+		var m := RegEx.create_from_string("falls in a circle ([0-9.]+) \\(step (\\d+)\\)").search(line)
+		return "%s step %s" % [m.get_string(1), m.get_string(2)] if m != null else "?"
+	var falls_of := func(line: String) -> int:
+		var m := RegEx.create_from_string(", (\\d+) falls").search(line)
+		return int(m.get_string(1)) if m != null else -1
+	# (1) Taps let go at 1, 2, 3 and 4 ticks: each lobs at tick 5, on the cell let go at, as the step-0 lob.
+	ready.call()
+	host.raised_tick = World.tick
+	var step0 := ""
+	host.raised = "draw"
+	host.lobbing = true
+	host.raised_tick = World.tick - 5
+	step0 = "%.1f step 0" % World.lob_circle_at(host, aim)
+	host.raised = ""
+	host.lobbing = false
+	var taps := []
+	for early: int in [1, 2, 3, 4]:
+		ready.call()
+		World.try_stance(host, "draw", true)
+		var began := World.tick
+		for i in early:
+			World.step()
+		var held := World.try_lob(host, aim) and host.lob_held == aim and host.raised == "draw"
+		var at := -1
+		var line := ""
+		for i in 8:
+			World.step()
+			var got: Array = lobs_since.call()
+			if not got.is_empty():
+				at = World.tick - began
+				line = got[0]
+				break
+		taps.append([early, held, at, circle.call(line), falls_of.call(line), ("at %s" % aim) in line])
+	_check(taps.all(func(t: Array) -> bool: return t[1] and t[2] == 5 and t[3] == step0 and t[4] == int(verb.get("lob_volley", 3)) and t[5]),
+			"a right tap let go at 1, 2, 3 or 4 ticks: held, and lobbed at tick 5 on the cell let go at, the step-0 lob exactly (%s falls in a circle %s) (%s)" % [verb.get("lob_volley", 3), step0, taps])
+	# Holding still buys something: 8 ticks is still step 0; 12 is step 1, its circle narrower.
+	var holds := []
+	for hold: int in [8, 12]:
+		ready.call()
+		World.try_stance(host, "draw", true)
+		for i in hold:
+			World.step()
+		World.try_lob(host, aim)
+		var got: Array = lobs_since.call()
+		holds.append([hold, circle.call(got[0] if not got.is_empty() else "")])
+	host.raised = "draw"
+	host.lobbing = true
+	host.raised_tick = World.tick - 12
+	var step1 := "%.1f step 1" % World.lob_circle_at(host, aim)
+	host.raised = ""
+	host.lobbing = false
+	_check(holds[0][1] == step0 and holds[1][1] == step1 and step1 != step0,
+			"an 8-tick hold is still step 0 (%s); 12 ticks is step 1, a narrower circle (%s) (%s)" % [step0, step1, holds])
+	# A let-down after the release keeps it; a blow before tick 5 drops it.
+	ready.call()
+	World.try_stance(host, "draw", true)
+	var began_down := World.tick
+	World.step()
+	World.try_lob(host, aim)
+	World.try_stance(host, "")  # The right button's own let-down, or Shift let go.
+	var kept_at := -1
+	for i in 8:
+		World.step()
+		if not lobs_since.call().is_empty():
+			kept_at = World.tick - began_down
+			break
+	_check(kept_at == 5, "let go, then let down: the lob still goes up at tick 5 (%d)" % kept_at)
+	ready.call()
+	World.try_stance(host, "draw", true)
+	World.step()
+	World.try_lob(host, aim)
+	World.knock_down(host, mark, 1)
+	var after_blow := []
+	for i in 8:
+		World.step()
+		after_blow.append_array(lobs_since.call())
+	_check(after_blow.is_empty() and host.lob_held == World.NO_CELL, "a blow before tick 5: dropped, nothing lobbed (%s)" % [after_blow])
+	for i in 30:
+		World.step()  # Up again.
+	# (5) A closed aim lobs nothing and prints nothing.
+	ready.call()
+	World.fields._roofed[aim] = true
+	World.try_stance(host, "draw", true)
+	World.step()
+	World.try_lob(host, aim)
+	var logged_was := World.logged
+	for i in 8:
+		World.step()
+	_check(lobs_since.call().is_empty() and World.logged == logged_was and host.raised == "" and host.lob_held == World.NO_CELL,
+			"a tap at a roofed cell: at tick 5 nothing lobbed and nothing printed, the stance ended (logged %d -> %d)" % [logged_was, World.logged])
+	World.fields._roofed.erase(aim)
+	# (2) Cadence: right taps one after another, each pressed the first tick it may be and let go the next, never
+	# lob closer together than the flat cycle looses (928: 6 ticks); a lob's first step is at 5, so 7.
+	ready.call()
+	var lob_ticks: Array[int] = []
+	var pressed_at := -99
+	for i in 40:
+		if pressed_at == World.tick - 1:
+			World.try_lob(host, aim)
+		elif host.raised == "" and host.shot_queued.is_empty() and pressed_at < World.tick - 1:
+			World.try_stance(host, "draw", true)
+			pressed_at = World.tick
+		World.step()
+		if not lobs_since.call().is_empty():
+			lob_ticks.append(World.tick)
+	var gaps := []
+	for i in range(1, lob_ticks.size()):
+		gaps.append(lob_ticks[i] - lob_ticks[i - 1])
+	_check(gaps.size() >= 3 and gaps.all(func(g: int) -> bool: return g >= 6), "right taps in a row: lobs %s ticks apart, none closer than the flat's 6" % [gaps])
+	# (3) A right tap inside a held flat loose: the flat flies at 4; the lob waits whole, drawn when the string hand
+	# is back (2 ticks) and lobbed at its first step (5) on the cell let go at.
+	ready.call()
+	World.try_stance(host, "draw")
+	var drew_flat := World.tick
+	World.step()
+	World.try_loose(host, 0.0)
+	var queued_lob := not World.try_stance(host, "draw", true) and not host.shot_queued.is_empty()
+	World.step()
+	var let_lob := World.try_lob(host, aim) and bool(host.shot_queued.get("let", false))
+	World._relocate(host, Vector2i(2, 1))  # Stepped since: the lob still comes down on the cell let go at.
+	var lob_at := -1
+	var lob_line := ""
+	for i in 16:
+		World.step()
+		var got: Array = lobs_since.call()
+		if not got.is_empty():
+			lob_at = World.tick
+			lob_line = got[0]
+			break
+	World._relocate(host, Vector2i(1, 1))
+	var flat_at: int = flat[0][0] if not flat.is_empty() else -1
+	_check(queued_lob and let_lob and flat_at - drew_flat == 4 and lob_at - flat_at == 2 + 5 and ("at %s" % aim) in lob_line,
+			"a right tap inside a held flat loose: the flat at 4 (%d), the lob waits and goes up 2 + 5 ticks after it (%d), on the cell let go at though the body stepped since (%s)" % [flat_at - drew_flat, lob_at - flat_at, lob_line])
+	# A Shift-left tap inside a held lob: the lob at 5; the flat waits whole, drawn 2 ticks after, flown at its first step (4),
+	# at the angle let go at though the body has turned since.
+	ready.call()
+	World.try_stance(host, "draw", true)
+	var drew_lob := World.tick
+	World.step()
+	World.try_lob(host, aim)
+	var queued_flat := not World.try_stance(host, "draw") and not host.shot_queued.is_empty()
+	World.step()
+	var let_flat := World.try_loose(host, 0.3) and bool(host.shot_queued.get("let", false))
+	host._world_set_facing(Vector2i(-1, 0))  # Turned away since.
+	lob_at = -1
+	for i in 16:
+		World.step()
+		if lob_at < 0 and not lobs_since.call().is_empty():
+			lob_at = World.tick
+		if not flat.is_empty():
+			break
+	flat_at = flat[0][0] if not flat.is_empty() else -1
+	_check(queued_flat and let_flat and lob_at - drew_lob == 5 and flat_at - lob_at == 2 + 4 and not flat.is_empty() and is_equal_approx(flat[0][2], 0.3),
+			"a Shift-left tap inside a held lob: the lob at 5 (%d), the flat waits and flies 2 + 4 ticks after it (%d), at the angle let go at (%s)" % [lob_at - drew_lob, flat_at - lob_at, flat])
+	# Let down before its release: nothing replayed.
+	ready.call()
+	World.try_stance(host, "draw", true)
+	World.step()
+	World.try_lob(host, aim)
+	World.try_stance(host, "draw")
+	World.try_stance(host, "")  # Shift let go before the left was.
+	var late := World.try_loose(host, 0.0)
+	for i in 16:
+		World.step()
+	_check(not late and flat.is_empty() and host.shot_queued.is_empty() and host.raised == "",
+			"a queued tap let down before its release: the lob goes up, nothing replayed after it, the late release takes nothing (%s)" % [flat])
+	# A blow, or the bow leaving the hand, between the two: the queued shot dropped, nothing loosed.
+	var dropped := []
+	for how: String in ["a blow", "the bow gone"]:
+		ready.call()
+		World.try_stance(host, "draw", true)
+		World.step()
+		World.try_lob(host, aim)
+		World.try_stance(host, "draw")
+		World.try_loose(host, 0.0)
+		var bow := 0
+		if how == "a blow":
+			World.knock_down(host, mark, 1)
+		else:
+			bow = World.take_item(host, host, Player.RIGHT_HAND)
+		for i in 16:
+			World.step()
+		dropped.append([how, flat.duplicate(), host.shot_queued.is_empty()])
+		if bow != 0:
+			World.put_item(host, host, Player.RIGHT_HAND, bow)
+		for i in 30:
+			World.step()
+	_check(dropped.all(func(d: Array) -> bool: return d[1].is_empty() and d[2]), "a queued shot with a blow or the bow gone before its turn: dropped, nothing loosed (%s)" % [dropped])
+	World.loosed.disconnect(on_loose)
+	World.fields.outdoor = false
 
 
 ## The bow held (decision 669): at full draw or past it the holder's

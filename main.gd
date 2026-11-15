@@ -741,6 +741,9 @@ var _aim_fixed := Vector2(NAN, NAN)
 ## The loose is sent and the server may hold it till the draw counts (decision 928, hold_from):
 ## the aim (and the body turned by it) stays where it was let go until the draw drops.
 var _loose_sent := false
+## The cell a lob was let go at while the body still lobs (677 amended (4): a tap before the
+## first step is held by the server till then): the arc and ring hold on it; NONE otherwise.
+var lob_let_at := NONE
 ## When the arc first showed, for its fade-in (msec).
 var _aim_since := 0
 ## The 2D view's arc, made on first use.
@@ -2194,6 +2197,7 @@ func _raise_off_hand(player: Player) -> bool:
 ## at the sky (a "stance" command with "lob").
 func _raise_lob(player: Player) -> void:
 	_stance = "lob"
+	lob_let_at = NONE
 	_toss_target = null
 	World.command(player, "stance", {"kind": "draw", "lob": true})
 
@@ -2206,10 +2210,12 @@ func _show_lob(player: Player, lobbing: bool) -> void:
 	if _client3d == null:
 		return
 	if not lobbing:
+		lob_let_at = NONE
 		_client3d.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
 		return
-	var cell := World.lob_aim(player, _mouse_tile())
-	var radius := World.lob_circle_at(player, _mouse_tile())
+	var aimed := lob_let_at if lob_let_at != NONE else _mouse_tile()  # 677 amended (4): let go, it holds there.
+	var cell := World.lob_aim(player, aimed)
+	var radius := World.lob_circle_at(player, aimed)
 	var puppet: Node3D = _client3d._puppets.get(player.get_instance_id())
 	var from: Vector3 = _client3d._bow_tip(puppet) if puppet != null else Vector3(player.tile.x, 1.1, player.tile.y)
 	var apex := float(Items.verb_of(World.drawn_with(player)).get("lob_apex", 0.25))
@@ -2264,6 +2270,7 @@ func _lower_off_hand(player: Player) -> void:
 	elif _stance == "lob":
 		var at := _mouse_tile()
 		World.command(player, "lob", {"at": [at.x, at.y]})  # 677: the server draws it in to the reach.
+		lob_let_at = at  # 677 amended (4): let go before the first step, the lob waits for it on this cell.
 	elif _stance == "block":
 		World.command(player, "stance", {"kind": ""})
 	_stance = ""

@@ -36001,6 +36001,55 @@ knockdown, one stepped out missed, a draugr staggered, roof and indoors refused,
 controls_test (RMB held lobs, the left button and Shift leave it, RMB let go looses, the controls
 line); view_test (the aim shown and hidden; the arrow above the bow mid-flight, down in the cell
 nose first).
+
+677 amended (4): a quick right click lobs; the lob takes the flat loose's held rule (the
+coordinator's approval, 2026-11-15, after the v0.1.218 checklist's known line "a quick right
+click with a bow does nothing"; label from tools/decision_number.sh). A right tap let go before
+the lob's first step (5 ticks) reached try_lob with no step, which ended the stance and lobbed
+nothing, without a word. Now, by 928's rule for the flat loose (hold_from 0):
+
+- **Held**: try_lob before the first step keeps the cell let go at (GridEntity.lob_held,
+  the server's alone; World.NO_CELL for none) and the stance; _tend_held_looses lobs it the tick
+  the first step counts. A second release before then takes the newer cell. A tap's lob is the
+  first step's lob exactly, never better: the step-0 circle (lob_circle[0] 2.5 by the aim's
+  share of the reach, 677 amended (3)), the verb's 3 falls, the flight ticks by distance. An
+  8-tick hold is still step 0 (the lob's first step is at 5, its second at 11), so the tour's
+  "3 falls in a circle 2.5 ... from 11 ticks" was a step-0 lob, not a held one; 12 ticks is step
+  1, the circle 1.0.
+- **Committed**: once let go, a let-down (stance "") leaves it; only the draw ending drops it,
+  with nothing lobbed (struck or knocked down, _stun_for; the bow or the arrows gone; death).
+- **Closed aim**: a lob let go at a cell not open to the sky (a roof, the aim on its own cell)
+  still lobs nothing, and prints nothing (Jeff's rule against explaining captions; the aim's arc
+  and ring already go red there).
+- **Cadence**: a lob let go at its first step is a step-0 shot, so it pays the snap's
+  loose_recover (2 ticks) as try_loose does; a lob asked in that wait waits whole (below). Right
+  taps one after another lob 7 ticks apart (5 + 2), against the flat taps' 6, never faster.
+- **The crossings wait whole** (GridEntity.shot_queued, the server's alone, one at a time, the
+  newest press's): the other kind's tap asked inside a held shot (a right tap while a flat
+  loose is held; a Shift-left tap while a lob is held), or a lob asked in loose_recover, keeps
+  {lob, let, angle or cell}. Its release commits it (_let_queued). When the held shot has gone
+  and the string hand is back (bow_ready_tick), _tend_held_looses draws it and, if its release
+  is in, holds it at the angle or cell it was let go at, whatever the body has turned or stepped
+  since: a flat one looses at its first step (4), a lob lobs at its (5). A let-down before its
+  release clears it; a further draw asked while a committed one waits is the flat's draw_queued
+  (Shift kept down, 928), a further lob refused. Same-kind taps keep 928's rule untouched.
+- **Client** (Main): after a lob's release the arc and ring hold on the cell let go at
+  (Main.lob_let_at) until the lob goes up, as 928 holds the flat aim (_loose_sent); a new right
+  press follows the cursor again. The bodies need nothing: the shooter's own puppet and an
+  onlooker's read the replicated raised and lobbing, which the server keeps through the hold, so
+  the bow stays to the sky and the loose plays on the lob's own event.
+
+Tests: combat_test `_test_lob` (let go before the first step: held, still drawn, nothing up) and
+`_test_lob_tap` (taps at 1 to 4 ticks lob at 5 on the cell, the step-0 figures; 8 ticks step 0,
+12 step 1; a let-down after the release keeps it; a blow before 5 drops it; a roofed cell lobs
+and prints nothing; taps in a row 7 apart; a right tap inside a held flat loose lobs 2 + 5 after
+the flat, on its cell though the body stepped; a Shift-left tap inside a held lob flies 2 + 4
+after it at its angle though the body turned; a queued tap let down before its release replays
+nothing; a blow or the bow gone between drops it); controls_test `_test_lob_tap_through_main`
+(right taps at 1 to 4 ticks through Main: drawn at the sky till 5, lob_let_at on the cell, the
+lob up at 5 there). Client and server; protocol unchanged (lobbing and raised already
+replicate); no new class_name.
+
 ## 676. Items as mass, step 1: load_arms and load_body
 
 Jeff, testing the bow in plate: "items shouldnt have direct impacts, they

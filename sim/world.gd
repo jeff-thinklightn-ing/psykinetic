@@ -6058,14 +6058,40 @@ func drop_boss_move(by: GridEntity) -> void:
 ## dropped if the draw ended first (struck, the bow gone; a let-down no longer: the
 ## shot was let go). A flat draw asked meanwhile or in loose_recover (draw_queued:
 ## Shift kept down) begins once the shot has flown and the wait is past.
+## A lob let go before its first step is held the same way (677 amended (4), lob_held), and
+## the other kind's tap asked inside a held shot waits whole (shot_queued): drawn once the
+## held shot has gone and the string hand is back, held at the angle or cell it was let go
+## at if its release is in; dropped with nothing loosed if the draw ends first (struck,
+## _stun_for; the bow or the arrows gone, death).
 func _tend_held_looses() -> void:
 	for entity in _entities:
-		if entity.draw_queued and is_nan(entity.loose_held):
+		if not entity.shot_queued.is_empty():
+			if not _alive(entity) or off_hand(entity) != "draw":
+				entity.shot_queued = {}
+			elif is_nan(entity.loose_held) and entity.lob_held == NO_CELL and entity.raised == "" and tick >= entity.bow_ready_tick:
+				var queued: Dictionary = entity.shot_queued
+				entity.shot_queued = {}
+				var lob := bool(queued["lob"])
+				if try_stance(entity, "draw", lob) and bool(queued["let"]):
+					if lob:
+						entity.lob_held = queued["cell"]
+					else:
+						entity.loose_held = float(queued["angle"])
+		if entity.draw_queued and is_nan(entity.loose_held) and entity.lob_held == NO_CELL and entity.shot_queued.is_empty():
 			if not _alive(entity) or entity.raised != "":
 				entity.draw_queued = false
 			elif tick >= entity.bow_ready_tick:
 				entity.draw_queued = false
 				try_stance(entity, "draw")  # 928: Shift kept down through the shot, the next draw begins.
+		if entity.lob_held != NO_CELL:
+			if entity.raised != "draw" or not entity.lobbing or not _alive(entity) or off_hand(entity) != "draw":
+				entity.lob_held = NO_CELL
+				entity.draw_queued = false
+			elif draw_step(entity) >= 0:
+				var cell := entity.lob_held
+				entity.lob_held = NO_CELL
+				try_lob(entity, cell)
+			continue
 		if is_nan(entity.loose_held):
 			continue
 		if entity.raised != "draw" or entity.lobbing or not _alive(entity):
@@ -6076,6 +6102,17 @@ func _tend_held_looses() -> void:
 			var angle := entity.loose_held
 			entity.loose_held = NAN
 			try_loose(entity, angle)
+
+
+## A release of [param lob]'s kind given to the tap waiting for it (677 amended (4)): its
+## angle or cell kept, the tap committed, true; false when no tap of that kind waits unreleased.
+func _let_queued(by: GridEntity, lob: bool, angle: float, cell: Vector2i) -> bool:
+	if by.shot_queued.is_empty() or bool(by.shot_queued["lob"]) != lob or bool(by.shot_queued["let"]):
+		return false
+	by.shot_queued["let"] = true
+	by.shot_queued["angle"] = angle
+	by.shot_queued["cell"] = cell
+	return true
 
 
 func _tend_draws() -> void:
@@ -7198,7 +7235,9 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 		return false
 	if kind.is_empty():
 		by.draw_queued = false
-		if is_finite(by.loose_held):
+		if not by.shot_queued.is_empty() and not bool(by.shot_queued["let"]):
+			by.shot_queued = {}  # 677 amended (4): a queued tap let down before its release is gone.
+		if is_finite(by.loose_held) or by.lob_held != NO_CELL or not by.shot_queued.is_empty():
 			return true  # 928: a loose let go is the shot's; only the draw asked after it is let down.
 		by.raised = ""
 		by.lobbing = false
@@ -7207,6 +7246,16 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 		return false
 	if kind == "block" and tick < by.guard_broken_until or is_stunned(by):
 		return false  # A broken guard comes back up only after a while; nothing is raised reeling or lying.
+	if kind == "draw" and not by.shot_queued.is_empty() and bool(by.shot_queued["let"]):
+		# 677 amended (4): one shot waits at a time; Shift kept down asks its flat draw after it (928).
+		by.draw_queued = not lob
+		return false
+	var held := is_finite(by.loose_held) or by.lob_held != NO_CELL
+	if kind == "draw" and (held and by.lobbing != lob or lob and by.raised != "draw" and tick < by.bow_ready_tick):
+		# 677 amended (4): the other kind's tap inside a held shot, or a lob in the string hand's wait,
+		# waits whole and is replayed when the hand is back (_tend_held_looses); the newest press's.
+		by.shot_queued = {"lob": lob, "let": false, "angle": NAN, "cell": NO_CELL}
+		return false
 	if by.raised == "draw" and kind == "draw" and by.lobbing != lob:
 		return false  # One draw at a time (677).
 	if kind == "draw" and not lob and (is_finite(by.loose_held) or by.raised != "draw" and tick < by.bow_ready_tick):
@@ -7218,6 +7267,7 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 		by.raised = kind
 		by.raised_tick = tick
 		by.loose_held = NAN
+		by.lob_held = NO_CELL
 		by.draw_queued = false
 		by.lobbing = lob and kind == "draw"
 		if kind == "draw":
@@ -7382,7 +7432,11 @@ func scatter(by: GridEntity, angle: float, spread: float) -> float:
 ## 620), facing the aim; before the first step, nothing. The stance ends
 ## either way.
 func try_loose(by: GridEntity, angle: float) -> bool:
-	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or by.lobbing or not is_finite(angle):
+	if not Net.is_authority() or not is_instance_valid(by) or not is_finite(angle):
+		return false
+	if _let_queued(by, false, angle, NO_CELL):
+		return true
+	if by.raised != "draw" or by.lobbing:
 		return false
 	var step := draw_step(by)
 	if step < 0 and tick - by.raised_tick >= int(Items.verb_of(drawn_with(by)).get("hold_from", 99)):
@@ -7475,14 +7529,22 @@ var _lobs: Array[Dictionary] = []
 ## and release to fire"): aimed at [param cell] (lob_aim), it comes down in
 ## a cell rolled in its circle (lob_circle_at; the aim if that one is closed),
 ## lob_ticks later, when whoever stands there is struck (_tend_lobs). Its
-## loose costs lob_cost stamina. Before the first step, or with the aim
-## not open to the sky (lob_open), nothing, the arrow kept. The stance
-## ends either way.
+## loose costs lob_cost stamina. Let go before the first step it is held,
+## the cell kept, and lobbed the tick that step counts (677 amended (4),
+## _tend_held_looses). With the aim not open to the sky (lob_open), nothing,
+## the arrow kept, and the stance ends.
 func try_lob(by: GridEntity, cell: Vector2i) -> bool:
-	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or not by.lobbing:
+	if not Net.is_authority() or not is_instance_valid(by):
+		return false
+	if _let_queued(by, true, NAN, cell):
+		return true
+	if by.raised != "draw" or not by.lobbing:
 		return false
 	var verb := Items.verb_of(drawn_with(by))
 	var step := draw_step(by)
+	if step < 0 and not verb.is_empty() and tick - by.raised_tick >= int(verb.get("hold_from", 99)):
+		by.lob_held = cell  # 677 amended (4): let go before the first step, held (a second, the newer cell).
+		return true
 	var aimed := lob_aim(by, cell)
 	var radius := lob_circle_at(by, cell)
 	by.raised = ""
@@ -11651,6 +11713,7 @@ func _stun_for(entity: GridEntity, ticks: int, cause: StringName = &"", through_
 	if _steady.has(entity) and not through_steady and cause != &"crash":
 		return  # Steadied (843): the blow's harm and push as ever, no stagger.
 	entity.draw_queued = false  # 928: a draw asked for after a shot does not begin once struck reeling.
+	entity.shot_queued = {}  # 677 amended (4): nor a tap waiting behind a held shot.
 	if cause == &"" and entity.stun_cause_tick == tick:
 		cause = entity.stun_cause  # The same blow's stun drawn out (a bash's slide): its cause kept.
 	if tick + ticks > entity.stunned_until_tick:
