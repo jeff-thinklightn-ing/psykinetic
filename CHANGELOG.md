@@ -6,10 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
-- Towns: a newcomer arrives south of Umbrage's square, facing the Mughouse's front across open grass, its windows lit at night, and the road in from the foothills is a single road (934).
 
-- With the hunting bow, a quick Shift-click looses an arrow at once (928).
-- Hold a shot on the hunting bow to steady your aim, then to reach farther; close in, every hit strikes as hard however long you held (928).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
@@ -18,6 +15,12 @@ notes (decision 324).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+
+## v0.1.219
+
+- Towns: a newcomer arrives south of Umbrage's square, facing the Mughouse's front across open grass, its windows lit at night, and where the road comes in from the foothills no trail runs beside it (934).
+- With the hunting bow, a quick Shift-click looses an arrow at once (928).
+- Hold a shot on the hunting bow to steady your aim, then to reach farther; close in, every hit strikes as hard however long you held (928).
 - A new player's companion greets them by the name of the town they've come to, then offers to take them fishing, and a yes sets her leading the way to the water (929).
 
 ## v0.1.218
