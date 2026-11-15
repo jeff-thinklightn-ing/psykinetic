@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3027)
+## Lines in the code (3033)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2143,7 +2143,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (807)
+### server and windows (813)
 
 | | Line | Where |
 |---|---|---|
@@ -2896,6 +2896,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | stock: %s isn't a raw (%s) | `main.gd` _stock_command() |
 |  | the admin's stock command | `main.gd` _stock_command() |
 |  | %s: %s %d (was %d) | `main.gd` _stock_command() |
+|  | usage: damage <town store> <kind> (test-only) | `main.gd` damage_command() |
+|  | damage: no town store %s | `main.gd` damage_command() |
+|  | damage: the %s is not built at %s | `main.gd` damage_command() |
+|  | damage: the %s is damaged already | `main.gd` damage_command() |
+|  | damage: the %s is %s, not standing | `main.gd` damage_command() |
+|  | %s: the %s damaged (level %d); its repair is ordered at the town's next turn | `main.gd` damage_command() |
 |  | usage: give <player> <item> [count] | `main.gd` _give_command() |
 |  | no player %s in the game | `main.gd` _give_command() |
 |  | give: no item %s%s | `main.gd` _give_command() |
