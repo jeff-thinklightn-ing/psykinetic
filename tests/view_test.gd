@@ -843,6 +843,18 @@ func _test_options_panel() -> void:
 			and panel.preview._model.find_children("*", "MeshInstance3D", true, false).any(func(m: MeshInstance3D) -> bool:
 				return m.name == "Body" and m.get_blend_shape_value(m.find_blend_shape_by_name(&"heavy")) > 0.3),
 			"Heavy and the seventh skin picked: written with the seed it was shown with (%s), the preview heavy" % written)
+	# 419 amended (6): each hair swatch is the colour you get beside the skin picked, redrawn as the skin changes.
+	var swatches_match := true
+	var swatch_moved := false
+	for i in PersonLook.SKINS.size():
+		(panel.swatches["skin"][str(i + 1)] as Button).pressed.emit()
+		var skin_now: Color = panel._look().colours["skin"]
+		for hair_name: String in panel.swatches["hair_colour"]:
+			var drawn_as := ((panel.swatches["hair_colour"][hair_name] as Button).get_theme_stylebox("normal") as StyleBoxFlat).bg_color
+			swatches_match = swatches_match and drawn_as.is_equal_approx(PersonLook.hair_against(hair_name, skin_now))
+			swatch_moved = swatch_moved or not drawn_as.is_equal_approx(Color(PersonLook.HAIR_COLOURS[hair_name]))
+	_check(swatches_match and swatch_moved, "every hair swatch on every skin is hair_against's colour, and some skin moves one off its name (%s, %s)" % [swatches_match, swatch_moved])
+	(panel.swatches["skin"]["7"] as Button).pressed.emit()
 	var seed_was := Net.player_look.get_slice(" ", 0)
 	for button: Button in panel.find_children("*", "Button", true, false):
 		if button.text == "Surprise me":

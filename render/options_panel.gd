@@ -430,8 +430,10 @@ func _show_look() -> void:
 		for value: String in swatches[key]:
 			var button := swatches[key][value] as Button
 			button.set_pressed_no_signal(value == current)
+			# 419 amended (6): a hair swatch is the colour you get beside the skin picked (PersonLook.hair_against), not the named one.
+			var shown: Color = PersonLook.hair_against(value, look.colours["skin"]) if key == "hair_colour" else button.get_meta("colour")
 			for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
-				button.add_theme_stylebox_override(state, UiTheme.swatch_style(button.get_meta("colour"), value == current))
+				button.add_theme_stylebox_override(state, UiTheme.swatch_style(shown, value == current))
 	if beard_row != null:
 		beard_row.visible = look.body == &"male"
 	if preview != null:
