@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The battle axe winds up in 0.6 s, as quick as the giant axe, and its blow lands as the blade comes round (908).
+- The giant axe hits harder, and its blow lands as the blade comes round (908).
 - Towns: your chest at Rolf's stall opens clear of the corner map, its top row and "Deposit unequipped" in full view (862 amended (1)).
 - Huts' roofs are closed at the gable ends, and their thatch reads as straw (watched joined at the nearest zoom, 8 m, and at 15 m).
 
