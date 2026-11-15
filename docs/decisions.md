@@ -59168,3 +59168,41 @@ no body the male take, at a roll between the well's odds and the sick's, the wel
 sound_kit_test: sick_cough by body. Pretests: load_check, sound_kit_test, view_test, view_world_test PASS.
 
 Client sound only; protocol unchanged; no new class_name; no new Client3D var.
+## 938. An empty hand at rest: its fingers eased from the clip's fist toward straight, its thumb laid in along the index (animation)
+
+The coordinator's ruling, 2026-11-15, on pc-character's jointed hands (419 amended (7)): the pack has one
+finger pose, a fist, the same in every clip, so on the new hands an empty hand at the side curls into a
+hook. Client3D._relax_hands puts a HandRelax (a SkeletonModifier3D) on each person's body ("hand_relax"
+in HUMAN and HUMAN_F; the goblin's, orc's and kobold's mittens don't bend). After the clips, each finger
+and thumb bone of a hand holding nothing is slerped from the clip's pose toward its rest by HAND_RELAX
+0.5 (the coordinator's pick from ui-design's sheet of 0.3, 0.5 and 0.7: C:/dev/review/ui-design/looks/
+relax3_203cc68b1/). A hand holding something keeps the clip's fist, and so does an empty hand working the
+other's piece (Client3D._works_both: a work's tool, a piece taking two hands, a bow's string for the right
+hand), or the left reaching (HandReach). The share eases over HAND_RELAX_EASE 0.25 s, so a hand never snaps
+open or shut on a draw or a sheathe; the first frame takes it whole. FEEL's client3d.hand_relax overrides
+the value for a look or the tuning panel.
+
+The thumb (the coordinator, on the same sheet: at every value the hand read as a pincer, the thumb standing
+off the fingers with a V of air between): its base bone's target is not its rest but the rest turned so
+its tip points at the index finger's second knuckle (HAND_THUMB_IN 1.0 of the way, HAND_THUMB_AIM 1.0
+along the index from its first knuckle to its second; Client3D._thumb_in). Its other bones go to rest. A
+thumb eases whole by the time the fingers reach HAND_RELAX. ui-design's thumb sheet
+(C:/dev/review/ui-design/looks/thumb_sheet_9a13492fb/, Lenovo, joined, low camera at zoom 0.40, Idle and
+Jog_Short): the thumb lies along the index, one closed relaxed shape, no V, a soft fist on the jog; the
+coordinator passed it.
+
+Measured at the skeleton's update (a modifier's work is seen only there): an empty hand's nearest
+fingertip 0.134 m out from the wrist along the hand (the hook 0.06); its thumb tip 0.040 m off the index
+finger's line (the woman 0.038; the clip's 0.075 and 0.071). No frame cost to measure (about 0.1 ms a
+frame, within the bench's spread).
+
+The grip (HAND_GRIP 0.07, HAND_PALM 0.005) is unchanged: no palm offset scanned passed the held-weapon
+rows, so the socket line pc-character's commit names is not in this package; it is the grip row's, after.
+
+Tests: anim_rig_test _test_hand_relax (the man and the woman, Idle and mid-Walk: with the relax off the
+check fails the hook; an empty hand's every tip RELAX_TIP_ALONG 0.11 out or more; its thumb tip within
+RELAX_THUMB_NEAR 0.055 of the index's line, the clip's thumb past it; a hand holding a sword, the bow's
+string hand, a two-handed axe's other hand and a work tool's keep the clip's fist within 1 mm; the ease's
+times). Client only; protocol unchanged; no new class_name. One package with 419 amended (7), landed
+together as animation's stack. The bullet waits for ui-design's joined look on the package and the
+coordinator's pass.

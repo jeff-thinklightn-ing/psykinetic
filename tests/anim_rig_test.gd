@@ -51,6 +51,7 @@ func _ready() -> void:
 	await _test_people_feet()
 	_test_work_clips_loop()
 	await _test_kneel_stays()
+	await _test_hand_relax()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2679,3 +2680,121 @@ func _test_people_feet() -> void:
 	_check(lib.has_animation(Client3D.PEOPLE_PREFIX + Client3D.CLIP_IDLE) and off.is_empty(),
 			"the people's clips meet People_Idle's feet where they begin or end at rest (within %.2f m) and slide none on the ground (%.2f m a 1/30 s), feet under the hips, five builds (the slide on one) (%d: %s)" % [
 			PEOPLE_FEET_NEAR, PEOPLE_SLIDE, off.size(), ", ".join(off.slice(0, 12))])
+
+
+## An empty hand at rest (decision 938): on the man and the woman, in Idle and mid-Walk, each hand's
+## fingertips (each finger's distal joint carried on as far again as its last segment) read from the
+## wrist along the hand (its +Y) at the skeleton's update, after its modifiers. The pack's one finger
+## pose curls them back under the palm, 0.06 m out (the hook): the check fails that, with the relax off.
+## An empty hand at rest has every tip RELAX_TIP_ALONG out or more (0.13 to 0.16 at HAND_RELAX 0.5). A
+## hand holding keeps the clip's fist to the millimetre, and so does an empty hand working the other's
+## piece: a bow's string hand, a two-handed piece's or a work tool's other hand. The share's ease
+## (hand_relax_step). The thumb (the coordinator, 11-15: the pincer's V of air): its tip, carried on as
+## its fingers' are, lies within RELAX_THUMB_NEAR of the index finger's line, knuckle to tip, in an empty
+## hand at rest (0.040 m the man, 0.038 the woman); the clip's thumb stands 0.075 and 0.071 off it.
+const RELAX_TIP_ALONG := 0.11
+const RELAX_THUMB_NEAR := 0.055
+func _test_hand_relax() -> void:
+	print("== an empty hand at rest ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var hooked: Array[String] = []
+	var tight: Array[String] = []
+	var moved: Array[String] = []
+	var least := INF
+	var thumb_far := 0.0
+	var thumb_hook := INF
+	var cases := [["empty", ["", ""], [true, true]], ["a sword in the right", ["sword", ""], [false, true]],
+		["a bow in the left (the string hand)", ["", "bow"], [false, false]],
+		["a two-handed axe", ["battle_axe", ""], [false, false]],
+		["a work's tool", [Client3D.ART_ID + "tool.axe", ""], [false, false]]]
+	for build: Array in [SWORD_BUILDS[0], SWORD_BUILDS[4]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		add_child(holder)
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		Client3D._relax_hands(model, holder)
+		var relax := holder.get_meta("hand_relax") as SkeletonModifier3D
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var caught := {}
+		skeleton.skeleton_updated.connect(func() -> void:
+			caught["tips"] = [_relax_tips(skeleton, "Right"), _relax_tips(skeleton, "Left")]
+			caught["thumbs"] = [_relax_thumb(skeleton, "Right"), _relax_thumb(skeleton, "Left")])
+		for at: Array in [["Idle", 0.0], ["Walk", 0.4]]:
+			rig.base_at(at[0], at[1])
+			relax.active = false
+			await _frames(3)
+			var fist: Array = caught["tips"]
+			for hand in 2:
+				thumb_hook = minf(thumb_hook, float(caught["thumbs"][hand]))
+				if _relax_least(fist[hand]) >= RELAX_TIP_ALONG:
+					hooked.append("%s %s %s with the relax off: %.3f" % [build[0], at[0], ["right", "left"][hand], _relax_least(fist[hand])])
+			relax.active = true
+			for case: Array in cases:
+				holder.set_meta("held", case[1])
+				relax.share = Vector2(-1.0, -1.0)
+				await _frames(3)
+				var tips: Array = caught["tips"]
+				for hand in 2:
+					var where := "%s %s, %s: the %s hand" % [build[0], at[0], case[0], ["right", "left"][hand]]
+					if bool(case[2][hand]):
+						least = minf(least, _relax_least(tips[hand]))
+						thumb_far = maxf(thumb_far, float(caught["thumbs"][hand]))
+						if _relax_least(tips[hand]) < RELAX_TIP_ALONG:
+							tight.append("%s %.3f" % [where, _relax_least(tips[hand])])
+					else:
+						for k in 4:
+							if absf(float(tips[hand][k]) - float(fist[hand][k])) > 0.001:
+								moved.append("%s %.3f against %.3f" % [where, tips[hand][k], fist[hand][k]])
+								break
+		model.queue_free()
+		holder.queue_free()
+	print("  the empty hand's nearest tip at rest: %.3f m (floor %.2f)" % [least, RELAX_TIP_ALONG])
+	_check(hooked.is_empty(), "with the relax off the check fails the hook: every hand's tips under %.2f m (%s)" % [RELAX_TIP_ALONG, ", ".join(hooked)])
+	_check(tight.is_empty(), "an empty hand at rest eased open: every tip %.2f m or more out from the wrist, Idle and Walk, man and woman (%d: %s)" % [
+		RELAX_TIP_ALONG, tight.size(), ", ".join(tight.slice(0, 6))])
+	_check(thumb_far <= RELAX_THUMB_NEAR and thumb_hook > RELAX_THUMB_NEAR,
+		"an empty hand's thumb lies in along the index, no pincer: its tip at most %.3f m off the index's line (within %.3f), the clip's thumb %.3f off with the relax off" % [
+		thumb_far, RELAX_THUMB_NEAR, thumb_hook])
+	_check(moved.is_empty(), "a hand holding, or working the other's bow, two-handed piece or tool, keeps the clip's fist within 1 mm (%d: %s)" % [
+		moved.size(), ", ".join(moved.slice(0, 6))])
+	var half := Client3D.hand_relax_step(Vector2.ZERO, Vector2(Client3D.HAND_RELAX, 0.0), Client3D.HAND_RELAX_EASE * 0.5)
+	var whole := Client3D.hand_relax_step(Vector2.ZERO, Vector2(Client3D.HAND_RELAX, 0.0), Client3D.HAND_RELAX_EASE)
+	var hitch := Client3D.hand_relax_step(Vector2(Client3D.HAND_RELAX, Client3D.HAND_RELAX), Vector2.ZERO, 2.0)
+	_check(is_equal_approx(half.x, Client3D.HAND_RELAX * 0.5) and is_equal_approx(whole.x, Client3D.HAND_RELAX) and is_equal_approx(hitch.x, 0.0),
+		"the share eases over %.2f s: half way at half the time (%.3f), whole at it (%.3f), a 2 s hitch shut (%.3f, %.3f)" % [
+		Client3D.HAND_RELAX_EASE, half.x, whole.x, hitch.x, hitch.y])
+
+
+## _test_hand_relax's: each finger's tip of [param side]'s hand from its wrist along the hand.
+static func _relax_tips(skeleton: Skeleton3D, side: String) -> Array:
+	var hand := skeleton.get_bone_global_pose(skeleton.find_bone(side + "Hand"))
+	var out := []
+	for finger in ["Index", "Middle", "Ring", "Little"]:
+		var mid := skeleton.get_bone_global_pose(skeleton.find_bone(side + finger + "Intermediate")).origin
+		var tip := skeleton.get_bone_global_pose(skeleton.find_bone(side + finger + "Distal")).origin
+		out.append((hand.affine_inverse() * (tip + (tip - mid))).y)
+	return out
+
+
+## _test_hand_relax's: the thumb's tip of [param side]'s hand (its last joint carried on as far again as
+## its last segment) from the index finger's line, its first knuckle to its tip.
+static func _relax_thumb(skeleton: Skeleton3D, side: String) -> float:
+	var at := func(bone: String) -> Vector3: return skeleton.get_bone_global_pose(skeleton.find_bone(side + bone)).origin
+	var near: Vector3 = at.call("ThumbProximal")
+	var last: Vector3 = at.call("ThumbDistal")
+	var tip := last + (last - near)
+	var knuckle: Vector3 = at.call("IndexProximal")
+	var mid: Vector3 = at.call("IndexIntermediate")
+	var end: Vector3 = at.call("IndexDistal")
+	var line := end + (end - mid) - knuckle
+	var u := clampf((tip - knuckle).dot(line) / line.length_squared(), 0.0, 1.0)
+	return tip.distance_to(knuckle + line * u)
+
+
+static func _relax_least(tips: Array) -> float:
+	var least := INF
+	for along: float in tips:
+		least = minf(least, along)
+	return least

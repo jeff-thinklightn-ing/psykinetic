@@ -1741,7 +1741,7 @@ const GAIT_SMOOTH := 0.25
 const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.75, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true, "hand_relax": true}
 ## The human bodies' gaits (decision 399 amended twice): the pack's jog and
 ## sprint take 2.6 m and 4 m steps, too long for a player's 4 tiles a second
 ## (Jeff on v0.1.149); Jog_Short and Sprint_Short narrow their swing
@@ -1814,7 +1814,7 @@ const POSTURES := {"stooped": "Posture_Stooped", "slouching": "Posture_Slouch"}
 const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "res://art/models/animations/goblin.res",
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_F_GAITS, "backpedal": 4.66,
-	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true}
+	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "people_stance": true, "hand_relax": true}
 ## Moving faster than this (tiles a second) walks. 0.4 let a slow approach
 ## (a monster easing into its last cell before a blow) slide standing
 ## ("blows you can see", 2iii).
@@ -24824,6 +24824,8 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
 		_wear_hat(scene, puppet)
+		if model.get("hand_relax", false):
+			_relax_hands(scene, puppet)
 	if puppet.has_meta("look") and not model.has("paint"):
 		# (A painted ally's mesh stands in its concept's stance already: no second hunch.)
 		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
@@ -25011,6 +25013,122 @@ static func _hang(socket: Node3D, piece: Node3D) -> void:
 	hang.socket = socket.transform
 	skeleton.add_child(hang)
 	piece.set_meta("hangs", true)
+
+
+## An empty hand at rest (decision 938; the coordinator, 11-15, on pc-character's jointed hands: the
+## pack's one finger pose, the same in every clip, curls an empty hand into a hook): each finger and
+## thumb bone of a hand holding nothing is eased from the clip's curl toward the body's rest (its
+## fingers straight) by HAND_RELAX. A hand holding something keeps the clip's fist, and so does an
+## empty one working the other hand's piece: a work's tool, a two-handed piece, a bow's string. The
+## share eases over HAND_RELAX_EASE, so a hand never snaps open or shut on a draw or a sheathe. On
+## people's bodies only ("hand_relax"): the goblin's, orc's and kobold's mittens don't bend.
+const HAND_RELAX := 0.5
+const HAND_RELAX_EASE := 0.25
+const HAND_RELAX_FINGERS: Array[String] = ["ThumbMetacarpal", "ThumbProximal", "ThumbDistal",
+	"IndexProximal", "IndexIntermediate", "IndexDistal", "MiddleProximal", "MiddleIntermediate", "MiddleDistal",
+	"RingProximal", "RingIntermediate", "RingDistal", "LittleProximal", "LittleIntermediate", "LittleDistal"]
+static func _relax_hands(scene: Node3D, puppet: Node3D) -> void:
+	var skeletons := scene.find_children("*", "Skeleton3D", true, false)
+	if skeletons.is_empty():
+		return
+	var skeleton := skeletons[0] as Skeleton3D
+	var relax := HandRelax.new()
+	relax.name = "HandRelax"
+	relax.puppet = puppet
+	for hand in 2:
+		var side := "Right" if hand == 0 else "Left"
+		for finger in HAND_RELAX_FINGERS:
+			var bone := skeleton.find_bone(side + finger)
+			if bone >= 0:
+				relax.bones[hand].append(bone)
+				relax.rests[hand].append(_thumb_in(skeleton, side) if finger == "ThumbMetacarpal" else skeleton.get_bone_rest(bone).basis.get_rotation_quaternion())
+				relax.thumbs[hand].append(finger.begins_with("Thumb"))
+	skeleton.add_child(relax)
+	puppet.set_meta("hand_relax", relax)
+
+
+## The thumb's own target (the coordinator, 11-15, on ui-design's relax sheet: at every value the hand
+## read as a pincer, the thumb standing off the finger block with a V of air between): the base of the
+## thumb (its metacarpal) at rest turned HAND_THUMB_IN of the way from where its tip points toward the
+## index's second knuckle (HAND_THUMB_AIM), so the thumb lies in along the index's side; its other bones go to rest, and a thumb
+## eases there whole by the time the fingers reach HAND_RELAX.
+const HAND_THUMB_IN := 1.0
+const HAND_THUMB_AIM := 1.0  # Along the index from its first knuckle (0) to its second (1).
+static func _thumb_in(skeleton: Skeleton3D, side: String) -> Quaternion:
+	var base := skeleton.find_bone(side + "ThumbMetacarpal")
+	var rest := skeleton.get_bone_global_rest(base)
+	var near := skeleton.get_bone_global_rest(skeleton.find_bone(side + "ThumbProximal")).origin
+	var last := skeleton.get_bone_global_rest(skeleton.find_bone(side + "ThumbDistal")).origin
+	var tip := last + (last - near)
+	var knuckle := skeleton.get_bone_global_rest(skeleton.find_bone(side + "IndexProximal")).origin.lerp(
+		skeleton.get_bone_global_rest(skeleton.find_bone(side + "IndexIntermediate")).origin, HAND_THUMB_AIM)
+	var turn := Quaternion.IDENTITY.slerp(Quaternion((tip - rest.origin).normalized(), (knuckle - rest.origin).normalized()), HAND_THUMB_IN)
+	var parent := skeleton.get_bone_parent(base)
+	var above := skeleton.get_bone_global_rest(parent).basis if parent >= 0 else Basis.IDENTITY
+	return (above.inverse() * Basis(turn) * rest.basis).get_rotation_quaternion()
+
+
+## The share of the way to rest each hand eases toward, (right, left): HAND_RELAX (FEEL's
+## client3d.hand_relax when set) for a hand at rest,
+## 0 for one holding or at work (above).
+static func hand_relax_wanted(puppet: Node3D) -> Vector2:
+	var held: Array = puppet.get_meta("held", ["", ""])
+	var right := str(held[0])
+	var left := str(held[1])
+	var reach := puppet.get_meta("reach") as HandReach if puppet.has_meta("reach") else null
+	var right_free := right == "" and not _works_both(left, true)
+	var left_free := left == "" and not _works_both(right, false) and not (reach != null and reach.active)
+	var relax := ArtKit.feel("client3d.hand_relax", HAND_RELAX)  # A look's or the tuning panel's override.
+	return Vector2(relax if right_free else 0.0, relax if left_free else 0.0)
+
+
+## [param share] moved toward [param want] over [param seconds]: the whole of HAND_RELAX in
+## HAND_RELAX_EASE, a hitch of a frame counted as a quarter second at most.
+static func hand_relax_step(share: Vector2, want: Vector2, seconds: float) -> Vector2:
+	var step := clampf(seconds, 0.0, 0.25) * HAND_RELAX / HAND_RELAX_EASE
+	return Vector2(move_toward(share.x, want.x, step), move_toward(share.y, want.y, step))
+
+
+## Whether [param id], in the other hand, works this one too: a work's own tool (ART_ID), a piece
+## taking two hands, or, for the right hand ([param string]), a bow, whose string it draws.
+static func _works_both(id: String, string: bool) -> bool:
+	if id == "":
+		return false
+	if id.begins_with(ART_ID) or int(Items.def(id).get("hands", 1)) >= 2:
+		return true
+	return string and Items.verb_of(id).has("draw_min")
+
+
+## _relax_hands': each hand's finger bones slerped from this frame's pose toward their rest by its
+## share, eased toward hand_relax_wanted; nothing while both shares are 0 or the body isn't drawn.
+class HandRelax extends SkeletonModifier3D:
+	var puppet: Node3D
+	var bones: Array[PackedInt32Array] = [PackedInt32Array(), PackedInt32Array()]
+	var rests: Array = [[], []]
+	var thumbs: Array = [[], []]  # Each bone a thumb's: eased whole by the time the fingers reach HAND_RELAX.
+	var share := Vector2(-1.0, -1.0)  # Below 0 until the first frame, which takes the wanted share at once.
+	var last_ms := 0
+
+	func _process_modification() -> void:
+		var skeleton := get_skeleton()
+		if skeleton == null or not is_instance_valid(puppet):
+			return
+		var want := Client3D.hand_relax_wanted(puppet)
+		var now := AnimRig.now_msec()
+		share = want if share.x < 0.0 else Client3D.hand_relax_step(share, want, float(now - last_ms) / 1000.0)
+		last_ms = now
+		if share == Vector2.ZERO or not skeleton.is_visible_in_tree():
+			return
+		for hand in 2:
+			var s := share[hand]
+			if s <= 0.0:
+				continue
+			var list: PackedInt32Array = bones[hand]
+			var rest: Array = rests[hand]
+			var thumb: Array = thumbs[hand]
+			var whole := minf(s / Client3D.HAND_RELAX, 1.0)
+			for k in list.size():
+				skeleton.set_bone_pose_rotation(list[k], skeleton.get_bone_pose_rotation(list[k]).slerp(rest[k], whole if thumb[k] else s))
 
 
 ## _hang's: [member piece]'s turn in its hand socket set so that it stands as the body does (its +y
