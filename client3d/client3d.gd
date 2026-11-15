@@ -3727,6 +3727,7 @@ func _process(delta: float) -> void:
 		return  # Half a room (decision 660): nothing to ease, fade or grow yet.
 	_end_warm_ups()
 	_sync_puppets()
+	_place_foot_marks()
 	WetLook.update(self, delta)  # Bodies wet from water and rain, and drying (775).
 	_update_seen_through()
 	_sync_doors()
@@ -21992,6 +21993,182 @@ func _set_transparency(puppet: Node3D, transparency: float) -> void:
 	for node in _descendants(puppet):
 		if node is GeometryInstance3D:
 			(node as GeometryInstance3D).transparency = transparency
+
+
+# --- Foot marks (a look for Jeff's pick; environment, 11-14) -----------------
+
+## A soft dark oval on the ground under each drawn body by day (the
+## coordinator's (a) after the shadow read: the sun's own shadow at the
+## nearest zoom is a strip some 11 px thick on ground that varies by a quarter
+## by itself). One MultiMesh under the view, outside every puppet's tree
+## (pc-character's word); each body's instance set after _sync_puppets from its
+## puppet root, the foot point. It multiplies what is drawn under it
+## (blend_mul): FOOT_MARK_DEPTH off at its middle, nothing at its rim. Where
+## the sun's own shadow already falls (a roof's, a tree's, the body's own) it
+## keeps FOOT_MARK_SHADED of that, so it never doubles a shade; cloud takes it
+## the same way; by day only, out of doors only.
+const FOOT_MARK_PERSON := Vector2(0.45, 0.6)  # along the body's facing, across: a person at model_scale 1
+const FOOT_MARK_FIT := 0.9  # a creature's: this share of its rest box at the ground
+const FOOT_MARK_LEAST := 0.25
+const FOOT_MARK_DEPTH := 0.39  # linear; about 0.8 of the bare ground at its middle, the body's own shadow's
+const FOOT_MARK_SHADED := 1.0 / 3.0
+const FOOT_MARK_SUN := Vector2(0.0, 12.0)  # the sun's height (degrees): none .. all of it
+const FOOT_MARK_LIFT := 0.03
+const FOOT_MARK_MOST := 256
+## Its colour multiplies the frame: 1 - k(shaded + (1 - shaded) * sun * the
+## sun's reach), k the oval's strength there: emission 1 - k, and the sun's
+## light (no ambient) giving back k (1 - shaded)(1 - sun * reach).
+const FOOT_MARK_SHADER := """shader_type spatial;
+render_mode blend_mul, depth_draw_never, cull_back, ambient_light_disabled, specular_disabled, fog_disabled;
+uniform float shaded = 0.3333;
+uniform float sun = 1.0;
+varying float strength;
+void vertex() {
+	strength = INSTANCE_CUSTOM.r;
+	vec4 view = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	view.z += 0.08;
+	POSITION = PROJECTION_MATRIX * view;
+}
+void fragment() {
+	float d = length(UV - vec2(0.5)) * 2.0;
+	float m = clamp(1.0 - d * d, 0.0, 1.0);
+	float k = strength * m * m;
+	ALBEDO = vec3(k);
+	EMISSION = vec3(1.0 - k);
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.0;
+}
+void light() {
+	if (LIGHT_IS_DIRECTIONAL) {
+		DIFFUSE_LIGHT += vec3((1.0 - shaded) * (1.0 - sun * ATTENUATION));
+	}
+}
+"""
+## Off for a look's "off" still.
+static var foot_marks_on := true
+var _foot_marks: MultiMeshInstance3D
+## By puppet id: its drawn "body", the "mesh" whose cast and transparency it
+## follows, its "size" (along, across), "height", and its "cell" and whether
+## that cell is "inside" a walled building.
+var _foot_mark_bodies: Dictionary[int, Dictionary] = {}
+
+
+func _make_foot_marks() -> void:
+	_foot_marks = MultiMeshInstance3D.new()
+	_foot_marks.name = "FootMarks"
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_custom_data = true
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	multimesh.mesh = plane
+	multimesh.instance_count = FOOT_MARK_MOST
+	multimesh.visible_instance_count = 0
+	_foot_marks.multimesh = multimesh
+	var shader := Shader.new()
+	shader.code = FOOT_MARK_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("shaded", FOOT_MARK_SHADED)
+	_foot_marks.material_override = material
+	_foot_marks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_foot_marks.custom_aabb = AABB(Vector3(-100000.0, -1000.0, -100000.0), Vector3(200000.0, 2000.0, 200000.0))
+	add_child(_foot_marks)
+
+
+## Every drawn body's mark, after _sync_puppets has placed them all.
+func _place_foot_marks() -> void:
+	if _foot_marks == null:
+		_make_foot_marks()
+	var multimesh := _foot_marks.multimesh
+	var day := smoothstep(FOOT_MARK_SUN.x, FOOT_MARK_SUN.y, _look_elevation)
+	if not foot_marks_on or not _outdoor or day <= 0.0:
+		multimesh.visible_instance_count = 0
+		return
+	for id: int in _foot_mark_bodies.keys():
+		if not _puppets.has(id) or not is_instance_valid(_foot_mark_bodies[id]["body"]):
+			_foot_mark_bodies.erase(id)
+	var shown := 0
+	for id: int in _puppets:
+		if shown >= FOOT_MARK_MOST:
+			break
+		var puppet := _puppets[id]
+		if not is_instance_valid(puppet) or puppet.is_queued_for_deletion() or not puppet.is_visible_in_tree():
+			continue
+		var body := _foot_mark_body(id, puppet)
+		if body.is_empty():
+			continue
+		var mesh: GeometryInstance3D = body["mesh"]
+		if not is_instance_valid(mesh) or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+			continue
+		var cell := Vector2i(roundi(puppet.position.x), roundi(puppet.position.z))
+		if body["cell"] != cell:
+			body["cell"] = cell
+			body["inside"] = _indoors(cell)
+		if body["inside"]:
+			continue
+		multimesh.set_instance_transform(shown, _foot_mark_at(puppet, body))
+		multimesh.set_instance_custom_data(shown, Color(FOOT_MARK_DEPTH * day * (1.0 - mesh.transparency), 0.0, 0.0, 0.0))
+		shown += 1
+	multimesh.visible_instance_count = shown
+	var cloud := float(_weather_view.weather.get("cloud", 0.0)) if _weather_view != null else 0.0
+	(_foot_marks.material_override as ShaderMaterial).set_shader_parameter("sun", 1.0 - clampf(cloud, 0.0, 1.0))
+
+
+## [param puppet]'s mark data (_foot_mark_bodies), made the first frame it
+## stands drawn; {} for a body drawn as a thing (a cart, a chest: an art
+## slot's), drawn as nothing, or not yet standing.
+func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
+	if _foot_mark_bodies.has(id):
+		return _foot_mark_bodies[id]
+	var drawn := puppet.get_node_or_null("Body") as Node3D
+	if drawn == null or absf(drawn.rotation.x) > 0.05:
+		return {}
+	var person := drawn.get_node_or_null("Model") != null and puppet.has_meta("look")
+	if not (drawn is MeshInstance3D or drawn.get_node_or_null("Model") != null or puppet.has_meta("creature_view")):
+		return {}
+	var meshes: Array[Node] = [drawn] if drawn is MeshInstance3D else drawn.find_children("*", "MeshInstance3D", true, false)
+	if meshes.is_empty():
+		return {}
+	var size: Vector2 = FOOT_MARK_PERSON * float(puppet.get_meta("model_scale", 1.0))
+	if not person:
+		var into := drawn.global_transform.affine_inverse()
+		var box := AABB()
+		var first := true
+		for node: Node in meshes:
+			var each := node as MeshInstance3D
+			if each.mesh == null:
+				continue
+			var part := (into * each.global_transform) * each.get_aabb()
+			box = part if first else box.merge(part)
+			first = false
+		size = Vector2(maxf(box.size.x * FOOT_MARK_FIT, FOOT_MARK_LEAST), maxf(box.size.z * FOOT_MARK_FIT, FOOT_MARK_LEAST))
+	var body := {"body": drawn, "mesh": meshes[0], "size": size, "height": float(puppet.get_meta("pick_height", 1.6)),
+			"cell": Vector2i(1 << 30, 0), "inside": false}
+	_foot_mark_bodies[id] = body
+	return body
+
+
+## The mark's place: at the foot point, long along the body's facing (its
+## Body's +X, the nose); a body tipped over (knocked down, DOWN_TILT) laid
+## along the way it lies, from its feet to its head.
+func _foot_mark_at(puppet: Node3D, body: Dictionary) -> Transform3D:
+	var drawn: Node3D = body["body"]
+	var basis := drawn.global_basis.orthonormalized()
+	var size: Vector2 = body["size"]
+	var origin := puppet.global_position + Vector3.UP * FOOT_MARK_LIFT
+	var lean := Vector2(basis.y.x, basis.y.z)
+	var way := Vector2(basis.x.x, basis.x.z)
+	var length := size.x
+	if lean.length() > 0.05:
+		way = lean
+		var lying := float(body["height"]) * lean.length()
+		origin += Vector3(lean.normalized().x, 0.0, lean.normalized().y) * lying * 0.5
+		length = maxf(size.x, lying + size.x * 0.5)
+	way = way.normalized() if way.length() > 0.001 else Vector2.RIGHT
+	var along := Vector3(way.x, 0.0, way.y)
+	var across := Vector3(-way.y, 0.0, way.x)
+	return Transform3D(Basis(along * length, Vector3.UP, across * size.y), origin)
 
 
 # --- Entities ----------------------------------------------------------------
