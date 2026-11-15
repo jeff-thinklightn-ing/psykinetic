@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, the offering stone stands in the First Hall, east of the fallen knight's bier (747 amended (13)).
 - Towns: a townsperson who goes hungry stays in their town and is no likelier to fall sick for it (918).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).

@@ -907,14 +907,19 @@ static func write(level_name: String, made: Dictionary) -> bool:
 ## its own cart), go into one pile on that cell, their uids listed in
 ## "moved" (Main places them there and notes it, MOVED); [param id_of]
 ## (uid -> item id) names a cart's things for the pile.
-static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant = null, id_of := Callable()) -> Dictionary:
+##
+## [param markers] (moved_markers: a marker key "x,y" -> the cell its marker
+## now stands on) keeps a saved entity, timer or record whose marker moved
+## by the template's word by its new cell, so it comes back on it (the
+## barrow's Offering stone out of the Low Hall, things and all).
+static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant = null, id_of := Callable(), markers: Dictionary = {}) -> Dictionary:
 	var lost: Array[int] = []
 	var moved: Array[int] = []
 	var kept := {"tick": int(section.get("tick", 0)), "entities": [], "respawns": [], "ground": [], "records": []}
 	var keeping := keep_to is Vector2i
 	var heap := {"cell": keep_to, "ids": [], "items": [], "gold": 0}
 	for entry: Dictionary in section.get("entities", []):
-		if _keeps(anchors, entry["spec"]):
+		if _keeps(anchors, entry["spec"], markers):
 			kept["entities"].append(entry)
 		elif keeping and str(entry["spec"].get("script", "")) == Level.CARGO and id_of.is_valid():
 			var cargo: Array[int] = []
@@ -930,7 +935,8 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 		else:
 			_uids_of(entry.get("items", []), lost)
 	for respawn: Dictionary in section.get("respawns", []):
-		var at: Variant = _key_cell(str(respawn.get("spawn_key", "")))
+		var key := str(respawn.get("spawn_key", ""))
+		var at: Variant = markers.get(key, _key_cell(key))
 		if at != null and Level.in_anchors(anchors, at):
 			kept["respawns"].append(respawn)
 	for pile: Dictionary in section.get("ground", []):
@@ -952,7 +958,7 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 	for record: Dictionary in section.get("records", []):
 		var entry: Variant = record.get("entry", {})
 		var spec: Variant = Snapshot.parse_entry(entry).get("spec", {})
-		if spec is Dictionary and not spec.is_empty() and _keeps(anchors, spec):
+		if spec is Dictionary and not spec.is_empty() and _keeps(anchors, spec, markers):
 			kept["records"].append(record)
 		elif entry is Dictionary:
 			_uids_of(entry.get("items", []), lost)
@@ -986,11 +992,30 @@ static func keep_cell(level_name: String) -> Variant:
 
 ## Whether a saved entity's [param spec] sits in [param anchors]: by its
 ## marker-cell key when it has one, else by its tile.
-static func _keeps(anchors: Array, spec: Dictionary) -> bool:
-	var at: Variant = _key_cell(str(spec.get("spawn_key", "")))
+static func _keeps(anchors: Array, spec: Dictionary, moved: Dictionary = {}) -> bool:
+	var key := str(spec.get("spawn_key", ""))
+	var at: Variant = moved.get(key, _key_cell(key))
 	if at == null:
 		at = spec.get("tile")
 	return at is Vector2i and Level.in_anchors(anchors, at)
+
+
+## Level [param level_name]'s markers moved by its template's word
+## (level.json "moved_markers": {"x,y": [x, y]}, the barrow's Offering stone
+## from the Low Hall, 38,30, to the First Hall, 44,8): each old key -> the
+## cell its marker stands on now. A saved entity keyed by an old key comes
+## back on the new marker, its things and all (Main._level_spec_for), and a
+## re-lay keeps it by the new cell (keep_section). Read from the template,
+## so a generation laid before the move has it too.
+static func moved_markers(level_name: String) -> Dictionary:
+	var out := {}
+	var given: Variant = Level.template_config(level_name).get("moved_markers", {})
+	if given is Dictionary:
+		for key: Variant in given:
+			var to: Variant = Level._tile(given[key])
+			if to is Vector2i and _key_cell(str(key)) != null:
+				out[str(key)] = to
+	return out
 
 
 ## A spawn key "x,y" as a cell; null for none or one that is no pair.

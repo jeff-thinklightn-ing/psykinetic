@@ -43026,6 +43026,65 @@ _test_people_feet's bounds (0.30 m across, 0.20 fore and aft) through the
 loop; view_test _test_knight_stands: a spawned knight's rig plays his vigil
 as People_Knight_Vigil, no fidgets. Client only, protocol unchanged, no new
 class_name.
+
+747 amended (13): the crypt without the old altar room (Jeff, 2026-11-14, on v0.1.215: "astral
+knight still in wrong room", then "in the crypt we dont even need the room that has two guards a
+chest and a knight anymore -- remove it all together"; the coordinator's approval of dungeon's
+plan, package "the crypt without the old altar room", whole and on; label from
+tools/decision_number.sh). The room is the Low Hall, the barrow's "altar" anchor (30,24 18x14):
+a dead end off the processional, the same in every generation, holding two skeleton guards at
+(36,30) and (40,30) and the Offering stone between them at (38,30), the "chest" Jeff saw.
+- Why a knight stood there (spawn_key_test's probe of the box's case; the seeds the box laid
+  that day, generations 136 and 137, lay one knight each, at the bier's (39,10)): a second boot
+  on a build before 747 amended (11) read the save (11) was written for (the stray at (38,32)
+  keyless, the marker's knight keyed "39,10") with the name match alone, so the stray took the
+  marker's key at his old cell and the marker's knight came back slotless. v0.1.215's boot
+  dropped the slotless one (the box's one "fallen knights whose marker moved dropped") and kept
+  the keyed one where he was saved; the altar anchor kept him through each re-lay. (11)'s test
+  read the cell, but of the first boot's save shape; the new row loads the second boot's.
+- The knight on his marker (Main.knight_on_marker): a knight holding his slot stands on his
+  marker's cell and faces as it does whatever a save says, at load, at a record's recall and
+  after a re-lay; he never takes a step, so another saved cell is a save's mistake. Counted for
+  release: "[state] <level>: 1 fallen knight set on his marker at x,y, saved at (x, y)".
+- The room gone: its floor out of barrow's template, its anchor and its rooms entry (the place
+  label "The Low Hall" with it), its two guards with it (no quest needs them: the knight's is
+  ready when the band is slain). Its place stays rock in every generation: the block's new
+  "rock" ([[30, 24, 18, 14]]), which the crypt generator keeps as it keeps an anchor's rim, never
+  carved and joined to nothing. Opened to the generator, the space let generation 1 keep a wrap
+  fault in all 16 tries and generation 8 lay 11 band pairs within the join reach (most 5 at a
+  post), past level_test's held rules; kept whole, the walk round it stays the shape those rules
+  were tuned on. Pip's niche (26,28) is its own anchor and joined by its own way
+  (Regen.connected holds every laid try to all anchors).
+- The Offering stone moved to the First Hall at (44,8), east of the bier, two cells and more
+  clear of the bier and the stair: the temple's offering errand closes there (Offers.crypt_done,
+  the chest named "Offering stone"), its words true unchanged. A marker moved far by the level's
+  word: level.json "moved_markers" {"38,30": [44, 8]} (Regen.moved_markers, read from the
+  template, so the box's generation laid before it has it too). A saved entity keyed by the old
+  cell comes back on the new marker as itself, its things in it (Main._level_spec_for), and a
+  re-lay keeps it by the new cell (Regen.keep_section's markers); counted for release: "[state]
+  <level>: 1 level entity moved with its marker, from x,y to x,y". 747 amended (8)'s 22-cell
+  knight move had no such word, which is how a saved knight came to stand in the old room.
+- What lay on the ground outside the anchors at a re-lay gathers at the arrival (39,2), not
+  lost: the regenerate block's "keep_ground": "entrance", 790's rule (the coordinator: a
+  standing rule). Nothing bounds that pile over many rotations: ground piles never expire, so
+  what nobody picks up is gathered again at each re-lay; its own row after this lands.
+- At the deploy: barrow's template changed, so its first boot lays it again (465 amended (4));
+  no regenerate by hand. The knight loads on (39,10) and is kept there, the stone comes back on
+  (44,8) with whatever it held, a pile on the Low Hall's floor gathers at the arrival, and a
+  player saved in the room is placed on open floor as any player on a cell no longer walked.
+- Lore's crypt.pip_carries now lays the offering in the First Hall (lore's fact, voice's
+  words); Jeff's two lines on the altar room's hidden passage in docs/lore/crypt.md stay as he
+  wrote them, with lore's dated note. The way down is the First Hall's hidden niche (the link at
+  (52,16), moved among its niches by each generation).
+Tests: level_test (_test_band, generations 1 to 5 and the box's 136 and 137: one knight at
+(39,10), no altar anchor or Low Hall room, no floor where it stood, no skeleton guard, the stone at (44,8), the hidden
+way down inside the First Hall's rect (27,1 26x16), Pip's niche joined; the template's kinds,
+rooms, moved_markers and keep cell); spawn_key_test (_test_a_moved_knight: the second boot's
+save loads to one knight on his marker facing as it does, through a re-lay keeping the old
+cell and a restart; _test_a_marker_moved_by_word: a chest keyed by the old cell, holding a
+thing, comes back on the new marker with it, at load and through a re-lay whose anchors hold
+only the new cell). The barrow tour's knight post is (39,10). Level data and server; protocol
+unchanged; no new class_name.
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.

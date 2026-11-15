@@ -263,8 +263,8 @@
 		},
 		{
 			"at": [
-				38,
-				30
+				44,
+				8
 			],
 			"name": "Offering stone",
 			"props": {
@@ -341,6 +341,15 @@
 			"first"
 		],
 		"every_days": 3,
+		"keep_ground": "entrance",
+		"rock": [
+			[
+				30,
+				24,
+				18,
+				14
+			]
+		],
 		"anchors": [
 			{
 				"rect": [
@@ -350,15 +359,6 @@
 					16
 				],
 				"name": "entrance"
-			},
-			{
-				"rect": [
-					30,
-					24,
-					18,
-					14
-				],
-				"name": "altar"
 			},
 			{
 				"rect": [
@@ -473,15 +473,6 @@
 				16
 			]
 		},
-		"altar": {
-			"name": "The Low Hall",
-			"rect": [
-				30,
-				24,
-				18,
-				14
-			]
-		},
 		"camp": {
 			"name": "The Robbers' Camp",
 			"rect": [
@@ -503,5 +494,11 @@
 	"respawn_s": {
 		"robber": 300,
 		"skeleton_guard": 600
+	},
+	"moved_markers": {
+		"38,30": [
+			44,
+			8
+		]
 	}
 }

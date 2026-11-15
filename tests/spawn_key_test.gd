@@ -24,6 +24,8 @@ const KNIGHT_LEVEL := "spawn_key_knight"
 const KNIGHT_WAS := Vector2i(13, 2)
 const KNIGHT_NOW := Vector2i(2, 2)
 const KNIGHT_LEGEND := {"monster_astral_knight": "#c8d8f0"}
+## The knight's marker's facing in KNIGHT_LEVEL (the barrow's faces north, [0, -1]).
+const KNIGHT_FACING := Vector2i(0, -1)
 
 var _failures := 0
 var _main: Node
@@ -50,6 +52,7 @@ func _run() -> void:
 	_test_stock_tops_up_once(path, saved)
 	_test_became(path, saved)
 	_test_a_moved_marker(path, saved)
+	_test_a_marker_moved_by_word(path, saved)
 	_test_a_moved_locker(path, saved)
 	_test_a_moved_knight()
 	DirAccess.remove_absolute(path)
@@ -63,7 +66,7 @@ func _run() -> void:
 ## The level, as saved or with GAINED (a chest, props {"temple": true}),
 ## or without the marker at [param lost], or with [param moved]'s markers
 ## (from -> to) moved.
-func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became := {}, moved := {}) -> void:
+func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became := {}, moved := {}, moved_markers := {}) -> void:
 	Level.unregister(LEVEL)
 	var markers := MARKERS.duplicate()
 	markers.erase(lost)
@@ -90,7 +93,10 @@ func _register(gained: bool, lost := Vector2i(-1, -1), stock: Array = [], became
 				image.set_pixel(x * 2 + 1, y * 2, ground)
 			if y + 1 < HEIGHT:
 				image.set_pixel(x * 2, y * 2 + 1, ground)
-	Level.register(LEVEL, image, null, {"name": "Spawn keys", "entities": entries, "became": became})
+	var config := {"name": "Spawn keys", "entities": entries, "became": became}
+	if not moved_markers.is_empty():
+		config["moved_markers"] = moved_markers
+	Level.register(LEVEL, image, null, config)
 
 
 ## The world saved, then made to tell its entities apart: each level entity
@@ -285,6 +291,51 @@ func _test_a_moved_marker(path: String, data: Dictionary) -> void:
 			"a marker moved past the reach: the saved one as saved, a new one on the marker (%s)" % [_names(at)])
 
 
+## A marker moved far by the level's word (747 amended (13), the barrow's
+## Offering stone out of the Low Hall: level.json "moved_markers"): the saved
+## chest, holding a thing, comes back on the new marker as itself, its thing
+## in it, at load; and through a re-lay whose anchors hold the new cell and
+## not the old, kept by the new cell, not lost; the load counts it.
+func _test_a_marker_moved_by_word(path: String, data: Dictionary) -> void:
+	print("
+== a marker moved far by the level's word: its saved chest on the new marker, its things in it (747 amended (13)) ==")
+	var held: Dictionary = data.duplicate(true)
+	for entry: Dictionary in held["zones"][LEVEL]["entities"]:
+		if str(entry.get("spawn_key", "")) == "6,2":
+			entry["slots"] = ["bandaging_kit", "", "", ""]
+	var word := {"6,2": [14, 3]}
+	_write(path, held)
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(6, 2): Vector2i(14, 3)}, word)
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var at := _by_tile()
+	var chests := at.values().filter(func(entity: GridEntity) -> bool: return entity is Chest)
+	var chest: Variant = at.get(Vector2i(14, 3))
+	_check(chests.size() == 1 and chest is Chest and chest.spawn_spec["spawn_key"] == "14,3" and chest.slots.size() > 0 and chest.slots[0] == "bandaging_kit"
+			and _main._alive_slots.get(_slot_keyed("14,3")) == chest,
+			"one chest, on the new marker, holding its thing, not a stray where it was saved nor an empty new one (%s)" % [_names(at)])
+	# The re-lay: the zone held on the old level, laid again on the new with
+	# anchors that hold (14,3) and not the old cell.
+	_write(path, held)
+	_register(false)
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(6, 2): Vector2i(14, 3)}, word)
+	var east := [{"rect": Rect2i(13, 0, 3, HEIGHT), "name": "east"}]
+	var sifted := Regen.keep_section({"entities": [{"spec": {"spawn_key": "6,2", "tile": Vector2i(6, 4)}}]}, east, null, Callable(), Regen.moved_markers(LEVEL))
+	_check((sifted["kept"]["entities"] as Array).size() == 1 and (Regen.keep_section({"entities": [{"spec": {"spawn_key": "6,2", "tile": Vector2i(6, 4)}}]}, east)["kept"]["entities"] as Array).is_empty(),
+			"keep_section keeps an entity keyed by the moved marker's old cell by its new one, and only with the level's word")
+	_main._rebuild_regenerated(LEVEL, east)
+	World.enter_named(LEVEL)
+	at = _by_tile()
+	chests = at.values().filter(func(entity: GridEntity) -> bool: return entity is Chest)
+	chest = at.get(Vector2i(14, 3))
+	_check(chests.size() == 1 and chest is Chest and chest.slots.size() > 0 and chest.slots[0] == "bandaging_kit",
+			"and through a re-lay that keeps the new cell, not the old: on the new marker, its thing kept (%s)" % [_names(at)])
+	_register(false)
+	_main._load_level(LEVEL)
+
+
 ## The knight's level, his marker at [param at], a start at (0, 2).
 func _register_knight(at: Vector2i) -> void:
 	Level.unregister(KNIGHT_LEVEL)
@@ -301,7 +352,8 @@ func _register_knight(at: Vector2i) -> void:
 				image.set_pixel(x * 2 + 1, y * 2, ground)
 			if y + 1 < HEIGHT:
 				image.set_pixel(x * 2, y * 2 + 1, ground)
-	Level.register(KNIGHT_LEVEL, image, null, {"name": "Knight keys", "legend": KNIGHT_LEGEND})
+	Level.register(KNIGHT_LEVEL, image, null, {"name": "Knight keys", "legend": KNIGHT_LEGEND,
+		"entities": [{"at": [at.x, at.y], "facing": [KNIGHT_FACING.x, KNIGHT_FACING.y]}]})
 
 
 ## The knight's level loaded from [param path] as it stands: its knights.
@@ -381,6 +433,45 @@ func _test_a_moved_knight() -> void:
 	World.enter_named(KNIGHT_LEVEL)
 	knights = _knights()
 	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and through a re-lay: still one, on the marker (%s)" % _knight_words(knights))
+	# The box's save as it was at v0.1.215's deploy (747 amended (13), Jeff 11-14: "astral
+	# knight still in wrong room"): a second boot before (11) read the shape above with the
+	# name match alone, so the stray took the marker's key at his old cell and the marker's
+	# knight came back slotless; that boot's save holds the marker's key at the old cell, a
+	# slotless knight on the marker. One knight, on the marker, facing as it does; through a
+	# re-lay that keeps the old cell, and a restart after.
+	_main._alive_slots.clear()
+	var old_read: Dictionary = _main._level_spec_for(stray.duplicate(true))
+	_check(old_read.get("spawn_key", "") == now_key, "the name match alone gives the stray the marker's key (%s), as a boot before (11) did" % [old_read.get("spawn_key", "-")])
+	var third: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var third_zone: Dictionary = third["zones"][LEVEL]
+	var third_list: Array = (third_zone["entities"] as Array).filter(func(entry: Dictionary) -> bool: return not str(entry.get("script", "")).ends_with("astral_knight.gd"))
+	var took: Dictionary = keyed.duplicate(true)
+	took["tile"] = [KNIGHT_WAS.x, KNIGHT_WAS.y]
+	took["facing"] = [1, 0]
+	if took.has("home"):
+		took["home"] = [KNIGHT_WAS.x, KNIGHT_WAS.y]
+	var slotless: Dictionary = keyed.duplicate(true)
+	slotless.erase("spawn_key")
+	slotless["spawn"] = -1
+	third_list.push_front(slotless)
+	third_list.push_front(took)
+	third_zone["entities"] = third_list
+	_write(path, third)
+	knights = _knights_loaded()
+	var marker_facing: Vector2i = knights[0].facing if knights.size() == 1 else Vector2i.ZERO
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW and knights[0].spawn_spec.get("spawn_key", "") == now_key and marker_facing == KNIGHT_FACING,
+			"the save after a second boot before (11), the marker's key at the old cell: one knight, on the marker, facing as it does (%s, facing %s)" % [_knight_words(knights), marker_facing])
+	_write(path, third)
+	_knights_loaded()
+	_main._rebuild_regenerated(KNIGHT_LEVEL, [{"rect": Rect2i(0, 0, WIDTH, HEIGHT), "name": "all"}])
+	World.enter_named(KNIGHT_LEVEL)
+	knights = _knights()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and through a re-lay that keeps the old cell: on the marker (%s)" % _knight_words(knights))
+	_main._save_state()
+	knights = _knights_loaded()
+	_check(knights.size() == 1 and knights[0].tile == KNIGHT_NOW, "and a restart after: on the marker (%s)" % _knight_words(knights))
+	_check(Main.knight_on_marker({"script": "res://sim/astral_knight.gd", "spawn_key": "2,2"}) and not Main.knight_on_marker({"script": "res://sim/astral_knight.gd"})
+			and not Main.knight_on_marker({"script": "res://sim/monster.gd", "spawn_key": "2,2"}), "only a knight holding his slot is put on his marker")
 	# A kept record of the old knight (retired while nobody was near), made again: dropped, not kept.
 	var as_record: Dictionary = saved.duplicate(true)
 	var zone: Dictionary = as_record["zones"][LEVEL]  # Saved under the zone's name, the test's (Main._start_level's "here").

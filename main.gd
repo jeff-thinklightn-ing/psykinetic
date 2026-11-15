@@ -4489,7 +4489,7 @@ func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
 	var raw: Dictionary = Snapshot.data_of({level_name: {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns,
 		"ground": ground, "records": World.record_list()}})["zones"][level_name]
 	var keep_to: Variant = Regen.keep_cell(level_name)
-	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors, keep_to, World.items.id_of)
+	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors, keep_to, World.items.id_of, Regen.moved_markers(level_name))
 	_lose_items(sifted["lost"], level_name)
 	_move_items(sifted["moved"], level_name, keep_to)
 	_load_level(level_name)
@@ -5281,7 +5281,7 @@ func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 	# 465); the snapshot's section for it keeps only what sits in an anchor.
 	if regenerate and _regenerate_if_due(zone_name) and not saved.is_empty():
 		var keep_to: Variant = Regen.keep_cell(zone_name)
-		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"], keep_to, World.items.id_of)
+		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"], keep_to, World.items.id_of, Regen.moved_markers(zone_name))
 		saved = sifted["kept"]
 		_lose_items(sifted["lost"], zone_name)
 		_move_items(sifted["moved"], zone_name, keep_to)
@@ -6421,7 +6421,7 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if entity == null:
 			continue
 		# The draugr whole again from a saved zone (573 amended (4), Jeff: a restart resets him).
-		World.restore(entity, entity.max_hp if entity is Draugr else entry["hp"], entry["stamina"], entry["facing"])
+		World.restore(entity, entity.max_hp if entity is Draugr else entry["hp"], entry["stamina"], entity.facing if knight_on_marker(spec) else entry["facing"])
 		if entry.get("slots") != null:
 			World.set_slots(entity, entry["slots"], entry.get("items", []))
 		_top_up(entity, entry["spec"])
@@ -6673,7 +6673,7 @@ func _recall(record: Dictionary) -> GridEntity:
 	var entity := _spawn(spec)
 	if entity == null:
 		return null
-	World.restore(entity, parsed["hp"], parsed["stamina"], parsed["facing"])
+	World.restore(entity, parsed["hp"], parsed["stamina"], entity.facing if knight_on_marker(spec) else parsed["facing"])
 	if parsed.get("slots") != null:
 		World.set_slots(entity, parsed["slots"], parsed.get("items", []))
 		_keep_old_stock(entity)
@@ -6797,6 +6797,18 @@ static func stray_knight(spec: Dictionary) -> bool:
 	return str(spec.get("script", "")).ends_with("astral_knight.gd") or str(spec.get("kind", "")) == "astral_knight"
 
 
+## Whether [param spec] (a slot's, as _level_spec_for gives it) is the
+## fallen knight holding his slot, who stands on his marker's cell and
+## faces as it does whatever a save says (747 amended (13), Jeff on
+## v0.1.215: "astral knight still in wrong room"). He never takes a step, so
+## a saved cell other than the marker's is a save's mistake: a second boot
+## before 747 amended (11) gave the stray at (38,32) the marker's key "39,10"
+## by name, and that save came back, and through every re-lay (the altar
+## anchor keeps him), keyed and slotted at the old cell in the Low Hall.
+static func knight_on_marker(spec: Dictionary) -> bool:
+	return spec.has("spawn_key") and (str(spec.get("script", "")).ends_with("astral_knight.gd") or str(spec.get("kind", "")) == "astral_knight")
+
+
 ## The spawn slots the zone's records hold.
 func _recorded_slots() -> Dictionary:
 	var slots := {}
@@ -6823,6 +6835,16 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 				slot = i
 				break
 	if slot == -1 and not key.is_empty():
+		# Its marker moved by the template's word (moved_markers): on the new
+		# marker, as itself, its things and all; counted for release.
+		var to: Variant = Regen.moved_markers(World.zone.name).get(key)
+		var moved_slot: int = _key_slots.get("%d,%d" % [to.x, to.y], -1) if to is Vector2i else -1
+		if moved_slot >= 0 and not _alive_slots.has(moved_slot) and not _saved_keys.has(_key_of(moved_slot)):
+			_saved_keys[_key_of(moved_slot)] = true
+			print("[state] %s: 1 level entity moved with its marker, from %s to %s" % [World.zone.name, key, _key_of(moved_slot)])
+			var carried := _slot_spec(moved_slot)
+			carried["tile"] = level_entities[moved_slot]["tile"]
+			return carried
 		# Its marker moved (decision 610): the marker it was, within reach.
 		slot = _moved_marker(saved, key)
 		if slot >= 0:
@@ -6839,6 +6861,13 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 		return saved
 	var spec := _slot_spec(slot)
 	spec["tile"] = saved["tile"]
+	if knight_on_marker(spec):
+		# He never takes a step: a saved cell off his marker is a save's
+		# mistake (747 amended (13)), mended here and counted for release.
+		var was: Variant = saved["tile"] if saved["tile"] is Vector2i else Snapshot.vector(saved["tile"])
+		spec["tile"] = level_entities[slot]["tile"]
+		if was != spec["tile"]:
+			print("[state] %s: 1 fallen knight set on his marker at %s, saved at %s" % [World.zone.name, _key_of(slot), was])
 	return spec
 
 

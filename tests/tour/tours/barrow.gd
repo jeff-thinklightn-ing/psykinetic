@@ -7,8 +7,9 @@ extends RefCounted
 ## The wilds' link to the barrow and where the barrow's arrival is.
 const BARROW_LINK := Vector2i(160, 160)
 const BARROW_ARRIVAL := Vector2i(40, 2)
-## The fallen knight's post, below the Altar Room's altar (747).
-const KNIGHT_AT := Vector2i(38, 32)
+## The fallen knight's post, by the First Hall's bier (747 amended (8); the
+## Low Hall, his old room, gone since 747 amended (13)).
+const KNIGHT_AT := Vector2i(39, 10)
 ## How far from its link's arrival a crossing may land a player.
 const ARRIVAL_REACH := 4
 ## The robbers' camp chest (742 amended), opened only with Brand's key.

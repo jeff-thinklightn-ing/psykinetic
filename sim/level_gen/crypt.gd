@@ -33,7 +33,7 @@ extends RefCounted
 ##                     no monster is laid in it;
 ##     sealed_vault    one, the room farthest walked off a gallery: a cache
 ##                     chest (the block's "cache") by its back wall.
-## The other anchors (The Altar Room, the niche) are joined to the
+## The other anchors (the niche) are joined to the
 ## processional by short ways three wide. Chests ("chests", the vault's
 ## first, then the farthest tombs) are caches of the block's "cache" table,
 ## each with a monster of the first "guard" kind in its room (Jeff: "keep
@@ -108,6 +108,12 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	rng.seed = seed
 	var given: Array = config.get("anchors", [])
 	var anchors := Labyrinth._set_in_rock(template, given)
+	# The block's "rock" ([[x, y, w, h], ...]): rock no way or room is carved
+	# into, kept as the anchors' rims are but joined to nothing (747 amended
+	# (13): the barrow's Low Hall, gone, its place left whole).
+	for rect: Variant in config.get("rock", []):
+		if rect is Array and rect.size() == 4:
+			anchors.append({"rect": Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3])), "name": ""})
 	var map := template.copy()
 	Tools.clear_outside(map, anchors)
 	Labyrinth._move_hidden(map, Labyrinth.niche_plan(config, seed))

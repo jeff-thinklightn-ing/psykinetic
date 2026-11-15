@@ -4863,7 +4863,7 @@ func _test_barrow_level() -> void:
 			and shafts[0]["cell"] == Vector2i(46, 13) and skylights[0]["at"] == Vector2i(46, 13)
 			and deep["terrain"]["decor"].size() == 30 and corner_webs.call(deep) == 4,
 		"the first hall holds two cobwebbed corners, a strip of moss and the light shaft under its skylight, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %s, %d)" % [barrow["terrain"]["decor"].size(), skylights, deep["terrain"]["decor"].size()])
-	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 5 and int(Regen.config_of("barrow").get("layer", 0)) == 1
+	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
 		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
 		and Regen.config_of("barrow_deep")["anchors"][1]["name"] == "lair" and Regen.config_of("barrow_deep").get("monsters") == {"skeleton": 6, "skeleton_guard": 3}
 		and int(Regen.config_of("barrow").get("ways", 0)) == 5 and int(Regen.config_of("barrow_deep").get("ways", 0)) == 5,
@@ -4881,12 +4881,17 @@ func _test_barrow_level() -> void:
 			grave_marked[spec["name"]] = marked
 			if kind == "skeleton_guard" and marked:
 				guards_marked += 1
-	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("offering stone", 0) == 1 and kinds.get("runner's pack", 0) == 1
-		and kinds.get("robbers' chest", 0) == 1 and kinds.get("astral_knight", 0) == 1
-		and kinds.get("robbers' bundle", 0) == 1 and barrow["places"].has("niche") and barrow["entities"].size() == 7 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
-		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742), the Robbers' bundle by their bedding (870) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
-	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and not grave_marked.get("Robbers' bundle", true) and guards_marked == 2,
-		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
+	var stone_at: Array = (barrow["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec["name"].begins_with("Offering stone")).map(func(spec: Dictionary) -> Variant: return spec["tile"])
+	_check(not kinds.has("skeleton_guard") and kinds.get("draugr", 0) == 1 and kinds.get("offering stone", 0) == 1 and kinds.get("runner's pack", 0) == 1
+		and kinds.get("robbers' chest", 0) == 1 and kinds.get("astral_knight", 0) == 1 and stone_at == [OFFERING_AT]
+		and kinds.get("robbers' bundle", 0) == 1 and barrow["places"].has("niche") and barrow["entities"].size() == 5 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
+		"the Offering stone in the First Hall east of the bier, the Low Hall's guards gone (747 amended (13)), the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742), the Robbers' bundle by their bedding (870) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s, the stone at %s)" % [kinds, stone_at])
+	_check(grave_marked.get("Offering stone", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and not grave_marked.get("Robbers' bundle", true) and guards_marked == 0,
+		"grave_goods marks the offering stone and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
+	# 747 amended (13): the stone moved by the template's word, so a saved one comes back on it,
+	# things and all; and what lies outside the anchors at a re-lay gathers at the arrival.
+	_check(Regen.moved_markers("barrow") == {"38,30": OFFERING_AT} and Regen.keep_cell("barrow") == Vector2i(39, 2),
+		"the barrow names the stone's move from the Low Hall (38,30) to %s, and its re-lay gathers the ground on the arrival (%s, %s)" % [OFFERING_AT, Regen.moved_markers("barrow"), Regen.keep_cell("barrow")])
 	_check(barrow["links"].size() == 3 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][0]["to_spawn"] == "from_crypt"
 		and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
 		and barrow["links"][2]["tile"] == Vector2i(31, 52) and barrow["links"][2]["to_map"] == "wilds" and barrow["links"][2]["to_spawn"] == "from_barrow"
@@ -4897,10 +4902,10 @@ func _test_barrow_level() -> void:
 	# The rooms named on entering (666, ui's 665 card).
 	var barrow_rooms: Dictionary = Level.template_config("barrow").get("rooms", {})
 	var deep_rooms: Dictionary = Level.template_config("barrow_deep").get("rooms", {})
-	_check(barrow_rooms.keys() == ["entrance", "altar", "camp"] and str(barrow_rooms["entrance"]["name"]) == "The First Hall"
+	_check(barrow_rooms.keys() == ["entrance", "camp"] and str(barrow_rooms["entrance"]["name"]) == "The First Hall"
 		and deep_rooms.keys() == ["entrance", "lair"] and str(deep_rooms["lair"]["name"]) == "The Hall of Fallen Souls" and Level.town_wall_rect(deep_rooms["lair"]) == Rect2i(34, 56, 32, 22)
 		and str(deep_rooms["entrance"]["name"]) == "The Charnel Vault" and Level.town_wall_rect(deep_rooms["entrance"]) == Rect2i(46, 1, 8, 6),
-		"the first hall, the altar room and the camp are named on the barrow, the Charnel Vault (714) and the Hall of Fallen Souls on the Ossuary, each on its anchor (%s %s)" % [barrow_rooms.keys(), deep_rooms.keys()])
+		"the first hall and the camp are named on the barrow (the Low Hall gone, 747 amended (13)), the Charnel Vault (714) and the Hall of Fallen Souls on the Ossuary, each on its anchor (%s %s)" % [barrow_rooms.keys(), deep_rooms.keys()])
 	# The hidden door (608): the template's stair lies behind the south-east
 	# niche's door, the link hidden; the 14 niches read.
 	var niches: Array = barrow["terrain"]["niches"]
@@ -4998,7 +5003,7 @@ func _test_barrow_level() -> void:
 	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == laid_solid and laid_solid > 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8 + deep_laid
 		and gen_deep["terrain"]["stairs"].size() == 12 and int(gen_deep["terrain"]["heights"].get(Vector2i(49, 75), 0)) == 1 and made_deep["height"] != null
 		and Level.narrow_runs(gen_barrow["terrain"]).is_empty() and Level.narrow_runs(gen_deep["terrain"]).is_empty()
-		and made["config"].get("rooms", {}).size() == 3 and made_deep["config"].get("rooms", {}).has("lair"),
+		and made["config"].get("rooms", {}).size() == 2 and made_deep["config"].get("rooms", {}).has("lair"),
 		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s; solid %d of %d laid; deep solid %d of %d; narrow %s)" % [gen_barrow["warnings"], gen_deep["warnings"],
 			gen_barrow["terrain"]["solid"].size(), laid_solid, gen_deep["terrain"]["solid"].size(), 37 + deep_laid, Level.narrow_runs(gen_barrow["terrain"]).slice(0, 8)])
 	# The co-op family tomb (crypt landing 2): one plate set, two plates at
@@ -5804,6 +5809,14 @@ func _test_crypt_spacing() -> void:
 ## The Charnel Vault's torches in barrow_deep's template (608 amended (4)):
 ## its south corners, either side of the way out at (47..52, 7).
 const VAULT_TORCHES: Array[Vector2i] = [Vector2i(46, 6), Vector2i(53, 6)]
+## The barrow's Offering stone, in the First Hall east of the bier since the
+## Low Hall went (747 amended (13)), and the First Hall's rect (its anchor).
+const OFFERING_AT := Vector2i(44, 8)
+const FIRST_HALL := Rect2i(27, 1, 26, 16)
+## The knight's marker, beside the bier (747 amended (8)).
+const KNIGHT_AT := Vector2i(39, 10)
+## Where the Low Hall stood, rock every generation leaves whole (the block's "rock").
+const LOW_HALL := Rect2i(30, 24, 18, 14)
 const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "chests": 3,
 	"held": ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop", "arrival"]}
 ## 806 amended (15): a chest only where its guard can stand. On main the
@@ -5901,7 +5914,8 @@ func _test_band() -> void:
 == the barrow's named band (714 (4)) ==")
 	var want := ["brand", "crake", "fenn", "mott", "nabb", "rook", "sedge", "tull", "wicket"]
 	var wrong: Array[String] = []
-	for generation in range(1, 6):
+	# 747 amended (13): five generations and the box's two of 11-14 (136, 137).
+	for generation: int in [1, 2, 3, 4, 5, 136, 137]:
 		var made := Regen.generate("barrow", generation)
 		if made.is_empty():
 			wrong.append("g%d: not made" % generation)
@@ -5916,11 +5930,31 @@ func _test_band() -> void:
 		if ids != want or named.get("brand") != "robber_brute" or named.values().count("robber") != 8:
 			wrong.append("g%d: %s" % [generation, named])
 		var knights := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "astral_knight")
-		if knights.size() != 1:
-			wrong.append("g%d: %d fallen knights" % [generation, knights.size()])  # 747: he stays in the Altar Room.
+		if knights.size() != 1 or knights[0]["tile"] != KNIGHT_AT:
+			wrong.append("g%d: fallen knights at %s" % [generation, knights.map(func(spec: Dictionary) -> Variant: return spec["tile"])])  # One, by the bier (747 amended (8)).
+		# The Low Hall gone (747 amended (13), Jeff 11-14): no altar anchor, no room
+		# of that name, none of its guards; the stone in the First Hall; the hidden
+		# way down inside the First Hall (the knight's reveal); Pip's niche joined.
+		var stones := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool: return str(spec["name"]).begins_with("Offering stone"))
+		var down := (level["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "barrow_deep")
+		var anchors: Array = made["anchors"]
+		var anchor_names := anchors.map(func(anchor: Dictionary) -> String: return str(anchor["name"]))
+		var rooms: Dictionary = made["config"].get("rooms", {})
+		if "altar" in anchor_names or rooms.has("altar") or (level["entities"] as Array).any(func(spec: Dictionary) -> bool: return spec.get("kind") == "skeleton_guard"):
+			wrong.append("g%d: the Low Hall still laid (%s, %s)" % [generation, anchor_names, rooms.keys()])
+		if stones.size() != 1 or stones[0]["tile"] != OFFERING_AT:
+			wrong.append("g%d: offering stones at %s" % [generation, stones.map(func(spec: Dictionary) -> Variant: return spec["tile"])])
+		if down.size() != 1 or not FIRST_HALL.has_point(down[0]["tile"]):
+			wrong.append("g%d: the way down at %s, not in the First Hall %s" % [generation, down.map(func(link: Dictionary) -> Variant: return link["tile"]), FIRST_HALL])
+		var laid_map := LevelMap.from_image(made["layout"], made["config"])
+		if not "niche" in anchor_names or not Regen.connected(laid_map, anchors):
+			wrong.append("g%d: Pip's niche not joined (%s)" % [generation, anchor_names])
+		var in_hall := Level.rect_cells(LOW_HALL).filter(func(cell: Vector2i) -> bool: return laid_map.walkable(cell))
+		if not in_hall.is_empty():
+			wrong.append("g%d: floor where the Low Hall stood %s" % [generation, in_hall.slice(0, 4)])
 		if (level["warnings"] as Array).any(func(w: String) -> bool: return "names an entity" in w):
 			wrong.append("g%d warned: %s" % [generation, level["warnings"]])
-	_check(wrong.is_empty(), "five generations: the nine named, Brand the brute and eight robbers, each a spawn, and the fallen knight (%s)" % [wrong])
+	_check(wrong.is_empty(), "five generations and the box's 136 and 137: the nine named, Brand the brute and eight robbers, each a spawn; one fallen knight, at %s by the bier; the Low Hall gone, its place rock, its guards with it, the Offering stone at %s in the First Hall, the hidden way down inside the First Hall %s, Pip's niche joined (%s)" % [KNIGHT_AT, OFFERING_AT, FIRST_HALL, wrong])
 
 
 ## 742, amended (Jeff: "the chest only opens with a key from the boss and
