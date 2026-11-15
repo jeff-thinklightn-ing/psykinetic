@@ -22045,8 +22045,10 @@ void light() {
 	}
 }
 """
-## Off for a look's "off" still.
+## Off for a look's "off" still; its depth for the look's second frame
+## (0.45 = the stall's shade, about 0.76).
 static var foot_marks_on := true
+static var foot_mark_depth := FOOT_MARK_DEPTH
 var _foot_marks: MultiMeshInstance3D
 ## By puppet id: its drawn "body", the "mesh" whose cast and transparency it
 ## follows, its "size" (along, across), "height", and its "cell" and whether
@@ -22113,7 +22115,7 @@ func _place_foot_marks() -> void:
 			body["inside"] = _indoors(cell) or _terrain_water_has(cell)
 		if body["inside"]:
 			continue
-		var strength := FOOT_MARK_DEPTH * day * (1.0 - mesh.transparency)
+		var strength := foot_mark_depth * day * (1.0 - mesh.transparency)
 		if String(puppet.name).begins_with("Corpse_"):
 			# A fallen player's body sinks after it lies (911): the mark goes with it.
 			var sunk := float(body["rest_y"]) - puppet.global_position.y
@@ -22140,7 +22142,11 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 	var person := drawn.get_node_or_null("Model") != null and puppet.has_meta("look")
 	if not (drawn is MeshInstance3D or drawn.get_node_or_null("Model") != null or puppet.has_meta("creature_view")):
 		return {}
-	var meshes: Array[Node] = [drawn] if drawn is MeshInstance3D else drawn.find_children("*", "MeshInstance3D", true, false)
+	var meshes: Array[Node] = []
+	if drawn is MeshInstance3D:
+		meshes.append(drawn)
+	else:
+		meshes = drawn.find_children("*", "MeshInstance3D", true, false)
 	if meshes.is_empty():
 		return {}
 	# A person's own "Body" mesh under Model (pc-character: gear comes and goes).
