@@ -68,6 +68,10 @@ func run(bot: Node) -> void:
 func _pass(bot: Node, hour: int) -> void:
 	var end: int = bot.now_msec() + int(PASS_SECONDS * 1000.0)
 	var tried := {}
+	# The day pass ends at the healer's hut too (the coordinator, 11-15, after perf's tour on 38394b4a4): Hob works,
+	# lives and sleeps there by his own clock, west of every spot, so by day no spot brought him into view and "met by
+	# day" missed him; the night pass's walk from sleeper to sleeper reached him.
+	var spots: Array = SPOTS + ([HEALER_HUT] if hour == HOURS[0] else [])
 	while bot.now_msec() < end:
 		if bot.me() == null or int(bot.me().hp) <= 0:
 			bot.log_line("down in the town; the pass ends")
@@ -77,10 +81,10 @@ func _pass(bot: Node, hour: int) -> void:
 		if left.is_empty():
 			# None new in view: on to the next of the town's spots, then done.
 			var spot: int = tried.get("_spot", 0)
-			if spot >= SPOTS.size():
+			if spot >= spots.size():
 				break
 			tried["_spot"] = spot + 1
-			await bot.walk_to(SPOTS[spot], 3, 60.0)
+			await bot.walk_to(spots[spot], 3, 60.0)
 			continue
 		left.sort_custom(func(a: GridEntity, b: GridEntity) -> bool: return World.distance(a.tile, bot.cell()) < World.distance(b.tile, bot.cell()))
 		var person: GridEntity = left[0]

@@ -58426,3 +58426,19 @@ the door's outside cells, one piece, nothing built, solid, a spot or an entity o
 to its mouth; the pool's water kept and no painted dirt beside it (fails on main's data,
 naming seven cells). relief_test's roads row counts twelve and names any road cell not painted dirt. Level data and
 tests; protocol unchanged; no new class_name. Road widths (the through road wider) are not in it.
+
+935 amended (2), tests only (the coordinator's ask, 2026-11-15, after economy's 853 amended (17); the label from
+tools/decision_number.sh): the folk tour's day pass ends at the healer's hut. On main 38394b4a4 every row passed but
+"every townsperson was met by day": the day pass walks the square and SPOTS, all east of x 190, and Hob works, lives
+and sleeps at his hut (149,232) by his own clock, so no spot brought him into view at noon. At 23:00 the pass's walk
+from sleeper to sleeper reached him off his doorway, and he answered. Now folk.gd's _pass walks to HEALER_HUT after
+SPOTS at the day's hour (the night pass as before). On main de16f929d: "every townsperson was met by day (10 in all)"
+PASS, Hob in. It uncovers one true FAIL, kept as found: at noon a click on the healer at work behind his shut door
+does nothing. Hob is inside at (152,233), his hut's door (152,232, side 1) shut, the player at (152,230). The click
+gives no route (the bot's "the click's 0"), so the player never moves toward the door. The bot opens a shut door only
+within one cell (bot.walk_to, E as a player presses it), and from two cells off it stalled for 40 s, so "Hob answers
+a click" fails by day and passes at night (outside at (154,234): "What ails you?", his wares). Teaching the bot to
+open a door from two cells off would hide what a player meets. The row stands until a click on a person behind a
+shut door walks the player to it (the coordinator has sent this to ui and economy). The folk tour is not a part of
+land.sh's suite and no landing check reads its result, so the standing FAIL fails no landing. Tests only; protocol
+unchanged; no class_name; no bullet.
