@@ -5,6 +5,9 @@ extends RefCounted
 ## (the client knows only who is near), clicked as a player clicks (Main's
 ## greet and talk bar, 560). Awake: the bar comes up, a trader's with its
 ## wares or a way to them; asleep (751): told they sleep, never spoken to.
+## Since 802 a click opens the person window (barter_panel), not the bar: the
+## window open and shown with them is an answer, and the tour closes it, never
+## hides it (a hidden window stays hidden; perf, 2026-11-15).
 ## Never a raw node name in what is shown. Each person's buttons logged, a
 ## table of who was met at the end.
 
@@ -95,7 +98,8 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 		return
 	var asleep := str(person.get("activity")) == "sleep"
 	var path := str(person.get_path())
-	await bot.click(person.tile)
+	var clicked: Vector2i = person.tile
+	await bot.click(clicked)
 	await bot.seconds(3.0)
 	if not is_instance_valid(person):
 		return
@@ -103,6 +107,9 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 		.map(func(b: Dictionary) -> String: return str(b["text"]))
 	var heard: Array = bot.heard_from(path, since).map(func(l: Dictionary) -> String: return str(l["text"]).left(60))
 	var trade := str(person.get("trade"))
+	# Their window (802), open and shown: a merchant's on his counter, with him as its person.
+	var panel: Node = bot.main.barter_panel
+	var windowed: bool = panel != null and panel.is_open() and panel.is_visible_in_tree() and (panel.person == person or panel.with == person)
 	_met["%s|%d" % [_who(person), hour]] = {"name": name, "trade": trade, "activity": str(person.get("activity")), "buttons": buttons, "heard": heard}
 	var shown := " ".join(bot.texts())
 	var raw: Array = bot.node_names_in(shown)
@@ -142,11 +149,12 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 				bot.expect(not data.is_empty() and str(data.get("why", "")).is_empty() and (by_day < 0 or goods.size() == by_day),
 					"%s's counter still sells while %s sleeps, as by day (intended)" % [name, name],
 					"the answer: why \"%s\", %d goods (by day %d)" % [data.get("why", ""), goods.size(), by_day] if not data.is_empty() else "no answer")
-			if bot.main.barter_panel != null and bot.main.barter_panel.visible:
-				bot.main.barter_panel.hide()
+			if bot.main.barter_panel != null and bot.main.barter_panel.is_open():
+				bot.main.barter_panel.close()
 	else:
-		bot.expect(not buttons.is_empty() or not heard.is_empty(), "%s answers a click (the talk bar or a greeting)" % name,
-			"no buttons, nothing heard; activity %s" % person.get("activity"))
+		bot.expect(windowed or not buttons.is_empty() or not heard.is_empty(), "%s answers a click (their window, the talk bar or a greeting)" % name,
+			"no window, no buttons, nothing heard; activity %s; clicked %s, they at %s, me at %s; the window %s" % [person.get("activity"), clicked, person.tile, bot.cell(),
+				("open with %s" % (panel.person.name if panel.person != null else panel.with.name if panel.with != null else "-")) if panel != null and panel.is_open() else "closed"])
 		if trade == "merchant":
 			var counter: GridEntity = bot.main._shop_counter_near(person)
 			if counter != null:
@@ -157,14 +165,25 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 				var day: Dictionary = bot.main.barter_data
 				_counter_by_day[name] = (day.get("goods", []) as Array).size() if not day.is_empty() else -1
 				bot.log_line("  %s's counter by day: why \"%s\", %d goods" % [name, day.get("why", ""), _counter_by_day[name]])
-				if bot.main.barter_panel != null and bot.main.barter_panel.visible:
-					bot.main.barter_panel.hide()
-		# A merchant fronting a shop, or a maker (Main._barters): a priest has none.
-		if (trade == "merchant" or trade in Items.TRADES) and not buttons.is_empty():
+				if bot.main.barter_panel != null and bot.main.barter_panel.is_open():
+					bot.main.barter_panel.close()
+		# A merchant fronting a shop, or a maker (Main._barters): a priest has none,
+		# nor a trade no item is made by (a carpenter today; economy, 11-15).
+		if trade in Items.TRADES and not _made_by(trade):
+			bot.log_line("  %s, a %s: no item is made by a %s, so no wares to show" % [name, trade, trade])
+		elif (trade == "merchant" or trade in Items.TRADES) and not buttons.is_empty():
 			bot.expect(buttons.any(func(t: String) -> bool: return TRADE_WORDS.any(func(w: String) -> bool: return w in t.to_lower())),
 				"%s, a %s, shows wares or a way to them" % [name, trade], "buttons %s" % [buttons])
 	bot.press("close")  # Else the bar goes as I walk on to the next.
 	await bot.seconds(0.5)
+
+
+## Whether any item is made by [param trade] (items.json's "made" "by").
+func _made_by(trade: String) -> bool:
+	for id: Variant in Items.ids():
+		if str((Items.def(str(id)).get("made", {}) as Dictionary).get("by", "")) == trade:
+			return true
+	return false
 
 
 ## Townsfolk come into the chapel at a visiting hour: watched from inside its
@@ -191,7 +210,9 @@ func _chapel_visit(bot: Node) -> void:
 	await bot.admin("day_minutes 90")
 	# The priest at his work (npc's 734 amended (4)): in the chapel, never on or
 	# beside its doors, its counter or the respawn cell (the coordinator, 11-01).
-	await bot.admin("hour 12")
+	# At 15:00, inside his 13-19 work stint after his own +-0.75 h (residents.json
+	# "priest": the square 12-13; economy, 11-15).
+	await bot.admin("hour 15")
 	var found := {}  # A lambda's own assignment never reaches out (captured by value).
 	await bot.until(func() -> bool:
 		for body: GridEntity in bot.seen(""):
@@ -199,7 +220,9 @@ func _chapel_visit(bot: Node) -> void:
 				found["priest"] = body
 		return found.has("priest"), 60.0)
 	var priest: GridEntity = found.get("priest")
-	if bot.expect(priest != null, "the priest is at his work in the chapel at noon"):
+	var seen_priests: Array = bot.seen("").filter(func(b: GridEntity) -> bool: return b is Resident and str(b.get("trade")) == "priest").map(func(b: GridEntity) -> String: return "%s at %s" % [_who(b), b.tile])
+	if bot.expect(priest != null, "the priest is at his work in the chapel at 15:00",
+			"in sight from %s: %s" % [bot.cell(), seen_priests if not seen_priests.is_empty() else "no priest"]):
 		await bot.seconds(5.0)  # Settled at his spot.
 		bot.expect(CHAPEL.has_point(priest.tile) and CHAPEL_KEEP_OFF.all(func(c: Vector2i) -> bool: return World.distance(c, priest.tile) > 1),
 			"%s works in the chapel off its doors, its counter and the respawn cell" % _who(priest), "at %s" % priest.tile)
