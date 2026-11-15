@@ -57732,3 +57732,54 @@ Mughouse's terrain names its town, the wilds' is empty. Pretests: load_check, so
 
 Client sound only, beside one terrain key a joined client lays itself; protocol unchanged; no new
 class_name.
+## 935. A player's click route search is bounded (perf; the coordinator's approval, 2026-11-15)
+
+A click on a cell that is walkable but cannot be reached searched the whole zone before it gave up.
+In perf_folk4 (Lenovo, windowed) the healer Hob stood on his hut's door cell (152,232) at night, so
+every cell a hand reaches him from lay past his body. Each click on him (Main._talk_to, _beside,
+_move_click, _free_route, World.walk_path, find_path with no max_tiles) closed the wilds' 49,771
+reachable cells and returned no route: 2,708 ms the first time and 420-885 ms after it on the
+Lenovo, about 230 ms here headless, on the main thread. The player did not move. (The ~410 ms frames
+that folk3 put down to a bot stall were these.)
+
+World.CLICK_SEARCH_TILES (12,000) bounds a player's click routes. World.walk_path takes max_tiles
+(default 0, unbounded, so its other callers are unchanged); Main's click-born callers pass the bound:
+_free_route, _free_intent (the held cursor's replan), _free_no_headway, _free_beside_again, _free_round
+(its two find_paths) and _free_chase. A click with no route now stops after 12,000 closed cells, about
+52 ms here and about 100 ms on a laptop, a fifth of before.
+
+Why 12,000 and not the 4,000 first approved. A click's cell is at most World.NEAR_TILES (22, ZOOM_MAX's
+widest view, decision 238) plus Client3D.PAN_MAX (10, the middle drag's slide) = 32 tiles off. A
+wilds-only survey (5,859 routes from 9 starts) found the worst route that exists within 40 tiles
+closing 1,916 cells, and 4,000 was approved on it. The every-zone row then found the hills' worst at
+5,098 cells ((48,72) to (16,46), 100 cells long), the foothills' at 3,719 and castle_halls generation
+1's at 2,157. 4,000 would have cut a real route in the hills. 12,000 keeps every route that exists
+under half the bound. A smaller bound made safe by walking toward the target was not taken, because
+it would cut routes that exist.
+
+The one path that can ask past 32 tiles is the chase: it replans to a fleeing target, which stays
+on the client at most interest's LEAVE (about 44 tiles) away. A target that has fled 33-44 tiles behind
+a long way round can give an empty replan, for that replan only. ui's take on top handles an empty
+chase path the same way as a click with no route. No other path asks a player route that far:
+- the world and corner maps send no walk;
+- a guide's led route is sent from her heel cell, and the client replans only to its last cell;
+- the test drives (--test-move, steer, contest) move 12 cells at most;
+- the tour bot's walk_to now clicks a longer route in legs of 24 cells along World.walk_path
+  (tests/tour/bot.gd, CLICK_LEG), as a player clicks ahead.
+
+What a click does with no route, and not asking an unreachable goal again from the same cell for
+about a second, are ui's, built on this.
+
+tests/click_route_test (base port 17867) and click_route_far_test (17868, its subclass: the hills,
+foothills and forest):
+- _test_doorway: a body on (152,232) and a route from (149,231) to (152,233). Uncapped it closes
+  49,771 cells; capped, exactly the bound, also through Main's _free_route. With the doorway clear,
+  the way through is found, the same capped as uncapped. The count decides; the ms is printed.
+- _test_click_routes_agree: every playable level and each regenerating level's generations 1-8
+  (registered in memory). From its starts, link cells and a stride-24 lattice, routes go to every
+  free walkable cell within 32 tiles, on a stride-3 lattice in a zone of 2,000 floor cells or more and
+  stride 6 in a smaller one, whose whole floor is under the bound. Every route that exists closes at
+  most half the bound, else the row names the route and its zone. Run: 46 zones, 125,887 routes; the
+  worst are the hills' 5,098 and castle_halls generation 1's 2,157.
+
+Client only; protocol unchanged; no new class_name; no bullet.

@@ -8,6 +8,10 @@ extends Node
 ## client: where it stands, which windows and buttons are up, what is said.
 ## Setup a player could not do (the hour, a place to start from) goes
 ## through the server's admin console, named as setup in the report.
+##
+## For playtest (perf, decision 935): a click's search is bounded for a cell
+## at most 32 tiles off, so walk_to clicks a longer route in legs of
+## CLICK_LEG (24) along World.walk_path, as a player clicks ahead.
 
 ## The client's Main (main.tscn), which the tour scene made.
 var main: Node
@@ -342,9 +346,17 @@ func key(keycode: Key, at := Vector2i(-1, -1)) -> void:
 			await frames(1)
 
 
+## The farthest a walk_to clicks at once along its route (decision 935): a
+## player's click reaches World.NEAR_TILES + Client3D.PAN_MAX (32) tiles at
+## most and its search is bounded for that (World.CLICK_SEARCH_TILES), so a
+## longer walk is clicked a leg at a time, as a player clicks ahead.
+const CLICK_LEG := 24
+
+
 ## Clicks [param at] and waits till the player stands on it (or within
 ## [param near] cells of it), most [param seconds]: true if it got there.
-## Clicks again when the walk stalls (a long route, a body in the way).
+## Clicks again when the walk stalls (a long route, a body in the way). A
+## route longer than CLICK_LEG is clicked a leg at a time (_leg_toward).
 func walk_to(at: Vector2i, near := 0, seconds := 60.0) -> bool:
 	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
 	var last := cell()
@@ -357,7 +369,8 @@ func walk_to(at: Vector2i, near := 0, seconds := 60.0) -> bool:
 		log_line("  no way there (%s walkable: %s); nearest reachable %s, %d cells off" % [
 			at, World.is_walkable(at), nearest.back() if not nearest.is_empty() else cell(),
 			World.distance(nearest.back() if not nearest.is_empty() else cell(), at)])
-	await click(at)
+	var leg := _leg_toward(at)
+	await click(leg)
 	while Time.get_ticks_msec() < until:
 		await frames(1)
 		if zone() != from_zone:
@@ -365,6 +378,9 @@ func walk_to(at: Vector2i, near := 0, seconds := 60.0) -> bool:
 			return true
 		if me() != null and World.distance(cell(), at) <= near:
 			return true
+		if leg != at and World.distance(cell(), leg) <= 1:
+			leg = _leg_toward(at)  # The leg walked: the next.
+			await click(leg)
 		if cell() != last:
 			last = cell()
 			still_since = Time.get_ticks_msec()
@@ -388,8 +404,18 @@ func walk_to(at: Vector2i, near := 0, seconds := 60.0) -> bool:
 					await tap_e_door(door)
 					await seconds(1.0)
 					break
-			await click(at)
+			leg = _leg_toward(at)
+			await click(leg)
 	return me() != null and World.distance(cell(), at) <= near
+
+
+## Where walk_to clicks next for [param at]: the cell CLICK_LEG along the
+## route from where it stands (World.walk_path, unbounded: the bot's own
+## planning, not a click), or [param at] itself when the route is no longer
+## (or there is none, so the click is as a player's).
+func _leg_toward(at: Vector2i) -> Vector2i:
+	var route := World.walk_path(cell(), at, me())
+	return route[CLICK_LEG - 1] if route.size() > CLICK_LEG else at
 
 
 ## Fights [param foe] as a player does: a left click on it (Main's click:

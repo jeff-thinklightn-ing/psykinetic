@@ -3076,7 +3076,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 				_free["goal"] = goal
 				_free["planned"] = now
 				var route: Array = []
-				for cell: Vector2i in World.walk_path(from, goal, player):
+				for cell: Vector2i in World.walk_path(from, goal, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
 					route.append(cell)
 				_free["path"] = route
 			if (_free["path"] as Array).is_empty():
@@ -3149,7 +3149,7 @@ func _free_no_headway(player: Player, own: FreeNet.Own, at: Vector2, path: Array
 	var route: Array = []
 	if not _free.get("replanned", false):
 		_free["replanned"] = true
-		for cell: Vector2i in World.walk_path(from, goal, player):
+		for cell: Vector2i in World.walk_path(from, goal, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
 			route.append(cell)
 	if route.is_empty() or route[0] == next:
 		print("[free] no headway %.1f s at %s making for %s toward %s (the planner: %s): the walk ended" % [stood, at, first, goal, believed])
@@ -3341,7 +3341,7 @@ func _free_beside_again(player: Player, at: Vector2, other: GridEntity, goal: Ve
 	var cell := _beside(of, from)
 	var route: Array = []
 	if cell != NONE and cell != goal and cell != from:
-		for step: Vector2i in World.walk_path(from, cell, player):
+		for step: Vector2i in World.walk_path(from, cell, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
 			route.append(step)
 	if route.is_empty() or route.back() != cell:
 		return []
@@ -3382,7 +3382,7 @@ func _free_round(player: Player, at: Vector2, heading: Vector2, other: GridEntit
 					World._line_clear(from, side, side, player)])
 			continue
 		var route: Array = [side]
-		for cell: Vector2i in World.find_path(side, goal, true, player, 0, false, {there: true}):
+		for cell: Vector2i in World.find_path(side, goal, true, player, World.CLICK_SEARCH_TILES, false, {there: true}):
 			route.append(cell)
 		if route.back() != goal:
 			if any_side:
@@ -3393,7 +3393,7 @@ func _free_round(player: Player, at: Vector2, heading: Vector2, other: GridEntit
 		return route
 	if any_side:
 		var route: Array = []
-		for cell: Vector2i in World.find_path(from, goal, true, player, 0, false, {there: true}):
+		for cell: Vector2i in World.find_path(from, goal, true, player, World.CLICK_SEARCH_TILES, false, {there: true}):
 			route.append(cell)
 		if not route.is_empty() and route.back() == goal:
 			print("[free] %s plans round %s at %s from %s (tick %d)" % [player.name, other.name, there, from, World.tick])
@@ -3657,7 +3657,7 @@ func _free_chase(player: Player, at: Vector2) -> void:
 	if target.tile != _free["chase_tile"]:
 		_free["chase_tile"] = target.tile
 		var route: Array = []
-		for step: Vector2i in World.walk_path(cell, target.tile, player):
+		for step: Vector2i in World.walk_path(cell, target.tile, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
 			route.append(step)
 		_free["path"] = route
 	var now := Time.get_ticks_msec()
@@ -3710,7 +3710,7 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	# finish (the latency table's click stop went on 0.4 cells into it).
 	tile = clear_of_fire(tile, from, World.is_burning, World.is_walkable)
 	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
-		for cell: Vector2i in World.walk_path(from, tile, player):
+		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
 			path.append(cell)
 	_free["path"] = path
 

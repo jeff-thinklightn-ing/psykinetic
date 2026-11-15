@@ -314,6 +314,13 @@ const PATH_STEP_COST := 1000
 const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
 const PATH_DIAGONAL_EXTRA := 1
 const PATH_FIRE_EXTRA := 5000
+## The most cells a player's click route closes (decision 935): a click's
+## cell is at most World.NEAR_TILES + Client3D.PAN_MAX (32) tiles off, and
+## the worst way there that exists in any zone closes under half of this
+## (click_route_test and click_route_far_test: the hills' 5,098); a cell
+## walkable but walled off (a body in a doorway) stops here, not after the
+## whole zone (the wilds' 49,777 cells, half a second a click on a laptop).
+const CLICK_SEARCH_TILES := 12000
 ## The cost of a burning cell to those that keep off fire (decision 707,
 ## find_path's fire_extra: her heel, errands and Guide, a resident's walk
 ## by a Heel): forty steps, so she goes the long way round, yet not a
@@ -14166,9 +14173,10 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 ## corner refusal, nobody but [param ignore], its own companion or the
 ## goal's occupant, no fire); never longer, as a line of n cells is n steps and the same
 ## diagonals. Players' own routes only (the prediction's plan and
-## Player's re-path); monsters keep find_path.
-func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA) -> Array[Vector2i]:
-	var path := find_path(from, to, true, ignore, 0, false, {}, true, fire_extra)
+## Player's re-path); monsters keep find_path. [param max_tiles] as
+## find_path's (0: no bound); a click's routes pass CLICK_SEARCH_TILES.
+func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA, max_tiles := 0) -> Array[Vector2i]:
+	var path := find_path(from, to, true, ignore, max_tiles, false, {}, true, fire_extra)
 	if path.size() < 3:
 		return path
 	var pulled: Array[Vector2i] = []
