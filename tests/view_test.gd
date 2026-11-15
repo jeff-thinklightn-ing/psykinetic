@@ -219,6 +219,7 @@ func _ready() -> void:
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
 		await _test_wind_flinch()  # 392 amended (11): after blows_seen, with its player still standing (the list's end has none).
+		await _test_tell_killed()  # 780 amended (36): after wind_flinch, its player still standing.
 		_test_gait_holds()
 		await _test_shield_seen()
 		await _test_reel_clock()
@@ -17693,6 +17694,55 @@ func _test_blows_seen() -> void:
 			% [int(heard[1]) - clock, int(both[1]) - clock])
 	for made: Monster in [bitten_body, at_rhea, biter]:
 		made.free()
+
+
+## 780 amended (36): a teller killed mid-tell (ui-design's dagger runs: a robber killed as he told). His tell
+## is dropped as he goes (_entity_went); his puppet freed as a gone body's is (_departed, then _drop_departed);
+## then the tell's end (Main._on_telegraph_ended). Its typed read of the freed puppet was a script error: now
+## none, and the tell's cells cleared.
+func _test_tell_killed() -> void:
+	print("
+== 780 amended (36): a teller killed mid-tell ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player for a teller to tell at")
+		return
+	var ticks := 6
+	var at_kill := player.tile + Vector2i(-2, 0)
+	if World.get_entity_at(at_kill) != null:
+		World.despawn(World.get_entity_at(at_kill))
+	var doomed := _spawn_imp(at_kill, "robber")
+	if doomed == null:
+		_check(false, "a robber to kill mid-tell")
+		return
+	doomed.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
+	doomed.sight_range = 0
+	World.face(doomed, Vector2i(1, 0))
+	for i in 30:
+		_rig._process(0.0)
+		if _rig._puppets.has(doomed.get_instance_id()):
+			break
+		await get_tree().process_frame
+	var doomed_puppet: Node3D = _rig._puppets.get(doomed.get_instance_id())
+	var kill_id := 499
+	_rig.telegraph_show(str(kill_id), [at_kill + Vector2i(1, 0), player.tile], World.tick, World.tick + ticks)
+	_rig.creature_tell(kill_id, {"id": kill_id, "source": str(doomed.get_path()), "kind": "lunge",
+			"from_tick": World.tick, "lands_tick": World.tick + ticks})
+	var telling := _rig._tells.has(kill_id) and _rig._telegraphs.has(str(kill_id))
+	var gone_name := str(doomed_puppet.get_meta("entity_name", "")) if doomed_puppet != null else ""
+	World.despawn(doomed)
+	_rig._process(0.0)
+	var dropped := not _rig._tells.has(kill_id)  # Dropped as he went (_entity_went), not left to be read.
+	if _rig._departed.has(gone_name):
+		_rig._departed[gone_name]["at"] = 0  # Long gone: dropped now, not after its wait.
+	_rig._drop_departed()
+	await _frames(2)
+	var freed := doomed_puppet == null or not is_instance_valid(doomed_puppet)
+	_main._on_telegraph_ended(kill_id, false)
+	_check(telling and dropped and freed and not _rig._tells.has(kill_id) and not _rig._telegraphs.has(str(kill_id)),
+			"a teller killed mid-tell: his tell dropped as he went (%s); its end, his puppet freed (%s), meets no error and clears its cells (told %s)"
+			% [dropped, freed, telling])
+	await _frames(2)
 
 
 ## 392 amended (11): a body struck while its blow winds up is rocked and its strike runs on (no hit clip

@@ -6741,9 +6741,13 @@ func _told_rock(puppet: Node3D) -> void:
 
 ## Telegraph [param id] over: the tell it began ends (cut short when it did not land).
 func creature_tell_over(id: int, landed: bool) -> void:
-	var puppet: Node3D = _tells.get(id)
+	# Read untyped and checked first (780 amended (36)): a typed read of a freed puppet is a script error.
+	var held: Variant = _tells.get(id)
 	_tells.erase(id)
-	if puppet == null or not is_instance_valid(puppet):
+	if not is_instance_valid(held):
+		return
+	var puppet := held as Node3D
+	if puppet == null:
 		return
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
@@ -22685,6 +22689,16 @@ func _entity_went(id: int) -> void:
 	var puppet: Node3D = _puppets[id]
 	_puppets.erase(id)
 	_plate_rows.erase(id)
+	# Its tells go with it (780 amended (36)): none left in _tells for a tell's end to read after its puppet
+	# is freed (a corpse's fall, or _departed's wait). Gone but standing, its tell's look ends as a broken
+	# one's; falling, the fall is its look.
+	var dying := _pending_deaths.has(str(puppet.get_meta("entity_name", "")))
+	for tell_id: int in _tells.keys():
+		if is_same(_tells[tell_id], puppet):
+			if dying:
+				_tells.erase(tell_id)
+			else:
+				creature_tell_over(tell_id, false)
 	_drop_remains(id)
 	_stop_creak(puppet)
 	if puppet == _outlined:
