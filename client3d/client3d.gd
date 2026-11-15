@@ -10640,7 +10640,9 @@ func _add_house_front(building: Dictionary, cells: Dictionary, wall_set: String)
 			_house_seats[rect.position].append([step, [doors[index][0]], 0.0])
 	if not ArtKit.has(DOOR_LAMP_SLOT):
 		return
-	var made := _door_lamp_piece(house_lamp_at(doors, grounds, wall_set == "stone"), turn, HOUSE_DOOR_LAMP_ENERGY, HOUSE_DOOR_LAMP_RANGE)
+	var trade := inn_front_lamp(building)
+	var made := _door_lamp_piece(house_lamp_at(doors, grounds, wall_set == "stone"), turn,
+			DOOR_LAMP_ENERGY if trade else HOUSE_DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE if trade else HOUSE_DOOR_LAMP_RANGE)
 	made[0].name = "HouseLamp_%d_%d" % [rect.position.x, rect.position.y]
 	(made[1] as OmniLight3D).visible = false
 	if made[2] != null:
@@ -10649,7 +10651,23 @@ func _add_house_front(building: Dictionary, cells: Dictionary, wall_set: String)
 	var inside: Array = doors.map(func(door: Array) -> Vector2i: return door[0])
 	_house_seats[rect.position].append([made[0], inside, 0.0])
 	var entry: Array = _house_lights[rect.position]
-	entry.append_array([made[1], made[2], Level.front_cell(rect, building["facing"]) if not building.has("front") else building["front"], made[0]])
+	entry.append_array([made[1], made[2], Level.front_cell(rect, building["facing"]) if not building.has("front") else building["front"], made[0], trade])
+
+
+## Whether [param building]'s door lantern is a trade's (927 amended (2); the
+## coordinator, 11-15, "the first view at night": the inn's porch the
+## brightest warm thing a newcomer sees): an inn's, its taverner's counter no
+## shop's, so 782's counter rule never reached it. Its own lantern, where it
+## hangs, at a trade's DOOR_LAMP_ENERGY over DOOR_LAMP_RANGE, its light shown
+## whenever its house is lit, outside the HOUSE_LIGHT_NEAR pick.
+static func inn_front_lamp(building: Dictionary) -> bool:
+	return str(building.get("use", "")) == "inn"
+
+
+## Whether a house light's row [param entry] carries a trade's door lantern
+## (inn_front_lamp).
+static func trade_lamp_row(entry: Array) -> bool:
+	return entry.size() > 8 and bool(entry[8])
 
 
 ## Each lived-in house's pieces on the ground as it now stands (489 amended
@@ -10756,14 +10774,14 @@ func _light_houses(delta: float) -> void:
 		var near := house_lights_near(lit, Vector2(_camera_target.x, _camera_target.z), HOUSE_LIGHT_NEAR)
 		for entry: Array in lit:
 			(entry[0] as OmniLight3D).visible = near.has(entry)
-			_show_house_lamp(entry, true, near.has(entry))
+			_show_house_lamp(entry, true, near.has(entry) or trade_lamp_row(entry))
 	for at: Vector2i in _house_lights:
 		var entry: Array = _house_lights[at]
 		var light := entry[0] as OmniLight3D
 		if is_instance_valid(light) and light.visible:
 			light.light_energy = HOUSE_LIGHT_ENERGY * Flames.flicker(_house_light_time, float(entry[3]), HOUSE_LIGHT_FLICKER)
 		if entry.size() > 4 and is_instance_valid(entry[4]) and (entry[4] as OmniLight3D).visible:
-			(entry[4] as OmniLight3D).light_energy = HOUSE_DOOR_LAMP_ENERGY * Flames.flicker(_house_light_time, float(entry[3]) + 1.0, LANTERN_FLICKER)
+			(entry[4] as OmniLight3D).light_energy = (DOOR_LAMP_ENERGY if trade_lamp_row(entry) else HOUSE_DOOR_LAMP_ENERGY) 					* Flames.flicker(_house_light_time, float(entry[3]) + 1.0, LANTERN_FLICKER)
 
 
 ## A house light's row [param entry]'s door lantern (_add_house_front; none on
@@ -20595,9 +20613,8 @@ static func door_lamp_at(ground: Vector3, facing: Vector2i) -> Vector3:
 
 
 ## A lantern hung by the door of each building holding a shop's or a
-## temple's counter (782; a Chest with props shop or temple), and of a
-## standing inn (782's rule, 927 amended (2)), once a building; looked at
-## with the window lights (LAMP_CHECK), since the
+## temple's counter (782; a Chest with props shop or temple), once a
+## building; looked at with the window lights (LAMP_CHECK), since the
 ## counters come with the entities, after the room. Outdoors only.
 func _hang_door_lamps() -> void:
 	if _room == null or not bool(_terrain.get("outdoor", false)):
@@ -20609,19 +20626,6 @@ func _hang_door_lamps() -> void:
 			continue
 		var building := building_holding(buildings, counter.tile)
 		if building.is_empty():
-			continue
-		var facing: Vector2i = building["facing"]
-		var front: Vector2i = building.get("front", Level.front_cell(building["rect"], facing))
-		if _door_lamps.has(front) and is_instance_valid(_door_lamps[front]):
-			continue
-		_door_lamps[front] = _add_door_lamp(front, facing)
-	# The inn's door as a trade's (782's rule; the coordinator, 11-15, "the
-	# first view at night": the inn's porch the brightest warm thing a newcomer
-	# sees), its taverner's counter no shop's: standing, once.
-	for building: Variant in buildings:
-		if not building is Dictionary or str((building as Dictionary).get("use", "")) != "inn" or not building.has("facing"):
-			continue
-		if _state_of(building) != Towns.STANDING:
 			continue
 		var facing: Vector2i = building["facing"]
 		var front: Vector2i = building.get("front", Level.front_cell(building["rect"], facing))

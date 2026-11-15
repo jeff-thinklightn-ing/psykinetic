@@ -57289,15 +57289,23 @@ temple's lancets drawn down toward a house pane, and the inn's door lantern made
   ui-design's two-up of the two decides; the value here is the one it picked. Nothing else of the window
   changes: it is lit at the same hours, and its patch on the ground (927) is as before. Lore is told the
   temple's windows dim a little.
-- The inn's lantern: _hang_door_lamps also hangs a trade's door lantern (782's _add_door_lamp:
-  DOOR_LAMP_ENERGY 1.2 over DOOR_LAMP_RANGE 4.5, shadowless, flickered with the fire lights, its pane
-  faded by day) at the front of each standing building whose use is "inn". It is outside the four-house
-  pick, and the inn's own house lantern at that door gives way to it, as a shop's does. Its taverner's
-  counter is no shop's, so 782's counter rule never reached it. Only the Umbrage inn has that use today.
-  Buildings is told.
-- Tests: view_world_test, in the wilds' doorway rows. The inn's front has a trade's lantern of 1.2 over 4.5
-  m, shadowless, with its house lantern given way. Every lancet glass in the wilds is at LANCET_GLOW of its
-  art's emission, every other pane exactly as drawn, and albedo and colour unchanged.
+- The inn's lantern: the inn's own door lantern, where it hangs (beside its door, house_lamp_at), is
+  made a trade's (Client3D.inn_front_lamp: a building whose use is "inn"; its taverner's counter is no
+  shop's, so 782's counter rule never reached it). It runs at DOOR_LAMP_ENERGY 1.2 over DOOR_LAMP_RANGE
+  4.5, shadowless, flickered as a house lantern's. Its light shows whenever the inn is lit, out of the
+  HOUSE_LIGHT_NEAR pick too (Client3D.trade_lamp_row), where a house's lantern goes dark out of it. The
+  inn's light inside stays one of the picked four. Only the Umbrage inn has that use today. Buildings is
+  told.
+  The first take hung a second lantern by 782's _add_door_lamp at the inn's front, giving the house
+  lantern's place to it. It passed headless (the piece in the room, at the door, lit), but ui-design's
+  joined two-up (twoup50_19ceed4f2) showed no lantern and no pool at the inn's door: the house lantern
+  gone and nothing in its place. Why it did not show joined is not found. The inn's own lantern, made with
+  its house in the room's build, shows joined (every base still), so the trade's numbers go on it.
+- Tests: view_world_test, in the wilds' doorway rows. The inn's row carries a trade's lantern of 1.2 over
+  4.5 m, shadowless, in the room. At 21:30, aimed at each other house in turn, the inn's lantern is lit
+  out of the pick (1.23 with its flicker) while each house's lantern is lit only with its pick. Every
+  lancet glass in the wilds is at LANCET_GLOW of its art's emission, every other pane exactly as drawn,
+  and albedo and colour unchanged.
 Client only; protocol unchanged; no new class_name.
 
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)

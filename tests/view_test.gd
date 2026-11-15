@@ -4215,7 +4215,8 @@ func _test_tavern_inside() -> void:
 		var lamp_light := entry[4] as OmniLight3D
 		var piece := entry[7] as Node3D
 		if (piece == null or lamp_light.get_parent() != piece or not lamp_light.position.is_equal_approx(socket + Client3D.DOOR_LAMP_ART_LIGHT)
-				or not is_equal_approx(lamp_light.omni_range, Client3D.HOUSE_DOOR_LAMP_RANGE) or lamp_light.shadow_enabled or entry[5] == null):
+				or not is_equal_approx(lamp_light.omni_range, Client3D.DOOR_LAMP_RANGE if Client3D.trade_lamp_row(entry) else Client3D.HOUSE_DOOR_LAMP_RANGE)
+				or lamp_light.shadow_enabled or entry[5] == null):
 			doorway_bad.append(["lamp", corner])
 			continue
 		# Its pane (489 amended (9): art-kit's glow surface, its "flame" an
@@ -4270,23 +4271,44 @@ func _test_tavern_inside() -> void:
 	_rig._fire_lights = _rig._fire_lights.filter(func(fire: Array) -> bool: return is_instance_valid(fire[0]) and not trade.is_ancestor_of(fire[0]))
 	_rig._fire_panes = _rig._fire_panes.filter(func(each: Array) -> bool: return each[1] != trade)
 	trade.free()
-	# The first view at night (927 amended (2)): the inn's door a trade's
-	# lantern (782's numbers, shadowless, never among the picked houses, its
-	# house lantern given way), and the temple's lancets' glass at
-	# LANCET_GLOW of art-kit's emission, every other pane as drawn.
-	_rig._hang_door_lamps()
-	var inn_facing: Vector2i = inns[0]["facing"]
-	var inn_front: Vector2i = inns[0].get("front", Level.front_cell(rect, inn_facing))
-	var inn_lamp := _rig._door_lamps.get(inn_front) as Node3D
-	var inn_fire: Array = []
-	for fire: Array in _rig._fire_lights:
-		if inn_lamp != null and is_instance_valid(fire[0]) and inn_lamp.is_ancestor_of(fire[0]):
-			inn_fire = fire
-	var inn_house: Array = _rig._house_lights.get(rect.position, [])
-	_check(not inn_fire.is_empty() and is_equal_approx(float(inn_fire[1]), Client3D.DOOR_LAMP_ENERGY)
-			and is_equal_approx((inn_fire[0] as OmniLight3D).omni_range, Client3D.DOOR_LAMP_RANGE) and not (inn_fire[0] as OmniLight3D).shadow_enabled
-			and not inn_house.is_empty() and inn_house.size() < 8,
-			"the inn's door a trade's lantern, %.1f over %.1f m, shadowless, its house lantern given way (%s)" % [Client3D.DOOR_LAMP_ENERGY, Client3D.DOOR_LAMP_RANGE, inn_front])
+	# The first view at night (927 amended (2)): the inn's own door lantern
+	# a trade's (782's numbers, shadowless), its light shown whenever the inn
+	# is lit, out of the HOUSE_LIGHT_NEAR pick too, where a house's goes dark;
+	# and the temple's lancets' glass at LANCET_GLOW of art-kit's emission,
+	# every other pane as drawn.
+	var inn_row: Array = _rig._house_lights.get(rect.position, [])
+	var plain_rows := _rig._house_lights.values().filter(func(row: Array) -> bool: return row.size() > 7 and not Client3D.trade_lamp_row(row))
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	var aim_was: Vector3 = _rig._camera_target
+	DayNight.set_hour(21.5)
+	var sun := DayNight.elevation(DayNight.now())
+	var inn_on: bool = inn_row.size() > 1 and _rig._window_lit(inn_row[1], 21.5, sun)
+	# Aimed at each other house in turn till the inn falls out of the pick: a
+	# picked house's lantern lit with it, an unpicked one's dark, the inn's lit.
+	var inn_out_shown := false
+	var inn_energy := 0.0
+	var picks_bad: Array = []
+	for row: Array in plain_rows:
+		var aim: Rect2i = row[2]
+		_rig._camera_target = Vector3(aim.get_center().x, 0.0, aim.get_center().y)
+		_rig._house_light_clock = Client3D.HOUSE_LIGHT_PICK
+		_rig._light_houses(0.016)
+		for each: Array in plain_rows:
+			if (each[4] as OmniLight3D).visible != (each[0] as OmniLight3D).visible:
+				picks_bad.append(each[2])
+		if inn_row.size() > 8 and not (inn_row[0] as OmniLight3D).visible:
+			inn_out_shown = (inn_row[4] as OmniLight3D).visible
+			inn_energy = (inn_row[4] as OmniLight3D).light_energy
+			break
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	_rig._camera_target = aim_was
+	_check(Client3D.trade_lamp_row(inn_row) and is_equal_approx((inn_row[4] as OmniLight3D).omni_range, Client3D.DOOR_LAMP_RANGE)
+			and not (inn_row[4] as OmniLight3D).shadow_enabled and is_instance_valid(inn_row[7]) and (inn_row[7] as Node3D).is_inside_tree()
+			and inn_on and inn_out_shown and inn_energy > Client3D.HOUSE_DOOR_LAMP_ENERGY and plain_rows.size() >= 3 and picks_bad.is_empty(),
+			"the inn's own door lantern a trade's, %.1f over %.1f m, shadowless, lit at 21:30 out of the pick (energy %.2f), each of %d houses' lanterns lit only with its pick (bad %s)" % [Client3D.DOOR_LAMP_ENERGY, Client3D.DOOR_LAMP_RANGE, inn_energy, plain_rows.size(), picks_bad])
 	var lancets := 0
 	var panes_bad: Array = []
 	for each: Array in _rig._glows:
