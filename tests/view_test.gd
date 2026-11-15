@@ -106,6 +106,7 @@ func _ready() -> void:
 		_test_work_strokes()
 		_test_town_day()
 		_test_tavern()
+		_test_tavern_room()
 		_test_wade_drip()
 		_test_bridge_ends()
 		_test_far_cry()
@@ -2080,6 +2081,105 @@ func _test_tavern() -> void:
 	puppet.set_meta("work", work_was)
 	if puppet.has_meta("stroke_at"):
 		puppet.remove_meta("stroke_at")
+
+
+## 920 amended (1): the Mughouse's hearth over its four tables. Its level
+## (umbrage_tavern) loaded into a zone of its own for World's lines, the
+## tables standing (building.tavern_table at (3, 6), (8, 6), (3, 10), (8, 10)):
+## each of the room's eight seats (maps' 875 talk pairs, on its floor once that
+## take is in) hears the fire clear, by distance alone, as 920 has it; without
+## the room the tables muffle the seats behind them, half reach (the east
+## table's farthest out of it). A cell outside the room hears it as before;
+## the street (the wilds) has no hearth. The cup's figures from her two work
+## stands, for the coordinator: no rule on it here.
+func _test_tavern_room() -> void:
+	print("\n== the Mughouse's hearth over its tables (920 amended (1)) ==")
+	var ambience := _rig.ambience
+	if ambience == null:
+		_check(true, "no ambience: skipped")
+		return
+	var ground := Level.load_level("umbrage_tavern")
+	var night := Main.night_places(ground.get("places", {}))
+	var hearths: Array[Vector2i] = []
+	for cell: Vector2i in night[2]:
+		hearths.append(cell)
+	var rooms: Array[Rect2i] = []
+	for room: Rect2i in night[3]:
+		rooms.append(room)
+	_check(hearths == [Vector2i(0, 6)] and rooms == [Rect2i(0, 0, 12, 14)],
+			"the Mughouse's hearth and its room, from its tavern place (%s, %s)" % [hearths, rooms])
+	var was := World.enter(World.add_zone("view_tavern_room"))
+	World.load_terrain(ground["terrain"])
+	var sources := Ambience.hearth_sources(hearths, World.is_walkable)
+	var source: Vector2i = sources[0]
+	var seats: Array[Vector2i] = [Vector2i(2, 6), Vector2i(5, 7), Vector2i(7, 6), Vector2i(10, 7),
+		Vector2i(2, 10), Vector2i(5, 11), Vector2i(7, 10), Vector2i(10, 11)]
+	var synced := not SoundKit.files(Ambience.HEARTH).is_empty()
+	var reach := float(SoundKit.reach(Ambience.HEARTH))
+	var rows: Array[String] = []
+	var behind := 0
+	var bare_lost := 0
+	var all_clear := true
+	var by_distance := true
+	var farthest := -INF
+	var farthest_d := 0
+	for seat: Vector2i in seats:
+		var d := maxi(absi(seat.x - source.x), absi(seat.y - source.y))
+		var bare := Sfx.hearing(Ambience.HEARTH, source, seat)
+		if not World.has_clear_line(source, seat):
+			behind += 1
+		if not bare.heard:
+			bare_lost += 1
+		ambience._place_point(Ambience.HEARTH, sources, seat, rooms)
+		var fire: AudioStreamPlayer3D = ambience.points.get(Ambience.HEARTH)
+		var on := fire != null and fire.playing
+		var db: float = fire.volume_db if on else -80.0
+		var want := SoundKit.volume_db(Ambience.HEARTH) + (0.0 if d <= 1 else Sfx.EDGE_DB * clampf((d - 1.0) / (reach - 1.0), 0.0, 1.0))
+		all_clear = all_clear and (not synced or on and fire.bus == "Ambience")
+		by_distance = by_distance and (not synced or is_equal_approx(db, want))
+		if d > farthest_d:
+			farthest_d = d
+			farthest = db
+		rows.append("%s %d cells: %s -> %s" % [seat, d,
+			("%.1f%s" % [SoundKit.volume_db(Ambience.HEARTH) + float(bare.db), " muffled" if bare.muffled else ""]) if bare.heard else "silent",
+			("%.1f" % db) if on else "off"])
+	print("  each seat, dB over the take, the tables' rule -> the room's: %s" % "; ".join(rows))
+	print("  the takes' mean about -44 dBFS (measured at their cut, 920), so the farthest seat at about %.0f at the ear" % (farthest - 44.0))
+	_check(behind > 0 and bare_lost > 0, "the tables stand between the fire and %d of the eight seats; by the tables' rule %d hear nothing" % [behind, bare_lost])
+	_check(all_clear and by_distance, "inside its room every seat hears the fire clear of the tables, its level by distance alone")
+	# 920 put the far seats at -56 from (1, 6); the fire's own cell (0, 6) is
+	# floor (the fireplace's fire cells), so they are a cell further, -59.
+	_check(source == Vector2i(0, 6) and (not synced or absf(farthest - (SoundKit.volume_db(Ambience.HEARTH) + Sfx.EDGE_DB * (farthest_d - 1.0) / (reach - 1.0))) < 0.01
+			and absf(farthest - 44.0 - (-56.0)) <= 3.0),
+			"the farthest seat (%d cells from the fire's own cell %s) within 3 dB of 920's -56 at the ear (%.1f)" % [farthest_d, source, farthest - 44.0])
+	# Out of the room (its kitchen, east of the common room's rect): as before.
+	var kitchen := Vector2i(14, 6)
+	var outside := Sfx.hearing(Ambience.HEARTH, source, kitchen)
+	ambience._place_point(Ambience.HEARTH, sources, kitchen, rooms)
+	var fire_out: AudioStreamPlayer3D = ambience.points.get(Ambience.HEARTH)
+	var out_db: float = fire_out.volume_db if fire_out != null and fire_out.playing else -80.0
+	_check(not synced or (outside.heard == (fire_out != null and fire_out.playing)) and (not outside.heard or is_equal_approx(out_db, SoundKit.volume_db(Ambience.HEARTH) + float(outside.db))),
+			"a cell outside the room hears it by the tables' and walls' rule, as before (%s: %s)" % [kitchen, ("%.1f" % out_db) if outside.heard else "silent"])
+	var street := JSON.parse_string(FileAccess.get_file_as_string("res://levels/wilds/level.json")) as Dictionary
+	_check((Main.night_places(street.get("places", {}))[2] as Array).is_empty(), "the street before its door (the wilds): no hearth, so no fire heard")
+	# The cup (sfx.cup_set_down, range 6) from her two work stands behind the
+	# bar (maps' 875: (8, 2), (10, 2)) at each seat and the guests' two stands
+	# at the counter ((8, 4), (10, 4)): figures only.
+	var cup_rows: Array[String] = []
+	for stand: Vector2i in [Vector2i(8, 2), Vector2i(10, 2)]:
+		var each: Array[String] = []
+		for seat: Vector2i in [Vector2i(8, 4), Vector2i(10, 4)] + seats:
+			var heard := Sfx.hearing("sfx.cup_set_down", stand, seat)
+			var clear := Sfx.hearing("sfx.cup_set_down", stand, seat, -1, true)
+			each.append("%s %s/%s" % [seat, ("%.0f%s" % [SoundKit.volume_db("sfx.cup_set_down") + float(heard.db), "m" if heard.muffled else ""]) if heard.heard else "-",
+				("%.0f" % (SoundKit.volume_db("sfx.cup_set_down") + float(clear.db))) if clear.heard else "-"])
+		cup_rows.append("from %s: %s" % [stand, ", ".join(each)])
+	print("  the cup at each seat, dB over the take (tables' rule / clear; m muffled, - silent): %s" % " | ".join(cup_rows))
+	if ambience.points.has(Ambience.HEARTH):
+		(ambience.points[Ambience.HEARTH] as AudioStreamPlayer3D).stop()
+	World.enter(was)
+	World.zones.erase("view_tavern_room")
+
 
 ## 676 1b (Jeff on the first mixes: "the walking ones are approximately
 ## running speed"): worn armour clanks on the body's own footfalls, from its

@@ -3165,6 +3165,7 @@ var _night_posts: Array = []
 var _night_stores: Array = []
 ## The tavern hearths' cells (868), burning always.
 var _night_hearths: Array = []
+var _night_hearth_rooms: Array = []  # Each hearth's room (920 amended (1)), set_night_places' rooms.
 var _night_places: Node3D
 var _carriers: Dictionary = {}
 var _carried_lights: Array[OmniLight3D] = []
@@ -20601,12 +20602,15 @@ func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
 ## [param stores] [its place's cell, where its lantern post stands (cells)]
 ## for a store with no building round it (one a building covers, at its
 ## cell or its post's, is left out: its counter's door lantern); [param
-## hearths] each tavern's hearth cell (868: its fire, _add_hearth_fire).
-## Drawn again whole on each call and after a rebuild (Main._on_room_built).
-func set_night_places(posts: Array, stores: Array, hearths: Array = []) -> void:
+## hearths] each tavern's hearth cell (868: its fire, _add_hearth_fire);
+## [param rooms] each hearth's room (920 amended (1): Main.night_places'
+## fourth list, an empty Rect2i for none), where sound hears it over the
+## tables. Drawn again whole on each call and after a rebuild (Main._on_room_built).
+func set_night_places(posts: Array, stores: Array, hearths: Array = [], rooms: Array = []) -> void:
 	_night_posts = posts
 	_night_stores = stores
 	_night_hearths = hearths
+	_night_hearth_rooms = rooms
 	_draw_night_places()
 
 
@@ -20616,6 +20620,15 @@ func hearth_cells() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for cell: Vector2i in _night_hearths:
 		out.append(cell)
+	return out
+
+
+## Each hearth's room, in hearth_cells' order (920 amended (1)): an empty
+## Rect2i for a hearth set without one.
+func hearth_rooms() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for i in _night_hearths.size():
+		out.append(_night_hearth_rooms[i] if i < _night_hearth_rooms.size() and _night_hearth_rooms[i] is Rect2i else Rect2i())
 	return out
 
 

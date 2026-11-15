@@ -56259,6 +56259,40 @@ and 6 bodies, 200 s of stretches from the chatter takes, a cup each time
 round of each aside, none at her idle or without the work). THIRD_PARTY: the
 three hearth and four cup lines (release's OK); sound_status regenerated.
 Client sound only; protocol unchanged; no new class_name.
+
+920 amended (1): a tavern's hearth is never muffled inside its own room
+(sound; the label from tools/decision_number.sh; the coordinator's approval,
+11-14, of sound's mend after the crackle's joined read on main). That read
+(C:\dev\review\sound\reads\hearth_5f9a9ea61\) found the Mughouse's four
+tables muffling the fire: they are solid footprints (building.tavern_table
+at (3, 6), (8, 6), (3, 10), (8, 10)), World.has_clear_line finds a line
+across one blocked, and Sfx.hearing gives a blocked line 4 dB less and half
+the reach. The room's middle, (6, 8), heard -67 at the ear; the east table's
+far seat, (10, 11), nothing. 920's "every one of the eight seats in reach"
+was measured in view_test's room, which has no tables. Now Main.night_places
+gives each hearth its tavern place's "rect" (a fourth list; the Mughouse's
+[0, 0, 12, 14], its common room), Client3D.set_night_places keeps them
+(hearth_rooms), and Ambience._place_point hears a source from a listener
+with both inside that source's room as a clear line (Ambience.in_room;
+Sfx.hearing's new "clear"), so a fire carries over its tables and its level
+in the room goes by distance alone. Outside the room nothing changes, nor for
+any other sound. The read also found the fire heard from its own cell,
+(0, 6), which is floor (the fireplace's two fire cells), not from (1, 6) as
+920 says, so the far seats are 10 cells off: about -59 at the ear, not -56
+(by distance from the take's mean, about -44 dBFS). view_test
+_test_tavern_room (in the view_test half, beside _test_tavern, which keeps
+the bare room): umbrage_tavern loaded into a zone of its own, the tables
+standing; by the tables' rule five of the eight seats lie behind one and
+three hear nothing; with the room every seat hears the fire clear, its level
+by distance alone, the farthest -58.6; a cell outside the room (its kitchen)
+as before; the street (the wilds) has no hearth. It prints the cup's figures
+for the coordinator, not ruled here: from her work stands behind the bar,
+(8, 2) and (10, 2), the counter muffles her cup for the guests at it (-37
+against -26 clear) and most seats lie beyond its range of 6 anyway. Package
+"Umbrage at night", on; the held bullet unchanged. Client sound only;
+protocol unchanged; no new class_name.
+
+
 ## 917. Her unasked lines one at a time: a floor between any two, the needed first, no idle wish beside a wound
 
 Playtest's look_flank_around3c (v0.1.215's main, joined) heard her quiet moment's wish ("I've a mind to go

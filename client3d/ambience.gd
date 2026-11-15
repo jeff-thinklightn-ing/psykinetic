@@ -1091,7 +1091,7 @@ func _door_open(edge: Variant) -> bool:
 func _place_torch(cell: Vector2i) -> void:
 	_place_point("amb.torch_fire", view.torch_fires(), cell)
 	_place_point("amb.campfire", view.campfire_cells(), cell)
-	_place_point(HEARTH, hearth_sources(view.hearth_cells(), World.is_walkable), cell)
+	_place_point(HEARTH, hearth_sources(view.hearth_cells(), World.is_walkable), cell, view.hearth_rooms())
 	var held := held_camps(view._terrain.get("camps", []), _camp_people())
 	for slot: String in CAMP_TALK:
 		_place_point(slot, held[slot], cell)
@@ -1173,6 +1173,12 @@ func _room_bodies() -> Array:
 	return out
 
 
+## Whether [param at] and [param cell] are both in [param room] (920
+## amended (1)): false for an empty room.
+static func in_room(room: Rect2i, at: Vector2i, cell: Vector2i) -> bool:
+	return room.has_area() and room.has_point(at) and room.has_point(cell)
+
+
 ## Where each hearth of [param cells] is heard from (920): its own cell if
 ## [param walkable] says so, else the first walkable cell beside it (a wall
 ## hearth's room side), else its own.
@@ -1190,15 +1196,19 @@ static func hearth_sources(cells: Array[Vector2i], walkable: Callable) -> Array[
 
 
 ## [param slot]'s loop at whichever of [param cells] is heard best from
-## [param cell] within its reach (Sfx.hearing), else off.
-func _place_point(slot: String, cells: Array[Vector2i], cell: Vector2i) -> void:
+## [param cell] within its reach (Sfx.hearing), else off. [param rooms], in
+## [param cells]' order: a source and a listener both inside its room hear
+## each other clear of what stands between (920 amended (1): a tavern's
+## hearth over its tables); a missing or empty room changes nothing.
+func _place_point(slot: String, cells: Array[Vector2i], cell: Vector2i, rooms: Array[Rect2i] = []) -> void:
 	var best := {}
 	var best_cell := Vector2i.ZERO
 	var reach := SoundKit.reach(slot)
-	for at: Vector2i in cells:
+	for i in cells.size():
+		var at := cells[i]
 		if maxi(absi(at.x - cell.x), absi(at.y - cell.y)) > reach:
 			continue
-		var heard := Sfx.hearing(slot, at, cell)
+		var heard := Sfx.hearing(slot, at, cell, -1, in_room(rooms[i] if i < rooms.size() else Rect2i(), at, cell))
 		if heard.heard and (best.is_empty() or float(heard.db) > float(best.db)):
 			best = heard
 			best_cell = at

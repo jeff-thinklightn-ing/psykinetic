@@ -141,8 +141,10 @@ static func _set_bus_volume(index: int, linear: float, duck := 0.0) -> void:
 ## [param radius] cells (Chebyshev), half that with no clear line, falling
 ## from 0 dB at a cell to EDGE_DB at the edge. [param radius] -1 is the
 ## slot's own (SoundKit.reach). Rain and wind shorten it under the sky
-## as World.noise has them (World.weather_hearing_at).
-static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1) -> Dictionary:
+## as World.noise has them (World.weather_hearing_at). [param clear] takes
+## the line as clear whatever stands on it (920 amended (1): a tavern's
+## hearth heard inside its own room, a fire carrying over the tables).
+static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1, clear := false) -> Dictionary:
 	var reach := radius if radius >= 0 else SoundKit.reach(slot)
 	if reach > 0 and SoundKit.noise_kind(slot) != "speech":
 		# Rain and wind cover it as World.noise has them cover a noise.
@@ -150,7 +152,7 @@ static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1) ->
 		if cover < 1.0:
 			reach = maxi(1, roundi(reach * cover))
 	var d := maxi(absi(at.x - from.x), absi(at.y - from.y))
-	var muffled := d > 0 and not World.has_clear_line(at, from)
+	var muffled := d > 0 and not clear and not World.has_clear_line(at, from)
 	var carries := reach / 2.0 if muffled else float(reach)
 	if reach <= 0 or d > reach or (muffled and d * 2 > reach):
 		return {"heard": false, "muffled": muffled, "db": -80.0}

@@ -4630,17 +4630,20 @@ func _show_folds() -> void:
 
 
 ## This level's night places as the view lights them (782): [posts, stores,
-## hearths].
+## hearths, hearth rooms].
 ## Posts: each "post" place's (771, buildings') brazier cell ("brazier", else
 ## its rect's middle, else its cell). Stores: [the "store" place's cell,
 ## where its lantern stands (Vector2, cells): its "lamp" cell, else beside
 ## its cell (NIGHT_STORE_ASIDE)]; the view leaves out one a building covers
 ## (that store's counter hangs its door lantern instead). Hearths (868): each
-## tavern place's "hearth" cell, its fire burning always.
+## tavern place's "hearth" cell, its fire burning always. Hearth rooms (920
+## amended (1)): each hearth's tavern's "rect" (Rect2i, empty for none),
+## where its fire is heard over the tables.
 static func night_places(places: Dictionary) -> Array:
 	var posts: Array = []
 	var stores: Array = []
 	var hearths: Array = []
+	var rooms: Array = []
 	for key: String in places:
 		var place: Dictionary = places[key]
 		if str(place.get("kind", "")) == "post":
@@ -4652,7 +4655,11 @@ static func night_places(places: Dictionary) -> Array:
 		# combat's warm rest reads it (Main._town_warm_cells); none unless said.
 		if str(place.get("kind", "")) == "tavern" and place.get("hearth") != null:
 			hearths.append(_place_cell(place, "hearth"))
-	return [posts, stores, hearths]
+			var rect: Variant = place.get("rect")
+			if rect is Array and (rect as Array).size() == 4:
+				rect = Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3]))
+			rooms.append(rect if rect is Rect2i else Rect2i())
+	return [posts, stores, hearths, rooms]
 
 
 ## [param place]'s cell named [param field] ([x, y] or a Vector2i), else
@@ -4696,7 +4703,7 @@ func _show_night_places() -> void:
 	if _client3d != null:
 		var night := night_places(level.get("places", {}))
 		_client3d.fire_places = fire_places(level.get("places", {}))
-		_client3d.set_night_places(night[0], night[1], night[2])
+		_client3d.set_night_places(night[0], night[1], night[2], night[3])
 
 
 ## Draws the terrain afresh in both views (a map loaded live). A
