@@ -272,6 +272,8 @@ func _ready() -> void:
 		_test_room_music()
 		_test_options_panel()
 		_test_hair_covers_head()
+		_test_hair_value()
+		_test_hair_pick_kept()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
@@ -12902,6 +12904,138 @@ func _test_person_garb() -> void:
 	var mine := Client3D.look_for(player)
 	_check(mine.garb == "none" and not "Coat" in mine.parts, "a player wears no garb: theirs is what they chose (%s)" % [mine.parts])
 	player.free()
+
+
+## The coordinator, 11-14 (faces package): hair and beard at least PersonLook.HAIR_STEP in L* from the skin, or as far
+## as the cap or its own name lets it (each such pair listed with its figure); every hair still nearest its own named
+## colour, hue and chroma kept, moved at most HAIR_MOVE_MAX; the skin never moved; a far pair left as named.
+func _test_hair_value() -> void:
+	print("
+== hair and beard set off from the skin in value; the skin never moved ==")
+	# Skin index (1..8) / hair: the gap reached where the cap (13 L*) or the name stops short of 16.
+	const SHORT := {"7/chestnut": 11.9, "3/blond": 13.1, "7/brown": 13.3, "3/grey": 13.8, "5/fair": 13.9,
+		"8/brown": 14.8, "6/fair": 15.2, "7/red": 15.4}
+	var moved := 0
+	var shorts: Array = []
+	var bad: Array = []
+	for i in PersonLook.SKINS.size():
+		var skin := Color(PersonLook.SKINS[i])
+		var ls := PersonLook.lab_of(skin).x
+		for name: String in PersonLook.HAIR_COLOURS:
+			var named := Color(PersonLook.HAIR_COLOURS[name])
+			var got := PersonLook.hair_against(name, skin)
+			var face := PersonLook.make("seed=7 hair=cropped hair_colour=%s skin=%d" % [name, i + 1], &"male")
+			var pair := "%d/%s" % [i + 1, name]
+			var h0 := PersonLook.lab_of(named)
+			var h1 := PersonLook.lab_of(got)
+			var gap := absf(h1.x - ls)
+			var chroma0 := Vector2(h0.y, h0.z).length()
+			var chroma1 := Vector2(h1.y, h1.z).length()
+			var hue := absf(wrapf(rad_to_deg(Vector2(h1.y, h1.z).angle() - Vector2(h0.y, h0.z).angle()), -180.0, 180.0))
+			if face.colours["skin"] != skin or face.colours["hair"] != got or face.hair_colour != name:
+				bad.append("%s: the look's skin %s, hair %s (want %s, %s)" % [pair, face.colours["skin"].to_html(false), face.colours["hair"].to_html(false), skin.to_html(false), got.to_html(false)])
+			if absf(h0.x - ls) >= PersonLook.HAIR_STEP:
+				if got != named:
+					bad.append("%s: %.1f apart already, moved to %s" % [pair, absf(h0.x - ls), got.to_html(false)])
+				continue
+			moved += 1
+			var want: float = SHORT.get(pair, PersonLook.HAIR_STEP)
+			if gap < want - 0.1:
+				bad.append("%s: %.1f apart, want %.1f" % [pair, gap, want])
+			if SHORT.has(pair):
+				shorts.append("%s %.1f" % [pair, gap])
+			if PersonLook.nearest_hair(got) != name:
+				bad.append("%s: %s reads as %s" % [pair, got.to_html(false), PersonLook.nearest_hair(got)])
+			if absf(h1.x - h0.x) > PersonLook.HAIR_MOVE_MAX + 0.2 or absf(chroma1 - chroma0) > 1.0 or (chroma0 > 8.0 and hue > 3.0):
+				bad.append("%s: moved %.1f L*, chroma %.1f -> %.1f, hue %.1f deg" % [pair, h1.x - h0.x, chroma0, chroma1, hue])
+	_check(bad.is_empty(), "64 pairs: %d moved, each at least %.0f L* from its skin or as listed, its name kept, hue and chroma kept, at most %.0f L*, the skin as picked (%s)" % [
+		moved, PersonLook.HAIR_STEP, PersonLook.HAIR_MOVE_MAX, bad if not bad.is_empty() else "ok"])
+	_check(shorts.size() == SHORT.size(), "the pairs short of %.0f, each with its figure: %s" % [PersonLook.HAIR_STEP, shorts])
+	# Oswin's pair (skin 7, chestnut): a darker chestnut, not the brown man's hair beside him.
+	var oswin := PersonLook.hair_against("chestnut", Color(PersonLook.SKINS[6]))
+	var brown := PersonLook.hair_against("brown", Color(PersonLook.SKINS[6]))
+	_check(oswin != brown and PersonLook.lab_of(oswin).x < PersonLook.lab_of(Color(PersonLook.HAIR_COLOURS["chestnut"])).x,
+			"skin 7: chestnut darkened (%s), not the same as brown beside it (%s)" % [oswin.to_html(false), brown.to_html(false)])
+	# The beard: BEARD_FACING further off the skin than its hair, fading out past HAIR_STEP + BEARD_FACING; never the skin.
+	var beard_bad: Array = []
+	var beards_moved := 0
+	for i in PersonLook.SKINS.size():
+		var skin := Color(PersonLook.SKINS[i])
+		var ls := PersonLook.lab_of(skin).x
+		for name: String in PersonLook.HAIR_COLOURS:
+			var hair := PersonLook.hair_against(name, skin)
+			var beard := PersonLook.beard_against(hair, skin)
+			var h := PersonLook.lab_of(hair)
+			var bd := PersonLook.lab_of(beard)
+			var hair_gap := absf(h.x - ls)
+			var want := hair_gap + clampf(PersonLook.HAIR_STEP + PersonLook.BEARD_FACING - hair_gap, 0.0, PersonLook.BEARD_FACING)
+			var gap := absf(bd.x - ls)
+			if beard != hair:
+				beards_moved += 1
+			# Hue and chroma kept, but for sRGB's own edge: a deep red darkened leaves it, and the channels' clip
+			# takes chroma off and turns the hue a few degrees (skin 7's red: 45 to 38 degrees), never adding chroma.
+			var c_h := Vector2(h.y, h.z)
+			var c_b := Vector2(bd.y, bd.z)
+			var turn := absf(wrapf(rad_to_deg(c_b.angle() - c_h.angle()), -180.0, 180.0)) if c_h.length() > 8.0 else 0.0
+			var kept := (c_b - c_h).length() <= 1.5 or (c_b.length() <= c_h.length() + 1.0 and turn <= 8.0)
+			if (bd.x - ls) * (h.x - ls) < 0.0 or gap < minf(want, 99.0) - 0.6 or gap > want + 0.6 or not kept:
+				beard_bad.append("%d/%s: hair %.1f off, beard %.1f (want %.1f), chroma %.1f -> %.1f, hue turned %.1f deg" % [
+					i + 1, name, hair_gap, gap, want, c_h.length(), c_b.length(), turn])
+	_check(beard_bad.is_empty(), "64 beards: %d set further off than their hair (BEARD_FACING %.0f, none past %.0f apart), on the hair's side of the skin, hue and chroma kept (%s)" % [
+		beards_moved, PersonLook.BEARD_FACING, PersonLook.HAIR_STEP + PersonLook.BEARD_FACING, beard_bad if not beard_bad.is_empty() else "ok"])
+	var oswin_beard := PersonLook.beard_against(oswin, Color(PersonLook.SKINS[6]))
+	var pale := PersonLook.hair_against("brown", Color(PersonLook.SKINS[3]))
+	_check(PersonLook.lab_of(oswin_beard).x < PersonLook.lab_of(oswin).x - 4.4 and PersonLook.beard_against(pale, Color(PersonLook.SKINS[3])) == pale,
+			"Oswin's beard 5 L* under his hair (%s, hair %s); a brown beard on skin 4, far off already, unmoved (%s)" % [oswin_beard.to_html(false), oswin.to_html(false), pale.to_html(false)])
+	# Drawn: the beard's meshes take the beard's colour, the hair's the hair's.
+	var model := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+	add_child(model)
+	Client3D._dress(model, Color.WHITE)
+	var look := PersonLook.make("seed=48213 body=male hair=long hair_colour=chestnut beard=full skin=7 headwear=none garb=none")
+	look.apply(model)
+	var beard_mesh := model.find_child("Beard_Full", true, false) as MeshInstance3D
+	var hair_mesh := model.find_child("Hair_Long", true, false) as MeshInstance3D
+	var drawn_beard: Variant = beard_mesh.get_instance_shader_parameter("hair")
+	var drawn_hair: Variant = hair_mesh.get_instance_shader_parameter("hair")
+	_check(drawn_beard is Color and (drawn_beard as Color).is_equal_approx(look.beard_colour) and drawn_hair is Color and (drawn_hair as Color).is_equal_approx(look.colours["hair"])
+			and look.beard_colour.is_equal_approx(oswin_beard) and look.colours["skin"] == Color(PersonLook.SKINS[6]),
+			"Oswin drawn: Beard_Full in %s, Hair_Long in %s, the skin as picked (beard %s, hair %s)" % [look.beard_colour.to_html(false), look.colours["hair"].to_html(false), drawn_beard, drawn_hair])
+	model.queue_free()
+
+
+## The value rule's promise to someone picking colours in Options (the coordinator, 11-14): (a) the name picked is never
+## changed, in the look or its words, and a rejoin (the same words made again) draws the same; (b) the hair drawn reads as
+## that name, moved in lightness alone and at most HAIR_MOVE_MAX; (c) the skin is never moved; (d) a beard is never more
+## than BEARD_FACING off the hair drawn, on the hair's side of the skin.
+func _test_hair_pick_kept() -> void:
+	print("
+== a player's picked hair colour and skin: the name and skin kept, the hair drawn as that name, the beard within BEARD_FACING ==")
+	var bad := {"a": [], "b": [], "c": [], "d": []}
+	for i in PersonLook.SKINS.size():
+		var skin := Color(PersonLook.SKINS[i])
+		var ls := PersonLook.lab_of(skin).x
+		for name: String in PersonLook.HAIR_COLOURS:
+			var said := "seed=48213 body=male hair=cropped hair_colour=%s beard=short skin=%d headwear=none garb=none" % [name, i + 1]
+			var pair := "%d/%s" % [i + 1, name]
+			var look := PersonLook.make(said)
+			var again := PersonLook.make(said)
+			if look.hair_colour != name or str(look.words.get("hair_colour", "")) != name or again.hair_colour != name \
+					or again.colours["hair"] != look.colours["hair"] or again.beard_colour != look.beard_colour:
+				bad["a"].append("%s: %s / %s, again %s" % [pair, look.hair_colour, look.words.get("hair_colour", ""), again.hair_colour])
+			var named := PersonLook.lab_of(Color(PersonLook.HAIR_COLOURS[name]))
+			var drawn := PersonLook.lab_of(look.colours["hair"])
+			if PersonLook.nearest_hair(look.colours["hair"]) != name or absf(drawn.x - named.x) > PersonLook.HAIR_MOVE_MAX + 0.2:
+				bad["b"].append("%s: drawn %s reads %s, moved %.1f L*" % [pair, look.colours["hair"].to_html(false),
+						PersonLook.nearest_hair(look.colours["hair"]), drawn.x - named.x])
+			if look.colours["skin"] != skin or again.colours["skin"] != skin:
+				bad["c"].append("%s: skin %s" % [pair, look.colours["skin"].to_html(false)])
+			var beard := PersonLook.lab_of(look.beard_colour)
+			if absf(beard.x - drawn.x) > PersonLook.BEARD_FACING + 0.6 or (beard.x - ls) * (drawn.x - ls) < 0.0:
+				bad["d"].append("%s: beard %.1f L*, hair %.1f, skin %.1f" % [pair, beard.x, drawn.x, ls])
+	_check(bad["a"].is_empty(), "(a) 64 picks: the name picked kept in the look and its words, a rejoin drawing the same (%s)" % [bad["a"] if not bad["a"].is_empty() else "ok"])
+	_check(bad["b"].is_empty(), "(b) 64 picks: the hair drawn reads as its name, at most %.0f L* off it (%s)" % [PersonLook.HAIR_MOVE_MAX, bad["b"] if not bad["b"].is_empty() else "ok"])
+	_check(bad["c"].is_empty(), "(c) 64 picks: the skin as picked (%s)" % [bad["c"] if not bad["c"].is_empty() else "ok"])
+	_check(bad["d"].is_empty(), "(d) 64 picks: the beard at most %.0f L* off the hair drawn, on its side of the skin (%s)" % [PersonLook.BEARD_FACING, bad["d"] if not bad["d"].is_empty() else "ok"])
 
 
 func _test_person_looks() -> void:

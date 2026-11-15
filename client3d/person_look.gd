@@ -43,6 +43,18 @@ const HIPS_MAX := {"male": 0.5, "female": 0.9}
 const SKINS := ["f1d3bd", "e3b99c", "d4a585", "c49075", "a97a5a", "8f6446", "74503a", "5a3a2a"]
 const HAIR_COLOURS := {"black": "1f1a17", "dark": "3b2a20", "brown": "564135", "chestnut": "7a5232",
 	"fair": "a0703e", "blond": "c8a060", "red": "8a3a20", "grey": "b0aca4"}
+## Hair and beard against the skin in value (the coordinator, 11-14, the faces package): hair whose lightness (CIELAB
+## L*) is nearer the skin's than HAIR_STEP is moved away from it in lightness alone (hue and chroma kept), at most
+## HAIR_MOVE_MAX, and only while it stays nearer its own named colour than any other (chestnut stays chestnut);
+## the skin never moves (it is what a player picked). Where both ways reach the step, the smaller move; else the way
+## ending further apart. Seven pairs stop short at the cap or the name (view_test _test_hair_value lists each).
+const HAIR_STEP := 16.0
+const HAIR_MOVE_MAX := 13.0
+const HAIR_MOVE_GRAIN := 0.25
+## What a beard's front loses beside the cheek as drawn: it faces down, out of the sun (faces7's stills on skin 7: 3.1 L* on
+## Oswin's full beard, 5.2 on the brown man's short one, against each one's hairline). A beard is set this much further
+## from the skin than its hair, fading out where the hair already stands HAIR_STEP + BEARD_FACING off (beard_against).
+const BEARD_FACING := 5.0
 ## How likely an old person's unnamed hair is grey.
 const OLD_GREY := 0.7
 ## Clothes when the look gives none (a player's tunic is their colour instead).
@@ -139,6 +151,8 @@ var scale := 1.0
 var parts: Array[String] = []
 ## skin, hair, tunic, trousers -> colour.
 var colours := {}
+## A beard's colour (beard_against): the hair's, set further off the skin; on the beard's meshes' "hair" alone.
+var beard_colour := Color.BLACK
 var posture := "straight"
 ## Its words as they came out, said or seeded (the Character section shows them).
 var build := ""
@@ -220,7 +234,8 @@ func _resolve(body_by_default: StringName) -> void:
 		hair_name = "grey"
 	if str(words.get("hair_colour", "")) in HAIR_COLOURS:
 		hair_name = str(words["hair_colour"])
-	colours["hair"] = Color(HAIR_COLOURS[hair_name])
+	colours["hair"] = hair_against(hair_name, colours["skin"])
+	beard_colour = beard_against(colours["hair"], colours["skin"])
 	hair_colour = hair_name
 	var tunic_roll := rng.randi()
 	var trousers_roll := rng.randi()
@@ -338,6 +353,8 @@ func apply(scene: Node3D, tunic := Color.WHITE) -> void:
 				mesh.set_blend_shape_value(i, float(keys.get(String(shapes.get_blend_shape_name(i)), 0.0)))
 		for part: String in colours:
 			mesh.set_instance_shader_parameter(part, colours[part])
+		if String(mesh.name) in BEARD_PARTS.values() and people == "human":
+			mesh.set_instance_shader_parameter("hair", beard_colour)
 		if tunic != Color.WHITE:
 			mesh.set_instance_shader_parameter("tunic", tunic)
 	dye_hood(scene)
@@ -359,6 +376,112 @@ static func dye_hood(scene: Node3D) -> void:
 
 
 static var _cape_colours := {}
+## hair_against's answers, by hair name and skin.
+static var _hair_against := {}
+
+
+## [param name]'s hair colour drawn beside [param skin] (HAIR_STEP): the named colour, moved in lightness when the
+## two are too near in value.
+static func hair_against(name: String, skin: Color) -> Color:
+	var key := name + "/" + skin.to_html(false)
+	if not _hair_against.has(key):
+		_hair_against[key] = _hair_moved(name, skin)
+	return _hair_against[key]
+
+
+static func _hair_moved(name: String, skin: Color) -> Color:
+	var hair := Color(HAIR_COLOURS[name])
+	var ls := lab_of(skin).x
+	var h := lab_of(hair)
+	var d := h.x - ls
+	if absf(d) >= HAIR_STEP:
+		return hair
+	var away := 1.0 if d > 0.0 else -1.0
+	var a := _hair_reach(name, h, ls, away)
+	var b := _hair_reach(name, h, ls, -away)
+	var pick := a
+	if a.x >= HAIR_STEP - 0.1 and b.x >= HAIR_STEP - 0.1:
+		pick = a if absf(a.y) <= absf(b.y) else b
+	elif b.x > a.x + 0.01:
+		pick = b
+	return from_lab(Vector3(h.x + pick.y, h.y, h.z))
+
+
+## How far from [param ls] hair [param h] (L*a*b*) gets moving lightness in direction [param sign]: Vector2(the gap
+## reached, the move), within HAIR_MOVE_MAX and while its nearest named colour is still [param name].
+static func _hair_reach(name: String, h: Vector3, ls: float, sign_: float) -> Vector2:
+	var move := 0.0
+	while move + HAIR_MOVE_GRAIN <= HAIR_MOVE_MAX and sign_ * (h.x + sign_ * move - ls) < HAIR_STEP:
+		var next := h.x + sign_ * (move + HAIR_MOVE_GRAIN)
+		if next <= 0.0 or next >= 100.0 or nearest_hair(from_lab(Vector3(next, h.y, h.z))) != name:
+			break
+		move += HAIR_MOVE_GRAIN
+	var reached := from_lab(Vector3(h.x + sign_ * move, h.y, h.z))
+	return Vector2(absf(lab_of(reached).x - ls), sign_ * move)
+
+
+## A beard of [param hair] (as hair_against drew it) beside [param skin]: its lightness moved further from the skin's by
+## what its front loses as drawn (BEARD_FACING), less as the hair's own gap passes HAIR_STEP, none past HAIR_STEP +
+## BEARD_FACING; hue and chroma kept, the skin never moved.
+static func beard_against(hair: Color, skin: Color) -> Color:
+	var ls := lab_of(skin).x
+	var h := lab_of(hair)
+	var extra := clampf(HAIR_STEP + BEARD_FACING - absf(h.x - ls), 0.0, BEARD_FACING)
+	if extra <= 0.0:
+		return hair
+	var away := 1.0 if h.x >= ls else -1.0
+	return from_lab(Vector3(clampf(h.x + away * extra, 0.0, 100.0), h.y, h.z))
+
+
+## The named hair colour nearest [param c] in L*a*b*.
+static func nearest_hair(c: Color) -> String:
+	var at := lab_of(c)
+	var best := ""
+	var best_d := INF
+	for name: String in HAIR_COLOURS:
+		var dist := at.distance_squared_to(lab_of(Color(HAIR_COLOURS[name])))
+		if dist < best_d:
+			best_d = dist
+			best = name
+	return best
+
+
+## [param c] (sRGB) in CIE L*a*b* (D65).
+static func lab_of(c: Color) -> Vector3:
+	var r := _srgb_lin(c.r)
+	var g := _srgb_lin(c.g)
+	var b := _srgb_lin(c.b)
+	var fx := _lab_f((0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047)
+	var fy := _lab_f(0.2126 * r + 0.7152 * g + 0.0722 * b)
+	var fz := _lab_f((0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883)
+	return Vector3(116.0 * fy - 16.0, 500.0 * (fx - fy), 200.0 * (fy - fz))
+
+
+## [param lab] (L*a*b*, D65) as an sRGB colour, each channel clamped and to 8 bits.
+static func from_lab(lab: Vector3) -> Color:
+	var fy := (lab.x + 16.0) / 116.0
+	var x := _lab_fi(fy + lab.y / 500.0) * 0.95047
+	var y := _lab_fi(fy)
+	var z := _lab_fi(fy - lab.z / 200.0) * 1.08883
+	return Color8(_srgb_byte(3.2406 * x - 1.5372 * y - 0.4986 * z), _srgb_byte(-0.9689 * x + 1.8758 * y + 0.0415 * z),
+			_srgb_byte(0.0557 * x - 0.2040 * y + 1.0570 * z))
+
+
+static func _srgb_lin(v: float) -> float:
+	return v / 12.92 if v <= 0.04045 else pow((v + 0.055) / 1.055, 2.4)
+
+
+static func _srgb_byte(v: float) -> int:
+	v = clampf(v, 0.0, 1.0)
+	return roundi((12.92 * v if v <= 0.0031308 else 1.055 * pow(v, 1.0 / 2.4) - 0.055) * 255.0)
+
+
+static func _lab_f(v: float) -> float:
+	return pow(v, 1.0 / 3.0) if v > 0.008856 else 7.787 * v + 16.0 / 116.0
+
+
+static func _lab_fi(v: float) -> float:
+	return v * v * v if v * v * v > 0.008856 else (v - 16.0 / 116.0) / 7.787
 
 
 ## [param cape]'s colour as drawn: its material's palette at the mean of its UVs (each part is on one

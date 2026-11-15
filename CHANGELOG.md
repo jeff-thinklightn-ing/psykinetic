@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Where hair and skin are close in tone, such as chestnut on darker skin, the hair is drawn a shade apart from the skin and a beard a shade further, so each reads against the face; the hair colour and skin you picked keep their names (419 amended (4)).
+- If you've never picked a look, Options shows the face you wear in the game (911 amended (1)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Ask your companion to fish with no water in reach and she leads you to the nearest, naming it if it's a fishing place you've already found (803).

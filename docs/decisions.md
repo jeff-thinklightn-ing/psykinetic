@@ -13301,6 +13301,42 @@ in the released game, not part of the faces package):
   head up to 4.8 mm outside; on the take 4.1 and 3.8 mm. anim_rig_test and seamless_test pass. Before and after from behind (Blender, rest pose):
   C:/dev/review/pc-character/crown_today/crown_before_after_blender.png.
 
+Amended (4) (hair and beard set off from the skin in value; the coordinator, 11-14, the faces package,
+after the head): where a person's hair and skin stood nearly one tone, a dark face under a chestnut or
+brown cap read as one patch at the nearest zoom.
+- The hair: PersonLook.hair_against(name, skin) draws hair whose CIELAB lightness lies nearer the skin's
+  than HAIR_STEP (16 L*) moved away from it in lightness alone, hue and chroma kept, at most
+  HAIR_MOVE_MAX (13 L*), and only while it stays nearer its own named colour than any other (chestnut
+  stays chestnut). Where both ways reach the step, the smaller move; else the way ending further apart.
+  The skin never moves: it is what a player picked. Eight of the 64 pairs stop short at the cap or the
+  name (7/chestnut 11.9, accepted by the coordinator; 3/blond 13.1, 7/brown 13.3, 3/grey 13.8, 5/fair
+  13.9, 8/brown 14.8, 6/fair 15.2, 7/red 15.4). Cached by name and skin.
+- The beard: its front faces down, out of the sun; on faces7's stills (skin 7) it read 3.1 to 5.2 L*
+  nearer the cheek than the hairline. PersonLook.beard_against(hair, skin) sets it BEARD_FACING (5 L*)
+  further from the skin than its hair, fading out as the hair's own gap passes HAIR_STEP and gone past
+  HAIR_STEP + BEARD_FACING (a pale skin's brown beard unmoved). apply draws PersonLook.beard_colour on
+  Beard_Short and Beard_Full's "hair" alone. sRGB's edge turns a deep red darkened a few degrees in hue,
+  never adding chroma. Oswin (skin 7, chestnut) picks 7a5232 and is drawn with hair 583416 and beard
+  4b290b.
+- What stays a player's: the name picked (the look's hair_colour and words, a rejoin drawing the same),
+  the skin, and the hair drawn always reading as its own name. Options' swatches still show the named
+  colours, so on a dark skin the swatch is up to 13 L* lighter than the hair drawn (the preview draws
+  the moved colour); the coordinator routed swatches drawn through hair_against to ui as a follow-up.
+- Watched joined on the Lenovo (ui-design, look_hairrule_5f7ec98d3, 3840x2160 saved at 1600x900, front,
+  lit side, camera 3.3 to 3.4 m), measured in pairs across each edge (C:/dev/review/pc-
+  character/value_rule/hair_value_patches_5f7ec98d3.png). Hair against the forehead below it: Oswin
+  -13.6 L*, the brown man (skin 7) -14.1, the pale man (skin 4) -36.8. Beard against the cheek above it:
+  -24.0, -25.7, -43.0 (faces7, before the beard mend: Oswin -10.8 / -7.7, brown -16.0 / -10.8, skin 4
+  -39.0 / -39.5). Two cautions, as the coordinator kept them: these rows are not a pure before and after
+  (faces7's Oswin and brown man stood on head A, these on today's head); and most of the jaw's gap is
+  light, not colour (Oswin's beard reads 17 L* under his hair on screen; the rule's own share is 5).
+- Tests: view_test _test_hair_value (the 64 pairs, the short ones each with its figure, Oswin's darker
+  chestnut apart from brown, the 64 beards within BEARD_FACING with the gamut allowance, Oswin's and the
+  pale case, the drawn meshes) and _test_hair_pick_kept, the promise to someone picking colours: (a) the
+  name picked kept and a rejoin drawing the same, (b) the hair drawn reads as its name within 13 L*, (c)
+  the skin as picked, (d) the beard within BEARD_FACING of the hair drawn, on its side of the skin.
+  Client only.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and
