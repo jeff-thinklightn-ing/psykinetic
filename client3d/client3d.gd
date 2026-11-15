@@ -12143,7 +12143,7 @@ static func _warm_art() -> void:
 ## cast below the ground). Godot (Forward+ on d3d12, 4.4 and on) also
 ## compiles pipelines in the background with its ubershaders, and keeps a
 ## shader cache in user data: check those before adding a warm-up.
-static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin"), Callable(Client3D, "warm_painted")]
+static var warm_ups: Array[Callable] = [Callable(GrownTrees, "warm"), Callable(Client3D, "warm_goblin"), Callable(Client3D, "warm_painted"), Callable(Client3D, "warm_window_light")]
 static var _warmed_ups: Dictionary[String, bool] = {}
 const WARM_FRAMES := 2
 const WARM_DEPTH := 6.0
@@ -22405,6 +22405,9 @@ var _window_light_rows: Array[Array] = []
 ## door lamps' and house lights'), to make them again when it changes (a
 ## neighbour's room swapped in, 822, changes the room).
 var _window_light_key: Array = []
+## The floor's lanterns last sent to its pass (927 amended (1)).
+var _window_floor_sent: Array[Vector4] = []
+var _window_floor_count := -1
 
 
 func _make_window_light() -> void:
@@ -22419,6 +22422,17 @@ func _make_window_light() -> void:
 	multimesh.instance_count = WINDOW_LIGHT_MOST
 	multimesh.visible_instance_count = 0
 	_window_light.multimesh = multimesh
+	_window_light.material_override = window_light_material()
+	_window_light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_window_light.custom_aabb = AABB(Vector3(-100000.0, -1000.0, -100000.0), Vector3(200000.0, 2000.0, 200000.0))
+	add_child(_window_light)
+	_window_floor_sent = []
+	_window_floor_count = -1
+
+
+## The patch's multiply with its floor as its next pass (927 amended (1)),
+## the two drawn on the same quads.
+static func window_light_material() -> ShaderMaterial:
 	var materials: Array[ShaderMaterial] = []
 	for pass_of: Array in [WINDOW_LIGHT_MUL, WINDOW_LIGHT_ADD]:
 		var shader := Shader.new()
@@ -22431,12 +22445,30 @@ func _make_window_light() -> void:
 		material.set_shader_parameter("near_share", WINDOW_FLOOR_NEAR)
 		material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
 		materials.append(material)
-	# The floor drawn after the multiply, on the same quads (927 amended (1)).
 	materials[0].next_pass = materials[1]
-	_window_light.material_override = materials[0]
-	_window_light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_window_light.custom_aabb = AABB(Vector3(-100000.0, -1000.0, -100000.0), Vector3(200000.0, 2000.0, 200000.0))
-	add_child(_window_light)
+	return materials[0]
+
+
+## One patch in both passes for the warm-up (warm_ups, decision 495; 927
+## amended (1)): drawn by day under the ground at the room's first build, so
+## the first nightfall does not compile the two passes mid-play (perf, 11-15:
+## a pipeline compile each, cost unmeasured, smaller than the arrival frames).
+## Its shaders are made from the same code as the view's, so the compile and
+## the driver's pipeline cache serve the view's patch.
+static func warm_window_light() -> Node3D:
+	var piece := MultiMeshInstance3D.new()
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_custom_data = true
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	multimesh.mesh = plane
+	multimesh.instance_count = 1
+	multimesh.set_instance_custom_data(0, Color(1.0, 0.0, 0.0, 0.0))
+	piece.multimesh = multimesh
+	piece.material_override = window_light_material()
+	piece.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return piece
 
 
 ## Every lit window's patch this frame (927): out of doors, the sun down.
@@ -22475,8 +22507,11 @@ func _place_window_light() -> void:
 		var lights := window_floor_lights(_puppets.values(), _camera_target)
 		var count := lights.size()
 		lights.resize(WINDOW_FLOOR_LIGHTS)  # The uniform array's whole length, as the foot marks'.
-		floor_pass.set_shader_parameter("lights", lights)
-		floor_pass.set_shader_parameter("light_count", count)
+		if lights != _window_floor_sent or count != _window_floor_count:  # Sent only when a lantern moves (perf's word).
+			_window_floor_sent = lights
+			_window_floor_count = count
+			floor_pass.set_shader_parameter("lights", lights)
+			floor_pass.set_shader_parameter("light_count", count)
 
 
 ## What the two passes show on ground of [param shown] (an sRGB colour, as a

@@ -57725,7 +57725,26 @@ Client only; protocol unchanged; no new class_name; a bullet (voice's words) whe
   wall's foot and a near house's, and the multiply alone reads under 45, so the row fails on 927 as landed.
   Lit ground of 80, 130 and 180 moves at most 6 levels. The floor is the multiply's next pass, an add of
   WINDOW_LIGHT_FLOOR. The carried lanterns are the lit ones, nearest first, and a covered one is none. The add
-  fades out inside a lantern's light.
+  fades out inside a lantern's light. Both passes are among the warm-ups, one patch made from the view's own
+  shader code.
+- Against the approval: the coordinator approved "same MultiMesh, no new light, one draw". It is the same
+  MultiMesh and no new light, but a second pass, so the same quads draw twice, and the carried lanterns'
+  places are fed to the second pass each frame. The lanterns are needed because a lantern's lit ground
+  already shows the multiply. The floor added there would raise it, and with it the ground behind a body
+  standing in his own light, which would cut 858's ratio. Faded out there, that ground is as before.
+- Cost (perf's word on d004cda9f, 11-15), its three parts as given: (1) the draw's cost is likely none once
+  resolved; (2) a small CPU part each frame, well under 0.1 ms; (3) one or two more first-draw compiles at
+  nightfall, each cost unmeasured, smaller than the arrival frames (perf's probes: frames of 216 to 503 ms
+  held about 120 pipeline compiles together as a room first drew). (2) and (3) are mended as perf
+  suggested. Client3D.warm_window_light
+  draws one patch in both passes under the ground at the room's first build (decision 495's warm-ups), so
+  a nightfall mid-play compiles nothing. Its shaders are made from the same code as the view's, so the
+  compile and the driver's pipeline cache serve the view's patch. The lanterns' array goes to the floor's
+  pass only when a lantern moves or the count changes. What the mends save is not yet measured. The
+  measure is one joined run on the landed sha that passes nightfall in play, with the longest frame across
+  the first night draw beside the same on main.
+- Looked at: ui-design's joined stills were taken on d004cda9f, the floor before the two mends. The mends
+  draw nothing different.
 Client only; protocol unchanged; no new class_name.
 
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
