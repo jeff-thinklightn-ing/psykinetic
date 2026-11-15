@@ -54995,6 +54995,15 @@ Markdown pushed stampless, Markdown elsewhere not; another branch never looked a
 marker off and on; an error passes loudly with the gate's line; the install off, on, from origin/main only,
 and lifted; the lock's checkout. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+883 amended (1): land.sh --checks never says the lock's name (sound's report, 2026-11-14; label from
+tools/decision_number.sh). Sound's 924 landed from a side worktree (wt-stab) under the lock name sound-stab with no
+PSYKINETIC_TREE, and land.sh --checks printed the name line ("the land lock was taken here by sound-stab: run as
+sound-stab, not wt-stab"): land_checks_test's "no gate, no landing result, no lock" row, run inside that landing, failed
+on the words "land lock". The checks take no lock and no gate, so the line is only noise there: land.sh reads the
+lock's name only when not run with --checks; a landing's run is as before. land_checks_test: a fake project whose lock
+was taken from it under another name, no PSYKINETIC_TREE: --checks passes and says nothing of the lock (with the old
+land.sh, that row fails). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 882. The sim's dusk follows the sky's: dark at the end of civil twilight
 
 **Why.** The sim's light (`DayNight.daylight_at`) was NIGHT plus the day's share by smoothstep from a sun of -6 to 12 degrees, and everything that asks "is it dark" reads it against 0.35 (`Animal.NIGHT_LIGHT`, `DayNight.DARK_LIGHT`, `Senses.DARK`): the dark fell with the sun at -1, a few minutes after sunset (equinox 18:06). The view's sky keys light the sky, the walls and bodies by the sun's elevation down to -14, so in the Umbrage square at 18:30 (-5.3) the sky kept 37% of noon and the pale wall 53% while the outdoor floor, which takes its light from the sim's, was already at the night's (FLOOR_DARKEST, cobbles 118.6 at noon to 18.6, ground/wall 0.82 to 0.24; stills C:/dev/review/environment/umbrage_square, 11-10). A view-only lift (environment's dusk design, option B) would have lit the ground while the sim called it dark, so a hidden player or a bold wolf stood on ground that looked like day's end (enemy-ai's page C:/dev/review/enemy-ai/sim_dark.md lists the readers).

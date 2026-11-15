@@ -54,6 +54,16 @@ run_fake() {
 }
 out="$(run_fake)"; code=$?
 check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: PASS'; echo $?) "all three pass: PASS, exit 0"
+# 883 amended (1): the land lock taken from this checkout under another name, no PSYKINETIC_TREE (a
+# side worktree's landing, sound's 924): --checks says nothing of the lock's name.
+git -C "$tmp/p" init -q 2>/dev/null
+echo "side-tree" >"$tmp/lock/owner"
+(cd "$tmp/p" && git rev-parse --show-toplevel) >"$tmp/lock/checkout"
+out="$(cd "$tmp/p" && env PSYKINETIC_LAND_LOCK="$tmp/lock" bash tests/land.sh --checks 2>&1)"; code=$?
+check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: PASS' && ! printf '%s\n' "$out" | grep -qE "land lock|run as"; echo $?) \
+	"the lock taken here under another name: --checks passes and says nothing of it (883 amended (1))"
+rm -f "$tmp/lock/checkout"
+echo "fake-tree" >"$tmp/lock/owner"
 check $(printf '%s\n' "$out" | grep -q "changelog_check exit 0" && printf '%s\n' "$out" | grep -q "godot_log_check exit 0" \
 	&& printf '%s\n' "$out" | grep -q "voice_inventory exit 0"; echo $?) "each of the three ran"
 lock_given="$(sed 's/.*--lock //' "$tmp/p/tools/voice_inventory.args")"

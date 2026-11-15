@@ -26,9 +26,11 @@ cd "$(dirname "$0")/.."
 tree="${PSYKINETIC_TREE:-$(basename "$(pwd)")}"
 # The land lock taken from this checkout under another name (decision 883): this
 # run is that landing's, under the lock's name, never a second take queued
-# under its lock (physics, 11-12 03:09).
+# under its lock (physics, 11-12 03:09). Not under --checks (883 amended (1)): the checks take
+# no lock and no gate, so the line was only noise there, and it failed land_checks_test's "no
+# lock" row for a side worktree's landing run under its lock's name (sound's 924, 11-14).
 land_lock_dir="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}"
-if [ -z "${PSYKINETIC_TREE:-}" ] && [ -f "$land_lock_dir/checkout" ] 	&& [ "$(cat "$land_lock_dir/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
+if [ "${1:-}" != "--checks" ] && [ -z "${PSYKINETIC_TREE:-}" ] && [ -f "$land_lock_dir/checkout" ] 	&& [ "$(cat "$land_lock_dir/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
 	lock_tree="$(cat "$land_lock_dir/owner" 2>/dev/null)"
 	if [ -n "$lock_tree" ] && [ "$lock_tree" != "$tree" ]; then
 		echo "landing tests: the land lock was taken here by $lock_tree: run as $lock_tree, not $tree"
