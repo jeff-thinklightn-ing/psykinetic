@@ -42386,6 +42386,72 @@ larder_test: kept, standing; empty 14 days, disrepair; a season on, a ruin,
 never gone; no supplies, nothing ordered; supplies bought from the town and
 the mend ordered; the keeper works it himself; standing again; the save.
 Server only, protocol unchanged, no new class_name.
+
+733 amended (1): a kept hut never decays, and its healer brings the fallen
+back whatever its walls (the coordinator's ruling, 2026-11-15, after
+release's journal read of the box; label from tools/decision_number.sh).
+On the box the forest's hut (45,31) lost its keeper in old age on 11-12,
+fell into disrepair empty 14 days on 11-13 (game days: the box's 90-minute
+day makes 14 of them about 21 real hours), and on 11-14 a new keeper came
+and the same day's turn made it a ruin, a season after the disrepair:
+_huts_turn decayed a hut in disrepair whenever no mend was ordered, kept or
+not, and the new keeper's mend could not be supplied. A ruin was no return
+point and gave no care, so nobody had been raised there since. Its mend
+could never be supplied: Main._hut_town ranked the towns without routes,
+which counts only the hut's own area, and the forest has no store, so the
+hut had no town. The wilds' hut went the same way (ruin 11-08), mended on
+11-12 once Umbrage's store held 8 wood and 2 cloth at once. Jeff's rule is
+bonuses, not penalties: a town short of wood must not take a player's
+return point away.
+(a) Only a hut nobody keeps decays: Towns._huts_turn reads the keeper live
+each turn before the decay, his first turn too, so a kept hut in disrepair
+stays in disrepair and a kept ruin stays a ruin while his mend waits. The
+mend is tried each day as before (Towns._hut_mend: the supplies all in the
+town's store at once, bought with his purse or a loan from the town's bank
+as any maker's materials, Economy.buy_materials; short of both, it waits
+too) and is ordered the day both are there. Towns.hut_kept(id) says whether
+a hut has a keeper now.
+(b) Main._hut_ruined becomes Main._hut_shut: a ruin nobody keeps. Only a
+shut hut is passed over as a return point (_return_place), gives no care
+(Offers' "hut_ruined", the care offers) and tells those in its care "has
+fallen in; you will wake at the temple" (_on_hut_changed). A kept ruin is
+drawn a ruin, brings the fallen back and gives care, saying nothing. The
+rule reads the state and the keeper live, so a ruin kept on a laid world
+(the box's forest hut) is open from the boot, nothing migrated, a player's
+care kept as it was.
+(c) Main._hut_town ranks by world route, as _return_place does: the hut's
+own area's town, else the nearest by route (the forest's hut buys from
+Umbrage's store). A hut no town can be reached from has none: kept, it
+still gives care and brings the fallen back, its walls waiting, nothing
+erring.
+(d) healers.repair.ruin: wood 10, no cloth (was wood 8 and cloth 2). A
+town must be able to mend its healer's hut from what it makes; Umbrage
+makes no cloth, and a mend waiting on players happening to sell it, with
+nothing telling them, was a dead end by another name. A disrepair's mend
+stays 4 wood. Players helping to raise a ruin, if wanted, comes later as a
+designed thing.
+How an empty hut gets a keeper is unchanged: Main._seat_healers seats a new
+medicine man healers.vacant_days (21) after empty_since, standing or ruin,
+needing no wood (the box's huts were kept again a day after their
+disrepair). The production line "paid 0 of 5 gold" on the box's wilds mend
+is the mend job's wage, which the hut's own store had no gold to pay: the
+keeper had bought the supplies, so the price did not stop the mend.
+Tests: larder_test _test_hut_kept (the box's sequence: kept, left, 14 days
+disrepair, a new keeper, three seasons with the store's wood 0: disrepair
+from his first turn, never a ruin, nothing ordered; the wood and his gold
+there, the mend ordered that day; a kept ruin's mend at 10 wood, no cloth);
+_test_hut_decay unchanged (an unkept hut as before). return_test: a kept
+ruin is a return point, an unkept one passed over; a saved world holding
+his hut a ruin, kept (huts_from_dict): the player in his care brought back
+there on the next step. resident_test _test_hut_ruin: a kept ruin, nothing
+said, still woken at, care offered; its keeper away, as before.
+hut_town_test (new, port 17996): on the laid world the wilds' and the
+forest's huts both buy from wilds/store; the forest's ruin, kept, mended
+for 10 wood from Umbrage; a hut no town can be reached from: no town, kept,
+in disrepair, nothing ordered, open. Also offers, towns, economy,
+respawn_places, regen, farm and suite_test PASS. No new log line; none
+carries a player's name or id. Server only, protocol unchanged, no new
+class_name.
 ## 736, items' side: the starter vendor's wares and the starter mark
 
 Economy's starter vendor (736) sells the base weapons at a token price, and

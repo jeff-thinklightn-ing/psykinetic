@@ -219,10 +219,17 @@ func _test_main() -> void:
 	var me := _player().player_id
 	_check(_main._return_place(_player().tile, me).get("place", "") != id and _main._return_place(_player().tile).get("place", "") == id,
 		"not in his care: his hut is passed over for a player, not for others")
-	# A ruined hut (733): passed over for a fallen companion too (companions' line).
+	# A ruined hut (733): with its keeper there it still brings the fallen back (733 amended (1): it is the healer
+	# who brings you back, the walls waiting for his mend); nobody keeping it, passed over for a fallen companion
+	# too (companions' line).
 	var hut_was: Variant = World.towns._huts.get(id)
 	World.towns._huts[id] = {"state": Towns.RUIN, "level": 0, "job": 0}
-	_check(_main._return_place(_player().tile).get("place", "") != id, "a ruin: a fallen companion is never brought back there (%s)" % [_main._return_place(_player().tile)])
+	_check(World.towns.hut_kept(id) and not _main._hut_shut(id) and _main._return_place(_player().tile).get("place", "") == id,
+		"a ruin its keeper keeps: still a return point (733 amended (1)) (%s)" % [_main._return_place(_player().tile)])
+	World.towns.hut_keeper = func(_hut: String) -> String: return ""
+	_check(_main._hut_shut(id) and _main._return_place(_player().tile).get("place", "") != id,
+		"a ruin nobody keeps: a fallen companion is never brought back there (%s)" % [_main._return_place(_player().tile)])
+	World.towns.hut_keeper = Callable()
 	if hut_was == null:
 		World.towns._huts.erase(id)
 	else:
@@ -324,6 +331,12 @@ func _test_main() -> void:
 	_check(_main.grant_care(me, id, "quest") and _main.care_via(me, id) == "quest" and not _main.grant_care(me, id, "antlers"), "his errand done after: the way in is the errand's; nothing replaces it")
 	_walk_ticks(_player(), Vector2i(12, 6), 60)
 	_kill_monsters()
+	# A laid world holding his hut a ruin, kept (the forest's on the box, 11-14): loaded as a save loads it,
+	# nothing migrated, the rule read live; he brings the player in his care back there (733 amended (1)).
+	var laid_was: Variant = World.towns._huts.get(id)
+	World.towns.huts_from_dict({id: {"state": Towns.RUIN, "level": 0, "job": 0, "ruin": 0}})
+	_check(World.towns.hut(id)["state"] == Towns.RUIN and _main._return_place(_player().tile, me).get("place", "") == id,
+		"a saved ruin, kept: his hut is where the player in his care is brought back (%s)" % [World.towns.hut(id)])
 	_kill(_player())
 	_check(_player() == null, "the player died")
 	var hob := str(World.production.worker(keeper)["name"])
@@ -335,6 +348,10 @@ func _test_main() -> void:
 	_check(player != null and World.distance(player.tile, hut) <= 2 and player.hp == player.max_hp,
 		"brought back at the hut on the next step, at full hp (at %s)" % (player.tile if player else World.NO_CELL))
 	_check(_said.any(func(text: String) -> bool: return text == "%s brought you back from near death." % hob), "said: %s brought you back from near death (%s)" % [hob, _said])
+	if laid_was == null:
+		World.towns._huts.erase(id)
+	else:
+		World.towns._huts[id] = laid_was
 	var reply: Variant = World.production.rules["return"].get("everyone_s")
 	_check(int(reply) == 20 and _main.tell_all_fallen([Net.local_id]) == 20 and _told.back() == {"all_fallen": 20},
 		"everyone down: told all come back in everyone_s, 20 s (%s)" % [_told.back()])

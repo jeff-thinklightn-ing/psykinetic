@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_hut_account()
 	_test_maker_swap()
 	_test_hut_decay()
+	_test_hut_kept()
 	_test_apprentice()
 	_test_contribute()
 	_test_caravan()
@@ -656,6 +657,74 @@ func _test_hut_decay() -> void:
 	var saved := Towns.new({}, work, _rules, clock)
 	saved.huts_from_dict(JSON.parse_string(JSON.stringify(towns.huts_to_dict())))
 	_check(saved.hut(HUT) == towns.hut(HUT), "kept in the save")
+
+
+## A kept hut never decays (733 amended (1), the coordinator's ruling, 11-15): the box's own sequence (the
+## forest's hut, 11-12 to 11-14: its keeper left, 14 days on disrepair, a new keeper came, his mend could not be
+## supplied, and the same day's turn made it a ruin). Kept, it stays in disrepair through three seasons with the
+## store's wood 0, never a ruin; wood and his gold there, the mend is ordered that day. A ruin kept is mended at
+## healers.repair.ruin's cost, wood alone (10): what a town makes.
+func _test_hut_kept() -> void:
+	print("
+== a kept healer's hut never decays; its mend waits for the wood (733 amended (1)) ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var day := DayNight.day_steps
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var no_areas: Array[String] = []
+	var holdings := Holdings.new(WorldMap.build(no_areas), null, {}, clock)
+	const HUT := "lt/healers_hut@1,1"
+	holdings._places[HUT] = {"id": HUT, "area": "lt", "key": "healers_hut@1,1", "cell": Vector2i(1, 1), "name": "the healer's hut",
+		"kind": "healers_hut", "radius": 2, "worth": 0, "start": ""}
+	holdings._places[TOWN] = {"id": TOWN, "area": "lt", "key": "store", "cell": Vector2i(9, 9), "name": "the store",
+		"kind": Stockpile.KIND, "radius": 2, "worth": 0, "start": ""}
+	var work := Production.new({}, stock, holdings, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.buy_materials = economy.buy_materials
+	towns.hut_supplies = func(hut_id: String, keeper: String, needs: Dictionary) -> bool: return economy.hut_supplies(TOWN, hut_id, keeper, needs)
+	work.add_worker("mm1", "Hob", ["medicine_man"], HUT, "test", "steady")
+	work.add_workshop(HUT, "medicine_man", HUT)
+	work.assign(HUT, "mm1")
+	towns._huts_turn()
+	work.remove_worker("mm1")  # He leaves in old age (759).
+	var unkept := int(_rules["decline"]["unkept_days"])
+	for i in unkept + 1:
+		_now += day
+		towns._huts_turn()
+	_check(towns.hut(HUT)["state"] == Towns.DISREPAIR and not towns.hut_kept(HUT), "empty %d days: disrepair, nobody keeping it (%s)" % [unkept, towns.hut(HUT)])
+	# A new keeper the next day, a season after the disrepair less a day: the box's ruin fell on his first turn.
+	_now += day * (Season.season_days - 1)
+	towns._huts_turn()
+	work.add_worker("mm3", "Gile", ["medicine_man"], HUT, "test", "steady")
+	work.assign(HUT, "mm3")
+	_check(stock.count(TOWN, "wood") == 0 and towns.hut_kept(HUT), "(a new keeper; the store's wood 0)")
+	var ruined := false
+	for i in Season.season_days * 3:
+		_now += day
+		towns._huts_turn()
+		ruined = ruined or towns.hut(HUT)["state"] == Towns.RUIN
+	_check(not ruined and towns.hut(HUT) == {"state": Towns.DISREPAIR, "level": 1} and int(towns._huts[HUT]["job"]) == 0,
+		"kept, no wood: three seasons in disrepair, never a ruin, nothing ordered, from his first turn (%s)" % [towns.hut(HUT)])
+	var needs: Dictionary = _rules["healers"]["repair"]["disrepair"]["needs"]
+	for what: String in needs:
+		stock.deposit(TOWN, what, int(needs[what]), "test")
+	work.pay("mm3", 100, "test")
+	_now += day
+	towns._huts_turn()
+	var job := int(towns._huts[HUT]["job"])
+	_check(job != 0 and stock.count(TOWN, "wood") == 0 and work.job(job).get("recipe", "") == Towns.HUT_REPAIR + HUT,
+		"the wood in the store and his gold: the mend ordered that day (%s)" % [needs])
+	# A ruin kept: mended at the ruin's cost, wood alone.
+	var ruin_needs: Dictionary = _rules["healers"]["repair"]["ruin"]["needs"]
+	_check(ruin_needs == {"wood": 10.0} or ruin_needs == {"wood": 10}, "a ruin's mend: 10 wood, no cloth (%s)" % [ruin_needs])
+	work.cancel(job)
+	towns._huts[HUT] = {"state": Towns.RUIN, "level": 0, "job": 0, "ruin": 0}
+	stock.deposit(TOWN, "wood", 10, "test")
+	_now += day
+	towns._huts_turn()
+	_check(int(towns._huts[HUT]["job"]) != 0 and stock.count(TOWN, "wood") == 0 and stock.count(TOWN, "cloth") == 0 and towns.hut(HUT)["state"] == Towns.RUIN,
+		"a ruin kept, 10 wood in the store: its mend ordered, no cloth wanted (%s)" % [towns.hut(HUT)])
 
 
 ## Gathered, hauled and paid for (decision 498): a delivery bought at the

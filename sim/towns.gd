@@ -3641,6 +3641,12 @@ func huts_from_dict(saved: Dictionary) -> void:
 		_huts[str(id)] = entry
 
 
+## Whether hut [param id] has a keeper now (733 amended (1): a kept hut gives
+## care and brings the fallen back whatever its walls).
+func hut_kept(id: String) -> bool:
+	return not _keeper_of(id).is_empty()
+
+
 ## Who keeps hut [param id]: hut_keeper's, else its workshop's worker while
 ## alive, not away and not held; "" for nobody.
 func _keeper_of(id: String) -> String:
@@ -3660,8 +3666,10 @@ func _keeper_of(id: String) -> String:
 ## Once a day, each healer's hut (733; Jeff: "it decays when nobody lives in
 ## it, and the healer rebuilds it with supplies"): nobody keeping it
 ## decline.unkept_days days running, it falls into disrepair; in disrepair
-## it loses a level a season, at none a ruin, never gone (it can always be
-## built again). Kept again, its keeper mends it: healers.repair's supplies
+## it loses a level a season while nobody keeps it (733 amended (1): a kept
+## hut never decays, its mend waiting for the supplies and his gold), at none
+## a ruin, never gone (it can always be built again). Kept again, its keeper
+## mends it: healers.repair's supplies
 ## for its state bought from the hut's town (hut_supplies), then a "build"
 ## job of his own workshop; standing again when it is done. Who comes to
 ## keep an empty hut is npc's (after healers.vacant_days, from
@@ -3696,7 +3704,8 @@ func _huts_turn() -> void:
 			entry["state"] = DISREPAIR
 			entry["decay"] = day
 			print("[towns] the healer's hut %s, empty %d days, has fallen into disrepair, step %d" % [id, day - int(entry["empty_since"]), now()])
-		elif entry["state"] == DISREPAIR and int(entry["job"]) == 0 and day - int(entry.get("decay", day)) >= season:
+		elif entry["state"] == DISREPAIR and keeper.is_empty() and int(entry["job"]) == 0 and day - int(entry.get("decay", day)) >= season:
+			# 733 amended (1): only an unkept hut decays; a kept one waits for its mend (read live, his first turn too).
 			entry["decay"] = day
 			entry["level"] = int(entry["level"]) - 1
 			if int(entry["level"]) <= 0:

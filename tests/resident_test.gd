@@ -8094,14 +8094,21 @@ func _test_hut_ruin() -> void:
 	World.towns._huts[hut]["state"] = Towns.RUIN
 	World.towns._huts[hut]["level"] = 0
 	_main._on_hut_changed(hut)
-	Net.message_received.disconnect(heard)
-	_check(told.size() == 1 and told[0].begins_with("Oren's hut has fallen in") and not told[0].contains(hut), "those in its care told where they will wake (%s)" % [told])
+	# 733 amended (1): Oren keeps it, so the ruin still gives care and brings them back, and nothing is said.
+	_check(told.is_empty() and str(_main._return_place(cell, pid).get("place", "")) == hut and care_offers.call() == standing_care and standing_care > 0,
+		"a ruin its keeper keeps: nothing said, they still wake at the hut, his care still offered (%s; %d offers)" % [told, care_offers.call()])
 	_check(views.get(hut, {}) == {"state": Towns.RUIN, "level": 0} and _main.hut_states.get(hut, {}).get("state") == Towns.RUIN,
 		"every view told the hut a ruin by its place id, the \"huts\" message (%s)" % [views])
+	# Nobody keeping it (Oren away): as before 733 amended (1).
+	World.production.set_away(oren_id, true)
+	_main._on_hut_changed(hut)
+	Net.message_received.disconnect(heard)
+	_check(told.size() == 1 and told[0].begins_with("Oren's hut has fallen in") and not told[0].contains(hut), "nobody keeping it: those in its care told where they will wake (%s)" % [told])
 	var elsewhere := str(_main._return_place(cell, pid).get("place", ""))
-	_check(elsewhere != hut, "a ruin: they wake elsewhere (%s; the test town has no temple)" % elsewhere)
+	_check(elsewhere != hut, "a ruin nobody keeps: they wake elsewhere (%s; the test town has no temple)" % elsewhere)
 	_check(record.care.has(hut), "their care kept for the hut mended")
-	_check(care_offers.call() == 0 and standing_care > 0, "no care offered at a ruin, to one not yet in it (%d while it stood)" % standing_care)
+	_check(care_offers.call() == 0 and standing_care > 0, "no care offered at a ruin nobody keeps, to one not yet in it (%d while it stood)" % standing_care)
+	World.production.set_away(oren_id, false)
 	World.production.remove_worker(oren_id)
 	var day := World.towns.now() / maxi(DayNight.day_steps, 1)
 	World.towns._huts[hut]["empty_since"] = day - 5

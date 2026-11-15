@@ -15042,7 +15042,7 @@ func _offers_context() -> Dictionary:
 		# The medicine man's care (584 amended): economy's rule, retainer and record; the town his hut serves; his brew handed over.
 		"care_hut": func(worker_id: String) -> String: return _care_hut_of(worker_id),
 		"care_rule": func(place_id: String) -> Dictionary: return care_rule(place_id),
-		"hut_ruined": _hut_ruined,
+		"hut_ruined": _hut_shut,
 		"retain": func(player_id: String, healer_id: String, pay: String) -> Dictionary: return _retain_care(player_id, healer_id, pay),
 		"grant_care": func(player_id: String, place_id: String, how: String) -> void: grant_care(player_id, place_id, how),
 		"in_care": func(player_id: String, place_id: String) -> bool: return in_care(player_id, place_id),
@@ -15286,7 +15286,10 @@ func _hut_town(hut_id: String) -> String:
 		if towns.has(id) and World.holdings.place(id).get("kind") == Stockpile.KIND:
 			return id
 	var kinds: Array[String] = [Stockpile.KIND]
-	for id: String in World.holdings.ranked(kinds, str(place.get("area", "")), place.get("cell", Vector2i.ZERO)):
+	# 733 amended (1): by world route, as _return_place ranks (without routes ranked counts only the hut's own area, and
+	# the forest's hut, with no store there, had no town: its mend never ordered).
+	var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
+	for id: String in World.holdings.ranked(kinds, str(place.get("area", "")), place.get("cell", Vector2i.ZERO), routes):
 		if towns.has(id):
 			return id
 	return ""
@@ -24631,19 +24634,24 @@ func _vacancy_run(place_id: String) -> bool:
 	return World.towns.now() / maxi(DayNight.day_steps, 1) - int(hut["empty_since"]) >= days
 
 
-## Whether healer's hut [param place_id] is a ruin (733, economy's
-## Towns.hut): no return point and no care there until it is mended;
-## disrepair still is both. False for any other place.
-func _hut_ruined(place_id: String) -> bool:
-	return World.towns != null and World.towns.has_method("hut") and str(World.towns.hut(place_id).get("state", "")) == Towns.RUIN
+## Whether healer's hut [param place_id] is shut (733, economy's Towns.hut):
+## a ruin nobody keeps, no return point and no care there. 733 amended (1):
+## a kept hut is both whatever its walls (it is the healer who brings you
+## back), read live, so a ruin kept on a laid world is open from the boot.
+## False for any other place.
+func _hut_shut(place_id: String) -> bool:
+	if World.towns == null or not World.towns.has_method("hut"):
+		return false
+	return str(World.towns.hut(place_id).get("state", "")) == Towns.RUIN and not World.towns.hut_kept(place_id)
 
 
 ## Server: healer's hut [param place_id] changed (Towns.hut_changed, 733):
-## fallen to a ruin, each player in its care who is here is told where they
-## will wake now (their care kept for the hut mended).
+## fallen to a ruin nobody keeps (733 amended (1): a kept ruin still brings
+## them back, and nothing is said), each player in its care who is here is
+## told where they will wake now (their care kept for the hut mended).
 func _on_hut_changed(place_id: String) -> void:
 	Net.broadcast("huts", {"states": huts_of(place_id.get_slice("/", 0))})  # Every peer's view (733).
-	if not _hut_ruined(place_id) or World.production == null:
+	if not _hut_shut(place_id) or World.production == null:
 		return
 	var keeper := str(World.production.worker(str(World.production.workshop(place_id).get("worker", ""))).get("name", ""))
 	var line := "%s has fallen in; until it stands again you will wake at the temple, or wherever is nearest." % (
@@ -24731,12 +24739,12 @@ func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 	var record: PlayerRecord = _records.get(player_id) if not player_id.is_empty() else null
 	if record != null and not record.care.is_empty():
 		for id: String in ranked:
-			if record.care.has(id) and not _hut_ruined(id):
+			if record.care.has(id) and not _hut_shut(id):
 				var shop := _return_workshop(id)
 				if not shop.is_empty() and World.production.manned(shop):
 					return {"place": id, "workshop": shop}
 		for id: String in record.care:
-			if not World.holdings.place(id).is_empty() and not _hut_ruined(id):
+			if not World.holdings.place(id).is_empty() and not _hut_shut(id):
 				var shop := _return_workshop(id)
 				if not shop.is_empty() and World.production.manned(shop):
 					return {"place": id, "workshop": shop}
@@ -24745,8 +24753,8 @@ func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 		var shop := _return_workshop(id)
 		if not player_id.is_empty() and World.holdings.place(id).get("kind") == "healers_hut" and not in_care(player_id, id):
 			continue  # A healer's hut brings back only a player in its care (584 amended).
-		if _hut_ruined(id):
-			continue  # A ruin is no return point; disrepair still is (733, npc's side).
+		if _hut_shut(id):
+			continue  # A ruin nobody keeps is no return point; disrepair still is, and a kept ruin (733 amended (1)).
 		if not shop.is_empty() and World.production.manned(shop):
 			return {"place": id, "workshop": shop}
 	return {}
