@@ -91,6 +91,7 @@ func _ready() -> void:
 	_test_crypt_spacing()
 	_test_hall_shortcut()
 	await _test_throne_way_held()
+	await _test_draugr_hall_is_his_room()
 	await _test_throne_home()
 	_test_barrow_quest()
 	await _test_knights_altar()
@@ -6988,6 +6989,95 @@ func _test_throne_way_held() -> void:
 	_check(_main.hall_link_held(laid), "a way laid in the held lair would be held all the same")
 	_main._hold_hall_door("barrow_deep", false)
 	_check(not _main.hall_held("barrow_deep") and not _main.hall_link_held(laid), "let go: not held")
+	_main.load_map("test_room")
+
+
+## The draugr's Hall is the room he keeps (548 amended (4); dungeon's read, the
+## coordinator's ruling): barrow_deep as the game lays it, his room (his row's
+## keeps_room, Monster.room_of(home)) is the rect Main.hall_lair_rect gives the
+## Hall's door lines (573 amended (6)), one source for both; a player in the door
+## row or beside its walls is not in it, one inside its far corners is. And none
+## outside it can strike him where he sits: no walkable cell outside his rect lies
+## within the longest reach of any ranged verb or move in the items and monsters
+## data (a wider Hall, a moved seat or a longer reach reopens the question), on
+## the template and on the crypt generated round it (generations 1-8, 109, 118).
+func _test_draugr_hall_is_his_room() -> void:
+	print("
+== the draugr's Hall is the room he keeps, and nobody outside it reaches his seat (548 amended (4)) ==")
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "")
+	await get_tree().process_frame
+	var lair: Rect2i = _main.hall_lair_rect("barrow_deep")
+	var draugr: Draugr = null
+	for each: Monster in World.monsters():
+		if each is Draugr:
+			draugr = each
+	_check(draugr != null and draugr.keeps_room and lair.has_area() and draugr._room == lair,
+		"his room is the Hall's rect (%s, %s)" % [draugr._room if draugr != null else "no draugr", lair])
+	if draugr == null:
+		_main.load_map("test_room")
+		return
+	var read := {}
+	for cell: Vector2i in [Vector2i(49, 54), Vector2i(49, 55), Vector2i(31, 70), Vector2i(67, 70), Vector2i(49, 56), Vector2i(34, 77), Vector2i(65, 56)]:
+		read[cell] = draugr._in_lair_cell(cell)
+	_check(not read[Vector2i(49, 54)] and not read[Vector2i(49, 55)] and not read[Vector2i(31, 70)] and not read[Vector2i(67, 70)]
+		and read[Vector2i(49, 56)] and read[Vector2i(34, 77)] and read[Vector2i(65, 56)],
+		"outside the door, in its row and beside the walls: not his Hall; inside to its corners: his Hall (%s)" % [read])
+	var longest := 0
+	var by := ""
+	for id: String in Items.ids():
+		var verb: Variant = Items.def(id).get("verb", {})
+		if verb is Dictionary:
+			for step: Variant in verb.get("steps", []):
+				if int(step) > longest:
+					longest = int(step)
+					by = id
+			if verb.get("reach") is int or verb.get("reach") is float:
+				if int(verb["reach"]) > longest:
+					longest = int(verb["reach"])
+					by = id
+	var kinds: Dictionary = Monster.kinds()
+	for kind: String in kinds:
+		var moves: Variant = kinds[kind].get("moves", {})
+		if moves is Dictionary:
+			for move: String in moves:
+				for key: String in ["reach", "day_reach"]:
+					var reach: Variant = moves[move].get(key) if moves[move] is Dictionary else null
+					if (reach is int or reach is float) and int(reach) > longest:
+						longest = int(reach)
+						by = "%s's %s" % [kind, move]
+	var seat := draugr.home
+	var nearest := 9999
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in World.floor_cells():
+		if not lair.has_point(cell) and World.distance(seat, cell) < nearest:
+			nearest = World.distance(seat, cell)
+			at = cell
+	_check(longest > 0 and nearest > longest,
+		"no floor outside his Hall within the longest ranged reach of his seat %s: the nearest %s, %d off; the longest reach %d (%s)" % [seat, at, nearest, longest, by])
+	# The template's floor is the Hall and the Charnel Vault alone; the crypt
+	# the game lays is generated round them, so its generations are read too.
+	var near := {}
+	for generation: int in [1, 2, 3, 4, 5, 6, 7, 8, 109, 118]:
+		var made := Regen.generate("barrow_deep", generation)
+		var ground: Array = Level.parse(made["layout"], made["height"], made["config"])["terrain"]["floor"]
+		var gen_lair: Rect2i = lair
+		for anchor: Dictionary in made["config"].get("anchors", Regen.config_of("barrow_deep").get("anchors", [])):
+			if str(anchor.get("name", "")) == "lair":
+				gen_lair = anchor["rect"]
+		var best := 9999
+		var best_at := Vector2i(-1, -1)
+		var seat_in := false
+		for cell: Vector2i in ground:
+			seat_in = seat_in or cell == seat
+			if not gen_lair.has_point(cell) and World.distance(seat, cell) < best:
+				best = World.distance(seat, cell)
+				best_at = cell
+		if not seat_in or gen_lair != lair or best <= longest:
+			near[generation] = "seat on its floor %s, lair %s, nearest outside %s %d off, of %d floor cells" % [seat_in, gen_lair, best_at, best, ground.size()]
+		elif generation == 1:
+			print("  generation 1: nearest floor outside his Hall %s, %d off his seat, of %d floor cells" % [best_at, best, ground.size()])
+	_check(near.is_empty(), "the crypt's generations 1-8, 109 and 118: his Hall where the template has it, his seat on its floor, no floor outside it within %d of the seat (%s)" % [longest, near])
 	_main.load_map("test_room")
 
 
