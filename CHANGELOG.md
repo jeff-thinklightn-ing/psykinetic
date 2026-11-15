@@ -7,24 +7,27 @@ notes (decision 324).
 
 ## Unreleased
 
-- Rolf's "Open locker" shows your locker beside your pack again: the store window stays shut and the locker's squares are there, where before it came back over them (807 amended (7)).
-- Towns: by day, coming into a town you hear its market for a while, a little different each time, before it fades into open air, with townsfolk's talk coming and going too low to make out, and work out of sight sounding faint and far off (578 amended (4)).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
-- Sacks of grain in the tavern's attic and the Forest's camps are whole, plain sacking tied at the neck (871 amended (2)).
-- Robbers fight as a band: one holds their lunge while a mate stands in the way, one your companion cuts turns to face her, and when two hang back, one soon presses in (898, 899, 806 amended (21)).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
-- Towns: the post at the end of Umbrage's east road is the east road post, on your map and where you stand (774 amended (3)).
-- The pond a long walk west of Umbrage is Reed Pond, and the water round Snagfin's shack is Snagfin's Fishin' Hole, a place of its own to find and named on your map (805 amended (20)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
+- Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+
+## v0.1.216
+
+- Towns: ask Rolf for your locker and "Your chest" opens beside your pack, with his store window shut (807 amended (7)).
+- Towns: by day, coming into a town you hear its market for a while, a little different each time, before it fades into open air, with townsfolk's talk coming and going too low to make out, and work out of sight sounding faint and far off (578 amended (4)).
+- Sacks of grain in the tavern's attic and the Forest's camps are whole, plain sacking tied at the neck (871 amended (2)).
+- Robbers fight as a band: one holds their lunge while a mate stands in the way, one your companion cuts turns to face her, and when two hang back, one soon presses in (898, 899, 806 amended (21)).
+- Towns: the post at the end of Umbrage's east road is the east road post, on your map and where you stand (774 amended (3)).
+- The pond a long walk west of Umbrage is Reed Pond, and the water round Snagfin's shack is Snagfin's Fishin' Hole, a place of its own to find and named on your map (805 amended (20)).
 - The draugr's and the fallen knight's windows open at the foot of the screen, left of the pack, and the draugr's closes by itself once he rests (629 amended (3)).
 - A name over someone's head sinks with them as they kneel, sleep or stoop tired, and their health bar with it (865 amended (2)).
 - When another player in your area goes down, you're told, and, when they can be saved, how long a blessed hand has to bring them back (914).
-- Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Anyone ready to fight with a giant axe or battle axe holds its edge turned out, away from their face, and with a tomb sledge, rot hammer or pick, its head leads toward the foe, wrists straight either way (451 amended (6)).
 - When you're brought back or moved within an area, you and your companion show only where you arrive (911).
-- Towns: townsfolk sawing or hammering close by sound no louder than people talking beside you, and their axes only a little louder (804 amended (22)).
+- Towns: a townsperson's axe close by sounds only a little louder than people talking beside you (804 amended (22)).
 - In his Hall, the draugr asks you by name why you have entered (548 amended (2)).
 - Towns: a companion left in town who falls sick gets well again and goes back to work; before, she stayed off work for good (915).
 
