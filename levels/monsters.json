@@ -203,7 +203,8 @@
 		"barks": {
 			"hold": ["I'm next.", "Leave some for me.", "Go on. I'll have what's left."],
 			"step_in": ["My turn.", "Stand back. Mine now.", "Out of it. Let me at them.", "Enough waiting."],
-			"leave": ["Gone, then.", "That's that. Back to it.", "Not worth it."]
+			"leave": ["Gone, then.", "That's that. Back to it.", "Not worth it."],
+			"downed": ["Nothing left for me, then.", "Beaten to it.", "Should've been mine."]
 		},
 		"wields": {"right": "dagger"},
 		"moves": {"lunge": {"windup": 10, "damage": 3, "reach": 2, "recover": 9}},

@@ -1892,6 +1892,7 @@ func _test_ambush() -> void:
 	_test_band_hold_off()
 	_test_band_lone_player()
 	_test_band_barks()
+	_test_band_downed()
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_freed_striker()
@@ -9738,6 +9739,103 @@ func _test_band_barks() -> void:
 	print("  in the fight: %s" % [said])
 	_check(his.size() == 2 and str(his[0]) in pools["hold"] and str(his[1]) in pools["step_in"] and named.is_empty(),
 		"a player alone: the second says a hold line, then a step-in line as the first falls, never her name (%s)" % [his])
+	World.band_said = was_said
+	World.band_barks.clear()
+	Monster.idling = true
+
+
+## The lines World logged since its count read [param since] (recent_logs keeps the last cases' too).
+func _logged_since(since: int) -> Array:
+	var n := mini(World.logged - since, World.recent_logs.size())
+	return World.recent_logs.slice(World.recent_logs.size() - n) if n > 0 else []
+
+
+## 806 amended (24): the one he held off downed by another's hand, the holder
+## leaves his hold and says a line of the "downed" pool; gone (freed), a line
+## of the "leave". Logged "[band] <him> leaves its hold, a player downed",
+## never her name. After, he is out of the fight as any fight's end (seek and
+## _hunt pass over the downed): not FIGHTING, no target. And her fall plays out
+## the same with the bark and without it (the band's tiles, alerts and hp, hers,
+## her lying and the ticks after).
+const DOWNED_LIE := 100
+
+
+## Her downed by the first after the second has held [param ticks]; then
+## [param after] ticks. With [param barks] off World.band_said is no Callable.
+func _downed_run(barks: bool, after: int) -> Dictionary:
+	var said: Array = []
+	World.band_said = (func(body: Monster, words: String) -> void: said.append([World.tick, body.name, words])) if barks else Callable()
+	World.band_barks.clear()
+	var room := _lone_band(false)
+	_lone_steps(room, 200)
+	var her: GridEntity = room["her"]
+	var first: Monster = room["first"]
+	var second: Monster = room["second"]
+	var held_before := second._holding
+	her.hp = 20
+	her.max_hp = 20
+	World.lay_downed(her, DOWNED_LIE, first, &"attack")
+	var downed_at := World.tick
+	var told: Array[String] = []
+	var out_at := -1
+	var trail: Array[String] = []
+	for i in after:
+		var logged := World.logged
+		World.step()
+		for line: String in _logged_since(logged):
+			if line.contains("[band]"):
+				told.append(line)
+		if out_at < 0 and second.alert != Monster.Alert.FIGHTING and second.target == null:
+			out_at = World.tick - downed_at
+		if i % 10 == 9:
+			trail.append("%s %s %s %d | %s %s %d | %s %d %s" % [first.tile, first.alert, first.target != null, first.hp, second.tile, second.alert, second.hp,
+				her.tile, her.hp, World.is_downed(her)])
+	return {"said": said, "told": told, "held_before": held_before, "out_at": out_at, "trail": trail, "second": second.name,
+		"her_end": [her.tile, her.hp, World.is_downed(her), her.downed_until - downed_at]}
+
+
+func _test_band_downed() -> void:
+	print("%s== the one he held off downed: he leaves his hold with a downed line; gone, a leave line; her fall the same with or without (806 amended (24)) ==" % char(10))
+	Monster.idling = false
+	var was_said: Callable = World.band_said
+	var run := _downed_run(true, 40)
+	var pools: Dictionary = Monster.read_kinds(Monster.KINDS_PATH).get("robber", {}).get("barks", {})
+	var his: Array = (run["said"] as Array).filter(func(l: Array) -> bool: return str(l[1]) == run["second"]).map(func(l: Array) -> String: return str(l[2]))
+	var left: Array = (run["told"] as Array).filter(func(l: String) -> bool: return l.contains("leaves its hold"))
+	print("  downed: held %s; his lines %s; [band] %s; out of the fight %d ticks after" % [run["held_before"], his, run["told"], run["out_at"]])
+	_check(pools.get("downed", []).size() == 3, "the robber's row carries voice's downed pool (%s)" % [pools.get("downed", [])])
+	_check(run["held_before"] and his.size() == 2 and str(his[0]) in pools.get("hold", []) and str(his[1]) in pools.get("downed", []),
+		"her downed by the first: the second, holding, says a hold line then a downed line (%s)" % [his])
+	_check(left.size() == 1 and str(left[0]).contains("leaves its hold, a player downed") and not str(left[0]).contains("Tove")
+			and (run["said"] as Array).all(func(l: Array) -> bool: return not str(l[2]).contains("Tove")),
+		"logged \"leaves its hold, a player downed\", never her name (%s)" % [left])
+	_check(int(run["out_at"]) >= 0 and int(run["out_at"]) <= 2, "he is out of the fight at once: not FIGHTING, no target (%d ticks)" % run["out_at"])
+	# Gone: freed while he holds.
+	var said: Array = []
+	World.band_said = func(body: Monster, words: String) -> void: said.append([World.tick, body.name, words])
+	World.band_barks.clear()
+	var room := _lone_band(false)
+	_lone_steps(room, 200)
+	var second: Monster = room["second"]
+	var held := second._holding
+	var her: GridEntity = room["her"]
+	var gone_from := World.logged
+	World.despawn(her)
+	her.free()
+	for i in 10:
+		World.step()
+	var told: Array = _logged_since(gone_from).filter(func(l: String) -> bool: return l.contains("[band]"))
+	var gone: Array = said.filter(func(l: Array) -> bool: return str(l[1]) == second.name).map(func(l: Array) -> String: return str(l[2]))
+	print("  gone: held %s; his lines %s; [band] %s" % [held, gone, told])
+	_check(held and gone.size() == 2 and str(gone[1]) in pools.get("leave", []) and told.any(func(l: String) -> bool: return l.ends_with("leaves its hold")),
+		"her freed while he holds: he says a leave line, logged \"leaves its hold\" (%s)" % [gone])
+	# The same fall with the bark and without it.
+	var with_bark := _downed_run(true, DOWNED_LIE + 60)
+	var without := _downed_run(false, DOWNED_LIE + 60)
+	print("  with the bark: %s, her %s" % [(with_bark["trail"] as Array).slice(-3), with_bark["her_end"]])
+	print("  without:       %s, her %s" % [(without["trail"] as Array).slice(-3), without["her_end"]])
+	_check(with_bark["trail"] == without["trail"] and with_bark["her_end"] == without["her_end"] and (without["said"] as Array).is_empty(),
+		"her fall plays out the same with the bark and without: the band's cells, alerts and hp, hers, her lying %d ticks and 60 after" % DOWNED_LIE)
 	World.band_said = was_said
 	World.band_barks.clear()
 	Monster.idling = true

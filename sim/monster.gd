@@ -557,8 +557,9 @@ var _joined_party := 0
 var _hold_shift_at := 0
 ## Ticks running a place has stood open at its party (HOLD_OPEN_TICKS).
 var _hold_open := 0
-## Its row's "barks" (806, voice's lines): pool ("hold", "step_in", "leave")
-## -> lines, said as it takes up its hold, steps in from it, or leaves it.
+## Its row's "barks" (806, voice's lines): pool ("hold", "step_in", "leave",
+## "downed") -> lines, said as it takes up its hold, steps in from it, leaves it
+## as the one it held off is gone, or as she is downed (806 amended (24)).
 var barks: Dictionary = {}
 ## The "<fight>:<pool>" it has spoken for (once a fight for each pool).
 var _barked: Dictionary = {}
@@ -1318,8 +1319,11 @@ func _sim_tick() -> void:
 				pose = Pose.STAND
 	if seen != null and seen != target and not named_id.is_empty():
 		World.named_note(self, "met", seen)  # Decision 716: npc's memory of it.
+	var held: Variant = target  # Untyped till checked: freed since, it is no GridEntity.
 	target = seen
 	if target == null:
+		if _holding:
+			_left_hold(held)
 		_holding = false
 		_hold_open = 0
 		_drop_windup()
@@ -1483,6 +1487,9 @@ func _sim_tick() -> void:
 func forget(gone: GridEntity) -> void:
 	super(gone)
 	if target == gone:
+		if _holding:
+			_holding = false
+			_left_hold(null, true)  # 806 amended (24): the one he held off gone (out of the zone or the game).
 		target = null
 		slot = NO_TILE
 	if _provoked == gone:
@@ -4394,6 +4401,22 @@ func _holds_now() -> bool:
 		World._log("[band] %s leaves its hold" % name)
 		_band_bark("leave")
 	return now
+
+
+## Its hold left as the one it held off goes out of its fight (806 amended
+## (24)): downed by another's hand (World.is_downed; seek passes over the
+## downed, 544) it says its row's "downed" pool, [param gone] (despawned:
+## forget, 897; or found freed or out of the zone) its "leave"; logged, never
+## her name. Lost from sight and still up, it says nothing, as before. What it
+## does after is the fight's end as ever: _hunt never hunts the downed or the
+## gone, so it goes back to where it idles.
+func _left_hold(held: Variant, gone := false) -> void:
+	if not gone and is_instance_valid(held) and (held as GridEntity).spawned and World.is_downed(held as GridEntity):
+		World._log("[band] %s leaves its hold, %s downed" % [name, World.plain_name(held as GridEntity)])
+		_band_bark("downed")
+	elif gone or typeof(held) == TYPE_OBJECT and (not is_instance_valid(held) or not (held as GridEntity).spawned):
+		World._log("[band] %s leaves its hold" % name)
+		_band_bark("leave")
 
 
 ## Its word aloud as it takes up its hold, steps in, or leaves it ([param
