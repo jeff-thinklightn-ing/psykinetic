@@ -17518,10 +17518,14 @@ func _taverner_places(level: Dictionary, tavern: Dictionary) -> Dictionary:
 
 ## [param fire]'s seats (Level.fires_of) as "fire" spots of the town [param key] (853 amended (18)): each a sit
 ## facing the cell next to it toward the pit, "fire" the pit, whose burning (World.is_fire) says whether it is sat at.
-static func fire_seat_spots(fire: Dictionary, key: String) -> Array:
+## Only a seat with something to sit on, a cell of [param seated] (Main.seat_cells_of): the sit is the chair's, and
+## nobody sits on air (the coordinator's, 11-15).
+static func fire_seat_spots(fire: Dictionary, key: String, seated: Dictionary) -> Array:
 	var pit: Vector2i = fire["cell"]
 	var out: Array = []
 	for seat: Vector2i in fire.get("seats", []):
+		if not seated.has(seat):
+			continue
 		out.append({"use": "fire", "cell": seat, "face": seat + (pit - seat).sign(), "pose": "sit", "town": key, "trade": "", "pair": "",
 			"fire": pit})
 	return out
@@ -17562,11 +17566,14 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		(spots.get_or_add(spot["use"], []) as Array).append(spot)
 	# Its town's fire's seats (853 amended (18), the coordinator's: nobody stood at the square's fire at noon) where
 	# the level lays no "fire" spots of its own: the square's hours sit there while it burns (Resident._free_spot).
+	# A seat with no seat decor under it is left out, so a fire with none is no fire spot at all.
 	if not spots.has("fire"):
-		for fires: Array in _fire_places.values():
-			for fire: Dictionary in fires:
-				if str(fire.get("town", "")) == str(place.get("id", "")) and not (fire.get("seats", []) as Array).is_empty():
-					spots["fire"] = fire_seat_spots(fire, key)
+		for zone: String in _fire_places:
+			for fire: Dictionary in _fire_places[zone]:
+				if str(fire.get("town", "")) == str(place.get("id", "")):
+					var seated := fire_seat_spots(fire, key, _seat_cells(zone))
+					if not seated.is_empty():
+						spots["fire"] = seated
 	if not spots.is_empty():
 		out["spots"] = spots
 	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside
@@ -24517,6 +24524,24 @@ func _camp_freer(camp: String, player_id: String) -> bool:
 ## The camp's mix ("trader", "mixed", ...), economy's stock key.
 func _camp_mix(camp: String) -> String:
 	return str(_level_place(camp).get("mix", "trader"))
+
+
+## The cells of [param decor] (a level's terrain decor, Level.decor_from) with a seat on them (853 amended (18)): a
+## piece whose kind [param kinds] (Level.DECOR_KINDS) flags "seat", as maps' logs at the square's fire.
+static func seat_cells_of(decor: Array, kinds: Dictionary) -> Dictionary:
+	var cells := {}
+	for piece: Variant in decor:
+		if piece is Dictionary and piece.get("cell") is Vector2i and bool((kinds.get(str(piece.get("kind", "")), {}) as Dictionary).get("seat", false)):
+			cells[piece["cell"]] = true
+	return cells
+
+
+## [param zone]'s seat cells (Main.seat_cells_of), read once a zone.
+var _seat_decor: Dictionary = {}
+func _seat_cells(zone: String) -> Dictionary:
+	if not _seat_decor.has(zone):
+		_seat_decor[zone] = seat_cells_of(Level.load_level(zone).get("terrain", {}).get("decor", []), Level.DECOR_KINDS) if Level.exists(zone) else {}
+	return _seat_decor[zone]
 
 
 ## The step of the "bedroll" decor piece on [param cell] in this zone (799 amended (3)), zero for none: a flat

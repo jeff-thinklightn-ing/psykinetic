@@ -56,6 +56,7 @@ func _run() -> void:
 	if FileAccess.file_exists(Net.state_path):
 		DirAccess.remove_absolute(Net.state_path)
 	_main = preload("res://main.tscn").instantiate()
+	_seat_the_fire(_main)
 	add_child(_main)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -227,6 +228,19 @@ func _sample_taken() -> void:
 			_check(false, "%s stood beside %s, taken by %s who chose it too, for two ten-minute samples running (at %.2f, %s)" % [
 				body.person, body._goal, holder.person, DayNight.hour(DayNight.now()), Resident.Doing.keys()[body.doing]])
 	_taken = found
+
+
+## The square's fire's seats each with a seat under it (853 amended (18): Main sits nobody where no seat decor is,
+## Main.seat_cells_of): the level's own (maps' logs, once in) and, for this run, every seat of the square's fire. Set
+## before Main boots: a body's spots are read as it is made.
+static func _seat_the_fire(main: Node) -> void:
+	var loaded := Level.load_level("wilds")
+	var cells: Dictionary = Main.seat_cells_of(loaded.get("terrain", {}).get("decor", []), Level.DECOR_KINDS)
+	for fire: Dictionary in Level.fires_of(loaded):
+		if str(fire.get("id", "")) == "square_fire":
+			for seat: Vector2i in fire["seats"]:
+				cells[seat] = true
+	main._seat_decor["wilds"] = cells
 
 
 func _check(ok: bool, label: String) -> void:

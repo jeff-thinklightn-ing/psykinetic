@@ -54664,9 +54664,20 @@ ruling (1), 11-15: people main already puts out on the square at those hours, si
 place of standing, which points at nothing not in). 875's seat rules for the lodgers and the turned away stay
 inert until its switch: with 875's evening off they seat nobody at the fire. The keepers (the stall's, the
 healer) never take a seat at work: their work places hold no square. A seat is taken as any spot is (853
-amended (16)).
+amended (16)). Nobody sits on air (the coordinator, 11-15, on the joined stills: the sit is the chair's, the
+body 0.46 m up and drawn 0.245 m toward its face, and the ring's eight cells had nothing under them): a seat is
+a spot only where a decor piece of a kind Level.DECOR_KINDS flags "seat" lies on its cell (Main.seat_cells_of,
+read once a zone by Main._seat_cells), and a fire with none is no "fire" spot at all, by day or for the night's
+rules. Umbrage's fire has none on main, so this lands off: it is the package "the square's fire seats" with
+maps' data (square_fire's seats at the pit's four diagonals, (193,210), (195,210), (193,212), (195,212), each
+with art-kit's prop.log_seat under it, a "seat" kind, turned to the pit), which switches it on. On a log 0.555
+m deep, centred on its cell with its front to the pit, the 0.245 m pull leaves the sitter's hips about 0.03 m
+inside the front edge: on the log, as on a chair, so the pull stays.
 - resident_test _test_fire_seats: the seats' faces; burning, the seat on every pick of six; out, the stand;
-  two of the town at its seats, the stand.
+  two of the town at its seats, the stand; seat cells only of a kind flagged seat; a seat with no seat under it
+  no spot, a fire with none no spots.
+- town_day_test and fire_night_test lay a seat under each of the square fire's seats before Main boots (the
+  level's own seat decor kept), so their rows read the switched-on town.
 - town_day_test: between 12:00 and 14:00 someone sits at the square's fire facing it (first: Maud at
   (192, 212), 12.00, SQUARE; on main's code 0 samples, FAIL); before 17:00 never more than two hold its
   seats; no sitter faces away; the stall's keeper and the healer never hold one in a work spell (974 and 913
@@ -54684,8 +54695,8 @@ amended (16)).
   875's switch is on the evening's place is the inn, so a late empty square fire beside a full common room is
   the right picture (the coordinator, 11-15). The bullet says someone sits at the fire by day and into the
   evening, never "at night".
-Server only; protocol unchanged; no new class_name; no bullet until ui-design's two joined stills, the player
-standing in the square, noon and about 20:50, zoom and the view's width named; voice words it to them.
+Server only; protocol unchanged; no new class_name; no bullet until the package is in and ui-design's two joined
+stills, the player standing in the square, noon and about 20:50, zoom and the view's width named; voice words it to them.
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 

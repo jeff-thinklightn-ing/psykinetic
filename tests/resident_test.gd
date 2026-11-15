@@ -5449,10 +5449,21 @@ func _test_show_work(mara: Resident) -> void:
 func _test_fire_seats(mara: Resident) -> void:
 	print("
 == the square's hours sit at its fire while it burns, two at most (853 amended (18)) ==")
-	var made := Main.fire_seat_spots({"cell": Vector2i(5, 5), "seats": [Vector2i(3, 5), Vector2i(7, 7), Vector2i(5, 3)]}, "store")
+	var all_seated := {Vector2i(3, 5): true, Vector2i(7, 7): true, Vector2i(5, 3): true}
+	var made := Main.fire_seat_spots({"cell": Vector2i(5, 5), "seats": [Vector2i(3, 5), Vector2i(7, 7), Vector2i(5, 3)]}, "store", all_seated)
 	_check(made.map(func(spot: Dictionary) -> Vector2i: return spot["face"]) == [Vector2i(4, 5), Vector2i(6, 6), Vector2i(5, 4)]
 			and made.all(func(spot: Dictionary) -> bool: return spot["use"] == "fire" and spot["pose"] == "sit" and spot["fire"] == Vector2i(5, 5) and spot["town"] == "store"),
 		"a fire place's seats: sits of the town facing the cell next to them toward the pit (%s)" % [made.map(func(spot: Dictionary) -> Vector2i: return spot["face"])])
+	# Nobody sits on air (the coordinator's, 11-15): a seat with no seat decor under it is no spot.
+	var kinds := {"log_seat": {"sits": "flat", "seat": true}, "fence": {"sits": "edge"}}
+	var decor := [{"cell": Vector2i(7, 7), "kind": "log_seat", "variant": 0}, {"cell": Vector2i(3, 5), "kind": "fence", "variant": 0},
+		{"cell": Vector2i(9, 9), "kind": "log_seat", "variant": 1}]
+	var seated := Main.seat_cells_of(decor, kinds)
+	_check(seated.keys() == [Vector2i(7, 7), Vector2i(9, 9)], "seat cells: the pieces of a kind flagged seat, no other (%s)" % [seated.keys()])
+	var some := Main.fire_seat_spots({"cell": Vector2i(5, 5), "seats": [Vector2i(3, 5), Vector2i(7, 7), Vector2i(5, 3)]}, "store", seated)
+	var none := Main.fire_seat_spots({"cell": Vector2i(5, 5), "seats": [Vector2i(3, 5), Vector2i(7, 7), Vector2i(5, 3)]}, "store", {})
+	_check(some.map(func(spot: Dictionary) -> Vector2i: return spot["cell"]) == [Vector2i(7, 7)] and none.is_empty(),
+		"only a seat with a seat under it is sat at, none with none (%s; %d)" % [some.map(func(spot: Dictionary) -> Vector2i: return spot["cell"]), none.size()])
 	var seat := _town_cell(mara.tile)
 	var stand := _town_cell(seat)
 	var pit := seat + Vector2i(2, 0)
@@ -5461,7 +5472,7 @@ func _test_fire_seats(mara: Resident) -> void:
 	var was_fire := World._fire.has(pit)
 	var was_picks := mara._picks  # The later rows' picks hash as they did.
 	mara.places["spots"] = {"square": [{"use": "square", "cell": stand, "face": stand + Vector2i(0, 1), "pose": "stand", "town": "store", "trade": "", "pair": ""}],
-		"fire": Main.fire_seat_spots({"cell": pit, "seats": [seat]}, "store")}
+		"fire": Main.fire_seat_spots({"cell": pit, "seats": [seat]}, "store", {seat: true})}
 	mara.doing = Resident.Doing.SQUARE
 	var picks := func() -> Array:
 		var got: Array = []
