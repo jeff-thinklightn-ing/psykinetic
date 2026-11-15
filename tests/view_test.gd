@@ -214,6 +214,7 @@ func _ready() -> void:
 		_test_townsfolk_spots()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
+		await _test_wind_flinch()  # 392 amended (11): after blows_seen, with its player still standing (the list's end has none).
 		_test_gait_holds()
 		await _test_shield_seen()
 		await _test_reel_clock()
@@ -16986,6 +16987,142 @@ func _test_blows_seen() -> void:
 		_check(bitten[1] < 0 and absi(int(bitten[0]) - sprung) <= 50,
 				"bitten by a wolf's lead: the player flinches as its coil's spring ends, %d ms off it, not at the news (%s then)"
 				% [int(bitten[0]) - sprung, "already" if bitten[1] >= 0 else "not yet"])
+	World.despawn(wolf)
+	_rig._swings.erase(wolf.get_instance_id())
+	_rig._process(0.0)
+
+
+## 392 amended (11): a body struck while its blow winds up is rocked and its strike runs on (no hit clip
+## over it), home before the contact; a blow the server loses (a give-up at 0 ticks, either side of the
+## hit's news) stops the strike and shows the hit; a give-up with no hit shows none. The player's heavy
+## wind-up, a foe's (an orc's led blow) and a creature's (a wolf's lead).
+func _test_wind_flinch() -> void:
+	print("
+== struck as it winds up: rocked, its strike runs on; a blow lost shows its hit (392 amended (11)) ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to wind up")
+		return
+	_rig._process(0.0)
+	var pid := player.get_instance_id()
+	var puppet: Node3D = _rig._puppets[pid]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var body := puppet.get_node("Body") as Node3D
+	var reset := func() -> void:
+		rig.cancel_strike()
+		puppet.set_meta("busy_until", 0)
+		puppet.set_meta("wound_until", 0)
+		_rig._on_winding(Vector2i(1, 0), 0, pid)
+		puppet.remove_meta("spared_at")
+	await _until_msec(AnimRig.now_msec() + 400)
+	reset.call()
+	# (a) Struck 0.2 s into a 6-tick wind-up: the strike runs on, the body rocked and home well before it lands.
+	var rest := body.position
+	var start := AnimRig.now_msec()
+	_rig._on_winding(Vector2i(1, 0), 6, pid)
+	var clip := rig.playing()
+	await _until_msec(start + 200)
+	_rig._flinch(puppet)
+	var kept := rig.playing()
+	var out := 0.0
+	var held := true
+	while AnimRig.now_msec() < start + 550:
+		await get_tree().process_frame
+		out = maxf(out, Vector2(body.position.x - rest.x, body.position.z - rest.z).length())
+		held = held and rig.playing() == clip
+	var home := Vector2(body.position.x - rest.x, body.position.z - rest.z).length()
+	_check(rig.striking() and held and kept == clip and not kept in Client3D.HIT_CLIPS and out > 0.05 and home < 0.01,
+			"the player struck 0.2 s into his wind-up: %s runs on (%s after the hit, kept %s), rocked %.2f m and home (%.3f m) before its contact"
+			% [clip, kept, held, out, home])
+	reset.call()
+	await _until_msec(AnimRig.now_msec() + 400)
+	# (b) Hit first, then the server gives the blow up (stunned, knocked off): the strike stops, the hit shows.
+	_rig._on_winding(Vector2i(1, 0), 6, pid)
+	await _until_msec(AnimRig.now_msec() + 150)
+	_rig._flinch(puppet)
+	var spared := rig.playing()
+	_rig._on_winding(Vector2i(1, 0), 0, pid)
+	await get_tree().process_frame
+	_check(not spared in Client3D.HIT_CLIPS and rig.playing() in Client3D.HIT_CLIPS,
+			"hit, then the blow given up: spared as it wound (%s), then its hit shows (%s)" % [spared, rig.playing()])
+	reset.call()
+	await _until_msec(AnimRig.now_msec() + 400)
+	# (c) Given up first, then the hit's news: an ordinary hit.
+	_rig._on_winding(Vector2i(1, 0), 6, pid)
+	await _until_msec(AnimRig.now_msec() + 150)
+	_rig._on_winding(Vector2i(1, 0), 0, pid)
+	_rig._flinch(puppet)
+	await get_tree().process_frame
+	_check(rig.playing() in Client3D.HIT_CLIPS, "given up, then hit: its hit shows (%s)" % rig.playing())
+	reset.call()
+	await _until_msec(AnimRig.now_msec() + 400)
+	# (d) Given up with no hit: no hit shown, no strike.
+	_rig._on_winding(Vector2i(1, 0), 6, pid)
+	await _until_msec(AnimRig.now_msec() + 150)
+	_rig._on_winding(Vector2i(1, 0), 0, pid)
+	await get_tree().process_frame
+	_check(not rig.playing() in Client3D.HIT_CLIPS and not rig.striking(),
+			"given up, never hit: no hit, no strike (%s)" % rig.playing())
+	reset.call()
+	# (e) A foe's led blow (an orc) struck as it gathers: its drawn strike runs on, rocked.
+	var imp := _spawn_imp(player.tile + Vector2i(1, 0), "brute")
+	var target: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		target = _rig._puppets.get(imp.get_instance_id())
+		if target != null and target.has_meta("rig"):
+			break
+		await get_tree().process_frame
+	if target == null or not target.has_meta("rig"):
+		_check(false, "an orc to strike mid-wind-up (%s)" % [target != null])
+	else:
+		var hurt := target.get_meta("rig") as AnimRig
+		var its := target.get_node("Body") as Node3D
+		var its_rest := its.position
+		var began := AnimRig.now_msec()
+		_rig._on_winding(Vector2i(-1, 0), Monster.LEAD_TICKS, imp.get_instance_id())
+		var gathered := hurt.playing()
+		await _until_msec(began + 120)
+		_rig._flinch(target)
+		var rocked := 0.0
+		var ran := true
+		while AnimRig.now_msec() < began + 400:
+			await get_tree().process_frame
+			rocked = maxf(rocked, Vector2(its.position.x - its_rest.x, its.position.z - its_rest.z).length())
+			ran = ran and hurt.playing() == gathered
+		_check(ran and not gathered in Client3D.HIT_CLIPS and rocked > 0.05,
+				"the orc struck as its led blow gathers: %s runs on (%s), rocked %.2f m" % [gathered, ran, rocked])
+		hurt.cancel_strike()
+		target.set_meta("busy_until", 0)
+	World.despawn(imp)
+	_rig._swings.erase(imp.get_instance_id())
+	# (f) A wolf's lead (a creature): struck as it coils, its bite runs on, rocked.
+	var wolf := _spawn_imp(player.tile + Vector2i(1, 0), "wolf")
+	var beast: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		beast = _rig._puppets.get(wolf.get_instance_id())
+		if beast != null and beast.has_meta("creature_view"):
+			break
+		await get_tree().process_frame
+	if beast == null or not beast.has_meta("creature_view"):
+		_check(false, "a wolf to strike mid-coil (%s)" % [beast != null])
+	else:
+		var view := beast.get_meta("creature_view") as CreatureView
+		var its := beast.get_node("Body") as Node3D
+		var its_rest := its.position
+		var began := AnimRig.now_msec()
+		_rig._on_winding(Vector2i(-1, 0), Monster.LEAD_TICKS, wolf.get_instance_id())
+		var biting := view.rig.playing()
+		await _until_msec(began + 120)
+		_rig._flinch(beast)
+		var rocked := 0.0
+		var ran := true
+		while AnimRig.now_msec() < began + 400:
+			await get_tree().process_frame
+			rocked = maxf(rocked, Vector2(its.position.x - its_rest.x, its.position.z - its_rest.z).length())
+			ran = ran and view.rig.playing() == biting
+		_check(ran and rocked > 0.05, "a wolf struck as it coils: its %s runs on (%s), rocked %.2f m" % [biting, ran, rocked])
 	World.despawn(wolf)
 	_rig._swings.erase(wolf.get_instance_id())
 	_rig._process(0.0)

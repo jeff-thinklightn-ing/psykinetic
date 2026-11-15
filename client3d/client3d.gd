@@ -2366,6 +2366,9 @@ const STEADY_CAP := 6.0
 const STEADY_SETTLE := 0.25
 const STEADY_ROCK := 0.1
 const STEADY_ROCK_SECONDS := 0.22
+## How recently a hit spared by a wind-up (_wind_rock) still plays when the server then loses the blow
+## (_wind_lost, 392 amended (11)): the two news come in the same step, a few frames apart at most.
+const SPARED_LOST_MS := 300
 static var _spark_mesh: ArrayMesh
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
@@ -6719,8 +6722,6 @@ func creature_tell_over(id: int, landed: bool) -> void:
 	_tells.erase(id)
 	if puppet == null or not is_instance_valid(puppet):
 		return
-	if not landed:
-		puppet.remove_meta("drawn_contact")
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
 	elif not landed and puppet.has_meta("rig"):
@@ -6735,6 +6736,8 @@ func creature_tell_over(id: int, landed: bool) -> void:
 			var home := _body_tween(puppet, "home")
 			home.tween_property(body, "position", _body_rest(puppet, body), TOLD_RECOVER * 0.5).set_ease(Tween.EASE_IN_OUT)
 			puppet.set_meta("told_tween", home)
+	if not landed:
+		_wind_lost(puppet)  # Broken: a hit it was spared as it gathered plays now (392 amended (11)).
 
 
 func telegraph_land(id: String, landed: bool) -> void:
@@ -23107,7 +23110,11 @@ func _flinch(puppet: Node3D) -> void:
 		_steady_rock(puppet)  # Steadied (843): no hit clip, rocked and held.
 		return
 	if _told_gathering(puppet):
+		puppet.set_meta("spared_at", AnimRig.now_msec())  # A tell then broken shows the hit (_wind_lost).
 		_told_rock(puppet)  # Struck as it gathers a told strike (790 amended (9)): the strike kept.
+		return
+	if _winding_drawn(puppet):
+		_wind_rock(puppet)  # Struck as it winds up (392 amended (11)): rocked, its strike runs on.
 		return
 	_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	if puppet.has_meta("creature_view"):
@@ -27539,8 +27546,39 @@ func _make_bar(max_hp: int, height: float) -> MeshInstance3D:
 static func _drawn_contact(puppet: Node3D, at: int) -> void:
 	if at >= AnimRig.now_msec():
 		puppet.set_meta("drawn_contact", at)
+		puppet.set_meta("wind_contact", at)  # Kept past its news, to the contact (_winding_drawn).
 	else:
 		puppet.remove_meta("drawn_contact")
+		puppet.remove_meta("wind_contact")
+
+
+## Whether [param puppet]'s wound-up or told blow is still drawing (392 amended (11)): from its winding
+## to its drawn contact (_drawn_contact), not given up. A blow taken meanwhile rocks it (_wind_rock).
+static func _winding_drawn(puppet: Node3D) -> bool:
+	return int(puppet.get_meta("wind_contact", -1)) > AnimRig.now_msec()
+
+
+## [param puppet] struck while its blow winds up (392 amended (11)): its body rocked back and home
+## (_steady_rock: STEADY_ROCK m back over STEADY_ROCK_SECONDS, cut to end before the contact and left out
+## with under TOLD_ROCK_MIN to go), its strike running on. Noted (spared_at) so a blow the server then
+## loses (_wind_lost) still shows the hit it took.
+func _wind_rock(puppet: Node3D) -> void:
+	puppet.set_meta("spared_at", AnimRig.now_msec())
+	var left := (int(puppet.get_meta("wind_contact", -1)) - AnimRig.now_msec()) / 1000.0
+	if left >= TOLD_ROCK_MIN:
+		_steady_rock(puppet, minf(STEADY_ROCK_SECONDS, left))
+
+
+## [param puppet]'s wound-up or told blow lost on the server (392 amended (11): a give-up at 0 ticks, a
+## tell broken): the strike already stopped by the caller; a hit it was spared within SPARED_LOST_MS
+## (its news and the loss's come in the same step, either first) now plays as any hit does.
+func _wind_lost(puppet: Node3D) -> void:
+	puppet.remove_meta("wind_contact")
+	puppet.remove_meta("drawn_contact")
+	var spared := int(puppet.get_meta("spared_at", -SPARED_LOST_MS - 1))
+	puppet.remove_meta("spared_at")
+	if AnimRig.now_msec() - spared <= SPARED_LOST_MS:
+		_flinch(puppet)
 
 
 ## A swing: the body goes out toward the blow and back, with a whoosh
@@ -28460,13 +28498,13 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	if ticks <= 0:
 		# Given up (decision 392): the wind-up stops; the gait or rest takes over.
 		puppet.set_meta("wound_until", 0)
-		puppet.remove_meta("drawn_contact")
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).unwind()
 		elif puppet.has_meta("rig"):
 			(puppet.get_meta("rig") as AnimRig).cancel_strike()
 			puppet.set_meta("busy_until", 0)
 			puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)  # A held one too.
+		_wind_lost(puppet)  # A hit it was spared as it wound up plays now (392 amended (11)).
 		return
 	_combat_at[id] = Time.get_ticks_msec()
 	var swinger := instance_from_id(id) as GridEntity
