@@ -30,6 +30,7 @@ STATE="$LOGS/world.json"
 ID_C=c0ffee00-0000-4000-8000-00000000000c
 ID_D=d0d0d0d0-0000-4000-8000-00000000000d
 ID_R=5e5e5e5e-0000-4000-8000-00000000000e
+ID_L=1a1a1a1a-0000-4000-8000-00000000001f
 
 # Every instance quits when the script makes its file ($LOGS/<name>.done),
 # once what the phase waits for is in the logs; nothing waits a fixed time,
@@ -296,6 +297,23 @@ phase_6() {
 	wait_for clientT '\[test\] tell got [0-9]+ lunge '
 	wait_for clientT '\[test\] tell end '
 	finish
+	# Phase 6b: a player's face (decision 911). Lark never picked a look: his
+	# settings name none. The server seeds his record once; his client keeps
+	# that look (its settings file) and prints his face at each build of him
+	# and the face Options shows. From tick 40 the server takes him within
+	# his zone, to sample and back, and lets him die and come back where he
+	# lay; then he leaves and joins again, asking with the seed he was given.
+	printf 'address=127.0.0.1\nport=%s\ntoken=%s\nplayer_id=%s\nname=Lark\n' "$P" "$TOKEN" "$ID_L" >"$LOGS/face.cfg"
+	server serverL --server --still-monsters --no-companions "--token=$TOKEN" --test-wait-players=1 --test-face-trips=40
+	wait_for serverL 'listening on port'
+	client clientL "--settings=$LOGS/face.cfg" --test-face
+	wait_for serverL '\[test\] face trips done'
+	wait_for clientL '\[test\] face Player[0-9]+: ' 5
+	quit clientL
+	CLIENTS=""
+	client clientM "--settings=$LOGS/face.cfg" --test-face
+	wait_for clientM '\[test\] face Player[0-9]+: '
+	finish
 }
 
 # All the groups at once, each in a shell of its own (its instances and
@@ -436,6 +454,11 @@ for id in $got_ids; do
 	grep -qE "\[test\] tell end $id landed=" "$LOGS/clientT.log" && ended=1
 done
 check "$ended" 1 "phase 6: and its end (landed or called off)"
+check "$(count '\[test\] face trip: ' "$LOGS/serverL.log")$(count 'joined as Player[2-9]' "$LOGS/serverL.log")" 40 "phase 6b: Lark went within his zone, to sample and back, and died and came back, and was never another Player"
+check "$(count '\[test\] face Player1: ' "$LOGS/clientL.log")" 5 "phase 6b: his client drew him five times, each as Player1"
+faces=$(cat "$LOGS/clientL.log" "$LOGS/clientM.log" 2>/dev/null | grep -E '^\[test\] face (Player[0-9]+|options): ' | sed -E 's/^\[test\] face [^:]+: //' | sort -u | wc -l | tr -d ' ')
+check "$faces" 1 "phase 6b: one face through his zone, a link, a death's return and a rejoin, and the face Options shows is it"
+check "$(count '\[net\] look adopted' "$LOGS/clientL.log")$(count '\[net\] look adopted' "$LOGS/clientM.log")$(grep -cE '^look=seed=[0-9]+' "$LOGS/face.cfg" 2>/dev/null || echo 0)" 101 "phase 6b: his client kept the server's look once, in its settings, and asked with it when he came back"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

@@ -55743,6 +55743,36 @@ player's name). view_test _respawn_under_one_name (a despawn and a spawn under o
 frame and 0.2 s on: one puppet, named so, none at the old spot). The joined look is playtest's
 compahead on the landed sha ("never two of her, never two of mine, in frame", farthest zoom).
 A second take seeds a player's look once on the server so the face Options shows is the one he wears.
+
+911 amended (1), the second take: a player's face kept (the decision-number script's label). A player who never
+picked a look in Options had record.look "", and Client3D.look_for seeded such a look from the body's node name,
+so until 911's first take a travel within one zone (Player2) gave him a new face. And the Options preview seeded a
+look with no seed from hash(Net.player_id), never the name, so the face Options showed was never the face the player
+walked as: that one every player who never picked met.
+- The server seeds a look with none, once, in _join_player. A known player gets seed=absi(hash("Player<index>")),
+  the seed look_for gave the name they have walked as, so nobody who has played changes face (respawn_test pins it
+  against look_for's own path, and against Player6's face as main drew it). A new player gets the same rule, the
+  face a new player had before the take: a random seed made the held-weapon rows of view_test turn on whichever
+  body a run drew (the take's first landing, 4 rows), and a pretest that passed on one draw proved nothing; the
+  seed is pinned by respawn_test's row. A
+  client that asks with no seed keeps the record's (its words, if any, laid on that seed); a chosen look with its
+  own seed still wins, as before.
+- The client adopts it: Net.adopt_look, from Main._build_entity when its own player arrives, keeps that look in its
+  settings, once, and only while the look kept there has no seed; a player who picked is never overwritten. Options
+  shows the look kept there. Before a first join it draws a random seed for the panel, which a first pick writes, as
+  "Surprise me" does.
+- No seed is made from the id (Net.player_id, what a player proves himself with) any more. Looks already kept with
+  the old panel's absi(hash(player_id)) stay as they are: 32 bits of a random 122-bit id confirm nothing that could
+  be guessed, and reseeding them would change faces players chose.
+- On the wire: a player's spawn "look" always carries seed= now; an old client draws it as any seeded look and
+  adopts nothing. No new number (net.gd's note under 57).
+Tests: respawn_test _test_look_seeded (a new player's seed from "Player<index>", not the id's hash; a seedless ask keeps the
+record's seed; seedless words on it; a chosen seed wins; a known seedless player keeps the face look_for gave their
+name; the adopt step once and only while seedless). net_test phase 6b (net_test.ps1's 8b), joined: Lark, who never
+picked, through a travel within his zone, to sample and back, a death's return where he lay and a rejoin, drawn
+with one face each time, always Player1, the face Options shows the same; his client keeps the server's look once,
+in its settings file, and asks with it when he comes back (--test-face-trips on the server, --test-face on the
+client). record_keys_test's sample look carries its seed.
 897, companions' side (enemy-ai's ask): Companion.forget, decision 572's let-go of what she holds,
 overrode the base's without calling it, so her shelter_lead and an order on the gone (action_target)
 were left; it calls super(entity) first now, then clears the foe she keeps a moment (_held_foe, 706;

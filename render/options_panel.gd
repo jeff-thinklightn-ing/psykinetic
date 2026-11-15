@@ -376,16 +376,23 @@ func _swatch_row(text: String, key: String, options: Array) -> HBoxContainer:
 	return row
 
 
-## The player's look as the game will draw it: their words, seeded by their
-## id where they have chosen no seed yet (the seed a first pick writes).
+## The player's look as the game draws it: the look kept here, which names its
+## seed once they have joined (Net.adopt_look keeps the one the server gave them:
+## decision 911). Before that, a seed drawn at random for this panel, which a
+## first pick writes (as "Surprise me" does); never one made from their id.
 func _look() -> PersonLook:
 	return PersonLook.make(_look_words(), Net.player_body)
 
 
+var _unseeded := 0
+
+
 func _look_words() -> String:
 	var words := Net.player_look
-	if not words.begins_with("seed=") and not " seed=" in words:
-		words = "seed=%d" % absi(hash(Net.player_id)) + (" " + words if words != "" else "")
+	if not Net.look_seeded(words):
+		if _unseeded == 0:
+			_unseeded = randi_range(1, 2147483646)
+		words = "seed=%d" % _unseeded + (" " + words if words != "" else "")
 	return words
 
 

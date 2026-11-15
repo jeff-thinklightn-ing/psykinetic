@@ -41,6 +41,7 @@ $state = Join-Path $logs 'world.json'
 $idC = 'c0ffee00-0000-4000-8000-00000000000c'
 $idD = 'd0d0d0d0-0000-4000-8000-00000000000d'
 $idR = '5e5e5e5e-0000-4000-8000-00000000000e'
+$idL = '1a1a1a1a-0000-4000-8000-00000000001f'
 
 # Servers read console commands from stdin; give them a closed one.
 $noStdin = Join-Path $logs 'stdin.empty'
@@ -289,6 +290,23 @@ if ($Phase -eq '8') {
 	Wait-Log 'clientT' '\[test\] tell got \d+ lunge '
 	Wait-Log 'clientT' '\[test\] tell end '
 	Complete-Phase
+	# Phase 8b (net_test.sh's 6b; decision 911): a player's face. Lark never
+	# picked a look; the server seeds his record once, his client keeps that
+	# look in its settings and prints his face at each build of him and the face
+	# Options shows. From tick 40 the server takes him within his zone, to
+	# sample and back, and lets him die and come back where he lay; then he
+	# leaves and joins again, asking with the seed he was given.
+	$faceSettings = Join-Path $logs 'face.cfg'
+	Set-Content $faceSettings "address=127.0.0.1`nport=$phasePort`ntoken=$token`nplayer_id=$idL`nname=Lark`n" -Encoding ascii
+	Start-Server 'serverL' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-wait-players=1', '--test-face-trips=40')
+	Wait-Log 'serverL' 'listening on port'
+	Start-Client 'clientL' @("--settings=`"$faceSettings`"", '--test-face')
+	Wait-Log 'serverL' '\[test\] face trips done'
+	Wait-Log 'clientL' '\[test\] face Player\d+: ' 5
+	Stop-Instance 'clientL'
+	Start-Client 'clientM' @("--settings=`"$faceSettings`"", '--test-face')
+	Wait-Log 'clientM' '\[test\] face Player\d+: '
+	Complete-Phase
 }
 
 if ($Phase) { exit 0 }
@@ -455,6 +473,17 @@ Assert ($gotInTime.Count -ge 1) "phase 8: her joined client got the lunge's tele
 $gotIds = @($clientTLog | Select-String '\[test\] tell got (\d+) lunge' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object -Unique)
 $ended = @($gotIds | Where-Object { @($clientTLog | Select-String "\[test\] tell end $_ landed=").Count -gt 0 })
 Assert ($ended.Count -ge 1) 'phase 8: and its end (landed or called off)'
+# Phase 8b: one face for Lark through his zone, a link, a death's return and a
+# rejoin, the face Options shows the same; his client kept the server's look once.
+$serverLLog = Read-Log 'serverL'
+$clientLLog = Read-Log 'clientL'
+$clientMLog = Read-Log 'clientM'
+Assert (@($serverLLog | Select-String '\[test\] face trip: ').Count -eq 4 -and @($serverLLog | Select-String 'joined as Player[2-9]').Count -eq 0) 'phase 8b: Lark went within his zone, to sample and back, and died and came back, and was never another Player'
+Assert (@($clientLLog | Select-String '\[test\] face Player1: ').Count -eq 5) 'phase 8b: his client drew him five times, each as Player1'
+$faces = @(@($clientLLog) + @($clientMLog) | Select-String '^\[test\] face (Player\d+|options): (.*)$' | ForEach-Object { $_.Matches[0].Groups[2].Value } | Sort-Object -Unique)
+Assert ($faces.Count -eq 1) "phase 8b: one face through his zone, a link, a death's return and a rejoin, and the face Options shows is it ($($faces.Count))"
+$faceKept = @(Get-Content (Join-Path $logs 'face.cfg') -ErrorAction SilentlyContinue | Select-String '^look=seed=\d+').Count
+Assert (@($clientLLog | Select-String '\[net\] look adopted').Count -eq 1 -and @($clientMLog | Select-String '\[net\] look adopted').Count -eq 0 -and $faceKept -eq 1) 'phase 8b: his client kept the server''s look once, in its settings, and asked with it when he came back'
 $errors = @(Get-ChildItem $logs -Filter *.err | Where-Object { $_.Length -gt 0 } | ForEach-Object { $_.Name })
 Assert ($errors.Count -eq 0) "no instance printed errors ($($errors -join ', '))"
 

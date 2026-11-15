@@ -50,7 +50,7 @@ func _ready() -> void:
 		"from_worker": "w-bram",
 	}
 	_player = {
-		"player_id": "p", "index": 2, "name": "Jeff", "body": &"female", "look": "", "tile": Vector2i(3, 4), "hp": 9, "stamina": 8,
+		"player_id": "p", "index": 2, "name": "Jeff", "body": &"female", "look": "seed=1234567 hair=long", "tile": Vector2i(3, 4), "hp": 9, "stamina": 8,
 		"facing": Vector2i(1, 0), "color": Color.html("336699"), "zone": "wilds", "last_seen": 1234,
 		"companion": _companion, "commissions": [{"id": "c1", "town": "t/store"}],
 		"slots": Items.tidy(["dagger"], Player.SLOTS), "slot_items": PackedInt32Array([5]),

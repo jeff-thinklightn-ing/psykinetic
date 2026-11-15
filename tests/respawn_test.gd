@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_click_snaps_to_floor()
 	_test_renderer_setting()
 	_test_player_body()
+	_test_look_seeded()
 	_test_same_zone_travel_keeps_names()
 	_test_kept_body_shelter_ends()
 	_test_closed_link()
@@ -325,6 +326,79 @@ func _monsters() -> int:
 	return count
 
 
+func _test_look_seeded() -> void:
+	print("
+== a player's look seeded once by the server, never from the id (decision 911) ==")
+	const KIM := 6
+	const KIM_ID := "6b6b6b6b-0000-4000-8000-0000000000c3"
+	Net._bodies[KIM_ID] = &"male"
+	_main._admit(KIM, KIM_ID, "Kim")
+	var kim: Player = _main._players.get(KIM)
+	var record: PlayerRecord = _main._records.get(KIM_ID)
+	_check(kim != null and Net.look_seeded(record.look) and str(kim.spawn_spec.get("look", "")) == record.look
+			and not str(absi(hash(KIM_ID))) in record.look and Net.look_seed_word(record.look) == "seed=%d" % absi(hash("Player%d" % record.index)),
+			"a new player who chose nothing: the seed of the name they walk as (Player<index>) on the record and in the spec, not the id's hash (%s)" % record.look)
+	var seeded := record.look
+	_main._leave(KIM, kim, KIM_ID)
+	# Pin 1: a client that never picked asks with no seed: the record's seed stays.
+	Net._looks[KIM_ID] = ""
+	_main._admit(KIM, KIM_ID, "Kim")
+	kim = _main._players.get(KIM)
+	_check(record.look == seeded, "back asking with no seed: the record's seed kept (%s)" % record.look)
+	_main._leave(KIM, kim, KIM_ID)
+	Net._looks[KIM_ID] = Net.tidy_look("hair=bald")
+	_main._admit(KIM, KIM_ID, "Kim")
+	kim = _main._players.get(KIM)
+	_check(record.look == Net.look_seed_word(seeded) + " hair=bald", "words with no seed: the words, on the record's seed (%s)" % record.look)
+	_main._leave(KIM, kim, KIM_ID)
+	Net._looks[KIM_ID] = Net.tidy_look("seed=4242 hair=long")
+	_main._admit(KIM, KIM_ID, "Kim")
+	kim = _main._players.get(KIM)
+	_check(record.look == "seed=4242 hair=long", "a chosen look with its own seed still wins, as before (%s)" % record.look)
+	_main._leave(KIM, kim, KIM_ID)
+	# Pin 2: a known player with no seed (they never picked; a record from before 911) keeps the face
+	# they have walked as: Client3D.look_for's from their name, Player<index>, unseeded.
+	record.look = ""
+	Net._looks.erase(KIM_ID)
+	Net._bodies.erase(KIM_ID)
+	var walked_entity := Player.new()
+	walked_entity.name = "Player%d" % record.index
+	walked_entity.spawn_spec = {"look": ""}
+	walked_entity.body = record.body
+	var walked := Client3D.look_for(walked_entity)
+	walked_entity.free()
+	_main._admit(KIM, KIM_ID, "Kim")
+	kim = _main._players.get(KIM)
+	var now := Client3D.look_for(kim)
+	_check(record.look == "seed=%d" % absi(hash("Player%d" % record.index)),
+			"a known player with no seed: the one their name gave them (%s)" % record.look)
+	_check(now.keys == walked.keys and now.parts == walked.parts and now.colours == walked.colours and now.scale == walked.scale
+			and now.hair == walked.hair and now.beard == walked.beard,
+			"and the face they have walked as: keys, parts, colours, stature, hair and beard the same (%s %s)" % [now.hair, now.beard])
+	# Recorded on main before 911 (Player6, male): the face a player who never picked has walked as.
+	var main_player6 := PersonLook.make("seed=%d headwear=none apron=no garb=none" % absi(hash("Player6")), &"male")
+	var as_was := Client3D.look_for(kim) if record.index == 6 else main_player6
+	_check(as_was.hair == main_player6.hair and as_was.beard == main_player6.beard and as_was.colours == main_player6.colours,
+			"Player6's face as main drew it (%s, %s)" % [main_player6.hair, main_player6.beard])
+	_main._leave(KIM, kim, KIM_ID)
+	_main._records.erase(KIM_ID)
+	# Pin 3: the adopt step, once and only while the look kept here has no seed.
+	var kept := Net.player_look
+	Net.player_look = ""
+	Net.adopt_look("seed=31 hair=long")
+	var first := Net.player_look
+	Net.adopt_look("seed=99")
+	_check(first == "seed=31 hair=long" and Net.player_look == first,
+			"a client that never picked takes its own player's look once, and only once (%s)" % Net.player_look)
+	Net.player_look = "seed=5 build=heavy"
+	Net.adopt_look("seed=31 hair=long")
+	_check(Net.player_look == "seed=5 build=heavy", "a player who picked is never overwritten by what arrives")
+	Net.player_look = "build=heavy"
+	Net.adopt_look("seed=8")
+	_check(Net.player_look == "seed=8", "a look with no seed takes the one that arrives")
+	Net.player_look = kept
+
+
 func _test_same_zone_travel_keeps_names() -> void:
 	print("
 == a travel within one zone keeps the player's and the companion's names (decision 911) ==")
@@ -565,7 +639,8 @@ func _test_player_body() -> void:
 	Net._looks[SAM_ID] = Net.tidy_look("build=" + "x".repeat(10000))
 	_main._admit(SAM, SAM_ID, "Sam")
 	sam = _main._players.get(SAM)
-	_check(sam != null and str(sam.spawn_spec.get("look", "")) == "", "a junk look asked for is none")
+	_check(sam != null and str(sam.spawn_spec.get("look", "")) == "seed=77",
+			"a junk look asked for is none: nothing of it kept, the record's seed alone (911 amended (1)) (%s)" % str(sam.spawn_spec.get("look", "")) if sam != null else "")
 	_main._leave(SAM, sam, SAM_ID)
 	Net._bodies.erase(SAM_ID)
 	Net._looks.erase(SAM_ID)

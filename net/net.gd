@@ -110,6 +110,8 @@ extends Node
 ##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --test-die-travel=<t>,<zone> server: at tick t the first player dies and is brought back in zone, in one frame (the at-once return, 587)
+##   --test-face-trips=<t>        server: from tick t the first player travels within its zone, to sample and back, and dies and returns in place (911)
+##   --test-face                  client: prints its own player's face each time it is built, and the face Options shows (911)
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --test-temple-day            server, tests only (with --run-marker): today is everyone's temple day (404 amended; playtest's tours)
 ##   --test-hp                    server, tests only (with --run-marker): the admin verb "hp <player> <n>" sets a player's hp (786; playtest's tours)
@@ -663,6 +665,7 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## notices (the restart warnings, an admin's word to all) are sent from the speaker "Notice". Mixed pairs are not refused: an
 ## old client shows a "Notice" line as "[party] Notice:", a new client shows an old server's warning as narration.
 ## 911: a same-frame respawn keeps its name; the despawn precedes the spawn; an old client draws the fade as before. No new number (release).
+## 911: a player's spawn "look" always carries seed= (kept in his record; an old client honours a seed= word already, so it draws the same face, and adopts nothing). No new number (release).
 const PROTOCOL_REVISION := 57
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
@@ -1063,6 +1066,12 @@ var test_foe: PackedStringArray = []
 ## sends (Main._tell_telegraph: its zone's peers and the joined ones), a client
 ## each it gets and each end (Main._on_telegraph).
 var test_tells := false
+## --test-face-trips=<tick> (server; net_test's face phase, decision 911):
+## Main._run_test_face_trips. -1: off.
+var test_face_trips := -1
+## --test-face (client; the same phase): Main._test_face prints its own
+## player's face at each build and the face Options shows.
+var test_face := false
 ## The voice A/B only (decision 803 amended): traits laid over a companion's
 ## roll (--test-traits), and a card that stands in for the written one
 ## (--test-card). Never on the box.
@@ -1150,6 +1159,33 @@ static func tidy_name(raw: String) -> String:
 ## sends none).
 static func tidy_body(raw: Variant) -> StringName:
 	return &"female" if str(raw).strip_edges().to_lower() == "female" else &"male"
+
+
+## Whether [param look] names its seed (decision 911): a look without one is
+## seeded by the server once, and a client adopts what comes back.
+static func look_seeded(look: String) -> bool:
+	return look.begins_with("seed=") or " seed=" in look
+
+
+## [param look]'s "seed=N" word, or "" if it has none.
+static func look_seed_word(look: String) -> String:
+	for word in look.split(" ", false):
+		if word.begins_with("seed="):
+			return word
+	return ""
+
+
+## This client's own player arrived wearing [param look] (its record's, which
+## the server seeds once: decision 911). While the look kept here has no seed
+## (they never picked one), it becomes that look, kept, so Options shows the
+## face they wear; once it has a seed, never: a player who picked keeps theirs.
+func adopt_look(look: String) -> void:
+	var tidied := tidy_look(look)
+	if look_seeded(player_look) or not look_seeded(tidied):
+		return
+	player_look = tidied
+	save_view_settings()
+	print("[net] look adopted from the server: %s" % player_look)
 
 
 ## A player's look as the game keeps it (decision 439; it comes from any
@@ -2348,6 +2384,8 @@ func _parse_args(given: Array = []) -> void:
 				companions = false
 			"--test-tells":
 				test_tells = true
+			"--test-face":
+				test_face = true
 			"--still-monsters":
 				still_monsters = true
 				Monster.idling = false
@@ -2389,7 +2427,7 @@ func _parse_args(given: Array = []) -> void:
 			"--address", "--port", "--bind", "--state", "--overlay-dir", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--voice-ab", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
-					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
+					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-face-trips", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--test-traits", "--test-card", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
 				if not has_value and i + 1 < args.size():
@@ -2573,6 +2611,8 @@ func _set_option(key: String, value: String) -> void:
 			test_reset_tick = value.to_int()
 		"--test-die-travel":
 			test_die_travel = value.split(",")
+		"--test-face-trips":
+			test_face_trips = value.to_int()
 		"--test-builder":
 			test_builder = value
 		"--test-exit-after":

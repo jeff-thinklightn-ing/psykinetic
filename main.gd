@@ -7315,8 +7315,19 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	var asked := Net.asked_body(id)
 	if asked != &"":
 		record.body = asked
-	if Net.asked_body(id) != &"" or Net.asked_look(id) != "":
-		record.look = Net.asked_look(id)  # Their choice this join (none: seeded by name).
+	var asked_look := Net.asked_look(id)
+	if asked != &"" or asked_look != "":
+		# Their choice this join; one that names no seed keeps the record's (decision 911:
+		# a client that never picked asks with none, and must not undo the seed it was given).
+		if not Net.look_seeded(asked_look) and Net.look_seeded(record.look):
+			asked_look = (Net.look_seed_word(record.look) + " " + asked_look).strip_edges()
+		record.look = asked_look
+	if not Net.look_seeded(record.look):
+		# Seeded once (decision 911): with the seed Client3D.look_for gave the name a player
+		# walks as ("Player<index>"), so nobody who has played changes face and a new one has
+		# the face a new one had before. Never from the id, which is what a player proves himself with.
+		var seed := absi(hash("Player%d" % record.index))
+		record.look = Net.tidy_look(("seed=%d %s" % [seed, record.look]).strip_edges())
 	var back := known and not respawn
 	# The zone laid again since they were last in it (decision 465): their
 	# saved cell may be rock now, so the nearest anchor's spawn point, or
@@ -20135,6 +20146,10 @@ func _free_start_tile() -> Vector2i:
 ## MultiplayerSpawner's spawn function: runs on the server and on every client
 ## with the same data, so static configuration never needs replicating.
 func _build_entity(spec: Dictionary) -> Node:
+	if spec.get("script") == PLAYER and int(spec.get("peer", 0)) == Net.local_id:
+		Net.adopt_look(str(spec.get("look", "")))  # Their own player: its seed kept (decision 911).
+		if Net.test_face:
+			_test_face(str(spec.get("name", "")), str(spec.get("look", "")))
 	if spec.get("script") == DOOR:
 		return Door.build(spec)
 	if spec.get("script") == PILE:
@@ -23972,6 +23987,7 @@ func _on_world_ticked(tick: int) -> void:
 			_visible_work_tick()  # The bodies at the work the sim does (decision 566).
 		_respawn_due_players(tick)
 		_run_test_die_travel(tick)
+		_run_test_face_trips(tick)
 		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
 		_all_fallen_tick()
 		_leaving_tick()  # A companion leaving her player (decision 581).
@@ -28163,6 +28179,57 @@ func _run_test_die_travel(tick: int) -> void:
 	World.despawn(player)  # Its death: _on_entity_despawned.
 	travel(peer, to)
 	print("[test] %s died and was brought back in %s" % [who, to])
+
+
+## --test-face-trips=<tick> (server; net_test's face phase, decision 911):
+## the first player, 20 ticks apart from that tick: travels within its own
+## zone, to sample, back to test_room, then dies and is brought back where
+## it lay in the same frame. Its client prints its face at each (_test_face).
+var _face_step := 0
+
+
+func _run_test_face_trips(tick: int) -> void:
+	if Net.test_face_trips < 0 or _players.is_empty() or tick < Net.test_face_trips + 20 * _face_step:
+		return
+	var peer: int = _players.keys()[0]
+	var player: Player = _players[peer]
+	var id: String = _peer_ids.get(peer, "")
+	var here: String = World.peer_zone.get(peer, World.zone.name)
+	_face_step += 1
+	match _face_step:
+		1:
+			travel(peer, here, "", {}, player.tile)
+			print("[test] face trip: within %s" % here)
+		2:
+			travel(peer, "sample")
+			print("[test] face trip: to sample")
+		3:
+			travel(peer, "test_room")
+			print("[test] face trip: back to test_room")
+		4:
+			var was := World.enter_named(here)
+			World.despawn(player)  # Its death.
+			_join_player(peer, id, _records[id].name, true)
+			World.enter(was)
+			print("[test] face trip: died and back in %s" % here)
+		_:
+			Net.test_face_trips = -1
+			print("[test] face trips done")
+
+
+## --test-face (client): [param look], its own player's as the server sent it,
+## at each build of it, and the look Options shows (Net.player_look, adopted
+## once), each as the face it draws: hair, beard, colours, keys, stature.
+func _test_face(entity_name: String, look: String) -> void:
+	print("[test] face %s: %s" % [entity_name, _face_words(PersonLook.make(look + " headwear=none apron=no garb=none", Net.player_body))])
+	print("[test] face options: %s" % _face_words(PersonLook.make(Net.player_look, Net.player_body)))
+
+
+static func _face_words(face: PersonLook) -> String:
+	var keys: Array = face.keys.keys()
+	keys.sort()
+	return "hair %s %s beard %s skin %s keys %s scale %.3f" % [face.hair, face.hair_colour, face.beard, face.colours["skin"].to_html(false),
+		",".join(keys.map(func(k: String) -> String: return "%s=%.2f" % [k, face.keys[k]])), face.scale]
 
 
 ## [param player]'s arts' marks changed (World.arts_marked, 766 amended): told
