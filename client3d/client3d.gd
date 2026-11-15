@@ -1015,6 +1015,17 @@ const STORE_LAMP_UP := 2.0
 const LAMP_POST_TALL := "prop.lamp_post"
 const LAMP_POST_LOW := "prop.lamp_post_low"
 const LAMP_LANTERN_SCALE := 1.7
+## A market stall's lantern (782 amended (3); the coordinator's, 11-15, from
+## the square by night: "the stalls are trades' places"): the posts' lantern
+## (LAMP_LANTERN_SCALE) hung by its ring from the stall's front rail at
+## STALL_LAMP_HOOK in building.market_stall's own frame (art-kit's: the rail's
+## underside, x on a notch of the valance so it shows below the tabs),
+## STALL_LAMP_ENERGY over STALL_LAMP_RANGE m, shadowless, outside the house
+## pick, lit as stall_lamp_lit says.
+const STALL_SLOT := "building.market_stall"
+const STALL_LAMP_HOOK := Vector3(0.245, 1.96, 0.5)
+const STALL_LAMP_ENERGY := 0.8
+const STALL_LAMP_RANGE := 3.5
 ## A terrain lantern's light, up from its cell's ground: inside the low
 ## post's lantern (0.79 to 1.015 m) as it was over the code stake.
 const LANTERN_LIGHT_UP := 0.95
@@ -3196,6 +3207,9 @@ var _fire_time := 0.0
 ## lights and whose lanterns they follow.
 var _night := false
 var _door_lamps: Dictionary[Vector2i, Node3D] = {}
+## The stalls' lanterns (782 amended (3)): [its building, its light, its own
+## pane or null, the piece, its flicker's phase] each.
+var _stall_lamps: Array[Array] = []
 var _night_posts: Array = []
 var _night_stores: Array = []
 ## The tavern hearths' cells (868), burning always.
@@ -8532,6 +8546,7 @@ func _phase_sets() -> void:
 	_room.name = "Room"
 	add_child(_room)
 	_door_lamps.clear()  # Hung again in the new room (782).
+	_stall_lamps.clear()  # And the stalls' (782 amended (3)), freed with the old room.
 	_wall_lamps.clear()  # And the mine's (769 amended (6)).
 	_house_lights.clear()  # And the houses' (489 amended (3)), freed with the old room.
 	_house_seats.clear()  # Their pieces too (489 amended (4)).
@@ -10487,6 +10502,8 @@ func _add_buildings() -> void:
 			parts.add_child(chimney)
 			node.add_child(parts)
 		_room.add_child(node)
+		if slot == STALL_SLOT:
+			_add_stall_lamp(node, building)
 		add_beds(node, building, _elevation(rect.position))
 		if slot == Main.ALTAR_SLOT and int(building.get("variant", 1)) == 1:
 			_add_bier_remains(node, slot)
@@ -11852,6 +11869,7 @@ func _update_lamps() -> void:
 	_glows = _glows.filter(func(each: Array) -> bool: return is_instance_valid(each[0]))
 	_night = bool(_terrain.get("outdoor", false)) and sun <= 0.0
 	_hang_door_lamps()
+	_light_stall_lamps(hour, sun)
 	for each in _glows:
 		(each[0] as Node3D).visible = _window_lit(each[1], hour, sun)
 	# The sill lamps' panes with their windows, the lanterns' let go with their pieces (489 amended (9)).
@@ -11869,6 +11887,64 @@ func _update_lamps() -> void:
 ## standing and not a hut told empty (hut_empty), then as lamp_lit says.
 func _window_lit(row: Array, hour: float, sun: float) -> bool:
 	return bool(row[2]) and not hut_empty(str(row[3])) and lamp_lit(_awake.get(row[0], {}), str(row[1]), hour, sun)
+
+
+## Whether a market stall's lantern is lit (782 amended (3)): the one
+## switch its light and its pane read. Now lamp_lit's answer for a building
+## no town tells of: from the sun's setting till LAMP_OUT, every stall,
+## every night (its keeper gone by then: Rolf's day ends at 18, a pedlar's
+## too). A later rule (a stall not kept that day dark) goes here alone.
+static func stall_lamp_lit(_stall: Dictionary, hour: float, sun: float) -> bool:
+	return lamp_lit({}, "", hour, sun)
+
+
+## A market stall's lantern (782 amended (3)): a piece in the room on the
+## stall's own frame (not under the stall, whose see-through fade would take
+## its pane), the posts' lantern under its front rail, its own pane, and its
+## light at the lantern's middle; out till stall_lamp_lit says.
+func _add_stall_lamp(stall: Node3D, building: Dictionary) -> void:
+	if not ArtKit.has(LANTERN_SLOT):
+		return
+	var rect: Rect2i = building["rect"]
+	var piece := Node3D.new()
+	piece.name = "StallLamp_%d_%d" % [rect.position.x, rect.position.y]
+	piece.transform = stall.transform
+	_room.add_child(piece)
+	var lantern := _hanging_lantern()
+	lantern.scale = Vector3.ONE * LAMP_LANTERN_SCALE
+	lantern.position = STALL_LAMP_HOOK - Vector3(0.0, (LANTERN_RING + LANTERN_TALL) * LAMP_LANTERN_SCALE, 0.0)
+	piece.add_child(lantern)
+	var pane: StandardMaterial3D = null
+	var glass := _lantern_pane(lantern)
+	if not glass.is_empty():
+		pane = _pane_copy(glass)
+		(glass[0] as MeshInstance3D).set_surface_override_material(glass[1], pane)
+		shade_pane(pane, 0.0)
+	var light := _night_light(LANTERN, STALL_LAMP_ENERGY, STALL_LAMP_RANGE)
+	light.name = "StallLight"
+	light.position = STALL_LAMP_HOOK - Vector3(0.0, LANTERN_TALL * 0.5 * LAMP_LANTERN_SCALE, 0.0)
+	light.visible = false
+	piece.add_child(light)
+	_stall_lamps.append([building, light, pane, piece, _roll(rect.position, 154) * TAU])
+
+
+## Each stall's lantern lit or out as stall_lamp_lit says (782 amended (3)),
+## its pane as the town's lanterns' while lit, its art's dull horn out.
+func _light_stall_lamps(hour: float, sun: float) -> void:
+	_stall_lamps = _stall_lamps.filter(func(row: Array) -> bool: return is_instance_valid(row[3]))
+	for row: Array in _stall_lamps:
+		var lit := stall_lamp_lit(row[0], hour, sun)
+		(row[1] as OmniLight3D).visible = lit
+		if row[2] != null:
+			shade_pane(row[2], pane_energy(LANTERN_ENERGY, day_share(DayNight.light), _outdoor) if lit else 0.0)
+
+
+## The stalls' lit lanterns flickered as a lantern (782 amended (3)).
+func _flicker_stall_lamps() -> void:
+	for row: Array in _stall_lamps:
+		var light := row[1] as OmniLight3D
+		if is_instance_valid(light) and light.visible:
+			light.light_energy = STALL_LAMP_ENERGY * Flames.flicker(_fire_time, float(row[4]), LANTERN_FLICKER)
 
 
 ## Whether a window of building [param code] is lit (566): only with the
@@ -20608,6 +20684,7 @@ static func place_ring_slot(cell: Vector2i, fire: Array) -> String:
 ## (Flames.day_share). World's light (Fields) is never touched: it stays
 ## steady for Senses.
 func _flicker_fires(delta: float) -> void:
+	_flicker_stall_lamps()
 	if _fire_lights.is_empty() and _lamp_lights.is_empty() and _forge_lights.is_empty() and _fire_panes.is_empty():
 		return
 	_fire_time += delta
