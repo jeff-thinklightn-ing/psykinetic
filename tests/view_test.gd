@@ -17164,6 +17164,13 @@ func _test_old_wolf_leap() -> void:
 			and absf(contact - 0.65) < 0.05 and not (view._coil != null and view._coil.is_running()),
 			"his bite told ahead: his bite_lead, its snap at 0.6 s with the blow, no generic coil (%s x%.2f, snap %.2f s of %.2f)"
 			% [rig.playing(), rig.speed(), contact, length])
+	# Its told cell too (the view side of enemy-ai's told bite for the old grey): the "bite" tell over his
+	# winding keeps its id and time and draws nothing of its own, his bite_lead the gather, no coil over it.
+	var bite_told := view.tell("bite", 0.7, 24)
+	_check(bite_told and view._tell_id == 24 and absi(view._tell_until - (AnimRig.now_msec() + 700)) <= 20
+			and rig.playing() == view.clips["bite_lead"] and not (view._coil != null and view._coil.is_running()),
+			"his bite's told cell: the tell kept (%s, id %d), still his bite_lead (%s), no coil over it" % [bite_told, view._tell_id, rig.playing()])
+	view.tell_over(24, true)
 	body.queue_free()
 	await _frames(1)
 
@@ -17190,6 +17197,12 @@ func _test_hill_cat_clips() -> void:
 	_check(view.tell("pounce", 1.1, 9) and rig.playing() == view.clips["crouch_tell"],
 			"the pounce's telegraph plays crouch_tell, not the leap (%s)" % rig.playing())
 	view.tell_over(9, true)
+	# A "bite" tell on a slot with no bite_lead (the grey's alone draws nothing for it): its own bite, as before.
+	rig.cancel_strike()
+	view._busy_until = 0
+	_check(view.tell("bite", 0.8, 10) and rig.playing() == view.clips["bite"], "a bite told on a body with no bite_lead: its bite clip, as before (%s)" % rig.playing())
+	view.tell_over(10, true)
+	rig.cancel_strike()
 	view.pounce()
 	var leapt := rig.playing()
 	# Waited on, not timed (perf's loaded suite, 11-12, read Pounce still: a timer's first count takes

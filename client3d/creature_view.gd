@@ -483,6 +483,12 @@ func tell(move: String, lands_in: float, id: int) -> bool:
 	var clip := str(TELL_CLIPS.get(move, move))
 	if rig == null or _dead:
 		return false
+	if move == "bite" and clips.has("bite_lead"):
+		# The old grey's told bite: his winding's bite_lead is its gather (wind), so the tell keeps its id and
+		# time (its end, the hurt's timing) and draws nothing; the generic coil over that gather sank him twice.
+		_tell_id = id
+		_tell_until = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+		return true
 	if not clips.has(clip):
 		# No clip of its own (the old grey's lunge before his lunge_tell): the body gathers over the
 		# tell and springs as it lands (coil, a lead's draw-back), never slid into untold (the
