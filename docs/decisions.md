@@ -52882,6 +52882,44 @@ so no player's id is named in a laptop run. The client takes the same id as its 
 an empty --builders refused; --server-args without --joined refused; both flags sent in either order; the stub alone
 sent. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+828 amended (12) (perf, 2026-11-15; the coordinator's approval and bounds; label from
+tools/decision_number.sh): the runner keeps and warms the pipeline cache, and samples the GPU, each
+opt-in. Godot 4.7.2 keeps compiled pipelines in user://vulkan (pipelines.<driver>.<device>.cache),
+and the runner gives each run an APPDATA of its own in the run's folder, so every laptop figure
+before this was a first play on an empty pipeline cache (perf's join and crossing probes: about
+120 compiles at the join); a player's installed game keeps that folder between plays. The clone's
+res://.godot/shader_cache and the driver's own cache stay warm across runs either way, so a "cold"
+run is a little warmer than a true first install. remote_shot.sh writes <run>\opts.txt (keep=,
+warm=, gpu=; the schtasks line holds 261 characters, so not as runner arguments). --keep-cache:
+when the run ends, bot 1's user://vulkan as the game left it on exit is kept as the laptop's
+<runs>\caches\<name> with the build's sha (build.txt); the six newest are kept, older ones removed
+and named in runner.log. --warm-from RUN: bot 1's user data starts with the cache that run kept on
+the same laptop. The source is a run's name, never a path (letters, digits, _ and -, refused
+otherwise; the runner's Read-Opts takes no other value), and must be one this runner kept there:
+remote_shot.sh asks before the run and the runner checks again; with none, nothing runs ("warm from
+RUN: refused, ..."). Only that kept vulkan folder is copied; nothing outside the run's folder and
+<runs>\caches is read or written, the laptop user's own Godot data never. A run named "caches" or
+"lock" (the runner's own folders) is refused, as is --warm-from its own name with --keep-cache.
+runner.log says "cache: cold" or "cache: warm from RUN, <n> files, <bytes> bytes copied ...; the
+builds match (<sha>)" or "the builds DIFFER (<kept>, <now>)", "cache kept as ..." or "nothing to
+keep" (a game stopped, not quit, may not save it), and ends "SHOT cache: ..."; the game gets
+PSYKINETIC_PIPELINE_CACHE ("cold" or "warm from RUN"), and map_bench's "BENCH ran:" line ends
+"pipeline cache <it>" ("unknown (not a laptop runner's run)" elsewhere), so no figure is read
+without it. Bot 2 (two-bot tours) always starts cold. --gpu-sample: nvidia-smi's own loop
+(timestamp, pstate, graphics and memory clocks, utilization, power, temperature, every 250 ms) into
+out\gpu-<pass>.csv, started after each pass's game, in the run's job (kill on close), stopped with
+the game by its own PID; runner.log names its pid, rows and how it ended, or "asked, no nvidia-smi
+on this laptop". Read-only on the laptop: nothing written, installed or left running.
+tests/remote_shot_sockets_test.sh: the three refusals; opts.txt by default (keep=0, warm=, gpu=0)
+and as asked; the runner's -Mode cache (its two steps alone, on a scratch runner folder): a cold
+run kept with its build; a warm run copied (files, bytes, the builds match) and keeping nothing; a
+kept build that differs said; a warm from a run that kept nothing refused with nothing copied; a
+path in opts.txt read as cold; nothing to keep without a cache; the six newest kept, the older
+removed and named; the BENCH ran and SHOT lines. Its proof on the laptops is the coordinator's pair:
+the idle run cold then warm on the Atlas, then the join and a barrow crossing cold and warm on the
+Lenovo, the same build both times, each machine's idle run also with and without --gpu-sample.
+Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the

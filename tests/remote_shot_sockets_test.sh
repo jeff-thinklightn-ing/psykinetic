@@ -194,6 +194,74 @@ if [ $code = 1 ] && [ "$out" = "barrow_deep" ]; then echo "  PASS  barrow_deep l
 rm -rf "$logs"
 if grep -q 'tour_bare_levels.sh "$SHA" "$REVIEW/server.log"' tools/remote_shot.sh; then echo "  PASS  remote_shot.sh fails a tour on it"; else echo "  FAIL  remote_shot.sh fails a tour on it"; failed=$((failed + 1)); fi
 
+# The pipeline cache kept and warmed, the GPU sampled (828 amended (12), the coordinator's bounds):
+# opt-in, the source named by run (never a path), only that run's kept vulkan folder copied, the
+# builds compared; remote_shot.sh's refusals and what it sends, then the runner's own two steps
+# (-Mode cache) on a scratch runner folder.
+refused "a run named caches: refused (the runner's own folder)" "name: caches is the runner's own folder" "$sha" caches --
+refused "--warm-from a path: refused (a run's name only)" "--warm-from: a run's name" --warm-from "../x" "$sha" x --
+refused "--warm-from its own name with --keep-cache: refused" "would keep over its own source" --warm-from x --keep-cache "$sha" x --
+rm -f "$tmp/reached"
+sent="$(shot --dry-run "$sha" x -- --host)"; code=$?
+got_opts="$(printf '%s\n' "$sent" | grep -E '^opts: ' | tr '\n' ';')"
+if [ $code -eq 0 ] && [ "$got_opts" = "opts: keep=0;opts: warm=;opts: gpu=0;" ] && [ ! -f "$tmp/reached" ]; then
+	echo "  PASS  by default nothing kept, warmed or sampled (opts.txt: keep=0, warm=, gpu=0)"
+else
+	echo "  FAIL  the default opts: exit $code, got [$got_opts]"; failed=$((failed + 1))
+fi
+sent="$(shot --dry-run --keep-cache --warm-from idle_cold --gpu-sample --tour smoke "$sha" idle_warm --)"; code=$?
+got_opts="$(printf '%s\n' "$sent" | grep -E '^opts: ' | tr '\n' ';')"
+if [ $code -eq 0 ] && [ "$got_opts" = "opts: keep=1;opts: warm=idle_cold;opts: gpu=1;" ]; then
+	echo "  PASS  --keep-cache --warm-from idle_cold --gpu-sample, with a tour: opts.txt says each"
+else
+	echo "  FAIL  the asked opts: exit $code, got [$got_opts]"; failed=$((failed + 1))
+fi
+runs="$tmp/runs"
+win() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
+# cache <run> <opts lines...>: the runner's -Mode cache on <runs>/<run>; its lines in $tmp/cache.txt.
+cache() {
+	local run="$1"
+	shift
+	mkdir -p "$runs/$run"
+	printf '%s\n' "$@" >"$runs/$run/opts.txt"
+	powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$runner" -Mode cache -Root "$(win "$PWD")" \
+		-Runs "$(win "$runs")" -Dir "$(win "$runs/$run")" 2>&1 | tr -d '\r' >"$tmp/cache.txt"
+}
+has() { grep -qxF -- "$1" "$tmp/cache.txt"; }
+row() { if [ "$1" = 0 ]; then echo "  PASS  $2"; else echo "  FAIL  $2: [$(tr '\n' '|' <"$tmp/cache.txt")]"; failed=$((failed + 1)); fi; }
+mkdir -p "$runs/idle_cold/appdata/vulkan"
+head -c 100 /dev/zero >"$runs/idle_cold/appdata/vulkan/pipelines.test.cache"
+cache idle_cold keep=1 warm= gpu=0
+row $(has "cache: cold (bot 1's user://vulkan empty)" && has "state: cold" && has "cache kept as caches\\idle_cold: 1 files, 100 bytes, build $sha" && has "result: "; echo $?) \
+	"a cold run with --keep-cache: cold, and its user://vulkan kept as caches\\idle_cold with its build"
+check_kept="$( [ -f "$runs/caches/idle_cold/vulkan/pipelines.test.cache" ] && [ "$(tr -d '\r\n' <"$runs/caches/idle_cold/build.txt")" = "$sha" ]; echo $?)"
+row "$check_kept" "the kept folder holds the cache file and build.txt"
+cache idle_warm keep=0 warm=idle_cold gpu=0
+row $(has "cache: warm from idle_cold, 1 files, 100 bytes copied into bot 1's user://vulkan; the builds match ($sha)" && has "state: warm from idle_cold" && has "result: " \
+	&& [ -f "$runs/idle_warm/appdata/vulkan/pipelines.test.cache" ]; echo $?) "--warm-from idle_cold: its files and bytes copied into bot 1's user data, the builds match"
+row $( [ ! -d "$runs/caches/idle_warm" ]; echo $?) "a warm run without --keep-cache keeps nothing"
+echo "0123abc" >"$runs/caches/idle_cold/build.txt"
+cache idle_warm2 warm=idle_cold
+row $(grep -qF "the builds DIFFER (0123abc kept, $sha now)" "$tmp/cache.txt"; echo $?) "another build's cache: warm, and the builds said to differ"
+cache idle_none warm=no_such_run
+row $(has "result: warm from no_such_run: refused, no pipeline cache kept by a run of that name on this laptop (a run keeps its own with --keep-cache)" \
+	&& [ ! -d "$runs/idle_none/appdata/vulkan" ]; echo $?) "--warm-from a run that kept nothing: refused, nothing copied"
+cache idle_path 'warm=..\idle_cold' keep=1
+row $(has "cache: cold (bot 1's user://vulkan empty)" && has "cache: nothing to keep (the game wrote no user://vulkan; a game stopped, not quit, may not save it)"; echo $?) \
+	"a path in opts.txt is no run's name: read as cold; and a game that wrote no cache keeps nothing"
+for i in 1 2 3 4 5 6; do mkdir -p "$runs/caches/old$i/vulkan"; touch -d "2026-11-0$i 12:00" "$runs/caches/old$i"; done
+mkdir -p "$runs/idle_new/appdata/vulkan"
+head -c 10 /dev/zero >"$runs/idle_new/appdata/vulkan/pipelines.test.cache"
+cache idle_new keep=1
+row $(has "cache removed: caches\\old1 (past the six newest)" && has "cache removed: caches\\old2 (past the six newest)" && [ ! -d "$runs/caches/old2" ] \
+	&& [ -d "$runs/caches/old3" ] && [ -d "$runs/caches/idle_new" ] && [ "$(ls "$runs/caches" | wc -l)" -eq 6 ]; echo $?) \
+	"the six newest kept, the older ones removed and named"
+if grep -qF 'cache if cache != "" else "unknown (not a laptop runner' tools/map_bench.gd && grep -qF 'SHOT cache: %s%s' tools/remote_shot.sh; then
+	echo "  PASS  a bench's BENCH ran: line and runner.log's SHOT line say the cache"
+else
+	echo "  FAIL  a bench's BENCH ran: line and runner.log's SHOT line say the cache"; failed=$((failed + 1))
+fi
+
 # The whole runner parses (its run mode needs a laptop's session; its proof is a laptop run).
 parsed="$(powershell -NoProfile -NonInteractive -Command "\$e = \$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$runner', [ref]\$null, [ref]\$e); \$e.Count" 2>&1 | tr -d '\r')"
 if [ "$parsed" = "0" ]; then echo "  PASS  the runner parses"; else echo "  FAIL  the runner parses: $parsed"; failed=$((failed + 1)); fi

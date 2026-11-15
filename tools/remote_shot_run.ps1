@@ -36,9 +36,14 @@
 #                 in the job, its sockets judged as the first's, and a pass fails when either
 #                 game does. runner.log: its lines and each game's SCRIPT ERROR count. Every joined run looks through
 #                 what it returns for its token; a file holding it is removed and the run fails.
+#                 <Dir>\opts.txt (828 amended (12)): keep=1 keeps bot 1's user://vulkan (the
+#                 pipeline cache) as <Runs>\caches\<name> when the run ends; warm=<run> starts
+#                 bot 1 with the one that run kept, else nothing runs; gpu=1 samples the GPU
+#                 with nvidia-smi into out\gpu-<pass>.csv while each pass's game runs.
 #   -Mode parse   a tour's scripts (-Dir: its name) checked in the clone, parse errors only
+#   -Mode cache   the cache's warm and keep steps alone on a scratch run folder (the test's)
 param(
-	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args")][string]$Mode,
+	[Parameter(Mandatory = $true)][ValidateSet("lock", "unlock", "import", "parse", "run", "judge", "bot2args", "cache")][string]$Mode,
 	[string]$Dir = "",
 	[string]$Root = "D:\psykinetic",
 	[string]$Runs = "D:\psykinetic-runs",
@@ -161,7 +166,81 @@ function Bot2-Args([string[]]$first) {
 	return ,@($first | ForEach-Object { if ($swaps.Contains($_) -and $swaps.Keys -ccontains $_) { $swaps[$_] } else { $_ } })
 }
 
+## The run's options (828 amended (12)): <Dir>\opts.txt from remote_shot.sh, one name=value a line;
+## only keep, warm and gpu, a value of letters, digits, _ and - (a run's name, never a path).
+function Read-Opts([string]$dir) {
+	$opts = @{}
+	$file = Join-Path $dir "opts.txt"
+	if (Test-Path $file) {
+		foreach ($line in Get-Content $file) { if ($line -match '^(keep|warm|gpu)=([A-Za-z0-9_-]*)$') { $opts[$Matches[1]] = $Matches[2] } }
+	}
+	return $opts
+}
+
+## The files and bytes under a folder, for runner.log.
+function Count-Files([string]$folder) {
+	$files = @(Get-ChildItem -Recurse -File $folder -ErrorAction SilentlyContinue)
+	return "$($files.Count) files, $([long]($files | Measure-Object Length -Sum).Sum) bytes"
+}
+
+## Before the game (828 amended (12)): warm=<run> copies the pipeline cache that run kept
+## (<caches>\<run>\vulkan) into [param appdata]\vulkan, else the run is refused. Returns
+## {result ("" or the refusal), line (runner.log's "cache: ..."), state (for the game's
+## PSYKINETIC_PIPELINE_CACHE)}.
+function Warm-Cache([hashtable]$opts, [string]$caches, [string]$appdata, [string]$build) {
+	if (-not $opts.warm) { return @{ result = ""; line = "cache: cold (bot 1's user://vulkan empty)"; state = "cold" } }
+	$from = $opts.warm
+	$source = Join-Path $caches "$from\vulkan"
+	if (-not (Test-Path $source -PathType Container)) {
+		$why = "warm from ${from}: refused, no pipeline cache kept by a run of that name on this laptop (a run keeps its own with --keep-cache)"
+		return @{ result = $why; line = "cache: $why"; state = "" }
+	}
+	$vulkan = Join-Path $appdata "vulkan"
+	New-Item -ItemType Directory -Force $appdata | Out-Null
+	Copy-Item -Recurse -Force $source $vulkan
+	$fromBuild = try { "$(Get-Content (Join-Path $caches "$from\build.txt") -TotalCount 1 -ErrorAction Stop)".Trim() } catch { "unread" }
+	$builds = if ($fromBuild -eq $build) { "the builds match ($build)" } else { "the builds DIFFER ($fromBuild kept, $build now)" }
+	return @{ result = ""; line = "cache: warm from $from, $(Count-Files $vulkan) copied into bot 1's user://vulkan; $builds"; state = "warm from $from" }
+}
+
+## After the game (828 amended (12)): keep=1 keeps [param appdata]\vulkan as <caches>\<name>
+## with its build; the six newest kept, older ones removed and named. Returns runner.log's lines.
+function Keep-Cache([hashtable]$opts, [string]$caches, [string]$name, [string]$appdata, [string]$build) {
+	if ($opts.keep -ne "1") { return @() }
+	$vulkan = Join-Path $appdata "vulkan"
+	if (-not (Test-Path $vulkan -PathType Container)) {
+		return @("cache: nothing to keep (the game wrote no user://vulkan; a game stopped, not quit, may not save it)")
+	}
+	$kept = Join-Path $caches $name
+	if (Test-Path $kept) { Remove-Item -Recurse -Force $kept }
+	New-Item -ItemType Directory -Force $kept | Out-Null
+	Copy-Item -Recurse -Force $vulkan (Join-Path $kept "vulkan")
+	Set-Content (Join-Path $kept "build.txt") $build
+	(Get-Item $kept).LastWriteTime = Get-Date
+	$lines = @("cache kept as caches\${name}: $(Count-Files (Join-Path $kept 'vulkan')), build $build")
+	foreach ($each in @(Get-ChildItem -Directory $caches | Sort-Object LastWriteTime -Descending | Select-Object -Skip 6)) {
+		Remove-Item -Recurse -Force $each.FullName
+		$lines += "cache removed: caches\$($each.Name) (past the six newest)"
+	}
+	return $lines
+}
+
 switch ($Mode) {
+	# The pipeline cache's two steps alone, for tests/remote_shot_sockets_test.sh (828 amended
+	# (12)): -Dir a run folder holding opts.txt (and appdata\vulkan as a game would leave it),
+	# -Runs the runner's folder; warms before and keeps after as a run does, printing each line
+	# and "result: ..." ("" when it would run).
+	"cache" {
+		$opts = Read-Opts $Dir
+		$caches = Join-Path $Runs "caches"
+		$build = try { "$(& git -C $Root rev-parse HEAD 2>$null)".Trim() } catch { "unread" }
+		$warm = Warm-Cache $opts $caches (Join-Path $Dir "appdata") $build
+		Write-Output $warm.line
+		Write-Output "state: $($warm.state)"
+		if ($warm.result -eq "") { Keep-Cache $opts $caches (Split-Path -Leaf $Dir) (Join-Path $Dir "appdata") $build | ForEach-Object { Write-Output $_ } }
+		Write-Output "result: $($warm.result)"
+		exit 0
+	}
 	# Bot 2's args alone, for tests/remote_shot_sockets_test.sh: -Dir names a file of bot 1's
 	# args, one a line; prints bot 2's, one a line, or "REFUSED".
 	"bot2args" {
@@ -382,6 +461,26 @@ public static class Dialogs {
 		$bot2Settings = Join-Path $bot2Data "settings.cfg"
 		$bot2Shown = $false
 		$bot2Sockets = ""
+		# The pipeline cache and the GPU's samples (828 amended (12); <Dir>\opts.txt from
+		# remote_shot.sh, one name=value a line): Godot keeps compiled pipelines in
+		# user://vulkan, which a run's own APPDATA starts empty (a first play). keep=1: when the
+		# run ends its appdata\vulkan is kept as <Runs>\caches\<name> with its build; warm=<run>:
+		# bot 1's appdata starts with the one kept by that run of this runner (a player's next
+		# play), else nothing runs; gpu=1: nvidia-smi samples the GPU into out\gpu-<pass>.csv while
+		# each pass's game runs, stopped with it by its PID. Nothing outside the run's folder and
+		# <Runs>\caches is read or written; the laptop user's own Godot data never.
+		$opts = Read-Opts $Dir
+		$caches = Join-Path $Runs "caches"
+		$build = try { "$(& git -C $Root rev-parse HEAD 2>$null)".Trim() } catch { "unread" }
+		$gpuLines = @()
+		$warm = Warm-Cache $opts $caches $appdata $build
+		$cacheLines = @($warm.line)
+		if ($warm.result -ne "") { $result = $warm.result } else { $env:PSYKINETIC_PIPELINE_CACHE = $warm.state }
+		$smiExe = $null
+		if ($opts.gpu -eq "1") {
+			$smiExe = try { (Get-Command nvidia-smi.exe -ErrorAction Stop).Source } catch { $null }
+			if ($smiExe -eq $null) { $gpuLines += "gpu sampling: asked, no nvidia-smi on this laptop" }
+		}
 		if ($Joined -and (Test-Path $tourFile)) {
 			foreach ($line in Get-Content $tourFile) {
 				if ($line -match '^tour=([a-z0-9_]+)$') { $tour = $Matches[1] }
@@ -487,6 +586,16 @@ public static class Dialogs {
 			$null = $process.Handle
 			$jobbed += "pass $pass's game pid $($process.Id): $(if (($code = [Job]::Add($process.Handle)) -eq 0) { 'in' } else { "not in (error $code)" })"
 			$full = [Idle]::FullSpeed($process.Handle)
+			# gpu=1 (828 amended (12)): nvidia-smi's own loop, every 250 ms, started after the game, in the job.
+			$smi = $null
+			$smiCsv = Join-Path $Dir "out\gpu-$pass.csv"
+			if ($smiExe -ne $null) {
+				$smi = Start-Process -FilePath $smiExe -WindowStyle Hidden -PassThru -ArgumentList @(
+					"--query-gpu=timestamp,pstate,clocks.gr,clocks.mem,utilization.gpu,power.draw,temperature.gpu",
+					"--format=csv", "-lms", "250", "-f", $smiCsv)
+				$null = $smi.Handle
+				$jobbed += "pass $pass's nvidia-smi pid $($smi.Id): $(if (($code = [Job]::Add($smi.Handle)) -eq 0) { 'in' } else { "not in (error $code)" })"
+			}
 			$shown = $false
 			$result = ""
 			$clientStart = Get-Date
@@ -604,6 +713,12 @@ public static class Dialogs {
 				$process.WaitForExit()
 				$result = "exit $($process.ExitCode)"
 			}
+			if ($smi -ne $null) {
+				# Stopped with the game, by its own PID (the job ends it too should this runner go first).
+				$smiState = if ($smi.HasExited) { "it had exited by itself ($($smi.ExitCode))" } else { Stop-Tree $smi; if ($smi.WaitForExit(5000)) { "stopped by its PID (gone)" } else { "stopped by its PID (STILL RUNNING)" } }
+				$rows = if (Test-Path $smiCsv) { [Math]::Max(0, @(Get-Content $smiCsv).Count - 1) } else { 0 }
+				$gpuLines += "gpu sampling, pass ${pass}: nvidia-smi pid $($smi.Id) every 250 ms from the game's start, $rows rows in out\gpu-$pass.csv; $smiState"
+			}
 			if ($bot2 -ne $null) {
 				if (-not $bot2.HasExited) { Stop-Tree $bot2 }
 				$null = $bot2.WaitForExit(10000)
@@ -658,6 +773,10 @@ public static class Dialogs {
 			$joinedLines += $(if ($socketLooks -gt 0 -or $socketLine -ne "") { "$socketLine ($socketLooks looks, ephemeral from $low)" } else { "SOCKETS: not looked at (no client ran)" })
 			if ($firewallUnread) { $firewallLine += "; during the run: not checked (the windows could not be listed)" }
 		}
+		# keep=1 (828 amended (12)): bot 1's user://vulkan, as the game left it on exit, kept.
+		if ($warm.result -eq "") { $cacheLines += Keep-Cache $opts $caches $name $appdata $build }
+		Remove-Item Env:PSYKINETIC_PIPELINE_CACHE -ErrorAction SilentlyContinue
+		$joinedLines += $cacheLines + $gpuLines
 		# The runner that ran, by its own file's hash (828 amended (4)): remote_shot.sh prints the
 		# hash of the copy it sent, and says so when they differ.
 		$runnerSha = try { (Get-FileHash -Algorithm SHA256 $PSCommandPath).Hash.ToLower().Substring(0, 16) } catch { "unread" }

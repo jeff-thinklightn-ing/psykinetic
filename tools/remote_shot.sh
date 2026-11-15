@@ -2,7 +2,17 @@
 # A shot or clip run on the laptop runner (lenovo-tethys; the coordinator's
 # design, 2026-11-08), so a windowed run never takes this machine's screen:
 #   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] [--vsync off|default]
-#     [--joined [--server-args "ARGS"]] <sha> <name> -- <godot args>
+#     [--keep-cache] [--warm-from RUN] [--gpu-sample] [--joined [--server-args "ARGS"]] <sha> <name> -- <godot args>
+# --keep-cache, --warm-from RUN (828 amended (12); the coordinator's approval, 2026-11-15): a run's
+# own APPDATA starts with an empty pipeline cache (Godot's user://vulkan), so every run is a
+# first play. --keep-cache keeps the run's user://vulkan when it ends, as the laptop's
+# <runs>\caches\<name> with its build (the six newest kept); --warm-from RUN starts bot 1 with the
+# one a run of that name kept on the same laptop (a player's next play), refused if there is
+# none. runner.log says "cache: cold" or "cache: warm from RUN", the files and bytes, and
+# whether the builds match, and ends "SHOT cache: ..."; the game reads it from
+# PSYKINETIC_PIPELINE_CACHE (map_bench's "BENCH ran:" line).
+# --gpu-sample (828 amended (12)): nvidia-smi samples the laptop's GPU every 250 ms while each
+# pass's game runs (out/gpu-<pass>.csv), started after the game and stopped with it by its PID.
 # --vsync (828 amended (5)): off by default, the engine's --disable-vsync put first in the
 # godot args, so a run's timing is the game's and not the laptop's present: the Atlas holds
 # each frame 200 to 500 ms with vsync on (3.5 fps against 204 with it off, the same full
@@ -91,6 +101,9 @@ REPEAT=1
 TIMEOUT=""
 WITH=()
 VSYNC=off
+KEEP_CACHE=0
+WARM_FROM=""
+GPU_SAMPLE=0
 JOINED=0
 SERVER_ARGS=""
 TOUR=""
@@ -105,6 +118,9 @@ while [ $# -gt 0 ]; do
 		--runner) RUNNER="$2"; shift 2 ;;
 		--repeat) REPEAT="$2"; shift 2 ;;
 		--vsync) VSYNC="$2"; shift 2 ;;
+		--keep-cache) KEEP_CACHE=1; shift ;;
+		--warm-from) WARM_FROM="$2"; shift 2 ;;
+		--gpu-sample) GPU_SAMPLE=1; shift ;;
 		--joined) JOINED=1; shift ;;
 		--server-args) SERVER_ARGS="$2"; shift 2 ;;
 		--tour) TOUR="$2"; JOINED=1; shift 2 ;;
@@ -117,7 +133,7 @@ while [ $# -gt 0 ]; do
 		*) break ;;
 	esac
 done
-[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--joined [--server-args \"ARGS\"]] [--tour NAME [--tour-only SECTION] [--tour-minutes N] [--tour-bots 2]] <sha> <name> -- <godot args>"; exit 2; }
+[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] [--repeat N] [--vsync off|default] [--keep-cache] [--warm-from RUN] [--gpu-sample] [--joined [--server-args \"ARGS\"]] [--tour NAME [--tour-only SECTION] [--tour-minutes N] [--tour-bots 2]] <sha> <name> -- <godot args>"; exit 2; }
 [ -z "$SERVER_ARGS" ] || [ $JOINED -eq 1 ] || { echo "--server-args: only with --joined"; exit 2; }
 if [ -n "$TOUR" ]; then
 	case "$TOUR" in *[!a-z0-9_]*) echo "--tour: a tour's name, a-z, 0-9 and _"; exit 2 ;; esac
@@ -149,6 +165,9 @@ SHA="$(git rev-parse --verify "$1^{commit}")" || exit 2
 NAME="$2"
 shift 3
 case "$NAME" in *[!A-Za-z0-9_-]*|"") echo "name: letters, digits, _ and - only"; exit 2 ;; esac
+case "$NAME" in caches|lock) echo "name: $NAME is the runner's own folder"; exit 2 ;; esac
+case "$WARM_FROM" in *[!A-Za-z0-9_-]*) echo "--warm-from: a run's name, letters, digits, _ and - only (never a path)"; exit 2 ;; esac
+[ "$WARM_FROM" != "$NAME" ] || [ -z "$WARM_FROM" ] || [ $KEEP_CACHE -eq 0 ] || { echo "--warm-from $NAME with --keep-cache: the warm run would keep over its own source; name it apart"; exit 2; }
 if [ -n "$TOUR" ]; then
 	[ $# -eq 0 ] || { echo "$1: refused (a tour's args come from the runner: --tour-only, --tour-minutes, --server-args)"; exit 2; }
 	tour_file="tests/tour/tours/$TOUR.gd"
@@ -325,8 +344,11 @@ if [ $JOINED -eq 1 ]; then
 	# The tour's own file for the runner (its section): the runner starts the admin console when it is there.
 	[ -z "$TOUR" ] || printf 'tour=%s\nonly=%s\nbots=%s\n' "$TOUR" "$TOUR_ONLY" "$TOUR_BOTS" >"$TMP/tour.txt"
 fi
+# The runner's options (828 amended (12)), one name=value a line: the pipeline cache kept, warmed
+# from a kept one, the GPU sampled.
+printf 'keep=%s\nwarm=%s\ngpu=%s\n' "$KEEP_CACHE" "$WARM_FROM" "$GPU_SAMPLE" >"$TMP/opts.txt"
 if [ $DRY -eq 1 ]; then
-	for file in args server_args tour; do
+	for file in args server_args tour opts; do
 		[ -f "$TMP/$file.txt" ] && sed "s/^/$file: /" "$TMP/$file.txt"
 	done
 	echo "timeout: $TIMEOUT min"
@@ -349,6 +371,10 @@ rsh "forfiles /p $RUNS /m r-*.ps1 /d -1 /c \"cmd /c del /q @path\"" >/dev/null 2
 # The runner this run copied, by its hash: runner.log names the copy that ran, and the two match.
 RUNNER_SHA="$(sha256sum tools/remote_shot_run.ps1 | cut -c1-16)"
 echo "runner: $(fwd "$helper"), sha256 $RUNNER_SHA"
+# --warm-from (828 amended (12)): a cache this runner kept for that run on this laptop, else nothing runs.
+if [ -n "$WARM_FROM" ] && ! rsh "if exist $RUNS\\caches\\$WARM_FROM\\vulkan\\nul (echo kept)" 2>/dev/null | grep -q kept; then
+	echo "--warm-from $WARM_FROM: no pipeline cache kept by a run of that name on $RUNNER (a run keeps its own with --keep-cache): nothing run"; exit 1
+fi
 
 # 1. The clone to <sha>.
 state="$(rsh "git -C $ROOT rev-parse HEAD && git -C $ROOT status --porcelain --untracked-files=no" | tr -d '\r')"
@@ -407,6 +433,7 @@ rsh "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run
 task="psyk_shot_$NAME"
 trap 'rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1; rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
 "${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
+"${SCP[@]}" "$TMP/opts.txt" "$HOST:$(fwd "$DIR")/opts.txt" || exit 1
 joined_flag=""
 if [ $JOINED -eq 1 ]; then
 	"${SCP[@]}" "$TMP/server_args.txt" "$HOST:$(fwd "$DIR")/server_args.txt" || exit 1
@@ -432,6 +459,10 @@ mkdir -p "$REVIEW"
 rsh "rmdir /s /q $DIR" >/dev/null 2>&1
 rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
 printf 'SHOT vsync: %s\n' "$VSYNC" >>"$REVIEW/runner.log"
+# 828 amended (12): no figure read without its pipeline cache's state (the runner's "cache:" line).
+cache_line="$(tr -d '\r' <"$REVIEW/runner.log" 2>/dev/null | grep "^cache: " | head -1 | sed 's/^cache: //')"
+printf 'SHOT cache: %s%s\n' "${cache_line:-unread}" "$([ $KEEP_CACHE -eq 1 ] && echo "; kept as $NAME")" >>"$REVIEW/runner.log"
+grep -h "^cache\|^gpu sampling\|^SHOT cache" "$REVIEW/runner.log" 2>/dev/null
 ls "$REVIEW"
 # The runner that ran is the one sent (828 amended (4)), else this run's numbers and stills are
 # another tool's: said, and the run fails.

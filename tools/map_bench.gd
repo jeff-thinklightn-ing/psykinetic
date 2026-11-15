@@ -616,8 +616,12 @@ func _ran(view: Node, host: Player) -> String:
 		zoom = view.zoom
 	var weather := str(Weather.at(World.fields.region, World.steps).get("kind", "clear")) if World.outdoor else "indoors"
 	var window := DisplayServer.window_get_size()
-	print("BENCH ran: %s%s, level %s, camera %s, zoom %.2f, weather %s, window %dx%d, water about %.0f%% of the frame (unoccluded)" % [
-		mode, " online" if Net.online else " offline", level, camera, zoom, weather, window.x, window.y, _water_share(view, host)])
+	# The pipeline cache it started with (828 amended (12)): "cold" or "warm from <run>", as the
+	# laptop runner set it; a figure is never read without it.
+	var cache := OS.get_environment("PSYKINETIC_PIPELINE_CACHE")
+	print("BENCH ran: %s%s, level %s, camera %s, zoom %.2f, weather %s, window %dx%d, water about %.0f%% of the frame (unoccluded), pipeline cache %s" % [
+		mode, " online" if Net.online else " offline", level, camera, zoom, weather, window.x, window.y, _water_share(view, host),
+		cache if cache != "" else "unknown (not a laptop runner's run)"])
 	var differs: Array[String] = []
 	if OS.get_cmdline_user_args().has("--host") and (Net.mode != Net.Mode.HOST or not Net.online):
 		differs.append("%s%s, asked --host" % [mode, "" if Net.online else " offline"])
