@@ -40215,6 +40215,33 @@ as "711, npc's side" and "711, items' side".
 - **Bullet.** Only after the joined look: from the arrival cell in the afternoon with a pedlar in town (camera distance named), and from (203, 206) with his window open across the counter. Watched: ui-design's joined look on 9e1739ecd (C:/dev/review/ui-design/looks/look_pedlar3_9e1739ecd/, the Atlas, hour 15; the coordinator's pass, 11-15); the bullet in voice's words.
 
 Maps' side (package "Umbrage: the pedlar's stand", the coordinator's, 2026-11-14; laid in this take, the one push that switches the package on). The wilds' "places" gains "pedlar_stall": a stall worth nothing, holder town, town "store", radius 1, at (203, 208), the keeper's cell behind Umbrage's second market stall M3 (203, 207), which faces north into the square, as weapon_stall (203, 196) sits behind Rolf's M2. Main._stall_spot keeps the pedlar on (202..204, 208), served from the north, the square's and the arrival's side. Its name, "the pedlar's stall" (voice's: one of a kind with "the weapon stall"), is drawn on the big map (M) and its box on the corner map from this commit whether or not the pedlar is in town: a place is on the map from the commit that lays it (Level.places_from has no hidden flag, and a place with no name shows its key), so it rides in the switch's push and never lands ahead of it. A stall is not an EXPLORE_KINDS place (no found line) and residents.json's "not_kinds" keeps it out of residents' talk. level_test: the place's fields and cell, his side clear floor with no marker on it.
+711 amended (3) (label from tools/decision_number.sh; the coordinator's approval, 11-15, after maps' Mughouse
+landing failed town_day_test on Edda, a traveller, standing 36 game minutes at (194, 199) north of the temple's
+pews): visitors come and go by a road. Main._town_edge, where one going on walks out to and one come is made,
+took the nearest way out of the area of any kind, and from Umbrage's store (192, 195) that was the crypt's stair
+(199, 199) in the temple, a link to the barrow. And a body going on was given that way's own cell as every place
+(a 1x1 rect), which Resident._free_cell never picks (571: a link's cell is a player's way out alone), so it
+stood where it was till its walk-out time (VISITOR_WALK_OUT_SECONDS, 60 s, about 16 game minutes) ran out and was
+taken from the world standing; one come was made by the crypt's stair. On main that ran out quietly (Edda's
+longest stay 30); maps' switch only put her stand before it over town_day_test's bar.
+- **The road.** _town_edge counts only an open way to an outdoor level (Main.road_way: not closed, sealed or
+  hidden, and the level's config "outdoor"), nearest the store first, as before. From Umbrage: the link to the
+  Held at (130, 244), 62 cells from the store, 40 from the town's nearest building (the foothills' north link is
+  175 off, the hills' 67).
+- **Going on.** The body's places are the 3x3 about the way, its own cell left out as ever; it walks there and
+  is let go on the cell beside it (Main's sync: within one of the way), as a player leaves by a link. Measured
+  (visitor_road_test): with a player walking beside her, Tamsin is gone after 330 ticks (8.9 game minutes, inside
+  her 600) at (130, 243), beside the way, never standing a game minute; with the player left in the square, the
+  same 330 ticks, at (129, 243), 63 cells from him. Before the mend both stood on their square cells 16 game
+  minutes and were taken there.
+- **Coming.** One come (enter_at, the first two game hours of a stay) is made at the same way, (130, 244), and
+  walks in by the road; none is made by the crypt's stair.
+- **Tests.** visitor_road_test (new, port 17992): the crypt's stair is a way and no road; Umbrage's road is the
+  Held's link; a traveller come is made at it; two going on from the square, a player beside one, the other's in
+  the square: each gone at the way inside her time, never standing over 3 game minutes. resident_test,
+  town_day_test, towns_test, farm_test, larder_test, door_day_test, ui_test, suite_test PASS.
+- **Wire.** Server only; protocol unchanged; no class_name.
+
 ## 719. A struck monster answers its striker
 
 Jeff: "barrow guards aren't aggro enough sometimes just stand and take hits".

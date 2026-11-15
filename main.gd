@@ -23978,8 +23978,10 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 		if body == null or World.tick > int(going["until"]) or World.distance(body.tile, going["edge"]) <= 1:
 			_visitors_leaving.erase(key)
 			continue
+		# The cells beside the way (711 amended (3)): its own cell is a link's, which a resident never picks
+		# (571), so a 1x1 place on it left the body standing where it was till its time ran out.
 		out.append({"key": key, "name": str(going["name"]), "trade": "", "player": "", "town": place_id,
-			"places": _visitor_places(Rect2i(going["edge"], Vector2i.ONE))})
+			"places": _visitor_places(Rect2i(going["edge"] - Vector2i.ONE, Vector2i(3, 3)))})
 	return out
 
 
@@ -24507,13 +24509,18 @@ func _resident_body(worker_id: String) -> Resident:
 
 ## Where the road leaves [param place]'s area nearest its store: an edge
 ## the area joins another by (the cell on it across from the store), or a
-## link's cell; the store's cell for none.
+## link's cell; the store's cell for none. Only an open way to an outdoor
+## level (Main.road_way, 711 amended (3)): Umbrage's nearest way of any kind was the crypt's
+## stair in its temple, so every visitor going on walked into the temple and
+## every one come walked out of it.
 func _town_edge(place: Dictionary) -> Vector2i:
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
 	var area_name := str(place.get("area", World.zone.name))
 	var size: Vector2i = _world_map.areas.get(area_name, {}).get("size", Vector2i.ZERO)
 	var best := Companion.NONE
 	for way: Dictionary in _world_map.ways_from(area_name):
+		if not road_way(way):
+			continue
 		var cell := Companion.NONE
 		if str(way["kind"]) == "edge":
 			match str(way["side"]):
@@ -24526,6 +24533,14 @@ func _town_edge(place: Dictionary) -> Vector2i:
 		if cell != Companion.NONE and (best == Companion.NONE or World.distance(cell, store) < World.distance(best, store)):
 			best = cell
 	return store if best == Companion.NONE else best
+
+
+## Whether [param way] (WorldMap.ways_from) is a road a visitor comes and goes by (711 amended (3)):
+## open (not sealed, hidden or closed) and to a level that is outdoors (its config's "outdoor"), never
+## a building's floor, a crypt or a barrow.
+static func road_way(way: Dictionary) -> bool:
+	var to := str(way.get("to", ""))
+	return not bool(way.get("closed", false)) and Level.exists(to) and bool(Level.template_config(to).get("outdoor", false))
 
 
 ## [param player] clicked visitor [param body] (_greeted, 711): a greeting
