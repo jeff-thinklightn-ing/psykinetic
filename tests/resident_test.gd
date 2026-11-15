@@ -7137,12 +7137,14 @@ func _test_keeper_counter_sight(player: Player, rolf: Resident) -> void:
 		rolf.doing = Resident.Doing.WORK
 	var counter := Main.NONE
 	var far := Main.NONE
+	var way := Vector2i.ZERO
 	for dir: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 		var near := rolf.tile + dir
 		var beyond := rolf.tile + dir * 2
 		if World.is_walkable(near) and World.is_walkable(beyond) and World.get_entity_at(near) == null and World.get_entity_at(beyond) == null:
 			counter = near
 			far = beyond
+			way = dir
 			break
 	if counter == Main.NONE:
 		print("  (no free line of two cells beside him here: skipped)")
@@ -7154,6 +7156,37 @@ func _test_keeper_counter_sight(player: Player, rolf: Resident) -> void:
 	_check(_main.keeper_sees(far, rolf.tile, rolf.zone), "his counter is no bar: he is seen over it")
 	var locker: Locker = _main.keeper_locker(player, rolf)
 	_check(locker != null, "served across his counter: the locker comes out")
+	# 807 amended (9): with his own side shut (nothing beside him within the player's hand), his chest goes down in front of the
+	# counter beside the player, within his serving reach, never refused "no room".
+	var shut: Array[Chest] = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var around := rolf.tile + Vector2i(dx, dy)
+			if (dx != 0 or dy != 0) and around != far and World.get_entity_at(around) == null and World.is_walkable(around):
+				var block := _main._spawn({"script": "res://sim/chest.gd", "name": "ShutBeside%d_%d" % [dx + 1, dy + 1], "tile": around}) as Chest
+				if block != null:
+					shut.append(block)
+	var chest_at: Vector2i = _main._locker_cell(player, rolf)
+	var blocked_tiles: Array[Vector2i] = []
+	for block: Chest in shut:
+		blocked_tiles.append(block.tile)
+	_check(chest_at != Main.NONE and chest_at != player.tile and World.distance(chest_at, player.tile) <= 1 and World.distance(chest_at, rolf.tile) <= World.COMPANION_REACH
+			and not blocked_tiles.has(chest_at), "his side shut: the chest is set down beside the player in front of the counter (%s of %d shut)" % [chest_at, shut.size()])
+	for block: Chest in shut:
+		World.despawn(block)
+	# 807 amended (9): a click from the street ends the walk in front of his counter, never round behind it beside him.
+	var street := rolf.tile + way * 4
+	if World.is_walkable(street) and World.get_entity_at(street) == null:
+		var stand: Vector2i = _main._stand_to_talk(rolf, street)
+		var along := (stand.x - rolf.tile.x) * way.x + (stand.y - rolf.tile.y) * way.y
+		_check(stand != Main.NONE and _main.keeper_sees(stand, rolf.tile, rolf.zone) and along >= 2 and World.distance(stand, rolf.tile) <= Main.TALK_REACH,
+			"from the street the walk ends in front of his counter, on the customers' side (%s, %d out)" % [stand, along])
+		_main._counter_cells[rolf.zone] = {}
+		_check(_main._stand_to_talk(rolf, street) == _main._beside(rolf.tile, street),
+			"with no counter in the zone the walk is as it was: beside him (%s)" % _main._stand_to_talk(rolf, street))
+		_main._counter_cells[rolf.zone] = {counter: true}
+	else:
+		print("  (no free cell four out in line: the street walk unchecked)")
 	if locker != null and is_instance_valid(locker):
 		World.despawn(locker)
 	# The same cell is a wall, not his counter: refused, and he says why.

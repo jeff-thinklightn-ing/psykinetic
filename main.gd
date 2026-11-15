@@ -1775,7 +1775,7 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 	if World.distance(player.tile, talk_cell(friend)) <= TALK_REACH:
 		_open_talk(friend)
 		return
-	var beside := _beside(talk_cell(friend), player.tile)
+	var beside := _stand_to_talk(friend, player.tile)
 	if beside == NONE and _is_own_companion(friend):
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
@@ -24918,6 +24918,29 @@ static func opens_on_click(target: GridEntity) -> bool:
 	return (target is Chest or target is Cargo) and not Level.undrawn(target)  # 734 amended (7): never one drawn as nothing.
 
 
+## Where a walk to talk to [param friend] from [param from] ends (807 amended (9)): beside them as _beside says, except a
+## keeper who answers clicks only and stands behind a counter (a stall's, in COUNTERS: Rolf's, a visiting pedlar's), where it is
+## the nearest free, unburnt cell within TALK_REACH of them from which keeper_sees holds, on the customers' side, so a click from
+## the street ends in front of the counter and not round behind it beside the keeper. NONE as _beside's, and _beside's own with no
+## such cell free or no counter.
+func _stand_to_talk(friend: GridEntity, from: Vector2i) -> Vector2i:
+	var at := talk_cell(friend)
+	if friend is Resident and answers_clicks_only(friend) and not _counters_of(friend.zone).is_empty():
+		var best := NONE
+		for dx in range(-TALK_REACH, TALK_REACH + 1):
+			for dy in range(-TALK_REACH, TALK_REACH + 1):
+				var cell := at + Vector2i(dx, dy)
+				if cell == at or not World.is_free(cell) or World.is_burning(cell) or World.distance(cell, at) > TALK_REACH:
+					continue
+				if not keeper_sees(cell, at, friend.zone):
+					continue
+				if best == NONE or World.distance(from, cell) < World.distance(from, best) 						or World.distance(from, cell) == World.distance(from, best) and Vector2(from).distance_to(Vector2(cell)) < Vector2(from).distance_to(Vector2(best)):
+					best = cell
+		if best != NONE:
+			return best
+	return _beside(at, from)
+
+
 ## The free floor cell next to [param at], reachable from it for a hand
 ## (World.can_melee), nearest [param from], never one burning (707 amended:
 ## a walk to talk or to open never ends in a fire); NONE if there is none.
@@ -25929,6 +25952,18 @@ func _locker_cell(player: Player, keeper: Resident) -> Vector2i:
 	for cell: Vector2i in around:
 		var there := World.get_entity_at(cell)
 		if cell != player.tile and World.is_walkable(cell) and (there == null or there == mine) and World.can_melee(player.tile, cell):
+			return cell
+	# 807 amended (9): served across his counter nothing beside him is within the player's hand (the counter is between), so the
+	# chest goes down on the customers' side: a free cell next to the player, within the reach he serves at, nearest him.
+	var front: Array[Vector2i] = []
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if dx != 0 or dy != 0:
+				front.append(player.tile + Vector2i(dx, dy))
+	front.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return World.distance(a, keeper.tile) < World.distance(b, keeper.tile))
+	for cell: Vector2i in front:
+		var there := World.get_entity_at(cell)
+		if World.is_walkable(cell) and (there == null or there == mine) and World.distance(cell, keeper.tile) <= World.COMPANION_REACH 				and World.can_melee(player.tile, cell):
 			return cell
 	return NONE
 
