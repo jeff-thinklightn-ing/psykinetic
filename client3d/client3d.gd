@@ -2801,6 +2801,19 @@ const IDLE_EVERY_MS := 1000
 const IDLE_AT_ONCE := 2
 const IDLE_SPAN_MS := 3000
 const IDLE_QUIET_MS := 6000
+## A town's people at rest heard now and then (940, _idle_people): checked
+## every IDLE_EVERY_MS; a person within PEOPLE_REACH cells of the listener,
+## standing at one of SoundKit.IDLE_PEOPLE_WORDS, rolls once a check for one
+## sound in PEOPLE_EVERY_S on average; PEOPLE_PER_MINUTE at most from
+## everyone together in any minute, one person at most once in
+## PEOPLE_APART_MS, none who fought or cried in the last IDLE_QUIET_MS. Six
+## idle people heard together: about one small sound every 15 s.
+const PEOPLE_REACH := 8
+const PEOPLE_EVERY_S := 90.0
+const PEOPLE_PER_MINUTE := 4
+const PEOPLE_APART_MS := 30000
+## A shifted foot's scuff (940): the cell's own footstep this far under the step.
+const SCUFF_DB := -8.0
 ## The mine's cart (769): its rolling loop held while its tile moves, its
 ## stop heard CART_STOP_MS after the last move (_sync_cart, 769 amended (4)).
 const CART_ART := "prop.mine_cart"
@@ -2960,6 +2973,11 @@ var _idle_next := 0
 var _idle_heard: Array[int] = []
 ## When each idle slot last sounded, ms (SoundKit.IDLE_APART_MS).
 var _idle_slot_at := {}
+## The people's next check, the times any was heard in the last minute, and
+## each one's last (940, _idle_people).
+var _people_next := 0
+var _people_heard: Array[int] = []
+var _people_at: Dictionary[int, int] = {}
 ## Puppet id -> [msec, what it swung with] of its last swing: a blow that
 ## lands soon after, beside it, was its (_struck_with).
 var _swings: Dictionary[int, Array] = {}
@@ -22981,6 +22999,7 @@ func _sync_puppets() -> void:
 	var seen: Dictionary[int, bool] = {}
 	var now := Time.get_ticks_msec()
 	_idle_voices(now)
+	_idle_people(now)
 	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
 	var aim := Vector2(_camera_target.x, _camera_target.z)
 	# The followed player is never far off nor past the low camera's near cull
@@ -29599,6 +29618,62 @@ func _idle_voices(now: int, roll := -1.0) -> void:
 				_idle_heard.append(now)
 				_idle_slot_at[slot] = now
 				break
+
+
+## A town's people at rest now and then make a small sound (940): a
+## cleared throat, a sniff or a shifted foot (SoundKit.idle_person; no cough),
+## only at one of SoundKit.IDLE_PEOPLE_WORDS, so never at a work with a
+## stroke, asleep, sitting or at a talk; within PEOPLE_REACH cells; capped
+## by people_due. [param roll] and [param pick] in place of randf (tests).
+func _idle_people(now: int, roll := -1.0, pick := -1.0) -> void:
+	if now < _people_next or sfx == null or sfx.listener == null:
+		return
+	_people_next = now + IDLE_EVERY_MS
+	var recent: Array[int] = []
+	for at: int in _people_heard:
+		if now - at < 60000:
+			recent.append(at)
+	_people_heard = recent
+	for id: int in _puppets:
+		var person := instance_from_id(id) as Resident
+		if person == null or person.hp <= 0 or _cells_apart(person.tile, sfx.listener) > PEOPLE_REACH:
+			continue
+		var word := str(person.activity)
+		var puppet: Node3D = _puppets[id]
+		if not word in SoundKit.IDLE_PEOPLE_WORDS or not people_due(_people_heard, int(_people_at.get(id, -PEOPLE_APART_MS)), now) 				or now - int(_combat_at.get(id, -IDLE_QUIET_MS)) < IDLE_QUIET_MS 				or now - int(puppet.get_meta("cried_at", -IDLE_QUIET_MS)) < IDLE_QUIET_MS:
+			continue
+		if (randf() if roll < 0.0 else roll) >= IDLE_EVERY_MS / 1000.0 / PEOPLE_EVERY_S:
+			continue
+		var slot := SoundKit.idle_person(word, _look_body(puppet), randf() if pick < 0.0 else pick)
+		if slot == "":
+			continue
+		var scuff := slot == SoundKit.SCUFF
+		if scuff:
+			var ground: String = "water" if wades(person.tile) else _ground_kinds.get(person.tile, "stone")
+			slot = SoundKit.footstep(ground, person.mass, "")
+		# One the listener couldn't hear (a step carries Senses.NOISE_STEP
+		# cells; a wall between halves a voice's reach) spends none of the cap.
+		if not Sfx.hearing(slot, person.tile, sfx.listener).heard:
+			continue
+		sfx.play(slot, puppet.position + Vector3.UP * (0.1 if scuff else 1.5), 1.0, SCUFF_DB if scuff else 0.0)
+		_people_heard.append(now)
+		_people_at[id] = now
+		return
+
+
+## A person's body by its puppet (940): a foe drawn as a person's
+## (person_body), else its look's (a resident's, look_for), else &"".
+static func _look_body(puppet: Node3D) -> StringName:
+	var body := _person_body(puppet)
+	var look := puppet.get_meta("look") as PersonLook if puppet.has_meta("look") else null
+	return look.body if body == &"" and look != null else body
+
+
+## Whether a person may sound now (940): fewer than PEOPLE_PER_MINUTE in
+## [param heard] (the last minute's), and its own [param last] at least
+## PEOPLE_APART_MS before [param now].
+static func people_due(heard: Array[int], last: int, now: int) -> bool:
+	return heard.size() < PEOPLE_PER_MINUTE and now - last >= PEOPLE_APART_MS
 
 
 func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:

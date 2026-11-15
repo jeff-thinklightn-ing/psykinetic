@@ -58692,3 +58692,81 @@ line, and 917's rule takes over. Her pace is the walk's own (she waits while the
 Logs: "[firststeps] <signal> <place key> <cell> t<tick>", never a name or an id. tests/first_steps_test: on
 the wilds, the package forced on (FirstSteps.forced). Joined proof (four bots on a laptop through
 ui-design's slots) comes before the switch.
+## 940. A town's people heard idle: a cleared throat, a sniff, a shifted foot
+
+(sound; the label from tools/decision_number.sh; the coordinator's approval 11-15 after sound's look at
+Umbrage by ear: a square of people standing about made no sound of their own between the chatter's
+lines.) Client3D._idle_people, checked every IDLE_EVERY_MS beside the creatures' idle sounds: a
+Resident within PEOPLE_REACH (8) cells of the listener, at one of SoundKit.IDLE_PEOPLE_WORDS ("",
+watch, lean, listen, tend: standing about, watching, leaning, listening, tending a stall), rolls once a
+check for one small sound in PEOPLE_EVERY_S (90 s) on average. Never at a work with a stroke, asleep,
+sitting or at a talk: there the work's own sound, the murmur or the chatter speaks. Caps: PEOPLE_PER_MINUTE
+(4) from everyone together in any minute (Client3D.people_due), one person once in PEOPLE_APART_MS
+(30 s), none from a person who fought or cried in the last IDLE_QUIET_MS. A sound the listener
+couldn't hear (Sfx.hearing: a step carries Senses.NOISE_STEP, 3 cells; a wall between halves a
+voice's reach) is not made and spends none of the cap: on the tagged run two shifted feet drawn for the
+vendor 8 cells off went unheard and took two of the minute's four, and on the last a sniff from the
+carpenter 7 cells off, behind a building, did the same. Six idle people together give
+about one small sound every 15 s.
+
+What is heard (SoundKit.IDLE_PEOPLE, drawn by SoundKit.idle_person): a cleared throat in the person's
+own body's voice (0.40: voice.idle_throat_male, voice.idle_throat_female), a sniff (0.25:
+voice.idle_sniff, either body), or a shifted foot (0.35: SCUFF, the cell's own footstep for the person's
+mass at SCUFF_DB, -8 dB under the step). A person of no known body sniffs or shifts its feet. The body is
+the puppet's (Client3D._look_body): a foe drawn as a person's person_body, else a resident's look
+(PersonLook.body); residents carry no person_body, and on the first joined run every voice was a sniff
+until the look was read.
+
+No cough from the well (the coordinator, 11-15): sickness is a thing in this world (the shakes), and a
+cough from a well hunter one cell away would tell a player she is sick when she isn't, and spend the one
+sound that could tell them when she is. The two cough slots (voice.idle_cough_male, _female) are in the
+kit with their takes, unplayed, for the sick: Resident.ailing is already replicated ("" while well;
+economy), so a cough from the sick, abed or walked to the healer, in the same cap and rolling twice as
+often, follows as an amendment of this decision with no protocol change.
+
+Five slots (art/audio/slots.json; category voices, oneshot, bus voice, range 8, volume_db -24.0, at least
+6 dB under a stone footstep), seven takes, every one CC0 1.0 from Freesound, each a single burst cut to a
+-5 dB peak, active RMS -17.3 to -21.5 dBFS (the stone footsteps -16.4 to -20.7), each under a second:
+voice.idle_throat_male 436107 (DrFortyseven, 0.48 s); voice.idle_throat_female 351161 (Reitanna,
+0.68 s); voice.idle_sniff 272031 (aldenroth2, 0.55 s); voice.idle_cough_male 272029 (aldenroth2,
+0.66 s) and 473867 (Kragnour, 0.73 s); voice.idle_cough_female 151213 (OwlStorm, from 0.05 s for 0.36 s:
+the whole file's next cough began at 0.41 s) and 486375 (an_na_ba_na_na, 0.59 s). Stored external
+(the take store), synced into art/audio/external; THIRD_PARTY.md's lines as release read them.
+
+Joined reads (EARS_ONLY=people; ears.gd logs each sound _idle_people makes and each sound the
+listener was too far to hear, so a shifted foot reads apart from a quiet walking step at a step's
+edge, -38 to -42 dB, which the first reads miscounted as shifted feet). On the last,
+kept/ears_20261115_114611 (exit 0, SCRIPT ERROR 0 in client and server logs, before the unheard rule
+covered voices as well as feet):
+- The square at noon (193, 212), 60 s, the priest alone within 8 cells: two sniffs from him, 5 cells
+  off, -38.6 and -38.1 dB, 42 s apart.
+- A crowd at (196, 196) at noon, nine at rest within 8 cells (hunter, snagfin, woodcutter, both
+  visitors, farmer_1, priest, carpenter, the vendor tending), 120 s: a cleared throat from the vendor
+  (7 cells, -45.0), from farmer_1 (6, -42.1) and from visitor_1 (8, -49.4); sniffs from farmer_1 (7,
+  -44.2) and snagfin (3, -32.0); a sniff drawn for the carpenter 7 cells off, behind a building,
+  unheard. Five heard in two minutes. On the tagged run before it (kept/ears_20261115_111934) at the
+  same stand: two throats, two sniffs, a shifted foot from snagfin at 2 cells (-37.3), two more
+  drawn 8 cells off and unheard.
+- The square at 23:00, 60 s, the woodcutter and the priest at rest within 8: nothing, as measured
+  (at one roll in 90 s each a quiet minute with two people is the likely one; on this run and the two
+  before it, none at that stand).
+- Beside the woodcutter chopping at (209, 230) (Umbrage has no smith on these runs; a worker at a
+  stroked task stands in for a smith at his anvil), 60 s: his chop and his carried log only.
+- Beside two asleep, visitor_1 and the hunter at (170, 216) and (168, 216), 60 s: nothing.
+- No cough on any of the three reads since the cough left the set.
+
+sound_kit_test _test_idle_people: never at a stroked work, asleep, sitting or talking; the shares in order
+(throat, sniff, scuff) and making a whole; a cleared throat in the body's voice, a sniff with no body; no
+cough at any pick or body; the five slots one-shots on the voice bus, heard to PEOPLE_REACH, 6 dB or more
+under a footstep, takes under a second. view_test _test_idle_people: eight stand-in residents, every roll
+a hit: four heard in eight seconds, from those at rest only, a cleared throat in each body's voice and a
+sniff from the one of no body, never a cough; the cap, a minute on, the rolls missing, people_due; a
+resident's body read from its look; a shifted foot a footstep, heard beside the person; a shifted foot past
+a step's reach not made and the cap untouched; past 8 cells, silence. Pretests:
+load_check, sound_kit_test, view_test, view_world_test PASS (also with art/audio/external moved aside).
+Ears tour (tests/tour/tours/ears.gd): EARS_ONLY=people stands at the square at noon and 23:00, by a
+worker at a stroked task, at a crowd of people at rest (CROWD_STAND, found as the cell with the most at
+rest within 8), and beside sleepers; each played line names its source, its activity and its distance,
+and each sound _idle_people makes and each one too far to hear has a line of its own.
+
+Client sound only; protocol unchanged; no new class_name.

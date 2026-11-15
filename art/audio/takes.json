@@ -4791,6 +4791,79 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"voice.idle_cough_female": [
+			{
+				"file": "voice.idle_cough_female.ogg",
+				"from": "freesound",
+				"original": "freesound 151213: Cough Female (from 0.05 s for 0.36 s)",
+				"sha256": "581cf9ceb09ded98de4d052615d09f53afe5469f6bc5cd91caffca017f12836c",
+				"by": "OwlStorm",
+				"url": "https://freesound.org/people/OwlStorm/sounds/151213/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.idle_cough_female.2.ogg",
+				"from": "freesound",
+				"original": "freesound 486375: cough.wav",
+				"sha256": "435e3cc42a0cb1352c08dca649599a8022708ddbf7ae8d1028cec66fffa3ea9c",
+				"by": "an_na_ba_na_na",
+				"url": "https://freesound.org/people/an_na_ba_na_na/sounds/486375/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.idle_cough_male": [
+			{
+				"file": "voice.idle_cough_male.ogg",
+				"from": "freesound",
+				"original": "freesound 272029: Male cough",
+				"sha256": "f7315be056b8aee1a5964482dd3c9b34f2f22db1470371ad22c70df452a11b60",
+				"by": "aldenroth2",
+				"url": "https://freesound.org/people/aldenroth2/sounds/272029/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.idle_cough_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 473867: MaleCough.wav",
+				"sha256": "d5a9d8a054bc7b136d072c3ac100b6782678124c74fbdf15f70018eec7afbbd7",
+				"by": "Kragnour",
+				"url": "https://freesound.org/people/Kragnour/sounds/473867/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.idle_sniff": [
+			{
+				"file": "voice.idle_sniff.ogg",
+				"from": "freesound",
+				"original": "freesound 272031: Male Sniff",
+				"sha256": "c6f97b3e0a4ebcbea19720018fa09a5d82c05565aca4b30e3edfd811125c2509",
+				"by": "aldenroth2",
+				"url": "https://freesound.org/people/aldenroth2/sounds/272031/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.idle_throat_female": [
+			{
+				"file": "voice.idle_throat_female.ogg",
+				"from": "freesound",
+				"original": "freesound 351161: clear throat18.wav",
+				"sha256": "5e9e4a60f51a67b57c84ea1bba1bd5eb05fb93607377327d19542bee3f9fd8d8",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/351161/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.idle_throat_male": [
+			{
+				"file": "voice.idle_throat_male.ogg",
+				"from": "freesound",
+				"original": "freesound 436107: Ahem 1",
+				"sha256": "b1ee9a4cb92498cc9ba1401f455befdbcdc874e2b47605a9fcdcfbd4119cf3c6",
+				"by": "DrFortyseven",
+				"url": "https://freesound.org/people/DrFortyseven/sounds/436107/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.last_breath_female": [
 			{
 				"file": "voice.last_breath_female.ogg",

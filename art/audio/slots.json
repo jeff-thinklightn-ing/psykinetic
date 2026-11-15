@@ -1594,6 +1594,51 @@
 			"volume_db": -8.0,
 			"uses": "a female strain lifting or throwing something heavy; a female-bodied person lifting a heavy thing (Client3D._pile_sounds)"
 		},
+		"voice.idle_cough_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -24.0,
+			"uses": "a small dry cough, once, never a fit; a male-bodied townsperson who is sick (940: kept unplayed; a well person never coughs, so a cough can tell a player someone is sick; for the sick at rest within 8 cells once the client can know it, at the idle sounds' cap, about as far under a footstep as a shifted foot)"
+		},
+		"voice.idle_cough_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -24.0,
+			"uses": "a small dry cough, once, never a fit; a female-bodied townsperson who is sick (940: kept unplayed; a well person never coughs, so a cough can tell a player someone is sick; for the sick at rest within 8 cells once the client can know it, at the idle sounds' cap, about as far under a footstep as a shifted foot)"
+		},
+		"voice.idle_throat_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -24.0,
+			"uses": "a throat cleared, once; a male-bodied townsperson (940: Client3D._idle_people, now and then from a person at rest within 8 cells: SoundKit.IDLE_PEOPLE, by the replicated activity word, never at a stroked work, asleep, sitting or talking; about as far under a footstep as a shifted foot, noticed and never startling)"
+		},
+		"voice.idle_throat_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -24.0,
+			"uses": "a throat cleared, once; a female-bodied townsperson (940: Client3D._idle_people, now and then from a person at rest within 8 cells: SoundKit.IDLE_PEOPLE, by the replicated activity word, never at a stroked work, asleep, sitting or talking; about as far under a footstep as a shifted foot, noticed and never startling)"
+		},
+		"voice.idle_sniff": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -24.0,
+			"uses": "a short sniff, either body (940: Client3D._idle_people, now and then from a person at rest within 8 cells: SoundKit.IDLE_PEOPLE, by the replicated activity word, never at a stroked work, asleep, sitting or talking; about as far under a footstep as a shifted foot, noticed and never startling)"
+		},
 		"voice.death_female": {
 			"category": "voices",
 			"type": "oneshot",

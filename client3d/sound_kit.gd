@@ -450,6 +450,41 @@ const IDLE := {"boar": {"sfx.boar_grunt": 20.0, "sfx.boar_root": 30.0},
 ## amended (3): a pack of four growls in turn, never two at once).
 const IDLE_APART_MS := {"sfx.wolf_growl": 5000}
 const IDLE_AS := {"boar_king": "boar", "old_wolf": "wolf"}
+## A town's people at rest (940, Client3D._idle_people): the activity words
+## a person may make a small sound at (standing about, watching, leaning,
+## listening, tending a stall: never at a work with a stroke, asleep,
+## sitting or at a talk, where the murmur and the chatter speak), and each
+## kind's share: a cleared throat in the person's own body's voice, a sniff,
+## a shifted foot (SCUFF: the cell's own footstep, under the step). A person
+## of no known body sniffs or shifts its feet. No cough: a cough from a well
+## person would tell a player they are sick when they aren't (the shakes are
+## a thing in this world, and the town's troubles are seen and felt), so the
+## cough slots (voice.idle_cough_male, _female) are kept unplayed, for the
+## sick (the coordinator, 11-15).
+const IDLE_PEOPLE_WORDS: Array[String] = ["", "watch", "lean", "listen", "tend"]
+const IDLE_PEOPLE := {"throat": 0.40, "sniff": 0.25, "scuff": 0.35}
+const SCUFF := "scuff"
+
+
+## The small sound a person at [param word] makes, drawn by [param pick]
+## (0..1) from IDLE_PEOPLE's shares: a voice slot, SCUFF, or "" at a word
+## not in IDLE_PEOPLE_WORDS. [param body] (&"male", &"female") voices a
+## cleared throat; without one, it falls to the sniff.
+static func idle_person(word: String, body: StringName, pick: float) -> String:
+	if not word in IDLE_PEOPLE_WORDS:
+		return ""
+	var kind := "scuff"
+	var upto := 0.0
+	for each: String in IDLE_PEOPLE:
+		upto += float(IDLE_PEOPLE[each])
+		if pick < upto:
+			kind = each
+			break
+	if kind == "scuff":
+		return SCUFF
+	if kind == "sniff" or not body in [&"male", &"female"]:
+		return "voice.idle_sniff"
+	return "voice.idle_%s_%s" % [kind, body]
 
 
 ## The sounds [param creature] (a monster's kind) makes at peace, slot ->

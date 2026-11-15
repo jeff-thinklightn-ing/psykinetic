@@ -63,6 +63,18 @@ const IN_HOUSE := Vector2i(215, 196)
 const IN_MUGHOUSE := Vector2i(6, 8)
 const TOWN_STAND := 20.0
 const ARRIVAL_WAIT := 40.0
+## The people leg (EARS_ONLY=people, 940: a town's people at rest heard now
+## and then): first a wait out of the arrival; at noon the square
+## PEOPLE_STAND seconds, then two cells off the first worker at a stroked
+## work as long, then CROWD_STAND seconds at the open cell near the square
+## with the most people at rest within Client3D.PEOPLE_REACH (the square at
+## noon held one, 11-15); at 23:00 the square, then two cells off the first
+## sleeper.
+## Each one-shot's line names the person nearest where it played (src:
+## name, activity, cells from the listener).
+const PEOPLE_STAND := 60.0
+const CROWD_STAND := 120.0
+const CROWD_LOOK := 16
 ## The Mughouse's floor (920): beside the fire, a hearth sit's cell, the
 ## room's middle, a far table's seat, the counter's guest side.
 const HEARTH_STANDS: Array[Vector2i] = [Vector2i(1, 6), Vector2i(2, 8), Vector2i(6, 8), Vector2i(10, 11), Vector2i(9, 4)]
@@ -76,6 +88,11 @@ var _file: FileAccess
 var _t0 := 0
 var _since := 0.0
 var _played_at := 0
+## 940: the idle-people sounds Client3D._idle_people has made (its
+## _people_at), and the sounds the listener was too far to hear (sfx.unheard),
+## so a shifted foot (a footstep slot) reads apart from a walking step.
+var _people_seen := {}
+var _unheard_at := 0
 var _record: AudioEffectRecord
 ## The longest frame since the last snapshot, and the longest before the walk with when it ended (ms since boot).
 var _frame_ms := 0.0
@@ -130,6 +147,10 @@ func run(bot: Node) -> void:
 	main.get_tree().process_frame.connect(_snap)
 	if OS.get_environment("EARS_ONLY") == "hearth":
 		await _hearth_leg()
+		_end()
+		return
+	if OS.get_environment("EARS_ONLY") == "people":
+		await _people_leg()
 		_end()
 		return
 	if OS.get_environment("EARS_ONLY") == "town":
@@ -248,6 +269,97 @@ func _walk(spots: Array) -> void:
 		await _bot.walk_to(spot, 2, 60.0)
 		_mark("stand %s at %s, under the sky %s" % [spot, _bot.cell(), World.fields != null and World.fields.under_sky(_bot.cell())])
 		await _bot.seconds(STAND)
+
+
+## 940's read: the square at noon, a worker at a stroked work, the square at
+## 23:00, a sleeper; PEOPLE_STAND seconds each.
+func _people_leg() -> void:
+	await _bot.admin("stock wilds/store wood 30")
+	await _bot.admin("hour %d" % DAY)
+	_mark("hour %d" % DAY)
+	await _walk_stand(SQUARE, ARRIVAL_WAIT, "waiting out the arrival")
+	await _walk_stand(SQUARE, PEOPLE_STAND, "people stand square")
+	var worker: Resident = await _first(func(entity: Resident) -> bool: return str(entity.get("activity")) in WORK_WORDS, WORK_WAIT)
+	if worker != null:
+		await _walk_stand(_off_by(worker.tile, 2), PEOPLE_STAND, "people stand by %s %s at %s" % [worker.name, worker.get("activity"), worker.tile])
+	else:
+		_mark("people: no worker at %s in %d s" % [", ".join(WORK_WORDS), int(WORK_WAIT)])
+	var crowd := _crowd()
+	await _walk_stand(crowd[0], CROWD_STAND, "people stand crowd (%d at rest within %d, found from %s)" % [crowd[1], Client3D.PEOPLE_REACH, _bot.cell()])
+	await _bot.admin("hour %d" % NIGHT)
+	_mark("hour %d" % NIGHT)
+	await _walk_stand(SQUARE, PEOPLE_STAND, "people stand square")
+	var sleeper: Resident = await _first(func(entity: Resident) -> bool: return str(entity.get("activity")) == "sleep", WORK_WAIT)
+	if sleeper != null:
+		await _walk_stand(_off_by(sleeper.tile, 2), PEOPLE_STAND, "people stand by %s sleep at %s" % [sleeper.name, sleeper.tile])
+	else:
+		_mark("people: nobody asleep outdoors in %d s" % int(WORK_WAIT))
+
+
+## The walkable cell under the sky within CROWD_LOOK of the square with the
+## most people at rest (SoundKit.IDLE_PEOPLE_WORDS) within PEOPLE_REACH, and
+## how many.
+func _crowd() -> Array:
+	var resting: Array[Vector2i] = []
+	for entity: GridEntity in _bot.seen(""):
+		if entity is Resident and str(entity.get("activity")) in SoundKit.IDLE_PEOPLE_WORDS:
+			resting.append(entity.tile)
+	var best := SQUARE
+	var most := -1
+	for dy in range(-CROWD_LOOK, CROWD_LOOK + 1):
+		for dx in range(-CROWD_LOOK, CROWD_LOOK + 1):
+			var cell := SQUARE + Vector2i(dx, dy)
+			if not World.is_walkable(cell) or not World.fields.under_sky(cell) or World.get_entity_at(cell) != null:
+				continue
+			var count := 0
+			for tile: Vector2i in resting:
+				if World.distance(tile, cell) <= Client3D.PEOPLE_REACH:
+					count += 1
+			if count > most:
+				most = count
+				best = cell
+	return [best, most]
+
+
+func _walk_stand(spot: Vector2i, seconds: float, what: String) -> void:
+	await _bot.walk_to(spot, 1, 90.0)
+	_mark("%s at %s" % [what, _bot.cell()])
+	await _bot.seconds(seconds)
+
+
+## The first resident seen that [param test] passes, waiting up to [param most] s.
+func _first(test: Callable, most: float) -> Resident:
+	var end := Time.get_ticks_msec() + int(most * 1000.0)
+	while Time.get_ticks_msec() < end:
+		for entity: GridEntity in _bot.seen(""):
+			if entity is Resident and test.call(entity):
+				return entity
+		await _bot.seconds(1.0)
+	return null
+
+
+## The resident nearest where [param path]'s newest playing 3D player sits
+## (within 1.5 m): [name, activity, cells from the listener], else [].
+func _source(path: String) -> Array:
+	var view: Node = _bot.main._client3d
+	var where: Variant = null
+	for node: Node in view.sfx.get_children():
+		if node is AudioStreamPlayer3D and node.playing and node.stream != null and node.stream.resource_path == path:
+			where = (node as Node3D).global_position
+	if where == null:
+		return []
+	var best: Array = []
+	var near := 1.5
+	var me: Vector2i = _bot.cell()
+	for entity: GridEntity in _bot.seen(""):
+		var puppet: Node3D = view._puppets.get(entity.get_instance_id())
+		if puppet == null:
+			continue
+		var d := Vector2(puppet.global_position.x - where.x, puppet.global_position.z - where.z).length()
+		if d < near:
+			near = d
+			best = [str(entity.name), str(entity.get("activity")), World.distance(entity.tile, me)]
+	return best
 
 
 ## The first resident seen at a work with a stroke, else null.
@@ -384,8 +496,20 @@ func _snap() -> void:
 	var sfx: Node = view.sfx
 	if sfx != null and sfx.played.size() > _played_at:
 		for entry: Array in sfx.played.slice(_played_at):
-			_file.store_line(JSON.stringify({"t": _now(), "played": entry, "cell": _cell()}))
+			_file.store_line(JSON.stringify({"t": _now(), "played": entry, "cell": _cell(), "src": _source(str(entry[1]))}))
 		_played_at = sfx.played.size()
+	if sfx != null and sfx.unheard.size() > _unheard_at:
+		for slot: String in sfx.unheard.slice(_unheard_at):
+			_file.store_line(JSON.stringify({"t": _now(), "unheard": slot, "cell": _cell()}))
+		_unheard_at = sfx.unheard.size()
+	var people_at: Dictionary = view.get("_people_at") if view.get("_people_at") != null else {}
+	for id: int in people_at:
+		if int(_people_seen.get(id, -1)) != int(people_at[id]):
+			_people_seen[id] = int(people_at[id])
+			var who := instance_from_id(id) as Resident
+			_file.store_line(JSON.stringify({"t": _now(), "idle_person": str(who.name) if who != null else "?",
+				"activity": str(who.activity) if who != null else "", "cells": Client3D._cells_apart(who.tile, _bot.cell()) if who != null else -1,
+				"cell": _cell()}))
 	_since += view.get_process_delta_time()
 	if _since < SNAP:
 		return

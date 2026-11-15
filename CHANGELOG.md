@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: people standing about or tending a stall every so often clear their throat, sniff or shift a foot, a few times a minute at most in a crowd, and never while chopping wood or asleep (940).
 - Bow: a quick right click lobs; the arrows go up a moment later and come down round the spot you let go at, even when the cursor has moved on (677 amended (4)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).

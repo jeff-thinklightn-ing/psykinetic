@@ -115,6 +115,7 @@ func _ready() -> void:
 		_test_mine_sounds()
 		await _test_held_stab()
 		_test_idle_voices()
+		_test_idle_people()
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
@@ -2057,6 +2058,108 @@ func _test_idle_voices() -> void:
 		World.despawn(wolf)
 	_rig.sfx.listener = listener_was
 	_rig._process(0.0)
+	_rig.sfx.hear_everything = hear_was
+
+
+## 940: a town's people at rest heard now and then: a cleared throat in
+## the body's own voice (no cough: kept for the sick), a sniff, a shifted foot; only at
+## SoundKit.IDLE_PEOPLE_WORDS, within PEOPLE_REACH; PEOPLE_PER_MINUTE at most
+## together, one person once in PEOPLE_APART_MS.
+func _test_idle_people() -> void:
+	print("
+== a town's people at rest heard now and then (940) ==")
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	var listener_was: Variant = _rig.sfx.listener
+	var at := Vector2i(10, 11)
+	_rig.sfx.listener = at
+	var words: Array[String] = ["", "watch", "hammer", "sleep", "sit_talk", "lean", "tend", "listen"]
+	var bodies: Array[StringName] = [&"male", &"female", &"male", &"female", &"male", &"", &"female", &"male"]
+	var people: Array[Resident] = []
+	var stands: Array[Node3D] = []
+	for i in words.size():
+		var person := Resident.new()
+		person.activity = words[i]
+		person.tile = at + Vector2i(i - 3, 2)
+		person.hp = maxi(person.hp, 1)
+		var stand := Node3D.new()
+		if bodies[i] != &"":
+			stand.set_meta("person_body", bodies[i])
+		people.append(person)
+		stands.append(stand)
+		_rig._puppets[person.get_instance_id()] = stand
+	var now := Time.get_ticks_msec() + 500000
+	_rig._people_next = 0
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	var heard: Array[String] = []
+	var from: Array[String] = []
+	for k in 8:
+		var got := _heard(func() -> void: _rig._idle_people(now + k * Client3D.IDLE_EVERY_MS, 0.0, 0.0))
+		heard.append_array(got)
+	for person: Resident in people:
+		if _rig._people_at.has(person.get_instance_id()):
+			from.append(person.activity if person.activity != "" else "standing")
+	_check(heard.size() == Client3D.PEOPLE_PER_MINUTE and not "hammer" in from and not "sleep" in from and not "sit_talk" in from,
+			"eight people, every roll a hit, eight seconds: %d heard, from those at rest only (%s; %s)" % [heard.size(), from, heard])
+	_check("voice.idle_throat_male" in heard and "voice.idle_throat_female" in heard and "voice.idle_sniff" in heard
+			and not heard.any(func(slot: String) -> bool: return slot.contains("cough")),
+			"a cleared throat in each body's own voice; no body known, a sniff; never a cough (%s)" % [heard])
+	var capped := _heard(func() -> void: _rig._idle_people(now + 20 * Client3D.IDLE_EVERY_MS, 0.0, 0.0))
+	_check(capped.is_empty(), "four in the minute: none more (%s)" % [capped])
+	var minute_on := now + 61000
+	var next := _heard(func() -> void: _rig._idle_people(minute_on, 0.0, 0.0))
+	_check(next.size() == 1, "a minute on: the next (%s)" % [next])
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	var missed := _heard(func() -> void: _rig._idle_people(minute_on + 2 * Client3D.IDLE_EVERY_MS, 0.99, 0.0))
+	_check(missed.is_empty(), "the rolls missing: silent (%s)" % [missed])
+	_check(not Client3D.people_due([] as Array[int], 1000, 1000 + Client3D.PEOPLE_APART_MS - 1)
+			and Client3D.people_due([] as Array[int], 1000, 1000 + Client3D.PEOPLE_APART_MS)
+			and not Client3D.people_due([1, 2, 3, 4] as Array[int], -Client3D.PEOPLE_APART_MS, 0),
+			"one person once in %d ms; %d a minute at most" % [Client3D.PEOPLE_APART_MS, Client3D.PEOPLE_PER_MINUTE])
+	# A resident's body is its look's (its puppet holds no person_body).
+	var resident_stand := Node3D.new()
+	resident_stand.set_meta("look", PersonLook.make("seed=7", &"female"))
+	var bare := Node3D.new()
+	_check(Client3D._look_body(resident_stand) == &"female" and Client3D._look_body(stands[0]) == &"male" and Client3D._look_body(bare) == &"",
+			"a resident's body read from its look; a person drawn so, its own; none known, none")
+	resident_stand.free()
+	bare.free()
+	# A shifted foot: the cell's own footstep, SCUFF_DB under the step, heard
+	# beside the first at rest (a step carries Senses.NOISE_STEP cells).
+	var played := _rig.sfx.played.size()
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig._people_next = 0
+	_rig.sfx.listener = people[0].tile + Vector2i(0, -1)
+	var scuff := _heard(func() -> void: _rig._idle_people(minute_on + 5 * Client3D.IDLE_EVERY_MS, 0.0, 0.99))
+	_check(scuff.size() == 1 and scuff[0].begins_with("sfx.footstep") and _rig.sfx.played.size() == played + 1,
+			"a shifted foot: the cell's footstep (%s)" % [scuff])
+	# A shifted foot past a step's reach (or any sound the listener can't
+	# hear): unheard, and none of the cap spent.
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig._people_next = 0
+	_rig.sfx.listener = at + Vector2i(0, -(Senses.NOISE_STEP + 3))
+	var far_foot := _heard(func() -> void: _rig._idle_people(minute_on + 7 * Client3D.IDLE_EVERY_MS, 0.0, 0.99))
+	_check(far_foot.is_empty() and _rig._people_heard.is_empty(), "a shifted foot past %d cells: unheard, and the cap untouched (%s; %d spent)"
+			% [Senses.NOISE_STEP, far_foot, _rig._people_heard.size()])
+	_rig.sfx.listener = at
+	# Out of reach: none.
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig._people_next = 0
+	_rig.sfx.listener = at + Vector2i(Client3D.PEOPLE_REACH + 6, 0)
+	var far := _heard(func() -> void: _rig._idle_people(minute_on + 9 * Client3D.IDLE_EVERY_MS, 0.0, 0.0))
+	_check(far.is_empty(), "everyone past %d cells: silent (%s)" % [Client3D.PEOPLE_REACH, far])
+	for i in people.size():
+		_rig._puppets.erase(people[i].get_instance_id())
+		stands[i].free()
+		people[i].free()
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig.sfx.listener = listener_was
 	_rig.sfx.hear_everything = hear_was
 
 

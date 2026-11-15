@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_ambience_weights()
 	_test_town_day()
 	_test_tavern()
+	_test_idle_people()
 	_test_heard_over_list()
 	_test_music()
 	_test_folders()
@@ -734,6 +735,49 @@ func _test_town_day() -> void:
 ## town's chatter takes, its weight by goers), the taverner's cup (a
 ## positional one-shot, short range), and the talk dealt for an hour with no
 ## piece twice in a deck nor at a seam.
+## 940: a town's people at rest: the words they may sound at, each kind's
+## slot by body, never a cough (kept for the sick), and the five slots: one-shots on the voice bus, heard to
+## Client3D.PEOPLE_REACH, under a footstep, each take under a second.
+func _test_idle_people() -> void:
+	print("
+== a town's people at rest: a cleared throat, a sniff, a shifted foot; the cough kept for the sick (940) ==")
+	var quiet: Array[String] = []
+	for word: String in ["hammer", "saw", "chop", "hoe", "sleep", "sit", "sit_talk", "sit_listen", "talk", "dress", "scrape"]:
+		if SoundKit.idle_person(word, &"male", 0.0) != "":
+			quiet.append(word)
+	_check(quiet.is_empty(), "never at a stroked work, asleep, sitting or at a talk (%s sound)" % [quiet])
+	var kinds := []
+	for pick: float in [0.0, 0.39, 0.41, 0.64, 0.66, 0.99]:
+		kinds.append(SoundKit.idle_person("", &"female", pick))
+	_check(kinds == ["voice.idle_throat_female", "voice.idle_throat_female", "voice.idle_sniff", "voice.idle_sniff", SoundKit.SCUFF, SoundKit.SCUFF],
+			"the shares in order: throat, sniff, scuff (%s)" % [kinds])
+	_check(SoundKit.idle_person("watch", &"male", 0.0) == "voice.idle_throat_male" and SoundKit.idle_person("tend", &"", 0.0) == "voice.idle_sniff"
+			and SoundKit.idle_person("lean", &"", 0.99) == SoundKit.SCUFF, "a cleared throat in the body's own voice; no body known, a sniff")
+	var coughs: Array[String] = []
+	for pick in 100:
+		for body: StringName in [&"male", &"female", &""]:
+			if SoundKit.idle_person("", body, pick / 100.0).contains("cough"):
+				coughs.append("%s %d" % [body, pick])
+	_check(coughs.is_empty() and not SoundKit.IDLE_PEOPLE.has("cough"), "a well person never coughs: the cough is kept for the sick (%s)" % [coughs])
+	var total := 0.0
+	for each: String in SoundKit.IDLE_PEOPLE:
+		total += float(SoundKit.IDLE_PEOPLE[each])
+	_check(is_equal_approx(total, 1.0), "the shares make a whole (%.2f)" % total)
+	var wrong: Array[String] = []
+	var lengths := []
+	for slot: String in ["voice.idle_cough_male", "voice.idle_cough_female", "voice.idle_throat_male", "voice.idle_throat_female", "voice.idle_sniff"]:
+		var spec := SoundKit.spec(slot)
+		if not SoundKit.has(slot) or str(spec.get("type", "")) != "oneshot" or str(spec.get("bus", "")) != "voice" 				or SoundKit.reach(slot) != Client3D.PEOPLE_REACH or float(spec.get("volume_db", 0.0)) > SoundKit.volume_db("sfx.footstep_stone_medium") - 6.0:
+			wrong.append(slot)
+		for path: String in SoundKit.files(slot):
+			var length := snappedf((load(path) as AudioStream).get_length(), 0.01)
+			lengths.append(length)
+			if length >= 1.0:
+				wrong.append(path)
+	_check(wrong.is_empty(), "five one-shots on the voice bus, heard to %d cells, 6 dB or more under a footstep, takes under a second (%s; lengths %s)"
+			% [Client3D.PEOPLE_REACH, wrong, lengths if not lengths.is_empty() else "no takes"])
+
+
 func _test_tavern() -> void:
 	print("\n== the tavern: its hearth, its room's talk by the goers, the taverner's cup (920) ==")
 	_check(SoundKit.has(Ambience.HEARTH) and SoundKit.positional(Ambience.HEARTH) and SoundKit.bus(Ambience.HEARTH) == "ambience"
