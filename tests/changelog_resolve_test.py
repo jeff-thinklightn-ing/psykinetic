@@ -181,9 +181,18 @@ sys.exit(1)
 PAGES_ALL = sorted(["CHANGELOG.md", VOICE, ART, ART_JSON])
 
 
-def fakes(voice=FAKE_VOICE, art=FAKE_ART):
+## 539 amended (7): sound_status's fake (never run unless THIRD_PARTY.md's
+## spans are in conflict or its page is) writes its page from sounds.txt.
+FAKE_SOUND = """
+import pathlib
+sounds = pathlib.Path("sounds.txt").read_text() if pathlib.Path("sounds.txt").exists() else ""
+pathlib.Path("docs/sound_status.md").write_text("sound from: " + sounds, newline="")
+"""
+
+
+def fakes(voice=FAKE_VOICE, art=FAKE_ART, sound=FAKE_SOUND):
     return dict(os.environ, CHANGELOG_RESOLVE_COMMANDS=json.dumps({"voice_inventory": [sys.executable, "-c", voice],
-        "art_status": [sys.executable, "-c", art]}))
+        "art_status": [sys.executable, "-c", art], "sound_status": [sys.executable, "-c", sound]}))
 
 
 def pages_case(third_party_conflict=False, branch_bullet=True):
@@ -256,7 +265,7 @@ try:
     rebase_stops(repo)
     before = {name: read(repo, name) for name in ("CHANGELOG.md", VOICE, ART, ART_JSON, THIRD)}
     done = resolve_in(repo, fakes())
-    check(done.returncode == 1 and THIRD in done.stderr, "THIRD_PARTY.md in conflict too: exit 1 (%s)" % done.stderr.strip())
+    check(done.returncode == 1 and THIRD in done.stderr, "THIRD_PARTY.md in conflict with no span markers: exit 1 (%s)" % done.stderr.strip())
     check(all(read(repo, name) == text for name, text in before.items()) and THIRD in conflicts(repo) and VOICE in conflicts(repo),
         "nothing written, every conflict left")
     git(repo, "rebase", "--abort", ok=False)
@@ -284,6 +293,154 @@ try:
     check(pages_only == sorted([VOICE, ART, ART_JSON]) and done.returncode == 0 and conflicts(repo) == []
         and read(repo, VOICE) == "voice from: a\nb\n",
         "the pages in conflict without CHANGELOG.md (%s): made again, exit 0 (%s)" % (pages_only, (done.stdout + done.stderr).strip()[:160]))
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+print("== THIRD_PARTY.md's generated spans (539 amended (7)) ==")
+# Maps' Mughouse take, 11-14: THIRD_PARTY.md's art slot lines met 919's and
+# 920's. A THIRD_PARTY.md with both spans between real markers; each side
+# makes its spans from its own slots.txt / sounds.txt, which merge cleanly.
+SOUND_PAGE = "docs/sound_status.md"
+
+
+def third_text(credit="Credits.", art="ART s1", sound="SOUND t1", end="End.", art_start="<!-- art slots: x -->"):
+    return ("# Third party\n\n%s\n\n%s\n%s\n<!-- end of art slots -->\n\nMid.\n\n"
+        "<!-- sound slots: y -->\n%s\n<!-- end of sound slots -->\n\n%s\n") % (credit, art_start, art, sound, end)
+
+
+SPAN_ART = """
+import pathlib, re
+slots = pathlib.Path("slots.txt").read_text().split()
+pathlib.Path("docs/art_status.md").write_text("art from: " + " ".join(slots), newline="")
+pathlib.Path("art/kit/status.json").write_text("json from: " + " ".join(slots), newline="")
+third = pathlib.Path("THIRD_PARTY.md")
+text = re.sub(r"(<!-- art slots:[^\\n]*\\n).*?(<!-- end of art slots -->)", lambda m: m.group(1) + "ART " + " ".join(slots) + "\\n" + m.group(2), third.read_text(), flags=re.S)
+third.write_text(%s, newline="")
+"""
+SPAN_SOUND = """
+import pathlib, re
+sounds = pathlib.Path("sounds.txt").read_text().split()
+pathlib.Path("docs/sound_status.md").write_text("sound from: " + " ".join(sounds), newline="")
+third = pathlib.Path("THIRD_PARTY.md")
+text = re.sub(r"(<!-- sound slots:[^\\n]*\\n).*?(<!-- end of sound slots -->)", lambda m: m.group(1) + "SOUND " + " ".join(sounds) + "\\n" + m.group(2), third.read_text(), flags=re.S)
+third.write_text(text, newline="")
+"""
+SPAN_FAKES = fakes(art=SPAN_ART % "text", sound=SPAN_SOUND)
+
+
+def span_case(span="art", branch_credit=None, branch_art_start=None):
+    """Main and the branch each add a slot (art: slots.txt; sound: sounds.txt)
+    and make THIRD_PARTY.md's span and the page from their own, so both
+    conflict; main also rewords the first credit line (far from the spans).
+    [branch_credit]: the branch rewords the closing line too. [branch_art_start]:
+    the branch's art start marker line, doubled into the file when given."""
+    repo = scratch()
+    os.makedirs(os.path.join(repo, "docs"))
+    os.makedirs(os.path.join(repo, "art", "kit"))
+    for name, text in (("CHANGELOG.md", HEAD + "## Unreleased\n\n- Older.\n"), ("slots.txt", "s1\n"), ("sounds.txt", "t1\n"),
+            (ART, "art from: s1"), (ART_JSON, "json from: s1"), (SOUND_PAGE, "sound from: t1"), (THIRD, third_text())):
+        write(repo, name, text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "base")
+    git(repo, "branch", "branch")
+    if span == "art":
+        write(repo, "slots.txt", "s0\ns1\n")
+        write(repo, ART, "art from: s0 s1")
+        write(repo, ART_JSON, "json from: s0 s1")
+        write(repo, THIRD, third_text(credit="Credits, main.", art="ART s0 s1"))
+    else:
+        write(repo, "sounds.txt", "t0\nt1\n")
+        write(repo, SOUND_PAGE, "sound from: t0 t1")
+        write(repo, THIRD, third_text(credit="Credits, main.", sound="SOUND t0 t1"))
+    git(repo, "commit", "-q", "-am", "main's slot")
+    git(repo, "checkout", "-q", "branch")
+    end = branch_credit or "End."
+    if span == "art":
+        write(repo, "slots.txt", "s1\ns2\n")
+        write(repo, ART, "art from: s1 s2")
+        write(repo, ART_JSON, "json from: s1 s2")
+        art = "ART s1 s2" if branch_art_start is None else "ART s1 s2\n" + branch_art_start
+        write(repo, THIRD, third_text(art=art, end=end))
+    else:
+        write(repo, "sounds.txt", "t1\nt2\n")
+        write(repo, SOUND_PAGE, "sound from: t1 t2")
+        write(repo, THIRD, third_text(sound="SOUND t1 t2", end=end))
+    git(repo, "commit", "-q", "-am", "a slot")
+    return repo
+
+
+repo = span_case("art")
+try:
+    rebase_stops(repo)
+    stopped_on = conflicts(repo)
+    done = resolve_in(repo, SPAN_FAKES)
+    check(THIRD in stopped_on and done.returncode == 0, "the art span in conflict (%s): resolved, exit 0 (%s)"
+        % (stopped_on, (done.stdout + done.stderr).strip()[:200]))
+    third = read(repo, THIRD)
+    check(third == third_text(credit="Credits, main.", art="ART s0 s1 s2"),
+        "main's credit line kept, the art span made from the merged slots, the sound span as it was: %r" % third)
+    staged = git(repo, "diff", "--cached", "--name-only").stdout.split()
+    check(THIRD in staged and ART in staged and conflicts(repo) == [], "THIRD_PARTY.md staged with the art pages, no conflict left (%s)" % staged)
+    check(git(repo, "-c", "core.editor=true", "rebase", "--continue", ok=False).returncode == 0, "the rebase goes on")
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = span_case("sound")
+try:
+    rebase_stops(repo)
+    stopped_on = conflicts(repo)
+    done = resolve_in(repo, SPAN_FAKES)
+    check(THIRD in stopped_on and SOUND_PAGE in stopped_on and done.returncode == 0,
+        "the sound span and docs/sound_status.md in conflict (%s): resolved, exit 0 (%s)" % (stopped_on, (done.stdout + done.stderr).strip()[:200]))
+    check(read(repo, THIRD) == third_text(credit="Credits, main.", sound="SOUND t0 t1 t2") and read(repo, SOUND_PAGE) == "sound from: t0 t1 t2",
+        "the sound span and its page made from the merged sounds, main's credit kept: %r" % read(repo, THIRD))
+    check(conflicts(repo) == [] and SOUND_PAGE in git(repo, "diff", "--cached", "--name-only").stdout.split(), "docs/sound_status.md staged, nothing left")
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+for span in ("art", "sound"):
+    repo = span_case(span, branch_credit="End, the branch's.")
+    try:
+        rebase_stops(repo)
+        before = {name: read(repo, name) for name in (THIRD, ART, SOUND_PAGE)}
+        done = resolve_in(repo, SPAN_FAKES)
+        check(done.returncode == 1 and THIRD in done.stderr and "outside" in done.stderr,
+            "the %s span and a credit line changed too: exit 1, named (%s)" % (span, done.stderr.strip()[:200]))
+        check({name: read(repo, name) for name in before} == before and THIRD in conflicts(repo), "nothing written, the conflict left")
+        git(repo, "rebase", "--abort", ok=False)
+    finally:
+        shutil.rmtree(repo, ignore_errors=True)
+
+repo = span_case("art", branch_art_start="<!-- art slots: again -->")
+try:
+    rebase_stops(repo)
+    done = resolve_in(repo, SPAN_FAKES)
+    check(done.returncode == 1 and "markers" in done.stderr, "an art marker doubled on the branch: exit 1 (%s)" % done.stderr.strip()[:200])
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = span_case("sound")
+try:
+    rebase_stops(repo)
+    before = {name: read(repo, name) for name in (THIRD, SOUND_PAGE, ART)}
+    done = resolve_in(repo, fakes(art=SPAN_ART % "text", sound=FAILING))
+    check(done.returncode == 1 and "sound_status" in done.stderr, "sound_status failing: exit 1 (%s)" % done.stderr.strip()[:200])
+    check({name: read(repo, name) for name in before} == before and THIRD in conflicts(repo) and SOUND_PAGE in conflicts(repo),
+        "the tree as the rebase stopped it, conflict markers and all")
+    git(repo, "rebase", "--abort", ok=False)
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+repo = span_case("art")
+try:
+    rebase_stops(repo)
+    before = {name: read(repo, name) for name in (THIRD, ART)}
+    done = resolve_in(repo, fakes(art=SPAN_ART % 'text.replace("Mid.", "Mid, by the tool.")', sound=SPAN_SOUND))
+    check(done.returncode == 1 and "outside its spans by the generators" in done.stderr,
+        "a generator writing outside its span: exit 1 (%s)" % done.stderr.strip()[:200])
+    check({name: read(repo, name) for name in before} == before and THIRD in conflicts(repo), "and nothing written")
     git(repo, "rebase", "--abort", ok=False)
 finally:
     shutil.rmtree(repo, ignore_errors=True)

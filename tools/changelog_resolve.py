@@ -20,13 +20,22 @@ art/kit/status.json, 2026-11-10): each conflicted one is taken from main's side
 (tools/voice_inventory.py; tools/art_status.gd under Godot, which also writes
 THIRD_PARTY.md's art slot block: a file it changes is staged with the pages).
 
+THIRD_PARTY.md itself too (539 amended (7): maps' Mughouse take met 919's and
+920's slot lines there, 2026-11-14): its art and sound slot spans, each
+between its marker lines, are written by tools/art_status.gd and
+tools/sound_status.tscn (docs/sound_status.md beside it), never by hand. In a
+conflict it is taken from main's side and both spans made again, only when
+the commit being rebased changes nothing outside the spans and every marker
+stands once on each side; main's text outside them must come through
+unchanged.
+
 Run while `git rebase` is stopped with only CHANGELOG.md and those pages in
 conflict (any of them):
   python -B tools/changelog_resolve.py      writes them, `git add`s them; exit 0
 It does not continue the rebase. Exit 1 (nothing written, the conflict left as
 it was) when the rebase is not stopped on a commit, another file is in conflict
-(THIRD_PARTY.md included), the file has no ## Unreleased heading, or a
-generator fails. Standard library only.
+(THIRD_PARTY.md changed outside its spans included), the file has no
+## Unreleased heading, or a generator fails. Standard library only.
 """
 import json
 import os
@@ -117,8 +126,51 @@ GENERATORS = {
     "voice_inventory": {"pages": ["docs/voice_inventory.md"], "writes": ["docs/voice_inventory.md"]},
     "art_status": {"pages": ["docs/art_status.md", "art/kit/status.json"],
         "writes": ["docs/art_status.md", "art/kit/status.json", "THIRD_PARTY.md"]},
+    # 539 amended (7), sound's yes: tools/sound_status.tscn, a scene (SoundKit
+    # reads Senses, an autoload), from tracked files only.
+    "sound_status": {"pages": ["docs/sound_status.md"], "writes": ["docs/sound_status.md", "THIRD_PARTY.md"]},
 }
 PAGES = [page for each in GENERATORS.values() for page in each["pages"]]
+## THIRD_PARTY.md (539 amended (7)): hand-written credits around spans a
+## generator writes, each between its own two marker lines. In a conflict it
+## is taken from main's side and its spans made again (every span's
+## generator runs), only when the commit being rebased changes nothing
+## outside them and each marker stands once on every side; else it refuses as
+## any other file does. Release: neither span is ever written by hand.
+THIRD = "THIRD_PARTY.md"
+SPANS = {"art_status": ("<!-- art slots:", "<!-- end of art slots -->"),
+    "sound_status": ("<!-- sound slots:", "<!-- end of sound slots -->")}
+
+
+def outside_spans(text):
+    """[param text] with what lies between each span's markers cut out (the
+    marker lines kept), or None when a marker is missing, doubled or out of
+    order."""
+    lines = text.replace("\r\n", "\n").split("\n")
+    for start, end in SPANS.values():
+        starts = [i for i, line in enumerate(lines) if line.startswith(start)]
+        ends = [i for i, line in enumerate(lines) if line.startswith(end)]
+        if len(starts) != 1 or len(ends) != 1 or ends[0] < starts[0]:
+            return None
+        lines = lines[:starts[0] + 1] + lines[ends[0]:]
+    return "\n".join(lines)
+
+
+def third_party_why(commit):
+    """"" when THIRD_PARTY.md's conflict may be resolved from main's side,
+    else why not."""
+    try:
+        before, after, ours = (_git("show", ref + ":" + THIRD) for ref in (commit + "^", commit, "HEAD"))
+    except OSError:
+        return "%s is new or gone on one side" % THIRD
+    cut = [outside_spans(each) for each in (before, after, ours)]
+    if None in cut:
+        return "%s's span markers missing or doubled on a side" % THIRD
+    if cut[0] != cut[1]:
+        return "the commit changes %s outside its generated spans" % THIRD
+    return ""
+
+
 ## The test's own commands (JSON {generator: argv}), never set in a landing.
 COMMANDS_ENV = "CHANGELOG_RESOLVE_COMMANDS"
 GENERATOR_SECONDS = 300
@@ -128,16 +180,18 @@ GODOT_FAILED = ("SCRIPT ERROR", "Parse Error", "ERROR:")
 
 def command(name):
     """[name]'s generator as argv: voice_inventory.py with this Python, or
-    art_status.gd under Godot ($GODOT_PATH, else `godot`, as land.sh's
-    scripts find it), headless, silent, its own log (decision 664)."""
+    art_status.gd (a script) or sound_status.tscn (a scene) under Godot
+    ($GODOT_PATH, else `godot`, as land.sh's scripts find it), headless,
+    silent, its own log (decision 664)."""
     override = os.environ.get(COMMANDS_ENV)
     if override:
         return json.loads(override)[name]
     if name == "voice_inventory":
         return [sys.executable, "-B", "tools/voice_inventory.py"]
     os.makedirs(os.path.join("build", "logs"), exist_ok=True)
+    run = ["--script", "tools/art_status.gd"] if name == "art_status" else ["--scene", "res://tools/sound_status.tscn"]
     return [os.environ.get("GODOT_PATH") or "godot", "--headless", "--audio-driver", "Dummy",
-        "--log-file", "build/logs/changelog_resolve_art_status.log", "--path", ".", "--script", "tools/art_status.gd"]
+        "--log-file", "build/logs/changelog_resolve_%s.log" % name, "--path", "."] + run
 
 
 def generate(name):
@@ -149,7 +203,7 @@ def generate(name):
     except (OSError, subprocess.TimeoutExpired) as error:
         return "%s: %s" % (name, error)
     out = (done.stdout + done.stderr).decode("utf-8", "replace")
-    failed = done.returncode != 0 or (name == "art_status" and any(each in out for each in GODOT_FAILED))
+    failed = done.returncode != 0 or (name != "voice_inventory" and any(each in out for each in GODOT_FAILED))
     return "%s exit %d: %s" % (name, done.returncode, out.strip()[-400:]) if failed else ""
 
 
@@ -165,11 +219,17 @@ def main():
     except OSError as error:
         print("changelog_resolve: not stopped in a rebase (%s)" % error, file=sys.stderr)
         return 1
-    others = [each for each in conflicted if each != PATH and each not in PAGES]
+    others = [each for each in conflicted if each != PATH and each not in PAGES and each != THIRD]
     if not conflicted or others:
         print("changelog_resolve: conflicted are %s, not CHANGELOG.md and the generated pages (%s) alone"
-            % (conflicted or "none", ", ".join(PAGES)), file=sys.stderr)
+            % (conflicted or "none", ", ".join(PAGES + [THIRD + "'s generated spans"])), file=sys.stderr)
         return 1
+    third = THIRD in conflicted
+    if third:
+        why = third_party_why(commit)
+        if why:
+            print("changelog_resolve: %s in conflict and %s; nothing written" % (THIRD, why), file=sys.stderr)
+            return 1
     text, added, taken = None, [], []
     if PATH in conflicted:
         try:
@@ -181,8 +241,9 @@ def main():
         if text is None:
             print("changelog_resolve: HEAD's CHANGELOG.md has no %s" % UNRELEASED, file=sys.stderr)
             return 1
-    pages = [each for each in conflicted if each in PAGES]
-    names = [name for name, each in GENERATORS.items() if any(page in pages for page in each["pages"])]
+    pages = [each for each in conflicted if each in PAGES or each == THIRD]
+    names = [name for name, each in GENERATORS.items()
+        if any(page in pages for page in each["pages"]) or (third and name in SPANS)]
     touched = [path for name in names for path in GENERATORS[name]["writes"] if path not in pages]
     # Nothing staged until every generator has worked: on a failure each file
     # gets back the bytes it had (the pages their conflict markers, the index
@@ -194,8 +255,14 @@ def main():
                 kept[path] = handle.read()
     for page in pages:
         _git("checkout", "--ours", "--", page)
+    ours_outside = outside_spans(_git("show", "HEAD:" + THIRD)) if third else None
     for name in names:
         why = generate(name)
+        if not why and third and name == names[-1]:
+            # Main's credits must come through the generators untouched.
+            with open(THIRD, encoding="utf-8", newline="") as handle:
+                if outside_spans(handle.read()) != ours_outside:
+                    why = "%s changed outside its spans by the generators" % THIRD
         if why:
             for path, data in kept.items():
                 with open(path, "wb") as handle:

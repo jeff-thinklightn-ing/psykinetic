@@ -20087,6 +20087,27 @@ line beginning "- " before the first line that begins "## ", naming it ("move it
 changelog_check_test: a bullet in the intro fails, named; the intro naming the heading mid-sentence with no bullet
 is clean. Tools only; protocol unchanged; no class_name; no bullet.
 
+539 amended (7) (perf, 2026-11-14; the coordinator's ruling, release's word that neither span is hand-written,
+sound's yes on its generator; label from tools/decision_number.sh): THIRD_PARTY.md's generated spans in a rebase.
+Maps' Mughouse take (a stool's art line) conflicted in THIRD_PARTY.md's art slot block with 919 and 920 on main,
+and the resolver refused the file, so the landing would have failed after taking the lock; maps caught it in its
+own rebase. THIRD_PARTY.md holds hand-written credits around two spans a tool writes, each between its own marker
+lines: the art slots (`<!-- art slots: ... -->` to `<!-- end of art slots -->`, tools/art_status.gd) and the sound
+slots (`<!-- sound slots: ... -->` to `<!-- end of sound slots -->`, tools/sound_status.tscn, a scene since SoundKit
+reads Senses, which also writes docs/sound_status.md). tools/changelog_resolve.py now resolves a conflicted
+THIRD_PARTY.md only when the commit being rebased changes nothing in it outside the spans (its parent's text and its
+own equal with the spans cut out) and each marker stands once, in order, on its parent's, its own and main's side.
+Then it takes main's side and runs both spans' generators over the merged tree; main's text outside the spans must
+come through them unchanged, or it refuses. docs/sound_status.md joins the pages (sound_status's), staged with
+THIRD_PARTY.md. A change outside the spans, a marker missing or doubled, a generator's nonzero exit or an ERROR,
+SCRIPT ERROR or Parse Error line (now for both Godot generators): exit 1, the file named, nothing written, the tree
+as the rebase stopped it. changelog_resolve_test.py: an art-span conflict resolved (main's credit kept, the span
+from the merged slots, the sound span as it was, staged, the rebase goes on); a sound-span conflict with
+docs/sound_status.md resolved; a credit line changed beside either span, exit 1; an art marker doubled, exit 1;
+sound_status failing, exit 1 and the tree untouched; a generator writing outside its span, exit 1; the old case (no
+markers) still exit 1. Both real generators run through the resolver's own commands on a clean tree exit 0 with
+nothing changed. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc
