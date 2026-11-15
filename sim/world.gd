@@ -777,6 +777,9 @@ var _fish_stock_of: Dictionary[String, String] = {}
 ## A solid building's cells (terrain "solid", decision 550): no floor, and
 ## they stop sight and light as a wall does.
 var _solid: Dictionary[Vector2i, bool] = {}
+## The solid cells hearing passes over (terrain "heard_over", 925:
+## Level.HEARD_OVER's footprints): has_hearing_line alone reads them.
+var _heard_over: Dictionary[Vector2i, bool] = {}
 ## Each cell's cover (decision 508), row by row over _cover_rect (0 off
 ## it): TALL_GRASS_COVER on tall grass, 0 elsewhere; a trampled cell
 ## (_trampled_here) has none while it is flat.
@@ -843,6 +846,8 @@ var north := Vector2i(0, -1)
 var outdoor := false
 ## Light a body through on a line (has_clear_line): bodies do not stop it.
 var _through_bodies := false
+## A line heard over the low solids (has_hearing_line, 925): their cells don't stop it.
+var _over_low := false
 ## The eye height of the line of sight being walked (has_line_of_sight), -1
 ## when none: a wall lower than the eye does not stop it.
 var _eye := -1.0
@@ -1891,6 +1896,7 @@ func enter(to: Zone) -> Zone:
 	from.water = _water
 	from.fords = _fords
 	from.solid = _solid
+	from.heard_over = _heard_over
 	from.cover = _cover
 	from.cover_rect = _cover_rect
 	from.torches = _torches
@@ -1918,6 +1924,7 @@ func enter(to: Zone) -> Zone:
 	_water = to.water
 	_fords = to.fords
 	_solid = to.solid
+	_heard_over = to.heard_over
 	_cover = to.cover
 	_cover_rect = to.cover_rect
 	_torches = to.torches
@@ -2062,6 +2069,7 @@ func reset() -> void:
 	_water.clear()
 	_fords.clear()
 	_solid.clear()
+	_heard_over.clear()
 	_cover = PackedFloat32Array()
 	_cover_rect = Rect2i()
 	_next_id = 1
@@ -2210,6 +2218,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 	_water.clear()
 	_fords.clear()
 	_solid.clear()
+	_heard_over.clear()
 	_torches.clear()
 	for cell: Vector2i in terrain.get("torches", []):
 		_torches[cell] = true
@@ -2235,6 +2244,8 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_water[cell] = true
 	for cell: Vector2i in terrain.get("solid", []):
 		_solid[cell] = true
+	for cell: Vector2i in terrain.get("heard_over", []):
+		_heard_over[cell] = true
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
 	_fish_waters[zone.name] = fish_waters_of(terrain)
@@ -10346,6 +10357,7 @@ func mirror_reset() -> void:
 	_water.clear()
 	_fords.clear()
 	_solid.clear()
+	_heard_over.clear()
 	tick = 0
 	tick_alpha = 0.0
 	_clock = 0.0
@@ -13717,6 +13729,17 @@ func has_clear_line(from: Vector2i, to: Vector2i) -> bool:
 	return seen
 
 
+## A line a sound carries along for a player's ears (925; Sfx.hearing
+## alone, client side): has_clear_line's, over the low solids a person sees
+## over (terrain "heard_over") as well as through bodies. Never for sight,
+## walking or monsters' hearing (World._hear): those keep has_clear_line.
+func has_hearing_line(from: Vector2i, to: Vector2i) -> bool:
+	_over_low = true
+	var heard := has_clear_line(from, to)
+	_over_low = false
+	return heard
+
+
 ## What a clear line (has_clear_line) from [param from] to [param to]
 ## owes to doors: null if the terrain alone stops it, else the keys of the
 ## doors it crosses, each of which must be open for it to be clear ([] for
@@ -13811,7 +13834,7 @@ func _line_of_sight(from: Vector2i, to: Vector2i) -> bool:
 		if _sight_crosses_edge(at, step):
 			return false
 		at += step
-		if at != to and (blocks_sight(at) or _solid.has(at) or height_at(at) > top):
+		if at != to and (blocks_sight(at) or _solid.has(at) and not (_over_low and _heard_over.has(at)) or height_at(at) > top):
 			return false
 	return true
 

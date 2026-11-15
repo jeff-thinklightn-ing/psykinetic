@@ -56824,3 +56824,54 @@ about 1.7 to 1.9, the end 1.01 to 1.06; two houses' patches where they meet 2.5 
 out from the wall's foot, fading outward, and the spill between two houses beside the player plain.
 
 Client only; protocol unchanged; no new class_name; a bullet (voice's words) when it is switched on.
+
+## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
+
+The crackle's joined read for 920 amended (1) found the Mughouse's tables
+muffling its fire, and that row's figures found the bar counter muffling the
+taverner's cup for the guests at it (-37 at the ear against -26 clear).
+World._line_of_sight stops at every cell of World._solid, whatever its
+height, and has_clear_line passes bodies but not solids, so every SOLID
+footprint (decision 550) muffled hearing, low or tall. The coordinator's
+ruling (11-14): for hearing only, a solid a person can see over (a table, a
+bar, a stall's counter) does not muffle; a wall does; sight stays exactly as
+it is (crates and counters as cover for sneaking and for a keeper's view
+are other trees'). Label from tools/decision_number.sh. Maps' read of
+main: terrain "solid" has two writers, Level._lay_solid's SOLID footprints
+(but their door) and Level.banked_cells (718: the turf house's banked ring
+and its FURNISHED cells); decor, markers and entities are never solid.
+
+Level.HEARD_OVER lists the SOLID slots a sound passes over: sound's first
+cut, for buildings to correct (buildings was stopped at one of Jeff's
+prompts; it amends the list when back). By art-kit's drawn heights
+(art/kit/slots.json "size"), each SOLID slot 1.35 m high or lower
+(Level.HEARD_OVER_HEIGHT; the bar counter at 1.31 the tallest), and the
+market stall (Level.HEARD_OVER_TALL: 2.4 m by its canopy, open on posts above
+its waist-high counter; FADES_ON_LINE counts it tall for the camera, which a
+canopy hides a body from, and so this is a list of its own and not that
+one's complement). The grave (0.39 m), the woodpile (1.07 m) and the smith's anvil (prop.anvil, 0.80 m) are in it.
+The hunter's blind (1.41), the racks, pillars, forges, stones and mounds are
+not. The turf house's banked ring and furnished cells stay as they are.
+Level._lay_solid lays each heard-over footprint's cells as terrain
+"heard_over" beside "solid"; World keeps them as _heard_over (per zone, as
+_solid), and World.has_hearing_line is has_clear_line with those cells open.
+Sfx.hearing alone reads it, client side: sight, walking, has_clear_line and
+monsters' hearing (World._hear) are unchanged. The key never crosses the wire:
+the "terrain" message carries the level's files and a joined client lays
+its terrain itself (Main._on_terrain, _load_level, Level._lay_solid);
+release confirmed no PROTOCOL_REVISION (its conditions: has_hearing_line out
+of every server-side and shared path, the print-protocol hashes in the
+landing message, one joined reading beside the stall). Cost per sound played:
+the same cell walk as before, one more lookup per solid cell met.
+
+A failing test first (view_test _test_heard_over, on the real levels each in
+a zone of its own): the cup from her work stands (8, 2) and (10, 2) at the
+counter's guest side (8, 4) and (10, 4), muffled before, now clear over the
+bar; a sound at Rolf's cell (203, 196) by a buyer at (203, 198), muffled
+before, now clear across his stall; across the common room's east wall
+into the kitchen ((11, 4) to (14, 4), no solid on the line) still muffled;
+sight across both counters blocked as before. sound_kit_test
+_test_heard_over_list holds the list to art-kit's heights, so a SOLID piece
+drawn low or tall later is named. Package: none. Its bullet ships only on a
+joined read at the Mughouse bar and at Rolf's stall (Rolf's half waits for
+maps' Rolf-on). Client sound only; protocol unchanged; no new class_name.

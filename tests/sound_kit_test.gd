@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_ambience_weights()
 	_test_town_day()
 	_test_tavern()
+	_test_heard_over_list()
 	_test_music()
 	_test_folders()
 	_test_sfx_plays_slots()
@@ -1156,3 +1157,29 @@ func _check(ok: bool, label: String) -> void:
 	print(("  PASS  " if ok else "  FAIL  ") + label)
 	if not ok:
 		_failures += 1
+
+
+## 925: Level.HEARD_OVER, the SOLID buildings hearing passes over, held to
+## art-kit's drawn heights: each SOLID slot drawn HEARD_OVER_HEIGHT high or
+## lower is in it, and the taller ones in it are HEARD_OVER_TALL's (the
+## market stall, open under its canopy); none outside SOLID.
+func _test_heard_over_list() -> void:
+	print("\n== the solids a sound passes over, by art-kit's drawn heights (925) ==")
+	var kit: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://art/kit/slots.json"))
+	var slots: Dictionary = kit.get("slots", kit)
+	var wrong: Array[String] = []
+	var heights: Array[String] = []
+	for slot: String in Level.SOLID:
+		var size: Variant = (slots.get(slot, {}) as Dictionary).get("size")
+		var height := float(size[1]) if size is Array and (size as Array).size() == 3 else -1.0
+		var low := height >= 0.0 and height <= Level.HEARD_OVER_HEIGHT
+		if (low or slot in Level.HEARD_OVER_TALL) != (slot in Level.HEARD_OVER):
+			wrong.append("%s (%.2f m)" % [slot, height])
+		if slot in Level.HEARD_OVER:
+			heights.append("%s %.2f" % [slot.trim_prefix("building."), height])
+	print("  heard over: %s" % ", ".join(heights))
+	_check(wrong.is_empty(), "every SOLID slot drawn %.2f m or lower heard over, and only the stall taller (%s)" % [Level.HEARD_OVER_HEIGHT, wrong])
+	_check(Level.HEARD_OVER.all(func(slot: String) -> bool: return slot in Level.SOLID), "none heard over that isn't SOLID")
+	var sorted := Level.HEARD_OVER.duplicate()
+	sorted.sort()
+	_check(sorted == Level.HEARD_OVER, "the list kept sorted, one a line (816)")

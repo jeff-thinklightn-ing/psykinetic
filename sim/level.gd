@@ -351,6 +351,43 @@ const SOLID: Array[String] = [
 	"tree.clawed",
 	"tree.great_oak",
 ]
+
+## 925: the SOLID buildings a sound passes over, with nothing solid between
+## a standing person's waist and head: hearing (World.has_hearing_line,
+## Sfx.hearing alone) takes their cells, laid as terrain "heard_over", as
+## open; sight, walking and monsters' hearing do not. Sound's first cut, for
+## buildings to correct: each SOLID slot art-kit draws 1.35 m high or lower
+## (art/kit/slots.json "size"'s height; the bar counter 1.31 the tallest),
+## and the market stall (2.4 m by its canopy, open on posts above its
+## waist-high counter). A BANKED or FURNISHED building's cells stay as
+## they are. sound_kit_test holds it to art-kit's heights.
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const HEARD_OVER: Array[String] = [
+	"building.bar_counter",
+	"building.broken_table",
+	"building.burial_table",
+	"building.chopping_block",
+	"building.fallen_column",
+	"building.grave",
+	"building.grindstone",
+	"building.market_stall",
+	"building.milestone",
+	"building.quench_trough",
+	"building.robbers_dig",
+	"building.round_table",
+	"building.rubble_heap",
+	"building.sarcophagus",
+	"building.set_windlass",
+	"building.smith_bench",
+	"building.tavern_table",
+	"building.temple_altar",
+	"building.woodpile",
+	"prop.anvil",
+]
+## The height (m) at or under which art-kit's drawn SOLID piece is heard over
+## (925), and the taller ones heard over all the same.
+const HEARD_OVER_HEIGHT := 1.35
+const HEARD_OVER_TALL: Array[String] = ["building.market_stall"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -3409,6 +3446,7 @@ static func _building_links(level: Dictionary, config: Dictionary, warnings: Arr
 static func _lay_solid(level: Dictionary) -> void:
 	var terrain: Dictionary = level["terrain"]
 	var solid: Array[Vector2i] = []
+	var heard_over: Array[Vector2i] = []
 	for building: Dictionary in level["buildings"]:
 		for cell in banked_cells(building):
 			terrain["floor"].erase(cell)
@@ -3422,7 +3460,10 @@ static func _lay_solid(level: Dictionary) -> void:
 			if cell != door:
 				terrain["floor"].erase(cell)
 				solid.append(cell)
+				if str(building["slot"]) in HEARD_OVER:
+					heard_over.append(cell)
 	terrain["solid"] = solid
+	terrain["heard_over"] = heard_over  # 925: hearing passes over these.
 
 
 ## A parsed building's cells laid solid though it is no SOLID one (718): a

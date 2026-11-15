@@ -15,7 +15,8 @@ extends Node3D
 ## slot's sim noise (SoundKit.reach: Senses' radii; a footstep's the body's,
 ## Senses.step_radius, passed in), counted in cells, Chebyshev, from the
 ## listener's cell (the local player's, set by the view); with no clear line
-## (a wall or a closed door between: World.has_clear_line) it carries half
+## (a wall or a closed door between: World.has_hearing_line, which passes
+## over the low solids a person sees over, 925) it carries half
 ## as far and is played through a low-pass. Beyond that it isn't played at
 ## all. Within it, it falls from full at a cell to EDGE_DB at the edge; the
 ## 3D player only pans it (its own distance falloff is off).
@@ -161,7 +162,7 @@ static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1, cl
 		if cover < 1.0:
 			reach = maxi(1, roundi(reach * cover))
 	var d := maxi(absi(at.x - from.x), absi(at.y - from.y))
-	var muffled := d > 0 and not clear and not World.has_clear_line(at, from)
+	var muffled := d > 0 and not clear and not World.has_hearing_line(at, from)
 	var carries := reach / 2.0 if muffled else float(reach)
 	if reach <= 0 or d > reach or (muffled and d * 2 > reach):
 		return {"heard": false, "muffled": muffled, "db": -80.0}

@@ -116,6 +116,7 @@ func _ready() -> void:
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
+		_test_heard_over()
 		_test_knight_stands()
 		await _test_forge()
 		await _test_companion_death()
@@ -2375,7 +2376,8 @@ func _test_tavern_room() -> void:
 			("%.1f" % db) if on else "off"])
 	print("  each seat, dB over the take, the tables' rule -> the room's: %s" % "; ".join(rows))
 	print("  the takes' mean about -44 dBFS (measured at their cut, 920), so the farthest seat at about %.0f at the ear" % (farthest - 44.0))
-	_check(behind > 0 and bare_lost > 0, "the tables stand between the fire and %d of the eight seats; by the tables' rule %d hear nothing" % [behind, bare_lost])
+	# 925: the tables are heard over, so they muffle no seat now; sight's line still stops at them.
+	_check(behind > 0 and bare_lost == 0, "the tables stand on sight's line from the fire to %d of the eight seats; heard over (925), %d hear nothing" % [behind, bare_lost])
 	_check(all_clear and by_distance, "inside its room every seat hears the fire clear of the tables, its level by distance alone")
 	# 920 put the far seats at -56 from (1, 6); the fire's own cell (0, 6) is
 	# floor (the fireplace's fire cells), so they are a cell further, -59.
@@ -18529,3 +18531,43 @@ func _test_bent_walk() -> void:
 	body._present = true
 	_check(body._bent_step(body._to_tile, 0.9).is_empty(), "a push is drawn straight")
 	body.free()
+
+
+## 925: hearing passes over a solid a person sees over (Level.HEARD_OVER),
+## not through a wall, on the real levels each in a zone of its own. The
+## Mughouse: the taverner's cup from her work stands behind the bar, (8, 2)
+## and (10, 2), heard clear at the counter's guest side, (8, 4) and (10, 4),
+## over the bar counter; across the common room's east wall into its kitchen,
+## no solid on the line, still muffled. The wilds: a sound at Rolf's cell
+## behind his stall, (203, 196), heard clear by a buyer before it, (203, 198).
+## Sight across both counters as before: has_clear_line still blocked.
+func _test_heard_over() -> void:
+	print("\n== hearing over a counter, not through a wall (925) ==")
+	var cup := "sfx.cup_set_down"
+	var tavern := Level.load_level("umbrage_tavern")
+	var was := World.enter(World.add_zone("view_heard_tavern"))
+	World.load_terrain(tavern["terrain"])
+	for pair: Array in [[Vector2i(8, 2), Vector2i(8, 4)], [Vector2i(10, 2), Vector2i(10, 4)]]:
+		var heard := Sfx.hearing(cup, pair[0], pair[1])
+		_check(World._solid.has(Vector2i(pair[0].x, 3)) and heard.heard and not heard.muffled and not World.has_clear_line(pair[0], pair[1]),
+				"her cup from %s heard clear at %s over the bar (%s, %.1f dB); sight across the counter blocked as before"
+				% [pair[0], pair[1], "muffled" if heard.muffled else "clear", float(heard.db)])
+	var room := Vector2i(11, 4)
+	var kitchen := Vector2i(14, 4)
+	var through := Sfx.hearing(cup, room, kitchen)
+	var no_solid := [Vector2i(12, 4), Vector2i(13, 4)].all(func(cell: Vector2i) -> bool: return not World._solid.has(cell))
+	_check(no_solid and not World.has_clear_line(room, kitchen) and through.muffled,
+			"across the common room's east wall into the kitchen (%s to %s), no solid on the line: still muffled" % [room, kitchen])
+	World.enter(was)
+	World.zones.erase("view_heard_tavern")
+	var wilds := Level.load_level("wilds")
+	was = World.enter(World.add_zone("view_heard_wilds"))
+	World.load_terrain(wilds["terrain"])
+	var rolf := Vector2i(203, 196)
+	var buyer := Vector2i(203, 198)
+	var at_stall := Sfx.hearing(cup, rolf, buyer)
+	_check(World._solid.has(Vector2i(203, 197)) and at_stall.heard and not at_stall.muffled and not World.has_clear_line(rolf, buyer),
+			"a sound at Rolf's cell %s heard clear by a buyer at %s across his stall (%s, %.1f dB); sight across it blocked as before"
+			% [rolf, buyer, "muffled" if at_stall.muffled else "clear", float(at_stall.db)])
+	World.enter(was)
+	World.zones.erase("view_heard_wilds")

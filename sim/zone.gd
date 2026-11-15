@@ -24,6 +24,8 @@ var water: Dictionary[Vector2i, bool] = {}
 var fords: Dictionary[Vector2i, bool] = {}
 ## A solid building's cells (decision 550): they stop sight.
 var solid: Dictionary[Vector2i, bool] = {}
+## The solid cells hearing passes over (925, World._heard_over).
+var heard_over: Dictionary[Vector2i, bool] = {}
 ## Each cell's cover in its rect (World.cover_at, decision 508).
 var cover := PackedFloat32Array()
 var cover_rect := Rect2i()
