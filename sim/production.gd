@@ -748,17 +748,19 @@ func building_in(town: String) -> bool:
 
 ## Whether every build [param town] has in hand is stalled (decision 522):
 ## queued, its materials not in the store, ordered build_wait.days ago or
-## more (a build saved before 522 has no "at": long ago), and fewer than
-## build_wait.most of them; then the town may order
+## more (a build saved before 522 has no "at": long ago), however many
+## there are (522 amended (3): a cap of build_wait.most froze Umbrage behind
+## three repairs, two wanting ore, from 10-25); then the town may order
 ## its next build, the stalled one kept at the head (499's shortfall, the
-## builder's first choice once its materials come).
+## builder's first choice once its materials come). Orders stay bounded
+## without a cap: one job at most per building kind (repair, roof, choose).
 func builds_stalled(town: String) -> bool:
 	var rule: Dictionary = rules.get("build_wait", {})
 	var wait := int(float(rule.get("days", 0)) * maxi(DayNight.day_steps, 1))
 	if wait <= 0:
 		return false
 	var builds := _jobs.values().filter(func(each: Dictionary) -> bool: return each["kind"] == "build" and each["town"] == town)
-	if builds.is_empty() or builds.size() >= int(rule.get("most", 3)):
+	if builds.is_empty():
 		return false
 	for each: Dictionary in builds:
 		if each["state"] != "queued" or now() - int(each.get("at", 0)) < wait or _affords(town, {"from": each.get("cost", {})}, false):
@@ -794,14 +796,48 @@ func job(id: int) -> Dictionary:
 	return _jobs.get(id, {}).duplicate(true)
 
 
-## [param town]'s first build job still queued (by id), without copying
-## every job: [id, a copy of it], or [0, {}] for none (Towns.shortfall).
+## [param town]'s first build job still queued in build_order (the builder's
+## order, 522 amended (3): the head means one thing to the builder, the
+## players and the town's account), without copying every job: [id, a copy
+## of it], or [0, {}] for none (Towns.shortfall).
 func queued_build(town: String) -> Array:
-	for id in jobs():
+	var id := _head_build(town)
+	return [id, _jobs[id].duplicate(true)] if id != 0 else [0, {}]
+
+
+func _head_build(town: String) -> int:
+	for id in build_order():
 		var each: Dictionary = _jobs[id]
 		if each["kind"] == "build" and each["town"] == town and each["state"] == "queued":
-			return [id, each.duplicate(true)]
-	return [0, {}]
+			return id
+	return 0
+
+
+## 522 amended (3): [param town]'s head build (queued_build) that has headed
+## its queue short of its materials for build_wait.behind_days goes behind the
+## town's other queued builds (put_last), so the next is what the builder, the
+## players and the town's account work toward; never dropped, it comes back to
+## the head in turn. A lone queued build keeps the head, and so does one put
+## first (the town's first field, 613 amended (6): food first). A head that
+## lacks nothing but a builder is not moved. The job moved, 0 for none.
+func rotate_head(town: String) -> int:
+	var head := _head_build(town)
+	var others := 0
+	for id: int in _jobs:
+		var each: Dictionary = _jobs[id]
+		if id != head and each["kind"] == "build" and each["town"] == town and each["state"] == "queued":
+			others += 1
+			each.erase("head_at")  # Its time at the head starts when it gets there.
+	if head == 0:
+		return 0
+	var job: Dictionary = _jobs[head]
+	if not job.has("head_at"):
+		job["head_at"] = now()
+	var behind := int(float(rules.get("build_wait", {}).get("behind_days", 0)) * maxi(DayNight.day_steps, 1))
+	if behind <= 0 or others == 0 or bool(job.get("first", false)) or now() - int(job["head_at"]) < behind 			or _affords(town, {"from": job.get("cost", {})}, false):
+		return 0
+	put_last(head)
+	return head
 
 
 ## [param town]'s workers in id order as [{id, name, trades, away}], without
@@ -820,19 +856,41 @@ func town_workers(town: String) -> Array[Dictionary]:
 func put_first(id: int) -> void:
 	if _jobs.has(id):
 		_jobs[id]["first"] = true
+		_jobs[id].erase("behind")
+
+
+## Build job [param id] goes behind the town's other queued builds (522 amended (3),
+## rotate_head): "behind" the step it went (saved), so the one moved longest ago
+## comes round first; its time at the head cleared.
+func put_last(id: int) -> void:
+	if _jobs.has(id):
+		_jobs[id].erase("first")
+		_jobs[id].erase("head_at")
+		_jobs[id]["behind"] = now()
 
 
 ## Every job's id in the order a workshop looks at them (_bid): those put first
-## (put_first), then the rest, each by id.
+## (put_first), then the rest, each by id, then those put behind (put_last), the
+## one moved longest ago first.
 func build_order() -> Array[int]:
 	var ids := jobs()
 	var out: Array[int] = []
+	var later: Array[int] = []
 	for id in ids:
 		if bool(_jobs[id].get("first", false)):
 			out.append(id)
 	for id in ids:
-		if not bool(_jobs[id].get("first", false)):
+		if bool(_jobs[id].get("first", false)):
+			continue
+		if _jobs[id].has("behind"):
+			later.append(id)
+		else:
 			out.append(id)
+	later.sort_custom(func(a: int, b: int) -> bool:
+		var at_a := int(_jobs[a]["behind"])
+		var at_b := int(_jobs[b]["behind"])
+		return at_a < at_b or at_a == at_b and a < b)
+	out.append_array(later)
 	return out
 
 

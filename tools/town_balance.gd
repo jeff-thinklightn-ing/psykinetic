@@ -15,6 +15,11 @@ extends Node
 ## --folk=<trade,trade|none>: only those of the nine (767's soak: "none" for gatherers alone).
 ## --inn: an inn standing from the start (the treasury-floor check: its bed fee to the treasury).
 ## Each line then ends with the store's raws and the shelf's goods by id.
+## --damaged=<kind,kind>: those buildings standing at level 1, damaged, for the town to repair (522
+## amended (3)'s soak: the box's Umbrage, temple, kitchen and forge from 10-25); each line then says the
+## builds in hand, and the run ends "BUILDS most N at once (day D); ordered O; went behind B times".
+## --no-trade: visitors buy and sell nothing (Towns.visitor_arrives unwired), so ore comes from nowhere,
+## as on the box since 10-25.
 ## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> soak -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
 const TOWN := "wilds/store"
@@ -28,6 +33,12 @@ var _every := 7
 var _gatherers := false
 var _folk: Array = []  # [] for all of FOLK.
 var _inn := false  # --inn: an inn standing from the start (its bed fee to the treasury).
+var _damaged: Array = []  # --damaged: kinds standing damaged at the start.
+var _no_trade := false  # --no-trade: visitors' trade unwired.
+var _builds_most := 0
+var _builds_most_day := 0
+var _builds_seen := {}  # build job id -> true
+var _behind_seen := {}  # "id:behind" -> true
 
 
 func _ready() -> void:
@@ -54,6 +65,10 @@ func _ready() -> void:
 			field = false
 		elif arg == "--inn":
 			_inn = true
+		elif arg == "--no-trade":
+			_no_trade = true
+		elif arg.begins_with("--damaged="):
+			_damaged = Array(arg.trim_prefix("--damaged=").split(",", false))
 	DayNight.day_steps = DAY
 	Season.season_days = 7
 	Season.year_phase = 0.0
@@ -74,7 +89,8 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	work.deliver = economy.deliver
 	work.buy_materials = economy.buy_materials
 	economy.shortfall = towns.shortfall
-	towns.visitor_arrives = economy.visitor_arrives  # Visitors (711), as Main wires them.
+	if not _no_trade:
+		towns.visitor_arrives = economy.visitor_arrives  # Visitors (711), as Main wires them.
 	work.build_lacks = func(town: String) -> Dictionary: return towns.shortfall(town).get("needs", {})
 	work.town_pays = economy.owe_or_pay
 	work.settle_fund = economy.settle_fund
@@ -96,6 +112,8 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 		towns._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	if _inn:
 		towns._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	for kind: String in _damaged:
+		towns._town(TOWN)["buildings"][kind] = {"kind": kind, "level": 1, "state": Towns.DAMAGED, "since": 0, "job": 0}
 	for each in FOLK:
 		if each[2] == "farmer" and not field or not _folk.is_empty() and each[2] not in _folk:
 			continue
@@ -124,6 +142,7 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 			economy.tick()
 			Townsfolk.tick(work, stock, economy)  # With the economy: the thief's fence (decision 461).
 			herds.tick()
+			_count_builds(work, day)
 			for id in work.worker_ids(TOWN):
 				var fed := str(work.worker(id).get("fed", ""))
 				var key := "%s:%s" % [id, work.worker(id).get("needs", {}).get("meal", 0)]
@@ -132,10 +151,28 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 					meals[fed] += 1
 		if (day + 1) % _every == 0 or day == 0 or day + 1 == days:
 			_line(day + 1, towns, work, stock, meals)
+	print("BUILDS most %d at once (day %d); ordered %d; went behind %d times" % [_builds_most, _builds_most_day, _builds_seen.size(), _behind_seen.size()])
 	print("residents at the end:")
 	for id in work.worker_ids(TOWN):
 		var w := work.worker(id)
 		print("  %s %s (%s): purse %d, loan %.0f, fed %s" % [w["name"], w["trades"], w.get("type", ""), w["purse"], w["loan"], w["fed"]])
+
+
+## The town's builds in hand this tick (queued or being worked), the most at once, every build
+## ordered and every time one went behind (522 amended (3)).
+func _count_builds(work: Production, day: int) -> void:
+	var here := 0
+	for id: int in work.jobs():
+		var each: Dictionary = work._jobs[id]
+		if each["kind"] != "build" or each["town"] != TOWN:
+			continue
+		here += 1
+		_builds_seen[id] = true
+		if each.has("behind"):
+			_behind_seen["%d:%d" % [id, int(each["behind"])]] = true
+	if here > _builds_most:
+		_builds_most = here
+		_builds_most_day = day + 1
 
 
 func _line(day: int, towns: Towns, work: Production, stock: Stockpile, meals: Dictionary) -> void:
@@ -160,5 +197,11 @@ func _line(day: int, towns: Towns, work: Production, stock: Stockpile, meals: Di
 	for uid in stock.shop(TOWN):
 		var id := stock.book.id_of(uid)
 		shelf[id] = int(shelf.get(id, 0)) + 1
-	print("        raws: wood %d meat %d hide %d leather %d food %d | shelf %s"
-		% [stock.count(TOWN, "wood"), stock.count(TOWN, "meat"), stock.count(TOWN, "hide"), stock.count(TOWN, "leather"), stock.count(TOWN, "food"), shelf])
+	print("        raws: wood %d meat %d hide %d leather %d food %d ore %d | shelf %s"
+		% [stock.count(TOWN, "wood"), stock.count(TOWN, "meat"), stock.count(TOWN, "hide"), stock.count(TOWN, "leather"), stock.count(TOWN, "food"), stock.count(TOWN, "ore"), shelf])
+	var builds := PackedStringArray()
+	for id: int in work.build_order():
+		var each: Dictionary = work._jobs[id]
+		if each["kind"] == "build" and each["town"] == TOWN:
+			builds.append("%s %s%s" % [each["recipe"], each["state"], " (behind)" if each.has("behind") else ""])
+	print("        builds: %s" % (", ".join(builds) if not builds.is_empty() else "none"))

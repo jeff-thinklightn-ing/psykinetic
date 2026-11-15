@@ -52,6 +52,8 @@ func _ready() -> void:
 	_test_damage_and_restart()
 	_test_world_tick()
 	_test_stalled_build()
+	_test_unmeetable_build()
+	_test_stands_states()
 	_test_boot_line()
 	_test_day_line()
 	_test_newcomer_want()
@@ -296,7 +298,7 @@ func _test_stalled_build() -> void:
 	print("
 == a stalled build ==")
 	var rules := RULES.duplicate(true)
-	rules["build_wait"] = {"days": 2, "most": 3}
+	rules["build_wait"] = {"days": 2, "behind_days": 7}
 	_now = 0
 	var clock := func() -> int: return _now
 	_book = ItemBook.new(clock)
@@ -374,3 +376,116 @@ func _test_newcomer_want() -> void:
 	_towns._town(TOWN)["sought"]["wyn"]["freed_by"] = "p1"
 	_check(_towns.newcomer_want(TOWN).is_empty(), "led home by a player already: nothing asked")
 	_fresh()
+
+
+## 522 amended (3), the box's shape (Umbrage from 10-25): three repairs queued, all short
+## (two want ore that never comes), a woodcutter waiting unseated for a woodshed that costs
+## nothing. build_wait.most (3) froze it: three builds in hand never counted as stalled, so
+## nothing more was ever ordered. Now the stall is counted however many builds there are,
+## and a build short at the head for build_wait.behind_days goes behind the rest, never
+## dropped; what a player gave stays in the store for whichever build next takes it.
+func _test_unmeetable_build() -> void:
+	print("
+== a build that can't be met: the town builds what it can, the head goes behind (522 amended (3)) ==")
+	var rules := RULES.duplicate(true)
+	rules["build_wait"] = {"days": 2, "behind_days": 7}
+	rules["raids"] = {"repair": {"share": 0.5}}
+	rules["buildings"]["temple"] = {"built_by": "carpenter", "xp": 20, "cost": {"wood": 10, "ore": 10}, "steps": 6000, "max_level": 2}
+	rules["buildings"]["woodshed"] = {"trade": "woodcutter", "built_by": "carpenter", "xp": 10, "cost": {}, "steps": 1500, "max_level": 2}
+	_now = 0
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	_stock.deposit(TOWN, "wood", 2, "test")  # Short of every repair, as the box was before the wood came.
+	_work = Production.new({}, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, rules, clock)
+	_towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_towns.note_rescue(TOWN, "wil", "Wil", "woodcutter")
+	for kind: String in ["forge", "kitchen", "temple"]:
+		_towns._towns[TOWN]["buildings"][kind] = {"kind": kind, "level": 1, "state": Towns.DAMAGED, "since": 0, "job": 0}
+	for i in 3:
+		_towns._repair(TOWN)
+	var forge := int(_towns.building(TOWN, "forge")["job"])
+	var kitchen := int(_towns.building(TOWN, "kitchen")["job"])
+	var temple := int(_towns.building(TOWN, "temple")["job"])
+	_check(forge != 0 and kitchen != 0 and temple != 0 and _towns.xp(TOWN) >= _towns.xp_price(TOWN, "woodshed"),
+		"three repairs queued (forge %s, kitchen %s, temple %s), xp %d for the woodshed" % [_work.job(forge).get("cost"), _work.job(kitchen).get("cost"), _work.job(temple).get("cost"), _towns.xp(TOWN)])
+	var day := DayNight.day_steps
+	_run_to(2 * day - 600)
+	_check(_towns.building(TOWN, "woodshed").is_empty(), "not before build_wait.days")
+	_run_to(2 * day + 600)
+	var shed := int(_towns.building(TOWN, "woodshed").get("job", 0))
+	_check(shed != 0, "three builds in hand, every one short for two days: stalled all the same, the woodshed ordered (was frozen under build_wait.most)")
+	_run_to(2 * day + 3600)
+	_check(int(_towns.building(TOWN, "woodshed").get("level", 0)) == 1, "it costs nothing, so the carpenter builds it: the woodcutter can be seated (%s)" % [_towns.building(TOWN, "woodshed")])
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == forge, "the head is the first ordered, the forge's repair")
+	_run_to(7 * day + 600)
+	var order := _work.build_order().filter(func(id: int) -> bool: return id in [forge, kitchen, temple])
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == kitchen and order == [kitchen, temple, forge],
+		"seven days short at the head: the forge's repair goes behind, the kitchen's heads (%s)" % [order])
+	_check(_work.job(forge).get("state") == "queued", "never dropped: the forge's repair still queued")
+	_stock.deposit(TOWN, "wood", 3, "test")
+	_run_to(7 * day + 3600)
+	_check(_towns.building(TOWN, "kitchen").get("state", "") == Towns.STANDING, "its wood in: the kitchen is repaired (%s)" % [_towns.building(TOWN, "kitchen")])
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == temple, "the temple's repair heads next: what players are asked for is the temple's")
+	_stock.deposit(TOWN, "ore", 3, "a player, toward the temple")  # Banked while the temple heads.
+	_run_to(14 * day + 3600)
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == forge and _work.job(temple).get("state") == "queued",
+		"seven days on the temple is still short: it goes behind, the forge's repair heads again")
+	_check(_stock.count(TOWN, "ore") == 3, "the ore given toward the temple is still in the store: nothing lost")
+	_stock.deposit(TOWN, "wood", 5, "test")
+	_run_to(14 * day + 4800)
+	_check(_work.job(forge).get("state") == "working" and _stock.count(TOWN, "ore") == 0,
+		"the forge heads when the builder starts: it takes the ore given while the temple headed (%s)" % [_work.job(forge)])
+	_run_to(15 * day)
+	var lone := _towns.shortfall(TOWN)
+	_check(int(lone.get("job", 0)) == temple and _work.build_order().filter(func(id: int) -> bool: return _work.job(id).get("state") == "queued" and _work.job(id).get("kind") == "build").size() == 1,
+		"the forge repaired; the temple's repair alone in the queue (%s)" % [lone])
+	var went_behind: Variant = _work.job(temple).get("behind")
+	_run_to(23 * day)
+	_check(int(_towns.shortfall(TOWN).get("job", 0)) == temple and _work.job(temple).get("behind") == went_behind and _work.job(temple).get("state") == "queued",
+		"a lone queued build keeps the head, past behind_days, never dropped")
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(_work.to_dict()))
+	_stock.deposit(TOWN, "ore", 7, "test")
+	_stock.deposit(TOWN, "wood", 5, "test")
+	_work = Production.new(saved, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new(JSON.parse_string(JSON.stringify(_towns.to_dict())), _work, rules, clock)
+	_run_to(23 * day + 1200)
+	_check(_work.job(temple).get("state") == "working", "after a restart, its ore and wood in at last: the temple's repair is taken (%s)" % [_work.job(temple)])
+
+
+## 522 amended (3): what stands for _stands' five readers (newcomers, crop, butcher, stages,
+## visitors) and _farmed, by a building's state. Only a raise of a standing building changed:
+## BUILDING at level 1 or more stands at the level it has, as allows reads it; a first raise
+## (PLANNED, level 0), a damaged building under its repair (DAMAGED, its job set), one in disrepair
+## or a ruin stand for none of them, as on main.
+func _test_stands_states() -> void:
+	print("
+== what stands: a raise keeps its level, a first raise or a repair doesn't (522 amended (3)) ==")
+	_fresh()
+	_towns.note_rescue(TOWN, "tam", "Tam", "farmer")
+	var cases := [
+		["standing at level 1", {"level": 1, "state": Towns.STANDING, "job": 0}, true],
+		["raised to its second level (BUILDING, level 1)", {"level": 1, "state": Towns.BUILDING, "job": 7}, true],
+		["a first raise, nothing stood yet (PLANNED, level 0)", {"level": 0, "state": Towns.PLANNED, "job": 7}, false],
+		["damaged, its repair ordered (DAMAGED, level 1)", {"level": 1, "state": Towns.DAMAGED, "job": 7}, false],
+		["in disrepair (level 1)", {"level": 1, "state": Towns.DISREPAIR, "job": 0}, false],
+		["a ruin (level 0)", {"level": 0, "state": Towns.RUIN, "job": 0}, false],
+	]
+	for each: Array in cases:
+		for kind: String in ["kitchen", "field"]:
+			var entry: Dictionary = (each[1] as Dictionary).duplicate()
+			entry["kind"] = kind
+			entry["since"] = 0
+			_towns._town(TOWN)["buildings"][kind] = entry
+		var allowed := _towns.allows({"trade": "cook", "town": TOWN})
+		_check(_towns._stands(TOWN, "kitchen") == each[2] and _towns._farmed(TOWN) == each[2] and allowed == (each[2] as bool),
+			"%s: stands for the five and the field is farmed: %s; its bench works: %s" % [each[0], _towns._stands(TOWN, "kitchen"), allowed])
+
+
+## Towns' and Production's turns every 600 steps up to [param step].
+func _run_to(step: int) -> void:
+	while _now + 600 <= step:
+		_at(_now + 600)
+	if _now < step:
+		_at(step)

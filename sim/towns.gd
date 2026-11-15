@@ -790,6 +790,7 @@ func tick() -> void:
 		_sought_turn(town)
 		_visitors_turn(town)
 		_bench_audit(town)
+		_behind(town)
 		if _field_first(town):
 			continue
 		# One build at a time, unless the one in hand has stalled on its
@@ -803,6 +804,27 @@ func tick() -> void:
 		var kind := choose(town)
 		if not kind.is_empty():
 			unlock(town, kind)
+
+
+## 522 amended (3): [param town]'s head build, short of its materials at the head for
+## build_wait.behind_days, goes behind its other queued builds (Production.rotate_head),
+## so what the builder takes, what players are asked for ("for the new X") and what the
+## town's account makes move to the next. Never dropped: the damage stays, its repair a
+## task a player can do, back at the head in turn. Whatever a player gave stays in the
+## store for whichever build next takes it: nothing given is lost and nobody is owed. The
+## journal's line names the town and the building only.
+func _behind(town: String) -> void:
+	var moved := production.rotate_head(town)
+	if moved == 0:
+		return
+	var job := production.job(moved)
+	var short := PackedStringArray()
+	var cost: Dictionary = job.get("cost", {})
+	for what: String in cost:
+		var lacking := int(cost[what]) - production.stockpile.count(town, what)
+		if lacking > 0:
+			short.append("%d %s" % [lacking, what])
+	print("[towns] %s: %s goes behind the town's other builds, short %s, step %d" % [town, str(job.get("recipe", "")), ", ".join(short), now()])
 
 
 ## The town's first field before all (613 amended (6), food first; a case read from the
@@ -1744,7 +1766,8 @@ func _crop_turn(town: String, crop_now: Dictionary, was: String, now_season: Str
 func _farmer_comes(town: String) -> void:
 	var house := building(town, "field")
 	var rule: Dictionary = rules.get("crop", {})
-	if rules.get("buildings", {}).has("field") and not _stands(town, "field") and not _has_trade(town, WALKS_IN) \
+	# A field not STANDING is none here, one being raised included (613 amended (5)'s ruling; not _stands).
+	if rules.get("buildings", {}).has("field") and not (int(house.get("level", 0)) >= 1 and house.get("state") == STANDING) and not _has_trade(town, WALKS_IN) \
 			and bool(rule.get("walks_in", true)):
 		_farmer_walks_in(town, rule)
 		return
@@ -2022,13 +2045,16 @@ func _butcher(town: String) -> void:
 ## Whether [param town]'s field stands and has its farmer.
 func _farmed(town: String) -> bool:
 	var field := building(town, "field")
-	return int(field.get("level", 0)) >= 1 and field.get("state") == STANDING 			and residents(town).any(func(who: String) -> bool: return "farmer" in production.worker(who).get("trades", []))
+	return int(field.get("level", 0)) >= 1 and field.get("state") in [STANDING, BUILDING] 			and residents(town).any(func(who: String) -> bool: return "farmer" in production.worker(who).get("trades", []))
 
 
-## Whether [param town]'s [param kind] stands (at least level 1).
+## Whether [param town]'s [param kind] stands (at least level 1), as allows reads it: one being
+## raised to its next level (BUILDING) still stands at the level it has (522 amended (3): with the
+## stall uncapped a town raises its buildings while a repair waits on ore, and a loom under its
+## second stage turned its weaver away; a field under its second its farmer's crop and its farmer).
 func _stands(town: String, kind: String) -> bool:
 	var house := building(town, kind)
-	return int(house.get("level", 0)) >= 1 and house.get("state") == STANDING
+	return int(house.get("level", 0)) >= 1 and house.get("state") in [STANDING, BUILDING]
 
 
 ## A town whose pasture stands (built once its field is farmed: choose)

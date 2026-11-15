@@ -19544,6 +19544,32 @@ can't buy hides (36 banked in the store over the run), his margin on a
 piece of leather (about 1.4 gold over two hides) less than his keep.
 larder_test. Protocol unchanged.
 
+522 amended (3) (label from tools/decision_number.sh; the coordinator's approval, 11-14): a build that can't be met no longer freezes its town.
+- **What froze Umbrage.** Its temple, kitchen and forge repairs, ordered on 10-25, all waited short: the temple and the forge on ore the town never got, the kitchen on wood until later. Production.builds_stalled returned false once a town held build_wait.most (3) builds, so Towns' turn stopped at one build at a time for good: no roof, no choose, no woodshed for the woodcutter waiting unseated. Only 613 amended (6)'s first field got past it.
+- **Stalled however many.** A town counts as stalled when every build it holds has waited build_wait.days (2) short of its materials, however many there are; "most" is out of the rule. Orders stay bounded without it: _repair orders one job per damaged building with none, _roof one per roof, and choose skips a kind already being built, so a town holds at most one job per building kind. A queued build whose materials are in the store isn't stalled, even with no builder present: nothing could be built then, and ordering more would only pile up jobs.
+- **Goes behind, never dropped.** A queued build that has headed its town's queue short of its materials for build_wait.behind_days (7) goes to the back (Production.rotate_head, put_last; "behind" holds the step it went, saved with the job, so the one moved longest ago comes round first). The next queued build heads instead: it is what the builder takes, what players are asked to give toward ("for the new X", "built with your ore"), and what 522 amended (2)'s maker makes on the town's account. A town with one queued build keeps it at the head, as does a build put first (the first field, 613 amended (6): food first). A head lacking nothing but a builder isn't moved.
+- **Why not drop it.** _repair would order it again at the next turn (the building still damaged, no job), so a drop would need a saved "don't reorder" mark. And it would take away the one thing a player can do there: ore is among the pedlar's raws, the castle market sells it, and players carry it home.
+- **Nothing given is lost.** A queued build holds nothing: its materials are taken when the builder starts, and a repair costs no experience. When the head moves, what the town asks for changes, but whatever a player gave stays in the store and counts toward whichever build next takes it, so nobody is owed. A giver's thanks (804's build credit, kept on the building they gave toward) still come when that building stands, even if their ore went into another first.
+- **Same head everywhere.** Production.queued_build, Towns.shortfall's source, now reads build_order, as the builder's bid does, so the head means one thing to the builder, the players and the town's account. Before, a field put first was never the shortfall.
+- **A building being raised still stands.** A building being raised to its next level now stands at the level it has.
+  - Towns._stands and Towns._farmed read a building at level 1 or more as standing in state STANDING or BUILDING, as allows (the benches) always has.
+  - The five readers this changes: newcomers (_comes for the shepherd, weaver and butcher), the crop (_crop's field days), the butcher's flock, the town's stages, and visitors' needs. _farmed (the pasture's want) changes the same way.
+  - Why: uncapped, a town raises its buildings while a repair waits on ore. farm_test's flock run ordered the loom's second stage, and its weaver never came.
+  - Unchanged from main: a first raise (PLANNED, level 0), a damaged building under its repair (DAMAGED, its job set: _repair never changes its state), one in disrepair and a ruin stand for none of the five, and their benches don't work.
+  - The exception: _farmer_comes keeps 613 amended (5)'s ruling, so a field not STANDING, one being raised included, has a farmer walk in at once.
+  - towns_test _test_stands_states holds each state's row: the five, _farmed and the bench.
+- **The journal line.** "[towns] <town>: <build> goes behind the town's other builds, short <what>, step N": the town and the building, never a name.
+- **On the box.** At the deploy, a present carpenter takes the kitchen's repair (wood in store). The ore repairs stall after 2 days, choose orders the woodshed (cost {}, xp 10), and it is built next. The temple and forge repairs take turns at the head every 7 days while players are asked for ore. Nothing is written to the box.
+- **Tests.** towns_test _test_unmeetable_build, the box's shape: three repairs queued, all short (two of ore), a woodcutter unseated, xp for the woodshed.
+  - The woodshed is ordered at 2 days (frozen under "most") and stands; the forge's repair, at the head 7 days, goes behind and is never dropped.
+  - The kitchen is repaired once its wood is in, and the temple heads; ore banked while the temple heads is taken by the forge's repair when the forge heads at the builder's start.
+  - A lone queued build keeps the head past 7 days; after a restart, its ore in, it is taken.
+  - _test_stalled_build as before.
+- **Soak.** tools/town_balance --days=56 --gatherers --no-trade --damaged=temple,kitchen,forge (the town's traders unwired, so no ore comes, as on the box). New flags: --damaged, --no-trade, and a "builds:" line each week.
+  - "BUILDS most 3 at once (day 5); ordered 8; went behind 7 times". The kitchen was repaired on day 3; the tannery, woodshed, pasture, field and kitchen's second level stood by day 9. The two ore repairs took turns at the head every 7 days to the end, queued, never dropped. No one went hungry.
+  - With the traders wired, 5 ore came on days 5 and 9 and everything stood by day 14 ("BUILDS most 2 at once").
+- Server only; protocol unchanged; no new class_name. CHANGELOG bullet in voice's words, held until release's journal read after the deploy shows the kitchen's repair taken or the woodshed ordered.
+
 ## 523. Fire drawn: flames, embers, smoke, and a flickering light
 
 The castle's fixes asked for "fire that looks like fire (flicker, flames,
