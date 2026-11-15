@@ -38,7 +38,7 @@ var _keeper := {"missing": [], "astray": [], "cells": {}, "doings": {}}  # 333 a
 ## at once before the evening, and any sitter not facing it.
 const FIRE_NOON := Vector2(12.0, 14.0)
 const FIRE_DAY_END := 17.0
-var _fire := {"noon": [], "most": 0, "most_at": "", "askew": []}
+var _fire := {"noon": [], "most": 0, "most_at": "", "askew": [], "keepers": [], "keeper_work": 0, "healer_work": 0}
 
 
 func _ready() -> void:
@@ -95,6 +95,9 @@ func _run() -> void:
 	_check(int(_fire["most"]) <= Resident.FIRE_SITTERS, "853am18: by day never more than %d of the square's people hold the fire's seats at once (most %d%s)" % [
 		Resident.FIRE_SITTERS, int(_fire["most"]), (" at " + str(_fire["most_at"])) if not str(_fire["most_at"]).is_empty() else ""])
 	_check((_fire["askew"] as Array).is_empty(), "853am18: a sitter at the fire faces it (%s)" % [(_fire["askew"] as Array).slice(0, 3)])
+	_check(int(_fire["keeper_work"]) > 0 and int(_fire["healer_work"]) > 0 and (_fire["keepers"] as Array).is_empty(),
+		"853am18: the stall's keeper and the healer never hold a fire seat in a work spell (%d and %d work samples; %s)" % [
+			int(_fire["keeper_work"]), int(_fire["healer_work"]), (_fire["keepers"] as Array).slice(0, 3)])
 	var names: Array = _worst.keys()
 	names.sort()
 	print("  longest idle stay each, game minutes: %s" % ", ".join(names.map(func(n: String) -> String: return "%s %d" % [n, _worst[n]])))
@@ -161,6 +164,11 @@ func _sample_fire() -> void:
 	var holding := 0
 	for entity in World.townsfolk():
 		var body := entity as Resident
+		# The keepers (the coordinator's row): the stall's and the healer, near or far, never at a fire seat at work.
+		if body != null and (body.worker_id == Offers.VENDOR + TOWN or body.town.begins_with("wilds/healers_hut")) and body.doing == Resident.Doing.WORK:
+			_fire["keeper_work" if body.worker_id == Offers.VENDOR + TOWN else "healer_work"] += 1
+			if str(body._spot.get("use", "")) == "fire":
+				(_fire["keepers"] as Array).append("%s at %s, %.2f" % [body.person, body._spot.get("cell"), hour])
 		if body == null or not body.spawned or body.town != TOWN or str(body._spot.get("use", "")) != "fire":
 			continue
 		holding += 1

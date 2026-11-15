@@ -54658,15 +54658,24 @@ while fewer than Resident.FIRE_SITTERS (2) of its town hold one, so one or two a
 stands and talk pairs keep the rest of the square; past two, or with the fire out, the seats leave the pool.
 A laid "fire" spot (no pit given) is taken as before, burning or not. The night's lodgers and the inn-goers
 turned away (Main._inn_town_side) keep their rules, every lit seat theirs, the burning read from the pit
-(Resident.fire_burns); in Umbrage they now find the seats their rules named. A seat is taken as any spot is
-(853 amended (16)).
+(Resident.fire_burns). The night's square-goers sit there too: the town's people whose night pick (772) or
+stint has them on the square after dark take the burning seats as by day, two at most (the coordinator's
+ruling (1), 11-15: people main already puts out on the square at those hours, sitting by a burning fire in
+place of standing, which points at nothing not in). 875's seat rules for the lodgers and the turned away stay
+inert until its switch: with 875's evening off they seat nobody at the fire. The keepers (the stall's, the
+healer) never take a seat at work: their work places hold no square. A seat is taken as any spot is (853
+amended (16)).
 - resident_test _test_fire_seats: the seats' faces; burning, the seat on every pick of six; out, the stand;
   two of the town at its seats, the stand.
 - town_day_test: between 12:00 and 14:00 someone sits at the square's fire facing it (first: Maud at
   (192, 212), 12.00, SQUARE; on main's code 0 samples, FAIL); before 17:00 never more than two hold its
-  seats; no sitter faces away.
-Server only; protocol unchanged; no new class_name; no bullet until a joined still shows one or two sitting
-at it at midday from the square, at the nearest zoom (ui-design shoots it once on main).
+  seats; no sitter faces away; the stall's keeper and the healer never hold one in a work spell (974 and 913
+  work samples).
+- fire_night_test (new; 21:00 to 05:00, 875 off): no lodger and no turned-away inn-goer holds a fire seat;
+  every holder's doing is the square (Hew, Pell and Nix sat); never more than two; none faces away; the fire
+  put out at 03:00, nobody holds a seat from 04:05.
+Server only; protocol unchanged; no new class_name; no bullet until ui-design's two joined stills, the player
+standing in the square, noon and about 22:00, zoom and the view's width named; voice words it to them.
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
