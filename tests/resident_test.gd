@@ -5651,6 +5651,8 @@ func _test_lodger_keeps_seat(rolf: String) -> void:
 	sitter._retry_at = -1
 	sitter._rise_until = -1
 	sitter._wander_at = World.tick  # A stroll due now.
+	sitter.activity = ""
+	World.face(sitter, Vector2i(0, -1))  # Put on its seat with its back to the table (maps' look on 659186cfe: stood an hour, never sat).
 	var quarter := maxi(DayNight.day_steps / 96, Resident.STROLL_TICKS + Resident.STROLL_SPREAD)
 	var tiles: Array[Vector2i] = []
 	var doings := {}
@@ -5662,6 +5664,7 @@ func _test_lodger_keeps_seat(rolf: String) -> void:
 		doings[Resident.Doing.keys()[sitter.doing]] = true
 	_check(doings.keys() == ["HOME"] and tiles.all(func(at: Vector2i) -> bool: return at == cells[0]) and sitter._goal == cells[0],
 		"a lodger in HOME on a seat at %.2f: four quarter hours, one seat (%s, %s, goal %s)" % [night + 0.25, tiles, doings.keys(), sitter._goal])
+	_check(sitter.facing == Vector2i(0, 1) and sitter.activity == "sit", "held on his seat, he turns to it and sits (facing %s, activity \"%s\")" % [sitter.facing, sitter.activity])
 	# A body with a bed: no seats asked in HOME, its bed as ever.
 	var bed := Rect2i(cells[1], Vector2i.ONE)
 	sitter.places = {"inn": room, "square": room, "home": room, "work": room, "well": room, "temple": room, "bed": bed}

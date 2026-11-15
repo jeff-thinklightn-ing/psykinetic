@@ -540,8 +540,8 @@ func _sim_tick() -> void:
 			World.walk(self, _goal, FAR_EVERY)
 		return
 	_step()
-	if keep_moving and tile == _goal and (activity in POSES or (activity.is_empty() and _strolls())):
-		_face_open()  # Not on its way to bed (its head to the wall is _show_work's), nor at a task.
+	if keep_moving and tile == _goal and (activity in POSES or (activity.is_empty() and (_strolls() or _night_seated()))):
+		_face_open()  # Not on its way to bed (its head to the wall is _show_work's), nor at a task; a lodger held on his seat turns to it and sits (875 amended (5)).
 
 
 ## Lost (decision 487): stands where it is, or follows the player who spoke
