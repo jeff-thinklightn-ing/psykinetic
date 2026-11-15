@@ -84,6 +84,10 @@ refused "--sought-first without --tour: refused" "--sought-first: refused (only 
 	--joined --server-args "--sought-first" "$sha" x --
 refused "--test-hp without --tour: refused" "--test-hp: refused (only with --tour)" \
 	--joined --server-args "--test-hp" "$sha" x --
+refused "--test-visitor without --tour: refused" "--test-visitor=pedlar: refused (only with --tour)" \
+	--joined --server-args "--test-visitor=pedlar" "$sha" x --
+refused "--test-visitor of another kind: refused (pedlar alone)" "--test-visitor=pilgrim: refused (only --test-visitor=pedlar)" \
+	--tour smoke --server-args "--test-visitor=pilgrim" "$sha" x --
 refused "--run-marker asked for: refused (the runner names it, under --tour)" "--server-args --run-marker=x: refused" \
 	--tour smoke --server-args "--run-marker=x" "$sha" x --
 refused "--overlay-dir asked for: refused (the runner names it, under --tour)" "--server-args --overlay-dir=x: refused" \
@@ -128,12 +132,12 @@ else
 	echo "  FAIL  --builder-stub alone: exit $code, got [$got_args]"; failed=$((failed + 1))
 fi
 rm -f "$tmp/reached"
-sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp" "$sha" tourx --)"
+sent="$(shot --dry-run --tour kit --tour-only wall --tour-minutes 10 --server-args "--test-foe=robber+robber+great_bear,sword+shield,1,around --sought-first --test-hp --test-visitor=pedlar" "$sha" tourx --)"
 code=$?
-wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --regenerate;server_args: --run-marker=tour-tourx;server_args: --overlay-dir=user://tour_overlay/;tour: tour=kit;tour: only=wall;tour: bots=1;timeout: 17 min;"
+wanted_args="args: --disable-vsync;args: --scene;args: res://tests/tour/tour.tscn;args: --;args: --name=Tourbot;args: --player-id=70a70000-0000-4000-8000-000000000001;args: --tour=kit;args: --tour-out=D:/psykinetic-runs/tourx/out;args: --tour-minutes=10;args: --test-exit-after=850;args: --tour-phase=1;args: --bind=127.0.0.1;server_args: --test-foe=robber+robber+great_bear,sword+shield,1,around;server_args: --sought-first;server_args: --test-hp;server_args: --test-visitor=pedlar;server_args: --regenerate;server_args: --run-marker=tour-tourx;server_args: --overlay-dir=user://tour_overlay/;tour: tour=kit;tour: only=wall;tour: bots=1;timeout: 17 min;"
 got_args="$(printf '%s\n' "$sent" | grep -E '^(args|server_args|tour|timeout): ' | tr '\n' ';')"
 if [ $code -eq 0 ] && [ "$got_args" = "$wanted_args" ] && [ ! -f "$tmp/reached" ]; then
-	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its own overlay dir, its foe, --sought-first and --test-hp; no mode, port or token"
+	echo "  PASS  --tour sends tour.sh's client args, the test player's fixed id, --regenerate, --run-marker, its own overlay dir, its foe, --sought-first, --test-hp and --test-visitor=pedlar; no mode, port or token"
 else
 	echo "  FAIL  --tour's args: exit $code, got [$got_args], wanted [$wanted_args]"; failed=$((failed + 1))
 fi

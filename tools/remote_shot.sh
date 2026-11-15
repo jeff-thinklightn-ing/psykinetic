@@ -304,7 +304,13 @@ if [ $JOINED -eq 1 ]; then
 			--test-hp)
 				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
-			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters, --builder-stub, --builders=<test ids> with it; --test-foe=a,b, --sought-first and --test-hp with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
+			# A tour's visiting pedlar at his stand (711 amended (2)): under --tour only, "pedlar" alone; the
+			# server answers it only beside --test-hp and the runner's --run-marker.
+			--test-visitor=*)
+				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
+				[ "${arg#--test-visitor=}" = "pedlar" ] || { echo "--server-args $arg: refused (only --test-visitor=pedlar)"; exit 2; }
+				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
+			*) echo "--server-args $arg: refused (the server takes --hour, --map, --day-minutes, --weather, --season, --season-days, --max-players as --key=value, and --no-companions, --still-monsters, --builder-stub, --builders=<test ids> with it; --test-foe=a,b, --sought-first, --test-hp and --test-visitor=pedlar with --tour; the runner names the rest, the admin port too)"; exit 2 ;;
 		esac
 	done
 	# A laptop's server never makes a real builder request: --builders turns builder mode on only
