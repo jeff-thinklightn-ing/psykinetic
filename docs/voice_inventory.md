@@ -3133,7 +3133,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (947)
+## Lines in the data (950)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3495,7 +3495,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (148)
+### levels/residents.json (151)
 
 | | Line | Key |
 |---|---|---|
@@ -3541,6 +3541,9 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Back again. What'll it be? | `keeper.greet_again[0]` |
 |  | Here's your locker, as you left it. | `keeper.locker[0]` |
 |  | No room to set it down here. Give me a bit of space and ask again. | `keeper.nowhere[0]` |
+|  | Come up to the counter and I'll see to you. | `keeper.away[0]` |
+|  | Over here, at the stall. I can't serve you from there. | `keeper.away[1]` |
+|  | Step up where I can see you, then ask again. | `keeper.away[2]` |
 |  | I'll take that back. Can't pay for it, mind. | `keeper.back[0]` |
 |  | Back on the pile, then. No coin for it, mind. | `keeper.back[1]` |
 |  | Right, that's back with me. Nothing to pay on it. | `keeper.back[2]` |
