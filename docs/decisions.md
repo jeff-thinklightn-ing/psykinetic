@@ -11325,6 +11325,20 @@ never starts beside a suite or a running bench; status names the old head and th
 passed line; the old row's file unedited. With the pass switched off, four of these rows fail. Tools and tests only;
 protocol unchanged; no class_name; no bullet.
 
+394 amended (56): a bench or soak queued over an hour is named in status and the daily summary (the coordinator's
+approval, 2026-11-14; no front; label from tools/decision_number.sh). 11-14: builder's bench waited about five hours at
+the head of the gate, passed by 868 landings (45 passes a bench that cannot start, rightly), holding the bench lock all
+the while, and nobody saw it until builder did. A timing run waits on a quiet machine that landings rarely leave it, so
+past TIMING_WAIT_SECONDS (an hour) of waiting, TIMING_KINDS (bench, soak) get "; queued N h, landings keep passing it:
+ask the coordinator for saturn or a laptop (394 amended (56))" on their status line (queue_reasons), and their waiter
+logs one "timing_wait" line, which the daily summary lists (SUMMARY_EVENTS) and prints to its own stderr. Not "run it
+as a scene": a scene's timings are not a bench's. Nothing about the queue changes. The bench lock's order is CLAUDE.md's
+(the coordinator's line: the bench's gate take first, the bench lock once it starts, never held while waiting on the
+gate), not built. tests/heavy_job_test.py: a bench queued 61 min behind a landing named, 59 min not; a soak queued 2 h
+behind a bench named; a scene queued 2 h never; a waiting bench's waiter logs it once (the hour shortened to 0.3 s) and
+starts when the suite ends as before; the day's summary lists it. On main's code the first two named rows fail. Tools
+and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

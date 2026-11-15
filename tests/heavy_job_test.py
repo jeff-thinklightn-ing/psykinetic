@@ -2178,6 +2178,58 @@ line = gate.bench_wait(bench_13th, convoy, [remote_on] + lock_waits, convoy_runs
 check(line == "; after 15 landings ahead, about 126 min", "a bench behind the convoy: %r" % line)
 check(gate.bench_wait(bench_13th, [], [remote_on], convoy_runs, now, 60.0, None) == "", "none ahead: nothing said")
 
+print("== a bench or soak queued over an hour is named (394 amended (56)) ==")
+# 11-14: builder's bench waited five hours at the head, passed by 868 landings, holding the bench lock.
+def entry56(tree, kind, age):
+    return {"file": "%019d-%s-1.json" % (int(age), tree), "tree": tree, "kind": kind, "queued": now - age,
+        "gate": gate.GATE_REVISION, "lock_rule": gate.LOCK_RULE, "checkout": "C:/dev/x"}
+advice = "landings keep passing it: ask the coordinator for saturn or a laptop (394 amended (56))"
+on56 = [dict(gate.KINDS["suite_remote"], kind="suite_remote", tree="lander", using_gb=0.0, started=now - 60)]
+said56 = gate.queue_reasons([entry56("builder", "bench", 3660)], on56, 60.0, 60.0, None, now=now)
+check(said56[0].startswith("waits: ") and said56[0].endswith("; queued 1.0 h, " + advice),
+    "a bench queued 61 min behind a landing: its line ends with the advice (%s)" % said56)
+said56 = gate.queue_reasons([entry56("builder", "bench", 3540)], on56, 60.0, 60.0, None, now=now)
+check(advice not in said56[0], "59 min: not yet (%s)" % said56)
+bench_on = [dict(gate.KINDS["bench"], kind="bench", tree="terrain", using_gb=0.0, started=now - 60)]
+said56 = gate.queue_reasons([entry56("economy", "soak", 7200)], bench_on, 60.0, 60.0, None, now=now)
+check("; queued 2.0 h, " + advice in said56[0], "a soak queued 2 h behind a bench: named the same (%s)" % said56)
+said56 = gate.queue_reasons([entry56("art", "scene", 7200)], [dict(gate.KINDS["scene"], kind="scene", tree="s%d" % n,
+    using_gb=0.0, started=now - 60) for n in range(2)], 60.0, 60.0, None, now=now)
+check(advice not in said56[0], "a scene queued 2 h: never (it is no timing) (%s)" % said56)
+mem56, total56, poll56, wait56 = gate._memory, gate.total_ram_gb, gate.POLL_SECONDS, gate.TIMING_WAIT_SECONDS
+saved56 = gate._read(gate._path("kinds.json"))
+gate._write(gate._path("kinds.json"), {"bench": dict(gate.KINDS["bench"], ram_gb=1.0, commit_gb=1.0)})
+gate.total_ram_gb = lambda: None
+gate._memory = lambda: (40.0, 40.0)
+gate.POLL_SECONDS = 0.05
+gate.TIMING_WAIT_SECONDS = 0.3
+clear_gate()
+owed_job("lander56", "suite", 0.5)
+log56 = gate._path("heavy_jobs.log")
+before56 = open(log56).read() if os.path.exists(log56) else ""
+taker56 = threading.Thread(target=lambda: gate.take("builder56", "bench", os.getpid()), daemon=True)
+taker56.start()
+seen56 = until(lambda: "\ttiming_wait\tbuilder56\tbench\t" in open(log56).read()[len(before56):], 10.0)
+time.sleep(0.5)
+lines56 = [each for each in open(log56).read()[len(before56):].splitlines() if "\ttiming_wait\t" in each]
+check(seen56 and len(lines56) == 1 and lines56[0].endswith(advice),
+    "its waiter logs it once, past the hour, with the advice (%s)" % lines56)
+gate._retried(os.remove, gate._path("running", "lander56-suite-%d.json" % os.getpid()))  # The suite done.
+check(until(lambda: "builder56" in trees("running"), 10.0), "the suite done: the bench starts as before (%s)" % trees("running"))
+taker56.join(5)
+gate.release("builder56", "bench")
+out56 = io.StringIO()
+with contextlib.redirect_stdout(out56):
+    gate.summary(datetime.date.today().isoformat())
+check(" builder56 bench timing_wait: queued " in out56.getvalue() and advice in out56.getvalue(),
+    "the day's summary lists it (%s)" % [each for each in out56.getvalue().splitlines() if "timing_wait" in each])
+gate._memory, gate.total_ram_gb, gate.POLL_SECONDS, gate.TIMING_WAIT_SECONDS = mem56, total56, poll56, wait56
+if saved56 is not None:
+    gate._write(gate._path("kinds.json"), saved56)
+elif os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+clear_gate()
+
 print("== a load_check starts past the queue (394 amended (48)) ==")
 gate.MARGIN_GB, gate.COMMIT_MARGIN_GB = 8.0, 4.0
 load48 = dict(gate.KINDS["load_check"], kind="load_check")

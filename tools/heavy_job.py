@@ -237,6 +237,13 @@ UNBEATEN_SECONDS = 10 * 60
 NOTED_FILE = "noted.json"
 ## A wait this long goes in the log (and so in `summary`) with its reason.
 LONG_WAIT_SECONDS = 5 * 60
+## A timing run (a bench or a soak) queued this long is named in status and the
+## daily summary (394 amended (56)): landings keep passing it (45), so its tree
+## asks the coordinator for saturn or a laptop rather than wait on. 11-14:
+## builder's bench waited five hours at the head, passed by 868 landings.
+TIMING_KINDS = ("bench", "soak")
+TIMING_WAIT_SECONDS = 60 * 60
+TIMING_WAIT_ADVICE = "landings keep passing it: ask the coordinator for saturn or a laptop (394 amended (56))"
 ## The state's own lock, if its holder died holding it.
 LOCK_STALE_SECONDS = 30
 ## A run's limit: this many times its kind's median clean run, at least the
@@ -2091,6 +2098,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
             _write(_path("queue", ticket), ticket_entry)
     said = 0.0
     long_logged = False
+    timing_logged = False
     # Since when only backfilled jobs have kept this one out (394 amended
     # (18)): its wait from then is the backfill's cost, logged as late. Only
     # while it is first in the queue: a job further back waits on those
@@ -2289,6 +2297,10 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
         if waited >= LONG_WAIT_SECONDS and not long_logged:
             long_logged = True
             log("waiting", tree, kind, "%.0f s, %s of %d: %s" % (waited, _ordinal(place), len(queue), why))
+        if kind in TIMING_KINDS and waited >= TIMING_WAIT_SECONDS and not timing_logged:
+            timing_logged = True
+            log("timing_wait", tree, kind, "queued %.1f h, %s of %d: %s" % (waited / 3600.0, _ordinal(place), len(queue), TIMING_WAIT_ADVICE))
+            print("heavy_job: %s %s queued %.1f h; %s" % (tree, kind, waited / 3600.0, TIMING_WAIT_ADVICE), file=sys.stderr)
         time.sleep(POLL_SECONDS)
 
 
@@ -2920,6 +2932,8 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
             # 394 amended (55): its own waiter judges it by its old rules; newer rows pass it.
             out[-1] += "; old code%s (%s): rebase %s; newer rows pass it" % (
                 " at the head" if place == 0 else "", old_code_why(entry), _where(entry))
+        if not ok and row.get("kind") in TIMING_KINDS and now - float(entry.get("queued", now)) >= TIMING_WAIT_SECONDS:
+            out[-1] += "; queued %.1f h, %s" % ((now - float(entry["queued"])) / 3600.0, TIMING_WAIT_ADVICE)
     return out
 
 
@@ -3098,7 +3112,7 @@ def summary(day):
 
 ## The log's events the daily summary lists.
 SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front", "jump_long",
-    "old_gate", "unbeaten", "beat_failed")
+    "old_gate", "unbeaten", "beat_failed", "timing_wait")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
 ## tool) or on Jeff's word. Names are an honour system, as the land lock's are.
