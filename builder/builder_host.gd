@@ -54,11 +54,66 @@ func _ready() -> void:
 
 
 ## Says, at boot, which levels the game reads from the overlay instead of
-## levels/: edited in the game, not yet copied back into the repo.
+## levels/: a warning for each edited in the game, not yet copied back into
+## the repo; a plain line for each the regenerator laid (199 amended (2)).
 static func warn_overlays() -> void:
+	for line: Dictionary in boot_lines():
+		if line["warn"]:
+			push_warning(line["text"])
+		else:
+			print(line["text"])
+
+
+## warn_overlays' lines, in name order: [{warn: an edit's warning, else a
+## laid generation's plain line; text}].
+static func boot_lines() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
 	for level_name in Level.overlay_names():
-		push_warning("[builder] %s is read from %s (edited in the game), not from %s: \"builder export\", then \"builder drop %s\" once it is in the repo" % [
-			level_name, ProjectSettings.globalize_path(Level.overlay_dir + level_name), Level.DIR + level_name, level_name])
+		if laid_generation(level_name).is_empty():
+			out.append({"warn": true, "text": "[builder] %s is read from %s (edited in the game), not from %s: \"builder export\", then \"builder drop %s\" once it is in the repo" % [
+				level_name, ProjectSettings.globalize_path(Level.overlay_dir + level_name), Level.DIR + level_name, level_name]})
+		else:
+			out.append({"warn": false, "text": "[builder] " + laid_line(level_name)})
+	return out
+
+
+## 199 amended (2): the overlay's level.json of level [param level_name] when
+## it is a laid generation, the regenerator's (a "regenerate" block in it:
+## Regen.write's own test, which writes over such a level and refuses any
+## other), else {} (an edit made in the game, or no overlay).
+static func laid_generation(level_name: String) -> Dictionary:
+	var path := Level.overlay_dir + level_name + "/level.json"
+	var there: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	return there if there is Dictionary and (there as Dictionary).get("regenerate") is Dictionary else {}
+
+
+## The overlay's levels by kind: {"edited": made in the game, "laid": the
+## regenerator's generations}, each sorted.
+static func overlay_kinds() -> Dictionary:
+	var edited: Array[String] = []
+	var laid: Array[String] = []
+	for level_name in Level.overlay_names():
+		(edited if laid_generation(level_name).is_empty() else laid).append(level_name)
+	return {"edited": edited, "laid": laid}
+
+
+## "edited levels: ...; laid generations: ..." for the console's lines.
+static func overlay_summary() -> String:
+	var kinds := overlay_kinds()
+	var named := func(names: Array[String]) -> String: return ", ".join(names) if not names.is_empty() else "none"
+	return "edited levels: %s; laid generations: %s" % [named.call(kinds["edited"]), named.call(kinds["laid"])]
+
+
+## Level [param level_name]'s laid generation in one line: its number, the
+## template it was laid from (Regen.write's "laid_from" mark, 465 amended
+## (4), its first 8) and when its level.json was written (UTC).
+static func laid_line(level_name: String) -> String:
+	var config := laid_generation(level_name)
+	var mark := str(config.get("laid_from", ""))
+	var written := FileAccess.get_modified_time(Level.overlay_dir + level_name + "/level.json")
+	return "%s is a laid generation (generation %d), from the template of %s, written %s UTC" % [level_name,
+		int(config.get("generation", 0)), mark.left(8) if not mark.is_empty() else "before 465 amended (4) (no mark)",
+		Time.get_datetime_string_from_unix_time(written, true)]
 
 
 func allowed(peer: int, player_id: String) -> bool:
@@ -596,9 +651,9 @@ func _reply(peer: int, data: Dictionary) -> void:
 ## edits: the repo's version again).
 func admin(words: PackedStringArray) -> String:
 	if words.size() < 2:
-		return "builder mode: %s, builders: host%s; %d sessions; $%.4f spent since start; edited levels: %s" % [
+		return "builder mode: %s, builders: host%s; %d sessions; $%.4f spent since start; %s" % [
 			"stub" if Net.builder_stub else Net.builder_model, ", " + ", ".join(Net.builders) if not Net.builders.is_empty() else "",
-			sessions.size(), spent, ", ".join(Level.overlay_names()) if not Level.overlay_names().is_empty() else "none"]
+			sessions.size(), spent, overlay_summary()]
 	return BuilderHost.overlay_command(words, main)
 
 
@@ -607,16 +662,23 @@ func admin(words: PackedStringArray) -> String:
 static func overlay_command(words: PackedStringArray, reloader: Node) -> String:
 	match words[1] if words.size() > 1 else "":
 		"export":
+			# 199 amended (2): only the edits are copied into levels/; a laid generation copied
+			# there would stand as the template it is laid from.
+			var kinds := overlay_kinds()
 			var lines := PackedStringArray()
-			for level_name in Level.overlay_names():
+			for level_name: String in kinds["edited"]:
 				var folder := ProjectSettings.globalize_path(Level.overlay_dir + level_name)
 				for file in DirAccess.get_files_at(folder):
 					if not file.ends_with(".import"):
 						lines.append("%s/%s -> levels/%s/%s" % [folder, file, level_name, file])
-			return "\n".join(lines) if not lines.is_empty() else "no edited levels"
+			if lines.is_empty():
+				lines.append("no edited levels")
+			if not (kinds["laid"] as Array).is_empty():
+				lines.append("laid generations, the regenerator's, not to copy: %s" % ", ".join(kinds["laid"]))
+			return "\n".join(lines)
 		"drop":
 			if words.size() < 3 or not Level.overlaid(words[2]):
-				return "usage: builder drop <name> (an edited level: %s)" % ", ".join(Level.overlay_names())
+				return "usage: builder drop <name> (%s)" % overlay_summary()
 			remove_overlay(words[2])
 			if reloader != null and reloader.has_method("forget_level_edits"):
 				reloader.forget_level_edits(words[2])

@@ -46,6 +46,7 @@ func _ready() -> void:
 	await _test_stale_proposal()
 	await _test_new_area()
 	_test_console()
+	_test_overlay_kinds()
 	await _test_panel_keys()
 	await _test_home_gives_way()
 	await _test_first_spots_save()
@@ -534,6 +535,55 @@ func _test_console() -> void:
 	_check(_main.admin_command("reload nowhere").contains("not open"), "reload of a zone not open: says so")
 	_check("dropped" in _main.admin_command("builder drop test_room") and not Level.overlaid("test_room"), "builder drop: the repo's level again")
 	_check("usage" in _main.admin_command("builder drop nothing_here"), "builder drop of a level not edited: how to use it")
+
+
+## 199 amended (2): the overlay's two kinds named apart. A generation the regenerator laid (Regen.write,
+## a "regenerate" block in its level.json) reads as a plain line at boot and is listed as laid, never as
+## one to copy into levels/; a level edited in the game keeps its warning and its export lines. The rule
+## is Regen.write's own: it writes over the laid one and refuses the edit.
+func _test_overlay_kinds() -> void:
+	print("\n== the overlay's laid generations and in-game edits, named apart (199 amended (2)) ==")
+	var block := {"generator": "maze", "every_days": 3, "anchors": []}
+	var layout := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	Level.keep_template("zt_laid", {"layout": layout, "height": null, "config": {"regenerate": block}})
+	var laid_ok := Regen.write("zt_laid", {"layout": layout, "height": null, "config": {"regenerate": block, "generation": 3}})
+	var edit_dir := ProjectSettings.globalize_path(Level.overlay_dir + "zt_edit")
+	DirAccess.make_dir_recursive_absolute(edit_dir)
+	layout.save_png(edit_dir.path_join("layout.png"))
+	FileAccess.open(Level.overlay_dir + "zt_edit/level.json", FileAccess.WRITE).store_string(JSON.stringify({"name": "Edited in the game"}))
+	_check(laid_ok and Level.overlaid("zt_laid") and Level.overlaid("zt_edit"), "a generation laid by Regen.write and an edit, both in the overlay")
+	var kinds := BuilderHost.overlay_kinds()  # An earlier row's new level may stand there too.
+	var laid: Array = kinds["laid"]
+	var edited: Array = kinds["edited"]
+	_check("zt_laid" in laid and "zt_laid" not in edited and "zt_edit" in edited and "zt_edit" not in laid,
+		"overlay_kinds: each in its own kind (%s)" % [kinds])
+	var summary := "edited levels: %s; laid generations: %s" % [", ".join(edited), ", ".join(laid)]
+	var lines := BuilderHost.boot_lines()
+	var mark := Regen.template_mark("zt_laid").left(8)
+	var laid_line := lines.filter(func(line: Dictionary) -> bool: return "zt_laid" in line["text"])
+	var edit_line := lines.filter(func(line: Dictionary) -> bool: return "zt_edit" in line["text"])
+	_check(laid_line.size() == 1 and not laid_line[0]["warn"] and (laid_line[0]["text"] as String).begins_with(
+		"[builder] zt_laid is a laid generation (generation 3), from the template of %s, written " % mark),
+		"boot: the laid generation a plain line, its number and template (%s)" % (laid_line[0]["text"] if laid_line.size() == 1 else "none"))
+	_check(edit_line.size() == 1 and edit_line[0]["warn"] and "(edited in the game)" in edit_line[0]["text"], "boot: the edit warned as before")
+	var said: String = _main.admin_command("builder")
+	_check(said.ends_with(summary), "builder: the two kinds named apart (%s)" % said.right(80))
+	var exported: String = _main.admin_command("builder export")
+	_check(exported.contains("-> levels/zt_edit/layout.png") and not exported.contains("-> levels/zt_laid/")
+		and exported.ends_with("laid generations, the regenerator's, not to copy: " + ", ".join(laid)),
+		"builder export: the edit's files to copy, the generation named not to copy (%s)" % exported.right(80))
+	_check(_main.admin_command("builder drop nothing_here").contains(summary), "builder drop's usage: both kinds")
+	_check(Regen.write("zt_laid", {"layout": layout, "height": null, "config": {"regenerate": block, "generation": 4}}),
+		"Regen.write: lays over the one named laid")
+	_check(not Regen.write("zt_edit", {"layout": layout, "height": null, "config": {"regenerate": block}}),
+		"Regen.write: refuses the one named edited (its warning above)")
+	for level_name: String in ["zt_laid", "zt_edit"]:
+		BuilderHost.remove_overlay(level_name)
+		Level.unregister(level_name)
+		Level._templates.erase(level_name)
+	Regen.forget()
+	var after := BuilderHost.overlay_kinds()
+	_check("zt_laid" not in (after["laid"] as Array) and "zt_edit" not in (after["edited"] as Array), "and both gone after")
 
 
 ## Whether a MapDoc report says a save without a parse: "saved <path> (W x H cells)", where one with a

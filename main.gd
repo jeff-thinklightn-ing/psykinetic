@@ -28162,7 +28162,7 @@ func admin_command(line: String, caller: Player = null) -> String:
 				return _builder.admin(words)
 			if words.size() > 1:
 				return BuilderHost.overlay_command(words, self)
-			return "builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s" % ", ".join(Level.overlay_names())
+			return "builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); %s" % BuilderHost.overlay_summary()
 		"reset":
 			var reset_zone := World.zone.name
 			_start_level()

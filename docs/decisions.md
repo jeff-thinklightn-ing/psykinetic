@@ -2537,6 +2537,36 @@ unnoticed), and making each test set its own overlay folder (every new
 test would have to remember to). level_test checks `is_test_scene` on a
 tests/ scene, a Windows path, a tool's scene and a server line.
 
+Amended (2) (2026-11-15; the decision-number script's label; the
+coordinator's ask): the overlay's two kinds named apart. At every boot the
+box warned that barrow, barrow_deep, castle_halls and hollowfell were "read
+from the overlay (edited in the game)", and the bare `builder` verb listed
+them as edited levels. They are the regenerator's own laid generations
+(Regen.write writes each to the overlay with its "regenerate" block and
+"laid_from"). Release took them for edits come back since 11-04, and the
+next deploy's torch move looked blocked. Now `BuilderHost.laid_generation`
+reads an overlay level as laid when its level.json carries a "regenerate"
+block. That is Regen.write's own test: it writes over such a level and
+refuses any other. `warn_overlays` (its lines from `boot_lines`) keeps the
+warning for an edit, which does block a lay. For a laid one it prints a
+plain line: "<name> is a laid generation (generation N), from the template
+of <laid_from's first 8>, written <its level.json's file time> UTC" ("before
+465 amended (4) (no mark)" without one). The bare verb, main's builder-off
+line and `builder drop`'s usage say "edited levels: ...; laid generations:
+..." (`overlay_summary`). `builder export` lists only the edits' files, then
+"laid generations, the regenerator's, not to copy: ...": a generation
+copied into levels/ would stand as the template it is laid from. Not said:
+whether its template has changed since (Regen.template_changed's cache,
+which read at boot could change when a level is laid again). `builder drop`
+does what it did: a drop of a laid generation removes its overlay files and
+reloads its zone, so one laid before this boot reads as its template at
+once and one laid since stays registered in memory (Level.register), read
+as laid, until a restart; in both cases until the regenerator lays it again.
+Every line carries level names only. builder_zone_test _test_overlay_kinds
+(a generation laid by Regen.write beside an edit: each in its own kind, the
+boot lines, the verb, export and drop's usage, Regen.write laying over the
+one named laid and refusing the one named edited). Server only.
+
 ## 200. An edited level is sent to clients: the "terrain" message
 
 Terrain was never sent over the network: every peer reads a level from its
