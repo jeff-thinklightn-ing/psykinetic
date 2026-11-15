@@ -57698,6 +57698,36 @@ out from the wall's foot, fading outward, and the spill between two houses besid
 
 Client only; protocol unchanged; no new class_name; a bullet (voice's words) when it is switched on.
 
+927 amended (1) (environment; the label from tools/decision_number.sh; the coordinator's approval of 11-15,
+"the first view at night", first of three; package "Umbrage at night: window light"): the patch's floor.
+- Why: 934 puts every newcomer at (190,219) facing the Mughouse, and from there the temple's forecourt showed
+  nothing. In ui-design's look_way_0140fb78a (A_first_view_190_219_2130) the cobbles under the south lancets
+  read (14, 15, 22) and (8, 12, 20) as shown, the same as cobbles away from them. A multiply leaves ground that
+  nothing else lights as dark as it was. The joined looks' strips (look_win927v_d1cbf0007, 100 to 133 at the
+  camera's foot, about 28 at the wall's foot) were the player's own lantern's ground, doubled. 927's row read
+  ratios, which are the same on lit and black ground.
+- What: a second pass on the same quads (the multiply's next_pass, blend_add, unshaded) adds tint x
+  WINDOW_LIGHT_FLOOR 0.05 (linear) x the patch's strength, so a patch shows on ground no light reaches. Inside
+  a carried lantern's light (a player's or a companion's "Lantern", shown, up to WINDOW_FLOOR_LIGHTS 8, the
+  nearest the view's aim first: Client3D.window_floor_lights) the add fades out, from WINDOW_FLOOR_NEAR 0.5 of
+  the lantern's range to none inside it. So the ground a body's own lantern lights is the multiply's alone, as
+  before, and a body standing in a patch by its own light keeps 858's body-over-ground ratio exactly. The
+  patch is ground only: a body drawn in front of it takes neither pass. A covered lantern (L) keeps nothing
+  off, so its bearer stands on the floored ground.
+- As shown (Client3D.window_floor_shown, the two passes' sum through the linear tonemap; mean of the three
+  channels, 0 to 255), at a wall's foot (strength 1) and a near house's (0.75), far from any carried lantern:
+  - unlit cobbles (8, 12, 20): 53.4 and 47.0 (the multiply alone 29.3 and 26.2); as colour (72, 52, 37) against
+    (32, 28, 28);
+  - dark grass (10, 19, 17): 55.4 (33.4);
+  - lit ground of 80: 146.5 (141.1); of 130 (a lantern's pool): 187.4 (185.5).
+  By day there is no patch, so nothing changes.
+- Tests: view_world_test _test_window_floor, inside _test_window_light. Unlit cobbles read 45 to 60 at the
+  wall's foot and a near house's, and the multiply alone reads under 45, so the row fails on 927 as landed.
+  Lit ground of 80, 130 and 180 moves at most 6 levels. The floor is the multiply's next pass, an add of
+  WINDOW_LIGHT_FLOOR. The carried lanterns are the lit ones, nearest first, and a covered one is none. The add
+  fades out inside a lantern's light.
+Client only; protocol unchanged; no new class_name.
+
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
 
 The crackle's joined read for 920 amended (1) found the Mughouse's tables
