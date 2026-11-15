@@ -666,7 +666,13 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## old client shows a "Notice" line as "[party] Notice:", a new client shows an old server's warning as narration.
 ## 911: a same-frame respawn keeps its name; the despawn precedes the spawn; an old client draws the fade as before. No new number (release).
 ## 911: a player's spawn "look" always carries seed= (kept in his record; an old client honours a seed= word already, so it draws the same face, and adopts nothing). No new number (release).
-const PROTOCOL_REVISION := 57
+## 58 (928, "the draw is one snap"; release's number): the hunting bow's verb in levels/items.json is now a
+## 3-tick nock, a 1-tick pull to full (step 0, full power, reach 9) and an aim that closes the cone 20 to 4 degrees
+## by tick 10, with a 2-tick loose_recover after a snap loose (step 0; the server's alone) and the hold's drain from the aimed step (drain_from 1). Both
+## sides derive the step, the cone, the reach and the pull from that catalog and the replicated raised/raised_tick, so
+## an old client would draw the old slow pull, its weak early steps and the old cone and range rings against a new
+## server's shots.
+const PROTOCOL_REVISION := 58
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

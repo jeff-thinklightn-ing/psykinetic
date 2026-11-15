@@ -57283,3 +57283,114 @@ untold, then said once water is near and a yes leads. record_keys_test's sample 
 Server only; protocol unchanged; no new class_name. The bullet, voice's, ships on a joined look: a
 fresh character, the first 30 s, her two lines read off the screen with their seconds, a "yes"
 typed, and her leading.
+## 928. The bow's draw is one snap pull; the time after it is the aim's (combat; Jeff's report, 2026-11-14)
+
+Jeff, 21:20, as a real player: "drawing shouldnt take a long time, its a fast twitch pull, you dont really
+wanna hang out in the middle of the pull the mechanical advantage is shit. you draw by explosively pulling.
+Its aiming that you could argue is taking a moment but the draw? only a total dork wad would hesitate
+through the power curve rather than just WHAM right through". Until now a bow's power grew with the ticks
+held (decisions 583, 669): the hunting bow loosed a 3-point arrow 5 cells at 3 ticks, a 5 at 6 ticks and
+full draw's 6 at 10, so a strong shot meant standing part-drawn. The coordinator approved this design
+the same night.
+
+The hunting bow (levels/items.json, its verb):
+
+- The nock, 3 ticks: raised, the arrow set. A loose in it looses nothing and the arrow is kept, as before
+  draw_min ever did; a tap does this.
+- The pull, one tick: at 4 ticks (draw_min 4) the bow is at full draw. Step 0 is full ("full": 0): full
+  strength (x1.6, 6 points from a player), reach 9. No step before it, so nothing rewards hanging mid-pull.
+- The aim, ticks 4 to 10: the cone closes evenly from 20 degrees to 4 (spread [20, 4, ...] over
+  draw_steps[0] = 6). A snap loose at 0.4 s is full strength in a wide cone, sure at two or three cells and
+  loose at six; step 1 at 10 ticks, the aimed shot, is the old full draw at its old time.
+- Holding on: the far reaches as before, 11 cells at 15 ticks, 13 at 21, 15 at 27 (steps [9, 9, 11, 13,
+  15], draw_steps [6, 5, 6, 6]), the struck body's band deciding the strength out there (damage_at [1.6,
+  1.6, 1.6, 1.2, 0.8]; Items.damage_for as 669 amended).
+- The hold's cost: the drain of 1 a tick (x the load, 676) from the aimed step (new verb key "drain_from":
+  1; a ranged verb without it drains from its full, as before), so the aimed shot costs what full draw
+  did, and the snap is the bonus. No tremble: 669's "no shaking" stands.
+- A loose at the snap's step (0) holds the next draw 2 ticks (new verb key "loose_recover": 2,
+  GridEntity.bow_ready_tick, the server's alone; World.try_stance refuses "draw" before it), a flat loose
+  or a lob. The fastest full-strength cycle is 0.6 s, 6 points; the old fastest was a 3-point arrow every
+  0.3 s, the same output for half the arrows. An aimed loose (step 1 or on) sets no wait and draws again
+  the tick after, as before 928: with the wait on every loose, the coordinator's bow1 rows (saturn,
+  11-14, 16 starts a row) had the aimed archer, holding 10 ticks as on main, 0.1 s a shot slower (one
+  robber 5.9 s against 5.5, two 10.7 against 9.9), a cost the report never asked for. The snap's rate is
+  what the wait is for; the aim's 10 ticks already bound it. A held loose (let go at nock ticks 0 to 3,
+  flown at 4, below) flies at step 0 and so pays the wait: tap after tap, each drawn the first tick the
+  bow allows, flies every 6 ticks, the snap's 0.6 s and no faster (combat_test _test_snap_draw).
+- The lob (677) keeps its keys: its first step one tick after the flat one (lob_draw_min 5), its circle
+  by the step, now [2.5, 1.0, 0.5, 0.5, 0.5] (the bow's own lob_circle) so it is 1 cell at the aimed step
+  as it was at full draw.
+
+What scales what: 365's quick bow (x0.8), 676's arms' load and 766's weapon memory (x(1 - 0.15 feel))
+multiply every tick of the draw as before (World._draw_quick); with the pull one tick that is the nock,
+the aim and the far reaches, so a quick bow is aimed at 8 ticks, plate settles slower, practice settles
+sooner and (766's spread share) tighter. 766's practice still counts a loose at full draw or past it,
+which is every loose now.
+
+World.draw_of, the pull's pose and the creak, follows the step: 0 before the first, 1 from full draw on
+(so it snaps at 4 ticks); a bow full at a later step grows to it as before. Animation's struck pull and
+its settle on World.spread_of follow as 928 amended (1); in between, the view nocks over the 4 ticks and
+goes to Bow_Hold at the pull's.
+
+Files: levels/items.json (the bow's verb and voice's words: "drawn with arrows in the other hand; at full
+strength as soon as the arrow is set, and held, it aims steadier and reaches farther, weaker the farther
+out"), sim/items.gd (drain_from, loose_recover), sim/world.gd (draw_of, try_stance, try_loose, try_lob,
+_tend_draws), sim/grid_entity.gd (bow_ready_tick), net/net.gd (PROTOCOL_REVISION 58). Foe archers draw
+by the same code (Monster._shoot_tick); no kind arms a bow on main. Companions' keep-out reads the
+keeper's spread_of and range_of, wide early now.
+
+Tests: combat_test _test_snap_draw (a loose at 3 ticks looses nothing and keeps the arrow; at 4 ticks
+full strength at reach 9 in a 20-degree cone and the arrow on the line strikes for 6; the cone 4 at 10
+ticks; no drain from 4 ticks to 8; the hold drains aimed; a loose holds the next draw 2 ticks), and the
+bow's asserts in combat_test (the cone table, the lob, the held draw), items_test (range, pose, cone,
+strength, the longest loose, plate's reach, the quick bow aimed sooner), tuning_test, view_test (the
+nock's scrub, Bow_Hold at the pull), monster_test (an archer shoots at the pull, struck in the nock its
+draw begins again), ui_test (the aim's pips 4, 4, 4, 3, 2; the tuning panel's typed steps five long:
+a list whose length differs from damage_at's falls back to the defaults). companion_test and
+physics_test pass unchanged.
+
+A loose let go in the nock is held (ui-design's joined strip, 11-14; the coordinator's ruling): letting
+go when the client first shows the pull (its tick 4) reached the server at its count of 3, in the nock,
+and 18 of 22 such loosings flew nothing, since a client's count runs ahead of the server's by a tick or
+more with lag. So the server holds a loose let go during the nock (GridEntity.loose_held, the angle it
+was sent with; World._tend_held_looses) and looses it the tick the draw counts: at 4 ticks, at full
+draw's damage and reach and that tick's 20-degree cone, the arrow spent then. Letting go at any tick
+from the press to 4 is the same shot, and a quick Shift-click (the press draws, the release looses) is a snap shot. The ranged verb's
+"hold_from" is a tuning key: the ticks drawn from which a loose in the nock is held, 0 for the bow (the
+whole nock); at or past draw_min (the default, 99) a loose in the nock is lost, as before 928. A loose
+let go is the shot's: only the draw ending first calls it off (the bow or arrows leaving the hand,
+struck or knocked out of the draw), never a let-down (stance ""); this replaces the coordinator's first
+word, "a let-down in the nock calls a held loose off", which the first take of the hold was built on
+(the coordinator's ruling, 11-14 23:40). A draw asked after the shot does not begin with no arrow left
+in the hand or once struck reeling (World._stun_for clears it), and the client lets its own stance go
+when nothing is left to draw (Main.drive_stand_draw). ui-design's counts on the joined tip
+(928f, 11-14) had the Shift path loose 1 of 32 at nock ticks 1 to 4: the left release sent the loose,
+Shift still read down that frame drew again at once (Main.drive_stand_draw, "after a shot with Shift
+still down the next draw starts"), and Shift read up a frame later let that draw down, which the server
+took as a let-down of the held shot. Any client sending loose, draw, let-down in that order loses the
+shot the same way, so the rule sits on the server. A flat draw asked while a loose is held, or in the
+loose_recover wait after a shot, is kept (GridEntity.draw_queued, the server's alone) and begins once
+the shot has flown and the wait is past (World._tend_held_looses); a let-down clears that ask, so Shift
+up calls off the next draw, not the shot. With Shift kept down through the shot the next draw begins at
+6 ticks from the last, and the client, which never stopped showing it drawn, agrees with the server
+again; before this the server refused a draw in the wait and the client went on showing a draw the
+server did not have. A let-down before anything is let go still lets the draw down, the arrow kept
+(Shift released, 583 amended). The right button is the lob's (677), which keeps its own first step at 5 ticks, as on main, and
+holds nothing: a sky draw let go before then is refused and nothing is said, as before 928 (combat
+proposes holding it, or a word, as its own row). The fastest cycle is unchanged: the shot
+at 4, the next draw 2 ticks on. Server only: raised stays "draw" until the shot's tick, drops on the
+shot's tick, and nothing new is replicated (inside revision 58). On the client
+the aim holds once the loose is sent (Main._loose_sent, until the draw drops; animation's read): the
+body turned by aim_angle stays where it was let go and never turns from the arrow's way in those ticks.
+Tests: combat_test _test_snap_draw (a loose at 0, 1, 2 and 3 ticks is held and flies at 4 at full
+draw; the next draw 2 ticks after, a draw asked in the wait kept till then; tap after tap 6 ticks
+apart; let go at 1, 2 and 3, drawn again and let down at once, still flown at 4; Shift kept down, the
+next draw at 6; a let-down with nothing let go lets the draw down, the arrow kept), controls_test (the
+same through the client: Main._unhandled_input's left release, drive_stand_draw with Shift read down
+then up; and Shift kept down, flown at 4, drawn again at 6, the client still drawn), items_test's nock
+row, ui_test (the loose sent, the aim holds; the draw down, cleared).
+
+Protocol 58 (release's number): both sides derive the step, cone, reach and pull from the catalog and
+raised/raised_tick, so an old client would draw the old pull against a new server. No new class_name.
+The bullet waits for animation's strip and the coordinator's bow rows.

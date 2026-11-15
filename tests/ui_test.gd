@@ -733,9 +733,9 @@ func _test_aim() -> void:
 	_check(Main.aim_point(origin, 0.0, 3.0) == Vector2(13.0, 10.0) and Main.aim_point(origin, PI * 0.5, 3.0).is_equal_approx(Vector2(10.0, 13.0)),
 		"x as 0, the grid's y as the second component")
 	var bow := Items.verb_of("bow")
-	_check(Main.aim_pips(bow, 0, 5) == 2 and Main.aim_pips(bow, 1, 7) == 3 and Main.aim_pips(bow, 2, 9) == 4 and Main.aim_pips(bow, 3, 11) == 4
-			and Main.aim_pips(bow, 4, 13) == 3 and Main.aim_pips(bow, 5, 15) == 2 and Main.aim_pips(bow, -1, 5) == 0 and Main.aim_pips({}, 2, 9) == 0,
-		"pips: the shot's strength at the aim's reach (decision 669): 2, 3, 4 drawing up, 4, 3, 2 in the bands (669 amended); none before the draw counts or without a bow")
+	_check(Main.aim_pips(bow, 0, 9) == 4 and Main.aim_pips(bow, 1, 9) == 4 and Main.aim_pips(bow, 2, 11) == 4 and Main.aim_pips(bow, 3, 13) == 3
+			and Main.aim_pips(bow, 4, 15) == 2 and Main.aim_pips(bow, 4, 12) == 3 and Main.aim_pips(bow, -1, 5) == 0 and Main.aim_pips({}, 2, 9) == 0,
+		"pips: the shot's strength at the aim's reach (decision 669): 4 from the snap and aimed (928), 4, 3, 2 in the bands (669 amended); none before the draw counts or without a bow")
 	_check(Main.aimed_distance(3.2, 9) == 3.2 and Main.aimed_distance(0.4, 9) == Main.AIM_POINT_BLANK and Main.aimed_distance(20.0, 9) == 9.0
 			and Main.aimed_distance(5.0, 0) == 0.0 and Main.aimed_distance(0.2, 1) == 1.0,
 		"the aim reaches the mouse's distance (Jeff, v0.1.192: point blank): at least AIM_POINT_BLANK, at most the step's reach, none before the draw")
@@ -791,6 +791,14 @@ func _test_aim() -> void:
 		_main._aim_fixed = aim_origin + Vector2(-4.0, 6.0)
 		_main._update_aim(own, true)
 		_check(absf(_main.aim_angle - Vector2(-4.0, 6.0).angle()) < 0.001 and _main.aim_drawn, "a fixed aim point sets the angle (%.3f)" % _main.aim_angle)
+		# 928: let go in the nock, the server holds the loose till the pull: the aim stays where it was let go.
+		var let_go: float = _main.aim_angle
+		_main._loose_sent = true
+		_main._aim_fixed = aim_origin + Vector2(5.0, -2.0)
+		_main._update_aim(own, true)
+		_check(absf(_main.aim_angle - let_go) < 0.001 and _main.aim_drawn, "the loose sent, the draw still up: the aim holds (%.3f, let go at %.3f)" % [_main.aim_angle, let_go])
+		_main._update_aim(own, false)
+		_check(not _main._loose_sent, "the draw down: the hold on the aim is cleared")
 		_main._aim_fixed = Vector2(NAN, NAN)
 		_main._update_aim(own, false)
 	# 617: the view's offset from the archer: the lean alone without a lead; lean and lead held to the most together.
@@ -1439,8 +1447,8 @@ func _test_tuning_panel() -> void:
 	var was := World.swing_base
 	_check(panel.set_value("combat.swing_base", was + 2.0) and is_equal_approx(World.swing_base, was + 2.0) and panel.marked("combat.swing_base"),
 			"a change takes at once and its row is marked (%s)" % World.swing_base)
-	panel._typed("items.bow.steps", "4, 6, 8, 10, 12, 14")
-	_check(Items.verb_of("bow").get("steps") == [4, 6, 8, 10, 12, 14] and panel.marked("items.bow.steps"), "a typed list takes (%s)" % [Items.verb_of("bow").get("steps")])
+	panel._typed("items.bow.steps", "4, 6, 8, 10, 12")  # The bow's five steps (928).
+	_check(Items.verb_of("bow").get("steps") == [4, 6, 8, 10, 12] and panel.marked("items.bow.steps"), "a typed list takes (%s)" % [Items.verb_of("bow").get("steps")])
 	panel._typed("combat.swing_base", "lots")
 	_check(is_equal_approx(World.swing_base, was + 2.0), "a word typed for a number changes nothing")
 	panel.reset("items.bow.steps")

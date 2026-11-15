@@ -5585,14 +5585,18 @@ func _test_archer() -> void:
 			break
 	_check(drawn and not shot.is_empty() and shot["entity"] == player and archer.tile == from,
 			"it draws where it stands and shoots the player 7 off (%s)" % [shot])
-	_check(not shot.is_empty() and int(shot["tick"]) >= 7, "once its draw's step reaches it, 7 cells, 7 ticks (decisions 583, 669; tick %s)" % shot.get("tick"))
-	# Struck as it draws: the draw starts again.
+	_check(not shot.is_empty() and int(shot["tick"]) >= 4, "once its draw's step reaches it, 7 cells, at the pull's 4 ticks (decisions 583, 928; tick %s)" % shot.get("tick"))
+	# Struck as it draws (928: the pull is one tick, so struck in the nock): the draw starts again.
 	for i in 12:
 		World.step()
-	var was := World.draw_of(archer)
+		if archer.raised == "draw" and World.draw_step(archer) < 0:
+			break
+	var nocking := archer.raised == "draw" and World.draw_step(archer) < 0
+	var began := archer.raised_tick
 	World.damage(archer, 1, player)
 	World.step()
-	_check(was > 0.0 and World.draw_of(archer) < was, "struck while drawing, its draw is spoilt (%.2f to %.2f)" % [was, World.draw_of(archer)])
+	_check(nocking and (archer.raised != "draw" or archer.raised_tick > began),
+			"struck while nocking, its draw is spoilt and begun again (raised %s, from %d, was %d)" % [archer.raised, archer.raised_tick, began])
 	# Someone in the way (a friend would be; a crate stays put): it does
 	# not shoot from there, but moves till it has a clear line.
 	e = _build(["##############", "#............#", "#.P...c..a...#", "#............#", "##############"])
@@ -5671,8 +5675,8 @@ func _test_archer_hold() -> void:
 	_check(is_equal_approx(float(read["steady"]["aim_spread"]), float(Items.verb_of("bow")["spread_floor"])),
 			"an aim_spread under the bow's floor is raised to it, with a warning (%s)" % read["steady"]["aim_spread"])
 	# Three off, its first step reaches: the draw's cone says when it looses.
-	for hold: Array in [[0.0, 0, 3, "no hold: as soon as the draw reaches, 3 ticks"], [16.0, 0, 5, "16 degrees: on the way to the second step, 5 ticks"],
-			[6.0, 0, 9, "6 degrees: on the way to full draw, 9 ticks (669 amended (2))"], [2.0, 25, 25, "under the floor, capped at 25: at the cap, 25 ticks"]]:
+	for hold: Array in [[0.0, 0, 4, "no hold: as soon as the pull, 4 ticks (928)"], [16.0, 0, 6, "16 degrees: the aim closing, 6 ticks (928)"],
+			[6.0, 0, 10, "6 degrees: at the aimed step, 10 ticks (928)"], [2.0, 25, 25, "under the floor, capped at 25: at the cap, 25 ticks"]]:
 		var e := _build(["##########", "#........#", "#..P..a..#", "#........#", "##########"])
 		var archer: Monster = e["a"][0]
 		_bold(archer)

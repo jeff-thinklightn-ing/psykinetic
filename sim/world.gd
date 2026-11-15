@@ -1476,6 +1476,7 @@ func _step_zone() -> void:
 	# 2. Hits (attacks and shoves) queued during the act phase.
 	_tend_wind_ups()  # Wound-up blows struck when due (decision 392).
 	_tend_boss_moves()  # A boss's spin, throw and charge (decision 603).
+	_tend_held_looses()  # A loose let go in the nock flies as the draw counts (decision 928).
 	_tend_draws()  # A bow held at full draw tires the arms (decision 669).
 	_tend_lobs()  # Lobbed arrows come down when due (decision 677).
 	_resolve_hits()
@@ -6038,12 +6039,37 @@ func drop_boss_move(by: GridEntity) -> void:
 ## the arms give out: the bow is let down, the arrow kept, nothing loosed
 ## (draw_given_up; winded, 597, follows from the 0). Only for those who pay
 ## for their swings; another zone's on its own tick.
+## Each loose let go in the nock and held (decision 928, hold_from): loosed the tick
+## its draw counts, at that tick's step and cone, with the angle it was sent with;
+## dropped if the draw ended first (struck, the bow gone; a let-down no longer: the
+## shot was let go). A flat draw asked meanwhile or in loose_recover (draw_queued:
+## Shift kept down) begins once the shot has flown and the wait is past.
+func _tend_held_looses() -> void:
+	for entity in _entities:
+		if entity.draw_queued and is_nan(entity.loose_held):
+			if not _alive(entity) or entity.raised != "":
+				entity.draw_queued = false
+			elif tick >= entity.bow_ready_tick:
+				entity.draw_queued = false
+				try_stance(entity, "draw")  # 928: Shift kept down through the shot, the next draw begins.
+		if is_nan(entity.loose_held):
+			continue
+		if entity.raised != "draw" or entity.lobbing or not _alive(entity):
+			entity.loose_held = NAN
+			entity.draw_queued = false
+			continue
+		if draw_step(entity) >= 0:
+			var angle := entity.loose_held
+			entity.loose_held = NAN
+			try_loose(entity, angle)
+
+
 func _tend_draws() -> void:
 	for entity in _entities:
 		if entity.raised != "draw" or entity.max_stamina <= 0 or not entity.pays_swings or not _alive(entity):
 			continue
 		var verb := Items.verb_of(drawn_with(entity))
-		if verb.is_empty() or int(verb.get("drain", 0)) <= 0 or draw_step(entity) < int(verb.get("full", 0)):
+		if verb.is_empty() or int(verb.get("drain", 0)) <= 0 or draw_step(entity) < int(verb.get("drain_from", verb.get("full", 0))):  # 928: from the aimed step.
 			continue
 		entity.stamina = maxi(0, entity.stamina - _carried(int(verb["drain"]) * draw_drain_load(entity), tick))  # The load drains it faster (676).
 		entity._world_note_exertion(tick)
@@ -7157,6 +7183,9 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by):
 		return false
 	if kind.is_empty():
+		by.draw_queued = false
+		if is_finite(by.loose_held):
+			return true  # 928: a loose let go is the shot's; only the draw asked after it is let down.
 		by.raised = ""
 		by.lobbing = false
 		return true
@@ -7166,9 +7195,16 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 		return false  # A broken guard comes back up only after a while; nothing is raised reeling or lying.
 	if by.raised == "draw" and kind == "draw" and by.lobbing != lob:
 		return false  # One draw at a time (677).
+	if kind == "draw" and not lob and (is_finite(by.loose_held) or by.raised != "draw" and tick < by.bow_ready_tick):
+		by.draw_queued = true  # 928: drawn once the held shot has flown and the string hand is back (_tend_held_looses).
+		return false
+	if kind == "draw" and by.raised != "draw" and tick < by.bow_ready_tick:
+		return false  # 928: the string hand back from a loose before the next arrow is set.
 	if by.raised != kind:
 		by.raised = kind
 		by.raised_tick = tick
+		by.loose_held = NAN
+		by.draw_queued = false
 		by.lobbing = lob and kind == "draw"
 		if kind == "draw":
 			stand_firm(by)
@@ -7185,20 +7221,24 @@ func stand_firm(by: GridEntity) -> void:
 	by.action_target = null
 
 
-## How far [param entity]'s bow is drawn, 0 to 1: nothing until its verb's
-## draw_min ticks, full at draw_full (its longest step); 0 when not
-## drawing. For the pull's pose and the creak; what it shoots is its step.
+## How far [param entity]'s bow is drawn, 0 to 1: nothing until its first
+## step (the nock, draw_min ticks), 1 from full draw on (decision 928: the
+## hunting bow's full is that first step, one tick's pull, so it snaps); 0
+## when not drawing. For the pull's pose and the creak; what it shoots is its step.
 func draw_of(entity: GridEntity) -> float:
 	if not is_instance_valid(entity) or entity.raised != "draw":
 		return 0.0
 	var verb := Items.verb_of(drawn_with(entity))
 	if verb.is_empty():
 		return 0.0
-	var drawn := tick - entity.raised_tick
-	var quick := _draw_quick(entity)
-	if drawn < roundi(int(verb["draw_min"]) * quick):
+	# 928: nothing before its first step (the nock), whole from full draw on, which for the hunting
+	# bow is that first step (one tick's pull); a bow full at a later step grows to it as before.
+	var step := draw_step(entity)
+	if step < 0:
 		return 0.0
-	return clampf(float(drawn) / draw_full_ticks(entity), 0.0, 1.0)
+	if step >= int(verb.get("full", 0)):
+		return 1.0
+	return clampf(float(tick - entity.raised_tick) / draw_full_ticks(entity), 0.0, 1.0)
 
 
 ## A quick bow (decision 365) draws in less time, and one drawn by loaded
@@ -7331,6 +7371,9 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by) or by.raised != "draw" or by.lobbing or not is_finite(angle):
 		return false
 	var step := draw_step(by)
+	if step < 0 and tick - by.raised_tick >= int(Items.verb_of(drawn_with(by)).get("hold_from", 99)):
+		by.loose_held = angle  # 928: let go in the nock, held (a second, the newer angle); it flies the tick the draw counts.
+		return true
 	var spread := spread_of(by)  # Before the stance ends: after it, none.
 	by.raised = ""
 	if step < 0:
@@ -7341,6 +7384,8 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 	if drawn_with(by) == "bow" and step >= int(Items.verb_of("bow").get("full", 0)):
 		practise(by, "bow", ART_DEED_LOOSE)  # 766: a full draw let go.
 	shoot(by, flown, step, angle)
+	if step == 0:  # 928: the snap's shot alone waits; an aimed one draws again at once, as before 928.
+		by.bow_ready_tick = tick + int(Items.verb_of(drawn_with(by)).get("loose_recover", 0))
 	return true
 
 
@@ -7444,6 +7489,8 @@ func try_lob(by: GridEntity, cell: Vector2i) -> bool:
 	_log("lob: %s at %s, %d falls in a circle %.1f (step %d) from %d ticks" % [by.name, aimed, falls.size(), radius, step, ticks])
 	by._world_lobbed(aimed, ticks, radius, falls)
 	noise(by.tile, NOISE_BOW, &"bow", by)
+	if step == 0:  # 928: as try_loose, the snap's step alone waits.
+		by.bow_ready_tick = tick + int(verb.get("loose_recover", 0))
 	return true
 
 
@@ -11589,6 +11636,7 @@ func _stun_for(entity: GridEntity, ticks: int, cause: StringName = &"", through_
 		return
 	if _steady.has(entity) and not through_steady and cause != &"crash":
 		return  # Steadied (843): the blow's harm and push as ever, no stagger.
+	entity.draw_queued = false  # 928: a draw asked for after a shot does not begin once struck reeling.
 	if cause == &"" and entity.stun_cause_tick == tick:
 		cause = entity.stun_cause  # The same blow's stun drawn out (a bash's slide): its cause kept.
 	if tick + ticks > entity.stunned_until_tick:

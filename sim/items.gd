@@ -725,7 +725,12 @@ const VERBS := {
 	"ranged": {"steps": [5, 7, 9, 11, 13, 15], "damage_at": [0.8, 1.2, 1.6, 1.2, 0.8, 0.4], "full": 2, "draw_min": 3,
 		"draw_steps": [4, 5, 6, 7, 8], "drain": 0, "cells": 15, "draw_full": 12, "spread": [], "spread_floor": 4.0,
 		"lob_draw_min": 5, "lob_cost": 8, "lob_damage": 0.5, "lob_volley": 3, "lob_volley_min": 1.0, "lob_down": 15, "lob_apex": 0.25, "lob_flight": 0.6,
-		"lob_per_cell": 0.05, "lob_circle": [2.5, 1.75, 1.0, 0.5, 0.5, 0.5]},
+		"lob_per_cell": 0.05, "lob_circle": [2.5, 1.75, 1.0, 0.5, 0.5, 0.5],
+		# 928: the step a held draw starts draining stamina from (its "full" when not given),
+		# the ticks after a loose before the next draw can begin, and the ticks drawn from which
+		# a loose let go in the nock is held and flies the tick the draw counts (0: the whole nock;
+		# at or past draw_min, as the default: never, a loose in the nock is lost).
+		"drain_from": 0, "loose_recover": 0, "hold_from": 99},
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1
 ## quicker), damage and force (multiples of the wielder's blow); windup, the
@@ -782,6 +787,7 @@ static func verb_from(id: String, verb: Dictionary) -> Dictionary:
 			each.fill(5)
 			out["draw_steps"] = each
 		out["full"] = clampi(int(out["full"]), 0, maxi(out["steps"].size() - 1, 0))
+		out["drain_from"] = clampi(int(verb["drain_from"]) if verb.has("drain_from") else int(out["full"]), 0, maxi(out["steps"].size() - 1, 0))  # 928.
 		# The longest step's reach, and the ticks to full draw (the pull's pose).
 		out["cells"] = int(out["steps"].max())
 		out["draw_full"] = roundi(step_ticks(out, int(out["full"])))

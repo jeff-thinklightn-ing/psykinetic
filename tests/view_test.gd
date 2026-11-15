@@ -14922,26 +14922,27 @@ func _test_bow() -> void:
 	var on_string := bow.find_child("Nocked", true, false) as Node3D
 	_check((on_string != null and on_string.is_visible_in_tree()) or not ArtKit.has("fx.arrow"),
 			"an arrow on the string, shown (Jeff: \"the arrow doesn't load into the bow with drawing\")")
-	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min,
-	# then the pull by draw_of (from draw_min's 3 ticks to the bow's draw_full,
-	# decision 669).
+	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min;
+	# since 928 the pull is one tick, so draw_of goes 0 to 1 and the pose goes
+	# to Bow_Hold at draw_min's 4 ticks (animation's 928 amended (1) strikes it).
 	var alpha := World.tick_alpha
 	World.tick_alpha = 0.0
 	var length := rig.length("Bow_Draw")
 	var poses := []
-	for drawn: int in [2, 6, 9]:
+	for drawn: int in [2, 3]:
 		player.raised_tick = World.tick - drawn
 		_rig._process(0.0)
 		poses.append(rig.upper_position() / length)
 	World.tick_alpha = alpha
-	var full := float(Items.verb_of("bow")["draw_full"])  # 10 ticks since 669 amended (2).
-	var expected := [Client3D.BOW_NOCK_END * 2.0 / 3.0, Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 3.0 / (full - 3.0),
-			Client3D.BOW_NOCK_END + (1.0 - Client3D.BOW_NOCK_END) * 6.0 / (full - 3.0)]
-	_check(range(3).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
-			"the pose scrubbed by the draw: nocking before draw_min, then drawn back as draw_of grows (%s of the clip, expected %s)" % [poses, expected])
+	var expected := [Client3D.BOW_NOCK_END * 2.0 / 4.0, Client3D.BOW_NOCK_END * 3.0 / 4.0]
+	_check(range(2).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
+			"the pose scrubbed by the draw: nocking through draw_min's 4 ticks (%s of the clip, expected %s)" % [poses, expected])
+	player.raised_tick = World.tick - 4
+	_rig._process(0.0)
+	_check(rig.upper_clip() == "Bow_Hold", "at the pull's tick (4, 928): Bow_Hold (%s)" % rig.upper_clip())
 	player.raised_tick = World.tick - 20
 	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Hold", "at full draw: Bow_Hold (%s)" % rig.upper_clip())
+	_check(rig.upper_clip() == "Bow_Hold", "held on: Bow_Hold (%s)" % rig.upper_clip())
 	if segments.size() == 2:
 		# Bent: both segments meet at the nock, drawn back of the brace.
 		var rest: Vector3 = string.get_meta("rest")

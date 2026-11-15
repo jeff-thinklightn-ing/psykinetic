@@ -156,6 +156,15 @@ var lobbing := false
 ## Server: until this tick a broken guard cannot be raised again
 ## (World._meet_guard, decision 340).
 var guard_broken_until := 0
+## The tick its bow may be drawn again after a loose at the snap's step, 0 (decision 928: the verb's loose_recover; an aimed loose sets none); the server's alone.
+var bow_ready_tick := 0
+## A loose let go in the nock, held (decision 928, its verb's hold_from): the angle it was sent with,
+## loosed the tick the draw counts (World._tend_held_looses); NAN for none. The server's alone.
+var loose_held := NAN
+## A flat draw asked while a held loose waits or the bow's loose_recover runs (928: Shift kept down, the
+## client draws again at once); World._tend_held_looses sets it once the shot has flown and the bow allows.
+## A let-down (stance "") clears it. The server's alone.
+var draw_queued := false
 ## Server: a shield bash (World.try_bash, decision 379) is ready again at
 ## this tick, and until bash_moment_until its raised shield is down for the
 ## bash's moment (World.guarding finds no guard).

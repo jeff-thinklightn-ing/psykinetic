@@ -631,7 +631,91 @@ func _test_bow_click_walks() -> void:
 	let_go.button_index = MOUSE_BUTTON_LEFT
 	let_go.pressed = false
 	_main._unhandled_input(let_go)
-	_check(_main._stance == "" and player.raised == "", "the left release while drawn: loosed (or let down before draw_min), the bow lowered (583 amended (2))")
+	var held_loose: bool = _main._stance == "" and player.raised == "draw" and is_finite(player.loose_held)
+	var ticks := 0
+	while player.raised == "draw" and ticks < 8:
+		World.step()
+		ticks += 1
+	_check(held_loose and player.raised == "" and World.tick - player.raised_tick >= 4,
+			"the left release while drawn, in the nock: the loose held, loosed at the pull, the bow lowered (583 amended (2); 928: hold_from 0) (%d ticks on)" % ticks)
+	World.step()
+	World.step()  # 928's loose_recover: the next arrow set 2 ticks after the shot.
+	# Shift kept down (ui-design's 928f counts: the Shift path loosed 1 of 32 in the nock): the left release
+	# looses; with Shift still read down that frame the client draws again at once, and lets that draw down
+	# a frame later as Shift comes up. The loose let go is the shot's: it flies at 4 all the same.
+	var flown := []
+	var on_loose := func(_by: GridEntity, _angle: float, step: int) -> void: flown.append(step)
+	World.loosed.connect(on_loose)
+	var kept := []
+	for early: int in [1, 2, 3]:
+		if World.slot_count(player, Player.LEFT_HAND) <= 0:
+			World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+		player.bow_ready_tick = World.tick
+		_main.drive_stand_draw(true)
+		var began := World.tick
+		for i in early:
+			World.step()
+		_main._unhandled_input(let_go)
+		_main.drive_stand_draw(true, false)  # The same frame: Shift still read down, drawn again.
+		var asked: bool = _main._stance == "draw" and player.draw_queued
+		_main.drive_stand_draw(false, false)  # The next frame: Shift up.
+		var at := -1
+		for i in 8:
+			World.step()
+			if not flown.is_empty():
+				at = World.tick - began
+				break
+		kept.append([early, asked, at, flown.duplicate(), _main._stance, player.draw_queued])
+		flown.clear()
+		World.step()
+		World.step()
+	_check(kept.all(func(k: Array) -> bool: return k[1] and k[2] == 4 and k[3] == [0] and k[4] == "" and not k[5]),
+			"Shift up a frame after the left release, let go at 1, 2 or 3: the arrow flies at 4, the draw after it let down (928) (%s)" % [kept])
+	# Shift kept down through the shot: the next draw begins as the wait ends, the client's stance and the server's alike.
+	if World.slot_count(player, Player.LEFT_HAND) <= 0:
+		World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	player.bow_ready_tick = World.tick
+	_main.drive_stand_draw(true)
+	var drew := World.tick
+	World.step()
+	_main._unhandled_input(let_go)
+	_main.drive_stand_draw(true, false)
+	var flew_at := -1
+	var redrawn := -1
+	for i in 10:
+		World.step()
+		if flew_at < 0 and not flown.is_empty():
+			flew_at = World.tick - drew
+		if flew_at > 0 and player.raised == "draw":
+			redrawn = World.tick - drew
+			break
+	_check(flew_at == 4 and redrawn == 6 and flown == [0] and _main._stance == "draw",
+			"Shift kept down: let go at 1, flown at 4, the next draw begun at 6, the client still drawn (flew %d, drawn %d, \"%s\")" % [flew_at, redrawn, _main._stance])
+	# The shot that spent the last arrow: Shift kept down draws nothing after it, and the client's stance clears.
+	_main.drive_stand_draw(false, false)
+	World.step()
+	World.step()
+	flown.clear()
+	player.bow_ready_tick = World.tick
+	_main.drive_stand_draw(true)
+	World.step()
+	_main._unhandled_input(let_go)
+	_main.drive_stand_draw(true, false)
+	for i in 6:
+		World.step()
+		if not flown.is_empty():
+			break
+	var last := World.take_item(player, player, Player.LEFT_HAND)  # None left in the hand.
+	for i in 4:
+		World.step()
+		_main.drive_stand_draw(true, false)
+	_check(flown == [0] and player.raised == "" and not player.draw_queued and _main._stance == "",
+			"Shift kept down, the last arrow flown: no draw begun on the server, none shown on the client (\"%s\", \"%s\")" % [player.raised, _main._stance])
+	World.put_item(player, player, Player.LEFT_HAND, last)
+	World.loosed.disconnect(on_loose)
+	_main.drive_stand_draw(false, false)
+	World.step()
+	World.step()
 	# Shift held, walking: the body stops where it stands and draws.
 	_main._move_click(player, Vector2i(5, 3))
 	_check(_walking_to(Vector2i(5, 3)), "(walking to 5,3)")

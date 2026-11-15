@@ -736,6 +736,9 @@ var aim_drawn := false
 var _aim_mark_cell := Vector2i.ZERO
 ## A fixed aim point on the grid for a shot (--test-show=aim); NAN for the mouse.
 var _aim_fixed := Vector2(NAN, NAN)
+## The loose is sent and the server may hold it till the draw counts (decision 928, hold_from):
+## the aim (and the body turned by it) stays where it was let go until the draw drops.
+var _loose_sent := false
 ## When the arc first showed, for its fade-in (msec).
 var _aim_since := 0
 ## The 2D view's arc, made on first use.
@@ -2254,6 +2257,7 @@ func _lower_off_hand(player: Player) -> void:
 	if _stance == "draw":
 		var at := _aim_mark_cell if aim_drawn else _mouse_tile()
 		World.command(player, "loose", loose_args(aim_angle if aim_drawn else NAN, at))
+		_loose_sent = true  # 928: a loose let go in the nock flies at the pull; the aim holds till then.
 	elif _stance == "lob":
 		var at := _mouse_tile()
 		World.command(player, "lob", {"at": [at.x, at.y]})  # 677: the server draws it in to the reach.
@@ -2607,7 +2611,11 @@ func _view_yaw() -> float:
 ## draw starts. Nothing without a bow and arrows in hand.
 func drive_stand_draw(held: bool, left_down := false) -> void:
 	var player := _local_player()
-	if player == null or World.off_hand(player) != "draw":
+	if player == null:
+		return
+	if World.off_hand(player) != "draw":
+		if _stance == "draw":
+			_stance = ""  # 928: the last arrow flown (Shift kept down through the shot): nothing left to draw.
 		return
 	if held and _stance.is_empty():
 		_raise_off_hand(player)
@@ -2627,6 +2635,7 @@ func drive_stand_draw(held: bool, left_down := false) -> void:
 ## let go, it all goes and the cursor is back.
 func _update_aim(player: Player, drawing: bool) -> void:
 	if not drawing:
+		_loose_sent = false
 		if aim_drawn:
 			aim_drawn = false
 			_aim_since = 0
@@ -2638,6 +2647,8 @@ func _update_aim(player: Player, drawing: bool) -> void:
 			if _aim_line != null:
 				_aim_line.visible = false
 		return
+	if _loose_sent and aim_drawn:
+		return  # 928: let go; the server looses it at this angle when the draw counts.
 	var origin := Iso.local_to_grid(player.position)
 	var toward_point := _aim_fixed if is_finite(_aim_fixed.x) else _mouse_grid()
 	if is_nan(toward_point.x):

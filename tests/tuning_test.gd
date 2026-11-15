@@ -67,7 +67,7 @@ func _test_apply_and_reset() -> void:
 	_check(Tuning.apply("items.bow.drain", 4) and int(Items.verb_of("bow")["drain"]) == 4, "the bow's drain 4")
 	_check(Tuning.apply("items.bow.full", 3) and float(Items.verb_of("bow")["draw_full"]) > full_before,
 			"full draw a step later: its ticks worked out anew (%s -> %s)" % [full_before, Items.verb_of("bow")["draw_full"]])
-	_check(Tuning.apply("items.bow.draw_steps", [3, 3, 3, 3, 3]) and Items.verb_of("bow")["draw_steps"] == [3, 3, 3, 3, 3],
+	_check(Tuning.apply("items.bow.draw_steps", [3, 3, 3, 3]) and Items.verb_of("bow")["draw_steps"] == [3, 3, 3, 3],
 			"a list field takes a list (%s)" % [Items.verb_of("bow")["draw_steps"]])
 	_check(not Tuning.apply("combat.swing_base", "soon") and not Tuning.apply("combat.swing_base", -1)
 			and not Tuning.apply("items.bow.steps", 4) and not Tuning.apply("combat.nothing", 1) and not Tuning.apply("items.bow.nothing", 1),
@@ -78,7 +78,7 @@ func _test_apply_and_reset() -> void:
 	_check(not Tuning.changes().has("combat.whiff_scale"), "set to the repo's own value: no change kept")
 	Tuning.reset_all()
 	_check(World.recover_at == 25 and World.moves["spin"]["windup"] == windup and int(Items.verb_of("bow")["drain"]) == 1
-			and int(Items.verb_of("bow")["full"]) == 2 and is_equal_approx(float(Items.verb_of("bow")["draw_full"]), full_before)
+			and int(Items.verb_of("bow")["full"]) == 0 and is_equal_approx(float(Items.verb_of("bow")["draw_full"]), full_before)
 			and Tuning.changes().is_empty(), "reset all: every one back, nothing changed")
 
 

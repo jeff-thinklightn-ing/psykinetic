@@ -63,6 +63,7 @@ func _ready() -> void:
 	_test_other_zone_waits()
 	_test_cone_spread()
 	_test_draw_held()
+	_test_snap_draw()
 	_test_lob()
 	_test_free_blows()
 	_test_click_away()
@@ -448,12 +449,12 @@ func _test_cone_spread() -> void:
 		means.append(snappedf(miss / 400.0, 0.01))
 		centred = centred and absf(signed / 400.0) < cone * 0.1
 	World.shot_salt = salt
-	var table := [0.43, 0.21, 0.35]
+	var table := [0.90, 0.21, 0.35]  # 928: the snap's open cone at 9 cells, then aimed.
 	var near := true
 	for i in 3:
 		near = near and absf(means[i] - table[i]) <= 0.05
 	_check(near and means[0] > means[1] and means[2] > means[1],
-			"the mean miss at 0.5, 1.2 and 3.3 s held, within 0.05 cells of the design's 0.43, 0.21, 0.35: least at full draw (%s)" % [means])
+			"the mean miss at 0.5, 1.2 and 3.3 s held, within 0.05 cells of 0.90 (the snap's open cone at 9 cells, 928), 0.21 (aimed), 0.35 (15 cells): least aimed (%s)" % [means])
 	_check(inside and centred, "every roll inside the cone, centred on the aim")
 	var plain := Items.verb_of("bow").duplicate()
 	plain.erase("spread")
@@ -1566,16 +1567,16 @@ func _test_lob() -> void:
 	host.raised_tick = World.tick - 5
 	_check(World.draw_step(host) == 0 and is_equal_approx(World.lob_radius(host), 2.5), "5 ticks: the first step, a circle 2.5 cells across")
 	host.raised_tick = World.tick - 12
-	_check(World.draw_step(host) == 2 and is_equal_approx(World.lob_radius(host), 1.0) and World.lob_aim(host, Vector2i(19, 1)) == Vector2i(10, 1),
-			"full draw: 1 cell, and aimed past the reach it is drawn in to 9 cells (%s)" % World.lob_aim(host, Vector2i(19, 1)))
+	_check(World.draw_step(host) == 1 and is_equal_approx(World.lob_radius(host), 1.0) and World.lob_aim(host, Vector2i(19, 1)) == Vector2i(10, 1),
+			"the aimed step (928): 1 cell, and aimed past the reach it is drawn in to 9 cells (%s)" % World.lob_aim(host, Vector2i(19, 1)))
 	host.raised_tick = World.tick - 40
 	_check(is_equal_approx(World.lob_radius(host), 0.5), "held on: half a cell")
 	# 677 amended (3): the circle by the aim's share of the reach.
 	host.raised_tick = World.tick - 5
-	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(6, 1)), 2.5) and is_equal_approx(World.lob_circle_at(host, Vector2i(19, 1)), 2.5),
-			"a first step's lob at its full reach (5 cells), or past it: the whole circle, 2.5")
-	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(3, 1)), 1.0) and is_equal_approx(World.lob_circle_at(host, Vector2i(4, 1)), 1.5),
-			"nearer, the circle shrinks with the distance: 2 cells off 1.0 (lob_volley_min), 3 off 1.5")
+	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(10, 1)), 2.5) and is_equal_approx(World.lob_circle_at(host, Vector2i(19, 1)), 2.5),
+			"a first step's lob at its full reach (9 cells since 928's snap), or past it: the whole circle, 2.5")
+	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(3, 1)), 1.0) and is_equal_approx(World.lob_circle_at(host, Vector2i(6, 1)), 2.5 * 5.0 / 9.0),
+			"nearer, the circle shrinks with the distance: 2 cells off 1.0 (lob_volley_min), 5 off 2.5 x 5/9")
 	host.raised_tick = World.tick - 40
 	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(3, 1)), 1.0), "held on and near: never under lob_volley_min")
 	var landed := []
@@ -1676,19 +1677,19 @@ func _test_draw_held() -> void:
 	near.hp = 100
 	far.max_hp = 100
 	far.hp = 100
-	World.shoot(host, 0.0, 5)
+	World.shoot(host, 0.0, 4)
 	_check(near.hp == 100 - roundi(blow * 1.6), "drawn to the last band, a body within 9 cells takes full strength (%d)" % (100 - near.hp))
 	World.despawn(near)
-	World.shoot(host, 0.0, 5)
+	World.shoot(host, 0.0, 4)
 	_check(far.hp == 100 - roundi(blow * 0.8), "one 14 cells out, in the last band, takes the least (669 amended: 0.8) (%d)" % (100 - far.hp))
 	far.hp = 100
-	World.shoot(host, 0.0, 4)
+	World.shoot(host, 0.0, 3)
 	_check(far.hp == 100, "drawn only to the second band (13 cells), the arrow falls short of it")
 	_check(World.try_stance(host, "draw"), "drawn")
 	host.stamina = 50
 	for i in 5:
 		World.step()
-	_check(host.raised == "draw" and host.stamina >= 50, "below full draw nothing drains (%d)" % host.stamina)
+	_check(host.raised == "draw" and host.stamina >= 50, "before the aimed step nothing drains, though full from 4 ticks (928) (%d)" % host.stamina)
 	host.raised_tick = World.tick - 12
 	var given := []
 	var shots := []
@@ -1698,7 +1699,7 @@ func _test_draw_held() -> void:
 	World.loosed.connect(on_loose)
 	host.stamina = 5
 	World.step()
-	_check(host.stamina == 4 and host.raised == "draw", "at full draw, 1 a tick (669 amended) (%d)" % host.stamina)
+	_check(host.stamina == 4 and host.raised == "draw", "aimed, 1 a tick (669 amended, 928) (%d)" % host.stamina)
 	for i in 3:
 		World.step()
 	_check(host.stamina == 1 and host.raised == "draw", "none comes back while held (%d)" % host.stamina)
@@ -1709,6 +1710,202 @@ func _test_draw_held() -> void:
 	_check(host.winded, "and winded")
 	World.draw_given_up.disconnect(on_given)
 	World.loosed.disconnect(on_loose)
+
+
+## 928 (Jeff's report, 11-14: "you draw by explosively pulling"): a 3-tick
+## nock, one tick's pull to full, then the time is the aim's; the hold drains
+## from the aimed step; a loose at the snap's step holds the next draw 2 ticks.
+func _test_snap_draw() -> void:
+	print("
+== the draw is one snap: nothing in the nock, full at 4 ticks in a 20 degree cone, 4 degrees by 10, no drain till aimed, 2 ticks after a snap loose, none after an aimed one (decision 928) ==")
+	var e := _build(["##############", "#P.....m.....#", "##############"])
+	var host: GridEntity = e["P"][0]
+	var mark: GridEntity = e["m"][0]  # 6 cells off.
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	World.set_arts(host, {})
+	mark.max_hp = 100
+	mark.hp = 100
+	var shots := []
+	var on_loose := func(_by: GridEntity, _angle: float, step: int) -> void: shots.append(step)
+	World.loosed.connect(on_loose)
+	var arrows := World.slot_count(host, Player.LEFT_HAND)
+	_check(arrows > 0 and World.try_stance(host, "draw"), "a bow drawn, %d arrows" % arrows)
+	# A loose let go at any tick of the nock is held and flies the tick the draw counts (hold_from 0):
+	# full, at the snap's 20-degree cone, the arrow spent then and not before.
+	var flew := []
+	for early: int in [0, 1, 2, 3]:
+		if early > 0:
+			host.bow_ready_tick = World.tick
+			_check(World.try_stance(host, "draw"), "drawn again for a loose at %d" % early)
+		var began := World.tick
+		for i in early:
+			World.step()
+		var held := World.try_loose(host, 0.0)
+		var kept := host.raised == "draw" and shots.is_empty() and World.slot_count(host, Player.LEFT_HAND) == arrows and is_finite(host.loose_held)
+		var at := -1
+		for i in 8:
+			if not shots.is_empty():
+				break
+			World.step()
+			if not shots.is_empty():
+				at = World.tick - began
+		flew.append([early, held and kept, at, shots.duplicate(), host.raised])
+		shots.clear()
+		arrows = maxi(1, World.slot_count(host, Player.LEFT_HAND))
+		if World.slot_count(host, Player.LEFT_HAND) <= 0:
+			World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+			arrows = World.slot_count(host, Player.LEFT_HAND)
+	_check(flew.all(func(f: Array) -> bool: return f[1] and f[2] == 4 and f[3] == [0] and f[4] == ""),
+			"let go at 0, 1, 2 or 3 ticks, in the nock: held, the draw kept, and the arrow flies at 4 ticks at full draw (step 0) (928: hold_from 0) (%s)" % [flew])
+	# The held loose's cycle is the snap's: the next draw 2 ticks after the shot (loose_recover); a draw
+	# asked in the wait (Shift kept down: the client draws again at once) is kept and begins then.
+	_check(not World.try_stance(host, "draw") and host.raised == "" and host.draw_queued,
+			"the held shot's own tick: no draw yet, the ask kept")
+	World.step()
+	var one_on: String = host.raised
+	World.step()
+	_check(one_on == "" and host.raised == "draw" and World.tick - host.raised_tick == 0 and not host.draw_queued,
+			"two ticks on: the kept ask sets the next arrow, a 0.6 s cycle as a loose at 4 (one tick on: \"%s\")" % one_on)
+	# Tap after tap: a held loose flies at the snap's step (0), so it pays the snap's wait. Each tap drawn the
+	# first tick the bow allows flies 6 ticks after the last, a 0.6 s cycle and no faster.
+	World.try_stance(host, "")
+	host.bow_ready_tick = World.tick
+	mark.hp = 100
+	var flown_at: Array[int] = []
+	var on_tap := func(_by: GridEntity, _angle: float, step: int) -> void: flown_at.append(World.tick * 10 + step)
+	World.loosed.connect(on_tap)
+	for i in 20:
+		if World.slot_count(host, Player.LEFT_HAND) <= 0:
+			World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+		if host.raised != "draw":
+			World.try_stance(host, "draw")
+		if host.raised == "draw" and is_nan(host.loose_held):
+			World.try_loose(host, 0.0)
+		World.step()
+	World.loosed.disconnect(on_tap)
+	for i in 8:  # The last tap's held loose is the shot's (a let-down no longer calls it off): flown before the next rows.
+		if is_nan(host.loose_held):
+			break
+		World.step()
+	var gaps := []
+	for k in range(1, flown_at.size()):
+		gaps.append((flown_at[k] - flown_at[k - 1]) / 10)
+	_check(flown_at.size() == 3 and gaps == [6, 6] and flown_at.all(func(f: int) -> bool: return f % 10 == 0),
+			"tap after tap: three shots in 2 s, each at the snap's step, 6 ticks apart (a 0.6 s cycle, no faster) (%s)" % [gaps])
+	shots.clear()
+	World.try_stance(host, "")
+	host.bow_ready_tick = World.tick
+	_check(World.try_stance(host, "draw"), "drawn again after the taps")
+	# Shift kept down on the Shift path (ui-design's 928f counts: 1 of 32 loosed): the client lets go, draws
+	# again at once with Shift still read down, and lets that draw down a frame later as Shift comes up. A loose
+	# let go is the shot's: the second draw and its let-down only ask for, then call off, the draw after it.
+	World.try_stance(host, "")
+	var kept_down := []
+	for early: int in [1, 2, 3]:
+		host.bow_ready_tick = World.tick
+		World.try_stance(host, "draw")
+		var began := World.tick
+		for i in early:
+			World.step()
+		World.try_loose(host, 0.0)
+		World.try_stance(host, "draw")  # Shift still read down: drawn again at once.
+		var asked := host.draw_queued
+		World.try_stance(host, "")  # Shift up a frame later.
+		var at := -1
+		for i in 8:
+			World.step()
+			if not shots.is_empty():
+				at = World.tick - began
+				break
+		kept_down.append([early, asked, at, shots.duplicate(), host.draw_queued])
+		shots.clear()
+		mark.hp = 100
+	_check(kept_down.all(func(k: Array) -> bool: return k[1] and k[2] == 4 and k[3] == [0] and not k[4]),
+			"let go at 1, 2 or 3 ticks, drawn again and let down at once (Shift up a frame late): the arrow still flies at 4, the draw after it called off (%s)" % [kept_down])
+	# Shift kept down through the shot: the next draw begins as the wait ends, the client's stance and the server's one again.
+	host.bow_ready_tick = World.tick
+	World.try_stance(host, "draw")
+	World.step()
+	World.try_loose(host, 0.0)
+	World.try_stance(host, "draw")
+	var drawn_at := -1
+	var flew_at := -1
+	for i in 10:
+		World.step()
+		if flew_at < 0 and not shots.is_empty():
+			flew_at = i + 2
+		if flew_at > 0 and host.raised == "draw":
+			drawn_at = i + 2
+			break
+	_check(flew_at == 4 and drawn_at == 6 and shots == [0], "Shift kept down: let go at 1, flown at 4, the next draw begun at 6 (flew %d, drawn %d)" % [flew_at, drawn_at])
+	shots.clear()
+	# A draw asked for after the shot does not begin with no arrow left in the hand, nor once struck reeling.
+	var asked_after := []
+	for how: String in ["no arrows", "knocked down"]:
+		World.try_stance(host, "")
+		host.bow_ready_tick = World.tick
+		World.try_stance(host, "draw")
+		World.step()
+		World.try_loose(host, 0.0)
+		World.try_stance(host, "draw")  # Shift kept down.
+		for i in 6:
+			World.step()
+			if not shots.is_empty():
+				break
+		var asked := host.draw_queued
+		var bundle := 0
+		if how == "no arrows":
+			bundle = World.take_item(host, host, Player.LEFT_HAND)  # The shot's was the last: none left in the hand.
+		else:
+			World.knock_down(host, mark, 1)
+		for i in 4:
+			World.step()
+		asked_after.append([how, shots.duplicate(), asked, host.raised, host.draw_queued])
+		if bundle != 0:
+			World.put_item(host, host, Player.LEFT_HAND, bundle)
+		shots.clear()
+		mark.hp = 100
+		for i in 4:
+			World.step()
+	_check(asked_after.all(func(k: Array) -> bool: return k[1] == [0] and k[2] and k[3] == "" and not k[4]),
+			"the draw asked after a shot: none begun with no arrow left, none once knocked down (%s)" % [asked_after])
+	# A let-down before any loose still lets the draw down, arrow kept.
+	arrows = World.slot_count(host, Player.LEFT_HAND)
+	World.try_stance(host, "")
+	for i in 6:
+		World.step()
+	_check(shots.is_empty() and host.raised == "" and is_nan(host.loose_held) and not host.draw_queued and World.slot_count(host, Player.LEFT_HAND) == arrows,
+			"drawn, then let down with nothing let go: nothing loosed, the arrow kept (%d of %d)" % [World.slot_count(host, Player.LEFT_HAND), arrows])
+	_check(World.try_stance(host, "draw"), "a let-down draw holds nothing back: drawn again at once")
+	World.set_arts(host, {})  # The held shots above practised the bow (766): back to an untried archer.
+	mark.hp = 100  # And they struck the mark.
+	host.raised_tick = World.tick - 4
+	var blow := host.attack_damage * float(Items.verb_of("bow")["damage"])
+	_check(World.draw_step(host) == 0 and World.draw_of(host) == 1.0 and World.range_of(host) == 9 and World.full_range_of(host) == 9
+			and is_equal_approx(World.shot_strength(host, 0, 9), 1.6) and is_equal_approx(rad_to_deg(World.spread_of(host)), 20.0),
+			"at 4 ticks, the pull's: full draw, full strength out to 9 cells, in a 20 degree cone (%.1f)" % rad_to_deg(World.spread_of(host)))
+	World.shoot(host, 0.0, World.draw_step(host))
+	_check(mark.hp == 100 - roundi(blow * 1.6), "the snap's arrow on the line strikes for full draw's %d (%d)" % [roundi(blow * 1.6), 100 - mark.hp])
+	host.raised_tick = World.tick - 10
+	_check(World.draw_step(host) == 1 and is_equal_approx(snappedf(rad_to_deg(World.spread_of(host)), 0.1), 4.0) and World.range_of(host) == 9,
+			"at 10 ticks, aimed: the cone 4 degrees, the reach still 9 (%.1f, step %d, reach %d)" % [rad_to_deg(World.spread_of(host)), World.draw_step(host), World.range_of(host)])
+	host.stamina = 50
+	host.raised_tick = World.tick - 4
+	for i in 4:
+		World.step()
+	_check(host.raised == "draw" and host.stamina >= 50, "full from 4 ticks to 8, no drain before the aimed step: the breath comes back (%d from 50)" % host.stamina)
+	host.raised_tick = World.tick - 12
+	var before := host.stamina
+	World.step()
+	_check(host.stamina < before, "aimed, the hold drains (%d from %d)" % [host.stamina, before])
+	host.raised_tick = World.tick - 10
+	_check(World.try_loose(host, 0.0) and shots.size() == 1 and host.raised == "", "loosed aimed (%s)" % [shots])
+	World.step()
+	_check(World.try_stance(host, "draw") and host.raised == "draw",
+			"an aimed loose (step 1) pays no loose_recover: the next arrow set the tick after, as before 928 (the coordinator's bow1 rows: the aimer 0.1 s a shot slower)")
+	World.loosed.disconnect(on_loose)
+	host.raised = ""
 
 
 ## Armour, combat's side (decision 622): the worn kind's deflect_shot after
