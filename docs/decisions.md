@@ -33545,6 +33545,28 @@ whoever runs them; C:/dev/psykinetic is shared by the coordinator and release, s
 renews the other's take there (harmless today: the coordinator's docs landings take seconds, and release cuts from
 C:/dev/psykinetic-release). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+667 amended (6): a release ends with the lock's folder gone, or says it didn't (combat's report, 2026-11-15, in
+C:/dev/review/perf/flakes.md; the coordinator's approval; label from tools/decision_number.sh). combat-lob's release
+after the push of b0e751222 logged "released by combat-lob" at 15:18:05, but /c/dev/land.lock stayed with its owner
+and checkout files and nothing else; status read "held by combat-lob (), 0 min" and three landings waited until combat
+released it again by hand at 15:21:43. On Windows a file another process holds open (a waiter's read; Python's open()
+shares no delete) survives `rm -rf`, which bench_lock.sh never checked; and age() read a missing "since" as 0, so the
+remnant would never have gone stale. Now bench_lock.sh's remove_lock tries again every half second until the folder is
+gone, logging each try that leaves it with the files left; past its tenth try (PSYKINETIC_LOCK_REMOVE_TRIES) a release
+logs and prints "release incomplete" and exits 5, the lock left held with its owner named. A lock with no "since" ages
+from its folder's time (a lock mid-take, its folder just made, is still fresh), so a remnant goes stale by the rule,
+25 minutes for the land lock, and the next take after that takes it over as any stale lock. A stale takeover that
+can't remove the old folder exits 1 ("retry"), and a take given back on a tracked file exits 5 as a release does. The
+bench lock shares the file and gets the same. What a land script does on release's exit 5: nothing more than log it
+loudly; it has pushed already, so it goes on to give back its gate take and never loops on the release. What the next
+taker sees meanwhile: a held lock with its owner named, waited on as any held lock and stale by the rule; a hand
+release only by its owner or release. tests/lock_release_test.sh (land.sh runs it when the lock or the test changes):
+an owner file held open 2 s by a Python child during the release, on the land lock and the bench lock: the folder
+gone, the leftover try logged naming the file, the next take at once; held past two tries: exit 5, "release
+incomplete" said and logged with the file, the lock held by its owner; a remnant with no "since": fresh at first, then
+read 2 min old by its folder and taken over past a 60 s stale time. RESULT: PASS; against main's bench_lock.sh 10
+rows fail. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs
 
 Godot writes `user://logs/godot.log` unless told otherwise, and that folder is shared by every

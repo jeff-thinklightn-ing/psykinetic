@@ -25,10 +25,13 @@ LABEL="${PSYKINETIC_LOCK_LABEL:-bench lock}"
 held() { [ -d "$LOCK" ]; }
 # Seconds since the holder took it or last beat ("since"; 667 amended: a landing beats
 # while its tests run, so a long one never goes stale, and every checkout's copy, old or
-# new, reads the same file). A lock another tree has only just taken may not have its time
-# written yet: count it as new.
+# new, reads the same file). A lock with no "since" (667 amended (6)) counts from its folder's
+# own mtime: one another tree has only just taken, its time not yet written, is as new as its
+# folder, and a release's remnant (files a reader held open, the rest removed) goes stale by
+# the rule from when it was left, never "0 min" for ever.
 age() {
 	since=$(cat "$LOCK/since" 2>/dev/null)
+	[ -n "$since" ] || since=$(stat -c %Y "$LOCK" 2>/dev/null)
 	[ -n "$since" ] || since=$(date +%s)
 	echo $(( $(date +%s) - since ))
 }
@@ -49,6 +52,32 @@ who() {
 # Every take, takeover and release, with the time, beside the lock (<lock>.log), so two
 # landings that overlapped can be traced afterwards. Refusals are not logged (loops retry).
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOCK.log" 2>/dev/null || true; }
+# The lock folder removed, every place it is (667 amended (6)): on Windows a file another
+# process holds open (a waiter's read; Python's open() doesn't share delete) survives rm -rf,
+# "Device or resource busy", and the folder stayed held with its owner named (combat-lob's
+# release, 11-15 15:18:05: three landings waited 3.5 min for a hand release). Tried again
+# till it is gone, PSYKINETIC_LOCK_REMOVE_TRIES (10) tries 0.5 s apart, each try that leaves
+# files logged with their names; 1 if it is still there after the last.
+remove_lock() {
+	rl_tries=0
+	while :; do
+		rm -rf "$LOCK" 2>/dev/null
+		[ -d "$LOCK" ] || return 0
+		rl_tries=$((rl_tries + 1))
+		rl_left="$(ls -A "$LOCK" 2>/dev/null | tr '\n' ' ')"
+		log "$1: $LOCK still there after try $rl_tries (left: ${rl_left:-nothing})"
+		[ "$rl_tries" -lt "${PSYKINETIC_LOCK_REMOVE_TRIES:-10}" ] || return 1
+		sleep 0.5
+	done
+}
+# A removal that never finished (667 amended (6)): logged and said, exit 5. A landing's land
+# script has pushed already: it says so and goes on to give its gate take back, never loops on
+# the release; the next take sees the lock held with its owner named, stale by the rule.
+release_incomplete() {
+	log "release incomplete by $1: $LOCK still there after ${PSYKINETIC_LOCK_REMOVE_TRIES:-10} tries (left: $(ls -A "$LOCK" 2>/dev/null | tr '\n' ' '))"
+	echo "$LABEL: release incomplete by $1: $LOCK still there (a file held open); it goes stale by the rule; nothing to do but go on (667 amended (6))"
+	exit 5
+}
 beat_gate() {
 	[ -n "${PSYKINETIC_LOCK_BEATS_GATE:-}" ] || return 0
 	# 0 beaten, 1 no take to beat (a docs push) or not this try's turn; anything
@@ -116,7 +145,8 @@ case "${1:-status}" in
 			rm -rf "$MARK"; log "freeze mark removed by $tree"
 		fi
 		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
-			rm -rf "$LOCK"; log "released by $tree"; echo "$LABEL: unfrozen and released by $tree"
+			remove_lock "release by $tree" || release_incomplete "$tree"
+			log "released by $tree"; echo "$LABEL: unfrozen and released by $tree"
 		else
 			echo "$LABEL: unfrozen by $tree"
 		fi
@@ -141,7 +171,8 @@ case "${1:-status}" in
 				turn_ok "$tree" "$what" || exit 1
 				echo "$LABEL: taking over a stale lock from $(who)"
 				log "takeover by $tree from $(who)"
-				rm -rf "$LOCK"; mkdir "$LOCK" || exit 1
+				remove_lock "takeover by $tree" || { log "takeover by $tree incomplete: the stale lock's folder stays"; echo "$LABEL: the stale lock could not be removed (a file held open); retry"; exit 1; }
+				mkdir "$LOCK" || exit 1
 			elif [ -n "${PSYKINETIC_LOCK_FROZEN_EXIT:-}" ] && grep -qi "main frozen" "$LOCK/what" 2>/dev/null; then
 				echo "$LABEL: main frozen by $(who): release your suite take and requeue"
 				exit "$PSYKINETIC_LOCK_FROZEN_EXIT"
@@ -164,7 +195,7 @@ case "${1:-status}" in
 			if ! TRACKED_LOG="$LOCK.log" TRACKED_TREE="$tree" sh "$(dirname "$0")/tracked_on_main.sh" --clear; then
 				# Given back, and no waiter either: its try left in .waiters would keep the next
 				# landing behind it by the lock's order (394 amended (36)) for LOCK_LIVE_SECONDS.
-				rm -rf "$LOCK"
+				remove_lock "given back by $tree" || release_incomplete "$tree"
 				rm -f "$LOCK.waiters/$tree.json"
 				log "refused $tree ($what): an untracked path origin/main tracks; given back (667 amended (2))"
 				echo "$LABEL: not taken: an untracked path origin/main tracks, named above; commit, move or remove it, then take again (667 amended (2))"
@@ -179,7 +210,8 @@ case "${1:-status}" in
 	release)
 		tree="${2:?tree name}"
 		if held && [ "$(cat "$LOCK/owner" 2>/dev/null)" = "$tree" ]; then
-			rm -rf "$LOCK"; log "released by $tree"; echo "$LABEL: released by $tree"
+			remove_lock "release by $tree" || release_incomplete "$tree"
+			log "released by $tree"; echo "$LABEL: released by $tree"
 		elif held; then
 			echo "$LABEL: held by $(who), not $tree; not released"; exit 1
 		else

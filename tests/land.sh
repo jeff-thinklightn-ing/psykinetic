@@ -266,6 +266,12 @@ if git diff --name-only origin/main...HEAD -- tools/land_lock.sh tools/bench_loc
 else
 	echo "land_beat_test: not run (the take changes none of tools/land_lock.sh, bench_lock.sh or its test)"
 fi
+# A release with a file held open (667 amended (6)), about 25 s: only when the take changes the lock or the test.
+if git diff --name-only origin/main...HEAD -- tools/land_lock.sh tools/bench_lock.sh tests/lock_release_test.sh 2>/dev/null | grep -q .; then
+	tool_part lock_release_test bash tests/lock_release_test.sh
+else
+	echo "lock_release_test: not run (the take changes none of tools/land_lock.sh, bench_lock.sh or its test)"
+fi
 # One name for a landing (883 amended), about 35 s: only when the take changes land.sh, the gate,
 # the lock or the test.
 if git diff --name-only origin/main...HEAD -- tests/land.sh tools/heavy_job.py tools/land_lock.sh tests/land_name_test.sh 2>/dev/null | grep -q .; then
