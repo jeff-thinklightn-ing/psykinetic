@@ -22015,6 +22015,7 @@ const FOOT_MARK_SHADED := 1.0 / 3.0
 const FOOT_MARK_SUN := Vector2(0.0, 12.0)  # the sun's height (degrees): none .. all of it
 const FOOT_MARK_LIFT := 0.03
 const FOOT_MARK_MOST := 256
+const FOOT_MARK_SINK := 0.3  # a sinking corpse's mark gone by this far under
 ## Its colour multiplies the frame: 1 - k(shaded + (1 - shaded) * sun * the
 ## sun's reach), k the oval's strength there: emission 1 - k, and the sun's
 ## light (no ambient) giving back k (1 - shaded)(1 - sun * reach).
@@ -22099,16 +22100,28 @@ func _place_foot_marks() -> void:
 		if body.is_empty():
 			continue
 		var mesh: GeometryInstance3D = body["mesh"]
-		if not is_instance_valid(mesh) or mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+		if not is_instance_valid(mesh):
+			_foot_mark_bodies.erase(id)  # Its part swapped or freed: measured again next frame.
+			continue
+		if mesh.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
 			continue
 		var cell := Vector2i(roundi(puppet.position.x), roundi(puppet.position.z))
 		if body["cell"] != cell:
 			body["cell"] = cell
-			body["inside"] = _indoors(cell)
+			# None indoors, nor on water: a ford's root is its bed, and the
+			# mark would darken the water's top.
+			body["inside"] = _indoors(cell) or _terrain_water_has(cell)
 		if body["inside"]:
 			continue
+		var strength := FOOT_MARK_DEPTH * day * (1.0 - mesh.transparency)
+		if String(puppet.name).begins_with("Corpse_"):
+			# A fallen player's body sinks after it lies (911): the mark goes with it.
+			var sunk := float(body["rest_y"]) - puppet.global_position.y
+			strength *= clampf(1.0 - sunk / FOOT_MARK_SINK, 0.0, 1.0)
+		if strength <= 0.0:
+			continue
 		multimesh.set_instance_transform(shown, _foot_mark_at(puppet, body))
-		multimesh.set_instance_custom_data(shown, Color(FOOT_MARK_DEPTH * day * (1.0 - mesh.transparency), 0.0, 0.0, 0.0))
+		multimesh.set_instance_custom_data(shown, Color(strength, 0.0, 0.0, 0.0))
 		shown += 1
 	multimesh.visible_instance_count = shown
 	var cloud := float(_weather_view.weather.get("cloud", 0.0)) if _weather_view != null else 0.0
@@ -22130,6 +22143,11 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 	var meshes: Array[Node] = [drawn] if drawn is MeshInstance3D else drawn.find_children("*", "MeshInstance3D", true, false)
 	if meshes.is_empty():
 		return {}
+	# A person's own "Body" mesh under Model (pc-character: gear comes and goes).
+	var own: MeshInstance3D = drawn.get_node_or_null("Model").find_child("Body", true, false) as MeshInstance3D if person else null
+	if own != null:
+		meshes.erase(own)
+		meshes.push_front(own)
 	var size: Vector2 = FOOT_MARK_PERSON * float(puppet.get_meta("model_scale", 1.0))
 	if not person:
 		var into := drawn.global_transform.affine_inverse()
@@ -22144,7 +22162,7 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 			first = false
 		size = Vector2(maxf(box.size.x * FOOT_MARK_FIT, FOOT_MARK_LEAST), maxf(box.size.z * FOOT_MARK_FIT, FOOT_MARK_LEAST))
 	var body := {"body": drawn, "mesh": meshes[0], "size": size, "height": float(puppet.get_meta("pick_height", 1.6)),
-			"cell": Vector2i(1 << 30, 0), "inside": false}
+			"cell": Vector2i(1 << 30, 0), "inside": false, "rest_y": puppet.global_position.y}
 	_foot_mark_bodies[id] = body
 	return body
 
