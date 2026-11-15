@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2988)
+## Lines in the code (2989)
 
 ### companions (Pip, Wren, Nix) (663)
 
@@ -1347,7 +1347,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (626)
+### other (sim) (627)
 
 | | Line | Where |
 |---|---|---|
@@ -1770,6 +1770,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s the %s is found, and on the way home | `sim/towns.gd` free_sought() |
 |  | %s the %s was lost on the way | `sim/towns.gd` sought_lost() |
 | L | %s the %s, found %s, comes home to %s | `sim/towns.gd` sought_home() |
+|  | a reason no save kept (left before 918) | `sim/towns.gd` _own_way_in() |
 |  | the woodlot has moved out: %s walks %d steps there and back now | `sim/towns.gd` _felled() |
 |  | the woodlot is cut bare: %s brings deadwood till it moves on or grows back | `sim/towns.gd` _felled() |
 |  | %s, the %s, is taught to fish | `sim/towns.gd` teach_fisher() |
