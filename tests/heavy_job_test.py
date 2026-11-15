@@ -1382,6 +1382,10 @@ def clear_gate():
             except FileNotFoundError:
                 pass
         time.sleep(0.02)
+    # Still not empty after 20 passes (release's note): said here, so a later
+    # row failing on a dirty gate names its cause.
+    left = ["%s/%s" % (each["tree"], each["kind"]) for each in gate._entries("queue") + gate._entries("running")]
+    check(not left, "clear_gate emptied the gate's queue and running folders (left: %s)" % left)
 def queued(tree, kind, waiter=True):
     name = "%019d-%s-%d.json" % (time.time_ns(), tree, os.getpid())
     entry = {"tree": tree, "kind": kind, "pid": None, "queued": time.time()}
