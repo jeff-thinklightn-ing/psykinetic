@@ -19,6 +19,9 @@ const LANTERN := 0.9
 ## How long a free body's attack or shove order waits for its client's
 ## chase to bring it into reach before it is given up (4 s).
 const FREE_CHASE_TICKS := 4 * World.TICK_RATE
+## Server: the tick a blow order began waiting under a told cell on her (decision 942,
+## World.red_holds_order), -1 while none waits; logged once as it begins and ends.
+var red_held_since := -1
 
 ## The armour it wears (decision 622): the Items id in its armour slot
 ## (Items.ARMOUR), "" for none. Replicated, for the views' covering (read
@@ -255,10 +258,13 @@ func _pursue_action() -> void:
 		if World.tick < maxf(next_attack_tick, next_move_tick):
 			return
 		var swing := action_direction
-		_clear_action()
 		var struck := World.stand_target(self, swing)  # Whatever is in the way takes it (decision 593).
 		# What it fires as: World.blow_of, as _test_blow_stands reckons its stand (688 amended (13)).
-		match World.blow_of(self, Order.SWING, struck, swing):
+		var fires := World.blow_of(self, Order.SWING, struck, swing)
+		if _red_holds(fires):
+			return
+		_clear_action()
+		match fires:
 			&"swing":
 				World.try_swing(self, swing)
 			&"wind_up":
@@ -288,8 +294,11 @@ func _pursue_action() -> void:
 		var order := action_order
 		var target := action_target
 		var direction := action_direction
+		var fires := World.blow_of(self, order, target, direction)  # As _test_blow_stands reckons it (688 amended (13)).
+		if _red_holds(fires):
+			return
 		_clear_action()
-		match World.blow_of(self, order, target, direction):  # As _test_blow_stands reckons it (688 amended (13)).
+		match fires:
 			&"wind_up":
 				World.try_wind_up(self, target)  # A heavy weapon winds up first (decision 392).
 			&"blow":
@@ -304,7 +313,29 @@ func _pursue_action() -> void:
 		_clear_action()
 
 
+## Decision 942: its ready blow order, firing as [param fires] (World.blow_of), waits while
+## World.red_holds_order says so: kept, nothing shown or said (a server line for tests and looks,
+## naming no player). False once it may begin.
+func _red_holds(fires: StringName) -> bool:
+	if World.red_holds_order(self, fires):
+		if red_held_since < action_tick:
+			red_held_since = -1  # A newer order (one before was dropped elsewhere): its own hold.
+		if red_held_since < 0:
+			red_held_since = World.tick
+			World._log("red hold: a player's ordered blow waits, a told blow on her cell")
+		return true
+	_red_hold_ends()
+	return false
+
+
+func _red_hold_ends() -> void:
+	if red_held_since >= 0:
+		World._log("red hold: ends after %d ticks" % (World.tick - red_held_since))
+		red_held_since = -1
+
+
 func _clear_action() -> void:
+	_red_hold_ends()
 	action_order = Order.NONE
 	action_target = null
 	action_direction = Vector2i.ZERO

@@ -58850,3 +58850,89 @@ and, again, till the lift; every wilds shell's way out outside, free, facing out
 _test_held_through_card (W held under the card and after the lift walks nothing; let go; a fresh press walks),
 failing on main under the card. (3c) by reading; ui-design's joined after-run (60 entries, 20 leavings with
 nothing held, W held and a route queued) is its proof. Server and client; protocol unchanged; no new class_name.
+
+## 942. A wind-up ordered before a told blow on her waits it out, unless it lands first (combat; the coordinator's yes, 2026-11-15, narrowed the same day)
+
+A told blow (a telegraph's red cells, 602) gives a player time to read it and step out. Her own order
+was spending that time for her. She clicks a foe while she is still recovering from her last blow; the
+order waits its turn (Player._pursue_action); the foe tells a blow on her cell; and the moment her
+recovery ends, the order begins a wind-up. The wind-up plants her, and the told blow lands on her where
+she stands. combat's rows showed it: 7 of 11 robber lunges in the yard runs landed on a player whose
+ordered wind-up had begun under his live red (C:/dev/review/combat/probe_box/brute_run/). enemy-ai's
+grey told-bite rows showed it for the axe: in the r8 trace, an order's swing began 2 ticks into the
+reaction window under live red (C:/dev/review/enemy-ai/grey/bitetell/). The game must not spend the
+player's reading time for her (the coordinator).
+
+As first built (be67eac37, never landed), every ordered blow waited under such a red. enemy-ai's grey
+rows with it (C:/dev/review/enemy-ai/grey/bitetell/with942/README.md) showed the players who never read
+collapse against the grey's told bite at lead 7: chaser fists 12 to 0 of 32, dagger 12 to 1, sword 29 to
+13, and the chaser's harm from told lunges 4.5 to 11.8. Her quick blow had been beating his slow lunge;
+held, she stood in the red and took it. The coordinator would not take that cost: the hold gives a
+reader her time back and must never take a newcomer's blows away (bonuses, not penalties). main's own
+monster_test grey table moved the same way (careless sword 27 to 18 of 32, chaser fists 12 to 6) while
+its relative checks still passed.
+
+The rule, server only (World.red_holds_order, read by Player._pursue_action with what the order fires
+as, World.blow_of):
+- Only a wind-up waits. A blow that winds up nothing (fists, the dagger, any quick blow), a swing at the
+  air and a shove are never held: they cannot pin her, and holding them only costs hits (the
+  coordinator's (a)).
+- A player's attack or swing order (World.order_attack, order_swing; action_tick, now kept for both)
+  that would wind up does not begin while all of these hold: a told blow not yet landed lies on the cell
+  it would strike her on; that red began at or after the tick the order was given; and it lands at or
+  before her wind-up's strike, begun now (tick plus blow_stand_ticks' wind-up). "Not yet landed" means
+  live through the tick it lands, as _into_mates_tell reads it. "The cell it would strike her on" is
+  tell_spares' rule: her centre once her waiting commands are walked.
+- A wind-up whose strike lands before his begins as before 942 (the coordinator's (b)), even when it
+  leaves her no tick to step after it (the middle case, (c)): a hit is worth more to the player who was
+  never going to step, and the reader loses only what she had before.
+- The order is kept, not dropped. It begins the first tick nothing holds it: the tick after the red
+  lands, or once she is out of it.
+- An order given once the red showed is her own, and it begins as ever. A click on the foe with the red
+  already on her is a press, and the press's own swing begins (the coordinator's (2)); only an order
+  given before she could see the red waits.
+- A red elsewhere holds nothing. The order's walk already never steps her into a live told cell from
+  outside: the client's chase holds at the edge (699 amended (3)), and the server never walks a free
+  body. Standing in the red, the chase goes on as before. A key step off the way to the foe still drops
+  the order (Jeff's lost clicks, World._free_drop_order; the coordinator: it stays), so after stepping
+  out sideways she clicks again; a key step towards the foe within WIND_UP_KEEP_ANGLE keeps it.
+- Nothing is shown or said (the coordinator's (4)): she holds her ready stance. Whether it holds through
+  a long red, or drops to the rest, is read in the joined watch, and animation is told if it drops. The
+  server logs "red hold: a player's ordered blow waits, a told blow on her cell" as a hold begins and
+  "red hold: ends after N ticks" as it ends, naming no player.
+- Players only. A companion steps out of a seen tell landing within DODGE_LOOK (12) ticks once her
+  DODGE_REACT (2, wary 4) ticks have passed, and strikes with try_attack, which winds up nothing. A
+  resident fighter steps out of a tell landing within its row's dodge_look (6) from its turn, also with
+  try_attack. Neither is touched (the coordinator: nothing routed).
+
+combat_test _test_red_hold, one cell from a dummy that tells a 3-cell line, she recovering for 6 ticks,
+a giant axe (a 6-tick wind-up) but in the fists row:
+- an attack ordered before a red landing in 8 waits through its landing (begun 10, it lands 9), with
+  the hold's two lines naming no player;
+- one pressed with the red already on her begins at once (6);
+- a red on the row beside hers holds nothing (6);
+- a swing order (order_swing, the WASD click) given before it waits as the attack does;
+- a wind-up whose strike (12) lands before a red landing at 15 begins at once, nothing held;
+- fists ordered before the red begin at once, nothing held;
+- a key step off the way to the foe drops the order as before, and nothing begins.
+monster_test's grey table (_test_old_wolf_rates) reads as on main, every one of its nine rows the same:
+careless fists, dagger, sword won 2, 4, 27 of 32 (sword harm 14.34); chaser 12, 12, 32; reader 9, 4, 30.
+Also run on this build: combat, monster, draugr_fight, items, controls, push and spawn tests PASS.
+
+What it buys, and where. It bites only where her wind-up is longer than the time the red has left to
+land: the heavy axes' 6 ticks, and the sword's 2-tick lead almost never. So it buys nothing for the
+grey's quick-weapon rows (enemy-ai's sword rows at tells 6 and 7 stay as flat as before), and it leaves
+main's grey table as it was. The robber yard rows (saturn, the coordinator's runs; 2 robbers against
+redreader with her companion, brute12's lines, 16 starts, C:/dev/review/combat/probe_box/brute_run/):
+- Lunges landing on a wind-up begun under live red: before 7 of 11, all battle-axe rows (sweep 2, B 5);
+  with the wide form 0 (red942_blows.txt); with this rule 0 (red942n_blows.txt). The 4 lunges that
+  still land all find her stepping off the red.
+- Fists, dagger and sword read exactly as before 942: won, time and harm to the decimal (sweep 3.2,
+  3.3, 1.6; B 2.1, 4.1, 1.5). The wide form had raised them by 0.2 to 0.8 hp.
+- The battle axe's harm falls: 2.9 to 1.8 (sweep) and 4.4 to 3.4 (B), while she wound 1.2 to 0.2 and
+  1.6 to 0.8; won 16 of 16 in each. 24 hold lines against the wide form's 439.
+The wide form, every ordered blow held, was built (be67eac37) and withdrawn the same day on enemy-ai's
+figures above. enemy-ai's greybite rows with this rule are checked before it is queued, and a joined
+watch by real events, with the battle axe, comes before any bullet.
+
+Server only; protocol unchanged; no new class_name; no bullet.

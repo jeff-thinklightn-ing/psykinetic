@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_lob_tap()
 	_test_free_blows()
 	_test_click_away()
+	_test_red_hold()
 	_test_wind_up_kept()
 	_test_hammer_shove()
 	_test_free_chase()
@@ -1339,6 +1340,75 @@ func _test_click_away() -> void:
 		_check(struck_at >= 0 and waited <= World.BLOW_STAND_TICKS + 1,
 				"%s: a click away moves the body within the short pin (%d ticks, the bar %d)" % ["another attack ordered" if queued else "after one blow", waited, World.BLOW_STAND_TICKS + 1])
 
+
+## Decision 942: a player's wind-up order given before a told cell on her began waits while that red is
+## live on her cell and lands at or before her strike (kept, then begun the tick it is gone); one given once
+## the red showed (a click on the foe with the red on her) is her own and begins; a red elsewhere holds
+## nothing; a swing order waits as an attack does. Narrowed (the coordinator, on enemy-ai's grey rows): a
+## blow with no wind-up (fists) is never held, nor a wind-up whose strike lands before the red does.
+func _test_red_hold() -> void:
+	print("
+== a wind-up ordered before the red on her waits it out, unless it lands first; a press or fists begin (942) ==")
+	for row: String in ["ordered before", "pressed in it", "red elsewhere", "a swing ordered before", "its strike lands first", "fists ordered before", "stepped out"]:
+		var e := _build(["##########", "#........#", "#...Pm...#", "#........#", "##########"])
+		var host: GridEntity = e["P"][0]
+		var foe: GridEntity = e["m"][0]
+		host.free_pos = Vector2(host.tile)
+		foe.acts = false
+		foe.max_hp = 999
+		foe.hp = 999
+		if row != "fists ordered before":
+			_give(host, "giant_axe")  # A 6-tick wind-up.
+		host.wind_up = {}
+		var at := host.tile
+		World.recent_logs.clear()  # This row's lines alone (World.reset keeps them).
+		host.next_attack_tick = World.tick + 6  # Recovering from a blow before: the order waits its turn.
+		# The red lands 8 ticks after it shows, before a wind-up begun at 6 strikes (12); 14 lands after it.
+		var lead := 14 if row == "its strike lands first" else 8
+		var told := 0
+		var shape := Telegraph.line(foe.tile, Vector2(-1, 0), 3.0)
+		if row == "red elsewhere":
+			shape = Telegraph.line(foe.tile + Vector2i(0, 1), Vector2(-1, 0), 3.0)  # The row below hers.
+		if row == "pressed in it":
+			told = World.telegraph(foe, "swipe", shape, lead)
+			World.step()
+			World.command_attack(host, foe)
+		elif row == "a swing ordered before":
+			World.order_swing(host, Vector2i(1, 0))  # As Main does for the "swing" command (the WASD click).
+			World.step()
+			told = World.telegraph(foe, "swipe", shape, lead)
+		else:
+			World.command_attack(host, foe)
+			World.step()
+			told = World.telegraph(foe, "swipe", shape, lead)
+		var lands := int(World.telegraphs().get(told, {}).get("lands_tick", -1))
+		var cells := World.told_cells(told)
+		_check(told != 0 and (cells.has(at) != (row == "red elsewhere")), "%s: the red %s her cell %s (%s)" % [row, "beside" if row == "red elsewhere" else "on", at, cells])
+		if row == "stepped out":
+			# Her own key out of it, off the way to him (Jeff's lost clicks, World._free_drop_order): the
+			# order is dropped as ever, not kept for after the red.
+			for i in 8:
+				World.free_input(host, Vector2.UP, World.TICK_DT)
+				World.step()
+			_check(host.action_order == GridEntity.Order.NONE and host.wind_up.is_empty() and World.struck_cell(host) != at,
+					"%s: a step off his way drops the order as before; no wind-up (at %s, order %d)" % [row, World.struck_cell(host), host.action_order])
+			continue
+		var began := -1
+		while World.tick <= lands + 3 and began < 0:
+			World.step()
+			if not host.wind_up.is_empty() or foe.hp < 999:  # Wound up, or struck (fists wind up nothing).
+				began = World.tick
+		var held := World.recent_logs.filter(func(line: String) -> bool: return line.begins_with("red hold: "))
+		match row:
+			"ordered before", "a swing ordered before":
+				_check(began > lands, "%s: nothing begun while the red lay on her; begun the tick after it landed (began %d, it lands %d)" % [row, began, lands])
+				_check(held.size() == 2 and str(held[0]).begins_with("red hold: a player's") and str(held[1]).begins_with("red hold: ends after")
+						and not held.any(func(line: String) -> bool: return line.contains(String(host.name))),
+						"%s: the hold's two server lines, naming no player (%s)" % [row, held])
+			_:
+				_check(began >= 0 and began < lands and held.is_empty(), "%s: begun at once, her turn come, nothing held (began %d, it lands %d, %s)" % [row, began, lands, held])
+		if told != 0:
+			World.end_telegraph(told, false)
 
 ## A wind-up clicked with a walk key held is never given up by that walk (the coordinator's
 ## ruling on combat's finding): its plant holds through its landing tick, so it is struck

@@ -407,7 +407,8 @@ var action_target: GridEntity
 ## For a shove: the way to toss the target, or ZERO for straight away.
 var action_direction := Vector2i.ZERO
 ## The tick action_order was given (a free body's chase gives up after
-## Player.FREE_CHASE_TICKS out of reach). Server only.
+## Player.FREE_CHASE_TICKS out of reach; decision 942: a blow order given
+## before a told cell on her began waits it out). Server only.
 var action_tick := 0
 
 # Render interpolation: slide from _from_tile to tile over _move_duration ticks.

@@ -5728,6 +5728,35 @@ func _into_mates_tell(mover: GridEntity, cell: Vector2i) -> bool:
 	return false
 
 
+## Decision 942 (the coordinator's yes, 11-15, on combat's rows: 7 of 11 robber lunges landed on a player
+## whose own ordered wind-up had begun under his live red), narrowed the same day (the coordinator, on
+## enemy-ai's grey rows: held as first built, a player who never steps out lost the blows that had beaten
+## the grey's slow lunge, chaser fists 12 to 0 of 32): whether [param entity]'s ready blow order, a
+## player's, firing as [param fires] (blow_of), waits this tick. Only a wind-up waits (a blow, a swing at
+## the air or a shove cannot pin her: never held), and only while a told blow not yet landed (a telegraph
+## live through the tick it lands, any source but her own) lies on the cell it would strike her on
+## (tell_spares' rule: her centre once her waiting commands are walked), that red began at or after the
+## tick the order was given (action_tick: an order clicked once the red showed is her own and begins),
+## and it lands at or before her wind-up's strike, begun now (blow_stand_ticks): a wind-up whose strike
+## lands first begins as before 942, even with no tick left to step after it. The order is kept, not
+## dropped: it begins the tick none holds it. Server only; false off authority.
+func red_holds_order(entity: GridEntity, fires: StringName) -> bool:
+	if not Net.is_authority() or not entity is Player or entity.action_order == GridEntity.Order.NONE or fires != &"wind_up":
+		return false
+	var strikes := tick + blow_stand_ticks(entity, &"wind_up")
+	var at := Vector2i(free_projected(entity).round())
+	for id: int in _telegraphs:
+		var each: Dictionary = _telegraphs[id]
+		var data: Dictionary = each["data"]
+		var source: Variant = each["source"]
+		if source == entity or not is_instance_valid(source) or tick > int(data["lands_tick"]) or int(data["lands_tick"]) > strikes:
+			continue
+		if int(data["from_tick"]) < entity.action_tick or str(data.get("zone", "")) != entity.zone:
+			continue
+		if [at.x, at.y] in (data["cells"] as Array):
+			return true
+	return false
+
 ## The flank-marked telegraph [param target] shows now, not yet landed and
 ## past its flank guard: its id, 0 for none (780, combat's rule, read here by
 ## _try_flank and by companions taking the flank: 780 amended (5)). Server
@@ -10146,6 +10175,7 @@ func order_swing(entity: GridEntity, direction: Vector2i) -> void:
 	entity.action_order = GridEntity.Order.SWING
 	entity.action_target = null
 	entity.action_direction = direction
+	entity.action_tick = tick  # Decision 942: when it was asked, against a told cell's start.
 
 
 ## Player intent (decision 593: Ctrl and a click): [param entity]'s
