@@ -54699,6 +54699,22 @@ centred on their logs.
   evening, never "at night".
 Server only; protocol unchanged; no new class_name; no bullet until the package is in and ui-design's two joined
 stills, the player standing in the square, noon and about 20:50, zoom and the view's width named; voice words it to them.
+853 amended (19) (the coordinator's approval, 11-15; label from tools/decision_number.sh): a solid building's way
+in takes both cells of its door's own edge. Found by perf's folk tour's day pass (now walking to the healer's hut)
+and ui's probe: at noon Hob stood on (152, 233), the one cell inside his door, and with a body there no route
+reached the hut's inside, for a player's click or anyone bringing the sick in. Main.door_cells gave a solid
+building its door (Level.solid_door_of) and the cell before it. The forge, the kitchen, both huts and the house
+each have their door's edge on the rect's boundary, so those two were the edge's two sides. The turf house's rect
+takes in a porch row, so its door's edge lies one row in, (152, 232) to (152, 233), and the two were the doorstep
+and the cell before it: the inside cell, its only way farther in, was left to stand on. Now door_cells also takes
+both cells of each door edge (the zone's Doors, World.get_doors, passed in by Main._keep_off_doors) beside that
+door cell: (152, 233) for the turf house, nothing for the other five. Resident leaves keep_off cells out of every
+pick and does not stay on one, so a body made there moves off at its next pick. The temple and the inn (a kind's
+entrances, both cells of each edge) were already whole; no laid spot stands on any door cell. door_day_test: the
+marks row names (152, 233); the widened buildings are the turf house alone; the healer's keep_off carries it;
+made on it at noon, Hob moves off at his next pick (at once) to (150, 233) in his hut, still at work, and a route
+from (152, 230) then reaches the inside (4 steps). door_day_test, resident_test, town_day_test PASS. Server only;
+protocol unchanged; no new class_name; no bullet (ui's door click carries what a player sees).
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 

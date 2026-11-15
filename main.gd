@@ -9658,10 +9658,11 @@ static func makes_goods(trades: Array) -> bool:
 ## leaves them out of every cell it picks in an area; a laid spot, a task's cell and a bed are its own.
 func _keep_off_doors(wanted: Dictionary, area: Dictionary) -> void:
 	var doors := {}
+	var door_edges: Array = World.get_doors().map(func(door: Door) -> Vector3i: return door.key)
 	for building: Variant in area.get("buildings", []):
 		if not building is Dictionary or not (building as Dictionary).get("rect") is Rect2i:
 			continue
-		doors[building["rect"]] = Main.door_cells(building)
+		doors[building["rect"]] = Main.door_cells(building, door_edges)
 	for who: String in wanted:
 		var places: Variant = (wanted[who] as Dictionary).get("places")
 		if not places is Dictionary:
@@ -9678,8 +9679,12 @@ func _keep_off_doors(wanted: Dictionary, area: Dictionary) -> void:
 
 
 ## A building's way in (853 amended (17)): both cells of each entrance edge (Level.entrances: a kind's doors and
-## open edges), else a solid building's door (Level.solid_door_of, 550) and its front; [] for a doorless one.
-static func door_cells(building: Dictionary) -> Array[Vector2i]:
+## open edges), else a solid building's door (Level.solid_door_of, 550) and its front, and both cells of each door
+## edge of [param door_edges] (the zone's Door keys, World.get_doors) beside that door cell; [] for a doorless one.
+## The last, 853 amended (19): the turf hut's rect takes in a porch row, so its door's edge lies one row in, (152, 232) to
+## (152, 233); its door cell and front were the doorstep and the cell before it, and the one cell inside, the hut's
+## only way farther in, was left to stand on (Hob at work there shut the whole inside off to any route).
+static func door_cells(building: Dictionary, door_edges: Array = []) -> Array[Vector2i]:
 	var cells: Array[Vector2i] = []
 	for edge: Variant in Level.entrances(building):
 		if edge is Vector3i:
@@ -9689,6 +9694,11 @@ static func door_cells(building: Dictionary) -> Array[Vector2i]:
 		if door != Level.NO_DOOR:
 			var facing: Vector2i = building["facing"] if building.get("facing") is Vector2i else Level.building_facing(building)
 			cells.append_array([door, door + facing])
+			for edge: Variant in door_edges:
+				if edge is Vector3i and door in Terrain.edge_cells(edge):
+					for cell: Vector2i in Terrain.edge_cells(edge):
+						if not cells.has(cell):
+							cells.append(cell)
 	return cells
 
 

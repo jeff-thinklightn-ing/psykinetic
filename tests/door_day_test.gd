@@ -15,6 +15,8 @@ const FROM_HOUR := 12
 const HOURS := 24
 ## The most game minutes a body may be read on a keep_off cell in a row: a walk out passes through.
 const PASS_MINUTES := 2
+## The one cell inside the turf house's door (853 amended (19)): its only way farther in.
+const ENTRY := Vector2i(152, 233)
 
 var _main: Node
 var _failed := 0
@@ -53,6 +55,7 @@ func _run() -> void:
 	for s in Main.RESIDENT_SYNC_TICKS * 3:  # Main's sync gives the bodies near the player theirs.
 		World.step()
 	_test_marks()
+	_test_entry()
 	var t0 := Time.get_ticks_msec()
 	for s in HOURS * HOUR:
 		World.step()
@@ -73,15 +76,21 @@ func _run() -> void:
 ## or bed is a building's rect carrying that building's door cells, and no spot on a building's way in.
 func _test_marks() -> void:
 	var area: Dictionary = _main._world_map.areas.get(World.zone.name, {})
+	var door_edges: Array = World.get_doors().map(func(door: Door) -> Vector3i: return door.key)
+	var widened: Array = []  # 853 amended (19): the buildings the door's own edge adds a cell for.
 	for building: Variant in area.get("buildings", []):
 		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i:
-			_doors[building["rect"]] = Main.door_cells(building)
+			_doors[building["rect"]] = Main.door_cells(building, door_edges)
+			if Main.door_cells(building, door_edges) != Main.door_cells(building):
+				widened.append(str(building.get("slot", building.get("kind", ""))))
 	var doors := _doors
-	_check(doors.get(HUT_RECT, []) == [Vector2i(152, 232), Vector2i(152, 231)],
-		"the turf house's way in: its door and the cell before it (%s)" % [doors.get(HUT_RECT, "no such building")])
+	_check(doors.get(HUT_RECT, []) == [Vector2i(152, 232), Vector2i(152, 231), ENTRY],
+		"the turf house's way in: its door, the cell before it and the one inside its door's edge, %s (%s)" % [ENTRY, doors.get(HUT_RECT, "no such building")])
+	_check(widened == ["building.turf_house"], "853 amended (19): the door's own edge adds a cell for the turf house alone (%s)" % [widened])
 	var healer := _healer_body()
-	_check(healer != null and (healer.places.get("keep_off", []) as Array).has(Vector2i(152, 232)) and (healer.places.get("keep_off", []) as Array).has(Vector2i(152, 231)),
-		"the healer keeps off his hut's door and front (%s)" % [healer.places.get("keep_off") if healer != null else "no body"])
+	var keep: Array = healer.places.get("keep_off", []) if healer != null else []
+	_check(healer != null and keep.has(Vector2i(152, 232)) and keep.has(Vector2i(152, 231)) and keep.has(ENTRY),
+		"the healer keeps off his hut's door, front and entry cell (%s)" % [keep])
 	var marked := 0
 	for entity in World.townsfolk():
 		var body := entity as Resident
@@ -102,6 +111,32 @@ func _test_marks() -> void:
 			if (doors[rect] as Array).has((spot as Dictionary).get("cell")):
 				on_door.append("%s %s at %s" % [spot.get("use", ""), spot.get("town", ""), spot["cell"]])
 	_check(on_door.is_empty(), "no spot stands on a building's way in (%s)" % [on_door])
+
+
+## 853 amended (19) (perf's folk tour's day pass and ui's probe, 11-15: at noon Hob stood on the one cell inside
+## his door, and with a body there no route reached the hut's inside): the healer made on ENTRY at work moves off
+## it at his next pick, to a cell of his hut, and works on there.
+func _test_entry() -> void:
+	var healer := _healer_body()
+	if healer == null:
+		_check(false, "the healer has a body at noon")
+		return
+	World._relocate(healer, ENTRY)
+	healer._goal = Resident.NO_CELL
+	healer._wander_at = World.tick
+	var off := -1
+	for s in 600:
+		World.step()
+		if healer.tile != ENTRY and off < 0:
+			off = s
+		if off >= 0 and healer.tile == healer._goal:
+			break
+	var keep: Array = healer.places.get("keep_off", [])
+	_check(off >= 0 and off <= 60 and HUT_RECT.has_point(healer._goal) and not keep.has(healer._goal) and healer.doing == Resident.Doing.WORK,
+		"made on the entry cell %s at work, the healer moves off it at his next pick (%d ticks) to %s in his hut, still at work (%s)" % [
+			ENTRY, off, healer._goal, Resident.Doing.keys()[healer.doing]])
+	var route := World.find_path(Vector2i(152, 230), healer.tile + Vector2i(1, 0) if World.is_walkable(healer.tile + Vector2i(1, 0)) else healer.tile + Vector2i(-1, 0))
+	_check(not route.is_empty(), "with him off it a route reaches the hut's inside from (152, 230) (%d steps)" % route.size())
 
 
 ## The door cells of [param body]'s own buildings (its work, home or bed rect), read here, not from its marks.
