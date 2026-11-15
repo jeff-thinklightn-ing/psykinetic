@@ -823,6 +823,12 @@ func _test_held() -> void:
 			and Level.room_at(wilds, Vector2i(70, 202)) == "" and Level.room_at(wilds, Vector2i(160, 160)) == "" and Level.room_at(wilds, Vector2i(155, 160)) == "",
 		"the wilds' town ground is named Umbrage while the town stands there (665's rooms; the store, the woodlot, the town's buildings), the standing stones and the barrow's mound and link not (774 amended) (%s: %s)"
 			% [town_cells, town_cells.map(func(cell: Vector2i) -> String: return Level.room_at(wilds, cell))])
+	var town_starts: Array = wilds["starts"].filter(func(cell: Vector2i) -> bool: return cell.y > 100)
+	_check(Level.where_name(wilds, Vector2i(208, 205)) == "Umbrage" and town_starts.size() == 4
+			and town_starts.all(func(cell: Vector2i) -> bool: return Level.where_name(wilds, cell) == "Umbrage")
+			and Level.where_name(wilds, Vector2i(128, 128)) == "The Wilds" and Level.where_name({}, Vector2i(1, 1)) == ""
+			and Level.where_name({"display_name": "A Cave"}, Vector2i(1, 1)) == "A Cave",
+		"where_name: a room's name inside it (the town's four starts), the level's name outside every room, nothing for neither (665 amended)")
 	var back: Array = wilds["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "held")
 	_check(to_wilds.size() == 1 and (to_wilds[0]["tile"] as Vector2i).y == 0 and back.size() == 1 and (back[0]["tile"] as Vector2i).y >= 236
 			and level["spawn_points"].has("from_wilds") and wilds["spawn_points"].has("from_held"),

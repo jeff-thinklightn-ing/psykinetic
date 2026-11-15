@@ -146,6 +146,21 @@ func say(text: String) -> void:
 	_apply()
 
 
+## The name showing becomes [param text] in place, with no second card (665 amended: a player
+## arriving inside a named room is told the room's name, not the zone's and then the room's);
+## nothing when no card shows or it already reads so. A name queued behind it that is the
+## same is dropped.
+func retitle(text: String) -> void:
+	var said := text.strip_edges()
+	if not showing or said.is_empty() or said == zone_name:
+		return
+	zone_name = said
+	if _next == said:
+		_next = ""
+	if _name != null:
+		_name.text = zone_name
+
+
 ## The rebuild is done: the dark lifts; the name stays its while.
 func finish() -> void:
 	if not showing or not _building:

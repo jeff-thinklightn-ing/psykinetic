@@ -1398,11 +1398,7 @@ func _process(delta: float) -> void:
 		compass.north_on_screen = screen_north()
 		if minimap != null:
 			minimap.north_on_screen = compass.north_on_screen  # The map turns as the compass does (535).
-		var standing := player.tile if player != null else NONE
-		if standing != _place_tile or _hud_tick != _place_tick:
-			_place_tile = standing
-			_place_tick = _hud_tick
-			_place_words = place_text(player)
+		_refresh_place(player)
 		compass.place = _place_words
 	if _context_hint != null:
 		var at := get_viewport().get_mouse_position()
@@ -2368,11 +2364,21 @@ func _update_room() -> void:
 	if key == _room_here:
 		return
 	var now := Time.get_ticks_msec()
+	var was := _room_here
 	if not _room_here.is_empty():
 		_room_left_at[_room_here] = now
 	_room_here = key
-	if not key.is_empty() and now - int(_room_left_at.get(key, -ROOM_AGAIN_MSEC)) >= ROOM_AGAIN_MSEC:
-		arrival_card.say(str(level["rooms"][key]["name"]))
+	# 665 amended: one card for where you arrive (the room's name over the zone's while the zone's still shows, not the two
+	# in turn), and the zone's name again on walking out of a room (the same ten seconds' quiet).
+	var name_now := Level.where_name(level, player.shown_tile())
+	if not key.is_empty():
+		if arrival_card.showing and arrival_card.zone_name == zone_display_name():
+			arrival_card.retitle(name_now)
+		elif now - int(_room_left_at.get(key, -ROOM_AGAIN_MSEC)) >= ROOM_AGAIN_MSEC:
+			arrival_card.say(name_now)
+	elif not was.is_empty() and now - int(_room_left_at.get("", -ROOM_AGAIN_MSEC)) >= ROOM_AGAIN_MSEC:
+		_room_left_at[""] = now
+		arrival_card.say(name_now)
 
 
 ## 643, ui's side, each frame: the sheet closes when its note is taken
@@ -17308,6 +17314,18 @@ func context_hint_for(thing: Node) -> String:
 		return "LMB  talk   E hold  bandage"
 	return ""
 
+## The compass's place words and the big map's title for where [param player] stands, read again when
+## the cell or the HUD's tick changes (665 amended: both from Level.where_name, the room's name inside
+## a room, the zone's outside).
+func _refresh_place(player: GridEntity) -> void:
+	var standing := player.tile if player != null else NONE
+	if standing != _place_tile or _hud_tick != _place_tick:
+		_place_tile = standing
+		_place_tick = _hud_tick
+		_place_words = place_text(player)
+		if minimap != null and player != null:
+			minimap.title = Level.where_name(level, player.tile)
+
 
 ## The place the player stands in, for the compass: the level's place
 ## whose disc covers their cell (the nearest centre of several; maps'
@@ -17319,6 +17337,9 @@ func place_text(player: GridEntity) -> String:
 	var zone_name := str(level.get("display_name", level.get("name", "")))
 	if player == null:
 		return zone_name
+	var here := Level.where_name(level, player.tile)  # 665 amended: the room's name inside one, else the zone's.
+	if not here.is_empty():
+		zone_name = here
 	var best := ""
 	var best_distance := INF
 	var listed: Dictionary = level.get("places", {})

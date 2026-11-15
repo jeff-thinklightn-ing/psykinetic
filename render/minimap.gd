@@ -69,7 +69,11 @@ var texture: ImageTexture
 var image: Image
 ## The zone's size in cells, its name to show, and what to mark from its level.
 var cells := Vector2i.ZERO
-var title := ""
+var title := "":
+	set(value):
+		if value != title:
+			title = value
+			queue_redraw()
 var starts: Array[Vector2i] = []
 ## {cell, label, to, cue, facing}: links at their marker with their built cue
 ## (Level.CUES) and the way it faces (a grid direction); neighbours at the

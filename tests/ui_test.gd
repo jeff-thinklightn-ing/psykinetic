@@ -1348,9 +1348,14 @@ func _test_room_names() -> void:
 	_check(card.showing and card.zone_name == "The Hall of Urns" and _main._room_here == "here", "stepping into a named room says its name (%s)" % card.zone_name)
 	card.finish()
 	card.advance(3.0)
+	var zone_was: Variant = _main.level.get("display_name")
+	_main.level["display_name"] = "The Ossuary"
 	_main.level["rooms"] = {}
 	_main._update_room()
-	_check(_main._room_here.is_empty() and _main._room_left_at.has("here") and not card.showing, "stepping out says nothing and notes the leaving")
+	_check(_main._room_here.is_empty() and _main._room_left_at.has("here") and card.showing and card.zone_name == "The Ossuary",
+		"stepping out says the zone's name and notes the leaving (665 amended)")
+	card.finish()
+	card.advance(3.0)
 	_main.level["rooms"] = Level.rooms_from({"rooms": {"here": {"name": "The Hall of Urns", "rect": [here.x, here.y, 1, 1]}}}, warnings)
 	_main._update_room()
 	_check(not card.showing and _main._room_here == "here", "back within 10 s: nothing said (no nagging at a doorway)")
@@ -1360,6 +1365,36 @@ func _test_room_names() -> void:
 	_check(card.showing and card.zone_name == "The Hall of Urns", "back after 10 s: said again")
 	card.finish()
 	card.advance(3.0)
+	# Arriving inside a room is one card, the room's (665 amended): the zone's card, up, takes the room's name in place.
+	_main._room_here = ""
+	_main._room_left_at.clear()
+	card.begin("The Ossuary")
+	card.advance(0.3)
+	_main._update_room()
+	_check(card.showing and card.zone_name == "The Hall of Urns" and card._next.is_empty() and card._name.text == "The Hall of Urns",
+		"arriving inside a room: the one card reads the room's name, none queued behind (%s)" % card.zone_name)
+	card.finish()
+	card.advance(3.0)
+	# The same words on the place line and the big map's title, from one source.
+	var spot_places: Variant = _main.level.get("places")
+	_main.level["places"] = {}
+	_check(_main.place_text(player) == "The Hall of Urns" and Level.where_name(_main.level, player.tile) == "The Hall of Urns",
+		"inside a room the place line reads its name, as the card did (%s)" % _main.place_text(player))
+	_main.level["rooms"] = {}
+	_check(_main.place_text(player) == "The Ossuary" and Level.where_name(_main.level, player.tile) == "The Ossuary",
+		"outside every room the zone's (%s)" % _main.place_text(player))
+	_main.level["rooms"] = Level.rooms_from({"rooms": {"here": {"name": "The Hall of Urns", "rect": [here.x, here.y, 1, 1]}}}, warnings)
+	_main._place_tile = Vector2i(-99999, -99999)
+	_main._refresh_place(player)
+	_check(_main.minimap.title == "The Hall of Urns", "the big map's title reads it too (%s)" % _main.minimap.title)
+	if spot_places == null:
+		_main.level.erase("places")
+	else:
+		_main.level["places"] = spot_places
+	if zone_was == null:
+		_main.level.erase("display_name")
+	else:
+		_main.level["display_name"] = zone_was
 	if kept == null:
 		_main.level.erase("rooms")
 	else:
