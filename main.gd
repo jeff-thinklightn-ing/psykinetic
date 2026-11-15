@@ -762,6 +762,9 @@ var _channel_seen: Dictionary = {}
 ## "offers" message's "standing" title, "" for none): said on the HUD
 ## line, taken by "yes" (Y, or typed).
 var standing_title := ""
+## Client: when (Time.get_ticks_msec) her own companion last said a line offering to lead (Companion.LEAD_OFFER), -1 for none:
+## Y answers it while Guide.OFFER_S lasts (929, ui's side; the typed "yes" is the same word to the same rule).
+var _lead_offer_msec := -1
 ## The world map (WorldMapPanel; ui's step 5), M after the zone's big map.
 var world_map_panel: WorldMapPanel
 ## Her card page (618, ui's side): C; what she has learned and how she fights, from world_state.
@@ -1525,6 +1528,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if Keys.pressed(event, "yes") and not standing_title.is_empty() and not is_typing():
 		_send_chat("yes", 0, _window_to())  # 536: the word, said; the server takes it (802: to the window's person).
+		return
+	if Keys.pressed(event, "yes") and not is_typing() and lead_offer_stands():
+		_lead_offer_msec = -1
+		# Her offer to lead taken (551 amended (5)): the typed word's own line, with her name after it so a resident beside them is
+		# not the one who answers (_resident_addressed hands a line naming her to her); the rule that takes it is today's.
+		_send_chat("yes, %s" % Companion._name_of(_own_companion()))
 		return
 	if Keys.pressed(event, "hints"):
 		toggle_hints()
@@ -17899,6 +17908,16 @@ func _send_chat(text: String, phrase := 0, to := "") -> void:
 	# their speech, and takes a word that accepts their standing offer (536).
 
 
+## Whether her own offer to lead stands for this player to take with Y (929, ui's side): she said it within Guide.OFFER_S, she is
+## in earshot, and she is not already leading. A resident's standing offer keeps Y first (the caller asks standing_title before this).
+func lead_offer_stands() -> bool:
+	if _lead_offer_msec < 0 or Time.get_ticks_msec() - _lead_offer_msec > int(Guide.OFFER_S * 1000.0):
+		return false
+	var me := _local_player()
+	var pet := _own_companion()
+	return me != null and pet != null and me.led_by.is_empty() and World.distance(pet.tile, me.tile) <= HEARING_RANGE
+
+
 ## This peer's own companion in the world, or null.
 func _own_companion() -> Companion:
 	for entity in World.get_entities():
@@ -18117,6 +18136,16 @@ func _update_person_window() -> void:
 ## The HUD's words while an offer stands (536, ui's side): how to take it, and what it is.
 static func standing_words(title: String) -> String:
 	return 'say "yes" to take it: %s' % title if not title.is_empty() else ""
+
+
+## The HUD's words for the offer Y would answer now: a resident's standing one (the resident's first), else her own offer to lead
+## while it stands (551 amended (5); voice's words, the word to say and what a yes does), else "".
+func offer_words() -> String:
+	if not standing_title.is_empty():
+		return standing_words(standing_title)
+	if lead_offer_stands():
+		return 'say "yes" to follow %s' % Companion._name_of(_own_companion())
+	return ""
 
 
 ## A boss's telegraph begins (combat's 602: the "telegraph" message {id,
@@ -18735,6 +18764,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
+		if entity != null and _is_own_companion(entity) and RegEx.create_from_string(Companion.LEAD_OFFER).search(str(data.get("text", ""))) != null:
+			_lead_offer_msec = Time.get_ticks_msec()  # Her offer to lead (929): Y answers it for Guide.OFFER_S.
 		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
 			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.
 		if entity != null and barter_panel != null:
@@ -24954,8 +24985,8 @@ func _on_world_ticked(tick: int) -> void:
 		_watch_bond()
 		if not _bond_hint.is_empty() and Time.get_ticks_msec() / 1000.0 < _bond_hint_until:
 			hp_text += "   " + _bond_hint  # 555, ui's side: her step dropped, said for BOND_HINT_SECONDS.
-		if not standing_title.is_empty():
-			hp_text += "   " + standing_words(standing_title)  # 536: an offer stands; "yes" (Y) takes it.
+		if not offer_words().is_empty():
+			hp_text += "   " + offer_words()  # 536: an offer stands; "yes" (Y) takes it. Hers too (551 amended (5)), the resident's first.
 		if not player.led_by.is_empty():  # 551, ui's side: she leads; the place from led_to when it is on the wire.
 			hp_text += "   " + led_words(player.led_by, world_map_panel.place_words(led_to_of(player)) if world_map_panel != null else "")
 		if World.is_downed(player):

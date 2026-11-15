@@ -4682,6 +4682,49 @@ func _test_guide_refuses() -> void:
 	_check(pet.guide != null and pet.guide.going() and pet.guide.goal["key"] == "test/short" and not _main._guide_offers.has(Net.player_id),
 		"lead on after her offer: as far as she said")
 	_main._guide_done(pet, "moved")
+	# 551 amended (5): Y answers her offer to lead, inside her 90 s, to her, through the path a typed yes takes.
+	var her := Companion._name_of(pet)
+	var press_yes := func() -> void:
+		var ev := InputEventKey.new()
+		ev.keycode = int(Keys.bound.get("yes", Keys.DEFAULTS.get("yes", KEY_Y)))
+		ev.pressed = true
+		_main._unhandled_input(ev)
+	var offer_stands := func() -> void:
+		_main._chat_sent_at = -100000
+		_main._chat_tick.clear()
+		_main.standing_title = ""
+		_main._guide_offers[Net.player_id] = {"day": today, "to": short, "tick": World.tick}
+		_main._on_message("speech", {"entity": str(pet.get_path()), "speaker": her, "text": "I'll show you the way to the near corner."})
+	_main._lead_offer_msec = -1
+	_check(_main.offer_words().is_empty(), "no offer of hers: no line")
+	offer_stands.call()
+	_check(_main.offer_words() == 'say "yes" to follow %s' % her, "her offer stands: the HUD's line names the word and her (%s)" % _main.offer_words())
+	_main.standing_title = "Bring Bram home"
+	_check(_main.offer_words() == Main.standing_words("Bring Bram home"), "a resident's offer beside it: the resident's line, hers waits")
+	var chat_was: int = _main._chat_sent_at
+	press_yes.call()
+	_check(_main._chat_sent_at != chat_was and _main._lead_offer_msec >= 0,
+		"Y with a resident's offer up is the resident's yes (a say goes out, with no name of hers after it); her offer is not taken up by it")
+	if pet.guide != null and pet.guide.going():
+		_main._guide_done(pet, "moved")  # (No resident in this world to take it: a bare yes reaches her, as a typed one does.)
+	_main.standing_title = ""
+	offer_stands.call()
+	press_yes.call()
+	_check(pet.guide != null and pet.guide.going() and pet.guide.goal["key"] == "test/short" and _main.offer_words().is_empty(),
+		"Y inside the window sets her leading, and the line goes")
+	_main._guide_done(pet, "moved")
+	offer_stands.call()
+	_main._lead_offer_msec = Time.get_ticks_msec() - int(Guide.OFFER_S * 1000.0) - 1000
+	_check(_main.offer_words().is_empty(), "past her 90 s: no line")
+	chat_was = _main._chat_sent_at
+	press_yes.call()
+	_check(not (pet.guide != null and pet.guide.going()) and _main._chat_sent_at == chat_was, "Y after it lapses does nothing to her")
+	_main._guide_offers.erase(Net.player_id)
+	offer_stands.call()
+	_main._guide_said(owner, pet, "yes")
+	_check(pet.guide != null and pet.guide.going(), "a typed yes still works")
+	_main._guide_done(pet, "moved")
+	_check(_main._resident_addressed(owner, "yes, %s" % her, pet) == null, "a line naming her is never handed to a resident beside them")
 	# A clean passage: into an area by a way, out by one, no stop.
 	var walk: Guide = pet.guide
 	walk.resume()
