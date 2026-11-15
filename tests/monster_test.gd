@@ -1879,7 +1879,7 @@ func _test_ambush() -> void:
 	_test_boar_king_far_chase()
 	_test_boar_king_rates()
 	_test_old_wolf_lunge_line()
-	_test_old_wolf_rates()
+	_test_old_wolf_fights()
 	_test_told_runs_stop()
 	_test_den_bite_per_blow()
 	_test_den_pack_covers()
@@ -8169,146 +8169,221 @@ func _test_old_wolf_lunge_line() -> void:
 	Monster.idling = true
 
 
-## The old grey alone on one player with a sword, the standing bar for a
-## boss (the coordinator's rulings on playtest's 843 set and on the name
-## roll), on the live body (_live_grey, his roll asserted), 2 minutes each
-## in the open, he and the player kept up so the rates hold: held still;
-## careless (every 2nd told lunge missed, held still through it); reading
-## his lines (off the lunge's line, striking beside him, the pant included);
-## and answering his bite too (out of reach in its lead). Her time to die
-## (20 hp) against his to fall (his max_hp): the careless one loses, the
-## line-reader comes out about even (she falls no sooner than four fifths
-## of his time), the answerer wins with half her health left.
-## The old grey's careless bar (780 amended (33)): she falls at least this
-## much before he does, as measured with his bite 5 (0.2 s with a sword);
-## with 887's sword (4 a blow) his told lunge 8 holds it (780 amended (34):
-## 0.26 s; at 7, 0.06).
-const CARELESS_MARGIN := 0.2
+## The old grey alone on one player, fought to the end (780 amended (35), the
+## coordinator's ruling: the 2-minute rate model it replaces measured a winded
+## player, her sword striking faster than her stamina's 10-tick pause, over a
+## time no fight reaches). The live body as the server lays him (_live_grey,
+## his roll asserted), her 20 hp counted down by his harm, 32 fixed starts in a
+## 20x13 room (her cell, his 4-7 off, both facings, her first move 0-8 ticks
+## late) for each bot with fists, a dagger and a sword: careless (walks to him
+## and strikes, never reads the red), chaser (clicks him from where she is and
+## is walked in, as the game's client does) and reader (careless, but steps off
+## a red cell GREY_REACT ticks after it lies on her), as combat's yard harness
+## plays them. The whole table prints every run (won, fell, both down, harm, of
+## it told), so a tuner sees what moved while it passes. It asserts only what
+## the design means and the table holds (the coordinator's ruling, 2026-11-14):
+## with each weapon the reader takes no more harm a fight than the careless one
+## plus GREY_HARM_SLACK (their gap is 0.9-1.4 hp at 64 starts); over the three
+## weapons together the reader takes less harm and wins more often; careless
+## fists win at most GREY_FISTS_WINS of the starts. Not per weapon wins (a coin
+## flip with the sword: 54 against 53 of 64), nor "a careless sword loses": it
+## wins 83% today.
+const GREY_STARTS := 32
+const GREY_HARM_SLACK := 0.5  # Hp a fight.
+const GREY_FISTS_WINS := 2  # Of GREY_STARTS.
+const GREY_REACT := 6  # A person's reaction to the red, ticks (the harness's DF_REACT).
+const GREY_HER_HP := 20
+const GREY_MAX_TICKS := 900
 
 
-func _test_old_wolf_rates() -> void:
-	print("%s== the old grey alone on one player: one who reads his lunge and his bite beats him; one careless loses ==" % char(10))
+func _test_old_wolf_fights() -> void:
+	print("%s== the old grey alone on one player, fought to the end: the reader does better than the careless; careless fists lose ==" % char(10))
+	var began := Time.get_ticks_msec()
 	Monster.idling = false
 	DayNight.set_hour(12.0)
-	var arena: Array[String] = ["#".repeat(46)]
-	for y in 25:
-		arena.append("#" + ".".repeat(44) + "#")
-	arena.append("#".repeat(46))
 	var row: Dictionary = Monster.kinds()["old_wolf"]
-	var his_hp := int(row["body"]["max_hp"])
-	var her_hp := 20
-	var taken := {}
-	var lost := {}
-	# The sword in every way; the dagger careless too (780 amended (33): it
-	# beat him careless on main, unmeasured, before his bite was 5); bare
-	# fists careless and reading (887: the bar holds with every weapon).
-	for run: Array in [["sword", "still"], ["sword", "careless"], ["sword", "reader"], ["sword", "answers"], ["dagger", "careless"],
-			["", "careless"], ["", "reader"]]:
-		var held: String = run[0]
-		var mode: String = run[1]
-		var key := mode if held == "sword" else (held if held != "" else "fists") + " " + mode
-		var rows := arena.duplicate()
-		rows[13] = rows[13].substr(0, 24) + "P" + rows[13].substr(25)
-		var e := _build(rows)
-		var grey := _live_grey(Vector2i(18, 13))
-		var player: GridEntity = e["P"][0]
-		if key == "still":
-			_check(World.attack_ticks_of(grey) == 31 and absf(grey.boldness - 0.75) < 0.005 and grey.reaction_ticks == 5,
-				"his roll as the server lays him (%s): attack_ticks 31 (his row's 30, rolled), boldness 0.75, reaction 5 (%d, %.3f, %d)" % [
-				grey.name, World.attack_ticks_of(grey), grey.boldness, grey.reaction_ticks])
-		player.protected = false
-		player.max_hp = 1000
-		player.hp = 1000
-		player.slots[Items.RIGHT_HAND] = held
-		grey.max_hp = 100000
-		grey.hp = 100000
-		grey.sight_range = 12
-		grey.target = player
-		_damage_log.clear()
-		var lunges := 0
-		var was := ""
-		var ignoring := false
-		var next_strike := 0
-		var held_line: Array[Vector2i] = []
-		var src := {"bites": 0, "bites_hp": 0, "lunges_hp": 0, "in_pant": 0}
-		var ticks := 1200
-		for i in ticks:
-			if int(grey._move.get("telegraph", 0)) != 0 and grey._move.has("shape"):
-				held_line = World.telegraph_cells(grey._move["shape"])
-			elif str(grey._move.get("move", "")) != "rush":
-				held_line = []
-			var aimed: bool = (not World.winding(grey).is_empty() and World.winding(grey).get("target") == player) \
-					or (not grey._windup.is_empty() and grey._windup.get("target") == player)
-			if mode != "still":
-				var acted := false
-				if not held_line.is_empty() and player.tile in held_line and not ignoring:
-					acted = _step_clear(player, grey, held_line)
-				elif mode == "answers" and aimed:
-					_step_clear(player, grey, held_line)
-					acted = true
-				if not acted:
-					if World.distance(player.tile, grey.tile) <= 1:
-						if World.tick >= next_strike:
-							World.face(player, grey.tile - player.tile)
-							if World.try_attack(player, grey):
-								next_strike = World.tick + World.attack_ticks_of(player)
-					elif held_line.is_empty() and not ignoring:
-						World.try_move(player, Senses.way_toward(player.tile, grey.tile))
-			var n0 := _damage_log.size()
-			var t0 := World.tick
-			var panting := str(grey._move.get("move", "")) == "pant"
-			World.step()
-			var move := str(grey._move.get("move", ""))
-			var lunge_landed := move == "pant" and int(grey._move.get("from", -1)) >= t0
-			for k in range(n0, _damage_log.size()):
-				var d: Dictionary = _damage_log[k]
-				if d["entity"] == player and d["source"] == grey:
-					src["lunges_hp" if lunge_landed else "bites_hp"] += int(d["amount"])
-					if not lunge_landed:
-						src["bites"] += 1
-				elif d["entity"] == grey and d["source"] == player and panting:
-					src["in_pant"] += 1
-			if move == "lunge" and was != "lunge":
-				lunges += 1
-				ignoring = mode == "careless" and lunges % 2 == 0
-			if move == "pant":
-				ignoring = false
-			was = move
-			player.hp = maxi(player.hp, 900)
-		var per := 600.0 / float(ticks)
-		var by_him := 0
-		var on_him := 0
-		for d: Dictionary in _damage_log:
-			if d["entity"] == player and d["source"] == grey:
-				by_him += int(d["amount"])
-			elif d["entity"] == grey:
-				on_him += int(d["amount"])
-		taken[key] = by_him * per
-		lost[key] = on_him * per
-		print("  %s (%s): %.0f hp a minute taken (bites %.1f a minute, %.0f hp; lunges %.0f hp), his %.0f lost (%.1f blows a minute in his pant), %.1f lunges a minute; she falls in %.1f s, he in %s" % [
-			mode, "a " + held if held != "" else "fists", taken[key], src["bites"] * per, src["bites_hp"] * per, src["lunges_hp"] * per, lost[key], src["in_pant"] * per, lunges * per,
-			60.0 * her_hp / maxf(taken[key], 0.01), "%.1f s" % (60.0 * his_hp / lost[key]) if lost[key] > 0.0 else "never"])
-	var falls := func(mode: String) -> float: return 60.0 * her_hp / maxf(float(taken[mode]), 0.01)
-	var beaten := func(mode: String) -> float: return 60.0 * his_hp / float(lost[mode]) if float(lost[mode]) > 0.0 else INF
 	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 5 and int(row["fight"]["lead_ticks"]) == 6,
 		"his bite slow and told: 5 a bite (780 amended (33)), a 6-tick lead, one each 3 s (the coordinator's rulings)")
 	_check(int(row["moves"]["spring"]["damage"]) == 8,
 		"his told lunge hurts more than his bite: 8 (780 amended (34)), against 5 (%d)" % int(row["moves"]["spring"]["damage"]))
-	# The margin as measured on 340 amended (2) (0.2 s with the sword, 0.4 s with
-	# the dagger): she falls first by at least CARELESS_MARGIN. 887's sword
-	# tipped it; his told lunge 8 holds it again (780 amended (34)), not bite 6,
-	# which takes the fight from the sword's reader.
-	for careless: String in ["careless", "dagger careless", "fists careless"]:
-		_check(falls.call(careless) + CARELESS_MARGIN <= beaten.call(careless),
-			"one who misses every 2nd told lunge loses (%s): she falls in %.2f s, he in %.2f s (first by %.1f s at least)" % [
-			{"careless": "a sword", "dagger careless": "a dagger", "fists careless": "fists"}[careless], falls.call(careless), beaten.call(careless), CARELESS_MARGIN])
-	_check(falls.call("reader") >= 0.8 * beaten.call("reader"),
-		"one who reads his lunge's line comes out about even: she falls in %.1f s, he in %.1f s (within a fifth)" % [falls.call("reader"), beaten.call("reader")])
-	_check(float(taken["answers"]) * beaten.call("answers") / 60.0 <= her_hp / 2.0,
-		"one who steps out of his lunge and his bite wins with half her health left: %.0f of %d lost by the time he falls (%.1f s)" % [
-		float(taken["answers"]) * beaten.call("answers") / 60.0, her_hp, beaten.call("answers")])
+	var table := {}
+	var rolled := false
+	for bot: String in ["careless", "chaser", "reader"]:
+		for weapon: String in ["fists", "dagger", "sword"]:
+			var acc := {"won": 0, "fell": 0, "both": 0, "timed": 0, "harm": 0, "told": 0, "won_t": 0, "lunges": 0}
+			for start in GREY_STARTS:
+				var out := _grey_fight(bot, weapon, start, not rolled)
+				rolled = true
+				for k: String in out:
+					acc[k] = int(acc[k]) + int(out[k])
+			table["%s %s" % [bot, weapon]] = acc
+			var f := float(GREY_STARTS)
+			print("  %s, %s: won %d/%d (in %.1f s), fell %d, both down %d, timed out %d; harm %.2f of %d a fight (%.2f of it from told lunges; %.2f lunges)" % [
+				bot, weapon, acc["won"], GREY_STARTS, float(acc["won_t"]) / 10.0 / maxf(1.0, float(acc["won"])), acc["fell"], acc["both"], acc["timed"],
+				float(acc["harm"]) / f, GREY_HER_HP, float(acc["told"]) / f, float(acc["lunges"]) / f])
+	var sums := {"careless": [0, 0], "reader": [0, 0]}  # [won, harm] over the three weapons.
+	for weapon: String in ["fists", "dagger", "sword"]:
+		var careless: Dictionary = table["careless " + weapon]
+		var reader: Dictionary = table["reader " + weapon]
+		for bot: String in sums:
+			var acc: Dictionary = table["%s %s" % [bot, weapon]]
+			sums[bot] = [int(sums[bot][0]) + int(acc["won"]), int(sums[bot][1]) + int(acc["harm"])]
+		var r_harm := float(reader["harm"]) / GREY_STARTS
+		var c_harm := float(careless["harm"]) / GREY_STARTS
+		var harm_ok := r_harm <= c_harm + GREY_HARM_SLACK
+		_check(harm_ok,
+			"with %s the reader takes no more harm than the careless one (%.1f slack): %.2f against %.2f a fight%s" % [weapon, GREY_HARM_SLACK, r_harm, c_harm,
+			"" if harm_ok else _grey_moved("reader %s harm %.2f, bound careless %.2f + %.1f" % [weapon, r_harm, c_harm, GREY_HARM_SLACK])])
+	var sum_ok := int(sums["reader"][1]) < int(sums["careless"][1]) and int(sums["reader"][0]) > int(sums["careless"][0])
+	_check(sum_ok,
+		"over fists, dagger and sword the reader takes less harm and wins more often than the careless one: harm %.2f against %.2f a fight, won %d against %d of %d%s" % [
+		float(sums["reader"][1]) / (GREY_STARTS * 3), float(sums["careless"][1]) / (GREY_STARTS * 3), sums["reader"][0], sums["careless"][0], GREY_STARTS * 3,
+		"" if sum_ok else _grey_moved("the three weapons summed: reader harm %d and wins %d, bound under careless harm %d and over careless wins %d" % [
+		sums["reader"][1], sums["reader"][0], sums["careless"][1], sums["careless"][0]])])
+	var fists_ok := int(table["careless fists"]["won"]) <= GREY_FISTS_WINS
+	_check(fists_ok,
+		"careless fists all but never beat him: won %d of %d (at most %d)%s" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS,
+		"" if fists_ok else _grey_moved("careless fists won %d of %d, bound at most %d" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS])])
+	print("  (the table's %d fights in %d ms)" % [GREY_STARTS * 9, Time.get_ticks_msec() - began])
 	DayNight.reset()
 	Monster.idling = true
+
+
+## The words a failed grey assert ends with (the coordinator's, 11-14): which
+## cell, its figure and bound, and what to do. A bound is changed only by
+## enemy-ai on the coordinator's ruling, with the table before and after.
+func _grey_moved(cell: String) -> String:
+	return " [fight balance moved: %s. The take that changed combat or a foe sends the printed table above to enemy-ai and the coordinator; do not loosen the bound]" % cell
+
+
+## One fight of the old grey's table: [param bot] with [param weapon] from
+## start [param start] (seeded), to his fall, her 20th hp of harm, or 90 s.
+func _grey_fight(bot: String, weapon: String, start: int, check_roll: bool) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7000 + start
+	seed(3000 + start)
+	var her := Vector2i(rng.randi_range(5, 16), rng.randi_range(4, 10))
+	var his := her + Vector2i(4, 0)
+	for i in 40:
+		var a := rng.randf() * TAU
+		var d := float(rng.randi_range(4, 7))
+		var c := Vector2i(clampi(her.x + roundi(cos(a) * d), 1, 20), clampi(her.y + roundi(sin(a) * d), 1, 13))
+		if c != her and World.distance(her, c) >= 4:
+			his = c
+			break
+	var hold := rng.randi_range(0, 8)
+	var rows: Array[String] = []
+	for y in 15:
+		rows.append("#".repeat(22) if y == 0 or y == 14 else "#" + ".".repeat(20) + "#")
+	rows[her.y] = rows[her.y].substr(0, her.x) + "P" + rows[her.y].substr(her.x + 1)
+	var e := _build(rows)
+	World.load_combat_rules(FileAccess.get_file_as_string(World.COMBAT_RULES))
+	var player: GridEntity = e["P"][0]
+	var grey := _live_grey(his)
+	if check_roll:
+		_check(World.attack_ticks_of(grey) == 31 and absf(grey.boldness - 0.75) < 0.005 and grey.reaction_ticks == 5,
+			"his roll as the server lays him (%s): attack_ticks 31 (his row's 30, rolled), boldness 0.75, reaction 5 (%d, %.3f, %d)" % [
+			grey.name, World.attack_ticks_of(grey), grey.boldness, grey.reaction_ticks])
+	player.protected = false
+	player.max_hp = 99999
+	player.hp = 99999
+	player.facing = World.DIRECTIONS[rng.randi_range(0, 3)]
+	if weapon != "fists":
+		World.put_item(player, player, Player.RIGHT_HAND, World.items.mint(weapon, "built"))
+	grey.acts = true
+	grey.sight_range = 14
+	grey.target = player
+	grey.facing = World.DIRECTIONS[rng.randi_range(0, 3)]
+	var harm := 0
+	var told := 0
+	var lunges := 0
+	var was := ""
+	var red_since := -1
+	var t := 0
+	while t < GREY_MAX_TICKS:
+		if World.tick >= hold:
+			red_since = _grey_drive(bot, player, grey, red_since)
+		var n0 := _damage_log.size()
+		var t0 := World.tick
+		World.step()
+		t += 1
+		var move := str(grey._move.get("move", ""))
+		var lunge_landed := move == "pant" and int(grey._move.get("from", -1)) >= t0
+		for k in range(n0, _damage_log.size()):
+			var d: Dictionary = _damage_log[k]
+			if d["entity"] == player and d["source"] == grey:
+				harm += int(d["amount"])
+				if lunge_landed:
+					told += int(d["amount"])
+		if move == "lunge" and was != "lunge":
+			lunges += 1
+		was = move
+		if harm >= GREY_HER_HP or not (World._alive(grey) and grey.hp > 0):
+			break
+	var down := not (World._alive(grey) and grey.hp > 0)
+	var fell := harm >= GREY_HER_HP
+	return {"won": 1 if down and not fell else 0, "fell": 1 if fell and not down else 0, "both": 1 if down and fell else 0,
+		"timed": 1 if not down and not fell else 0, "harm": mini(harm, GREY_HER_HP), "told": mini(told, GREY_HER_HP),
+		"won_t": t if down and not fell else 0, "lunges": lunges}
+
+
+## Her bot's tick in the grey's table (combat's yard harness, zz_duel5's
+## careless, chaser and reader): returns the tick the red first lay on her.
+func _grey_drive(bot: String, player: GridEntity, grey: GridEntity, red_since: int) -> int:
+	if bot == "reader":
+		var red := {}
+		for id: int in World._telegraphs:
+			if World._telegraphs[id]["source"] == grey:
+				for c: Variant in World._telegraphs[id]["data"]["cells"]:
+					red[c if c is Vector2i else Vector2i(int(c[0]), int(c[1]))] = true
+		var me := World.struck_cell(player)  # Where a told blow takes her (810).
+		if not red.has(me):
+			red_since = -1
+		elif red_since < 0:
+			red_since = World.tick
+		if red.has(me) and player.wind_up.is_empty() and World.tick - red_since >= GREY_REACT:
+			for way: Vector2i in World.DIRECTIONS:
+				var c: Vector2i = me + way
+				if not red.has(c) and World.is_walkable(c) and not World._occupancy.has(c):
+					player.action_order = GridEntity.Order.NONE
+					Walk.toward(player, c)
+					return red_since
+	if not player.wind_up.is_empty():
+		return red_since
+	if bot == "chaser":
+		# A click on him from wherever she is; her client walks her in, stopped
+		# at 0.85 of her weapon's span or once a blow has halted her in reach.
+		if player.action_order == GridEntity.Order.NONE or player.action_target != grey:
+			World.command_attack(player, grey)
+		var at: Vector2 = player.free_pos
+		var verb := World.blow_verb(player)
+		var halted: bool = player.free_halt_until > World.tick and World._body_reach(at, World.body_centre(grey), player, grey, verb)
+		if halted or World._body_reach(at, World.body_centre(grey), player, grey, verb, -(1.0 - 0.85) * World.span_of(verb)):
+			return red_since
+		var path: Array = World.walk_path(player.tile, grey.tile, player)
+		var next: Vector2 = Vector2(path[0]) if not path.is_empty() else Vector2(grey.tile)
+		var way := next - at
+		if way.length() > 0.0001:
+			var speed := 1.0 / World.step_ticks(player, World._free_axis(way))
+			World.free_input(player, way / maxf(way.length(), speed), World.TICK_DT)
+		return red_since
+	if not World.in_reach(player, grey, false):
+		var best := Vector2i(-1, -1)
+		var bd := 999
+		for way: Vector2i in World.DIRECTIONS:
+			var c: Vector2i = grey.tile + way
+			if not World.is_walkable(c) or (World._occupancy.has(c) and World._occupancy[c] != player):
+				continue
+			var d := World.distance(player.tile, c)
+			if d < bd:
+				bd = d
+				best = c
+		if best != Vector2i(-1, -1):
+			Walk.toward(player, best)
+		return red_since
+	if player.action_order == GridEntity.Order.NONE:
+		World.command_attack(player, grey)
+	return red_since
 
 
 ## His harm per minute alone on one player (the coordinator, for his
