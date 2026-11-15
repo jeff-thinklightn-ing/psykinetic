@@ -4270,7 +4270,42 @@ func _test_tavern_inside() -> void:
 	_rig._fire_lights = _rig._fire_lights.filter(func(fire: Array) -> bool: return is_instance_valid(fire[0]) and not trade.is_ancestor_of(fire[0]))
 	_rig._fire_panes = _rig._fire_panes.filter(func(each: Array) -> bool: return each[1] != trade)
 	trade.free()
-	var lamp_spot := Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
+	# The first view at night (927 amended (2)): the inn's door a trade's
+	# lantern (782's numbers, shadowless, never among the picked houses, its
+	# house lantern given way), and the temple's lancets' glass at
+	# LANCET_GLOW of art-kit's emission, every other pane as drawn.
+	_rig._hang_door_lamps()
+	var inn_facing: Vector2i = inns[0]["facing"]
+	var inn_front: Vector2i = inns[0].get("front", Level.front_cell(rect, inn_facing))
+	var inn_lamp := _rig._door_lamps.get(inn_front) as Node3D
+	var inn_fire: Array = []
+	for fire: Array in _rig._fire_lights:
+		if inn_lamp != null and is_instance_valid(fire[0]) and inn_lamp.is_ancestor_of(fire[0]):
+			inn_fire = fire
+	var inn_house: Array = _rig._house_lights.get(rect.position, [])
+	_check(not inn_fire.is_empty() and is_equal_approx(float(inn_fire[1]), Client3D.DOOR_LAMP_ENERGY)
+			and is_equal_approx((inn_fire[0] as OmniLight3D).omni_range, Client3D.DOOR_LAMP_RANGE) and not (inn_fire[0] as OmniLight3D).shadow_enabled
+			and not inn_house.is_empty() and inn_house.size() < 8,
+			"the inn's door a trade's lantern, %.1f over %.1f m, shadowless, its house lantern given way (%s)" % [Client3D.DOOR_LAMP_ENERGY, Client3D.DOOR_LAMP_RANGE, inn_front])
+	var lancets := 0
+	var panes_bad: Array = []
+	for each: Array in _rig._glows:
+		var glass := each[0] as MeshInstance3D
+		if not is_instance_valid(glass) or glass.mesh == null:
+			continue
+		for surface in glass.mesh.get_surface_count():
+			var art := glass.mesh.surface_get_material(surface) as BaseMaterial3D
+			var glass_drawn := glass.get_active_material(surface) as BaseMaterial3D
+			if art == null or glass_drawn == null or not art.emission_enabled:
+				continue
+			var lancet := art.albedo_color.v > 0.9  # The lancet's glass is pale (1, 0.72, 0.42), every house pane's dark (0.2 or 0.22).
+			var want := art.emission_energy_multiplier * (Client3D.LANCET_GLOW if lancet else 1.0)
+			lancets += 1 if lancet else 0
+			if not is_equal_approx(glass_drawn.emission_energy_multiplier, want) or glass_drawn.albedo_color != art.albedo_color or glass_drawn.emission != art.emission:
+				panes_bad.append([glass.get_path(), glass_drawn.emission_energy_multiplier, want])
+	_check(lancets > 0 and panes_bad.is_empty(),
+			"the temple's lancets' glass at %.2f of its emission (%d), every other pane as drawn (bad %s)" % [Client3D.LANCET_GLOW, lancets, panes_bad])
+	var lamp_spot :=Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
 		[Vector3(3.0, 0.0, 8.5), Vector3(4.0, 0.0, 8.5)], true)
 	_check(lamp_spot.is_equal_approx(Vector3(3.0 - Client3D.DOOR_LAMP_ASIDE, 0.0, 8.5 + Client3D.DOOR_LAMP_STONE)),
 			"a two-door front's lantern beside its last door, on a stone wall %.1f m further out (%s)" % [Client3D.DOOR_LAMP_STONE, lamp_spot])
