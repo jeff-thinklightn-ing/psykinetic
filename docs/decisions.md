@@ -17789,6 +17789,25 @@ store resource from economy's c3130ddc. Protocol unchanged.
 
 501 amended (4) (label from tools/decision_number.sh; the coordinator's ruling, 11-14): one new case a town a day holds across a restart. Townsfolk._sick_due, the mark that a town's day is rolled, belongs to the process and is not saved, so the first tick after a boot rolled the current day again with the same seed. When that day's case had already fallen, the fallen one was skipped without a draw, every later resident took the draw meant for the one before, and a second case could fall the same day. On the box on 11-14 it did: a resident took to bed at 16:11:48 (day 497) and a second 30 s after the 16:25:24 restart, also day 497 (release's journal read). With the box restarted two or three times a day for cuts, the cost of our deploys fell on the townsfolk. Townsfolk.sicken now skips a town's roll when any of its residents (a resting companion too) has a sickness dated today ("since" == day), after that morning's endings. Nothing is added to the save: the case on the card is the mark. Any case dated today spends the day's roll, however it came. townsfolk_test _test_sick_restart: a case falls at midday, the production is saved and loaded a minute on with the day's mark cleared as at a boot, and the next tick rolls nobody (failing before this); the next day rolls as ever. Server only; protocol unchanged; no new class_name; no bullet.
 
+501 amended (5) (the coordinator's ruling, 2026-11-15; label from tools/decision_number.sh): sickness kills
+nobody until Jeff rules on it. levels/townsfolk.json sick.death_old is 0. The death rule (an old resident of the
+town's own, untreated, dying with chance 0.25 at the end of the course) was the coordinator's shape of
+2026-10-19, never Jeff's: his "yes" was to sickness in the world, for the sick-child errand, and 501's own guard
+said it was there "lifted when he says". On v0.1.218's box it took the hunter (wilds/store, day 502) and a
+herder (hills/herders_hut, day 506), both "of the shakes", in one night, with nothing a player was shown or could
+do (every treatment needs a player: the medicine man goes on a player's accepted plea, the walk to the healer's
+hut is a player's escort, a remedy a player's gift). Jeff's rules lean the other way (bonuses, not penalties;
+"dont punish town people for being hungry", 918). Off loses nothing; it comes back only on Jeff's word, as a
+data line. The code stays: Townsfolk._sick_ends rolls death_old as before, so at 0 every untreated case gets up
+"thinner for it", like any recovered one; the kin's "died of" fact, the lawspeaker's memory and Offers' "died"
+notice are never reached. The dead stay dead: the hunter is not brought back, and no growth path seeks a hunter
+(the trades that come back by themselves are the makers and the carpenter, maker_comes, and the farmer,
+shepherd, weaver, butcher and woodcutter by their buildings).
+- townsfolk_test _test_sick_no_death: the file's rules with a case certain to fall; forty old residents of the
+  town's own, each untreated to its end: none dies, each is not sick, in the town, at work, its card's last
+  fact "thinner for it". With 0.25 it fails: d-0, d-2 and d-6 among the first to die.
+Server only; protocol unchanged; no new class_name; no bullet (a thing that no longer happens).
+
 ## 501 amended, items' side: herbs, and the remedy's recipe
 
 The coordinator, on economy's word that a remedy stocked from nothing

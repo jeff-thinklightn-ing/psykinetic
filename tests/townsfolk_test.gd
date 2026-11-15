@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_scoundrel()
 	_test_sickness()
 	_test_sick_restart()
+	_test_sick_no_death()
 	_test_road_news()
 	_test_mood_in_town()
 	print("")
@@ -505,6 +506,62 @@ func _test_sick_restart() -> void:
 	Townsfolk.sicken(_work)
 	_check(Townsfolk.is_sick(_work, "r-bram"), "the next day rolls as ever: Bram falls sick")
 	Townsfolk._sick_due.clear()
+
+
+## Sickness kills nobody until Jeff rules on it (501 amended (5), the coordinator's ruling 11-15: the box lost
+## its hunter and a herder to "the shakes" in one night). levels/townsfolk.json's own rules, a case certain to
+## fall: forty old residents of the town's own, each untreated to the end of its course, none dies, and each is
+## up again as a recovered one is: not sick, in the town, back at work, "thinner for it" on the card.
+func _test_sick_no_death() -> void:
+	print("
+== sickness kills nobody: the old of the town's own, untreated, all get up again (501 amended (5)) ==")
+	Townsfolk.use_rules({})
+	var file := Townsfolk.rules().duplicate(true)
+	_check(float(file.get("sick", {}).get("death_old", -1.0)) == 0.0, "levels/townsfolk.json: sick.death_old is 0 (%s)" % [file.get("sick", {}).get("death_old")])
+	file["sick"]["chance"] = 1.0  # A case on the first roll, the rest of the file as it stands.
+	file["thief"] = {"every": 0}
+	file["strays"] = {"every": 0}
+	file["type_weights"] = {}
+	var after := file.duplicate(true)
+	after["sick"]["chance"] = 0.000000001  # No second case once the first has fallen (0 stops sicken, endings too).
+	var died: Array = []
+	var faults: Array = []
+	var day := DayNight.day_steps
+	for n in 40:
+		_setup()
+		Townsfolk._sick_due.clear()
+		Production.type_of = Callable()
+		var id := "d-%d" % n
+		_work.add_worker(id, "Ada", ["hunter"], TOWN, "placeholder")
+		Production.type_of = Townsfolk.roll_type
+		var card := Townsfolk.card_of(_work, id)
+		card["kin"] = {}
+		card["look"]["age"] = "old"
+		card["traits"]["pronoun"] = "she"
+		_work.set_card(id, card)
+		Offers.ctx = {"production": _work, "lawspeaker_of": func(_t: String) -> String: return "", "model": func() -> String: return "off",
+			"died": func(town: String, who: String, why: String) -> bool:
+				died.append([town, who, why])
+				return true}
+		_now = (10 + n) * day + day / 2
+		Townsfolk.use_rules(file)
+		Townsfolk.sicken(_work)
+		Townsfolk.use_rules(after)
+		if not Townsfolk.is_sick(_work, id):
+			faults.append("%s never fell sick" % id)
+			continue
+		for d in Townsfolk.sick_days() + 1:
+			_now += day
+			Townsfolk.sicken(_work)
+		var facts: Array = Townsfolk.card_of(_work, id).get("facts", [])
+		if Townsfolk.is_sick(_work, id) or _work.worker(id).is_empty() or Production.off_work(_work.worker(id)) 				or facts.is_empty() or not str(facts.back()["text"]).ends_with("thinner for it."):
+			faults.append("%s: sick %s, worker %s, off work %s, last fact %s" % [id, Townsfolk.is_sick(_work, id), not _work.worker(id).is_empty(),
+				Production.off_work(_work.worker(id)) if not _work.worker(id).is_empty() else "-", facts.back()["text"] if not facts.is_empty() else ""])
+	_check(died.is_empty(), "forty old residents untreated to the end: nobody dies (%s)" % [died.slice(0, 3)])
+	_check(faults.is_empty(), "each is up again as a recovered one is: not sick, in the town, at work, \"thinner for it\" (%s)" % [faults.slice(0, 3)])
+	Townsfolk._sick_due.clear()
+	Townsfolk.use_rules({})
+	Offers.ctx = {}
 
 
 func _work_has(method: String) -> bool:
