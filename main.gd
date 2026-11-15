@@ -2448,6 +2448,8 @@ func _show_3d() -> void:
 	_client3d = preload("res://client3d/client3d.tscn").instantiate()
 	add_child(_client3d)
 	_client3d.room_built.connect(_on_room_built)
+	if arrival_card != null:
+		arrival_card.steady_when = func() -> bool: return _client3d != null and _client3d.steady_frames() >= Client3D.STEADY_FRAMES  # 660 amended (12).
 	_client3d.fields_done.connect(_replay.bind(_held_clearings))
 	_client3d.room_filled.connect(_replay.bind(_held_redraws))
 	_client3d.setup(_terrain, level_centre)
@@ -4937,12 +4939,22 @@ func _on_room_built() -> void:
 	_show_towns()
 	_show_folds()
 	_show_night_places()
-	if arrival_card != null:
-		arrival_card.finish()
+	# 660 amended (12): the card holds till the view draws steadily (or its cap), and the shelter and the hands go
+	# with its lift (_on_card_lifted); with no card or none to hold, now.
+	if arrival_card != null and arrival_card.finish():
+		return
 	# The server's arrival shelter ends (combat's 661): the zone by the level
 	# shown, as the player's zone names it (a client's World.zone is a mirror
 	# with no name).
 	tell_view_ready(map_name)
+
+
+## 660 amended (12): the arrival card has lifted ("steady" or "cap", after held_msec): the server's arrival shelter ends
+## and the hands are given back (_arriving), and the view's own count says what still showed after it.
+func _on_card_lifted(how: String, held_msec: int) -> void:
+	tell_view_ready(map_name)
+	if _client3d != null:
+		_client3d.lifted(how, held_msec)
 
 
 ## What waited on the view's build (decision 660), done now, in order.
@@ -4955,7 +4967,7 @@ func _replay(held: Array[Callable]) -> void:
 
 ## The 3D room is still being built (decision 660): the player's input waits.
 func _arriving() -> bool:
-	return _client3d != null and _client3d.building_room
+	return _client3d != null and (_client3d.building_room or arrival_card != null and arrival_card.holding)  # 660 amended (12): through the card's hold too.
 
 
 # --- Zones (server) -------------------------------------------------------------
@@ -17559,6 +17571,7 @@ func _build_talk() -> void:
 	down_screen.bleed_out.connect(_ask_bleed_out)
 	$HUD.add_child(down_screen)
 	arrival_card = ArrivalCard.new()  # 660, ui's side.
+	arrival_card.lifted.connect(_on_card_lifted)
 	$HUD.add_child(arrival_card)
 	# Combat's ground telegraphs (602, ui's side), connected by name so either side lands first.
 	if has_signal("telegraph_started"):

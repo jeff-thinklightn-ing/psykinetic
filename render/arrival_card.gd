@@ -32,6 +32,17 @@ const BREATH_PERIOD := 1.6
 ## Where the name sits: this far down the screen.
 const NAME_TOP := 1.0 / 3.0
 const RULE_SIZE := Vector2(160.0, 4.0)
+## 660 amended (12): after finish() the card stays up until [member steady_when] says the view has drawn steadily, or this long
+## (seconds) from finish(), whichever is first; then the dark lifts and [signal lifted] says how.
+const HOLD_CAP := 2.5
+
+## Told once at the lift: "steady" (steady_when said so) or "cap" (HOLD_CAP ran out), and how long the card was held (msec).
+signal lifted(how: String, held_msec: int)
+## Whether the view is steady (Main sets it from Client3D.steady_frames); invalid for none, and the card lifts at finish() as before.
+var steady_when: Callable
+## True from finish() until the lift (Main keeps the player's hands and the arrival shelter through it).
+var holding := false
+var _hold := 0.0
 
 ## True from begin() until the name has faded.
 var showing := false
@@ -113,6 +124,7 @@ func begin(zone: String, line := "") -> void:
 	_since = 0.0
 	_finished_at = -1.0
 	_next = ""
+	holding = false
 	visible = true
 	if _name != null:
 		_name.text = zone_name
@@ -161,12 +173,19 @@ func retitle(text: String) -> void:
 		_name.text = zone_name
 
 
-## The rebuild is done: the dark lifts; the name stays its while.
-func finish() -> void:
+## The rebuild is done: with a [member steady_when] to ask, the card holds (dark and name as they are) till it says steady or
+## HOLD_CAP runs out, then lifts (advance); with none, the dark lifts at once, the name staying its while. True when it
+## is holding (the caller then waits for [signal lifted]).
+func finish() -> bool:
 	if not showing or not _building:
-		return
+		return false
+	if steady_when.is_valid():
+		holding = true
+		_hold = 0.0
+		return true
 	_building = false
 	_finished_at = _since
+	return false
 
 
 ## [param delta] seconds on: the dark in or out, the name's time, the rule's breath.
@@ -174,6 +193,14 @@ func advance(delta: float) -> void:
 	if not showing:
 		return
 	_since += delta
+	if holding:
+		_hold += delta
+		var steady: bool = steady_when.is_valid() and bool(steady_when.call())
+		if steady or _hold >= HOLD_CAP or not steady_when.is_valid():
+			holding = false
+			_building = false
+			_finished_at = _since
+			lifted.emit("steady" if steady else "cap", roundi(_hold * 1000.0))
 	if _building:
 		_dark = minf(DARK_ALPHA, _dark + delta / DARK_IN * DARK_ALPHA)
 	else:

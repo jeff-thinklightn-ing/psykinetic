@@ -1297,6 +1297,48 @@ func _test_arrival_card() -> void:
 			"a long build: the name holds through it and leaves 0.3 s after finish (%.2f, %.2f)" % [long_build, after_long])
 	_check(ArrivalCard.breath_at(0.0) > 0.69 and ArrivalCard.breath_at(0.0) < 0.71 and ArrivalCard.breath_at(ArrivalCard.BREATH_PERIOD / 4.0) > 0.89,
 			"the rule breathes between 0.5 and 0.9")
+	# 660 amended (12): after finish() the card holds till the view is steady, or HOLD_CAP; then it lifts and says how.
+	var told: Array = []
+	var on_lift := func(how: String, msec: int) -> void: told.append([how, msec])
+	card.lifted.connect(on_lift)
+	var steady_now := [false]
+	card.steady_when = func() -> bool: return steady_now[0]
+	card.begin("The Hold")
+	card.advance(0.3)
+	_check(card.finish() and card.holding, "finish() with a steadiness to ask: the card is holding")
+	card.advance(1.0)
+	_check(card.holding and is_equal_approx(card._dark, ArrivalCard.DARK_ALPHA) and card.name_alpha() == 1.0 and told.is_empty(),
+		"held while the view is not steady: the dark and the name as they were, nothing told")
+	steady_now[0] = true
+	card.advance(0.016)
+	_check(not card.holding and told.size() == 1 and told[0][0] == "steady" and int(told[0][1]) >= 1000 and int(told[0][1]) < 1100,
+		"steady: the card lifts and says so, with the ms it was held (%s)" % [told])
+	card.advance(0.5)
+	_check(card._dark == 0.0 and card.showing and card.name_alpha() > 0.0, "and the dark lifts over DARK_OUT, the name staying its while")
+	card.advance(2.0)
+	_check(not card.showing, "and the card ends")
+	steady_now[0] = false
+	told.clear()
+	card.begin("The Cap")
+	card.advance(0.3)
+	card.finish()
+	card.advance(ArrivalCard.HOLD_CAP - 0.1)
+	_check(card.holding and told.is_empty(), "a view that is never steady: held right up to the cap")
+	card.advance(0.2)
+	_check(not card.holding and told.size() == 1 and told[0][0] == "cap" and int(told[0][1]) >= 2500, "the cap: the card lifts and says cap (%s)" % [told])
+	card.advance(3.0)
+	card.begin("The Dropped")
+	card.finish()
+	card.begin("A Crossing Again")
+	_check(not card.holding, "a crossing begun while holding drops the hold")
+	card.advance(3.0)
+	card.steady_when = Callable()
+	told.clear()
+	card.begin("No Ask")
+	card.advance(0.3)
+	_check(not card.finish() and not card.holding, "with nothing to ask the card lifts at finish() as before, no hold")
+	card.advance(3.0)
+	card.lifted.disconnect(on_lift)
 	card.set_process(true)
 
 
