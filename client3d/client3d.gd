@@ -2952,6 +2952,9 @@ var _idle_slot_at := {}
 ## Puppet id -> [msec, what it swung with] of its last swing: a blow that
 ## lands soon after, beside it, was its (_struck_with).
 var _swings: Dictionary[int, Array] = {}
+## Puppet id -> the msec its told move's drawn blow lands (390 amended (4)): a told lunge, an ambush, a
+## creature's tell. Its hit's news sends no swing, so _struck_with times the hurt by this.
+var _told_lands: Dictionary[int, int] = {}
 ## Each pile's things as last drawn: what came or went is heard
 ## (_pile_sounds). Quiet till this msec after the piles are drawn anew (a
 ## zone's piles coming and going are no one's doing).
@@ -2964,6 +2967,15 @@ const SLIDE_SECONDS := 0.35
 ## A swing's blow lands within this many ms of it, this many cells off.
 const BLOW_AFTER_MS := 700
 const BLOW_REACH := 2
+## A told blow's hurt (390 amended (4)): a told move's landing heard this long after it (a hit's news a
+## little late), as far as its line can carry (a lunge's 2 cells and the step it ends on).
+const TOLD_AFTER_MS := 400
+const TOLD_REACH_CELLS := 3
+## No told hurt waits longer than a wound-up blow's does after its news (STRIKE_LANDS_IN, the drawn
+## body's lag): past that it plays then, before its drawn blow if that runs late.
+const TOLD_WAIT_MOST_MS := int(STRIKE_LANDS_IN * 1000.0)
+## The hurts timed to a drawn blow (its flinch, thud and cry): a plain blow and the told moves' hits.
+const BLOW_CAUSES: Array[StringName] = [&"attack", &"lunge", &"ambush", &"pounce"]
 ## A person grunts with one swing in this many, and a goblin cries out at
 ## one blow in this many (a grunt every time wears thin).
 const EFFORT_EVERY := 3
@@ -6674,14 +6686,21 @@ func creature_tell(id: int, data: Dictionary) -> void:
 	var puppet: Node3D = _puppets.get(source.get_instance_id())
 	if puppet == null:
 		return
-	var lands_in := (int(data.get("lands_tick", World.tick)) - World.tick) * World.TICK_DT
+	# From the tick it was told on (390 amended (4)), as a winding's ticks are counted from its news: the
+	# client's own tick runs a little behind the message, and counted from it the tell drew a tick long.
+	var told_from := int(data.get("from_tick", World.tick))
+	var lands_in := (int(data.get("lands_tick", told_from)) - told_from) * World.TICK_DT
 	if not puppet.has_meta("creature_view"):
 		if str(data.get("kind", "")) == "lunge" and _told_strike(puppet, source as GridEntity, lands_in + STRIKE_LANDS_IN):
 			_tells[id] = puppet
+			_told_lands[source.get_instance_id()] = AnimRig.now_msec() + int((lands_in + STRIKE_LANDS_IN) * 1000.0)
+			puppet.set_meta("told_by", source.get_instance_id())
 		return
 	if (puppet.get_meta("creature_view") as CreatureView).tell(str(data.get("kind", "")), lands_in, id):
 		_tells[id] = puppet
 		_drawn_contact(puppet, AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0))  # Its tell lands as the sim's does.
+		_told_lands[source.get_instance_id()] = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+		puppet.set_meta("told_by", source.get_instance_id())
 
 
 ## A person's told lunge (790 amended (7), animation's side; enemy-ai's ask, the coordinator's
@@ -6844,6 +6863,8 @@ func creature_tell_over(id: int, landed: bool) -> void:
 	var puppet := held as Node3D
 	if puppet == null:
 		return
+	if not landed and puppet.has_meta("told_by"):
+		_told_lands.erase(int(puppet.get_meta("told_by")))  # Broken: no blow to time a hurt by.
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
 	elif not landed and puppet.has_meta("rig"):
@@ -23503,7 +23524,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		# An impact is shown by _on_impacted. A blow's flinch waits for the drawn blade to land
 		# ("blows you can see" (a)), as its thud does: not as the news comes, before it.
 		var flinch := 0.0
-		if cause == &"attack" and instance_from_id(id) is GridEntity:
+		if cause in BLOW_CAUSES and instance_from_id(id) is GridEntity:
 			flinch = (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - AnimRig.now_msec()) / 1000.0
 		if flinch > 0.0:
 			var ids_flinch := puppet.get_instance_id()
@@ -23533,7 +23554,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 			sfx.play("sfx.pick_strike", puppet.position + Vector3.UP * 0.8)
 			_seam_dust(puppet, seam)
 		return
-	if puppet != null and cause == &"attack":
+	if puppet != null and cause in BLOW_CAUSES:
 		var struck := instance_from_id(id) as GridEntity
 		var blow := _struck_with(struck)
 		if _heard_steadied(struck):
@@ -23920,9 +23941,33 @@ func _struck_with(struck: GridEntity) -> Array:
 			best = swinger_id
 			best_cells = cells
 			best_faces = faces
+	# A told move's blow (390 amended (4)): no swing comes with its hit, so its own landing, taken as the
+	# tell began; ranked with the swings the same way (one facing the struck body first, then the nearest).
+	var told_at := -1
+	for teller_id: int in _told_lands.keys():
+		var lands_at := int(_told_lands[teller_id])
+		var teller := instance_from_id(teller_id) as GridEntity
+		if teller == null or now - lands_at > TOLD_AFTER_MS:
+			_told_lands.erase(teller_id)
+			continue
+		if teller == struck:
+			continue
+		var told_cells := _cells_apart(teller.tile, struck.tile)
+		if told_cells > TOLD_REACH_CELLS:
+			continue
+		var told_faces := _faces_toward(teller, struck)
+		if best < 0 or (told_faces and not best_faces) or (told_faces == best_faces and told_cells < best_cells):
+			best = teller_id
+			best_cells = told_cells
+			best_faces = told_faces
+			told_at = lands_at
 	var plain := "sfx.hit_blunt_armor" if armour in SoundKit.ARMOUR_STRUCK else "sfx.hit_flesh"
 	if best < 0:
 		return [plain, now, 0]
+	if told_at >= 0:
+		# A told move's blow: a monster's, its hands not sent. Its teller is the third field, as a swinger is
+		# (924's voice key: one teller's hits two voices at once at most, sound's condition).
+		return [plain, clampi(told_at, now, now + TOLD_WAIT_MOST_MS), best]
 	var lands := maxi(int(_swings[best][2]), now)
 	var by := instance_from_id(best) as GridEntity
 	if not (by is Player or by is Companion):

@@ -221,6 +221,7 @@ func _ready() -> void:
 		await _test_blows_seen()  # It lets frames run too.
 		await _test_wind_flinch()  # 392 amended (11): after blows_seen, with its player still standing (the list's end has none).
 		await _test_tell_killed()  # 780 amended (36): after wind_flinch, its player still standing.
+		await _test_told_hurts()  # 390 amended (4): after wind_flinch, its player still standing.
 		_test_gait_holds()
 		await _test_shield_seen()
 		await _test_reel_clock()
@@ -18171,8 +18172,109 @@ func _test_blows_seen() -> void:
 	_check(int(heard[1]) == clock + 180 and int(both[1]) < clock + 180,
 			"of two swinging beside a body, the one facing it struck: its landing (%+d ms), not its mate's facing away; both facing it, the first found as before (%+d ms)"
 			% [int(heard[1]) - clock, int(both[1]) - clock])
+	# 390 amended (4): a told move's hit sends no swing; its hurt waits for the told blow's own landing
+	# (look_thrust5: a robber's told lunge hurt the player at the news, 270 ms before his thrust).
+	var kept_told: Dictionary[int, int] = _rig._told_lands.duplicate()
+	var held_swings: Dictionary = _rig._swings.duplicate()
+	_rig._swings.clear()
+	_rig._told_lands.clear()
+	at_rhea.facing = Vector2i(1, 0)
+	_rig._told_lands[biter.get_instance_id()] = clock + 100
+	var told_heard: Array = _rig._struck_with(bitten_body)
+	_rig._told_lands[biter.get_instance_id()] = AnimRig.now_msec() + 900  # Running late: no longer than a wound-up blow waits.
+	var capped_at := AnimRig.now_msec()
+	var capped: Array = _rig._struck_with(bitten_body)
+	_rig._told_lands[biter.get_instance_id()] = clock - 1000  # Long landed: its time gone, and forgotten.
+	var stale: Array = _rig._struck_with(bitten_body)
+	var forgotten := not _rig._told_lands.has(biter.get_instance_id())
+	_rig._swings = held_swings
+	_rig._told_lands = kept_told
+	_check(int(told_heard[1]) == clock + 100 and int(told_heard[2]) == biter.get_instance_id()
+			and int(capped[1]) - capped_at <= Client3D.TOLD_WAIT_MOST_MS + 5 and int(stale[1]) < clock + 100 and forgotten
+			and &"lunge" in Client3D.BLOW_CAUSES and &"ambush" in Client3D.BLOW_CAUSES and &"pounce" in Client3D.BLOW_CAUSES,
+			"a told blow's hurt at its landing (%+d ms), never more than %d ms after its news (one 900 ms late: %d); one long landed forgotten (%s); lunge, ambush and pounce hurts timed; its teller the blow's (924's voice key: %s)"
+			% [int(told_heard[1]) - clock, Client3D.TOLD_WAIT_MOST_MS, int(capped[1]) - capped_at, forgotten,
+			int(told_heard[2]) == biter.get_instance_id()])
 	for made: Monster in [bitten_body, at_rhea, biter]:
 		made.free()
+
+
+## 390 amended (4): each told move's hurt against its drawn landing, through the client (Client3D.creature_tell
+## with the message's from and lands ticks; the hit's news at the sim's landing, its cause the server's): a
+## robber's lunge (his thrust, STRIKE_LANDS_IN behind the sim), a person's ambush (no told strike drawn for it:
+## at the news), a hill cat's pounce, a great bear's swipe and a boar king's charge (each its tell as the sim's,
+## or at the news where its body draws none); and each tell broken first: no record, at the news.
+func _test_told_hurts() -> void:
+	print("
+== 390 amended (4): the told moves' hurts at their drawn landing ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to be struck by told moves")
+		return
+	var tellers := [["robber", "lunge", &"lunge"], ["robber", "ambush", &"ambush"], ["hill_cat", "pounce", &"pounce"],
+			["great_bear", "swipe", &"attack"], ["boar_king", "charge", &"attack"]]
+	var ticks := 6
+	var n := 0
+	for row: Array in tellers:
+		var kind := str(row[0])
+		var at := player.tile + Vector2i(-2, 0)
+		if World.get_entity_at(at) != null:
+			World.despawn(World.get_entity_at(at))
+		var teller: Monster = null
+		if kind == "robber":
+			teller = _spawn_imp(at, "robber")
+			if teller != null:
+				teller.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
+		else:
+			var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+			spec["name"] = "Told" + kind.capitalize().replace(" ", "") + str(n)
+			spec["tile"] = at
+			teller = _main._spawn(spec) as Monster
+		if teller == null:
+			_check(false, "a %s to tell" % kind)
+			continue
+		teller.sight_range = 0
+		World.face(teller, Vector2i(1, 0))
+		for i in 30:
+			_rig._process(0.0)
+			if _rig._puppets.has(teller.get_instance_id()):
+				break
+			await get_tree().process_frame
+		await _frames(2)
+		var results: Array[String] = []
+		var ok := true
+		for broken: bool in [false, true]:
+			n += 1
+			var id := 400 + n
+			var told := AnimRig.now_msec()
+			_rig.creature_tell(id, {"id": id, "source": str(teller.get_path()), "kind": str(row[1]),
+					"from_tick": World.tick, "lands_tick": World.tick + ticks})
+			var drawn := int(_rig._told_lands.get(teller.get_instance_id(), -1))
+			if broken:
+				_rig.creature_tell_over(id, false)
+			var news := told + int(ticks * World.TICK_DT * 1000.0)
+			await _until_msec(news)  # The sim's hit: its news.
+			var hurt: Array = await _flinch_time(player, teller.get_instance_id(), row[2])
+			if not broken:
+				_rig.creature_tell_over(id, true)
+			# Where it should fall: its drawn landing, no earlier than the news and no later than a wound-up
+			# blow's wait after it; at the news with no record (a body drawing no tell, or the tell broken).
+			var want := news if drawn < 0 or broken else clampi(drawn, news, news + Client3D.TOLD_WAIT_MOST_MS)
+			var off := int(hurt[0]) - want if int(hurt[0]) >= 0 else 9999
+			var case_ok := absi(off) <= 60 and (not broken or not _rig._told_lands.has(teller.get_instance_id()) or int(hurt[1]) == 0)
+			ok = ok and case_ok
+			# Read once a frame: the flinch starts on the first frame at or after its wait (150 ms at most from
+			# the hurt's news); this read sees it up to two awaited frames on (the timer fires after a frame's
+			# process, the clip shows the frame after). Times from the hurt's own news, which this wait gives late.
+			var heard := int(hurt[3])
+			results.append("%s: news at %+d ms, flinch seen %+d ms after it, not yet at the frame before (%+d; the bound %d), drawn landing %s, %+d off" % [
+					"broken" if broken else "told", heard - news, int(hurt[0]) - heard if int(hurt[0]) >= 0 else -1,
+					int(hurt[2]) - heard, Client3D.TOLD_WAIT_MOST_MS, ("%+d" % (drawn - told)) if drawn >= 0 else "none", off])
+			_rig._told_lands.erase(teller.get_instance_id())
+		_check(ok, "a %s's %s (%s): %s" % [kind, row[1], row[2], "; ".join(results)])
+		World.despawn(teller)
+		_rig._process(0.0)
+		await _frames(2)
 
 
 ## 780 amended (36): a teller killed mid-tell (ui-design's dagger runs: a robber killed as he told). His tell
@@ -18362,23 +18464,26 @@ func _test_wind_flinch() -> void:
 
 ## The player struck by [param _by]'s blow now (_on_struck, its news): [when it flinched on the rigs'
 ## clock, -1 if it never did in 1 s; 0 if it had flinched as the news came, else -1]. 390 amended (2).
-func _flinch_time(player: GridEntity, _by: int) -> Array:
+func _flinch_time(player: GridEntity, _by: int, cause := &"attack") -> Array:
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
 	var rig := puppet.get_meta("rig") as AnimRig
 	rig.cancel_strike()
 	puppet.set_meta("busy_until", 0)
-	_rig._on_struck(1, &"attack", player.get_instance_id())
+	var called := AnimRig.now_msec()  # When the hurt's news reached it (a test's wait ends a frame late).
+	_rig._on_struck(1, cause, player.get_instance_id())
 	var at_news := 0 if rig.playing() in Client3D.HIT_CLIPS else -1
 	var flinched := -1
+	var looked := AnimRig.now_msec()  # The last frame read before it (the flinch fell between the two).
 	var until := AnimRig.now_msec() + 1000
 	while AnimRig.now_msec() < until:
 		if rig.playing() in Client3D.HIT_CLIPS:
 			flinched = AnimRig.now_msec()
 			break
+		looked = AnimRig.now_msec()
 		await get_tree().process_frame
 	rig.cancel_strike()
 	puppet.set_meta("busy_until", 0)
-	return [flinched, at_news]
+	return [flinched, at_news, looked, called]
 
 
 ## The shield package, animation's side (340 and 379 amended): a bash's Shield_Bash on the basher and
