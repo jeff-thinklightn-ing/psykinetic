@@ -1589,6 +1589,32 @@ func _test_lodger_sleep(level: Dictionary, laid: Array, door: Vector2i, away_bef
 	_check(stand_ticks >= 6 and kept == stand_ticks and at_stand_inn.is_empty() and held_after == 0,
 		"17:30 to 18:30, the inn up: Rolf and the pedlar kept at their stands till 18:00 read as at work, never INN at the stall (%d samples, %s); from 18:00 the hold gone (%d)" % [
 			stand_ticks, at_stand_inn, held_after])
+	# No inn open (no spots on its floor, main before the Mughouse's): his stand his every place, his inn spell there
+	# reads as his work all evening (the cap's take 333 amended (4) on main: Rolf kept his body and stood at his stall
+	# in INN from 17:45 to 22:00, "idle facing shut ground").
+	level["spots"] = []
+	_main._inn_walked_in.clear()
+	_main._inn_walked_out.clear()
+	var evening: Array[String] = []
+	var evening_marked := 0
+	var evening_ticks := 0
+	for h: float in [17.0, 19.0, 20.5, 21.5]:
+		DayNight.set_hour(h)
+		_main._sync_residents()
+		var body := _body(rolf)
+		if body == null:
+			continue
+		evening_marked += 1 if bool(body.places.get("keep_work", false)) else 0
+		for i in Resident.FAR_EVERY:
+			World.tick += 1
+			body._sim_tick()
+		evening_ticks += 1
+		var now_h := DayNight.now()
+		evening.append("%.1f clock %s tick %s" % [h, Resident.Doing.keys()[Resident.doing_at("", h, Season.name_at(int(now_h)), "", rolf,
+			Townsfolk.day_of(now_h), Townsfolk.mood_of(World.production, rolf))], Resident.Doing.keys()[body.doing]])
+	level["spots"] = laid
+	_check(evening_ticks == 4 and evening_marked == 4 and evening.all(func(line: String) -> bool: return not line.ends_with("tick INN")),
+		"no inn open: Rolf at his stand all evening, his inn spell read as his work, never INN there (%s)" % [evening])
 	# A pilgrim and a visitor on her way out are no lodgers: unchanged.
 	var stay := {"came": World.towns.now() - DayNight.day_steps, "leaves": World.towns.now() + DayNight.day_steps, "from": "Saltmarsh", "news": []}
 	var pilgrim := Offers.VISITOR + "rs_pilgrim"

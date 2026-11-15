@@ -15888,6 +15888,7 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 		for use: String in ["inn", "square", "temple", "well", "work", "home"]:
 			going[use] = Rect2i(door, Vector2i.ONE)  # Whatever its doing (a lodger up at night in any, his sleep too), to the door.
 		going.erase("spots")
+		going.erase("keep_work")  # Walking in: his inn spell is the inn's.
 		going["bed"] = Rect2i()  # Never down on a roofless bedroll on the way in (875 amended (4)).
 		return true
 	_inn_walked_in.erase(who)
@@ -15907,6 +15908,7 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 		# bedroll in the open; the lit fire's seats if his places have them, else his stand with short stands.
 		var night_places: Dictionary = each["places"]
 		night_places["bed"] = Rect2i()
+		night_places.erase("keep_work")  # Up at night, not at work.
 		var lit := ((night_places.get("spots", {}) as Dictionary).get("fire", []) as Array).filter(func(spot: Dictionary) -> bool:
 			return World.is_fire(spot.get("face", Vector2i.ZERO)))
 		if not lit.is_empty():
@@ -22827,6 +22829,9 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 			# Maps' work spot for him (trade "vendor"): whatever his hour, his stand is the spot he
 			# walks to, and he strolls his side of the counter between (853's keep-moving).
 			places["spots"] = {"work": stands, "square": stands, "well": stands, "inn": stands, "temple": stands}
+		# His stand his every place: his clock's inn spell there reads as his work (875 amended (4)); the Mughouse,
+		# open, takes him in from INN_TRADERS_DAY's end and lets the mark go (_inn_town_side).
+		places["keep_work"] = true
 		out.append({"key": Offers.VENDOR + place_id, "name": str(vendor.get("name", "Rolf")), "trade": "", "player": "",
 			"town": place_id, "look_trade": "smith", "places": places})
 	for entry: Dictionary in World.towns.visitors(place_id):
