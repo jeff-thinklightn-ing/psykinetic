@@ -22014,26 +22014,54 @@ const FOOT_MARK_DEPTH := 0.39  # linear; about 0.8 of the bare ground at its mid
 const FOOT_MARK_SHADED := 1.0 / 3.0
 const FOOT_MARK_SUN := Vector2(0.0, 12.0)  # the sun's height (degrees): none .. all of it
 const FOOT_MARK_LIFT := 0.03
-const FOOT_MARK_MOST := 256
+const FOOT_MARK_MOST := 64  # the shader's arrays
 const FOOT_MARK_SINK := 0.3  # a sinking corpse's mark gone by this far under
 ## Its colour multiplies the frame: 1 - k(shaded + (1 - shaded) * sun * the
 ## sun's reach), k the oval's strength there: emission 1 - k, and the sun's
-## light (no ambient) giving back k (1 - shaded)(1 - sun * reach).
+## light (no ambient) giving back k (1 - shaded)(1 - sun * reach). Marks that
+## overlap darken as the deepest of them alone, never together: each quad
+## draws only where its own oval is the strongest of all (the arrays hold
+## every mark, ties to the lower index).
 const FOOT_MARK_SHADER := """shader_type spatial;
 render_mode blend_mul, depth_draw_never, cull_back, ambient_light_disabled, specular_disabled, fog_disabled;
 uniform float shaded = 0.3333;
 uniform float sun = 1.0;
-varying float strength;
+uniform int count = 0;
+uniform vec4 mark_at[64];
+uniform vec4 mark_size[64];
+varying vec3 world;
+varying flat int self_id;
+float mark(int i, vec2 p) {
+	vec4 at = mark_at[i];
+	vec4 size = mark_size[i];
+	vec2 d = p - at.xy;
+	float u = dot(d, at.zw) / max(size.x, 0.01);
+	float v = dot(d, vec2(-at.w, at.z)) / max(size.y, 0.01);
+	float m = clamp(1.0 - (u * u + v * v), 0.0, 1.0);
+	return size.z * m * m;
+}
 void vertex() {
-	strength = INSTANCE_CUSTOM.r;
+	self_id = INSTANCE_ID;
+	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec4 view = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	view.z += 0.08;
 	POSITION = PROJECTION_MATRIX * view;
 }
 void fragment() {
-	float d = length(UV - vec2(0.5)) * 2.0;
-	float m = clamp(1.0 - d * d, 0.0, 1.0);
-	float k = strength * m * m;
+	float k = mark(self_id, world.xz);
+	for (int j = 0; j < count; j++) {
+		if (j == self_id) {
+			continue;
+		}
+		float other = mark(j, world.xz);
+		if (other > k || (other == k && j < self_id)) {
+			k = 0.0;
+			break;
+		}
+	}
+	if (k <= 0.0) {
+		discard;
+	}
 	ALBEDO = vec3(k);
 	EMISSION = vec3(1.0 - k);
 	ROUGHNESS = 1.0;
@@ -22061,7 +22089,6 @@ func _make_foot_marks() -> void:
 	_foot_marks.name = "FootMarks"
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_3D
-	multimesh.use_custom_data = true
 	var plane := PlaneMesh.new()
 	plane.size = Vector2.ONE
 	multimesh.mesh = plane
@@ -22092,6 +22119,10 @@ func _place_foot_marks() -> void:
 		if not _puppets.has(id) or not is_instance_valid(_foot_mark_bodies[id]["body"]):
 			_foot_mark_bodies.erase(id)
 	var shown := 0
+	var marks_at: Array[Vector4] = []
+	var marks_size: Array[Vector4] = []
+	marks_at.resize(FOOT_MARK_MOST)
+	marks_size.resize(FOOT_MARK_MOST)
 	for id: int in _puppets:
 		if shown >= FOOT_MARK_MOST:
 			break
@@ -22122,12 +22153,19 @@ func _place_foot_marks() -> void:
 			strength *= clampf(1.0 - sunk / FOOT_MARK_SINK, 0.0, 1.0)
 		if strength <= 0.0:
 			continue
-		multimesh.set_instance_transform(shown, _foot_mark_at(puppet, body))
-		multimesh.set_instance_custom_data(shown, Color(strength, 0.0, 0.0, 0.0))
+		var place := _foot_mark_at(puppet, body)
+		multimesh.set_instance_transform(shown, place)
+		var along := place.basis.x
+		marks_at[shown] = Vector4(place.origin.x, place.origin.z, along.normalized().x, along.normalized().z)
+		marks_size[shown] = Vector4(along.length() * 0.5, place.basis.z.length() * 0.5, strength, 0.0)
 		shown += 1
 	multimesh.visible_instance_count = shown
+	var material := _foot_marks.material_override as ShaderMaterial
+	material.set_shader_parameter("count", shown)
+	material.set_shader_parameter("mark_at", marks_at)
+	material.set_shader_parameter("mark_size", marks_size)
 	var cloud := float(_weather_view.weather.get("cloud", 0.0)) if _weather_view != null else 0.0
-	(_foot_marks.material_override as ShaderMaterial).set_shader_parameter("sun", 1.0 - clampf(cloud, 0.0, 1.0))
+	material.set_shader_parameter("sun", 1.0 - clampf(cloud, 0.0, 1.0))
 
 
 ## [param puppet]'s mark data (_foot_mark_bodies), made the first frame it
