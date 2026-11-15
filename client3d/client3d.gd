@@ -22007,11 +22007,11 @@ func _set_transparency(puppet: Node3D, transparency: float) -> void:
 ## the sun's own shadow already falls (a roof's, a tree's, the body's own) it
 ## keeps FOOT_MARK_SHADED of that, so it never doubles a shade; cloud takes it
 ## the same way; by day only, out of doors only.
-const FOOT_MARK_PERSON := Vector2(0.45, 0.6)  # along the body's facing, across: a person at model_scale 1
-const FOOT_MARK_FIT := 0.9  # a creature's: this share of its rest box at the ground
+const FOOT_MARK_PERSON := Vector2(0.9, 0.75)  # along the body's facing, across: a person at model_scale 1 (v2: v1's 0.45 x 0.6 lay under the body)
+const FOOT_MARK_FIT := 1.3  # a creature's: this share of its rest box at the ground
 const FOOT_MARK_LEAST := 0.25
 const FOOT_MARK_DEPTH := 0.39  # linear; about 0.8 of the bare ground at its middle, the body's own shadow's
-const FOOT_MARK_SHADED := 1.0 / 3.0
+const FOOT_MARK_SHADED := 0.42  # v1's 1/3 read a quarter on the Atlas
 const FOOT_MARK_SUN := Vector2(0.0, 12.0)  # the sun's height (degrees): none .. all of it
 const FOOT_MARK_LIFT := 0.03
 const FOOT_MARK_MOST := 64  # the shader's arrays
@@ -22027,6 +22027,7 @@ render_mode blend_mul, depth_draw_never, cull_back, ambient_light_disabled, spec
 uniform float shaded = 0.3333;
 uniform float sun = 1.0;
 uniform int count = 0;
+const float FLAT = 0.35;  // full strength out to this share of its radius, gone at its rim
 uniform vec4 mark_at[64];
 uniform vec4 mark_size[64];
 varying vec3 world;
@@ -22037,8 +22038,8 @@ float mark(int i, vec2 p) {
 	vec2 d = p - at.xy;
 	float u = dot(d, at.zw) / max(size.x, 0.01);
 	float v = dot(d, vec2(-at.w, at.z)) / max(size.y, 0.01);
-	float m = clamp(1.0 - (u * u + v * v), 0.0, 1.0);
-	return size.z * m * m;
+	float m = 1.0 - smoothstep(FLAT, 1.0, sqrt(u * u + v * v));
+	return size.z * m;
 }
 void vertex() {
 	self_id = INSTANCE_ID;
