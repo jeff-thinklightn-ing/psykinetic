@@ -2130,6 +2130,16 @@ func _test_foot_marks() -> void:
 	var elevation_was: float = _rig._look_elevation
 	_rig._outdoor = true
 	_rig._look_elevation = 40.0
+	# The test room's own walls stand between its floor and the sun: asked with
+	# no occluders but this test's roof, and given back after.
+	var occluders_was: Array[Array] = _rig._occluders.duplicate()
+	var chunks_was: Dictionary[Vector2i, Array] = _rig._occluder_chunks.duplicate(true)
+	var top_was: float = _rig._occluder_top
+	var built_was: bool = _rig._occluders_built
+	_rig._occluders.clear()
+	_rig._occluder_chunks.clear()
+	_rig._occluder_top = 0.0
+	_rig._occluders_built = true
 	_rig._foot_mark_bodies.clear()
 	_rig._place_foot_marks()
 	var multimesh: MultiMesh = _rig._foot_marks.multimesh
@@ -2144,7 +2154,7 @@ func _test_foot_marks() -> void:
 	var person: Vector2 = Client3D.FOOT_MARK_PERSON * float(mine.get_meta("model_scale", 1.0))
 	var size: Vector4 = sizes[index] if index >= 0 else Vector4.ZERO
 	_check(multimesh.visible_instance_count >= 2 and index >= 0, "by day out of doors: a mark under the player and the imp, the player's at the foot point (%d marks)" % multimesh.visible_instance_count)
-	_check(is_equal_approx(size.x * 2.0, person.x) and is_equal_approx(size.y * 2.0, person.y) and is_equal_approx(size.z, Client3D.FOOT_MARK_DEPTH) and size.w == 0.0,
+	_check(absf(size.x * 2.0 - person.x) < 0.01 and absf(size.y * 2.0 - person.y) < 0.01 and absf(size.z - Client3D.FOOT_MARK_DEPTH) < 0.001 and size.w == 0.0,
 			"the player's the soles' size (%.2f x %.2f m), its depth in the open (%s)" % [person.x, person.y, size])
 	_rig._look_elevation = -5.0
 	_rig._place_foot_marks()
@@ -2164,14 +2174,10 @@ func _test_foot_marks() -> void:
 		_rig.add_child(roof)
 		var foot := mine.global_position
 		roof.global_position = foot + Vector3.UP * 0.5 + toward * (2.0 / toward.y)
-		var built: bool = _rig._occluders_built
-		if not built:
-			_rig._index_occluders()
 		var bounds := AABB(roof.global_position - box.size * 0.5, box.size)
 		_rig._occluders.append([roof, bounds, false, [roof]])
 		var index_of: int = _rig._occluders.size() - 1
-		var top_was: float = _rig._occluder_top
-		_rig._occluder_top = maxf(top_was, bounds.end.y)
+		_rig._occluder_top = bounds.end.y
 		var chunks: Array[Vector2i] = []
 		for x in range(floori(bounds.position.x / Client3D.FADE_CHUNK), floori(bounds.end.x / Client3D.FADE_CHUNK) + 1):
 			for z in range(floori(bounds.position.z / Client3D.FADE_CHUNK), floori(bounds.end.z / Client3D.FADE_CHUNK) + 1):
@@ -2189,22 +2195,21 @@ func _test_foot_marks() -> void:
 			var each: Vector4 = at[i]
 			if Vector2(each.x, each.y).distance_to(Vector2(foot.x, foot.z)) < 0.01:
 				covered = sizes[i]
-		_check(covered.w == 1.0 and is_equal_approx(covered.z, Client3D.FOOT_MARK_DEPTH * Client3D.FOOT_MARK_SHADED),
+		_check(covered.w == 1.0 and absf(covered.z - Client3D.FOOT_MARK_DEPTH * Client3D.FOOT_MARK_SHADED) < 0.001,
 				"a roof between the feet and the sun: covered, a third of it (%s)" % [covered])
 		# Moved off the sun's line (its box no longer met): the open again.
 		var body: Dictionary = _rig._foot_mark_bodies[player.get_instance_id()]
 		body["cover_at"] = -Client3D.FOOT_MARK_COVER_FRAMES * 10
 		roof.global_position += Vector3(toward.x, 0.0, toward.z).normalized().rotated(Vector3.UP, PI * 0.5) * 6.0
 		_check(not _rig._foot_mark_covered(body, foot), "the roof moved off the sun's line: not covered")
-		for chunk in chunks:
-			(_rig._occluder_chunks[chunk] as Array).erase(index_of)
-		_rig._occluders.remove_at(index_of)
-		_rig._occluder_top = top_was
 		_rig._foot_mark_shapes.erase(roof)
 		roof.queue_free()
-		_rig._occluders_built = built
 	else:
 		_check(false, "the test rig's sun stands above the horizon (%s)" % [_rig._sun])
+	_rig._occluders = occluders_was
+	_rig._occluder_chunks = chunks_was
+	_rig._occluder_top = top_was
+	_rig._occluders_built = built_was
 	_rig._outdoor = outdoor_was
 	_rig._look_elevation = elevation_was
 	_rig._foot_mark_bodies.clear()
