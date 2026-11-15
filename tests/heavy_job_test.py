@@ -1858,6 +1858,68 @@ check(gate.blockers(dict(table41["suite_remote"], kind="suite_remote", own_cap=T
     and gate.blockers(dict(table41["suite_remote"], kind="suite_remote"), one_suite) == [],
     "blockers: the running suite holds an unmarked suite, not a marked one")
 
+print("== an old-code row holds nobody behind it (394 amended (55)) ==")
+# 11-14 22:09: dungeon-knightrec's scene, queued by revision-37 code (no gate, no lock_rule),
+# counted three land-lock waiters against MAX_RUNNING and held every scene behind it.
+def entry55(tree, kind, n, gate_rev="new"):
+    entry = {"file": "%019d-%s-1.json" % (n, tree), "tree": tree, "kind": kind, "queued": 2000.0 + n}
+    if gate_rev == "new":
+        entry.update(gate=gate.GATE_REVISION, lock_rule=gate.LOCK_RULE, checkout="C:/dev/new")
+    elif gate_rev is not None:
+        entry.update(gate=gate_rev, lock_rule=gate.LOCK_RULE, checkout="C:/dev/behind")
+    return entry
+def judge55(queue, running):
+    """(ok, holder, why) for each row as a waiter of this code judges itself (wait_turn)."""
+    out = []
+    for place, entry in enumerate(queue):
+        row = gate.judged_row(table41, entry, dict(table41[entry["kind"]], kind=entry["kind"]), running, 40.0, 40.0)
+        ahead = [gate.judged_row(table41, each, row, running, 40.0, 40.0) for each in queue[:place]]
+        head, _, _, holder = gate.passes_held(row, ahead, running, 40.0, 40.0, table41, time.time(), gate.backfill_length(row))
+        if not head and entry["kind"] in gate.PAST_QUEUE_KINDS:
+            jumped, jump_holder, _ = gate.jumps(row, ahead, running, 40.0, 40.0)
+            head, holder = (True, None) if jumped else (head, jump_holder if jump_holder is not None else holder)
+        ok, why = gate.decide(row, running, head, 40.0, None, 40.0)
+        out.append((ok, holder, why))
+    return out
+landing = one_suite + [dict(one_suite[0], tree="w%d" % n, lock_wait=True) for n in range(3)]
+old_head = entry55("dungeon-knightrec", "scene", 1, None)
+got = judge55([old_head, entry55("economy", "scene", 2)], landing)
+check(not got[0][0] and "3 heavy jobs running" in got[0][2],
+    "the old scene at the head waits by its own count, the land-lock waiters counted (%s)" % (got[0],))
+check(got[1][0], "the scene behind it starts past it (%s)" % (got[1],))
+rev37 = {k: v for k, v in entry55("dungeon-knightrec", "scene", 1, 37).items() if k != "lock_rule"}
+one_scene = [dict(table41["scene"], kind="scene", tree="s0", using_gb=0.0, started=time.time())]
+got = judge55([rev37, entry55("economy", "scene", 2)], one_scene + landing)
+check(not got[0][0] and got[1][0], "the stall's own row (revision 37, no lock_rule) is passed the same (%s)" % (got,))
+got = judge55([rev37, entry55("economy", "scene", 2)], one_suite)
+check(got[0][0] and not got[1][0] and got[1][1] == 0,
+    "one its own count lets start now holds the row behind it: never two started on one slot (%s)" % (got,))
+two_scenes = [dict(table41["scene"], kind="scene", tree="s%d" % n, using_gb=0.0, started=time.time()) for n in range(2)]
+got = judge55([entry55("art-kit", "scene", 1), entry55("economy", "scene", 2)], two_scenes)
+check(not got[0][0] and not got[1][0] and got[1][1] == 0,
+    "a current head is still honoured: the scene behind it waits behind it (%s)" % (got[1],))
+got = judge55([entry55("old", "bench", 1, None), entry55("new", "bench", 2)], one_suite)
+check(not got[1][0] and "never beside a bench" in got[1][2],
+    "a bench behind an old bench passes it but never starts beside a suite: the exclusions are this code's (%s)" % (got[1],))
+got = judge55([entry55("old", "bench", 1, None), entry55("new", "bench", 2)],
+    [dict(table41["bench"], kind="bench", tree="b", using_gb=0.0, started=time.time())])
+check(not got[1][0], "nor beside a running bench (%s)" % (got[1],))
+said = gate.queue_reasons([old_head, entry55("economy", "scene", 2)], landing, 40.0, 40.0, None)
+check("old code at the head (no revision (before 37)): rebase its checkout unknown" in said[0] and said[1].startswith("may start"),
+    "status names the old row at the head and the one behind may start: %s" % said)
+before_log = open(gate._path("heavy_jobs.log")).read() if os.path.exists(gate._path("heavy_jobs.log")) else ""
+gate.passed_old_code("economy", "scene", [old_head], [gate.judged_row(table41, old_head, {}, landing, 40.0, 40.0)], landing, 40.0, 40.0)
+after_log = open(gate._path("heavy_jobs.log")).read()[len(before_log):]
+check("\tpassed\teconomy\tscene\tpast dungeon-knightrec scene (old code: no revision (before 37); rebase its checkout unknown" in after_log,
+    "the start logs one passed line naming the old row: %s" % after_log.strip())
+queue_file = gate._path("queue", old_head["file"])
+os.makedirs(os.path.dirname(queue_file), exist_ok=True)
+gate._write(queue_file, {k: v for k, v in old_head.items() if k != "file"})
+gate.passed_old_code("economy", "scene", [old_head], [gate.judged_row(table41, old_head, {}, landing, 40.0, 40.0)], landing, 40.0, 40.0)
+check(gate._read(queue_file) == {k: v for k, v in old_head.items() if k != "file"},
+    "the old row's file is left as it was: never edited by another waiter")
+os.remove(queue_file)
+
 print("== a landing's take clears or refuses untracked files main tracks (394 amended (35)) ==")
 import subprocess  # noqa: E402
 repo = tempfile.mkdtemp(prefix="heavy_job_stray_")

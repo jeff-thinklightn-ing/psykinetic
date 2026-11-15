@@ -564,6 +564,25 @@ def judged_row(table, entry, default, running, free_ram_gb, free_commit_gb=None,
     return row
 
 
+def old_code_passable(row, running, free_ram_gb, free_commit_gb):
+    """Whether judged queue [row] holds nobody behind it now (394 amended (55)): queued by code
+    from before 41 (own_cap: its waiter counts the takes waiting on the land lock against
+    MAX_RUNNING), it waits on that count alone: this code's rules would start it at once, and
+    by its own it cannot start. 11-14 22:09: dungeon-knightrec's scene, queued from a checkout
+    at revision 37, counted three suite_remote takes waiting on the lock and held all 16 scenes
+    behind it for half an hour. Rows behind pass it; it keeps its place and starts when its own
+    count lets it, and nobody else's waiter stops or edits it. One its own rules would start
+    now, or one waiting on memory, its cap or an exclusion by this code's rules too, holds as
+    any row, so a row passing it never starts beside it on room it would have taken."""
+    if not row.get("own_cap") or free_ram_gb is None:
+        return False
+    if decide(row, running, True, free_ram_gb, None, free_commit_gb)[0]:
+        return False
+    judged = dict(row)
+    judged.pop("own_cap", None)
+    return decide(judged, running, True, free_ram_gb, None, free_commit_gb)[0]
+
+
 def first_come_only(row):
     """Whether queue [row], of a kind that starts past the queue, was queued by code from
     before its kind did (PAST_QUEUE_SINCE): it waits for its turn, never past the queue."""
@@ -630,6 +649,20 @@ def count_passed(queue, ahead, running):
             if saved is not None:
                 saved["passed_by"] = saved.get("passed_by", 0) + 1
                 _write(path, saved)
+
+
+def passed_old_code(tree, kind, queue, ahead, running, free_ram_gb, free_commit_gb):
+    """A job starting: one "passed" line in the gate's log for each old-code row in [ahead]
+    (judged rows of [queue]'s entries before it) it went past (394 amended (55))."""
+    for entry, row in zip(queue, ahead):
+        if old_code_passable(row, running, free_ram_gb, free_commit_gb):
+            log("passed", tree, kind, "past %s %s (old code: %s; rebase %s) (394 amended (55))" % (
+                entry["tree"], entry["kind"], old_code_why(entry), _where(entry)))
+
+
+def old_code_why(entry):
+    """Which old code wrote queue [entry]: its revision against main's, or none."""
+    return ("revision %d, main's %d" % (entry["gate"], main_revision())) if "gate" in entry else "no revision (before 37)"
 
 
 def kind_blocked(job, running):
@@ -715,6 +748,8 @@ def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, 
     holds nobody (bench_passable, 394 amended (45))."""
     past = []
     for place, (other, waits) in enumerate(zip(ahead, held)):
+        if old_code_passable(other, running, free_ram_gb, free_commit_gb):
+            continue  # 394 amended (55): it waits only on its own older rules.
         if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
             continue
         if bench_passable(other, running):
@@ -2182,6 +2217,7 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None, caller=None):
                     why += "; %s" % past_why
             if ok:
                 count_passed(queue[:place - 1], ahead, running)
+                passed_old_code(tree, kind, queue[:place - 1], ahead, running, free_ram, free_commit)
             if ok and swapped is not None:
                 _retried(os.remove, _path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, "suite_remote", pid or os.getpid())
@@ -2880,6 +2916,10 @@ def queue_reasons(queue, running, free_ram, free_commit, free_gpu, now=None):
             out.append("waits: %s" % at_least(table, row, why))
         if not ok and row.get("kind") == "bench":
             out[-1] += bench_wait(row, ahead, running, table, now, free_ram, free_commit)
+        if not ok and old_code_passable(row, running, free_ram, free_commit):
+            # 394 amended (55): its own waiter judges it by its old rules; newer rows pass it.
+            out[-1] += "; old code%s (%s): rebase %s; newer rows pass it" % (
+                " at the head" if place == 0 else "", old_code_why(entry), _where(entry))
     return out
 
 

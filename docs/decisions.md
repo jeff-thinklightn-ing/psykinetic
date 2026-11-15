@@ -11302,6 +11302,29 @@ suite, scene, net, bench, soak, import or load check never read so, nor a plain 
 mark, an unmarked holder reads the same, the adoption ends both. Tools and tests only; protocol unchanged; no
 class_name; no bullet.
 
+394 amended (55): a queue row from before 41 that waits only on its own old count holds nobody behind it (the
+coordinator's approval with conditions, 2026-11-14; no front; label from tools/decision_number.sh). 11-14 22:09:
+dungeon-knightrec's scene, queued from a checkout at gate revision 37 (no lock_rule), sat at the head of the queue. Its
+waiter counted the three suite_remote takes waiting on the land lock against MAX_RUNNING (41's own_cap judges it so,
+as its waiter judges itself), so it could not start, and every waiter of this code held its row behind it: 16 scenes
+waited half an hour, until dungeon stopped its waiter at 22:41:57. Now a row judged own_cap that this code's rules would
+start at once (decide at the head without own_cap) and its own count would not (decide with it) is passed by the rows
+behind it, in _passes (old_code_passable). It keeps its place and its file: nobody else's waiter stops, moves or edits
+it, and it starts when its own count lets it. A row its own rules would start now still holds the row behind it, so two
+never start on one slot or on the room one of them would take. So does a row that waits on memory, its cap or an
+exclusion by this code's rules too, and the passer is judged by this code's count, exclusions and margin: passing an
+old bench never starts a bench beside a suite or another bench, and the margin is untouched. jumps (48's past-the-queue
+kinds) is unchanged: it already passes a row held by the count. A row of a lower revision that carries 41's lock_rule
+is judged by the same rules as a current one and holds as before. A start that passed such a row logs "passed ... past
+<tree> <kind> (old code: revision r, main's m; rebase <checkout>) (394 amended (55))", and status adds "; old code (at
+the head) (...): rebase <checkout>; newer rows pass it" to its line. GATE_REVISION stays 47: a waiter of 47 that has not
+rebased only holds behind such a row, as before. tests/heavy_job_test.py: an old head scene waits on its count with
+three land-lock waiters running and the scene behind it starts; the same for the stall's own row (revision 37, no
+lock_rule); one its own count lets start holds the row behind; a current head is honoured; a bench behind an old bench
+never starts beside a suite or a running bench; status names the old head and the one behind may start; the start's
+passed line; the old row's file unedited. With the pass switched off, four of these rows fail. Tools and tests only;
+protocol unchanged; no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
