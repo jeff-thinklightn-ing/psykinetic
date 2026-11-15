@@ -1367,9 +1367,21 @@ saved_kinds = gate._read(gate._path("kinds.json"))
 gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=2.0, commit_gb=1.0, lean_first=False),
     "bench": dict(gate.KINDS["bench"], ram_gb=2.0, commit_gb=1.0)})
 def clear_gate():
-    for each in gate._entries("queue") + gate._entries("running"):
-        folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
-        gate._retried(os.remove, gate._path(folder, each["file"]))
+    # A live waiter thread may drop or rename its own entry between the listing
+    # and the remove (combat's landing, 11-15 00:54: FileNotFoundError on the
+    # tour's queue file): a file already gone counts as cleared, and the folders
+    # are listed again until both are empty.
+    for attempt in range(20):
+        entries = gate._entries("queue") + gate._entries("running")
+        if not entries:
+            return
+        for each in entries:
+            folder = "running" if os.path.exists(gate._path("running", each["file"])) else "queue"
+            try:
+                gate._retried(os.remove, gate._path(folder, each["file"]))
+            except FileNotFoundError:
+                pass
+        time.sleep(0.02)
 def queued(tree, kind, waiter=True):
     name = "%019d-%s-%d.json" % (time.time_ns(), tree, os.getpid())
     entry = {"tree": tree, "kind": kind, "pid": None, "queued": time.time()}
