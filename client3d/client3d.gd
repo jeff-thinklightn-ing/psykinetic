@@ -22045,6 +22045,10 @@ uniform bool contact = false;  // the darker of the mark and the sun's shadow, n
 uniform float shadow_drop = 0.2;  // the sun's full shadow on lit ground, as shown (it reads about 0.8)
 uniform vec4 mark_at[64];
 uniform vec4 mark_size[64];
+// What stands on the ground under it (a boot, a hoof) is left alone: the quad is pulled toward
+// the lens to clear the ground's relief, and drew over the soles (foot5: boot pixels to 0.57).
+uniform sampler2D depth_texture : hint_depth_texture, repeat_disable, filter_nearest;
+const float OVER_GROUND = 0.04;  // over the quad, itself FOOT_MARK_LIFT over the foot point
 varying vec3 world;
 varying flat int self_id;
 varying float mark_k;
@@ -22066,6 +22070,11 @@ void vertex() {
 	POSITION = PROJECTION_MATRIX * view;
 }
 void fragment() {
+	vec4 behind = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, texture(depth_texture, SCREEN_UV).r, 1.0);
+	vec3 seen = (INV_VIEW_MATRIX * vec4(behind.xyz / behind.w, 1.0)).xyz;
+	if (seen.y > world.y + OVER_GROUND) {
+		discard;
+	}
 	float k = mark(self_id, world.xz);
 	for (int j = 0; j < count; j++) {
 		if (j == self_id) {
