@@ -1206,7 +1206,66 @@ def hair(J: dict, nape: bool) -> Part:
 			if z < 0.19:
 				pts[i] = pts[i] + Z * (0.19 - z) + (-FRONT) * 0.02
 		p.add(pts)
+	clear_of_head(p, J)
 	return p
+
+
+## The least the hair cap stands off the head it is worn over, along the ray from the head's middle.
+HAIR_CLEAR = 0.004
+
+
+def clear_of_head(p: Part, J: dict) -> None:
+	"""Every point of the hair cap [p] at least HAIR_CLEAR out from the head under it (head_rings, the same
+	MORPH), along the ray from the head's middle (0.11 over the Head bone, 1.2 cm back) through the point,
+	behind that middle only: the hairline's points before it are tucked into the forehead on purpose.
+	head_rings' back is fuller than the cap's rings (its 1.2 cm bulge from the eyes to the crown), so the
+	head stood out through the cap: a bare patch at the back of the crown from behind (v0.1.215, every
+	hair, man and woman). Points already further out stay where they are."""
+	under = Part("under_hair", "Skin")
+	for r in head_rings(J):
+		under.add(r)
+	tree = _bvh([under])
+	bone = J["Head"]
+	mid = Vector((bone.x, bone.y + 0.012, bone.z + 0.11))
+	for r in p.rings:
+		for k, q in enumerate(r):
+			rel = q - mid
+			if rel.length < 1e-6 or rel.dot(FRONT) > 0.0:
+				continue
+			way = rel.normalized()
+			hit = tree.ray_cast(mid, way, 0.6)
+			if hit[0] is not None:
+				r[k] = mid + way * max(rel.length, (hit[0] - mid).length + HAIR_CLEAR)
+	# Then the head's own corners: a head ring between two of the cap's stood out through the flat face
+	# between them (the woman's crown, 0.6 mm). Each head point the cap's side covers pushes that face's
+	# corners out by what it lacks of HAIR_CLEAR (a corner the most any of its faces asks), a few rounds.
+	from mathutils.bvhtree import BVHTree
+	n = len(p.rings[0])
+	quads = [(k * n + i, k * n + (i + 1) % n, (k + 1) * n + (i + 1) % n, (k + 1) * n + i)
+		for k in range(len(p.rings) - 1) for i in range(n)]
+	heads = [q for r in under.rings for q in r if (q - mid).dot(FRONT) <= 0.0]
+	for _round in range(4):
+		flat = [q for r in p.rings for q in r]
+		cap = BVHTree.FromPolygons(flat, quads)
+		push = {}
+		for q in heads:
+			rel = q - mid
+			way = rel.normalized()
+			hit = cap.ray_cast(mid, way, 0.6)
+			if hit[0] is None:
+				continue
+			short = rel.length + HAIR_CLEAR - (hit[0] - mid).length
+			if short <= 1e-5:
+				continue
+			for c in quads[hit[2]]:
+				push[c] = max(push.get(c, 0.0), short + 1e-4)
+		if not push:
+			break
+		for c, by in push.items():
+			kk, ii = divmod(c, n)
+			at = p.rings[kk][ii]
+			if (at - mid).dot(FRONT) <= 0.0:
+				p.rings[kk][ii] = at + (at - mid).normalized() * by
 
 
 def bun(J: dict) -> Part:

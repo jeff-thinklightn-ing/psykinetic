@@ -270,6 +270,7 @@ func _ready() -> void:
 		_test_level_music()
 		_test_room_music()
 		_test_options_panel()
+		_test_hair_covers_head()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
@@ -705,6 +706,92 @@ func _test_bandaging() -> void:
 	patient.free()
 	player.free()
 	bandaging.free()
+
+
+## The hair caps cover the back of a person's head (body_gen's clear_of_head, 419 amended (3)): every point of the Body's head
+## 13 cm and more over the Head bone and 5 cm and more behind it (the ears and the face apart), on the ray from the head's
+## middle, lies at least 2 mm under the outermost face of each hair (Hair_Cropped, Hair_Bound, Hair_Long), in the base shape
+## and in each shape key at full. v0.1.215's head stood up to 4.8 mm out through every cap: a bare patch from behind.
+func _test_hair_covers_head() -> void:
+	print("
+== the hair cap covers the back of the head: no point of it outside, every shape key (419 amended (3)) ==")
+	var into := func(node: Node, root: Node) -> Transform3D:
+		var xf := Transform3D.IDENTITY
+		while node != root:
+			xf = (node as Node3D).transform * xf
+			node = node.get_parent()
+		return xf
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		var body := model.find_child("Body", true, false) as MeshInstance3D
+		var skeleton := body.get_parent() as Skeleton3D
+		var head: Vector3 = into.call(skeleton, model) * skeleton.get_bone_global_rest(skeleton.find_bone("Head")).origin
+		# Blender's +Y (the back) is -Z here.
+		var mid := head + Vector3(0.0, 0.11, -0.012)
+		var shapes: Array = [""]
+		var body_mesh := body.mesh as ArrayMesh
+		for k in body_mesh.get_blend_shape_count():
+			shapes.append(String(body_mesh.get_blend_shape_name(k)))
+		var shaped := func(mesh: MeshInstance3D, shape: String) -> Array:
+			# [points, triangles' corners] in the model's space, [shape] at full ("" the base).
+			var am := mesh.mesh as ArrayMesh
+			var xf: Transform3D = into.call(mesh, model)
+			var points := PackedVector3Array()
+			var corners := PackedInt32Array()
+			for s in am.get_surface_count():
+				var src := am.surface_get_arrays(s)
+				var verts: PackedVector3Array = (src[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+				var k := -1
+				for j in am.get_blend_shape_count():
+					if String(am.get_blend_shape_name(j)) == shape:
+						k = j
+				if k >= 0:
+					var target: PackedVector3Array = am.surface_get_blend_shape_arrays(s)[k][Mesh.ARRAY_VERTEX]
+					for i in verts.size():
+						verts[i] += target[i] - (src[Mesh.ARRAY_VERTEX] as PackedVector3Array)[i] if am.blend_shape_mode == Mesh.BLEND_SHAPE_MODE_NORMALIZED else target[i]
+				var base := points.size()
+				for v in verts:
+					points.append(xf * v)
+				var index: PackedInt32Array = src[Mesh.ARRAY_INDEX]
+				if index.is_empty():
+					index = PackedInt32Array(range(verts.size()))
+				for i in index:
+					corners.append(base + i)
+			return [points, corners]
+		for hair_name: String in ["Hair_Cropped", "Hair_Bound", "Hair_Long"]:
+			var hair := model.find_child(hair_name, true, false) as MeshInstance3D
+			var least := INF
+			var where := ""
+			var covered := 0
+			var outside := 0
+			for shape: String in shapes:
+				var b: Array = shaped.call(body, shape)
+				var h: Array = shaped.call(hair, shape)
+				var tris: PackedVector3Array = h[0]
+				var corner: PackedInt32Array = h[1]
+				for v: Vector3 in b[0]:
+					if v.y < head.y + 0.13 or v.z > head.z - 0.05:
+						continue
+					# Two rays, the second 0.3 mm aside at the point: a ray through a vertex or along an edge the
+					# cap's triangles share can slip between them (the mended cap's middle point lies on the ray).
+					var far := -1.0
+					for aside: Vector3 in [Vector3.ZERO, Vector3(0.0003, 0.0002, 0.0)]:
+						var way := (v + aside - mid).normalized()
+						for t in range(0, corner.size(), 3):
+							var hit: Variant = Geometry3D.ray_intersects_triangle(mid, way, tris[corner[t]], tris[corner[t + 1]], tris[corner[t + 2]])
+							if hit != null:
+								far = maxf(far, ((hit as Vector3) - mid).length())
+					if far < 0.0:
+						continue
+					covered += 1
+					var gap := far - (v - mid).length()
+					outside += 1 if gap < 0.0 else 0
+					if gap < least:
+						least = gap
+						where = "%s at %s" % [shape if shape != "" else "base", v - head]
+			_check(covered >= 20 and least >= 0.002, "%s, %s: the back of the head under the cap by %.1f mm at the least (%d points under it over %d shapes, %d outside; least %s)"
+					% [build[0], hair_name, least * 1000.0, covered, shapes.size(), outside, where])
+		model.free()
 
 
 func _test_options_panel() -> void:

@@ -13240,6 +13240,36 @@ and picks, 2026-11-12/13): people are smooth-shaded, and the head is drawn a ten
     already in the released game (about 2 cm of fist at those frames).
 - Lands after Jeff has seen both in game (C:/dev/review/decisions/people-look.md).
 
+Amended (3) (a bare patch at the back of the crown, seen from behind on every hair, man and woman, in
+v0.1.215's stills: about 20 by 15 px at 3.6 m; the coordinator's approval as a take of its own, a fault
+in the released game, not part of the faces package):
+- The cause: head_rings' back is fuller than the hair cap's rings. Its rings from the eyes to the crown
+  carry a 1.2 cm bulge behind, the cap's none, so the head stood out through the cap. Measured on the
+  glbs from the head's middle (0.11 m over the Head bone, 1.2 cm back) through each Body point 13 cm and
+  more over the bone and 5 cm and more behind it: 5 of the man's 18 points were outside Hair_Cropped and
+  Hair_Long, by up to 4.8 mm, 3 outside Hair_Bound; the woman's the same, up to 4.7 mm.
+- body_gen's clear_of_head, run by hair() on the cap it builds: every cap point behind the head's middle
+  at least HAIR_CLEAR (4 mm) out from the head's own loft along the ray from that middle; then each head
+  point under the cap pushes the face over it out by what it lacks of 4 mm, a corner the most any face
+  asks, until none lacks (a head ring between two of the cap's poked through the flat face between them,
+  0.6 mm, on the woman's crown). The hairline's points before the head's middle are tucked into the
+  forehead on purpose and are left.
+- Only the cap moves (the coordinator's bound: hats, hoods and beards stay unless they need it, and none
+  did): Hair_Cropped, and the cap of Hair_Bound and Hair_Long; not the bun, the fall, a beard, a hood, a
+  hat or any garb. 22 of the cap's 86 points move, all behind the head's middle, out by at most 1.14 cm
+  (the man) and 1.12 cm (the woman), at the back's middle where the head's bulge is. Every other mesh,
+  the Body included, has each vertex where it was (checked on the glbs). Now at least 4.1 mm (the man)
+  and 3.8 mm (the woman) of cap over each of those points, over the base shape and every key.
+- The builds it reaches: human_m and human_f, built again. The orc and the kobold wear no hair part
+  (PEOPLE_WEARABLES), so nothing of theirs is built again. Jeff's goblin (goblin.blend, goblin.glb and what
+  is fitted to it by hand) is not made by body_gen, and its files are byte for byte as on main.
+- Tests: view_world_test _test_hair_covers_head (the row fails on main's glbs): for each hair, every such
+  Body point under the outermost face of the hair by at least 2 mm, in the base shape and each shape key
+  at full; two rays a point, the second 0.3 mm aside (a ray through a vertex the cap's triangles share
+  slipped between them and read the cap's bottom: a false -118 mm on the first run). On main 6 FAILs, the
+  head up to 4.8 mm outside; on the take 4.1 and 3.8 mm. anim_rig_test and seamless_test pass. Before and after from behind (Blender, rest pose):
+  C:/dev/review/pc-character/crown_today/crown_before_after_blender.png.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and
