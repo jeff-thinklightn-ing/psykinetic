@@ -54673,9 +54673,19 @@ amended (16)).
   work samples).
 - fire_night_test (new; 21:00 to 05:00, 875 off): no lodger and no turned-away inn-goer holds a fire seat;
   every holder's doing is the square (Hew, Pell and Nix sat); never more than two; none faces away; the fire
-  put out at 03:00, nobody holds a seat from 04:05.
+  put out at 03:00, nobody holds a seat from 04:05. On maps' Mughouse switch (c83c14c03, 875's evening on)
+  with this take: PASS, the night sitters Gar (the guard, on his square stint to 22:00), Hew, Pell and Nix, most
+  two at once (at 21.00); without the switch Hew, Pell and Nix, most two (at 22.48).
+- What the joined town shows (ui-design's stills on bd9e89643, joined, the player at (197,211)): at noon Maud
+  seated at (196,212), facing in; four evenings of four, one sitter, Aldous the priest in his square stint
+  (19:00 to 21:00 by his clock), about 20:25 to 21:13 on a different seat each night; nobody from 21:22 to
+  23:00. The tests sat people later because they add ten extra townsfolk (town_soak's folk), and more of them
+  roll the square for the night; a town of its own roster mostly takes the inn or the temple then, and once
+  875's switch is on the evening's place is the inn, so a late empty square fire beside a full common room is
+  the right picture (the coordinator, 11-15). The bullet says someone sits at the fire by day and into the
+  evening, never "at night".
 Server only; protocol unchanged; no new class_name; no bullet until ui-design's two joined stills, the player
-standing in the square, noon and about 22:00, zoom and the view's width named; voice words it to them.
+standing in the square, noon and about 20:50, zoom and the view's width named; voice words it to them.
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
