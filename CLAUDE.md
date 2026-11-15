@@ -100,7 +100,12 @@ that the walk looks like skipping and the people look like "bad claymation place
   folder)" (278 amended (8)). A tool test stops only a process it can still show is its own
   (its pid made before it recorded it, or its command line unchanged), never a pid alone
   (perf-timed's landing, 11-13 22:19); heavy_job_test's real takes go by a free-memory figure
-  of the test's own, never read by a real take (394 amended (50)).
+  of the test's own, never read by a real take (394 amended (50)). Since 278 amended (9) (7c4dcbbf9) view_test and
+  view_land_test each run as two scenes (view_test and view_world_test, view_land_test and
+  view_land_far_test, one script each with a port of its own): a new row goes in the half whose
+  list names its subject (the header of each half says what it holds), and land.sh names any suite
+  scene over 220 s as a warning ("slow scene: ..."), never a failure: its tree splits it at its
+  next row.
 - Take the landing lock for your final retest and push, so nobody lands between them, with
   the resource gate taken first (decision 394): `kind=$(bash tools/remote_tests.sh kind)`,
   `sh tools/heavy_job.sh take <tree> $kind`
