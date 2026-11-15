@@ -1837,16 +1837,15 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 	var beside := _stand_to_talk(friend, player.tile)
 	if beside == NONE and _is_own_companion(friend):
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
-	# 935 amended (3): a stand cell no route reaches (the healer at work in the one cell inside his shut door: his body shuts the
-	# hut's inside off, so every cell beside him is walled in, and the click did nothing) is walked at his own cell instead: a route
-	# to an occupied goal exists, the free body opens a shut door by walking at it, and stops against him, in the talk's reach.
-	if beside != NONE and beside != friend.tile and not (friend is Monster):
-		var way_beside := World.walk_path(World.free_cell(player, Vector2(player.tile)), beside, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES)
-		if way_beside.is_empty():
-			beside = friend.tile
 	if beside == NONE:
 		return
 	_move_click(player, beside)
+	# 935 amended (3): a stand cell no route reaches (the healer at work in the one cell inside his shut door: his body shuts the
+	# hut's inside off, so every cell beside him is walled in, and the click did nothing) is walked at his own cell instead: a route
+	# to an occupied goal exists, and the walk stops at his shut door for the step to open (_update_talk). The route the click just
+	# planned is the check, so a stand cell with a way costs no second search.
+	if (_free["path"] as Array).is_empty() and _free_waiting.is_empty() and beside != friend.tile and not (friend is Monster):
+		_move_click(player, friend.tile)
 	_talk_wanted = friend
 	_talk_door_sent = 0
 	_talk_door_tries = 0
