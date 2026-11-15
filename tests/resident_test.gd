@@ -870,6 +870,25 @@ func _test_threat() -> void:
 				_check(spoken.is_empty(), "too far: no word of his shelf (%s)" % [spoken])
 			if off <= World.PERSON_REACH:
 				_check(World.try_barter(dealer, bram, [], [], 0, bram.worker_id) == "nothing to trade", "and a trade reaches him (not \"nobody to trade with here\")")
+		# 562 amended (10): a trade nothing is made by has no shelf to be bare (Maud the carpenter said "Come back tomorrow").
+		_check(not Main.makes_goods(["carpenter"]) and Main.makes_goods(["smith"]) and Main.makes_goods(["medicine_man"]),
+			"562am10: nothing is made by a carpenter; a smith and a medicine man make things")
+		World.towns.note_rescue(STORE, "rs-maud", "Maud", "carpenter")
+		World.production.set_away("rs-maud", false)
+		_sync()
+		var maud := _body("rs-maud")
+		_check(maud != null, "(Maud the carpenter has a body)")
+		if maud != null:
+			_put(dealer, _main._nearest_free(maud.tile + Vector2i(1, 0)))
+			answers.clear()
+			spoken.clear()
+			_main._on_command(dealer, "barter", {"resident": str(maud.get_path())})
+			var shelf_lines: Array = []
+			for lines: Variant in (Townsfolk.rules().get("empty_shelf", {}) as Dictionary).values():
+				shelf_lines.append_array((lines as Array).map(func(line: Variant) -> String: return str(line)))
+			_check(answers.size() == 1 and spoken.all(func(d: Dictionary) -> bool: return not str(d["text"]) in shelf_lines),
+				"562am10: Maud the carpenter, bartered in person, says no shelf line (%s)" % [spoken])
+		World.production.set_away("rs-maud", true)
 		Net.message_received.disconnect(answered)
 	var hut := Rect2i(9, 5, 3, 3)
 	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsThreat%d" % World.tick,

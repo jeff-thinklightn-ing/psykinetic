@@ -9550,6 +9550,8 @@ func _empty_shelf_told(player: Player, body: Resident) -> void:
 	if player == null or body == null or World.economy == null or not World.economy.maker_goods(body.worker_id).is_empty():
 		return
 	var trades: Array = World.production.worker(body.worker_id).get("trades", [])
+	if not makes_goods(trades):
+		return  # A trade nothing is made by (the carpenter) has no shelf to be bare (562 amended (10)).
 	var key := "potions" if "medicine_man" in trades else "smithed" if "smith" in trades else "default"
 	var all: Dictionary = Townsfolk.rules().get("empty_shelf", {})
 	var lines: Array = all.get(key, all.get("default", []))
@@ -9557,6 +9559,16 @@ func _empty_shelf_told(player: Player, body: Resident) -> void:
 		return
 	var line := str(lines[absi(hash("%s|%s|%d" % [body.worker_id, player.player_id, Townsfolk.day_of(DayNight.now())])) % lines.size()])
 	Net.broadcast_to([player.owner_peer], "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": ""})
+
+
+## Whether any of [param trades] makes a thing (562 amended (10)): some item of Production.items_catalog
+## is "made" by it. A carpenter's work is roofs, builds and mending: no shelf of her own, ever.
+static func makes_goods(trades: Array) -> bool:
+	var catalog := Production.items_catalog()
+	for id: String in catalog:
+		if str((catalog[id] as Dictionary).get("made", {}).get("by", "")) in trades:
+			return true
+	return false
 
 
 # --- The healer's care (decision 584 amended) ------------------------------------------

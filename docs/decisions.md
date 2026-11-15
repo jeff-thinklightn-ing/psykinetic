@@ -29117,6 +29117,16 @@ window still opens: the client opens it itself before the server answers, a medi
 and what he buys, and ui's 765 store window shows a bare shelf as just his name, so nothing says it twice
 (ui agreed). resident_test _test_threat: Bram the smith, bare, says a smith's line in person, nothing from
 too far. Server only, protocol unchanged, no new class_name.
+562 amended (10) (2026-11-15, economy; perf's folk tour, the coordinator's approval; label from
+tools/decision_number.sh): the empty-shelf word only for a trade some item is made by. Main treats every
+resident a barter reaches as a maker, so Maud the carpenter, clicked, said the default line ("Nothing made
+just now. Come back tomorrow."), though no item is "made" by a carpenter (her work is roofs, builds and
+mending): she promised goods she never makes. Main.makes_goods(trades): some item of
+Production.items_catalog is made by one of them; _empty_shelf_told says nothing for a trade with none.
+No new words: she says nothing of goods. The tour's "shows wares or a way to them" row skips such a trade
+(perf's). resident_test _test_threat: nothing is made by a carpenter, a smith and a medicine man make
+things; Maud bartered in person says no shelf line; Bram the smith, bare, still says his. Server only,
+protocol unchanged, no new class_name, no bullet.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4
