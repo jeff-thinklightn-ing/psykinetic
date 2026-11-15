@@ -299,8 +299,12 @@ const FISH_STILL_NEAR := 3
 const FISH_SELF: Array[String] = ["Too good a spot to walk past.", "I'll wet a line while we're here.",
 	"Worth a cast, this.", "Let's see what's down there."]
 ## With no rod she sits by the water on her own: rarely, once in
-## FISH_SIT_DAYS game days, else silent (voice's).
+## FISH_SIT_DAYS game days, else silent (voice's). Her lines then are a deck
+## (805 amended (22), voice's three beside the first): none again until the
+## others have been said, then round again.
 const FISH_SIT := "Nice spot. I'll sit a while."
+const FISH_SIT_LINES: Array[String] = [FISH_SIT, "Quiet here. I'll rest my feet a bit.",
+	"Good water, this. I'll sit with you.", "I like the sound of the water. I'll stay a while."]
 const FISH_SIT_DAYS := 3
 ## Words of fishing no ask matched, she with a rod or the pond want and a
 ## pond she would lead to, they far from water: once a game day, never more
@@ -1758,8 +1762,21 @@ var _fish_asked := false
 ## danger, to take up again ({spot, asked}); her last danger word (tick).
 var _still_tile := World.NO_CELL
 var _still_since := 0
-var _fish_self_days := {}
-var _fish_sit_day := -100
+## Her water lines' memory (805 amended (22)): Main shares her record's
+## "water_lines" here ({self_days: {line: day}, sit_day, sit_said: [lines]}),
+## so a travel, which spawns her as a new node from her record, keeps it; a
+## record from before it has none, and starts as never said.
+var water_lines: Dictionary = {}
+var _fish_self_days: Dictionary:
+	get:
+		return water_lines.get_or_add("self_days", {})
+	set(value):
+		water_lines["self_days"] = value
+var _fish_sit_day: int:
+	get:
+		return int(water_lines.get("sit_day", -100))
+	set(value):
+		water_lines["sit_day"] = value
 var _fish_hint_day := -1
 var _fish_declined := World.NO_CELL
 var _fish_resume := {}
@@ -2074,7 +2091,7 @@ func _fish_self_start() -> bool:
 	var line := ""
 	if _rod_slot() < 0:
 		if day - _fish_sit_day >= FISH_SIT_DAYS:
-			line = FISH_SIT
+			line = _fish_sit_next()
 	else:
 		for each: String in FISH_SELF:
 			if int(_fish_self_days.get(each, -1)) != day:
@@ -2083,13 +2100,25 @@ func _fish_self_start() -> bool:
 	if not line.is_empty() and _say(line, true, false, Weight.IDLE):
 		# Counted only once said (805 amended (15)): within the hush after a
 		# fight the line is dropped, and kept for her next start.
-		if line == FISH_SIT:
+		if line in FISH_SIT_LINES:
 			_fish_sit_day = day
+			(water_lines.get_or_add("sit_said", []) as Array).append(line)
 		else:
 			_fish_self_days[line] = day
 	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "still by the water",
 		"outcome": "fish" if _rod_slot() >= 0 else "company", "note": "of her own: her player stood by a fishing place"})
 	return true
+
+
+## Her next sit line (805 amended (22)): the first of FISH_SIT_LINES not
+## said since the deck was last round; all said, the deck starts again.
+func _fish_sit_next() -> String:
+	var said: Array = water_lines.get("sit_said", [])
+	for line: String in FISH_SIT_LINES:
+		if not line in said:
+			return line
+	water_lines["sit_said"] = []
+	return FISH_SIT_LINES[0]
 
 
 ## Words of fishing in [param text] no ask matched (805 amended (14)): with a

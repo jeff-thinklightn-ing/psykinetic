@@ -46,9 +46,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2995)
+## Lines in the code (2998)
 
-### companions (Pip, Wren, Nix) (664)
+### companions (Pip, Wren, Nix) (667)
 
 | | Line | Where |
 |---|---|---|
@@ -117,6 +117,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Worth a cast, this. | `sim/companion.gd`  |
 |  | Let's see what's down there. | `sim/companion.gd`  |
 |  | Nice spot. I'll sit a while. | `sim/companion.gd` FISH_SIT |
+|  | Quiet here. I'll rest my feet a bit. | `sim/companion.gd` FISH_SIT_LINES |
+|  | Good water, this. I'll sit with you. | `sim/companion.gd`  |
+|  | I like the sound of the water. I'll stay a while. | `sim/companion.gd`  |
 |  | If you want to go fishing, say so and I'll lead the way to the water. | `sim/companion.gd` FISH_ASK_HINT |
 |  | Not with that about. I'll keep my eyes on it, not the float. | `sim/companion.gd` FISH_DANGER |
 |  | My pack's too full to put this away, so I can't take up my rod. | `sim/companion.gd` FISH_NO_HAND |

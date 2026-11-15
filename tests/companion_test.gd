@@ -109,6 +109,7 @@ func _ready() -> void:
 	_test_companion_verb()
 	_test_fishing()
 	_test_fish_mend()
+	_test_water_lines_kept()
 	_test_left_and_rest()
 	_test_reed_pond_cells()
 	_test_fish_waters()
@@ -3263,6 +3264,141 @@ func _test_fish_mend() -> void:
 	pet._fish_resume = {}
 	pet._fish_declined = World.NO_CELL
 	pet.said.disconnect(_record_said)
+	_settle(pet)
+
+
+## 805 amended (22): her water lines' memory (the sit line's day, her rod
+## lines' days) on her record, so a travel, which despawns her and spawns a
+## new node from her record (an area crossing's, an admin move's), does not
+## make her say a sit line again the same day.
+func _test_water_lines_kept() -> void:
+	print("\n== her water lines kept across a travel's new node (805 amended (22)) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var owner: GridEntity = pet.keeper
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var zone := String(World.zone.name)
+	var water := World.NO_CELL
+	for cell: Vector2i in [owner.tile + Vector2i(2, 0), owner.tile + Vector2i(-2, 0), owner.tile + Vector2i(0, 2), owner.tile + Vector2i(0, -2)]:
+		if World.is_walkable(cell) and not World._occupancy.has(cell):
+			water = cell
+			break
+	_check(water != World.NO_CELL, "a cell for a pond beside her player")
+	if water == World.NO_CELL:
+		return
+	var had_water := World.is_water(water)
+	var pond := "%s/water_pond" % zone
+	var lay := func() -> void:
+		World._water[water] = true
+		World.holdings._places[pond] = {"id": pond, "area": zone, "key": "water_pond", "cell": water, "name": "the water pond",
+			"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+		World._fish_waters.get_or_add(zone, {})[water] = "pool_water"
+		World._fish_stock_of.clear()
+		World.holdings._holder[pond] = "nobody"
+		World.holdings._strength[pond] = 1
+		World.holdings._since[pond] = 0
+	lay.call()
+	var no_rod := func(p: Companion) -> void:
+		for slot in p.slots.size():
+			if p.slots[slot] == "fishing_rod":
+				p.slots[slot] = ""
+	var still_ticks := Companion.FISH_STILL_S * World.TICK_RATE
+	# Her player stands still by the water: she goes to the bank of her own (true), then is told to stop.
+	var start := func(p: Companion) -> bool:
+		p._still_tile = World.NO_CELL
+		var there := false
+		for i in still_ticks + 80:
+			World.step()
+			if p.order == "fish" and p.tile == p.fish_spot:
+				there = true
+				break
+		p._carry_out({"verb": "fish", "on": false}, "Stop fishing.")
+		for i in World.FISH_END_TICKS + 2:
+			World.step()
+		return there
+	# A travel to where they stand: her node despawned, a new one spawned from her record.
+	var travel := func() -> Companion:
+		var at: Vector2i = _player().tile
+		_main.travel(Net.local_id, zone, "", {}, at)
+		World.enter_named(zone)
+		lay.call()
+		return _companion()
+	# Her lines as said (her said signal): her record gives a new node her last lines back.
+	var heard: Array[String] = []
+	var on_said := func(line: String) -> void:
+		heard.append(line)
+	var is_sit := func(line: String) -> bool:
+		return line in Companion.FISH_SIT_LINES
+	var slots_were := pet.slots.duplicate()
+	no_rod.call(pet)
+	pet._fish_sit_day = -100
+	pet.water_lines.clear()  # Her deck from the top, whatever earlier tests had her say.
+	pet.said.connect(on_said)
+	var sat: bool = start.call(pet)
+	var sit_said := heard.filter(is_sit)
+	_check(sat and sit_said.size() == 1, "no rod, by the water: she sits and says so (%s, %s)" % [sat, sit_said])
+	var node_was := pet.get_instance_id()
+	pet = travel.call()
+	_check(pet != null and pet.get_instance_id() != node_was, "a travel placed her again: a new node")
+	if pet == null:
+		return
+	no_rod.call(pet)
+	heard.clear()
+	pet.said.connect(on_said)
+	print("  the new node's sit day %d (today %d)" % [pet._fish_sit_day, Townsfolk.day_of(World.steps)])
+	var sat_again: bool = start.call(pet)
+	var again := heard.filter(is_sit)
+	print("  after the travel: sat %s, said %s; her record's water lines %s" % [sat_again, again, record.companion.get("water_lines")])
+	_check(sat_again and again.is_empty(), "placed again by a travel the same day: she sits, and no sit line again (%s)" % [again])
+	# The deck: each start FISH_SIT_DAYS on, the next line not yet said; all said, round again.
+	var order: Array[String] = []
+	for k in 5:
+		pet._fish_sit_day = -100
+		pet._fish_declined = World.NO_CELL
+		heard.clear()
+		start.call(pet)
+		var sits := heard.filter(is_sit)
+		order.append(sits[0] if sits.size() == 1 else "<%d sit lines>" % sits.size())
+	var lines := Companion.FISH_SIT_LINES
+	var deck: Array[String] = [lines[1], lines[2], lines[3], lines[0], lines[1]]
+	_check(order == deck, "her sit lines a deck: none again till the others are said, then round (%s)" % [order])
+	# Her rod lines: today's first, a travel, today's second (not the first again).
+	pet.slots[0] = "fishing_rod"
+	pet._fish_declined = World.NO_CELL
+	pet._fish_self_days = {}
+	heard.clear()
+	start.call(pet)
+	var rod_first := heard.filter(func(line: String) -> bool: return line in Companion.FISH_SELF)
+	pet = travel.call()
+	pet.said.connect(on_said)
+	if pet.slots.find("fishing_rod") < 0:
+		pet.slots[0] = "fishing_rod"
+	heard.clear()
+	start.call(pet)
+	var rod_next := heard.filter(func(line: String) -> bool: return line in Companion.FISH_SELF)
+	_check(rod_first == [Companion.FISH_SELF[0]] and rod_next == [Companion.FISH_SELF[1]],
+		"with a rod, a travel between: the next of today's lines, not the first again (%s, %s)" % [rod_first, rod_next])
+	# Saved: her record's copy goes through the save, and a record without it starts as never said.
+	var saved := PlayerRecord.companion_from(record.companion)
+	var kept: Dictionary = saved.get("water_lines", {})
+	_check(int(kept.get("sit_day", -100)) == pet._fish_sit_day and (kept.get("sit_said", []) as Array) == [lines[0], lines[1]]
+		and int((kept.get("self_days", {}) as Dictionary).get(Companion.FISH_SELF[1], -1)) == Townsfolk.day_of(World.steps),
+		"her water lines go through the save (%s)" % [kept])
+	record.companion.erase("water_lines")
+	_main._set_mood(record)
+	_check(pet._fish_sit_day == -100 and pet._fish_self_days.is_empty() and pet._fish_sit_next() == lines[0],
+		"an older record without them: never said (%s)" % [record.companion.get("water_lines")])
+	# Put back.
+	pet.slots = slots_were
+	if not had_water:
+		World._water.erase(water)
+	(World._fish_waters.get(zone, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
+	World.holdings._places.erase(pond)
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
 	_settle(pet)
 
 

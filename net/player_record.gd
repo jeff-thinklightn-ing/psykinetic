@@ -368,6 +368,16 @@ static func companion_from(pet: Variant) -> Dictionary:
 			"hi": float(rate.get("hi", 2.0))}
 	if pet.get("want_rest") is float or pet.get("want_rest") is int:
 		out["want_rest"] = int(pet["want_rest"])
+	# Her water lines' memory (805 amended (22)): her rod lines' days, her sit line's day and the deck said.
+	var water: Variant = pet.get("water_lines")
+	if water is Dictionary:
+		var days := {}
+		var self_days: Variant = water.get("self_days", {})
+		if self_days is Dictionary:
+			for line: Variant in self_days:
+				days[str(line)] = int(self_days[line])
+		out["water_lines"] = {"self_days": days, "sit_day": int(water.get("sit_day", -100)),
+			"sit_said": Array(_strings(water.get("sit_said", [])))}
 	var games: Variant = pet.get("games")
 	if games is Dictionary:
 		out["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}

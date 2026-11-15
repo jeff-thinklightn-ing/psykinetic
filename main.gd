@@ -15439,6 +15439,9 @@ func _set_mood(record: PlayerRecord) -> void:
 		if not record.companion.get("talk_rate") is Dictionary:
 			record.companion["talk_rate"] = Companion.talk_start()
 		pet.talk_rate = record.companion["talk_rate"]  # Shared: her moves are her record's (803 amended (5)).
+		if not record.companion.get("water_lines") is Dictionary:
+			record.companion["water_lines"] = {}  # A record from before 805 amended (22): never said.
+		pet.water_lines = record.companion["water_lines"]  # Shared, so a travel's new node keeps it.
 		if not record.companion.has("want") and not record.companion.has("want_rest"):
 			# A new companion's first want from her first tick, not her first
 			# world tick's tend (803 amended (12), playtest's pond 3): asked to
