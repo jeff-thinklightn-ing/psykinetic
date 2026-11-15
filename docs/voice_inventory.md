@@ -3436,7 +3436,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | a miner's swing: slow and heavy, it drives back whoever it hits | `items[62].verb.says` |
 |  | strikes two cells off; braced, it stops a charge | `items[63].verb.says` |
 |  | quick; twice the hurt from behind | `items[64].verb.says` |
-|  | drawn with arrows in the other hand; strikes hardest at full draw, and held past it reaches farther, weaker the farther out | `items[65].verb.says` |
+|  | drawn with arrows in the other hand; at full strength as soon as the arrow is set, and held, it aims steadier and reaches farther, weaker the farther out | `items[65].verb.says` |
 |  | A willow rod with a horsehair line and a quill float. | `items[67].about` |
 |  | A perch fresh from the water, still cold. | `items[68].about` |
 |  | Roast over the fire, the skin crisp. | `items[69].about` |
