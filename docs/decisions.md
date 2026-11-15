@@ -54670,9 +54670,11 @@ a spot only where a decor piece of a kind Level.DECOR_KINDS flags "seat" lies on
 read once a zone by Main._seat_cells), and a fire with none is no "fire" spot at all, by day or for the night's
 rules. Umbrage's fire has none on main, so this lands off: it is the package "the square's fire seats" with
 maps' data (square_fire's seats at the pit's four diagonals, (193,210), (195,210), (193,212), (195,212), each
-with art-kit's prop.log_seat under it, a "seat" kind, turned to the pit), which switches it on. On a log 0.555
-m deep, centred on its cell with its front to the pit, the 0.245 m pull leaves the sitter's hips about 0.03 m
-inside the front edge: on the log, as on a chair, so the pull stays.
+with art-kit's prop.log_seat under it, a "seat" kind, turned to the pit), which switches it on. The pull stays
+on a log as on a chair: the chair sit's hips come down SEAT_TOWARD (0.245 m) behind its feet, and the body is
+drawn that far ahead of its cell, so the hips land over the cell's centre, the log's axis (art-kit, 11-15: its
+coming log's flat face 0.32 m wide, the hips 0.16 m inside each edge); the joined stills show the sitters
+centred on their logs.
 - resident_test _test_fire_seats: the seats' faces; burning, the seat on every pick of six; out, the stand;
   two of the town at its seats, the stand; seat cells only of a kind flagged seat; a seat with no seat under it
   no spot, a fire with none no spots.
