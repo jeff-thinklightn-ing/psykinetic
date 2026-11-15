@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- With the hunting bow, a quick Shift-click looses an arrow at once (928).
+- Hold a shot on the hunting bow to steady your aim, then to reach farther; close in, every hit strikes as hard however long you held (928).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
