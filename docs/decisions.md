@@ -57672,3 +57672,63 @@ town's ground and the farmstead's, no grass in the north road's own cells and no
 meets the hills road and the breach's road the barrow road; it prints the wilds' safe-path count. Level data and a
 test; protocol unchanged; no new class_name. Its bullet follows the joined stills from the new start (noon, 21:30),
 by ui-design's order.
+
+## 939. The woods sit past the houses; the town is heard through a roof (sound)
+
+The coordinator's approval of 11-15 after sound's look at Umbrage by ear (the square at an ordinary
+hour): at the square, (195, 211), at noon the forest's day bed played at -12.0 dB, its full level,
+over the town's own bed at -19 to -21.6, and the same at every town cell and by night; the town's
+heart was heard as woods with a town under them. Inside a hut, the forest and wind went through the
+low-pass and the town's bed and chatter stayed clear, as if in the street; in the Mughouse the town
+was not heard at all.
+
+Ambience.weights weighs the forest's five beds (dawn, day, night, the deep forest's day and night)
+by 1 - FOREST_IN_TOWN (0.75) x the town's weight (_town_nearness: full within TOWN_NEAR 10 cells of
+a town's building, gone by TOWN_FAR 22): at a town's heart they sit 12 dB down, and they rise with
+the town's weight as smoothly as it falls (sound_kit_test: no step over a hundredth larger than
+FOREST_IN_TOWN / 100). Under a roof the town's two beds go to ROOFED (0.35, about -9 dB) as the
+outdoor beds do, and on the Ambience bus's muffled twin; so do the chatter and the arrival (Ambience
+._town_bus; the floor's Strand takes a bus). Inside a town's own building (an interior level naming
+its "town": the Mughouse and its storeys, the smithy) the town's bed plays at ROOFED, muffled,
+through its walls; none in a building of no town or under stone. Level._interior_from (run for every level)
+now writes the level's "town" into its terrain too, where Ambience reads it: "" for an outdoor level
+or a building of no town (maps' yes, 11-15; Client3D._fields_key's terrain hash changes once, at the
+build that brings it in).
+
+Read by ears (tests/tour/tours/ears.gd EARS_ONLY=town, joined, on this take and with main's
+Ambience; each mean over a 20 s stand, past its first second):
+
+- Noon, at the square, the east street (210, 203), the temple's side (219, 195), the west huts (196,
+  190): the forest -12.0 before, -23.7 to -24.0 after; the town's bed -19.0 to -21.5 after; the
+  chatter -15.1 to -17.2. At 23:00 at the same cells the night forest -12.0 before, -23.8 to -24.0
+  after, under the town's night bed at -12.0 to -12.2.
+- The town's edge, (195, 220), at a town weight of 0.50: the forest -12.0 before, -15.9 after (noon
+  and night), the town's bed -25.5 by day and -18.5 by night either way.
+- Well outside, (205, 234), town weight 0: the forest at -12.0 either way, and no town.
+- Inside the hut at (212, 205), noon: the town's bed -22.1 clear before, -28.3 muffled after; the
+  chatter -27.0 clear before, -24.8 muffled; the forest -22.9 before, -33.8 after, both muffled. At
+  23:00 the town's night bed -14.7 clear before, -21.1
+  muffled after.
+- In the Mughouse's common room, (6, 8): before, the hearth alone at -5.9; after, the town's bed
+  -28.1 muffled by day and -21.1 by night, and the chatter -24.3 muffled by day, the hearth still
+  on top at -5.9.
+- Inside a house (building.house, rect (214, 194), stood at (215, 196)), after: the town's bed -30.4
+  muffled by noon and -21.1 by night, the chatter -24.0 muffled. Neither hut nor house has a fire
+  of its own: a stand's window runs to the next mark, so the hearth heard in the house's window (and
+  in the hut's, in the first runs) is the Mughouse's, after the move there (voice's read, 11-15).
+- Walked from the square out to (205, 234) at noon (a quarter-second snapshot a step, after): the
+  forest at -24.0 to (197, 216), then up at every step to -12.1 at (205, 233), the town's bed down
+  from -19.0 to -57.5 and off; the largest step 1.65 dB between snapshots, walking about 4 cells a
+  second (kept/ears_20261115_090302, the log voice read the bullet against).
+
+At the outside stand, both runs show the muffled twin for about a second after the console's move:
+it was there before this decision, and a player who walks there doesn't meet it.
+
+sound_kit_test _test_ambience_weights: the forest at a town's heart at 1 - FOREST_IN_TOWN by day and
+night; no step across the edge; the deep forest's beds the same; under a roof in a town, its bed at
+ROOFED and the forest under it; inside a town's building, the town at ROOFED by day and night and no
+forest; none inside a building of no town or under stone; the town's bus muffled under a roof; the
+Mughouse's terrain names its town, the wilds' is empty. Pretests: load_check, sound_kit_test PASS.
+
+Client sound only, beside one terrain key a joined client lays itself; protocol unchanged; no new
+class_name.

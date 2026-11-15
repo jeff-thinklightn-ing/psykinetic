@@ -433,6 +433,52 @@ func _test_ambience_weights() -> void:
 	_check(is_equal_approx(town["amb.town_day"], 1.0) and town["amb.town_night"] == 0.0, "by a town's buildings by day: its day bed")
 	var town_night := Ambience.weights("outdoors", true, DayNight.NIGHT, 23.0, clear, 1.0)
 	_check(is_equal_approx(town_night["amb.town_night"], 1.0) and town_night["amb.town_day"] == 0.0, "by a town's buildings at 23:00: its night bed")
+	# 939: the woods past the houses. At a town's heart the forest's beds at
+	# 1 - FOREST_IN_TOWN (12 dB down), by night as by day; out of town as
+	# before; across the edge no step (the weight's 100 steps each within
+	# FOREST_IN_TOWN / 100 of the last).
+	_check(is_equal_approx(town["amb.forest_day"], 1.0 - Ambience.FOREST_IN_TOWN)
+			and is_equal_approx(town_night["amb.forest_night"], 1.0 - Ambience.FOREST_IN_TOWN)
+			and is_equal_approx(noon["amb.forest_day"], 1.0),
+			"in a town's heart the forest 12 dB down (%.2f by day, %.2f by night), out of town full" % [town["amb.forest_day"], town_night["amb.forest_night"]])
+	var last := 1.0
+	var worst := 0.0
+	for i in range(1, 101):
+		var at := Ambience.weights("outdoors", true, 1.0, 12.0, clear, i / 100.0)["amb.forest_day"] as float
+		worst = maxf(worst, absf(at - last))
+		last = at
+	_check(worst <= Ambience.FOREST_IN_TOWN / 100.0 + 0.0001, "the forest across a town's edge: no step (the largest %.4f a hundredth)" % worst)
+	var deep_town := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 1.0, 1.0)
+	_check(is_equal_approx(deep_town["amb.forest_deep_day"], 1.0 - Ambience.FOREST_IN_TOWN),
+			"the deep forest's beds down in a town the same")
+	# The town through a roof (939): its bed at ROOFED as the forest's; inside
+	# a town's own building (an interior naming its town) heard through the
+	# walls at ROOFED, by day and by night; none inside a building of no town
+	# or under stone.
+	var town_roofed := Ambience.weights("outdoors", false, 1.0, 12.0, clear, 1.0)
+	_check(is_equal_approx(town_roofed["amb.town_day"], Ambience.ROOFED)
+			and is_equal_approx(town_roofed["amb.forest_day"], Ambience.ROOFED * (1.0 - Ambience.FOREST_IN_TOWN)),
+			"under a roof in a town: its bed at %.2f, the forest under it" % town_roofed["amb.town_day"])
+	var inn := Ambience.weights("indoors", false, 1.0, 12.0, clear, 0.0, 0.0, 0.0, -1.0, "", true)
+	var inn_night := Ambience.weights("indoors", false, DayNight.NIGHT, 23.0, clear, 0.0, 0.0, 0.0, -1.0, "", true)
+	_check(is_equal_approx(inn["amb.town_day"], Ambience.ROOFED) and inn["amb.town_night"] == 0.0
+			and is_equal_approx(inn_night["amb.town_night"], Ambience.ROOFED) and inn["amb.forest_day"] == 0.0,
+			"inside a town's building: the town through its walls (%.2f by day, %.2f by night), no forest" % [inn["amb.town_day"], inn_night["amb.town_night"]])
+	_check(Ambience.weights("indoors", false, 1.0, 12.0, clear, 0.0)["amb.town_day"] == 0.0
+			and Ambience.weights("dungeon", false, 1.0, 12.0, clear, 0.0, 0.0, 0.0, -1.0, "", true)["amb.town_day"] == 0.0,
+			"inside a building of no town, or under stone: no town")
+	var through := Ambience.new()
+	through._town_muffled = true
+	var muffled_bus := through._town_bus()
+	through._town_muffled = false
+	_check(muffled_bus == "Ambience" + Sfx.MUFFLED_SUFFIX and through._town_bus() == "Ambience",
+			"the chatter and arrival muffled with the town's bed (%s)" % muffled_bus)
+	through.free()
+	# The Mughouse's own terrain names its town, as Ambience reads it.
+	var mughouse := Level.load_level("umbrage_tavern")
+	_check(not mughouse.is_empty() and str(mughouse["terrain"].get("town", "")) == "wilds/store"
+			and str(Level.load_level("wilds")["terrain"].get("town", "")) == "",
+			"the Mughouse's terrain names its town (%s); the wilds' is empty" % [mughouse.get("terrain", {}).get("town", "missing")])
 	# Its takes (the town's night heard: wind in the eaves and timber) run
 	# minutes each, so no loop comes round that a player could count.
 	var night_lengths: Array[float] = []

@@ -12,11 +12,15 @@ extends Node
 ##   rain and storm by the weather (World.fields.weather); under stone the
 ##   dungeon's bed;
 ## - the sky over the listener (World.fields.under_sky): under a roof the
-##   outdoor beds are quieter and muffled (the Ambience bus's low-pass twin);
+##   outdoor beds are quieter and muffled (the Ambience bus's low-pass twin),
+##   and the town's bed, chatter and arrival with them (939); inside a
+##   town's own building the town is heard through its walls the same way;
 ## - rain quietening the birds;
 ## - a town: its day or night bed within TOWN_NEAR cells of a building that
 ##   serves one, fading out by TOWN_FAR; by day its market once on arriving,
-##   its chatter and its far work over the day bed (TOWN_DAY);
+##   its chatter and its far work over the day bed (TOWN_DAY); the forest's
+##   beds down under it as its weight grows (FOREST_IN_TOWN, 939), so the
+##   woods sit past the houses;
 ## - a forest's canopy (decision 466) round the view (Client3D's eased
 ##   cover, the mean of Fields.canopy_at the drawn canopy uses): the deep
 ##   forest's day and night beds taking over from the open forest's as the
@@ -50,8 +54,19 @@ extends Node
 const FADE_SECONDS := 2.0
 ## Weights are worked out this often (s); the loudness eases every frame.
 const WEIGH_EVERY := 0.25
-## Under a roof, outdoor beds at this share of their weight, muffled.
+## Under a roof, outdoor beds at this share of their weight, muffled; so is
+## the town's bed and its chatter (939), and inside a town's own building
+## (an interior level naming its "town": the Mughouse, the smithy) the
+## town is heard at this share through its walls, muffled, not gone.
 const ROOFED := 0.35
+## The woods past the houses (939): the forest's beds at 1 - FOREST_IN_TOWN
+## x the town's weight (Ambience._town_nearness), so at a town's heart they
+## sit 12 dB down under the town's own bed, and rise again as smoothly as
+## the town's weight falls (full by TOWN_NEAR, gone by TOWN_FAR).
+const FOREST_IN_TOWN := 0.75
+const FOREST_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night",
+	"amb.forest_deep_day", "amb.forest_deep_night"]
+const TOWN_BEDS: Array[String] = ["amb.town_day", "amb.town_night"]
 ## How much rain quietens the birds (at full rain).
 const RAIN_HUSH := 0.7
 ## Under a full roof: the share of the open forest's beds the deep forest's
@@ -238,6 +253,9 @@ var floor_played: Array = _town_floor.played
 var murmur_played: Array = _murmur.played
 ## The goers last counted in the room (920), for tests and the ears tour.
 var goers_seen := 0
+## Whether the listener is under a roof or inside a building (939): the
+## town's chatter and its arrival muffled with its bed.
+var _town_muffled := false
 
 
 func _ready() -> void:
@@ -288,7 +306,9 @@ func _weigh() -> void:
 	var lair := str(view._terrain.get("ambience", ""))
 	var town := _town_nearness(cell)
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, town,
-			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0, lair))
+			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0, lair,
+			str(view._terrain.get("town", "")) != ""))
+	_town_muffled = not under_sky
 	goers_seen = goers(_room_bodies())
 	targets[MURMUR] = murmur_weight(goers_seen, zone != "outdoors" and not view.hearth_cells().is_empty())
 	if arrival_step(arrival, zone == "outdoors" and under_sky, town, day_share(DayNight.daylight(steps)), WEIGH_EVERY):
@@ -327,9 +347,11 @@ func _weigh() -> void:
 ## [param canopy] (0..1: its cover round the view) with its [param drip]
 ## (0..1, Weather.drip_at); in a mine (769 amended (4)) [param mine_open]
 ## its openness there (0 a tunnel .. 1 a chamber), else below 0; under
-## level.json's [param lair] "ambience" (795 amended) "cave_lair", its bed.
+## level.json's [param lair] "ambience" (795 amended) "cave_lair", its bed;
+## [param in_town] inside a town's own building (an interior level naming
+## its "town", 939): the town's bed through its walls.
 static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float,
-		canopy := 0.0, drip := 0.0, mine_open := -1.0, lair := "") -> Dictionary:
+		canopy := 0.0, drip := 0.0, mine_open := -1.0, lair := "", in_town := false) -> Dictionary:
 	var out := {}
 	for bed in BEDS:
 		out[bed] = 0.0
@@ -353,9 +375,15 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		out["amb.drips"] = drip
 		out["amb.town_day"] = town * day
 		out["amb.town_night"] = town * (1.0 - day)
+		for bed in FOREST_BEDS:
+			out[bed] = out[bed] * (1.0 - FOREST_IN_TOWN * town)
 		if not under_sky:
-			for bed in OUTDOOR_BEDS:
+			for bed in OUTDOOR_BEDS + TOWN_BEDS:
 				out[bed] = out[bed] * ROOFED
+	elif in_town and zone not in ["cave", "dungeon"] and lair == "" and mine_open < 0.0:
+		var day := day_share(daylight)
+		out["amb.town_day"] = ROOFED * day
+		out["amb.town_night"] = ROOFED * (1.0 - day)
 	elif lair == "cave_lair":
 		out["amb.lair_cave"] = 1.0
 	elif mine_open >= 0.0:
@@ -608,7 +636,14 @@ func _play_cue(delta: float, town_day: float) -> void:
 		_cue.stop()
 		_cue_at = -1.0
 		return
+	_cue.bus = _town_bus()
 	_cue.volume_db = SoundKit.volume_db("amb.town_arrival") + linear_to_db(maxf(share, 0.0001)) + duck_db
+
+
+## The town's chatter and arrival's bus: the Ambience bus's muffled twin
+## under a roof or inside a building, as the town's bed (939).
+func _town_bus() -> String:
+	return "Ambience" + (Sfx.MUFFLED_SUFFIX if _town_muffled else "")
 
 
 ## The chatter [param delta] on under the town's day weight [param town_day]:
@@ -622,6 +657,7 @@ func _play_chatter(delta: float, town_day: float) -> void:
 			_bursts.erase(burst)
 			continue
 		var share := burst_envelope(float(burst["at"]), float(burst["length"])) * town_day
+		player.bus = _town_bus()
 		player.volume_db = SoundKit.volume_db("amb.town_chatter") + linear_to_db(maxf(share, 0.0001)) + duck_db
 	if town_day < SILENT or (_cue_at >= 0.0 and _cue_at < float(TOWN_DAY["chatter_after_s"])):
 		return
@@ -653,7 +689,7 @@ func _play_chatter(delta: float, town_day: float) -> void:
 	if player == null:
 		player = AudioStreamPlayer.new()
 		player.name = "town_chatter_%d" % _chatter.size()
-		player.bus = "Ambience"
+		player.bus = _town_bus()
 		add_child(player)
 		_chatter.append(player)
 	player.stream = stream
@@ -668,6 +704,7 @@ func _play_chatter(delta: float, town_day: float) -> void:
 ## stretch of the deck at a time, the next begun "floor_fade_s" before the
 ## last ends and cross-faded over it; nothing when silent.
 func _play_floor(delta: float, level: float) -> void:
+	_town_floor.bus = _town_bus()
 	_town_floor.step(self, delta, level, duck_db)
 
 
@@ -678,9 +715,11 @@ func _play_floor(delta: float, level: float) -> void:
 ## at the slot's volume; nothing when silent. Its two players, the stretch
 ## each plays ({take, start, length, at}, empty for none), the one in front,
 ## its deck and the take last dealt; every stretch begun in [member played]
-## ([take path, start, length]).
+## ([take path, start, length]); its players on [member bus] (the town's
+## floor under a roof on the Ambience bus's muffled twin, 939).
 class Strand:
 	var slot: String
+	var bus := "Ambience"
 	var span: Vector2
 	var fade: float
 	var label: String
@@ -725,7 +764,7 @@ class Strand:
 			while players.size() < 2:
 				var made := AudioStreamPlayer.new()
 				made.name = "%s_%d" % [label, players.size()]
-				made.bus = "Ambience"
+				made.bus = bus
 				owner.add_child(made)
 				players.append(made)
 			var player := players[front]
@@ -744,6 +783,7 @@ class Strand:
 				pieces[side] = {}
 				continue
 			var share := clampf(minf(at, float(piece["length"]) - at) / fade, 0.0, 1.0)
+			player.bus = bus
 			player.volume_db = SoundKit.volume_db(slot) + linear_to_db(maxf(share * level, 0.0001)) + duck
 
 
@@ -1248,7 +1288,7 @@ func _set_level(bed: String, level: float) -> void:
 		player.stream = stream
 		add_child(player)
 		players[bed] = player
-	var roofed := bed in OUTDOOR_BEDS and view != null and view.sfx.listener != null and World.fields != null \
+	var roofed := (bed in OUTDOOR_BEDS or bed in TOWN_BEDS) and view != null and view.sfx.listener != null and World.fields != null \
 			and not World.fields.under_sky(view.sfx.listener)
 	player.bus = "Ambience" + (Sfx.MUFFLED_SUFFIX if roofed else "")
 	player.volume_db = SoundKit.volume_db(bed) + linear_to_db(level) + duck_db

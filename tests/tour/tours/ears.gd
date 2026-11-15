@@ -46,6 +46,23 @@ const WORK_WORDS: Array[String] = ["chop", "saw", "hammer", "hoe"]
 ## The work leg: how long to wait for a worker, and the stands' distances.
 const WORK_WAIT := 240.0
 const WORK_STANDS: Array[int] = [2, 6, 20]
+## The town leg (EARS_ONLY=town, 939: the woods past the houses, the town
+## through a roof): by the console's move, noon and 23:00, stood TOWN_STAND
+## seconds each at the square, the east street, the temple's side, the west
+## huts, a cell on the town's edge (its weight near a half), one well
+## outside every town's reach, inside a hut (rect (210, 204)), inside a
+## house (building.house, rect (214, 194)) and in the Mughouse's common
+## room; first a wait out of the arrival. At noon, last, a walk from the
+## square out past the last buildings to that cell outside, logged as it
+## goes (the forest rising as the town falls behind). For about a second
+## after each console move the Ambience bus's muffled twin can show (both
+## before and after 939): the move's, not the place's; a walk meets none.
+const TOWN_CELLS: Array[Vector2i] = [Vector2i(194, 211), Vector2i(210, 203), Vector2i(219, 195), Vector2i(196, 190)]
+const IN_HUT := Vector2i(212, 205)
+const IN_HOUSE := Vector2i(215, 196)
+const IN_MUGHOUSE := Vector2i(6, 8)
+const TOWN_STAND := 20.0
+const ARRIVAL_WAIT := 40.0
 ## The Mughouse's floor (920): beside the fire, a hearth sit's cell, the
 ## room's middle, a far table's seat, the counter's guest side.
 const HEARTH_STANDS: Array[Vector2i] = [Vector2i(1, 6), Vector2i(2, 8), Vector2i(6, 8), Vector2i(10, 11), Vector2i(9, 4)]
@@ -115,6 +132,10 @@ func run(bot: Node) -> void:
 		await _hearth_leg()
 		_end()
 		return
+	if OS.get_environment("EARS_ONLY") == "town":
+		await _town_leg()
+		_end()
+		return
 	await bot.admin("stock wilds/store wood 30")
 	await bot.admin("hour %d" % DAY)
 	_mark("hour %d" % DAY)
@@ -170,6 +191,55 @@ func _hearth_leg() -> void:
 		await _bot.seconds(1.0)
 		_mark("outside the Mughouse %s" % [_bot.cell()])
 		await _bot.seconds(STAND)
+
+
+## 939's read: each stand marked with its cell, its town weight and its sky.
+func _town_leg() -> void:
+	var ambience: Ambience = _bot.main._client3d.ambience
+	await _bot.admin("hour %d" % DAY)
+	_mark("waiting out the arrival %d s" % ARRIVAL_WAIT)
+	await _bot.seconds(ARRIVAL_WAIT)
+	var edge := Vector2i(-1, -1)
+	var away := Vector2i(-1, -1)
+	for r in range(1, AWAY_LOOK):
+		for cell: Vector2i in _ring(SQUARE, r):
+			if not World.is_walkable(cell) or not World.fields.under_sky(cell):
+				continue
+			if edge.x < 0 and absf(ambience._town_nearness(cell) - 0.5) <= 0.05:
+				edge = cell
+			if away.x < 0 and r > int(Ambience.TOWN_FAR) and _clear_of_towns(ambience, cell):
+				away = cell
+		if away.x >= 0:
+			break
+	var stands: Array[Vector2i] = TOWN_CELLS.duplicate()
+	stands.append_array([edge, away, IN_HUT, IN_HOUSE])
+	for hour: int in [DAY, NIGHT]:
+		await _bot.admin("hour %d" % hour)
+		_mark("hour %d" % hour)
+		for spot: Vector2i in stands:
+			if spot.x < 0:
+				_mark("no cell found for a stand")
+				continue
+			await _bot.admin("move Tourbot %d %d wilds" % [spot.x, spot.y])
+			await _bot.seconds(1.0)
+			_mark("stand %s at %s, town %.2f, under the sky %s" % [spot, _bot.cell(), ambience._town_nearness(_bot.cell()),
+					World.fields.under_sky(_bot.cell())])
+			await _bot.seconds(TOWN_STAND)
+		await _bot.admin("zone move Tourbot umbrage_tavern")
+		await _bot.until(func() -> bool: return _bot.zone() == "umbrage_tavern", 30.0)
+		await _bot.admin("move Tourbot %d %d umbrage_tavern" % [IN_MUGHOUSE.x, IN_MUGHOUSE.y])
+		await _bot.seconds(4.0)
+		_mark("stand in the Mughouse at %s" % [_bot.cell()])
+		await _bot.seconds(TOWN_STAND)
+		await _bot.admin("zone move Tourbot wilds")
+		await _bot.until(func() -> bool: return _bot.zone() == "wilds", 30.0)
+		if hour == DAY and away.x >= 0:
+			await _bot.admin("move Tourbot %d %d wilds" % [SQUARE.x, SQUARE.y])
+			await _bot.seconds(4.0)
+			_mark("walk out from %s to %s" % [_bot.cell(), away])
+			await _bot.walk_to(away, 1, 120.0)
+			_mark("walked out to %s, town %.2f" % [_bot.cell(), ambience._town_nearness(_bot.cell())])
+			await _bot.seconds(5.0)
 
 
 func _walk(spots: Array) -> void:

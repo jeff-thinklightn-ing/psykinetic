@@ -1124,9 +1124,11 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 ## points, its foot the cell behind. As level "town" ("" for none),
 ## "storeys" ([] for none) and "beds" ([{cells: [head, foot], head, prop}],
 ## as Level.beds_in's); a bed off the floor is said in [param warnings]
-## and left out.
+## and left out. Its terrain carries the town too (939: Ambience hears the
+## town through a town's own walls).
 static func _interior_from(level: Dictionary, config: Dictionary, warnings: Array[String]) -> void:
 	level["town"] = str(config.get("town", ""))
+	level["terrain"]["town"] = level["town"]
 	var storeys: Array[String] = []
 	var listed: Variant = config.get("storeys", [])
 	for each: Variant in listed if listed is Array else []:

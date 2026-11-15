@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: at Umbrage's square the town's own sound leads, with the woods behind the houses, and the forest rises as you walk out past the last buildings; inside a hut, a house or the Mughouse the street is heard faint and dulled through the walls, and in the Mughouse it sits under the hearth (939).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Builder mode: the answer panel shows the start of Claude's answer, with Tab for more, and opens at the left when a window is open at the right or your companion stands there (885 amended (1)).
