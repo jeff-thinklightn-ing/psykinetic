@@ -22016,6 +22016,19 @@ const FOOT_MARK_SUN := Vector2(0.0, 12.0)  # the sun's height (degrees): none ..
 const FOOT_MARK_LIFT := 0.03
 const FOOT_MARK_MOST := 64  # the shader's arrays
 const FOOT_MARK_SINK := 0.3  # a sinking corpse's mark gone by this far under
+## The contact mark (the coordinator's second candidate, 11-14; past 534 and
+## Jeff's 10-22 shadow strength, so labelled): tight to the soles, some
+## 0.12 m past the boots all round, its core about 0.55 of the lit ground
+## (foot_mark_depth 0.4 .. 0.5 in this mode), soft to nothing at its rim; the
+## darker of it and the sun's shadow, never their product; a third under a
+## roof's or a tree's shade (found by a ray toward the sun through the
+## occluders, _foot_mark_covered) and a third again as cloud closes in.
+const FOOT_MARK_CONTACT := Vector2(0.52, 0.56)  # a person's soles (about 0.28 x 0.32) and 0.12 round
+const FOOT_MARK_CONTACT_FIT := 1.0  # a creature's: its rest box at the ground
+const FOOT_MARK_CONTACT_FLAT := 0.4
+const FOOT_MARK_CONTACT_DEPTH := 0.45
+const FOOT_MARK_SHADOW_DROP := 0.2  # the sun's full shadow on lit ground reads about 0.8 (dating.md)
+const FOOT_MARK_COVER_FRAMES := 15  # a mark's cover asked again this often while it stands
 ## Its colour multiplies the frame: 1 - k(shaded + (1 - shaded) * sun * the
 ## sun's reach), k the oval's strength there: emission 1 - k, and the sun's
 ## light (no ambient) giving back k (1 - shaded)(1 - sun * reach). Marks that
@@ -22027,18 +22040,22 @@ render_mode blend_mul, depth_draw_never, cull_back, ambient_light_disabled, spec
 uniform float shaded = 0.3333;
 uniform float sun = 1.0;
 uniform int count = 0;
-const float FLAT = 0.35;  // full strength out to this share of its radius, gone at its rim
+uniform float flat_share = 0.35;  // full strength out to this share of its radius, gone at its rim
+uniform bool contact = false;  // the darker of the mark and the sun's shadow, never their product
+uniform float shadow_drop = 0.2;  // the sun's full shadow on lit ground (it reads about 0.8)
 uniform vec4 mark_at[64];
 uniform vec4 mark_size[64];
 varying vec3 world;
 varying flat int self_id;
+varying float mark_k;
+varying float mark_covered;
 float mark(int i, vec2 p) {
 	vec4 at = mark_at[i];
 	vec4 size = mark_size[i];
 	vec2 d = p - at.xy;
 	float u = dot(d, at.zw) / max(size.x, 0.01);
 	float v = dot(d, vec2(-at.w, at.z)) / max(size.y, 0.01);
-	float m = 1.0 - smoothstep(FLAT, 1.0, sqrt(u * u + v * v));
+	float m = 1.0 - smoothstep(flat_share, 1.0, sqrt(u * u + v * v));
 	return size.z * m;
 }
 void vertex() {
@@ -22063,14 +22080,29 @@ void fragment() {
 	if (k <= 0.0) {
 		discard;
 	}
-	ALBEDO = vec3(k);
-	EMISSION = vec3(1.0 - k);
+	mark_k = k;
+	mark_covered = mark_size[self_id].w;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
+	if (contact) {
+		ALBEDO = vec3(1.0);
+		EMISSION = vec3(0.0);
+	} else {
+		ALBEDO = vec3(k);
+		EMISSION = vec3(1.0 - k);
+	}
 }
 void light() {
 	if (LIGHT_IS_DIRECTIONAL) {
-		DIFFUSE_LIGHT += vec3((1.0 - shaded) * (1.0 - sun * ATTENUATION));
+		if (contact) {
+			// Under a roof's or a tree's shade (covered): its k already cut on the CPU, laid on as a
+			// plain multiply. In the open: the darker of the mark and the sun's shadow here.
+			float lit_share = 1.0 - shadow_drop * sun * (1.0 - ATTENUATION);
+			float keep = mark_covered > 0.5 ? 1.0 - mark_k : min(1.0, (1.0 - mark_k) / max(lit_share, 0.01));
+			DIFFUSE_LIGHT += vec3(keep);
+		} else {
+			DIFFUSE_LIGHT += vec3((1.0 - shaded) * (1.0 - sun * ATTENUATION));
+		}
 	}
 }
 """
@@ -22078,6 +22110,8 @@ void light() {
 ## (0.45 = the stall's shade, about 0.76).
 static var foot_marks_on := true
 static var foot_mark_depth := FOOT_MARK_DEPTH
+## The contact mark instead of v2's (its depth then 0.4 .. 0.5).
+static var foot_mark_contact := false
 var _foot_marks: MultiMeshInstance3D
 ## By puppet id: its drawn "body", the "mesh" whose cast and transparency it
 ## follows, its "size" (along, across), "height", and its "cell" and whether
@@ -22119,6 +22153,8 @@ func _place_foot_marks() -> void:
 	for id: int in _foot_mark_bodies.keys():
 		if not _puppets.has(id) or not is_instance_valid(_foot_mark_bodies[id]["body"]):
 			_foot_mark_bodies.erase(id)
+	var cloud := float(_weather_view.weather.get("cloud", 0.0)) if _weather_view != null else 0.0
+	var sun_share := 1.0 - clampf(cloud, 0.0, 1.0)
 	var shown := 0
 	var marks_at: Array[Vector4] = []
 	var marks_size: Array[Vector4] = []
@@ -22152,21 +22188,29 @@ func _place_foot_marks() -> void:
 			# A fallen player's body sinks after it lies (911): the mark goes with it.
 			var sunk := float(body["rest_y"]) - puppet.global_position.y
 			strength *= clampf(1.0 - sunk / FOOT_MARK_SINK, 0.0, 1.0)
+		var covered := 0.0
+		if foot_mark_contact:
+			if _foot_mark_covered(body, puppet.global_position):
+				covered = 1.0
+				strength *= FOOT_MARK_SHADED
+			strength *= lerpf(FOOT_MARK_SHADED, 1.0, sun_share)
 		if strength <= 0.0:
 			continue
 		var place := _foot_mark_at(puppet, body)
 		multimesh.set_instance_transform(shown, place)
 		var along := place.basis.x
 		marks_at[shown] = Vector4(place.origin.x, place.origin.z, along.normalized().x, along.normalized().z)
-		marks_size[shown] = Vector4(along.length() * 0.5, place.basis.z.length() * 0.5, strength, 0.0)
+		marks_size[shown] = Vector4(along.length() * 0.5, place.basis.z.length() * 0.5, strength, covered)
 		shown += 1
 	multimesh.visible_instance_count = shown
 	var material := _foot_marks.material_override as ShaderMaterial
 	material.set_shader_parameter("count", shown)
 	material.set_shader_parameter("mark_at", marks_at)
 	material.set_shader_parameter("mark_size", marks_size)
-	var cloud := float(_weather_view.weather.get("cloud", 0.0)) if _weather_view != null else 0.0
-	material.set_shader_parameter("sun", 1.0 - clampf(cloud, 0.0, 1.0))
+	material.set_shader_parameter("sun", sun_share)
+	material.set_shader_parameter("contact", foot_mark_contact)
+	material.set_shader_parameter("flat_share", FOOT_MARK_CONTACT_FLAT if foot_mark_contact else 0.35)
+	material.set_shader_parameter("shadow_drop", FOOT_MARK_SHADOW_DROP)
 
 
 ## [param puppet]'s mark data (_foot_mark_bodies), made the first frame it
@@ -22193,7 +22237,9 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 	if own != null:
 		meshes.erase(own)
 		meshes.push_front(own)
-	var size: Vector2 = FOOT_MARK_PERSON * float(puppet.get_meta("model_scale", 1.0))
+	var scale := float(puppet.get_meta("model_scale", 1.0))
+	var size: Vector2 = FOOT_MARK_PERSON * scale
+	var contact: Vector2 = FOOT_MARK_CONTACT * scale
 	if not person:
 		var into := drawn.global_transform.affine_inverse()
 		var box := AABB()
@@ -22206,10 +22252,45 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 			box = part if first else box.merge(part)
 			first = false
 		size = Vector2(maxf(box.size.x * FOOT_MARK_FIT, FOOT_MARK_LEAST), maxf(box.size.z * FOOT_MARK_FIT, FOOT_MARK_LEAST))
-	var body := {"body": drawn, "mesh": meshes[0], "size": size, "height": float(puppet.get_meta("pick_height", 1.6)),
-			"cell": Vector2i(1 << 30, 0), "inside": false, "rest_y": puppet.global_position.y}
+		contact = Vector2(maxf(box.size.x * FOOT_MARK_CONTACT_FIT, FOOT_MARK_LEAST), maxf(box.size.z * FOOT_MARK_CONTACT_FIT, FOOT_MARK_LEAST))
+	var body := {"body": drawn, "mesh": meshes[0], "size": size, "contact": contact, "height": float(puppet.get_meta("pick_height", 1.6)),
+			"cell": Vector2i(1 << 30, 0), "inside": false, "rest_y": puppet.global_position.y, "covered": false, "cover_at": -FOOT_MARK_COVER_FRAMES}
 	_foot_mark_bodies[id] = body
 	return body
+
+
+## Whether a roof, a wall, a tree or a tall piece stands between [param foot]
+## (half a metre up) and the sun: the contact mark keeps a third there. Asked
+## when its cell changes and every FOOT_MARK_COVER_FRAMES; the occluders'
+## boxes (a tree's crown is its box), the fade's index (_index_occluders).
+func _foot_mark_covered(body: Dictionary, foot: Vector3) -> bool:
+	var frame := Engine.get_process_frames()
+	if body["cell"] == body.get("cover_cell", Vector2i(1 << 30, 0)) and frame - int(body["cover_at"]) < FOOT_MARK_COVER_FRAMES:
+		return body["covered"]
+	body["cover_cell"] = body["cell"]
+	body["cover_at"] = frame
+	body["covered"] = false
+	if _sun == null or not _occluders_built:
+		return false
+	var toward := _sun.global_transform.basis.z.normalized()
+	if toward.y <= 0.01:
+		return false
+	var point := foot + Vector3.UP * 0.5
+	var end := point + toward * (maxf(_occluder_top - point.y, 0.0) / toward.y)
+	var low := Vector2i(floori(minf(point.x, end.x) / FADE_CHUNK), floori(minf(point.z, end.z) / FADE_CHUNK))
+	var high := Vector2i(floori(maxf(point.x, end.x) / FADE_CHUNK), floori(maxf(point.z, end.z) / FADE_CHUNK))
+	for x in range(low.x, high.x + 1):
+		for z in range(low.y, high.y + 1):
+			for index: int in _occluder_chunks.get(Vector2i(x, z), []):
+				var entry := _occluders[index]
+				if not is_instance_valid(entry[0]) or not (entry[0] as Node3D).is_visible_in_tree():
+					continue
+				var bounds: AABB = entry[1]
+				if bounds.intersects_segment(point, end) != null \
+						and (not (entry[3] as Array).is_empty() or shapes_meet(entry[4], point, end)):
+					body["covered"] = true
+					return true
+	return false
 
 
 ## The mark's place: at the foot point, long along the body's facing (its
@@ -22218,7 +22299,7 @@ func _foot_mark_body(id: int, puppet: Node3D) -> Dictionary:
 func _foot_mark_at(puppet: Node3D, body: Dictionary) -> Transform3D:
 	var drawn: Node3D = body["body"]
 	var basis := drawn.global_basis.orthonormalized()
-	var size: Vector2 = body["size"]
+	var size: Vector2 = body["contact"] if foot_mark_contact else body["size"]
 	var origin := puppet.global_position + Vector3.UP * FOOT_MARK_LIFT
 	var lean := Vector2(basis.y.x, basis.y.z)
 	var way := Vector2(basis.x.x, basis.x.z)
