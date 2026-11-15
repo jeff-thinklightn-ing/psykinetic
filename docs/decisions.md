@@ -54468,6 +54468,25 @@ stays. At most one move a bout (20 to 40 s of work, 5 to 15 s of rest). resident
 guest's end; stays at a guest's or with none. Server only; protocol unchanged; no new class_name; package
 "Umbrage at night", which lands off as 875 does.
 
+875 amended (4) (label from tools/decision_number.sh; the coordinator's approval, 11-14, on maps' ten-minute probe of the Mughouse take 41efa30ef with Rolf on): a lodger is an inn-goer through his sleep spell, and at night the lodgers take the spots first.
+- **The fault.** _inn_goers left a lodger out whenever his day said HOME (`doing != HOME` in its night rule), so his sleep spell put him back in the town.
+  - Maps' probe found Rolf gone 02:00 to 02:40, walking out at 02:50, past his stall awake at 03:00, and asleep 03:10 to 05:00 at (169,215), open ground about 10 cells south of the Mughouse.
+  - (169,215) is 751's roofless bedroll (npc's side (2)). Main._bed_down_roofless gives _sleep_spot (by the town's fire, else along the inn's wall away from the square, else by the store) to anyone wanted with no "bed". Rolf's places (_visitor_places of his stall) carry none, nor do a visitor's. It was never his "home".
+- **Now.**
+  - (1) A lodger (the stall's keeper, or a visitor who is no pilgrim and not on her way out: Main._inn_lodger) outside INN_TRADERS_DAY is a goer whenever the inn is up, in his sleep spell too.
+  - (2) At night the lodgers take the spots before the town's own. A lodger has nowhere else to be; a resident has his own house. A resident left without a seat does what the code did for him before: the lit fire's seats, else his stroll with short stands. By day the order is as before: the town's own by id, then the lodgers.
+  - (3) Every inn entry carries "bed": Rect2i(): on the floor, walking in at the town's door, walking out at the floor's door. So a lodger in the inn sits up at the seats through the night (the floor's spots stand for "home" too) and is never given a bedroll in either zone.
+  - (4) A lodger past the spots at night (_inn_town_side) gets the same no-bed and short stands, and the lit fire's seats if his places carry any. Rolf's and a visitor's carry none today, so he stays up at his stand. He never lies down in the open.
+- **What a full night is** (for ui-design's night look). The Mughouse take lays 15 spots that _inn_spots("wilds/store") returns: 7 "inn" (2 stands at the counter, 5 sits round the hearth) and 8 "talk" (four table pairs). Umbrage's lodgers are at most 3 (Rolf and visitors.most 2). On a full night they take 3 of the 15, and at most 3 of the town's own who would have had a seat keep to the fire's seats outside, else stroll. A lodger past the spots cannot happen at Umbrage.
+- **Tests.** resident_test _test_inn_night (its order row now: the town's own first by day, the lodgers first at night; a lodger at night is in, asleep too) and _test_lodger_sleep:
+  - at 04 with the inn up, Rolf and a pedlar are goers; on the floor Rolf has no bed and the seats for his sleep;
+  - every ten game minutes 18:00 to 06:00 through the town's sync, Rolf and the pedlar are outdoors only on the walk in, never standing or asleep in the open, never with a bedroll;
+  - a pilgrim and one leaving are no lodgers and their places are untouched;
+  - by day the traders keep their stands;
+  - with the town's own filling the floor's 3 spots, Rolf has his seat and the last of them keeps to the fire's seats or strolls;
+  - one spot and three lodgers at 22:00: Rolf in, the pedlar and the traveller up at their stands with no bedroll.
+- Server only; protocol unchanged; no new class_name; no bullet. Package "Umbrage at night", which lands off as 875 does.
+
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...
