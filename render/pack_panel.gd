@@ -639,7 +639,33 @@ func _process(_delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	if _signature() != _signature_shown:
 		_refresh()
+	_keep_clear()
 	UiCost.add("pack", Time.get_ticks_usec() - began)
+
+
+## The top of the screen's right-hand column in [param screen]'s units: the corner map and the World map button under it
+## (Minimap's place, at its scale). A window reaching above its foot meets it.
+static func corner_column(screen: Rect2) -> Rect2:
+	var k := maxf(1.0, screen.size.y / Minimap.BASE_HEIGHT)
+	var left := screen.end.x - (Minimap.CORNER_MARGIN + Minimap.CORNER_SIZE) * k
+	var foot := screen.position.y + (Minimap.CORNER_TOP + Minimap.CORNER_SIZE + 6.0 + Minimap.WORLD_ROW) * k
+	return Rect2(left, screen.position.y, screen.end.x - left, foot - screen.position.y)
+
+
+## The window stands clear of the corner map (the coordinator, 11-15: the chest's 48 put "Your chest" and its Deposit
+## under the map, look_rolf_03f991be1): kept at the bottom-right margin while its top stays below the column's foot,
+## else moved left until its right edge is a margin short of the column, its foot where it was.
+func _keep_clear() -> void:
+	var screen := get_viewport_rect()
+	var margin := float(UiTheme.constant("margin"))
+	var column := corner_column(screen)
+	var least := get_combined_minimum_size()
+	var right := -margin
+	if screen.end.y - margin - maxf(size.y, least.y) < column.end.y + margin:
+		right = -(screen.end.x - column.position.x + margin)
+	if not is_equal_approx(offset_right, right):
+		offset_right = right
+		offset_left = right - least.x
 
 
 func _icon_arrived(_id: String) -> void:

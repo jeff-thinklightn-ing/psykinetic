@@ -2132,6 +2132,40 @@ func _test_inventory_panel() -> void:
 			"your chest: %d boxes, 12 a line, titled \"Your chest\", Deposit unequipped shown" % chest_boxes.size())
 	_check(chest_boxes.all(func(box: PackPanel.SlotBox) -> bool: return not box.empty_shown()),
 		"no empty square of your chest pictures a hat or a sword (their slot numbers only match the worn squares')")
+	# The chest's window clear of the corner map (ui-design, 11-15: look_rolf_03f991be1 had "Your chest" and its Deposit under
+	# the map at 1600 x 900). A 1600 x 900 window, as 1920 x 1080 and 4K, lays the HUD out on 3840 x 2160 (canvas_items,
+	# expand), so 2160 lines is its layout, and the only one the game draws. The chest opened and placed in the same frame
+	# (a frame's refresh drops a test chest beside nobody), its rect meets neither the corner column nor the World map
+	# button, its foot keeps the bottom margin, and it is on the screen; the plain pack after it is back at the margin.
+	var win := get_window()
+	var scale_was := [win.content_scale_mode, win.content_scale_aspect, win.content_scale_size]
+	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	var margin := float(UiTheme.constant("margin"))
+	for lines: int in [2160]:
+		win.content_scale_size = Vector2i(int(round(lines * 16.0 / 9.0)), lines)
+		for i in 2:
+			await get_tree().process_frame
+		var screen := pack.get_viewport_rect()
+		pack.open(locker)
+		pack.reset_size()
+		pack._keep_clear()
+		var least := pack.get_combined_minimum_size()
+		var rect := Rect2(Vector2(screen.end.x + pack.offset_right - least.x, screen.end.y - margin - least.y), least)
+		var column := PackPanel.corner_column(screen)
+		var button: Rect2 = _main.minimap.world_button.get_global_rect() if _main.minimap != null and _main.minimap.world_button != null else Rect2()
+		_check(int(screen.size.y) == lines and PackPanel.layout_of(pack.other) == "locker" and not rect.intersects(column) and not rect.intersects(button)
+				and screen.encloses(rect) and least.y > screen.size.y - column.end.y - 2.0 * margin,
+				"at %d lines your chest's window %s, as tall as it reaches the corner map's foot, stands clear of the column %s and the World map button %s, on the screen" % [lines, rect, column, button])
+		pack.open(null)
+		pack.reset_size()
+		pack._keep_clear()
+		_check(is_equal_approx(pack.offset_right, -margin), "at %d lines the plain pack back at the bottom-right margin (%s)" % [lines, pack.offset_right])
+	win.content_scale_mode = scale_was[0]
+	win.content_scale_aspect = scale_was[1]
+	win.content_scale_size = scale_was[2]
+	for i in 2:
+		await get_tree().process_frame
 	var carrier := Chest.new()  # A companion's row is a carrier's (Items.CARRIED slots), as here.
 	carrier.name = "TestCarrier"
 	carrier.slots = Items.tidy([], Items.CARRIED)

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Towns: your chest at Rolf's stall opens clear of the corner map, its top row and "Deposit unequipped" in full view (862 amended (1)).
 - Huts' roofs are closed at the gable ends, and their thatch reads as straw (watched joined at the nearest zoom, 8 m, and at 15 m).
 
 - A trader's window now shuts when they are gone from view, instead of staying open on someone who has left (765 amended (3)).
