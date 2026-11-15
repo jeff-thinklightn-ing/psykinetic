@@ -7824,6 +7824,23 @@ func _test_keeper_counter_sight(player: Player, rolf: Resident) -> void:
 	_check(_main.keeper_sees(far, rolf.tile, rolf.zone), "his counter is no bar: he is seen over it")
 	var locker: Locker = _main.keeper_locker(player, rolf)
 	_check(locker != null, "served across his counter: the locker comes out")
+	# His ware offer accepted across the counter: _accept_offer gates on the distance alone, so the buy is served from the far
+	# cell where World's sight to him is blocked (Jeff's "rolf locker doesn't work"; ui-design's joined check of both stands).
+	var wares: Array = Offers.of(rolf.worker_id, player.player_id).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.VENDOR_WARES and int(o["cost"]) > 0)
+	if wares.is_empty():
+		print("  (no priced ware of his here: the buy across his counter unchecked)")
+	else:
+		var ware := str((wares[0] as Dictionary)["what"].get("item", ""))
+		var price := int((wares[0] as Dictionary)["cost"])
+		for slot in player.slots.size():
+			if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
+				World.items.place(World._take_out(player, slot), "the test")  # Room in the hands for what he sells.
+		World.economy.add_gold(player.player_id, 50, "the test")
+		var gold_was: int = World.economy.gold(player.player_id)
+		_check(not player.slots.has(ware), "(he holds no %s yet, so the ware in hand below is the buy's)" % ware)
+		_main._accept_offer(player, str((wares[0] as Dictionary)["id"]), 0)
+		_check(World.economy.gold(player.player_id) == gold_was - price and player.slots.has(ware),
+			"his %s bought from across the counter: the price paid, the ware in hand (gold %d to %d, price %d)" % [ware, gold_was, World.economy.gold(player.player_id), price])
 	# 807 amended (9): with his own side shut (nothing beside him within the player's hand), his chest goes down in front of the
 	# counter beside the player, within his serving reach, never refused "no room".
 	var shut: Array[Chest] = []
