@@ -114,17 +114,12 @@ func _say(body: Resident, what: String, label: String) -> void:
 	_check(false, label)
 
 
-## The square's fire's seats each with a seat under it (853 amended (18): Main sits nobody where no seat decor is,
-## Main.seat_cells_of): the level's own (maps' logs, once in) and, for this run, every seat of the square's fire. Set
-## before Main boots: a body's spots are read as it is made.
+## The square's fire's seats (853 amended (18): Main sits nobody where no seat decor is, Main.seat_cells_of): the
+## level's own, maps' four log seats on the pit's diagonals (774 amended (5)), nothing added for the run. Set before
+## Main boots: a body's spots are read as it is made.
 static func _seat_the_fire(main: Node) -> void:
 	var loaded := Level.load_level("wilds")
-	var cells: Dictionary = Main.seat_cells_of(loaded.get("terrain", {}).get("decor", []), Level.DECOR_KINDS)
-	for fire: Dictionary in Level.fires_of(loaded):
-		if str(fire.get("id", "")) == "square_fire":
-			for seat: Vector2i in fire["seats"]:
-				cells[seat] = true
-	main._seat_decor["wilds"] = cells
+	main._seat_decor["wilds"] = Main.seat_cells_of(loaded.get("terrain", {}).get("decor", []), Level.DECOR_KINDS)
 
 
 func _check(ok: bool, label: String) -> void:

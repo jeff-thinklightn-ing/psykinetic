@@ -4788,8 +4788,36 @@ func _test_town_places(wilds: Dictionary) -> void:
 		"the inn a shell: its inside umbrage_tavern, no beds nor tavern in the wilds (%s)" % [Level.tavern_of(wilds).keys()])
 	var fires := Level.fires_of(wilds)
 	_check(fires.size() == 1 and fires[0]["id"] == "square_fire" and fires[0]["cell"] == Vector2i(194, 211) and fires[0]["town"] == "wilds/store"
-		and (wilds["terrain"]["fire"] as Array).has(Vector2i(194, 211)) and fires[0]["seats"].size() == 8
-		and (fires[0]["seats"] as Array).all(func(cell: Vector2i) -> bool: return floor.has(cell)), "the square's fire: a fire cell, eight seats on floor round it")
+		and (wilds["terrain"]["fire"] as Array).has(Vector2i(194, 211)) and fires[0]["seats"].size() == 4
+		and (fires[0]["seats"] as Array).all(func(cell: Vector2i) -> bool: return floor.has(cell)), "the square's fire: a fire cell, four seats on floor round it")
+	# 774 amended (5): its seats the pit's four diagonals, each on a log seat (a "seat" decor kind) turned to the pit,
+	# none on a flame cell, nothing solid there, and the pit's straight neighbours open (the way round the fire).
+	var pit := Vector2i(194, 211)
+	var flames := {}
+	for cell: Vector2i in wilds["terrain"]["fire"]:
+		flames[cell] = true
+	var seated := {}
+	for piece: Dictionary in wilds["terrain"]["decor"]:
+		if bool((Level.DECOR_KINDS.get(str(piece["kind"]), {}) as Dictionary).get("seat", false)):
+			seated[piece["cell"]] = piece
+	var seat_bad: Array[String] = []
+	for cell: Vector2i in fires[0]["seats"]:
+		var off: Vector2i = cell - pit
+		if absi(off.x) != 1 or absi(off.y) != 1:
+			seat_bad.append("%s not a diagonal" % [cell])
+		if not seated.has(cell) or seated[cell]["kind"] != "log_seat" or seated[cell]["out"] != -off:
+			seat_bad.append("%s no log seat turned to the pit (%s)" % [cell, seated.get(cell, {})])
+		if flames.has(cell) or wilds["terrain"]["solid"].has(cell):
+			seat_bad.append("%s on a flame or solid" % [cell])
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var side: Vector2i = pit + way
+		if not floor.has(side) or wilds["terrain"]["solid"].has(side) or seated.has(side) or (fires[0]["seats"] as Array).has(side):
+			seat_bad.append("the pit's side %s not open" % [side])
+	_check(seat_bad.is_empty(), "the square's fire seats: the pit's four diagonals, each on a log seat turned to the fire, none on a flame or solid, its four sides open (%s)" % [seat_bad])
+	var turned: Array[String] = []
+	var laid := Level.decor_from({"decor": [[193, 210, 1, 1, "stool", 1], [193, 210, 1, 1, "log_seat", 1], [195, 210, -1, 1, "log_seat", 2]]}, wilds["terrain"], turned)
+	_check(laid.size() == 2 and laid.all(func(piece: Dictionary) -> bool: return piece["kind"] == "log_seat") and turned.size() == 1,
+		"a diagonal step: refused for a kind without \"diagonal\" (the stool), kept for the log seat (%s; %s)" % [laid.map(func(piece: Dictionary) -> String: return "%s %s" % [piece["kind"], piece["out"]]), turned])
 	_check(wilds["places"]["store"].get("lamp") == Vector2i(191, 194) and floor.has(Vector2i(191, 194)), "the store's lamp, on floor")
 	var warnings: Array[String] = []
 	var odd := Level.places_from({"places": {"a": {"at": [1, 1], "kind": "post", "rect": [1, 1, 0, 3], "brazier": "x", "seats": [[1, 1], 2]}}}, warnings)

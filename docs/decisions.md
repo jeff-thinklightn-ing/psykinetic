@@ -49390,6 +49390,21 @@ places: fire seats 370.9; 0 path searches": Main._seat_cells reads the zone's wh
 _test_slow_tick_line: residents at 600 ms gives the breakdown by trade and cell, at 499 ms none; a search while watched
 is counted for the tick and the body, none after; the costliest of three bodies is kept. Server only; protocol
 unchanged; no class_name; no bullet.
+774 amended (5): the square fire's seats on logs at the pit's diagonals (2026-11-15, maps; the coordinator's approval
+after economy's joined stills of its fire seats: the sitters sat a chair's sit on air, nothing under a seat, and at two
+cells out the evening sitter was outside the fire's light; package "the square's fire seats", one with economy's
+853 amended (18); label from tools/decision_number.sh). square_fire's "seats" become the pit (194,211)'s four
+diagonals, (193,210), (195,210), (193,212), (195,212), in place of the eight two cells out; each has art-kit's
+prop.log_seat under it (777's roadside camp log, long along x, its flat face up at 0.45 for animation's sit), a new
+decor kind "log_seat" (flat, faced, a seat for builder's seat reading, 875 maps' side). Its long side lies square to
+the line to the pit, its front turned to the fire: a DECOR_KINDS row may now carry "diagonal", and Level.decor_from
+then takes a diagonal step for that flat faced kind as well as a side (the client already turns a flat faced piece
+by atan2 of its step, so it draws at 45 degrees). Decor is never solid, so a log closes no way: the walk round the
+fire, a cart's and a resident's route are as before, and the pit's four sides stay open. Nobody sat at the old seats
+on main (Level.fires_of read them for tests only), so this lands before economy's take or with it, never after.
+level_test: four seats, each a diagonal of the pit with a log seat turned to it, none on a flame or solid cell, the
+pit's four sides open; Level.decor_from refuses a diagonal step for a kind without "diagonal" (the stool) and keeps
+it for the log seat. builder_test's fire sit spot moves onto a seat, (193,210) facing the pit.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's

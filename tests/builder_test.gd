@@ -1721,22 +1721,22 @@ func _test_runner() -> void:
 
 func _test_spots() -> void:
 	print("\n== the spot tool: where townsfolk stand, sit and lean (859, npc's 853) ==")
-	# Umbrage's square fire (wilds' square_fire, its seats) and the weapon stall's counter.
+	# Umbrage's square fire (wilds' square_fire, its seats: since 774 amended (5) the pit's diagonals on log seats) and the weapon stall's counter.
 	# From no spots: the wilds' own (Umbrage's square, well and talk spots, maps' laying) set aside.
 	var wilds_doc := MapDoc.from_level("wilds")
 	wilds_doc.config.erase("spots")
 	var wilds := BuilderSession.new(wilds_doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
 	var steps := wilds.working.undo_steps.size()
-	var seat := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 211], "pose": "sit"})
+	var seat := wilds.run_tool("spot", {"at": [193, 210], "use": "fire", "face": [194, 211], "pose": "sit"})
 	var seat_text := str(seat.get("text"))
-	_check(seat.get("ok", false) and wilds.working.config.get("spots") == [{"use": "fire", "cell": [192, 210], "face": [193, 211], "pose": "sit", "town": "store"}]
+	_check(seat.get("ok", false) and wilds.working.config.get("spots") == [{"use": "fire", "cell": [193, 210], "face": [194, 211], "pose": "sit", "town": "store"}]
 		and wilds.working.undo_steps.size() == steps + 1 and not "Warning" in seat_text,
 		"a sit spot on the fire's seat: npc's shape, the store its town by default, one undo step, no seat warning (%s)" % seat_text)
 	if not Client3D.ACTIVITIES.has("sit"):
 		_check("drawn standing until its clip lands" in wilds.spot_preview()[0], "the panel says the sit draws as a stand until animation's clip lands")
-	var turned := wilds.run_tool("spot", {"at": [192, 210], "use": "fire", "face": [193, 209], "pose": "sit"})
+	var turned := wilds.run_tool("spot", {"at": [193, 210], "use": "fire", "face": [192, 209], "pose": "sit"})
 	_check(turned.get("ok", false) and "changed it to" in str(turned.get("text")) and (wilds.working.config["spots"] as Array).size() == 1
-		and wilds.working.config["spots"][0]["face"] == [193, 209], "laid again on its cell: the spot turned, still one (%s)" % turned.get("text"))
+		and wilds.working.config["spots"][0]["face"] == [192, 209], "laid again on its cell: the spot turned, still one (%s)" % turned.get("text"))
 	var refusals := {
 		"its face is not one of the eight cells about it": {"at": [192, 212], "use": "fire", "face": [195, 215]},
 		"its use \"dance\" is none of": {"at": [192, 212], "use": "dance", "face": [193, 212]},
@@ -1758,25 +1758,25 @@ func _test_spots() -> void:
 	var keeper_line: String = wilds.spot_preview()[1]
 	_check("Snagfin" in keeper_line and (World.towns != null or "(settled folk only)" in keeper_line),
 		"who comes to it read in the panel's line, the settled folk only with no world (%s)" % keeper_line)
-	var gone := wilds.run_tool("spot", {"at": [192, 210], "remove": true})
-	_check(gone.get("ok", false) and "took away the fire spot at (192, 210)" in str(gone.get("text")) and (wilds.working.config["spots"] as Array).size() == 1, "removed (%s)" % gone.get("text"))
+	var gone := wilds.run_tool("spot", {"at": [193, 210], "remove": true})
+	_check(gone.get("ok", false) and "took away the fire spot at (193, 210)" in str(gone.get("text")) and (wilds.working.config["spots"] as Array).size() == 1, "removed (%s)" % gone.get("text"))
 	wilds.working.undo()
 	_check((wilds.working.config["spots"] as Array).size() == 2, "undone: the fire spot back")
 	var preview := wilds.spot_preview()
 	var jargon := preview.filter(func(line: String) -> bool: return "this world" in line or "at most" in line or "square, fire and talk" in line)
-	_check(preview.size() == 2 + wilds.trade_lines("store").size() and preview[0].begins_with("Fire spot (192, 210), sit facing (193, 209)")
+	_check(preview.size() == 2 + wilds.trade_lines("store").size() and preview[0].begins_with("Fire spot (193, 210), sit facing (192, 209)")
 		and preview[1].begins_with("Work spot (merchant) (204, 196), stand facing (204, 197): ") and "Snagfin" in preview[1] and "one at a time" in preview[1]
 		and preview.slice(2) == Array(wilds.trade_lines("store")) and jargon.is_empty(),
 		"the proposal's reading (859 amended (3)): a line a laid spot, its cell, pose and who comes, then the trades a line each; none of the old words (%s)" % [preview])
 	_check(BuilderSession.shortfall([0, 0, 2, 2, 1] as Array[int], 1) == "; short at 2-4: 2 want it" and BuilderSession.shortfall([3, 1, 3] as Array[int], 2) == "; short at 0-1 and 2-3: 3 want its 2 spots"
 		and BuilderSession.shortfall([1, 1] as Array[int], 1).is_empty(), "the hours a spot is short: voice's words (%s; %s)" % [BuilderSession.shortfall([0, 0, 2, 2, 1] as Array[int], 1), BuilderSession.shortfall([3, 1, 3] as Array[int], 2)])
 	var shown := BuilderSession.spot_words(wilds.working.config)
-	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (192, 210) facing (193, 209)" in shown,
+	_check(wilds.accept() and (wilds.doc.config.get("spots") as Array).size() == 2 and "fire sit at (193, 210) facing (192, 209)" in shown,
 		"accepted: both spots in the level, said in the situation (%s)" % shown)
 	var after := BuilderSession.new(wilds.doc, Rect2i(185, 190, 25, 25), "wilds", StubClaude.new([]))
-	after.run_tool("spot", {"at": [192, 210], "remove": true})
+	after.run_tool("spot", {"at": [193, 210], "remove": true})
 	var taken := after.spot_preview()
-	_check(not taken.is_empty() and taken[0] == "Fire spot (192, 210) taken up" and not taken.any(func(line: String) -> bool: return "(204, 196)" in line),
+	_check(not taken.is_empty() and taken[0] == "Fire spot (193, 210) taken up" and not taken.any(func(line: String) -> bool: return "(204, 196)" in line),
 		"a spot taken up: said so; the spot kept is not said again (%s)" % [taken])
 	# A field with no town, then with one: the seat warning, a doorway, a way closed, ground not reached.
 	var field := _doc()

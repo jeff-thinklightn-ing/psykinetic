@@ -2726,6 +2726,8 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 ## each walled on the same side, drawn at their middle. A kind with
 ## "seat" is sat on (875, maps' side): a sit spot on its cell is seated,
 ## and builder's spot tool says nothing of the ground (BuilderSession.seat_at).
+## A flat faced kind with "diagonal" (774 amended (5): the square fire's log
+## seats) may take a diagonal step as well as a side, its +z turned that way.
 const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"moss_patch": {"sits": "flat", "variants": 3, "faced": false},
 	"moss_strip": {"sits": "wall", "variants": 2},
@@ -2790,6 +2792,12 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# under each sit spot, its seat 0.45 up for animation's sit, its front
 	# turned to the table or the hearth it serves; never solid, as all decor.
 	"stool": {"sits": "flat", "variants": 1, "faced": true, "seat": true},
+	# The square fire's seats (774 amended (5), the coordinator's): art-kit's
+	# prop.log_seat (777's roadside camps), long along x, its flat face up at
+	# 0.45 for animation's sit, one on each diagonal of the pit, its front +z
+	# turned to the fire ("diagonal": a flat faced piece whose step may also
+	# be a diagonal, drawn turned 45 degrees); never solid, as all decor.
+	"log_seat": {"sits": "flat", "variants": 2, "faced": true, "diagonal": true, "seat": true},
 	# Umbrage's smithy (811 amended (2), art-kit's pieces): the smith's tool
 	# wall hung on the forge hall's wall, its front +z out of it (variant 1
 	# while he is home, 2 the gaps while the town has none); the stores'
@@ -3088,6 +3096,8 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 		match str(DECOR_KINDS[kind]["sits"]):
 			"flat":
 				fits = way == Vector2i.ZERO or side and bool(DECOR_KINDS[kind].get("faced", false))
+				# A kind marked "diagonal" (774 amended (5), the log seats) faces a diagonal too.
+				fits = fits or absi(way.x) == 1 and absi(way.y) == 1 and bool(DECOR_KINDS[kind].get("diagonal", false))
 			"wall":
 				fits = side and walled.call(cell, way)
 				piece["edge"] = Terrain.edge_key(cell, way)
