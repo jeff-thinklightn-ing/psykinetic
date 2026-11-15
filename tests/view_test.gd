@@ -112,6 +112,7 @@ func _ready() -> void:
 		_test_mine_sounds()
 		_test_idle_voices()
 		await _test_monster_death()
+		_test_foot_marks()
 		_test_aura()
 		_test_hip_lantern()
 		_test_knight_stands()
@@ -2115,6 +2116,101 @@ func _test_armour_footfalls() -> void:
 		await _frames(30)
 	player.worn = worn_was
 	_rig.sfx.hear_everything = hear_was
+
+## FOOT_LABEL: a contact mark at each drawn body's feet by day, out of doors:
+## a person's its soles' size, at the foot point; its depth in the open, a
+## third under a roof's shade; none by night or indoors.
+func _test_foot_marks() -> void:
+	print("\n== foot marks (FOOT_LABEL): a dark patch at each body's feet by day, out of doors ==")
+	var player := _player()
+	var imp := _spawn_imp(Vector2i(9, 6))
+	_rig._process(0.0)
+	var mine: Node3D = _rig._puppets[player.get_instance_id()]
+	var outdoor_was: bool = _rig._outdoor
+	var elevation_was: float = _rig._look_elevation
+	_rig._outdoor = true
+	_rig._look_elevation = 40.0
+	_rig._foot_mark_bodies.clear()
+	_rig._place_foot_marks()
+	var multimesh: MultiMesh = _rig._foot_marks.multimesh
+	var material := _rig._foot_marks.material_override as ShaderMaterial
+	var at: Array = material.get_shader_parameter("mark_at")
+	var sizes: Array = material.get_shader_parameter("mark_size")
+	var index := -1
+	for i in multimesh.visible_instance_count:
+		var each: Vector4 = at[i]
+		if Vector2(each.x, each.y).distance_to(Vector2(mine.global_position.x, mine.global_position.z)) < 0.01:
+			index = i
+	var person: Vector2 = Client3D.FOOT_MARK_PERSON * float(mine.get_meta("model_scale", 1.0))
+	var size: Vector4 = sizes[index] if index >= 0 else Vector4.ZERO
+	_check(multimesh.visible_instance_count >= 2 and index >= 0, "by day out of doors: a mark under the player and the imp, the player's at the foot point (%d marks)" % multimesh.visible_instance_count)
+	_check(is_equal_approx(size.x * 2.0, person.x) and is_equal_approx(size.y * 2.0, person.y) and is_equal_approx(size.z, Client3D.FOOT_MARK_DEPTH) and size.w == 0.0,
+			"the player's the soles' size (%.2f x %.2f m), its depth in the open (%s)" % [person.x, person.y, size])
+	_rig._look_elevation = -5.0
+	_rig._place_foot_marks()
+	_check(multimesh.visible_instance_count == 0, "by night: none")
+	_rig._look_elevation = 40.0
+	_rig._outdoor = false
+	_rig._place_foot_marks()
+	_check(multimesh.visible_instance_count == 0, "indoors: none")
+	_rig._outdoor = true
+	# A roof between the foot and the sun: a third of it.
+	if _rig._sun != null and _rig._sun.global_transform.basis.z.y > 0.05:
+		var toward := _rig._sun.global_transform.basis.z.normalized()
+		var roof := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3(3.0, 0.2, 3.0)
+		roof.mesh = box
+		_rig.add_child(roof)
+		var foot := mine.global_position
+		roof.global_position = foot + Vector3.UP * 0.5 + toward * (2.0 / toward.y)
+		var built: bool = _rig._occluders_built
+		if not built:
+			_rig._index_occluders()
+		var bounds := AABB(roof.global_position - box.size * 0.5, box.size)
+		_rig._occluders.append([roof, bounds, false, [roof]])
+		var index_of: int = _rig._occluders.size() - 1
+		var top_was: float = _rig._occluder_top
+		_rig._occluder_top = maxf(top_was, bounds.end.y)
+		var chunks: Array[Vector2i] = []
+		for x in range(floori(bounds.position.x / Client3D.FADE_CHUNK), floori(bounds.end.x / Client3D.FADE_CHUNK) + 1):
+			for z in range(floori(bounds.position.z / Client3D.FADE_CHUNK), floori(bounds.end.z / Client3D.FADE_CHUNK) + 1):
+				var chunk := Vector2i(x, z)
+				if not _rig._occluder_chunks.has(chunk):
+					_rig._occluder_chunks[chunk] = []
+				_rig._occluder_chunks[chunk].append(index_of)
+				chunks.append(chunk)
+		_rig._foot_mark_bodies.clear()
+		_rig._place_foot_marks()
+		sizes = material.get_shader_parameter("mark_size")
+		at = material.get_shader_parameter("mark_at")
+		var covered := Vector4.ZERO
+		for i in multimesh.visible_instance_count:
+			var each: Vector4 = at[i]
+			if Vector2(each.x, each.y).distance_to(Vector2(foot.x, foot.z)) < 0.01:
+				covered = sizes[i]
+		_check(covered.w == 1.0 and is_equal_approx(covered.z, Client3D.FOOT_MARK_DEPTH * Client3D.FOOT_MARK_SHADED),
+				"a roof between the feet and the sun: covered, a third of it (%s)" % [covered])
+		# Moved off the sun's line (its box no longer met): the open again.
+		var body: Dictionary = _rig._foot_mark_bodies[player.get_instance_id()]
+		body["cover_at"] = -Client3D.FOOT_MARK_COVER_FRAMES * 10
+		roof.global_position += Vector3(toward.x, 0.0, toward.z).normalized().rotated(Vector3.UP, PI * 0.5) * 6.0
+		_check(not _rig._foot_mark_covered(body, foot), "the roof moved off the sun's line: not covered")
+		for chunk in chunks:
+			(_rig._occluder_chunks[chunk] as Array).erase(index_of)
+		_rig._occluders.remove_at(index_of)
+		_rig._occluder_top = top_was
+		_rig._foot_mark_shapes.erase(roof)
+		roof.queue_free()
+		_rig._occluders_built = built
+	else:
+		_check(false, "the test rig's sun stands above the horizon (%s)" % [_rig._sun])
+	_rig._outdoor = outdoor_was
+	_rig._look_elevation = elevation_was
+	_rig._foot_mark_bodies.clear()
+	_rig._place_foot_marks()
+	World.despawn(imp)
+	_rig._process(0.0)
 
 func _test_monster_death() -> void:
 	print("\n== a monster's death: it falls, lies, sinks; its tile is free at once ==")
