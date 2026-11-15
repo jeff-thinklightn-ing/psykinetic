@@ -22,6 +22,7 @@ notes (decision 324).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+- Towns: in the Last Light Mughouse the round tables are planked tops in two browns with a darker rim, and a house's stone chimney shows its stones and mortar, with soot round the pot (art-kit).
 
 ## v0.1.219
 
