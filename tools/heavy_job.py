@@ -1951,6 +1951,9 @@ def _note_odd(folder, entries):
         if older_code(entry):
             odd.append(("old_gate", entry, "%s, pid %s, gate revision %s, %s; rebase it (394 amended (38))" % (
                 folder, entry.get("waiter") if folder == "queue" else entry.get("pid"), entry["gate"], _where(entry))))
+        if folder == "queue" and self_waiting(entry):
+            odd.append(("self_waiting", entry, "queued from the checkout holding the land lock (%s), pid %s, %s (883 amended)" % (
+                lock_owner(LAND_LOCK), entry.get("waiter"), _where(entry))))
         if folder == "running" and unbeaten(entry):
             odd.append(("unbeaten", entry, "held %.0f min, since %s, with no beat from its land lock tries, pid %s, %s" % (
                 (time.time() - entry.get("started", 0.0)) / 60, time.strftime("%H:%M", time.localtime(entry.get("started", 0.0))),
@@ -2410,17 +2413,56 @@ def lock_owned(tree, owner):
         or (tree.startswith(owner + "-") and tree not in tree_folders()))
 
 
-def lock_owner(folder):
-    """The land lock [folder]'s owner, or "" (not held); a Git Bash path
-    (/c/dev/land.lock) read as Windows'."""
+def _windows_path(folder):
+    """A Git Bash path (/c/dev/land.lock) as Windows reads it."""
     drive = re.match(r"^/([a-zA-Z])/(.*)$", folder)
     if drive and os.name == "nt":
         folder = "%s:/%s" % (drive.group(1).upper(), drive.group(2))
+    return folder
+
+
+def _lock_file(folder, name):
     try:
-        with open(os.path.join(folder, "owner"), encoding="utf-8") as handle:
+        with open(os.path.join(_windows_path(folder), name), encoding="utf-8") as handle:
             return handle.read().strip()
     except OSError:
         return ""
+
+
+def lock_owner(folder):
+    """The land lock [folder]'s owner, or "" (not held); a Git Bash path
+    (/c/dev/land.lock) read as Windows'."""
+    return _lock_file(folder, "owner")
+
+
+def same_checkout(one, other):
+    """Whether two checkout paths name one folder (Git Bash's or Windows' form, either case)."""
+    if not one or not other:
+        return False
+    return os.path.normcase(os.path.normpath(_windows_path(one))) == os.path.normcase(os.path.normpath(_windows_path(other)))
+
+
+## The land lock status reads (883 amended): the real one unless a test points elsewhere.
+LAND_LOCK = os.environ.get("PSYKINETIC_LAND_LOCK", "/c/dev/land.lock")
+
+
+def lock_checkout(folder):
+    """The checkout the land lock [folder] was taken from while it is held
+    (its owner written), or "": a run from there is that landing's own, by
+    whatever name it runs (883 amended)."""
+    if not lock_owner(folder):
+        return ""
+    return _lock_file(folder, "checkout")
+
+
+def self_waiting(entry, folder=None):
+    """Whether queued [entry] was queued from the checkout that holds the land
+    lock (883 amended): that landing waits on itself, the lock held by its own
+    beat (animation's, 11-15 04:13-04:55: gate and lock as animation-gather,
+    land.sh as animation; 41 minutes for every queued tree)."""
+    if not str(entry.get("kind", "")).startswith("suite"):
+        return False  # A landing's own kinds: a scene queued from there is no landing.
+    return same_checkout(entry.get("checkout", ""), lock_checkout(folder or LAND_LOCK))
 
 
 def run(tree, kind, command, expect_minutes=None, no_queue=False):
@@ -2448,10 +2490,13 @@ def run(tree, kind, command, expect_minutes=None, no_queue=False):
             # 394 amended (31): land.sh holding the land lock with no take to adopt
             # queued at the gate with main locked (perf 09:45-10:12, animation
             # 11:04-11:22, 11-11: their takes dropped while they waited on the lock).
-            print("heavy_job: %s %s: this tree holds the land lock and has no take of %s to run in: not queued "
-                "(never queue at the gate holding the lock: release the lock, take the gate, then the lock again)"
-                % (tree, kind, kind), file=sys.stderr)
-            log("refused", tree, kind, "holding the land lock with no take to adopt")
+            print("heavy_job: %s %s: %s and has no take of %s to run in: not queued "
+                "(never queue at the gate holding the lock: release the lock, take the gate, then the lock again%s)"
+                % (tree, kind, no_queue if isinstance(no_queue, str) else "this tree holds the land lock", kind,
+                    "; the gate take, the lock and PSYKINETIC_TREE are one name, 883 amended" if isinstance(no_queue, str) else ""),
+                file=sys.stderr)
+            log("refused", tree, kind, "holding the land lock with no take to adopt%s" % (
+                " (%s)" % no_queue if isinstance(no_queue, str) else ""))
             return NO_QUEUE_CODE
         else:
             name, estimate = wait_turn(tree, kind, os.getpid(), True, expect_minutes)
@@ -3017,6 +3062,12 @@ def status():
             print("unbeaten: %s %s held %.0f min, since %s, no beat from its land lock tries (pid %s, %s)" % (
                 entry["tree"], entry["kind"], (time.time() - entry["started"]) / 60,
                 time.strftime("%H:%M", time.localtime(entry["started"])), entry.get("pid"), _where(entry)))
+    # 883 amended: a landing queued behind its own lock.
+    for entry in queue:
+        if self_waiting(entry):
+            print("self-waiting: %s %s queued %.0f min from the checkout holding the land lock (%s, %s): this landing waits on"
+                " itself; release the lock (883 amended)" % (entry["tree"], entry["kind"], (time.time() - entry["queued"]) / 60,
+                    lock_owner(LAND_LOCK), _where(entry)))
     if not running and not queue:
         print("no heavy jobs")
     # 394 amended (43): last, so the lines above keep their places for scripts.
@@ -3081,7 +3132,7 @@ def summary(day):
     print("%s: %s" % (day, ", ".join(counts)))
     # By tree (394 amended (37)): a tree with old gate code, or whose land lock
     # tries don't beat its take, shows up the same day.
-    for event in ("old_gate", "unbeaten", "beat_failed"):
+    for event in ("old_gate", "unbeaten", "beat_failed", "self_waiting"):
         by_tree = {}
         for each in lines:
             if each[1] == event:
@@ -3112,7 +3163,7 @@ def summary(day):
 
 ## The log's events the daily summary lists.
 SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "timeout", "backfill", "backfill_late", "front", "jump_long",
-    "old_gate", "unbeaten", "beat_failed", "timing_wait")
+    "old_gate", "unbeaten", "beat_failed", "timing_wait", "self_waiting")
 ## Who may move a queued entry to the front (394 amended (25)): release, for a
 ## change every queued landing is paying for (a failing check on main, a broken
 ## tool) or on Jeff's word. Names are an honour system, as the land lock's are.
@@ -3222,7 +3273,11 @@ def main(args):
             if at + 1 >= len(options):
                 print("heavy_job: --no-queue-under-lock <land lock folder>", file=sys.stderr)
                 return 2
-            no_queue = lock_owned(args[1], lock_owner(options[at + 1]))
+            # 883 amended: by the lock's name, or by its checkout whatever the names
+            # (a take, a lock and a PSYKINETIC_TREE that disagree).
+            no_queue = lock_owned(args[1], lock_owner(options[at + 1])) or same_checkout(lock_checkout(options[at + 1]), CHECKOUT)
+            if no_queue and not lock_owned(args[1], lock_owner(options[at + 1])):
+                no_queue = "the land lock was taken from this checkout (%s) as %s" % (CHECKOUT, lock_owner(options[at + 1]))
             del options[at:at + 2]
         if options:
             if options[0] != "--expect" or len(options) != 2:

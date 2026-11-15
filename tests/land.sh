@@ -30,11 +30,28 @@ tree="${PSYKINETIC_TREE:-$(basename "$(pwd)")}"
 # no lock and no gate, so the line was only noise there, and it failed land_checks_test's "no
 # lock" row for a side worktree's landing run under its lock's name (sound's 924, 11-14).
 land_lock_dir="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}"
-if [ "${1:-}" != "--checks" ] && [ -z "${PSYKINETIC_TREE:-}" ] && [ -f "$land_lock_dir/checkout" ] 	&& [ "$(cat "$land_lock_dir/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
+# 883 amended (2026-11-15): with PSYKINETIC_TREE set to a name that is not the lock's, the
+# run stops here, exit 7 (no other way out of land.sh gives 7), holding nothing, its gate never
+# asked. animation's land script took the gate and the lock as animation-gather and ran land.sh
+# as animation: no take under that name, so it queued a second, 21st in the gate, holding the
+# lock, whose minute beat (a beat from the lock's own checkout counts, 667 amended (5)) kept it
+# fresh; 04:13 to 04:55, every queued tree waited. PSYKINETIC_TREE unset keeps 883's adopt.
+if [ "${1:-}" != "--checks" ] && [ -f "$land_lock_dir/checkout" ] 		&& [ "$(cat "$land_lock_dir/checkout" 2>/dev/null)" = "$(git rev-parse --show-toplevel 2>/dev/null)" ]; then
 	lock_tree="$(cat "$land_lock_dir/owner" 2>/dev/null)"
 	if [ -n "$lock_tree" ] && [ "$lock_tree" != "$tree" ]; then
-		echo "landing tests: the land lock was taken here by $lock_tree: run as $lock_tree, not $tree"
-		tree="$lock_tree"
+		if [ -z "${PSYKINETIC_TREE:-}" ]; then
+			echo "landing tests: the land lock was taken here by $lock_tree: run as $lock_tree, not $tree"
+			tree="$lock_tree"
+		else
+			held=""
+			for name in "$tree" "$lock_tree"; do
+				for each in suite_remote suite; do
+					python tools/heavy_job.py holds "$name" "$each" >/dev/null 2>&1 && held="$held${held:+, }$name $each"
+				done
+			done
+			echo "LANDING TESTS: FAIL (the land lock was taken from this checkout as $lock_tree; land.sh runs as $tree (PSYKINETIC_TREE=$PSYKINETIC_TREE), and the gate take is ${held:-none}: the gate take, the lock and PSYKINETIC_TREE are one name; release the lock and run again (883 amended))"
+			exit 7
+		fi
 	fi
 fi
 . tools/land_stamp.sh
@@ -90,12 +107,15 @@ fi
 export LAND_HEAD="${LAND_HEAD:-$(git rev-parse HEAD 2>/dev/null)}"
 if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# The push guard's hook, when origin/main switches it on (tools/hooks/install).
-	land_hook_install
-	land_checks "$land_lock_dir" || { echo "LANDING TESTS: FAIL ($checks_why)"; exit 1; }
+	# LAND_TEST_STANDIN (a tool test's, 883 amended): no checks, no hook, no tested sha, and
+	# no part run inside the gate; only the naming, the gate and the beat.
+	inventory_stale=""
+	[ -z "${LAND_TEST_STANDIN:-}" ] && land_hook_install
+	[ -n "${LAND_TEST_STANDIN:-}" ] || land_checks "$land_lock_dir" || { echo "LANDING TESTS: FAIL ($checks_why)"; exit 1; }
 	# The commit these tests run, read once here, after the inventory's own commit and
 	# before any part starts; the result line names it, or fails if it moved (278 amended (1)).
 	. tools/land_tested.sh
-	land_tested_begin
+	[ -z "${LAND_TEST_STANDIN:-}" ] && land_tested_begin
 	# The Godot parts on saturn when it answers (Jeff, 2026-11-11: "go ahead
 	# and move landings' test runs to saturn"; tools/remote_tests.sh): the
 	# gate is then asked for suite_remote, the room of the parts that stay
@@ -112,6 +132,8 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	elif python tools/heavy_job.py holds "$tree" suite >/dev/null 2>&1; then
 		kind=suite
 		echo "landing tests: this landing holds a suite take: every part here"
+	elif [ -n "${LAND_TEST_STANDIN:-}" ]; then
+		kind=suite  # Never saturn from a tool test.
 	else
 		kind="$(bash tools/remote_tests.sh kind)"
 		echo "landing tests: no take held; tools/remote_tests.sh kind says $kind"
@@ -121,23 +143,18 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# memory table): a check reading the log's tail reads the result. No
 	# result line written is a fail, whatever the exit (a killed run).
 	result="$(mktemp -t psykinetic-result.XXXXXX)"
-	# While the tests run, a land lock this tree holds is beaten each minute (667
-	# amended): a live landing, however long, is never taken for stale, and one
-	# killed stops beating (the loop ends with this script) and goes stale as before.
-	parent=$$
-	( while kill -0 "$parent" 2>/dev/null; do sh tools/land_lock.sh beat "$tree"; sleep 60; done ) &
-	beater=$!
+	# The land lock's minute beat runs inside the gated run (below), from the grant on, never
+	# while a run waits in the queue (883 amended).
 	# Holding the land lock, never queue at the gate (394 amended (31)): with no
 	# take of this tree's to run in (dropped while it waited, or never taken), the
 	# run refuses at once (exit 6) instead of queueing with main locked.
 	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" "$kind" 		--no-queue-under-lock "${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}" -- bash tests/land.sh
 	code=$?
-	kill "$beater" 2>/dev/null
 	line="$(cat "$result" 2>/dev/null)"
 	rm -f "$result"
 	[ -z "$line" ] && [ "$code" -eq 6 ] && line="LANDING TESTS: FAIL (lost the gate take while holding the land lock: release the lock, take the gate, then the lock again; 394 amended (31))"
 	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
-	line="$(land_tested_end "$line")"
+	[ -z "${LAND_TEST_STANDIN:-}" ] && line="$(land_tested_end "$line")"
 	echo
 	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	echo "$line"
@@ -154,12 +171,29 @@ LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
 # left its holder, and the next landing's tests were refused. finish removes the
 # holder only when it names this tree and this commit.
 on_exit() {
+	[ -n "${beater:-}" ] && kill "$beater" 2>/dev/null
 	if [ -n "${remote:-}" ]; then
 		bash tools/remote_tests.sh finish >/dev/null 2>&1
 	fi
 	rm -rf "$LOGS"
 }
 trap on_exit EXIT
+# While the tests run, a land lock this tree holds is beaten each minute (667 amended): a live
+# landing, however long, is never taken for stale, and one killed stops beating (the loop ends
+# with this script) and goes stale as before. Since 883 amended it starts here, in the run the
+# gate granted (a landing holding its take: at once, its first beat in its first second), never
+# in the run that asks the gate: one that ever waited in the queue holding the lock would not
+# beat it, and the lock would go stale by 667's rule instead of living as long as the wait.
+parent=$$
+( while kill -0 "$parent" 2>/dev/null; do sh tools/land_lock.sh beat "$tree"; sleep 60; done ) &
+beater=$!
+if [ -n "${LAND_TEST_STANDIN:-}" ]; then
+	sleep "$LAND_TEST_STANDIN"
+	line="LANDING TESTS: FAIL (a tool test's stand-in, no part run)"
+	echo "$line"
+	[ -z "${LAND_RESULT:-}" ] || echo "$line" > "$LAND_RESULT"
+	exit 1
+fi
 
 jobs_at_once="$(test_jobs)"
 suite_jobs=$(( jobs_at_once - 2 ))
@@ -230,6 +264,13 @@ if git diff --name-only origin/main...HEAD -- tools/land_lock.sh tools/bench_loc
 	tool_part land_beat_test bash tests/land_beat_test.sh
 else
 	echo "land_beat_test: not run (the take changes none of tools/land_lock.sh, bench_lock.sh or its test)"
+fi
+# One name for a landing (883 amended), about 35 s: only when the take changes land.sh, the gate,
+# the lock or the test.
+if git diff --name-only origin/main...HEAD -- tests/land.sh tools/heavy_job.py tools/land_lock.sh tests/land_name_test.sh 2>/dev/null | grep -q .; then
+	tool_part land_name_test bash tests/land_name_test.sh
+else
+	echo "land_name_test: not run (the take changes none of tests/land.sh, tools/heavy_job.py, land_lock.sh or its test)"
 fi
 # The retry's own test (278 amended (8)), about 15 s: only when the take changes land.sh, the retry or the test.
 if git diff --name-only origin/main...HEAD -- tests/land.sh tests/land_retry.sh tests/land_retry_test.sh 2>/dev/null | grep -q .; then

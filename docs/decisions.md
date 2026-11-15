@@ -55645,6 +55645,35 @@ lock's name only when not run with --checks; a landing's run is as before. land_
 was taken from it under another name, no PSYKINETIC_TREE: --checks passes and says nothing of the lock (with the old
 land.sh, that row fails). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+883 amended (2): one name for a landing (the coordinator's ask and approval, 2026-11-15; label from
+tools/decision_number.sh). animation's land script took the gate and the land lock as animation-gather and ran land.sh
+with PSYKINETIC_TREE=animation. 883's adopt reads the lock's name only with PSYKINETIC_TREE unset, and the gate's
+--no-queue-under-lock (394 amended (31)) asked lock_owned by name, so "animation" read as another tree's lock: land.sh
+queued a second suite_remote take under that name and sat 21st in the gate holding the lock, while its own minute beat
+(a beat from the lock's own checkout counts, 667 amended (5)) kept the lock fresh. From 04:13:52 to 04:55:06 every
+queued tree waited, and saturn sat idle. (1) land.sh: when the lock was taken from this checkout under a name that is not
+PSYKINETIC_TREE (set), it stops before the gate, exit 7, holding nothing, and the line names the lock's name, the tree,
+PSYKINETIC_TREE and any suite take held under either ("the gate take, the lock and PSYKINETIC_TREE are one name;
+release the lock and run again"). No other way out of land.sh gives 7: its own exits are 0 and 1, and the gate's are 2,
+5, 6, 75 and 128+n. PSYKINETIC_TREE unset keeps 883's adopt. (2) The gate: --no-queue-under-lock also refuses, exit 6
+at once with nothing queued, when the lock's recorded checkout is the run's own (heavy_job.CHECKOUT; Git Bash's and
+Windows' forms read alike), whatever the names. (3) land.sh's minute beat moves into the run the gate granted: a
+landing holding its take beats in its first second, as before; a run refused, or one that ever waited in the queue, never
+beats, so such a lock goes stale by 667's rule. (4) heavy_job status marks a landing's take (a suite kind) queued from
+the checkout holding the lock: "self-waiting: <tree> <kind> queued N min from the checkout holding the land lock
+(<owner>, <checkout>): this landing waits on itself; release the lock". It is logged once as self_waiting, and the daily
+summary counts it by tree. A scene queued from there is not marked. tests/land_name_test.sh (new; run by land.sh when a
+take changes land.sh, heavy_job.py, land_lock.sh or the test): land.sh runs as a stand-in (LAND_TEST_STANDIN: no
+checks, no hook, no parts; the naming, the gate and the beat only) on a scratch lock and gate, never saturn. Its rows:
+the ordinary landing (gate take, then lock, one name) runs inside its take and beats in its first seconds; unset, the
+lock's name adopted and beaten; a mismatched PSYKINETIC_TREE gives exit 7 with the named line, the gate never asked,
+no take made, the lock not beaten; the gate's exit 6 by checkout, with nothing queued, the lock's own name with no take
+(31's refusal), with its take (runs inside it), and a lock from another checkout under another name (runs as before);
+a refused run never beats; status's self-waiting line, its log event and the summary's count, gone when the lock is
+released, none for a scene; checkout paths. The test refuses to run on a land.sh without the stand-in and points
+GODOT_PATH at nothing, so it can never start a real suite. land.ps1 has no lock adopt and no saturn path, and is
+unchanged. Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 882. The sim's dusk follows the sky's: dark at the end of civil twilight
 
 **Why.** The sim's light (`DayNight.daylight_at`) was NIGHT plus the day's share by smoothstep from a sun of -6 to 12 degrees, and everything that asks "is it dark" reads it against 0.35 (`Animal.NIGHT_LIGHT`, `DayNight.DARK_LIGHT`, `Senses.DARK`): the dark fell with the sun at -1, a few minutes after sunset (equinox 18:06). The view's sky keys light the sky, the walls and bodies by the sun's elevation down to -14, so in the Umbrage square at 18:30 (-5.3) the sky kept 37% of noon and the pale wall 53% while the outdoor floor, which takes its light from the sim's, was already at the night's (FLOOR_DARKEST, cobbles 118.6 at noon to 18.6, ground/wall 0.82 to 0.24; stills C:/dev/review/environment/umbrage_square, 11-10). A view-only lift (environment's dusk design, option B) would have lit the ground while the sim called it dark, so a hidden player or a bold wolf stood on ground that looked like day's end (enemy-ai's page C:/dev/review/enemy-ai/sim_dark.md lists the readers).
