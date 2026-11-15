@@ -2846,6 +2846,11 @@ const DECOR_POST_INSET := 0.15
 var _remains: Dictionary[int, Node3D] = {}
 const REMAINS_PROP := "prop.draugr_remains"
 var _hover: MeshInstance3D
+## The hovered cell (hover), for the plates' focus; far off when none.
+var _hover_tile := Vector2i(-1048576, -1048576)
+## Bodies the player is busy with, by instance id, besides the hovered and his action target: Main's talk and
+## store windows set it (ui's to fill).
+var plate_focus: Dictionary = {}
 ## The ring at the feet of the body a standing swing would strike
 ## (stand_ring; the low-angle fight, combat's (c)).
 var _stand_ring: MeshInstance3D
@@ -2948,6 +2953,16 @@ var own_name_on_hud := true
 ## name_plates' reused rows, by the puppet's id, and the list it returns.
 var _plate_rows: Dictionary[int, Dictionary] = {}
 var _plates: Array[Dictionary] = []
+## The local player's own body box row (UiNamePlates: a deeper row that would sit on it goes above it, shaded), reused.
+var _own_box_row: Dictionary = {"key": "own_box", "named": false, "bar": 0.0, "text": ""}
+## Half the local player's body width for its box on the screen (metres).
+const OWN_BOX_HALF := 0.3
+## His body as drawn, either side of his line: a head behind him inside it is hidden (UiNamePlates). Below his
+## shoulders (HIDE_SHOULDER under his head's top) his torso, HIDE_HALF either side; above them his head and neck only,
+## HIDE_HEAD either side, so a head beside his (its face showing) keeps its plate (the coordinator, 11-14).
+const HIDE_HALF := 0.2
+const HIDE_HEAD := 0.08
+const HIDE_SHOULDER := 0.3
 ## When name_plates last ran (msec), for the plates' easing.
 var _plates_ms := 0
 ## 865 amended (2): a plate goes with its head (down and across together) once the head
@@ -5039,6 +5054,10 @@ func name_plates() -> Array[Dictionary]:
 	var now := Time.get_ticks_msec()
 	var seconds := float(now - _plates_ms) / 1000.0 if _plates_ms > 0 else 1.0
 	_plates_ms = now
+	# The plate pass (the coordinator's rule 2): a talked-to, targeted or hovered body's plate is never faded.
+	var focus := plate_focus.duplicate()
+	if own != null and own.get("action_target") is Object and is_instance_valid(own.get("action_target")):
+		focus[(own.get("action_target") as Object).get_instance_id()] = true
 	for id: int in _puppets:
 		var puppet: Node3D = _puppets[id]
 		if not puppet.visible or not puppet.is_inside_tree():
@@ -5069,8 +5088,62 @@ func name_plates() -> Array[Dictionary]:
 		row["at"] = _camera.unproject_position(head)
 		row["depth"] = (head - _camera.global_position).dot(forward)
 		row["boss"] = label.get_node_or_null("BossMark") != null
+		row.erase("own_body")
+		row.erase("own_core")
+		row.erase("own_torso")
+		var body := instance_from_id(id) as GridEntity
+		row["focus"] = focus.has(id) or (body != null and body.tile == _hover_tile)
 		_plates.append(row)
+	_add_own_box(own, forward)
 	return _plates
+
+
+## [param pup]'s body on the screen, its head (Name label, else 1.7 m) to its feet, OWN_BOX_HALF either side; null
+## when either end is behind the lens.
+func _screen_body(pup: Node3D, half_m := OWN_BOX_HALF, drop_m := 0.0) -> Variant:
+	var label := pup.get_node_or_null("Name") as Label3D
+	var feet := pup.global_position
+	var head := label.global_position - Vector3.UP * NAME_LIFT if label != null else feet + Vector3.UP * 1.7
+	head -= Vector3.UP * drop_m
+	if _camera.is_position_behind(head) or _camera.is_position_behind(feet):
+		return null
+	var a := _camera.unproject_position(head)
+	var b := _camera.unproject_position(feet)
+	var half := absf(_camera.unproject_position(feet + _camera.global_transform.basis.x * half_m).x - b.x)
+	return Rect2(minf(a.x, b.x) - half, minf(a.y, b.y), absf(a.x - b.x) + half * 2.0, absf(b.y - a.y))
+
+
+## The local player's body on the screen, head to feet (OWN_BOX_HALF either side), as "own_body" on his own
+## row when it is listed, else on a box-only row (named false, no bar): UiNamePlates keeps a deeper body's
+## row off it (the plate-back mock, 11-14).
+func _add_own_box(own: Player, forward: Vector3) -> void:
+	if own == null:
+		return
+	var pup: Node3D = _puppets.get(own.get_instance_id())
+	if pup == null or not pup.visible:
+		return
+	var label := pup.get_node_or_null("Name") as Label3D
+	var feet := pup.global_position
+	var head := label.global_position - Vector3.UP * NAME_LIFT if label != null else feet + Vector3.UP * 1.7
+	var seen_box: Variant = _screen_body(pup)
+	if seen_box == null:
+		return
+	var a := _camera.unproject_position(head)
+	var box: Rect2 = seen_box
+	var core: Variant = _screen_body(pup, HIDE_HEAD)
+	var torso: Variant = _screen_body(pup, HIDE_HALF, HIDE_SHOULDER)
+	for row: Dictionary in _plates:
+		if row.get("key") == own.get_instance_id():
+			row["own_body"] = box
+			row["own_core"] = core if core != null else Rect2()
+			row["own_torso"] = torso if torso != null else Rect2()
+			return
+	_own_box_row["at"] = a
+	_own_box_row["depth"] = (head - _camera.global_position).dot(forward)
+	_own_box_row["own_body"] = box
+	_own_box_row["own_core"] = core if core != null else Rect2()
+	_own_box_row["own_torso"] = torso if torso != null else Rect2()
+	_plates.append(_own_box_row)
 
 
 ## Where [param puppet]'s plate goes from its stand (world metres): its skeleton's "Head"
@@ -6514,6 +6587,7 @@ func clear_builder() -> void:
 ## The hover outline on [param tile], or hidden.
 func hover(tile: Vector2i, show: bool) -> void:
 	_hover.visible = show
+	_hover_tile = tile if show else Vector2i(-1048576, -1048576)
 	if show:
 		_lay_on_ground(_hover, tile, ON_FLOOR)
 

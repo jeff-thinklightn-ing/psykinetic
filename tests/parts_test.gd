@@ -356,8 +356,10 @@ func _test_name_plates() -> void:
 	var held: Rect2 = placed[0]["rect"]
 	var inside := screen.grow(-UiNamePlates.EDGE)
 	_check(inside.encloses(held) and is_equal_approx(held.size.y, a.size.y), "a head on the screen's edge keeps its plate whole, held inside it, the same size (%s)" % held)
-	var faded: Rect2 = placed[1]["rect"]
-	_check(inside.encloses(faded) and placed[1]["alpha"] == UiNamePlates.SHADED, "and one that can't step up past the top fades in place, still inside (%s)" % faded)
+	# The climb's top (the coordinator's plate rules, 11-14): the farther row, whose climb would leave the
+	# screen's top, drops: not drawn.
+	_check(bool(placed[1]["gone"]) and float(placed[1]["alpha"]) == 0.0, "and the farther one whose climb would leave the top drops, not drawn (gone %s, alpha %.2f)" % [placed[1]["gone"], placed[1]["alpha"]])
+	_check(plates.placed_rect(int((placed[1]["entry"] as Dictionary).get("key", 0))) == Rect2(), "placed_rect: a dropped row is none")
 	# The health bar in the name's row (865 amended (3), the approved C:/dev/review/ui-design/bar_mock): under
 	# the name, centred, one size at every depth, its length by max hp within least and most.
 	var gap := float(plates.get_theme_constant(&"gap", &"HpBar"))
@@ -422,7 +424,8 @@ func _test_name_plates() -> void:
 	placed = plates.place([front, back], font, size, plate, Rect2(), 1.0)
 	_check(is_equal_approx((placed[1]["bar"] as Rect2).end.y, stand.call()), "and settles on its own head")
 	# Up, then met where it stands by a third (bar_row4: a row dropped to fade on its stand for 35 ms and stepped
-	# back): it stays up and fades there.
+	# back): it climbs on past the third (the coordinator's plate rules, 11-14: no two rows overlap) and fades,
+	# never back to its stand.
 	var low := {"key": 41, "text": "Hale", "at": Vector2(1000, 600), "depth": 8.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
 	var rising := {"key": 42, "text": "Tourbot", "at": Vector2(1000, 600.0 + row_high - 2.0), "depth": 10.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
 	placed = plates.place([low, rising], font, size, plate, Rect2(), 1.0)
@@ -431,8 +434,31 @@ func _test_name_plates() -> void:
 	var meeting := {"key": 43, "text": "Rolf", "at": Vector2(1000, low_top - UiNamePlates.GAP - 5.0 + UiNamePlates.LIFT), "depth": 9.0, "plain": true, "bar": 1.0, "share": 1.0, "max_hp": 20}
 	placed = plates.place([low, rising, meeting], font, size, plate, Rect2(), 1.0)
 	var kept: Dictionary = placed[2] if (placed[2]["entry"] as Dictionary)["key"] == 42 else placed[1]
-	_check(is_equal_approx((kept["bar"] as Rect2).end.y, up_foot) and float(kept["alpha"]) < 0.5,
-		"met up there by a third: it stays up (%.0f, was %.0f) and fades there (%.2f), never back to its stand for a frame" % [(kept["bar"] as Rect2).end.y, up_foot, float(kept["alpha"])])
+	var rows3: Array[Rect2] = []
+	for one: Dictionary in placed:
+		rows3.append((one["rect"] as Rect2).merge(one["bar"] as Rect2))
+	var apart3 := not rows3[0].intersects(rows3[1]) and not rows3[0].intersects(rows3[2]) and not rows3[1].intersects(rows3[2])
+	_check((kept["bar"] as Rect2).end.y <= up_foot + 0.5 and absf(float(kept["alpha"]) - UiNamePlates.SHADED) < 0.01 and apart3,
+		"met up there by a third: it climbs on past it (%.0f, was %.0f), faded (%.2f), no two rows overlapping (%s), never back to its stand for a frame" % [(kept["bar"] as Rect2).end.y, up_foot, float(kept["alpha"]), apart3])
+	# His plate kept apart (the coordinator, 11-15: Rhea's row lay on mine, Tourbot's): a body beside him at his
+	# depth, or nearer, steps off his plate; one nearer whose row lies on his body below his plate stays on its
+	# stand (only a row behind him steps off his body); behind him, his body as before.
+	var me := {"key": 51, "text": "Tourbot", "at": Vector2(1000, 600), "depth": 5.0, "plain": true, "own_body": Rect2(970, 600, 60, 300)}
+	var beside := {"key": 52, "text": "Rhea", "at": Vector2(1030, 604), "depth": 5.0, "plain": true}
+	var nearer := {"key": 53, "text": "Hale", "at": Vector2(980, 590), "depth": 3.0, "plain": true}
+	var below := {"key": 54, "text": "Imp", "at": Vector2(1010, 800), "depth": 4.0, "plain": true}
+	for other: Dictionary in [beside, nearer]:
+		placed = plates.place([me, other], font, size, plate)
+		var mine: Rect2 = placed[0]["rect"]
+		var theirs: Rect2 = placed[1]["rect"]
+		_check(placed[0]["entry"] == me and not mine.intersects(theirs) and theirs.end.y <= mine.position.y + 0.5,
+			"%s at depth %.0f beside me (5): steps off my plate, above it (%s over %s)" % [other["text"], other["depth"], theirs, mine])
+	placed = plates.place([me, below], font, size, plate)
+	_check(is_equal_approx((placed[1]["rect"] as Rect2).end.y, 800.0 - UiNamePlates.LIFT) and float(placed[1]["alpha"]) == 1.0,
+		"a nearer row lying on my body below my plate stays on its stand, whole (%s)" % placed[1]["rect"])
+	var behind_me := {"key": 55, "text": "Bram", "at": Vector2(1010, 800), "depth": 9.0, "plain": true}
+	placed = plates.place([me, behind_me], font, size, plate)
+	_check(not (placed[1]["rect"] as Rect2).intersects(Rect2(970, 600, 60, 300)), "a row behind me still steps off my body (%s)" % placed[1]["rect"])
 	remove_child(plates)
 	plates.free()
 	var client := Client3D.new()  # Never in the tree: the layers alone.
