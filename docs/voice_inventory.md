@@ -3172,7 +3172,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (955)
+## Lines in the data (1003)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3210,15 +3210,21 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (149)
+### levels/companion_traits.json (160)
 
 | | Line | Key |
 |---|---|---|
+|  | This way. | `guide.set_off.default[0]` |
+|  | Follow me. | `guide.set_off.default[1]` |
 |  | This way. Stay close. | `guide.set_off.steady and watchful[0]` |
 |  | This way. Keep up. | `guide.set_off.quick and wary[0]` |
 |  | Come on, it's this way. | `guide.set_off.warm and talkative[0]` |
+|  | This way. | `guide.set_off.quiet and patient[0]` |
+|  | Follow me. | `guide.set_off.blunt and fearless[0]` |
+|  | Right, follow me. | `guide.set_off.cheerful under pressure[0]` |
 |  | This way. Watch your step. | `guide.set_off.careful and thoughtful[0]` |
 |  | This way, come on. | `guide.set_off.restless and curious[0]` |
+|  | On we go. | `guide.set_off.resume[0]` |
 |  | Get your back to something! | `flank_says.default[0]` |
 |  | They're getting round you! Back up! | `flank_says.default[1]` |
 |  | Behind you! Don't let them get behind you! | `flank_says.default[2]` |
@@ -3247,6 +3253,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Give it a breath. We're still bleeding from that. | `bandage_says.hurt_now` |
 |  | I've nothing to bandage with. | `bandage_says.no_kit` |
 |  | There's nothing to bandage. | `bandage_says.no_wound` |
+|  | I'm not hurt. | `bandage_says.no_wound_self` |
 |  | It's bound already. Give it time. | `bandage_says.mending` |
 |  | Hold still, or I can't bind it. | `bandage_says.patient_moved` |
 |  | I had to move. Let me start again. | `bandage_says.moved` |
@@ -3254,6 +3261,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | I can't reach you from here. | `bandage_says.not_beside` |
 |  | My hands are full. | `bandage_says.busy` |
 |  | Not now. I have to get clear of it first. | `bandage_says.low` |
+|  | It came loose. | `bandage_says.broken` |
 |  | You are unhappy with %s, and may say so. | `loyalty.words.cooling` |
 |  | You keep your distance from %s now, and fight only what comes at you. | `loyalty.words.wary` |
 |  | You do as little for %s as you can: you won't carry their things or lead them anywhere. | `loyalty.words.sullen` |
@@ -3265,7 +3273,10 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | But you follow them; you do not take the lead. | `loyalty.guide_words.wary` |
 |  | But you will not lead them anywhere now. | `loyalty.guide_words.sullen` |
 |  | But you will not lead them anywhere now. | `loyalty.guide_words.apart` |
+|  | Must I? | `loyalty.hesitate[0]` |
 |  | If I have to. | `loyalty.hesitate[1]` |
+|  | Hm. Fine. | `loyalty.hesitate[2]` |
+|  | You're sure? | `loyalty.hesitate[3]` |
 |  | warm\|talkative\|friendly\|kind\|cheerful | `needs.weights[0].words` |
 |  | watchful\|wary\|cautious\|careful\|patient | `needs.weights[1].words` |
 |  | fearless\|bold\|restless\|reckless\|brave\|quick | `needs.weights[2].words` |
@@ -3364,7 +3375,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {she} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (39)
+### levels/economy.json (40)
 
 | | Line | Key |
 |---|---|---|
@@ -3374,6 +3385,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
 |  | %s, from the old chests | `kept.caption` |
 |  | This was in the old chests by the stall. I kept it for you. | `kept.says` |
+|  | Yours, for %d. | `camp_traders.say.sold` |
 |  | That's %d gold, friend. | `camp_traders.say.short` |
 |  | I've none of that. | `camp_traders.say.none` |
 |  | There's %d gold for it. | `camp_traders.say.bought` |
@@ -3408,7 +3420,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | a bed at the inn | `folk.needs.bed.what` |
 |  | work on their tools | `folk.needs.tools.what` |
 
-### levels/items.json (56)
+### levels/items.json (57)
 
 | | Line | Key |
 |---|---|---|
@@ -3463,39 +3475,53 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | bundle of barbed arrows | `items[85].name` |
 |  | guarding with it costs a quarter less stamina | `naming.strengths.steady.says` |
 |  | it draws in four fifths of the time | `naming.strengths.quick.says` |
+|  | braced sooner | `naming.strengths.set.says` |
 |  | its blows make half the fight noise | `naming.strengths.quiet.says` |
 |  | its knockdowns last half a second longer | `naming.strengths.heavy.says` |
 |  | cowards dread whoever holds it | `naming.strengths.dread.says` |
 |  | its kind dread whoever holds it, and notice them from further off | `growth.says.bane` |
 |  | its blows stagger that kind, and they come for whoever holds it first | `growth.says.vengeance` |
 
-### levels/monsters.json (10)
+### levels/monsters.json (15)
 
 | | Line | Key |
 |---|---|---|
 |  | headwear=hood garb=none apron=no clothes=grave | `robber.person` |
+|  | I'm next. | `robber.barks.hold[0]` |
 |  | Leave some for me. | `robber.barks.hold[1]` |
 |  | Go on. I'll have what's left. | `robber.barks.hold[2]` |
+|  | My turn. | `robber.barks.step_in[0]` |
 |  | Stand back. Mine now. | `robber.barks.step_in[1]` |
 |  | Out of it. Let me at them. | `robber.barks.step_in[2]` |
+|  | Enough waiting. | `robber.barks.step_in[3]` |
+|  | Gone, then. | `robber.barks.leave[0]` |
 |  | That's that. Back to it. | `robber.barks.leave[1]` |
+|  | Not worth it. | `robber.barks.leave[2]` |
 |  | headwear=hood garb=none apron=no clothes=grave build=heavy stature=tall | `robber_brute.person` |
 |  | headwear=hood garb=vest apron=no clothes=forest | `bandit.person` |
 |  | headwear=hood garb=vest apron=no clothes=forest build=heavy stature=tall | `bandit_brute.person` |
 |  | his plain blow, a heavy strike: the knockdown is his spin's (603 amended; a draft for Jeff) | `draugr.blows.battle_axe.says` |
 
-### levels/named_enemies.json (8)
+### levels/named_enemies.json (16)
 
 | | Line | Key |
 |---|---|---|
+|  | Fresh meat. | `lines.stranger[0]` |
+|  | Lost, are you? | `lines.stranger[1]` |
 |  | You picked the wrong hole to crawl into. | `lines.stranger[2]` |
+|  | You again. | `lines.known[0]` |
 |  | I know your face. | `lines.known[1]` |
+|  | Back for more? | `lines.foe[0]` |
 |  | You should have stayed gone. | `lines.foe[1]` |
 |  | You put me in the ground. It didn't take. | `lines.bane[0]` |
+|  | Not this time. | `lines.bane[1]` |
 |  | Come to lie down again? | `lines.prey[0]` |
+|  | You never learn. | `lines.prey[1]` |
 |  | Last time you ran. | `lines.fled_from[0]` |
 |  | Running again, are we? | `lines.fled_from[1]` |
+|  | %s walks again. | `lines.rose[0]` |
 |  | %s is up and about again. | `lines.rose[1]` |
+|  | bares its teeth | `lines.emote[1]` |
 
 ### levels/resident_traits.json (37)
 
@@ -3539,7 +3565,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | over a share of a harvest | `grudge.causes[5]` |
 |  | over a promise broken | `grudge.causes[6]` |
 
-### levels/residents.json (151)
+### levels/residents.json (157)
 
 | | Line | Key |
 |---|---|---|
@@ -3630,10 +3656,14 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Can't hold. Falling back. | `guard_fight.fall_back[1]` |
 |  | I'm cut. To the square. | `guard_fight.fall_back[2]` |
 |  | To me. They're at the post. | `guard_fight.call[0]` |
+|  | Guards, here, now. | `guard_fight.call[1]` |
 |  | Up, all of you. They're on us. | `guard_fight.call[2]` |
 |  | I'm here. Hold it with me. | `guard_fight.to_post[0]` |
 |  | Easy. We hold it together. | `guard_fight.to_post[1]` |
 |  | Stand by me and keep your feet. | `guard_fight.to_post[2]` |
+|  | I'm down. | `guard_fight.downed[0]` |
+|  | Can't get up. | `guard_fight.downed[1]` |
+|  | They've had me. | `guard_fight.downed[2]` |
 |  | I owe you that. | `guard_fight.raised[0]` |
 |  | Thanks. Back to it. | `guard_fight.raised[1]` |
 |  | I'll not forget that. | `guard_fight.raised[2]` |
@@ -3665,6 +3695,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | We're short of ore. Our first folk dug iron at Hollowfell, up in the hills; something holds it now. | `pointers.ore.towns.wilds/store[0]` |
 |  | Town's short of ore. The old iron workings at Hollowfell, in the hills, fed us once. Mind what's in there now. | `pointers.ore.towns.wilds/store[1]` |
 |  | Ore's short here. There's iron yet at Hollowfell, up in the hills, where the miners gave it up; something's moved in since. | `pointers.ore.towns.wilds/store[2]` |
+|  | Lead on. | `sought.default.freed` |
 |  | I am the %s you sent for. | `sought.default.arrival` |
 |  | %s the %s is up at my fold, sheltering with me. Take them home if you can. | `sought.default.shelter` |
 |  | Not while they watch. They keep me at this forge, working their weapons for the raids. | `sought.smith.held` |
@@ -3690,15 +3721,18 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | %s is in %s's care now: fall where they will, he will see to them. | `offers.care.kept` |
 |  | That's %d. %d more and you're in my care. | `offers.care.counted` |
 |  | That's %d of the herbs and %d of the antlers; bring me the rest. | `offers.care.counted_brew` |
+|  | Not now. | `offers.care.refuse` |
 |  | %s is in your care: if they fall anywhere, they wake at your hut and you see to them. Say so when it fits, briefly. | `offers.care.voice` |
 |  | %s gathered your herbs, and you trust them with more. | `offers.care.voice_quest` |
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (142)
+### levels/townsfolk.json (158)
 
 | | Line | Key |
 |---|---|---|
+|  | %s is asleep. | `asleep[0]` |
+|  | %s sleeps on. | `asleep[1]` |
 |  | %s sleeps and does not stir. | `asleep[2]` |
 |  | {name} is asleep. {other} at the store will see to you. | `asleep_store[0]` |
 |  | The healer's seen to me. I'll be up by morning. | `sick_says.treated[0]` |
@@ -3779,25 +3813,39 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Nothing made just now. Come back tomorrow. | `empty_shelf.default[0]` |
 |  | I've nothing ready for you yet. | `empty_shelf.default[1]` |
 |  | The shelf's bare. Give me time. | `empty_shelf.default[2]` |
+|  | Not now. | `greet.refuse` |
+|  | Lead on, then. | `greet.refuse_by.led_by_you[0]` |
+|  | Right behind you. | `greet.refuse_by.led_by_you[1]` |
 |  | Not now; I've somewhere to be. | `greet.refuse_by.away[0]` |
 |  | Not now. I need to get back to town. | `greet.refuse_by.lost[0]` |
+|  | Let me rest. | `greet.refuse_by.abed[0]` |
 |  | Not now. I'm abed. | `greet.refuse_by.abed[1]` |
 |  | Still on it? Good. | `greet.waiting[0]` |
 |  | Glad you're seeing to that. | `greet.waiting[1]` |
 |  | That's in good hands, then. | `greet.waiting[2]` |
 |  | You're one of mine now. Mind how you go. | `greet.care` |
+|  | You again. | `greet.standing.wronged[0]` |
 |  | What do you want now? | `greet.standing.wronged[1]` |
 |  | Say it and be on your way. | `greet.standing.wronged[2]` |
 |  | Good to see you. | `greet.standing.trusted[0]` |
 |  | There you are. What is it? | `greet.standing.trusted[1]` |
 |  | Ah, it's you. All well? | `greet.standing.trusted[2]` |
+|  | What ails you? | `greet.trades.medicine_man[0]` |
 |  | Herbs, if you have any; I'll put them to use. | `greet.trades.medicine_man[1]` |
 |  | Sit; let me look at you. | `greet.trades.medicine_man[2]` |
+|  | What is it? | `greet.trades.default[0]` |
+|  | Aye? | `greet.trades.default[1]` |
+|  | Yes? | `greet.trades.default[2]` |
 |  | What is it? The forge won't wait. | `greet.trades.smith[0]` |
 |  | Aye? Make it quick, the iron's hot. | `greet.trades.smith[1]` |
 |  | What is it? The pot's on. | `greet.trades.cook[0]` |
+|  | Hungry, are you? | `greet.trades.cook[1]` |
 |  | Wares, if you have coin. | `greet.trades.merchant[0]` |
+|  | Looking to buy? | `greet.trades.merchant[1]` |
+|  | State your business. | `greet.trades.guard[0]` |
+|  | Something wrong? | `greet.trades.guard[1]` |
 |  | Peace on you. What is it? | `greet.trades.priest[0]` |
+|  | Yes, child? | `greet.trades.priest[1]` |
 |  | Quiet, you'll scare the game. What? | `greet.trades.hunter[0]` |
 |  | Softly, now. What is it? | `greet.trades.hunter[1]` |
 |  | Mind the block. What? | `greet.trades.butcher[0]` |

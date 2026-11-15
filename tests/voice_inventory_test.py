@@ -205,6 +205,25 @@ def chests():
     shutil.rmtree(root, ignore_errors=True)
 
 
+def said_pools():
+    """The coordinator, 11-15: a string under a spoken key (SPOKEN_KEYS: "barks", a guard's
+    "downed", ...) is listed whole at any length; a short free string stays off the page."""
+    root, repo, lock = scratch(stale=False)
+    data = {"robber": {"barks": {"hold": ["I'm next.", "Leave some for me."], "leave": ["Gone."], "cue": "hold_cue"}},
+            "rules": {"hint": "Not now.", "label": "My turn"},
+            "guard_fight": {"downed": ["I'm down."]}}
+    write(repo, "levels/monsters.json", json.dumps(data))
+    git(repo, "add", "-A")
+    check(run(repo).returncode == 0, "the generator runs over spoken pools")
+    page = read(repo)
+    for line in ("I'm next.", "Gone.", "I'm down."):
+        check("| %s | `" % line in page, "a short line in a spoken pool is listed (%s)" % line)
+    check("hold_cue" not in page, "an id in a spoken pool is not")
+    check("| Not now. |" not in page and "| My turn |" not in page, "a short free string stays off the page")
+    shutil.rmtree(root, ignore_errors=True)
+
+
+said_pools()
 folds()
 folds("items-cast", "items")
 folds("psykinetic-release", "release")

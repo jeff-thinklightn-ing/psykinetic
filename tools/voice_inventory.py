@@ -281,18 +281,44 @@ def scan_gd(rel):
     return rows
 
 
-def walk_json(node, path, out):
+# Keys whose strings are spoken or shown as said by their nature (the coordinator, 11-15,
+# after enemy-ai's band barks: "I'm next." was off the page). Under any of them a string
+# is listed whole at any length (spoken()); elsewhere the four-word rule keeps ids and
+# labels off the page. A key here names a pool of lines wherever it sits in a file.
+SPOKEN_KEYS = {
+    "barks",  # monsters.json: a foe's barks by moment (806 amended (23))
+    "lines",  # named_enemies.json: a named foe's lines by standing
+    "greet",  # townsfolk.json: a resident's word when clicked, by trade, standing, refusal
+    "asleep",  # townsfolk.json: told of a sleeper
+    "say", "says", "bandage_says",  # a trader's and a companion's said lines
+    "set_off",  # companion_traits.json: a guide's word as she sets off
+    "hesitate",  # companion_traits.json: a companion's word before she obeys
+    "call", "to_post", "fall_back", "downed", "raised",  # residents.json: a guard's fight lines
+    "freed",  # residents.json: a sought one's word when freed
+    "refuse",  # a resident's word when they won't
+}
+
+
+def spoken(s):
+    """A said line under a SPOKEN_KEYS key: any length, so long as it reads as words
+    (a letter, no address, and a space or an ending stop) and not as an id."""
+    if "://" in s or not re.search(r"[A-Za-z]", s):
+        return False
+    return bool(re.search(r"\s", s.strip()) or re.search(r"[.!?…]['\"’”]?$", s.strip()))
+
+
+def walk_json(node, path, out, said=False):
     if isinstance(node, dict):
         for k, v in node.items():
             if str(k).startswith("_"):  # notes for developers
                 continue
-            walk_json(v, path + "." + str(k) if path else str(k), out)
+            walk_json(v, path + "." + str(k) if path else str(k), out, said or str(k) in SPOKEN_KEYS)
     elif isinstance(node, list):
         for i, v in enumerate(node):
-            walk_json(v, "%s[%d]" % (path, i), out)
+            walk_json(v, "%s[%d]" % (path, i), out, said)
     elif isinstance(node, str):
         text = norm(node)
-        if wordy(text, 4):
+        if wordy(text, 4) or (said and spoken(text)):
             out.append((path, text))
 
 
