@@ -18,11 +18,9 @@ const SQUARE := Vector2i(212, 205)
 const SPOTS := [Vector2i(212, 205), Vector2i(219, 195), Vector2i(196, 190), Vector2i(228, 214),
 	Vector2i(204, 216), Vector2i(212, 218)]
 const PASS_SECONDS := 600.0
-## Umbrage's chapel (734 amended (2), buildings), its doors, counter and the
-## visit's front cell: a visitor stands inside, beyond a cell of each (the
-## coordinator, 11-01, after npc's 734 amended (4)).
-const CHAPEL := Rect2i(215, 191, 6, 10)
-const CHAPEL_KEEP_OFF := [Vector2i(217, 200), Vector2i(218, 200), Vector2i(217, 195), Vector2i(217, 201)]
+## Umbrage's temple is read from the zone's buildings (_temple), never a
+## constant: the old Rect2i(215, 191, 6, 10) named no temple on main (economy,
+## 11-15: the one temple, Main._is_temple, at Rect2i(190, 199, 10, 6)).
 const TRADE_WORDS := ["gold", "buy", "ware", "trade", "sell", "barter"]
 
 var _met := {}
@@ -186,13 +184,55 @@ func _made_by(trade: String) -> bool:
 	return false
 
 
-## Townsfolk come into the chapel at a visiting hour: watched from inside its
-## door over a quick morning (a game hour in 30 s, from 9), a Resident not the
-## priest (Aldous works there) on a cell of the chapel more than a cell from its
-## doors, its counter and the visit's front cell.
+## Umbrage's temple as Main's places find it (decision 404; Main._is_temple,
+## the nearest to the square: the town has one), {} for none: "rect", and
+## "keep", the cells its visitors keep off (Main._temple_keep, 734 amended
+## (4): its doors' and counters' cells and those about them; the respawn cell
+## is the server's, not in a client's).
+func _temple(bot: Node) -> Dictionary:
+	var buildings: Array = bot.main._terrain.get("buildings", [])
+	if buildings.is_empty() and World.zone != null and Level.exists(World.zone.name):
+		buildings = Level.load_level(World.zone.name).get("buildings", [])
+	var best := {}
+	for building: Dictionary in buildings:
+		var rect: Rect2i = building.get("rect", Rect2i())
+		if rect.size != Vector2i.ZERO and Main._is_temple(building) and (best.is_empty()
+				or World.distance(rect.get_center(), SQUARE) < World.distance((best["rect"] as Rect2i).get_center(), SQUARE)):
+			best = {"rect": rect, "building": building}
+	if not best.is_empty():
+		best["keep"] = bot.main._temple_keep(best["building"], best["rect"])
+	return best
+
+
+## A cell of [param temple] off its keep cells, nearest its middle (where the visit is watched from).
+func _temple_spot(temple: Dictionary) -> Vector2i:
+	var rect: Rect2i = temple["rect"]
+	var best := rect.get_center()
+	var best_d := 1000000
+	for y in range(rect.position.y, rect.end.y):
+		for x in range(rect.position.x, rect.end.x):
+			var cell := Vector2i(x, y)
+			if World.is_walkable(cell) and not (temple["keep"] as Array).has(cell) and World.distance(cell, rect.get_center()) < best_d:
+				best = cell
+				best_d = World.distance(cell, rect.get_center())
+	return best
+
+
+## Whether [param cell] is in [param temple] and off its keep cells.
+static func _in_temple(temple: Dictionary, cell: Vector2i) -> bool:
+	return (temple["rect"] as Rect2i).has_point(cell) and not (temple["keep"] as Array).has(cell)
+
+
+## Townsfolk come into the temple at a visiting hour: watched from inside it
+## over a quick morning (a game hour in 30 s, from 9), a Resident not the
+## priest (Aldous works there) on a cell of the temple off its keep cells.
 func _chapel_visit(bot: Node) -> void:
 	await bot.admin("hour 9")
-	await bot.walk_to(Vector2i(217, 198), 1, 120.0)
+	var temple := _temple(bot)
+	if not bot.expect(not temple.is_empty(), "Umbrage's temple found in the zone's buildings (Main._is_temple)"):
+		return
+	bot.log_line("the temple: %s, %d keep cells" % [temple["rect"], (temple["keep"] as Array).size()])
+	await bot.walk_to(_temple_spot(temple), 1, 120.0)
 	# With npc's --test-temple-day (TOUR_TEMPLE_DAY=1 and TOUR_SERVER_ARGS
 	# carrying the flag): today is everyone's temple day, watched 9:00 to about
 	# 10:45 (each one's own clock, +-0.75 h) at a normal clock, and judged.
@@ -203,37 +243,37 @@ func _chapel_visit(bot: Node) -> void:
 	var end: int = bot.now_msec() + (420000 if judged else 240000)
 	while bot.now_msec() < end and inside.is_empty():
 		for body: GridEntity in bot.seen(""):
-			if body is Resident and str(body.get("trade")) != "priest" and CHAPEL.has_point(body.tile) 					and CHAPEL_KEEP_OFF.all(func(c: Vector2i) -> bool: return World.distance(c, body.tile) > 1):
+			if body is Resident and str(body.get("trade")) != "priest" and _in_temple(temple, body.tile):
 				inside[_who(body)] = body.tile
-				bot.log_line("in the chapel: %s at %s (%s)" % [_who(body), body.tile, body.get("activity")])
+				bot.log_line("in the temple: %s at %s (%s)" % [_who(body), body.tile, body.get("activity")])
 		await bot.seconds(1.0)
 	await bot.admin("day_minutes 90")
-	# The priest at his work (npc's 734 amended (4)): in the chapel, never on or
-	# beside its doors, its counter or the respawn cell (the coordinator, 11-01).
+	# The priest at his work (npc's 734 amended (4)): in the temple, never on or
+	# beside its doors or its counter (the coordinator, 11-01).
 	# At 15:00, inside his 13-19 work stint after his own +-0.75 h (residents.json
 	# "priest": the square 12-13; economy, 11-15).
 	await bot.admin("hour 15")
 	var found := {}  # A lambda's own assignment never reaches out (captured by value).
 	await bot.until(func() -> bool:
 		for body: GridEntity in bot.seen(""):
-			if body is Resident and str(body.get("trade")) == "priest" and CHAPEL.has_point(body.tile):
+			if body is Resident and str(body.get("trade")) == "priest" and (temple["rect"] as Rect2i).has_point(body.tile):
 				found["priest"] = body
 		return found.has("priest"), 60.0)
 	var priest: GridEntity = found.get("priest")
 	var seen_priests: Array = bot.seen("").filter(func(b: GridEntity) -> bool: return b is Resident and str(b.get("trade")) == "priest").map(func(b: GridEntity) -> String: return "%s at %s" % [_who(b), b.tile])
-	if bot.expect(priest != null, "the priest is at his work in the chapel at 15:00",
+	if bot.expect(priest != null, "the priest is at his work in the temple at 15:00",
 			"in sight from %s: %s" % [bot.cell(), seen_priests if not seen_priests.is_empty() else "no priest"]):
 		await bot.seconds(5.0)  # Settled at his spot.
-		bot.expect(CHAPEL.has_point(priest.tile) and CHAPEL_KEEP_OFF.all(func(c: Vector2i) -> bool: return World.distance(c, priest.tile) > 1),
-			"%s works in the chapel off its doors, its counter and the respawn cell" % _who(priest), "at %s" % priest.tile)
+		bot.expect(_in_temple(temple, priest.tile),
+			"%s works in the temple off its doors and its counter" % _who(priest), "at %s, the temple %s" % [priest.tile, temple["rect"]])
 	# Reported, not judged: a visit comes on a person's temple day (residents.json
 	# "temple", every 7 days by their id), which the tour can't choose yet (asked
 	# 11-01 for a test hook); one morning has about a 63% chance of nobody's.
 	if judged:
-		bot.expect(not inside.is_empty(), "on a temple day a townsperson comes into the chapel (beyond its doors and counter)",
+		bot.expect(not inside.is_empty(), "on a temple day a townsperson comes into the temple (beyond its doors and counter)",
 			"%s" % (inside if not inside.is_empty() else "none from 9:00 to about 10:45"))
 	else:
-		bot.log_line("chapel visitors from 9:00 (not judged without --test-temple-day): %s" % (inside if not inside.is_empty() else "none"))
+		bot.log_line("temple visitors from 9:00 (not judged without --test-temple-day): %s" % (inside if not inside.is_empty() else "none"))
 
 
 ## Beds at night (751; Jeff on v0.1.197: Hob slept on a bedroll, not in his
