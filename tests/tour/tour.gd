@@ -40,13 +40,20 @@ func _ready() -> void:
 
 
 func _run(tour_name: String, script: GDScript) -> void:
+	var tour: Object = script.new()
+	# A tour may set the client up as it boots, before the server puts it in
+	# its zone (sound's ears: the 3D view a real client makes at boot, so the
+	# zone's room is built by the join's own rebuild, not in one frame after
+	# it: a 12 s frame just after joining left the link at seconds of rtt
+	# until the server dropped it, 920).
+	if tour.has_method("before_join"):
+		tour.before_join(_bot)
 	_bot.log_line("tour %s: joining %s:%d" % [tour_name, Net.address, Net.port])
 	if not await _bot.joined():
 		_bot.expect(false, "joined the server", "no player after 120 s")
 		_finish(tour_name, 2)
 		return
 	_bot.log_line("joined: zone %s at %s" % [_bot.zone(), _bot.cell()])
-	var tour: Object = script.new()
 	await tour.run(_bot)
 	_finish(tour_name, 0 if _bot.failures() == 0 else 1)
 

@@ -44242,6 +44242,27 @@ and the dwelling beds, who lies in each. Who owns a bed is the server's and neve
 so a player's reading is judged: a townsperson with a trade is not on a bedroll or the ground while
 a dwelling bed stands free, and the healer sleeps in his hut's bed. It failed on Hob before npc's
 89f15f57 and passes after. Tests only, protocol unchanged, no new class_name.
+
+754 amended (8) (2026-11-15, sound): the ears tour, Umbrage by ear (tests/tour/tours/ears.gd, `sh
+tools/tour.sh ears`), the joined log a sound bullet is read on (the coordinator, 11-14: an ears read
+of a joined run with the take names heard, never a log read alone). The headless client draws its
+3D view so its sound runs, the Music bus muted. Every quarter second each sound player the view holds
+is logged (stream, slot, bus, volume, position, pitch), with every one-shot played (slot, take,
+bus), the folk near, the rtt and the longest frame, to ears.jsonl beside the report; Master is
+recorded to ears.wav where the audio driver mixes. Its legs: noon's walk by the square, the east,
+the temple's side, the huts and the store; the work leg (the store given wood by the console, so its
+carpenter takes up a build, economy's word 11-14; stood 2, 6 and 20 cells off the first worker
+sawing, hammering, chopping or hoeing); a dropped link and the reconnect (the arrival not played
+again); away out of every town's reach for 190 s and back past 600 s since the last arrival (578
+amended (4)); the night's walk. EARS_ONLY=hearth walks the Mughouse's floor alone (920: beside the
+fire, a hearth sit, the room's middle, a far table's seat, the counter's guest side, the street
+before its door). tour.gd gains a hook a tour may define, before_join(bot), called as the client
+boots and before the server places it: the ears tour makes the 3D view there, so the zone's room is
+built by the join's own rebuild. Made a frame after joining, it stalled 12 s, the link's rtt ran to
+seconds and the server dropped it (920's first reads). A tour without the hook runs as before. It
+writes nothing under user://: tools/tour.sh runs both Godots under build/tours/ears/appdata. Tests
+only, protocol unchanged, no new class_name.
+
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping
