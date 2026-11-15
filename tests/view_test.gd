@@ -4839,6 +4839,7 @@ func _test_window_light() -> void:
 		return not _rig._indoors(Vector2i(roundi(at.x), roundi(at.z))))
 	_check(int(evening[0]) > 0 and int(evening[1]) == int(evening[0]) and int(evening[2]) == int(evening[3]) and outside,
 			"21:30: a patch outside each of its lit windows with a leaf open, none in the house (rows, lit, drawn, open: %s; unrowed %s)" % [evening, unrowed])
+	_test_window_floor()
 	# A window's shutters: its open share, a leaf open of two half its light, both shut none, none to have all.
 	var piece := Node3D.new()
 	var glow := Node3D.new()
@@ -4860,6 +4861,60 @@ func _test_window_light() -> void:
 	_check(int(noon[2]) == 0, "noon: none (%s)" % [noon])
 	DayNight.set_hour(hour_was)
 	_rig.set_town("stage_town", {})
+
+
+## 927 amended (1): the patch's floor. Unlit ground at a wall's foot reads
+## 45 to 60 shown (the multiply alone, 29: from the first view the temple's
+## forecourt showed nothing), lit ground within a few levels of the multiply,
+## and inside a carried lantern's light the multiply's alone, so a body's own
+## ground (858's ratio) is as it was. Called inside _test_window_light, at
+## 21:30 with its house's patches drawn.
+func _test_window_floor() -> void:
+	var mean := func(c: Color) -> float: return (c.r + c.g + c.b) / 3.0 * 255.0
+	var unlit := Color8(8, 12, 20)
+	var foot: float = mean.call(Client3D.window_floor_shown(unlit, 1.0))
+	var near_house: float = mean.call(Client3D.window_floor_shown(unlit, Client3D.WINDOW_LIGHT_NEAR))
+	var multiply_alone: float = mean.call(Client3D.window_floor_shown(unlit, 1.0, 0.0))
+	_check(foot >= 45.0 and foot <= 60.0 and near_house >= 45.0 and multiply_alone < 45.0,
+			"unlit cobbles (8, 12, 20) at a wall's foot: %.1f shown, a near house's %.1f (45 to 60; the multiply alone %.1f)" % [foot, near_house, multiply_alone])
+	var moved := []
+	for grey: int in [80, 130, 180]:
+		var ground := Color8(grey, grey, grey)
+		moved.append(snappedf(mean.call(Client3D.window_floor_shown(ground, 1.0)) - mean.call(Client3D.window_floor_shown(ground, 1.0, 0.0)), 0.1))
+	_check(moved.all(func(levels: float) -> bool: return levels >= 0.0 and levels <= 6.0),
+			"lit ground of 80, 130 and 180 at a wall's foot: up %s levels on the multiply alone (at most 6)" % [moved])
+	# The floor is the multiply's next pass, an add; its carried lanterns are the shown ones.
+	var mul := _rig._window_light.material_override as ShaderMaterial
+	var add := mul.next_pass as ShaderMaterial if mul != null else null
+	_check(add != null and add.shader.code.contains("blend_add") and mul.shader.code.contains("blend_mul")
+			and is_equal_approx(float(add.get_shader_parameter("floor_add")), Client3D.WINDOW_LIGHT_FLOOR),
+			"the floor drawn as the multiply's next pass, an add of %.2f" % Client3D.WINDOW_LIGHT_FLOOR)
+	var bearers: Array = []
+	for at: Vector3 in [Vector3(3.0, 0.0, 3.0), Vector3(40.0, 0.0, 3.0)]:
+		var bearer := Node3D.new()
+		var lantern := OmniLight3D.new()
+		lantern.name = "Lantern"
+		lantern.omni_range = Client3D.PLAYER_LIGHT_RANGE
+		lantern.light_energy = 1.0
+		bearer.add_child(lantern)
+		add_child(bearer)
+		bearer.global_position = at
+		bearers.append(bearer)
+	var both := Client3D.window_floor_lights(bearers, Vector3(2.0, 0.0, 3.0))
+	(bearers[1].get_node("Lantern") as OmniLight3D).visible = false  # Covered (L).
+	var one := Client3D.window_floor_lights(bearers, Vector3(2.0, 0.0, 3.0))
+	for bearer: Node3D in bearers:
+		bearer.free()
+	_check(both.size() == 2 and is_equal_approx(both[0].x, 3.0) and is_equal_approx(both[0].w, Client3D.PLAYER_LIGHT_RANGE)
+			and one.size() == 1 and is_equal_approx(one[0].x, 3.0),
+			"the floor kept off the carried lanterns lit, nearest the view first, a covered one none (%s, then %s)" % [both, one])
+	# A body's own lantern-lit ground (the joined looks' (55, 45, 35)) inside its light: the multiply's alone.
+	var own := Color8(55, 45, 35)
+	var inside: float = mean.call(Client3D.window_floor_shown(own, 1.0, 0.0))
+	var lone: float = mean.call(Client3D.window_floor_shown(own, 1.0, 1.0))
+	_check(add != null and add.shader.code.contains("smoothstep(reach * near_share, reach")
+			and is_equal_approx(float(add.get_shader_parameter("near_share")), Client3D.WINDOW_FLOOR_NEAR) and lone > inside,
+			"inside a carried lantern's light the floor fades out from %.1f of its range (own ground %.1f, as the multiply; with the floor it would read %.1f)" % [Client3D.WINDOW_FLOOR_NEAR, inside, lone])
 
 
 ## The plinth (decision 489 amended): a kind's wood walls on a stone band
