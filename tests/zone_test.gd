@@ -537,6 +537,15 @@ func _test_arrival_shelter() -> void:
 	_check(_main.travel(BO, "sample") and _main.travel(BO, "test_room", "from_sample"), "Bo crosses there and back")
 	bo = _player(BO)
 	_check(not World.is_sheltered(bo) and bo.protected, "inside the cooldown: spawn grace alone")
+	# 661 amended (2): the grace of a crossing inside the cooldown waits on the lift, to the shelter's bound.
+	var cool_was := World.enter_named(bo.zone)
+	_check(bo.protected_until_tick == World.tick + _main.ARRIVAL_SHELTER_TICKS, "held to the shelter's bound (%d) till his card lifts" % _main.ARRIVAL_SHELTER_TICKS)
+	for i in 45:
+		World.step()
+	_check(bo.protected, "45 ticks on with no lift, still in grace")
+	_main._on_command(bo, "view_ready", {"zone": bo.zone})
+	_check(not World.is_sheltered(bo) and bo.protected and bo.protected_until_tick == World.tick + _main.SPAWN_GRACE_TICKS, "the lift: %d ticks from now" % _main.SPAWN_GRACE_TICKS)
+	World.enter(cool_was)
 
 	_main._sheltered_at.clear()
 	_main.travel(BO, "sample")

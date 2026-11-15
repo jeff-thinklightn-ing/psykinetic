@@ -78,6 +78,26 @@ func _test_spawn_grace() -> void:
 	_rejoin()
 	var player := _player()
 	_check(player.protected, "a newly spawned player is protected")
+	# 661 amended (2): the arrival card holds a joiner's hands, so the grace waits on his client's view_ready.
+	_check(player.protected_until_tick == World.tick + _main.ARRIVAL_SHELTER_TICKS, "a join's grace is held to the shelter's bound (%d ticks) till the lift" % _main.ARRIVAL_SHELTER_TICKS)
+	var foe := _spawn_imp(player.tile + Vector2i(1, 0))
+	foe.sight_range = 7
+	var foe_at := foe.tile
+	var hp := player.hp
+	for i in 45:
+		World.step()
+	_check(player.protected and player.hp == hp and foe.tile == foe_at, "45 ticks on with no lift, a sighted imp beside him lands nothing and does not close (hp %d of %d, imp at %s)" % [player.hp, hp, foe.tile])
+	World.damage(foe, 999)
+	_main._on_command(player, "view_ready", {"zone": player.zone})
+	_check(player.protected and player.protected_until_tick == World.tick + _main.SPAWN_GRACE_TICKS, "the lift: the %d ticks run from now" % _main.SPAWN_GRACE_TICKS)
+	_rejoin()
+	player = _player()
+	for i in _main.ARRIVAL_SHELTER_TICKS + 1:
+		World.step()
+	_check(not player.protected, "a client that never lifts is open after the bound (%d ticks)" % _main.ARRIVAL_SHELTER_TICKS)
+	_rejoin()
+	player = _player()
+	_main._on_command(player, "view_ready", {"zone": player.zone})
 	var imp := _spawn_imp(player.tile + Vector2i(-3, 0))
 	imp.sight_range = 7
 	var imp_start := imp.tile

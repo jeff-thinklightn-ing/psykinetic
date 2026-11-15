@@ -425,6 +425,9 @@ var _arrived_at: Dictionary[int, int] = {}
 ## Server: when (Time.get_ticks_msec) each player id was last sheltered on
 ## arriving (decision 661); zones' ticks differ, so the clock is the machine's.
 var _sheltered_at: Dictionary[String, int] = {}
+## Server: by peer, a player whose spawn grace waits on their client's view_ready (decision 661 amended (2)): the
+## arrival card holds his hands, so the 30 ticks run from its lift, not from the arrival.
+var _lift_awaited: Dictionary[int, bool] = {}
 ## Camp place id -> the tick it was first seen undefended with a player in
 ## it (decision 429); not saved, so a restart starts the clock again.
 var _camp_clear_since: Dictionary[String, int] = {}
@@ -5993,6 +5996,8 @@ func _view_ready(player: Player, zone_name: String) -> void:
 	if zone_name != player.zone:
 		return
 	World.unshelter(player, SPAWN_GRACE_TICKS)
+	if _lift_awaited.erase(player.owner_peer) and player.protected and not player.sheltered:
+		player.protected_until_tick = World.tick + SPAWN_GRACE_TICKS  # 661 amended (2): plain grace runs from the lift.
 	# Where their companion is, said again once they can see (the first
 	# went by under the loading), when the view took a while.
 	if Time.get_ticks_msec() - int(_where_told.get(player.owner_peer, 0)) > WHERE_AGAIN_MS and _where_told.has(player.owner_peer):
@@ -7634,7 +7639,13 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		return
 	if known and not respawn:
 		World.restore(player, record.hp if record.hp > 0 else player.max_hp, record.stamina, record.facing)
-	World.protect(player, SPAWN_GRACE_TICKS)
+	# 661 amended (2): a join or a travel's grace waits on the client's lift (its card holds his hands), at most
+	# ARRIVAL_SHELTER_TICKS from now; a respawn has no card, so keeps the 30 ticks.
+	World.protect(player, SPAWN_GRACE_TICKS if respawn else ARRIVAL_SHELTER_TICKS)
+	if respawn:
+		_lift_awaited.erase(peer)
+	else:
+		_lift_awaited[peer] = true
 	_arrived_at[peer] = World.tick
 	player.player_id = id
 	player.body = record.body
