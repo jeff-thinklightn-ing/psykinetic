@@ -3921,6 +3921,7 @@ func _test_kinds() -> void:
 			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
 	_test_composer()
 	_test_stages()
+	_test_window_light()
 	_test_window_slot()
 	_test_plinth()
 	_test_open_kinds()
@@ -4603,6 +4604,94 @@ func _test_stages() -> void:
 		Client3D.lamp_lit({"H1": false}, "H1", 20.0, -5.0), Client3D.lamp_lit({"H1": true}, "H1", 13.0, 40.0)]
 	_check(lit == [true, false, true, false, false],
 			"a window lit with the sun down: as its building's awake says, else till 22 (%s)" % [lit])
+
+
+## 927: each lit window's light on the ground outside it, while the sun is
+## down: a patch per pane, out from the wall as far as its top's height sets,
+## never on another building's cells, a lantern's door cell or water; out with
+## its pane.
+func _test_window_light() -> void:
+	print("\n== window light on the ground (927): a patch outside each lit window, on outdoor ground only ==")
+	# Two houses a cell apart; a 1 m pane in the first's south wall (the line y = 3.5), its top 2 m up.
+	var a := Rect2i(0, 0, 4, 4)
+	var b := Rect2i(0, 5, 4, 4)
+	var rects: Array[Rect2i] = [a, b]
+	var held := func(cell: Vector2i) -> bool: return rects.any(func(rect: Rect2i) -> bool: return rect.has_point(cell))
+	var flat := func(_at: Vector2) -> float: return 0.0
+	var pane := AABB(Vector3(-0.5, -0.5, -0.02), Vector3(1.0, 1.0, 0.04))
+	var patch := Client3D.window_patch(Transform3D(Basis(), Vector3(1.5, 1.5, 3.5)), pane, held, rects, flat)
+	var place: Transform3D = patch.get("place", Transform3D())
+	var reach := clampf(2.0 * Client3D.WINDOW_LIGHT_OUT, Client3D.WINDOW_LIGHT_REACH.x, Client3D.WINDOW_LIGHT_REACH.y)
+	_check(not patch.is_empty() and patch["rect"] == a and patch["cell"] == Vector2i(2, 4),
+			"a pane's patch: its house's, its outside the gap's cell (%s)" % [patch])
+	_check(place.origin.z > 3.5 and absf(place.origin.x - 1.5) < 0.01 and is_equal_approx(place.basis.z.length(), reach)
+			and is_equal_approx(place.basis.x.length(), Client3D.WINDOW_LIGHT_SPREAD) and place.basis.determinant() > 0.0,
+			"out from the wall %.2f m (its top's 2 m), as wide as its pane spread at its end, face up (%s)" % [reach, place])
+	# Turned the other way in its wall (the pane's box the same), it still finds its outside.
+	var turned := Client3D.window_patch(Transform3D(Basis(Vector3.UP, PI), Vector3(1.5, 1.5, 3.5)), pane, held, rects, flat)
+	_check(not turned.is_empty() and (turned["place"] as Transform3D).origin.z > 3.5, "a pane turned round in its wall: the same outside")
+	var lancet := Client3D.window_patch(Transform3D(Basis(), Vector3(1.5, 2.6, 3.5)), AABB(Vector3(-0.4, -1.8, -0.02), Vector3(0.8, 3.6, 0.04)), held, rects, flat)
+	_check(not lancet.is_empty() and (lancet["place"] as Transform3D).basis.z.length() > 2.5,
+			"a tall lancet's reaches further (%.2f m)" % [(lancet.get("place", Transform3D()) as Transform3D).basis.z.length()])
+	var lanterns: Dictionary[Vector2i, bool] = {Vector2i(3, 4): true}
+	var may := [_rig._window_light_may(Vector2i(1, 4), held, lanterns), _rig._window_light_may(Vector2i(1, 5), held, lanterns),
+			_rig._window_light_may(Vector2i(1, 3), held, lanterns), _rig._window_light_may(Vector2i(3, 4), held, lanterns)]
+	_check(may == [true, false, false, false],
+			"the strip between the houses lit; never the next house's cell, its own, nor a lantern's door cell (%s)" % [may])
+	# A house standing, at 21:30 and after LAMP_OUT, and by day.
+	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false]])
+	_rig.rebuild(level["terrain"], Vector2i(4, 11))
+	var house: Dictionary = _rig._buildings[0]
+	house["use"] = "house"
+	house["town_id"] = "stage_town"
+	_rig.set_town("stage_town", {"house": {"state": Towns.STANDING, "level": 1}})
+	var hour_was := DayNight.hour(DayNight.now())
+	var read := func(hour: float) -> Array:
+		DayNight.set_hour(hour)
+		_rig._update_lamps()
+		_rig._place_window_light()
+		var lit := _rig._glows.filter(func(each: Array) -> bool: return is_instance_valid(each[0]) and (each[0] as Node3D).is_visible_in_tree()).size()
+		var open := _rig._window_light_rows.filter(func(row: Array) -> bool: return is_instance_valid(row[0]) and (row[0] as Node3D).is_visible_in_tree() and float(row[3]) > 0.0).size()
+		return [_rig._window_light_rows.size(), lit, _rig._window_light.multimesh.visible_instance_count, open]
+	var evening: Array = read.call(21.5)
+	# Any lit pane left without a patch, its place and the cells either side of it (indoors or not).
+	var rowed := _rig._window_light_rows.map(func(row: Array) -> Object: return row[0])
+	var unrowed := []
+	for each: Array in _rig._glows:
+		var glow := each[0] as MeshInstance3D
+		if is_instance_valid(glow) and glow.is_visible_in_tree() and not rowed.has(glow):
+			var at := glow.global_position
+			var normal := glow.global_basis.z.normalized()
+			var sides := [Vector2i(roundi(at.x + normal.x * 0.7), roundi(at.z + normal.z * 0.7)), Vector2i(roundi(at.x - normal.x * 0.7), roundi(at.z - normal.z * 0.7))]
+			unrowed.append([at, sides, sides.map(func(cell: Vector2i) -> bool: return _rig._indoors(cell))])
+	var late: Array = read.call(23.0)
+	var noon: Array = read.call(12.0)
+	var outside := _rig._window_light_rows.all(func(row: Array) -> bool:
+		var at := (row[2] as Transform3D).origin
+		return not _rig._indoors(Vector2i(roundi(at.x), roundi(at.z))))
+	_check(int(evening[0]) > 0 and int(evening[1]) == int(evening[0]) and int(evening[2]) == int(evening[3]) and outside,
+			"21:30: a patch outside each of its lit windows with a leaf open, none in the house (rows, lit, drawn, open: %s; unrowed %s)" % [evening, unrowed])
+	# A window's shutters: its open share, a leaf open of two half its light, both shut none, none to have all.
+	var piece := Node3D.new()
+	var glow := Node3D.new()
+	piece.add_child(glow)
+	for leaf_name: String in ["shutter_a", "shutter_b"]:
+		var leaf := Node3D.new()
+		leaf.name = leaf_name
+		piece.add_child(leaf)
+	var shares := [Client3D.window_open_share(glow)]
+	glow.set_meta(&"window_piece", piece)
+	shares.append(Client3D.window_open_share(glow))
+	(piece.get_node("shutter_a") as Node3D).rotation_degrees.y = 95.0
+	shares.append(Client3D.window_open_share(glow))
+	(piece.get_node("shutter_b") as Node3D).rotation_degrees.y = -100.0
+	shares.append(Client3D.window_open_share(glow))
+	piece.free()
+	_check(shares == [1.0, 0.0, 0.5, 1.0], "a window's light by its shutters: no piece known 1, both shut 0, one open 0.5, both 1 (%s)" % [shares])
+	_check(int(late[1]) == 0 and int(late[2]) == 0, "23:00, its lamps out (none awake): no patch (%s)" % [late])
+	_check(int(noon[2]) == 0, "noon: none (%s)" % [noon])
+	DayNight.set_hour(hour_was)
+	_rig.set_town("stage_town", {})
 
 
 ## The plinth (decision 489 amended): a kind's wood walls on a stone band

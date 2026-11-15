@@ -3759,6 +3759,7 @@ func _process(delta: float) -> void:
 		return  # Half a room (decision 660): nothing to ease, fade or grow yet.
 	_end_warm_ups()
 	_sync_puppets()
+	_place_window_light()
 	WetLook.update(self, delta)  # Bodies wet from water and rain, and drying (775).
 	_update_seen_through()
 	_sync_doors()
@@ -11781,6 +11782,7 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		made.rotation.y = PI
 	if glow != null and _window_code.has(key):
 		_glows.append([glow, _window_code[key]])
+		glow.set_meta(&"window_piece", made)  # Its leaves, for its light on the ground (927).
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
 				DayNight.elevation(DayNight.now()))
 	made.scale.y = _height_of(key) / window_drawn_height(slot)
@@ -22123,6 +22125,256 @@ func _set_transparency(puppet: Node3D, transparency: float) -> void:
 	for node in _descendants(puppet):
 		if node is GeometryInstance3D:
 			(node as GeometryInstance3D).transparency = transparency
+
+
+# --- Window light on the ground (927, "Umbrage at night: window light") ------
+
+## Each lit window's light on the ground outside it while the sun is down
+## (927): a warm patch, as wide as the pane at the wall and WINDOW_LIGHT_SPREAD
+## times that at its end, WINDOW_LIGHT_OUT of the pane's top height out from
+## the wall (WINDOW_LIGHT_REACH bounds it), brightest at the wall's foot and
+## gone at its end. One MultiMesh outside every building's tree, each quad
+## multiplying the frame under it by 1 + tint x gain x its strength
+## (blend_mul above 1 on Forward+'s float buffer: the ground's own colour
+## brightened as a lamp's light would, no screen copy), so a body standing
+## in it, drawn in front, keeps its own light. It falls on outdoor ground
+## only (_window_light_may: never in a building's rect, on water, or on a
+## door's cell whose lantern lights it), so a window a metre from the next
+## house lights the strip between and stops at that wall. Its pane out, it
+## is out the same frame; a lit house in the near pick (its light inside
+## reaching a little past its walls) keeps WINDOW_LIGHT_NEAR of it.
+const WINDOW_LIGHT_TINT := Color(1.0, 0.7, 0.4)  # HOUSE_LIGHT's
+const WINDOW_LIGHT_GAIN := 4.9  # linear; the tint is a source colour (linear 1, 0.45, 0.13: a luma of 0.54), so about 3.7 times on grey at the wall's foot, shown about 2.1 times the night cobbles (perf's Lenovo curve; 3.6 read 1.4 to 1.6 on the Atlas, 927)
+const WINDOW_LIGHT_SPREAD := 1.6
+const WINDOW_LIGHT_OUT := 0.8  # a house window's top 2 m: 1.6 m out (0.6, with its light falling as the square, read as a line along the wall foot: look_win927)
+const WINDOW_LIGHT_REACH := Vector2(0.8, 3.0)
+const WINDOW_LIGHT_NEAR := 0.75  # a near house's patch (its light inside spills past its walls): shown about 1.9 (0.5 read 1.4 to 1.6, and the houses a player looks at are the near ones)
+const WINDOW_LIGHT_LIFT := 0.03
+const WINDOW_LIGHT_MOST := 256
+const WINDOW_LIGHT_MARGIN := 4  # cells round the windows the may-light mask covers
+const WINDOW_LIGHT_SHADER := """shader_type spatial;
+render_mode blend_mul, unshaded, fog_disabled, depth_draw_never, shadows_disabled, cull_back;
+uniform vec3 tint : source_color = vec3(1.0, 0.7, 0.4);
+uniform float gain = 4.9;
+uniform float spread = 1.6;
+uniform sampler2D may : filter_nearest, repeat_disable;
+uniform vec2 may_origin;
+uniform vec2 may_size = vec2(1.0);
+varying vec2 local;
+varying vec3 world;
+varying float strength;
+void vertex() {
+	local = VERTEX.xz;
+	strength = INSTANCE_CUSTOM.r;
+	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	vec4 view = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	view.z += 0.05;
+	POSITION = PROJECTION_MATRIX * view;
+}
+void fragment() {
+	float out_share = clamp(local.y + 0.5, 0.0, 1.0);
+	float half_width = 0.5 * mix(1.0 / spread, 1.0, out_share);
+	float edge = 1.0 - smoothstep(0.6, 1.0, abs(local.x) / half_width);
+	float fall = 1.0 - smoothstep(0.35, 1.0, out_share);  // full a third out, soft to its end (a pool, not a line along the wall)
+	float ok = texture(may, (world.xz - may_origin + vec2(0.5)) / may_size).r;
+	float k = strength * fall * edge * ok;
+	if (k <= 0.002) {
+		discard;
+	}
+	ALBEDO = vec3(1.0) + tint * gain * k;
+}
+"""
+var _window_light: MultiMeshInstance3D
+## One row per window with a glow pane: [glow, building rect (or an empty
+## Rect2i), transform of its patch, its window's open share].
+var _window_light_rows: Array[Array] = []
+## What the rows and the mask were made from (the room, the glows' count, the
+## door lamps' and house lights'), to make them again when it changes (a
+## neighbour's room swapped in, 822, changes the room).
+var _window_light_key: Array = []
+
+
+func _make_window_light() -> void:
+	_window_light = MultiMeshInstance3D.new()
+	_window_light.name = "WindowLight"
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_custom_data = true
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	multimesh.mesh = plane
+	multimesh.instance_count = WINDOW_LIGHT_MOST
+	multimesh.visible_instance_count = 0
+	_window_light.multimesh = multimesh
+	var shader := Shader.new()
+	shader.code = WINDOW_LIGHT_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("tint", WINDOW_LIGHT_TINT)
+	material.set_shader_parameter("gain", WINDOW_LIGHT_GAIN)
+	material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
+	_window_light.material_override = material
+	_window_light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_window_light.custom_aabb = AABB(Vector3(-100000.0, -1000.0, -100000.0), Vector3(200000.0, 2000.0, 200000.0))
+	add_child(_window_light)
+
+
+## Every lit window's patch this frame (927): out of doors, the sun down.
+func _place_window_light() -> void:
+	if _window_light == null:
+		_make_window_light()
+	var multimesh := _window_light.multimesh
+	if not bool(_terrain.get("outdoor", false)) or not _night:
+		multimesh.visible_instance_count = 0
+		return
+	var key := [_room, _glows.size(), _door_lamps.size(), _house_lights.size()]
+	if key != _window_light_key or _window_light_rows.any(func(row: Array) -> bool: return not is_instance_valid(row[0])):
+		_window_light_key = key
+		_build_window_light()
+	var near: Array[Rect2i] = []
+	for at: Vector2i in _house_lights:
+		var entry: Array = _house_lights[at]
+		if is_instance_valid(entry[0]) and (entry[0] as OmniLight3D).visible:
+			near.append(entry[2])
+	var shown := 0
+	for row: Array in _window_light_rows:
+		if shown >= WINDOW_LIGHT_MOST:
+			break
+		var glow := row[0] as Node3D
+		if not is_instance_valid(glow) or not glow.is_visible_in_tree():
+			continue
+		var strength := (WINDOW_LIGHT_NEAR if near.has(row[1]) else 1.0) * float(row[3])
+		if strength <= 0.0:
+			continue
+		multimesh.set_instance_transform(shown, row[2])
+		multimesh.set_instance_custom_data(shown, Color(strength, 0.0, 0.0, 0.0))
+		shown += 1
+	multimesh.visible_instance_count = shown
+
+
+## How much of [param glow]'s window is open to the street (927): its window
+## piece's shutter leaves swung open over those it has (489 amended: a third
+## stand shut, and a leaf with no room to swing stays shut), 1 for a window
+## with none (a lancet, a grate), or a pane not dressed as a window
+## (_dress_window marks its piece). A shut leaf hides the pane behind it, so
+## a window shut both sides throws no light (look_win927: a warm patch under a
+## dark side window).
+static func window_open_share(glow: Node3D) -> float:
+	if not glow.has_meta(&"window_piece"):
+		return 1.0
+	var held: Variant = glow.get_meta(&"window_piece")
+	if not is_instance_valid(held):
+		return 1.0
+	var piece := held as Node
+	var leaves: Array[Node3D] = []
+	for leaf_name: String in ["shutter_a", "shutter_b"]:
+		var leaf := piece.find_child(leaf_name, true, false) as Node3D
+		if leaf != null:
+			leaves.append(leaf)
+	if leaves.is_empty():
+		return 1.0
+	var open := leaves.filter(func(leaf: Node3D) -> bool: return absf(leaf.rotation_degrees.y) > 45.0).size()
+	return float(open) / leaves.size()
+
+
+## The rows (_window_light_rows) and the mask of where a patch may fall, from
+## the glow panes now drawn.
+func _build_window_light() -> void:
+	_window_light_rows.clear()
+	var buildings := _drawn_buildings()
+	var rects: Array[Rect2i] = []
+	for building: Variant in buildings:
+		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i:
+			rects.append((building as Dictionary)["rect"])
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	for each: Array in _glows:
+		var glow := each[0] as MeshInstance3D
+		if not is_instance_valid(glow) or glow.mesh == null:
+			continue
+		var patch := window_patch(glow.global_transform, glow.get_aabb(), _indoors, rects, _ground_height)
+		if patch.is_empty():
+			continue
+		_window_light_rows.append([glow, patch["rect"], patch["place"], window_open_share(glow)])
+		var cell: Vector2i = patch["cell"]
+		low = Vector2i(mini(low.x, cell.x), mini(low.y, cell.y))
+		high = Vector2i(maxi(high.x, cell.x), maxi(high.y, cell.y))
+	if _window_light_rows.is_empty():
+		return
+	var origin := low - Vector2i.ONE * WINDOW_LIGHT_MARGIN
+	var size := high - low + Vector2i.ONE * (WINDOW_LIGHT_MARGIN * 2 + 1)
+	var lanterns: Dictionary[Vector2i, bool] = {}
+	for front: Vector2i in _door_lamps:
+		lanterns[front] = true
+	for at: Vector2i in _house_lights:
+		var entry: Array = _house_lights[at]
+		if entry.size() > 7 and entry[6] is Vector2i:
+			lanterns[entry[6]] = true
+	var bytes := PackedByteArray()
+	bytes.resize(size.x * size.y)
+	for y in size.y:
+		for x in size.x:
+			var cell := origin + Vector2i(x, y)
+			bytes[y * size.x + x] = 255 if _window_light_may(cell, _indoors, lanterns) else 0
+	var material := _window_light.material_override as ShaderMaterial
+	material.set_shader_parameter("may", ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_R8, bytes)))
+	material.set_shader_parameter("may_origin", Vector2(origin))
+	material.set_shader_parameter("may_size", Vector2(size))
+
+
+## Whether a window's light may fall on [param cell] (927): outdoor ground,
+## inside no building ([param held]: a cell's _indoors, so an L-house's
+## corner is out of doors), not water, not a door's cell a lantern of
+## [param lanterns] lights.
+func _window_light_may(cell: Vector2i, held: Callable, lanterns: Dictionary[Vector2i, bool]) -> bool:
+	if lanterns.has(cell) or _terrain_water_has(cell):
+		return false
+	return not bool(held.call(cell))
+
+
+## A window's patch (927) from its glow pane's [param glow] transform and
+## local [param box]: the pane's width along the wall, its out side the one
+## whose cell is not inside a building ([param held]: a cell's _indoors, so
+## an L-house's corner is outside), its top's height over the ground
+## ([param ground]: a grid point's height) setting how far out it reaches.
+## {"place": the patch quad's Transform3D (a unit plane: x across, z out),
+## "rect": the building it is in (of [param rects]; an empty Rect2i if none), "cell": the cell
+## outside it}, or {} for a pane with no outside.
+static func window_patch(glow: Transform3D, box: AABB, held: Callable, rects: Array[Rect2i], ground: Callable) -> Dictionary:
+	var world := glow * box
+	var middle := world.get_center()
+	var a := glow.basis.x * box.size.x
+	var b := glow.basis.z * box.size.z
+	var a_flat := Vector2(a.x, a.z)
+	var b_flat := Vector2(b.x, b.z)
+	var along := a_flat if a_flat.length() >= b_flat.length() else b_flat
+	var width := along.length()
+	if width < 0.05:
+		return {}
+	var out := Vector2(-along.y, along.x).normalized()
+	var inside := Rect2i()
+	for sign_of: float in [1.0, -1.0]:
+		var probe := Vector2(middle.x, middle.z) + out * sign_of * 0.7
+		var cell := Vector2i(roundi(probe.x), roundi(probe.y))
+		if not bool(held.call(cell)):
+			out *= sign_of
+			var back := Vector2(middle.x, middle.z) - out * 0.7
+			for rect: Rect2i in rects:
+				if rect.has_point(Vector2i(roundi(back.x), roundi(back.y))):
+					inside = rect
+			var foot := Vector2(middle.x, middle.z) + out * 0.05
+			var floor_y: float = ground.call(foot + out * 0.5)
+			var top := world.end.y - floor_y
+			var reach := clampf(top * WINDOW_LIGHT_OUT, WINDOW_LIGHT_REACH.x, WINDOW_LIGHT_REACH.y)
+			var across := Vector3(along.x, 0.0, along.y).normalized()
+			var outward := Vector3(out.x, 0.0, out.y)
+			var centre := Vector3(foot.x, floor_y + WINDOW_LIGHT_LIFT, foot.y) + outward * reach * 0.5
+			# The unit plane's +z is outward; its x across, as wide as the end.
+			var basis := Basis(across * width * WINDOW_LIGHT_SPREAD, Vector3.UP, outward * reach)
+			if basis.determinant() < 0.0:
+				basis = Basis(-across * width * WINDOW_LIGHT_SPREAD, Vector3.UP, outward * reach)
+			return {"place": Transform3D(basis, centre), "rect": inside, "cell": cell}
+	return {}
 
 
 # --- Entities ----------------------------------------------------------------

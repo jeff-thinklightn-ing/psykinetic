@@ -56746,3 +56746,67 @@ is the frames after the dagger is put in his hand (about 11.8 s twice), not
 the sound's. Animation's joined clip of ten held stabs (combat's b6a5c2edd)
 is read against the same three when it lands. Client sound only; protocol
 unchanged; no new class_name.
+## 927. A lit window's light on the ground outside it (environment; package "Umbrage at night: window light")
+
+The coordinator's approval of 11-14, after environment's three-worst row of the same day: at night the
+temple's lancets shine over a black forecourt. Its house light (489 amended (3)) sits at the middle of its
+floor and reaches half its longer side and HOUSE_LIGHT_BEYOND, at most HOUSE_LIGHT_RANGE (4.5 m); the small
+temple is 6 by 10 and its west front 5 m from that middle, so the light ends inside its walls, and the
+lancets' glow panes (emissive) light nothing. The same gap stands at every house outside the near pick.
+
+Each lit window now throws a warm patch on the ground outside it while the sun is down
+(Client3D._place_window_light, after _sync_puppets): one MultiMesh outside every building's tree, a row per
+glow pane in _glows (Client3D.window_patch: the pane's width along its wall, its outside the side whose cell
+is not inside a building (_indoors, so an L-house's inner corner is outside), out from the wall WINDOW_LIGHT_OUT of the pane's top height, bounded by
+WINDOW_LIGHT_REACH: a house window about 1.6 m, the temple's lancets 3 m), as wide as the pane at the
+wall and WINDOW_LIGHT_SPREAD times that at its end, full to a third of the way out and soft to nothing at its
+end (falling as the square of the way out, and 1.2 m long, it read as a thin line along the wall's foot in
+the joined look). A window throws light as its shutters let it (Client3D.window_open_share: the leaves swung
+open over those its piece has, 1 with none; _dress_window marks the pane's piece): one leaf open of two, half;
+both shut (a third of windows, and a leaf with no room to swing), none, where the look found a warm patch
+under a dark window. Each
+quad multiplies the frame under it by 1 + WINDOW_LIGHT_TINT x WINDOW_LIGHT_GAIN x its strength (blend_mul,
+unshaded, fog off): above 1 on Forward+'s float scene buffer, so the ground's own colour is brightened as a
+lamp's light would brighten it, with no screen copy (perf's reading of the renderer). perf's Lenovo figure
+(GTX 1660 Ti, Vulkan Forward+, 1600 x 900, 11-14, a throwaway test quad at a factor of 2 on Umbrage's cobbles at
+21:30, each pair one frame apart, 81 points by 3): the buffer doubles exactly (linear 1.996 to 2.000, nothing
+clipped); as shown (sRGB, the colour adjustments as played, which are 1.0 today and change nothing) 1.53 to 1.55
+on the night cobbles, more on darker ground and less on lighter, the sRGB curve being steep low down (perf's
+table: ground at 0.05 shows 1.70, at 0.15 1.46, at 0.5 1.37). The tint is a source colour, so the shader holds it
+linear (1, 0.45, 0.13: a luma of 0.54, not the 0.74 its sRGB numbers give); at a gain of 3.6 and a near house's
+half the joined look on the Atlas (ui-design's look_win927, 21:30) read 1.35 to 1.60 at the wall's foot, faint at
+play size, and every house it read was a near one. So WINDOW_LIGHT_GAIN 4.9 (about 3.7 times on grey at the
+wall's foot), worked from that curve to show about 2.1 times the night cobbles and about 2.0 times night grass,
+and a near house's share WINDOW_LIGHT_NEAR 0.75, about 1.9 shown. The figures here and in the bullet are as shown. Frame cost:
+none resolved at that size, under about 1 ms within the run's drift (means 11.55, 11.65, 11.86, 12.98 ms off,
+on, off, on). A body standing in it is drawn in
+front of the quad and keeps its own light: ground only, no new light on bodies. Lighting a body by a front
+stays the door lanterns' (489 amended (9), the near 4) and the temple's door lamp's (782).
+
+Where it falls (_window_light_may, a cell mask round the windows, nearest-filtered so it stops on the cell
+lines walls stand on): outdoor ground only; never inside a building (_indoors: its own or the next house's; a window
+a metre from the next house lights the strip between and stops at that wall), never water, never a door's
+cell a lantern lights (782's door lamps, a house's own lantern). Nothing lit twice: a lit house in the near
+pick (its light inside reaching a little past a small house's walls) keeps WINDOW_LIGHT_NEAR of its patches.
+Patches that meet compound: each multiplies the frame, so two houses' at the same ground read 2.5 to 2.7 as
+shown where light adding would give about 2.2 to 2.3 (the coordinator's keep: rare, well short of white on night
+ground). A third source laid the same way over them (none today: a lantern's door cell takes none) would
+compound again; mind it before adding one.
+Its pane out (LAMP_OUT, a building told empty or asleep, 566), the patch is out the same frame: it follows
+the glow's own visibility. The foot marks of the look then on trial (environment's (a)) are gone after dusk
+by their own rule, so the two never meet.
+
+Tests: view_world_test _test_window_light (a pane's patch, its outside found either way round in its wall, a
+lancet's reach, the mask between two houses a cell apart and on a lantern's door cell, a standing house at
+21:30, after LAMP_OUT and at noon). Stills before landing (the coordinator's list, joined, 21:30, 8 m and
+top-down, before and after: the chapel forecourt, the square, a lane of houses, the Mughouse front, two
+houses close together, a person standing in a house's patch and in the temple's, one house either side of
+22:00): ui-design's, joined on the Atlas (1536 x 864), 21:30 held, clear, the patch switched off and on at one
+paused instant (C:/dev/review/ui-design/looks/look_win927_693ead893/, report.md; the first two runs at a gain of
+3.6 and at 4.9 with the square's fall, look_win927_dd11b4393 and look_win927_924a4074b, read 1.35 to 1.6 and 1.6 to
+1.9 at the wall's foot and "a faint warming"). As shown, on over off: the wall's foot about 1.6 to 2.1, the middle
+about 1.7 to 1.9, the end 1.01 to 1.06; two houses' patches where they meet 2.5 to 2.7; a lantern's door cell
+1.00; at 22:05 none drawn. By eye at play size (the nearest, 8 m): a defined warm pool on the ground about a cell
+out from the wall's foot, fading outward, and the spill between two houses beside the player plain.
+
+Client only; protocol unchanged; no new class_name; a bullet (voice's words) when it is switched on.
