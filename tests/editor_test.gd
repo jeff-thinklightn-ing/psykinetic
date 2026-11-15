@@ -15,6 +15,7 @@ func _ready() -> void:
 	World.set_process(false)
 	_clear()
 	_test_round_trip()
+	_test_to_image_pin()
 	await _test_painting()
 	_clear()
 	await _test_monsters()
@@ -74,6 +75,99 @@ func _test_round_trip() -> void:
 			if outer and map.edges[key] != "wall":
 				border.append("%s %s" % [key, map.edges[key]])
 		_check(border.is_empty(), "%s: no door or other edge but a wall on its outer east or south border (%s)" % [folder, ", ".join(border)])
+
+
+## Decision 921's pin: LevelMap.to_image, packed and written into one byte array, draws byte for byte
+## the picture the per-pixel loops drew (_old_to_image, kept here as the reference), on every level in
+## levels/ and on a made map with every case on purpose.
+func _test_to_image_pin() -> void:
+	print("\n== 921: to_image byte for byte the old loops' picture, every level and a made map ==")
+	var started := Time.get_ticks_msec()
+	var differ: Array[String] = []
+	var levels := 0
+	var folders: Array[String] = []
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		folders.append(Level.DIR + folder + "/")
+	for folder in DirAccess.get_directories_at(Prefab.DIR):
+		folders.append(Prefab.DIR + folder + "/")  # A prefab's save goes through to_image too.
+	for folder in folders:
+		if not FileAccess.file_exists(folder + "layout.png"):
+			continue
+		var config := {}
+		if FileAccess.file_exists(folder + "level.json"):
+			config = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))
+		var map := LevelMap.from_image(Image.load_from_file(ProjectSettings.globalize_path(folder + "layout.png")), config)
+		levels += 1
+		if not _same_image(map.to_image(), _old_to_image(map)):
+			differ.append(folder.trim_prefix(Level.DIR))
+	_check(levels > 30 and differ.is_empty(), "every level and prefab: the same bytes, size and format (%d pictures; differ: %s)" % [levels, ", ".join(differ)])
+	# The made map: every filler ground side by side and against another; walls and doors on all four
+	# sides of a filler cell; four corners each with one of its four edges set; a thing on a ground; a
+	# meaning with no colour; an empty cell; a cell and edges out of bounds; a legend override; and the
+	# same with a spare edge column and row in the picture.
+	var made := LevelMap.new(Vector2i(14, 10), {"legend": {"stone": "#405060"}})
+	var grounds: Array[String] = ["stone", "grass", "dirt", "water", "fire", "ford", "tall_grass"]
+	for y in 10:
+		for x in 14:
+			made.cells[Vector2i(x, y)] = grounds[(x / 2 + y / 3) % grounds.size()]
+	made.cells[Vector2i(5, 5)] = "torch"
+	made.cells[Vector2i(6, 5)] = "chest"
+	made.cells[Vector2i(9, 2)] = "mystery_meaning"
+	made.cells.erase(Vector2i(12, 8))
+	made.cells[Vector2i(20, 3)] = "grass"
+	made.cells[Vector2i(-1, 2)] = "dirt"
+	for key: Vector3i in [Vector3i(1, 1, Terrain.EAST), Vector3i(1, 1, Terrain.SOUTH), Vector3i(0, 1, Terrain.EAST)]:
+		made.edges[key] = "wall"
+	made.edges[Vector3i(1, 0, Terrain.SOUTH)] = "door"
+	# A corner (x, y) reads E(x, y), S(x, y), S(x + 1, y) and E(x, y + 1): one of each, at four corners.
+	made.edges[Vector3i(2, 6, Terrain.EAST)] = "wall"
+	made.edges[Vector3i(4, 6, Terrain.SOUTH)] = "door"
+	made.edges[Vector3i(7, 7, Terrain.SOUTH)] = "wall"
+	made.edges[Vector3i(8, 8, Terrain.EAST)] = "door"
+	made.edges[Vector3i(13, 4, Terrain.EAST)] = "wall"  # Out of bounds: east of the last column.
+	made.edges[Vector3i(4, 9, Terrain.SOUTH)] = "wall"  # Out of bounds: south of the last row.
+	var spare := made.copy()
+	spare.pixels = Vector2i(made.size.x * 2, made.size.y * 2)
+	_check(_same_image(made.to_image(), _old_to_image(made)) and _same_image(spare.to_image(), _old_to_image(spare)),
+		"the made map, and it with a spare edge column and row: the same bytes")
+	print("    (information) the pin took %d ms" % (Time.get_ticks_msec() - started))
+
+
+static func _same_image(a: Image, b: Image) -> bool:
+	return a.get_size() == b.get_size() and a.get_format() == b.get_format() and a.get_data() == b.get_data()
+
+
+## LevelMap.to_image as it was before decision 921 (the per-pixel loops), the pin's reference only.
+static func _old_to_image(map: LevelMap) -> Image:
+	var image := Image.create(map.pixels.x, map.pixels.y, false, Image.FORMAT_RGBA8)
+	image.fill(map.colours["void"])
+	for at: Vector2i in map.cells:
+		if map.in_bounds(at):
+			image.set_pixel(at.x * 2, at.y * 2, map.colours.get(map.cells[at], map.colours["void"]))
+	for y in map.size.y:
+		for x in map.size.x:
+			for side in [Terrain.EAST, Terrain.SOUTH]:
+				var key := Vector3i(x, y, side)
+				if not map.edge_in_bounds(key):
+					continue
+				var pixel := Vector2i(x * 2 + 1, y * 2) if side == Terrain.EAST else Vector2i(x * 2, y * 2 + 1)
+				var kind := map.edge(key)
+				if kind != "clear":
+					image.set_pixelv(pixel, map.colours[kind])
+					continue
+				var sides := Terrain.edge_cells(key)
+				var filler := LevelMap._filler([map.cell(sides[0]), map.cell(sides[1])])
+				if not filler.is_empty():
+					image.set_pixelv(pixel, map.colours[filler])
+	for y in map.size.y - 1:
+		for x in map.size.x - 1:
+			var around := [map.cell(Vector2i(x, y)), map.cell(Vector2i(x + 1, y)), map.cell(Vector2i(x, y + 1)), map.cell(Vector2i(x + 1, y + 1))]
+			var walled := map.edge(Vector3i(x, y, Terrain.EAST)) != "clear" or map.edge(Vector3i(x, y, Terrain.SOUTH)) != "clear" \
+					or map.edge(Vector3i(x + 1, y, Terrain.SOUTH)) != "clear" or map.edge(Vector3i(x, y + 1, Terrain.EAST)) != "clear"
+			var filler := LevelMap._filler(around)
+			if not walled and not filler.is_empty():
+				image.set_pixel(x * 2 + 1, y * 2 + 1, map.colours[filler])
+	return image
 
 
 func _test_painting() -> void:

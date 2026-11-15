@@ -56208,3 +56208,47 @@ not quiet her, and the narrowing is what keeps her talking beside a wound she ca
 with the floor; both were the test's: the room's monsters back in sight, then each run's lines echoing the last's.)
 The section runs late in companion_test, as its quarter hours move the clock on. Server only, protocol unchanged, no new class_name. Its bullet waits on playtest's
 rerun of look_flank_around3c.
+## 921. LevelMap.to_image reads the map once and writes the picture into one byte array
+
+The coordinator's approval of builder's design, 2026-11-14 (C:/dev/review/builder/to_image_design.md),
+after 867 amended (5)'s timing found that LevelMap.to_image was about 85 per cent of a working copy's parse
+in builder mode (MapDoc.parsed: to_image, then Level.parse).
+
+Where the time went (the wilds, 256 x 256 cells, this PC under the bench lock, medians of five;
+C:/dev/review/builder/profile_to_image.gd and profile_to_image_1114.out): to_image 471 ms, of it the edge
+loop 277 (130 of that Terrain.edge_cells' new array per edge and its two cell lookups), the corner loop
+185, the cells loop 28.5, creating and filling the image 0.2. The picture was never the cost: one small
+allocation and two or three dictionary reads per pixel, 260 000 pixels, was.
+
+Now to_image reads the cells once into a PackedInt32Array of meaning indices and the edges into two
+PackedByteArrays (east, south), takes each index's colour as an RGBA8 image stores it (set on a 1 x 1
+image and read back, so no Color rounding can differ), and in one pass over the cells writes each
+cell's pixel, its east and south edge pixels and the corner after it into one byte array with
+encode_u32, then Image.create_from_data over a buffer Image.fill'd with void. The rules are the old
+loops' word for word: the fillers are _filler's (Level.GROUNDS, water, fire, ford, tall_grass); an edge
+pixel is its wall's or door's colour, else the cells' colour when both are the same filler; a corner is
+the filler when its four cells match and none of its four edges is set; cells and edges out of bounds
+are skipped; a meaning with no colour draws void; a spare edge column or row in pixels is kept. One
+difference, on data nothing writes: an edge whose kind is neither wall, door nor clear made the old
+loops fail on colours[kind]; it is now a push_error and stands as an edge drawn void. As a probe in the
+profile's run the same code took 40.4 ms (37.9 to 45.3), byte for byte the old picture on the wilds:
+about 12 times faster. editor/level_map.gd alone.
+
+Expected on the box, scaled by its parse (454 ms against this PC's 545 for to_image and Level.parse):
+a working copy's parse about 95 ms, so builder mode's ask start about 512 to 150 ms and a cell
+change's frame about 450 to 95; not timed there until the coordinator's probe. 867's lever 4c
+(patching the parse by area) is dropped: it would now save at most Level.parse's ~60 ms; 4b (frame 0's
+parse on a thread) stays open until frame 0 is measured on the new figure. Every other caller gets the
+same picture, faster: MapDoc.save, the editor's world map, fields and level editor, prefab saves,
+sim/regen (a regenerating dungeon's every try) and six tools.
+
+The pin (editor_test _test_to_image_pin): the old to_image kept in the test as its reference
+(_old_to_image, never called by the game); every level and every prefab in levels/ (37 pictures) and a
+made map (every filler beside each other, walls and doors on all four sides of a filler cell, four
+corners each with one of its four edges set, a thing on a ground, a meaning with no colour, an empty
+cell, a cell and edges out of bounds, a legend override), and that map with a spare edge column and row:
+the same bytes, size and format. The pin takes about 2.1 s. Run once against a corner rule broken on
+purpose, it failed on five levels and the made map. Decision 147's round trip (_test_round_trip) as
+before. Also run on the take: level_test, regen_test, labyrinth_test, builder_zone_test, builder_test.
+
+Editor and server; protocol unchanged; no new class_name; no bullet (nothing a player is told).

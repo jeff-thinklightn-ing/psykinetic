@@ -447,36 +447,85 @@ static func turn(direction: Vector2i, turns: int) -> Vector2i:
 ## two cells of one ground (or water, or fire) is painted that colour, and
 ## so is a corner with that ground on all four sides and no wall at it, so
 ## the picture reads as the map; anything else between cells is void.
+## Decision 921: the cells and edges are read once into packed grids and the
+## pixels written into one byte array (the wilds 471 ms to about 40 here),
+## byte for byte the picture the per-pixel loops drew (editor_test's pin).
 func to_image() -> Image:
-	var image := Image.create(pixels.x, pixels.y, false, Image.FORMAT_RGBA8)
-	image.fill(colours["void"])
+	var w := size.x
+	var h := size.y
+	var stride := pixels.x * 4
+	# Each meaning an index (void 0), each index's colour as RGBA8 stores it
+	# (set on a 1 x 1 image and read back: no rounding of a Color can differ),
+	# and the index a filler (_filler's grounds) or -1.
+	var void_colour: Color = colours["void"]
+	var swatch := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	var as_stored := func(colour: Color) -> int:
+		swatch.set_pixel(0, 0, colour)
+		return swatch.get_data().decode_u32(0)
+	var index := {"void": 0}
+	var rgba := PackedInt64Array([as_stored.call(void_colour)])
+	var fills := PackedInt32Array([-1])
+	var grid := PackedInt32Array()
+	grid.resize(w * h)
 	for at: Vector2i in cells:
-		if in_bounds(at):
-			image.set_pixel(at.x * 2, at.y * 2, colours.get(cells[at], colours["void"]))
-	for y in size.y:
-		for x in size.x:
-			for side in [Terrain.EAST, Terrain.SOUTH]:
-				var key := Vector3i(x, y, side)
-				if not edge_in_bounds(key):
-					continue
-				var pixel := Vector2i(x * 2 + 1, y * 2) if side == Terrain.EAST else Vector2i(x * 2, y * 2 + 1)
-				var kind := edge(key)
-				if kind != "clear":
-					image.set_pixelv(pixel, colours[kind])
-					continue
-				var sides := Terrain.edge_cells(key)
-				var filler := _filler([cell(sides[0]), cell(sides[1])])
-				if not filler.is_empty():
-					image.set_pixelv(pixel, colours[filler])
-	for y in size.y - 1:
-		for x in size.x - 1:
-			var around := [cell(Vector2i(x, y)), cell(Vector2i(x + 1, y)), cell(Vector2i(x, y + 1)), cell(Vector2i(x + 1, y + 1))]
-			var walled := edge(Vector3i(x, y, Terrain.EAST)) != "clear" or edge(Vector3i(x, y, Terrain.SOUTH)) != "clear" \
-					or edge(Vector3i(x + 1, y, Terrain.SOUTH)) != "clear" or edge(Vector3i(x, y + 1, Terrain.EAST)) != "clear"
-			var filler := _filler(around)
-			if not walled and not filler.is_empty():
-				image.set_pixel(x * 2 + 1, y * 2 + 1, colours[filler])
-	return image
+		if not in_bounds(at):
+			continue
+		var meaning: String = cells[at]
+		var i: int = index.get(meaning, -1)
+		if i < 0:
+			i = rgba.size()
+			index[meaning] = i
+			rgba.append(as_stored.call(colours.get(meaning, void_colour)))
+			fills.append(i if not _filler([meaning]).is_empty() else -1)
+		grid[at.y * w + at.x] = i
+	# The edges: 0 clear, 1 wall, 2 door; a kind the legend has no colour for
+	# is said (the old loops failed on it) and stands as an edge drawn void.
+	var kinds := PackedInt64Array([0, as_stored.call(colours["wall"]), as_stored.call(colours["door"]), as_stored.call(void_colour)])
+	var east := PackedByteArray()
+	east.resize(w * h)
+	var south := PackedByteArray()
+	south.resize(w * h)
+	for key: Vector3i in edges:
+		if not edge_in_bounds(key):
+			continue
+		var kind: String = edges[key]
+		var k := 1 if kind == "wall" else (2 if kind == "door" else (0 if kind == "clear" else 3))
+		if k == 3:
+			push_error("LevelMap.to_image: edge %s is \"%s\", not wall or door" % [key, kind])
+		if key.z == Terrain.EAST:
+			east[key.y * w + key.x] = k
+		else:
+			south[key.y * w + key.x] = k
+	var blank := Image.create(pixels.x, pixels.y, false, Image.FORMAT_RGBA8)
+	blank.fill(void_colour)
+	var data := blank.get_data()
+	for y in h:
+		var row := y * w
+		for x in w:
+			var c := grid[row + x]
+			var o := y * 2 * stride + x * 8
+			if c != 0:
+				data.encode_u32(o, rgba[c])
+			var f := fills[c]
+			var e := east[row + x] if x < w - 1 else 0
+			if x < w - 1:
+				if e != 0:
+					data.encode_u32(o + 4, kinds[e])
+				elif f >= 0 and grid[row + x + 1] == c:
+					data.encode_u32(o + 4, rgba[c])
+			if y < h - 1:
+				var s := south[row + x]
+				var below := o + stride
+				if s != 0:
+					data.encode_u32(below, kinds[s])
+				elif f >= 0 and grid[row + w + x] == c:
+					data.encode_u32(below, rgba[c])
+				# The corner after the cell: the filler when all four cells match
+				# and none of its four edges is set.
+				if x < w - 1 and f >= 0 and e == 0 and s == 0 and south[row + x + 1] == 0 and east[row + w + x] == 0 \
+						and grid[row + x + 1] == c and grid[row + w + x] == c and grid[row + w + x + 1] == c:
+					data.encode_u32(below + 4, rgba[c])
+	return Image.create_from_data(pixels.x, pixels.y, false, Image.FORMAT_RGBA8, data)
 
 
 ## The colour name to paint between [param around] cells: their ground
