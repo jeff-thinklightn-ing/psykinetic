@@ -103,7 +103,10 @@ that the walk looks like skipping and the people look like "bad claymation place
   of the test's own, never read by a real take (394 amended (50)). Since 278 amended (9) (7c4dcbbf9) view_test and
   view_land_test each run as two scenes (view_test and view_world_test, view_land_test and
   view_land_far_test, one script each with a port of its own): a new row goes in the half whose
-  list names its subject (the header of each half says what it holds), and land.sh names any suite
+  list names its subject (the header of each half says what it holds), a take that adds a var to Client3D runs both
+  halves before it queues (the every-var check, `_test_neighbour_swap`, wants each sorted into
+  `client3d/room_fields.gd`'s VIEW or ROOM and runs in view_world_test: a take that ran
+  view_test alone failed its landing on it, 11-14), and land.sh names any suite
   scene over 220 s as a warning ("slow scene: ..."), never a failure: its tree splits it at its
   next row.
 - Take the landing lock for your final retest and push, so nobody lands between them, with
@@ -179,7 +182,7 @@ that the walk looks like skipping and the people look like "bad claymation place
   line what to do and what to look for, with known leaks and what is not in the build, and gives
   him the path.
   After a rebase, check your bullet still sits under `## Unreleased`, above the first
-  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it, and (539 amended (4), 0fc2e053) on any non-bullet line under `## Unreleased`: one line per bullet, never wrapped. On a rebase conflict in CHANGELOG.md alone, or with the generated pages beside it (`docs/voice_inventory.md`, `docs/art_status.md`, `art/kit/status.json`: taken from main's side and regenerated, 539 amended (5), 4003d2a0c; any other conflicted file it refuses), run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
+  `## v` heading: a cut moves the heading, and git keeps a bullet beside the old top one; since 539, land.sh fails on a bullet in a shipped section or in two places, naming it, and (539 amended (4), 0fc2e053) on any non-bullet line under `## Unreleased`: one line per bullet, never wrapped. On a rebase conflict in CHANGELOG.md alone, or with the generated pages beside it (`docs/voice_inventory.md`, `docs/art_status.md`, `art/kit/status.json`: taken from main's side and regenerated, 539 amended (5), 4003d2a0c; `THIRD_PARTY.md` too since 539 amended (7), be392c4a1: its art and sound slot spans taken from main's side and made again, only when the commit changes nothing outside those spans; any other conflicted file it refuses), run `python -B tools/changelog_resolve.py`, then `GIT_EDITOR=true git rebase --continue`, once per commit that stops; never keep both sides (four trees' own resolvers did, each costing a refused landing, 2026-10-20).
 - Every architectural choice gets its own numbered entry at the bottom of
   `docs/decisions.md`, in the same commit as the code. With several worktree sessions
   running, take the number from the script before committing, so two trees don't take the
