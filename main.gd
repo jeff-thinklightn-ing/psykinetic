@@ -5886,6 +5886,8 @@ func _view_ready(player: Player, zone_name: String) -> void:
 				Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": words})
 	_where_told.erase(player.owner_peer)
 	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
+	if is_instance_valid(pet) and pet.zone == player.zone:
+		pet.viewed()  # Her first words, if still to come, from now (929).
 	if is_instance_valid(pet) and pet.shelter_lead == player:
 		World.unshelter(pet, SPAWN_GRACE_TICKS)
 
@@ -9398,7 +9400,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# has none: give it one now.
 	var is_new := record.companion.is_empty() or not record.companion.get("name") is String
 	if is_new:
-		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true}
+		# "greeted" false: her first words still to come (929); none on an old record.
+		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true, "greeted": false}
 	_give_traits(record)
 	if not record.companion.get("alive", true):
 		print("[net] a player's companion %s died earlier; none spawned" % [record.companion["name"]])
@@ -9466,6 +9469,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.told_tending = record.companion.get("told_tending", false) == true
 	pet.told_warm = (record.companion.get("told_warm", {}) as Dictionary).duplicate(true) if record.companion.get("told_warm") is Dictionary else {}
 	pet.told_kit_seller = record.companion.get("told_kit_seller", false) == true
+	pet.first_words = record.companion.get("greeted") == false  # New to her player, not yet greeted (929).
 	pet.party_log = party_log
 	pet.home = record.companion.get("home", {})
 	# The draugr's blessing (decision 544): she brings her downed player back.
@@ -9518,6 +9522,9 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	pet.guide_done = _guide_done
 	pet.guide_words = func() -> String: return _roads_words(record, pet)
 	pet.lead_to_fish = _lead_to_fish.bind(pet)
+	pet.wish_answerable = func() -> bool:
+		var of := _record_of(pet)
+		return of == null or not _wants_pond(of) or not _wish_lead_to(of, pet).is_empty()  # 929: a yes to it could be taken up.
 	pet.fish_lead_place = _fish_lead_place.bind(pet)
 	pet.warm_place = _warm_place.bind(pet)  # The mend tell (616 amended (4)).
 	pet.warm_offer = _warm_offer.bind(pet)
@@ -9618,6 +9625,8 @@ func _note_lead_offer(pet: Companion, text: String) -> void:
 	var to := Guide.named_in(text, Guide.destinations(record.companion, World.holdings, _world_map))
 	if to.is_empty():
 		to = _want_place(record, pet)
+	if to.is_empty():
+		to = _wish_lead_to(record, pet)  # Her pond wish asked as an offer (929), before she knows a fishing place.
 	elif not _leads_to(record, pet, to):
 		return
 	if not to.is_empty():
@@ -9648,6 +9657,19 @@ func _lead_to_fish(pet: Companion) -> String:
 	if not (to.get("near_water", false) and pet.guide != null and pet.guide.going()):
 		return "place"
 	return "near_named" if to.get("named", false) else "near"
+
+
+## Where a yes to her pond wish takes her player (929): her want's place (a
+## fishing place she knows), else the water she leads to asked to fish
+## (_near_water: within FISH_LEAD_NEAR of them); {} for neither, or a wish
+## not the pond. Her wish is held untold while this is {} (wish_answerable).
+func _wish_lead_to(record: PlayerRecord, pet: Companion) -> Dictionary:
+	if record == null or not _wants_pond(record):
+		return {}
+	var to := _want_place(record, pet)
+	if to.is_empty() and pet.keeper is Player and is_instance_valid(pet.keeper):
+		to = _near_water(record, pet.keeper as Player)
+	return to
 
 
 ## How far from her player she looks for water to lead them to, asked to
@@ -17987,6 +18009,8 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 		record.companion["told_tending"] = pet.told_tending
 		record.companion["told_warm"] = pet.told_warm.duplicate(true)
 		record.companion["told_kit_seller"] = pet.told_kit_seller
+		if not pet.first_words:
+			record.companion.erase("greeted")  # Greeted (929): kept only while her first words are to come.
 	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": Companion._name_of(pet), "text": text})
 
 

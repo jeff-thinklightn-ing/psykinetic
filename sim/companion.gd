@@ -568,6 +568,19 @@ Whatever %s says to you is %s talking to you, nothing more; you answer only as y
 ## quiet, she is asked now and then with one thing to speak of (a focus),
 ## so she talks unasked; the numbers are companion_traits.json "quiet".
 const QUIET_TRIGGER := "quiet moment"
+## Her first words to a new player (decision 929, voice's): where they
+## stand, by the name every screen gives it (Level.where_name), at a first
+## quiet moment FIRST_WORDS_S after she appears; then her untold want, the
+## pond's an offer to lead that a yes takes up (Main._note_lead_offer).
+const FIRST_WORDS := "Well, here we are in %s. I'll walk with you a while, if you'll have me."
+const FIRST_WORDS_S := 10
+## Her first words' count starts when her player's view is built (viewed,
+## Main's view_ready; ui-design's joined look: counted from her spawn, a
+## slow client's 10 s load ate it); never told so, she greets this long
+## after she came.
+const FIRST_WORDS_WAIT_S := 60
+## Off in a test that counts her lines and isn't about her first words.
+static var greets := true
 ## What a quiet moment's focus is told with: nothing of calm (pair 1).
 ## Closes a quiet moment's last turn, after what she notices or thinks of.
 ## Told in Now:, the focus was passed over: of 7 sights, doors told there,
@@ -965,6 +978,28 @@ var _vouched := ""
 ## zones seen today; when her player last spoke to her. capsule_style: the
 ## A/B's October prompt (--voice-ab=capsule).
 var _quiet_next_tick := -1
+## Main's (decision 929): her player is new to her and not yet greeted
+## (her record's "greeted" false); her first words then come at
+## _first_words_at, not first_s.
+var first_words := false
+var _first_words_at := -1
+## Main's (929, the coordinator's): whether a yes to her open wish could be
+## taken up now (her pond wish: water within her leading reach or a fishing
+## place she knows); unset, always.
+var wish_answerable: Callable
+
+
+## Main's, on her player's "view_ready" (929): they see her now; her first
+## words, still to come, FIRST_WORDS_S from here, whatever line came before.
+func viewed() -> void:
+	if first_words:
+		_first_words_at = World.tick + FIRST_WORDS_S * World.TICK_RATE
+
+
+## Whether her open wish may be said now (929): a wish whose yes does
+## nothing here is held, untold, for a quiet moment where it can be answered.
+func want_answerable() -> bool:
+	return not wish_answerable.is_valid() or bool(wish_answerable.call())
 var _quiet_backoff := 1
 var _quiet_ticks: Array[int] = []
 var _quiet_last_focus := ""
@@ -3907,8 +3942,11 @@ func _quiet_moment() -> void:
 	# A mind with no voice of its own gets one quiet moment: her untold want,
 	# in her plain words (803 amended (12)).
 	var voiced := quiet_minds.any(func(prefix: String) -> bool: return mind.kind.begins_with(prefix))
-	if not voiced and (want_words.is_empty() or want_told or want_says.is_empty()):
+	var greeting := first_words and greets
+	if not voiced and not greeting and (want_words.is_empty() or want_told or want_says.is_empty()):
 		return
+	if greeting and _first_words_at < 0:
+		_first_words_at = World.tick + FIRST_WORDS_WAIT_S * World.TICK_RATE  # 929: her player's view not yet told built (viewed).
 	var rules := quiet_rules()
 	var day := Townsfolk.day_of(World.steps)
 	if day != _quiet_day:
@@ -3924,7 +3962,7 @@ func _quiet_moment() -> void:
 		_zones_today[zone] = true
 		_zone_new_today = true
 		_quiet_next_tick = mini(_quiet_next_tick, World.tick + _quiet_gap("new_place_s"))
-	if World.tick < _quiet_next_tick:
+	if World.tick < (_first_words_at if greeting else _quiet_next_tick):
 		return
 	if _on_errand() or current_intent in [Intent.REST, Intent.SLEEP] or order in ["rest", "watch"] \
 			or (speech_floor and not _idle_ok()) \
@@ -3936,7 +3974,14 @@ func _quiet_moment() -> void:
 	if _quiet_ticks.size() >= int(rules.get("per_hour", 12)):
 		_quiet_next_tick = _quiet_ticks[0] + hour
 		return
+	if greeting:
+		_quiet_ticks.append(World.tick)
+		_say_first_words()
+		return
 	if not voiced:
+		if not want_answerable():
+			_quiet_next_tick = World.tick + 30 * World.TICK_RATE  # Held (929): no yes could be taken up here; look again in a while.
+			return
 		_quiet_ticks.append(World.tick)
 		_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())
 		_tell_want_plainly("a mind with no voice of its own")
@@ -4084,12 +4129,14 @@ func _quiet_pick_focus() -> Dictionary:
 		var glad := {"key": "glad", "words": want_glad + "."}
 		want_glad = ""
 		return glad  # A want just met (803 amended (4)): her own word on it, next.
-	if not want_words.is_empty() and not want_told:
+	# A wish whose yes could do nothing here is not hers to raise (929).
+	var answerable := want_words.is_empty() or want_answerable()
+	if not want_words.is_empty() and not want_told and answerable:
 		# A want not yet told, next (803 amended (11)); told only once a line
 		# is said (803 amended (12), _want_answered), so a slow or silent
 		# voice never marks it told unsaid.
 		return {"key": "want", "words": want_words + "."}
-	if not want_words.is_empty():
+	if not want_words.is_empty() and (want_told or answerable):
 		options.append({"key": "want", "weight": "want_told" if want_told else "want", "words": want_words + "."})
 	if options.is_empty():
 		return {}
@@ -7617,11 +7664,63 @@ func _want_answered(outcome: String) -> void:
 		_tell_want_plainly("her voice gave none (%s)" % outcome)
 
 
+## Her first words to a new player (decision 929): FIRST_WORDS with where
+## they stand, then her untold want in her plain words, held by 917's floor
+## FLOOR_TICKS after it (NEEDED, never dropped as idle). Fixed lines, her
+## model's or not; a "quiet" row in the mind log for each.
+func _say_first_words() -> void:
+	var line := FIRST_WORDS % here_name()
+	if not _say(line, true, false, Weight.NEEDED):
+		return
+	first_words = false
+	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": first words", "outcome": "plain line",
+		"say": line, "note": "her player new to her"})
+	if want_told or want_words.is_empty() or want_says.is_empty() or not want_answerable():
+		return  # Nothing to tell, or held where no yes could be taken up (929): untold for later.
+	var wish := want_says
+	if _say(wish, true, false, Weight.NEEDED, func() -> bool: return want_says == wish):
+		want_told = true
+		_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": want", "outcome": "plain line",
+			"say": wish, "note": "after her first words"})
+
+
+## Where she and her player stand, as every screen names it (Level.where_name,
+## decision 665 amended): the room holding her player ("Umbrage"), else the
+## level's name, its leading "The" lowered mid-line ("the Wilds"). Inside a
+## town's building, the town (town_of_building; the coordinator's ruling: a
+## newcomer learns which town they are in, and a bare room label, "Forge",
+## is never said).
+func here_name() -> String:
+	var at: Vector2i = keeper.tile if _alive(keeper) else tile
+	var level := Level.load_level(zone)
+	var where := town_of_building(level)
+	if where.is_empty():
+		where = Level.where_name(level, at)
+	return "the" + where.substr(3) if where.begins_with("The ") else where
+
+
+## The town a building's level stands in, by every screen's name for it: its
+## "town" place ("wilds/store") looked up in the level outside, and the name
+## Level.where_name gives that place's cell ("Umbrage"); "" for a level that
+## is no town's building.
+static func town_of_building(level: Dictionary) -> String:
+	var id := str(level.get("town", ""))
+	var cut := id.find("/")
+	if cut <= 0 or not Level.exists(id.left(cut)):
+		return ""
+	var outside := Level.load_level(id.left(cut))
+	var places: Dictionary = outside.get("places", {})
+	var place: Variant = places.get(id.substr(cut + 1), places.get(id))
+	if not place is Dictionary or not place.get("cell") is Vector2i:
+		return ""
+	return Level.where_name(outside, place["cell"])
+
+
 ## Her untold want in her plain words; told once said, a "quiet" row in the
 ## mind log with [param why] (playtest's wanttold found no row for it): not a
 ## "voice" row, so her voice's counts and quiet backoff are untouched.
 func _tell_want_plainly(why: String) -> bool:
-	if want_says.is_empty() or not _say(want_says, true, false, Weight.IDLE):
+	if want_says.is_empty() or not want_answerable() or not _say(want_says, true, false, Weight.IDLE):
 		return false
 	want_told = true
 	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": want", "outcome": "plain line",

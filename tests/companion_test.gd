@@ -21,6 +21,7 @@ func _ready() -> void:
 	Companion.ask_rest = false  # Her rest ask (616 amended (3)) only where _test_left_and_rest tests it.
 	Companion.tends_unasked = false  # The older sections hurt bodies she would tend; _test_tends_unasked and _test_drinks_a_remedy have it on (decision 681).
 	Companion.speech_floor = false  # The older sections stage lines ticks apart; _test_speech_floor has it on (decision 917).
+	Companion.greets = false  # Her first words to a new player (929) only in _test_first_words.
 	_main = preload("res://main.tscn").instantiate()
 	_main.returns = false  # The old respawn (decision 396 is return_test's).
 	add_child(_main)
@@ -127,6 +128,7 @@ func _ready() -> void:
 	_test_guide_refuses()
 	_bond_as(0, kept_bond)
 	_test_want_lead()
+	_test_first_words()
 	_test_loyalty()
 	_test_leaving()
 	_test_out_of_reach()
@@ -1687,6 +1689,8 @@ func _test_needs() -> void:
 func _test_wants() -> void:
 	print("\n== her wants: one at a time, the pond first, then by what she lacks; told first; met by a deed, a big gain; lapsing unseen (803 amended (4), (11)) ==")
 	var pet := _companion()
+	var answerable_was: Callable = pet.wish_answerable
+	pet.wish_answerable = func() -> bool: return true  # The test room has no water; 929's hold is _test_first_words'.
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var steps_were := World.steps
 	var keys := ["needs", "need_weights", "needs_day", "needs_today", "standing", "bond_day", "bond_today", "bond_carry", "bond_best",
@@ -1788,6 +1792,7 @@ func _test_wants() -> void:
 	_main._set_mood(record)
 	pet.want_words = ""
 	pet.want_glad = ""
+	pet.wish_answerable = answerable_was
 
 
 ## 803 amended (11), Jeff's loop 1: a new companion's first quiet moment, a
@@ -1836,6 +1841,8 @@ func _quiet_row(row: Dictionary) -> String:
 func _first_quiet_moment(kind: String, answer: Dictionary, fight := false, again := false, timeout := false) -> Dictionary:
 	var owner := _player()
 	var pet := _companion()
+	var answerable_was: Callable = pet.wish_answerable
+	pet.wish_answerable = func() -> bool: return true  # The test room has no water; 929's hold is _test_first_words'.
 	_put(pet, owner.tile + Vector2i(1, 0))
 	_settle(pet)
 	var record: PlayerRecord = _main._records[Net.player_id]
@@ -1894,6 +1901,7 @@ func _first_quiet_moment(kind: String, answer: Dictionary, fight := false, again
 		record.companion.erase(key)
 	pet.want_words = ""
 	pet.want_says = ""
+	pet.wish_answerable = answerable_was
 	return row
 
 ## 705 amended (2), environment's read of playtest's compreturn4: brought
@@ -4423,6 +4431,182 @@ func _test_want_lead() -> void:
 		else:
 			record.companion[key] = was
 	_bond_as(0, kept_bond)
+	_settle(pet)
+
+
+func _test_first_words() -> void:
+	print("\n== her first words to a new player: where they stand, then her wish as an offer a yes takes up (decision 929) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var here := String(World.zone.name)
+	# The name every screen gives where they stand (Level.where_name): Umbrage at the arrival.
+	var wilds := Level.load_level("wilds")
+	_check(Level.where_name(wilds, Vector2i(208, 205)) == "Umbrage", "the arrival's cell is in Umbrage (%s)" % Level.where_name(wilds, Vector2i(208, 205)))
+	_check(Level.where_name(wilds, Vector2i(5, 5)) == "The Wilds", "outside a room: the level's name (%s)" % Level.where_name(wilds, Vector2i(5, 5)))
+	# Indoors, the town; never a bare room label (the coordinator's ruling).
+	for building: String in ["umbrage_smithy", "umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]:
+		_check(Companion.town_of_building(Level.load_level(building)) == "Umbrage",
+			"in %s she names the town (%s)" % [building, Companion.town_of_building(Level.load_level(building))])
+	for outdoors: String in ["wilds", "barrow", "hills"]:
+		_check(Companion.town_of_building(Level.load_level(outdoors)).is_empty(), "%s is no town's building" % outdoors)
+	# Her wishes: one ending in a question is an offer a yes takes up; the rest ask nothing.
+	var offer := RegEx.create_from_string(Companion.LEAD_OFFER)
+	for template: Variant in Companion.want_templates():
+		var says := str((template as Dictionary).get("says", ""))
+		_check(not says.ends_with("?") or offer.search(says) != null,
+			"her %s wish asks only what a yes answers (%s)" % [(template as Dictionary).get("key"), says])
+	var pond_says := Companion.want_said("pond", "says", record.name)
+	_check(pond_says.ends_with("?") and offer.search(pond_says) != null, "her pond wish is an offer to lead (%s)" % pond_says)
+	# A fishing place in her home area, as in _test_want_lead: her want's place.
+	var kept := {"home": record.companion.get("home"), "want": record.companion.get("want"), "roads": record.companion.get("roads"),
+		"greeted": record.companion.get("greeted")}
+	var water := _far_cell(owner.tile, 9, 14)
+	_check(water != Vector2i(-1, -1), "a cell 9-14 from her player for the pond (%s)" % water)
+	if water == Vector2i(-1, -1):
+		return
+	var pond := "%s/first_pond" % here
+	World.holdings._places[pond] = {"id": pond, "area": here, "key": "first_pond", "cell": water, "name": "the first pond",
+		"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+	World.holdings._holder[pond] = "nobody"
+	World.holdings._strength[pond] = 1
+	World.holdings._since[pond] = 0
+	record.companion["home"] = {"place": "", "zone": here, "trade": ""}
+	record.companion["want"] = {"key": "pond", "need": "leisure", "since": Townsfolk.day_of(World.steps), "told": false}
+	record.companion["greeted"] = false
+	_main._set_want_words(record)
+	_main._guides.clear()
+	_main._guide_offers.clear()
+	pet.guide = null
+	var spoken: Array[String] = []
+	var at: Array[int] = []
+	var on_said := func(line: String) -> void:
+		spoken.append(line)
+		at.append(World.tick)
+	pet.said.connect(on_said)
+	var floor_was := Companion.speech_floor
+	Companion.speech_floor = true
+	Companion.greets = true
+	# Met now: her first quiet moment FIRST_WORDS_S on, not first_s.
+	pet.first_words = true
+	pet._first_words_at = -1
+	pet._quiet_next_tick = -1
+	pet._keeper_spoke_tick = -100000
+	pet._last_unasked_tick = -100000
+	World.step()
+	_check(pet._first_words_at - World.tick >= Companion.FIRST_WORDS_WAIT_S * World.TICK_RATE - 2,
+		"her player's view not told built: her first words wait %d s at most (%.1f s)" % [Companion.FIRST_WORDS_WAIT_S, float(pet._first_words_at - World.tick) / World.TICK_RATE])
+	_main._view_ready(owner, owner.zone)  # Their client's view built (661): they see her now.
+	var met := World.tick
+	var greet := Companion.FIRST_WORDS % pet.here_name()
+	_check(pet.here_name() == Level.where_name(Level.load_level(here), owner.tile).replace("The ", "the ") and not pet.here_name().is_empty(),
+		"her greeting names where they stand (%s)" % pet.here_name())
+	_step_until(func() -> bool: return pet.want_says in spoken, Companion.FIRST_WORDS_S * World.TICK_RATE + Companion.FLOOR_TICKS * 3 + 60)
+	_check(spoken.size() >= 2 and spoken[0] == greet and spoken[1] == pond_says,
+		"her greeting, then her wish (%s)" % [spoken])
+	if spoken.size() >= 2:
+		var first_s := float(at[0] - met) / World.TICK_RATE
+		_check(first_s >= Companion.FIRST_WORDS_S and first_s <= Companion.FIRST_WORDS_S + 2, "her first words %.1f s after her player's view was built" % first_s)
+		_check(at[1] - at[0] >= Companion.FLOOR_TICKS and at[1] - at[0] <= Companion.FLOOR_TICKS + 3,
+			"her wish %.1f s after, held by 917's floor" % [float(at[1] - at[0]) / World.TICK_RATE])
+	_check(not pet.first_words and pet.want_told and not record.companion.has("greeted"),
+		"greeted and her wish told: her record keeps no \"greeted\" (%s)" % [record.companion.get("greeted")])
+	_check(str((_main._guide_offers.get(record.player_id, {}).get("to", {}) as Dictionary).get("key", "")) == pond,
+		"her wish kept as an offer to her pond (%s)" % [_main._guide_offers.get(record.player_id, {})])
+	_main._guide_said(owner, pet, "yes")
+	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == pond, "a yes, and she leads them there")
+	# Once only: no second greeting.
+	for i in Companion.FIRST_WORDS_S * World.TICK_RATE * 2:
+		World.step()
+	_check(spoken.count(greet) == 1, "greeted once (%s)" % [spoken])
+	# An old record (no "greeted") is never greeted; a new one's key is saved, never sent.
+	_check(not PlayerRecord.companion_from({"name": "Rhea"}).has("greeted") and PlayerRecord.companion_from({"name": "Rhea", "greeted": false})["greeted"] == false,
+		"\"greeted\" saved only while her first words are to come")
+	# With no fishing place she knows: the water near her player she leads to asked to fish.
+	if pet.guide != null:
+		pet.guide.stop("moved")
+	pet.guide = null
+	owner.led_by = ""
+	owner.led_to = ""
+	_main._guides.clear()
+	_main._guide_offers.clear()
+	World.holdings._places.erase(pond)
+	var had_water := World.is_water(water)
+	World._water[water] = true
+	World._fish_waters.get_or_add(here, {})[water] = "pool_first"
+	World._fish_stock_of.clear()
+	var near: Dictionary = _main._near_water(record, owner)
+	_main._on_companion_said(pond_says, pet)
+	var offered: Dictionary = _main._guide_offers.get(record.player_id, {}).get("to", {})
+	_check(not near.is_empty() and str(offered.get("key", "")) == str(near["key"]) and offered.get("near_water") == true,
+		"knowing no fishing place: her offer is to the water near her player she leads to asked to fish (%s, near %s)" % [offered.get("key"), near.get("key")])
+	_main._guide_said(owner, pet, "Yes, let's.")
+	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == str(near.get("key")), "a yes, and she leads them to that water")
+	if pet.guide != null:
+		pet.guide.stop("moved")
+	pet.guide = null
+	owner.led_by = ""
+	owner.led_to = ""
+	_main._guides.clear()
+	# Out of reach (no fishing place she knows, no water near her player): her
+	# pond wish held, untold, and her first words greet alone.
+	World._fish_waters.get_or_add(here, {})[water] = "pool_first"
+	World._fish_stock_of.clear()
+	_check(pet.want_answerable(), "water near: her wish may be said")
+	(World._fish_waters.get(here, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
+	pet.want_told = false
+	pet._last_unasked_tick = -100000
+	spoken.clear()
+	_check(not pet.want_answerable() and _main._wish_lead_to(record, pet).is_empty(), "no water near, no fishing place she knows: no yes could be taken up")
+	_check(not pet._tell_want_plainly("test") and not pet.want_told and pond_says not in spoken,
+		"out of reach: her pond wish held, still untold (%s)" % [spoken])
+	_check(pet._quiet_pick_focus().get("key", "") != "want", "nor raised by her voice's quiet moment")
+	pet.first_words = true
+	pet._first_words_at = World.tick
+	pet._quiet_next_tick = World.tick
+	pet._keeper_spoke_tick = -100000
+	_step_until(func() -> bool: return not pet.first_words, 40)
+	for i in Companion.FLOOR_TICKS + 10:
+		World.step()
+	_check(spoken.size() == 1 and spoken[0].begins_with("Well, here we are in") and not pet.want_told,
+		"out of reach: her first words greet alone, her wish untold (%s)" % [spoken])
+	# Back in reach: said, and a yes leads.
+	World._fish_waters.get_or_add(here, {})[water] = "pool_first"
+	World._fish_stock_of.clear()
+	_main._guide_offers.clear()
+	pet._last_unasked_tick = -100000
+	spoken.clear()
+	_check(pet._tell_want_plainly("test") and pet.want_told and spoken == [pond_says], "in reach again: her wish said (%s)" % [spoken])
+	_main._guide_said(owner, pet, "Yes.")
+	_check(pet.guide != null and pet.guide.going(), "and a yes leads")
+	if pet.guide != null:
+		pet.guide.stop("moved")
+	pet.guide = null
+	owner.led_by = ""
+	owner.led_to = ""
+	if not had_water:
+		World._water.erase(water)
+	(World._fish_waters.get(here, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
+	record.companion.erase("greeted")
+	# Put back.
+	pet.said.disconnect(on_said)
+	Companion.speech_floor = floor_was
+	Companion.greets = false
+	_main._guides.clear()
+	_main._guide_offers.clear()
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
+	for key: String in kept:
+		if kept[key] == null:
+			record.companion.erase(key)
+		else:
+			record.companion[key] = kept[key]
+	_main._set_want_words(record)
 	_settle(pet)
 
 

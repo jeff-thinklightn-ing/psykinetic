@@ -285,6 +285,8 @@ static func companion_from(pet: Variant) -> Dictionary:
 		out["told_warm"] = {"day": int(pet["told_warm"].get("day", -1)), "places": _lines(pet["told_warm"].get("places", []))}  # The rests named today (616 amended (4)).
 	if pet.get("told_kit_seller") == true:
 		out["told_kit_seller"] = true  # She has said where kits are sold (616 amended (4)).
+	if pet.get("greeted") == false:
+		out["greeted"] = false  # Her first words still to come (929); never sent.
 	var traits: Variant = pet.get("traits")
 	if traits is Dictionary and not traits.is_empty():
 		var kept := {}

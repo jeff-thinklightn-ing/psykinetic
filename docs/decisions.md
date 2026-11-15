@@ -56934,3 +56934,75 @@ named without a body, the speaker as the one, no trade word, the plain good day 
 greeting asking why or whence; and at _test_hails' end (Mara standing, no hour of its own: a test that set the hour
 and back left Bram awake in _test_threat), the fixed line said with no words from the mind and on a slow mind's
 drop, silence for a greeting with none, greeted is met. towns_test _test_newcomer_want (economy's). Server only; protocol unchanged; no new class_name; the bullet waits for the look.
+## 929. Her first words: a new player greeted where they stand, then her wish as an offer a yes takes up
+
+The first piece of the package "the first five minutes" (the coordinator's, from Jeff's 21:20 report
+on v0.1.217: "looks nice, still dont know where am i going or why or where i am"). companions' read
+of the opening (C:/dev/review/companions/first_five_minutes.md): she stood silent beside a new player
+for 60 to 120 s (quiet.first_s), then said her first wish, "I've a mind to go fishing. Will you come
+with me?", which matched no offer to lead, so a "yes" did nothing; unasked, she never said where they
+were.
+
+New: a companion new to her player (Main gives one to a record that has none, is_new) has
+"greeted": false on her record, saved by PlayerRecord.companion_from, never sent, and no log line
+names it; Main sets her first_words from it. Her first quiet moment then comes FIRST_WORDS_S (10 s)
+after her player's view of the zone is built (Main._view_ready, decision 661's "view_ready": she
+Companion.viewed), whatever line of hers came before; a client that never tells it, FIRST_WORDS_WAIT_S
+(60 s) after she came. ui-design's joined look on the Atlas (C:/dev/review/look_first_words, the
+first build) counted from her spawn: the client's load ate the 10 s and she greeted as the player
+appeared. All under the quiet moment's own calm gates (no
+fight or hostile in sight, no errand or rest, her player near, no one talking near her for
+player_quiet_s). She says two fixed lines, her model's or not (voice's words): FIRST_WORDS, "Well,
+here we are in {place}. I'll walk with you a while, if you'll have me.", and then her untold want's
+plain line, held by 917's floor (both Weight.NEEDED) and said 5 s after. Once she has said the
+greeting, her record drops "greeted"; a record without the key (every record from before) is never
+greeted, so a player who leaves before the 10 s is greeted on their next join and nobody twice.
+
+{place} is Level.where_name (ui's, decision 665 amended: the one name the arrival card, the compass
+line and the big map's title read): the named room holding her player's cell (wilds' "umbrage",
+"Umbrage", holds all four starts; maps: hand-written, anchored, kept on save), else the level's
+display_name with a leading "The" lowered mid-line ("the Wilds"). The corner map draws no words, so
+nothing on screen names it differently (maps). Inside a town's building she names the town, never its
+room: indoor rooms carry bare labels ("Forge", "Common room", "Attic"), and a newcomer's first words
+are to learn which town they are in (the coordinator's ruling; voice: the town only, not "in Umbrage,
+in the smithy", since they can see they are in a building). Companion.town_of_building reads the
+building level's "town" place ("wilds/store"), looks it up in the level outside, and names its cell
+by Level.where_name: "Umbrage" for the smithy and every floor of the Mughouse; "" for a level that is
+no town's building (the wilds, the barrow, the hills), which keeps where_name's name.
+
+Her first want is the pond (803 amended (11)); its plain line is now voice's offer, "I've a mind to
+fish today. Shall I take us to some water?", which matches Companion.LEAD_OFFER, so Main's
+_note_lead_offer keeps it as an offer for Guide.OFFER_S and a yes starts her lead (551 amended (3)).
+The offer goes to her want's place (_want_place: a fishing place she knows); a new player's companion
+knows none yet, so it now falls back to what she leads to on "Let's go fishing." (_lead_to_fish): the
+nearest fishable water within FISH_LEAD_NEAR of her player (at the arrival, the pool by Snagfin's
+shack), else the fishing place she would lead to. Her other wishes no longer ask (voice: "I'd like to
+sit by a fire a while, you and me.", "I'd like to be among people for a bit, in a town.", "I'd like to
+stop at the temple for a blessing."); the wolves line asked nothing already. So every wish of hers
+that ends in a question is one a yes takes up, and companion_test checks every template's line so. No
+"why" in her mouth yet (Jeff's pick, C:/dev/review/decisions/first-five-minutes.md); a third line is a
+later take.
+
+Her pond wish is held where a yes could do nothing (the coordinator's, on companions' note: an offer
+whose yes does nothing is the very fault this mends). Main gives her wish_answerable: her pond wish
+may be said only while Main._wish_lead_to finds where a yes would take her player, her want's place (a
+fishing place she knows) or water within FISH_LEAD_NEAR of them; _note_lead_offer reads the same. Where
+neither holds (a dungeon, far country) her plain line is not said (_tell_want_plainly), her voice's
+quiet moment is not given her want to speak of, and her first words greet alone; the wish stays
+untold and comes at a quiet moment where it can be answered (a mind with no voice of its own looks
+again every 30 s). A wish not the pond is never held.
+
+Companion.greets (static, on) is off in companion_test outside _test_first_words, which counts
+lines in its older sections. companion_test _test_first_words: Umbrage at the arrival and "The
+Wilds" outside a room; Umbrage inside its four building levels, none for the wilds, barrow and hills; every wish ending in "?" matches LEAD_OFFER; her first words waiting
+FIRST_WORDS_WAIT_S untold of the view, then, the view built, the greeting with
+where_name's name at 10 s, the wish at the floor after, her record's "greeted" gone; the offer kept
+to her pond and a "yes" sets her off; greeted once; companion_from saves "greeted" only while false;
+knowing no fishing place, her offer goes to the near water and a yes leads there; with no water near
+and no place known, her wish held (no plain line, no voice focus, her first words alone), still
+untold, then said once water is near and a yes leads. record_keys_test's sample carries
+"greeted". Until ui's where_name lands, this commit carries it as written on ui's branch.
+
+Server only; protocol unchanged; no new class_name. The bullet, voice's, ships on a joined look: a
+fresh character, the first 30 s, her two lines read off the screen with their seconds, a "yes"
+typed, and her leading.

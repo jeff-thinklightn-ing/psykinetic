@@ -1562,6 +1562,17 @@ static func room_at(level: Dictionary, cell: Vector2i) -> String:
 	return ""
 
 
+## The name of where [param cell] is, the one source every screen reads (the arrival card, the
+## compass's place line, the big map's title, her greeting; decision 665 amended): the name of the
+## named room that holds it, else the level's own name ("" for neither). maps': a room's name
+## is rooms.<key>.name, never another.
+static func where_name(level: Dictionary, cell: Vector2i) -> String:
+	var key := room_at(level, cell)
+	if not key.is_empty():
+		return str(level["rooms"][key].get("name", ""))
+	return str(level.get("display_name", ""))
+
+
 ## level.json's "places", key -> {key, cell, name, kind (PLACE_KINDS), radius
 ## (cells, at least 1), worth (at least 0), holder (who holds it at the
 ## start; "nobody" if not said), and town if it works for one (decision 517:
