@@ -945,6 +945,58 @@ func shortfall(town: String) -> Dictionary:
 	return {"kind": str(each["recipe"]), "job": id, "steps": int(each.get("steps", 0)), "needs": needs}
 
 
+## What [param town] wants now that a newcomer with an empty pack can answer in the first hour (931,
+## economy's side; voice's greeting, the coordinator's ruling on Jeff's report of 11-14: "still dont know
+## where am i going or why"): {good, words, short (0..1), worker, person, trade}, or {} for none.
+## Only economy.json newcomer_wants' rows are asked (things to eat, firewood, a sought newcomer to bring
+## home): never a build's materials (shortfall) or a trade's own stock. A good's row is short by how far
+## the store's count of its goods ("counts") is under its comfort ("enough", Production.comfort); the
+## sought row by its "short" while the town seeks anyone not yet led home. The shortest wins, rows in
+## their order breaking ties; nothing under "least" counts. The asker: the first of the town's residents
+## by id whose first trade is one of the row's "trades", not away and not sick ("" for none, and for the
+## sought row); "trade" is that worker's trade id, voice's to word. Records only: the same town state
+## gives the same answer, nothing goes on the wire, and no player is named.
+func newcomer_want(town: String) -> Dictionary:
+	var rows: Array = rules.get("newcomer_wants", [])
+	var least := float(rules.get("newcomer_wants_least", 0.0))
+	var best := {}
+	for row: Dictionary in rows:
+		var short := 0.0
+		if str(row.get("good", "")) == "sought":
+			var open := sought(town).filter(func(entry: Dictionary) -> bool: return str(entry.get("freed_by", "")).is_empty())
+			short = float(row.get("short", 0.0)) if not open.is_empty() else 0.0
+		else:
+			var enough := production.comfort(town, str(row.get("enough", row.get("good", ""))))
+			var have := 0
+			for what: String in row.get("counts", [row.get("good", "")]):
+				have += production.stockpile.count(town, what)
+			short = clampf(1.0 - float(have) / enough, 0.0, 1.0) if enough > 0 else 0.0
+		if short > least and (best.is_empty() or short > float(best["short"])):
+			best = {"good": str(row.get("good", "")), "words": str(row.get("words", "")), "short": short, "trades": row.get("trades", [])}
+	if best.is_empty():
+		return {}
+	best["worker"] = ""
+	best["person"] = ""
+	best["trade"] = ""
+	var trades: Array = best["trades"]
+	best.erase("trades")
+	if trades.is_empty():
+		return best
+	var ids := residents(town)
+	ids.sort()
+	for id: String in ids:
+		var worker := production.worker(id)
+		var theirs: Array = worker.get("trades", [])
+		if id.begins_with(Townsfolk.COMPANION) or theirs.is_empty() or not str(theirs[0]) in trades \
+				or bool(worker.get("away", false)) or Townsfolk.is_sick(production, id):
+			continue
+		best["worker"] = id
+		best["person"] = str(worker.get("name", ""))
+		best["trade"] = str(theirs[0])
+		break
+	return best
+
+
 ## [param town] spends experience on [param kind]'s next level: a build job
 ## for it (its cost and steps times the level). False, and nothing spent,
 ## for no such kind, not enough experience, or one already being built.

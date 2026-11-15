@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_stalled_build()
 	_test_boot_line()
 	_test_day_line()
+	_test_newcomer_want()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -324,3 +325,52 @@ func _test_stalled_build() -> void:
 	_at(2 * day + 3900)
 	_check(_work.job(inn).get("state") == "working", "its cloth in: the inn is built next (%s)" % [_work.job(inn)])
 
+
+## What a newcomer is told the town wants (931, economy's side): only economy.json newcomer_wants' rows,
+## the shortest under its comfort, the asker the first of its trades by id who is here and well.
+func _test_newcomer_want() -> void:
+	print("
+== a newcomer's want: something to eat, firewood or a sought one, never a build's materials; the asker here and well (931, economy's side) ==")
+	var rules: Dictionary = RULES.duplicate(true)
+	rules["newcomer_wants"] = [{"good": "food", "words": "food", "counts": ["food", "meat", "fish"], "enough": "food", "trades": ["cook"]},
+		{"good": "wood", "words": "firewood", "counts": ["wood"], "enough": "wood", "trades": ["carpenter", "woodcutter"]},
+		{"good": "sought", "words": "someone brought home", "short": 0.5, "trades": []}]
+	rules["newcomer_wants_least"] = 0.25
+	_now = 0
+	var clock := func() -> int: return _now
+	_book = ItemBook.new(clock)
+	_stock = Stockpile.new({}, clock, _book)
+	for what: String in {"gold": 100, "ore": 30, "wood": 60, "food": 10}:
+		_stock.deposit(TOWN, what, {"gold": 100, "ore": 30, "wood": 60, "food": 10}[what], "test")
+	_work = Production.new({}, _stock, null, clock, rules, func() -> Dictionary: return CATALOG)
+	_towns = Towns.new({}, _work, rules, clock)
+	_check(_towns.newcomer_want(TOWN).is_empty(), "food 10 and wood 60 over their comfort (4, 5): nothing asked")
+	_stock.take(TOWN, "ore", 30, "test")
+	_check(_towns.newcomer_want(TOWN).is_empty(), "no ore at all: still nothing (a build's or a trade's stock is never asked)")
+	_stock.take(TOWN, "food", 9, "test")
+	var want := _towns.newcomer_want(TOWN)
+	_check(want.get("good") == "food" and want.get("words") == "food" and is_equal_approx(float(want.get("short", 0)), 0.75)
+		and want.get("worker") == "" and want.get("person") == "", "1 food of 4: food, nobody to ask yet (%s)" % [want])
+	_towns.note_rescue(TOWN, "cob", "Cob", "cook")
+	_towns.note_rescue(TOWN, "cara", "Cara", "cook")
+	want = _towns.newcomer_want(TOWN)
+	_check(want.get("worker") == "cara" and want.get("person") == "Cara" and want.get("trade") == "cook", "two cooks: the first by id asks (%s)" % [want])
+	_check(_towns.newcomer_want(TOWN) == want, "the same state: the same answer")
+	_work.set_away("cara", true)
+	_check(_towns.newcomer_want(TOWN).get("worker") == "cob", "Cara away: Cob asks")
+	Townsfolk._set_sickness(_work, "cob", {"kind": "the shakes", "since": 0, "day": 0})
+	want = _towns.newcomer_want(TOWN)
+	_check(want.get("good") == "food" and want.get("worker") == "", "Cob abed too: the want still, nobody named (%s)" % [want])
+	_stock.deposit(TOWN, "fish", 2, "test")
+	_stock.deposit(TOWN, "meat", 1, "test")
+	_check(_towns.newcomer_want(TOWN).is_empty(), "fish and meat count as food: 4 of 4, nothing asked")
+	_stock.take(TOWN, "wood", 59, "test")
+	want = _towns.newcomer_want(TOWN)
+	_check(want.get("good") == "wood" and want.get("words") == "firewood" and want.get("worker") == "", "1 wood of 5: firewood, no carpenter here (%s)" % [want])
+	_stock.deposit(TOWN, "wood", 59, "test")
+	_towns._seek(TOWN, "wyn", "Wyn", "weaver")
+	want = _towns.newcomer_want(TOWN)
+	_check(want.get("good") == "sought" and want.get("worker") == "", "a weaver sought, the stores full: someone brought home (%s)" % [want])
+	_towns._town(TOWN)["sought"]["wyn"]["freed_by"] = "p1"
+	_check(_towns.newcomer_want(TOWN).is_empty(), "led home by a player already: nothing asked")
+	_fresh()

@@ -225,6 +225,10 @@
 	},
 	"level_speed": 0.25,
 	"build_wait": {"days": 2, "most": 3},
+	"newcomer_wants": [{"_": "Decision 931, economy's side (Towns.newcomer_want, voice's greeting): what a newcomer with an empty pack can answer in the first hour, never a build's materials or a trade's own stock. A row is short by how far its counts are under the comfort of enough; the sought row by its short while anyone sought is not yet led home. words are voice's; trades ask, in order.", "good": "food", "words": "food", "counts": ["food", "meat", "fish"], "enough": "food", "trades": ["cook"]},
+		{"good": "wood", "words": "firewood", "counts": ["wood"], "enough": "wood", "trades": ["carpenter", "woodcutter"]},
+		{"good": "sought", "words": "someone brought home", "short": 0.5, "trades": []}],
+	"newcomer_wants_least": 0.25,
 	"xp": {"rescue": 10, "objective": 50},
 	"residents": {"base": 3, "per_inn": 3},
 	"raids": {
