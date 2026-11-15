@@ -54491,6 +54491,40 @@ taken over while it holds the lock, and kept when another tree holds it; three t
 when a take changes tools/remote_tests.sh or the test. Tools and tests only; protocol unchanged; no class_name; no
 bullet.
 
+878 amended (2): a prepare's exit reaches the PC, a live holder refuses the slot at once, and a dead landing gives it
+back (the coordinator's ask and approval with conditions, 2026-11-14; label from tools/decision_number.sh). On 11-14 ui's
+landing (lock 20:11:23 to 20:20:03, no push) left saturn's holder "ui d0935fec…", and combat's landing after it read
+"PASS remote_prepare 619s" and then had all three parts refused in a second ("the slot is not combat's"); release cleared
+the slot by hand at 20:40:27. Two faults. First, remote() handed its arguments to ssh unquoted, and ssh joins them into
+one line for saturn's login shell: prepare's last argument "live=a,b;mine=1" ended the line at the ";", saturn ran
+"mine=1" after the script, and every prepare since 878 amended (1) (ff25e8fa5) came back 0 whatever it said (combat's
+remote_prepare.log: "saturn's slot is held by 'ui d0935fec…' (816 s); waited 10 minutes"), and mine=1 never reached
+saturn, so the own-earlier-take case never fired. Each argument is now quoted (printf %q); remote_slot_test's saturn
+gets the same line through bash -c, never the arguments as an array, which is why its rows had not seen it. The other
+ssh callers in tools/ were read: remote_shot.sh sends a command line it builds itself or a base64 PowerShell script,
+and deploy_box.ps1 and ship.ps1 fixed strings; none hands an argument list over, so none had this fault. Second,
+any gate take counted a tree as live, so ui's scene and load_check takes kept its dead landing's slot. Now a tree is live
+only by the land lock's beat in the last 150 s or by a running suite_remote take that is not waiting on the land lock
+(the gate's lock_wait flag): a requeue of the dead landing, queued for the lock, is no sign either. Another tree's live
+holder refuses the slot at once, naming it ("refused at once; requeue"): a landing runs only under the land lock, so a
+live holder beside this take is a fault to requeue past, never ten minutes' wait; a holder not live is waited for as
+before (2 minutes untouched, then taken over). land.sh, on a failed prepare, prints its "remote" lines, and on a refused
+slot "SATURN SLOT REFUSED: not this commit's fault; no part ran; requeue", and no part runs. The slot is given back on
+every way out: land.sh's EXIT trap runs `remote_tests.sh finish` (it removes the holder only when it names this tree
+and commit), and on saturn prepare now has the connection watcher part had: when its ten-second line can't be written,
+or the shell gets HUP or TERM, give_back removes the holder only if it names this landing's tree and sha, and what this
+landing started is stopped by its own shell's session id, recorded at its start, never by name. A new verb `script`
+prints the saturn side for the test. remote_slot_test's rows: refused at once (named, in under 3 s) with the lock beaten,
+with a suite_remote take and no lock beat, and with the take alone; taken over with only a scene take, and with a
+suite_remote take waiting on the lock; through a real command line in a small repo with a stand-in Godot, a free slot
+prepared (exit 0), a failed import exits non-zero, a refused slot exits 1 with the holder named and kept, and mine=1
+arrives (this tree's earlier sha taken over and logged); with stderr closed, as a lost connection leaves it, its own
+holder given back within ten seconds, and another landing's holder left alone. With the old unquoted line put back,
+the prepare rows fail. What a tree sees from now on: a prepare can fail, and its line says why ("refused at once;
+requeue" or "waited 10 minutes": another landing's slot, never this commit; "the import failed": this commit's import
+on saturn, its SCRIPT ERROR lines above it; "saturn does not have", "could not check out", "is not clean": a send or
+checkout fault, requeue and tell perf). Tools and tests only; protocol unchanged; no class_name; no bullet.
+
 ## 879. A level link's cell is a step only as the goal
 
 A level link's cell is a player's way out alone (571): World.try_move refuses any other body onto one,

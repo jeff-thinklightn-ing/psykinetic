@@ -147,7 +147,17 @@ fi
 . tests/jobs.sh
 . tests/land_retry.sh  # tool_part: a tool part retried once on a temp-folder fault (278 amended (8)).
 LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
-trap 'rm -rf "$LOGS"' EXIT
+# 878 amended (2): saturn's slot given back on every way out (a failed or refused
+# part, a stop), not only after the parts: ui's landing that ended at 20:20 on 11-14
+# left its holder, and the next landing's tests were refused. finish removes the
+# holder only when it names this tree and this commit.
+on_exit() {
+	if [ -n "${remote:-}" ]; then
+		bash tools/remote_tests.sh finish >/dev/null 2>&1
+	fi
+	rm -rf "$LOGS"
+}
+trap on_exit EXIT
 
 jobs_at_once="$(test_jobs)"
 suite_jobs=$(( jobs_at_once - 2 ))
@@ -247,6 +257,15 @@ if [ -n "$remote" ]; then
 	read -r prepared _ <"$LOGS/remote_prepare.status"
 	# Where saturn's scene caps came from (90 amended (2)): own, seeded from a tree, or none.
 	grep -h "^durations: " "$LOGS/remote_prepare.log"
+	# 878 amended (2): a prepare can fail now (before it, every exit came back 0). Its
+	# line says which: a slot refused (another landing's, live or not given up in 10
+	# minutes) is never this commit's fault, so the landing ends here and says requeue.
+	if [ "$prepared" != "0" ]; then
+		grep -h "^remote" "$LOGS/remote_prepare.log" | tail -3
+		if grep -q "slot is held by" "$LOGS/remote_prepare.log"; then
+			echo "SATURN SLOT REFUSED: not this commit's fault; no part ran; requeue (878 amended (2))"
+		fi
+	fi
 	if [ "$prepared" = "0" ]; then
 		part state_test bash tools/remote_tests.sh part state_test &
 		sleep 0.3

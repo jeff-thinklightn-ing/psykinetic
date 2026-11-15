@@ -14,12 +14,15 @@
 #   tools/remote_tests.sh finish             give saturn's slot back
 #   tools/remote_tests.sh slot               take saturn's slot only (tests/remote_slot_test.sh's)
 #   tools/remote_tests.sh seed               prepare's durations step only (the same test's)
+#   tools/remote_tests.sh script             print what runs on saturn (the same test's)
 #   tools/remote_tests.sh run                prepare, the three parts, finish
 # One landing's tests at a time there (a slot, ~/land/.busy, stale after 40
 # minutes; waited for 10). A slot whose landing is gone on this PC is taken
 # over at once (878 amended (1)): prepare tells saturn which trees are live
 # here (the land lock's holder beaten in the last 150 s, and every tree with a
-# running gate take) and whether this tree holds the lock; a holder that is
+# running suite_remote take not waiting on the lock, 878 amended (2)) and
+# whether this tree holds the lock; another tree's live holder refuses the slot
+# at once (requeue); a holder that is
 # neither live nor this tree's own earlier take is taken over only when
 # nothing runs under ~/land/<holder> and the slot has gone 2 minutes
 # untouched, each one logged in saturn's ~/land/.slot_clears.log. The timeouts there (slot 10 min, two imports 5
@@ -42,12 +45,18 @@ case "$tree" in
 esac
 
 # What runs on saturn. Arguments: verb tree sha jobs [part]. Sent on stdin so
-# nothing is installed there but Godot and the clone.
+# nothing is installed there but Godot and the clone. 878 amended (2): ssh joins
+# its arguments into one line that saturn's login shell parses, so each is quoted
+# (printf %q): unquoted, prepare's "live=a,b;mine=1" ended the line at the ";",
+# saturn ran "mine=1" last, and every prepare's exit came back 0 whatever it said
+# (combat's "PASS remote_prepare 619s" on a refused slot, 11-14). The test's
+# saturn here gets the same line through bash -c, never the arguments as an array.
 remote() {
+	cmd="bash -s --$(printf ' %q' "$@")"
 	if [ -n "${PSYKINETIC_REMOTE_HERE:-}" ]; then
-		remote_script | HOME="$PSYKINETIC_REMOTE_HERE" bash -s -- "$@"
+		remote_script | HOME="$PSYKINETIC_REMOTE_HERE" bash -c "$cmd"
 	else
-		remote_script | "${SSH[@]}" "$HOST" bash -s -- "$@"
+		remote_script | "${SSH[@]}" "$HOST" "$cmd"
 	fi
 }
 # tests/remote_slot_test.sh runs it here, its HOME a scratch folder (PSYKINETIC_REMOTE_HERE).
@@ -66,8 +75,33 @@ mkdir -p "$HOME/land/.logs" "$HOME/land/.in"
 # `timeout` leaves its process group but never its session: whatever this
 # shell started is stopped by session, never by name.
 sid="$(ps -o sid= -p $$ | tr -d ' ')"
-end_session() { pkill -TERM -s "$sid" 2>/dev/null; }
-trap 'trap - TERM HUP INT; end_session' HUP TERM INT
+end_session() { [ -n "$sid" ] && pkill -TERM -s "$sid" 2>/dev/null; }
+# 878 amended (2): a landing stopped on the PC, or its connection lost, gives saturn's
+# slot back here, and only its own: the holder removed when it names this tree and
+# sha (give_back), never another landing's; what runs is stopped by this shell's own
+# session id, recorded above.
+give_back() {
+	if mine; then
+		rm -rf "$BUSY"
+		echo "remote: the slot given back ($1)" >&2
+	fi
+}
+watcher=""
+stop_watcher() {
+	[ -n "$watcher" ] || return 0
+	pkill -P "$watcher" 2>/dev/null; kill "$watcher" 2>/dev/null
+	watcher=""
+}
+# The connection watched: with no terminal there is no HUP when the PC's side dies
+# (a stopped landing, a lost network), and what this shell started would run on in
+# the checkout. A blank line to stderr every ten seconds; when it can't be written,
+# the slot is given back and the session ends.
+watch_connection() {
+	( trap '' PIPE; while sleep 10; do echo >&2 || { give_back "the connection was lost"; end_session; sleep 3; [ -n "$sid" ] && pkill -KILL -s "$sid"; exit; }; done ) &
+	watcher=$!
+}
+trap 'trap - TERM HUP INT; give_back "stopped"; end_session' HUP TERM INT
+trap 'stop_watcher' EXIT
 # What an earlier run left in a tree's checkout (its shell died with the
 # connection, its Godots ran on): this user's processes whose folder is that
 # checkout, stopped by id.
@@ -91,8 +125,13 @@ holder() { cat "$BUSY/holder" 2>/dev/null; }
 mine() { [ "$(holder)" = "$tree $sha" ]; }
 # 878 amended (1): what this PC said with prepare ("live=a,b;mine=1"; nothing
 # said, nothing taken over early). A holder is gone when its tree is not live
-# here (no land-lock beat in 150 s and no gate take: both signs, never one),
-# or is this tree's own earlier take while this take holds the land lock.
+# here (no land-lock beat in 150 s and no landing's suite_remote take: both
+# signs, never one; 878 amended (2): a scene, load_check or import take, or a
+# suite_remote take still waiting on the land lock, is no sign), or is this
+# tree's own earlier take while this take holds the land lock. Another tree's
+# live holder refuses the slot at once (is_live): a landing runs only under the
+# land lock, so a live holder beside this take is a fault to requeue past,
+# never ten minutes' wait.
 said_live=""; said_mine=""; said_wait=600; said_any=""
 case "${part:-}" in
 live=*|wait=*)
@@ -110,8 +149,13 @@ gone_why() {
 	case "$1" in
 	"$tree") [ "$2" != "$sha" ] && [ "$said_mine" = 1 ] && echo "this tree's earlier take; this take holds the land lock" ;;
 	*) case "$said_live" in *",$1,"*) return 1 ;; esac
-		echo "no land-lock beat in 150 s and no gate take" ;;
+		echo "no land-lock beat in 150 s and no landing's suite_remote take" ;;
 	esac
+}
+is_live() {
+	[ -n "$said_any" ] || return 1
+	case "$said_live" in *",$1,"*) return 0 ;; esac
+	return 1
 }
 take_slot() {
 	waited=0
@@ -119,6 +163,10 @@ take_slot() {
 		if mine; then return 0; fi
 		age=$(( $(date +%s) - $(stat -c %Y "$BUSY" 2>/dev/null || echo 0) ))
 		other="$(holder)"
+		if [ -n "$other" ] && [ "${other%% *}" != "$tree" ] && is_live "${other%% *}"; then
+			echo "remote: saturn's slot is held by '$other' ($age s), a landing live on the PC (its land-lock beat or its suite_remote take): refused at once; requeue (878 amended (2))"
+			return 1
+		fi
 		why=""
 		[ "$age" -ge 120 ] && [ -n "$other" ] && why="$(gone_why "${other%% *}" "${other#* }")"
 		if [ -n "$why" ] && [ -z "$(running_in "$HOME/land/${other%% *}")" ] && [ "$(holder)" = "$other" ]; then
@@ -173,6 +221,7 @@ slot)
 	;;
 prepare)
 	take_slot || exit 1
+	watch_connection
 	stop_leftovers "$W"
 	rm -rf "$LOGS"; mkdir -p "$LOGS"
 	bundle="$HOME/land/.in/$tree.bundle"
@@ -216,12 +265,7 @@ part)
 	suite|state_test|net_test) ;;
 	*) echo "remote: no part '$part'"; exit 1 ;;
 	esac
-	# The connection watched: with no terminal there is no HUP when the PC's
-	# side dies (a stopped landing, a lost network), and the Godots, writing
-	# to their own logs, would run on in this checkout. A blank line to
-	# stderr every ten seconds; when it can't be written, the session ends.
-	( trap '' PIPE; while sleep 10; do echo >&2 || { end_session; sleep 3; pkill -KILL -s "$sid"; exit; }; done ) &
-	watcher=$!
+	watch_connection  # (878 amended (2): it gives the slot back too.)
 	t0=$(date +%s)
 	case "$part" in
 	suite) timeout 1200 bash tests/run.sh </dev/null 2>&1 ;;
@@ -229,7 +273,7 @@ part)
 	net_test) timeout 600 bash tests/net_test.sh </dev/null 2>&1 ;;
 	esac
 	code=$?
-	pkill -P "$watcher" 2>/dev/null; kill "$watcher" 2>/dev/null
+	stop_watcher
 	touch "$BUSY"
 	echo "REMOTE $part: $([ "$code" -eq 0 ] && echo PASS || echo FAIL) sha=$sha $(( $(date +%s) - t0 ))s"
 	exit "$code"
@@ -246,8 +290,9 @@ REMOTE
 sha="$(git rev-parse HEAD)" || exit 1
 # 878 amended (1): the trees whose landings are live on this PC, for saturn's
 # slot: the land lock's holder when beaten in the last 150 s, and every tree
-# with a running gate take (the gate drops the dead and those from before a
-# boot). With "mine=1" when this tree holds the lock. Nothing printed when
+# with a running suite_remote take not waiting on the land lock (878 amended
+# (2): ui's scene and load_check takes kept its dead landing's slot from being
+# taken over, 11-14; the gate drops the dead and those from before a boot). With "mine=1" when this tree holds the lock. Nothing printed when
 # either can't be read: saturn then takes nothing over early.
 live_here() {
 	lock="${PSYKINETIC_LAND_LOCK:-/c/dev/land.lock}"
@@ -264,7 +309,7 @@ import sys
 sys.path.insert(0, 'tools')
 import heavy_job as gate
 with gate.StateLock():
-    print(','.join(sorted({each['tree'] for each in gate._entries('running')})))
+    print(','.join(sorted({each['tree'] for each in gate._entries('running') if each.get('kind') == 'suite_remote' and not each.get('lock_wait')})))
 " 2>/dev/null)" || return 1
 	case "$owner,$gate" in *[!A-Za-z0-9_.,-]*) return 1 ;; esac
 	echo "live=$owner,$gate;mine=$mine"
@@ -324,7 +369,8 @@ prepare)
 		fi
 		( cd "$tmp" && "${SCP[@]}" "$tree.bundle" "$HOST:land/.in/$tree.bundle" ) || { echo "remote_tests: could not send the bundle"; exit 1; }
 	fi
-	remote prepare "$tree" "$sha" "$JOBS" "$(slot_said)"
+	# The watcher's blank lines (878 amended (2)) left out of what prepare shows.
+	remote prepare "$tree" "$sha" "$JOBS" "$(slot_said)" 2> >(grep -v '^$' >&2)
 	;;
 slot)
 	# tests/remote_slot_test.sh's: take saturn's slot only, as prepare would.
@@ -352,6 +398,11 @@ part)
 	;;
 finish)
 	remote finish "$tree" "$sha" "$JOBS"
+	;;
+script)
+	# tests/remote_slot_test.sh's: what runs on saturn, printed (878 amended (2)), so the
+	# test can run it with its stderr cut, as a lost connection leaves it.
+	remote_script
 	;;
 run)
 	bash "$0" prepare || { bash "$0" finish; echo "REMOTE TESTS: FAIL sha=$sha (prepare)"; exit 1; }
