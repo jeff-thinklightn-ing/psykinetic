@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Towns: at night a newcomer arriving in Umbrage sees the Mughouse's door lit ahead, its lantern lighting the step and the wall beside the door (927 amended (2)).
 - Towns: a newcomer arrives south of Umbrage's square, facing the Mughouse's front across open grass, its windows lit at night, and the road in from the foothills is a single road (934).
 
 - With the hunting bow, a quick Shift-click looses an arrow at once (928).
