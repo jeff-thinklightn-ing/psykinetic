@@ -11781,7 +11781,7 @@ static func window_slot(wall_set: String, height: float) -> String:
 ## 0.42: a luma of 0.76, near white as shown), outshone every house's pane
 ## (0.75, 0.315, 0.068: 0.39) and the inn's porch from a newcomer's first
 ## view. Drawn at LANCET_GLOW of it, still plainly lit.
-const LANCET_GLOW := 0.5
+const LANCET_GLOW := 0.35
 
 
 ## Whether [param slot] is a lancet: a set's tall window with no plain one
