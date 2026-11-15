@@ -5912,7 +5912,7 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	if not World.zone.outdoor and not World.peers_in(to_map).any(func(other: int) -> bool: return other != peer):
 		_arrival_sync(to_map)  # Before the first state they are shown: no empty room, then folk appearing. The first in only (perf's).
 	_show_zone_to(peer, to_map, leaving)
-	_join_player(peer, id, record.name)
+	_join_player(peer, id, record.name, false, World.NO_CELL, true)  # A travel's re-join: --test-foe leaves the hands (392 amended (12)).
 	_shelter_arrival(peer, id)
 	if to_spawn == "from_below":
 		_reveal_from_below(to_map)  # The hidden door pushed open from behind (608).
@@ -7541,7 +7541,7 @@ func _spend_name(entity_name: String) -> void:
 ## player left off if the server has seen the id before (nearest free tile
 ## if its own is taken), fresh at a start tile if not. [param respawn] is a
 ## death: known player, but a start tile and full stats.
-func _join_player(peer: int, id: String, player_name: String, respawn := false, at := World.NO_CELL) -> void:
+func _join_player(peer: int, id: String, player_name: String, respawn := false, at := World.NO_CELL, travelled := false) -> void:
 	var record: PlayerRecord = _records.get(id)
 	var known := record != null
 	if not known:
@@ -7652,7 +7652,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		record.seen_generation[World.zone.name] = generation
 	_join_companion(record, player)
 	_on_gold_changed(id, World.gold_of(id))
-	_test_foe(player)
+	_test_foe(player, travelled)
 	if admin_peer_allowed(peer, id) and peer != Net.local_id:
 		Net.message_to(peer, "admin", {"admin": true})  # 672: their F10 opens the panel.
 
@@ -29541,18 +29541,25 @@ func _test_arts(player: Player) -> void:
 ## 392 amended (9) (playtest's joined look of 806 amended (21)): a kind may
 ## carry ":<temperament>" (bold, cautious, cowardly), "robber:cautious+robber:cautious":
 ## its spawn spec's "temperament", as a level entry's, in place of the draw by name.
+## 392 amended (12) (ui-design's arms4: nine "hands after the move" read empty): the hands are set at a
+## fresh join, a re-join after leaving and a respawn, never on a travel's re-join ([param travelled]: a
+## link, a waystone, the console's move), which keeps what the body held, as the game does; the foes
+## of a flag without "held" are laid on it as before.
 const TEST_FOE_SPACING := 8
 const TEST_FOE_AROUND: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1)]
 ## How many test foes laid so far, so a later ring's names follow on (Foe4...).
 var _test_foes_laid := 0
-func _test_foe(player: Player) -> void:
+func _test_foe(player: Player, travelled := false) -> void:
 	var plan := test_foe_plan(Net.test_foe)
 	if plan.is_empty():
 		if not Net.test_foe.is_empty():
 			push_error("[test] --test-foe=%s: not kind[:temperament],weapon[,count[,around][,held]]: ignored" % ",".join(Net.test_foe))
 		return
-	World.set_slots(player, Items.tidy(["", "", "", "", plan["right"], plan["left"]], Items.CARRIED))
+	if not travelled:
+		World.set_slots(player, Items.tidy(["", "", "", "", plan["right"], plan["left"]], Items.CARRIED))
 	if plan["held"]:
+		if travelled:
+			return  # Neither hands nor a held line on a travel's re-join.
 		print("[test] held: %s in hand at %s; the foes wait for \"foes %s\"" % [
 				"+".join([plan["right"], plan["left"]]).trim_suffix("+"), player.tile, player.name])
 		return

@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_look_seeded()
 	_test_same_zone_travel_keeps_names()
 	_test_kept_body_shelter_ends()
+	_test_test_foe_hands_through_travel()
 	_test_closed_link()
 
 	print("")
@@ -474,6 +475,37 @@ func _test_kept_body_shelter_ends() -> void:
 	World.damage(player, 1, null, &"attack")
 	_check(player.hp == hp - 1, "and a blow lands (%d, was %d)" % [player.hp, hp])
 	player.hp = player.max_hp
+
+
+## 392 amended (12): --test-foe sets the hands at a join and a respawn, never on a travel's re-join, which
+## keeps what the body held as the game does (ui-design's arms4 read nine moves' hands empty: the flag's).
+func _test_test_foe_hands_through_travel() -> void:
+	print("
+== --test-foe's hands: set at a respawn, kept through a travel (392 amended (12)) ==")
+	_kill_monsters()
+	var was := Net.test_foe
+	Net.test_foe = PackedStringArray(["imp", "sword", "1", "held"])  # Held: hands only, no foes laid.
+	var player := _player()
+	var peer := player.owner_peer
+	var id := player.player_id
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not player.slots[slot].is_empty():
+			World.items.end(World.take_item(player, player, slot), "gone")
+	var dagger := World.items.mint("dagger", "built")
+	World.put_item(player, player, Player.RIGHT_HAND, dagger)
+	_check(_main.travel(peer, World.zone.name, "", {}, player.tile), "travels within its own zone, under --test-foe")
+	player = _player()
+	_check(player.slots[Player.RIGHT_HAND] == "dagger" and World.items.at_of(dagger).begins_with("player:"),
+			"the dagger the tour gave is still in hand, not the flag's sword (%s, %s)" % [player.slots[Player.RIGHT_HAND], World.items.at_of(dagger)])
+	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
+	World.despawn(player)
+	_main._join_player(peer, id, _main._records[id].name, true)  # A fall's return, as _respawn_due_players does.
+	player = _player()
+	_check(player != null and player.slots[Player.RIGHT_HAND] == "sword", "a respawn under the flag: the sword in hand (%s)" % [
+			player.slots[Player.RIGHT_HAND] if player != null else "none"])
+	Net.test_foe = was
+	if player != null and not player.slots[Player.RIGHT_HAND].is_empty():
+		World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
 
 
 func _pet_of(player: Player) -> Companion:
