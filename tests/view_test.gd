@@ -140,6 +140,7 @@ func _ready() -> void:
 		await _test_reach_ease()
 		await _test_far_jump()
 		await _test_low_names()
+		await _test_stone_names()
 		_test_cone_lift()
 		_test_bent_walk()
 		_test_pine_stands()
@@ -18331,6 +18332,51 @@ func _test_low_names() -> void:
 	_rig._sync_puppets()
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 865 amended: a talking monster whose body is not flesh (the fallen knight, stone) has a Name label and a plate
+## row; a chest and a door, the other bodies that are not flesh, have neither. No bar comes with it.
+func _test_stone_names() -> void:
+	print("
+== a talking stone body has a name; a chest and a door have none (865 amended) ==")
+	var player := _player()
+	var at: Vector2i = _main._nearest_free(player.tile + Vector2i(3, 0))
+	# What a level's spawn gives him: his kind's label (Level's spec["label"], monsters.json "Fallen knight").
+	var kind_label := str(Monster.kinds().get("astral_knight", {}).get("label", ""))
+	var knight := _main._spawn({"script": "res://sim/astral_knight.gd", "shape": "capsule", "name": "ViewKnight%d" % World.tick,
+		"tile": at, "label": kind_label, "props": Level.MONSTER_TYPES["astral_knight"].duplicate()}) as AstralKnight
+	_check(knight != null and knight.talks and not knight.is_creature(), "the fallen knight: talks, and his body is not flesh")
+	if knight == null:
+		return
+	await _frames(4)
+	_rig._sync_puppets()
+	var puppet: Node3D = _rig._puppets.get(knight.get_instance_id())
+	var label := puppet.get_node_or_null("Name") as Label3D if puppet != null else null
+	_check(kind_label == "Fallen knight" and label != null and label.text == "Fallen knight", "he has a Name label reading his kind's label (%s)" % [label.text if label != null else "none"])
+	_check(puppet != null and puppet.get_node_or_null("HpBar") == null, "and no bar comes with it")
+	var rows: Array[Dictionary] = _rig.name_plates()
+	_check(rows.any(func(row: Dictionary) -> bool: return row.get("key", 0) == knight.get_instance_id()) or label == null or not label.visible,
+		"his plate is among the rows once his name shows (%d rows)" % rows.size())
+	# 752: with neither a given name nor a label there is no plate, never the node name.
+	var bare_at: Vector2i = _main._nearest_free(at + Vector2i(2, 0))
+	var bare := _main._spawn({"script": "res://sim/astral_knight.gd", "shape": "capsule", "name": "ViewBare%d" % World.tick,
+		"tile": bare_at, "props": Level.MONSTER_TYPES["astral_knight"].duplicate()}) as AstralKnight
+	await _frames(4)
+	_rig._sync_puppets()
+	var bare_puppet: Node3D = _rig._puppets.get(bare.get_instance_id()) if bare != null else null
+	_check(bare != null and bare.label.is_empty() and bare_puppet != null and bare_puppet.get_node_or_null("Name") == null,
+		"a talking stone monster with no given name and no label has no plate, never its node name")
+	if bare != null:
+		World.despawn(bare)
+	var box := Chest.new()
+	box.name = "ViewBox"
+	add_child(box)
+	var box_puppet: Node3D = _rig._make_puppet(box)
+	_check(box_puppet.get_node_or_null("Name") == null, "a chest, not flesh and not a talker, has no Name label")
+	box_puppet.free()
+	box.free()
+	World.despawn(knight)
+	_rig._sync_puppets()
 
 
 ## The low-angle fight, combat's (d): under a camera pitched below

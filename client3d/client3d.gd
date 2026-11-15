@@ -27850,6 +27850,16 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		# Hooked once: a zone entered again builds its breakables' puppets again.
 		_hook(entity.impacted, _on_impacted.bind(entity.get_instance_id()))
 		_break_sounds[String(entity.name)] = SoundKit.breaking(entity)
+	if not entity.is_creature() and entity is Monster and (entity as Monster).talks:
+		# 865 amended: a monster that talks has a name though its body is not flesh (the fallen knight's is stone). The label only: no bar,
+		# no nose, no hooks, no bubble height of its own (_sync_named gives the words).
+		# Never its node name (752): a talker with neither a given name nor its kind's label has no plate.
+		var talker := entity as Monster
+		var talker_caption: String = talker.given_name if not talker.given_name.is_empty() else talker.label
+		if not talker_caption.is_empty():
+			puppet.add_child(_label("Name", talker_caption, Color.WHITE, height + NAME_LIFT))
+			_hide_name_layers(puppet)
+			puppet.set_meta("caption", talker_caption)
 	if entity is Player or entity is Companion:
 		var light := OmniLight3D.new()
 		light.name = "Lantern"
