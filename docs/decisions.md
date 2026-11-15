@@ -35733,6 +35733,20 @@ only. view_test: the spent arrow still lands past its aim, nose down. A new chec
 level halfway, dipping, never turning more than 8 degrees a twentieth. Client only, protocol
 unchanged, no new class_name.
 
+583 amended (4): an arrow's tween is the arrow's own (the coordinator's ruling, 2026-11-15, after
+ui-design traced the bow tours' engine ERROR "Lambda capture at index 0 was freed"; label from
+tools/decision_number.sh). Client3D._on_shot puts a shot's arrow under the shooter's puppet's
+parent (the zone's node), _loose_up a lob's rising arrow there too, and _volley_fall a volley's
+arrow under the view, and each drove it with Client3D's own create_tween(), whose lambdas capture
+the arrow (its flight, the glance, the queue_free after SHOT_STUCK_SECONDS 10.0). A travel or a
+zone sent again frees the zone's node and its arrows while the tween lives on, and Godot refuses
+the freed capture before the lambda's own is_instance_valid can run: a player who shot and
+travelled within about 10 s printed that line (nothing else broke; the player saw nothing). Now
+each of the three is arrow.create_tween(): the tween dies with its arrow. view_test
+`_test_arrow_freed_with_zone`: a shot's, a lob's and a volley's arrow freed mid-flight, none left
+after their time, and no engine ERROR (land.sh fails the scene on one; on main's code the row
+prints the error seven times). Client only; protocol unchanged; no new class_name; no bullet.
+
 ## 677. The bow's lob: the right-button arced shot
 
 Jeff: "for the right click ability of the bow, im thinking arced shot, where the bow is aimed up to

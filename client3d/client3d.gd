@@ -28428,7 +28428,7 @@ func _on_shot(point: Vector2, struck: StringName, id: int) -> void:
 	puppet.get_parent().add_child(arrow, true)
 	_fly_arrow(arrow)
 	_head_arrow(arrow, from, stop - from)
-	var tween := create_tween()
+	var tween := arrow.create_tween()  # 583 amended (4): the arrow's own, freed with it (a travel frees the zone's node and the arrow).
 	if sags:
 		# Its range spent: one arc, level then dipping ever steeper over the last ARROW_DIP of it,
 		# to stand in the ground past its reach, nose first, at its angle; into water it's gone.
@@ -28558,7 +28558,7 @@ func _loose_up(shooter: GridEntity, parent: Node, from: Vector3, way: Vector2, f
 	var up := Vector3(way.x * cos(pitch), sin(pitch), way.y * cos(pitch))
 	var seconds := minf(VOLLEY_RISE_SECONDS, flight * 0.6)
 	_head_arrow(arrow, from, up)
-	var tween := create_tween()
+	var tween := arrow.create_tween()  # 583 amended (4): the arrow's own, freed with it with its zone.
 	tween.tween_method(func(t: float) -> void:
 		_head_arrow(arrow, from + up * VOLLEY_RISE * t, up)
 		if is_instance_valid(arrow):
@@ -28603,7 +28603,7 @@ func _volley_fall(shooter: GridEntity, point: Vector2, way: Vector2, at: float) 
 	add_child(arrow, true)
 	_fly_arrow(arrow)
 	_head_arrow(arrow, top, down)
-	var tween := create_tween()
+	var tween := arrow.create_tween()  # 583 amended (4): the arrow's own, freed with it.
 	tween.tween_interval(maxf(at - VOLLEY_FALL_SECONDS, 0.0))
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(arrow):

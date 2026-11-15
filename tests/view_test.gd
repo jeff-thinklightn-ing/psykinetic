@@ -102,6 +102,7 @@ func _ready() -> void:
 		await _test_hp_bars()
 		await _test_sounds_follow_events()
 		await _test_bow_sounds()
+		await _test_arrow_freed_with_zone()
 		await _test_armour_footfalls()
 		_test_work_strokes()
 		_test_town_day()
@@ -1235,6 +1236,44 @@ func _shot_arrows() -> Array:
 	var parent := (_rig._puppets.values()[0] as Node3D).get_parent()
 	return parent.get_children().filter(func(node: Node) -> bool:
 		return String(node.name).begins_with("ShotArrow") and not node.is_queued_for_deletion())
+
+
+## 583 amended (4): an arrow in the air freed under its tween (as a travel frees the zone's node and
+## every arrow under it: a shot's and a lob's rising arrow are the zone's, a volley's the view's)
+## takes its tween with it: nothing left, and no "Lambda capture ... was freed" engine ERROR once the
+## tween's time is past (land.sh fails the scene on any engine ERROR, so the row walks the path).
+func _test_arrow_freed_with_zone() -> void:
+	print("\n== an arrow freed in the air takes its tween with it: none left, no engine error (583 amended (4)) ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var zone := puppet.get_parent()
+	var far := player.tile + Vector2i(6, 0)
+	var named := func(under: Node, prefix: String) -> Array:
+		return under.get_children().filter(func(node: Node) -> bool:
+			return String(node.name).begins_with(prefix) and not node.is_queued_for_deletion())
+	var rows := []
+	# A shot let go at the open ground past its reach: in flight, its arc, then stuck 10 s.
+	var before: Array = named.call(zone, "ShotArrow")
+	player._world_shot(Vector2(far), &"")
+	var shot: Array = named.call(zone, "ShotArrow").filter(func(node: Node) -> bool: return not before.has(node))
+	# A lob's rising arrow, under the zone too.
+	var lob_before: Array = named.call(zone, "LobArrow")
+	_rig._loose_up(player, zone, puppet.position + Vector3.UP * 1.4, Vector2(1, 0), 1.0)
+	var rising: Array = named.call(zone, "LobArrow").filter(func(node: Node) -> bool: return not lob_before.has(node))
+	# A volley's arrow, coming down in 0.4 s, under the view.
+	var fall_before: Array = named.call(_rig, "VolleyArrow")
+	_rig._volley_fall(player, Vector2(far), Vector2(1, 0), 0.4)
+	var falling: Array = named.call(_rig, "VolleyArrow").filter(func(node: Node) -> bool: return not fall_before.has(node))
+	await _frames(2)
+	for arrow: Node in shot + rising + falling:
+		if is_instance_valid(arrow):
+			arrow.free()  # Gone with its zone, mid-tween.
+	await get_tree().create_timer(1.5).timeout  # Past each one's flight, rise and fall.
+	rows = [shot.size(), rising.size(), falling.size(), named.call(zone, "ShotArrow").size() - before.size(),
+		named.call(zone, "LobArrow").size() - lob_before.size(), named.call(_rig, "VolleyArrow").size() - fall_before.size()]
+	_check(rows.slice(0, 3) == [1, 1, 1] and rows.slice(3) == [0, 0, 0],
+			"a shot's, a lob's and a volley's arrow freed in the air: none left, their tweens gone with them (%s)" % [rows])
 
 
 func _test_bow_sounds() -> void:
