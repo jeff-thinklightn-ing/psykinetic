@@ -25744,6 +25744,7 @@ const BOW_LOOSE_UP := 0.3  # Bow_Loose's last key with the bow on the line (the 
 const BOW_RENOCK_SECONDS := 0.25  # Bow_Renock's length; it ends on Bow_Draw's BOW_SET_END key.
 const BOW_PULL_EASE := 3.0
 const NOCK_CLIPS := {"draw": "bow_draw", "loose": "bow_shoot", "renock": "bow_renock"}
+const BOW_LETDOWN := 0.15  # A cancelled draw's let-down, seconds (928 amended (2)).
 static func bow_pull(entity: GridEntity) -> float:
 	var phase := bow_phase(entity)
 	return float(bow_nock_at(phase.x, -1.0)[1]) if phase.y <= 0.0 else BOW_SET_END + (1.0 - BOW_SET_END) * phase.y
@@ -25871,6 +25872,14 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 			want = "carry"
 	if want in ["idle", "carry"] and calm:
 		want = "stowed"  # On the back (662 amended (d)), the hands free.
+	if bow != "" and want in ["idle", "carry", "stowed"] and state in ["draw", "hold", "letdown"]:
+		# A draw let go with no shot (a cancel, 928 amended (2)): the bow eased down, Bow_Draw run back
+		# from where it was to its start over BOW_LETDOWN, then as wanted; Bow_Draw's start is Bow_Idle's pose.
+		if state != "letdown":
+			puppet.set_meta("letdown_at", now)
+			puppet.set_meta("letdown_from", 1.0 if state == "hold" else float(puppet.get_meta("draw_share", 0.0)))
+		if now - int(puppet.get_meta("letdown_at", now)) < int(BOW_LETDOWN * 1000.0):
+			want = "letdown"
 	var rest := _rest_of(entity, puppet, ids, rig, now) if want == "" else {}
 	if want == "" and rest.is_empty() and calm and sheathes(ids):
 		want = "sheathed"  # The blade at the hip, the shield on the back (662 (c)).
@@ -25909,6 +25918,13 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		var clip := str(moves.get(NOCK_CLIPS[str(puppet.get_meta("nock_clip"))], ""))
 		var at := float(nocked[1]) if not nocked.is_empty() else BOW_SET_END + (1.0 - BOW_SET_END) * phase.y
 		rig.upper_at(clip, at * rig.length(clip))
+		# Where a cancel's let-down starts (928 amended (2)): Bow_Draw's share; the renock and the loose's
+		# last stretch hold the bow up, as Bow_Draw does at BOW_SET_END.
+		puppet.set_meta("draw_share", at if str(puppet.get_meta("nock_clip")) == "draw" else BOW_SET_END)
+	elif want == "letdown":
+		var down := str(moves.get("bow_draw", ""))
+		var u := clampf(float(now - int(puppet.get_meta("letdown_at", now))) / 1000.0 / BOW_LETDOWN, 0.0, 1.0)
+		rig.upper_at(down, float(puppet.get_meta("letdown_from", 0.0)) * (1.0 - smoothstep(0.0, 1.0, u)) * rig.length(down))
 	elif want != state:
 		match want:
 			"hold":
@@ -25971,12 +25987,15 @@ func _sky_bow(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionar
 			off += float(puppet.get_meta("settle_left", 0.0)) * (1.0 - phase.x)
 	elif want == "loose":
 		off = float(puppet.get_meta("sky_off", 0.0))
+	elif want == "letdown":  # A let-down keeps the draw's mix on its sky clip, the settle eased off with it (928 amended (2)).
+		var down := (now - int(puppet.get_meta("sky_msec", now))) / 1000.0 / BOW_LETDOWN
+		off = move_toward(float(puppet.get_meta("sky_off", 0.0)), 0.0, BOW_SETTLE_SKY * down)
 	else:
 		amount = 0.0
 	puppet.set_meta("sky_msec", now)
 	puppet.set_meta("sky_base", amount)
 	puppet.set_meta("sky_off", off)
-	var key := str(puppet.get_meta("nock_clip", "draw")) if want == "draw" else want
+	var key := str(puppet.get_meta("nock_clip", "draw")) if want == "draw" else ("draw" if want == "letdown" else want)
 	rig.sky(str(moves.get(SKY_CLIPS.get(key, ""), "")), clampf(amount + off, 0.0, 1.0))
 
 

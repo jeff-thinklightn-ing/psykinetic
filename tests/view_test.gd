@@ -15510,6 +15510,7 @@ func _test_bow_back() -> void:
 	player.raised = ""
 	_rig._process(0.0)
 	_check(hand.has_node("Held"), "let go: still in hand, roused")
+	puppet.set_meta("letdown_at", 0)  # The cancel's let-down (928 amended (2)) over.
 	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
 	_rig._combat_at.erase(id)
 	_rig._process(0.0)
@@ -15717,6 +15718,9 @@ func _test_sheathed() -> void:
 ## The most the bow hand may sit below where the first draw's pull starts (Bow_Draw at BOW_SET_END)
 ## while drawn again inside a loose (928 amended (1); anim_rig_test _test_bow_renock samples the whole path).
 const RENOCK_DROP := 0.04
+## The sky mix's step a frame may pass its fade's share by (a crossing, 677 amended (4)): the settle's own
+## ease as the pull lands, never a flip of its sign (BOW_SETTLE_SKY twice, 0.12).
+const SKY_STEP_SLACK := 0.04
 func _test_bow() -> void:
 	print("
 == the bow (decision 462): held left, drawn, held at full draw, loosed; the shield's guard ==")
@@ -15882,14 +15886,69 @@ func _test_bow() -> void:
 			loose_at, RENOCK_DROP, drop, cycle])
 	player.raised = ""
 	puppet.set_meta("bow_until", 0)
+	_rig._process(0.0)  # A cancel: its let-down begins (below)...
+	puppet.set_meta("letdown_at", 0)  # ...and is over.
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Idle", "then Bow_Idle again")
+	# A draw let go with no shot (a cancel, 928 amended (2)): the bow eased down, Bow_Draw run back from
+	# where it was to its start (Bow_Idle's pose) over BOW_LETDOWN, then Bow_Idle; no one-frame drop.
+	World.tick_alpha = 0.0
 	player.raised = "draw"
-	player.raised_tick = World.tick
+	player.raised_tick = World.tick - 3  # The bow up on the line: Bow_Draw at BOW_SET_END.
 	_rig._process(0.0)
 	player.raised = ""
 	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Idle", "a draw let go with no shot: back to Bow_Idle")
+	var let_go := [rig.upper_clip(), snappedf(rig.upper_position() / rig.length("Bow_Draw"), 0.001)]
+	puppet.set_meta("letdown_at", Time.get_ticks_msec() - int(Client3D.BOW_LETDOWN * 500.0))
+	_rig._process(0.0)
+	var halfway := [rig.upper_clip(), snappedf(rig.upper_position() / rig.length("Bow_Draw"), 0.001)]
+	puppet.set_meta("letdown_at", 0)
+	_rig._process(0.0)
+	World.tick_alpha = alpha
+	_check(let_go[0] == "Bow_Draw" and absf(let_go[1] - Client3D.BOW_SET_END) < 0.03 and halfway[0] == "Bow_Draw"
+			and absf(halfway[1] - Client3D.BOW_SET_END * 0.5) < 0.05 and rig.upper_clip() == "Bow_Idle",
+			"a draw let go with no shot (a cancel): the bow eased down, Bow_Draw run back from %s through %s at half its %.2f s, then Bow_Idle (%s)" % [
+			let_go, halfway, Client3D.BOW_LETDOWN, rig.upper_clip()])
+	# A crossing (677 amended (4)'s queue; today a lob then a Shift-click): a lob let go and a flat draw
+	# 2 ticks later, and the reverse. The sky mix fades to the new side over SKY_FADE with no step past a
+	# frame's share of it plus SKY_STEP_SLACK, frame by frame at 60 a second through the redraw to its aim.
+	var steps := []
+	for lob_first: bool in [true, false]:
+		player.lobbing = lob_first
+		player.raised = "draw"
+		player.raised_tick = World.tick - 12
+		puppet.set_meta("sky_base", 1.0 if lob_first else 0.0)
+		_rig._process(0.0)
+		player.shot.emit(Vector2(player.tile + Vector2i(4, 0)), &"ground")
+		player.raised = ""
+		_rig._process(0.0)
+		rig.tree.advance(2 * World.TICK_DT)
+		puppet.set_meta("bow_until", Time.get_ticks_msec() + 1000)
+		player.lobbing = not lob_first
+		player.raised = "draw"
+		var mixes := []
+		for frame in 61:
+			var t := frame / 60.0
+			player.raised_tick = World.tick - int(t / World.TICK_DT)
+			World.tick_alpha = fmod(t, World.TICK_DT) / World.TICK_DT
+			puppet.set_meta("sky_msec", AnimRig.now_msec() - (17 if frame > 0 else 0))
+			_rig._process(0.0)
+			mixes.append(rig.sky_amount())
+		var worst := 0.0
+		for i in range(1, mixes.size()):
+			worst = maxf(worst, absf(mixes[i] - mixes[i - 1]))
+		steps.append([snappedf(worst, 0.001), snappedf(mixes[0], 0.01), snappedf(mixes[-1], 0.01)])
+		player.raised = ""
+		puppet.set_meta("bow_until", 0)
+		_rig._process(0.0)
+		puppet.set_meta("letdown_at", 0)
+		_rig._process(0.0)
+	World.tick_alpha = alpha
+	player.lobbing = false
+	var frame_share := 17.0 / 1000.0 / Client3D.SKY_FADE
+	_check(steps.all(func(s: Array) -> bool: return s[0] <= frame_share + SKY_STEP_SLACK) and steps[0][2] < 0.05 and steps[1][2] > 0.9,
+			"a lob let go then a flat draw, and the reverse: the sky mix fades over, no step past %.3f a frame ([largest step, first, last] %s)" % [
+			frame_share + SKY_STEP_SLACK, steps])
 	slots[Items.RIGHT_HAND] = "sword"
 	slots[Items.LEFT_HAND] = "shield"
 	player.slots = slots
