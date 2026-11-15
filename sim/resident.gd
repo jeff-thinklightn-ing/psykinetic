@@ -785,7 +785,14 @@ func _set_goal(cell: Vector2i) -> void:
 
 ## Whether it strolls now (the mend): idle in a doing of STROLLS, no task, not abed, not addressing.
 func _strolls() -> bool:
-	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not _abed_time()
+	return doing in STROLLS and task.is_empty() and addressing.is_empty() and not _abed_time() and not _night_seated()
+
+
+## A lodger in his sleep spell on one of the seats it lists for it (875 amended (5); ui-design's night look on maps'
+## 8fb9940fc: every lodger changed seat each quarter hour, _free_spot never giving back the one it stands on): it
+## keeps the seat till the spell ends, as a body abed keeps its bed.
+func _night_seated() -> bool:
+	return doing == Doing.HOME and _spot_use() == "home" and not _spot.is_empty() and tile == _spot.get("cell")
 
 
 ## Whether it stands on a work spot whose trade shows a word (residents.json "show", only words the

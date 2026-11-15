@@ -54725,6 +54725,12 @@ guest's end; stays at a guest's or with none. Server only; protocol unchanged; n
   - town_day_test on maps' switch 2ff63092c with this take: Rolf's "idle facing shut ground at (203, 197)" gone; with 853 amended (16) beside it as well (economy's own take, Pell beside Nix's well spot, an old fault this timing showed) it passes whole. On main, town_day_test PASS.
 - Server only; protocol unchanged; no new class_name; no bullet. Package "Umbrage at night", which lands off as 875 does.
 
+875 amended (5) (label from tools/decision_number.sh; the coordinator's ruling, 2026-11-15: its own small take behind 875 amended (4), the Mughouse's switch waiting on it; Resident is npc's, written by economy while npc is stopped). ui-design's joined night look on maps' 8fb9940fc (C:/dev/review/ui-design/looks/look_mug2_8fb9940fc/): from 03:00 to 04:00 every lodger in the common room changed seat each quarter hour, always to another (Rolf (10, 4), (10, 7), (2, 10); Maud and Hale likewise), a busy room at 3 am. 875 amended (4)'s part (6) gave HOME the seats; each stroll then re-chose, and Resident._free_spot never gives back the one it stands on.
+- A lodger in his sleep spell on one of the seats his places list for it (Resident._night_seated: doing HOME, spot use "home", on its cell) does not stroll (_strolls false), so he keeps the seat until the spell ends, as a body abed keeps its bed. Reaching a seat, a change of doing, a seat his places no longer list (197 amended (1)) and a fight or a hide move him as ever.
+- A body with a bed has no "home" seats listed and goes to its bed as ever. Seated lodgers still sit upright: a doze on the stool would be a new activity word, a protocol revision and a clip (the coordinator's, for later).
+- resident_test _test_lodger_keeps_seat: a body in HOME by its own clock on one of three seats with a stroll due, its own ticks through four quarter hours: one seat (FAIL before: (6, 3), (5, 3), (5, 1), (6, 3)); a body with a bed in HOME: no seat asked, its bed when abed. resident_test, town_day_test, townsfolk_test PASS.
+- Server only; protocol unchanged; no new class_name; no bullet. Package "Umbrage at night".
+
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...

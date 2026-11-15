@@ -1529,6 +1529,7 @@ func _test_lodger_sleep(level: Dictionary, laid: Array, door: Vector2i, away_bef
 				Resident.Doing.keys()[clock.call(1.0)], Resident.Doing.keys()[late], uses])
 	else:
 		_check(false, "(a body to ask the spot use of)")
+	_test_lodger_keeps_seat(rolf)
 	# Every ten game minutes from 18:00 to 06:00 through the town's sync: no body outdoors but on the walk in.
 	_main._inn_walked_in.clear()
 	_main._inn_walked_out.clear()
@@ -5598,6 +5599,87 @@ func _test_spot_taken(mara: Resident, square: Rect2i, home: Rect2i) -> void:
 	other._route.clear()
 	if player != null:
 		_put(player, player_was)
+
+
+## 875 amended (5) (ui-design's joined night look on maps' 8fb9940fc, C:/dev/review/ui-design/looks/look_mug2_8fb9940fc/:
+## from 03:00 every lodger changed seat each quarter hour, _free_spot never giving back the one it stands on): a lodger
+## in HOME on a seat keeps it till the spell ends; a body with a bed goes to it as ever.
+func _test_lodger_keeps_seat(rolf: String) -> void:
+	var sitter := _body(rolf) if _body(rolf) != null else (World.townsfolk()[0] as Resident if not World.townsfolk().is_empty() else null)
+	if sitter == null:
+		_check(false, "(a body to sit the night)")
+		return
+	var was := {"places": sitter.places, "doing": sitter.doing, "tile": sitter.tile, "spot": sitter._spot, "goal": sitter._goal,
+		"wander": sitter._wander_at, "activity": sitter.activity, "keep": Resident.keep_moving, "task": sitter.task}
+	Resident.keep_moving = true
+	var night := -1.0
+	for q in 32:  # An hour of his sleep spell by his own clock, from midnight on.
+		DayNight.set_hour(q * 0.25)
+		if Resident.doing_now(sitter.trade, sitter.type, sitter.worker_id) == Resident.Doing.HOME:
+			night = q * 0.25
+			break
+	_check(night >= 0.0, "(%s's sleep spell by his own clock: from %.2f)" % [sitter.person, night])
+	if night < 0.0:
+		return
+	DayNight.set_hour(night + 0.25)
+	var seats: Array = []
+	var cells: Array[Vector2i] = []
+	var cell := _town_cell(Vector2i(-1, -1))
+	while cells.size() < 3 and cell != Vector2i(-1, -1):
+		cells.append(cell)
+		var next := Vector2i(-1, -1)
+		for y in 10:
+			for x in 16:
+				var at := Vector2i(x, y)
+				if next == Vector2i(-1, -1) and not at in cells and World.is_free(at) and Stockpile.place_at(World.holdings, TOWN, at) == STORE 						and World.distance(at, cells[0]) >= 2:
+					next = at
+		cell = next
+	_check(cells.size() == 3, "(three free cells of the store for seats: %s)" % [cells])
+	if cells.size() < 3:
+		return
+	var room := Rect2i(cells[0], Vector2i.ONE).merge(Rect2i(cells[1], Vector2i.ONE)).merge(Rect2i(cells[2], Vector2i.ONE))
+	for at: Vector2i in cells:
+		seats.append({"use": "inn", "cell": at, "face": at + Vector2i(0, 1), "pose": "sit", "town": "store", "trade": "", "pair": ""})
+	sitter.task = {}
+	sitter.places = {"inn": room, "square": room, "home": room, "work": room, "well": room, "temple": room, "bed": Rect2i(),
+		"spots": {"inn": seats, "square": seats, "temple": seats, "well": seats, "home": seats}}
+	_put(sitter, cells[0])
+	sitter.doing = Resident.Doing.HOME
+	sitter._spot = (seats[0] as Dictionary).duplicate()
+	sitter._goal = cells[0]
+	sitter._route.clear()
+	sitter._retry_at = -1
+	sitter._rise_until = -1
+	sitter._wander_at = World.tick  # A stroll due now.
+	var quarter := maxi(DayNight.day_steps / 96, Resident.STROLL_TICKS + Resident.STROLL_SPREAD)
+	var tiles: Array[Vector2i] = []
+	var doings := {}
+	for q in 4:
+		for i in quarter:
+			World.tick += 1
+			sitter._sim_tick()
+		tiles.append(sitter.tile)
+		doings[Resident.Doing.keys()[sitter.doing]] = true
+	_check(doings.keys() == ["HOME"] and tiles.all(func(at: Vector2i) -> bool: return at == cells[0]) and sitter._goal == cells[0],
+		"a lodger in HOME on a seat at %.2f: four quarter hours, one seat (%s, %s, goal %s)" % [night + 0.25, tiles, doings.keys(), sitter._goal])
+	# A body with a bed: no seats asked in HOME, its bed as ever.
+	var bed := Rect2i(cells[1], Vector2i.ONE)
+	sitter.places = {"inn": room, "square": room, "home": room, "work": room, "well": room, "temple": room, "bed": bed}
+	sitter._spot = {}
+	sitter._goal = Resident.NO_CELL
+	sitter._pick_goal()
+	_check(sitter._spot_use() == "" and sitter._spot.is_empty() and (not sitter._abed_time() or bed.has_point(sitter._goal)),
+		"a body with a bed in HOME: no seat asked, its bed when abed (abed %s, goal %s)" % [sitter._abed_time(), sitter._goal])
+	sitter.places = was["places"]
+	sitter.doing = was["doing"]
+	sitter._spot = was["spot"]
+	sitter._wander_at = was["wander"]
+	sitter.activity = was["activity"]
+	sitter.task = was["task"]
+	_put(sitter, was["tile"])
+	sitter._goal = was["goal"]
+	sitter._route.clear()
+	Resident.keep_moving = was["keep"]
 
 
 func _sync() -> void:
