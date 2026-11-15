@@ -52911,7 +52911,13 @@ without it. Bot 2 (two-bot tours) always starts cold. --gpu-sample: nvidia-smi's
 (timestamp, pstate, graphics and memory clocks, utilization, power, temperature, once a second) into
 out\gpu-<pass>.csv, started after each pass's game, in the run's job (kill on close), stopped with
 the game by its own PID; runner.log names its pid, rows and how it ended, or "asked, no nvidia-smi
-on this laptop". Read-only on the laptop: nothing written, installed or left running.
+on this laptop". Read-only on the laptop: nothing written, installed or left running. It was built
+at 250 ms; the coordinator approved once a second unless a warm run with and without it read the
+same, and on the Atlas (860ee85a6, hosted idle, one run each) it moved both, frames over 100 ms 18
+to 25 and the worst 394 to 816 ms, so it samples once a second. The Atlas pair itself (the same
+build, cold then warm from it, the builds matching, a 16 MB cache): the join's worst run of frames
+1269 ms cold (236, 389, 408, 236, each with a compile counted) and 1075 ms warm (219, 308, 332,
+217, still each with a compile counted); no lone stall in either 120 s run.
 tests/remote_shot_sockets_test.sh: the three refusals; opts.txt by default (keep=0, warm=, gpu=0)
 and as asked; the runner's -Mode cache (its two steps alone, on a scratch runner folder): a cold
 run kept with its build; a warm run copied (files, bytes, the builds match) and keeping nothing; a
