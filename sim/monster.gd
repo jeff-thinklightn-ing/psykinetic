@@ -4292,8 +4292,9 @@ func _rally_send() -> void:
 		var mate := each as Monster
 		if mate == null or not mate._rallies() or not mate.spawned or mate.hp <= 0:
 			continue
-		if mate.alert == Alert.FIGHTING and is_instance_valid(mate.target) and _rally_party(mate.target) == fight or mate.alert == Alert.HUNTING and mate._rally_for == fight:
-			fighting += 1  # At it, or sent and on the way.
+		if mate.alert == Alert.FIGHTING and (is_instance_valid(mate.target) and _rally_party(mate.target) == fight or mate.target == null and mate._joined_party == fight) \
+				or mate.alert == Alert.HUNTING and (mate._rally_for == fight or mate._joined_party == fight):
+			fighting += 1  # At it, or sent and on the way, or (806 amended (22)) a holder who lost sight of her, still on her fight.
 	if fighting >= RALLY_MOST:
 		return
 	var pick := -1
@@ -4352,10 +4353,44 @@ static func _hold_share(bodies: int) -> int:
 	return maxi(HOLD_SHARE_LEAST, bodies + HOLD_SHARE_OVER_BODIES)
 
 
+## The share on a party of [param bodies] (806 amended (22), the coordinator's
+## pick of enemy-ai's B on the crypt rows, 11-14: a robber pair killed a new
+## player alone with fists or a dagger 14 to 16 times in 16): a player alone,
+## no companion of his up and no other player or companion within BAND_TILES
+## of him (_band_odds' measure), has one of the band on him; the next holds
+## off till that one falls, flees, or is cut under his stand (a named one's
+## STAND_BELOW, _holding_now). A party, or players side by side, keep
+## _hold_share's. The rally (_rally_send) counts a holder who has lost sight of
+## her (FIGHTING with no target, or HUNTING her, in the dark or past his sight)
+## as still on her fight, so it sends no fifth.
+static func _share_on(bodies: Array[GridEntity]) -> int:
+	if bodies.size() == 1 and bodies[0] is Player:
+		var her := bodies[0]
+		for other in World.sought():
+			if other != her and other.spawned and other.hp > 0 and World.distance(other.tile, her.tile) <= BAND_TILES:
+				return _hold_share(1)  # Not alone: another player or a companion beside her.
+		return 1
+	return _hold_share(bodies.size())
+
+
+## Whether it holds off its target's party now (_holding_now's), logged as it
+## takes up its hold and as it leaves it (806 amended (22), for the waiting
+## robber's joined look): a body by what it is, never a player's name
+## (World.plain_name).
+func _holds_now() -> bool:
+	var was := _holding
+	var now := _holding_now()
+	if now != was and is_instance_valid(target):
+		World._log("[band] %s %s %s%s" % [name, "holds off" if now else "steps in on", World.plain_name(target), ", his turn next" if now else ""])
+	elif now != was:
+		World._log("[band] %s leaves its hold" % name)
+	return now
+
+
 ## Whether it holds off its target's party now (holds_off): the share on it
 ## already, and it the newest there (a standing boss never); one of the
 ## party struck it, or is in reach and facing it, and it fights.
-func _holds_now() -> bool:
+func _holding_now() -> bool:
 	if stands or not is_instance_valid(target):
 		_holding = false
 		return false
@@ -4371,6 +4406,7 @@ func _holds_now() -> bool:
 	if _joined_party != party:
 		_joined_party = party
 		_joined_tick = World.tick
+	var lone := _share_on(bodies) == 1
 	var at: Array[Monster] = []
 	for each in World.monsters():
 		var mate := each as Monster
@@ -4378,9 +4414,13 @@ func _holds_now() -> bool:
 			continue
 		if mate.alert != Alert.FIGHTING:
 			continue
+		if lone and mate.stands and mate.max_hp > 0 and float(mate.hp) < float(mate.max_hp) * STAND_BELOW:
+			continue  # Under his stand (806 amended (14)): the one on a player alone frees his place.
+		if lone and mate._held_back_last >= World.tick - 1 and not mate._pressing:
+			continue  # Holding back himself (806 amended (16)), not on her: no place taken (else the two wait on each other).
 		if is_instance_valid(mate.target) and _rally_party(mate.target) == party or mate.target == null and mate._joined_party == party:
 			at.append(mate)  # At her, or lost sight of her this tick and still at her fight.
-	var share := _hold_share(bodies.size())
+	var share := _share_on(bodies)
 	if _holding:
 		_hold_open = _hold_open + 1 if at.size() < share else 0
 		if _hold_open >= HOLD_OPEN_TICKS:

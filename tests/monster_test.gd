@@ -1890,6 +1890,7 @@ func _test_ambush() -> void:
 	_test_boss_stand()
 	_test_band_rally()
 	_test_band_hold_off()
+	_test_band_lone_player()
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_freed_striker()
@@ -9445,11 +9446,11 @@ func _test_rally_knows() -> void:
 
 
 ## The band's hold-off (the coordinator's ruling on enemy-ai's crypt rows):
-## six in sight of a solo player, never more than her share (4) in reach of
-## her over a minute; a fifth in within 1.5 s of a fall; one she strikes from
-## his hold fights her.
+## six in sight of a solo player, never more than her share in reach of her
+## over a minute (one since 806 amended (22): she is alone); the next in
+## within 1.5 s of a fall; one she strikes from his hold fights her.
 func _test_band_hold_off() -> void:
-	print("%s== the band's hold-off: six robbers in sight of one player, never more than three on her; the next in when one falls ==" % char(10))
+	print("%s== the band's hold-off: six robbers in sight of one player, never more than her share (one, alone) on her; the next in when one falls ==" % char(10))
 	Monster.idling = false
 	_check(Monster._hold_share(1) == 3 and Monster._hold_share(2) == 3 and Monster._hold_share(3) == 4,
 		"806 amended (18): the share is 3 on one body and on two, 4 on three (%d, %d, %d)" % [Monster._hold_share(1), Monster._hold_share(2), Monster._hold_share(3)])
@@ -9461,6 +9462,8 @@ func _test_band_hold_off() -> void:
 	her.max_hp = 100000
 	her.hp = 100000
 	var band: Array = e["x"]
+	var alone: Array[GridEntity] = [her]
+	var share := Monster._share_on(alone)
 	for robber: Monster in band:
 		robber.temper = Monster.Temper.BOLD
 		robber.sight_range = 8
@@ -9482,9 +9485,9 @@ func _test_band_hold_off() -> void:
 	for held: Monster in holders:
 		var d := World.distance(held.tile, her.tile)
 		held_off = held_off and d >= Monster.HOLD_NEAR and d <= Monster.HOLD_FAR + 1 and World.has_line_of_sight(held.tile, her.tile)
-	_check(most <= Monster.HOLD_SHARE_LEAST and holders_seen >= 2 and held_off,
+	_check(share == 1 and most <= share and holders_seen >= 2 and held_off,
 		"over a minute at most %d in reach of her (%d), %d holding off 3 to 4 cells away in sight (%s)" \
-		% [Monster.HOLD_SHARE_LEAST, most, holders_seen, holders.map(func(r: Monster) -> int: return World.distance(r.tile, her.tile))])
+		% [share, most, holders_seen, holders.map(func(r: Monster) -> int: return World.distance(r.tile, her.tile))])
 	# One of those at her falls: a holder takes his place within 1.5 s.
 	var at_her: Array = band.filter(func(r: Monster) -> bool: return r.spawned and not r._holding and r.target == her)
 	var fallen: Monster = at_her[0]
@@ -9494,10 +9497,10 @@ func _test_band_hold_off() -> void:
 		World.step()
 		her.hp = 100000
 		var near_her := band.filter(func(r: Monster) -> bool: return r.spawned and World.in_reach(r, her)).size()
-		if near_her >= Monster.HOLD_SHARE_LEAST and back < 0:
+		if near_her >= share and back < 0:
 			back = i + 1
 	_check(not fallen.spawned and back > 0 and back <= 15,
-		"one of the four falls: the next is in reach of her %d ticks after (within 15)" % back)
+		"the one at her falls: the next is in reach of her %d ticks after (within 15)" % back)
 	# A holder she strikes fights her (her choice), over the share.
 	var holder: Monster = null
 	for i in 200:
@@ -9515,6 +9518,132 @@ func _test_band_hold_off() -> void:
 			her.hp = 100000
 		struck = not holder._holding and holder.alert == Monster.Alert.FIGHTING
 	_check(holder != null and struck, "a holder she strikes fights her (holding now: %s)" % [holder._holding if holder != null else null])
+	Monster.idling = true
+
+
+## 806 amended (22) (the coordinator's pick of enemy-ai's B, 11-14): a player
+## alone has one of the band on him. Two robbers on her: never both FIGHTING
+## within 2 cells of her while the first is above his stand; the second steps
+## in within LONE_STEP_IN ticks of the first falling, fleeing or being cut
+## under his stand; with a companion of hers up the party's share stands (3)
+## and the second fights, her or her companion. The holder's [band] lines
+## never name her.
+const LONE_STEP_IN := 25
+
+
+func _lone_band(pet: bool, first_stands := false) -> Dictionary:
+	var rows: Array[String] = ["##############", "#............#", "#............#", "#............#", "#............#",
+		"#.....P...x..#", "#............#", "#............#", "#............#", "#..........x.#", "##############"]
+	var e := _build(rows)
+	var her: GridEntity = e["P"][0]
+	her.protected = false
+	her.max_hp = 100000
+	her.hp = 100000
+	(her as Player).label = "Tove"
+	var band: Array = e["x"]
+	band.sort_custom(func(a: Monster, b: Monster) -> bool: return World.distance(a.tile, her.tile) < World.distance(b.tile, her.tile))
+	for robber: Monster in band:
+		robber.temper = Monster.Temper.BOLD
+		robber.sight_range = 10
+		robber.senses.cone_cos = -1.0
+		robber.max_hp = 100000
+		robber.hp = 100000
+	if first_stands:
+		(band[0] as Monster).stands = true
+	var kin: Companion = null
+	if pet:
+		kin = EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "LoneKin", "props": {"max_hp": 100000}}) as Companion
+		kin.keeper = her
+		_room.add_child(kin)
+		World.spawn(kin, her.tile + Vector2i(0, 1))
+		kin.hp = 100000
+	return {"her": her, "first": band[0], "second": band[1], "kin": kin}
+
+
+## Steps the room [param ticks] times, her (and her companion's) hp kept;
+## returns the most of the band FIGHTING within 2 of her at once while the
+## first is above his stand, the second's held ticks, and the tick the second
+## first stood FIGHTING in her reach unheld (-1 never), and the [band] lines.
+func _lone_steps(room: Dictionary, ticks: int) -> Dictionary:
+	var her: GridEntity = room["her"]
+	var first: Monster = room["first"]
+	var second: Monster = room["second"]
+	var both := 0
+	var held := 0
+	var in_at := -1
+	var told: Array[String] = []
+	for i in ticks:
+		var logged := World.logged
+		World.step()
+		for line: String in World.recent_logs.slice(World.recent_logs.size() - mini(World.logged - logged, World.recent_logs.size())):
+			if line.contains("[band]"):
+				told.append(line)
+		her.hp = 100000
+		if room["kin"] != null:
+			(room["kin"] as GridEntity).hp = 100000
+		var near := 0
+		for r: Monster in [first, second]:
+			if r.spawned and r.hp > 0 and r.alert == Monster.Alert.FIGHTING and World.distance(r.tile, her.tile) <= 2:
+				near += 1
+		if first.spawned and first.hp > 0 and float(first.hp) >= float(first.max_hp) * Monster.STAND_BELOW:
+			both = maxi(both, near)
+		if second._holding:
+			held += 1
+		if in_at < 0 and not second._holding and second.alert == Monster.Alert.FIGHTING and World.in_reach(second, her):
+			in_at = i + 1
+	return {"both": both, "held": held, "in_at": in_at, "told": told}
+
+
+func _test_band_lone_player() -> void:
+	print("%s== a player alone has one of the band on him: the second holds off till the first falls, flees or is cut under his stand (806 amended (22)) ==" % char(10))
+	Monster.idling = false
+	var shares: Array[int] = []
+	for plan: Array in [["###############", "#P...........P#", "###############"], ["###############", "#P...P........#", "###############"]]:
+		var rows: Array[String] = []
+		rows.assign(plan)
+		var two := _build(rows)
+		var one: Array[GridEntity] = [two["P"][0]]
+		shares.append(Monster._share_on(one))
+	var kin := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "ShareKin"}) as GridEntity
+	var pair: Array[GridEntity] = [EntityFactory.build(SPECS["P"].duplicate(true)) as GridEntity, kin]
+	shares.append(Monster._share_on(pair))
+	for body in pair:
+		body.free()
+	_check(shares == [1, Monster._hold_share(1), Monster._hold_share(2)] and Monster._hold_share(1) == 3 and Monster._hold_share(2) == 3,
+		"the share: one on a player alone (another player 12 off), a party's 3 with another player 4 off or a companion of hers (%s)" % [shares])
+	var outcomes := {}
+	for how: String in ["falls", "flees", "under his stand"]:
+		var room := _lone_band(false, how == "under his stand")
+		var first: Monster = room["first"]
+		var second: Monster = room["second"]
+		var before := _lone_steps(room, 200)
+		var told: Array[String] = before["told"]
+		match how:
+			"falls":
+				World.damage(first, 1000000, room["her"])
+			"flees":
+				first._flee((room["her"] as GridEntity).tile)
+			_:
+				first.hp = int(floor(0.14 * first.max_hp))
+		var after := _lone_steps(room, 60)
+		outcomes[how] = [before, after]
+		print("  %s: over 20 s first, at most %d FIGHTING within 2 of her, the second held %d ticks; he stepped in %d ticks after; his lines %s" % [
+			how, before["both"], before["held"], after["in_at"], told])
+		_check(before["both"] <= 1 and before["held"] >= 100 and before["in_at"] < 0,
+			"%s case, before: never both FIGHTING within 2 of her, the second held off (%d of 200 ticks held, at most %d near)" % [how, before["held"], before["both"]])
+		_check(after["in_at"] > 0 and after["in_at"] <= LONE_STEP_IN,
+			"the first %s: the second fights in her reach %d ticks after (within %d)" % [how, after["in_at"], LONE_STEP_IN])
+		if how == "falls":
+			var named := told.filter(func(l: String) -> bool: return l.contains("Tove") or l.contains("Player"))
+			_check(not told.is_empty() and named.is_empty() and told.any(func(l: String) -> bool: return l.contains("holds off a player, his turn next")),
+				"806 amended (22): a [band] line as he takes up his hold, never her name (%s)" % [told])
+	# With her companion up: the party's share, so the second never holds off; he fights one of them.
+	var with := _lone_band(true)
+	var steps := _lone_steps(with, 200)
+	var second_at: GridEntity = (with["second"] as Monster).target
+	print("  with her companion up: the second held %d ticks; at %s; at most %d FIGHTING within 2 of her" % [steps["held"], second_at.name if second_at != null else "nobody", steps["both"]])
+	_check(steps["held"] == 0 and (with["second"] as Monster).alert == Monster.Alert.FIGHTING and (second_at == with["her"] or second_at == with["kin"]),
+		"with her companion up the second never holds off and fights her or her companion (held %d, at %s)" % [steps["held"], second_at.name if second_at != null else "nobody"])
 	Monster.idling = true
 
 
@@ -10391,6 +10520,13 @@ func _test_struck_foe_fights_front() -> void:
 	player.max_hp = 100000
 	player.hp = 100000
 	player.protected = false
+	# Not alone (806 amended (22): on a player alone the mate would hold off): a
+	# second player 4 off, standing, so the band's share is a party's.
+	var friend := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player2"})) as Player
+	_room.add_child(friend)
+	World.spawn(friend, Vector2i(8, 1))
+	friend.max_hp = 100000
+	friend.hp = 100000
 	for robber in robbers:
 		robber.target = player
 	World.step()  # They take her up (their _noticed_tick).
@@ -10460,12 +10596,14 @@ func _test_dagger_open_after_miss() -> void:
 ## 806 amended (21) (the coordinator's ruling on combat's duel7 pair, 11-12):
 ## Crake and Mott both rolled cautious, on a player who stands 3 off them.
 ## Each held back for another at her (806 amended (16)), so they stared five
-## seconds and walked home. Now the one who held first presses, and the other
-## follows him in: both in reach of her within the standoff's 50 ticks. A lone
-## holder, a mate near but not in it, holds as before; and a pair on two
-## players holds as before ("a pair of cautious ones against two", unchanged).
+## seconds and walked home. Now the one who held first presses (in reach of
+## her within the standoff's 50 ticks), and, she alone, the other holds off his
+## turn (806 amended (22): one of the band on a player alone), never in her
+## reach. A lone holder, a mate near but not in it, holds as before; and a pair
+## on two players holds as before ("a pair of cautious ones against two",
+## unchanged).
 func _test_two_holders() -> void:
-	print("%s== two cautious robbers on one standing player: the first holder presses, the other follows ==" % char(10))
+	print("%s== two cautious robbers on one standing player: the first holder presses, the other holds off his turn ==" % char(10))
 	var rows: Array[String] = ["#".repeat(16)]
 	for y in 9:
 		rows.append("#" + ".".repeat(14) + "#")
@@ -10496,6 +10634,7 @@ func _test_two_holders() -> void:
 		player.hp = 1000
 		player.protected = false
 		var in_reach := [-1, -1]
+		var band_held := [0, 0]  # 806 amended (22): ticks each held off his turn.
 		var held := 0
 		var first_held := -1
 		var lines: Array[String] = []  # 392 amended (9): its [hold] and [press] lines.
@@ -10509,20 +10648,23 @@ func _test_two_holders() -> void:
 			for k in 2:
 				if in_reach[k] < 0 and World.in_reach(robbers[k], player):
 					in_reach[k] = i
+				if robbers[k]._holding:
+					band_held[k] += 1
 			if robbers[0]._held_back_last == World.tick:
 				held += 1
 				if first_held < 0:
 					first_held = i
-		print("  %s: in her reach at ticks %s, the first held back %d ticks from tick %d, pressing %s" % [
-			"two holders" if pair else "a lone holder", in_reach, held, first_held, [robbers[0]._pressing, robbers[1]._pressing]])
+		print("  %s: in her reach at ticks %s, the first held back %d ticks from tick %d, pressing %s, held off his turn %s ticks" % [
+			"two holders" if pair else "a lone holder", in_reach, held, first_held, [robbers[0]._pressing, robbers[1]._pressing], band_held])
 		print("  its lines: %s" % [lines])
 		var named := lines.filter(func(line: String) -> bool: return "Tove" in line or "Player1" in line)
 		_check(named.is_empty(), "392 amended (9): no [hold] or [press] line names the player (%s)" % [named])
 		var holds := lines.filter(func(line: String) -> bool: return "[hold]" in line)
 		var presses := lines.filter(func(line: String) -> bool: return "[press]" in line)
 		if pair:
-			_check(in_reach[0] >= 0 and in_reach[1] >= 0 and (robbers[0]._pressing or robbers[1]._pressing),
-					"two holders on her: one presses, and both are in her reach within 50 ticks (%s)" % [in_reach])
+			var pressed := 0 if robbers[0]._pressing else 1
+			_check(robbers[pressed]._pressing and in_reach[pressed] >= 0 and in_reach[1 - pressed] < 0 and band_held[1 - pressed] > 0,
+					"two holders on her: one presses and is in her reach within 50 ticks, the other holds off his turn, never in it (806 amended (22); reach %s, held off %s)" % [in_reach, band_held])
 			_check(presses.size() == 1 and holds.size() >= 1 and holds.size() <= 2 and lines[0].contains("[hold]")
 					and presses[0].contains("presses in on a player"),
 					"392 amended (9): a [hold] line as each holds off, then one [press] as the first holder presses in on a player (%s)" % [lines])
