@@ -8,7 +8,6 @@ notes (decision 324).
 ## Unreleased
 
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
-- In the crypt, the offering stone stands in the First Hall, east of the fallen knight's bier (747 amended (13)).
 - Towns: a townsperson who goes hungry stays in their town and is no likelier to fall sick for it (918).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
 - In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
@@ -16,6 +15,10 @@ notes (decision 324).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+
+## v0.1.217
+
+- In the crypt, the offering stone stands in the First Hall, east of the fallen knight's bier (747 amended (13)).
 
 ## v0.1.216
 
