@@ -15897,7 +15897,11 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 		each["enter_at"] = door  # Out of the inn: from its door, where a body is made.
 	var hour := DayNight.hour(DayNight.now())
 	if hour >= INN_TRADERS_DAY.x and hour < INN_TRADERS_DAY.y and _inn_trader(place_id, who):
-		return true  # Keeping its stand by day, not shut out: its own stands (nwhy2: Rolf paced his stall at noon).
+		# Keeping its stand by day, not shut out: its own stands (nwhy2: Rolf paced his stall at noon). Kept there, his own
+		# clock's inn spell (from about 17:45) reads as his work (875 amended (4), maps' town_day_test on the Mughouse take:
+		# Rolf stood at his stall in INN, nothing drawn, "idle facing shut ground" at 17:49).
+		each["places"]["keep_work"] = true
+		return true
 	if (hour < INN_TRADERS_DAY.x or hour >= INN_TRADERS_DAY.y) and _inn_lodger(place_id, who):
 		# A lodger at night the inn has no spot for (875 amended (4)): up all night, never down on 751's roofless
 		# bedroll in the open; the lit fire's seats if his places have them, else his stand with short stands.

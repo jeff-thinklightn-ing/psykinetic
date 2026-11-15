@@ -1532,6 +1532,42 @@ func _test_lodger_sleep(level: Dictionary, laid: Array, door: Vector2i, away_bef
 	_check(by_day and walked >= 2 and outdoors.is_empty() and bedded == 0,
 		"18:00 to 06:00 every ten game minutes, the inn up: Rolf and the pedlar outdoors only on the walk in (%d walking), never standing or asleep in the open (%s), never with a bedroll (%d)" % [
 			walked, outdoors, bedded])
+	# Held at the stand by day, 17:30 to 18:30 every ten game minutes (maps' town_day_test on the Mughouse take: Rolf stood
+	# at his stall in INN from about 17:45, nothing drawn, "idle facing shut ground"): his clock's inn spell reads as his
+	# work while Main keeps him there; from 18:00 he walks in, the hold gone.
+	_main._inn_walked_in.clear()
+	_main._inn_walked_out.clear()
+	var clock_inn := false
+	var at_stand_inn: Array[String] = []
+	var kept := 0
+	var held_after := 0
+	var stand_ticks := 0
+	for step in 7:
+		var h := 17.5 + step / 6.0
+		DayNight.set_hour(h)
+		var now_h := DayNight.now()
+		clock_inn = clock_inn or Resident.doing_at("", h, Season.name_at(int(now_h)), "", rolf, Townsfolk.day_of(now_h),
+			Townsfolk.mood_of(World.production, rolf)) == Resident.Doing.INN
+		_main._sync_residents()
+		for who: String in [rolf, odo]:
+			var body := _body(who)
+			if body == null:
+				continue
+			if h >= _main.INN_TRADERS_DAY.y:
+				held_after += 1 if bool(body.places.get("keep_work", false)) else 0
+				World._relocate(body, _main._nearest_free(door))  # The walk in, done.
+				continue
+			kept += 1 if bool(body.places.get("keep_work", false)) else 0
+			for i in Resident.FAR_EVERY:
+				World.tick += 1
+				body._sim_tick()  # The doing his tick picks (a far body ticks one in FAR_EVERY).
+			stand_ticks += 1
+			if body.doing == Resident.Doing.INN:
+				at_stand_inn.append("%s %.2f" % [body.person, h])
+	_check(clock_inn, "(Rolf's own clock has him in his inn spell before 18:00)")
+	_check(stand_ticks >= 6 and kept == stand_ticks and at_stand_inn.is_empty() and held_after == 0,
+		"17:30 to 18:30, the inn up: Rolf and the pedlar kept at their stands till 18:00 read as at work, never INN at the stall (%d samples, %s); from 18:00 the hold gone (%d)" % [
+			stand_ticks, at_stand_inn, held_after])
 	# A pilgrim and a visitor on her way out are no lodgers: unchanged.
 	var stay := {"came": World.towns.now() - DayNight.day_steps, "leaves": World.towns.now() + DayNight.day_steps, "from": "Saltmarsh", "news": []}
 	var pilgrim := Offers.VISITOR + "rs_pilgrim"

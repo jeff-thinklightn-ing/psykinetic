@@ -516,6 +516,8 @@ func _sim_tick() -> void:
 		_hide_until = World.tick + HIDE_TICKS
 	var hidden := World.tick < _hide_until
 	var now := Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id)
+	if now == Doing.INN and bool(places.get("keep_work", false)):
+		now = Doing.WORK  # A trader Main keeps at his stand by day (places "keep_work", 875 amended (4)): his inn spell waits for INN_TRADERS_DAY's end.
 	if laid_up():
 		now = Doing.VISIT  # Laid up hurt at the temple (791): off duty till its time is out.
 	elif trade in FIGHTERS and (hidden or sheltering or _fall_back):
