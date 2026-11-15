@@ -64,6 +64,11 @@ func _run() -> void:
 		if s % HOUR == 0:
 			await get_tree().process_frame
 	_check(not _worst.is_empty(), "bodies were read (%d)" % _worst.size())
+	# 853 amended (15): a run whose body is gone at a sample ends there, so one despawned and spawned again
+	# on its own tile and facing starts a new run, never counting the time it had no body.
+	_runs["absent:probe"] = {"tile": Vector2i(1, 1), "facing": Vector2i(0, 1), "since": 0, "told": false, "shut_told": false}
+	_sample()
+	_check(not _runs.has("absent:probe"), "a body with none at a sample ends its idle run (despawned and back on its tile is not idle)")
 	var names: Array = _worst.keys()
 	names.sort()
 	print("  longest idle stay each, game minutes: %s" % ", ".join(names.map(func(n: String) -> String: return "%s %d" % [n, _worst[n]])))
@@ -89,11 +94,13 @@ func _idle(body: Resident) -> bool:
 
 func _sample() -> void:
 	var now := World.steps
+	var seen := {}
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or not body.spawned or body._far():
 			_runs.erase(body.worker_id if body != null else "")
 			continue
+		seen[body.worker_id] = true
 		var run: Dictionary = _runs.get(body.worker_id, {})
 		var idle := _idle(body)
 		if run.is_empty() or run["tile"] != body.tile or run["facing"] != body.facing or not idle:
@@ -109,6 +116,12 @@ func _sample() -> void:
 		if minutes > SHUT_MINUTES and not run["shut_told"] and not World.is_walkable(body.tile + body.facing):
 			run["shut_told"] = true
 			_check(false, "%s stood idle facing shut ground at %s for %d game minutes" % [body.person, body.tile + body.facing, minutes])
+	# A body not here at this sample (despawned under Main's RESIDENTS_MAX, gone indoors, away) ends its run
+	# (853 amended (15)): the stall's keeper, given no body from 13.83 to 17.33 and spawned again on his own
+	# tile and facing, read as 236 minutes stood idle.
+	for who: String in _runs.keys():
+		if not seen.has(who):
+			_runs.erase(who)
 
 
 func _check(ok: bool, label: String) -> void:

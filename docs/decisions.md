@@ -53406,6 +53406,19 @@ this is on main (every activity with an exit has a row, at least its clip's tick
 unchanged (no field replicated); no new class_name; package "people work", after maps' take and not a
 condition of it; no bullet until playtest has the hunter through two bouts, joined and close.
 
+853 amended (15) (the coordinator's ruling (a), 11-14; maps' probe; the label from decision_number.sh; npc
+stopped at Jeff's prompt, economy reads it in npc's place). town_day_test failed maps' Mughouse take (875)
+on "Rolf stood idle on (202, 195) ... for 236 game minutes from 13.53". The probe, in a worktree never
+committed, printed every zone's bodies each ten game minutes: from 13.83 to 17.33 the stall's keeper had no
+body at all (none in any zone, nothing on his cell, his tick never called), for Main's wanted bodies are
+capped at RESIDENTS_MAX (12) and the town's folk fill it before the keeper; at 17.50 he stood again on his own
+tile and facing. The test's _sample read only the bodies present and never ended a run whose body was gone,
+so the time without a body counted as one idle stand. Now a run ends at any sample its body is not read at
+(despawned, indoors, away), and a body back on its tile starts a new one. town_day_test: a run left for a
+worker id with no body is gone after the next sample. Whether a keeper may lose his body to the cap is a
+separate question, measured on Umbrage as shipped before anything changes (the coordinator's (b)). Test
+only; protocol unchanged; no new class_name; no bullet.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays
