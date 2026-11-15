@@ -200,6 +200,11 @@
 		"temperament": {"bold": 1, "cautious": 2, "cowardly": 0},
 		"band_fights": true,
 		"holds_off": true,
+		"barks": {
+			"hold": ["I'm next.", "Leave some for me.", "Go on. I'll have what's left."],
+			"step_in": ["My turn.", "Stand back. Mine now.", "Out of it. Let me at them.", "Enough waiting."],
+			"leave": ["Gone, then.", "That's that. Back to it.", "Not worth it."]
+		},
 		"wields": {"right": "dagger"},
 		"moves": {"lunge": {"windup": 10, "damage": 3, "reach": 2, "recover": 9}},
 		"lifts": 4,

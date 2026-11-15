@@ -1242,6 +1242,7 @@ func _go_online() -> void:
 		World.telegraph_ended_in.connect(_tell_telegraph_ended)
 		# The draugr's blessed, downed and brought back (decision 544).
 		World.downed = _downed
+		World.band_said = _band_told  # 806: the band's barks.
 		World.entity_downed.connect(_on_downed)
 		# What she lives through is a danger of the place (decision 551).
 		World.entity_downed.connect(_roads_downed)
@@ -21501,6 +21502,12 @@ func _say_plain(speaker: GridEntity, name: String, words: String, note := "", al
 		if peer not in peers:
 			peers.append(peer)
 	Net.broadcast_to(peers, "speech", {"entity": String(speaker.get_path()), "speaker": name, "text": words})
+
+
+## A band robber's bark (806, World.band_said): said aloud, as one with no
+## mind asked says a thing (_say_plain), by its name in a sentence.
+func _band_told(body: Monster, words: String) -> void:
+	_say_plain(body, _speaker_name(body), words)
 
 
 ## A draugr's unasked line (548 amended (3); playtest's look_drhall_c: he asks

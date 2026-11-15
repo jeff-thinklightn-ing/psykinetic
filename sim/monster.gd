@@ -557,6 +557,11 @@ var _joined_party := 0
 var _hold_shift_at := 0
 ## Ticks running a place has stood open at its party (HOLD_OPEN_TICKS).
 var _hold_open := 0
+## Its row's "barks" (806, voice's lines): pool ("hold", "step_in", "leave")
+## -> lines, said as it takes up its hold, steps in from it, or leaves it.
+var barks: Dictionary = {}
+## The "<fight>:<pool>" it has spoken for (once a fight for each pool).
+var _barked: Dictionary = {}
 ## Its pack (824): props "pack" where its kind's row has a "pack" block, else
 ## "" (fights as ever: barrow_deep's grave guards are laid with the prop and
 ## no block); the block's rules (PACK_DEFAULTS); the most of its pack it has
@@ -881,6 +886,7 @@ func _ready() -> void:
 		never_lies = bool(row.get("never_lies", false))
 		band_fights = bool(row.get("band_fights", false))
 		holds_off = bool(row.get("holds_off", false))
+		barks = row.get("barks", {})
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
 		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
@@ -3034,7 +3040,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "plural": str(row.get("plural", "")), "fearless": bool(row.get("fearless", false)),
-			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "holds_off": bool(row.get("holds_off", false)), "boss": bool(row.get("boss", false)),
+			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "holds_off": bool(row.get("holds_off", false)),
+			"barks": (row["barks"] as Dictionary).duplicate(true) if row.get("barks") is Dictionary else {}, "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"pack": (row["pack"] as Dictionary).duplicate(true) if row.get("pack") is Dictionary else null,  # 824.
@@ -4382,9 +4389,45 @@ func _holds_now() -> bool:
 	var now := _holding_now()
 	if now != was and is_instance_valid(target):
 		World._log("[band] %s %s %s%s" % [name, "holds off" if now else "steps in on", World.plain_name(target), ", his turn next" if now else ""])
+		_band_bark("hold" if now else "step_in")
 	elif now != was:
 		World._log("[band] %s leaves its hold" % name)
+		_band_bark("leave")
 	return now
+
+
+## Its word aloud as it takes up its hold, steps in, or leaves it ([param
+## pool] of its row's "barks"; 806, the coordinator's conditions): once a
+## fight for each pool of its; one voice a tick for each pool across the
+## band at that fight; and no line of a pool said again there while the pool
+## has one unsaid.
+func _band_bark(pool: String) -> void:
+	var lines: Array = barks.get(pool, [])
+	if lines.is_empty() or not World.band_said.is_valid() or _joined_party == 0:
+		return
+	var key := "%d:%s" % [_joined_party, pool]
+	if _barked.has(key):
+		return
+	var was: Dictionary = World.band_barks.get(key, {})
+	if int(was.get("tick", -1)) == World.tick:
+		return  # Another of the band said one this tick.
+	var heard: Array = (was.get("lines", []) as Array).duplicate()
+	var fresh: Array = []
+	for line: Variant in lines:
+		if not str(line) in heard:
+			fresh.append(str(line))
+	if fresh.is_empty():
+		heard.clear()
+		fresh = lines.duplicate()
+	var words := str(fresh[absi(hash(name + key)) % fresh.size()])
+	heard.append(words)
+	if World.band_barks.size() > 64:
+		for old: String in World.band_barks.keys():
+			if World.tick - int(World.band_barks[old].get("tick", 0)) > 6000:
+				World.band_barks.erase(old)
+	World.band_barks[key] = {"tick": World.tick, "lines": heard}
+	_barked[key] = true
+	World.band_said.call(self, words)
 
 
 ## Whether it holds off its target's party now (holds_off): the share on it

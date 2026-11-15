@@ -715,6 +715,13 @@ var spawn_spec: Callable
 ## beside her player): Main's companion_freed. Raids calls it for those a
 ## beaten group carried (decision 314).
 var companion_freed: Callable
+## A band robber says [param words] aloud (806, the band's barks): (monster,
+## words) -> void; Main's _band_told. Unset (a test of its own), nobody hears.
+var band_said: Callable
+## The band's barks said at each fight (Monster._band_bark): "<fight>:<pool>"
+## -> {tick, lines}, the tick one was last said and the pool's lines said
+## there. Not saved.
+var band_barks: Dictionary = {}
 ## carried_lights' memo: for which (tick, entity count), and the list.
 var _carried_lights_key := Vector2i(-1, -1)
 var _carried_lights: Array[GridEntity] = []

@@ -1891,6 +1891,7 @@ func _test_ambush() -> void:
 	_test_band_rally()
 	_test_band_hold_off()
 	_test_band_lone_player()
+	_test_band_barks()
 	_test_den_foe_order()
 	_test_den_walk_refused()
 	_test_freed_striker()
@@ -9648,6 +9649,83 @@ func _test_band_lone_player() -> void:
 	print("  with her companion up: the second held %d ticks; at %s; at most %d FIGHTING within 2 of her" % [steps["held"], second_at.name if second_at != null else "nobody", steps["both"]])
 	_check(steps["held"] == 0 and (with["second"] as Monster).alert == Monster.Alert.FIGHTING and (second_at == with["her"] or second_at == with["kin"]),
 		"with her companion up the second never holds off and fights her or her companion (held %d, at %s)" % [steps["held"], second_at.name if second_at != null else "nobody"])
+	Monster.idling = true
+
+
+## The band's barks (806, voice's lines in the robber row's "barks"): a
+## robber says one as it takes up its hold, steps in, or leaves it; once a
+## fight for each pool of his; one voice a tick for each pool across the band;
+## no line of a pool said twice at a fight while it has one unsaid.
+func _test_band_barks() -> void:
+	print("%s== the band's barks: hold, step in, leave; one a tick a pool, no line twice while one is unsaid (806) ==" % char(10))
+	Monster.idling = false
+	var said: Array = []
+	var was_said: Callable = World.band_said
+	World.band_said = func(body: Monster, words: String) -> void: said.append([World.tick, body.name, words])
+	var rows: Array[String] = ["##############", "#............#", "#............#", "#............#", "#.....P...x..#",
+		"#............#", "#..........x.#", "#............#", "#........x...#", "##############"]
+	var e := _build(rows)
+	var band: Array = e["x"]
+	var pools: Dictionary = (band[0] as Monster).barks
+	_check(pools.get("hold", []).size() == 3 and pools.get("step_in", []).size() == 4 and pools.get("leave", []).size() == 3,
+		"the robber's row carries voice's three pools (%s)" % [pools.keys()])
+	# Three of the band at one fight, two taking up the hold on one tick: one speech.
+	for robber: Monster in band:
+		robber._joined_party = 4242
+	World.step()
+	(band[0] as Monster)._band_bark("hold")
+	(band[1] as Monster)._band_bark("hold")
+	var same_tick := said.size()
+	World.step()
+	(band[2] as Monster)._band_bark("hold")
+	(band[0] as Monster)._band_bark("hold")  # His once a fight: said.
+	var holds := said.map(func(l: Array) -> String: return str(l[2]))
+	print("  hold: %d said on the tick two took it up; then %s" % [same_tick, holds])
+	_check(same_tick == 1 and said.size() == 2 and holds[0] != holds[1] and holds.all(func(w: String) -> bool: return w in pools["hold"]),
+		"two holders on one tick: one speech; the third's line the next tick a different one; the first's second hold silent (%s)" % [holds])
+	# Two step in: two different lines, each from the pool.
+	said.clear()
+	World.step()
+	(band[0] as Monster)._band_bark("step_in")
+	World.step()
+	(band[1] as Monster)._band_bark("step_in")
+	var ins := said.map(func(l: Array) -> String: return str(l[2]))
+	_check(ins.size() == 2 and ins[0] != ins[1] and ins.all(func(w: String) -> bool: return w in pools["step_in"]),
+		"two step-ins at one fight: two different lines (%s)" % [ins])
+	# A pool all said at a fight begins again, and another fight is its own.
+	said.clear()
+	for i in 4:
+		World.step()
+		var extra := Monster.new()
+		extra.name = "Barker%d" % i
+		extra.barks = pools
+		extra._joined_party = 4242
+		extra._band_bark("leave")
+		extra.free()
+	World.step()
+	(band[0] as Monster)._joined_party = 4343
+	(band[0] as Monster)._band_bark("hold")
+	var leaves := said.slice(0, 3).map(func(l: Array) -> String: return str(l[2]))
+	leaves.sort()
+	var pool_sorted: Array = (pools["leave"] as Array).duplicate()
+	pool_sorted.sort()
+	_check(said.size() == 5 and leaves == pool_sorted and str(said[3][2]) in pools["leave"] and str(said[4][2]) in pools["hold"],
+		"each leave line once before any again; a fourth after all three; another fight's hold his own (%s)" % [said.map(func(l: Array) -> String: return str(l[2]))])
+	# In the fight: a player alone, the second holds then steps in as the first falls; its lines never name her.
+	said.clear()
+	World.band_barks.clear()
+	var room := _lone_band(false)
+	_lone_steps(room, 200)
+	World.damage(room["first"], 1000000, room["her"])
+	_lone_steps(room, 60)
+	var second: Monster = room["second"]
+	var his: Array = said.filter(func(l: Array) -> bool: return str(l[1]) == second.name).map(func(l: Array) -> String: return str(l[2]))
+	var named := said.filter(func(l: Array) -> bool: return str(l[2]).contains("Tove"))
+	print("  in the fight: %s" % [said])
+	_check(his.size() == 2 and str(his[0]) in pools["hold"] and str(his[1]) in pools["step_in"] and named.is_empty(),
+		"a player alone: the second says a hold line, then a step-in line as the first falls, never her name (%s)" % [his])
+	World.band_said = was_said
+	World.band_barks.clear()
 	Monster.idling = true
 
 

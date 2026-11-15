@@ -3171,7 +3171,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (950)
+## Lines in the data (955)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3468,11 +3468,16 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | its kind dread whoever holds it, and notice them from further off | `growth.says.bane` |
 |  | its blows stagger that kind, and they come for whoever holds it first | `growth.says.vengeance` |
 
-### levels/monsters.json (5)
+### levels/monsters.json (10)
 
 | | Line | Key |
 |---|---|---|
 |  | headwear=hood garb=none apron=no clothes=grave | `robber.person` |
+|  | Leave some for me. | `robber.barks.hold[1]` |
+|  | Go on. I'll have what's left. | `robber.barks.hold[2]` |
+|  | Stand back. Mine now. | `robber.barks.step_in[1]` |
+|  | Out of it. Let me at them. | `robber.barks.step_in[2]` |
+|  | That's that. Back to it. | `robber.barks.leave[1]` |
 |  | headwear=hood garb=none apron=no clothes=grave build=heavy stature=tall | `robber_brute.person` |
 |  | headwear=hood garb=vest apron=no clothes=forest | `bandit.person` |
 |  | headwear=hood garb=vest apron=no clothes=forest build=heavy stature=tall | `bandit_brute.person` |
