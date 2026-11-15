@@ -133,7 +133,11 @@ func _test_fought_off() -> void:
 func _test_raided() -> void:
 	print("\n== a raid that gets past: food, and the walls damaged ==")
 	_now = 12200
+	var changed: Array = []
+	var told := func(town: String, kind: String) -> void: changed.append([town, kind])
+	_towns.building_changed.connect(told)
 	var report := _towns.raid_arrives(TOWN, {"id": "g2", "faction": "goblins", "strength": 10.0, "from": "forest/camp"})
+	_towns.building_changed.disconnect(told)
 	_check(not report["repelled"] and report["margin"] == 3.0, "strength 10 against 7: 3 gets past")
 	_check(report["took"].get("food") == 6 and report["took"]["items"].size() == 1 and _stock.count(TOWN, "food") == 34
 		and _stock.shop(TOWN).size() == 2, "it takes 6 food (half, at 3/10) and a meal (%s)" % [report["took"]])
@@ -142,6 +146,10 @@ func _test_raided() -> void:
 		"the meal is carried by the group in the book")
 	_check(report["damaged"] == "walls" and _towns.building(TOWN, "walls")["state"] == Towns.DAMAGED and _towns.building(TOWN, "walls")["level"] == 1,
 		"the walls are damaged, still level 1")
+	# 566 amended (8): a raid's damage through Towns.damage, as before it: since the raid's step, told once, the log's words.
+	_check(int(_towns.building(TOWN, "walls")["since"]) == 12200 and changed.filter(func(each: Array) -> bool: return each == [TOWN, "walls"]).size() == 1
+		and _towns.log_of(TOWN).any(func(line: Dictionary) -> bool: return str(line["what"]).begins_with("a raid by ") and str(line["what"]).contains(", damaged the walls")),
+		"the walls' damage dated the raid's step, building_changed told once, the log's \"damaged the walls\" (%s)" % [changed])
 	_check(report["captives"].is_empty(), "under 6: nobody is taken")
 	_check(_stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "raid:goblins" and line["what"] == "food" and line["count"] == -6),
 		"the ledger says the goblins took 6 food")

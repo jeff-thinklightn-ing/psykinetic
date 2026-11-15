@@ -199,6 +199,17 @@ func _test_damage_and_restart() -> void:
 	_at(_now + 1000)
 	_check(id == 0 or _work.job(id).get("worked") == before, "the forge damaged: no work on Bram's sword")
 	_towns._towns[TOWN]["buildings"]["forge"]["state"] = Towns.STANDING
+	# 566 amended (8): Towns.damage, a raid's damage and the test verb's: STANDING only, told once, level kept.
+	var changed: Array = []
+	var told := func(town: String, kind: String) -> void: changed.append([town, kind])
+	_towns.building_changed.connect(told)
+	var level := int(_towns.building(TOWN, "forge")["level"])
+	_check(_towns.damage(TOWN, "forge") and _towns.building(TOWN, "forge")["state"] == Towns.DAMAGED and int(_towns.building(TOWN, "forge")["since"]) == _now
+		and int(_towns.building(TOWN, "forge")["level"]) == level and int(_towns.building(TOWN, "forge")["job"]) == 0 and changed == [[TOWN, "forge"]],
+		"Towns.damage: the standing forge damaged from now, its level kept, no repair ordered by it, told once")
+	_check(not _towns.damage(TOWN, "forge") and not _towns.damage(TOWN, "no_such") and changed.size() == 1, "a damaged one or none: refused, nothing told")
+	_towns.building_changed.disconnect(told)
+	_towns._towns[TOWN]["buildings"]["forge"]["state"] = Towns.STANDING
 	var clock := func() -> int: return _now
 	var saved: Array = [_book.to_dict(), _stock.to_dict(), _work.to_dict(), _towns.to_dict()]
 	saved = JSON.parse_string(JSON.stringify(saved))

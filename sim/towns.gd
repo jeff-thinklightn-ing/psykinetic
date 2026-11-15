@@ -3447,12 +3447,8 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 	if margin >= float(damage.get("margin", INF)):
 		var record := _town(town)
 		for kind: Variant in damage.get("prefer", []):
-			var entry: Dictionary = record["buildings"].get(str(kind), {})
-			if entry.get("state") == STANDING:
-				entry["state"] = DAMAGED
-				entry["since"] = now()
+			if damage(town, str(kind)):
 				report["damaged"] = str(kind)
-				building_changed.emit(town, str(kind))
 				break
 	var taking: Dictionary = raids.get("captives", {})
 	# In play the raiders' blows decide who is taken (resident_taken, Main's
@@ -3480,6 +3476,20 @@ func raid_arrives(town: String, group: Dictionary) -> Dictionary:
 			if not report["captives"].is_empty() else ""])
 	raided.emit(town, report)
 	return report
+
+
+## [param town]'s [param kind] damaged, as a raid damages it (566 amended (8): the raid's own
+## steps, and the test-only "damage" verb's): a STANDING building goes DAMAGED from now, its level
+## kept, building_changed told once; its repair is the town's next turn's (_repair). Nothing else:
+## no one harmed, no stock taken. False, nothing done, for a building not STANDING or none.
+func damage(town: String, kind: String) -> bool:
+	var entry: Dictionary = _towns.get(town, {}).get("buildings", {}).get(kind, {})
+	if entry.get("state") != STANDING:
+		return false
+	entry["state"] = DAMAGED
+	entry["since"] = now()
+	building_changed.emit(town, kind)
+	return true
 
 
 ## Resident [param who] of [param town] beaten down by raiders in play

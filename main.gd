@@ -27481,6 +27481,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"foes":
 			if hp_verb_allowed(not Net.test_foe.is_empty(), Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return _foes_command(words)
+		"damage":  # 566 amended (8), test-only: never in the help, unknown without --test-hp beside --run-marker.
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return damage_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -27792,6 +27795,28 @@ func _stock_command(words: PackedStringArray) -> String:
 		World.stockpile.take(town, what, had - want, "admin")
 	print("[economy] the admin set %s's %s to %d (was %d)" % [town, what, want, had])
 	return "%s: %s %d (was %d)" % [town, what, World.stockpile.count(town, what), had]
+
+
+## "damage <town store> <kind>" (566 amended (8), test-only: --test-hp beside --run-marker, by
+## hp_verb_allowed alone; never in CONSOLE_HELP): that town's standing building damaged as a raid
+## damages it (Towns.damage), for the look of a repair that waits and then is taken up. One building
+## a call; no one harmed, nothing taken; its repair ordered by the town's own next turn.
+func damage_command(words: PackedStringArray) -> String:
+	if words.size() != 3:
+		return "usage: damage <town store> <kind> (test-only)"
+	if World.towns == null or not World.towns.is_town(words[1]) or World.holdings == null or World.holdings.place(words[1]).is_empty():
+		return "damage: no town store %s" % words[1]  # As stock checks one.
+	var town := words[1]
+	var kind := words[2]
+	var house := World.towns.building(town, kind)
+	if house.is_empty() or int(house.get("level", 0)) < 1:
+		return "damage: the %s is not built at %s" % [kind, town]
+	if house.get("state") == Towns.DAMAGED:
+		return "damage: the %s is damaged already" % kind
+	if not World.towns.damage(town, kind):
+		return "damage: the %s is %s, not standing" % [kind, str(house.get("state", ""))]
+	print("[economy] the admin damaged %s's %s, step %d" % [town, kind, World.steps])
+	return "%s: the %s damaged (level %d); its repair is ordered at the town's next turn" % [town, kind, int(house.get("level", 0))]
 
 
 ## "give <player> <item> [count]" (709 amended; playtest's tours): that

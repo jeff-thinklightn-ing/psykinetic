@@ -23847,6 +23847,26 @@ view_test's stage and scaffolded (given dicts); Main's body site (reads build_pr
 voice inventory's "being mended" (wording unchanged). farm_test _test_progress_queued: a queued order has no
 progress and reads "Planned"; the start tells the views; 915's unseat sends the working field back to the queue,
 the views told, the Ledger back to "Planned", and the new holder takes it up.
+
+566 amended (8) (label from tools/decision_number.sh; the coordinator's approval, 11-14): a test-only console verb for (7)'s world half. It is a test verb: the box never has it.
+- **Why.** (7)'s bullet was trimmed to its Ledger half because a test host could damage a building only by a raid, so nobody could shoot a damaged building whose repair waits (no scaffold, "Damaged: the kitchen.") and then is taken up (scaffold).
+- **The verb.** `damage <town store> <kind>` damages that town's standing building as a raid damages it: Towns.damage(town, kind), the raid's own steps moved into one function. State DAMAGED, `since` now, its level kept, building_changed told once.
+  - One building a call, no "all". It harms no one, moves no resident and takes no stock.
+  - Its repair is ordered by the town's own next turn (_repair, under 522's rules), never by the verb.
+  - Reply: "<town>: the <kind> damaged (level N); its repair is ordered at the town's next turn". Refusals: "damaged already", "not built", "no town store" (checked as stock checks one), and usage.
+  - Journal: "[economy] the admin damaged <town>'s <kind>, step N". The town and the building only. It is printed by the verb alone, never for a raid.
+- **What opens it.** The verb rides Main.hp_verb_allowed(Net.test_hp, args) and nothing else opens it: --test-hp beside a --run-marker, as hp, rest, relic and strike. Without them its reply is the very line an unknown word gets ("unknown command damage (try help)"). Like the other test verbs it is never in CONSOLE_HELP.
+- **Raids unchanged.** Towns.raid_arrives calls Towns.damage for each kind its damage prefers and stops at the first it damages. Same state, the same `since` (the raid's step), building_changed once, report["damaged"], and the log's "a raid by ..., damaged the <kind>" as on main.
+- **Tests.**
+  - towns_test: Towns.damage on the standing forge (from now, level kept, no repair ordered, told once); a damaged one or none refused, nothing told.
+  - raids_test _test_raided: the walls' damage dated the raid's step, told once, the log's words.
+  - economy_test _test_admin_damage: without --test-hp the reply equals a nonsense verb's, string for string, and nothing is damaged; never in the help. With it: the kitchen damaged at level 1, no job ordered by the verb, residents and stock unchanged; the refusals; the town's next turn orders the repair, or holds it behind a build in hand.
+  - towns_test, raids_test, larder_test and economy_test PASS.
+- **The look it serves** (a joined look on a local test host, the player standing at the kitchen, the town's step 310 or later):
+  - With `--test-hp`, run `stock wilds/store wood 0`, then `damage wilds/store kitchen`. The repair waits: no scaffold, and the Ledger reads "Damaged: the kitchen.".
+  - Then `stock wilds/store wood 20`, and wait for the journal's "(carpenter) starts repair:kitchen": scaffold.
+  - (7)'s trimmed half comes back only on that look.
+- Server only; protocol unchanged; no class_name; no bullet; no package.
 ## 566, builder's side: a woodlot's standing cell, and builds with no site
 
 On npc's visible-work page (566, the coordinator's approval): a marked but

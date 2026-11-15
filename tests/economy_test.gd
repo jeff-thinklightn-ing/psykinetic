@@ -1034,6 +1034,7 @@ func _test_town_sheet(host: Player) -> void:
 	_test_charm_inputs(host)
 	_test_truffles(host)
 	_test_admin_stock(host)
+	_test_admin_damage()
 
 
 ## 826 amended (1): a Give row's gold is what the give pays (playtest's joined storearrive: herbs
@@ -1554,6 +1555,50 @@ func _test_admin_stock(host: Player) -> void:
 	_check(_main.admin_command("give %s nothing_such 2" % host.name).begins_with("give: no item")
 		and _main.admin_command("give nobody wood 2").begins_with("no player"), "no such item, no such player: refused")
 	_main.admin_command("stock %s gold 100" % STORE)
+
+
+## The test-only damage verb (566 amended (8)): unknown, string for string, without --test-hp beside
+## --run-marker, and never in the help; with it, one standing building damaged as a raid damages it,
+## nobody harmed, nothing taken, its repair left to the town's own next turn.
+func _test_admin_damage() -> void:
+	print("
+== the test-only damage verb (566 amended (8)) ==")
+	var had_hp := Net.test_hp
+	var buildings: Dictionary = World.towns._town(STORE)["buildings"]
+	var was: Variant = buildings.get("kitchen")
+	buildings["kitchen"] = {"kind": "kitchen", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	Net.test_hp = false
+	var shut: String = _main.admin_command("damage %s kitchen" % STORE)
+	var nonsense: String = _main.admin_command("zqxverb %s kitchen" % STORE)
+	_check(shut == nonsense.replace("zqxverb", "damage") and World.towns.building(STORE, "kitchen")["state"] == Towns.STANDING,
+		"without --test-hp: the very reply an unknown word gets, nothing damaged (%s)" % shut)
+	_check(not _main.admin_command("help").contains("damage"), "never in the help")
+	Net.test_hp = true
+	var residents := World.towns.residents(STORE)
+	var stock := {}
+	for what: String in Stockpile.RESOURCES:
+		stock[what] = World.stockpile.count(STORE, what)
+	var reply: String = _main.admin_command("damage %s kitchen" % STORE)
+	var kitchen := World.towns.building(STORE, "kitchen")
+	var same_stock := Stockpile.RESOURCES.all(func(what: String) -> bool: return World.stockpile.count(STORE, what) == int(stock[what]))
+	_check(reply.begins_with("%s: the kitchen damaged (level 1)" % STORE) and kitchen["state"] == Towns.DAMAGED and int(kitchen["level"]) == 1
+		and int(kitchen["since"]) == World.towns.now() and int(kitchen["job"]) == 0 and World.towns.residents(STORE) == residents and same_stock,
+		"with it: the kitchen damaged at level 1, its repair not ordered by the verb, nobody moved, nothing taken (%s)" % reply)
+	var refusals: Array[String] = [_main.admin_command("damage %s kitchen" % STORE), _main.admin_command("damage %s nowhere_hall" % STORE),
+		_main.admin_command("damage nowhere/store kitchen"), _main.admin_command("damage %s" % STORE)]
+	_check(refusals[0].begins_with("damage: the kitchen is damaged already") and refusals[1].begins_with("damage: the nowhere_hall is not built")
+		and refusals[2].begins_with("damage: no town store") and refusals[3].begins_with("usage"), "damaged already, not built, no such store, no kind: refused (%s)" % [refusals])
+	World.towns.tick()
+	_check(int(World.towns.building(STORE, "kitchen")["job"]) != 0 or World.production.building_in(STORE),
+		"the town's own next turn orders its repair (or holds it behind a build in hand)")
+	Net.test_hp = had_hp
+	var job := int(World.towns.building(STORE, "kitchen").get("job", 0))
+	if job != 0:
+		World.production.cancel(job)
+	if was == null:
+		buildings.erase("kitchen")
+	else:
+		buildings["kitchen"] = was
 
 
 ## The town window (768, economy's side): the sheet's new fields for the
