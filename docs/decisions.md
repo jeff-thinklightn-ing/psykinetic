@@ -57642,7 +57642,8 @@ temple's lancets drawn down toward a house pane, and the inn's door lantern made
   The first take hung a second lantern by 782's _add_door_lamp at the inn's front, giving the house
   lantern's place to it. It passed headless (the piece in the room, at the door, lit), but ui-design's
   joined two-up (twoup50_19ceed4f2) showed no lantern and no pool at the inn's door: the house lantern
-  gone and nothing in its place. Why it did not show joined is not found. The inn's own lantern, made with
+  gone and nothing in its place. Why it did not show joined is not found; the cause stays open under 782,
+  whose shops' and temple's door lanterns are hung the same way. The inn's own lantern, made with
   its house in the room's build, shows joined (every base still), so the trade's numbers go on it.
 - Tests: view_world_test, in the wilds' doorway rows. The inn's row carries a trade's lantern of 1.2 over
   4.5 m, shadowless, in the room. At 21:30, aimed at each other house in turn, the inn's lantern is lit
