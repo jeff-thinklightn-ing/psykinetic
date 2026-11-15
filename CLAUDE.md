@@ -133,6 +133,13 @@ that the walk looks like skipping and the people look like "bad claymation place
   unset (883: land.sh then takes the lock's name). On 11-15 a script took the gate and the
   lock as `animation-gather` and ran land.sh as `animation`: land.sh queued a second take
   behind its own lock, its beat kept the lock fresh, and no tree landed for 41 minutes.
+  Since 883 amended (2) (a8cab46a6) such a landing stops at once: land.sh exits 7, holding
+  nothing, when the lock was taken from its checkout under a name that is not `PSYKINETIC_TREE`
+  (release the lock and run again under one name), and the gate answers exit 6, with nothing
+  queued, to a landing's take asked from the checkout that holds the lock without its take.
+  Neither is retried in a loop. `heavy_job.sh status` names a landing "self-waiting". Once every
+  part has ended land.sh has 180 s to end, then fails itself with a line saying so (its first
+  landing hung 46 minutes on a bare `wait`): give the lock back and run the landing again.
   Since 667 amended (3) (ffeb4a634) a land script's push is `sh tools/land_push.sh <tree>
   <tested sha>` in place of its own `git push`: `<tree>` is the lock take's name, `<tested
   sha>` the 40-hex sha the `LANDING TESTS: PASS ... tested <sha>` line names, called only
