@@ -21,8 +21,8 @@ LOGS="$(mktemp -d)"
 . tests/test_ports.sh
 # The phases run at once (decision 279), each group on ports of its own:
 # phases 1 and 2 (2 reads 1's snapshot) on PORT, 3 on PORT + 1, 4 on PORT + 2,
-# 5 on PORT + 3 with its console on PORT + 4, 6 on PORT + 7 (net_test.ps1 has + 5 and + 6),
-# 7 on PORT + 8.
+# 5 on PORT + 3 with its console on PORT + 4, 6 on PORT + 7, 7 on PORT + 8,
+# 8 on PORT + 5 (PORT + 6 is free).
 PORT=$((17760 + PORT_OFFSET))
 ADMIN=$((PORT + 4))
 TOKEN=test-secret
@@ -349,13 +349,34 @@ phase_7() {
 	finish
 }
 
+phase_8() {
+	P=$((PORT + 5))
+	# Phase 8: the chest (net_test.ps1's phase 6, brought here as no landing
+	# ran the .ps1). Max joins first at the room's first start (11, 2) and steps
+	# to (12, 3), off the way to Chest1 at (10, 3): the .ps1 left him where he
+	# joined and Lee, at the start beside him, was boxed in and never reached
+	# it. Lee then joins, walks to the chest and drags the bandaging kit into
+	# Lee's slots. Both clients must show the chest empty and Lee holding the
+	# kit; Max reports and leaves first, so Lee's last view has only Lee in it.
+	server serverC --server --still-monsters --no-companions "--token=$TOKEN"
+	wait_for serverC 'listening on port'
+	client clientMa $GOOD --name=Max --test-move=1,1
+	wait_for clientMa '\[test\] Player1 arrived at '
+	client clientLe $GOOD --name=Lee --test-chest=take
+	wait_for serverC 'slots: Player2 moved bandaging_kit'
+	quit clientMa
+	CLIENTS=" clientLe"
+	wait_for serverC 'Max \([a-z0-9-]+\) left'
+	finish
+}
+
 # All the groups at once, each in a shell of its own (its instances and
 # helpers' state its own); what each printed (a wait given up) after. With
 # NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another: the
 # groups at once are fourteen Godots, a lean landing's peak.
 # NET_TEST_GROUPS (by hand only, never in a landing): just those groups,
 # e.g. "phase_3"; the checks of the others then fail.
-for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5 phase_6 phase_7}; do
+for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5 phase_6 phase_7 phase_8}; do
 	if [ -n "${NET_TEST_SERIAL:-}" ]; then
 		( "$group" ) >"$LOGS/$group.out" 2>&1
 	else
@@ -521,6 +542,12 @@ else
 	check "slots ${jo_slot:-none}/${kim_slot:-none}, companions ${jo_pet:-none}/${kim_pet:-none}" "two of each" "phase 7: each client's slot and its own companion read ($jo_tiles | $kim_tiles)"
 fi
 check "$(cat "$LOGS/server10.log" "$LOGS/server10.err" 2>/dev/null | grep -c '^ERROR' || true)" 0 "phase 7: with companions on it went without an ERROR"
+# Phase 8: the drag goes through the server, and both joined clients see it.
+check "$(count '\[test\] Player1 arrived at \(12, 3\)' "$LOGS/clientMa.log")" 1 "phase 8: Max steps off the way to the chest before Lee joins"
+check "$(count '\[test\] Player2 drags bandaging_kit from Chest1 0 to Player2 0' "$LOGS/clientLe.log")" 1 "phase 8: Lee walks to the chest and drags the kit to their slots"
+check "$(count 'slots: Player2 moved bandaging_kit from Chest1 0 to Player2 0' "$LOGS/serverC.log")" 1 "phase 8: the server moves it"
+check "$(count '\[test\] slots: Chest1=\[\] Player2=\[bandaging_kit\]$' "$LOGS/clientLe.log")" 1 "phase 8: Lee sees the chest empty and the kit in their slots (Max has gone by then)"
+check "$(count '\[test\] slots: Chest1=\[\] Player1=\[\] Player2=\[bandaging_kit\]$' "$LOGS/clientMa.log")" 1 "phase 8: Max, who took nothing, sees the same"
 errors=$(cat "$LOGS"/*.err 2>/dev/null | wc -l | tr -d ' ')
 check "$errors" 0 "no instance printed errors"
 

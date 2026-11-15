@@ -5985,6 +5985,22 @@ one run each, beside other trees' jobs: the whole 177 s with it, 165 s without (
 Godots peak 2.8 GB alone; the whole's peak 14.8 GB with it, 12.0 without (working set at once
 12.6 and 9.9), over the kind's 12 GB row (perf: it fits). net_test.ps1 is left as it is: its zones phase reads the old line, so it fails there until perf's wrapper replaces it.
 
+279 amended (2) (the script's label; the coordinator's approval 11-14, release reading the diff):
+net_test.ps1 is a thin call of net_test.sh through Git's bash, as server_boot_test.ps1 is, its
+output and exit code; land.ps1 and tools/ship.ps1 call it unchanged. The .ps1 had drifted: no
+landing ran it, and tools/ship.ps1's step 2 showed seven stale FAILs from it: three in its phase 2
+(a second online connection still expected refused; since 721 it replaces the first, which
+net_test.sh checks) and four in its phase 6, the chest. That phase comes here as phase 8, on PORT + 5
+(PORT + 6 now free): Max joins at the room's first start (11, 2) and steps to (12, 3) (--test-move=1,1)
+before Lee joins; in the .ps1 he stayed where he joined and Lee, at the start beside him, was boxed
+in and never reached Chest1 at (10, 3). Lee walks to the chest and drags the bandaging kit into
+Lee's slots (--test-chest=take); Max reports and leaves first. Checks: Max at (12, 3); Lee's drag;
+the server's move; Lee's last view the chest empty and the kit Lee's; Max's the same with himself.
+Alone through the gate as `net` (NET_TEST_GROUPS=phase_8) it passes in 57 s, three Godots, 2.4 GB
+at its peak; with Lee told to put (the kit left in the chest) the last four fail, so it is a watch,
+not a line that passes either way. Its seconds and memory in a landing's net_test on saturn are
+measured before it queues.
+
 ## 320. Companions bandage, and heal only by being bandaged
 
 Companions step 4's last verb. Items' bandaging (#272: World.try_bandage,
