@@ -23448,14 +23448,21 @@ func _struck_with(struck: GridEntity) -> Array:
 	var armour := SoundKit.armour_look(struck)
 	var best := -1
 	var best_cells := BLOW_REACH + 1
+	var best_faces := false
 	for swinger_id: int in _swings:
 		var swinger := instance_from_id(swinger_id) as GridEntity
 		if swinger == null or swinger == struck or now - int(_swings[swinger_id][0]) > BLOW_AFTER_MS:
 			continue
 		var cells := _cells_apart(swinger.tile, struck.tile)
-		if cells < best_cells:
+		if cells > BLOW_REACH:
+			continue
+		# One facing the struck body first (390 amended (3)): the sim turns a swinger to what it strikes, so
+		# of two beside it (a wolf biting the player, its mate coiling at Rhea) the one facing it struck.
+		var faces := _faces_toward(swinger, struck)
+		if (faces and not best_faces) or (faces == best_faces and cells < best_cells):
 			best = swinger_id
 			best_cells = cells
+			best_faces = faces
 	var plain := "sfx.hit_blunt_armor" if armour in SoundKit.ARMOUR_STRUCK else "sfx.hit_flesh"
 	if best < 0:
 		return [plain, now]
@@ -23464,6 +23471,16 @@ func _struck_with(struck: GridEntity) -> Array:
 	if not (by is Player or by is Companion):
 		return [plain, lands]  # A monster's hands aren't sent to clients.
 	return [SoundKit.hit(str(_swings[best][1]), armour), lands]
+
+
+## Whether [param swinger]'s facing (the sim's, replicated) points at [param struck]'s cell, within half a
+## step of the eight ways (a body on its own cell counts).
+static func _faces_toward(swinger: GridEntity, struck: GridEntity) -> bool:
+	var way := Vector2(struck.tile - swinger.tile)
+	if way == Vector2.ZERO:
+		return true
+	var facing := Vector2(swinger.facing)
+	return facing != Vector2.ZERO and absf(facing.angle_to(way)) <= PI / 4.0 + 0.01
 
 
 ## The body whose voice a monster drawn as a person (person_words: a grave

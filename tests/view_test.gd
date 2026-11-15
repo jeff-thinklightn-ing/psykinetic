@@ -17077,6 +17077,31 @@ func _test_blows_seen() -> void:
 	World.despawn(wolf)
 	_rig._swings.erase(wolf.get_instance_id())
 	_rig._process(0.0)
+	# 390 amended (3): of two swinging beside a body, the one facing it struck (look_wolf2b: its mate's
+	# swing, at Rhea and found first, flinched the player at the news, 154 ms before the bite's stretch).
+	var bitten_body := Monster.new()
+	bitten_body.tile = Vector2i(10, 10)
+	var at_rhea := Monster.new()
+	at_rhea.tile = Vector2i(11, 10)
+	at_rhea.facing = Vector2i(1, 0)  # Away, at someone else.
+	var biter := Monster.new()
+	biter.tile = Vector2i(10, 11)
+	biter.facing = Vector2i(0, -1)  # At the bitten body.
+	var clock := AnimRig.now_msec()
+	var kept_swings: Dictionary = _rig._swings.duplicate()
+	_rig._swings.clear()
+	_rig._swings[at_rhea.get_instance_id()] = [clock - 100, "", clock - 100]  # Found first, nearer or as near.
+	_rig._swings[biter.get_instance_id()] = [clock, "", clock + 180]
+	var heard: Array = _rig._struck_with(bitten_body)
+	_rig._swings[biter.get_instance_id()] = [clock, "", clock + 180]
+	at_rhea.facing = Vector2i(-1, 0)  # Both facing it: the nearer (both one cell), then the first found, as before.
+	var both: Array = _rig._struck_with(bitten_body)
+	_rig._swings = kept_swings
+	_check(int(heard[1]) == clock + 180 and int(both[1]) < clock + 180,
+			"of two swinging beside a body, the one facing it struck: its landing (%+d ms), not its mate's facing away; both facing it, the first found as before (%+d ms)"
+			% [int(heard[1]) - clock, int(both[1]) - clock])
+	for made: Monster in [bitten_body, at_rhea, biter]:
+		made.free()
 
 
 ## 392 amended (11): a body struck while its blow winds up is rocked and its strike runs on (no hit clip
