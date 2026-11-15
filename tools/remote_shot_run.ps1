@@ -222,6 +222,8 @@ function Keep-Cache([hashtable]$opts, [string]$caches, [string]$name, [string]$a
 		Remove-Item -Recurse -Force $each.FullName
 		$lines += "cache removed: caches\$($each.Name) (past the six newest)"
 	}
+	# What sits on the laptop between runs, as a number (the coordinator's ask).
+	$lines += "caches folder now: $(@(Get-ChildItem -Directory $caches).Count) caches, $(Count-Files $caches)"
 	return $lines
 }
 

@@ -256,6 +256,7 @@ cache idle_new keep=1
 row $(has "cache removed: caches\\old1 (past the six newest)" && has "cache removed: caches\\old2 (past the six newest)" && [ ! -d "$runs/caches/old2" ] \
 	&& [ -d "$runs/caches/old3" ] && [ -d "$runs/caches/idle_new" ] && [ "$(ls "$runs/caches" | wc -l)" -eq 6 ]; echo $?) \
 	"the six newest kept, the older ones removed and named"
+row $(has "caches folder now: 6 caches, 4 files, 160 bytes"; echo $?) "and the caches folder's total said after the keep (6 caches; the two caches' 110 bytes and their build.txt files, 160)"
 if grep -qF 'cache if cache != "" else "unknown (not a laptop runner' tools/map_bench.gd && grep -qF 'SHOT cache: %s%s' tools/remote_shot.sh; then
 	echo "  PASS  a bench's BENCH ran: line and runner.log's SHOT line say the cache"
 else

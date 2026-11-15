@@ -52893,7 +52893,8 @@ run is a little warmer than a true first install. remote_shot.sh writes <run>\op
 warm=, gpu=; the schtasks line holds 261 characters, so not as runner arguments). --keep-cache:
 when the run ends, bot 1's user://vulkan as the game left it on exit is kept as the laptop's
 <runs>\caches\<name> with the build's sha (build.txt); the six newest are kept, older ones removed
-and named in runner.log. --warm-from RUN: bot 1's user data starts with the cache that run kept on
+and named in runner.log, which then says the caches folder's total ("caches folder now: <n>
+caches, <files> files, <bytes> bytes"), so what sits on the laptop between runs is a number. --warm-from RUN: bot 1's user data starts with the cache that run kept on
 the same laptop. The source is a run's name, never a path (letters, digits, _ and -, refused
 otherwise; the runner's Read-Opts takes no other value), and must be one this runner kept there:
 remote_shot.sh asks before the run and the runner checks again; with none, nothing runs ("warm from
