@@ -1298,47 +1298,76 @@ func _test_every_sound_has_its_files() -> void:
 
 
 func _test_hp_bars() -> void:
-	print("\n== HP bars: hurt or fighting, Alt for all, by hp, sized by max hp ==")
+	print("\n== HP bars (865 amended (3)): in the name's row; hurt or fighting, Alt for all, by hp; never the player's own ==")
 	var player := _player()
 	var imp := _spawn_imp(Vector2i(9, 4))
 	_rig._process(0.0)
-	var bar := _bar(player)
-	var imp_bar := _bar(imp)
-	_check(bar != null and imp_bar != null, "a player and an imp each have one")
-	var width := (bar.mesh as QuadMesh).size.x
-	var imp_width := (imp_bar.mesh as QuadMesh).size.x
-	_check(is_equal_approx(width / imp_width, float(player.max_hp) / imp.max_hp),
-			"widths in proportion to max hp (%.2f for %d, %.2f for %d)" % [width, player.max_hp, imp_width, imp.max_hp])
+	var id := imp.get_instance_id()
+	var row: Dictionary = _rig._plate_rows.get(id, {})
+	_check(int(row.get("max_hp", 0)) == imp.max_hp and (_rig._puppets[id] as Node3D).get_node_or_null("HpBar") == null,
+			"the imp's bar is kept on its name's row (max hp %d), no 3D bar on the body" % int(row.get("max_hp", 0)))
 	await _fade()
-	_check(not bar.visible, "at full hp, out of a fight: no bar")
+	_check(_bar(imp) == 0.0, "at full hp, out of a fight: no bar")
 	_rig.show_all_bars = true
 	await _fade()
-	_check(bar.visible and _alpha(bar) > 0.99, "Alt held: shown (%.2f)" % _alpha(bar))
+	_check(_bar(imp) > 0.99, "Alt held: shown (%.2f)" % _bar(imp))
+	# 865 amended (4): the player's own bar as anyone's (no HUD part shows his hp; bbf3d845b left him none).
+	_check(_bar(player) > 0.99, "Alt held: the player's own bar too (%.2f)" % _bar(player))
+	_rig.own_name_on_hud = false
+	var own_rows := _rig.name_plates().filter(func(r: Dictionary) -> bool: return r["key"] == player.get_instance_id())
+	_check(own_rows.size() == 1 and not bool(own_rows[0]["named"]) and float(own_rows[0]["bar"]) > 0.99,
+			"his own name off: his row listed bar-only, named false (%s)" % [own_rows.map(func(r: Dictionary) -> String: return "named %s bar %.2f" % [r["named"], r["bar"]])])
+	_rig.own_name_on_hud = true
+	# One bar for one body (865 amended (4)): the boss whose HUD bar is up has none on his row, Alt or not;
+	# a plain foe beside him keeps his; it comes back when the boss bar goes.
+	var plain := _spawn_imp(Vector2i(10, 4))
+	imp.boss = true
+	await _fade()
+	_check(_main.boss_in_sight() == imp and _bar(imp) == 0.0 and _bar(plain) > 0.99,
+			"a boss with his bar up: no row bar (%.2f), even with Alt; the plain imp beside him keeps his (%.2f)" % [_bar(imp), _bar(plain)])
+	# ui's read: the HUD bar shows on the very predicate the row gives way to, so a boss is never left with neither.
+	var hud_bar: BossBar = _main.get("boss_bar")
+	_check(hud_bar == null or (hud_bar.boss_of == Callable(_main, "boss_in_sight") and hud_bar.visible and hud_bar.boss == imp),
+			"the HUD's boss bar reads Main.boss_in_sight and is up for him (%s)" % [hud_bar.boss if hud_bar != null else "no bar in this scene"])
+	imp.boss = false
+	await _fade()
+	_check(_main.boss_in_sight() == null and _bar(imp) > 0.99, "his boss bar gone: his row bar is back (%.2f)" % _bar(imp))
+	World.despawn(plain)
 	_rig.show_all_bars = false
 	await _fade()
-	_check(not bar.visible, "let go: gone again")
+	_check(_bar(imp) == 0.0 and _bar(player) == 0.0, "let go: gone again, his and the player's")
+	var full_hp := player.hp
+	player.hp = maxi(1, player.max_hp - 2)
+	await _fade()
+	_check(_bar(player) > 0.99 and _share(player) < 1.0, "the player hurt (%d of %d): his own bar shows (%.2f)" % [player.hp, player.max_hp, _bar(player)])
+	player.hp = full_hp
+	await _frames(2)
+	_rig._combat_at.erase(player.get_instance_id())
+	await _fade()
+	_check(_bar(player) == 0.0, "whole again and out of the fight: his bar fades out")
 	World.damage(imp, 4, player, &"attack")
 	_rig._process(0.0)
 	await _fade()
-	_check(imp_bar.visible and is_equal_approx(_fill(imp_bar), 8.0 / 12.0), "hurt: shown, two-thirds full (%.2f)" % _fill(imp_bar))
-	_check(_colour(imp_bar).is_equal_approx(Client3D.HP_GREEN_COLOR), "green above half")
+	_check(_bar(imp) > 0.99 and is_equal_approx(_share(imp), 8.0 / 12.0), "hurt: shown, two-thirds full (%.2f)" % _share(imp))
+	_check(UiNamePlates.bar_fill(_share(imp)) == &"fill_high", "the high fill above half")
 	World.damage(imp, 3, player, &"attack")
 	await _frames(2)
-	_check(_colour(imp_bar).is_equal_approx(Client3D.HP_AMBER_COLOR), "amber at 5 of 12")
+	_check(UiNamePlates.bar_fill(_share(imp)) == &"fill_mid", "the middle fill at 5 of 12")
 	World.damage(imp, 3, player, &"attack")
 	await _frames(2)
-	_check(_colour(imp_bar).is_equal_approx(Client3D.HP_RED_COLOR), "red at 2 of 12")
-	var id := player.get_instance_id()
+	_check(UiNamePlates.bar_fill(_share(imp)) == &"fill_low", "the low fill at 2 of 12")
+	imp.hp = imp.max_hp
+	_rig._process(0.0)
 	_rig._combat_at[id] = Time.get_ticks_msec()
 	await _fade()
-	_check(bar.visible, "full hp, but in a fight a moment ago: shown")
+	_check(_bar(imp) > 0.99, "full hp, but in a fight a moment ago: shown")
 	_rig._combat_at[id] = Time.get_ticks_msec() - int(Client3D.COMBAT_SECONDS * 1000.0) - 100
 	await _fade()
-	_check(not bar.visible, "more than %d s after the fight: faded out" % roundi(Client3D.COMBAT_SECONDS))
+	_check(_bar(imp) == 0.0, "more than %d s after the fight: faded out" % roundi(Client3D.COMBAT_SECONDS))
 	Net.hp_bars = false
 	_rig.show_all_bars = true
 	await _fade()
-	_check(not imp_bar.visible and not bar.visible, "hp_bars=0: none, even with Alt")
+	_check(_bar(imp) == 0.0, "hp_bars=0: none, even with Alt")
 	Net.hp_bars = true
 	_rig.show_all_bars = false
 	World.despawn(imp)
@@ -18522,21 +18551,14 @@ func _swing_pitch(entity: GridEntity) -> float:
 	return 0.0
 
 
-func _bar(entity: GridEntity) -> MeshInstance3D:
-	var puppet: Node3D = _rig._puppets.get(entity.get_instance_id())
-	return puppet.get_node_or_null("HpBar") as MeshInstance3D if puppet != null else null
+## How much [param entity]'s bar shows (0 to 1) on its name's row (865 amended (3)).
+func _bar(entity: GridEntity) -> float:
+	return float((_rig._plate_rows.get(entity.get_instance_id(), {}) as Dictionary).get("bar", 0.0))
 
 
-func _alpha(bar: MeshInstance3D) -> float:
-	return float((bar.material_override as ShaderMaterial).get_shader_parameter("alpha"))
-
-
-func _fill(bar: MeshInstance3D) -> float:
-	return float((bar.material_override as ShaderMaterial).get_shader_parameter("fill"))
-
-
-func _colour(bar: MeshInstance3D) -> Color:
-	return (bar.material_override as ShaderMaterial).get_shader_parameter("fill_color")
+## The share of hp [param entity]'s bar is filled to.
+func _share(entity: GridEntity) -> float:
+	return float((_rig._plate_rows.get(entity.get_instance_id(), {}) as Dictionary).get("share", 1.0))
 
 
 func _frames(count: int) -> void:

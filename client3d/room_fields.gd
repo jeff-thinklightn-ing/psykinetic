@@ -27,7 +27,9 @@ const VIEW: Array[StringName] = [
 	&"_body_marked",
 	&"_body_marking",
 	&"_body_marking_shaders",  # 623 amended (6).
+	&"_boss_at",
 	&"_boss_mark",
+	&"_boss_this_frame",
 	&"_break_sounds",
 	&"_build_generation",
 	&"_builder_marks",
@@ -87,7 +89,6 @@ const VIEW: Array[StringName] = [
 	&"_house_light_clock",
 	&"_house_light_time",
 	&"_hover",
-	&"_hp_bar_shader",
 	&"_idle_heard",
 	&"_idle_next",
 	&"_idle_slot_at",

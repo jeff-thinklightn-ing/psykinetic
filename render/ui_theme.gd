@@ -10,9 +10,11 @@ extends RefCounted
 ## Row, RowHover, RowRefused, RowWords, RowLine, and their list Rows; the HUD's quest card (862):
 ## QuestCard, QuestColumn, QuestRows, QuestItem, QuestLine, QuestDone, QuestMore, QuestReturn; the hints
 ## (UiKeyCap, 872): KeyCap, KeyMouse, KeyText, KeyJoin, KeyRow, HintStrip, HintRows, HintLine, HintWords,
-## HintFoot, HintGroup; names over heads (UiNamePlates, 865): NamePlate, NameText; a person window's typing
-## line: SayLine (a LineEdit, room at its left for UiSayMark) and SayMark (mark, mark_idle; width, height, tail,
-## radius, inset); its containers Stack,
+## HintFoot, HintGroup; names over heads (UiNamePlates, 865): NamePlate, NameText, and the health bar in a name's
+## row (865 amended (3)): HpBar (fill_high, fill_mid, fill_low, track; gap, height, per_hp, least, most, hold; panel);
+## a person window's typing line: SayLine (a LineEdit, room at its left for UiSayMark) and SayMark (mark, mark_idle;
+## width, height, tail, radius, inset);
+## its containers Stack,
 ## Strip (separation row), Halves (half_gap), Squares (square_gap); and the constants
 ## square, square_gap, half_gap) and set no fonts, sizes or colours of
 ## their own (Hud is the HUD's one line over the world). What is drawn by hand (the compass, the maps, the speech
