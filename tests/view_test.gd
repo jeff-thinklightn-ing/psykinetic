@@ -257,6 +257,7 @@ func _ready() -> void:
 		await _test_phased_build()
 		await _test_kept_fields()
 		await _test_indoor_phased_build()
+		_test_steady_frames()
 		await _test_shade_mid_build()
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
@@ -16015,6 +16016,65 @@ func _test_indoor_phased_build() -> void:
 	_check(lifted > 0 and lifted <= ceiling, "the barrow's card lifts within a frame a phase, %d (%d)" % [ceiling, lifted])
 	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The card mend (perf's side): the frames in a row under STEADY_FRAME_MSEC since the room
+## was built, 0 while it builds; view_steady told once a build at STEADY_FRAMES; after a
+## lift, the slow frames of the next LIFT_WATCH_MSEC counted with and without a compile.
+## Frames given by hand, no awaits between them (no real _process counts in between).
+func _test_steady_frames() -> void:
+	print("\n== the view's steady frames (the card waits for them) ==")
+	var counts: Array[int] = []
+	var count := 0
+	for frame_msec: float in [20.0, 60.0, 20.0, 20.0, 20.0, 50.0, 49.9]:
+		count = Client3D.steady_after(count, frame_msec, false)
+		counts.append(count)
+	_check(counts == [1, 0, 1, 2, 3, 0, 1], "a frame under 50 ms one more, 50 or over back to 0: %s" % [counts])
+	_check(Client3D.steady_after(5, 10.0, true) == 0, "0 while the room builds")
+	var told := [0]
+	var tell := func() -> void: told[0] += 1
+	_rig.view_steady.connect(tell)
+	var was_building: bool = _rig.building_room
+	_rig.building_room = true
+	for _frame in 5:
+		_rig._count_frame(20.0, 0)
+	_check(_rig.steady_frames() == 0 and told[0] == 0, "building: no steady frames, nothing told (%d, %d)" % [_rig.steady_frames(), told[0]])
+	_rig.building_room = false
+	var told_at := -1
+	for i in 5:
+		_rig._count_frame([20.0, 60.0, 20.0, 20.0, 20.0][i], 0)
+		if told[0] > 0 and told_at < 0:
+			told_at = i + 1
+	_check(told_at == 5 and _rig.steady_frames() == 3, "built: view_steady at the 3rd steady frame in a row, the 5th frame (%d, count %d)" % [told_at, _rig.steady_frames()])
+	_rig._count_frame(200.0, 0)
+	for _frame in 4:
+		_rig._count_frame(20.0, 0)
+	_check(told[0] == 1 and _rig.steady_frames() == 4, "told once a build, a long frame after it or not (%d)" % told[0])
+	_rig.building_room = true
+	_rig._count_frame(20.0, 0)
+	_rig.building_room = false
+	for _frame in 3:
+		_rig._count_frame(20.0, 0)
+	_check(told[0] == 2, "and again after the next build (%d)" % told[0])
+	_rig.view_steady.disconnect(tell)
+	# The watch after a lift: 6 s of frames, two slow with a compile, one slow without, one at 100.
+	_rig.lifted("steady", 900)
+	var start: int = _rig._lift.get("compiles", -1)
+	var frames: Array = [[300.0, start + 4], [20.0, start + 4], [100.0, start + 4], [150.0, start + 4], [120.0, start + 9]]
+	var seen := 0.0
+	for frame: Array in frames:
+		_rig._count_frame(frame[0], frame[1])
+		seen += frame[0]
+	_check(not _rig._lift.is_empty() and _rig.lift_report.is_empty(), "watching till 6 s of frames (%.0f ms seen)" % seen)
+	while seen < Client3D.LIFT_WATCH_MSEC:
+		_rig._count_frame(16.0, start + 9)
+		seen += 16.0
+	var report: Dictionary = _rig.lift_report
+	_check(_rig._lift.is_empty() and str(report.get("how")) == "steady" and int(report.get("slow", -1)) == 3
+			and int(report.get("slow_compiled", -1)) == 2 and is_equal_approx(float(report.get("worst", 0.0)), 300.0),
+			"after 6 s: 3 frames over 100 ms, 2 with a compile counted, the worst 300 ms (%s)" % [report])
+	_rig.building_room = was_building
+	_rig.lift_report = {}
 
 
 ## 660 amended (11): a shade pass while a zone change builds over frames.

@@ -2544,6 +2544,26 @@ var _room: Node3D
 var building_room := false
 ## Told when a rebuild's room is whole.
 signal room_built
+## The card mend (perf's side; the coordinator's approval, 11-15): the room's first draws
+## compile its pipelines (about 120 at the join, 1.4 s in four frames on the Atlas as the
+## card lifted), so the card waits for the view to draw steadily. [member _steady_count] counts
+## the frames in a row under STEADY_FRAME_MSEC since the room was built (0 while it builds,
+## and back to 0 at a longer frame); [signal view_steady] is told once a build when it
+## reaches STEADY_FRAMES (ui's ArrivalCard holds till then or its own cap).
+const STEADY_FRAME_MSEC := 50.0
+const STEADY_FRAMES := 3
+signal view_steady
+var _steady_count := 0
+## The ticks of the last _process (0 none yet), and whether this build's view_steady was told.
+var _steady_usec := 0
+var _steady_told := false
+## After the card lifts (lifted): for LIFT_WATCH_MSEC of frames, the frames over
+## LIFT_SLOW_MSEC, those with a pipeline compile counted in them, the worst, and the
+## compile total last read ({} not watching); [member lift_report] the last watch's.
+const LIFT_WATCH_MSEC := 6000.0
+const LIFT_SLOW_MSEC := 100.0
+var _lift := {}
+var lift_report := {}
 ## A rebuild's number: a phase of an older one stops (decision 660).
 var _build_generation := 0
 ## The grown trees' data, read in _phase_land, built in _phase_grown.
@@ -3756,6 +3776,10 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 
 
 func _process(delta: float) -> void:
+	var now := Time.get_ticks_usec()
+	# Timed between _process calls, not by delta (the engine may smooth it).
+	_count_frame((now - _steady_usec) / 1000.0 if _steady_usec > 0 else INF, _pipeline_compiles() if not _lift.is_empty() else 0)
+	_steady_usec = now
 	if building_room:
 		return  # Half a room (decision 660): nothing to ease, fade or grow yet.
 	_end_warm_ups()
@@ -7647,6 +7671,66 @@ func build_neighbour(terrain: Dictionary, centre: Vector2i, sky_floor: float, ov
 ## no old room left to free (swap_room trades only whole rooms).
 func room_whole() -> bool:
 	return _room != null and not building_room and not ground_filling and _fill_jobs.is_empty() and _old_rooms.is_empty()
+
+
+## The frames in a row under STEADY_FRAME_MSEC since the room was built (0 while it builds):
+## the card lifts at STEADY_FRAMES (view_steady), or at ui's cap.
+func steady_frames() -> int:
+	return _steady_count
+
+
+## The steady count after a frame of [param frame_msec]: 0 while the room builds or after a
+## frame as long as STEADY_FRAME_MSEC or longer, else one more.
+static func steady_after(count: int, frame_msec: float, building: bool) -> int:
+	if building or frame_msec >= STEADY_FRAME_MSEC:
+		return 0
+	return count + 1
+
+
+## One frame counted (from _process; a test gives its own): the steady count, view_steady told
+## once a build, and the watch after a lift, [param compiles] the engine's pipeline
+## compiles so far (read only while watching).
+func _count_frame(frame_msec: float, compiles: int) -> void:
+	_steady_count = steady_after(_steady_count, frame_msec, building_room)
+	if building_room:
+		_steady_told = false
+	elif _steady_count >= STEADY_FRAMES and not _steady_told:
+		_steady_told = true
+		view_steady.emit()
+	if _lift.is_empty():
+		return
+	var compiled := compiles > int(_lift["compiles"])
+	_lift["compiles"] = compiles
+	_lift["seen_msec"] += frame_msec
+	if frame_msec > LIFT_SLOW_MSEC:
+		_lift["slow"] += 1
+		_lift["slow_compiled"] += 1 if compiled else 0
+		_lift["worst"] = maxf(float(_lift["worst"]), frame_msec)
+	if float(_lift["seen_msec"]) >= LIFT_WATCH_MSEC:
+		lift_report = _lift
+		_lift = {}
+		print("[view] %.0f s after the card lifted (%s): %d frames over %.0f ms, %d with a pipeline compile counted, %d with none; the worst %.0f ms" % [
+				LIFT_WATCH_MSEC / 1000.0, lift_report["how"], lift_report["slow"], LIFT_SLOW_MSEC,
+				lift_report["slow_compiled"], lift_report["slow"] - lift_report["slow_compiled"], lift_report["worst"]])
+
+
+## The card lifted (ui's ArrivalCard, the card mend): [param how] "steady" (view_steady) or
+## "cap" (its cap), after [param held_msec] held. Logged, and the frames over
+## LIFT_SLOW_MSEC in the LIFT_WATCH_MSEC after it counted, with and without a compile
+## counted in them, logged at the end: what the card covered and what still shows.
+func lifted(how: String, held_msec: int) -> void:
+	print("[view] the card lifted %s after %d ms held, %d steady frames" % [how, held_msec, _steady_count])
+	_lift = {"how": how, "held_msec": held_msec, "compiles": _pipeline_compiles(), "seen_msec": 0.0,
+			"slow": 0, "slow_compiled": 0, "worst": 0.0}
+
+
+## The engine's pipeline compiles so far, of every kind (map_bench's sum).
+static func _pipeline_compiles() -> int:
+	return int(Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_MESH)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SURFACE)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_DRAW)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_SPECIALIZATION)
+			+ Performance.get_monitor(Performance.PIPELINE_COMPILATIONS_CANVAS))
 
 
 ## The live view and the held neighbour [param other] trade rooms (822): every

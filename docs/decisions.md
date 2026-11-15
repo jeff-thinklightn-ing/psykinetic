@@ -34030,6 +34030,33 @@ recorded shades stay until the spans are in, so each later pass in the wait coun
 guard none did, and the floor's bytes are as a pass from scratch gives them. Client only, protocol unchanged, no new class_name; not a package
 piece; no bullet.
 
+660 amended (12) (perf, 2026-11-15; the coordinator's approval of the card mend after perf's frame
+probes; label from tools/decision_number.sh): the card waits for the view to draw steadily, perf's
+side. The probes (C:/dev/review/perf_join2D, perf_join2E, perf_cross2F, perf_idle2G, on both
+laptops, joined) found the room's first draws compile its pipelines, about 120 at the join, and
+they fall as the card lifts: on the Atlas f1440 to f1443 ran 216, 503, 232 and 425 ms (the far
+shader, the character body's inline outline and stencil shaders, the palette, scatter,
+ground_sight, season_eye_cut), on the Lenovo 327 and 308 ms; the barrow's crossings about 300 ms at
+card-up and as it lifts. Draw stalls with no compile counted (330 to 460 ms) cluster in the 4 to 6 s
+after. Client3D now counts, in _process before its building return, the frames in a row under
+STEADY_FRAME_MSEC (50 ms, timed between _process calls by Time.get_ticks_usec, not delta) since the
+room was built: steady_frames(), 0 while it builds and back to 0 at a longer frame (the pure step
+steady_after); view_steady is told once a build when the count reaches STEADY_FRAMES (3). ui's
+ArrivalCard holds the card till view_steady or its own cap (2.5 s), and moves tell_view_ready and
+all keyed to "the view is ready" to the lift, a take of ui's on this one. lifted(how, held_msec),
+called at the lift ("steady" or "cap"), logs it and counts the frames over LIFT_SLOW_MSEC (100 ms)
+in the next LIFT_WATCH_MSEC (6 s of frames), with and without a pipeline compile counted in them
+(Performance's PIPELINE_COMPILATIONS_* summed, as map_bench does, read only while watching), logged
+at its end and kept as lift_report: what the card now covers and what still shows. The
+coordinator's bound for the after-run: no frame with a compile over 100 ms in the first second
+after the card lifts, Lenovo, joined, at the join and both crossings; a stall with nothing compiled
+is logged, not failed. The new vars are the view's (room_fields VIEW). view_test (view_world_test's
+half) _test_steady_frames: the step's counts; nothing counted or told while building; told at the
+5th of 20, 60, 20, 20, 20 ms; once a build; a lift's watch of 300 (a compile), 20, 100, 150 (none),
+120 (a compile) ms then 16 ms frames to 6 s reports 3 slow, 2 with a compile, the worst 300. Client
+only, protocol unchanged, no new class_name; no bullet (ui's take carries it, after ui-design's
+joined look of the join on a laptop and voice's words).
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and
