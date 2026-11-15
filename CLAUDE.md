@@ -27,7 +27,9 @@ which worktree owns each step, and the design rules not to break without asking 
 - A design question goes to the coordinator first; once approved, take its decision number
   from the script (`sh tools/decision_number.sh new <tree> "<what>"`).
 - New player-facing lines (dialogue, windows, signs, barks) go to the `voice` worktree session
-  for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`.
+  for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`. A
+  CHANGELOG bullet is a player-facing line too: voice reads its words before the commit that
+  carries it, not after it lands.
 - The interface is two trees (Jeff, 2026-11-09): `ui` owns what a window does (behaviour and
   flow), `ui-design` owns how it looks (theme, fonts, the shared parts, spacing). A new or
   changed window gets `ui-design`'s mock before `ui` builds it, and no window script sets a
@@ -67,7 +69,10 @@ that the walk looks like skipping and the people look like "bad claymation place
 - Passing tests and a far-camera still are not "it looks right". Art and animation are shown at
   the nearest zoom beside Jeff's goblin before they land. A look names its camera distance and
   is shot with the player standing in the place: a panned lens shows what no player sees
-  (2026-11-14: a "tipped fir" was a branch round a panned lens). A check that reads the same
+  (2026-11-14: a "tipped fir" was a branch round a panned lens). A tour's click or key goes in
+  as an input event (`Input.parse_input_event`), never as a direct call to Main's handler: a
+  direct call is not a player's press, and beside a parsed Shift it failed where no player
+  could (11-15, the bow's taps). A check that reads the same
   for the right pose and the wrong one is no watch: a stance is read by its clip's name, and a
   still's time comes from the run's log (11-14: an axe's edge direction passed for the ready
   and the rest alike). A still that needs the town's people settles on the town's step
@@ -119,8 +124,15 @@ that the walk looks like skipping and the people look like "bad claymation place
   Fetch and rebase onto `origin/main` before you take the gate as well as after the lock, so
   the gate's waiter runs main's code: a take queued from an older checkout is judged by that
   older code until the tree rebases (394 amended (53), (54); `heavy_job.sh status` lists each
-  take "on older gate code"). The fetch and rebase after the lock's take stay as they are: they
-  make the tested sha main's tip.
+  take "on older gate code"). A queued row from older code that waits only on its own old count
+  holds nobody behind it (394 amended (55), fe5d77b43): newer rows pass it, it keeps its place,
+  and status notes it; rebase it all the same. The fetch and rebase after the lock's take stay
+  as they are: they make the tested sha main's tip.
+  The gate take, the lock take and `PSYKINETIC_TREE` are one name: a landing under a second
+  name (`<tree>-<what>`) takes both as that name and sets `PSYKINETIC_TREE` to it, or leaves it
+  unset (883: land.sh then takes the lock's name). On 11-15 a script took the gate and the
+  lock as `animation-gather` and ran land.sh as `animation`: land.sh queued a second take
+  behind its own lock, its beat kept the lock fresh, and no tree landed for 41 minutes.
   Since 667 amended (3) (ffeb4a634) a land script's push is `sh tools/land_push.sh <tree>
   <tested sha>` in place of its own `git push`: `<tree>` is the lock take's name, `<tested
   sha>` the 40-hex sha the `LANDING TESTS: PASS ... tested <sha>` line names, called only
@@ -227,6 +239,9 @@ that the walk looks like skipping and the people look like "bad claymation place
   never hold the bench lock while waiting on the gate, as with the land lock (2026-11-14: a
   bench queued about five hours behind the evening's landings held the bench lock all that
   time; a timing that can't find its gap is asked of the coordinator for saturn or a laptop).
+  Since 394 amended (56) (4eb0fd78c) `heavy_job.sh status` and the daily summary name a bench
+  or soak queued over an hour ("landings keep passing it: ask the coordinator for saturn or a
+  laptop"): ask then, rather than wait on.
   Keep many-process runs short. A windowed clip recording (Godot's movie
   maker writes gigabytes of frames and starves everything else) counts as a heavy run:
   take the bench lock for it too, and clear its frames from `%TEMP%` after.
