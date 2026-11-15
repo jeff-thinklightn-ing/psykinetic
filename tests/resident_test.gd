@@ -122,6 +122,7 @@ func _ready() -> void:
 	_test_told_refusals()  # 914.
 	_test_lower_first()  # Lore's finding: a name keeps its capital.
 	_test_sick_word()  # 501 amended (2): last, as it moves the day on.
+	_test_cap_rank()  # 333 amended (4): Main._cap_pick on made-up candidates, no steps.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -5706,6 +5707,228 @@ func _test_telling_greetings() -> void:
 	for each: String in Resident.HAIL_STRANGER:
 		var cue := Resident.stranger_cue(each, "Jeff", "Hazel", "farmer", want)
 		_check(not str(cue.get("text", "")).contains("what brings") and not str(cue.get("text", "")).contains("come from"), "no greeting asks a newcomer why or whence (%s)" % each)
+
+
+## A _sync_residents entry for the cap's cases (333 amended (4)): at [param at], of [param town].
+static func _cap_entry(key: String, at: Vector2i, town: String, extra := {}) -> Dictionary:
+	var each := {"key": key, "name": key, "trade": "farmer", "player": "", "town": town, "type": "", "places": {"square": Rect2i(at, Vector2i.ONE)}}
+	each.merge(extra, true)
+	return each
+
+
+## Who stands under RESIDENTS_MAX (333 amended (4), the coordinator's ruling, 11-14): by rank, then
+## nearness, a standing body held; never the order the sync found them in. Main._cap_pick on made-up
+## candidates and players (the test room is too small for sight and margins), its cut list cleared
+## before and put back after.
+func _test_cap_rank() -> void:
+	print("\n== under the cap: the stall's keeper, a sought one, the healer and a camp's trader stand in a full town; nobody seen goes, nobody cut comes back within the hour (333 amended (4)) ==")
+	var cut_was: Dictionary = _main._cap_cut.duplicate()
+	var over_was: Dictionary = _main._cap_over_hour.duplicate()
+	_main._cap_cut.clear()
+	# A full town through _sync_residents (last of all, so no case after it meets the bodies it moves): Rolf
+	# at the test town's store, 19 more residents, and he keeps his body, the cap kept (before it the town's
+	# folk filled the twelve first by id and he had none).
+	var rule: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
+	if not rule.is_empty():
+		var towns_was: Array = (rule.get("towns", []) as Array).duplicate()
+		rule["towns"] = [STORE]
+		_main._sync_residents()
+		var rolf := _body(Offers.VENDOR + STORE)
+		var crowd: Array[String] = []
+		for i in 19:
+			var crowd_id := "rs-crowd%02d" % i
+			if World.towns.note_rescue(STORE, crowd_id, "Crowd%d" % i, "carpenter"):
+				crowd.append(crowd_id)
+		_main._sync_residents()
+		_check(rolf != null and crowd.size() == 19 and _body(Offers.VENDOR + STORE) == rolf and rolf.spawned and World.townsfolk().size() == Main.RESIDENTS_MAX,
+			"the stall's keeper and 19 more residents: he keeps his body, %d bodies in all (%d)" % [Main.RESIDENTS_MAX, World.townsfolk().size()])
+		for crowd_id in crowd:
+			World.production.set_away(crowd_id, true)
+		rule["towns"] = towns_was
+		_main._cap_cut.clear()
+		_main._sync_residents()
+	else:
+		_check(true, "(no vendor rule: the full town through the sync skipped)")
+	_main._cap_cut.clear()
+	var hut := "%s/cap_hut" % TOWN
+	World.holdings._places[hut] = {"id": hut, "area": TOWN, "key": "cap_hut", "cell": Vector2i(70, 0), "name": "a healer's hut", "kind": "healers_hut",
+		"radius": 1, "worth": 0, "start": ""}
+	var hour := maxf(DayNight.day_steps / 24.0, 1.0)
+	var now := 40.0 * DayNight.day_steps
+	var me: Array[Vector2i] = [Vector2i(0, 0)]
+	var ids := {"cap-player": true}
+	# 19 residents nearest the player, the four who must stand farther off than any of them.
+	var town := {}
+	for i in 19:
+		var key := "cap-folk%02d" % i
+		town[key] = _cap_entry(key, Vector2i(2 + i, 0), STORE)
+	var must := {Offers.VENDOR + STORE: _cap_entry(Offers.VENDOR + STORE, Vector2i(50, 0), STORE, {"trade": ""}),
+		"cap-sought": _cap_entry("cap-sought", Vector2i(60, 0), STORE, {"sought": "cap-sought", "strayed": true}),
+		"medicine_man:" + hut: _cap_entry("medicine_man:" + hut, Vector2i(70, 0), hut, {"trade": "medicine_man"}),
+		Offers.CAMP_TRADER + "cap": _cap_entry(Offers.CAMP_TRADER + "cap", Vector2i(80, 0), "cap", {"trade": ""})}
+	var wanted := town.duplicate()
+	wanted.merge(must)
+	_main._cap_pick(wanted, {}, me, ids, now)
+	var nearest := range(8).all(func(i: int) -> bool: return wanted.has("cap-folk%02d" % i))
+	_check(wanted.size() == Main.RESIDENTS_MAX and must.keys().all(func(k: String) -> bool: return wanted.has(k)) and nearest,
+		"19 residents, the stall's keeper, a sought one, the healer's keeper and a camp's trader: those four and the 8 nearest residents (%s)" % [wanted.keys()])
+	var again := town.duplicate()
+	again.merge(must)
+	_main._cap_pick(again, {}, me, ids, now)
+	_check(again.keys() == wanted.keys(), "the same world: the same twelve, in the same order")
+	_main._cap_cut.clear()
+	# Umbrage's sum (the coordinator's case): 10 residents standing round the player, Rolf and Hob standing
+	# off; then an 11th and a 12th led home, standing beside the player: both keepers still stand.
+	var umbrage := {}
+	var bodies_now := {}
+	for i in 12:
+		var key := "cap-home%02d" % i
+		umbrage[key] = _cap_entry(key, Vector2i(6 + i, 3), STORE)
+		if i < 10:
+			bodies_now[key] = {"tile": Vector2i(6 + i, 3), "escort": "", "trade": "farmer"}
+	for keeper: String in [Offers.VENDOR + STORE, "medicine_man:" + hut]:
+		umbrage[keeper] = must[keeper]
+		bodies_now[keeper] = {"tile": (must[keeper]["places"]["square"] as Rect2i).position, "escort": "", "trade": str(must[keeper]["trade"])}
+	for led in ["cap-home10", "cap-home11"]:
+		bodies_now[led] = {"tile": Vector2i(1, 1), "escort": "", "trade": "farmer"}
+		var pick_now := umbrage.duplicate()
+		_main._cap_pick(pick_now, bodies_now, me, ids, now)
+		_check(pick_now.size() == Main.RESIDENTS_MAX and pick_now.has(Offers.VENDOR + STORE) and pick_now.has("medicine_man:" + hut),
+			"%s led home beside the player: Rolf and Hob both stand, an ordinary resident out of sight goes" % led)
+		for key: String in bodies_now.keys():
+			if not pick_now.has(key):
+				bodies_now.erase(key)
+	_main._cap_cut.clear()
+	# Umbrage by day with Rolf on (the coordinator's cases): 9 residents, Rolf, Hob and two visitors (visitors.most);
+	# then three companions left to rest. What goes in their place is named by kind.
+	var day := {}
+	var day_bodies := {}
+	for i in 9:
+		var key := "cap-day%02d" % i
+		day[key] = _cap_entry(key, Vector2i(30 + 2 * i, 0), STORE)
+		day_bodies[key] = {"tile": Vector2i(30 + 2 * i, 0), "escort": "", "trade": "farmer"}
+	for keeper: String in [Offers.VENDOR + STORE, "medicine_man:" + hut]:
+		day[keeper] = must[keeper]
+		day_bodies[keeper] = {"tile": (must[keeper]["places"]["square"] as Rect2i).position, "escort": "", "trade": str(must[keeper]["trade"])}
+	for v in 2:
+		var key := Offers.VISITOR + "cap%d" % v
+		day[key] = _cap_entry(key, Vector2i(10 + v, 5), STORE, {"trade": ""})
+	var pick_day := day.duplicate()
+	_main._cap_pick(pick_day, day_bodies, me, ids, now)
+	var gone_kinds := day.keys().filter(func(k: String) -> bool: return not pick_day.has(k)).map(func(k: String) -> String: return Main._cap_kind(k, day[k]))
+	_check(pick_day.has(Offers.VENDOR + STORE) and pick_day.has("medicine_man:" + hut) and pick_day.has(Offers.VISITOR + "cap0") and pick_day.has(Offers.VISITOR + "cap1")
+		and gone_kinds == ["farmer"], "Umbrage by day, two visitors in: Rolf and Hob stand; the one gone is a resident, the farthest (%s)" % [gone_kinds])
+	_main._cap_cut.clear()
+	for c in 3:
+		var key := "companion:cap-r%d" % c
+		day[key] = _cap_entry(key, Vector2i(60 + c, 0), STORE, {"player": "cap-r%d" % c})
+	pick_day = day.duplicate()
+	_main._cap_pick(pick_day, day_bodies, me, ids, now)
+	gone_kinds = day.keys().filter(func(k: String) -> bool: return not pick_day.has(k)).map(func(k: String) -> String: return Main._cap_kind(k, day[k]))
+	_check(pick_day.has(Offers.VENDOR + STORE) and pick_day.has("medicine_man:" + hut) and range(3).all(func(c: int) -> bool: return pick_day.has("companion:cap-r%d" % c))
+		and gone_kinds == ["farmer", "farmer", "farmer", "farmer"], "and three companions left to rest: Rolf, Hob, the companions and the visitors stand; four residents go (%s)" % [gone_kinds])
+	_main._cap_cut.clear()
+	# More of rank 0 than the cap, the keeper the farthest of them: he still stands, a companion goes.
+	var crowded := {Offers.VENDOR + STORE: must[Offers.VENDOR + STORE]}
+	for i in 13:
+		crowded["companion:cap-q%02d" % i] = _cap_entry("companion:cap-q%02d" % i, Vector2i(i, 2), STORE, {"player": "cap-q%02d" % i})
+	_main._cap_pick(crowded, {}, me, ids, now)
+	_check(crowded.has(Offers.VENDOR + STORE) and crowded.size() == Main.RESIDENTS_MAX, "13 companions nearer than Rolf: Rolf stands, the farthest two companions go")
+	_main._cap_cut.clear()
+	# A walk there and back through a full town of 30 strung along a road, within the hour: nobody in sight
+	# goes, nobody cut comes back. Bodies are made where they would be and stand there.
+	var road := {}
+	for i in 30:
+		var key := "cap-road%02d" % i
+		road[key] = _cap_entry(key, Vector2i(i * 10, 0), STORE)
+	var bodies := {}
+	var gone_at := {}
+	var cuts := 0
+	var seen_go := 0
+	var came_back := 0
+	var t := now
+	var path: Array[int] = []
+	for x in range(0, 300, 12):
+		path.append(x)
+	for x in range(300, -1, -12):
+		path.append(x)
+	for x: int in path:
+		t += hour / 80.0
+		var at: Array[Vector2i] = [Vector2i(x, 0)]
+		var pick := road.duplicate()
+		_main._cap_pick(pick, bodies, at, ids, t)
+		for key: String in bodies.keys():
+			if not pick.has(key):
+				cuts += 1
+				if World.distance(bodies[key]["tile"], at[0]) <= Main.CAP_SIGHT:
+					seen_go += 1
+				gone_at[key] = t
+				bodies.erase(key)
+		for key: String in pick:
+			if not bodies.has(key):
+				if gone_at.has(key) and t - float(gone_at[key]) < hour:
+					came_back += 1
+				bodies[key] = {"tile": (road[key]["places"]["square"] as Rect2i).position, "escort": "", "trade": "farmer"}
+	_check(cuts > 0 and seen_go == 0 and came_back == 0 and t - now < hour,
+		"there and back in %.2f of an hour: %d cut, none within %d cells of the player, none back within the hour" % [(t - now) / hour, cuts, Main.CAP_SIGHT])
+	_main._cap_cut.clear()
+	# The margin: a standing body out of sight keeps its place till an equal one is nearer by more than CAP_KEEP_MARGIN.
+	var held := {}
+	var standing := {}
+	for i in 11:
+		var key := "cap-held%02d" % i
+		held[key] = _cap_entry(key, Vector2i(i, 1), STORE)
+		standing[key] = {"tile": Vector2i(i, 1), "escort": "", "trade": "farmer"}
+	held["cap-far"] = _cap_entry("cap-far", Vector2i(40, 0), STORE)
+	standing["cap-far"] = {"tile": Vector2i(40, 0), "escort": "", "trade": "farmer"}
+	var near_by := Main.CAP_KEEP_MARGIN - 2
+	var pick := held.duplicate()
+	pick["cap-new"] = _cap_entry("cap-new", Vector2i(40 - near_by, 0), STORE)
+	_main._cap_pick(pick, standing, me, ids, now)
+	_check(pick.has("cap-far") and not pick.has("cap-new"), "a new one %d cells nearer than a standing one out of sight: the standing one stays" % near_by)
+	_main._cap_cut.clear()
+	pick = held.duplicate()
+	pick["cap-new"] = _cap_entry("cap-new", Vector2i(40 - Main.CAP_KEEP_MARGIN - 1, 0), STORE)
+	_main._cap_pick(pick, standing, me, ids, now)
+	_check(not pick.has("cap-far") and pick.has("cap-new"), "%d cells nearer: the new one stands, the standing one goes" % (Main.CAP_KEEP_MARGIN + 1))
+	_main._cap_cut.clear()
+	# In sight: no equal one takes a standing body's place, however near; a higher rank does, the farthest going.
+	standing["cap-far"] = {"tile": Vector2i(20, 0), "escort": "", "trade": "farmer"}
+	held["cap-far"] = _cap_entry("cap-far", Vector2i(20, 0), STORE)
+	pick = held.duplicate()
+	pick["cap-new"] = _cap_entry("cap-new", Vector2i(1, 0), STORE)
+	_main._cap_pick(pick, standing, me, ids, now)
+	_check(pick.has("cap-far") and not pick.has("cap-new"), "twelve standing in sight, a resident one cell off: nobody seen goes for them")
+	_main._cap_cut.clear()
+	pick = held.duplicate()
+	pick[Offers.VISITOR + "cap"] = _cap_entry(Offers.VISITOR + "cap", Vector2i(30, 0), STORE, {"trade": ""})
+	_main._cap_pick(pick, standing, me, ids, now)
+	_check(pick.has(Offers.VISITOR + "cap") and not pick.has("cap-far"), "a visitor (rank 1): she stands, and the farthest standing resident goes")
+	_main._cap_cut.clear()
+	# More of rank 0 than the cap: the nearest stand, and the over-the-cap line is printed once a game hour.
+	var kept := {}
+	for i in 14:
+		kept["companion:cap-p%02d" % i] = _cap_entry("companion:cap-p%02d" % i, Vector2i(3 * i, 2), STORE, {"player": "cap-p%02d" % i})
+	_main._cap_over_hour.erase(World.zone.name)
+	_main._cap_pick(kept, {}, me, ids, now)
+	_check(kept.size() == Main.RESIDENTS_MAX and not kept.has("companion:cap-p12") and not kept.has("companion:cap-p13")
+		and int(_main._cap_over_hour.get(World.zone.name, -1)) == int(now / hour),
+		"14 companions kept by players: the 12 nearest stand, the line printed for the hour (%s)" % [kept.keys()])
+	# Rank 0 by the window's reach: a standing body within PERSON_REACH + 1 of a player, a trading one within HEARING_RANGE.
+	var plain := _cap_entry("cap-x", Vector2i.ZERO, STORE)
+	var reach: int = World.PERSON_REACH + 1
+	_check(_main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "", "trade": "farmer"}, reach, {}) == 0
+		and _main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "", "trade": "farmer"}, reach + 1, {}) == 2
+		and _main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "", "trade": "smith"}, Main.HEARING_RANGE, {}) == 0
+		and _main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "", "trade": "smith"}, Main.HEARING_RANGE + 1, {}) == 2
+		and _main._cap_rank("cap-x", plain, {}, 0, {}) == 2,
+		"a body within %d cells, a smith within %d: rank 0; farther, or no body yet: 2" % [reach, Main.HEARING_RANGE])
+	_check(_main._cap_rank("cap-x", plain, {"tile": Vector2i.ZERO, "escort": "cap-player", "trade": ""}, 50, {}) == 0
+		and _main._cap_rank("cap-x", plain, {}, 50, {"cap-x": true}) == 0,
+		"one a player leads, or one carrying a player's ask: rank 0 wherever they are")
+	World.holdings._places.erase(hut)
+	_main._cap_cut = cut_was
+	_main._cap_over_hour = over_was
 
 
 func _test_hails() -> void:

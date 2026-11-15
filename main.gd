@@ -13068,7 +13068,8 @@ func _arrival_sync(zone_name: String) -> void:
 ## Server: the zone World is in has a body for each resident of its towns
 ## (Towns.residents, not away), then for each companion resting or working
 ## in one away from her player (her record's "resident", not held, her
-## player's Companion not out: decision 333 amended), at most RESIDENTS_MAX,
+## player's Companion not out: decision 333 amended), at most RESIDENTS_MAX
+## (who, by rank once all are found: _cap_wanted, 333 amended (4)),
 ## and none for anyone else (decision 333). A body comes where its day puts
 ## it now, and goes when the record says it is gone (taken, away, moved, her
 ## player come for her); bodies are never saved. A body's key is its worker
@@ -13106,39 +13107,37 @@ func _sync_residents() -> void:
 			var inn_now := _inn_goers(place_id, DayNight.now())  # 875: who is in the shell inn now, and an hour since.
 			var inn_before := _inn_goers(place_id, DayNight.now() - _inn_walk_steps())
 			for i in folk.size():
-				if wanted.size() < RESIDENTS_MAX:
-					var each: Dictionary = folk[i]
-					each["town"] = place_id
-					each["places"] = _resident_places(area, place, each["trade"], homes, i)
-					if not str(each["key"]).begins_with("companion:") and not _inn_town_side(each, place_id, inn_now, inn_before):
-						continue  # In the Mughouse (875).
-					var settled := Townsfolk.settled()
-					if settled.has(each["key"]):
-						# A stall, not a house (decision 471): the 3x3 about the marked cell;
-						# his work the store's counter; his body's kind the table's.
-						var home_at: Variant = settled[each["key"]].get("home")
-						if home_at is Array and home_at.size() == 2:
-							each["places"]["home"] = Rect2i(Vector2i(int(home_at[0]) - 1, int(home_at[1]) - 1), Vector2i(3, 3))
-							each["places"].erase("bed")  # A stall has no roof to sleep under (751).
-						var store: Vector2i = place.get("cell", Vector2i.ZERO)
-						each["places"]["work"] = Rect2i(store - Vector2i(1, 1), Vector2i(3, 3))
-						each["kind"] = str(settled[each["key"]].get("kind", ""))
-					if each["trade"] == "lawspeaker":
-						# His rounds (decision 459): the town's homes in the order
-						# they are given, with who lives there; his own left out.
-						var stops: Array = []
-						for k in mini(folk.size(), homes.size()):
-							if k != i and str(folk[k].get("player", "")).is_empty():
-								stops.append({"rect": homes[k], "who": str(folk[k]["name"]), "id": str(folk[k]["key"])})
-						each["places"]["rounds"] = stops
-					wanted[each["key"]] = each
+				var each: Dictionary = folk[i]
+				each["town"] = place_id
+				each["places"] = _resident_places(area, place, each["trade"], homes, i)
+				if not str(each["key"]).begins_with("companion:") and not _inn_town_side(each, place_id, inn_now, inn_before):
+					continue  # In the Mughouse (875).
+				var settled := Townsfolk.settled()
+				if settled.has(each["key"]):
+					# A stall, not a house (decision 471): the 3x3 about the marked cell;
+					# his work the store's counter; his body's kind the table's.
+					var home_at: Variant = settled[each["key"]].get("home")
+					if home_at is Array and home_at.size() == 2:
+						each["places"]["home"] = Rect2i(Vector2i(int(home_at[0]) - 1, int(home_at[1]) - 1), Vector2i(3, 3))
+						each["places"].erase("bed")  # A stall has no roof to sleep under (751).
+					var store: Vector2i = place.get("cell", Vector2i.ZERO)
+					each["places"]["work"] = Rect2i(store - Vector2i(1, 1), Vector2i(3, 3))
+					each["kind"] = str(settled[each["key"]].get("kind", ""))
+				if each["trade"] == "lawspeaker":
+					# His rounds (decision 459): the town's homes in the order
+					# they are given, with who lives there; his own left out.
+					var stops: Array = []
+					for k in mini(folk.size(), homes.size()):
+						if k != i and str(folk[k].get("player", "")).is_empty():
+							stops.append({"rect": homes[k], "who": str(folk[k]["name"]), "id": str(folk[k]["key"])})
+					each["places"]["rounds"] = stops
+				wanted[each["key"]] = each
 			# Strangers passing through (711, npc's side): at the inn, the store or the temple by kind.
 			for each: Dictionary in _visitors_wanted(area, place_id, place):
-				if wanted.size() < RESIDENTS_MAX:
-					if (str(each["key"]).begins_with(Offers.VISITOR) or str(each["key"]).begins_with(Offers.VENDOR)) \
-							and not _visitors_leaving.has(str(each["key"])) and not _inn_town_side(each, place_id, inn_now, inn_before):
-						continue  # Lodging in the Mughouse (875).
-					wanted[each["key"]] = each
+				if (str(each["key"]).begins_with(Offers.VISITOR) or str(each["key"]).begins_with(Offers.VENDOR)) \
+						and not _visitors_leaving.has(str(each["key"])) and not _inn_town_side(each, place_id, inn_now, inn_before):
+					continue  # Lodging in the Mughouse (875).
+				wanted[each["key"]] = each
 		# The healer's hut (decision 404): whoever economy seats there (the
 		# medicine man, a worker whose town is the hut's place id) has a body
 		# at the hut as a town's folk have theirs, only while someone is near.
@@ -13163,8 +13162,6 @@ func _sync_residents() -> void:
 			var ids := World.production.worker_ids(place_id).filter(func(who: String) -> bool:
 				return not who.begins_with("companion:") and not bool(World.production.worker(who).get("away", false)))
 			for who: String in ids:
-				if wanted.size() >= RESIDENTS_MAX:
-					break
 				var trades: Array = World.production.worker(who).get("trades", [])
 				wanted[who] = {"key": who, "name": str(World.production.worker(who).get("name", who)),
 					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "", "town": place_id,
@@ -13191,7 +13188,7 @@ func _sync_residents() -> void:
 			var market := World.holdings.place(buyer)
 			if market.is_empty() or str(market.get("area", "")) != World.zone.name or not _town_near(buyer, market):
 				continue
-			if wanted.size() >= RESIDENTS_MAX or wanted.has(who):
+			if wanted.has(who):
 				continue
 			var store: Vector2i = market.get("cell", Vector2i.ZERO)
 			var square := Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
@@ -13201,7 +13198,7 @@ func _sync_residents() -> void:
 				"places": {"work": square, "home": square, "square": square}}
 		# The forest camps' traders (799, npc's side): one body at each "trader" place while someone is near.
 		for each: Dictionary in _camp_traders_wanted(area):
-			if wanted.size() < RESIDENTS_MAX and not wanted.has(each["key"]):
+			if not wanted.has(each["key"]):
 				wanted[each["key"]] = each
 	_tavern_folk(wanted)
 	# The lost (decision 487): a town's people beyond the walls stand at their
@@ -13213,8 +13210,6 @@ func _sync_residents() -> void:
 		if place.get("kind") != "stockpile":
 			continue
 		for who: String in Townsfolk.strayed_of(World.production, place_id):
-			if wanted.size() >= RESIDENTS_MAX:
-				break
 			var cell: Variant = Townsfolk.stray_cell(World.production, who)
 			if cell == null:
 				cell = _stray_cell(place)
@@ -13234,9 +13229,8 @@ func _sync_residents() -> void:
 	# player leading them, in whatever zone that player is (the entry's freed_by is the state, no record of its own:
 	# a body not wanted is despawned as any other); at their town's ground they are home (_sought_home).
 	for each: Dictionary in _sought_here():
-		if wanted.size() >= RESIDENTS_MAX:
-			break
 		wanted[str(each["key"])] = each
+	_cap_wanted(wanted)  # Who stands under RESIDENTS_MAX, by rank, not by the order found (333 amended (4)).
 	_bed_down_roofless(wanted, area)
 	_shelter_all(wanted, area)
 	var have := {}
@@ -13285,6 +13279,192 @@ func _sync_residents() -> void:
 	for entity: GridEntity in World.townsfolk():
 		(entity as Resident).sheltering = not World.towns.threatened((entity as Resident).town).is_empty()  # 762.
 	_notes_tick()
+
+
+## Who has a body under RESIDENTS_MAX (333 amended (4), the coordinator's ruling, 11-14: the cap
+## stays 12; this changes who, never how many). Before it, the zone's wanted were taken in the order
+## the sync found them (a town's folk by id first), so a full town left the stall's keeper, the
+## healer, a camp's trader and a sought newcomer with no body. Now every candidate is ranked:
+## 0, whoever a player deals with or is bound to (_cap_rank); 1, other visitors, herders and the
+## strayed; 2, everyone else. Within a rank the nearest to any player of the zone stand; a body that
+## stands is counted CAP_KEEP_MARGIN cells nearer than it is, so an equal-rank candidate takes its
+## place only when nearer by more than that; and a standing body within CAP_SIGHT of a player is
+## never cut for an equal or lower rank at all (only someone of a higher rank can take its place).
+## The keepers (_cap_keeper) are ranked ahead of all of rank 0, so they are never the ones cut.
+## A body the cap cut stays without one for CAP_CUT_HOURS (unless it is of rank 0 by then), so
+## nobody leaves and comes back within the hour. Ties go by key: the same world gives the same
+## order. More of rank 0 than the cap: the nearest stand, and a line once a game hour, with counts
+## and trades only. Server only: nothing new goes on the wire.
+const CAP_KEEP_MARGIN := 6
+const CAP_SIGHT := 24
+const CAP_CUT_HOURS := 1.0
+## Keys the cap cut a body of -> DayNight.now() then (333 amended (4)); not saved.
+var _cap_cut: Dictionary = {}
+## Zone -> the game hour the over-the-cap line was last printed in (333 amended (4)).
+var _cap_over_hour: Dictionary = {}
+
+
+func _cap_wanted(wanted: Dictionary) -> void:
+	var players: Array[Vector2i] = []
+	var player_ids := {}
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.spawned and player.zone == World.zone.name:
+			players.append(player.tile)
+			player_ids[player.player_id] = true
+	var bodies := {}
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		bodies[body.worker_id] = {"tile": body.tile, "escort": body.escort_of, "trade": body.trade}
+	_cap_pick(wanted, bodies, players, player_ids, DayNight.now())
+
+
+## [param wanted] cut to RESIDENTS_MAX as _cap_wanted says (333 amended (4)), from [param bodies] (key ->
+## {tile, escort, trade} of each standing body), [param players] (the zone's players' cells; their ids
+## [param player_ids]) and [param now] (DayNight's steps): a test gives its own.
+func _cap_pick(wanted: Dictionary, bodies: Dictionary, players: Array[Vector2i], player_ids: Dictionary, now: float) -> void:
+	var hour_steps := maxf(DayNight.day_steps / 24.0, 1.0)
+	for key: String in _cap_cut.keys():
+		var at := float(_cap_cut[key])
+		if now < at or now - at >= CAP_CUT_HOURS * hour_steps:
+			_cap_cut.erase(key)
+	if wanted.size() <= RESIDENTS_MAX and _cap_cut.is_empty():
+		return
+	var asked := _cap_asked(player_ids)
+	var rows: Array = []
+	for key: String in wanted:
+		var each: Dictionary = wanted[key]
+		var body: Dictionary = bodies.get(key, {})
+		var stands := not body.is_empty()
+		var d := _cap_distance(body["tile"] if stands else _wanted_spot(each), players)
+		var rank := _cap_rank(key, each, body, d, asked)
+		if rank > 0 and not stands and _cap_cut.has(key):
+			continue  # Cut within the hour: not back yet.
+		# The keepers first of all (never cut: a zone has a few); the rest of rank 0 by distance alone (the
+		# nearest stand when there are more than the cap); ranks 1 and 2 hold a standing body in a player's
+		# sight ahead of any candidate of its rank.
+		var tier := (-1 if _cap_keeper(key, each) else 0) if rank == 0 else rank * 2 + (0 if stands and d <= CAP_SIGHT else 1)
+		rows.append([tier, d - (CAP_KEEP_MARGIN if stands else 0), key, rank])
+	rows.sort_custom(func(a: Array, b: Array) -> bool:
+		if a[0] != b[0]:
+			return a[0] < b[0]
+		if a[1] != b[1]:
+			return a[1] < b[1]
+		return str(a[2]) < str(b[2]))
+	var keep := {}
+	var first := 0
+	var kinds := {}
+	for i in rows.size():
+		var key: String = rows[i][2]
+		if int(rows[i][3]) == 0:
+			first += 1
+			var kind := _cap_kind(key, wanted[key])
+			kinds[kind] = int(kinds.get(kind, 0)) + 1
+		if i < RESIDENTS_MAX:
+			keep[key] = true
+		elif bodies.has(key):
+			_cap_cut[key] = now
+	for key: String in wanted.keys():
+		if not keep.has(key):
+			wanted.erase(key)
+	if first > RESIDENTS_MAX:
+		var hour := int(now / hour_steps)
+		if int(_cap_over_hour.get(World.zone.name, -1)) != hour:
+			_cap_over_hour[World.zone.name] = hour
+			var names: Array = kinds.keys()
+			names.sort()
+			var counts: Array[String] = []
+			for kind: String in names:
+				counts.append("%s %d" % [kind, kinds[kind]])
+			print("[residents] %d to stand first, over the cap of %d: the %d farthest stand nowhere (%s), step %d" % [
+				first, RESIDENTS_MAX, first - RESIDENTS_MAX, ", ".join(counts), World.steps])
+
+
+## The rank of a candidate for a body (333 amended (4)): 0 for whoever a player deals with or is bound
+## to: a companion a player keeps (resting or working in town), the stall's keeper, a camp's trader,
+## the healer's hut's keeper, a sought newcomer (placed or led), a body a player leads, one carrying an
+## open ask of a player in the zone (or the one an errand is for), and a standing body a player may
+## have a window open on or be talking to now (within PERSON_REACH + 1, the person window's reach; a
+## trading one within HEARING_RANGE, the barter window's); 1 for other visitors, herders and the
+## strayed; 2 for everyone else.
+func _cap_rank(key: String, each: Dictionary, body: Dictionary, d: int, asked: Dictionary) -> int:
+	if key.begins_with(Townsfolk.COMPANION) or key.begins_with(Offers.VENDOR) or key.begins_with(Offers.CAMP_TRADER) \
+			or not str(each.get("sought", "")).is_empty() or not str(each.get("escort", "")).is_empty() or asked.has(key) \
+			or str(World.holdings.place(str(each.get("town", ""))).get("kind", "")) == "healers_hut":
+		return 0
+	if not body.is_empty():
+		if not str(body.get("escort", "")).is_empty() or d <= World.PERSON_REACH + 1:
+			return 0
+		if d <= HEARING_RANGE and (str(body.get("trade", "")) in Items.TRADES or str(body.get("trade", "")) == "merchant"):
+			return 0
+	var herder := str(World.production.rules.get("herder", {}).get("trade", "herder")) + ":"
+	if key.begins_with(Offers.VISITOR) or key.begins_with(herder) or bool(each.get("strayed", false)):
+		return 1
+	return 2
+
+
+## Whether [param key] is a keeper a player's window, locker or care hangs on (333 amended (4)): the stall's
+## keeper, a camp's trader, the healer's hut's keeper. Ranked ahead of everyone, so never the one cut.
+func _cap_keeper(key: String, each: Dictionary) -> bool:
+	return key.begins_with(Offers.VENDOR) or key.begins_with(Offers.CAMP_TRADER) 			or str(World.holdings.place(str(each.get("town", ""))).get("kind", "")) == "healers_hut"
+
+
+## Worker ids carrying an open ask of one of [param player_ids], and those an errand is for (333 amended (4)).
+func _cap_asked(player_ids: Dictionary) -> Dictionary:
+	var out := {}
+	if player_ids.is_empty() or World.production == null:
+		return out
+	for pair: Array in Offers._asks(World.production):
+		var ask: Dictionary = pair[1]
+		if player_ids.has(str(ask.get("by", ""))):
+			out[str(pair[0])] = true
+			if not str(ask.get("worker", "")).is_empty():
+				out[str(ask["worker"])] = true
+	return out
+
+
+## Cells from [param at] to the nearest of [param players]; CAP_NOBODY with none (nobody near, in reach
+## or in sight: ranks and keys alone decide).
+const CAP_NOBODY := 1 << 20
+
+func _cap_distance(at: Vector2i, players: Array[Vector2i]) -> int:
+	var best := CAP_NOBODY
+	for tile in players:
+		best = mini(best, World.distance(at, tile))
+	return best
+
+
+## Where [param each] (a _sync_residents entry with no body yet) would be made: the middle of its place
+## for what it does now, as _spawn_resident has it (333 amended (4)).
+func _wanted_spot(each: Dictionary) -> Vector2i:
+	if each.get("enter_at") is Vector2i:
+		return each["enter_at"]
+	var who := str(each.get("key", ""))
+	var places: Dictionary = each.get("places", {})
+	var doing := Resident.Doing.STRAYED if bool(each.get("strayed", false)) else (Resident.Doing.BED if Townsfolk.is_sick(World.production, who) \
+			else Resident.doing_now(str(each.get("trade", "")), str(each.get("type", "")), who))
+	var spot: Variant = places.get(Resident.PLACE_OF[doing], places.get("square", Rect2i()))
+	if not spot is Rect2i:
+		spot = places.get("square", Rect2i())
+	var area: Rect2i = spot if spot is Rect2i else Rect2i()
+	if area.size != Vector2i.ZERO:
+		return area.get_center()
+	return World.holdings.place(str(each.get("town", ""))).get("cell", Vector2i.ZERO)
+
+
+## What the over-the-cap line counts [param key] as (333 amended (4)): never a name or a player's id.
+static func _cap_kind(key: String, each: Dictionary) -> String:
+	if key.begins_with(Townsfolk.COMPANION):
+		return "companion"
+	if key.begins_with(Offers.VENDOR):
+		return "stall keeper"
+	if key.begins_with(Offers.CAMP_TRADER):
+		return "camp trader"
+	if key.begins_with(Offers.VISITOR):
+		return "visitor"
+	if not str(each.get("sought", "")).is_empty():
+		return "sought"
+	var trade := str(each.get("trade", ""))
+	return trade if not trade.is_empty() else "townsman"
 
 
 ## Threat in town (decision 762), seen in the zone World is in: a hostile
@@ -15704,7 +15884,7 @@ func _tavern_folk(wanted: Dictionary, zone_name := "") -> void:
 	var places := _taverner_places(level, tavern)
 	for who: String in World.towns.residents(town):
 		var worker := World.production.worker(who)
-		if wanted.size() >= RESIDENTS_MAX or worker.is_empty() or bool(worker.get("away", false)) or not TAVERNER in worker.get("trades", []):
+		if worker.is_empty() or bool(worker.get("away", false)) or not TAVERNER in worker.get("trades", []):
 			continue
 		wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": TAVERNER, "player": "", "town": town,
 			"type": str(worker.get("type", "")), "places": places.duplicate()}
@@ -15969,8 +16149,6 @@ func _inn_floor_side(wanted: Dictionary, level: Dictionary, town: String, tavern
 	var town_area := str(World.holdings.place(town).get("area", ""))
 	for who: String in goers:
 		_inn_walked_out.erase(who)
-		if wanted.size() >= RESIDENTS_MAX:
-			break
 		if not who in earlier and not _inn_walked_in.has(who) and _held_body(town_area, who) != null:
 			continue  # Still walking to the inn's door in the town (a player out there): not in yet.
 		# A lodger up at night in any doing, his sleep spell too, at the fire's seats: no bed, so no roofless bedroll on
@@ -15980,7 +16158,7 @@ func _inn_floor_side(wanted: Dictionary, level: Dictionary, town: String, tavern
 		if not who in earlier and door != Companion.NONE:
 			wanted[who]["enter_at"] = door
 	for who: String in earlier:
-		if who in goers or wanted.size() >= RESIDENTS_MAX:
+		if who in goers:
 			continue
 		var body := _resident_body(who)
 		if body == null or _inn_walked_out.has(who) or door == Companion.NONE:

@@ -7438,6 +7438,32 @@ hints over things and the "LMB interact" hint behind hints=off) lands
 beside it. Protocol unchanged: the caption is the spawn spec's, drawn as
 is.
 
+333 amended (4) (label from tools/decision_number.sh; the coordinator's ruling, 11-14, on maps' Mughouse probe and economy's reading of the code): who has a body under RESIDENTS_MAX, by rank, not by the order found. The cap stays 12 a zone: this changes who, never how many.
+- **The fault.** _sync_residents took the zone's wanted in the order it found them, capped as it went: a town's folk by id, its resting companions, the stall's keeper, visitors, the healer's hut's keeper, herders, camp traders, the strayed, the sought. A full zone left the last of these with no body. In the test town (19 residents) Rolf had none from 13.83 to 17.33. Umbrage as shipped stands at 12 of 12 by day (9 residents outside, Rolf, a visitor; 772 amended (2) puts the taverner inside). So the second visitor that visitors.most (2) allows cuts Hob at the healer's hut, and three more of the town's folk or resting companions would cut Rolf. Nobody chose that order.
+- **Now.** Every candidate is gathered uncapped, then Main._cap_wanted (_cap_pick, pure, for the tests) keeps the first 12 by:
+  - **Keepers first of all** (_cap_keeper): the stall's keeper, a camp's trader, the healer's hut's keeper. A player's window, locker or care hangs on them. A zone has a few, so they are never the ones cut.
+  - **Rank 0** (_cap_rank): a companion a player keeps (resting or working in town); a sought newcomer, placed or led; a body a player leads; whoever carries an open ask of a player in the zone (Offers' asks, "by"), or the one an errand is for; and a standing body a player may have a window open on or be talking to now. That is within World.PERSON_REACH + 1 (4) of a player, the person window's reach, or for a trading one (Items.TRADES, a merchant) within HEARING_RANGE (10), the barter window's. The window's own reach stands for "open": the server keeps no record of open windows, and a window closes beyond it.
+  - **Rank 1:** other visitors, herders, the strayed. **Rank 2:** everyone else.
+  - **Order within a rank:** the nearest to any player of the zone first. Rank 0 goes by distance alone, so when rank 0 is over the cap the nearest stand. Ties go by key: the same world gives the same order on every run.
+- **No flicker.**
+  - A body that stands counts CAP_KEEP_MARGIN (6) cells nearer than it is, so an equal-rank candidate takes its place only when nearer by more than 6 cells.
+  - A standing body of rank 1 or 2 within CAP_SIGHT (24) cells of a player is never cut for an equal or lower rank, however near the other.
+  - Cuts fall on the farthest from every player first.
+  - A body the cap cut is not brought back for CAP_CUT_HOURS (1) game hour unless it is rank 0 by then. A player walking through a full town never sees anyone go and come back within the hour (_cap_cut, not saved).
+- **Can a body still be cut in a player's sight?** Yes, in one case only. Someone of a higher rank must have a body: a keeper, a companion left to rest, a sought one, an ask's carrier, or a visitor over a plain resident. And every standing body of the cut one's rank beyond sight must already be gone. Then the farthest from every player goes first.
+- **More of rank 0 than 12.** The nearest stand, and a line once a game hour per zone: "[residents] N to stand first, over the cap of 12: the M farthest stand nowhere (counts by kind and trade), step S". Counts and trades only: no name, no player's id, no zone name. In a shipped zone this needs 13 of rank 0 at once: Umbrage's two keepers plus eleven of companions resting, sought ones, ask carriers and bodies within a window's reach of a player. On the box today that takes several players each with a companion resting in town; none does.
+- **Cost.** Server only. The candidates are gathered every RESIDENT_SYNC_TICKS as before, uncapped (Umbrage about 14), and ranked when there are more than 12 or a cut is still within its hour. Nothing new goes on the wire; no replicated value changes meaning; the spawn spec is the same.
+- **Tests.**
+  - resident_test _test_cap_rank (Main._cap_pick on made-up candidates, as the test room is too small for sight and margins):
+    - 19 residents, Rolf, a sought one, the healer's keeper and a camp's trader: those four stand, plus the 8 nearest residents; the same input gives the same twelve.
+    - Umbrage's sum: 10 residents, Rolf and Hob, then an 11th and a 12th led home beside the player: both keepers stand.
+    - 13 companions nearer than Rolf: Rolf stands.
+    - A walk there and back through a road of 30 within the hour: some cut, none within 24 cells of the player, none back within the hour.
+    - The margin both ways; in sight, no equal-rank swap but a visitor's; 14 companions over the cap, the nearest 12 and the hour's line; rank 0 by reach.
+  - _test_vendor: 19 more residents in the town through _sync_residents, and Rolf keeps his body, 12 bodies in all.
+- **Not changed.** The tests that seat the taverner, the healer and the rest under the cap keep their own room. town_day_test passes on maps' Mughouse take with it.
+- No bullet until a joined look: Rolf at his stall in the afternoon in a town at the cap. No package of its own; it bears on maps' Rolf-on look.
+
 ## 330. Loot: tables as data, named by a level or the builder; monsters drop what they carried
 
 Jeff's items step 6, as mechanism only (2026-10-15, through the
