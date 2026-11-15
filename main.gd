@@ -27097,6 +27097,7 @@ func _resend_offers(id: String, player: Player) -> void:
 ## (starts "restarting") and "players" (its count line).
 const CONSOLE_HELP: Array[String] = [
 	"players: who is on, where, their hp",
+	"bodies <zone> <kind>: that kind's bodies and kept records in an open zone, each by its spawn key and cell, and a count; never a name, any kind's (a resident's or a named foe's), and never players",
 	"zones: each loaded zone, awake or asleep, and who is in it",
 	"go <zone> [player]: you (or that player) and the companion to that zone's start",
 	"quests reset [all|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here",
@@ -27130,6 +27131,48 @@ const CONSOLE_HELP: Array[String] = [
 	"restart|stop [<seconds>] [<why>] | restart cancel: a restart, or calling it off",
 	"help: these lines",
 ]
+
+
+## "bodies <zone> <kind>" (the coordinator's ask after v0.1.217, when the
+## box's journal could not say whether the barrow's knight was a body or a
+## kept record): the bodies of [param words]' kind standing in that open zone,
+## then its records (_retire's, kept off the world), each one line, "body" or
+## "record", its spawn key ("-" with none) and its cell, under a count line.
+## A kind is a monster kind's name (its spawn spec's "kind", else its script's
+## file name: astral_knight, draugr, skeleton_guard). Never a name or an id,
+## for any kind: where a kind's bodies carry names (a resident, whose kind is
+## a trade; a named foe), the line is still its key and cell alone. Never
+## players, whose own verb is "players".
+func _bodies_command(words: PackedStringArray) -> String:
+	if words.size() != 3:
+		return "bodies <zone> <kind>: e.g. bodies barrow_deep astral_knight"
+	var zone_name := words[1]
+	var kind := words[2].to_lower()
+	if kind in ["player", "players"]:
+		return "bodies never lists players; \"players\" does"
+	var zone: Zone = World.zones.get(zone_name)
+	if zone == null:
+		return "no open zone %s; open: %s" % [zone_name, ", ".join(World.zones.keys())]
+	var of_kind := func(spec: Dictionary) -> bool:
+		var own := str(spec.get("kind", ""))
+		return own == kind if not own.is_empty() else str(spec.get("script", "")).get_file().get_basename() == kind
+	var lines: Array[String] = []
+	for entity: GridEntity in zone_entities(zone_name):
+		if entity.spawned and not entity is Player and of_kind.call(entity.spawn_spec):
+			lines.append("body key %s at %d,%d" % [str(entity.spawn_spec.get("spawn_key", "-")), entity.tile.x, entity.tile.y])
+	var bodies := lines.size()
+	var was := World.enter(zone)
+	var records := World.record_list()
+	World.enter(was)
+	for record: Dictionary in records:
+		var entry: Dictionary = record.get("entry", {})
+		if of_kind.call(entry):
+			var at := World.record_tile(record)
+			lines.append("record key %s at %d,%d" % [str(entry.get("spawn_key", "-")), at.x, at.y])
+	var head := "%s %s: %d bodies, %d records" % [zone_name, kind, bodies, lines.size() - bodies]
+	return head if lines.is_empty() else "%s
+%s" % [head, "
+".join(lines)]
 
 
 ## One console command; the reply is what the operator sees. [param caller]:
@@ -27189,6 +27232,8 @@ func admin_command(line: String, caller: Player = null) -> String:
 					player.name, record.name if record != null else "?", id.left(8), peer, player.zone,
 					player.tile, player.hp, player.max_hp])
 			return "%d connected\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 connected"
+		"bodies":
+			return _bodies_command(words)
 		"move":
 			return _move_command(words)
 		"mark":

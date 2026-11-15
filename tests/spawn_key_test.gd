@@ -57,6 +57,7 @@ func _run() -> void:
 	_test_a_moved_marker(path, saved)
 	_test_a_marker_moved_by_word(path, saved)
 	_test_a_moved_locker(path, saved)
+	_test_bodies_verb()
 	_test_a_moved_knight()
 	_test_a_knight_retired_and_recalled()
 	DirAccess.remove_absolute(path)
@@ -615,6 +616,55 @@ func _host() -> Player:
 		if entity is Player and entity.spawned and entity.owner_peer == Net.local_id:
 			return entity
 	return null
+
+
+## The console's "bodies <zone> <kind>" (the coordinator's ask after
+## v0.1.217: the box's journal could not say whether the barrow's knight was a
+## body or a kept record): a kind's bodies, then its records, each by spawn key
+## and cell under a count; nothing of a name; refused for players.
+func _test_bodies_verb() -> void:
+	print("
+== the console's bodies verb: a kind's bodies and records by key and cell, never players ==")
+	Net.state_path = ""
+	_register_knight(KNIGHT_WAS)
+	_main._load_level(KNIGHT_LEVEL)
+	_main._start_level(false)
+	var here := World.zone.name
+	var knights := _knights()
+	var as_body: String = _main.admin_command("bodies %s astral_knight" % here)
+	_check(knights.size() == 1 and as_body == "%s astral_knight: 1 bodies, 0 records
+body key 13,2 at 13,2" % here,
+			"his body: its key and cell under the count (%s)" % as_body.replace("
+", " | "))
+	_check(knights.size() == 1 and not as_body.contains(str(knights[0].name)) and not as_body.contains(World.shown_name(knights[0])),
+			"and no name of his")
+	if knights.size() == 1:
+		_main._retire(knights[0])
+	var as_record: String = _main.admin_command("bodies %s astral_knight" % here)
+	_check(as_record == "%s astral_knight: 0 bodies, 1 records
+record key 13,2 at 13,2" % here,
+			"kept as a record: the same key and cell, said a record (%s)" % as_record.replace("
+", " | "))
+	# A kind whose bodies carry names (a named foe, as a resident's trade is): key and cell, never the name.
+	var named := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "imp", "name": "Grimblewick",
+		"label": "Grimblewick the Sly", "props": Level.MONSTER_TYPES["imp"].duplicate(), "tile": Vector2i(6, 2)}) as Monster
+	var imps: String = _main.admin_command("bodies %s imp" % here)
+	_check(named != null and imps == "%s imp: 1 bodies, 0 records
+body key - at 6,2" % here and not imps.contains("Grimble"),
+			"a body that carries a name: its key and cell, never the name (%s)" % imps.replace("
+", " | "))
+	if named != null:
+		World.despawn(named)
+	var none: String = _main.admin_command("bodies %s draugr" % here)
+	_check(none == "%s draugr: 0 bodies, 0 records" % here, "a kind not there: the count alone (%s)" % none)
+	var players: String = _main.admin_command("bodies %s player" % here)
+	_check(players.begins_with("bodies never lists players"), "players refused (%s)" % players)
+	var shut: String = _main.admin_command("bodies nowhere astral_knight")
+	_check(shut.begins_with("no open zone nowhere"), "a zone not open: said so (%s)" % shut)
+	World.take_records_near(KNIGHT_WAS, 64)  # His record let go: the knight rows after start fresh.
+	Level.unregister(KNIGHT_LEVEL)
+	_register(false)
+	_main._load_level(LEVEL)
 
 
 ## A town's locker whose marker moved past the reach (737: Umbrage's into

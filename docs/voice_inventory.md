@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3013)
+## Lines in the code (3020)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2143,7 +2143,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (793)
+### server and windows (800)
 
 | | Line | Where |
 |---|---|---|
@@ -2773,6 +2773,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s: quests reset (%s) | `main.gd` _quests_reset_all() |
 |  | nothing was held | `main.gd` _quests_reset_all() |
 |  | players: who is on, where, their hp | `main.gd` _resend_offers() |
+|  | bodies <zone> <kind>: that kind's bodies and kept records in an open zone, each by its spawn key and cell, and a count; never a name, any kind's (a resident's or a named foe's), and never players | `main.gd` _resend_offers() |
 |  | zones: each loaded zone, awake or asleep, and who is in it | `main.gd` _resend_offers() |
 |  | go <zone> [player]: you (or that player) and the companion to that zone's start | `main.gd` _resend_offers() |
 |  | quests reset [all\|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here | `main.gd` _resend_offers() |
@@ -2805,6 +2806,12 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | version: the build and its protocol | `main.gd` _resend_offers() |
 |  | restart\|stop [<seconds>] [<why>] \| restart cancel: a restart, or calling it off | `main.gd` _resend_offers() |
 |  | help: these lines | `main.gd` _resend_offers() |
+|  | bodies <zone> <kind>: e.g. bodies barrow_deep astral_knight | `main.gd` _bodies_command() |
+|  | bodies never lists players; "players" does | `main.gd` _bodies_command() |
+|  | no open zone %s; open: %s | `main.gd` _bodies_command() |
+|  | body key %s at %d,%d | `main.gd` _bodies_command() |
+|  | record key %s at %d,%d | `main.gd` _bodies_command() |
+|  | %s %s: %d bodies, %d records | `main.gd` _bodies_command() |
 |  | not the authority | `main.gd` admin_command() |
 |  | map load is now zone reset <name>; zones: %s | `main.gd` admin_command() |
 |  | builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s | `main.gd` admin_command() |
