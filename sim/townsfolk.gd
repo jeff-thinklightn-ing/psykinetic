@@ -416,7 +416,8 @@ static func _set_sickness(production: Production, id: String, record: Dictionary
 ## are on their feet again), then one new case at most: each resident not
 ## away and not sick (a resting companion too, 442) draws against "chance"
 ## times the season's, the hungry's and the old's factors, by a seed of the
-## town and the day. The sick keep to their bed (Resident) and economy
+## town and the day; none in a town with a case dated today, so a restart
+## rolls no second one (501 amended (4)). The sick keep to their bed (Resident) and economy
 ## counts them out of work but not out of need (Production.set_sick).
 static func sicken(production: Production) -> void:
 	if production == null:
@@ -448,6 +449,17 @@ static func sicken(production: Production) -> void:
 			elif day - int(record.get("since", day)) >= sick_days():
 				_sick_ends(production, town, id, record, false, at)
 				ended[id] = true
+		# 501 amended (4): one new case a town a day across a restart too. _sick_due is
+		# the process's and not saved, so a boot rolled the day again (the box, 11-14: a
+		# second case dated day 497 thirty seconds after the 16:25 restart). A case
+		# dated today means today's roll is spent.
+		var fell_today := false
+		for id: String in towns[town]:
+			if not ended.has(id) and int(sickness_of(production, id).get("since", -1)) == day:
+				fell_today = true
+				break
+		if fell_today:
+			continue
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash("sick:%s:%d" % [town, day])
 		var winter := Season.name_at(at) == "winter"

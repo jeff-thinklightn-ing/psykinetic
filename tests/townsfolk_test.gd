@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_strays()
 	_test_scoundrel()
 	_test_sickness()
+	_test_sick_restart()
 	_test_road_news()
 	_test_mood_in_town()
 	print("")
@@ -467,6 +468,42 @@ func _test_sickness() -> void:
 	Townsfolk.sicken(_work)
 	_check(_her_sick.is_empty() and _died.size() == 1, "she gets over it on her own; a companion never dies of it")
 	Offers.ctx = {}
+	Townsfolk._sick_due.clear()
+
+
+## 501 amended (4) (the coordinator's ruling, 11-14: the box restarts two or three times a
+## day): the day's roll mark is not saved, so a restart rolled the day again and a town could
+## take a second case that day. A case falls, the world is saved and loaded the same day (the
+## mark gone, as at a boot), and the next tick rolls nobody; the next day rolls as ever.
+func _test_sick_restart() -> void:
+	print("\n== sickness: one new case a town a day across a restart (501 amended (4)) ==")
+	Townsfolk.use_rules({"type_weights": {}, "thief": {"every": 0}, "strays": {"every": 0},
+		"sick": {"chance": 1.0, "winter": 1, "hungry": 1, "old": 1, "days": 5, "death_old": 0.0, "visit_hours": 2, "kinds": ["a fever"]}})
+	_setup()
+	Townsfolk._sick_due.clear()
+	Production.type_of = Callable()
+	_work.add_worker("r-ada", "Ada", ["cook"], TOWN, "placeholder")
+	_work.add_worker("r-bram", "Bram", ["smith"], TOWN, "placeholder")
+	Production.type_of = Townsfolk.roll_type
+	for id: String in ["r-ada", "r-bram"]:
+		var c := Townsfolk.card_of(_work, id)
+		c["kin"] = {}
+		_work.set_card(id, c)
+	var day := DayNight.day_steps
+	_now = 3 * day + day / 2  # Midday of day 3.
+	Townsfolk.sicken(_work)
+	_check(Townsfolk.is_sick(_work, "r-ada") and not Townsfolk.is_sick(_work, "r-bram"), "a case falls: Ada (chance 1)")
+	var saved := _work.to_dict()
+	var at := _now
+	_setup(saved)  # The world saved and loaded: a boot, the day's mark gone with the old process.
+	_now = at + 600  # A minute on, the same day.
+	Townsfolk._sick_due.clear()
+	_check(Townsfolk.is_sick(_work, "r-ada"), "her sickness came back with the save")
+	Townsfolk.sicken(_work)
+	_check(not Townsfolk.is_sick(_work, "r-bram"), "the first tick after the load rolls nobody: today's case already fell")
+	_now = 4 * day + day / 2
+	Townsfolk.sicken(_work)
+	_check(Townsfolk.is_sick(_work, "r-bram"), "the next day rolls as ever: Bram falls sick")
 	Townsfolk._sick_due.clear()
 
 
