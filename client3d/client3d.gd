@@ -11933,13 +11933,42 @@ static func window_slot(wall_set: String, height: float) -> String:
 	return ""
 
 
+## The temple's lancets' panes (927 amended (2); the coordinator, 11-15, "the
+## first view at night"): their glass, at art-kit's emission (linear 1, 0.72,
+## 0.42: a luma of 0.76, near white as shown), outshone every house's pane
+## (0.75, 0.315, 0.068: 0.39) and the inn's porch from a newcomer's first
+## view. Drawn at LANCET_GLOW of it, still plainly lit.
+const LANCET_GLOW := 0.5
+
+
+## Whether [param slot] is a lancet: a set's tall window with no plain one
+## beside it (the chapel's, 734), as window_drawn_height reads it.
+static func lancet_slot(slot: String) -> bool:
+	return slot.ends_with(".window_tall") and not ArtKit.has(slot.trim_suffix("_tall")) and ArtKit.has(slot)
+
+
+## [param pane]'s glass at [param share] of its own emission (927 amended
+## (2)): each surface's material copied onto the piece, its emission's
+## energy times share. Its albedo is untouched.
+static func dim_pane(pane: MeshInstance3D, share: float) -> void:
+	if pane == null or pane.mesh == null:
+		return
+	for surface in pane.mesh.get_surface_count():
+		var own := pane.get_active_material(surface) as BaseMaterial3D
+		if own == null or not own.emission_enabled:
+			continue
+		var dim := own.duplicate() as BaseMaterial3D
+		dim.emission_energy_multiplier = own.emission_energy_multiplier * share
+		pane.set_surface_override_material(surface, dim)
+
+
 ## The height [param slot] (a window piece, window_slot's) is drawn at: a
 ## set's tall window beside a plain one stands two storeys; one with no
 ## plain window beside it (the chapel's lancets, 734) its own height (489 amended (7):
 ## at a storey, the temple's 4.5 m lancet on its 4.5 m wall was drawn half
 ## again as tall, its head through the roof); any other one storey.
 static func window_drawn_height(slot: String) -> float:
-	if slot.ends_with(".window_tall") and not ArtKit.has(slot.trim_suffix("_tall")) and ArtKit.has(slot):
+	if lancet_slot(slot):
 		return maxf(ArtKit.size(slot).y, 0.1)
 	var two := slot.ends_with(".window_tall") and ArtKit.has(slot.trim_suffix("_tall"))
 	return WALL_HEIGHT * (2.0 if two else 1.0)
@@ -11961,6 +11990,8 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 	if _window_flipped.get(key, false) != lit_minus:
 		made.rotation.y = PI
 	if glow != null and _window_code.has(key):
+		if lancet_slot(slot):
+			dim_pane(glow as MeshInstance3D, LANCET_GLOW)
 		_glows.append([glow, _window_code[key]])
 		glow.set_meta(&"window_piece", made)  # Its leaves, for its light on the ground (927).
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
@@ -20739,8 +20770,9 @@ static func door_lamp_at(ground: Vector3, facing: Vector2i) -> Vector3:
 
 
 ## A lantern hung by the door of each building holding a shop's or a
-## temple's counter (782; a Chest with props shop or temple), once a
-## building; looked at with the window lights (LAMP_CHECK), since the
+## temple's counter (782; a Chest with props shop or temple), and of a
+## standing inn (782's rule, 927 amended (2)), once a building; looked at
+## with the window lights (LAMP_CHECK), since the
 ## counters come with the entities, after the room. Outdoors only.
 func _hang_door_lamps() -> void:
 	if _room == null or not bool(_terrain.get("outdoor", false)):
@@ -20752,6 +20784,19 @@ func _hang_door_lamps() -> void:
 			continue
 		var building := building_holding(buildings, counter.tile)
 		if building.is_empty():
+			continue
+		var facing: Vector2i = building["facing"]
+		var front: Vector2i = building.get("front", Level.front_cell(building["rect"], facing))
+		if _door_lamps.has(front) and is_instance_valid(_door_lamps[front]):
+			continue
+		_door_lamps[front] = _add_door_lamp(front, facing)
+	# The inn's door as a trade's (782's rule; the coordinator, 11-15, "the
+	# first view at night": the inn's porch the brightest warm thing a newcomer
+	# sees), its taverner's counter no shop's: standing, once.
+	for building: Variant in buildings:
+		if not building is Dictionary or str((building as Dictionary).get("use", "")) != "inn" or not building.has("facing"):
+			continue
+		if _state_of(building) != Towns.STANDING:
 			continue
 		var facing: Vector2i = building["facing"]
 		var front: Vector2i = building.get("front", Level.front_cell(building["rect"], facing))
