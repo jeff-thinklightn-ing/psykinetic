@@ -57614,6 +57614,32 @@ Client only; protocol unchanged; no new class_name; a bullet (voice's words) whe
   own.
 Client only; protocol unchanged; no new class_name.
 
+927 amended (2) (environment; the label from tools/decision_number.sh; the coordinator's approval of 11-15,
+"the first view at night", second and third of three; package "Umbrage at night: window light"): the
+temple's lancets drawn down toward a house pane, and the inn's door lantern made a trade's.
+- Why: from 934's start (190,219) at 21:30 the brightest warm things in the frame were the temple's
+  lancets: tall, near white as shown, and facing the start. The inn, the place a newcomer is meant to
+  find, showed one small orange pane and a house lantern among the four picked. The target: the inn's lit
+  pane and porch are the brightest warm things in that frame, with the temple's glass still plainly lit.
+- The lancets: art-kit's lancet glass (wall.chapel.window_tall's glow) carries an emission of linear (1,
+  0.72, 0.42), a luma of 0.76. Every house pane is (0.75, 0.315, 0.068), 0.39. _dress_window now draws a
+  lancet's glass (Client3D.lancet_slot, window_drawn_height's own test) at LANCET_GLOW of its emission
+  (Client3D.dim_pane: each glowing surface's material copied onto the piece, its emission energy times the
+  share, its albedo untouched). 0.5 puts a lancet level with a house pane by luma; 0.35 puts it below one.
+  ui-design's two-up of the two decides; the value here is the one it picked. Nothing else of the window
+  changes: it is lit at the same hours, and its patch on the ground (927) is as before. Lore is told the
+  temple's windows dim a little.
+- The inn's lantern: _hang_door_lamps also hangs a trade's door lantern (782's _add_door_lamp:
+  DOOR_LAMP_ENERGY 1.2 over DOOR_LAMP_RANGE 4.5, shadowless, flickered with the fire lights, its pane
+  faded by day) at the front of each standing building whose use is "inn". It is outside the four-house
+  pick, and the inn's own house lantern at that door gives way to it, as a shop's does. Its taverner's
+  counter is no shop's, so 782's counter rule never reached it. Only the Umbrage inn has that use today.
+  Buildings is told.
+- Tests: view_world_test, in the wilds' doorway rows. The inn's front has a trade's lantern of 1.2 over 4.5
+  m, shadowless, with its house lantern given way. Every lancet glass in the wilds is at LANCET_GLOW of its
+  art's emission, every other pane exactly as drawn, and albedo and colour unchanged.
+Client only; protocol unchanged; no new class_name.
+
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
 
 The crackle's joined read for 920 amended (1) found the Mughouse's tables
