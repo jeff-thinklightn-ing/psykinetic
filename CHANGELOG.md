@@ -7,6 +7,17 @@ notes (decision 324).
 
 ## Unreleased
 
+- Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
+- In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
+- Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
+- In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
+- In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
+- Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
+- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
+- Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
+
+## v0.1.218
+
 - Towns: in the evening lit windows throw their light onto the ground outside, the temple's in long strips across its forecourt; a shuttered window throws none (927).
 - Towns: walking through Umbrage, its houses come into view and drop out of it without a hitch (351 amended (2)).
 - A person's belt sits close round their tunic, whatever their build (419 amended (5)).
@@ -14,28 +25,18 @@ notes (decision 324).
 - The battle axe winds up in 0.6 s, as quick as the giant axe, and its blow lands as the blade comes round (908).
 - The giant axe hits harder, and its blow lands as the blade comes round (908).
 - Towns: your chest at Rolf's stall opens clear of the corner map, its top row and "Deposit unequipped" in full view (862 amended (1)).
-- Huts' roofs are closed at the gable ends, and their thatch reads as straw (watched joined at the nearest zoom, 8 m, and at 15 m).
-
-- A trader's window now shuts when they are gone from view, instead of staying open on someone who has left (765 amended (3)).
+- Huts have their roofs closed at both gable ends and thatched in straw (art-kit).
+- A trader's window shuts once they're gone from view (765 amended (3)).
 - Rolf serves you across his counter: his window stays open and his locker comes out from the front and the sides of his stall, and when you are too far from his counter he tells you so (807 amended (8)).
 - The empty squares of your chest are empty, not faint pictures of gear (787 amended (8)).
 - Where hair and skin are close in tone, such as chestnut on darker skin, the hair is drawn a shade apart from the skin and a beard a shade further, so each reads against the face; the hair colour and skin you picked keep their names (419 amended (4)).
 - If you've never picked a look, Options shows the face you wear in the game (911 amended (1)).
-- Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
-- In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Ask your companion to fish with no water in reach and she leads you to the nearest, naming it if it's a fishing place you've already found (803).
-
 - In the crypt, when the draugr's Hall bolts shut on a challenger, a player watching its door is told who went in and that it won't open till it's over, and told again when it opens (573 amended (6)).
 - Seen from behind, a person's hair covers the whole back of their head, whatever its style (419 amended (3)).
 - Your companion kneels all the way down to bind a wound (877 amended (3)).
-- Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
 - Towns: a townsperson who goes hungry stays in their town and is no likelier to fall sick for it (918).
 - Towns: by day in Umbrage, Rolf tends his weapon stall from behind the counter (853, maps' side, people work).
-- In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
-- In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
-- Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
-- Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
-- Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 
 ## v0.1.217
 
