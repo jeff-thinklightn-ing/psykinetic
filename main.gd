@@ -870,8 +870,6 @@ var _pack_wanted: GridEntity
 ## A friend left-clicked from afar (decision 454): talk opens once within
 ## TALK_REACH, if before _talk_until (msec).
 var _talk_wanted: GridEntity
-## 935 amended (3): the talk wanted is walked at its person's own cell, a shut door in the way to be opened at its step first.
-var _talk_at_door := false
 var _talk_until := 0
 ## 560, ui's side: the resident last greeted by a click (their bubble opens
 ## the talk bar), the bar itself (their name, Talk, Barter) and who it is for.
@@ -1848,10 +1846,10 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 			beside = friend.tile
 	if beside == NONE:
 		return
-	var at_him := beside == friend.tile and not _is_own_companion(friend)
 	_move_click(player, beside)
 	_talk_wanted = friend
-	_talk_at_door = at_him
+	_talk_door_sent = 0
+	_talk_door_tries = 0
 	_talk_until = Time.get_ticks_msec() + TALK_WAIT_MSEC
 
 
@@ -2238,32 +2236,46 @@ func _update_talk() -> void:
 		_talk_wanted = null
 		return
 	if World.distance(player.tile, talk_cell(_talk_wanted)) <= TALK_REACH:
-		if _talk_at_door:
-			var shut := _shut_door_between(player.tile, _talk_wanted.tile)
+		# 935 amended (3): a talk that is walked to opens no further than a shut door: while one stands in the way (the person unseen
+		# across it) the talk waits, and at the door's step E's own "door" command opens it (once per 400 ms; a door that will not
+		# open, locked or held, is tried TALK_DOOR_TRIES times and the want dropped: he stands at the door, nothing more is sent).
+		if not keeper_sees(player.tile, _talk_wanted.tile, String(player.zone)):
+			var shut := _shut_door_in_the_way(player.tile, _talk_wanted.tile)
 			if shut != null:
-				# A shut door between: walked to its step, opened there (a walk does not open a door; E does), then the talk.
 				if player.tile in Terrain.edge_cells(shut.key) and Time.get_ticks_msec() - _talk_door_sent >= 400:
+					if _talk_door_tries >= TALK_DOOR_TRIES:
+						_talk_wanted = null
+						return
+					_talk_door_tries += 1
 					_talk_door_sent = Time.get_ticks_msec()
 					World.command(player, "door", {"edge": [shut.key.x, shut.key.y, shut.key.z]})
 				return
 		_open_talk(_talk_wanted)
 
 
-## When the shut-door command was last sent for a wanted talk, msec (once per 400 ms).
+## When the shut-door command was last sent for a wanted talk, msec, and how many have been (935 amended (3)).
 var _talk_door_sent := 0
+var _talk_door_tries := 0
+const TALK_DOOR_TRIES := 3
 
 
-## The first shut door on the straight line from [param from] to [param to], or null: one orthogonal step at a time (a door is an
-## edge between two cells), so a diagonal step has none.
-func _shut_door_between(from: Vector2i, to: Vector2i) -> Door:
-	var cells := World.line_cells(from, to)
-	var here := from
-	for cell: Vector2i in cells:
-		var door := World.door_across(here, cell - here)
-		if door != null and not door.is_open() and not door.is_broken():
-			return door
-		here = cell
-	return null
+## The nearest shut door within three cells of [param from] that crossing does not take away from [param to] (a door edge, seen from
+## either cell), or null: the door a walk to a person must open to reach him.
+func _shut_door_in_the_way(from: Vector2i, to: Vector2i) -> Door:
+	var best: Door = null
+	var best_apart := 99
+	for dx in range(-3, 4):
+		for dy in range(-3, 4):
+			var cell := from + Vector2i(dx, dy)
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var door := World.door_across(cell, direction)
+				if door == null or door.is_open() or door.is_broken():
+					continue
+				var apart := World.distance(cell, from)
+				if World.distance(cell + direction, to) <= World.distance(cell, to) and apart < best_apart:
+					best = door
+					best_apart = apart
+	return best
 
 
 ## The right button pressed: what the off hand holds is raised (a
@@ -3184,6 +3196,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
 		if along.length() > 0.01:
+			_talk_wanted = null  # Keys taken: a walk at a person is given up (935 amended (3)).
 			_free_taken_over(player)
 			_free["path"] = []
 			return along.normalized()

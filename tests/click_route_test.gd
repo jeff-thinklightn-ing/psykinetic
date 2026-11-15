@@ -261,28 +261,48 @@ func _test_door_talk() -> void:
 	var path: Array = _main._free.get("path", [])
 	_check(_main._talk_wanted == body and not path.is_empty() and path.back() == inside,
 		"the click walks at his own cell %s (%d cells), and the talk is wanted on arrival" % [inside, path.size()])
-	# The walk does not open a shut door; the step does (E's "door" command): from two cells off the talk waits, at the door's step the
-	# door is opened, and then the talk is let through.
+	# The walk does not open a shut door; the step does (E's "door" command). Every walked talk: two cells off it waits, at the door's step
+	# the door is opened, then the talk is let through; with him at the entry (the walk at his cell) and off it (a stand cell inside).
+	for him: Vector2i in [inside, Vector2i(150, 233)]:
+		World._relocate(body, him)
+		var shut: Door = _main._shut_door_in_the_way(street + Vector2i(0, 1), him)
+		_check(shut != null and not shut.is_open(), "him at %s: a shut door is in the way from the cell two off %s" % [him, street + Vector2i(0, 1)])
+		_main._talk_wanted = body
+		_main._talk_until = Time.get_ticks_msec() + 20000
+		_main._talk_door_sent = 0
+		_main._talk_door_tries = 0
+		World._relocate(player, street + Vector2i(0, 1))
+		_main._update_talk()
+		_check(_main._talk_wanted == body and shut != null and not shut.is_open(), "two cells off, the door shut, the talk waits (not opened, the door not yet touched)")
+		World._relocate(player, street + Vector2i(0, 2))
+		player.next_move_tick = 0
+		_main._update_talk()
+		_check(shut != null and shut.is_open(), "at the door's step the door is opened by the step's command")
+		_main._update_talk()
+		_check(_main._talk_wanted == null, "and the talk is let through once it is open")
+		if shut != null:
+			shut.open = false  # Shut again, as it was laid.
+	# A door that will not open (locked, no key): tried three times, the want dropped, the door still shut, nothing more sent.
 	World._relocate(body, inside)
-	var shut: Door = _main._shut_door_between(street + Vector2i(0, 1), inside)
-	_check(shut != null and not shut.is_open(), "a shut door lies between the cell two off %s and him %s" % [street + Vector2i(0, 1), inside])
+	var locked: Door = _main._shut_door_in_the_way(street + Vector2i(0, 2), inside)
+	if locked != null:
+		locked.lock = "test_key"
+		_main._talk_wanted = body
+		_main._talk_until = Time.get_ticks_msec() + 20000
+		_main._talk_door_tries = 0
+		World._relocate(player, street + Vector2i(0, 2))
+		for i in 6:
+			_main._talk_door_sent = 0
+			player.next_move_tick = 0
+			_main._update_talk()
+		_check(_main._talk_wanted == null and not locked.open and _main._talk_door_tries == Main.TALK_DOOR_TRIES,
+			"a locked door: tried %d times, the want dropped, the door still shut" % _main._talk_door_tries)
+		locked.lock = ""
+	# A walk of his own (a click elsewhere) drops the want.
 	_main._talk_wanted = body
-	_main._talk_at_door = true
-	_main._talk_until = Time.get_ticks_msec() + 20000
-	_main._talk_door_sent = 0
-	World._relocate(player, street + Vector2i(0, 1))
-	_main._update_talk()
-	_check(_main._talk_wanted == body and shut != null and not shut.is_open(), "two cells off, the door shut, the talk waits (not opened, the door not yet touched)")
-	World._relocate(player, street + Vector2i(0, 2))
-	player.next_move_tick = 0
-	_main._update_talk()
-	_check(shut != null and shut.is_open(), "at the door's step the door is opened by the step's command")
-	_main._update_talk()
-	_check(_main._talk_wanted == null, "and the talk is let through once it is open")
-	if shut != null and shut.is_open():
-		World.command(player, "door", {"edge": [shut.key.x, shut.key.y, shut.key.z]})  # Shut again, as it was laid.
+	_main._move_click(player, street)
+	_check(_main._talk_wanted == null, "a click elsewhere drops the wanted talk")
 	_main._talk_wanted = null
-	_main._talk_at_door = false
 	_main._free["path"] = []
 	# In the open, with a way to the stand cell: as before.
 	var open_cell := Vector2i(-1, -1)
