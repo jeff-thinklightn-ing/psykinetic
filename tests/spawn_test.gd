@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_reconnect_avoids_hostiles()
 	_test_respawn_avoids_hostiles()
 	_test_spawn_grace()
+	_test_missiles_end_grace()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -105,6 +106,61 @@ func _test_spawn_grace() -> void:
 	World.order_attack(player, imp)
 	World.step()
 	_check(not player.protected, "attacking ends it too")
+	World.damage(imp, 999)
+
+
+## 661 amended (3): a loose, a lob and a throw end spawn grace and a shelter as a blow begun does, the
+## moment the missile leaves; a draw raised and let down without loosing keeps it.
+func _test_missiles_end_grace() -> void:
+	print("\n== spawn grace: a loose, a lob and a throw end it as the missile leaves; a draw let down keeps it ==")
+	var player := _player()
+	_clear_hands(player)
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	# A lob comes down only under open sky (World.lob_open); this test's level is indoors, so the sky is opened
+	# over it for these rows and shut again after.
+	var was_outdoor := World.fields.outdoor
+	World.fields.outdoor = true
+	var open := _open_cell(player, 3)
+	_check(open != World.NO_CELL, "an open cell 3 off the player under the sky (%s, from %s)" % [open, player.tile])
+
+	_ready_hands(player)
+	World.protect(player, _main.SPAWN_GRACE_TICKS)
+	_check(World.try_stance(player, "draw") and player.protected, "a bow drawn: still in grace (the draw is no act)")
+	for i in 6:
+		World.step()
+	_check(player.protected and player.raised == "draw", "held 6 ticks: still in grace")
+	World.try_stance(player, "")
+	_check(player.protected and player.raised == "" and not World.last_log.begins_with("loose: "),
+			"let down without loosing: the grace kept (last line %s)" % World.last_log)
+
+	_ready_hands(player)
+	World.protect(player, _main.SPAWN_GRACE_TICKS)
+	player.sheltered = true
+	_check(World.is_sheltered(player), "sheltered, as on an arrival inside the cooldown")
+	World.try_stance(player, "draw")
+	player.raised_tick = World.tick - 30
+	var angle := Vector2(open - player.tile).angle()
+	_check(World.try_loose(player, angle) and not player.protected and not World.is_sheltered(player),
+			"an arrow loosed ends the grace and the shelter at once (protected %s, sheltered %s)" % [player.protected, World.is_sheltered(player)])
+
+	_ready_hands(player)
+	World.protect(player, _main.SPAWN_GRACE_TICKS)
+	World.try_stance(player, "draw", true)
+	player.raised_tick = World.tick - 30
+	_check(player.protected and player.lobbing, "drawn at the sky: still in grace")
+	_check(World.try_lob(player, open) and not player.protected, "a lob let fly ends the grace (protected %s)" % player.protected)
+	for i in 30:
+		World.step()  # Its falls come down, away from anyone.
+	World.fields.outdoor = was_outdoor
+
+	_clear_hands(player)
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("ore_sack", "built"))
+	_ready_hands(player)
+	World.protect(player, _main.SPAWN_GRACE_TICKS)
+	_check(player.protected, "a sack of ore in hand: in grace")
+	_check(World.try_throw(player, Player.RIGHT_HAND, open) and not player.protected, "a thing thrown ends the grace (protected %s)" % player.protected)
+	_clear_hands(player)
 
 
 # --- helpers ------------------------------------------------------------------
@@ -144,6 +200,33 @@ func _kill_monsters() -> void:
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
 	Walk.to(entity, tile, 240)  # A free body (703): its commands, a tick at a time.
+
+
+func _clear_hands(entity: GridEntity) -> void:
+	for slot in [Player.RIGHT_HAND, Player.LEFT_HAND]:
+		if not entity.slots[slot].is_empty():
+			World.items.end(World.take_item(entity, entity, slot), "gone")
+
+
+## Its hands free to act this tick: no blow, step or shot still recovering.
+func _ready_hands(entity: GridEntity) -> void:
+	while World.tick < maxi(maxi(entity.next_attack_tick, entity.next_move_tick), entity.bow_ready_tick):
+		World.step()
+	entity.stamina = entity.max_stamina
+
+
+## A cell [param dist] off [param entity] in a straight line, open for a lob to land (and a thing to fall);
+## World.NO_CELL if none of the eight ways has one.
+func _open_cell(entity: GridEntity, dist: int) -> Vector2i:
+	for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var ok := true
+		for k in range(1, dist + 1):
+			if not World.lob_open(entity.tile + way * k):
+				ok = false
+				break
+		if ok:
+			return entity.tile + way * dist
+	return World.NO_CELL
 
 
 func _check(ok: bool, label: String) -> void:

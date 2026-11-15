@@ -7074,6 +7074,8 @@ func try_throw(by: GridEntity, slot: int, target: Vector2i) -> bool:
 	# and hurt by the thing's energy; the thing falls before it.
 	var reach := mini(throw_reach(by, by.slots[slot]), distance(by.tile, target))
 	var out := hurl(by, slot, Vector2(target - by.tile), reach, throw_speed, {"lands": "before", "hurts": true})
+	if out["thrown"]:
+		by.protected = false  # 661 amended (3): a thing thrown ends spawn grace and a shelter, as a blow begun does.
 	return out["thrown"]
 
 
@@ -7563,6 +7565,7 @@ func try_lob(by: GridEntity, cell: Vector2i) -> bool:
 		"amount": maxi(1, roundi(by.attack_damage * float(verb["damage"]) * float(verb.get("lob_damage", 1.0)))),
 		"down": int(verb.get("lob_down", 0)), "slot": drawn_slot(by)})
 	_log("lob: %s at %s, %d falls in a circle %.1f (step %d) from %d ticks" % [by.name, aimed, falls.size(), radius, step, ticks])
+	by.protected = false  # 661 amended (3): a lob let fly ends spawn grace and a shelter, as a blow begun does.
 	by._world_lobbed(aimed, ticks, radius, falls)
 	noise(by.tile, NOISE_BOW, &"bow", by)
 	if step == 0:  # 928: as try_loose, the snap's step alone waits.
@@ -7659,6 +7662,7 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	var way := Vector2.from_angle(angle if is_nan(aimed) else aimed)
 	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
 	by._world_shot(aim["end"], aim["struck"])
+	by.protected = false  # 661 amended (3): an arrow loosed ends spawn grace and a shelter, as a blow begun does.
 	noise(by.tile, NOISE_BOW, &"bow", by)
 	if hit == null:
 		# A miss lands with a thud where it stops (397 amended (2); Jeff's
