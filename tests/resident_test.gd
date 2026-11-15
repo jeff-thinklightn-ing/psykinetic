@@ -2459,6 +2459,28 @@ func _test_strayed_body() -> void:
 	_check(home != null and not home.strayed and home.doing != Resident.Doing.STRAYED, "her body is one of the town's again")
 	World.production.set_away("rs-folk02", true)
 	World.production.set_away("rs-folk03", true)
+	# 487 amended (2): a stray with no reachable far cell costs one look that day, not one a sync.
+	rules["strays"]["far"] = 999  # Farther than any cell of the test town.
+	Townsfolk.use_rules(rules)
+	card = Townsfolk.card_of(World.production, "rs-folk02")
+	card[Townsfolk.STRAYED] = {"since": World.production.now()}
+	World.production.set_card("rs-folk02", card)
+	_main._stray_missed.clear()
+	var looks: int = _main._stray_looks
+	_sync()
+	_sync()
+	_sync()
+	var day := Townsfolk.day_of(World.steps)
+	_check(_main._stray_looks == looks + 1 and _main._stray_missed.values() == [day] and _body("rs-folk02") == null,
+		"487am2: no far cell reachable: one look over three syncs, the miss kept for day %d, no body (%d looks, %s)" % [day, _main._stray_looks - looks, _main._stray_missed])
+	for id: Variant in _main._stray_missed:
+		_main._stray_missed[id] = day - 1  # As if the miss were yesterday's.
+	_sync()
+	_check(_main._stray_looks == looks + 2, "487am2: the next day, looked for again (%d looks)" % [_main._stray_looks - looks])
+	card = Townsfolk.card_of(World.production, "rs-folk02")
+	card.erase(Townsfolk.STRAYED)
+	World.production.set_card("rs-folk02", card)
+	_main._stray_missed.clear()
 	Townsfolk.use_rules({})
 	_sync()
 

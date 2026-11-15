@@ -324,6 +324,8 @@ var _greet_at: Dictionary = {}  # "worker id|player id" -> msec of the last clic
 ## what was last told of each house's waking ("town id|code" -> bool), and
 ## the tests' stand-ins for economy's trip and build (worker id -> ...).
 var _site_spots: Dictionary = {}
+var _stray_missed: Dictionary = {}  # place id -> the game day _stray_cell found no far cell (487 amended (2))
+var _stray_looks := 0  # How many looks _stray_cell has made (resident_test's count)
 var _awake_sent: Dictionary = {}
 var _trip_stub: Dictionary = {}
 var _build_stub: Dictionary = {}
@@ -14260,8 +14262,25 @@ func _rumour_for(town: String, player_id: String, day: int) -> String:
 ## is not the town's), among the farthest dozen one a path over the zone's
 ## grid reaches from the store (the coordinator's condition: walkable from
 ## the town); null when the zone has none. One in three cells is looked
-## at, which is enough to find the far edge.
+## at, which is enough to find the far edge. A miss is remembered for the
+## place and the game day (487 amended (2)): the day's seed picks the same
+## dozen, so a sync every RESIDENT_SYNC_TICKS would scan the floor and walk
+## up to twelve paths over the zone again for nothing; one server line.
 func _stray_cell(place: Dictionary) -> Variant:
+	var id := str(place.get("id", ""))
+	var day := Townsfolk.day_of(World.steps)
+	if int(_stray_missed.get(id, -1)) == day:
+		return null
+	var cell: Variant = _stray_cell_far(place)
+	if cell == null:
+		_stray_missed[id] = day
+		print("[strays] %s: no far cell reachable from the store on day %d; looked for again the next day (487 amended (2))" % [id, day])
+	return cell
+
+
+## [method _stray_cell]'s look itself (decision 487): the cell, else null.
+func _stray_cell_far(place: Dictionary) -> Variant:
+	_stray_looks += 1
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
 	var far := int(Townsfolk.rules().get("strays", {}).get("far", 24))
 	var mine := World.holdings.holder(str(place.get("id", "")))

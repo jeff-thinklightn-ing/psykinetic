@@ -16690,6 +16690,27 @@ party-log line "Tam came home on his own" (Townsfolk.stray calls
 Offers.walked_home with nobody); before, the pleas stayed open and lapsed
 seven days later against the players who had taken them.
 
+487 amended (2) (2026-11-15, economy; perf's question on unbounded paths,
+the coordinator's approval; label from tools/decision_number.sh): a stray's
+missed far cell is remembered for the place and the game day. Main's
+_stray_cell saved a cell once one was found, but a miss (none of the farthest
+dozen reachable from the store) saved nothing. So each resident sync
+(RESIDENT_SYNC_TICKS, 3 s) while a player was near ran the scan of the whole
+floor again, plus up to twelve find_paths with no bound, each exploring the
+zone, for every stray with no cell. That is a stall on the server every
+player feels. Every retry that day got the same answer, since the rng is
+seeded by place and day. Now Main._stray_missed keeps the miss's day by
+place id, and _stray_cell looks again only on the next game day. Each miss
+prints one server line ("[strays] <place id>: no far cell reachable from the
+store on day N ..."), naming the place and the day and no person, so the
+box's journal shows whether it has ever happened. No max_tiles: the cell is
+meant to be far (strays.far 24), and a cap could pass over a reachable far
+cell. _walk_home's find_path, which perf also asked about, needs nothing: it
+is cached by body and spot, a miss included. resident_test
+(_test_strayed_body): with no far cell, one look over three syncs, the miss
+kept for the day, no body; the next day, looked for again. Server only;
+protocol unchanged; no new class_name; no bullet.
+
 ## 490. The bard sings what the town remembers
 
 The hidden types' side-doings (393: "scoundrel, thieves, and bards isn't
