@@ -847,19 +847,23 @@ func _test_wilds() -> void:
 	# The roads (569): from the castle's, the forest's and the hills' links to
 	# the waystone, the forest road over the bridge, their ground dirt; and
 	# since 743 a fourth from the waystone south to Umbrage's link; since 774
-	# Umbrage's six spokes from its square and the lane to the barrow's door.
+	# Umbrage's six spokes from its square and the lane to the barrow's door; since 934 amended (1) the lane
+	# from road 6 to the inn's door.
 	var roads: Array = terrain["roads"]
 	var starts_at := roads.map(func(road: Dictionary) -> Vector2i: return Vector2i((road["points"] as PackedVector2Array)[0]))
 	var ends_at := roads.map(func(road: Dictionary) -> Vector2i: return Vector2i((road["points"] as PackedVector2Array)[-1]))
 	var over_bridge := roads.any(func(road: Dictionary) -> bool:
 		var cells := Curves.cells(road["curve"], false)
 		return bridged.all(func(cell: Vector2i) -> bool: return cells.has(cell)))
-	var dirt := roads.all(func(road: Dictionary) -> bool:
-		return Curves.cells(road["curve"], false).keys().all(func(cell: Vector2i) -> bool:
-			return not floor.has(cell) or terrain["kinds"].get(cell, "") == "dirt"))
-	_check(roads.size() == 11 and starts_at.has(level["spawn_points"]["from_foothills"]) and starts_at.has(level["spawn_points"]["from_hills"])
+	var not_dirt: Array[Vector2i] = []
+	for road: Dictionary in roads:
+		for cell: Vector2i in Curves.cells(road["curve"], false):
+			if floor.has(cell) and terrain["kinds"].get(cell, "") != "dirt" and not cell in not_dirt:
+				not_dirt.append(cell)
+	var dirt := not_dirt.is_empty()
+	_check(roads.size() == 12 and starts_at.has(level["spawn_points"]["from_foothills"]) and starts_at.has(level["spawn_points"]["from_hills"])
 		and starts_at.has(level["spawn_points"]["from_forest"]) and ends_at.has(level["spawn_points"]["from_held"]) and over_bridge and dirt,
-		"eleven dirt roads: from the foothills' (the castle's till 745), the forest's and the hills' links, the forest road over the bridge, south to Umbrage's, its six spokes and the barrow lane (569, 743, 774; from %s, to %s)" % [starts_at, ends_at])
+		"twelve dirt roads: from the foothills' (the castle's till 745), the forest's and the hills' links, the forest road over the bridge, south to Umbrage's, its six spokes, the barrow lane and the lane to the inn's door (569, 743, 774, 934 amended (1); from %s, to %s; not dirt %s)" % [starts_at, ends_at, not_dirt.slice(0, 12)])
 
 
 ## A bridge's deck kept out of the relief (505 amended): under each of the

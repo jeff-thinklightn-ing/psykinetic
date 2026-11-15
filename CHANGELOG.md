@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a dirt lane runs from where a newcomer arrives, south of Umbrage's square, to the Mughouse's door (934 amended (1)).
 - Towns: in the evening each of Umbrage's two market stalls has a small lantern burning under its awning by the left post, lighting the counter top warm (782 amended (3)).
 - Towns: at night a newcomer arriving in Umbrage sees the Mughouse's door lit ahead, its lantern lighting the step and the wall beside the door (927 amended (2)).
 - Towns: a hut's gable ends are upright boards with dark gaps between them, its ridge comes to a point at each end, and its roof has a thin straw edge with a ragged fringe beneath it (art-kit).

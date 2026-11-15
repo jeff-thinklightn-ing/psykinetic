@@ -58410,3 +58410,19 @@ write (barrow, by the console's regenerate now), each of which had Main adopt a 
 
 Server only; protocol unchanged; no new class_name; no bullet, no ui-design part, no new words: the panel
 says "Asking:" and "Checking:" as before, and the builder's view now keeps moving while he waits.
+934 amended (1): two ground mends from terrain's read of ui-design's joined stills (C:/dev/review/terrain/umbrage_ground,
+worst1 and worst2; the coordinator's approval, 11-15). (a) A 2 m dirt lane, the wilds' twelfth road (terrain's points),
+from road 6's centre line, where the line from the first start (190,219) to the inn's door crosses it, to the door's
+outside cells (180,208)/(180,209): the newcomer's ground goes to the door and not past it into the square. 22 cells,
+nothing built, solid or a spot on them; 880's door way runs to the nearest road cell, so the door's worn earth joins
+onto it. From the start it is a small change, a thin strip of dirt where main has grass between the strip and the
+porch, which is the size meant for ground that leads (terrain's sheet, C:/dev/review/terrain/umbrage_ground/
+lane_934am1_sheet.png; the coordinator's pass). The two handcarts at the cobble's corner, (186,212) and (188,214),
+stand off the lane and off the line from the first start to its mouth, and the lane is one piece from road 6 to the
+door, so a player walking it is neither blocked nor steered round them. (b) The bare dirt pad round the pool by (113,59), a make_wilds patch beside a pond that read as a yard or a
+cut-off trail start: its 50 painted cells to grass (cells and edge pixels), the pool's own cells kept. The wilds' safe
+paths 2218 -> 2235 (the lane's cells; the pad was never a run). level_test _test_way_in: the lane joins road 6, reaches
+the door's outside cells, one piece, nothing built, solid, a spot or an entity on it or on the way from the first start
+to its mouth; the pool's water kept and no painted dirt beside it (fails on main's data,
+naming seven cells). relief_test's roads row counts twelve and names any road cell not painted dirt. Level data and
+tests; protocol unchanged; no new class_name. Road widths (the through road wider) are not in it.

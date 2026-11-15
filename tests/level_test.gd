@@ -1563,6 +1563,63 @@ func _test_way_in(wilds: Dictionary) -> void:
 		var a_cells := Curves.cells(roads[a]["curve"], false)
 		return a_cells.keys().any(func(cell: Vector2i) -> bool: return b_cells.has(cell))
 	_check(joined.call(9, 2) and joined.call(10, 8), "the hill road meets the hills road (%s), the breach's road the barrow road (%s)" % [joined.call(9, 2), joined.call(10, 8)])
+	# 934 amended (1) (b): the pool by (113, 59) beside the north road has no bare dirt pad round it (terrain's
+	# worst2 still: it read as a yard or a cut-off trail start); the pool itself is kept.
+	var pool: Array[Vector2i] = []
+	for cell: Vector2i in terrain["water"]:
+		if cell.x >= 105 and cell.x < 122 and cell.y >= 52 and cell.y < 66:
+			pool.append(cell)
+	var pad: Array[Vector2i] = []
+	for cell: Vector2i in pool:
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var by := cell + Vector2i(dx, dy)
+				if str(terrain["kinds"].get(by, "")) == "dirt" and not by in pad:
+					pad.append(by)
+	pad.sort()
+	_check(pool.size() >= 20 and pad.is_empty(), "the pool by (113, 59): its %d water cells kept, no painted dirt beside them (%s)" % [pool.size(), pad])
+	# 934 amended (1) (a): a 2 m lane (road 11, terrain's points) from road 6, where the line from the first start to
+	# the inn's door crosses it, to the ground outside the door, so the newcomer's ground goes to the door and not past
+	# it into the square (terrain's worst1 still); nothing built, solid or a spot on it.
+	var lane: Dictionary = Curves.cells(roads[11]["curve"], false) if roads.size() > 11 else {}
+	var door_out := [Vector2i(180, 208), Vector2i(180, 209)]
+	var in_way: Array[String] = []
+	for cell: Vector2i in lane:
+		if built.has(cell) or terrain["solid"].has(cell) or not terrain["floor"].has(cell):
+			in_way.append("%s %s" % [cell, built.get(cell, "solid or off the floor")])
+		if wilds["spots"].any(func(spot: Dictionary) -> bool: return spot["cell"] == cell):
+			in_way.append("%s a spot" % [cell])
+	# Nothing a body bumps (the level's entities: the two handcarts at the cobble's corner, (186, 212) and (188, 214))
+	# on the lane or on the line from the first start to its mouth, and the lane one piece from there to the door, so
+	# a player walking it is neither blocked nor steered round (the coordinator, 11-15).
+	var things := {}
+	for spec: Dictionary in wilds["entities"]:
+		things[spec["tile"]] = str(spec.get("name", ""))
+	var mouth := Vector2i((roads[11]["points"] as PackedVector2Array)[0].round()) if roads.size() > 11 else first
+	for k in range(0, 21):
+		var cell := Vector2i((Vector2(first).lerp(Vector2(mouth), k / 20.0)).round())
+		if things.has(cell):
+			in_way.append("%s %s on the way to its mouth" % [cell, things[cell]])
+	for cell: Vector2i in lane:
+		if things.has(cell):
+			in_way.append("%s %s" % [cell, things[cell]])
+	var reached := {mouth: true} if lane.has(mouth) else {}
+	var queue: Array[Vector2i] = []
+	queue.assign(reached.keys())
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_back()
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var next := cell + Vector2i(dx, dy)
+				if lane.has(next) and not reached.has(next):
+					reached[next] = true
+					queue.append(next)
+	if reached.size() != lane.size():
+		in_way.append("the lane in pieces (%d of %d from its mouth %s)" % [reached.size(), lane.size(), mouth])
+	var at_door := door_out.any(func(cell: Vector2i) -> bool: return lane.has(cell))
+	_check(not lane.is_empty() and joined.call(11, 6) and at_door and in_way.is_empty(),
+		"the lane to the inn's door: joins road 6 (%s), reaches the door's outside cells %s (%s), %d cells, nothing in its way (%s)" % [
+			joined.call(11, 6) if not lane.is_empty() else false, door_out, at_door, lane.size(), in_way])
 	var safe := Level.safe_paths(terrain)
 	print("  the wilds' safe paths: %d cells" % safe.size())
 
