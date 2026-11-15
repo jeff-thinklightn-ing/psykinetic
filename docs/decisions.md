@@ -54005,6 +54005,28 @@ set off for one, and the later now goes elsewhere on arriving.
   it too, for two ten-minute samples running (at 6.97, WELL)", beside the shut-ground fail.
 Server only; protocol unchanged; no new class_name; no bullet (one if maps or ui-design watch the well
 joined with the town at its usual count).
+853 amended (17) (2026-11-15, economy; perf's folk tour on v0.1.217, C:/dev/review/perf_folk4/; the
+coordinator's rulings; label from tools/decision_number.sh). Hob, the wilds' healer, stood in his hut's
+doorway at night: on (152, 232), the turf house's door, where a click picked nothing and nobody got in.
+His places are all the hut (work, home and bed). A stroll's goal (Resident._pick_goal, _free_cell) took
+any free cell of the area, so the door row's middle was one of his own picks: 42 of 180 samples on it in
+the probe. The healer is one case of a general rule. Main._keep_off_doors, run at each sync after
+_shelter_all, gives any resident whose work, home or bed rect is a building's rect that building's way in
+as places["keep_off"]: Main.door_cells, both cells of each entrance edge (Level.entrances, a kind's doors
+and open edges), else a solid building's door (Level.solid_door_of, 550) and the cell before it, none for
+a doorless one. _pick_goal keeps off them as it keeps off the temple's cells. Spots are untouched
+(_free_spot is separate), and none stands on any building's way in on Umbrage, so no spot names a door
+on purpose. A walk out still passes through. Marked on Umbrage: Hob, Maud, Agnes, Aldous. The click row
+failing at night ("Hob answers a click") was the doorway, not a fault of its own. New scene
+door_day_test (port 17986): Umbrage with a player at the healer's hut, 12:00 to 12:00, every body near
+read each game minute. The marks are right for each resident with a building of its own. No goal lies on
+its own way in (a spot's cell aside), and no body stands on one more than 2 game minutes. The healer is
+in his own bed inside his sleep spell (Townsfolk.sleep_spell) and up outside it. Without the mend it
+fails: Hob set out for (152, 232) at 13.37 and stood there 3 game minutes. The folk tour
+(tests/tour/tours/folk.gd, playtest's; a line in its header) judges the healer by his own spell, no
+longer by the tour's 23:00: asleep in his bed inside it, awake and off his doorway outside it. Server
+only; protocol unchanged; no new class_name; no bullet (v0.1.218's known line: "the healer may stand in
+his own doorway for a while; then you can't reach him or get into his hut").
 
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 

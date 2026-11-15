@@ -9166,6 +9166,47 @@ func _empty_shelf_told(player: Player, body: Resident) -> void:
 
 # --- The healer's care (decision 584 amended) ------------------------------------------
 
+## Each wanted body whose work, home or bed is a building's rect keeps off that building's way in (853 amended (17);
+## perf's folk tour, 11-14: Hob, at work in his turf house till his sleep spell, stood on its door cell (152, 232)
+## between strolls, and nobody could reach him or get in): places["keep_off"], the cells of the building's
+## entrances (a kind's doors and open edges), else a solid building's door (550) and the cell before it. Resident
+## leaves them out of every cell it picks in an area; a laid spot, a task's cell and a bed are its own.
+func _keep_off_doors(wanted: Dictionary, area: Dictionary) -> void:
+	var doors := {}
+	for building: Variant in area.get("buildings", []):
+		if not building is Dictionary or not (building as Dictionary).get("rect") is Rect2i:
+			continue
+		doors[building["rect"]] = Main.door_cells(building)
+	for who: String in wanted:
+		var places: Variant = (wanted[who] as Dictionary).get("places")
+		if not places is Dictionary:
+			continue
+		var keep: Array[Vector2i] = []
+		for use: String in ["work", "home", "bed"]:
+			var rect: Variant = (places as Dictionary).get(use)
+			if rect is Rect2i and doors.has(rect):
+				for cell: Vector2i in doors[rect]:
+					if not keep.has(cell):
+						keep.append(cell)
+		if not keep.is_empty():
+			places["keep_off"] = keep
+
+
+## A building's way in (853 amended (17)): both cells of each entrance edge (Level.entrances: a kind's doors and
+## open edges), else a solid building's door (Level.solid_door_of, 550) and its front; [] for a doorless one.
+static func door_cells(building: Dictionary) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for edge: Variant in Level.entrances(building):
+		if edge is Vector3i:
+			cells.append_array(Terrain.edge_cells(edge))
+	if cells.is_empty() and not building.has("kind") and building.get("rect") is Rect2i:
+		var door := Level.solid_door_of(building)
+		if door != Level.NO_DOOR:
+			var facing: Vector2i = building["facing"] if building.get("facing") is Vector2i else Level.building_facing(building)
+			cells.append_array([door, door + facing])
+	return cells
+
+
 ## The healer's hut whose care medicine man [param worker_id] gives (his
 ## town's zone's, maps' 372), "" if he is none or has no hut.
 func _care_hut_of(worker_id: String) -> String:
@@ -13345,6 +13386,7 @@ func _sync_residents() -> void:
 	_cap_wanted(wanted)  # Who stands under RESIDENTS_MAX, by rank, not by the order found (333 amended (4)).
 	_bed_down_roofless(wanted, area)
 	_shelter_all(wanted, area)
+	_keep_off_doors(wanted, area)
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident

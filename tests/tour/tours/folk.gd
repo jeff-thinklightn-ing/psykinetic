@@ -10,6 +10,12 @@ extends RefCounted
 ## hides it (a hidden window stays hidden; perf, 2026-11-15).
 ## Never a raw node name in what is shown. Each person's buttons logged, a
 ## table of who was met at the end.
+## For playtest (economy, 853 amended (17), 2026-11-15): the healer is judged
+## by his own sleep spell (Townsfolk.sleep_spell), not the tour's hour: asleep
+## in his hut's bed inside it, awake off his hut's doorway (Main.door_cells)
+## outside it, where the night pass's click reaches him. "Hob answers a click"
+## failing at night was the doorway (perf's folk tour: Hob on (152, 232), the
+## click picked nothing there).
 
 const HOURS := [12, 23]
 ## Where the town is walked from (Umbrage's square), and how long a pass may take.
@@ -300,12 +306,16 @@ func _beds(bot: Node) -> void:
 		bot.log_line("beds: not judged headless (no drawn view; run --offscreen)")
 		return
 	var lying := {}  # Their name -> {trade, tile, on}.
+	var healer := {}  # The healer as seen at his hut: {who, id, tile, activity, hour}.
 	for spot: Vector2i in [SQUARE] + SPOTS + [HEALER_HUT]:
 		await bot.walk_to(spot, 3, 120.0)
 		await bot.seconds(3.0)
 		for body: GridEntity in bot.seen(""):
 			if body is Resident and str(body.get("activity")) == "sleep":
 				lying[_who(body)] = {"trade": str(body.get("trade")), "tile": body.tile, "on": _lies_on(c3, body)}
+			if spot == HEALER_HUT and body is Resident and "medicine" in str(body.get("trade")):
+				healer = {"who": _who(body), "id": str(body.get("worker_id")), "tile": body.tile,
+					"activity": str(body.get("activity")), "hour": DayNight.hour(DayNight.now())}
 	var beds: Array = []  # {slot, head, by}
 	for building: Variant in c3._drawn_buildings():
 		if not building is Dictionary or bool((building as Dictionary).get("home", false)) or not (building as Dictionary).get("rect") is Rect2i:
@@ -332,12 +342,37 @@ func _beds(bot: Node) -> void:
 		return not lying[who]["trade"].is_empty() and lying[who]["on"] in ["bedroll", "ground", "floor"])
 	bot.expect(outside.is_empty() or free.is_empty(), "every townsperson with a trade sleeps in a bed while one stands free in the town",
 		"%s; free beds: %s" % [", ".join(outside.map(func(who: String) -> String: return "%s (%s) on %s at %s" % [who, lying[who]["trade"], lying[who]["on"], lying[who]["tile"]])), free])
-	bot.expect(lying.keys().any(func(who: String) -> bool: return "medicine" in lying[who]["trade"]), "the healer is asleep at his hut",
-		"none with the trade medicine_man seen asleep by %s" % HEALER_HUT)
+	_healer_by_spell(bot, c3, healer, lying)
 	for who: String in lying:
 		if "medicine" in lying[who]["trade"] or "healer" in lying[who]["trade"]:
 			bot.expect(lying[who]["on"] == "bed", "%s, the healer, sleeps in his hut's bed" % who, "on %s at %s" % [lying[who]["on"], lying[who]["tile"]])
 	bot.log_line("beds: %d asleep seen, %d dwelling beds (%d free)" % [lying.size(), beds.size(), free.size()])
+
+
+## The healer at his hut by his own sleep spell (853 amended (17)): inside
+## it, asleep (the bed rows after); outside it, awake and off his hut's
+## doorway, so the pass's click reaches him. With no id on the body (a joined
+## client) his spell isn't known, and only what is seen is logged.
+func _healer_by_spell(bot: Node, c3: Node, healer: Dictionary, lying: Dictionary) -> void:
+	if healer.is_empty():
+		bot.expect(false, "the healer is seen at his hut", "no one with the trade medicine_man by %s" % HEALER_HUT)
+		return
+	var doors: Array[Vector2i] = []
+	for building: Variant in c3._drawn_buildings():
+		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and (building["rect"] as Rect2i).position == HEALER_HUT:
+			doors = Main.door_cells(building)
+	var spell := Townsfolk.sleep_spell(healer["id"])
+	var seen := "%s at %s, %s, %.2f o'clock; his spell %.2f to %.2f; the hut's doorway %s" % [healer["who"], healer["tile"],
+		healer["activity"] if not str(healer["activity"]).is_empty() else "awake", healer["hour"], spell.x, spell.y, doors]
+	bot.log_line("healer: " + seen)
+	if str(healer["id"]).is_empty():
+		bot.log_line("healer: no id on his body here (a joined client): asleep or awake not judged")
+		return
+	if Townsfolk.asleep_at(healer["id"], healer["hour"]):
+		bot.expect(lying.has(healer["who"]), "the healer is asleep at his hut, inside his own spell", seen)
+	else:
+		bot.expect(not lying.has(healer["who"]), "the healer is awake outside his own spell", seen)
+	bot.expect(not doors.is_empty() and not doors.has(healer["tile"]), "the healer is off his hut's doorway", seen)
 
 
 ## What [param body], asleep, lies on as drawn: "bed" (a drawn bed's head

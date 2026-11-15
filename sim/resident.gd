@@ -657,7 +657,8 @@ func _pick_goal() -> void:
 		_goal = tile
 		return
 	# In the temple (734 amended (4)): off its doors, its counter and its respawn (Main's "temple_keep").
-	var keep: Array = places.get("temple_keep", []) if area == places.get("temple") else []
+	var keep: Array = (places.get("temple_keep", []) as Array).duplicate() if area == places.get("temple") else []
+	keep.append_array(places.get("keep_off", []))  # A building's way in, never a stroll's or a stand's (853 amended (17)).
 	# Always a cell to walk to in a doing that strolls (the mend): one it stood on already in the place kept
 	# it there for hours (the square, the work, the inn and the well were one rect with no building for its
 	# trade). Hiding, sick abed, led or at a bedside it stays where it is in the place, as before.
