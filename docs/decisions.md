@@ -25817,6 +25817,29 @@ This is dungeon's side.
 
 level_test _test_hall_door; labyrinth_test (the hall's one door on layer
 3). Protocol unchanged (a Door's open and lock replicate already); no new
+
+573 amended (6): who is told the hall's door shuts and opens (ui-design's look_hall2b on main
+1f73e24bd, two joined players: one walked into the Hall at (49,57), the other, waiting outside the
+door at (49,54), was told "The hall's door shuts behind you."; found by enemy-ai, routed by the
+coordinator, who approved the line; label from tools/decision_number.sh). _hold_hall_door said its
+line to World.peers_in, every player in the level. _test_hall_door had one player, so it never
+showed; the new test, run on main first, found only the far-off host told (peers_in reads
+peer_zone, which held the host's peer alone). Now Main._tell_hall_door says it to the players
+standing inside the lair's rect (hall_lair_rect, the rect _hall_doors finds the doors on) and to
+those outside with one of the door's cells within HALL_DOOR_SEEN (6) cells and in line of sight;
+nobody else in the level hears it. Those inside hear "The hall's door shuts behind you." as before
+(the party log keeps it). Those outside hear voice's line naming one inside by shown name,
+HALL_SHUT_OUTSIDE ("The hall's door shuts behind %s, and the bolt drops. It won't open till it's
+over in there."), or HALL_SHUT_OUTSIDE_NONE with nobody inside to name. "The hall's door opens."
+goes to the same two groups. Draugr.in_hall reads the same rect: his kind's row keeps his room
+(levels/monsters.json "keeps_room"), so his _room is room_of(home), the lair anchor; the test
+holds that they agree. Tests: level_test _test_hall_door_heard (its own
+level: a Hall with one door, an antechamber, a side room walled off) has four players at the shut
+and the opening, read per peer through Net.test_sends: inside, outside at the door, within 6 cells
+behind a wall, and off at the far side. _test_hall_door's one player stands inside for the shut.
+No new server log line carries the shown name: the outside line goes by Net.broadcast_to, which
+prints nothing, and not into the party log (only the inside line, with no name, goes there); the
+"[party]" print is the receiving client's own, which a dedicated server never is. Server only; protocol unchanged; no new class_name.
 ## 601. Gold from humanoid enemies
 
 Jeff: "one feature i really want before the cut is gold drop from

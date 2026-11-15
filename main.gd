@@ -11586,9 +11586,53 @@ func _hold_hall_door(zone_name: String, held: bool) -> void:
 		World.hold_door(door, held, HALL_LOCK)
 	World.enter(was)
 	if not doors.is_empty():
-		say_to(World.peers_in(zone_name), "The hall's door shuts behind you." if held else "The hall's door opens.")
+		_tell_hall_door(zone_name, doors, held)
 	if not held:
 		_apply_hall_seal(zone_name)  # The challenge over, the dead's seal holds again by its own rule (666).
+
+
+## How near, in cells, a player outside the hall must stand to one of its door
+## cells, in sight of it, to be told it shuts or opens (573 amended (2)).
+const HALL_DOOR_SEEN := 6
+## Voice's words to a player outside who sees the hall's door shut (573
+## amended (2)): %s the shown name of one inside; HALL_SHUT_OUTSIDE_NONE with
+## nobody inside to name.
+const HALL_SHUT_OUTSIDE := "The hall's door shuts behind %s, and the bolt drops. It won't open till it's over in there."
+const HALL_SHUT_OUTSIDE_NONE := "The hall's door shuts and the bolt drops. Someone is in there; it won't open till it's over."
+
+
+## The hall's [param doors] held shut or let go, said (573 amended (2);
+## ui-design's look_hall2b: a player waiting outside the door was told "The
+## hall's door shuts behind you."): to the players standing inside its lair's
+## rect (hall_lair_rect, as _hall_doors finds the doors), and to those outside
+## with a door cell within HALL_DOOR_SEEN cells and in line of sight, who are
+## told who went in; nobody else in the level. The inside line goes to the
+## party log as before.
+func _tell_hall_door(zone_name: String, doors: Array[Door], held: bool) -> void:
+	var rect := hall_lair_rect(zone_name)
+	var inside: Array[Player] = []
+	var seen_by: Array[int] = []
+	var zone: Zone = World.zones.get(zone_name)
+	var was := World.enter(zone)
+	for entity: GridEntity in zone_entities(zone_name):
+		var player := entity as Player
+		if player == null or not player.spawned:
+			continue
+		if rect.has_point(player.tile):
+			inside.append(player)
+		elif doors.any(func(door: Door) -> bool: return Terrain.edge_cells(door.key).any(func(cell: Vector2i) -> bool:
+				return World.distance(player.tile, cell) <= HALL_DOOR_SEEN and World.has_line_of_sight(player.tile, cell))):
+			seen_by.append(player.owner_peer)
+	World.enter(was)
+	var inside_peers: Array[int] = []
+	for player in inside:
+		inside_peers.append(player.owner_peer)
+	if not seen_by.is_empty():
+		var outside_line := "The hall's door opens."
+		if held:
+			outside_line = HALL_SHUT_OUTSIDE % World.shown_name(inside[0]) if not inside.is_empty() else HALL_SHUT_OUTSIDE_NONE
+		Net.broadcast_to(seen_by, "party", {"from": "Server", "text": outside_line})
+	say_to(inside_peers, "The hall's door shuts behind you." if held else "The hall's door opens.")
 
 
 ## The zones whose hall the standing dead seal (666, dungeon's side; Jeff:

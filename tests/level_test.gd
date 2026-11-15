@@ -77,6 +77,7 @@ func _ready() -> void:
 	_test_temple_town()
 	_test_barrow_won()
 	await _test_hall_door()
+	_test_hall_door_heard()
 	await _test_hidden_niche()
 	await _test_robbers_latch()
 	_test_double_doors()
@@ -3193,17 +3194,19 @@ func _test_hall_door() -> void:
 	Net.message_received.connect(hear)
 	_main._told_dead.clear()
 	_main._dead_near.clear()
+	_put(player, Vector2i(5, 4))  # In the Hall as it shuts (573 amended (2): the shut line is theirs).
 	_main._hold_hall_door("lt_hall", true)
+	_put(player, Vector2i(5, 3))
 	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
 		and _main.party_log.last(1) == ["The hall's door shuts behind you."] and _heard.slice(-1) == ["The hall's door shuts behind you."],
-		"held: shut, locked with a key nobody holds, stone, and said to those in the zone (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
+		"held: shut, locked with a key nobody holds, stone, and said to the one inside (%s %s)" % [_main.party_log.last(1), _heard.slice(-1)])
 	_hold_free(player, Vector2(0, 1), 8)
 	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "no walk goes through it: stopped at its face (%s)" % player.free_pos)
 	_check(not heard.has(_main.DEAD_LINE), "a challenge's held door says nothing of the dead to a walk into it (%s)" % [heard])
 	_check(not World.try_toggle_door(player, key) and not door.open, "and E rattles it")
 	_main._hold_hall_door("lt_hall", false)
 	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."] and _heard.slice(-1) == ["The hall's door opens."],
-		"let go: the lock lifted, still shut till opened, and said to them (%s)" % [_heard.slice(-1)])
+		"let go: the lock lifted, still shut till opened, and said to the one at its door (%s)" % [_heard.slice(-1)])
 	await get_tree().process_frame
 	_check(World.try_toggle_door(player, key) and door.open, "E opens it now")
 	# 608 amended (3): the warning ahead of his Hall, once a visit, while he sits waiting.
@@ -3306,6 +3309,107 @@ func _test_hall_door() -> void:
 	_main._records = kept_records
 	_main.load_map("test_room")
 	Level.unregister("lt_hall")
+
+
+## Who is told the hall's door shuts and opens (573 amended, ui-design's
+## look_hall2b, two joined players: one walked into the Hall, the other,
+## waiting outside the door, was told "The hall's door shuts behind you."):
+## the players inside its lair's rect hear the shut line; one outside with a
+## door cell within 6 cells and in sight hears voice's line naming who went
+## in; one off at the level's far side, and one within 6 cells behind a
+## wall, hear nothing; the opening is said to the same two. Inside is the
+## lair's rect (Main.hall_lair_rect, as its doors are found), which
+## Draugr.in_hall reads too.
+func _test_hall_door_heard() -> void:
+	print("\n== the hall's door: its shut and its opening said to those inside, and to those outside who see it (573 amended) ==")
+	_register_hall_heard("lt_hall_heard")
+	_main.load_map("lt_hall_heard")
+	var host := _player()
+	var made: Array[Player] = []
+	for at: Vector2i in [Vector2i(9, 9), Vector2i(9, 4), Vector2i(4, 4)]:
+		made.append(_main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "LtHallHeard%d" % made.size(), "tile": at}) as Player)
+	_check(host != null and made.all(func(p: Player) -> bool: return p != null), "(the host and three more players)")
+	if host == null or made.any(func(p: Player) -> bool: return p == null):
+		return
+	var inside := made[0]
+	var at_door := made[1]
+	var walled := made[2]
+	inside.owner_peer = 4301
+	at_door.owner_peer = 4302
+	walled.owner_peer = 4303
+	_put(host, Vector2i(17, 1))
+	var key := Terrain.edge_key(Vector2i(9, 6), Vector2i(0, -1))
+	_check(_main._hall_doors("lt_hall_heard").size() == 1 and _main._hall_doors("lt_hall_heard")[0] == World.door_on(key),
+		"(the hall's one door, between (9,5) and (9,6))")
+	# His kind's row (levels/monsters.json: keeps_room) gives him his home's anchor as his room.
+	var draugr := _main._spawn({"script": "res://sim/draugr.gd", "shape": "capsule", "name": "LtHallHeardDraugr", "kind": "draugr",
+		"tile": Vector2i(9, 11), "props": Level.MONSTER_TYPES["draugr"].duplicate()}) as Draugr
+	_check(draugr != null, "(the draugr in his Hall)")
+	if draugr != null:
+		draugr.acts = false
+		_check(draugr._room == _main.hall_lair_rect("lt_hall_heard") and draugr.in_hall(inside) and not draugr.in_hall(at_door)
+				and not draugr.in_hall(walled) and not draugr.in_hall(host),
+				"Main.hall_lair_rect and Draugr.in_hall agree on who is inside (%s, %s)" % [draugr._room, _main.hall_lair_rect("lt_hall_heard")])
+		World.despawn(draugr)
+	var outside_line := "The hall's door shuts behind %s, and the bolt drops. It won't open till it's over in there." % World.shown_name(inside)
+	var peers := {"inside": inside.owner_peer, "at the door": at_door.owner_peer, "behind a wall": walled.owner_peer, "far off": host.owner_peer}
+	Net.test_sends.clear()
+	Net.test_keep_sends = true
+	_main._hold_hall_door("lt_hall_heard", true)
+	var shut := _hall_lines(peers)
+	_check(shut["inside"] == ["The hall's door shuts behind you."], "sealed: the one inside is told it shuts behind them (%s)" % [shut])
+	_check(shut["at the door"] == [outside_line], "the one waiting outside at the door is told who went in, the bolt, and till when (%s)" % [shut])
+	_check(shut["far off"].is_empty() and shut["behind a wall"].is_empty(),
+		"the far side of the level, and a player within 6 cells behind a wall, are told nothing (%s)" % [shut])
+	Net.test_sends.clear()
+	_main._hold_hall_door("lt_hall_heard", false)
+	var opened := _hall_lines(peers)
+	_check(opened["inside"] == ["The hall's door opens."] and opened["at the door"] == ["The hall's door opens."]
+			and opened["far off"].is_empty() and opened["behind a wall"].is_empty(),
+			"let go: the opening said to the same two, nobody else (%s)" % [opened])
+	Net.test_keep_sends = false
+	Net.test_sends.clear()
+	for each: Player in made:
+		World.despawn(each)
+	_main.load_map("test_room")
+	Level.unregister("lt_hall_heard")
+
+
+## The "party" lines Net.test_sends holds for each of [param peers] (name -> peer).
+func _hall_lines(peers: Dictionary) -> Dictionary:
+	var out := {}
+	for name: String in peers:
+		var lines: Array[String] = []
+		for send: Array in Net.test_sends:
+			if send[1] == "party" and (send[0] as Array).has(peers[name]):
+				lines.append(str((send[2] as Dictionary).get("text", "")))
+		out[name] = lines
+	return out
+
+
+## A 20 x 14 level [param level_name]: the Hall (its lair anchor, 6,6 8x7)
+## shut off but for one door in its north wall at x 9; an antechamber
+## (2..17, 1..5) before it; a side room (2..4, 1..5) walled off from it.
+func _register_hall_heard(level_name: String) -> void:
+	var floor_at := func(x: int, y: int) -> bool:
+		return (x >= 2 and x <= 17 and y >= 1 and y <= 5) or (x >= 6 and x <= 13 and y >= 6 and y <= 12)
+	var rows: Array[String] = []
+	for py in 14 * 2 - 1:
+		var row := ""
+		for px in 20 * 2 - 1:
+			var cx := px / 2
+			var cy := py / 2
+			if px % 2 == 0 and py % 2 == 0:
+				row += "." if floor_at.call(cx, cy) else " "
+			elif px % 2 == 0:
+				row += ("+" if cx == 9 else "#") if cy == 5 and cx >= 6 and cx <= 13 else " "
+			elif py % 2 == 0:
+				row += "#" if cx == 4 and cy >= 1 and cy <= 5 else " "
+			else:
+				row += " "
+		rows.append(row)
+	Level.register(level_name, Level.image_from_rows(rows, {Vector2i(9, 2): "start"}), null,
+		{"regenerate": {"anchors": [{"rect": [6, 6, 8, 7], "name": "lair"}]}})
 
 
 ## Umbrage re-laid round its chapel (Relaid, 774): a save on the old layout

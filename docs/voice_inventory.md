@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (2991)
+## Lines in the code (2994)
 
 ### companions (Pip, Wren, Nix) (663)
 
@@ -2126,7 +2126,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (788)
+### server and windows (791)
 
 | | Line | Where |
 |---|---|---|
@@ -2339,8 +2339,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s takes the key from Brand's belt. | `main.gd` _give_camp_key() |
 |  | Brand's key falls at your feet: your pack is full. | `main.gd` _give_camp_key() |
 |  | Brand's key falls at %s's feet. | `main.gd` _give_camp_key() |
-|  | The hall's door shuts behind you. | `main.gd` _hold_hall_door() |
-|  | The hall's door opens. | `main.gd` _hold_hall_door() |
+|  | The hall's door shuts behind %s, and the bolt drops. It won't open till it's over in there. | `main.gd` HALL_SHUT_OUTSIDE |
+|  | The hall's door shuts and the bolt drops. Someone is in there; it won't open till it's over. | `main.gd` HALL_SHUT_OUTSIDE_NONE |
+|  | The hall's door opens. | `main.gd` _tell_hall_door() |
+|  | The hall's door shuts behind you. | `main.gd` _tell_hall_door() |
+|  | The hall's door opens. | `main.gd` _tell_hall_door() |
 |  | The way is shut until the fight is done. | `main.gd` HALL_WAY_HELD |
 |  | The throne is still his. | `main.gd` THRONE_HIS |
 |  | Bring his remains to his bier | `main.gd` ALTAR_STEP |
