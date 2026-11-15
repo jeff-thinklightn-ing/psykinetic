@@ -1500,7 +1500,47 @@ func _test_benches() -> void:
 		Townsfolk.sicken(work)
 	_check(not stored.has("companion:Wynn") and not bool(work.worker("companion:Wynn").get("sick", false)),
 		"after its days her sickness ends, and the mark with it")
+
+	# 915 amended (1): taken out sick, her sickness ends in the party (Main ends it on her player's
+	# card); the town's mark used to stay while she was away, so her bench was never handed on.
+	towns = _bench_world()
+	work = towns.production
+	towns.note_companion_in(TOWN, "Wynn", "carpenter", "p1")
+	Townsfolk._falls_sick(work, TOWN, "companion:Wynn", Townsfolk.day_of(_now), rng)
+	_bench_ticks(towns, 1)
+	towns.note_companion_out(TOWN, "Wynn")
+	towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	_bench_ticks(towns, 1)
+	_check(work.workshop_of("companion:Wynn") == bench and towns._bench_line(TOWN, bench).contains("holder sick, away"),
+		"taken out sick: she keeps the bench, its line says both (%s)" % towns._bench_line(TOWN, bench))
+	stored.erase("companion:Wynn")  # Her sickness over out of town, on her player's card.
+	_bench_ticks(towns, 1)
+	_check(not bool(work.worker("companion:Wynn").get("sick", false)) and work.workshop_of("dag") == bench,
+		"her sickness over while she is away: the mark cleared at the town's turn, and the bench goes to the carpenter here (%s)" % towns._bench_line(TOWN, bench))
 	Offers.ctx = ctx_was
+
+	# 915 amended (1), the box's cook (11-14: holder sick at every boot, the town counting 0 sick): a save
+	# carrying a resident's mark with no sickness on the card, an older build's leftover. Cleared at the
+	# first turn after the load, with the journal line, and the trade works that turn.
+	towns = _bench_world()
+	work = towns.production
+	towns.note_rescue(TOWN, "dag", "Dag", "carpenter")
+	work.stockpile.deposit(TOWN, "wood", 80, "test", "")
+	work.stockpile.deposit(TOWN, "ore", 20, "test", "")
+	work.set_sick("dag", true)
+	towns = _bench_loaded(towns)
+	work = towns.production
+	_check(work.workshop_of("dag") == bench and bool(work.worker("dag").get("sick", false)) and Townsfolk.sickness_of(work, "dag").is_empty(),
+		"a save like the box's cook: his bench, a sick mark, no sickness on his card")
+	_bench_ticks(towns, 1)
+	var started := int(work.workshop(bench)["job"])
+	_check(not bool(work.worker("dag").get("sick", false)) and started != 0 and work.job(started).get("state") == "working",
+		"the first turn after the load: the mark cleared and he takes a repair that turn (%s)" % towns._bench_line(TOWN, bench))
+	# A real sickness keeps its mark: the audit only follows the card.
+	Townsfolk._falls_sick(work, TOWN, "dag", Townsfolk.day_of(_now), rng)
+	_bench_ticks(towns, 2)
+	_check(bool(work.worker("dag").get("sick", false)) and Townsfolk.is_sick(work, "dag") and towns._bench_line(TOWN, bench).contains("holder sick, job"),
+		"a sickness on his card: the mark stays (%s)" % towns._bench_line(TOWN, bench))
 
 	# An away holder (a first player's companion taken out for good): a second companion of the
 	# trade takes the bench; the first, back, waits; the second away, the first takes it back.

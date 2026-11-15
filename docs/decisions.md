@@ -55902,6 +55902,20 @@ companion_test checks both hooks by the town worker's id. tools/probe_umbrage (n
 away-holder silence on rows3's tip (saturn, 94e1796ae, case D).
 
 Protocol unchanged; save format unchanged (no new key). No new class_name.
+
+915 amended (1) (label from tools/decision_number.sh; the coordinator's approval, 11-14): every resident's sick mark follows their sickness each turn, companions away or not. On the box on 11-14, Umbrage's cook bench read "holder sick, job 0 -, unseated of the trade 0" at the 07:18:17, 16:25:54 and 18:44:58 boots. The day lines counted 0 sick from day 488 to 490, six minutes before the first of those boots (release's journal reads). The bench lines print before that tick's falls (Towns.tick runs before Townsfolk.tick), and the cook is the only bench on all three lists. So the cook's mark had no sickness behind it, and as a sick holder she kept the bench and did no work. The audit had made only companions' marks follow, and only while they were in town. Two ways a mark outlived its sickness:
+- A companion taken out sick whose sickness ended in the party (Main ends it on her player's card) kept the town's mark while away. Her bench reads sick before away, so 915's hand-on never passed it.
+- A resident's mark left in the save by an older build, with no sickness on the card, had nothing to end it: Townsfolk's endings only run for a card that holds a sickness.
+Towns._bench_audit now reads every resident's sickness (Townsfolk.sickness_of: the card, or for a companion her player's card through Offers.ctx, away or not; nothing of the player goes into a line) and sets the flag to match.
+- A mark with nothing behind it is cleared and journals "[towns] <town> bench <trade>: a sick mark with no sickness behind it cleared, step N". It holds the town, the trade and the step, no name. That is the line release greps after the deploy.
+- A companion's mark set to match her sickness keeps 915's line. A resident's set to match (no path sets a card's sickness without the flag today) journals "<town> bench <trade>: a sick mark set, as the sickness".
+- The bench line says "holder sick, away" when both are true.
+An idle cook doesn't explain the hungry days: cooking turns one raw into one meal (items' food, meat and fish recipes, 1 to 1), and a resident eats a store raw when the shelf is empty (Economy._eat). So days 488-490 (food 0, hungry 6, 6, 4) went hungry for want of raw, not for want of a cook.
+farm_test _test_benches:
+- taken out sick, she keeps the bench and its line says both; her sickness over while away, the mark is cleared at the town's turn and the bench goes to the carpenter here;
+- a save shaped like the box's cook (a resident's mark, no sickness on his card), cleared at the first turn after the load with the line, a repair taken that turn;
+- a real sickness keeps its mark.
+farm_test, towns_test, rescue_test, resident_test, townsfolk_test, companion_test PASS. Server only; protocol unchanged; save format unchanged; no new class_name; no bullet.
 ## 905. The camps' tents by hand: a bandits' hide shelter and a traders' canvas with an awning, each camp naming its own
 
 The coordinator's rulings of 11-13 on art-gen's 10-18 prop.tent fit (a pale slab by day and the brightest thing
