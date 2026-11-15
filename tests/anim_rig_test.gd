@@ -30,6 +30,7 @@ func _ready() -> void:
 	await _test_shield_works()
 	await _test_bow_clear()
 	await _test_sky_bow()
+	await _test_bow_renock()
 	await _test_bow_back()
 	await _test_sheathed()
 	await _test_sheathe_clips()
@@ -1133,6 +1134,72 @@ const FORM_T := 12.0
 const FORM_ELBOW := 0.07
 const FORM_BEHIND := 0.2
 const FORM_EYE := 0.06
+## Drawn again inside a loose (928 amended (1); the coordinator on ui-design's cycle strip: through
+## Bow_Loose's NOCK the bow dropped to the chest and came back up between two quick shots): the path
+## Client3D.bow_nock_at gives from a loose RENOCK_FROM in (Bow_Loose on to BOW_LOOSE_UP, Bow_Renock),
+## sampled RENOCK_SAMPLES times, flat and at the sky: the bow hand never more than RENOCK_DROP below
+## where the first draw's pull starts (Bow_Draw at BOW_SET_END, the bow up on the line; ui-design's
+## snap strip); Bow_Renock's ends on Bow_Loose's BOW_LOOSE_UP and Bow_Draw's BOW_SET_END within
+## RENOCK_SEAM (each hand), so the clip changes show nothing. The old path (no renock) is measured
+## beside it and printed.
+const RENOCK_FROM := 0.2
+const RENOCK_SAMPLES := 20
+const RENOCK_DROP := 0.04
+const RENOCK_SEAM := 0.03
+func _test_bow_renock() -> void:
+	print("== drawn again inside a loose, the bow kept on the line ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	_check(lib.has_animation("Bow_Renock") and lib.has_animation("Bow_Renock_Sky")
+			and absf(lib.get_animation("Bow_Renock").length - Client3D.BOW_RENOCK_SECONDS) < 0.001
+			and absf(lib.get_animation("Bow_Renock_Sky").length - Client3D.BOW_RENOCK_SECONDS) < 0.001,
+			"Bow_Renock and its sky clip, %.2f s (BOW_RENOCK_SECONDS)" % Client3D.BOW_RENOCK_SECONDS)
+	if not lib.has_animation("Bow_Renock"):
+		return
+	var clip_of := {"loose": "Bow_Loose", "renock": "Bow_Renock", "draw": "Bow_Draw"}
+	var sky_of := {"Bow_Loose": "Bow_Loose_Sky", "Bow_Renock": "Bow_Renock_Sky", "Bow_Draw": "Bow_Draw_Sky"}
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		model.add_child(holder)
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		rig.loop("Idle", 0.0)
+		var hands := func() -> Array:
+			var inv := model.global_transform.affine_inverse()
+			return [inv * (sockets["hand_l"] as Node3D).global_position, inv * (sockets["hand_r"] as Node3D).global_position]
+		var pose := func(clip: String, share: float, sky: bool) -> Array:
+			rig.sky(sky_of[clip] if sky else "", 1.0 if sky else 0.0)
+			rig.upper_at(clip, share * lib.get_animation(clip).length)  # After the sky's: it seeks both.
+			await _frames(3)
+			return hands.call()
+		for sky: bool in [false, true]:
+			var held: Array = await pose.call("Bow_Draw", Client3D.BOW_SET_END, sky)
+			var lows := []
+			for renock: bool in [true, false]:
+				var low := INF
+				for i in RENOCK_SAMPLES + 1:
+					var at: Array = Client3D.bow_nock_at(float(i) / RENOCK_SAMPLES, RENOCK_FROM, renock)
+					var got: Array = await pose.call(clip_of[at[0]], float(at[1]), sky)
+					low = minf(low, (got[0] as Vector3).y)
+				lows.append((held[0] as Vector3).y - low)
+			var name := "%s %s" % [build[0], "sky" if sky else "flat"]
+			_check(lows[0] <= RENOCK_DROP, "%s: drawn again inside a loose the bow hand at most %.3f m below where the first draw's pull starts (%.3f; through Bow_Loose's NOCK, the old path: %.3f)" % [
+				name, RENOCK_DROP, lows[0], lows[1]])
+			var loose_up: Array = await pose.call("Bow_Loose", Client3D.BOW_LOOSE_UP, sky)
+			var start: Array = await pose.call("Bow_Renock", 0.0, sky)
+			var finish: Array = await pose.call("Bow_Renock", 1.0, sky)
+			var set_at: Array = await pose.call("Bow_Draw", Client3D.BOW_SET_END, sky)
+			var seams := [(loose_up[0] as Vector3).distance_to(start[0]), (loose_up[1] as Vector3).distance_to(start[1]),
+				(finish[0] as Vector3).distance_to(set_at[0]), (finish[1] as Vector3).distance_to(set_at[1])]
+			_check(seams.all(func(d: float) -> bool: return d <= RENOCK_SEAM), "%s: Bow_Renock begins on Bow_Loose at %.1f and ends on Bow_Draw at %.2f, each hand within %.2f m (%s)" % [
+				name, Client3D.BOW_LOOSE_UP, Client3D.BOW_SET_END, RENOCK_SEAM, seams.map(func(d: float) -> String: return "%.3f" % d)])
+		rig.sky("", 0.0)
+		model.queue_free()
+
+
+const SETTLE_DEGREES := Vector2(2.5, 6.0)
 func _test_sky_bow() -> void:
 	print("== the lob's draw at the sky ==")
 	var lib := load(CLIPS) as AnimationLibrary
@@ -1157,7 +1224,8 @@ func _test_sky_bow() -> void:
 			return rad_to_deg(asin(d.y))
 		var at := {}
 		for moment: Array in [["flat", "Bow_Draw", "", 0.0], ["sky", "Bow_Draw", "Bow_Draw_Sky", 1.0], ["half", "Bow_Draw", "Bow_Draw_Sky", 0.5],
-				["held", "Bow_Hold", "Bow_Hold_Sky", 1.0], ["let go", "Bow_Draw", "", 0.0]]:
+				["held", "Bow_Hold", "Bow_Hold_Sky", 1.0], ["held flat", "Bow_Hold", "", 0.0], ["settle", "Bow_Hold", "Bow_Hold_Sky", Client3D.BOW_SETTLE_SKY],
+				["let go", "Bow_Draw", "", 0.0]]:
 			rig.upper_at(moment[1], 1.0 if moment[1] == "Bow_Draw" else 0.4)
 			rig.sky(moment[2], moment[3])
 			await _frames(3)
@@ -1180,6 +1248,12 @@ func _test_sky_bow() -> void:
 			build[0], squares["sky"], squares["flat"]])
 		_check(at["half"] > at["flat"] + 10.0 and at["half"] < at["sky"] - 10.0,
 			"%s: half mixed, between (%.1f of %.1f..%.1f)" % [build[0], at["half"], at["flat"], at["sky"]])
+		# 928 amended (1): the snap's settle, BOW_SETTLE_SKY of the sky clip over the hold, lifts the arrow's
+		# line SETTLE_DEGREES (a few degrees: not yet settled, never aimed elsewhere), the bow still square to it.
+		var lift: float = at["settle"] - at["held flat"]
+		_check(lift >= SETTLE_DEGREES.x and lift <= SETTLE_DEGREES.y and absf(squares["settle"] - squares["held flat"]) <= 1.0,
+			"%s: the settle's start lifts the held arrow %.1f deg (%.0f..%.0f), the bow square to it as held (%.1f, %.1f deg)" % [
+			build[0], lift, SETTLE_DEGREES.x, SETTLE_DEGREES.y, squares["settle"], squares["held flat"]])
 		_check(absf(at["let go"] - at["flat"]) < 1.0 and rig.sky_amount() == 0.0, "%s: let go, the flat draw again (%.1f)" % [build[0], at["let go"]])
 		rig.sky("", 0.0)
 		model.queue_free()

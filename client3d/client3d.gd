@@ -1381,6 +1381,7 @@ const HUMANOID_MOVES := {
 	"deaths": ["Death01", "Death02"], "bow_draw": "Bow_Draw", "bow_aim": "Bow_Hold", "bow_shoot": "Bow_Loose", "bow_idle": "Bow_Idle",
 	# The same aimed at the sky, for a lob (677, pc-character's side; _sync_bow mixes them in).
 	"bow_draw_sky": "Bow_Draw_Sky", "bow_aim_sky": "Bow_Hold_Sky", "bow_shoot_sky": "Bow_Loose_Sky",
+	"bow_renock": "Bow_Renock", "bow_renock_sky": "Bow_Renock_Sky",
 	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle", "ready": "Axe_Ready",
 }
 ## Attach points (decision 451): where a humanoid holds and hangs things, on
@@ -24582,26 +24583,109 @@ static func held_ids(entity: GridEntity) -> Array:
 
 
 ## How far into Bow_Draw [param entity]'s pose is (0 to 1), scrubbed by the
-## sim's draw (decision 462): before the draw counts (draw_of 0, until its
-## draw_min) the nock, the clip's first BOW_NOCK_END, by the ticks toward
-## draw_min; then the pull, the rest of the clip, by World.draw_of from
-## where it starts (draw_min over draw_full) to 1. Carried on between ticks
-## by World.tick_alpha, so it moves every frame, not ten times a second.
-const BOW_NOCK_END := 0.3
+## sim's draw (decision 462; 928 amended (1), Jeff: "you draw by explosively
+## pulling"): the nock (bow_phase's first share) takes the clip to
+## BOW_SET_END, the arrow set and the bow raised onto the line, the string a
+## hand back; the pull, the draw's last tick before its first step, takes
+## it the rest of the way, eased hard (BOW_PULL_EASE): most of the pull in
+## the tick's first part, whole at the step, where Bow_Hold takes over from
+## the clip's last key (the same pose). Carried on between ticks by
+## World.tick_alpha, so it moves every frame, not ten times a second.
+const BOW_NOCK_END := 0.3  # Bow_Draw's NOCK key: the arrow on the string.
+const BOW_SET_END := 0.55  # Bow_Draw's key with the bow up on the line, the string a hand back.
+const BOW_LOOSE_NOCK := 0.6  # Bow_Loose's NOCK key (the same pose as Bow_Draw's at BOW_NOCK_END).
+const BOW_LOOSE_UP := 0.3  # Bow_Loose's last key with the bow on the line (the string hand back past the ear): Bow_Renock's first.
+const BOW_RENOCK_SECONDS := 0.25  # Bow_Renock's length; it ends on Bow_Draw's BOW_SET_END key.
+const BOW_PULL_EASE := 3.0
+const NOCK_CLIPS := {"draw": "bow_draw", "loose": "bow_shoot", "renock": "bow_renock"}
 static func bow_pull(entity: GridEntity) -> float:
+	var phase := bow_phase(entity)
+	return float(bow_nock_at(phase.x, -1.0)[1]) if phase.y <= 0.0 else BOW_SET_END + (1.0 - BOW_SET_END) * phase.y
+
+
+## Where [param entity]'s draw is (928 amended (1)): x the nock's share (0 to
+## 1 over the ticks before the pull's), y the pull's share eased (0 to 1 over
+## the tick before its bow's first step, World.draw_step's, quickness and a
+## lob's later step counted); (1, 1) from World.draw_of 1, (0, 0) not drawing.
+## A bow whose full draw comes after its first step (none now) is pulled by
+## draw_of's growth, as 462 had it.
+static func bow_phase(entity: GridEntity) -> Vector2:
 	var verb := Items.verb_of(World.drawn_with(entity))
 	if verb.is_empty() or entity.raised != "draw":
-		return 0.0
-	var quick := World.draw_quick(entity)  # A quick bow's, and the armour's (decision 622, step 2).
-	var least := roundi(int(verb.get("draw_min", 0)) * quick)
-	var full := World.draw_full_ticks(entity)
-	var drawn := World.tick - entity.raised_tick
+		return Vector2.ZERO
 	var progress := World.draw_of(entity)
-	if progress <= 0.0:
-		return BOW_NOCK_END * clampf((drawn + World.tick_alpha) / maxf(1.0, least), 0.0, 1.0)
-	progress = minf(1.0, progress * (drawn + World.tick_alpha) / maxf(1.0, drawn))
-	var start := least / full
-	return BOW_NOCK_END + (1.0 - BOW_NOCK_END) * clampf((progress - start) / maxf(0.001, 1.0 - start), 0.0, 1.0)
+	if progress >= 1.0:
+		return Vector2.ONE
+	var drawn := float(World.tick - entity.raised_tick) + World.tick_alpha
+	if progress > 0.0:
+		var ticks := float(World.tick - entity.raised_tick)
+		return Vector2(1.0, minf(1.0, progress * drawn / maxf(1.0, ticks)))
+	var pull_at := maxf(0.0, bow_first_tick(entity, verb) - 1.0)
+	var nock := clampf(drawn / pull_at, 0.0, 1.0) if pull_at > 0.0 else 1.0
+	var u := clampf(drawn - pull_at, 0.0, 1.0)
+	return Vector2(nock, 1.0 - pow(1.0 - u, BOW_PULL_EASE))
+
+
+## The tick of [param entity]'s draw at which its bow ([param verb]) reaches
+## its first step (World.draw_step's: draw_min, a lob's lob_draw_min, by its
+## quickness).
+static func bow_first_tick(entity: GridEntity, verb: Dictionary) -> float:
+	var least := float(verb.get("lob_draw_min", verb["draw_min"]) if entity.lobbing else verb["draw_min"])
+	return ceilf(least * World.draw_quick(entity) - 0.0001)
+
+
+## The nock's pose at its share [param nock] (928 amended (1)): ["draw",
+## "loose" or "renock", how far into that clip, 0 to 1]. From rest ([param
+## from] -1), Bow_Draw from its start to BOW_SET_END. Drawn again inside a
+## loose (the 0.6 s cycle: loose_recover's 2 ticks and the draw's 4), from
+## where the loose is ([param from], into Bow_Loose), the bow kept on the line
+## (the coordinator on ui-design's cycle strip: through Bow_Loose's NOCK it
+## dropped to the chest and came back up): Bow_Loose to BOW_LOOSE_UP (on, or
+## back up if it had begun to lower), then Bow_Renock, the string hand forward
+## to the string with the bow held up, which ends on Bow_Draw's BOW_SET_END
+## key, where the pull goes on. A loose already past its NOCK (the bow down)
+## goes on from Bow_Draw's matching key (its lowering is Bow_Draw's lifting
+## run back). Without the renock clip ([param renock] false), Bow_Loose on to
+## its NOCK, then Bow_Draw from its own.
+static func bow_nock_at(nock: float, from: float, renock := true) -> Array:
+	if from < 0.0:
+		return ["draw", BOW_SET_END * nock]
+	if from >= BOW_LOOSE_NOCK:
+		var start := BOW_NOCK_END * (1.0 - minf(from, 1.0)) / (1.0 - BOW_LOOSE_NOCK)
+		return ["draw", lerpf(start, BOW_SET_END, nock)]
+	if not renock:
+		var down := BOW_LOOSE_NOCK - from
+		var on := nock * (down + BOW_SET_END - BOW_NOCK_END)
+		return ["loose", from + on] if on < down else ["draw", BOW_NOCK_END + on - down]
+	var back := absf(BOW_LOOSE_UP - from)
+	var along := nock * (back + BOW_RENOCK_SECONDS)
+	if along < back:
+		return ["loose", from + along * signf(BOW_LOOSE_UP - from)]
+	return ["renock", (along - back) / BOW_RENOCK_SECONDS]
+
+
+## How far from settled [param entity]'s drawn bow is (928 amended (1)): 0
+## through the nock, rising with the pull to 1 at its step (the snap carries
+## the bow arm past the line), then down to 0 as its aim closes (World.spread_of's
+## cone from the pull's to its floor, carried on by World.tick_alpha), eased
+## to land soft; 0 not drawing. The steady buff and practice narrow the cone
+## by a share, so the settle's time is the same; what it moves is
+## BOW_SETTLE_SKY's (_sky_bow).
+static func bow_unsettled(entity: GridEntity) -> float:
+	var phase := bow_phase(entity)
+	if phase.y < 1.0:
+		return phase.y
+	var verb := Items.verb_of(World.drawn_with(entity))
+	if verb.is_empty() or (verb.get("spread", []) as Array).is_empty():
+		return 0.0
+	var quick := maxf(0.01, World.draw_quick(entity))
+	var floor_at := deg_to_rad(float(verb.get("spread_floor", 0.0)))
+	var widest := Items.spread_at(verb, bow_first_tick(entity, verb) / quick)  # The cone at the pull's step.
+	var now := Items.spread_at(verb, (float(World.tick - entity.raised_tick) + World.tick_alpha) / quick)
+	if widest <= floor_at + 0.0001:
+		return 0.0
+	var left := clampf((now - floor_at) / (widest - floor_at), 0.0, 1.0)
+	return left * left
 
 
 ## A bow's look on its puppet (decision 462), from what the sim replicates
@@ -24663,9 +24747,22 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 		_rest_sound(puppet, str(ids[0]), want != "rest")
 	if (want == "stowed") != (state == "stowed"):
 		_rest_sound(puppet, bow if bow != "" else str(ids[1]), want != "stowed")
+	if want == "draw" and state != "draw":
+		# 928 amended (1): drawn again inside a loose, the nock goes on from where the loose is
+		# (bow_nock_at), and the settle left on its sky mix eases off over the nock (_sky_bow).
+		var shoot := str(moves.get("bow_shoot", ""))
+		var inside := state == "loose" and shoot != "" and rig.upper_clip() == shoot
+		puppet.set_meta("nock_from", rig.upper_position() / maxf(0.001, rig.length(shoot)) if inside else -1.0)
+		puppet.set_meta("settle_left", float(puppet.get_meta("sky_off", 0.0)) if inside else 0.0)
+	var phase := bow_phase(entity) if want == "draw" else Vector2.ZERO
+	var renock := rig.has(str(moves.get("bow_renock", "")))
+	var nocked: Array = bow_nock_at(phase.x, float(puppet.get_meta("nock_from", -1.0)), renock) if want == "draw" and phase.y <= 0.0 else []
+	puppet.set_meta("nock_clip", str(nocked[0]) if not nocked.is_empty() else "draw")
+	_sky_bow(entity, puppet, rig, moves, want, now, phase)  # Before the upper clip moves, which seeks the sky's too.
 	if want == "draw":
-		var clip := str(moves.get("bow_draw", ""))
-		rig.upper_at(clip, bow_pull(entity) * rig.length(clip))
+		var clip := str(moves.get(NOCK_CLIPS[str(puppet.get_meta("nock_clip"))], ""))
+		var at := float(nocked[1]) if not nocked.is_empty() else BOW_SET_END + (1.0 - BOW_SET_END) * phase.y
+		rig.upper_at(clip, at * rig.length(clip))
 	elif want != state:
 		match want:
 			"hold":
@@ -24681,7 +24778,6 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 			"", "carry", "stowed", "sheathed":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
-	_sky_bow(entity, puppet, rig, moves, want, now)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
 	else:
@@ -24705,20 +24801,37 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 ## leaves steep whatever its reach): the sky clips aim the arrow's line,
 ## nock to bow hand, LOB_PITCH degrees up, and the loosed arrow (ui's side)
 ## leaves on that line.
+## The settle (928 amended (1); Jeff, 669: no shaking): the sky mix also
+## carries the drawn bow's one settle onto its line, BOW_SETTLE_SKY of the sky
+## clip at bow_unsettled 1 (the snap's end), the bow arm about 4 degrees
+## above the line drawn flat (below it at the sky), easing onto the line as
+## the aim's cone closes; never a sway, never aimed elsewhere. A loose keeps
+## what it was loosed with; drawn again inside it, that eases off over the
+## nock ([param phase]'s x).
 const SKY_FADE := 0.2
 const LOB_PITCH := 70.0
-const SKY_CLIPS := {"draw": "bow_draw_sky", "hold": "bow_aim_sky", "loose": "bow_shoot_sky"}
+const SKY_CLIPS := {"draw": "bow_draw_sky", "hold": "bow_aim_sky", "loose": "bow_shoot_sky", "renock": "bow_renock_sky"}
+const BOW_SETTLE_SKY := 0.06
 
 
-func _sky_bow(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String, now: int) -> void:
-	var amount := rig.sky_amount()
+func _sky_bow(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String, now: int, phase := Vector2.ZERO) -> void:
+	var amount := float(puppet.get_meta("sky_base", rig.sky_amount()))
+	var off := 0.0
 	if want in ["draw", "hold"]:
 		var step := (now - int(puppet.get_meta("sky_msec", now))) / 1000.0 / SKY_FADE
 		amount = move_toward(amount, 1.0 if entity.lobbing else 0.0, step)
-	elif want != "loose":
+		off = BOW_SETTLE_SKY * bow_unsettled(entity) * (-1.0 if amount > 0.5 else 1.0)
+		if want == "draw" and phase.y <= 0.0:
+			off += float(puppet.get_meta("settle_left", 0.0)) * (1.0 - phase.x)
+	elif want == "loose":
+		off = float(puppet.get_meta("sky_off", 0.0))
+	else:
 		amount = 0.0
 	puppet.set_meta("sky_msec", now)
-	rig.sky(str(moves.get(SKY_CLIPS.get(want, ""), "")), amount)
+	puppet.set_meta("sky_base", amount)
+	puppet.set_meta("sky_off", off)
+	var key := str(puppet.get_meta("nock_clip", "draw")) if want == "draw" else want
+	rig.sky(str(moves.get(SKY_CLIPS.get(key, ""), "")), clampf(amount + off, 0.0, 1.0))
 
 
 ## The rest [param puppet] stands at (662 (b)): RESTS' row for the piece in

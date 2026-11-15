@@ -57394,3 +57394,38 @@ row, ui_test (the loose sent, the aim holds; the draw down, cleared).
 Protocol 58 (release's number): both sides derive the step, cone, reach and pull from the catalog and
 raised/raised_tick, so an old client would draw the old pull against a new server. No new class_name.
 The bullet waits for animation's strip and the coordinator's bow rows.
+
+928 amended (1), animation's side (the coordinator's approval of the design; Jeff's report: "you draw by
+explosively pulling"; 669's "no shaking"; the decision-number script's label): the pose follows the snap.
+Client3D.bow_phase reads the draw from raised_tick and World.tick_alpha: the nock's share over the ticks
+before the pull's tick, and the pull's share over the tick before the bow's first step (World.draw_step's:
+draw_min, a lob's lob_draw_min, by its quickness; bow_first_tick). The nock scrubs Bow_Draw from its start to
+BOW_SET_END 0.55, the clip's key with the bow up on the line and the string a hand back. The pull takes it on
+to 1.0 eased by 1-(1-u)^BOW_PULL_EASE (3): 87% of the pull in its first 50 ms. It is whole at the step, where
+draw_of is 1 and Bow_Hold takes over from the same pose, with no pop. The settle: the snap carries the bow arm
+past the line, and it eases back onto it as the aim's cone closes, one movement and never a sway or an aim
+elsewhere. Client3D.bow_unsettled rises with the pull to 1, then falls as Items.spread_at's cone goes from the
+pull's step to its floor (10 ticks), squared to land soft; the steady buff and practice narrow the cone by a
+share, so they leave its time alone. It is carried on the sky mix (_sky_bow): BOW_SETTLE_SKY 0.06 of the sky
+clip, which lifts the held arrow's line about 4 degrees drawn flat (anim_rig_test: 2.5 to 6, the bow square to
+it as held); at the sky it settles from below. A loose keeps the mix it was loosed with, so a snap loose
+leaves on the unsettled line. Drawn again inside a loose (the 0.6 s cycle: loose_recover's 2 ticks and the
+draw's 4), the nock goes on from where the loose is with the bow kept on the line (bow_nock_at): Bow_Loose on
+to BOW_LOOSE_UP 0.3, its last key with the bow up and the string hand back past the ear (back up to it if the
+loose had begun to lower), then Bow_Renock (0.25 s, key for key with Bow_Renock_Sky), the string hand forward
+to the string with the bow arm held on the line (the drawn form at nock 0), which ends on Bow_Draw's 0.55 key,
+where the pull goes on. A first try went on through Bow_Loose's NOCK key to Bow_Draw's: ui-design's joined
+cycle strip (C:/dev/review/ui-design/looks/bow928d_B_7e1dd024e) showed the bow dropping to the chest and
+coming back up between two quick shots, and the coordinator sent it back. A loose already past its NOCK goes
+on from Bow_Draw's matching key, its lowering being Bow_Draw's lifting run back. The settle left on the mix
+eases off over that nock, and the sky clips follow key for key. _sky_bow now runs before the upper clip moves,
+so a new upper clip seeks the sky clip with it. Tests: view_test _test_bow (combat's nock rows replaced: the nock to BOW_SET_END by the
+pull's tick, the pull's eased shares at a quarter and a half of its tick, Bow_Hold at the step, the settle's
+sky mix 0.06 at 4 ticks falling to 0 by 10 and staying there, a draw inside a loose at 0.2 s going on from
+there through Bow_Renock to the pull, the bow hand within RENOCK_DROP 0.04 m of where the first draw's pull starts, Bow_Draw at 0.55)
+and anim_rig_test _test_sky_bow (the settle's lift in degrees) and _test_bow_renock (the redraw's path sampled
+flat and at the sky, the bow hand within 0.04 m of that: 0.034 m flat at its lowest, 0.005 at the sky, where the old path
+dropped 0.29 and 0.63, printed beside it;
+Bow_Renock's ends on its neighbours' keys within 0.03 m). The clips are built by tools/humanoid_clips.py
+into goblin.res. Client only; protocol unchanged by this side; no new class_name. The bullet is voice's, for the bow
+as a whole (combat's numbers and this pull together), limited to what the joined strip shows.

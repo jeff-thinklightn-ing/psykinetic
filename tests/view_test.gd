@@ -14874,6 +14874,9 @@ func _test_sheathed() -> void:
 	_rig._process(0.0)
 
 
+## The most the bow hand may sit below where the first draw's pull starts (Bow_Draw at BOW_SET_END)
+## while drawn again inside a loose (928 amended (1); anim_rig_test _test_bow_renock samples the whole path).
+const RENOCK_DROP := 0.04
 func _test_bow() -> void:
 	print("
 == the bow (decision 462): held left, drawn, held at full draw, loosed; the shield's guard ==")
@@ -14922,26 +14925,40 @@ func _test_bow() -> void:
 	var on_string := bow.find_child("Nocked", true, false) as Node3D
 	_check((on_string != null and on_string.is_visible_in_tree()) or not ArtKit.has("fx.arrow"),
 			"an arrow on the string, shown (Jeff: \"the arrow doesn't load into the bow with drawing\")")
-	# Scrubbed by the sim's draw (bow_pull): the nock by the ticks to draw_min;
-	# since 928 the pull is one tick, so draw_of goes 0 to 1 and the pose goes
-	# to Bow_Hold at draw_min's 4 ticks (animation's 928 amended (1) strikes it).
+	# Scrubbed by the sim's draw (bow_pull; 928 amended (1): the snap): the nock
+	# over the 3 ticks before the pull's to BOW_SET_END (the bow up on the line),
+	# then the pull in the tick before draw_min's 4, eased hard, whole at the
+	# step, where Bow_Hold takes over; the settle on the sky mix after it.
 	var alpha := World.tick_alpha
-	World.tick_alpha = 0.0
 	var length := rig.length("Bow_Draw")
 	var poses := []
-	for drawn: int in [2, 3]:
-		player.raised_tick = World.tick - drawn
+	var bow_skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var bow_hand := func() -> float:  # The bow hand's height in metres (the skeleton's frame, scaled).
+		return bow_skeleton.get_bone_global_pose(bow_skeleton.find_bone("LeftHand")).origin.y * bow_skeleton.global_basis.get_scale().y
+	var set_hand := 0.0  # Where the first draw's pull starts (Bow_Draw at BOW_SET_END): the bow up on the line.
+	for at: Vector2 in [Vector2(2, 0.0), Vector2(3, 0.0), Vector2(3, 0.25), Vector2(3, 0.5)]:
+		World.tick_alpha = at.y
+		player.raised_tick = World.tick - int(at.x)
 		_rig._process(0.0)
-		poses.append(rig.upper_position() / length)
+		poses.append(snappedf(rig.upper_position() / length, 0.001))
+		if at == Vector2(3, 0.0):
+			set_hand = bow_hand.call()
+	var ease := func(u: float) -> float: return 1.0 - pow(1.0 - u, Client3D.BOW_PULL_EASE)
+	var expected := [Client3D.BOW_SET_END * 2.0 / 3.0, Client3D.BOW_SET_END,
+			Client3D.BOW_SET_END + (1.0 - Client3D.BOW_SET_END) * ease.call(0.25), Client3D.BOW_SET_END + (1.0 - Client3D.BOW_SET_END) * ease.call(0.5)]
+	_check(range(4).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0 and rig.upper_clip() == "Bow_Draw",
+			"the pose scrubbed by the draw: the nock to the bow on the line by the pull's tick, then the pull, most of it in the tick's first half (%s of the clip, expected %s)" % [poses, expected])
+	var settles := []
+	for at: Vector2 in [Vector2(4, 0.0), Vector2(6, 0.0), Vector2(8, 0.0), Vector2(10, 0.0), Vector2(14, 0.0)]:
+		World.tick_alpha = at.y
+		player.raised_tick = World.tick - int(at.x)
+		_rig._process(0.0)
+		settles.append(snappedf(rig.sky_amount(), 0.0001))
+		if at.x == 4:
+			_check(rig.upper_clip() == "Bow_Hold", "at the pull's step (4, 928): Bow_Hold (%s)" % rig.upper_clip())
 	World.tick_alpha = alpha
-	var expected := [Client3D.BOW_NOCK_END * 2.0 / 4.0, Client3D.BOW_NOCK_END * 3.0 / 4.0]
-	_check(range(2).all(func(i: int) -> bool: return absf(poses[i] - expected[i]) < 0.02) and rig.upper_speed() == 0.0,
-			"the pose scrubbed by the draw: nocking through draw_min's 4 ticks (%s of the clip, expected %s)" % [poses, expected])
-	player.raised_tick = World.tick - 4
-	_rig._process(0.0)
-	_check(rig.upper_clip() == "Bow_Hold", "at the pull's tick (4, 928): Bow_Hold (%s)" % rig.upper_clip())
-	player.raised_tick = World.tick - 20
-	_rig._process(0.0)
+	_check(absf(settles[0] - Client3D.BOW_SETTLE_SKY) < 0.0005 and settles[1] < settles[0] and settles[2] < settles[1] and settles[3] == 0.0 and settles[4] == 0.0,
+			"the settle: the bow arm past the line at the snap's end, onto it as the aim closes, on it by its floor at 10 ticks, never a sway (sky mix %s)" % [settles])
 	_check(rig.upper_clip() == "Bow_Hold", "held on: Bow_Hold (%s)" % rig.upper_clip())
 	if segments.size() == 2:
 		# Bent: both segments meet at the nock, drawn back of the brace.
@@ -14999,6 +15016,31 @@ func _test_bow() -> void:
 			and swing.max() <= Client3D.STRING_OVERSHOOT_MAX + 0.0001 and swing.min() >= -0.5 and swing.slice(swing.size() - 30).all(func(z: float) -> bool: return z == 0.0),
 			"the string's spring: at the brace by %.2f s, rings past it at most %.2f m (%.3f), still after %.1f s" % [
 				Client3D.STRING_SNAP, Client3D.STRING_OVERSHOOT_MAX, swing.max(), Client3D.STRING_SETTLE])
+	# Drawn again inside the loose (928 amended (1), the 0.6 s cycle: loose_recover's 2 ticks and the
+	# draw's 4): the nock goes on from where the loose is, the bow kept on the line (the coordinator on
+	# ui-design's cycle strip: through Bow_Loose's NOCK it dropped to the chest and came back up):
+	# Bow_Loose on to BOW_LOOSE_UP, Bow_Renock, then the pull on Bow_Draw from BOW_SET_END; the bow
+	# hand never more than RENOCK_DROP below where the first draw's pull started.
+	rig.upper("Bow_Loose", 1.0, true)
+	rig.tree.advance(0.2)
+	puppet.set_meta("bow_until", Time.get_ticks_msec() + 1000)
+	var loose_at := rig.upper_position() / rig.length("Bow_Loose")
+	player.raised = "draw"
+	var cycle := []
+	var lowest := INF
+	for at: Vector2 in [Vector2(0, 0.0), Vector2(0, 0.5), Vector2(1, 0.0), Vector2(1, 0.5), Vector2(2, 0.0), Vector2(2, 0.5), Vector2(3, 0.0), Vector2(3, 0.5)]:
+		World.tick_alpha = at.y
+		player.raised_tick = World.tick - int(at.x)
+		_rig._process(0.0)
+		cycle.append([rig.upper_clip(), snappedf(rig.upper_position() / maxf(0.001, rig.length(rig.upper_clip())), 0.001)])
+		lowest = minf(lowest, bow_hand.call())
+	World.tick_alpha = alpha
+	var drop := set_hand - lowest
+	_check(cycle[0][0] == "Bow_Loose" and absf(cycle[0][1] - loose_at) < 0.02 and cycle[2][0] == "Bow_Renock" and cycle[6][0] == "Bow_Renock"
+			and cycle[6][1] > 0.98 and cycle[7][0] == "Bow_Draw" and cycle[7][1] > Client3D.BOW_SET_END and drop <= RENOCK_DROP,
+			"drawn again inside the loose (%.2f in): on from there through the renock to the pull, the bow hand at most %.3f m below where the first draw's pull started (%.3f; [clip, share] %s)" % [
+			loose_at, RENOCK_DROP, drop, cycle])
+	player.raised = ""
 	puppet.set_meta("bow_until", 0)
 	_rig._process(0.0)
 	_check(rig.upper_clip() == "Bow_Idle", "then Bow_Idle again")

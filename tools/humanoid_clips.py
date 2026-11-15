@@ -417,6 +417,19 @@ CLIPS["Bow_Loose"] = {"keys": [
 	(0.8, P("Idle_Loop", 0.8, LIFTING)),
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
 ]}
+# The arrow set again with the bow kept up (928 amended (1); the coordinator on ui-design's cycle strip:
+# drawn again through Bow_Loose's NOCK the bow dropped to the chest and came back up between two quick
+# shots): from Bow_Loose's 0.3 key, the bow on the line and the string hand back past the ear, the
+# string hand comes forward to the string at the bow, the bow arm held on the line (the drawn form at
+# nock 0), and ends on Bow_Draw's 0.55 key, from which Client3D's pull goes on. Key for key with
+# Bow_Renock_Sky.
+BOW_RENOCK = 0.25
+CLIPS["Bow_Renock"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.3, form(**{**FLAT_FORM, "raise_": FLAT_FORM["raise_"] - 0.04}, back=0.1))),
+	(0.13, P("Idle_Loop", 0.4, form(**FLAT_FORM, nock=0.0))),
+	(BOW_RENOCK, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + bow_arm(0.45, -0.13, 0.0, BOW_UP)
+		+ string_arm(0.25, (-1.0, -0.1, 0.0), out=0.1))),
+]}
 
 # The lob (677, pc-character's side; combat's lob, the bow aimed at the sky): the draw, the hold
 # and the release key for key with Bow_Draw, Bow_Hold and Bow_Loose (so Client3D scrubs and
@@ -475,6 +488,12 @@ CLIPS["Bow_Loose_Sky"] = {"keys": [
 	(0.6, P("Idle_Loop", 0.6, NOCK)),
 	(0.8, P("Idle_Loop", 0.8, LIFTING)),
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
+]}
+CLIPS["Bow_Renock_Sky"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.3, form(**{**SKY_FORM, "raise_": SKY_FORM["raise_"] - 0.04}, back=0.1))),
+	(0.13, P("Idle_Loop", 0.4, form(**SKY_FORM, nock=0.0))),
+	(BOW_RENOCK, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + sky_bow(0.45, -0.13, 0.0, BOW_UP, 0.85)
+		+ string_arm(0.25, (-1.0, -0.1, 0.0), out=0.16) + sky_lean(0.85, 0.0))),
 ]}
 
 # Visible work (566, pc-character's side; Jeff: "town people need to be doing activities to better
