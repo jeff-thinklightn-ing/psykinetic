@@ -1391,7 +1391,7 @@ const HUMANOID_MOVES := {
 	# not named here leads with its plain strike.
 	"drawn": {
 		"": [["Punch_Jab_Drawn", 0.33], ["Punch_Cross_Drawn", 0.38]],
-		"dagger": [["Dagger_Stab_Drawn", 0.29]],
+		"dagger": [["Dagger_Stab_Drawn", 0.25]],  # 930: redrawn, its contact by --contacts (0.29 before).
 	},
 	# A person's told strike (790 amended (7), animation's side: a robber's lunge): [clip, peak, contact],
 	# drawn back to its gathered pose (peak, seconds in at speed 1), held there through the tell, thrust

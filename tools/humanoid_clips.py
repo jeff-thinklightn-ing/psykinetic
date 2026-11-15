@@ -139,15 +139,7 @@ CLIPS = {
 			("upperarm_l", LIFT, -35.0), ("upperarm_r", LIFT, -35.0)], move=(0.0, -0.06, -0.02))),
 		(0.5, P("Idle_Loop", 0.5)),
 	]},
-	# The dagger: the hand drawn back to the hip, then stabbed forward, the right shoulder
-	# turned in behind it.
-	"Dagger_Stab": {"keys": [
-		(0.0, P("Sword_Idle", 0.0)),
-		(0.12, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, -25.0), ("lowerarm_r", LIFT, 70.0), ("spine_02", TURN, -12.0)])),
-		(0.24, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, 95.0), ("upperarm_r", TURN, 20.0), ("lowerarm_r", LIFT, -10.0), ("spine_02", TURN, 18.0),
-			("spine_01", LIFT, -6.0)], move=(0.0, -0.06, 0.0))),
-		(0.55, P("Sword_Idle", 0.0)),
-	]},
+	# The dagger's stab: CLIPS["Dagger_Stab"] after one_hand (930).
 	# The shield bash: from the guard, the left shoulder drawn back, then driven forward
 	# behind the shield, a lunge.
 	"Shield_Bash": {"keys": [
@@ -699,6 +691,28 @@ CLIPS["Spear_Thrust"] = {"keys": [
 	(0.44, P("Sword_Idle", 0.0, SPEAR_OUT, move=(0.0, -0.12, -0.02))),
 	(0.8, P("Sword_Idle", 0.0, SPEAR_READY)),
 ]}
+# The dagger's stab (930; the coordinator's line from ui-design's dagger4/5 reads: the free left hand, never
+# keyed, swung out ahead on the trunk's counter-turn, 0.46 m before the blade came, and read as the stab at
+# 8 m, the blade landing low at the belly): the free hand held in a fist guard at the chest throughout
+# (DAGGER_GUARD, keyed against the counter-turn so it never swings out), the blade drawn back to the hip
+# with the right shoulder turned away, then thrust straight ahead at chest height (one_hand), the right
+# shoulder turned in behind it and a half step in; home by 0.55. Keys and timing as before (contact 0.17).
+DAGGER_AHEAD = (0.0, -1.0, 0.06)
+DAGGER_FACE = (0.0, 0.0, 1.0)
+DAGGER_POLE = (-1.0, 0.6, -0.4)
+DAGGER_GUARD = left_arm(-0.06, -0.02, -0.24, (1.0, 0.3, -0.6))
+# Against the counter-turn (the left shoulder comes forward with it), the guard's wrist held back by as much.
+DAGGER_GUARD_TURNED = left_arm(-0.09, -0.02, -0.24, (1.0, 0.3, -0.6))
+DAGGER_GUARD_TURNED_FAR = left_arm(-0.17, -0.02, -0.24, (1.0, 0.3, -0.6))
+DAGGER_DRAWN = one_hand((-0.04, 0.18, -0.28), DAGGER_AHEAD, DAGGER_FACE, DAGGER_POLE) + DAGGER_GUARD_TURNED + [("spine_02", TURN, -12.0)]
+DAGGER_OUT = one_hand((0.5, 0.02, -0.18), DAGGER_AHEAD, DAGGER_FACE, DAGGER_POLE) + DAGGER_GUARD + [
+	("spine_02", TURN, 18.0), ("spine_01", LIFT, -6.0)]
+CLIPS["Dagger_Stab"] = {"keys": [
+	(0.0, P("Sword_Idle", 0.0, DAGGER_GUARD)),
+	(0.12, P("Sword_Idle", 0.0, DAGGER_DRAWN)),
+	(0.24, P("Sword_Idle", 0.0, DAGGER_OUT, move=(0.0, -0.06, 0.0))),
+	(0.55, P("Sword_Idle", 0.0, DAGGER_GUARD)),
+]}
 # The sword's slashes (338 amended, pc-character's side; Jeff: "sword swings a little too fast",
 # "a small reset to guard between slashes"): from a guard (the hand before the right shoulder, the
 # blade up and back past it, clear of the face; the coordinator on the strip), a short wind-up, the
@@ -816,14 +830,14 @@ def drawn_ual(base: str, side: str, start: float, length: float) -> list:
 CLIPS["Punch_Jab_Drawn"] = {"keys": drawn_ual("Punch_Jab", "l", 0.04, 0.87)}
 CLIPS["Punch_Cross_Drawn"] = {"keys": drawn_ual("Punch_Cross", "r", 0.05, 1.0)}
 CLIPS["Dagger_Stab_Drawn"] = {"keys": [
-	(0.0, P("Sword_Idle", 0.0)),
-	# Drawn back to the hip, deeper than the plain stab's, the shoulders turned well away.
-	(DRAW_AT, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, -40.0), ("lowerarm_r", LIFT, 80.0), ("spine_01", TURN, -10.0),
-		("spine_02", TURN, -24.0), ("spine_03", TURN, -10.0), ("spine_01", LIFT, 5.0), ("neck_01", TURN, 16.0), ("Head", TURN, 12.0),
-		("thigh_l", LIFT, -6.0), ("calf_l", LIFT, 10.0)], move=DRAW_BACK)),
-	(DRAW_AT + 0.12, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, 95.0), ("upperarm_r", TURN, 20.0), ("lowerarm_r", LIFT, -10.0), ("spine_02", TURN, 18.0),
-		("spine_01", LIFT, -6.0)], move=(0.0, -0.08, 0.0))),
-	(DRAW_AT + 0.45, P("Sword_Idle", 0.0)),
+	(0.0, P("Sword_Idle", 0.0, DAGGER_GUARD)),
+	# Drawn back to the hip, deeper than the plain stab's, the shoulders turned well away; the free hand kept
+	# in its guard at the chest (930), the blade thrust at chest height as the plain stab's.
+	(DRAW_AT, P("Sword_Idle", 0.0, one_hand((-0.1, 0.2, -0.28), DAGGER_AHEAD, DAGGER_FACE, DAGGER_POLE) + DAGGER_GUARD_TURNED_FAR + [
+		("spine_01", TURN, -10.0), ("spine_02", TURN, -24.0), ("spine_03", TURN, -10.0), ("spine_01", LIFT, 5.0), ("neck_01", TURN, 16.0),
+		("Head", TURN, 12.0), ("thigh_l", LIFT, -6.0), ("calf_l", LIFT, 10.0)], move=DRAW_BACK)),
+	(DRAW_AT + 0.12, P("Sword_Idle", 0.0, DAGGER_OUT, move=(0.0, -0.08, 0.0))),
+	(DRAW_AT + 0.45, P("Sword_Idle", 0.0, DAGGER_GUARD)),
 ]}
 # Thrown back off a raised shield (340 amended, animation's side; combat's 4-tick recoil, stun_cause
 # "guarded"): the striking arm flung up and back off the shield, the trunk rocked back and turned

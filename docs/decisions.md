@@ -59931,3 +59931,41 @@ told bite's red drawn and the snarl played in the same call, once; his lunge's t
 and swung bites land as sfx.wolf_bite, a monster of no kind's as the thud; a wolf's swing snaps, no whoosh). Package "the wilds' basics", on
 (the coordinator); a CHANGELOG bullet in voice's words from the joined client's sound log above, the snarl's and
 the red's times logged side by side, heard on a log read. Client only; protocol unchanged; no new class_name.
+## 930. Dagger_Stab redrawn: the free hand in a guard at the chest, the blade thrust at chest height ahead of it (animation)
+
+The coordinator's approval of the design line, from ui-design's dagger4/5 reads (Atlas, full rate, each bone's
+reach ahead of the chest along the line to the foe; C:/dev/review/ui-design/looks/dagger4_quick_37143ecb6 and
+dagger5_main2tick_b6a5c2edd): Dagger_Stab never keyed the left arm, so the trunk's counter-turn at 0.12
+(spine_02 -12 degrees) threw the free hand out to +0.47 m before the blade came, and it stayed out while the
+right thrust landed low, at belly height. At 8 m the open left hand read as the stab and the blade was hardly
+seen. The stab is redrawn with its keys and timing as before (0 the guard, 0.12 drawn back to the hip, 0.24 full
+stretch, 0.55 home; contact 0.17 unchanged by --contacts):
+(a) the free hand held in a fist guard at the chest throughout (DAGGER_GUARD, left_arm placed against the
+shoulder), held back by as much as the counter-turn brings that shoulder forward (DAGGER_GUARD_TURNED, _FAR for
+the drawn stab's deeper turn), so it never swings out;
+(b) the blade drawn back to the hip and thrust straight ahead at chest height by one_hand (DAGGER_AHEAD,
+DAGGER_FACE, DAGGER_POLE, the spear jab's pattern), the right shoulder turned in behind it and a half step in.
+Measured on the man, the heavy man and the woman at 1/60 s, in the model's frame from the UpperChest bone (the
+same measure as dagger5's):
+- the blade's hand ahead of the free hand at its largest reach: +0.37 m (+0.35 the woman); main +0.09;
+- the free hand at its farthest: +0.100 m (+0.095 the woman), the guard's own place; main +0.47;
+- the blade's hand at contact: 0.12 m under the chest bone (the hips 0.38 under it); main 0.21, the belly.
+Dagger_Stab_Drawn (the robbers' held stab, 338 amended (6)) follows with the same placing, its free hand at
+most +0.102 m. Its contact by --contacts moved from 0.29 to 0.25 s: the thrust starts from a higher hip, so its
+fastest forward move comes sooner. Client3D's "drawn" table carries 0.25. The told strike's row (790 amended
+(9): peak 0.2, contact 0.33, the full stretch) is unchanged, its stretch still at 0.333 s. The clips are built
+by tools/humanoid_clips.py into goblin.res. Tests: anim_rig_test _test_dagger_stab (the man and the woman, both stabs: the
+free hand at most DAGGER_FREE_AHEAD 0.15 m ahead, the blade's hand DAGGER_BLADE_LEADS 0.25 m or more ahead of it at its
+farthest reach, at the clip's contact at most DAGGER_CONTACT_UNDER 0.17 m under the chest bone; main's clips fail all three). The looks are
+ui-design's, at 8 m in the open and the nearest zoom beside a building, the goblin in shot, R and L marked. The
+pacing pick (923) is read again on the redrawn stab from a viewer's client. Client only; protocol unchanged;
+no new class_name; no bullet unless the looks show a player would notice.
+
+anim_rig_test split in two (the coordinator, 11-16, folded into this take, the first since to add a row to it): perf's read of
+saturn's last 16 landings had it at 249 to 297 s, over land.sh's 220 s slow-scene line in every landing since 11-14 17:46.
+One script, two scenes, as view_test and view_world_test: anim_rig_test runs the first half of its list (the rig's make and
+loops, the strikes, the shield and the bow, sheathing and work; _first_half, 134 s here) and the new anim_rig_poses_test,
+the same script with _half 1, the second (fidgets and gestures, the props' clips, rests, hafts and wrists, the upper layer,
+the people's feet; 147 s), cut where the times fall even (sword_clear 80 s, armed_fidgets 62, people_feet 55 of 254). The
+second half's call lines stay where they were in _ready, so a queued take's new row there merges as it is. Neither scene
+takes a port or a scratch folder; suite_test passes with both. Same 159 checks.

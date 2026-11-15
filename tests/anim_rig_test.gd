@@ -13,28 +13,21 @@ const CLIPS := "res://art/models/animations/goblin.res"
 var _failures := 0
 
 
+## Which half of the list this scene runs (930's split; the coordinator, 11-16: anim_rig_test ran 249 to
+## 297 s in saturn's landings, over land.sh's 220 s slow-scene line): 0 the first, anim_rig_test (the rig's
+## make and loops, the strikes, the shield and the bow, sheathing and work, about 125 s); 1 the second,
+## anim_rig_poses_test, the same script (fidgets and gestures, the props' clips, rests, hafts and wrists,
+## the upper layer, the people's feet, about 130 s). Neither takes a port or a scratch folder. A new
+## section's call line goes in the half its subject belongs to.
+func _half() -> int:
+	return 0
+
+
 func _ready() -> void:
-	await _test_make()
-	await _test_loop()
-	await _test_held_hands_over()
-	_test_feel_moved()
-	_test_feel_source()
-	await _test_strike()
-	await _test_strike_held_long_frame()
-	await _test_legs_walk()
-	await _test_one_strike_clip()
-	await _test_spear_jab()
-	await _test_sword_slash()
-	await _test_strike_fade()
-	await _test_sword_clear()
-	await _test_shield_works()
-	await _test_bow_clear()
-	await _test_sky_bow()
-	await _test_bow_renock()
-	await _test_bow_back()
-	await _test_sheathed()
-	await _test_sheathe_clips()
-	await _test_work_clear()
+	if _half() == 0:
+		await _first_half()
+		_result()
+		return
 	await _test_armed_fidgets()
 	await _test_beckon()
 	_test_knight_vigil()
@@ -53,6 +46,38 @@ func _ready() -> void:
 	_test_work_clips_loop()
 	await _test_kneel_stays()
 	await _test_hand_relax()
+	print("")
+	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+	get_tree().quit(1 if _failures > 0 else 0)
+
+
+## anim_rig_test's half of the list (_half 0).
+func _first_half() -> void:
+	await _test_make()
+	await _test_loop()
+	await _test_held_hands_over()
+	_test_feel_moved()
+	_test_feel_source()
+	await _test_strike()
+	await _test_strike_held_long_frame()
+	await _test_legs_walk()
+	await _test_one_strike_clip()
+	await _test_spear_jab()
+	await _test_dagger_stab()
+	await _test_sword_slash()
+	await _test_strike_fade()
+	await _test_sword_clear()
+	await _test_shield_works()
+	await _test_bow_clear()
+	await _test_sky_bow()
+	await _test_bow_renock()
+	await _test_bow_back()
+	await _test_sheathed()
+	await _test_sheathe_clips()
+	await _test_work_clear()
+
+
+func _result() -> void:
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -395,6 +420,58 @@ func _test_spear_jab() -> void:
 		_check(maxf(across.y - across.x, up.y - up.x) <= SPEAR_SWAY * height, "%s: the point swung %.2f m across, %.2f m up and down (at most %.2f)" % [
 			body[0], across.y - across.x, up.y - up.x, SPEAR_SWAY * height])
 		puppet.queue_free()
+
+
+## The dagger's stab (930; the coordinator's line from ui-design's dagger4/5 reads: the free left hand,
+## never keyed, swung out ahead on the trunk's counter-turn and read as the stab at 8 m, the blade landing
+## low at the belly). On the man and the woman, Dagger_Stab and the robbers' Dagger_Stab_Drawn, each hand
+## from the UpperChest bone in the model's frame (ahead is its +z): the free hand never more than
+## DAGGER_FREE_AHEAD ahead (main's 0.47 and 0.54 m; redrawn 0.10); at the blade's largest reach its hand
+## DAGGER_BLADE_LEADS or more ahead of the free one (main's 0.09; redrawn 0.37); at the clip's contact
+## (Client3D's strike and drawn tables) the blade's hand at most DAGGER_CONTACT_UNDER under the chest bone
+## (main's 0.21 and 0.20, the belly; redrawn 0.12 and 0.06).
+const DAGGER_FREE_AHEAD := 0.15
+const DAGGER_BLADE_LEADS := 0.25
+const DAGGER_CONTACT_UNDER := 0.17
+func _test_dagger_stab() -> void:
+	print("== the dagger's stab ==")
+	var strike: Array = Client3D.HUMANOID_MOVES["strikes"]["dagger"][0]
+	var drawn: Array = Client3D.HUMANOID_MOVES["drawn"]["dagger"][0]
+	var contacts := {str(strike[0]): float(strike[1]), str(drawn[0]): float(drawn[1])}
+	for build: Array in [SWORD_BUILDS[0], SWORD_BUILDS[4]]:
+		var made := _sword_body(self, build)
+		var model: Node3D = made[0]
+		var rig: AnimRig = made[2]
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var place := func(bone: String) -> Vector3:
+			return model.global_transform.affine_inverse() * (skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone)).origin)
+		for clip: String in contacts:
+			var free_far := -INF
+			var blade_far := -INF
+			var lead := 0.0
+			var t := 0.0
+			while t <= rig.length(clip) + 0.001:
+				rig.base_at(clip, t)
+				await _frames(2)
+				var chest: Vector3 = place.call("UpperChest")
+				var right: Vector3 = place.call("RightHand") - chest
+				var left: Vector3 = place.call("LeftHand") - chest
+				free_far = maxf(free_far, left.z)
+				if right.z > blade_far:
+					blade_far = right.z
+					lead = right.z - left.z
+				t += 1.0 / 30.0
+			rig.base_at(clip, float(contacts[clip]))
+			await _frames(2)
+			var under: float = (place.call("UpperChest") as Vector3).y - (place.call("RightHand") as Vector3).y
+			_check(free_far <= DAGGER_FREE_AHEAD, "%s, %s: the free hand kept in its guard, at most %.3f m ahead of the chest (within %.2f)" % [
+				build[0], clip, free_far, DAGGER_FREE_AHEAD])
+			_check(lead >= DAGGER_BLADE_LEADS, "%s, %s: the blade's hand %.3f m ahead of the free one at its farthest reach (%.3f m; at least %.2f)" % [
+				build[0], clip, lead, blade_far, DAGGER_BLADE_LEADS])
+			_check(under <= DAGGER_CONTACT_UNDER, "%s, %s: at contact (%.2f s) the blade's hand %.3f m under the chest bone (at most %.2f), at chest height" % [
+				build[0], clip, float(contacts[clip]), under, DAGGER_CONTACT_UNDER])
+		model.queue_free()
+		(made[3] as Node3D).free()
 
 
 ## The sword's slashes (338 amended, pc-character's side; Jeff: "sword swings a little too fast", "a
