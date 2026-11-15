@@ -2773,7 +2773,7 @@ func _test_umbrage_locker() -> void:
 		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not Rect2i(203, 196, 2, 3).has_point(spec["tile"])),
 		"the place weapon_stall, a stall worth nothing, at (203, 196) behind it on floor, no marker in or about it (%s)" % [place])
 	# Package "Umbrage: the pedlar's stand" (maps' side, in economy's switch take): the visiting pedlar's place at
-	# his keeper's cell behind M3, which faces north into the square; he keeps (202..204, 208..209), served from the north.
+	# his keeper's cell behind M3, which faces north into the square; he keeps (202..204, 208) (413b0f7b4), served from the north; both rows behind it are checked clear floor.
 	var pedlar: Dictionary = wilds["places"].get("pedlar_stall", {})
 	var pedlar_side := Rect2i(202, 208, 3, 2)
 	var side_clear := true
