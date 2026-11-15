@@ -17,6 +17,7 @@ notes (decision 324).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Ask your companion to fish with no water in reach and she leads you to the nearest, naming it if it's a fishing place you've already found (803).
 
+- In the crypt, when the draugr's Hall bolts shut on a challenger, a player watching its door is told who went in and that it won't open till it's over, and told again when it opens (573 amended (6)).
 - Seen from behind, a person's hair covers the whole back of their head, whatever its style (419 amended (3)).
 - Your companion kneels all the way down to bind a wound (877 amended (3)).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
