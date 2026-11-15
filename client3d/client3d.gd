@@ -22156,10 +22156,32 @@ const WINDOW_LIGHT_NEAR := 0.75  # a near house's patch (its light inside spills
 const WINDOW_LIGHT_LIFT := 0.03
 const WINDOW_LIGHT_MOST := 256
 const WINDOW_LIGHT_MARGIN := 4  # cells round the windows the may-light mask covers
+## The patch's floor (927 amended (1)): a multiply alone leaves ground no
+## other light reaches as dark as it was (three times nearly black), so from
+## a newcomer's first view the temple's forecourt showed nothing (cobbles
+## under its lancets (8, 12, 20) as shown, the same as away from them; the
+## joined looks' strips were the player's own lantern's ground, doubled). A
+## second pass (next_pass, blend_add) adds tint x WINDOW_LIGHT_FLOOR x its
+## strength, so unlit cobbles at the wall's foot show about (72, 52, 37)
+## (today's multiply, (32, 28, 28)). Within a carried lantern's light
+## (a player's or a companion's "Lantern": up to WINDOW_FLOOR_LIGHTS of
+## them, nearest the view first) the add fades out, from
+## WINDOW_FLOOR_NEAR of its range to none inside it, so the ground a body's
+## own lantern lights is the multiply's alone, as before: a body standing in
+## a patch by his own light keeps 858's ratio exactly.
+const WINDOW_LIGHT_FLOOR := 0.05  # linear: lit ground of 80 shown at the wall's foot reads 146.5 (141.1 with the multiply alone), 130 reads 187.4 (185.5)
+const WINDOW_FLOOR_LIGHTS := 8
+const WINDOW_FLOOR_NEAR := 0.5
+## The two passes share their shape (the patch's width, fall and mask); each
+## puts its own blend and its own output in.
 const WINDOW_LIGHT_SHADER := """shader_type spatial;
-render_mode blend_mul, unshaded, fog_disabled, depth_draw_never, shadows_disabled, cull_back;
+render_mode %s, unshaded, fog_disabled, depth_draw_never, shadows_disabled, cull_back;
 uniform vec3 tint : source_color = vec3(1.0, 0.7, 0.4);
 uniform float gain = 4.9;
+uniform float floor_add = 0.05;
+uniform float near_share = 0.5;
+uniform vec4 lights[8];
+uniform int light_count = 0;
 uniform float spread = 1.6;
 uniform sampler2D may : filter_nearest, repeat_disable;
 uniform vec2 may_origin;
@@ -22185,9 +22207,20 @@ void fragment() {
 	if (k <= 0.002) {
 		discard;
 	}
-	ALBEDO = vec3(1.0) + tint * gain * k;
+%s
 }
 """
+const WINDOW_LIGHT_MUL := ["blend_mul", "	ALBEDO = vec3(1.0) + tint * gain * k;"]
+const WINDOW_LIGHT_ADD := ["blend_add", """	float far = 1.0;
+	for (int i = 0; i < light_count; i++) {
+		float reach = lights[i].w;
+		far = min(far, smoothstep(reach * near_share, reach, distance(world, lights[i].xyz)));
+	}
+	float a = floor_add * k * far;
+	if (a <= 0.0005) {
+		discard;
+	}
+	ALBEDO = tint * a;"""]
 var _window_light: MultiMeshInstance3D
 ## One row per window with a glow pane: [glow, building rect (or an empty
 ## Rect2i), transform of its patch, its window's open share].
@@ -22210,14 +22243,21 @@ func _make_window_light() -> void:
 	multimesh.instance_count = WINDOW_LIGHT_MOST
 	multimesh.visible_instance_count = 0
 	_window_light.multimesh = multimesh
-	var shader := Shader.new()
-	shader.code = WINDOW_LIGHT_SHADER
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	material.set_shader_parameter("tint", WINDOW_LIGHT_TINT)
-	material.set_shader_parameter("gain", WINDOW_LIGHT_GAIN)
-	material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
-	_window_light.material_override = material
+	var materials: Array[ShaderMaterial] = []
+	for pass_of: Array in [WINDOW_LIGHT_MUL, WINDOW_LIGHT_ADD]:
+		var shader := Shader.new()
+		shader.code = WINDOW_LIGHT_SHADER % pass_of
+		var material := ShaderMaterial.new()
+		material.shader = shader
+		material.set_shader_parameter("tint", WINDOW_LIGHT_TINT)
+		material.set_shader_parameter("gain", WINDOW_LIGHT_GAIN)
+		material.set_shader_parameter("floor_add", WINDOW_LIGHT_FLOOR)
+		material.set_shader_parameter("near_share", WINDOW_FLOOR_NEAR)
+		material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
+		materials.append(material)
+	# The floor drawn after the multiply, on the same quads (927 amended (1)).
+	materials[0].next_pass = materials[1]
+	_window_light.material_override = materials[0]
 	_window_light.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_window_light.custom_aabb = AABB(Vector3(-100000.0, -1000.0, -100000.0), Vector3(200000.0, 2000.0, 200000.0))
 	add_child(_window_light)
@@ -22254,6 +22294,50 @@ func _place_window_light() -> void:
 		multimesh.set_instance_custom_data(shown, Color(strength, 0.0, 0.0, 0.0))
 		shown += 1
 	multimesh.visible_instance_count = shown
+	if shown > 0:
+		var floor_pass := (_window_light.material_override as ShaderMaterial).next_pass as ShaderMaterial
+		var lights := window_floor_lights(_puppets.values(), _camera_target)
+		var count := lights.size()
+		lights.resize(WINDOW_FLOOR_LIGHTS)  # The uniform array's whole length, as the foot marks'.
+		floor_pass.set_shader_parameter("lights", lights)
+		floor_pass.set_shader_parameter("light_count", count)
+
+
+## What the two passes show on ground of [param shown] (an sRGB colour, as a
+## still reads it) at a patch's strength [param k], [param lantern] the share
+## of the floor a carried lantern's light leaves (1 far from any, 0 inside
+## one): the frame's linear value times 1 + tint x gain x k, plus tint x
+## WINDOW_LIGHT_FLOOR x k x lantern, back to sRGB (Forward+'s float buffer,
+## the linear tonemap). The shaders' sum, for 927 amended (1)'s figures and
+## its row: headless runs compile no shader.
+static func window_floor_shown(shown: Color, k: float, lantern := 1.0) -> Color:
+	var tint := WINDOW_LIGHT_TINT.srgb_to_linear()
+	var base := shown.srgb_to_linear()
+	var out := Color(base.r * (1.0 + tint.r * WINDOW_LIGHT_GAIN * k) + tint.r * WINDOW_LIGHT_FLOOR * k * lantern,
+			base.g * (1.0 + tint.g * WINDOW_LIGHT_GAIN * k) + tint.g * WINDOW_LIGHT_FLOOR * k * lantern,
+			base.b * (1.0 + tint.b * WINDOW_LIGHT_GAIN * k) + tint.b * WINDOW_LIGHT_FLOOR * k * lantern)
+	return out.clamp().linear_to_srgb()
+
+
+## The carried lanterns lit now that the patch's floor keeps off (927
+## amended (1)): each puppet's shown "Lantern" light as [position, its
+## range] (a Vector4), the WINDOW_FLOOR_LIGHTS nearest [param near] (the
+## view's aim) first. A covered or dropped lantern is none.
+static func window_floor_lights(puppets: Array, near: Vector3) -> Array[Vector4]:
+	var found: Array[Vector4] = []
+	for puppet: Variant in puppets:
+		if not puppet is Node3D or not is_instance_valid(puppet):
+			continue
+		var lantern := (puppet as Node3D).get_node_or_null("Lantern") as OmniLight3D
+		if lantern == null or not lantern.is_visible_in_tree() or lantern.light_energy <= 0.0:
+			continue
+		var at := lantern.global_position
+		found.append(Vector4(at.x, at.y, at.z, lantern.omni_range))
+	found.sort_custom(func(a: Vector4, b: Vector4) -> bool:
+		return Vector3(a.x, a.y, a.z).distance_squared_to(near) < Vector3(b.x, b.y, b.z).distance_squared_to(near))
+	if found.size() > WINDOW_FLOOR_LIGHTS:
+		found.resize(WINDOW_FLOOR_LIGHTS)
+	return found
 
 
 ## How much of [param glow]'s window is open to the street (927): its window
@@ -22320,10 +22404,12 @@ func _build_window_light() -> void:
 		for x in size.x:
 			var cell := origin + Vector2i(x, y)
 			bytes[y * size.x + x] = 255 if _window_light_may(cell, _indoors, lanterns) else 0
+	var may := ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_R8, bytes))
 	var material := _window_light.material_override as ShaderMaterial
-	material.set_shader_parameter("may", ImageTexture.create_from_image(Image.create_from_data(size.x, size.y, false, Image.FORMAT_R8, bytes)))
-	material.set_shader_parameter("may_origin", Vector2(origin))
-	material.set_shader_parameter("may_size", Vector2(size))
+	for each: ShaderMaterial in [material, material.next_pass as ShaderMaterial]:
+		each.set_shader_parameter("may", may)
+		each.set_shader_parameter("may_origin", Vector2(origin))
+		each.set_shader_parameter("may_size", Vector2(size))
 
 
 ## Whether a window's light may fall on [param cell] (927): outdoor ground,
