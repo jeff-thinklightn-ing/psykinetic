@@ -38500,6 +38500,27 @@ _test_wind_up_range: a player's battle and giant axes 2.3, the tomb sledge
 1.8, fists with the slack, the draugr his reach alone; a clear line on open
 floor, none through a wall. Sim only, nothing calls them yet; protocol
 unchanged, no new class_name, no bullet.
+
+699 amended (5): the chase hold reads her cell by the strike's own rule (the
+decision-number script's label; the coordinator's ask after enemy-ai's tick
+log of the harness's port, 11-14). 699 amended (3) judged "outside the red"
+and the walk ahead by World.free_cell, the held tile with its 0.1
+hysteresis, while a told blow strikes the body whose World.struck_cell, the
+round of its centre, is told (810 amended). The two disagree for a centre
+0.5 to 0.6 off the held tile: at t53 of start 1 her centre stood at (10.47,
+46.67), free_cell (11, 47), struck_cell (10, 47) in the sweep's arc, so the
+hold called her outside and let the step go, and the sweep struck her the
+next tick (t89 the same). World.struck_cell_at(at), the one round(), is now
+what World.struck_cell and the hold both read: Main._free_chase_holds judges
+"mine" by it, and Main._free_cell_ahead walks the line ahead by it in place
+of World._free_cell_from. free_cell still picks the route's next point.
+controls_test _test_free_chase_hold: her centre at 5.55, (5, 3) by free_cell
+and his told (6, 3) by the strike's rule, is in the red and never held
+there (this row fails on 699 amended (3)'s hold); she holds at 5.3, and the
+rows of (3) pass with the edge read by struck_cell. The harness's own port
+(zz_duel5, scratch) takes the same rule and a look of at least one of its
+ticks' walk. Client only; protocol unchanged; no new class_name; no bullet
+(699 amended (3)'s bullet waits for ui-design's look on this).
 ## 344 amended. The spear's strike is a jab
 
 Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation

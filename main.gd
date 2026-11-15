@@ -3546,10 +3546,11 @@ func _free_chase_holds(player: Player, at: Vector2) -> bool:
 		_free_chase_hold_ends(player, foe)
 		return false
 	var told := told_cells()
-	var mine := World.free_cell(player, at)
+	var held := World.free_cell(player, at)  # The route's cells go by the held one.
 	var to: Vector2i = path[0]
-	if to == mine and path.size() > 1:
+	if to == held and path.size() > 1:
 		to = path[1]
+	var mine := World.struck_cell_at(at)  # 699 amended (5): in or out of the red by the strike's own rule.
 	var next := _free_cell_ahead(mine, at, Vector2(to))
 	if told.has(mine) or not told.has(next):
 		_free_chase_hold_ends(player, foe)
@@ -3576,7 +3577,9 @@ func _free_chase_hold_ends(player: Player, foe: Variant) -> void:
 
 ## The first cell other than [param mine] that the straight walk from
 ## [param at] towards [param to] would take the body into within
-## CHASE_HOLD_LOOK cells (World.free_cell's rule, its hysteresis kept), so
+## CHASE_HOLD_LOOK cells by the strike's own rule (World.struck_cell_at, no
+## hysteresis: 699 amended (5); free_cell's let her centre stray 0.1 into a
+## told cell, struck there, while the hold still called her outside), so
 ## a held chase stands at the told line's edge, not a cell short of it;
 ## [param mine] when none. A route in the open is its goal alone
 ## (World.walk_path's straight stretches), so its next point can lie past a
@@ -3588,7 +3591,7 @@ static func _free_cell_ahead(mine: Vector2i, at: Vector2, to: Vector2) -> Vector
 		return mine
 	var steps := ceili(look / 0.05)
 	for i in range(1, steps + 1):
-		var cell := World._free_cell_from(mine, at + way.normalized() * (look * float(i) / steps))
+		var cell := World.struck_cell_at(at + way.normalized() * (look * float(i) / steps))
 		if cell != mine:
 			return cell
 	return mine

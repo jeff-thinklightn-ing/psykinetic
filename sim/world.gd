@@ -6159,7 +6159,14 @@ func free_projected(body: GridEntity) -> Vector2:
 func struck_cell(body: GridEntity) -> Vector2i:
 	if not free_body(body):
 		return body.tile
-	return Vector2i(body_centre(body).round())
+	return struck_cell_at(body_centre(body))
+
+
+## struck_cell's rule for a free body whose centre stands at [param at]: the
+## cell under it, no hysteresis (699 amended (5): the chase's hold judges
+## "outside the red" by this, the strike's own rule, not free_cell's).
+static func struck_cell_at(at: Vector2) -> Vector2i:
+	return Vector2i(at.round())
 
 
 ## Who a blow at [param cell] strikes (struck_cell): its holder unless that

@@ -1668,13 +1668,13 @@ func _test_free_chase_hold() -> void:
 	var entered := false
 	for i in 40:
 		_free_frames(player, 6)
-		if _main.told_cells().has(World.free_cell(player, player.free_pos)):
-			entered = true
+		if _main.told_cells().has(World.struck_cell(player)):
+			entered = true  # By the strike's own cell (699 amended (5)).
 	_check(not entered and _main._free.get("chase_held", false) and imp.hp == hp and _main._free["chase"] != null,
 			"chasing, she stops short of his told line and holds (at %s, held %s, the chase on)" % [player.free_pos, _main._free.get("chase_held", false)])
 	# At the edge, not a cell short: the line starts at x 5.5 (6.0 less half a
-	# cell), entered at 5.6 by free_cell's hysteresis; the hold looks 0.3 ahead.
-	_check(World.free_cell(player, player.free_pos) == Vector2i(5, 3) and player.free_pos.x > 5.2,
+	# cell) by the strike's rule (699 amended (5)); the hold looks 0.3 ahead.
+	_check(World.struck_cell(player) == Vector2i(5, 3) and player.free_pos.x > 5.15,
 			"held at the line's edge, a route in the open its goal alone (at %s, route %s)" % [player.free_pos, _main._free["path"]])
 	_check(player.facing == Vector2i(1, 0), "holding, she faces him (facing %s)" % player.facing)
 	print("held: order %s, %d ticks since it was given (FREE_CHASE_TICKS %d)" % [player.action_order, World.tick - player.action_tick, Player.FREE_CHASE_TICKS])
@@ -1699,6 +1699,26 @@ func _test_free_chase_hold() -> void:
 			"standing in his told line, the chase walks on, never held (%s -> %s)" % [from, player.free_pos])
 	_main._free["chase"] = null
 	_main._free["path"] = []
+	# 699 amended (5): "outside the red" by the strike's own cell. Her centre at x 5.55 lies in (6, 3)
+	# by World.struck_cell's rule and still on her held (5, 3) by free_cell's (0.5 + 0.1 hysteresis):
+	# a blow at (6, 3) strikes her there, so she is in the red and never held there; from 5.3, the
+	# strike's edge at 5.5 lies 0.2 ahead, so she is held (free_cell's 5.6 is past the look).
+	_place_player(Vector2i(5, 3))
+	_free_start(player)
+	_main.telegraphs[tell] = {"id": tell, "source": str(imp.get_path()), "kind": "lunge",
+		"cells": [[6, 3], [7, 3], [8, 3]], "lands_tick": World.tick + 9999}
+	World.command_attack(player, imp)
+	_main._free_chase_start(player, imp)
+	_main._free["chase"] = imp
+	_main._free["path"] = [Vector2i(9, 3)]
+	var between := Vector2(5.55, 3.0)
+	var in_red: bool = World.free_cell(player, between) == Vector2i(5, 3) and World.struck_cell_at(between) == Vector2i(6, 3) and not _main._free_chase_holds(player, between)
+	_check(in_red, "her centre at 5.55: in his told cell by the strike's rule (free_cell still (5, 3)): in the red, never held there (699 amended (5))")
+	_check(_main._free_chase_holds(player, Vector2(5.3, 3.0)), "at 5.3, the strike's edge 0.2 ahead: held (699 amended (5))")
+	_main.telegraphs.erase(tell)
+	_main._free["chase"] = null
+	_main._free["path"] = []
+	_main._free["chase_held"] = false
 	# A plain click-walk onto a told cell: walked, never held.
 	_place_player(Vector2i(4, 5))
 	_free_start(player)
