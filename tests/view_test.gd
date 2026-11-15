@@ -4438,7 +4438,8 @@ func _test_tavern_inside() -> void:
 				panes_bad.append([glass.get_path(), glass_drawn.emission_energy_multiplier, want])
 	_check(lancets > 0 and panes_bad.is_empty(),
 			"the temple's lancets' glass at %.2f of its emission (%d), every other pane as drawn (bad %s)" % [Client3D.LANCET_GLOW, lancets, panes_bad])
-	var lamp_spot :=Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
+	_test_stall_lamps()
+	var lamp_spot := Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
 		[Vector3(3.0, 0.0, 8.5), Vector3(4.0, 0.0, 8.5)], true)
 	_check(lamp_spot.is_equal_approx(Vector3(3.0 - Client3D.DOOR_LAMP_ASIDE, 0.0, 8.5 + Client3D.DOOR_LAMP_STONE)),
 			"a two-door front's lantern beside its last door, on a stone wall %.1f m further out (%s)" % [Client3D.DOOR_LAMP_STONE, lamp_spot])
@@ -4982,6 +4983,55 @@ func _test_window_floor() -> void:
 			and warm_mul.shader.code == mul.shader.code and warm_add.shader.code == add.shader.code,
 			"both passes among the warm-ups, one patch from the view's own shader code, a multimesh with custom data as the view's (its shader variant)")
 	warm.free()
+
+
+## The market stalls' lanterns (782 amended (3)), the wilds built: one per
+## stall, the posts' lantern under its front rail (art-kit's hook, in the
+## stall's own frame), shadowless, STALL_LAMP_ENERGY over STALL_LAMP_RANGE,
+## never under the stall; lit at 19:00 and out at 22:00 and by day, by
+## stall_lamp_lit alone, its pane with it.
+func _test_stall_lamps() -> void:
+	var rows: Array = _rig._stall_lamps
+	var placed_bad: Array = []
+	for row: Array in rows:
+		var piece := row[3] as Node3D
+		var light := row[1] as OmniLight3D
+		var rect: Rect2i = row[0]["rect"]
+		var stall: Node3D = null
+		for b: Dictionary in _rig._buildings:
+			if b["rect"] == rect:
+				stall = b["node"]
+		var want := stall.transform * (Client3D.STALL_LAMP_HOOK - Vector3(0.0, Client3D.LANTERN_TALL * 0.5 * Client3D.LAMP_LANTERN_SCALE, 0.0)) if stall != null else Vector3.INF
+		if (stall == null or piece.get_parent() != _rig._room or stall.is_ancestor_of(piece) or not light.global_position.is_equal_approx(_rig._room.global_transform * want)
+				or light.shadow_enabled or not is_equal_approx(light.omni_range, Client3D.STALL_LAMP_RANGE) or row[2] == null):
+			placed_bad.append([rect, light.global_position, want])
+	_check(rows.size() == 2 and placed_bad.is_empty(),
+			"the wilds' two market stalls each a lantern under its front rail, in the room beside the stall, %.1f m, shadowless, its own pane (%d; bad %s)" % [Client3D.STALL_LAMP_RANGE, rows.size(), placed_bad])
+	var answers := [Client3D.stall_lamp_lit({}, 19.0, -0.2), Client3D.stall_lamp_lit({}, 21.9, -0.4), Client3D.stall_lamp_lit({}, 22.0, -0.4),
+		Client3D.stall_lamp_lit({}, 3.0, -0.6), Client3D.stall_lamp_lit({}, 12.0, 0.8), Client3D.stall_lamp_lit({}, 18.5, 0.01)]
+	# Applied: the hour set, the lamps looked at, then put back.
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	var shown: Array = []
+	for hour: float in [19.0, 22.0]:
+		DayNight.set_hour(hour)
+		_rig._update_lamps()
+		_rig._flicker_fires(0.016)
+		var all_ok := not rows.is_empty()
+		for row: Array in rows:
+			var light := row[1] as OmniLight3D
+			var glow := float((row[2] as StandardMaterial3D).get_meta(&"glow", -1.0)) if row[2] != null else -1.0
+			if hour < 20.0:
+				all_ok = all_ok and light.visible and light.light_energy > 0.5 * Client3D.STALL_LAMP_ENERGY and glow > 0.0
+			else:
+				all_ok = all_ok and not light.visible and is_zero_approx(glow)
+		shown.append(all_ok)
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	_rig._update_lamps()
+	_check(answers == [true, true, false, false, false, false] and shown == [true, true],
+			"a stall's lantern lit at 19:00 and out at 22:00, by stall_lamp_lit alone, its pane with it; out by day, after LAMP_OUT and before the sun sets (%s; applied %s)" % [answers, shown])
 
 
 ## The plinth (decision 489 amended): a kind's wood walls on a stone band
