@@ -55672,7 +55672,25 @@ no take made, the lock not beaten; the gate's exit 6 by checkout, with nothing q
 a refused run never beats; status's self-waiting line, its log event and the summary's count, gone when the lock is
 released, none for a scene; checkout paths. The test refuses to run on a land.sh without the stand-in and points
 GODOT_PATH at nothing, so it can never start a real suite. land.ps1 has no lock adopt and no saturn path, and is
-unchanged. Tools and tests only; protocol unchanged; no class_name; no bullet.
+unchanged. Its first landing (cbcc8ac90 rebased as b32751076, perf-lockname, 11-15) hung: every part passed by 11:38
+(server_boot_test, and on saturn state_test 163 s, the suite 258 s, net_test 64 s), and land.sh then never printed its
+result line. Its bare `wait` after the Godot parts waits for every child of the shell, and (3) had made the beater
+one of them, a loop that ends only with that shell. The beat kept the lock fresh, so nothing went stale. Perf stopped
+it by PID at 12:17 and released the lock; nothing was pushed. The cost was 46 minutes of the whole queue (20 landings
+waiting, the gate's take OVERRUN at 83 of 60 min). Release's read had checked on_exit's kill of the beater, which only
+runs at the script's exit, and the wait never let it get there. Mended in the same take: (5) land.sh waits for its parts
+by their own pids (jobs -p less the beater), never a bare wait. (6) The tail's own limit: once every part has ended,
+land.sh has LAND_TAIL_SECONDS (180) to end. Past it, whatever holds it, it prints and writes "LANDING TESTS: FAIL
+(every part had ended, and land.sh had not ended 180 s later: stopped, its beat with it; give the lock back ...)" and
+stops itself. on_exit stops the beat, and the land script gives the lock back as on any failure. The guard counts in
+1 s steps, so a stopped guard leaves no long sleep behind. land_name_test's new rows use their own stand-in, never a
+flag land.sh must know: a scratch folder outside any git repository holding a copy of the checkout's land.sh, the
+helpers it sources, and every part and tool part as a stub that exits 0, with the beat's land_lock.sh a stub that
+records the beater's pid. Run as the gate runs it, it goes from the beat through every part to the result line in
+seconds and starts no Godot. Rows: land.sh ends by itself after its parts (5 s), its PASS line printed and written for
+the outer run, its beater gone, the limit never met. A copy with the bare wait put back and a 3 s limit ends by itself
+(9 s), failing with that line, its beater gone. Run on the hung land.sh (b32751076's), the first row fails: every stub
+part passed in about a second, and land.sh printed PASS only when the row stopped its beater at 60 s (61 s).
 
 ## 882. The sim's dusk follows the sky's: dark at the end of civil twilight
 

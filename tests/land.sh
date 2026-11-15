@@ -172,6 +172,7 @@ LOGS="$(mktemp -d -t psykinetic-land.XXXXXX)"
 # holder only when it names this tree and this commit.
 on_exit() {
 	[ -n "${beater:-}" ] && kill "$beater" 2>/dev/null
+	[ -n "${tail_guard:-}" ] && kill "$tail_guard" 2>/dev/null
 	if [ -n "${remote:-}" ]; then
 		bash tools/remote_tests.sh finish >/dev/null 2>&1
 	fi
@@ -335,7 +336,32 @@ else
 	sleep 0.3
 	part server_boot_test bash tests/server_boot_test.sh &
 fi
-wait
+# The parts alone are waited for, by their own pids, never a bare wait: a bare wait waits for
+# every child of this shell, and the beater (above) is one that ends only with this shell. With
+# 883 amended (2)'s beat begun here, perf-lockname's landing (11-15, 11:26 to 12:17) waited on
+# it for ever after every part had passed, its beat keeping the lock fresh: 46 minutes of the
+# whole queue (883 amended (2)).
+parts="$(jobs -p | grep -vx "$beater")"
+# The tail's own limit (883 amended (2)): once every part has ended, land.sh has
+# LAND_TAIL_SECONDS to end too (its tail is the counting and the result line, seconds). Past
+# it, whatever holds it, the run fails loudly, its result line written, and stops: its beat
+# goes with it (on_exit), and the land script gives the lock back as on any failure.
+LAND_TAIL_SECONDS=180
+( for p in $parts; do while kill -0 "$p" 2>/dev/null; do sleep 2; done; done
+	# In 1 s steps, so a guard stopped at the run's end leaves no long sleep behind it.
+	waited=0
+	while [ "$waited" -lt "$LAND_TAIL_SECONDS" ]; do
+		kill -0 "$parent" 2>/dev/null || exit 0
+		sleep 1
+		waited=$((waited + 1))
+	done
+	kill -0 "$parent" 2>/dev/null || exit 0
+	line="LANDING TESTS: FAIL (every part had ended, and land.sh had not ended $LAND_TAIL_SECONDS s later: stopped, its beat with it; give the lock back (883 amended (2)))"
+	echo "$line"
+	[ -z "${LAND_RESULT:-}" ] || echo "$line" > "$LAND_RESULT"
+	kill "$parent" ) &
+tail_guard=$!
+for p in $parts; do wait "$p"; done
 [ -n "$remote" ] && bash tools/remote_tests.sh finish
 # 278 amended (9): a scene over 220 s in this suite is named, a warning and not a failure; the
 # tree adding its next row splits it, as view_test and view_land_test were.
