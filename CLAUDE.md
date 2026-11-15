@@ -140,7 +140,13 @@ that the walk looks like skipping and the people look like "bad claymation place
   connection fails the landing: run it again, never push on it. A saturn slot whose landing
   is gone on this PC (no land-lock beat in 150 s and no gate take, or this tree's own earlier
   sha while it holds the lock) is taken over at once by the next prepare, logged in saturn's
-  `~/land/.slot_clears.log` (878 amended (1)). A first landing under a new tree name takes
+  `~/land/.slot_clears.log` (878 amended (1)). Since 878 amended (2) (e508cf6ab) a landing's
+  saturn prepare can fail, and its line says why: "SATURN SLOT REFUSED: ... requeue" (or
+  "waited 10 minutes") is another landing's slot, never this commit's fault: no part ran,
+  requeue; "the import failed" is this commit's own import on saturn, its SCRIPT ERROR lines
+  above it; "saturn does not have", "could not check out" or "is not clean" is a send or
+  checkout fault: requeue and tell perf. A landing gives its slot back itself on every way
+  out; nobody clears one by hand. A first landing under a new tree name takes
   saturn's newest scene times (90 amended (2)); the landing log's "durations:" line says where
   its caps came from, and a tree that reads "durations: none" tells perf. `LAND_LOCAL=1` keeps
   everything here (the cut's suite on main does); `land.ps1` has no saturn path. This is the
