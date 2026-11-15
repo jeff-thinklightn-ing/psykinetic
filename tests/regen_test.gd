@@ -616,7 +616,7 @@ func _test_richness_never_waited() -> void:
 	# WorldRichness's own: is_ready never waits; a mine's steps come in.
 	var real := WorldRichness.new(_main._world_map, World.holdings)
 	var area := "wilds"
-	var at := Vector2i(208, 205)  # The wilds' start.
+	var at := Vector2i(208, 205)  # By the square (the wilds' first start till 934).
 	real.mines.append({"area": area, "cell": at})
 	real.start()
 	var t := Time.get_ticks_usec()

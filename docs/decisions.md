@@ -57529,3 +57529,45 @@ dropped 0.29 and 0.63, printed beside it;
 Bow_Renock's ends on its neighbours' keys within 0.03 m). The clips are built by tools/humanoid_clips.py
 into goblin.res. Client only; protocol unchanged by this side; no new class_name. The bullet is voice's, for the bow
 as a whole (combat's numbers and this pull together), limited to what the joined strip shows.
+
+## 934. Umbrage: the way in. The wilds' starts face the inn's lit front, the north road reads as one road, the hill road joined (maps)
+
+The flow page's (A) (C:/dev/review/maps/umbrage_flow_page.md; Jeff, 2026-11-14: "the game needs intuitive designs
+that flow from place to place"; the coordinator's rulings, 2026-11-15, package "Umbrage: the way in", switched on by
+this take; label from tools/decision_number.sh). Nothing in it is a sign, a marker or a word.
+
+(1) The four starts stand together on the level grass south of the square: (190, 219), (192, 219), (190, 221),
+(192, 221). The client's first view (yaw 0) looks north-west, and from (190, 219) the inn's lit front (180, 208) lies
+11 cells straight north-west with nothing built between: the porch lantern, two lit panes, the warm spill at the door.
+The page's look was shot from (185, 219) (terrain's stills C:/dev/review/umb_arrivals/a185_219_*, environment's lead
+lines C:/dev/review/environment/lead/6..9; environment builds nothing for it), but that grass slopes, and relief_test
+keeps every start on level ground (Relief.PAD_FLAT), so the starts stand on the flat ground 5 cells east; the joined
+stills before the bullet are shot from (190, 219). From today's start the first view met the temple's lit back gable, and turning
+west put the camera inside hut H2. This supersedes 774 amended (4)'s second start; the camera keeps a player's own
+turn across zones and restarts, so only a brand-new install sees the first view.
+
+(2) The north road (roads 0, 3 and 7: the foothills link to the crossroads, south, then east into the town) loses the
+painted dirt beside it: 367 cells within 6 of it, outside every road's 2-cell margin, repainted to the grass beside
+them. Most are the parallel dirt and the first stretch of each place a trail met it, left by tools/make_wilds.gd's
+generated paths, which are drawn like the road, so the road seemed to branch (terrain's from_north sheet). Every
+trail beyond stays: painted dirt tracks are safe paths (763), which herds use and dens and roaming predators keep
+off, and moving those is not a way-in mend (the full 1,297 off-road cells were weighed and set aside, the
+coordinator). Kept too: the old farmstead's yard (within 12 of its place) and round its fallow fields' furrows. Its band
+is clean too (the coordinator, on ui-design's joined look at (125, 74), C:/dev/review/ui-design/looks/
+look_way_0140fb78a/: a grass notch and an island in the road's dirt where the kept margin met the repaint): 163 more
+cells, the painted dirt in the north road's 2-cell margin outside every road's own cells, are grass, so the road's dirt
+is its curve's own width. The wilds' safe paths go from 2248 cells to 2256 with the hill road's new point (3) and to
+2218 with the repaint: it takes 38 safe-path cells, fewer than the 40 or more a trail falling under TRACK_RUN (40)
+would take with it, so no trail fell out.
+
+(3) The hill road (road 9) gains a point at (235, 128.5), so it meets the hills road (road 2) at the hills arrival
+instead of stopping 6 cells short. The breach's road (10) already meets the barrow road (8), 1.7 cells from its line
+within its width; nothing changes there.
+
+level_test _test_way_in, each failing on main's data: the wilds' starts within 3 of the first, open floor all round
+each, none on a spot; the inn's front within 15 of the first start, north-west of it, nothing built between; no
+painted dirt within 6 of the north road outside the roads' margins, the farmstead's yard and its fields; out of the
+town's ground and the farmstead's, no grass in the north road's own cells and no painted dirt in its margin; the hill road
+meets the hills road and the breach's road the barrow road; it prints the wilds' safe-path count. Level data and a
+test; protocol unchanged; no new class_name. Its bullet follows the joined stills from the new start (noon, 21:30),
+by ui-design's order.

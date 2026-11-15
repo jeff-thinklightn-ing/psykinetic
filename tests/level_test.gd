@@ -1455,15 +1455,115 @@ func _test_starts() -> void:
 		and way_out.size() == 1 and way_out[0]["tile"] == Vector2i(128, 20) and wilds_level["terrain"]["floor"].has(arrival) and not wilds_level["starts"].has(arrival)
 		and _floor_walks(wilds_level["terrain"], arrival, wilds_level["starts"][0]),
 		"a walk in from the foothills arrives at the wilds' %s, open floor, no start, walked from there to the town's start" % [arrival])
-	var wilds := wilds_level
-	var second: Vector2i = wilds["starts"][1]
-	var around := true
-	for dx in range(-1, 2):
-		for dy in range(-1, 2):
-			var cell := second + Vector2i(dx, dy)
-			around = around and wilds["terrain"]["floor"].has(cell) and not wilds["terrain"]["solid"].has(cell)
-	_check(around and World.distance(second, wilds["starts"][0]) <= 8 and wilds["spots"].all(func(spot: Dictionary) -> bool: return spot["cell"] != second),
-		"the wilds' second start %s near the first %s (within 8), open floor all round it, no spot on it" % [second, wilds["starts"][0]])
+	_test_way_in(wilds_level)
+
+
+## The way in (934, the flow page's (A); the coordinator's rulings, 2026-11-15): the wilds' four starts together on
+## open grass south-east of the inn, the inn's lit front where the first view looks; the north road free of the old
+## generator's dirt beside it, so it reads as one road; the hill and breach roads joined to the roads they meet.
+func _test_way_in(wilds: Dictionary) -> void:
+	print("
+== the way in: the wilds' starts face the inn, the north road reads as one road, the roads joined ==")
+	var terrain: Dictionary = wilds["terrain"]
+	var first: Vector2i = wilds["starts"][0]
+	var bad: Array[String] = []
+	for start: Vector2i in wilds["starts"]:
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				var cell := start + Vector2i(dx, dy)
+				if not terrain["floor"].has(cell) or terrain["solid"].has(cell):
+					bad.append("%s beside %s not open" % [cell, start])
+		if World.distance(start, first) > 3:
+			bad.append("%s %d from the first" % [start, World.distance(start, first)])
+		if wilds["spots"].any(func(spot: Dictionary) -> bool: return spot["cell"] == start):
+			bad.append("%s on a spot" % [start])
+	_check(bad.is_empty(), "the wilds' starts within 3 of the first %s, open floor all round each, none on a spot (%s)" % [first, bad])
+	# The first view (yaw 0) looks north-west: the inn's front within 15 of the first start, north-west of it, nothing
+	# built on the line between.
+	var inn: Dictionary = {}
+	var built := {}
+	for building: Dictionary in wilds["buildings"]:
+		if str(building.get("code", "")) == "I1":
+			inn = building
+		for cell: Vector2i in Level.building_cells(building):
+			built[cell] = str(building.get("code", building.get("slot", "")))
+	var front := Level.front_cell(inn["rect"], inn["facing"]) if not inn.is_empty() else World.NO_CELL
+	var between: Array[String] = []
+	for k in range(1, 40):
+		var cell := Vector2i((Vector2(first).lerp(Vector2(front), k / 40.0)).round())
+		if built.has(cell) and not between.has(built[cell]):
+			between.append(built[cell])
+	_check(not inn.is_empty() and World.distance(first, front) <= 15 and front.x < first.x and front.y < first.y and between.is_empty(),
+		"the inn's front %s within 15 of the first start %s, north-west of it, nothing built between (%s)" % [front, first, between])
+	# The north road (roads 0, 3 and 7: the north link to the crossroads, south, east into the town) has no painted dirt
+	# within 6 of it but its own and the other roads' margins (2 cells): the generator's trails start off in the grass.
+	var roads: Array = terrain["roads"]
+	var road_cells := {}
+	var north := {}
+	for index in roads.size():
+		for cell: Vector2i in Curves.cells(roads[index]["curve"], false):
+			road_cells[cell] = true
+			if index in [0, 3, 7]:
+				north[cell] = true
+	var margin := {}
+	for cell: Vector2i in road_cells:
+		for dx in range(-2, 3):
+			for dy in range(-2, 3):
+				margin[cell + Vector2i(dx, dy)] = true
+	var near_north := {}
+	for cell: Vector2i in north:
+		for dx in range(-6, 7):
+			for dy in range(-6, 7):
+				near_north[cell + Vector2i(dx, dy)] = true
+	# Kept: the old farmstead's yard (within 12 of its place) and round its fallow fields' furrows.
+	var config := Level.template_config("wilds")
+	var farm: Array = config["places"]["old_farmstead"]["at"]
+	var kept := {}
+	for dx in range(-12, 13):
+		for dy in range(-12, 13):
+			kept[Vector2i(int(farm[0]) + dx, int(farm[1]) + dy)] = true
+	for furrow: Dictionary in config.get("furrows", []):
+		var r: Array = furrow["rect"]
+		for x in range(int(r[0]) - 2, int(r[0]) + int(r[2]) + 2):
+			for y in range(int(r[1]) - 2, int(r[1]) + int(r[3]) + 2):
+				kept[Vector2i(x, y)] = true
+	var left: Array[Vector2i] = []
+	for cell: Vector2i in terrain["kinds"]:
+		if terrain["kinds"][cell] == "dirt" and near_north.has(cell) and not margin.has(cell) and not kept.has(cell):
+			left.append(cell)
+	left.sort()
+	_check(left.is_empty(), "the north road: no painted dirt within 6 of it outside the roads' margins, the farmstead's yard and its fields (%d: %s)" % [left.size(), left.slice(0, 12)])
+	# Its band clean (the coordinator, on ui-design's look at (125, 74): a grass notch and an island in the road's dirt):
+	# out of the town's ground and the farmstead's, every one of its own cells painted dirt where the layout has grass,
+	# and no painted dirt in its 2-cell margin outside every road's own cells.
+	var islands: Array[Vector2i] = []
+	var edge: Array[Vector2i] = []
+	for cell: Vector2i in near_north:
+		if kept.has(cell) or (cell.x >= 165 and cell.y >= 185) or not terrain["kinds"].has(cell):
+			continue
+		var kind := str(terrain["kinds"][cell])
+		if north.has(cell) and kind == "grass":
+			islands.append(cell)
+		elif kind == "dirt" and margin.has(cell) and not road_cells.has(cell):
+			var by_north := false
+			for dx in range(-2, 3):
+				for dy in range(-2, 3):
+					by_north = by_north or north.has(cell + Vector2i(dx, dy))
+			if by_north:
+				edge.append(cell)
+	islands.sort()
+	edge.sort()
+	print("  north road band: islands %s; edge %s" % [islands, edge])
+	_check(islands.is_empty() and edge.is_empty(), "the north road's band: no grass in its own cells, no painted dirt in its margin (%d islands, %d edge: %s %s)" % [
+		islands.size(), edge.size(), islands.slice(0, 6), edge.slice(0, 6)])
+	# The hill road (9) reaches the hills road (2) at the hills arrival; the breach's road (10) reaches the barrow road (8).
+	var joined := func(a: int, b: int) -> bool:
+		var b_cells := Curves.cells(roads[b]["curve"], false)
+		var a_cells := Curves.cells(roads[a]["curve"], false)
+		return a_cells.keys().any(func(cell: Vector2i) -> bool: return b_cells.has(cell))
+	_check(joined.call(9, 2) and joined.call(10, 8), "the hill road meets the hills road (%s), the breach's road the barrow road (%s)" % [joined.call(9, 2), joined.call(10, 8)])
+	var safe := Level.safe_paths(terrain)
+	print("  the wilds' safe paths: %d cells" % safe.size())
 
 
 ## Whether [param to] is walked to from [param from] over [param terrain]'s floor: four steps, a wall edge or a

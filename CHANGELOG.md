@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Towns: a newcomer arrives south of Umbrage's square, facing the Mughouse's front across open grass, its windows lit at night, and the road in from the foothills is a single road (934).
 
 - With the hunting bow, a quick Shift-click looses an arrow at once (928).
 - Hold a shot on the hunting bow to steady your aim, then to reach farther; close in, every hit strikes as hard however long you held (928).
