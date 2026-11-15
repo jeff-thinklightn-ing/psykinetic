@@ -2287,25 +2287,33 @@ func unregister_pile(pile: GroundPile) -> void:
 	pile_gone.emit(pile)
 
 
+## A door come (into the zone, or to a client as its chunk arrives) or gone:
+## only the light and heat that reach its two cells are worked out again, as
+## when it opens (351 amended (2)). A door not there counts as shut, and the
+## lines know its edge from the terrain, so this is all it changes; on a
+## client, a door's whole-map pass was a stall each time one came or went by
+## interest, about six a minute walking Umbrage.
 func register_door(door: Door) -> void:
 	_doors[door.key] = door
-	fields_changed()
+	fields_changed(Terrain.edge_cells(door.key), door.key)
 	door_shown.emit(door)
 
 
 func unregister_door(door: Door) -> void:
 	if _doors.get(door.key) == door:
 		_doors.erase(door.key)
-		fields_changed()
+		fields_changed(Terrain.edge_cells(door.key), door.key)
 
 
 ## The fixed heat and light must be worked out again (a door, the map):
-## all of it, or ([param near]) only what reaches those cells.
-func fields_changed(near: Array[Vector2i] = []) -> void:
+## all of it, or ([param near]) only what reaches those cells; a door's
+## ([param door], its key) through the lines kept, anything else's with
+## the near sources' lines made again (Fields.mark_dirty_near).
+func fields_changed(near: Array[Vector2i] = [], door := Vector3i.MAX) -> void:
 	if near.is_empty():
 		fields.mark_dirty()
 	else:
-		fields.mark_dirty_near(near)
+		fields.mark_dirty_near(near, door)
 	fields_changed_signal.emit()
 
 
@@ -13744,8 +13752,11 @@ func has_hearing_line(from: Vector2i, to: Vector2i) -> bool:
 ## owes to doors: null if the terrain alone stops it, else the keys of the
 ## doors it crosses, each of which must be open for it to be clear ([] for
 ## none); LINE_ASK when it passes a door on a diagonal step, where it
-## depends on more than one door being open. Walls, heights and where the
-## doors are stay put, so this is worked out once (Fields).
+## depends on more than one door being open. It reads the terrain's edges,
+## not the Door nodes: a door edge's key is listed whether its door has
+## arrived or not. Fields keeps each source's lines through a door's
+## changes, and makes them again only when the terrain near it changes (a
+## felled cell, an edge set: Fields.mark_dirty_near).
 const LINE_ASK := -1
 func line_doors(from: Vector2i, to: Vector2i) -> Variant:
 	var eye := height_at(from)

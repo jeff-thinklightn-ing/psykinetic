@@ -41,6 +41,9 @@ func _ready() -> void:
 	_test_paths_remember_the_terrain()
 	_test_steps_filled_by_cell()
 	_test_fields_by_door()
+	_test_fields_door_comes_and_goes()
+	_test_fields_by_edge()
+	_test_fields_whole_kept()
 	_test_lines_owe_doors()
 
 	print("")
@@ -405,6 +408,324 @@ func _test_fields_by_door() -> void:
 		if World.fields._heat != afresh._heat or World.fields._light != afresh._light 				or World.fields.hot_set(World, World.HEAT_BURN) != afresh.hot_set(World, World.HEAT_BURN):
 			wrong += 1
 	_check(doors.size() > 30 and wrong == 0, "a maze of %d doors, 40 rounds of one or two flipped: %d rounds differ from a whole recompute" % [doors.size(), wrong])
+
+
+## 351 amended (2): a door come or gone (a client's, as its chunk arrives or
+## leaves by interest; a zone's, as it opens) works out again only what
+## reaches its two cells, never the whole map: on a client the whole map's
+## floor shaded again was a 200-320 ms stall, about six a minute walking
+## Umbrage (perf, folk tour, 11-15). Every door of a maze and of the wilds
+## gone and come back in turn, and opened: each time the fields as a whole
+## recompute has them, every cell that changed among those taken, and no
+## more taken than the sources near it reach.
+func _test_fields_door_comes_and_goes() -> void:
+	print("\n== a door come or gone works out again only what reaches it, the same as all of it (351 amended (2)) ==")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 29
+	var size := 14
+	var rows: Array[String] = []
+	for y in size * 2 - 1:
+		var row := ""
+		for x in size * 2 - 1:
+			if x % 2 == 0 and y % 2 == 0:
+				row += "."
+			elif x % 2 == 1 and y % 2 == 1:
+				row += " "
+			else:
+				row += [" ", " ", " ", "#", "+"][rng.randi_range(0, 4)]
+		rows.append(row)
+	var maze := Terrain.parse(rows)
+	maze["torches"] = [Vector2i(2, 2), Vector2i(9, 3), Vector2i(5, 6), Vector2i(1, 10), Vector2i(10, 10), Vector2i(12, 5)]
+	maze["fire"] = [Vector2i(7, 8), Vector2i(3, 12)]
+	maze["lanterns"] = [Vector2i(6, 1), Vector2i(12, 12)]
+	var seen := _doors_come_and_go(maze, rng, true)
+	_check(seen["doors"] > 30 and seen["wrong"].is_empty(),
+			"a maze of %d doors, each come across lines cached without it, then gone, back and opened or shut: %d of %d steps differ from a whole recompute %s" % [seen["doors"], seen["wrong"].size(), seen["steps"], seen["wrong"].slice(0, 3)])
+	_check(seen["all"] == 0 and seen["over"].is_empty(),
+			"none takes the whole map (%d did), none more than its near sources reach %s; at most %d cells, near sources %d" % [seen["all"], seen["over"].slice(0, 3), seen["most"], seen["near"]])
+	_check(seen["moved"] > 0, "and they do change the light and heat (%d steps)" % seen["moved"])
+	# Four doors in one go (a chunk arriving with four huts): one refresh,
+	# its cells the union of each one's near sources', not the whole map.
+	_build()
+	World.load_terrain(maze)
+	var doors: Array[Door] = []
+	for key: Vector3i in maze["edges"]:
+		if maze["edges"][key] == Terrain.Edge.DOOR:
+			doors.append(_door(key, 20))
+	for door in doors:
+		door.open = rng.randf() < 0.5
+	World.fields.hot_set(World, World.HEAT_BURN)
+	World.fields.take_touched(World)
+	var four: Array[Door] = [doors[0], doors[7], doors[14], doors[21]]
+	var keys: Array[Vector3i] = []
+	var open: Array[bool] = []
+	for door in four:
+		keys.append(door.key)
+		open.append(door.open)
+	# What each takes alone (gone, then back as it was): the four together
+	# take the union of those, in one refresh.
+	var union: Dictionary[Vector2i, bool] = {}
+	for k in keys.size():
+		var alone: Door = four[k]
+		_room.remove_child(alone)
+		alone.free()
+		for cell: Vector2i in World.fields.take_touched(World)["cells"]:
+			union[cell] = true
+		four[k] = _door(keys[k], 20)
+		four[k].open = open[k]
+		World.fields.take_touched(World)
+	var light_before: Dictionary = World.fields._light.duplicate()
+	var heat_before: Dictionary = World.fields._heat.duplicate()
+	for door in four:
+		_room.remove_child(door)
+		door.free()
+	var gone := World.fields.take_touched(World)
+	var why := _fields_as_whole(maze, light_before, heat_before, gone)
+	var reach := _near_reach(keys)
+	var taken: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in gone["cells"]:
+		taken[cell] = true
+	_check(why.is_empty() and not gone["all"] and not union.is_empty() and taken == union,
+			"four doors gone at once: one refresh, as a whole recompute (%s), its %d cells the union of what each takes alone (%d; their near sources reach %d)" % [why if not why.is_empty() else "the same", taken.size(), union.size(), reach.size()])
+	light_before = World.fields._light.duplicate()
+	heat_before = World.fields._heat.duplicate()
+	for k in keys.size():
+		doors.append(_door(keys[k], 20))
+		doors.back().open = open[k]
+	var back := World.fields.take_touched(World)
+	why = _fields_as_whole(maze, light_before, heat_before, back)
+	var taken_back: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in back["cells"]:
+		taken_back[cell] = true
+	_check(why.is_empty() and not back["all"] and taken_back == union,
+			"and back at once: the same (%s), %d cells" % [why if not why.is_empty() else "the same", taken_back.size()])
+	# A source added while a door is away (its zone read again, as a
+	# lantern lit by a town's change is), then the door comes: the new
+	# source's lines were made without it, and must still hold its edge.
+	_build()
+	World.load_terrain(maze)
+	World.fields.take_touched(World)
+	var lit: Dictionary = maze.duplicate()
+	var near_door: Vector3i = doors_of(maze)[0]
+	lit["lanterns"] = (maze["lanterns"] as Array) + [Vector2i(near_door.x, near_door.y)]
+	World.load_terrain(lit)
+	World.fields.hot_set(World, World.HEAT_BURN)
+	World.fields.take_touched(World)
+	var came := {"doors": 0, "steps": 0, "wrong": [], "all": 0, "over": [], "moved": 0, "most": 0, "near": 0}
+	for key in doors_of(lit):
+		var light_was: Dictionary = World.fields._light.duplicate()
+		var heat_was: Dictionary = World.fields._heat.duplicate()
+		var arriving := _door(key, 20)
+		arriving.open = true
+		_tally(came, lit, key, "came, a source added before", light_was, heat_was, World.fields.take_touched(World))
+	_check(came["wrong"].is_empty() and came["all"] == 0 and came["over"].is_empty() and came["moved"] > 0,
+			"a lantern added by %s with no door there, then its %d doors come open: %d differ from a whole recompute %s, %d take the whole map; %d moved the light" % [near_door, came["steps"], came["wrong"].size(), came["wrong"].slice(0, 3), came["all"], came["moved"]])
+	# The server's cost, as a count (the coordinator, 351 amended (2)): a door
+	# opened or shut makes no source's lines again (Fields.lines_made); its
+	# lines kept, only those through it are worked out again. Moving doors
+	# onto the full mode fails this row.
+	var made := World.fields.lines_made
+	var flipped := 0
+	for door: Door in World.get_doors():
+		door.open = not door.open
+		World.fields.take_touched(World)
+		door.open = not door.open
+		World.fields.take_touched(World)
+		flipped += 2
+	_check(flipped > 60 and World.fields.lines_made == made,
+			"%d doors opened and shut again in the maze: %d sources' lines made again (none: 351's path)" % [flipped, World.fields.lines_made - made])
+	# And a felled cell or an edge set does make the near ones again.
+	World.set_edges({near_door: Terrain.Edge.WALL})  # The lantern's own door edge walled.
+	World.fields.take_touched(World)
+	_check(World.fields.lines_made > made, "an edge set beside them makes the near sources' lines again (%d)" % (World.fields.lines_made - made))
+	# The wilds, its every door (the pin the mend ships on).
+	var wilds: Dictionary = Level.load_level("wilds")["terrain"]
+	var in_wilds := _doors_come_and_go(wilds, rng, false)
+	_check(in_wilds["doors"] > 10 and in_wilds["wrong"].is_empty() and in_wilds["all"] == 0 and in_wilds["over"].is_empty(),
+			"the wilds' %d doors, each come across lines cached without it, then gone and back: %d of %d steps differ from a whole recompute %s, %d take the whole map, %d more than their near sources reach; %d near a source, at most %d cells" % [in_wilds["doors"], in_wilds["wrong"].size(), in_wilds["steps"], in_wilds["wrong"].slice(0, 3), in_wilds["all"], in_wilds["over"].size(), in_wilds["near"], in_wilds["most"]])
+
+
+## [param terrain] loaded and its fields worked out with no door there, then
+## a door come on each of its door edges in turn, open or shut, then each
+## door in turn gone (freed), back (made again) and, with [param flip],
+## opened or shut: after each step the fields against a whole recompute
+## (_fields_as_whole) and what was taken against its near sources' reach.
+func _doors_come_and_go(terrain: Dictionary, rng: RandomNumberGenerator, flip: bool) -> Dictionary:
+	_build()
+	World.load_terrain(terrain)
+	# The fields worked out, every source's lines kept, before any door is
+	# there (maps' ask): each door then arrives across lines cached without
+	# it, as a client's does when its chunk comes in.
+	World.fields.hot_set(World, World.HEAT_BURN)  # Kept up from here, not looked for afresh.
+	World.fields.take_touched(World)
+	var out := {"doors": doors_of(terrain).size(), "steps": 0, "wrong": [], "all": 0, "over": [], "moved": 0, "most": 0, "near": 0, "arrived": 0}
+	var doors: Dictionary[Vector3i, Door] = {}
+	for key: Vector3i in doors_of(terrain):
+		var light_before: Dictionary = World.fields._light.duplicate()
+		var heat_before: Dictionary = World.fields._heat.duplicate()
+		doors[key] = _door(key, 20)
+		doors[key].open = rng.randf() < 0.5
+		var taken := World.fields.take_touched(World)
+		out["arrived"] += 1
+		_tally(out, terrain, key, "arrived", light_before, heat_before, taken)
+	var was_open: Dictionary[Vector3i, bool] = {}
+	for key: Vector3i in doors.keys():
+		if not _near_reach([key]).is_empty():
+			out["near"] += 1
+		var steps := ["gone", "back"] + (["flipped"] if flip else [])
+		for step: String in steps:
+			var light_before: Dictionary = World.fields._light.duplicate()
+			var heat_before: Dictionary = World.fields._heat.duplicate()
+			match step:
+				"gone":
+					was_open[key] = doors[key].open
+					_room.remove_child(doors[key])
+					doors[key].free()
+					doors[key] = null
+				"back":
+					doors[key] = _door(key, 20)
+					doors[key].open = was_open[key]
+				"flipped":
+					doors[key].open = not doors[key].open
+			_tally(out, terrain, key, step, light_before, heat_before, World.fields.take_touched(World))
+	return out
+
+
+## The door edges of [param terrain], in its order.
+static func doors_of(terrain: Dictionary) -> Array[Vector3i]:
+	var keys: Array[Vector3i] = []
+	for key: Vector3i in terrain["edges"]:
+		if terrain["edges"][key] == Terrain.Edge.DOOR:
+			keys.append(key)
+	return keys
+
+
+## One step of door [param key]'s ([param step]) put in [param out]: the
+## fields against a whole recompute, the whole map taken or more than its
+## near sources reach, and whether it moved anything.
+func _tally(out: Dictionary, terrain: Dictionary, key: Vector3i, step: String, light_before: Dictionary,
+		heat_before: Dictionary, taken: Dictionary) -> void:
+	out["steps"] += 1
+	var why := _fields_as_whole(terrain, light_before, heat_before, taken)
+	if not why.is_empty():
+		out["wrong"].append("%s %s: %s" % [key, step, why])
+	if taken["all"]:
+		out["all"] += 1
+		return
+	out["most"] = maxi(out["most"], (taken["cells"] as Array).size())
+	var near := _near_reach([key])
+	for cell: Vector2i in taken["cells"]:
+		if not near.has(cell):
+			out["over"].append("%s %s: %s" % [key, step, cell])
+			break
+	if World.fields._light != light_before or World.fields._heat != heat_before:
+		out["moved"] += 1
+
+
+## "" if World's fields are as a whole recompute over [param terrain] has
+## them: light, heat and the hot cells, each cell's value, a cell absent as
+## absent; and every cell whose light or heat moved from
+## [param light_before] / [param heat_before] among [param taken]'s cells.
+## Else what differs.
+func _fields_as_whole(terrain: Dictionary, light_before: Dictionary, heat_before: Dictionary, taken: Dictionary) -> String:
+	var fields := World.fields
+	var afresh := Fields.new()
+	afresh.load(terrain)
+	afresh._refresh(World)
+	if fields._light != afresh._light:
+		return "light"
+	if fields._heat != afresh._heat:
+		return "heat"
+	if fields.hot_set(World, World.HEAT_BURN) != afresh.hot_set(World, World.HEAT_BURN):
+		return "hot cells"
+	if taken["all"]:
+		return ""
+	var cells: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in taken["cells"]:
+		cells[cell] = true
+	for pair: Array in [[light_before, fields._light], [heat_before, fields._heat]]:
+		var before: Dictionary = pair[0]
+		var now: Dictionary = pair[1]
+		for cell: Vector2i in before.keys() + now.keys():
+			if before.get(cell) != now.get(cell) and not cells.has(cell):
+				return "%s moved, not taken" % cell
+	return ""
+
+
+## The cells the sources within their reach and a pace of the doors at
+## [param keys] can reach (Fields._reachable): all a door's change may take.
+func _near_reach(keys: Array) -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for source: Array in World.fields._sources():
+		var at: Vector2i = source[0]
+		var reach: int = source[1]["reach"]
+		var near := false
+		for key: Vector3i in keys:
+			for cell in Terrain.edge_cells(key):
+				near = near or maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= reach + 1
+		if near:
+			for cell in Fields._reachable(at, reach):
+				out[cell] = true
+	return out
+
+
+## 351 amended (2), environment's pin: an edge set beside a lantern (a wall
+## opened, then walled again; World.set_edges, a felled trunk's) is seen
+## through lines made again, the fields as a whole recompute has them. Its
+## lines kept, a light the old wall stopped stayed dark behind it; the whole
+## pass a door's coming made every ten seconds hid it.
+func _test_fields_by_edge() -> void:
+	print("\n== an edge set beside a lantern: its light as a whole recompute has it (351 amended (2)) ==")
+	_build()
+	var terrain := Terrain.parse(ROOM)
+	terrain["lanterns"] = [Vector2i(0, 0)]
+	World.load_terrain(terrain)
+	World.fields.hot_set(World, World.HEAT_BURN)
+	World.fields.take_touched(World)
+	var wall := Vector3i(1, 1, Terrain.EAST)
+	_check(World.edge_kind(Vector2i(1, 1), Vector2i(1, 0)) == Terrain.Edge.WALL, "the room's wall at %s" % wall)
+	var walled: Dictionary = World.fields._light.duplicate()
+	var results: Array[String] = []
+	var lit := 0
+	for kind: int in [Terrain.Edge.OPEN, Terrain.Edge.WALL]:
+		var light_before: Dictionary = World.fields._light.duplicate()
+		var heat_before: Dictionary = World.fields._heat.duplicate()
+		World.set_edges({wall: kind})
+		var taken := World.fields.take_touched(World)
+		var why := _fields_as_whole(terrain, light_before, heat_before, taken)
+		results.append("%s: %s%s" % ["opened" if kind == Terrain.Edge.OPEN else "walled", why if not why.is_empty() else "the same", ", the whole map" if taken["all"] else ""])
+		if kind == Terrain.Edge.OPEN:
+			for cell: Vector2i in World.fields._light:
+				if World.fields._light[cell] != walled.get(cell, 0.0):
+					lit += 1
+	_check(results == ["opened: the same", "walled: the same"] and lit > 0 and World.fields._light == walled,
+			"the wall opened and walled again, each as a whole recompute, near alone: %s; opened, %d cells' light moved; walled again, as before" % ["; ".join(results), lit])
+
+
+## 351 amended (2): the whole pass kept where the whole map changes: a
+## level's terrain read (Fields.load), and a roof broken (World.open_roofs).
+func _test_fields_whole_kept() -> void:
+	print("\n== the whole map worked out again when a terrain is read or a roof breaks (351 amended (2)) ==")
+	_build()
+	var terrain := Terrain.parse(ROOM)
+	terrain["lanterns"] = [Vector2i(0, 0)]
+	terrain["level"] = "edge_roof_test"
+	var rect := Rect2i(0, 0, 5, 4)
+	terrain["roofs"] = [{"rect": rect}]
+	World.load_terrain(terrain)
+	var loaded := World.fields.take_touched(World)
+	var door := _door(DOOR_KEY, 20)
+	door.open = not door.open
+	var near := World.fields.take_touched(World)
+	var key := World._roof_key("edge_roof_test", rect)
+	World.roofs_damaged[key] = true
+	World.open_roofs("edge_roof_test")
+	var broken := World.fields.take_touched(World)
+	World.roofs_damaged.erase(key)
+	World.open_roofs("edge_roof_test")
+	var mended := World.fields.take_touched(World)
+	_check(loaded["all"] and not near["all"] and broken["all"] and mended["all"],
+			"read: the whole map %s; a door opened: near %s; a roof broken: the whole map %s; mended: %s" % [loaded["all"], not near["all"], broken["all"], mended["all"]])
 
 
 func _test_lines_owe_doors() -> void:

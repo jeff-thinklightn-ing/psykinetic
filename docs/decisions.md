@@ -8392,6 +8392,58 @@ hills 0, sample 4, test_room 3, small enough for a zone opened in play
 whole build: doors register before the warm and unregister only as the
 zone closes. Server only.
 
+351 amended (2) (perf; the coordinator's ruling, 2026-11-15, read by environment and maps): a
+door's coming and going takes the door's own narrow path, and a changed edge or floor makes its near
+sources' lines again.
+- Why: on a client, doors come and go by interest (decision 217, v0.1.139) as a player walks, and
+  World.register_door and unregister_door called fields_changed() with no cells: a whole refresh,
+  then Client3D._shade_floor over every ground cell. The folk tour walking Umbrage (Lenovo, joined,
+  probe 2 C, C:/dev/review/perf_folk2C): 31 whole passes of the wilds' 52,798 cells in 5.3
+  minutes, 182-324 ms each, about six stalls a minute while walking and none standing (the design,
+  C:/dev/review/perf/shade_pass_design.md). The server meets it only as a zone opens, before
+  Fields.warm.
+- Doors (opened, shut, come, gone) keep 351's lines-kept path, taken only when the caller names
+  its door: World.fields_changed(cells, door_key), Fields.mark_dirty_near(cells, door). World.line_doors
+  lists a door's edge from the terrain's edges whether its Door node has arrived or not, and a
+  missing door counts as shut (_all_open), so the cached lines are right across a door's coming and
+  going (environment's reading; pinned below with the lines cached before any door is there).
+  Register and unregister now pass the door's two cells and its key, as Door.open always did.
+- A call with cells and no door key is never read as a door (mark_dirty_near once took any two
+  adjacent cells for one, and set_edges can pass exactly that). It redoes each source within its
+  reach and a pace whole, with its lines (_lines) made again: World.set_edges and World.set_floor
+  (Clearing's felling, regrowth and building over, decision 591) changed walls and floor under kept
+  lines, so a light a wall had stopped stayed dark behind a felled trunk. The whole pass a door's
+  coming made every few seconds hid this; with it gone, it would have stood till the zone reloaded.
+- Their callers on the server: Main._on_clearing_changed (Clearing.changed: Clearing.daily's
+  regrowth, once a game day though its check runs in the tick; a town's ruin, Clearing.unbuild; a
+  town building again, Clearing.build), and on a client Main._on_clearing (the server's "clearing"
+  message for the same). None runs per tick. Fields.lines_made counts the sources' lines made.
+- The whole pass stays for a whole change: Fields.load (a zone's terrain read, shaded under the
+  card) and open_roofs (a roof broken or mended). Spreading a whole pass over frames is not built:
+  with this in, a whole pass is a load or a roof (measure again before anyone builds it).
+- Not timed: the server's door path is 351's own, unchanged; edge_test pins its cost as a count.
+- edge_test (run against main's sim before lines_made was added, 6 rows failed: a door's coming
+  taking the whole map in the maze, the four doors at once and back, the wilds, the wall's opening,
+  and a door opened after one came; with the mend, all pass):
+  - _test_fields_door_comes_and_goes. A maze of 71 doors and 10 sources, its fields worked out
+    with no door there, then each door comes across lines cached without it, open or shut, then
+    each is gone, back and opened or shut (284 steps). After each: _light, _heat and the hot cells
+    as a whole recompute has them, every changed cell among those take_touched gives, none the whole
+    map, none beyond its near sources' reach. Four doors gone at once and back: one refresh, its
+    cells the union of what each takes alone (124). A lantern added (the zone read again) with no
+    door there, then 71 doors come open: each as a whole recompute. 142 openings and shuttings make
+    no source's lines again (lines_made 0); an edge set beside a lantern makes them. The wilds' 11
+    doors (the 11 the client met walking Umbrage) the same way, 33 steps, all as a whole recompute.
+  - _test_fields_by_edge (environment's pin): a wall beside a lantern opened, then walled again,
+    by World.set_edges; each as a whole recompute (on main the opening's light differs).
+  - _test_fields_whole_kept: a terrain read and a roof broken and mended give the whole map; a
+    door opened, near.
+- view_world_test _test_door_shades_near: a dark 30x20 room, a wall with a door, a lantern and a
+  torch west of it. The door gone and back shades again only cells its near sources reach (on main
+  all 600); after it is shut, opened, gone and back, each shaded near, the floor (_ground_shades)
+  is as a whole pass shades it, and each moved it.
+Client and server sim; protocol unchanged; no new class_name.
+
 ## 353. A town's starting gold, and residents' own trade
 
 Jeff (2026-10-15): "give the town 50 starting gold and a flowing economy,

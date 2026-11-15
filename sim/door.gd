@@ -33,7 +33,7 @@ var open := false:
 		if open != value:
 			open = value
 			# Light and heat pass an open door: what reaches it is worked out again.
-			World.fields_changed(Terrain.edge_cells(key))
+			World.fields_changed(Terrain.edge_cells(key), key)
 			_shown_changed()
 var hp := 20:
 	set(value):

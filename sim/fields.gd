@@ -137,8 +137,12 @@ var _source_list: Array = []
 ## For each fixed source (indices into _parts), or null till worked out:
 ## {"cells": the cells within its reach whose line the terrain does not
 ## stop, in the order _spread looks at them, "doors": for each, what its
-## line owes to doors (World.line_doors)}.
+## line owes to doors (World.line_doors)}. Let go with its share when the
+## terrain near it changes (mark_dirty_near with no door).
 var _lines: Array = []
+## How many sources' lines have been made (_lines_of): a door opening makes
+## none (351 amended (2); edge_test counts it).
+var lines_made := 0
 ## hot_cells' answers, kept up as cells are added up again:
 ## {threshold: {cell: true}}.
 var _hot := {}
@@ -226,26 +230,32 @@ func mark_dirty() -> void:
 	_dirty = true
 
 
-## Something changed at [param cells] (a door between two): only the
-## sources that reach that far (their reach, and a pace) are worked out
-## again; any line of theirs that crosses it stays within that.
-func mark_dirty_near(cells: Array[Vector2i]) -> void:
+## Something changed at [param cells]: only the sources that reach that far
+## (their reach, and a pace) are worked out again. A door named
+## ([param door], its key; the two cells beside it: opened, shut, come or
+## gone): a source's lines are kept, and only those through it worked out
+## again (_redo_lines). The lines know a door's edge from the terrain
+## whether its door is there or not (World.line_doors), so this holds for
+## a door that comes or goes too (351 amended (2)). Anything else (a cell
+## felled or grown, an edge set; never read as a door, whatever its cells):
+## each near source worked out again whole, its lines made again, since a
+## changed wall or floor moves which lines the terrain stops.
+func mark_dirty_near(cells: Array[Vector2i], door := Vector3i.MAX) -> void:
 	_dirty = true
 	if _parts.is_empty():
 		return
-	# The door between the two cells, as a line owes it (World.line_doors):
-	# a source's lines that do not go through it keep what they give.
-	var door := Vector3i.MAX
-	if cells.size() == 2 and (cells[1] - cells[0]) in [Vector2i(1, 0), Vector2i(0, 1)]:
-		door = Vector3i(cells[0].x, cells[0].y, Terrain.EAST if cells[1].x > cells[0].x else Terrain.SOUTH)
 	var sources := _sources()
 	for i in sources.size():
 		var source: Vector2i = sources[i][0]
 		var reach: int = sources[i][1]["reach"]
 		for cell in cells:
 			if maxi(absi(cell.x - source.x), absi(cell.y - source.y)) <= reach + 1:
-				if door == Vector3i.MAX or _parts[i] == null:
+				if door == Vector3i.MAX:
 					_parts[i] = null
+					_redo_doors.erase(i)
+					if i < _lines.size():
+						_lines[i] = null
+				elif _parts[i] == null:
 					_redo_doors.erase(i)
 				else:
 					if not _redo_doors.has(i):
@@ -624,6 +634,7 @@ func _lines_of(world: Node, index: int, source: Vector2i, reach: int) -> Diction
 		_lines.resize(_sources().size())
 	if _lines[index] != null:
 		return _lines[index]
+	lines_made += 1
 	var cells: Array[Vector2i] = []
 	var doors := []
 	for dy in range(-reach, reach + 1):

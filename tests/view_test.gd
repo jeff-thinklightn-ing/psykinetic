@@ -249,6 +249,7 @@ func _ready() -> void:
 		_test_no_2d_under_3d()
 		await _test_doors_swing()
 		await _test_door_states()
+		_test_door_shades_near()
 		_test_art_puppets()
 		_test_undrawn_puppet()
 		_test_breakable_hooked_once()
@@ -15463,6 +15464,98 @@ func _test_undrawn_puppet() -> void:
 	for callable in kept:
 		crate.impacted.connect(callable)
 	_check(not Level.undrawn(crate), "its own art back")
+
+
+## 351 amended (2), the client's side: a door come or gone (its chunk in or
+## out by interest, about six a minute walking Umbrage, each a 200-320 ms
+## whole pass before) shades again only the floor its sources' light
+## reaches, and the floor after each change, door opened, gone, back and
+## shut, is as a whole pass shades it.
+func _test_door_shades_near() -> void:
+	print("\n== a door come or gone shades only the floor its light reaches, as a whole pass has it (351 amended (2)) ==")
+	# A dark 30x20 room, a wall down it between x 14 and 15 with a door at
+	# y 10, a lantern and a torch on its west side, a torch far off: the
+	# east side lit by the door alone.
+	var rows: Array[String] = []
+	for y in 20 * 2 - 1:
+		var row := ""
+		for x in 30 * 2 - 1:
+			if y % 2 == 0 and x % 2 == 0:
+				row += "."
+			elif y % 2 == 0 and x == 29:
+				row += "+" if y == 20 else "#"
+			else:
+				row += " "
+		rows.append(row)
+	var terrain := Terrain.parse(rows)
+	terrain["lanterns"] = [Vector2i(13, 10)]
+	terrain["torches"] = [Vector2i(12, 8), Vector2i(27, 17)]
+	terrain["ambient"] = 0.2  # Dark, so the floor shows what the door lets through.
+	var was := World.enter(World.add_zone("view_door_shades"))
+	World.load_terrain(terrain)
+	var key := Vector3i(14, 10, Terrain.EAST)
+	var door := Door.build({"script": "res://sim/door.gd", "name": "Door", "edge": [key.x, key.y, key.z], "props": {"max_hp": 20}})
+	add_child(door)
+	door.open = true
+	_rig.rebuild(terrain, Vector2i(15, 10))
+	_rig._shade_all = true
+	_rig._shade_floor()
+	var near: Dictionary[Vector2i, bool] = {}
+	for source: Array in World.fields._sources():
+		var at: Vector2i = source[0]
+		var reach: int = source[1]["reach"]
+		for cell in Terrain.edge_cells(key):
+			if maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= reach + 1:
+				for each in Fields._reachable(at, reach):
+					near[each] = true
+	# The cells a pass works out: each seeded unlike any shade, so each one
+	# it works out is written.
+	var unlike := Vector2(-1.0, -1.0)
+	for cell: Vector2i in _rig._grounds:
+		_rig._ground_shades[cell] = unlike
+	World.unregister_door(door)
+	World.register_door(door)
+	_rig._shade_floor()
+	var worked := 0
+	var astray := 0
+	for cell: Vector2i in _rig._grounds:
+		if _rig._ground_shades.get(cell) != unlike:
+			worked += 1
+			if not near.has(cell):
+				astray += 1
+	var grounds := _rig._grounds.size()
+	_check(grounds == 600 and worked > 0 and astray == 0 and worked < grounds / 2,
+			"the door gone and back: %d of the %d floor cells shaded again, all within its %d near cells' reach (%d beyond; a whole pass shades all %d)" % [worked, grounds, near.size(), astray, grounds])
+	_rig._shade_all = true
+	_rig._shade_floor()
+	var differ: Array[String] = []
+	var moved: Array[String] = []
+	for step: String in ["shut", "opened", "gone", "back"]:
+		var before: Dictionary = _rig._ground_shades.duplicate()
+		match step:
+			"shut":
+				door.open = false
+			"opened":
+				door.open = true
+			"gone":
+				World.unregister_door(door)
+			"back":
+				World.register_door(door)
+		_rig._shade_floor()
+		var narrow: Dictionary = _rig._ground_shades.duplicate()
+		if narrow != before:
+			moved.append(step)
+		_rig._shade_all = true
+		_rig._shade_floor()
+		if _rig._ground_shades != narrow:
+			differ.append(step)
+	_check(differ.is_empty() and moved == ["shut", "opened", "gone", "back"],
+			"shut, opened, gone and back, each shaded near: the floor as a whole pass shades it after each (differ: %s); each moved it (%s)" % [differ, moved])
+	remove_child(door)
+	door.free()
+	World.enter(was)
+	World.zones.erase("view_door_shades")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 func _test_art_puppets() -> void:
