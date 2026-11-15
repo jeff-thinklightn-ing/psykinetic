@@ -51,6 +51,16 @@ func _init() -> void:
 			missing += 1
 			continue
 		var animation := source.get_animation(clip).duplicate(true) as Animation
+		# A glb imported without step 2's bone map keeps its own bone paths (Armature/Skeleton3D:...), and
+		# its clips play broken on every model (a fresh glb name imports with _subresources={}: 338
+		# amended (9)'s first re-extract, its forehand 1.2 m off). Nothing is saved from such a glb.
+		for t in animation.get_track_count():
+			if not str(animation.track_get_path(t)).begins_with("%GeneralSkeleton:"):
+				print("REFUSED %s: no bone map on its .import (%s's track %s is not retargeted); give %s.import step 2's retarget/bone_map, import, extract again" % [
+					args[0], clip, animation.track_get_path(t), args[0]])
+				scene.free()
+				quit(1)
+				return
 		clip = names[1] if names.size() > 1 else clip
 		if library.has_animation(clip):
 			library.remove_animation(clip)

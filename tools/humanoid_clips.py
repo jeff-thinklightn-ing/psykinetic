@@ -738,7 +738,7 @@ def slash(way: float, shield: bool = False) -> list:
 	# pommel points down, not across the face; the backhand's elbow forward, so its forearm crosses in
 	# front of the face, not through it.
 	if way > 0.0:
-		wind_arm = one_hand((0.2, 0.42, 0.16), (-0.15, 0.45, 0.88), (1.0, -0.3, 0.0))
+		wind_arm = one_hand((0.24, 0.47, 0.16), (-0.15, 0.45, 0.88), (1.0, -0.3, 0.0))
 	else:  # The backhand winds up over the far (left) shoulder.
 		wind_arm = one_hand((0.46, -0.3, 0.26), (0.3, 0.05, 0.95), (-1.0, -0.3, 0.0), (-0.4, -1.0, -0.6))
 	wind = wind_arm + left_wind + [

@@ -473,15 +473,6 @@ const SWORD_CLEAR := 0.03
 ## (Slash_B at 0.07 s), shield or not, never touching. The smallest pass is printed each run; under
 ## this the answer is animation's re-pose of the slash, not the bar.
 const SWORD_HOOD_CLEAR := 0.015
-## Where the sword's cross-guard goes through the hood's cloth today (419 amended (2), the coordinator's
-## ruling): Sword_Slash_F and Sword_Shield_Slash_F at 4/30 s on every build, already on main, and at
-## 5/30 s with the 1.10 head. Animation's re-pose of the slash (its row) clears them; then this goes.
-const SWORD_HOOD_CROSSED: Array[String] = [
-	"man Sword_Slash_F 0.13 s", "man Sword_Slash_F 0.17 s", "man Sword_Shield_Slash_F 0.13 s", "man Sword_Shield_Slash_F 0.17 s",
-	"man heavy Sword_Slash_F 0.13 s", "man heavy Sword_Slash_F 0.17 s", "man heavy Sword_Shield_Slash_F 0.13 s", "man heavy Sword_Shield_Slash_F 0.17 s",
-	"man broad Sword_Slash_F 0.13 s", "man broad Sword_Slash_F 0.17 s", "man broad Sword_Shield_Slash_F 0.13 s", "man broad Sword_Shield_Slash_F 0.17 s",
-	"man lean Sword_Slash_F 0.13 s", "man lean Sword_Slash_F 0.17 s", "man lean Sword_Shield_Slash_F 0.13 s", "man lean Sword_Shield_Slash_F 0.17 s",
-	"woman Sword_Slash_F 0.13 s", "woman Sword_Slash_F 0.17 s", "woman Sword_Shield_Slash_F 0.13 s", "woman Sword_Shield_Slash_F 0.17 s"]
 const SWORD_NEAR := 0.06
 const SWORD_FPS := 30.0
 const SWORD_ARM_IN := 0.01  # An arm resting on the trunk, its skin pressed in so far, is no clip.
@@ -548,17 +539,11 @@ func _test_sword_clear() -> void:
 		print("  near-misses (under %.2f m): %d, %s" % [SWORD_NEAR, near.size(), ", ".join(near.slice(0, 12))])
 	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears (the hood %.2f m), five builds, %d worn pieces, %s (%d: %s)" % [
 		SWORD_CLEAR, SWORD_HOOD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
-	# 419 amended (2), the coordinator's ruling: the sword's cross-guard goes through the hood's cloth at
-	# the top of the forward slashes' wind-up, already on main (4/30 s, every build) and one frame more
-	# with the 1.10 head (5/30 s). Those twenty are SWORD_HOOD_CROSSED; any other crossing fails. Deleted
-	# when animation's re-pose of the slash clears both frames.
-	var known: Array[String] = []
-	var new: Array[String] = []
-	for at in whole_through:
-		(known if at in SWORD_HOOD_CROSSED else new).append(at)
-	print("  the sword through the hood: %d of the %d known (%s)" % [known.size(), SWORD_HOOD_CROSSED.size(), ", ".join(known.slice(0, 4))])
-	_check(new.is_empty(), "the whole sword, guard included, through the hood nowhere but the forward slashes' known 4/30 and 5/30 s (%d new: %s)" % [
-		new.size(), ", ".join(new.slice(0, 12))])
+	# 419 amended (2) held twenty frames where the cross-guard went through the hood's cloth (the forward
+	# slashes at 4/30 and 5/30 s); the forehand's wind-up re-posed (338 amended (9)) clears them: none now.
+	print("  the sword through the hood: %d frames (%s)" % [whole_through.size(), ", ".join(whole_through.slice(0, 4))])
+	_check(whole_through.is_empty(), "the whole sword, guard included, through the hood nowhere (%d: %s)" % [
+		whole_through.size(), ", ".join(whole_through.slice(0, 12))])
 	_check(coiled.is_empty(), "neither forearm %.2f m or more into the rest of the body through them (%d: %s)" % [SWORD_ARM_IN, coiled.size(), ", ".join(coiled.slice(0, 16))])
 
 
