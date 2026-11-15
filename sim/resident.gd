@@ -811,6 +811,10 @@ func _spot_use() -> String:
 			return "inn"
 		Doing.TEMPLE:
 			return "temple"
+		Doing.HOME:
+			# A lodger up through his sleep spell (875 amended (4)): his places list seats for it (the inn's floor, or the
+			# lit fire's), so he sits or stands at one; a body with a bed has none listed and goes to it as ever.
+			return "home" if places.get("spots") is Dictionary and (places["spots"] as Dictionary).has("home") else ""
 	return ""
 
 

@@ -1506,6 +1506,27 @@ func _test_lodger_sleep(level: Dictionary, laid: Array, door: Vector2i, away_bef
 	var rolf_places: Dictionary = (floor.get(rolf, {}) as Dictionary).get("places", {})
 	_check(rolf_places.get("bed") == Rect2i() and (rolf_places.get("spots", {}).get("home", []) as Array).size() == 3,
 		"on the floor at 04: no bed (no bedroll on the inn's floor), his sleep spell's place the seats (%s)" % [rolf_places.get("bed")])
+	# His sleep spell's doing takes those seats (maps' night look on 89c08371b: Rolf up at (11, 7) at 03:12 on no spot,
+	# 4 of 15 taken): the doing his clock gives at 01:00 and 03:12, and the spot use a body with these places asks in it.
+	var clock := func(h: float) -> Resident.Doing:
+		var at_h := DayNight.now() - int((DayNight.hour(DayNight.now()) - h) * DayNight.day_steps / 24.0)
+		return Resident.doing_at("", h, Season.name_at(int(at_h)), "", rolf, Townsfolk.day_of(at_h), Townsfolk.mood_of(World.production, rolf))
+	var late: Resident.Doing = clock.call(3.2)
+	var probe := _body(rolf) if _body(rolf) != null else (World.townsfolk()[0] as Resident if not World.townsfolk().is_empty() else null)
+	if probe != null:
+		var probe_was := {"places": probe.places, "doing": probe.doing}
+		probe.places = rolf_places
+		var uses := {}
+		for doing: Resident.Doing in [late, Resident.Doing.HOME, Resident.Doing.INN, Resident.Doing.SQUARE]:
+			probe.doing = doing
+			uses[Resident.Doing.keys()[doing]] = probe._spot_use()
+		probe.places = probe_was["places"]
+		probe.doing = probe_was["doing"]
+		_check(not uses.values().has("") and (rolf_places["spots"] as Dictionary).has(str(uses[Resident.Doing.keys()[late]])),
+			"on the floor, every doing of his night asks one of the floor's seats: his clock's at 01:00 %s, at 03:12 %s, uses %s" % [
+				Resident.Doing.keys()[clock.call(1.0)], Resident.Doing.keys()[late], uses])
+	else:
+		_check(false, "(a body to ask the spot use of)")
 	# Every ten game minutes from 18:00 to 06:00 through the town's sync: no body outdoors but on the walk in.
 	_main._inn_walked_in.clear()
 	_main._inn_walked_out.clear()
