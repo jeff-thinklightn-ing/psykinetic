@@ -5,7 +5,8 @@ extends Node
 ## No awake body stands on one cell and facing longer than STAY_MINUTES with no clip but the stand,
 ## and none stands idle facing shut ground longer than SHUT_MINUTES. A body at a task's work, or at its
 ## work spot showing a trade the client draws, in a pose of a spot, asleep, sick, hiding, led or
-## addressing a player is not standing idle.
+## addressing a player is not standing idle. At every tenth sample, no body stands beside its goal while
+## another that chose that cell too stands on it, two samples running (853 amended (16)).
 
 const TOWN := "wilds/store"
 const HOUR := 2250
@@ -24,6 +25,12 @@ var _main: Node
 var _failed := 0
 var _runs := {}  # worker id -> {tile, facing, since, shut_since}
 var _worst := {}  # person -> the longest idle stay seen (minutes)
+## 853 amended (16): every TAKEN_EVERY samples (ten game minutes), each body beside its goal while another
+## that chose that cell too stands on it; two such samples running is a fail (Pell beside Nix's well spot).
+const TAKEN_EVERY := 10
+var _samples := 0
+var _taken := {}  # worker id -> the ten-minute samples running it was found so
+var _taken_seen := 0
 
 
 func _ready() -> void:
@@ -69,6 +76,8 @@ func _run() -> void:
 	_runs["absent:probe"] = {"tile": Vector2i(1, 1), "facing": Vector2i(0, 1), "since": 0, "told": false, "shut_told": false}
 	_sample()
 	_check(not _runs.has("absent:probe"), "a body with none at a sample ends its idle run (despawned and back on its tile is not idle)")
+	_check(_samples >= HOURS * 60,
+		"(%d samples; at the ten-minute ones, %d found beside a spot another chose too and stands on, none two running unless told above)" % [_samples, _taken_seen])
 	var names: Array = _worst.keys()
 	names.sort()
 	print("  longest idle stay each, game minutes: %s" % ", ".join(names.map(func(n: String) -> String: return "%s %d" % [n, _worst[n]])))
@@ -95,6 +104,9 @@ func _idle(body: Resident) -> bool:
 func _sample() -> void:
 	var now := World.steps
 	var seen := {}
+	_samples += 1
+	if _samples % TAKEN_EVERY == 0:
+		_sample_taken()
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		if body == null or not body.spawned or body._far():
@@ -122,6 +134,24 @@ func _sample() -> void:
 	for who: String in _runs.keys():
 		if not seen.has(who):
 			_runs.erase(who)
+
+
+## Each body beside its goal while the body on it chose that cell too and stays there (853 amended (16)).
+func _sample_taken() -> void:
+	var found := {}
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned or body._far() or body.tile == body._goal or World.distance(body.tile, body._goal) > 1:
+			continue
+		var holder := World.get_entity_at(body._goal) as Resident
+		if holder == null or holder == body or holder._goal != body._goal:
+			continue
+		found[body.worker_id] = int(_taken.get(body.worker_id, 0)) + 1
+		_taken_seen += 1
+		if int(found[body.worker_id]) == 2:
+			_check(false, "%s stood beside %s, taken by %s who chose it too, for two ten-minute samples running (at %.2f, %s)" % [
+				body.person, body._goal, holder.person, DayNight.hour(DayNight.now()), Resident.Doing.keys()[body.doing]])
+	_taken = found
 
 
 func _check(ok: bool, label: String) -> void:

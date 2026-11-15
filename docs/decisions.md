@@ -53656,6 +53656,30 @@ worker id with no body is gone after the next sample. Whether a keeper may lose 
 separate question, measured on Umbrage as shipped before anything changes (the coordinator's (b)). Test
 only; protocol unchanged; no new class_name; no bullet.
 
+853 amended (16) (the coordinator's ruling, 2026-11-15; the label from decision_number.sh; Resident._step is
+npc's, written by economy while npc is stopped, npc to read it when back). Found on maps' Mughouse take
+2ff63092c with economy's lodger take: town_day_test's "Pell stood idle facing shut ground at (194, 190)" at
+06:47, Pell beside the well's lean spot (194, 189), Nix on it. Both had picked that spot while it was free,
+on their ways (Resident._free_spot reads World.is_free at the pick and holds nothing), Nix came first, and
+Pell met _step's "Beside it, the cell taken: it waits there for it": no retry set, no stroll while off his
+goal, so he stood facing the well for good, the frozen townsman of 853 again. An old fault the Mughouse's
+timing showed, open on main as well (nothing in it is the Mughouse's); no mark of the lodger take touches either. Now a body beside its goal waits
+only while the one on the cell is passing through; when that one is a resident who has the cell as its own
+goal and stands on it, the later one takes 762 amended (3)'s path, its goal where it stands and another
+choice in PATH_RETRY_TICKS to that plus PATH_RETRY_SPREAD (4 to 6 s). A spot is still not reserved: two may
+set off for one, and the later now goes elsewhere on arriving.
+- resident_test _test_spot_taken (in _test_keep_moving): one settled on a spot the other chose too, the
+  later beside it, its own ticks alone: chosen again in 61 ticks and moving (on main's _step it still waits at
+  85, FAIL); one passing through on its spot, the later waits beside it, its goal kept, and steps on when
+  the cell is free.
+- town_day_test: every tenth sample (ten game minutes), a body beside its goal while one that chose that
+  cell too stands on it; two samples running fails, naming both. On main with this take: 0 found, PASS. On
+  maps' 2ff63092c with this take: 0 found (its one failure is Rolf at 17:45, the lodger take's to mend). On
+  2ff63092c with the lodger take and without this one: "Pell stood beside (194, 189), taken by Nix who chose
+  it too, for two ten-minute samples running (at 6.97, WELL)", beside the shut-ground fail.
+Server only; protocol unchanged; no new class_name; no bullet (one if maps or ui-design watch the well
+joined with the town at its usual count).
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

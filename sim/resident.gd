@@ -2003,7 +2003,11 @@ func _step() -> void:
 			_route = _path_beside(_goal)  # Another stands on it (853: one strolled onto the store's cell and the carrier stood).
 		if _route.is_empty():
 			if World.distance(tile, _goal) <= 1 and not World.is_free(_goal):
-				return  # Beside it, the cell taken: it waits there for it.
+				var holder := World.get_entity_at(_goal)
+				if not (holder is Resident and holder.tile == _goal and (holder as Resident)._goal == _goal):
+					return  # Beside it, the cell taken by one passing through: it waits there for it.
+				# Taken by one who chose it too and stays there (853 amended (16): two picked one free spot on their
+				# ways, and Pell stood beside Nix's at the well for good): it chooses again, as below.
 			_goal = tile  # No way there now: it waits, and chooses again later (762 amended (3): whatever it is doing).
 			_retry_at = World.tick + PATH_RETRY_TICKS + absi(id) % (PATH_RETRY_SPREAD + 1)
 			return

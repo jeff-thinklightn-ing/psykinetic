@@ -5484,6 +5484,7 @@ func _test_keep_moving() -> void:
 	_test_show_work(mara)
 	_test_hauler(mara)
 	_test_take_places(mara)  # 875 amended (1): no steps.
+	_test_spot_taken(mara, square, was["places"].get("home", square))
 	mara.places = was["places"]
 	mara.doing = was["doing"]
 	mara.task = was["task"]
@@ -5493,6 +5494,109 @@ func _test_keep_moving() -> void:
 	mara._goal = mara.tile
 	mara.activity = ""
 	Resident.keep_moving = false
+
+
+## 853 amended (16) (maps' Mughouse day run: Pell stood beside the well's lean spot Nix had taken, both having
+## picked it while it was free, facing the well for good): beside its goal, a body waits while the one on it is
+## passing through, and chooses again (762 amended (3)'s path, 4 to 6 s) when that one chose the cell too and stays.
+func _test_spot_taken(mara: Resident, square: Rect2i, home: Rect2i) -> void:
+	print("
+== two bodies pick one spot: the later one chooses again; one waiting on a passer-by steps on (853 amended (16)) ==")
+	var other: Resident = null
+	for body: GridEntity in World.townsfolk():
+		if body != mara and (body as Resident).town == STORE and not (body as Resident).worker_id.begins_with(Offers.VISITOR) 				and (body as Resident).task.is_empty():
+			other = body
+			break
+	_check(other != null, "(a second of the town's people: %s)" % [other.person if other != null else ""])
+	if other == null:
+		return
+	var spot := Resident.NO_CELL
+	var beside := Resident.NO_CELL
+	for y in range(square.position.y, square.end.y):
+		for x in range(square.position.x, square.end.x):
+			var at := Vector2i(x, y)
+			if spot != Resident.NO_CELL or not World.is_free(at) or World.is_link_cell(at):
+				continue
+			for d: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if World.is_free(at + d) and not World.is_link_cell(at + d):
+					spot = at
+					beside = at + d
+					break
+	_check(spot != Resident.NO_CELL, "(a free cell of the square with a free one beside it: %s, %s)" % [spot, beside])
+	if spot == Resident.NO_CELL:
+		return
+	var player := _player()
+	var player_was: Vector2i = player.tile if player != null else Resident.NO_CELL
+	if player != null:
+		_put(player, _main._nearest_free(spot + Vector2i(0, 4)))  # Near: the walk by steps, not the far one.
+	var other_was := {"places": other.places.duplicate(true), "doing": other.doing, "tile": other.tile, "goal": other._goal,
+		"wander": other._wander_at, "spot": other._spot.duplicate(true), "activity": other.activity}
+	var lean := {"use": "well", "cell": spot, "face": beside, "pose": "lean", "town": "store", "trade": "", "pair": ""}
+	mara.places = {"square": square, "work": square, "home": home}
+	mara.task = {}
+	mara.activity = ""
+	mara.doing = Resident.doing_now(mara.trade, mara.type, mara.worker_id)  # Its clock's: no new pick from a changed doing.
+	_put(mara, beside)
+	other.places = {"square": square, "work": square, "home": home}
+	other.doing = Resident.doing_now(other.trade, other.type, other.worker_id)
+	_put(other, spot)
+	other._goal = spot
+	other._spot = lean.duplicate()
+	other._route.clear()
+	other._wander_at = World.tick + 100000  # It stays there through the row.
+	mara._spot = lean.duplicate()
+	mara._goal = spot
+	mara._route.clear()
+	mara._retry_at = -1
+	mara._rise_until = -1  # No get-up left from the rows before.
+	_check(not mara._far(), "(the two near a player: the steps' walk)")
+	var start := World.tick
+	var limit := Resident.PATH_RETRY_TICKS + Resident.PATH_RETRY_SPREAD + Resident.LOOK_EVERY + 20
+	for i in limit:  # Its own ticks alone (Main's sync would let go a spot its places don't list, 197 amended (1)).
+		if mara._goal != spot and mara._goal != mara.tile:
+			break
+		World.tick += 1
+		mara._sim_tick()
+	var took := World.tick - start
+	_check(other.tile == spot and mara._goal != spot and mara._goal != mara.tile and took <= Resident.PATH_RETRY_TICKS + Resident.PATH_RETRY_SPREAD + Resident.LOOK_EVERY,
+		"its spot taken by one who chose it too and stays: within 6 s it has chosen again (goal %s, %d ticks; the other still on %s)" % [mara._goal, took, other.tile])
+	var from := mara.tile
+	for i in 40:
+		if mara.tile != from:
+			break
+		World.tick += 1
+		mara._sim_tick()
+	_check(mara.tile != from, "and is moving (%s to %s)" % [from, mara.tile])
+	# One passing through: it waits beside its goal, then steps on when the cell is free.
+	_put(mara, beside)
+	_put(other, spot)
+	other._goal = _main._nearest_free(spot + Vector2i(6, 0))  # Its way lies on: it stands on the spot only for now.
+	other._wander_at = World.tick + 100000
+	mara._goal = spot
+	mara._route.clear()
+	mara._retry_at = -1
+	for i in 20:
+		World.tick += 1
+		mara._step()  # Its steps alone: the passer-by held where it stands.
+	_check(other.tile == spot and mara._goal == spot and mara.tile == beside and mara._retry_at < 0,
+		"its spot held by one passing through: it waits beside it, its goal kept (%s at %s, retry %d)" % [mara._goal, mara.tile, mara._retry_at])
+	_put(other, other._goal)
+	for i in 40:
+		if mara.tile == spot:
+			break
+		World.tick += 1
+		mara._step()
+	_check(mara.tile == spot, "the passer-by gone on, it steps onto its spot (%s)" % [mara.tile])
+	other.places = other_was["places"]
+	other.doing = other_was["doing"]
+	other._spot = other_was["spot"]
+	other._wander_at = other_was["wander"]
+	other.activity = other_was["activity"]
+	_put(other, other_was["tile"])
+	other._goal = other_was["goal"]
+	other._route.clear()
+	if player != null:
+		_put(player, player_was)
 
 
 func _sync() -> void:
