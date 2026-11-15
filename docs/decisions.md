@@ -56559,3 +56559,57 @@ purpose, it failed on five levels and the made map. Decision 147's round trip (_
 before. Also run on the take: level_test, regen_test, labyrinth_test, builder_zone_test, builder_test.
 
 Editor and server; protocol unchanged; no new class_name; no bullet (nothing a player is told).
+
+
+## 924. A held stab's sounds: an effort floor per swinger, swing and hit takes dealt from a deck, two voices of one hit slot per swinger (sound)
+
+Combat's 923 takes a player's or a companion's stab from every 0.30 s to every
+0.20 s on held clicks. Read from the takes and the code at that rate (sound's
+read for the coordinator and combat, 11-14): sfx.swing's four takes (0.13 to
+0.30 s) overlap the next whoosh by about 0.1 s, two at once at most;
+sfx.hit_blade_flesh's three (0.32 to 0.45 s) overlap the next hit by 0.12 to
+0.25 s; sfx.hit_blade_armor is one take of 0.68 s, the same file at every
+hit, three or four deep at five a second; Sfx._pick refused only the take
+just played, so a hit's A-B-A 0.4 s apart was common; and the grunt
+(Client3D.EFFORT_EVERY, one swing in three, two takes a body) came about 1.7
+times a second. The coordinator's approval, all three, and its condition:
+923 queues only after (1) and (3) are on main. Label from
+tools/decision_number.sh. Package: none (nothing a player is told; no
+bullet).
+
+(1) The effort floor: a swing grunts on its one in three and not within
+Client3D.EFFORT_FLOOR_MS (900) of the same swinger's last grunt
+(Client3D.effort_due, Client3D._effort_at by instance id, on the rigs'
+clock). A weapon swung every 0.9 s or slower is unchanged: no grunt it would
+have given is refused. Faster, the floor thins only grunts that would come
+within 0.9 s of the last: of ten swings each rolling a grunt, it refuses 5
+at the robbers' 0.6 s (one pair of rolled grunts in nine under the one in
+three), 6 at 0.3 s and 8 at 0.2 s.
+
+(2) Dealt takes: a swing's and a blow's slot (Sfx.dealt: "sfx.swing...",
+"sfx.hit_...") plays its takes from a deck (Sfx._deal_take): each once a
+round in a shuffled order, a round's first never the take last played; every
+other slot picks at random as before, never the take just played. A reel's
+next_take still overrides either.
+
+(3) Voices capped: a blow's hit plays under its swinger's key
+(Client3D._struck_with gives the swinger's instance id third; _on_struck and
+_play_later pass "swinger:<id>"), and Sfx.play keeps at most Sfx.VOICE_CAP
+(2) of one slot under one key at once, the oldest cut (Sfx._cap_voices;
+Sfx.cut_voices for tests). More armour-hit takes may follow in a take of
+their own.
+
+view_test _test_held_stab (view_test's half, a sound row): a warm-up stab,
+then ten held stabs from the player with a dagger on an imp beside him at
+0.20 s and at 0.30 s through _on_swung and _on_struck, the stabs holding
+their pace (206 to 208 ms; 303 to 304): no two grunts within 900 ms, the
+swing's four takes and the hit's three dealt with none twice in a round and
+no round begun on the last's last, never more than two of the hit at once;
+the one-take armour hit at 0.20 s under his key, two at once at most (8 of
+10 cut); a weapon swung each 1.0 s or 0.9 s keeps every rolled grunt. It
+prints the first stab's costs: the swing's call 1.2 ms against 0.8 later, the
+blow's 0.1, the frames after it as after any; the stall a headless run shows
+is the frames after the dagger is put in his hand (about 11.8 s twice), not
+the sound's. Animation's joined clip of ten held stabs (combat's b6a5c2edd)
+is read against the same three when it lands. Client sound only; protocol
+unchanged; no new class_name.

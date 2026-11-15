@@ -2936,6 +2936,10 @@ const BLOW_REACH := 2
 ## A person grunts with one swing in this many, and a goblin cries out at
 ## one blow in this many (a grunt every time wears thin).
 const EFFORT_EVERY := 3
+## 924: and never within this long of the same swinger's last grunt (a held
+## stab at five a second grunted 1.7 times a second). A weapon swung slower
+## than this is unchanged.
+const EFFORT_FLOOR_MS := 900
 const PAIN_EVERY := 2
 ## A goblin standing idle mutters every so often (s, picked between these).
 const CHATTER_SECONDS := Vector2(8.0, 25.0)
@@ -23097,8 +23101,9 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		if _heard_steadied(struck):
 			blow[0] = SoundKit.HIT_STEADIED  # 843: a blow that doesn't rock him lands dull.
 		var wait := (int(blow[1]) - AnimRig.now_msec()) / 1000.0
+		var voice := "swinger:%d" % int(blow[2]) if int(blow[2]) != 0 else ""  # 924: two at once at most.
 		if wait > 0.0:
-			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait)
+			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait, voice)
 			var ids_hurt := [struck.get_instance_id() if struck != null else 0, puppet.get_instance_id()]
 			get_tree().create_timer(wait).timeout.connect(func() -> void:
 				var fired_body := instance_from_id(ids_hurt[0]) as GridEntity
@@ -23106,7 +23111,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 				if is_instance_valid(fired_body) and is_instance_valid(fired_puppet) and is_instance_valid(sfx) and sfx.is_inside_tree():
 					_pain(fired_body, fired_puppet))
 		else:
-			sfx.play(str(blow[0]), puppet.position + Vector3.UP * 0.8)
+			sfx.play(str(blow[0]), puppet.position + Vector3.UP * 0.8, 1.0, 0.0, -1, voice)
 			_pain(struck, puppet)
 		if music != null and struck != null and sfx.listener != null and _cells_apart(struck.tile, sfx.listener) <= Music.TENSION_NEAR:
 			music.fight_near()
@@ -23449,14 +23454,15 @@ func _heard_steadied(struck: GridEntity) -> bool:
 	return struck != null and int(_steadied.get(struck.get_instance_id(), 0)) > AnimRig.now_msec()
 
 
-## What a blow on [param struck] sounds like and when, [slot, msec]: the
+## What a blow on [param struck] sounds like and when, [slot, msec, the
+## swinger's instance id or 0 (924: its hits' voices capped)]: the
 ## weapon of whoever swung beside it just now (_swings; a person's, whose
 ## hands are known), else the plain hit, on its flesh or its worn metal
 ## (SoundKit.hit); heard when that swing's drawn blow lands (its strike's
 ## contact), now if that has passed or there was no swing.
 func _struck_with(struck: GridEntity) -> Array:
 	if struck == null:
-		return ["sfx.hit_flesh", AnimRig.now_msec()]
+		return ["sfx.hit_flesh", AnimRig.now_msec(), 0]
 	var now := AnimRig.now_msec()
 	var armour := SoundKit.armour_look(struck)
 	var best := -1
@@ -23478,12 +23484,12 @@ func _struck_with(struck: GridEntity) -> Array:
 			best_faces = faces
 	var plain := "sfx.hit_blunt_armor" if armour in SoundKit.ARMOUR_STRUCK else "sfx.hit_flesh"
 	if best < 0:
-		return [plain, now]
+		return [plain, now, 0]
 	var lands := maxi(int(_swings[best][2]), now)
 	var by := instance_from_id(best) as GridEntity
 	if not (by is Player or by is Companion):
-		return [plain, lands]  # A monster's hands aren't sent to clients.
-	return [SoundKit.hit(str(_swings[best][1]), armour), lands]
+		return [plain, lands, best]  # A monster's hands aren't sent to clients.
+	return [SoundKit.hit(str(_swings[best][1]), armour), lands, best]
 
 
 ## Whether [param swinger]'s facing (the sim's, replicated) points at [param struck]'s cell, within half a
@@ -23537,10 +23543,10 @@ func _sync_chatter(monster: Monster, puppet: Node3D) -> void:
 
 ## [param slot] at [param at] after [param seconds] (a body landing as its
 ## fall ends).
-func _play_later(slot: String, at: Vector3, seconds: float) -> void:
+func _play_later(slot: String, at: Vector3, seconds: float, voice_key := "") -> void:
 	get_tree().create_timer(seconds).timeout.connect(func() -> void:
 		if is_instance_valid(sfx) and sfx.is_inside_tree():
-			sfx.play(slot, at))
+			sfx.play(slot, at, 1.0, 0.0, -1, voice_key))
 
 
 ## A person's bow drawn (raised "draw", replicated for players): the
@@ -27611,6 +27617,16 @@ func _wind_lost(puppet: Node3D) -> void:
 		_flinch(puppet)
 
 
+## Each swinger's last grunt (924), on the rigs' clock: id -> msec.
+var _effort_at: Dictionary[int, int] = {}
+
+
+## Whether a swing grunts (924): one in EFFORT_EVERY by [param roll], and
+## not within EFFORT_FLOOR_MS of [param last], the swinger's last grunt.
+static func effort_due(roll: int, now: int, last: int) -> bool:
+	return roll % EFFORT_EVERY == 0 and now - last >= EFFORT_FLOOR_MS
+
+
 ## A swing: the body goes out toward the blow and back, with a whoosh
 ## pitched by the swinger's weight.
 func _on_swung(direction: Vector2i, id: int) -> void:
@@ -27633,7 +27649,8 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 		_swings[id][2] = drawn_at
 	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	var effort := SoundKit.voice(swinger, "effort_swing", _person_body(puppet))
-	if effort != "" and randi() % EFFORT_EVERY == 0:
+	if effort != "" and effort_due(randi(), now, int(_effort_at.get(id, now - EFFORT_FLOOR_MS))):
+		_effort_at[id] = now
 		sfx.play(effort, puppet.position + Vector3.UP * 1.5)
 	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
 		_strike(puppet, swinger, weapon)

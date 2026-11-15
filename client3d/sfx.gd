@@ -66,6 +66,15 @@ var _last: Dictionary[String, int] = {}
 var next_take: Dictionary[String, int] = {}
 ## Plays made, for tests: [slot, file ("" for the placeholder), bus] each.
 var played: Array[Array] = []
+## 924: at most this many voices of one slot under one key at once (a
+## swinger's hits, Client3D._on_struck), the oldest cut.
+const VOICE_CAP := 2
+## "slot|key" -> its playing voices, oldest first (924).
+var _voices: Dictionary[String, Array] = {}
+## Voices cut by the cap, for tests: [slot, key] each.
+var cut_voices: Array[Array] = []
+## Slot -> the takes left to deal this round, for a dealt slot (924, dealt).
+var _decks: Dictionary[String, Array] = {}
 ## Sounds not played because they were out of hearing, for tests: slot each.
 var unheard: Array[String] = []
 ## dB the DUCKED buses sit below their volumes (0 or less; set_duck).
@@ -164,7 +173,7 @@ static func hearing(slot: String, at: Vector2i, from: Vector2i, radius := -1, cl
 ## (before the jitter), [param volume_db] on top of the slot's volume,
 ## heard over [param radius] cells (-1: the slot's own). One that isn't
 ## positional is played flat.
-func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0, radius := -1) -> void:
+func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0, radius := -1, voice_key := "") -> void:
 	if not SoundKit.has(slot):
 		push_warning("[sfx] no sound slot %s" % slot)
 		return
@@ -194,6 +203,44 @@ func play(slot: String, at: Vector3, pitch := 1.0, volume_db := 0.0, radius := -
 	player.finished.connect(player.queue_free)
 	player.play()
 	played.append([slot, stream.resource_path, player.bus])
+	if not voice_key.is_empty():
+		_cap_voices(slot, voice_key, player)
+
+
+## 924: [param player] joins [param slot]'s voices under [param key]; past
+## VOICE_CAP still playing, the oldest is cut.
+func _cap_voices(slot: String, key: String, player: AudioStreamPlayer3D) -> void:
+	var held: Array = (_voices.get(slot + "|" + key, []) as Array).filter(func(each: Variant) -> bool:
+		return is_instance_valid(each) and (each as AudioStreamPlayer3D).playing)
+	held.append(player)
+	while held.size() > VOICE_CAP:
+		var oldest := held.pop_front() as AudioStreamPlayer3D
+		oldest.stop()
+		oldest.queue_free()
+		cut_voices.append([slot, key])
+	_voices[slot + "|" + key] = held
+
+
+## Whether [param slot]'s takes are dealt from a deck (924): a swing's and a
+## blow's, which come fast in a fight; every other slot picks at random,
+## never the take just played.
+static func dealt(slot: String) -> bool:
+	return slot.begins_with("sfx.swing") or slot.begins_with("sfx.hit_")
+
+
+## The next take of [param count] for [param slot] from its deck (924): each
+## once a round in a shuffled order, the round's first never the take last
+## played.
+func _deal_take(slot: String, count: int) -> int:
+	var deck: Array = _decks.get(slot, [])
+	if deck.is_empty() or deck.any(func(index: Variant) -> bool: return int(index) >= count):
+		deck = range(count)
+		deck.shuffle()
+		if count > 1 and int(deck[0]) == _last.get(slot, -1):
+			deck.append(deck.pop_front())
+	var index := int(deck.pop_front())
+	_decks[slot] = deck
+	return index
 
 
 ## A loop of [param slot] held at [param at] until it is freed (a bow's
@@ -329,7 +376,9 @@ func _pick(slot: String) -> AudioStream:
 	if streams.is_empty():
 		return null
 	var index := randi() % streams.size()
-	if streams.size() > 1 and index == _last.get(slot, -1):
+	if dealt(slot):
+		index = _deal_take(slot, streams.size())
+	elif streams.size() > 1 and index == _last.get(slot, -1):
 		index = (index + 1) % streams.size()
 	if next_take.has(slot):
 		index = next_take[slot] % streams.size()

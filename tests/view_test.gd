@@ -111,6 +111,7 @@ func _ready() -> void:
 		_test_bridge_ends()
 		_test_far_cry()
 		_test_mine_sounds()
+		await _test_held_stab()
 		_test_idle_voices()
 		await _test_monster_death()
 		_test_aura()
@@ -1492,6 +1493,160 @@ func _test_far_cry() -> void:
 	heard = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
 	_check(heard == ["sfx.wave_wolves"], "a night watch's wave heard from its cell (771) (%s)" % [heard])
 	_rig.sfx.hear_everything = hear_was
+
+
+## 924: ten held stabs from one swinger at 923's 0.20 s and at 0.30 s, the
+## player with a dagger on an imp beside him, through the client's own swing
+## and blow paths (_on_swung, _on_struck): his grunts never closer than
+## EFFORT_FLOOR_MS; the swing's and the hit's takes dealt, none twice in a
+## round, a round's first never the last round's last; never more than
+## VOICE_CAP of the hit's slot from him at once. The one-take armour hit the
+## same at 0.20 s. A slow weapon's grunts by its one in three alone.
+func _test_held_stab() -> void:
+	print("\n== a held stab at five a second and at three: grunts, decks, voices (924) ==")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
+	if puppet == null:
+		_check(true, "no drawn player: skipped")
+		return
+	var id := player.get_instance_id()
+	# An empty floor cell near him: _spawn_imp despawns whoever stands on its tile, and the
+	# companion often stands at his side (a landing's later companion rows lost her so).
+	var spot := Vector2i(-1, -1)
+	for r in range(1, 4):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				var cell := player.tile + Vector2i(dx, dy)
+				if spot.x < 0 and maxi(absi(dx), absi(dy)) == r and World.is_walkable(cell) and World.get_entity_at(cell) == null:
+					spot = cell
+	if spot.x < 0:
+		_check(true, "no empty floor beside the player: skipped")
+		return
+	var companion_was := _companion()
+	var imp := _spawn_imp(spot)
+	if imp == null:
+		_check(false, "an imp spawned beside the player at %s" % spot)
+		return
+	imp.hp = 100000  # Outlives anyone's blows while the stabs run (the companion fights it).
+	_rig._process(0.0)
+	var slots_was := player.slots.duplicate()
+	var slots := player.slots.duplicate()
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	slots[Items.RIGHT_HAND] = "dagger"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	var swing := SoundKit.swing("dagger")
+	var hit := SoundKit.hit("dagger", "")
+	var sfx := _rig.sfx
+	var playing := func(slot: String) -> int:
+		return sfx.get_children().filter(func(node: Node) -> bool:
+			return node is AudioStreamPlayer3D and str(node.get_meta("slot", "")) == slot and (node as AudioStreamPlayer3D).playing).size()
+	var dealt_right := func(files: Array, count: int) -> bool:
+		for i in files.size():
+			var round_start := i - i % count
+			if files.slice(round_start, i).has(files[i]):
+				return false
+			if i % count == 0 and i > 0 and count > 1 and files[i] == files[i - 1]:
+				return false
+		return true
+	# One stab first, its dagger drawn and its takes loaded (a headless first build stalls frames for seconds).
+	# Its costs printed: the dagger's drawing (the slots set just now), the calls, the frames after.
+	var timed := func(label: String) -> void:
+		var frames: Array[int] = []
+		for f in 4:
+			var began := Time.get_ticks_usec()
+			await get_tree().process_frame
+			frames.append(int((Time.get_ticks_usec() - began) / 1000))
+		print("  %s: the next frames %s ms" % [label, frames])
+	await timed.call("the dagger put in his hand")
+	var calls := func() -> Array:
+		var t0 := Time.get_ticks_usec()
+		_rig._on_swung(Vector2i(1, 0), id)
+		var t1 := Time.get_ticks_usec()
+		_rig._on_struck(1, &"attack", imp.get_instance_id())
+		return [(t1 - t0) / 1000.0, (Time.get_ticks_usec() - t1) / 1000.0]
+	var first: Array = calls.call()
+	print("  the first stab: the swing's call %.1f ms, the blow's %.1f ms" % first)
+	await timed.call("after the first stab")
+	await get_tree().create_timer(1.5).timeout
+	var again: Array = calls.call()
+	print("  a later stab: the swing's call %.1f ms, the blow's %.1f ms" % again)
+	await timed.call("after a later stab")
+	await get_tree().create_timer(1.0).timeout
+	for pace: float in [0.20, 0.30]:
+		sfx._decks.erase(swing)
+		sfx._decks.erase(hit)
+		var before := sfx.played.size()
+		var grunts: Array[int] = []
+		var stabs: Array[int] = []
+		var most := 0
+		for i in 10:
+			var at := AnimRig.now_msec()
+			stabs.append(at)
+			var n := sfx.played.size()
+			_rig._on_swung(Vector2i(1, 0), id)
+			if sfx.played.slice(n).any(func(entry: Array) -> bool: return str(entry[0]).begins_with("voice.effort")):
+				grunts.append(at)
+			_rig._on_struck(1, &"attack", imp.get_instance_id())
+			var until := Time.get_ticks_msec() + int(pace * 1000.0)
+			while Time.get_ticks_msec() < until:
+				await get_tree().process_frame
+				most = maxi(most, playing.call(hit))
+		await get_tree().create_timer(0.8).timeout
+		var plays: Array = sfx.played.slice(before)
+		var swings: Array = plays.filter(func(entry: Array) -> bool: return entry[0] == swing).map(func(entry: Array) -> String: return str(entry[1]).get_file())
+		var hits: Array = plays.filter(func(entry: Array) -> bool: return entry[0] == hit).map(func(entry: Array) -> String: return str(entry[1]).get_file())
+		var gaps: Array[int] = []
+		for i in range(1, grunts.size()):
+			gaps.append(grunts[i] - grunts[i - 1])
+		var spacing: Array[int] = []
+		for i in range(1, stabs.size()):
+			spacing.append(stabs[i] - stabs[i - 1])
+		var spaced := spacing.duplicate()
+		spaced.sort()
+		print("  at %.2f s: the stabs %s ms apart (the rigs' clock)" % [pace, spacing])
+		_check(spaced[0] >= int(pace * 1000.0) and spaced[-1] <= int(pace * 1000.0) + 120, "at %.2f s: the stabs held their pace (%d to %d ms)" % [pace, spaced[0], spaced[-1]])
+		print("  at %.2f s: swings %s; hits %s; grunts at %s ms (gaps %s); the hit's voices at once, most %d" % [pace, swings, hits,
+				grunts.map(func(at: int) -> int: return at - grunts[0]) if not grunts.is_empty() else [], gaps, most])
+		var synced := not SoundKit.files(swing).is_empty() and not SoundKit.files(hit).is_empty()
+		_check(swings.size() == 10, "at %.2f s: ten swings, ten whooshes (%d)" % [pace, swings.size()])
+		_check(gaps.all(func(gap: int) -> bool: return gap >= Client3D.EFFORT_FLOOR_MS - 2), "at %.2f s: no two grunts within %d ms (gaps %s)" % [pace, Client3D.EFFORT_FLOOR_MS, gaps])
+		_check(not synced or dealt_right.call(swings, SoundKit.files(swing).size()) and dealt_right.call(hits, SoundKit.files(hit).size()),
+				"at %.2f s: the swing's %d takes and the hit's %d dealt, none twice in a round, no round begun on the last's last" % [pace, SoundKit.files(swing).size(), SoundKit.files(hit).size()])
+		_check(hits.size() >= 9 and most <= Sfx.VOICE_CAP, "at %.2f s: %d blows heard, never more than %d of the hit at once (%d)" % [pace, hits.size(), Sfx.VOICE_CAP, most])
+	# The armour hit, one 0.68 s take: at 0.20 s, under his key, two at once at most.
+	var armour := SoundKit.hit("dagger", "plate")
+	var cut_before := sfx.cut_voices.size()
+	var most_armour := 0
+	if not SoundKit.files("sfx.hit_blade_armor").is_empty():
+		for i in 10:
+			sfx.play("sfx.hit_blade_armor", puppet.position, 1.0, 0.0, -1, "swinger:%d" % id)
+			var until := Time.get_ticks_msec() + 200
+			while Time.get_ticks_msec() < until:
+				await get_tree().process_frame
+				most_armour = maxi(most_armour, playing.call("sfx.hit_blade_armor"))
+	_check(SoundKit.files("sfx.hit_blade_armor").is_empty() or most_armour <= Sfx.VOICE_CAP,
+			"the armour hit (%s's one take) at 0.20 s: never more than %d at once (%d; %d cut)" % [armour, Sfx.VOICE_CAP, most_armour, sfx.cut_voices.size() - cut_before])
+	# A slow weapon (a swing a second) grunts on every due roll; the floor bites only faster than itself.
+	var refused := func(spacing: int) -> int:
+		var last := -Client3D.EFFORT_FLOOR_MS
+		var count := 0
+		for i in 10:
+			if Client3D.effort_due(0, i * spacing, last):
+				last = i * spacing
+			else:
+				count += 1
+		return count
+	print("  ten due grunts refused by the floor: a swing each 1.0 s %d, 0.9 s %d, 0.6 s %d, 0.3 s %d, 0.2 s %d"
+			% [refused.call(1000), refused.call(900), refused.call(600), refused.call(300), refused.call(200)])
+	_check(refused.call(1000) == 0 and refused.call(900) == 0 and not Client3D.effort_due(1, 0, -10000) and refused.call(200) > 0,
+			"a weapon swung a second or slower: every due grunt kept, the one in three unchanged; at 0.2 s the floor thins them")
+	player.slots = slots_was
+	World.despawn(imp)
+	_rig._process(0.0)
+	await get_tree().create_timer(0.8).timeout
+	_check(companion_was == null or is_instance_valid(companion_was) and _companion() == companion_was, "the companion still beside him after the stabs")
 
 
 ## 769 amended (4): a mine's sounds. A blow on a seam is the pick on rock,

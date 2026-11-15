@@ -27,7 +27,7 @@ const VIEW: Array[StringName] = [
 	&"_aim_cone_shown", &"_aim_arc_span", &"_aim_lead", &"_aim_lead_to", &"_aim_arc_angle",
 	&"_telegraphs", &"_tells", &"_cell_quad", &"_outline", &"_seen_through", &"_outlined",
 	&"_marking", &"_marking_shaders", &"_toss", &"_ring_mesh", &"bubbles", &"names_on_hud", &"own_name_on_hud", &"_plate_rows", &"_plates", &"_plates_ms", &"show_all_bars",
-	&"taker_marks", &"_combat_at", &"_idle_next", &"_idle_heard", &"_idle_slot_at", &"_swings", &"_steadied",
+	&"taker_marks", &"_combat_at", &"_idle_next", &"_idle_heard", &"_effort_at", &"_idle_slot_at", &"_swings", &"_steadied",
 	&"_pile_ids", &"_piles_quiet_until", &"_door_hp", &"_last_hp", &"_last_tile", &"_last_step_ms",
 	&"_step_pace", &"_step_slot", &"_flattened", &"_arrows", &"_pending_deaths", &"_break_sounds",
 	&"_departed", &"_door_open", &"_door_node", &"_far", &"_relook_far", &"_local_name", &"_mourning", &"_mourn",
