@@ -49,6 +49,7 @@ func _ready() -> void:
 		_test_doorway()
 		_test_go_in()
 		_test_footprint_click()
+		_test_door_talk()
 	await _test_click_routes_agree()
 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -231,6 +232,76 @@ func _building_at(from_level: Dictionary, cell: Vector2i) -> Dictionary:
 		if Level.building_rect(building).has_point(cell):
 			return building
 	return {}
+
+
+## 935 amended (3): a click on one at work in the one cell inside his shut door (the healer by day, the wilds' (152, 233)): the cells
+## beside him are walled in by his own body, so the stand cell has no route and the click did nothing; now the walk is at his own cell
+## (a route to an occupied goal exists, a free body opens a door by walking at it). With a stand cell that has a route: unchanged.
+func _test_door_talk() -> void:
+	print("
+== a click on one behind a shut door walks at him; with a way to the stand cell, as before (935 amended (3)) ==")
+	var player := _player()
+	var body: GridEntity = null
+	for entity: GridEntity in World.get_entities():
+		if entity != player and entity.spawned and not entity is Player:
+			body = entity
+			break
+	if player == null or body == null:
+		_check(false, "a player and a body")
+		return
+	var street := Vector2i(152, 230)
+	var inside := Vector2i(152, 233)
+	World._relocate(body, inside)
+	World._relocate(player, street)
+	_main._free_taken_over(player)
+	var stand: Vector2i = _main._stand_to_talk(body, street)
+	var routed := not World.walk_path(World.free_cell(player, Vector2(player.tile)), stand, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES).is_empty()
+	_check(stand != Main.NONE and not routed, "the stand cell beside him inside the hut, %s, has no route (his body shuts the entry)" % stand)
+	_main._talk_to(player, body)
+	var path: Array = _main._free.get("path", [])
+	_check(_main._talk_wanted == body and not path.is_empty() and path.back() == inside,
+		"the click walks at his own cell %s (%d cells), and the talk is wanted on arrival" % [inside, path.size()])
+	# The walk does not open a shut door; the step does (E's "door" command): from two cells off the talk waits, at the door's step the
+	# door is opened, and then the talk is let through.
+	World._relocate(body, inside)
+	var shut: Door = _main._shut_door_between(street + Vector2i(0, 1), inside)
+	_check(shut != null and not shut.is_open(), "a shut door lies between the cell two off %s and him %s" % [street + Vector2i(0, 1), inside])
+	_main._talk_wanted = body
+	_main._talk_at_door = true
+	_main._talk_until = Time.get_ticks_msec() + 20000
+	_main._talk_door_sent = 0
+	World._relocate(player, street + Vector2i(0, 1))
+	_main._update_talk()
+	_check(_main._talk_wanted == body and shut != null and not shut.is_open(), "two cells off, the door shut, the talk waits (not opened, the door not yet touched)")
+	World._relocate(player, street + Vector2i(0, 2))
+	player.next_move_tick = 0
+	_main._update_talk()
+	_check(shut != null and shut.is_open(), "at the door's step the door is opened by the step's command")
+	_main._update_talk()
+	_check(_main._talk_wanted == null, "and the talk is let through once it is open")
+	if shut != null and shut.is_open():
+		World.command(player, "door", {"edge": [shut.key.x, shut.key.y, shut.key.z]})  # Shut again, as it was laid.
+	_main._talk_wanted = null
+	_main._talk_at_door = false
+	_main._free["path"] = []
+	# In the open, with a way to the stand cell: as before.
+	var open_cell := Vector2i(-1, -1)
+	for dx in range(-8, -3):
+		for dy in range(-2, 3):
+			var cell := street + Vector2i(dx, dy)
+			if open_cell == Vector2i(-1, -1) and World.is_walkable(cell) and World.get_entity_at(cell) == null:
+				open_cell = cell
+	if open_cell == Vector2i(-1, -1):
+		print("  (no open cell near the street: the unchanged row skipped)")
+	else:
+		World._relocate(body, open_cell)
+		var stand_open: Vector2i = _main._stand_to_talk(body, street)
+		_main._talk_to(player, body)
+		var way: Array = _main._free.get("path", [])
+		_check(stand_open != Main.NONE and not way.is_empty() and way.back() == stand_open and way.back() != open_cell,
+			"in the open: the walk is to the stand cell %s beside him, as before (%s)" % [stand_open, way.back() if not way.is_empty() else "none"])
+	_main._talk_wanted = null
+	_main._free["path"] = []
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's
