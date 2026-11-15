@@ -4804,6 +4804,16 @@ func _test_window_floor() -> void:
 	_check(add != null and add.shader.code.contains("smoothstep(reach * near_share, reach")
 			and is_equal_approx(float(add.get_shader_parameter("near_share")), Client3D.WINDOW_FLOOR_NEAR) and lone > inside,
 			"inside a carried lantern's light the floor fades out from %.1f of its range (own ground %.1f, as the multiply; with the floor it would read %.1f)" % [Client3D.WINDOW_FLOOR_NEAR, inside, lone])
+	# Both passes warmed at the first build (perf's word: a nightfall mid-play compiles them otherwise).
+	var warm := Client3D.warm_window_light() as MultiMeshInstance3D
+	var warm_mul := warm.material_override as ShaderMaterial if warm != null else null
+	var warm_add := warm_mul.next_pass as ShaderMaterial if warm_mul != null else null
+	_check(Client3D.warm_ups.has(Callable(Client3D, "warm_window_light")) and warm_add != null
+			and warm.multimesh.instance_count == 1 and warm.multimesh.visible_instance_count != 0 and warm.multimesh.use_custom_data
+			and warm.multimesh.transform_format == _rig._window_light.multimesh.transform_format
+			and warm_mul.shader.code == mul.shader.code and warm_add.shader.code == add.shader.code,
+			"both passes among the warm-ups, one patch from the view's own shader code, a multimesh with custom data as the view's (its shader variant)")
+	warm.free()
 
 
 ## The plinth (decision 489 amended): a kind's wood walls on a stone band
