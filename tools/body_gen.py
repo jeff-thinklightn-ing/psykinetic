@@ -1281,14 +1281,46 @@ def bun(J: dict) -> Part:
 
 
 def belt(J: dict) -> Part:
+	"""The belt at the waist. A person's: each of BELT_ROWS rings laid BELT_OUT outside the tunic at its own height, by a
+	level ray out from the body's line at each of BELT_AROUND points, so the tunic never shows through it whatever the
+	keys make of the waist (a band drawn by widths sat on the s1 ring alone, and the tunic above and below it, flaring
+	to the hips, came through it by up to a centimetre). An orc's and a kobold's: as they were."""
 	p = Part("Belt", "Belt", follow=True)
 	z = J["spine_01"].z
+	if PEOPLE == "human":
+		p.sparse = True
+		tree = _bvh([torso(J)])
+		for dz in BELT_ROWS:
+			centre = Vector((0.0, -0.005, z + dz))
+			r = []
+			for i in range(BELT_AROUND):
+				# ring()'s way round, so its faces turn out as before; half a step on. Each point as far out as the tunic
+				# reaches within a quarter step either side (a straight edge between two points cut the tunic's corners by
+				# up to 3 mm; half a step stood it 11 mm out on the waist's sloping sides), each read twice, the second
+				# 0.3 mm up, taking the further (a ray through the tunic's own vertex or edge can slip between its faces).
+				a = 2.0 * math.pi * (i + 0.5) / BELT_AROUND
+				reach = 0.0
+				for turn in (-0.25, 0.0, 0.25):
+					b = 2.0 * math.pi * (i + 0.5 + turn) / BELT_AROUND
+					way = (X * math.cos(b) + FRONT * math.sin(b)).normalized()
+					reach = max(reach, _outside(tree, centre, way, 0.4), _outside(tree, centre + Z * 0.0003, way, 0.4))
+				ray = (X * math.cos(a) + FRONT * math.sin(a)).normalized()
+				r.append(centre + ray * (reach + BELT_OUT))
+			p.add(r)
+		return p
 	w, d = pick((0.155, 0.105), (0.141, 0.096))  # Just over the tunic's waist (torso()'s s1 ring).
 	w, d = w * m("torso") * m("waist"), d * m("torso") * m("waist")
 	w, d = w * TORSO_WIDTH.get(PEOPLE, [1.0] * 10)[3] * per(1.0, 1.06, 1.0), d * TORSO_DEPTH.get(PEOPLE, [1.0] * 10)[3] * per(1.0, 1.06, 1.0)
 	for dz, dw in [(-0.022, 0.001), (0.022, -0.001)]:
 		p.add(ring(Vector((0, -0.005, z + dz)), X, FRONT, w + dw, d + dw, 12, 0.45, (0.01 + m("belly"), 0.0)))
 	return p
+
+
+## A person's belt (belt): its rings' heights about spine_01, its points round each, and how far each stands
+## outside the tunic along its level ray.
+BELT_ROWS = tuple(-0.022 + 0.0055 * k for k in range(9))
+BELT_AROUND = 48
+BELT_OUT = 0.004
 
 
 def outward(p: Vector, axis: Vector) -> Vector:

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A person's belt sits close round their tunic, whatever their build (419 amended (5)).
 - Towns: when a pedlar visits Umbrage, they keep the second stall in the square, behind its counter by day; click them across it to see their wares (711 amended (2)).
 - The battle axe winds up in 0.6 s, as quick as the giant axe, and its blow lands as the blade comes round (908).
 - The giant axe hits harder, and its blow lands as the blade comes round (908).

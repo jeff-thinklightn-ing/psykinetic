@@ -13389,6 +13389,26 @@ brown cap read as one patch at the nearest zoom.
   name picked kept and a rejoin drawing the same, (b) the hair drawn reads as its name within 13 L*, (c)
   the skin as picked, (d) the beard within BEARD_FACING of the hair drawn, on its side of the skin.
   Client only.
+Amended (5) (pc-character; the coordinator's order after the collar, from the checklist's belt line): a person's
+belt is laid outside the tunic by rays, on every shape key, as the collar and the crown are.
+- Before: the belt was one band drawn by widths, just over torso()'s s1 ring. The tunic above and below that ring
+  flares to the hips, and on some keys the ring itself is wider than the widths, so the tunic came through the belt.
+  view_world_test measured main at -6.2 to 17.3 mm outside the tunic on the man and -10.0 to 14.4 mm on the woman,
+  over 13 shapes: through it on some keys, standing well off it on others.
+- Now (body_gen belt, BELT_ROWS, BELT_AROUND, BELT_OUT): nine rings 5.5 mm apart, from 22 mm under spine_01 to 22 mm
+  over it. Each ring has 48 points, each on a level ray out from the body's line (5 mm in front of the middle), laid
+  BELT_OUT (4 mm) beyond the furthest the torso reaches within a quarter step either side of it. Each reach is read
+  twice, the second 0.3 mm up, keeping the further, since a ray through the tunic's own vertex can slip between its
+  faces. Since every shape key rebuilds the body, the belt is laid again on each.
+  - Two fits failed on the way. Points with straight edges between them cut the tunic's corners by up to 3 mm. A
+    window of half a step stood the belt 11 mm out on the man's sloping sides.
+  - Measured now: the man 2.5 to 7.4 mm outside the tunic, the woman 2.4 to 6.9, none under 1 mm.
+  - An orc's and a kobold's belt are as they were.
+- Only the belt's shape changes. It follows the same bones as before, and no clip is keyed differently; animation was
+  told before landing. anim_rig_test and seamless_test pass on the new bodies.
+- Test: view_world_test _test_belt_over_tunic. On each body and key, 36 angles at three heights across the belt's
+  band each take a level ray in, comparing the belt's outermost hit with the tunic's (two rays, the second 0.3 mm
+  up). It needs at least 1 mm and at most 10 mm everywhere. It fails on main and passes on these bodies.
 
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 

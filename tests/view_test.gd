@@ -279,6 +279,7 @@ func _ready() -> void:
 		_test_hair_covers_head()
 		_test_hair_value()
 		_test_hair_pick_kept()
+		_test_belt_over_tunic()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
@@ -13394,6 +13395,107 @@ func _test_hair_pick_kept() -> void:
 	_check(bad["b"].is_empty(), "(b) 64 picks: the hair drawn reads as its name, at most %.0f L* off it (%s)" % [PersonLook.HAIR_MOVE_MAX, bad["b"] if not bad["b"].is_empty() else "ok"])
 	_check(bad["c"].is_empty(), "(c) 64 picks: the skin as picked (%s)" % [bad["c"] if not bad["c"].is_empty() else "ok"])
 	_check(bad["d"].is_empty(), "(d) 64 picks: the beard at most %.0f L* off the hair drawn, on its side of the skin (%s)" % [PersonLook.BEARD_FACING, bad["d"] if not bad["d"].is_empty() else "ok"])
+
+
+## A person's belt stands outside the tunic all the way round and across its width, on every shape key: level rays out
+## from the body's line at BELT_RAYS angles and BELT_HEIGHTS heights through the belt's band, the belt's outermost face
+## against the tunic's (419 amended, the belt: rings fitted BELT_OUT outside the tunic at their own heights).
+func _test_belt_over_tunic() -> void:
+	print("
+== a person's belt over the tunic: never under it, a few mm out, every shape key ==")
+	const RAYS := 36
+	const HEIGHTS := 3
+	var into := func(node: Node, root: Node) -> Transform3D:
+		var xf := Transform3D.IDENTITY
+		while node != root:
+			xf = (node as Node3D).transform * xf
+			node = node.get_parent()
+		return xf
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		var body := model.find_child("Body", true, false) as MeshInstance3D
+		var am := body.mesh as ArrayMesh
+		var xf: Transform3D = into.call(body, model)
+		var shapes: Array = [-1]
+		for k in am.get_blend_shape_count():
+			shapes.append(k)
+		var least := INF
+		var most := -INF
+		var where := ""
+		var rays := 0
+		var under := 0
+		for k: int in shapes:
+			# The faces in two sets: the tunic's (blue, one-hot) and the belt's (no part's colour, within the tunic's height:
+			# the boots are under it, the eyes' boxes over it). Each as corners in the model's space with this shape at full.
+			var belt := PackedVector3Array()
+			var tunic := PackedVector3Array()
+			var plain := PackedVector3Array()
+			for s in am.get_surface_count():
+				var src := am.surface_get_arrays(s)
+				var verts: PackedVector3Array = (src[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+				if k >= 0:
+					var target: PackedVector3Array = am.surface_get_blend_shape_arrays(s)[k][Mesh.ARRAY_VERTEX]
+					for i in verts.size():
+						verts[i] += target[i] - (src[Mesh.ARRAY_VERTEX] as PackedVector3Array)[i] if am.blend_shape_mode == Mesh.BLEND_SHAPE_MODE_NORMALIZED else target[i]
+				var colours: PackedColorArray = src[Mesh.ARRAY_COLOR] if src[Mesh.ARRAY_COLOR] != null else PackedColorArray()
+				var index: PackedInt32Array = src[Mesh.ARRAY_INDEX]
+				if index.is_empty():
+					index = PackedInt32Array(range(verts.size()))
+				for t in range(0, index.size(), 3):
+					var a := xf * verts[index[t]]
+					var b := xf * verts[index[t + 1]]
+					var c := xf * verts[index[t + 2]]
+					var tint: Color = colours[index[t]] if not colours.is_empty() else Color(0, 0, 0, 0)
+					if tint.b > 0.5 and tint.r + tint.g + tint.a < 0.5:
+						tunic.append_array([a, b, c])
+					elif tint.r + tint.g + tint.b + tint.a < 0.5:
+						plain.append_array([a, b, c])
+			var t_lo := INF
+			var t_hi := -INF
+			for v in tunic:
+				t_lo = minf(t_lo, v.y)
+				t_hi = maxf(t_hi, v.y)
+			for i in range(0, plain.size(), 3):
+				if minf(plain[i].y, minf(plain[i + 1].y, plain[i + 2].y)) > t_lo and maxf(plain[i].y, maxf(plain[i + 1].y, plain[i + 2].y)) < t_hi:
+					belt.append_array([plain[i], plain[i + 1], plain[i + 2]])
+			var lo := INF
+			var hi := -INF
+			var centre := Vector2.ZERO
+			for v in belt:
+				lo = minf(lo, v.y)
+				hi = maxf(hi, v.y)
+				centre += Vector2(v.x, v.z) / belt.size()
+			var outer := func(tris: PackedVector3Array, from: Vector3, way: Vector3) -> float:
+				# The furthest face along the ray, over it and a ray 0.3 mm up (one through a shared vertex can slip).
+				var far := -1.0
+				for up in [0.0, 0.0003]:
+					var o := from + Vector3(0.0, up, 0.0)
+					for t in range(0, tris.size(), 3):
+						var hit: Variant = Geometry3D.ray_intersects_triangle(o, way, tris[t], tris[t + 1], tris[t + 2])
+						if hit != null:
+							far = maxf(far, ((hit as Vector3) - o).length())
+				return far
+			for h in HEIGHTS:
+				var y := lo + 0.003 + (hi - lo - 0.006) * h / (HEIGHTS - 1.0)
+				for r in RAYS:
+					var ang := TAU * (r + 0.25) / RAYS
+					var way := Vector3(cos(ang), 0.0, sin(ang))
+					var from := Vector3(centre.x, y, centre.y)
+					var t_far: float = outer.call(tunic, from, way)
+					if t_far < 0.0:
+						continue
+					var b_far: float = outer.call(belt, from, way)
+					var gap := b_far - t_far if b_far >= 0.0 else -t_far
+					rays += 1
+					under += 1 if gap < 0.001 else 0
+					most = maxf(most, gap)
+					if gap < least:
+						least = gap
+						where = "%s at %s" % [String(am.get_blend_shape_name(k)) if k >= 0 else "base", (from + way * t_far).snappedf(0.001)]
+		_check(rays >= 2 * RAYS * HEIGHTS and least >= 0.001 and most <= 0.010,
+				"%s: the belt %.1f to %.1f mm outside the tunic (%d rays over %d shapes, %d under 1 mm; least %s)" % [
+				build[0], least * 1000.0, most * 1000.0, rays, shapes.size(), under, where])
+		model.free()
 
 
 func _test_person_looks() -> void:
