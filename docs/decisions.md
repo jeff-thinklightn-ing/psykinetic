@@ -27094,6 +27094,49 @@ deploy (465 amended (4)). level_test (_test_deep_crypt): on each generation, bot
 with rock beyond them and the way's mouth between them. Level data; protocol unchanged; no new
 class_name.
 
+608 amended (5), dungeon's side: every crypt torch a torch the default view sees, the Vault's pair
+moved to its way out's ends, the barrow's own laid off a south wall (the decision-number script's
+label; the coordinator's rulings of 11-15 on ui-design's torch5, C:/dev/review/ui-design/looks/
+torch5_94e02919e/, joined on the Lenovo at main 94e02919e, the default camera, yaw 0). In none of
+torch5's four stills was a post or flame drawn at (46,6) or (53,6): each light, at 1.69 m on its
+cell's middle, lit only the wall end beside it. Client3D draws a post and flame on every torch cell
+(_add_torch); what hid them is the vault's own south wall on their south edge, between the resting
+camera (south-east, looking north-west) and the post. The stills set the rule: the Ossuary's spine
+torches with a wall on the east edge alone, (51,11) and (51,18), were drawn whole, so a torch is
+hidden from the default view when its south neighbour is not open floor or the edge between is a
+wall or door, and an east wall is not counted. (1) The Vault's pair: (46,6) to (48,6) and (53,6)
+to (52,6), its south row, at the ends of the way out, which every generation opens at (48..52, 7)
+(47 too on generations 1 and 3, so (47,6), the first proposal, would stand behind the wall on the
+rest). From the foot's cell (49,2) at the nearest zoom (0.5) both flames fall on the screen by the
+camera's projection: (48,6) left of the player at about his height, (52,6) below him near the
+bottom. (2) The barrow's own torches (Crypt._torches): a processional pair stands one against
+each wall of the way, so on a run going east and west one of the pair stood against the south wall,
+1 or 2 of the barrow's 15 to 17 a generation; and a room torch by a south wall likewise. A torch
+whose south edge hides it is laid a cell north, off the wall: a processional one only where the way
+keeps CLEAR_ACROSS (2) clear cells across at that point with both posts counted as solid (a post in
+the sim blocks no step, as 608 amended (4) has it; the coordinator's rule counts it so a post never
+reads as standing in the way), else not laid, and the pair's north torch carries the way alone; a
+room one only onto open floor no door's line takes, with no marker or level thing on it and no edge
+between, else not laid. No roll is drawn in _torches, so the rooms and ways are the same either way
+(Crypt.lay_off_south_wall false lays them as before, for the row). Barrow generations 1 to 5: 80
+torches before, 77 after; 5 moved a cell north ((17,7) and (24,7) on 1, (18,6) and (25,6) on 3,
+(22,11) on 5), 3 not laid (one each on 2, 4 and 5). When a laid world shows it: the Vault's move
+is a template change, so with 684 amended (1)'s boot lay the box lays barrow_deep at the deploy,
+before the first join; the barrow's is code, its template unchanged, so a laid barrow shows it at
+its next due re-lay (every 3 days), not at the deploy. level_test _test_torches_seen (the default
+view, said in its comment): the old (46,6) and (53,6) read hidden; on barrow, barrow_deep and
+Hollowfell generations 1 to 5 every torch seen (before the move barrow_deep failed on every
+generation, both old cells hidden, and the barrow 1 or 2 a generation); the Vault's pair at
+(48,6) and (52,6), a walk from the stair's foot routing past both posts counted solid to y 8, its
+mouth's clear cells beside them never under 2 (3 on generation 4, 4 on the rest); for the barrow,
+_torches_moved: the same cells and edges as with the mend off, torches read as floor, the counts
+printed, every way routing from the arrival (39,2) with every post solid (nothing cut off), and a
+moved post leaving 2 clear cells across. _test_deep_crypt's Vault row reads the new pair, the way
+open below each. The look for the barrow half (a moved post on an east-west way, the nearest zoom,
+the player standing in it) is read with the Vault's reshoot; if it reads as a post in the path, the
+moved ones become not laid. Level data and the generator; protocol unchanged; no new class_name;
+the Vault's bullet stays held (608 amended (4)'s, its words after the stills); none for the barrow.
+
 ## 608, terrain's side: niches and the hidden door drawn as walls
 
 Dungeon's 608 (the hidden door; design C:/dev/review/dungeon/hidden_door_design.md)

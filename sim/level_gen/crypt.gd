@@ -1170,12 +1170,29 @@ static func _chest(map: LevelMap, room: Dictionary, kept: Dictionary, config: Di
 ## one inside each room by its door (none in the vault, the ossuary dark
 ## too) unless [param rooms] is false (the deep's lit way), never in a
 ## door's line.
+##
+## Seen from the default view (608 amended (5)): a torch with a wall on its
+## south edge (no open floor south of it, or a wall or door between) is
+## never seen from Client3D's resting camera, so it stands a cell north,
+## off the wall (_off_south_wall), or is not laid. A processional torch moves
+## only where the way stays CLEAR_ACROSS clear cells across with both posts
+## counted as solid; in a narrower run the north one of the pair carries
+## the way alone. A room torch moves only onto open floor no door's line
+## takes and no level thing stands on. No roll is drawn here, so the rooms
+## and ways a generation lays are the same either way; lay_off_south_wall
+## false lays them as before (level_test compares the two).
 static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary, rooms := true) -> void:
 	var kept := Labyrinth.door_line(map)
+	var things := {}
+	for entity: Dictionary in plan.get("entities", []):
+		var at: Variant = entity.get("at")
+		if at is Array and (at as Array).size() == 2:
+			things[Vector2i(int(at[0]), int(at[1]))] = true
 	var path: Array = plan["processional"]
 	for run: Dictionary in _runs(path):
 		var cells: Array = run["cells"]
 		for i in range(TORCH_EVERY / 2, cells.size(), TORCH_EVERY):
+			var pair: Array[Vector2i] = []
 			for side: Vector2i in [run["across"], -(run["across"] as Vector2i)]:
 				# The deep's lit way (rooms false): a spot a side door's line
 				# takes slides along the wall to the nearest free one, so a way
@@ -1188,21 +1205,74 @@ static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary
 						if not map.walkable(at + side):
 							break
 						at += side
-					if map.cell(at) == FLOOR and not kept.has(at) and not Labyrinth._beside_anchor(anchors, at) and not map.walkable(at + side):
-						map.set_cell(at, "torch")
-						kept[at] = true
+					if map.cell(at) == FLOOR and not kept.has(at) and not pair.has(at) and not Labyrinth._beside_anchor(anchors, at) and not map.walkable(at + side):
+						pair.append(at)
 						break
+			for at in pair:
+				var lay: Variant = at
+				if lay_off_south_wall and hides_south(map, at):
+					var posts := pair.filter(func(other: Vector2i) -> bool: return other.x == at.x).size()
+					var moved := at + NORTH
+					var room_left := _across(map, at) - posts >= CLEAR_ACROSS
+					var open := map.cell(moved) == FLOOR and not kept.has(moved) and not things.has(moved)
+					lay = moved if open and room_left and not Labyrinth._beside_anchor(anchors, moved) else null
+				if lay != null:
+					map.set_cell(lay, "torch")
+					kept[lay] = true
 	for room: Dictionary in plan["rooms"] if rooms else []:
 		if room["use"] == "sealed_vault" or room["use"] == "ossuary":
 			continue
-		var spot: Variant = Labyrinth._by_wall_near(map, room["cells"], room["doors"][0], kept)
+		var spot: Variant = _off_south_wall(map, Labyrinth._by_wall_near(map, room["cells"], room["doors"][0], kept), kept, things)
 		if spot != null:
 			map.set_cell(spot, "torch")
 			kept[spot] = true
 			if room["use"] == "chapel_of_rest":
-				var second: Variant = Labyrinth._by_wall_near(map, room["cells"], room["doors"][room["doors"].size() - 1] + (room["x_way"] as Vector2i) * 2, kept)
+				var second: Variant = _off_south_wall(map, Labyrinth._by_wall_near(map, room["cells"], room["doors"][room["doors"].size() - 1] + (room["x_way"] as Vector2i) * 2, kept), kept, things)
 				if second != null:
 					map.set_cell(second, "torch")
+
+
+## 608 amended (5): whether _torches lays a torch hidden behind a south wall a
+## cell north (or not at all), as it does; false lays it where it was
+## (level_test, to compare the rooms and ways laid).
+static var lay_off_south_wall := true
+## The clear cells across a processional way a moved torch leaves, both
+## posts counted as solid (608 amended (5): the coordinator's rule).
+const CLEAR_ACROSS := 2
+const NORTH := Vector2i(0, -1)
+
+
+## Whether a torch on [param cell] is hidden from the default view (608
+## amended (5)): no open floor south of it, or a wall or door between.
+static func hides_south(map: LevelMap, cell: Vector2i) -> bool:
+	var south := Vector2i(0, 1)
+	return not map.walkable(cell + south) or map.edge(Terrain.edge_key(cell, south)) != "clear"
+
+
+## A room torch's [param spot] as it is laid (608 amended (5)): itself if it is
+## seen from the default view; else the cell north of it if that is open
+## floor (no marker), in no door's line ([param kept]), with no level thing
+## ([param things]) and no edge between; else null, not laid.
+static func _off_south_wall(map: LevelMap, spot: Variant, kept: Dictionary, things: Dictionary) -> Variant:
+	if spot == null or not lay_off_south_wall or not hides_south(map, spot):
+		return spot
+	var moved: Vector2i = spot + NORTH
+	if map.cell(moved) == FLOOR and not kept.has(moved) and not things.has(moved) and map.edge(Terrain.edge_key(spot, NORTH)) == "clear":
+		return moved
+	return null
+
+
+## How many open cells a way has across, north from [param cell] (against
+## its south wall) to the next wall or rock (608 amended (5)).
+static func _across(map: LevelMap, cell: Vector2i) -> int:
+	var count := 0
+	var at := cell
+	while map.walkable(at):
+		count += 1
+		if map.edge(Terrain.edge_key(at, NORTH)) != "clear":
+			break
+		at += NORTH
+	return count
 
 
 ## The monsters: a guard (the block's "guard" kind, else the first kind) in
