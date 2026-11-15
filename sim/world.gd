@@ -8424,6 +8424,14 @@ func _ground_room(cell: Vector2i, uid := 0) -> Vector2i:
 	return NO_CELL
 
 
+## Whether [param cell] could take [param uid] (0: anything) on the ground
+## itself, as put_on_ground's nearest try: walkable, dry, no level link, room
+## left (Main's far room for a re-lay's gathered pile, 790 amended (12)).
+func ground_has_room(cell: Vector2i, uid := 0) -> bool:
+	var there: PackedInt32Array = zone.ground.get(cell, PackedInt32Array())
+	return is_walkable(cell) and not is_water(cell) and not is_link_cell(cell) and _ground_takes(there, uid)
+
+
 ## Whether a cell holding [param there] has room for [param uid] (0: for
 ## anything): fewer than GROUND_PER_CELL heaps, a stackable kind's units
 ## a heap up to its stack (decision 619), or a heap of its kind with room.

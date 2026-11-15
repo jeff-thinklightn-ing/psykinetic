@@ -4760,14 +4760,27 @@ func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
 	var ground := ground_entries(World.zone)
 	var raw: Dictionary = Snapshot.data_of({level_name: {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns,
 		"ground": ground, "records": World.record_list()}})["zones"][level_name]
-	var keep_to: Variant = Regen.keep_cell(level_name)
-	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors, keep_to, World.items.id_of, Regen.moved_markers(level_name))
-	_lose_items(sifted["lost"], level_name)
-	_move_items(sifted["moved"], level_name, keep_to)
+	var kept := _sift_saved(level_name, Snapshot.parse_zone(raw), anchors)
 	_load_level(level_name)
-	_start_level(false, false, sifted["kept"])
+	_start_level(false, false, kept)
 	_level_stamps[level_name] = _level_stamp(level_name)
 	World.enter(was)
+
+
+## Server: what of [param section] (a snapshot's form of zone [param
+## level_name]) a re-lay keeps (Regen.keep_section, by [param anchors], its
+## moved markers, and for a level that gathers its ground the claim of each
+## thing on it, ground_claim: 790 amended (12)); what it loses ended, what it
+## gathers moved, and the count of things no player carried left for
+## _restore_ground's journal line. The kept section.
+func _sift_saved(level_name: String, section: Dictionary, anchors: Array) -> Dictionary:
+	var keep_to: Variant = Regen.keep_cell(level_name)
+	var sifted := Regen.keep_section(section, anchors, keep_to, World.items.id_of, Regen.moved_markers(level_name), ground_claim)
+	_lose_items(sifted["lost"], level_name)
+	_move_items(sifted["moved"], level_name, keep_to)
+	if keep_to is Vector2i:
+		_relay_unclaimed[level_name] = int(sifted["unclaimed"])
+	return sifted["kept"]
 
 
 ## Server: things left outside the anchors of [param level_name] when it
@@ -5583,11 +5596,7 @@ func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 	# A regenerating level due is laid again before it opens (decision
 	# 465); the snapshot's section for it keeps only what sits in an anchor.
 	if regenerate and _regenerate_if_due(zone_name) and not saved.is_empty():
-		var keep_to: Variant = Regen.keep_cell(zone_name)
-		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"], keep_to, World.items.id_of, Regen.moved_markers(zone_name))
-		saved = sifted["kept"]
-		_lose_items(sifted["lost"], zone_name)
-		_move_items(sifted["moved"], zone_name, keep_to)
+		saved = _sift_saved(zone_name, saved, Regen.config_of(zone_name)["anchors"])
 	var opened := World.add_zone(zone_name)
 	var was := World.enter(opened)
 	_load_level(zone_name, _open_kept(zone_name))
@@ -27405,7 +27414,20 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 
 ## Server: what lay on the ground in a snapshot's zone section, back where
 ## it was, each thing its saved instance where the book still has it.
+##
+## A thing with no room within World.GROUND_SPILL of its cell (790 amended
+## (1): a gathered pile past the room round the way in) never lies on no
+## cell: one ground_claim calls CLAIMED goes on to the nearest open floor
+## cell of the zone, by rings outward (_far_ground_room); any other, or one
+## in a zone with no room anywhere, is ended as lost. One journal line a
+## zone, counts only: after a re-lay of a level that gathers its ground
+## (_sift_saved left its figure), the things no player carried lost there
+## and those that found no room; at any other load, only when some found
+## none.
 func _restore_ground(ground: Array) -> void:
+	var no_room := 0
+	var rings: Array[Vector2i] = []
+	var rings_at := World.NO_CELL
 	for pile: Dictionary in ground:
 		var ids: Array = pile["ids"]
 		var uids: Array = pile.get("items", [])
@@ -27425,7 +27447,84 @@ func _restore_ground(ground: Array) -> void:
 			var at := World.items.at_of(uid)
 			if World.items.id_of(uid) != id or not at in ["", "%s@%d,%d" % [World.zone.name, pile["cell"].x, pile["cell"].y]]:
 				uid = World.items.mint(id, "migrated", "the ground", World.zone.name, pile["cell"])
-			World.put_on_ground(uid, pile["cell"])
+			if World.put_on_ground(uid, pile["cell"]) != World.NO_CELL:
+				continue
+			if ground_claim(uid) == Regen.CLAIMED:
+				if rings_at != pile["cell"]:
+					rings_at = pile["cell"]
+					rings = _rings_from(rings_at)
+				var far := _far_ground_room(rings, uid)
+				if far != World.NO_CELL and World.put_on_ground(uid, far) != World.NO_CELL:
+					continue
+			no_room += 1
+			World.items.end(uid, "lost", Regen.LOST, World.zone.name, pile["cell"])
+	var unclaimed := int(_relay_unclaimed.get(World.zone.name, -1))
+	_relay_unclaimed.erase(World.zone.name)
+	if unclaimed >= 0:
+		print("[regen] %s: %d things no player carried lost at the re-lay; %d found no room" % [World.zone.name, unclaimed, no_room])
+	elif no_room > 0:
+		print("[state] %s: %d things found no room on the ground: lost" % [World.zone.name, no_room])
+
+
+## The re-lay's count of things no player carried lost (790 amended (12)), by
+## zone, left by _sift_saved for _restore_ground's journal line.
+var _relay_unclaimed: Dictionary[String, int] = {}
+
+
+## Every open floor cell of the zone, nearest [param cell] first by rings
+## (the larger of the two offsets), each ring as World._ground_room walks
+## it: row by row, then along the row (790 amended (12)).
+func _rings_from(cell: Vector2i) -> Array[Vector2i]:
+	var cells := World.floor_cells()
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var ra := maxi(absi(a.x - cell.x), absi(a.y - cell.y))
+		var rb := maxi(absi(b.x - cell.x), absi(b.y - cell.y))
+		if ra != rb:
+			return ra < rb
+		return a.y < b.y if a.y != b.y else a.x < b.x)
+	return cells
+
+
+## The first of [param rings] that has room for [param uid] on the ground
+## (World.ground_has_room), World.NO_CELL for none.
+func _far_ground_room(rings: Array[Vector2i], uid: int) -> Vector2i:
+	for each in rings:
+		if World.ground_has_room(each, uid):
+			return each
+	return World.NO_CELL
+
+
+## Whose [param uid] is, for a re-lay's sorting of the ground (790 amended
+## (1), Regen.keep_section's claim_of): Regen.CLAIMED for a thing a player
+## or a companion has carried (an ItemBook carriers row "player:" or
+## "companion:", World.holder_key's), one bound to anyone (a holy knight's
+## remains, minted bound to its finder and laid at their feet when their
+## pack is all bound), or one a quest needs (a catalog tag "key", "relic" or
+## "token": Brand's key fallen at a full pack's feet, a trophy token);
+## Regen.GATHERED for one an earlier re-lay moved to the way in (its event
+## "moved", Regen.MOVED) that none of those holds; else "".
+func ground_claim(uid: int) -> String:
+	var entry := World.items.history(uid)
+	if entry.is_empty():
+		return ""
+	if not World.items.bound_to(uid).is_empty():
+		return Regen.CLAIMED
+	for tag: String in CLAIMED_TAGS:
+		if Items.has_tag(str(entry.get("id", "")), tag):
+			return Regen.CLAIMED
+	for row: Dictionary in entry.get("carriers", []):
+		var who := str(row.get("who", ""))
+		if who.begins_with("player:") or who.begins_with("companion:"):
+			return Regen.CLAIMED
+	for event: Dictionary in entry.get("events", []):
+		if str(event.get("kind", "")) == "moved" and str(event.get("what", "")) == Regen.MOVED:
+			return Regen.GATHERED
+	return ""
+
+
+## The catalog tags of what a quest step needs (790 amended (12)): kept by a
+## re-lay whoever carried them.
+const CLAIMED_TAGS: Array[String] = ["key", "relic", "token"]
 
 
 ## What lies on [param zone]'s ground, for a save: one entry a cell, {cell,

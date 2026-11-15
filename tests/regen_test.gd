@@ -72,6 +72,9 @@ func _ready() -> void:
 	_test_richness_never_waited()
 	_test_routes_never_waited()
 	await _test_laid_at_boot()
+	_test_gathered_by_claim()
+	_test_heap_past_its_room()
+	_test_room_at_the_way_in()
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -694,6 +697,137 @@ func _test_routes_never_waited() -> void:
 
 ## The slow ticks' regeneration run through (decision 684): each due level
 ## made on Main's worker, then laid on the next slow tick, till none is left.
+## 790 amended (12): a re-lay that gathers its ground gathers only what a
+## player or a companion carried, what is bound to anyone and what a quest
+## needs; a foe's loot left lying is lost, and so is what an earlier re-lay
+## gathered that nobody has claimed since, while the level's own things in
+## an anchor and anything a player carried stay where they lie.
+func _test_gathered_by_claim() -> void:
+	print("\n== 790 amended (12): the ground at a re-lay, sorted by who carried it ==")
+	var was := World.enter_named("rg_halls")
+	var keep_to := Vector2i(3, 3)
+	var anchors := [{"rect": GATE, "name": "gatehouse"}, {"rect": DEEP, "name": "deep"}]
+	var outside := Vector2i(12, 8)
+	var dropped := World.items.mint("knife", "test", "", "rg_halls", outside)
+	World.items.place(dropped, "player:%s" % BO_ID, "player:%s" % BO_ID, "Bo")
+	World.items.place(dropped, "rg_halls@12,8")
+	var hers := World.items.mint("bandaging_kit", "test", "", "rg_halls", outside)
+	World.items.place(hers, "companion:%s:Wren" % BO_ID, "companion:%s:Wren" % BO_ID, "Wren")
+	World.items.place(hers, "rg_halls@12,8")
+	var loot := World.items.mint("knife", "looted", "Imp1", "rg_halls", outside)
+	World.items.place(loot, "rg_halls/Imp1", "rg_halls/Imp1", "Imp")
+	World.items.place(loot, "rg_halls@12,8")
+	var remains := World.items.mint("holy_remains", "bound", "Bo", "rg_halls", outside)
+	World.items.bind(remains, "player:%s" % BO_ID)
+	var key := World.items.mint("camp_key", "looted", "Brand the Ox", "rg_halls", outside)
+	var junk := World.items.mint("knife", "looted", "Imp2", "rg_halls", Vector2i(4, 4))
+	World.items.note(junk, "moved", Regen.MOVED, "rg_halls", keep_to)
+	var junk_on_heap := World.items.mint("knife", "looted", "Imp3", "rg_halls", keep_to)
+	World.items.note(junk_on_heap, "moved", Regen.MOVED, "rg_halls", keep_to)
+	var laid := World.items.mint("bandaging_kit", "test", "", "rg_halls", Vector2i(4, 4))
+	var claimed_since := World.items.mint("knife", "looted", "Imp4", "rg_halls", Vector2i(4, 4))
+	World.items.note(claimed_since, "moved", Regen.MOVED, "rg_halls", keep_to)
+	World.items.place(claimed_since, "player:%s" % BO_ID, "player:%s" % BO_ID, "Bo")
+	World.items.place(claimed_since, "rg_halls@4,4")
+	_check(_main.ground_claim(dropped) == Regen.CLAIMED and _main.ground_claim(hers) == Regen.CLAIMED and _main.ground_claim(loot) == ""
+		and _main.ground_claim(remains) == Regen.CLAIMED and _main.ground_claim(key) == Regen.CLAIMED and _main.ground_claim(junk) == Regen.GATHERED
+		and _main.ground_claim(laid) == "" and _main.ground_claim(claimed_since) == Regen.CLAIMED,
+		"claims: Bo's drop and Wren's carrying (a companion's counts as her player's), the remains bound and never carried, Brand's key (a quest's) are claimed; the imp's loot is no one's; gathered junk is gathered; the level's own kit no one's; gathered junk Bo picked up since is his")
+	var section := {"tick": 1, "entities": [], "respawns": [], "records": [], "ground": [
+		{"cell": outside, "ids": ["knife", "bandaging_kit", "knife", "holy_remains", "camp_key"], "items": [dropped, hers, loot, remains, key], "gold": 5},
+		{"cell": Vector2i(4, 4), "ids": ["knife", "bandaging_kit", "knife"], "items": [junk, laid, claimed_since], "gold": 0},
+		{"cell": keep_to, "ids": ["knife"], "items": [junk_on_heap], "gold": 1}]}
+	var sifted := Regen.keep_section(section, anchors, keep_to, World.items.id_of, {}, _main.ground_claim)
+	var ground: Array = sifted["kept"]["ground"]
+	var heap: Array = ground.filter(func(pile: Dictionary) -> bool: return pile["cell"] == keep_to)
+	var room: Array = ground.filter(func(pile: Dictionary) -> bool: return pile["cell"] == Vector2i(4, 4))
+	var lost: Array = sifted["lost"]
+	lost.sort()
+	var wanted_lost := [loot, junk, junk_on_heap]
+	wanted_lost.sort()
+	_check(lost == wanted_lost and int(sifted["unclaimed"]) == 3,
+		"lost: the imp's loot outside, the gathered junk in the gatehouse and on the heap's own cell; 3 counted for the journal (%s, %d)" % [lost, sifted["unclaimed"]])
+	_check(heap.size() == 1 and (heap[0]["items"] as Array) == [dropped, hers, remains, key] and int(heap[0]["gold"]) == 6 and (sifted["moved"] as Array) == [dropped, hers, remains, key],
+		"gathered at the way in: Bo's knife, Wren's kit, the remains and the key, and all the gold (5 outside, 1 there) (%s)" % [heap])
+	_check(room.size() == 1 and (room[0]["items"] as Array) == [laid, claimed_since],
+		"in the gatehouse the level's own kit and the junk Bo carried since stay where they lie (%s)" % [room])
+	var plain := Regen.keep_section(section, anchors, keep_to, World.items.id_of)
+	_check((plain["lost"] as Array).is_empty() and int(plain["unclaimed"]) == 0, "without a claim, 790's first rule: everything gathered, nothing lost")
+	for uid: int in [dropped, hers, loot, remains, key, junk, junk_on_heap, laid, claimed_since]:
+		World.items.end(uid, "test")
+	World.enter(was)
+
+
+## 790 amended (12): a gathered pile past the room round the way in. A thing
+## a player carried goes on to the nearest open floor of the zone, never on
+## no cell and never ended; one nobody carried, with no room, is ended as
+## lost, never left on no cell.
+func _test_heap_past_its_room() -> void:
+	print("\n== 790 amended (12): a heap past its room: a player's things laid farther on, the rest lost, none on no cell ==")
+	var was := World.enter_named("rg_halls")
+	var keep_to := Vector2i(3, 3)
+	var cells := World.floor_cells()
+	for cell: Vector2i in cells:
+		if World.zone.ground.has(cell):
+			World.zone.ground.erase(cell)
+	var spill := 0
+	for cell: Vector2i in cells:
+		if maxi(absi(cell.x - keep_to.x), absi(cell.y - keep_to.y)) <= World.GROUND_SPILL and World.ground_has_room(cell):
+			spill += 1
+	var count := spill * World.GROUND_PER_CELL + 20
+	var his: Array = []
+	var ids: Array = []
+	for i in count:
+		var uid := World.items.mint("knife", "test", "", "rg_halls", keep_to)
+		World.items.place(uid, "player:%s" % BO_ID, "player:%s" % BO_ID, "Bo")
+		World.items.place(uid, "rg_halls@3,3")
+		World.items.note(uid, "moved", Regen.MOVED, "rg_halls", keep_to)
+		his.append(uid)
+		ids.append("knife")
+	var nobodys: Array = []
+	var nobody_ids: Array = []
+	for i in 5:
+		nobodys.append(World.items.mint("knife", "looted", "Imp", "rg_halls", keep_to))
+		nobody_ids.append("knife")
+	_main._relay_unclaimed["rg_halls"] = 2
+	_main._restore_ground([{"cell": keep_to, "ids": ids, "items": his, "gold": 0}, {"cell": keep_to, "ids": nobody_ids, "items": nobodys, "gold": 0}])
+	var on_ground := {}
+	for cell: Vector2i in World.zone.ground:
+		for uid: int in World.zone.ground[cell]:
+			on_ground[uid] = cell
+	var farther := his.filter(func(uid: int) -> bool:
+		return on_ground.has(uid) and maxi(absi(on_ground[uid].x - keep_to.x), absi(on_ground[uid].y - keep_to.y)) > World.GROUND_SPILL)
+	_check(his.all(func(uid: int) -> bool: return on_ground.has(uid) and World.items.has(uid) and World.items.at_of(uid) == "rg_halls@%d,%d" % [on_ground[uid].x, on_ground[uid].y]),
+		"all %d of Bo's things lie on a cell, the book saying which; none ended (the spill room %d cells, %d heaps)" % [count, spill, spill * World.GROUND_PER_CELL])
+	_check(farther.size() >= 20, "%d of them laid past the spill, on the nearest open floor beyond it" % farther.size())
+	_check(nobodys.all(func(uid: int) -> bool: return not World.items.has(uid) and not on_ground.has(uid)),
+		"the 5 things nobody carried, with no room left round the way in, are ended as lost, none left on no cell")
+	_check(not _main._relay_unclaimed.has("rg_halls"), "the re-lay's figure is said once and forgotten (the journal's line)")
+	for cell: Vector2i in World.zone.ground.keys():
+		World.zone.ground.erase(cell)
+	for uid: int in his:
+		World.items.end(uid, "test")
+	World.enter(was)
+
+
+## 790 amended (12): the room round each way in that gathers its ground,
+## measured on its template (the entrance anchor is laid verbatim in every
+## generation): open floor within World.GROUND_SPILL of the cell, less water
+## and the level's link cells, and the heaps it holds.
+func _test_room_at_the_way_in() -> void:
+	print("\n== 790 amended (12): the room round the way in, measured ==")
+	for level_name: String in ["barrow", "hollowfell"]:
+		var at: Variant = Regen.keep_cell(level_name)
+		var level := Level.load_level(level_name)
+		var water: Array = level["terrain"].get("water", [])
+		var links: Array = (level["links"] as Array).map(func(link: Dictionary) -> Variant: return link.get("at"))
+		var open := 0
+		for cell: Vector2i in level["terrain"]["floor"]:
+			if at is Vector2i and maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= World.GROUND_SPILL and not cell in water and not cell in links:
+				open += 1
+		_check(at is Vector2i and open > 0, "%s: gathered on %s, %d open cells within %d, %d heaps" % [level_name, at, open, World.GROUND_SPILL, open * World.GROUND_PER_CELL])
+
+
 func _regenerate_round() -> void:
 	for i in 8:
 		_main._regenerate_due()

@@ -912,11 +912,23 @@ static func write(level_name: String, made: Dictionary) -> bool:
 ## now stands on) keeps a saved entity, timer or record whose marker moved
 ## by the template's word by its new cell, so it comes back on it (the
 ## barrow's Offering stone out of the Low Hall, things and all).
-static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant = null, id_of := Callable(), markers: Dictionary = {}) -> Dictionary:
+##
+## [param claim_of] (790 amended (12); uid -> CLAIMED, GATHERED or "", Main's
+## ground_claim) sorts the ground when [param keep_to] is a cell: of what
+## lies outside the anchors (a pile, a cart's load), only a CLAIMED thing (a
+## player's or a companion's) is gathered; any other is lost, as 465 had it.
+## A GATHERED thing (moved by an earlier re-lay and claimed by nobody since)
+## lying in an anchor, the gathered pile's cell too, is lost with them. Gold,
+## a count that takes no room, is gathered as before. "unclaimed" counts
+## the things lost by this sorting (the journal's figure). Without it the
+## ground is gathered whole, as 790 first had it.
+static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant = null, id_of := Callable(), markers: Dictionary = {}, claim_of := Callable()) -> Dictionary:
 	var lost: Array[int] = []
 	var moved: Array[int] = []
 	var kept := {"tick": int(section.get("tick", 0)), "entities": [], "respawns": [], "ground": [], "records": []}
 	var keeping := keep_to is Vector2i
+	var sorting := keeping and claim_of.is_valid()
+	var unclaimed := 0
 	var heap := {"cell": keep_to, "ids": [], "items": [], "gold": 0}
 	for entry: Dictionary in section.get("entities", []):
 		if _keeps(anchors, entry["spec"], markers):
@@ -926,8 +938,9 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 			_uids_of(entry.get("items", []), cargo)
 			for uid in cargo:
 				var id := str(id_of.call(uid))
-				if id.is_empty():
+				if id.is_empty() or (sorting and str(claim_of.call(uid)) != CLAIMED):
 					lost.append(uid)
+					unclaimed += 0 if id.is_empty() else 1
 					continue
 				heap["ids"].append(id)
 				heap["items"].append(uid)
@@ -940,11 +953,14 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 		if at != null and Level.in_anchors(anchors, at):
 			kept["respawns"].append(respawn)
 	for pile: Dictionary in section.get("ground", []):
-		if keeping and pile["cell"] == keep_to:
+		var inside := Level.in_anchors(anchors, pile["cell"])
+		if sorting:
+			unclaimed += _sort_pile(pile, claim_of, inside or pile["cell"] == keep_to, heap, kept["ground"], moved, lost)
+		elif keeping and pile["cell"] == keep_to:
 			heap["ids"].append_array(pile.get("ids", []))
 			heap["items"].append_array(pile.get("items", []))
 			heap["gold"] = int(heap["gold"]) + int(pile.get("gold", 0))
-		elif Level.in_anchors(anchors, pile["cell"]):
+		elif inside:
 			kept["ground"].append(pile)
 		elif keeping:
 			heap["ids"].append_array(pile.get("ids", []))
@@ -962,7 +978,50 @@ static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant =
 			kept["records"].append(record)
 		elif entry is Dictionary:
 			_uids_of(entry.get("items", []), lost)
-	return {"kept": kept, "lost": lost, "moved": moved}
+	return {"kept": kept, "lost": lost, "moved": moved, "unclaimed": unclaimed}
+
+
+## keep_section's claim_of answers (790 amended (12)): a thing a player or a
+## companion carried, is bound to, or a quest needs; one an earlier re-lay
+## gathered that nobody has claimed since.
+const CLAIMED := "claimed"
+const GATHERED := "gathered"
+
+
+## One saved ground [param pile] sorted by [param claim_of] (keep_section,
+## 790 amended (12)). [param stays] (in an anchor, or on the gathered pile's
+## cell): it is kept where it lies less any GATHERED thing; else only its
+## CLAIMED things, and its gold, go to [param heap]. What goes is added to
+## [param lost], what is gathered to [param moved]. How many things were
+## lost.
+static func _sort_pile(pile: Dictionary, claim_of: Callable, stays: bool, heap: Dictionary, kept_ground: Array, moved: Array[int], lost: Array[int]) -> int:
+	var ids: Array = pile.get("ids", [])
+	var uids: Array = pile.get("items", [])
+	var left := {"cell": pile["cell"], "ids": [], "items": [], "gold": int(pile.get("gold", 0))}
+	var count := 0
+	for i in ids.size():
+		var uid := int(uids[i]) if i < uids.size() and (uids[i] is int or uids[i] is float) else 0
+		var claim := str(claim_of.call(uid)) if uid != 0 else ""
+		if (stays and claim != GATHERED) or (not stays and claim == CLAIMED):
+			var into: Dictionary = left if stays else heap
+			into["ids"].append(ids[i])
+			into["items"].append(uids[i] if i < uids.size() else 0)
+			if not stays and uid != 0:
+				moved.append(uid)
+			continue
+		count += 1
+		if uid != 0:
+			lost.append(uid)
+	if not stays:
+		heap["gold"] = int(heap["gold"]) + int(left["gold"])
+		return count
+	if pile["cell"] == heap["cell"]:
+		heap["ids"].append_array(left["ids"])
+		heap["items"].append_array(left["items"])
+		heap["gold"] = int(heap["gold"]) + int(left["gold"])
+	elif not (left["ids"] as Array).is_empty() or int(left["gold"]) > 0:
+		kept_ground.append(left)
+	return count
 
 
 ## Where level [param level_name]'s ground is gathered when it is laid again
