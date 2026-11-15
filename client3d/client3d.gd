@@ -6560,6 +6560,7 @@ func creature_tell(id: int, data: Dictionary) -> void:
 		return
 	if (puppet.get_meta("creature_view") as CreatureView).tell(str(data.get("kind", "")), lands_in, id):
 		_tells[id] = puppet
+		_drawn_contact(puppet, AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0))  # Its tell lands as the sim's does.
 
 
 ## A person's told lunge (790 amended (7), animation's side; enemy-ai's ask, the coordinator's
@@ -6584,6 +6585,7 @@ func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float) -> bool:
 	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 	puppet.set_meta("wound_until", now + int(lands_in * 1000.0) + 400)
 	puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)
+	_drawn_contact(puppet, AnimRig.now_msec() + int(lands_in * 1000.0))  # Its thrust's full stretch.
 	_combat_at[source.get_instance_id()] = now
 	if puppet.has_node("Body") and source.facing != Vector2i.ZERO:
 		var thrust := minf(TOLD_THRUST, lands_in)
@@ -6717,6 +6719,8 @@ func creature_tell_over(id: int, landed: bool) -> void:
 	_tells.erase(id)
 	if puppet == null or not is_instance_valid(puppet):
 		return
+	if not landed:
+		puppet.remove_meta("drawn_contact")
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
 	elif not landed and puppet.has_meta("rig"):
@@ -27528,6 +27532,17 @@ func _make_bar(max_hp: int, height: float) -> MeshInstance3D:
 	return bar
 
 
+## Where [param puppet]'s wound-up or told blow is drawn landing, on the rigs' clock ([param at] ms;
+## 390 amended (2)): its swing's news (_on_swung) comes as the sim's blow lands, STRIKE_LANDS_IN or
+## more before the drawn one, and the struck body's flinch, thud and cry (_struck_with) wait for this.
+## Kept till that swing's news; a blow given up drops it. None set for a time already past.
+static func _drawn_contact(puppet: Node3D, at: int) -> void:
+	if at >= AnimRig.now_msec():
+		puppet.set_meta("drawn_contact", at)
+	else:
+		puppet.remove_meta("drawn_contact")
+
+
 ## A swing: the body goes out toward the blow and back, with a whoosh
 ## pitched by the swinger's weight.
 func _on_swung(direction: Vector2i, id: int) -> void:
@@ -27542,6 +27557,12 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var weapon := World.wielded(swinger) if swinger != null else ""
 	var now := AnimRig.now_msec()  # _swings on the rigs' clock (390 amended): a reel's frames, else the wall.
 	_swings[id] = [now, weapon, now]
+	# A wound-up or told blow (390 amended (2)): struck when its drawn blow lands (the coil's spring, the
+	# rig's contact, the thrust), recorded as it began; its news comes as the sim's lands, before it.
+	var drawn_at := int(puppet.get_meta("drawn_contact", -1))
+	puppet.remove_meta("drawn_contact")
+	if drawn_at >= now:
+		_swings[id][2] = drawn_at
 	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	var effort := SoundKit.voice(swinger, "effort_swing", _person_body(puppet))
 	if effort != "" and randi() % EFFORT_EVERY == 0:
@@ -28439,6 +28460,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	if ticks <= 0:
 		# Given up (decision 392): the wind-up stops; the gait or rest takes over.
 		puppet.set_meta("wound_until", 0)
+		puppet.remove_meta("drawn_contact")
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).unwind()
 		elif puppet.has_meta("rig"):
@@ -28459,6 +28481,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		# A plain blow's lead (338 amended (4)) coils it too.
 		(puppet.get_meta("creature_view") as CreatureView).wind(seconds, is_lead(swinger, ticks))
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
+		_drawn_contact(puppet, AnimRig.now_msec() + int(seconds * 1000.0))  # The coil's spring ends then.
 		return
 	var weapon := World.wielded(swinger) if swinger != null else ""
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
@@ -28468,6 +28491,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	var mine := strikes.has(weapon) or (not (swinger is Player or swinger is Companion) and strikes.has(""))
 	if (weapon in WOUND_STRIKES or swinger is Monster) and mine and _strike(puppet, swinger, weapon, seconds, is_lead(swinger, ticks)):
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
+		_drawn_contact(puppet, int(puppet.get_meta("contact_msec", -1)))  # The rig's own contact (_strike).
 		return
 	if not puppet.has_meta("rig") or not (puppet.get_meta("rig") as AnimRig).has(CLIP_HEAVY):
 		return
@@ -28479,6 +28503,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	var now := Time.get_ticks_msec()
 	puppet.set_meta("busy_until", now + int(rig.strike(CLIP_HEAVY, contact, seconds, after) * 1000.0))
 	puppet.set_meta("wound_until", now + int(seconds * 1000.0) + 400)
+	_drawn_contact(puppet, AnimRig.now_msec() + int(seconds * 1000.0))
 
 
 func _pick_shape(shape_name: String, mesh: Mesh) -> Shape3D:

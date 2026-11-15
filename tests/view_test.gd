@@ -16953,11 +16953,63 @@ func _test_blows_seen() -> void:
 			"the orc's led blow gathers first: %s, its contact on the landing (%d ms off)" % [hurt.playing(), contact_at - lands_at])
 	_rig._on_swung(Vector2i(-1, 0), imp.get_instance_id())
 	_check(hurt.playing() in drawn_names, "its swing's news starts no second strike (%s)" % hurt.playing())
+	# 390 amended (2): the player it strikes flinches at its drawn contact (the rig's contact_msec), not
+	# at the swing's news (the sim's landing, STRIKE_LANDS_IN before): wound-up blows were struck at the news.
+	_rig._swings.erase(player.get_instance_id())
+	var flinched: Array = await _flinch_time(player, imp.get_instance_id())
+	_check(flinched[1] < 0 and absi(int(flinched[0]) - contact_at) <= 50,
+			"the player struck by its wound-up blow flinches at its drawn contact, not at the news (%d ms off the contact; %s at the news)"
+			% [int(flinched[0]) - contact_at, "already" if flinched[1] >= 0 else "not yet"])
 	hurt.cancel_strike()
 	target.set_meta("busy_until", 0)
 	World.despawn(imp)
-	_rig._swings.erase(player.get_instance_id())
+	_rig._swings.erase(imp.get_instance_id())
 	_rig._process(0.0)
+	# A wolf's lead (a creature: CreatureView.wind's coil): the player flinches as its spring ends.
+	var wolf := _spawn_imp(player.tile + Vector2i(1, 0), "wolf")
+	var beast: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		beast = _rig._puppets.get(wolf.get_instance_id())
+		if beast != null and beast.has_meta("creature_view"):
+			break
+		await get_tree().process_frame
+	if beast == null or not beast.has_meta("creature_view"):
+		_check(false, "a wolf to bite (%s)" % [beast != null])
+	else:
+		var wound := AnimRig.now_msec()
+		_rig._on_winding(Vector2i(-1, 0), Monster.LEAD_TICKS, wolf.get_instance_id())
+		var sprung := wound + int((Monster.LEAD_TICKS * World.TICK_DT + Client3D.STRIKE_LANDS_IN) * 1000.0)
+		await _until_msec(wound + int(Monster.LEAD_TICKS * World.TICK_DT * 1000.0))  # The sim's bite lands: its news.
+		_rig._on_swung(Vector2i(-1, 0), wolf.get_instance_id())
+		var bitten: Array = await _flinch_time(player, wolf.get_instance_id())
+		_check(bitten[1] < 0 and absi(int(bitten[0]) - sprung) <= 50,
+				"bitten by a wolf's lead: the player flinches as its coil's spring ends, %d ms off it, not at the news (%s then)"
+				% [int(bitten[0]) - sprung, "already" if bitten[1] >= 0 else "not yet"])
+	World.despawn(wolf)
+	_rig._swings.erase(wolf.get_instance_id())
+	_rig._process(0.0)
+
+
+## The player struck by [param _by]'s blow now (_on_struck, its news): [when it flinched on the rigs'
+## clock, -1 if it never did in 1 s; 0 if it had flinched as the news came, else -1]. 390 amended (2).
+func _flinch_time(player: GridEntity, _by: int) -> Array:
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	_rig._on_struck(1, &"attack", player.get_instance_id())
+	var at_news := 0 if rig.playing() in Client3D.HIT_CLIPS else -1
+	var flinched := -1
+	var until := AnimRig.now_msec() + 1000
+	while AnimRig.now_msec() < until:
+		if rig.playing() in Client3D.HIT_CLIPS:
+			flinched = AnimRig.now_msec()
+			break
+		await get_tree().process_frame
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	return [flinched, at_news]
 
 
 ## The shield package, animation's side (340 and 379 amended): a bash's Shield_Bash on the basher and
