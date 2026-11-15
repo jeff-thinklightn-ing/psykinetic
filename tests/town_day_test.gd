@@ -31,6 +31,7 @@ const TAKEN_EVERY := 10
 var _samples := 0
 var _taken := {}  # worker id -> the ten-minute samples running it was found so
 var _taken_seen := 0
+var _keeper := {"missing": [], "astray": [], "cells": {}, "doings": {}}  # 333 amended (4): Rolf, sample by sample
 
 
 func _ready() -> void:
@@ -78,6 +79,10 @@ func _run() -> void:
 	_check(not _runs.has("absent:probe"), "a body with none at a sample ends its idle run (despawned and back on its tile is not idle)")
 	_check(_samples >= HOURS * 60,
 		"(%d samples; at the ten-minute ones, %d found beside a spot another chose too and stands on, none two running unless told above)" % [_samples, _taken_seen])
+	_check(int(_keeper.get("due", 0)) >= 60 and (_keeper["missing"] as Array).is_empty() and (_keeper["astray"] as Array).is_empty(),
+		"Rolf under the cap: from his first work spell to his sleep, a body at his stand at work in every one of %d samples (cells %s, doings %s; %d samples before work or asleep; missing %s; astray %s)" % [
+			int(_keeper.get("due", 0)), (_keeper["cells"] as Dictionary).keys(), (_keeper["doings"] as Dictionary).keys(), int(_keeper.get("off", 0)),
+			(_keeper["missing"] as Array).slice(0, 5), (_keeper["astray"] as Array).slice(0, 5)])
 	var names: Array = _worst.keys()
 	names.sort()
 	print("  longest idle stay each, game minutes: %s" % ", ".join(names.map(func(n: String) -> String: return "%s %d" % [n, _worst[n]])))
@@ -134,6 +139,35 @@ func _sample() -> void:
 	for who: String in _runs.keys():
 		if not seen.has(who):
 			_runs.erase(who)
+	_sample_keeper()
+
+
+## The stall's keeper under the cap (333 amended (4): keepers are never cut): from his clock's first work spell to his
+## sleep spell, a body at every sample, on his stand, at work (his inn spell there read as work, 875 amended (4)).
+func _sample_keeper() -> void:
+	var id := Offers.VENDOR + TOWN
+	var now := DayNight.now()
+	var hour := DayNight.hour(now)
+	var clock := Resident.doing_at("", hour, Season.name_at(int(now)), "", id, Townsfolk.day_of(now), Townsfolk.mood_of(World.production, id))
+	if clock == Resident.Doing.WORK:
+		_keeper["worked"] = true
+	if not bool(_keeper.get("worked", false)) or clock == Resident.Doing.HOME:
+		_keeper["off"] = int(_keeper.get("off", 0)) + 1
+		return
+	_keeper["due"] = int(_keeper.get("due", 0)) + 1
+	var body: Resident = null
+	for entity in World.townsfolk():
+		if (entity as Resident).worker_id == id and entity.spawned:
+			body = entity
+	var line := "%.2f clock %s" % [hour, Resident.Doing.keys()[clock]]
+	if body == null:
+		(_keeper["missing"] as Array).append(line)
+		return
+	var stand: Rect2i = _main._vendor_spot(TOWN, World.holdings.place(TOWN).get("cell", Vector2i.ZERO))
+	(_keeper["cells"] as Dictionary)[body.tile] = true
+	(_keeper["doings"] as Dictionary)[Resident.Doing.keys()[body.doing]] = true
+	if not stand.has_point(body.tile) or body.doing != Resident.Doing.WORK:
+		(_keeper["astray"] as Array).append("%s: %s %s" % [line, body.tile, Resident.Doing.keys()[body.doing]])
 
 
 ## Each body beside its goal while the body on it chose that cell too and stays there (853 amended (16)).

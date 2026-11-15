@@ -7461,6 +7461,7 @@ is.
     - A walk there and back through a road of 30 within the hour: some cut, none within 24 cells of the player, none back within the hour.
     - The margin both ways; in sight, no equal-rank swap but a visitor's; 14 companions over the cap, the nearest 12 and the hour's line; rank 0 by reach.
   - _test_vendor: 19 more residents in the town through _sync_residents, and Rolf keeps his body, 12 bodies in all.
+  - town_day_test _sample_keeper (the coordinator's ask, 11-15): from his clock's first work spell to his sleep, Rolf has a body at every sample, on his stand, at work (his inn spell there read as work by 875 amended (4)'s keep_work). With the cap and the lodger take: 974 of 974 samples at (203, 196), WORK. Without the cap: no body at any sample (FAIL). 333 amended (4)'s first landing failed town_day_test on main for want of that mend (Rolf idle at his stall in INN from 17:45), so it lands after the lodger take.
 - **Not changed.** The tests that seat the taverner, the healer and the rest under the cap keep their own room. town_day_test passes on maps' Mughouse take with it.
 - No bullet until a joined look: Rolf at his stall in the afternoon in a town at the cap. No package of its own; it bears on maps' Rolf-on look.
 
