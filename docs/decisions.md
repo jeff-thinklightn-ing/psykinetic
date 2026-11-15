@@ -44290,6 +44290,17 @@ seconds and the server dropped it (920's first reads). A tour without the hook r
 writes nothing under user://: tools/tour.sh runs both Godots under build/tours/ears/appdata. Tests
 only, protocol unchanged, no new class_name.
 
+754 amended (9) (2026-11-15, sound): the ears walk's stands. "The town's east" was (212, 205), a
+cell inside a hut (building.hut, rect (210, 204) 3x3): the walk went in by its door (11-14 14:42,
+sfx.door_wood_open at (211, 203)), and its roof's low-pass on the forest and wind was read as a
+street cell counted roofed (a joined probe on 11d35122f: every one of Umbrage's 222 walkable cells
+not under the sky lies inside a building's footprint, none on a street). The stand is now the street
+at (210, 203), by day and by night. The square is stood again at the day walk's end: its first stand
+falls in the arrival's first 22 s, when the chatter is held (Ambience TOWN_DAY "chatter_after_s"),
+so the day's square was never heard with it. Each stand's mark names the cell stood on and whether
+Fields has it under the sky. tour.gd's header names the before_join hook (754 amended (8)). Tests
+only, protocol unchanged, no new class_name.
+
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping

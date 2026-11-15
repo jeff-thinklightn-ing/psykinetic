@@ -26,10 +26,13 @@ extends RefCounted
 
 const DAY := 12
 const NIGHT := 23
-## The square by its fire, the town's east, the temple's side, the west huts, the east, the south, the store.
-const SPOTS := [Vector2i(194, 211), Vector2i(212, 205), Vector2i(219, 195), Vector2i(196, 190), Vector2i(228, 214),
-	Vector2i(204, 216), Vector2i(212, 218)]
-const NIGHT_SPOTS := [Vector2i(194, 211), Vector2i(212, 205)]
+## The square by its fire, the town's east, the temple's side, the west huts, the east, the south, the store,
+## and the square again: its first stand falls in the arrival's first 22 s, when the chatter is held
+## (Ambience TOWN_DAY "chatter_after_s"). The town's east is the street at (210, 203): (212, 205), its
+## spot until 754 amended (9), lies inside a hut (rect (210, 204) 3x3), and the walk went in by its door.
+const SPOTS := [Vector2i(194, 211), Vector2i(210, 203), Vector2i(219, 195), Vector2i(196, 190), Vector2i(228, 214),
+	Vector2i(204, 216), Vector2i(212, 218), Vector2i(194, 211)]
+const NIGHT_SPOTS := [Vector2i(194, 211), Vector2i(210, 203)]
 const SQUARE := Vector2i(194, 211)
 const STAND := 20.0
 ## Away: how far out to look for a cell out of every town's reach, the
@@ -173,7 +176,7 @@ func _walk(spots: Array) -> void:
 	for spot: Vector2i in spots:
 		_mark("walk %s" % spot)
 		await _bot.walk_to(spot, 2, 60.0)
-		_mark("stand %s" % spot)
+		_mark("stand %s at %s, under the sky %s" % [spot, _bot.cell(), World.fields != null and World.fields.under_sky(_bot.cell())])
 		await _bot.seconds(STAND)
 
 

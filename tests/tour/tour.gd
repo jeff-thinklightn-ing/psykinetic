@@ -7,6 +7,9 @@ extends Node
 ## would not load, 3 when it ran past --tour-minutes (default 20).
 ## --tour-admin=<port>: the server's admin console, for setup.
 ## --tour-out=<folder>: where report.md and stills go.
+## A tour may also define before_join(bot): called as the client boots,
+## before the server places it (754 amended (8); the ears tour makes its 3D
+## view there); a tour without it runs as before.
 
 const Bot := preload("res://tests/tour/bot.gd")
 
