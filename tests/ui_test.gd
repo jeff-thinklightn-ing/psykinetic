@@ -3820,6 +3820,16 @@ func _test_person_window() -> void:
 	else:
 		print("  (no far cell in sight here: the close unchecked)")
 	World._relocate(me, home)
+	# A seller's body freed under their open window (ui-design's look_foot6, 11-14: `with is Resident` on a freed instance
+	# threw every frame): the window shuts at once, no engine error (which fails the scene).
+	window.close()
+	var seller := Chest.new()
+	add_child(seller)
+	window._open = true
+	window.with = seller
+	seller.free()
+	_main._update_store()
+	_check(not window.is_open(), "a seller freed under their open window: it closes, no fault")
 	_main._open_talk(body)
 	for i in 2:
 		await get_tree().process_frame

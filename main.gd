@@ -17540,9 +17540,13 @@ func _update_store() -> void:
 	if barter_panel.person != null:
 		_update_person_window()
 		return
-	if not barter_panel.with is Resident:
+	var held: Variant = barter_panel.with
+	if typeof(held) == TYPE_OBJECT and not is_instance_valid(held):
+		barter_panel.close()  # Their body is gone from the client (out of range, left the zone): `is` on a freed instance is an engine error every frame, and a freed one reads == null, so a typeof tells it from none.
 		return
 	var who := barter_panel.with
+	if not who is Resident:
+		return
 	var player := _local_player()
 	if not is_instance_valid(who) or not who.spawned or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
 		barter_panel.close()
@@ -24714,7 +24718,7 @@ func _open_pack(player: Player, target: GridEntity) -> void:
 		var prop := World.get_entity_at(target.tile)
 		if prop is Chest and (prop as Chest).locker:
 			target = prop
-	if pack_panel != null and pack_panel.other is Locker and target is Chest and (target as Chest).locker:
+	if pack_panel != null and is_instance_valid(pack_panel.other) and pack_panel.other is Locker and target is Chest and (target as Chest).locker:
 		close_other()  # E on the locker again: your chest shuts.
 		return
 	if pack_panel != null and pack_panel.other == target:
