@@ -57286,7 +57286,10 @@ temple's lancets drawn down toward a house pane, and the inn's door lantern made
   lancet's glass (Client3D.lancet_slot, window_drawn_height's own test) at LANCET_GLOW of its emission
   (Client3D.dim_pane: each glowing surface's material copied onto the piece, its emission energy times the
   share, its albedo untouched). 0.5 puts a lancet level with a house pane by luma; 0.35 puts it below one.
-  ui-design's two-up of the two decides; the value here is the one it picked. Nothing else of the window
+  ui-design's joined two-up picked 0.5 (twoup50b_ca7fab4ce beside twoupbase_734daff60, A_first_view at
+  (190,219), 21:30; means of the brightest 80 pixels, luma as shown). The lancets read 179 against 232,
+  the inn's door pane 186 against 179, and the ground before the inn 108 against 96. So the inn's pane
+  now edges past the lancets, with the temple's glass still plainly lit. Nothing else of the window
   changes: it is lit at the same hours, and its patch on the ground (927) is as before. Lore is told the
   temple's windows dim a little.
 - The inn's lantern: the inn's own door lantern, where it hangs (beside its door, house_lamp_at), is
