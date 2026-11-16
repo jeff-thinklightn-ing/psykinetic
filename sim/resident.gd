@@ -664,7 +664,12 @@ func _pick_goal() -> void:
 	# trade). Hiding, sick abed, led or at a bedside it stays where it is in the place, as before.
 	var stays := (doing not in STROLLS or not keep_moving and not (doing == Doing.SQUARE and _goal != NO_CELL)) \
 		and area.has_point(tile) and not keep.has(tile)
-	_set_goal(tile if stays else _free_cell(area, keep))
+	var goal := tile if stays else _free_cell(area, keep)
+	_set_goal(goal)
+	if goal == tile and not area.has_point(tile):
+		# No free cell in a place it is not in yet (875: a goer's one cell, the inn's door, stood on by another walking in):
+		# it tries again as a shut way does, not at its next stroll (Hale stood 46 minutes by the square at 18:00; economy's).
+		_retry_at = World.tick + PATH_RETRY_TICKS + absi(id) % (PATH_RETRY_SPREAD + 1)
 
 
 ## The home the lawspeaker's rounds (decision 459) have him at now: one of
@@ -964,8 +969,15 @@ func inn_pick(pool: Array, taken: Dictionary) -> Dictionary:
 	var groups: Array = [[], [], [], [], [], [], []]  # join, fire, the first pair, the counter's first, another pair, the counter, any
 	var back := {}
 	var here := {}
+	# A settled body drawn as a kind of its own (residents.json's settled "kind": Snagfin, the goblin) keeps to the stands:
+	# the sit clip is unseen on its rig (the coordinator, 11-16, until animation's still of it passes; not a rule about
+	# goblins). A visitor's spec "kind" (traveller, pedlar) is no body's kind and sits as anyone.
+	var stands_only := not str((Townsfolk.settled().get(worker_id, {}) as Dictionary).get("kind", "")).is_empty() \
+			and str(spawn_spec.get("kind", "")) == str(Townsfolk.settled()[worker_id]["kind"])
 	for spot: Dictionary in pool:
 		var cell: Vector2i = spot["cell"]
+		if stands_only and str(spot.get("pose", "")) != "stand":
+			continue
 		if cell == tile and not taken.has(cell):
 			here = spot  # Seated with nowhere else free, it stays (853 amended (13)'s rule).
 			continue

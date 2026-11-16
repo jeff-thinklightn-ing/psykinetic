@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_first_room()
 	_test_settled_at_boot()
 	_test_settled_kind_indoors()
+	_test_fence_keeps_stall()
 	_test_shell_roof()
 	await _test_out_of_shell()
 	print("")
@@ -70,6 +71,34 @@ func _test_settled_kind_indoors() -> void:
 	var model: Dictionary = Client3D.model_for(body)
 	body.free()
 	_check(str(model.get("scene", "")).ends_with("goblin.glb"), "and his body is drawn from the goblin's scene (%s)" % [model.get("scene", "-")])
+
+## 875 on the four-piece (economy's lines, the coordinator's ruling, 11-16): the fence (economy.json fence.by, Snagfin)
+## keeps his stall through his night trade (586): at 21:00 he is none of the Mughouse's goers, and his inn spell is his
+## stall (the 3x3 about residents.json's home), not its floor; at noon the night is not near.
+func _test_fence_keeps_stall() -> void:
+	print("
+== the fence keeps his stall through his night trade, not the Mughouse's floor ==")
+	var fence: String = World.economy.fence_by()
+	var table := Townsfolk.settled()
+	_check(fence == "snagfin" and table.has(fence), "(the fence is Snagfin: %s)" % fence)
+	if not table.has(fence):
+		return
+	var town := str(table[fence].get("town", ""))
+	var stall: Array = table[fence]["home"]
+	var was := DayNight.hour(DayNight.now())
+	DayNight.set_hour(12.0)
+	_check(not Main._fence_night_near(DayNight.now()), "at 12:00 his night trade is not near")
+	DayNight.set_hour(21.0)
+	var goers: Array[String] = _main._inn_goers(town, DayNight.now())
+	_check(Main._fence_night_near(DayNight.now()) and fence not in goers and not goers.is_empty(),
+		"at 21:00 his night trade is open and he is none of the inn's %d goers" % goers.size())
+	var each := {"key": fence, "name": "Snagfin", "trade": "merchant", "player": "", "type": "merchant", "town": town,
+		"places": {"home": Rect2i(0, 0, 1, 1), "inn": Rect2i(0, 0, 1, 1), "spots": {"inn": [{"cell": Vector2i(1, 6)}]}}}
+	var here: bool = _main._inn_town_side(each, town, goers, goers)
+	var want := Rect2i(Vector2i(int(stall[0]) - 1, int(stall[1]) - 1), Vector2i(3, 3))
+	_check(here and each["places"]["inn"] == want and not (each["places"]["spots"] as Dictionary).has("inn"),
+		"his body stays in town, his inn spell at his stall %s (%s)" % [want, each["places"]["inn"]])
+	DayNight.set_hour(was)
 
 func _test_first_room() -> void:
 	print("\n== a view's first room, before any rebuild (782 amended (2)) ==")

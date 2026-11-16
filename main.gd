@@ -17394,11 +17394,14 @@ func _inn_goers(place_id: String, at: float) -> Array[String]:
 	if cap <= 0 or World.towns == null or World.production == null:
 		return out
 	var ids: Array[String] = []
+	var fence: String = World.economy.fence_by() if World.economy != null else ""
 	for who: String in World.towns.residents(place_id):
 		var worker := World.production.worker(who)
 		if who.begins_with("companion:") or worker.is_empty() or bool(worker.get("away", false)) or TAVERNER in worker.get("trades", []) \
 				or Townsfolk.is_sick(World.production, who):
 			continue
+		if who == fence and _fence_night_near(at):
+			continue  # The fence keeps his stall through his night trade (586; the coordinator, 11-16).
 		ids.append(who)
 	ids.sort()
 	var lodgers: Array[String] = []
@@ -17502,6 +17505,12 @@ func _inn_walk_steps() -> float:
 	return INN_WALK_HOURS * DayNight.day_steps / 24.0
 
 
+## Whether the fence's night trade (World.fence_state: daylight under DayNight.DARK_LIGHT) is open at [param at]
+## or opens within the hour (586; the coordinator, 11-16; economy's): his evening spell starts within an hour of dusk all year.
+static func _fence_night_near(at: float) -> bool:
+	return DayNight.daylight(at) < DayNight.DARK_LIGHT or DayNight.daylight(at + DayNight.day_steps / 24.0) < DayNight.DARK_LIGHT
+
+
 ## The town's side of [param place_id]'s shell inn for [param each] (a _sync_residents entry, its places
 ## made) (875): false when it is inside and not wanted here; a goer whose stint began within
 ## INN_WALK_HOURS and whose body stands here walks to the inn's door and is let go there; one just out
@@ -17553,6 +17562,17 @@ func _inn_town_side(each: Dictionary, place_id: String, goers: Array[String], ea
 				seats[use] = lit
 			night_places["spots"] = seats
 		night_places["short_stands"] = true
+		return true
+	var settled := Townsfolk.settled()
+	if who == (World.economy.fence_by() if World.economy != null else "") and _fence_night_near(DayNight.now()) \
+			and settled.has(who) and settled[who].get("home") is Array and (settled[who]["home"] as Array).size() == 2:
+		# The fence through his night trade (586; the coordinator, 11-16; economy's line): his INN spell at his stall, the
+		# 3x3 about residents.json's "home" (_sync_residents' settled branch sets his home to it only after this returns).
+		var stall: Array = settled[who]["home"]
+		each["places"]["inn"] = Rect2i(Vector2i(int(stall[0]) - 1, int(stall[1]) - 1), Vector2i(3, 3))
+		var own: Dictionary = (each["places"].get("spots", {}) as Dictionary).duplicate()
+		own.erase("inn")
+		each["places"]["spots"] = own
 		return true
 	var person := _inn_person(place_id, who)
 	if Resident.doing_now(str(person["trade"]), str(person["type"]), who) == Resident.Doing.INN:

@@ -1241,6 +1241,24 @@ func _test_inn_room(body: Resident) -> void:
 		"six guests one by one: three at the fire, a pair at one table, one at the counter (%s)" % [six])
 	_check(seated[3].begins_with("table") and seated[4] == seated[3], "the fourth starts a pair, the fifth joins it (%s, %s)" % [seated[3], seated[4]])
 	_check(seated[6].begins_with("table") and seated[6] != seated[3], "a seventh starts the other pair (%s)" % seated[6])
+	# The four-piece (the coordinator, 11-16): a body of a kind of its own (Snagfin, the goblin) keeps to the stands, never
+	# a sit, until animation's still of its rig's sit passes.
+	var spec_was: Dictionary = body.spawn_spec
+	var id_was := body.worker_id
+	body.spawn_spec = spec_was.duplicate()
+	body.spawn_spec["kind"] = "traveller"  # A visitor's kind: sits as anyone.
+	body._left = Resident.NO_CELL
+	var visitor: Dictionary = body.inn_pick(pool, {})
+	body.worker_id = "snagfin"
+	body.spawn_spec["kind"] = str((Townsfolk.settled().get("snagfin", {}) as Dictionary).get("kind", ""))
+	var first: Dictionary = body.inn_pick(pool, {})
+	var full: Dictionary = body.inn_pick(pool, {free[5]: true, free[6]: true})
+	body.spawn_spec = spec_was
+	body.worker_id = id_was
+	body._left = left_was
+	_check(str(visitor.get("pose", "")) == "sit", "a visitor (spec kind traveller) still takes a seat (%s)" % [visitor.get("cell", "-")])
+	_check(str(first.get("pose", "")) == "stand" and full.is_empty(),
+		"Snagfin, a settled body of his own kind, takes a counter stand in an empty room (%s), and nothing when both are held (%s), never a sit" % [first.get("cell", "-"), full.get("cell", "-")])
 	# The taverner (the coordinator's ask): behind the counter end a guest stands at, else either.
 	var west := {"use": "work", "trade": "taverner", "cell": free[0], "face": free[5], "pose": "stand"}
 	var east := {"use": "work", "trade": "taverner", "cell": free[1], "face": free[6], "pose": "stand"}

@@ -56111,9 +56111,18 @@ body under Snagfin's name drawn as a full-size man: an inn floor's body was made
 residents.json's settled "kind" (the wilds' _sync_residents does, decision 471), and Client3D.model_for draws a kind-less
 Resident human. Since this take is what sends the evening crowd in, it carries the mend (the coordinator's ruling):
 _inn_entry copies the settled kind, so Snagfin is the goblin ("imp") on the floor as in the street. first_room_test:
-his floor entry carries kind "imp", and model_for gives the goblin's scene. The landing waits for ui-design's joined
-still of him seated at the nearest zoom; if a 1.2 m body sits a 0.45 m stool wrongly, he stands by the fire and takes
-no stool until animation gives his rig a sit that fits.
+his floor entry carries kind "imp", and model_for gives the goblin's scene. Economy's reading of the floor side found
+kind the only field dropped, and one scene the evening would break: Snagfin is the town's only fence (586), and his
+night trade (World.fence_state: daylight under DayNight.DARK_LIGHT, dusk 17:34 to 19:38 over a year) would run from
+an empty stall while he sat in the inn. So, in economy's lines (the coordinator's ruling): the fence is none of
+Main._inn_goers while his night trade is open or opens within the hour (Main._fence_night_near; his evening spell starts
+within an hour of dusk all year), and Main._inn_town_side keeps his inn spell at his stall, the 3x3 about residents.json's
+home; his noon spell (11 to 13) may take him in as anyone. first_room_test: at 21:00 he is none of the goers and his inn
+spell is his stall; at noon the night is not near. On the floor, Resident.inn_pick keeps a body whose spawn_spec names a
+kind (residents.json's settled "kind"; a visitor's spec kind, traveller or pedlar, sits as anyone) to the "stand" spots, never a sit: the human sit clip on a 1.2 m body over a 0.45 m stool is unseen, so Snagfin
+stands at the counter until animation's still of his rig's sit passes, and then a small take of maps' takes the condition
+out. It is a hold on one unseen pose, not a rule about goblins. resident_test: a kind's body takes a counter stand in an
+empty room and nothing when both are held, and a visitor still sits (the first try kept every visitor to the stands and town_day_test caught Hale idle). The walk in had a fault of its own that the new order showed (economy's trace): a goer's every place is the inn's door, one cell, and when another body stood on it at his pick Resident._pick_goal gave him his own tile and nothing tried again until his next stroll (Hale 46 minutes by the square at 18:00); now a goal that is its own tile, in a place it is not in yet, retries as a shut way does (PATH_RETRY_TICKS); town_day_test: Hale's longest idle 30.
 ## 852. The store window: one window for every keeper, one click a buy or a sale
 
 Jeff, five reports (11-01 "Rolf doesn't have a shop", 11-02 "squares with graphics and price on the side ...
