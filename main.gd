@@ -2244,18 +2244,29 @@ func _update_talk() -> void:
 		return
 	if World.distance(player.tile, talk_cell(_talk_wanted)) <= TALK_REACH:
 		# 935 amended (3): a talk that is walked to opens no further than a shut door: while one stands in the way (the person unseen
-		# across it) the talk waits, and at the door's step E's own "door" command opens it (once per 400 ms; a door that will not
-		# open, locked or held, is tried TALK_DOOR_TRIES times and the want dropped: he stands at the door, nothing more is sent).
+		# across it) the talk waits. The walk itself opens a door pressed into (World._free_off_edge: a creature that may open it), so
+		# the wait is usually a frame or two; a door still shut after TALK_DOOR_WAIT_MSEC at its step is not being pressed open (the
+		# route ended there), and E's own "door" command is sent (once per 400 ms, TALK_DOOR_TRIES times at most, never on a door
+		# already open: the command toggles); a door that will not open (locked, no key) drops the want: he stands at the door.
 		if not keeper_sees(player.tile, _talk_wanted.tile, String(player.zone)):
 			var shut := _shut_door_in_the_way(player.tile, _talk_wanted.tile)
 			if shut != null:
-				if player.tile in Terrain.edge_cells(shut.key) and Time.get_ticks_msec() - _talk_door_sent >= 400:
-					if _talk_door_tries >= TALK_DOOR_TRIES:
-						_talk_wanted = null
+				if not (player.tile in Terrain.edge_cells(shut.key)):
+					_talk_door_since = 0
+				else:
+					var now := Time.get_ticks_msec()
+					if _talk_door_since == 0:
+						_talk_door_since = now
+					if shut.lock != "" and not World.has_key(player, shut.lock):
+						_talk_wanted = null  # A door he may not open: no walk opens it, nothing is sent.
 						return
-					_talk_door_tries += 1
-					_talk_door_sent = Time.get_ticks_msec()
-					World.command(player, "door", {"edge": [shut.key.x, shut.key.y, shut.key.z]})
+					if now - _talk_door_since >= TALK_DOOR_WAIT_MSEC and now - _talk_door_sent >= 400:
+						if _talk_door_tries >= TALK_DOOR_TRIES:
+							_talk_wanted = null
+							return
+						_talk_door_tries += 1
+						_talk_door_sent = now
+						World.command(player, "door", {"edge": [shut.key.x, shut.key.y, shut.key.z]})
 				return
 		_open_talk(_talk_wanted)
 
@@ -2263,6 +2274,9 @@ func _update_talk() -> void:
 ## When the shut-door command was last sent for a wanted talk, msec, and how many have been (935 amended (3)).
 var _talk_door_sent := 0
 var _talk_door_tries := 0
+## When he first stood at the shut door's step with the talk wanted, msec (0: not at one); and how long the walk is given to open it itself.
+var _talk_door_since := 0
+const TALK_DOOR_WAIT_MSEC := 600
 const TALK_DOOR_TRIES := 3
 
 

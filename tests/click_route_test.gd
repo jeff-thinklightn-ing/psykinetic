@@ -281,8 +281,12 @@ func _test_door_talk() -> void:
 		_check(_main._talk_wanted == body and shut != null and not shut.is_open(), "two cells off, the door shut, the talk waits (not opened, the door not yet touched)")
 		World._relocate(player, street + Vector2i(0, 2))
 		player.next_move_tick = 0
+		_main._talk_door_since = 0
 		_main._update_talk()
-		_check(shut != null and shut.is_open(), "at the door's step the door is opened by the step's command")
+		_check(shut != null and not shut.is_open(), "at the door's step the walk is given its moment to open the door itself: not yet touched")
+		_main._talk_door_since = Time.get_ticks_msec() - Main.TALK_DOOR_WAIT_MSEC - 50
+		_main._update_talk()
+		_check(shut != null and shut.is_open(), "still shut after its moment (the route ended there): E's own command opens it")
 		_main._update_talk()
 		_check(_main._talk_wanted == null, "and the talk is let through once it is open")
 		if shut != null:
@@ -295,13 +299,11 @@ func _test_door_talk() -> void:
 		_main._talk_wanted = body
 		_main._talk_until = Time.get_ticks_msec() + 20000
 		_main._talk_door_tries = 0
+		_main._talk_door_since = 0
 		World._relocate(player, street + Vector2i(0, 2))
-		for i in 6:
-			_main._talk_door_sent = 0
-			player.next_move_tick = 0
-			_main._update_talk()
-		_check(_main._talk_wanted == null and not locked.open and _main._talk_door_tries == Main.TALK_DOOR_TRIES,
-			"a locked door: tried %d times, the want dropped, the door still shut" % _main._talk_door_tries)
+		_main._update_talk()
+		_check(_main._talk_wanted == null and not locked.open and _main._talk_door_tries == 0,
+			"a locked door he has no key for: the want dropped at once, the door still shut, nothing sent")
 		locked.lock = ""
 	# A walk of his own (a click elsewhere) drops the want.
 	_main._talk_wanted = body
