@@ -3217,6 +3217,21 @@ var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 ## The night's fill on bodies (858).
 var _body_fill: DirectionalLight3D
+## SCRATCH light probe (environment, the coordinator's sheen row 2; never
+## lands): which of the frame's light terms are off, so one tour can shoot
+## them back to back. "" or "today": as main. "spec0": the body's specular 0
+## (the sun's highlight and the sky's reflection). "sky0": the sky's
+## reflection alone off (Environment reflected light disabled). "fog0": the
+## scene fog off. "ambient0" / "sun0": the ambient / the sun at 0 (these
+## scale with albedo, so they should move a fit's a, not its b: a check on
+## the fit). "add0": spec0 and fog0, every term this renderer has that adds
+## light whatever the albedo. "dark0": add0 with the ambient, the sun and
+## the body fill off too: a body should draw black, so what is left is the
+## capture's. Set from a tour (Client3D.light_probe = "spec0") or at start
+## with --light-probe=<name>; each change prints a PROBE line a second later.
+static var light_probe := ""
+var _probe_seen := "-"
+var _probe_print_in := -1.0
 var _outdoor := false
 ## The low-horizon camera is on now (decision 623): Net.camera_low and
 ## outdoors.
@@ -3864,6 +3879,7 @@ func _process(delta: float) -> void:
 	_update_grown()
 	_update_shadows()
 	_update_sky(delta)
+	_apply_light_probe(delta)
 	_grow_scatter()
 	_update_blood()
 	_update_tracks()
@@ -3964,6 +3980,67 @@ func _place_body_fill() -> void:
 		var down := deg_to_rad(BODY_FILL_DOWN)
 		var way := (level * cos(down) + Vector3.DOWN * sin(down)).normalized()
 		_body_fill.basis = Basis.looking_at(way, Vector3.UP)
+
+
+## SCRATCH: the light probe's terms off (light_probe), every frame after
+## _update_sky; a change makes the sky put its own values back first.
+func _apply_light_probe(delta: float) -> void:
+	if _probe_seen == "-":
+		for arg: String in OS.get_cmdline_user_args():
+			if arg.begins_with("--light-probe="):
+				light_probe = arg.trim_prefix("--light-probe=")
+	var probe := "today" if light_probe == "" else light_probe
+	if probe != _probe_seen:
+		var first := _probe_seen == "-"
+		_probe_seen = probe
+		_sky_step = -1
+		_environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
+		if not first:
+			_apply_sky()  # The fog's switch and the place's light as a build sets them.
+		HUMAN_MATERIAL.set_shader_parameter("probe_specular", 0.0 if probe in ["spec0", "add0", "dark0"] else 0.5)
+		_probe_print_in = 1.0
+	if probe == "sky0":
+		_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
+	if probe in ["fog0", "add0", "dark0"]:
+		_environment.fog_enabled = false
+	if probe in ["ambient0", "dark0"]:
+		_environment.ambient_light_energy = 0.0
+	if probe in ["sun0", "dark0"]:
+		_sun.light_energy = 0.0
+	if probe == "dark0":
+		_body_fill.visible = false
+	if _probe_print_in >= 0.0:
+		_probe_print_in -= delta
+		if _probe_print_in < 0.0:
+			print(_probe_line(probe))
+
+
+## SCRATCH: the frame's light as it stands, one line, so a still's sheet names its terms.
+func _probe_line(probe: String) -> String:
+	var env := _environment
+	var view := get_viewport()
+	var near_lights := 0
+	for light: Node in find_children("*", "Light3D", true, false):
+		if light is DirectionalLight3D or not (light as Light3D).is_visible_in_tree():
+			continue
+		if (light as Node3D).global_position.distance_to(_camera_target) < 10.0 and (light as Light3D).light_energy > 0.0:
+			near_lights += 1
+	var weather: Dictionary = _weather_view.weather if _weather_view != null else {}
+	return ("PROBE %s: hour %.2f sun %.1f deg, cloud %.2f rain %.2f fog %.2f; low_camera %s distance %.1f; "
+			+ "tonemap %d exposure %.2f white %.2f; glow %s ssao %s ssil %s sdfgi %s ssr %s volfog %s; "
+			+ "fog %s mode %d density %.4f begin %.0f aerial %.2f; reflected %d; ambient %s x %.3f; sun %s x %.3f; "
+			+ "body fill %s x %.3f; adjust %s b %.2f c %.2f s %.2f; msaa %d ssaa %d taa %s scale %.2f; "
+			+ "near point/spot lights %d; specular %.2f") % [
+			probe, DayNight.hour(DayNight.now()), _look_elevation, float(weather.get("cloud", -1.0)),
+			float(weather.get("rain", -1.0)), float(weather.get("fog", -1.0)), _low, _camera_distance(),
+			env.tonemap_mode, env.tonemap_exposure, env.tonemap_white, env.glow_enabled, env.ssao_enabled,
+			env.ssil_enabled, env.sdfgi_enabled, env.ssr_enabled, env.volumetric_fog_enabled,
+			env.fog_enabled, env.fog_mode, env.fog_density, env.fog_depth_begin, env.fog_aerial_perspective,
+			env.reflected_light_source, env.ambient_light_color, env.ambient_light_energy, _sun.light_color,
+			_sun.light_energy, _body_fill.visible, _body_fill.light_energy, env.adjustment_enabled,
+			env.adjustment_brightness, env.adjustment_contrast, env.adjustment_saturation, view.msaa_3d,
+			view.screen_space_aa, view.use_taa, view.scaling_3d_scale, near_lights,
+			float(HUMAN_MATERIAL.get_shader_parameter("probe_specular"))]
 
 
 ## The dark under-stone look, or outdoors the sky on the world clock

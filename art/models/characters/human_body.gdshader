@@ -14,6 +14,8 @@ instance uniform vec4 trousers : source_color = vec4(0.32, 0.24, 0.18, 1.0);
 // A dye over the part's own colour by its alpha (419 amended (2): a hood worn with a cape takes
 // the cape's, PersonLook.dye_hood); alpha 0, the default, leaves the picture as it was.
 instance uniform vec4 dye : source_color = vec4(0.0);
+// SCRATCH (environment's light probe, never lands): Client3D.light_probe sets it.
+uniform float probe_specular = 0.5;
 
 void fragment() {
 	vec4 part = COLOR;
@@ -21,4 +23,5 @@ void fragment() {
 	float tinted = clamp(part.r + part.g + part.b + part.a, 0.0, 1.0);
 	ALBEDO = mix(mix(texture(palette, UV).rgb, own, tinted), dye.rgb, dye.a);
 	ROUGHNESS = 0.9;
+	SPECULAR = probe_specular;  // SCRATCH light probe: 0.5 is Godot's default, today's look.
 }
