@@ -163,6 +163,11 @@ const SAID_MSEC := 600
 const PACK_WAIT_MSEC := 500
 ## A pack that changed under the open window is settled this long before the keeper is asked again, msec.
 const REFRESH_MSEC := 600
+## The server's words for a barter look it answers with the player out of reach or out of sight (Main's "barter" and "retain": World.in_person), and
+## how soon after an answer of them the window asks again once it is in reach (the window opens on the client's own cell, a step or two ahead
+## of the server's, so the keeper's first answer can be "too far away" for a player standing beside him), msec.
+const FAR_WORDS := "too far away"
+const FAR_REASK_MSEC := 1000
 ## And the keeper is asked again no oftener than this, msec: a player sorting the pack is a few asks, not one a change.
 const REFRESH_GAP_MSEC := 3000
 ## A sale whose thing has left the pack but whose gold has not come this long after the click is said as left, not
@@ -2274,7 +2279,17 @@ func is_stale(slot: int) -> bool:
 ## Each frame: when the pack has changed under the open window and nothing waits on an answer, ask the keeper
 ## again once the change has settled; his answer (the rows) lays the squares right.
 func _refresh_stale() -> void:
-	if not _open or not _pending.is_empty() or _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
+	if not _open or not _pending.is_empty():
+		return
+	# The keeper's last answer said "too far away" and the window is in reach now: his answer was about where the server had the player
+	# a step ago, and nothing else would ask him again (Hob's window said it to a player beside him, 15 s on).
+	if near and str(data.get("why", "")) == FAR_WORDS:
+		var asked := Time.get_ticks_msec()
+		if asked - _refreshed_at >= FAR_REASK_MSEC:
+			_refreshed_at = asked
+			refresh_asked.emit()
+		return
+	if _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
 		return
 	var ids := _pack_ids()
 	if ids == _slots_seen:

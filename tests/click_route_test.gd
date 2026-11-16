@@ -50,6 +50,7 @@ func _ready() -> void:
 		_test_go_in()
 		_test_footprint_click()
 		_test_door_talk()
+		_test_hut_sight()
 		_test_stand_cell_routes()
 		_test_no_route()
 	await _test_click_routes_agree()
@@ -619,6 +620,30 @@ func _test_no_route() -> void:
 	_main._free["path"] = []
 	for chest: Chest in blocks:
 		World.despawn(chest)
+
+
+## ui-design's joined run of the healer's window (11-16, ui-route's rows): "too far away" under Buy with the player one cell from Hob (150,233) inside
+## his hut, 15 s on. The server's barter look is answered by World.in_person (PERSON_REACH 3 and line of sight from the player's cell as the SERVER holds
+## it), and the client opens the window on its own cell, a step or two ahead. These are the sight lines into his bench cell from the cells the walk
+## in passes: the door cell (152,232) and the street cell before it are out of sight of him, so a look sent as the window opens there is refused.
+func _test_hut_sight() -> void:
+	print("
+== Hob's hut: from which cells of the walk in he is in person (the barter look's answer) ==")
+	var hob := Vector2i(150, 233)
+	var rows: Array[String] = []
+	var seen_from: Dictionary = {}
+	for cell: Vector2i in [Vector2i(152, 229), Vector2i(152, 230), Vector2i(152, 231), Vector2i(152, 232), Vector2i(152, 233), Vector2i(151, 233)]:
+		var in_reach := World.distance(cell, hob) <= World.PERSON_REACH
+		var sight := World.has_line_of_sight(cell, hob)
+		seen_from[cell] = in_reach and sight
+		rows.append("%s %s%s" % [cell, "reach" if in_reach else "far", " sight" if sight else " no sight"])
+	print("  %s" % [rows])
+	_check(bool(seen_from[Vector2i(151, 233)]) and bool(seen_from[Vector2i(152, 233)]), "inside the hut, beside him, he is in person (%s)" % [rows])
+	var first_out := ""
+	for cell: Vector2i in [Vector2i(152, 231), Vector2i(152, 232)]:
+		if World.distance(cell, hob) <= World.PERSON_REACH and not bool(seen_from[cell]):
+			first_out += "%s " % cell
+	print("  in reach and out of his sight: %s" % ("none" if first_out.is_empty() else first_out))
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's

@@ -4437,6 +4437,30 @@ func _test_person_give() -> void:
 	window._note_pack()
 	window._rebuild()
 	_check(not window.is_stale(3) and store_view.squares_shown("mine")[3] == "mine 3 3", "his next rows lay it right: priced again (%s)" % [store_view.squares_shown("mine")[3]])
+	# The keeper's answer was "too far away" (the window opened on the client's own cell, a step ahead of the server's: ui-design's joined run of
+	# Hob's window, 11-16, the line still there 15 s on beside him): the window in reach asks him again, once a second at most, and not when it is out
+	# of reach or the answer was something else.
+	refreshes.clear()
+	window._pending = {}
+	window.data = {"why": BarterPanel.FAR_WORDS}
+	window.near = true
+	window._refreshed_at = -100000
+	window._refresh_stale()
+	_check(refreshes.size() == 1, "an answer of 'too far away' and the window in reach: he is asked again (%s)" % [refreshes])
+	window._refresh_stale()
+	_check(refreshes.size() == 1, "and not again inside the second (%s)" % [refreshes])
+	window._refreshed_at = Time.get_ticks_msec() - BarterPanel.FAR_REASK_MSEC - 1
+	window._refresh_stale()
+	_check(refreshes.size() == 2, "a second on, again, while the answer stays so (%s)" % [refreshes])
+	window.near = false
+	window._refreshed_at = -100000
+	window._refresh_stale()
+	_check(refreshes.size() == 2, "out of reach, he is not asked (%s)" % [refreshes])
+	window.near = true
+	window.data = {"why": "already in his care"}
+	window._refresh_stale()
+	_check(refreshes.size() == 2, "another answer, he is not asked (%s)" % [refreshes])
+	window.data = {}
 	window.refresh_asked.disconnect(catch_refresh)
 	World.set_slots(me, stock)
 	window.set_takes([])
