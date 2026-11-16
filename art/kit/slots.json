@@ -2946,6 +2946,17 @@
 			"states": ["low", "half", "full"],
 			"grey": [{"at": [0.008, 0.498, 0], "size": [1.195, 0.996, 0.483]}]
 		},
+		"prop.log_rack": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.11, 1.0, 0.48],
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-16", "notes": "C:/dev/review/log_rack/make_log_rack.py (economy's ask, the coordinator's yes 11-16; package \"wood at the hut's door\"), from make_site.py's woodpile pieces: an open rack of grey weathered timber, two ground rails, four corner posts to 1.0 m, side rails and back rails at knee height, a back rail at 0.8 and top rails front and back, no lid (a lid hid the fill and read as a table); the body the frame (144 tris), the fill three whole states (state_* nodes) of their own split logs 0.36 m long laid across the rack's depth, bark on their long sides and their pale split ends to the front: state_empty chips and a strip of bark on the rails (52), state_part two courses and a broken third (180), state_full six courses to 0.86 m (436)"},
+			"uses": "split wood stacked at a hut's door (package \"wood at the hut's door\", economy's side: its server picks the rack's cell beside the door, rack_cell), 1 x 1 cell, its back (-z) to the hut's wall, its log ends toward +z: show one of state_empty, state_part and state_full by the bundles laid of the bundles the mend wants (economy's count, the coordinator's: a disrepair wants 1, a ruin 2): empty at 0, part at 1 of 2 (a ruin only), full at the need",
+			"states": ["empty", "part", "full"],
+			"grey": [{"at": [0, 0.5, -0.005], "size": [1.11, 1.0, 0.48]}]
+		},
 		"prop.sawhorse": {
 			"category": "props",
 			"type": "mesh",
