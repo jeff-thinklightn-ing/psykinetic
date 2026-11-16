@@ -3742,8 +3742,6 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 		while rim_pass != null:
 			rim_pass.set_shader_parameter("night_share", THROUGH_NIGHT_RIM)
 			rim_pass = rim_pass.next_pass as ShaderMaterial
-	if "--inside-plain" in OS.get_cmdline_user_args() and not OS.has_feature("template"):
-		inside_plain = true  # 946's look: the plainer surround, for the pair's extra still.
 	if "--body-marks" in OS.get_cmdline_user_args():
 		body_marks = true  # Stills and benches with it on (623 amended (6)).
 	for arg: String in OS.get_cmdline_user_args():
@@ -29786,10 +29784,14 @@ func _sync_doors() -> void:
 ## A window every this many edges along an outer run, from its second.
 const INSIDE_WINDOW_EVERY := 3
 ## A pane by night (deep blue, never black) and its emission then; by day
-## the sky's horizon colour at INSIDE_PANE_DAY.
+## the sky's horizon colour toward INSIDE_PANE_SKY's blue by
+## INSIDE_PANE_BLUE, at INSIDE_PANE_DAY: glass, not paper (at 2.2 of the
+## bare horizon the first pair's panes read near-white).
 const INSIDE_PANE_NIGHT := Color(0.07, 0.11, 0.26)
 const INSIDE_PANE_NIGHT_ENERGY := 0.6
-const INSIDE_PANE_DAY := 2.2
+const INSIDE_PANE_DAY := 0.9
+const INSIDE_PANE_SKY := Color(0.36, 0.55, 0.84)
+const INSIDE_PANE_BLUE := 0.6
 ## The room's ambient by day: the sky look's colour toward the indoor warm
 ## grey by INSIDE_DAY_WARM, its energy INSIDE_DAY_LIFT times the night's;
 ## by night the zone's look as before (the hearth and candles carry it; the
@@ -29801,16 +29803,19 @@ const INSIDE_DAY_WARM := 0.35
 ## foot (INSIDE_SKY_PATCH, INSIDE_SKY_REACH m in) and at the way out
 ## (INSIDE_DOOR_PATCH, INSIDE_DOOR_REACH m); by night the door lantern's
 ## warm pool (INSIDE_DOOR_NIGHT, INSIDE_DOOR_NIGHT_REACH m).
-const INSIDE_SUN_COLOUR := Color(1.0, 0.92, 0.76)
-const INSIDE_SUN_PATCH := 0.42
-const INSIDE_SKY_COLOUR := Color(0.78, 0.86, 1.0)
-const INSIDE_SKY_PATCH := 0.16
+## Both warm (the first pair's grey-blue sky patches read as pale rugs on
+## the boards); the night's pool lies outside the threshold, where 927
+## amended (2) puts the door lantern's in the wilds.
+const INSIDE_SUN_COLOUR := Color(1.0, 0.84, 0.6)
+const INSIDE_SUN_PATCH := 0.4
+const INSIDE_SKY_COLOUR := Color(1.0, 0.92, 0.78)
+const INSIDE_SKY_PATCH := 0.13
 const INSIDE_SKY_REACH := 1.3
-const INSIDE_DOOR_PATCH := 0.3
+const INSIDE_DOOR_PATCH := 0.2
 const INSIDE_DOOR_REACH := 2.4
 const INSIDE_DOOR_NIGHT_COLOUR := Color(1.0, 0.62, 0.3)
-const INSIDE_DOOR_NIGHT := 0.14
-const INSIDE_DOOR_NIGHT_REACH := 1.4
+const INSIDE_DOOR_NIGHT := 0.22
+const INSIDE_DOOR_NIGHT_REACH := 2.0
 ## A pool's sides soften over this many metres from the wall (927 amended (3)'s, not yet on main).
 const INSIDE_SIDE_SOFT := 1.0
 ## A window's glass (wall.wood.window's glow, 1.3 to 2.0 m) and a doorway's
@@ -29819,15 +29824,26 @@ const INSIDE_PANE_LOW := 1.3
 const INSIDE_PANE_HIGH := 2.0
 const INSIDE_DOOR_HIGH := 2.2
 ## Past the walls (946): the apron's ground INSIDE_APRON m beyond the
-## level's floor, fading out into the background; its near colour the
-## ground's (FOREST_FLOOR) in the day's light, between INSIDE_APRON_NIGHT and
-## INSIDE_APRON_DAY of it; the background the sky's horizon darkened to
-## INSIDE_HAZE_DAY by day, BACKGROUND's blue-black at night.
+## level's floor, fading out into the background. Its near colour by day an
+## earthy green under the floor's value, so the room stays the brightest
+## thing (the first pair's lawn green, luma 67, stood over the boards' ~60);
+## by night the wilds' grass under the moon (their 21:30 grass reads 25 to
+## 38, dark blue-green, so never black). Past the way out, the lane's dirt
+## for INSIDE_WAY_DIRT m, then the square's cobbles, the way widening by
+## INSIDE_WAY_WIDEN a metre out: the way out reads as the way to the square.
+## The background the sky's horizon darkened to INSIDE_HAZE_DAY by day, the
+## wilds' far ground at night.
 const INSIDE_APRON := 7.0
-const INSIDE_APRON_DAY := 1.15
-const INSIDE_APRON_NIGHT := 0.32
-const INSIDE_HAZE_DAY := 0.3
-const INSIDE_HAZE_NIGHT := Color(0.025, 0.035, 0.06)
+const INSIDE_APRON_DAY := Color(0.18, 0.2, 0.15)
+const INSIDE_APRON_NIGHT := Color(0.09, 0.135, 0.13)
+const INSIDE_DIRT_DAY := Color(0.27, 0.21, 0.145)
+const INSIDE_DIRT_NIGHT := Color(0.12, 0.11, 0.1)
+const INSIDE_COBBLE_DAY := Color(0.22, 0.22, 0.215)
+const INSIDE_COBBLE_NIGHT := Color(0.1, 0.11, 0.12)
+const INSIDE_WAY_DIRT := 2.5
+const INSIDE_WAY_WIDEN := 0.35
+const INSIDE_HAZE_DAY := 0.24
+const INSIDE_HAZE_NIGHT := Color(0.065, 0.1, 0.105)
 const INSIDE_PATCH_SHADER := """shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
 // 946: a patch of daylight (or the door lantern's) on an inside's floor.
@@ -29849,9 +29865,9 @@ void vertex() {
 void fragment() {
 	float o = clamp(local.y + 0.5, 0.0, 1.0);
 	float half_width = mix(0.5 * mix(1.0 / spread, 1.0, o), 0.5, sun);
-	float soft = mix(0.6 * (1.0 - clamp(o * reach_m / side_soft, 0.0, 1.0)), 0.35, sun);
+	float soft = mix(0.3 * (1.0 - clamp(o * reach_m / side_soft, 0.0, 1.0)), 0.05, sun);
 	float edge = 1.0 - smoothstep(soft, 1.0, abs(local.x) / half_width);
-	float fall = mix((1.0 - o) * (1.0 - o), smoothstep(0.0, 0.2, o) * (1.0 - smoothstep(0.8, 1.0, o)), sun);
+	float fall = mix((1.0 - o) * (1.0 - o) * smoothstep(0.0, 0.08, o), smoothstep(0.0, 0.35, o) * (1.0 - smoothstep(0.6, 1.0, o)), sun);
 	ALBEDO = tint * fall * edge;
 }
 """
@@ -29860,15 +29876,32 @@ render_mode unshaded, cull_disabled, shadows_disabled;
 // 946: the ground past an inside's walls, fading into the background.
 uniform vec3 near_colour : source_color;
 uniform vec3 far_colour : source_color;
+uniform vec3 dirt_colour : source_color;
+uniform vec3 cobble_colour : source_color;
 uniform vec4 rect;
 uniform float reach = 7.0;
+// The way out: its threshold's middle and outward direction (zero: none).
+uniform vec2 way_at;
+uniform vec2 way_out;
+uniform float way_dirt = 2.5;
+uniform float way_widen = 0.35;
+uniform float way_half = 1.0;
 varying vec3 world;
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
 	vec2 d = max(max(rect.xy - world.xz, world.xz - rect.zw), vec2(0.0));
-	ALBEDO = mix(near_colour, far_colour, smoothstep(0.0, reach, length(d)));
+	vec3 ground = near_colour;
+	if (dot(way_out, way_out) > 0.25) {
+		vec2 rel = world.xz - way_at;
+		float t = dot(rel, way_out);
+		float s = abs(dot(rel, vec2(-way_out.y, way_out.x)));
+		float w = way_half + max(t, 0.0) * way_widen;
+		float in_way = (1.0 - smoothstep(w - 0.4, w + 0.4, s)) * smoothstep(-0.3, 0.2, t);
+		ground = mix(ground, mix(dirt_colour, cobble_colour, smoothstep(way_dirt - 0.6, way_dirt + 0.6, t)), in_way);
+	}
+	ALBEDO = mix(ground, far_colour, smoothstep(0.0, reach, length(d)));
 }
 """
 ## The inside's windows (edge keys) this level, their panes, the patches'
@@ -29879,9 +29912,6 @@ var _inside_pane_material: StandardMaterial3D
 var _inside_rows: Array[Array] = []
 var _inside_patches: MultiMeshInstance3D
 var _inside_apron: MeshInstance3D
-## The plainer surround (946's look, --inside-plain): the apron's ground
-## colour carried out to the frame's edge, no sky tone in the background.
-var inside_plain := false
 var _inside_step := -1
 var _inside_night: Array = []
 
@@ -30069,6 +30099,12 @@ func _build_inside_day() -> void:
 	apron_material.shader = apron_shader
 	apron_material.set_shader_parameter("rect", Vector4(low.x - 0.5, low.y - 0.5, high.x + 0.5, high.y + 0.5))
 	apron_material.set_shader_parameter("reach", INSIDE_APRON)
+	apron_material.set_shader_parameter("way_dirt", INSIDE_WAY_DIRT)
+	apron_material.set_shader_parameter("way_widen", INSIDE_WAY_WIDEN)
+	var way := inside_way(_inside_rows)
+	apron_material.set_shader_parameter("way_at", way[0])
+	apron_material.set_shader_parameter("way_out", way[1])
+	apron_material.set_shader_parameter("way_half", way[2])
 	var plane := PlaneMesh.new()
 	var margin := INSIDE_APRON + 30.0
 	plane.size = Vector2(high.x - low.x + 1.0 + 2.0 * margin, high.y - low.y + 1.0 + 2.0 * margin)
@@ -30150,10 +30186,36 @@ static func inside_patches(row: Array, toward: Vector3, elevation: float, day: f
 					var share := INSIDE_SUN_PATCH * day * smoothstep(2.0, 14.0, elevation) * clampf(into * 1.4, 0.0, 1.0)
 					found.append([sun_place, inside_patch_custom(INSIDE_SUN_COLOUR, share, high - low, true)])
 	if door and day < 0.99:
-		var night_reach := minf(INSIDE_DOOR_NIGHT_REACH, free)
-		var night_place := Transform3D(Basis(along * 1.0 * WINDOW_LIGHT_SPREAD, Vector3.UP, inward * night_reach), foot.origin + lift + inward * night_reach * 0.5)
+		# Outside the threshold, on the way out's ground (927 amended (2)'s place).
+		var night_reach := INSIDE_DOOR_NIGHT_REACH
+		var night_place := Transform3D(Basis(along * 1.0 * WINDOW_LIGHT_SPREAD, Vector3.UP, -inward * night_reach), foot.origin + lift - inward * night_reach * 0.5)
 		found.append([night_place, inside_patch_custom(INSIDE_DOOR_NIGHT_COLOUR, INSIDE_DOOR_NIGHT * (1.0 - day), night_reach, false)])
 	return found
+
+
+## The way out on the apron (946) from [param rows] (inside_row's): [its
+## threshold's middle (x, z), its outward direction (zero: no way out), its
+## half width in metres], from the door rows' feet; the first door's
+## direction, its rows within 2 m of the first.
+static func inside_way(rows: Array) -> Array:
+	var feet: Array[Vector3] = []
+	var out := Vector3.ZERO
+	for row: Array in rows:
+		if str(row[0]) != "door":
+			continue
+		var foot: Transform3D = row[1]
+		if feet.is_empty():
+			out = -foot.basis.z.normalized()
+		elif foot.origin.distance_to(feet[0]) > 2.0:
+			continue
+		feet.append(foot.origin)
+	if feet.is_empty():
+		return [Vector2.ZERO, Vector2.ZERO, 0.0]
+	var middle := Vector3.ZERO
+	for at in feet:
+		middle += at
+	middle /= feet.size()
+	return [Vector2(middle.x, middle.z), Vector2(out.x, out.z), 0.5 * feet.size()]
 
 
 ## A patch's custom data (946): [param colour] times [param strength] in rgb,
@@ -30172,9 +30234,10 @@ static func inside_look(look: Dictionary, day: float, night_colour: Color, night
 	var horizon: Color = look["horizon"]
 	return {"ambient": night_colour.lerp(day_ambient, day),
 		"ambient_energy": lerpf(night_energy, night_energy * INSIDE_DAY_LIFT, day),
-		"pane": INSIDE_PANE_NIGHT.lerp(horizon, day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
+		"pane": INSIDE_PANE_NIGHT.lerp(horizon.lerp(INSIDE_PANE_SKY, INSIDE_PANE_BLUE), day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
 		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, INSIDE_HAZE_DAY), day),
-		"apron": shade(FOREST_FLOOR, lerpf(INSIDE_APRON_NIGHT, INSIDE_APRON_DAY, day))}
+		"apron": INSIDE_APRON_NIGHT.lerp(INSIDE_APRON_DAY, day),
+		"dirt": INSIDE_DIRT_NIGHT.lerp(INSIDE_DIRT_DAY, day), "cobble": INSIDE_COBBLE_NIGHT.lerp(INSIDE_COBBLE_DAY, day)}
 
 
 ## [param colour] times [param k], its alpha 1 (946).
@@ -30196,8 +30259,6 @@ func _update_inside() -> void:
 	var elevation := DayNight.elevation_at(fraction)
 	var day := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
 	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1])
-	if inside_plain:
-		look["haze"] = look["apron"]
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.background_color = look["haze"]
@@ -30209,6 +30270,8 @@ func _update_inside() -> void:
 		var apron := _inside_apron.mesh.surface_get_material(0) as ShaderMaterial
 		apron.set_shader_parameter("near_colour", look["apron"])
 		apron.set_shader_parameter("far_colour", look["haze"])
+		apron.set_shader_parameter("dirt_colour", look["dirt"])
+		apron.set_shader_parameter("cobble_colour", look["cobble"])
 	if _inside_patches == null:
 		return
 	var toward := _level_direction(DayNight.sun_at(fraction)).normalized()

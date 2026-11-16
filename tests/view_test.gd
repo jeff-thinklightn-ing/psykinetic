@@ -4194,6 +4194,16 @@ func _test_daylight_indoors() -> void:
 			and (noon[2] as Color).v > (night[2] as Color).v and (night[2] as Color).v > 0.0 and int(noon[3]) > int(night[3]) and int(night[3]) == doors.size(),
 			"noon's ambient %.2f over 21:30's %.2f (the night's as before), its panes %s by day, %s by night, the background %s over %s, %d patches by day and the way out's %d pools at night"
 			% [noon[0], night[0], noon[1], night[1], noon[2], night[2], noon[3], night[3]])
+	# Past the walls: the way out's dirt and cobbles laid outward from its
+	# threshold, as wide as its doorway; by day the ground under the floor's
+	# light, by night the wilds' grass under the moon, never black.
+	var way: Array = Client3D.inside_way(_rig._inside_rows)
+	var noon_look: Dictionary = Client3D.inside_look(Client3D.sky_look(60.0), 1.0, _rig._inside_night[0], _rig._inside_night[1])
+	var night_look: Dictionary = Client3D.inside_look(Client3D.sky_look(-30.0), 0.0, _rig._inside_night[0], _rig._inside_night[1])
+	_check(is_equal_approx((way[1] as Vector2).length(), 1.0) and float(way[2]) >= 1.0
+			and (noon_look["apron"] as Color).get_luminance() < 0.25 and (night_look["apron"] as Color).get_luminance() > 0.08
+			and (night_look["haze"] as Color).get_luminance() > 0.07 and (night_look["dirt"] as Color).r > (night_look["apron"] as Color).r,
+			"the way out laid from %s toward %s, %.1f m wide; the ground %s by day, %s and the far %s by night" % [way[0], way[1], float(way[2]) * 2.0, noon_look["apron"], night_look["apron"], night_look["haze"]])
 	# The patches: a window with the sun on its side throws the sky's pool and
 	# the sun's patch, its length the glass's fall at that height; with the
 	# sun behind its wall the pool alone; none at night; the way out's warm
@@ -4208,8 +4218,8 @@ func _test_daylight_indoors() -> void:
 	var door_dark: Array = Client3D.inside_patches(door_row, sun_in, -20.0, 0.0)
 	var want := (Client3D.INSIDE_PANE_HIGH - Client3D.INSIDE_PANE_LOW) / tan(deg_to_rad(40.0))
 	_check(lit.size() == 2 and (lit[1][1] as Color).a < 0.0 and is_equal_approx(-(lit[1][1] as Color).a, want) and behind.size() == 1 and dark.is_empty()
-			and door_dark.size() == 1 and (door_dark[0][1] as Color).r > (door_dark[0][1] as Color).b,
-			"a window with the sun on its side its sky's pool and the sun's patch %.2f m long; the sun behind its wall the pool alone; none at night; the way out's warm pool then" % [-(lit[1][1] as Color).a if lit.size() == 2 else 0.0])
+			and door_dark.size() == 1 and (door_dark[0][1] as Color).r > (door_dark[0][1] as Color).b and (door_dark[0][0] as Transform3D).origin.z < 0.0,
+			"a window with the sun on its side its sky's pool and the sun's patch %.2f m long; the sun behind its wall the pool alone; none at night; the way out's warm pool then, outside its threshold" % [-(lit[1][1] as Color).a if lit.size() == 2 else 0.0])
 	# An outdoor level none of it.
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
