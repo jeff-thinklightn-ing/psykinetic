@@ -71,6 +71,14 @@ var _goal := NONE
 var _trail: Array[Vector2i] = []
 ## Her goal is one of their footsteps (_footstep), dropped when they stop.
 var _on_trail := false
+## Stepped aside for a leader setting off through her cell (678 amended
+## (2)): till she is on their trail, or they stop, any footstep of theirs
+## (their last too) as near them as she is serves, so she falls in behind
+## them as they pass, not a stand till they are START off. It ends too the
+## tick their way turns back on the one they set off on (_rejoin_way): one
+## coming back at her is in her path again.
+var _rejoin := false
+var _rejoin_way := Vector2i.ZERO
 ## Goals found with no way, each to the tick it may be tried again, and the
 ## tick before which she asks for no way at all (685 amended).
 var _no_way: Dictionary[Vector2i, int] = {}
@@ -140,8 +148,21 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 			if aside != NONE:
 				_pace(body, leader, NONE)
 				step(body, aside, false, leader)
+				# Out of the way of a player setting off through her cell, she is
+				# following: she lets him by (the stay-put rule below) and falls in on
+				# his footsteps, no stand till he is the start band off (678 amended
+				# (2); ui-design's jog takes stood her 0.6 s at the start). He is
+				# walking from now, though his cell is still the one he set off
+				# from: else, not walking, she settled again on her first heel cell.
+				if walking_on(leader):
+					catching_up = true
+					_leader_moved = World.tick
+					_rejoin = true
+					_rejoin_way = travel(leader)
 		return
 	var walking := World.tick - _leader_moved <= WALKING_TICKS
+	if _rejoin and (not walking_on(leader) or _trail.has(body.tile) or Vector2(travel(leader)).dot(Vector2(_rejoin_way)) < 0.0):
+		_rejoin = false
 	var way := travel(leader)
 	var clear := keep_clear(leader)
 	# Cells found with no way lately are passed over as goals (685 amended).
@@ -260,7 +281,7 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 	if due and not next.is_empty() and World.distance(next[0], leader.tile) == 1 and World.is_free(next[0]):
 		lead = next[0]
 		steps.push_front(leader.tile)
-	for at: Vector2i in steps.slice(1):
+	for at: Vector2i in steps.slice(0 if _rejoin else 1):
 		if World.distance(at, lead) > STOP:
 			break
 		if clear.has(at) or shut_cell(at) or Companion._inside_of(at) != Companion._inside_of(leader.tile):
@@ -269,7 +290,8 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 			return at
 		# Only one that brings her nearer them: none back onto their line
 		# after a step aside, a cell no nearer.
-		if World.is_walkable(at) and World.is_free(at) and World.distance(at, lead) < World.distance(body.tile, lead):
+		if World.is_walkable(at) and World.is_free(at) and (World.distance(at, lead) < World.distance(body.tile, lead)
+				or _rejoin and World.distance(at, lead) <= World.distance(body.tile, lead)):
 			return at
 	return NONE
 

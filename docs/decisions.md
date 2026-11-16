@@ -37268,6 +37268,39 @@ its tick; she is swapped to where he stood or has stepped aside, so it
 checks her beside him.
 
 Server only, protocol unchanged, no new class_name.
+678 amended (2): her step aside for a player setting off starts her follow (the coordinator's
+jog finding, ui-design's takes C:/dev/review/ui-design/looks/jogA_3f76ef27e, jogB_c35f9947f and
+jogC_26959fb78; the coordinator's yes, 2026-11-16). Measured, server side, each tick (a probe on
+the wilds row (186, 212), he running 13 cells east, three takes each): settled one cell ahead of
+him on his line, she stepped aside at once (above), then stood 0.6 s, settled, till he was
+Heel.START (3) off, and from then followed with no stop. So it was once, at the start, and only
+when she began on his line, not a drop to Idle mid-run: the stills read Walk (the step aside),
+Idle (the stand), then Jog. Begun behind him, beside him, or a cell ahead off his line, she set
+off at the start band with no step before it, as designed (unchanged).
+- Heel.follow, settled: the step aside out of keep_clear's cells for a leader walking on
+  (walking_on) sets catching_up, and counts him walking (his cell is still the one he set off
+  from), so she is following: the stay-put rule holds her while he comes level and goes by.
+- The rejoin (Heel._rejoin, from that step till she stands on his trail, he stops walking, or his
+  way turns back on the one he set off on): _footstep takes his last cell too, and a footstep as
+  near him as she is, not only a nearer one. The turn-back guard came from the coordinator's row:
+  without it, turned back while it ran, she stepped onto his line in front of him again (on, off
+  and on, three changes).
+  Started alone, the follow still stood her 7 ticks: level beside him, no footstep was nearer him
+  than her cell (485 amended (2)'s "none back onto their line after a step aside"), so her heel
+  cell was her own till he was START off. That rule keeps her from stepping back into the path of
+  a player still coming at her; a step onto his trail behind him once he has passed is not that,
+  and the rejoin only ever follows a settled step aside for a player walking on (the coordinator's
+  yes). A settled step aside for a standing player (a held line, an order not yet walked) settles
+  as before.
+- companion_test _test_set_off_aside: settled a cell ahead on row 8, he walks 9 east: after her
+  step aside no stand longer than a step's gap (3 ticks; 2 now, 7 with the follow started alone),
+  never on his cell; he steps two past her and stops: she ends settled within 20 ticks of his
+  stop, never on his cell, at most one step of hers after it, and no cell walked twice but her
+  first (back onto his line behind him as he passed, the rejoin); he walks past her and turns
+  straight back along his line, once while the rejoin runs and once just after it ends: she
+  stands in his way no longer than a step aside takes (3 ticks at most) and steps on and off his
+  line at most once.
+Server only, protocol unchanged, no new class_name.
 ## 660 amended (2): the scatter meshes warmed behind the card
 
 The coordinator's request: the 249 ms Client3D._grow_scatter frame a moment

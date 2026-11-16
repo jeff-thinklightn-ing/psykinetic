@@ -157,6 +157,7 @@ func _ready() -> void:
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
+	_test_set_off_aside()
 	_test_heel_no_way()
 	_test_heel_free_leader()
 	_test_heel_paced()
@@ -8113,6 +8114,127 @@ func _test_heel_leaves_his_line() -> void:
 	_put(pet, pet_was)
 	_settle(pet)
 
+
+func _test_set_off_aside() -> void:
+	print("\n== settled one ahead on his line, he sets off through her: she steps aside and falls in behind him, no stand (678 amended (2); ui-design's jog takes) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	# He walks east along row 8 from (3, 8), she settled a cell ahead on his line.
+	var rows := {}
+	for stop_at: int in [12, 6]:
+		_put(owner, Vector2i(3, 8))
+		owner.free_pos = Vector2(3, 8)
+		_put(pet, Vector2i(4, 8))
+		pet.heel.catching_up = false
+		for i in 20:
+			World.free_input(owner, Vector2.ZERO, World.TICK_DT)
+			World.step()
+		_check(not pet.heel.catching_up and pet.tile == Vector2i(4, 8), "(settled a cell ahead of him at %s)" % pet.tile)
+		var her_was := pet.tile
+		var started := false
+		var stand := 0
+		var longest := 0
+		var on_him := 0
+		var cells: Array[Vector2i] = [pet.tile]
+		var stopped_at := -1
+		var settled_after := -1
+		var after_stop := 0  # Her steps once he stood.
+		for i in 80:
+			var walking := owner.free_pos.x < float(stop_at) - 0.01
+			var go := Vector2(minf(1.0, (float(stop_at) - owner.free_pos.x) * World.step_ticks(owner, Vector2i(1, 0))), 0) if walking else Vector2.ZERO
+			World.free_input(owner, go, World.TICK_DT)
+			World.step()
+			var stepped := pet.tile != her_was
+			her_was = pet.tile
+			if stepped:
+				cells.append(pet.tile)
+				if stopped_at >= 0:
+					after_stop += 1
+			if pet.tile == owner.tile:
+				on_him += 1
+			var moving := stepped or World.tick < pet.step_until
+			started = started or stepped
+			if started and walking and not moving:
+				stand += 1
+				longest = maxi(longest, stand)
+			else:
+				stand = 0
+			if not walking and stopped_at < 0:
+				stopped_at = i
+			if stopped_at >= 0 and settled_after < 0 and not moving and not pet.heel.catching_up:
+				settled_after = i - stopped_at
+		# Back onto his line behind him as he passes (the rejoin) may be her own
+		# first cell again; any other cell twice is a step back and forth.
+		var revisits := 0
+		for c: Vector2i in cells:
+			if c != Vector2i(4, 8):
+				revisits += cells.count(c) - 1
+		rows[stop_at] = {"longest": longest, "on_him": on_him, "cells": cells, "settled_after": settled_after, "revisits": revisits / 2,
+			"settled": not pet.heel.catching_up, "her": pet.tile, "him": owner.tile, "after_stop": after_stop}
+	var far: Dictionary = rows[12]
+	_check(int(far["longest"]) <= 3 and int(far["on_him"]) == 0,
+		"he walks 9 east: after her step aside no stand longer than a step's gap (longest %d ticks; she %s)" % [far["longest"], far["cells"]])
+	var near: Dictionary = rows[6]
+	_check(near["settled"] and near["her"] != near["him"] and int(near["on_him"]) == 0 and int(near["revisits"]) == 0
+			and int(near["after_stop"]) <= 1 and int(near["settled_after"]) >= 0 and int(near["settled_after"]) <= 20,
+		"he steps two past her and stops: she ends settled, never on his cell, no step back and forth (%d of hers after his stop), settled %d ticks after it (she %s, he %s)" % [
+			near["after_stop"], near["settled_after"], near["cells"], near["him"]])
+	# He walks past her and turns straight back along his line: once while
+	# her rejoin runs, once just after it ends (the coordinator's row).
+	var turns := {}
+	for turn_at: int in [3, 7]:
+		_put(owner, Vector2i(3, 8))
+		owner.free_pos = Vector2(3, 8)
+		_put(pet, Vector2i(4, 8))
+		pet.heel.catching_up = false
+		for i in 20:
+			World.free_input(owner, Vector2.ZERO, World.TICK_DT)
+			World.step()
+		var rejoin_at_turn := false
+		var rejoin_seen := false
+		var in_way := 0
+		var in_way_longest := 0
+		var line_changes := 0
+		var on_line := pet.tile.y == 8
+		var back := false
+		for i in 60:
+			back = back or i >= turn_at
+			var go := Vector2.ZERO
+			if not back:
+				go = Vector2(1, 0)
+			elif owner.free_pos.x > 1.01:
+				go = Vector2(-minf(1.0, (owner.free_pos.x - 1.0) * World.step_ticks(owner, Vector2i(-1, 0))), 0)
+			World.free_input(owner, go, World.TICK_DT)
+			World.step()
+			rejoin_seen = rejoin_seen or pet.heel._rejoin
+			if i == turn_at - 1:
+				rejoin_at_turn = pet.heel._rejoin  # As he turns (the guard ends it on the turn's own tick).
+			if not back:
+				continue
+			if go != Vector2.ZERO and (Heel.keep_clear(owner).has(pet.tile) or pet.tile == owner.tile):
+				in_way += 1
+				in_way_longest = maxi(in_way_longest, in_way)
+			else:
+				in_way = 0
+			if (pet.tile.y == 8) != on_line:
+				on_line = pet.tile.y == 8
+				line_changes += 1
+		turns[turn_at] = {"rejoin": rejoin_at_turn, "seen": rejoin_seen, "in_way": in_way_longest, "changes": line_changes,
+			"her": pet.tile, "him": owner.tile}
+	var during: Dictionary = turns[3]
+	var after: Dictionary = turns[7]
+	_check(during["rejoin"] and not after["rejoin"] and after["seen"],
+		"(he turned back while her rejoin ran, and once just after it ended: %s, %s)" % [during["rejoin"], after["rejoin"]])
+	_check(int(during["in_way"]) <= 3 and int(after["in_way"]) <= 3 and int(during["changes"]) <= 2 and int(after["changes"]) <= 2,
+		"he turns straight back along his line: she stands in his way no longer than a step aside takes (%d, %d ticks; 3 at most), and steps on and off his line at most once (%d, %d changes)" % [
+			during["in_way"], after["in_way"], during["changes"], after["changes"]])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
 
 func _test_heel_on_the_line() -> void:
 	print("\n== following a player on a slanting line she walks the line, not a staircase (678, companions' side; Jeff: \"Pip now does zig zag run behind me\") ==")
