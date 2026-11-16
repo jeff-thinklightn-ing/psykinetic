@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3040)
+## Lines in the code (3044)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2147,7 +2147,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (817)
+### server and windows (821)
 
 | | Line | Where |
 |---|---|---|
@@ -2215,6 +2215,10 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s %s %s; marks: %s | `main.gd` _mark_command() |
 |  | %s stays in %s, working as its %s. Come back and %s will travel with you again. | `main.gd` travel() |
 |  | %s went to %s. | `main.gd` travel() |
+|  | %d,%d,%s | `main.gd` _clearing_print() |
+|  | its generation not the same, or not sent | `main.gd` _take_left() |
+|  | its terrain changed | `main.gd` _take_left() |
+|  | a regenerating level | `main.gd` _take_left() |
 | L | The stair down is barred from below. | `main.gd` SEALED_LINES |
 |  | The way on is closed. | `main.gd` _take_link() |
 |  | The way is sealed. | `main.gd` _take_link() |
