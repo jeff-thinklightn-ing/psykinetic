@@ -4080,8 +4080,31 @@ func _set_sky_floor(level: float, roof := -1.0, base := -1.0, base_roof := -1.0)
 				else (base if base_roof < 0.0 else base_roof))
 	if _cliff_material != null:
 		_cliff_material.set_shader_parameter("sky_floor", cliff_sky(level))
+	if not _neighbour:
+		_set_scatter_sky(scatter_sky(level, _outdoor))
 	for view in _glimpses:
 		view._set_sky_floor(level, roof)
+
+
+## The swaying scatter's share of the sky's light (858 amended (1)): outdoors
+## under a sky that lights it, the ground's floor light [param level] to
+## SCATTER_SKY_POWER; 1 indoors or on a level the sky leaves dark (level 0),
+## the plants as they were. 1 by day.
+static func scatter_sky(level: float, outdoor: bool) -> float:
+	return pow(clampf(level, 0.0, 1.0), SCATTER_SKY_POWER) if outdoor and level > 0.0 else 1.0
+
+
+## The ground takes the sky at about its floor light to 2.2 (as linear); the
+## tufts at that read 1.28x their ground at the arrival at play nearest, both
+## hours (scat2_25c4fb7d1), under 858's 1.3 to 1.8. At 1.6 (0.44 at 02:00, the
+## floor 0.6) a fit of those stills puts them about 1.55x.
+const SCATTER_SKY_POWER := 1.6
+
+
+static func _set_scatter_sky(share: float) -> void:
+	_scatter_sky = share
+	if _scatter_sway != null:
+		_scatter_sway.set_shader_parameter("sky_light", share)
 
 
 ## Outdoors: the sky, its light and the sun or moon as the world clock
@@ -13979,6 +14002,8 @@ func _hide_instance(cell: Vector2i, multimesh: MultiMesh, i: int, placed: Transf
 const SWAYING: Array[String] = ["tuft", "flower", "reeds", "tall"]
 static var _scatter_look: StandardMaterial3D
 static var _scatter_sway: ShaderMaterial
+## Its sky_light (858 amended (1)), kept for a material made after it is set.
+static var _scatter_sky := 1.0
 
 
 static func _scatter_material(kind := "") -> Material:
@@ -13986,6 +14011,7 @@ static func _scatter_material(kind := "") -> Material:
 		if _scatter_sway == null:
 			_scatter_sway = ShaderMaterial.new()
 			_scatter_sway.shader = SCATTER_SHADER
+			_scatter_sway.set_shader_parameter("sky_light", _scatter_sky)
 		return _scatter_sway
 	if _scatter_look == null:
 		_scatter_look = StandardMaterial3D.new()

@@ -8884,6 +8884,8 @@ func _test_night_look_2() -> void:
 	_check(sky_light.distance_to(midnight) < 0.01, "midnight: the sky's light on the floor %s, the ambient and the moon's fall summed %s" % [sky_light, midnight])
 	at.call(2.0, true)
 	var later: Vector3 = _param_or(_rig._ground_shader_material, "night_sky_light", Vector3.ZERO)
+	var scatter_night := Client3D._scatter_sky
+	var floor_night := _rig._sky_floor
 	var env := _rig._environment
 	var falls := maxf(_rig._sun.global_transform.basis.z.y, 0.0)
 	var summed := Vector3(env.ambient_light_color.r * env.ambient_light_energy + _rig._sun.light_color.r * _rig._sun.light_energy * falls,
@@ -8894,6 +8896,16 @@ func _test_night_look_2() -> void:
 	var on_noon: Array = at.call(12.0, true)
 	_check(off_noon.slice(0, 5) == on_noon.slice(0, 5) and not bool(on_noon[3]) and is_equal_approx(float(on_noon[4]), float(on_noon[2])),
 			"noon outdoors: the same switched on as off, no fill, no lift")
+	# 858 amended (1): the swaying scatter outdoors under the ground's floor light to SCATTER_SKY_POWER;
+	# by day, indoors and under a sky that leaves a level dark, as it was.
+	var sway := Client3D._scatter_material("tuft") as ShaderMaterial
+	var scatter_code := FileAccess.get_file_as_string("res://client3d/scatter.gdshaderinc")
+	_check(is_equal_approx(scatter_night, pow(floor_night, Client3D.SCATTER_SKY_POWER)) and scatter_night < 0.5 and is_equal_approx(Client3D._scatter_sky, 1.0)
+			and is_equal_approx(float(sway.get_shader_parameter("sky_light")), Client3D._scatter_sky)
+			and is_equal_approx(Client3D.scatter_sky(0.6, false), 1.0) and is_equal_approx(Client3D.scatter_sky(0.0, true), 1.0)
+			and scatter_code.contains("AO = sky_light;") and scatter_code.contains("LIGHT_IS_DIRECTIONAL && floor_shade_rect.z <= 0.0) ? sky_light : 1.0")
+			and scatter_code.contains("ATTENUATION * (n_l / PI) * k") and not scatter_code.contains("fd90") and scatter_code.contains("min(a2 / (PI * dd * dd), 1.0)") and scatter_code.contains("min(0.5 / mix(2.0 * n_l * n_v, n_l + n_v, a), 1.0)"),
+			"the tufts at 02:00 under the floor's light to %.1f (%.3f of the sky's, the floor %.2f), at noon 1, indoors and on a dark level 1; light()'s diffuse Lambert, its D and V held to 1, as the engine's default" % [Client3D.SCATTER_SKY_POWER, scatter_night, floor_night])
 	var parts := 0
 	var layered := 0
 	for puppet: Node3D in _rig._puppets.values():

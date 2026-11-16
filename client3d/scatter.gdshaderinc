@@ -40,6 +40,15 @@ varying float straw_light;
 varying float trodden;
 // How far full wind bends a tip one unit up (in the mesh's own units).
 uniform float bend = 0.35;
+// Outdoors, the sky's floor light the ground is drawn under, as linear
+// (858 amended (1), Client3D._set_scatter_sky: pow(sky_floor, 2.2); 1 by
+// day, indoors and on a level the sky does not light), so at night the
+// plants take the ambient and the moon as the ground does, not three times
+// over it. Only the sky's own terms take it: the ambient through AO (which
+// scales the ambient alone), the sun or moon (the one directional light) in
+// light(); a lantern's, a torch's or a lamp's light reaches them at full,
+// so the grass a player lights still reads as lit grass.
+uniform float sky_light = 1.0;
 // The scatter's reach under the low camera (decision 653, Client3D._grow_scatter):
 // xy the aim on the ground, z where it starts to shrink into the ground, w
 // where it is gone; past z the plants sink toward their roots.
@@ -122,8 +131,41 @@ void fragment() {
 	if (floor_shade_rect.z > 0.0) {
 		float shade = texture(floor_shade, (world.xz - floor_shade_rect.xy + 0.5) / floor_shade_rect.zw).r;
 		colour *= pow(shade, 2.2);
+	} else {
+		AO = sky_light;
 	}
 	ALBEDO = colour;
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.5;
+}
+
+// Godot's own lighting for this material: Lambert diffuse (the render_mode
+// names no diffuse mode, and the engine's default without one is Lambert:
+// only diffuse_burley defines DIFFUSE_BURLEY; a Burley here read 2.2 brighter
+// on the tufts at noon, scat2 and scat3) and Schlick-GGX specular at SPECULAR
+// 0.5 (f0 0.04, f90 1, its D and V each held to 1 as the engine's are), the
+// directional light's share times sky_light outdoors (858 amended (1));
+// every other light as it was. Godot's specular energy compensation (a few
+// hundredths of the specular at this roughness) reads a table light() can't.
+float schlick(float u) {
+	float m = clamp(1.0 - u, 0.0, 1.0);
+	float m2 = m * m;
+	return m2 * m2 * m;
+}
+
+void light() {
+	float k = (LIGHT_IS_DIRECTIONAL && floor_shade_rect.z <= 0.0) ? sky_light : 1.0;
+	float n_l = max(dot(NORMAL, LIGHT), 0.0);
+	float n_v = max(dot(NORMAL, VIEW), 1e-4);
+	vec3 h = normalize(VIEW + LIGHT);
+	float l_h = clamp(dot(LIGHT, h), 0.0, 1.0);
+	float n_h = clamp(dot(NORMAL, h), 0.0, 1.0);
+	DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * (n_l / PI) * k;
+	float a = ROUGHNESS * ROUGHNESS;
+	float a2 = a * a;
+	float dd = n_h * n_h * (a2 - 1.0) + 1.0;
+	float d = min(a2 / (PI * dd * dd), 1.0);
+	float g = min(0.5 / mix(2.0 * n_l * n_v, n_l + n_v, a), 1.0);
+	float f = 0.04 + 0.96 * schlick(l_h);
+	SPECULAR_LIGHT += LIGHT_COLOR * ATTENUATION * (n_l * d * f * g) * SPECULAR_AMOUNT * k;
 }
