@@ -7,7 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails, and the way down from upstairs glows with the light of the room below (589 amended (3)).
+- Towns: every stair in the Mughouse, from the common room up to the attic, is a wooden flight with rails; upstairs, the attic stair stands beside the way down, candle stands light the stairs, and the way down glows with the light of the room below (589 amended (3), 589 amended (4)).
 - In the crypt you meet the Mound-breakers one or two at a time, and Brand the Ox at his camp has at most one of his band beside him (870 amended (1)).
 - In a fight your companion stays near you, chasing a foe farther only when you're fighting it too (957).
 - Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).

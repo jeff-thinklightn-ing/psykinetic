@@ -29252,6 +29252,43 @@ to .5, landed off, and this switch), turned ON by this (the coordinator,
 11-16); its stone stairs come off the cut's known faults. Levels data and a
 tool; protocol unchanged; no new class_name.
 
+589 amended (4), maps' side: the Mughouse's attic stair moves beside the way
+down (the coordinator, 11-16: "both flights in one row, two to three cells
+from where you arrive, on screen at any yaw" is the plain reading of Jeff's
+"intuitive designs that flow from place to place"). On ui-design's walked
+tour (stairwalk2_pair) the attic's way up, upstairs at (12,11..12) facing
+west against the stair room's west wall, was 23 viewport px off the top of
+the screen from the arrival (16,11) at yaw 45 and the nearest zoom, base and
+after alike. levels/interiors/umbrage_tavern.json puts it at (13..14,10)
+facing north, its arrivals from the attic (13..14,11), one cell west of the
+way down (16..17,10) in the same row; the stair room's door (13..14,8) is
+walked to round them by (12,9) and (15,9..11). Rebuilt by
+tools/make_interior.py (umbrage_tavern_up's level.json and layout.png); the
+attic's own floor is unchanged. Looked at on ui-design's stairwalk3 pair
+(Lenovo, joined, nearest, real clicks, 12:00 and 21:30, base main): from
+(16,11) the attic stair is on the screen at yaw 45 and 315 (base: off at 45);
+up and down to the attic arrive (the east half (14,10) leads to its own twin
+(17,1)); walked in from the hall's door it reads as a stair, its foot on the
+room's side (art-kit), with no doubling beside the lit way down. The stair
+room was very dark at noon there, the flights read by their edges alone
+(art-kit), and the coordinator asked for a light the inn already has, no new
+prop, kind or shader (the inn's daylight is Jeff's open pick,
+C:/dev/review/decisions/mughouse-inside.md): make_interior.py takes a room's
+"candle_stands", cells where art-kit's prop.candle_stand stands lit with the
+temple's own numbers (CANDLE_STAND, copied from the wilds' stand: top 0, up
+0.1, energy 0.9, reach 4, falloff 1, as level.json "lit_candles" entries),
+and the stair room lays two: (12,11) beside the attic flight's foot and
+(17,12) by where one comes up from below. Upstairs then draws 2 candle lights
+(none before). ui-design's stairlit pair (Lenovo, joined, nearest, 12:00
+and 21:30, yaw 45 and 315, base rerun beside): both stands drawn, the
+flights' treads, rail and newels read by their light, the changed pixels
+all inside the stair room round them, nothing else moved. tests: level_test (upstairs, the four
+flights in row 10 within 3 cells of the arrival, facing north; every floor
+still reaches the ground and back; the stair room's two stands, the
+temple's own slot and numbers). Package "the Mughouse's timber stairs"
+(its look is shot with this in). Levels data and a tool; protocol
+unchanged; no new class_name.
+
 ## 600. The Old Tower: Snagfin's ruin in Held as one prefab
 
 Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down

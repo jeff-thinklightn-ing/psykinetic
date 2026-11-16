@@ -28,7 +28,8 @@ rooms and its stairs:
   bottom one. No piece on another, on a fire, a seat or a door's cell.
   With "candles" true (811 amended (4)), lit candles stand on each table's
   middle and the counter's (level.json "lit_candles", Level.lit_candles_from),
-  each with a warm light of its own.
+  each with a warm light of its own. Any room's "candle_stands" are cells a
+  prop.candle_stand stands on, lit as the temple's (589 amended (4)).
   A forge room (811 amended (2), Umbrage's smithy; art-kit's pieces) holds
   its "forge" (the west cell of a building.smithy_forge two across, its
   back to the north wall), its "anvil" (a prop.anvil, a cell, solid), its
@@ -102,6 +103,11 @@ CANDLE_LIGHT_OVER_COUNTER = 1.4
 # keeps its grain (environment, from the stills): their light's energy, reach
 # and falloff; the counter's are Client3D's own (CANDLE_ENERGY, _RANGE, _FALLOFF).
 TABLE_CANDLE_LIGHT = {"energy": 0.9, "reach": 4.5, "falloff": 1.0}
+# A room's "candle_stands" (589 amended (4), the coordinator: a stair room read
+# only by its edges): art-kit's prop.candle_stand standing on the floor with
+# the temple's own light (levels/wilds' lit_candles, 868's paragraph), the
+# same prop and the same numbers, no light of its own kind.
+CANDLE_STAND = {"top": 0.0, "up": 0.1, "energy": 0.9, "reach": 4.0, "falloff": 1.0, "slot": "prop.candle_stand"}
 # A forge room's pieces (811 amended (2), Level.BUILDINGS' sizes, all solid,
 # facing south, their backs to the north): key -> (slot, across, deep).
 FORGE_PIECES = {
@@ -416,6 +422,8 @@ def lay(spec, floor):
     for room in floor["rooms"]:
         for cell in room.get("beds", []):
             beds.append(list(cell) + list(bed_way(room["rect"], cell)))
+        for x, y in room.get("candle_stands", []):
+            lit_candles.append(dict({"at": [x, y]}, **CANDLE_STAND))
         if room["use"] == "common":
             # The common room's furniture (811 amended): solid pieces, and
             # the hearth's two fire cells under its wall decor.
