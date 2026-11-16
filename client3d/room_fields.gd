@@ -262,6 +262,7 @@ const ROOM: Array[StringName] = [
 	&"_blood_shades",
 	&"_blood_specks",
 	&"_border",
+	&"_box_close",
 	&"_box_hold",
 	&"_box_pull",
 	&"_building_at",

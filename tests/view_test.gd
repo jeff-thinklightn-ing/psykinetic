@@ -74,6 +74,7 @@ func _ready() -> void:
 		# view_land_test: the horizon, sky, landmarks, hills, shores, water, ledges, the forest's edge.
 		_test_horizon()
 		_test_eye_kept_out()
+		_test_box_turn()
 		_test_doors_fade_inside()
 		_test_sky()
 		_test_far_landmarks()
@@ -10005,6 +10006,100 @@ func _test_sky() -> void:
 ## nearer than BOX_PULL_LEAST; on open ground it does not move at
 ## all; and a walk past the inn at a player's pace (5 cells a second), the
 ## eye's distance printed each half second, coming in and going out once.
+## The box turn (decision 801 amended (3)): the low camera's eye in a roofed building's box (the slab at the lens at the Mughouse's door) is turned
+## out of it as 801 turns for a hidden player: at once walking, after BOX_STAND_HOLD standing and slowly; held while the eye stays
+## clear; eased back after BOX_BACK_HOLD with the hand yaw clear; no flip inside BOX_FLIP_COOL; the search widens to 90; 4b lets the eye in
+## nearer with the aim lifted; the player's turning and the option off stop it. First numbers, settled on ui-design's walks.
+func _test_box_turn() -> void:
+	print("
+== the box turn: the eye turned out of a building's box (801 amended (3)) ==")
+	const CameraTurn := preload("res://client3d/camera_turn.gd")
+	# The state machine alone.
+	var turn := CameraTurn.new()
+	_check(turn.box_step(0.016, true, false, false, false, true) == 1, "walking, the eye boxed: a search at once, no hold")
+	turn = CameraTurn.new()
+	var stood := [turn.box_step(0.1, true, false, true, false, true), turn.box_step(0.1, true, false, true, false, true), turn.box_step(0.15, true, false, true, false, true)]
+	_check(stood == [0, 0, 1], "standing, the eye boxed: nothing for CameraTurn.BOX_STAND_HOLD (0.3 s), then a search (%s)" % [stood])
+	turn = CameraTurn.new()
+	turn.held = 3.0
+	var held_ok := turn.box_step(0.016, true, false, false, false, true) == 0
+	turn.held = 0.0
+	var off_ok := turn.box_step(0.016, true, false, false, false, false) == 0
+	_check(held_ok and off_ok, "the player's own turning (held) and Options' 'keep you in view' off: nothing")
+	turn = CameraTurn.new()
+	var back := 0
+	for i in 100:
+		back = maxi(back, turn.box_step(0.01, false, false, true, true, true))
+	_check(back == 0 and turn.box_step(0.6, false, false, true, true, true) == 2, "off the hand yaw with it clear 1.5 s: eased back (BOX_BACK_HOLD)")
+	turn = CameraTurn.new()
+	var kept := true
+	for i in 400:
+		kept = kept and turn.box_step(0.01, false, true, true, true, true) == 0
+	_check(kept, "off the hand yaw while the hand yaw is itself boxed: it stays (no turn back into the box)")
+	turn = CameraTurn.new()
+	turn.start(0.0, 30.0)
+	turn.advance(10.0)
+	_check(turn.flips(30.0, 0.0) and not turn.flips(30.0, 45.0), "a turn the other way inside BOX_FLIP_COOL is a flip, held off; the same way is not")
+	turn.flip_cool = 0.0
+	_check(not turn.flips(30.0, 0.0), "after the cool, a flip is allowed")
+	var wide := func(degrees: float) -> bool: return absf(degrees - 75.0) < 1.0
+	_check(is_nan(CameraTurn.choose(0.0, wide, Vector2.ZERO, 0.0)) and CameraTurn.choose(0.0, wide, Vector2.ZERO, 0.0, CameraTurn.BOX_TURN_MOST) == 75.0,
+			"no yaw within 45 degrees clears: the widened search (90) finds 75")
+	# On the real inn: the eye boxed at a yaw at its door front, and the search finds a clear yaw within 45 degrees.
+	var low_was := Net.camera_low
+	var yaw_was := _rig.yaw
+	Net.set_camera_low(true, false)
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], Vector2i(181, 208))
+	_rig.zoom = 1.0
+	_rig._zoom_to = 1.0
+	_rig.pan = Vector3.ZERO
+	_rig._ridge_pitch = 0.0
+	_rig.pitch = _rig.normal_pitch()
+	_rig._box_pull = 1.0
+	_rig._box_hold = 0.0
+	_rig._walk = Vector2.ZERO
+	var boxed_n := 0
+	var within_45 := 0
+	var within_90 := 0
+	var none_found: Array[String] = []
+	var first_spot := Vector2.ZERO
+	var first_yaw := 0.0
+	for x in range(180, 191, 2):
+		for y in range(205, 213, 2):
+			_rig._camera_target = Vector3(float(x), _rig._ground_height(Vector2(x, y)), float(y))
+			for ang in range(0, 360, 15):
+				var degrees := float(ang)
+				if not _rig.eye_boxed_at(degrees):
+					continue
+				boxed_n += 1
+				if first_spot == Vector2.ZERO:
+					first_spot = Vector2(x, y)
+					first_yaw = degrees
+				var near := CameraTurn.choose(degrees, _rig._box_clear, Vector2.ZERO, degrees)
+				var far := CameraTurn.choose(degrees, _rig._box_clear, Vector2.ZERO, degrees, CameraTurn.BOX_TURN_MOST)
+				if not is_nan(near) and not _rig.eye_boxed_at(near):
+					within_45 += 1
+				elif not is_nan(far) and not _rig.eye_boxed_at(far):
+					within_90 += 1
+				else:
+					none_found.append("(%d,%d) yaw %d" % [x, y, ang])
+	_check(boxed_n > 0 and none_found.is_empty(),
+		"around the Mughouse's door front (x 180..190, y 205..212) the eye is boxed at %d spots-and-yaws; each has a clear yaw: %d within 45 degrees, %d only within 90; none without one (%s)" % [boxed_n, within_45, within_90, none_found])
+	_rig._camera_target = Vector3(first_spot.x, _rig._ground_height(first_spot), first_spot.y)
+	# Rung 4b: with no turn, the eye may come in to BOX_CLOSE_LEAST (the aim lifted): never farther out than the normal pull.
+	if boxed_n > 0:
+		_rig._set_yaw(first_yaw)
+		var normal := _rig.eye_clear_share()
+		_rig._box_close = true
+		var close := _rig.eye_clear_share()
+		_rig._box_close = false
+		_check(close <= normal + 0.0001 and Client3D.BOX_CLOSE_LEAST < Client3D.BOX_PULL_LEAST, "rung 4b lets the eye in to %.1f m (share %.2f against %.2f), under the normal least of %.1f m, the aim at its full lift" % [Client3D.BOX_CLOSE_LEAST, close, normal, Client3D.BOX_PULL_LEAST])
+	Net.set_camera_low(low_was, false)
+	_rig._set_yaw(yaw_was)
+	_rig._place_camera()
+
+
 func _test_eye_kept_out() -> void:
 	print("\n== the low camera's eye kept out of buildings (864) ==")
 	var box := AABB(Vector3.ZERO, Vector3(2.0, 2.0, 2.0))

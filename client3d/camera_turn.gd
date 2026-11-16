@@ -25,6 +25,16 @@ const TURN_MOST := 45.0
 ## Degrees a second, on average over the turn.
 const TURN_SPEED := 120.0
 const MANUAL_HOLD := 6.0
+## The box turn (decision 801 amended (3)): the same turn for the eye in a building's box (Client3D.eye_boxed_at). First numbers, settled on
+## ui-design's joined walks of the Mughouse's lane: a standing player's turn starts after BOX_STAND_HOLD and runs at BOX_STAND_SPEED
+## (not a startle); the camera holds a boxed turn till the hand yaw has been clear BOX_BACK_HOLD, then eases back at BOX_BACK_SPEED; a
+## turn to the other side waits BOX_FLIP_COOL after the last ended; the search widens to BOX_TURN_MOST when 45 degrees finds none.
+const BOX_STAND_HOLD := 0.3
+const BOX_STAND_SPEED := 45.0
+const BOX_BACK_HOLD := 1.5
+const BOX_BACK_SPEED := 60.0
+const BOX_FLIP_COOL := 1.0
+const BOX_TURN_MOST := 90.0
 
 ## How long they have been hidden.
 var hidden_for := 0.0
@@ -42,6 +52,12 @@ var seconds := 0.0
 var move_yaw := 0.0
 ## The last search found no yaw that clears them, and they are still hidden.
 var stuck := false
+## Box turn: how long the eye has been in a box (and, standing, the hold's clock); how long the hand yaw has been clear while the
+## camera is off it; the cool before a turn to the other side; the side of the last turn (-1, 0, 1).
+var boxed_for := 0.0
+var back_clear := 0.0
+var flip_cool := 0.0
+var last_dir := 0.0
 
 
 ## The player turned the camera themselves: any turn stops where it is.
@@ -67,15 +83,47 @@ func step(delta: float, hidden: bool, on: bool) -> bool:
 	return on and held <= 0.0 and cool <= 0.0 and hidden_for >= HIDE_SECONDS
 
 
-## Turn from [param now] to [param target].
-func start(now: float, target: float) -> void:
+## Turn from [param now] to [param target], at [param speed] degrees a second on average.
+func start(now: float, target: float, speed := TURN_SPEED) -> void:
 	turning = true
 	stuck = false
 	from = now
 	to = target
 	t = 0.0
-	seconds = maxf(absf(target - now) / TURN_SPEED, 0.05)
+	seconds = maxf(absf(target - now) / speed, 0.05)
 	move_yaw = now
+	last_dir = signf(wrapf(target - now, -180.0, 180.0))
+
+
+## One frame of the box turn: 1 to search for a yaw that clears the eye of its box, 2 to ease back to the hand yaw, 0 for nothing.
+## [param boxed]: the eye is (or by the player's walk will be) in a box at this yaw; [param hand_boxed]: at the hand yaw; [param standing]:
+## the player is still; [param off_hand]: the camera is off the hand yaw. A turn of its own under way, the player's turning
+## (held) and the option off all end it. Walking, a boxed eye searches at once; standing, after BOX_STAND_HOLD.
+func box_step(delta: float, boxed: bool, hand_boxed: bool, standing: bool, off_hand: bool, on: bool) -> int:
+	flip_cool = maxf(flip_cool - delta, 0.0)
+	if turning or not on or held > 0.0:
+		boxed_for = 0.0
+		back_clear = 0.0
+		return 0
+	if boxed:
+		back_clear = 0.0
+		boxed_for += delta
+		return 0 if standing and boxed_for < BOX_STAND_HOLD else 1
+	boxed_for = 0.0
+	if off_hand and not hand_boxed:
+		back_clear += delta
+		if back_clear >= BOX_BACK_HOLD:
+			back_clear = 0.0
+			return 2
+	else:
+		back_clear = 0.0
+	return 0
+
+
+## Whether a turn to [param target] from [param now] would flip to the other side of the last box turn inside BOX_FLIP_COOL.
+func flips(now: float, target: float) -> bool:
+	var dir := signf(wrapf(target - now, -180.0, 180.0))
+	return flip_cool > 0.0 and last_dir != 0.0 and dir != 0.0 and dir != last_dir
 
 
 ## A search found nothing: fade what hides them, and try again after COOL_DOWN.
@@ -91,6 +139,7 @@ func advance(delta: float) -> float:
 	if t >= 1.0:
 		turning = false
 		cool = COOL_DOWN
+		flip_cool = BOX_FLIP_COOL
 		hidden_for = 0.0
 		return to
 	return lerpf(from, to, sin(t * PI * 0.5))
@@ -108,9 +157,9 @@ func no_help(hidden: bool, on: bool) -> bool:
 ## distance, the one whose camera looks more along [param walk] (the way
 ## they move on the ground, x and z; ZERO: the one turning positive). NAN
 ## for none.
-static func choose(yaw: float, clear: Callable, walk: Vector2, hand: float) -> float:
-	var within := func(degrees: float) -> bool: return absf(wrapf(degrees - hand, -180.0, 180.0)) <= TURN_MOST + 0.01
-	for k in range(1, int(2.0 * TURN_MOST / SEARCH_STEP) + 1):
+static func choose(yaw: float, clear: Callable, walk: Vector2, hand: float, most := TURN_MOST) -> float:
+	var within := func(degrees: float) -> bool: return absf(wrapf(degrees - hand, -180.0, 180.0)) <= most + 0.01
+	for k in range(1, int(2.0 * most / SEARCH_STEP) + 1):
 		var up := yaw + k * SEARCH_STEP
 		var down := yaw - k * SEARCH_STEP
 		var up_clear: bool = within.call(up) and clear.call(up)
