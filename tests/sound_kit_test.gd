@@ -24,6 +24,7 @@ func _ready() -> void:
 	_test_town_day()
 	_test_tavern()
 	_test_idle_people()
+	_test_biters()
 	_test_heard_over_list()
 	_test_music()
 	_test_folders()
@@ -738,6 +739,42 @@ func _test_town_day() -> void:
 ## 940: a town's people at rest: the words they may sound at, each kind's
 ## slot by body, never a cough (kept for the sick), and the five slots: one-shots on the voice bus, heard to
 ## Client3D.PEOPLE_REACH, under a footstep, each take under a second.
+## 955: a biter's blow heard as jaws. The snap in place of the whoosh, the bite in place of
+## the thud (metal on plate and mail), and the told bite's own cry, which no other tell
+## of the old grey's makes.
+func _test_biters() -> void:
+	print("\n== the wolves' bite heard as jaws: snap, bite, and the told bite's snarl (955) ==")
+	_check(SoundKit.has(SoundKit.SNAP) and SoundKit.has(SoundKit.BITE) and SoundKit.has("sfx.wolf_snarl"), "the three slots are in the manifest")
+	_check(str(SoundKit.spec(SoundKit.BITE).get("fallback", "")) == "sfx.hit_flesh" and str(SoundKit.spec(SoundKit.SNAP).get("fallback", "")) == "sfx.swing"
+			and not SoundKit.spec("sfx.wolf_snarl").has("fallback"),
+			"without their takes the bite falls to the thud and the snap to the whoosh; the snarl has no fallback (a warning is never blipped)")
+	_check(SoundKit.snap("wolf") == SoundKit.SNAP and SoundKit.snap("old_wolf") == SoundKit.SNAP
+			and SoundKit.snap("boar") == "" and SoundKit.snap("great_bear") == "" and SoundKit.snap("") == "",
+			"a wolf's and the old grey's jaws snap; a boar's, a bear's, anyone else's swing is no bite")
+	_check(SoundKit.bite("old_wolf") == SoundKit.BITE and SoundKit.bite("wolf", "leather") == SoundKit.BITE
+			and SoundKit.bite("wolf", "mail") == "" and SoundKit.bite("old_wolf", "plate") == "" and SoundKit.bite("hill_cat") == "",
+			"a bite on flesh or leather is jaws; on mail or plate it stays metal; a cat's blow is no bite")
+	_check(SoundKit.tell_cry("old_wolf", "lunge") == "" and SoundKit.tell_cry("old_wolf", "howl") == ""
+			and SoundKit.tell_cry("old_wolf", "pant") == "" and SoundKit.tell_cry("great_bear", "bite") == ""
+			and SoundKit.cry("old_wolf", "lunge") == "sfx.wolf_lunge" and SoundKit.cry("old_wolf", "lunge") != "sfx.wolf_snarl",
+			"his lunge, howl and pant have no tell cry here (the server cries them: the lunge sfx.wolf_lunge), so the bite's warning sounds as none of them")
+	var lunge_db := SoundKit.volume_db("sfx.wolf_lunge")
+	var snarl_db := SoundKit.volume_db("sfx.wolf_snarl")
+	_check(snarl_db <= lunge_db - 4.0, "the bite's snarl %.0f dB sits 4 dB or more under the lunge's %.0f dB" % [snarl_db, lunge_db])
+	if SoundKit.files("sfx.wolf_snarl").is_empty():
+		_check(SoundKit.tell_cry("old_wolf", "bite") == "", "its takes not synced here: the told bite silent, never a placeholder")
+	else:
+		_check(SoundKit.tell_cry("old_wolf", "bite") == "sfx.wolf_snarl" and SoundKit.tell_cry("wolf", "bite") == "sfx.wolf_snarl",
+				"the told bite snarls")
+		# Each take over inside the red (his lead's ticks), at his pitch slowed by the jitter's most.
+		var red := int(Monster.fight_for("old_wolf").get("lead_ticks", Monster.LEAD_TICKS)) * World.TICK_DT
+		var slowest := float(SoundKit.CREATURE_PITCH.get("old_wolf", 1.0)) * (1.0 - Sfx.PITCH_JITTER)
+		var longest := 0.0
+		for path: String in SoundKit.files("sfx.wolf_snarl"):
+			longest = maxf(longest, (load(path) as AudioStream).get_length() / slowest)
+		_check(longest > 0.0 and longest <= red - 0.05, "each snarl heard ends by %.2f s, inside his %.1f s red" % [longest, red])
+
+
 func _test_idle_people() -> void:
 	print("
 == a town's people at rest: a cleared throat, a sniff, a shifted foot; the cough kept for the sick (940) ==")

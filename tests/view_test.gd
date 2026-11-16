@@ -117,6 +117,7 @@ func _ready() -> void:
 		await _test_held_stab()
 		_test_idle_voices()
 		_test_idle_people()
+		await _test_bite_heard()
 		await _test_monster_death()
 		_test_aura()
 		_test_hip_lantern()
@@ -2100,6 +2101,95 @@ func _test_idle_voices() -> void:
 	_rig.sfx.listener = listener_was
 	_rig._process(0.0)
 	_rig.sfx.hear_everything = hear_was
+
+
+## 955: the wolves' bite heard as jaws. The old grey's told bite snarls as its red is laid
+## (Main._on_telegraph_started: the telegraph drawn and the cry in one call), his lunge's tell
+## does not; a biter's blow on a body is the bite, anyone else's the thud; a biter's swing
+## snaps, anyone else's whooshes.
+func _test_bite_heard() -> void:
+	print("\n== the wolves' bite heard as jaws: the told bite's snarl with its red, the bite, the snap (955) ==")
+	var spawned: Array[Monster] = []
+	for kind: String in ["old_wolf", "wolf"]:
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+		spec["name"] = "Bite" + kind.capitalize().replace(" ", "")
+		var at := Vector2i(9 + spawned.size() * 2, 9)  # The idle voices' free row.
+		if World.get_entity_at(at) != null:
+			World.despawn(World.get_entity_at(at))
+		spec["tile"] = at
+		var beast := _main._spawn(spec) as Monster
+		if beast != null:
+			beast.sight_range = 0  # Still: nothing to hunt.
+		spawned.append(beast)
+	var grey := spawned[0]
+	var wolf := spawned[1]
+	var puppet: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		puppet = _rig._puppets.get(grey.get_instance_id()) if grey != null else null
+		if puppet != null and puppet.has_meta("creature_view") and wolf != null and _rig._puppets.has(wolf.get_instance_id()):
+			break
+		await get_tree().process_frame
+	if puppet == null or not puppet.has_meta("creature_view") or wolf == null:
+		_check(false, "the old grey and a wolf drawn (%s, %s)" % [grey != null, puppet != null])
+		for beast in spawned:
+			if beast != null:
+				World.despawn(beast)
+		return
+	var lead := int(Monster.fight_for("old_wolf").get("lead_ticks", Monster.LEAD_TICKS))
+	var played_since := func(before: int, slot: String) -> int:
+		return _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]) == slot).size()
+	var tell := func(id: int, kind: String) -> Array:
+		var before := _rig.sfx.played.size()
+		_main._on_telegraph_started(id, {"id": id, "source": str(grey.get_path()), "kind": kind,
+				"cells": [[grey.tile.x - 1, grey.tile.y]], "from_tick": World.tick, "lands_tick": World.tick + lead})
+		var drawn := _rig._telegraphs.has(str(id))
+		var snarls: int = played_since.call(before, "sfx.wolf_snarl")
+		_rig.creature_tell_over(id, false)
+		_rig.telegraph_drop(str(id))
+		_rig._told_lands.erase(grey.get_instance_id())
+		return [drawn, snarls]
+	var bitten: Array = tell.call(95501, "bite")
+	var lunged: Array = tell.call(95502, "lunge")
+	if SoundKit.files("sfx.wolf_snarl").is_empty():
+		_check(bitten[0] and bitten[1] == 0, "its takes not synced here: his told bite's red drawn, silent, never a placeholder")
+	else:
+		_check(bitten[0] and bitten[1] == 1, "his told bite: its red drawn and the snarl played in the same call, once (%s, %d)" % bitten)
+	_check(lunged[0] and lunged[1] == 0, "his lunge's tell: its red drawn, no snarl (the server cries the lunge's own, sfx.wolf_lunge)")
+	# A biter's blow on a body: the bite, told or swung; anyone else's (a monster of no kind) the thud.
+	var body := Monster.new()
+	body.tile = grey.tile + Vector2i(-1, 0)
+	var kept_swings: Dictionary = _rig._swings.duplicate()
+	var kept_told: Dictionary[int, int] = _rig._told_lands.duplicate()
+	_rig._swings.clear()
+	_rig._told_lands.clear()
+	var clock := AnimRig.now_msec()
+	_rig._told_lands[grey.get_instance_id()] = clock + 100
+	var told_bite := str(_rig._struck_with(body)[0])
+	_rig._told_lands.clear()
+	_rig._swings[grey.get_instance_id()] = [clock, "", clock]
+	var swung_bite := str(_rig._struck_with(body)[0])
+	_rig._swings.clear()
+	var plain := Monster.new()
+	plain.tile = body.tile + Vector2i(0, 1)
+	_rig._swings[plain.get_instance_id()] = [clock, "", clock]
+	var thud := str(_rig._struck_with(body)[0])
+	_rig._swings = kept_swings
+	_rig._told_lands = kept_told
+	_check(told_bite == SoundKit.BITE and swung_bite == SoundKit.BITE and thud == "sfx.hit_flesh",
+			"the old grey's told bite and a swung one land as jaws on flesh (%s, %s); a monster of no kind's blow, the thud (%s)" % [told_bite, swung_bite, thud])
+	body.free()
+	plain.free()
+	# A biter's swing snaps, at once with no drawn bite waiting.
+	var before := _rig.sfx.played.size()
+	_rig._on_swung(Vector2i(-1, 0), wolf.get_instance_id())
+	_check(played_since.call(before, SoundKit.SNAP) == 1 and played_since.call(before, "sfx.swing") == 0,
+			"a wolf's swing: its jaws snap, no whoosh")
+	_rig._swings.erase(wolf.get_instance_id())
+	for beast in spawned:
+		World.despawn(beast)
+	_rig._process(0.0)
+	await _frames(1)
 
 
 ## 940: a town's people at rest heard now and then: a cleared throat in

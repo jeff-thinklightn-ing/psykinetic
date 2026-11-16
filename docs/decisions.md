@@ -59832,3 +59832,66 @@ through the nock, where the mix crosses 0.5. Client only; protocol unchanged; no
 unless a strip shows a player would notice.
 
 935 amended (1) (ui, 2026-11-15; label by decision_number.sh; perf's yes and the coordinator's approval: a click with no route). A click or a chase whose goal no route reaches used to give an empty path and the body stood still (a person across a counter, a cell walled off, a body in a doorway). World.walk_path takes find_path's `nearest` (default false, nothing else changes) and Main._free_route and Main._free_chase pass it: with no way, or the bound reached, the one search already run returns the way to the closed cell nearest the goal by its octile estimate (the earliest of equals; empty if that cell is the start), so the body walks there and stops, no caption and no sound, never through a body or a wall. No second search, no new closed cell (the doorway row: 12,000 closed capped, the same with nearest, 49.8 ms here; perf's estimate on the Lenovo 95-200 ms capped, not measured). A goal that is not walkable still returns empty before any search, as before. This changes every click on a walkable cell no route reaches, not only a person's (a pocket walled off, a cell a body in a doorway shuts off, an island): where before the player stood, he walks to the nearest cell reached. A click on water or a wall, which is not a walkable cell, returns empty before any search as it always did, and a goal across water or into a house with a way round or through (a door opens: find_path opens doors) has a route, so those walk it, not the nearest. Nearest under a capped search is the nearest cell the search reached, not the nearest there is: when the bound ends it early he walks toward the goal and stops short of it, never away (the route's end is no farther from the goal than where he began: a row, with a far goal under a bound of 150 cells), and a click repeated from there searches again from where he stands. The talk a click asked for (Main._talk_to) is unchanged: the walk to the cell beside the person ends nearer, and the talk opens only when the player stands within TALK_REACH of the person's talk cell, the rule it has always had, so nothing opens farther off because the route failed. Left alone: _free_beside_again and _free_round (they test that a route reaches its cell) and _free_no_headway (it ends a stalled walk). _free_intent's held-button steering takes the nearest too (found by ui-design's joined watch of the healer's door: a first click whose press and release a 930 ms frame apart was a click held past FREE_HOLD_SECONDS, 0.25 s, so the steering replanned to the cursor without the nearest and emptied the click's own partial route: he did not walk; the second click, 107 ms, did): the steering plan is the click's plan, and a route that has a way is the same either way, so a first click with a route was never affected; click_route_test's held-click row fails without it (0 cells) and passes with it. ui-design's diagnostic on the Lenovo (aecba7d20: the first click, a 940 ms press frame, since_click 555 ms at the first frame Main saw, the button still down, then "steering in the open: path cleared" toward the OS cursor's cell) showed the other half: a click read as a hold the moment its press frame was long, the steer clearing the route toward wherever the cursor was (in the tour, 16 cells off: a parsed event cannot move it; for a player the cursor is on the click). So a button still down over the very cell it clicked (_free["click"]) is still the click and does not steer; only a cursor moved off it does; and the hold is timed from when the click's route is ready (_free["at"] set again after the search), not from the search's start: a click whose own search took 669 ms on the Lenovo was a hold at once. A row: held over the clicked cell in the open, the click's route is kept; the cursor moved off it, the hold steers (the route cleared, straight at the cursor). The client's log says so (no name in it): "[click] route: N cells planned, search X ms" at the click, and once per click "[click] kept: held over the clicked cell, the route stays" or "[click] steer: cursor moved off the clicked cell" at the hold (the coordinator's ask, so a look need not read the route from the trail). Watched joined on the Atlas, route4_52cd7244c (the first click's 473.5 ms press frame with the pointer on the clicked cell, no steer, the walk made); the walled-off and body-shut cases (the stop beside them) are watched when a joined run clicks one: until then the CHANGELOG's line is voice's first, about a click that lands on a slow moment. The steering replans every 300 ms while the button is held (and at once when the cursor moves a cell), as it did before; a plan from a cell to a goal that finds no way (the held button over ground nothing reaches, standing at the nearest cell) is remembered for NO_ROUTE_MEMORY_MSEC (1500 ms) and not searched again, so a hold over a walled pocket costs one search to the bound (12,000 closed, about 52 ms on the dev PC, perf's 935 figure; before this take main searched every 300 ms there and found nothing, each time), not one every replan; a new click forgets it. A row: the first replan from the nearest cell searches (12,000 closed), the next does not (0). No no-replan flag, since nothing replans from the stop cell (the path ends there, the chase replans only when its target's tile changes). Tests: click_route_test (the doorway row now reads the click's route as the cell nearest, not through the body, on the one search, equal to walk_path's nearest; a walled pocket: no route in, the click ends two cells off and never in; a chase of one in a pocket walks to the cell nearest it and, the target moved to the other pocket, is planned again to that; the stop short of a far goal under a small bound; a click from the street on Rolf's cell in the wilds as Umbrage lays it is a walk-round (a route exists), not a nearest). The joined watch, each with a parsed click, before any bullet: Rolf from the street (a walk-round: arrives), a body in a doorway (the healer in his door at night: a click past him ends at the door's step), a walled cell: where he stops, that he stops once, no walk away before it turns back, and the click frame's ms on the Lenovo beside 935's figure. controls_test, ui_test, builder_zone_test PASS. Client only; protocol unchanged; no new class_name; no bullet (watched joined first: the counter's wrong side, a wall pocket, a target that moves).
+## 955. The wolves' bite heard: a snarl with the told bite's red, jaws on flesh and on air (sound; the coordinator's approval, 2026-11-16)
+
+The old grey's told bite (780 amended (38)) had no sound of its own. Its warning was silent: World.try_wind_up
+lays the "bite" telegraph, the client draws the red (Client3D.telegraph_show plays nothing) and coils the body
+(CreatureView.wind, no sound); only his lunge, howl and pant cry at their tells, through the server's
+Monster.cried. A bite on a body was the plain blow's thud (sfx.hit_flesh; a told move sends no swing, and a
+monster's hands are not sent), and a bite at the air fell to World.try_swing, so the weapon whoosh (sfx.swing)
+pitched by his mass. Every plain wolf's bite was the same: a whoosh on the go and a thud on the hit. For a
+newcomer's first fight, a warning given only by sight, a punch's thud and a sword's whoosh is among the worst
+things heard, and the warning's sound is also the cue that tells a player to step.
+
+SoundKit.BITERS (by slot name, creature_slot_name: "wolf", so the old grey too) are heard as jaws:
+- **The told bite's snarl.** SoundKit.TELL_CRIES {"wolf": {"bite": "sfx.wolf_snarl"}} and tell_cry(kind, tell):
+  Client3D.creature_tell plays it from the teller, at its kind's pitch (the old grey 0.8), in the call
+  Main._on_telegraph_started makes right after telegraph_show draws the red, so sound and sight begin in the
+  same frame. tell_cry is "" for a tree without the takes (no fallback: a warning is never blipped with
+  another sound). His den bite is untold (no telegraph) and stays silent.
+- **What each tell of the old grey's cries** (enemy-ai's finding, 11-16: the bite and the lunge ask different
+  steps of a player, any step off the cell against a step to the side, so the two warnings sound different):
+  the told bite sfx.wolf_snarl, a short low growl, laid by the client; the lunge sfx.wolf_lunge, a rising
+  snarl and bark, and the howl sfx.wolf_howl, both cried by the server (Monster.cried) and given no TELL_CRIES
+  row, so the snarl never plays at them. The pant is sfx.wolf_pant. The snarl's takes come from other
+  recordings than the lunge's and steady's, measured darker (zero crossings 440 to 1070 a second
+  against the lunge's 790 to 1610), and its slot sits 4 dB under the lunge's (-6 against -2).
+- **Inside the red.** Each snarl take is 0.45 to 0.47 s; at his pitch slowed by Sfx's jitter's most (0.8 x 0.93) it is
+  heard for 0.63 s at most, inside his 7-tick red (0.7 s), so it ends before the bite lands.
+- **The bite.** Client3D._struck_with gives a biter's blow, told or swung, SoundKit.bite(kind, armour):
+  sfx.wolf_bite (combat, sfx bus, -2 dB, fallback sfx.hit_flesh) in place of the thud, heard when the blow
+  lands as before; on plate or mail it stays metal (sfx.hit_blunt_armor).
+- **The snap.** Client3D._on_swung gives a biter's swing SoundKit.snap(kind): sfx.wolf_snap (combat, sfx bus,
+  -8 dB, fallback sfx.swing) in place of the whoosh, timed to the drawn bite's landing (its coil's spring,
+  _swings' contact), not to the news. A bite that meets air (World.try_swing, the told bite's cell left empty
+  or dodged) is heard as the snap alone; one that lands, the bite (with the snap where a swing came too). A
+  told bite given up because he moved (World.cancel_wind_up) strikes nothing and is silent, as before. The snap
+  plays at its own pitch, since teeth are not a voice.
+
+The joined read, heard on a log read: a headless client joined to a --server, the old grey laid by
+--test-foe=old_wolf,,1,held, each telegraph logged as Main handed it on, with its red's cells, the sounds
+its own call played and whether it landed. In C:/dev/review/sound/bite955/ears_20261116_110844, every told
+bite was at the player (its red his own cell), and each time he stepped one cell off by a click sent as a
+parsed input event: 5 of 5 landed on the empty cell and played sfx.wolf_snap alone, 0.79 to 0.88 s after the
+red, each red drawn with its sfx.wolf_snarl on the same frame. His three lunge tells played sfx.wolf_lunge,
+never the snarl; one caught the player, sfx.wolf_bite with his hurt cry. In ears_20261116_110148 his six told
+bites were at Rhea: the four she stepped off snapped, one bit her (sfx.wolf_bite with her hurt cry), and the
+last was called off as he died. An earlier run (ears_20261116_104946) moved the player by console mid-tell;
+he followed, and leaving his cell called those bites off (World.cancel_wind_up), silent, a fault of the run.
+The ears tour logs a telegraph line in every run since (tests/tour/tours/ears.gd: kind, the red's cells,
+on_me, ticks, frame; then landed or called off), so a tell's read can be checked.
+
+Takes, all CC0 1.0 (the coordinator's terms; credits to release, who OK'd the lines): sfx.wolf_snarl, four from
+eZZin 683970 and NearTheAtmoshphere 676474; sfx.wolf_bite, three from LucasDuff 467701 and Breviceps 445987;
+sfx.wolf_snap, five from qubodup 841350 and princessemilu 457475. Each is measured, not listened to. This
+replaces sound's unlanded 780 amended (31), the old grey's lead growl of 11-10, which played from the plain
+lead's winding. That label is given back, and its one CC BY take is not used.
+
+Tests: sound_kit_test _test_biters (the three slots; fallbacks: the bite to the thud, the snap to the whoosh,
+none for the snarl; wolf and old grey bite and snap, boar, bear and cat do not; mail and plate stay metal; no
+tell cry for his lunge, howl or pant, and the lunge's cry is sfx.wolf_lunge; the snarl 4 dB or more under the
+lunge; each snarl heard inside his red; without takes the told bite is silent). view_test _test_bite_heard (his
+told bite's red drawn and the snarl played in the same call, once; his lunge's tell drawn without it; his told
+and swung bites land as sfx.wolf_bite, a monster of no kind's as the thud; a wolf's swing snaps, no whoosh). Package "the wilds' basics", on
+(the coordinator); a CHANGELOG bullet in voice's words from the joined client's sound log above, the snarl's and
+the red's times logged side by side, heard on a log read. Client only; protocol unchanged; no new class_name.

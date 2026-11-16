@@ -441,6 +441,39 @@ const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
 		"hill_cat": {"call": "snarl"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer", "old_wolf": "wolf"}
+## The biters (955), by the name they go by in slots (creature_slot_name: the old grey a
+## wolf): a blow of theirs is a bite, heard as jaws, not as a weapon. SNAP as the jaws shut
+## (Client3D._on_swung, in place of the whoosh, so alone when the bite meets air), BITE on a
+## body (Client3D._struck_with, in place of the thud; plate and mail stay metal).
+const BITERS: Array[String] = ["wolf"]
+const SNAP := "sfx.wolf_snap"
+const BITE := "sfx.wolf_bite"
+## A told move's own cry as its red is laid (955; Client3D.creature_tell), by slot name, then
+## the telegraph's kind: only for a tell the server cries nothing at. The lunge, the howl and
+## the pant are cried by the server (Monster.cried: sfx.wolf_lunge, sfx.wolf_howl,
+## sfx.wolf_pant), so they have no row here and never sound as the bite does.
+const TELL_CRIES := {"wolf": {"bite": "sfx.wolf_snarl"}}
+
+
+## The slot [param creature]'s (a monster's kind) jaws shut with as it bites (955), "" for a
+## kind that is no biter (its swing whooshes as a weapon's).
+static func snap(creature: String) -> String:
+	return SNAP if creature_slot_name(creature) in BITERS else ""
+
+
+## The slot [param creature]'s (a monster's kind) bite lands with on a body wearing
+## [param armour] (armour_look) (955): "" for a kind that is no biter, or on plate or mail,
+## heard as metal as any blow there is (hit).
+static func bite(creature: String, armour := "") -> String:
+	return BITE if creature_slot_name(creature) in BITERS and not armour in ARMOUR_STRUCK else ""
+
+
+## The slot [param creature] (a monster's kind) cries as its told move of telegraph kind
+## [param tell] is laid (955): "" for none, or a tree without the takes (no fallback: a
+## warning is never blipped with another sound).
+static func tell_cry(creature: String, tell: String) -> String:
+	var slot := str((TELL_CRIES.get(creature_slot_name(creature), {}) as Dictionary).get(tell, ""))
+	return slot if slot != "" and has(slot) and not files(slot).is_empty() else ""
 ## A creature's sounds while it is at peace (795): slot -> its average
 ## seconds between, each body on its own; a kind in IDLE_AS has another's
 ## (the boar king a boar's, pitched his own; Client3D._idle_voices).

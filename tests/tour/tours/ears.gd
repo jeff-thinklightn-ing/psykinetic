@@ -21,8 +21,11 @@ extends RefCounted
 ## Each snapshot line: t, cell, zone, rtt (Net.rtt_ms), frame_ms (the
 ## longest frame since the last line), players [{id, path, slot, bus, db,
 ## on, pos, pitch, len, at}], folk [[name, x, y, activity, trade]] (within 16
-## cells, or 45 for one at a work with a sound). A one-shot line: t, cell,
-## played [slot, file, bus]. A mark line: t, cell, mark.
+## cells, or 45 for one at a work with a sound). A one-shot line: t, frame,
+## cell, played [slot, file, bus]. A mark line: t, cell, mark. A telegraph
+## line (955): t, frame, telegraph (its kind), id, source, red (the cells it
+## will strike), on_me, from_tick, lands_tick, cell; logged after the sounds
+## its own call played; and at its end t, frame, telegraph_over, landed.
 
 const DAY := 12
 const NIGHT := 23
@@ -152,6 +155,8 @@ func run(bot: Node) -> void:
 	_t0 = Time.get_ticks_msec()
 	_frame_ms = 0.0
 	main.get_tree().process_frame.connect(_snap)
+	main.telegraph_started.connect(_tell_logged)
+	main.telegraph_ended.connect(_tell_over_logged)
 	if OS.get_environment("EARS_ONLY") == "hearth":
 		await _hearth_leg()
 		_end()
@@ -185,6 +190,8 @@ func run(bot: Node) -> void:
 func _end() -> void:
 	var main: Node = _bot.main
 	main.get_tree().process_frame.disconnect(_snap)
+	main.telegraph_started.disconnect(_tell_logged)
+	main.telegraph_ended.disconnect(_tell_over_logged)
 	main.get_tree().process_frame.disconnect(_watch)
 	_record.set_recording_active(false)
 	var got := _record.get_recording()
@@ -540,6 +547,25 @@ func _ring(at: Vector2i, r: int) -> Array[Vector2i]:
 	return out
 
 
+## Each telegraph as Main hands it on (955; the coordinator: a tell's read checkable): after Main's own
+## handler, so its red is drawn and any cry it lays is played by then (the sounds of that call logged
+## first, on the same frame); its red's cells beside the listener's cell; then whether it landed or was
+## called off.
+func _tell_logged(id: int, data: Dictionary) -> void:
+	_snap()
+	var red: Array = []
+	for each: Variant in (data.get("cells", []) as Array):
+		red.append([int(each[0]), int(each[1])] if each is Array else [int(each.x), int(each.y)])
+	_file.store_line(JSON.stringify({"t": _now(), "frame": Engine.get_process_frames(), "telegraph": str(data.get("kind", "")), "id": id,
+		"source": str(data.get("source", "")).get_file(), "red": red, "on_me": red.has(_cell()),
+		"from_tick": int(data.get("from_tick", -1)), "lands_tick": int(data.get("lands_tick", -1)), "cell": _cell()}))
+
+
+func _tell_over_logged(id: int, landed: bool) -> void:
+	_snap()
+	_file.store_line(JSON.stringify({"t": _now(), "frame": Engine.get_process_frames(), "telegraph_over": id, "landed": landed, "cell": _cell()}))
+
+
 func _mark(text: String) -> void:
 	_bot.log_line(text)
 	_file.store_line(JSON.stringify({"t": _now(), "mark": text, "cell": _cell()}))
@@ -561,7 +587,7 @@ func _snap() -> void:
 	var sfx: Node = view.sfx
 	if sfx != null and sfx.played.size() > _played_at:
 		for entry: Array in sfx.played.slice(_played_at):
-			_file.store_line(JSON.stringify({"t": _now(), "played": entry, "cell": _cell(), "src": _source(str(entry[1]))}))
+			_file.store_line(JSON.stringify({"t": _now(), "frame": Engine.get_process_frames(), "played": entry, "cell": _cell(), "src": _source(str(entry[1]))}))
 		_played_at = sfx.played.size()
 	if sfx != null and sfx.unheard.size() > _unheard_at:
 		for slot: String in sfx.unheard.slice(_unheard_at):

@@ -6965,6 +6965,12 @@ func creature_tell(id: int, data: Dictionary) -> void:
 	var puppet: Node3D = _puppets.get(source.get_instance_id())
 	if puppet == null:
 		return
+	# Its tell's own cry, as its red is laid in this same call (955: the old grey's told bite snarls;
+	# his lunge, howl and pant are cried by the server, Monster.cried, and have none here).
+	var creature := str((source as Monster).spawn_spec.get("kind", "")) if source is Monster else ""
+	var cry := SoundKit.tell_cry(creature, str(data.get("kind", "")))
+	if cry != "" and sfx != null:
+		sfx.play(cry, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
 	# From the tick it was told on (390 amended (4)), as a winding's ticks are counted from its news: the
 	# client's own tick runs a little behind the message, and counted from it the tell drew a tick long.
 	var told_from := int(data.get("from_tick", World.tick))
@@ -24793,12 +24799,16 @@ func _struck_with(struck: GridEntity) -> Array:
 	var plain := "sfx.hit_blunt_armor" if armour in SoundKit.ARMOUR_STRUCK else "sfx.hit_flesh"
 	if best < 0:
 		return [plain, now, 0]
+	var by := instance_from_id(best) as GridEntity
+	# A biter's blow is a bite (955): jaws on flesh in place of the thud, metal on plate or mail.
+	var jaws := SoundKit.bite(str((by as Monster).spawn_spec.get("kind", "")), armour) if by is Monster else ""
+	if jaws != "":
+		plain = jaws
 	if told_at >= 0:
 		# A told move's blow: a monster's, its hands not sent. Its teller is the third field, as a swinger is
 		# (924's voice key: one teller's hits two voices at once at most, sound's condition).
 		return [plain, clampi(told_at, now, now + TOLD_WAIT_MOST_MS), best]
 	var lands := maxi(int(_swings[best][2]), now)
-	var by := instance_from_id(best) as GridEntity
 	if not (by is Player or by is Companion):
 		return [plain, lands, best]  # A monster's hands aren't sent to clients.
 	return [SoundKit.hit(str(_swings[best][1]), armour), lands, best]
@@ -29248,7 +29258,17 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	puppet.remove_meta("drawn_contact")
 	if drawn_at >= now:
 		_swings[id][2] = drawn_at
-	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
+	# A biter's jaws shut (955) as its drawn bite lands (its coil's spring), with the hit if it bites a
+	# body, alone on air; anyone else's swing whooshes as it sets off, pitched by its heft.
+	var snap := SoundKit.snap(str((swinger as Monster).spawn_spec.get("kind", ""))) if swinger is Monster else ""
+	if snap != "":
+		var shut := (int(_swings[id][2]) - now) / 1000.0
+		if shut > 0.0:
+			_play_later(snap, puppet.position + Vector3.UP * 0.8, shut)
+		else:
+			sfx.play(snap, puppet.position + Vector3.UP * 0.8)
+	else:
+		sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	var effort := SoundKit.voice(swinger, "effort_swing", _person_body(puppet))
 	if effort != "" and effort_due(randi(), now, int(_effort_at.get(id, now - EFFORT_FLOOR_MS))):
 		_effort_at[id] = now

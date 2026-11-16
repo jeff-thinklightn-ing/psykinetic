@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wilds: the old grey snarls as his bite's warning shows and his jaws snap shut as it lands, on you or on the air, and his lunge comes with a snarl and a bark (955).
 - Towns: gold you give toward a building stays in its fund and pays for that building's materials; the town window's card counts your gift at once, and the total it shows falls as the materials come in (918 amended (2)).
 - Long hair falls down the back, and in Options hair can be tied back in a tail and a man's beard grown long (419 amended (11)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).

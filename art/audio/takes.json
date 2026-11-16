@@ -3796,6 +3796,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.wolf_bite": [
+			{
+				"file": "sfx.wolf_bite.ogg",
+				"from": "freesound",
+				"original": "freesound 467701: monster bite (from 0.4 s for 0.5 s)",
+				"sha256": "8f3d1480b9991af0e737549989954c7b63c460dd7fdd59f93ff2066b63aeb2b9",
+				"by": "LucasDuff",
+				"url": "https://freesound.org/people/LucasDuff/sounds/467701/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_bite.2.ogg",
+				"from": "freesound",
+				"original": "freesound 467701: monster bite (from 0.9 s for 0.35 s)",
+				"sha256": "08236f0f6332ddcada450538f55f30327a3cb7af4950d3dfd7f65a6ea405e573",
+				"by": "LucasDuff",
+				"url": "https://freesound.org/people/LucasDuff/sounds/467701/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_bite.3.ogg",
+				"from": "freesound",
+				"original": "freesound 445987: Horror / Zombie - Biting on bones (from 0.2 s for 0.39 s)",
+				"sha256": "d2f751f5caad07d3397b26fccf165b06a411714b8a53a15501bea2dfb69494c1",
+				"by": "Breviceps",
+				"url": "https://freesound.org/people/Breviceps/sounds/445987/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.wolf_death": [
 			{
 				"file": "sfx.wolf_death.ogg",
@@ -3921,6 +3950,91 @@
 				"by": "GB01",
 				"url": "https://freesound.org/people/GB01/sounds/152815/",
 				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.wolf_snap": [
+			{
+				"file": "sfx.wolf_snap.ogg",
+				"from": "freesound",
+				"original": "freesound 841350: Dog Teeth Clattering Clicking (from 0.62 s for 0.25 s)",
+				"sha256": "54d5e77480155f01559f97acbf62f43076bd5ea2cdf61887f082ce0628095cfa",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/841350/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snap.2.ogg",
+				"from": "freesound",
+				"original": "freesound 841350: Dog Teeth Clattering Clicking (from 0.9 s for 0.2 s)",
+				"sha256": "b20877dd444c49426b971464cac827179d6819b614091426b3f5ec3483859f78",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/841350/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snap.3.ogg",
+				"from": "freesound",
+				"original": "freesound 841350: Dog Teeth Clattering Clicking (from 1.95 s for 0.2 s)",
+				"sha256": "30be6f70e0a1e56aae4060f673ad92573fc8aefe886d51ab644d0fde4d32f07b",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/841350/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snap.4.ogg",
+				"from": "freesound",
+				"original": "freesound 841350: Dog Teeth Clattering Clicking (from 2.45 s for 0.25 s)",
+				"sha256": "06b8e8a83cfb25ada805c9bd1387a44f7532dc96459d728630fac4a7e57d7f95",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/841350/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snap.5.ogg",
+				"from": "freesound",
+				"original": "freesound 457475: Open Mouth Chomp.wav (from 0.79 s for 0.3 s)",
+				"sha256": "6daacf8fc4666d7b80c1706f441dedd45a19bbaef5c060fc61950541d9fa27d6",
+				"by": "princessemilu",
+				"url": "https://freesound.org/people/princessemilu/sounds/457475/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wolf_snarl": [
+			{
+				"file": "sfx.wolf_snarl.ogg",
+				"from": "freesound",
+				"original": "freesound 683970: Dog groan.wav (from 0.25 s for 0.45 s)",
+				"sha256": "ef99d72db13b64712ce8e3616788af56657c89e307a252acd760c8caa97d671c",
+				"by": "eZZin",
+				"url": "https://freesound.org/people/eZZin/sounds/683970/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snarl.2.ogg",
+				"from": "freesound",
+				"original": "freesound 683970: Dog groan.wav (from 0.7 s for 0.45 s)",
+				"sha256": "9471c114b25571a5f68f1e3cddddffca5d37ed37d2e8ca17543e07fcb7de574b",
+				"by": "eZZin",
+				"url": "https://freesound.org/people/eZZin/sounds/683970/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snarl.3.ogg",
+				"from": "freesound",
+				"original": "freesound 676474: Beast 1 (from 0.75 s for 0.45 s)",
+				"sha256": "c1a3f41ef87d20544b01c0eb579dd3ca8a109dac81003754e5664fa99ea7fa07",
+				"by": "NearTheAtmoshphere",
+				"url": "https://freesound.org/people/NearTheAtmoshphere/sounds/676474/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_snarl.4.ogg",
+				"from": "freesound",
+				"original": "freesound 676474: Beast 1 (from 1.2 s for 0.45 s)",
+				"sha256": "0563dd89abc865025d3c5a7af20ef2ebd5a54c297536ba2cf5ce874724b0417e",
+				"by": "NearTheAtmoshphere",
+				"url": "https://freesound.org/people/NearTheAtmoshphere/sounds/676474/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.wolf_steady": [

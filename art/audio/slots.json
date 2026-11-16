@@ -1317,6 +1317,33 @@
 			"volume_db": -2.0,
 			"uses": "the old grey's told lunge: a short rising snarl as its 0.8 s tell starts, heard in time to step aside (780 amended (15); Monster.cried lunge; he sounds as a wolf, SoundKit.SOUNDS_AS, pitched 0.8)"
 		},
+		"sfx.wolf_snarl": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -6.0,
+			"uses": "a biter's told bite heard coming: a short low growl as its red is laid, over before the bite lands, lower, shorter and quieter than the lunge's rising snarl and from other recordings, so the ear tells step off from step aside (955; SoundKit.tell_cry, Client3D.creature_tell; the old grey's pitched 0.8; no fallback, silent without takes)"
+		},
+		"sfx.wolf_bite": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a wolf's or the old grey's bite landing on flesh: jaws closing on a body, in place of a blow's thud (955; SoundKit.bite, Client3D's struck sound for a biter's blow; plate and mail stay metal)",
+			"fallback": "sfx.hit_flesh"
+		},
+		"sfx.wolf_snap": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -8.0,
+			"uses": "a wolf's or the old grey's jaws snapping shut as it bites, in place of a weapon's whoosh, heard alone when the bite meets air (955; SoundKit.snap, Client3D._on_swung for a biter)",
+			"fallback": "sfx.swing"
+		},
 		"sfx.wolf_pant": {
 			"category": "creatures",
 			"type": "oneshot",
