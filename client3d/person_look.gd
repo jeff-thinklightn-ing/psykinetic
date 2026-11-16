@@ -49,6 +49,11 @@ const HAIR_COLOURS := {"black": "1f1a17", "dark": "3b2a20", "brown": "564135", "
 ## the skin never moves (it is what a player picked). Where both ways reach the step, the smaller move; else the way
 ## ending further apart. Seven pairs stop short at the cap or the name (view_test _test_hair_value lists each).
 const HAIR_STEP := 16.0
+## SCRATCH (tone row A, not for landing as is): the step judged as the game draws the two at noon, not on the palette.
+## Each as linear luminance Y -> a * Y + b (pc-character's fit to ui-design's 64-still noon grid, hairgrid2_noon_8529d2d65:
+## the crown faces the sun, the face is shaded; b, the same order on both, is light no albedo shapes).
+const HAIR_DRAWN := Vector2(1.60, 0.074)
+const FACE_DRAWN := Vector2(0.714, 0.055)
 const HAIR_MOVE_MAX := 13.0
 const HAIR_MOVE_GRAIN := 0.25
 ## What a beard's front loses beside the cheek as drawn: it faces down, out of the sun (faces7's stills on skin 7: 3.1 L* on
@@ -391,9 +396,9 @@ static func hair_against(name: String, skin: Color) -> Color:
 
 static func _hair_moved(name: String, skin: Color) -> Color:
 	var hair := Color(HAIR_COLOURS[name])
-	var ls := lab_of(skin).x
+	var ls := drawn_l(lab_of(skin).x, FACE_DRAWN)
 	var h := lab_of(hair)
-	var d := h.x - ls
+	var d := drawn_l(h.x, HAIR_DRAWN) - ls
 	if absf(d) >= HAIR_STEP:
 		return hair
 	var away := 1.0 if d > 0.0 else -1.0
@@ -411,13 +416,20 @@ static func _hair_moved(name: String, skin: Color) -> Color:
 ## reached, the move), within HAIR_MOVE_MAX and while its nearest named colour is still [param name].
 static func _hair_reach(name: String, h: Vector3, ls: float, sign_: float) -> Vector2:
 	var move := 0.0
-	while move + HAIR_MOVE_GRAIN <= HAIR_MOVE_MAX and sign_ * (h.x + sign_ * move - ls) < HAIR_STEP:
+	while move + HAIR_MOVE_GRAIN <= HAIR_MOVE_MAX and sign_ * (drawn_l(h.x + sign_ * move, HAIR_DRAWN) - ls) < HAIR_STEP:
 		var next := h.x + sign_ * (move + HAIR_MOVE_GRAIN)
 		if next <= 0.0 or next >= 100.0 or nearest_hair(from_lab(Vector3(next, h.y, h.z))) != name:
 			break
 		move += HAIR_MOVE_GRAIN
 	var reached := from_lab(Vector3(h.x + sign_ * move, h.y, h.z))
-	return Vector2(absf(lab_of(reached).x - ls), sign_ * move)
+	return Vector2(absf(drawn_l(lab_of(reached).x, HAIR_DRAWN) - ls), sign_ * move)
+
+
+## L* [param l] as drawn under [param k] (HAIR_DRAWN, FACE_DRAWN): its luminance times k.x plus k.y.
+static func drawn_l(l: float, k: Vector2) -> float:
+	var fy := (l + 16.0) / 116.0
+	var y := k.x * _lab_fi(fy) + k.y
+	return 116.0 * _lab_f(y) - 16.0
 
 
 ## A beard of [param hair] (as hair_against drew it) beside [param skin]: its lightness moved further from the skin's by
