@@ -51,6 +51,7 @@ func _ready() -> void:
 		_test_footprint_click()
 		_test_door_talk()
 		_test_stand_cell_routes()
+		_test_no_route()
 	await _test_click_routes_agree()
 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -111,8 +112,36 @@ func _test_doorway() -> void:
 		var out: Array[Vector2i] = []
 		out.assign(_main._free.get("path", []))
 		return out)
-	_check(clicked["path"].is_empty() and clicked["closed"] <= World.CLICK_SEARCH_TILES,
-		"Main's click route (_free_route) there: none, after at most %d cells closed (%d, %.1f ms)" % [World.CLICK_SEARCH_TILES, clicked["closed"], clicked["ms"]])
+	# 935 amended (ui's side): no way past the body, so the click walks to the cell that comes nearest it (find_path's nearest: the
+	# same one search, the same cells closed), never through the body, and stops there.
+	var nearest := _closed(func() -> Array[Vector2i]: return World.walk_path(free, PAST, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES, true))
+	_check(not clicked["path"].is_empty() and clicked["path"].back() != PAST and not clicked["path"].has(HUT_DOOR) and clicked["path"] == nearest["path"]
+			and clicked["closed"] <= World.CLICK_SEARCH_TILES and nearest["closed"] == capped["closed"],
+		"Main's click route (_free_route) there: to the cell nearest it, %s, not through the body, on the one search (%d closed, as capped %d; %.1f ms)" % [
+			clicked["path"].back() if not clicked["path"].is_empty() else "none", clicked["closed"], capped["closed"], clicked["ms"]])
+	# The same click held past the hold (ui-design's first click: a long frame between its press and release), the body still in the door:
+	# the steering must keep the walk to the door's step. Printed first, then checked.
+	var own = _main._free_own(player)
+	if own != null:
+		var controls_was: String = Net.controls
+		Net.controls = "mouse"
+		_main._free_route(player, PAST)
+		var planned: Array = (_main._free.get("path", []) as Array).duplicate()
+		_main._free["held"] = true
+		_main._free["at"] = Time.get_ticks_msec() - 1000
+		_main._free.erase("goal")
+		_main._free.erase("no_route")
+		_main._test_holding = true
+		_main._pick_grid = Vector2(PAST)
+		var line_clear := World._line_clear(World.free_cell(player, own.shown(player)), PAST, PAST, player)
+		var way: Vector2 = _main._free_intent(player, own)
+		var kept: Array = _main._free.get("path", [])
+		print("  (door: line clear %s, click planned %d cells, after the held steering %d cells, way %s)" % [line_clear, planned.size(), kept.size(), way])
+		_check(not planned.is_empty() and not kept.is_empty(),
+			"the click past a body in the door, held past the hold: the walk to the door's step is kept (%d cells planned, %d after)" % [planned.size(), kept.size()])
+		_main._test_holding = false
+		_main._free["held"] = false
+		Net.controls = controls_was
 	if was == null:
 		World._occupancy.erase(HUT_DOOR)
 	else:
@@ -402,6 +431,194 @@ func _test_stand_cell_routes() -> void:
 			worst["closed"], World.CLICK_SEARCH_TILES, Main.TALK_STAND_SEARCH_TILES, over_cap])
 	World._relocate(body, Vector2i(152, 233))
 	World._relocate(player, Vector2i(149, 231))
+
+
+## 935 amended (ui's side): a click with no route walks to the cell that comes nearest it and stops, a chase of a target that cannot
+## be reached likewise, and replans as it moves. A walkable cell with the eight round it blocked by chests is a pocket no route enters.
+func _test_no_route() -> void:
+	print("\n== a click with no route walks to the nearest cell and stops (935 amended, ui's side) ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player")
+		return
+	var held: GridEntity = World.get_entity_at(OUTSIDE)
+	if held != null and held != player:
+		World.despawn(held)
+	World._relocate(player, OUTSIDE)
+	var rings: Array[Dictionary] = []
+	var blocks: Array[Chest] = []
+	for dx in range(-12, -5):
+		for dy in range(-3, 4):
+			var centre := OUTSIDE + Vector2i(dx, dy)
+			var clear := true
+			for ax in range(-1, 2):
+				for ay in range(-1, 2):
+					var cell := centre + Vector2i(ax, ay)
+					if not World.is_walkable(cell) or World.get_entity_at(cell) != null:
+						clear = false
+			if clear and rings.size() < 2 and (rings.is_empty() or World.distance(rings[0]["centre"], centre) > 4):
+				var made: Array[Chest] = []
+				for ax in range(-1, 2):
+					for ay in range(-1, 2):
+						if ax != 0 or ay != 0:
+							var chest := _main._spawn({"script": "res://sim/chest.gd", "name": "Ring%d_%d_%d" % [rings.size(), ax, ay], "tile": centre + Vector2i(ax, ay)}) as Chest
+							if chest != null:
+								made.append(chest)
+				blocks.append_array(made)
+				rings.append({"centre": centre})
+	if rings.size() < 2:
+		print("  (no two free pockets near the doorway: skipped)")
+		for chest: Chest in blocks:
+			World.despawn(chest)
+		return
+	var pocket: Vector2i = rings[0]["centre"]
+	var free := World.free_cell(player, Vector2(player.tile))
+	_check(World.walk_path(free, pocket, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES).is_empty(), "the pocket %s has no route in" % pocket)
+	_main._free_taken_over(player)
+	_main._free_route(player, pocket)
+	var path: Array = _main._free.get("path", [])
+	_check(not path.is_empty() and not path.has(pocket) and World.distance(path.back(), pocket) <= 2 and World.distance(path.back(), pocket) < World.distance(free, pocket),
+		"a click on it walks nearer and stops at %s, two cells off, never in (%d cells)" % [path.back() if not path.is_empty() else "none", path.size()])
+	# A click held past FREE_HOLD_SECONDS (ui-design's first click: a 930 ms frame between its press and its release) steers to the cursor
+	# by the same plan: the walk the click planned to the cell nearest the pocket is kept, never emptied by a plan with no nearest.
+	var own = _main._free_own(player)
+	if own != null:
+		var controls_was: String = Net.controls
+		Net.controls = "mouse"
+		_main._free_route(player, pocket)
+		_main._free["held"] = true
+		_main._free["at"] = Time.get_ticks_msec() - 1000
+		_main._free.erase("goal")
+		_main._free["click"] = Vector2i(-99999, -99999)  # The cursor has left the clicked cell: a steer.
+		_main._test_holding = true
+		_main._pick_grid = Vector2(pocket)
+		_main._free_intent(player, own)
+		var steered: Array = _main._free.get("path", [])
+		_check(not steered.is_empty() and not steered.has(pocket) and World.distance(steered.back(), pocket) <= 2,
+			"a click held past the hold (a long first frame): the steering plans to the cell nearest the cursor, the walk kept (%d cells, ends %s)" % [
+				steered.size(), steered.back() if not steered.is_empty() else "none"])
+		# The held replan from the cell that comes nearest finds no way on: it searches once, then not again within the memory.
+		World._relocate(player, steered.back())
+		_main._free.erase("goal")
+		_main._free.erase("no_route")
+		_main._free["planned"] = 0
+		_main._free["click"] = Vector2i(-99999, -99999)
+		var c0 := World.path_closed
+		_main._free_intent(player, own)
+		var first_closed := World.path_closed - c0
+		_main._free["planned"] = 0
+		var c1 := World.path_closed
+		_main._free_intent(player, own)
+		var again_closed := World.path_closed - c1
+		_check(first_closed > 0 and again_closed == 0,
+			"held over a pocket from the nearest cell: the first replan searches (%d closed), the next within the memory does not (%d closed)" % [first_closed, again_closed])
+		# A button still down over the very cell clicked is still the click (a long frame or search between press and release): in the
+		# open the click's route is kept, never cleared into a straight steer; a cursor moved off the cell is a steer, as ever.
+		World._relocate(player, free)
+		var open_to := Vector2i(-1, -1)
+		for reach in [7, 6, 5, 8]:
+			for way: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var cell: Vector2i = free + way * reach
+				if open_to == Vector2i(-1, -1) and World.is_walkable(cell) and World.get_entity_at(cell) == null and World._line_clear(free, cell, cell, player):
+					open_to = cell
+		if open_to != Vector2i(-1, -1):
+			_main._free_route(player, open_to)
+			var planned_open: int = (_main._free.get("path", []) as Array).size()
+			_main._free["held"] = true
+			_main._free["at"] = Time.get_ticks_msec() - 1000
+			_main._test_holding = true
+			_main._pick_grid = Vector2(open_to)
+			_main._free_intent(player, own)
+			var kept_open: int = (_main._free.get("path", []) as Array).size()
+			_check(planned_open > 0 and kept_open > 0, "held over the cell clicked: the click's route is kept (%d cells planned, %d after)" % [planned_open, kept_open])
+			_main._free["at"] = Time.get_ticks_msec() - 1000
+			_main._pick_grid = Vector2(open_to) + Vector2(3, 0)
+			_main._free_intent(player, own)
+			_check((_main._free.get("path", []) as Array).is_empty(), "the cursor moved off the clicked cell: the hold steers, the route cleared (straight at the cursor)")
+		else:
+			print("  (no open cell to try the held click on: skipped)")
+		# A click whose search is slow (the pocket's: the zone's bound searched dry): its time is taken when its route is ready, so the
+		# search is no hold; released 100 ms on it walks; held on over the same cell it still walks and does not steer.
+		World._relocate(player, free)
+		_main._test_holding = false
+		_main._free["held"] = false
+		var t_before := Time.get_ticks_msec()
+		_main._free_route(player, pocket)
+		var t_after := Time.get_ticks_msec()
+		var stamped := int(_main._free["at"])
+		_check(t_after - t_before >= 5 and t_after - stamped <= 15 and stamped - t_before >= (t_after - t_before) - 15,
+			"the click's time is taken when its route is ready (a %d ms search: stamped %d ms after the press, %d ms before the end)" % [t_after - t_before, stamped - t_before, t_after - stamped])
+		_main._free["held"] = true
+		_main._test_holding = true
+		_main._pick_grid = Vector2(pocket)
+		OS.delay_msec(100)
+		_main._test_holding = false
+		var released_way: Vector2 = _main._free_intent(player, own)
+		_check(not (_main._free.get("path", []) as Array).is_empty() and released_way != Vector2.ZERO, "released 100 ms on, the click walks (%d cells, way %s)" % [(_main._free.get("path", []) as Array).size(), released_way])
+		_main._free_route(player, pocket)
+		_main._free["held"] = true
+		_main._free["at"] = Time.get_ticks_msec() - 600
+		_main._test_holding = true
+		_main._pick_grid = Vector2(pocket)
+		var held_way: Vector2 = _main._free_intent(player, own)
+		_check(not (_main._free.get("path", []) as Array).is_empty() and held_way != Vector2.ZERO, "held past the hold over the same cell, it still walks and does not steer (%d cells)" % (_main._free.get("path", []) as Array).size())
+		_main._test_holding = false
+		_main._free["held"] = false
+		Net.controls = controls_was
+	else:
+		print("  (no own free body here: the held-click steering row skipped)")
+	# A target that cannot be reached, then moves: its chase walks to the cell nearest it, and plans again as it moves.
+	var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RouteImp", "tile": pocket}) as Monster
+	if foe != null:
+		foe.sight_range = 0
+		_main._free["chase"] = foe
+		_main._free["chase_tile"] = Vector2i(-99999, -99999)
+		_main._free["chase_shove"] = false
+		_main._free["chase_sent"] = Time.get_ticks_msec()  # (A chase as _free_chase_begin makes it: its order not resent here.)
+		_main._free_chase(player, Vector2(free))
+		var first: Array = (_main._free.get("path", []) as Array).duplicate()
+		_check(not first.is_empty() and World.distance(first.back(), pocket) <= 2, "a chase of one in the pocket walks to the cell nearest it (%s)" % [first.back() if not first.is_empty() else "none"])
+		var second_at: Vector2i = rings[1]["centre"]
+		World._relocate(foe, second_at)
+		_main._free_chase(player, Vector2(free))
+		var second: Array = _main._free.get("path", [])
+		_check(not second.is_empty() and World.distance(second.back(), second_at) <= 2 and second.back() != first.back(),
+			"it moves to the other pocket: the route is planned again to the cell nearest that (%s)" % [second.back() if not second.is_empty() else "none"])
+		_main._free["chase"] = null
+		World.despawn(foe)
+	# The cap ends the search early: "nearest" is then the nearest cell the search reached, so the walk goes toward the goal and stops
+	# short of it, never away: a far goal under a tiny bound ends no farther from it than the start, and short of it.
+	var far := Vector2i.ZERO
+	for reach in [60, 50, 45, 40]:
+		for way: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if far == Vector2i.ZERO and World.is_walkable(free + way * reach) and World.get_entity_at(free + way * reach) == null:
+				far = free + way * reach
+	if far == Vector2i.ZERO:
+		print("  (no free far cell to try a short bound on: skipped)")
+	else:
+		var stopped := World.walk_path(free, far, player, World.PATH_FIRE_EXTRA, 150, true)
+		_check(not stopped.is_empty() and stopped.back() != far and World.distance(stopped.back(), far) <= World.distance(free, far),
+			"a bound that ends the search early: toward %s and stopped short at %s, no farther from it than the start (%d to %d)" % [
+				far, stopped.back() if not stopped.is_empty() else "none", World.distance(free, far), World.distance(stopped.back(), far) if not stopped.is_empty() else -1])
+	# Rolf's stand as Umbrage lays it (the wilds' M2, counter row 196): a click from the street on his own cell has a route (round the
+	# counter to his side), so this is a walk-round, not a nearest: it ends at his cell, once, and never farther from it than it began.
+	var rolf_cell := Vector2i(203, 196)
+	var street := Vector2i(203, 201)
+	if World.is_walkable(rolf_cell) and World.is_walkable(street) and World.get_entity_at(street) == null:
+		World._relocate(player, street)
+		var from_street := World.free_cell(player, Vector2(player.tile))
+		_main._free_taken_over(player)
+		_main._free_route(player, rolf_cell)
+		var to_rolf: Array = _main._free.get("path", [])
+		var routed := not World.walk_path(from_street, rolf_cell, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES).is_empty()
+		_check(routed and not to_rolf.is_empty() and to_rolf.back() == rolf_cell,
+			"a click from the street (%s) on the cell behind Rolf's counter %s is a walk-round: a route exists and the walk ends at it (%d cells, from %d off)" % [
+				street, rolf_cell, to_rolf.size(), World.distance(from_street, rolf_cell)])
+	else:
+		print("  (the wilds' M2 cells are not floor here: Rolf's counter row skipped)")
+	_main._free["path"] = []
+	for chest: Chest in blocks:
+		World.despawn(chest)
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's

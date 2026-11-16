@@ -3067,6 +3067,8 @@ var _free := {"path": [], "held": false, "at": 0, "chase": null}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
+## How long a held button's plan that found no way from a cell to the cursor's cell is not searched again (935 amended (1)).
+const NO_ROUTE_MEMORY_MSEC := 1500
 ## A click before the own body's free state is heard (just after a join or a
 ## zone change): its cell, walked once the state comes ({tile, zone, until}),
 ## for up to FREE_WAIT_MSEC (779 amended (2); playtest's bear tour).
@@ -3230,6 +3232,17 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	# A click walks its route; the button still held past FREE_HOLD_SECONDS
 	# steers to the cursor instead (Jeff: "wasn't one click enough before?").
 	var steering: bool = _free["held"] and Time.get_ticks_msec() - int(_free["at"]) > FREE_HOLD_SECONDS * 1000.0
+	# 935 amended (1): a button still down over the very cell it clicked is still the click (a slow frame, or a long search, between
+	# its press and its release turned one into a hold at once, and the steer cleared the click's route); only a cursor moved
+	# off that cell steers (ui-design's joined diagnostic of the healer's door: the first click did nothing).
+	if steering and not is_nan(_mouse_grid().x) and Vector2i(_mouse_grid().round()) == _free.get("click", NONE):
+		steering = false
+		if not _free.get("logged", true):
+			_free["logged"] = true
+			print("[click] kept: held over the clicked cell, the route stays")
+	elif steering and not _free.get("logged", true):
+		_free["logged"] = true
+		print("[click] steer: cursor moved off the clicked cell")
 	if steering and Net.controls != "wasd":
 		_free_taken_over(player)
 		var cursor := _mouse_grid()
@@ -3243,13 +3256,23 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			# Something in the way (a tree, a wall): round it, as a held walk
 			# on the grid went, planned again as the cursor moves.
 			var now := Time.get_ticks_msec()
-			if goal != _free.get("goal", NONE) or now - int(_free.get("planned", 0)) > 300:
+			# 935 amended (1): a plan from this cell to this goal that found nothing is remembered for NO_ROUTE_MEMORY_MSEC, so a button
+			# held over ground nothing reaches searches to the bound once, not at every replan (the cursor moving a cell is a new goal).
+			var none: Dictionary = _free.get("no_route", {})
+			var remembered: bool = none.get("from") == from and none.get("goal") == goal and now - int(none.get("at", 0)) < NO_ROUTE_MEMORY_MSEC
+			if not remembered and (goal != _free.get("goal", NONE) or now - int(_free.get("planned", 0)) > 300):
 				_free["goal"] = goal
 				_free["planned"] = now
 				var route: Array = []
-				for cell: Vector2i in World.walk_path(from, goal, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
+				# 935 amended (1): the nearest too, so a click held past FREE_HOLD_SECONDS (a long first frame between its press and
+				# its release is one) keeps the walk to the cell nearest the cursor that the click itself planned, not an empty route.
+				for cell: Vector2i in World.walk_path(from, goal, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES, true):
 					route.append(cell)
 				_free["path"] = route
+				if route.is_empty():
+					_free["no_route"] = {"from": from, "goal": goal, "at": now}
+				else:
+					_free.erase("no_route")
 			if (_free["path"] as Array).is_empty():
 				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
 	_free_chase(player, at)
@@ -3828,8 +3851,8 @@ func _free_chase(player: Player, at: Vector2) -> void:
 	if target.tile != _free["chase_tile"]:
 		_free["chase_tile"] = target.tile
 		var route: Array = []
-		for step: Vector2i in World.walk_path(cell, target.tile, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES):
-			route.append(step)
+		for step: Vector2i in World.walk_path(cell, target.tile, player, World.PATH_FIRE_EXTRA, World.CLICK_SEARCH_TILES, true):
+			route.append(step)  # With no way to it, to the cell that comes nearest (935 amended: a click with no route).
 		_free["path"] = route
 	var now := Time.get_ticks_msec()
 	if not _free["chase_shove"] and apart > 2 and now - int(_free["chase_sent"]) >= FREE_CHASE_RESEND_MS:
@@ -3868,7 +3891,11 @@ func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEA
 	_free_taken_over(player)
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
+	_free["click"] = tile
+	_free["logged"] = false
+	var searched_from := Time.get_ticks_msec()
 	_free.erase("replanned")  # 689 amended (9): a click's one plan again from where it stands.
+	_free.erase("no_route")  # 935 amended (1): and what the held button found of the last goal is forgotten.
 	_free.erase("repicked")  # Its one other cell beside a chest or a person (_free_beside_again).
 	var path: Array = []
 	var own := _free_own(player)
@@ -3881,9 +3908,13 @@ func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEA
 	# finish (the latency table's click stop went on 0.4 cells into it).
 	tile = clear_of_fire(tile, from, World.is_burning, World.is_walkable)
 	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
-		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, search_tiles):
+		# 935 amended (ui's side): a click with no route walks to the cell that comes nearest it (find_path's nearest, the one
+		# search the bound already runs), and stops there; the talk a click asked for still opens only inside its own reach.
+		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, search_tiles, true):
 			path.append(cell)
 	_free["path"] = path
+	_free["at"] = Time.get_ticks_msec()  # 935 amended (1): the hold is timed from when the route is ready, not from the click's search.
+	print("[click] route: %d cells planned, search %d ms" % [path.size(), int(_free["at"]) - searched_from])
 
 
 ## A click route's end clear of fire (playtest, 2026-11-04: a click on

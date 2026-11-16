@@ -14347,8 +14347,11 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 ## diagonals. Players' own routes only (the prediction's plan and
 ## Player's re-path); monsters keep find_path. [param max_tiles] as
 ## find_path's (0: no bound); a click's routes pass CLICK_SEARCH_TILES.
-func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA, max_tiles := 0) -> Array[Vector2i]:
-	var path := find_path(from, to, true, ignore, max_tiles, false, {}, true, fire_extra)
+## [param nearest] as find_path's: with no way, or the bound reached, the way to the closed cell
+## nearest [param to] (the one search, nothing more; empty if that is [param from]); a click's own
+## walk asks it (935 amended, ui's side), so a route that does not exist ends where it comes nearest.
+func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA, max_tiles := 0, nearest := false) -> Array[Vector2i]:
+	var path := find_path(from, to, true, ignore, max_tiles, nearest, {}, true, fire_extra)
 	if path.size() < 3:
 		return path
 	var pulled: Array[Vector2i] = []
