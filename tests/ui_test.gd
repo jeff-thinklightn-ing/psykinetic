@@ -1863,6 +1863,15 @@ func _test_card_page() -> void:
 	_check(page.feels_shown() == "Wary." and page.feels_why_shown() == "" and not page._feels_why.visible, "a step with no reason: the word alone")
 	# 945: the line under her name, voice's "Where to?" as the theme's FoldLink: shown with her beside the player, hidden otherwise; a click
 	# says it once as the player's own words and the card steps aside.
+	# The package's switch (companions' FirstSteps.on(), levels/companion_traits.json "first_steps"): off, the card asks nothing.
+	var forced_was: int = FirstSteps.forced
+	FirstSteps.forced = 0
+	_main._refresh_card()
+	_check(not page.where_shown(), "the package switched off: no line under her name, whoever is beside him")
+	FirstSteps.forced = 1
+	_main._refresh_card()
+	_check(page.where_shown() == (_main._own_companion() != null and _main._her_beside(_main._own_companion())), "switched on: the line follows her being beside him")
+	FirstSteps.forced = forced_was
 	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "", "", true)
 	_check(page.where_shown() and page._where.text == "Where to?" and page._where.theme_type_variation == &"FoldLink", "her beside him: the line under her name, the theme's FoldLink, voice's words")
 	_check(page._title.get_index() == 0 and page._where.get_index() == 1, "straight under her name (the card's column, index 1)")

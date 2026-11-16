@@ -27275,7 +27275,7 @@ func _refresh_card() -> void:
 		return
 	var pet := _own_companion()
 	card_page.show_state(world_state, Companion._name_of(pet) if pet != null else "",
-		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "", _her_beside(pet))  # Her bond (555) is on her node.
+		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "", _her_beside(pet) and FirstSteps.on())  # Her bond (555) is on her node.
 	_card_bars()
 
 
@@ -27291,7 +27291,7 @@ func _her_beside(pet: Companion) -> bool:
 ## The click on the card's line under her name (945): the player's own words to her, once, and the card steps aside so her answer's
 ## bubble and her first step are seen. The server's ask-way matcher answers (companions' side).
 func _ask_where() -> void:
-	if not _her_beside(_own_companion()):
+	if not FirstSteps.on() or not _her_beside(_own_companion()):
 		return
 	_send_chat(CardPage.WHERE_WORDS)
 	if card_page != null:

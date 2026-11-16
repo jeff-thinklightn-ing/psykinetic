@@ -5283,6 +5283,12 @@ func _test_guide_refuses() -> void:
 	_check(_main._resident_addressed(owner, "yes, %s" % her, pet) == null, "a line naming her is never handed to a resident beside them")
 	# 945: the card's line under her name, said to her: once, with her beside him, and the card steps aside; with her away, nothing is sent.
 	if _main.card_page != null:
+		var steps_was: int = FirstSteps.forced
+		FirstSteps.forced = 0
+		_main._chat_sent_at = -100000
+		_main._ask_where()
+		_check(_main._chat_sent_at == -100000, "the package switched off: a click that could not be made sends nothing")
+		FirstSteps.forced = 1
 		_main._chat_sent_at = -100000
 		_main.card_page.visible = true
 		_main._ask_where()
@@ -5295,6 +5301,7 @@ func _test_guide_refuses() -> void:
 		_check(_main._chat_sent_at == -100000 and not _main._her_beside(pet), "her away: the click sends nothing")
 		_main.card_page.visible = false
 		World._relocate(pet, at_was)
+		FirstSteps.forced = steps_was
 	# A clean passage: into an area by a way, out by one, no stop.
 	var walk: Guide = pet.guide
 	walk.resume()
