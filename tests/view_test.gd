@@ -4154,25 +4154,40 @@ func _test_daylight_indoors() -> void:
 			and ruled.filter(func(key: Vector3i) -> bool: return key.z == Terrain.EAST).size() == 2
 			and not Terrain.edge_key(Vector2i(1, 0), Vector2i(0, -1)) in kept_ruled,
 			"the rule's windows every %d edges from a run's second, none at its ends, none by a kept cell (north at %s, %d in all)" % [Client3D.INSIDE_WINDOW_EVERY, north, ruled.size()])
-	# The Mughouse's ground floor (no cells marked yet): windows drawn, none
-	# by its hearth, its way out or its stair, each a pane painted by the
-	# clock; its way out a patch's row.
+	# The Mughouse's ground floor (maps' four marked, 946 amended (1)): its
+	# windows maps', none by its hearth, its way out or its stair, each a pane
+	# painted by the clock; its way out a patch's row.
 	var ground := Level.load_level("umbrage_tavern")
 	_rig.rebuild(ground["terrain"], ground["spawn_points"]["from_wilds"])
 	var kept_cells := Client3D.inside_kept_cells(ground["terrain"])
 	var floor: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in ground["terrain"]["floor"]:
 		floor[cell] = true
+	# Marked windows answer to the coordinator's terms (never on a door, a
+	# link or the hearth, nor on a piece); the rule's own keep a cell clear
+	# round each (inside_kept_cells).
+	var by_maps := bool(ground["terrain"].get("windows_marked", false))
+	var on_piece := func(cell: Vector2i) -> bool:
+		if cell in ground["terrain"].get("links_at", []):
+			return true
+		for building: Variant in ground["terrain"].get("buildings", []):
+			if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(cell):
+				return true
+		return false
 	var bad: Array = []
 	for key: Vector3i in _rig._inside_windows:
 		var sides := Terrain.edge_cells(key)
 		var inner := sides[0] if floor.has(sides[0]) else sides[1]
-		if kept_cells.has(inner) or _rig._wall_states.get(key) != "window" or inner.distance_to(Vector2i(0, 6)) < 2.0:
+		var window_kept: bool = on_piece.call(inner) if by_maps else kept_cells.has(inner)
+		if window_kept or _rig._wall_states.get(key) != "window" or inner.distance_to(Vector2i(0, 6)) < 2.0:
 			bad.append(key)
 	var doors := _rig._inside_rows.filter(func(row: Array) -> bool: return row[0] == "door")
-	_check(_rig._inside_lit() and _rig._inside_windows.size() >= 4 and bad.is_empty() and _rig._inside_panes.size() == _rig._inside_windows.size()
+	var ground_marked: Array = ground["terrain"].get("windows", [])
+	var as_marked := not bool(ground["terrain"].get("windows_marked", false)) \
+			or (ground_marked.size() == _rig._inside_windows.size() and ground_marked.all(func(key: Vector3i) -> bool: return _rig._inside_windows.has(key)))
+	_check(_rig._inside_lit() and _rig._inside_windows.size() >= 4 and bad.is_empty() and as_marked and _rig._inside_panes.size() == _rig._inside_windows.size()
 			and doors.size() == 2 and _rig._inside_patches != null and _rig._inside_apron != null,
-			"the Mughouse's ground floor: %d windows, none by its hearth, way out or stair (bad %s), each a pane; its way out two patches' rows; the apron laid" % [_rig._inside_windows.size(), bad])
+			"the Mughouse's ground floor: %d windows (maps' marked: %s), none by its hearth, way out or stair (bad %s), each a pane; its way out two patches' rows; the apron laid" % [_rig._inside_windows.size(), ground["terrain"].get("windows_marked", false), bad])
 	# By the clock: noon brighter than 21:30, its panes the sky's and the
 	# background the day's haze; at night deep blue panes, never black, and
 	# the room's look the hearth's as before.
