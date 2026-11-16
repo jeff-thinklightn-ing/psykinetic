@@ -1204,6 +1204,8 @@ static func buildings_words(buildings: Dictionary) -> String:
 	var standing: Array[String] = []
 	var building: Array[String] = []
 	var damaged: Array[String] = []
+	var unkept: Array[String] = []
+	var ruined: Array[String] = []
 	var planned: Array[String] = []
 	var kinds: Array = buildings.keys()
 	kinds.sort()
@@ -1217,7 +1219,11 @@ static func buildings_words(buildings: Dictionary) -> String:
 		if state == "standing":
 			standing.append(name)
 		elif state == "damaged":
-			damaged.append("%s, being mended" % name if progress >= 0.0 else name)
+			damaged.append(mended_words(name) if progress >= 0.0 else name)
+		elif state == "disrepair":
+			unkept.append(mended_words(name) if progress >= 0.0 else name)  # 566 amended (9): its mend never reads as a build.
+		elif state == "ruin":
+			ruined.append(name)
 		elif progress >= 0.0:
 			building.append("%s, %s" % [name, progress_words(progress)])
 		elif state == "planned":
@@ -1229,9 +1235,18 @@ static func buildings_words(buildings: Dictionary) -> String:
 		parts.append("Building: %s." % ", ".join(building))
 	if not damaged.is_empty():
 		parts.append("Damaged: %s." % ", ".join(damaged))
+	if not unkept.is_empty():
+		parts.append("In disrepair: %s." % ", ".join(unkept))
+	if not ruined.is_empty():
+		parts.append("In ruins: %s." % ", ".join(ruined))
 	if not planned.is_empty():
 		parts.append("Planned: %s." % ", ".join(planned))
 	return " ".join(parts)
+
+
+## A damaged or disrepaired [param name] whose repair is worked (566 amended (9)): "the kitchen, being mended".
+static func mended_words(name: String) -> String:
+	return "%s, being mended" % name
 
 
 ## A job's progress (0..1) as a word: begun, half built, nearly done.

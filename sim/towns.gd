@@ -2016,7 +2016,7 @@ func _cull(town: String, flock_now: Dictionary) -> void:
 ## butcher.growth_days without (decision 590).
 func _butcher_comes(town: String) -> void:
 	var rule: Dictionary = rules.get("butcher", {})
-	var wanted: bool = not rule.is_empty() and _stands(town, "butchery")
+	var wanted: bool = not rule.is_empty() and _kept_for_trade(town, "butchery")
 	_comes(town, str(rule.get("trade", "butcher")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Hew"]), "butcher")
 
 
@@ -2055,6 +2055,15 @@ func _farmed(town: String) -> bool:
 ## raised to its next level (BUILDING) still stands at the level it has (522 amended (3): with the
 ## stall uncapped a town raises its buildings while a repair waits on ore, and a loom under its
 ## second stage turned its weaver away; a field under its second its farmer's crop and its farmer).
+## Whether [param town]'s [param kind] is there for its trade to come to (566 amended (9), the coordinator's ruling
+## 11-15: the trade comes back first, the walls after): built to a level and standing, being raised, damaged or in
+## disrepair. A pasture that fell into disrepair for want of a shepherd (Umbrage's, the box, 11-15) still brings one,
+## so "no shepherd, so it fell, so no shepherd" cannot close on itself; a ruin is none.
+func _kept_for_trade(town: String, kind: String) -> bool:
+	var house := building(town, kind)
+	return int(house.get("level", 0)) >= 1 and house.get("state") in [STANDING, BUILDING, DAMAGED, DISREPAIR]
+
+
 func _stands(town: String, kind: String) -> bool:
 	var house := building(town, kind)
 	return int(house.get("level", 0)) >= 1 and house.get("state") in [STANDING, BUILDING]
@@ -2066,7 +2075,7 @@ func _stands(town: String, kind: String) -> bool:
 ## (as a field gets its farmer).
 func _shepherd_comes(town: String) -> void:
 	var rule: Dictionary = rules.get("flock", {})
-	var wanted: bool = not rule.is_empty() and _stands(town, "pasture")
+	var wanted: bool = not rule.is_empty() and _kept_for_trade(town, "pasture")
 	_comes(town, str(rule.get("trade", "shepherd")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Wat"]), "shepherd")
 
 
@@ -2076,7 +2085,7 @@ func _shepherd_comes(town: String) -> void:
 ## from wool (items' 500).
 func _weaver_comes(town: String) -> void:
 	var rule: Dictionary = rules.get("flock", {}).get("weaver", {})
-	var wanted: bool = not rule.is_empty() and _stands(town, "loom")
+	var wanted: bool = not rule.is_empty() and _kept_for_trade(town, "loom")
 	_comes(town, str(rule.get("trade", "weaver")), wanted, float(rule.get("growth_days", 3)), rule.get("names", ["Joan"]), "weaver")
 
 

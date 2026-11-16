@@ -1251,10 +1251,10 @@ static func plot_stage(record: Dictionary) -> int:
 
 
 ## Whether [param record]'s building stands in scaffold: a level being
-## raised, or a repair under way (damaged, with a job's progress).
+## raised, or a repair under way (damaged or, 566 amended (9), in disrepair, with a job's progress).
 static func scaffolded(record: Dictionary) -> bool:
 	var state := str(record.get("state", Towns.STANDING))
-	return record.has("progress") and (state == Towns.DAMAGED
+	return record.has("progress") and (state in [Towns.DAMAGED, Towns.DISREPAIR]
 			or state == Towns.BUILDING and int(record.get("level", 0)) >= 1)
 
 

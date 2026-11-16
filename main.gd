@@ -23735,6 +23735,8 @@ func _task_for(body: Resident) -> Dictionary:
 		return _hauler_task(body)
 	var build := _build_of(body)
 	if not build.is_empty():
+		if bool(build.get("repair", false)):
+			return _repair_task(body, build["building"])
 		return _build_task(build["building"], float(build["progress"]))
 	return {}
 
@@ -24086,6 +24088,7 @@ func _prop_spot(slot: String, around: Vector2i, within: int, near: Vector2i) -> 
 func _build_of(body: Resident) -> Dictionary:
 	var use := ""
 	var progress := -1.0
+	var repair := false
 	if _build_stub.has(body.worker_id):
 		use = str(_build_stub[body.worker_id].get("use", ""))
 		progress = float(_build_stub[body.worker_id].get("progress", 0.0))
@@ -24097,6 +24100,10 @@ func _build_of(body: Resident) -> Dictionary:
 			if str(job.get("worker", "")) != body.worker_id and str(job.get("trade", "")) != body.trade:
 				continue
 			use = str(job.get("recipe", ""))
+			# A repair's recipe is Towns.REPAIR + its kind (566): the building it works is its kind's (566 amended (9):
+			# matched against the whole recipe, a repair found no building and the carpenter stood idle at the temple).
+			repair = use.begins_with(Towns.REPAIR)
+			use = use.trim_prefix(Towns.REPAIR)
 			progress = float(job.get("worked", 0)) / maxf(float(job.get("needed", 1)), 1.0)
 			var told: float = World.towns.build_progress(body.town, use)
 			if told >= 0.0:
@@ -24107,8 +24114,38 @@ func _build_of(body: Resident) -> Dictionary:
 	var key := str(World.holdings.place(body.town).get("key", ""))
 	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
 		if str(building.get("town", "")) == key and str(building.get("use", "")) == use and building.get("rect") is Rect2i:
-			return {"building": building, "progress": progress}
+			return {"building": building, "progress": progress, "repair": repair}
 	return {}
+
+
+## The carpenter's task at a repair of [param building] (566 amended (9), the coordinator's ruling 11-15: a
+## repair is worked at the building): hammering on a cell beside it, outside its rect, facing the wall beside
+## her; the cell she stands on when it is one, else the first free one from its front round (never a link's
+## cell, nor a door's two cells, Main.door_cells); {} when none is free, and she works from her bench as before.
+func _repair_task(body: Resident, building: Dictionary) -> Dictionary:
+	var rect: Rect2i = building["rect"]
+	var doors := door_cells(building)
+	var ring: Array[Vector2i] = []
+	for x in range(rect.position.x - 1, rect.end.x + 1):
+		for y in range(rect.position.y - 1, rect.end.y + 1):
+			var at := Vector2i(x, y)
+			if not rect.has_point(at) and not doors.has(at) and not World.is_link_cell(at):
+				ring.append(at)
+	var front := Level.front_cell(rect, building.get("facing", Vector2i(0, 1)))
+	ring.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var da := World.distance(a, front)
+		var db := World.distance(b, front)
+		return da < db or da == db and (a.y < b.y or a.y == b.y and a.x < b.x))
+	var cell := body.tile if ring.has(body.tile) else World.NO_CELL
+	if cell == World.NO_CELL:
+		for at: Vector2i in ring:
+			if World.is_free(at):
+				cell = at
+				break
+	if cell == World.NO_CELL:
+		return {}
+	var wall := Vector2i(clampi(cell.x, rect.position.x, rect.end.x - 1), clampi(cell.y, rect.position.y, rect.end.y - 1))
+	return {"kind": "hammer", "cell": cell, "face": wall, "walking": false}
 
 
 ## The carpenter's task at a build [param building] (a world map record):

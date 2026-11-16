@@ -24019,6 +24019,25 @@ the views told, the Ledger back to "Planned", and the new holder takes it up.
   - Then `stock wilds/store wood 20`, and wait for the journal's "(carpenter) starts repair:kitchen": scaffold.
   - (7)'s trimmed half comes back only on that look.
 - Server only; protocol unchanged; no class_name; no bullet; no package.
+
+566 amended (9): a repair is worked at the building, and the Ledger says it is in hand (the coordinator's ruling, 2026-11-15, after ui-design's look at (8)'s damaged kitchen; label from tools/decision_number.sh; voice's words, 11-15).
+- **What was wrong.** On (8)'s look the carpenter stood near the temple the whole repair. Main._build_of matched the job's recipe, "repair:kitchen", against a map building's use, so a repair found no building and she had no task. Towns.build_progress was asked with the same whole recipe.
+- **What damages a building in ordinary play.** Disrepair (649): owed upkeep, or none of its trade in town, for decline.unkept_days. Raids only when switched on (328); the console's damage verb in tests and looks. On the box, release's journal read found Umbrage's pasture fallen into disrepair on 11-15, its shepherd dead on 11-14/15.
+- **The carpenter at the building.** _build_of takes off Towns.REPAIR and says the build is a repair. Main._repair_task gives her hammering on a cell of the ring about the building's rect: the cell she stands on when it is one, else the first free one counted from its front cell round. Never a link's cell, never a door's two cells (Main.door_cells). She faces the wall beside her. With no free cell in the ring, no task: she works from her bench as before.
+- **The Ledger** (TownSheet.buildings_words, voice's words): after "Damaged:", the groups "In disrepair: the pasture." and "In ruins: the inn.", before "Planned:". A damaged or disrepaired building whose repair is worked reads "..., being mended." (TownSheet.mended_words) and never as a new build. Before this a building in disrepair was named nowhere and its mend read "Building: the pasture, half built". BuildingComposer.scaffolded stands a disrepair's mend in scaffold, as a damaged one's.
+- **Why the Ledger showed nothing on (8)'s look.** The views are told a building's progress with the "town" message as a repair starts and at each stage it crosses, on the town's turn (Towns._stages, building_changed). Net.broadcast hands the same message to the host's own handler as to a joined client's, so the record the views hold carries the progress once a repair is worked, the Ledger's line and BuildingComposer.scaffolded both read it, and their figure trails the sim's by up to a turn. Client3D._show_stage draws a scaffold only for a building with a composed kind; the joined watch shows whether the kitchen's does.
+- **The trade first, the walls after.** Towns._kept_for_trade (built to a level and standing, being raised, damaged or in disrepair; a ruin none) is what brings a shepherd to a pasture, a weaver to a loom and a butcher to a butchery, in place of _stands. A pasture that fell for want of a shepherd still brings one, so "no shepherd, so it fell, so no shepherd" cannot close on itself; the loom and the butchery had the same loop and get the same answer (the coordinator, 11-15). A ruin brings no one: there is nothing left there to keep, and a season on the wild takes its ground (649). The trade's coming never needs wood: the newcomer comes (or is sought) on growth_days alone, and the walls' mend waits for its wood after. The farmer's walk-in already came to a field not standing (613 amended (5)).
+- **The wood a pending repair waits for.** Nothing is set aside. The 60-day founding soaks (C:/dev/review/economy/founding_town_page.md) start from an empty store with a woodcutter and hold 186 to 341 wood by day 21 in every run, every draw met. A repair's job takes its wood when it starts.
+- **No new art.** The drawn stage is the composer's scaffold, already there.
+- **Tests.** repair_site_test (new, port 17998) on the laid world:
+  - Umbrage's kitchen damaged and its repair taken up.
+  - Her build is the kitchen's repair, her task a hammer beside the kitchen, outside it, not in its door, facing its wall. At 0.4 she stands beside it.
+  - The views' record carries progress; the Ledger reads "Damaged: the kitchen, being mended."; the composer stands it in scaffold.
+  - A building with no free cell about it: no task.
+  - The disrepair and ruin groups and the disrepair's mend, in voice's words.
+  - A pasture in disrepair wants a shepherd, and after flock.growth_days word goes out for one; a ruin wants none.
+  - Also farm_test, resident_test, ui_test, view_test, view_world_test, towns_test, town_day_test and suite_test PASS.
+- Client and server; protocol unchanged (the "town" message carries what it did); no new class_name; no bullet until the joined watch (the carpenter beside the kitchen and the Ledger's line mid-repair), voice's words after.
 ## 566, builder's side: a woodlot's standing cell, and builds with no site
 
 On npc's visible-work page (566, the coordinator's approval): a marked but
