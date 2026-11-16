@@ -15318,6 +15318,15 @@ func _test_two_hands() -> void:
 	slots[Items.LEFT_HAND] = ""
 	player.slots = slots
 	player.raised = ""
+	# Roused before each read of its stance (perf's flakes.md, three sightings, 11-16; combat's read): Client3D._calm
+	# is on the wall clock, REST_SECONDS since the body was last roused, and a loaded suite ran the rows before this past
+	# it: the body calm, its two-handed piece stowed (no Axe_Ready, no reach, the left hand 0.05 m off its grip_2), or
+	# its upper layer left as it was (Axe_Overhead under the shield).
+	var rouse := func() -> void:
+		var body: Node3D = _rig._puppets.get(player.get_instance_id())
+		if body != null:
+			body.set_meta("roused_at", Time.get_ticks_msec())
+	rouse.call()
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
 	var sockets: Dictionary = puppet.get_meta("sockets")
@@ -15349,6 +15358,7 @@ func _test_two_hands() -> void:
 	# and is on it there; at the contact and held down after it, the head on the ground before him.
 	slots[Items.RIGHT_HAND] = "tomb_sledge"
 	player.slots = slots
+	rouse.call()
 	_rig._process(0.0)
 	var sledge_sockets: Dictionary = ArtKit.spec("item.tomb_sledge").get("sockets", {})
 	var grip_up := float(sledge_sockets["grip"][1])
@@ -15381,6 +15391,7 @@ func _test_two_hands() -> void:
 		for step in int(length / 0.05) + 1:
 			rig.tree.set("parameters/action_seek/seek_request", minf(step * 0.05, length))
 			rig._apply()
+			rouse.call()
 			_rig._process(0.0)
 			var grip := reach.grip
 			await get_tree().process_frame
@@ -15410,10 +15421,12 @@ func _test_two_hands() -> void:
 		rig._strike_msec = 0
 		for i in 4:
 			await get_tree().process_frame
+		rouse.call()
 		_rig._process(0.0)
 		_check(not rig.striking() and is_equal_approx(reach.grip.y, grip_2), "the blow done: back at grip_2 (%.2f)" % reach.grip.y)
 	slots[Items.RIGHT_HAND] = "giant_axe"
 	player.slots = slots
+	rouse.call()
 	_rig._process(0.0)
 	# A one-handed weapon never swings a two-handed clip (the war hammer did: its left hand came up
 	# beside the haft holding nothing).
@@ -15424,10 +15437,12 @@ func _test_two_hands() -> void:
 	_check(one_handed.is_empty(), "no one-handed weapon strikes with both hands (%s)" % [one_handed])
 	slots[Items.LEFT_HAND] = "shield"
 	player.slots = slots
+	rouse.call()
 	_rig._process(0.0)
 	_check(reach == null or not reach.active, "a shield in the left: no reach")
 	_check(rig.upper_clip() == "", "nor the ready stance (%s)" % rig.upper_clip())
 	player.slots = was
+	rouse.call()
 	_rig._process(0.0)
 
 
