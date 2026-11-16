@@ -1651,6 +1651,11 @@ const KNEEL_UP := "Kneel_Up"
 const SEAT_EASE := 0.5
 const FIDGET_SECONDS_MIN := 6.0
 const FIDGET_SECONDS_MAX := 25.0
+## No fidget sooner than this (s) after the body last moved (the coordinator's ruling on ui-design's hops, 11-16:
+## a fidget's time, on the wall clock, came due during a two-cell hop and Fidget_Shoulders played straight out of
+## the jog, no Idle between, the next hop starting out of it). "moved_at", on the rigs' clock, from the frame it
+## last moved; a body that has not moved fidgets as before.
+const FIDGET_SETTLE := 1.5
 const FIDGET_CALM_SECONDS := 4.0
 const TIRED_BELOW := 0.34
 ## A wound-up blow (Monster's HEAVY): this clip, played so that its swing
@@ -28378,6 +28383,7 @@ func _animate(puppet: Node3D) -> void:
 	# fall under WALKING a quarter second later: held from there, it stands STOP_HOLD after it stopped.
 	if seconds > 0.0 and step.length() / seconds > WALKING:
 		puppet.remove_meta("still_since")
+		puppet.set_meta("moved_at", clock)  # A fidget waits FIDGET_SETTLE from here.
 	elif seconds > 0.0 and not puppet.has_meta("still_since"):
 		puppet.set_meta("still_since", clock)
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
@@ -28508,7 +28514,7 @@ func _animate(puppet: Node3D) -> void:
 		return
 	var idle := _idle_clip(puppet)
 	var both_hands := puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active  # Ready with a two-hander: no fidgets.
-	if idle == CLIP_IDLE and calm and not both_hands and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)):
+	if idle == CLIP_IDLE and calm and not both_hands and puppet.has_meta("rng") and now >= int(puppet.get_meta("fidget_at", 0)) and _settled(puppet):
 		var rng: RandomNumberGenerator = puppet.get_meta("fidget_rng", puppet.get_meta("rng"))
 		puppet.set_meta("fidget_at", now + int(rng.randf_range(FIDGET_SECONDS_MIN, FIDGET_SECONDS_MAX) * 1000.0))
 		var fidget := _pick_fidget(puppet, rig)
@@ -28516,6 +28522,12 @@ func _animate(puppet: Node3D) -> void:
 			_play_fidget(puppet, rig, fidget, now, tempo)
 			return
 	rig.loop(idle, tempo)
+
+
+## Whether [param puppet] has stood FIDGET_SETTLE since it last moved ("moved_at"; never moved, true): a fidget
+## rises out of its Idle, never out of the gait it stopped from.
+static func _settled(puppet: Node3D) -> bool:
+	return not puppet.has_meta("moved_at") or AnimRig.now_msec() - int(puppet.get_meta("moved_at")) >= int(FIDGET_SETTLE * 1000.0)
 
 
 ## Its gait for [param speed] (m/s, the quick read), looped at the stride's rate: chosen and paced by
