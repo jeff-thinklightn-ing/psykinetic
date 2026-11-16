@@ -121,6 +121,11 @@ that the walk looks like skipping and the people look like "bad claymation place
   `sh tools/land_lock.sh take <tree> "<what>"`, then fetch, rebase, import, `bash
   tests/land.sh` (it sees your take and doesn't queue again), push,
   `sh tools/land_lock.sh release <tree>`, and `sh tools/heavy_job.sh release <tree> $kind`.
+  A release that can't remove the lock's folder (a file another process holds open on Windows)
+  retries for 5 s, then prints `release incomplete`, logs the files left and exits 5 (667 amended
+  (6), 116c867e1). Your push stands: log it and give back your gate take, never loop on the
+  release. The remnant is held under your name and goes stale by the rule; the next take after
+  that clears it. Only its owner or release releases it by hand.
   Fetch and rebase onto `origin/main` before you take the gate as well as after the lock, so
   the gate's waiter runs main's code: a take queued from an older checkout is judged by that
   older code until the tree rebases (394 amended (53), (54); `heavy_job.sh status` lists each
