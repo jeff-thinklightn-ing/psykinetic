@@ -244,7 +244,7 @@ static func _is_letter(code: int) -> bool:
 
 ## The names the game's own texts use (NAME_FILES), read once. Always a name: a value that is one
 ## capitalized word (a names list's, "Rook", "Wren"), a person's name in lore (an entry of type
-## "person": "Wren", "Pip"), and the name of a title ("Brand the Ox"), whatever else the texts write
+## "person": "Wren", "Pip"), and the name of a title, a whole value ("Brand the Ox"), whatever else the texts write
 ## in small letters (the coordinator's rule, 2026-11-11, after voice's keep-list). A word they write
 ## capitalized mid-sentence (after a small letter or a comma; "Mound-breakers" with its hyphen) is a
 ## name unless they also write it in small letters in prose ("Old Marta" is old Marta: "old" is a
@@ -265,7 +265,9 @@ static func is_name(word: String) -> bool:
 		var mid := RegEx.create_from_string("[a-z,] ([A-Z][a-z']+(?:-[a-z]+)*)")
 		var capital := RegEx.create_from_string("[A-Z][a-z']+")
 		var lone := RegEx.create_from_string("^[A-Z][a-z']+$")
-		var titled := RegEx.create_from_string("^([A-Z][a-z']+) the [A-Z]")
+		# A title's name only from a whole value ("Brand the Ox"): prose opening "When the Blood Rot's ..."
+		# or "That's the Mughouse" made "When" and "That's" names (853 amended (20), lore's find).
+		var titled := RegEx.create_from_string("^([A-Z][a-z']+) the [A-Z][a-z']+$")
 		var small := RegEx.create_from_string("(?:^|(?<=[ (\"]))([a-z][a-z']+)(?=[ ,.;:!?)\"]|$)")
 		var phrase := RegEx.create_from_string("(?<=[a-z,] )([A-Z][a-z']+(?: (?:of the |of |the )?[A-Z][a-z']+)+)")
 		var phrases := {}

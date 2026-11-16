@@ -55260,6 +55260,17 @@ made on it at noon, Hob moves off at his next pick (at once) to (150, 233) in hi
 from (152, 230) then reaches the inside (4 steps). door_day_test, resident_test, town_day_test PASS. Server only;
 protocol unchanged; no new class_name; no bullet (ui's door click carries what a player sees).
 
+853 amended (20) (lore's find in companions' 945 amended (2) transcript, the coordinator's ruling, 2026-11-16;
+label from tools/decision_number.sh; lore carries it in npc's place while npc's session is stopped): a title's
+name comes only from a whole value. Hearsay.is_name took the first word of any text that opened "X the
+<Capital>" as a title's name, meant for "Brand the Ox", so prose made names of "When" (blood_rot.spill, "When the
+Blood Rot's numbers ..."), "Those" ("Those the Blood Rot take ...") and "That's" (voice's "That's the Mughouse"),
+and hollowfell.barrow_gold was said "It is said that When Hollowfell was lost ...". Now the pattern is a whole
+value, ^X the Y$: "Brand the Ox" (named_enemies' name, the one titled name in the data) is still one, and those
+words open a rumour in small letters. resident_test _test_lower_first: the rumour said "It is said that when
+Hollowfell ...", "Those" and "That's" lowered, Brand still a name. No player-facing line changes but that
+rumour's capital; no bullet.
+
 ## 851. Builder's tools run headless on a level, and level.json is written in its own words
 
 The coordinator's approval, for Umbrage (Jeff, 11-10: one area at a time, Umbrage first). Maps lays

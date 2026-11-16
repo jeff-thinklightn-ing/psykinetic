@@ -5208,6 +5208,16 @@ func _test_lower_first() -> void:
 		"Brand holds the key.", "Mound-breakers dig by night.", "Old Tam mends bones.", "Brother Cuth prays."]
 	_check(people.all(func(line: String) -> bool: return Hearsay._lower_first(line) == line), "people's names kept: %s" % [people.map(func(line: String) -> String: return Hearsay._lower_first(line))])
 	_check(Hearsay._lower_first("Mound of earth.") == "mound of earth.", "a word of a hyphened name lowered alone (%s)" % Hearsay._lower_first("Mound of earth."))
+	# 853 amended (20) (lore's find, 2026-11-16): a title's name comes from a whole value ("Brand the Ox",
+	# named_enemies), never from prose that opens "X the Y" (blood_rot.spill's "When the Blood Rot's ...").
+	var barrow_gold := {"text": "When Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed.", "hearsay": true}
+	_check(Hearsay.said_of(barrow_gold) == "It is said that when Hollowfell was lost, the town turned to the crypt's gold, and that is part of why Umbrage is cursed.",
+		"a rumour opening \"When\" lowered (%s)" % Hearsay.said_of(barrow_gold))
+	_check(Hearsay._lower_first("Those the Blood Rot take are carried off.") == "those the Blood Rot take are carried off." and Hearsay._lower_first("That's the Mughouse.") == "that's the Mughouse.",
+		"\"Those\" and \"That's\" opening \"X the Y\" lowered (%s, %s)" % [Hearsay._lower_first("Those the Blood Rot take are carried off."), Hearsay._lower_first("That's the Mughouse.")])
+	_check(Hearsay.is_name("Brand") and not Hearsay.is_name("When") and not Hearsay.is_name("Those") and not Hearsay.is_name("That's")
+		and Hearsay._lower_first("Brand the Ox carries the key.") == "Brand the Ox carries the key.",
+		"a title's name still a name, prose's first words not (Brand %s, When %s, Those %s, That's %s)" % [Hearsay.is_name("Brand"), Hearsay.is_name("When"), Hearsay.is_name("Those"), Hearsay.is_name("That's")])
 	# 289 amended (1), npc's side: a rumour that already speaks as one is not wrapped again.
 	var forge := {"text": "Rumour tells of a great dwarven forge deep below the castle.", "hearsay": true, "speaks_as_rumour": true}
 	var plain := {"text": "Raiders can kill.", "hearsay": true}
