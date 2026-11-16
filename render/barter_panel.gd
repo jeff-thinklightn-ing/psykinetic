@@ -563,7 +563,10 @@ func _size_asks() -> void:
 		return
 	var row_h := (_asks_box.get_child(0) as Control).get_combined_minimum_size().y
 	var gap := float(_asks_box.get_theme_constant(&"separation"))
-	_asks_scroll.custom_minimum_size = Vector2(0.0, shown * row_h + (shown - 1) * gap)
+	# The viewport is the scroll less its panel's margins (the theme's inset: 16 px top and bottom together): the rows alone left that much
+	# short, and two asks scrolled (852 amended (9): ui-design's route7e still of Hob's window, "Bring him herbs" cut at the foot).
+	var margins := _asks_scroll.get_theme_stylebox(&"panel").get_minimum_size().y
+	_asks_scroll.custom_minimum_size = Vector2(0.0, shown * row_h + (shown - 1) * gap + margins)
 
 
 ## One row of the asks (the part ui-design swaps for UiRow): [param title] on the left, [param amount] gold on

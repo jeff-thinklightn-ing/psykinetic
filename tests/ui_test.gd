@@ -4484,6 +4484,19 @@ func _test_resident_asks() -> void:
 	_check(BarterPanel.asks_of(offers, false).map(func(o: Dictionary) -> String: return str(o["title"])) == ["Take the rescue", "Give toward the well", "Buy a knife"]
 		and BarterPanel.asks_of(offers, true).size() == 2,
 		"asks: the open one, the ware and the words-only one are no rows; a plain buy is one only where the person has no squares")
+	# 852 amended (9), first, before Main's window is open (its per-frame reach check would shut it in the frames the layout needs):
+	# A window of its own beside Main's (Main's per-frame reach check shuts Main's: the frames the layout needs would end this test's window).
+	var own := BarterPanel.new()
+	_main.add_child(own)
+	await get_tree().process_frame
+	own.open(me, "Hob")
+	own.set_person(me, true, false)
+	own.show_asks(me, offers.slice(0, 2), 7)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var two_bar: VScrollBar = own._asks_scroll.get_v_scroll_bar()
+	_check(not two_bar.visible or two_bar.max_value <= two_bar.page + 0.5, "two asks: the list shows both rows whole, no scrollbar (bar %s, max %.0f, page %.0f)" % [two_bar.visible, two_bar.max_value, two_bar.page])
+	own.queue_free()
 	var asked: Array = []
 	panel.offer_asked.connect(func(id: String, gold: int) -> void: asked.append([id, gold]))
 	panel.open(me, "Hob")
@@ -4512,6 +4525,7 @@ func _test_resident_asks() -> void:
 	var chip: Node = panel._asks_box.get_child(1).get_node_or_null("Price")
 	_check(chip is UiPrice and (chip as UiPrice).shown() == "10" and (chip as UiPrice).mode == "gold" and panel._asks_box.get_child(0).get_node_or_null("Price") == null,
 		"a priced row carries the UiPrice chip (the coin and the number), a free one none")
+	# 852 amended (9): Hob's two asks show whole, unscrolled (the scroll's viewport, its size less the theme's panel margins, holds the rows).
 	var many: Array = []
 	for i in 6:
 		many.append({"id": "hob|commission|m%d" % i, "kind": "commission", "title": "Ask %d" % i, "words": "", "accept": "take", "cost": 0})
@@ -4520,11 +4534,14 @@ func _test_resident_asks() -> void:
 	var box: VBoxContainer = panel._asks_box
 	var one: float = (box.get_child(0) as Control).get_combined_minimum_size().y
 	var gap := float(box.get_theme_constant(&"separation"))
-	_check(box.get_child_count() == 6 and is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 4.0 * one + 3.0 * gap)
+	_check(box.get_child_count() == 6 and is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 4.0 * one + 3.0 * gap + panel._asks_scroll.get_theme_stylebox(&"panel").get_minimum_size().y)
 		and panel._asks_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED and panel._asks_scroll.visible,
 		"six asks: the list is four rows and three gaps high, the rest scroll, never sideways (%s)" % [panel._asks_scroll.custom_minimum_size])
+	var six_bar: VScrollBar = panel._asks_scroll.get_v_scroll_bar()
+	_check(six_bar.visible and six_bar.page >= 4.0 * one + 3.0 * gap - 0.5 and six_bar.max_value > six_bar.page,
+		"six asks: four rows show whole, the other two scroll (page %.0f for 4 x %.0f + 3 x %.0f, max %.0f)" % [six_bar.page, one, gap, six_bar.max_value])
 	panel.show_asks(me, many.slice(0, 2), 7)
-	_check(is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 2.0 * one + gap), "two asks: it shrinks to fit")
+	_check(is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 2.0 * one + gap + panel._asks_scroll.get_theme_stylebox(&"panel").get_minimum_size().y), "two asks: it shrinks to fit")
 	panel.show_asks(me, offers.slice(0, 1), 7)
 	panel.show_asks(null, offers, 7)
 	_check(panel.asks_shown() == ["Take the rescue|"], "another person's offers change nothing")
