@@ -459,11 +459,17 @@ const IDLE_AS := {"boar_king": "boar", "old_wolf": "wolf"}
 ## of no known body sniffs or shifts its feet. No cough: a cough from a well
 ## person would tell a player they are sick when they aren't (the shakes are
 ## a thing in this world, and the town's troubles are seen and felt), so the
-## cough slots (voice.idle_cough_male, _female) are kept unplayed, for the
-## sick (the coordinator, 11-15).
+## cough slots (voice.idle_cough_male, _female) are the sick's alone
+## (sick_cough, 940 amended).
 const IDLE_PEOPLE_WORDS: Array[String] = ["", "watch", "lean", "listen", "tend"]
 const IDLE_PEOPLE := {"throat": 0.40, "sniff": 0.25, "scuff": 0.35}
 const SCUFF := "scuff"
+
+
+## A sick person's cough (940 amended; Client3D._idle_people, a resident
+## whose ailing is set): in its body's voice, the male take with no body known.
+static func sick_cough(body: StringName) -> String:
+	return "voice.idle_cough_%s" % ("female" if body == &"female" else "male")
 
 
 ## The small sound a person at [param word] makes, drawn by [param pick]

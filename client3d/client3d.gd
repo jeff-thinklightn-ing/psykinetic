@@ -2812,6 +2812,9 @@ const PEOPLE_REACH := 8
 const PEOPLE_EVERY_S := 90.0
 const PEOPLE_PER_MINUTE := 4
 const PEOPLE_APART_MS := 30000
+## The sick (940 amended): a resident with an ailing (Resident.ailing) rolls
+## this many times as often, at any activity, and coughs (SoundKit.sick_cough).
+const SICK_MORE := 2.0
 ## A shifted foot's scuff (940): the cell's own footstep this far under the step.
 const SCUFF_DB := -8.0
 ## The mine's cart (769): its rolling loop held while its tile moves, its
@@ -29717,11 +29720,20 @@ func _idle_people(now: int, roll := -1.0, pick := -1.0) -> void:
 			continue
 		var word := str(person.activity)
 		var puppet: Node3D = _puppets[id]
-		if not word in SoundKit.IDLE_PEOPLE_WORDS or not people_due(_people_heard, int(_people_at.get(id, -PEOPLE_APART_MS)), now) 				or now - int(_combat_at.get(id, -IDLE_QUIET_MS)) < IDLE_QUIET_MS 				or now - int(puppet.get_meta("cried_at", -IDLE_QUIET_MS)) < IDLE_QUIET_MS:
+		# The sick (Resident.ailing, replicated; 940 amended) cough, abed or
+		# walked to the healer, and roll SICK_MORE times as often; the well
+		# never cough.
+		var sick := person.ailing != ""
+		var quiet := (not sick and not word in SoundKit.IDLE_PEOPLE_WORDS)
+		quiet = quiet or not people_due(_people_heard, int(_people_at.get(id, -PEOPLE_APART_MS)), now)
+		quiet = quiet or now - int(_combat_at.get(id, -IDLE_QUIET_MS)) < IDLE_QUIET_MS
+		quiet = quiet or now - int(puppet.get_meta("cried_at", -IDLE_QUIET_MS)) < IDLE_QUIET_MS
+		if quiet:
 			continue
-		if (randf() if roll < 0.0 else roll) >= IDLE_EVERY_MS / 1000.0 / PEOPLE_EVERY_S:
+		if (randf() if roll < 0.0 else roll) >= IDLE_EVERY_MS / 1000.0 / PEOPLE_EVERY_S * (SICK_MORE if sick else 1.0):
 			continue
-		var slot := SoundKit.idle_person(word, _look_body(puppet), randf() if pick < 0.0 else pick)
+		var body := _look_body(puppet)
+		var slot := SoundKit.sick_cough(body) if sick else SoundKit.idle_person(word, body, randf() if pick < 0.0 else pick)
 		if slot == "":
 			continue
 		var scuff := slot == SoundKit.SCUFF

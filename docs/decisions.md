@@ -59092,3 +59092,39 @@ checks pass and each ran; a list out of shape fails naming it and its --fix, the
 land.ps1 -Checks the same). The first landing (22:03) failed on it, the fake project having no list_lines.py.
 
 Tools, tests and two lists' layout; protocol unchanged; no new class_name; no bullet.
+940 amended (1): the sick cough (sound; the label from tools/decision_number.sh; the coordinator's approval 11-15, with
+economy's word that the client already has it). The cough left 940's idle set because it must mean sick; now
+the sick are heard by it. Client3D._idle_people: a resident whose Resident.ailing is set (replicated, "" while
+well, else "a fever", "a cough" or "the shakes"; economy) is heard at any activity and coughs
+(SoundKit.sick_cough: voice.idle_cough_male or _female by the body, the male take with no body known), rolling
+SICK_MORE (2) times as often as the well, within PEOPLE_REACH, in the same cap as the rest (PEOPLE_PER_MINUTE
+from everyone, one person once in PEOPLE_APART_MS), and like the rest made only if the listener can hear it
+(through a wall a voice carries half as far). Any of the three sicknesses coughs (the cough is the sound that
+says "sick"; the hint names which), abed and while a player walks them to the healer (the coordinator: the one
+time a player is sure to be beside them). The well never cough. No protocol change.
+
+The cough reads ailing, never activity: a sick resident abed shows activity "" (Resident._sim_tick's sick
+branch, Doing.BED, returns before _show_work_now, the only place that sets "sleep"), and a sleeper's "sleep"
+can't tell sick from asleep (economy). Economy and the coordinator have the pose that follows (standing Idle
+with the standing fidgets on the bed's cell, never lying) for npc and animation; nothing of it changes here.
+
+Joined reads on a local host (EARS_ONLY=sick, new: at noon the first resident ailing, followed home until
+still SICK_STILL (6) s, then stood 1 cell off SICK_STAND (120) s, and again at 23:00; a line a second of what
+the client shows of them, activity, ailing, tile, facing and the clip its rig plays), with levels/townsfolk.json
+"sick" "chance" 1.0 in a scratch checkout, never committed (economy's recipe); the server logged "wilds/store:
+Maud took to bed with a fever, day 0". kept/ears_20261115_172107 and ears_20261115_172747 (copies in
+C:/dev/review/sound/sick_pose/), exit 0, SCRIPT ERROR 0 in client and server logs:
+- 172107: Maud still on (209, 197); I stood on (210, 197) under a roof, inside her house (the beds on the
+  muffled bus), so her cough on the clear bus: none at noon, one at 23:00 (-25.4 dB).
+- 172747: Maud still on (211, 197); I stood on (212, 197) under the sky, outside her wall (the beds clear),
+  so her coughs muffled: one at noon (-29.5), three at 23:00 (-27.5, -28.3, -29.9; 77 s and 37 s apart).
+- Five coughs in eight minutes, about one every 96 s, every one voice.idle_cough_female, her body's; one
+  two-minute stand of the four had none. No other idle sound at that stand, and no well person coughed.
+- Her lines: activity "" on every one, ailing "a fever", the clip Idle, Idle_LookAround and the Fidget_
+  clips, never a lying one.
+
+view_test _test_idle_people: the sick abed ("sleep") cough, each once, a female body in her voice and one of
+no body the male take, at a roll between the well's odds and the sick's, the well silent at that roll.
+sound_kit_test: sick_cough by body. Pretests: load_check, sound_kit_test, view_test, view_world_test PASS.
+
+Client sound only; protocol unchanged; no new class_name; no new Client3D var.

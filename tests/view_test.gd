@@ -2062,7 +2062,7 @@ func _test_idle_voices() -> void:
 
 
 ## 940: a town's people at rest heard now and then: a cleared throat in
-## the body's own voice (no cough: kept for the sick), a sniff, a shifted foot; only at
+## the body's own voice (no cough from the well; the sick cough, 940 amended), a sniff, a shifted foot; only at
 ## SoundKit.IDLE_PEOPLE_WORDS, within PEOPLE_REACH; PEOPLE_PER_MINUTE at most
 ## together, one person once in PEOPLE_APART_MS.
 func _test_idle_people() -> void:
@@ -2153,6 +2153,35 @@ func _test_idle_people() -> void:
 	_rig.sfx.listener = at + Vector2i(Client3D.PEOPLE_REACH + 6, 0)
 	var far := _heard(func() -> void: _rig._idle_people(minute_on + 9 * Client3D.IDLE_EVERY_MS, 0.0, 0.0))
 	_check(far.is_empty(), "everyone past %d cells: silent (%s)" % [Client3D.PEOPLE_REACH, far])
+	# The sick (940 amended): a resident whose ailing is set coughs at any
+	# activity (abed, "sleep"; walked to the healer), in its body's voice, the
+	# male take with no body known, rolling SICK_MORE times as often as the
+	# well: at a roll between the two, the sick cough and the well are silent.
+	_rig.sfx.listener = at
+	var well_odds := Client3D.IDLE_EVERY_MS / 1000.0 / Client3D.PEOPLE_EVERY_S
+	var between := well_odds * (1.0 + Client3D.SICK_MORE) / 2.0
+	for person: Resident in people:
+		person.activity = "sleep"
+	people[1].ailing = "a cough"
+	people[5].ailing = "the shakes"
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig._people_next = 0
+	var sick_heard: Array[String] = []
+	for k in 4:
+		sick_heard.append_array(_heard(func() -> void: _rig._idle_people(minute_on + (12 + k) * Client3D.IDLE_EVERY_MS, between, 0.0)))
+	_check(sick_heard.size() == 2 and "voice.idle_cough_female" in sick_heard and "voice.idle_cough_male" in sick_heard
+			and _rig._people_at.has(people[1].get_instance_id()) and _rig._people_at.has(people[5].get_instance_id()),
+			"the sick abed cough, each once, in her voice and, no body known, the male take; the asleep and well silent (%s)" % [sick_heard])
+	people[1].ailing = ""
+	people[5].ailing = ""
+	for person: Resident in people:
+		person.activity = ""
+	_rig._people_heard.clear()
+	_rig._people_at.clear()
+	_rig._people_next = 0
+	var well_between := _heard(func() -> void: _rig._idle_people(minute_on + 20 * Client3D.IDLE_EVERY_MS, between, 0.0))
+	_check(well_between.is_empty(), "the well at rest at that roll: silent (the sick roll %.0f times as often) (%s)" % [Client3D.SICK_MORE, well_between])
 	for i in people.size():
 		_rig._puppets.erase(people[i].get_instance_id())
 		stands[i].free()

@@ -1601,7 +1601,7 @@
 			"noise": null,
 			"range": 8,
 			"volume_db": -24.0,
-			"uses": "a small dry cough, once, never a fit; a male-bodied townsperson who is sick (940: kept unplayed; a well person never coughs, so a cough can tell a player someone is sick; for the sick at rest within 8 cells once the client can know it, at the idle sounds' cap, about as far under a footstep as a shifted foot)"
+			"uses": "a small dry cough, once, never a fit; a male-bodied townsperson who is sick, or a sick one of no known body (940 amended: Client3D._idle_people, SoundKit.sick_cough, from a resident whose ailing is set, abed or walked to the healer, within 8 cells, at the idle sounds' cap and twice as often; a well person never coughs, so a cough tells a player someone is sick)"
 		},
 		"voice.idle_cough_female": {
 			"category": "voices",
@@ -1610,7 +1610,7 @@
 			"noise": null,
 			"range": 8,
 			"volume_db": -24.0,
-			"uses": "a small dry cough, once, never a fit; a female-bodied townsperson who is sick (940: kept unplayed; a well person never coughs, so a cough can tell a player someone is sick; for the sick at rest within 8 cells once the client can know it, at the idle sounds' cap, about as far under a footstep as a shifted foot)"
+			"uses": "a small dry cough, once, never a fit; a female-bodied townsperson who is sick (940 amended: Client3D._idle_people, SoundKit.sick_cough, from a resident whose ailing is set, abed or walked to the healer, within 8 cells, at the idle sounds' cap and twice as often; a well person never coughs, so a cough tells a player someone is sick)"
 		},
 		"voice.idle_throat_male": {
 			"category": "voices",

@@ -74,6 +74,13 @@ const ARRIVAL_WAIT := 40.0
 ## name, activity, cells from the listener).
 const PEOPLE_STAND := 60.0
 const CROWD_STAND := 120.0
+## The sick leg (EARS_ONLY=sick, 940 amended: the sick cough): at noon, a
+## cell beside the first resident whose ailing is set, once abed, SICK_STAND
+## seconds, then the same beside them at 23:00. Needs a server where someone
+## is sick: economy's local recipe, levels/townsfolk.json "sick" "chance" 1.0
+## in a scratch checkout, never committed (the first at a town's first tick).
+const SICK_STAND := 120.0
+const SICK_STILL := 6.0
 const CROWD_LOOK := 16
 ## The Mughouse's floor (920): beside the fire, a hearth sit's cell, the
 ## room's middle, a far table's seat, the counter's guest side.
@@ -151,6 +158,10 @@ func run(bot: Node) -> void:
 		return
 	if OS.get_environment("EARS_ONLY") == "people":
 		await _people_leg()
+		_end()
+		return
+	if OS.get_environment("EARS_ONLY") == "sick":
+		await _sick_leg()
 		_end()
 		return
 	if OS.get_environment("EARS_ONLY") == "town":
@@ -294,6 +305,60 @@ func _people_leg() -> void:
 		await _walk_stand(_off_by(sleeper.tile, 2), PEOPLE_STAND, "people stand by %s sleep at %s" % [sleeper.name, sleeper.tile])
 	else:
 		_mark("people: nobody asleep outdoors in %d s" % int(WORK_WAIT))
+
+
+func _sick_leg() -> void:
+	await _bot.admin("hour %d" % DAY)
+	_mark("hour %d" % DAY)
+	var sick: Resident = await _first(func(entity: Resident) -> bool: return str(entity.get("ailing")) != "", WORK_WAIT)
+	if sick == null:
+		_mark("sick: nobody ailing in %d s" % int(WORK_WAIT))
+		return
+	# Abed: one fallen sick walks home to its bed first (11-15: Maud, a fever,
+	# picked on the way, was 16 cells off by the stand's first second), and
+	# the client sees only so far: follow until it lies down.
+	# Abed is read as still for SICK_STILL seconds: the sick's tick (Doing.BED)
+	# leaves its activity as it was, so "sleep" may never show (11-15).
+	var end := Time.get_ticks_msec() + int(WORK_WAIT * 1000.0)
+	var last := Vector2i(-1, -1)
+	var still := 0.0
+	while is_instance_valid(sick) and still < SICK_STILL and Time.get_ticks_msec() < end:
+		if sick.tile == last:
+			still += 1.0
+		else:
+			last = sick.tile
+			still = 0.0
+			if World.distance(_bot.cell(), sick.tile) > 2:
+				await _bot.walk_to(_off_by(sick.tile, 1), 1, 10.0)
+		await _bot.seconds(1.0)
+	if not is_instance_valid(sick) or still < SICK_STILL:
+		_mark("sick: not still in %d s" % int(WORK_WAIT))
+		return
+	var bed: Vector2i = sick.tile
+	await _bot.walk_to(_off_by(bed, 1), 1, 90.0)
+	_mark("sick stand by %s (%s, activity %s, still %d s) at %s at %s" % [sick.name, sick.get("ailing"), sick.get("activity"), int(still), bed, _bot.cell()])
+	await _sick_watch(sick, SICK_STAND)
+	await _bot.admin("hour %d" % NIGHT)
+	_mark("hour %d" % NIGHT)
+	await _bot.walk_to(_off_by(bed, 1), 1, 90.0)
+	_mark("sick stand by %s (%s, activity %s) at %s at %s" % [sick.name, sick.get("ailing"), sick.get("activity"), sick.tile, _bot.cell()])
+	await _sick_watch(sick, SICK_STAND)
+
+
+## [param seconds] by [param sick], a line a second of what the client shows of
+## them (economy's ask, 11-15: the pose of the sick abed): activity, ailing,
+## tile, facing and the clip its puppet's rig plays.
+func _sick_watch(sick: Resident, seconds: float) -> void:
+	var view: Node = _bot.main._client3d
+	var end := Time.get_ticks_msec() + int(seconds * 1000.0)
+	while Time.get_ticks_msec() < end:
+		if is_instance_valid(sick):
+			var puppet: Node3D = view._puppets.get(sick.get_instance_id())
+			var rig: Variant = puppet.get_meta("rig") if puppet != null and puppet.has_meta("rig") else null
+			_file.store_line(JSON.stringify({"t": _now(), "sick_pose": str(sick.name), "activity": str(sick.get("activity")),
+				"ailing": str(sick.get("ailing")), "tile": [sick.tile.x, sick.tile.y], "facing": [sick.facing.x, sick.facing.y],
+				"clip": (rig as AnimRig).playing() if rig is AnimRig else "", "cell": _cell()}))
+		await _bot.seconds(1.0)
 
 
 ## The walkable cell under the sky within CROWD_LOOK of the square with the

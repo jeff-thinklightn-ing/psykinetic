@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a townsperson sick in bed coughs every so often, and it carries muffled through the wall to the street (940 amended (1)).
 - At night the grass lies dark under the moon, green only where lamplight or firelight falls (858 amended (1)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).

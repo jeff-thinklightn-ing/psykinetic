@@ -759,6 +759,8 @@ func _test_idle_people() -> void:
 			if SoundKit.idle_person("", body, pick / 100.0).contains("cough"):
 				coughs.append("%s %d" % [body, pick])
 	_check(coughs.is_empty() and not SoundKit.IDLE_PEOPLE.has("cough"), "a well person never coughs: the cough is kept for the sick (%s)" % [coughs])
+	_check(SoundKit.sick_cough(&"female") == "voice.idle_cough_female" and SoundKit.sick_cough(&"male") == "voice.idle_cough_male"
+			and SoundKit.sick_cough(&"") == "voice.idle_cough_male", "the sick cough in the body's voice, the male take with no body known (940 amended)")
 	var total := 0.0
 	for each: String in SoundKit.IDLE_PEOPLE:
 		total += float(SoundKit.IDLE_PEOPLE[each])
