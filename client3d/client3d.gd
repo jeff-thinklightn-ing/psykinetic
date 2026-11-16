@@ -23261,9 +23261,11 @@ func _sync_puppets() -> void:
 			if lantern != null:
 				var lit := entity.emit_light > 0.0 if entity is Player else true  # Covered (L).
 				var shown := lit
+				# Off, as main: lit at _size_lantern's energy every hour (written here too, so a
+				# switch flipped mid-run leaves no scaled energy behind).
+				var dark := _lantern_dark_at(entity.tile) if lantern_by_day else 1.0
+				lantern.light_energy = _lantern_lit_energy() * dark
 				if lantern_by_day:
-					var dark := _lantern_dark_at(entity.tile)
-					lantern.light_energy = _lantern_lit_energy() * dark
 					shown = lit and dark >= LANTERN_DAY_LEAST
 				if lantern.visible != shown:
 					lantern.visible = shown
