@@ -35,6 +35,9 @@ function Invoke-LandChecks($lock) {
 	# the shared user:// logs folder (decision 664).
 	& python -B (Join-Path $root 'tools\godot_log_check.py') | Write-Host
 	if ($LASTEXITCODE -ne 0) { return 'a Godot launch without --log-file, decision 664: fix it as above' }
+	# The lists every tree adds a name to, one name a line in order, so two takes' adds merge (decision 944).
+	& python -B (Join-Path $root 'tools\list_lines.py') | Write-Host
+	if ($LASTEXITCODE -ne 0) { return 'a list not one name a line in order, decision 944: python -B tools/list_lines.py --fix, then commit' }
 	# docs/voice_inventory.md is generated: a changed player's line means
 	# re-running its tool, never a hand edit (748 amended (6)). Under this
 	# tree's land lock, clean and ahead of origin/main, a stale page is
@@ -65,7 +68,7 @@ if ($Checks) {
 	if ($inventoryStale) { Write-Output $inventoryStale }
 	if ($why -eq '') {
 		$stale = if ($inventoryStale) { ', its page stale: the landing regenerates it' } else { '' }
-		Write-Output "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the voice inventory$stale)"
+		Write-Output "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the lists' lines, the voice inventory$stale)"
 		exit 0
 	}
 	Write-Output "LANDING CHECKS: FAIL ($why)"

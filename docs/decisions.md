@@ -59036,3 +59036,59 @@ figures above. enemy-ai's greybite rows with this rule are checked before it is 
 watch by real events, with the battle axe, comes before any bullet.
 
 Server only; protocol unchanged; no new class_name; no bullet.
+
+## 944. The lists every tree adds a name to: one name a line, in order (perf; the coordinator's ask, 2026-11-15)
+
+sound-940 waited 38 minutes on the land lock after hours in the gate and lost its turn at the rebase
+(2026-11-15 16:23): another tree's take had added &"_told_lands" to client3d/room_fields.gd's VIEW on the
+same line as sound's three new fields. Every take that adds a var to Client3D sorts it into VIEW or ROOM
+(822, P1; view_world_test's every-var check), and the lists were many names a line, each new name put at
+the end of the last: two such takes in a queue always met, and the second went back to the end. net/net.gd's
+MESSAGE_KINDS and SUBCLASS_REPLICATED (a new message kind or replicated property; protocol_test names a
+missing one) were each one line, the same shape.
+
+- The four lists are one name a line, in order of the name's text: room_fields.gd's VIEW (233 names) and
+  ROOM (245), net.gd's MESSAGE_KINDS (35) and SUBCLASS_REPLICATED (59). Two takes' new names land on lines
+  of their own, and git merges them unless both fall in the same gap between two neighbours.
+- tools/list_lines.py checks them (exit 1 naming the list: names out of order, a repeated name, more than
+  one name a line) and `--fix` writes them so, a comment after a name kept on its line. land.sh's and
+  land.ps1's checks before the gate run it (`land.sh --checks` too), so a take that puts a name at the end
+  of a line hears it in seconds, before the queue.
+- The one-time cost: a take queued before this that added a name the old way stops at its rebase on these
+  lines. `python -B tools/list_lines.py --fix` there, then `git add` the file and `GIT_EDITOR=true git
+  rebase --continue`: a conflict in a list's names alone is written as main's file with each list merged
+  three ways, from the whole files git's index holds for the stopped merge (stage 1 the base, 2 main's, 3
+  the take's): a name either side added is in, a name either side took out of the base stays out
+  (ui-design's queued take removes &"_hp_bar_shader" from VIEW; a plain union of both sides would bring it
+  back). Each side is read from its stage, not rebuilt from the markers: git takes the part of a list only
+  one side rewrote from that side and marks only the rest, so a side rebuilt from the markers is a mix of
+  both, and a first build of this merge read from it dropped 189 of VIEW's names in its test. With no
+  stages in the index, both sides' names are kept and the line says a removed name must be taken out by
+  hand. Any other conflict in the file is refused (exit 2) and left as git stopped it, to resolve by hand.
+  The same --fix mends two new takes whose adds fall in one gap.
+- The values are unchanged: MESSAGE_KINDS and SUBCLASS_REPLICATED were already in order, so Net.protocol()
+  is the same (--print-protocol before and after: v0.1.219 0243d4354a0f). VIEW and ROOM are read as sets
+  (swap_room, the every-var check), so their order means nothing.
+- Read and left: RPC_SCRIPTS (four scripts, rarely changed, and protocol() reads them in their order);
+  tests/style_budget.txt (one file a line, already in order); tests/port_offsets.txt (one checkout a line,
+  in offset order, a line added only for a new tree); CHANGELOG.md (changelog_resolve.py) and
+  docs/decisions.md (merge=union in .gitattributes).
+
+tests/list_lines_test.sh (land.sh runs it when the tool or the test changes): the checkout's four lists in
+shape; two names put at the end of a line named (VIEW out of order, exit 1) and mended by --fix, each on a
+line of its own; a repeated MESSAGE_KINDS name named and dropped; in a scratch repository two branches each
+adding a var to VIEW, the second rebased onto the first with no conflict, the list still in shape with both
+names; a third adding a name in the second's gap, rebased onto it through --fix, all three names in and in
+shape. With LIST_LINES_TEST_FILES pointing at main's old files the rebase row fails (the conflict sound met).
+A take queued on the old files, adding a var to VIEW and a kind to MESSAGE_KINDS at the line ends, rebased
+onto 944: it stops, --fix exits 0, no markers are left, the take's names and main's all there, the rebase
+goes on; a take on the old files that removes &"_hp_bar_shader" from VIEW and adds a name: stops, --fix
+says it merged three ways, the removed name stays out, the added one is in, main's others kept, the lists
+in shape, the rebase goes on; a take that also wrote a comment beside the list where main wrote another: refused, exit 2, the
+file left as git stopped it (the row runs while origin/main still has the old files).
+view_world_test (the every-var check) and protocol_test PASS; load_check PASS.
+tests/land_checks_test.sh fakes each check's tool in its own project: it fakes tools/list_lines.py too (all four
+checks pass and each ran; a list out of shape fails naming it and its --fix, the voice inventory not run;
+land.ps1 -Checks the same). The first landing (22:03) failed on it, the fake project having no list_lines.py.
+
+Tools, tests and two lists' layout; protocol unchanged; no new class_name; no bullet.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/land.sh --checks (and land.ps1 -Checks) run only the landing's checks before the gate
-# (278 amended (5)): the CHANGELOG, Godot launches' logs and the voice inventory, one "LANDING
+# (278 amended (5)): the CHANGELOG, Godot launches' logs, the lists' lines (944) and the voice inventory, one "LANDING
 # CHECKS: PASS|FAIL" line, no Godot, gate, lock or import. Once on this checkout as it is, then
 # on a fake project (land.sh, land.ps1 and land_stamp.sh copied; the three checks faked, each
 # failing on its own) for each way to fail, and that the voice inventory is never given the
@@ -36,7 +36,7 @@ cp tests/land.sh tests/land.ps1 "$tmp/p/tests/"
 cp tools/land_stamp.sh "$tmp/p/tools/"
 # tools/tracked_on_main.sh (667 amended (2)): says how it was run, exits FAKE_TRACKED.
 printf '#!/usr/bin/env sh\necho "tracked_on_main $* exit ${FAKE_TRACKED:-0}"\nexit "${FAKE_TRACKED:-0}"\n' >"$tmp/p/tools/tracked_on_main.sh"
-for tool in changelog_check godot_log_check voice_inventory; do
+for tool in changelog_check godot_log_check list_lines voice_inventory; do
 	cat >"$tmp/p/tools/$tool.py" <<EOF
 import os, sys
 open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "$tool.args"), "w").write(" ".join(sys.argv[1:]))
@@ -53,7 +53,7 @@ run_fake() {
 	(cd "$tmp/p" && env PSYKINETIC_LAND_LOCK="$tmp/lock" PSYKINETIC_TREE=fake-tree "$@" bash tests/land.sh --checks 2>&1)
 }
 out="$(run_fake)"; code=$?
-check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: PASS'; echo $?) "all three pass: PASS, exit 0"
+check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: PASS'; echo $?) "all four pass: PASS, exit 0"
 # 883 amended (1): the land lock taken from this checkout under another name, no PSYKINETIC_TREE (a
 # side worktree's landing, sound's 924): --checks says nothing of the lock's name.
 git -C "$tmp/p" init -q 2>/dev/null
@@ -65,7 +65,7 @@ check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: PASS' 
 rm -f "$tmp/lock/checkout"
 echo "fake-tree" >"$tmp/lock/owner"
 check $(printf '%s\n' "$out" | grep -q "changelog_check exit 0" && printf '%s\n' "$out" | grep -q "godot_log_check exit 0" \
-	&& printf '%s\n' "$out" | grep -q "voice_inventory exit 0"; echo $?) "each of the three ran"
+	&& printf '%s\n' "$out" | grep -q "list_lines exit 0" && printf '%s\n' "$out" | grep -q "voice_inventory exit 0"; echo $?) "each of the four ran"
 lock_given="$(sed 's/.*--lock //' "$tmp/p/tools/voice_inventory.args")"
 check $([ -n "$lock_given" ] && [ "$lock_given" != "$tmp/lock" ] && [ ! -e "$lock_given" ]; echo $?) \
 	"the voice inventory's lock is an empty folder of its own, gone after (not the land lock)"
@@ -75,6 +75,9 @@ check $([ $code = 1 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: FAIL (
 out="$(run_fake FAKE_GODOT_LOG_CHECK=1)"; code=$?
 check $([ $code = 1 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: FAIL (a Godot launch without --log-file'; echo $?) \
 	"a Godot launch without its log: FAIL naming it"
+out="$(run_fake FAKE_LIST_LINES=1)"; code=$?
+check $([ $code = 1 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: FAIL (a list not one name a line in order, decision 944' \
+	&& ! printf '%s\n' "$out" | grep -q "voice_inventory exit"; echo $?) "a list out of shape: FAIL naming it and its --fix, nothing after (944)"
 out="$(run_fake FAKE_VOICE_INVENTORY=2)"; code=$?
 check $([ $code = 1 ] && printf '%s\n' "$out" | grep -q '^LANDING CHECKS: FAIL (voice inventory'; echo $?) \
 	"the voice inventory's generator failing: FAIL naming it"
@@ -97,6 +100,9 @@ if command -v powershell.exe >/dev/null 2>&1; then
 	(cd "$tmp/p" && FAKE_GODOT_LOG_CHECK=1 PSYKINETIC_TREE=fake-tree powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" -Checks >"$tmp/ps.out" 2>&1); code=$?
 	out="$(tr -d '\r' <"$tmp/ps.out")"
 	check $([ $code = 1 ] && printf '%s\n' "$out" | tail -1 | grep -q '^LANDING CHECKS: FAIL (a Godot launch'; echo $?) "land.ps1 -Checks: a fault fails, naming it"
+	(cd "$tmp/p" && FAKE_LIST_LINES=1 PSYKINETIC_TREE=fake-tree powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" -Checks >"$tmp/ps.out" 2>&1); code=$?
+	out="$(tr -d '\r' <"$tmp/ps.out")"
+	check $([ $code = 1 ] && printf '%s\n' "$out" | tail -1 | grep -q '^LANDING CHECKS: FAIL (a list not one name a line'; echo $?) "land.ps1 -Checks: a list out of shape fails, naming it (944)"
 	lock_given="$(sed 's/.*--lock //' "$tmp/p/tools/voice_inventory.args")"
 	check $(case "$lock_given" in *land-checks-*) [ ! -e "$lock_given" ]; echo $? ;; *) echo 1 ;; esac) \
 		"land.ps1 -Checks: the voice inventory's lock is an empty folder of its own"
