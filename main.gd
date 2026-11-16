@@ -19380,6 +19380,7 @@ func _build_talk() -> void:
 		connect("world_changed", _refresh_world_map)
 	card_page = CardPage.new()
 	$HUD.add_child(card_page)
+	card_page.asked.connect(_ask_where)  # 945: the line under her name, said to her.
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_card)  # 618: her page follows the world message while open.
 	town_panel = TownSheet.new()
@@ -27274,8 +27275,27 @@ func _refresh_card() -> void:
 		return
 	var pet := _own_companion()
 	card_page.show_state(world_state, Companion._name_of(pet) if pet != null else "",
-		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "")  # Her bond (555) is on her node.
+		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "", _her_beside(pet))  # Her bond (555) is on her node.
 	_card_bars()
+
+
+## Whether [param pet] is with the player: spawned, in their zone, up, and within hearing (945: the card's line asks her where to go
+## only then; down, parted, or away it is not shown).
+func _her_beside(pet: Companion) -> bool:
+	var player := _local_player()
+	if pet == null or player == null or not pet.spawned or pet.zone != player.zone or World.is_downed(pet):
+		return false
+	return World.distance(pet.tile, player.tile) <= HEARING_RANGE
+
+
+## The click on the card's line under her name (945): the player's own words to her, once, and the card steps aside so her answer's
+## bubble and her first step are seen. The server's ask-way matcher answers (companions' side).
+func _ask_where() -> void:
+	if not _her_beside(_own_companion()):
+		return
+	_send_chat(CardPage.WHERE_WORDS)
+	if card_page != null:
+		card_page.visible = false
 
 
 ## Her card's bars (804, Landing B) from her body: Companion.bond_bar,

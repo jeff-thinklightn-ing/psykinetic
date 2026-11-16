@@ -1861,6 +1861,30 @@ func _test_card_page() -> void:
 		"her step and its reason: How she feels about you")
 	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "wary", "")
 	_check(page.feels_shown() == "Wary." and page.feels_why_shown() == "" and not page._feels_why.visible, "a step with no reason: the word alone")
+	# 945: the line under her name, voice's "Where to?" as the theme's FoldLink: shown with her beside the player, hidden otherwise; a click
+	# says it once as the player's own words and the card steps aside.
+	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "", "", true)
+	_check(page.where_shown() and page._where.text == "Where to?" and page._where.theme_type_variation == &"FoldLink", "her beside him: the line under her name, the theme's FoldLink, voice's words")
+	_check(page._title.get_index() == 0 and page._where.get_index() == 1, "straight under her name (the card's column, index 1)")
+	page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name if pet != null else "Wren", "", "", false)
+	_check(not page.where_shown(), "her down, parted or away: the line is not shown")
+	page.show_state({}, "", "", "", true)
+	_check(not page.where_shown(), "nobody travels with him: no line")
+	if pet != null:
+		var player: Player = _main._local_player()
+		var near_was: Vector2i = pet.tile
+		_check(_main._her_beside(pet) == (pet.spawned and pet.zone == player.zone and not World.is_downed(pet) and World.distance(pet.tile, player.tile) <= Main.HEARING_RANGE),
+			"beside him means spawned, in his zone, up and within hearing")
+		_main._chat_sent_at = -100000
+		page.visible = true
+		var sent_before: int = _main._chat_sent_at
+		var asked_n := [0]
+		page.asked.connect(func() -> void: asked_n[0] += 1)
+		page.show_state({"focus": {"companion": "Wren", "fight": 30, "magic": 20, "stealth": 50}}, body_name, "", "", true)
+		page._where.pressed.emit()
+		_check(asked_n[0] == 1 and (_main._chat_sent_at != sent_before or not _main._her_beside(pet)) and (not page.visible or not _main._her_beside(pet)),
+			"a click: the line is said once as his own words and the card steps aside (%d asked)" % asked_n[0])
+		pet.tile = near_was
 	if pet != null:
 		var step_was: String = pet.bond_step
 		var why_was: String = pet.bond_why

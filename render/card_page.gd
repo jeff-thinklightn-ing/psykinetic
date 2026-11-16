@@ -38,7 +38,13 @@ const NEED_BAR_HEIGHT := 12.0
 ## The three axes, from the top clockwise: the focus key and its name on the card.
 const AXES: Array[Array] = [["fight", "Fighting"], ["magic", "Magic"], ["stealth", "Stealth"]]
 
+## The player's click on the line under her name (945): Main sends it as the player's own words to her.
+signal asked
+## The words under her name, and what the click says (voice's: "Where to?").
+const WHERE_WORDS := "Where to?"
+
 var _title: Label
+var _where: Button
 var _learned_heading: Label
 var _learned: VBoxContainer
 var _bent_heading: Label
@@ -76,6 +82,15 @@ func _ready() -> void:
 	_title = Label.new()
 	_title.theme_type_variation = &"Title"
 	column.add_child(_title)
+	_where = Button.new()
+	_where.theme_type_variation = &"FoldLink"
+	_where.text = WHERE_WORDS
+	_where.flat = true
+	_where.focus_mode = Control.FOCUS_NONE
+	_where.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_where.visible = false
+	_where.pressed.connect(func() -> void: asked.emit())
+	column.add_child(_where)
 	_alone = Label.new()
 	_alone.text = alone_words()
 	_alone.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -141,10 +156,11 @@ func _heading(column: VBoxContainer, words: String) -> Label:
 ## state's "companion" names her otherwise. Nobody: the page says so.
 ## [param bond_step] and [param bond_why] are her body's (Companion), ""
 ## for none: the feelings row stays away without a step.
-func show_state(state: Dictionary, her := "", bond_step := "", bond_why := "") -> void:
+func show_state(state: Dictionary, her := "", bond_step := "", bond_why := "", beside := false) -> void:
 	var name_shown := her_name(state, her)
 	var known := not name_shown.is_empty()
 	_title.text = name_shown if known else "Your companion"
+	_where.visible = known and beside  # 945: asked of her only while she is with the player.
 	_alone.visible = not known
 	_learned_heading.visible = known
 	_learned.visible = known
@@ -268,6 +284,10 @@ func learned_shown() -> PackedStringArray:
 		if child is Label and not child.is_queued_for_deletion():
 			out.append((child as Label).text)
 	return out
+
+
+func where_shown() -> bool:
+	return _where != null and _where.visible
 
 
 func title_shown() -> String:
