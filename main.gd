@@ -1739,7 +1739,8 @@ func _plain_left(player: Player, target: GridEntity, tile: Vector2i, targetable:
 ## A plain click's goal (935 amended (4)): for a building with an inside (a level_link behind its door), a click on one of its door
 ## edges' cells, the front one outside or the one inside the door, is a click to go in: the goal is that building's link, so "lane, click
 ## the door, he is in the tavern": a route ends on the cell clicked and never passes over a link, and a click on the door's own face
-## falls on whichever cell the cursor meets. A walk-in building (no link) and any other cell are [param tile] as clicked. The link
+## falls on whichever cell the cursor meets; and (935 amended (5)) a click anywhere inside the building's footprint, the roof's picture or
+## a wall's, goes in by its nearest link too. A walk-in building (no link) and any other cell are [param tile] as clicked. The link
 ## nearest the clicked cell when it has two (the Mughouse's (178,208), (178,209)); not a closed, sealed or hidden one.
 static func go_in_goal(from_level: Dictionary, tile: Vector2i) -> Vector2i:
 	var links: Array = from_level.get("links", [])
@@ -1755,6 +1756,8 @@ static func go_in_goal(from_level: Dictionary, tile: Vector2i) -> Vector2i:
 		for key: Variant in Level.entrances(building):
 			if key is Vector3i and tile in Terrain.edge_cells(key):
 				at_door = true
+		if Level.building_rect(building).has_point(tile):
+			at_door = true  # 935 amended (5): anywhere on its footprint (the roof's picture, a wall's): a click to go in by its nearest link.
 		if not at_door:
 			continue
 		var best: Vector2i = mine[0]["tile"]

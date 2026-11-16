@@ -140,6 +140,19 @@ func _test_go_in() -> void:
 	_check(Main.go_in_goal(wilds, Vector2i(183, 208)) == Vector2i(183, 208) and Main.go_in_goal(wilds, Vector2i(152, 231)) == Vector2i(152, 231)
 			and Main.go_in_goal(wilds, Vector2i(150, 233)) == Vector2i(150, 233), "the lane, the healer's hut's front cell and a cell inside it: as clicked (no inside, no link)")
 	_check(Main.go_in_goal(wilds, Vector2i(152, 232)) == Vector2i(152, 232), "a walk-in hut's door cell stays plain ground")
+	# 935 amended (5): anywhere on the footprint (170..179, 205..212) goes in by the nearest link; a cell just outside it does not.
+	for cell: Vector2i in [Vector2i(170, 205), Vector2i(174, 208), Vector2i(179, 212), Vector2i(176, 211), Vector2i(171, 206)]:
+		var goal_in: Vector2i = Main.go_in_goal(wilds, cell)
+		_check(links.has(goal_in), "a click on %s, inside the inn's footprint, goes in: the goal is %s" % [cell, goal_in])
+	for cell: Vector2i in [Vector2i(169, 205), Vector2i(175, 204), Vector2i(174, 204), Vector2i(175, 213), Vector2i(180, 206)]:
+		_check(Main.go_in_goal(wilds, cell) == cell, "a click on %s, outside the footprint and not a door cell, is as clicked" % cell)
+	# A building whose way in is shut: the click stays as it is (a closed link is no way in).
+	var shut_level: Dictionary = wilds.duplicate(true)
+	for link: Dictionary in shut_level["links"]:
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			link["closed"] = true
+	_check(Main.go_in_goal(shut_level, Vector2i(174, 208)) == Vector2i(174, 208) and Main.go_in_goal(shut_level, Vector2i(180, 208)) == Vector2i(180, 208),
+		"the inn's way in shut (a closed link): a click on its footprint or its front cell stays as clicked")
 	if player != null:
 		World._relocate(player, Vector2i(185, 208))
 		_main._free_taken_over(player)
