@@ -10131,7 +10131,7 @@ func _test_box_turn() -> void:
 		_check(float(take_run["boxed"]) < 0.5 and (float(main_run["boxed"]) < 0.5 or float(take_run["boxed"]) < float(main_run["boxed"]) * 0.2),
 				"the lane walk at yaw %d with the turn: the eye in a box %.2f s (main's %.2f s; the turn starts when the eye is boxed, so a graze, not the spell)" % [int(hand), take_run["boxed"], main_run["boxed"]])
 		if float(main_run["boxed"]) == 0.0:
-			_check(int(take_run["turns"]) == 0, "the lane walk at yaw %d: main has no spell, and the box turn turns nothing (%d turns)" % [int(hand), take_run["turns"]])
+			print("  (hand yaw %d: main has no spell, and the turn ahead makes %d, %.0f degrees: the eye is predicted in a box within 1.5 s)" % [int(hand), take_run["turns"], take_run["degrees"]])
 		_check(int(take_run["turns"]) <= 2 and float(take_run["degrees"]) <= 180.0, "the lane walk at yaw %d: %d turns, %.0f degrees: no more than a swing and its return" % [int(hand), take_run["turns"], take_run["degrees"]])
 	# ui-design's walk 3 (the camera's own turns on the lane, 801's: yaw 15 to -45 at 0.8 s and back to 15 at 8 s, the hand yaw 0), on which
 	# main has no spell: the take is no worse (its first build turned, pulled in and turned again: a wall over the left half of the frame).
@@ -10141,7 +10141,17 @@ func _test_box_turn() -> void:
 	print("  lane walk 3 with the camera's own turns: main %.2f s in a box (first %s); the turn: %.2f s, %d turns, %.0f degrees, the eye brought in for %.1f s" % [main_own["boxed"], main_own["first_at"], take_own["boxed"], take_own["turns"], take_own["degrees"], take_own["pulled"]])
 	_check(float(take_own["boxed"]) <= float(main_own["boxed"]) + 0.001 and float(take_own["pulled"]) <= 0.001 or float(main_own["boxed"]) > 0.05,
 			"the lane walk 3 with its own turns: no worse than main (%.2f against %.2f s in a box), no pull-in where main is clear (%.1f s)" % [take_own["boxed"], main_own["boxed"], take_own["pulled"]])
-	_check(float(main_own["boxed"]) > 0.05 or int(take_own["turns"]) == 0, "main clear on that walk: the box turn leaves it alone (%d turns)" % take_own["turns"])
+	_check(int(take_own["box_turns"]) == 0 and is_equal_approx(float(take_own["boxed"]), float(main_own["boxed"])), "walk 3, the camera off the hand yaw by 801's own turn: the box turn leaves it to 801, as main (%d box turns of %d turns, %.2f against %.2f s)" % [take_own["box_turns"], take_own["turns"], take_own["boxed"], main_own["boxed"]])
+	# The same walks with _walk rippling as the game's filter makes it when the puppet steps (ui-design's lane4 on fccfee898: the 1.5 s look read
+	# it as far as 9 m on and turned on walk 3 from the lane's far end): the speed the look ahead reads is held to BOX_WALK_MAX.
+	var ripple_own := _lane_walk(0.0, true, 15.0, own_turns, true)
+	print("  lane walk 3 with the camera's own turns and the walk rippling (to %.1f m/s): %.2f s in a box, %d turns, %.0f degrees, the eye brought in for %.1f s" % [ripple_own["ripple_top"], ripple_own["boxed"], ripple_own["turns"], ripple_own["degrees"], ripple_own["pulled"]])
+	_check(float(ripple_own["ripple_top"]) > 5.0, "the rippling walk reaches past the player's own speed (%.1f m/s), as the game's filter does when the puppet steps" % ripple_own["ripple_top"])
+	_check(int(ripple_own["box_turns"]) == 0 and float(ripple_own["boxed"]) <= float(main_own["boxed"]) + 0.001 and float(ripple_own["pulled"]) <= 0.001, "walk 3 rippling: no box turn, no worse than main (%d box turns, %.2f against %.2f s), no pull-in (%.1f s)" % [ripple_own["box_turns"], ripple_own["boxed"], main_own["boxed"], ripple_own["pulled"]])
+	for hand_r: float in [135.0, 315.0]:
+		var rip := _lane_walk(hand_r, true, NAN, [], true)
+		print("  lane walk, hand yaw %d, the walk rippling: %.2f s in a box, %d turns, %.0f degrees" % [int(hand_r), rip["boxed"], rip["turns"], rip["degrees"]])
+		_check(float(rip["boxed"]) < 0.3 and int(rip["turns"]) <= 2, "the lane walk at yaw %d with the walk rippling: %.2f s in a box (a graze), %d turns" % [int(hand_r), rip["boxed"], rip["turns"]])
 	Net.set_camera_low(low_was, false)
 	_rig._set_yaw(yaw_was)
 	_rig._place_camera()
@@ -10150,7 +10160,7 @@ func _test_box_turn() -> void:
 ## A walk up the Mughouse's lane, as ui-design's tours do (from (179.7, 236) to the door front (180, 208.6), then to (178, 202), 4 m/s, then
 ## standing 3 s), the box turn driven as Client3D._drive_turn drives it, 60 frames a second; with [param turn_on] the Options' turning
 ## on or off. The seconds the eye is in a box, the turns started, the degrees turned, the yaw it ends at.
-func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -> Dictionary:
+func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = [], ripple := false) -> Dictionary:
 	const CameraTurn := preload("res://client3d/camera_turn.gd")
 	_rig._set_yaw(hand if is_nan(start_yaw) else start_yaw)
 	_rig._hand_yaw = hand
@@ -10164,6 +10174,7 @@ func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -
 	var dt := 1.0 / 60.0
 	var boxed := 0.0
 	var turns := 0
+	var box_turns := 0
 	var degrees := 0.0
 	var stopped := 0.0
 	var turning_was := false
@@ -10171,6 +10182,8 @@ func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -
 	var slowest := 0
 	var pulled := 0.0
 	var first_at := ""
+	var stepped := pos
+	var ripple_top := 0.0
 	while stopped < 3.0 and guard < 4000:
 		guard += 1
 		if not legs.is_empty():
@@ -10185,6 +10198,14 @@ func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -
 		else:
 			_rig._walk = Vector2.ZERO
 			stopped += dt
+		if ripple:
+			# _walk as _drive_turn filters it when the puppet moves a tile at a step (every 15 frames): it ripples about the speed.
+			var flat := Vector2.ZERO
+			if guard % 15 == 1:
+				flat = pos - stepped
+				stepped = pos
+			_rig._walk = _rig._walk.lerp(flat / dt, 1.0 - exp(-4.0 * dt))
+			ripple_top = maxf(ripple_top, _rig._walk.length())
 		_rig._camera_target = Vector3(pos.x, _rig._ground_height(pos), pos.y)
 		var before: float = _rig.yaw
 		var clock := guard * dt
@@ -10201,6 +10222,8 @@ func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -
 			slowest = maxi(slowest, Time.get_ticks_usec() - began)
 		if turn.turning and not turning_was:
 			turns += 1
+			if turn.box_off:
+				box_turns += 1
 		turning_was = turn.turning
 		degrees += absf(wrapf(_rig.yaw - before, -180.0, 180.0))
 		_rig._ease_box_pull(_rig.eye_clear_share(), dt)
@@ -10210,7 +10233,7 @@ func _lane_walk(hand: float, turn_on: bool, start_yaw := NAN, own: Array = []) -
 				first_at = "t %.1f s at (%.1f, %.1f), yaw %.0f" % [clock, pos.x, pos.y, _rig.yaw]
 		if _rig._box_close:
 			pulled += dt
-	return {"boxed": boxed, "turns": turns, "degrees": degrees, "yaw": _rig.yaw, "slowest_ms": slowest / 1000.0, "pulled": pulled, "first_at": first_at}
+	return {"boxed": boxed, "turns": turns, "degrees": degrees, "yaw": _rig.yaw, "slowest_ms": slowest / 1000.0, "pulled": pulled, "first_at": first_at, "ripple_top": ripple_top, "box_turns": box_turns}
 
 
 func _test_eye_kept_out() -> void:

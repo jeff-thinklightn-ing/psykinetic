@@ -512,7 +512,8 @@ const BOX_PULL_LEAST := 3.0
 ## how far from every box the player must be for the camera to ease back to their own yaw, and, rung 4b, how near the eye may come when no
 ## yaw clears it (the aim then at its full lift).
 const BOX_LOOK_AHEAD := 0.5
-const BOX_TRIGGER_AHEAD := 0.0
+const BOX_TRIGGER_AHEAD := 1.5
+const BOX_WALK_MAX := 4.5
 const BOX_SEEK_AHEAD := 4.0
 const BOX_CHOOSE_LOOK := 1.5
 const BOX_LOOK_STEP := 0.5
@@ -4731,12 +4732,22 @@ func eye_boxed_at(degrees: float, ahead := BOX_LOOK_AHEAD) -> bool:
 	if full.length() < 0.001:
 		return false
 	var base := _camera_target + Vector3.UP * BOX_PULL_CHEST
-	var walk := Vector3(_walk.x, 0.0, _walk.y)
+	var walk := _box_walk()
 	var steps := int(ahead / BOX_LOOK_STEP) if walk.length() >= BOX_WALK_MIN else 0
 	for i in steps + 1:
 		if _eye_in_box(base + walk * (BOX_LOOK_STEP * i), full, BOX_PULL_LEAST):
 			return true
 	return false
+
+
+## The walk's velocity as the box look ahead reads it (x, 0, z), its speed held to BOX_WALK_MAX: _walk is a filter of the puppet's frame-by-frame
+## displacement and ripples about the player's speed (about 4 m/s) when the puppet moves in steps, so a look ahead of 1.5 s read it as far as
+## 9 m on (the first rebuild turned on ui-design's walk 3 from the lane's far end, before 801's own turn at the inn's corner).
+func _box_walk() -> Vector3:
+	var walk := Vector3(_walk.x, 0.0, _walk.y)
+	if walk.length() > BOX_WALK_MAX:
+		walk = walk.normalized() * BOX_WALK_MAX
+	return walk
 
 
 ## Whether the eye is inside a roofed building's box as the camera stands now (its yaw, and the pull's least as the box turn has set it).
@@ -4796,7 +4807,7 @@ func _box_look(degrees: float) -> float:
 	if full.length() < 0.001:
 		return BOX_SEEK_AHEAD
 	var base := _camera_target + Vector3.UP * BOX_PULL_CHEST
-	var walk := Vector3(_walk.x, 0.0, _walk.y)
+	var walk := _box_walk()
 	var steps := int(BOX_SEEK_AHEAD / BOX_LOOK_STEP) if walk.length() >= BOX_WALK_MIN else 0
 	for i in steps + 1:
 		if _eye_in_box(base + walk * (BOX_LOOK_STEP * i), full, BOX_PULL_LEAST):
@@ -22542,10 +22553,13 @@ func _drive_turn(delta: float) -> void:
 ## but its boxed eye is brought in as 4b does. Nothing at all with the option off (CameraTurn.box_step).
 func _box_turn(delta: float, manual: bool, on: bool) -> void:
 	var standing := _walk.length() < 0.3
-	# The 801 search owns the turn while the player is hidden (it also leaves a boxed yaw): never a box turn that pre-empts it.
-	if _turn_view.hidden_for > 0.0:
+	# A camera 801 itself turned off the hand yaw is 801's to move (it chose that yaw to show the player and leaves a boxed one): the box turn
+	# takes up only a camera at the hand yaw or off it by a box turn of its own (ui-design's walk 3: main's 801 turned -45 to 15 at the inn's
+	# corner just in time, and the first rebuild's turn ahead of it pre-empted it).
+	if absf(wrapf(yaw - _hand_yaw, -180.0, 180.0)) > 1.0 and not _turn_view.box_off:
 		return
-	# A turn only from a yaw whose eye is boxed now (the coordinator, 11-16: none from one that stays clear); the look ahead only chooses.
+	# A turn only from a yaw whose eye is boxed now or within BOX_TRIGGER_AHEAD (0.5 s of the walk's line, 2 m: the coordinator, 11-16, none from
+	# one that stays clear; the first build's 1.5 s fired at the inn's corner, where the walk turns); the longer look only chooses.
 	var boxed := eye_boxed_at(yaw, BOX_TRIGGER_AHEAD)
 	var off_hand := absf(wrapf(yaw - _hand_yaw, -180.0, 180.0)) > 1.0
 	# Back to the player's own yaw only after a box turn of this, walking, and well clear of every box: none at the door, none stopped.
@@ -22598,7 +22612,7 @@ func _box_turn(delta: float, manual: bool, on: bool) -> void:
 		return
 	_box_close = false
 	_turn_view.start(yaw, target, CameraTurn.BOX_STAND_SPEED if standing else CameraTurn.TURN_SPEED, true)
-	print("[camera] box turn: yaw %.0f to %.0f (rung %s), eye boxed %.1f s" % [yaw, target, rung, _turn_view.boxed_for])
+	print("[camera] box turn: yaw %.0f to %.0f (rung %s), eye boxed %.1f s, walking %.1f m/s" % [yaw, target, rung, _turn_view.boxed_for, _walk.length()])
 
 
 ## Where the local player and their companion are, at FADE_HEIGHTS: as
