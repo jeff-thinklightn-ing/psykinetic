@@ -1826,9 +1826,9 @@ func talks_on_click(entity: GridEntity) -> bool:
 ## it opens on arrival (_update_talk). Holding the button does not steer
 ## this walk away.
 ## The most cells a walk to a talk's stand cell closes before it gives up (935 amended (3)): a stand cell is a few cells from its
-## person, and the worst real route to one on Umbrage's lattice closes 904 (click_route_test's survey, 2297 routes), so a stand cell a
-## wall or a body shuts off ends at this, not at the zone's CLICK_SEARCH_TILES, and the walk goes at his own cell.
-const TALK_STAND_SEARCH_TILES := 2500
+## person, and the worst real route to one in the wilds' survey closes 2,400 (click_route_test: 5,749 routes, from up to 32 cells off), so
+## a stand cell a wall or a body shuts off ends at this (a quarter of CLICK_SEARCH_TILES, 25% over the worst), and the walk goes at his own cell.
+const TALK_STAND_SEARCH_TILES := 3000
 ## The bound in force (a test lowers it to cut a real route short).
 var talk_stand_search_tiles := TALK_STAND_SEARCH_TILES
 
