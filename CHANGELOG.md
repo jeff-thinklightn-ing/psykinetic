@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: the Mughouse's hired rooms upstairs have beds, and at night Margery sleeps in her own bed in the keeper's room (948).
 - Towns: clicking anywhere on the Mughouse, its roof or its walls, walks you to its door and takes you inside (935 amended (5), 935 amended (6)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
