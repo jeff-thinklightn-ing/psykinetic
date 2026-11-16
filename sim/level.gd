@@ -1192,6 +1192,9 @@ static func _interior_from(level: Dictionary, config: Dictionary, warnings: Arra
 			continue
 		beds.append({"cells": [head, head - way], "head": way, "prop": "prop.bed"})
 	level["beds"] = beds
+	# The view's copy (948): Client3D draws them and lays a sleeper on one.
+	# It changes no floor, walk or solid.
+	level["terrain"]["beds"] = beds
 
 
 ## A building's floors, ground first ([param level_name]'s "storeys", else

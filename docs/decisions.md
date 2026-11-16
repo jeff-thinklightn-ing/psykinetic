@@ -59514,3 +59514,35 @@ coordinator's pass.
 935 amended (5) (ui, 2026-11-15; label by decision_number.sh; the coordinator's go on the footprint click): a click anywhere inside the footprint of a building with an open way in is a click to go in. Main.go_in_goal gains one case beside the door edges' cells (935 amended (4)): a tile inside Level.building_rect of a building that has a link behind its door (not closed, sealed, hidden or one-way) has that building's link nearest it as the goal, so a click on the roof's picture or a wall's goes in as a click on its door does, where with the pocket's solid cells it was snapped to ground outside the wall ((175,204) or (174,204), north of the inn) and he stopped there. Cells outside the rect, a building with no link, and a building whose way in is shut (a closed link) are as clicked. The wall-foot case is measured, not argued: ui-design's joined run, ten clicks aimed at the ground at the foot of the Mughouse's south wall and ten at its west wall, at the default camera and the nearest zoom: how many go in; if more than a couple of the twenty do, this is narrowed (the roof's picture and the door's side only, or the cells more than one in from the wall) before it queues. Rows: click_route_test (five cells inside the inn's footprint go to the link nearest them; five cells outside it, among them (175,204) and (174,204), are as clicked; the inn's way in shut: the footprint and the front cell stay as clicked). Never in a cut without the pocket or 947 beside it, as 935 amended (4). Client only; protocol unchanged; no new class_name; no bullet till the joined run.
 
 935 amended (6) (ui, 2026-11-16; label by decision_number.sh; ui-design's gate run on main 87b2f6017, the Atlas, the coordinator's report mend: 0 of 22 clicks on the Mughouse's footprint off the door went in, all 16 on the door's cells and the link did). Where the click was dropped: Main's click handler took the cell under the cursor through _snap_to_floor (the walkable cell nearest within SNAP_RANGE, 3) before _plain_left and go_in_goal saw it. With 811 amended (8)'s shell solid, a click on the roof's picture at (174,206) or (175,205) snapped to the ground north of the building, (174,204) or (175,204), which is outside the footprint, so go_in_goal read plain ground and she walked round; a wall at (179,206) or (179,211) snapped to the lane beside it, (180,206) or (180,211); and (173,210), (172,207), (173,208), (174,208) lay more than SNAP_RANGE from any floor, so the snap gave NONE and the click did nothing (no card, no travel line). The pre-test of 935 amended (5) passed "without and with the pocket" on a take that had no solid shell: its footprint row called go_in_goal and _plain_left with the cell given, never the snap, and the shell it stood on was floor then, so the snap would have returned the cell itself. Now Main._click_ground_cell(grid) asks go_in_goal of the cell under the cursor first (the way in when it is a door cell or a footprint cell of a building with an open link), and only otherwise the snap; the plain click and the bow's click both use it (the bow's click never asked go_in_goal at all, so a door clicked with a bow in hand walked to the cell). The WASD scheme's click-walk and the scripted pick of the latency tests are unchanged. Rows (click_route_test _test_footprint_click, on main's own wilds cells with the shell solid, asserted solid): the eight targets of the run (the roof (174,206), (175,205), the walls (179,206), (179,211), the inside (173,210), (172,207), (173,208), (174,208)): the snap alone takes all eight off the footprint or to nothing (the fault), the click's cell is a link ((178,208) or (178,209), the nearer), and the walk from the lane at (185,208) ends on that link in seven cells; the open lane is the cell clicked as before; the way in shut (a closed link) is the snap's cell as before. Client only; protocol unchanged; no new class_name; no bullet beyond 935 amended (5)'s own: ui-design's five lines on this sha before it queues.
+## 948. A room level's own beds drawn and slept on (environment; the coordinator's go, 2026-11-16)
+
+Package "Umbrage: rooms read as rooms" (with art-kit's tone for the Mughouse's inner doors; it goes
+on when both are in). Art-kit's nearest-zoom read of the Mughouse's rooms on main
+(C:/dev/review/ui-design/looks/aknear_ae3f0cb9a/, zoom 0.50, the player standing there) found the
+hired rooms upstairs bare. umbrage_tavern_up lists five beds in level.json ("beds", [x, y, dx, dy],
+tools/make_interior.py), read by Level._interior_from into level["beds"] for the sim (storeys_of, the
+taverner's bed_at, level_test). But Client3D drew only a building's beds (add_beds, Level.beds_in),
+and a room level holds its beds itself. The ground floor's one bed, the keeper's at (17, 7), was
+undrawn too. Maps: she sleeps there at night on main (Main._taverner_places), and with no bed under
+her the view gave her a bedroll on the boards (_bed_under found none, _indoors none). Nobody sleeps
+upstairs yet.
+
+Now Level._interior_from also puts the beds into the level's terrain (terrain "beds", as 939 put the
+town there): the view's copy, the same list. It changes no floor, walk or solid; interior beds carry
+no "solid" key, so the taverner stays on hers. Client3D._add_level_beds, after the buildings, draws
+each as a dwelling's is drawn: its prop (prop.bed) on the middle of its two cells at the head cell's
+ground, its head (art-kit's -z) the bed's way, under a "beds" node in the room. _bed_under reads the
+terrain's beds before a building's, so a sleeper on a head cell lies on the bed (LIE_HEIGHT 0.37)
+with no bedroll. A drawn bed blocks no step; that would move the keeper's bed_at, and would be its
+own ask to maps and the coordinator.
+
+The inner doors' wardrobe look in the same stills is not this decision's. There is no near-wall cut
+to fit a door to (every wall in a room level stands WALL_HEIGHT 3.0 m, as the door frames do), so the
+coordinator ruled art-kit's tone first. A room level's near side faded as a house's is stays an option
+for after 946.
+
+view_world_test _test_room_beds: umbrage_tavern_up's five beds and umbrage_tavern's one, each at
+"beds/Bed_x_y" on the middle of its cells at the floor with its head the bed's way; the keeper asleep
+at (17, 7) on her bed at 0.37, no bedroll. It fails on main (no beds node). Client only (Level's line
+is read by the client's own load of the level; nothing is sent); protocol unchanged; no new
+class_name. No bullet until it is seen joined at the nearest zoom.
