@@ -46,7 +46,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3034)
+## Lines in the code (3035)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -980,7 +980,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s\|rose\|%d | `sim/named_mind.gd` rose_news() |
 |  | %s\|%s\|%d | `sim/named_mind.gd` emote() |
 
-### other (client3d) (80)
+### other (client3d) (81)
 
 | | Line | Where |
 |---|---|---|
@@ -1023,6 +1023,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s=made %s %d | `client3d/client3d.gd` _world_map_key() |
 |  | %s=%s %s | `client3d/client3d.gd` _world_map_key() |
 |  | %s %s %s %s | `client3d/client3d.gd` _update_fade() |
+|  | ALBEDO = vec3(1.0) + tint * gain * k; | `client3d/client3d.gd` WINDOW_LIGHT_MUL |
 |  | %s %d %s | `client3d/client3d.gd` _sling_bend() |
 |  | headwear=none apron=no garb=none | `client3d/client3d.gd` look_for() |
 |  | could not copy %s | `client3d/lab_drop.gd` poll() |
