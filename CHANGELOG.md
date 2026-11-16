@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: at night a lit house window casts a soft glow on the ground beside its wall (927 amended (3)).
 - Towns: you leave the Mughouse standing outside its door, facing away from it, and a walk key held through a door or on arriving waits until you let it go (947).
 - Stepping out of the barrow onto the wilds shows the land again within about a fifth of a second, as the land you left is kept while you're inside (822 amended (6)).
 - Towns: people standing about or tending a stall every so often clear their throat, sniff or shift a foot, a few times a minute at most in a crowd, and never while chopping wood or asleep (940).
