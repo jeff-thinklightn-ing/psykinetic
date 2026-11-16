@@ -8193,8 +8193,16 @@ func _test_old_wolf_lunge_line() -> void:
 ## weapons together the reader takes less harm and wins more often; careless
 ## fists win at most GREY_FISTS_WINS of the starts. Not per weapon wins (a coin
 ## flip with the sword: 54 against 53 of 64), nor "a careless sword loses": it
-## wins 83% today.
+## wins 83% today. Under the players who do not read (780 amended (37), the
+## coordinator's ruling, 2026-11-15, after a hold on ordered blows took them
+## away: careless sword 27 to 18 here, chaser sword 32 to 25): each wins at
+## least its GREY_UNREAD_FLOORS, five and six under main's figure. One
+## sided, wins only: no assert on which weapon wins most at the top, and no
+## harm band here (that stays with the change that sets its figure).
 const GREY_STARTS := 32
+## Of GREY_STARTS: main reads careless sword 27, chaser sword 32 (11-15, the same each run); the
+## coordinator's floors. A change that sets the table again re-sets each to six under its own figure.
+const GREY_UNREAD_FLOORS := {"careless sword": 22, "chaser sword": 26}
 const GREY_HARM_SLACK := 0.5  # Hp a fight.
 const GREY_FISTS_WINS := 2  # Of GREY_STARTS.
 const GREY_REACT := 6  # A person's reaction to the red, ticks (the harness's DF_REACT).
@@ -8250,6 +8258,12 @@ func _test_old_wolf_fights() -> void:
 	_check(fists_ok,
 		"careless fists all but never beat him: won %d of %d (at most %d)%s" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS,
 		"" if fists_ok else _grey_moved("careless fists won %d of %d, bound at most %d" % [table["careless fists"]["won"], GREY_STARTS, GREY_FISTS_WINS])])
+	for cell: String in GREY_UNREAD_FLOORS:
+		var won := int(table[cell]["won"])
+		var floor_at := int(GREY_UNREAD_FLOORS[cell])
+		_check(won >= floor_at,
+			"a player who does not read still beats him with a sword: %s won %d of %d (at least %d)%s" % [cell, won, GREY_STARTS, floor_at,
+			"" if won >= floor_at else _grey_moved("%s won %d of %d, floor %d" % [cell, won, GREY_STARTS, floor_at])])
 	print("  (the table's %d fights in %d ms)" % [GREY_STARTS * 9, Time.get_ticks_msec() - began])
 	DayNight.reset()
 	Monster.idling = true
