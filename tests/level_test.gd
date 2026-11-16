@@ -3368,6 +3368,8 @@ func _test_temple_town() -> void:
 ## 947 (Jeff 11-15 18:48: "often you end up in the shell of the mughouse instead of the
 ## zone"): out of the tavern he stands outside the inn's door, facing away, never in its
 ## footprint; and set down on a way back, it does not take him till he steps off or his card lifts.
+## Since the pocket (811 amended (8)) no arrival stands in a shell, so the hold's rows use a way back
+## with no shell, registered in memory; the real levels are searched for a named arrival on one.
 func _test_out_of_the_shell() -> void:
 	print("
 == out of the Mughouse (947): outside its door, facing away; set down on a way back, held till a step off or the lift ==")
@@ -3397,24 +3399,66 @@ func _test_out_of_the_shell() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check(_main.map_name == "umbrage_tavern", "arrived off the ways back: the way in takes him at once (%s)" % _main.map_name)
-	# Set down ON a way back (main's (179,209), the inside door cell): held till he steps off, or his card lifts.
+	# Set down on the inn's inside door cell (179,209), in its shell: since the pocket (811 amended (8)) an
+	# arrival in a shell's footprint is put outside its door, off the ways back, and the way in takes him at
+	# once (terrain's row, changed in maps' take with terrain's yes). Without the pocket he stands on it, held.
 	var door_cell := Vector2i(rect.end.x - 1, link_in.y)
+	var ways_in: Array = (wilds["links"] as Array).map(func(link: Dictionary) -> Vector2i: return link["tile"])
+	_check(rect.has_point(door_cell), "the inn's inside door cell %s lies in its footprint %s" % [door_cell, rect])
+	_main.travel(Net.local_id, "wilds", "from_tavern", {}, door_cell)
+	await get_tree().process_frame
+	player = _player()
+	at = player.tile if player != null else World.NO_CELL
+	_check(_main.map_name == "wilds" and player != null and not rect.has_point(at) and not at in ways_in,
+		"set down on the door cell %s: put outside the inn's footprint, off the ways back (%s)" % [door_cell, at])
+	_main._take_link(player, link_in)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "umbrage_tavern", "and the way in takes him at once (%s)" % _main.map_name)
+	# 947's hold stays for a way back with no shell (the console's move, a return to a cell, a builder's
+	# level): coming from test_link_b, set down on test_link_a's way to it at (4, 1), held till he steps off,
+	# or his card lifts.
+	var way_back := Vector2i(4, 1)
+	_check(Main.shell_of(Level.load_level("test_link_a"), way_back).is_empty(), "test_link_a's way back to test_link_b at %s has no shell" % way_back)
+	_main.load_map("test_link_b")
 	for ends: String in ["step", "lift"]:
-		_main.travel(Net.local_id, "wilds", "from_tavern", {}, door_cell)
+		_main.travel(Net.local_id, "test_link_a", "", {}, way_back)
 		await get_tree().process_frame
 		player = _player()
-		_main._take_link(player, link_in)
+		_main._take_link(player, way_back)
 		await get_tree().process_frame
 		await get_tree().process_frame
-		_check(_main.map_name == "wilds" and player != null and player.tile == door_cell, "set down on the door cell %s, a way in before %s: held" % [door_cell, ends])
+		_check(_main.map_name == "test_link_a" and player != null and player.tile == way_back, "set down on the way back %s, no shell, the way taken before %s: held" % [way_back, ends])
 		if ends == "step":
-			_main._on_entity_moved(player, door_cell, door_cell + Vector2i(2, 0))
+			_main._on_entity_moved(player, way_back, way_back + Vector2i(-1, 0))
 		else:
 			_main._on_command(player, "view_ready", {"zone": player.zone})
-		_main._take_link(player, link_in)
+		_main._take_link(player, way_back)
 		await get_tree().process_frame
 		await get_tree().process_frame
-		_check(_main.map_name == "umbrage_tavern", "after his %s, the way in takes him (%s)" % [ends, _main.map_name])
+		_check(_main.map_name == "test_link_b", "after his %s, the way back takes him (%s)" % [ends, _main.map_name])
+	# Which real levels can still set a player down on a way back by a named arrival: the spawn a link
+	# names (or the level's first start) standing on a link back to where he came from, with no building's
+	# stair to come out beside. None: the hold guards the console's move, a return to a cell and builders' levels.
+	var levels := {}
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" != Prefab.DIR and FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			levels[folder] = Level.load_level(folder)
+	var on_way_back: Array[String] = []
+	for from_name: String in levels:
+		for link: Dictionary in (levels[from_name] as Dictionary).get("links", []):
+			var to_level: Dictionary = levels.get(str(link["to_map"]), {})
+			if to_level.is_empty() or Main.building_link_back(to_level, from_name) != World.NO_CELL:
+				continue
+			var spawns: Dictionary = to_level.get("spawn_points", {})
+			var starts: Array = to_level.get("starts", [])
+			var arrival: Variant = spawns.get(str(link.get("to_spawn", "")), starts[0] if not starts.is_empty() else null)
+			if arrival == null:
+				continue
+			for back: Dictionary in to_level.get("links", []):
+				if back["tile"] == Vector2i(arrival) and str(back["to_map"]) == from_name:
+					on_way_back.append("%s to %s at %s" % [from_name, link["to_map"], back["tile"]])
+	_check(on_way_back.is_empty(), "no real level's named arrival stands on its way back (%s)" % [on_way_back])
 	# Every shell in the wilds: its way out stands outside it, on a free cell, by its rule.
 	var was := World.enter_named("wilds")
 	var bad: Array[String] = []

@@ -50857,7 +50857,13 @@ shell) now walks to the doorway (179, 208), the shell behind it no floor, the ro
 room_fields.gd). Also run alone: view_world_test, relief_test, world_map_test, regen_test, resident_test,
 town_day_test, zone_test, companion_test, protocol_test; load_check. Protocol changed: PROTOCOL_REVISION 59 (release's number): an old client's own
 parse would still walk into the 76 cells. Server and client both; needs the deploy; no new class_name; no bullet till
-ui-design's joined after-run on this take (voice words it then).
+ui-design's joined after-run on this take (voice words it then). 947's row in level_test
+_test_out_of_the_shell (terrain's, changed here with its yes; the coordinator's ruling, 11-16): set down on the inn's
+inside door cell (179, 209) he is put outside the footprint, off the ways back, and the way in takes him at once (both
+rows fail on main without the pocket, where 947's hold keeps him on the door cell); 947's hold keeps its step and lift
+rows on test_link_a's way back at (4, 1), which has no shell; no real level's named arrival stands on its own way back
+(a new row searches them all), so the hold now guards a set-down by an explicit cell only: the console's move,
+Main._on_returned's return to a cell, and builders' levels.
 
 805 amended (11), "fishing that works", A, B, H and F (2) (items; the script's label; the coordinator's package and rulings
 after Jeff on v0.1.210: "fishing still doesn't work even though its in the release notes again", and his core loop
