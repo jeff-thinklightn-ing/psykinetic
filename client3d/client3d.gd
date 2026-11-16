@@ -837,6 +837,17 @@ const DAMP_FOG_DENSITY := 0.02
 const DAMP_LANTERN := 0.75
 ## A carried lantern's light energy on a dry level (_size_lantern).
 const LANTERN_ENERGY := 1.2
+## The carried lantern by daylight (451 amended, pc-character's to take; environment's
+## scratch, the coordinator's accepted design of 11-16): a player's or companion's
+## lantern light at LANTERN_ENERGY times the dark at its carrier's cell (lantern_dark:
+## the sim's own light there before any source, Fields.ambient_at, so a roof, cloud and
+## canopy count and the hour alone does not), hidden under LANTERN_DAY_LEAST of it, so by
+## day in the open it lights nothing and casts no shadow; its pane reads the same dark.
+## Covered (L) is out at any hour; the sim's emit_light and all that reads it unchanged.
+## The lantern_by_day static mirrors the const for tests and stills (off: as before).
+const LANTERN_BY_DAY := true
+static var lantern_by_day := LANTERN_BY_DAY
+const LANTERN_DAY_LEAST := 0.02
 ## The lantern hung (451 amended (4), pc-character's side): art-kit's gear.lantern in the room the
 ## two code boxes filled, its ring's top LANTERN_RING under its socket (belt_r's, its frame turned)
 ## or LANTERN_RING + LANTERN_TALL over a hung one's anchor (a post's arm, a hand's CARRIED_HANG).
@@ -23246,9 +23257,16 @@ func _sync_puppets() -> void:
 				puppet.set_meta("guide_wait", (entity as Companion).guide_wait)
 		_sync_bow(entity, puppet)
 		if entity is Player or entity is Companion:
-			var lantern := puppet.get_node_or_null("Lantern") as Node3D
-			if entity is Player and lantern != null and lantern.visible != (entity.emit_light > 0.0):
-				lantern.visible = entity.emit_light > 0.0  # Covered (L).
+			var lantern := puppet.get_node_or_null("Lantern") as OmniLight3D
+			if lantern != null:
+				var lit := entity.emit_light > 0.0 if entity is Player else true  # Covered (L).
+				var shown := lit
+				if lantern_by_day:
+					var dark := _lantern_dark_at(entity.tile)
+					lantern.light_energy = _lantern_lit_energy() * dark
+					shown = lit and dark >= LANTERN_DAY_LEAST
+				if lantern.visible != shown:
+					lantern.visible = shown
 			_glow_lantern(puppet)
 		elif entity is Monster:
 			_sync_named(entity as Monster, puppet)
@@ -25384,6 +25402,25 @@ static func pane_energy(energy: float, day: float, outdoor: bool) -> float:
 	return PANE_BRIGHT * energy / LANTERN_ENERGY * lerpf(PANE_FLOOR, 1.0, dark)
 
 
+## How dark it is for a carried lantern (LANTERN_BY_DAY): 1 - day_share of [param ambient]
+## (the sim's light at its carrier's cell before any source, Fields.ambient_at) on an outdoor
+## level, 1 on a room level or underground. Its light's share and its pane's dark both.
+static func lantern_dark(ambient: float, outdoor: bool) -> float:
+	return 1.0 - day_share(ambient) if outdoor else 1.0
+
+
+## lantern_dark at [param cell] as this view stands; 1 with lantern_by_day off.
+func _lantern_dark_at(cell: Vector2i) -> float:
+	if not lantern_by_day:
+		return 1.0
+	return lantern_dark(World.fields.ambient_at(cell) if World.fields != null else DayNight.light, _outdoor)
+
+
+## A carried lantern's energy lit, before the dark: _size_lantern's.
+func _lantern_lit_energy() -> float:
+	return LANTERN_ENERGY * (DAMP_LANTERN if bool(_terrain.get("damp", false)) else 1.0)
+
+
 ## Sets [param pane] glowing at [param energy] (pane_energy's), or back to its dull horn at 0.
 static func shade_pane(pane: StandardMaterial3D, energy: float) -> void:
 	if is_equal_approx(float(pane.get_meta(&"glow", -1.0)), energy):
@@ -25409,8 +25446,20 @@ func _glow_lantern(puppet: Node3D) -> void:
 	if pane == null:
 		return
 	var light := puppet.get_node_or_null("Lantern") as OmniLight3D
-	var energy := light.light_energy if light != null and light.visible else 0.0
-	shade_pane(pane, pane_energy(energy, day_share(DayNight.light), _outdoor))
+	if not lantern_by_day:
+		var energy := light.light_energy if light != null and light.visible else 0.0
+		shade_pane(pane, pane_energy(energy, day_share(DayNight.light), _outdoor))
+		return
+	# By day (LANTERN_BY_DAY) the light may be hidden while lit: lit is its carrier's (covered or
+	# not), and the pane's dark the carrier's cell's, the light's own.
+	var id: int = puppet.get_meta("entity_id", 0)
+	var entity: Object = instance_from_id(id) if id != 0 else null
+	var lit: bool = light != null and light.visible
+	var cell := Vector2i(roundi(puppet.position.x), roundi(puppet.position.z))
+	if entity != null and is_instance_valid(entity) and entity is GridEntity:
+		lit = light != null and ((entity as GridEntity).emit_light > 0.0 if entity is Player else true)
+		cell = (entity as GridEntity).tile
+	shade_pane(pane, pane_energy(_lantern_lit_energy() if lit else 0.0, 1.0 - _lantern_dark_at(cell), true))
 
 
 ## The town's lanterns' shared pane, always lit, shaded by the place's dark (451 amended (4)).
