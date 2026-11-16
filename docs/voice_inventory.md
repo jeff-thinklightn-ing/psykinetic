@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3045)
+## Lines in the code (3047)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -981,7 +981,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s\|rose\|%d | `sim/named_mind.gd` rose_news() |
 |  | %s\|%s\|%d | `sim/named_mind.gd` emote() |
 
-### other (client3d) (81)
+### other (client3d) (83)
 
 | | Line | Where |
 |---|---|---|
@@ -1014,6 +1014,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | stencil_mode read, write, compare_not_equal, 1; | `client3d/client3d.gd` setup() |
 |  | stencil_mode read, compare_not_equal, 1; | `client3d/client3d.gd` setup() |
 |  | stencil_mode read, compare_not_equal, 1; | `client3d/client3d.gd` setup() |
+|  | %s at +%.1f s, the eye %.1f m inside its box | `client3d/client3d.gd` _box_why() |
 |  | stencil_mode write, compare_always, %d; | `client3d/client3d.gd` _marking_shader() |
 |  | stencil_mode write, compare_always, %d; | `client3d/client3d.gd` _marking_shader() |
 |  | shader_type spatial; | `client3d/client3d.gd` _marking_shader() |
@@ -1024,6 +1025,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s=made %s %d | `client3d/client3d.gd` _world_map_key() |
 |  | %s=%s %s | `client3d/client3d.gd` _world_map_key() |
 |  | %s %s %s %s | `client3d/client3d.gd` _update_fade() |
+|  | 4a, the longest look | `client3d/client3d.gd` _box_turn() |
 |  | ALBEDO = vec3(1.0) + tint * gain * k; | `client3d/client3d.gd` WINDOW_LIGHT_MUL |
 |  | %s %d %s | `client3d/client3d.gd` _sling_bend() |
 |  | headwear=none apron=no garb=none | `client3d/client3d.gd` look_for() |
