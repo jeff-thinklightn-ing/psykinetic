@@ -4289,6 +4289,36 @@ func _test_storey_stairs() -> void:
 			if cue["cue"] in ["up", "down"]:
 				(timber if int(cue["variant"]) == 4 else stone).append("%s %s" % [name, cue["tile"]])
 	_check(timber.size() == 8 and stone.is_empty(), "the Mughouse's eight stair links are drawn timber, variant 4 (%d; else %s)" % [timber.size(), stone])
+	# 589 amended (4) (the coordinator, 11-16: the attic's way up sat 23 px off the screen's top from where one comes up):
+	# upstairs, the attic's flight stands in the way down's row, both within 3 cells of the arrival from below, facing
+	# north (the room's door (13..14,8) is walked to round them by (12,9) and (15,9..11)).
+	var up_floor := Level.load_level("umbrage_tavern_up")
+	var came: Vector2i = up_floor["spawn_points"]["from_umbrage_tavern_0"]
+	var flights: Array[String] = []
+	var far: Array[String] = []
+	for cue: Dictionary in up_floor["terrain"].get("link_cues", []):
+		if cue["cue"] in ["up", "down"]:
+			flights.append("%s %s" % [cue["cue"], cue["tile"]])
+			var at: Vector2i = cue["tile"]
+			if at.y != 10 or maxi(absi(at.x - came.x), absi(at.y - came.y)) > 3 or cue["facing"] != Vector2i(0, -1):
+				far.append("%s %s facing %s" % [cue["cue"], at, cue["facing"]])
+	_check(flights.size() == 4 and far.is_empty(),
+		"upstairs, the attic's way up and the way down in one row, within 3 cells of the arrival %s, facing north (%s; off %s)" % [came, flights, far])
+	# The stair room lit by the temple's own candle stand (the coordinator: no new prop or light kind), one beside the
+	# attic flight's foot and one by where one comes up: the same slot and numbers as the temple's stand in the wilds.
+	var temple: Dictionary = {}
+	for lit: Dictionary in Level.load_level("wilds")["terrain"]["lit_candles"]:
+		if str(lit.get("slot", "")) == "prop.candle_stand":
+			temple = lit
+	var stands: Array[String] = []
+	var unlike: Array[String] = []
+	for lit: Dictionary in up_floor["terrain"]["lit_candles"]:
+		stands.append(str(lit["at"]))
+		for key: String in ["slot", "top", "up", "energy", "reach", "falloff"]:
+			if lit.get(key) != temple.get(key):
+				unlike.append("%s %s" % [lit["at"], key])
+	_check(not temple.is_empty() and stands == ["(12.0, 11.0)", "(17.0, 12.0)"] and unlike.is_empty(),
+		"upstairs, the stair room's two candle stands at (12, 11) and (17, 12), the temple's own (%s; unlike %s)" % [stands, unlike])
 
 
 ## 811 amended (8) (the coordinator's bar on Jeff's report, 11-15: "often you end up in the shell of the mughouse instead
@@ -4432,8 +4462,9 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	on_pieces.sort()
 	_check(on_pieces == ["building.bar_counter 1.05", "building.tavern_table 0.79", "building.tavern_table 0.79",
 			"building.tavern_table 0.79", "building.tavern_table 0.79"]
-		and (floors["umbrage_tavern_up"]["terrain"].get("lit_candles", []) as Array).is_empty(),
-		"the Mughouse's lit candles on its four tables and its bar, at their tops, none upstairs (%s)" % [on_pieces])
+		and (floors["umbrage_tavern_up"]["terrain"].get("lit_candles", []) as Array).all(
+			func(lit: Dictionary) -> bool: return str(lit.get("slot", "")) == "prop.candle_stand"),
+		"the Mughouse's lit candles on its four tables and its bar, at their tops; upstairs only the stair room's candle stands (589 amended (4)) (%s)" % [on_pieces])
 	var storeys := Level.storeys_of("umbrage_tavern")
 	var beds: Array = storeys["beds"]
 	var laid := beds.filter(func(bed: Dictionary) -> bool:
