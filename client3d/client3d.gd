@@ -5177,7 +5177,8 @@ func _plate_shift(puppet: Node3D, row: Dictionary) -> Vector3:
 	if int(row["bone"]) < 0 or not puppet.has_meta("rig"):
 		return Vector3.ZERO
 	var rig := puppet.get_meta("rig") as AnimRig
-	return plate_shift(skeleton, int(row["bone"]), row["idle"] as Vector3, rig.playing())
+	var lay: Vector3 = puppet.get_meta("lay_at", Vector3.ZERO)  # Where _lay rests the Body (865 amended (8)).
+	return plate_shift(skeleton, int(row["bone"]), row["idle"] as Vector3, rig.playing(), puppet.global_basis * lay)
 
 
 ## [param bone]'s place in [param skeleton]'s own space when [param idle] is posed at its
@@ -5228,9 +5229,12 @@ static func plate_follow(drop: float, clip: String) -> float:
 
 
 ## [param skeleton]'s [param bone] off [param idle] (its Idle head, idle_head), in world
-## metres (the skeleton's turn and scale), down and across together, times plate_follow:
+## metres (the skeleton's turn and scale), down and across together, plus [param laid] (the
+## Body's lay place in world metres: _lay's lay_at, a sleeper's SLEEP_MIDDLE back and its bed's
+## height, a sitter's SEAT_TOWARD; 865 amended (8): the skeleton's own pose never sees it, and the
+## sleeping keeper's plate stood 0.80 m past her head, out beyond the wall), times plate_follow:
 ## an upright body's plate stays on its stand exactly. Nought without the bone.
-static func plate_shift(skeleton: Skeleton3D, bone: int, idle: Vector3, clip: String) -> Vector3:
+static func plate_shift(skeleton: Skeleton3D, bone: int, idle: Vector3, clip: String, laid := Vector3.ZERO) -> Vector3:
 	if bone < 0:
 		return Vector3.ZERO
 	var moved := skeleton.get_bone_global_pose(bone).origin - idle
@@ -5238,7 +5242,7 @@ static func plate_shift(skeleton: Skeleton3D, bone: int, idle: Vector3, clip: St
 	if follow <= 0.0:
 		return Vector3.ZERO
 	var basis := skeleton.global_basis if skeleton.is_inside_tree() else skeleton.basis
-	return basis * (moved * follow)
+	return (basis * moved + laid) * follow
 
 
 ## A plate's shift [param seconds] on from [param was] toward [param shift]: most of the

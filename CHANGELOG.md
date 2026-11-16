@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- A sleeping person's name shows over their head (865 amended (8)).
 
 - Towns: Umbrage's two handcarts stand at the square's north-west edge beside the town's store, clear of a newcomer's way from the arrival to the Mughouse (774 amended (6)).
 - Towns: of an evening Umbrage's townsfolk go inside the Last Light Mughouse and stay a while (875).

@@ -514,6 +514,49 @@ func _test_name_plates() -> void:
 	puppet.free()
 	client.free()
 	_test_plate_heights()
+	_test_plate_laid()
+
+
+## 865 amended (8) (the coordinator's find on ui-design's beds pair: the sleeping keeper's plate 0.80 m past
+## her head, out beyond the wall): a sleeper laid back by _lay (SLEEP_MIDDLE, the aside, the bed's height)
+## and turned half round has its plate over its head bone as drawn, by Client3D._plate_shift on a real
+## puppet (Body, Model, rig), within 0.1 m; standing, the same puppet's shift stays nought.
+func _test_plate_laid() -> void:
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var client := Client3D.new()
+	var puppet := Node3D.new()
+	var body := Node3D.new()
+	body.name = "Body"
+	puppet.add_child(body)
+	var model := (load(Client3D.HUMAN["scene"]) as PackedScene).instantiate() as Node3D
+	model.name = "Model"
+	body.add_child(model)
+	add_child(puppet)
+	puppet.position = Vector3(17.0, 0.0, 7.0)
+	var rig := AnimRig.make(model, lib, 0.0, true, null)
+	rig.loop("Idle", 0.0)
+	puppet.set_meta("rig", rig)
+	puppet.set_meta("faces", 0.0)
+	var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var head := skeleton.find_bone("Head")
+	_plate_pose(skeleton, lib.get_animation("Idle"), 0.0)
+	var stand := skeleton.global_transform * skeleton.get_bone_global_pose(head).origin
+	var row := {}
+	var standing := client._plate_shift(puppet, row)
+	_check(standing.length() < 0.001, "standing, the puppet's plate stays on its stand (%.3f)" % standing.length())
+	# Asleep on a bed 0.28 m up, facing east (yaw 0), as the Mughouse's keeper lies (948).
+	puppet.set_meta("work", "sleep")
+	puppet.set_meta("bed_height", 0.28)
+	client._lay(puppet, body, 0.0)
+	rig.loop("Sleep_Side", 0.0)
+	_plate_pose(skeleton, lib.get_animation("Sleep_Side"), 0.0)
+	var lying := skeleton.global_transform * skeleton.get_bone_global_pose(head).origin
+	var plate := stand + client._plate_shift(puppet, row)
+	_check(body.position.length() > 0.5, "the sleeper's Body is laid off its stand (%s)" % body.position)
+	_check(plate.distance_to(lying) < 0.1, "asleep on a bed, the plate is over the head as drawn (%.3f m off: plate %s, head %s; the Body laid at %s)" % [
+		plate.distance_to(lying), plate.snapped(Vector3.ONE * 0.01), lying.snapped(Vector3.ONE * 0.01), body.position.snapped(Vector3.ONE * 0.01)])
+	puppet.free()
+	client.free()
 
 
 ## 865 amended (2) (the coordinator, on playtest's bind7 and bind8: a kneeling companion's
