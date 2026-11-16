@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3047)
+## Lines in the code (3048)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -2119,10 +2119,11 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd` KEPT_LINE |
 |  | %s and %s | `sim/resident.gd` _listed() |
 
-### residents (card) (25)
+### residents (card) (26)
 
 | | Line | Where |
 |---|---|---|
+|  | tied back in a tail | `sim/resident_card.gd` HAIR_SAID |
 |  | was rescued from captivity and brought home to the town%s | `sim/resident_card.gd` came_words() |
 |  | %s was born in %s, %s. | `sim/resident_card.gd` plain_card() |
 |  | a place not far off | `sim/resident_card.gd` plain_card() |
