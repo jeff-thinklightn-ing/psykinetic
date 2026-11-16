@@ -2893,7 +2893,7 @@ func _test_armour_footfalls() -> void:
 			if not now_heard.is_empty():
 				heard_at.append(fposmod(frame / 60.0, length) / length)
 				together = together and now_heard == ["sfx.footstep_stone_medium", "sfx.armour_plate"]
-		var falls: Array = Client3D.GAIT_FOOTFALLS[clip]
+		var falls: Array = Client3D.footfalls_of(rig, clip)
 		var on_falls := heard_at.all(func(share: float) -> bool: return falls.any(func(fall: float) -> bool: return share >= fall and share - fall < 1.5 / 60.0 / length))
 		print("  %s: %d clanks in 3 cycles, at %s of the clip" % [clip, heard_at.size(), heard_at.map(func(share: float) -> String: return "%.3f" % share)])
 		_check(heard_at.size() == 6 and on_falls and together, "%s: the footstep and the clank together at each of its two footfalls a cycle, none between (%d)" % [clip, heard_at.size()])
@@ -2935,7 +2935,7 @@ func _test_armour_footfalls() -> void:
 			clips[clip] = int(clips.get(clip, 0)) + 1
 			var length := rig.length(clip)
 			var at := fposmod(rig.base_position(), length) / length if length > 0.0 else 0.0
-			if was[0] == clip and Client3D.footfall_between(float(was[1]), at, Client3D.GAIT_FOOTFALLS.get(clip, [])):
+			if was[0] == clip and Client3D.footfall_between(float(was[1]), at, Client3D.footfalls_of(rig, clip)):
 				falls += 1
 			was = [clip, at]
 		var clanks := _rig.sfx.played.slice(before).filter(func(entry: Array) -> bool: return str(entry[0]).begins_with("sfx.armour_"))

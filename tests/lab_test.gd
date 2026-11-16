@@ -204,7 +204,7 @@ func _test_feet() -> void:
 	_check(set_to > 0.0 and is_equal_approx(ArtKit.feel("client3d.gait.Jog_Short", 0.0), set_to)
 		and absf(_lab.pace() - set_to * _lab.look.scale) < 0.01, "Use measured: his jog's pace %.2f for this run, the treadmill at it" % set_to)
 	ArtKit.set_feel("client3d.gait.Jog_Short", null)
-	_check(is_equal_approx(ArtKit.feel("client3d.gait.Jog_Short", 0.0), 3.63), "put back: the file's")
+	_check(is_equal_approx(ArtKit.feel("client3d.gait.Jog_Short", 0.0), 3.25), "put back: the file's")
 	_lab.clip = "Idle"
 	_check(_lab.use_measured(0) == 0.0, "an idle: nothing to set")
 	_lab._age_marks(CharacterLab.MARK_LIFE + 0.1, 0.0)

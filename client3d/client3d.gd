@@ -1503,16 +1503,16 @@ const MODELS := {
 		"fidgets": KOBOLD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": KOBOLD_SOCKETS},
 	"skeleton": {"scene": "res://art/kit/creatures/creature.skeleton/creature.skeleton.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
-		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+		"gaits": DEAD_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 	"skeleton_guard": {"scene": "res://art/kit/creatures/creature.skeleton/creature.skeleton.2.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
-		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+		"gaits": DEAD_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 	"draugr": {"scene": "res://art/kit/creatures/creature.draugr/creature.draugr.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75 * DRAUGR_SCALE, "faces": PI * 0.5, "by_mass": false,
 		"gaits": DRAUGR_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": DRAUGR_SOCKETS},
 	"ghost": {"scene": "res://art/kit/creatures/creature.ghost/creature.ghost.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
-		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+		"gaits": DEAD_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
 	"astral_knight": {"scene": "res://art/kit/creatures/creature.astral_knight/creature.astral_knight.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
 		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL, "one_shell": true,
@@ -1778,13 +1778,19 @@ const HUMAN := {"scene": "res://art/models/characters/human_m.glb", "clips": "re
 ## a second. A person (people_stance) plays the jog as People_Jog_Short, its back held up to about
 ## 15 degrees where the pack's pitches 24 to 29 (Jeff, 11-11: "the walk looks like skipping"; every
 ## player in motion plays the jog); the orc, kobold and barrow dead keep Jog_Short.
-const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.63], ["Sprint_Short", 5.55]]
+## The people's jog is their own (the stride row, (b)): People_Jog_Short keeps Jog_Short's 22 keys with the legs'
+## swing narrowed and each foot down longer (tools/humanoid_clips.py), 3.25 m a second at its own rate (hers 3.08;
+## tools/gait_pace.gd), 1.5 m steps at a player's 4 m/s. The sprint takes over where it did before (its third item,
+## Client3D.gait_change: 4.488, the old jog's and the sprint's paces' mean), so a stamina potion's 5 m/s still jogs.
+## The barrow's dead (DEAD_GAITS) play Jog_Short itself at its 3.63.
+const HUMAN_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.25], ["Sprint_Short", 5.55, 4.488]]
+const DEAD_GAITS: Array[Array] = [[CLIP_WALK, 0.94], ["Jog_Short", 3.63], ["Sprint_Short", 5.55]]
 ## The draugr: the human skeleton scaled up (art-kit's, 2.1 m and more), its
 ## strides and its hands' sockets with it.
 const DRAUGR_SCALE := 1.2
 const DRAUGR_GAITS: Array[Array] = [[CLIP_WALK, 0.94 * DRAUGR_SCALE], ["Jog_Short", 3.63 * DRAUGR_SCALE], ["Sprint_Short", 5.55 * DRAUGR_SCALE]]
 const DRAUGR_SOCKETS := {"hand": DRAUGR_SCALE, "hip": 0.17 * DRAUGR_SCALE, "back": 0.13 * DRAUGR_SCALE, "chest": 0.04 * DRAUGR_SCALE}
-const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.44], ["Sprint_Short", 5.27]]
+const HUMAN_F_GAITS: Array[Array] = [[CLIP_WALK, 0.89], ["Jog_Short", 3.08], ["Sprint_Short", 5.27, 4.258]]
 ## A body whose last cell came this long ago (ms) or more has stopped: its
 ## gait's last frames step no more.
 const FOOTFALL_MOVING_MS := 1000
@@ -1792,7 +1798,9 @@ const FOOTFALL_MOVING_MS := 1000
 ## (tools/gait_pace.gd; the two bodies' within 0.005): the footstep and worn
 ## armour's clank play on them (676 1b amended), at the body's own steps,
 ## not the cells'.
-const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587]}
+## The people's jog (People_Jog_Short, its stance longer: each foot strikes sooner) has its own.
+const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "Jog_Short": [0.027, 0.532], "Sprint_Short": [0.044, 0.587],
+	"People_Jog_Short": [0.966, 0.450]}
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
@@ -23908,10 +23916,16 @@ func _armour_sound(entity: GridEntity, puppet: Node3D, pace: float) -> void:
 ## the last cell's footstep and the armour's clank together, at that step's
 ## pace, while the body still moves (a cell within FOOTFALL_MOVING_MS).
 ## Standing, or a clip with no footfalls, none: _step_sound plays the cell's.
+## [param clip]'s footfalls on [param rig] (GAIT_FOOTFALLS): the copy it plays for it (a person's People_Jog_Short)
+## where that has its own, else the clip's.
+static func footfalls_of(rig: AnimRig, clip: String) -> Array:
+	return GAIT_FOOTFALLS.get(rig.as_played(clip), GAIT_FOOTFALLS.get(clip, []))
+
+
 func _footfall_sounds(entity: GridEntity, puppet: Node3D, rig: AnimRig) -> void:
 	var clip := rig.base_clip()
 	var length := rig.length(clip)
-	var falls: Array = GAIT_FOOTFALLS.get(clip, [])
+	var falls := footfalls_of(rig, clip)
 	if falls.is_empty() or length <= 0.0:
 		if puppet.has_meta("footfall_at"):
 			puppet.remove_meta("footfall_at")
@@ -28524,7 +28538,7 @@ func _gait(puppet: Node3D, rig: AnimRig, speed: float, smooth := -1.0) -> void:
 	# smoothed read has crossed the change (a walk broken into a run jogs in a tenth of a second).
 	var burst := false
 	if at >= 0 and at + 1 < gaits.size():
-		var up := sqrt(float(gaits[at][1]) * float(gaits[at + 1][1])) * ArtKit.feel("client3d.gait_burst", GAIT_BURST)
+		var up := gait_change(gaits, at + 1) * ArtKit.feel("client3d.gait_burst", GAIT_BURST)
 		var clock := AnimRig.now_msec()
 		if float(puppet.get_meta("step_speed", speed)) / pace <= up:
 			puppet.remove_meta("burst_since")
@@ -28867,10 +28881,18 @@ static func gait_for(current: String, speed: float, gaits: Array = GAITS) -> int
 			at = i
 	var index := 0
 	for i in range(1, gaits.size()):
-		var change := sqrt(float(gaits[i - 1][1]) * float(gaits[i][1]))
+		var change := gait_change(gaits, i)
 		if speed > change * (1.0 / GAIT_HYSTERESIS if at >= i else GAIT_HYSTERESIS):
 			index = i
 	return index
+
+
+## The speed (tiles a second, before the hysteresis) at which [param gaits]'s gait [param i] takes over from the
+## one before: its own third item where it has one (the people's sprint: the jog's own pace moved with its clip,
+## the change kept where it was, the coordinator 11-16), else halfway between the two paces (their geometric mean).
+static func gait_change(gaits: Array, i: int) -> float:
+	var gait: Array = gaits[i]
+	return float(gait[2]) if gait.size() > 2 else sqrt(float(gaits[i - 1][1]) * float(gait[1]))
 
 
 ## [param gaits] with their paces as feel.json has them (674 step 3; the
@@ -28891,7 +28913,7 @@ static func paced(gaits: Array) -> Array:
 	if not _paced.has(prefix):
 		var own := []
 		for gait: Array in gaits:
-			own.append([gait[0], ArtKit.feel(prefix + str(gait[0]), float(gait[1]))])
+			own.append([gait[0], ArtKit.feel(prefix + str(gait[0]), float(gait[1]))] + gait.slice(2))
 		_paced[prefix] = own
 	return _paced[prefix]
 

@@ -186,6 +186,27 @@ PEOPLE_JOG_RISE = 0.5
 PEOPLE_JOG_TOE_ABOVE = 0.022
 CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["Jog_Short_Loop"], rise=PEOPLE_JOG_RISE, floor="Walk_Loop", kept_hands=True,
 	turns=[("spine_02", LIFT, PEOPLE_JOG_UPRIGHT), ("spine_03", LIFT, PEOPLE_JOG_UPRIGHT), ("neck_01", LIFT, -PEOPLE_JOG_NECK)])
+# The stride row (Jeff, 11-11: "the walk looks like skipping"; the coordinator's (b), 11-16): what read as a skip was
+# the hang, 953's runner in the air 263 ms of each 416 ms step where one at 4 m/s is about 100 to 130. Every one of
+# Jog_Short's 22 keys kept (a cycle played in 0.86 to 0.90 of them left 3 keys a stance, the planted foot arcing
+# between them: the lab's slide 6 to 8%) and the legs' swing narrowed to PEOPLE_JOG_LEGS of it, so the people play it
+# at their own pace (client3d's HUMAN_GAITS; the barrow's dead keep Jog_Short's in DEAD_GAITS): 1.5 m steps at a
+# player's 4 m/s, was 1.66 (1.25 m glided, Jeff at v0.1.150). Each foot down PEOPLE_JOG_STANCE of a step about its
+# stance's middle (stance_plan; 8 keys of 22, was 6), the heel up by as much as PEOPLE_JOG_PUSH degrees over the
+# push-off and the toe up PEOPLE_JOG_STRIKE at the strike so the leg reaches, the left foot planned as the right
+# one's mirror half a cycle on (the pack's jog is uneven: the left met its last key 3 cm short, 189 ms of stance
+# against 236); in the air 158 ms a step. The hips' rise cut to PEOPLE_JOG_STRIDE_RISE, the pelvis where the jog
+# has it (option 2's 3 cm lift took the foot off sooner: 192 ms); the swing foot's toe kept PEOPLE_JOG_CLEAR over
+# its lowest through the passing pose.
+PEOPLE_JOG_LEGS = 0.91
+PEOPLE_JOG_STRIDE_RISE = 0.35
+PEOPLE_JOG_CLEAR = 0.06
+PEOPLE_JOG_STANCE = 0.7
+PEOPLE_JOG_PUSH = 60.0
+PEOPLE_JOG_STRIKE = 15.0
+CLIPS["People_Jog_Short_Loop"] = dict(CLIPS["People_Jog_Short_Loop"], rise=PEOPLE_JOG_STRIDE_RISE, clear=PEOPLE_JOG_CLEAR,
+	stride=dict(CLIPS["Jog_Short_Loop"]["stride"], legs=CLIPS["Jog_Short_Loop"]["stride"]["legs"] * PEOPLE_JOG_LEGS),
+	stance=PEOPLE_JOG_STANCE, push=PEOPLE_JOG_PUSH, strike=PEOPLE_JOG_STRIKE, mirror="r")
 # The wade (775; Jeff: wading the hills' streams): the pack's walk with each knee lifted high out
 # of the water over its swing (the walk's swing windows, measured on its feet: the right foot off
 # the ground from 0.11 s to 0.67 s of its 1.33 s, the left half a cycle on), the arms held a little
@@ -1572,6 +1593,8 @@ class Rig:
 				toe = self.posed(spec["base"], spec["at"])[hand].col[1].xyz.copy()
 				if len(reach) > 2:
 					toe.rotate(Quaternion((0.0, 0.0, 1.0), math.radians(reach[2])))
+				if len(reach) > 3 and reach[3]:  # A fourth tips the toe down that many degrees (the heel up).
+					toe.rotate(Quaternion(toe.cross(Vector((0.0, 0.0, 1.0))).normalized(), math.radians(reach[3])))
 				turns.append((hand, toe, AIM))
 		return self.turned(spec, turns)
 
@@ -1646,14 +1669,18 @@ class Rig:
 		floor = self.floor_of(clip["floor"]) if "floor" in clip else None
 		out = []
 		for i, (t, z) in enumerate(zip(times, heights)):
-			move = (0.0, 0.0, (mean - z) * (1.0 - rise))
+			# "hips_up" (m): the pelvis raised by that much on every frame, the feet held where they were (the
+			# knees opened: less fold at the passing pose).
+			move = (0.0, 0.0, (mean - z) * (1.0 - rise) + clip.get("hips_up", 0.0))
 			frame_turns = list(turns)
 			stock = self.posed(base, t)
 			if rise != 1.0 or floor is not None:
 				for side, sign in (("l", 1.0), ("r", -1.0)):
 					lift = max(0.0, floor - stock["ball_" + side].translation.z) if floor is not None else 0.0
 					lift += extra[i][side] if extra else 0.0
-					frame_turns.append(("thigh_" + side, ([("foot_%s@base" % side, (0.0, 0.0, lift), 1.0)], (0.2 * sign, -1.0, 0.0)), REACH))
+					along = extra[i].get(side + "_h", (0.0, 0.0)) if extra else (0.0, 0.0)  # "stance": the foot moved over the ground.
+					pitch = extra[i].get(side + "_pitch", 0.0) if extra else 0.0  # "push": the heel up, the toe down.
+					frame_turns.append(("thigh_" + side, ([("foot_%s@base" % side, (along[0], along[1], lift), 1.0)], (0.2 * sign, -1.0, 0.0), 0.0, pitch), REACH))
 			if clip.get("kept_hands"):
 				for side in ("l", "r"):
 					frame_turns.append(("upperarm_" + side, ([("hand_%s@base" % side, move, 1.0)], [("lowerarm_" + side, (0.0, 0.0, 0.0), 1.0)]), REACH))
@@ -1683,20 +1710,35 @@ class Rig:
 		if "segment" in clip:
 			base, start, end = clip["segment"]
 			times = [start + f / FPS for f in range(round((end - start) * FPS) + 1)]
+			if "time" in clip:
+				# The segment played in that share of its length, in whole frames, its ends the segment's own
+				# (a quicker cadence over the same ground).
+				span = round((end - start) * FPS) / FPS
+				n = round(span * clip["time"] * FPS)
+				times = [start + span * f / n for f in range(n + 1)]
 			frames = [self.basis(m) for m in self.segment_poses(clip, base, times)]
 			if "stride" in clip:
 				frames = narrowed(frames, clip["stride"])
 			if "floor" in clip:
 				# The legs' narrowing moves the feet after their reach: each ball of the foot found under the floor
 				# is lifted by as much again and the frames made anew, until none is under by more than 2 mm.
+				# "clear" (m): over each foot's swing (the frames it moves forward, as the narrowed frames first
+				# have it), its toe's end at least that high over its lowest (swing_arcs: up over the swing's first
+				# sixth, held through the passing pose, down over its last); the planted foot as it was (the
+				# narrowed legs lowered the swing: the toe 2 cm over the cobbles at the passing pose).
 				floor = self.floor_of(clip["floor"])
 				extra = [{"l": 0.0, "r": 0.0} for _t in times]
-				for _pass in range(4):
+				toe = {s: next(b.length for b in self.bones if b.name == "ball_" + s) for s in ("l", "r")}
+				tip = lambda arm, side: arm["ball_" + side] @ Vector((0.0, toe[side], 0.0))  # The toe's end.
+				arc = swing_arcs([self.armature(b) for b in frames], clip["clear"], tip) if "clear" in clip else None
+				for _pass in range(6 if arc else 4):
 					under = 0.0
 					for i, basis in enumerate(frames):
 						arm = self.armature(basis)
 						for side in ("l", "r"):
 							short = floor - arm["ball_" + side].translation.z
+							if arc:
+								short = max(short, arc[side][i] - (tip(arm, side).z - arc["low"][side]))
 							if short > 0.0:
 								extra[i][side] += short
 								under = max(under, short)
@@ -1706,6 +1748,46 @@ class Rig:
 					frames = [self.basis(m) for m in self.segment_poses(clip, base, times, extra)]
 					if "stride" in clip:
 						frames = narrowed(frames, clip["stride"])
+				if "stance" in clip:
+					# "stance" (a share of a step): each foot down that share of a step (the lower of its heel and
+					# its ball as deep as at the middle of its stance, the ball on a line at the planted speed), the
+					# stance grown about its middle frame, its swing the floored swing played in the frames left
+					# (stance_plan); the hips as they were. Driven by the feet's reach as the floor is, until no ball
+					# is off its mark by more than 2 mm or the passes run out.
+					rest = {b.name: b.matrix_local.translation.z for b in self.bones if b.name.startswith(("foot_", "ball_"))}
+					plan = stance_plan([self.armature(b) for b in frames], clip["stance"], rest, clip.get("stance_ahead", 0.5), clip.get("push", 0.0), clip.get("strike", 0.0), clip.get("mirror", ""))
+					ball = lambda arm, side: arm["ball_" + side].translation
+					if clip.get("push", 0.0) or clip.get("strike", 0.0):
+						for i in range(len(frames)):
+							for side in ("l", "r"):
+								extra[i][side + "_pitch"] = plan[side + "_pitch"][i]
+						frames = [self.basis(m) for m in self.segment_poses(clip, base, times, extra)]
+						if "stride" in clip:
+							frames = narrowed(frames, clip["stride"])
+					for side in ("l", "r"):
+						print("STANCE %s %s: %d frames down, was %d; swing %d frames, was %d" % ((name, side) + plan["counts"][side]))
+					for _pass in range(12):
+						arms = [self.armature(b) for b in frames]
+						off_most = 0.0
+						for i in range(len(frames) - 1):
+							for side in ("l", "r"):
+								off = plan[side][i] - ball(arms[i], side)
+								if i in plan[side + "_sole"]:
+									now = min(arms[i]["foot_" + side].translation.z - rest["foot_" + side], ball(arms[i], side).z - rest["ball_" + side])
+									off.z = plan[side + "_sole"][i] - now
+								h = extra[i].get(side + "_h", (0.0, 0.0))
+								extra[i][side + "_h"] = (h[0] + off.x, h[1] + off.y)
+								extra[i][side] += off.z
+								if off.length > off_most:
+									worst = (i, side, tuple(round(c, 3) for c in off))
+								off_most = max(off_most, off.length)
+						extra[len(frames) - 1] = dict(extra[0])
+						print("stance %s pass %d: a ball off its mark by %.3f m at most (%s)" % (name, _pass, off_most, worst))
+						if off_most <= 0.002:
+							break
+						frames = [self.basis(m) for m in self.segment_poses(clip, base, times, extra)]
+						if "stride" in clip:
+							frames = narrowed(frames, clip["stride"])
 			for f, basis in enumerate(frames):
 				self.basis_cache = basis
 				self.key(action, f, None, last)
@@ -1720,6 +1802,132 @@ class Rig:
 		print("clip %-12s %.2f s%s%s" % (name, (frames[1] - frames[0]) / FPS, ", loops" if clip.get("loop") else "",
 			", contact %.2f s" % CONTACT[name] if name in CONTACT else ""))
 		return action
+
+
+def cyclic_runs(flags: list) -> list:
+	"""The runs of True in a looping [flags], as lists of indices (a run over the end goes on from the start)."""
+	n = len(flags)
+	if all(flags) or not any(flags):
+		return [list(range(n))] if all(flags) else []
+	start = next(i for i in range(n) if flags[i] and not flags[i - 1])
+	runs, run = [], []
+	for k in range(n):
+		i = (start + k) % n
+		if flags[i]:
+			run.append(i)
+		elif run:
+			runs.append(run)
+			run = []
+	if run:
+		runs.append(run)
+	return runs
+
+
+def stance_plan(arms: list, share: float, rest: dict, ahead: float = 0.5, push: float = 0.0, strike: float = 0.0, mirror: str = "") -> dict:
+	"""Each foot's ball of the foot (armature xyz) per frame of a looping segment's [arms] with its stance grown to
+	[share] of a step: its sole (the lower of the foot bone's and the ball's height over their [rest] heights) is
+	down within 2 cm of its lowest; the new stance, round(share * n / 2) frames about the old one's middle frame m,
+	moves the whole foot (its own turn kept) so its sole is as deep as at m and its ball on the line through m's at
+	the planted speed (stance_lines' median); the swing left, the old swing's balls played over its frames by its
+	share (a straight blend between the two ends' gaps added, so it leaves where the stance ends and lands where the
+	next begins). {"l": [Vector xyz per frame, the last the first], "r": ..., "counts": {side: (down, was, swing,
+	was)}}."""
+	n = len(arms) - 1
+	out = {"counts": {}}
+	for side in ("l", "r"):
+		ball = [arms[i]["ball_" + side].translation.copy() for i in range(n)]
+		sole = [min(arms[i]["foot_" + side].translation.z - rest["foot_" + side], ball[i].z - rest["ball_" + side]) for i in range(n)]
+		low = min(sole)
+		runs = cyclic_runs([s <= low + 0.02 for s in sole])
+		old = max(runs, key=len)
+		m = old[len(old) // 2]
+		firm = [i for i in range(n) if sole[i] <= low + 0.005]
+		vel = [((ball[(i + 1) % n] - ball[i - 1]) / 2.0).xy for i in firm]
+		v = Vector((sorted(s.x for s in vel)[len(vel) // 2], sorted(s.y for s in vel)[len(vel) // 2]))
+		count = max(len(old), round(share * n / 2.0))
+		before = round((count - 1) * ahead)  # The frames of it before the middle one ([ahead] of them).
+		down = [(m - before + k) % n for k in range(count)]
+		want = [None] * n
+		pitch = [0.0] * n
+		for k, f in enumerate(down):
+			if k > before:
+				pitch[f] = push * (k - before) / max(1, count - 1 - before)
+			elif k < before:
+				pitch[f] = -strike * (before - k) / max(1, before)
+			d = k - before
+			at = ball[f].copy()
+			at.x, at.y = ball[m].x + v.x * d, ball[m].y + v.y * d
+			at.z = ball[f].z + (sole[m] - sole[f])
+			want[f] = at
+		out[side + "_sole"] = {f: sole[m] for f in down}  # Over the stance the sole's depth, not the ball's, is met.
+		# The swing: the old one (from the frame after the old stance to the frame before it) over the new one's.
+		old_swing = [(old[-1] + 1 + k) % n for k in range(n - len(old))]
+		new_swing = [(down[-1] + 1 + k) % n for k in range(n - count)]
+		if new_swing:
+			path = [ball[old[-1]]] + [ball[i] for i in old_swing] + [ball[old[0]]]
+			sample = lambda u: path[min(int(u), len(path) - 2)].lerp(path[min(int(u), len(path) - 2) + 1], u - min(int(u), len(path) - 2))
+			last = len(new_swing) + 1
+			gap_from = want[down[-1]] - ball[old[-1]]
+			gap_to = want[down[0]] - ball[old[0]]
+			for j, f in enumerate(new_swing):
+				u = (j + 1) / last
+				blend = gap_from.lerp(gap_to, u)
+				want[f] = sample(u * (len(path) - 1)) + Vector((blend.x, blend.y, max(0.0, blend.z)))
+		out[side] = want + want[:1]
+		out[side + "_pitch"] = pitch + pitch[:1]
+		out["counts"][side] = (count, len(old), n - count, n - len(old))
+	if mirror:
+		# The other foot as [mirror]'s, half a cycle on, across the middle (x): the two feet alike (the pack's jog
+		# is uneven, and the left foot met its stance's last key 3 cm short where the right met its own).
+		other = "l" if mirror == "r" else "r"
+		half = n // 2
+		want = []
+		for i in range(n):
+			v = out[mirror][(i + half) % n].copy()
+			v.x = -v.x
+			want.append(v)
+		out[other] = want + want[:1]
+		out[other + "_pitch"] = [out[mirror + "_pitch"][(i + half) % n] for i in range(n)] + [out[mirror + "_pitch"][half % n]]
+		out[other + "_sole"] = {(f - half) % n: d for f, d in out[mirror + "_sole"].items()}
+		out["counts"][other] = out["counts"][mirror]
+	return out
+
+
+def swing_arcs(arms: list, clear: float, tip) -> dict:
+	"""Each foot's wanted toe-end height ([tip](arm, side)) over its lowest per frame (a looping segment's
+	[arms]): over its swing (the frames its toe moves forward, against the way its planted frames move),
+	[clear] * min(1, 2 sin(pi u)) of the swing's share u (up over its first sixth, held, down over its last);
+	0 elsewhere. {"l": [...], "r": [...], "low": {"l": z, "r": z}}."""
+	out = {"low": {}}
+	n = len(arms) - 1  # The last frame is the first again.
+	for side in ("l", "r"):
+		pos = [tip(arms[i], side) for i in range(n)]
+		low = min(p.z for p in pos)
+		out["low"][side] = low
+		axis = 0 if max(p.x for p in pos) - min(p.x for p in pos) > max(p.y for p in pos) - min(p.y for p in pos) else 1
+		vel = [pos[(i + 1) % n][axis] - pos[i - 1][axis] for i in range(n)]
+		planted = [vel[i] for i in range(n) if pos[i].z <= low + 0.01]
+		back = 1.0 if sum(planted) > 0.0 else -1.0  # The planted foot's way, in the segment's axis.
+		swing = [vel[i] * back < 0.0 for i in range(n)]
+		want = [0.0] * n
+		if all(swing) or not any(swing):
+			out[side] = want + want[:1]
+			continue
+		start = next(i for i in range(n) if swing[i] and not swing[i - 1])
+		i = start
+		while True:
+			run = []
+			while swing[i % n] and len(run) < n:
+				run.append(i % n)
+				i += 1
+			for k, f in enumerate(run):
+				want[f] = clear * min(1.0, 2.0 * math.sin(math.pi * (k + 1) / (len(run) + 1)))
+			while not swing[i % n]:
+				i += 1
+			if i % n == start:
+				break
+		out[side] = want + want[:1]
+	return out
 
 
 def solve(shoulder: Vector, elbow: Vector, wrist: Vector, target: Vector, pole: Vector) -> tuple:

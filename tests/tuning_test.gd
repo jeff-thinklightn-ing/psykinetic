@@ -121,8 +121,8 @@ func _test_gait_paces() -> void:
 		listed = listed and ("feel.client3d.gait." + clip) in paths and ("feel.client3d.gait_f." + clip) in paths
 	_check(listed, "a row each on the panel, his and hers")
 	_check(Tuning.apply("feel.client3d.gait.Jog_Short", 3.9) and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_GAITS)[1][1]), 3.9)
-		and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_F_GAITS)[1][1]), 3.44), "his jog set to 3.9: his read so, hers not")
-	_check(Tuning.reset("feel.client3d.gait.Jog_Short") and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_GAITS)[1][1]), 3.63),
+		and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_F_GAITS)[1][1]), 3.08), "his jog set to 3.9: his read so, hers not")
+	_check(Tuning.reset("feel.client3d.gait.Jog_Short") and is_equal_approx(float(Client3D.paced(Client3D.HUMAN_GAITS)[1][1]), 3.25),
 		"reset: the table's again")
 	_check(Client3D.paced(Client3D.ORC_GAITS) == Client3D.ORC_GAITS, "the orc's table as it is")
 	Tuning._sources.erase("feel")

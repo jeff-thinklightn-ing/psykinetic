@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Running, you keep a foot on the ground for most of each stride, on brisk steps (953 amended (1)).
 - Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).
 - In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).
 - Towns: a damaged building is mended by one of the town's own people, with wood from the town's store, and stands again (566 amended (9)).
