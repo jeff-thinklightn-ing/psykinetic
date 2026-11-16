@@ -230,6 +230,15 @@ that the walk looks like skipping and the people look like "bad claymation place
   `godot --headless --path . --import` before testing: each worktree has its own `.godot`
   class cache, and without it scripts naming the new class fail to compile. Name any new
   `class_name` when you report a landing.
+- The lists every tree adds a name to are one name a line, in order by the name's text (944,
+  b939185bd): `client3d/room_fields.gd`'s VIEW and ROOM, `net/net.gd`'s MESSAGE_KINDS and
+  SUBCLASS_REPLICATED. A new name goes on a line of its own in its place, never at the end
+  (two takes that each added to one line cost the second its turn: sound's 940, 38 minutes on
+  the lock, 2026-11-15). `python -B tools/list_lines.py` checks them (land.sh's checks and
+  `--checks` run it) and `--fix` writes them so. A rebase that stops in either file with a
+  conflict in the lists' names alone: `python -B tools/list_lines.py --fix`, `git add
+  client3d/room_fields.gd net/net.gd`, `GIT_EDITOR=true git rebase --continue`. Exit 2 is some
+  other conflict in the file: that one is resolved by hand.
 - The release session deploys the server to the box after releases; worktree sessions don't.
 - Worktrees share one Godot `user://` folder (`%APPDATA%/Godot/app_userdata/Psykinetic`),
   which holds the edited-level overlay every test reads. Tests, benches and tools never
