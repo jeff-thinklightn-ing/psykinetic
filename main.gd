@@ -5625,6 +5625,11 @@ func _boot() -> void:
 		return r.companion))))  # Counts only (293 amended (2)): no name, no card's words.
 	_move_off_retired(snapshot)
 	_move_off_remade(snapshot)
+	# Every area's game from the first tick (949): its ground built and a new world seeded now, not as
+	# the ticks' share comes round (the wilds last, 42 real minutes); after a remade level's herds are
+	# dropped (756), so its game is seeded on the new ground. One line for release's grep, no names.
+	var herds_ms: int = World.herds.build_all_now()
+	print("[herds] boot: %d areas' ground built in %d ms" % [World.herds.areas.size(), herds_ms])
 	var saved: Dictionary = snapshot["zones"]
 	var restored := 0
 	for zone_name: String in saved:

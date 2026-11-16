@@ -76,7 +76,7 @@ check "$(count 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$' "$DIR/after_put.l
 # to the hills' arrival, drops the rest and saves "remade"; the next does
 # nothing. The save is the real one, edited: the host and a crate in the
 # hills, and a deer herd at a home of the old grid.
-python -B - "$STATE" <<'PY'
+python -B - "$STATE" "$DIR" <<'PY'
 import json, sys
 path = sys.argv[1]
 data = json.load(open(path, encoding="utf-8"))
@@ -90,13 +90,15 @@ for record in data["players"]:
 herds = data.setdefault("herds", {})
 herds.setdefault("groups", {})["old-hills-deer"] = {"species": "deer", "area": "hills", "home": [80, 30], "count": 4.0, "out": 0, "made": 0}
 herds["seeded"] = sorted(set(herds.get("seeded", [])) | {"hills"})
+# Every group of the area in the save, the old grid's among them (949: each area seeded from the boot).
+open(sys.argv[2] + "/hills_groups", "w").write(str(sum(1 for g in herds["groups"].values() if g.get("area") == "hills")))
 data.setdefault("clearing", {})["hills"] = {"80,30": [1, 0]}
 data.pop("remade", None)
 json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
 PY
 run_host remade --test-exit-after=2
 check "$(count '\[level\] remade forest \(760\): 0 players moved' "$DIR/remade.log")" 1 "the forest, remade too, with nobody there"
-check "$(count '\[level\] remade hills \(756\): 1 players moved; dropped 1 entities, 1 herd groups, 0 plots, 1 felled cells' "$DIR/remade.log")" 1 "a save on the hills' old grid: its player moved, its entity and herd dropped, said once by count (756)"
+check "$(count '\[level\] remade hills \(756\): 1 players moved; dropped 1 entities, '"$(cat "$DIR/hills_groups")"' herd groups, 0 plots, 1 felled cells' "$DIR/remade.log")" 1 "a save on the hills' old grid: its player moved, its entity and every herd group there dropped ($(cat "$DIR/hills_groups"), the old grid's among them), said once by count (756)"
 check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade.log")" 1 "the host comes back at the hills' arrival from the wilds"
 check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"hills": 756' || true)" 1 "the save keeps the remake as done"
 check "$(count 'old-hills-deer' "$STATE")" 0 "the old grid's herd is gone from the save"
@@ -106,7 +108,7 @@ check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade_again.log
 
 # 2d. The forest remade (decision 760) the same way, the hills' remake
 # already done in the save: only the forest is moved off, once.
-python -B - "$STATE" <<'PY'
+python -B - "$STATE" "$DIR" <<'PY'
 import json, sys
 path = sys.argv[1]
 data = json.load(open(path, encoding="utf-8"))
@@ -120,12 +122,14 @@ for record in data["players"]:
 herds = data.setdefault("herds", {})
 herds.setdefault("groups", {})["old-forest-deer"] = {"species": "deer", "area": "forest", "home": [46, 34], "count": 3.0, "out": 0, "made": 0}
 herds["seeded"] = sorted(set(herds.get("seeded", [])) | {"forest"})
+# Every group of the area in the save, the old grid's among them (949: each area seeded from the boot).
+open(sys.argv[2] + "/forest_groups", "w").write(str(sum(1 for g in herds["groups"].values() if g.get("area") == "forest")))
 data.setdefault("clearing", {})["forest"] = {"46,34": [1, 0]}
 data.setdefault("remade", {}).pop("forest", None)
 json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
 PY
 run_host forest_remade --test-exit-after=2
-check "$(count '\[level\] remade forest \(760\): 1 players moved; dropped 1 entities, 1 herd groups, 0 plots, 1 felled cells' "$DIR/forest_remade.log")" 1 "a save on the forest's old grid: its player moved, its entity and herd dropped, said once by count (760)"
+check "$(count '\[level\] remade forest \(760\): 1 players moved; dropped 1 entities, '"$(cat "$DIR/forest_groups")"' herd groups, 0 plots, 1 felled cells' "$DIR/forest_remade.log")" 1 "a save on the forest's old grid: its player moved, its entity and every herd group there dropped ($(cat "$DIR/forest_groups"), the old grid's among them), said once by count (760)"
 check "$(count '\[level\] remade hills' "$DIR/forest_remade.log")" 0 "the hills, remade already, left be"
 check "$(count 'joined as Player1 at \(220, 48\) \(back\)' "$DIR/forest_remade.log")" 1 "the host comes back at the forest's arrival from the wilds"
 check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"forest": 760' || true)" 1 "the save keeps the forest's remake as done"

@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_spread()
 	_test_short_days()
 	_test_seed_now()
+	_test_boot()
 	for body in _bodies:
 		body.free()
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -130,6 +131,44 @@ func _test_seed_now() -> void:
 	_tick(herds)
 	_check(is_equal_approx(_sum(herds, "meadow"), count) and herds.progress()["fields"]["seeded"],
 		"the ticks after seed the rest and leave meadow as it was")
+
+
+## The server's boot (949): every area's ground built and a new world seeded before the first tick, not
+## as the ticks' share comes round; a saved world's groups as they were, breeding from its first tick.
+func _test_boot() -> void:
+	print("\n== the boot: every ground built and seeded before the first tick ==")
+	_now = 0
+	var calm := _rules.duplicate(true)
+	calm["species"]["wolf"]["eats"] = 0.0
+	var fresh := _herds(calm)
+	var ms: int = fresh.build_all_now()
+	var state := fresh.progress()
+	_check(state["meadow"]["seeded"] and state["fields"]["seeded"] and state["meadow"]["built"] and state["fields"]["built"]
+		and fresh.groups_in("meadow").size() > 0 and fresh.groups_in("fields").size() > 0,
+		"a fresh world: both meadows built and seeded at the boot (%d and %d groups, %d ms)" % [fresh.groups_in("meadow").size(),
+		fresh.groups_in("fields").size(), ms])
+	_check(state["cave"]["seeded"] and fresh.groups_in("cave").is_empty(), "the cave seeded with none")
+	var groups := fresh.groups_in("meadow").size()
+	fresh.tick()
+	_check(fresh.groups_in("meadow").size() == groups, "the first tick finds them there and seeds none again (%d groups)" % groups)
+	_now = DAY / 2
+	fresh.tick()
+	var saved: Dictionary = JSON.parse_string(JSON.stringify(fresh.to_dict()))
+	var booted := _herds(calm, saved)
+	var unbuilt := _herds(calm, saved)
+	_check(not booted.progress()["meadow"]["built"], "a saved world keeps no ground")
+	booted.build_all_now()
+	_check(JSON.stringify(booted.to_dict()) == JSON.stringify(unbuilt.to_dict()) and booted.groups_in("meadow").size() == groups,
+		"a saved world's boot: its groups as they were, none seeded again (%d groups)" % booted.groups_in("meadow").size())
+	_check(booted.progress()["meadow"]["built"], "and its ground built")
+	var deer := booted.total("meadow", "deer")
+	_now = DAY / 2 + 6 * World.WORLD_TICK_STEPS
+	booted.tick()
+	booted.tick()
+	unbuilt.tick()
+	unbuilt.tick()
+	_check(booted.total("meadow", "deer") > deer + 0.001, "it breeds from its first ticks (deer %.3f, were %.3f)" % [booted.total("meadow", "deer"), deer])
+	_check(is_equal_approx(unbuilt.total("meadow", "deer"), deer), "where without the boot's build they stood still (%.3f)" % unbuilt.total("meadow", "deer"))
 
 
 func _herds(rules := _rules, saved := {}) -> Herds:

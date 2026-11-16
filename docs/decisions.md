@@ -60080,3 +60080,54 @@ second half's call lines stay where they were in _ready, so a queued take's new 
 takes a port or a scratch folder; suite_test passes with both. Same 159 checks.
 
 852 amended (8) (ui, 2026-11-16; label by decision_number.sh; the coordinator's order, 11-16 08:45, on ui-design's joined run of the healer's window, route7d_e810dac85): "too far away" under Buy in Hob's window with the player one cell from him inside his hut, still there 15 s on; nothing was pressed and no retain, care or refusal line is in either log. The cause: the server answers the "barter" look of a trading resident with why "too far away" unless World.in_person holds (the person within PERSON_REACH, 3, AND World.has_line_of_sight from the player's cell as the server holds it), and the client opens the window and sends that look as soon as its own cell is within TALK_REACH of his, a step or two ahead of the server's. Hob works at his bench cell (150,233) inside his hut and the door is at (152,232); measured on main's wilds (click_route_test _test_hut_sight): from (152,230), (152,231) and (152,232) he is within reach and OUT OF SIGHT (the hut's wall and door line), from (152,233) and (151,233) he is in person. So it is sight, not reach, and the cell that blocked it is the one at the door and the two before it; the window opens from (152,231) or the door cell on the client, the server's cell is behind, the look is refused, and nothing asks him again: the window's refresh (852 amended (4)) asks when the pack changes, and set_near is the client's own. It shows on any trading person met at a door: here it shows on main since the door take (935 amended (3), 1bab734a5) walks a click to him; before it the click did nothing. The fix: BarterPanel._refresh_stale asks the keeper again (refresh_asked, Main._refresh_barter, silently) when the answer in hand (data["why"]) is FAR_WORDS ("too far away") and the window is in reach (near), no oftener than FAR_REASK_MSEC (1 s); his next answer, with the server's cell caught up, carries no why. It stops there: no ask from a window out of reach (near false), none once the answer in hand carries another why or none (a good answer), none from a shut window (the same function returns first when the window is not open or a click waits on an answer). What clears it on main today, without this: nothing asks him again, so only a pack change under the open window (852 amended (4)'s refresh) or closing his window and clicking him again from a cell the server holds in his sight, a fresh look; ui-design's still had the player at (151,233), inside and in sight, with the line still up at 15 s. Rows: ui_test (an answer of "too far away" and the window in reach: asked; not again inside the second; asked again a second on; out of reach: not asked; another answer: not asked; a shut window: not asked) and click_route_test _test_hut_sight (the sight lines of the walk in, asserted for the two cells inside the hut, printed for the three outside). Client only; protocol unchanged; no new class_name. The bullet is voice's, with this take.
+## 949. Every area's herds there from the server's first tick: their ground built and a new world seeded at boot (economy; the coordinator's go, 2026-11-16, from combat's audit)
+
+combat's audit asked what a player meets on the wilds in the first hour. Herds (367) built each area's ground
+on the world tick's share alone (469: Herds._build_grounds, ground_per_tick 300 samples a tick, one area at a
+time, queued in name order), and seeded an area only once its ground was done. economy's local probe, a fresh
+world on wilds stepped as the server steps it (a world tick every 300 steps, 10 steps a second): barrow seeded
+at 1 real minute, foothills at 8, forest 16.5, held 18.5, hills 27.5, the small rooms by 31.5, and the wilds
+last at 42.0 (30 groups: 14 boar, 36 deer, 73 rabbit). A player in the wilds met no deer, boar or rabbit for
+42 minutes on a new world, whatever the day's length. A saved world (every deploy on the box) keeps its groups
+and its seeded set (to_dict), so the animals were there at once, but not its ground: tick() skips breeding,
+wolves eating and camps' hunting in an area with none (469), and every area's ground came round again on the
+same queue, so after each restart the wilds' herds stood still for about 42 minutes.
+
+- Herds.build_all_now(): every area's ground built at once (Herds._ground_of), in name order, and each area
+  never seeded seeded (Herds._seed); a saved world's groups are left as they were, none seeded again. The
+  milliseconds it took.
+- Main's boot calls it once, after the balance is made (761's steer is read when a balance area is seeded),
+  before anyone can join, and prints one line for release's grep after the deploy that carries it, no names:
+  "[herds] boot: N areas' ground built in M ms". economy's probe at a fresh boot on this PC: wilds 104 ms,
+  hills 82, forest 76, foothills 27, held 15, every other area 4 or less; all 21 areas 319 ms, on the main
+  thread, once.
+- The day's rebuilds stay spread over the ticks as 469 has them (the last ground kept while the new one is
+  built, so no gap); the first tick after a boot queues them as before.
+- tools/town_balance builds them at its start as the server's boot does.
+
+What it changes for the towns' first day: the hunter's day-one budget (take_share of the spare at the day's
+start, 407) was 0 on a fresh world, the groups not yet there; now it is the same as any later day's.
+town_balance (4 days): main's code, day one "found no game" and a rabbit a day from day two (3 in 4 days);
+949, a rabbit on day one as on every later day (4 in 4 days); day four the same but for a meal and a gold of
+owed (owed 18 for 19, meals bought 3 for 2). town_soak (2 days, 3 players): main's code, day one both hunters
+"found no game", a rabbit on day two (1 meat in 2 days); 949, Hob a rabbit on day one and one on day two (2),
+Agnes none either way; its boot line "[herds] boot: 21 areas' ground built in 306 ms". The wilds were seeded
+with 31 groups at the boot where the 42nd minute's seeding made 30 (the same counts of each, a group more).
+
+Rows: herds_test _test_boot (a fresh world: both meadows built and seeded at the boot, the cave seeded with
+none, the first tick seeds none again; a saved world's boot: its groups as they were and none seeded again,
+its ground built, its deer breeding from its first ticks where without the boot's build they stood still);
+town_day_test (a fresh Umbrage boot, before its first world tick: every area's ground built and seeded, the
+wilds' groups there). Server only; protocol unchanged; no new class_name; no bullet (a player never saw the
+cause), in the cut's checklist.
+
+Its first landing failed two state_test checks (756, 760: a save on the hills' and the forest's old grid, "dropped 1
+entities, 1 herd groups", got 0), and they found a real fault, not only a stale count. The boot's build ran before
+Main._move_off_remade, so a remade level's herds were seeded and built at the boot and then dropped by the remake,
+and that level waited on the ticks' share for its game as before 949. The build now runs right after
+_move_off_remade: a remade level is seeded again on its new ground at once ("[level] remade hills (756): 1 players
+moved; dropped 1 entities, 28 herd groups, 0 plots, 1 felled cells", then "[herds] hills seeded: 27 groups, boar 12,
+deer 31, rabbit 63, wolf 3", in that order). The checks' own count was stale too: the test edits a save made by an
+earlier boot of its run, which now holds the area's own groups as well as the one old-grid group it adds, so it
+counts that area's groups in the save it edits and wants that number dropped (hills 28, forest 26); the old grid's
+group gone from the save stays checked by name.

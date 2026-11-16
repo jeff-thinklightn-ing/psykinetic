@@ -60,6 +60,13 @@ func _run() -> void:
 	add_child(_main)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	# 949: the server's boot builds every area's herd ground and seeds a new world before its first tick.
+	var herds_at_boot: Dictionary = World.herds.progress()
+	var unbuilt := herds_at_boot.keys().filter(func(area: String) -> bool:
+		return not herds_at_boot[area]["seeded"] or not herds_at_boot[area]["built"])
+	_check(World.steps_now() < World.WORLD_TICK_STEPS and unbuilt.is_empty() and World.herds.groups_in("wilds").size() > 0,
+		"949: a fresh world's boot, before its first world tick (step %d): every area's herd ground built and seeded (not: %s), the wilds' groups there (%d)" % [
+		World.steps_now(), unbuilt, World.herds.groups_in("wilds").size()])
 	for each: Array in FOLK:
 		World.towns.note_rescue(TOWN, each[0], each[1], each[2])
 	await get_tree().process_frame

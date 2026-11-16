@@ -101,6 +101,7 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	work.hunt = func(town: String) -> String:
 		var place := holdings.place(town)
 		return herds.hunt_one(str(place.get("area", "wilds")), place.get("cell", Vector2i.ZERO))
+	herds.build_all_now()  # As the server's boot does (949).
 	var region := str(world_map.areas["wilds"].get("region", Level.DEFAULT_REGION))
 	towns.wells = func(_town: String) -> int: return 1
 	towns.rain = func(_town: String, from: float, to: float) -> float: return Weather.rain_between(region, from, to)

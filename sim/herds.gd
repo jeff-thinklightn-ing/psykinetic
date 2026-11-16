@@ -590,6 +590,22 @@ func seed_now(area: String) -> int:
 	return groups_in(area).size()
 
 
+## Every area's ground built now and each never seeded seeded (949, the server's boot, before anyone
+## can join): on the ticks' share alone (_build_grounds, the areas in name order) a fresh world's wilds
+## came last, 42 real minutes with no game, and after every restart a saved world's areas bred and
+## were hunted only as each ground came round again. About 0.3 s for every area (economy's probe,
+## 11-16); the day's rebuilds stay spread over the ticks. The milliseconds it took.
+func build_all_now() -> int:
+	var started := Time.get_ticks_usec()
+	var names: Array = areas.keys()
+	names.sort()
+	for area: String in names:
+		_ground_of(area)
+		if not _seeded.has(area):
+			_seed(area)
+	return (Time.get_ticks_usec() - started) / 1000
+
+
 ## Each area: whether it is seeded, and how far its ground's build is (the
 ## console's "herds"): area -> {seeded, built (a first ground done),
 ## building (0..1 of the build going, -1 for none)}.
