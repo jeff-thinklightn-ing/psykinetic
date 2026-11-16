@@ -318,6 +318,17 @@ func walls_up(town: String, kind: String) -> bool:
 	return build_progress(town, kind) >= BUILD_STAGES[1]
 
 
+## Every town's _stages (566 amended (11), the coordinator's approval of 2026-11-16 after ui-design's repair2: the
+## Ledger read "Damaged: the kitchen." for half a minute with the carpenter already hammering): World.world_tick
+## calls it right after production.tick, so a build taken up this tick is told this tick, not at the towns' next
+## turn. It only tells: _stages writes nothing but its own note of the stage last told ("stage" on the building's
+## record), the very value the towns' next turn would write; with nothing crossed since, it sends nothing.
+func tell_stages() -> void:
+	for town: String in _towns:
+		if is_town(town):
+			_stages(town)
+
+
 ## Each building of [param town] whose build crossed one of BUILD_STAGES since
 ## the views were last told: told again (building_changed).
 func _stages(town: String) -> void:

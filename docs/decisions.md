@@ -24235,6 +24235,23 @@ the views told, the Ledger back to "Planned", and the new holder takes it up.
   - A pasture in disrepair wants a shepherd, and after flock.growth_days word goes out for one; a ruin wants none.
   - Also farm_test, resident_test, ui_test, view_test, view_world_test, towns_test, town_day_test and suite_test PASS.
 - Client and server; protocol unchanged (the "town" message carries what it did); no new class_name; no bullet until the joined watch (the carpenter beside the kitchen and the Ledger's line mid-repair), voice's words after.
+
+566 amended (11): a build taken up is told the same world tick (the coordinator's approval, 2026-11-16, after
+ui-design's joined repair2 on 0773c622c; label from tools/decision_number.sh). The Ledger read "Damaged: the kitchen."
+37 and 48 s after the damage with Maud already hammering, and "being mended" only by 75 s. World.world_tick runs
+towns.tick and then production.tick; the views are told a build's progress in Towns._stages, inside towns.tick, and
+build_progress reads -1 until its job is "working", which production.tick sets when the builder takes it up, the
+same tick the town ordered it. So the first _stages to see the work was the towns' next turn, one world tick (30 s)
+later: repair2's order and start at step 3900, the "town" message at 4200. Now Towns.tell_stages, every town's
+_stages, is called in World.world_tick right after production.tick: a build or repair taken up is told that tick.
+It only tells: _stages writes nothing but its own note of the stage last told ("stage" on the building's record),
+the value the towns' next turn would write; with nothing crossed since, it sends nothing, so a quiet town costs no
+extra message. No new message; what is sent is the same, sooner. Tests: repair_site_test _test_told_same_tick (told
+the step the repair was taken up; a second call sends nothing and leaves the towns' records, the jobs and the town's
+stage the same; with its note taken back, the call's only write is that note, the same value). Also towns_test,
+raids_test, farm_test, town_day_test, builder_test, view_test, view_world_test. Server only; protocol unchanged; no
+new class_name; no bullet (the checklist: the Ledger's "being mended" from the step the work starts).
+
 ## 566, builder's side: a woodlot's standing cell, and builds with no site
 
 On npc's visible-work page (566, the coordinator's approval): a marked but

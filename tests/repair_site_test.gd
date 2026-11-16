@@ -42,12 +42,17 @@ func _run() -> void:
 	var kitchen := _map_building("kitchen")
 	_check(not kitchen.is_empty(), "(the kitchen on the map: %s)" % [kitchen.get("rect", "none")])
 	var job := 0
+	var told_at := {}  # building kind -> the last step the views were told it (566 amended (11)).
+	World.towns.building_changed.connect(func(town: String, kind: String) -> void:
+		if town == TOWN:
+			told_at[kind] = World.steps)
 	for s in 6000:
 		World.step()
 		job = int(World.towns.building(TOWN, "kitchen").get("job", 0))
 		if job != 0 and str(World.production.job(job).get("state", "")) == "working":
 			break
 	_check(job != 0 and str(World.production.job(job).get("recipe", "")) == Towns.REPAIR + "kitchen", "its repair ordered and taken up (job %d)" % job)
+	_test_told_same_tick(job, told_at)
 	var carpenter := _carpenter()
 	_check(carpenter != null, "(the carpenter's body in the wilds)")
 	if carpenter == null or kitchen.is_empty():
@@ -117,6 +122,32 @@ func _run() -> void:
 	else:
 		record["buildings"]["pasture"] = had
 	_end()
+
+
+## 566 amended (11): the step its repair is taken up the views are told it (Towns.tell_stages after
+## production.tick), not the towns' next turn; the second call only tells (the town's records, its jobs and
+## its stage the same, bar _stages' own note of the stage told, which the towns' next turn writes the same)
+## and, nothing crossed since, sends nothing.
+func _test_told_same_tick(job: int, told_at: Dictionary) -> void:
+	var started := int(World.production.job(job).get("last", -1))
+	_check(int(told_at.get("kitchen", -1)) == World.steps and World.towns.build_progress(TOWN, "kitchen") >= 0.0,
+		"told the step it was taken up (step %d, told %d, its job's start %d), not 30 s on" % [World.steps, int(told_at.get("kitchen", -1)), started])
+	var towns_before := World.towns.to_dict()
+	var work_before: Dictionary = World.production.to_dict()
+	var stage_before := World.towns.stage(TOWN)
+	told_at.clear()
+	World.towns.tell_stages()
+	_check(told_at.is_empty() and World.towns.to_dict() == towns_before and World.production.to_dict() == work_before
+		and World.towns.stage(TOWN) == stage_before, "again, nothing crossed since: nothing sent, nothing changed (told %s)" % [told_at])
+	var house: Dictionary = World.towns._town(TOWN)["buildings"]["kitchen"]
+	var noted := int(house.get("stage", -1))
+	house.erase("stage")  # As before the call: the towns' last turn had not seen her at work.
+	var unnoted := World.towns.to_dict()
+	World.towns.tell_stages()
+	var after := World.towns.to_dict()
+	after[TOWN]["buildings"]["kitchen"].erase("stage")
+	_check(after == unnoted and int(house.get("stage", -1)) == noted and told_at.has("kitchen") and World.production.to_dict() == work_before,
+		"its only write is its note of the stage told (%d, as the towns' turn writes it); jobs and records the same" % noted)
 
 
 func _end() -> void:

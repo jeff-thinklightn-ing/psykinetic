@@ -1317,6 +1317,8 @@ func world_tick(slice := -1) -> void:
 		if towns != null:
 			towns.tick()
 		production.tick()
+		if towns != null:
+			towns.tell_stages()  # A build taken up this tick told this tick (566 amended (11)).
 		# Then its residents buy what they need (decision 353).
 		if economy != null:
 			economy.tick()
