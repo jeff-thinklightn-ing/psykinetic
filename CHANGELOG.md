@@ -7,11 +7,6 @@ notes (decision 324).
 
 ## Unreleased
 
-- Towns: at night a lit house window casts a soft glow on the ground beside its wall (927 amended (3)).
-- Towns: you leave the Mughouse standing outside its door, facing away from it, and a walk key held through a door or on arriving waits until you let it go (947).
-- Stepping out of the barrow onto the wilds shows the land again within about a fifth of a second, as the land you left is kept while you're inside (822 amended (6)).
-- Towns: people standing about or tending a stall every so often clear their throat, sniff or shift a foot, a few times a minute at most in a crowd, and never while chopping wood or asleep (940).
-- Bow: a quick right click lobs; the arrows go up a moment later and come down round the spot you let go at, even when the cursor has moved on (677 amended (4)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
@@ -22,6 +17,14 @@ notes (decision 324).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.221
+
+- Towns: at night a lit house window casts a soft glow on the ground beside its wall (927 amended (3)).
+- Towns: you leave the Mughouse standing outside its door, facing away from it, and a walk key held through a door or on arriving waits until you let it go (947).
+- Stepping out of the barrow onto the wilds shows the land again within about a fifth of a second, as the land you left is kept while you're inside (822 amended (6)).
+- Towns: people standing about or tending a stall every so often clear their throat, sniff or shift a foot, a few times a minute at most in a crowd, and never while chopping wood or asleep (940).
+- Bow: a quick right click lobs; the arrows go up a moment later and come down round the spot you let go at, even when the cursor has moved on (677 amended (4)).
 
 ## v0.1.220
 
