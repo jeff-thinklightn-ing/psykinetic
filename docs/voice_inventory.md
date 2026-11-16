@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3043)
+## Lines in the code (3042)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1356,7 +1356,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (628)
+### other (sim) (627)
 
 | | Line | Where |
 |---|---|---|
@@ -1475,7 +1475,6 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s (given toward the %s) | `sim/economy.gd` _owe_or_pay() |
 |  | the town's wage floor | `sim/economy.gd` _owe_or_pay() |
 |  | what the town owed | `sim/economy.gd` _pay_owed() |
-|  | what the town owed (given toward the %s) | `sim/economy.gd` _pay_owed() |
 |  | the town's wage floor | `sim/economy.gd` _floor_turn() |
 |  | an offering at the temple%s | `sim/economy.gd` temple_offering() |
 | L | alms at the temple, %d | `sim/economy.gd` temple_offering() |
