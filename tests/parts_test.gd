@@ -15,6 +15,7 @@ func _ready() -> void:
 	_test_tabs()
 	_test_line()
 	await _test_row()
+	await _test_offer_row()
 	await _test_quest_card()
 	await _test_key_cap()
 	_test_name_plates()
@@ -220,6 +221,31 @@ func _test_row() -> void:
 	click.pressed = true
 	row._gui_input(click)
 	_check(got == [row] and not row.is_inside_tree(), "a click is reported, even one that takes the row away")
+	await get_tree().process_frame
+
+
+## A talk window's offer row (OfferRow) holds its price chip: built as BarterPanel._row builds it (the chip
+## anchored centre right inside the button, so the button's own minimum never counts it), at every text
+## scale the Options give, the row is at least the chip's height and the laid-out chip sits inside it
+## (Hob's two offers, the second cut off at its foot: the coordinator, 11-16).
+func _test_offer_row() -> void:
+	for k: float in [1.0, 0.5, 1.5, 2.0]:
+		UiTheme.apply_text_scale(k)
+		var panel := BarterPanel.new()
+		var row: Button = panel._row("Set the bone", 12, false)
+		add_child(row)
+		row.size = Vector2(900.0, 0.0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var chip := row.get_node("Price") as Control
+		var row_h := row.get_combined_minimum_size().y
+		var chip_h := chip.get_combined_minimum_size().y
+		print("OFFER ROW at text scale %.1f: the row %.0f px, the chip %.0f px; laid out, the row %.0f, the chip from %.0f to %.0f" % [k, row_h, chip_h, row.size.y, chip.position.y, chip.position.y + chip.size.y])
+		_check(row_h >= chip_h, "an offer row holds its chip at text scale %.1f (%s >= %s)" % [k, row_h, chip_h])
+		_check(chip.position.y >= 0.0 and chip.position.y + chip.size.y <= row.size.y + 0.5, "the laid-out chip sits inside its row at text scale %.1f" % k)
+		row.queue_free()
+		panel.free()
+	UiTheme.apply_text_scale(1.0)
 	await get_tree().process_frame
 
 

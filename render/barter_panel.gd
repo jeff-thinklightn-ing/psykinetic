@@ -590,6 +590,11 @@ func _row(title: String, amount: int, short: bool) -> Button:
 		price.grow_vertical = Control.GROW_DIRECTION_BOTH
 		var inset := float(row.get_theme_stylebox(&"normal").get_margin(SIDE_LEFT))  # The words' left inset, on the right too.
 		price.offset_right = -inset
+		# No size of its own (set_gold sized it out of the tree): its minimum grows it leftward and both ways about the
+		# row's centre line, so it sits inside the row at every text scale (it hung from the centre line, 87 px tall).
+		price.offset_left = -inset
+		price.offset_top = 0.0
+		price.offset_bottom = 0.0
 		row.add_child(price)
 	return row
 
