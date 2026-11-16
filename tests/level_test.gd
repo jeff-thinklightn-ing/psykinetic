@@ -1458,6 +1458,7 @@ func _test_starts() -> void:
 		and _floor_walks(wilds_level["terrain"], arrival, wilds_level["starts"][0]),
 		"a walk in from the foothills arrives at the wilds' %s, open floor, no start, walked from there to the town's start" % [arrival])
 	_test_way_in(wilds_level)
+	_test_clicked_things_clear(wilds_level)
 
 
 ## The way in (934, the flow page's (A); the coordinator's rulings, 2026-11-15): the wilds' four starts together on
@@ -1590,8 +1591,8 @@ func _test_way_in(wilds: Dictionary) -> void:
 			in_way.append("%s %s" % [cell, built.get(cell, "solid or off the floor")])
 		if wilds["spots"].any(func(spot: Dictionary) -> bool: return spot["cell"] == cell):
 			in_way.append("%s a spot" % [cell])
-	# Nothing a body bumps (the level's entities: the two handcarts at the cobble's corner, (186, 212) and (188, 214))
-	# on the lane or on the line from the first start to its mouth, and the lane one piece from there to the door, so
+	# Nothing a body bumps (the level's entities; the two handcarts once at the cobble's corner, (186, 212) and
+	# (188, 214), moved to the store's side by 774 amended (6), _test_clicked_things_clear) on the lane or on the line from the first start to its mouth, and the lane one piece from there to the door, so
 	# a player walking it is neither blocked nor steered round (the coordinator, 11-15).
 	var things := {}
 	for spec: Dictionary in wilds["entities"]:
@@ -1623,6 +1624,102 @@ func _test_way_in(wilds: Dictionary) -> void:
 			joined.call(11, 6) if not lane.is_empty() else false, door_out, at_door, lane.size(), in_way])
 	var safe := Level.safe_paths(terrain)
 	print("  the wilds' safe paths: %d cells" % safe.size())
+
+
+## 774 amended (6) (the coordinator's ruling, 11-15, on environment's walk from the new arrival to the Mughouse: it
+## stopped twice at a parked cart and a click meant as a walk opened an empty "Cart" window): nothing a click opens
+## (a cart, a crate, a chest: Level.CARGO and Level.CHEST) stands (1) within 2 cells of the line from any of the wilds'
+## starts to the Mughouse's door, (2) on or beside the newcomer's lane, (3) on any of the wilds' roads; and (4) in
+## every level, on a building's door cell or the cell in front of it (Main.door_cells), off the floor or on a solid
+## cell, on a cell a closed building stands on (one entered by a link or with no rooms of its own), on a decor piece
+## (a mine's cart on its track excepted), or on a resident's spot or a place's seat; one drawn as nothing (the house's
+## locker) is never opened by a click and is not counted. Umbrage's two carts moved from (186, 212) and (188, 214) to the store's
+## side, (184, 193) and (185, 192) (level.json "moved_markers": a saved world's carts follow, Main._level_spec_for).
+func _test_clicked_things_clear(wilds: Dictionary) -> void:
+	print("
+== nothing a click opens stands in the newcomer's walk, on a door, a building, a decor piece, a spot or a seat ==")
+	# Drawn as nothing (Level.UNDRAWN_ART: the house's locker), a click never opens it (734 amended (7)).
+	var opened := func(spec: Dictionary) -> bool: return str(spec.get("script", "")) in [Level.CARGO, Level.CHEST] and str(spec.get("art", "")) != Level.UNDRAWN_ART
+	var terrain: Dictionary = wilds["terrain"]
+	var roads: Array = terrain["roads"]
+	var door := Vector2(180, 208.5)
+	var lane: Dictionary = Curves.cells(roads[11]["curve"], false) if roads.size() > 11 else {}
+	var road_cells := {}
+	for road: Dictionary in roads:
+		for cell: Vector2i in Curves.cells(road["curve"], false):
+			road_cells[cell] = true
+	var in_walk: Array[String] = []
+	var carts: Array[Vector2i] = []
+	for spec: Dictionary in wilds["entities"]:
+		if not opened.call(spec):
+			continue
+		var cell: Vector2i = spec["tile"]
+		if str(spec.get("script", "")) == Level.CARGO:
+			carts.append(cell)
+		for start: Vector2i in wilds["starts"]:
+			var a := Vector2(start)
+			var t := clampf((Vector2(cell) - a).dot(door - a) / (door - a).length_squared(), 0.0, 1.0)
+			if Vector2(cell).distance_to(a.lerp(door, t)) <= 2.0:
+				in_walk.append("%s %s within 2 of the line from %s to the Mughouse's door" % [cell, spec.get("name", ""), start])
+				break
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				if lane.has(cell + Vector2i(dx, dy)) and not in_walk.has("%s on or beside the lane" % [cell]):
+					in_walk.append("%s on or beside the lane" % [cell])
+		if road_cells.has(cell):
+			in_walk.append("%s %s on a road" % [cell, spec.get("name", "")])
+	carts.sort()
+	_check(not lane.is_empty() and in_walk.is_empty() and Vector2i(184, 193) in carts and Vector2i(185, 192) in carts
+		and not Vector2i(186, 212) in carts and not Vector2i(188, 214) in carts,
+		"the wilds: no cart, crate or chest by the newcomer's line to the Mughouse's door, on or beside the lane, or on a road; the two carts by the store (%s; %s)" % [carts, in_walk])
+	var where := Regen.moved_markers("wilds")
+	_check(where == {"186,212": Vector2i(184, 193), "188,214": Vector2i(185, 192)},
+		"the wilds' level.json moves the two carts' markers by its word, so a saved world's carts follow them (%s)" % [where])
+	var placed: Array[String] = []
+	var levels := 0
+	for level_name: String in Level.names():
+		var level := Level.load_level(level_name)
+		if level.is_empty():
+			continue
+		levels += 1
+		var lt: Dictionary = level["terrain"]
+		var floor_cells := {}
+		for cell: Vector2i in lt["floor"]:
+			floor_cells[cell] = true
+		var why := {}
+		for building: Dictionary in level.get("buildings", []):
+			var bname := str(building.get("code", building.get("slot", building.get("kind", "building"))))
+			for cell: Vector2i in Main.door_cells(building):
+				why[cell] = "the door of %s" % bname
+			if building.has("inside") or not building.has("kind"):
+				for cell: Vector2i in Level.building_cells(building):
+					if not why.has(cell):
+						why[cell] = "%s's footprint" % bname
+		var tracks := {}
+		for piece: Variant in lt.get("decor", []):
+			if piece is Dictionary:
+				why[piece["cell"]] = "a %s" % str(piece.get("kind", "decor piece"))
+				if str(piece.get("kind", "")) == "mine_track":
+					tracks[piece["cell"]] = true
+		for spot: Variant in level.get("spots", []):
+			if spot is Dictionary and spot.get("cell") is Vector2i:
+				why[spot["cell"]] = "a %s spot" % str(spot.get("use", ""))
+		for key: Variant in level.get("places", {}):
+			var place: Variant = level["places"][key]
+			if place is Dictionary:
+				for seat: Variant in place.get("seats", []):
+					if seat is Vector2i:
+						why[seat] = "a seat of %s" % key
+		for spec: Dictionary in level.get("entities", []):
+			if not opened.call(spec):
+				continue
+			var cell: Vector2i = spec["tile"]
+			if not floor_cells.has(cell) or lt.get("solid", {}).has(cell):
+				placed.append("%s %s %s off the floor or solid" % [level_name, spec.get("name", ""), cell])
+			elif why.has(cell) and not (tracks.has(cell) and str(spec.get("script", "")) == Level.CARGO):  # A mine's cart rides its track.
+				placed.append("%s %s %s on %s" % [level_name, spec.get("name", ""), cell, why[cell]])
+	_check(levels > 10 and placed.is_empty(), "in all %d levels, no cart, crate or chest on a door or the cell before it, off the floor, on a closed building, a decor piece, a spot or a seat (%d: %s)" % [
+		levels, placed.size(), placed.slice(0, 12)])
 
 
 ## Whether [param to] is walked to from [param from] over [param terrain]'s floor: four steps, a wall edge or a

@@ -7500,9 +7500,27 @@ func _level_spec_for(saved: Dictionary) -> Dictionary:
 		var moved_slot: int = _key_slots.get("%d,%d" % [to.x, to.y], -1) if to is Vector2i else -1
 		if moved_slot >= 0 and not _alive_slots.has(moved_slot) and not _saved_keys.has(_key_of(moved_slot)):
 			_saved_keys[_key_of(moved_slot)] = true
-			print("[state] %s: 1 level entity moved with its marker, from %s to %s" % [World.zone.name, key, _key_of(moved_slot)])
 			var carried := _slot_spec(moved_slot)
-			carried["tile"] = level_entities[moved_slot]["tile"]
+			var marker: Vector2i = level_entities[moved_slot]["tile"]
+			# 774 amended (6): one that can be pushed (a cart, a crate, a boulder) saved off its old marker was moved
+			# there by someone, so it is left where it was, holding the new marker's slot (no second one is laid).
+			var was: Variant = saved.get("tile")
+			if was != null and not was is Vector2i:
+				was = Snapshot.vector(was)
+			var old_cell := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+			if was is Vector2i and was != old_cell and str(carried.get("script", "")) in [Level.CARGO, Level.PUSHABLE]:
+				print("[state] %s: 1 level entity left where it was moved, at %d,%d; its marker moved from %s to %s" % [
+					World.zone.name, was.x, was.y, key, _key_of(moved_slot)])
+				carried["tile"] = was
+				return carried
+			# Its new marker's cell taken (by a saved body laid before it): the nearest free cell beside it.
+			var at := marker if World.is_free(marker) else _nearest_free(marker)
+			if at == marker:
+				print("[state] %s: 1 level entity moved with its marker, from %s to %s" % [World.zone.name, key, _key_of(moved_slot)])
+			else:
+				print("[state] %s: 1 level entity moved with its marker, from %s to %d,%d beside %s, its cell taken" % [
+					World.zone.name, key, at.x, at.y, _key_of(moved_slot)])
+			carried["tile"] = at
 			return carried
 		# Its marker moved (decision 610): the marker it was, within reach.
 		slot = _moved_marker(saved, key)

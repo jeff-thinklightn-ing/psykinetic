@@ -40,6 +40,7 @@ func _ready() -> void:
 	await _test_cart()
 	_test_old_and_odd_snapshots()
 	_test_player_refused()
+	await _test_cart_moved_at_boot()
 
 	remove_child(_main)
 	_main.free()
@@ -55,22 +56,27 @@ func _ready() -> void:
 
 ## sp_town: 12 x 8 cells of stone in a wall; the start at (2, 2); the store
 ## (a stockpile the town holds) at (5, 3), radius 2, its depot at (5, 2); a
-## stray depot at (9, 2) outside it; a chest with the kit at (9, 5).
-func _register_town() -> void:
+## stray depot at (9, 2) outside it; a chest with the kit at (9, 5); the cart's
+## marker at [param cart_at] (774 amended (6): moved there by the level's word
+## [param moved], {"x,y": [x, y]}, for the boot move's row).
+func _register_town(cart_at := Vector2i(1, 6), moved := {}) -> void:
 	var rows: Array[String] = []
 	for y in 15:
 		rows.append("#".repeat(23) if y == 0 or y == 14 else "#" + ".".repeat(21) + "#")
-	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "chest", Vector2i(9, 2): "chest", Vector2i(9, 5): "chest", Vector2i(1, 6): "cart"}
-	Level.register(TOWN, Level.image_from_rows(rows, markers), null, {
+	var markers := {Vector2i(2, 2): "start", Vector2i(5, 2): "chest", Vector2i(9, 2): "chest", Vector2i(9, 5): "chest", cart_at: "cart"}
+	var config := {
 		"name": "Stockpile town", "centre": [6, 4], "starts": [[2, 2]],
 		"entities": [
 			{"at": [5, 2], "name": "Depot1", "props": {"depot": true}},
 			{"at": [9, 2], "name": "StrayDepot", "props": {"depot": true}},
 			{"at": [9, 5], "name": "Chest1", "props": {"slots": [KIT, "", "", ""]}},
-			{"at": [1, 6], "name": "Cart1"},
+			{"at": [cart_at.x, cart_at.y], "name": "Cart1"},
 		],
 		"places": {"store": {"at": [5, 3], "kind": "stockpile", "radius": 2, "holder": "town", "name": "the stockpile"}},
-	})
+	}
+	if not moved.is_empty():
+		config["moved_markers"] = moved
+	Level.register(TOWN, Level.image_from_rows(rows, markers), null, config)
 
 
 ## Main, booted; Holdings take in the test town too (levels made in code are
@@ -326,6 +332,36 @@ func _test_cart() -> void:
 		"its kit is banked, the ledger crediting who pushed it home (%s)" % [line])
 	World._relocate(cart, Vector2i(1, 5))
 	World.set_slots(cart, [])
+
+
+## 774 amended (6) (the coordinator's ruling, economy's word on 259): a cart the level's word moves onto the store's
+## ground at a boot is laid there, not pushed, so what it carries stays in it and nothing is banked; only a push or a
+## move onto the ground (entity_moved) unloads a cart.
+func _test_cart_moved_at_boot() -> void:
+	print("
+== a cart moved onto the store's ground by the level's word at a boot keeps its load: a lay is no push (774 amended (6), 259) ==")
+	var cart := _entity("Cart1")
+	World._relocate(cart, Vector2i(1, 6))
+	World.set_slots(cart, ["ore_sack", KIT, "", "", "", "", "", ""])
+	var ore := World.stockpile.count(STORE, "ore")
+	var kits := World.stockpile.count(STORE, KIT)
+	var ledger := World.stockpile.ledger(STORE).size()
+	_main._save_state()
+	remove_child(_main)
+	_main.free()
+	World.clear_zones()
+	World.stockpile = null
+	_register_town(Vector2i(3, 3), {"1,6": [3, 3]})
+	await _boot()
+	await get_tree().process_frame
+	World.step()
+	await get_tree().process_frame
+	cart = _entity("Cart1")
+	_check(cart is Cargo and cart.tile == Vector2i(3, 3) and cart.slots[0] == "ore_sack" and cart.slots[1] == KIT
+		and World.stockpile.count(STORE, "ore") == ore and World.stockpile.count(STORE, KIT) == kits and World.stockpile.ledger(STORE).size() == ledger,
+		"on its new marker on the store's ground, its sack and kit still in it, the store's ore, kits and ledger unchanged (%s; ore %d of %d)" % [
+			Array(cart.slots) if cart != null else [], World.stockpile.count(STORE, "ore"), ore])
+	_register_town()
 
 
 func _slot_of(entity: GridEntity, id: String) -> int:

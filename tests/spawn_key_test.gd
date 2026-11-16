@@ -56,6 +56,7 @@ func _run() -> void:
 	_test_became(path, saved)
 	_test_a_moved_marker(path, saved)
 	_test_a_marker_moved_by_word(path, saved)
+	_test_carts_moved_by_word(path, saved)
 	_test_a_moved_locker(path, saved)
 	_test_bodies_verb()
 	_test_a_moved_knight()
@@ -337,6 +338,63 @@ func _test_a_marker_moved_by_word(path: String, data: Dictionary) -> void:
 	chest = at.get(Vector2i(14, 3))
 	_check(chests.size() == 1 and chest is Chest and chest.slots.size() > 0 and chest.slots[0] == "bandaging_kit",
 			"and through a re-lay that keeps the new cell, not the old: on the new marker, its thing kept (%s)" % [_names(at)])
+	_register(false)
+	_main._load_level(LEVEL)
+
+
+## Pushable markers moved far by the level's word (774 amended (6), Umbrage's two carts out of the newcomer's way):
+## a saved world with both crates (Cargo, as a cart is) on their old markers loads each on its new marker, its things
+## in it; one pushed off its old marker is left where it was, holding the new marker's slot, with no second laid on the
+## new marker; one whose new cell a saved body laid before it stands on goes to the nearest free cell beside it.
+func _test_carts_moved_by_word(path: String, data: Dictionary) -> void:
+	print("
+== pushables moved by the level's word: on their new markers with their loads; a pushed one left; a taken cell beside (774 amended (6)) ==")
+	var held: Dictionary = data.duplicate(true)
+	for entry: Dictionary in held["zones"][LEVEL]["entities"]:
+		var key := str(entry.get("spawn_key", ""))
+		if key == "4,2" or key == "12,2":
+			entry["tile"] = [int(key.get_slice(",", 0)), 2]
+			entry["slots"] = ["bandaging_kit" if key == "4,2" else "ore_sack", "", "", ""]
+	var word := {"4,2": [3, 3], "12,2": [14, 3]}
+	_write(path, held)
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(4, 2): Vector2i(3, 3), Vector2i(12, 2): Vector2i(14, 3)}, word)
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var at := _by_tile()
+	var crates := at.values().filter(func(entity: GridEntity) -> bool: return entity is Cargo)
+	var west: Variant = at.get(Vector2i(3, 3))
+	var east: Variant = at.get(Vector2i(14, 3))
+	_check(crates.size() == 2 and west is Cargo and west.slots[0] == "bandaging_kit" and west.spawn_spec["spawn_key"] == "3,3"
+			and east is Cargo and east.slots[0] == "ore_sack" and east.spawn_spec["spawn_key"] == "14,3"
+			and not at.has(Vector2i(4, 2)) and not at.has(Vector2i(12, 2)),
+			"both on their old cells: each on its new marker, its load in it, none left on the old cells, no third (%s)" % [_names(at)])
+	# One pushed away before the save: left where it was, keyed by its new marker, and no empty one laid there.
+	for entry: Dictionary in held["zones"][LEVEL]["entities"]:
+		if str(entry.get("spawn_key", "")) == "4,2":
+			entry["tile"] = [5, 4]
+	_write(path, held)
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	at = _by_tile()
+	crates = at.values().filter(func(entity: GridEntity) -> bool: return entity is Cargo)
+	var pushed: Variant = at.get(Vector2i(5, 4))
+	_check(crates.size() == 2 and pushed is Cargo and pushed.slots[0] == "bandaging_kit" and pushed.spawn_spec["spawn_key"] == "3,3"
+			and _main._alive_slots.get(_slot_keyed("3,3")) == pushed and not at.has(Vector2i(3, 3)) and at.get(Vector2i(14, 3)) is Cargo,
+			"one pushed away: left at (5, 4) with its load, holding the new marker's slot, none laid on (3, 3); the other moved (%s)" % [_names(at)])
+	# Its new cell taken: the chest (laid before it, an earlier slot) saved standing on (6, 4), the east crate's new marker.
+	for entry: Dictionary in held["zones"][LEVEL]["entities"]:
+		if str(entry.get("spawn_key", "")) == "4,2":
+			entry["tile"] = [4, 2]
+	_write(path, held)
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(4, 2): Vector2i(3, 3), Vector2i(12, 2): Vector2i(6, 4)}, {"4,2": [3, 3], "12,2": [6, 4]})
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	at = _by_tile()
+	crates = at.values().filter(func(entity: GridEntity) -> bool: return entity is Cargo)
+	var beside: Array = crates.filter(func(entity: GridEntity) -> bool: return entity.spawn_spec.get("spawn_key", "") == "6,4")
+	_check(at.get(Vector2i(6, 4)) is Chest and crates.size() == 2 and beside.size() == 1 and World.distance(beside[0].tile, Vector2i(6, 4)) == 1
+			and beside[0].slots[0] == "ore_sack" and at.get(Vector2i(3, 3)) is Cargo,
+			"its new cell taken by the saved chest: on the nearest free cell beside it, its load kept (%s)" % [_names(at)])
 	_register(false)
 	_main._load_level(LEVEL)
 

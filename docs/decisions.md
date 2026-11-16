@@ -48461,6 +48461,38 @@ walked from there to the town's start. The playtest tours'
 "town square" (212, 205) (barrow, fish_click, folk, restart, seams) is a cell of their own, not a start, and still
 names H2's inside; playtest is told. The flow page's (A) may move all four starts later; the row stays. Level data
 and a test; protocol unchanged; no new class_name; no bullet.
+
+774 amended (6): Umbrage's two carts out of the newcomer's way (2026-11-15, maps; the coordinator's ruling on
+environment's walk on main 9150bdff1 from the new arrival (190,219) to the Mughouse's step, which stopped twice at a
+parked cart, and a click meant as a walk opened an empty "Cart" window; economy probed the cells; label from
+tools/decision_number.sh). The two cart markers this decision laid at the cobbles' south-west corner, (186,212) beside
+road 6 and (188,214) on it, stood between the starts and the Mughouse's door, 2 to 3 cells from 934
+amended (1)'s lane; no town code moves or parks a cart (one moves only when pushed, and a push onto the store's ground
+banks its load, 259). They move to the square's north-west edge by the store's pile, (184,193) and (185,192): stone,
+free, on no building, door, decor, spot or seat, off every road, 4 and more from the pile spot (189,194), off the
+stockpile's ground (7 and 8 from (192,195), r 4), outside the kitchen's ring and the visitors' square rect; economy's
+probe on the laid wilds passed both. The third cart, (206,198) by Rolf's stall, stays. A world already laid keeps its
+carts as saved bodies, keyed by their old marker cells, so level.json "moved_markers" names the move (747 amended
+(13)'s word: Regen.moved_markers): at the server's start a cart still on its old marker comes back on its new one with
+whatever it holds ("[state] wilds: 1 level entity moved with its marker, from 186,212 to 184,193", cells only). Two
+cases the word did not cover before, in Main._level_spec_for: one that can be pushed (Level.CARGO or Level.PUSHABLE)
+saved off its old marker was moved there by someone and is left where it was, holding the new marker's slot, so no
+second one is laid ("left where it was moved, at x,y; its marker moved from ... to ..."); a new marker's cell taken
+by a saved body laid before it puts it on the nearest free cell beside it (Main._nearest_free; "... to x,y beside
+..., its cell taken"). A chest (the barrow's Offering stone) cannot be pushed and moves as before. A lay at boot is
+no push and no move (World.spawn emits no entity_moved), so a cart laid on the store's ground keeps its load.
+The rule, a level_test row in four parts (_test_clicked_things_clear): nothing a click opens (Level.CARGO or
+Level.CHEST, one drawn as nothing excepted: the house's locker) stands (1) within 2 cells of the line from any of the
+wilds' starts to the Mughouse's door, (2) on or beside the lane, (3) on a wilds road; and (4), in every level, on a
+building's door cell or the cell before it (Main.door_cells), off the floor or solid, on a closed building's
+footprint (one entered by a link, or a slot with no rooms), on a decor piece (a mine's cart on its mine_track
+excepted), or on a spot or a place's seat. All 21 levels pass; on main the wilds' row fails. spawn_key_test
+_test_carts_moved_by_word: both crates (Cargo, as a cart is) on their old cells come back on their new markers with
+their loads; one pushed away is left with its load, holding the new slot, none laid on the marker; one whose new cell
+the saved chest stands on lands beside it with its load. stockpile_test _test_cart_moved_at_boot (economy's word on
+259): a cart moved by the word onto the store's ground at a boot keeps its sack and kit, the store's ore, kits and
+ledger unchanged. Level data, a server load rule and tests; protocol unchanged; no new class_name; a bullet in voice's
+words after a joined walk from (190,219) to the door meets no cart.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's
