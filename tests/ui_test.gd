@@ -4460,6 +4460,12 @@ func _test_person_give() -> void:
 	window.data = {"why": "already in his care"}
 	window._refresh_stale()
 	_check(refreshes.size() == 2, "another answer, he is not asked (%s)" % [refreshes])
+	window.data = {"why": BarterPanel.FAR_WORDS}
+	window._refreshed_at = -100000
+	window._open = false
+	window._refresh_stale()
+	window._open = true
+	_check(refreshes.size() == 2, "a shut window asks nothing, whatever answer it held (%s)" % [refreshes])
 	window.data = {}
 	window.refresh_asked.disconnect(catch_refresh)
 	World.set_slots(me, stock)

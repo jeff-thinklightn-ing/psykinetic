@@ -2287,6 +2287,7 @@ func _refresh_stale() -> void:
 		var asked := Time.get_ticks_msec()
 		if asked - _refreshed_at >= FAR_REASK_MSEC:
 			_refreshed_at = asked
+			print("[barter] his answer said 'too far away' and the window is in reach: asked again")
 			refresh_asked.emit()
 		return
 	if _slots_seen.is_empty() or pack == null or not is_instance_valid(pack.player):
