@@ -9751,11 +9751,12 @@ func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	if not lead and _takes_windup_slack(by):
 		by.wind_up["apart"] = body_centre(by).distance_to(body_centre(target))  # 874 amended (1).
 	if lead and by.has_method("tells_bite") and bool(by.call("tells_bite")):
-		# The old grey's told bite (enemy-ai, the coordinator's approval 11-15): his lead lays
-		# his target's struck cell, fixed as it begins and flank-marked, for its whole lead; as it
-		# lands it strikes whoever stands there (_land_told_bite).
+		# The old grey's told bite (enemy-ai, the coordinator's approval 11-15), and any row's told
+		# lead (its "tells": the digger's stab, a first fight): its lead lays its target's struck
+		# cell, fixed as it begins and flank-marked, for its whole lead; as it lands it strikes
+		# whoever stands there (_land_told_bite).
 		var aim := struck_cell(target) - by.tile
-		var told := telegraph(by, "bite", Telegraph.line(by.tile, Vector2(aim).normalized(), Vector2(aim).length(), 1), ticks, true)
+		var told := telegraph(by, str(by.call("tell_kind")) if by.has_method("tell_kind") else "bite", Telegraph.line(by.tile, Vector2(aim).normalized(), Vector2(aim).length(), 1), ticks, true)
 		if told > 0:
 			by.wind_up["tell"] = told
 			by.wind_up["bite_tell"] = told_cells(told)

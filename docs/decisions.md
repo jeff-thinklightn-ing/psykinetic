@@ -60649,3 +60649,92 @@ him, 780 amended (32)'s _left_to_it, needs her under half her hp, and she sat at
   by the host while the row has her held still. The row reads a bleed alone, so items_test _test_arrows now
   moves any live foe within BANDAGE_SAFE of the host to a far cell and holds it for the two rows, then
   gives its acts back. On main it moves none; on the take it moves CorridorImp1; both PASS.
+## 951. The kobold digger: a first fight's foe, its stab told at a 10-tick lead, to its burrow and back once, at work by its burrow (enemy-ai; the coordinator's pass, 2026-11-16)
+
+Package "a first fight" (the coordinator's pass of maps' and enemy-ai's page, C:/dev/review/maps/first_fight.md): one
+small fight a newcomer finds on a road out of Umbrage within a minute or two, which teaches the red and is won with
+fists or any 1-gold kit, more easily with her companion. This is enemy-ai's side: the foe and how it fights. Maps lays
+the two dens (a copse's edge each) and switches the package on; sound's pick, companions' dig_heard line and lore's
+widened kobolds.sneak land on it, all off till then.
+
+The row, "digger" in levels/monsters.json: label "Kobold digger" (voice's, the plate; the coordinator's ruling over
+enemy-ai's "Kobold"), in the kobolds' faction list beside "sneak" (the kobolds fight nobody on sight, so it never starts
+on townsfolk). Its fields:
+- body: hp 28, attack_damage 2, the sneak's mass and pace; tactic plain (alone it has no mate to flank with);
+- strength 0, so the goblins' raids never draw it (Raids._kinds_of takes a kind with strength above 0; with 1 a raid
+  took it, and monster_test's raid march read "digger");
+- idle patrol, its pauses "idle_pause" [200, 400] ticks (its spells at its digging), leash 8;
+- temperament cautious (flees under 0.35 of its hp);
+- wields a pick, but its blow is the row's own ("blows": the pick as a plain backstab verb at behind 1.0, speed 1.2),
+  so it leads its blow rather than winding up the pick's heavy, knockback swing;
+- fight lead_ticks 10, "tells": "stab", "burrow": true;
+- drops its pick at the sneak's chance, 0.2, and a purse of 1 to 3. The pick is main's item. The coordinator held its
+  chance at the sneak's till economy says what a pick fetches: two dens rising every 600 s could otherwise give four
+  picks an hour, and a pick is a held weapon.
+
+New row fields, read by Monster.read_kinds: "tells", "burrow", "idle_pause" and "drawn_as".
+
+A told lead any row can carry (the old grey's told bite, 780 amended (38), made a flag): Monster.tells_bite() is true
+for a row with "tells", and Monster.tell_kind() returns it. OldWolf keeps his own tells_bite (not on his den bite) and
+tell_kind "bite". World.try_wind_up lays the telegraph with tell_kind's kind, so the digger's lead lays its target's
+struck cell, kind "stab", for its whole lead, fixed as it began. _land_told_bite strikes whoever stands there. Release:
+"stab" is no new number, a comment line under 59's in net/net.gd.
+
+Why lead 10 (the coordinator's ask: count stabs thrown against landed, careless against reader, and give a newcomer's
+slower reading its own row). Combat's foes-first harness, 16 starts each, her 20 hp; C:/dev/review/enemy-ai/first_fight/digger/README.md:
+- At lead 6 the reader's figures were the careless bot's, stab for stab: a 6-tick lead against a 6-tick reaction lands
+  as she moves.
+- At lead 8 a reader at reaction 8 was the careless bot again.
+- At lead 10 (hp 26) a reader at reaction 8 was hit by fists 8 of 33 and sword 3 of 28, against the careless bot's 16
+  and 12.
+The old grey keeps his 7: he is not the first fight.
+
+The row's figures, lead 10, hp 28, careless, stabs on her of thrown:
+- fists 24/35, knife 22/33, dagger 35/49, spear 22/33 (harm 2.8 to 4.4); sword 12/27, battle axe 12/24 (harm 1.5 to
+  1.6); every kit 16/16.
+- Of the stabs not broken, nearly all land on the careless bot.
+- The reader at reaction 6 is hit by 0 to 20, mostly at the air; at reaction 8, fists 11/38 and sword 3/28.
+- With her companion: careless 7 to 9 on her, harm at most 1.1; she took nothing and was never down.
+- The hammer's knockdown breaks every stab (27 of 27); it wins with no harm.
+- About a third of the stabs are given up, by her blows or by its run to its burrow, which drops a stab begun.
+- Earlier, at hp 16 and lead 6, careless fists won in 4.5 s with 0.6 harm.
+
+To its burrow and back once (Monster._burrow_break, from _breaks for a body with a burrow_cell): hurt under its
+flee_below, it runs to its burrow (_flee with _call_to its burrow and _rally the one it ran from; _flee_goal returns
+the burrow first, and it waits there), its run lasting its walk there plus BURROW_HIDE_TICKS (30). Then it comes back
+at the one it ran from, as a band fighter's run to call does. Once run (_ran_to_burrow, cleared when the fight is over)
+it fights to the end. Its line: "[monster] <name> runs to its burrow at <cell>, step <n>", never a player's name.
+
+At work, one definition for sound's chink on the client and companions' dig_heard on the server (the coordinator's
+term that her line and the pick always agree). It lives in sim/monster.gd:
+- DIGGER_KIND "digger", DIG_STILL_S 3.0, DIG_HOME_CELLS 3, DIG_REACH 18 (sound's slot range and her line's reach, one
+  number);
+- static Monster.at_work(creature, still_s): the digger kind, up, Pose.STAND, Alert.IDLE, still on one cell
+  still_s >= DIG_STILL_S, within DIG_HOME_CELLS (Chebyshev) of its burrow. The last is enemy-ai's, accepted: a pause on
+  its way home after a chase is no work.
+- The caller gives the still time: the server's Monster.still_s() (ticks since GridEntity.last_step_tick / TICK_RATE;
+  a turn in place is no step), a client's from the body's replicated tile.
+- Monster.burrow_cell(): for a row with "burrow", its placing's "idle" point, else its home, else its tile; NO_TILE for
+  any other body.
+at_work and burrow_cell read only spawn_spec, its row and replicated hp, pose, alert and tile, so a client reads them
+as the server does.
+
+Drawn as the kobold: the row's "drawn_as": "sneak" and static Monster.drawn_kind(kind) (the kind itself for any row
+without one). Client3D.model_for and look_for read it, so the digger has the kobold's body; sound keys its per-kind
+lookups on it. An outdated client (v0.1.222) has no "digger" row and draws its spawn shape's capsule, tinted, with its
+nose and pick shape: visible and struck as any body (release: no number at its switch-on either).
+
+Rows: monster_test _test_digger:
+- its row (label, drawn as the kobold, the kobolds' side, on nobody at sight);
+- its pick at the sneak's chance and a purse;
+- never in a goblin raid;
+- its burrow (its tile, else its placing's point; none for a sneak);
+- its pauses and its pick in hand;
+- at_work's table (still 3 s, IDLE, standing, 3 off; not 2.9 s, fighting, wary, sitting, 4 off, down, nor a sneak);
+- still_s;
+- the told stab (its target's cell, "stab", 10 ticks; on it struck, off it clear);
+- hurt, to its burrow and back at her; hurt again the same fight, it fights on.
+Also run: factions_test, raid_groups_test, companion_test, protocol_test.
+
+Lands off: no level lays a digger till maps' dens. Server rows and a client lookup; protocol unchanged; no new
+class_name; no bullet till the package is switched on.

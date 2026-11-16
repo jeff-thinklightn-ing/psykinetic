@@ -16,7 +16,7 @@
 	"kobolds": {
 		"name": "the kobolds",
 		"colour": "#8fb84a",
-		"monsters": ["sneak"],
+		"monsters": ["sneak", "digger"],
 		"allied_to": "goblins",
 		"lore_id": "kobolds"
 	},

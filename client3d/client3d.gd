@@ -25119,7 +25119,7 @@ static func model_for(entity: GridEntity) -> Dictionary:
 		return HUMAN_F if look_for(entity).body == &"female" else HUMAN
 	if not entity is Monster:
 		return {}
-	return MODELS.get(str(entity.spawn_spec.get("kind", "")), {})
+	return MODELS.get(Monster.drawn_kind(str(entity.spawn_spec.get("kind", ""))), {})  # The digger as the kobold.
 
 
 ## A person's head drawn HEAD_SCALE of its built size (head_size.gd, after the animation each frame):
@@ -29172,7 +29172,7 @@ static func look_for(entity: GridEntity) -> PersonLook:
 	if entity is Player:
 		look += " headwear=none apron=no garb=none" + PersonLook.EXTRAS_OFF
 	if entity is Monster:
-		var people := str(MODELS.get(str(entity.spawn_spec.get("kind", "")), {}).get("people", ""))
+		var people := str(MODELS.get(Monster.drawn_kind(str(entity.spawn_spec.get("kind", ""))), {}).get("people", ""))
 		if people != "":
 			look += " people=" + people
 		var words := person_words(entity)

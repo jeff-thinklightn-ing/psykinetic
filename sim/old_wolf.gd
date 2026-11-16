@@ -89,6 +89,11 @@ func tells_bite() -> bool:
 	return not _den_biting
 
 
+## His told bite's telegraph kind (Monster.tell_kind).
+func tell_kind() -> String:
+	return "bite"
+
+
 ## On his den bite (_den_bite, untouched by the told bite): true while it begins.
 var _den_biting := false
 

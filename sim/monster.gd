@@ -260,6 +260,20 @@ const IDLE_PLAN_RETRY_TICKS := 10
 ## it never holds back, and it circles to a flank only while a mate is beside
 ## its target.
 const CALL_RUN_TICKS := 20
+## The digger (package a first fight, the coordinator's pass 11-16): a kobold
+## at its digging, by its burrow at a copse's edge (at_work, burrow_cell).
+const DIGGER_KIND := "digger"
+## At work once it has stood on one cell this long (at_work) ...
+const DIG_STILL_S := 3.0
+## ... within this of its burrow (Chebyshev).
+const DIG_HOME_CELLS := 3
+## How far its pick is heard (Chebyshev cells; sound's World.heard halves it
+## past a wall): sound's pick slot's range and companions' dig_heard both read
+## this one number.
+const DIG_REACH := 18
+## A burrower's wait at its burrow's mouth past its walk there before it
+## comes back (_burrow_break).
+const BURROW_HIDE_TICKS := 30
 ## The band's rally (806 amended (14), the coordinator's ruling on enemy-ai's
 ## crypt band probe: robbers stood idle 5 to 12 cells from a mate being cut
 ## down). A band fighter idle or wary, looked at every RALLY_EVERY ticks,
@@ -571,6 +585,14 @@ var pack_id := ""
 var pack_rules := {}
 var _pack_seen := 0
 var _ran_to_call := false
+## Its told lead's telegraph kind (its row's "tells": the digger's "stab"),
+## World.try_wind_up; "" for a lead untold.
+var tells := ""
+## Its patrol's pauses in ticks (its row's "idle_pause": the digger's spells
+## at its digging), else PATROL_PAUSE_TICKS.
+var idle_pause := PATROL_PAUSE_TICKS
+## It has run to its burrow this fight (_burrow_break): next time it fights on.
+var _ran_to_burrow := false
 var _rally: GridEntity = null
 var _call_to := NO_TILE
 ## FLANK's lean checked by its path (806 amended (9)): [from, to, ok].
@@ -887,6 +909,9 @@ func _ready() -> void:
 		never_lies = bool(row.get("never_lies", false))
 		band_fights = bool(row.get("band_fights", false))
 		holds_off = bool(row.get("holds_off", false))
+		tells = str(row.get("tells", ""))
+		var pause: Variant = row.get("idle_pause", [])
+		idle_pause = Vector2i(int(pause[0]), maxi(int(pause[0]), int(pause[1]))) if pause is Array and (pause as Array).size() == 2 else PATROL_PAUSE_TICKS
 		barks = row.get("barks", {})
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
@@ -1307,6 +1332,7 @@ func _sim_tick() -> void:
 				# The fight is over: back to where it idles, then on as before.
 				_returning = idle != Idle.NONE
 				_ran_to_call = false  # The fight over: next time it may run to call again.
+				_ran_to_burrow = false  # And to its burrow (the digger).
 				if alert == Alert.FIGHTING:
 					alert = Alert.IDLE
 			_idle_goal = NO_TILE
@@ -2149,6 +2175,8 @@ func _nearest_mate() -> Monster:
 ## to call its band, once a fight, toward its nearest mate, and comes back
 ## (_flee_tick); with no mate left, or once run, it fights on.
 func _breaks() -> bool:
+	if burrow_cell() != NO_TILE:
+		return _burrow_break()
 	if not band_fights:
 		_flee(target.tile)
 		return true
@@ -3050,6 +3078,10 @@ static func read_kinds(path: String) -> Dictionary:
 			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "holds_off": bool(row.get("holds_off", false)),
 			"barks": (row["barks"] as Dictionary).duplicate(true) if row.get("barks") is Dictionary else {}, "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
+			# The digger (a first fight): its told lead, its burrow, its patrol's pauses, the kind it is drawn as.
+			"tells": str(row.get("tells", "")), "burrow": bool(row.get("burrow", false)),
+			"idle_pause": (row["idle_pause"] as Array).duplicate() if row.get("idle_pause") is Array else [],
+			"drawn_as": str(row.get("drawn_as", "")),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"pack": (row["pack"] as Dictionary).duplicate(true) if row.get("pack") is Dictionary else null,  # 824.
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
@@ -3330,6 +3362,80 @@ func at_home() -> bool:
 	return given is Array and str(spawn_spec.get("kind", "")) in given
 
 
+## A burrower hurt to its flee_below (_breaks; the digger, package a first
+## fight, the coordinator's pass 11-16): to its burrow's mouth, a while there
+## (BURROW_HIDE_TICKS past its walk), and back at the one it ran from, once a
+## fight; once run it fights on to the end. True if it runs.
+func _burrow_break() -> bool:
+	var burrow := burrow_cell()
+	if _ran_to_burrow or burrow == NO_TILE or not is_instance_valid(target):
+		return false
+	var back := target
+	_ran_to_burrow = true
+	_flee(back.tile, false)
+	_way_out = NO_TILE  # Not out of the level: to its burrow, and back.
+	_rally = back
+	_call_to = burrow
+	_alert_until = World.tick + World.distance(tile, burrow) * ceili(move_ticks) + BURROW_HIDE_TICKS
+	print("[monster] %s runs to its burrow at %s, step %d" % [name, burrow, World.tick])
+	return true
+
+
+## Its told lead (World.try_wind_up): its row's "tells" (the digger's stab).
+func tells_bite() -> bool:
+	return not tells.is_empty()
+
+
+## The telegraph kind its told lead lays (tells_bite).
+func tell_kind() -> String:
+	return tells
+
+
+## Seconds since it last stepped (GridEntity.last_step_tick; a turn in place
+## is no step): the server's still time for at_work.
+func still_s() -> float:
+	return float(World.tick - last_step_tick) / float(World.TICK_RATE)
+
+
+## Its burrow, a burrower's (its row's "burrow": the digger): its placing's
+## "idle" point, else its home, else its spawn tile; NO_TILE for any other
+## body. Read from spawn_spec and its row only, so a client reads it too.
+func burrow_cell() -> Vector2i:
+	if not bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("burrow", false)):
+		return NO_TILE
+	var given: Variant = spawn_spec.get("idle", {})
+	var point: Variant = (given as Dictionary).get("point") if given is Dictionary else null
+	if point is Vector2i:
+		return point
+	var at: Variant = spawn_spec.get("home", spawn_spec.get("tile"))
+	return at if at is Vector2i else NO_TILE
+
+
+## Whether [param creature] is a digger at work (package a first fight; one
+## definition for sound's chink on the client and companions' dig_heard on the
+## server, the coordinator's pass 11-16): up, standing, at peace (Alert.IDLE),
+## still on one cell for [param still_s] >= DIG_STILL_S, within DIG_HOME_CELLS
+## of its burrow (a pause on its way home after a chase is no work). The
+## caller gives the still time: the server's still_s(), a client's from the
+## body's replicated tile. Reads only what a client holds.
+static func at_work(creature: Monster, still_s: float) -> bool:
+	if not is_instance_valid(creature) or not creature.spawned or creature.hp <= 0:
+		return false
+	if str(creature.spawn_spec.get("kind", "")) != DIGGER_KIND:
+		return false
+	if creature.pose != Pose.STAND or creature.alert != Alert.IDLE or still_s < DIG_STILL_S:
+		return false
+	var burrow := creature.burrow_cell()
+	return burrow != NO_TILE and maxi(absi(creature.tile.x - burrow.x), absi(creature.tile.y - burrow.y)) <= DIG_HOME_CELLS
+
+
+## The kind [param kind] is drawn as (its row's "drawn_as": the digger as the
+## kobold), else itself.
+static func drawn_kind(kind: String) -> String:
+	var as_kind := str(kinds().get(kind, {}).get("drawn_as", ""))
+	return as_kind if not as_kind.is_empty() else kind
+
+
 ## FLEEING: a step away from what it runs from, toward its post if that is
 ## away from it; recovering (SUSPICIOUS, then back) once nobody has been
 ## near for FLEE_TICKS.
@@ -3428,6 +3534,8 @@ func _pick_way_out(foe: Vector2i) -> Vector2i:
 ## Where it runs to: its post if that is farther from the threat than it
 ## is, else the farthest walkable tile of a few straight away from it.
 func _flee_goal() -> Vector2i:
+	if _ran_to_burrow and _rally != null and _call_to != NO_TILE:
+		return _call_to  # To its burrow's mouth, and it waits there (_burrow_break).
 	if _call_to != NO_TILE and _call_to != tile \
 			and World.distance(_call_to, _flee_from) >= World.distance(tile, _flee_from):
 		return _call_to  # Running to call its band (806 amended (9)): to its mate.
@@ -4071,7 +4179,7 @@ func _patrol() -> void:
 			if _route_index + _route_step < 0 or _route_index + _route_step >= route.size():
 				_route_step = -_route_step
 			_route_index += _route_step
-		_idle_until = World.tick + _idle_rng.randi_range(PATROL_PAUSE_TICKS.x, PATROL_PAUSE_TICKS.y)
+		_idle_until = World.tick + _idle_rng.randi_range(idle_pause.x, idle_pause.y)
 
 
 ## A route of its own when none is set (if World.take_plan allows it this

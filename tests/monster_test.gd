@@ -1880,6 +1880,7 @@ func _test_ambush() -> void:
 	_test_boar_king_rates()
 	_test_old_wolf_lunge_line()
 	_test_old_wolf_told_bite()
+	_test_digger()
 	_test_old_wolf_fights()
 	_test_old_wolf_fights_along()
 	_test_told_runs_stop()
@@ -8163,6 +8164,159 @@ func _test_old_wolf_told_bite() -> void:
 			_check(bit > 0, "stays: on the told cell as it lands, she is bitten (%d)" % bit)
 		else:
 			_check(bit == 0, "steps: off it, she is clear (%d)" % bit)
+	DayNight.reset()
+	Monster.idling = true
+
+
+## A kobold digger as a level lays it (Level._spec_for, armed as a level arms
+## it): at [param at], its placing's "idle" [param idle] if any.
+func _live_digger(at: Vector2i, idle := {}) -> Monster:
+	var spec := Level._spec_for("monster_digger", Level.MONSTER_TYPES)
+	spec["name"] = "Digger%d_%d" % [at.x, at.y]
+	spec["tile"] = at
+	if not idle.is_empty():
+		spec["idle"] = idle
+	Level.arm(spec)
+	var digger := EntityFactory.build(spec) as Monster
+	_room.add_child(digger)
+	World.spawn(digger, at)
+	return digger
+
+
+## The kobold digger (package a first fight, the coordinator's pass 11-16):
+## its row (label "Kobold digger", drawn as the kobold, the kobolds' side, its
+## pick left at the sneak's chance), its burrow (its placing's idle point, else its
+## tile; none for a sneak), at_work (up, standing, IDLE, still DIG_STILL_S,
+## within DIG_HOME_CELLS of its burrow) and still_s, its long pauses, its told
+## stab (its target's cell, "stab", its 10-tick lead: stay and be struck, step
+## off and be clear), and its run to its burrow and back once a fight.
+func _test_digger() -> void:
+	print("%s== the kobold digger: at work by its burrow, its stab told, to its burrow and back once ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var row: Dictionary = Monster.kinds().get(Monster.DIGGER_KIND, {})
+	var factions := Monster._factions()
+	_check(str(row.get("label", "")) == "Kobold digger" and Monster.drawn_kind("digger") == "sneak" and Monster.drawn_kind("sneak") == "sneak"
+			and factions.of_kind("digger") == factions.of_kind("sneak") and factions.on_sight(factions.of_kind("digger")).is_empty(),
+		"its row: Kobold digger, drawn as the kobold, of the kobolds' side, on nobody at sight (%s)" % row.get("label", ""))
+	var pick_drop: Array = (row.get("drops", []) as Array).filter(func(drop: Variant) -> bool: return str(drop.get("item", "")) == "pick")
+	var sneak_drop: Array = (Monster.kinds()["sneak"]["drops"] as Array).filter(func(drop: Variant) -> bool: return str(drop.get("item", "")) == "pick")
+	_check(pick_drop.size() == 1 and not sneak_drop.is_empty() and is_equal_approx(float(pick_drop[0].get("chance", 1.0)), float(sneak_drop[0].get("chance", 1.0)))
+			and int(row.get("purse", [0, 0])[1]) > 0,
+		"it leaves its pick at the sneak's chance (the coordinator, till economy's word), and a few coins (%s)" % [pick_drop])
+	_check(not Raids._kinds_of("goblins").has("digger") and Raids._kinds_of("goblins").has("sneak"),
+		"never in a raid: the goblins raid with the sneak, not the digger (%s)" % [Raids._kinds_of("goblins")])
+	var rows: Array[String] = ["#".repeat(20)]
+	for y in 11:
+		rows.append("#" + ".".repeat(18) + "#")
+	rows.append("#".repeat(20))
+	rows[5] = rows[5].substr(0, 12) + "P" + rows[5].substr(13)
+	var e := _build(rows)
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var plain := _live_digger(Vector2i(3, 9))
+	var pointed := _live_digger(Vector2i(8, 9), {"mode": "patrol", "point": Vector2i(6, 9)})
+	var sneak_spec := Level._spec_for("monster_sneak", Level.MONSTER_TYPES)
+	sneak_spec["name"] = "SneakNear"
+	sneak_spec["tile"] = Vector2i(16, 9)
+	var sneak := EntityFactory.build(sneak_spec) as Monster
+	_room.add_child(sneak)
+	World.spawn(sneak, Vector2i(16, 9))
+	_check(plain.burrow_cell() == Vector2i(3, 9) and pointed.burrow_cell() == Vector2i(6, 9) and sneak.burrow_cell() == Monster.NO_TILE,
+		"its burrow: its tile, else its placing's point; a sneak has none (%s, %s, %s)" % [plain.burrow_cell(), pointed.burrow_cell(), sneak.burrow_cell()])
+	_check(plain.idle_pause == Vector2i(200, 400) and sneak.idle_pause == Monster.PATROL_PAUSE_TICKS and World.wielded(plain) == "pick",
+		"its patrol pauses 20 to 40 s at its digging (%s), its pick in hand (%s); a sneak's pauses as ever" % [plain.idle_pause, World.wielded(plain)])
+	plain.alert = Monster.Alert.IDLE
+	plain.pose = Monster.Pose.STAND
+	var work := Monster.at_work(plain, 3.0)
+	var short := Monster.at_work(plain, 2.9)
+	plain.alert = Monster.Alert.FIGHTING
+	var fighting := Monster.at_work(plain, 10.0)
+	plain.alert = Monster.Alert.SUSPICIOUS
+	var wary := Monster.at_work(plain, 10.0)
+	plain.alert = Monster.Alert.IDLE
+	plain.pose = Monster.Pose.SIT
+	var sitting := Monster.at_work(plain, 10.0)
+	plain.pose = Monster.Pose.STAND
+	plain.tile = Vector2i(3, 6)  # Three off its burrow: still by it (read only: no world move).
+	var near := Monster.at_work(plain, 10.0)
+	plain.tile = Vector2i(3, 5)  # Four off: on its way home.
+	var far := Monster.at_work(plain, 10.0)
+	plain.tile = Vector2i(3, 9)
+	plain.hp = 0
+	var down := Monster.at_work(plain, 10.0)
+	plain.hp = plain.max_hp
+	sneak.alert = Monster.Alert.IDLE
+	_check(work and not short and not fighting and not wary and not sitting and near and not far and not down and not Monster.at_work(sneak, 10.0),
+		"at work: still 3 s, IDLE, standing, within 3 of its burrow; not at 2.9 s, fighting, wary, sitting, 4 off, down, nor a sneak (%s)"
+			% [[work, short, fighting, wary, sitting, near, far, down]])
+	plain.acts = false
+	plain.last_step_tick = World.tick
+	var still0 := plain.still_s()
+	for i in 5:
+		World.step()
+	_check(is_equal_approx(still0, 0.0) and is_equal_approx(plain.still_s(), 0.5), "still_s: 0 as it steps, 0.5 five ticks after (%.2f, %.2f)" % [still0, plain.still_s()])
+	# Its stab told: stay and be struck; step off and be clear.
+	for case: String in ["stays", "steps"]:
+		e = _build(rows)
+		player = e["P"][0]
+		player.protected = false
+		player.max_hp = 1000
+		player.hp = 1000
+		var digger := _live_digger(Vector2i(13, 5))
+		digger.acts = false
+		digger.next_attack_tick = 0
+		var her := World.struck_cell(player)
+		_check(World.try_wind_up(digger, player, digger.lead_ticks), "%s: its stab begins" % case)
+		var tell := int(digger.wind_up.get("tell", 0))
+		var shown: Dictionary = World.telegraphs().get(tell, {})
+		var cells: Array[Vector2i] = []
+		for c: Array in shown.get("cells", []):
+			cells.append(Vector2i(int(c[0]), int(c[1])))
+		_check(tell > 0 and cells == [her] and str(shown.get("kind", "")) == "stab" and int(shown.get("lands_tick", 0)) - int(shown.get("from_tick", 0)) == 10,
+			"%s: her cell told as it begins, a stab, 10 ticks (%s, %s)" % [case, cells, shown])
+		if case == "steps":
+			Walk.step(player, Vector2i(0, 1), 5)
+		_damage_log.clear()
+		for i in 14:
+			World.step()
+		var struck := 0
+		for d: Dictionary in _damage_log:
+			if d["entity"] == player and d["source"] == digger:
+				struck += int(d["amount"])
+		_check(not World._telegraphs.has(tell) and ((struck > 0) if case == "stays" else (struck == 0)),
+			"%s: the tell over as it lands; %s (%d)" % [case, "on it, struck" if case == "stays" else "off it, clear", struck])
+	# Hurt to its flee_below: to its burrow, a while there, back at her; hurt again, it fights on.
+	e = _build(rows)
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var runner := _live_digger(Vector2i(11, 5), {"mode": "patrol", "point": Vector2i(5, 5)})
+	runner.temper = Monster.Temper.CAUTIOUS
+	runner.hp = 8  # Under a third of its 28.
+	var burrow := runner.burrow_cell()
+	var at_burrow := -1
+	var fled := -1
+	var back := -1
+	for i in 200:
+		World.step()
+		if fled < 0 and runner.alert == Monster.Alert.FLEEING:
+			fled = i
+		if fled >= 0 and at_burrow < 0 and runner.tile == burrow:
+			at_burrow = i
+		if at_burrow >= 0 and back < 0 and runner.alert != Monster.Alert.FLEEING and World.distance(runner.tile, player.tile) <= 2:
+			back = i
+			break
+	_check(fled >= 0 and at_burrow > fled and back > at_burrow, "hurt, it runs to its burrow (fled at %d, there at %d) and comes back at her (%d)" % [fled, at_burrow, back])
+	runner.hp = 3
+	var fled_again := false
+	for i in 60:
+		World.step()
+		fled_again = fled_again or runner.alert == Monster.Alert.FLEEING
+	_check(not fled_again and runner.hp > 0, "hurt again the same fight, it fights on (fled again: %s)" % fled_again)
 	DayNight.reset()
 	Monster.idling = true
 
