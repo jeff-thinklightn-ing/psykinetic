@@ -21089,6 +21089,30 @@ sound_status failing, exit 1 and the tree untouched; a generator writing outside
 markers) still exit 1. Both real generators run through the resolver's own commands on a clean tree exit 0 with
 nothing changed. Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+539 amended (8) (perf, 2026-11-16; the coordinator's (C) of perf's row-list page, C:/dev/review/perf/row_lists.md,
+with four conditions; the label from tools/decision_number.sh): the resolver also takes a test file whose every
+conflict is rows added. perf's firstclick (943) lost three landings at its rebase on 11-16 (02:07, 09:00, 13:14), each
+a conflict in click_route_test's _ready alone: main had added a row after the same last row the take added its own
+after (_test_go_in; _test_door_talk and _test_stand_cell_routes; _test_no_route). A sorted row list (944's shape) or
+rows found by name would reorder 1950 row calls in 93 test files, 248 of them awaited and 223 inside a block, and
+nobody has shown them order-free; this changes no test. tools/changelog_resolve.py takes a conflicted tests/*.gd
+beside CHANGELOG.md and the generated pages: merge_rows merges its three index stages with git merge-file --diff3 and
+keeps a hunk only when its base part is empty (no line changed or removed), every added line is a row call (ROW,
+`_test_x(...)`, awaited or not, a comment after it) or a comment, all at one indent, and no row name is added by both
+sides; main's lines first, the take's after them, so the take's rows run last as it wrote them. Any other hunk
+anywhere in the file (two new functions met at its foot) refuses the whole run, nothing written, the conflict left as
+it was, as for any other file. Each merged file is printed in one line a landing log keeps: "changelog_resolve: <file>
+rows merged: main's <rows>, then the take's <rows> (<commit>)". It never continues the rebase: the merged file is what
+the landing's suite runs, and nothing pushes on the resolver's word. changelog_resolve_test: rows added after the same
+row merged, said by name, staged, the rebase going on; awaited rows inside a block with a comment, CRLF kept; beside a
+CHANGELOG.md conflict, both settled; refused, file and conflict untouched: the same row by both, two indents in a
+hunk, a line not a row, a row changed by main, rows merging but two functions meeting at the foot; and firstclick's
+three lost turns replayed (main's sides and the take's bases read from main's commits, the take's own click_route_test
+change kept as tests/changelog_resolve/firstclick_<time>.patch), each merged exactly as git merge-file --union gives,
+its row and function kept; RESULT: PASS. A land script calls `python -B tools/changelog_resolve.py` on a rebase
+conflict in tests/*.gd as it does on one in CHANGELOG.md. Tools and tests only; protocol unchanged; no class_name; no
+bullet.
+
 ## 436 amended: the quick asks go
 
 Jeff, from his play tests (2026-10-19, through the coordinator): "the npc

@@ -29,18 +29,34 @@ the commit being rebased changes nothing outside the spans and every marker
 stands once on each side; main's text outside them must come through
 unchanged.
 
-Run while `git rebase` is stopped with only CHANGELOG.md and those pages in
-conflict (any of them):
+A test file too (539 amended (8), the coordinator's (C), 2026-11-16: perf's
+firstclick lost three turns at click_route_test's _ready, each side's new row
+call added after the same last one). A tests/*.gd file is merged three ways
+from its index stages (git merge-file --diff3), and taken only when every
+conflicted hunk is rows added by both sides: no base line changed or removed,
+every added line a row call (ROW: `_test_x(...)`, awaited or not) or a comment,
+all at one indent, and no row name added by both. Main's rows stay first, the
+take's after them, so the take's rows still run last as it wrote them. Any
+other hunk in the file (two new functions met at its foot) refuses the whole
+file, never half merged. Each merged file is printed, its rows by name, for the
+landing's log. The resolver never continues the rebase: the merged file is what
+the landing's suite then runs.
+
+Run while `git rebase` is stopped with only CHANGELOG.md, those pages and such
+test files in conflict (any of them):
   python -B tools/changelog_resolve.py      writes them, `git add`s them; exit 0
 It does not continue the rebase. Exit 1 (nothing written, the conflict left as
 it was) when the rebase is not stopped on a commit, another file is in conflict
-(THIRD_PARTY.md changed outside its spans included), the file has no
+(THIRD_PARTY.md changed outside its spans included, and a test file
+whose conflict is more than rows added), the file has no
 ## Unreleased heading, or a generator fails. Standard library only.
 """
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
 
 PATH = "CHANGELOG.md"
 UNRELEASED = "## Unreleased"
@@ -171,6 +187,84 @@ def third_party_why(commit):
     return ""
 
 
+# --- Test files' rows (539 amended (8)) ------------------------------------
+
+## A row call in a test's body ("_test_x(...)", awaited or not, a comment after
+## it), and a comment line; each line's indent is its leading tabs.
+ROW = re.compile(r"^(\t+)(?:await )?(_test_\w+)\(.*\)\s*(?:#.*)?$")
+NOTE = re.compile(r"^(\t+)#.*$")
+
+
+def is_test_file(path):
+    return path.startswith("tests/") and path.endswith(".gd")
+
+
+def merge_rows(base, ours, theirs):
+    """[param base], [param ours] (main's side) and [param theirs] (the take's)
+    merged three ways: (text, main's rows, the take's rows, "") when every
+    conflicted hunk is rows added on both sides, main's first; else (None, [],
+    [], why not)."""
+    crlf = "\r\n" in ours
+    folder = tempfile.mkdtemp(prefix="changelog_resolve_rows_")
+    try:
+        paths = []
+        for name, text in (("main", ours), ("base", base), ("take", theirs)):
+            paths.append(os.path.join(folder, name))
+            with open(paths[-1], "w", encoding="utf-8", newline="") as handle:
+                handle.write(text.replace("\r\n", "\n"))
+        done = subprocess.run(["git", "merge-file", "-p", "--diff3", "-L", "main", "-L", "base", "-L", "take"] + paths,
+            capture_output=True)
+    finally:
+        for name in os.listdir(folder):
+            os.remove(os.path.join(folder, name))
+        os.rmdir(folder)
+    if done.returncode < 0 or done.returncode > 127:
+        return None, [], [], "git merge-file failed (%d)" % done.returncode
+    lines = done.stdout.decode("utf-8").split("\n")
+    out, mains, takes, hunks = [], [], [], 0
+    i = 0
+    while i < len(lines):
+        if not lines[i].startswith("<<<<<<< main"):
+            out.append(lines[i])
+            i += 1
+            continue
+        sides = {"main": [], "base": [], "take": []}
+        side = "main"
+        i += 1
+        while i < len(lines) and not lines[i].startswith(">>>>>>> take"):
+            if lines[i].startswith("||||||| base"):
+                side = "base"
+            elif lines[i] == "=======":
+                side = "take"
+            else:
+                sides[side].append(lines[i])
+            i += 1
+        if i >= len(lines):
+            return None, [], [], "a conflict hunk with no end"
+        i += 1
+        hunks += 1
+        if sides["base"]:
+            return None, [], [], "a hunk changes or removes a line (%s)" % sides["base"][0].strip()[:60]
+        added = sides["main"] + sides["take"]
+        bad = [line for line in added if not ROW.match(line) and not NOTE.match(line)]
+        if bad:
+            return None, [], [], "a hunk is not rows alone (%s)" % bad[0].strip()[:60]
+        if len({(ROW.match(line) or NOTE.match(line)).group(1) for line in added}) != 1:
+            return None, [], [], "a hunk's added rows stand at two indents"
+        main_rows = [ROW.match(line).group(2) for line in sides["main"] if ROW.match(line)]
+        take_rows = [ROW.match(line).group(2) for line in sides["take"] if ROW.match(line)]
+        both = sorted(set(main_rows) & set(take_rows))
+        if both:
+            return None, [], [], "both sides add the row %s" % ", ".join(both)
+        mains += main_rows
+        takes += take_rows
+        out += sides["main"] + sides["take"]
+    if hunks == 0:
+        return None, [], [], "no conflict hunk to merge"
+    text = "\n".join(out)
+    return (text.replace("\n", "\r\n") if crlf else text), mains, takes, ""
+
+
 ## The test's own commands (JSON {generator: argv}), never set in a landing.
 COMMANDS_ENV = "CHANGELOG_RESOLVE_COMMANDS"
 GENERATOR_SECONDS = 300
@@ -219,11 +313,25 @@ def main():
     except OSError as error:
         print("changelog_resolve: not stopped in a rebase (%s)" % error, file=sys.stderr)
         return 1
-    others = [each for each in conflicted if each != PATH and each not in PAGES and each != THIRD]
+    tests = [each for each in conflicted if is_test_file(each)]
+    others = [each for each in conflicted if each != PATH and each not in PAGES and each != THIRD and each not in tests]
     if not conflicted or others:
-        print("changelog_resolve: conflicted are %s, not CHANGELOG.md and the generated pages (%s) alone"
+        print("changelog_resolve: conflicted are %s, not CHANGELOG.md, the generated pages (%s) and test files' rows alone"
             % (conflicted or "none", ", ".join(PAGES + [THIRD + "'s generated spans"])), file=sys.stderr)
         return 1
+    # Test files' rows first, in memory: one that is more than rows added refuses the run, nothing written.
+    rows = {}
+    for path in tests:
+        try:
+            sides = [_git("show", ":%d:%s" % (stage, path)) for stage in (1, 2, 3)]
+        except OSError:
+            print("changelog_resolve: %s is new or gone on one side; nothing written" % path, file=sys.stderr)
+            return 1
+        merged, mains, takes, why = merge_rows(*sides)
+        if why:
+            print("changelog_resolve: %s: %s; nothing written, the conflict left as it was" % (path, why), file=sys.stderr)
+            return 1
+        rows[path] = (merged, mains, takes)
     third = THIRD in conflicted
     if third:
         why = third_party_why(commit)
@@ -270,6 +378,10 @@ def main():
             print("changelog_resolve: %s; nothing written, the conflict left as it was" % why, file=sys.stderr)
             return 1
     staged = pages + [path for path in dict.fromkeys(touched) if _changed(path)]
+    for path, (merged, _mains, _takes) in rows.items():
+        with open(path, "w", encoding="utf-8", newline="") as handle:
+            handle.write(merged)
+        staged.append(path)
     if text is not None:
         with open(PATH, "w", encoding="utf-8", newline="") as handle:
             handle.write(text)
@@ -281,6 +393,9 @@ def main():
     if pages:
         print("changelog_resolve: %s from main's side, made again over the merged tree (%s); staged: %s"
             % (", ".join(pages), ", ".join(names), ", ".join(staged)))
+    for path, (_merged, mains, takes) in rows.items():
+        print("changelog_resolve: %s rows merged: main's %s, then the take's %s (%s)"
+            % (path, ", ".join(mains) or "none", ", ".join(takes) or "none", commit[:8]))
     return 0
 
 

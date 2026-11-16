@@ -1,0 +1,118 @@
+diff --git a/tests/click_route_test.gd b/tests/click_route_test.gd
+index acfca5f2f..20f506840 100644
+--- a/tests/click_route_test.gd
++++ b/tests/click_route_test.gd
+@@ -33,6 +33,8 @@ const SMALL_STRIDE := 6
+ const WIDE_FLOOR := 2000
+ ## The far scene's zones (click_route_far_test).
+ const FAR_ZONES: Array[String] = ["hills", "foothills", "forest"]
++## The zone whose level lays the draugr's throne (Main.THRONE_WAYS).
++const THRONE_ZONE := "barrow_deep"
+ 
+ var _failures := 0
+ var _main: Node
+@@ -47,6 +49,7 @@ func _ready() -> void:
+ 	await get_tree().process_frame
+ 	if not _far():
+ 		_test_doorway()
++		_test_first_click_reads_no_level()
+ 	await _test_click_routes_agree()
+ 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
+ 	get_tree().quit(1 if _failures > 0 else 0)
+@@ -225,6 +228,96 @@ func _closed(search: Callable) -> Dictionary:
+ 	return {"path": path, "closed": World.path_closed - c0, "ms": (Time.get_ticks_usec() - t) / 1000.0}
+ 
+ 
++## A client's first press reads no level again (943; perf's click probe 2b on the Lenovo: a click on
++## Rolf at his stall, _counters_of, and one on open ground, remains_at -> throne_at -> _zone_level,
++## each read the wilds' whole level from its files once, ~400 ms). Asked as a client (Net.mode
++## CLIENT; World.zone unnamed there), with the wilds the level in play: the stalls' counter cells
++## as the level's own buildings give them, no throne, altar or remains on the street, the rooms the
++## level's, and Level.loads unchanged. Across zones (wilds, then the throne's zone, then the wilds
++## again) each answer is its own zone's, none left from the zone before. A builder's change while
++## standing there (a terrain message with a stall taken out) shows at the next ask.
++func _test_first_click_reads_no_level() -> void:
++	print("
++== a client's first press reads no level again (943) ==")
++	var kept_mode: int = Net.mode
++	_check(_main.load_map("wilds"), "the wilds load")
++	var wilds_read := Level.load_level("wilds")
++	var stalls := _counter_cells_of(wilds_read)
++	_check(stalls.has(Vector2i(203, 197)), "the wilds' own buildings lay a counter at Rolf's stall (203, 197) (%d counter cells)" % stalls.size())
++	_main._counter_cells.clear()
++	_main._zone_levels.clear()
++	_main._rooms_read.clear()
++	Net.mode = Net.Mode.CLIENT
++	var loads := Level.loads
++	var counters: Dictionary = _main._counters_of("wilds")
++	var street := Vector2i(222, 223)
++	_check(counters.keys().size() == stalls.size() and counters.keys().all(func(cell: Vector2i) -> bool: return stalls.has(cell)),
++		"_counters_of(the wilds) from the level in play: the same %d cells" % stalls.size())
++	_check(_main.throne_at("wilds", street).is_empty() and _main.remains_at(street) == null and _main.knights_altar("wilds") == Rect2i(),
++		"on the street %s: no throne, no remains, no altar" % street)
++	_check(_main._zone_level("wilds").is_empty(), "the wilds' _zone_level: {} outdoors, as the server's")
++	_check(_main._rooms_of("wilds") == wilds_read.get("rooms", {}), "the wilds' rooms: the level's own")
++	_check(Level.loads == loads, "and no level read again for any of it (Level.loads %d -> %d)" % [loads, Level.loads])
++	Net.mode = kept_mode
++	var throne_zone: String = THRONE_ZONE
++	_check(_main.load_map(throne_zone), "%s loads (the throne's zone)" % throne_zone)
++	var throne := Rect2i()
++	for building: Dictionary in _main.level.get("buildings", []):
++		if str(building.get("slot", "")) == _main.THRONE_SLOT:
++			throne = building["rect"]
++	_check(throne != Rect2i(), "%s's level lays a throne (%s)" % [throne_zone, throne])
++	Net.mode = Net.Mode.CLIENT
++	loads = Level.loads
++	_check(not _main.throne_at(throne_zone, throne.position).is_empty(), "standing in %s, throne_at finds its throne at %s" % [throne_zone, throne.position])
++	_check(_main._zone_level(throne_zone) == _main.level, "its _zone_level is the level in play")
++	_check(Level.loads == loads, "and no level read again (Level.loads %d -> %d)" % [loads, Level.loads])
++	Net.mode = kept_mode
++	_check(_main.load_map("wilds"), "back to the wilds")
++	Net.mode = Net.Mode.CLIENT
++	loads = Level.loads
++	counters = _main._counters_of("wilds")
++	_check(counters.keys().size() == stalls.size() and _main.throne_at("wilds", throne.position).is_empty() and _main._zone_level("wilds").is_empty(),
++		"back in the wilds: its own counters (%d cells), no throne at %s, {} for its _zone_level" % [counters.size(), throne.position])
++	_check(Level.loads == loads, "and no level read again (Level.loads %d -> %d)" % [loads, Level.loads])
++	# A builder's change, as a client gets it (_on_terrain): the wilds sent with Rolf's stall taken out.
++	var was_registered: Dictionary = Level._registered.get("wilds", {})
++	var made := Level.source("wilds")
++	var config: Dictionary = (made["config"] as Dictionary).duplicate(true)
++	var buildings: Array = config.get("buildings", [])
++	config["buildings"] = buildings.filter(func(each: Variant) -> bool:
++		return not (each is Dictionary and str(each.get("slot", "")) == "building.market_stall" and each.get("at") is Array
++			and Vector2i(int(each["at"][0]), int(each["at"][1])) == Vector2i(203, 197)))  # JSON's numbers are floats.
++	_check((config["buildings"] as Array).size() == buildings.size() - 1, "a terrain message for the wilds without the stall at (203, 197)")
++	var message := {"name": "wilds", "layout": (made["layout"] as Image).save_png_to_buffer(), "config": config}
++	if made.get("height") is Image:
++		message["height"] = (made["height"] as Image).save_png_to_buffer()
++	if made.get("relief") is Image:
++		message["relief"] = (made["relief"] as Image).save_png_to_buffer()
++	_main._on_terrain(message)
++	counters = _main._counters_of("wilds")
++	_check(not counters.has(Vector2i(203, 197)) and not counters.is_empty(),
++		"the next ask after it: no counter at (203, 197), the other stall's still there (%d cells)" % counters.size())
++	Net.mode = kept_mode
++	Level.unregister("wilds")
++	if not was_registered.is_empty():
++		Level._registered["wilds"] = was_registered
++	_main._counter_cells.clear()
++	_check(_main._load_level("wilds") and _main._counters_of("wilds").has(Vector2i(203, 197)), "the message's level forgotten and read again: the stall is back")
++
++
++## The counter cells (Main.COUNTERS) laid by [param read]'s buildings, as _counters_of reads them.
++func _counter_cells_of(read: Dictionary) -> Dictionary:
++	var cells := {}
++	for each: Variant in read.get("buildings", []):
++		if each is Dictionary and str(each.get("slot", "")) in _main.COUNTERS:
++			var rect: Variant = Level.building_rect(each)
++			if rect is Rect2i:
++				for y in range((rect as Rect2i).position.y, (rect as Rect2i).end.y):
++					for x in range((rect as Rect2i).position.x, (rect as Rect2i).end.x):
++						cells[Vector2i(x, y)] = true
++	return cells
++
++
+ func _player() -> Player:
+ 	for entity in World.get_entities():
+ 		if entity is Player and entity.spawned:

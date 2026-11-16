@@ -445,5 +445,143 @@ try:
 finally:
     shutil.rmtree(repo, ignore_errors=True)
 
+print("== a test file's rows added on both sides (539 amended (8)) ==")
+ROWS_FILE = "tests/thing_test.gd"
+ROWS_BASE = ("extends Node\n\n\nfunc _ready() -> void:\n\t_test_a()\n\t_test_b()\n\tif true:\n\t\t_test_c()\n"
+    "\tprint(\"RESULT\")\n\n\nfunc _test_a() -> void:\n\tpass\n\n\nfunc _test_b() -> void:\n\tpass\n\n\nfunc _test_c() -> void:\n\tpass\n")
+
+
+def rows_case(main_text, branch_text, base_text=ROWS_BASE, path=ROWS_FILE, crlf=False):
+    """A scratch repository whose branch and main each changed [param path] from [param base_text]."""
+    nl = "\r\n" if crlf else "\n"
+    repo = scratch()
+    os.makedirs(os.path.join(repo, os.path.dirname(path)), exist_ok=True)
+    write(repo, path, base_text.replace("\n", nl))
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "base")
+    git(repo, "branch", "branch")
+    write(repo, path, main_text.replace("\n", nl))
+    git(repo, "commit", "-q", "-am", "main's row")
+    git(repo, "checkout", "-q", "branch")
+    if branch_text is not None:  # None: the caller makes the branch's commit.
+        write(repo, path, branch_text.replace("\n", nl))
+        git(repo, "commit", "-q", "-am", "mine")
+    return repo
+
+
+def resolve_rows(repo):
+    return subprocess.run([sys.executable, "-B", TOOL], cwd=repo, capture_output=True, text=True)
+
+
+def after_b(text, rows):
+    return text.replace("\t_test_b()\n", "\t_test_b()\n" + rows)
+
+
+repo = rows_case(after_b(ROWS_BASE, "\t_test_main()\n"), after_b(ROWS_BASE, "\t_test_mine()  # mine, with a note\n"))
+try:
+    check(rebase_stops(repo), "two rows added after the same last row: the rebase stops on the test file")
+    done = resolve_rows(repo)
+    text = read(repo, ROWS_FILE)
+    check(done.returncode == 0 and text == after_b(ROWS_BASE, "\t_test_main()\n\t_test_mine()  # mine, with a note\n"),
+        "merged: main's row, then the take's, nothing else changed (%s)" % (done.stdout.strip() or done.stderr.strip()))
+    check("tests/thing_test.gd rows merged: main's _test_main, then the take's _test_mine" in done.stdout,
+        "said in one line: the file, main's rows and the take's by name")
+    check(git(repo, "diff", "--name-only", "--diff-filter=U").stdout.strip() == "", "and staged: no conflict left")
+    check(git(repo, "-c", "core.editor=true", "rebase", "--continue", ok=False).returncode == 0, "the rebase goes on")
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+inner = "\t\t_test_c()\n"
+repo = rows_case(ROWS_BASE.replace(inner, inner + "\t\tawait _test_main(1)\n"),
+    ROWS_BASE.replace(inner, inner + "\t\t# The take's own.\n\t\tawait _test_mine()\n"), crlf=True)
+try:
+    rebase_stops(repo)
+    done = resolve_rows(repo)
+    text = read(repo, ROWS_FILE)
+    check(done.returncode == 0 and text == ROWS_BASE.replace(inner, inner + "\t\tawait _test_main(1)\n\t\t# The take's own.\n\t\tawait _test_mine()\n").replace("\n", "\r\n"),
+        "awaited rows inside a block, a comment among them, CRLF: merged and kept CRLF (%s)" % (done.stdout.strip() or done.stderr.strip()))
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+# With a CHANGELOG.md conflict in the same commit: both settled in one run.
+repo = rows_case(after_b(ROWS_BASE, "\t_test_main()\n"), after_b(ROWS_BASE, "\t_test_mine()\n"))
+try:
+    git(repo, "checkout", "-q", "main")
+    write(repo, "CHANGELOG.md", HEAD + "## Unreleased\n\n- Main's.\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "--amend", "--no-edit")
+    git(repo, "checkout", "-q", "branch")
+    write(repo, "CHANGELOG.md", HEAD + "## Unreleased\n\n- Mine.\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "--amend", "--no-edit")
+    rebase_stops(repo)
+    done = resolve_rows(repo)
+    check(done.returncode == 0 and "- Mine." in read(repo) and "- Main's." in read(repo)
+        and "_test_main()\n\t_test_mine()" in read(repo, ROWS_FILE), "beside a CHANGELOG.md conflict: both settled (%s)" % done.stderr.strip())
+finally:
+    shutil.rmtree(repo, ignore_errors=True)
+
+
+def refused(what, main_text, branch_text, base_text=ROWS_BASE):
+    repo = rows_case(main_text, branch_text, base_text)
+    try:
+        stopped = rebase_stops(repo)
+        before = read(repo, ROWS_FILE)
+        done = resolve_rows(repo)
+        check(stopped and done.returncode == 1 and read(repo, ROWS_FILE) == before and "<<<<<<<" in before
+            and git(repo, "diff", "--name-only", "--diff-filter=U").stdout.strip() == ROWS_FILE,
+            "%s: refused, the file and its conflict left as they were (%s)" % (what, done.stderr.strip()))
+    finally:
+        shutil.rmtree(repo, ignore_errors=True)
+
+
+refused("the same row added by both", after_b(ROWS_BASE, "\t_test_same()\n"), after_b(ROWS_BASE, "\t_test_same()\n\t_test_mine()\n"))
+refused("rows at two indents in one hunk", after_b(ROWS_BASE, "\t_test_main()\n"), after_b(ROWS_BASE, "\t\t_test_mine()\n"))
+refused("a line that is not a row", after_b(ROWS_BASE, "\t_test_main()\n"), after_b(ROWS_BASE, "\tvar seen := 1\n\t_test_mine()\n"))
+refused("a row changed by main", ROWS_BASE.replace("\t_test_b()\n", "\t_test_b(2)\n"), after_b(ROWS_BASE, "\t_test_mine()\n"))
+foot = "\n\nfunc _test_%s() -> void:\n\tpass\n"
+refused("the rows merge but two new functions meet at the foot", after_b(ROWS_BASE, "\t_test_main()\n") + foot % "main",
+    after_b(ROWS_BASE, "\t_test_mine()\n") + foot % "mine")
+
+print("== firstclick's three lost turns, replayed (539 amended (8)) ==")
+# perf's 943 (firstclick) lost its landing at its rebase three times on 11-16, each side
+# adding its row after the same last one in click_route_test's _ready. Main's sides and
+# the take's bases are main's commits; the take's own change is kept beside this test
+# (tests/changelog_resolve/firstclick_<time>.patch, its click_route_test diff).
+CLICK = "tests/click_route_test.gd"
+HERE = os.path.dirname(os.path.abspath(__file__))
+for when, base_sha, main_sha in (("0207", "116c867e1", "62444988f"), ("0900", "7e932cbd6", "6b8172f3c"),
+        ("1314", "6b8172f3c", "794b18f26")):
+    sides = {}
+    for name, sha in (("base", base_sha), ("main", main_sha)):
+        shown = subprocess.run(["git", "-C", HERE, "show", "%s:%s" % (sha, CLICK)], capture_output=True)
+        sides[name] = shown.stdout.decode("utf-8") if shown.returncode == 0 else None
+    if None in sides.values():
+        check(False, "firstclick at %s: main's commits %s and %s readable in this checkout" % (when, base_sha, main_sha))
+        continue
+    repo = rows_case(sides["main"], None, sides["base"], CLICK)
+    try:
+        patch = os.path.join(HERE, "changelog_resolve", "firstclick_%s.patch" % when)
+        git(repo, "apply", patch)
+        git(repo, "commit", "-q", "-am", "943 at %s" % when)
+        take = read(repo, CLICK)
+        stopped = rebase_stops(repo)
+        done = resolve_rows(repo)
+        text = read(repo, CLICK)
+        union = {}
+        for name, body in (("main", sides["main"]), ("base", sides["base"]), ("take", take)):
+            union[name] = os.path.join(repo, ".git", "rows_" + name)
+            with open(union[name], "w", encoding="utf-8", newline="") as handle:
+                handle.write(body)
+        both = subprocess.run(["git", "merge-file", "-p", "--union", union["main"], union["base"], union["take"]],
+            capture_output=True).stdout.decode("utf-8")
+        check(stopped and done.returncode == 0 and text == both and "<<<<<<<" not in text,
+            "firstclick at %s: merged, main's rows then the take's (%s)" % (when, done.stdout.strip() or done.stderr.strip()))
+        ready = text[text.index("func _ready"):]
+        check("_test_first_click_reads_no_level()" in ready and "func _test_first_click_reads_no_level" in text,
+            "firstclick at %s: its row in _ready and its function kept" % when)
+    finally:
+        shutil.rmtree(repo, ignore_errors=True)
+
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
