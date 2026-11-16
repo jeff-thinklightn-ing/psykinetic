@@ -7,19 +7,25 @@ notes (decision 324).
 
 ## Unreleased
 
-- A grave robber waiting his turn in a fight calls that he's next, calls again as he steps in, and grumbles if you're downed before his turn comes (806 amended (23), 806 amended (24)).
-- Towns: a townsperson sick in bed coughs every so often, and it carries muffled through the wall to the street (940 amended (1)).
-- At night the grass lies dark under the moon, green only where lamplight or firelight falls (858 amended (1)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).
 - Towns: in the Last Light Mughouse the hearth crackles across the room, Margery sets a cup down on the counter now and then as she serves, and low talk rises as the room fills with townsfolk (920).
-- In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
 - In the crypt, when another player takes up the fallen knight's task, lays remains on his bier or proves their strength to him, you're told so by their name (666 amended (2)).
 - Towns: wood houses stand straight, their plank rows running level into their window and door frames (287 amended (1)).
 - Bundles of arrows of one kind stack up to five on a square in your pack or off hand, with their count shown, and a bundle you pick up with your bow out joins those in your hand (619 amended (4)).
 - Towns: a house's door lantern is dark by day and lights with its windows in the evening, and the temple's burns low by day and full after dark (489 amended (9)).
 - Towns: a pedlar comes into Umbrage along the road from the south-west to a stall by the store, and when they go on, they walk back out the same way and are gone where the road leaves (711 amended (3)).
+
+## v0.1.222
+
+- A grave robber waiting his turn in a fight calls that he's next, calls again as he steps in, and grumbles if you're downed before his turn comes (806 amended (23), 806 amended (24)).
+- Towns: a townsperson sick in bed coughs every so often, and it carries muffled through the wall to the street (940 amended (1)).
+- At night the grass lies dark under the moon, green only where lamplight or firelight falls (858 amended (1)).
+- In the Ossuary, two torches burn either side of the Charnel Vault's way out, so from the foot of the stair the first light you see is the way on (608 amended (4)).
+- Towns: walking up to the Mughouse's door from any side of its porch, or clicking its door, takes you into the inn (811 amended (8), 935 amended (4)).
+- With a battle axe or giant axe, a swing you click before a foe's red warning reaches you waits until his blow lands, then comes at once, unless yours would land first (942).
+- Bow: a quick right click in the open lobs; a ring shows at once where the arrows will fall, on the spot you let go at or as far toward it as a lob reaches, wherever the cursor goes next, and the arrows go up a moment later (677 amended (5)).
 
 ## v0.1.221
 
