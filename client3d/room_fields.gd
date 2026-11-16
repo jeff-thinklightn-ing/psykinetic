@@ -113,6 +113,8 @@ const VIEW: Array[StringName] = [
 	&"_look_daylight",
 	&"_look_elevation",
 	&"_low",
+	&"_low_sun_dim",
+	&"_low_sun_tint",
 	&"_marking",
 	&"_marking_shaders",
 	&"_mourn",
