@@ -70,6 +70,9 @@ land_checks() {
 	python -B tools/godot_log_check.py || { checks_why="a Godot launch without --log-file, silence or off-screen, decision 664 and its amendments: fix it as above"; return 1; }
 	# The lists every tree adds a name to, one name a line in order, so two takes' adds merge (decision 944).
 	python -B tools/list_lines.py || { checks_why="a list not one name a line in order, decision 944: python -B tools/list_lines.py --fix, then commit"; return 1; }
+	# No server print names a companion or carries a whole player id, and the prints that still
+	# name a player stay within tools/print_names_budget.txt, which only falls (284 amended (2)).
+	python -B tools/print_names.py || { checks_why="a server print names a companion or a player, or its budget line is off, 284 amended (2): fix it as above; python -B tools/print_names.py --list shows every line read"; return 1; }
 	# docs/voice_inventory.md is generated: a changed player's line means
 	# re-running its tool, never a hand edit (748 amended (6)). Under this
 	# tree's land lock, clean and ahead of origin/main, a stale page is
@@ -99,7 +102,7 @@ if [ "${1:-}" = "--checks" ]; then
 	echo "not run here: bash tools/load_check.sh loads your changed scripts in a Godot with the autoloads in, a few seconds through the gate (278 amended (7))"
 	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	if [ "$code" -eq 0 ]; then
-		echo "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the lists' lines, the voice inventory$([ -n "$inventory_stale" ] && echo ", its page stale: the landing regenerates it"))"
+		echo "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the lists' lines, the server prints' names, the voice inventory$([ -n "$inventory_stale" ] && echo ", its page stale: the landing regenerates it"))"
 		exit 0
 	fi
 	echo "LANDING CHECKS: FAIL ($checks_why)"
@@ -243,6 +246,12 @@ if git diff --name-only origin/main...HEAD -- tools/list_lines.py tests/list_lin
 	tool_part list_lines_test bash tests/list_lines_test.sh
 else
 	echo "list_lines_test: not run (the take changes neither tools/list_lines.py nor its test)"
+fi
+# The server prints' names (284 amended (2)), a few seconds: only when the take changes the tool, its budget or its test.
+if git diff --name-only origin/main...HEAD -- tools/print_names.py tools/print_names_budget.txt tests/print_names_test.sh 2>/dev/null | grep -q .; then
+	tool_part print_names_test bash tests/print_names_test.sh
+else
+	echo "print_names_test: not run (the take changes neither tools/print_names.py, its budget nor its test)"
 fi
 tool_part changelog_resolve_test python -B tests/changelog_resolve_test.py
 tool_part voice_inventory_test python -B tests/voice_inventory_test.py

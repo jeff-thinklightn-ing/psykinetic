@@ -38,6 +38,10 @@ function Invoke-LandChecks($lock) {
 	# The lists every tree adds a name to, one name a line in order, so two takes' adds merge (decision 944).
 	& python -B (Join-Path $root 'tools\list_lines.py') | Write-Host
 	if ($LASTEXITCODE -ne 0) { return 'a list not one name a line in order, decision 944: python -B tools/list_lines.py --fix, then commit' }
+	# No server print names a companion or carries a whole player id, and the prints that still
+	# name a player stay within tools/print_names_budget.txt, which only falls (284 amended (2)).
+	& python -B (Join-Path $root 'tools\print_names.py') | Write-Host
+	if ($LASTEXITCODE -ne 0) { return 'a server print names a companion or a player, or its budget line is off, 284 amended (2): fix it as above; python -B tools/print_names.py --list shows every line read' }
 	# docs/voice_inventory.md is generated: a changed player's line means
 	# re-running its tool, never a hand edit (748 amended (6)). Under this
 	# tree's land lock, clean and ahead of origin/main, a stale page is
@@ -68,7 +72,7 @@ if ($Checks) {
 	if ($inventoryStale) { Write-Output $inventoryStale }
 	if ($why -eq '') {
 		$stale = if ($inventoryStale) { ', its page stale: the landing regenerates it' } else { '' }
-		Write-Output "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the lists' lines, the voice inventory$stale)"
+		Write-Output "LANDING CHECKS: PASS (CHANGELOG.md, Godot launches' logs, the lists' lines, the server prints' names, the voice inventory$stale)"
 		exit 0
 	}
 	Write-Output "LANDING CHECKS: FAIL ($why)"

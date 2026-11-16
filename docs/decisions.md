@@ -4771,6 +4771,18 @@ wait; the names are Jeff's say. perf wires the check into land.sh's and land.ps1
 reading this diff, failing only once it passes on main's tip. Server only, protocol unchanged, no
 new class_name, no bullet.
 
+284 amended (2), perf's side (the wiring; the coordinator's ruling of 2026-11-16, no label of its
+own): land.sh's and land.ps1's checks before the gate run python -B tools/print_names.py after the
+lists' lines (944) and before the voice inventory, so `land.sh --checks` shows it too; a failure is
+"LANDING CHECKS: FAIL (a server print names a companion or a player, or its budget line is off, 284
+amended (2): ...)", its lines named above it, --list for every line read. It passed on main's tip
+with companions' take before this was queued (0.3 s). tests/print_names_test.sh runs among the tool
+parts only when a take changes tools/print_names.py, its budget or its test, as list_lines_test.
+tests/land_checks_test.sh fakes print_names.py beside the other checks' tools (944's first landing
+failed for lack of one) with a row for each of land.sh and land.ps1: PASS; the other tests that copy
+land.sh (fonts_imported, land_beat, land_retry, land_tested, land_name, push_guard, remote_slot,
+run_digest, run_parse) PASS.
+
 ## 289. Lore is read by one class, Lore, and asked one thing: what a knower knows
 
 `Lore` (`sim/lore.gd`) reads levels/lore/ once and keeps it (read on first use,
