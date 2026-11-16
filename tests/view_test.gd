@@ -230,6 +230,8 @@ func _ready() -> void:
 		await _test_wind_flinch()  # 392 amended (11): after blows_seen, with its player still standing (the list's end has none).
 		await _test_tell_killed()  # 780 amended (36): after wind_flinch, its player still standing.
 		await _test_told_hurts()  # 390 amended (4): after wind_flinch, its player still standing.
+		await _test_told_sweep()  # After tell_killed: the player it strikes flinches, still standing.
+		_test_told_kinds_known()
 		await _test_gait_holds()  # It lets frames run (the hold's rows).
 		_test_run_arms_held()
 		await _test_shield_seen()
@@ -12955,7 +12957,7 @@ func _test_told_lunge() -> void:
 	_rig._process(0.0)
 	var puppet: Node3D = _rig._puppets[robber.get_instance_id()]
 	var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
-	var told: Array = Client3D.HUMANOID_MOVES["told"].get(World.wielded(robber), [])
+	var told: Array = Client3D.HUMANOID_MOVES["told"]["lunge"].get(World.wielded(robber), [])
 	_check(rig != null and told.size() == 3 and rig.has(str(told[0])),
 			"his told strike for what he holds (%s): %s" % [World.wielded(robber), told])
 	if rig == null or told.size() < 3:
@@ -13116,6 +13118,96 @@ func _test_told_lunge() -> void:
 	_rig.creature_tell_over(24, false)
 	World.despawn(other)
 	World.despawn(robber)
+	_rig._process(0.0)
+
+
+## Brand's told sweep (the coordinator's yes to animation's design, 11-15; enemy-ai's ask): a "sweep"
+## telegraph on a person holding the Tomb Sledge plays HUMANOID_MOVES "told"["sweep"] (Sledge_Sweep):
+## coiled and held, carried across to its contact as the drawn tell lands, the body pushed nowhere.
+## His wound-up heavy's winding replaces nothing, whichever of the two comes first (the server sends
+## the telegraph, then the winding on the same tick); a second telegraph during it replaces nothing;
+## called off, it stops; a player he strikes flinches at its drawn contact, measured (390 amended (4));
+## a person with no sweep for what he holds plays nothing told on one (an older client: nothing told
+## on any person but a lunge, the winding's plain Sledge_Attack).
+func _test_told_sweep() -> void:
+	print("\n== Brand's told sweep: coiled, held, carried across as it lands; a winding either side replaces nothing ==")
+	var player := _player()
+	# Beside the player, facing it (_struck_with takes the swinger within BLOW_REACH, facing what it struck).
+	var brute := _spawn_imp(player.tile + Vector2i(1, 0) if player != null else Vector2i(9, 6), "robber_brute")
+	brute.hands = PackedStringArray(["tomb_sledge", ""])  # Brand's (named_enemies "brand"), as his row arms him.
+	World.face(brute, Vector2i(-1, 0))
+	_rig._process(0.0)
+	var id := brute.get_instance_id()
+	var puppet: Node3D = _rig._puppets[id]
+	var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+	var told: Array = Client3D.HUMANOID_MOVES["told"]["sweep"].get(World.wielded(brute), [])
+	_check(rig != null and player != null and told.size() == 3 and str(told[0]) == "Sledge_Sweep" and rig.has("Sledge_Sweep"),
+			"the sledge's told sweep (%s): %s, a player to strike (%s)" % [World.wielded(brute), told, player != null])
+	if rig == null or player == null or told.size() < 3:
+		World.despawn(brute)
+		return
+	var lands_ticks := 9
+	var lands_in := lands_ticks * World.TICK_DT + Client3D.STRIKE_LANDS_IN
+	var body := puppet.get_node("Body") as Node3D
+	# The telegraph first, the winding on the same tick (as the server sends them).
+	var start := AnimRig.now_msec()
+	_rig.creature_tell(31, {"id": 31, "source": str(brute.get_path()), "kind": "sweep", "lands_tick": World.tick + lands_ticks})
+	var contact := rig.contact_msec
+	_rig._on_winding(Vector2i(-1, 0), lands_ticks, id)
+	_check(rig.striking() and rig.playing() == "Sledge_Sweep" and rig.contact_msec == contact and _rig._tells.get(31) == puppet
+			and absi(contact - (start + int(lands_in * 1000.0))) <= 20,
+			"the telegraph, then his winding: %s kept, its contact as the drawn tell lands (%d ms, want %d)" % [
+			rig.playing(), contact - start, int(lands_in * 1000.0)])
+	_rig.creature_tell(32, {"id": 32, "source": str(brute.get_path()), "kind": "sweep", "lands_tick": World.tick + 5})
+	_check(rig.playing() == "Sledge_Sweep" and rig.contact_msec == contact and not _rig._tells.has(32),
+			"a second telegraph during it replaces nothing (%s, its contact %d ms off)" % [rig.playing(), rig.contact_msec - contact])
+	await _until_msec(start + int((Client3D.SWEEP_DRAW + 0.1) * 1000.0))
+	_check(rig.striking() and is_zero_approx(rig.speed()), "coiled and held at the gather (speed %.2f)" % rig.speed())
+	var pushed := 0.0
+	while AnimRig.now_msec() < start + int(lands_ticks * World.TICK_DT * 1000.0):
+		await get_tree().process_frame
+		pushed = maxf(pushed, Vector2(body.position.x, body.position.z).length())
+	# The sim's blow lands STRIKE_LANDS_IN before the drawn one: its news starts no second strike, and the
+	# player it strikes flinches at the drawn contact (390 amended (4)), measured.
+	_rig._on_swung(Vector2i(-1, 0), id)
+	_check(rig.playing() == "Sledge_Sweep" and rig.speed() > 0.0, "its swing's news starts no second strike (%s, carried at %.2f)" % [rig.playing(), rig.speed()])
+	_rig._swings.erase(player.get_instance_id())
+	var flinched: Array = await _flinch_time(player, id)
+	_check(flinched[1] < 0 and absi(int(flinched[0]) - contact) <= 50,
+			"the player struck by the sweep flinches at its drawn contact, not at the news (%d ms off the contact; %s at the news)"
+			% [int(flinched[0]) - contact, "already" if flinched[1] >= 0 else "not yet"])
+	pushed = maxf(pushed, Vector2(body.position.x, body.position.z).length())
+	_check(pushed < 0.03, "his body pushed nowhere through it (%.3f m; the half step is the clip's)" % pushed)
+	_rig.creature_tell_over(31, true)
+	_rig._swings.erase(id)
+	await _until_msec(AnimRig.now_msec() + int((Client3D.SWEEP_RECOVER + 0.2) * 1000.0))
+	# The winding first, then the telegraph: his plain heavy begun, then the told sweep in its place.
+	var plain := str((Client3D.HUMANOID_MOVES["strikes"]["tomb_sledge"] as Array)[0][0])
+	_rig._on_winding(Vector2i(-1, 0), lands_ticks, id)
+	var began := rig.playing()
+	var start2 := AnimRig.now_msec()
+	_rig.creature_tell(33, {"id": 33, "source": str(brute.get_path()), "kind": "sweep", "lands_tick": World.tick + lands_ticks})
+	_check(began == plain and rig.playing() == "Sledge_Sweep" and absi(rig.contact_msec - (start2 + int(lands_in * 1000.0))) <= 20
+			and _rig._tells.get(33) == puppet,
+			"his winding, then the telegraph: %s begun, then %s, its contact as the drawn tell lands (%d ms)" % [began, rig.playing(), rig.contact_msec - start2])
+	# Called off (stunned in the wind-up: the server ends the tell and the winding): it stops.
+	await _until_msec(start2 + int((Client3D.SWEEP_DRAW + 0.05) * 1000.0))
+	_rig.creature_tell_over(33, false)
+	_rig._on_winding(Vector2i(-1, 0), 0, id)
+	await get_tree().process_frame
+	_check(not rig.striking() and int(puppet.get_meta("wound_until", 0)) == 0 and int(puppet.get_meta("told_until", 0)) == 0,
+			"called off: stopped, his blows his own again")
+	# A person with no sweep for what he holds (a robber's dagger): nothing told on a "sweep" telegraph.
+	var robber := _spawn_imp(Vector2i(9, 9), "robber")
+	robber.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
+	_rig._process(0.0)
+	var robber_rig := (_rig._puppets[robber.get_instance_id()] as Node3D).get_meta("rig") as AnimRig
+	_rig.creature_tell(35, {"id": 35, "source": str(robber.get_path()), "kind": "sweep", "lands_tick": World.tick + lands_ticks})
+	_check(not robber_rig.striking() and not _rig._tells.has(35), "a sweep told on a body with no sweep for its weapon plays nothing told")
+	_rig.creature_tell_over(35, true)
+	World.despawn(robber)
+	World.despawn(brute)
+	_rig._swings.erase(id)
 	_rig._process(0.0)
 
 
@@ -20195,7 +20287,8 @@ func _test_blows_seen() -> void:
 ## 390 amended (4): each told move's hurt against its drawn landing, through the client (Client3D.creature_tell
 ## with the message's from and lands ticks; the hit's news at the sim's landing, its cause the server's): a
 ## robber's lunge (his thrust, STRIKE_LANDS_IN behind the sim), a person's ambush (no told strike drawn for it:
-## at the news), a hill cat's pounce, a great bear's swipe and a boar king's charge (each its tell as the sim's,
+## at the news), Brand's sweep (the told kinds by Client3D.TOLD_TIMES: his sledge across as the lunge's thrust),
+## a hill cat's pounce, a great bear's swipe and a boar king's charge (each its tell as the sim's,
 ## or at the news where its body draws none); and each tell broken first: no record, at the news.
 func _test_told_hurts() -> void:
 	print("
@@ -20204,8 +20297,8 @@ func _test_told_hurts() -> void:
 	if player == null:
 		_check(false, "a player to be struck by told moves")
 		return
-	var tellers := [["robber", "lunge", &"lunge"], ["robber", "ambush", &"ambush"], ["hill_cat", "pounce", &"pounce"],
-			["great_bear", "swipe", &"attack"], ["boar_king", "charge", &"attack"]]
+	var tellers := [["robber", "lunge", &"lunge"], ["robber", "ambush", &"ambush"], ["robber_brute", "sweep", &"attack"],
+			["hill_cat", "pounce", &"pounce"], ["great_bear", "swipe", &"attack"], ["boar_king", "charge", &"attack"]]
 	var ticks := 6
 	var n := 0
 	for row: Array in tellers:
@@ -20214,10 +20307,10 @@ func _test_told_hurts() -> void:
 		if World.get_entity_at(at) != null:
 			World.despawn(World.get_entity_at(at))
 		var teller: Monster = null
-		if kind == "robber":
-			teller = _spawn_imp(at, "robber")
-			if teller != null:
-				teller.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]), ""])
+		if kind == "robber" or kind == "robber_brute":
+			teller = _spawn_imp(at, kind)
+			if teller != null:  # Brand's sledge for the brute's sweep (named_enemies "brand"), as his row arms him.
+				teller.hands = PackedStringArray([str(Monster.kinds()["robber"]["wields"]["right"]) if kind == "robber" else "tomb_sledge", ""])
 		else:
 			var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
 			spec["name"] = "Told" + kind.capitalize().replace(" ", "") + str(n)
@@ -20268,6 +20361,29 @@ func _test_told_hurts() -> void:
 		World.despawn(teller)
 		_rig._process(0.0)
 		await _frames(2)
+
+
+## Every telegraph kind the sim tells by name (World.telegraph's callers in sim/, read from their source) is
+## either a told strike's (Client3D.TOLD_TIMES: drawn, its landing recorded, the hurt waiting for it) or one
+## drawn as its cells only for a reason (Client3D.TOLD_CELLS_ONLY), or a creature's own (its CreatureView
+## tells it). A new told move in neither fails here, not on a laptop (the coordinator, 11-15: Brand's sweep
+## reached creature_tell's told branch by no name).
+func _test_told_kinds_known() -> void:
+	print("\n== every told kind a person can be told by is drawn or named as cells only ==")
+	var said := RegEx.create_from_string("telegraph\\((self|by|entity|source|[a-z_]+), \"([a-z_]+)\"")
+	var creatures := ["boar_king.gd", "great_bear.gd", "hill_cat.gd", "old_wolf.gd"]
+	var seen := {}
+	var unknown: Array[String] = []
+	for file: String in DirAccess.get_files_at("res://sim"):
+		if not file.ends_with(".gd") or file in creatures:
+			continue
+		for m in said.search_all(FileAccess.get_file_as_string("res://sim/" + file)):
+			var kind := m.get_string(2)
+			seen[kind] = file
+			if not Client3D.TOLD_TIMES.has(kind) and not Client3D.TOLD_CELLS_ONLY.has(kind):
+				unknown.append("%s (%s)" % [kind, file])
+	_check(seen.size() >= 4 and unknown.is_empty(),
+			"each told kind drawn (TOLD_TIMES) or cells only (TOLD_CELLS_ONLY): %s; in neither: %s" % [seen.keys(), unknown])
 
 
 ## 780 amended (36): a teller killed mid-tell (ui-design's dagger runs: a robber killed as he told). His tell

@@ -34,6 +34,7 @@ func _ready() -> void:
 	_test_sledge()
 	_test_sleep_clips()
 	_test_axe_sweep()
+	await _test_sledge_sweep()
 	await _test_rests()
 	await _test_haft_turned()
 	await _test_held_wrists()
@@ -2074,6 +2075,167 @@ func _test_axe_sweep() -> void:
 	_check(lib.has_animation("Axe_Sweep") and absf(lib.get_animation("Axe_Sweep").length - 1.3) < 0.02
 		and lib.get_animation("Axe_Sweep").loop_mode == Animation.LOOP_NONE and axes.size() == 2,
 		"Axe_Sweep is 1.3 s, its contact at 0.8, both heavy axes' wound-up blow (%s)" % [axes])
+
+
+## Brand's told sweep (the coordinator's yes to animation's design, 11-15): Sledge_Sweep, the Tomb Sledge
+## in the right hand as Client3D holds it, on the man and the woman. Each head place in the model's frame
+## from its feet: its way round from ahead (+ to his right) and its reach. Coiled and held behind his right
+## (SSWEEP_ANGLES[0] or more round at the gather), carried across his front through the three told cells
+## (right of SSWEEP_ANGLES[1] at 0.75, within SSWEEP_AT_CONTACT of ahead at the contact, the middle cell,
+## left past -SSWEEP_ANGLES[1] by 1.2), at the contact SSWEEP_REACH or more out and between SSWEEP_LOW
+## and SSWEEP_HIGH up (knee to waist); the head SSWEEP_CLEAR or more off his hips' upright throughout; the
+## left hand's grip (its socket, as the chopping row) within SSWEEP_ON_HAFT of the haft's line throughout, where
+## HandReach holds it as in play (grip_2 slid down by REACH_SLIDES, as _slide_reach does: the arm reaches it at
+## every frame), the head's centre SSWEEP_FLOOR or more up (its face off the ground); the head's long axis along its travel (SSWEEP_FACE) across the
+## carry (its face leads). The coil read apart from Sledge_Attack's wind-up from its first frames (the
+## coordinator's condition): the head never over its ready height (at 0) before the gather and SSWEEP_DROP_BY
+## or more under it at 0.3 s, where Sledge_Attack lifts it SSWEEP_ATTACK_RISE or more over its own by 0.45 s,
+## and SSWEEP_APART or more from where Sledge_Attack has it at 0.3 s.
+const SSWEEP_ANGLES := [100.0, 45.0]
+const SSWEEP_AT_CONTACT := 15.0
+const SSWEEP_REACH := 0.9
+const SSWEEP_LOW := 0.25
+const SSWEEP_HIGH := 1.0
+const SSWEEP_CLEAR := 0.4
+const SSWEEP_ON_HAFT := 0.09
+const SSWEEP_FLOOR := 0.2
+const SSWEEP_FACE := 0.8
+const SSWEEP_DROP_BY := 0.4
+const SSWEEP_ATTACK_RISE := 0.2
+const SSWEEP_APART := 0.6
+func _test_sledge_sweep() -> void:
+	print("== Brand's told sweep: Sledge_Sweep ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var told: Array = Client3D.HUMANOID_MOVES["told"]["sweep"].get("tomb_sledge", [])
+	_check(lib.has_animation("Sledge_Sweep") and absf(lib.get_animation("Sledge_Sweep").length - 1.75) < 0.02
+		and lib.get_animation("Sledge_Sweep").loop_mode == Animation.LOOP_NONE and told == ["Sledge_Sweep", 0.6, 0.9]
+		and Client3D.REACH_SLIDES.has("Sledge_Sweep"),
+		"Sledge_Sweep is 1.75 s, the sledge's told sweep gathered at 0.6, its contact at 0.9 (%s), its left hand's slides" % [told])
+	if not lib.has_animation("Sledge_Sweep"):
+		return
+	var off_reach: Array[String] = []
+	for build: Array in [SWORD_BUILDS[0], SWORD_BUILDS[4]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		Client3D._hold(sockets, 0, "tomb_sledge")
+		var piece := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+		var tip := _head_of(piece)
+		var long := _head_long(piece, tip.y)
+		var reach := holder.get_meta("reach") as HandReach
+		Client3D._sync_reach(reach, sockets, ["tomb_sledge", ""])
+		var second: Vector3 = reach.get_meta("second", Vector3.ZERO)
+		if not reach.active:
+			off_reach.append(str(build[0]))
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+		var inv := func() -> Transform3D: return model.global_transform.affine_inverse()
+		var bone := func(bone_name: String) -> Vector3:
+			return (inv.call() as Transform3D) * (skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(bone_name)).origin)
+		rig.base_at("Idle", 0.0)
+		await _frames(2)
+		var right_way := 1.0 if (bone.call("RightShoulder") as Vector3).x > (bone.call("LeftShoulder") as Vector3).x else -1.0
+		var head_at := func() -> Vector3: return (inv.call() as Transform3D) * (piece.global_transform * tip)
+		var round_of := func(at: Vector3) -> float: return rad_to_deg(atan2(at.x * right_way, at.z))
+		var angles := {}
+		var off: Array[String] = []
+		var coil_top := -INF
+		var ready_up := 0.0
+		var dropped := 0.0
+		var clear := INF
+		var on_haft := 0.0
+		var lowest := INF
+		var t := 0.0
+		while t <= 1.75 + 0.001:
+			reach.grip = second + Vector3.DOWN * Client3D._keyed(Client3D.REACH_SLIDES["Sledge_Sweep"], t)
+			rig.base_at("Sledge_Sweep", t)
+			await _frames(2)
+			var head: Vector3 = head_at.call()
+			var hips: Vector3 = bone.call("Hips")
+			clear = minf(clear, Vector2(head.x - hips.x, head.z - hips.z).length())
+			if t < 0.001:
+				ready_up = head.y
+			elif t <= 0.6 + 0.001:
+				coil_top = maxf(coil_top, head.y)
+			if absf(t - 0.3) < 0.01:
+				dropped = ready_up - head.y
+			var butt := (inv.call() as Transform3D) * piece.global_position
+			var line := ((inv.call() as Transform3D).basis * piece.global_basis.y).normalized()
+			var hand := (inv.call() as Transform3D) * (sockets["hand_l"] as Node3D).global_position
+			lowest = minf(lowest, head.y)
+			on_haft = maxf(on_haft, ((hand - butt) - line * (hand - butt).dot(line)).length())
+			for key: float in [0.6, 0.75, 0.9, 1.2]:
+				if absf(t - key) < 0.01:
+					angles[key] = [round_of.call(head), Vector2(head.x, head.z).length(), head.y]
+			t = snappedf(t + 0.05, 0.05)
+		var faces: Array[String] = []
+		for at: float in [0.75, 0.8, 0.85, 0.9, 0.95, 1.0]:
+			rig.base_at("Sledge_Sweep", at)
+			await _frames(2)
+			var a: Vector3 = head_at.call()
+			var axis := ((inv.call() as Transform3D).basis * (piece.global_basis * long)).normalized()
+			rig.base_at("Sledge_Sweep", at + 0.03)
+			await _frames(2)
+			var travel := (head_at.call() as Vector3) - a
+			travel.y = 0.0
+			var along := absf(Vector3(axis.x, 0.0, axis.z).normalized().dot(travel.normalized())) if travel.length() > 0.005 else 1.0
+			faces.append("%.2f" % along)
+			if along < SSWEEP_FACE:
+				off.append("its face off its travel at %.2f s (%.2f)" % [at, along])
+		reach.reach(false)
+		rig.base_at("Sledge_Sweep", 0.3)
+		await _frames(2)
+		var sweep_at: Vector3 = head_at.call()
+		rig.base_at("Sledge_Attack", 0.0)
+		await _frames(2)
+		var attack_ready: float = (head_at.call() as Vector3).y
+		rig.base_at("Sledge_Attack", 0.3)
+		await _frames(2)
+		var attack_at: Vector3 = head_at.call()
+		rig.base_at("Sledge_Attack", 0.45)
+		await _frames(2)
+		var attack_rise: float = (head_at.call() as Vector3).y - attack_ready
+		var g: Array = angles.get(0.6, [0.0, 0.0, 0.0])
+		var o: Array = angles.get(0.75, [0.0, 0.0, 0.0])
+		var c: Array = angles.get(0.9, [0.0, 0.0, 0.0])
+		var p: Array = angles.get(1.2, [0.0, 0.0, 0.0])
+		print("  %s: round %.0f / %.0f / %.0f / %.0f deg (gather, 0.75, contact, 1.2); at the contact %.2f m out, %.2f m up; clear %.2f m; left hand %.3f m off the haft; lowest %.2f m; faces %s; coil at most %+.2f m on its ready, %.2f under it at 0.3 (Sledge_Attack %+.2f at 0.45), %.2f m apart at 0.3" % [
+			build[0], g[0], o[0], c[0], p[0], c[1], c[2], clear, on_haft, lowest, ", ".join(faces), coil_top - ready_up, dropped, attack_rise, sweep_at.distance_to(attack_at)])
+		if float(g[0]) < SSWEEP_ANGLES[0] or float(o[0]) < SSWEEP_ANGLES[1] or absf(float(c[0])) > SSWEEP_AT_CONTACT or float(p[0]) > -SSWEEP_ANGLES[1]:
+			off.append("its way round %.0f / %.0f / %.0f / %.0f" % [g[0], o[0], c[0], p[0]])
+		if float(c[1]) < SSWEEP_REACH or float(c[2]) < SSWEEP_LOW or float(c[2]) > SSWEEP_HIGH:
+			off.append("at the contact %.2f m out, %.2f m up" % [c[1], c[2]])
+		if clear < SSWEEP_CLEAR:
+			off.append("the head %.2f m off his hips" % clear)
+		if on_haft > SSWEEP_ON_HAFT:
+			off.append("the left hand %.3f m off the haft" % on_haft)
+		if lowest < SSWEEP_FLOOR:
+			off.append("the head's centre %.2f m up" % lowest)
+		if coil_top > ready_up + 0.001 or dropped < SSWEEP_DROP_BY or attack_rise < SSWEEP_ATTACK_RISE or sweep_at.distance_to(attack_at) < SSWEEP_APART:
+			off.append("the coil %+.2f m on its ready, %.2f under it at 0.3 (Sledge_Attack %+.2f), %.2f m from Sledge_Attack's at 0.3" % [
+				coil_top - ready_up, dropped, attack_rise, sweep_at.distance_to(attack_at)])
+		_check(off.is_empty(), "%s: coiled behind his right, carried across his front through the three cells to the middle at the contact, knee to waist, clear of him, both hands on the haft, off the ground, its face leading, the coil apart from Sledge_Attack's (%s)" % [
+			build[0], "; ".join(off)])
+		model.queue_free()
+		holder.free()
+
+	_check(off_reach.is_empty(), "the sledge in the right hand: the left on its grip_2 (HandReach on; %s)" % ", ".join(off_reach))
+
+## _test_sledge_sweep's: the long axis of [param piece]'s head (its points within 0.2 m of [param centre]
+## along the haft, _head_of's height), across the haft: its own x or z, whichever the head spans further.
+static func _head_long(piece: Node3D, centre: float) -> Vector3:
+	var span := {0: Vector2(INF, -INF), 2: Vector2(INF, -INF)}
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		var into := piece.global_transform.affine_inverse() * mesh.global_transform
+		for s in mesh.mesh.get_surface_count():
+			for v: Vector3 in mesh.mesh.surface_get_arrays(s)[Mesh.ARRAY_VERTEX]:
+				var q := into * v
+				if absf(q.y - centre) < 0.2:
+					for axis: int in [0, 2]:
+						span[axis] = Vector2(minf(span[axis].x, q[axis]), maxf(span[axis].y, q[axis]))
+	return Vector3.RIGHT if span[0].y - span[0].x >= span[2].y - span[2].x else Vector3.BACK
 
 
 ## The sleeper's clips (751): the curl loops, its breath plainly seen; the lie-down and the get-up

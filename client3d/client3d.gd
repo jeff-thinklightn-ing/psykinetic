@@ -1413,11 +1413,20 @@ const HUMANOID_MOVES := {
 	},
 	# A person's told strike (790 amended (7), animation's side: a robber's lunge): [clip, peak, contact],
 	# drawn back to its gathered pose (peak, seconds in at speed 1), held there through the tell, thrust
-	# as the telegraph lands (AnimRig.strike_held). By what is in the striking hand, as "strikes".
+	# as the telegraph lands (AnimRig.strike_held). By the telegraph's kind (TOLD_TIMES), then by what is in
+	# the striking hand, as "strikes".
 	"told": {
-		# Its contact the stab's full stretch (0.33 s, the hand 1 m on from the gather; 790 amended (9):
-		# at 0.29 the hand was still coming, and its stretch came after the drawn landing).
-		"dagger": ["Dagger_Stab_Drawn", 0.2, 0.33],
+		"lunge": {
+			# Its contact the stab's full stretch (0.33 s, the hand 1 m on from the gather; 790 amended (9):
+			# at 0.29 the hand was still coming, and its stretch came after the drawn landing).
+			"dagger": ["Dagger_Stab_Drawn", 0.2, 0.33],
+		},
+		# Brand's told sweep (the coordinator's yes, 11-15): coiled low past the right hip and held there,
+		# carried across his front through the three told cells, its contact the head crossing his front
+		# (the middle cell: the sim strikes all three at once).
+		"sweep": {
+			"tomb_sledge": ["Sledge_Sweep", 0.6, 0.9],
+		},
 	},
 	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
@@ -2347,6 +2356,26 @@ const TOLD_THRUST := 0.15
 const TOLD_RECOVER := 0.45
 const TOLD_REACH := 0.6
 const TOLD_GAP := 0.7
+## Brand's told sweep (the coordinator's yes to animation's design, 11-15): coiled over SWEEP_DRAW s and
+## held, carried across his front over SWEEP_CARRY s to the contact as the telegraph lands, then on past
+## and back over SWEEP_RECOVER s; the body pushed nowhere (its half step is in the clip).
+const SWEEP_DRAW := 0.35
+const SWEEP_CARRY := 0.25
+const SWEEP_RECOVER := 0.8
+## Each told kind's [draw, thrust, recover, reach] (HUMANOID_MOVES "told" holds its strikes): a telegraph
+## of another kind begins no told strike on a person.
+const TOLD_TIMES := {"lunge": [TOLD_DRAW, TOLD_THRUST, TOLD_RECOVER, TOLD_REACH], "sweep": [SWEEP_DRAW, SWEEP_CARRY, SWEEP_RECOVER, 0.0]}
+## The telegraph kinds a person's body is told by that draw no told strike, each for its reason (the coordinator,
+## 11-15, after Brand's sweep reached neither _told_strike nor _told_lands by name: every kind a person can be told
+## by is in TOLD_TIMES or here, and view_test's _test_told_kinds_known fails on one in neither, so the next told
+## move is not found missing on a laptop).
+const TOLD_CELLS_ONLY := {
+	"ambush": "a leap from hiding: drawn at the hit's news (390 amended (4))",
+	"spin": "a boss's move: its winding draws the blow (_on_winding)",
+	"throw": "a boss's move: its winding draws the blow (_on_winding)",
+	"charge": "a boss's move: its winding draws the blow (_on_winding)",
+	"bite": "the old grey's told bite (780 amended (38)): a creature's, its own view draws it; no person bites",
+}
 ## 790 amended (9): a blow taken while a told strike gathers rocks the body (STEADY_ROCK) and leaves
 ## the strike to land, as the sim lands it; a rock with less than this before the thrust is left out
 ## (the thrust moves the body then).
@@ -7127,7 +7156,10 @@ func creature_tell(id: int, data: Dictionary) -> void:
 	var told_from := int(data.get("from_tick", World.tick))
 	var lands_in := (int(data.get("lands_tick", told_from)) - told_from) * World.TICK_DT
 	if not puppet.has_meta("creature_view"):
-		if str(data.get("kind", "")) == "lunge" and _told_strike(puppet, source as GridEntity, lands_in + STRIKE_LANDS_IN):
+		# A person's told strike, by TOLD_TIMES (a robber's lunge, Brand's sweep): the strike and its drawn landing
+		# (_told_lands, the hurt waits for it) by the one table; a kind of TOLD_CELLS_ONLY draws its cells only.
+		var kind := str(data.get("kind", ""))
+		if TOLD_TIMES.has(kind) and _told_strike(puppet, source as GridEntity, lands_in + STRIKE_LANDS_IN, kind):
 			_tells[id] = puppet
 			_told_lands[source.get_instance_id()] = AnimRig.now_msec() + int((lands_in + STRIKE_LANDS_IN) * 1000.0)
 			puppet.set_meta("told_by", source.get_instance_id())
@@ -7143,34 +7175,47 @@ func creature_tell(id: int, data: Dictionary) -> void:
 ## approval): its HUMANOID_MOVES "told" strike for what it holds, drawn back, held at the gather
 ## through the tell, thrust to land [param lands_in] seconds from now (drawn STRIKE_LANDS_IN behind
 ## the sim, as a wound-up blow), the body pushed out along its facing on the thrust and eased back.
-## Its plain blow kept off meanwhile (wound_until). False, nothing played, for a body with no rig or
-## no told strike for its weapon.
-func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float) -> bool:
-	if source == null or not puppet.has_meta("rig"):
+## Its plain blow kept off meanwhile (wound_until), and its wind-up's own strike (_on_winding leaves a
+## told strike be till told_until, whichever of the telegraph and the winding comes first). Each
+## [param kind]'s times and reach from TOLD_TIMES, its strike from HUMANOID_MOVES "told"[kind] (Brand's
+## sweep, the coordinator's yes 11-15: no push, its half step in the clip). False, nothing played, for
+## a body with no rig, no told strike of that kind for its weapon, or a told strike already under way
+## (a second telegraph replaces nothing).
+func _told_strike(puppet: Node3D, source: GridEntity, lands_in: float, kind := "lunge") -> bool:
+	if source == null or not puppet.has_meta("rig") or not TOLD_TIMES.has(kind):
 		return false
-	var told: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("told", {})
+	var told: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("told", {}).get(kind, {})
 	var row: Array = told.get(World.wielded(source), [])
 	var rig := puppet.get_meta("rig") as AnimRig
-	if row.size() < 3 or not rig.has(str(row[0])):
+	if row.size() < 3 or not rig.has(str(row[0])) or _told_under_way(puppet):
 		return false
+	var times: Array = TOLD_TIMES[kind]
 	puppet.set_meta("fidgeting", false)
-	var seconds := rig.strike_held(str(row[0]), float(row[1]), float(row[2]), lands_in, TOLD_DRAW, TOLD_THRUST, TOLD_RECOVER)
+	var seconds := rig.strike_held(str(row[0]), float(row[1]), float(row[2]), lands_in, float(times[0]), float(times[1]), float(times[2]))
 	if seconds <= 0.0:
 		return false
 	var now := Time.get_ticks_msec()
 	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 	puppet.set_meta("wound_until", now + int(lands_in * 1000.0) + 400)
+	puppet.set_meta("told_until", now + int(lands_in * 1000.0) + 400)
 	puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)
 	_drawn_contact(puppet, AnimRig.now_msec() + int(lands_in * 1000.0))  # Its thrust's full stretch.
 	_combat_at[source.get_instance_id()] = now
 	if puppet.has_node("Body") and source.facing != Vector2i.ZERO:
-		var thrust := minf(TOLD_THRUST, lands_in)
+		var thrust := minf(float(times[1]), lands_in)
 		puppet.set_meta("told_thrust_at", now + int(maxf(lands_in - thrust, 0.0) * 1000.0))
 		puppet.set_meta("told_thrust", thrust)
+		puppet.set_meta("told_recover", float(times[2]))
+		puppet.set_meta("told_reach", float(times[3]))
 		puppet.set_meta("told_way", Vector3(source.facing.x, 0.0, source.facing.y).normalized())
 		puppet.set_meta("told_source", source.get_instance_id())
 		_told_body(puppet)
 	return true
+
+
+## Whether [param puppet] has a told strike under way: from its tell to its landing (told_until).
+static func _told_under_way(puppet: Node3D) -> bool:
+	return Time.get_ticks_msec() < int(puppet.get_meta("told_until", 0))
 
 
 ## [param puppet]'s Body over a told strike from now (790 amended (11)): rocked back and home first
@@ -7203,20 +7248,22 @@ func _told_body(puppet: Node3D, rock := 0.0) -> void:
 	var settle := func(f: float) -> void:
 		body.position = rest + (out.get("at", Vector3.ZERO) as Vector3) * (1.0 - f)
 	tween.tween_method(spring, 0.0, 1.0, thrust).set_ease(Tween.EASE_OUT)
-	tween.tween_method(settle, 0.0, 1.0, TOLD_RECOVER).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_method(settle, 0.0, 1.0, float(puppet.get_meta("told_recover", TOLD_RECOVER))).set_ease(Tween.EASE_IN_OUT)
 	puppet.set_meta("told_tween", tween)
 
 
 ## How far [param source]'s told thrust carries [param puppet]'s Body along [param way] (790 amended
 ## (11)): TOLD_REACH, or as far as keeps its centre TOLD_GAP m off every drawn body it passes
 ## (_bodies_on_line: one on the faced cell stops it TOLD_GAP short, as before; a free body beside the
-## line, off the faced cell, as near as it lets it come; one further aside, not at all).
+## line, off the faced cell, as near as it lets it come; one further aside, not at all). Its kind's
+## reach ("told_reach", TOLD_TIMES) caps it: a sweep's 0, no push.
 func _told_reach(puppet: Node3D, source: GridEntity, way: Vector3) -> float:
-	var reach := TOLD_REACH
-	for near: Dictionary in _bodies_on_line(puppet.position, way, TOLD_REACH + TOLD_GAP, TOLD_GAP, source.get_instance_id()):
+	var most := float(puppet.get_meta("told_reach", TOLD_REACH))
+	var reach := most
+	for near: Dictionary in _bodies_on_line(puppet.position, way, most + TOLD_GAP, TOLD_GAP, source.get_instance_id()):
 		var aside := float(near["aside"])
 		reach = minf(reach, float(near["along"]) - sqrt(maxf(TOLD_GAP * TOLD_GAP - aside * aside, 0.0)))
-	return clampf(reach, 0.0, TOLD_REACH)
+	return clampf(reach, 0.0, most)
 
 
 ## The drawn bodies ahead of [param from] along [param way] (a unit vector on the ground), nearest
@@ -7303,8 +7350,12 @@ func creature_tell_over(id: int, landed: bool) -> void:
 		_told_lands.erase(int(puppet.get_meta("told_by")))  # Broken: no blow to time a hurt by.
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
-	elif not landed and puppet.has_meta("rig"):
-		# A person's told lunge broken (stunned, knocked off its cell): the thrust never comes.
+		if not landed:
+			_wind_lost(puppet)
+		return
+	puppet.set_meta("told_until", 0)  # Its tell over, landed or not: the next telegraph or wind-up is its own.
+	if not landed and puppet.has_meta("rig"):
+		# A person's told strike broken (stunned, knocked off its cell): the thrust never comes.
 		(puppet.get_meta("rig") as AnimRig).cancel_strike()
 		puppet.set_meta("busy_until", 0)
 		puppet.set_meta("wound_until", 0)
@@ -7313,7 +7364,7 @@ func creature_tell_over(id: int, landed: bool) -> void:
 			# Its push given up (790 amended (11)): eased home from wherever it is (the pose fades out as
 			# cancel_strike fades it), and the Body free for anything else at once.
 			var home := _body_tween(puppet, "home")
-			home.tween_property(body, "position", _body_rest(puppet, body), TOLD_RECOVER * 0.5).set_ease(Tween.EASE_IN_OUT)
+			home.tween_property(body, "position", _body_rest(puppet, body), float(puppet.get_meta("told_recover", TOLD_RECOVER)) * 0.5).set_ease(Tween.EASE_IN_OUT)
 			puppet.set_meta("told_tween", home)
 	if not landed:
 		_wind_lost(puppet)  # Broken: a hit it was spared as it gathered plays now (392 amended (11)).
@@ -25696,7 +25747,9 @@ static func _sync_reach(reach: HandReach, sockets: Dictionary, ids: Array) -> vo
 ## SWEEP_*: down to 0.2 for the coil, 0.1 to 0.12 across the front, back up for the guard).
 const REACH_SLIDES := {"Axe_Sweep": [[0.0, 0.0], [0.4, 0.25], [0.55, 0.25], [0.68, 0.35], [0.8, 0.33], [1.05, 0.3], [1.2, 0.2], [1.3, 0.0]],
 	"Sledge_Attack": [[0.0, 0.0], [0.2, 0.1], [0.45, 0.12], [0.6, 0.12], [0.75, 0.18], [0.84, 0.3],
-	[0.88, 0.38], [1.3, 0.38], [1.5, 0.25], [1.7, 0.0]]}
+	[0.88, 0.38], [1.3, 0.38], [1.5, 0.25], [1.7, 0.0]],
+	# Brand's told sweep (humanoid_clips' SSWEEP_*: the hands 0.15 apart coiled and out, 0.2 at the contact, 0.12 past, back up).
+	"Sledge_Sweep": [[0.0, 0.0], [0.1, 0.25], [0.2, 0.3], [0.45, 0.35], [0.6, 0.35], [0.75, 0.35], [0.825, 0.3], [0.9, 0.3], [1.2, 0.38], [1.35, 0.33], [1.5, 0.125], [1.75, 0.0]]}
 static func _slide_reach(puppet: Node3D) -> void:
 	if not puppet.has_meta("reach") or not puppet.has_meta("rig"):
 		return
@@ -30577,6 +30630,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	if ticks <= 0:
 		# Given up (decision 392): the wind-up stops; the gait or rest takes over.
 		puppet.set_meta("wound_until", 0)
+		puppet.set_meta("told_until", 0)  # A told sweep's wind-up with it.
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).unwind()
 		elif puppet.has_meta("rig"):
@@ -30599,6 +30653,10 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		(puppet.get_meta("creature_view") as CreatureView).wind(seconds, is_lead(swinger, ticks))
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
 		_drawn_contact(puppet, AnimRig.now_msec() + int(seconds * 1000.0))  # The coil's spring ends then.
+		return
+	if _told_under_way(puppet):
+		# A told strike carries this wind-up (Brand's sweep: its telegraph came first, the winding on the same
+		# tick): left be, its contact already the told one's (the coordinator's yes, 11-15).
 		return
 	var weapon := World.wielded(swinger) if swinger != null else ""
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})

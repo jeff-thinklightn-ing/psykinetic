@@ -151,7 +151,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Pick_Swing": "hand_r", "Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Sword_Shield_Slash_F": "hand_r", "Sword_Shield_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Pick_Swing": "hand_r", "Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sledge_Sweep": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Sword_Shield_Slash_F": "hand_r", "Sword_Shield_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -1058,6 +1058,57 @@ CLIPS["Axe_Sweep"] = {"keys": [
 	(0.8, P("Idle_Loop", 0.0, SWEEP_HIT, move=(0.0, -0.12, -0.06))),
 	(1.05, P("Idle_Loop", 0.0, SWEEP_PAST, move=(0.0, -0.2, -0.08))),
 	(1.3, P("Idle_Loop", 0.0, AXE_READY)),
+]}
+# Brand the Ox's told sweep with the Tomb Sledge (the coordinator's yes to animation's design, 11-15, on enemy-ai's ask:
+# his wound-up heavy told over three cells, the front and both front corners): from the sledge's ready, coiled back
+# low past the right hip, the trunk turned away and the weight sunk on the back knee (to SSWEEP_GATHER, where the told
+# strike holds it through the tell: AnimRig.strike_held), then carried flat across his front at knee to waist height,
+# right to left, through all three told cells, a step onto the lead foot; the head crossing his front at the contact
+# (the middle cell: the sim strikes all three at once); carried on past his left and dragged back to the ready. The
+# axes' sweep's legs and hips (the coordinator on Axe_Sweep: "the sweep reads as arms only"), lower, the sledge's
+# grips (the left hand slid down toward the right for the swing, Client3D's REACH_SLIDES, 0.5 - grip), and its face
+# set along the head's travel at each key (edge = the swing's tangent, (haft right, -haft ahead, 0): chop() turns
+# the hands so, and the sledge's head lies across the haft along it, as Sledge_Attack's face leads its fall).
+# The coil differs from Sledge_Attack's wind-up from its first frames (the coordinator's condition): the head goes
+# down and back past the hip, never up over the shoulder.
+def ssweep(right: tuple, haft: tuple, grip: float, trunk: list) -> list:
+	return sweep(right, haft, (haft[1], -haft[0], 0.0), grip, trunk)
+
+
+SSWEEP_COILED = [("pelvis", TURN, -20.0), ("thigh_l", TURN, 20.0), ("thigh_r", TURN, 20.0), ("thigh_r", LIFT, 16.0),
+	("calf_r", LIFT, -24.0), ("thigh_l", LIFT, 2.0), ("calf_l", LIFT, -6.0), ("spine_01", TURN, -8.0), ("spine_02", TURN, -11.0),
+	("spine_03", TURN, -7.0), ("Head", TURN, 30.0), ("spine_01", LIFT, -6.0), ("spine_02", LIFT, -6.0)]
+# Between the ready and the coil, each hand solved (CHOP_SWING's way: blended, the left hand left the haft by
+# 0.18 m and the face turned off its travel): the head let fall ahead of his right knee, most of the way coiled,
+# the hands short on the haft in front of him where the left reaches (swung out level to his right, or half
+# coiled, or the hands the coil's 0.4 apart, the left hand's hold lay past its reach).
+SSWEEP_DROP = ssweep((0.2, -0.12, -0.46), (0.55, 0.65, -0.18), 0.2, [(bone, axis, angle * 0.75) for bone, axis, angle in SSWEEP_COILED])
+SSWEEP_COIL = ssweep((0.04, -0.02, -0.48), (-0.6, 0.74, 0.05), 0.15, SSWEEP_COILED)
+SSWEEP_GATHER = ssweep((0.02, -0.01, -0.48), (-0.64, 0.7, 0.04), 0.15, [(bone, axis, angle * 1.06) for bone, axis, angle in SSWEEP_COILED])
+SSWEEP_OUT = ssweep((0.2, -0.04, -0.44), (0.0, 1.0, -0.12), 0.15, [("pelvis", TURN, 6.0), ("thigh_r", TURN, -6.0),
+	("thigh_l", LIFT, 22.0), ("calf_l", LIFT, -30.0), ("thigh_r", LIFT, 6.0), ("calf_r", LIFT, -12.0), ("spine_01", TURN, -11.0),
+	("spine_02", TURN, -11.0), ("spine_01", LIFT, -6.0), ("Head", TURN, 10.0)])
+SSWEEP_HIT = ssweep((0.2, -0.28, -0.4), (1.0, 0.05, -0.26), 0.2, [("pelvis", TURN, 18.0), ("thigh_r", TURN, -18.0),
+	("thigh_l", TURN, -10.0), ("thigh_l", LIFT, 26.0), ("calf_l", LIFT, -18.0), ("thigh_r", LIFT, -8.0), ("calf_r", LIFT, -6.0),
+	("spine_01", TURN, -11.0), ("spine_02", TURN, -11.0), ("spine_01", LIFT, -8.0), ("spine_02", LIFT, -8.0), ("Head", TURN, -14.0)])
+SSWEEP_PAST = ssweep((0.12, -0.36, -0.36), (0.15, -0.95, -0.05), 0.12, [("pelvis", TURN, 26.0), ("thigh_r", TURN, -26.0),
+	("thigh_l", TURN, -14.0), ("thigh_l", LIFT, 28.0), ("calf_l", LIFT, -24.0), ("thigh_r", LIFT, -16.0), ("spine_01", TURN, 4.0),
+	("spine_02", TURN, 4.0), ("spine_03", TURN, 4.0), ("spine_01", LIFT, -8.0), ("spine_02", LIFT, -8.0), ("Head", TURN, -28.0)])
+# Between the out and the contact, the same: the head out at his right front corner, the hips half round.
+SSWEEP_CROSS = ssweep((0.2, -0.2, -0.42), (0.7, 0.7, -0.19), 0.2, [("pelvis", TURN, 12.0), ("thigh_r", TURN, -12.0),
+	("thigh_l", TURN, -5.0), ("thigh_l", LIFT, 24.0), ("calf_l", LIFT, -24.0), ("thigh_r", LIFT, -1.0), ("calf_r", LIFT, -9.0),
+	("spine_01", TURN, -9.5), ("spine_02", TURN, -9.5), ("spine_01", LIFT, -7.0), ("spine_02", LIFT, -4.0), ("Head", TURN, -2.0)])
+CLIPS["Sledge_Sweep"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, SLEDGE_READY)),
+	(0.2, P("Idle_Loop", 0.0, SSWEEP_DROP, move=(0.0, 0.035, -0.03))),
+	(0.45, P("Idle_Loop", 0.0, SSWEEP_COIL, move=(0.0, 0.07, -0.06))),
+	(0.6, P("Idle_Loop", 0.0, SSWEEP_GATHER, move=(0.0, 0.075, -0.065))),
+	(0.75, P("Idle_Loop", 0.0, SSWEEP_OUT, move=(0.0, 0.0, -0.05))),
+	(0.825, P("Idle_Loop", 0.0, SSWEEP_CROSS, move=(0.0, -0.06, -0.065))),
+	(0.9, P("Idle_Loop", 0.0, SSWEEP_HIT, move=(0.0, -0.12, -0.08))),
+	(1.2, P("Idle_Loop", 0.0, SSWEEP_PAST, move=(0.0, -0.2, -0.1))),
+	(1.5, P("Idle_Loop", 0.0, SLEDGE_RETURN, move=(0.0, -0.08, -0.03))),
+	(1.75, P("Idle_Loop", 0.0, SLEDGE_READY)),
 ]}
 # Sawing at the woodpile: bent over the log, the left hand pressing it down ahead to the left,
 # the saw in the right hand pushed and drawn ahead and down, the blade sloping into the cut, the
