@@ -42,6 +42,7 @@
 		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 2},
 		"wields": {"right": "dagger"},
+		"blows": {"dagger": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5}},
 		"drops": [{"item": "pick", "count": [1, 1], "chance": 0.2}],
 		"purse": [1, 3],
 		"aim_spread": 10,
@@ -230,6 +231,7 @@
 			"downed": ["Nothing left for me, then.", "Beaten to it.", "Should've been mine."]
 		},
 		"wields": {"right": "dagger"},
+		"blows": {"dagger": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5}},
 		"moves": {"lunge": {"windup": 10, "damage": 3, "reach": 2, "recover": 9}},
 		"lifts": 4,
 		"aim_spread": 10,
@@ -267,6 +269,7 @@
 		"strength": 1,
 		"temperament": {"bold": 0, "cautious": 2, "cowardly": 1},
 		"wields": {"right": "dagger"},
+		"blows": {"dagger": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5}},
 		"lifts": 4,
 		"aim_spread": 10,
 		"aim_hold_max": 25

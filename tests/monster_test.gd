@@ -1882,6 +1882,7 @@ func _test_ambush() -> void:
 	_test_old_wolf_told_bite()
 	_test_digger()
 	_test_old_wolf_fights()
+	_test_dagger_foes_pace()
 	_test_old_wolf_fights_along()
 	_test_told_runs_stop()
 	_test_den_bite_per_blow()
@@ -8500,6 +8501,110 @@ func _test_old_wolf_fights() -> void:
 	_grey_alone = table
 	print("  (the table's %d fights in %d ms)" % [GREY_STARTS * 9, Time.get_ticks_msec() - began])
 	DayNight.reset()
+	Monster.idling = true
+
+
+## A dagger foe's blow is its row's own, not the item's (the coordinator's
+## ruling, package "Rolf's small blades", 2026-11-16: the dagger's speed may
+## change for players and companions; no foe's blow changes with it). Each row
+## that wields a dagger (sneak, robber, bandit) carries "blows" with today's
+## dagger verb; with the item's speed set to 0.4 its pace stays as it was
+## (World.attack_ticks_of 7 for a bandit of attack_ticks 12, 5 for a sneak's 9
+## and a robber's 8), where a body with no entry reads the new speed; and a
+## bandit leading by nothing (lead_ticks 0) lands every 7 ticks, not 5.
+func _test_dagger_foes_pace() -> void:
+	print("%s== a dagger foe's blow is its row's own: the dagger's speed at 0.4 leaves its pace as it was ==" % char(10))
+	Monster.idling = false
+	# The entries hold the dagger's verb as it was when they were written (603 amended (10)), as numbers: the item's
+	# own may move (combat's small blades) and they must not move with it.
+	var verb := {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5}
+	var item_speed := float(Items.verb_of("dagger").get("speed", 0.6))  # Put back as it was, at the end.
+	Items.set_verb("dagger", "speed", 0.6)
+	var rows: Array[String] = ["#".repeat(16)]
+	for y in 7:
+		rows.append("#" + ".".repeat(14) + "#")
+	rows.append("#".repeat(16))
+	rows[4] = rows[4].substr(0, 8) + "P" + rows[4].substr(9)
+	var e := _build(rows)
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var bases := {"bandit": 12, "sneak": 9, "robber": 8}
+	var foes := {}
+	var at := 2
+	for kind: String in bases:
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+		spec["name"] = "Pace_" + kind
+		spec["tile"] = Vector2i(at, 1)
+		Level.arm(spec)
+		var foe := EntityFactory.build(spec) as Monster
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(at, 1))
+		foe.acts = false
+		foe.attack_ticks = int(bases[kind])
+		foes[kind] = foe
+		at += 3
+	var bare_spec := Level._spec_for("monster_bandit", Level.MONSTER_TYPES)  # A bandit with its entry taken away: the item's own verb.
+	bare_spec["name"] = "Pace_bare"
+	bare_spec["tile"] = Vector2i(12, 6)
+	Level.arm(bare_spec)
+	var bare := EntityFactory.build(bare_spec) as Monster
+	_room.add_child(bare)
+	World.spawn(bare, Vector2i(12, 6))
+	bare.acts = false
+	bare.blows = {}
+	bare.attack_ticks = 12
+	var own := {}
+	var today := {}
+	for kind: String in foes:
+		var theirs: Dictionary = World.blow_verb(foes[kind])
+		own[kind] = theirs.get("kind") == verb.get("kind") and is_equal_approx(float(theirs.get("behind", 0.0)), float(verb.get("behind", -1.0))) \
+				and is_equal_approx(float(theirs.get("speed", 0.0)), float(verb.get("speed", -1.0))) and is_equal_approx(float(theirs.get("damage", 0.0)), float(verb.get("damage", -1.0)))
+		today[kind] = World.attack_ticks_of(foes[kind])
+	_check(own.values().all(func(b: bool) -> bool: return b) and World.wielded(foes["bandit"]) == "dagger",
+		"each dagger row's blow is its own entry, the dagger's verb of 603 amended (10) whole: backstab, behind 2.0, speed 0.6, damage 0.5 (%s)" % [own])
+	_check(today == {"bandit": 7, "sneak": 5, "robber": 5}, "the dagger at 0.6: attack_ticks_of bandit 7, sneak 5, robber 5 (%s)" % [today])
+	var bare_today := World.attack_ticks_of(bare)
+	Items.set_verb("dagger", "speed", 0.4)
+	var later := {}
+	for kind: String in foes:
+		later[kind] = World.attack_ticks_of(foes[kind])
+	var bare_later := World.attack_ticks_of(bare)
+	_check(later == {"bandit": 7, "sneak": 5, "robber": 5}, "the dagger at 0.4: bandit 7, sneak 5, robber 5 still (%s)" % [later])
+	_check(World.wielded(bare) == "dagger" and bare_today == 7 and bare_later == 5,
+		"a bandit with no entry reads the item's speed: 7 at 0.6, 5 at 0.4 (%d, %d; holds %s)" % [bare_today, bare_later, World.wielded(bare)])
+	# The one cadence that moves: a bandit leading by nothing lands every attack_ticks_of.
+	e = _build(rows)
+	player = e["P"][0]
+	player.protected = false
+	player.max_hp = 1000
+	player.hp = 1000
+	var spec := Level._spec_for("monster_bandit", Level.MONSTER_TYPES)
+	spec["name"] = "Pace_lead0"
+	spec["tile"] = player.tile + Vector2i(-1, 0)
+	Level.arm(spec)
+	var bandit := EntityFactory.build(spec) as Monster
+	_room.add_child(bandit)
+	World.spawn(bandit, player.tile + Vector2i(-1, 0))
+	bandit.attack_ticks = 12
+	bandit.lead_ticks = 0
+	bandit.sight_range = 7
+	bandit.facing = Vector2i(1, 0)
+	bandit.next_attack_tick = 0
+	_damage_log.clear()
+	for i in 120:
+		World.step()
+	var lands: Array[int] = []
+	for d: Dictionary in _damage_log:
+		if d["entity"] == player and d["source"] == bandit and (lands.is_empty() or lands[-1] != int(d["tick"])):
+			lands.append(int(d["tick"]))
+	var gaps: Array[int] = []
+	for i in range(1, lands.size()):
+		gaps.append(lands[i] - lands[i - 1])
+	Items.set_verb("dagger", "speed", item_speed)
+	_check(gaps.size() >= 3 and gaps.all(func(g: int) -> bool: return g == 7),
+		"the dagger at 0.4, a bandit at lead 0 lands every 7 ticks (lands %s, gaps %s)" % [lands, gaps])
 	Monster.idling = true
 
 

@@ -27619,6 +27619,21 @@ body and lies before it; a charge stopped by a body disarms, a clear one
 re-arms. A two-handed giant axe stands in for items' battle_axe (603,
 items' side). No new class_name.
 
+603 amended (10): a dagger foe's blow is its row's own, today's dagger verb (the coordinator's ruling, 2026-11-16, on the
+package that changes the dagger for players and companions, combat's, unlanded: no foe's blow changes with it). The rows
+that wield a dagger, sneak, robber and bandit (no other row, named foe or level placing arms one), each carry "blows":
+{"dagger": {"kind": "backstab", "behind": 2.0, "speed": 0.6, "damage": 0.5}}, the item's verb today, every key copied
+(World.blow_verb takes a row's entry whole, so a missing key would fall to the verb kind's default, not the item's; its
+"says" is the item's words and left out). Alone it changes nothing: World.attack_ticks_of reads 7 for a bandit of
+attack_ticks 12, 5 for a sneak's 9 and a robber's 8, as before. With the item's speed set to 0.4 they stay 7, 5 and 5,
+where a body with no entry reads the new speed (a bandit with its entry taken away: 7, then 5). Combat's runs show
+that today no led foe blow would move anyway (a led blow cycles no faster than its lead plus strike_recover 4, and the
+bandit sits on that floor), so the entries guard against a later change to a lead or a recover. The one cadence that
+would move: a bandit leading by nothing (lead_ticks 0) lands every 7 ticks with the entry, every 5 without (combat's
+run: 22, 29, 36 against 22, 27, 32, 37, 42). monster_test _test_dagger_foes_pace: each row's blow is the entry; 7/5/5
+today and at 0.4; a bandit without one reads 7 then 5; the lead-0 bandit lands every 7 at 0.4. It lands before the
+dagger's change, never after it (the coordinator). Server only; protocol unchanged; no new class_name; no bullet.
+
 ## 583 amended, pc-character's side. The draw waits a quarter second
 
 Jeff, playing v0.1.165: "for archery, left click move tries to draw back the bow,
