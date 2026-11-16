@@ -30280,6 +30280,11 @@ func _update_inside() -> void:
 		return
 	var at := DayNight.fraction(DayNight.now())
 	var step := floori(at * SKY_STEPS) % SKY_STEPS
+	# A see-through copy of the panes made since the last step (a wall just
+	# cut away) carries the full glow: repaint now, not at the next minute.
+	var fresh := _see_through.get(_inside_pane_material) as BaseMaterial3D if _inside_pane_material != null else null
+	if fresh != null and not is_equal_approx(fresh.emission_energy_multiplier, _inside_pane_material.emission_energy_multiplier * NEAR_ALPHA):
+		_inside_step = -1
 	if step == _inside_step:
 		return
 	_inside_step = step
@@ -30294,6 +30299,14 @@ func _update_inside() -> void:
 		_inside_pane_material.albedo_color = look["pane"]
 		_inside_pane_material.emission = look["pane"]
 		_inside_pane_material.emission_energy_multiplier = look["pane_energy"]
+		# A pane in a wall the camera cuts away draws in the near fade's
+		# see-through copy, made once from this material: kept to the clock,
+		# and faded as its wall is (else it stood in the air, full and stale).
+		var faded := _see_through.get(_inside_pane_material) as BaseMaterial3D
+		if faded != null:
+			faded.albedo_color = Color(look["pane"], NEAR_ALPHA)
+			faded.emission = look["pane"]
+			faded.emission_energy_multiplier = float(look["pane_energy"]) * NEAR_ALPHA
 	if _inside_apron != null:
 		var apron := _inside_apron.mesh.surface_get_material(0) as ShaderMaterial
 		apron.set_shader_parameter("near_colour", look["apron"])

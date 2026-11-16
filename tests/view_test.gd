@@ -4219,6 +4219,14 @@ func _test_daylight_indoors() -> void:
 			and (noon_look["apron"] as Color).get_luminance() < 0.25 and (night_look["apron"] as Color).get_luminance() > 0.08
 			and (night_look["haze"] as Color).get_luminance() > 0.07 and (night_look["dirt"] as Color).r > (night_look["apron"] as Color).r,
 			"the way out laid from %s toward %s, %.1f m wide; the ground %s by day, %s and the far %s by night" % [way[0], way[1], float(way[2]) * 2.0, noon_look["apron"], night_look["apron"], night_look["haze"]])
+	# A pane in a wall the camera cuts away: the near fade's see-through copy
+	# of the panes kept to the clock and faded as its wall, at once.
+	var pane_copy := _rig._see_through_of(_rig._inside_pane_material) as BaseMaterial3D
+	_rig._update_inside()
+	_check(pane_copy != null and pane_copy.emission == _rig._inside_pane_material.emission
+			and is_equal_approx(pane_copy.emission_energy_multiplier, _rig._inside_pane_material.emission_energy_multiplier * Client3D.NEAR_ALPHA)
+			and is_equal_approx(pane_copy.albedo_color.a, Client3D.NEAR_ALPHA),
+			"a pane in a cut-away wall faded with it and kept to the clock (glow %.2f of the pane's %.2f)" % [pane_copy.emission_energy_multiplier if pane_copy != null else -1.0, _rig._inside_pane_material.emission_energy_multiplier])
 	# The patches: a window with the sun on its side throws the sky's pool and
 	# the sun's patch, its length the glass's fall at that height; with the
 	# sun behind its wall the pool alone; none at night; the way out's warm
