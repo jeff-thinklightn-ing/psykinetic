@@ -30,22 +30,49 @@ var _routes: WorldRoutes = null
 ## with [param sources] (area name -> {layout, height, config}, as
 ## Level.source gives them) read in place of the files: levels being
 ## edited and not saved yet.
+## A level whose files are unchanged since its last read (Level.files_key, 303 amended (1)) is taken as
+## it was, its images neither read nor hashed: on this PC every build read and hashed all 21 levels,
+## 58 ms and 16 ms of the main thread (an accept, a regenerated lay, the console's reload).
 static func build(names: Array[String] = Level.names(), sources: Dictionary = {}) -> WorldMap:
 	var out := WorldMap.new()
 	for area_name in names:
-		out._read(area_name, sources[area_name] if sources.has(area_name) else Level.source(area_name))
+		if sources.has(area_name):
+			out._read(area_name, sources[area_name])
+			continue
+		var key := Level.files_key(area_name)
+		if not out._read_kept(area_name, key):
+			source_reads += 1
+			out._read(area_name, Level.source(area_name), key)
 	return out
 
 
+## Levels a build read from Level.source (its files or what was registered), every build counted (tests).
+static var source_reads := 0
+
+
 ## Each area as last read: name -> {digest (of its layout, height and
-## config), area, ways}. A build reads again only the levels that changed
+## config), key (Level.files_key of what it was read from; "" when not read
+## from files), config, area, ways}. A build reads again only the levels that changed
 ## (an accept parses the one edited, not the whole world: decision 303);
 ## what is kept is shared by every build, so it is never changed, only
 ## read: WorldRoutes copies floor and edges, Holdings.rebind each place.
 static var _read_before: Dictionary[String, Dictionary] = {}
 
 
-func _read(area_name: String, made: Dictionary) -> void:
+## Area [param area_name] as it was last read, when that read was of the files [param key] names
+## (Level.files_key); false, and nothing taken, when it was not.
+func _read_kept(area_name: String, key: String) -> bool:
+	var before: Dictionary = _read_before.get(area_name, {})
+	if key.is_empty() or str(before.get("key", "")) != key or not before.has("config"):
+		return false
+	areas[area_name] = before["area"].duplicate()
+	_configs[area_name] = before["config"]
+	for way: Dictionary in before["ways"]:
+		ways.append(way.duplicate())
+	return true
+
+
+func _read(area_name: String, made: Dictionary, key := "") -> void:
 	var layout: Image = made["layout"]
 	if layout == null:
 		return
@@ -61,6 +88,9 @@ func _read(area_name: String, made: Dictionary) -> void:
 		before["ways"] = ways
 		ways = ways_before
 		_read_before[area_name] = before
+	# What it was read from, for the next build's _read_kept (a read given in sources is no file's: "").
+	before["key"] = key
+	before["config"] = config
 	areas[area_name] = before["area"].duplicate()
 	_configs[area_name] = config
 	for way: Dictionary in before["ways"]:

@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_same_bytes()
 	_test_one_cell()
 	await _test_overlay()
+	_test_files_key()
 	_clear_overlay()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -131,3 +132,76 @@ func _test_overlay() -> void:
 	var builds := Client3D.world_builds
 	Client3D._world_map()
 	_check(_built(builds) == 1, "and the world map built")
+
+
+## Levels read from Level.source by a WorldMap.build of every level, after [param since].
+func _reads(since: int) -> int:
+	return WorldMap.source_reads - since
+
+
+## 303 amended (1): WorldMap.build takes a level whose files are unchanged (Level.files_key: the folder and
+## each file's MD5) as it was last read, its images neither read nor hashed; a registered level is read
+## whole each time; any write to a level's files, the same second or not, and the overlay dropped, read it
+## again. The barrow is in the overlay from _test_overlay.
+func _test_files_key() -> void:
+	print("\n== WorldMap.build: an unchanged level's files neither read nor hashed (303 amended (1)) ==")
+	var level_name := "barrow"
+	var into := Level.overlay_dir + level_name + "/"
+	var registered := 0
+	for each in Level.names():
+		if Level._registered.has(each):
+			registered += 1
+	_check(not Level._registered.has(level_name) and Level.overlaid(level_name), "the barrow read from the overlay's files")
+	var first := WorldMap.build()
+	var since := WorldMap.source_reads
+	var kept := WorldMap.build()
+	_check(_reads(since) == registered, "built again with nothing changed: only the %d registered levels read (%d)" % [registered, _reads(since)])
+	var fresh := WorldMap.new()
+	for each in Level.names():
+		fresh._read(each, Level.source(each))
+	var same := kept.areas.keys() == fresh.areas.keys() and kept._configs.keys() == fresh._configs.keys() and kept.ways.size() == fresh.ways.size()
+	for each: String in fresh.areas:
+		if kept.areas[each]["floor"] != fresh.areas[each]["floor"] or kept._configs[each] != fresh._configs[each]:
+			same = false
+	_check(same, "and the map kept the same as one read afresh (%d areas, %d ways)" % [kept.areas.size(), kept.ways.size()])
+	_check(kept.problems() == first.problems(), "its problems the same as the first build's (%d)" % first.problems().size())
+	WorldMap.build()  # The fresh read above was no file's (key ""): each level keyed again.
+	# The same bytes written again: the same MD5s, not read.
+	var bytes := FileAccess.get_file_as_bytes(into + "level.json")
+	var out := FileAccess.open(into + "level.json", FileAccess.WRITE)
+	out.store_buffer(bytes)
+	out.close()
+	since = WorldMap.source_reads
+	WorldMap.build()
+	_check(_reads(since) == registered, "its level.json written again with the same bytes: not read (%d)" % _reads(since))
+	# Two saves of the layout in the same second, one cell each: each read again (a time would miss the second).
+	var layout := Image.load_from_file(ProjectSettings.globalize_path(into + "layout.png"))
+	var digest_before := str(WorldMap._read_before[level_name]["digest"])
+	for i in 2:
+		var cell := Vector2i(5 + i, 5)
+		layout.set_pixelv(cell, Color(0, 0, 0) if layout.get_pixelv(cell) != Color(0, 0, 0) else Color(0.6, 0.6, 0.6))
+		layout.save_png(ProjectSettings.globalize_path(into + "layout.png"))
+		since = WorldMap.source_reads
+		WorldMap.build()
+		var digest_now := str(WorldMap._read_before[level_name]["digest"])
+		_check(_reads(since) == registered + 1 and digest_now != digest_before,
+				"layout saved again (%d of 2 in one second): the barrow read again, its digest moved" % (i + 1))
+		digest_before = digest_now
+	# The overlay dropped: read from the pack's files again.
+	for file in DirAccess.get_files_at(ProjectSettings.globalize_path(into)):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(into + file))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(into))
+	since = WorldMap.source_reads
+	WorldMap.build()
+	_check(not Level.overlaid(level_name) and _reads(since) == registered + 1, "the overlay dropped: the barrow read again from the pack's files")
+	since = WorldMap.source_reads
+	WorldMap.build()
+	_check(_reads(since) == registered, "and kept at the build after")
+	# A registered level: read whole every build (its images may be changed in place).
+	var source := Level.source(level_name)
+	Level.register(level_name, source["layout"], source["height"], source["config"], source.get("relief"))
+	since = WorldMap.source_reads
+	WorldMap.build()
+	WorldMap.build()
+	_check(_reads(since) == 2 * (registered + 1), "registered: read at each build (%d)" % _reads(since))
+	Level.unregister(level_name)

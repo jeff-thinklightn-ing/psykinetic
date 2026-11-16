@@ -649,6 +649,28 @@ static func overlaid(level_name: String) -> bool:
 	return not level_name.is_empty() and not RETIRED.has(level_name) and FileAccess.file_exists(overlay_dir + level_name + "/layout.png")
 
 
+## A key for level [param level_name]'s files as they stand on disk now (303 amended (1)): the folder
+## they are read from and the MD5 of each file source() reads (SOURCE_FILES), so any write to them (a
+## builder's save, a hand-edit, the overlay put or dropped) gives another key. Only those: a level folder
+## may hold others (the forest's trees.json, 5.4 MB) that no read of the level takes. "" for a level made
+## in memory (register: read whole each time, as its images may be changed in place) and for one with no
+## folder. A file's MD5, not its time: two saves in one second keep the same time.
+static func files_key(level_name: String) -> String:
+	if _registered.has(level_name):
+		return ""
+	var folder := folder_of(level_name)
+	if not DirAccess.dir_exists_absolute(folder):
+		return ""
+	var parts: Array[String] = [folder]
+	for file in SOURCE_FILES:
+		parts.append("%s=%s" % [file, FileAccess.get_md5(folder + file) if FileAccess.file_exists(folder + file) else "none"])
+	return "|".join(parts)
+
+
+## The files source() reads a level from.
+const SOURCE_FILES: Array[String] = ["layout.png", "height.png", "relief.png", "level.json"]
+
+
 ## The folder level [param level_name]'s files are read from: the overlay's
 ## if it is there, else DIR's.
 static func folder_of(level_name: String) -> String:

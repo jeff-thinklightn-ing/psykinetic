@@ -5367,6 +5367,30 @@ it), parsing on a thread (more moving parts than the remaining 180 ms
 needs), and maps' incremental rebuild of only the edited area's cells,
 which stays the next step if an accept must fit inside a tick.
 
+Amended (1) (2026-11-16; the decision-number script's label; the first row of 956, a builder's accept off
+the server's frame, which the coordinator approved, landed on its own at perf's word). Each build still
+read every level's images (Level.source) and hashed their bytes to find the one that changed: on this PC,
+under the bench lock, 58 ms and 16 ms of the main thread for the 21 levels at every build (an accept, a
+regenerated lay, the console's reload, a boot). Now WorldMap.build first takes Level.files_key of a level:
+the folder it is read from and the MD5 of each of the four files Level.source reads (layout, height and
+relief PNGs, level.json), and of no other file there: the forest's folder holds a 5.4 MB trees.json no
+level read takes, and a key over every file cost as much as the read it saved. A level whose key
+is the one its last read was made from is taken as that read, its images neither read nor hashed; any
+other is read as before, digest and all, so a key moved by a write that changed nothing still keeps its
+parse. The two misses this decision gave for keying on stamps are kept out: a level registered in code
+has no key and is read whole at every build, as its images may be changed in place, and a read given in
+`sources` (the editor's unsaved levels, a builder's working copy) is keyed to no file, so the next build
+from files reads that level again. A file's MD5, not its time: two saves in one second keep one time
+(Client3D's key for the client's map, 822 amended (7), trusts times; the server's does not). The MD5 is
+of the file's bytes, a 15 KB layout.png on the wilds, not of the decoded image. On this PC (bench lock,
+medians of three) a build with nothing changed went from 45.6 to 32.4 ms: the key's 84 file opens are
+most of what is left here, each scanned as it opens; the box's figure is its probe's. WorldMap.source_reads
+counts the levels a build read. world_key_test _test_files_key: built again with nothing changed, only
+the registered levels read, and the map the same as one read afresh; the same bytes written again not
+read; two saves of the layout in one second each read again; the overlay dropped read again, and kept at
+the build after; a registered level read at every build. Server and client (both build world maps),
+protocol unchanged, no new class_name, no bullet.
+
 ## 305. Knockback threshold: an attack pushes only from World.knockback_min_force
 
 Every melee blow carried half a shove's force and pushed with it, so the
