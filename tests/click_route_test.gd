@@ -47,6 +47,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	if not _far():
 		_test_doorway()
+		_test_go_in()
 	await _test_click_routes_agree()
 	print("\nRESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -118,6 +119,35 @@ func _test_doorway() -> void:
 	_check(not open["path"].is_empty() and open["path"] == open_whole,
 		"the doorway clear: the way through found capped, the same as uncapped (%s, %d closed)" % [open["path"], open["closed"]])
 	_main._free["path"] = []
+
+
+## 935 amended (4): a click on a way into a building with an inside (its front cells and its inside door cells) is a click to go in: the
+## goal is the building's link behind the door. The wilds' Mughouse (I1): doors on the east side at y208 and y209, links (178,208) and
+## (178,209). A hut with no inside and plain ground are the cell clicked.
+func _test_go_in() -> void:
+	print("
+== a click on the way into a building with an inside goes in (935 amended (4)) ==")
+	var player := _player()
+	var wilds: Dictionary = _main.level
+	var links: Array = []
+	for link: Dictionary in wilds.get("links", []):
+		if str(link.get("to_map", "")) == "umbrage_tavern":
+			links.append(link["tile"])
+	_check(links.has(Vector2i(178, 208)) and links.has(Vector2i(178, 209)), "the Mughouse's links to its inside: %s" % [links])
+	for cell: Vector2i in [Vector2i(180, 208), Vector2i(180, 209), Vector2i(179, 208), Vector2i(179, 209)]:
+		var goal: Vector2i = Main.go_in_goal(wilds, cell)
+		_check(links.has(goal) and goal.y == cell.y, "a click on %s goes in: the goal is its link %s" % [cell, goal])
+	_check(Main.go_in_goal(wilds, Vector2i(183, 208)) == Vector2i(183, 208) and Main.go_in_goal(wilds, Vector2i(152, 231)) == Vector2i(152, 231)
+			and Main.go_in_goal(wilds, Vector2i(150, 233)) == Vector2i(150, 233), "the lane, the healer's hut's front cell and a cell inside it: as clicked (no inside, no link)")
+	_check(Main.go_in_goal(wilds, Vector2i(152, 232)) == Vector2i(152, 232), "a walk-in hut's door cell stays plain ground")
+	if player != null:
+		World._relocate(player, Vector2i(185, 208))
+		_main._free_taken_over(player)
+		_main._plain_left(player, null, Vector2i(180, 208), false)
+		var path: Array = _main._free.get("path", [])
+		_check(not path.is_empty() and path.back() == Vector2i(178, 208) and path.has(Vector2i(179, 208)),
+			"a click on the front cell (180,208) from the lane: the route goes through the door cell to the link %s (%d cells)" % [path.back() if not path.is_empty() else "none", path.size()])
+		_main._free["path"] = []
 
 
 ## Every zone the game loads (Level.names(), and each regenerating level's

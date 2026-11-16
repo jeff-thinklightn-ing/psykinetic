@@ -22086,10 +22086,10 @@ bard's song in earshot (490) and an offer when asked (536). What he saw
 is the shape of the answers: the model wraps the resident's words in
 stage direction and inner state, second person, and the whole of it went
 to the bubble, the transcript, the party log and the gossip of those in
-earshot. Aldous: "You nod, your voice steady despite the rain. \"Jeff,
-I've been meaning to thank you for the food you brought last time.\"";
+earshot. Aldous: "You nod, your voice steady despite the rain. "Jeff,
+I've been meaning to thank you for the food you brought last time."";
 Snagfin: "You look up from your workbench, your voice low and careful.
-\"I owe the town 29 gold.\"". Worse, the two-sentence cut then kept the
+"I owe the town 29 gold."". Worse, the two-sentence cut then kept the
 narration as sentence one and cut the words themselves. The prompt already
 forbade it ("never describe what you do"); the model ignores it. Then
 Jeff, on the fix: "might be interesting if there's some sort of narration
@@ -49600,8 +49600,8 @@ went unthanked, nobody within hearing; the coordinator: it holds the cut; releas
 hears (Main._thanker finds none, and no give path named the receiver), the town's nearest awake body
 (Main._far_thanker: of the hand-in's town, in the player's zone, not hiding, not asleep, never a visitor;
 the store's merchant first, then the stall's keeper, then the nearest) calls the thanks over, narrated to
-the player alone (residents.json thanks "far": "{name} calls over: \"{line}\"" / "{name} calls across to
-you: \"{line}\"", the line its trade's); with all asleep or hiding, the store's own words ("store": "You
+the player alone (residents.json thanks "far": "{name} calls over: "{line}"" / "{name} calls across to
+you: "{line}"", the line its trade's); with all asleep or hiding, the store's own words ("store": "You
 leave {count} {item} on the store's shelves for the town."; at night also "store_night": "No one is
 about. You leave {count} {item} on the shelves for the morning."; voice's words, "you" the doer so the verb
 never agrees with the count). A give to a person who does not hear stays theirs alone. Main._thanks_line
@@ -59206,3 +59206,4 @@ string hand, a two-handed axe's other hand and a work tool's keep the clip's fis
 times). Client only; protocol unchanged; no new class_name. One package with 419 amended (7), landed
 together as animation's stack. The bullet waits for ui-design's joined look on the package and the
 coordinator's pass.
+935 amended (4) (ui, 2026-11-15; label by decision_number.sh; Jeff's 18:48 report, "the mughouse entry is buggy, often you end up in the shell of the mughouse", and the coordinator's ruling on maps' pocket mend and ui's read of the click path): a click on a way into a building that has an inside goes in. A click's route ends ON the clicked cell and never passes over a link, and a click on a door's own face is a ground click that may fall on the front cell outside (the door not even pressed), so wherever the links sit a click on the door did not take a newcomer in. Main.go_in_goal(level, tile), used by Main._plain_left for a plain ground click: for each building of the level that has a level_link behind its door (the links' "building" code; not a closed, sealed, hidden or one-way one), a click on a cell of any of its entrances' edges (Level.entrances: the front cell outside and the cell inside the door) has that building's link nearest the clicked cell as its goal, so "lane, click the door, he is in the tavern": the walk presses the door open as a walk does (World._free_off_edge), and the step onto the link is the crossing. A walk-in building (no link), any other cell, a click on a person, E and the walk's own door-opening are untouched. It works on main's links as on maps' pocket (the Mughouse's I1: doors (179|180, 208) and (179|180, 209), links (178,208) and (178,209)). Rows: click_route_test (the four cells (180,208), (180,209), (179,208), (179,209) each go to the link on their row; the lane, the healer's hut's front cell and a cell inside it, and a walk-in hut's door cell are as clicked; a click on the front cell from the lane routes through the door cell to the link). Not rowed here: the arrival in umbrage_tavern (a travel through the server: ui-design's joined after-run, 0 of 60). Client only; protocol unchanged; no new class_name; no bullet till watched joined.
