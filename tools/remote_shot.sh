@@ -312,7 +312,8 @@ if [ $JOINED -eq 1 ]; then
 			--test-foe=*)
 				[ -n "$TOUR" ] || { echo "--server-args $arg: refused (only with --tour)"; exit 2; }
 				# Kinds and hands joined by + (392 amended (7): --test-foe=robber+robber+great_bear,sword+shield,1,around).
-				case "${arg#--test-foe=}" in *[!a-z0-9_,+]*|"") echo "--server-args $arg: refused (foes and weapons, a-z, 0-9, _, + and ,)"; exit 2 ;; esac
+				# A kind's ":<temperament>" (392 amended (9): --test-foe=imp:bold,,1,around,held).
+				case "${arg#--test-foe=}" in *[!a-z0-9_,+:]*|"") echo "--server-args $arg: refused (foes and weapons, a-z, 0-9, _, +, : and ,)"; exit 2 ;; esac
 				printf '%s\n' "$arg" >>"$TMP/server_args.txt" ;;
 			# The first rescue's walk (613 amended (4)): sought_first on for this server only.
 			--sought-first)

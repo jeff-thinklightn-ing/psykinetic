@@ -79,7 +79,7 @@ refused "tour.tscn without --tour: refused (a test scene)" "res://tests/tour/tou
 	--joined "$sha" x -- --scene res://tests/tour/tour.tscn
 refused "--test-foe without --tour: refused" "--test-foe=rat,bow: refused (only with --tour)" \
 	--joined --server-args "--test-foe=rat,bow" "$sha" x --
-refused "--test-foe with a character past a-z, 0-9, _, + and ,: refused" "--test-foe=rat;bow: refused (foes and weapons" 	--tour smoke --server-args "--test-foe=rat;bow" "$sha" x --
+refused "--test-foe with a character past a-z, 0-9, _, +, : and ,: refused" "--test-foe=rat;bow: refused (foes and weapons" 	--tour smoke --server-args "--test-foe=rat;bow" "$sha" x --
 refused "--sought-first without --tour: refused" "--sought-first: refused (only with --tour)" \
 	--joined --server-args "--sought-first" "$sha" x --
 refused "--test-hp without --tour: refused" "--test-hp: refused (only with --tour)" \
@@ -145,6 +145,15 @@ if printf '%s' "$sent" | grep -qiE -- "--token|--admin-port|--address|--port=|--
 	echo "  FAIL  a tour's args name a token, an admin port, an address or a mode: [$sent]"; failed=$((failed + 1))
 else
 	echo "  PASS  and no token, admin port, address or mode of its own (the runner names those on the laptop)"
+fi
+rm -f "$tmp/reached"
+sent="$(shot --dry-run --tour kit --server-args "--test-foe=imp:bold,,1,around,held" "$sha" tourx --)"
+code=$?
+got_args="$(printf '%s\n' "$sent" | grep -E '^server_args: --test-foe' | tr '\n' ';')"
+if [ $code -eq 0 ] && [ "$got_args" = "server_args: --test-foe=imp:bold,,1,around,held;" ] && [ ! -f "$tmp/reached" ]; then
+	echo "  PASS  --test-foe with a kind's temperament (imp:bold, 392 amended (9)): sent as written"
+else
+	echo "  FAIL  --test-foe=imp:bold,,1,around,held: exit $code, got [$got_args]"; failed=$((failed + 1))
 fi
 
 # Two bots (828 amended (10)): bot 1 says it is bot 1, tour.txt says two; the runner makes bot 2's

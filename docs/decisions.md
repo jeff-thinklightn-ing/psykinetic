@@ -53531,6 +53531,18 @@ the idle run cold then warm on the Atlas, then the join and a barrow crossing co
 Lenovo, the same build both times, each machine's idle run also with and without --gpu-sample.
 Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+828 amended (13) (perf; ui-design's ask, 2026-11-15; label from tools/decision_number.sh): the runner's
+--test-foe takes a kind's ":<temperament>". 392 amended (9) let main.gd's --test-foe name one
+(kind[:temperament][+kind...], bold, cautious or cowardly), but remote_shot.sh's character check on the
+line (a-z, 0-9, _, + and ,) never took ":", so ui-design's --test-foe=imp:bold,,1,around,held for
+animation's 941 row (a bold imp that stands and fights) was refused before it was sent. ":" joins the
+allowed set; the line still goes to the server as written, under --tour only, and main.gd names a spec
+it can't read ("not kind[:temperament],weapon...: ignored"). The laptop's remote_shot_run.ps1 reads
+server_args.txt line by line with no check of its own. tests/remote_shot_sockets_test.sh: the refusal
+row (rat;bow) says the new set; a --tour dry run with --test-foe=imp:bold,,1,around,held sends it as
+written; on the old runner that row fails (exit 2). Tools and tests only; protocol unchanged; no
+class_name; no bullet.
+
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 
 The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
