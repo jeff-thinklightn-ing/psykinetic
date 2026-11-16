@@ -119,8 +119,29 @@ static func _digest(layout: Image, height: Image, config: Dictionary, relief: Im
 	return hashing.finish().hex_encode()
 
 
-func _parse_area(area_name: String, layout: Image, height: Image, config: Dictionary, relief: Image = null) -> void:
-	var level := Level.parse(layout, height, config, relief)
+## 956: area [param area_name]'s read from [param made] ({layout, height, config, relief}) and
+## [param parsed] (Level.parse's of the same, which this keeps as it is: hand a copy no one else holds), made
+## on a scratch map, so off the main thread: {digest, area, ways, config}. keep_read, on the main thread,
+## keeps it for the next build.
+static func read_of(area_name: String, made: Dictionary, parsed: Dictionary) -> Dictionary:
+	var scratch := WorldMap.new()
+	scratch._parse_area(area_name, made["layout"], made["height"], made["config"], made.get("relief"), parsed)
+	return {"digest": _digest(made["layout"], made["height"], made["config"], made.get("relief")),
+		"area": scratch.areas[area_name], "ways": scratch.ways, "config": made["config"]}
+
+
+## 956: [param read] (read_of's) kept as area [param area_name]'s last read, of the files [param key] names
+## (Level.files_key of what was written from it): the next build takes it without a read. The main thread
+## only (the one writer of _read_before).
+static func keep_read(area_name: String, read: Dictionary, key: String) -> void:
+	var kept := read.duplicate()
+	kept["key"] = key
+	_read_before[area_name] = kept
+
+
+## [param parsed]: Level.parse's of these (956's read_of); empty, parsed here.
+func _parse_area(area_name: String, layout: Image, height: Image, config: Dictionary, relief: Image = null, parsed: Dictionary = {}) -> void:
+	var level := parsed if not parsed.is_empty() else Level.parse(layout, height, config, relief)
 	var floor_cells: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor_cells[cell] = true

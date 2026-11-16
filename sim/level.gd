@@ -794,7 +794,31 @@ static func playable(level_name: String) -> bool:
 static func source(level_name: String) -> Dictionary:
 	if _registered.has(level_name):
 		return _registered[level_name]
-	var folder := folder_of(level_name)
+	return source_at(folder_of(level_name))
+
+
+## Levels parsed and level folders read (source_at), every one counted (tests: 956's one parse an accept,
+## nothing read back from disk on the main thread), under a lock, since a builder's worker parses beside
+## the main thread.
+static var parses := 0
+static var folder_reads := 0
+static var _counting := Mutex.new()
+
+
+static func _count(parse: bool) -> void:
+	_counting.lock()
+	if parse:
+		parses += 1
+	else:
+		folder_reads += 1
+	_counting.unlock()
+
+
+## What the level in [param folder] is made of, as source() reads a level's folder (956: a builder's
+## accept reads back, on its worker, the level it has just written beside the overlay's). A user:// folder
+## reads its files alone, touching no resource cache, so it may be read off the main thread.
+static func source_at(folder: String) -> Dictionary:
+	_count(false)
 	var config := {}
 	if FileAccess.file_exists(folder + "level.json"):
 		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(folder + "level.json"))
@@ -814,7 +838,19 @@ static func load_level(level_name: String) -> Dictionary:
 	if layout == null:
 		push_warning("[level] no level %s (%slayout.png)" % [level_name, folder_of(level_name)])
 		return {}
-	var level := parse(layout, made["height"], made["config"], made.get("relief"))
+	var level := level_from(level_name, made)
+	for warning: String in level["warnings"]:
+		push_warning("[level] %s: %s" % [level_name, warning])
+	return level
+
+
+## Level [param level_name] as load_level reads it, from [param made] ({layout, height, config, relief}, as
+## source() gives them) rather than its files, warning of nothing (956: a builder's accept parses the level
+## it writes once, on its worker, and the zone is reloaded from that parse). [param templates]: parse's.
+## Touches no node or cache: it may run off the main thread, with the templates read on the main thread.
+## [param parsed]: parse's of [param made], taken as it is (and changed: hand a copy no one else holds).
+static func level_from(level_name: String, made: Dictionary, templates: Dictionary = {}, parsed: Dictionary = {}) -> Dictionary:
+	var level := parsed if not parsed.is_empty() else parse(made["layout"], made["height"], made["config"], made.get("relief"), templates)
 	level["name"] = level_name
 	level["terrain"]["level"] = level_name
 	# A slot in its land's look (718), unless the entry names a variant.
@@ -832,8 +868,6 @@ static func load_level(level_name: String) -> Dictionary:
 	for link: Dictionary in level["links"]:
 		if link.has("stands"):
 			link["stands"]["town"] = "%s/%s" % [level_name, link["stands"]["town"]]
-	for warning: String in level["warnings"]:
-		push_warning("[level] %s: %s" % [level_name, warning])
 	return level
 
 
@@ -883,6 +917,7 @@ static func _rgb(colour: Color) -> int:
 ## main thread never reads Level's registered levels while a regeneration writes them; empty, read
 ## here as before.
 static func parse(layout: Image, height: Image, config: Dictionary, relief: Image = null, templates: Dictionary = {}) -> Dictionary:
+	_count(true)
 	var by_colour := legend(config)
 	var warnings: Array[String] = []
 	var unknown: Dictionary[int, bool] = {}

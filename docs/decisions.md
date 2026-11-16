@@ -60364,3 +60364,78 @@ picks fill the want and the sword is refused, as before); _test_town_window (a p
 the window's weapon row as it was). economy, items, folk, towns, production, larder, raids and offers PASS. When
 it is on main enemy-ai raises the digger's pick to 1 in a take of its own, and voice's bullet ships with that.
 Server only (the window's row is the server's); protocol unchanged; no new class_name; no bullet in this take.
+## 956. A builder's accept laid off the server's frame (builder; the coordinator's go, 2026-11-16)
+
+An accept stopped the whole server in one frame: the layout check parsed the working copy fresh, the save
+encoded and wrote the level, main.reload_zone read the files back and parsed them again, and WorldMap.build
+read and parsed it a third time. The local split on the wilds (a private overlay, tools probe never landed,
+medians of three) was 1,946 ms: check 406, save 67, reload 447 (its parse 348, _start_level 60), world map
+447. On the box (probe_box, 11-13) it was about 1.6 s. ui-design's joined look of an ask in Umbrage on main
+bd50a9723 (Atlas, C:/dev/review/ui-design/looks/builderlook_bd50a9723/) took 2,210 ms from Enter to the
+answer; that is the figure this decision beats. The design page with every ruling is
+C:/dev/review/builder/accept_off_frame.md.
+
+Now a plain accept, a spots-only accept and an undo run in two short frames with a worker between them.
+Frame A (BuilderHost._start_laying, the main thread): the stale check as accept() makes it, proposal(), the
+level's kept layout faults, a copy of the doc (MapDoc.copy), Level.kinds() and Level.templates_now() warmed,
+the session marked busy, and a Thread started at PRIORITY_LOW (perf: a Thread, not the pool, so it yields to
+the sim on the box's few cores; one pattern with 684's maker). The worker (the static _lay) applies the
+changes (or the undo) to the copy, saves the whole level into Level.overlay_dir + "_laying/<zone>.new/"
+(MapDoc.save and save_config take a folder; outside the overlay, since a folder holding layout.png reads as a
+level), reads it back with Level.source_at, parses it once, runs the layout check on that parse
+(BuilderSession.fault_news: the faults the change adds refuse it as before), and makes the zone's level
+(Level.level_from with the parse), the world map's read of it (WorldMap.read_of, on a scratch map) and the
+terrain message, all from what it wrote. Frame B (_process polls is_alive; _laid): wait_to_finish once; the
+stale check a second time, the doc's revision and the level's mark (a registered level's digest, else
+Level.files_key, 303 amended (1)): moved, the folder is dropped and the builder answered STALE_SAYS; then
+_swap_in, two renames (<zone> to <zone>.old, <zone>.new in), each tried 3 times 100 ms apart (perf: the
+antivirus holds a new file a moment on this PC; on the box one call), a failed second rename putting .old
+back, and the builder told "could not save" with the doc, disk and zone as they were; then the live doc
+takes the worker's copy whole (MapDoc.take_laid: its map, undo steps and revision as the change was made
+there, and its save, so the change is not made twice), main.reload_zone(zone, level, message, config)
+loads the worker's level with no read (the clearing's felled cells applied as a read from disk does), the
+respawn's config handed to Monster's cache (give_zone_config) so it reads no file, WorldMap.keep_read keeps
+the worker's read for the build, and adopt, towns and captives as before.
+
+What can reach the level between the frames: another accept or undo in the zone is refused with voice's
+words, LAYING_SAYS ("another change to this level is still being saved; try again in a moment"); the
+console's builder drop of it is refused; a regenerator lay, a console reload or zone reset that gets through
+moves the mark, and frame B drops the change. A stop: NOTIFICATION_WM_CLOSE_REQUEST and the graceful
+countdown both reach BuilderHost._exit_tree, whose finish_laying asks the worker to stop at its next step
+and joins it, before any rename; the worker's whole run is tens of ms here, against the unit's 90 s from
+SIGTERM and deploy's countdown + 60 s (release, 11-16). At boot, recover_overlays (the start of main._ready
+on the authority) drops a leftover .new and restores a lone .old.
+
+Static state on the worker's path (perf's walk): Level._kinds and _templates are only read there (warmed in
+frame A; parse takes the templates handed in); _registered is read only by frame B's mark; WorldMap's
+_read_before is written by keep_read on the main thread alone (read_of uses a scratch map); the worker opens
+user:// files with no resource cache, and touches no node, signal or tree. Level.parses and folder_reads
+(new counters, under a lock since the worker parses beside the main thread) are for the rows. A swap drops
+no file: MapDoc's save into the folder beside copies every file of the level's folder there first.
+
+A new level beyond an edge (new_area) stays on today's main-thread path (the coordinator's narrowing: two
+levels saved), refused as busy while an accept of that zone is in flight. What it costs today, on the
+wilds (the tools probe never landed, two gated scene runs beside the suites: taken under load, not benched;
+medians of three): 1,538 and 1,602 ms in one frame, against a plain accept's longest frame in the same runs
+(frame B) of 159 and 159 ms, so about ten times as long (9.7 and 10.1). --builder-inline
+(933's switch) keeps the whole old path.
+
+What it costs now, on the wilds in the same two runs: frame A 45 and 49 ms (the stale check, proposal()
+about 32 ms of it, made once now that spots_only_of reads the proposal in hand, and the doc's copy), the
+worker 498 and 538 ms, frame B 159 and 159 ms, against today's 1,946 ms in one frame. Frame B's own steps
+(its log line names each): reload_zone 98 to 121 (the respawn, _start_level, about 60 of it in the split),
+the world map's build 27 to 37 (files_key over 21 levels, 303 amended (1)), the renames 5 to 9, the doc 2 to
+4, the rest 7 to 14. Frame B is over the page's 100 ms aim on this PC; its bulk is the respawn, which this
+decision leaves as it is. Frame B hashes files (the mark's files_key, the world map's keys, Main's level
+stamp) but reads no level back and parses none. In builder_zone_test's test room, frame A 1 to 3 ms, the worker 16 to 37 ms,
+frame B 44 to 57 ms, most of it the respawn and WorldMap.build's key over 21 levels. The PC frame-B ceiling
+(100 ms) is logged only, never asserted (the coordinator: a wall-clock bound on this shared PC is a flake),
+and the PC-to-box ratio stays provisional until the box probe, which carries frame B's own steps and
+files_key's own time.
+
+builder_zone_test (rows that check structure, not time): _test_laid_off_frame (one parse per accept, frame B
+reads no level from disk and parses none, the doc matches the files, the zone reloaded, the world map keyed,
+the figures logged; a stale change at frame B dropped with no folder left; the second rename failed and .old
+put back); _test_laying_refusals (an undo and a new_area accept during an accept refused busy, no .new left;
+the quit's join leaves a whole level); _test_recover_overlays (a leftover .new dropped, a lone .old
+restored). Server only; protocol unchanged; no new class_name.

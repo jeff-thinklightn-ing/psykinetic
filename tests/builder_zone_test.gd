@@ -26,6 +26,7 @@ func _ready() -> void:
 	Net.builder_stub = true
 	Level.overlay_dir = OVERLAY
 	_remove_tree(ProjectSettings.globalize_path(OVERLAY))
+	_remove_tree(ProjectSettings.globalize_path(BuilderHost.laying_dir()))
 	Net.message_received.connect(func(kind: String, data: Dictionary) -> void:
 		if kind == "builder":
 			_heard.append(data))
@@ -44,6 +45,9 @@ func _ready() -> void:
 	await _test_flooded()
 	await _test_spots_only()
 	await _test_stale_proposal()
+	await _test_laid_off_frame()
+	await _test_laying_refusals()
+	_test_recover_overlays()
 	await _test_new_area()
 	_test_console()
 	_test_overlay_kinds()
@@ -55,6 +59,7 @@ func _ready() -> void:
 	await _test_asking_focus()  # Last: its walk wakes the room's imps.
 
 	_remove_tree(ProjectSettings.globalize_path(OVERLAY))
+	_remove_tree(ProjectSettings.globalize_path(BuilderHost.laying_dir()))
 	Level.overlay_dir = Level.OVERLAY
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -515,6 +520,134 @@ func _test_stale_proposal() -> void:
 		"and nothing of it is laid: the rock stays, no spot on it")
 	first.discard()
 	_check(first.based_on == doc.revision, "discarded (its copy taken afresh), it builds on the rock")
+
+
+## A fresh session asking to paint [param at] with [param ground], its proposal come.
+func _ask_paint(at: Vector2i, ground: String) -> void:
+	_main._builder.sessions.clear()
+	_main._builder.test_turns = [[{"name": "paint", "input": {"ground": ground, "rects": [{"x": at.x, "y": at.y, "w": 1, "h": 1}]}}], "Painted."]
+	_main._on_command(_player(Net.local_id), "builder", {"op": "ask", "area": AREA, "text": "paint"})
+	await _wait_for("proposal")
+
+
+## The folders left beside the overlay (BuilderHost.laying_dir).
+func _laying_left() -> Array:
+	var dir := ProjectSettings.globalize_path(BuilderHost.laying_dir())
+	return Array(DirAccess.get_directories_at(dir)) if DirAccess.dir_exists_absolute(dir) else []
+
+
+## 956: an accept laid off the server's frame: frame A starts its worker; the level parsed once in all and
+## read back once, by the worker; the files, the doc, the zone and the world map agree after; nothing left
+## beside the overlay. The stale check made again at frame B, and a second rename that fails, each leave
+## the files and the doc as they were.
+func _test_laid_off_frame() -> void:
+	print("\n== 956: an accept laid off the server's frame ==")
+	var builder: BuilderHost = _main._builder
+	var at := Vector2i(6, 5)
+	await _ask_paint(at, "dirt")
+	var parses := Level.parses
+	var reads := Level.folder_reads
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	_check(builder.laying.has("test_room"), "accepted: being laid, its worker started (frame A)")
+	var answer := await _wait_for("accepted")
+	_check(answer.get("state") == "accepted", "and accepted when laid (frame B)")
+	_check(Level.parses - parses == 1, "the level parsed once for the whole accept (%d)" % (Level.parses - parses))
+	_check(int(builder.last_laid.get("reads_in_b", -1)) == 0 and int(builder.last_laid.get("parses_in_b", -1)) == 0,
+		"frame B read no level from disk and parsed none (%s reads, %s parses; %d level reads in all, the host's own client's among them)" % [
+			builder.last_laid.get("reads_in_b"), builder.last_laid.get("parses_in_b"), Level.folder_reads - reads])
+	_check(builder.laying.is_empty() and _laying_left().is_empty(), "nothing being laid, no folder left beside the overlay (%s)" % [_laying_left()])
+	var doc: MapDoc = builder.docs["test_room"]
+	var on_disk := MapDoc.open(OVERLAY + "test_room/")
+	_check(on_disk.map.cell(at) == doc.map.cell(at) and str(on_disk.config) == str(JSON.parse_string(doc.source_text)),
+		"the doc is what the files hold (the cell, the config as written)")
+	_check(Level.load_level("test_room")["terrain"]["kinds"].get(at) == _main._terrain["kinds"].get(at),
+		"the zone was reloaded from what the files hold")
+	_check(str(WorldMap._read_before.get("test_room", {}).get("key", "")) == Level.files_key("test_room"),
+		"the world map kept the worker's read, keyed to the files written")
+	var figures: Dictionary = builder.last_laid
+	_check(figures.has("frame_a") and figures.has("worker") and figures.has("frame_b") and figures.has("longest"),
+		"its frames logged (frame A %.1f ms, worker %.0f ms, longest frame meanwhile %.1f ms, frame B %.1f ms; logged, not held to)" % [
+			figures.get("frame_a", 0.0), figures.get("worker", 0.0), figures.get("longest", 0.0), figures.get("frame_b", 0.0)])
+
+	print("\n== 956: the stale check again at frame B (a write slipped past the busy mark) ==")
+	await _ask_paint(Vector2i(7, 5), "dirt")
+	var key := Level.files_key("test_room")
+	builder.test_between = func(_job: Dictionary) -> void: doc.revision += 1
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	answer = await _wait_for("accepted")
+	builder.test_between = Callable()
+	_check(answer.get("error") == BuilderSession.STALE_SAYS, "refused as a stale ask is (%s)" % answer.get("error", answer.get("state")))
+	_check(Level.files_key("test_room") == key and _laying_left().is_empty(), "its files as they were, nothing left beside them")
+
+	print("\n== 956: the second rename fails (a folder held open on Windows) ==")
+	await _ask_paint(Vector2i(7, 5), "dirt")
+	key = Level.files_key("test_room")
+	var revision := doc.revision
+	builder.fail_rename_from = ProjectSettings.globalize_path(BuilderHost.laying_dir() + "test_room.new")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	answer = await _wait_for("accepted")
+	builder.fail_rename_from = ""
+	_check(str(answer.get("error", "")).begins_with("could not save"), "the builder told it could not be saved (%s)" % answer.get("error", answer.get("state")))
+	_check(Level.files_key("test_room") == key and doc.revision == revision and _laying_left().is_empty(),
+		"the old files put back, the doc as it was, nothing left beside them (files %s, revision %d to %d, left %s)" % [
+			"the same" if Level.files_key("test_room") == key else "changed", revision, doc.revision, _laying_left()])
+
+
+## 956: one writer a zone. While an accept is laid, an undo and another builder's accept (one making a
+## new level beyond an edge, which keeps today's path) are refused as busy and leave nothing behind; a
+## quit while one is laid joins its worker and leaves the level whole.
+func _test_laying_refusals() -> void:
+	print("\n== 956: one writer a zone while an accept is laid ==")
+	var builder: BuilderHost = _main._builder
+	await _ask_paint(Vector2i(8, 5), "dirt")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	_check(builder.laying.has("test_room"), "an accept being laid")
+	_heard.clear()
+	_main._on_command(_player(Net.local_id), "builder", {"op": "undo"})
+	var undo_heard: Dictionary = _heard.back() if not _heard.is_empty() else {}
+	_heard.clear()
+	_check(undo_heard.get("error") == BuilderHost.LAYING_SAYS, "an undo meanwhile refused as busy (%s)" % undo_heard.get("error", undo_heard.get("state")))
+	var other := BuilderSession.new(builder.docs["test_room"], Rect2i(AREA[0], AREA[1], AREA[2], AREA[3]), "test_room", StubClaude.new([]))
+	other.new_area = {"name": "zt_beyond", "title": "Beyond", "side": "east", "size": Vector2i(8, 8), "seed": 1, "gate": 2}
+	builder.sessions[BO] = other
+	builder._session_zone[BO] = "test_room"
+	builder._accept(BO, BO_ID)
+	_check(not builder.created.has("zt_beyond") and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(OVERLAY + "zt_beyond"))
+		and not _laying_left().has("zt_beyond.new") and builder.laying.size() == 1,
+		"another builder's accept of a new level beyond an edge refused as busy, nothing of it written")
+	builder.sessions.erase(BO)
+	builder._session_zone.erase(BO)
+	await _wait_for("accepted")
+	_check(builder.laying.is_empty() and _laying_left().is_empty(), "the first laid, nothing left beside the overlay")
+
+	print("\n== 956: a quit while an accept is laid ==")
+	await _ask_paint(Vector2i(9, 5), "dirt")
+	var key := Level.files_key("test_room")
+	_main._on_command(_player(Net.local_id), "builder", {"op": "accept"})
+	builder.finish_laying()
+	var whole := Level.load_level("test_room")
+	_check(builder.laying.is_empty() and _laying_left().is_empty() and not whole.is_empty(),
+		"its worker joined, nothing left beside the overlay, the level whole (%s)" % ("the new files" if Level.files_key("test_room") != key else "the old files"))
+	# Not quitting after all: the doc and the zone read again from the files, the session let go.
+	builder.docs.erase("test_room")
+	builder.sessions.clear()
+	_main.reload_zone("test_room")
+
+
+## 956: what an accept stopped in the middle of leaves, put right at boot: an old folder with none in the
+## overlay put back; a new one beside a level in the overlay, and one alone, removed.
+func _test_recover_overlays() -> void:
+	print("\n== 956: a stopped accept's folders put right at boot ==")
+	var laying := ProjectSettings.globalize_path(BuilderHost.laying_dir())
+	var overlay := ProjectSettings.globalize_path(OVERLAY)
+	for name: String in ["zt_rec.old", "test_room.new", "zt_lone.new"]:
+		DirAccess.make_dir_recursive_absolute(laying.path_join(name))
+		FileAccess.open(laying.path_join(name).path_join("level.json"), FileAccess.WRITE).store_string(JSON.stringify({"name": name}))
+	var key := Level.files_key("test_room")
+	BuilderHost.recover_overlays()
+	_check(FileAccess.file_exists(overlay.path_join("zt_rec/level.json")), "an old folder with none in the overlay: put back")
+	_check(Level.files_key("test_room") == key and _laying_left().is_empty(), "a new folder beside the level's own, and one alone: removed, the level as it was")
+	BuilderHost.remove_folder(overlay.path_join("zt_rec"))
 
 
 func _test_new_area() -> void:

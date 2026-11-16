@@ -903,6 +903,9 @@ func _ready() -> void:
 		return
 	# After every other node: see _process.
 	process_priority = 10
+	# A builder's accept the last run stopped in the middle of: each level whole, old or new, before any is read (956).
+	if Net.is_authority():
+		BuilderHost.recover_overlays()
 	seamless_crossings = "--seamless" in OS.get_cmdline_user_args()  # 822, off till switched on.
 	held_left = not "--no-held-left" in OS.get_cmdline_user_args()  # 822 amended (6), on.
 	var probe := Vector2i(3, 5)
@@ -4552,18 +4555,30 @@ func _redraw_clearing(cells: Array, edges: Dictionary = {}) -> void:
 ## but not healed: the players stay where they are, everything else is
 ## spawned again. Everyone in it is sent the new terrain. Nothing if the
 ## zone is not open (it reads the edited level when it opens).
-func reload_zone(zone_name: String) -> void:
+## [param read] and [param message] (956: a builder's accept, laid off the main thread): the level as
+## Level.load_level would read it from the files just written, parsed there, and its "terrain" message
+## made there too, so nothing is read back from disk or encoded here; its felled cells laid as a read does.
+## [param config]: its level.json as read there, handed to the respawn's monsters (Monster.give_zone_config).
+func reload_zone(zone_name: String, read := {}, message := {}, config := {}) -> void:
 	if not Net.is_authority() or not World.zones.has(zone_name):
 		return
 	var was := World.enter_named(zone_name)
 	_counter_cells.erase(zone_name)  # Its buildings may have changed (807 amended (8): read again at the next ask).
 	Regen.forget()  # An edited level.json may mark it, or no longer.
-	_load_level(zone_name)
+	if read.is_empty():
+		_load_level(zone_name)
+	else:
+		if World.clearing != null:
+			World.clearing.apply(zone_name, read["terrain"])  # As _load_level does for a level it reads.
+		_load_level(zone_name, read)
+		if not config.is_empty():
+			Monster.give_zone_config(World.zone, config)  # Its respawn reads the worker's config, not the disk.
 	_reloading = true
 	_start_level(false, false)
 	_reloading = false
 	World.enter(was)
-	var message := BuilderHost.terrain_message(zone_name)
+	if message.is_empty():
+		message = BuilderHost.terrain_message(zone_name)
 	for peer in World.peers_in(zone_name):
 		if peer != Net.local_id:
 			Net.message_to(peer, "terrain", message)

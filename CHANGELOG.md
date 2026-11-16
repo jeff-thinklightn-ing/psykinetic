@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Builder mode: accepting or taking back a change no longer stops the world for everyone for a second or two; the change is saved while play goes on and appears a moment later, and another change to that level waits until it has (956).
 - In the crypt, clicking a wall niche walks you to it and presses it, even from right in front of it, so once the fallen knight has told you of the way down, the niche that hides it opens to a click, and the stair behind it takes you down at the first click (608 amended (8)).
 - Towns: a damaged building is mended by one of the town's own people, with wood from the town's store, and stands again (566 amended (9)).
 - Out under an open sky at midday the lantern at your hip casts no light, at dusk a soft one and by night its full glow, and blond and grey hair on light skin is drawn pale, red hair on darker skin a bright copper and black hair on the darkest skin a deep black, so each stands apart from the face by day and at dusk; the hair colour you picked keeps its name (419 amended (10), 451 amended (8)).

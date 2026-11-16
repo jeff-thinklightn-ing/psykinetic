@@ -4075,14 +4075,30 @@ static func layout_faults(of: MapDoc, parsed: Dictionary = {}) -> Array:
 ## had stays its own (the barrow's empty rooms, castle_halls'): only what
 ## the edit adds is refused, a fault moved with its chest or room included.
 func layout_news(before: Variant = null, parsed: Dictionary = {}) -> Array[String]:
+	return fault_news(before if before is Array else layout_faults(_doc_read()), layout_faults(working, parsed))
+
+
+## The faults of [param after] not in [param before] (by rule and cell), said as layout_news says them.
+## Static (956: a builder's accept checks the level it wrote off the main thread).
+static func fault_news(before: Array, after: Array) -> Array[String]:
 	var had := {}
-	for fault: Dictionary in (before if before is Array else layout_faults(_doc_read())):
+	for fault: Dictionary in before:
 		had["%s %s" % [fault["rule"], fault["cell"]]] = true
 	var out: Array[String] = []
-	for fault: Dictionary in layout_faults(working, parsed):
+	for fault: Dictionary in after:
 		if not had.has("%s %s" % [fault["rule"], fault["cell"]]):
 			out.append("%s at %s: %s" % [fault["rule"], fault["cell"], fault["what"]])
 	return out
+
+
+## The level's own layout faults when they are kept for its revision now (doc_layout_faults' baseline,
+## made at the ask), else null: never parsed here (956: an accept's frame on the main thread reads it;
+## its worker parses the level for it when there is none).
+func kept_layout_faults() -> Variant:
+	var kept: Variant = _baselines.get("layout")
+	if kept is Dictionary and int(kept["revision"]) == _doc_read().revision and is_same(kept["doc"], doc):
+		return kept["faults"]
+	return null
 
 
 ## Dungeon's arrival rule (806 amended (11), layout_sense.arrival_faults)
@@ -4130,7 +4146,12 @@ const ARRIVAL_SAYS := "a warning: a player coming in there lands inside a fight;
 ## height, relief, entry, link or other config key, no new level. Such a change is saved and put into the
 ## running world without the layout, a reload or a world map built again (BuilderHost._save_spots).
 func spots_only() -> bool:
-	var changes := proposal()
+	return spots_only_of(proposal())
+
+
+## Whether [param changes] (a [method proposal]) changes level.json's spots and nothing else: spots_only's
+## rule, for a caller that holds the proposal already (956's frame A makes it once).
+static func spots_only_of(changes: Dictionary) -> bool:
 	return spots_at_most(changes) and (changes.get("config", {}) as Dictionary).keys() == ["spots"]
 
 

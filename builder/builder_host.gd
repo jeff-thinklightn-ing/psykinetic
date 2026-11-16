@@ -365,12 +365,39 @@ static func proposal_message(session: BuilderSession) -> Dictionary:
 	return message
 
 
+## What an accept or undo in a zone whose last one is still being laid is refused with (956; voice's words).
+const LAYING_SAYS := "another change to this level is still being saved; try again in a moment"
+
+
 func _accept(peer: int, player_id: String) -> void:
 	var session: BuilderSession = sessions.get(peer)
 	if session == null or session.busy:
 		_reply(peer, {"state": "nothing"})
 		return
 	var zone_name: String = _session_zone[peer]
+	if laying.has(zone_name):
+		_reply(peer, {"state": "error", "error": LAYING_SAYS})
+		return
+	# 956: laid off the frame, but a new level beyond an edge (two levels saved, the coordinator's ruling:
+	# today's path) and --builder-inline (933's switch, the old path whole).
+	if Net.builder_inline or not session.new_area.is_empty():
+		_accept_inline(peer, player_id, session, zone_name)
+		return
+	# Frame A: the stale check as accept() makes it; the change's proposal, and the level's own faults
+	# when they are kept, read here; the rest on the worker, from a copy of the doc.
+	var began_a := Time.get_ticks_usec()
+	if session._doc_read().revision != session.based_on:
+		_reply(peer, {"state": "error", "error": BuilderSession.STALE_SAYS})
+		return
+	var changes := session.proposal()  # Once: spots_only() would make it again.
+	var spots_alone := BuilderSession.spots_only_of(changes)
+	var doc: MapDoc = docs[zone_name]
+	_start_laying({"kind": "accept", "peer": peer, "player_id": player_id, "zone": zone_name, "spots": spots_alone,
+		"changes": changes, "baseline": null if spots_alone else session.kept_layout_faults(), "doc": doc,
+		"began_a": began_a})
+
+
+func _accept_inline(peer: int, player_id: String, session: BuilderSession, zone_name: String) -> void:
 	var plan := session.new_area.duplicate()
 	var spots_alone := session.spots_only()  # Before accept: after it the proposal is the level's own.
 	if not session.accept():
@@ -397,12 +424,19 @@ func _undo(peer: int, player_id: String, zone_name: String) -> void:
 	if doc == null or doc.undo_steps.is_empty():
 		_reply(peer, {"state": "nothing"})
 		return
+	if laying.has(zone_name):
+		_reply(peer, {"state": "error", "error": LAYING_SAYS})
+		return
 	# A new level the step made goes with it: not while anyone is in it.
 	for level_name: String in created:
 		if created[level_name]["parent"] == zone_name and doc.undo_steps.back().has("config neighbours") \
 				and not World.peers_in(level_name).is_empty():
 			_reply(peer, {"state": "error", "error": "someone is in %s: it cannot be taken back now" % level_name})
 			return
+	if not Net.builder_inline:
+		_start_laying({"kind": "undo", "peer": peer, "player_id": player_id, "zone": zone_name, "spots": false,
+			"changes": {}, "baseline": [], "doc": doc})
+		return
 	doc.undo()
 	for each: int in sessions:
 		if _session_zone.get(each, "") == zone_name:
@@ -410,6 +444,14 @@ func _undo(peer: int, player_id: String, zone_name: String) -> void:
 	if not _save_and_reload(zone_name):
 		_reply(peer, {"state": "error", "error": "could not save: %s" % doc.report})
 		return
+	_forget_created(zone_name, doc)
+	print("[builder] %s took back the last change to %s" % [player_id, zone_name])
+	_reply(peer, {"state": "undone"})
+
+
+## The levels a new_area of [param zone_name]'s made that its doc's neighbours no longer name (an undo
+## took the step that made one back): forgotten and their overlay removed.
+func _forget_created(zone_name: String, doc: MapDoc) -> void:
 	for level_name: String in created.keys():
 		var made: Dictionary = created[level_name]
 		if made["parent"] == zone_name and str(doc.config.get("neighbours", {}).get(made["side"], "")) != level_name:
@@ -417,8 +459,317 @@ func _undo(peer: int, player_id: String, zone_name: String) -> void:
 			docs.erase(level_name)
 			remove_overlay(level_name)
 			print("[builder] %s is gone with it" % level_name)
-	print("[builder] %s took back the last change to %s" % [player_id, zone_name])
-	_reply(peer, {"state": "undone"})
+
+
+# --- An accept laid off the server's frame (956) -------------------------------------------------
+
+## The accepts and undos being laid, by zone: {job, thread, stop, began}. One a zone: another accept or
+## undo there is refused (LAYING_SAYS) until frame B.
+var laying: Dictionary[String, Dictionary] = {}
+## Tests: a rename of this folder (globalized, no trailing slash) fails, as a folder held open does on Windows.
+var fail_rename_from := ""
+## Tests: called on the main thread between frame A and the worker's start (a write that slips past the
+## busy mark), with the job.
+var test_between := Callable()
+## The main thread's longest frame while any accept was being laid, in ms (logged at frame B).
+var _longest_frame := 0.0
+var _frame_at := 0
+## What the last frame B logged, for tests and the probe: {frame_a, worker, frame_b, longest} in ms.
+var last_laid := {}
+
+
+## Asks the worker of a job to stop at its next step, read under a lock by both threads.
+class Stop:
+	var _mutex := Mutex.new()
+	var _stopped := false
+
+	func stop() -> void:
+		_mutex.lock()
+		_stopped = true
+		_mutex.unlock()
+
+	func asked() -> bool:
+		_mutex.lock()
+		var out := _stopped
+		_mutex.unlock()
+		return out
+
+
+## The folder an accept's files are written in, and its old level kept in while they are swapped:
+## beside the overlay, never in it (a folder in the overlay holding a layout.png reads as a level).
+static func laying_dir() -> String:
+	return Level.overlay_dir.trim_suffix("/") + "_laying/"
+
+
+## Frame A of an accept or an undo (956): the session busy, a copy of the zone's doc taken with what its
+## worker reads (the linked levels' configs; Level.kinds warmed: its first use fills a static), what frame
+## B checks taken (the doc's revision, the level's mark), and the worker started at below-normal priority.
+func _start_laying(job: Dictionary) -> void:
+	var began: int = job.get("began_a", Time.get_ticks_usec())  # Frame A from the accept's stale check.
+	var zone_name: String = job["zone"]
+	var doc: MapDoc = job["doc"]
+	var session: BuilderSession = sessions.get(job["peer"])
+	if session != null:
+		session.busy = true
+	Level.kinds()
+	job["revision"] = doc.revision
+	job["mark"] = _level_mark(zone_name)
+	job["templates"] = Level.templates_now()
+	job["copy"] = doc.copy()
+	job["into"] = laying_dir() + zone_name + ".new/"
+	job.erase("doc")  # The live doc stays on the main thread.
+	if test_between.is_valid():
+		test_between.call(job)
+	var stop := Stop.new()
+	var thread := Thread.new()
+	thread.start(_lay.bind(job, stop), Thread.PRIORITY_LOW)
+	_frame_at = Time.get_ticks_usec()
+	if laying.is_empty():
+		_longest_frame = 0.0
+	laying[zone_name] = {"job": job, "thread": thread, "stop": stop, "began": Time.get_ticks_usec(),
+		"frame_a": (Time.get_ticks_usec() - began) / 1000.0}
+
+
+## What frame B checks the level's files against (956): a level registered in memory (a laid generation)
+## by its digest, else Level.files_key. Moved, another write reached the level while the worker ran.
+static func _level_mark(level_name: String) -> String:
+	if Level._registered.has(level_name):
+		return "made " + str(Level._registered[level_name].get("digest", ""))
+	return Level.files_key(level_name)
+
+
+## The worker (956), on its own thread: [param job]'s copy changed as the accept or undo changes the doc,
+## the whole level written into job.into, read back and parsed once; the layout checked on that parse
+## (806, an accept's: a fault it adds refuses it, the folder removed); the zone's level, the world map's
+## read of it and its terrain message made from it. Touches no node, signal with a listener, resource
+## cache or static (the copy is its own; the templates and kinds read on the main thread first).
+## {ok, copy, level, read, message} or {ok: false, refused | error | stopped}.
+static func _lay(job: Dictionary, stop: Stop) -> Dictionary:
+	var copy: MapDoc = job["copy"]
+	var templates: Dictionary = job["templates"]
+	copy.parse_templates = templates
+	var into: String = job["into"]
+	var baseline: Variant = job["baseline"]
+	if job["kind"] == "undo":
+		copy.undo()
+	else:
+		if not job["spots"] and baseline == null:
+			baseline = BuilderSession.layout_faults(copy, copy.parsed(templates))  # None kept: the level's own.
+		copy.apply_changes(job["changes"])
+	if stop.asked():
+		return {"ok": false, "stopped": true}
+	remove_folder(into)  # One a stopped run left.
+	if not (copy.save_config(into) if job["spots"] else copy.save(false, {}, into)):
+		remove_folder(into)
+		return {"ok": false, "error": copy.report}
+	if job["spots"]:
+		return {"ok": true, "copy": copy}
+	if stop.asked():
+		remove_folder(into)
+		return {"ok": false, "stopped": true}
+	var made := Level.source_at(into)
+	var parsed := Level.parse(made["layout"], made["height"], made["config"], made.get("relief"), templates)
+	if job["kind"] == "accept":
+		var news := BuilderSession.fault_news(baseline, BuilderSession.layout_faults(copy, parsed))
+		if not news.is_empty():
+			remove_folder(into)
+			return {"ok": false, "refused": "the change breaks the layout rules: " + "; ".join(news)}
+	var level := Level.level_from(job["zone"], made, templates, parsed.duplicate(true))
+	return {"ok": true, "copy": copy, "level": level, "read": WorldMap.read_of(job["zone"], made, parsed),
+		"message": terrain_message_of(job["zone"], made), "config": made["config"], "warnings": level["warnings"]}
+
+
+func _process(_delta: float) -> void:
+	if laying.is_empty():
+		return
+	var now := Time.get_ticks_usec()
+	_longest_frame = maxf(_longest_frame, (now - _frame_at) / 1000.0)
+	_frame_at = now
+	for zone_name: String in laying.keys():
+		var entry: Dictionary = laying[zone_name]
+		if (entry["thread"] as Thread).is_alive():
+			continue
+		var result: Dictionary = (entry["thread"] as Thread).wait_to_finish()
+		laying.erase(zone_name)
+		_laid(entry, result)
+
+
+## Frame B (956): the stale check again; the new folder swapped in for the overlay's; the live doc changed
+## as the copy was, taking what its save made; the zone reloaded from the worker's parse and the world map
+## given its read; the builder answered. On a refusal, a failed save or swap, or a stale check, the folder
+## is removed and the doc, the files and the zone are as they were.
+func _laid(entry: Dictionary, result: Dictionary) -> void:
+	var began := Time.get_ticks_usec()
+	_laps.clear()
+	_lap_at = began
+	var reads := Level.folder_reads
+	var parses := Level.parses
+	var job: Dictionary = entry["job"]
+	var zone_name: String = job["zone"]
+	var peer: int = job["peer"]
+	var session: BuilderSession = sessions.get(peer)
+	var doc: MapDoc = docs[zone_name]
+	var into: String = job["into"]
+	var answer := {}
+	if not result["ok"]:
+		remove_folder(into)
+		if result.has("refused"):
+			answer = {"state": "error", "error": result["refused"]}
+		elif result.has("error"):
+			push_warning("[builder] " + str(result["error"]))
+			answer = {"state": "error", "error": "could not save: %s" % result["error"]}
+	elif doc.revision != job["revision"] or _level_mark(zone_name) != job["mark"]:
+		# The world ran while the worker did: another write reached the level (coordinator, 11-16).
+		remove_folder(into)
+		answer = {"state": "error", "error": BuilderSession.STALE_SAYS}
+	else:
+		_lap("join and check")
+		var swapped := _swap_in(zone_name, into)
+		_lap("renames")
+		if not swapped.is_empty():
+			push_warning("[builder] %s: %s" % [zone_name, swapped])
+			answer = {"state": "error", "error": "could not save: %s" % swapped}
+		else:
+			answer = _take_laid(job, result, doc, session)
+	if session != null:
+		session.busy = false
+		if session.discard_waiting:
+			session.discard_waiting = false
+			session._fresh_working()
+	if not _laps.is_empty():
+		_lap("adopt and the rest")
+	var frame_b := (Time.get_ticks_usec() - began) / 1000.0
+	last_laid = {"frame_a": entry["frame_a"], "worker": (began - int(entry["began"])) / 1000.0, "frame_b": frame_b,
+		"longest": _longest_frame, "answer": answer.get("state", "nothing"),
+		"reads_in_b": Level.folder_reads - reads, "parses_in_b": Level.parses - parses, "steps": ", ".join(_laps)}
+	print("[builder] %s %s laid off the frame: frame A %.1f ms, the worker %.0f ms (the longest frame meanwhile %.1f ms), frame B %.1f ms (%s)" % [
+		zone_name, job["kind"], last_laid["frame_a"], last_laid["worker"], _longest_frame, frame_b, last_laid["steps"]])
+	_reply(peer, answer if not answer.is_empty() else {"state": "nothing"})
+
+
+## The swapped-in change taken into the running game (frame B's rest): the doc, the session, the zone and
+## the world map. The answer to the builder.
+func _take_laid(job: Dictionary, result: Dictionary, doc: MapDoc, session: BuilderSession) -> Dictionary:
+	var zone_name: String = job["zone"]
+	var held_before := camps_holding(doc.config)  # The doc is the files it was saved as until now.
+	doc.take_laid(result["copy"])  # The worker's copy, changed and saved: the same revision checked above.
+	_lap("the doc")
+	if job["kind"] == "undo":
+		for each: int in sessions:
+			if _session_zone.get(each, "") == zone_name:
+				sessions[each].discard()
+	elif session != null:
+		session._fresh_working()  # As accept() leaves it.
+	if not job["spots"]:
+		for warning: String in result.get("warnings", []):
+			push_warning("[level] %s: %s" % [zone_name, warning])
+		_after_save(zone_name, held_before, result)
+	elif not _spots_into_world(zone_name):
+		_after_save(zone_name, held_before)  # A world map without the zone: the whole way, read from the files.
+	if job["kind"] == "undo":
+		_forget_created(zone_name, doc)
+		print("[builder] %s took back the last change to %s" % [job["player_id"], zone_name])
+		return {"state": "undone"}
+	print("[builder] %s accepted their change to %s%s" % [job["player_id"], zone_name, " (spots only)" if job["spots"] else ""])
+	return {"state": "accepted"}
+
+
+## Frame B's steps, timed for its log line (956: the box probe reads frame B's own steps).
+var _laps: Array[String] = []
+var _lap_at := 0
+
+
+func _lap(step: String) -> void:
+	var now := Time.get_ticks_usec()
+	_laps.append("%s %.1f" % [step, (now - _lap_at) / 1000.0])
+	_lap_at = now
+
+
+## [param into] (a whole level written there) swapped in for level [param zone_name]'s overlay folder:
+## the old folder renamed aside into laying_dir, the new one renamed in, the old removed. "" when done,
+## else why not, with everything as it was: a second rename that fails puts the old folder back; if even
+## that fails, both stay whole in laying_dir and the next boot puts the old back (recover_overlays).
+func _swap_in(zone_name: String, into: String) -> String:
+	var folder := ProjectSettings.globalize_path(Level.overlay_dir + zone_name)
+	var new_folder := ProjectSettings.globalize_path(into).trim_suffix("/")
+	var old_folder := ProjectSettings.globalize_path(laying_dir() + zone_name + ".old")
+	remove_folder(old_folder)
+	var had := DirAccess.dir_exists_absolute(folder)
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(Level.overlay_dir)):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(Level.overlay_dir))
+	if had and not _rename(folder, old_folder):
+		remove_folder(new_folder)
+		return "could not move %s aside" % zone_name
+	if not _rename(new_folder, folder):
+		if had and not _rename(old_folder, folder):
+			push_warning("[builder] %s: neither its new files nor its old could be put back; the next start puts the old back" % zone_name)
+			return "could not put %s's files in place" % zone_name
+		remove_folder(new_folder)
+		return "could not put %s's files in place" % zone_name
+	if had and not remove_folder(old_folder):
+		push_warning("[builder] %s: its old files stay in %s until the next start" % [zone_name, laying_dir()])
+	return ""
+
+
+## A folder renamed, tried three times 100 ms apart (a file scanned as it was written may be held open
+## for a moment on Windows; on the box it is one call). The test hook fails it.
+func _rename(from: String, to: String) -> bool:
+	for attempt in 3:
+		if from != fail_rename_from and DirAccess.rename_absolute(from, to) == OK:
+			return true
+		if attempt < 2:
+			OS.delay_msec(100)
+	return false
+
+
+## [param path]'s folder and the files in it removed (a level's folder holds no folders). Whether it is gone.
+static func remove_folder(path: String) -> bool:
+	var folder := ProjectSettings.globalize_path(path).trim_suffix("/")
+	if not DirAccess.dir_exists_absolute(folder):
+		return true
+	for file in DirAccess.get_files_at(folder):
+		DirAccess.remove_absolute(folder.path_join(file))
+	return DirAccess.remove_absolute(folder) == OK
+
+
+## At boot, before any level is read (956): what an accept stopped in the middle of left in laying_dir
+## put right, every level whole, old or new. A level's folder there with the level's own in the overlay:
+## removed (the swap was done, or never begun). An old folder there with none in the overlay: put back
+## (stopped between the two renames). Said in a line each.
+static func recover_overlays() -> void:
+	var dir := ProjectSettings.globalize_path(laying_dir())
+	if not DirAccess.dir_exists_absolute(dir):
+		return
+	var overlay := ProjectSettings.globalize_path(Level.overlay_dir)
+	for name: String in DirAccess.get_directories_at(dir):
+		var level_name := name.get_basename()
+		var in_overlay := DirAccess.dir_exists_absolute(overlay.path_join(level_name))
+		if name.ends_with(".old") and not in_overlay:
+			DirAccess.make_dir_recursive_absolute(overlay)
+			if DirAccess.rename_absolute(dir.path_join(name), overlay.path_join(level_name)) == OK:
+				print("[builder] %s: put back as it was before an accept the last run stopped in" % level_name)
+				continue
+		remove_folder(dir.path_join(name))
+		print("[builder] %s: an unfinished accept's %s files removed" % [level_name, name.get_extension()])
+
+
+## Quitting (956): each accept being laid asked to stop and joined. One whose worker had finished is
+## swapped in (its level saved as accepted); one stopped is removed, before any rename.
+func finish_laying() -> void:
+	for zone_name: String in laying.keys():
+		var entry: Dictionary = laying[zone_name]
+		(entry["stop"] as Stop).stop()
+		var result: Dictionary = (entry["thread"] as Thread).wait_to_finish()
+		laying.erase(zone_name)
+		var into: String = entry["job"]["into"]
+		if result.get("ok", false) and _swap_in(zone_name, into).is_empty():
+			print("[builder] %s: an accept being laid as the server stopped saved" % zone_name)
+		else:
+			remove_folder(into)
+
+
+func _exit_tree() -> void:
+	finish_laying()
 
 
 ## Saves the zone's doc to the overlay, has Main reload the zone, and says
@@ -434,10 +785,19 @@ func _save_spots(zone_name: String) -> bool:
 	if not doc.save_config():
 		push_warning("[builder] " + doc.report)
 		return false
+	if not _spots_into_world(zone_name):
+		return _save_and_reload(zone_name)  # A world map without the zone: the whole way.
+	return true
+
+
+## The zone's spots, its level.json saved, read again into each place the running world holds them
+## (_save_spots'). False, nothing done, when Main's world map has no such area.
+func _spots_into_world(zone_name: String) -> bool:
+	var doc: MapDoc = docs[zone_name]
 	var world_map: WorldMap = main._world_map if main != null else null
 	var area: Dictionary = world_map.areas.get(zone_name, {}) if world_map != null else {}
 	if area.is_empty():
-		return _save_and_reload(zone_name)  # A world map without the zone: the whole way.
+		return false
 	var warnings: Array[String] = []
 	var spots := Level.spots_from(doc.config, warnings, area["floor"])
 	area["spots"] = spots
@@ -458,8 +818,21 @@ func _save_and_reload(zone_name: String) -> bool:
 	if not doc.save(false):  # 867 amended (2): no report's parse; builder mode shows a report only when it fails.
 		push_warning("[builder] " + doc.report)
 		return false
-	main.reload_zone(zone_name)
+	_after_save(zone_name, held_before)
+	return true
+
+
+## The zone, its level saved, reloaded, the world map built and adopted, the towns and captives as the
+## change leaves them, and what the map finds wrong said (_save_and_reload's). [param laid] (956): the
+## worker's {level, message, read} of the files it wrote, so nothing is read back from disk here.
+func _after_save(zone_name: String, held_before: Array[String], laid := {}) -> void:
+	var doc: MapDoc = docs[zone_name]
+	main.reload_zone(zone_name, laid.get("level", {}), laid.get("message", {}), laid.get("config", {}))
+	_lap("reload_zone")
+	if laid.has("read"):
+		WorldMap.keep_read(zone_name, laid["read"], Level.files_key(zone_name))
 	var world_map := WorldMap.build()
+	_lap("world map")
 	if main != null and main.has_method("adopt_world_map"):
 		# 197 amended (1): the new map everywhere one is held, as a regenerated level's is: the residents'
 		# places (read from Main's each sync: spots, homes, work), the holdings (places added, moved or gone,
@@ -484,7 +857,6 @@ func _save_and_reload(zone_name: String) -> bool:
 	var problems := world_map.problems()
 	for problem in problems:
 		push_warning("[builder] after the change to %s: %s" % [zone_name, problem])
-	return true
 
 
 ## The keys of [param config]'s camps that hold captives (level.json
@@ -503,7 +875,12 @@ static func camps_holding(config: Dictionary) -> Array[String]:
 ## The "terrain" message for level [param level_name]: its files as the
 ## game reads them now, for clients (whose own copy is the pck's).
 static func terrain_message(level_name: String) -> Dictionary:
-	var made := Level.source(level_name)
+	return terrain_message_of(level_name, Level.source(level_name))
+
+
+## terrain_message's, from [param made] ({layout, height, config, relief}) rather than the level as
+## the game reads it now (956: made on an accept's worker from the files it wrote). Touches no node.
+static func terrain_message_of(level_name: String, made: Dictionary) -> Dictionary:
 	var layout: Image = made["layout"]
 	var height: Image = made["height"]
 	var relief: Image = made.get("relief")
@@ -679,6 +1056,9 @@ static func overlay_command(words: PackedStringArray, reloader: Node) -> String:
 		"drop":
 			if words.size() < 3 or not Level.overlaid(words[2]):
 				return "usage: builder drop <name> (%s)" % overlay_summary()
+			var host: Variant = reloader.get("_builder") if reloader != null else null
+			if host is BuilderHost and (host as BuilderHost).laying.has(words[2]):
+				return "%s: a builder's change is being laid there; drop it once that is done" % words[2]  # 956.
 			remove_overlay(words[2])
 			if reloader != null and reloader.has_method("forget_level_edits"):
 				reloader.forget_level_edits(words[2])

@@ -119,16 +119,21 @@ static func from_level(level_name: String) -> MapDoc:
 ## the folder holds the layout already. Else save(false): no layout there yet
 ## (the overlay is a whole level), every file. False if it could not;
 ## [member report] says.
-func save_config() -> bool:
+## [param into] (956): the folder the files are written in instead of [member folder] (a builder's
+## accept writes the whole level beside it, then swaps the two), the level's other files copied there first.
+func save_config(into := "") -> bool:
 	if heights_dirty or relief_dirty or not FileAccess.file_exists(ProjectSettings.globalize_path(folder + "layout.png")):
 		# The level's first save (the box's levels have no overlay until a builder's accept): every file,
 		# the images as they were read (an exported game holds them imported, no file to copy), encoded
 		# from the images themselves, the cells being unchanged on the caller's word (867 amended (5)).
-		return save(false, _read_images)
+		return save(false, _read_images, into)
+	var dir := into if not into.is_empty() else folder
+	if dir != folder and not _copy_files_into(dir):
+		return false
 	if Level.fill_codes(config):
 		config_dirty = true
 	if config_dirty:
-		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
+		var json := FileAccess.open(ProjectSettings.globalize_path(dir + "level.json"), FileAccess.WRITE)
 		if json == null:
 			report = "could not save %slevel.json" % folder
 			return false
@@ -151,23 +156,29 @@ func save_config() -> bool:
 ## (builder mode, which shows a report only when a save fails, before it
 ## would parse): the report without the level's parse. [param as_read] (save_config's first save, 867
 ## amended (5)): the images the level was read from, written in place of the map's own, which hold the
-## same cells; empty, the map's.
-func save(with_report := true, as_read := {}) -> bool:
-	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(folder)):
-		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(folder))
+## same cells; empty, the map's. [param into] (956): the folder the files are written in instead of
+## [member folder] (a builder's accept writes the whole level beside it, then swaps the two): the level's
+## files copied there first, those this save writes written over them, each .import naming the files'
+## place in [member folder], where they will stand.
+func save(with_report := true, as_read := {}, into := "") -> bool:
+	var dir := into if not into.is_empty() else folder
+	if not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(dir)):
+		DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(dir))
+	if dir != folder and not _copy_files_into(dir):
+		return false
 	var png := folder + "layout.png"
 	var image: Image = as_read["layout"] if as_read.get("layout") is Image else map.to_image()
-	var error := image.save_png(ProjectSettings.globalize_path(png))
+	var error := image.save_png(ProjectSettings.globalize_path(dir + "layout.png"))
 	if error != OK:
-		report = "could not save %s (%s)" % [png, error_string(error)]
+		report = "could not save %s (%s)" % [dir + "layout.png", error_string(error)]
 		return false
-	var imported := LevelMap.ensure_image_import(ProjectSettings.globalize_path(png), png)
+	var imported := LevelMap.ensure_image_import(ProjectSettings.globalize_path(dir + "layout.png"), png)
 	# Each building's code written in, so it stays its own (decision 537).
 	if Level.fill_codes(config):
 		config_dirty = true
 	# The ledges traced again from the relief as it now is (decision 585).
 	if relief_changed and map.has_relief():
-		var terrain: Dictionary = Level.parse(image, map.to_height_image() if had_heights or heights_dirty else null, config, map.to_relief_image())["terrain"]
+		var terrain: Dictionary = Level.parse(image, map.to_height_image() if had_heights or heights_dirty else null, config, map.to_relief_image(), parse_templates)["terrain"]
 		var ledges := Level.ledges_of(terrain)
 		if ledges != config.get("ledges", []):
 			if ledges.is_empty():
@@ -176,9 +187,9 @@ func save(with_report := true, as_read := {}) -> bool:
 				config["ledges"] = ledges
 			config_dirty = true
 	if config_dirty:
-		var json := FileAccess.open(ProjectSettings.globalize_path(folder + "level.json"), FileAccess.WRITE)
+		var json := FileAccess.open(ProjectSettings.globalize_path(dir + "level.json"), FileAccess.WRITE)
 		if json == null:
-			report = "could not save %slevel.json" % folder
+			report = "could not save %slevel.json" % dir
 			return false
 		var written := JSON_KEEP.write(source_text, config)
 		json.store_string(written)
@@ -187,20 +198,20 @@ func save(with_report := true, as_read := {}) -> bool:
 		config_dirty = false
 	if heights_dirty:
 		var heights_png := folder + "height.png"
-		error = map.to_height_image().save_png(ProjectSettings.globalize_path(heights_png))
+		error = map.to_height_image().save_png(ProjectSettings.globalize_path(dir + "height.png"))
 		if error != OK:
-			report = "could not save %s (%s)" % [heights_png, error_string(error)]
+			report = "could not save %s (%s)" % [dir + "height.png", error_string(error)]
 			return false
-		LevelMap.ensure_image_import(ProjectSettings.globalize_path(heights_png), heights_png)
+		LevelMap.ensure_image_import(ProjectSettings.globalize_path(dir + "height.png"), heights_png)
 		had_heights = true
 		heights_dirty = false
 	if relief_dirty and map.has_relief():
 		var relief_png := folder + "relief.png"
-		error = map.to_relief_image().save_png(ProjectSettings.globalize_path(relief_png))
+		error = map.to_relief_image().save_png(ProjectSettings.globalize_path(dir + "relief.png"))
 		if error != OK:
-			report = "could not save %s (%s)" % [relief_png, error_string(error)]
+			report = "could not save %s (%s)" % [dir + "relief.png", error_string(error)]
 			return false
-		LevelMap.ensure_image_import(ProjectSettings.globalize_path(relief_png), relief_png)
+		LevelMap.ensure_image_import(ProjectSettings.globalize_path(dir + "relief.png"), relief_png)
 		relief_dirty = false
 	relief_changed = false
 	dirty = false
@@ -217,6 +228,78 @@ func save(with_report := true, as_read := {}) -> bool:
 		"; import set to Image" if imported else "",
 		"; warnings: " + "; ".join(warnings) if not warnings.is_empty() else ""]
 	return true
+
+
+## Every file in [member folder] copied into [param dir] (956): what a save there does not write stays as
+## it was, and the swap that puts [param dir] in its place drops nothing. False, and [member report] says,
+## if one could not be.
+func _copy_files_into(dir: String) -> bool:
+	var from := ProjectSettings.globalize_path(folder)
+	var to := ProjectSettings.globalize_path(dir)
+	if not DirAccess.dir_exists_absolute(to):
+		DirAccess.make_dir_recursive_absolute(to)
+	if not DirAccess.dir_exists_absolute(from):
+		return true  # Nothing there yet: the level's first save writes every file.
+	for each: String in DirAccess.get_files_at(from):
+		if DirAccess.copy_absolute(from.path_join(each), to.path_join(each)) != OK:
+			report = "could not copy %s%s" % [folder, each]
+			return false
+	return true
+
+
+## The linked levels' configs a parse here reads (Level.parse's templates, 933), read on the main thread
+## first when this doc is saved off it (956); empty, Level.parse reads them itself.
+var parse_templates := {}
+
+
+## A copy of this doc (956: a builder's accept changes and saves it off the main thread, then this doc
+## takes it whole: take_laid): its map, config, files' text,
+## revision, undo and redo, and what is still to write. The images it was read from are shared, read only.
+func copy() -> MapDoc:
+	var out := MapDoc.new()
+	out.folder = folder
+	out.map = map.copy()
+	out.config = config.duplicate(true)
+	out.source_text = source_text
+	out.revision = revision
+	out.dirty = dirty
+	out.config_dirty = config_dirty
+	out.had_heights = had_heights
+	out.heights_dirty = heights_dirty
+	out.relief_dirty = relief_dirty
+	out.relief_changed = relief_changed
+	out._read_images = _read_images
+	out.undo_steps = undo_steps.duplicate()
+	out.redo_steps = redo_steps.duplicate()
+	return out
+
+
+## What [param saved] (copy()'s, changed as this doc has just been and saved, 956) made of the save
+## taken: its config as written (building codes filled, ledges traced), the text written, what is left to
+## write (nothing) and whether the level has heights.
+func take_saved(saved: MapDoc) -> void:
+	config = saved.config
+	source_text = saved.source_text
+	dirty = saved.dirty
+	config_dirty = saved.config_dirty
+	had_heights = saved.had_heights
+	heights_dirty = saved.heights_dirty
+	relief_dirty = saved.relief_dirty
+	relief_changed = saved.relief_changed
+	_read_images = saved._read_images
+	report = saved.report
+
+
+## [param laid] (copy()'s of this doc, changed and saved on a builder's worker, 956) taken whole: its map,
+## undo and redo steps and revision (the change as apply_changes or undo made it there, so it is not made
+## twice), and its save (take_saved). Said once, as a change here would be.
+func take_laid(laid: MapDoc) -> void:
+	map = laid.map
+	undo_steps = laid.undo_steps
+	redo_steps = laid.redo_steps
+	revision = laid.revision
+	take_saved(laid)
+	changed.emit()
 
 
 ## The level as Level.parse reads it from what is here now (saved or not).

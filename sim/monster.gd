@@ -3937,6 +3937,13 @@ static func _zone_config() -> Dictionary:
 static var _zone_configs: Dictionary[String, Dictionary] = {}
 
 
+## Server: [param config] as the zone's next terrain load reads it (956: a level laid off the frame hands in
+## the config its worker read, so the respawn in frame B reads nothing from disk).
+static func give_zone_config(zone: Zone, config: Dictionary) -> void:
+	if _zone_configs.size() >= 32: _zone_configs.clear()
+	_zone_configs["%d/%s/%d" % [zone.get_instance_id(), zone.name, zone.terrain_loads + 1]] = config
+
+
 ## Whether it has marched to its route's end (or as near as its fellows let
 ## it, [param near] tiles).
 func marched(near := 0) -> bool:
