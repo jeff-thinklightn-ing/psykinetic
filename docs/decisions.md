@@ -58055,6 +58055,49 @@ temple's lancets drawn down toward a house pane, and the inn's door lantern made
   and albedo and colour unchanged.
 Client only; protocol unchanged; no new class_name.
 
+927 amended (3) (environment; the label from tools/decision_number.sh; the coordinator's ruling of 11-15 on
+environment's three worst, item 1; package "Umbrage at night: window light", landing on): the patch fades along
+its length and its sides go soft, so at the nearest zoom it reads as light from a window, not a beam.
+- Why: on ui-design's walk from the arrival to the Mughouse's door on main 9150bdff1 (joined, 21:30, play
+  nearest, C:\dev\review\environment\three_worst_1115\1_window_beam_porch_foot_2130_play_nearest.png), a
+  Mughouse window threw a long, hard-sided warm shaft across the grass from the porch's foot, about 4 m by
+  eye: 58.4 in its middle against 21.8 for the grass beside it (2.7x), the brightest thing in the frame. The
+  shape did it: the patch stayed at full strength a third of the way out, then fell slowly, with its sides
+  crisp to its end.
+- What: in both passes (the multiply and its floor, which share the shape), the fall along the patch is
+  (1 - out)^2 of the way out: full at the wall's foot, a quarter halfway, none at its end. The sides are crisp
+  across the pane at the wall and soften from the middle outward over WINDOW_LIGHT_SIDE_SOFT (1.0 m) out,
+  so no straight side runs past a metre from the wall. Each patch drawn carries its own length, in metres,
+  in its custom data's second channel (Client3D.window_patch_custom). Client3D.window_patch_k is the shaders'
+  sum, for the rows.
+- Against the ruling: the reach is unchanged. look_win927 found a shorter patch (WINDOW_LIGHT_OUT 0.6) read
+  as a line along the wall's foot, and the new fall already takes the far half down to a quarter and less,
+  which shortens the patch as seen more than a cut in reach would. If the joined look shows it still long,
+  the reach comes in as its own step.
+- The lancets keep the first shape. On ui-design's joined pair of be3765c2c against main 497f0fd12 (21:30,
+  low, C:\dev\review\ui-design\looks\win_be3765c2c beside winbase_497f0fd12) a house window's patch fell from 62.2
+  to 35.6 in its middle, level with the door lantern's pool (35.5). But the temple's three shafts on the
+  square's cobbles fell from about 42 to 22 to 27, under the cobbles' own 30, and were lost. Their shaft is
+  the light the square reads by at night. So each patch carries its pane's tall share in its custom data's
+  third channel (Client3D.window_pane_tall): 1 for a lancet's pane, which keeps the first fall (full a third
+  out) and crisp sides to its end; 0 for every other pane, which takes the fall and the soft sides.
+- The share goes by the slot, not by the glass's height, so no window flips between the shapes on a few
+  centimetres of art. The lancet (wall.chapel.window_tall, dressed with its LANCET_GLOW dim) is marked when
+  it is placed. Its glass is one run 2.25 m high. Every house pane is 0.69 to 0.84 m (wall.wood.window,
+  wall.stone.window_house, wall.stone.window). The Mughouse's two-storey window (wall.wood.window_tall) is
+  two 0.69 m panes, one per storey, in one glow mesh from 1.3 to 5.0 m. A height line would have read it as
+  3.7 m and given the Mughouse its long shaft back. wall.castle.window and wall.chapel.window_broken_tall
+  have no glass and throw no patch.
+- The wall's foot is unchanged (k 1 there), so 927 amended (1)'s figures hold: unlit cobbles 53.4 at the
+  foot, and the floor's lantern fade as it was.
+- Tests: view_world_test, _test_window_light. The patch is full at the wall's foot, 0.25 halfway and 0.0 at
+  95%; crisp across the pane at the wall; a falling ramp from its middle 1.2 m out of 2; the shaders' code
+  carries the fall and the soft sides; each patch's custom data is its strength, its own length and its
+  tall share; a tall pane's patch is full a third out and crisp to its end. view_world_test, the first view at
+  night: each of the temple's lancets' patches takes the tall shape, every other pane's the house's, the
+  Mughouse's two-storey windows among them.
+Client only; protocol unchanged; no new class_name; a bullet only if voice reads a player would notice.
+
 ## 925. Hearing passes over the low solids a person sees over; a wall still muffles (sound)
 
 The crackle's joined read for 920 amended (1) found the Mughouse's tables

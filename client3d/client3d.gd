@@ -12268,6 +12268,7 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 	if glow != null and _window_code.has(key):
 		if lancet_slot(slot):
 			dim_pane(glow as MeshInstance3D, LANCET_GLOW)
+			glow.set_meta(&"lancet", true)  # Its patch keeps the first shape (window_pane_tall).
 		_glows.append([glow, _window_code[key]])
 		glow.set_meta(&"window_piece", made)  # Its leaves, for its light on the ground (927).
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
@@ -22640,6 +22641,13 @@ const WINDOW_LIGHT_GAIN := 4.9  # linear; the tint is a source colour (linear 1,
 const WINDOW_LIGHT_SPREAD := 1.6
 const WINDOW_LIGHT_OUT := 0.8  # a house window's top 2 m: 1.6 m out (0.6, with its light falling as the square, read as a line along the wall foot: look_win927)
 const WINDOW_LIGHT_REACH := Vector2(0.8, 3.0)
+## 927 amended (3): how far out from the wall, metres, the patch's sides go
+## from crisp to fully soft, and its fall along its length, so at the nearest
+## zoom no straight edge runs out past a metre and its far end fades (the
+## Mughouse's window read as a searchlight at the porch's foot: 58.4 in its
+## middle over grass of 21.8, hard-sided). The fall: (1 - out)^2 of the way
+## out (a quarter halfway); window_patch_k, for the rows.
+const WINDOW_LIGHT_SIDE_SOFT := 1.0
 const WINDOW_LIGHT_NEAR := 0.75  # a near house's patch (its light inside spills past its walls): shown about 1.9 (0.5 read 1.4 to 1.6, and the houses a player looks at are the near ones)
 const WINDOW_LIGHT_LIFT := 0.03
 const WINDOW_LIGHT_MOST := 256
@@ -22674,12 +22682,17 @@ uniform float spread = 1.6;
 uniform sampler2D may : filter_nearest, repeat_disable;
 uniform vec2 may_origin;
 uniform vec2 may_size = vec2(1.0);
+uniform float side_soft = 1.0;
 varying vec2 local;
 varying vec3 world;
 varying float strength;
+varying float reach_m;
+varying float tall;
 void vertex() {
 	local = VERTEX.xz;
 	strength = INSTANCE_CUSTOM.r;
+	reach_m = INSTANCE_CUSTOM.g;
+	tall = INSTANCE_CUSTOM.b;
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec4 view = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	view.z += 0.05;
@@ -22688,8 +22701,11 @@ void vertex() {
 void fragment() {
 	float out_share = clamp(local.y + 0.5, 0.0, 1.0);
 	float half_width = 0.5 * mix(1.0 / spread, 1.0, out_share);
-	float edge = 1.0 - smoothstep(0.6, 1.0, abs(local.x) / half_width);
-	float fall = 1.0 - smoothstep(0.35, 1.0, out_share);  // full a third out, soft to its end (a pool, not a line along the wall)
+	// 927 amended (3): the sides crisp at the wall (the pane's own width), soft from the middle out by side_soft metres out, so no straight side runs out into the ground.
+	// A tall pane (tall 1: a lancet's) keeps its crisp sides and its long fall: its shaft is the light a square reads by.
+	float soft = 0.6 * (1.0 - clamp(out_share * reach_m / side_soft, 0.0, 1.0) * (1.0 - tall));
+	float edge = 1.0 - smoothstep(soft, 1.0, abs(local.x) / half_width);
+	float fall = mix((1.0 - out_share) * (1.0 - out_share), 1.0 - smoothstep(0.35, 1.0, out_share), tall);  // a house pane: brightest at the wall's foot, a quarter halfway, gone at its end, a pool that fades, not a shaft
 	float ok = texture(may, (world.xz - may_origin + vec2(0.5)) / may_size).r;
 	float k = strength * fall * edge * ok;
 	if (k <= 0.002) {
@@ -22756,6 +22772,7 @@ static func window_light_material() -> ShaderMaterial:
 		material.set_shader_parameter("floor_add", WINDOW_LIGHT_FLOOR)
 		material.set_shader_parameter("near_share", WINDOW_FLOOR_NEAR)
 		material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
+		material.set_shader_parameter("side_soft", WINDOW_LIGHT_SIDE_SOFT)
 		materials.append(material)
 	materials[0].next_pass = materials[1]
 	return materials[0]
@@ -22811,7 +22828,7 @@ func _place_window_light() -> void:
 		if strength <= 0.0:
 			continue
 		multimesh.set_instance_transform(shown, row[2])
-		multimesh.set_instance_custom_data(shown, Color(strength, 0.0, 0.0, 0.0))
+		multimesh.set_instance_custom_data(shown, window_patch_custom(strength, row[2], float(row[4]) if row.size() > 4 else 0.0))
 		shown += 1
 	multimesh.visible_instance_count = shown
 	if shown > 0:
@@ -22842,6 +22859,27 @@ static func window_floor_shown(shown: Color, k: float, lantern := 1.0) -> Color:
 	return out.clamp().linear_to_srgb()
 
 
+## A patch's custom data (927 amended (3)): its strength, its length out
+## from the wall, metres, from [param place] (window_patch's quad), which the
+## shaders' sides soften over, and its pane's [param tall] share (window_pane_tall).
+static func window_patch_custom(strength: float, place: Transform3D, tall := 0.0) -> Color:
+	return Color(strength, place.basis.z.length(), tall, 0.0)
+
+
+## The patch's share of its strength (the shaders' fall times edge, 927
+## amended (3)) at [param x] across its unit quad (-0.5 to 0.5) and
+## [param out_share] of the way out (0 at the wall, 1 at its end), on a patch
+## [param reach_m] metres long, its pane [param tall] (0 a house's, 1 a
+## lancet's: the first shape); the mask's ok aside. Headless runs compile no
+## shader: this is its sum, for the rows.
+static func window_patch_k(x: float, out_share: float, reach_m: float, tall := 0.0) -> float:
+	var out := clampf(out_share, 0.0, 1.0)
+	var half_width := 0.5 * lerpf(1.0 / WINDOW_LIGHT_SPREAD, 1.0, out)
+	var soft := 0.6 * (1.0 - clampf(out * reach_m / WINDOW_LIGHT_SIDE_SOFT, 0.0, 1.0) * (1.0 - tall))
+	var edge := 1.0 - smoothstep(soft, 1.0, absf(x) / half_width)
+	return lerpf((1.0 - out) * (1.0 - out), 1.0 - smoothstep(0.35, 1.0, out), tall) * edge
+
+
 ## The carried lanterns lit now that the patch's floor keeps off (927
 ## amended (1)): each puppet's shown "Lantern" light as [position, its
 ## range] (a Vector4), the WINDOW_FLOOR_LIGHTS nearest [param near] (the
@@ -22861,6 +22899,19 @@ static func window_floor_lights(puppets: Array, near: Vector3) -> Array[Vector4]
 	if found.size() > WINDOW_FLOOR_LIGHTS:
 		found.resize(WINDOW_FLOOR_LIGHTS)
 	return found
+
+
+## [param glow]'s pane's tall share for its patch (927 amended (3)): 1 for
+## a lancet's (wall.chapel.window_tall, one run of glass 2.25 m high), whose
+## patch keeps the first shape, crisp-sided and full a third out (softened
+## as a house's, the temple's three shafts on the square's cobbles faded
+## under the cobbles' own grey, win_be3765c2c); 0 for every other pane,
+## which takes the fall and the soft sides. By the slot, not the glass's
+## height: the house panes are 0.69 to 0.84 m of glass, but the Mughouse's
+## two-storey window (wall.wood.window_tall) is two of 0.69 m in one glow
+## mesh, 1.3 to 5.0 m, and its box would read it a lancet.
+static func window_pane_tall(glow: Node) -> float:
+	return 1.0 if glow.has_meta(&"lancet") else 0.0
 
 
 ## How much of [param glow]'s window is open to the street (927): its window
@@ -22906,7 +22957,7 @@ func _build_window_light() -> void:
 		var patch := window_patch(glow.global_transform, glow.get_aabb(), _indoors, rects, _ground_height)
 		if patch.is_empty():
 			continue
-		_window_light_rows.append([glow, patch["rect"], patch["place"], window_open_share(glow)])
+		_window_light_rows.append([glow, patch["rect"], patch["place"], window_open_share(glow), window_pane_tall(glow)])
 		var cell: Vector2i = patch["cell"]
 		low = Vector2i(mini(low.x, cell.x), mini(low.y, cell.y))
 		high = Vector2i(maxi(high.x, cell.x), maxi(high.y, cell.y))

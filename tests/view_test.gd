@@ -4542,6 +4542,26 @@ func _test_tavern_inside() -> void:
 				panes_bad.append([glass.get_path(), glass_drawn.emission_energy_multiplier, want])
 	_check(lancets > 0 and panes_bad.is_empty(),
 			"the temple's lancets' glass at %.2f of its emission (%d), every other pane as drawn (bad %s)" % [Client3D.LANCET_GLOW, lancets, panes_bad])
+	# 927 amended (3): a lancet's patch keeps the first shape, every other
+	# pane's softens, the Mughouse's two-storey window (two house panes in one
+	# glow, 1.3 to 5.0 m) among them: by the slot, not the glass's height.
+	var tall_rows := 0
+	var house_rows := 0
+	var tall_bad: Array = []
+	_rig._build_window_light()
+	for row: Array in _rig._window_light_rows:
+		var glass_row := row[0] as MeshInstance3D
+		if not is_instance_valid(glass_row) or glass_row.mesh == null or row.size() < 5:
+			tall_bad.append(row)
+			continue
+		var art_row := glass_row.mesh.surface_get_material(0) as BaseMaterial3D
+		var pale := art_row != null and art_row.albedo_color.v > 0.9
+		tall_rows += 1 if pale else 0
+		house_rows += 0 if pale else 1
+		if float(row[4]) != (1.0 if pale else 0.0):
+			tall_bad.append([glass_row.get_path(), row[4], glass_row.get_aabb().size.y])
+	_check(tall_rows > 0 and house_rows > 0 and tall_bad.is_empty(),
+			"each lancet's patch the tall shape (%d), every other pane's the house's (%d, the Mughouse's two-storey windows among them; bad %s)" % [tall_rows, house_rows, tall_bad])
 	_test_stall_lamps()
 	var lamp_spot := Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
 		[Vector3(3.0, 0.0, 8.5), Vector3(4.0, 0.0, 8.5)], true)
@@ -4963,6 +4983,32 @@ func _test_window_light() -> void:
 	var lancet := Client3D.window_patch(Transform3D(Basis(), Vector3(1.5, 2.6, 3.5)), AABB(Vector3(-0.4, -1.8, -0.02), Vector3(0.8, 3.6, 0.04)), held, rects, flat)
 	_check(not lancet.is_empty() and (lancet["place"] as Transform3D).basis.z.length() > 2.5,
 			"a tall lancet's reaches further (%.2f m)" % [(lancet.get("place", Transform3D()) as Transform3D).basis.z.length()])
+	# 927 amended (3): a pool that fades along its length, its sides soft from
+	# WINDOW_LIGHT_SIDE_SOFT out (the shaders' sum, window_patch_k).
+	var k := func(x: float, out: float) -> float: return Client3D.window_patch_k(x, out, 2.0)
+	var falls := [snappedf(k.call(0.0, 0.0), 0.01), snappedf(k.call(0.0, 0.5), 0.01), snappedf(k.call(0.0, 0.95), 0.01)]
+	var wall_hw := 0.5 / Client3D.WINDOW_LIGHT_SPREAD
+	var far_hw := 0.5 * lerpf(1.0 / Client3D.WINDOW_LIGHT_SPREAD, 1.0, 0.6)  # 1.2 m out of 2
+	var at_wall := [k.call(0.0, 0.0), k.call(0.5 * wall_hw, 0.0)]
+	var out_side := [k.call(0.0, 0.6), k.call(0.25 * far_hw, 0.6), k.call(0.5 * far_hw, 0.6), k.call(0.75 * far_hw, 0.6)]
+	var ramp: bool = out_side[1] < out_side[0] * 0.98 and out_side[2] < out_side[1] and out_side[3] < out_side[2]
+	var code := (_rig._window_light.material_override as ShaderMaterial).shader.code if _rig._window_light != null else Client3D.window_light_material().shader.code
+	_check(falls == [1.0, 0.25, 0.0] and is_equal_approx(at_wall[1], at_wall[0]) and ramp
+			and code.contains("(1.0 - out_share) * (1.0 - out_share)") and code.contains("out_share * reach_m / side_soft"),
+			"the patch full at the wall's foot, a quarter halfway, gone at its end (%s); crisp across the pane at the wall, a ramp from its middle 1.2 m out (%s)" % [falls, out_side.map(func(v: float) -> float: return snappedf(v, 0.01))])
+	# A tall pane keeps the first shape (the lancets' shafts on the square): full a third out, crisp to its end.
+	var tall_k := func(x: float, out: float) -> float: return Client3D.window_patch_k(x, out, 3.0, 1.0)
+	var tall_hw := 0.5 * lerpf(1.0 / Client3D.WINDOW_LIGHT_SPREAD, 1.0, 0.6)
+	var tall_ok: bool = (is_equal_approx(tall_k.call(0.0, 0.3), 1.0) and is_equal_approx(tall_k.call(0.0, 0.5), 1.0 - smoothstep(0.35, 1.0, 0.5))
+			and is_equal_approx(tall_k.call(0.5 * tall_hw, 0.6), tall_k.call(0.0, 0.6)))
+	var marked := Node3D.new()
+	marked.set_meta(&"lancet", true)
+	var plain := Node3D.new()
+	var marks := [Client3D.window_pane_tall(marked), Client3D.window_pane_tall(plain)]
+	marked.free()
+	plain.free()
+	_check(tall_ok and marks == [1.0, 0.0],
+			"a lancet's pane tall, any other not (%s); a tall pane's patch full a third out, %.2f halfway, crisp-sided to its end" % [marks, tall_k.call(0.0, 0.5)])
 	var lanterns: Dictionary[Vector2i, bool] = {Vector2i(3, 4): true}
 	var may := [_rig._window_light_may(Vector2i(1, 4), held, lanterns), _rig._window_light_may(Vector2i(1, 5), held, lanterns),
 			_rig._window_light_may(Vector2i(1, 3), held, lanterns), _rig._window_light_may(Vector2i(3, 4), held, lanterns)]
@@ -4984,6 +5030,14 @@ func _test_window_light() -> void:
 		var open := _rig._window_light_rows.filter(func(row: Array) -> bool: return is_instance_valid(row[0]) and (row[0] as Node3D).is_visible_in_tree() and float(row[3]) > 0.0).size()
 		return [_rig._window_light_rows.size(), lit, _rig._window_light.multimesh.visible_instance_count, open]
 	var evening: Array = read.call(21.5)
+	var reaches_bad := []
+	for row: Array in _rig._window_light_rows:
+		var custom := Client3D.window_patch_custom(0.75, row[2], float(row[4]))
+		var length := (row[2] as Transform3D).basis.z.length()
+		if not is_equal_approx(custom.r, 0.75) or not is_equal_approx(custom.g, length) or not is_equal_approx(custom.b, float(row[4])) or length < Client3D.WINDOW_LIGHT_REACH.x - 0.001:
+			reaches_bad.append([row[2], custom])
+	_check(not _rig._window_light_rows.is_empty() and reaches_bad.is_empty(),
+			"each patch's custom data its strength and its own length, metres, for its sides' softening (bad %s)" % [reaches_bad])
 	# Any lit pane left without a patch, its place and the cells either side of it (indoors or not).
 	var rowed := _rig._window_light_rows.map(func(row: Array) -> Object: return row[0])
 	var unrowed := []
