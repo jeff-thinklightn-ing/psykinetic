@@ -361,6 +361,49 @@ func _test_flooded() -> void:
 ## The host back in the test room, on a cell picked from the level: _test_flooded leaves them on (1, 1),
 ## the link to sample, which they take a frame or more on (saturn's runs). Waits for any move under way to
 ## land first, travels back if it took them away, then stands them on the cell found and asserts it.
+## While a row steps the world long (933's soak, the walk while he types), the room's imps reach the
+## host whatever his home: on saturn under a suite's load economy's landing (11-15) had him downed in the
+## soak and his bleed-out end free his body in _test_asking_focus's walk (a script error on me.tile). On,
+## he holds HARDY_HP, more than the imps take in a row; off, his own max_hp again, whole.
+const HARDY_HP := 1000000
+var _kept_max_hp := 0
+## The host's first downing from the first _hardy on (World.entity_downed): {by, tick}, {} none; read
+## into a lost body's failure line (the coordinator's ask), so a next time is read from the log.
+var _host_downed := {}
+
+
+func _on_host_downed(entity: GridEntity, source: GridEntity, _ticks: int) -> void:
+	if _host_downed.is_empty() and entity == _player(Net.local_id):
+		_host_downed = {"by": source.name if is_instance_valid(source) else "nothing named", "tick": World.tick}
+
+
+## Where the host's downing came, for a failure line: "downed by X at step N of the walk (tick T)",
+## "... before the walk began (tick T)", or "never downed".
+func _downed_said(walk_from_tick: int) -> String:
+	if _host_downed.is_empty():
+		return "never downed"
+	var at: int = _host_downed["tick"]
+	return "downed by %s %s (tick %d)" % [_host_downed["by"],
+		"at step %d of the walk" % (at - walk_from_tick) if at >= walk_from_tick else "before the walk began", at]
+
+
+func _hardy(on: bool) -> void:
+	if not World.entity_downed.is_connected(_on_host_downed):
+		World.entity_downed.connect(_on_host_downed)
+	var host := _player(Net.local_id)
+	if host == null:
+		return
+	if on:
+		if _kept_max_hp == 0:
+			_kept_max_hp = host.max_hp
+		host.max_hp = HARDY_HP
+		host.hp = HARDY_HP
+	elif _kept_max_hp > 0:
+		host.max_hp = _kept_max_hp
+		host.hp = _kept_max_hp
+		_kept_max_hp = 0
+
+
 func _host_home() -> void:
 	for i in 6:
 		await get_tree().process_frame
@@ -757,6 +800,7 @@ func _test_asking_focus() -> void:
 	_check(ui != null and me != null, "the host's client has builder mode and its own player")
 	if ui == null or me == null:
 		return
+	_hardy(true)
 	var from := me.tile
 	var to := Vector2i(-1, -1)
 	for step: Vector2i in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3)]:
@@ -773,9 +817,13 @@ func _test_asking_focus() -> void:
 	if own != null and to.x >= 0:
 		_check(_main._free_intent(me, own) == Vector2.ZERO, "Main._free_intent: ZERO while Main.is_typing() (its first line): no way meant, so no step")
 		_main._move_click(me, to, false)
+		var walk_from_tick := World.tick
 		for i in 60:
 			World.step()
 			await get_tree().process_frame
+		if not is_instance_valid(me):
+			_check(false, "the host's body still there after 60 steps (gone: %s)" % _downed_said(walk_from_tick))
+			return
 		var held := me.tile
 		_check(held == from, "a walk ordered while he types waits: still at %s after 60 steps (at %s)" % [from, held])
 		print("    (information) the route kept while he types: %d cells" % (_main._free["path"] as Array).size())
@@ -783,7 +831,9 @@ func _test_asking_focus() -> void:
 		for i in 120:
 			World.step()
 			await get_tree().process_frame
-		print("    (information) the box let go: at %s (from %s), the route %d cells, Main typing %s" % [me.tile, from, (_main._free["path"] as Array).size(), _main.is_typing()])
+		if is_instance_valid(me):
+			print("    (information) the box let go: at %s (from %s), the route %d cells, Main typing %s" % [me.tile, from, (_main._free["path"] as Array).size(), _main.is_typing()])
+	_hardy(false)
 	ui.escape()
 	if ui.active:
 		ui.toggle()
@@ -850,6 +900,7 @@ func _test_threaded_soak() -> void:
 		[[{"name": "paint", "input": {"ground": "grass", "rects": [{"x": 6, "y": 6, "w": 2, "h": 1}]}}], "More grass."],
 	]
 	var plot := Rect2i(14, 12, 2, 2)
+	_hardy(true)
 	var kept_inline := Net.builder_inline
 	var kept_state: String = _main._builder_ui.state if _main._builder_ui != null else ""
 	var said := {}
@@ -871,6 +922,7 @@ func _test_threaded_soak() -> void:
 		_main._builder.sessions.clear()
 	Net.builder_inline = kept_inline
 	_main._builder.test_turns = []
+	_hardy(false)
 	# The answers reached the host's own panel too, as proposals of sessions cleared above: put it
 	# back here, with no discard sent (an empty ask after would read as an accept, "Nothing to do").
 	var ui: BuilderUI = _main._builder_ui
