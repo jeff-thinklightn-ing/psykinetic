@@ -511,8 +511,10 @@ const BOX_PULL_LEAST := 3.0
 ## walks on 6d421b998 had a turn taken to a yaw whose eye entered the box 1.2 s on), the walk under which a player counts as standing,
 ## how far from every box the player must be for the camera to ease back to their own yaw, and, rung 4b, how near the eye may come when no
 ## yaw clears it (the aim then at its full lift).
-const BOX_LOOK_AHEAD := 1.5
+const BOX_LOOK_AHEAD := 0.5
+const BOX_TRIGGER_AHEAD := 0.0
 const BOX_SEEK_AHEAD := 4.0
+const BOX_CHOOSE_LOOK := 1.5
 const BOX_LOOK_STEP := 0.5
 const BOX_WALK_MIN := 0.3
 const BOX_BACK_MARGIN := 8.0
@@ -22540,7 +22542,11 @@ func _drive_turn(delta: float) -> void:
 ## but its boxed eye is brought in as 4b does. Nothing at all with the option off (CameraTurn.box_step).
 func _box_turn(delta: float, manual: bool, on: bool) -> void:
 	var standing := _walk.length() < 0.3
-	var boxed := eye_boxed_at(yaw)
+	# The 801 search owns the turn while the player is hidden (it also leaves a boxed yaw): never a box turn that pre-empts it.
+	if _turn_view.hidden_for > 0.0:
+		return
+	# A turn only from a yaw whose eye is boxed now (the coordinator, 11-16: none from one that stays clear); the look ahead only chooses.
+	var boxed := eye_boxed_at(yaw, BOX_TRIGGER_AHEAD)
 	var off_hand := absf(wrapf(yaw - _hand_yaw, -180.0, 180.0)) > 1.0
 	# Back to the player's own yaw only after a box turn of this, walking, and well clear of every box: none at the door, none stopped.
 	var may_back := not standing and _box_nearest() > BOX_BACK_MARGIN
@@ -22577,8 +22583,11 @@ func _box_turn(delta: float, manual: bool, on: bool) -> void:
 		target = CameraTurn.choose(yaw, _box_clear, _walk, _hand_yaw, CameraTurn.BOX_TURN_MOST)
 		rung = "4a"
 	if is_nan(target):
-		target = CameraTurn.choose_longest(yaw, _box_look, _box_seen, _hand_yaw, CameraTurn.BOX_TURN_MOST, BOX_LOOK_AHEAD)
+		target = CameraTurn.choose_longest(yaw, _box_look, _box_seen, _hand_yaw, CameraTurn.BOX_TURN_MOST, BOX_CHOOSE_LOOK)
 		rung = "4a, the longest look"
+	# After a turn the new eye stays clear at least as long as the old one did: never a turn to a yaw no better than the one left.
+	if not is_nan(target) and _box_look(target) <= _box_look(yaw):
+		target = NAN
 	if is_nan(target):
 		_turn_view.search_cool = CameraTurn.BOX_SEARCH_COOL
 		if boxed_now and not _box_close:
