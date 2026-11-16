@@ -151,7 +151,7 @@
 				},
 				{
 					"id": "medicine_man.sick",
-					"text": "The medicine man visits the sick in town, and mends his hut with wood and cloth from the town's store.",
+					"text": "The medicine man visits the sick in town, and mends his hut with wood from the town's store.",
 					"known": "lived",
 					"knowers": [
 						"medicine_man"
