@@ -3020,12 +3020,37 @@ func _test_hip_lantern() -> void:
 	_check(pane != null and pane.emission == dull[0] and is_equal_approx(pane.emission_energy_multiplier, dull[1]),
 			"covered (L) at night: the art's own dull horn")
 	light.visible = true
+	player.emit_light = Player.LANTERN
+	# LANTERN_BY_DAY: lit is the carrier's, the pane's dark its cell's (lantern_dark), the light's own.
+	var pane_want := func() -> float:
+		return Client3D.pane_energy(_rig._lantern_lit_energy(), 1.0 - _rig._lantern_dark_at(player.tile), true)
 	_rig._glow_lantern(puppet)
-	_check(pane != null and pane.emission == Client3D.PANE_GLOW and is_equal_approx(pane.emission_energy_multiplier, Client3D.pane_energy(light.light_energy, 0.0, true)),
+	_check(pane != null and pane.emission == Client3D.PANE_GLOW and is_equal_approx(pane.emission_energy_multiplier, pane_want.call()),
 			"lit at night: the panes glow at %.2f" % (pane.emission_energy_multiplier if pane != null else 0.0))
 	DayNight.light = 1.0
 	_rig._glow_lantern(puppet)
-	_check(pane != null and is_equal_approx(pane.emission_energy_multiplier, Client3D.pane_energy(light.light_energy, 1.0, true)), "lit by day: the floor, still lit")
+	_check(pane != null and is_equal_approx(pane.emission_energy_multiplier, pane_want.call()) and pane.emission_energy_multiplier > 0.0,
+			"lit by day: as its cell's dark has it (%.2f), still lit" % (pane.emission_energy_multiplier if pane != null else 0.0))
+	# The dark itself (lantern_dark): night 1, an open noon 0, a room level 1; a storm at noon (cloud 1,
+	# Weather.CLOUD_DIM) and a full canopy at noon (DayNight.CANOPY_SHADE) by the sim's ambient_at.
+	var storm_noon := DayNight.NIGHT + (1.0 - DayNight.NIGHT) * (1.0 - Weather.CLOUD_DIM)
+	var canopy_noon := DayNight.NIGHT + (1.0 - DayNight.NIGHT) * (1.0 - DayNight.CANOPY_SHADE)
+	var darks := [Client3D.lantern_dark(DayNight.NIGHT, true), Client3D.lantern_dark(1.0, true), Client3D.lantern_dark(1.0, false),
+			Client3D.lantern_dark(storm_noon, true), Client3D.lantern_dark(canopy_noon, true)]
+	_check(is_equal_approx(darks[0], 1.0) and is_zero_approx(darks[1]) and is_equal_approx(darks[2], 1.0) and float(darks[3]) > 0.1 and float(darks[4]) > float(darks[3]),
+			"the lantern's dark: night %.2f, open noon %.2f, a room by day %.2f, a storm at noon %.2f (light %.2f), full canopy at noon %.2f (light %.2f)"
+			% [darks[0], darks[1], darks[2], darks[3], Client3D.LANTERN_ENERGY * float(darks[3]), darks[4], Client3D.LANTERN_ENERGY * float(darks[4])])
+	# The switch flipped in a run (lantern2's void "today"): off writes the lit energy every sync, on the scaled.
+	var by_day_was := Client3D.lantern_by_day
+	var flips := []
+	for on: bool in [true, false, true, false]:
+		Client3D.lantern_by_day = on
+		_rig._process(0.0)
+		var want: float = _rig._lantern_lit_energy() * (_rig._lantern_dark_at(player.tile) if on else 1.0)
+		flips.append([on, light.light_energy, want])
+	Client3D.lantern_by_day = by_day_was
+	_check(flips.all(func(f: Array) -> bool: return is_equal_approx(float(f[1]), float(f[2]))),
+			"lantern_by_day flipped in a run: the light's energy follows each way (%s)" % [flips])
 	if pet != null:
 		var hers: Node3D = _rig._puppets[pet.get_instance_id()]
 		_rig._glow_lantern(hers)
