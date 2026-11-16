@@ -57,6 +57,19 @@ const HAIR_STEP := 16.0
 const HAIR_LIT := {"noon": [33.2, 33.2, 35.6, 37.4, 40.7, 45.2, 49.7, 55.8, 60.6, 65.8, 71.0, 76.2, 80.8, 86.2, 90.6, 92.4,
 	93.9, 95.3, 95.3, 95.3, 95.3], "evening": [27.3, 27.3, 28.0, 30.0, 33.9, 37.1, 40.2, 44.8, 49.4, 52.1, 56.7, 62.5, 65.9,
 	69.5, 75.2, 80.1, 83.3, 84.1, 84.1, 84.1, 84.1]}
+## SCRATCH (the coordinator's pinned row, never lands): which hair rule a look is built with, set by the tour before
+## it joins: "today" (the palette rule as main has it), "two_light" (69d096916's), "two_light_D" (that with dark and
+## brown ashen, HAIR_ASHEN: Jeff's pick). log_looks prints each applied body's drawn hair and skin instance values.
+static var rule := "today"
+static var log_looks := false
+const HAIR_ASHEN := {"dark": "312d29", "brown": "494541"}
+
+
+## [param name]'s named colour under the rule in force (HAIR_ASHEN under "two_light_D").
+static func named_hex(name: String) -> String:
+	return str(HAIR_ASHEN.get(name, HAIR_COLOURS[name])) if rule == "two_light_D" else str(HAIR_COLOURS[name])
+
+
 const FACE_SKIN_L := [27.8, 37.4, 46.2, 55.2, 64.1, 71.3, 78.1, 86.5]
 const FACE_LIT := {"noon": [35.5, 41.6, 47.7, 54.3, 60.9, 66.4, 70.9, 78.6], "evening": [26.2, 28.4, 32.1, 34.2, 38.5, 40.5,
 	44.3, 47.4]}
@@ -368,6 +381,9 @@ func apply(scene: Node3D, tunic := Color.WHITE) -> void:
 			mesh.set_instance_shader_parameter("hair", beard_colour)
 		if tunic != Color.WHITE:
 			mesh.set_instance_shader_parameter("tunic", tunic)
+	if log_looks:
+		print("LOOK rule=%s words=%s hair_colour=%s skin=%d hair=%s skin_rgb=%s" % [rule, words, hair_colour, skin,
+				Color(colours.get("hair", Color.BLACK)).to_html(false), Color(colours.get("skin", Color.BLACK)).to_html(false)])
 	dye_hood(scene)
 
 
@@ -394,7 +410,7 @@ static var _hair_against := {}
 ## [param name]'s hair colour drawn beside [param skin] (HAIR_STEP): the named colour, moved in lightness when the
 ## two are too near in value.
 static func hair_against(name: String, skin: Color) -> Color:
-	var key := name + "/" + skin.to_html(false)
+	var key := rule + "/" + name + "/" + skin.to_html(false)
 	if not _hair_against.has(key):
 		_hair_against[key] = _hair_moved(name, skin)
 	return _hair_against[key]
@@ -402,6 +418,8 @@ static func hair_against(name: String, skin: Color) -> Color:
 
 static func _hair_moved(name: String, skin: Color) -> Color:
 	var today := _hair_palette_move(name, skin)
+	if rule == "today":
+		return today
 	var drawn := _hair_drawn_move(name, skin)
 	var ls := lab_of(skin).x
 	var t := lab_of(today).x
@@ -432,7 +450,7 @@ static func lit_face(l: float, light: String) -> float:
 
 ## The move the rule makes judged on the noon-drawn values (HAIR_LIT, FACE_LIT), as the palette rule below.
 static func _hair_drawn_move(name: String, skin: Color) -> Color:
-	var hair := Color(HAIR_COLOURS[name])
+	var hair := Color(named_hex(name))
 	var ls := lit_face(lab_of(skin).x, "noon")
 	var h := lab_of(hair)
 	var d := lit_hair(h.x, "noon") - ls
@@ -461,7 +479,7 @@ static func _hair_reach_lit(name: String, h: Vector3, ls: float, sign_: float) -
 
 ## Today's rule: the step judged on the palette's L*.
 static func _hair_palette_move(name: String, skin: Color) -> Color:
-	var hair := Color(HAIR_COLOURS[name])
+	var hair := Color(named_hex(name))
 	var ls := lab_of(skin).x
 	var h := lab_of(hair)
 	var d := h.x - ls
@@ -510,7 +528,7 @@ static func nearest_hair(c: Color) -> String:
 	var best := ""
 	var best_d := INF
 	for name: String in HAIR_COLOURS:
-		var dist := at.distance_squared_to(lab_of(Color(HAIR_COLOURS[name])))
+		var dist := at.distance_squared_to(lab_of(Color(named_hex(name))))
 		if dist < best_d:
 			best_d = dist
 			best = name
