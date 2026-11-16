@@ -1077,6 +1077,7 @@ func _test_town_sheet(host: Player) -> void:
 	_test_truffles(host)
 	_test_admin_stock(host)
 	_test_admin_damage()
+	_test_admin_owe(host)
 
 
 ## 826 amended (1): a Give row's gold is what the give pays (playtest's joined storearrive: herbs
@@ -1641,6 +1642,43 @@ func _test_admin_damage() -> void:
 		buildings.erase("kitchen")
 	else:
 		buildings["kitchen"] = was
+
+
+## The test-only owe verb (918 amended (3)): unknown, string for string, without --test-hp beside
+## --run-marker, and never in the help; with it, what the town owes a resident read (no gold) or set,
+## by name in any case, refused past their ceiling, for no such resident (a player is none) or store.
+func _test_admin_owe(host: Player) -> void:
+	print("\n== the test-only owe verb (918 amended (3)) ==")
+	var had_hp := Net.test_hp
+	var ids := World.production.worker_ids(STORE)
+	_check(not ids.is_empty(), "a resident at %s to owe" % STORE)
+	if ids.is_empty():
+		return
+	var id: String = ids[0]
+	var who := str(World.production.worker(id)["name"])
+	var was := int(World.production.worker(id).get("owed", 0))
+	Net.test_hp = false
+	var shut: String = _main.admin_command("owe %s %s 3" % [STORE, who])
+	var nonsense: String = _main.admin_command("zqxverb %s %s 3" % [STORE, who])
+	_check(shut == nonsense.replace("zqxverb", "owe") and int(World.production.worker(id).get("owed", 0)) == was,
+		"without --test-hp: the very reply an unknown word gets, nothing owed (%s)" % shut)
+	_check(not _main.admin_command("help").contains("owe "), "never in the help")
+	Net.test_hp = true
+	var ceiling := World.production.owed_ceiling(id)
+	var gold := mini(3, ceiling)
+	var set_reply: String = _main.admin_command("owe %s %s %d" % [STORE, who.to_upper(), gold])
+	_check(set_reply == "%s: the town owes %s %d (was %d)" % [STORE, who, gold, was] and int(World.production.worker(id)["owed"]) == gold,
+		"set by name in any case: %s" % set_reply)
+	var read_reply: String = _main.admin_command("owe %s %s" % [STORE, who])
+	_check(read_reply == "%s: the town owes %s %d" % [STORE, who, gold] and int(World.production.worker(id)["owed"]) == gold,
+		"no gold: read, unchanged (%s)" % read_reply)
+	var refusals: Array[String] = [_main.admin_command("owe %s %s %d" % [STORE, who, ceiling + 1]), _main.admin_command("owe %s %s 2" % [STORE, host.name]),
+		_main.admin_command("owe nowhere/store %s 2" % who), _main.admin_command("owe %s" % STORE), _main.admin_command("owe %s %s -1" % [STORE, who])]
+	_check(refusals[0] == "owe: %d is past %s's ceiling of %d" % [ceiling + 1, who, ceiling] and refusals[1].begins_with("owe: no resident")
+		and refusals[2].begins_with("owe: no town store") and refusals[3].begins_with("usage") and refusals[4].begins_with("usage")
+		and int(World.production.worker(id)["owed"]) == gold, "past the ceiling, a player, no such store, no name, below 0: refused, nothing moved (%s)" % [refusals])
+	World.production.set_owed(id, was)
+	Net.test_hp = had_hp
 
 
 ## The town window (768, economy's side): the sheet's new fields for the

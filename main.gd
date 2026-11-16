@@ -29141,6 +29141,9 @@ func admin_command(line: String, caller: Player = null) -> String:
 		"damage":  # 566 amended (8), test-only: never in the help, unknown without --test-hp beside --run-marker.
 			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 				return damage_command(words)
+		"owe":  # 918 amended (3), test-only: never in the help, unknown without --test-hp beside --run-marker.
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return owe_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -29474,6 +29477,37 @@ func damage_command(words: PackedStringArray) -> String:
 		return "damage: the %s is %s, not standing" % [kind, str(house.get("state", ""))]
 	print("[economy] the admin damaged %s's %s, step %d" % [town, kind, World.steps])
 	return "%s: the %s damaged (level %d); its repair is ordered at the town's next turn" % [town, kind, int(house.get("level", 0))]
+
+
+## "owe <town store> <resident name> [gold]" (918 amended (3), test-only: --test-hp beside
+## --run-marker, by hp_verb_allowed alone; never in CONSOLE_HELP): what that town owes one of its
+## residents (Production's owed, the debt the treasury pays first above its floor), set to [gold], or
+## read with no gold, for the joined pass showing a gift toward a building leaves a debt standing.
+## Residents only, by name (any case); never a player. Refused past their owed_ceiling (918 amended (1)).
+func owe_command(words: PackedStringArray) -> String:
+	if words.size() < 3 or words.size() > 4 or (words.size() == 4 and (not words[3].is_valid_int() or words[3].to_int() < 0)):
+		return "usage: owe <town store> <resident name> [gold] (test-only)"
+	if World.production == null or World.towns == null or not World.towns.is_town(words[1]) or World.holdings == null or World.holdings.place(words[1]).is_empty():
+		return "owe: no town store %s" % words[1]  # As stock checks one.
+	var town := words[1]
+	var id := ""
+	for each: String in World.production.worker_ids(town):
+		if str(World.production.worker(each).get("name", "")).to_lower() == words[2].to_lower():
+			id = each
+			break
+	if id.is_empty():
+		return "owe: no resident %s at %s" % [words[2], town]
+	var who := str(World.production.worker(id)["name"])
+	var had := int(World.production.worker(id).get("owed", 0))
+	if words.size() == 3:
+		return "%s: the town owes %s %d" % [town, who, had]
+	var gold := words[3].to_int()
+	var ceiling := World.production.owed_ceiling(id)
+	if gold > ceiling:
+		return "owe: %d is past %s's ceiling of %d" % [gold, who, ceiling]
+	World.production.set_owed(id, gold)
+	print("[economy] the admin set what %s owes %s to %d (was %d), step %d" % [town, who, gold, had, World.steps])
+	return "%s: the town owes %s %d (was %d)" % [town, who, gold, had]
 
 
 ## "give <player> <item> [count]" (709 amended; playtest's tours): that

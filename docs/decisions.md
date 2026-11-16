@@ -58446,6 +58446,25 @@ the floor pays him 5, the fund untouched), economy_test _test_town_window (wants
 its people and 5 given: M the same, the fund 5 more). Server only; no new class_name. Bullet: voice's (a gift always
 moves the building's bar), once ui-design's joined watch on a broke local town shows it (the coordinator).
 
+918 amended (3): a test-only console verb for what a town owes a resident (approved by the coordinator, 2026-11-16, as
+designed; label from tools/decision_number.sh). ui-design's joined donate2 watch on 3e5899425 showed a gift counted at
+once and paying its building's wood, but no debt stood in it, so "never the town's debts" and the builder's fee were
+tested and unseen; no console line could stand one inside a short run (an official's first wage falls due one "every",
+54000 steps, after the official is seated; a fresh local Umbrage has no wage-floor trade; a delivery the build lacks
+is paid from its fund first, 499). Main.owe_command, "owe <town store> <resident name> [gold]": gated as 566 amended
+(8)'s damage (hp_verb_allowed, --test-hp beside --run-marker, never in CONSOLE_HELP, so the box answers "unknown
+command"); residents only, by name in any case, never a player; with gold it sets that resident's owed
+(Production.set_owed), refused past their owed_ceiling ("owe: 21 is past Aldous's ceiling of 20"), replying "<store>:
+the town owes <name> N (was M)" and printing "[economy] the admin set what <store> owes <name> to N (was M), step S";
+with no gold it reads the figure, unchanged (ui-design's ask: the sheet carries no owed). The coordinator's pass runs
+on main's tip with this verb added, the verb landing with economy's next take. As landed (499, 918 amended (2)), a
+fund is its building's until it stands or its plan is dropped, then the rest is the town's (settle_fund pays the
+builder's fee, _keep_fund deposits the rest), and the treasury pays its officials' debts first at the next economy
+tick above gold_floor: so a gift's leftover past the floor pays a debt; the pass runs it twice, a gift of 10 (the
+leftover at the floor) and of 17 (past it). Tests: economy_test _test_admin_owe (unknown without the flags, string for
+string; not in the help; set by name in another case; read unchanged; past the ceiling, a player, no store, no name,
+below 0 refused, nothing moved). Server only; protocol unchanged; no new class_name; no bullet (a test verb).
+
 ## 920. The tavern's sound: its hearth burning, the taverner's cup, the room's talk by the goers seen (sound)
 
 The coordinator's order of 11-14: maps' Mughouse take switches "Umbrage at
