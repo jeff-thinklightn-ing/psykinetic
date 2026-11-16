@@ -58617,7 +58617,17 @@ well im not sure the solution".
     the wilds' grass under the moon (INSIDE_APRON_NIGHT, INSIDE_HAZE_NIGHT; their 21:30 grass reads 25 to
     38, dark blue-green), never black: half of Jeff's report was the black outside. Past the way out the
     apron is what is there in the wilds, the lane's dirt for INSIDE_WAY_DIRT m, then the square's cobbles,
-    widening outward (inside_way, from the door rows), so the way out reads as the way to the square.
+    widening outward (inside_way, from the door rows), so the way out reads as the way to the square: crisp
+    at its edges, the dirt mottled and the cobbles laid as stones 0.45 m with darker joints, in the shader
+    (the second pair's soft, plain way read as spilled light or a rug). By day (the coordinator, 11-15, on
+    the second pair: its dark blue-green falling to darker corners read as a lit room at dusk, or a vignette,
+    "black outside" again) the apron by the walls the town's ground in daylight, muted, a step under the
+    floor's value, going off with distance to a pale haze, the sky's horizon at INSIDE_HAZE_DAY, lighter than
+    the apron and never dark; the fall to dark is the night's, 17:30 between; the room the warmest thing,
+    not the only bright one. The third look shows noon three ways from one build (Client3D.inside_apron_day
+    and inside_haze_day, set by the tour; they go once one is picked). The door lantern's
+    night pool warmer and wider (INSIDE_DOOR_NIGHT_WIDE; it read as a pale doormat, cooler than the
+    candles).
 - Tests: view_world_test _test_daylight_indoors: maps' windows read as wall edges (a bad side, a cell off the
   floor said); the rule's spacing and kept cells; the Mughouse's ground floor its windows clear of its
   hearth, way out and stair, each a pane, its way out two rows, the apron laid; noon's ambient over 21:30's

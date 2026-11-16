@@ -29813,9 +29813,11 @@ const INSIDE_SKY_PATCH := 0.13
 const INSIDE_SKY_REACH := 1.3
 const INSIDE_DOOR_PATCH := 0.2
 const INSIDE_DOOR_REACH := 2.4
-const INSIDE_DOOR_NIGHT_COLOUR := Color(1.0, 0.62, 0.3)
-const INSIDE_DOOR_NIGHT := 0.22
-const INSIDE_DOOR_NIGHT_REACH := 2.0
+const INSIDE_DOOR_NIGHT_COLOUR := Color(1.0, 0.55, 0.2)
+const INSIDE_DOOR_NIGHT := 0.34
+const INSIDE_DOOR_NIGHT_REACH := 2.8
+## The night pool's width, in the door's (it spreads as the lantern's).
+const INSIDE_DOOR_NIGHT_WIDE := 1.6
 ## A pool's sides soften over this many metres from the wall (927 amended (3)'s, not yet on main).
 const INSIDE_SIDE_SOFT := 1.0
 ## A window's glass (wall.wood.window's glow, 1.3 to 2.0 m) and a doorway's
@@ -29831,18 +29833,20 @@ const INSIDE_DOOR_HIGH := 2.2
 ## 38, dark blue-green, so never black). Past the way out, the lane's dirt
 ## for INSIDE_WAY_DIRT m, then the square's cobbles, the way widening by
 ## INSIDE_WAY_WIDEN a metre out: the way out reads as the way to the square.
-## The background the sky's horizon darkened to INSIDE_HAZE_DAY by day, the
-## wilds' far ground at night.
+## The background by day the sky's horizon at INSIDE_HAZE_DAY, a pale haze
+## lighter than the apron, so the ground goes off into air and never to dark
+## (the fall to dark is the night's; 17:30 between); at night the wilds' far
+## ground.
 const INSIDE_APRON := 7.0
-const INSIDE_APRON_DAY := Color(0.18, 0.2, 0.15)
+const INSIDE_APRON_DAY := Color(0.22, 0.245, 0.18)
 const INSIDE_APRON_NIGHT := Color(0.09, 0.135, 0.13)
 const INSIDE_DIRT_DAY := Color(0.27, 0.21, 0.145)
 const INSIDE_DIRT_NIGHT := Color(0.12, 0.11, 0.1)
 const INSIDE_COBBLE_DAY := Color(0.22, 0.22, 0.215)
 const INSIDE_COBBLE_NIGHT := Color(0.1, 0.11, 0.12)
 const INSIDE_WAY_DIRT := 2.5
-const INSIDE_WAY_WIDEN := 0.35
-const INSIDE_HAZE_DAY := 0.24
+const INSIDE_WAY_WIDEN := 0.2
+const INSIDE_HAZE_DAY := 0.55
 const INSIDE_HAZE_NIGHT := Color(0.065, 0.1, 0.105)
 const INSIDE_PATCH_SHADER := """shader_type spatial;
 render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
@@ -29887,6 +29891,15 @@ uniform float way_dirt = 2.5;
 uniform float way_widen = 0.35;
 uniform float way_half = 1.0;
 varying vec3 world;
+float hash2(vec2 p) {
+	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float noise2(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), u.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), u.x), u.y);
+}
 void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
@@ -29898,8 +29911,18 @@ void fragment() {
 		float t = dot(rel, way_out);
 		float s = abs(dot(rel, vec2(-way_out.y, way_out.x)));
 		float w = way_half + max(t, 0.0) * way_widen;
-		float in_way = (1.0 - smoothstep(w - 0.4, w + 0.4, s)) * smoothstep(-0.3, 0.2, t);
-		ground = mix(ground, mix(dirt_colour, cobble_colour, smoothstep(way_dirt - 0.6, way_dirt + 0.6, t)), in_way);
+		float in_way = (1.0 - smoothstep(w - 0.12, w + 0.12, s)) * smoothstep(-0.3, 0.0, t);
+		vec2 q = world.xz;
+		float mottle = 0.86 + 0.18 * noise2(q * 1.3) + 0.1 * noise2(q * 5.0);
+		vec3 dirt = dirt_colour * mottle;
+		// Cobbles: rows of stones 0.45 m, every other row half a stone along, each its own shade, the joints darker.
+		vec2 c = q / 0.45;
+		c.x += 0.5 * mod(floor(c.y), 2.0);
+		vec2 f = fract(c);
+		float joint = smoothstep(0.0, 0.14, min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)));
+		vec3 stones = cobble_colour * (0.85 + 0.3 * hash2(floor(c))) * mix(0.55, 1.0, joint);
+		float cobbled = smoothstep(way_dirt - 0.25, way_dirt + 0.25, t + 0.3 * noise2(q * 2.0));
+		ground = mix(ground, mix(dirt, stones, cobbled), in_way);
 	}
 	ALBEDO = mix(ground, far_colour, smoothstep(0.0, reach, length(d)));
 }
@@ -29912,6 +29935,11 @@ var _inside_pane_material: StandardMaterial3D
 var _inside_rows: Array[Array] = []
 var _inside_patches: MultiMeshInstance3D
 var _inside_apron: MeshInstance3D
+## The day's apron colour and haze share this view uses (INSIDE_APRON_DAY,
+## INSIDE_HAZE_DAY): the third look sets them to show the coordinator noon's
+## surround three ways from one build; they go once one is picked.
+var inside_apron_day := INSIDE_APRON_DAY
+var inside_haze_day := INSIDE_HAZE_DAY
 var _inside_step := -1
 var _inside_night: Array = []
 
@@ -30188,7 +30216,7 @@ static func inside_patches(row: Array, toward: Vector3, elevation: float, day: f
 	if door and day < 0.99:
 		# Outside the threshold, on the way out's ground (927 amended (2)'s place).
 		var night_reach := INSIDE_DOOR_NIGHT_REACH
-		var night_place := Transform3D(Basis(along * 1.0 * WINDOW_LIGHT_SPREAD, Vector3.UP, -inward * night_reach), foot.origin + lift - inward * night_reach * 0.5)
+		var night_place := Transform3D(Basis(along * INSIDE_DOOR_NIGHT_WIDE * WINDOW_LIGHT_SPREAD, Vector3.UP, -inward * night_reach), foot.origin + lift - inward * night_reach * 0.5)
 		found.append([night_place, inside_patch_custom(INSIDE_DOOR_NIGHT_COLOUR, INSIDE_DOOR_NIGHT * (1.0 - day), night_reach, false)])
 	return found
 
@@ -30229,14 +30257,14 @@ static func inside_patch_custom(colour: Color, strength: float, length: float, s
 ## [[param night_colour], [param night_energy]]: {ambient, ambient_energy,
 ## pane, pane_energy, haze (the background), apron (the ground's near
 ## colour)}.
-static func inside_look(look: Dictionary, day: float, night_colour: Color, night_energy: float) -> Dictionary:
+static func inside_look(look: Dictionary, day: float, night_colour: Color, night_energy: float, apron_day := INSIDE_APRON_DAY, haze_day := INSIDE_HAZE_DAY) -> Dictionary:
 	var day_ambient := (look["ambient"] as Color).lerp(night_colour, INSIDE_DAY_WARM)
 	var horizon: Color = look["horizon"]
 	return {"ambient": night_colour.lerp(day_ambient, day),
 		"ambient_energy": lerpf(night_energy, night_energy * INSIDE_DAY_LIFT, day),
 		"pane": INSIDE_PANE_NIGHT.lerp(horizon.lerp(INSIDE_PANE_SKY, INSIDE_PANE_BLUE), day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
-		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, INSIDE_HAZE_DAY), day),
-		"apron": INSIDE_APRON_NIGHT.lerp(INSIDE_APRON_DAY, day),
+		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, haze_day), day),
+		"apron": INSIDE_APRON_NIGHT.lerp(apron_day, day),
 		"dirt": INSIDE_DIRT_NIGHT.lerp(INSIDE_DIRT_DAY, day), "cobble": INSIDE_COBBLE_NIGHT.lerp(INSIDE_COBBLE_DAY, day)}
 
 
@@ -30258,7 +30286,7 @@ func _update_inside() -> void:
 	var fraction := float(step) / SKY_STEPS
 	var elevation := DayNight.elevation_at(fraction)
 	var day := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
-	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1])
+	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1], inside_apron_day, inside_haze_day)
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.background_color = look["haze"]
