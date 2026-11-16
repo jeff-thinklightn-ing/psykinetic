@@ -4274,7 +4274,8 @@ func _test_tavern_inside() -> void:
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
 	# The inn's shell (the tavern zone: its inside is umbrage_tavern, its way
-	# in two cells inside the door; the roof still eases off a player there).
+	# in a cell inside the door). 811 amended (8): its footprint is solid but
+	# its links and doorway, and its roof stays on over one in its doorway.
 	var inns: Array = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return str(building.get("use", "")) == "inn")
 	var rect: Rect2i = inns[0]["rect"] if inns.size() == 1 else Rect2i()
 	var drawn: Array = _rig._buildings.filter(func(building: Dictionary) -> bool: return building.get("rect") == rect)
@@ -4300,22 +4301,22 @@ func _test_tavern_inside() -> void:
 	_rig.inside_changed.connect(listen)
 	var at := func(cell: Vector2i) -> void:
 		_rig._update_roofs([_rig.to_global(Vector3(cell.x, 0.5, cell.y))])
-	var path: Array[Vector2i] = [Vector2i(182, 208), Vector2i(181, 208), Vector2i(180, 208), Vector2i(179, 208), Vector2i(178, 208), Vector2i(177, 208), Vector2i(176, 208)]
+	var path: Array[Vector2i] = [Vector2i(182, 208), Vector2i(181, 208), Vector2i(180, 208), Vector2i(179, 208)]
 	var outside := not _rig._indoors(path[0]) and _rig.inside_building() == Rect2i()
 	for cell: Vector2i in path:
 		at.call(cell)
 	var bounds := _rig.inside_building()
-	_check(outside and bounds != Rect2i() and rect.encloses(bounds) and bounds.has_point(path.back()) and not told.is_empty() and told.back()[0],
-			"walked in through its east door: inside, the camera's bounds %s within the inn %s and round the player at %s" % [bounds, rect, path.back()])
+	_check(outside and (bounds == Rect2i() or rect.encloses(bounds)) and not (wilds["terrain"]["floor"] as Array).has(Vector2i(177, 208)),
+			"walked to its east door's inside cell %s: the shell behind it no floor, the camera's bounds %s none or within the inn %s" % [path.back(), bounds, rect])
 	var roof: Node3D = drawn[0]["roof"]
 	for i in 3:
 		_rig._fade_clock += Client3D.ROOF_FADE
 		at.call(path.back())
 	var meshes: Array = _rig._descendants(roof).filter(func(node: Node) -> bool: return node is GeometryInstance3D)
-	_check(not meshes.is_empty() and (meshes[0] as GeometryInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
-			"the inn's own roof eased off over the player")
+	_check(not meshes.is_empty() and (meshes[0] as GeometryInstance3D).cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+			and not drawn[0]["off"], "the inn's roof stays on over the player in its doorway (811 amended (8))")
 	at.call(path[0])
-	_check(not told.back()[0] and _rig.inside_building() == Rect2i(), "out of its door again: not inside")
+	_check((told.is_empty() or not told.back()[0]) and _rig.inside_building() == Rect2i(), "out of its door again: not inside")
 	_rig._fade_clock += Client3D.FADE_HOLD + Client3D.ROOF_FADE * 4.0
 	at.call(path[0])
 	# Out in the street the view stays the street's (the coordinator, 11-13: a

@@ -3938,6 +3938,7 @@ func _test_relaid() -> void:
 	_test_caches(wilds, hills)
 	_test_carved(hills)
 	_test_tavern_zone(wilds)
+	_test_insides_closed()
 	_test_smithy_inside()
 	_test_spots(wilds)  # 853.
 	_test_temple_furnished(wilds)
@@ -4675,6 +4676,54 @@ func _test_storey_stairs() -> void:
 			"%s: all %d floors reach the ground and back (down %s, up %s), every stair in sight (bad %s)" % [ground, names.size(), down, up, bad])
 
 
+## 811 amended (8) (the coordinator's bar on Jeff's report, 11-15: "often you end up in the shell of the mughouse instead
+## of the zone"): in every level, no cell of a building that has an "inside" level can be stood on from outside it
+## but its doorway's cells, each a step from a link, without crossing one: walked from the floor before each of its doors (WorldRoutes._flood, the routes' own
+## steps, diagonals and edges), the links as walls, it reaches none of the footprint. On main before the mend the
+## Mughouse's links stood a cell in from its door's inside cells, and its other 76 cells were walked to round them.
+func _test_insides_closed() -> void:
+	print("
+== no building with an inside level can be stood in from outside without its links ==")
+	var open: Array[String] = []
+	var closed := 0
+	for level_name: String in Level.names():
+		var level := Level.load_level(level_name)
+		if level.is_empty():
+			continue
+		var area: Dictionary = {}
+		for building: Dictionary in level.get("buildings", []):
+			var inside := str(building.get("inside", ""))
+			if inside.is_empty():
+				continue
+			if area.is_empty():
+				area = WorldMap.build([level_name]).areas[level_name]
+			var foot := {}
+			for cell: Vector2i in Level.building_cells(building):
+				foot[cell] = true
+			var links := {}
+			for link: Dictionary in level["links"]:
+				if str(link.get("to_map", "")) == inside:
+					links[link["tile"]] = true
+			var fronts: Array[Vector2i] = []
+			for edge: Vector3i in Level.entrances(building):
+				for cell: Vector2i in Terrain.edge_cells(edge):
+					if not foot.has(cell) and (area["floor"] as Dictionary).has(cell):
+						fronts.append(cell)
+			var reached := {}
+			for front: Vector2i in fronts:
+				reached.merge(WorldRoutes._flood(area, front, foot, PackedFloat32Array(), links))
+			# Its doorway's cells beside a link are the step before the crossing: stood on, and the next step is in.
+			for cell: Vector2i in reached.keys():
+				if fronts.any(func(front: Vector2i) -> bool: return World.distance(front, cell) <= 1) 						and links.keys().any(func(link: Vector2i) -> bool: return (link - cell).abs().x + (link - cell).abs().y == 1):
+					reached.erase(cell)
+			if fronts.is_empty() or links.is_empty() or not reached.is_empty():
+				open.append("%s %s: %d of %d cells walked to from %s without its links %s" % [level_name, building.get("code", building.get("slot", "")),
+					reached.size(), foot.size(), fronts, links.keys()])
+			else:
+				closed += 1
+	_check(closed >= 1 and open.is_empty(), "every building with an inside level (%d) is entered only by its links: none of its cells stood on from outside (%s)" % [closed, open])
+
+
 func _test_tavern_zone(wilds: Dictionary) -> void:
 	print("
 == Umbrage's tavern, its own zone: three floors, its way in, its tavern and beds ==")
@@ -4691,7 +4740,26 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	tiles.sort()
 	_check(tiles == [Vector2i(178, 208), Vector2i(178, 209)] and ins.all(func(link: Dictionary) -> bool:
 		return link["to_spawn"] == "from_wilds" and link.get("stands", {}) == {"town": "wilds/store", "use": "inn"}),
-		"the inn's way in: two cells inside its door, to the ground floor, closed unless the inn stands (%s)" % [tiles])
+		"the inn's way in: a cell in from its door, to the ground floor, closed unless the inn stands (%s)" % [tiles])
+	# 811 amended (8): its footprint's floor is its links and its door's two inside cells, the rest solid.
+	var mughouse: Dictionary = (wilds["buildings"] as Array).filter(func(b: Dictionary) -> bool: return str(b.get("code", "")) == "I1")[0]
+	var floor_in: Array[Vector2i] = []
+	var solid_in := 0
+	var solid_set := {}
+	for cell: Vector2i in wilds["terrain"]["solid"]:
+		solid_set[cell] = true
+	var floor_set := {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor_set[cell] = true
+	for cell: Vector2i in Level.building_cells(mughouse):
+		if floor_set.has(cell):
+			floor_in.append(cell)
+		elif solid_set.has(cell):
+			solid_in += 1
+	floor_in.sort()
+	_check(floor_in == [Vector2i(178, 208), Vector2i(178, 209), Vector2i(179, 208), Vector2i(179, 209)] and solid_in == Level.building_cells(mughouse).size() - 4
+		and Level.shell_pocket(wilds, mughouse).size() == 4,
+		"the Mughouse's floor is its two links and its door's two inside cells, its other %d cells solid (floor %s)" % [solid_in, floor_in])
 	var unpaired: Array[String] = []
 	for name: String in floors:
 		for link: Dictionary in floors[name]["links"]:

@@ -430,6 +430,7 @@ const ROOM: Array[StringName] = [
 	&"_shadow_key",
 	&"_shadow_lights",
 	&"_shafts",
+	&"_shell_at",
 	&"_shore_heights",
 	&"_shore_image",
 	&"_shore_mask",

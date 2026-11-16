@@ -1127,6 +1127,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_lay_bridges(level)
 	_lay_solid(level)
 	_building_links(level, config, warnings)
+	_lay_shells(level)
 	level["terrain"]["link_cues"] = link_cues(level, config, templates)
 	var derived := _lay_curves(level["terrain"], config, warnings)
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
@@ -3515,6 +3516,48 @@ static func _lay_solid(level: Dictionary) -> void:
 					heard_over.append(cell)
 	terrain["solid"] = solid
 	terrain["heard_over"] = heard_over  # 925: hearing passes over these.
+
+
+## 811 amended (8) (Jeff, 11-15: "often you end up in the shell of the mughouse instead of the zone"): a building whose
+## "inside" names a level (the inn's shell) and has a link laid for it keeps as floor only its links' cells and its
+## entrances' cells inside its footprint (the door's inside cells): its every other footprint cell is out of the floor and
+## into terrain "solid", as a SOLID building's are (550: drawn as land, nobody steps onto it, routes go round, sight stops),
+## so the only cells of it a body can stand on from outside are ones whose next step is the crossing. One with no link laid
+## (left out, or none given) keeps its floor: nobody is shut out of a way in that isn't there.
+static func _lay_shells(level: Dictionary) -> void:
+	var terrain: Dictionary = level["terrain"]
+	var solid: Array[Vector2i] = terrain["solid"]
+	for building: Dictionary in level["buildings"]:
+		if str(building.get("inside", "")).is_empty():
+			continue
+		var keep := shell_pocket(level, building)
+		if keep.is_empty():
+			continue
+		for cell: Vector2i in building_cells(building):
+			if not keep.has(cell) and terrain["floor"].has(cell):
+				terrain["floor"].erase(cell)
+				solid.append(cell)
+
+
+## The cells of shell [param building]'s footprint left floor by _lay_shells: its links' cells in [param level] (those
+## naming it) and its entrances' cells inside it; {} when no link is laid for it.
+static func shell_pocket(level: Dictionary, building: Dictionary) -> Dictionary:
+	var foot := {}
+	for cell: Vector2i in building_cells(building):
+		foot[cell] = true
+	var keep := {}
+	var code := str(building.get("code", ""))
+	var named := code if not code.is_empty() else str(building.get("slot", ""))
+	for link: Dictionary in level["links"]:
+		if str(link.get("building", "")) == named and foot.has(link["tile"]):
+			keep[link["tile"]] = true
+	if keep.is_empty():
+		return keep
+	for edge: Vector3i in entrances(building):
+		for cell: Vector2i in Terrain.edge_cells(edge):
+			if foot.has(cell):
+				keep[cell] = true
+	return keep
 
 
 ## A parsed building's cells laid solid though it is no SOLID one (718): a

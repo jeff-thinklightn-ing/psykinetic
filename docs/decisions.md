@@ -50822,6 +50822,43 @@ C:/dev/review/mughouse/make_mughouse.py; the look at C:/dev/review/mughouse/smit
 nothing places it till buildings' 811 amended (2) switches the smithy on. Art only, protocol unchanged, no
 new class_name, no bullet.
 
+811 amended (8): the Mughouse's shell is solid but its links and its doorway; anything saved in it is set outside its
+door (maps; the script's label; the coordinator's bar on Jeff's report, 11-15 18:48: "often you end up in the shell of the
+mughouse instead of the zone"; ui-design's repro on main c8fc3823e and on v0.1.219, joined: 13 of 33 entries and 14 of
+20 leavings ended in the shell, C:/dev/review/ui-design/looks/mug_c8fc3823e/). The shell's 80 cells were all floor,
+its links (178, 208)/(178, 209) a cell in from its door's inside cells (179, 208)/(179, 209), and from the lane 76 of
+them were walked to round the links (a click on the door cell, the wall, the roof, a diagonal from the door). The
+links stay where they are: Level._building_links refuses a link on a door or front cell (715), and a link on the
+door's inside cell would have left the leaver no cell beside it. Level._lay_shells, after _building_links: a building
+whose "inside" names a level and has a link laid for it keeps as floor only its links' cells and its entrances' cells
+inside its footprint (Level.shell_pocket); every other footprint cell is out of the floor and into terrain "solid", as
+550's mounds and 718's bank are (the client draws land under it, no tree; nobody steps onto it, routes go round, sight
+stops). For I1 that is 76 cells, the pocket (178..179, 208..209): from outside the only cells of it a body can stand
+on are its door's two inside cells, each a step from a link. One with no link laid keeps its floor. The view keeps a
+shell's roof on and its walls up for one standing in its footprint (Client3D._shell_at): the doorway is a step, and a
+lifted roof over bare boards was what made the shell read as a broken inside. Nobody sealed in (the coordinator's bar
+4): a saved body or thing read at the server's start (_spawn_saved, _recall) and a player record read at a join
+(_join_player) standing on a shell's footprint is set at the nearest free cell to the one a step beyond its front,
+(181, 208) for I1, outside the door and off the goers' door cell (Main._out_of_shell), with one line each,
+"[state] wilds: 1 <kind> saved in a shell's footprint set outside its door, from x,y to x,y" (the script's file name
+or "player", the two cells, nothing else), for release to count after the deploy. Residents are not saved by tile
+(they are made at their places, which skip shells), so none is moved; economy finds none of its people placed or
+routed inside I1 and a non-player never steps onto a link. Leaving, on this take alone (before terrain's 947): a
+leaver still arrives where he does on main, (179, 209), now the doorway, a step from the link and every other step
+off it solid but the door's; W held through the card walks him west onto the link and back in, where on main it
+walked him into the shell's corner: 947's held-input guard and arrival outside close that. level_test
+_test_insides_closed (every level, every building with an inside: a flood from the floor before each door, the links
+as walls, reaches none of its footprint but its doorway's cells beside a link; main: 76 of I1's) and the tavern-zone
+row's pocket (its floor exactly the links and the door's inside cells, the other 76 solid); first_room_test
+_test_shell_roof (on (179, 208) the roof stays on and no wall fades; a walk-in building's roof still lifts) and
+_test_out_of_shell (a cart saved at (175, 208) and a player whose record stands there both come back outside the door,
+on floor, off its door and link cells); view_test _test_tavern_inside (774's row: the roof eased off a player in the
+shell) now walks to the doorway (179, 208), the shell behind it no floor, the roof on (Client3D._shell_at a room field,
+room_fields.gd). Also run alone: view_world_test, relief_test, world_map_test, regen_test, resident_test,
+town_day_test, zone_test, companion_test, protocol_test; load_check. Protocol changed: PROTOCOL_REVISION 59 (release's number): an old client's own
+parse would still walk into the 76 cells. Server and client both; needs the deploy; no new class_name; no bullet till
+ui-design's joined after-run on this take (voice words it then).
+
 805 amended (11), "fishing that works", A, B, H and F (2) (items; the script's label; the coordinator's package and rulings
 after Jeff on v0.1.210: "fishing still doesn't work even though its in the release notes again", and his core loop
 first; items' blind tour on v0.1.210, tests/tour/tours/fish.gd, and playtest's: the cast was only a right-click on

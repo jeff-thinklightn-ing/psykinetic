@@ -3594,6 +3594,9 @@ const RUIN_SPILL_OUT := 0.35
 ## A ruin's wall edges (649): no post stands for them.
 var _ruin_edges: Dictionary[Vector3i, bool] = {}
 var _building_at: Dictionary[Vector2i, int] = {}
+## The footprints of the buildings whose "inside" names a level (811 amended (8): the inn's shell, solid but its links and
+## door cells): one standing there is in its doorway for a step before the crossing, so its roof and walls never lift.
+var _shell_at: Dictionary[Vector2i, bool] = {}
 ## A banked building's whole plot (718: its bank and walls over the ring
 ## round its block): no outdoor scatter there, as on a floor (734 amended
 ## (6): tufts at the turf house's walls, inside their art).
@@ -7673,6 +7676,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_buildings.clear()
 	_home_labels.clear()
 	_building_at.clear()
+	_shell_at.clear()
 	_banked_plot.clear()
 	_stand_at.clear()
 	_roofs_off.clear()
@@ -10689,6 +10693,9 @@ func _add_buildings() -> void:
 		show_building_codes.call_deferred(true)
 	_plots_drawn.clear()
 	for building: Dictionary in _drawn_buildings():
+		if not str(building.get("inside", "")).is_empty():
+			for cell: Vector2i in Level.building_cells(building):
+				_shell_at[cell] = true
 		if building.get("plot", false):
 			_plots_drawn[(building["rect"] as Rect2i).position] = true
 		if building.get("home", false):
@@ -21977,7 +21984,7 @@ func _inside_walls(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D
 	for point in points:
 		var at := to_local(point)
 		var cell := Vector2i(roundi(at.x), roundi(at.z))
-		if _building_at.has(cell):
+		if _building_at.has(cell) and not _shell_at.has(cell):
 			inside[_building_at[cell]] = true
 	for index in inside:
 		var rect: Rect2i = _buildings[index]["rect"]
@@ -22021,7 +22028,7 @@ func _update_roofs(points: Array[Vector3]) -> bool:
 	for point in points:
 		var at := to_local(point)
 		var cell := Vector2i(roundi(at.x), roundi(at.z))
-		if _building_at.has(cell):
+		if _building_at.has(cell) and not _shell_at.has(cell):
 			_roofs_off[_building_at[cell]] = _fade_clock
 	var changed := false
 	for index in _buildings.size():

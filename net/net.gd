@@ -674,7 +674,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## sides derive the step, the cone, the reach and the pull from that catalog and the replicated raised/raised_tick, so
 ## an old client would draw the old slow pull, its weak early steps and the old cone and range rings against a new
 ## server's shots.
-const PROTOCOL_REVISION := 58
+## 59 (811 amended (8), the Mughouse shell; release's number): Level.parse lays a building whose "inside" names a level
+## (the wilds' I1) solid but its links' and door's inside cells, out of the floor and into terrain "solid". Both sides
+## parse the level, so an old client would still walk its own prediction into the 76 cells the server holds solid,
+## at the inn's door.
+const PROTOCOL_REVISION := 59
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

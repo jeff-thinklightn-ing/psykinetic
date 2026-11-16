@@ -7045,6 +7045,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 		if stray_knight(spec):
 			knights_dropped += 1  # His marker's own knight stands (747 amended (11)).
 			continue
+		if spec.get("tile") is Vector2i:
+			spec["tile"] = _out_of_shell(spec["tile"], _kind_word(spec))
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
@@ -7297,7 +7299,7 @@ func _recall(record: Dictionary) -> GridEntity:
 		record["dropped"] = true  # Not kept again: his marker's own knight stands (747 amended (11)).
 		print("[state] %s: 1 fallen knight whose marker moved dropped" % World.zone.name)
 		return null
-	spec["tile"] = _nearest_free(spec["tile"])
+	spec["tile"] = _nearest_free(_out_of_shell(spec["tile"], _kind_word(spec)) if spec.get("tile") is Vector2i else spec["tile"])
 	var entity := _spawn(spec)
 	if entity == null:
 		return null
@@ -8017,6 +8019,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		if spawn != null:
 			record.tile = spawn
 		record.companion["tile"] = null
+	if back:
+		record.tile = _out_of_shell(record.tile, "player")
 	var tile := _nearest_free(record.tile) if back else _free_start_tile()
 	if respawn and at != World.NO_CELL:
 		tile = _nearest_free(at)  # Brought back at a temple or a hut (decision 396).
@@ -21869,6 +21873,35 @@ func _safest_start_tile(fallback: Vector2i) -> Vector2i:
 
 ## [param wanted] if it is free, else the closest free walkable tile that is
 ## not on fire, else a start tile.
+## 811 amended (8) (the coordinator's bar on Jeff's report, 11-15: nobody sealed in): [param cell], or, when it is on
+## the footprint of a building in this zone's level whose "inside" names a level (the inn's shell: solid but its links and
+## door cells, Level._lay_shells), the nearest free cell to the one a step beyond its front, outside its door and clear
+## of the goers' door cell; said once in the log by [param kind] and the two cells alone (no name, no id). For a saved
+## body, record or thing read at the server's start or a join.
+func _out_of_shell(cell: Vector2i, kind: String) -> Vector2i:
+	var shell := shell_holding(level, cell)
+	if shell.is_empty():
+		return cell
+	var facing: Vector2i = shell["facing"]
+	var at := _nearest_free(Level.front_cell(shell["rect"], facing) + facing)
+	print("[state] %s: 1 %s saved in a shell's footprint set outside its door, from %d,%d to %d,%d" % [World.zone.name if World.zone != null else "", kind, cell.x, cell.y, at.x, at.y])
+	return at
+
+
+## The building of [param a_level] whose "inside" names a level and whose footprint holds [param cell], else {}.
+static func shell_holding(a_level: Dictionary, cell: Vector2i) -> Dictionary:
+	for building: Dictionary in a_level.get("buildings", []):
+		if not str(building.get("inside", "")).is_empty() and (building["rect"] as Rect2i).has_point(cell) and cell in Level.building_cells(building):
+			return building
+	return {}
+
+
+## What [param spec] spawns, for a log line: its script's file name ("resident", "cargo", "pile"), never its name.
+static func _kind_word(spec: Dictionary) -> String:
+	var script := str(spec.get("script", ""))
+	return script.get_file().get_basename() if not script.is_empty() else "entity"
+
+
 func _nearest_free(wanted: Vector2i) -> Vector2i:
 	var queue: Array[Vector2i] = [wanted]
 	var seen: Dictionary[Vector2i, bool] = {wanted: true}
