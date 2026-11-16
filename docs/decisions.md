@@ -58624,8 +58624,12 @@ well im not sure the solution".
     "black outside" again) the apron by the walls the town's ground in daylight, muted, a step under the
     floor's value, going off with distance to a pale haze, the sky's horizon at INSIDE_HAZE_DAY, lighter than
     the apron and never dark; the fall to dark is the night's, 17:30 between; the room the warmest thing,
-    not the only bright one. The third look shows noon three ways from one build (Client3D.inside_apron_day
-    and inside_haze_day, set by the tour; they go once one is picked). The door lantern's
+    not the only bright one. The coordinator picked this, the haze, from three
+    noons on one build (the third look, 6c7906217: "a room in daylight with open air past its walls"), with
+    two trims: the ground carried about twice as far before the haze takes it (INSIDE_APRON 14 m; at 7 the
+    inn stood on a small dark island in mist), its green nearer the town's daylight grass, still muted and
+    under the floor; and the doorway's sun patch at INSIDE_DOOR_SUN of a window's and warmer, the boards
+    showing through it (its two rows side by side read as pale oblongs, the brightest thing on the floor). The door lantern's
     night pool warmer and wider (INSIDE_DOOR_NIGHT_WIDE; it read as a pale doormat, cooler than the
     candles).
 - Tests: view_world_test _test_daylight_indoors: maps' windows read as wall edges (a bad side, a cell off the

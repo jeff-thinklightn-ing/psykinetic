@@ -29811,7 +29811,12 @@ const INSIDE_SUN_PATCH := 0.4
 const INSIDE_SKY_COLOUR := Color(1.0, 0.92, 0.78)
 const INSIDE_SKY_PATCH := 0.13
 const INSIDE_SKY_REACH := 1.3
-const INSIDE_DOOR_PATCH := 0.2
+const INSIDE_DOOR_PATCH := 0.12
+## The sun's patch through a doorway, this share of a window's: its two rows
+## lie side by side, and at a window's share they read as pale oblongs, the
+## brightest thing on the floor (the third look).
+const INSIDE_DOOR_SUN := 0.4
+const INSIDE_DOOR_SUN_COLOUR := Color(1.0, 0.78, 0.5)
 const INSIDE_DOOR_REACH := 2.4
 const INSIDE_DOOR_NIGHT_COLOUR := Color(1.0, 0.55, 0.2)
 const INSIDE_DOOR_NIGHT := 0.34
@@ -29837,8 +29842,8 @@ const INSIDE_DOOR_HIGH := 2.2
 ## lighter than the apron, so the ground goes off into air and never to dark
 ## (the fall to dark is the night's; 17:30 between); at night the wilds' far
 ## ground.
-const INSIDE_APRON := 7.0
-const INSIDE_APRON_DAY := Color(0.22, 0.245, 0.18)
+const INSIDE_APRON := 14.0
+const INSIDE_APRON_DAY := Color(0.19, 0.26, 0.135)
 const INSIDE_APRON_NIGHT := Color(0.09, 0.135, 0.13)
 const INSIDE_DIRT_DAY := Color(0.27, 0.21, 0.145)
 const INSIDE_DIRT_NIGHT := Color(0.12, 0.11, 0.1)
@@ -29935,11 +29940,6 @@ var _inside_pane_material: StandardMaterial3D
 var _inside_rows: Array[Array] = []
 var _inside_patches: MultiMeshInstance3D
 var _inside_apron: MeshInstance3D
-## The day's apron colour and haze share this view uses (INSIDE_APRON_DAY,
-## INSIDE_HAZE_DAY): the third look sets them to show the coordinator noon's
-## surround three ways from one build; they go once one is picked.
-var inside_apron_day := INSIDE_APRON_DAY
-var inside_haze_day := INSIDE_HAZE_DAY
 var _inside_step := -1
 var _inside_night: Array = []
 
@@ -30211,8 +30211,8 @@ static func inside_patches(row: Array, toward: Vector3, elevation: float, day: f
 					var start := foot.origin + lift + flat * low
 					var run := flat * (high - low)
 					var sun_place := Transform3D(Basis(along * width, Vector3.UP, run), start + run * 0.5)
-					var share := INSIDE_SUN_PATCH * day * smoothstep(2.0, 14.0, elevation) * clampf(into * 1.4, 0.0, 1.0)
-					found.append([sun_place, inside_patch_custom(INSIDE_SUN_COLOUR, share, high - low, true)])
+					var share := INSIDE_SUN_PATCH * day * smoothstep(2.0, 14.0, elevation) * clampf(into * 1.4, 0.0, 1.0) * (INSIDE_DOOR_SUN if door else 1.0)
+					found.append([sun_place, inside_patch_custom(INSIDE_DOOR_SUN_COLOUR if door else INSIDE_SUN_COLOUR, share, high - low, true)])
 	if door and day < 0.99:
 		# Outside the threshold, on the way out's ground (927 amended (2)'s place).
 		var night_reach := INSIDE_DOOR_NIGHT_REACH
@@ -30257,14 +30257,14 @@ static func inside_patch_custom(colour: Color, strength: float, length: float, s
 ## [[param night_colour], [param night_energy]]: {ambient, ambient_energy,
 ## pane, pane_energy, haze (the background), apron (the ground's near
 ## colour)}.
-static func inside_look(look: Dictionary, day: float, night_colour: Color, night_energy: float, apron_day := INSIDE_APRON_DAY, haze_day := INSIDE_HAZE_DAY) -> Dictionary:
+static func inside_look(look: Dictionary, day: float, night_colour: Color, night_energy: float) -> Dictionary:
 	var day_ambient := (look["ambient"] as Color).lerp(night_colour, INSIDE_DAY_WARM)
 	var horizon: Color = look["horizon"]
 	return {"ambient": night_colour.lerp(day_ambient, day),
 		"ambient_energy": lerpf(night_energy, night_energy * INSIDE_DAY_LIFT, day),
 		"pane": INSIDE_PANE_NIGHT.lerp(horizon.lerp(INSIDE_PANE_SKY, INSIDE_PANE_BLUE), day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
-		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, haze_day), day),
-		"apron": INSIDE_APRON_NIGHT.lerp(apron_day, day),
+		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, INSIDE_HAZE_DAY), day),
+		"apron": INSIDE_APRON_NIGHT.lerp(INSIDE_APRON_DAY, day),
 		"dirt": INSIDE_DIRT_NIGHT.lerp(INSIDE_DIRT_DAY, day), "cobble": INSIDE_COBBLE_NIGHT.lerp(INSIDE_COBBLE_DAY, day)}
 
 
@@ -30286,7 +30286,7 @@ func _update_inside() -> void:
 	var fraction := float(step) / SKY_STEPS
 	var elevation := DayNight.elevation_at(fraction)
 	var day := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
-	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1], inside_apron_day, inside_haze_day)
+	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1])
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.background_color = look["haze"]
