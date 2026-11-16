@@ -502,6 +502,9 @@ const NEAR_CLOSE_ALPHA := 0.1
 ## been clear BOX_PULL_HOLD seconds, at BOX_PULL_OUT_RATE, so a walk past a
 ## house does not pump the view. Nothing fades for it (Jeff, 11-06).
 const BOX_PULL_CHEST := 1.2
+## The rack's count (rack_view) is drawn this high over its cell (the mock's rack height, ui-design), under its own key among the name plates' rows.
+const RACK_COUNT_HEIGHT := 1.05
+const RACK_PLATE_KEY := -4107
 const BOX_PULL_MARGIN := 0.5
 const BOX_PULL_IN_RATE := 10.0
 const BOX_PULL_OUT_RATE := 1.2
@@ -3034,6 +3037,10 @@ const PLATE_LOOK_SOON := 100
 const PLATE_LOOK_QUICK := 2000
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
+## The count over a healer's rack (wood at the hut's door): {text: "L of M", cell} while Main says the local player stands within reach of a rack the
+## server tells, {} otherwise; name_plates lists it as a row of its own (UiNamePlates's, as a name's), at the rack's top.
+var rack_view := {}
+var _rack_row := {"key": RACK_PLATE_KEY, "tint": Color.WHITE, "plain": true, "boss": false, "named": true, "bar": 0.0, "share": 1.0, "max_hp": 0, "focus": false}
 ## Main: the bodies (node paths) who take something in the player's pack,
 ## named in TAKER_NAME (802 amended (5), ui's side).
 var taker_marks: Dictionary = {}
@@ -5129,8 +5136,23 @@ func name_plates() -> Array[Dictionary]:
 		var body := instance_from_id(id) as GridEntity
 		row["focus"] = focus.has(id) or (body != null and body.tile == _hover_tile)
 		_plates.append(row)
+	_add_rack_row(forward)
 	_add_own_box(own, forward)
 	return _plates
+
+
+## The rack's count as a row of the plates (rack_view): its words at the rack's top (RACK_COUNT_HEIGHT over its cell), one screen size at every depth
+## and stepping apart from a name or bar it meets, as the rows do; none while rack_view is empty or the rack is behind the lens.
+func _add_rack_row(forward: Vector3) -> void:
+	if rack_view.is_empty() or _camera == null:
+		return
+	var top := to_global(_tile_position(rack_view["cell"] as Vector2i)) + Vector3.UP * RACK_COUNT_HEIGHT
+	if _camera.is_position_behind(top):
+		return
+	_rack_row["text"] = str(rack_view["text"])
+	_rack_row["at"] = _camera.unproject_position(top)
+	_rack_row["depth"] = (top - _camera.global_position).dot(forward)
+	_plates.append(_rack_row)
 
 
 ## [param pup]'s body on the screen, its head (Name label, else 1.7 m) to its feet, OWN_BOX_HALF either side; null

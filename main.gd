@@ -1411,6 +1411,7 @@ func _process(delta: float) -> void:
 	_update_throne()
 	_update_altar()
 	_update_niche()
+	_update_rack()
 	_update_talk()
 	_update_deal()
 	_update_find()
@@ -1719,6 +1720,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return  # 896: the knight's altar, walked to and his remains laid.
 	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _niche_click(player, tile):
 		return  # 608 amended (8): a niche's stone, walked to and pressed.
+	if click.button_index == MOUSE_BUTTON_LEFT and not on_sprite and _rack_click(player, tile):
+		return  # The healer's rack at his door (wood at the hut's door): walked to and the wood laid.
 	if Net.controls == "wasd" and not on_sprite:
 		_wasd_click(player, click.button_index)
 		return
@@ -3046,6 +3049,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles
 	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
 	_altar_wanted = NONE  # 896: and a far altar (_altar_click).
 	_niche_wanted = {}  # 608 amended (8): and a far niche (_niche_click sets it after).
+	_rack_wanted = {}  # And a far rack (_rack_click sets it after).
 	_talk_wanted = null
 	_free_waiting = {}
 	if _free_own(player) == null:
@@ -27697,6 +27701,96 @@ func _update_altar() -> void:
 	if _beside_rect(player.tile, knights_altar(map_name)):
 		World.command(player, "altar", {"at": [_altar_wanted.x, _altar_wanted.y]})
 	_altar_wanted = NONE
+
+
+## The racks the "huts" message tells (economy's package, "wood at the hut's door"): each hut whose entry carries "rack": [laid, need], in
+## bundles, and "rack_cell": [x, y] (the server's pick, never worked out here), as {hut, laid, need, cell}. None while the server sends none:
+## the switch off, the hut standing, a mend under way, or an older server (nothing then shows, and no click means anything).
+func racks_told() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for hut: Variant in hut_states:
+		var entry: Variant = hut_states[hut]
+		if not entry is Dictionary:
+			continue
+		var rack: Variant = entry.get("rack")
+		var cell: Variant = entry.get("rack_cell")
+		if rack is Array and (rack as Array).size() == 2 and cell is Array and (cell as Array).size() == 2 \
+				and int(rack[0]) < int(rack[1]):
+			out.append({"hut": str(hut), "laid": int(rack[0]), "need": int(rack[1]), "cell": Vector2i(int(cell[0]), int(cell[1]))})
+	return out
+
+
+## The rack whose cell is [param tile] and still short of its bundles ({} for none).
+func rack_at(tile: Vector2i) -> Dictionary:
+	for rack: Dictionary in racks_told():
+		if rack["cell"] == tile:
+			return rack
+	return {}
+
+
+## How near the local player must stand to lay wood at a rack (cells; the server checks the same), and what he lays: a bundle of wood.
+const RACK_REACH := 2
+const RACK_WOOD := "wood_bundle"
+## The rack a click asked to lay at, walked to first ({hut}); {} if none.
+var _rack_wanted := {}
+## Each hut laid at (the "hut_give" commands this client sent), for the log and the rows.
+var rack_gives: Array[String] = []
+
+
+## A left click on a rack's cell (the click scheme's; wood at the hut's door): carrying a bundle of wood, within RACK_REACH cells it lays at once,
+## else it walks there and lays on arrival (_update_rack), as the altar does; one click is the whole give (the server lays every bundle he
+## carries while the rack is short). False when the cell is no rack's, nothing is carried, or under the keys' scheme: the click is the ordinary one.
+func _rack_click(player: Player, tile: Vector2i) -> bool:
+	_rack_wanted = {}
+	if Net.controls == "wasd" or tile == NONE:
+		return false
+	var rack := rack_at(tile)
+	if rack.is_empty() or World.count_of(player, RACK_WOOD) <= 0:
+		return false
+	if World.distance(player.tile, rack["cell"]) <= RACK_REACH:
+		_rack_give(player, str(rack["hut"]))
+		return true
+	_move_click(player, rack["cell"])
+	_rack_wanted = {"hut": rack["hut"], "cell": rack["cell"]}
+	return true
+
+
+## The "hut_give" for [param hut]: no count (the server lays all he carries, up to what the rack wants).
+func _rack_give(player: Player, hut: String) -> void:
+	rack_gives.append(hut)
+	print("[rack] laying wood at %s" % hut)
+	World.command(player, "hut_give", {"hut": hut})
+
+
+## Each frame: a rack clicked from afar is laid at once the route is walked out, if it is still told, still short, within reach and he still
+## carries wood (the rack may have filled, or a mend begun, on the way: nothing is sent then); and the count the view draws.
+func _update_rack() -> void:
+	var player := _local_player()
+	if _client3d != null:
+		_client3d.rack_view = rack_count_view(player)
+	if _rack_wanted.is_empty():
+		return
+	if player == null:
+		_rack_wanted = {}
+		return
+	if not (_free.get("path", []) as Array).is_empty():
+		return
+	var rack := rack_at(_rack_wanted["cell"])
+	if not rack.is_empty() and rack["hut"] == _rack_wanted["hut"] and World.distance(player.tile, rack["cell"]) <= RACK_REACH \
+			and World.count_of(player, RACK_WOOD) > 0:
+		_rack_give(player, str(rack["hut"]))
+	_rack_wanted = {}
+
+
+## The count over a rack: {text: "L of M" (bundles laid of wanted), cell} while the local player stands within RACK_REACH of a rack the server tells,
+## {} otherwise (beyond it, with the switch off, the hut standing or a mend under way: nothing).
+func rack_count_view(player: Player) -> Dictionary:
+	if player == null:
+		return {}
+	for rack: Dictionary in racks_told():
+		if World.distance(player.tile, rack["cell"]) <= RACK_REACH:
+			return {"text": "%d of %d" % [rack["laid"], rack["need"]], "cell": rack["cell"]}
+	return {}
 
 
 ## The free floor cell round the bier [param bier] (a king's step from it)

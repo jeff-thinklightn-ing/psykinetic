@@ -48,6 +48,7 @@ func _ready() -> void:
 	if not _far():
 		_test_doorway()
 		_test_hut_sight()
+		_test_rack_click()
 		_test_go_in()
 		_test_footprint_click()
 		_test_door_talk()
@@ -786,3 +787,96 @@ func _test_hut_sight() -> void:
 		if World.distance(cell, hob) <= World.PERSON_REACH and not bool(seen_from[cell]):
 			first_out += "%s " % cell
 	print("  in reach and out of his sight: %s" % ("none" if first_out.is_empty() else first_out))
+
+
+## Wood at the hut's door (economy's package; the coordinator's ruling, 11-16): a healer's rack the "huts" message tells ("rack": [laid, need] in
+## bundles, "rack_cell"), the click on its cell lays the wood he carries (the "hut_give" command, no count), at once within two cells, else on
+## arrival; the count is "L of M" within two cells. Nothing, no click and no count, while the server tells no rack (the switch off, the hut
+## standing, an older server). The cell here is the fixture's, as the server would send it.
+func _test_rack_click() -> void:
+	print("
+== a click on a healer's rack lays the wood he carries (wood at the hut's door) ==")
+	var player := _player()
+	if player == null:
+		return
+	var hut := "wilds/healers_hut@152,232"
+	var cell := Vector2i(151, 231)
+	var beside := Vector2i(151, 229)
+	var far := Vector2i(151, 226)
+	var controls_was: String = Net.controls
+	Net.controls = "click"
+	var hut_was: Variant = _main.hut_states.get(hut)
+	var stock: Array = player.slots.duplicate()
+	var empty: Array = stock.duplicate()
+	var carrying: Array = stock.duplicate()
+	for slot: int in Items.CARRIED:
+		empty[slot] = ""
+	carrying.assign(empty)
+	carrying[Items.CARRIED - 1] = Main.RACK_WOOD  # The pack's last square.
+	_main._free_taken_over(player)
+	_main.hut_states[hut] = {"state": "ruin", "level": 0, "rack": [0, 2], "rack_cell": [cell.x, cell.y]}
+	World.set_slots(player, empty)
+	World._relocate(player, beside)
+	_main.rack_gives.clear()
+	_check(not _main._rack_click(player, cell) and _main.rack_gives.is_empty(), "carrying nothing, the click on the rack is the ordinary one: nothing laid")
+	World.set_slots(player, carrying)
+	_check(_main._rack_click(player, cell) and _main.rack_gives == [hut], "carrying a bundle, two cells off: the click lays at once, once (%s)" % [_main.rack_gives])
+	_check(not _main._rack_click(player, cell + Vector2i(1, 0)) and _main.rack_gives.size() == 1, "a click beside the rack's cell lays nothing")
+	# From afar: it walks, and lays when the route is walked out and the rack still wants it.
+	_main.rack_gives.clear()
+	World._relocate(player, far)
+	_main._free_taken_over(player)
+	_check(_main._rack_click(player, cell) and _main.rack_gives.is_empty() and not _main._rack_wanted.is_empty() and not (_main._free.get("path", []) as Array).is_empty(),
+		"five cells off: the click walks (%d cells) and lays nothing yet" % (_main._free.get("path", []) as Array).size())
+	World._relocate(player, beside)
+	_main._free["path"] = []
+	_main._update_rack()
+	_check(_main.rack_gives == [hut] and _main._rack_wanted.is_empty(), "walked out beside it, it lays once (%s)" % [_main.rack_gives])
+	# A walk cut off short of reach, a rack filled or taken down on the way: nothing is laid.
+	_main.rack_gives.clear()
+	World._relocate(player, far)
+	_main._free_taken_over(player)
+	_main._rack_click(player, cell)
+	_main._free["path"] = []
+	_main._update_rack()
+	_check(_main.rack_gives.is_empty() and _main._rack_wanted.is_empty(), "the walk ended out of reach (cut off): nothing laid")
+	_main._free_taken_over(player)
+	_main._rack_click(player, cell)
+	_main.hut_states[hut] = {"state": "disrepair", "level": 0}
+	World._relocate(player, beside)
+	_main._free["path"] = []
+	_main._update_rack()
+	_check(_main.rack_gives.is_empty(), "the rack gone on the way (a mend begun: the field absent): nothing laid")
+	_main.hut_states[hut] = {"state": "ruin", "level": 0, "rack": [0, 2], "rack_cell": [cell.x, cell.y]}
+	World._relocate(player, far)
+	_main._free_taken_over(player)
+	_main.rack_gives.clear()
+	_main._rack_click(player, cell)
+	World.set_slots(player, empty)
+	World._relocate(player, beside)
+	_main._free["path"] = []
+	_main._update_rack()
+	_check(_main.rack_gives.is_empty(), "the wood gone from his hands on the way: nothing laid")
+	World.set_slots(player, carrying)
+	# The count: within two cells while the rack is told, "L of M" in bundles; none beyond, none with no rack told (an older server), none when full.
+	_main.hut_states[hut] = {"state": "ruin", "level": 0, "rack": [1, 2], "rack_cell": [cell.x, cell.y]}
+	World._relocate(player, beside)
+	var view: Dictionary = _main.rack_count_view(player)
+	_check(str(view.get("text", "")) == "1 of 2" and view.get("cell") == cell, "within two cells: the count reads '1 of 2' over the rack's cell (%s)" % [view])
+	World._relocate(player, far)
+	_check(_main.rack_count_view(player).is_empty(), "five cells off: no count")
+	World._relocate(player, beside)
+	_main.hut_states[hut] = {"state": "ruin", "level": 0}
+	_main.rack_gives.clear()
+	_check(_main.rack_count_view(player).is_empty() and _main.racks_told().is_empty() and not _main._rack_click(player, cell) and _main.rack_gives.is_empty(),
+		"no rack told (an older server, the switch off, the hut standing): no count and the click is the ordinary one, nothing laid")
+	_main.hut_states[hut] = {"state": "ruin", "level": 0, "rack": [2, 2], "rack_cell": [cell.x, cell.y]}
+	_check(_main.racks_told().is_empty() and _main.rack_count_view(player).is_empty() and not _main._rack_click(player, cell), "a rack at its bundles (full) shows nothing and takes no click")
+	if hut_was == null:
+		_main.hut_states.erase(hut)
+	else:
+		_main.hut_states[hut] = hut_was
+	World.set_slots(player, stock)
+	_main._rack_wanted = {}
+	_main._free["path"] = []
+	Net.controls = controls_was

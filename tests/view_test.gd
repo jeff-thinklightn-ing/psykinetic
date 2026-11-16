@@ -20589,6 +20589,13 @@ func _test_stone_names() -> void:
 	var rows: Array[Dictionary] = _rig.name_plates()
 	_check(rows.any(func(row: Dictionary) -> bool: return row.get("key", 0) == knight.get_instance_id()) or label == null or not label.visible,
 		"his plate is among the rows once his name shows (%d rows)" % rows.size())
+	# Wood at the hut's door: the rack's count is a row of its own while Main says it shows, none otherwise.
+	_rig.rack_view = {"text": "1 of 2", "cell": player.tile + Vector2i(1, 0)}
+	var with_rack: Array = _rig.name_plates().filter(func(row: Dictionary) -> bool: return row.get("key", 0) == Client3D.RACK_PLATE_KEY)
+	_check(with_rack.size() == 1 and str(with_rack[0]["text"]) == "1 of 2" and bool(with_rack[0]["named"]) and with_rack[0].has("at") and with_rack[0].has("depth"),
+		"the rack's count is one row among the plates, its words '1 of 2' (%s)" % [with_rack.size()])
+	_rig.rack_view = {}
+	_check(_rig.name_plates().filter(func(row: Dictionary) -> bool: return row.get("key", 0) == Client3D.RACK_PLATE_KEY).is_empty(), "and no row once Main says no count shows")
 	# 752: with neither a given name nor a label there is no plate, never the node name.
 	var bare_at: Vector2i = _main._nearest_free(at + Vector2i(2, 0))
 	var bare := _main._spawn({"script": "res://sim/astral_knight.gd", "shape": "capsule", "name": "ViewBare%d" % World.tick,
