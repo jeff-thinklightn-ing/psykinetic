@@ -40,6 +40,8 @@ func _ready() -> void:
 	_test_bow_click_walks()
 	await _test_lob_tap_through_main()
 	await _test_lob_tap_ring()
+	_test_bow_tap_at_a_foe()
+	await _test_bow_tap_real_events()
 	_test_friend_click()
 	_test_peaceable_click()
 	_test_bubble_click_goes_through()
@@ -916,6 +918,10 @@ func _test_lob_tap_ring() -> void:
 	var before_let := [tap_shown.call(), arc_shown.call()]
 	right.call(false, cell)
 	var fall: Array = _main.lob_tap_fall.duplicate()
+	# The cursor goes on after the let-go (the line's "wherever the cursor goes next", voice's): to the
+	# cell across from her, which the ring never follows.
+	var moved_to := player.tile - (cell - player.tile)
+	_main._pick_grid = Vector2(moved_to) + Vector2(0.1, 0.1)
 	var frames := []  # [shown, on, arc] each frame from the let-go's to the lob's.
 	var at_lob := []
 	for i in 8:
@@ -931,7 +937,7 @@ func _test_lob_tap_ring() -> void:
 	print("  tap: before the let-go %s; fall %s; frames %s; at the lob %s; a frame on %s" % [before_let, fall, frames, at_lob, after])
 	_check(before_let == [false, false], "drawn at the sky before the first step: no ring of the tap's yet, and no arc (%s)" % [before_let])
 	_check(fall.size() == 2 and fall[0] == cell and not frames.is_empty() and frames.all(func(f: Array) -> bool: return f[0] and f[1] == cell and not f[2]),
-			"let go: from the let-go's frame to the lob's, the volley's ring on the cell let go at and no arc (%s, %s)" % [fall, frames])
+			"let go, the cursor moved on to %s: from the let-go's frame to the lob's, the volley's ring on the cell let go at and no arc (%s, %s)" % [moved_to, fall, frames])
 	var said := "" if at_lob.is_empty() else str(at_lob[2])
 	_check(at_lob.size() == 3 and at_lob[0] == 1 and not at_lob[1] and not after,
 			"the lob up: its volley's ring appears and the tap's is gone, and stays gone (%s, a frame on %s)" % [at_lob, after])
@@ -1002,13 +1008,30 @@ func _test_lob_tap_ring() -> void:
 		World.step()
 	right.call(false, cell)
 	var shut := []
+	var shut_arc := []
 	for i in 8:
 		await get_tree().process_frame
 		shut.append(tap_shown.call())
+		shut_arc.append(arc_shown.call())
 		World.step()
+	_check(_main.lob_tap_fall.is_empty() and not shut.has(true) and not shut_arc.has(true) and World._lobs.size() == lobs,
+			"a tap under a roof (no lob comes down there): no ring, no arc, no lob (%s, arc %s)" % [shut, shut_arc])
+	# The joined frame ui-design's tap2 caught (3a, 3b): the client's body still drawn at the sky with its
+	# first step counted and the let-go kept, before the server's word that nothing flew. A let-go under a
+	# roof comes down nowhere: no arc for it, never one frame of it.
+	reset_bow.call()
+	World.try_stance(player, "draw", true)
+	player.raised_tick = World.tick - 8  # Its first step counted.
+	_main.lob_let_at = cell
+	_main.lob_tap_fall = []
+	_main._show_lob(player, true)
+	var joined_arc: bool = arc_shown.call()
 	World.fields.outdoor = true
-	_check(_main.lob_tap_fall.is_empty() and not shut.has(true) and World._lobs.size() == lobs,
-			"a tap under a roof (no lob comes down there): no ring, no lob (%s)" % [shut])
+	_main._show_lob(player, true)
+	var open_arc: bool = arc_shown.call()
+	_main.lob_let_at = Main.NONE
+	_check(player.lobbing and World.draw_step(player) >= 0 and not joined_arc and open_arc,
+			"let go, its first step counted, the client not yet told: no arc under a roof, the arc under the sky (%s, %s)" % [joined_arc, open_arc])
 
 	# Esc in the draw: the game menu over it, the let-go never reaches Main; no ring.
 	reset_bow.call()
@@ -1053,6 +1076,176 @@ func _test_lob_tap_ring() -> void:
 	_stop_walk()
 	Net.controls = saved
 
+## 928 (the coordinator's ask after ui-design's bow928n: 48 Shift-click taps on a closing
+## Orc's cell loosed nothing, the same press on bare ground 8 of 8): a quick Shift-click
+## through Main's own input, on an empty cell and on a hostile's cell 6 off with him in
+## sight, the release a frame after the press and in the same frame, and the press with
+## Shift read from the keys (the event's own modifier off), shoots at the server's tick 4.
+func _test_bow_tap_at_a_foe() -> void:
+	print("
+== a quick Shift-click shoots, at bare ground and at a foe in sight (928) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var flown := []
+	var on_loose := func(by: GridEntity, _angle: float, step: int) -> void:
+		if by == player:
+			flown.append(step)
+	World.loosed.connect(on_loose)
+	var foe: Monster = null
+	var rows := []
+	for case: String in ["empty, a frame between", "foe, a frame between", "foe, the same frame", "foe, Shift from the keys"]:
+		if case.begins_with("foe") and (foe == null or not is_instance_valid(foe) or not foe.spawned):
+			var occupant := World.get_entity_at(Vector2i(5, 3))
+			if occupant != null and occupant != player:
+				World.despawn(occupant)
+			foe = EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "TapFoe", "tile": Vector2i(5, 3)}) as Monster
+			foe.sight_range = 7
+			foe.max_hp = 500
+			foe.hp = 500
+			_main.add_child(foe)
+			World.spawn(foe, Vector2i(5, 3))
+		if foe != null and is_instance_valid(foe):
+			_main._pick_grid = Vector2(foe.free_pos if World.free_body(foe) else Vector2(foe.tile)) + Vector2(0.1, 0.1)
+		else:
+			_main._pick_grid = Vector2(5.1, 3.1)
+		player.bow_ready_tick = World.tick
+		var keyed := case.ends_with("from the keys")
+		var press := InputEventMouseButton.new()
+		press.button_index = MOUSE_BUTTON_LEFT
+		press.pressed = true
+		press.shift_pressed = not keyed
+		_main._unhandled_input(press)
+		var after_press: String = _main._stance
+		if not case.ends_with("same frame"):
+			_main.drive_stand_draw(true, true)  # The frame between: Shift and the left button held (_process).
+		var release := InputEventMouseButton.new()
+		release.button_index = MOUSE_BUTTON_LEFT
+		release.pressed = false
+		release.shift_pressed = not keyed
+		_main._unhandled_input(release)
+		_main.drive_stand_draw(true, false)  # The release's frame: Shift still down.
+		_main.drive_stand_draw(false, false)  # Shift up the frame after.
+		var drew := player.raised_tick
+		var at := -1
+		for i in 10:
+			World.step()
+			if not flown.is_empty():
+				at = World.tick - drew
+				break
+		rows.append([case, after_press, at, flown.duplicate(), foe != null and is_instance_valid(foe) and foe.spawned])
+		flown.clear()
+		_stop_walk()
+		for i in 3:
+			World.step()
+	World.loosed.disconnect(on_loose)
+	print("  taps: %s" % [rows])
+	for row: Array in rows:
+		_check(row[2] == 4 and row[3] == [0], "a quick Shift-click, %s: loosed at the server's tick 4, step 0 (%s)" % [row[0], row])
+	_kill_monsters()
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	Net.controls = saved
+
+
+## 928 (the coordinator's ask, the Atlas's 0 of 48 against the Lenovo's 56 of 56): a quick
+## Shift-click by real input events (Input.parse_input_event: flushed at a frame's start, Shift's
+## state and the button's in Input before Main hears them, Main._process between the frames), in
+## every way its four events can fall across frames, with a server tick after each frame and with
+## the whole click inside one server tick: the arrow let go at the draw's tick 4. The tour's own
+## press (Shift by parse_input_event, the left straight into Main._unhandled_input) is printed
+## beside them, not checked: it is the suspect.
+func _test_bow_tap_real_events() -> void:
+	print("\n== a quick Shift-click by real input events, every frame phase, a tick a frame and one tick for all (928) ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	_kill_monsters()
+	var player := _place_player(Vector2i(11, 3))
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	World.put_item(player, player, Player.RIGHT_HAND, World.items.mint("bow", "built"))
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	var flown := []
+	var flown_tick := []
+	var on_loose := func(by: GridEntity, _angle: float, step: int) -> void:
+		if by == player:
+			flown.append(step)
+			flown_tick.append(World.tick)
+	World.loosed.connect(on_loose)
+	var cases: Array = [
+		["Shift a frame early, press, release, Shift up, a frame each", [["S+"], ["L+"], ["L-"], ["S-"]]],
+		["press and release in one frame", [["S+"], ["L+", "L-"], ["S-"]]],
+		["all four in one frame", [["S+", "L+", "L-", "S-"]]],
+		["Shift and press together, release, Shift up", [["S+", "L+"], ["L-"], ["S-"]]],
+		["Shift up before the release", [["S+", "L+"], ["S-"], ["L-"]]],
+		["the tour's: Shift by events, the left straight into Main", [["S+", "D+"], ["D-"], ["S-"]]],
+	]
+	var rows := []
+	for each_tick: bool in [true, false]:
+		for case: Array in cases:
+			_main._stance = ""
+			player.raised = ""
+			player.loose_held = NAN
+			player.draw_queued = false
+			player.bow_ready_tick = World.tick
+			await get_tree().process_frame
+			var started := World.tick
+			var sent := []
+			var shift := false
+			for frame: Array in case[1]:
+				for token: String in frame:
+					match token:
+						"S+", "S-":
+							shift = token == "S+"
+							var key := InputEventKey.new()
+							key.keycode = KEY_SHIFT
+							key.physical_keycode = KEY_SHIFT
+							key.pressed = shift
+							Input.parse_input_event(key)
+						"L+", "L-", "D+", "D-":
+							var click := InputEventMouseButton.new()
+							click.button_index = MOUSE_BUTTON_LEFT
+							click.pressed = token.ends_with("+")
+							click.shift_pressed = shift
+							click.position = get_viewport().get_visible_rect().size / 2.0
+							click.global_position = click.position
+							if token.begins_with("L"):
+								Input.parse_input_event(click)
+							else:
+								_main._unhandled_input(click)
+				await get_tree().process_frame
+				sent.append(_main._stance)
+				if each_tick:
+					World.step()
+			await get_tree().process_frame
+			await get_tree().process_frame
+			var drew := player.raised_tick
+			for i in 10:
+				if not flown.is_empty():
+					break
+				World.step()
+			var at: int = int(flown_tick[0]) - drew if not flown_tick.is_empty() else -1
+			rows.append([case[0], "a tick a frame" if each_tick else "one tick", at, flown.duplicate(), sent, World.tick - started])
+			flown.clear()
+			flown_tick.clear()
+			World.try_stance(player, "")
+			player.loose_held = NAN
+			for i in 3:
+				World.step()
+	World.loosed.disconnect(on_loose)
+	for row: Array in rows:
+		print("  real-event tap: %s" % [row])
+	for row: Array in rows:
+		if str(row[0]).begins_with("the tour's"):
+			continue
+		_check(row[2] == 4 and row[3] == [0], "a quick Shift-click by real events, %s, %s: loosed at the draw's tick 4, step 0 (%s)" % [row[0], row[1], row])
+	World.set_slots(player, Items.tidy(["", "", "", "", "", ""], Items.CARRIED))
+	_stop_walk()
+	Net.controls = saved
+
+
 func _test_friend_click() -> void:
 	print("
 == a left click on a friend talks, never attacks; Shift's swing strikes one (decisions 454, 593) ==")
@@ -1062,6 +1255,9 @@ func _test_friend_click() -> void:
 	var occupant := World.get_entity_at(Vector2i(9, 6))
 	if occupant != null:
 		World.despawn(occupant)
+	while World.tick % Main.RESIDENT_SYNC_TICKS != 1:
+		World.step()  # Just past Main's sync, which despawns a body no town wants: Tam stands the whole test.
+	var from_tick := World.tick
 	var body := Resident.new()
 	body.name = "Tam"
 	_check(World.spawn(body, Vector2i(9, 6)), "(a resident stands at 9,6)")
@@ -1104,6 +1300,7 @@ func _test_friend_click() -> void:
 	World.step()
 	_resolve()
 	_check(body.hp < hp, "beside them, Shift+click strikes the friend that way (%d -> %d)" % [hp, body.hp])
+	_check(World.tick - from_tick < Main.RESIDENT_SYNC_TICKS, "(no sync of Main's fell within the test: %d ticks)" % [World.tick - from_tick])
 	player.action_order = GridEntity.Order.NONE
 	World.despawn(body)
 	body.queue_free()

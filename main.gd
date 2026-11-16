@@ -2347,7 +2347,10 @@ func _show_lob(player: Player, lobbing: bool) -> void:
 	var puppet: Node3D = _client3d._puppets.get(player.get_instance_id())
 	var from: Vector3 = _client3d._bow_tip(puppet) if puppet != null else Vector3(player.tile.x, 1.1, player.tile.y)
 	var apex := float(Items.verb_of(World.drawn_with(player)).get("lob_apex", 0.25))
-	_client3d.lob_aim(from, cell, radius, World.lob_open(cell), apex, radius >= 0.0 and cell != player.tile)
+	var open := World.lob_open(cell)
+	# 677 amended (6): let go, a lob is spent on that cell or on nothing; where it cannot come down (a roof)
+	# it shows no arc, not the frame before the server's word that nothing flew (ui-design's tap2, 3a and 3b).
+	_client3d.lob_aim(from, cell, radius, open, apex, radius >= 0.0 and cell != player.tile and (open or lob_let_at == NONE))
 
 
 ## [param command_name] ("swing", "signature") toward the ground point under

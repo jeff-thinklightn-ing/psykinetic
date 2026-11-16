@@ -36472,6 +36472,25 @@ under a roof, no ring, no lob; Esc in the draw, no ring; a lob held past the fir
 and no ring). Client only (World's new reads are pure); protocol unchanged; no new class_name; no
 bullet of its own.
 
+677 amended (6): no arc under a roof once let go, and 928's tap rows (ui-design's tap2, 3a and 3b
+on 677 amended (5); label from tools/decision_number.sh). A tap let go at a roofed cell showed the
+held arc for one frame, the frame its first step counted on the server and before the client heard
+that nothing flew: Main._show_lob drew the arc for any cell but her own. Once let go (lob_let_at
+set) a lob is spent on that cell or on nothing, so the arc shows only where it can come down
+(World.lob_open); a held lob draws as before, closed cells too (its arc marks them). Tests:
+controls_test `_test_lob_tap_ring` gains a row for that frame (let go, its first step counted, the
+client not yet told: no arc under a roof, the arc under the sky; it fails without the mend), the
+roof row now also reads no arc each frame, and the first tap row moves the cursor on after the
+let-go (the ring stays on the cell let go at). 928's tap rows: controls_test
+`_test_bow_tap_at_a_foe` (a quick Shift-click through Main's input shoots at bare ground and at a
+foe in sight) and `_test_bow_tap_real_events` (real input events, Input.parse_input_event, in each
+frame phase, a tick a frame and one tick for all: loosed at the draw's tick 4, step 0), and
+view_test's quick Shift-click through the viewport with the client and HUD up. `_test_friend_click`
+now starts just past Main's resident sync (World.tick % Main.RESIDENT_SYNC_TICKS == 1) and checks
+none fell within it: the sync despawns a body no town wants, and the rows before it had moved a
+sync into its click (Tam gone from (9, 6), the click on nobody). Client only; protocol unchanged;
+no new class_name; no bullet.
+
 ## 676. Items as mass, step 1: load_arms and load_body
 
 Jeff, testing the bow in plate: "items shouldnt have direct impacts, they

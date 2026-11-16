@@ -216,6 +216,7 @@ func _ready() -> void:
 		_test_hood_dye()
 		_test_attach_points()
 		_test_bow()
+		await _test_bow_tap_through_viewport()
 		_test_standing_turn()
 		_test_visible_work()
 		_test_head_socket()
@@ -18619,6 +18620,110 @@ func _bar(entity: GridEntity) -> float:
 ## The share of hp [param entity]'s bar is filled to.
 func _share(entity: GridEntity) -> float:
 	return float((_rig._plate_rows.get(entity.get_instance_id(), {}) as Dictionary).get("share", 1.0))
+
+
+## 928 (the coordinator's ask after ui-design's bow928n): a quick Shift-click through the
+## viewport, as the mouse and keyboard send it (the 3D client and the HUD up, so any Control
+## under the pointer sees it first): the pointer resting a second on a hostile's cell, then on
+## an empty one; Shift down, the left pressed, a frame, released, a frame, Shift up; it shoots,
+## the arrow let go at the server's tick 4. The press reaches the world (Main.world_clicks).
+## Headless, Main._entity_under_mouse is null, so the sprite pick a windowed click on a foe takes
+## is not walked here (in the bow's branch it feeds only _fish_click, false on a sprite).
+func _test_bow_tap_through_viewport() -> void:
+	print("\n== a quick Shift-click through the viewport shoots, on a foe's cell and an empty one (928) ==")
+	var player := _player()
+	var slots := player.slots.duplicate()
+	var was := slots.duplicate()
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	slots[Items.RIGHT_HAND] = "bow"
+	slots[Items.LEFT_HAND] = "arrows"
+	player.slots = slots
+	player.raised = ""
+	player.loose_held = NAN
+	var foe_cell := Vector2i(-1, -1)
+	var empty_cell := Vector2i(-1, -1)
+	for offset: Vector2i in [Vector2i(4, 0), Vector2i(-4, 0), Vector2i(0, 4), Vector2i(0, -4), Vector2i(3, 3), Vector2i(-3, 3), Vector2i(3, -3), Vector2i(-3, -3)]:
+		var cell := player.tile + offset
+		if not World.is_walkable(cell):
+			continue
+		if foe_cell.x < 0:
+			foe_cell = cell
+		elif empty_cell.x < 0 and World.get_entity_at(cell) == null:
+			empty_cell = cell
+	_check(foe_cell.x >= 0 and empty_cell.x >= 0, "(a floor cell for the foe at %s and an empty one at %s, the player at %s)" % [foe_cell, empty_cell, player.tile])
+	if foe_cell.x < 0 or empty_cell.x < 0:
+		player.slots = was
+		return
+	var foe := _spawn_imp(foe_cell)
+	_rig._process(0.0)
+	var flown := []
+	var on_loose := func(by: GridEntity, _angle: float, step: int) -> void:
+		if by == player:
+			flown.append(step)
+	World.loosed.connect(on_loose)
+	var rows := []
+	for case: String in ["foe", "empty"]:
+		var cell := foe_cell if case == "foe" else empty_cell
+		await _frames(2)
+		var at := _rig.screen_of_tile(cell)
+		var motion := InputEventMouseMotion.new()
+		motion.position = at
+		motion.global_position = at
+		get_viewport().push_input(motion, true)
+		await get_tree().create_timer(1.0).timeout  # Resting on him long enough for anything drawn on hover.
+		var hovered := get_viewport().gui_get_hovered_control()
+		var under: String = str(hovered.get_path()) if hovered != null else "none"
+		player.bow_ready_tick = World.tick
+		var clicks_before: int = _main.world_clicks
+		Input.parse_input_event(_shift_event(true))
+		for pressed: bool in [true, false]:
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = pressed
+			click.shift_pressed = true
+			click.position = at
+			click.global_position = at
+			get_viewport().push_input(click, true)
+			await get_tree().process_frame
+		var stance_after: String = _main._stance
+		Input.parse_input_event(_shift_event(false))
+		await get_tree().process_frame
+		var drew := player.raised_tick
+		var raised := player.raised
+		var loosed_at := -1
+		for i in 10:
+			World.step()
+			if not flown.is_empty():
+				loosed_at = World.tick - drew
+				break
+		rows.append([case, cell, under, _main.world_clicks - clicks_before, raised, stance_after, loosed_at, flown.duplicate()])
+		flown.clear()
+		World.try_stance(player, "")
+		player.loose_held = NAN
+		for i in 3:
+			World.step()
+	World.loosed.disconnect(on_loose)
+	print("  viewport taps: %s" % [rows])
+	for row: Array in rows:
+		_check(row[3] == 1 and row[6] == 4 and row[7] == [0],
+				"a quick Shift-click through the viewport on %s: reached the world (under %s) and loosed at the server's tick 4, step 0 (%s)" % [
+				"a foe's cell" if row[0] == "foe" else "an empty cell", row[2], row])
+	if is_instance_valid(foe) and foe.spawned:
+		World.despawn(foe)
+	player.slots = was
+	player.raised = ""
+	_rig._process(0.0)
+	await _frames(2)
+
+
+## A Shift key event, down or up, as the keyboard sends it.
+static func _shift_event(pressed: bool) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = KEY_SHIFT
+	event.physical_keycode = KEY_SHIFT
+	event.pressed = pressed
+	return event
 
 
 func _frames(count: int) -> void:
