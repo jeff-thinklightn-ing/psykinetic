@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3048)
+## Lines in the code (3049)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1142,7 +1142,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (213)
+### other (render) (214)
 
 | | Line | Where |
 |---|---|---|
@@ -1176,6 +1176,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s won't take that. | `render/barter_panel.gd` WONT_TAKE_LINE |
 |  | The town has enough of that. | `render/barter_panel.gd` ENOUGH_LINE |
 |  | %s is asleep. Come back by day. | `render/barter_panel.gd` ASLEEP_LINE |
+|  | too far away | `render/barter_panel.gd` FAR_WORDS |
 |  | For %s: %d of %d %s | `render/barter_panel.gd` give_lines() |
 |  | Pays %d gold | `render/barter_panel.gd` give_lines() |
 |  | nothing for sale | `render/barter_panel.gd` empty_words() |
