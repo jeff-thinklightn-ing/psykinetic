@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Umbrage's two handcarts stand at the square's north-west edge beside the town's store, clear of a newcomer's way from the arrival to the Mughouse (774 amended (6)).
 - Towns: of an evening Umbrage's townsfolk go inside the Last Light Mughouse and stay a while (875).
 - Towns: click someone from a little way off, such as the healer in his hut, and their window opens with what they sell once you're beside them (852 amended (8)).
 - Wilds: the old grey snarls as his bite's warning shows and his jaws snap shut as it lands, on you or on the air, and his lunge comes with a snarl and a bark (955).

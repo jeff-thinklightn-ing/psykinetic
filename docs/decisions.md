@@ -48810,7 +48810,10 @@ their loads; one pushed away is left with its load, holding the new slot, none l
 the saved chest stands on lands beside it with its load. stockpile_test _test_cart_moved_at_boot (economy's word on
 259): a cart moved by the word onto the store's ground at a boot keeps its sack and kit, the store's ore, kits and
 ledger unchanged. Level data, a server load rule and tests; protocol unchanged; no new class_name; a bullet in voice's
-words after a joined walk from (190,219) to the door meets no cart.
+words after a joined walk from (190,219) to the door meets no cart. The walk, maps' on a92f93de5: the click walk from
+the arrival to the door watched joined only, on the Atlas, by clicks (stills in C:/dev/review/carts_walk_a92f93de5/);
+its saved-world half ran headless with Main's handler on the cell and proves the boot move alone, not a click; no
+cart met. The bullet, voice's words, rides maps' next take.
 774 amended (7): her stop by the Mughouse's door, for 945 (2026-11-15, maps; the coordinator's approval of companions'
 "first five minutes", decision 945: she leads a newcomer to the Mughouse's door, says what it is and stops, and he
 chooses whether to go in; a piece of package "the first five minutes", landing off; label from
@@ -51192,7 +51195,11 @@ _test_shell_roof (on (179, 208) the roof stays on and no wall fades; a walk-in b
 _test_out_of_shell (a cart saved at (175, 208) and a player whose record stands there both come back outside the door,
 on floor, off its door and link cells; out of the tavern by travel he stands outside, not in the doorway); view_test _test_tavern_inside (774's row: the roof eased off a player in the
 shell) now walks to the doorway (179, 208), the shell behind it no floor, the roof on (Client3D._shell_at a room field,
-room_fields.gd). Also run alone: view_world_test, relief_test, world_map_test, regen_test, resident_test,
+room_fields.gd). view_test _test_eye_kept_out (864's walk past the inn, the coordinator's ruling after this take's first
+landing failed it): its walk was a BFS over floor that never reads walls, so on main it went up x 178 through the
+shell; it now walks twice, that line kept as the camera's arithmetic (the footprint read as the floor it was, on
+purpose), and the walk a player takes, up x 180 along the inn's front by the lane, pinned at that night's 2 turns and
+123 frames with the eye inside the inn's box (a margin of 12), named 864's known look fault, first seen 11-15. Also run alone: view_world_test, relief_test, world_map_test, regen_test, resident_test,
 town_day_test, zone_test, companion_test, protocol_test; load_check. Protocol changed: PROTOCOL_REVISION 59 (release's number): an old client's own
 parse would still walk into the 76 cells. Server and client both; needs the deploy; no new class_name; no bullet till
 ui-design's joined after-run on this take (voice words it then). 947's row in level_test
