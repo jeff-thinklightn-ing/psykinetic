@@ -13390,6 +13390,7 @@ func townsfolk() -> Array[GridEntity]:
 
 func _roster_changed() -> void:
 	_roster_current = false
+	_mask_current = false  # World.masked's own list of the zone's companions (279 amended (4)).
 
 
 func _take_roster() -> void:
@@ -14652,7 +14653,64 @@ func _log(message: String) -> void:
 	recent_logs.append(message)
 	if recent_logs.size() > LOG_KEEP:
 		recent_logs.pop_front()
-	print("[tick %d] %s" % [tick, message])
+	print("[tick %d] %s" % [tick, masked(message)])
+
+
+## [param message] as the journal prints it (279 amended (4)): each companion
+## of this zone named in it, by her node's name or her label, as a whole word
+## ("Ash" never in "Ashen"), becomes her tag, Companion.tag(her player's id), the
+## per-boot "#n" 279 amended (3) gives her. Made only as a line is printed:
+## last_log and recent_logs keep the line as written, which tests read. The
+## names' pattern is made again only when the zone's companions change. Her
+## list is the mask's own (_mask_companions), walked from _entities when a
+## body comes or goes (_roster_changed): the sim's lazy roster (_take_roster)
+## is never filled by a line logged mid-step (the coordinator's condition).
+func masked(message: String) -> String:
+	if not _mask_current:
+		_mask_companions = []
+		for entity in _entities:
+			if entity is Companion:
+				_mask_companions.append(entity)
+		_mask_current = true
+	var tags: Dictionary[String, String] = {}
+	for each in _mask_companions:
+		if is_instance_valid(each):
+			var tag := Companion.tag((each as Companion).keeper_id)
+			for name_of: String in [String(each.name), each.label]:
+				if not name_of.is_empty():
+					tags[name_of] = tag
+	if tags.is_empty():
+		return message
+	var key := "|".join(tags.keys())
+	if key != _mask_key:
+		_mask_key = key
+		_mask_pattern = mask_pattern(tags)
+	return mask_line(message, tags, _mask_pattern)
+
+
+var _mask_key := ""
+var _mask_pattern: RegEx = null
+var _mask_companions: Array[GridEntity] = []
+var _mask_current := false
+
+
+## The pattern that finds any of [param tags]' names as a whole word.
+static func mask_pattern(tags: Dictionary[String, String]) -> RegEx:
+	var names: PackedStringArray = []
+	for name_of: String in tags:
+		names.append(MindLog._escaped(name_of))
+	return RegEx.create_from_string("(?<![\\w])(%s)(?![\\w])" % "|".join(names))
+
+
+## [param message] with each whole-word name of [param tags] (found by
+## [param pattern], mask_pattern's) put as its tag.
+static func mask_line(message: String, tags: Dictionary[String, String], pattern: RegEx) -> String:
+	var out := ""
+	var at := 0
+	for found in pattern.search_all(message):
+		out += message.substr(at, found.get_start() - at) + tags[found.get_string(1)]
+		at = found.get_end()
+	return message if at == 0 else out + message.substr(at)
 
 
 ## [param entity] as a server line names it (392 amended (9), the

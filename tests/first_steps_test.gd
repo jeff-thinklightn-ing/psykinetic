@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_stray_and_fight()
 	_test_travel()
 	_test_log_lines()
+	_test_journal_mask()
 	_test_off()
 	FirstSteps.forced = -1
 	print("")
@@ -451,6 +452,53 @@ func _test_log_lines() -> void:
 				func(word: String) -> bool: return word in line):
 			bad.append(line.strip_edges())
 	_check(bad.is_empty() and source.count("\"[firststeps]") >= 6, "place key, cell, tick and kind only (%s)" % [bad])
+
+
+## 279 amended (4): World._log's printed line puts each companion of the zone as
+## her tag, by whole word; the line as written stays in last_log and recent_logs.
+func _test_journal_mask() -> void:
+	print("\n== the journal's World._log line: a companion as her tag, a whole word ==")
+	var tags: Dictionary[String, String] = {"Ash": "#1", "Rhea": "#2", "Rhea2": "#3"}
+	var pattern := World.mask_pattern(tags)
+	_check(World.mask_line("push: Ash -> Crate1", tags, pattern) == "push: #1 -> Crate1", "her name as a whole word is her tag")
+	var wolf := World.mask_line("hurt: Ashen Wolf loses 3 to Ash's blow", tags, pattern)
+	_check(wolf == "hurt: Ashen Wolf loses 3 to #1's blow", "Ash never inside Ashen; Ash's is hers (%s)" % wolf)
+	var two := World.mask_line("guard: Rhea takes Ash's blow (4, force 1.00) for 2 stamina", tags, pattern)
+	_check(two == "guard: #2 takes #1's blow (4, force 1.00) for 2 stamina", "two companions in one line, each by her own tag (%s)" % two)
+	_check(World.mask_line("push: Rhea2 -> Rhea", tags, pattern) == "push: #3 -> #2", "Rhea2 is hers, not Rhea's with a 2 left over")
+	_check(World.mask_line("push: Player1 -> Crate1", tags, pattern) == "push: Player1 -> Crate1", "a line naming no companion is as written")
+	var pet := _companion()
+	if pet == null:
+		_check(false, "a companion to mask")
+		return
+	var tag := Companion.tag(pet.keeper_id)
+	var line := "push: %s -> Crate1 dir=(1, 0) tiles=1" % pet.name
+	var before := World.logged
+	World._log(line)
+	_check(World.last_log == line and World.recent_logs.back() == line and World.logged == before + 1,
+		"last_log and recent_logs keep the line as written (tests read them)")
+	var printed := World.masked(line)
+	_check(printed == "push: %s -> Crate1 dir=(1, 0) tiles=1" % tag and not String(pet.name) in printed,
+		"the printed line: her node's name as her tag (%s)" % printed)
+	if not pet.label.is_empty():
+		_check(World.masked("downed: %s lies downed" % pet.label) == "downed: %s lies downed" % tag, "her label too")
+	# The cost: a fight's worth of World._log lines, she in the zone and in half of them.
+	var fight: Array[String] = []
+	for i in 400:
+		var who := String(pet.name) if i % 2 == 0 else "Robber%d" % i
+		fight.append("hurt: %s loses %d to a robber's dagger (blow), hp %d/40" % [who, i % 7, 40 - i % 40])
+		fight.append("guard: Robber%d takes %s's blow (%d, force 1.20) for 3 stamina" % [i, who, i % 5])
+	var start := Time.get_ticks_usec()
+	for each in fight:
+		World.masked(each)
+	var masked_us := float(Time.get_ticks_usec() - start) / fight.size()
+	start = Time.get_ticks_usec()
+	for each in fight:
+		var _plain := "[tick %d] %s" % [World.tick, each]
+	var plain_us := float(Time.get_ticks_usec() - start) / fight.size()
+	print("  (the mask: %.1f us a line over %d lines, %.2f ms in all; the line's format alone %.1f us)" % [
+		masked_us, fight.size(), masked_us * fight.size() / 1000.0, plain_us])
+	_check(masked_us < 100.0, "a fight's lines through the mask cost under 100 us each (%.1f)" % masked_us)
 
 
 func _test_off() -> void:

@@ -1,4 +1,4 @@
-"""No server log line names a companion or carries a player's id (279 amended (3), 284 amended (2)).
+"""No server log line names a companion or carries a player's id (279 amended (3) and (4), 284 amended (2)).
 
 The server's prints go to the box's journal. A companion's name is rolled from her player's id
 (decision 293) and kept, and it is her node's name and her label, so a line naming her is a steady
@@ -16,6 +16,12 @@ Each passes inside Companion.tag(...), Main.pet_tag(...) or Companion.log_name(.
 inside Standing.score(...), which reads by it and prints a number): a per-boot
 "#n", her player's place in this run's order of first mention, kept in memory only. A print whose
 text starts "[test]" runs only under a test flag and is not read.
+
+World._log's lines (279 amended (4)) are printed through World.masked, which puts each companion of
+the zone, by node name or label as a whole word, as her tag: in them her name and an entity's are
+not read (a whole player id and a player's name still are). It fails (log_print) unless World._log
+prints once, through masked(message), and if any print reads its kept lines (last_log,
+recent_logs), a second printer of the message unmasked.
 
 Lines that still name a player (284 amended (1) left them; the coordinator's (3), 2026-11-16, holds
 them for Jeff and release) are counted per file in tools/print_names_budget.txt, which only falls:
@@ -43,6 +49,15 @@ FOLDERS = ["sim", "net"]
 FILES = ["main.gd"]
 
 CALL = re.compile(r"(?<![\w.])(print|printerr|printraw|print_rich|push_warning|push_error)\(")
+# World._log's lines (279 amended (4)): printed through World.masked, which puts each companion of the
+# zone as her tag, so her name and an entity's are not read in them; an id or a player's name still is.
+# Bare _log( in sim/world.gd alone (sim/companion.gd's _log is her mind log, never the journal).
+LOG_CALL = re.compile(r"(?<![\w.])(?:World\.)?_log\(")
+WORLD_LOG = re.compile(r"(?<![\w.])World\._log\(")
+LOG_HOME = "sim/world.gd"
+# The one print World._log makes, and the only one of its message: through masked().
+LOG_PRINT = re.compile(r"^func _log\(message: String\) -> void:\n((?:\t.*\n|\n)*)", re.M)
+RAW_LOG = re.compile(r"\b(?:last_log|recent_logs)\b")
 # A tag in place of a name or id: its whole call, nested parens and all, is taken out before the rules.
 # Standing.score(card, id) reads by the id and prints a number.
 TAGGED = re.compile(r"(?<![\w])(?:(?:Companion\.|Main\.)?(?:pet_tag|tag|log_name)|Standing\.score)\(")
@@ -101,10 +116,10 @@ def _in_code(text, start):
 	return True
 
 
-def calls(text):
-	"""[(line number, code with each string kept, first string's text)] of every print call."""
+def calls(text, call=CALL):
+	"""[(line number, code with each string kept, first string's text)] of every call [call] finds."""
 	out = []
-	for m in CALL.finditer(text):
+	for m in call.finditer(text):
 		if not _in_code(text, m.start()):
 			continue
 		depth, i, code, first = 1, m.end(), [], None
@@ -155,22 +170,45 @@ def scan():
 	hits, counts = [], {}
 	for f in server_files():
 		text = open(os.path.join(ROOT, f), encoding="utf-8").read()
-		for line, code, first in calls(text):
+		logged = [(line, code, first, True) for line, code, first in calls(text, LOG_CALL if f == LOG_HOME else WORLD_LOG)]
+		for line, code, first, masked in [(l, c, s, False) for l, c, s in calls(text)] + logged:
 			if first.startswith("[test]"):
 				continue
 			bare = _untagged(code)
 			blank = _blanked(bare)
 			for rule, pattern in RULES:
+				if masked and rule != "player_id":
+					continue  # World.masked puts her as her tag; an entity's name is hers only if she is it.
 				if pattern.search(blank):
 					hits.append((f, line, rule, code))
-			if f == "sim/companion.gd" and SELF_NAME.search(blank):
+			if f == "sim/companion.gd" and not masked and SELF_NAME.search(blank):
 				hits.append((f, line, "entity", code))
 			for rule, pattern in BUDGETED:
+				if masked and rule == "player_node":
+					continue  # A Player's node among World._log's entity names: Jeff's pick, as the rest.
 				if pattern.search(blank):
 					counts.setdefault(f, {}).setdefault(rule, 0)
 					counts[f][rule] += 1
 					hits.append((f, line, rule, code))
+		if not masked_print_ok(f, text):
+			hits.append((f, 0, "log_print", "World._log prints its message only through masked(message), once; "
+				"no other print reads last_log or recent_logs"))
 	return hits, counts
+
+
+def masked_print_ok(f, text):
+	"""World._log prints once, through masked(message); no print anywhere reads its kept lines."""
+	for line, code, first in calls(text):
+		if RAW_LOG.search(_blanked(code)) and not first.startswith("[test]"):
+			return False
+	if f != LOG_HOME:
+		return True
+	m = LOG_PRINT.search(text)
+	if not m:
+		return False
+	body = m.group(1)
+	printed = calls(body)
+	return len(printed) == 1 and "masked(message)" in printed[0][1]
 
 
 def read_budget():
@@ -185,6 +223,9 @@ def read_budget():
 
 
 def main(argv):
+	# A line holding a character the pipe's code page lacks (cp1252 under a Start-Process landing,
+	# PYTHONIOENCODING unset) is shown with a stand-in, never a crash that hides which line it was.
+	sys.stdout.reconfigure(errors="replace")
 	hits, counts = scan()
 	if "--counts" in argv:
 		for f in sorted(counts):
@@ -198,7 +239,9 @@ def main(argv):
 	budget = read_budget()
 	failed = []
 	for f, line, rule, code in hits:
-		if rule in dict(RULES) or rule == "entity":
+		if rule == "log_print":
+			failed.append("%s: %s (279 amended (4))" % (f, code))
+		elif rule in dict(RULES) or rule == "entity":
 			failed.append("%s:%d names %s: print(%s" % (f, line, {"companion": "a companion", "entity": "an entity by node name or label (her, if it is her: Companion.log_name)", "player_id": "a whole player id (Companion.tag)"}[rule], code[:140]))
 	for f in sorted(set(counts) | set(budget)):
 		for rule, _ in BUDGETED:

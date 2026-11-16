@@ -6124,6 +6124,37 @@ Monster lines already say "a companion" (Monster.alert_who). Readers: no test, t
 these prints (companion_test's "bumped into" row reads the party log, unchanged); release's box
 greps that matched a name change with the next deploy. Server only, protocol unchanged, no bullet.
 
+279 amended (4) (the script's label; the coordinator's ruling on companions' read of World._log, 2026-11-16):
+World._log's lines name no companion either. About fifty of its callers name a mover or a target by
+node name (push, slots, launch, lunge, rush, guard, hurt, downed, down, staggered, steadied, grace,
+channel, bandage, teeter, fall, wear, ail, buff, windup, flank, draw, growth, named, steady), and
+World._logs_for logs a push or a door exactly when its doer is a player or a companion, so she was
+in the journal in every fight and every push. One place takes her out: World._log prints
+World.masked(message), in which each companion of the zone, by her node's
+name or her label, as a whole word, becomes Companion.tag(her player's id), 279 amended (3)'s
+per-boot "#n". A whole word only: "Ash" never inside "Ashen", "Rhea2" hers and not "Rhea" with a 2
+left over; two companions in one line each by her own tag. The swap is made only as the line is
+printed: last_log and recent_logs keep the line as written (25 test reads). The names' pattern
+(World.mask_pattern) is made again only when the zone's companions change; with none in the zone the
+line goes through untouched. The zone's companions are the mask's own list (_mask_companions),
+walked from _entities when it is stale; it never calls _take_roster, so a line logged mid-step never
+fills the sim's lazy roster at a moment the sim did not choose (the coordinator's condition). It goes
+stale in _roster_changed, which follows every write to _entities: enter (a zone's list taken),
+reset, spawn, despawn, mirror_reset, mirror_add and mirror_remove, each on the line after; a stale
+mask list could only misword a printed line, never a step. Its cost, from first_steps_test's own timing on a fight's 800 hurt and
+guard lines, she in half of them: 4.9 us a line, 3.93 ms in all, beside 0.9 us for the line's own
+format. tools/print_names.py reads World._log's callers (bare in sim/world.gd, World._log elsewhere;
+sim/companion.gd's own _log is her mind log, never the journal) as masked: her name and an entity's
+are not read in them, a whole player id and a player's name still are; and it fails (log_print)
+unless World._log prints once, through masked(message), and if any print reads last_log or
+recent_logs, a second printer of the message. A Player's node among those names is not counted: it
+waits on Jeff's pick with the rest (C:/dev/review/decisions/names-in-server-log.md), and the
+budget's player_name and player_node lines say so. The tool's output takes errors="replace", so a
+line it names never crashes a cp1252 pipe (perf). combat and physics, whose shared file it is, read
+the diff first; combat said yes, and with physics' session stopped at a prompt of Jeff's, the
+coordinator ruled in its place (the print's wording and helpers that feed only it; physics reads it
+when it is back). Server and tools only, protocol unchanged, no new class_name, no bullet.
+
 ## 320. Companions bandage, and heal only by being bandaged
 
 Companions step 4's last verb. Items' bandaging (#272: World.try_bandage,

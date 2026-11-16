@@ -18,14 +18,15 @@ cp -r "$here/sim" "$here/net" "$work/"
 PN() { PRINT_NAMES_ROOT="$work" python -B "$work/tools/print_names.py" "$@" >"$tmp/out.txt" 2>&1; }
 cp "$work/main.gd" "$tmp/main.gd.good"
 cp "$work/sim/companion.gd" "$tmp/companion.gd.good"
+cp "$work/sim/world.gd" "$tmp/world.gd.good"
 # A take adds <code> as a function's body at the end of main.gd (or sim/companion.gd).
 add() { printf '\n\nfunc _print_names_row() -> void:\n%s\n' "$2" >>"$work/$1"; }
 fails_with() { [ "$1" = 1 ] && grep -q "$2" "$tmp/out.txt"; echo $?; }
-reset() { cp "$tmp/main.gd.good" "$work/main.gd"; cp "$tmp/companion.gd.good" "$work/sim/companion.gd"; }
+reset() { cp "$tmp/main.gd.good" "$work/main.gd"; cp "$tmp/companion.gd.good" "$work/sim/companion.gd"; cp "$tmp/world.gd.good" "$work/sim/world.gd"; }
 
 echo "== the server's code as it stands =="
 PN; check $? "no print names a companion or carries a player id; the player-name lines within their budget"
-PN --counts; check $(diff <(grep -v '^#' "$work/tools/print_names_budget.txt" | tr -d '\r') <(tr -d '\r' <"$tmp/out.txt") >/dev/null; echo $?) "--counts prints the budget as it stands"
+PN --counts; check $(diff <(grep -v '^#' "$work/tools/print_names_budget.txt" | sed 's/ *#.*//' | tr -d '\r') <(tr -d '\r' <"$tmp/out.txt") >/dev/null; echo $?) "--counts prints the budget as it stands"
 
 echo "== a companion's name, an entity's, an id: each named =="
 add main.gd $'\tprint("[bond] %s rests" % record.companion["name"])'
@@ -61,6 +62,33 @@ PN; check $? "a [test] line passes (test runs only)"
 reset
 add main.gd $'\t# print("%s" % player_id)\n\tprint("the player_id and pet.name are words here (%s)" % [tile])'
 PN; check $? "a print in a comment, and the words inside a line's text, are not read"
+reset
+
+echo "== World._log's lines: printed through the mask (279 amended (4)) =="
+add sim/world.gd $'\t_log("push: %s -> %s blocked" % [mover.name, body.name])'
+PN; check $? "an entity's node name in a World._log line passes (World.masked puts her as her tag)"
+reset
+add main.gd $'\tWorld._log("guard: %s takes it" % target.name)'
+PN; check $? "and in a World._log line from main.gd"
+reset
+add sim/world.gd $'\t_log("named: %s took it" % player_id)'
+PN; check $(fails_with $? "whole player id") "a whole player id in a World._log line still fails"
+reset
+add sim/companion.gd $'\t_log({"kind": "voice", "companion": _name_of(self)})'
+PN; check $? "her own _log in sim/companion.gd (her mind log, never the journal) is not read"
+reset
+python - "$work/sim/world.gd" <<'EOF'
+import sys
+p = sys.argv[1]
+s = open(p, encoding="utf-8", newline="").read()
+a = 'print("[tick %d] %s" % [tick, masked(message)])'
+assert s.count(a) == 1
+open(p, "w", encoding="utf-8", newline="").write(s.replace(a, 'print("[tick %d] %s" % [tick, message])'))
+EOF
+PN; check $(fails_with $? "World._log prints its message only through masked") "World._log printing its message unmasked fails"
+reset
+add main.gd $'\tprint("[fight] %s" % World.last_log)'
+PN; check $(fails_with $? "World._log prints its message only through masked") "a second printer of the message (last_log) fails"
 reset
 
 echo "== the budget only falls =="

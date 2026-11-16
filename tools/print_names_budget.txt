@@ -3,10 +3,11 @@
 # player_name, Main._display_name), id_letters (an id's first letters, .left(n)), player_node
 # (a Player node's name, "Player<index>"). A line only falls: print_names fails a file over its
 # line (a new print names a player) and under it (lower the line in the same commit). The
-# coordinator's (3), 2026-11-16: the id's letters come off next; the names are Jeff's say.
-main.gd player_name 22
+# coordinator's rulings, 2026-11-16: the id's letters come off next, in a take of their own; a player's
+# name and a Player node's name wait on Jeff's pick (C:/dev/review/decisions/names-in-server-log.md).
+main.gd player_name 22  # waits Jeff's pick
 main.gd id_letters 3
-main.gd player_node 15
-net/net.gd player_name 1
+main.gd player_node 15  # waits Jeff's pick
+net/net.gd player_name 1  # waits Jeff's pick
 net/net.gd id_letters 1
-sim/world.gd player_node 1
+sim/world.gd player_node 1  # waits Jeff's pick
