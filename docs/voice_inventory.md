@@ -47,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3042)
+## Lines in the code (3044)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1140,7 +1140,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
 |  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (render) (211)
+### other (render) (213)
 
 | | Line | Where |
 |---|---|---|
@@ -1289,7 +1289,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %d %s: %s. | `render/town_sheet.gd` people_words() |
 |  | You haven't seen who lives here. | `render/town_sheet.gd` away_words() |
 |  | No town is known here. | `render/town_sheet.gd` none_words() |
-|  | %s, being mended | `render/town_sheet.gd` buildings_words() |
+|  | In disrepair: %s. | `render/town_sheet.gd` buildings_words() |
+|  | In ruins: %s. | `render/town_sheet.gd` buildings_words() |
+|  | %s, being mended | `render/town_sheet.gd` mended_words() |
 |  | %s, day %d. | `render/town_sheet.gd` when_words() |
 |  | %s is %s. | `render/town_sheet.gd` economy_lines() |
 |  | Treasury: %d gold. | `render/town_sheet.gd` economy_lines() |
