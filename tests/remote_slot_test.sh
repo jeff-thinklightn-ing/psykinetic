@@ -49,7 +49,10 @@ take_by() {
 		"$1" "$kind" "$now" "$now" "$extra" >"$gate/running/$1-$kind-1.json"
 }
 ask() {
-	out="$(timeout 60 bash tools/remote_tests.sh slot 2>&1)"; code=$?
+	# 300 s, not 60 (878 amended (3)): the slot's leftover check walks /proc for each tree, milliseconds
+	# on saturn and 17 s a walk on this PC under load (705 msys processes, 11-16); 60 s cut a waiting
+	# row short (exit 124) on main.
+	out="$(timeout 300 bash tools/remote_tests.sh slot 2>&1)"; code=$?
 	holder="$(cat "$home/land/.busy/holder" 2>/dev/null)"
 }
 cleared() { grep -c "" "$home/land/.slot_clears.log" 2>/dev/null || echo 0; }
@@ -91,7 +94,7 @@ held_by "physics 2b928b9f7" 60; lock_by; take_by
 ask
 check $([ $code = 1 ] && [ "$holder" = "physics 2b928b9f7" ]; echo $?) "touched 60 s ago (under 2 min): waits ($code)"
 held_by "physics 2b928b9f7" 300; lock_by; take_by
-( cd "$home/land/physics" && exec sleep 60 ) &
+( cd "$home/land/physics" && exec sleep 600 ) &  # Outlives ask's 300 s; killed below.
 sleeper=$!
 until readlink "/proc/$sleeper/cwd" 2>/dev/null | grep -q "land/physics"; do :; done
 ask

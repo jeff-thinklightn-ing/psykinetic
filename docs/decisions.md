@@ -57175,6 +57175,14 @@ requeue" or "waited 10 minutes": another landing's slot, never this commit; "the
 on saturn, its SCRIPT ERROR lines above it; "saturn does not have", "could not check out", "is not clean": a send or
 checkout fault, requeue and tell perf). Tools and tests only; protocol unchanged; no class_name; no bullet.
 
+878 amended (3) (2026-11-16, perf; the script's label): remote_slot_test's slot asks wait 300 s, not 60. On main
+(32b06d5e9) it failed "a process running under ~/land/physics: waits, and it is not stopped (124)" and "that process
+still alive", twice on this PC under load: the slot verb's leftover check (running_in) walks /proc once for each
+tree, milliseconds on saturn and 17 s a walk here (705 msys processes, 1340 in all, 11-16), so the 60 s cut the ask
+(exit 124) and the 60 s sleeper it was watching ended with it. The test's sleeper now sleeps 600 s (killed after the
+row, as before). Nothing changes on saturn. RESULT: PASS in 456 s here (a landing runs it only when a take changes
+tools/remote_tests.sh or the test). Tests only; protocol unchanged; no class_name; no bullet.
+
 ## 879. A level link's cell is a step only as the goal
 
 A level link's cell is a player's way out alone (571): World.try_move refuses any other body onto one,
