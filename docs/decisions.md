@@ -11592,6 +11592,14 @@ for the head and not for the scene behind it, which holds nobody as before; in r
 summary lists a "reach" line. On main's code the status row fails ("waits: 3 heavy jobs running"). Tools and tests only;
 protocol unchanged; no class_name; no bullet.
 
+394 amended (58) (perf, 2026-11-16; animation's report; the label from tools/decision_number.sh): run.sh and run.ps1
+refuse net_test by its own name, so free_net_test, an ordinary suite scene, runs. 394 amended (24)'s refusal matched
+*net_test* anywhere in the argument, so `run.sh tests/view_world_test.tscn tests/free_net_test.tscn` exited 2 and ran
+nothing ("tests/free_net_test.tscn refused: net_test runs alone as the gate's net kind"). run.sh's case is now
+net_test*|*/net_test*, run.ps1's match (^|/)net_test. run_parse_test: free_net_test runs through run.sh and run.ps1
+(both fail on the old match), net_test still refused by both; RESULT: PASS. Tools and tests only; protocol unchanged;
+no class_name; no bullet.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

@@ -50,7 +50,7 @@ NAMED=""
 for arg in "$@"; do
 	case "$arg" in
 		--serial) SERIAL=1 ;;
-		*net_test*) echo "run.sh: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.sh), never as a scene (394 amended (24))"; exit 2 ;;
+		net_test*|*/net_test*) echo "run.sh: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.sh), never as a scene (394 amended (24))"; exit 2 ;;
 		*.tscn)
 			arg="${arg#./}"
 			arg="${arg#res://}"

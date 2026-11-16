@@ -79,6 +79,11 @@ check $(grep -qx '30 tests/kept_test.tscn' "$tmp/p/.godot/test_durations.txt" &&
 	"named scenes: the others' times kept, theirs replaced"
 out="$(run tests/net_test.sh)"; code=$?
 check $([ $code = 2 ] && printf '%s' "$out" | grep -q "net_test runs alone as the gate's net kind"; echo $?) "net_test refused"
+# Refused by its own name only (animation's report, 11-16): free_net_test is an ordinary scene.
+: >"$tmp/p/tests/free_net_test.tscn"
+out="$(run tests/free_net_test.tscn)"; code=$?
+check $([ $code = 0 ] && printf '%s\n' "$out" | grep -q '^PASS  free_net_test '; echo $?) "free_net_test is no net_test: it runs"
+rm -f "$tmp/p/tests/free_net_test.tscn"
 out="$(run tests/none_test.tscn)"; code=$?
 check $([ $code = 2 ] && printf '%s' "$out" | grep -q "no scene tests/none_test.tscn"; echo $?) "a scene that isn't there refused"
 out="$(run --fast)"; code=$?
@@ -113,6 +118,11 @@ if command -v powershell.exe >/dev/null 2>&1; then
 	(cd "$tmp/p" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" tests/net_test.ps1 >"$tmp/ps.out" 2>&1)
 	code=$?
 	check $([ $code = 2 ] && grep -q "net_test runs alone" "$tmp/ps.out"; echo $?) "run.ps1: net_test refused"
+	: >"$tmp/p/tests/free_net_test.tscn"
+	(cd "$tmp/p" && GODOT_PATH="$(cygpath -w "$tmp/godot.cmd")" PSYKINETIC_TEST_JOBS=4 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" tests/free_net_test.tscn >"$tmp/ps.out" 2>&1)
+	code=$?
+	check $([ $code = 0 ] && tr -d '\r' <"$tmp/ps.out" | grep -q '^SUITE: PASS (1 scenes'; echo $?) "run.ps1: free_net_test is no net_test: it runs"
+	rm -f "$tmp/p/tests/free_net_test.tscn"
 fi
 grep -q "^tool_part run_parse_test bash tests/run_parse_test.sh" tests/land.sh
 check $? "tests/land.sh runs this test"

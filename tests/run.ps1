@@ -64,7 +64,7 @@ if ($Named) {
 	$picked = @()
 	foreach ($arg in $Named) {
 		$scene = (($arg -replace '^res://', '') -replace '^\./', '') -replace '\\', '/'
-		if ($scene -match 'net_test') { Refuse "run.ps1: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.ps1), never as a scene (394 amended (24))" }
+		if ($scene -match '(^|/)net_test') { Refuse "run.ps1: $arg refused: net_test runs alone as the gate's net kind (tests/net_test.ps1), never as a scene (394 amended (24))" }
 		if ($scene -notmatch '\.tscn$') { Refuse "run.ps1: ${arg}: not -Serial or a scene (tests/x_test.tscn)" }
 		if (-not (Test-Path (Join-Path $root $scene))) { Refuse "run.ps1: no scene $scene" }
 		$picked += $scene
