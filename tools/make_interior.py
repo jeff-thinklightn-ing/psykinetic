@@ -46,7 +46,10 @@ rooms and its stairs:
 - a stair: two cells side by side (the two-cell passages rule), the floor it
   reaches, the two cells beside it one arrives on from there, and its way
   ("up" or "down"), and its "facing" (north, south, west or east: the way its
-  steps run, the link's own facing for its cue, Level.link_cues). Each cell
+  steps run, the link's own facing for its cue, Level.link_cues), and a
+  "variant" if its cue is drawn other than variant 1 (each of its links
+  carries it: 4 is the timber stair inside a house or inn, art-kit's, 11-16;
+  left out, the zone-link cue's stone). Each cell
   is a link to the matching arrival on the other floor, whose stair back must
   be as wide. Never on the floor's south row, where the outer wall nearest
   the view hides it (811 amended (5)).
@@ -399,6 +402,8 @@ def lay(spec, floor):
             markers[tuple(cell)] = "link"
             links.append({"at": list(cell), "to_map": stair["to"], "to_spawn": spawn_name(level, index), "cue": stair["way"],
                           "facing": list(SIDES[stair["facing"]])})
+            if int(stair.get("variant", 1)) != 1:
+                links[-1]["variant"] = int(stair["variant"])
         for index, cell in enumerate(stair["spawns"]):
             spawns[spawn_name(stair["to"], index)] = list(cell)
     buildings = []
