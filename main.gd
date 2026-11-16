@@ -1847,7 +1847,7 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 		beside = friend.tile  # A corridor: walk at her, and the bump swaps you.
 	if beside == NONE:
 		return
-	_move_click(player, beside, true, talk_stand_search_tiles)
+	_move_click(player, beside, true, talk_stand_search_tiles, false)  # The stand cell is asked strictly: no route is how the walk goes at him (below).
 	# 935 amended (3): a stand cell no route reaches (the healer at work in the one cell inside his shut door: his body shuts the
 	# hut's inside off, so every cell beside him is walled in, and the click did nothing) is walked at his own cell instead: a route
 	# to an occupied goal exists, and the walk stops at his shut door for the step to open (_update_talk). The route the click just
@@ -3034,7 +3034,7 @@ func _apply_azimuth() -> void:
 ## A move click: the player's route to [param tile] (NONE: nowhere near the
 ## floor, a stop) and a ripple there. Held, the button steers to the cursor
 ## (_free_intent). Nothing before its body's free state is heard (703).
-func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles := World.CLICK_SEARCH_TILES) -> void:
+func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles := World.CLICK_SEARCH_TILES, nearest := true) -> void:
 	_pack_wanted = null
 	_cast_wanted = NONE  # 805 amended (11): a walk ordered drops a far cast (_fish_click sets it after).
 	_throne_wanted = NONE  # 896: likewise a far throne (_throne_click sets it after).
@@ -3047,7 +3047,7 @@ func _move_click(player: Player, tile: Vector2i, ripple_it := true, search_tiles
 		if player != null and tile != NONE:
 			_free_waiting = {"tile": tile, "zone": String(player.zone), "until": Time.get_ticks_msec() + FREE_WAIT_MSEC}
 		return
-	_free_route(player, tile, search_tiles)
+	_free_route(player, tile, search_tiles, nearest)
 	if _test_holding:
 		_test_hold_counts["orders"] += 1
 	if ripple_it and tile != NONE:
@@ -3887,7 +3887,7 @@ func _guide_taken_over(player: Player) -> void:
 
 ## A click on [param tile]: its route (World.walk_path's cells), steered
 ## along; the button held from here steers to the cursor instead.
-func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEARCH_TILES) -> void:
+func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEARCH_TILES, nearest := true) -> void:
 	_free_taken_over(player)
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
@@ -3910,7 +3910,7 @@ func _free_route(player: Player, tile: Vector2i, search_tiles := World.CLICK_SEA
 	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
 		# 935 amended (ui's side): a click with no route walks to the cell that comes nearest it (find_path's nearest, the one
 		# search the bound already runs), and stops there; the talk a click asked for still opens only inside its own reach.
-		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, search_tiles, true):
+		for cell: Vector2i in World.walk_path(from, tile, player, World.PATH_FIRE_EXTRA, search_tiles, nearest):
 			path.append(cell)
 	_free["path"] = path
 	_free["at"] = Time.get_ticks_msec()  # 935 amended (1): the hold is timed from when the route is ready, not from the click's search.
