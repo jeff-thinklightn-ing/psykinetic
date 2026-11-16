@@ -5773,6 +5773,28 @@ the camera and fades, the ground's look; view_world_test: places and decor, wate
 gear, creatures, music; view_land_test: the horizon to the forest's edge; view_land_far_test: the forest floor,
 roads, relief, sight, fields), at the end of that list unless it needs another row's state. Tests and tools only; protocol unchanged; no class_name; no bullet.
 
+278 amended (10): level_test runs as two scenes (the coordinator's approval, 2026-11-16; label from
+tools/decision_number.sh). perf's read of saturn's landings had level_test at 219 to 269 s, over land.sh's 220 s
+slow-scene line in every one since 11-15 16:23. The cut follows the timings (209 s on this PC, per test): the laid
+levels hold about half of it (torches_seen 38 s, crypt_spacing 14, giver_rule 11), so they are one half. Unlike
+view_test's one script in two scenes, the halves are two scripts extending a third. tests/level_test_base.gd is
+not a scene. It holds the consts, the checks, the maps made in code (_register_maps), the setup and end both share
+(_setup, _finish), and the helpers both halves reach. Each half sets its own port, calls _setup(), its tests in
+today's order, then _finish(). level_test (base port 17790, as before, about 106 s here) holds the test room, every
+level and prefab loading, the round trip, edges and doors, heights, stairs, falls, pits and the mine, sight, hills,
+the forest, fields, folds and the canopy, the world plane with its roads, water, ledges and ways on foot,
+buildings and their kinds, links in and out, beds and lockers, towns, walls, roofs and temples, 947's leaving,
+level and edge links, the console, and layout sense over every level. level_dungeons_test (base port 17772,
+about 103 s here) holds the laid levels: the barrow and its deep, the crypts (ways, spacing, the arrival and giver
+rules, chests, torches, the hall shortcut, niches, latches, double doors), the draugr's hall, throne and altars,
+the barrow's quest and charges, camps and bands, the castle and its halls, towers and decor. A script made the
+split from the call graph: each test goes to the half that calls it, and a helper both reach goes to the base.
+No row changed: the original's lines and the three files' lines, sorted, differ only in the headers, the
+_setup/_finish calls and the new port. The halves print 1285 PASS lines against 1284 unsplit, because both run
+the setup's free-body check. A new row goes in the half whose header names its subject, at the end of its list
+unless it needs another row's state. A helper or const both halves need goes in the base. Tests only; protocol
+unchanged; no class_name; no bullet.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
