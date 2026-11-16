@@ -3,9 +3,22 @@ extends RefCounted
 ## the wilds' town (Umbrage's store) to the barrow, through the fallen
 ## knight's quest, with the companion along. First cut: Rolf's stall, the
 ## walk to the barrow, the arrival, the knight and his quest window.
+## In by the crypt's front door, Umbrage's temple stair (decision 715: the
+## temple carries the link to the barrow's from_chapel), as a newcomer comes;
+## the mound in the wilds at (160, 160) is the band's breach (from_breach),
+## its back door, which arrives 51 cells from the knight.
+## Run with TOUR_SERVER_ARGS=--test-hp for the count at the taking (one of
+## the band felled by the console's strike before the quest is taken, ticked
+## at the taking: 747 amended (8)); without it that row is said skipped.
 
-## The wilds' link to the barrow and where the barrow's arrival is.
-const BARROW_LINK := Vector2i(160, 160)
+## The temple's link to the crypt, read from the wilds as the client has it
+## (_crypt_door); the mound's breach only if it is not there.
+const BARROW_BREACH := Vector2i(160, 160)
+## Where the crypt's door (BARROW_DOOR) sets one down in the wilds: the
+## temple's from_crypt.
+const TEMPLE_ARRIVAL := Vector2i(198, 199)
+## Felled before the quest is taken, for the count at the taking.
+const FELLED_FIRST := "tull"
 const BARROW_ARRIVAL := Vector2i(40, 2)
 ## The fallen knight's post, by the First Hall's bier (747 amended (8); the
 ## Low Hall, his old room, gone since 747 amended (13)).
@@ -38,7 +51,8 @@ func run(bot: Node) -> void:
 		bot.log_line("setup: %s" % await bot.admin("mark Tourbot barrow_quest"))
 		await bot.seconds(2.0)
 		bot.press("close")
-		await _talk_knight(bot, "after the quest (its mark set)", "", AstralKnight.DONE, true)
+		# The mark is the whole circle done, his remains laid (896, the altar step on).
+		await _talk_knight(bot, "after the quest (its mark set)", "", AstralKnight.DONE_LAID, true)
 		bot.press("close")
 		await _keep_knight(bot, true)
 		return
@@ -76,24 +90,26 @@ func _rolf(bot: Node) -> void:
 	await bot.click(rolf.tile)
 	await bot.seconds(2.0)
 	_list_buttons(bot, "after clicking Rolf")
-	var buys: Array = bot.buttons().filter(func(b: Dictionary) -> bool: return "gold" in String(b["text"]).to_lower() or "buy" in String(b["text"]).to_lower())
-	if not bot.expect(not buys.is_empty(), "Rolf's window has buy buttons", "%d buttons up" % bot.buttons().size()):
+	# The barter window's store layout (560; ui, 11-16): no Buy button, one click on a
+	# ware's square buys it at its price (StoreView.square_pressed, as a click emits).
+	var panel: BarterPanel = bot.main.get("barter_panel")
+	var wares: Array = panel.boxes_shown() if panel != null else []
+	bot.log_line("Rolf's wares: %s" % [wares])
+	if not bot.expect(not wares.is_empty(), "Rolf's window shows his wares", "%d squares" % wares.size()):
 		return
-	var enabled: Array = buys.filter(func(b: Dictionary) -> bool: return not b["disabled"])
-	bot.expect(not enabled.is_empty(), "with 50 gold, Rolf's wares can be bought", "every ware button is off; the client's purse reads %d" % int(bot.main.gold))
-	if enabled.is_empty():
-		# The purse the client never got (reported 2026-10-31, ui's): set to the
-		# server's so the tour can go on armed; the check above stays failed.
-		bot.log_line("workaround: the client's purse set to 50, Rolf clicked again")
-		bot.main.gold = 50
-		await bot.click(rolf.tile)
-		await bot.seconds(2.0)
 	var gold_before := int(bot.main.gold)
 	var hands_before := str(bot.me().get("slots")) if bot.me() != null and "slots" in bot.me() else ""
-	bot.press("sword")
-	await bot.seconds(2.0)
-	bot.press("shield")
-	await bot.seconds(2.0)
+	var sword := ""
+	for shown: String in wares:  # "ware <id> gold <cost>"
+		if shown.get_slice(" ", 1).ends_with("|sword"):
+			sword = shown.get_slice(" ", 1)
+	var cost := int(panel.ware_entry(sword).get("cost", -1)) if not sword.is_empty() else -1
+	if bot.expect(not sword.is_empty() and cost >= 0 and cost <= gold_before, "with 50 gold, Rolf's sword is within the purse",
+			"sword \"%s\", cost %d, the client's purse %d" % [sword, cost, gold_before]):
+		panel._store_view.square_pressed.emit("ware", sword)
+		await bot.seconds(2.0)
+		bot.expect(int(bot.main.gold) == gold_before - cost, "a click on the sword's square buys it: the purse falls by its price",
+			"purse %d -> %d, cost %d; why \"%s\"" % [gold_before, int(bot.main.gold), cost, panel.why_shown()])
 	bot.log_line("purse %d -> %d" % [gold_before, int(bot.main.gold)])
 	var hands_after := str(bot.me().get("slots")) if bot.me() != null and "slots" in bot.me() else ""
 	bot.expect(hands_after != hands_before and "sword" in hands_after.to_lower(), "the sword is in my hands", "slots %s" % hands_after.left(200))
@@ -122,8 +138,21 @@ func _sleepers(bot: Node) -> void:
 	await bot.admin("hour 9")
 
 
+## The wilds' link into the crypt by the temple (to_map barrow, to_spawn
+## from_chapel), from the level the client holds; the breach if none.
+func _crypt_door(bot: Node) -> Vector2i:
+	var level: Dictionary = bot.main.get("level") if bot.main.get("level") is Dictionary else {}
+	for link: Dictionary in level.get("links", []):
+		if str(link.get("to_map", "")) == "barrow" and str(link.get("to_spawn", "")) == "from_chapel":
+			return link["tile"]
+	bot.log_line("no temple link to the crypt in the client's level; the breach instead")
+	return BARROW_BREACH
+
+
 func _to_barrow(bot: Node) -> void:
-	var arrived: bool = await bot.walk_to(BARROW_LINK, 0, 120.0)
+	var door := _crypt_door(bot)
+	bot.log_line("the crypt's door by the temple at %s" % door)
+	var arrived: bool = await bot.walk_to(door, 0, 120.0)
 	await bot.until(func() -> bool: return bot.zone() == "barrow", 30.0)
 	if not bot.expect(bot.zone() == "barrow", "the wilds' barrow link takes me into the barrow", "zone %s at %s (walked there: %s)" % [bot.zone(), bot.cell(), arrived]):
 		return
@@ -145,11 +174,21 @@ func _knight(bot: Node) -> void:
 	bot.expect(got_there, "I can walk to the knight", "at %s" % bot.cell())
 	await _talk_knight(bot, "before the quest", AstralKnight.ASK_TITLE)
 	_names_read(bot, "the knight's window and his words")
+	# The count at the taking (747 amended (8)): one of the band felled before.
+	var struck: String = await bot.admin("strike Tourbot %s" % FELLED_FIRST)
+	var felled_first: bool = struck.begins_with("strike: Tourbot struck")
+	bot.log_line("before the taking: %s" % (struck if felled_first else "count at the taking skipped (%s)" % struck.left(80)))
+	await bot.seconds(1.0)
 	var took: bool = bot.press("Prove")
 	bot.expect(took, "the knight's window offers his quest")
 	await bot.seconds(2.0)
 	var quest: Dictionary = bot.me().get("quest") if bot.me() != null else {}
 	bot.expect(not quest.is_empty(), "the quest tracker has his quest", str(quest).left(300))
+	if felled_first:
+		var first := FELLED_FIRST.capitalize()
+		var ticked: Array = (quest.get("items", []) as Array).filter(func(item: Dictionary) -> bool:
+			return str(item.get("name", "")) == first and bool(item.get("done", false)))
+		bot.expect(not ticked.is_empty(), "%s, felled before the quest was taken, is ticked at the taking" % first, str(quest.get("items", [])).left(300))
 	bot.press("close")
 	await bot.seconds(1.0)
 	await _talk_knight(bot, "during the quest", AstralKnight.NOT_YET_TITLE, AstralKnight.NOT_YET)
@@ -187,9 +226,12 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 		if not _boss_bar_checked and bot.me() != null and bot.zone() == "barrow":
 			await _boss_bar(bot)
 		if bot.me() == null or bot.zone() != "barrow" or int(bot.me().hp) <= 0:
+			var never_heard := _fell_heard(bot, 0).is_empty()
 			if not await _back_in(bot):
 				break
 			deaths += 1
+			if deaths == 1 and not _unticked(bot).is_empty():
+				await _knight_after_fall(bot, never_heard)
 			continue
 		var left := _unticked(bot)
 		if (bot.me().get("quest") as Dictionary).is_empty():
@@ -217,6 +259,43 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 	bot.expect(not bosses.is_empty(), "a boss was seen in the barrow")
 	for id: int in bosses:
 		_sledge(bot, bosses[id], id, since)
+
+
+## The knight's line after a fall (747 amended (15), voice's words): after the first fall
+## in the barrow with his task open, his next greeting is AstralKnight.FELL, word for word
+## in the joined client's talk text (his window and the line said); the greeting after it
+## is "not yet" again; before any fall it was never heard ([param never_heard]).
+func _knight_after_fall(bot: Node, never_heard: bool) -> void:
+	bot.expect(never_heard, "before any fall the knight's line after a fall was never heard",
+		"heard %s" % [_fell_heard(bot, 0).map(func(t: String) -> String: return t.left(60))])
+	var since: int = bot.now_msec()
+	await _talk_knight(bot, "after a fall, the quest open", "", AstralKnight.FELL, true)
+	var panel: Control = bot.main.deal_panel
+	var shown: String = " ".join(bot.texts(panel)) if panel != null else ""
+	bot.expect(AstralKnight.FELL in shown, "after a fall: his window reads the knight's line after a fall, word for word", shown.left(300))
+	bot.expect(not _fell_heard(bot, since).is_empty(), "after a fall: the line is said to me, word for word",
+		"told %s" % [bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]).left(80))])
+	bot.press("close")
+	await bot.seconds(1.0)
+	since = bot.now_msec()
+	await _talk_knight(bot, "the greeting after that", "", AstralKnight.NOT_YET, true)
+	shown = " ".join(bot.texts(panel)) if panel != null else ""
+	bot.expect(not AstralKnight.FELL in shown and _fell_heard(bot, since).is_empty(),
+		"the greeting after that is the ordinary one (\"not yet\"), the fall's line not again", shown.left(300))
+	bot.press("close")
+	await bot.seconds(1.0)
+
+
+## The told and heard lines since [param since] holding AstralKnight.FELL whole.
+func _fell_heard(bot: Node, since: int) -> Array:
+	var out: Array = []
+	var lines: Array = []
+	lines.append_array(bot.told_since(since))
+	lines.append_array(bot.heard.filter(func(l: Dictionary) -> bool: return l["msec"] >= since))
+	for line: Dictionary in lines:
+		if AstralKnight.FELL in str(line["text"]):
+			out.append(str(line["text"]))
+	return out
 
 
 ## The turn round a wall's end to a shut door (724 amended (2), physics'
@@ -282,7 +361,7 @@ func _back_in(bot: Node) -> bool:
 	bot.log_line("brought back in %s at %s" % [bot.zone(), bot.cell()])
 	if bot.zone() != "wilds":
 		return false
-	await bot.walk_to(BARROW_LINK, 0, 120.0)
+	await bot.walk_to(_crypt_door(bot), 0, 120.0)
 	await bot.until(func() -> bool: return bot.zone() == "barrow" and bot.me() != null, 30.0)
 	await bot.settled()
 	return bot.zone() == "barrow"
@@ -491,8 +570,12 @@ func _turn_in(bot: Node) -> void:
 	# The step's button is the step's own words (AstralKnight.TURN_IN_TITLE).
 	var pressed: bool = bot.press("robbers are put down")
 	await bot.seconds(3.0)
-	bot.expect(pressed and (bot.me().get("quest") as Dictionary).is_empty(), "handing the quest in clears the tracker",
-		"pressed %s; quest %s" % [pressed, str(bot.me().get("quest")).left(200)])
+	# 896 (the altar step, on): the band leaves the tracker and his remains are
+	# its one step, to be brought to his bier.
+	var after: Dictionary = bot.me().get("quest") if bot.me() != null else {}
+	var steps: Array = (after.get("items", []) as Array).map(func(item: Dictionary) -> String: return str(item.get("name", "")))
+	bot.expect(pressed and steps.size() == 1 and "remains" in steps[0].to_lower(), "handing the quest in leaves his remains its one step (896)",
+		"pressed %s; quest %s" % [pressed, str(after).left(200)])
 	# His reward is the way below (AstralKnight.REVEALED): the hidden niche's door.
 	var said: Array = bot.heard.filter(func(line: Dictionary) -> bool:
 		return line["msec"] >= since and "breathes cold air" in str(line["text"]))
@@ -500,11 +583,11 @@ func _turn_in(bot: Node) -> void:
 		"heard since: %s" % [bot.heard.filter(func(l: Dictionary) -> bool: return l["msec"] >= since).map(func(l: Dictionary) -> String: return str(l["text"]).left(80))])
 	for each: Dictionary in bot.told_since(since):
 		bot.log_line("told at the turn-in: %s" % each["text"])
-	# His closing words (AstralKnight.DONE: a greeting with nothing left to
-	# offer): his window closed, then he is talked to again.
+	# His words after the turn-in (AstralKnight.AWAIT, 896: his remains wait in
+	# the Hall of Fallen Souls): his window closed, then he is talked to again.
 	bot.press("close")
 	await bot.seconds(1.0)
-	await _talk_knight(bot, "after the quest", "", AstralKnight.DONE, true)
+	await _talk_knight(bot, "after the band's turn-in", "", AstralKnight.AWAIT, true)
 	bot.press("close")
 	bot.log_line("purse %d -> %d at the turn-in" % [before, int(bot.main.gold)])
 
@@ -607,14 +690,14 @@ func _out_to_rolf(bot: Node) -> void:
 		var revived: bool = not bot.told_since(walk_since, "brought you back").is_empty()
 		if revived:
 			# Down on the way and brought back at the temple: not the door's arrival.
-			bot.log_line("down on the way out; brought back in %s at %s, the mound's arrival not seen" % [bot.zone(), bot.cell()])
+			bot.log_line("down on the way out; brought back in %s at %s, the temple's arrival not seen" % [bot.zone(), bot.cell()])
 		elif not bot.expect(out, "out through the barrow's door", "zone %s at %s" % [bot.zone(), bot.cell()]):
 			return
 		await bot.settled()
 		if not revived:
-			bot.expect(World.distance(bot.cell(), BARROW_LINK) <= 6, "set down by the mound", "at %s" % bot.cell())
+			bot.expect(World.distance(bot.cell(), TEMPLE_ARRIVAL) <= ARRIVAL_REACH, "set down in the temple, by its stair", "at %s, %d cells from %s" % [bot.cell(), World.distance(bot.cell(), TEMPLE_ARRIVAL), TEMPLE_ARRIVAL])
 	await bot.admin("hour 12")
-	# The town is out of view from the mound: to the square, then find him.
+	# To the square, then find him.
 	await bot.walk_to(TOWN_SQUARE, 3, 120.0)
 	await bot.until(func() -> bool: return bot.find("Rolf") != null, 60.0)
 	var rolf: GridEntity = bot.find("Rolf")
@@ -623,10 +706,26 @@ func _out_to_rolf(bot: Node) -> void:
 	await bot.walk_to(rolf.tile, 2, 120.0)
 	await bot.click(rolf.tile)
 	await bot.seconds(2.0)
-	var buys: Array = bot.buttons().filter(func(b: Dictionary) -> bool: return "gold" in String(b["text"]).to_lower() or "buy" in String(b["text"]).to_lower())
-	var enabled: Array = buys.filter(func(b: Dictionary) -> bool: return not b["disabled"])
-	bot.expect(not enabled.is_empty(), "with the chest's gold (purse %d), Rolf's wares can be bought" % int(bot.main.gold),
-		"%d of %d ware buttons on" % [enabled.size(), buys.size()])
+	# The chest's gold buys a ware with a click on its square (ui, 11-16: the store layout).
+	var panel: BarterPanel = bot.main.get("barter_panel")
+	var wares: Array = panel.boxes_shown() if panel != null else []
+	var purse := int(bot.main.gold)
+	var pick := ""
+	var cost := -1
+	for shown: String in wares:  # "ware <id> gold <cost>"
+		var id := shown.get_slice(" ", 1)
+		var entry: Dictionary = panel.ware_entry(id)
+		if not entry.is_empty() and int(entry.get("cost", purse + 1)) <= purse:
+			pick = id
+			cost = int(entry.get("cost"))
+			break
+	if not bot.expect(not pick.is_empty(), "with the chest's gold (purse %d), one of Rolf's wares is within it" % purse,
+			"%d wares shown: %s" % [wares.size(), wares]):
+		return
+	panel._store_view.square_pressed.emit("ware", pick)
+	await bot.seconds(2.0)
+	bot.expect(int(bot.main.gold) == purse - cost, "a click on \"%s\"'s square buys it with the chest's gold: the purse falls by its price" % pick,
+		"purse %d -> %d, cost %d; why \"%s\"" % [purse, int(bot.main.gold), cost, panel.why_shown()])
 
 
 ## A click on the fallen knight opens his talk (Jeff on v0.1.197: "the fallen
@@ -704,7 +803,7 @@ func _after_restart(bot: Node) -> void:
 	if step in ["open", "ready"]:
 		bot.expect(not quest.is_empty(), "after the restart the quest is still on my tracker", str(quest).left(200))
 	var by_step := {"ask": [AstralKnight.ASK_TITLE, ""], "open": [AstralKnight.NOT_YET_TITLE, AstralKnight.NOT_YET],
-		"ready": [AstralKnight.TURN_IN_TITLE, ""], "done": ["", AstralKnight.DONE]}
+		"ready": [AstralKnight.TURN_IN_TITLE, ""], "done": ["", AstralKnight.DONE_LAID]}
 	var want: Array = by_step.get(step, ["", ""])
 	await _talk_knight(bot, "after a server restart (the quest %s)" % step, want[0], want[1], step == "done")
 	bot.press("close")
