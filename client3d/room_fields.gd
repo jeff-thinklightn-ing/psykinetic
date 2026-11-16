@@ -143,6 +143,8 @@ const VIEW: Array[StringName] = [
 	&"_player_hidden",
 	&"_player_through",
 	&"_player_through_clear",
+	&"_probe_fog_kept",
+	&"_probe_frames",
 	&"_probe_print_in",
 	&"_probe_seen",
 	&"_puppets",

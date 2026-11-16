@@ -3232,6 +3232,8 @@ var _body_fill: DirectionalLight3D
 static var light_probe := ""
 var _probe_seen := "-"
 var _probe_print_in := -1.0
+var _probe_fog_kept := true
+var _probe_frames := 0
 var _outdoor := false
 ## The low-horizon camera is on now (decision 623): Net.camera_low and
 ## outdoors.
@@ -3990,18 +3992,21 @@ func _apply_light_probe(delta: float) -> void:
 			if arg.begins_with("--light-probe="):
 				light_probe = arg.trim_prefix("--light-probe=")
 	var probe := "today" if light_probe == "" else light_probe
+	var fog_probe := ["fog0", "add0", "dark0"]
+	if not _probe_seen in fog_probe:
+		_probe_fog_kept = _environment.fog_enabled  # The place's own fog switch, while no probe holds it.
 	if probe != _probe_seen:
-		var first := _probe_seen == "-"
 		_probe_seen = probe
-		_sky_step = -1
+		_sky_step = -1  # The sky's values come back on the next _update_sky; the Sky itself is never rebuilt.
 		_environment.reflected_light_source = Environment.REFLECTION_SOURCE_BG
-		if not first:
-			_apply_sky()  # The fog's switch and the place's light as a build sets them.
+		_environment.fog_enabled = _probe_fog_kept
+		_probe_frames = 0
 		HUMAN_MATERIAL.set_shader_parameter("probe_specular", 0.0 if probe in ["spec0", "add0", "dark0"] else 0.5)
 		_probe_print_in = 1.0
 	if probe == "sky0":
 		_environment.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
-	if probe in ["fog0", "add0", "dark0"]:
+	_probe_frames += 1
+	if probe in fog_probe:
 		_environment.fog_enabled = false
 	if probe in ["ambient0", "dark0"]:
 		_environment.ambient_light_energy = 0.0
@@ -4026,12 +4031,12 @@ func _probe_line(probe: String) -> String:
 		if (light as Node3D).global_position.distance_to(_camera_target) < 10.0 and (light as Light3D).light_energy > 0.0:
 			near_lights += 1
 	var weather: Dictionary = _weather_view.weather if _weather_view != null else {}
-	return ("PROBE %s: hour %.2f sun %.1f deg, cloud %.2f rain %.2f fog %.2f; low_camera %s distance %.1f; "
+	return ("PROBE %s (%d frames after the switch): hour %.2f sun %.1f deg, cloud %.2f rain %.2f fog %.2f; low_camera %s distance %.1f; "
 			+ "tonemap %d exposure %.2f white %.2f; glow %s ssao %s ssil %s sdfgi %s ssr %s volfog %s; "
 			+ "fog %s mode %d density %.4f begin %.0f aerial %.2f; reflected %d; ambient %s x %.3f; sun %s x %.3f; "
 			+ "body fill %s x %.3f; adjust %s b %.2f c %.2f s %.2f; msaa %d ssaa %d taa %s scale %.2f; "
 			+ "near point/spot lights %d; specular %.2f") % [
-			probe, DayNight.hour(DayNight.now()), _look_elevation, float(weather.get("cloud", -1.0)),
+			probe, _probe_frames, DayNight.hour(DayNight.now()), _look_elevation, float(weather.get("cloud", -1.0)),
 			float(weather.get("rain", -1.0)), float(weather.get("fog", -1.0)), _low, _camera_distance(),
 			env.tonemap_mode, env.tonemap_exposure, env.tonemap_white, env.glow_enabled, env.ssao_enabled,
 			env.ssil_enabled, env.sdfgi_enabled, env.ssr_enabled, env.volumetric_fog_enabled,
