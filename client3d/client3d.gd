@@ -944,6 +944,19 @@ const BODY_FILL_ENERGY := 0.26
 ## How far below the camera's line the fill shines (degrees), so a body's
 ## front and top take it.
 const BODY_FILL_DOWN := 20.0
+## The low sun's share of that fill (858 amended, environment's low-sun
+## fill, on scratch): outdoors, at dawn and dusk alike, at most
+## LOW_SUN_FILL_ENERGY with the sun LOW_SUN_FILL_PEAK degrees up, none at
+## MOON_BELOW and none by LOW_SUN_FILL_TOP (low_sun_fill_share), in the
+## sun's own colour and dimmed as the weather and season dim the sun, so a
+## face at a low sun comes up toward the ground beside it, never past it.
+## Bodies alone: the ground, houses, shadows and sky keep their evening.
+## The low_sun_fill static mirrors the const for tests and stills.
+const LOW_SUN_FILL := true
+static var low_sun_fill := LOW_SUN_FILL
+const LOW_SUN_FILL_ENERGY := 0.18
+const LOW_SUN_FILL_PEAK := 6.0
+const LOW_SUN_FILL_TOP := 12.0
 const WARM := Color(1.0, 0.5, 0.2)
 const WARM_MOST := 0.45
 const LANTERN := Color(1.0, 0.93, 0.7)
@@ -3298,6 +3311,10 @@ var _look_daylight := 0.0
 var _floor_least := 0.0
 ## The sun's height the look was last worked out at (degrees).
 var _look_elevation := 90.0
+## The sun's drawn colour and how much of its key's energy the weather,
+## season and canopy leave it (_update_sky), for the low sun's fill.
+var _low_sun_tint := DAY_SUN
+var _low_sun_dim := 1.0
 ## The haze's density (look's own, the weather's share), for _set_haze.
 var _haze := Vector2.ZERO
 var _weather_view: WeatherView
@@ -3950,11 +3967,16 @@ func _tag_body(node: Node) -> void:
 ## The night's fill on bodies (858), outdoors while night_look_2: as strong
 ## as the night is deep (BODY_FILL_ENERGY when the day's light is gone), and
 ## shining from the camera's side, BODY_FILL_DOWN under its line, so the
-## faces seen take it.
+## faces seen take it. With low_sun_fill, the low sun's share beside it
+## (LOW_SUN_FILL_ENERGY), in the sun's colour.
 func _place_body_fill() -> void:
-	var energy := BODY_FILL_ENERGY * (1.0 - _look_daylight) if night_look_2 and _outdoor else 0.0
+	var night := BODY_FILL_ENERGY * (1.0 - _look_daylight) if night_look_2 and _outdoor else 0.0
+	var low := LOW_SUN_FILL_ENERGY * low_sun_fill_share(_look_elevation) * _low_sun_dim if low_sun_fill and _outdoor else 0.0
+	var energy := night + low
 	_body_fill.light_energy = energy
 	_body_fill.visible = energy > 0.001
+	if _body_fill.visible:
+		_body_fill.light_color = BODY_FILL.lerp(_low_sun_tint, low / energy)
 	if _body_fill.visible and _camera != null:
 		var ahead := -_camera.global_transform.basis.z
 		var level := Vector3(ahead.x, 0.0, ahead.z)
@@ -4199,6 +4221,9 @@ func _update_sky(delta: float) -> void:
 	_environment.fog_height_density = look["fog_height_density"]
 	_sun.light_color = look["light"]
 	_sun.light_energy = look["energy"]
+	_low_sun_tint = look["light"]
+	var keyed := float(_look.get("energy", 0.0))
+	_low_sun_dim = clampf(float(look["energy"]) / keyed, 0.0, 1.0) if keyed > 0.01 else 1.0
 	# The floor as the sim lights it: cloud takes Weather.CLOUD_DIM of the
 	# day's light over the night's (Fields.ambient_at).
 	var day := DayNight.daylight_at(float(_sky_step) / SKY_STEPS)
@@ -4287,6 +4312,13 @@ static func hazed_density(base: float, weather: float, low: bool, distance: floa
 	if not low:
 		return base + weather
 	return weather * CAMERA_DISTANCE / maxf(distance, CAMERA_DISTANCE * LOW_DISTANCE_SHARE)
+
+
+## The low sun's share of the body fill at [param elevation] (degrees): 1
+## at LOW_SUN_FILL_PEAK, easing to 0 at MOON_BELOW and at LOW_SUN_FILL_TOP.
+## By the sun's height alone, so dawn takes it as dusk does.
+static func low_sun_fill_share(elevation: float) -> float:
+	return smoothstep(MOON_BELOW, LOW_SUN_FILL_PEAK, elevation) * (1.0 - smoothstep(LOW_SUN_FILL_PEAK, LOW_SUN_FILL_TOP, elevation))
 
 
 ## How much of dusk's lift (623 amended (3)) the sun at [param elevation]

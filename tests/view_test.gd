@@ -155,6 +155,7 @@ func _ready() -> void:
 		_test_heights()
 		_test_damp_look()
 		_test_night_look_2()
+		_test_low_sun_fill()
 		_test_dusk_floor()
 	else:
 		# view_world_test: places and decor, water, buildings and doors, people and gear, creatures, music.
@@ -8993,6 +8994,70 @@ func _test_night_look_2() -> void:
 				layered += 1
 	_check(parts > 0 and layered == parts, "every body's drawn part on BODY_LAYER, its own layer kept (%d of %d)" % [layered, parts])
 	Client3D.night_look_2 = was
+	DayNight.set_hour(hour_was)
+	World.fields.weather = weather_was
+	_rig._weather_view.weather = weather_was.duplicate()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The low sun's fill (858 amended, environment's, on scratch): by the
+## sun's height alone, 1 at LOW_SUN_FILL_PEAK and none at MOON_BELOW or
+## LOW_SUN_FILL_TOP; outdoors under a clear sky the BodyFill lit at dawn as
+## at dusk, in the sun's own colour, none at noon or midnight (night_look_2
+## off), less under full cloud as the sun is less, none indoors.
+func _test_low_sun_fill() -> void:
+	print("\n== The low sun's fill on bodies: dawn and dusk, the sun's colour, people only ==")
+	var was := Client3D.low_sun_fill
+	var night_was := Client3D.night_look_2
+	var hour_was := DayNight.hour(DayNight.now())
+	var weather_was: Dictionary = World.fields.weather.duplicate()
+	Client3D.low_sun_fill = true
+	Client3D.night_look_2 = false
+	var shares := [Client3D.low_sun_fill_share(Client3D.MOON_BELOW), Client3D.low_sun_fill_share(Client3D.LOW_SUN_FILL_PEAK),
+			Client3D.low_sun_fill_share(Client3D.LOW_SUN_FILL_TOP), Client3D.low_sun_fill_share(-10.0), Client3D.low_sun_fill_share(40.0),
+			Client3D.low_sun_fill_share(2.5)]
+	_check(is_zero_approx(shares[0]) and is_equal_approx(shares[1], 1.0) and is_zero_approx(shares[2]) and is_zero_approx(shares[3])
+			and is_zero_approx(shares[4]) and float(shares[5]) > 0.0 and float(shares[5]) < 1.0,
+			"the share by the sun's height: %s at -1, 6, 12, -10, 40 and 2.5 degrees" % [shares])
+	var hills := Level.load_level("hills")
+	var barrow := Level.load_level("barrow")
+	# The hills built once: each hour only moves the sky on (a rebuild an hour ran view_test past its cap).
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var at := func(hour: float, kind: String) -> Array:
+		DayNight.set_hour(hour)
+		World.fields.weather = Weather.KINDS[kind].duplicate()
+		World.fields.weather["wind_dir"] = Vector2.RIGHT
+		World.fields.weather["snow"] = 0.0
+		_rig._weather_view.weather = World.fields.weather.duplicate()
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+		_rig._update_sky(0.0)  # The fill follows the look the first call set.
+		return [_rig._body_fill.light_energy if _rig._body_fill.visible else 0.0, _rig._look_elevation, _rig._body_fill.light_color, _rig._sun.light_color]
+	# Each low sun's strongest quarter hour: morning from 03:00, evening from 15:00.
+	var best := func(from: float) -> Array:
+		var top := [0.0, 0.0, Color.BLACK, Color.BLACK, from]
+		for k in 28:
+			var seen: Array = at.call(from + k * 0.25, "clear")
+			if float(seen[0]) > float(top[0]):
+				top = seen + [from + k * 0.25]
+		return top
+	var dawn: Array = best.call(3.0)
+	var dusk: Array = best.call(15.0)
+	var colour_kept: bool = (dusk[2] as Color).is_equal_approx(dusk[3]) and (dawn[2] as Color).is_equal_approx(dawn[3])
+	_check(float(dawn[0]) > 0.5 * Client3D.LOW_SUN_FILL_ENERGY and float(dusk[0]) > 0.5 * Client3D.LOW_SUN_FILL_ENERGY
+			and float(dawn[0]) <= Client3D.LOW_SUN_FILL_ENERGY + 0.0001 and float(dusk[0]) <= Client3D.LOW_SUN_FILL_ENERGY + 0.0001 and colour_kept,
+			"hills, clear: the fill %.3f at %.2f h (the sun %.1f degrees up) and %.3f at %.2f h (%.1f), each in the sun's colour (%s)"
+			% [dawn[0], dawn[4], dawn[1], dusk[0], dusk[4], dusk[1], colour_kept])
+	var noon: Array = at.call(12.0, "clear")
+	var midnight: Array = at.call(0.0, "clear")
+	var cloudy: Array = at.call(float(dusk[4]), "storm")
+	_rig.rebuild(barrow["terrain"], barrow["centre"])
+	var indoors: Array = at.call(float(dusk[4]), "clear")
+	_check(is_zero_approx(float(noon[0])) and is_zero_approx(float(midnight[0])) and float(cloudy[0]) < float(dusk[0]) and is_zero_approx(float(indoors[0])),
+			"no fill at noon (%.3f) or midnight (%.3f); under a storm at dusk %.3f (clear %.3f); in the barrow %.3f"
+			% [noon[0], midnight[0], cloudy[0], dusk[0], indoors[0]])
+	Client3D.low_sun_fill = was
+	Client3D.night_look_2 = night_was
 	DayNight.set_hour(hour_was)
 	World.fields.weather = weather_was
 	_rig._weather_view.weather = weather_was.duplicate()
