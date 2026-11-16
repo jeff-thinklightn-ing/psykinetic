@@ -57650,6 +57650,50 @@ box's woodcutter back in Umbrage). Release reads the box's journal after the dep
 "sent for, finds the way to" lines and the step, never a name; if the line is there, voice's second half goes into
 the next cut's section as its own bullet.
 
+918 amended (1): a town that can't pay keeps its people and its wood (the coordinator's ruling, 2026-11-15, made on
+Jeff's words for the hungry town, "dont punish town people for being hungry, have hunger be something the players can
+see and feel", and not waiting on a new pick; label from tools/decision_number.sh). On the box Umbrage's woodcutter
+left at 14:56 for unpaid wages, and the forest hut's mend (10 wood, 733 amended (1)) and the kitchen's repair had no
+wood coming: Towns._low counted any owed gold, so a treasury under its floor sent its owed people off one by one every
+wander_every_days (only the gatherers walking home, 767), Economy.deliver refused a gatherer's goods once he was owed
+store.owed_cap ("the town can't pay ... for more wood"), and _woodcutter_comes called a newcomer only for a planned
+building's wood.
+- (a) Towns._low no longer counts owed gold: nobody leaves for being owed; only an idle bench (work queued at their
+  workshop, none of it going) sends anyone off, and a leaver's "why" is "bench". The debt is paid first as gold comes
+  in above gold_floor, as before (Economy._pay_owed).
+- (b) Economy.deliver takes every delivery; the "can't pay for more" ledger note is gone.
+- (b2) A ceiling on what one worker is owed (the coordinator, the same evening, after this take's soak: with everyone
+  staying a broke town's debt grew to 168 gold by day 21, and 499 adds it all to the Donate window's ask and spends a
+  gift on it first, so a player giving toward the field would see the town swallow it): Production.owed_ceiling,
+  store.owed_days (5) of his wage, an official's (official.wage, 4) else the wage floor's (3). Past it he works for
+  his keep: he stays and eats as now, and the debt stops growing, the rest let go. Applied where a debt grows
+  (Economy._owe_or_pay: deliveries, hauling, the wage floor; Production's official wages); a debt already larger
+  (an old save) is never cut, only paid down.
+- (c) _woodcutter_comes reads a damaged or disrepaired building's queued repair job and a kept healer's hut this town
+  supplies (Towns.hut_town, Main._hut_town by world route) whose mend lacks the wood (_hut_wood_short), as it read a
+  planned building's: a ruin never waits on a trade nobody sends for. One away (sought) still counts, so no second.
+- (d) A gatherer already away comes home at gatherers_days as built (767) and, home, stays. Anyone else already gone
+  for wages (a sought entry, wandered, why "wages", nobody freeing them) comes home at the town's next turn, as 918
+  brings the hunger leavers home, since the reason they left is no longer one (the coordinator, the same day); the
+  debt still owed and paid first. Its journal line names the worker, the trade and the town, never a player. On the
+  box this changes who is in Umbrage at the deploy's first town turn.
+- (e) Not in this take. The Ledger's line for what the town owes its people is parked (the coordinator, the same
+  evening): Jeff's hungry-town words ask for trouble a player sees in the world, not a figure in a window, and it
+  would cost a protocol revision; ui-design's mock (C:/dev/review/ui-design/owed_mock/A_own_line.png, voice's words)
+  is kept as the answer if Jeff ever wants the figure. What stays: a worker owed long may say so when spoken to
+  (voice's words, lore's check, nothing on the wire), with what a player can do about it (a gift to the treasury pays
+  debts first, 499), economy's small design after this take. Nothing makes a player owe or be owed.
+Why a fresh town reads "treasury 2 at its floor 5": its treasury starts empty by 353 amended (start_gold is spread
+over its residents' purses), and fills only as they buy from the store, so a new town opens under its floor and its
+first deliveries are owed. With (a) and (b) that costs it nobody and no wood. Whether unpaid wages ever cost a town
+anything a player feels beyond the Ledger (slower work, a shut stall) stays Jeff's.
+Tests: farm_test (every resident owed its cap for 30 days, all there; owed past leave_days he stays; an idle bench
+still sends him off, why "bench", the note on his shop's door, wander_every_days kept; the box's old save home and
+staying), larder_test _test_delivery (a woodcutter's ceiling 15, a guard's 20; owed his ceiling, the wood still
+taken and the debt no more; paid when gold comes in, as before), farm_test (a smith gone for wages home at the next turn, his debt still owed), hut_town_test (no woodcutter in Umbrage: the forest's kept ruin calls one, its ordered mend
+doesn't, a queued kitchen repair short of wood does). Server only; protocol unchanged; no new class_name. Bullet:
+voice's, once a joined Ledger shows the owed line.
+
 ## 920. The tavern's sound: its hearth burning, the taverner's cup, the room's talk by the goers seen (sound)
 
 The coordinator's order of 11-14: maps' Mughouse take switches "Umbrage at

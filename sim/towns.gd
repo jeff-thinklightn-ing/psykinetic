@@ -173,6 +173,9 @@ var water_safe := Callable()
 ## from the store of the hut's town, brought to the hut (733; Main, through
 ## Economy.hut_supplies). Nothing bought, no mend, while unset.
 var hut_supplies := Callable()
+## (hut_id) -> String: the town a hut buys its mend from ("" for none; Main's
+## _hut_town, by world route), for the woodcutter its wood calls (918 amended (1)).
+var hut_town := Callable()
 ## Healer's huts (733): Holdings place id -> {state (STANDING, DISREPAIR,
 ## RUIN), level, job, empty_since, decay, ruin (days)}. Saved beside the
 ## towns (huts_to_dict).
@@ -2424,8 +2427,8 @@ func _wander_turn(town: String) -> void:
 	var trade := str(worker["trades"][0])
 	_note(town, "%s the %s has gone, low too long; they say back where they were found" % [worker["name"], trade.replace("_", " ")])
 	_seek(town, leaving, str(worker["name"]), trade, true)
-	# Why they went (918): unpaid wages, else idle at a bench; never hunger now.
-	_town(town)["sought"][leaving]["why"] = "wages" if int(worker.get("owed", 0)) > 0 else "bench"
+	# Why they went (918): idle at a bench; never hunger, never wages now (918 amended (1)).
+	_town(town)["sought"][leaving]["why"] = "bench"
 	# For the box's journal only, never the town's log (release's ask, 11-14: a line that names why): the worker's
 	# name as every [towns] line has it, no player's.
 	print("[towns] %s: %s the %s left for %s (owed %d), step %d" % [town, worker["name"], trade.replace("_", " "),
@@ -2434,13 +2437,12 @@ func _wander_turn(town: String) -> void:
 	wandered.emit(town, leaving)
 
 
-## Whether worker [param id] ([param worker]) is low (613 amended): owed
-## unpaid wages, or seated with work queued at their workshop and none of it
-## going. Not hunger (918, Jeff 11-14: "dont punish town people for being
-## hungry"): a hungry resident stays.
-func _low(id: String, worker: Dictionary) -> bool:
-	if int(worker.get("owed", 0)) > 0:
-		return true
+## Whether worker [param id] ([param worker]) is low (613 amended): seated
+## with work queued at their workshop and none of it going. Not hunger (918,
+## Jeff 11-14: "dont punish town people for being hungry"): a hungry resident
+## stays; nor owed wages (918 amended (1), the coordinator's ruling on the same
+## words, 11-15): one the town owes stays and works, paid first as gold comes.
+func _low(id: String, _worker: Dictionary) -> bool:
 	var shop := production.workshop_of(id)
 	if shop.is_empty():
 		return false
@@ -2574,6 +2576,11 @@ func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
 		# 918: home at the town's next turn, nobody needing to fetch them. The box's journal only (release's ask).
 		print("[towns] %s: %s comes home, gone for %s, step %d" % [town, entry["name"],
 			"hunger" if str(entry.get("why", "")) == "hunger" else "a reason no save kept (left before 918)", now()])
+	elif bool(entry.get("wandered", false)) and str(entry.get("why", "")) == "wages" and str(entry.get("freed_by", "")).is_empty():
+		# 918 amended (1), the coordinator: owed is no reason to leave now, so one gone for it comes home at the town's
+		# next turn, his debt still owed and paid first. The box's journal only: the trade and the town.
+		print("[towns] %s: %s the %s comes home, gone for wages (owed %d), step %d" % [town, entry["name"], str(entry["trade"]).replace("_", " "),
+			int(production.worker(id).get("owed", 0)), now()])
 	elif str(entry["trade"]) != WALKS_IN:
 		var days := float(rules.get("gatherers_days", 0))
 		if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
@@ -3183,17 +3190,24 @@ func seat_gatherers(town: String) -> Array[String]:
 
 ## A town with a building waiting on wood and no woodcutter gets one, a
 ## newcomer, once it has waited woodcutter.growth_days (a rescue may bring
-## one first), as a field gets its farmer (449).
+## one first), as a field gets its farmer (449). Waiting on wood: a planned
+## building's job, a repair's queued job (918 amended (1): a ruin never waits
+## on a trade nobody sends for), or a kept healer's hut this town supplies
+## whose mend lacks it (_hut_wood_short). One away (sought) still counts.
 func _woodcutter_comes(town: String) -> void:
 	var rule: Dictionary = rules.get("woodcutter", {})
 	var trade := str(rule.get("trade", ""))
 	var record := _town(town)
+	var wood := production.stockpile.count(town, "wood")
 	var short := false
 	for kind: String in record["buildings"]:
 		var house: Dictionary = record["buildings"][kind]
 		var job := production.job(int(house.get("job", 0))) if int(house.get("job", 0)) != 0 else {}
-		if house.get("state") == PLANNED and int(job.get("cost", {}).get("wood", 0)) > production.stockpile.count(town, "wood"):
+		var waits: bool = house.get("state") == PLANNED or house.get("state") in [DAMAGED, DISREPAIR] and str(job.get("state", "")) == "queued"
+		if waits and int(job.get("cost", {}).get("wood", 0)) > wood:
 			short = true
+	if not short and not trade.is_empty() and not _has_trade(town, trade):
+		short = _hut_wood_short(town, wood)
 	if trade.is_empty() or not short or _has_trade(town, trade):
 		record.erase("woodcutter_wanted")
 		return
@@ -3210,6 +3224,22 @@ func _woodcutter_comes(town: String) -> void:
 	var name := _free_name(town, names, absi(hash("%s/wood/%d" % [town, count])))
 	var id := "woodcutter_%s_%d" % [town.replace("/", "_"), count]
 	_arrive(town, id, name, trade, "%s the woodcutter comes: the town has building to do and no wood" % name)
+
+
+## Whether a kept healer's hut that [param town] supplies (hut_town) waits on
+## a mend whose wood is more than the town's [param wood] (918 amended (1)).
+func _hut_wood_short(town: String, wood: int) -> bool:
+	if not hut_town.is_valid():
+		return false
+	var repair: Dictionary = rules.get("healers", {}).get("repair", {})
+	for id: String in _huts:
+		var entry: Dictionary = _huts[id]
+		if entry["state"] == STANDING or int(entry["job"]) != 0 or _keeper_of(id).is_empty():
+			continue
+		var needs: Dictionary = repair.get("ruin" if entry["state"] == RUIN else "disrepair", {}).get("needs", {})
+		if int(needs.get("wood", 0)) > wood and str(hut_town.call(id)) == town:
+			return true
+	return false
 
 
 # --- Wells and roofs (decision 426) -------------------------------------------------

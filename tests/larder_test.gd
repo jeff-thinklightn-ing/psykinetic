@@ -729,8 +729,10 @@ func _test_hut_kept() -> void:
 
 ## Gathered, hauled and paid for (decision 498): a delivery bought at the
 ## shop's raw price, a hauler's fee a load out of it, the rest owed when the
-## treasury is at its floor and paid as gold comes in, no more bought past
-## owed_cap; a maker paying for materials, never under what the store paid.
+## treasury is at its floor and paid as gold comes in, the debt stopping at
+## the worker's owed_ceiling (store.owed_days of his wage) and the wood still
+## taken (918 amended (1)); a maker
+## paying for materials, never under what the store paid.
 func _test_delivery() -> void:
 	print("
 == gathered, hauled and paid for ==")
@@ -765,12 +767,22 @@ func _test_delivery() -> void:
 	_check(int(work.worker("w1")["owed"]) == 0 and int(work.worker("w1")["purse"]) == before + owed, "paid when gold comes in")
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold)
 	var wood := stock.count(TOWN, "wood")
-	while int(work.worker("w1")["owed"]) < int(_rules["store"]["owed_cap"]):
+	var ceiling := work.owed_ceiling("w1")
+	_check(ceiling == int(_rules["store"]["owed_days"]) * int(_rules["wage_floor"]["gold"]),
+		"918 amended (1): a woodcutter's ceiling, owed_days of the wage floor (%d)" % ceiling)
+	for i in 20:
+		if int(work.worker("w1")["owed"]) >= ceiling:
+			break
 		work.deliver_to(TOWN, "w1", "wood", 10, "w", "test")
 	wood = stock.count(TOWN, "wood")
-	_check(not work.deliver_to(TOWN, "w1", "wood", 10, "w", "test") and stock.count(TOWN, "wood") == wood
-		and stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return "can't pay Bran for more wood" in str(line.get("from", "")) + str(line.get("what", "")) + str(line)),
-		"owed its cap: the store takes no more, and says so")
+	var capped := int(work.worker("w1")["owed"])
+	_check(capped == ceiling and work.deliver_to(TOWN, "w1", "wood", 10, "w", "test") and stock.count(TOWN, "wood") == wood + 10
+		and int(work.worker("w1")["owed"]) == capped and stock.count(TOWN, "gold") == floor_gold,
+		"owed his ceiling: the store still takes his wood (918 amended (1)), the debt no more (%d)" % int(work.worker("w1")["owed"]))
+	work.add_worker("g1", "Brand", ["guard"], TOWN, "test", "steady")
+	_check(work.owed_ceiling("g1") == int(_rules["store"]["owed_days"]) * int(_rules["official"]["guard"]["wage"]),
+		"an official's ceiling: owed_days of his wage (%d)" % work.owed_ceiling("g1"))
+	work._workers.erase("g1")  # Asked only: no wage of his in the rows below.
 	work.add_worker("m1", "Odo", ["smith"], TOWN, "test", "steady")
 	work.pay("m1", 40)
 	var paid_unit := float(economy._paid[TOWN]["wood"])

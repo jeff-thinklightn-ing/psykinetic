@@ -601,14 +601,24 @@ func _test_hunger_harms_none() -> void:
 	# (A gatherer the town seats on its own turn may join them; nobody leaves.)
 	_check(gone.is_empty() and heads.all(func(h: String) -> bool: return h in after) and towns.stage(TOWN) == "hamlet" and towns.hungry_now(TOWN) >= heads.size(),
 		"20 hungry days, the store bare: all %d heads still there, still a hamlet, nobody gone (%s, %s, gone %s)" % [heads.size(), after, towns.stage(TOWN), gone])
+	# 918 amended (1): a town that can't pay keeps its people. Every one owed store.owed_cap for 30 days: nobody goes.
+	heads = towns.residents(TOWN).duplicate()
+	for id: String in heads:
+		towns.production.set_owed(id, int(_full["store"]["owed_cap"]))
+	_year(towns, 30)
+	_check(gone.is_empty() and heads.all(func(h: String) -> bool: return h in towns.residents(TOWN)),
+		"918 amended (1): all %d owed their cap for 30 days, every one still there (gone %s)" % [heads.size(), gone])
+	for id: String in heads:
+		towns.production.set_owed(id, 0)
 	var sick: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/townsfolk.json"))["sick"]
 	_check(float(sick.get("hungry", 0)) == 1.0, "going without adds no sickness (sick.hungry %s)" % sick.get("hungry"))
 
-	# Gone before 918 (a save with no why) and gone for wages: the first home at the next turn, alone.
+	# Gone before 918 (a save with no why) and gone for wages: both home at the next turn, alone (918 amended (1)).
 	# (Sought under trades no resident has, so "the town has one again" doesn't call them in first.)
 	towns._seek(TOWN, "w0", "W0", "weaver", true)
 	towns._seek(TOWN, "w1", "W1", "smith", true)
 	towns._town(TOWN)["sought"]["w1"]["why"] = "wages"
+	towns.production.set_owed("w1", 7)
 	var again := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), towns.production, _full, towns.clock)
 	again.place_sought = towns.place_sought
 	_check("w0" not in again.residents(TOWN) and again.sought_entry("w0").get("why", "") == "", "a save with one gone before 918, no why")
@@ -616,10 +626,11 @@ func _test_hunger_harms_none() -> void:
 	again.tick()
 	_check("w0" in again.residents(TOWN) and again.sought_entry("w0").is_empty() and not bool(again.production.worker("w0")["away"]),
 		"the next turn: he comes home by himself")
-	_check("w1" not in again.residents(TOWN) and again.sought_entry("w1").get("why") == "wages", "gone for unpaid wages: still out, to be found (%s, %s)" % [again.residents(TOWN), again.sought_entry("w1")])
+	_check("w1" in again.residents(TOWN) and again.sought_entry("w1").is_empty() and not bool(again.production.worker("w1")["away"])
+		and int(again.production.worker("w1")["owed"]) == 7,
+		"918 amended (1): a smith gone for unpaid wages, home at the next turn too, his debt still owed (%s, owed %d)" % [again.residents(TOWN), int(again.production.worker("w1")["owed"])])
 	# The box's save (the coordinator's question, 11-14): every entry there was saved before "why", so one who left
-	# for wages comes home too. Still owed, he is low again from the day he is back, and leave_days later gone
-	# again, this time with his why kept.
+	# for wages comes home too. Still owed, he stays (918 amended (1): nobody leaves for being owed).
 	again.production.set_owed("w2", 5)
 	again._seek(TOWN, "w2", "W2", "tanner", true)  # As a leaving was saved before 918: no why (a trade no resident has, as above).
 	var old_save: Dictionary = JSON.parse_string(JSON.stringify(again.to_dict()))
@@ -634,8 +645,8 @@ func _test_hunger_harms_none() -> void:
 	boxlike._wander_turn(TOWN)
 	_now += int(float(_full["sought"]["leave_days"]) * DayNight.day_steps) + 1
 	boxlike._wander_turn(TOWN)
-	_check("w2" not in boxlike.residents(TOWN) and boxlike.sought_entry("w2").get("why") == "wages",
-		"still owed, leave_days later he is gone again, for wages, his why kept (%s)" % [boxlike.sought_entry("w2")])
+	_check("w2" in boxlike.residents(TOWN) and boxlike.sought_entry("w2").is_empty(),
+		"still owed, leave_days later he is still home (918 amended (1)) (%s)" % [boxlike.sought_entry("w2")])
 
 
 func _test_settle() -> void:
@@ -1170,31 +1181,50 @@ func _test_sought() -> void:
 	towns.production.set_owed("h1", 5)
 	towns.production.set_owed("f1", 5)
 	var leave := int(_rules["sought"]["leave_days"])
+	_year(towns, leave + 2)
+	_check(gone.is_empty() and id in towns.residents(TOWN),
+		"918 amended (1): owed past leave_days, he stays and works (a town that can't pay keeps its people) (%s)" % [gone])
+	# An idle bench still sends him off: work queued at his shop and none of it going. The job's recipe is no
+	# catalog's, so the turns are driven by hand (_sought_turn, which wanders and places), production never ticked
+	# while it stands.
 	var shop := towns.production.workshop_of(id)
-	_year(towns, leave - 1)
-	_check(gone.is_empty() and id in towns.residents(TOWN), "not before leave_days")
-	_year(towns, 2)
+	if shop.is_empty():
+		shop = "fold_test"
+		towns.production.add_workshop(shop, trade, TOWN)
+		towns.production.assign(shop, id)
+	var idle := towns.production._new_job("make", "idle_test", towns.production.workshop(shop))
+	var wander := func(days: float) -> void:
+		towns._sought_turn(TOWN)
+		_now += int(days * DAY) + 1
+		towns._sought_turn(TOWN)
+	towns._town(TOWN).erase("wandered_at")
+	wander.call(leave)
 	entry = towns.sought_entry(id)
 	_check(gone == [[TOWN, id]] and id not in towns.residents(TOWN) and bool(entry.get("wandered")) and bool(towns.production.worker(id)["away"])
 		and towns.sought(TOWN).filter(func(each: Dictionary) -> bool: return each["trade"] == trade).size() == 1,
-		"owed too long: he wanders off, the same worker, sought again (%s %s)" % [entry, gone])
-	_check(entry.get("door") == (shop if not shop.is_empty() else "inn"), "the note on the door of the shop they kept (%s, %s)" % [entry.get("door"), shop])
-	_check(entry.get("why") == "wages", "918: why he went is kept, unpaid wages (%s)" % entry.get("why"))
+		"idle at his bench too long: he wanders off, the same worker, sought again (%s %s)" % [entry, gone])
+	_check(entry.get("door") == shop, "the note on the door of the shop they kept (%s, %s)" % [entry.get("door"), shop])
+	_check(entry.get("why") == "bench", "918: why he went is kept, an idle bench, never wages (%s)" % entry.get("why"))
 	_check(towns.sought(TOWN).all(func(each: Dictionary) -> bool: return each["door"] == "" or bool(each["wandered"])), "one who never came has no door")
 	_check("h1" in towns.residents(TOWN), "a hunter (no story of his trade) stays")
 	_check("f1" in towns.residents(TOWN) and towns.sought_entry("f1").is_empty(), "the farmer (never sought, WALKIN) stays, owed or not")
 	_check(entry.get("place") == "wilds/%s" % story["place"] or entry.get("place") == "wilds/camp_1", "back to a place of his story (%s)" % entry.get("place"))
-	_check(_year(towns, 1) >= 0 and towns.free_sought(id, "p1") and towns.sought_home(id) and id in towns.residents(TOWN), "found again and home")
-	# Low again at once: not within wander_every_days of the last (613 amended, tuned).
+	_check(towns.free_sought(id, "p1") and towns.sought_home(id) and id in towns.residents(TOWN), "found again and home")
+	# Low again at once: not within wander_every_days of the last (613 amended, tuned). Back at his bench, its work still
+	# queued and none going.
+	if towns.production.workshop_of(id) != shop:
+		towns.production.assign(shop, id)
 	var every := int(_rules["sought"]["wander_every_days"])
 	gone.clear()
-	towns.production.set_owed(id, 5)
 	towns._town(TOWN)["low"] = {id: _now - (leave + 1) * DAY}  # Low past leave_days already.
 	towns._town(TOWN)["wandered_at"] = _now
-	_year(towns, every - 1)
+	_now += (every - 1) * DAY
+	towns._wander_turn(TOWN)
 	_check(gone.is_empty(), "low past leave_days, but one went %d days ago: stays (%s)" % [every - 1, gone])
-	_year(towns, 2)
+	_now += 2 * DAY
+	towns._wander_turn(TOWN)
 	_check(gone.size() == 1, "past wander_every_days: goes (%s)" % [gone])
+	towns.production._jobs.erase(idle)
 
 	print("
 == the sought answered by another ==")

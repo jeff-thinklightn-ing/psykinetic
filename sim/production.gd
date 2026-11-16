@@ -367,6 +367,25 @@ func worker_ids(town := "") -> Array[String]:
 
 ## What the town owes worker [param worker_id] for deliveries it could not
 ## pay for yet (decision 498).
+## The most the town comes to owe worker [param worker_id] (918 amended (1),
+## the coordinator: past it he works for his keep, staying, the debt no longer
+## growing): store.owed_days of his wage, an official's (official.wage, a
+## payday a day) else the wage floor's (wage_floor.gold); store.owed_cap with
+## no owed_days.
+func owed_ceiling(worker_id: String) -> int:
+	var store: Dictionary = rules.get("store", {})
+	var days := int(store.get("owed_days", 0))
+	if days <= 0:
+		return int(store.get("owed_cap", 30))
+	var wage := int(rules.get("wage_floor", {}).get("gold", 0))
+	var official: Dictionary = rules.get("official", {})
+	for trade: Variant in worker(worker_id).get("trades", []):
+		if official.has(str(trade)):
+			wage = int(official[str(trade)].get("wage", wage))
+			break
+	return days * maxi(wage, 1)
+
+
 func set_owed(worker_id: String, gold: int) -> void:
 	if _workers.has(worker_id):
 		_workers[worker_id]["owed"] = maxi(gold, 0)
@@ -1346,9 +1365,9 @@ func _official_wages(at: int) -> void:
 		if stockpile.count(town, "gold") - wage < floor_gold or not stockpile.take(town, "gold", wage, "wage:%s" % id):
 			# Owed, as the wage floor is, and paid first when the treasury
 			# can (528 amended: "the town pays official jobs").
-			# Never past store.owed_cap, as a delivery's debt: what the town
+			# Never past his owed_ceiling (918 amended (1)): what the town
 			# keeps back for its officials can't grow without end.
-			var cap := int(rules.get("store", {}).get("owed_cap", 30))
+			var cap := owed_ceiling(id)
 			worker_record["owed"] = mini(int(worker_record.get("owed", 0)) + wage, maxi(cap, int(worker_record.get("owed", 0))))
 			print("[production] %s the %s goes unpaid: %s's treasury is at its floor; owed %d, step %d" % [worker_record["name"], trade, town,
 				int(worker_record["owed"]), at])

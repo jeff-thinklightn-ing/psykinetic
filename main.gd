@@ -5323,6 +5323,7 @@ func _boot() -> void:
 	World.towns.hut_supplies = func(hut_id: String, keeper: String, needs: Dictionary) -> bool:  # 733.
 		var town := _hut_town(hut_id)
 		return not town.is_empty() and World.economy.hut_supplies(town, hut_id, keeper, needs)
+	World.towns.hut_town = _hut_town  # The woodcutter a hut's mend calls (918 amended (1)).
 	World.towns.visitor_sale = World.economy.visitor_sale
 	# Each healer's hut its own potions (641).
 	World.production.workshop_makes = _workshop_makes

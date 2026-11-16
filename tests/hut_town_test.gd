@@ -4,7 +4,8 @@ extends Node
 ## with no store in the forest, had no town, so its keeper's mend was never ordered (the box, 11-14: a ruin, kept,
 ## nobody raised there since). On the laid world: the forest's hut buys from Umbrage's store, and its ruin is mended
 ## for 10 wood; a hut no town can be reached from has none, and kept it still gives care and brings the fallen back,
-## its walls waiting, nothing erring.
+## its walls waiting, nothing erring. 918 amended (1): with no woodcutter in Umbrage, the kept ruin's 10 wood calls
+## one, as a queued repair short of wood does.
 
 const FOREST := "forest/healers_hut@45,31"
 const WILDS := "wilds/healers_hut@152,232"
@@ -48,6 +49,32 @@ func _run() -> void:
 	var job := int(World.towns._huts[FOREST]["job"])
 	_check(job != 0 and World.stockpile.count(UMBRAGE, "wood") == 0 and World.production.job(job).get("recipe", "") == Towns.HUT_REPAIR + FOREST,
 		"10 wood in Umbrage's store: the forest's ruin's mend ordered, the wood taken from Umbrage (job %d, wood left %d)" % [job, World.stockpile.count(UMBRAGE, "wood")])
+	# 918 amended (1): a ruin's wood calls a woodcutter when the town has none (the box, 11-15: Umbrage's left for
+	# wages; _woodcutter_comes read only a planned building's wood).
+	var record: Dictionary = World.towns._town(UMBRAGE)
+	for who: String in World.towns.residents(UMBRAGE).duplicate():
+		if "woodcutter" in World.production.trades_of(who):
+			record["residents"].erase(who)
+	record.erase("woodcutter_wanted")
+	World.towns._huts[FOREST] = {"state": Towns.STANDING, "level": 1, "job": 0}
+	World.towns._woodcutter_comes(UMBRAGE)
+	_check(not World.towns.has_resident(UMBRAGE, "woodcutter") and not record.has("woodcutter_wanted"),
+		"(no woodcutter in Umbrage, nothing waiting on wood: none called)")
+	World.towns._huts[FOREST] = {"state": Towns.RUIN, "level": 0, "job": 0, "ruin": 0}
+	World.towns._woodcutter_comes(UMBRAGE)
+	_check(int(record.get("woodcutter_wanted", -1)) >= 0, "the forest's kept ruin wants 10 wood, Umbrage has %d and no woodcutter: one called (wanted since %d)"
+		% [World.stockpile.count(UMBRAGE, "wood"), int(record.get("woodcutter_wanted", -1))])
+	World.towns._huts[FOREST]["job"] = -1  # Its mend ordered: the hut no longer waits on Umbrage's wood.
+	record.erase("woodcutter_wanted")
+	World.towns._woodcutter_comes(UMBRAGE)
+	_check(not record.has("woodcutter_wanted"), "its mend ordered: no call for it")
+	_check(World.towns.damage(UMBRAGE, "kitchen") and World.towns._repair(UMBRAGE), "(Umbrage's kitchen damaged, its repair ordered)")
+	var repair := int(World.towns.building(UMBRAGE, "kitchen").get("job", 0))
+	var wood := int(World.production.job(repair).get("cost", {}).get("wood", 0))
+	World.towns._woodcutter_comes(UMBRAGE)
+	_check(wood > World.stockpile.count(UMBRAGE, "wood") and str(World.production.job(repair).get("state", "")) == "queued" and int(record.get("woodcutter_wanted", -1)) >= 0,
+		"a repair queued for %d wood, none in the store: a woodcutter called" % wood)
+	World.towns._huts[FOREST]["job"] = 0
 	# A hut no town can be reached from: no town; kept, open, its walls waiting, its turn erring nowhere.
 	World.holdings._places[NOWHERE] = {"id": NOWHERE, "area": "hut_town_nowhere", "key": "healers_hut@3,3", "cell": Vector2i(3, 3), "name": "a lost hut",
 		"kind": "healers_hut", "radius": 2, "worth": 0, "start": Factions.NOBODY}

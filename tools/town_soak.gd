@@ -62,6 +62,16 @@ const WOODLOT := "wilds/soak_woodlot"
 ## debt, the town's gold, workers owed, hungry, on the dole, what was paid.
 var _sell := 0
 var _sell_until := 20
+## --broke=N: 918 amended (1)'s check (a town that can't pay keeps its people
+## and its wood): at each day's start the treasury is held at N gold (what is
+## above it taken, "soak:broke"), so the town can't pay all the soak long. With
+## it or --wages, a "SOAK918" line each day: the treasury, its floor, wood,
+## what the town owes its people, the residents by trade, who is sought, why.
+var _broke := -1
+var _wages := false
+## --broke-until=DAY: the hold stops at that day's start, the treasury then
+## left to recover (how many days the owed takes to come down to 0).
+var _broke_until := 1 << 30
 ## --trusted: 831's check: trusted prices on, the seller trusted by the town
 ## (Economy.trusted_of), so --sell sells at a trusted player's prices.
 var _trusted := false
@@ -142,6 +152,12 @@ func _run() -> void:
 			_sell_until = int(arg.trim_prefix("--sell-until="))
 		elif arg == "--trusted":
 			_trusted = true
+		elif arg.begins_with("--broke="):
+			_broke = maxi(int(arg.trim_prefix("--broke=")), 0)
+		elif arg == "--wages":
+			_wages = true
+		elif arg.begins_with("--broke-until="):
+			_broke_until = int(arg.trim_prefix("--broke-until="))
 		elif arg.begins_with("--woodlot-taken="):
 			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
@@ -292,6 +308,7 @@ func _hourly() -> void:
 	if day != _last_day:
 		_last_day = day
 		_day_826(day)
+		_day_918(day)
 	if _sell > 0 and hour == 12 and day < _sell_until:
 		_sell_826()
 	for entity in World.townsfolk():
@@ -430,6 +447,35 @@ func _day_826(day: int) -> void:
 	print("SOAK826 day %d: treasury %d, trade debt %d, town gold %d, workers owed %d, hungry %d, dole %d, paid players town %d camp %d, short %d" % [day,
 		World.stockpile.count(TOWN, "gold"), World.economy.trade_debt(TOWN), World.economy.town_gold(TOWN), owed, hungry,
 		World.production.on_dole(TOWN), _sold["town"], _sold["camp"], _sold["short"]])
+
+
+## 918 amended (1): the day's line (see --broke), after the day's hold.
+func _day_918(day: int) -> void:
+	if _broke < 0 and not _wages:
+		return
+	var gold := World.stockpile.count(TOWN, "gold")
+	if _broke >= 0 and gold > _broke and day < _broke_until:
+		World.stockpile.take(TOWN, "gold", gold - _broke, "soak:broke")
+	var owed := 0
+	var trades := {}
+	for id: String in World.towns.residents(TOWN):
+		owed += int(World.production.worker(id).get("owed", 0))
+		var trade := str((World.production.worker(id).get("trades", [""]) as Array).front())
+		trades[trade] = int(trades.get(trade, 0)) + 1
+	var keys := trades.keys()
+	keys.sort()
+	var by_trade := PackedStringArray()
+	for trade: String in keys:
+		by_trade.append("%s %d" % [trade, trades[trade]])
+	var sought := PackedStringArray()
+	for entry: Dictionary in World.towns.sought(TOWN):
+		sought.append("%s (%s)" % [entry["trade"], entry.get("why", "")])
+	var use := World.economy.fund_use(TOWN)
+	var first := int(use.get("first_build", -1))
+	print("SOAK918 day %d: treasury %d (floor %d), wood %d, owed %d, residents %d: %s; sought: %s; given %d: to the build %d, to wages %d, kept %d, first to the build %s" % [
+		day, World.stockpile.count(TOWN, "gold"), int(World.economy.rules.get("gold_floor", 0)), World.stockpile.count(TOWN, "wood"), owed,
+		World.towns.residents(TOWN).size(), ", ".join(by_trade), ", ".join(sought) if not sought.is_empty() else "none", int(_counts.get("given_gold", 0)),
+		int(use.get("build", 0)), int(use.get("owed", 0)), int(use.get("kept", 0)), "day %d" % Townsfolk.day_of(first) if first >= 0 else "none"])
 
 
 ## 826: the noon sale (see --sell): hides and a claw to the town, priced as
