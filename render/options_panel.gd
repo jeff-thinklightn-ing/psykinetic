@@ -46,8 +46,8 @@ var _scroll: ScrollContainer
 const LOOK_ROWS := [
 	["build", "Build", [["lean", "Lean"], ["middling", "Middling"], ["heavy", "Heavy"]]],
 	["stature", "Height", [["short", "Short"], ["middling", "Middling"], ["tall", "Tall"]]],
-	["hair", "Hair", [["cropped", "Cropped"], ["bound", "Bound"], ["long", "Long"], ["bald", "Bald"]]],
-	["beard", "Beard", [["none", "None"], ["short", "Short"], ["full", "Full"]]],
+	["hair", "Hair", [["cropped", "Cropped"], ["bound", "Bound"], ["long", "Long"], ["bald", "Bald"], ["tail", "Tail"]]],
+	["beard", "Beard", [["none", "None"], ["short", "Short"], ["full", "Full"], ["long", "Long"]]],
 ]
 ## A swatch's size (ui: big enough to hit at 1080p).
 const SWATCH := Vector2(56, 56)
@@ -384,7 +384,7 @@ func _swatch_row(text: String, key: String, options: Array) -> HBoxContainer:
 ## decision 911). Before that, a seed drawn at random for this panel, which a
 ## first pick writes (as "Surprise me" does); never one made from their id.
 func _look() -> PersonLook:
-	return PersonLook.make(_look_words(), Net.player_body)
+	return PersonLook.make(_look_words() + PersonLook.EXTRAS_OFF, Net.player_body)  # As look_for draws a player: no last rolls.
 
 
 var _unseeded := 0

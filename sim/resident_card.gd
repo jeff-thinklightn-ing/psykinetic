@@ -64,7 +64,30 @@ static func roll(worker_id: String, person_name: String, trade: String, origin :
 	traits["pronoun"] = pronoun_of(person_name, str(traits["pronoun"]))  # Drawn all the same: the rest rolls as before.
 	var came := _pick(table.get("came", []), rng)
 	var look := _roll_look(table.get("look", {}), rng, str(traits["pronoun"]), worker_id)
+	_roll_extras(look, rng, str(traits["pronoun"]))
 	return {"traits": traits, "came": came_words(origin, by, came), "look": look, "facts": [], "card": "", "card_by": ""}
+
+
+## The tail and the long beard (pc-character's, in npc's file on the coordinator's ruling of 2026-11-16; npc reads
+## it when back): two draws after every other, so a card rolls every word it rolled before, and only these two
+## may change. A he whose card rolled cropped wears the tail at TAIL_SHARE (1 man in 8), one whose card rolled a
+## full beard the long beard at LONG_BEARD_SHARE (1 in 16). Only a card rolled from now on: a kept card is never
+## rolled again (Townsfolk.card_of), so no one in a town today changes.
+const TAIL_SHARE := 0.5
+const LONG_BEARD_SHARE := 0.1875
+## A hair word as the card says it (voice's words, 11-16): "with brown hair, tied back in a tail".
+const HAIR_SAID := {"tail": "tied back in a tail"}
+
+
+static func _roll_extras(look: Dictionary, rng: RandomNumberGenerator, pronoun: String) -> void:
+	var tail_roll := rng.randf()
+	var long_roll := rng.randf()
+	if pronoun != "he":
+		return
+	if str(look.get("hair", "")) == "cropped" and tail_roll < TAIL_SHARE:
+		look["hair"] = "tail"
+	if str(look.get("beard", "")) == "full" and long_roll < LONG_BEARD_SHARE:
+		look["beard"] = "long"
 
 
 ## [param person_name]'s own pronoun (resident_traits.json "pronoun_of", lore's table; playtest saw
@@ -174,7 +197,7 @@ static func plain_card(card: Dictionary) -> String:
 		"%s speaks in %s." % [she.capitalize(), traits.get("speech", "")],
 	]
 	if not look.is_empty():
-		var hair := "bald" if look.get("hair", "") == "bald" else "%s hair, %s" % [look.get("hair_colour", ""), look.get("hair", "")]
+		var hair := "bald" if look.get("hair", "") == "bald" else "%s hair, %s" % [look.get("hair_colour", ""), HAIR_SAID.get(look.get("hair", ""), look.get("hair", ""))]
 		var beard := ", and a %s beard" % look["beard"] if look.get("beard", "none") not in ["none", ""] else ""
 		sentences.append("%s is %s, %s and %s, %s, with %s%s." % [she.capitalize(), look.get("age", "grown"), look.get("stature", "middling"),
 			look.get("build", "middling"), look.get("posture", "straight"), hair, beard])
@@ -201,7 +224,7 @@ static func facts(card: Dictionary) -> String:
 	var look: Dictionary = card.get("look", {})
 	if not look.is_empty():
 		lines.append("looks: %s, %s, %s, %s, %s hair %s%s" % [look.get("age", ""), look.get("stature", ""), look.get("build", ""), look.get("posture", ""),
-			look.get("hair_colour", ""), look.get("hair", ""), ", a %s beard" % look["beard"] if look.get("beard", "none") not in ["none", ""] else ""])
+			look.get("hair_colour", ""), HAIR_SAID.get(look.get("hair", ""), look.get("hair", "")), ", a %s beard" % look["beard"] if look.get("beard", "none") not in ["none", ""] else ""])
 	for fact: Dictionary in card.get("facts", []):
 		lines.append("also true: %s" % fact.get("text", ""))
 	return "\n".join(lines)

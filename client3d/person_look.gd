@@ -73,12 +73,23 @@ const GRAVE_TROUSERS := ["3e3a36", "4a4038", "352f2a", "524a42"]
 const CLOTHES := {"forest": [FOREST_TUNICS, FOREST_TROUSERS], "grave": [GRAVE_TUNICS, GRAVE_TROUSERS]}
 ## Hair styles by body, as the seed picks them (bald among a man's, more so old).
 const HAIR_STYLES := {"male": ["cropped", "cropped", "long", "bald"], "female": ["bound", "bound", "long"]}
-const HAIR_PARTS := {"cropped": "Hair_Cropped", "bound": "Hair_Bound", "long": "Hair_Long", "bald": ""}
+const HAIR_PARTS := {"cropped": "Hair_Cropped", "bound": "Hair_Bound", "long": "Hair_Long", "bald": "", "tail": "Hair_Cropped"}
 ## Bound hair's top-knot (419 amended (9)): its own part beside Hair_Bound, drawn only bare-headed. It stands 4.6 cm off
 ## the crown, so any headwear hides it rather than make room for it: the look's own hood, cap or hat here (and a cap or
 ## hat put on by a trade, _wear_headwear); a worn head-slot item and a bard's hat in Client3D (HEADWEAR_MESHES).
 const HAIR_KNOT := "Hair_Bun"
-const BEARD_PARTS := {"none": "", "short": "Beard_Short", "full": "Beard_Full"}
+## What a style wears beside its cap (the tail: the cropped cap and a tail at the nape), never under a hood.
+## The seed never picks it from HAIR_STYLES (unchanged, so no look's hair draw moves): a look's word, or
+## TAIL_SHARE of the men the seed gave cropped hair, by a roll drawn after every other (480's way).
+const HAIR_ADDED := {"tail": "Hair_Tail"}
+## The share of seeded cropped men who wear the tail, and of seeded full-bearded men the long beard (1 man
+## in 8 and 1 in 16), each by its own roll drawn last in _resolve; never where the look says hair or beard,
+## never an ally, never a player (look_for's EXTRAS_OFF; theirs only by their own choice).
+const TAIL_SHARE := 0.25
+const LONG_BEARD_SHARE := 1.0 / 3.0
+## Appended to a player's look by Client3D.look_for: the two last rolls switched off.
+const EXTRAS_OFF := " extras=no"
+const BEARD_PARTS := {"none": "", "short": "Beard_Short", "full": "Beard_Full", "long": "Beard_Long"}
 const HEADWEAR_PARTS := {"none": "", "hood": "Hood", "hat": "Hat_Brimmed", "cap": "Cap_Soft"}
 ## Garb (decision 480): what is worn over the tunic, by word; rolled is the
 ## sleeves rolled to the elbows.
@@ -137,9 +148,9 @@ const PLAYER_CHOICES := {
 	"seed": [],
 	"build": ["lean", "middling", "heavy"],
 	"stature": ["short", "middling", "tall"],
-	"hair": ["cropped", "bound", "long", "bald"],
+	"hair": ["cropped", "bound", "long", "bald", "tail"],
 	"hair_colour": ["black", "dark", "brown", "chestnut", "fair", "blond", "red", "grey"],
-	"beard": ["none", "short", "full"],
+	"beard": ["none", "short", "full", "long"],
 	"skin": ["1", "2", "3", "4", "5", "6", "7", "8"],
 }
 
@@ -270,6 +281,8 @@ func _resolve(body_by_default: StringName) -> void:
 	# A hood is worn over the hair: the hair is not drawn under it.
 	if HAIR_PARTS[hair] != "" and headwear != "hood":
 		parts.append(HAIR_PARTS[hair])
+		if HAIR_ADDED.has(hair):
+			parts.append(HAIR_ADDED[hair])
 	if hair == "bound" and headwear == "none":
 		parts.append(HAIR_KNOT)
 	for part: String in [BEARD_PARTS[beard], HEADWEAR_PARTS[headwear]]:
@@ -292,6 +305,19 @@ func _resolve(body_by_default: StringName) -> void:
 	if said_people in PEOPLE_SKINS:
 		_ally(said_people, rng)
 		return
+	# The last draws (after everything above, so every look keeps every word it
+	# had): the tail on a seeded cropped man, the long beard on a seeded full one.
+	var tail_roll := rng.randf()
+	var long_roll := rng.randf()
+	if body == &"male" and str(words.get("extras", "")) != "no":
+		if hair == "cropped" and not words.has("hair") and tail_roll < TAIL_SHARE:
+			hair = "tail"
+			var at := parts.find(HAIR_PARTS[hair])
+			if at >= 0:
+				parts.insert(at + 1, HAIR_ADDED[hair])
+		if beard == "full" and not words.has("beard") and long_roll < LONG_BEARD_SHARE:
+			beard = "long"
+			parts[parts.find(BEARD_PARTS["full"])] = BEARD_PARTS["long"]
 	keys.merge(face)
 	trade = str(words.get("trade", ""))
 	var dressed: Array = TRADE_GARB.get(trade, ["", ""])
@@ -317,6 +343,8 @@ func _wear_headwear(worn: String) -> void:
 	parts.erase(HAIR_KNOT)
 	if HAIR_PARTS[hair] != "" and not HAIR_PARTS[hair] in parts:
 		parts.insert(0, HAIR_PARTS[hair])
+	if HAIR_ADDED.has(hair) and not HAIR_ADDED[hair] in parts:
+		parts.insert(1, HAIR_ADDED[hair])
 	parts.append(HEADWEAR_PARTS[worn])
 
 

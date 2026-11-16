@@ -23,6 +23,7 @@ func _ready() -> void:
 	add_child(_main)
 	await _test_escape()
 	_test_options_choices()
+	_test_look_rows()
 	_test_item_tip()
 	_test_stacks_ui()
 	await _test_talk_panel()
@@ -259,6 +260,58 @@ func _test_options_choices() -> void:
 	Net.controls = kept[3]
 	Net.hints = kept[4]
 	Net.window_size = kept[5]
+
+
+## The tail and the long beard in Character (ui's conditions, 11-16): the rows' choices and voice's labels; the
+## beard row a man's only; the preview drawn as the game draws a player (PersonLook.EXTRAS_OFF: no tail or long
+## beard from the seed's last draws); a chosen tail or long beard kept by Net.tidy_look.
+func _test_look_rows() -> void:
+	print("== Character's hair and beard rows: the tail and the long beard ==")
+	var panel: OptionsPanel = _main.options_panel
+	var labels := func(key: String) -> Array:
+		var buttons: Dictionary = panel.choices["look_" + key]["buttons"]
+		return buttons.keys().map(func(value: String) -> String: return "%s:%s" % [value, (buttons[value] as Button).text])
+	_check(labels.call("hair") == ["cropped:Cropped", "bound:Bound", "long:Long", "bald:Bald", "tail:Tail"],
+		"the hair row: Cropped, Bound, Long, Bald, Tail (%s)" % [labels.call("hair")])
+	_check(labels.call("beard") == ["none:None", "short:Short", "full:Full", "long:Long"],
+		"the beard row: None, Short, Full, Long (%s)" % [labels.call("beard")])
+	var kept: Array = [Net._settings_override, Net.player_id, Net.player_name, Net.player_body, Net.player_look]
+	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("ui_test_look.cfg")
+	Net.save_settings("127.0.0.1", 17841, "", Net.player_name)
+	var bodies: Dictionary = panel.choices["body"]["buttons"]
+	(bodies["male"] as Button).pressed.emit()
+	_check(panel.beard_row.visible, "a man's beard row is shown")
+	(bodies["female"] as Button).pressed.emit()
+	_check(not panel.beard_row.visible, "a woman's is hidden")
+	(bodies["male"] as Button).pressed.emit()
+	# A seed whose last draws give a man the tail, and one the long beard: the preview draws neither.
+	var tail_seed := -1
+	var long_seed := -1
+	for seed in range(1, 4000):
+		var drawn := PersonLook.make("seed=%d" % seed, &"male")
+		if tail_seed < 0 and drawn.hair == "tail":
+			tail_seed = seed
+		if long_seed < 0 and drawn.beard == "long":
+			long_seed = seed
+	Net.player_look = "seed=%d" % tail_seed
+	var shown: PersonLook = panel._look()
+	_check(tail_seed > 0 and shown.hair == "cropped" and not "Hair_Tail" in shown.parts,
+		"the preview of a seed that draws a man the tail shows him cropped, as the game draws a player (seed %d: %s)" % [tail_seed, shown.hair])
+	Net.player_look = "seed=%d" % long_seed
+	shown = panel._look()
+	_check(long_seed > 0 and shown.beard == "full", "and one that draws the long beard shows the full one (seed %d: %s)" % [long_seed, shown.beard])
+	var tidied := Net.tidy_look("seed=5 hair=tail beard=long")
+	_check("hair=tail" in tidied and "beard=long" in tidied, "a chosen tail and long beard kept by tidy_look (%s)" % tidied)
+	Net.player_look = tidied
+	shown = panel._look()
+	_check(shown.hair == "tail" and "Hair_Tail" in shown.parts and shown.beard == "long" and "Beard_Long" in shown.parts,
+		"and drawn so in the preview (%s)" % [shown.parts])
+	DirAccess.remove_absolute(Net._settings_override)
+	Net._settings_override = kept[0]
+	Net.player_id = kept[1]
+	Net.player_name = kept[2]
+	Net.player_body = kept[3]
+	Net.player_look = kept[4]
 
 
 ## A stack on the interface (619, ui's side): the count in the slot's corner,

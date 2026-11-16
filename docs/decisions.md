@@ -13666,6 +13666,55 @@ sheet): bound hair's knot on the crown, where the game's camera sees it, as its 
   for the bullet: a woman with bound hair bare-headed, hooded and in a brimmed hat, at the nearest and playing zoom.
   Client only, protocol unchanged, no new class_name.
 
+419 amended (11) (pc-character, 2026-11-16; label by decision_number.sh; the coordinator's hair row and men's outline,
+its pass on ui-design's joined sheets): long hair as one mass down the back, and two new choices for a man's head, the
+tail and the long beard, reaching people only by intent.
+- Long hair (take 4, in place of today's Hair_Long, the coordinator's to tell Jeff as his to overrule): the nape cap
+  and fall(), one mass from under the cap's lower edge across the back (FALL_ARC 75 degrees either side of straight
+  back) down to the shoulder blades' lower edge (spine_03 - 0.06), about the head's width (FALL_ROWS 1.0 to 1.05 of
+  it), a rounded end, 2.5 cm off the back (FALL_OFF), weighted by ring (Part.ring_weights, FALL_WEIGHTS: Head at the
+  top, then neck_01, spine_03, spine_02) so the jog's lean keeps it on the back. Its top row sits on the cap's rim and
+  2 mm thick (FALL_OVER 0, FALL_TUCK 0.002), so no ledge shows across the back of the head. Before: a thin curtain
+  that read at the nearest zoom as a lock and under a hat as a cropped head. The sheets (C:/dev/review/ui-design/looks/
+  long5_c1a85a56d, long6_07d6e2272 beside long5m_a431fb6af, long6m_d71bdc1be): one wide mass down the back, standing
+  and jogging, woman and man, and below a worn felt hat's brim; from the front as main's (nothing past the face).
+- hair=tail: the cropped cap and Hair_Tail (body_gen tail(): tied at the nape, TAIL_AT 9.2 cm back and 7 up from the
+  Head joint along TAIL_DIR, TAIL_RINGS to 15 cm, weighted Head to neck_01 to spine_03 as the fall). PersonLook
+  HAIR_ADDED draws it beside its cap, never under a hood (the look's own, a worn one: Client3D.HAIR_MESHES gains
+  Hair_Tail, without which a worn hood hid the cap and left the tail showing); under a cap or hat it shows. It reads
+  at the nape from behind and three-quarter on the woman as on the man, at the nearest and the playing zoom
+  (long5w_c1a85a56d), so the Options row is open to both bodies, as Cropped is.
+- beard=long: Beard_Long, a third beard (BEARD_LONG_DROPS: to 20 cm under the chin, up to 1.18 of its width), the
+  beard's colour as the others; to mid-chest from the front, plain beside the full beard.
+- Who wears them (the coordinator's design and ruling A, 2026-11-16): nobody who has a look today changes but by
+  intent. HAIR_STYLES and the beard draw are unchanged (a value added to either would move every seeded pick).
+  - A said word always wins: a look's hair= or beard= is drawn as said.
+  - PersonLook: two draws appended at the very end of _resolve, for people only (after the ally branch returns),
+    480's way: a man the seed gave cropped hair wears the tail at TAIL_SHARE 0.25 (1 man in 8), one it gave a full
+    beard the long beard at LONG_BEARD_SHARE 1/3 (1 in 16). Every resident's and companion's card names hair and
+    beard, so these reach only the seeded few: robbers and bandits (always hooded: the long beard is what shows).
+  - ResidentCard.roll (npc's file, carried here on the coordinator's ruling; npc reads it when back): two draws after
+    every other (_roll_extras): a he whose card rolled cropped gets the tail at 0.5, a full beard the long one at
+    0.1875 (1 new man in 8 and 1 in 16). A card kept on a worker is never rolled again (Townsfolk.card_of), so people
+    already on cards in a running world keep their heads; giving some of them the new choices is Jeff's pick (B), on
+    its page. The card says it in voice's words (HAIR_SAID: "with brown hair, tied back in a tail").
+  - Players never by a draw: Client3D.look_for appends PersonLook.EXTRAS_OFF (" extras=no") to every player's look,
+    as the Options preview and --test-face do; a player has them only by choosing them (PLAYER_CHOICES gain "tail"
+    and "long", so Net.tidy_look keeps them). No player's look moves.
+- Options (ui's file, carried with ui's yes): LOOK_ROWS hair gains ["tail", "Tail"], beard ["long", "Long"] (voice's
+  labels); the beard row stays a man's.
+- Tests: tests/look_pins.txt is main d71bdc1be's lines from tools/look_pins.gd (2,000 seeds' looks, 1,000 robbers',
+  400 players', 2,000 worker ids' cards): view_test _test_look_pins finds every line the same but the two allowed
+  changes with their parts, no player line changed, and the shares (seeded men: tail 0.136, long 0.066; new cards'
+  men: tail 0.127, long 0.071; robbers 37 long of 500). resident_card_test _test_kept_card (a kept card's cropped
+  hair and full beard stay) and the card's words; ui_test _test_look_rows (the rows and labels, the beard row a man's,
+  the preview through EXTRAS_OFF, the choices kept by tidy_look); view_test _test_tail_under_headwear (look-word
+  hood, cap, hat and a farmer's hat; on a player a worn felt hat shows it, a worn hood hides it); anim_rig_test,
+  seamless_test, parts_test, view_world_test, style_test (style_budget unchanged).
+- 10,126 triangles a body (+528 over 9,598: the fall +244, the tail and long beard +284). Both glbs carry the new
+  meshes, so art and client ship together. Protocol: no new number (release): the server's tidy_look keeps the two
+  words, so client and server go out together (needs the deploy); an old client draws its seeded pick. No new class_name.
+
 ## 438. The counter's work: what can be done, ordered and collected; the reforge
 
 On items' 432 (Items.reforge_cost, reforge_targets, ItemBook.reforge) and

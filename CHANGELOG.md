@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Long hair falls down the back, and in Options hair can be tied back in a tail and a man's beard grown long (419 amended (11)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
 - Click a foe to attack and your walk to it stops at the edge of the red marked on the ground, facing the foe, until the blow has passed, then carries on to your swing (699 amended (3)).
 - In a fight your companion calls each warning once, as it comes, and keeps her idle talk until a while after (917).

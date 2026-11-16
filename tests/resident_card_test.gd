@@ -29,6 +29,7 @@ func _ready() -> void:
 	Production.type_of = Townsfolk.roll_type
 	_test_tables()
 	_test_roll()
+	_test_kept_card()
 	_test_plain_card()
 	_test_record()
 	_test_kin_and_grudge()
@@ -128,6 +129,30 @@ func _test_roll() -> void:
 			grey_young += 1 if their["hair_colour"] == "grey" else 0
 	_check(women_bearded == 0, "no woman has a beard")
 	_check(old > 0 and young > 0 and float(grey_old) / old > float(grey_young) / maxi(young, 1), "grey hair is likelier for the old (%.2f) than the young (%.2f)" % [float(grey_old) / old, float(grey_young) / maxi(young, 1)])
+
+
+## A card kept on a worker is never rolled again (the tail and the long beard, the coordinator's ruling of 11-16):
+## a kept card's cropped hair and full beard stay as they were, whatever the last draws would give a new one.
+func _test_kept_card() -> void:
+	print("
+== a kept card is never rolled again ==")
+	_setup()
+	var kept_any := 0
+	for i in 40:
+		var id := "rc-kept-%d" % i
+		_resident(id, "Bran", "farmer")
+		var card := ResidentCard.roll(id, "Bran", "farmer")
+		card["look"]["hair"] = "cropped"
+		card["look"]["beard"] = "full"
+		_work.set_card(id, card)
+		var again: Dictionary = Townsfolk.card_of(_work, id)
+		kept_any += 1 if again["look"]["hair"] == "cropped" and again["look"]["beard"] == "full" else 0
+	_check(kept_any == 40, "every kept card keeps its cropped hair and full beard (%d of 40)" % kept_any)
+	var tailed := ResidentCard.roll("rc-kept-0", "Bran", "farmer")
+	tailed["look"]["hair"] = "tail"
+	tailed["look"]["beard"] = "long"
+	_check("hair, tied back in a tail, and a long beard." in ResidentCard.plain_card(tailed) and "hair tied back in a tail, a long beard" in ResidentCard.facts(tailed),
+			"a tail and a long beard said in voice's words: %s / %s" % [ResidentCard.plain_card(tailed).get_slice(".", 6), ResidentCard.facts(tailed)])
 
 
 func _test_plain_card() -> void:

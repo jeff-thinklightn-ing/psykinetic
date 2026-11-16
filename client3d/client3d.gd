@@ -27562,7 +27562,7 @@ static func _front_socket(skeleton: Skeleton3D, name: String) -> Array:
 const WORN_PARTS := {"hood": "Worn_Hood", "cloak": "Worn_Cloak", "boots_soft": "Worn_Boots"}
 const WORN_SOCKET_OF := {Items.HEAD: "head", Items.NECK: "neck", Items.CHARM: "belt_c", Items.BAG: "bag"}
 const WORN_DRAWN: Array[int] = [Items.HEAD, Items.BACK, Items.FEET, Items.NECK, Items.CHARM, Items.BAG]
-const HAIR_MESHES: Array[String] = ["Hair_Cropped", "Hair_Bound", "Hair_Long"]
+const HAIR_MESHES: Array[String] = ["Hair_Cropped", "Hair_Bound", "Hair_Long", "Hair_Tail"]
 ## The strap over each covering, first shown first ([covering mesh, strap]); none shown, Worn_Strap.
 const STRAP_OVER := [["Armour_Plate", "Worn_Strap_Plate"], ["Armour_Mail", "Worn_Strap_Sleeved"],
 	["Armour_Robes", "Worn_Strap_Sleeved"], ["Armour_Leather", "Worn_Strap_Over"], ["Cape", "Worn_Strap_Cape"],
@@ -27640,7 +27640,7 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 				mesh.set_instance_shader_parameter("tunic", Items.color_of(shown[name]))
 		elif name in HAIR_MESHES:
 			# Under a worn hat, the look's own hair even where its own hood had hidden it.
-			var own_hair := hats and name == str(PersonLook.HAIR_PARTS.get(look.hair, ""))
+			var own_hair := hats and name in [str(PersonLook.HAIR_PARTS.get(look.hair, "")), str(PersonLook.HAIR_ADDED.get(look.hair, ""))]
 			mesh.visible = (name in look.parts or own_hair) and not hooded
 		elif name in HEADWEAR_MESHES:
 			mesh.visible = name in look.parts and not hooded and not hats
@@ -28986,7 +28986,7 @@ static func look_for(entity: GridEntity) -> PersonLook:
 	if not look.begins_with("seed=") and not " seed=" in look:
 		look = ("seed=%d " % absi(hash(String(entity.name)))) + look
 	if entity is Player:
-		look += " headwear=none apron=no garb=none"
+		look += " headwear=none apron=no garb=none" + PersonLook.EXTRAS_OFF
 	if entity is Monster:
 		var people := str(MODELS.get(str(entity.spawn_spec.get("kind", "")), {}).get("people", ""))
 		if people != "":

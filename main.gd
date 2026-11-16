@@ -30732,8 +30732,8 @@ func _run_test_face_trips(tick: int) -> void:
 ## at each build of it, and the look Options shows (Net.player_look, adopted
 ## once), each as the face it draws: hair, beard, colours, keys, stature.
 func _test_face(entity_name: String, look: String) -> void:
-	print("[test] face %s: %s" % [entity_name, _face_words(PersonLook.make(look + " headwear=none apron=no garb=none", Net.player_body))])
-	print("[test] face options: %s" % _face_words(PersonLook.make(Net.player_look, Net.player_body)))
+	print("[test] face %s: %s" % [entity_name, _face_words(PersonLook.make(look + " headwear=none apron=no garb=none" + PersonLook.EXTRAS_OFF, Net.player_body))])
+	print("[test] face options: %s" % _face_words(PersonLook.make(Net.player_look + PersonLook.EXTRAS_OFF, Net.player_body)))
 
 
 static func _face_words(face: PersonLook) -> String:

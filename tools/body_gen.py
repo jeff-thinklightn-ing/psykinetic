@@ -345,6 +345,9 @@ class Part:
 		# Rings shared with another bone at a weight ({ring index: (bone, weight)}): the top of
 		# a sleeve half on the clavicle, so it turns only part way as the arm comes down.
 		self.mixes = {}
+		# Rings weighted outright ({ring index: {bone: weight}}), whatever their distances say: long hair's fall
+		# from the head down the neck to the chest, ring by ring.
+		self.ring_weights = {}
 		# Its last ring joined back to its first, no caps: a loop (a chain's link).
 		self.closed = False
 		# Left as built by densify (a small part: a finger, a toe, a rivet).
@@ -386,6 +389,7 @@ class Part:
 		self.rings = along
 		self.pins = {k * d: bone for k, bone in self.pins.items()}
 		self.mixes = {k * d: mix for k, mix in self.mixes.items()}
+		self.ring_weights = {k * d: w for k, w in self.ring_weights.items()}
 
 	def mesh(self, J: dict, cap_start: bool = True, cap_end: bool = True):
 		self.densify(per(1, *DENSITY_OF))
@@ -428,6 +432,13 @@ class Part:
 							continue
 						g.add([i], w * (1.0 - share), "REPLACE")
 					obj.vertex_groups[bone].add([i], share, "ADD")
+			for k, weights in self.ring_weights.items():
+				held = list(range(k * n, (k + 1) * n))
+				for g in obj.vertex_groups:
+					g.remove(held)
+				for bone, w in weights.items():
+					group = obj.vertex_groups.get(bone) or obj.vertex_groups.new(name=bone)
+					group.add(held, w, "REPLACE")
 		return obj
 
 
@@ -1410,7 +1421,7 @@ def slab(points: list, axis: Vector, out: float, inside: float) -> list:
 	return front + back
 
 
-def beard(J: dict, full: bool) -> list:
+def beard(J: dict, full: bool, long: bool = False) -> list:
 	"""A beard over the jaw, ear to ear: from under the jaw (short) or a hanging point below
 	the chin (full) up to the sideburns and the moustache, as the head's own rings, out."""
 	p = Part("Beard", "Hair", rigid="Head")
@@ -1423,7 +1434,9 @@ def beard(J: dict, full: bool) -> list:
 	top = [mouth[i].lerp(nose[i], {0: 1.0, 1: 0.35, 2: 0.15, 3: 0.55, 4: 0.15, 5: 0.35, 6: 1.0}[i]) for i in cols]
 	rows = []
 	if full:
-		for drop, narrow, fwd in [(0.085, 0.4, 0.035), (0.045, 0.8, 0.02)]:
+		# The long beard (the men's outline row, 11-16): past the jaw's line onto the chest, broader than the chin.
+		drops = BEARD_LONG_DROPS if long else [(0.085, 0.4, 0.035), (0.045, 0.8, 0.02)]
+		for drop, narrow, fwd in drops:
 			rows.append([Vector((chin[i].x * narrow, chin[i].y - fwd, chin[i].z - drop)) for i in cols])
 		rows += [[chin[i] for i in cols]]
 	else:
@@ -1433,6 +1446,30 @@ def beard(J: dict, full: bool) -> list:
 	for r in rows:
 		p.add(slab(r, axis, out, 0.004))
 	return [p]
+
+
+## The long beard's rows under the chin: (m down, width over the chin's, m forward).
+BEARD_LONG_DROPS = [(0.20, 0.45, 0.075), (0.15, 0.95, 0.065), (0.095, 1.18, 0.045), (0.045, 1.12, 0.025)]
+
+
+def tail(J: dict) -> Part:
+	"""The tail (the men's outline row, 11-16): a short tail tied at the nape, out from under the cropped cap's back edge and
+	down the upper back, TAIL_AT (back, up) from the Head joint along TAIL_DIR, TAIL_RINGS (m along, radius). Its rings
+	ride the head at the tie and the neck and chest below (TAIL_WEIGHTS, as the long fall's), so it moves in the jog."""
+	p = Part("Hair_Tail", "Hair")
+	p.bones = ["Head", "neck_01", "spine_03"]
+	c = J["Head"] + Vector((0, TAIL_AT[0], TAIL_AT[1]))
+	d = Vector(TAIL_DIR).normalized()
+	v = d.cross(X).normalized()
+	for t, r in TAIL_RINGS:
+		p.add(ring(c + d * t, X, v, r * 1.1, r, 8, 0.1))
+	p.ring_weights = dict(enumerate(TAIL_WEIGHTS))
+	return p
+TAIL_AT = (0.092, 0.07)
+TAIL_DIR = (0.0, 0.42, -0.91)
+TAIL_RINGS = [(-0.012, 0.014), (0.0, 0.019), (0.03, 0.026), (0.075, 0.025), (0.12, 0.017), (0.15, 0.006)]
+TAIL_WEIGHTS = [{"Head": 1.0}, {"Head": 1.0}, {"Head": 0.7, "neck_01": 0.3}, {"Head": 0.35, "neck_01": 0.5, "spine_03": 0.15},
+	{"neck_01": 0.5, "spine_03": 0.5}, {"neck_01": 0.3, "spine_03": 0.7}]
 
 
 def curtain(J: dict) -> Part:
@@ -1447,6 +1484,97 @@ def curtain(J: dict) -> Part:
 		p.add(slab(pts, axis, 0.006, 0.006))
 	p.pins = {3: "Head"}  # The top, under the cap, with the head.
 	return p
+
+
+def long_hair(J: dict) -> list:
+	"""Long hair (take 4, the coordinator's hair row, 11-16): the nape cap and one mass falling from it down the back (fall()), the cap's
+	lowest ring its top, so there is no seam between them."""
+	cap = hair(J, nape=True)
+	return [cap, fall(J, cap.rings[0], cap.rings[1])]
+
+
+def fall(J: dict, rim: list, above: list) -> Part:
+	"""Long hair's fall: one thick mass from the cap's nape ring ([rim], its back FALL_ARC degrees either side of
+	straight back) down the back to the shoulder blades' lower edge, about the head's width at the nape, a rounded
+	end, standing FALL_OFF off the back (its own edge and shadow on the tunic). Its rings ride the head at the top
+	and the neck and then the chest below (FALL_WEIGHTS), so the jog's lean keeps it on the back."""
+	p = Part("Hair_Fall", "Hair")
+	p.bones = ["Head", "neck_01", "spine_03", "spine_02"]
+	n = len(rim)
+	back = 0.75 * n  # ring() starts at +X and goes round by the front (a quarter) to the back (three quarters).
+	span = FALL_ARC / 360.0 * n
+
+	def on_rim(f: float) -> Vector:
+		f %= n
+		i = int(math.floor(f))
+		return rim[i].lerp(rim[(i + 1) % n], f - i)
+
+	top = [on_rim(back - span + 2.0 * span * j / (FALL_ACROSS - 1)) for j in range(FALL_ACROSS)]
+	# Its first ring tucked up inside the cap (on the ring over the nape's, FALL_TUCK in), so its outside passes
+	# over the cap's lower edge across the back: no line where the cap ends and the fall begins.
+	rim_mid = sum(rim, Vector()) / n
+	tuck = [above[int(math.floor(f)) % n].lerp(above[(int(math.floor(f)) + 1) % n], f - math.floor(f))
+		for f in [back - span + 2.0 * span * j / (FALL_ACROSS - 1) for j in range(FALL_ACROSS)]]
+	tuck = [q + (Vector((rim_mid.x, rim_mid.y, q.z)) - q).normalized() * FALL_TUCK for q in tuck]
+	p.add(slab(tuck, Vector((J["Head"].x, J["Head"].y - 0.05, 0.0)), 0.002, 0.002))
+	under = Part("under_fall", "Skin")
+	for r in head_rings(J):
+		under.add(r)
+	tree = _bvh([under, torso(J)])
+	h = J["Head"]
+	z0 = sum(q.z for q in top) / len(top)
+	z1 = J["spine_03"].z + FALL_END
+	top_y = max(q.y for q in top)
+	w0 = 0.5 * (max(q.x for q in top) - min(q.x for q in top))
+
+	def body_back(x: float, z: float) -> float:
+		hit = tree.ray_cast(Vector((x, h.y - 0.02, z)), -FRONT, 0.5)
+		return hit[0].y if hit[0] is not None else None
+
+	axis = Vector((h.x, h.y - 0.05, 0.0))
+	for k, (u, wide, thick, bend) in enumerate(FALL_ROWS):
+		if k == 0:
+			# On the cap's lower edge (FALL_OVER out, none), thin (2 mm), so it leaves the cap nearly flush: a top row
+			# 9 mm out and 6 mm thick stood a ledge across the back of the head at the nearest zoom (the coordinator).
+			over = [q + (q - Vector((rim_mid.x, rim_mid.y, q.z))).normalized() * FALL_OVER for q in top]
+			p.add(slab(over, axis, thick, thick))
+			continue
+		z = z0 + (z1 - z0) * u
+		w = w0 * wide
+		yc = body_back(0.0, z)
+		yc = (yc if yc is not None else top_y) + FALL_OFF
+		ease = min(1.0, u / FALL_EASE)
+		yc = top_y + (max(yc, top_y - 0.04) - top_y) * (ease * ease * (3.0 - 2.0 * ease)) if u < FALL_EASE else yc
+		pts = []
+		for j in range(FALL_ACROSS):
+			sx = -1.0 + 2.0 * j / (FALL_ACROSS - 1)
+			x = h.x + w * sx
+			y = yc - bend * w * sx * sx
+			own = body_back(x, z)
+			if own is not None:
+				y = max(y, own + FALL_OFF * 0.6)
+			pts.append(Vector((x, y, z)))
+		p.add(slab(pts, axis, thick, thick))
+	p.ring_weights = dict(enumerate([{"Head": 1.0}] + FALL_WEIGHTS))
+	return p
+
+
+## Long hair's fall (take 4): how far round from straight back the cap's nape ring gives it its top (degrees),
+## points across, the end (m from spine_03), how far off the back it stands, the share of its length over which it
+## comes from the cap's back down to that stand-off, and its rows: (place down its length 0..1, width over the
+## head's at the nape, half its thickness, how far its edges curve forward over its half-width).
+FALL_ARC = 75.0
+FALL_ACROSS = 9
+FALL_END = -0.06
+FALL_OFF = 0.025
+FALL_EASE = 0.35
+FALL_ROWS = [(0.0, 1.0, 0.002, 0.0), (0.12, 1.02, 0.008, 0.9), (0.27, 1.05, 0.009, 0.7), (0.45, 1.02, 0.009, 0.5),
+	(0.65, 0.96, 0.008, 0.4), (0.84, 0.86, 0.007, 0.35), (0.94, 0.62, 0.006, 0.3), (1.0, 0.28, 0.004, 0.25)]
+FALL_TUCK = 0.002
+FALL_OVER = 0.0
+FALL_WEIGHTS = [{"Head": 1.0}, {"Head": 0.75, "neck_01": 0.25}, {"Head": 0.35, "neck_01": 0.5, "spine_03": 0.15},
+	{"neck_01": 0.35, "spine_03": 0.65}, {"neck_01": 0.1, "spine_03": 0.8, "spine_02": 0.1},
+	{"spine_03": 0.7, "spine_02": 0.3}, {"spine_03": 0.7, "spine_02": 0.3}, {"spine_03": 0.7, "spine_02": 0.3}]
 
 
 def hood(J: dict, name: str = "Hood", region: str = "Hat") -> list:
@@ -2157,9 +2285,11 @@ WEARABLES = {
 	"Hair_Cropped": lambda J: [hair(J, nape=False)],
 	"Hair_Bound": lambda J: [hair(J, nape=True)],
 	"Hair_Bun": lambda J: [bun(J)],
-	"Hair_Long": lambda J: [hair(J, nape=True), curtain(J)],
+	"Hair_Long": long_hair,
 	"Beard_Short": lambda J: beard(J, full=False),
 	"Beard_Full": lambda J: beard(J, full=True),
+	"Beard_Long": lambda J: beard(J, full=True, long=True),
+	"Hair_Tail": lambda J: [tail(J)],
 	"Hood": hood,
 	"Hat_Brimmed": brimmed_hat,
 	"Apron": apron,

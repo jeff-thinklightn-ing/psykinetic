@@ -209,6 +209,7 @@ func _ready() -> void:
 		_test_worn()
 		_test_worn_gear()
 		_test_knot_under_headwear()
+		_test_tail_under_headwear()
 		_test_satchel_worn()
 		_test_asleep()
 		_test_person_looks()
@@ -287,6 +288,7 @@ func _ready() -> void:
 		await _test_preview_tunic()
 		_test_hair_covers_head()
 		_test_hair_value()
+		_test_look_pins()
 		_test_hair_pick_kept()
 		_test_belt_over_tunic()
 		_test_body_on_screen()
@@ -14158,6 +14160,73 @@ func _test_person_garb() -> void:
 	player.free()
 
 
+## The tail and the long beard (the coordinator's ruling, 11-16): nobody who has a look today changes but by the
+## two last draws. tests/look_pins.txt is main's lines from before them (tools/look_pins.gd): every seed's look, a
+## robber's, a player's and a resident's card the same now, but a seeded cropped man who drew the tail and a seeded
+## full beard that drew the long one (the parts with them, nothing else); a player's look never changes; the shares
+## about 1 man in 8 and 1 in 16, on the looks and on the cards.
+func _test_look_pins() -> void:
+	print("
+== the pinned looks: nobody changes but by the tail's and the long beard's draws ==")
+	var was := FileAccess.get_file_as_string("res://tests/look_pins.txt").strip_edges().split("
+")
+	var now: PackedStringArray = preload("res://tools/look_pins.gd").lines()
+	_check(was.size() == now.size() and was.size() > 4000, "as many lines as main wrote (%d, %d)" % [was.size(), now.size()])
+	var wrong: Array[String] = []
+	# Per kind: men, of them seeded cropped and seeded full, and of those the tail and the long beard.
+	var counts := {"L": [0, 0, 0, 0, 0], "C": [0, 0, 0, 0, 0], "R": [0, 0, 0, 0, 0]}
+	for i in mini(was.size(), now.size()):
+		var a := was[i].split(" ")
+		var b := now[i].split(" ")
+		match a[0]:
+			"P":
+				if was[i] != now[i]:
+					wrong.append("player %s" % a[1])
+			"L", "R":
+				# L/R <seed> <body> <hair> <beard> <parts> | <md5>
+				var ok := a[1] == b[1] and a[2] == b[2] and a[7] == b[7]
+				var parts := Array(a[5].split(","))
+				var tail := a[3] == "cropped" and b[3] == "tail"
+				var long := a[4] == "full" and b[4] == "long"
+				ok = ok and (b[3] == a[3] or tail) and (b[4] == a[4] or long) and (a[2] == "male" or not (tail or long))
+				if tail and parts.has("Hair_Cropped"):
+					parts.insert(parts.find("Hair_Cropped") + 1, "Hair_Tail")
+				if long:
+					parts[parts.find("Beard_Full")] = "Beard_Long"
+				ok = ok and ",".join(parts) == b[5]
+				if not ok:
+					wrong.append("%s | %s" % [was[i], now[i]])
+				if a[2] == "male":
+					var row: Array = counts[a[0]]
+					row[0] += 1
+					row[1] += 1 if a[3] == "cropped" else 0
+					row[2] += 1 if a[4] == "full" else 0
+					row[3] += 1 if tail else 0
+					row[4] += 1 if long else 0
+			"C":
+				var he := a[3] == "he"
+				var tail := he and a[4] == "cropped" and b[4] == "tail"
+				var long := he and a[5] == "full" and b[5] == "long"
+				if a[1] != b[1] or a[2] != b[2] or a[3] != b[3] or a[7] != b[7] or not (b[4] == a[4] or tail) or not (b[5] == a[5] or long):
+					wrong.append("%s | %s" % [was[i], now[i]])
+				if he:
+					var row: Array = counts["C"]
+					row[0] += 1
+					row[1] += 1 if a[4] == "cropped" else 0
+					row[2] += 1 if a[5] == "full" else 0
+					row[3] += 1 if tail else 0
+					row[4] += 1 if long else 0
+	_check(wrong.is_empty(), "every line as main drew it but the two draws (%d not: %s)" % [wrong.size(), wrong.slice(0, 4)])
+	for kind: String in ["L", "C"]:
+		var row: Array = counts[kind]
+		var men := maxf(row[0], 1.0)
+		print("  %s: %d men, %d cropped (%d tail, %.3f of men), %d full (%d long, %.3f of men)" % [kind, row[0], row[1], row[3], row[3] / men, row[2], row[4], row[4] / men])
+		_check(absf(row[3] / men - 0.125) < 0.04 and absf(row[4] / men - 0.0625) < 0.03,
+				"%s: about 1 man in 8 wears the tail (%.3f) and 1 in 16 the long beard (%.3f)" % ["seeded looks" if kind == "L" else "new cards", row[3] / men, row[4] / men])
+	var robbers: Array = counts["R"]
+	print("  R: %d hooded men, %d long beards, %d tails (under the hood)" % [robbers[0], robbers[4], robbers[3]])
+
+
 ## The coordinator, 11-14 (faces package): hair and beard at least PersonLook.HAIR_STEP in L* from the skin, or as far
 ## as the cap or its own name lets it (each such pair listed with its figure); every hair still nearest its own named
 ## colour, hue and chroma kept, moved at most HAIR_MOVE_MAX; the skin never moved; a far pair left as named.
@@ -18906,6 +18975,68 @@ func _test_knot_under_headwear() -> void:
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
 	model.set_meta("worn_gear", "")
 	_rig._process(0.0)
+
+
+## The tail (the men's outline row, 11-16): the cropped cap and Hair_Tail, both put away by the look's own hood and
+## a worn one, both shown under a cap, a hat or a worn felt hat (Client3D.HAIR_MESHES has the tail, so a worn hood
+## hides it as the hair).
+func _test_tail_under_headwear() -> void:
+	print("
+== the tail: hidden under a hood with the hair, shown under a cap or hat ==")
+	var words := {}
+	for headwear: String in ["none", "hood", "hat", "cap"]:
+		var each := PersonLook.make("seed=11 body=male hair=tail headwear=%s" % headwear)
+		words[headwear] = [each.parts.has("Hair_Cropped"), each.parts.has("Hair_Tail")]
+	var farmer := PersonLook.make("seed=11 body=male hair=tail trade=farmer")
+	_check(words["none"] == [true, true] and words["hood"] == [false, false] and words["hat"] == [true, true]
+			and words["cap"] == [true, true] and farmer.parts.has("Hat_Brimmed") and farmer.parts.has("Hair_Tail") and farmer.parts.has("Hair_Cropped"),
+			"bare, under a cap or hat: the cap and the tail; under the look's own hood neither; under a farmer's hat both (%s, farmer %s)" % [words, farmer.parts])
+	var player := _player()
+	if player == null:
+		_check(false, "a player to dress")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var look := puppet.get_meta("look") as PersonLook
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var tail := model.find_child("Hair_Tail", true, false) as MeshInstance3D if model != null else null
+	var cap := model.find_child("Hair_Cropped", true, false) as MeshInstance3D if model != null else null
+	_check(tail != null and cap != null, "a person's body has the tail and the cropped cap")
+	if tail == null or cap == null:
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	var parts_were := look.parts.duplicate()
+	var hair_was := look.hair
+	for part: String in PersonLook.HAIR_PARTS.values() + PersonLook.HEADWEAR_PARTS.values() + [PersonLook.HAIR_KNOT, "Hair_Tail"]:
+		look.parts.erase(part)
+	look.parts.append_array(["Hair_Cropped", "Hair_Tail"])
+	look.hair = "tail"
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	slots[Items.HEAD] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	var bare := [cap.visible, tail.visible]
+	slots[Items.HEAD] = "felt_hat"
+	player.slots = slots
+	_rig._process(0.0)
+	var hatted := [cap.visible, tail.visible]
+	slots[Items.HEAD] = "hood"
+	player.slots = slots
+	_rig._process(0.0)
+	var hooded := [cap.visible, tail.visible]
+	_check(bare == [true, true] and hatted == [true, true] and hooded == [false, false],
+			"bare and under a worn felt hat the cap and the tail; a worn hood hides both (%s, %s, %s)" % [bare, hatted, hooded])
+	player.slots = was
+	look.hair = hair_was
+	look.parts.assign(parts_were)
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	_rig._process(0.0)
+
 
 func _test_satchel_worn() -> void:
 	print("
