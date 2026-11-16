@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Only in the party log (14)
+## Only in the party log (15)
 
 Lines whose only delivery is `party_log.add`, the server's own list that her mind reads and no
 client is ever sent (748 amended (7)): a player never sees them. Give each a delivery that
@@ -21,6 +21,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s throws the bones: %d to %s's %d. | `sim/companion.gd` _play_on() |
 | %s won't touch grave goods | `sim/companion.gd` turns_down() |
 | %s won't carry that for %s | `sim/companion.gd` turns_down() |
+| %s has brought %s to %s. | `main.gd` _first_walk_done() |
 | %s leaves you %s. | `main.gd` _return_gear() |
 | The relic's gift spills: %d more than %s can hold. | `main.gd` charge_from_relic() |
 | %s brought %s back (%d charges left). | `main.gd` _on_channel() |
@@ -46,7 +47,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 | R | Robbers' chest | `levels/barrow/level.json` |
 | R | Robbers' bundle | `levels/barrow/level.json` |
 
-## Lines in the code (3035)
+## Lines in the code (3040)
 
 ### companions (Pip, Wren, Nix) (670)
 
@@ -1355,7 +1356,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | \\[([A-Za-z]{1,2}[0-9]+)\\] | `render/parts/ui_code_chip.gd` MARK |
 |  | shader_type canvas_item; void fragment() { \tvec4 c = texture(TEXTURE, UV) * COLOR; \tCOLOR = vec4(vec3(dot(c.rgb, vec3(0.299, 0.587, 0.114))), c.a); } | `render/parts/ui_slot.gd` _init() |
 
-### other (sim) (627)
+### other (sim) (629)
 
 | | Line | Where |
 |---|---|---|
@@ -1555,6 +1556,8 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | I've enough of that for now. | `sim/economy.gd` camp_buy() |
 |  | %d %s to a camp trader | `sim/economy.gd` camp_buy() |
 |  | There's %d gold for it. | `sim/economy.gd` camp_buy() |
+|  | (?i)\\b(where (now\|to\|next\|should (we\|i) go\|shall (we\|i) go\|do (we\|i) go)\|what now\|what (should\|shall\|do\|can) (we\|i) do\|what'?s there to do\|i'?m lost\|show me (a)?round)\\b | `sim/first_steps.gd` ASK_WAY |
+|  | (?i)^\\W*(no\|nah\|nope\|not now\|not yet\|no thanks\|later\|maybe later\|another time\|i'?d rather not\|let'?s not\|i'?m fine\|i'?m good)\\b | `sim/first_steps.gd` NO |
 |  | off its ground | `sim/great_bear.gd` _nearest_visible_target() |
 |  | landed on %d | `sim/great_bear.gd` _tend_move() |
 |  | landed on %d | `sim/great_bear.gd` _tend_move() |
@@ -2144,7 +2147,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (814)
+### server and windows (817)
 
 | | Line | Where |
 |---|---|---|
@@ -2291,6 +2294,9 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | You know the way to %s%s. %s | `main.gd` _roads_words() |
 |  | You would like to go fishing with them at %s, and could offer to take them there. | `main.gd` _roads_words() |
 |  | Except to %s: you would like to go fishing with them there, and you can take them there yourself. | `main.gd` _roads_words() |
+|  | the old mound | `main.gd` _first_dest() |
+|  | %s at the stall | `main.gd` _first_taker() |
+| U | %s has brought %s to %s. | `main.gd` _first_walk_done() |
 |  | (?i)\\b(to\|towards?)\\b | `main.gd` _guide_said() |
 |  | %s asks you to lead them somewhere you have not been with them: you do not know the way there. | `main.gd` _guide_said() |
 |  | %s asks you to lead them to %s, and you are there already. | `main.gd` _guide_said() |
@@ -3173,7 +3179,7 @@ only letters, spaces, apostrophes and hyphens; 787 amended (5)); any other reads
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (1003)
+## Lines in the data (1100)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3211,7 +3217,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | took the dark elves' gift with you | `dark_gift.bond_why` |
 |  | fight: the first magic | `dark_gift.gates[0]` |
 
-### levels/companion_traits.json (160)
+### levels/companion_traits.json (257)
 
 | | Line | Key |
 |---|---|---|
@@ -3226,6 +3232,103 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | This way. Watch your step. | `guide.set_off.careful and thoughtful[0]` |
 |  | This way, come on. | `guide.set_off.restless and curious[0]` |
 |  | On we go. | `guide.set_off.resume[0]` |
+|  | Shall we try the Mughouse? A hearth and a cup of ale would do us both good. | `first_steps.decks.offer.mughouse.default[0]` |
+|  | I could do with a sit by a fire. Shall we try the Mughouse? | `first_steps.decks.offer.mughouse.default[1]` |
+|  | Shall we look in at the Mughouse first? There's a hearth, and ale at the counter. | `first_steps.decks.offer.mughouse.default[2]` |
+|  | Shall we start at the Mughouse? Best to know where there's a roof and a fire. | `first_steps.decks.offer.mughouse.steady and watchful[0]` |
+|  | Shall we try the Mughouse? I'd sooner have walls round us while we get our bearings. | `first_steps.decks.offer.mughouse.quick and wary[0]` |
+|  | Oh, shall we try the Mughouse? There's a hearth, and ale, and folk to talk to. | `first_steps.decks.offer.mughouse.warm and talkative[0]` |
+|  | Shall we see the Mughouse first? A fire and a room to hire are worth knowing about. | `first_steps.decks.offer.mughouse.careful and thoughtful[0]` |
+|  | Shall we look in at the Mughouse? I want to see what this town's like inside. | `first_steps.decks.offer.mughouse.restless and curious[0]` |
+|  | Shall we try the Mughouse? A fire, and somewhere to sit. | `first_steps.decks.offer.mughouse.quiet and patient[0]` |
+|  | The Mughouse first, I'd say. Fire, ale, a bed if we want one. Shall we? | `first_steps.decks.offer.mughouse.blunt and fearless[0]` |
+|  | Right, shall we try the Mughouse? A hearth and an ale fix most things. | `first_steps.decks.offer.mughouse.cheerful under pressure[0]` |
+|  | That's the Mughouse. A hearth inside, ale at the counter, and rooms upstairs if we want one. | `first_steps.decks.arrive.mughouse[0]` |
+|  | The Last Light Mughouse. Folk here just call it the Mughouse. | `first_steps.decks.arrive.mughouse[1]` |
+|  | I've a mind to fish today. There's a pond a short walk south-east of the square. Shall we? | `first_steps.decks.offer.pond.default[0]` |
+|  | I'd like to fish a while. Shall we try the pond? It holds more fish than any other water. | `first_steps.decks.offer.pond.default[1]` |
+|  | Shall we go and fish? The pond's a short walk south-east of the square. | `first_steps.decks.offer.pond.default[2]` |
+|  | I'd like an hour by the water. Shall we try the pond, south-east of the square? | `first_steps.decks.offer.pond.steady and watchful[0]` |
+|  | Shall we fish a bit? The pond's close, south-east of the square. | `first_steps.decks.offer.pond.quick and wary[0]` |
+|  | Oh, shall we go fishing? There's a pond just south-east of the square, and it's full of them. | `first_steps.decks.offer.pond.warm and talkative[0]` |
+|  | Shall we try the pond? Fish feed best at dawn and dusk. | `first_steps.decks.offer.pond.careful and thoughtful[0]` |
+|  | I'm itching to do something. Shall we fish? There's a pond south-east of the square. | `first_steps.decks.offer.pond.restless and curious[0]` |
+|  | Shall we go and fish? The pond's south-east of the square. | `first_steps.decks.offer.pond.quiet and patient[0]` |
+|  | Let's fish. The pond south-east of the square has the most in it. Shall we? | `first_steps.decks.offer.pond.blunt and fearless[0]` |
+|  | Fancy some fishing? There's a pond south-east of the square. Shall we? | `first_steps.decks.offer.pond.cheerful under pressure[0]` |
+|  | Here's the pond. Fish feed keenest at dawn and dusk. | `first_steps.decks.arrive.pond[0]` |
+|  | This is it. It fills again every day, so it's never empty for long. | `first_steps.decks.arrive.pond[1]` |
+|  | That's a fair catch. Shall we take it to %s? | `first_steps.decks.offer.catch.default[0]` |
+|  | We've more fish than we'll eat. Shall we carry them to %s? | `first_steps.decks.offer.catch.default[1]` |
+|  | Shall we take the fish to %s while they're fresh? | `first_steps.decks.offer.catch.default[2]` |
+|  | No sense carrying those about. Shall we take them to %s? | `first_steps.decks.offer.catch.steady and watchful[0]` |
+|  | Let's not lug those round. Shall we take them to %s? | `first_steps.decks.offer.catch.quick and wary[0]` |
+|  | Look at all that! Shall we take it to %s? | `first_steps.decks.offer.catch.warm and talkative[0]` |
+|  | Shall we take the catch to %s? Better than carrying it about. | `first_steps.decks.offer.catch.careful and thoughtful[0]` |
+|  | Right, what next? Shall we take the fish to %s? | `first_steps.decks.offer.catch.restless and curious[0]` |
+|  | Shall we take those to %s? | `first_steps.decks.offer.catch.quiet and patient[0]` |
+|  | The fish go to %s. Shall we? | `first_steps.decks.offer.catch.blunt and fearless[0]` |
+|  | Not a bad day's work! Shall we take it to %s? | `first_steps.decks.offer.catch.cheerful under pressure[0]` |
+|  | Here we are. The fish go to %s. | `first_steps.decks.arrive.catch[0]` |
+|  | That's where the catch goes: %s. | `first_steps.decks.arrive.catch[1]` |
+|  | We've not seen the Mughouse yet. There's a hearth there, and ale. Shall we? | `first_steps.decks.go.mughouse[0]` |
+|  | Shall we find the Mughouse? I'd like to know where there's a fire and a room. | `first_steps.decks.go.mughouse[1]` |
+|  | Shall we try the pond? It's a short walk south-east of the square. | `first_steps.decks.go.pond[0]` |
+|  | I'd not mind fishing a while. Shall we go to the pond? | `first_steps.decks.go.pond[1]` |
+|  | There's a medicine man out in the wilds who makes remedies. Shall we find his hut, so we know where it is? | `first_steps.decks.go.healer[0]` |
+|  | Shall we look for the medicine man's hut? Better to know the way before we need it. | `first_steps.decks.go.healer[1]` |
+|  | Shall we see the temple? The priest there brings the fallen back. | `first_steps.decks.go.temple[0]` |
+|  | We've not been to the temple. Shall we? It's worth knowing where it is. | `first_steps.decks.go.temple[1]` |
+|  | There's an old mound a little outside town, with spears planted round it. We could go and look, if you like. | `first_steps.decks.go.barrow[0]` |
+|  | There's an old burial mound just outside town, grassed over, with a stone-framed door. We could have a look. | `first_steps.decks.go.barrow[1]` |
+|  | I could do with a sit down. Shall we go to the Mughouse? | `first_steps.decks.sit.default[0]` |
+|  | My feet could use a rest. Shall we sit a while at the Mughouse? | `first_steps.decks.sit.default[1]` |
+|  | Shall we go and sit by the fire at the Mughouse? | `first_steps.decks.sit.default[2]` |
+|  | Standing about out here makes me twitchy. Shall we go to the Mughouse? | `first_steps.decks.sit.quick and wary[0]` |
+|  | Shall we go and sit at the Mughouse? I'd like a bit of company and a fire. | `first_steps.decks.sit.warm and talkative[0]` |
+|  | We're just standing here. Shall we go to the Mughouse and sit properly? | `first_steps.decks.sit.restless and curious[0]` |
+|  | No use standing here. The Mughouse? | `first_steps.decks.sit.blunt and fearless[0]` |
+|  | Right, I'm having a sit down. The Mughouse? | `first_steps.decks.sit.cheerful under pressure[0]` |
+|  | It's getting dark. The Mughouse has rooms to hire, if you want a bed. | `first_steps.decks.bed[0]` |
+|  | Night's coming on. Shall we see about a room at the Mughouse? | `first_steps.decks.bed[1]` |
+|  | That looks sore. There's a medicine man out in the wilds who makes remedies. Shall we go to his hut? | `first_steps.decks.hurt[0]` |
+|  | The medicine man makes remedies. His hut's out in the wilds. Shall we go? | `first_steps.decks.hurt[1]` |
+|  | This is the temple. The fallen are brought back here, for an offering. | `first_steps.decks.risen.temple_paid[0]` |
+|  | The temple. The priest brings the fallen back here, for an offering. | `first_steps.decks.risen.temple_paid[1]` |
+|  | This is the temple. The fallen are brought back here. | `first_steps.decks.risen.temple[0]` |
+|  | The temple. The priest brings the fallen back here. | `first_steps.decks.risen.temple[1]` |
+|  | This is the medicine man's hut. Those in his care are brought back here. | `first_steps.decks.risen.healer[0]` |
+|  | We're at the medicine man's hut. Those in his care who fall are brought back here. | `first_steps.decks.risen.healer[1]` |
+|  | the Mughouse, for a fire and an ale | `first_steps.decks.choice.mughouse` |
+|  | the pond, to fish a while | `first_steps.decks.choice.pond` |
+|  | the medicine man's hut, so we know where he is | `first_steps.decks.choice.healer` |
+|  | the temple, so we know where the fallen are brought back | `first_steps.decks.choice.temple` |
+|  | the old mound outside town, for a look at its door | `first_steps.decks.choice.barrow` |
+|  | %s. Or %s, if you'd rather. | `first_steps.decks.asked[0]` |
+|  | I'd say %s. Or %s. | `first_steps.decks.asked[1]` |
+|  | %s. Or there's %s. | `first_steps.decks.asked[2]` |
+|  | Fair enough. Another time. | `first_steps.decks.no.default[1]` |
+|  | No matter. I'm happy here. | `first_steps.decks.no.default[3]` |
+|  | Fine by me. Say if you change your mind. | `first_steps.decks.no.default[4]` |
+|  | All right. I'll keep an eye out. | `first_steps.decks.no.steady and watchful[0]` |
+|  | Fine. Just don't stand still too long. | `first_steps.decks.no.quick and wary[0]` |
+|  | Ah, all right. Another time, then! | `first_steps.decks.no.warm and talkative[0]` |
+|  | That's fair. We'll go when you're ready. | `first_steps.decks.no.careful and thoughtful[0]` |
+|  | Ha, fair enough. Another time. | `first_steps.decks.no.cheerful under pressure[0]` |
+|  | This way, when you're ready. | `first_steps.decks.stray.default[0]` |
+|  | Over here, when you're ready. | `first_steps.decks.stray.default[1]` |
+|  | I'm this way. No hurry. | `first_steps.decks.stray.default[2]` |
+|  | This way. I'll wait. | `first_steps.decks.stray.steady and watchful[0]` |
+|  | Over here. Keep close. | `first_steps.decks.stray.quick and wary[0]` |
+|  | This way! Whenever you're ready. | `first_steps.decks.stray.warm and talkative[0]` |
+|  | I'm this way. Take your time. | `first_steps.decks.stray.careful and thoughtful[0]` |
+|  | This way! Come on, when you're ready. | `first_steps.decks.stray.restless and curious[0]` |
+|  | This way, when you're ready! | `first_steps.decks.stray.cheerful under pressure[0]` |
+|  | If you ever want somewhere to go, just ask me where to. | `first_steps.decks.chain_end.default[0]` |
+|  | Whenever you want an idea of where to go, ask me where to. I usually have one. | `first_steps.decks.chain_end.default[1]` |
+|  | Any time you want somewhere to go, just ask me where to. I love picking. | `first_steps.decks.chain_end.warm and talkative[0]` |
+|  | Want somewhere to go, ask me where to. | `first_steps.decks.chain_end.blunt and fearless[0]` |
+|  | Ask me where to, any time. | `first_steps.decks.chain_end.quiet and patient[0]` |
 |  | Get your back to something! | `flank_says.default[0]` |
 |  | They're getting round you! Back up! | `flank_says.default[1]` |
 |  | Behind you! Don't let them get behind you! | `flank_says.default[2]` |

@@ -9611,7 +9611,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var is_new := record.companion.is_empty() or not record.companion.get("name") is String
 	if is_new:
 		# "greeted" false: her first words still to come (929); none on an old record.
-		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true, "greeted": false}
+		record.companion = {"hp": 0, "stamina": 0, "tile": [player.tile.x, player.tile.y], "alive": true, "greeted": false,
+			"first_steps": {"done": []}}  # Her first steps' card (945): a newcomer's chain to come.
 	_give_traits(record)
 	if not record.companion.get("alive", true):
 		print("[net] a player's companion %s died earlier; none spawned" % [record.companion["name"]])
@@ -9680,6 +9681,20 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.told_warm = (record.companion.get("told_warm", {}) as Dictionary).duplicate(true) if record.companion.get("told_warm") is Dictionary else {}
 	pet.told_kit_seller = record.companion.get("told_kit_seller", false) == true
 	pet.first_words = record.companion.get("greeted") == false  # New to her player, not yet greeted (929).
+	if not record.companion.get("first_steps") is Dictionary:
+		record.companion["first_steps"] = {}
+	# 945: her first steps live on across her joins (a travel respawns her):
+	# the Mughouse and back keeps "came back out", her rate and a no's quiet.
+	# A travel ends her walk, its stray and her standing offer. Her card is her
+	# record's, kept as it changes.
+	var steps: FirstSteps = _first_steps_live.get(record.player_id)
+	if steps == null:
+		steps = FirstSteps.new()
+		_first_steps_live[record.player_id] = steps
+	steps.card = record.companion["first_steps"]
+	steps.stray = {}
+	steps.offer = {}
+	pet.first_steps = steps
 	pet.party_log = party_log
 	pet.home = record.companion.get("home", {})
 	# The draugr's blessing (decision 544): she brings her downed player back.
@@ -9819,7 +9834,7 @@ func _want_place(record: PlayerRecord, pet: Companion) -> Dictionary:
 ## step: devoted, anywhere she knows; else only her want's place, or
 ## where her own mend tell offered to take him ("mend", 616 amended (4)).
 func _leads_to(record: PlayerRecord, pet: Companion, to: Dictionary) -> bool:
-	if pet.bond_at_least("devoted") or to.get("mend") == true or to.get("near_water") == true:
+	if pet.bond_at_least("devoted") or to.get("mend") == true or to.get("near_water") == true or to.has("first"):
 		return true  # Devoted (621), her own mend tell's offer (616 amended (4)), or water near asked to fish (803 amended (11), _lead_to_fish's).
 	var wanted := _want_place(record, pet)
 	return not wanted.is_empty() and wanted["key"] == to.get("key")
@@ -10093,6 +10108,588 @@ func _observe_roads() -> void:
 			_tell_roads(record, pet)
 
 
+# --- Her first steps with a newcomer, and a player at a loss (decision 945) ---
+
+## A rising each player had (_on_returned), for her line at their side
+## within FirstSteps "risen_s": player id -> {kind, paid, tick}.
+var _first_steps_rise: Dictionary[String, Dictionary] = {}
+var _first_steps_at := -100000
+## Her first steps' live state by her player's id (945), kept across her
+## joins in this server run (a few entries: the players seen); never saved.
+var _first_steps_live: Dictionary[String, FirstSteps] = {}
+## Her stop on the Mughouse's door (maps' spawn points, the first found), else
+## where its way out sets a player down.
+const FIRST_DOOR_POINTS: Array[String] = ["guide_inn", "guide_inn_2", "from_tavern"]
+## Within this many cells of her a player stepped off her walk comes back
+## (her walk resumes); her answer and her offers carry this far.
+const FIRST_NEAR := 3
+## The places her first steps count as reached, by Holdings kind.
+const FIRST_KINDS := {"tavern": "mughouse", "fishing": "pond", "healers_hut": "healer", "temple": "temple"}
+const FIRST_HEARD := 6
+
+
+## Once a second (from _tell_world): each companion out with her player
+## measures them (_first_steps_sense) and, in a lull, says her chain's next
+## step, a rising's line, or one offer to a player at a loss
+## (_first_steps_tend). Off with the package (FirstSteps.on()).
+func _first_steps_tick() -> void:
+	if not FirstSteps.on() or World.tick - _first_steps_at < World.TICK_RATE:
+		return
+	_first_steps_at = World.tick
+	for id: String in _companions:
+		var pet: Companion = _companions[id]
+		var record: PlayerRecord = _records.get(id)
+		if record == null or not is_instance_valid(pet) or not pet.spawned or pet.first_steps == null \
+				or record.companion.has("resident"):
+			continue
+		var player := pet.keeper as Player
+		if player == null or not is_instance_valid(player) or not player.spawned:
+			continue
+		_first_steps_sense(pet.first_steps, player, record, pet)
+		_first_steps_tend(pet, player, record)
+	for who: String in _first_steps_rise.keys():
+		if World.tick - int(_first_steps_rise[who]["tick"]) > FirstSteps.ticks("risen_s", 30):
+			_first_steps_rise.erase(who)
+
+
+## What the server sees of [param player] (945), live: places reached today,
+## something new found, their trail, standing still, hurt, a fight, inside
+## the Mughouse, a night spent there.
+func _first_steps_sense(fs: FirstSteps, player: Player, record: PlayerRecord, pet: Companion) -> void:
+	var now := World.tick
+	var day := Townsfolk.day_of(World.steps)
+	if World.holdings != null:
+		for place_id: String in World.holdings.places_in(player.zone):
+			var place := World.holdings.place(place_id)
+			var kind := str(FIRST_KINDS.get(str(place.get("kind", "")), ""))
+			if not kind.is_empty() and place.get("cell") is Vector2i \
+					and World.distance(player.tile, place["cell"]) <= maxi(int(place.get("radius", 0)), FIRST_NEAR):
+				fs.reached(kind, day)
+	if player.zone.begins_with("barrow"):
+		fs.reached("barrow", day)
+	var inside := _first_inside(player.zone)
+	if inside:
+		fs.reached("mughouse", day)
+		fs.was_inside = true
+		var hour := DayNight.hour(World.steps)
+		if hour >= FirstSteps.rule("dusk_hour", 19) or hour < FirstSteps.rule("dawn_hour", 5):
+			fs.card["slept"] = true  # A night inside (945: no hire is kept; the bed is offered no more).
+	var known := record.known_areas.size() + record.known_places.size() + record.explored_places.size()
+	if known != fs.known or player.zone != fs.zone:
+		if fs.known >= 0:
+			fs.last_new_tick = now
+			fs.cells_since_new = 0
+		fs.known = known
+		fs.zone = player.zone
+		fs.trail.clear()
+	var last: Vector2i = fs.trail[-1][1] if not fs.trail.is_empty() else player.tile
+	if fs.trail.is_empty() or last != player.tile:
+		fs.cells_since_new += World.distance(last, player.tile)
+		fs.trail.append([now, player.tile])
+	var window := FirstSteps.ticks("circle_s", 180)
+	while not fs.trail.is_empty() and now - int(fs.trail[0][0]) > window:
+		fs.trail.pop_front()
+	if player.tile != fs.still_tile:
+		fs.still_tile = player.tile
+		fs.still_since = now
+	if pet.quiet() or pet._hostile_within(Companion.SIGHT_RANGE):
+		fs.fought = now
+	if fs.hp >= 0 and player.hp > fs.hp:
+		fs.hurt_since = -1  # Tended, or rested: care given.
+	fs.hp = player.hp
+	if player.max_hp > 0 and float(player.hp) / player.max_hp < FirstSteps.rule("hurt_below", 0.5):
+		if fs.hurt_since < 0:
+			fs.hurt_since = now
+	else:
+		fs.hurt_since = -1
+	# Two lapses hold her unasked offers till her player moves or speaks.
+	if fs.lapses > 0 and (World.distance(player.tile, fs.lapse_tile) > FIRST_NEAR or pet._keeper_spoke_tick > fs.lapse_spoke):
+		fs.lapses = 0
+
+
+## Whether [param zone] is the Mughouse (a level holding a tavern place).
+func _first_inside(zone: String) -> bool:
+	return World.holdings != null and World.holdings.places_in(zone).any(func(id: String) -> bool:
+		return str(World.holdings.place(id).get("kind", "")) == "tavern")
+
+
+## A lull for her first steps (945): her floor (917's settle, no line of hers
+## in FLOOR_TICKS), her player quiet "quiet_s" and by her, no fight near, no
+## one else talking to them, someone to hear.
+func _first_lull(pet: Companion, player: Player) -> bool:
+	var now := World.tick
+	return not pet.quiet() and not World.is_downed(pet) and not World.is_downed(player) and pet._idle_ok() \
+		and now - pet._last_unasked_tick >= Companion.FLOOR_TICKS \
+		and now - pet._keeper_spoke_tick >= FirstSteps.ticks("quiet_s", 30) \
+		and now - pet.first_steps.fought >= Companion.SETTLE_TICKS \
+		and pet.zone == player.zone and World.distance(pet.tile, player.tile) <= FIRST_HEARD \
+		and not pet._hostile_within(Companion.SIGHT_RANGE) and not _keeper_busy(pet) and pet.heard_by_anyone() \
+		and (pet.guide == null or not pet.guide.going())
+
+
+## [param pet]'s first steps this second (945): an offer lapsed, a walk
+## stepped off, a rising's line; then, in a lull, her chain's next step, its
+## end told, or one unasked offer.
+func _first_steps_tend(pet: Companion, player: Player, record: PlayerRecord) -> void:
+	var fs := pet.first_steps
+	var now := World.tick
+	if not fs.offer.is_empty() and now - int(fs.offer["tick"]) > FirstSteps.ticks("lapse_s", 90):
+		_first_lapsed(pet, player)
+	if not fs.stray.is_empty():
+		_first_stray(pet, player)
+		return
+	var rise: Dictionary = _first_steps_rise.get(record.player_id, {})
+	if not rise.is_empty() and pet.zone == player.zone and World.distance(pet.tile, player.tile) <= FIRST_HEARD \
+			and not pet.quiet() and not pet._hostile_within(Companion.SIGHT_RANGE):
+		_first_steps_rise.erase(record.player_id)
+		var key := "risen.healer" if rise["kind"] == "healers_hut" else "risen.temple_paid" if int(rise["paid"]) > 0 else "risen.temple"
+		_first_say(pet, key, "risen", "", player.tile, Companion.Weight.NEEDED)
+		return
+	if not fs.offer.is_empty() or not _first_lull(pet, player):
+		return
+	if fs.chain_running():
+		_first_chain(pet, player, record)
+		return
+	if not fs.card.is_empty() and not fs.end_told() and fs.card.has("done"):
+		fs.card["told"] = true
+		_first_say(pet, "chain_end", "chain_end", "", player.tile, Companion.Weight.NEEDED)
+		return
+	_first_unasked(pet, player, record)
+
+
+## Her chain's next step (945), when its time has come: the Mughouse's door
+## after her first words; the pond on coming back out of it, or a while at
+## its door; the catch's taker with fish in the pack, while still by the
+## pond (walked off with none: no step 3, the chain ends).
+func _first_chain(pet: Companion, player: Player, record: PlayerRecord) -> void:
+	var fs := pet.first_steps
+	var now := World.tick
+	var step := fs.next_step()
+	match step:
+		"mughouse":
+			if fs.first_words_tick == -1:
+				if pet.first_words:
+					return  # Her first words still to come (929).
+				fs.first_words_tick = now  # Said before (a rejoin): her beat from now.
+			if now < fs.first_words_tick + FirstSteps.ticks("first_offer_s", 6):
+				return
+			var door := _first_dest("mughouse", pet, player, record)
+			if door.is_empty() or _first_inside(player.zone) or World.distance(player.tile, door["cell"]) <= FIRST_NEAR:
+				fs.pass_step("mughouse")  # Nowhere to lead, or there already.
+				fs.next_chain_tick = now + FirstSteps.ticks("next_offer_s", 30)
+				return
+			_first_offer(pet, player, "mughouse", "offer.mughouse", door, true)
+		"pond":
+			if _first_inside(player.zone):
+				return  # In the Mughouse: the pond when they come back out.
+			if not fs.was_inside and now < fs.next_chain_tick:
+				return
+			var water := _first_dest("pond", pet, player, record)
+			if water.is_empty():
+				fs.end_chain()  # No water she could lead to: the chain ends (no catch without the pond).
+				return
+			_first_offer(pet, player, "pond", "offer.pond", water, true)
+			if water.get("want") == "pond":
+				pet.want_told = true  # Her wish, said as the chain's step (929's).
+		"catch":
+			var near_pond: bool = not fs.pond.is_empty() and player.zone == str(fs.pond.get("area", "")) \
+				and World.distance(player.tile, fs.pond["cell"]) <= Companion.SIGHT_RANGE * 3
+			if World.count_of(player, "fish") <= 0:
+				if not near_pond and player.fishing.is_empty():
+					fs.pass_step("catch")  # Nothing caught: no step 3 (945).
+				return
+			var taker := _first_dest("catch", pet, player, record)
+			if taker.is_empty():
+				fs.pass_step("catch")
+				return
+			_first_offer(pet, player, "catch", "offer.catch", taker, true, str(taker["taker"]))
+
+
+## Her one unasked offer this lull (945) to a player at a loss: hurt and
+## untended, dusk with no Mughouse today, nothing new for a while, circling,
+## standing in the open. Her rate (gap_s, per_hour), a no's quiet, two
+## lapses in a row and a kind's two noes keep her from it.
+func _first_unasked(pet: Companion, player: Player, record: PlayerRecord) -> void:
+	var fs := pet.first_steps
+	var now := World.tick
+	var hour := 3600 * World.TICK_RATE
+	fs.unasked_ticks = fs.unasked_ticks.filter(func(at: int) -> bool: return now - at < hour)
+	if now < fs.quiet_until or now - fs.last_unasked_tick < FirstSteps.ticks("gap_s", 180) or fs.lapses >= 2 \
+			or fs.unasked_ticks.size() >= int(FirstSteps.rule("per_hour", 4)):
+		return
+	var day := Townsfolk.day_of(World.steps)
+	var outdoors: bool = Level.load_level(player.zone).get("outdoor", false) == true
+	if fs.hurt_since >= 0 and now - fs.hurt_since >= FirstSteps.ticks("hurt_s", 60) and _first_may(fs, "healer", player):
+		var hut := _first_dest("healer", pet, player, record)
+		if not hut.is_empty() and World.distance(player.tile, hut["cell"]) > FIRST_NEAR:
+			_first_offer(pet, player, "healer", "hurt", hut, false, "", "hurt")
+			return
+	var clock := DayNight.hour(World.steps)
+	if (clock >= FirstSteps.rule("dusk_hour", 19) or clock < FirstSteps.rule("dawn_hour", 5)) and fs.card.get("slept") != true \
+			and not fs.reached_today("mughouse", day) and _first_may(fs, "bed", player):
+		var door := _first_dest("mughouse", pet, player, record)
+		if not door.is_empty():
+			_first_offer(pet, player, "bed", "bed", door, false, "", "dusk")
+			return
+	var why_now := ""
+	if now - fs.last_new_tick >= FirstSteps.ticks("nothing_new_s", 240) and fs.cells_since_new >= int(FirstSteps.rule("nothing_new_cells", 60)):
+		why_now = "nothing_new"
+	elif outdoors and _first_circling(fs):
+		why_now = "circling"
+	elif outdoors and fs.still_since >= 0 and now - fs.still_since >= FirstSteps.ticks("stand_s", 90) and player.fishing.is_empty() \
+			and _warm_place([], pet).get("near") != true:
+		why_now = "standing"
+	if why_now.is_empty():
+		return
+	if why_now == "standing":
+		var rest := _first_dest("mughouse", pet, player, record)
+		if not rest.is_empty() and not fs.reached_today("mughouse", day) and _first_may(fs, "mughouse", player):
+			_first_offer(pet, player, "mughouse", "sit", rest, false, "", why_now)
+		return
+	for each: Dictionary in _first_choices(pet, player, record, true):
+		_first_offer(pet, player, str(each["first"]), "go." + str(each["first"]), each, false, "", why_now)
+		return
+
+
+## Whether her player's trail is circling (945): circle_steps or more over
+## circle_s, all within circle_cells across.
+func _first_circling(fs: FirstSteps) -> bool:
+	if fs.trail.size() < int(FirstSteps.rule("circle_steps", 60)) \
+			or World.tick - int(fs.trail[0][0]) < FirstSteps.ticks("circle_s", 180) * 9 / 10:
+		return false
+	var low: Vector2i = fs.trail[0][1]
+	var high: Vector2i = low
+	for each: Array in fs.trail:
+		low = Vector2i(mini(low.x, each[1].x), mini(low.y, each[1].y))
+		high = Vector2i(maxi(high.x, each[1].x), maxi(high.y, each[1].y))
+	return maxi(high.x - low.x, high.y - low.y) <= int(FirstSteps.rule("circle_cells", 15))
+
+
+## Whether an unasked offer of [param kind] may be made (945): fewer than two
+## noes to it, and no no to it in this zone and hour.
+func _first_may(fs: FirstSteps, kind: String, player: Player) -> bool:
+	return fs.noes(kind) < 2 and str(fs.no_where.get(kind, "")) != _first_where(player)
+
+
+func _first_where(player: Player) -> String:
+	return "%s|%d" % [player.zone, int(DayNight.hour(World.steps))]
+
+
+## Her places to offer, in her order (FirstSteps.PLACES), as walk goals: the
+## ones there is a way to, not where her player stands, and for an unasked
+## offer ([param unasked]) none reached on three days or offered twice in
+## vain. The barrow's door only after her chain and for a player never in
+## it.
+func _first_choices(pet: Companion, player: Player, record: PlayerRecord, unasked: bool) -> Array[Dictionary]:
+	var fs := pet.first_steps
+	var out: Array[Dictionary] = []
+	for kind: String in FirstSteps.PLACES:
+		if unasked and (fs.days_at(kind).size() >= int(FirstSteps.rule("known_days", 3)) or not _first_may(fs, kind, player)):
+			continue
+		if kind == "barrow" and (fs.chain_running() or "barrow" in record.known_areas):
+			continue
+		var to := _first_dest(kind, pet, player, record)
+		if to.is_empty() or player.zone == to["area"] and World.distance(player.tile, to["cell"]) <= FIRST_NEAR:
+			continue
+		if kind == "mughouse" and _first_inside(player.zone):
+			continue
+		out.append(to)
+	return out
+
+
+## Where her first steps lead for [param kind] (945), as a walk's goal with
+## "first" its kind; {} for nowhere. The Mughouse: its door's stop cell
+## (FIRST_DOOR_POINTS), "arrive" 1. The pond: her wish's water, else the
+## water nearest her player. The healer's hut, the temple: their places in
+## her player's area. The barrow: its door's way out (lore: the old mound
+## outside town). The catch: its taker by the store's pointer's rule
+## (depot_pointer): the stall's keeper "at the stall", else the Mughouse
+## while the taverner takes it ("taker", the line's words); none else.
+func _first_dest(kind: String, pet: Companion, player: Player, record: PlayerRecord) -> Dictionary:
+	var to := {}
+	match kind:
+		"mughouse":
+			to = _first_door(player.zone)
+		"pond":
+			to = _wish_lead_to(record, pet)
+			if to.is_empty():
+				to = _near_water(record, player)
+			to = to.duplicate()
+		"healer", "temple":
+			var want := "healers_hut" if kind == "healer" else "temple"
+			for id: String in World.holdings.places_in(player.zone) if World.holdings != null else []:
+				var place := World.holdings.place(id)
+				if str(place.get("kind", "")) == want:
+					to = {"key": id, "kind": "place", "name": str(place["name"]), "area": str(place["area"]), "cell": place["cell"]}
+					break
+		"barrow":
+			var at: Variant = Level.load_level(player.zone).get("spawn_points", {}).get("from_barrow")
+			if at is Vector2i:
+				to = {"key": "barrow", "kind": "area", "name": "the old mound", "area": player.zone, "cell": at}
+		"catch":
+			to = _first_taker(player)
+	if not to.is_empty():
+		to["first"] = kind
+	return to
+
+
+## The Mughouse's door seen from [param zone] (945): its stop cell, the
+## first of FIRST_DOOR_POINTS laid in that level; {} for none.
+func _first_door(zone: String) -> Dictionary:
+	var points: Dictionary = Level.load_level(zone).get("spawn_points", {})
+	var tavern := ""
+	for id: String in World.holdings.all_places() if World.holdings != null else []:
+		if str(World.holdings.place(id).get("kind", "")) == "tavern":
+			tavern = id
+			break
+	for point: String in FIRST_DOOR_POINTS:
+		if points.get(point) is Vector2i and not tavern.is_empty():
+			return {"key": tavern, "kind": "place", "name": str(World.holdings.place(tavern)["name"]), "area": zone,
+				"cell": points[point], "arrive": 1}
+	return {}
+
+
+## Who takes [param player]'s catch at their town's store (945, step 3):
+## the pointer's rule (depot_pointer), as a walk's goal with "taker" its
+## words ("Rolf at the stall", "the Mughouse"); {} for nobody she can lead to.
+func _first_taker(player: Player) -> Dictionary:
+	if World.economy == null or World.holdings == null:
+		return {}
+	var vendor: Dictionary = World.economy.rules.get("vendor", {})
+	for town: Variant in vendor.get("towns", []):
+		var store := World.holdings.place(str(town))
+		if store.is_empty() or str(store["area"]) != player.zone:
+			continue
+		var yields := Items.yield_of("fish")
+		var raw := str(yields.keys()[0]) if not yields.is_empty() else "fish"
+		var worker := Offers.VENDOR + str(town) if keeper_takes(str(town), raw) else receiver_for(str(town), raw)
+		if worker.begins_with(Offers.VENDOR):
+			var stall := World.holdings.place("%s/%s" % [player.zone, str(vendor.get("stall", ""))])
+			if stall.is_empty():
+				return {}
+			return {"key": "%s/%s" % [player.zone, vendor.get("stall", "")], "kind": "place",
+				"name": str(stall["name"]), "area": player.zone, "cell": stall["cell"],
+				"taker": "%s at the stall" % str(vendor.get("name", "Rolf"))}
+		if not worker.is_empty() and TAVERNER in World.production.worker(worker).get("trades", []):
+			var door := _first_door(player.zone)
+			if not door.is_empty():
+				door["taker"] = str(door["name"])
+			return door
+		return {}
+	return {}
+
+
+## Her offer of [param to] in deck [param key]'s words (945), kept for her
+## player's yes (_guide_offers, as her own lead offer is) and as her standing
+## offer; [param chain] a chain step's, else an unasked one (her rate).
+## A "[firststeps]" line: the signal's kind, the place, its cell, the tick.
+func _first_offer(pet: Companion, player: Player, kind: String, key: String, to: Dictionary, chain: bool, fill := "",
+		why_now := "chain") -> void:
+	var fs := pet.first_steps
+	var line := fs.line(key, str(pet.traits.get("temperament", "")), World.tick)
+	if line.is_empty():
+		return
+	if not fill.is_empty():
+		line = line % fill if "%s" in line else line
+	if not pet._say(line, true, false, Companion.Weight.NEEDED):
+		return
+	var now := World.tick
+	fs.offer = {"kind": kind, "tick": now, "chain": fs.next_step() if chain else "", "unasked": not chain}
+	_guide_offers[pet.keeper_id] = {"day": Townsfolk.day_of(World.steps), "to": to, "tick": now}
+	if not chain:
+		fs.last_unasked_tick = now
+		fs.unasked_ticks.append(now)
+	print("[firststeps] %s %s %s t%d" % [why_now, str(to.get("key", kind)), str(to.get("cell", "")), now])
+
+
+## A deck line of hers that is no offer (945): a rising's, the chain's end,
+## a no taken, a stray call, an arrival; a "[firststeps]" line.
+func _first_say(pet: Companion, key: String, why_now: String, place: String, cell: Vector2i, weight: Companion.Weight, fill := "") -> bool:
+	var line := pet.first_steps.line(key, str(pet.traits.get("temperament", "")), World.tick)
+	if line.is_empty():
+		return false
+	if not fill.is_empty() and "%s" in line:
+		line = line % fill
+	if not pet._say(line, true, false, weight):
+		return false
+	print("[firststeps] %s %s %s t%d" % [why_now, place, str(cell), World.tick])
+	return true
+
+
+## Her offer went 90 s with no answer (945): a lapse. A chain step's passes
+## (the Mughouse's: the pond next; the pond's or the catch's: the chain
+## ends); two in a row hold her unasked offers till her player moves or
+## speaks.
+func _first_lapsed(pet: Companion, player: Player) -> void:
+	var fs := pet.first_steps
+	var step := str(fs.offer.get("chain", ""))
+	fs.offer = {}
+	_guide_offers.erase(pet.keeper_id)
+	fs.lapses += 1
+	fs.lapse_tile = player.tile
+	fs.lapse_spoke = pet._keeper_spoke_tick
+	if step == "mughouse":
+		fs.pass_step(step)
+		fs.next_chain_tick = World.tick
+	elif not step.is_empty():
+		fs.end_chain()
+	print("[firststeps] lapse %s %s t%d" % [step if not step.is_empty() else "unasked", str(player.tile), World.tick])
+
+
+## Her player's line to her, for her first steps (945): an ask where to go
+## gets her two true choices (asking clears the noes); a no to her standing
+## offer, her no-line, its quiet and the chain passed on; naming the second
+## of an asked pair takes it. True when she answered it with a deck's line
+## (her voice not asked); a yes is left to _guide_said, as her lead offer's.
+func _first_steps_said(player: Player, pet: Companion, line: String) -> bool:
+	var fs := pet.first_steps if is_instance_valid(pet) else null
+	if fs == null or not FirstSteps.on():
+		return false
+	fs.lapses = 0
+	var record := _record_of(pet)
+	if RegEx.create_from_string(FirstSteps.ASK_WAY).search(line) != null and record != null:
+		fs.clear_noes()
+		fs.no_where.clear()
+		_first_answer(pet, player, record)
+		return true
+	if fs.offer.is_empty() or not _guide_offers.has(pet.keeper_id):
+		return false
+	if RegEx.create_from_string(FirstSteps.NO).search(line) != null:
+		var kind := str(fs.offer["kind"])
+		var step := str(fs.offer.get("chain", ""))
+		fs.offer = {}
+		_guide_offers.erase(pet.keeper_id)
+		_first_say(pet, "no", "no", kind, player.tile, Companion.Weight.REPLY)
+		if not step.is_empty():
+			fs.pass_step(step)
+			if step == "mughouse":
+				fs.next_chain_tick = World.tick  # The pond at the next lull.
+			else:
+				fs.end_chain()  # A no to the pond (or the catch) ends the chain.
+			return true
+		fs.add_no(kind)
+		fs.no_where[kind] = _first_where(player)
+		fs.quiet_until = World.tick + FirstSteps.ticks("quiet_after_no_s", 600)
+		return true
+	var second: Dictionary = fs.offer.get("or", {})
+	if not second.is_empty() and FirstSteps.names(line, str(second["first"])) and not FirstSteps.names(line, str(fs.offer["kind"])):
+		fs.offer = {}
+		_start_guide(pet, player, second)
+		return false  # Her voice answers as she sets off (guide_note).
+	if RegEx.create_from_string(Guide.AGREES).search(line) != null:
+		fs.offer = {}  # _guide_said takes the yes up.
+	return false
+
+
+## Asked where to go (945): her two true choices (_first_choices), in the
+## asked / asked_one joiners with the choice.* clauses (FirstSteps.joined:
+## the line's first letter capitalised, never a clause's mid-line; her chain's
+## next step first while it runs); a yes takes the
+## first, naming the second takes it. None to give: no line of hers (her
+## voice is not asked either; the line is kept as heard).
+func _first_answer(pet: Companion, player: Player, record: PlayerRecord) -> void:
+	var fs := pet.first_steps
+	var choices := _first_choices(pet, player, record, false)
+	if fs.chain_running() and not choices.is_empty():
+		var step := fs.next_step()
+		var first := choices.filter(func(each: Dictionary) -> bool: return each["first"] == ("pond" if step == "catch" else step))
+		if not first.is_empty():
+			choices.erase(first[0])
+			choices.push_front(first[0])  # Her chain's next first.
+	if choices.is_empty():
+		return
+	var temperament := str(pet.traits.get("temperament", ""))
+	var clauses: Array[String] = []
+	for each: Dictionary in choices.slice(0, 2):
+		var clause := fs.line("choice." + str(each["first"]), temperament, 0)
+		clauses.append(clause if not clause.is_empty() else str(each["name"]))
+	var joiner := fs.line("asked" if clauses.size() > 1 else "asked_one", temperament, World.tick)
+	if joiner.is_empty():
+		return
+	var line := FirstSteps.joined(joiner, clauses)
+	if not pet._say(line, true, false, Companion.Weight.REPLY):
+		return
+	var now := World.tick
+	fs.offer = {"kind": str(choices[0]["first"]), "tick": now, "chain": "", "unasked": false}
+	if choices.size() > 1:
+		fs.offer["or"] = choices[1]
+	_guide_offers[pet.keeper_id] = {"day": Townsfolk.day_of(World.steps), "to": choices[0], "tick": now}
+	print("[firststeps] asked %s %s t%d" % [str(choices[0]["key"]), str(choices[0]["cell"]), now])
+
+
+## Her first-steps walk ended (945, from _guide_done): arrived, her deck's
+## arrival line (her mind on or off) and the chain's next step set; her
+## player's own key or click took over ("moved"), one stray call, then she
+## waits; a fight (danger, struck) ends it with no line. True when it was
+## handled here.
+func _first_walk_done(pet: Companion, walk: Guide, why: String) -> bool:
+	var fs := pet.first_steps
+	var kind := str(walk.goal.get("first", ""))
+	if fs == null or kind.is_empty() or not FirstSteps.on():
+		return false
+	var player := walk.leader as Player
+	var at: Vector2i = walk.goal["cell"]
+	match why:
+		"arrived":
+			var key := "arrive." + kind
+			if FirstSteps.lines(key, "").is_empty():
+				return false  # No arrival deck (the healer's, the temple's, the mound's): as any walk's end, her voice told.
+			pet.guide = null
+			_guides.erase(pet.keeper_id)
+			party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), _display_name(player) if is_instance_valid(player) else "",
+				walk.goal["name"]])
+			_first_say(pet, key, "arrived", str(walk.goal.get("key", kind)), at, Companion.Weight.NEEDED, str(walk.goal.get("taker", "")))
+			if fs.next_step() == kind:
+				fs.pass_step(kind)
+				fs.next_chain_tick = World.tick + FirstSteps.ticks("next_offer_s", 30)
+				fs.was_inside = false
+				if kind == "pond":
+					fs.pond = walk.goal.duplicate()
+			return true
+		"moved":
+			if not is_instance_valid(player):
+				return false
+			fs.stray = {"goal": walk.goal.duplicate(), "tick": World.tick}
+			_first_say(pet, "stray", "stray", str(walk.goal.get("key", kind)), player.tile, Companion.Weight.NEEDED)
+			return true
+		"danger", "struck":
+			pet.guide = null
+			_guides.erase(pet.keeper_id)
+			print("[firststeps] fight %s %s t%d" % [str(walk.goal.get("key", kind)), str(at), World.tick])
+			return true  # 917's rule takes over; no line of the walk's.
+	return false
+
+
+## A player who stepped off her walk (945): back within FIRST_NEAR of her
+## within stray_wait_s, the walk resumes; else it is dropped, quietly (a
+## chain step's passed on, as a lapse).
+func _first_stray(pet: Companion, player: Player) -> void:
+	var fs := pet.first_steps
+	var goal: Dictionary = fs.stray["goal"]
+	if pet.zone == player.zone and World.distance(pet.tile, player.tile) <= FIRST_NEAR \
+			and World.tick - int(fs.stray["tick"]) >= World.TICK_RATE:
+		fs.stray = {}
+		_start_guide(pet, player, goal)
+		print("[firststeps] resume %s %s t%d" % [str(goal.get("key", "")), str(goal.get("cell", "")), World.tick])
+		return
+	if World.tick - int(fs.stray["tick"]) < FirstSteps.ticks("stray_wait_s", 20):
+		return
+	fs.stray = {}
+	var walk: Guide = _guides.get(pet.keeper_id)
+	if walk != null and walk.goal.get("first") == goal.get("first"):
+		_guides.erase(pet.keeper_id)
+		if pet.guide == walk:
+			pet.guide = null
+	var kind := str(goal.get("first", ""))
+	if fs.next_step() == kind:
+		if kind == "mughouse":
+			fs.pass_step(kind)
+			fs.next_chain_tick = World.tick
+		else:
+			fs.end_chain()
+	print("[firststeps] dropped %s %s t%d" % [str(goal.get("key", "")), str(goal.get("cell", "")), World.tick])
+
+
 ## Her player's words to her (decision 551): an ask to lead the way to a
 ## place she knows sets her off, and her voice, about to answer, is told
 ## she agreed; one she does not know, that she does not know the way;
@@ -10154,6 +10751,8 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	if not wanted.is_empty() and wanted["key"] == to.get("key"):
 		if to.get("named", false):
 			wanted["named"] = true  # The found place she names is her want's (803 amended (14), look_named_leadc).
+		if to.has("first"):
+			wanted["first"] = to["first"]  # Her first steps' walk (945).
 		to = wanted
 	elif not to.has("bank") and World.holdings != null and to.get("kind") == "place" \
 			and str(World.holdings.place(str(to.get("key", ""))).get("kind", "")) == "fishing":
@@ -10260,6 +10859,8 @@ func _guide_done(pet: Companion, why: String) -> void:
 		walk.leader.led_to = ""
 	var words := Guide.stop_words(why, who)
 	print("[guide] %s stops: %s" % [Companion._name_of(pet), why])
+	if _first_walk_done(pet, walk, why):
+		return  # Her first steps' walk (945): its arrival line, a stray call, or a fight's silence.
 	if why == "arrived":
 		party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), who, walk.goal["name"]])
 		pet.guide = null
@@ -18471,6 +19072,9 @@ func _player_said(player: Player, text: String, phrase := 0, to_path := "") -> v
 	elif to != "":
 		if phrase == 0 and _part_said(player, pet, line):
 			return  # They part for a while (581 amended (3)): she answers as she sets off.
+		if phrase == 0 and _first_steps_said(player, pet, line):
+			pet.heard_only(line)  # Answered by her first steps' deck line (945): her voice not asked.
+			return
 		if phrase == 0:
 			_guide_said(player, pet, line)  # An ask to lead the way (decision 551).
 		pet.owner_spoke(line, phrase)
@@ -21081,6 +21685,7 @@ func _tell_world(tick: int) -> void:
 	_takers_by_zone.clear()  # Built once a zone a pass, shared by its players (perf).
 	_tell_town_trades()
 	_observe_roads()  # Hers too (decision 551).
+	_first_steps_tick()  # Her first steps with a newcomer, a player at a loss (945).
 	_world_news.update()
 
 
@@ -24855,6 +25460,7 @@ func _on_returned(job: Dictionary) -> void:
 				else "%s brought you back at %s" % [by, where]  # Decision 587.
 			# A notice, not their speech (voice, 11-12: "Ned: ... by Ned." named them twice): from the server.
 			Net.broadcast_to([peer], "party", {"from": "Server", "text": "%s%s." % [words, ", for an offering of %d gold" % offered if offered > 0 else ""]})
+			_first_steps_rise[who] = {"kind": str(place.get("kind", "")), "paid": offered, "tick": World.tick}  # Her line at their side (945).
 		"companion":
 			var record: PlayerRecord = _records.get(who)
 			if record == null or record.companion.is_empty():

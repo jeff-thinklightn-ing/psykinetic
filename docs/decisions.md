@@ -58510,3 +58510,62 @@ open a door from two cells off would hide what a player meets. The row stands un
 shut door walks the player to it (the coordinator has sent this to ui and economy). The folk tour is not a part of
 land.sh's suite and no landing check reads its result, so the standing FAIL fails no landing. Tests only; protocol
 unchanged; no class_name; no bullet.
+
+## 945. Her first steps: she guides a newcomer, and offers a player at a loss somewhere to go (companions)
+
+Jeff, 18:00 on 11-15: "use the companion help the beginner guide lost players". This is the coordinator's
+package "the first five minutes". The design is C:/dev/review/companions/first_five_minutes_design.md
+(approved). The lines are voice's (C:/dev/review/voice/first_five_decks.md) and the facts lore's. It lands
+switched off: companion_traits.json "first_steps" "on" false until the package is whole (maps' guide_inn
+cells, ui's card line, voice's bullet). FirstSteps.on() reads it on both sides: the client's "Where to?" line
+(945 amended (1), ui's) shows only while it is true, so no wire change.
+
+Her card. A new companion record carries "first_steps" {"done": []} (Main, beside 929's "greeted"); one met
+before has none and gets no chain. PlayerRecord.companion_from keeps it as {done, ended, told, slept, noes,
+days (three game days each place was reached)}. Everything else is live in sim/first_steps.gd (class_name
+FirstSteps), one per player (Main._first_steps_live, never saved), kept across her joins in a server run:
+a travel respawns her, and the Mughouse and back must keep "came back out", her rate and a no's quiet. A
+travel ends her walk, its stray and her standing offer (Companion.first_steps on each join).
+
+The chain, once her first words (929) are said; her wish waits for it, her idle lines too:
+- the Mughouse's door. She stops on maps' "guide_inn" (then "guide_inn_2", then "from_tavern") with the walk's
+  own "arrive" 1 (Guide.step now reads a goal's "arrive"), says arrive.mughouse and stops: going in is theirs.
+- the pond, when they come back out of the Mughouse or after next_offer_s at its door (her wish's water,
+  _wish_lead_to, else _near_water). Offered as her pond wish, her want is told.
+- the catch, only with fish in the pack by the pond: to its taker by depot_pointer's rule (the stall's keeper,
+  "Rolf at the stall", while he takes fish; else the taverner's Mughouse). Never "the store". Walked off with
+  none: no step 3.
+A no to the Mughouse: the pond at the next lull; a no to the pond ends the chain. When it ends she says once
+that they can ask her (chain_end).
+
+A lull (Main._first_lull): her floor (917's settle, no line of hers in FLOOR_TICKS), her player quiet 30 s and
+by her, no fight near, nobody busy with them (_keeper_busy), someone to hear, no walk going.
+
+Unasked offers (Main._first_unasked), one a lull, in this order:
+- hurt under half health for hurt_s with no care: the healer's hut;
+- dusk with no Mughouse that day and no night spent inside: a bed;
+- nothing new found for nothing_new_s over nothing_new_cells;
+- circling outdoors (circle_steps over circle_s within circle_cells);
+- standing still in the open for stand_s, not fishing, not by a fire.
+"Nothing new" and circling offer the first of the Mughouse, the pond, the healer's hut, the temple and (after
+the chain, for a player never in it) the barrow's door that is not reached on three days, not here, and not
+said no to. Her rate: gap_s between, per_hour at most. A no: her no-line, every unasked offer quiet for
+quiet_after_no_s, that kind quiet in that zone and hour; two noes to a kind, quiet for good until asked. An
+offer unanswered for lapse_s lapses; two lapses in a row hold her until her player moves or speaks. A rising
+(_on_returned) gives her line at their side within risen_s: risen.temple_paid for an offering over 0,
+risen.temple at 0, risen.healer.
+
+Asked ("Where to?", "where now", "what now", "I'm lost", "show me around": FirstSteps.ASK_WAY), she answers
+with two true choices from the choice.* clauses in the asked joiner (asked_one for one), her chain's next step
+first while it runs. A yes takes the first; naming the second takes it (FirstSteps.names). Asking clears the
+noes. Her deck's line answers, so her voice is not asked (Companion.heard_only keeps the line).
+
+Her walks are Main._start_guide's with "first" in the goal; _leads_to takes them at any bond. On arrival
+(_first_walk_done) she says the deck's arrive line, her mind on or off; with no arrive deck (the hut, the
+temple, the mound) it ends as any walk. Her player's own key or click ("moved"): one stray line; back within
+3 cells in stray_wait_s the walk resumes, else it is dropped quietly. A fight (danger, struck): it ends with no
+line, and 917's rule takes over. Her pace is the walk's own (she waits while they fall behind).
+
+Logs: "[firststeps] <signal> <place key> <cell> t<tick>", never a name or an id. tests/first_steps_test: on
+the wilds, the package forced on (FirstSteps.forced). Joined proof (four bots on a laptop through
+ui-design's slots) comes before the switch.

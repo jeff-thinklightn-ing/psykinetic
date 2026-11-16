@@ -879,6 +879,9 @@ var revive := Callable()
 ## roads for her voice, () -> String. [member guide_note]: told her voice
 ## once, at her next line (she agreed, or does not know the way).
 var guide: Guide = null
+## Main's (decision 945): her first steps with her player (FirstSteps: a
+## newcomer's chain, her notices of a player at a loss); null for none.
+var first_steps: FirstSteps = null
 var guide_routes := Callable()
 var guide_done := Callable()
 var guide_words := Callable()
@@ -1670,13 +1673,20 @@ func friend_words(entity: GridEntity) -> String:
 	return _name_of(entity)
 
 
+## Her player's line to her, heard and kept (her talk, when they last spoke)
+## with no answer of her voice's: owner_spoke's first half; Main's alone for a
+## line her first steps answered with a deck's (decision 945).
+func heard_only(text: String) -> void:
+	_keeper_spoke_tick = World.tick
+	_heard.append({"text": text, "tick": World.tick, "speaker": keeper_name()})
+	_talked("%s: %s" % [keeper_name(), text])
+
+
 ## A quick phrase ([param phrase], 1-4) sets its stance at once
 ## (PHRASE_STANCES) and stands as the instruction; her voice still answers
 ## it, but its stance, if any, is not taken.
 func owner_spoke(text: String, phrase := 0) -> void:
-	_keeper_spoke_tick = World.tick
-	_heard.append({"text": text, "tick": World.tick, "speaker": keeper_name()})
-	_talked("%s: %s" % [keeper_name(), text])
+	heard_only(text)
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
 	var told := talk_told(text)
@@ -3943,6 +3953,8 @@ func _quiet_moment() -> void:
 	# in her plain words (803 amended (12)).
 	var voiced := quiet_minds.any(func(prefix: String) -> bool: return mind.kind.begins_with(prefix))
 	var greeting := first_words and greets
+	if not greeting and first_steps != null and FirstSteps.on() and first_steps.chain_running():
+		return  # 945: a newcomer's chain says her next (Main._first_steps_tick); her idle lines wait for its end.
 	if not voiced and not greeting and (want_words.is_empty() or want_told or want_says.is_empty()):
 		return
 	if greeting and _first_words_at < 0:
@@ -7675,6 +7687,9 @@ func _say_first_words() -> void:
 	first_words = false
 	_log({"kind": "quiet", "companion": _name_of(self), "trigger": QUIET_TRIGGER + ": first words", "outcome": "plain line",
 		"say": line, "note": "her player new to her"})
+	if first_steps != null and FirstSteps.on() and first_steps.chain_running():
+		first_steps.first_words_tick = World.tick  # 945: her chain's first step comes next; its pond step carries her wish.
+		return
 	if want_told or want_words.is_empty() or want_says.is_empty() or not want_answerable():
 		return  # Nothing to tell, or held where no yes could be taken up (929): untold for later.
 	var wish := want_says

@@ -402,11 +402,11 @@ func step(routes: WorldRoutes, threat: Callable) -> String:
 				_leg = {}
 				_cells.clear()
 		var there := Companion.castable(pet.tile) if bool(goal["banked"]) \
-			else World.distance(pet.tile, goal["cell"]) <= int(setting("arrive", 3.0))
+			else World.distance(pet.tile, goal["cell"]) <= int(goal.get("arrive", setting("arrive", 3.0)))
 		if there:
 			return "arrived"
-	elif pet.zone == goal["area"] and World.distance(pet.tile, goal["cell"]) <= int(setting("arrive", 3.0)):
-		return "arrived"
+	elif pet.zone == goal["area"] and World.distance(pet.tile, goal["cell"]) <= int(goal.get("arrive", setting("arrive", 3.0))):
+		return "arrived"  # A goal's own "arrive" (945: the Mughouse's door, on its cell).
 	if _leg.is_empty():
 		if pet.zone == goal["area"] and (routes == null or not routes.is_ready(WorldRoutes.OPEN)):
 			# Here, before the world's routes are in: a walk here alone.

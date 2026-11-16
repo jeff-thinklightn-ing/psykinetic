@@ -287,6 +287,8 @@ static func companion_from(pet: Variant) -> Dictionary:
 		out["told_kit_seller"] = true  # She has said where kits are sold (616 amended (4)).
 	if pet.get("greeted") == false:
 		out["greeted"] = false  # Her first words still to come (929); never sent.
+	if pet.get("first_steps") is Dictionary:
+		out["first_steps"] = _first_steps_card(pet["first_steps"])  # Her first steps' card (945); never sent.
 	var traits: Variant = pet.get("traits")
 	if traits is Dictionary and not traits.is_empty():
 		var kept := {}
@@ -496,4 +498,30 @@ static func _strings(value: Variant) -> Array[String]:
 			if each is String and not each.is_empty() and not out.has(each):
 				out.append(each)
 	out.sort()
+	return out
+
+
+## Her first steps' card (decision 945) as kept: the chain's steps done,
+## ended, its end told, a night at the Mughouse, the noes by offer kind, and
+## the game days (three at most) each place was reached.
+static func _first_steps_card(card: Dictionary) -> Dictionary:
+	var out := {}
+	if card.get("done") is Array:
+		out["done"] = _lines(card["done"])
+	for flag: String in ["ended", "told", "slept"]:
+		if card.get(flag) == true:
+			out[flag] = true
+	if card.get("noes") is Dictionary:
+		var noes := {}
+		for kind: Variant in card["noes"]:
+			noes[str(kind)] = int(card["noes"][kind])
+		out["noes"] = noes
+	if card.get("days") is Dictionary:
+		var days := {}
+		for place: Variant in card["days"]:
+			var kept: Array = []
+			for day: Variant in (card["days"][place] if card["days"][place] is Array else []):
+				kept.append(int(day))
+			days[str(place)] = kept.slice(-3)
+		out["days"] = days
 	return out
