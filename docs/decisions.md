@@ -58569,3 +58569,54 @@ line, and 917's rule takes over. Her pace is the walk's own (she waits while the
 Logs: "[firststeps] <signal> <place key> <cell> t<tick>", never a name or an id. tests/first_steps_test: on
 the wilds, the package forced on (FirstSteps.forced). Joined proof (four bots on a laptop through
 ui-design's slots) comes before the switch.
+## 946. Daylight indoors: a building's inside lit by the world clock (environment)
+
+The script's number; the coordinator's approval of 11-15, evening, with five conditions; Jeff's report of
+11-15, 18:48: "the inside reminds me of a dungeon, no natural light, black outside - this doesn't work very
+well im not sure the solution".
+
+- Why, from the code before any still: an inside's light was a fixed zone look (ZONE_LOOK "indoors", a warm
+  grey at 0.55 times the level's ambient share: the Mughouse 0.35 of it), its key light pinned at one angle,
+  so noon and night were the same by construction; past its walls the background was BACKGROUND (0.02,
+  0.02, 0.025), the black; and it had no windows at all: window pieces are drawn only on outdoor buildings'
+  walls (BuildingComposer.windows), and levels/interiors/*.json made no window. Every light inside was a
+  flame and nothing said "outside".
+- What, for every building's inside by one rule (Level terrain "interior": a level whose "storeys" are
+  said; caves, crypts and mines as they were):
+  - Windows on its outer walls (a wall edge with floor on one side only): where maps marks them, level.json
+    "windows" ([{cells, side}], the shape of a room's doors; Level.windows_from, terrain "windows" and
+    "windows_marked"), else Client3D.inside_windows_by_rule (every INSIDE_WINDOW_EVERY-th edge of a run from
+    its second, none at its ends, none beside a kept cell: its hearths and decor, its pieces, its candles,
+    its ways out; inside_kept_cells). The coordinator's condition: the rule proposes, maps disposes. The
+    wall set's own window (window_slot), turned so its outside is off the floor; visual only, the sim's walls
+    unchanged.
+  - Panes painted by the clock (one shared material, never a house's lit window's): the sky's horizon colour
+    at INSIDE_PANE_DAY by day, INSIDE_PANE_NIGHT's deep blue at night, never black.
+  - Patches on the floor (one additive MultiMesh): at each window the sky's pool at its foot by day, and the
+    sun's patch where its glass (INSIDE_PANE_LOW to INSIDE_PANE_HIGH) sends it while the sun stands on that
+    wall's side, its length and lean by the sun's height and side, stopped at the floor's run inward (a
+    room's wall); at the way out (a link off the floor beside it) the same, wider and further, and by night
+    the door lantern's warm pool, so a player finds the way out by its light (condition 2). A wall the camera
+    cuts away still throws its windows' patches (condition 3).
+  - The ambient follows the day (inside_look): by day the sky look's ambient warmed toward the indoor grey
+    (INSIDE_DAY_WARM) at INSIDE_DAY_LIFT (1.6) times the night's energy (the open sky's share would have
+    read below the night's: the Mughouse's indoor 0.48 against 0.37 by day); by night the zone's look as it
+    was, so the hearth and candles carry the room at night at today's level (condition 4).
+  - The way out: each drawn doorway with a link's cell on one side and none on the other (the link tiles
+    stand on the floor, so a row from them alone found none).
+  - For the coordinator's choice of surround (11-15), a look flag `--inside-plain` (never in a release
+    build) sets the background to the apron's ground colour, so the ground runs out to the frame's edge
+    with no sky tone; the pair shows one noon stand both ways. Whichever is picked becomes the rule, and
+    the flag goes.
+  - Past the walls: the background the sky's horizon darkened to INSIDE_HAZE_DAY by day, INSIDE_HAZE_NIGHT's
+    blue-black at night; an apron under the level, the ground (FOREST_FLOOR) in the day's light at its walls,
+    fading over INSIDE_APRON m into that background (one shader), so no room floats in sky or void
+    (condition 5).
+- Tests: view_world_test _test_daylight_indoors: maps' windows read as wall edges (a bad side, a cell off the
+  floor said); the rule's spacing and kept cells; the Mughouse's ground floor its windows clear of its
+  hearth, way out and stair, each a pane, its way out two rows, the apron laid; noon's ambient over 21:30's
+  (the night's as before), panes the sky's by day and deep blue at night, the background brighter by day,
+  the patches by day and the way out's pools at night; a window's sun patch its glass's fall in length, the
+  sun behind its wall the pool alone; an outdoor level none of it.
+Client and level data; protocol unchanged; no new class_name; a bullet only after the coordinator sees the
+joined pair.

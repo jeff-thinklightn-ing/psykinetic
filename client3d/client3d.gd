@@ -3742,6 +3742,8 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 		while rim_pass != null:
 			rim_pass.set_shader_parameter("night_share", THROUGH_NIGHT_RIM)
 			rim_pass = rim_pass.next_pass as ShaderMaterial
+	if "--inside-plain" in OS.get_cmdline_user_args() and not OS.has_feature("template"):
+		inside_plain = true  # 946's look: the plainer surround, for the pair's extra still.
 	if "--body-marks" in OS.get_cmdline_user_args():
 		body_marks = true  # Stills and benches with it on (623 amended (6)).
 	for arg: String in OS.get_cmdline_user_args():
@@ -3833,6 +3835,7 @@ func _process(delta: float) -> void:
 	_update_grown()
 	_update_shadows()
 	_update_sky(delta)
+	_update_inside()
 	_grow_scatter()
 	_update_blood()
 	_update_tracks()
@@ -3944,6 +3947,7 @@ func _apply_sky() -> void:
 	_environment.fog_enabled = false
 	_set_sky_floor(0.0)
 	_weather_view.set_outdoor(_outdoor)
+	_inside_night = []
 	if _outdoor:
 		_sky_material = ShaderMaterial.new()
 		_sky_material.shader = SKY_SHADER
@@ -3979,6 +3983,9 @@ func _apply_sky() -> void:
 		_environment.ambient_light_energy = float(look[1]) * share
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY * share
+		# An inside's night look, the clock's day lifted from it (946).
+		_inside_night = [_environment.ambient_light_color, _environment.ambient_light_energy]
+		_inside_step = -1
 		# A cave's floor (304 amended): drawn no darker than CAVE_FLOOR of its
 		# own colour (the sim's cell light left as it is), so its edge reads
 		# without a torch; a lantern's pool still lights above it.
@@ -8773,6 +8780,7 @@ func _phase_sets() -> void:
 	_building_dry.clear()
 	for building: Dictionary in _drawn_buildings():
 		_building_sets(building)
+	_inside_window_sets()  # An inside's windows (946), before its walls.
 	_warm_art()
 
 
@@ -9273,6 +9281,7 @@ func _phase_doors() -> void:
 	_show_piles()
 	_draw_blood()
 	_draw_tracks()
+	_build_inside_day()
 
 
 ## The walls, doorways and posts of the terrain's edges; none along an
@@ -12254,6 +12263,8 @@ func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 		glow.set_meta(&"window_piece", made)  # Its leaves, for its light on the ground (927).
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
 				DayNight.elevation(DayNight.now()))
+	elif glow is MeshInstance3D and _inside_windows.has(key):
+		_inside_pane(glow as MeshInstance3D)  # Painted by the clock (946).
 	made.scale.y = _height_of(key) / window_drawn_height(slot)
 	_wall_faces(made, slot.get_slice(".", 1), made.position.z, made.rotation.y != 0.0)
 	# A shell's lamp on its sill (811 amended), in the wall's middle, kept
@@ -29759,3 +29770,455 @@ func _sync_doors() -> void:
 		hinge.rotation.y = move_toward(hinge.rotation.y, target, get_process_delta_time() / Door.SWING_SECONDS * PI * 0.5)
 		if is_equal_approx(hinge.rotation.y, target):  # (A float32 angle: never == PI / 2.)
 			_doors_due.erase(key)
+
+
+# --- Daylight indoors (946) ---------------------------------------------------
+
+## A building's inside (Level terrain "interior") lit by the world clock
+## (946, Jeff's report of 11-15: "the inside reminds me of a dungeon, no
+## natural light, black outside"): windows on its outer walls (where maps
+## marks them, else INSIDE_WINDOW_EVERY along each run), their panes the
+## sky's colour by day and deep blue at night, the sun's patch through each
+## on the floor and the sky's at its foot, the way out bright by day and the
+## door lantern's warm pool at night, the ambient following the day, and
+## past the walls ground in the day's light fading into a dark haze, never
+## the void. Caves, crypts and mines (no "interior") as they were.
+## A window every this many edges along an outer run, from its second.
+const INSIDE_WINDOW_EVERY := 3
+## A pane by night (deep blue, never black) and its emission then; by day
+## the sky's horizon colour at INSIDE_PANE_DAY.
+const INSIDE_PANE_NIGHT := Color(0.07, 0.11, 0.26)
+const INSIDE_PANE_NIGHT_ENERGY := 0.6
+const INSIDE_PANE_DAY := 2.2
+## The room's ambient by day: the sky look's colour toward the indoor warm
+## grey by INSIDE_DAY_WARM, its energy INSIDE_DAY_LIFT times the night's;
+## by night the zone's look as before (the hearth and candles carry it; the
+## Mughouse's 0.48).
+const INSIDE_DAY_LIFT := 1.6
+const INSIDE_DAY_WARM := 0.35
+## The patches (additive, unshaded): the sun's through a window, warm white,
+## at INSIDE_SUN_PATCH of the sun's height share; the sky's at a window's
+## foot (INSIDE_SKY_PATCH, INSIDE_SKY_REACH m in) and at the way out
+## (INSIDE_DOOR_PATCH, INSIDE_DOOR_REACH m); by night the door lantern's
+## warm pool (INSIDE_DOOR_NIGHT, INSIDE_DOOR_NIGHT_REACH m).
+const INSIDE_SUN_COLOUR := Color(1.0, 0.92, 0.76)
+const INSIDE_SUN_PATCH := 0.42
+const INSIDE_SKY_COLOUR := Color(0.78, 0.86, 1.0)
+const INSIDE_SKY_PATCH := 0.16
+const INSIDE_SKY_REACH := 1.3
+const INSIDE_DOOR_PATCH := 0.3
+const INSIDE_DOOR_REACH := 2.4
+const INSIDE_DOOR_NIGHT_COLOUR := Color(1.0, 0.62, 0.3)
+const INSIDE_DOOR_NIGHT := 0.14
+const INSIDE_DOOR_NIGHT_REACH := 1.4
+## A pool's sides soften over this many metres from the wall (927 amended (3)'s, not yet on main).
+const INSIDE_SIDE_SOFT := 1.0
+## A window's glass (wall.wood.window's glow, 1.3 to 2.0 m) and a doorway's
+## opening, metres off the floor: where the sun's patch falls through each.
+const INSIDE_PANE_LOW := 1.3
+const INSIDE_PANE_HIGH := 2.0
+const INSIDE_DOOR_HIGH := 2.2
+## Past the walls (946): the apron's ground INSIDE_APRON m beyond the
+## level's floor, fading out into the background; its near colour the
+## ground's (FOREST_FLOOR) in the day's light, between INSIDE_APRON_NIGHT and
+## INSIDE_APRON_DAY of it; the background the sky's horizon darkened to
+## INSIDE_HAZE_DAY by day, BACKGROUND's blue-black at night.
+const INSIDE_APRON := 7.0
+const INSIDE_APRON_DAY := 1.15
+const INSIDE_APRON_NIGHT := 0.32
+const INSIDE_HAZE_DAY := 0.3
+const INSIDE_HAZE_NIGHT := Color(0.025, 0.035, 0.06)
+const INSIDE_PATCH_SHADER := """shader_type spatial;
+render_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;
+// 946: a patch of daylight (or the door lantern's) on an inside's floor.
+// INSTANCE_CUSTOM: rgb its colour times its strength, a its length in metres
+// (for the soft sides), negative for the sun's patch (even, soft at its ends)
+// where a pool falls from the wall.
+uniform float spread = 1.6;
+uniform float side_soft = 1.0;
+varying vec2 local;
+varying vec3 tint;
+varying float reach_m;
+varying float sun;
+void vertex() {
+	local = VERTEX.xz;
+	tint = INSTANCE_CUSTOM.rgb;
+	reach_m = abs(INSTANCE_CUSTOM.a);
+	sun = INSTANCE_CUSTOM.a < 0.0 ? 1.0 : 0.0;
+}
+void fragment() {
+	float o = clamp(local.y + 0.5, 0.0, 1.0);
+	float half_width = mix(0.5 * mix(1.0 / spread, 1.0, o), 0.5, sun);
+	float soft = mix(0.6 * (1.0 - clamp(o * reach_m / side_soft, 0.0, 1.0)), 0.35, sun);
+	float edge = 1.0 - smoothstep(soft, 1.0, abs(local.x) / half_width);
+	float fall = mix((1.0 - o) * (1.0 - o), smoothstep(0.0, 0.2, o) * (1.0 - smoothstep(0.8, 1.0, o)), sun);
+	ALBEDO = tint * fall * edge;
+}
+"""
+const INSIDE_APRON_SHADER := """shader_type spatial;
+render_mode unshaded, cull_disabled, shadows_disabled;
+// 946: the ground past an inside's walls, fading into the background.
+uniform vec3 near_colour : source_color;
+uniform vec3 far_colour : source_color;
+uniform vec4 rect;
+uniform float reach = 7.0;
+varying vec3 world;
+void vertex() {
+	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+}
+void fragment() {
+	vec2 d = max(max(rect.xy - world.xz, world.xz - rect.zw), vec2(0.0));
+	ALBEDO = mix(near_colour, far_colour, smoothstep(0.0, reach, length(d)));
+}
+"""
+## The inside's windows (edge keys) this level, their panes, the patches'
+## rows (inside_row's), and the night's look kept ([colour, energy]).
+var _inside_windows: Dictionary[Vector3i, bool] = {}
+var _inside_panes: Array[MeshInstance3D] = []
+var _inside_pane_material: StandardMaterial3D
+var _inside_rows: Array[Array] = []
+var _inside_patches: MultiMeshInstance3D
+var _inside_apron: MeshInstance3D
+## The plainer surround (946's look, --inside-plain): the apron's ground
+## colour carried out to the frame's edge, no sky tone in the background.
+var inside_plain := false
+var _inside_step := -1
+var _inside_night: Array = []
+
+
+## Whether this view lights an inside by the clock (946).
+func _inside_lit() -> bool:
+	return bool(_terrain.get("interior", false)) and not _outdoor and not _neighbour
+
+
+## The inside's windows (946), set before its walls are drawn: maps' marked
+## edges where the level has "windows", else inside_windows_by_rule; each an
+## outer wall edge (floor one side, none the other) that is a wall, turned
+## so its outside is off the floor.
+func _inside_window_sets() -> void:
+	_inside_windows.clear()
+	_inside_panes.clear()
+	if not bool(_terrain.get("interior", false)):
+		return
+	var floor: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain["floor"]:
+		floor[cell] = true
+	var edges: Dictionary = _terrain["edges"]
+	var keys: Array[Vector3i] = []
+	if bool(_terrain.get("windows_marked", false)):
+		keys.assign(_terrain.get("windows", []))
+	else:
+		keys = inside_windows_by_rule(floor, edges, inside_kept_cells(_terrain))
+	for key in keys:
+		var sides := Terrain.edge_cells(key)
+		if edges.get(key, Terrain.Edge.OPEN) != Terrain.Edge.WALL or floor.has(sides[0]) == floor.has(sides[1]):
+			continue
+		_inside_windows[key] = true
+		_set_wall_state(key, "window")
+		var outside_first := not floor.has(sides[0])
+		_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
+
+
+## The cells no window of an inside's own spacing rule goes beside (946,
+## the coordinator's condition 1): its hearths, counter, taps, tables, every
+## building piece and decor piece, beds and ways out, each with its
+## neighbours along the wall.
+static func inside_kept_cells(terrain: Dictionary) -> Dictionary[Vector2i, bool]:
+	var kept: Dictionary[Vector2i, bool] = {}
+	var keep := func(cell: Vector2i) -> void:
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				kept[cell + Vector2i(dx, dy)] = true
+	for entry: Variant in terrain.get("decor", []):
+		if entry is Dictionary and (entry as Dictionary).get("cell") is Vector2i:
+			keep.call(entry["cell"])
+	for building: Variant in terrain.get("buildings", []):
+		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i:
+			var rect: Rect2i = building["rect"]
+			for x in range(rect.position.x, rect.end.x):
+				for y in range(rect.position.y, rect.end.y):
+					keep.call(Vector2i(x, y))
+	for at: Variant in terrain.get("links_at", []):
+		if at is Vector2i:
+			keep.call(at)
+	for candle: Variant in terrain.get("lit_candles", []):
+		if candle is Dictionary and (candle as Dictionary).get("at") is Vector2:
+			keep.call(Vector2i((candle["at"] as Vector2).round()))
+	return kept
+
+
+## An unmarked inside's windows (946): along each straight run of outer wall
+## (a wall edge with floor on one side only), every INSIDE_WINDOW_EVERY-th
+## edge from the run's second, none at its ends, none whose floor cell is
+## kept (inside_kept_cells). Sorted, so a level draws the same each time.
+static func inside_windows_by_rule(floor: Dictionary[Vector2i, bool], edges: Dictionary, kept: Dictionary[Vector2i, bool]) -> Array[Vector3i]:
+	var outer: Dictionary[Vector3i, bool] = {}
+	for key: Variant in edges:
+		if not key is Vector3i or edges[key] != Terrain.Edge.WALL:
+			continue
+		var sides := Terrain.edge_cells(key)
+		if floor.has(sides[0]) != floor.has(sides[1]):
+			outer[key] = true
+	var found: Array[Vector3i] = []
+	var seen: Dictionary[Vector3i, bool] = {}
+	var sorted: Array[Vector3i] = []
+	sorted.assign(outer.keys())
+	sorted.sort()
+	for key in sorted:
+		if seen.has(key):
+			continue
+		# The run this edge starts: back to its first, then along.
+		var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+		var first := key
+		while outer.has(first - step):
+			first -= step
+		var run: Array[Vector3i] = []
+		var at := first
+		while outer.has(at):
+			run.append(at)
+			seen[at] = true
+			at += step
+		for k in range(1, run.size() - 1):
+			if k % INSIDE_WINDOW_EVERY != 1:
+				continue
+			var sides := Terrain.edge_cells(run[k])
+			var inner := sides[0] if floor.has(sides[0]) else sides[1]
+			if not kept.has(inner):
+				found.append(run[k])
+	return found
+
+
+## A window's pane inside (946): painted by the clock, never a house's lit
+## window's (_window_code).
+func _inside_pane(glow: MeshInstance3D) -> void:
+	if _inside_pane_material == null:
+		_inside_pane_material = StandardMaterial3D.new()
+		_inside_pane_material.emission_enabled = true
+		_inside_pane_material.roughness = 0.4
+	for surface in glow.mesh.get_surface_count():
+		glow.set_surface_override_material(surface, _inside_pane_material)
+	glow.visible = true
+	_inside_panes.append(glow)
+
+
+## The inside's patches and apron (946), made with its room: a row per
+## window (its floor foot, inward) and per way out (a link off the floor
+## beside it), the apron under the level past its floor.
+func _build_inside_day() -> void:
+	_inside_rows.clear()
+	_inside_patches = null
+	_inside_apron = null
+	_inside_step = -1
+	if not _inside_lit():
+		return
+	var floor: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _terrain["floor"]:
+		floor[cell] = true
+	var edges: Dictionary = _terrain["edges"]
+	for key: Vector3i in _inside_windows:
+		var row := inside_row("window", key, floor, edges, _ground_height)
+		if not row.is_empty():
+			_inside_rows.append(row)
+	# The way out: each drawn doorway with a link's cell on one side, its
+	# patch on the other.
+	var links: Dictionary[Vector2i, bool] = {}
+	for at: Variant in _terrain.get("links_at", []):
+		if at is Vector2i:
+			links[at] = true
+	for key: Vector3i in _doorways:
+		var sides := Terrain.edge_cells(key)
+		for i in 2:
+			if links.has(sides[i]) and not links.has(sides[1 - i]):
+				var row := inside_row("door", key, floor, edges, _ground_height, sides[i])
+				if not row.is_empty():
+					_inside_rows.append(row)
+	var quad := PlaneMesh.new()
+	quad.size = Vector2.ONE
+	var material := ShaderMaterial.new()
+	var shader := Shader.new()
+	shader.code = INSIDE_PATCH_SHADER
+	material.shader = shader
+	material.set_shader_parameter("spread", WINDOW_LIGHT_SPREAD)
+	material.set_shader_parameter("side_soft", INSIDE_SIDE_SOFT)
+	quad.material = material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_custom_data = true
+	multimesh.mesh = quad
+	multimesh.instance_count = _inside_rows.size() * 3
+	multimesh.visible_instance_count = 0
+	_inside_patches = MultiMeshInstance3D.new()
+	_inside_patches.name = "InsidePatches"
+	_inside_patches.multimesh = multimesh
+	_inside_patches.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_room.add_child(_inside_patches)
+	# The apron: one quad under the floor, the level's rect and INSIDE_APRON
+	# and more round it.
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	var lowest := INF
+	for cell: Vector2i in floor:
+		low = Vector2i(mini(low.x, cell.x), mini(low.y, cell.y))
+		high = Vector2i(maxi(high.x, cell.x), maxi(high.y, cell.y))
+		lowest = minf(lowest, _elevation(cell))
+	if floor.is_empty():
+		return
+	var apron_shader := Shader.new()
+	apron_shader.code = INSIDE_APRON_SHADER
+	var apron_material := ShaderMaterial.new()
+	apron_material.shader = apron_shader
+	apron_material.set_shader_parameter("rect", Vector4(low.x - 0.5, low.y - 0.5, high.x + 0.5, high.y + 0.5))
+	apron_material.set_shader_parameter("reach", INSIDE_APRON)
+	var plane := PlaneMesh.new()
+	var margin := INSIDE_APRON + 30.0
+	plane.size = Vector2(high.x - low.x + 1.0 + 2.0 * margin, high.y - low.y + 1.0 + 2.0 * margin)
+	plane.material = apron_material
+	_inside_apron = MeshInstance3D.new()
+	_inside_apron.name = "InsideApron"
+	_inside_apron.mesh = plane
+	_inside_apron.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_inside_apron.position = Vector3((low.x + high.x) * 0.5, (lowest if lowest < INF else 0.0) - 0.06, (low.y + high.y) * 0.5)
+	_room.add_child(_inside_apron)
+
+
+## A patch's row (946) for edge [param key] of [param kind] ("window" or
+## "door"): [kind, foot (a Transform3D at the edge's middle on the floor, its
+## x along the wall, its z inward), the floor's run inward in metres (to the
+## first wall or the floor's end, so a patch stops at a room's wall)];
+## [] for an edge with no floor on either side. Its outside the side off the
+## floor, or [param outside] where given (a doorway's link cell).
+static func inside_row(kind: String, key: Vector3i, floor: Dictionary[Vector2i, bool], edges: Dictionary, ground: Callable, outside := Vector2i(-1048576, 0)) -> Array:
+	var sides := Terrain.edge_cells(key)
+	var inner := sides[0] if floor.has(sides[0]) else sides[1]
+	if outside in sides:
+		inner = sides[1] if outside == sides[0] else sides[0]
+	var outer := sides[1] if inner == sides[0] else sides[0]
+	if not floor.has(inner) or (floor.has(outer) and outer != outside):
+		return []
+	var way := inner - outer
+	var free := 0
+	var at := inner
+	while floor.has(at) and free < 8:
+		free += 1
+		if edges.get(Terrain.edge_key(at, way), Terrain.Edge.OPEN) == Terrain.Edge.WALL:
+			break
+		at += way
+	var middle := (Vector2(inner) + Vector2(outer)) * 0.5
+	var inward := Vector3(way.x, 0.0, way.y)
+	var along := Vector3(-way.y, 0.0, way.x)
+	var foot := Vector3(middle.x, float(ground.call(Vector2(inner))), middle.y)
+	return [kind, Transform3D(Basis(along, Vector3.UP, inward), foot), float(free)]
+
+
+## Each patch's place and look (946) for [param row] (inside_row) under a
+## sun at [param toward] (unit, toward it, the level's frame) and
+## [param elevation] degrees with daylight [param day]: [[transform, custom
+## (inside_patch_custom)], ...], none with
+## nothing to show. A window: the sky's pool at its foot by day, the sun's
+## patch where its glass sends it when the sun stands on its side (its
+## length and lean by the sun's height and side, stopped at the floor's run);
+## the way out the same, wider and further, and by night the lantern's pool.
+static func inside_patches(row: Array, toward: Vector3, elevation: float, day: float) -> Array:
+	var found: Array = []
+	var kind := str(row[0])
+	var foot: Transform3D = row[1]
+	var free: float = row[2]
+	var along := foot.basis.x
+	var inward := foot.basis.z
+	var door := kind == "door"
+	var lift := Vector3(0.0, WINDOW_LIGHT_LIFT, 0.0)
+	if day > 0.01:
+		var reach := minf(INSIDE_DOOR_REACH if door else INSIDE_SKY_REACH, free)
+		var width := 1.0 if door else 0.9
+		var place := Transform3D(Basis(along * width * WINDOW_LIGHT_SPREAD, Vector3.UP, inward * reach), foot.origin + lift + inward * reach * 0.5)
+		var strength := (INSIDE_DOOR_PATCH if door else INSIDE_SKY_PATCH) * day
+		found.append([place, inside_patch_custom(INSIDE_SKY_COLOUR, strength, reach, false)])
+		# The sun's patch: its light (away from the sun) must come in through this wall.
+		var flat := Vector3(-toward.x, 0.0, -toward.z)
+		var tan_up := tan(deg_to_rad(clampf(elevation, 4.0, 85.0)))
+		if flat.length() > 0.01 and elevation > 2.0:
+			flat = flat.normalized()
+			var into := flat.dot(inward)
+			if into > 0.15:
+				var low := (0.0 if door else INSIDE_PANE_LOW) / tan_up
+				var high := minf((INSIDE_DOOR_HIGH if door else INSIDE_PANE_HIGH) / tan_up, free / into)
+				if high > low + 0.05:
+					# Along the light, so a low sun's patch leans across the floor.
+					var start := foot.origin + lift + flat * low
+					var run := flat * (high - low)
+					var sun_place := Transform3D(Basis(along * width, Vector3.UP, run), start + run * 0.5)
+					var share := INSIDE_SUN_PATCH * day * smoothstep(2.0, 14.0, elevation) * clampf(into * 1.4, 0.0, 1.0)
+					found.append([sun_place, inside_patch_custom(INSIDE_SUN_COLOUR, share, high - low, true)])
+	if door and day < 0.99:
+		var night_reach := minf(INSIDE_DOOR_NIGHT_REACH, free)
+		var night_place := Transform3D(Basis(along * 1.0 * WINDOW_LIGHT_SPREAD, Vector3.UP, inward * night_reach), foot.origin + lift + inward * night_reach * 0.5)
+		found.append([night_place, inside_patch_custom(INSIDE_DOOR_NIGHT_COLOUR, INSIDE_DOOR_NIGHT * (1.0 - day), night_reach, false)])
+	return found
+
+
+## A patch's custom data (946): [param colour] times [param strength] in rgb,
+## its [param length] in a, negative for [param sun]'s patch.
+static func inside_patch_custom(colour: Color, strength: float, length: float, sun: bool) -> Color:
+	return Color(colour.r * strength, colour.g * strength, colour.b * strength, -length if sun else length)
+
+
+## The inside's look for the clock (946) from [param look] (sky_look's at
+## the sun's height), its daylight [param day] and the night's
+## [[param night_colour], [param night_energy]]: {ambient, ambient_energy,
+## pane, pane_energy, haze (the background), apron (the ground's near
+## colour)}.
+static func inside_look(look: Dictionary, day: float, night_colour: Color, night_energy: float) -> Dictionary:
+	var day_ambient := (look["ambient"] as Color).lerp(night_colour, INSIDE_DAY_WARM)
+	var horizon: Color = look["horizon"]
+	return {"ambient": night_colour.lerp(day_ambient, day),
+		"ambient_energy": lerpf(night_energy, night_energy * INSIDE_DAY_LIFT, day),
+		"pane": INSIDE_PANE_NIGHT.lerp(horizon, day), "pane_energy": lerpf(INSIDE_PANE_NIGHT_ENERGY, INSIDE_PANE_DAY, day),
+		"haze": INSIDE_HAZE_NIGHT.lerp(shade(horizon, INSIDE_HAZE_DAY), day),
+		"apron": shade(FOREST_FLOOR, lerpf(INSIDE_APRON_NIGHT, INSIDE_APRON_DAY, day))}
+
+
+## [param colour] times [param k], its alpha 1 (946).
+static func shade(colour: Color, k: float) -> Color:
+	return Color(colour.r * k, colour.g * k, colour.b * k, 1.0)
+
+
+## Each game minute (946): the inside's ambient, panes, patches, apron and
+## background by the world clock.
+func _update_inside() -> void:
+	if not _inside_lit() or _inside_night.is_empty():
+		return
+	var at := DayNight.fraction(DayNight.now())
+	var step := floori(at * SKY_STEPS) % SKY_STEPS
+	if step == _inside_step:
+		return
+	_inside_step = step
+	var fraction := float(step) / SKY_STEPS
+	var elevation := DayNight.elevation_at(fraction)
+	var day := smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
+	var look := inside_look(sky_look(elevation), day, _inside_night[0], _inside_night[1])
+	if inside_plain:
+		look["haze"] = look["apron"]
+	_environment.ambient_light_color = look["ambient"]
+	_environment.ambient_light_energy = look["ambient_energy"]
+	_environment.background_color = look["haze"]
+	if _inside_pane_material != null:
+		_inside_pane_material.albedo_color = look["pane"]
+		_inside_pane_material.emission = look["pane"]
+		_inside_pane_material.emission_energy_multiplier = look["pane_energy"]
+	if _inside_apron != null:
+		var apron := _inside_apron.mesh.surface_get_material(0) as ShaderMaterial
+		apron.set_shader_parameter("near_colour", look["apron"])
+		apron.set_shader_parameter("far_colour", look["haze"])
+	if _inside_patches == null:
+		return
+	var toward := _level_direction(DayNight.sun_at(fraction)).normalized()
+	var multimesh := _inside_patches.multimesh
+	var shown := 0
+	for row: Array in _inside_rows:
+		for patch: Array in inside_patches(row, toward, elevation, day):
+			if shown >= multimesh.instance_count:
+				break
+			multimesh.set_instance_transform(shown, patch[0])
+			multimesh.set_instance_custom_data(shown, patch[1])
+			shown += 1
+	multimesh.visible_instance_count = shown
