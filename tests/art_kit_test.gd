@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_overrides()
 	_test_swatch_uvs()
 	_test_carved()
+	_test_indoor_stairs_clear_the_wall()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -132,6 +133,27 @@ func _test_grey_boxes() -> void:
 			"a slot with no art and no fill is its grey box in the game too, without a label unless asked")
 	node.free()
 	ArtKit.forget("wall.castle.rubble")
+
+
+## Indoor stair heads that stand in the open part of their cell (the coordinator, 11-16). Client3D
+## turns a link's cue so the slot's +z is the way its link faces, and a room's wall stands on that
+## cell edge, WALL_THICKNESS 0.5 thick, so its half covers the cell's last 0.25 m. The attic's
+## way down (variant 4's far rail and the dark under it, at z +0.47..0.5) hid in that half and read
+## as nothing in the attic's pair. The up flight (stair_up 4) is left out on purpose: its top
+## meets the wall as a flight going on up through it (the common room's pair at the keeper's
+## wall passed as built).
+const INDOOR_STAIRS_CLEAR := [["building.stair_down", 4]]
+
+
+func _test_indoor_stairs_clear_the_wall() -> void:
+	print("\n== an indoor stair head stands clear of the wall its link faces (the last 0.25 m of its cell) ==")
+	var half_wall := Client3D.WALL_THICKNESS * 0.5
+	for row: Array in INDOOR_STAIRS_CLEAR:
+		var node := ArtKit.instance(str(row[0]), int(row[1]))
+		var box := ArtKit.bounds_of(node)
+		node.free()
+		_check(box.end.z <= 0.5 - half_wall + 0.005 and box.size.z > 0.0,
+				"%s variant %d: nothing past z %.2f (its far end at z %.3f)" % [row[0], row[1], 0.5 - half_wall, box.end.z])
 
 
 func _test_parts() -> void:
