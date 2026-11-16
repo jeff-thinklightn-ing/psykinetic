@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Out under an open sky at midday the lantern at your hip casts no light, at dusk a soft one and by night its full glow, and blond and grey hair on light skin is drawn pale, red hair on darker skin a bright copper and black hair on the darkest skin a deep black, so each stands apart from the face by day and at dusk; the hair colour you picked keeps its name (419 amended (10), 451 amended (8)).
 - Towns: gold you give toward a building stays in its fund and pays for that building's materials; the town window's card counts your gift at once, and the total it shows falls as the materials come in (918 amended (2)).
 - Long hair falls down the back, and in Options hair can be tied back in a tail and a man's beard grown long (419 amended (11)).
 - Towns: a town waiting on materials for one build gets on with others meanwhile, in Umbrage its woodshed and then its kitchen, and asks you for what each needs in turn; whatever you give keeps for the build that takes it (522 amended (3)).
