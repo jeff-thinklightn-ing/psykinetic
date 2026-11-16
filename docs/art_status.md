@@ -78,8 +78,8 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.shed` | 1 | art-kit, by hand (roof, roof_damaged); art-gen c11, fitted (trim, state_damaged) | own | 2026-11-11 |
 | `building.smith_bench` | 1 | art-kit, by hand | own | 2026-11-06 |
 | `building.smithy_forge` | 1 | art-kit, by hand | own | 2026-11-06 |
-| `building.stair_down` | 3 | art-kit, by hand | own | 2026-10-22 |
-| `building.stair_up` | 3 | art-kit, by hand | own | 2026-10-22 |
+| `building.stair_down` | 4 | art-kit, by hand | own | 2026-10-22 |
+| `building.stair_up` | 4 | art-kit, by hand | own | 2026-10-22 |
 | `building.standing_stone` | 3 | art-kit, by hand | own | 2026-10-21 |
 | `building.statue_toppled` | 1 | art-kit, by hand | own | 2026-11-05 |
 | `building.tap_rack` | 1 | art-kit, by hand | own | 2026-11-05 |
