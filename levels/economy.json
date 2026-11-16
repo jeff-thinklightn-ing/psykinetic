@@ -6,6 +6,7 @@
 	"comfort_not_full": ["meat", "hide", "leather"],
 	"comfort_per_head": {"_": "Decision 652 (the coordinator's ruling on economy's gold and food note: a founding town never sells its stores): a raw good's comfort is the most of comfort's and this times the town's residents.", "food": 2},
 	"wants": {"weapon": 3, "shield": 2, "bandage": 4, "food": 4},
+	"want_tags_not": {"_": "Decision 954 (the coordinator's approval, 2026-11-16, from the digger's pick): tags an item keeps everywhere but in the town's wants (Production.want_tags: the counter's buying and price, the smith's choice of work, the town window's rows). A looted pick filled the weapon want with gear nobody buys off the shelf at 18 while Rolf sells one for 5, so the counter refused every sword and the smith forged none; a pick is a miner's tool to the town.", "pick": ["weapon"]},
 	"uneasy_extra": {"weapon": 2, "shield": 1},
 	"shop_cap": 6,
 	"tiers": {

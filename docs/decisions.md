@@ -60209,3 +60209,38 @@ repairs; each reason in turn on a damaged kitchen and a forge in disrepair; on t
 _test_hut_day_words (no keeper and the days left, today, can't pay, short, ordered, being mended, standing none, no
 name). Server only; protocol unchanged; no new class_name; no bullet. Release's daily read counts "; repairs " and
 "the healer's hut" with "day " (fixed words told it at the landing).
+
+## 954. A looted pick is no weapon to the town's wants (economy; the coordinator's approval, 2026-11-16, from the digger's pick)
+
+enemy-ai's digger drops a pick (an existing item: a held weapon, tags weapon and tool), and the coordinator asked
+what a pick fetches. economy's probe on a fresh Umbrage: the town's counter paid 9, 7 and 6 for three, then "the
+town has enough of that"; nobody else buys one (Rolf takes fish only and sells a pick for 5 himself, the smith
+only his listed inputs, camp traders offer 0). The store's "wants" count gear by tag (weapon 3, plus 2 while the
+town is uneasy), a pick is one weapon, and nobody buys a pick off the shelf at 18 while Rolf sells one for 5. So
+three looted picks filled the town's whole weapon want, and from then: every player's sword, spear or dagger was
+refused at the counter, the smith forged no weapon (Production.signals_of read the town as having its three, so
+no weapon want for his workshop), and the town window's weapon row read full. The smith's half was the worse.
+
+- economy.json "want_tags_not": tags an item keeps everywhere but in the town's wants; "pick": ["weapon"].
+- Production.want_tags(id, tags, rules) strips them, the one reading every want shares: Economy.short_of and
+  up_to (the counter's buying and its price), Economy._gear_by_tag (the town window's rows, Main.town_window),
+  Production._gear_by_tag (the workshops' signals) and Production._serves (the smith never takes the pick's
+  recipe for a weapon want). Its weapon tag stands everywhere else (combat, held, raiders' takes, items.json).
+- Economy.refuses: a thing whose only wanted tags want_tags_not strips is refused "the town has no use for
+  that" (the counter's existing line), never "has enough"; every other unwanted thing as before.
+- At the deploy that carries it: any pick in the box's store or on its shelf stops counting as a weapon, the
+  weapon want opens again (the counter buys swords, the smith forges if short), and a pick left on the shelf
+  asks what a thing the town has plenty of does (half its value, about 4 or 5, Rolf's price); bought, it can't
+  be sold back, so no loop. A looted pick now sells nowhere: a change a player selling sneaks' picks will see.
+- Weighed and not taken: a want counted per kind (kept in reserve: a pick would still hold one of the three for
+  good, and it touches every weapon's sale and the smith's choice); the shelf's price falling till it sells (under
+  Rolf's 5 it sells, the want reopens and the counter pays 9 again: a loop); the store not buying what Rolf sells
+  cheaper (he sells every base weapon for 1: every looted weapon refused).
+
+Rows: economy_test _test_pick_not_weapon (two picks on a shelf wanting two weapons: a third refused "no use", a
+sword still bought, the gear counted no weapon and two tools, the town still wholly short of weapons, the smith
+takes the sword and never the pick for that want, the pick's shelf price half its value; without the rule the two
+picks fill the want and the sword is refused, as before); _test_town_window (a pick on the store's shelf leaves
+the window's weapon row as it was). economy, items, folk, towns, production, larder, raids and offers PASS. When
+it is on main enemy-ai raises the digger's pick to 1 in a take of its own, and voice's bullet ships with that.
+Server only (the window's row is the server's); protocol unchanged; no new class_name; no bullet in this take.

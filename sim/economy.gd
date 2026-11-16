@@ -347,7 +347,7 @@ func short_of(town: String, id: String, cat := {}) -> float:
 	var extra: Dictionary = rules.get("uneasy_extra", {}) if production.tier(town) == Production.DEFEND else {}
 	var have := _gear_by_tag(town, cat)
 	var most := -1.0
-	for tag: Variant in def.get("tags", []):
+	for tag: Variant in Production.want_tags(id, def.get("tags", []), rules):  # As the wants read them (954).
 		if wants.has(tag):
 			most = maxf(most, _short(int(have.get(tag, 0)), int(wants[tag]) + int(extra.get(tag, 0))))
 	return most
@@ -365,7 +365,8 @@ func _gear_by_tag(town: String, cat: Dictionary) -> Dictionary:
 	var uids := stockpile.items(town)
 	uids.append_array(stockpile.shop(town))
 	for uid in uids:
-		for tag: Variant in cat.get(stockpile.book.id_of(uid), {}).get("tags", []):
+		var id := stockpile.book.id_of(uid)
+		for tag: Variant in Production.want_tags(id, cat.get(id, {}).get("tags", []), rules):  # 954.
 			out[str(tag)] = int(out.get(str(tag), 0)) + 1
 	return out
 
@@ -421,9 +422,24 @@ func refuses(town: String, id: String, cat := {}) -> String:
 		return "gold is given, not sold: put it in the depot"
 	if rules.get("maker_only", {}).has(id):
 		return str(rules["maker_only"][id])  # Only its maker buys it (562: the herbs).
+	if _wants_none(id, cat):
+		return "the town has no use for that"  # A looted pick (954): no weapon to the town, so never "enough".
 	if short_of(town, id, cat) <= 0.0:
 		return "the town has enough of that"
 	return ""  # Never "can't pay" (826): a player's sale is paid in full (pay_for_player).
+
+
+## Whether [param id] is a thing whose only wanted tags economy.json's want_tags_not strips (954: the
+## pick), so the town never wants it; any other unwanted thing stays "has enough" as before.
+func _wants_none(id: String, cat: Dictionary) -> bool:
+	var stripped: Variant = rules.get("want_tags_not", {}).get(id, [])
+	if not stripped is Array or (stripped as Array).is_empty():
+		return false
+	var wants: Dictionary = rules.get("wants", {})
+	var def: Dictionary = cat.get(id, {})
+	if def.get("yield", {}) is Dictionary and not (def.get("yield", {}) as Dictionary).is_empty():
+		return false
+	return not Production.want_tags(id, def.get("tags", []), rules).any(func(tag: Variant) -> bool: return wants.has(tag))
 
 
 ## [param town]'s shop, for a shop panel: [{uid, id, price}] by uid.
@@ -599,7 +615,7 @@ func up_to(town: String, id: String, cat := {}) -> int:
 	var wants: Dictionary = rules.get("wants", {})
 	var extra: Dictionary = rules.get("uneasy_extra", {}) if production.tier(town) == Production.DEFEND else {}
 	var have := _gear_by_tag(town, cat)
-	for tag: Variant in def.get("tags", []):
+	for tag: Variant in Production.want_tags(id, def.get("tags", []), rules):  # 954.
 		if wants.has(tag):
 			most = maxi(most, int(wants[tag]) + int(extra.get(tag, 0)) - int(have.get(tag, 0)))
 	return most

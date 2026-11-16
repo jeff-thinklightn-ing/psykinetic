@@ -1631,7 +1631,7 @@ func _gear_by_tag(town: String, cat: Dictionary) -> Dictionary:
 	var uids := stockpile.items(town)
 	uids.append_array(stockpile.shop(town))
 	for uid in uids:
-		for tag: Variant in _tags_of(book().id_of(uid), cat):
+		for tag: Variant in _want_tags_of(book().id_of(uid), cat):  # As the wants read them (954).
 			out[str(tag)] = int(out.get(str(tag), 0)) + 1
 	return out
 
@@ -1643,6 +1643,21 @@ func tags_of(id: String) -> Array:
 
 func _tags_of(id: String, cat: Dictionary) -> Array:
 	return cat[id]["tags"] if cat.has(id) else Items.def(id).get("tags", [])
+
+
+## [param id]'s [param tags] as the town's wants read them (954): less those [param with_rules]'
+## want_tags_not strips from it ("pick": ["weapon"], a miner's tool to the town), every other read of
+## its tags (combat, held, raiders' takes) untouched. The one reading Economy (the counter's buying
+## and price), Production (the gear counted, the smith's choice of work) and the town window share.
+static func want_tags(id: String, tags: Array, with_rules: Dictionary) -> Array:
+	var stripped: Variant = with_rules.get("want_tags_not", {}).get(id, [])
+	if not stripped is Array or (stripped as Array).is_empty():
+		return tags
+	return tags.filter(func(tag: Variant) -> bool: return str(tag) not in stripped)
+
+
+func _want_tags_of(id: String, cat: Dictionary) -> Array:
+	return want_tags(id, _tags_of(id, cat), rules)
 
 
 ## The town's tier follows its raw tier once that has held tier_hold ticks.
@@ -1852,7 +1867,7 @@ func _recipe_ok(entry: Dictionary) -> bool:
 ## that tag ("goods": anything), and the shop not yet holding shop_cap of it
 ## (or its recipe's own "stock", 562: the medicine man's potions).
 func _serves(town: String, entry: Dictionary, want: String, cat: Dictionary) -> bool:
-	if want != "goods" and want not in _tags_of(entry["id"], cat):
+	if want != "goods" and want not in _want_tags_of(entry["id"], cat):  # Never a pick for a weapon want (954).
 		return false
 	var in_shop := stockpile.shop(town).filter(func(uid: int) -> bool: return book().id_of(uid) == entry["id"]).size()
 	if entry["made"].has("stock"):

@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_prices()
 	_test_buying()
 	_test_selling()
+	_test_pick_not_weapon()
 	_test_counter_raws()
 	_test_trusted_prices()
 	_test_barter()
@@ -127,6 +128,47 @@ func _test_buying() -> void:
 ## The counter buys meat and hides as the depot banks them, up to their
 ## comfort (652 amended (3), economy.json's own rules); a town short of
 ## them still counts its store full for its surplus work.
+## 954 (the coordinator's approval, from the digger's pick): economy.json's want_tags_not takes "weapon"
+## from a pick's tags for the town's wants alone. Two picks on a shelf that wants two weapons: the counter
+## still buys a sword and refuses a pick ("no use"), the gear count leaves them out, the smith short of
+## weapons, never bidding the pick for that want; without the rule the two picks fill the want.
+func _test_pick_not_weapon() -> void:
+	print("
+== a looted pick is no weapon to the town (954) ==")
+	var cat := CATALOG.duplicate(true)
+	cat["pick"] = {"id": "pick", "tags": ["weapon", "tool"], "made": {"by": "smith", "from": {"ore": 2, "wood": 1}, "steps": 2400}}
+	var rules := RULES.duplicate(true)
+	rules["want_tags_not"] = {"_": "test", "pick": ["weapon"]}
+	for with_rule: bool in [true, false]:
+		_now = 0
+		var clock := func() -> int: return _now
+		var book := ItemBook.new(clock)
+		var stock := Stockpile.new({}, clock, book)
+		stock.deposit(TOWN, "gold", 100, "test")
+		var used := rules if with_rule else RULES
+		var work := Production.new({}, stock, null, clock, used, func() -> Dictionary: return cat)
+		work.add_worker("bram", "Bram", ["smith"], TOWN, "rescued:bram")
+		var economy := Economy.new({}, stock, work, clock, used, func() -> Dictionary: return cat)
+		for i in 2:
+			stock.stock_shop(TOWN, book.mint("pick", "looted", "a digger"), "test")
+		var counted := economy._gear_by_tag(TOWN, cat)
+		var short: Dictionary = work.signals_of(TOWN, cat)["short"]
+		if with_rule:
+			_check(economy.refuses(TOWN, "pick") == "the town has no use for that" and not economy.offers(TOWN, ["pick"]).has("pick"),
+				"two picks on the shelf: a third refused, \"the town has no use for that\" (%s)" % economy.refuses(TOWN, "pick"))
+			_check(economy.refuses(TOWN, "sword").is_empty() and economy.offers(TOWN, ["sword"]).has("sword"),
+				"and a sword still bought (%s)" % [economy.offers(TOWN, ["sword"])])
+			_check(not counted.has("weapon") and int(counted.get("tool", 0)) == 2, "the gear counted: no weapon, two tools (%s)" % [counted])
+			_check(is_equal_approx(float(short.get("weapon", 0.0)), 1.0), "the smith's town still wholly short of weapons (%s)" % [short])
+			_check(not work._serves(TOWN, cat["pick"], "weapon", cat) and work._serves(TOWN, cat["sword"], "weapon", cat),
+				"for the weapon want the smith takes the sword, never the pick")
+			_check(economy.price(TOWN, "pick") == maxi(roundi(economy.value_of("pick", cat) * 0.5), 1),
+				"a pick on the shelf asks what a thing the town has plenty of does: half its value (%d)" % economy.price(TOWN, "pick"))
+		else:
+			_check(int(counted.get("weapon", 0)) == 2 and not short.has("weapon") and economy.refuses(TOWN, "sword") == "the town has enough of that",
+				"without the rule two picks fill the weapon want and the sword is refused, as before (%s, %s)" % [counted, economy.refuses(TOWN, "sword")])
+
+
 func _test_counter_raws() -> void:
 	print("\n== the counter buys meat and hides, up to comfort ==")
 	_now = 0
@@ -1618,6 +1660,14 @@ func _test_town_window(host: Player) -> void:
 		"wood in stock: enough at least its comfort, drawn as wood (%s)" % [wood_row])
 	_check(sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] == "weapon" and row.get("item") == "sword")
 		and not sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] in ["gold", "herbs"]), "a weapon row drawn as a sword; no gold or herbs")
+	# 954: a pick on the shelf is no weapon to the window's row (the real rules' want_tags_not).
+	var weapons_had := int(sheet["stock"].filter(func(row: Dictionary) -> bool: return row["id"] == "weapon")[0]["have"])
+	var shelf_pick := World.items.mint("pick", "looted", "test")
+	World.stockpile.stock_shop(STORE, shelf_pick, "test")
+	var with_pick: Dictionary = _main.ask_town_sheet(host, {"town": STORE})
+	var weapons_now := int(with_pick["stock"].filter(func(row: Dictionary) -> bool: return row["id"] == "weapon")[0]["have"])
+	_check(weapons_now == weapons_had, "954: a pick on the store's shelf leaves the window's weapon row as it was (%d, %d)" % [weapons_had, weapons_now])
+	World.stockpile.take_from_shop(STORE, shelf_pick, "test")
 	_check(sheet["regard"]["word"] == "" and sheet["regard"]["score"] == 0.0 and sheet["regard"]["last"] == 0, "a stranger to the town at first")
 	# Wood short: a bundle donated is banked, paid in full, and moves its regard.
 	_no_wood()
