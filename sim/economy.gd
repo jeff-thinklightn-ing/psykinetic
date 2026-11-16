@@ -1519,7 +1519,10 @@ func _owe_or_pay(town: String, id: String, amount: int, why: String, what := "")
 
 
 ## What the town owes worker [param id], paid as its treasury has gold
-## above gold_floor, before anything else of theirs.
+## above gold_floor, before anything else of theirs. Never from what players
+## gave toward a build (918 amended (2): the town window's card says "toward
+## the building", so a gift stays the building's; owed clears only from the
+## treasury, under the ceiling).
 func _pay_owed(id: String, town: String) -> void:
 	var owed := int(production.worker(id).get("owed", 0))
 	if owed <= 0:
@@ -1531,16 +1534,6 @@ func _pay_owed(id: String, town: String) -> void:
 		owed -= paid
 		if owed <= 0:
 			_owed_what.erase(id)
-	# The treasury at its floor: what players gave pays the town's debts (499).
-	for kind: String in _funds.get(town, {}).keys():
-		if owed <= 0:
-			break
-		var given := _from_fund(town, kind, owed)
-		if given > 0:
-			_fund_used(town, "owed", given)
-			production.pay(id, given, "what the town owed (given toward the %s)" % kind)
-			owed -= given
-			production.set_owed(id, owed)
 
 
 ## The town pays worker [param id] [param amount] for [param why] from its
@@ -2456,9 +2449,9 @@ func bank_pays(town: String, player_id: String, slots: Array) -> Dictionary:
 ## would give toward it (Jeff: "players bank goods for gold and if they want
 ## they spend gold later to help the town with upgrades and defences"):
 ## {kind, gold}: the materials the store lacks at what it pays for them
-## (raw_price x store.buy), what the town owes its gatherers and haulers,
-## and the builder's fee, less what was given already. {} for no build
-## waiting.
+## (raw_price x store.buy) and the builder's fee, less what was given
+## already. {} for no build waiting. Never what the town owes its people
+## (918 amended (2): a figure under the building's name is the building's).
 func contribution_wanted(town: String) -> Dictionary:
 	var short: Dictionary = shortfall.call(town) if shortfall.is_valid() else {}
 	if short.is_empty():
@@ -2467,8 +2460,6 @@ func contribution_wanted(town: String) -> Dictionary:
 	var gold := production.town_work_fee(int(short.get("steps", 0)))
 	for what: String in short["needs"]:
 		gold += ceili(raw_price(town, what) * buy * int(short["needs"][what]))
-	for id in production.worker_ids(town):
-		gold += int(production.worker(id).get("owed", 0))
 	gold -= fund(town, str(short["kind"]))
 	return {"kind": str(short["kind"]), "gold": maxi(gold, 0)}
 
@@ -2476,10 +2467,10 @@ func contribution_wanted(town: String) -> Dictionary:
 ## Player [param player_id] gives up to [param amount] of their gold toward
 ## [param town]'s next build (decision 499): never more than it still
 ## needs (contribution_wanted) or they have. Kept in a fund for that build,
-## not the treasury: it pays first for deliveries of what the build lacks,
-## then what the town owes its workers, then the builder's fee when it
-## stands (settle_fund), the rest the town's; kept by the town if the plan
-## is dropped. Thanked in town experience, contribute.gold_per_xp gold a
+## not the treasury: it pays for deliveries of what the build lacks, then
+## the builder's fee when it stands (settle_fund), the rest the town's; kept
+## by the town if the plan is dropped. Never the town's debts to its people
+## (918 amended (2)). Thanked in town experience, contribute.gold_per_xp gold a
 ## point (contributed). The gold given (the caller tells the player).
 func contribute(town: String, player_id: String, amount: int) -> int:
 	var wanted := contribution_wanted(town)
@@ -2531,10 +2522,10 @@ func settle_fund(town: String, kind: String, worker_id: String, fee: int) -> int
 
 
 ## Where players' gifts to [param town] went since the boot (918 amended (1)'s
-## soak, the coordinator's ask; never saved): {"build": gold, "owed": gold,
-## "kept": gold, "first_build": step} (the build: a delivery it lacked or
-## its builder's fee; owed: the town's debts to its people; kept: the rest to
-## the treasury).
+## soak, the coordinator's ask; never saved): {"build": gold, "kept": gold,
+## "first_build": step} (the build: a delivery it lacked or its builder's
+## fee; kept: the rest to the treasury). Since 918 amended (2) no gift pays
+## the town's debts to its people.
 func fund_use(town: String) -> Dictionary:
 	return (_fund_use.get(town, {}) as Dictionary).duplicate()
 

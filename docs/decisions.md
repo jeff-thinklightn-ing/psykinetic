@@ -58042,6 +58042,31 @@ taken and the debt no more; paid when gold comes in, as before), farm_test (a sm
 doesn't, a queued kitchen repair short of wood does). Server only; protocol unchanged; no new class_name. Bullet:
 voice's, once a joined Ledger shows the owed line.
 
+918 amended (2): what is given toward a building is the building's (the coordinator's ruling, 2026-11-15, on 918
+amended (1)'s gift soak; label from tools/decision_number.sh). The soak, the treasury held at its floor and a player
+giving 10 gold a day: of the 30 given (its player's purse ran dry by day 3, a setup fault, not a result), 30 paid the
+town's debts and none reached the inn; the first gold never did. Structural: Economy._pay_owed, after the treasury
+above its floor, drew every build's fund for what the town owed its people (499's order on paper was deliveries
+first, but a debt is paid each day and a delivery only when one comes), so in a broke town every coin given went to
+wages. The town window's card (768) has named the building since 499: its coin square puts 10 gold "toward the
+building", its bar fills with it, "N of M" under its name. A gift silently spent on wages makes that card untrue.
+A half-and-half split was drawn and withdrawn (the coordinator: a gift silently halved is the wrong answer to a card
+that says "toward the building", and a caption explaining it is the explaining words the game does without; helping
+a town pay its people would be its own offer, a pick for Jeff). Now: (a) _pay_owed pays from the treasury above
+gold_floor only, never from a fund; owed clears from the treasury, under 918 amended (1)'s ceiling, as the broke and
+recover soaks showed (recover: 56 owed at the hold's end, 1 fourteen days on, nobody gone). A fund still pays the
+deliveries its build lacks and its builder's fee (settle_fund), the rest the town's, kept when the plan is dropped,
+as 499. (b) contribution_wanted no longer counts what the town owes its people: a figure under the building's name
+is the building's. (c) The town window's "build" sends "wants" as the building's whole, what it still wants and what
+was given (Main.town_window); it sent what it still wanted alone, while TownSheet read it as the whole (the bar's
+fund over wants, the coin square's room wants - fund, the words "%d of %d" fund + gift of wants), so each gift
+shrank M and the room. The value now is what the window always took it for: no client change, protocol unchanged.
+fund_use (the soak's tally) loses "owed". Tests: larder_test _test_contribute (8 owed Bran, the treasury at its
+floor: the inn's wanted gold the same; the next day and the day after the fund whole and Bran still owed; 5 above
+the floor pays him 5, the fund untouched), economy_test _test_town_window (wants the building's whole; 9 owed one of
+its people and 5 given: M the same, the fund 5 more). Server only; no new class_name. Bullet: voice's (a gift always
+moves the building's bar), once ui-design's joined watch on a broke local town shows it (the coordinator).
+
 ## 920. The tavern's sound: its hearth burning, the taverner's cup, the room's talk by the goers seen (sound)
 
 The coordinator's order of 11-14: maps' Mughouse take switches "Umbrage at

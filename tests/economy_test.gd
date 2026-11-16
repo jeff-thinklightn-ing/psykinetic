@@ -1715,7 +1715,23 @@ func _test_build_credit(host: Player) -> void:
 		World.put_item(host, host, 1, sack)
 		World.donate(host, sack, STORE)
 		await get_tree().process_frame
+	# 918 amended (2): the card's "N of M" is the building's: M its whole (still wanted + given), the gift moving N
+	# alone, never what the town owes its people.
+	var card: Dictionary = _main.ask_town_sheet(host, {"town": STORE})["build"]
+	var wanted := World.economy.contribution_wanted(STORE)
+	_check(not card.is_empty() and int(card["wants"]) == int(wanted.get("gold", 0)) + World.economy.fund(STORE, kind),
+		"the build card: wants is the %s's whole, %d (%s)" % [kind, int(card.get("wants", -1)), card])
+	var owed_one: String = World.towns.residents(STORE)[0] if not World.towns.residents(STORE).is_empty() else ""
+	var owed_was := int(World.production.worker(owed_one).get("owed", 0))
+	if not owed_one.is_empty():
+		World.production.set_owed(owed_one, owed_was + 9)
 	var given := World.economy.contribute(STORE, me, 5) if World.gold_of(me) >= 5 else 0
+	var card_after: Dictionary = _main.ask_town_sheet(host, {"town": STORE})["build"]
+	_check(given == 5 and not owed_one.is_empty() and int(card_after.get("wants", -1)) == int(card.get("wants", -2))
+		and int(card_after.get("fund", -1)) == int(card.get("fund", 0)) + 5,
+		"9 owed %s and 5 given: M stays %d, the fund %d (%s)" % [owed_one, int(card.get("wants", -1)), int(card_after.get("fund", -1)), card_after])
+	if not owed_one.is_empty():
+		World.production.set_owed(owed_one, owed_was)
 	var entry: Dictionary = World.towns.to_dict()[STORE]["buildings"].get(kind.trim_prefix(Towns.REPAIR), {})
 	var by: Dictionary = entry.get("by", {}).get(me, {})
 	_check((raw.is_empty() or int(by.get(raw, 0)) > 0) and (given == 0 or int(by.get("gold", 0)) == given),

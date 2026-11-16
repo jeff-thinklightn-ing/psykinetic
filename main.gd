@@ -21170,7 +21170,10 @@ func town_window(player: Player, town: String) -> Dictionary:
 		return out
 	var wanted := World.economy.contribution_wanted(town)
 	if not wanted.is_empty():
-		out["build"] = {"kind": str(wanted["kind"]), "wants": int(wanted["gold"]), "fund": World.economy.fund(town, str(wanted["kind"]))}
+		# "wants" the building's whole (918 amended (2)): what it still wants and what was given, as TownSheet reads it
+		# ("N of M", the coin square's room wants - fund); before, what it still wanted alone, so a gift shrank M.
+		var fund := World.economy.fund(town, str(wanted["kind"]))
+		out["build"] = {"kind": str(wanted["kind"]), "wants": int(wanted["gold"]) + fund, "fund": fund}
 	if at:
 		out["gold"] = World.gold_of(player_id)
 		out["pays"] = World.economy.bank_pays(town, player_id, Array(player.slots))

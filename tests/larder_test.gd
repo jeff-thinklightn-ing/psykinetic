@@ -924,6 +924,26 @@ func _test_contribute() -> void:
 	work.deliver_to(TOWN, "w1", "wood", 3, "w", "test")
 	_check(int(work.worker("w1")["purse"]) == price and int(work.worker("w1")["owed"]) == 0 and economy.fund(TOWN, "inn") == had - price
 		and stock.count(TOWN, "gold") == floor_gold, "the treasury at its floor: 3 wood paid from the fund (%d)" % price)
+	# 918 amended (2) (the coordinator, 11-15: the card says "toward the building"): a broke town's debts to its people
+	# never come out of what was given toward a build. Bran owed 8, the treasury at its floor: the next day and the day
+	# after, the inn's fund whole and Bran still owed; contribution_wanted never counts it.
+	var wanted_was := int(economy.contribution_wanted(TOWN).get("gold", 0))
+	work.set_owed("w1", 8)
+	_check(int(economy.contribution_wanted(TOWN).get("gold", 0)) == wanted_was,
+		"8 owed Bran: the inn's wanted gold the same, %d (never the town's debts)" % wanted_was)
+	had = economy.fund(TOWN, "inn")
+	for day in 2:
+		_now += DayNight.day_steps
+		economy._pay_head_first()
+		economy._pay_owed("w1", TOWN)
+		_check(economy.fund(TOWN, "inn") == had and int(work.worker("w1")["owed"]) == 8 and int(work.worker("w1")["purse"]) == price
+			and stock.count(TOWN, "gold") == floor_gold,
+			"day %d after: the inn's fund still %d, Bran still owed 8, nothing from the gift" % [day + 1, economy.fund(TOWN, "inn")])
+	stock.deposit(TOWN, "gold", 5)
+	economy._pay_owed("w1", TOWN)
+	_check(int(work.worker("w1")["owed"]) == 3 and economy.fund(TOWN, "inn") == had and stock.count(TOWN, "gold") == floor_gold,
+		"5 into the treasury above its floor: Bran paid 5 from it, 3 still owed, the fund untouched")
+	work.set_owed("w1", 0)
 	work.add_worker("c1", "Pell", ["carpenter"], TOWN, "test", "steady")
 	had = economy.fund(TOWN, "inn")
 	var fee := work.town_work_fee(1200)
