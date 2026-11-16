@@ -1624,6 +1624,82 @@ func _test_way_in(wilds: Dictionary) -> void:
 			joined.call(11, 6) if not lane.is_empty() else false, door_out, at_door, lane.size(), in_way])
 	var safe := Level.safe_paths(terrain)
 	print("  the wilds' safe paths: %d cells" % safe.size())
+	_test_guide_cells(wilds)
+
+
+## 774 amended (7) (the coordinator's approval, 11-15, for companions' 945, "the first five minutes": she leads a newcomer
+## to the Mughouse's door, says what it is and stops; he chooses whether to go in): her stop as level data, the wilds'
+## level.json spawn_points "guide_inn" (183, 206) and "guide_inn_2" (183, 205) when the first is taken, north-east of
+## the door, off the lane, on no door cell or the cell before it, in sight of the lit front, on level ground as every
+## spawn point is (relief_test: (181, 206) and (182, 206), first offered, lie on the inn front's slope). Unseen and unused until
+## companions' switch. Nothing that places a player or a body reads those names: the readers of spawn_points checked
+## are Main.travel (a link's to_spawn by name, else the level's first start), World._steps_from_spawn
+## (a "from" by name), WorldMap's and WorldRoutes' ways (a link's to_spawn), Apex's lair doors ("from_" + a land),
+## Main.place_dummies (the practice hall's names beginning "dummy"), Guide._arrival_of (a level's first start, a spawn
+## point only for a level with none), the generators' arrivals ("from_" names) and the builder's keep-clear (which
+## only keeps building off them); the tours start by cells, never by a spawn name.
+func _test_guide_cells(wilds: Dictionary) -> void:
+	print("
+== her stop by the Mughouse's door: two named cells clear of its door and the lane, never where a body is placed ==")
+	var terrain: Dictionary = wilds["terrain"]
+	var spawns: Dictionary = wilds["spawn_points"]
+	var cells: Array[Vector2i] = []
+	for key: String in ["guide_inn", "guide_inn_2"]:
+		if spawns.has(key):
+			cells.append(spawns[key])
+	var inn: Dictionary = {}
+	var doors := {}
+	for building: Dictionary in wilds["buildings"]:
+		if str(building.get("code", "")) == "I1":
+			inn = building
+		for cell: Vector2i in Main.door_cells(building):
+			doors[cell] = str(building.get("code", building.get("slot", "")))
+	var inside := Level.building_cells(inn) if not inn.is_empty() else []
+	var front: Array[Vector2i] = []
+	for cell: Vector2i in Main.door_cells(inn) if not inn.is_empty() else []:
+		if not cell in inside:
+			front.append(cell)
+	var roads: Array = terrain["roads"]
+	var lane: Dictionary = Curves.cells(roads[11]["curve"], false) if roads.size() > 11 else {}
+	var taken := {}
+	for spot: Dictionary in wilds["spots"]:
+		taken[spot["cell"]] = "a %s spot" % spot.get("use", "")
+	for piece: Variant in terrain.get("decor", []):
+		if piece is Dictionary:
+			taken[piece["cell"]] = "a %s" % piece.get("kind", "decor piece")
+	for spec: Dictionary in wilds["entities"]:
+		taken[spec["tile"]] = str(spec.get("name", "an entity"))
+	var bad: Array[String] = []
+	for cell: Vector2i in cells:
+		if not terrain["floor"].has(cell) or terrain["solid"].has(cell):
+			bad.append("%s off the floor or solid" % [cell])
+		if doors.has(cell):
+			bad.append("%s a door cell of %s" % [cell, doors[cell]])
+		for dx in range(-1, 2):
+			for dy in range(-1, 2):
+				if lane.has(cell + Vector2i(dx, dy)) and not bad.has("%s on or beside the lane" % [cell]):
+					bad.append("%s on or beside the lane" % [cell])
+		if taken.has(cell):
+			bad.append("%s on %s" % [cell, taken[cell]])
+		var near := 99
+		for at: Vector2i in front:
+			near = mini(near, World.distance(cell, at))
+		if near > 3:
+			bad.append("%s %d from the door's front %s" % [cell, near, front])
+	_check(cells == [Vector2i(183, 206), Vector2i(183, 205)] and front.size() == 2 and not lane.is_empty() and bad.is_empty(),
+		"the wilds' guide_inn %s and guide_inn_2: floor, on no door cell or its front %s, off the lane and beside it, no spot, decor or entity, within 3 of the front (%s)" % [
+			cells, front, bad])
+	# Never a place a body appears: no link in any level names either as where it arrives, the wilds has starts (so a
+	# first-start reader never falls back to a spawn point), and neither name is one a reader takes by its prefix.
+	var named: Array[String] = []
+	for level_name: String in Level.names():
+		for link: Dictionary in Level.load_level(level_name).get("links", []):
+			if str(link.get("to_spawn", "")).begins_with("guide_"):
+				named.append("%s's link at %s" % [level_name, link.get("tile")])
+	var keys: Array = spawns.keys()
+	_check(named.is_empty() and not (wilds["starts"] as Array).is_empty() and keys.find("guide_inn") > keys.find("from_tavern")
+		and not keys.any(func(key: String) -> bool: return key.begins_with("guide_") and (key.begins_with("dummy") or key.begins_with("from_"))),
+		"nothing places a body on them: no link arrives at a guide_ point (%s), the wilds has its starts, they come after the arrivals, no reader's prefix" % [named])
 
 
 ## 774 amended (6) (the coordinator's ruling, 11-15, on environment's walk from the new arrival to the Mughouse: it

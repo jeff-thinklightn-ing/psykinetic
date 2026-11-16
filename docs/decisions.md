@@ -48811,6 +48811,23 @@ the saved chest stands on lands beside it with its load. stockpile_test _test_ca
 259): a cart moved by the word onto the store's ground at a boot keeps its sack and kit, the store's ore, kits and
 ledger unchanged. Level data, a server load rule and tests; protocol unchanged; no new class_name; a bullet in voice's
 words after a joined walk from (190,219) to the door meets no cart.
+774 amended (7): her stop by the Mughouse's door, for 945 (2026-11-15, maps; the coordinator's approval of companions'
+"first five minutes", decision 945: she leads a newcomer to the Mughouse's door, says what it is and stops, and he
+chooses whether to go in; a piece of package "the first five minutes", landing off; label from
+tools/decision_number.sh). Her cell is level data, so a re-lay moves it with the door: the wilds' level.json
+spawn_points "guide_inn" (183,206) and "guide_inn_2" (183,205) when the first is taken, listed after the arrivals,
+read by companions from there (no new parser: Level already reads spawn_points). North-east of the door, 3 from its
+front cells (180,208)/(180,209), 3 off the lane, about 5 off the line from the arrival (190,219) to the door, on level
+ground (relief_test holds every spawn point to it: (181,206) and (182,206), first offered, lie on the inn front's
+slope), on no door cell or the cell before it (Main.door_cells), no spot, decor or entity. Unseen and unused until
+companions' switch: nothing that places a player or a body reads those names. The readers of spawn_points: Main.travel
+(a link's to_spawn by name, else the first start), World._steps_from_spawn (by name), WorldMap's and WorldRoutes' ways
+(a link's to_spawn), Apex's lair doors ("from_" + a land), Main.place_dummies ("dummy" names, the practice hall),
+Guide._arrival_of (a level's first start; a spawn point only for a level with none), the generators' "from_"
+arrivals; the builder's keep-clear only keeps building off them, and layout_sense's walk checks read them as arrivals
+to check, never to place. level_test _test_guide_cells: the two cells as above, and no link in any level arrives at a
+guide_ point, the wilds has its starts, the names follow the arrivals and carry no reader's prefix. Level data and a
+test; protocol unchanged; no new class_name; no bullet (unseen).
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's
