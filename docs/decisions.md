@@ -29233,6 +29233,25 @@ display_name, "" when untitled). tests: minimap_test (the words by title,
 an untitled level's none). Package none (a mend). Client only, protocol
 unchanged, no new class_name.
 
+589 amended (3), maps' side: the Mughouse's stairs are drawn timber (art-kit's
+building.stair_up / stair_down variant 4, with its rail clear of the wall and
+the well lit from the room below; the coordinator kept the inn on variant 1
+until the attic's way down passed). tools/make_interior.py's stair spec takes
+a "variant" (left out, 1: the zone-link cue's stone), written onto each of
+that stair's links; levels/interiors/umbrage_tavern.json gives the Mughouse's
+four stairs variant 4, so its eight links (ground (16..17,10) up, upstairs
+(16..17,10) down and (12,11..12) up, the attic's (16..17,0) down) draw the
+wooden flight, rebuilt by the tool. Drawn only: where each link leads, its
+cue and facing are unchanged. Looked at joined, play nearest, on ui-design's
+walked tour (stairwalk2_pair, the after build with the evening on top, base
+main): every walk down from upstairs and up from the common room, and to the
+attic and back, at 12:00 and 21:30, arrived; art-kit read the stairs in use,
+maps the rooms, no finding. tests: level_test (the eight links variant 4,
+none stone). Package "the Mughouse's timber stairs" (art-kit's stair pieces .1
+to .5, landed off, and this switch), turned ON by this (the coordinator,
+11-16); its stone stairs come off the cut's known faults. Levels data and a
+tool; protocol unchanged; no new class_name.
+
 ## 600. The Old Tower: Snagfin's ruin in Held as one prefab
 
 Jeff named Snagfin's place in Held the Old Tower: "the ancients' broken-down

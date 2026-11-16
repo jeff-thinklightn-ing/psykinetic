@@ -59,7 +59,8 @@
 			"facing": [
 				0,
 				-1
-			]
+			],
+			"variant": 4
 		},
 		{
 			"at": [
@@ -72,7 +73,8 @@
 			"facing": [
 				0,
 				-1
-			]
+			],
+			"variant": 4
 		}
 	],
 	"buildings": [

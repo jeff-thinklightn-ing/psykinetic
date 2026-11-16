@@ -4280,6 +4280,15 @@ func _test_storey_stairs() -> void:
 		var up: Array = reach.call(ground, false)
 		_check(down.size() == names.size() and up.size() == names.size() and bad.is_empty(),
 			"%s: all %d floors reach the ground and back (down %s, up %s), every stair in sight (bad %s)" % [ground, names.size(), down, up, bad])
+	# 589 amended (3), package "the Mughouse's timber stairs" (art-kit's variant 4, 11-16): the Mughouse's stair spec gives each of its
+	# eight stair links variant 4, so the inn's stairs are wood, not the zone-link cue's grey stone.
+	var timber: Array[String] = []
+	var stone: Array[String] = []
+	for name: Variant in buildings.get("umbrage_tavern", []):
+		for cue: Dictionary in Level.load_level(str(name))["terrain"].get("link_cues", []):
+			if cue["cue"] in ["up", "down"]:
+				(timber if int(cue["variant"]) == 4 else stone).append("%s %s" % [name, cue["tile"]])
+	_check(timber.size() == 8 and stone.is_empty(), "the Mughouse's eight stair links are drawn timber, variant 4 (%d; else %s)" % [timber.size(), stone])
 
 
 ## 811 amended (8) (the coordinator's bar on Jeff's report, 11-15: "often you end up in the shell of the mughouse instead
